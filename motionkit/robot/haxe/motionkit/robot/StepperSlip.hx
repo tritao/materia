@@ -87,17 +87,24 @@ class StepperSlip {
       if (joint == null) continue;
       offsets.set(joint, -lostNow.get(axis));
     }
-    // Followers move by their ratio times the leader, so offsets propagate down the couplings.
+    // Followers move by their ratios times their leaders (summed over several), so offsets propagate down the couplings.
+    var followers:Array<Int> = [];
+    for (coupling in couplings) if (followers.indexOf(coupling.follower) < 0) followers.push(coupling.follower);
     var changed = true, passes = 0;
     while (changed && passes++ <= couplings.length) {
       changed = false;
-      for (coupling in couplings) {
-        var leader = offsets.get(coupling.leader);
-        if (leader == null) continue;
-        var wanted = coupling.ratio * leader;
-        var current = offsets.get(coupling.follower);
+      for (follower in followers) {
+        var wanted = 0.0, any = false;
+        for (coupling in couplings) if (coupling.follower == follower) {
+          var leader = offsets.get(coupling.leader);
+          if (leader == null) continue;
+          wanted += coupling.ratio * leader;
+          any = true;
+        }
+        if (!any) continue;
+        var current = offsets.get(follower);
         if (current == null || current != wanted) {
-          offsets.set(coupling.follower, wanted);
+          offsets.set(follower, wanted);
           changed = true;
         }
       }

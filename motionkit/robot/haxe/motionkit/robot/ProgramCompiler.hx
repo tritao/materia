@@ -61,6 +61,8 @@ class ProgramCompiler {
   public final maxJointJump:Float;
   public final perJointMaxJump:Array<Float>;
   final couplingIndices:Array<{leader:Int, follower:Int, ratio:Float, offset:Float}>;
+  /** The coupled joints, each after the coupled joints among its leaders: a follower is the sum of its terms. */
+  final projectionOrder:Array<Int>;
   public final positionTolerance:Float;
   public final orientationTolerance:Float;
   public final ikTolerance:IkTolerance;
@@ -137,6 +139,7 @@ class ProgramCompiler {
       if (!Math.isFinite(jump) || jump <= 0.0)
         throw "Program compiler joint jump limits must be finite and positive";
     couplingIndices = [];
+    projectionOrder = [];
     if (couplings != null) {
       if (jointIds == null || jointIds.length != count)
         throw "Program compiler couplings need joint IDs in solver order";
@@ -160,6 +163,10 @@ class ProgramCompiler {
         if (next < 0) throw "Program compiler joint couplings contain a cycle";
         couplingIndices.push(pending.splice(next, 1)[0]);
       }
+      // A follower is complete once its last term is placed, which is after every leader is.
+      var remaining = [for (_ in 0...count) 0];
+      for (term in couplingIndices) remaining[term.follower]++;
+      for (term in couplingIndices) if (--remaining[term.follower] == 0) projectionOrder.push(term.follower);
     }
     this.jointIds = jointIds == null ? null : jointIds.copy();
     this.couplings = couplings == null ? null : couplings.copy();
@@ -397,11 +404,14 @@ class ProgramCompiler {
   /** Keep the follower polynomial exact after independent Hermite lowering. */
   function projectCouplings(source:Trajectory):Trajectory {
     var segments = source.segments();
-    for (segment in segments) for (coupling in couplingIndices)
-      for (degree in 0...segment.coefficients[coupling.leader].length)
-        segment.coefficients[coupling.follower][degree] =
-          coupling.ratio * segment.coefficients[coupling.leader][degree] +
-          (degree == 0 ? coupling.offset : 0.0);
+    for (segment in segments) for (follower in projectionOrder)
+      for (degree in 0...segment.coefficients[follower].length) {
+        var sum = 0.0;
+        for (coupling in couplingIndices) if (coupling.follower == follower)
+          sum += coupling.ratio * segment.coefficients[coupling.leader][degree] +
+            (degree == 0 ? coupling.offset : 0.0);
+        segment.coefficients[follower][degree] = sum;
+      }
     return Trajectory.fromSegments(segments);
   }
 

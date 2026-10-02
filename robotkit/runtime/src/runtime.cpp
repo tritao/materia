@@ -567,12 +567,28 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
             mk_trajectory_state endpoint{};
             motionkit::evaluate_segment(segment,
                 static_cast<double>(terminal.duration_ns) * 1e-9, endpoint);
+            // A coupled joint moves its leaders' amount times the ratios, so its rest tolerance is theirs
+            // scaled the same way (a screw turns 3142 rad for a metre, a belt pulley 157).
+            double rest_scale[RK_MAX_JOINTS];
+            std::fill_n(rest_scale, blueprint_.joint_count, 1.0);
+            uint32_t followers[RK_MAX_JOINTS], follower_count = 0;
+            if (blueprint_.struct_size >= sizeof(blueprint_) &&
+                internal::order_followers(blueprint_.couplings, blueprint_.coupling_count,
+                    blueprint_.joint_count, nullptr, followers, follower_count))
+                for (uint32_t index = 0; index < follower_count; ++index) {
+                    double sum = 0.0;
+                    for (uint32_t k = 0; k < blueprint_.coupling_count; ++k)
+                        if (blueprint_.couplings[k].follower == followers[index])
+                            sum += std::abs(blueprint_.couplings[k].ratio) *
+                                rest_scale[blueprint_.couplings[k].leader];
+                    rest_scale[followers[index]] = std::max(1.0, sum);
+                }
             for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
                 // TOPP-RA can stop with nonzero endpoint acceleration. A
                 // checked-jerk plan must also join the held state smoothly.
-                if (std::abs(endpoint.velocity[joint]) > 1e-6 ||
+                if (std::abs(endpoint.velocity[joint]) > 1e-6 * rest_scale[joint] ||
                     ((plan.flags & RK_PLAN_JERK_UNCHECKED) == 0 &&
-                     std::abs(endpoint.acceleration[joint]) > 1e-6))
+                     std::abs(endpoint.acceleration[joint]) > 1e-6 * rest_scale[joint]))
                     return RK_ERROR_INVALID_ARGUMENT;
         }
         // A replacement keeps the queue only up to its anchor, so it works on a copy.

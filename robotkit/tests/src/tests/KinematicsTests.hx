@@ -40,6 +40,7 @@ class KinematicsTests {
     testToJointTargetsThroughSimulatedRobot();
     testWholeModelMatchesChain();
     testCoupledArm();
+    testSummedFollower();
     testSolveWithMovingBase();
     Sys.println('RobotKit kinematics tests passed ($assertions assertions)');
     return assertions;
@@ -201,6 +202,40 @@ class KinematicsTests {
     var result = arm.solve(pose, [0.1, 0.5], new IkOptions(1e-9, 1e-9, 200, 0.01).flange());
     check(result.converged && approx(result.q[1], 0.8, 1e-6), "IK through the coupling recovers the leader angle");
     check(arm.toJointTargets(q).length == 2, "joint targets go to the leaders; the runtime moves followers");
+  }
+
+  /** A third joint that follows the sum of two leaders (a differential): still two arm DOFs, and the model checks its terms. */
+  static function testSummedFollower():Void {
+    var model = new RobotModel("summed-arm");
+    var links = [for (name in ["base", "l1", "l2", "l3"]) model.addLink(new Link(name))];
+    for (i in 0...3) {
+      var joint = model.addJoint(new Joint('j$i', JointType.Revolute, links[i], links[i + 1]));
+      joint.parentFramePosition = [i == 0 ? 0.0 : 0.5, 0.0, 0.0];
+      joint.axis = [0.0, 0.0, 1.0];
+      joint.limits.lower = -3.0;
+      joint.limits.upper = 3.0;
+    }
+    model.addCoupling(new JointCoupling("sum-0", "j0", "j2", 0.5, 0.0));
+    model.addCoupling(new JointCoupling("sum-1", "j1", "j2", -0.25, 0.1));
+    check(model.validate().length == 0, "two leaders for one follower are a valid model");
+    var flange = model.addFrame(new Frame("flange", links[3]));
+    flange.position = [0.5, 0.0, 0.0];
+    var arm = new Manipulator(model, links[0].id, flange.id);
+    check(arm.dofCount() == 2 && arm.jointIds().join(",") == "j0,j1", "a follower of two leaders is not an arm DOF");
+    var q = [0.3, 0.8];
+    var pose = arm.forwardKinematics(q);
+    var a1 = 0.3, a2 = 0.3 + 0.8, a3 = a2 + 0.5 * 0.3 - 0.25 * 0.8 + 0.1;
+    check(approx(pose.translation.x, 0.5 * Math.cos(a1) + 0.5 * Math.cos(a2) + 0.5 * Math.cos(a3), 1e-12) &&
+      approx(pose.translation.y, 0.5 * Math.sin(a1) + 0.5 * Math.sin(a2) + 0.5 * Math.sin(a3), 1e-12),
+      "the follower turns by the sum of its terms in the arm's FK");
+    var result = arm.solve(pose, [0.1, 0.5], new IkOptions(1e-9, 1e-9, 200, 0.01).flange());
+    check(result.converged && approx(result.q[0], 0.3, 1e-6) && approx(result.q[1], 0.8, 1e-6), "IK through both couplings recovers the leaders");
+    // The same leader twice for one follower is refused, and so is a cycle through the terms.
+    model.addCoupling(new JointCoupling("again", "j0", "j2", 1.0, 0.0));
+    check(model.validate().length == 1, "a leader twice for one follower is reported: " + model.validate());
+    model.couplings.pop();
+    model.addCoupling(new JointCoupling("loop", "j2", "j0", 1.0, 0.0));
+    check(model.validate().length == 1 && JointCoupling.cycleThrough(model.couplings) != null, "a cycle through the terms is reported: " + model.validate());
   }
 
   /** A UR5-sized arm and a tool target 2.2 m away: out of reach from a fixed base, reachable once the base moves. */

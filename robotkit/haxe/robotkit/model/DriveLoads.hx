@@ -82,13 +82,21 @@ class AxisLoad {
    * efficiency the other way.
    */
   public function motorTorque(motor:MotorLoad, velocity:Float, acceleration:Float, resisting:Float):Float {
+    var speed = motor.ratio * velocity;
+    var drag = speed > 1e-12 ? motor.drag : speed < -1e-12 ? -motor.drag : 0.0;
+    return motorTorqueWithoutDrag(motor, velocity, acceleration, resisting) + drag;
+  }
+
+  /**
+   * As `motorTorque`, less drag. A motor that serves several axes (CoreXY) takes the sum of this
+   * over its axes, and one drag in the direction of its total motion.
+   */
+  public function motorTorqueWithoutDrag(motor:MotorLoad, velocity:Float, acceleration:Float, resisting:Float):Float {
     var load = force(velocity, acceleration, resisting);
     var perUnit = motor.share * load / motor.ratio;
     var motoring = load * velocity >= 0.0;
     var transmitted = motoring ? perUnit / motor.efficiency : perUnit * motor.efficiency;
-    var speed = motor.ratio * velocity;
-    var drag = speed > 1e-12 ? motor.drag : speed < -1e-12 ? -motor.drag : 0.0;
-    return motor.rotorInertia * motor.ratio * acceleration + transmitted + drag;
+    return motor.rotorInertia * motor.ratio * acceleration + transmitted;
   }
 }
 
