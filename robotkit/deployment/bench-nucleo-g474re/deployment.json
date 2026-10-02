@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "model": "robot.json",
   "device": {
     "path": "/dev/robotkit-mcu",
@@ -7,8 +7,7 @@
     "owner_period_ns": 10000000,
     "processing_allowance_ns": 2000000,
     "layout": "layout.json",
-    "schema_lock": "../../schema/device_wire6.lock.json",
-    "fingerprint": "637c4a8593abdd0c100f88077688955d",
+    "controller": "baadf00dbaadf00dbaadf00dbaadf00d",
     "target_error": 1e-06,
     "step_tick_hz": 40000,
     "link_loss_timeout_ns": 500000000,

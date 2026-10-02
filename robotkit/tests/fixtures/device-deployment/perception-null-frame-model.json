@@ -268,7 +268,50 @@
       }
     }
   ],
-  "actuators": [],
+  "actuators": [
+    {
+      "id": "actuator/left-wheel",
+      "maxEffort": 0,
+      "maxRate": 0,
+      "servoStiffness": 0,
+      "servoDamping": 0,
+      "fullStepsPerRevolution": 200,
+      "transmission": {
+        "kind": "simple",
+        "jointId": "joint/left-wheel",
+        "ratio": 1,
+        "offset": 0
+      }
+    },
+    {
+      "id": "actuator/right-wheel",
+      "maxEffort": 0,
+      "maxRate": 0,
+      "servoStiffness": 0,
+      "servoDamping": 0,
+      "fullStepsPerRevolution": 200,
+      "transmission": {
+        "kind": "simple",
+        "jointId": "joint/right-wheel",
+        "ratio": 1,
+        "offset": 0
+      }
+    },
+    {
+      "id": "actuator/lift",
+      "maxEffort": 0,
+      "maxRate": 0,
+      "servoStiffness": 0,
+      "servoDamping": 0,
+      "fullStepsPerRevolution": 200,
+      "transmission": {
+        "kind": "simple",
+        "jointId": "joint/lift",
+        "ratio": 785.3981633974483,
+        "offset": 0
+      }
+    }
+  ],
   "couplings": [],
   "frames": [
     {

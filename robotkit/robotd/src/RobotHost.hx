@@ -22,11 +22,16 @@ class RobotHost {
   }
 
   public function run():Void {
+    if (args.length > 0 && args[0] == "identify") {
+      identify();
+      return;
+    }
     if (args.indexOf("--help") >= 0) {
       Sys.println("Usage: robotd [--server [--once]] [--port=N] [--listen=IPv4] "
         + "[--robot-id=N] [--multi-joint] [--behavior=oscillate] [--in-memory] "
         + "[--deployment=FILE] [--camera-fixture] [--camera-fixture-stream] "
         + "[--bulk-budget-bytes=N] [--help]");
+      Sys.println("       robotd identify DEVICE_PATH BAUD   print the connected board's controller id");
       return;
     }
     var port = parsePort();
@@ -38,12 +43,12 @@ class RobotHost {
     var deployment = deploymentPath == null ? null : new RobotDeployment(deploymentPath);
     var serialPath = deployment == null ? null : deployment.serialPath;
     var baud = deployment == null ? 115200 : deployment.baud;
-    var fingerprint = deployment == null ? null : deployment.fingerprint;
+    var controller = deployment == null ? null : deployment.controller;
+    var binding = deployment == null ? null : deployment.binding;
     var targetError = deployment == null ? 0.0 : deployment.targetError;
-    var stepTickHz = deployment == null ? 40000 : deployment.stepTickHz;
     var linkLossTimeoutNs = deployment == null ? haxe.Int64.ofInt(500000000) : deployment.linkLossTimeoutNs;
     var clockSyncBoundNs = deployment == null ? haxe.Int64.ofInt(30000000) : deployment.clockSyncBoundNs;
-    if (optionValue("--serial=") != null || optionValue("--fingerprint=") != null ||
+    if (optionValue("--serial=") != null || optionValue("--controller=") != null ||
         optionValue("--target-error=") != null || optionValue("--baud=") != null)
       throw "robotd: serial settings belong in --deployment";
     if (deployment != null && args.indexOf("--multi-joint") >= 0)
@@ -60,7 +65,8 @@ class RobotHost {
     var cameraFixture = args.indexOf("--camera-fixture") >= 0 || cameraFixtureStream;
     if (cameraFixture && deployment != null)
       throw "robotd: --camera-fixture requires the demo robot";
-    var robot = deployment == null ? new RobotModel(multiJoint ? "demo-forklift" : "demo-arm") : deployment.robot;
+    // A deployment plans on its binding's model, whose actuator rates are what the step tick can drive.
+    var robot = deployment == null ? new RobotModel(multiJoint ? "demo-forklift" : "demo-arm") : deployment.binding.model;
     if (deployment == null) {
     var base = robot.addLink(new Link("base"));
     if (multiJoint) {
@@ -132,7 +138,7 @@ class RobotHost {
       try {
         if (serialPath != null)
           serverRuntime = RobotRuntime.createSerial(blueprint, serialPath,
-            fingerprint, targetError, baud, stepTickHz,
+            controller, binding, targetError, baud,
             linkLossTimeoutNs, clockSyncBoundNs);
         else {
           var newServerSimulation = new SimulationHarness();
@@ -197,8 +203,8 @@ class RobotHost {
     var simulation:Null<SimulationHarness> = null;
     var runtime:RobotRuntime;
     if (serialPath != null)
-      runtime = RobotRuntime.createSerial(blueprint, serialPath, fingerprint, targetError, baud,
-        stepTickHz, linkLossTimeoutNs, clockSyncBoundNs);
+      runtime = RobotRuntime.createSerial(blueprint, serialPath, controller, binding, targetError,
+        baud, linkLossTimeoutNs, clockSyncBoundNs);
     else if (inMemory)
       runtime = RobotRuntime.create(blueprint);
     else {
@@ -222,6 +228,15 @@ class RobotHost {
     runtime.dispose();
     if (simulation != null)
       simulation.dispose();
+  }
+
+  /** `robotd identify DEVICE_PATH BAUD`: prints the unique id of the board on a serial port. */
+  function identify():Void {
+    if (args.length != 3) throw "usage: robotd identify DEVICE_PATH BAUD";
+    var baud = Std.parseInt(args[2]);
+    if (baud == null || [115200, 230400, 460800, 921600].indexOf(baud) < 0)
+      throw "robotd: identify baud must be one of 115200, 230400, 460800, 921600";
+    Sys.println(RobotRuntime.identifySerial(args[1], baud));
   }
 
   function parsePort():Int {

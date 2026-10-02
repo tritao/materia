@@ -4,8 +4,8 @@ import haxe.Json;
 import haxe.io.Path;
 import haxe.crypto.Sha256;
 import visionkit.CameraCalibration;
+import robotkit.device.DeviceBinding;
 import robotkit.device.DeviceLayout;
-import robotkit.device.DeviceFingerprint;
 import robotkit.model.RobotModel;
 import robotkit.model.RobotModelCodec;
 import robotkit.world.ProcessChannelDeclaration;
@@ -13,12 +13,19 @@ import robotkit.world.ProcessEventValue;
 import robotkit.inference.InferenceSession;
 import robotkit.perception.PerceptionPipelineRegistry;
 
-/** A canonical semantic robot model plus its physical device configuration. */
+/**
+ * A canonical semantic robot model plus its physical device configuration: which board it is for
+ * (`controller`) and how its channels are wired (`binding`, derived from the model and the layout).
+ */
 class SerialDeployment {
   public final robot:RobotModel;
+  /** The channel layout derived from the model and the wiring, with the tightened model to plan on. */
+  public final binding:DeviceBinding;
+  public final layout:DeviceLayout;
   public final serialPath:String;
   public final baud:Int;
-  public final fingerprint:String;
+  /** Unique id of the board this deployment is for: 32 lowercase hex digits. */
+  public final controller:String;
   public final targetError:Float;
   public final ownerPeriodNs:haxe.Int64;
   public final processingAllowanceNs:haxe.Int64;
@@ -34,13 +41,17 @@ class SerialDeployment {
     var directory = Path.directory(path);
     var config:Dynamic = Json.parse(sys.io.File.getContent(path));
     var version:Dynamic = Reflect.field(config, "schemaVersion");
-    if (version != 3 && version != 4 && version != 5) throw "robotd: unsupported deployment schema version";
+    if (version == 3 || version == 4)
+      throw 'robotd: deployment schema v$version names a compiled device fingerprint, which firmware no longer carries; ' +
+        'update the file to schemaVersion 5: replace device.fingerprint with device.controller (the board\'s unique id, ' +
+        'from `robotd identify <path> <baud>`), drop device.schema_lock, and wire each layout channel to a model actuator ' +
+        '(see runtime/DEVICE_PROTOCOL.md)';
+    if (version != 5) throw "robotd: unsupported deployment schema version";
     var modelPath = Path.join([directory, requiredString(config, "model")]);
     robot = RobotModelCodec.decode(sys.io.File.getBytes(modelPath));
     cameras = new Map();
     var cameraRows:Dynamic = Reflect.field(config, "cameras");
     if (cameraRows != null) {
-      if (version != 5) throw "robotd: deployment cameras require schema version 5";
       if (!Std.isOfType(cameraRows, Array)) throw "robotd: deployment cameras must be an array";
       for (entry in (cast cameraRows:Array<Dynamic>)) {
         if (entry == null) throw "robotd: deployment camera cannot be null";
@@ -80,7 +91,6 @@ class SerialDeployment {
     perception = [];
     var configured:Dynamic = Reflect.field(config, "perception");
     if (configured != null) {
-      if (version != 5) throw "robotd: perception requires deployment schema version 5";
       if (!Std.isOfType(configured, Array)) throw "robotd: perception must be an array";
       var rows:Array<Dynamic> = cast configured;
       for (entry in rows) {
@@ -171,20 +181,17 @@ class SerialDeployment {
     }
     var device:Dynamic = Reflect.field(config, "device");
     if (device == null) throw "robotd: deployment requires device";
-    var declaredProtocol:Dynamic = Reflect.field(device, "protocol");
-    if (version == 3 && declaredProtocol != "rkd6")
-      throw "robotd: v3 deployment requires rkd6; rkd5 is unsupported";
-    if ((version == 4 || version == 5) && declaredProtocol != null)
-      throw "robotd: v4/v5 deployment must omit protocol (RKD6 is implied)";
+    if (Reflect.field(device, "protocol") != null)
+      throw "robotd: deployment must omit protocol (RKD6 is implied)";
+    if (Reflect.field(device, "fingerprint") != null)
+      throw "robotd: device.fingerprint is gone; name the board with device.controller (see `robotd identify`)";
     protocol = "rkd6";
-    if (version == 3 || version == 4 || version == 5) {
-      var stepRate:Dynamic = Reflect.field(device, "step_tick_hz");
-      if (!Std.isOfType(stepRate, Int) || stepRate <= 0)
-        throw "robotd: deployment step_tick_hz must be a positive integer";
-      stepTickHz = stepRate;
-      linkLossTimeoutNs = requiredNanoseconds(device, "link_loss_timeout_ns");
-      clockSyncBoundNs = requiredNanoseconds(device, "clock_sync_bound_ns");
-    }
+    var stepRate:Dynamic = Reflect.field(device, "step_tick_hz");
+    if (!Std.isOfType(stepRate, Int) || stepRate <= 0)
+      throw "robotd: deployment step_tick_hz must be a positive integer";
+    stepTickHz = stepRate;
+    linkLossTimeoutNs = requiredNanoseconds(device, "link_loss_timeout_ns");
+    clockSyncBoundNs = requiredNanoseconds(device, "clock_sync_bound_ns");
     serialPath = requiredString(device, "path");
     var baudValue:Dynamic = Reflect.field(device, "baud");
     if (!Std.isOfType(baudValue, Int))
@@ -192,10 +199,11 @@ class SerialDeployment {
     baud = baudValue;
     if ([115200, 230400, 460800, 921600].indexOf(baud) < 0)
       throw "robotd: deployment baud is unsupported";
-    fingerprint = requiredString(device, "fingerprint");
-    if (!~/^[0-9a-fA-F]{32}$/.match(fingerprint) ||
-        fingerprint.toLowerCase() == "00000000000000000000000000000000")
-      throw "robotd: deployment requires a nonzero 32-digit fingerprint";
+    var declaredController = requiredString(device, "controller");
+    if (!~/^[0-9a-fA-F]{32}$/.match(declaredController) ||
+        declaredController.toLowerCase() == "00000000000000000000000000000000")
+      throw "robotd: deployment requires a nonzero 32-digit controller id";
+    controller = declaredController.toLowerCase();
     var errorValue:Dynamic = Reflect.field(device, "target_error");
     if (!Std.isOfType(errorValue, Int) && !Std.isOfType(errorValue, Float))
       throw "robotd: deployment target_error must be a number";
@@ -206,13 +214,8 @@ class SerialDeployment {
     processingAllowanceNs = requiredNanoseconds(device, "processing_allowance_ns");
 
     var layoutPath = Path.join([directory, requiredString(device, "layout")]);
-    var layoutBytes = sys.io.File.getBytes(layoutPath);
-    var lockPath = Path.join([directory, requiredString(device, "schema_lock")]);
-    var actualFingerprint = DeviceFingerprint.compute(layoutBytes,
-      sys.io.File.getBytes(lockPath));
-    if (actualFingerprint != fingerprint.toLowerCase())
-      throw 'robotd: deployment fingerprint does not match layout and schema lock (expected $actualFingerprint)';
-    DeviceLayout.decode(layoutBytes).validateAgainst(robot);
+    layout = DeviceLayout.decode(sys.io.File.getBytes(layoutPath));
+    binding = DeviceBinding.bind(robot, layout, stepTickHz);
   }
 
   static function requiredString(value:Dynamic, field:String):String {

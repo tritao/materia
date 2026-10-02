@@ -124,7 +124,13 @@
         "frictionLoss": 0,
         "limitTimeConstant": 0,
         "limitDampingRatio": 0,
-        "limitImpedance": [0, 0, 0, 0, 0]
+        "limitImpedance": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
       }
     },
     {
@@ -173,11 +179,46 @@
         "frictionLoss": 0,
         "limitTimeConstant": 0,
         "limitDampingRatio": 0,
-        "limitImpedance": [0, 0, 0, 0, 0]
+        "limitImpedance": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
       }
     }
   ],
-  "actuators": [],
+  "actuators": [
+    {
+      "id": "actuator/left-wheel",
+      "maxEffort": 0,
+      "maxRate": 0,
+      "servoStiffness": 0,
+      "servoDamping": 0,
+      "fullStepsPerRevolution": 200,
+      "transmission": {
+        "kind": "simple",
+        "jointId": "joint/left-wheel",
+        "ratio": 1,
+        "offset": 0
+      }
+    },
+    {
+      "id": "actuator/right-wheel",
+      "maxEffort": 0,
+      "maxRate": 0,
+      "servoStiffness": 0,
+      "servoDamping": 0,
+      "fullStepsPerRevolution": 200,
+      "transmission": {
+        "kind": "simple",
+        "jointId": "joint/right-wheel",
+        "ratio": 1,
+        "offset": 0
+      }
+    }
+  ],
   "couplings": [],
   "frames": [],
   "sensors": [],

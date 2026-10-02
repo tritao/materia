@@ -65,10 +65,10 @@ class PerceptionInferenceTests {
           case "unknown-pipeline": "unknown perception pipeline";
           case _: "unsupported perception consumer";
         });
-    var older = new SerialDeployment(fixture("deployment.json"));
-    check(older.perception.length == 0, "v4 remains accepted without perception");
-    check(older.fingerprint == deployment.fingerprint,
-      "perception section stays outside the RKD6 device fingerprint");
+    var plain = new SerialDeployment(fixture("deployment.json"));
+    check(plain.perception.length == 0, "a deployment without perception loads");
+    check(plain.controller == deployment.controller,
+      "perception section stays outside the device configuration");
     var dynamicDeployment = new SerialDeployment(fixture("perception-dynamic.json"));
     var dynamicConfig = dynamicDeployment.perception[0];
     check(dynamicConfig.threads == 2 && dynamicConfig.dynamicWidth == 4 &&

@@ -6,5 +6,7 @@ fn main() {
     for (i, byte) in controller.iter_mut().enumerate() {
         *byte = u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).unwrap();
     }
-    shared::run(3, controller);
+    // Steps per actuator unit the board physically makes; a deployment's wiring must agree.
+    let steps_per_unit = std::env::args().nth(4).map_or(1_000.0, |text| text.parse().expect("steps per unit"));
+    shared::run(3, controller, steps_per_unit);
 }

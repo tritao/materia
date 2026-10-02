@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "model": "robot.json",
   "channels": [
     {
@@ -16,8 +16,7 @@
     "owner_period_ns": 10000000,
     "processing_allowance_ns": 2000000,
     "layout": "layout.json",
-    "schema_lock": "../../../schema/device_wire6.lock.json",
-    "fingerprint": "f022b46c4eedc9f6a80701975071b832",
+    "controller": "0123456789abcdef0123456789abcdef",
     "target_error": 1e-06,
     "step_tick_hz": 40000,
     "link_loss_timeout_ns": 500000000,

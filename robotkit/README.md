@@ -148,9 +148,10 @@ actuator state from the device. `robotd --server --deployment=FILE` hosts that
 endpoint behind the existing remote protocol; see
 [the device protocol](runtime/DEVICE_PROTOCOL.md).
 
-Use `new SerialRobot(id, model, devicePath, fingerprintHex, maxTargetError)`
-or `RobotRuntime.createSerial(...)`. The fingerprint comes from
-`robotkit/tools/device_fingerprint.py`; the error budget bounds the converted
+Use `new SerialRobot(id, model, devicePath, controllerHex, layout, maxTargetError)`
+or `RobotRuntime.createSerial(...)`. The controller is the board's unique id
+(`robotd identify` prints it) and the layout wires its channels to the model's
+actuators; the error budget bounds the converted
 trajectory's position error in the joint's SI units. Serial devices do not
 carry bulk sensors.
 

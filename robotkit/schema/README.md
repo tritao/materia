@@ -6,5 +6,6 @@ The lock records field order and sizes; protocol version bumps permit in-place
 revisions until the first hardware release. See [the protocol](../runtime/DEVICE_PROTOCOL.md)
 for framing, timing, device profiles and the hardware freeze policy.
 
-`tools/device_fingerprint.py` hashes the canonical lock and exact deployment
-layout bytes into the shared 16-byte fingerprint.
+Session identity and agreement are checked while the session opens (controller id
+and a 64-bit FNV-1a configuration digest), not by a compiled constant; see
+the protocol.

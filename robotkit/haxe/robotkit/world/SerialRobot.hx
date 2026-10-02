@@ -1,31 +1,39 @@
 package robotkit.world;
 
+import robotkit.device.DeviceBinding;
+import robotkit.device.DeviceLayout;
 import robotkit.model.RobotModel;
 import robotkit.runtime.RobotRuntime;
 import robotkit.runtime.RobotRuntimeBlueprint;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.deployment.SerialDeployment;
 
-/** RobotWorld adapter that owns and starts a model-configured serial runtime. */
+/**
+ * RobotWorld adapter that owns and starts a serial runtime for one board, wired to the model's
+ * actuators by a device layout.
+ */
 class SerialRobot implements Robot {
   final adapter:RuntimeRobotAdapter;
 
   public function new(id:RobotId, model:RobotModel, devicePath:String,
-      fingerprintHex:String, maxTargetError:Float, ?baud:Int = 115200,
+      controllerHex:String, layout:DeviceLayout, maxTargetError:Float, ?baud:Int = 115200,
       ?ownerPeriodNs:haxe.Int64, ?processingAllowanceNs:haxe.Int64,
       ?channels:Array<ProcessChannelDeclaration>, ?stepTickHz:Int = 40000,
       ?linkLossTimeoutNs:haxe.Int64, ?clockSyncBoundNs:haxe.Int64) {
     if (id == null || id.length == 0)
       throw "SerialRobot requires a non-empty logical ID";
     if (model == null) throw "SerialRobot requires a robot model";
-    var blueprint:RobotRuntimeBlueprint = RobotRuntimeCompiler.compile(model);
+    if (layout == null) throw "SerialRobot requires a device layout";
+    var binding = DeviceBinding.bind(model, layout, stepTickHz);
+    // The runtime plans on the binding's model, whose actuator rates are what the step tick can drive.
+    var blueprint:RobotRuntimeBlueprint = RobotRuntimeCompiler.compile(binding.model);
     if (channels != null)
       for (channel in channels) blueprint.channels.push(channel);
     if (ownerPeriodNs != null) blueprint.ownerPeriodNs = ownerPeriodNs;
     if (processingAllowanceNs != null)
       blueprint.serialProcessingAllowanceNs = processingAllowanceNs;
-    var runtime = RobotRuntime.createSerial(blueprint, devicePath, fingerprintHex,
-      maxTargetError, baud, stepTickHz, linkLossTimeoutNs, clockSyncBoundNs);
+    var runtime = RobotRuntime.createSerial(blueprint, devicePath, controllerHex, binding,
+      maxTargetError, baud, linkLossTimeoutNs, clockSyncBoundNs);
     adapter = new RuntimeRobotAdapter(id, runtime, model.name,
       [for (link in model.links) link.id], [for (joint in model.joints) joint.id],
       true, true, "serial endpoint fault");
@@ -35,7 +43,7 @@ class SerialRobot implements Robot {
   public static function fromDeployment(id:RobotId, path:String):SerialRobot {
     var deployment = new SerialDeployment(path);
     return new SerialRobot(id, deployment.robot, deployment.serialPath,
-      deployment.fingerprint, deployment.targetError, deployment.baud,
+      deployment.controller, deployment.layout, deployment.targetError, deployment.baud,
       deployment.ownerPeriodNs, deployment.processingAllowanceNs, deployment.channels,
       deployment.stepTickHz, deployment.linkLossTimeoutNs, deployment.clockSyncBoundNs);
   }

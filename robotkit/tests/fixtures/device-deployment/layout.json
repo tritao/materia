@@ -1,7 +1,7 @@
 {
   "channels": [
-    {"index": 0, "joint": "joint/left-wheel", "direction": 1, "encoder_counts_per_rev": 4096},
-    {"index": 1, "joint": "joint/right-wheel", "direction": 1, "encoder_counts_per_rev": 4096},
-    {"index": 2, "joint": "joint/lift", "direction": 1, "encoder_counts_per_rev": 4096}
+    {"index": 0, "actuator": "actuator/left-wheel", "direction": 1, "microsteps": 16},
+    {"index": 1, "actuator": "actuator/right-wheel", "direction": 1, "microsteps": 16},
+    {"index": 2, "actuator": "actuator/lift", "direction": 1, "microsteps": 16}
   ]
 }

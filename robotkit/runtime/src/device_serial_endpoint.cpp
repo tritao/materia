@@ -1,5 +1,6 @@
 #include "robotkit_device_serial_endpoint.hpp"
 #include "rkd6_endpoint.hpp"
+#include "device_compiler6.hpp"
 #include "device_frame6.hpp"
 #include <algorithm>
 #include <chrono>
@@ -95,31 +96,52 @@ private:
 };
 } // namespace
 
-std::shared_ptr<Rkd6Endpoint> DeviceSerialEndpoint::open(const char *path, unsigned baud,
-    const rk_robot_runtime_blueprint &blueprint, std::array<std::uint8_t, 16> controller,
-    double target_error, std::uint32_t step_tick_hz,
-    std::uint64_t link_loss_timeout_ns, std::uint64_t clock_bound_ns,
-    std::uint64_t link_latency_ns, rk_result *error) {
+namespace {
+/** Opens and configures a raw 8N1 serial port; -1 with `error` set on failure. */
+int open_port(const char *path, unsigned baud, rk_result *error) {
     if (error) *error = RK_ERROR_BACKEND;
     const auto speed = baud_value(baud);
     if (!path || !*path || !speed) {
         if (error) *error = RK_ERROR_UNSUPPORTED;
-        return {};
+        return -1;
     }
     const auto fd = ::open(path, O_RDWR | O_NOCTTY | O_NONBLOCK | O_CLOEXEC);
-    if (fd < 0) return {};
+    if (fd < 0) return -1;
     termios settings{};
-    if (::tcgetattr(fd, &settings) != 0) { ::close(fd); return {}; }
+    if (::tcgetattr(fd, &settings) != 0) { ::close(fd); return -1; }
     ::cfmakeraw(&settings);
     ::cfsetispeed(&settings, speed);
     ::cfsetospeed(&settings, speed);
     settings.c_cflag |= CLOCAL | CREAD;
-    if (::tcsetattr(fd, TCSANOW, &settings) != 0) { ::close(fd); return {}; }
+    if (::tcsetattr(fd, TCSANOW, &settings) != 0) { ::close(fd); return -1; }
+    return fd;
+}
+
+std::uint64_t random_session() {
     std::random_device random;
     auto session = (static_cast<std::uint64_t>(random()) << 32) | random();
-    if (session == 0) session = 1;
+    return session == 0 ? 1 : session;
+}
+} // namespace
+
+std::shared_ptr<Rkd6Endpoint> DeviceSerialEndpoint::open(const char *path, unsigned baud,
+    const rk_robot_runtime_blueprint &blueprint, std::array<std::uint8_t, 16> controller,
+    double target_error, std::uint32_t step_tick_hz,
+    std::uint64_t link_loss_timeout_ns, std::uint64_t clock_bound_ns,
+    std::uint64_t link_latency_ns, std::span<const DeviceActuator6> layout, rk_result *error) {
+    const auto fd = open_port(path, baud, error);
+    if (fd < 0) return {};
     return Rkd6Endpoint::attach(std::make_unique<PosixRkd6Transport>(fd, baud), blueprint,
-        controller, session, target_error, clock_bound_ns, link_latency_ns,
-        step_tick_hz, link_loss_timeout_ns, {}, error);
+        controller, random_session(), target_error, clock_bound_ns, link_latency_ns,
+        step_tick_hz, link_loss_timeout_ns, layout, error);
+}
+
+rk_result DeviceSerialEndpoint::identify(const char *path, unsigned baud,
+    std::array<std::uint8_t, 16> &controller) {
+    rk_result error = RK_ERROR_BACKEND;
+    const auto fd = open_port(path, baud, &error);
+    if (fd < 0) return error;
+    return Rkd6Endpoint::identify(std::make_unique<PosixRkd6Transport>(fd, baud),
+        random_session(), controller);
 }
 } // namespace robotkit

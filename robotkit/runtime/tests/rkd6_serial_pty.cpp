@@ -47,6 +47,17 @@ int main(int argc, char **argv) {
     blueprint.joints[0].max_acceleration = 10;
     std::array<std::uint8_t, 16> controller{};
     for (std::size_t i = 0; i < controller.size(); ++i) controller[i] = i;
+    // The board's id is readable without configuring it, and a deployment for another id is refused.
+    std::array<std::uint8_t, 16> found{};
+    assert(DeviceSerialEndpoint::identify(slave, 921'600, found) == RK_OK && found == controller);
+    {
+        auto other = controller;
+        other[0] ^= 0xff;
+        rk_result reason = RK_OK;
+        auto refused = DeviceSerialEndpoint::open(slave, 921'600, blueprint, other, 1e-5,
+            40'000, 500'000'000, 30'000'000, 100'000, {}, &reason);
+        assert(!refused && reason == RK_ERROR_MODEL_MISMATCH);
+    }
     auto endpoint = DeviceSerialEndpoint::open(slave, 921'600, blueprint,
         controller, 1e-5, 40'000, 500'000'000, 30'000'000);
     assert(endpoint);
