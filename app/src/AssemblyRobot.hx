@@ -36,6 +36,8 @@ class AssemblyRobot {
   /** The runtime blueprint the robot was compiled to, for motion planners that need its limits. */
   public final blueprint:RobotRuntimeBlueprint;
   public final parts:Array<AssemblyPart>;
+  /** The collision hull of each part that has one, in the frame of the link that carries it (metres), by occurrence id. */
+  public final hulls:Array<cadbridge.AssemblySimulationBridge.AssemblyLinkHull>;
   /** Parts whose collision shape could not be made exact, each tagged with its part. */
   public final warnings:Array<String>;
   /**
@@ -45,12 +47,14 @@ class AssemblyRobot {
   public final mobile:Null<MobileBase>;
 
   function new(robot:SimulatedRobot, runtime:RobotRuntime, model:RobotModel, blueprint:RobotRuntimeBlueprint,
-      parts:Array<AssemblyPart>, warnings:Array<String>, mobile:Null<MobileBase>) {
+      parts:Array<AssemblyPart>, hulls:Array<cadbridge.AssemblySimulationBridge.AssemblyLinkHull>, warnings:Array<String>,
+      mobile:Null<MobileBase>) {
     this.robot = robot;
     this.runtime = runtime;
     this.model = model;
     this.blueprint = blueprint;
     this.parts = parts;
+    this.hulls = hulls;
     this.warnings = warnings;
     this.mobile = mobile;
   }
@@ -203,13 +207,15 @@ class AssemblyRobot {
       closures.push(new SimulationClosure(parent, child, type,
         closure.anchorParent, closure.axisParent));
     }
-    // Each tool reports on its vacuum sensor, mounted at the tool's contact on the link that carries it.
+    // Each tool reports on its sensor (a suction tool's vacuum, a torch's weld circuit), mounted at the tool's
+    // contact on the link that carries it.
     for (tool in session.robotTools) {
       var sensorId = tool.sensor;
       if (sensorId == null) continue;
       var carrier = converted.partLinks.get(tool.contact.occurrence);
       if (carrier == null) throw 'Robot tool "${tool.contact.occurrence}" is not part of the robot';
-      var sensor = converted.model.addSensor(new robotkit.model.Sensor(sensorId, "tool_vacuum_kpa", 0.0, sensorId));
+      var kind = tool.kind == "torch" ? robotkit.tool.WeldSensor.KIND : "tool_vacuum_kpa";
+      var sensor = converted.model.addSensor(new robotkit.model.Sensor(sensorId, kind, 0.0, sensorId));
       var mount = converted.model.addFrame(new robotkit.model.Frame(sensorId + " mount", converted.model.links[carrier.link]));
       mount.position = [carrier.offset.x, carrier.offset.y, carrier.offset.z];
       sensor.frame = mount;
@@ -218,9 +224,15 @@ class AssemblyRobot {
     // Process channels (a machine's spindle and coolant, a tool's vacuum) must be declared before the
     // robot is added.
     if (channels != null) for (channel in channels) blueprint.channels.push(channel);
-    // A tool keeps holding through a commanded stop, as when its base arrives somewhere carrying a part.
-    for (tool in session.robotTools)
-      blueprint.channels.push(new ProcessChannelDeclaration(tool.channel, robotkit.world.ProcessEventValue.Digital(false), true));
+    // A suction tool keeps holding through a commanded stop, as when its base arrives somewhere carrying a part. A
+    // torch does the opposite: its arc and wire go safe, off, on any stop.
+    for (tool in session.robotTools) {
+      var welder = tool.torch;
+      if (welder == null)
+        blueprint.channels.push(new ProcessChannelDeclaration(tool.channel, robotkit.world.ProcessEventValue.Digital(false), true));
+      else for (declaration in robotkit.tool.WeldChannels.declarations(tool.channel, welder.wireSpeedChannel, welder.voltageChannel))
+        blueprint.channels.push(declaration);
+    }
     // A mobile robot stands at its origin on the floor; its root link is framed there.
     var origin = session.mobileBase == null ? null : session.mobileBase.origin;
     var position = origin == null ? [0.0, 0.0, 0.0] : [origin.x, origin.y, 0.0];
@@ -250,6 +262,6 @@ class AssemblyRobot {
       parts.push({id: "project:" + occurrence.id, robotIndex: robotIndex, linkIndex: placed.link,
         offset: placed.offset, center: [for (coordinate in center) coordinate * physical.metresPerUnit]});
     }
-    return new AssemblyRobot(robot, runtime, converted.model, blueprint, parts, warnings, mobile);
+    return new AssemblyRobot(robot, runtime, converted.model, blueprint, parts, converted.linkHulls, warnings, mobile);
   }
 }

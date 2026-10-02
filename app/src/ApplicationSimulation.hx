@@ -223,6 +223,11 @@ class ApplicationSimulation {
       var candidateTools = new SimulatedTools([for (entry in candidateObjects) {id: entry.id, object: entry.object}]);
       var freeObjects = [for (entry in candidateObjects) entry.object];
       if (session != null && candidateAssembly != null) for (tool in session.robotTools) {
+        if (tool.kind == "torch") {
+          candidate.addStepObserver(candidateTools.addWelder(SimulatedTools.welderFor(candidate, candidateAssembly,
+            assemblyIndex, tool, session)));
+          continue;
+        }
         var carrier = candidateAssembly.part("project:" + tool.contact.occurrence);
         candidate.addStepObserver(candidateTools.add(new robotkit.runtime.SimulatedSuctionTool(candidate,
           candidateAssembly.runtime, assemblyIndex, carrier.linkIndex, tool.channel, freeObjects, tool.sensor)));
