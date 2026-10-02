@@ -466,6 +466,13 @@ class SensorConfiguration {
             }], finite(driveData, "wheelRadius"), finite(driveData, "baseRadius"));
         default: throw "Unsupported mobile-base drive configuration";
       };
+      // Documents before version 2 store no joint axes; their wheels always meant a positive rate
+      // rolls forward, which is a turn about the base's +Y.
+      if (modelVersion < 2) switch drive {
+        case Differential(leftId, rightId, _, _):
+          for (joint in model.joints) if (joint.id == leftId || joint.id == rightId) joint.axis = [0.0, 1.0, 0.0];
+        case _:
+      }
       model.mobileBase = new RobotMobileConfiguration(drive,
         finite(mobileData, "maxLinearSpeed"), finite(mobileData, "maxAngularSpeed"),
         finite(mobileData, "maxLinearAcceleration"), finite(mobileData, "maxAngularAcceleration"),

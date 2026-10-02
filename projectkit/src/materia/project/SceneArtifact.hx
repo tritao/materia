@@ -62,6 +62,91 @@ typedef SceneArtifactData = {
 	@:optional var recipeDiagnostics:Array<String>;
 	/** A machining job the generator made for its own machine; see SceneArtifactMachining. */
 	@:optional var machining:SceneArtifactMachining;
+	/** The assembly is a wheeled robot that drives on the floor; see SceneArtifactMobileBase. */
+	@:optional var mobileBase:SceneArtifactMobileBase;
+	/** Work the assembly's robot does on its own; see SceneArtifactMission. */
+	@:optional var mission:SceneArtifactMission;
+	/** The tools the assembly's robot works with; see SceneArtifactRobotTool. */
+	@:optional var robotTools:Array<SceneArtifactRobotTool>;
+}
+
+/**
+ * A tool on the assembly's robot and how it is worked (since version 13), as its parts' declared
+ * capabilities say: a `suction` tool seals on what touches the occurrence `contact.occurrence` at its
+ * connector `contact.connector` while the digital process channel `channel` is on, and reports the
+ * vacuum it pulls on the sensor `sensor` when it has one.
+ */
+typedef SceneArtifactRobotTool = {
+	var kind:String;
+	var contact:SceneArtifactPlace;
+	var channel:String;
+	@:optional var sensor:String;
+}
+
+/**
+ * The assembly is a differential-drive robot that rolls on the floor (since version 13). Its root body
+ * is the chassis, driven over the floor plane in the assembly frame: +X forward, +Z up, the origin on
+ * the floor between the wheels' contacts. `leftWheel` and `rightWheel` are its wheel joints (+Y side
+ * first), each turning about its own axle; the simulation reads each one's rolling direction from
+ * its axis. Lengths are metres, speeds m/s and rad/s, accelerations m/s² and rad/s², whatever the
+ * scene's unit. `footprintLength`/`footprintWidth` are the chassis outline, centred on the origin.
+ *
+ * A robot that works in a scene of its own names its occurrence subtree as `robot` (an include id:
+ * its occurrences are `robot/...`) and stands at `origin` (x, y and heading on the floor, in the
+ * assembly frame); everything outside the subtree is its world, held where it stands. Without
+ * `robot` the whole assembly is the robot, standing at the assembly origin.
+ */
+typedef SceneArtifactMobileBase = {
+	var leftWheel:String;
+	var rightWheel:String;
+	var wheelRadius:Float;
+	var trackWidth:Float;
+	var maxLinearSpeed:Float;
+	var maxAngularSpeed:Float;
+	var maxLinearAcceleration:Float;
+	var maxAngularAcceleration:Float;
+	@:optional var footprintLength:Float;
+	@:optional var footprintWidth:Float;
+	@:optional var robot:String;
+	@:optional var origin:SceneArtifactFloorPose;
+}
+
+/**
+ * Work the assembly's robot does on its own when the simulation runs (since version 13): its
+ * steps in order, starting over after the last when `loop`. Steps name what they act on in the
+ * assembly, so where they lead follows the model. Picking and placing work the robot's one suction
+ * tool (see SceneArtifactRobotTool).
+ */
+typedef SceneArtifactMission = {
+	var steps:Array<SceneArtifactMissionStep>;
+	@:optional var loop:Bool;
+}
+
+/**
+ * One step of a mission.
+ * - `goTo`: drive the mobile base to `pose`, in the assembly frame on the floor.
+ * - `pick`: take hold of the occurrence `at.occurrence` with the tool, meeting it at its connector
+ *   `at.connector`, wherever the part is when the step starts.
+ * - `place`: set what the tool holds down with its base on the connector `at.connector` of
+ *   `at.occurrence`, and let go.
+ */
+typedef SceneArtifactMissionStep = {
+	var kind:String;
+	@:optional var pose:SceneArtifactFloorPose;
+	@:optional var at:SceneArtifactPlace;
+}
+
+/** A connector of an occurrence in the assembly. */
+typedef SceneArtifactPlace = {
+	var occurrence:String;
+	var connector:String;
+}
+
+/** A pose on the floor: x and y in metres and the heading `yaw` in radians about +Z. */
+typedef SceneArtifactFloorPose = {
+	var x:Float;
+	var y:Float;
+	var yaw:Float;
 }
 
 /**
@@ -102,7 +187,7 @@ typedef SceneArtifactTool = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 12;
+	public static inline var VERSION:Int = 13;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -128,8 +213,13 @@ class SceneArtifact {
 		if (recipeDiagnostics.length > 2000000) throw "Scene artifact recipe diagnostics are too large";
 		var machining = data.machining == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.machining));
 		if (machining.length > 8000000) throw "Scene artifact machining job is too large";
+		var mobileBase = data.mobileBase == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.mobileBase));
+		var mission = data.mission == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.mission));
+		if (mission.length > 1000000) throw "Scene artifact mission is too large";
+		var robotTools = data.robotTools == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.robotTools));
+		if (robotTools.length > 100000) throw "Scene artifact robot tools are too large";
 		var length = 40 + unitText.length + assembly.length + assemblyDefinition.length + assemblyState.length + recipeDocument.length + recipeDiagnostics.length + 4
-			+ machining.length + 4;
+			+ machining.length + 4 + mobileBase.length + 4 + mission.length + 4 + robotTools.length + 4;
 		for (part in data.parts) {
 			validatePart(part, true);
 			var id = Bytes.ofString(part.id), name = Bytes.ofString(part.name);
@@ -219,6 +309,12 @@ class SceneArtifact {
 		result.blit(offset, recipeDiagnostics, 0, recipeDiagnostics.length); offset += recipeDiagnostics.length;
 		offset = putInt(result, offset, machining.length);
 		result.blit(offset, machining, 0, machining.length); offset += machining.length;
+		offset = putInt(result, offset, mobileBase.length);
+		result.blit(offset, mobileBase, 0, mobileBase.length); offset += mobileBase.length;
+		offset = putInt(result, offset, mission.length);
+		result.blit(offset, mission, 0, mission.length); offset += mission.length;
+		offset = putInt(result, offset, robotTools.length);
+		result.blit(offset, robotTools, 0, robotTools.length); offset += robotTools.length;
 		if (offset != result.length) throw "Scene artifact size mismatch";
 		return result;
 	}
@@ -265,6 +361,171 @@ class SceneArtifact {
 				AssemblyDefinitionCodec.validateState(assemblyDefinition, data.assemblyState);
 		}
 		if (data.machining != null) validateMachining(data.machining, ids, data.assemblyDefinition);
+		if (data.mobileBase != null) validateMobileBase(data.mobileBase, data.assemblyDefinition);
+		if (data.robotTools != null) validateRobotTools(data.robotTools, data);
+		if (data.mission != null) validateMission(data.mission, data);
+	}
+
+	static function validateRobotTools(tools:Array<SceneArtifactRobotTool>, data:SceneArtifactData):Void {
+		function fail(detail:String):Void throw 'Scene artifact robot tool $detail';
+		var definition = data.assemblyDefinition;
+		if (definition == null) fail("needs the robot's assembly definition");
+		var flat = AssemblyDefinitionFlattener.flatten(cast definition);
+		var channels = new Map<String, Bool>();
+		for (tool in tools) {
+			if (tool == null || tool.kind != "suction") fail('kind "${tool == null ? null : tool.kind}" is unknown');
+			var contact = tool.contact;
+			var occurrence = contact == null ? [] : [for (item in flat.occurrences) if (item.id == contact.occurrence) item];
+			if (occurrence.length != 1) fail("touches with no occurrence of the assembly");
+			var found = false;
+			for (component in flat.definitions) if (component.id == occurrence[0].definition)
+				for (connector in component.connectors) if (connector.name == contact.connector) found = true;
+			if (!found) fail('has no contact connector "${contact.connector}" on "${contact.occurrence}"');
+			if (tool.channel == null || tool.channel.length == 0 || channels.exists(tool.channel))
+				fail("needs a channel of its own");
+			channels.set(tool.channel, true);
+			if (tool.sensor != null && tool.sensor.length == 0) fail("has an empty sensor name");
+		}
+	}
+
+	/** Robot tools from their JSON section, typed field by field. */
+	static function decodeRobotTools(decoded:Dynamic):Array<SceneArtifactRobotTool> {
+		function fail():Dynamic throw "Scene artifact robot tools are invalid";
+		function text(value:Dynamic, name:String):String {
+			var item:Dynamic = Reflect.field(value, name);
+			return Std.isOfType(item, String) ? item : fail();
+		}
+		if (!Std.isOfType(decoded, Array)) fail();
+		return [for (raw in (cast decoded:Array<Dynamic>)) {
+			var contact:Dynamic = Reflect.field(raw, "contact");
+			if (contact == null) fail();
+			var tool:SceneArtifactRobotTool = {kind: text(raw, "kind"),
+				contact: {occurrence: text(contact, "occurrence"), connector: text(contact, "connector")},
+				channel: text(raw, "channel")};
+			if (Reflect.field(raw, "sensor") != null) tool.sensor = text(raw, "sensor");
+			tool;
+		}];
+	}
+
+	static function finiteFloorPose(pose:Null<SceneArtifactFloorPose>):Bool
+		return pose != null && finite(pose.x) && finite(pose.y) && finite(pose.yaw);
+
+	static function validateMission(mission:SceneArtifactMission, data:SceneArtifactData):Void {
+		function fail(detail:String):Void throw 'Scene artifact mission $detail';
+		if (mission.steps == null || mission.steps.length == 0) fail("has no steps");
+		var definition = data.assemblyDefinition;
+		var flat = definition == null ? null : AssemblyDefinitionFlattener.flatten(definition);
+		/** Whether `place` names an existing connector of an existing occurrence. */
+		function exists(place:Null<SceneArtifactPlace>):Bool {
+			if (place == null || flat == null) return false;
+			var occurrence = [for (item in flat.occurrences) if (item.id == place.occurrence) item];
+			if (occurrence.length != 1) return false;
+			for (component in flat.definitions) if (component.id == occurrence[0].definition)
+				for (connector in component.connectors) if (connector.name == place.connector) return true;
+			return false;
+		}
+		var handles = false;
+		for (index in 0...mission.steps.length) {
+			var step = mission.steps[index];
+			if (step == null) fail('step $index is empty');
+			switch step.kind {
+				case "goTo":
+					if (data.mobileBase == null) fail('step $index drives, but the assembly has no mobile base');
+					if (!finiteFloorPose(step.pose)) fail('step $index needs a finite pose');
+				case "pick" | "place":
+					handles = true;
+					if (!exists(step.at)) fail('step $index names no connector of an occurrence in the assembly');
+				default: fail('step $index has unknown kind "${step.kind}"');
+			}
+		}
+		var suctions = data.robotTools == null ? 0 : [for (tool in data.robotTools) if (tool.kind == "suction") tool].length;
+		if (handles && suctions != 1) fail("picks and places, but the robot has $suctions suction tools, not one");
+	}
+
+	/** A mission from its JSON section, typed field by field. */
+	static function decodeMission(decoded:Dynamic):SceneArtifactMission {
+		function fail():Dynamic throw "Scene artifact mission is invalid";
+		function number(value:Dynamic, name:String):Float {
+			var item:Dynamic = Reflect.field(value, name);
+			return Std.isOfType(item, Float) || Std.isOfType(item, Int) ? (item:Float) : fail();
+		}
+		function place(value:Dynamic):SceneArtifactPlace {
+			var occurrence:Dynamic = Reflect.field(value, "occurrence"), connector:Dynamic = Reflect.field(value, "connector");
+			if (!Std.isOfType(occurrence, String) || !Std.isOfType(connector, String)) fail();
+			return {occurrence: occurrence, connector: connector};
+		}
+		var steps:Dynamic = Reflect.field(decoded, "steps");
+		if (!Std.isOfType(steps, Array)) fail();
+		var mission:SceneArtifactMission = {steps: [for (raw in (cast steps:Array<Dynamic>)) {
+			var kind:Dynamic = Reflect.field(raw, "kind");
+			if (!Std.isOfType(kind, String)) fail();
+			var step:SceneArtifactMissionStep = {kind: kind};
+			var pose:Dynamic = Reflect.field(raw, "pose");
+			if (pose != null) step.pose = {x: number(pose, "x"), y: number(pose, "y"), yaw: number(pose, "yaw")};
+			var at:Dynamic = Reflect.field(raw, "at");
+			if (at != null) step.at = place(at);
+			step;
+		}]};
+		var loop:Dynamic = Reflect.field(decoded, "loop");
+		if (loop != null) mission.loop = Std.isOfType(loop, Bool) ? (loop:Bool) : fail();
+		return mission;
+	}
+
+	static function validateMobileBase(base:SceneArtifactMobileBase, definition:Null<AssemblyDefinition>):Void {
+		function fail(detail:String):Void throw 'Scene artifact mobile base $detail';
+		if (definition == null) fail("needs the robot's assembly definition");
+		var flat = AssemblyDefinitionFlattener.flatten(definition);
+		var prefix = base.robot == null ? "" : base.robot + "/";
+		if (base.robot != null && [for (item in flat.occurrences) if (StringTools.startsWith(item.id, prefix)) item].length == 0)
+			fail('robot "${base.robot}" has no occurrences');
+		for (wheel in [base.leftWheel, base.rightWheel]) {
+			var joint = [for (joint in flat.joints) if (joint.id == wheel) joint];
+			if (joint.length != 1) fail('wheel "$wheel" is not a joint');
+			var type = Std.string(joint[0].type);
+			if (type != "continuous" && type != "revolute") fail('wheel "$wheel" is a $type joint, not a rotary one');
+			if (!StringTools.startsWith(joint[0].child, prefix)) fail('wheel "$wheel" is not part of the robot');
+		}
+		if (base.origin != null && !finiteFloorPose(base.origin)) fail("needs a finite origin");
+		if (base.leftWheel == base.rightWheel) fail("needs two different wheels");
+		for (value in [base.wheelRadius, base.trackWidth, base.maxLinearSpeed, base.maxAngularSpeed,
+				base.maxLinearAcceleration, base.maxAngularAcceleration])
+			if (!finite(value) || value <= 0) fail("needs positive dimensions and limits");
+		if ((base.footprintLength == null) != (base.footprintWidth == null)) fail("needs both footprint sides or neither");
+		if (base.footprintLength != null) {
+			var length:Float = cast base.footprintLength, width:Float = cast base.footprintWidth;
+			if (!finite(length) || length <= 0 || !finite(width) || width <= 0) fail("needs a positive footprint");
+		}
+	}
+
+	/** A mobile base from its JSON section, typed field by field. */
+	static function decodeMobileBase(decoded:Dynamic):SceneArtifactMobileBase {
+		function fail():Dynamic throw "Scene artifact mobile base is invalid";
+		function text(name:String):String {
+			var value:Dynamic = Reflect.field(decoded, name);
+			return Std.isOfType(value, String) ? value : fail();
+		}
+		function number(name:String):Float {
+			var value:Dynamic = Reflect.field(decoded, name);
+			return Std.isOfType(value, Float) || Std.isOfType(value, Int) ? (value:Float) : fail();
+		}
+		var base:SceneArtifactMobileBase = {leftWheel: text("leftWheel"), rightWheel: text("rightWheel"),
+			wheelRadius: number("wheelRadius"), trackWidth: number("trackWidth"),
+			maxLinearSpeed: number("maxLinearSpeed"), maxAngularSpeed: number("maxAngularSpeed"),
+			maxLinearAcceleration: number("maxLinearAcceleration"), maxAngularAcceleration: number("maxAngularAcceleration")};
+		if (Reflect.field(decoded, "footprintLength") != null) base.footprintLength = number("footprintLength");
+		if (Reflect.field(decoded, "footprintWidth") != null) base.footprintWidth = number("footprintWidth");
+		function floorPose(value:Dynamic):SceneArtifactFloorPose {
+			if (value == null) fail();
+			function field(name:String):Float {
+				var item:Dynamic = Reflect.field(value, name);
+				return Std.isOfType(item, Float) || Std.isOfType(item, Int) ? (item:Float) : fail();
+			}
+			return {x: field("x"), y: field("y"), yaw: field("yaw")};
+		}
+		if (Reflect.field(decoded, "robot") != null) base.robot = text("robot");
+		var origin:Dynamic = Reflect.field(decoded, "origin");
+		if (origin != null) base.origin = floorPose(origin);
+		return base;
 	}
 
 	static function validateMachining(machining:SceneArtifactMachining, parts:Map<String, Bool>,
@@ -426,7 +687,7 @@ private class SceneArtifactReader {
 			throw "Scene artifact has an invalid signature";
 		var version = readInt();
 		if (version != 2 && version != 3 && version != 4 && version != 5 && version != 6 && version != 7 &&
-			version != 8 && version != 9 && version != 10 && version != 11 && version != SceneArtifact.VERSION)
+			version != 8 && version != 9 && version != 10 && version != 11 && version != 12 && version != SceneArtifact.VERSION)
 			throw 'Unsupported scene artifact version $version';
 		var metresPerUnit = readDouble();
 		var lengthUnit = version >= 8 ? readText() : null;
@@ -522,11 +783,33 @@ private class SceneArtifactReader {
 				machining = @:privateAccess SceneArtifact.decodeMachining(haxe.Json.parse(readBytes(machiningLength).getString(0, machiningLength)));
 			}
 		}
+		var mobileBase:Null<SceneArtifactMobileBase> = null;
+		if (version >= 13) {
+			var mobileLength = readInt();
+			if (mobileLength < 0 || mobileLength > 100000) throw "Scene artifact mobile base is too large";
+			if (mobileLength > 0)
+				mobileBase = @:privateAccess SceneArtifact.decodeMobileBase(haxe.Json.parse(readBytes(mobileLength).getString(0, mobileLength)));
+		}
+		var mission:Null<SceneArtifactMission> = null;
+		if (version >= 13) {
+			var missionLength = readInt();
+			if (missionLength < 0 || missionLength > 1000000) throw "Scene artifact mission is too large";
+			if (missionLength > 0)
+				mission = @:privateAccess SceneArtifact.decodeMission(haxe.Json.parse(readBytes(missionLength).getString(0, missionLength)));
+		}
+		var robotTools:Null<Array<SceneArtifactRobotTool>> = null;
+		if (version >= 13) {
+			var toolsLength = readInt();
+			if (toolsLength < 0 || toolsLength > 100000) throw "Scene artifact robot tools are too large";
+			if (toolsLength > 0)
+				robotTools = @:privateAccess SceneArtifact.decodeRobotTools(haxe.Json.parse(readBytes(toolsLength).getString(0, toolsLength)));
+		}
 		if (offset != source.length) throw "Scene artifact contains trailing data";
 		var result:SceneArtifactData = {metresPerUnit: metresPerUnit, lengthUnit: lengthUnit,
 			parts: parts, assembly: assembly,
 			assemblyDefinition: assemblyDefinition, assemblyState: assemblyState, recipeDocument: recipeDocument,
-			recipeDiagnostics: recipeDiagnostics, machining: machining};
+			recipeDiagnostics: recipeDiagnostics, machining: machining, mobileBase: mobileBase, mission: mission,
+			robotTools: robotTools};
 		@:privateAccess SceneArtifact.validateHeader(result);
 		return result;
 	}

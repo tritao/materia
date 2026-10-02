@@ -71,6 +71,7 @@ std::shared_ptr<Rkd6Endpoint> Rkd6Endpoint::attach(std::unique_ptr<Rkd6Transport
         const auto &channel = blueprint.channels[i];
         begin.channel_kind[i] = static_cast<std::uint8_t>(channel.kind);
         begin.safe_digital[i] = static_cast<std::uint8_t>(channel.safe_value.digital);
+        begin.channel_stop_policy[i] = static_cast<std::uint8_t>(channel.stop_policy);
         if (!std::isfinite(channel.safe_value.analog) ||
             !std::isfinite(channel.safe_value.argument) ||
             std::abs(channel.safe_value.analog) > std::numeric_limits<float>::max() ||

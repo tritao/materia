@@ -130,7 +130,8 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
         for (uint32_t i = 0; i < blueprint->channel_count; ++i) {
             const auto &channel = blueprint->channels[i];
             if (!valid_event_id(channel.id, sizeof(channel.id)) ||
-                channel.kind != channel.safe_value.kind || !valid_event_value(channel.safe_value))
+                channel.kind != channel.safe_value.kind || !valid_event_value(channel.safe_value) ||
+                (channel.stop_policy != RK_CHANNEL_SAFE_ON_STOP && channel.stop_policy != RK_CHANNEL_KEEP_ON_STOP))
                 return RK_ERROR_INVALID_ARGUMENT;
             for (uint32_t j = 0; j < i; ++j)
                 if (std::strcmp(channel.id, blueprint->channels[j].id) == 0)

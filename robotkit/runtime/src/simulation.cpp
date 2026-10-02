@@ -615,6 +615,14 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         const auto topology_result = nksim_world_end_topology_update(world);
         topology_update = false;
         require_sim(topology_result, "nksim_world_end_topology_update");
+        if (robot_desc && (robot_desc->flags & RK_SIMULATION_ROBOT_HOLD_AT_REST)) {
+            std::vector<uint8_t> held(blueprint.joint_count, 0);
+            for (uint32_t index = 0; index < blueprint.joint_count; ++index)
+                held[index] = binding->actuated_joints_[index];
+            for (uint32_t index = 0; index < blueprint.coupling_count; ++index)
+                held[blueprint.couplings[index].follower] = 0;
+            binding->hold_at_rest(std::move(held));
+        }
         bindings_.push_back(binding);
         virtual_bindings_.push_back(virtual_endpoint ? binding : nullptr);
         virtual_devices_.push_back(virtual_endpoint);
@@ -871,8 +879,8 @@ rk_result Simulation::advance_drives() {
         // Body twist (forward, lateral, yaw rate) decoded from the applied rates.
         double forward = 0.0, lateral = 0.0, turn_rate = 0.0;
         if (drive.kind == DrivePlant::Kind::Differential) {
-            const double left = drive.rates[0] * drive.wheel_radius;
-            const double right = drive.rates[1] * drive.wheel_radius;
+            const double left = drive.rates[0] * drive.directions[0] * drive.wheel_radius;
+            const double right = drive.rates[1] * drive.directions[1] * drive.wheel_radius;
             forward = (left + right) * 0.5;
             turn_rate = (right - left) / drive.track_width;
         } else {
@@ -925,7 +933,8 @@ rk_result Simulation::set_differential_drive(
     Lock lock(session_);
     if (desc.struct_size < sizeof(desc) || robot_index >= drives_.size() ||
         !valid_drive_geometry(desc.wheel_radius) || !valid_drive_geometry(desc.track_width) ||
-        desc.left_wheel_joint == desc.right_wheel_joint)
+        desc.left_wheel_joint == desc.right_wheel_joint ||
+        (desc.reversed_wheels & ~(RK_DRIVE_REVERSED_LEFT | RK_DRIVE_REVERSED_RIGHT)) != 0)
         return RK_ERROR_INVALID_ARGUMENT;
     if (robot_floating_[robot_index]) return RK_ERROR_INVALID_STATE;
     const uint32_t joints[2] = {desc.left_wheel_joint, desc.right_wheel_joint};
@@ -937,6 +946,8 @@ rk_result Simulation::set_differential_drive(
     std::copy_n(joints, 2, drive.joints);
     drive.wheel_radius = desc.wheel_radius;
     drive.track_width = desc.track_width;
+    drive.directions[0] = (desc.reversed_wheels & RK_DRIVE_REVERSED_LEFT) != 0 ? -1.0 : 1.0;
+    drive.directions[1] = (desc.reversed_wheels & RK_DRIVE_REVERSED_RIGHT) != 0 ? -1.0 : 1.0;
     std::fill(std::begin(drive.rates), std::end(drive.rates), 0.0);
     return set_robot_base_node_pose(robot_index, robot_base_poses_[robot_index]);
 }

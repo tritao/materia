@@ -15,6 +15,9 @@ import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.JointLimits;
 import robotkit.model.JointCoupling;
+import robotkit.model.RobotDriveConfiguration;
+import robotkit.model.RobotMobileConfiguration;
+import materia.project.SceneArtifact.SceneArtifactMobileBase;
 import cadkit.modeling.AssemblyState;
 
 /**
@@ -83,18 +86,24 @@ class AssemblySimulationBridge {
   public static final DEFAULT_ROTARY_OVERTRAVEL = Math.PI / 180;
 
   /**
-   * `freeOccurrences` are parts the simulation moves on its own instead of bolting them to the
-   * assembly, such as a workpiece; they get no link, and no joint may touch them.
+   * `freeOccurrences` are parts the simulation holds or moves on its own instead of bolting them to
+   * the assembly: a workpiece, or a mobile robot's surroundings; they get no link, and no joint may
+   * touch them.
    *
    * Each rigid body (`AssemblyBodies`) becomes one link, framed at its root part, with the combined
    * mass properties of its parts and one collision hull per part; bodies that no joint carries join
    * the root link. Only moving joints remain joints, so a machine of many bolted parts simulates as
    * a few links and its real axes. `massOf` may override a part's mass in kilograms (a part given
    * another material); its inertia scales with it.
+   *
+   * With `mobileBase` the assembly is a wheeled robot: its root link is the chassis that the drive
+   * rolls over the floor, framed at the robot's `origin` on the floor (the assembly origin without
+   * one), and the named wheel joints drive it.
    */
   public static function toRobotModel(definition:AssemblyDefinition,
       artifact:AssemblyPhysicalData, ?savedState:AssemblyStateRecord,
-      ?freeOccurrences:Array<String>, ?massOf:String->Null<Float>):AssemblySimulationModel {
+      ?freeOccurrences:Array<String>, ?massOf:String->Null<Float>,
+      ?mobileBase:SceneArtifactMobileBase):AssemblySimulationModel {
     var free = new Map<String, Bool>();
     if (freeOccurrences != null) for (id in freeOccurrences) free.set(id, true);
     AssemblyDefinitionCodec.validate(definition);
@@ -108,8 +117,11 @@ class AssemblySimulationBridge {
     var definitions = new Map<String, materia.assembly.AssemblyDefinition.AssemblyComponentDefinition>();
     for (component in definition.definitions) definitions.set(component.id, component);
     for (edge in definition.joints) if (free.exists(edge.parent) || free.exists(edge.child))
-      throw 'Free part is joined by "${edge.id}"; a part the simulation moves on its own cannot be joined';
+      throw 'Free part is joined by "${edge.id}"; a part the simulation holds or moves on its own cannot be joined';
     var placement = new AssemblyState(sourceDefinition, savedState);
+    var rootFrame = mobileBase == null || mobileBase.origin == null ? AssemblyFrames.identity() :
+      {x: mobileBase.origin.x / scale, y: mobileBase.origin.y / scale, z: 0.0, qx: 0.0, qy: 0.0,
+        qz: Math.sin(mobileBase.origin.yaw / 2), qw: Math.cos(mobileBase.origin.yaw / 2)};
     var model = new RobotModel(definition.id);
     var root = model.addLink(new Link("assembly-root"));
     var links = [root];
@@ -124,7 +136,7 @@ class AssemblySimulationBridge {
     for (body in AssemblyBodies.of(definition)) {
       if (free.exists(body.id)) continue;
       var index = 0;
-      var frame = AssemblyFrames.identity();
+      var frame = rootFrame;
       if (body.joint != null) {
         index = links.length;
         links.push(model.addLink(new Link(body.id)));
@@ -244,6 +256,17 @@ class AssemblySimulationBridge {
         placement.joint(coupling.target)) * followerScale;
       model.addCoupling(new JointCoupling(coupling.id, coupling.source,
         coupling.target, ratio, offset));
+    }
+    if (mobileBase != null) {
+      for (wheel in [mobileBase.leftWheel, mobileBase.rightWheel])
+        if ([for (joint in model.joints) if (joint.id == wheel) joint].length != 1)
+          throw 'Mobile base wheel "$wheel" is not a moving joint of the assembly';
+      model.mobileBase = new RobotMobileConfiguration(
+        RobotDriveConfiguration.Differential(mobileBase.leftWheel, mobileBase.rightWheel,
+          mobileBase.wheelRadius, mobileBase.trackWidth),
+        mobileBase.maxLinearSpeed, mobileBase.maxAngularSpeed,
+        mobileBase.maxLinearAcceleration, mobileBase.maxAngularAcceleration,
+        mobileBase.footprintLength, mobileBase.footprintWidth);
     }
     return {model: model, linkHulls: linkHulls, partLinks: partLinks,
       closureIds: closures, closures: closureGeometry};

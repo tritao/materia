@@ -27,6 +27,12 @@ import cadbridge.WallBridge;
 import cadbridge.BimFrameBridge;
 import cadbridge.AssemblySimulationBridge;
 import cadbridge.AssemblyPhysicalPartView;
+import MobileBasePreview;
+import materia.project.SceneArtifact;
+import robotkit.mobile.Twist2;
+import robotkit.runtime.DifferentialDrivePlant;
+import robotkit.runtime.SimulationHarness;
+import robotkit.world.SimulatedRobot;
 import cadbridge.MachineAssemblyMassBridge;
 import cadbridge.EndEffectorBridge;
 import cadbridge.EndEffectorCollision;
@@ -85,6 +91,7 @@ class CadBridgeTests {
     testEndEffectorRuntimeBridge();
     testDerivedRuntimeBindings();
     testAssemblySimulationBridge();
+    testMobileBaseBridge();
     testFaceBridgeOnPlainBoxFace();
     testFaceBridgePreservesConcaveWireOrder();
     testWallBridgeAreaNormalAndExclusion();
@@ -681,6 +688,61 @@ class CadBridgeTests {
    * path this milestone's fallback describes is exercised by at least one
    * test even though the M9 scenario itself never imports cadbridge.
    */
+  /**
+   * The mobile base example drives as a wheeled robot: the bridge makes its chassis the root link that
+   * the drive rolls over the floor, each wheel turns about its own outward shaft, and the chassis
+   * follows the commanded twist.
+   */
+  static function testMobileBaseBridge():Void {
+    var scene = SceneArtifact.decode(MobileBasePreview.base());
+    var drive = scene.mobileBase;
+    if (drive == null || scene.assemblyDefinition == null) throw "Mobile base example should declare its drive";
+    var converted = AssemblySimulationBridge.toRobotModel(cast scene.assemblyDefinition,
+      AssemblyPhysicalPartView.fromSceneArtifact(scene), scene.assemblyState, null, null, drive);
+    var model = converted.model;
+    check(model.links.length == 3 && [for (joint in model.joints) joint.id].join(",") == "wheel_l,wheel_r",
+      "the mobile base is its chassis and two wheel links on the wheel joints");
+    check(model.mobileBase != null, "the bridge configures the mobile base");
+    var blueprint = robotkit.runtime.RobotRuntimeCompiler.compile(model);
+    var configuration:robotkit.runtime.RobotRuntimeConfiguration = cast blueprint.configuration;
+    var mobile:robotkit.runtime.RobotRuntimeMobileConfiguration = cast configuration.mobileBase;
+    check(switch mobile.drive {
+      case robotkit.runtime.RobotRuntimeDriveConfiguration.Differential(_, _, _, _, radius, track, left, right):
+        left == 1 && right == -1 && approx(radius, 0.075, 1e-12) && approx(track, 0.3, 1e-12);
+      case _: false;
+    }, "each wheel's direction comes from its shaft: the right one rolls back on a positive rate");
+
+    var harness = new SimulationHarness(0.02);
+    var runtime = harness.simulation.addRobotAtPose(blueprint, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]);
+    var robot = new SimulatedRobot("mobile-base", runtime, model.name, [for (link in model.links) link.id],
+      [for (joint in model.joints) joint.id]);
+    var base = robotkit.mobile.MobileBase.fromBlueprint(robot, blueprint);
+    var plant = new DifferentialDrivePlant(harness, 0, base);
+    var odometry = base.driveModel.createOdometry();
+    var tick = 1;
+    var snapshot = plant.step(haxe.Int64.ofInt(tick++));
+    odometry.update(snapshot);
+    // 0.5 m/s for ten 0.02 s ticks: 0.1 m straight ahead, each wheel turning 0.1 / 0.075 rad its own way.
+    base.command(new Twist2(0.5, 0.0));
+    for (_ in 0...10) odometry.update(snapshot = plant.step(haxe.Int64.ofInt(tick++)));
+    check(approx(plant.pose.x, 0.1, 1e-9) && approx(plant.pose.y, 0.0, 1e-9) && approx(plant.pose.yaw, 0.0, 1e-9),
+      "the chassis rolls straight ahead at the commanded speed");
+    var chassis = harness.simulation.linkPose(0, 0);
+    check(approx(chassis.position[0], 0.1, 1e-6) && approx(chassis.position[2], 0.0, 1e-6),
+      "the chassis link, which carries the base's parts, moves with the drive");
+    check(approx(snapshot.velocities.get(0), 0.5 / 0.075, 1e-6) && approx(snapshot.velocities.get(1), -0.5 / 0.075, 1e-6),
+      "the wheel joints spin at v / r, the right one negative");
+    // A positive yaw rate turns the base counter-clockwise in place.
+    base.command(new Twist2(0.0, 1.0));
+    for (_ in 0...10) odometry.update(snapshot = plant.step(haxe.Int64.ofInt(tick++)));
+    check(approx(plant.pose.yaw, 0.2, 1e-9) && approx(plant.pose.x, 0.1, 1e-9),
+      "the base turns in place counter-clockwise at the commanded rate");
+    var estimate = odometry.current();
+    check(approx(estimate.x, plant.pose.x, 2e-3) && approx(estimate.yaw, plant.pose.yaw, 2e-2),
+      'wheel odometry follows the chassis (${estimate.x}, ${estimate.yaw} vs ${plant.pose.x}, ${plant.pose.yaw})');
+    harness.dispose();
+  }
+
   static function testBimWallToPatchPlanEndToEnd():Void {
     var bim = new BimDocument();
     // A 6m x 0.3m wall band, the same proportions PlacementTests' (M8) own

@@ -153,6 +153,101 @@ class ProjectKitTests {
     }
   }
 
+  /** A mobile base names its robot's wheel joints and carries positive dimensions and limits. */
+  static function mobileBase():Void {
+    var vertices = Bytes.alloc(96), normals = Bytes.alloc(96), indices = Bytes.alloc(48);
+    vertices.setDouble(24, 1); vertices.setDouble(56, 1); vertices.setDouble(88, 1);
+    var corners = [0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3];
+    for (i in 0...corners.length) indices.setInt32(i * 4, corners[i]);
+    var frame = AssemblyFrames.identity();
+    function wheel(id:String, child:String, type:AssemblyJointType):materia.assembly.AssemblyDefinition.KinematicJoint
+      return {id: id, type: type, role: AssemblyJointRole.Tree, parent: "chassis", parentConnector: "pin",
+        child: child, childConnector: "pin", axis: {x: 0.0, y: 1.0, z: 0.0},
+        limits: {lower: null, upper: null, velocity: 10.0, effort: 1.0}, defaultValue: 0.0};
+    var robot:AssemblyDefinition = {schemaVersion: AssemblyDefinitionCodec.VERSION, id: "robot",
+      lengthUnit: "mm", definitions: [{id: "body", connectors: [{name: "pin", frame: frame}]}],
+      occurrences: [for (id in ["chassis", "left", "right", "mast"]) {id: id, definition: "body", initialPose: frame}],
+      joints: [wheel("wheel_l", "left", AssemblyJointType.Continuous), wheel("wheel_r", "right", AssemblyJointType.Continuous),
+        wheel("lift", "mast", AssemblyJointType.Prismatic)]};
+    var base:materia.project.SceneArtifact.SceneArtifactMobileBase = {leftWheel: "wheel_l", rightWheel: "wheel_r",
+      wheelRadius: 0.075, trackWidth: 0.3, maxLinearSpeed: 0.8, maxAngularSpeed: 2.0,
+      maxLinearAcceleration: 0.5, maxAngularAcceleration: 1.5, footprintLength: 0.6, footprintWidth: 0.44};
+    var data:materia.project.SceneArtifact.SceneArtifactData = {lengthUnit: "mm", metresPerUnit: 0.001,
+      parts: [{id: "body", name: "body", red: 0.5, green: 0.5, blue: 0.5, vertexCount: 4, indexCount: 12,
+        vertices: vertices, normals: normals, indices: indices, faceRanges: []}],
+      assemblyDefinition: robot, mobileBase: base};
+    var restored = SceneArtifact.decode(SceneArtifact.encode(data)).mobileBase;
+    if (restored == null) throw "mobile base round trip lost the base";
+    check(restored.leftWheel == "wheel_l" && restored.rightWheel == "wheel_r" && restored.wheelRadius == 0.075 &&
+      restored.trackWidth == 0.3 && restored.maxAngularAcceleration == 1.5 && restored.footprintWidth == 0.44,
+      "mobile base round trip");
+    // A version 12 scene is the same bytes without the trailing mobile-base and mission sections.
+    data.mobileBase = null;
+    var plain = SceneArtifact.encode(data);
+    var older = Bytes.alloc(plain.length - 12);
+    older.blit(0, plain, 0, older.length);
+    older.setInt32(4, 12);
+    var read = SceneArtifact.decode(older);
+    var readDefinition:AssemblyDefinition = cast read.assemblyDefinition;
+    check(read.mobileBase == null && readDefinition.id == "robot", "scene version 12 reader");
+    data.mobileBase = base;
+    base.rightWheel = "lift";
+    rejects(function() SceneArtifact.encode(data), "mobile base wheel on a sliding joint");
+    base.rightWheel = "wheel_l";
+    rejects(function() SceneArtifact.encode(data), "mobile base with one wheel twice");
+    base.rightWheel = "missing";
+    rejects(function() SceneArtifact.encode(data), "mobile base wheel outside the assembly");
+    base.rightWheel = "wheel_r"; base.trackWidth = 0;
+    rejects(function() SceneArtifact.encode(data), "mobile base without a track");
+    base.trackWidth = 0.3; base.footprintWidth = null;
+    rejects(function() SceneArtifact.encode(data), "mobile base footprint with one side");
+    base.footprintWidth = 0.44;
+    // A robot in a scene of its own: its subtree, where it stands, and where it drives.
+    base.robot = "missing";
+    rejects(function() SceneArtifact.encode(data), "mobile base robot subtree without occurrences");
+    base.robot = null; base.origin = {x: 1.0, y: -0.5, yaw: 0.25};
+    var mission:materia.project.SceneArtifact.SceneArtifactMission = {loop: true, steps: [
+      {kind: "goTo", pose: {x: 2.0, y: 1.0, yaw: Math.PI}}, {kind: "goTo", pose: {x: 0.0, y: 0.0, yaw: 0.0}}]};
+    data.mission = mission;
+    var decoded = SceneArtifact.decode(SceneArtifact.encode(data));
+    var placed = decoded.mobileBase, restoredMission = decoded.mission;
+    if (placed == null || placed.origin == null || restoredMission == null) throw "mobile base mission round trip lost data";
+    var firstPose:materia.project.SceneArtifact.SceneArtifactFloorPose = cast restoredMission.steps[0].pose;
+    var origin:materia.project.SceneArtifact.SceneArtifactFloorPose = cast placed.origin;
+    check(origin.yaw == 0.25 && restoredMission.steps.length == 2 && restoredMission.steps[0].kind == "goTo" &&
+      firstPose.yaw == Math.PI && restoredMission.loop == true, "mobile base origin and mission round trip");
+    var secondPose:materia.project.SceneArtifact.SceneArtifactFloorPose = cast mission.steps[1].pose;
+    secondPose.y = Math.NaN;
+    rejects(function() SceneArtifact.encode(data), "mission pose that is not finite");
+    secondPose.y = 0.0; mission.steps[1].kind = "fly";
+    rejects(function() SceneArtifact.encode(data), "mission step of an unknown kind");
+    mission.steps[1].kind = "goTo";
+    // Picking and placing name connectors of occurrences, and the tool that holds.
+    mission.steps.push({kind: "pick", at: {occurrence: "mast", connector: "pin"}});
+    rejects(function() SceneArtifact.encode(data), "picking mission without a suction tool");
+    data.robotTools = [{kind: "suction", contact: {occurrence: "chassis", connector: "pin"}, channel: "tool/cup.enable",
+      sensor: "tool/sensor.pressureSignal"}];
+    var picked = SceneArtifact.decode(SceneArtifact.encode(data));
+    var picking = picked.mission, tools = picked.robotTools;
+    if (picking == null || tools == null || picking.steps[2].at == null) throw "picking mission round trip lost data";
+    var pickAt:materia.project.SceneArtifact.SceneArtifactPlace = cast picking.steps[2].at;
+    check(pickAt.occurrence == "mast" && tools.length == 1 && tools[0].channel == "tool/cup.enable" &&
+      tools[0].contact.connector == "pin" && tools[0].sensor == "tool/sensor.pressureSignal", "picking mission and tool round trip");
+    mission.steps.push({kind: "place", at: {occurrence: "mast", connector: "seat"}});
+    rejects(function() SceneArtifact.encode(data), "placing on a connector the occurrence lacks");
+    mission.steps.pop();
+    data.robotTools[0].contact.connector = "nowhere";
+    rejects(function() SceneArtifact.encode(data), "suction tool touching with a missing connector");
+    data.robotTools[0].contact.connector = "pin";
+    data.robotTools.push({kind: "suction", contact: {occurrence: "mast", connector: "pin"}, channel: "tool/cup.enable"});
+    rejects(function() SceneArtifact.encode(data), "two tools on one channel");
+    data.robotTools.pop(); mission.steps.pop(); data.robotTools = null;
+    data.mobileBase = null;
+    rejects(function() SceneArtifact.encode(data), "driving mission without a mobile base");
+    data.mobileBase = base; data.mission = null; data.assemblyDefinition = null;
+    rejects(function() SceneArtifact.encode(data), "mobile base without its robot");
+  }
+
   /** A machining job travels with its machine and names only what the scene has. */
   static function machining():Void {
     var vertices = Bytes.alloc(96), normals = Bytes.alloc(96), indices = Bytes.alloc(48);
@@ -269,7 +364,7 @@ class ProjectKitTests {
     near(LengthUnit.metresPerUnit("in"), 0.0254, "inches");
     check(LengthUnit.fromScale(0.01) == "cm", "scale to centimetres");
     rejects(function() LengthUnit.metresPerUnit("feet"), "unsupported unit");
-    assembly(); frames(); scene(); machining(); bodies();
+    assembly(); frames(); scene(); machining(); mobileBase(); bodies();
     check(MaterialLibrary.require("steel-c45").physical.density == 7850, "steel density");
     check(MaterialLibrary.fromSpec("steel C45") == "steel-c45", "material lookup");
     rejects(function() MaterialLibrary.require("unknown"), "unknown material");

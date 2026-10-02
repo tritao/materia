@@ -83,7 +83,8 @@ inline bool decode(std::span<const std::uint8_t> bytes, Frame &frame) {
             const auto *id = header.channel_id.data() + i * 48;
             if (header.channel_kind[i] < 1 || header.channel_kind[i] > 3 || id[0] == 0 ||
                 std::find(id, id + 48, 0) == id + 48 ||
-                header.safe_digital[i] > 1 || !std::isfinite(header.safe_analog[i]) ||
+                header.safe_digital[i] > 1 || header.channel_stop_policy[i] > 1 ||
+                !std::isfinite(header.safe_analog[i]) ||
                 !std::isfinite(header.safe_argument[i])) return false;
         }
     }

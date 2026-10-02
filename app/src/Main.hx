@@ -188,11 +188,7 @@ class Main {
         new ReferenceEditorApp();
       if (projectPath.length > 0) {
         var generated = MateriaProjectRunner.loadProject(projectPath);
-        editor.session.openGeneratedScene(generated.objects, projectPath, generated.assembly,
-          generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
-          generated.localCentersByDefinition, generated.metresPerUnit,
-          generated.physical, generated.recipeDocument, generated.robotMotions, generated.robotGrips,
-          generated.faceDescriptorsByDefinition, generated.cncJob);
+        editor.session.openGeneratedProject(generated, projectPath);
       }
       // Opens bundled examples in order, exactly as the Start page does, for headless checks.
       var settleSeconds = 0.0;
@@ -677,11 +673,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       if(hostContext!=null) deferredProject=projectPath;
       else {
         var generated=MateriaProjectRunner.loadProject(projectPath);
-        session.openGeneratedScene(generated.objects, projectPath, generated.assembly,
-          generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
-          generated.localCentersByDefinition, generated.metresPerUnit,
-          generated.physical, generated.recipeDocument, generated.robotMotions, generated.robotGrips,
-          generated.faceDescriptorsByDefinition, generated.cncJob);
+        session.openGeneratedProject(generated, projectPath);
       }
     }
     bimEditor = makeBimEditor();

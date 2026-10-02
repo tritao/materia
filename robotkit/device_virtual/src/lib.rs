@@ -274,19 +274,19 @@ impl VirtualDevice {
             }
             10 => {
                 self.core.as_mut().unwrap().abort();
-                if self.core.as_ref().unwrap().stop_reason().is_some() {
-                    self.events.as_mut().unwrap().stop(&mut self.board);
+                if let Some(reason) = self.core.as_ref().unwrap().stop_reason() {
+                    self.events.as_mut().unwrap().stop(&mut self.board, reason);
                 }
                 true
             }
             11 => {
                 self.core.as_mut().unwrap().stop(StopReason::Stop);
-                self.events.as_mut().unwrap().stop(&mut self.board);
+                self.events.as_mut().unwrap().stop(&mut self.board, StopReason::Stop);
                 true
             }
             12 => {
                 self.core.as_mut().unwrap().emergency_stop(&mut self.board);
-                self.events.as_mut().unwrap().stop(&mut self.board);
+                self.events.as_mut().unwrap().stop(&mut self.board, StopReason::EmergencyStop);
                 self.final_safe_applied = true;
                 true
             }
@@ -312,10 +312,10 @@ impl VirtualDevice {
             self.board.advance_host_ns(self.host_ns);
             if let Some(core) = self.core.as_mut() {
                 core.tick(&mut self.board);
-                if core.stop_reason().is_some() {
-                    self.events.as_mut().unwrap().stop(&mut self.board);
+                if let Some(reason) = core.stop_reason() {
+                    self.events.as_mut().unwrap().stop(&mut self.board, reason);
                     if core.is_stopped() && !self.final_safe_applied {
-                        self.events.as_ref().unwrap().apply_safe(&mut self.board);
+                        self.events.as_ref().unwrap().apply_safe(&mut self.board, reason);
                         self.final_safe_applied = true;
                     }
                 } else {
@@ -645,7 +645,7 @@ mod tests {
             link_loss_timeout_ns: 2_000_000_000,
             channel_count: 0, channel_id: [0; 1536], channel_kind: [0; 32],
             safe_digital: [0; 32], safe_analog: [0.0; 32],
-            safe_argument: [0.0; 32], safe_command: [0; 1536],
+            safe_argument: [0.0; 32], safe_command: [0; 1536], channel_stop_policy: [0; 32],
         };
         let mut session = vec![0; SessionBegin6::SIZE];
         begin.encode(&mut session).unwrap();

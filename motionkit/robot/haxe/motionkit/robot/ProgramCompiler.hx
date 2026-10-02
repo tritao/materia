@@ -65,6 +65,22 @@ class ProgramCompiler {
   public final orientationTolerance:Float;
   public final ikTolerance:IkTolerance;
   public final configurationSelector:Null<PathConfigurationSelector>;
+  final jointIds:Null<Array<String>>;
+  final couplings:Null<Array<JointCoupling>>;
+
+  /**
+   * This compiler for a planning thread, on a fork of its solver: the worker never shares solver
+   * state with the caller, who keeps using the same kinematics while plans execute.
+   */
+  public function forWorker():ProgramCompiler {
+    var forked = solver.fork();
+    if (forked == solver) return this;
+    return new ProgramCompiler(forked, limits, frameId, maxVelocity, maxAcceleration, maxJerk,
+      startTolerances, timing, cartesianResolution, maxJointJump, positionTolerance,
+      orientationTolerance, ikTolerance,
+      configurationSelector == null ? null : configurationSelector.withSolver(forked),
+      perJointMaxJump, jointIds, couplings);
+  }
 
   public function new(solver:KinematicsSolver, limits:ValidationLimits,
       frameId:String, maxVelocity:Array<Float>, maxAcceleration:Array<Float>,
@@ -135,6 +151,8 @@ class ProgramCompiler {
         couplingIndices.push(pending.splice(next, 1)[0]);
       }
     }
+    this.jointIds = jointIds == null ? null : jointIds.copy();
+    this.couplings = couplings == null ? null : couplings.copy();
     this.positionTolerance = positionTolerance;
     this.orientationTolerance = orientationTolerance;
     this.ikTolerance = ikTolerance == null ? new IkTolerance() : ikTolerance;
@@ -473,7 +491,8 @@ class ProgramCompiler {
     for (k in 0...samples.length) {
       var sample = samples[k], q = positions[k];
       var leaving = sample.primitive.derivativesAt(sample.local);
-      var rate = jointRate(q, leaving.linear, leaving.angular);
+      var chord = pathChord(distances, positions, k);
+      var rate = jointRate(q, leaving.linear, leaving.angular, chord);
       if (rate == null) throw 'Motion program op $index has no joint velocity along the path at distance ${sample.distance}';
       first.push(rate);
       second.push(jointCurvature(q, rate, leaving));
@@ -705,8 +724,9 @@ class ProgramCompiler {
       var pieces = Std.int(Math.max(1, Math.max(Math.ceil(length / cartesianResolution),
         Math.ceil(length * curvature / 0.25))));
       for (piece in 1...(pieces + 1)) {
-        var local = length * piece / pieces;
         var last = piece == pieces;
+        // Exactly the end: `length * pieces / pieces` can round one ulp past it.
+        var local = last ? length : length * piece / pieces;
         var next = last && k + 1 < path.primitives.length ? path.primitives[k + 1] : null;
         samples.push(next == null ?
           {distance: start + local, primitive: primitive, local: local, arriving: null} :
@@ -720,9 +740,21 @@ class ProgramCompiler {
   }
 
   /** dq/ds for a pose moving at `linear` and `angular` per metre of path, or null at a singularity. */
-  function jointRate(q:Array<Float>, linear:Array<Float>, angular:Array<Float>):Null<Array<Float>>
+  function jointRate(q:Array<Float>, linear:Array<Float>, angular:Array<Float>,
+      ?chord:Array<Float>):Null<Array<Float>>
     return solver.solveDifferential(q, new Twist6(linear[0], linear[1], linear[2],
-      angular[0], angular[1], angular[2]));
+      angular[0], angular[1], angular[2]), chord);
+
+  /**
+    dq/ds of the solved samples around sample `k`, centred where it can be: a redundant solver takes
+    its self-motion from it, so the rates follow the redundancy the path search chose.
+  **/
+  static function pathChord(distances:Array<Float>, positions:Array<Array<Float>>, k:Int):Array<Float> {
+    var before = k > 0 ? k - 1 : k, after = k + 1 < positions.length ? k + 1 : k;
+    var span = distances[after] - distances[before];
+    return [for (joint in 0...positions[k].length)
+      span > 0.0 ? (positions[after][joint] - positions[before][joint]) / span : 0.0];
+  }
 
   /**
     d²q/ds²: how dq/ds changes along the path, from the pose's second
@@ -734,7 +766,7 @@ class ProgramCompiler {
     function at(sign:Float):Null<Array<Float>>
       return jointRate([for (joint in 0...q.length) q[joint] + sign * step * rate[joint]],
         [for (axis in 0...3) pose.linear[axis] + sign * step * pose.linearSecond[axis]],
-        [for (axis in 0...3) pose.angular[axis] + sign * step * pose.angularSecond[axis]]);
+        [for (axis in 0...3) pose.angular[axis] + sign * step * pose.angularSecond[axis]], rate);
     var ahead = at(1.0), behind = at(-1.0);
     if (ahead == null || behind == null) return [for (_ in q) 0.0];
     return [for (joint in 0...q.length) (ahead[joint] - behind[joint]) / (2.0 * step)];

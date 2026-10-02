@@ -2,7 +2,7 @@
 	"version": 1,
 	"package": { "name": "cadbridge-tests" },
 	"entry": "tests.CadBridgeTests",
-	"sourceRoots": ["src", "../../../machinekit/examples"],
+	"sourceRoots": ["src", "../../../machinekit/examples", "../../../machinekit/examples/mobile-base", "../../../machinekit/examples/robot-arm"],
 	"dependencies": {
 		"nativekit": { "path": "../../../nativekit" },
 		"projectkit": { "path": "../../../projectkit" },

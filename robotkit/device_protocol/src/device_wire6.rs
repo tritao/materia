@@ -3,7 +3,7 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Error { ShortBuffer, WrongLength }
 
-pub const PROTOCOL_VERSION: u8 = 11;
+pub const PROTOCOL_VERSION: u8 = 12;
 pub const MAX_ACTUATORS: u8 = 64;
 
 #[repr(u8)]
@@ -51,10 +51,11 @@ pub struct SessionBegin6 {
     pub safe_analog: [f32; 32],
     pub safe_argument: [f32; 32],
     pub safe_command: [u8; 1536],
+    pub channel_stop_policy: [u8; 32],
 }
 
 impl SessionBegin6 {
-    pub const SIZE: usize = 4908;
+    pub const SIZE: usize = 4940;
 
     pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {
         if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }
@@ -128,6 +129,10 @@ impl SessionBegin6 {
             offset += 4;
         }
         for value in self.safe_command {
+            out[offset..offset + 1].copy_from_slice(&value.to_le_bytes());
+            offset += 1;
+        }
+        for value in self.channel_stop_policy {
             out[offset..offset + 1].copy_from_slice(&value.to_le_bytes());
             offset += 1;
         }
@@ -267,8 +272,15 @@ impl SessionBegin6 {
             *item = u8::from_le_bytes(bytes);
             offset += 1;
         }
+        let mut channel_stop_policy = [0 as u8; 32];
+        for item in &mut channel_stop_policy {
+            let mut bytes = [0u8; 1];
+            bytes.copy_from_slice(&input[offset..offset + 1]);
+            *item = u8::from_le_bytes(bytes);
+            offset += 1;
+        }
         let _ = offset;
-        Ok(Self { session, protocol_version, model_fingerprint, actuator_count, max_degree, step_tick_hz, max_acceleration, actuator_max_acceleration, steps_per_unit, max_rate, direction_setup_ticks, actuator_joint, actuator_ratio, dual_drive_skew_bound, link_loss_timeout_ns, channel_count, channel_id, channel_kind, safe_digital, safe_analog, safe_argument, safe_command })
+        Ok(Self { session, protocol_version, model_fingerprint, actuator_count, max_degree, step_tick_hz, max_acceleration, actuator_max_acceleration, steps_per_unit, max_rate, direction_setup_ticks, actuator_joint, actuator_ratio, dual_drive_skew_bound, link_loss_timeout_ns, channel_count, channel_id, channel_kind, safe_digital, safe_analog, safe_argument, safe_command, channel_stop_policy })
     }
 }
 

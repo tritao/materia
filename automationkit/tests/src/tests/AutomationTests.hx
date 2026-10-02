@@ -381,9 +381,11 @@ class AutomationTests {
     liftJoint.limits = new JointLimits(0.0, 1.0, 1.0, 100.0);
     var leftJoint = model.addJoint(new Joint("left wheel joint", JointType.Continuous,
       base, leftWheel, "joint/left-wheel"));
+    leftJoint.axis = [0.0, 1.0, 0.0];
     leftJoint.limits = new JointLimits(-100.0, 100.0, 100.0, 100.0);
     var rightJoint = model.addJoint(new Joint("right wheel joint", JointType.Continuous,
       base, rightWheel, "joint/right-wheel"));
+    rightJoint.axis = [0.0, 1.0, 0.0];
     rightJoint.limits = new JointLimits(-100.0, 100.0, 100.0, 100.0);
     model.mobileBase = new RobotMobileConfiguration(
       RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel",

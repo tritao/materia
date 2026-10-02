@@ -96,6 +96,7 @@ fn validate_payload(kind: u8, bytes: &[u8]) -> Result<(), Frame6Error> {
             let id = &head.channel_id[channel * 48..(channel + 1) * 48];
             if !(1..=3).contains(&kind) || id[0] == 0 ||
                !id.contains(&0) || head.safe_digital[channel] > 1 ||
+               head.channel_stop_policy[channel] > 1 ||
                !head.safe_analog[channel].is_finite() ||
                !head.safe_argument[channel].is_finite() {
                 return Err(Frame6Error::BadPayload);

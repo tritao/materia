@@ -6,7 +6,7 @@
     },
     "PROTOCOL_VERSION": {
       "type": "u8",
-      "value": 11
+      "value": 12
     }
   },
   "enums": {
@@ -484,9 +484,14 @@
           "length": 1536,
           "name": "safe_command",
           "type": "u8"
+        },
+        {
+          "length": 32,
+          "name": "channel_stop_policy",
+          "type": "u8"
         }
       ],
-      "size": 4908
+      "size": 4940
     },
     "State6Header": {
       "endian": "little",

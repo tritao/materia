@@ -23,9 +23,21 @@ rk_result RobotRuntime::poll_events(rk_event_record_batch &out_batch) {
     return RK_OK;
 }
 
+rk_result RobotRuntime::channel_value(const char *channel, rk_event_value &out_value) const {
+    if (!channel) return RK_ERROR_INVALID_ARGUMENT;
+    std::lock_guard owner_lock(owner_mutex_);
+    for (uint32_t i = 0; i < blueprint_.channel_count; ++i) {
+        if (std::strncmp(blueprint_.channels[i].id, channel, sizeof(blueprint_.channels[i].id)) != 0) continue;
+        out_value = channel_outputs_[i];
+        return RK_OK;
+    }
+    return RK_ERROR_INVALID_ARGUMENT;
+}
+
 void RobotRuntime::record_event(uint32_t channel_index, const rk_event_value &value,
     uint64_t plan_id, uint64_t scheduled_ns, uint64_t owner_ns, rk_event_cause cause) {
     control_.channel_values[channel_index] = value;
+    channel_outputs_[channel_index] = value;
     rk_event_record record{};
     record.plan_id = plan_id;
     record.scheduled_time_ns = scheduled_ns;
@@ -40,9 +52,10 @@ void RobotRuntime::record_event(uint32_t channel_index, const rk_event_value &va
     event_records_.push_back(record);
 }
 
-void RobotRuntime::safe_channels(uint64_t owner_ns, rk_event_cause cause, bool hold_only) {
+void RobotRuntime::safe_channels(uint64_t owner_ns, rk_event_cause cause, bool hold_only, bool commanded_stop) {
     for (uint32_t i = 0; i < blueprint_.channel_count; ++i) {
         if (hold_only && control_.channel_hold_policies[i] == RK_EVENT_KEEP) continue;
+        if (commanded_stop && blueprint_.channels[i].stop_policy == RK_CHANNEL_KEEP_ON_STOP) continue;
         record_event(i, blueprint_.channels[i].safe_value, control_.active_plan_id,
             control_.trajectory_time_ns, owner_ns, cause);
     }
@@ -272,6 +285,8 @@ RobotRuntime::RobotRuntime(const rk_robot_runtime_blueprint &blueprint,
                            std::shared_ptr<RobotEndpoint> endpoint,
                  std::chrono::nanoseconds period)
     : blueprint_(blueprint), endpoint_(std::move(endpoint)), period_(period) {
+    for (uint32_t i = 0; i < blueprint_.channel_count && i < RK_MAX_PROCESS_CHANNELS; ++i)
+        channel_outputs_[i] = blueprint_.channels[i].safe_value;
     state_.struct_size = sizeof(state_);
     state_.joint_count = blueprint_.joint_count;
     state_.safety = endpoint_ ? endpoint_->initial_safety_state() : RK_SAFETY_READY;
@@ -731,6 +746,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
     }
     control_backup_ = control_;
     trajectory_.begin_tick();
+    std::copy_n(channel_outputs_, RK_MAX_PROCESS_CHANNELS, channel_outputs_backup_);
     std::copy_n(commanded_position_, RK_MAX_JOINTS, commanded_position_backup_);
     std::copy_n(velocity_anchor_pending_, RK_MAX_JOINTS,
         velocity_anchor_pending_backup_);
@@ -1118,7 +1134,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
             }
 
             if (value.kind == RK_COMMAND_STOP) {
-                safe_channels(owner_time_ns, RK_EVENT_STOP_SAFE);
+                safe_channels(owner_time_ns, RK_EVENT_STOP_SAFE, false, true);
                 controlled_stop = begin_controlled_stop();
                 safety = RK_SAFETY_READY;
                 if (has_later_effective_command) {
@@ -1130,7 +1146,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
             }
 
             if (value.kind == RK_COMMAND_ABORT) {
-                safe_channels(owner_time_ns, RK_EVENT_STOP_SAFE);
+                safe_channels(owner_time_ns, RK_EVENT_STOP_SAFE, false, true);
                 if (control_.trajectory_active && !trajectory_.empty()) {
                     refresh_trajectory_progress();
                     double positions[RK_MAX_TRAJECTORY_JOINTS]{};
@@ -1834,6 +1850,7 @@ void RobotRuntime::discard_pending_commands() noexcept {
         state_ = state_backup_;
         trajectory_.undo_tick();
         control_ = control_backup_;
+        std::copy_n(channel_outputs_backup_, RK_MAX_PROCESS_CHANNELS, channel_outputs_);
         std::copy_n(commanded_position_backup_, RK_MAX_JOINTS, commanded_position_);
         std::copy_n(velocity_anchor_pending_backup_, RK_MAX_JOINTS,
             velocity_anchor_pending_);
@@ -1866,6 +1883,9 @@ void RobotRuntime::reset_state() noexcept {
     state_.mode = state_.safety == RK_SAFETY_EMERGENCY_STOP ||
         state_.safety == RK_SAFETY_FAULT ? RK_ROBOT_MODE_FAULT : RK_ROBOT_MODE_IDLE;
     control_ = {};
+    // A robot reset to its start has every output at its safe value again.
+    for (uint32_t i = 0; i < blueprint_.channel_count && i < RK_MAX_PROCESS_CHANNELS; ++i)
+        channel_outputs_[i] = blueprint_.channels[i].safe_value;
     latched_fault_code_ = 1;
     std::fill_n(commanded_position_, RK_MAX_JOINTS, 0.0);
     std::fill_n(commanded_position_backup_, RK_MAX_JOINTS, 0.0);

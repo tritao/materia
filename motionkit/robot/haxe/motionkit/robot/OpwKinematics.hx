@@ -149,6 +149,9 @@ class OpwKinematics implements KinematicsSolver {
       offsets, signs);
   }
 
+  /** Nothing here changes once built, and the arm is safe to share. */
+  public function fork():KinematicsSolver return this;
+
   public function jointCount():Int return 6;
 
   public function forward(q:Array<Float>):Pose3 {
@@ -175,7 +178,8 @@ class OpwKinematics implements KinematicsSolver {
     return result.slice(0, maxCount);
   }
 
-  public function solveDifferential(q:Array<Float>, twist:Twist6):Null<Array<Float>>
+  public function solveDifferential(q:Array<Float>, twist:Twist6,
+      ?preferredRate:Array<Float>):Null<Array<Float>>
     return differential.solveDifferential(q, twist);
 
   /**

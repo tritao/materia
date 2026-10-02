@@ -71,55 +71,13 @@ class EndEffectorRuntimeBridge {
   public static function deriveBindings(set:EndEffectorSet,
       configurationId:String):EndEffectorRuntimeBindings {
     if (set == null) throw "End effector set is required";
-    var configuration = set.configuration(configurationId);
-    var controls:Array<EndEffectorControlBinding> = [];
-    var sensorId:Null<String> = null;
-    var hasGripper = false, hasVacuum = false, hasLock = false;
-    var hasExplicitVacuumValve = false;
-    for (member in configuration.components()) for (intent in member.component.capabilities())
-      switch intent {
-        case VacuumValve(_): hasExplicitVacuumValve = true;
-        case _:
-      }
-    for (member in configuration.components()) for (intent in member.component.capabilities()) {
-      var prefix = '$configurationId/${member.id}';
-      switch intent {
-        case Grip(_, _, openPort, closePort):
-          if (hasGripper || openPort == closePort) throw "Ambiguous gripper runtime ports";
-          requireInlet(configuration, member.id, openPort, [PortKind.Pneumatic, PortKind.Signal]);
-          requireInlet(configuration, member.id, closePort, [PortKind.Pneumatic, PortKind.Signal]);
-          controls.push(EndEffectorControlBinding.Gripper('$prefix.close', member.id,
-            openPort, closePort));
-          hasGripper = true;
-        case VacuumActuator(inletPort):
-          if (hasExplicitVacuumValve) continue;
-          if (hasVacuum) throw "Ambiguous vacuum runtime ports";
-          requireInlet(configuration, member.id, inletPort, [PortKind.Pneumatic, PortKind.Signal]);
-          controls.push(EndEffectorControlBinding.Vacuum('$prefix.enable', member.id, inletPort));
-          hasVacuum = true;
-        case VacuumValve(controlPort):
-          if (hasVacuum) throw "Ambiguous vacuum runtime ports";
-          requireInlet(configuration, member.id, controlPort, [PortKind.Signal]);
-          controls.push(EndEffectorControlBinding.Vacuum('$prefix.enable', member.id, controlPort));
-          hasVacuum = true;
-        case ChangerLock(inletPort):
-          if (hasLock) throw "Ambiguous changer-lock runtime ports";
-          requireInlet(configuration, member.id, inletPort, [PortKind.Pneumatic]);
-          controls.push(EndEffectorControlBinding.Lock('$prefix.lock', member.id, inletPort));
-          hasLock = true;
-        case VacuumPressureSensor(vacuumPort, signalPort):
-          if (sensorId != null) throw "Ambiguous vacuum pressure sensors";
-          requireInlet(configuration, member.id, vacuumPort, [PortKind.Vacuum]);
-          var signal = member.component.port(signalPort);
-          if (signal.role != PortRole.Supply || signal.kind != PortKind.Signal)
-            throw 'Pressure sensor "$prefix" needs a signal supply';
-          sensorId = '$prefix.$signalPort';
-        case _:
-      }
-    }
-    if (sensorId != null && !hasVacuum)
-      throw "Vacuum pressure sensor has no bound vacuum actuator";
-    return {controls: controls, vacuumSensorId: sensorId};
+    var derived = machinekit.robotics.EndEffectorControls.derive(set.configuration(configurationId), configurationId);
+    var controls:Array<EndEffectorControlBinding> = [for (control in derived.controls) switch control {
+      case Gripper(channel, member, openPort, closePort): EndEffectorControlBinding.Gripper(channel, member, openPort, closePort);
+      case Vacuum(channel, member, inletPort): EndEffectorControlBinding.Vacuum(channel, member, inletPort);
+      case Lock(channel, member, inletPort): EndEffectorControlBinding.Lock(channel, member, inletPort);
+    }];
+    return {controls: controls, vacuumSensorId: derived.vacuumSensor};
   }
 
   /** Build a runtime using only declarations on the coupled components. */

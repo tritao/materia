@@ -43,6 +43,7 @@ class MotionKitBootstrapTests {
     processTests.testPoseProcessPath();
     processTests.testMotionEventContracts();
     kinematicsTests.testKinematicsContract();
+    kinematicsTests.testSharedGroupAcrossThreads();
     kinematicsTests.testOpwKinematics();
     programTests.testMotionProgramContracts();
     programTests.testProgramCompiler();

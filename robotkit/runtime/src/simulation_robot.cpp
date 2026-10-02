@@ -17,6 +17,19 @@ std::vector<SimulationRobot::JointCommand> &SimulationRobot::staged_commands() {
     return staged_;
 }
 
+void SimulationRobot::queue_rest_holds() noexcept {
+    for (std::size_t joint = 0; joint < held_at_rest_.size() && joint < joints_.size(); ++joint) {
+        if (!held_at_rest_[joint]) continue;
+        nksim_joint_target target{};
+        target.struct_size = sizeof(target);
+        target.joint = joints_[joint];
+        target.mode = NKSIM_JOINT_TARGET_POSITION;
+        target.target = 0.0;
+        pending_targets_.push_back(target);
+        staged_commands()[joint] = {NKSIM_JOINT_TARGET_POSITION, 0.0};
+    }
+}
+
 void SimulationRobot::queue_velocity_hold(std::size_t joint) {
     nksim_joint_target target{};
     target.struct_size = sizeof(target);

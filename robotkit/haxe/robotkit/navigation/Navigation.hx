@@ -21,6 +21,12 @@ class Navigation {
   public final maxLateralAcceleration:Float;
   public final allowReverse:Bool;
   public var status(default, null):NavigationStatus = Idle;
+  /**
+   * Driving forward, a drive that can turn in place does so first when the route's lookahead point
+   * lies more than this far off its heading, in radians, instead of sweeping a wide arc: leaving a
+   * goal that faces a wall, an arc would run into it. Infinity always follows the arc.
+   */
+  public var rotateToHeadingAngle:Float = Math.PI / 4;
   public var progressDistance(default, null):Float = 0.0;
   /** Signed cross-track error, positive to the left of the path direction. */
   public var crossTrackError(default, null):Float = 0.0;
@@ -31,6 +37,12 @@ class Navigation {
   var lastProjectionPose:Null<Pose2> = null;
   var currentGoal:Null<NavigationGoal> = null;
   var commandedLinearSpeed:Float = 0.0;
+  /**
+   * Following a path, the robot has once come within the goal's position tolerance. From then on it
+   * only turns in place to the goal heading, so rolling on while it brakes cannot send it back to
+   * the path and past the goal.
+   */
+  var positionReached = false;
   var trajectoryElapsedSeconds:Float = 0.0;
   var commandFilter:Null<Twist2 -> Twist2> = null;
 
@@ -95,6 +107,7 @@ class Navigation {
     currentTrajectory = null;
     currentGoal = target;
     progressDistance = initialProgress;
+    positionReached = false;
     lastProjectionPose = initialEstimate == null ||
       initialEstimate.referenceFrame != path.frameId
       ? null
@@ -120,6 +133,7 @@ class Navigation {
     currentGoal = target;
     lastProjectionPose = null;
     trajectoryElapsedSeconds = 0.0;
+    positionReached = false;
     progressDistance = 0.0;
     crossTrackError = 0.0;
     commandedLinearSpeed = 0.0;
@@ -161,7 +175,16 @@ class Navigation {
     var dy = goal.pose.y - state.pose.y;
     var goalDistance = Math.pow(dx * dx + dy * dy, 0.5);
     var headingError = Pose2.wrapAngle(goal.pose.yaw - state.pose.yaw);
-    if (goalDistance <= goal.positionTolerance &&
+    // Within the tolerance it keeps closing in while the goal still lies ahead in its direction of
+    // travel, and latches once it is close (a quarter of the tolerance), has gone past, or has stopped:
+    // braking can carry it on, but must not send it back along the path.
+    if (currentTrajectory == null && goalDistance <= goal.positionTolerance && !positionReached) {
+      var ahead = (goal.pose.x - state.pose.x) * Math.cos(state.pose.yaw) + (goal.pose.y - state.pose.y) * Math.sin(state.pose.yaw);
+      var travel = commandedLinearSpeed;
+      if (goalDistance <= 0.25 * goal.positionTolerance || Math.abs(travel) < 1e-3 || ahead * travel <= 0.0)
+        positionReached = true;
+    }
+    if ((goalDistance <= goal.positionTolerance || positionReached) &&
         Math.abs(headingError) <= goal.headingTolerance) {
       base.stop(StopMode.Normal);
       status = Succeeded;
@@ -181,7 +204,7 @@ class Navigation {
       return updateTrajectory(state, cast currentTrajectory, durationSeconds);
     }
 
-    if (goalDistance <= goal.positionTolerance) {
+    if (positionReached) {
       if (!base.driveModel.supportsInPlaceRotation())
         return fail("Drive model cannot align final heading in place; include a final approach in the path");
       var angular = headingError * 2.0;
@@ -221,6 +244,7 @@ class Navigation {
     var distanceSquared = localTarget.x * localTarget.x + localTarget.y * localTarget.y;
     if (distanceSquared < 1e-9) return fail("Path lookahead collapsed at the robot pose");
     var curvature = 2.0 * localTarget.y / distanceSquared;
+    var bearing = Math.atan2(localTarget.y, localTarget.x);
     var pathHeading = projection.pose.yaw;
     var pathDirection = Math.cos(Pose2.wrapAngle(projection.tangentYaw - pathHeading));
     var direction = allowReverse && pathDirection < 0.0 ? -1.0 : 1.0;
@@ -229,8 +253,18 @@ class Navigation {
         return fail("Navigation passed the path end and reverse motion is disabled");
       direction = -1.0;
     }
-    var remainingDistance = Math.max(path.length - progressDistance,
-      Math.max(0.0, goalDistance - goal.positionTolerance));
+    // Brake to stop at the goal itself, not at the edge of its tolerance: the base keeps rolling while
+    // it decelerates at its limit. The straight line to the goal is never longer than the route left,
+    // and the route left can read long while projection progress lags the robot, so brake for the
+    // shorter: stopping in time, and slowing early only within a braking distance of the goal. Past
+    // the path's end only the goal distance is left.
+    if (direction > 0.0 && Math.abs(bearing) > rotateToHeadingAngle && base.driveModel.supportsInPlaceRotation()) {
+      var turn = bearing * 2.0;
+      if (turn > maxAngularSpeed) turn = maxAngularSpeed;
+      if (turn < -maxAngularSpeed) turn = -maxAngularSpeed;
+      return command(new Twist2(0.0, turn), durationSeconds);
+    }
+    var remainingDistance = atPathEnd ? goalDistance : Math.min(path.length - progressDistance, goalDistance);
     var speed = Math.min(Math.min(cruiseSpeed, base.motionLimits.maxLinearSpeed),
       Math.pow(2.0 * base.motionLimits.maxLinearAcceleration * remainingDistance, 0.5));
     for (limit in currentSpeedLimits) {

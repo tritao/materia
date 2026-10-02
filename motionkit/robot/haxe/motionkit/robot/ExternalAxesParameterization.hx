@@ -40,6 +40,13 @@ class ExternalAxesParameterization implements RedundancyParameterization {
 
   public function valuesAt(q:Array<Float>):Null<Array<Float>> return [for (index in indices) q[index]];
 
+  public function valuesJacobian(q:Array<Float>):Null<Array<Float>> {
+    var n = group.dofCount();
+    var rows = [for (_ in 0...indices.length * n) 0.0];
+    for (k in 0...indices.length) rows[k * n + indices[k]] = 1.0;
+    return rows;
+  }
+
   public function solveAt(target:Pose3, seed:Array<Float>, values:Array<Float>, tolerance:IkTolerance):Null<Array<Float>> {
     for (k in 0...indices.length) {
       var limits = group.group.limitsOf(indices[k]);

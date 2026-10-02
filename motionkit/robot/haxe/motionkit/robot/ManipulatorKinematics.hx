@@ -32,6 +32,8 @@ class ManipulatorKinematics implements KinematicsSolver {
    */
   public var preferredPosture:Null<Array<Float>> = null;
   public final differentialDamping:Float;
+  /** How the group's redundancy is named; null for a group without any. */
+  final parameterization:Null<RedundancyParameterization>;
 
   public function new(manipulator:KinematicGroup, ?differentialDamping:Float = 1e-6) {
     if (manipulator == null) throw "Manipulator kinematics requires a manipulator";
@@ -39,6 +41,15 @@ class ManipulatorKinematics implements KinematicsSolver {
       throw "Differential IK damping must be finite and positive";
     this.manipulator = manipulator;
     this.differentialDamping = differentialDamping;
+    parameterization = manipulator.redundant() ? new SwivelParameterization(manipulator)
+      : manipulator.external.indexOf(true) >= 0 ? new ExternalAxesParameterization(manipulator) : null;
+  }
+
+  /** The same kinematics with its own posture preference; the group is shared, as it is safe to. */
+  public function fork():KinematicsSolver {
+    var copy = new ManipulatorKinematics(manipulator, differentialDamping);
+    copy.preferredPosture = preferredPosture == null ? null : preferredPosture.copy();
+    return copy;
   }
 
   public function jointCount():Int return manipulator.dofCount();
@@ -130,27 +141,53 @@ class ManipulatorKinematics implements KinematicsSolver {
    * plain arm follows point by point, each sample seeded by the last.
    */
   public function solvePath(request:PathRequest):Array<Null<Array<Float>>> {
-    var parameterization = redundancy();
-    if (parameterization == null) return request.followPointByPoint(this);
-    return new RedundancyResolver(parameterization).solvePath(this, request);
+    var named = parameterization;
+    if (named == null) return request.followPointByPoint(this);
+    return new RedundancyResolver(named).solvePath(this, request);
   }
 
   /** How the group's redundancy is named, if it has any: its swivel, else its external axes. */
-  public function redundancy():Null<RedundancyParameterization> {
-    if (manipulator.redundant()) return new SwivelParameterization(manipulator);
-    for (value in manipulator.external) if (value) return new ExternalAxesParameterization(manipulator);
-    return null;
-  }
+  public function redundancy():Null<RedundancyParameterization> return parameterization;
 
 
-  public function solveDifferential(q:Array<Float>, twist:Twist6):Null<Array<Float>> {
+  public function solveDifferential(q:Array<Float>, twist:Twist6,
+      ?preferredRate:Array<Float>):Null<Array<Float>> {
     if (q == null || q.length != jointCount())
       throw 'Differential IK requires ${jointCount()} joint values';
     if (twist == null) throw "Differential IK requires a tool twist";
     var n = jointCount();
     var jacobian = manipulator.tcpJacobian(q);
-    return LinearAlgebra.dampedStep(jacobian, 6, n, [for (joint in 0...n) joint], twist.toArray(),
-      differentialDamping);
+    var columns = [for (joint in 0...n) joint];
+    if (n <= 6) return LinearAlgebra.dampedStep(jacobian, 6, n, columns, twist.toArray(), differentialDamping);
+    var preferred = preferredRate;
+    if (preferred != null && preferred.length != n) throw 'Differential IK preferred rate needs $n values';
+    var rows = 6, target = twist.toArray();
+    // The redundancy moves exactly as the preferred rate moves it: its values' rows join the
+    // tool's, G q̇ = G p, as long as they leave a solvable system.
+    var named = preferred == null || parameterization == null ? null : parameterization.valuesJacobian(q);
+    if (named != null && 6 + parameterization.dimension() <= n) {
+      var extra = parameterization.dimension();
+      for (k in 0...extra) {
+        var rate = 0.0;
+        for (joint in 0...n) {
+          jacobian.push(named[k * n + joint]);
+          rate += named[k * n + joint] * preferred[joint];
+        }
+        target.push(rate);
+      }
+      rows += extra;
+    }
+    // A redundant group's JᵀJ is rank-deficient: solve in row space instead, for
+    // q̇ = p + A⁺(b - A p), the rate nearest the preferred one p that meets every row.
+    if (preferred != null)
+      for (row in 0...rows) {
+        var made = 0.0;
+        for (joint in 0...n) made += jacobian[row * n + joint] * preferred[joint];
+        target[row] -= made;
+      }
+    var step = LinearAlgebra.dampedRowStep(jacobian, rows, n, columns, target, differentialDamping);
+    if (step == null || preferred == null) return step;
+    return [for (joint in 0...n) step[joint] + preferred[joint]];
   }
 
   function options(tolerance:IkTolerance):IkOptions {

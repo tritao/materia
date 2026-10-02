@@ -86,11 +86,12 @@ class Simulation {
       ?linkCollisionBoxes:Array<Null<Array<Float>>>,
       ?linkCollisionHulls:Array<Null<Array<Float>>>,
       ?closures:Array<SimulationClosure>, ?tool:ToolCollisionShape,
-      ?toolLink:Int, ?toolMargin:Float, ?toolGap:Float, ?linkHulls:Array<SimulationLinkHull>):RobotRuntime {
+      ?toolLink:Int, ?toolMargin:Float, ?toolGap:Float, ?linkHulls:Array<SimulationLinkHull>,
+      holdAtRest:Bool = false):RobotRuntime {
     if (position == null || position.length != 3 || rotation == null || rotation.length != 4)
       throw "Simulation.addRobotAtPose requires a three-component position and four-component rotation";
     return addRobotWithPose(blueprint, makePose(position, rotation), virtualDevice, linkCollisionBoxes,
-      linkCollisionHulls, closures, tool, toolLink, toolMargin, toolGap, linkHulls);
+      linkCollisionHulls, closures, tool, toolLink, toolMargin, toolGap, linkHulls, holdAtRest);
   }
 
   function addRobotWithPose(blueprint:RobotRuntimeBlueprint,
@@ -99,7 +100,8 @@ class Simulation {
       ?linkCollisionBoxes:Array<Null<Array<Float>>>,
       ?linkCollisionHulls:Array<Null<Array<Float>>>,
       ?closures:Array<SimulationClosure>, ?tool:ToolCollisionShape,
-      ?toolLink:Int, ?toolMargin:Float, ?toolGap:Float, ?linkHulls:Array<SimulationLinkHull>):RobotRuntime {
+      ?toolLink:Int, ?toolMargin:Float, ?toolGap:Float, ?linkHulls:Array<SimulationLinkHull>,
+      holdAtRest:Bool = false):RobotRuntime {
     ensureLive();
     var robotDesc:Null<rk_simulation_robot_desc> = null;
     if (initialPose != null || virtualDevice != null) {
@@ -344,6 +346,15 @@ class Simulation {
         robotDesc.set_contact_pairs(index, native);
       }
     }
+    // Joints hold the designed pose until commanded, like servos enabled at power-on.
+    if (holdAtRest) {
+      if (robotDesc == null) {
+        robotDesc = new rk_simulation_robot_desc();
+        robotDesc.set_struct_size(rk_simulation_robot_desc.size());
+      }
+      var desc:rk_simulation_robot_desc = cast robotDesc;
+      desc.set_flags(desc.get_flags() | RobotKitSimKitConstants.RK_SIMULATION_ROBOT_HOLD_AT_REST);
+    }
     var result = RobotKitSimKit.rk_simulation_add_robot(owner.borrow(), blueprint.nativeValue(), robotDesc);
     check(result.status, "simulation.addRobot");
     var runtime = new RobotRuntime(result.out_runtime, blueprint);
@@ -498,10 +509,12 @@ class Simulation {
    * tick the base rolls by the wheel targets the robot applied for that tick
    * (after runtime clamping, zero after any stop), before physics advances,
    * whatever submitted them. Joint indices are robot joint indices; lengths
-   * are metres. The plant starts from the base's current pose.
+   * are metres. A wheel's direction is -1 when a positive joint rate rolls it
+   * backward. The plant starts from the base's current pose.
    */
   public function setDifferentialDrive(robotIndex:Int, leftWheelJoint:Int,
-      rightWheelJoint:Int, wheelRadius:Float, trackWidth:Float):Void {
+      rightWheelJoint:Int, wheelRadius:Float, trackWidth:Float,
+      leftDirection:Int = 1, rightDirection:Int = 1):Void {
     ensureLive();
     if (leftWheelJoint < 0 || rightWheelJoint < 0)
       throw "Simulation.setDifferentialDrive requires wheel joint indices";
@@ -511,6 +524,10 @@ class Simulation {
     desc.set_right_wheel_joint(rightWheelJoint);
     desc.set_wheel_radius(wheelRadius);
     desc.set_track_width(trackWidth);
+    if (Math.abs(leftDirection) != 1 || Math.abs(rightDirection) != 1)
+      throw "Simulation.setDifferentialDrive wheel directions must be 1 or -1";
+    desc.set_reversed_wheels((leftDirection < 0 ? RobotKitSimKitConstants.RK_DRIVE_REVERSED_LEFT : 0)
+      | (rightDirection < 0 ? RobotKitSimKitConstants.RK_DRIVE_REVERSED_RIGHT : 0));
     check(RobotKitSimKit.rk_simulation_set_differential_drive(owner.borrow(), robotIndex, desc),
       "simulation.setDifferentialDrive");
   }
@@ -660,6 +677,33 @@ class Simulation {
     var result = RobotKitSimKit.rk_simulation_get_link_body(owner.borrow(), robotIndex, linkIndex);
     check(result.status, "simulation.linkBody");
     return result.out_body;
+  }
+
+  /** Where a session object is now. */
+  public function objectPose(object:nativekit.sim.SimObject):nativekit.sim.SimPose {
+    ensureLive();
+    var frame = session.capture();
+    try {
+      var pose = frame.objectPose(object);
+      frame.dispose();
+      return pose;
+    } catch (failure:Dynamic) {
+      frame.dispose();
+      throw failure;
+    }
+  }
+
+  /** Carries a session object on a robot link at `relative`, its pose in the link's frame, until released. */
+  public function holdObjectOnLink(object:nativekit.sim.SimObject, robotIndex:Int, linkIndex:Int,
+      relative:nativekit.sim.SimPose):Void {
+    ensureLive();
+    session.holdObject(object, linkBody(robotIndex, linkIndex), relative);
+  }
+
+  /** Lets go of a session object some link carries. */
+  public function releaseObject(object:nativekit.sim.SimObject):Void {
+    ensureLive();
+    session.releaseObject(object);
   }
 
   /** Reads an articulated link pose without mutating the simulation. */

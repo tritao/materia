@@ -9,9 +9,20 @@ import materia.project.SceneArtifact;
 class RobotArmPreview {
 	public static inline var ASSEMBLY_ID:String = "robot-arm";
 
-	/** Geometry, joints and initial pose of the arm; parts with equal designations share geometry. */
-	public static function arm():Bytes
-		return SceneArtifact.encode(AssemblyPreview.scene(new RobotArm(), ASSEMBLY_ID));
+	/**
+	 * Geometry, joints and initial pose of the arm in its cell, its suction tool, and its work: carry
+	 * the workpiece from one pad to the other and back, on repeat.
+	 */
+	public static function arm():Bytes {
+		var robot = new RobotArm();
+		var scene = AssemblyPreview.scene(robot, ASSEMBLY_ID);
+		scene.robotTools = AssemblyPreview.robotTools(robot.tool, "tool");
+		function onto(pad:String):Array<materia.project.SceneArtifact.SceneArtifactMissionStep>
+			return [{kind: "pick", at: {occurrence: "workpiece", connector: "top"}},
+				{kind: "place", at: {occurrence: pad, connector: "top"}}];
+		scene.mission = {loop: true, steps: onto("padPlace").concat(onto("padPick"))};
+		return SceneArtifact.encode(scene);
+	}
 }
 
 /** Geometry builds, and forward kinematics puts the tool where the layout says. */
@@ -24,6 +35,10 @@ class RobotArmChecks {
 	public static function run():Void {
 		var scene = SceneArtifact.decode(RobotArmPreview.arm());
 		var definition = scene.assemblyDefinition;
+		if (scene.robotTools == null || scene.robotTools.length != 1 || scene.robotTools[0].sensor == null)
+			throw "Robot arm should carry one suction tool with a vacuum sensor";
+		if (scene.mission == null || scene.mission.steps.length != 4)
+			throw "Robot arm should carry the workpiece to the other pad and back";
 		var robot = new RobotArm();
 		if (definition == null || definition.occurrences.length != robot.components().length)
 			throw "Robot arm preview has the wrong number of occurrences";

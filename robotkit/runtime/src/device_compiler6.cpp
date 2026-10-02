@@ -62,6 +62,8 @@ std::array<std::uint8_t, 16> fingerprint_device_layout6(
         mix(std::bit_cast<std::uint64_t>(channel.safe_value.analog));
         mix(std::bit_cast<std::uint64_t>(channel.safe_value.argument));
         for (unsigned char c : channel.safe_value.command) mix(c);
+        // Mixed only when set, so models declared before the policy keep their identity.
+        if (channel.stop_policy != RK_CHANNEL_SAFE_ON_STOP) mix(channel.stop_policy);
     }
     for (int i = 0; i < 16; ++i) {
         hash ^= hash >> 32; hash *= 1099511628211ULL;

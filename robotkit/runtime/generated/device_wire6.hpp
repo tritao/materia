@@ -8,7 +8,7 @@
 
 namespace robotkit::device_wire6 {
 
-inline constexpr std::uint8_t PROTOCOL_VERSION = 11;
+inline constexpr std::uint8_t PROTOCOL_VERSION = 12;
 inline constexpr std::uint8_t MAX_ACTUATORS = 64;
 
 enum class MessageType6 : std::uint8_t {
@@ -30,7 +30,7 @@ enum class MessageType6 : std::uint8_t {
     event = 16,
 };
 
-inline constexpr std::size_t SessionBegin6_SIZE = 4908;
+inline constexpr std::size_t SessionBegin6_SIZE = 4940;
 struct SessionBegin6 {
     static constexpr std::size_t SIZE = SessionBegin6_SIZE;
     std::uint64_t session{};
@@ -55,6 +55,7 @@ struct SessionBegin6 {
     std::array<float, 32> safe_analog{};
     std::array<float, 32> safe_argument{};
     std::array<std::uint8_t, 1536> safe_command{};
+    std::array<std::uint8_t, 32> channel_stop_policy{};
 };
 
 inline bool encode(const SessionBegin6 &value, std::span<std::uint8_t> out) {
@@ -173,6 +174,10 @@ inline bool encode(const SessionBegin6 &value, std::span<std::uint8_t> out) {
     for (std::size_t i = 0; i < 1536; ++i) {
         const std::uint8_t bits_safe_command = static_cast<std::uint8_t>(value.safe_command[i]);
         out[offset++] = static_cast<std::uint8_t>(bits_safe_command >> 0);
+    }
+    for (std::size_t i = 0; i < 32; ++i) {
+        const std::uint8_t bits_channel_stop_policy = static_cast<std::uint8_t>(value.channel_stop_policy[i]);
+        out[offset++] = static_cast<std::uint8_t>(bits_channel_stop_policy >> 0);
     }
     return true;
 }
@@ -315,6 +320,11 @@ inline bool decode(std::span<const std::uint8_t> input, SessionBegin6 &value) {
         std::uint8_t bits_safe_command = 0;
         bits_safe_command |= static_cast<std::uint8_t>(input[offset++]) << 0;
         value.safe_command[i] = bits_safe_command;
+    }
+    for (std::size_t i = 0; i < 32; ++i) {
+        std::uint8_t bits_channel_stop_policy = 0;
+        bits_channel_stop_policy |= static_cast<std::uint8_t>(input[offset++]) << 0;
+        value.channel_stop_policy[i] = bits_channel_stop_policy;
     }
     return true;
 }

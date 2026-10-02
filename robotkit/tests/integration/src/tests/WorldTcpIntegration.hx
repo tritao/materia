@@ -101,11 +101,13 @@ class WorldTcpIntegration {
       var carriage = model.addLink(new robotkit.model.Link("fork carriage", "link/carriage"));
       var leftWheelJoint = model.addJoint(new robotkit.model.Joint("left wheel joint",
         robotkit.model.JointType.Continuous, base, leftWheel, "joint/left-wheel"));
+      leftWheelJoint.axis = [0.0, 1.0, 0.0];
       leftWheelJoint.limits.lower = -100.0;
       leftWheelJoint.limits.upper = 100.0;
       leftWheelJoint.limits.effort = 100.0;
       var rightWheelJoint = model.addJoint(new robotkit.model.Joint("right wheel joint",
         robotkit.model.JointType.Continuous, base, rightWheel, "joint/right-wheel"));
+      rightWheelJoint.axis = [0.0, 1.0, 0.0];
       rightWheelJoint.limits.lower = -100.0;
       rightWheelJoint.limits.upper = 100.0;
       rightWheelJoint.limits.effort = 100.0;

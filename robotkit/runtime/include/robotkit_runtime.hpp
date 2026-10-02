@@ -212,6 +212,8 @@ public:
     /** Copies the latest state plus revision, endpoint, and fault metadata. */
     rk_result snapshot_full(rk_robot_snapshot &out_snapshot) const;
     rk_result poll_events(rk_event_record_batch &out_batch);
+    /** The current output value of a declared process channel. */
+    rk_result channel_value(const char *channel, rk_event_value &out_value) const;
     /** Reports whether the endpoint accepts buffered trajectory chunks. */
     bool supports_trajectory_queue() const noexcept {
         return endpoint_ != nullptr && endpoint_->supports_trajectory_queue();
@@ -332,6 +334,12 @@ private:
     mutable std::mutex queue_mutex_;
     /** Serializes plan submission with owner queue/clock mutations. */
     mutable std::mutex owner_mutex_;
+    /**
+     * Each channel's output as its device sees it: the safe value until an event fires on it, then
+     * the last value fired. Kept apart from the control state, which stops and resets clear.
+     */
+    rk_event_value channel_outputs_[RK_MAX_PROCESS_CHANNELS]{};
+    rk_event_value channel_outputs_backup_[RK_MAX_PROCESS_CHANNELS]{};
     std::condition_variable queue_condition_;
     std::deque<QueuedCommand> commands_;
     std::thread worker_;
@@ -346,7 +354,11 @@ private:
     uint64_t current_owner_time_ns_ = 0;
     void record_event(uint32_t channel_index, const rk_event_value &value,
         uint64_t plan_id, uint64_t scheduled_ns, uint64_t owner_ns, rk_event_cause cause);
-    void safe_channels(uint64_t owner_ns, rk_event_cause cause, bool hold_only = false);
+    /**
+     * Takes channels to their safe values; a commanded stop or abort leaves those declared
+     * RK_CHANNEL_KEEP_ON_STOP as they are.
+     */
+    void safe_channels(uint64_t owner_ns, rk_event_cause cause, bool hold_only = false, bool commanded_stop = false);
     int32_t latched_fault_code_ = 1;
     /** The control state at the start of the world tick, without its trajectory queue. */
     ControlState control_backup_{};

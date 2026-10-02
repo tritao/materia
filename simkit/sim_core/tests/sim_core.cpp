@@ -93,6 +93,80 @@ void offset_convex_fallback_uses_its_bounds_center() {
     nkscene_scene_destroy(scene);
 }
 
+nkscene_node_id make_turned_node(nkscene_scene scene, double x, double y, double z, double yaw) {
+    nkscene_transaction transaction = 0;
+    assert(nkscene_transaction_begin(scene, &transaction) == NKS_OK);
+    nkscene_node_id node{};
+    assert(nkscene_tx_create_node(transaction, &node) == NKS_OK);
+    auto transform = make_transform(x, y, z);
+    transform.matrix[0] = static_cast<float>(std::cos(yaw));
+    transform.matrix[1] = static_cast<float>(std::sin(yaw));
+    transform.matrix[4] = static_cast<float>(-std::sin(yaw));
+    transform.matrix[5] = static_cast<float>(std::cos(yaw));
+    assert(nkscene_tx_set_transform(transaction, node, &transform) == NKS_OK);
+    nkscene_change_set changes = 0;
+    assert(nkscene_transaction_commit_with_changes(transaction, &changes) == NKS_OK);
+    nkscene_change_set_destroy(changes);
+    return node;
+}
+
+// A slender bar turned 45 degrees catches what falls on it, and nothing beside it: its axis-aligned
+// bounds reach far past the bar, and a box falling there must fall by.
+void turned_box_contacts_reach_only_the_box() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    const auto bar_node = make_turned_node(scene, 0.0, 0.0, 0.0, M_PI / 4);
+    const auto on_node = make_node_at(scene, 0.5, 0.5, 1.0);
+    const auto beside_node = make_node_at(scene, 0.6, -0.6, 1.0);
+    nksim_world_desc world_desc{};
+    world_desc.struct_size = sizeof(world_desc);
+    world_desc.scene = scene;
+    world_desc.fixed_timestep = 0.01;
+    world_desc.physics_substeps = 1;
+    world_desc.gravity[2] = -9.81;
+    nksim_world world = 0;
+    assert(nksim_world_create(&world_desc, &world) == NKSIM_OK);
+    const double bar_half[] = {1.0, 0.05, 0.05};
+    nksim_shape bar_shape = 0;
+    assert(nksim_shape_create_box(world, bar_half, &bar_shape) == NKSIM_OK);
+    const double half[] = {0.1, 0.1, 0.1};
+    nksim_shape box = 0;
+    assert(nksim_shape_create_box(world, half, &box) == NKSIM_OK);
+    nksim_body_desc body_desc{};
+    body_desc.struct_size = sizeof(body_desc);
+    body_desc.node = bar_node;
+    body_desc.shape = bar_shape;
+    body_desc.motion_type = NKSIM_MOTION_STATIC;
+    body_desc.collision_layer = body_desc.collision_mask = 1;
+    nksim_body bar = 0;
+    assert(nksim_body_create(world, &body_desc, &bar) == NKSIM_OK);
+    body_desc.shape = box;
+    body_desc.motion_type = NKSIM_MOTION_DYNAMIC;
+    body_desc.mass = 1.0;
+    body_desc.node = on_node;
+    nksim_body on = 0;
+    assert(nksim_body_create(world, &body_desc, &on) == NKSIM_OK);
+    body_desc.node = beside_node;
+    nksim_body beside = 0;
+    assert(nksim_body_create(world, &body_desc, &beside) == NKSIM_OK);
+    for (int tick = 0; tick < 200; ++tick) {
+        nksim_step_result step{};
+        step.struct_size = sizeof(step);
+        assert(nksim_world_step(world, &step) == NKSIM_OK);
+        if (step.scene_changes) nkscene_change_set_destroy(step.scene_changes);
+    }
+    nksim_body_state on_state{}, beside_state{};
+    on_state.struct_size = beside_state.struct_size = sizeof(on_state);
+    assert(nksim_body_get_state(world, on, &on_state) == NKSIM_OK);
+    assert(nksim_body_get_state(world, beside, &beside_state) == NKSIM_OK);
+    // Resting on the bar's top face: its centre a box's half above the bar's.
+    assert(on_state.position[2] > 0.14 && on_state.position[2] < 0.16);
+    assert(std::abs(on_state.position[0] - 0.5) < 1e-6 && std::abs(on_state.position[1] - 0.5) < 1e-6);
+    assert(beside_state.position[2] < -1.0);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
 struct NestedNodes {
     nkscene_node_id parent{};
     nkscene_node_id child{};
@@ -837,6 +911,7 @@ void kinematic_root_twist_carries_to_its_links() {
 
 int main() {
     offset_convex_fallback_uses_its_bounds_center();
+    turned_box_contacts_reach_only_the_box();
     falling_body_updates_scene_and_snapshot();
     nested_dynamic_body_updates_local_transform();
     repeated_replays_are_identical();

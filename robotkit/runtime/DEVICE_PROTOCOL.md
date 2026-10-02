@@ -31,8 +31,12 @@ device path tick, channel index, typed value and HOLD policy. The host maps
 each `TimedEvent` from plan-relative path time with the same frozen clock
 mapping as its trajectory segments. The device fires only committed events as
 its path clock crosses their ticks. HOLD makes configured channels safe,
-RESUME restores `RestoreOnResume` values, and STOP or a fault discards future
-events and sets every channel to its declared safe value. Replacement discards
+RESUME restores `RestoreOnResume` values, and STOP, ABORT or a fault discards
+future events and sets every channel to its declared safe value, except that a
+commanded STOP or ABORT leaves a channel whose stop policy is keep-on-stop as it
+is (protocol version 12), so a vacuum holding a part does not drop it when the
+arm is stopped. An emergency stop, link loss or fault still makes every channel
+safe. Stopping the motion never touches the channels: they are the events'. Replacement discards
 events at or after the replacement boundary. The virtual event log records
 scheduled path ticks, applied path ticks and device ticks.
 
@@ -106,6 +110,10 @@ converted f32 path against the original trajectory at step-tick resolution,
 and revalidates the lowered path. It accounts for frames in flight when
 streaming into a small queue. Qualification reports minimum baud, queue depth
 and period before construction succeeds.
+
+Protocol version 12 adds `channel_stop_policy` to `SESSION_BEGIN6`, one byte per
+channel: 0 makes the channel safe on every stop, 1 keeps it through a commanded
+STOP or ABORT, as the host runtime's `RK_CHANNEL_KEEP_ON_STOP` does.
 
 Protocol version 11 adds two `QUEUE_STATUS6` fields. `received_until_ticks` is
 the end of the last segment the device holds, so a replacement is accepted only
