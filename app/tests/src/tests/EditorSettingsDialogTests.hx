@@ -182,6 +182,11 @@ class EditorSettingsDialogTests {
     check(editor.commands.execute("scene.toggle-grid") && !editor.gridVisible && !store.getBool(AppSettings.GRID_VISIBLE),
       "Toggle grid saves the choice");
     check(editor.commands.get("scene.toggle-grid").isChecked() == false, "and the menu shows it");
+    check(editor.simulationOverlaysVisible && editor.commands.execute("scene.toggle-simulation-overlays") &&
+      !editor.simulationOverlaysVisible && !store.getBool(AppSettings.SIMULATION_OVERLAYS) &&
+      editor.commands.get("scene.toggle-simulation-overlays").isChecked() == false,
+      "Toggle simulation overlays saves the choice and the menu shows it");
+    editor.commands.execute("scene.toggle-simulation-overlays");
     editor.commands.execute("scene.toggle-grid-snap");
     editor.commands.execute("scene.grid-spacing-0.5");
     check(editor.gridSnapEnabled && editor.gridSpacing == 0.5 && store.getFloat(AppSettings.GRID_SPACING) == 0.5,

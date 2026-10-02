@@ -101,6 +101,10 @@ class MissionPlayer implements SessionMember {
   public static inline var MAP_TOLERANCE:Float = 0.1;
   /** Radius (m) of the disk a lidar return stands for: a scan samples the face of what it sees. */
   public static inline var SCAN_RADIUS:Float = 0.08;
+  /** The guard's reaction time (s), the clearance (m) it stops at, and the further distance (m) over which it slows. */
+  public static inline var GUARD_REACTION:Float = 0.2;
+  public static inline var GUARD_MARGIN:Float = 0.1;
+  public static inline var GUARD_SLOWDOWN:Float = 0.5;
   /** An obstacle the lidar has lost sight of stays on the map this long (s), unless a scan sees through its place. */
   public static inline var MEMORY_SECONDS:Float = 20.0;
 
@@ -197,7 +201,8 @@ class MissionPlayer implements SessionMember {
         scanner = sensor.id;
         scanning = new FrameAwarePerception(LidarObstaclePerception.fromSensor(sensor, SCAN_RADIUS), localization, null,
           LidarMapFilter.fromSensor(map.grid, sensor, MAP_TOLERANCE), LidarFreeSpace.fromSensor(sensor));
-        guard = new MotionGuard(navigation, footprint);
+        guard = new MotionGuard(navigation, footprint, GUARD_REACTION, base.motionLimits.maxLinearAcceleration, GUARD_MARGIN,
+          GUARD_SLOWDOWN, map);
       }
       navigator = new Navigator(navigation, new AStarPlanner(map), map, 0.5, guard);
       wheels = new WheelOdometryLocalization(base, FRAME, robot.rootLink);

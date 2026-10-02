@@ -82,6 +82,7 @@ class EditorPerspectiveViewport implements View {
   var simulationPoses:Array<SimulationPoseVisual> = [];
   var robotVisuals:Array<SimulationRobotVisual> = [];
   final missionOverlay = new MissionOverlayView();
+  var overlaysVisible:Bool = true;
 
   public function new(key:String, scene:EditorScene, host:UiHostContext, ?style:LayoutStyle) {
     this.key = key;
@@ -283,6 +284,8 @@ class EditorPerspectiveViewport implements View {
     robotVisuals=robots==null?[]:robots.copy();
   }
   /** What the running mission shows on the floor: its route, costmap, sensed obstacles and odometry; null shows none. */
+  /** Whether sensor rays (and, through `setMissionOverlay`, the mission's overlays) are drawn. */
+  public function setSimulationOverlays(visible:Bool):Void overlaysVisible = visible;
   public function setMissionOverlay(overlay:Null<MissionOverlay>):Void missionOverlay.set(overlay);
   public function editingEnabled():Bool return !simulationActive;
 
@@ -595,7 +598,7 @@ class EditorPerspectiveViewport implements View {
         if(hit!=null&&(hit.x!=mount.x||hit.y!=mount.y)){path.moveTo(mount.x,mount.y).lineTo(hit.x,hit.y);visibleRays++;}}
       // Every ray can project to nothing (behind the camera, clipped, or a range that is not finite yet) or have
       // no length (a zero range before the first scan); stroking such a path would hand the renderer nothing.
-      if(visibleRays>0)canvas.strokeTransient(path.build(),Color.rgba(0.25,0.8,1.0,0.55),1.0);
+      if(visibleRays>0&&overlaysVisible)canvas.strokeTransient(path.build(),Color.rgba(0.25,0.8,1.0,0.22),1.0);
     }
     }
   }

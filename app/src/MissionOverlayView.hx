@@ -7,6 +7,7 @@ import app.MissionPlayer.MissionOverlay;
 import robotkit.mobile.Pose2;
 import robotkit.navigation.Costmap2;
 import robotkit.navigation.MotionGuardState;
+import robotkit.perception.Obstacle;
 
 /**
  * Draws a running mission on the floor of the viewport, from the data `MissionPlayer.overlay` hands over
@@ -17,13 +18,15 @@ import robotkit.navigation.MotionGuardState;
 class MissionOverlayView {
   /** Height above the floor the lines are drawn at, in metres, to keep clear of it. */
   public static inline var LIFT:Float = 0.02;
-  static inline var CIRCLE_SEGMENTS:Int = 24;
+  static inline var CIRCLE_SEGMENTS:Int = 12;
 
   var overlay:Null<MissionOverlay> = null;
   /** The costmap's blocked-area edge as x0, y0, x1, y1 runs, and what it was drawn from. */
   var edge:Array<Float> = [];
   var edgeMap:Null<Costmap2> = null;
   var edgeRevision:Int = -1;
+  /** Segments added to the path being built; a path with none cannot be stroked. */
+  var appended:Int = 0;
 
   public function new() {}
 
@@ -45,6 +48,7 @@ class MissionOverlayView {
   public function paint(canvas:Canvas, camera:PerspectiveCamera, width:Float, height:Float):Void {
     var drawn = overlay;
     if (drawn == null) return;
+    appended = 0;
     var blocked = switch drawn.guard { case Blocked(_): true; case _: false; };
 
     var wall = new PathBuilder();
@@ -53,25 +57,17 @@ class MissionOverlayView {
       segment(wall, camera, width, height, edge[index], edge[index + 1], edge[index + 2], edge[index + 3]);
       index += 4;
     }
-    canvas.strokeTransient(wall.build(), Color.rgba(0.95, 0.35, 0.3, 0.55), 1.0);
+    stroke(canvas, wall, Color.rgba(0.95, 0.35, 0.3, 0.55), 1.0);
 
     var sensed = new PathBuilder();
-    for (obstacle in drawn.obstacles) {
-      var at = obstacle.detection.pose;
-      for (step in 0...CIRCLE_SEGMENTS) {
-        var from = 2.0 * Math.PI * step / CIRCLE_SEGMENTS, to = 2.0 * Math.PI * (step + 1) / CIRCLE_SEGMENTS;
-        segment(sensed, camera, width, height, at.x + obstacle.radiusMeters * Math.cos(from),
-          at.y + obstacle.radiusMeters * Math.sin(from), at.x + obstacle.radiusMeters * Math.cos(to),
-          at.y + obstacle.radiusMeters * Math.sin(to));
-      }
-    }
-    canvas.strokeTransient(sensed.build(), Color.rgba(1.0, 0.3, 0.85, 0.9), 2.0);
+    for (obstacle in drawn.obstacles) capsule(sensed, camera, width, height, obstacle);
+    stroke(canvas, sensed, Color.rgba(1.0, 0.3, 0.85, 0.9), 2.0);
 
     var route = new PathBuilder();
     for (point in 1...drawn.route.length)
       segment(route, camera, width, height, drawn.route[point - 1].x, drawn.route[point - 1].y,
         drawn.route[point].x, drawn.route[point].y);
-    canvas.strokeTransient(route.build(), blocked ? Color.rgba(1.0, 0.2, 0.2, 0.95) : Color.rgba(1.0, 0.8, 0.2, 0.95), 2.0);
+    stroke(canvas, route, blocked ? Color.rgba(1.0, 0.2, 0.2, 0.95) : Color.rgba(1.0, 0.8, 0.2, 0.95), 2.0);
 
     var ghost = new PathBuilder();
     var corners = drawn.outline;
@@ -81,13 +77,40 @@ class MissionOverlayView {
     }
     var at = drawn.odometry;
     if (at != null) segment(ghost, camera, width, height, at.x, at.y, at.x + 0.3 * Math.cos(at.yaw), at.y + 0.3 * Math.sin(at.yaw));
-    canvas.strokeTransient(ghost.build(), Color.rgba(0.6, 0.85, 1.0, 0.9), 1.5);
+    stroke(canvas, ghost, Color.rgba(0.6, 0.85, 1.0, 0.9), 1.5);
+  }
+
+  /** An obstacle's outline: two sides along its segment and a half circle round each end. */
+  function capsule(path:PathBuilder, camera:PerspectiveCamera, width:Float, height:Float, obstacle:Obstacle):Void {
+    var ends = obstacle.ends(), r = obstacle.radiusMeters, yaw = obstacle.detection.pose.yaw;
+    var nx = -Math.sin(yaw) * r, ny = Math.cos(yaw) * r;
+    segment(path, camera, width, height, ends[0].x + nx, ends[0].y + ny, ends[1].x + nx, ends[1].y + ny);
+    segment(path, camera, width, height, ends[0].x - nx, ends[0].y - ny, ends[1].x - nx, ends[1].y - ny);
+    for (end in 0...2) {
+      // The cap runs from one side, round the outer end, to the other.
+      var centre = ends[end], start = yaw + (end == 1 ? -Math.PI / 2 : Math.PI / 2);
+      for (step in 0...CIRCLE_SEGMENTS) {
+        var from = start + Math.PI * step / CIRCLE_SEGMENTS;
+        var to = start + Math.PI * (step + 1) / CIRCLE_SEGMENTS;
+        segment(path, camera, width, height, centre.x + r * Math.cos(from), centre.y + r * Math.sin(from),
+          centre.x + r * Math.cos(to), centre.y + r * Math.sin(to));
+      }
+    }
+  }
+
+  /** Strokes the path if any segment reached it, and starts counting for the next. */
+  function stroke(canvas:Canvas, path:PathBuilder, color:Color, width:Float):Void {
+    if (appended > 0) canvas.strokeTransient(path.build(), color, width);
+    appended = 0;
   }
 
   function segment(path:PathBuilder, camera:PerspectiveCamera, width:Float, height:Float, x0:Float, y0:Float,
       x1:Float, y1:Float):Void {
     var from = camera.project(x0, y0, LIFT, width, height), to = camera.project(x1, y1, LIFT, width, height);
-    if (from != null && to != null) path.moveTo(from.x, from.y).lineTo(to.x, to.y);
+    if (from != null && to != null) {
+      path.moveTo(from.x, from.y).lineTo(to.x, to.y);
+      appended++;
+    }
   }
 
   /**

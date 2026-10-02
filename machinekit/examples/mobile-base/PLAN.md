@@ -126,11 +126,21 @@ the sensors' samples index into (C ABI version 23), so a snapshot is no larger t
 scan costs only the robots that have one; the wire and recording formats carry values as arrays and
 are unchanged. The puck scans a ray a degree.
 
-Left over: `MotionGuard` still judges only the latest scan, so a remembered obstacle just out of sight
-beside the base does not stop it (the costmap routes round it); a lidar return is a point on a face, so a
-sensed box is a disk (0.08 m beyond its visible extent) and a long object seen end-on is underestimated;
-the overlays have no toggle and no UI of their own; wheel odometry follows the truth to within a tenth of
-a metre after a minute, which is the ghost's whole use until slip is simulated.
+Then polished: the sensed shapes are capsules (`Obstacle` has a half length along its heading;
+`LidarObstaclePerception` fits each cluster of hits with a Douglas-Peucker run of segments, so a flat
+wall is a thin segment of its own length, a corner two, and a lone return a disk), `Costmap2` draws
+them and redraws only the cells a change touches, and `MotionGuard` takes the costmap and judges its
+dynamic layer, so it holds for what the costmap remembers and keeps no memory of its own. The
+simulation overlays (sensor rays and the mission's route, costmap edge, obstacles and odometry) have a
+"Toggle simulation overlays" command in the view menus, saved as the editor setting
+`editors/3d/simulation/show_overlays`. A capture of the running cell
+(`--project=... --simulate --capture-dir=... --capture-seconds=N` under xvfb) showed them reading
+correctly and caught a stroke of an empty path.
+
+Left over: a sensed object is the visible surface only (a long wall seen end-on is its near end, and the
+unseen back of a box is not covered); a remembered obstacle that cannot be seen through stays for its
+full 20 s; wheel odometry drifts up to a few decimetres from the truth over a round (the ghost's whole
+use until slip is simulated); the overlays have a toggle but no finer controls (per overlay, colours).
 
 **M5. Mobile manipulator** (done). The robot arm stands on the deck's payload
 seat, turned to work ahead; the room's shelves became two tables with place

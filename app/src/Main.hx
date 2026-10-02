@@ -305,7 +305,16 @@ class Main {
     host.captureSeconds = diagnostics.captureSeconds;
     var activeEditor:Null<ReferenceEditorApp> = null;
     // A launch project builds in the background; captures wait for it so they show the project.
-    host.captureReady = function() return activeEditor == null || !activeEditor.openingProject();
+    // `--simulate` presses Play once that project is open, so a capture can show a running simulation.
+    var playOnOpen = args.indexOf("--simulate") >= 0;
+    host.captureReady = function() {
+      var ready = activeEditor == null || !activeEditor.openingProject();
+      if (ready && playOnOpen && activeEditor != null) {
+        playOnOpen = false;
+        activeEditor.commands.execute("sim.play");
+      }
+      return ready;
+    };
     host.continuousFrames = function() return activeEditor != null &&
       (activeEditor.simulation.isRunning() || diagnostics.robotHost != null ||
         activeEditor.hasCharacterPreview());
@@ -586,6 +595,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   final consoleDocument:TextDocument = new TextDocument("");
   final logLengths:Array<Int> = [];
   var gridVisible:Bool;
+  var simulationOverlaysVisible:Bool = true;
   var gridSnapEnabled:Bool;
   var gridSpacing:Float;
   /** The viewport's lighting preset number, from the saved setting. */
@@ -809,6 +819,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         "assembly.mate-perpendicular",
         "assembly.convert-to-joint",
         "scene.toggle-grid",
+        "scene.toggle-simulation-overlays",
         "scene.toggle-grid-snap",
         "scene.grid-spacing-0.1",
         "scene.grid-spacing-0.2",
@@ -839,7 +850,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         "editor.save-as", "scene.export-step", "editor.undo", "editor.redo",
         "scene.frame-selected", "scene.reset-perspective",
         "scene.lighting-studio", "scene.lighting-soft", "scene.lighting-contrast",
-        "scene.toggle-grid", "editor.toggle-dark-theme", "start.show", "editor.command-palette", "editor.settings",
+        "scene.toggle-grid", "scene.toggle-simulation-overlays", "editor.toggle-dark-theme", "start.show", "editor.command-palette", "editor.settings",
         "workspace.reset"
       ], Math.max(8.0, viewportWidth - 228.0), FILE_BAR_HEIGHT, commands, ui.commandContext,
         function() { toolbarMenuVisible = false; invalidateView(); },
@@ -1568,6 +1579,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function readViewSettings():Void {
     var store = preferences.store;
     gridVisible = store.getBool(AppSettings.GRID_VISIBLE);
+    simulationOverlaysVisible = store.getBool(AppSettings.SIMULATION_OVERLAYS);
     gridSnapEnabled = store.getBool(AppSettings.GRID_SNAP);
     gridSpacing = store.getFloat(AppSettings.GRID_SPACING);
     lightingPreset = Std.int(Math.max(0, AppSettings.LIGHTING_PRESETS.indexOf(store.getString(AppSettings.LIGHTING))));
@@ -1770,7 +1782,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
       perspectiveViewport.setSimulationState(simulation.isActive(),frame == null ? [] : frame.environment,
         frame == null ? 0 : frame.revision,frame == null ? [] : frame.robots);
       var mission = simulation.missionPlayer();
-      perspectiveViewport.setMissionOverlay(mission == null || !simulation.isActive() ? null : mission.overlay());
+      perspectiveViewport.setSimulationOverlays(simulationOverlaysVisible);
+      perspectiveViewport.setMissionOverlay(mission == null || !simulation.isActive() || !simulationOverlaysVisible ? null : mission.overlay());
     }
     return perspectiveViewport == null
       ? new Text("Perspective rendering requires the desktop GPU host.")
