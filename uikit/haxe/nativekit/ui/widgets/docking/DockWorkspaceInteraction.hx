@@ -129,7 +129,8 @@ class DockWorkspaceInteraction {
 			for (index in 0...tabTargets.length) {
 				var tabTarget = tabTargets[tabTargets.length - index - 1];
 				var tabZone = tabTarget.zoneAt(x, y);
-				if (tabZone != null) {
+				if (tabZone != null && (draggingPanelId == tabTarget.targetPanelId ||
+					model.canDock(draggingPanelId, tabTarget.targetPanelId, tabZone))) {
 					next = new DockDropPreview(draggingPanelId, tabTarget.targetPanelId, tabZone);
 					break;
 				}
@@ -139,7 +140,8 @@ class DockWorkspaceInteraction {
 			for (index in 0...targets.length) {
 				var target = targets[targets.length - index - 1];
 				var zone = target.zoneAt(x, y);
-				if (zone != null) {
+				if (zone != null && (draggingPanelId == target.targetPanelId ||
+					model.canDock(draggingPanelId, target.targetPanelId, zone))) {
 					next = new DockDropPreview(draggingPanelId, target.targetPanelId, zone);
 					break;
 				}

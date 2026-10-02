@@ -4673,6 +4673,31 @@ class FrameworkSmoke {
 			default: return false;
 		}
 		var singletonDock = new DockWorkspaceModel();
+		var groupedDock = new DockWorkspaceModel();
+		groupedDock.register(new DockPanelDescriptor("surface", "Surface", false, true, null,
+			nativekit.ui.docking.DockPanelHeaderMode.Content,
+			new nativekit.ui.docking.DockPanelGrouping("surfaces", false)));
+		groupedDock.register(new DockPanelDescriptor("tool-a", "Tool A", true, true, null,
+			nativekit.ui.docking.DockPanelHeaderMode.Dock,
+			new nativekit.ui.docking.DockPanelGrouping("tools")));
+		groupedDock.register(new DockPanelDescriptor("tool-b", "Tool B", true, true, null,
+			nativekit.ui.docking.DockPanelHeaderMode.Dock,
+			new nativekit.ui.docking.DockPanelGrouping("tools")));
+		groupedDock.setDefaultLayout(DockNode.Panel("surface"));
+		if (groupedDock.canDock("tool-a", "surface", DockDropZone.Center) ||
+			groupedDock.dock("tool-a", "surface", DockDropZone.TabBefore) ||
+			!groupedDock.open("tool-a", "surface") || !groupedDock.open("tool-b", "surface")) return false;
+		var groupedSnapshot = new nativekit.ui.docking.DockWorkspaceSnapshot(DockNode.Tabs(["surface", "tool-a", "tool-b"], "tool-b"), "tool-b");
+		if (!groupedDock.restorePersisted(groupedSnapshot) || groupedDock.activePanelId != "tool-b") return false;
+		switch groupedDock.root {
+			case Split(Vertical, _, Panel("surface"), Tabs(ids, selected)):
+				if (ids.length != 2 || ids[0] != "tool-a" || ids[1] != "tool-b" || selected != "tool-b") return false;
+			default: return false;
+		}
+		var groupedJson = groupedDock.snapshotJson();
+		if (!groupedDock.restoreJson(groupedJson) || groupedDock.snapshotJson() != groupedJson) return false;
+		if (!groupedDock.canDock("tool-a", "surface", DockDropZone.Right) ||
+			!groupedDock.dock("tool-a", "surface", DockDropZone.Right)) return false;
 		var contentHeaderDock = new DockWorkspaceModel();
 		contentHeaderDock.register(new DockPanelDescriptor("content-header", "Content header", false,
 			true, null, nativekit.ui.docking.DockPanelHeaderMode.Content));
