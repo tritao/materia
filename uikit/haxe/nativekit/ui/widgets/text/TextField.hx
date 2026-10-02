@@ -82,6 +82,8 @@ class TextField implements View {
 	public var document:Null<TextDocument>;
 	public var onSubmit:Null<String->Void>;
 	public var onDiagnostics:Null<TextEditorDiagnostics->Void>;
+	/** Current logical-screen caret bounds after layout, or null when clipped out. */
+	public var onCaretRect:Null<Null<Rect>->Void>;
 	/** Semantic role override used by composite editable controls. */
 	public var semanticRole:AccessibilityRole;
 	/** Semantic action capabilities override used by composite editable controls. */
@@ -101,6 +103,7 @@ class TextField implements View {
 		this.onEdit = onEdit;
 		this.document = document;
 		this.onSubmit = null;
+		this.onCaretRect = null;
 		this.colorRangeProvider = null;
 		this.decorationProvider = null;
 		this.selectionProvider = null;
@@ -407,6 +410,14 @@ class TextField implements View {
 				var caretRect = new Rect(Math.min(screenTopX, screenBottomX), Math.min(screenTopY, screenBottomY),
 					Math.max(1.0, absolute(screenBottomX - screenTopX)),
 					Math.max(1.0, absolute(screenBottomY - screenTopY)));
+				var caretHandler = onCaretRect;
+				if (caretHandler != null) {
+					var clip = geometry.clipBounds;
+					var visible = geometry.visible && caretRect.x < clip.x + clip.width &&
+						caretRect.x + caretRect.width > clip.x && caretRect.y < clip.y + clip.height &&
+						caretRect.y + caretRect.height > clip.y;
+					caretHandler(visible ? caretRect : null);
+				}
 				publishDiagnostics(caretRect);
 				if (!editor.focused || !context.textInput.isOwner(id) || context.platformSurface == null ||
 					context.platformSurface.isDisposed())

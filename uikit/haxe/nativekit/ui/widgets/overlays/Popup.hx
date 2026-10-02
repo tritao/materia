@@ -26,6 +26,8 @@ class Popup implements View {
 	public final x:Float;
 	public final y:Float;
 	public final style:LayoutStyle;
+	/** Optional live anchor in logical screen coordinates; placement uses measured panel size. */
+	public var anchorRectProvider:Null<Void->Null<Rect>>;
 	public var label:Null<String>;
 	public var modal:Bool;
 	public var dimBackdrop:Bool;
@@ -48,6 +50,7 @@ class Popup implements View {
 		this.y = y;
 		this.style = style == null ? new LayoutStyle() : style.copy();
 		label = null;
+		anchorRectProvider = null;
 		modal = true;
 		dimBackdrop = true;
 		dismissOnOutside = true;
@@ -172,6 +175,26 @@ class Popup implements View {
 			}
 			var content = context.withStyleParent(panelComputed, function() return
 				context.withScope(new Key("content"), function() return child.build(context)));
+			if (anchorRectProvider != null)
+				panel.onResolved(function(geometry) {
+					var bounds = root.resolved;
+					var provider = anchorRectProvider;
+					if (provider == null) return;
+					var anchor = provider();
+					if (bounds == null || anchor == null) return;
+					var left = anchor.x - bounds.x;
+					var top = anchor.y + anchor.height - bounds.y;
+					if (top + geometry.height > bounds.height)
+						top = anchor.y - bounds.y - geometry.height;
+					left = Math.max(0.0, Math.min(left, bounds.width - geometry.width));
+					top = Math.max(0.0, Math.min(top, bounds.height - geometry.height));
+					if (Math.abs(panel.layout.style.positionX - left) > 0.01 ||
+						Math.abs(panel.layout.style.positionY - top) > 0.01) {
+						panel.layout.style.positionX = left;
+						panel.layout.style.positionY = top;
+						context.requestLayoutFeedback();
+					}
+				});
 			panel.add(content);
 			root.add(panel);
 			root.on(UiEventKind.KeyDown, function(event) {
