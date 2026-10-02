@@ -74,6 +74,15 @@ class SimulatedWelder implements SimulationStepObserver {
   /** The latest reading. */
   public function reading():WeldReading return model.reading;
 
+  /** Where the wire tip is now, in the world frame, in metres. */
+  public function tip():Array<Float> {
+    var link = simulation.linkPose(robotIndex, linkIndex);
+    return place(link.position, link.rotation, tipPosition);
+  }
+
+  /** The wire speed the channel commands now, in metres per minute. */
+  public function wireSpeed():Float return Math.max(0.0, analog(wireSpeedChannel));
+
   public function afterSimulationStep(sourceTimestampNs:Int64):Void {
     var previous = lastTimestampNs;
     lastTimestampNs = sourceTimestampNs;

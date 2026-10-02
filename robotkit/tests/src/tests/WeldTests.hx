@@ -1,7 +1,13 @@
 package tests;
 
+import robotkit.skill.WeldPlan;
+import robotkit.skill.WeldPlan.WeldParameters;
+import robotkit.spatial.Quat;
+import robotkit.spatial.Transform3;
+import robotkit.spatial.Vec3;
 import robotkit.tool.ConvexSolid;
 import robotkit.tool.GroundedWork;
+import robotkit.tool.WeldBead;
 import robotkit.tool.WeldArcModel.WeldArcConfig;
 import robotkit.tool.WeldArcModel;
 import robotkit.tool.WeldChannelPolicy;
@@ -33,6 +39,11 @@ class WeldTests {
     testBurnbackAndSupply();
     testChannelsGoSafeOnStop();
     testSensorFrame();
+    testBeadLegFromDeposition();
+    testBeadOnlyWhereTheArcBurns();
+    testBeadOverlapAndGaps();
+    testBeadFaces();
+    testWeldPlan();
     Sys.println('RobotKit weld tests passed ($assertions assertions)');
     return assertions;
   }
@@ -298,6 +309,130 @@ class WeldTests {
     check(back.arc && back.currentA == reading.currentA && back.fault == 0 && !back.touch, "a frame reads back as the reading");
     check(!WeldSensor.valid([1.0, 0.0]) && !WeldSensor.valid([2.0, 0, 0, 0, 0, 0]) && !WeldSensor.valid([0.0, -1, 0, 0, 0, 0]) &&
       !WeldSensor.valid([0.0, 0, 0, 0, 7, 0]), "malformed frames are refused");
+  }
+
+  /** A 100 mm seam along +X on the plate's top (z = 0) against an upright's face that looks toward -Y. */
+  static function seam(?wire:Float = 1.2):WeldBead
+    return new WeldBead([0.0, 0.0, 0.0], [0.1, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -1.0, 0.0], wire);
+
+  /** The tip travels the seam from `from` to `to` (metres along it) at `speed` m/s, wire at `wire` m/min, in 1 ms steps. */
+  static function travel(bead:WeldBead, from:Float, to:Float, speed:Float, wire:Float, ?arc:Bool = true):Void {
+    var steps = Math.round((to - from) / speed / 0.001);
+    for (i in 0...steps) bead.step(0.001, arc, wire, [from + (to - from) * (i + 0.5) / steps, 0.0, 0.0]);
+  }
+
+  static function testBeadLegFromDeposition():Void {
+    var bead = seam();
+    check(bead.count == 100, "a 100 mm seam is cut into 1 mm stations");
+    near(bead.legA[1], -1.0, "the leg on the plate runs away from the upright", 1e-12);
+    near(bead.legB[2], 1.0, "the leg on the upright runs up it", 1e-12);
+    // 8 m/min of 1.2 mm wire at 11.46 mm/s deposits an equal-leg fillet of 5 mm.
+    var area = (8.0 / 60.0 * 1000.0) * (Math.PI * 0.6 * 0.6) * WeldBead.DEPOSITION_EFFICIENCY / (0.01146 * 1000.0);
+    travel(bead, 0.0, 0.1, 0.01146, 8.0);
+    near(bead.meanLeg(0.1, 0.9) * 1000.0, Math.sqrt(2.0 * area), "the leg is the deposition rate over travel speed", 0.02);
+    near(bead.meanLeg(0.1, 0.9) * 1000.0, 5.0, "a fillet of 5 mm legs", 0.02);
+    check(bead.gaps() == 0 && bead.covered() == 100, "the bead covers the seam without a gap");
+    near(bead.extent(), 0.1, "and is as long as the seam", 1e-9);
+    check(bead.runs(50) == 1, "one arc run laid it");
+    check(bead.stray == 0.0, "no metal missed the seam");
+    // Twice the wire speed at the same travel speed deposits twice the section: the leg grows with its root.
+    var rich = seam();
+    travel(rich, 0.0, 0.1, 0.01146, 16.0);
+    near(rich.meanLeg(0.1, 0.9) / bead.meanLeg(0.1, 0.9), Math.sqrt(2.0), "twice the section is root two the leg", 1e-3);
+    // Twice the travel speed halves it.
+    var quick = seam();
+    travel(quick, 0.0, 0.1, 0.02292, 8.0);
+    near(bead.meanLeg(0.1, 0.9) / quick.meanLeg(0.1, 0.9), Math.sqrt(2.0), "twice the travel speed is root two less leg", 1e-3);
+    // A thicker wire melts more metal at the same wire speed.
+    var thick = seam(1.6);
+    travel(thick, 0.0, 0.1, 0.01146, 8.0);
+    near(thick.meanLeg(0.1, 0.9) / bead.meanLeg(0.1, 0.9), 1.6 / 1.2, "the leg follows the wire's diameter", 1e-3);
+  }
+
+  static function testBeadOnlyWhereTheArcBurns():Void {
+    var bead = seam();
+    travel(bead, 0.0, 0.05, 0.01, 8.0, false);
+    check(bead.deposited == 0.0 && bead.covered() == 0, "with the arc out nothing is deposited");
+    bead.step(0.1, true, 0.0, [0.02, 0.0, 0.0]);
+    check(bead.deposited == 0.0, "with the wire still nothing is deposited");
+    // An arc held in the air above the seam is metal lost.
+    bead.step(0.1, true, 8.0, [0.02, 0.0, 0.05]);
+    check(bead.deposited == 0.0 && bead.stray > 0.0, "an arc far from the seam line deposits nothing in it");
+    bead.step(0.1, true, 8.0, [0.2, 0.0, 0.0]);
+    check(bead.covered() == 0, "nor does one far past the seam's end");
+    // Standing still piles the metal into one station.
+    var pile = seam();
+    for (i in 0...300) pile.step(0.001, true, 8.0, [0.05, 0.0, 0.0]);
+    check(pile.covered() == 1 && pile.leg(50) > 0.008, "standing still piles the metal into one station, a crater's blob");
+    // Past the end by less than the overrun, the metal lands in the end station.
+    var end = seam();
+    end.step(0.1, true, 8.0, [0.102, 0.0, 0.0]);
+    check(end.covered() == 1 && end.leg(99) > 0.0, "the tip just past the seam's end deposits into the last station");
+  }
+
+  static function testBeadOverlapAndGaps():Void {
+    var bead = seam();
+    // One run lays 0 to 60 mm; the arc goes out; a second begins 10 mm back and finishes the seam.
+    travel(bead, 0.0, 0.06, 0.01146, 8.0);
+    travel(bead, 0.06, 0.07, 0.01146, 8.0, false);
+    check(bead.covered() == 60, "the arc out lays nothing while the torch moves on");
+    bead.takeChanges();
+    travel(bead, 0.05, 0.1, 0.01146, 8.0);
+    check(bead.gaps() == 0 && bead.covered() == 100, "the second run closes the bead");
+    var twice = 0;
+    for (i in 0...100) if (bead.runs(i) == 2) twice++;
+    near(twice, 10, "the restart overlaps by the 10 mm it backed up", 1);
+    check(bead.leg(55) > bead.leg(20) * 1.3, "the overlap carries both runs' metal, a hump of root two the leg");
+    var changed = bead.takeChanges();
+    check(changed != null && changed.first >= 49 && changed.first <= 51 && changed.last == 99, "what grew is reported once");
+    check(bead.takeChanges() == null, "and not again");
+    // A restart that skips a stretch leaves the gap showing.
+    var gappy = seam();
+    travel(gappy, 0.0, 0.04, 0.01146, 8.0);
+    travel(gappy, 0.06, 0.1, 0.01146, 8.0);
+    near(gappy.gaps(), 20, "the stretch skipped is a gap", 1);
+    gappy.reset();
+    check(gappy.covered() == 0 && gappy.deposited == 0.0, "a reset leaves the seam bare");
+  }
+
+  static function testWeldPlan():Void {
+    var parameters:WeldParameters = {wireSpeed: 8.0, voltage: 24.0, travelSpeed: 0.0115, approach: 0.04, startDwell: 0.15,
+      craterDwell: 0.15, burnback: 0.1};
+    var plan = new WeldPlan(new Transform3(new Vec3(0.1, 0.0, 0.0), Quat.identity()),
+      new Transform3(new Vec3(0.1, 0.5, 0.0), Quat.identity()), parameters);
+    near(plan.length(), 0.5, "a plan's length is the seam's", 1e-12);
+    // In a frame turned a quarter about Z and shifted 1 m along X, the start (0.1, 0, 0) lands at (1, 0.1, 0), the stop
+    // (0.1, 0.5, 0) at (0.5, 0.1, 0), and the torch turns with the frame.
+    var quarter = Quat.fromAxisAngle(new Vec3(0.0, 0.0, 1.0), Math.PI / 2);
+    var moved = plan.transformed(new Transform3(new Vec3(1.0, 0.0, 0.0), quarter));
+    near(moved.start.translation.x, 1.0, "the start moves with the frame", 1e-12);
+    near(moved.start.translation.y, 0.1, "and turns with it", 1e-12);
+    near(moved.stop.translation.x, 0.5, "the stop likewise", 1e-12);
+    near(moved.length(), 0.5, "turning keeps the length", 1e-12);
+    near(moved.start.rotation.angularDistance(quarter), 0.0, "the torch turns with the frame", 1e-9);
+    check(moved.parameters == parameters, "the parameters go along");
+    var failed = false;
+    try new WeldPlan(plan.start, plan.start, parameters) catch (_:Dynamic) failed = true;
+    check(failed, "a plan needs a seam with a length");
+    failed = false;
+    try new WeldPlan(plan.start, plan.stop, {wireSpeed: 0.0, voltage: 24.0, travelSpeed: 0.0115, approach: 0.04, startDwell: 0.0,
+      craterDwell: 0.0, burnback: 0.0}) catch (_:Dynamic) failed = true;
+    check(failed, "a plan needs a wire speed");
+  }
+
+  static function testBeadFaces():Void {
+    // Faces at 120 degrees (an obtuse T-joint corner): the legs run along each face, away from the corner.
+    var s = Math.sqrt(0.75);
+    var bead = new WeldBead([0.0, 0.0, 0.0], [0.1, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -s, 0.5], 1.2);
+    near(bead.legA[0] * bead.normalA[0] + bead.legA[1] * bead.normalA[1] + bead.legA[2] * bead.normalA[2], 0.0, "leg A lies in face A", 1e-12);
+    near(bead.legB[0] * bead.normalB[0] + bead.legB[1] * bead.normalB[1] + bead.legB[2] * bead.normalB[2], 0.0, "leg B lies in face B", 1e-12);
+    check(bead.legA[1] < 0 && bead.legB[2] > 0, "each leg leaves the corner toward the open side");
+    var failed = false;
+    try new WeldBead([0.0, 0.0, 0.0], [0.1, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, 0.0, -2.0], 1.2) catch (_:Dynamic) failed = true;
+    check(failed, "opposed faces have no corner to fill");
+    failed = false;
+    try new WeldBead([0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -1.0, 0.0], 1.2) catch (_:Dynamic) failed = true;
+    check(failed, "a seam needs a length");
   }
 
   static function near(actual:Float, expected:Float, message:String, tolerance:Float):Void {
