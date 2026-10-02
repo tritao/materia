@@ -24,7 +24,8 @@ enum MessageType6 : u8 {
 packed SessionBegin6 endian little {
     session : u64
     protocol_version : u8
-    model_fingerprint : u8[16]
+    # Id of the controller this configuration is for; all zero asks any board to identify itself.
+    expected_controller : u8[16]
     actuator_count : u8
     max_degree : u8
     step_tick_hz : u32
@@ -63,7 +64,8 @@ packed Event6 endian little {
 packed SessionAck6 endian little {
     session : u64
     protocol_version : u8
-    device_fingerprint : u8[16]
+    # The board's own unique id, reported even when the session is refused.
+    controller : u8[16]
     status : u8
     device_tick_hz : u64
     segment_capacity : u16
@@ -72,6 +74,8 @@ packed SessionAck6 endian little {
     max_degree : u8
     actuator_count : u8
     profile : u8
+    # 64-bit FNV-1a of the SessionBegin6 payload after its session field, as the device received it.
+    config_digest : u64
 }
 
 packed TimeSyncRequest endian little {

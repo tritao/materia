@@ -86,6 +86,8 @@ import robotkit.manipulation.Manipulator;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationHarness;
 import robotkit.runtime.VirtualDeviceOptions;
+import robotkit.device.DeviceBinding;
+import robotkit.device.DeviceLayout;
 import robotkit.runtime.VirtualActuatorOptions;
 import robotkit.runtime.RobotRuntimeError;
 import robotkit.runtime.RobotRuntimeCompiler;
@@ -148,15 +150,10 @@ class ToolpathTestSupport extends MotionKitTestSupport {
     var options:Null<VirtualDeviceOptions> = null;
     if (virtualDevice) {
       options = new VirtualDeviceOptions();
-      for (index in 0...blueprint.model.actuators.length) {
-        var actuator = blueprint.model.actuators[index];
-        switch actuator.transmission {
-          case SimpleTransmission(_, ratio, offset):
-            options.actuators.push(new VirtualActuatorOptions(actuator.id,
-              index, ratio, offset, 3200.0 / (2.0 * Math.PI),
-              0.01 * Math.abs(ratio), 2));
-        }
-      }
+      // The motors' 200 full steps at 16 microsteps a turn, wired in model order.
+      var binding = DeviceBinding.bind(blueprint.model,
+        DeviceLayout.forActuators(blueprint.model, 16, 2), options.stepTickHz);
+      options.actuators = binding.virtualActuators();
     }
     var simulationHarness = new SimulationHarness(0.01);
     var simulation = simulationHarness.simulation;

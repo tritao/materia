@@ -86,6 +86,8 @@ import robotkit.manipulation.Manipulator;
 import robotkit.runtime.SimulationHarness;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.VirtualDeviceOptions;
+import robotkit.device.DeviceBinding;
+import robotkit.device.DeviceLayout;
 import robotkit.runtime.VirtualActuatorOptions;
 import robotkit.runtime.RobotRuntimeError;
 import robotkit.runtime.RobotRuntimeCompiler;
@@ -461,8 +463,11 @@ class ProcessTests extends MotionKitTestSupport {
     var ratio = 2.0 * Math.PI /
       (axis.nut.travelPerRevolution() * MachineKitRobotCompiler.MILLIMETRES_TO_METRES);
     var options = new VirtualDeviceOptions();
-    options.actuators = [new VirtualActuatorOptions(blueprint.model.actuators[0].id, 0, ratio, 0.0,
-      3200.0 / (2.0 * Math.PI), 0.01 * Math.abs(ratio), 2)];
+    // 200 full steps at 16 microsteps a turn.
+    var binding = DeviceBinding.bind(blueprint.model,
+      DeviceLayout.forActuators(blueprint.model, 16, 2), options.stepTickHz);
+    near(binding.channels[0].ratio, ratio, "the binding takes the screw's ratio from the model");
+    options.actuators = binding.virtualActuators();
     var simulationHarness = new SimulationHarness(0.01);
     var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime, null, options);

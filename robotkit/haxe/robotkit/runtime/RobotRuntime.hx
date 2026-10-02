@@ -3,6 +3,7 @@ package robotkit.runtime;
 import RobotKitRuntime;
 import haxe.Int64;
 import nativekit.ffi.NativeKit;
+import robotkit.device.DeviceBinding;
 import robotkit.world.CameraImage;
 import robotkit.world.SensorFrame;
 import robotkit.world.TrajectoryChunk;
@@ -34,6 +35,8 @@ class RobotRuntime {
   final defaultMaxEfforts:Array<Float>;
   final sensorLayout:Array<RobotRuntimeSensorBlueprint>;
   public final channels:Array<ProcessChannelDeclaration>;
+  /** The blueprint's joint couplings: a joint a plan leaves out follows its leader. */
+  public final couplings:Array<robotkit.world.CoupledJoint>;
   final externalSensorLayout:Array<RobotRuntimeSensorBlueprint>;
   final externalMutex = new Mutex();
   final externalFrames:Map<String, SensorFrame> = new Map();
@@ -61,6 +64,8 @@ class RobotRuntime {
     defaultMaxEfforts = [for (joint in blueprint.joints) joint.maxEffort];
     sensorLayout = blueprint.nativeSensorLayout();
     channels = blueprint.channels.copy();
+    couplings = [for (coupling in blueprint.couplings)
+      new robotkit.world.CoupledJoint(coupling.follower, coupling.leader, coupling.ratio, coupling.offset)];
     externalSensorLayout = blueprint.externalSensorLayout();
   }
 
@@ -87,26 +92,60 @@ class RobotRuntime {
     return new RobotRuntime(result.out_runtime, blueprint);
   }
 
-  /** Creates a serial runtime using a deployed layout fingerprint and SI-unit error budget. */
+  /**
+   * Creates a serial runtime for the board `controllerHex` (its 32-digit unique id) wired as
+   * `binding` says, within an SI-unit error budget. The blueprint should be compiled from the
+   * binding's model so its limits are the device's. The board must be that controller and agree
+   * with the configuration, or this throws with the device's reason on stderr.
+   */
   public static function createSerial(blueprint:RobotRuntimeBlueprint,
-      devicePath:String, fingerprintHex:String, maxTargetError:Float,
-      ?baud:Int = 115200, ?stepTickHz:Int = 40000,
-      ?linkLossTimeoutNs:haxe.Int64, ?clockSyncBoundNs:haxe.Int64):RobotRuntime {
+      devicePath:String, controllerHex:String, binding:DeviceBinding, maxTargetError:Float,
+      ?baud:Int = 115200, ?linkLossTimeoutNs:haxe.Int64, ?clockSyncBoundNs:haxe.Int64):RobotRuntime {
     if (blueprint == null) throw "Serial runtime requires a compiled blueprint";
     if (devicePath == null || StringTools.trim(devicePath).length == 0)
       throw "Serial runtime requires a device path";
-    if (fingerprintHex == null || !~/^[0-9a-fA-F]{32}$/.match(fingerprintHex) ||
-        fingerprintHex.toLowerCase() == "00000000000000000000000000000000")
-      throw "Serial runtime requires a nonzero 32-digit fingerprint";
+    if (binding == null) throw "Serial runtime requires a device binding";
+    if (controllerHex == null || !~/^[0-9a-fA-F]{32}$/.match(controllerHex) ||
+        controllerHex.toLowerCase() == "00000000000000000000000000000000")
+      throw "Serial runtime requires a nonzero 32-digit controller id";
     if (!Math.isFinite(maxTargetError) || maxTargetError < 0.0)
       throw "Serial runtime requires a finite nonnegative target error budget";
     if (linkLossTimeoutNs == null) linkLossTimeoutNs = haxe.Int64.ofInt(500000000);
     if (clockSyncBoundNs == null) clockSyncBoundNs = haxe.Int64.ofInt(30000000);
+    var device = new rk_serial_device_desc();
+    device.set_struct_size(rk_serial_device_desc.size());
+    device.set_actuator_count(binding.channels.length);
+    for (i in 0...16)
+      device.set_controller(i, Std.parseInt("0x" + controllerHex.substr(i * 2, 2)));
+    for (i in 0...binding.channels.length) {
+      var channel = binding.channels[i];
+      device.set_actuator_joint(i, channel.jointIndex);
+      device.set_actuator_ratio(i, channel.ratio);
+      device.set_actuator_offset(i, channel.offset);
+      device.set_actuator_steps_per_unit(i, channel.stepsPerUnit);
+      device.set_actuator_max_rate(i, channel.maxRate);
+      device.set_actuator_direction_setup_ticks(i, channel.directionSetupTicks);
+      device.set_actuator_skew_bound(i, channel.skewBound);
+      if (channel.actuatorId.length > 63) throw "Serial actuator ID is longer than 63 characters";
+      for (byte in 0...channel.actuatorId.length)
+        device.set_actuator_ids(i * 64 + byte, channel.actuatorId.charCodeAt(byte));
+    }
     var result = RobotKitRuntime.rk_robot_runtime_create_serial6(
-      blueprint.nativeValue(), devicePath, baud, fingerprintHex, maxTargetError,
-      stepTickHz, linkLossTimeoutNs, clockSyncBoundNs, haxe.Int64.ofInt(100000));
+      blueprint.nativeValue(), devicePath, baud, device, maxTargetError,
+      binding.stepTickHz, linkLossTimeoutNs, clockSyncBoundNs, haxe.Int64.ofInt(100000));
     check(result.status, "runtime.createSerial");
     return new RobotRuntime(result.out_runtime, blueprint);
+  }
+
+  /** Reads the unique id (32 lowercase hex digits) of the board on a serial port. */
+  public static function identifySerial(devicePath:String, baud:Int):String {
+    if (devicePath == null || StringTools.trim(devicePath).length == 0)
+      throw "Identifying a serial device requires a device path";
+    var result = RobotKitRuntime.rk_serial_device_identify(devicePath, baud);
+    check(result.status, "runtime.identifySerial");
+    var text = "";
+    for (i in 0...16) text += StringTools.hex(result.out_controller.get_bytes(i), 2).toLowerCase();
+    return text;
   }
 
   /** Starts a standalone runtime worker; Simulation-owned runtimes reject this. */

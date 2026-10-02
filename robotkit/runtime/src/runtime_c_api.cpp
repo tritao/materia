@@ -23,26 +23,6 @@ std::mutex registry_mutex;
 std::unordered_map<rk_robot_runtime, std::shared_ptr<robotkit::RobotRuntime>> runtimes;
 rk_robot_runtime next_runtime = 1;
 
-int hex_nibble(char value) {
-    if (value >= '0' && value <= '9') return value - '0';
-    if (value >= 'a' && value <= 'f') return value - 'a' + 10;
-    if (value >= 'A' && value <= 'F') return value - 'A' + 10;
-    return -1;
-}
-
-bool parse_fingerprint(const char *hex, std::array<std::uint8_t, 16> &result) {
-    if (!hex) return false;
-    for (std::size_t index = 0; index < result.size(); ++index) {
-        if (!hex[2 * index] || !hex[2 * index + 1]) return false;
-        const int high = hex_nibble(hex[2 * index]);
-        const int low = hex_nibble(hex[2 * index + 1]);
-        if (high < 0 || low < 0) return false;
-        result[index] = static_cast<std::uint8_t>((high << 4) | low);
-    }
-    return hex[32] == '\0' &&
-        !std::all_of(result.begin(), result.end(), [](auto byte) { return byte == 0; });
-}
-
 std::chrono::nanoseconds owner_period(const rk_robot_runtime_blueprint &blueprint) {
     return std::chrono::nanoseconds(blueprint.owner_period_ns == 0
         ? 10'000'000 : static_cast<int64_t>(blueprint.owner_period_ns));
@@ -102,31 +82,40 @@ rk_result RK_CALL rk_robot_runtime_create(const rk_robot_runtime_blueprint *blue
     }
 }
 
-rk_result RK_CALL rk_robot_runtime_create_serial(const rk_robot_runtime_blueprint *blueprint,
-                                                    const char *device_path, uint32_t baud,
-                                                    const char *fingerprint_hex,
-                                                    double max_target_error,
-                                                    rk_robot_runtime *out_runtime) {
-    return rk_robot_runtime_create_serial6(blueprint, device_path, baud, fingerprint_hex,
-        max_target_error, 40'000, 500'000'000, 30'000'000, 100'000, out_runtime);
-}
-
 rk_result RK_CALL rk_robot_runtime_create_serial6(const rk_robot_runtime_blueprint *blueprint,
                                                     const char *device_path, uint32_t baud,
-                                                    const char *fingerprint_hex,
+                                                    const rk_serial_device_desc *device,
                                                     double max_target_error,
                                                     uint32_t step_tick_hz,
                                                     uint64_t link_loss_timeout_ns,
                                                     uint64_t clock_bound_ns,
                                                     uint64_t link_latency_ns,
                                                     rk_robot_runtime *out_runtime) {
-    std::array<std::uint8_t, 16> fingerprint{};
     if (!out_runtime || !blueprint || rk_robot_runtime_blueprint_validate(blueprint) != RK_OK ||
         !device_path || !*device_path || blueprint->joint_count > RK_MAX_SERIAL_JOINTS ||
+        !device || device->struct_size < sizeof(*device) || device->actuator_count == 0 ||
+        device->actuator_count > RK_MAX_SERIAL_JOINTS ||
         !std::isfinite(max_target_error) || max_target_error < 0.0 ||
-        step_tick_hz == 0 || link_loss_timeout_ns == 0 || clock_bound_ns == 0 ||
-        !parse_fingerprint(fingerprint_hex, fingerprint))
+        step_tick_hz == 0 || link_loss_timeout_ns == 0 || clock_bound_ns == 0)
         return RK_ERROR_INVALID_ARGUMENT;
+    std::array<std::uint8_t, 16> controller{};
+    std::copy_n(device->controller, controller.size(), controller.begin());
+    std::vector<robotkit::DeviceActuator6> layout;
+    for (std::uint32_t i = 0; i < device->actuator_count; ++i) {
+        robotkit::DeviceActuator6 actuator;
+        actuator.joint = device->actuator_joint[i];
+        actuator.ratio = device->actuator_ratio[i];
+        actuator.offset = device->actuator_offset[i];
+        actuator.steps_per_unit = device->actuator_steps_per_unit[i];
+        actuator.max_rate = device->actuator_max_rate[i];
+        actuator.direction_setup_ticks = device->actuator_direction_setup_ticks[i];
+        actuator.dual_drive_skew_bound = device->actuator_skew_bound[i];
+        const auto *id = device->actuator_ids + i * 64;
+        const auto *end = std::find(id, id + 64, 0);
+        if (end == id || end == id + 64) return RK_ERROR_INVALID_ARGUMENT;
+        actuator.id.assign(reinterpret_cast<const char *>(id), reinterpret_cast<const char *>(end));
+        layout.push_back(std::move(actuator));
+    }
     *out_runtime = RK_INVALID_ROBOT_RUNTIME;
 #if !defined(RK_HAS_SERIAL_DEVICE)
     // Built without serial ports (RK_BUILD_SERIAL_DEVICE).
@@ -138,8 +127,8 @@ rk_result RK_CALL rk_robot_runtime_create_serial6(const rk_robot_runtime_bluepri
         const auto period = owner_period(*copied);
         rk_result endpoint_error = RK_ERROR_BACKEND;
         auto endpoint = robotkit::DeviceSerialEndpoint::open(device_path, baud, *copied,
-            fingerprint, max_target_error, step_tick_hz, link_loss_timeout_ns,
-            clock_bound_ns, link_latency_ns, &endpoint_error);
+            controller, max_target_error, step_tick_hz, link_loss_timeout_ns,
+            clock_bound_ns, link_latency_ns, layout, &endpoint_error);
         if (!endpoint) return endpoint_error;
         auto runtime = std::make_shared<robotkit::RobotRuntime>(
             *copied, std::static_pointer_cast<robotkit::RobotEndpoint>(endpoint), period);
@@ -151,6 +140,21 @@ rk_result RK_CALL rk_robot_runtime_create_serial6(const rk_robot_runtime_bluepri
         return RK_ERROR_BACKEND;
     }
 #endif
+}
+
+rk_result RK_CALL rk_serial_device_identify(const char *device_path, uint32_t baud,
+                                            rk_controller_id *out_controller) {
+    if (!device_path || !*device_path || !out_controller) return RK_ERROR_INVALID_ARGUMENT;
+    try {
+        std::array<std::uint8_t, 16> controller{};
+        const auto result = robotkit::DeviceSerialEndpoint::identify(device_path, baud, controller);
+        if (result == RK_OK) std::copy(controller.begin(), controller.end(), out_controller->bytes);
+        return result;
+    } catch (const std::bad_alloc &) {
+        return RK_ERROR_OUT_OF_MEMORY;
+    } catch (...) {
+        return RK_ERROR_BACKEND;
+    }
 }
 
 void RK_CALL rk_robot_runtime_destroy(rk_robot_runtime runtime) {
@@ -177,13 +181,15 @@ rk_result RK_CALL rk_robot_runtime_submit(rk_robot_runtime runtime, const rk_rob
 namespace {
 /**
  * Copies segment arrays into a batch over every robot joint: once, the runtime's one copy.
- * Source joint j drives robot joint joint_map[j], or joint j without a map; a robot joint
- * no source joint drives holds its held position.
+ * Source joint j drives robot joint joint_map[j], or joint j without a map. A robot joint no
+ * source joint drives follows its leader when the blueprint couples it to one (a lead screw
+ * turning with its axis), and otherwise holds its held position.
  */
 rk_result copy_segments(const int64_t *starts_ns, const int64_t *durations_ns,
     const int32_t *degrees, uint32_t segment_count, const double *coefficients,
     uint32_t coefficient_count, const int32_t *joint_map, uint32_t source_joint_count,
-    uint32_t robot_joint_count, const double *held_positions, robotkit::SegmentBatch &batch) {
+    uint32_t robot_joint_count, const double *held_positions,
+    const rk_robot_runtime_blueprint *blueprint, robotkit::SegmentBatch &batch) {
     constexpr uint32_t stride = RK_TRAJECTORY_COEFFICIENT_STRIDE;
     if (segment_count == 0 || segment_count > RK_MAX_TRAJECTORY_QUEUE_POINTS ||
         source_joint_count == 0 || source_joint_count > robot_joint_count ||
@@ -203,6 +209,36 @@ rk_result copy_segments(const int64_t *starts_ns, const int64_t *durations_ns,
     }
     if (source_joint_count < robot_joint_count && !held_positions)
         return RK_ERROR_INVALID_ARGUMENT;
+    // Couplings whose follower no source joint drives, ordered so each leader is final before
+    // its followers are derived from it.
+    uint32_t followed[RK_MAX_JOINT_COUPLINGS];
+    uint32_t follow_count = 0;
+    if (blueprint && blueprint->struct_size >= sizeof(*blueprint) &&
+        source_joint_count < robot_joint_count) {
+        bool pending[RK_MAX_TRAJECTORY_JOINTS]{};
+        uint32_t pending_count = 0;
+        for (uint32_t i = 0; i < blueprint->coupling_count; ++i) {
+            const auto follower = blueprint->couplings[i].follower;
+            if (follower >= robot_joint_count || blueprint->couplings[i].leader >= robot_joint_count)
+                return RK_ERROR_INVALID_ARGUMENT;
+            if (!driven[follower] && !pending[follower]) {
+                pending[follower] = true;
+                ++pending_count;
+            }
+        }
+        for (bool progress = true; progress && follow_count < pending_count;) {
+            progress = false;
+            for (uint32_t i = 0; i < blueprint->coupling_count; ++i) {
+                const auto &coupling = blueprint->couplings[i];
+                if (pending[coupling.follower] && !pending[coupling.leader]) {
+                    pending[coupling.follower] = false;
+                    followed[follow_count++] = i;
+                    progress = true;
+                }
+            }
+        }
+        if (follow_count < pending_count) return RK_ERROR_INVALID_ARGUMENT;
+    }
     batch.segments.resize(segment_count);
     for (uint32_t index = 0; index < segment_count; ++index) {
         if (starts_ns[index] < starts_ns[0] || durations_ns[index] <= 0 || degrees[index] < 0 ||
@@ -219,6 +255,13 @@ rk_result copy_segments(const int64_t *starts_ns, const int64_t *durations_ns,
         for (uint32_t joint = 0; joint < source_joint_count; ++joint)
             for (uint32_t power = 0; power <= segment.degree; ++power)
                 segment.coefficients[targets[joint]].value[power] = source[joint * stride + power];
+        for (uint32_t i = 0; i < follow_count; ++i) {
+            const auto &coupling = blueprint->couplings[followed[i]];
+            auto &follower = segment.coefficients[coupling.follower].value;
+            const auto &leader = segment.coefficients[coupling.leader].value;
+            for (uint32_t power = 0; power <= segment.degree; ++power)
+                follower[power] = coupling.ratio * leader[power] + (power == 0 ? coupling.offset : 0.0);
+        }
     }
     return RK_OK;
 }
@@ -236,7 +279,7 @@ rk_result RK_CALL rk_robot_runtime_submit_segments(rk_robot_runtime runtime,
         batch.tag = tag;
         const auto joints = value->blueprint().joint_count;
         const auto copied = copy_segments(starts_ns, durations_ns, degrees, segment_count,
-            coefficients, coefficient_count, nullptr, joints, joints, nullptr, batch);
+            coefficients, coefficient_count, nullptr, joints, joints, nullptr, nullptr, batch);
         return copied == RK_OK ? value->submit_segments(*command, std::move(batch)) : copied;
     } catch (const std::bad_alloc &) {
         return RK_ERROR_OUT_OF_MEMORY;
@@ -275,7 +318,8 @@ rk_result RK_CALL rk_robot_runtime_submit_plan(rk_robot_runtime runtime,
         plan.segments.tag = header->tag;
         const auto copied = copy_segments(starts_ns, durations_ns, degrees, segment_count,
             coefficients, coefficient_count, joint_map, source_joint_count,
-            value->blueprint().joint_count, header->start_position, plan.segments);
+            value->blueprint().joint_count, header->start_position, &value->blueprint(),
+            plan.segments);
         if (copied != RK_OK) return copied;
         plan.events.assign(events, events + event_count);
         return value->submit_plan(plan);

@@ -212,6 +212,8 @@ class RobotWorldTests {
     testSensorResetPublication();
     testRobotResetPose();
     SimulationPoseResetTests.run(0);
+    SimulationPoseResetTests.coupledLimits();
+    assertions += DeviceBindingTests.run();
     SharedSessionTests.run();
     testConfiguredSensors();
     testCameraFrameProtocol();
@@ -828,6 +830,7 @@ class RobotWorldTests {
     source.joints[2].limitImpedance = [0.0, 0.99, 0.01, 0.5, 2.0];
     source.joints[1].limits.overtravel = 0.004;
     source.actuators[0].servoStiffness = 75.0;
+    source.actuators[0].fullStepsPerRevolution = 200.0;
     source.actuators[0].servoDamping = 2.0;
 
     var encoded = RobotModelCodec.encode(source);
@@ -893,6 +896,7 @@ class RobotWorldTests {
     check(restored.joints[2].limitTimeConstant == 0.008 && restored.joints[2].limitImpedance[1] == 0.99,
       "RobotModel codec preserves joint limit softness");
     equal(restored.actuators[0].servoStiffness, 75.0, "RobotModel codec preserves servo stiffness");
+    equal(restored.actuators[0].fullStepsPerRevolution, 200.0, "RobotModel codec preserves a stepper's full steps");
     var restoredSurface = restored.links[1].collisionShapes[1].surface;
     check(restoredSurface != null && restoredSurface.frictionDimensions == 4 &&
       restoredSurface.friction[0] == 0.7 && restoredSurface.contactTimeConstant == 0.01,
@@ -4349,19 +4353,43 @@ class RobotWorldTests {
     if (!sys.FileSystem.exists(fixture + "deployment.json"))
       fixture = Sys.getCwd() + "/fixtures/device-deployment/";
     var current = new SerialDeployment(fixture + "deployment.json");
-    equal(current.protocol, "rkd6", "v4 deployment implies RKD6");
-    var scheduled = new SerialDeployment(fixture + "deployment6.json");
-    equal(scheduled.protocol, "rkd6", "v3 reader accepts RKD6");
-    equal(scheduled.stepTickHz, 40000, "v3 step tick rate");
-    equal(scheduled.clockSyncBoundNs, haxe.Int64.ofInt(30000000), "v3 sync bound");
-    var rejected = haxe.Json.parse(sys.io.File.getContent(fixture + "deployment6.json"));
-    Reflect.setField(Reflect.field(rejected, "device"), "protocol", "rkd5");
-    var rejectedPath = fixture + "rejected-rkd5-${Sys.getPid()}.json";
-    sys.io.File.saveContent(rejectedPath, haxe.Json.stringify(rejected));
-    var message = "";
-    try new SerialDeployment(rejectedPath) catch (error:Dynamic) message = Std.string(error);
-    sys.FileSystem.deleteFile(rejectedPath);
-    check(message.indexOf("rkd5 is unsupported") >= 0, "v3 reader rejects RKD5 clearly");
+    equal(current.protocol, "rkd6", "v5 deployment implies RKD6");
+    equal(current.stepTickHz, 40000, "v5 step tick rate");
+    equal(current.clockSyncBoundNs, haxe.Int64.ofInt(30000000), "v5 sync bound");
+    equal(current.controller, "0123456789abcdef0123456789abcdef", "v5 names the board it is for");
+    equal(current.binding.channels.length, 3, "the layout wires three channels");
+    // 200 full steps at 16 microsteps a turn; the lift's 8 mm lead gives its ratio.
+    check(Math.abs(current.binding.channels[0].stepsPerUnit - 3200.0 / (2.0 * Math.PI)) < 1e-9,
+      "steps per radian come from the model and the wiring");
+    equal(current.binding.channels[2].jointIndex, 2, "the lift's channel drives the lift joint");
+    check(current.binding.model.actuators[2].maxRate > 0.0,
+      "the binding's model carries the step tick's rate ceiling");
+    // Deployments that named a compiled fingerprint say what to change.
+    var legacy = sys.io.File.getContent(fixture + "deployment-v3.json");
+    var legacyPath = fixture + "legacy-${Sys.getPid()}.json";
+    function loads(text:String):String {
+      sys.io.File.saveContent(legacyPath, text);
+      var message = "";
+      try new SerialDeployment(legacyPath) catch (error:Dynamic) message = Std.string(error);
+      sys.FileSystem.deleteFile(legacyPath);
+      return message;
+    }
+    var v3 = loads(legacy);
+    check(v3.indexOf("schemaVersion 5") >= 0 && v3.indexOf("device.controller") >= 0, "v3 is rejected with what to change: " + v3);
+    var v4 = loads(StringTools.replace(legacy, "\"schemaVersion\": 3", "\"schemaVersion\": 4"));
+    check(v4.indexOf("schemaVersion 5") >= 0, "v4 is rejected with what to change");
+    var withFingerprint = loads(StringTools.replace(sys.io.File.getContent(fixture + "deployment.json"),
+      "\"controller\"", "\"fingerprint\""));
+    check(withFingerprint.indexOf("fingerprint is gone") >= 0, "a v5 file with a fingerprint is rejected");
+    var unwired = haxe.Json.parse(sys.io.File.getContent(fixture + "deployment.json"));
+    var unwiredLayout = haxe.Json.parse(sys.io.File.getContent(fixture + "layout.json"));
+    var unwiredChannels:Array<Dynamic> = Reflect.field(unwiredLayout, "channels");
+    unwiredChannels.pop();
+    sys.io.File.saveContent(fixture + "layout-unwired-${Sys.getPid()}.json", haxe.Json.stringify(unwiredLayout));
+    Reflect.setField(Reflect.field(unwired, "device"), "layout", "layout-unwired-${Sys.getPid()}.json");
+    var unwiredMessage = loads(haxe.Json.stringify(unwired));
+    sys.FileSystem.deleteFile(fixture + "layout-unwired-${Sys.getPid()}.json");
+    check(unwiredMessage.indexOf("has no channel") >= 0, "a stepper without a channel fails loudly: " + unwiredMessage);
     var bench = Sys.getCwd() + "/robotkit/deployment/bench-nucleo-g474re/deployment.json";
     if (!sys.FileSystem.exists(bench))
       bench = Sys.getCwd() + "/../deployment/bench-nucleo-g474re/deployment.json";
@@ -4372,28 +4400,36 @@ class RobotWorldTests {
 
   static function testSerialRobotUnavailableDevice():Void {
     var model = new RobotModel("serial probe");
-    model.addLink(new Link("base", "base"));
+    var base = model.addLink(new Link("base", "base"));
+    var tool = model.addLink(new Link("tool", "tool"));
+    var joint = model.addJoint(new Joint("axis", JointType.Revolute, base, tool, "joint/axis"));
+    joint.limits.lower = -1.0;
+    joint.limits.upper = 1.0;
+    joint.limits.effort = 1.0;
+    var motor = new Actuator("axis-motor", 0.0, 0.0, Transmission.SimpleTransmission("joint/axis", 1.0, 0.0));
+    motor.fullStepsPerRevolution = 200.0;
+    model.addActuator(motor);
+    var layout = DeviceLayout.forActuators(model, 16);
     var robot:Null<SerialRobot> = null;
     var failed = false;
     try robot = new SerialRobot("serial-probe", model,
       '/dev/robotkit-missing-${Sys.getPid()}',
-      "000102030405060708090a0b0c0d0e0f", 1e-6) catch (_:Dynamic) failed = true;
+      "000102030405060708090a0b0c0d0e0f", layout, 1e-6) catch (_:Dynamic) failed = true;
     if (robot != null) robot.close();
     check(failed, "serial adapter reports an unavailable device path through Haxe FFI");
-    var tool = model.addLink(new Link("tool", "tool"));
-    var joint = model.addJoint(new Joint("axis", JointType.Revolute,
-      model.links[0], tool, "joint/axis"));
-    joint.limits.lower = -1.0;
-    joint.limits.upper = 1.0;
-    joint.limits.effort = 1.0;
     var timingMessage = "";
     try new SerialRobot("under-period", model,
       '/dev/robotkit-missing-${Sys.getPid()}',
-      "000102030405060708090a0b0c0d0e0f", 1e-6, 115200,
+      "000102030405060708090a0b0c0d0e0f", layout, 1e-6, 115200,
       Int64.ofInt(1000000), Int64.ofInt(2000000))
     catch (error:Dynamic) timingMessage = Std.string(error);
     check(timingMessage.indexOf("runtime.createSerial") >= 0,
       "serial construction reports an unavailable device");
+    var unwiredMessage = "";
+    try new SerialRobot("unwired", model, '/dev/robotkit-missing-${Sys.getPid()}',
+      "000102030405060708090a0b0c0d0e0f", new DeviceLayout([]), 1e-6)
+    catch (error:Dynamic) unwiredMessage = Std.string(error);
+    check(unwiredMessage.indexOf("from 1 to 64") >= 0, "a serial robot needs a wired layout, not a default one");
   }
 
   static function testProcessChannelDeployment():Void {
@@ -4401,7 +4437,7 @@ class RobotWorldTests {
       "fixtures/device-deployment/deployment.json");
     equal(deployment.channels.length, 1, "deployment declares one process channel");
     equal(deployment.channels[0].id, "sprayer.flow", "deployment keeps channel ID");
-    var blueprint = RobotRuntimeCompiler.compile(deployment.robot);
+    var blueprint = RobotRuntimeCompiler.compile(deployment.binding.model);
     for (channel in deployment.channels) blueprint.channels.push(channel);
     var simulationHarness = new SimulationHarness();
 

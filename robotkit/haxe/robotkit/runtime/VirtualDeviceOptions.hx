@@ -17,7 +17,8 @@ class VirtualDeviceOptions {
   public var seed:Int64 = Int64.ofInt(1);
   public var stepsPerUnit:Array<Float> = [];
   public var actuators:Array<VirtualActuatorOptions> = [];
-  public var fingerprint:String = "00000000000000000000000000000000";
+  /** The virtual board's unique id, 32 hex digits, which a deployment names; "Virtual-Device-1" by default. */
+  public var controller:String = "5669727475616c2d4465766963652d31";
   public var targetError:Float = 0.00001;
   public var clockBoundNs:Int64 = Int64.ofInt(5000000);
   public var linkLossTimeoutNs:Int64 = Int64.ofInt(500000000);

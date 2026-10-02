@@ -27,6 +27,7 @@ import machinekit.standard.SocketHeadCapScrew;
 class NemaStepper extends MachineComponent {
 	static var frameTable:Null<Catalog<NemaFrameInterface>>;
 	static var variantTable:Null<Catalog<StepperMotorVariant>>;
+	static var ratingTable:Null<Catalog<StepperMotorRating>>;
 
 	/** Frame mounting dimensions; kept as `spec` for existing callers. */
 	public final spec:NemaFrameInterface;
@@ -66,6 +67,26 @@ class NemaStepper extends MachineComponent {
 			}, standard: null, standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope,
 				verifiedFields: ["bodyFace", "bodyLength", "shaftDiameter", "shaftLength"]}));
 		return variantTable;
+	}
+
+	/**
+	 * Ratings of the named variants. Holding torque and rated current are the ones the products are
+	 * named by; inductance and rotor inertia are typical datasheet values, not checked against
+	 * the linked pages.
+	 */
+	public static function ratingCatalog():Catalog<StepperMotorRating> {
+		if (ratingTable == null)
+			ratingTable = new Catalog("stepper motor rating", spec -> spec.designation, [
+				{designation: "17HS19-1684S1", holdingTorque: 0.45, ratedCurrent: 1.68, phaseInductance: 2.8e-3,
+					rotorInertia: 8.2e-6, stepAngle: 1.8},
+				{designation: "23HS22-2804S", holdingTorque: 1.26, ratedCurrent: 2.8, phaseInductance: 2.5e-3,
+					rotorInertia: 3.0e-5, stepAngle: 1.8},
+				{designation: "34HS31-5504S", holdingTorque: 4.5, ratedCurrent: 5.5, phaseInductance: 3.2e-3,
+					rotorInertia: 1.4e-4, stepAngle: 1.8},
+			], spec -> ({source: variantCatalog().metadata(spec.designation).source, standard: null,
+				standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope,
+				verifiedFields: ["holdingTorque", "ratedCurrent", "stepAngle"]}));
+		return ratingTable;
 	}
 
 	/** Named manufacturer variant. */
@@ -120,6 +141,51 @@ class NemaStepper extends MachineComponent {
 		addConnector("shaftTip", Shaft, Solids.axial(0, 0, variant.shaftLength));
 		var i = 1;
 		for (point in boltPattern()) addConnector('bolt${i++}', Mount, Solids.axial(point.x, point.y, 0));
+	}
+
+	/** The motor's ratings, or null for a variant without them, such as a generic length. */
+	public function rating():Null<StepperMotorRating>
+		return ratingCatalog().exists(variant.designation) ? ratingCatalog().get(variant.designation) : null;
+
+	/**
+	 * Pull-out torque at shaft speed `speed` (rad/s) on a `volts` supply, in N m: the holding torque
+	 * until the winding's inductance keeps its current below rated, then falling as 1 / speed. A
+	 * first-order model: back EMF, the driver's current regulation and resonance are left out.
+	 */
+	public function pullOutTorque(speed:Float, volts:Float):Float {
+		var rated = requireRating();
+		var corner = cornerSpeed(rated, volts);
+		var magnitude = Math.abs(speed);
+		return magnitude <= corner ? rated.holdingTorque : rated.holdingTorque * corner / magnitude;
+	}
+
+	/**
+	 * Torque and speed the motor can be relied on for on a `volts` supply: `margin` of its holding
+	 * torque, up to the speed where its pull-out torque falls to that. Half is the usual margin
+	 * that keeps a stepper from missing steps.
+	 */
+	public function usableTorque(margin:Float = 0.5):Float {
+		if (!(margin > 0 && margin <= 1)) throw "Stepper torque margin must be in (0, 1]";
+		return requireRating().holdingTorque * margin;
+	}
+
+	public function usableSpeed(volts:Float, margin:Float = 0.5):Float {
+		usableTorque(margin);
+		return cornerSpeed(requireRating(), volts) / margin;
+	}
+
+	/** Shaft speed (rad/s) where the winding's reactance at rated current takes the whole supply. */
+	static function cornerSpeed(rated:StepperMotorRating, volts:Float):Float {
+		if (!(volts > 0) || !Math.isFinite(volts)) throw "Stepper supply voltage must be positive";
+		// A two-phase hybrid stepper has 90 / step angle rotor teeth: its electrical frequency.
+		var teeth = 90 / rated.stepAngle;
+		return volts / (teeth * rated.phaseInductance * rated.ratedCurrent);
+	}
+
+	function requireRating():StepperMotorRating {
+		var rated = rating();
+		if (rated == null) throw '${variant.designation} has no torque rating';
+		return rated;
 	}
 
 	/** Bolt centres on the mounting face, counter-clockwise from (+,+). */

@@ -14,7 +14,7 @@ fn frame_sync_slides_across_a_bad_marker() {
 
 #[test]
 fn rkd6_records_round_trip() {
-    let begin = SessionBegin6 { session: 7, protocol_version: 12, model_fingerprint: [3; 16],
+    let begin = SessionBegin6 { session: 7, protocol_version: 12, expected_controller: [3; 16],
         actuator_count: 2, max_degree: 5, step_tick_hz: 40_000,
         max_acceleration: 4.0, actuator_max_acceleration: [4.0; 64], steps_per_unit: [400.0; 64], max_rate: [0.0; 64], direction_setup_ticks: [0; 64], actuator_joint: [0; 64], actuator_ratio: [1.0; 64], dual_drive_skew_bound: [0.0; 64], link_loss_timeout_ns: 500_000_000,
         channel_count: 0, channel_id: [0; 1536], channel_kind: [0; 32],
@@ -48,7 +48,7 @@ fn frame_rejects_corruption_and_wrong_lengths() {
     for kind in 8..=13 {
         assert_eq!(encode_frame6(kind, &[1], &mut frame), Err(Frame6Error::BadLength));
     }
-    for (kind, size) in [(2, 45), (3, 8), (4, 24), (5, 529),
+    for (kind, size) in [(2, 53), (3, 8), (4, 24), (5, 529),
                          (7, 8), (14, 44)] {
         assert_eq!(encode_frame6(kind, &vec![0; size - 1], &mut frame),
                    Err(Frame6Error::BadLength));
@@ -64,7 +64,7 @@ fn session_begin_carries_per_actuator_acceleration_limits() {
     limits[0] = 2.0;
     limits[1] = 4.0;
     let begin = SessionBegin6 { session: 7, protocol_version: 12,
-        model_fingerprint: [3; 16], actuator_count: 2, max_degree: 5,
+        expected_controller: [3; 16], actuator_count: 2, max_degree: 5,
         step_tick_hz: 40_000, max_acceleration: 4.0,
         actuator_max_acceleration: limits, steps_per_unit: [400.0; 64], max_rate: [0.0; 64], direction_setup_ticks: [0; 64], actuator_joint: [0; 64], actuator_ratio: [1.0; 64], dual_drive_skew_bound: [0.0; 64], link_loss_timeout_ns: 500_000_000,
         channel_count: 0, channel_id: [0; 1536], channel_kind: [0; 32],
@@ -114,4 +114,38 @@ fn shared_frame_vectors() {
         let size = encode_frame6(kind, payload, &mut encoded).unwrap();
         assert_eq!(&encoded[..size], bytes);
     }
+}
+
+#[test]
+fn config_digest_is_fnv1a_after_the_session_field() {
+    use robotkit_device_protocol::config_digest::{config_digest6, fnv1a64};
+    assert_eq!(fnv1a64(b""), 0xcbf2_9ce4_8422_2325);
+    assert_eq!(fnv1a64(b"a"), 0xaf63_dc4c_8601_ec8c);
+    assert_eq!(fnv1a64(b"foobar"), 0x8594_4171_f739_67e8);
+    let mut payload = [0u8; 8 + 6];
+    payload[8..].copy_from_slice(b"foobar");
+    let other_session = {
+        let mut copy = payload;
+        copy[..8].copy_from_slice(&99u64.to_le_bytes());
+        copy
+    };
+    assert_eq!(config_digest6(&payload), 0x8594_4171_f739_67e8);
+    assert_eq!(config_digest6(&other_session), config_digest6(&payload));
+}
+
+#[test]
+fn config_digest_covers_the_channel_stop_policy() {
+    use robotkit_device_protocol::config_digest::config_digest6;
+    let mut begin = SessionBegin6 { session: 7, protocol_version: 12, expected_controller: [3; 16],
+        actuator_count: 0, max_degree: 5, step_tick_hz: 40_000,
+        max_acceleration: 4.0, actuator_max_acceleration: [4.0; 64], steps_per_unit: [400.0; 64], max_rate: [0.0; 64], direction_setup_ticks: [0; 64], actuator_joint: [0; 64], actuator_ratio: [1.0; 64], dual_drive_skew_bound: [0.0; 64], link_loss_timeout_ns: 500_000_000,
+        channel_count: 0, channel_id: [0; 1536], channel_kind: [0; 32],
+        safe_digital: [0; 32], safe_analog: [0.0; 32],
+        safe_argument: [0.0; 32], safe_command: [0; 1536], channel_stop_policy: [0; 32] };
+    let mut safe = [0; SessionBegin6::SIZE];
+    begin.encode(&mut safe).unwrap();
+    begin.channel_stop_policy[3] = 1;
+    let mut keep = [0; SessionBegin6::SIZE];
+    begin.encode(&mut keep).unwrap();
+    assert_ne!(config_digest6(&safe), config_digest6(&keep));
 }

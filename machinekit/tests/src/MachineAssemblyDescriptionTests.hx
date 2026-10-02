@@ -24,6 +24,15 @@ import machinekit.transmission.SpurGear;
 import machinekit.assembly.FlangeBearingAssembly;
 import machinekit.standard.DeepGrooveBearing;
 import machinekit.assembly.LinearAxis;
+import machinekit.assembly.Drive;
+import machinekit.motion.NemaStepper;
+import machinekit.assembly.MachineAssemblyDescription;
+import machinekit.assembly.MachineAssemblyDescription.MemberSource;
+import machinekit.assembly.MachineAssemblyDescription.SavedValue;
+import machinekit.motion.LeadScrew;
+import machinekit.motion.LeadScrewThread;
+import machinekit.transmission.TimingPulley;
+import machinekit.transmission.TimingBeltProfile;
 import pickingstation.StorageRack;
 import pickingstation.PickingStationConfig;
 
@@ -144,6 +153,8 @@ class MachineAssemblyDescriptionTests {
 		includedConnectorRuntime();
 		suctionInterfaceRoundTrip();
 		documentRoundTrip();
+		drivesFollowTheirParts();
+		motorsDriveJoints();
 		changerDocumentRoundTrip();
 		fullEoatDocumentRoundTrip();
 		documentEditsAndUndo();
@@ -236,6 +247,139 @@ class MachineAssemblyDescriptionTests {
 		if (nestedShape.volume() <= 1) throw "Nested assembly retained placeholder geometry";
 		reopened.close();
 		document.close();
+	}
+
+	/** A coupling's ratio comes from the parts that drive it, so editing a part changes it. */
+	static function drivesFollowTheirParts():Void {
+		var assembly = new MachineAssembly();
+		assembly.addComponent("base", new RobotFlange(50));
+		assembly.addComponent("slider", new RobotFlange(50));
+		assembly.addComponent("screw", new LeadScrew(new LeadScrewThread(MetricTrapezoidal, 10, 2), 100));
+		assembly.addComponent("pulley", new TimingPulley(TimingBeltProfile.GT2, 20, 5, 8));
+		assembly.addComponent("driver", new SpurGear(1, 20, 6));
+		assembly.addComponent("driven", new SpurGear(1, 40, 6));
+		assembly.addMateOnAxis("slide", "prismatic", "base", "face", "slider", "face", {x: 0, y: 1, z: 0}, 10);
+		for (turning in ["screw", "pulley", "driver", "driven"])
+			assembly.addMateOnAxis('$turning-turn', "continuous", "base", "face", turning,
+				turning == "screw" ? "input" : "axis", {x: 0, y: 1, z: 0});
+		// A right-hand Tr10 x 2 screw: one turn moves its nut 2 mm back along the screw, from 10 mm.
+		var lead = assembly.addDrive("lead", "slide", "screw-turn", Drive.LeadScrew("screw", 1), 10);
+		var belt = assembly.addDrive("belt", "slide", "pulley-turn", Drive.Belt("pulley", -1), 10);
+		var mesh = assembly.addDrive("mesh", "driver-turn", "driven-turn", Drive.GearMesh("driver", "driven", 1));
+		function near(actual:Float, expected:Float, what:String):Void
+			if (!(Math.abs(actual - expected) < 1e-12)) throw '$what: $actual, expected $expected';
+		near(lead, -Math.PI, "a 2 mm right-hand lead turns the screw -pi rad per mm");
+		near(belt, -Math.PI / 20, "a 20-tooth GT2 pulley (40 mm round) turns 1 / pitch radius per mm");
+		near(mesh, -0.5, "a 20-tooth gear turns a 40-tooth one back at half speed");
+		function ratio(machine:MachineAssembly, id:String):{ratio:Float, offset:Float} {
+			for (coupling in machine.describe().mechanical.couplings) if (coupling.id == id)
+				return {ratio: coupling.ratio, offset: coupling.offset};
+			throw 'No coupling "$id"';
+		}
+		near(ratio(assembly, "lead").offset, 10 * Math.PI, "the screw is at zero where the slide is at 10 mm");
+		// Saved, then rebuilt with a 4 mm pitch: the ratio follows the thread, not the saved number.
+		var description = assembly.describe();
+		var drives = description.machine.drives;
+		if (drives == null || drives.length != 3) throw "The description lost its drives";
+		var leadDrive = assembly.drive("lead");
+		if (leadDrive == null) throw "The assembly lost its lead screw drive";
+		if (leadDrive.kind != "lead-screw" || leadDrive.members[0] != "screw")
+			throw "The lead screw drive names its screw";
+		var edited:MachineAssemblyDescription = haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(description));
+		edited.machine.members = [for (member in edited.machine.members) member.occurrence != "screw" ? member :
+			{occurrence: member.occurrence, material: member.material, source: switch member.source {
+				case Typed(id, values): Typed(id, [for (value in values) value.name != "pitch" ? value :
+					{name: "pitch", value: SavedValue.Number(4)}]);
+				case other: other;
+			}}];
+		var rebuilt = MachineAssembly.fromDescription(edited);
+		near(ratio(rebuilt, "lead").ratio, -Math.PI / 2, "a rebuilt drive takes its ratio from the edited screw");
+		near(ratio(rebuilt, "lead").offset, 10 * Math.PI / 2, "and keeps the screw at zero at 10 mm");
+		near(ratio(rebuilt, "mesh").ratio, -0.5, "an unedited drive keeps its ratio");
+		// Through a CadKit document, as the editor would change it.
+		var document = new Document();
+		var root = MachineAssemblyDocuments.defineAssembly(document, assembly);
+		var screwInstance:InstanceElement = null;
+		for (element in document.allElements()) {
+			var id = element.property("cadkit.assembly.id");
+			if (id != null && id.value == "screw") screwInstance = cast element;
+		}
+		if (screwInstance == null) throw "The screw is not a document instance";
+		screwInstance.setOverride("pitch", 4);
+		var reopened = MachineAssemblyDocuments.rebuildAssembly(document.element(root.id));
+		near(ratio(reopened, "lead").ratio, -Math.PI / 2, "a document edit to the screw's pitch changes its drive");
+		document.close();
+	}
+
+	/** A stepper's actuator comes from its ratings and supply, and follows the motor part. */
+	static function motorsDriveJoints():Void {
+		function near(actual:Float, expected:Float, what:String, tolerance:Float = 1e-12):Void
+			if (!(Math.abs(actual - expected) < tolerance)) throw '$what: $actual, expected $expected';
+		var motor = NemaStepper.frame(23);
+		// 1.26 N m holding; on 24 V its 2.5 mH winding passes rated 2.8 A up to 24 / (50 x 2.5 mH x 2.8 A).
+		var corner = 24 / (50 * 2.5e-3 * 2.8);
+		near(motor.pullOutTorque(corner / 2, 24), 1.26, "below the corner speed a stepper pulls its holding torque");
+		near(motor.pullOutTorque(2 * corner, 24), 0.63, "above it, its torque falls as 1 / speed");
+		near(motor.usableTorque(), 0.63, "half the holding torque is the usable torque");
+		near(motor.usableSpeed(24), 2 * corner, "and it holds that up to twice the corner speed");
+		near(motor.usableSpeed(48), 4 * corner, "a higher supply keeps the torque to a higher speed");
+		if (NemaStepper.frame(23, 70).rating() != null) throw "A generic-length motor has no rating";
+		// A Tr10 x 2 thread with a 0.1 friction nut passes about 40% of the motor's work to the nut.
+		var thread = new LeadScrewThread(MetricTrapezoidal, 10, 2);
+		near(thread.efficiency(), 0.403, "a Tr10 x 2 screw is about 40% efficient", 0.002);
+		near(thread.efficiency(0), 1, "a frictionless screw is lossless", 1e-12);
+		if (!(new LeadScrewThread(MetricTrapezoidal, 10, 2, 4).efficiency() > thread.efficiency()))
+			throw "A steeper lead is more efficient";
+
+		var assembly = new MachineAssembly();
+		assembly.addComponent("base", new RobotFlange(50));
+		assembly.addComponent("slider", new RobotFlange(50));
+		assembly.addComponent("motor", motor);
+		assembly.addComponent("screw", new LeadScrew(thread, 100));
+		assembly.addMateOnAxis("slide", "prismatic", "base", "face", "slider", "face", {x: 0, y: 1, z: 0});
+		assembly.addMateOnAxis("turn", "continuous", "base", "face", "screw", "input", {x: 0, y: 1, z: 0});
+		assembly.addDrive("lead", "slide", "turn", Drive.LeadScrew("screw", 1));
+		assembly.addMotor("drive", "turn", "motor", 24);
+		function definition(machine:MachineAssembly):materia.assembly.AssemblyDefinition {
+			var model = new AssemblyModel("mm");
+			machine.addTo(model, "");
+			return model.definition("motorised");
+		}
+		function actuatorsOf(definition:materia.assembly.AssemblyDefinition):Array<materia.assembly.AssemblyDefinition.AssemblyActuator> {
+			var actuators = definition.actuators;
+			if (actuators == null) throw "The assembly has no actuators";
+			return actuators;
+		}
+		function efficiencyOf(definition:materia.assembly.AssemblyDefinition):Float {
+			var couplings = definition.couplings;
+			if (couplings == null || couplings.length != 1) throw "The assembly has no coupling";
+			var efficiency = couplings[0].efficiency;
+			if (efficiency == null) throw "The coupling has no efficiency";
+			return efficiency;
+		}
+		var built = definition(assembly);
+		var actuators = actuatorsOf(built);
+		if (actuators.length != 1 || actuators[0].joint != "turn") throw "The motor drives its joint";
+		var rotor = actuators[0].rotorInertia;
+		near(actuators[0].maxEffort, 0.63, "the actuator gets the usable torque");
+		near(actuators[0].maxRate, 2 * corner, "and the usable speed");
+		near(rotor == null ? 0 : rotor, 3.0e-5, "and the rotor's inertia");
+		var steps = actuators[0].fullStepsPerRevolution;
+		near(steps == null ? 0 : steps, 200, "and 200 full steps a turn from its 1.8 degree step");
+		near(efficiencyOf(built), thread.efficiency(), "the lead screw's coupling carries its efficiency");
+		// Rebuilt with the NEMA 17 in the motor's place, the actuator follows the motor.
+		var description:MachineAssemblyDescription = haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(assembly.describe()));
+		description.machine.members = [for (member in description.machine.members) member.occurrence != "motor" ? member :
+			{occurrence: member.occurrence, material: member.material, source: switch member.source {
+				case Typed(id, values): Typed(id, [for (value in values) value.name != "model" ? value :
+					{name: "model", value: SavedValue.Token("17HS19-1684S1")}]);
+				case other: other;
+			}}];
+		var rebuilt = definition(MachineAssembly.fromDescription(description));
+		var rebuiltSteps = actuatorsOf(rebuilt)[0].fullStepsPerRevolution;
+		near(rebuiltSteps == null ? 0 : rebuiltSteps, 200, "a rebuilt motor keeps its steps");
+		near(actuatorsOf(rebuilt)[0].maxEffort, 0.225, "a rebuilt motor's actuator follows the motor part");
+		near(efficiencyOf(rebuilt), thread.efficiency(), "and the screw keeps its efficiency");
 	}
 
 	static function documentRoundTrip():Void {

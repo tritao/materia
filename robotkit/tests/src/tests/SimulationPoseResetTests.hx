@@ -84,6 +84,10 @@ class SimulationPoseResetTests {
 
     var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(RobotRuntimeCompiler.compile(model));
+    // A plan leaving the follower out turns it with its source, so the runtime names the pair.
+    if (runtime.couplings.length != 1 || runtime.couplings[0].leader != 0 ||
+        runtime.couplings[0].follower != 1 || runtime.couplings[0].ratio != -2.0)
+      throw 'runtime did not report its coupling on backend $backend';
     runtime.submitPosition(0, 0.3, 1);
     for (index in 0...200) simulationHarness.step(Int64.ofInt(index));
     var q = runtime.snapshot().q;
@@ -91,6 +95,84 @@ class SimulationPoseResetTests {
     if (!(Math.abs(q.get(0)) > 0.1 && Math.abs(q.get(1) + 2.0 * q.get(0)) < tolerance))
       throw 'coupling did not follow source on backend $backend: ${q.get(0)}, ${q.get(1)}';
     simulationHarness.dispose();
+  }
+
+  /** A joint is as fast as every joint that turns with it allows: a lead screw caps its axis. */
+  public static function coupledLimits():Void {
+    var model = new RobotModel("screw axis");
+    var base = model.addLink(new Link("base"));
+    var carriage = model.addLink(new Link("carriage"));
+    var screw = model.addLink(new Link("screw"));
+    var pulley = model.addLink(new Link("pulley"));
+    var axis = model.addJoint(new Joint("axis", JointType.Prismatic, base, carriage));
+    var turn = model.addJoint(new Joint("turn", JointType.Revolute, base, screw));
+    var belt = model.addJoint(new Joint("belt", JointType.Revolute, base, pulley));
+    axis.limits = new JointLimits(0, 0.3, 0.08, 400, 0.5);
+    axis.limits.overtravel = 0.005;
+    // 2 mm lead: pi * 1000 rad per metre of travel. The screw turns at most 100 rad/s.
+    turn.limits = new JointLimits(-1e9, 1e9, 100, 0, 0);
+    // A belt off the screw at 1:2, limited to 150 rad/s and 2000 rad/s², with no limit of its own on speed below.
+    belt.limits = new JointLimits(-1e9, 1e9, 150, 0, 2000);
+    model.addCoupling(new JointCoupling("lead", "axis", "turn", -Math.PI * 1000, 0.0));
+    model.addCoupling(new JointCoupling("belt", "turn", "belt", 2.0, 0.0));
+    var limits = model.coupledLimits("axis");
+    var screwSpeed = 100 / (Math.PI * 1000), beltSpeed = 150 / (2 * Math.PI * 1000);
+    if (Math.abs(limits.velocity - Math.min(screwSpeed, beltSpeed)) > 1e-12)
+      throw 'coupled velocity limit ${limits.velocity}';
+    if (Math.abs(limits.maxAcceleration - Math.min(0.5, 2000 / (2 * Math.PI * 1000))) > 1e-12)
+      throw 'coupled acceleration limit ${limits.maxAcceleration}';
+    if (limits.lower != 0 || limits.upper != 0.3 || limits.effort != 400 || limits.overtravel != 0.005)
+      throw "coupled limits must keep the joint's own travel, effort and overtravel";
+    if (axis.limits.velocity != 0.08) throw "coupled limits must not change the model";
+    // A joint with no limit of its own takes its followers'.
+    axis.limits.velocity = 0;
+    if (Math.abs(model.coupledLimits("axis").velocity - Math.min(screwSpeed, beltSpeed)) > 1e-12)
+      throw "an unlimited joint should take its followers' limit";
+    if (model.coupledLimits("belt").velocity != 150) throw "a follower is not limited by its leader";
+
+    // A motor on the screw: 0.63 N m up to 137 rad/s, a 3e-5 kg m² rotor, through a 40% screw.
+    var motorModel = new RobotModel("motor axis");
+    var frame = motorModel.addLink(new Link("frame"));
+    var table = motorModel.addLink(new Link("table"));
+    var rotor = motorModel.addLink(new Link("rotor"));
+    table.mass = 10.0;
+    rotor.mass = 0.2;
+    rotor.centerOfMass = [0.0, 0.0, 0.0];
+    rotor.inertiaTensor = [1e-5, 0.0, 0.0, 0.0, 1e-5, 0.0, 0.0, 0.0, 4e-6];
+    var slide = motorModel.addJoint(new Joint("slide", JointType.Prismatic, frame, table));
+    var screwJoint = motorModel.addJoint(new Joint("screw", JointType.Continuous, frame, rotor));
+    slide.limits = new JointLimits(0, 0.3);
+    screwJoint.limits = new JointLimits(-1e9, 1e9);
+    screwJoint.axis = [0.0, 0.0, 1.0];
+    screwJoint.armature = 3e-5;
+    var screwLead = new JointCoupling("lead", "slide", "screw", Math.PI * 1000, 0.0);
+    screwLead.efficiency = 0.4;
+    motorModel.addCoupling(screwLead);
+    motorModel.addActuator(new robotkit.model.Actuator("motor", 0.63, 137.0,
+      robotkit.model.Transmission.SimpleTransmission("screw", 1.0, 0.0)));
+    var driven = motorModel.coupledLimits("slide");
+    var scale = Math.PI * 1000;
+    if (Math.abs(driven.velocity - 137.0 / scale) > 1e-12)
+      throw 'a motor caps its axis at its rate through the screw: ${driven.velocity}';
+    // a = eta s T / (m + eta (J_screw + J_rotor) s²), with the screw's own 4e-6 about its axis.
+    var expected = 0.4 * scale * 0.63 / (10.0 + 0.4 * (4e-6 + 3e-5) * scale * scale);
+    if (Math.abs(driven.maxAcceleration - expected) > expected * 1e-12)
+      throw 'a motor accelerates its axis by its force over mass and turning inertia: ${driven.maxAcceleration}, expected $expected';
+    // Two motors, one per screw, as on a gantry's two sides: twice the force and twice the turning inertia.
+    var second = motorModel.addLink(new Link("rotor2"));
+    second.mass = 0.2;
+    second.inertiaTensor = rotor.inertiaTensor.copy();
+    var other = motorModel.addJoint(new Joint("screw2", JointType.Continuous, frame, second));
+    other.limits = new JointLimits(-1e9, 1e9);
+    other.armature = 3e-5;
+    var otherLead = new JointCoupling("lead2", "slide", "screw2", -Math.PI * 1000, 0.0);
+    otherLead.efficiency = 0.4;
+    motorModel.addCoupling(otherLead);
+    motorModel.addActuator(new robotkit.model.Actuator("motor2", 0.63, 137.0,
+      robotkit.model.Transmission.SimpleTransmission("screw2", 1.0, 0.0)));
+    var pair = 2 * 0.4 * scale * 0.63 / (10.0 + 2 * 0.4 * (4e-6 + 3e-5) * scale * scale);
+    if (Math.abs(motorModel.coupledLimits("slide").maxAcceleration - pair) > pair * 1e-12)
+      throw "two motors add their force and their screws' turning inertia";
   }
 
   static function checkPose(simulation:Simulation, position:Array<Float>, rotation:Array<Float>,

@@ -7,7 +7,6 @@ import cnckit.CncCompiler;
 import cnckit.CncController;
 import cnckit.CncDiagnostic.CncSeverity;
 import robotkit.model.Joint;
-import robotkit.model.JointLimits;
 import robotkit.model.Link;
 import robotkit.model.RobotModel;
 import robotkit.runtime.Simulation;
@@ -161,14 +160,18 @@ class CncProgramPlayer implements SessionMember {
 			if (joint.length != 1 || Std.string(joint[0].type) != "prismatic")
 				throw 'CNC axis "$id" must be a prismatic joint of the machine';
 			var limits = joint[0].limits;
-			var lower = limits.lower, upper = limits.upper, velocity = limits.velocity, acceleration = limits.acceleration;
-			if (lower == null || upper == null || velocity == null || acceleration == null)
-				throw 'CNC axis "$id" needs travel, velocity and acceleration limits';
+			var lower = limits.lower, upper = limits.upper;
+			if (lower == null || upper == null) throw 'CNC axis "$id" needs travel limits';
 			var initial = placement.joint(id) * metresPerUnit;
 			start.push(initial);
-			rapid = Math.max(rapid, velocity * metresPerUnit);
+			// The axis is as fast as the joints turning with it and their motors allow, such as its
+			// lead screw and the motor turning it.
+			var coupled = robot.model.coupledLimits(id);
+			if (!(coupled.velocity > 0) || !(coupled.maxAcceleration > 0))
+				throw 'CNC axis "$id" needs velocity and acceleration limits, its own or its motors\'';
+			rapid = Math.max(rapid, coupled.velocity);
 			axes.push(new MotionAxisBlueprint(id, [id], lower * metresPerUnit, upper * metresPerUnit,
-				velocity * metresPerUnit, acceleration * metresPerUnit, initial, [1.0], [-initial]));
+				coupled.velocity, coupled.maxAcceleration, initial, [1.0], [-initial]));
 		}
 		// Plan over the three axes alone: the machine's other joints are fixed mounts, and planning
 		// them all made compiling a short program take many seconds.
@@ -454,7 +457,9 @@ class CncProgramPlayer implements SessionMember {
 
 	/**
 	 * A serial chain of just the machine's axis joints, with their types, axes and limits, for the
-	 * planner, and each joint's index in the full model, where plans are executed.
+	 * planner, and each joint's index in the full model, where plans are executed. Joints coupled
+	 * to an axis, such as its lead screws, are left out: the runtime turns them with their axis,
+	 * and their limits are folded into the axis's.
 	 */
 	static function planningModel(model:RobotModel, axes:Array<String>):{model:RobotModel, indices:Array<Int>} {
 		var planning = new RobotModel(model.name + ".axes");
@@ -468,9 +473,7 @@ class CncProgramPlayer implements SessionMember {
 			var child = planning.addLink(new Link(id + ".carriage"));
 			var joint = planning.addJoint(new Joint(id, source.type, parent, child, source.id));
 			joint.axis = source.axis.copy();
-			var limits = source.limits;
-			joint.limits = new JointLimits(limits.lower, limits.upper, limits.velocity, limits.effort, limits.maxAcceleration);
-			joint.limits.overtravel = limits.overtravel;
+			joint.limits = model.coupledLimits(source.id);
 			indices.push(index);
 			parent = child;
 		}

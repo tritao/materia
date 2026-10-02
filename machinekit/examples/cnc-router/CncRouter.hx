@@ -1,5 +1,8 @@
+import cadkit.modeling.Location;
 import cadkit.modeling.Part;
+import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
+import machinekit.assembly.Drive;
 import machinekit.assembly.MachineAssembly;
 import machinekit.component.ComponentDetail;
 import machinekit.component.Dimension;
@@ -11,6 +14,8 @@ import machinekit.motion.LeadScrewThread.LeadScrewThreadFamily;
 import machinekit.motion.LinearRail;
 import machinekit.motion.LinearRailBlock;
 import machinekit.motion.NemaStepper;
+import machinekit.motion.ShaftCoupling;
+import machinekit.standard.ClearanceFit;
 import machinekit.structural.TSlotExtrusion;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
@@ -43,20 +48,37 @@ class RouterPlate extends MachineComponent {
 	public final width:Float;
 	public final depth:Float;
 	public final height:Float;
+	/** The motor this plate mounts, or null: its pilot and bolt holes go through the plate. */
+	public final motor:Null<NemaStepper>;
+	/** The motor's face in the plate's frame, its shaft pointing into the plate. */
+	public final motorFace:Null<AssemblyFrame>;
 
-	public function new(width:Float, depth:Float, height:Float, material:String, name:String) {
+	public function new(width:Float, depth:Float, height:Float, material:String, name:String, ?motor:NemaStepper,
+			?motorFace:AssemblyFrame) {
 		if (!(width > 0) || !(depth > 0) || !(height > 0)) throw "Plate needs positive dimensions";
-		super('${name.toUpperCase()}-${Dimension.format(width)}x${Dimension.format(depth)}x${Dimension.format(height)}',
-			name, material, true);
+		if ((motor == null) != (motorFace == null)) throw "A motor mount needs both the motor and where its face sits";
+		super('${name.toUpperCase()}-${Dimension.format(width)}x${Dimension.format(depth)}x${Dimension.format(height)}' +
+			(motor == null ? "" : '-NEMA${motor.spec.frame}'), name, material, true);
 		this.width = width;
 		this.depth = depth;
 		this.height = height;
+		this.motor = motor;
+		this.motorFace = motorFace;
 	}
 
 	override public function hasGeometry():Bool return true;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Part.box(width, depth, height);
+	override public function geometry(detail:ComponentDetail = Preview):Part {
+		var box = Part.box(width, depth, height);
+		var mounted = motor, face = motorFace;
+		if (mounted == null || face == null || detail == Envelope) return box;
+		var cutout = mounted.mountingCutout(width + depth + height);
+		var x = AssemblyFrames.transformVector(face, 1, 0, 0), z = AssemblyFrames.transformVector(face, 0, 0, 1);
+		var placed = cutout.placed(new Location(new Plane(new Vector(face.x, face.y, face.z), new Vector(x.x, x.y, x.z),
+			new Vector(z.x, z.y, z.z))));
+		cutout.close();
+		return Solids.cut(box, [placed]);
+	}
 }
 
 /**
@@ -226,6 +248,30 @@ class TwistDrill extends MachineComponent {
 	}
 }
 
+/** Round spacer standing a motor off its mount, bored for the screw that holds it. Origin: one end, along +Z. */
+class Standoff extends MachineComponent {
+	public final diameter:Float;
+	public final length:Float;
+	public final bore:Float;
+
+	public function new(diameter:Float, length:Float, bore:Float) {
+		if (!(bore > 0) || !(diameter > bore) || !(length > 0)) throw "Standoff needs a bore inside a positive diameter and length";
+		super('STANDOFF-D${Dimension.format(diameter)}-L${Dimension.format(length)}', 'Standoff ${Dimension.format(diameter)} x ${Dimension.format(length)} mm',
+			"aluminium 6061", true);
+		this.diameter = diameter;
+		this.length = length;
+		this.bore = bore;
+	}
+
+	override public function hasGeometry():Bool return true;
+
+	override public function geometry(detail:ComponentDetail = Preview):Part {
+		var body = Part.cylinderSpan(diameter / 2, 0, length);
+		if (detail == Envelope) return body;
+		return Solids.cut(body, [Part.cylinderSpan(bore / 2, -0.1, length + 0.1)]);
+	}
+}
+
 /**
  * Step clamp holding the stock's edge to the spoilboard. Origin on the spoilboard under the stock
  * edge; the clamp reaches 8 mm over the stock along -X and stands on a riser outboard along +X.
@@ -249,16 +295,14 @@ class ToeClamp extends MachineComponent {
 	}
 }
 
-/** Travel limit and speed of one linear axis, in millimetres and mm/s. */
+/**
+ * Travel of one linear axis, in millimetres. Its speed and acceleration are its motors' and
+ * screws', worked out from the parts.
+ */
 typedef RouterAxisSpec = {
 	var id:String;
 	var lower:Float;
 	var upper:Float;
-	var velocity:Float;
-	/** Peak axis force in newtons. */
-	var effort:Float;
-	/** Largest axis acceleration in mm/s². */
-	var acceleration:Float;
 	var initial:Float;
 }
 
@@ -270,7 +314,10 @@ typedef RouterAxisSpec = {
  * Joints `x`, `y` and `z` are prismatic and read in machine coordinates, in millimetres: the
  * machine origin is the front-left corner of travel with Z at the top, so the spindle nose sits at
  * `noseAt(x, y, z)` in the assembly frame (floor at z = 0, bed centred on the origin).
- * Lead screws and motors are placed as fixed parts; the screws do not turn with the axes.
+ * Each motor turns its lead screw through a shaft coupling, on a continuous joint coupled to its
+ * axis by the screw's lead: Y has two, one on each side of the gantry. The motors are the screw
+ * joints' actuators, so each axis is as fast as its motors turn its screws, and accelerates as
+ * hard as their torque, through the screws' efficiency, moves its mass and turns its screws.
  */
 class CncRouter extends MachineAssembly {
 	public static inline var PROFILE:String = "HFS5-4040";
@@ -304,10 +351,12 @@ class CncRouter extends MachineAssembly {
 	/** Tool 2, loaded by hand when a program calls for it. */
 	public final drill = new TwistDrill(5.5, 28, 40);
 	public final specs:Array<RouterAxisSpec> = [
-		{id: "x", lower: 0, upper: 300, velocity: 80, effort: 400, acceleration: 500, initial: 150},
-		{id: "y", lower: 0, upper: 300, velocity: 80, effort: 600, acceleration: 400, initial: 150},
-		{id: "z", lower: -80, upper: 0, velocity: 40, effort: 400, acceleration: 300, initial: 0}
+		{id: "x", lower: 0, upper: 300, initial: 150},
+		{id: "y", lower: 0, upper: 300, initial: 150},
+		{id: "z", lower: -80, upper: 0, initial: 0}
 	];
+	/** The stepper drivers' supply, as on most desktop routers. */
+	public static inline var SUPPLY_VOLTS:Float = 24;
 
 	/** Room past each axis's travel before its rail blocks reach the rail ends, in millimetres. */
 	final overtravel = new Map<String, Float>();
@@ -332,12 +381,14 @@ class CncRouter extends MachineAssembly {
 			var name = side < 0 ? "Left" : "Right";
 			place('side$name', new ExtrusionMember(profile, FRAME_LENGTH), orient(side * SIDE_X, -halfFrame, 20, up, alongY));
 			place('railY$name', LinearRail.metric(RAIL, FRAME_LENGTH - 40), orient(side * SIDE_X, -halfFrame + 20, railTop, up, alongY));
-			place('motorPlateY$name', new RouterPlate(66, 8, 62, "aluminium 6061", "Motor plate"),
-				AssemblyFrames.translation(side * 295, halfFrame + 4, 0));
 			// The motor stands behind its plate with the shaft pointing forward through it.
-			place('motorY$name', side < 0 ? motorY : NemaStepper.frame(23), orient(side * 295, halfFrame + 8, Y_SCREW_Z, up, [0, -1, 0]));
-			place('screwY$name', new LeadScrew(thread, FRAME_LENGTH + 8 - shaft - 10),
-				orient(side * 295, halfFrame + 8 - shaft, Y_SCREW_Z, up, [0, -1, 0]));
+			var motorPose = orient(side * 295, halfFrame + 8, Y_SCREW_Z, up, [0, -1, 0]);
+			var platePose = AssemblyFrames.translation(side * 295, halfFrame + 4, 0);
+			place('motorPlateY$name', new RouterPlate(66, 8, 62, "aluminium 6061", "Motor plate", motorY,
+				AssemblyFrames.compose(AssemblyFrames.inverse(platePose), motorPose)), platePose);
+			place('motorY$name', side < 0 ? motorY : NemaStepper.frame(23), motorPose);
+			driveScrew(specs[1], 'screwY$name', 'motorY$name', new LeadScrew(thread, FRAME_LENGTH + 8 - shaft - 10),
+				orient(side * 295, halfFrame + 8 - shaft, Y_SCREW_Z, up, [0, -1, 0]), [0, -1, 0], [0, 1, 0]);
 		}
 		var inner = 2 * (SIDE_X - 20);
 		for (entry in [{id: "crossFront", y: -halfFrame + 20}, {id: "crossMiddle", y: 0.0}, {id: "crossBack", y: halfFrame - 20}])
@@ -361,7 +412,12 @@ class CncRouter extends MachineAssembly {
 		var beamZ = [233.0, 163];
 		attach("beamUpper", new ExtrusionMember(profile, beamLength), orient(-beamLength / 2, yb, beamZ[0], up, alongX), "uprightLeft");
 		attach("beamLower", new ExtrusionMember(profile, beamLength), orient(-beamLength / 2, yb, beamZ[1], up, alongX), "uprightLeft");
-		attach("uprightRight", upright, AssemblyFrames.translation(SIDE_X, yb, uprightTop), "beamUpper");
+		// The right upright carries the X motor, so it has the motor's pilot and bolt holes.
+		var outside = SIDE_X + 6;
+		var uprightRightPose = AssemblyFrames.translation(SIDE_X, yb, uprightTop);
+		var motorXPose = orient(outside, yb, X_SCREW_Z, up, [-1, 0, 0]);
+		attach("uprightRight", new RouterPlate(12, 100, 200, "aluminium 6061", "Gantry upright", motorY,
+			AssemblyFrames.compose(AssemblyFrames.inverse(uprightRightPose), motorXPose)), uprightRightPose, "beamUpper");
 		attach("blockYRight", LinearRailBlock.metric(RAIL), orient(SIDE_X, yb, railTop, up, alongY), "uprightRight");
 		attach("nutBracketYLeft", new YNutBracket(-1), AssemblyFrames.translation(-SIDE_X, yb, 0), "uprightLeft");
 		attach("nutBracketYRight", new YNutBracket(1), AssemblyFrames.translation(SIDE_X, yb, 0), "uprightRight");
@@ -370,10 +426,9 @@ class CncRouter extends MachineAssembly {
 		var railXFace = yb - 20 - railSpec.railHeight;
 		attach("railXUpper", LinearRail.metric(RAIL, railX), orient(-railX / 2, railXFace, beamZ[0], front, alongX), "beamUpper");
 		attach("railXLower", LinearRail.metric(RAIL, railX), orient(-railX / 2, railXFace, beamZ[1], front, alongX), "beamLower");
-		var outside = SIDE_X + 6;
-		attach("motorX", NemaStepper.frame(23), orient(outside, yb, X_SCREW_Z, up, [-1, 0, 0]), "uprightRight");
-		attach("screwX", new LeadScrew(thread, outside - shaft + beamLength / 2 - 4),
-			orient(outside - shaft, yb, X_SCREW_Z, up, [-1, 0, 0]), "uprightRight");
+		attach("motorX", NemaStepper.frame(23), motorXPose, "uprightRight");
+		driveScrew(specs[0], "screwX", "motorX", new LeadScrew(thread, outside - shaft + beamLength / 2 - 4),
+			orient(outside - shaft, yb, X_SCREW_Z, up, [-1, 0, 0]), [-1, 0, 0], [1, 0, 0]);
 
 		// X carriage, riding the X rails on the beams' front faces.
 		var xc = MACHINE_ZERO_X;
@@ -396,11 +451,24 @@ class CncRouter extends MachineAssembly {
 		}
 		var xPlateTop = xPlateBottom + xPlateHeight;
 		var screwZY = railZFace + 1;
-		attach("motorBracketZ", new RouterPlate(70, 49, 8, "aluminium 6061", "Z motor bracket"),
-			AssemblyFrames.translation(xc, blockFace - 24.5, xPlateTop), "xPlate");
-		attach("motorZ", NemaStepper.frame(23), orient(xc, screwZY, xPlateTop + 8, [0, 1, 0], [0, 0, -1]), "motorBracketZ");
-		attach("screwZ", new LeadScrew(thread, xPlateTop + 8 - shaft - (xPlateBottom + 2)),
-			orient(xc, screwZY, xPlateTop + 8 - shaft, [0, 1, 0], [0, 0, -1]), "motorBracketZ");
+		// The Z screw runs in the narrow gap between the X and Z plates, too narrow for its coupling, so
+		// the motor stands on four spacers above its bracket and the coupling turns between them.
+		var bracketPose = AssemblyFrames.translation(xc, blockFace - 24.5, xPlateTop);
+		var bracketTop = xPlateTop + 8;
+		var coupling = new ShaftCoupling(motorY.variant.shaftDiameter, thread.screwDiameter);
+		var zFace = bracketTop + 1 + coupling.length / 2 + shaft;
+		var motorZPose = orient(xc, screwZY, zFace, [0, 1, 0], [0, 0, -1]);
+		attach("motorBracketZ", new RouterPlate(70, 49, 8, "aluminium 6061", "Z motor bracket", motorY,
+			AssemblyFrames.compose(AssemblyFrames.inverse(bracketPose), motorZPose)), bracketPose, "xPlate");
+		var standoff = new Standoff(8, zFace - bracketTop, motorY.mountScrew(10).clearanceDiameter(ClearanceFit.Medium));
+		var corner = 1;
+		for (bolt in motorY.boltPattern()) {
+			var at = AssemblyFrames.transformPoint(motorZPose, bolt.x, bolt.y, 0);
+			attach('standoffZ${corner++}', standoff, AssemblyFrames.translation(at.x, at.y, bracketTop), "motorBracketZ");
+		}
+		attach("motorZ", NemaStepper.frame(23), motorZPose, "motorBracketZ");
+		driveScrew(specs[2], "screwZ", "motorZ", new LeadScrew(thread, zFace - shaft - (xPlateBottom + 2)),
+			orient(xc, screwZY, zFace - shaft, [0, 1, 0], [0, 0, -1]), [0, 0, -1], [0, 0, 1]);
 
 		// Z slide and spindle. The Z blocks sit at the top of their rails at z = 0.
 		var zBlock = xPlateTop - railSpec.railEndMargin - railSpec.blockLength / 2 - 0.5;
@@ -466,7 +534,37 @@ class CncRouter extends MachineAssembly {
 		addMate('$id-mount', "fixed", parent, 'to-$id', id, 'attach-$id');
 	}
 
-	/** A member sliding on `parent` along a world axis; `pose` is where it sits at coordinate zero. */
+	/**
+	 * Motor `motor` turns lead screw `id` (at `pose`, its input end on the shaft tip, pointing
+	 * along world direction `along`) through a shaft coupling. Coupling and screw turn together on
+	 * a continuous joint `id-turn`, which coupling `id-lead` ties to `axis` (moving along world
+	 * `axisDirection`) by the screw's lead. The coupling is centred on the shaft tip and turns
+	 * inside the mount's pilot bore.
+	 */
+	function driveScrew(axis:RouterAxisSpec, id:String, motor:String, screw:LeadScrew, pose:AssemblyFrame,
+			along:Array<Float>, axisDirection:Array<Float>):Void {
+		var shaft = cast(component(motor), NemaStepper).variant.shaftDiameter;
+		var coupling = new ShaftCoupling(shaft, screw.thread.screwDiameter);
+		var grip = coupling.length / 2;
+		var couplingId = id + "Coupling";
+		addComponent(couplingId, coupling);
+		zeroPoses.set(couplingId, {x: pose.x - along[0] * grip, y: pose.y - along[1] * grip, z: pose.z - along[2] * grip,
+			qx: pose.qx, qy: pose.qy, qz: pose.qz, qw: pose.qw});
+		connect(motor, couplingId);
+		attach(id, screw, pose, couplingId);
+		// The screw's thread sets the ratio; the joint starts where the axis puts it.
+		var alongAxis = along[0] * axisDirection[0] + along[1] * axisDirection[1] + along[2] * axisDirection[2];
+		var ratio = addDrive('$id-lead', axis.id, '$id-turn', LeadScrew(id, alongAxis));
+		addMateOnAxis('$id-turn', "continuous", motor, 'to-$couplingId', couplingId, 'attach-$couplingId',
+			{x: along[0], y: along[1], z: along[2]}, ratio * axis.initial);
+		addMotor(motor, '$id-turn', motor, SUPPLY_VOLTS);
+	}
+
+	function component(id:String):MachineComponent {
+		for (entry in components()) if (entry.id == id) return entry.component;
+		throw 'CNC router has no member "$id" yet';
+	}
+
 	/**
 	 * A rail block sliding on its rail (`parent`) along a world axis; `pose` is where it sits at
 	 * coordinate zero. The axis's overtravel is the room its block has left on the rail at either end
@@ -490,8 +588,7 @@ class CncRouter extends MachineAssembly {
 		zeroPoses.set(id, pose);
 		connect(parent, id);
 		addMateOnAxis(spec.id, "prismatic", parent, 'to-$id', id, 'attach-$id', axis, spec.initial,
-			{lower: spec.lower, upper: spec.upper, velocity: spec.velocity, effort: spec.effort, overtravel: room,
-				acceleration: spec.acceleration});
+			{lower: spec.lower, upper: spec.upper, velocity: null, effort: null, overtravel: room});
 	}
 
 	/**

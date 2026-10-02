@@ -181,9 +181,11 @@ directly.
 `RobotModelCodec` stores the complete semantic robot definition as a versioned
 JSON artifact shared by editor, simulation, and `robotd`. Deployment files refer
 to that artifact and keep `DeviceLayout` as the separate ordered mapping from
-model joint IDs to ordered RKD6 actuator channels. The RKD6 base fingerprint
-covers exact device layout bytes and the RKD6 schema lock. The endpoint also
-hashes ordered actuator transmissions and process-channel declarations.
+model actuators to ordered RKD6 actuator channels, with each driver's direction
+and microstepping. A stepper's full steps live in the model's `Actuator`; the
+device binding derives each channel's steps per unit from them. A board is
+identified by its unique id, which the session names and the board reports, and
+the configuration it receives is checked by digest (see the device protocol).
 
 ### Transmissions (model contract and RKD6 implementation)
 
@@ -254,7 +256,8 @@ RKD6's ordered actuator layout names each channel by stable actuator ID and
 maps it to a joint through transmission
 ratio and offset, including multiple channels for a dual-driven joint. The
 session carries the step scale, rate bound, direction setup time and skew
-bound. The RKD6 endpoint fingerprint covers channel order and all layout
+bound. The session's controller id and configuration digest cover channel order
+and all layout
 fields. The no_std step generator compares
 dual-drive feedback in joint units and latches `dual_drive_skew` when the
 deployment bound is exceeded.
@@ -843,8 +846,8 @@ source timestamps are never silently reused as receive or command time.
 `SerialDeployment` schema v5 may declare perception pipelines separately from
 the device layout. Each entry names a camera sensor, a model path and SHA-256,
 a pipeline implementation, an execution `host`, and its `consumers`.
-The section is strict and remains outside the RKD6 device fingerprint. Older
-v3/v4 deployments remain valid without it. A `worldd` host cannot serve a
+The section is strict and remains outside the device configuration. Deployments
+are schema v5. A `worldd` host cannot serve a
 `local` consumer without a network round trip.
 
 `PerceptionHost` routes camera `SensorFrame`s by sensor ID to code-defined

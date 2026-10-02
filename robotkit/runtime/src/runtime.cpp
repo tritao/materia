@@ -188,6 +188,40 @@ rk_result validate_appended_path(
     return RK_OK;
 }
 
+/**
+  The blueprint with each coupled joint that has no velocity or acceleration limit of its own
+  given its leader's, scaled by the ratio: a lead screw turns as fast as its axis moves it. Its
+  motion is its leader's, so this bounds nothing new, but every stop and check that budgets
+  joint by joint then has a limit to work with.
+**/
+rk_robot_runtime_blueprint with_coupled_limits(rk_robot_runtime_blueprint blueprint) {
+    if (blueprint.struct_size < sizeof(blueprint)) return blueprint;
+    const auto count = std::min(blueprint.coupling_count,
+        static_cast<uint32_t>(RK_MAX_JOINT_COUPLINGS));
+    // Each pass settles at least one more link of every chain.
+    for (uint32_t pass = 0; pass < count; ++pass) {
+        bool changed = false;
+        for (uint32_t i = 0; i < count; ++i) {
+            const auto &coupling = blueprint.couplings[i];
+            if (coupling.leader >= blueprint.joint_count || coupling.follower >= blueprint.joint_count)
+                continue;
+            const auto &leader = blueprint.joints[coupling.leader];
+            auto &follower = blueprint.joints[coupling.follower];
+            const double scale = std::abs(coupling.ratio);
+            if (!(follower.max_velocity > 0.0) && leader.max_velocity > 0.0) {
+                follower.max_velocity = scale * leader.max_velocity;
+                changed = true;
+            }
+            if (!(follower.max_acceleration > 0.0) && leader.max_acceleration > 0.0) {
+                follower.max_acceleration = scale * leader.max_acceleration;
+                changed = true;
+            }
+        }
+        if (!changed) break;
+    }
+    return blueprint;
+}
+
 /** Queued knots, excluding the end marker, once `added` replaces it. */
 std::size_t knots_after_append(const std::deque<RobotRuntime::RuntimeTrajectoryPoint> &queue,
     const std::vector<RobotRuntime::RuntimeTrajectoryPoint> &added) {
@@ -284,7 +318,7 @@ rk_result InMemoryRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) {
 RobotRuntime::RobotRuntime(const rk_robot_runtime_blueprint &blueprint,
                            std::shared_ptr<RobotEndpoint> endpoint,
                  std::chrono::nanoseconds period)
-    : blueprint_(blueprint), endpoint_(std::move(endpoint)), period_(period) {
+    : blueprint_(with_coupled_limits(blueprint)), endpoint_(std::move(endpoint)), period_(period) {
     for (uint32_t i = 0; i < blueprint_.channel_count && i < RK_MAX_PROCESS_CHANNELS; ++i)
         channel_outputs_[i] = blueprint_.channels[i].safe_value;
     state_.struct_size = sizeof(state_);
@@ -746,7 +780,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         state_backup_ = state_;
         state_backup_valid_ = true;
         // A device that executes the queue reports its own path clock.
-        device_running = endpoint_->executes_trajectory_queue() && state_.trajectory_active != 0;
+        device_running = endpoint_->executes_trajectory_queue() && device_queue_active_;
         device_path_time_ns = state_.trajectory_time_ns;
     }
     control_backup_ = control_;
@@ -772,6 +806,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
             control_.trajectory_time_remainder_ns;
         if (control_.plan_just_submitted) {
             control_.plan_just_submitted = false;
+            control_.device_queue_end_ns = 0;
         } else if (!control_.stop_ramp_active && !control_.hold_requested &&
                    !control_.resume_requested) {
             // The runtime's copy of a device's queue follows the device: it
@@ -779,12 +814,17 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
             // ran on the owner clock alone would retire knots the device has
             // not executed (and take an append for a new plan). The device
             // reports its queue running from submission (path time 0 until it
-            // starts); once it has finished, or failed, the copy runs out on
-            // the owner clock.
-            if (device_running)
+            // starts). Once it has finished, or failed, the copy is done at
+            // once up to the end of the queue the device was running, and
+            // runs out on the owner clock through anything appended since.
+            if (device_running) {
                 time_ns = std::max(time_ns, static_cast<double>(device_path_time_ns));
-            else
+                control_.device_queue_end_ns = trajectory_.back().point.time_from_start_ns;
+            } else {
                 time_ns += static_cast<double>(period_ns);
+                if (endpoint_->executes_trajectory_queue())
+                    time_ns = std::max(time_ns, static_cast<double>(control_.device_queue_end_ns));
+            }
         } else if (control_.stop_ramp_active || control_.hold_requested) {
             // Path-following stop. A joint moves at rate * v and accelerates
             // at rate' * v + rate^2 * a, where v and a belong to the queued
@@ -1702,8 +1742,15 @@ rk_result RobotRuntime::publish_sample_impl(uint64_t timestamp_ns,
     next.received_timestamp_ns = 0;
     next.sensor_count = 0;
     const auto result = sample ? (next = *sample, sample_result) : endpoint_->sample(timestamp_ns, next);
-    if (endpoint_->executes_trajectory_queue())
+    if (endpoint_->executes_trajectory_queue()) {
         control_.diagnostic_code = endpoint_->diagnostic_code();
+        // The runtime's copy of the device's queue follows the device's path time, so it runs
+        // out a little after the device finishes, and until then a plan joins it. The queue is
+        // active until both are done: a plan submitted after that starts afresh instead of
+        // joining a queue the device has already finished.
+        device_queue_active_ = next.trajectory_active != 0;
+        if (control_.trajectory_active) next.trajectory_active = 1;
+    }
     next.mode = runtime_mode;
     if (!endpoint_->executes_trajectory_queue()) {
         next.trajectory_queue_depth = trajectory_queue_depth;

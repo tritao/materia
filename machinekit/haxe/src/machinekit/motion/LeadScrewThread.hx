@@ -51,4 +51,18 @@ class LeadScrewThread {
 	 */
 	public function signedLead():Float
 		return hand == RightHand ? -lead : lead;
+
+	/**
+	 * Share of the motor's work that reaches the nut when the screw drives it: tan λ / tan(λ + φ'),
+	 * with λ the lead angle at the pitch diameter and φ' the friction angle on the 15° flanks of a
+	 * trapezoidal or Acme thread. `friction` is the nut's sliding friction coefficient; 0.1 is
+	 * typical of a greased bronze or plastic nut on steel.
+	 */
+	public function efficiency(friction:Float = 0.1):Float {
+		if (!(friction >= 0) || !Math.isFinite(friction)) throw "Lead screw friction must be non-negative";
+		var pitchDiameter = screwDiameter - pitch / 2;
+		var leadAngle = Math.atan(lead / (Math.PI * pitchDiameter));
+		var frictionAngle = Math.atan(friction / Math.cos(15 * Math.PI / 180));
+		return Math.tan(leadAngle) / Math.tan(leadAngle + frictionAngle);
+	}
 }

@@ -473,7 +473,7 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		virtual_device_corruption_rate: f64 @offset(144);
 		virtual_device_seed: u64 @offset(152);
 		virtual_device_steps_per_unit: array<f64, 64> @offset(160);
-		virtual_device_fingerprint: array<u8, 16> @offset(672);
+		virtual_device_controller: array<u8, 16> @offset(672);
 		virtual_device_target_error: f64 @offset(688);
 		virtual_device_clock_bound_ns: u64 @offset(696);
 		virtual_device_link_loss_timeout_ns: u64 @offset(704);

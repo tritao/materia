@@ -9,8 +9,9 @@ import runtime.memory.NativeSpan;
   starts `starts[i] - starts[0]` after the run's start, lasts `durations[i]`,
   and has degree `degrees[i]`. The arrays' joints are source joints: source
   joint `j` drives robot joint `jointMap[j]`, with its coefficient of power `p`
-  at `coefficients[(i * jointMap.length + j) * STRIDE + p]`; a robot joint no
-  source joint drives holds its `heldPositions` value.
+  at `coefficients[(i * jointMap.length + j) * STRIDE + p]`. A robot joint no
+  source joint drives follows its leader when `couplings` couple it to one,
+  as the runtime does, and otherwise holds its `heldPositions` value.
 
   The spans are borrowed: they stay readable while their owner is open, so a
   submission carrying them is consumed while its plan is alive. `segments()`
@@ -26,9 +27,13 @@ class SegmentArrays {
   public final coefficients:NativeSpan<Float>;
   public final jointMap:Array<Int>;
   public final heldPositions:Array<Float>;
+  public final couplings:Array<CoupledJoint>;
+  /** For each robot joint no source joint drives, the coupling it follows, or null. */
+  final followed:Array<Null<CoupledJoint>>;
 
   public function new(starts:NativeSpan<Int64>, durations:NativeSpan<Int64>, degrees:NativeSpan<Int>,
-      coefficients:NativeSpan<Float>, jointMap:Array<Int>, heldPositions:Array<Float>) {
+      coefficients:NativeSpan<Float>, jointMap:Array<Int>, heldPositions:Array<Float>,
+      ?couplings:Array<CoupledJoint>) {
     var count = starts.length();
     if (count < 1 || durations.length() != count || degrees.length() != count)
       throw "Segment arrays need equal, nonempty start, duration and degree arrays";
@@ -45,12 +50,27 @@ class SegmentArrays {
     }
     for (position in heldPositions)
       if (!Math.isFinite(position)) throw "Segment arrays need finite held positions";
+    followed = [for (_ in heldPositions) null];
+    if (couplings != null) for (coupling in couplings) {
+      if (coupling.follower >= heldPositions.length || coupling.leader >= heldPositions.length)
+        throw "Segment arrays couple a joint the robot does not have";
+      if (!driven[coupling.follower]) followed[coupling.follower] = coupling;
+    }
+    for (joint in 0...followed.length) {
+      // Each chain of followers must reach a driven or held joint.
+      var steps = 0, next = followed[joint];
+      while (next != null) {
+        if (++steps > followed.length) throw "Segment arrays have a cycle of couplings";
+        next = followed[next.leader];
+      }
+    }
     this.starts = starts;
     this.durations = durations;
     this.degrees = degrees;
     this.coefficients = coefficients;
     this.jointMap = jointMap.copy();
     this.heldPositions = heldPositions.copy();
+    this.couplings = couplings == null ? [] : couplings.copy();
   }
 
   public function count():Int return starts.length();
@@ -63,14 +83,54 @@ class SegmentArrays {
     var joints = jointMap.length * STRIDE;
     return new SegmentArrays(starts.slice(first, last - first), durations.slice(first, last - first),
       degrees.slice(first, last - first), coefficients.slice(first * joints, (last - first) * joints),
-      jointMap, heldPositions);
+      jointMap, heldPositions, couplings);
   }
 
   /** Robot joint `joint`'s coefficient of `power` in segment `index`. */
   public function coefficient(index:Int, joint:Int, power:Int):Float {
     var source = jointMap.indexOf(joint);
-    if (source < 0) return power == 0 ? heldPositions[joint] : 0.0;
+    if (source < 0) {
+      var coupling = followed[joint];
+      if (coupling != null)
+        return coupling.ratio * coefficient(index, coupling.leader, power) + (power == 0 ? coupling.offset : 0.0);
+      return power == 0 ? heldPositions[joint] : 0.0;
+    }
     return coefficients.get((index * jointMap.length + source) * STRIDE + power);
+  }
+
+  /**
+    Source joints' `values` over every robot joint: each at its robot joint, a
+    coupled joint's from its leader (with the coupling's offset when the values
+    are `positions`, not their derivatives), and `rest` for every other joint.
+  **/
+  public function robotValues(values:Array<Float>, rest:Array<Float>, positions:Bool):Array<Float> {
+    if (values.length != jointMap.length || rest.length != heldPositions.length)
+      throw "Segment arrays map source values onto every robot joint";
+    var result = rest.copy();
+    for (source in 0...jointMap.length) result[jointMap[source]] = values[source];
+    function value(joint:Int):Float {
+      var coupling = followed[joint];
+      if (coupling == null) return result[joint];
+      return coupling.ratio * value(coupling.leader) + (positions ? coupling.offset : 0.0);
+    }
+    return [for (joint in 0...result.length) value(joint)];
+  }
+
+  /**
+    Source joints' tolerances over every robot joint: as `robotValues`, but a
+    coupled joint's is its leader's scaled by the size of the ratio, so it
+    allows the same error, and `rest` for every other joint.
+  **/
+  public function robotTolerances(values:Array<Float>, rest:Array<Float>):Array<Float> {
+    if (values.length != jointMap.length || rest.length != heldPositions.length)
+      throw "Segment arrays map source tolerances onto every robot joint";
+    var result = rest.copy();
+    for (source in 0...jointMap.length) result[jointMap[source]] = values[source];
+    function tolerance(joint:Int):Float {
+      var coupling = followed[joint];
+      return coupling == null ? result[joint] : Math.abs(coupling.ratio) * tolerance(coupling.leader);
+    }
+    return [for (joint in 0...result.length) tolerance(joint)];
   }
 
   /** The segments as managed values over every robot joint, timed from the first one's start. */

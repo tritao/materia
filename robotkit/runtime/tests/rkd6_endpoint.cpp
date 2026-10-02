@@ -13,8 +13,14 @@ public:
     int segment_frames = 0;
     int commit_frames = 0;
     int queue_begin_frames = 0;
-    std::array<std::uint8_t, 16> fingerprint{};
+    std::array<std::uint8_t, 16> controller{};
     bool minimal = false;
+    /** The id the board reports when it is not the one the host expects. */
+    std::optional<std::array<std::uint8_t, 16>> reported_controller;
+    /** Channels the board reports, when not as many as the session asked for. */
+    std::optional<std::uint8_t> board_channels;
+    /** Xored into the digest the board acknowledges, as a board that read other bytes would. */
+    std::uint64_t digest_flip = 0;
     std::deque<std::vector<std::uint8_t>> incoming;
     std::vector<std::uint8_t> delayed;
     bool delay_once = false;
@@ -49,14 +55,22 @@ public:
             device_wire6::SessionAck6 ack{};
             ack.session = begin.session;
             ack.protocol_version = device_wire6::PROTOCOL_VERSION;
-            ack.device_fingerprint = fingerprint;
-            ack.status = 1;
+            ack.controller = reported_controller.value_or(controller);
+            // The board's own FNV-1a over what it received after the session field.
+            ack.config_digest = 14695981039346656037ULL;
+            for (std::size_t i = 8; i < begin.SIZE; ++i) {
+                ack.config_digest ^= decoded.payload[i];
+                ack.config_digest *= 1099511628211ULL;
+            }
+            ack.config_digest ^= digest_flip;
+            ack.status = ack.controller == begin.expected_controller &&
+                begin.actuator_count <= board_channels.value_or(begin.actuator_count);
             ack.device_tick_hz = 1'000'000;
             ack.step_tick_hz = 40'000;
             ack.segment_capacity = minimal ? 8 : 4;
             ack.event_capacity = 4;
             ack.max_degree = minimal ? 1 : 5;
-            ack.actuator_count = begin.actuator_count;
+            ack.actuator_count = board_channels.value_or(begin.actuator_count);
             ack.profile = minimal ? 2 : 1;
             push(2, ack);
             device_wire6::State6Header state{};
@@ -114,9 +128,9 @@ void unseen_backlog_holds_segments(const rk_robot_runtime_blueprint &blueprint) 
     // status says what it has received, and segments wait while the rest would delay a commit.
     auto link = std::make_unique<MockLink>();
     auto *observed = link.get();
-    observed->fingerprint.fill(7);
+    observed->controller.fill(7);
     observed->line_baud = 115'200;
-    auto endpoint = Rkd6Endpoint::attach(std::move(link), blueprint, observed->fingerprint,
+    auto endpoint = Rkd6Endpoint::attach(std::move(link), blueprint, observed->controller,
         77, 1e-6, 500'000, 100'000);
     assert(endpoint);
     rk_robot_state state{};
@@ -166,7 +180,7 @@ int main() {
     unseen_backlog_holds_segments(blueprint);
     {
         auto wrong = std::make_unique<MockLink>();
-        wrong->fingerprint.fill(4);
+        wrong->controller.fill(4);
         rk_result reason = RK_OK;
         auto rejected = Rkd6Endpoint::attach(std::move(wrong), blueprint,
             std::array<std::uint8_t, 16>{7, 7, 7, 7, 7, 7, 7, 7,
@@ -176,7 +190,7 @@ int main() {
         auto fast = blueprint;
         fast.owner_period_ns = 1'000'000;
         auto short_queue = std::make_unique<MockLink>();
-        short_queue->fingerprint.fill(4);
+        short_queue->controller.fill(4);
         reason = RK_OK;
         rejected = Rkd6Endpoint::attach(std::move(short_queue), fast,
             std::array<std::uint8_t, 16>{4, 4, 4, 4, 4, 4, 4, 4,
@@ -185,11 +199,54 @@ int main() {
         assert(!rejected && reason == RK_ERROR_UNSUPPORTED);
     }
     {
+        // A board that reports another id, or read other bytes, or has fewer channels than the
+        // layout wires, or generates another step tick, is refused with its reason.
+        const std::array<std::uint8_t, 16> seven{7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7};
+        rk_result reason = RK_OK;
+        auto attach = [&](MockLink &&setup, std::span<const DeviceActuator6> layout,
+                          const std::array<std::uint8_t, 16> &expected, std::uint32_t step_tick) {
+            auto link = std::make_unique<MockLink>(std::move(setup));
+            reason = RK_OK;
+            return Rkd6Endpoint::attach(std::move(link), blueprint, expected, 91, 1e-6, 500'000,
+                100'000, step_tick, 500'000'000, layout, &reason);
+        };
+        MockLink healthy;
+        healthy.controller = seven;
+        assert(attach(MockLink(healthy), {}, seven, 40'000));
+        MockLink other = healthy;
+        other.reported_controller = std::array<std::uint8_t, 16>{9, 9, 9, 9, 9, 9, 9, 9,
+            9, 9, 9, 9, 9, 9, 9, 9};
+        assert(!attach(MockLink(other), {}, seven, 40'000) && reason == RK_ERROR_MODEL_MISMATCH);
+        MockLink flipped = healthy;
+        flipped.digest_flip = 1;
+        assert(!attach(MockLink(flipped), {}, seven, 40'000) && reason == RK_ERROR_MODEL_MISMATCH);
+        assert(!attach(MockLink(healthy), {}, seven, 20'000) && reason == RK_ERROR_MODEL_MISMATCH);
+        // The host never asks a board to configure itself for no controller.
+        assert(!attach(MockLink(healthy), {}, std::array<std::uint8_t, 16>{}, 40'000) &&
+            reason == RK_ERROR_INVALID_ARGUMENT);
+        auto wide = blueprint;
+        wide.joint_count = 2;
+        wide.joints[1] = wide.joints[0];
+        MockLink narrow = healthy;
+        narrow.board_channels = 1;
+        auto link = std::make_unique<MockLink>(narrow);
+        auto refused = Rkd6Endpoint::attach(std::move(link), wide, seven, 92, 1e-6, 500'000,
+            100'000, 40'000, 500'000'000, {}, &reason);
+        assert(!refused && reason == RK_ERROR_MODEL_MISMATCH);
+        // identify reads the board's id from a refused session.
+        auto probe = std::make_unique<MockLink>(healthy);
+        probe->reported_controller = std::array<std::uint8_t, 16>{1, 2, 3, 4, 5, 6, 7, 8,
+            9, 10, 11, 12, 13, 14, 15, 16};
+        std::array<std::uint8_t, 16> found{};
+        assert(Rkd6Endpoint::identify(std::move(probe), 5, found) == RK_OK);
+        assert(found[0] == 1 && found[15] == 16);
+    }
+    {
         auto mismatched = std::make_unique<MockLink>();
         auto *device = mismatched.get();
-        device->fingerprint.fill(7);
+        device->controller.fill(7);
         auto endpoint = Rkd6Endpoint::attach(std::move(mismatched), blueprint,
-            device->fingerprint, 88, 1e-6, 500'000, 100'000);
+            device->controller, 88, 1e-6, 500'000, 100'000);
         assert(endpoint);
         rk_robot_state state{};
         assert(endpoint->sample(0, state) == RK_OK);
@@ -206,7 +263,7 @@ int main() {
         bench.joints[1] = bench.joints[0];
         auto minimal_link = std::make_unique<MockLink>();
         minimal_link->minimal = true;
-        minimal_link->fingerprint.fill(9);
+        minimal_link->controller.fill(9);
         auto qualified = Rkd6Endpoint::attach(std::move(minimal_link), bench,
             std::array<std::uint8_t, 16>{9, 9, 9, 9, 9, 9, 9, 9,
                 9, 9, 9, 9, 9, 9, 9, 9},
@@ -215,9 +272,9 @@ int main() {
     }
     auto link = std::make_unique<MockLink>();
     auto *observed = link.get();
-    observed->fingerprint.fill(7);
+    observed->controller.fill(7);
     auto endpoint = Rkd6Endpoint::attach(std::move(link), blueprint,
-        observed->fingerprint, 77, 1e-6, 500'000, 100'000);
+        observed->controller, 77, 1e-6, 500'000, 100'000);
     assert(endpoint);
     rk_robot_state state{};
     assert(endpoint->sample(0, state) == RK_OK);

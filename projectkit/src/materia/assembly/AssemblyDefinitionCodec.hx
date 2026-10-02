@@ -151,13 +151,26 @@ class AssemblyDefinitionCodec {
 			if (coupling == null || !validText(coupling.id) || names.exists(coupling.id) ||
 				coupling.source == coupling.target || movable.get(coupling.source) == null ||
 				movable.get(coupling.target) == null || targets.exists(coupling.target) ||
-				!Math.isFinite(coupling.ratio) || coupling.ratio == 0 || !Math.isFinite(coupling.offset))
+				!Math.isFinite(coupling.ratio) || coupling.ratio == 0 || !Math.isFinite(coupling.offset) ||
+				(coupling.efficiency != null && !(coupling.efficiency > 0 && coupling.efficiency <= 1)))
 				throw "Assembly has an invalid coupled joint";
 			if (movable.get(coupling.target).driven == true)
 				throw 'Assembly joint "${coupling.target}" is driven by a coupling, so it cannot also be an input';
 			names.set(coupling.id, true);
 			targets.set(coupling.target, true);
 			sourceByTarget.set(coupling.target, coupling.source);
+		}
+		var actuators = definition.actuators == null ? [] : definition.actuators;
+		if (actuators.length > 4000) throw "Assembly has too many actuators";
+		var actuatorIds = new Map<String, Bool>();
+		for (actuator in actuators) {
+			if (actuator == null || !validText(actuator.id) || actuatorIds.exists(actuator.id) ||
+				movable.get(actuator.joint) == null || !Math.isFinite(actuator.maxEffort) || actuator.maxEffort < 0 ||
+				!Math.isFinite(actuator.maxRate) || actuator.maxRate < 0 ||
+				(actuator.rotorInertia != null && !(actuator.rotorInertia >= 0 && Math.isFinite(actuator.rotorInertia))) ||
+				(actuator.fullStepsPerRevolution != null && !(actuator.fullStepsPerRevolution > 0 && Math.isFinite(actuator.fullStepsPerRevolution))))
+				throw 'Assembly has an invalid actuator "${actuator == null ? "" : actuator.id}"';
+			actuatorIds.set(actuator.id, true);
 		}
 		for (coupling in couplings) {
 			var seen = new Map<String, Bool>();

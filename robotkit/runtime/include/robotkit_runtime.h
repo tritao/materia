@@ -105,7 +105,7 @@ enum {
     RK_ERROR_STALE_COMMAND = -9, /**< Command sequence is not newer than the last accepted command. */
     RK_ERROR_LIMIT = -10, /**< Command violates a compiled joint or actuator limit. */
     RK_ERROR_STALE_STATE = -11, /**< The endpoint only supplied an old observation. */
-    RK_ERROR_MODEL_MISMATCH = -12, /**< Device layout fingerprint differs from the host deployment. */
+    RK_ERROR_MODEL_MISMATCH = -12, /**< The device is not the deployment's controller or disagrees with its configuration. */
     RK_ERROR_FOLLOWING_ERROR = -13 /**< Measured state exceeds the configured distance from the commanded setpoint. */
 };
 
@@ -398,6 +398,11 @@ typedef struct rk_event_record_batch {
  * realtime code is running and lets Simulation build several runtimes before
  * its first shared tick.
  */
+/**
+ * Joint follower's position is leader's times ratio plus offset. A follower with no velocity or
+ * acceleration limit of its own moves within its leader's, scaled by the ratio's size, and a
+ * plan that leaves the follower out turns it with its leader.
+ */
 typedef struct rk_robot_joint_coupling {
     rk_joint_id leader;
     rk_joint_id follower;
@@ -688,18 +693,45 @@ typedef uint32_t rk_robot_runtime RK_HANDLE RK_HANDLE_DESTROY(rk_robot_runtime_d
  */
 RK_API rk_result RK_CALL rk_robot_runtime_create(const rk_robot_runtime_blueprint *blueprint,
                                            rk_robot_runtime *out_runtime RK_OUT RK_OWNED);
-/** Creates a serial runtime; fingerprint is 32 hex digits and error is in target SI units. */
-RK_API rk_result RK_CALL rk_robot_runtime_create_serial(
-    const rk_robot_runtime_blueprint *blueprint, const char *device_path RK_UTF8,
-    uint32_t baud, const char *fingerprint_hex RK_UTF8,
-    double max_target_error, rk_robot_runtime *out_runtime RK_OUT RK_OWNED);
-/** RKD6 serial constructor with deployment timing and capability inputs. */
+/**
+ * A serial device's actuator layout: one RKD6 channel per actuator, derived by the host from the
+ * model and the deployment's wiring (robotkit.device.DeviceBinding), and the unique id of the
+ * board it is for. Joint, ratio and offset relate a channel to a blueprint joint:
+ * actuator = ratio * (joint - offset), in the actuator's unit (a stepper's rotor radians).
+ */
+typedef struct rk_serial_device_desc {
+    uint32_t struct_size RK_STRUCT_SIZE; /**< Set to sizeof this struct. */
+    uint32_t actuator_count; /**< Channels wired, 1 to RK_MAX_SERIAL_JOINTS. */
+    uint8_t controller[16]; /**< Unique id of the board; not all zero. */
+    uint8_t actuator_joint[RK_MAX_SERIAL_JOINTS];
+    double actuator_ratio[RK_MAX_SERIAL_JOINTS];
+    double actuator_offset[RK_MAX_SERIAL_JOINTS];
+    double actuator_steps_per_unit[RK_MAX_SERIAL_JOINTS];
+    double actuator_max_rate[RK_MAX_SERIAL_JOINTS]; /**< Zero means no rate limit. */
+    uint16_t actuator_direction_setup_ticks[RK_MAX_SERIAL_JOINTS];
+    double actuator_skew_bound[RK_MAX_SERIAL_JOINTS];
+    uint8_t actuator_ids[RK_MAX_SERIAL_JOINTS * 64]; /**< 64 NUL-terminated ASCII IDs, 64 bytes each. */
+} rk_serial_device_desc;
+
+/** The unique id of a controller board. */
+typedef struct rk_controller_id {
+    uint8_t bytes[16];
+} rk_controller_id;
+
+/**
+ * RKD6 serial constructor. The board must be the layout's controller and must agree with the
+ * session it is sent (id, digest, channel count and step tick), or the result is
+ * RK_ERROR_MODEL_MISMATCH with the reason on stderr. Error is in target SI units.
+ */
 RK_API rk_result RK_CALL rk_robot_runtime_create_serial6(
     const rk_robot_runtime_blueprint *blueprint, const char *device_path RK_UTF8,
-    uint32_t baud, const char *fingerprint_hex RK_UTF8,
+    uint32_t baud, const rk_serial_device_desc *device,
     double max_target_error, uint32_t step_tick_hz,
     uint64_t link_loss_timeout_ns, uint64_t clock_bound_ns,
     uint64_t link_latency_ns, rk_robot_runtime *out_runtime RK_OUT RK_OWNED);
+/** Reads the unique id of the board on a serial port by opening a session no board accepts. */
+RK_API rk_result RK_CALL rk_serial_device_identify(const char *device_path RK_UTF8,
+    uint32_t baud, rk_controller_id *out_controller RK_OUT);
 /**
  * Stops and releases a standalone runtime handle.
  *
@@ -761,7 +793,8 @@ RK_API rk_result RK_CALL rk_robot_runtime_submit_segments(rk_robot_runtime runti
  * Atomically validates and accepts a plan or committed-horizon replacement. A replacement before
  * committed_until_ns returns RK_ERROR_INVALID_STATE with no queue mutation. The segments' joints
  * are source joints: source joint j drives robot joint joint_map[j], and joint_count is
- * source_joint_count; a robot joint no source joint drives holds header->start_position. Events
+ * source_joint_count. A robot joint no source joint drives follows its leader when the blueprint
+ * couples it to one, and otherwise holds header->start_position. Events
  * are sorted by path time from the plan's start.
  */
 RK_API rk_result RK_CALL rk_robot_runtime_submit_plan(rk_robot_runtime runtime,

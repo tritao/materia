@@ -87,7 +87,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 */
 	const RK_ERROR_LIMIT = -10;
 	/**
-	 * < Device layout fingerprint differs from the host deployment.
+	 * < The device is not the deployment's controller or disagrees with its configuration.
 	 */
 	const RK_ERROR_MODEL_MISMATCH = -12;
 	/**
@@ -339,13 +339,11 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 */
 	extern fn rk_robot_runtime_create(blueprint: ptr<const<rk_robot_runtime_blueprint>>, out_runtime: ptr<rk_robot_runtime> @out @owned) -> rk_result;
 	/**
-	 * Creates a serial runtime; fingerprint is 32 hex digits and error is in target SI units.
+	 * RKD6 serial constructor. The board must be the layout's controller and must agree with the
+	 * session it is sent (id, digest, channel count and step tick), or the result is
+	 * RK_ERROR_MODEL_MISMATCH with the reason on stderr. Error is in target SI units.
 	 */
-	extern fn rk_robot_runtime_create_serial(blueprint: ptr<const<rk_robot_runtime_blueprint>>, device_path: utf8, baud: u32, fingerprint_hex: utf8, max_target_error: f64, out_runtime: ptr<rk_robot_runtime> @out @owned) -> rk_result;
-	/**
-	 * RKD6 serial constructor with deployment timing and capability inputs.
-	 */
-	extern fn rk_robot_runtime_create_serial6(blueprint: ptr<const<rk_robot_runtime_blueprint>>, device_path: utf8, baud: u32, fingerprint_hex: utf8, max_target_error: f64, step_tick_hz: u32, link_loss_timeout_ns: u64, clock_bound_ns: u64, link_latency_ns: u64, out_runtime: ptr<rk_robot_runtime> @out @owned) -> rk_result;
+	extern fn rk_robot_runtime_create_serial6(blueprint: ptr<const<rk_robot_runtime_blueprint>>, device_path: utf8, baud: u32, device: ptr<const<rk_serial_device_desc>>, max_target_error: f64, step_tick_hz: u32, link_loss_timeout_ns: u64, clock_bound_ns: u64, link_latency_ns: u64, out_runtime: ptr<rk_robot_runtime> @out @owned) -> rk_result;
 	/**
 	 * Stops and releases a standalone runtime handle.
 	 *
@@ -409,7 +407,8 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 * Atomically validates and accepts a plan or committed-horizon replacement. A replacement before
 	 * committed_until_ns returns RK_ERROR_INVALID_STATE with no queue mutation. The segments' joints
 	 * are source joints: source joint j drives robot joint joint_map[j], and joint_count is
-	 * source_joint_count; a robot joint no source joint drives holds header->start_position. Events
+	 * source_joint_count. A robot joint no source joint drives follows its leader when the blueprint
+	 * couples it to one, and otherwise holds header->start_position. Events
 	 * are sorted by path time from the plan's start.
 	 */
 	extern fn rk_robot_runtime_submit_plan(runtime: rk_robot_runtime, header: ptr<const<rk_plan_header>>, starts_ns: ptr<const<i64>> @in_array("segment_count"), durations_ns: ptr<const<i64>> @in_array("segment_count"), degrees: ptr<const<i32>> @in_array("segment_count"), segment_count: u32, coefficients: ptr<const<f64>> @in_array("coefficient_count"), coefficient_count: u32, joint_map: ptr<const<i32>> @in_array("source_joint_count"), source_joint_count: u32, events: ptr<const<rk_timed_event>> @in_array("event_count"), event_count: u32) -> rk_result;
@@ -426,11 +425,21 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 * Validates a mutable native state value and its array counts.
 	 */
 	extern fn rk_robot_state_validate(state: ptr<const<rk_robot_state>>) -> rk_result;
+	/**
+	 * Reads the unique id of the board on a serial port by opening a session no board accepts.
+	 */
+	extern fn rk_serial_device_identify(device_path: utf8, baud: u32, out_controller: ptr<rk_controller_id> @out) -> rk_result;
 	struct rk_channel_declaration @layout(136, 8) {
 		id: array<c_char, 48> @offset(0);
 		kind: rk_event_kind @offset(48);
 		safe_value: rk_event_value @offset(56);
 		stop_policy: rk_channel_stop_policy @offset(128);
+	}
+	/**
+	 * The unique id of a controller board.
+	 */
+	struct rk_controller_id @layout(16, 1) {
+		bytes: array<u8, 16> @offset(0);
 	}
 	struct rk_event_record @layout(152, 8) {
 		plan_id: u64 @offset(0);
@@ -1084,6 +1093,40 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		received_timestamp_ns: u64 @offset(16);
 		value_count: u32 @offset(24);
 		value_offset: u32 @offset(28);
+	}
+	/**
+	 * A serial device's actuator layout: one RKD6 channel per actuator, derived by the host from the
+	 * model and the deployment's wiring (robotkit.device.DeviceBinding), and the unique id of the
+	 * board it is for. Joint, ratio and offset relate a channel to a blueprint joint:
+	 * actuator = ratio * (joint - offset), in the actuator's unit (a stepper's rotor radians).
+	 */
+	struct rk_serial_device_desc @layout(6872, 8) {
+		/**
+		 * < Set to sizeof this struct.
+		 */
+		struct_size: u32 @offset(0) @struct_size;
+		/**
+		 * < Channels wired, 1 to RK_MAX_SERIAL_JOINTS.
+		 */
+		actuator_count: u32 @offset(4);
+		/**
+		 * < Unique id of the board; not all zero.
+		 */
+		controller: array<u8, 16> @offset(8);
+		actuator_joint: array<u8, 64> @offset(24);
+		actuator_ratio: array<f64, 64> @offset(88);
+		actuator_offset: array<f64, 64> @offset(600);
+		actuator_steps_per_unit: array<f64, 64> @offset(1112);
+		/**
+		 * < Zero means no rate limit.
+		 */
+		actuator_max_rate: array<f64, 64> @offset(1624);
+		actuator_direction_setup_ticks: array<u16, 64> @offset(2136);
+		actuator_skew_bound: array<f64, 64> @offset(2264);
+		/**
+		 * < 64 NUL-terminated ASCII IDs, 64 bytes each.
+		 */
+		actuator_ids: array<u8, 4096> @offset(2776);
 	}
 	struct rk_timed_event @layout(136, 8) {
 		/**

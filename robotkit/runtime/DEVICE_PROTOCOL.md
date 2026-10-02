@@ -3,7 +3,7 @@
 The four-byte sync marker is `RKD6`. A frame is marker (4), message type (1), reserved zero
 (1), little-endian payload length (2), payload, then little-endian CRC-32/IEEE
 (4), calculated over every preceding byte. The largest current payload is the
-version 10 session record (4,908 bytes), so the frame maximum is 4,920 bytes.
+session record (4,908 bytes), so the frame maximum is 4,920 bytes.
 A receiver rejects unknown types, wrong lengths, a nonzero reserved byte,
 CRC mismatch, or malformed session, segment and event records.
 
@@ -19,8 +19,8 @@ It also carries the link-loss timeout in nanoseconds. The device converts that
 timeout using its own clock after the session begins.
 Protocol version 8 also carries steps per actuator unit, actuator rate limits,
 direction setup ticks, source joint indices, transmission ratios and dual-drive
-skew bounds. Stable actuator IDs, channel order and transmission fields are
-part of the RKD6 endpoint fingerprint.
+skew bounds, all derived by the host from the model and the deployment's
+wiring. Nothing about them is compiled into firmware.
 The host converts joint polynomials to actuator polynomials before encoding and
 rejects motion faster than either the authored actuator rate or one step per
 device step tick. The no_std device generator uses the configured direction
@@ -111,10 +111,6 @@ and revalidates the lowered path. It accounts for frames in flight when
 streaming into a small queue. Qualification reports minimum baud, queue depth
 and period before construction succeeds.
 
-Protocol version 12 adds `channel_stop_policy` to `SESSION_BEGIN6`, one byte per
-channel: 0 makes the channel safe on every stop, 1 keeps it through a commanded
-STOP or ABORT, as the host runtime's `RK_CHANNEL_KEEP_ON_STOP` does.
-
 Protocol version 11 adds two `QUEUE_STATUS6` fields. `received_until_ticks` is
 the end of the last segment the device holds, so a replacement is accepted only
 at a boundary the device has, as it reports, rather than one a commit implied.
@@ -151,8 +147,35 @@ clock: far enough that the device keeps moving through a host stall such as a
 garbage collection, and no further, so the path beyond stays open to
 replacement.
 
-Deployment schema v4 implies RKD6 and omits `protocol`. The v3 reader accepts
-only an explicit `rkd6` declaration. Layout fingerprints use the canonical
-RKD6 schema lock and exact layout bytes; ordered actuator and process-channel
-fields further specialize the endpoint fingerprint. The POSIX serial endpoint,
-virtual endpoint, PTY harness and two-joint Nucleo stub share this protocol.
+Protocol version 12 (one in-place revision, before any hardware release) has two
+changes to `SESSION_BEGIN6`. `channel_stop_policy` is one byte per channel: 0
+makes the channel safe on every stop, 1 keeps it through a commanded STOP or
+ABORT, as the host runtime's `RK_CHANNEL_KEEP_ON_STOP` does. The configuration
+digest below covers these bytes, so a board that disagrees about a stop policy
+is refused. The second change replaces the compiled layout fingerprint with
+identity and agreement checked while the session opens. `SESSION_BEGIN6.expected_controller`
+names the board the configuration is for. `SESSION_ACK6.controller` is the
+board's own unique id (on an STM32G4, its 96-bit unique-ID register padded to 16
+bytes); a board reports it even when it refuses the session, so `robotd identify`
+can read it by asking for the all-zero id, which no board accepts. A board
+refuses a session whose expected controller is not its own. `config_digest` is
+the 64-bit FNV-1a of the `SESSION_BEGIN6` payload after its `session` field,
+computed by the device over the bytes it received. The host computes the same
+over the bytes it sent and refuses the board when the digests differ, or when
+the controller is not the expected one, the board has fewer channels than the
+layout wires, or its step tick is not the one the deployment plans for. Each
+refusal says which check failed on stderr; a wrong controller, digest, channel
+count or step tick is `RK_ERROR_MODEL_MISMATCH`. Firmware is therefore per
+board type: it carries the channel count, pins, tick rates and the unique id
+the chip already has, and a configuration change never needs a reflash.
+
+Deployment schema v5 implies RKD6 and omits `protocol`. Its `device.controller`
+is the 32-hex-digit unique id of the board; the layout wires channels to the
+model's actuators (see `robotkit.device.DeviceBinding`). The motor's full steps
+come from the machine model, direction and microstepping from the layout, and
+the step tick from `device.step_tick_hz`; the binding derives each channel's
+steps per radian, ratio, rate ceiling and direction setup, and refuses a
+stepper without a channel or a channel without a stepper. Earlier deployment
+versions, which named a compiled `fingerprint`, are rejected. The POSIX serial
+endpoint, virtual endpoint, PTY harness and two-joint Nucleo stub share this
+protocol.

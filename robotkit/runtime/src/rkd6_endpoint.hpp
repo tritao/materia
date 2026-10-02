@@ -36,11 +36,15 @@ public:
         std::uint64_t minimum_segment_ns, std::uint64_t link_latency_ns,
         std::uint64_t clock_uncertainty_ns);
     static std::shared_ptr<Rkd6Endpoint> attach(std::unique_ptr<Rkd6Transport> transport,
-        const rk_robot_runtime_blueprint &blueprint, std::array<std::uint8_t, 16> fingerprint,
+        const rk_robot_runtime_blueprint &blueprint, std::array<std::uint8_t, 16> expected_controller,
         std::uint64_t session, double target_error, std::uint64_t clock_bound_ns,
         std::uint64_t link_latency_ns, std::uint32_t step_tick_hz = 40'000,
         std::uint64_t link_loss_timeout_ns = 500'000'000,
         std::span<const DeviceActuator6> layout = {}, rk_result *error = nullptr);
+
+    /** Reads a board's own controller id by opening a session no board accepts. */
+    static rk_result identify(std::unique_ptr<Rkd6Transport> transport, std::uint64_t session,
+        std::array<std::uint8_t, 16> &controller);
 
     rk_result apply(const rk_robot_command &command) override;
     rk_result sample(std::uint64_t timestamp_ns, rk_robot_state &state) override;

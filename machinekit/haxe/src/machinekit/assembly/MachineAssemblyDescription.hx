@@ -235,6 +235,31 @@ import machinekit.component.PortInterface;
 	@:id(3) Attached(kg:Float, instanceId:String, x:Float, y:Float, z:Float);
 }
 
+/**
+ * A coupling whose ratio its parts set (see `Drive`): `kind` is "lead-screw", "gear-mesh",
+ * "rack-and-pinion" or "belt", `members` the parts in the order the drive names them, and the
+ * follower sits at zero where the leader is at `leaderZero`.
+ */
+@:wire typedef DriveRecord = {
+	@:id(1) var coupling:String;
+	@:id(2) var kind:String;
+	@:id(3) var members:ReadOnlyArray<String>;
+	@:id(4) var alignment:Float;
+	@:id(5) var leaderZero:Float;
+}
+
+/**
+ * A stepper motor member driving a joint on a `volts` supply, its actuator given `margin` of the
+ * motor's holding torque (see `MachineAssembly.addMotor`).
+ */
+@:wire typedef MotorRecord = {
+	@:id(1) var actuator:String;
+	@:id(2) var joint:String;
+	@:id(3) var motor:String;
+	@:id(4) var volts:Float;
+	@:id(5) var margin:Float;
+}
+
 @:wire typedef AssemblySideRecord = {
 	@:id(1) var members:ReadOnlyArray<MemberRecord>;
 	@:id(2) var portConnections:ReadOnlyArray<PortConnectionRecord>;
@@ -247,6 +272,8 @@ import machinekit.component.PortInterface;
 	@:id(9) @:optional var tools:ReadOnlyArray<ToolRecord>;
 	@:id(10) var ports:ReadOnlyArray<PortRecord>;
 	@:id(11) var included:ReadOnlyArray<IncludedRecord>;
+	@:id(12) @:optional var drives:ReadOnlyArray<DriveRecord>;
+	@:id(13) @:optional var motors:ReadOnlyArray<MotorRecord>;
 }
 
 /** Mechanical definition plus the MachineKit facts keyed by occurrence ID. */

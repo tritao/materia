@@ -161,7 +161,7 @@ typedef struct rk_simulation_robot_desc {
     double virtual_device_corruption_rate;
     uint64_t virtual_device_seed;
     double virtual_device_steps_per_unit[64];
-    uint8_t virtual_device_fingerprint[16];
+    uint8_t virtual_device_controller[16];
     double virtual_device_target_error;
     uint64_t virtual_device_clock_bound_ns;
     uint64_t virtual_device_link_loss_timeout_ns;

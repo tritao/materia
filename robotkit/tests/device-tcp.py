@@ -3,12 +3,12 @@
 
 import fcntl
 import json
+import math
 import os
 from pathlib import Path
 import pty
 import signal
 import socket
-import struct
 import subprocess
 import tempfile
 import time
@@ -20,32 +20,6 @@ ROBOTD = ROOT / "robotkit/robotd/haxeon.json"
 CLIENT = ROOT / "robotkit/tests/integration/haxeon.json"
 MANIFEST = ROOT / "robotkit/device_virtual/Cargo.toml"
 TARGET = ROOT / "robotkit/tests/build/device-pty-cargo"
-def effective_fingerprint(base_hex, channels):
-    if not channels:
-        return base_hex
-    mask = (1 << 64) - 1
-    value = 14695981039346656037
-    def mix(number):
-        nonlocal value
-        for byte in number.to_bytes(8, "little"):
-            value = ((value ^ byte) * 1099511628211) & mask
-    for byte in bytes.fromhex(base_hex): mix(byte)
-    mix(0)  # no actuator layout
-    mix(len(channels))
-    for channel in channels:
-        for byte in channel["id"].encode().ljust(48, b"\0"): mix(byte)
-        safe = channel["safeValue"]
-        kind = {"digital": 1, "analog": 2, "process": 3}[safe["kind"]]
-        mix(kind); mix(kind); mix(int(safe.get("digital", False)))
-        mix(struct.unpack("<Q", struct.pack("<d", safe.get("analog", 0.0)))[0])
-        mix(struct.unpack("<Q", struct.pack("<d", safe.get("argument", 0.0)))[0])
-        for byte in safe.get("command", "").encode().ljust(48, b"\0"): mix(byte)
-    output = bytearray()
-    for i in range(16):
-        value ^= value >> 32
-        value = (value * 1099511628211) & mask
-        output.append((value >> ((i % 8) * 8)) & 255)
-    return output.hex()
 def run(*args):
     result = subprocess.run(args, cwd=ROOT, text=True, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT)
@@ -91,23 +65,14 @@ def main():
         fixture_dir = ROOT / "robotkit/tests/fixtures/device-deployment"
         (deployment_dir / "robot.json").write_bytes((fixture_dir / "robot.json").read_bytes())
         (deployment_dir / "layout.json").write_bytes((fixture_dir / "layout.json").read_bytes())
-        (deployment_dir / "device_wire6.lock.json").write_bytes(
-            (ROOT / "robotkit/schema/device_wire6.lock.json").read_bytes())
         deployment = json.loads((fixture_dir / "deployment.json").read_text())
         deployment["device"]["path"] = slave_path
-        deployment["device"]["schema_lock"] = "device_wire6.lock.json"
         deployment_path = deployment_dir / "deployment.json"
         deployment_path.write_text(json.dumps(deployment))
         wrong = json.loads(json.dumps(deployment))
-        wrong["device"]["fingerprint"] = "000102030405060708090a0b0c0d0e0f"
-        wrong_path = deployment_dir / "wrong-fingerprint.json"
+        wrong["device"]["controller"] = "000102030405060708090a0b0c0d0e0f"
+        wrong_path = deployment_dir / "wrong-controller.json"
         wrong_path.write_text(json.dumps(wrong))
-        rejected = subprocess.run(
-            [str(HAXEON), "run", "--project", str(ROBOTD), "--", "--server",
-             f"--deployment={wrong_path}"], cwd=ROOT, text=True,
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30)
-        if rejected.returncode == 0 or "fingerprint does not match" not in rejected.stdout:
-            raise RuntimeError(f"robotd accepted a stale deployment fingerprint:\n{rejected.stdout}")
         device_log_path = Path(temp) / "device.log"
         server_log_path = Path(temp) / "robotd.log"
         client_log_path = Path(temp) / "client.log"
@@ -115,8 +80,9 @@ def main():
                 client_log_path.open("w+") as client_log:
             device = subprocess.Popen(
                 [str(TARGET / "debug/robotd_pty_device"), str(master), str(control_read),
-                 effective_fingerprint(deployment["device"]["fingerprint"],
-                     deployment.get("channels", []))],
+                 deployment["device"]["controller"],
+                 # 200 full steps at 16 microsteps a turn, as the layout wires the motors.
+                 repr(200 * 16 / (2 * math.pi))],
                 cwd=ROOT, pass_fds=(master, control_read), stdout=device_log,
                 stderr=subprocess.STDOUT)
             os.close(control_read)
@@ -124,6 +90,14 @@ def main():
             server = None
             error = None
             try:
+                # A deployment for another board is refused by the board, which says who it is.
+                rejected = subprocess.run(
+                    [str(HAXEON), "run", "--project", str(ROBOTD), "--", "--server",
+                     f"--deployment={wrong_path}"], cwd=ROOT, text=True,
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60)
+                if rejected.returncode == 0 or "is for controller 000102030405060708090a0b0c0d0e0f" \
+                        not in rejected.stdout:
+                    raise RuntimeError(f"robotd accepted another board's deployment:\n{rejected.stdout}")
                 server = subprocess.Popen(
                     [str(HAXEON), "run", "--project", str(ROBOTD), "--", "--server",
                      f"--deployment={deployment_path}", f"--port={port}",

@@ -5,6 +5,7 @@ import materia.assembly.AssemblyDefinition.AssemblyComponentDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyComponentOccurrence;
 import materia.assembly.AssemblyDefinition.AssemblyExposedConnector;
 import materia.assembly.AssemblyDefinition.AssemblyJointCoupling;
+import materia.assembly.AssemblyDefinition.AssemblyActuator;
 import materia.assembly.AssemblyDefinition.AssemblyMate;
 import materia.assembly.AssemblyDefinition.AssemblySubdefinition;
 import materia.assembly.AssemblyDefinition.AssemblyStateRecord;
@@ -81,16 +82,17 @@ class AssemblyDefinitionFlattener {
 			definitions: [], occurrences: [], joints: []};
 		flat.lengthUnit = source.lengthUnit;
 		flat.couplings = [];
+		if (source.actuators != null) flat.actuators = [];
 		var active = new Map<String, Bool>();
 		var rootMembers = expand("", AssemblyFrames.identity(), source.definitions, source.occurrences, source.joints,
-			source.couplings, source.mates, library, flat, active);
+			source.couplings, source.mates, library, flat, active, source.actuators);
 		exposed(source.exposedConnectors, rootMembers, source.id);
 		for (entry in source.assemblies) {
 			var unused:AssemblyDefinition = {schemaVersion: source.schemaVersion, id: entry.id,
 				definitions: [], occurrences: [], joints: [], couplings: []};
 			active.set(entry.id, true);
 			var members = expand("", AssemblyFrames.identity(), entry.definitions, entry.occurrences, entry.joints,
-				entry.couplings, entry.mates, library, unused, active);
+				entry.couplings, entry.mates, library, unused, active, entry.actuators);
 			active.remove(entry.id);
 			exposed(entry.exposedConnectors, members, entry.id);
 			AssemblyDefinitionCodec.validate(unused);
@@ -100,7 +102,8 @@ class AssemblyDefinitionFlattener {
 
 	static function expand(prefix:String, pose:AssemblyFrame, definitions:Array<AssemblyComponentDefinition>,
 			occurrences:Array<AssemblyComponentOccurrence>, joints:Array<KinematicJoint>, couplings:Array<AssemblyJointCoupling>,
-			mates:Null<Array<AssemblyMate>>, library:Map<String, AssemblySubdefinition>, flat:AssemblyDefinition, active:Map<String, Bool>):Map<String, FlatMember> {
+			mates:Null<Array<AssemblyMate>>, library:Map<String, AssemblySubdefinition>, flat:AssemblyDefinition, active:Map<String, Bool>,
+			?actuators:Array<AssemblyActuator>):Map<String, FlatMember> {
 		if (definitions == null || occurrences == null || joints == null) throw "Nested assembly has missing members or joints";
 		var localDefinitions = new Map<String, AssemblyComponentDefinition>();
 		var emittedDefinitions = new Map<String, Bool>();
@@ -133,7 +136,7 @@ class AssemblyDefinitionFlattener {
 				if (nested == null) throw 'Assembly "$path" references a missing nested definition';
 				active.set(nested.id, true);
 				var children = expand(path, worldPose, nested.definitions, nested.occurrences, nested.joints,
-					nested.couplings, nested.mates, library, flat, active);
+					nested.couplings, nested.mates, library, flat, active, nested.actuators);
 				active.remove(nested.id);
 				connectors = exposed(nested.exposedConnectors, children, path);
 			} else {
@@ -162,9 +165,22 @@ class AssemblyDefinitionFlattener {
 			if (joint.driven == true) expanded.driven = true;
 			flat.joints.push(expanded);
 		}
-		if (couplings != null) for (coupling in couplings)
-			flat.couplings.push({id: scoped(prefix, coupling.id), source: scoped(prefix, coupling.source),
-				target: scoped(prefix, coupling.target), ratio: coupling.ratio, offset: coupling.offset});
+		if (couplings != null) for (coupling in couplings) {
+			var expanded:AssemblyJointCoupling = {id: scoped(prefix, coupling.id), source: scoped(prefix, coupling.source),
+				target: scoped(prefix, coupling.target), ratio: coupling.ratio, offset: coupling.offset};
+			if (coupling.efficiency != null) expanded.efficiency = coupling.efficiency;
+			flat.couplings.push(expanded);
+		}
+		if (actuators != null) {
+			if (flat.actuators == null) flat.actuators = [];
+			for (actuator in actuators) {
+				var expanded:AssemblyActuator = {id: scoped(prefix, actuator.id), joint: scoped(prefix, actuator.joint),
+					maxEffort: actuator.maxEffort, maxRate: actuator.maxRate};
+				if (actuator.rotorInertia != null) expanded.rotorInertia = actuator.rotorInertia;
+				if (actuator.fullStepsPerRevolution != null) expanded.fullStepsPerRevolution = actuator.fullStepsPerRevolution;
+				flat.actuators.push(expanded);
+			}
+		}
 		if (mates != null) for (mate in mates) {
 			var first = endpoint(members, mate.first, mate.firstConnector, prefix);
 			var second = endpoint(members, mate.second, mate.secondConnector, prefix);
