@@ -280,14 +280,16 @@ bool append_render_glyph(const skb_layout_render_glyph_t *glyph, void *context) 
         return true;
     if (std::getenv("NKUI_DEBUG_GLYPHS")) {
         const uint32_t script = skb_script_to_iso15924_tag(glyph->script);
-        const uint32_t *text = skb_layout_get_text(render.layout);
         std::fprintf(
             stderr, "glyph %c%c%c%c size=%.1f font=%u gid=%u range=%d..%d cp=%x offset=%.1f,%.1f\n",
             static_cast<char>(script >> 24), static_cast<char>(script >> 16),
             static_cast<char>(script >> 8), static_cast<char>(script), glyph->font_size,
             static_cast<unsigned>(glyph->font_handle), static_cast<unsigned>(glyph->glyph_id),
             glyph->text_range.start, glyph->text_range.end,
-            text ? text[glyph->text_range.start] : 0u, glyph->offset_x, glyph->offset_y);
+            glyph->text_range.start >= 0 &&
+                    glyph->text_range.start < skb_layout_get_text_count(render.layout)
+                ? skb_layout_get_text_at(render.layout, glyph->text_range.start) : 0u,
+            glyph->offset_x, glyph->offset_y);
     }
     const skb_quad_t quad = skb_image_atlas_get_glyph_quad(
         render.state->atlas, render.origin_x + glyph->offset_x, render.origin_y + glyph->offset_y,
@@ -678,17 +680,15 @@ static bool same_rendered_line(const skb_layout_t *previous, const skb_layout_t 
         a.bounds.width != b.bounds.width || a.bounds.height != b.bounds.height ||
         a.baseline - a.bounds.y != b.baseline - b.bounds.y ||
         a.layout_run_range.end - a.layout_run_range.start !=
-            b.layout_run_range.end - b.layout_run_range.start ||
-        (count > 0 && !std::equal(skb_layout_get_text(previous) + a.text_range.start,
-                    skb_layout_get_text(previous) + a.text_range.end,
-                    skb_layout_get_text(next) + b.text_range.start)))
+            b.layout_run_range.end - b.layout_run_range.start)
         return false;
+    for (int32_t i = 0; i < count; ++i) {
+        if (skb_layout_get_text_at(previous, a.text_range.start + i) !=
+            skb_layout_get_text_at(next, b.text_range.start + i))
+            return false;
+    }
     const auto *old_runs = skb_layout_get_layout_runs(previous);
     const auto *new_runs = skb_layout_get_layout_runs(next);
-    const auto *old_glyphs = skb_layout_get_glyphs(previous);
-    const auto *new_glyphs = skb_layout_get_glyphs(next);
-    const auto *old_clusters = skb_layout_get_clusters(previous);
-    const auto *new_clusters = skb_layout_get_clusters(next);
     for (int32_t run = 0; run < a.layout_run_range.end - a.layout_run_range.start; ++run) {
         const auto &x = old_runs[a.layout_run_range.start + run];
         const auto &y = new_runs[b.layout_run_range.start + run];
@@ -707,8 +707,8 @@ static bool same_rendered_line(const skb_layout_t *previous, const skb_layout_t 
             x.glyph_range.end - x.glyph_range.start != y.glyph_range.end - y.glyph_range.start)
             return false;
         for (int32_t glyph = 0; glyph < x.glyph_range.end - x.glyph_range.start; ++glyph) {
-            const auto &p = old_glyphs[x.glyph_range.start + glyph];
-            const auto &q = new_glyphs[y.glyph_range.start + glyph];
+            const auto p = skb_layout_get_glyph_at(previous, x.glyph_range.start + glyph);
+            const auto q = skb_layout_get_glyph_at(next, y.glyph_range.start + glyph);
             if (p.gid != q.gid || p.advance_x != q.advance_x ||
                 p.offset_x - a.bounds.x != q.offset_x - b.bounds.x ||
                 p.offset_y - a.bounds.y != q.offset_y - b.bounds.y ||
@@ -716,8 +716,8 @@ static bool same_rendered_line(const skb_layout_t *previous, const skb_layout_t 
                 p.cluster_idx >= skb_layout_get_clusters_count(previous) ||
                 q.cluster_idx >= skb_layout_get_clusters_count(next))
                 return false;
-            const auto &pc = old_clusters[p.cluster_idx];
-            const auto &qc = new_clusters[q.cluster_idx];
+            const auto pc = skb_layout_get_cluster_at(previous, p.cluster_idx);
+            const auto qc = skb_layout_get_cluster_at(next, q.cluster_idx);
             if (pc.text_offset - a.text_range.start != qc.text_offset - b.text_range.start ||
                 pc.text_count != qc.text_count || pc.glyphs_count != qc.glyphs_count)
                 return false;
@@ -1132,13 +1132,13 @@ bool TextEngine::prepare_glyphs_internal(TextLayoutId id, float origin_x, float 
                                          state_->rasterizer, pixel_scale, raster_mode(mode)))
         return false;
     if (std::getenv("NKUI_DEBUG_GLYPHS") && retained->options.font_size == 18.0f) {
-        const uint32_t *text = skb_layout_get_text(retained->layout.get());
-        const skb_text_property_t *properties = skb_layout_get_text_properties(retained->layout.get());
         const int32_t count = skb_layout_get_text_count(retained->layout.get());
         std::fprintf(stderr, "text properties:");
         for (int32_t i = 0; i < count; ++i) {
-            const uint32_t script = skb_script_to_iso15924_tag(properties[i].script);
-            std::fprintf(stderr, " %x/%c%c%c%c", text[i], static_cast<char>(script >> 24),
+            const uint32_t script = skb_script_to_iso15924_tag(
+                skb_layout_get_text_property_at(retained->layout.get(), i).script);
+            std::fprintf(stderr, " %x/%c%c%c%c", skb_layout_get_text_at(retained->layout.get(), i),
+                         static_cast<char>(script >> 24),
                          static_cast<char>(script >> 16), static_cast<char>(script >> 8),
                          static_cast<char>(script));
         }
@@ -1313,10 +1313,6 @@ int32_t TextEngine::move_word(int32_t offset, int32_t direction, bool mac_style)
     if (text_count <= 0)
         return 0;
 
-    const skb_text_property_t *properties = skb_layout_get_text_properties(layout);
-    if (!properties)
-        return std::clamp(offset, 0, text_count);
-
     int32_t next = std::clamp(offset, 0, text_count);
     const auto next_grapheme = [layout](int32_t value) {
         return skb_layout_get_next_grapheme_offset(layout, value);
@@ -1330,10 +1326,11 @@ int32_t TextEngine::move_word(int32_t offset, int32_t direction, bool mac_style)
 
     if (direction > 0) {
         if (mac_style) {
-            while (next < text_count && (properties[next].flags & (whitespace | punctuation)) != 0)
+            while (next < text_count &&
+                   (skb_layout_get_text_property_at(layout, next).flags & (whitespace | punctuation)) != 0)
                 next++;
             while (next < text_count) {
-                if ((properties[next].flags & word_break) != 0) {
+                if ((skb_layout_get_text_property_at(layout, next).flags & word_break) != 0) {
                     next = next_grapheme(next);
                     break;
                 }
@@ -1341,10 +1338,10 @@ int32_t TextEngine::move_word(int32_t offset, int32_t direction, bool mac_style)
             }
         } else {
             while (next < text_count) {
-                if ((properties[next].flags & word_break) != 0) {
+                if ((skb_layout_get_text_property_at(layout, next).flags & word_break) != 0) {
                     const int32_t after_boundary = next_grapheme(next);
                     if (after_boundary >= text_count ||
-                        (properties[after_boundary].flags & whitespace) == 0) {
+                        (skb_layout_get_text_property_at(layout, after_boundary).flags & whitespace) == 0) {
                         next = after_boundary;
                         break;
                     }
@@ -1354,16 +1351,17 @@ int32_t TextEngine::move_word(int32_t offset, int32_t direction, bool mac_style)
         }
     } else {
         if (mac_style) {
-            while (next > 0 && (properties[next - 1].flags & (whitespace | punctuation)) != 0)
+            while (next > 0 &&
+                   (skb_layout_get_text_property_at(layout, next - 1).flags & (whitespace | punctuation)) != 0)
                 next--;
         }
         if (next > 0)
             next = previous_grapheme(next);
         while (next > 0) {
-            if ((properties[next - 1].flags & word_break) != 0) {
+            if ((skb_layout_get_text_property_at(layout, next - 1).flags & word_break) != 0) {
                 const int32_t after_boundary = next_grapheme(next - 1);
                 if (mac_style || after_boundary >= text_count ||
-                    (properties[after_boundary].flags & whitespace) == 0) {
+                    (skb_layout_get_text_property_at(layout, after_boundary).flags & whitespace) == 0) {
                     next = after_boundary;
                     break;
                 }
@@ -1384,20 +1382,16 @@ int32_t TextEngine::move_paragraph(int32_t offset, int32_t direction, bool mac_s
     const int32_t text_count = skb_layout_get_text_count(layout);
     if (text_count <= 0)
         return 0;
-    const skb_text_property_t *properties = skb_layout_get_text_properties(layout);
-    if (!properties)
-        return std::clamp(offset, 0, text_count);
-
     const int32_t current = std::clamp(offset, 0, text_count);
     int32_t paragraph_start = 0;
     for (int32_t index = 0; index < current; ++index) {
-        if ((properties[index].flags & SKB_TEXT_PROP_MUST_LINE_BREAK) != 0)
+        if ((skb_layout_get_text_property_at(layout, index).flags & SKB_TEXT_PROP_MUST_LINE_BREAK) != 0)
             paragraph_start = index + 1;
     }
 
     int32_t paragraph_end = text_count;
     for (int32_t index = current; index < text_count; ++index) {
-        if ((properties[index].flags & SKB_TEXT_PROP_MUST_LINE_BREAK) != 0) {
+        if ((skb_layout_get_text_property_at(layout, index).flags & SKB_TEXT_PROP_MUST_LINE_BREAK) != 0) {
             paragraph_end = index;
             break;
         }
@@ -1410,7 +1404,7 @@ int32_t TextEngine::move_paragraph(int32_t offset, int32_t direction, bool mac_s
 
     int32_t previous_start = 0;
     for (int32_t index = 0; index + 1 < paragraph_start; ++index) {
-        if ((properties[index].flags & SKB_TEXT_PROP_MUST_LINE_BREAK) != 0)
+        if ((skb_layout_get_text_property_at(layout, index).flags & SKB_TEXT_PROP_MUST_LINE_BREAK) != 0)
             previous_start = index + 1;
     }
     return previous_start;
