@@ -243,7 +243,9 @@ class DesktopUiHost {
 									var frameStartedAt = Sys.time();
 									frameGc.beginFrame();
 									var rendered = runtime.render(Sys.time());
+									var collectionStartedAt = options.captureDirectory == null ? 0.0 : Sys.time();
 									frameGc.endFrame();
+									var collectionSeconds = options.captureDirectory == null ? 0.0 : Sys.time() - collectionStartedAt;
 									if (!rendered) return;
 									var renderedApp = runtime.app();
 									nextCaretFrameAt = renderedApp != null
@@ -265,6 +267,7 @@ class DesktopUiHost {
 											textInputDispatchSeconds: textInputDispatchSeconds,
 											requestAgeSeconds: requestedAt < 0.0 ? null : frameStartedAt - requestedAt,
 											frameSeconds: Sys.time() - frameStartedAt,
+											frameGcSeconds: collectionSeconds,
 											submitSeconds: metrics == null ? null : metrics.submitSeconds,
 											styleResolutions: metrics == null ? null : metrics.styleResolutions,
 											styleCacheHits: metrics == null ? null : metrics.styleCacheHits,
