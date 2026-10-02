@@ -263,7 +263,7 @@ class RobotModelCodec {
     }
 
     var couplingIds = new Map<String, Bool>();
-    var followers = new Map<String, Bool>();
+    var pairs = new Map<String, Bool>();
     for (record in array(root, "couplings")) {
       var coupling = new JointCoupling(text(record, "id"), text(record, "leader"),
         text(record, "follower"), number(record, "ratio"), number(record, "offset"));
@@ -277,12 +277,15 @@ class RobotModelCodec {
       if (Reflect.hasField(record, "drag")) coupling.drag = nonNegative(number(record, "drag"), "coupling drag");
       if (!joints.exists(coupling.leader) || !joints.exists(coupling.follower))
         throw 'Coupling ${coupling.id} references an unknown joint';
-      if (couplingIds.exists(coupling.id) || followers.exists(coupling.follower))
-        throw 'Duplicate robot coupling ${coupling.id} or follower';
+      var pair = coupling.follower + "\n" + coupling.leader;
+      if (couplingIds.exists(coupling.id) || pairs.exists(pair))
+        throw 'Duplicate robot coupling ${coupling.id} or leader and follower pair';
       couplingIds.set(coupling.id, true);
-      followers.set(coupling.follower, true);
+      pairs.set(pair, true);
       model.addCoupling(coupling);
     }
+    var cycle = JointCoupling.cycleThrough(model.couplings);
+    if (cycle != null) throw 'Joint $cycle depends on itself through its couplings';
 
     var actuatorIds = new Map<String, Bool>();
     for (record in array(root, "actuators")) {

@@ -230,6 +230,9 @@ class KinematicsTests {
       "the follower turns by the sum of its terms in the arm's FK");
     var result = arm.solve(pose, [0.1, 0.5], new IkOptions(1e-9, 1e-9, 200, 0.01).flange());
     check(result.converged && approx(result.q[0], 0.3, 1e-6) && approx(result.q[1], 0.8, 1e-6), "IK through both couplings recovers the leaders");
+    var decoded = robotkit.model.RobotModelCodec.decode(robotkit.model.RobotModelCodec.encode(model));
+    check(decoded.couplings.length == 2 && decoded.couplings[1].follower == "j2" && decoded.couplings[1].ratio == -0.25,
+      "both terms survive the model's saved form");
     // The same leader twice for one follower is refused, and so is a cycle through the terms.
     model.addCoupling(new JointCoupling("again", "j0", "j2", 1.0, 0.0));
     check(model.validate().length == 1, "a leader twice for one follower is reported: " + model.validate());
