@@ -89,7 +89,7 @@ slows, stops short of it without touching it, replans round it and finishes its 
 it 1.2 m ahead; about 0.3 m is left between them at the closest).
 
 How it is built, each piece where it belongs:
-- *The lidar from the CAD.* `LidarPuck` declares a `PlanarScanner` capability (scan connector, 64 rays,
+- *The lidar from the CAD.* `LidarPuck` declares a `PlanarScanner` capability (scan connector, 360 rays,
   6 m, 10 Hz), as a suction cup declares its contact; `AssemblyPreview.robotSensors` turns the robot's
   declared scanners into the scene artifact's new `robotSensors` section (format 14; 13 still reads),
   mounted at the puck's `scan` connector. The app's `AssemblyRobot` puts the sensor on the link that
@@ -116,11 +116,20 @@ How it is built, each piece where it belongs:
   footprint. The lidar rays are the viewport's existing sensor drawing. Lines only, a few hundred a
   frame; the costmap edge is rebuilt only when the costs change.
 
-Left over: the dynamic layer is the latest scan only (no memory: an obstacle behind the base or out of
-sight is forgotten, and the base can plan back through it); a lidar return is a point on a face, so a
+Added after the first cut: the room has a floor slab (modelled like the walls, its top the assembly's
+z = 0), so what is dropped lands on it; it stays out of the map because only boxes that rise into the
+robot's height are drawn there, and out of the scan because the plane is above it. The costmap
+remembers: an obstacle the lidar loses sight of stays in the dynamic layer for 20 s of simulation time
+unless a later scan sees through its place (`LidarFreeSpace`, carried on the perception snapshot), so a
+replan does not route back through it. RobotKit sensor samples now carry up to 360 values (C ABI version
+22; the wire and recording formats carry values as arrays and are unchanged), and the puck scans a ray
+a degree.
+
+Left over: `MotionGuard` still judges only the latest scan, so a remembered obstacle just out of sight
+beside the base does not stop it (the costmap routes round it); a lidar return is a point on a face, so a
 sensed box is a disk (0.08 m beyond its visible extent) and a long object seen end-on is underestimated;
-a RobotKit sensor reports at most 64 rays; the overlays have no toggle and no UI of their own; the room
-has no floor in the simulation (the base rolls on its drive), so the test lands its box on a mat.
+the overlays have no toggle and no UI of their own; wheel odometry follows the truth to within a tenth of
+a metre after a minute, which is the ghost's whole use until slip is simulated.
 
 **M5. Mobile manipulator** (done). The robot arm stands on the deck's payload
 seat, turned to work ahead; the room's shelves became two tables with place

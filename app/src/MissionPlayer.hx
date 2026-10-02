@@ -28,6 +28,7 @@ import robotkit.navigation.Navigator;
 import robotkit.navigation.OccupancyCell;
 import robotkit.navigation.OccupancyGrid2;
 import robotkit.perception.FrameAwarePerception;
+import robotkit.perception.LidarFreeSpace;
 import robotkit.perception.LidarMapFilter;
 import robotkit.perception.LidarObstaclePerception;
 import robotkit.perception.Obstacle;
@@ -100,11 +101,13 @@ class MissionPlayer implements SessionMember {
   public static inline var MAP_TOLERANCE:Float = 0.1;
   /** Radius (m) of the disk a lidar return stands for: a scan samples the face of what it sees. */
   public static inline var SCAN_RADIUS:Float = 0.08;
+  /** An obstacle the lidar has lost sight of stays on the map this long (s), unless a scan sees through its place. */
+  public static inline var MEMORY_SECONDS:Float = 20.0;
 
   public final mission:SceneArtifactMission;
   /** The navigation map, when the mission drives. */
   public final costmap:Null<Costmap2>;
-  /** The boxes the map was drawn from. */
+  /** The boxes the map was drawn from: those standing in the robot's way. */
   public final obstacles:Array<FloorObstacle>;
   /** The software guard that slows and stops the base for what the lidar sees, when the robot has a lidar. */
   public final guard:Null<MotionGuard>;
@@ -155,7 +158,7 @@ class MissionPlayer implements SessionMember {
     this.mission = mission;
     this.robot = robot;
     this.timestep = timestep;
-    this.obstacles = obstacles.copy();
+    this.obstacles = standing(obstacles);
     this.simulation = simulation;
     this.objects = objects;
     this.robotIndex = robotIndex;
@@ -179,7 +182,7 @@ class MissionPlayer implements SessionMember {
       if (base == null) throw "A mission that drives needs the project's wheeled assembly";
       var footprint = base.footprint;
       if (footprint == null) throw "A mission that drives needs the robot's footprint";
-      var map = new Costmap2(floorPlan(obstacles, [for (step in drives) floorPose(step)]), footprint.radius, true, 0.3, 1.5);
+      var map = new Costmap2(floorPlan(obstacles, [for (step in drives) floorPose(step)]), footprint.radius, true, 0.3, 1.5, MEMORY_SECONDS);
       costmap = map;
       var navigation = new Navigation(base, localization, 0.35, 0.5, 1.2, false);
       var lidars = [for (sensor in project.robotSensors) if (sensor.kind == "lidar") sensor];
@@ -193,7 +196,7 @@ class MissionPlayer implements SessionMember {
         if (sensor == null) throw 'The robot has no sensor "${lidars[0].id}"';
         scanner = sensor.id;
         scanning = new FrameAwarePerception(LidarObstaclePerception.fromSensor(sensor, SCAN_RADIUS), localization, null,
-          LidarMapFilter.fromSensor(map.grid, sensor, MAP_TOLERANCE));
+          LidarMapFilter.fromSensor(map.grid, sensor, MAP_TOLERANCE), LidarFreeSpace.fromSensor(sensor));
         guard = new MotionGuard(navigation, footprint);
       }
       navigator = new Navigator(navigation, new AStarPlanner(map), map, 0.5, guard);
@@ -224,6 +227,10 @@ class MissionPlayer implements SessionMember {
     }
   }
 
+  /** The boxes that stand in the robot's way: above the floor and below its height; the floor itself and overhead boxes are not. */
+  public static function standing(boxes:Array<FloorObstacle>):Array<FloorObstacle>
+    return [for (box in boxes) if (box.z - box.halfZ < CLEARANCE && box.z + box.halfZ > 0.01) box];
+
   /**
    * An occupancy grid covering the obstacles and `poses` with a margin: a cell is occupied when its
    * square overlaps a box that stands within the robot's height.
@@ -235,8 +242,8 @@ class MissionPlayer implements SessionMember {
       minX = Math.min(minX, x); maxX = Math.max(maxX, x);
       minY = Math.min(minY, y); maxY = Math.max(maxY, y);
     }
-    var standing = [for (box in obstacles) if (box.z - box.halfZ < CLEARANCE && box.z + box.halfZ > 0.01) box];
-    for (box in standing) {
+    var blocking = standing(obstacles);
+    for (box in blocking) {
       var reach = Math.sqrt(box.halfX * box.halfX + box.halfY * box.halfY);
       extend(box.x - reach, box.y - reach);
       extend(box.x + reach, box.y + reach);
@@ -250,7 +257,7 @@ class MissionPlayer implements SessionMember {
     // A cell square overlaps a box when its centre lies within the box grown by half a cell's diagonal
     // projected on each box axis; growing by the full half-diagonal is the safe side of that.
     var grow = RESOLUTION * Math.sqrt(0.5);
-    for (box in standing) {
+    for (box in blocking) {
       var c = Math.cos(box.yaw), s = Math.sin(box.yaw);
       var reach = Math.sqrt(box.halfX * box.halfX + box.halfY * box.halfY) + grow;
       var low = grid.worldToCell(new Pose2(box.x - reach, box.y - reach));

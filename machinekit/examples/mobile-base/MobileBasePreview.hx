@@ -195,6 +195,8 @@ class MobileBaseChecks {
 			if (block.id == "workpiece") continue;
 			var solid = posed(cell, state, block.id);
 			var box = solid.shape.bounds();
+			// The floor slab lies under the robot, not in its way.
+			if (box.get_max().get_z() <= 1e-6) { solid.close(); continue; }
 			var minX = box.get_min().get_x(), maxX = box.get_max().get_x();
 			var minY = box.get_min().get_y(), maxY = box.get_max().get_y();
 			solid.close();

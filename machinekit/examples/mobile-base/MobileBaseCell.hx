@@ -7,7 +7,7 @@ import machinekit.component.Solids;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
-/** A block standing on the floor (z=0), centred on its origin: a wall, shelf, pillar or dock. */
+/** A block standing on the floor (z=0), centred on its origin: a wall, shelf, pillar or dock (or the floor slab itself, lowered). */
 class RoomBlock extends MachineComponent {
 	public final length:Float;
 	public final width:Float;
@@ -45,13 +45,15 @@ enum CellStep {
  * `ORIGIN`. A workpiece starts on the north table; `ROUND` carries it to the east table and back,
  * then rests at the dock. Every goal leaves the chassis half a metre or so from what it faces, and
  * at a table it leaves the place seat in the arm's reach ahead. The room's floor is the assembly's
- * z = 0, centred on its origin, with +X east.
+ * z = 0, centred on its origin, with +X east, and rests on a floor slab whose top it is.
  */
 class MobileBaseCell extends MachineAssembly {
 	public static inline var ROOM_LENGTH:Float = 5000;
 	public static inline var ROOM_WIDTH:Float = 4000;
 	public static inline var WALL:Float = 100;
 	public static inline var WALL_HEIGHT:Float = 400;
+	/** The floor slab under the room; its top is the assembly's z = 0. */
+	public static inline var FLOOR:Float = 50;
 
 	public static final ORIGIN:FloorPose = {x: -1500, y: -1000, yaw: 0};
 	/** Facing the north table, the east table and the dock. */
@@ -77,6 +79,9 @@ class MobileBaseCell extends MachineAssembly {
 		var hx = ROOM_LENGTH / 2, hy = ROOM_WIDTH / 2;
 		var wallX = new RoomBlock(ROOM_LENGTH + 2 * WALL, WALL, WALL_HEIGHT, "painted steel", "Wall");
 		var wallY = new RoomBlock(WALL, ROOM_WIDTH, WALL_HEIGHT, "painted steel", "Wall");
+		// The floor is a slab the walls stand on the edge of, lowered so its top is z = 0: what is dropped in the room lands on it.
+		addComponent("floor", new RoomBlock(ROOM_LENGTH + 2 * WALL, ROOM_WIDTH + 2 * WALL, FLOOR, "painted steel", "Floor"),
+			AssemblyFrames.translation(0, 0, -FLOOR));
 		addComponent("wallNorth", wallX, AssemblyFrames.translation(0, hy + WALL / 2, 0));
 		addComponent("wallSouth", wallX, AssemblyFrames.translation(0, -hy - WALL / 2, 0));
 		addComponent("wallEast", wallY, AssemblyFrames.translation(hx + WALL / 2, 0, 0));
