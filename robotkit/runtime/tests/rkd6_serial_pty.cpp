@@ -45,10 +45,10 @@ int main(int argc, char **argv) {
     blueprint.joints[0].upper_limit = 10;
     blueprint.joints[0].max_velocity = 10;
     blueprint.joints[0].max_acceleration = 10;
-    std::array<std::uint8_t, 16> fingerprint{};
-    for (std::size_t i = 0; i < fingerprint.size(); ++i) fingerprint[i] = i;
+    std::array<std::uint8_t, 16> controller{};
+    for (std::size_t i = 0; i < controller.size(); ++i) controller[i] = i;
     auto endpoint = DeviceSerialEndpoint::open(slave, 921'600, blueprint,
-        fingerprint, 1e-5, 40'000, 500'000'000, 30'000'000);
+        controller, 1e-5, 40'000, 500'000'000, 30'000'000);
     assert(endpoint);
     rk_robot_state state{};
     for (int i = 0; i < 40; ++i) {

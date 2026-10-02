@@ -8,7 +8,7 @@
 
 namespace robotkit::device_wire6 {
 
-inline constexpr std::uint8_t PROTOCOL_VERSION = 11;
+inline constexpr std::uint8_t PROTOCOL_VERSION = 12;
 inline constexpr std::uint8_t MAX_ACTUATORS = 64;
 
 enum class MessageType6 : std::uint8_t {
@@ -35,7 +35,7 @@ struct SessionBegin6 {
     static constexpr std::size_t SIZE = SessionBegin6_SIZE;
     std::uint64_t session{};
     std::uint8_t protocol_version{};
-    std::array<std::uint8_t, 16> model_fingerprint{};
+    std::array<std::uint8_t, 16> expected_controller{};
     std::uint8_t actuator_count{};
     std::uint8_t max_degree{};
     std::uint32_t step_tick_hz{};
@@ -72,8 +72,8 @@ inline bool encode(const SessionBegin6 &value, std::span<std::uint8_t> out) {
     const std::uint8_t bits_protocol_version = static_cast<std::uint8_t>(value.protocol_version);
     out[offset++] = static_cast<std::uint8_t>(bits_protocol_version >> 0);
     for (std::size_t i = 0; i < 16; ++i) {
-        const std::uint8_t bits_model_fingerprint = static_cast<std::uint8_t>(value.model_fingerprint[i]);
-        out[offset++] = static_cast<std::uint8_t>(bits_model_fingerprint >> 0);
+        const std::uint8_t bits_expected_controller = static_cast<std::uint8_t>(value.expected_controller[i]);
+        out[offset++] = static_cast<std::uint8_t>(bits_expected_controller >> 0);
     }
     const std::uint8_t bits_actuator_count = static_cast<std::uint8_t>(value.actuator_count);
     out[offset++] = static_cast<std::uint8_t>(bits_actuator_count >> 0);
@@ -194,9 +194,9 @@ inline bool decode(std::span<const std::uint8_t> input, SessionBegin6 &value) {
     bits_protocol_version |= static_cast<std::uint8_t>(input[offset++]) << 0;
     value.protocol_version = bits_protocol_version;
     for (std::size_t i = 0; i < 16; ++i) {
-        std::uint8_t bits_model_fingerprint = 0;
-        bits_model_fingerprint |= static_cast<std::uint8_t>(input[offset++]) << 0;
-        value.model_fingerprint[i] = bits_model_fingerprint;
+        std::uint8_t bits_expected_controller = 0;
+        bits_expected_controller |= static_cast<std::uint8_t>(input[offset++]) << 0;
+        value.expected_controller[i] = bits_expected_controller;
     }
     std::uint8_t bits_actuator_count = 0;
     bits_actuator_count |= static_cast<std::uint8_t>(input[offset++]) << 0;
@@ -454,12 +454,12 @@ inline bool decode(std::span<const std::uint8_t> input, Event6 &value) {
     return true;
 }
 
-inline constexpr std::size_t SessionAck6_SIZE = 45;
+inline constexpr std::size_t SessionAck6_SIZE = 53;
 struct SessionAck6 {
     static constexpr std::size_t SIZE = SessionAck6_SIZE;
     std::uint64_t session{};
     std::uint8_t protocol_version{};
-    std::array<std::uint8_t, 16> device_fingerprint{};
+    std::array<std::uint8_t, 16> controller{};
     std::uint8_t status{};
     std::uint64_t device_tick_hz{};
     std::uint16_t segment_capacity{};
@@ -468,6 +468,7 @@ struct SessionAck6 {
     std::uint8_t max_degree{};
     std::uint8_t actuator_count{};
     std::uint8_t profile{};
+    std::uint64_t config_digest{};
 };
 
 inline bool encode(const SessionAck6 &value, std::span<std::uint8_t> out) {
@@ -485,8 +486,8 @@ inline bool encode(const SessionAck6 &value, std::span<std::uint8_t> out) {
     const std::uint8_t bits_protocol_version = static_cast<std::uint8_t>(value.protocol_version);
     out[offset++] = static_cast<std::uint8_t>(bits_protocol_version >> 0);
     for (std::size_t i = 0; i < 16; ++i) {
-        const std::uint8_t bits_device_fingerprint = static_cast<std::uint8_t>(value.device_fingerprint[i]);
-        out[offset++] = static_cast<std::uint8_t>(bits_device_fingerprint >> 0);
+        const std::uint8_t bits_controller = static_cast<std::uint8_t>(value.controller[i]);
+        out[offset++] = static_cast<std::uint8_t>(bits_controller >> 0);
     }
     const std::uint8_t bits_status = static_cast<std::uint8_t>(value.status);
     out[offset++] = static_cast<std::uint8_t>(bits_status >> 0);
@@ -516,6 +517,15 @@ inline bool encode(const SessionAck6 &value, std::span<std::uint8_t> out) {
     out[offset++] = static_cast<std::uint8_t>(bits_actuator_count >> 0);
     const std::uint8_t bits_profile = static_cast<std::uint8_t>(value.profile);
     out[offset++] = static_cast<std::uint8_t>(bits_profile >> 0);
+    const std::uint64_t bits_config_digest = static_cast<std::uint64_t>(value.config_digest);
+    out[offset++] = static_cast<std::uint8_t>(bits_config_digest >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_config_digest >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_config_digest >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_config_digest >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_config_digest >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_config_digest >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_config_digest >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_config_digest >> 56);
     return true;
 }
 
@@ -536,9 +546,9 @@ inline bool decode(std::span<const std::uint8_t> input, SessionAck6 &value) {
     bits_protocol_version |= static_cast<std::uint8_t>(input[offset++]) << 0;
     value.protocol_version = bits_protocol_version;
     for (std::size_t i = 0; i < 16; ++i) {
-        std::uint8_t bits_device_fingerprint = 0;
-        bits_device_fingerprint |= static_cast<std::uint8_t>(input[offset++]) << 0;
-        value.device_fingerprint[i] = bits_device_fingerprint;
+        std::uint8_t bits_controller = 0;
+        bits_controller |= static_cast<std::uint8_t>(input[offset++]) << 0;
+        value.controller[i] = bits_controller;
     }
     std::uint8_t bits_status = 0;
     bits_status |= static_cast<std::uint8_t>(input[offset++]) << 0;
@@ -576,6 +586,16 @@ inline bool decode(std::span<const std::uint8_t> input, SessionAck6 &value) {
     std::uint8_t bits_profile = 0;
     bits_profile |= static_cast<std::uint8_t>(input[offset++]) << 0;
     value.profile = bits_profile;
+    std::uint64_t bits_config_digest = 0;
+    bits_config_digest |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_config_digest |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_config_digest |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_config_digest |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_config_digest |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_config_digest |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_config_digest |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_config_digest |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.config_digest = bits_config_digest;
     return true;
 }
 

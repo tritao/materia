@@ -3,7 +3,7 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Error { ShortBuffer, WrongLength }
 
-pub const PROTOCOL_VERSION: u8 = 11;
+pub const PROTOCOL_VERSION: u8 = 12;
 pub const MAX_ACTUATORS: u8 = 64;
 
 #[repr(u8)]
@@ -31,7 +31,7 @@ pub enum MessageType6 {
 pub struct SessionBegin6 {
     pub session: u64,
     pub protocol_version: u8,
-    pub model_fingerprint: [u8; 16],
+    pub expected_controller: [u8; 16],
     pub actuator_count: u8,
     pub max_degree: u8,
     pub step_tick_hz: u32,
@@ -63,7 +63,7 @@ impl SessionBegin6 {
         offset += 8;
         out[offset..offset + 1].copy_from_slice(&self.protocol_version.to_le_bytes());
         offset += 1;
-        for value in self.model_fingerprint {
+        for value in self.expected_controller {
             out[offset..offset + 1].copy_from_slice(&value.to_le_bytes());
             offset += 1;
         }
@@ -145,8 +145,8 @@ impl SessionBegin6 {
         bytes.copy_from_slice(&input[offset..offset + 1]);
         let protocol_version = u8::from_le_bytes(bytes);
         offset += 1;
-        let mut model_fingerprint = [0 as u8; 16];
-        for item in &mut model_fingerprint {
+        let mut expected_controller = [0 as u8; 16];
+        for item in &mut expected_controller {
             let mut bytes = [0u8; 1];
             bytes.copy_from_slice(&input[offset..offset + 1]);
             *item = u8::from_le_bytes(bytes);
@@ -268,7 +268,7 @@ impl SessionBegin6 {
             offset += 1;
         }
         let _ = offset;
-        Ok(Self { session, protocol_version, model_fingerprint, actuator_count, max_degree, step_tick_hz, max_acceleration, actuator_max_acceleration, steps_per_unit, max_rate, direction_setup_ticks, actuator_joint, actuator_ratio, dual_drive_skew_bound, link_loss_timeout_ns, channel_count, channel_id, channel_kind, safe_digital, safe_analog, safe_argument, safe_command })
+        Ok(Self { session, protocol_version, expected_controller, actuator_count, max_degree, step_tick_hz, max_acceleration, actuator_max_acceleration, steps_per_unit, max_rate, direction_setup_ticks, actuator_joint, actuator_ratio, dual_drive_skew_bound, link_loss_timeout_ns, channel_count, channel_id, channel_kind, safe_digital, safe_analog, safe_argument, safe_command })
     }
 }
 
@@ -372,7 +372,7 @@ impl Event6 {
 pub struct SessionAck6 {
     pub session: u64,
     pub protocol_version: u8,
-    pub device_fingerprint: [u8; 16],
+    pub controller: [u8; 16],
     pub status: u8,
     pub device_tick_hz: u64,
     pub segment_capacity: u16,
@@ -381,10 +381,11 @@ pub struct SessionAck6 {
     pub max_degree: u8,
     pub actuator_count: u8,
     pub profile: u8,
+    pub config_digest: u64,
 }
 
 impl SessionAck6 {
-    pub const SIZE: usize = 45;
+    pub const SIZE: usize = 53;
 
     pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {
         if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }
@@ -393,7 +394,7 @@ impl SessionAck6 {
         offset += 8;
         out[offset..offset + 1].copy_from_slice(&self.protocol_version.to_le_bytes());
         offset += 1;
-        for value in self.device_fingerprint {
+        for value in self.controller {
             out[offset..offset + 1].copy_from_slice(&value.to_le_bytes());
             offset += 1;
         }
@@ -413,6 +414,8 @@ impl SessionAck6 {
         offset += 1;
         out[offset..offset + 1].copy_from_slice(&self.profile.to_le_bytes());
         offset += 1;
+        out[offset..offset + 8].copy_from_slice(&self.config_digest.to_le_bytes());
+        offset += 8;
         Ok(offset)
     }
 
@@ -427,8 +430,8 @@ impl SessionAck6 {
         bytes.copy_from_slice(&input[offset..offset + 1]);
         let protocol_version = u8::from_le_bytes(bytes);
         offset += 1;
-        let mut device_fingerprint = [0 as u8; 16];
-        for item in &mut device_fingerprint {
+        let mut controller = [0 as u8; 16];
+        for item in &mut controller {
             let mut bytes = [0u8; 1];
             bytes.copy_from_slice(&input[offset..offset + 1]);
             *item = u8::from_le_bytes(bytes);
@@ -466,8 +469,12 @@ impl SessionAck6 {
         bytes.copy_from_slice(&input[offset..offset + 1]);
         let profile = u8::from_le_bytes(bytes);
         offset += 1;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let config_digest = u64::from_le_bytes(bytes);
+        offset += 8;
         let _ = offset;
-        Ok(Self { session, protocol_version, device_fingerprint, status, device_tick_hz, segment_capacity, event_capacity, step_tick_hz, max_degree, actuator_count, profile })
+        Ok(Self { session, protocol_version, controller, status, device_tick_hz, segment_capacity, event_capacity, step_tick_hz, max_degree, actuator_count, profile, config_digest })
     }
 }
 

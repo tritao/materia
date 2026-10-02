@@ -11,7 +11,7 @@ class RK_API DeviceSerialEndpoint {
 public:
     static std::shared_ptr<Rkd6Endpoint> open(const char *path, unsigned baud,
         const rk_robot_runtime_blueprint &blueprint,
-        std::array<std::uint8_t, 16> fingerprint, double target_error,
+        std::array<std::uint8_t, 16> controller, double target_error,
         std::uint32_t step_tick_hz = 40'000,
         std::uint64_t link_loss_timeout_ns = 500'000'000,
         std::uint64_t clock_bound_ns = 30'000'000,

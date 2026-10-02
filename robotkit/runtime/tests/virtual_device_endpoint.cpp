@@ -115,7 +115,7 @@ void dual_drive_layout() {
     blueprint.joints[0].max_velocity = 0.02;
     blueprint.joints[0].max_acceleration = 1;
     VirtualDeviceConfig6 config;
-    config.fingerprint.fill(7);
+    config.controller.fill(7);
     config.clock_bound_ns = 5'000'000;
     config.actuators = {{0, 1.0, 0.0, 400'000.0, 0.02, 2, 4e-6},
                         {0, 2.0, 0.0, 400'000.0, 0.04, 2, 4e-6}};
@@ -126,7 +126,7 @@ void dual_drive_layout() {
     auto changed = config;
     changed.actuators[1].ratio = 3.0;
     auto other = VirtualDeviceEndpoint::create(blueprint, changed);
-    assert(other && endpoint->fingerprint() != other->fingerprint());
+    assert(other && endpoint->controller() == other->controller());
     rk_robot_state state{};
     endpoint->sample(0, state);
     for (std::uint64_t now = 2'000'000; now <= 20'000'000; now += 2'000'000)
@@ -196,7 +196,7 @@ void lead_screw_carriage_coupling() {
     blueprint.coupling_count = 1;
     blueprint.couplings[0] = {0, 1, 0.008, 0.001};
     VirtualDeviceConfig6 config;
-    config.fingerprint.fill(9);
+    config.controller.fill(9);
     config.clock_bound_ns = 5'000'000;
     config.actuators = {{0, 1.0, 0.0, 3'200.0, 1.0},
                         {1, 1.0, 0.001, 400'000.0, 0.01}};
@@ -264,7 +264,7 @@ void minimal_midstream_replacement() {
     blueprint.joints[0].max_acceleration = 10;
     VirtualDeviceConfig6 config;
     config.profile = 2;
-    config.fingerprint.fill(4);
+    config.controller.fill(4);
     config.clock_bound_ns = 5'000'000;
     config.steps_per_unit = {1'000};
     auto endpoint = VirtualDeviceEndpoint::create(blueprint, config);
@@ -320,7 +320,7 @@ void host_stall_keeps_device_moving() {
     blueprint.joints[0].max_velocity = 10;
     blueprint.joints[0].max_acceleration = 10;
     VirtualDeviceConfig6 config;
-    config.fingerprint.fill(5);
+    config.controller.fill(5);
     config.steps_per_unit = {1'000};
     config.clock_bound_ns = 5'000'000;
     auto endpoint = VirtualDeviceEndpoint::create(blueprint, config);
@@ -372,7 +372,7 @@ void midsegment_replacement_keeps_events() {
     blueprint.channels[0].kind = RK_EVENT_DIGITAL;
     blueprint.channels[0].safe_value.kind = RK_EVENT_DIGITAL;
     VirtualDeviceConfig6 config;
-    config.fingerprint.fill(8);
+    config.controller.fill(8);
     config.steps_per_unit = {1'000};
     config.clock_bound_ns = 5'000'000;
     config.drift_ppm = 2'000;
@@ -450,7 +450,7 @@ std::vector<VirtualEventRecord6> run_event_pair(bool hold, bool stop) {
     blueprint.channels[0].kind = RK_EVENT_DIGITAL;
     blueprint.channels[0].safe_value.kind = RK_EVENT_DIGITAL;
     VirtualDeviceConfig6 config;
-    config.fingerprint.fill(8);
+    config.controller.fill(8);
     config.steps_per_unit = {1'000};
     config.clock_bound_ns = 5'000'000;
     auto endpoint = VirtualDeviceEndpoint::create(blueprint, config);
@@ -540,7 +540,7 @@ void runtime_hold_rest_resume_fires_final_event() {
     blueprint.channels[0].safe_value.kind = RK_EVENT_DIGITAL;
 
     VirtualDeviceConfig6 config;
-    config.fingerprint.fill(11);
+    config.controller.fill(11);
     config.steps_per_unit = {1'000};
     config.clock_bound_ns = 5'000'000;
     auto endpoint = VirtualDeviceEndpoint::create(blueprint, config);
@@ -642,7 +642,7 @@ int main() {
     host_stall_keeps_device_moving();
     assert(held_events[1].device_ticks > ordinary_events[1].device_ticks);
     VirtualDeviceConfig6 config;
-    config.fingerprint.fill(7);
+    config.controller.fill(7);
     config.steps_per_unit = {1'000};
     config.clock_bound_ns = 5'000'000;
     const auto baseline = run(config);
@@ -676,7 +676,7 @@ int main() {
     assert(std::abs(replaced_disturbed.position - 1.0) <= 0.00101);
     assert(replaced_disturbed.state.safety == RK_SAFETY_READY);
     assert(disturbed.steps == run(config).steps);
-    const auto interrupted = run(VirtualDeviceConfig6{.fingerprint = config.fingerprint,
+    const auto interrupted = run(VirtualDeviceConfig6{.controller = config.controller,
         .steps_per_unit = config.steps_per_unit, .clock_bound_ns = config.clock_bound_ns}, true);
     assert(interrupted.position < 0.5);
     assert(interrupted.state.safety == RK_SAFETY_FAULT);

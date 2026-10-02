@@ -5,8 +5,33 @@
 #include <cstring>
 #include <cstdio>
 #include <limits>
+#include <string>
 
 namespace robotkit {
+
+namespace {
+
+bool is_zero(const std::array<std::uint8_t, 16> &id) {
+    return std::all_of(id.begin(), id.end(), [](std::uint8_t byte) { return byte == 0; });
+}
+
+std::string controller_hex(const std::array<std::uint8_t, 16> &id) {
+    char text[33];
+    for (std::size_t i = 0; i < id.size(); ++i) std::snprintf(text + 2 * i, 3, "%02x", id[i]);
+    return text;
+}
+
+/** 64-bit FNV-1a of a SESSION_BEGIN6 payload after its `session` field. */
+std::uint64_t device_wire6_config_digest(std::span<const std::uint8_t> payload) {
+    std::uint64_t hash = 14695981039346656037ULL;
+    for (std::size_t i = 8; i < payload.size(); ++i) {
+        hash ^= payload[i];
+        hash *= 1099511628211ULL;
+    }
+    return hash;
+}
+
+} // namespace
 
 std::uint64_t Rkd6Endpoint::minimum_baud(std::uint8_t actuator_count,
     std::uint64_t minimum_segment_ns, std::uint64_t processing_allowance_ns) {
@@ -40,7 +65,7 @@ Rkd6Endpoint::Rkd6Endpoint(std::unique_ptr<Rkd6Transport> transport,
       link_latency_ns_(link_latency_ns) {}
 
 std::shared_ptr<Rkd6Endpoint> Rkd6Endpoint::attach(std::unique_ptr<Rkd6Transport> transport,
-    const rk_robot_runtime_blueprint &blueprint, std::array<std::uint8_t, 16> fingerprint,
+    const rk_robot_runtime_blueprint &blueprint, std::array<std::uint8_t, 16> expected_controller,
     std::uint64_t session, double target_error, std::uint64_t clock_bound_ns,
     std::uint64_t link_latency_ns, std::uint32_t step_tick_hz,
     std::uint64_t link_loss_timeout_ns, std::span<const DeviceActuator6> layout,
@@ -52,16 +77,15 @@ std::shared_ptr<Rkd6Endpoint> Rkd6Endpoint::attach(std::unique_ptr<Rkd6Transport
         actuator_count == 0 || actuator_count > device_wire6::MAX_ACTUATORS ||
         !std::isfinite(target_error) || target_error < 0 || clock_bound_ns == 0 ||
         step_tick_hz == 0 || link_loss_timeout_ns == 0 ||
-        blueprint.channel_count > RK_MAX_PROCESS_CHANNELS) {
+        blueprint.channel_count > RK_MAX_PROCESS_CHANNELS ||
+        is_zero(expected_controller)) {
         if (error) *error = RK_ERROR_INVALID_ARGUMENT;
         return {};
     }
-    fingerprint = fingerprint_device_layout6(fingerprint, layout,
-        std::span(blueprint.channels, blueprint.channel_count));
     device_wire6::SessionBegin6 begin{};
     begin.session = session;
     begin.protocol_version = device_wire6::PROTOCOL_VERSION;
-    begin.model_fingerprint = fingerprint;
+    begin.expected_controller = expected_controller;
     begin.actuator_count = static_cast<std::uint8_t>(actuator_count);
     begin.max_degree = 5;
     begin.step_tick_hz = step_tick_hz;
@@ -106,6 +130,7 @@ std::shared_ptr<Rkd6Endpoint> Rkd6Endpoint::attach(std::unique_ptr<Rkd6Transport
     if (!device_wire6::encode(begin, payload)) return {};
     std::vector<std::uint8_t> frame;
     if (!device_frame6::encode(1, payload, frame) || !transport->send(frame)) return {};
+    const auto digest = device_wire6_config_digest(payload);
     std::vector<std::uint8_t> reply;
     device_wire6::SessionAck6 ack{};
     bool acknowledged = false;
@@ -117,16 +142,52 @@ std::shared_ptr<Rkd6Endpoint> Rkd6Endpoint::attach(std::unique_ptr<Rkd6Transport
             break;
         }
     }
-    if (acknowledged && ack.device_fingerprint != fingerprint) {
+    if (!acknowledged || ack.session != session) {
+        std::fprintf(stderr, "Rkd6Endpoint: the device did not acknowledge the session\n");
+        if (error) *error = RK_ERROR_BACKEND;
+        return {};
+    }
+    if (ack.protocol_version != device_wire6::PROTOCOL_VERSION) {
+        std::fprintf(stderr, "Rkd6Endpoint: device speaks protocol %u, the host speaks %u\n",
+            ack.protocol_version, device_wire6::PROTOCOL_VERSION);
+        if (error) *error = RK_ERROR_UNSUPPORTED;
+        return {};
+    }
+    // The board says who it is even when it refuses, so a wrong board is named, not just refused.
+    if (ack.controller != expected_controller) {
+        std::fprintf(stderr, "Rkd6Endpoint: the deployment is for controller %s but the device is "
+            "controller %s (robotd identify prints a board's id)\n",
+            controller_hex(expected_controller).c_str(), controller_hex(ack.controller).c_str());
         if (error) *error = RK_ERROR_MODEL_MISMATCH;
         return {};
     }
-    if (!acknowledged || ack.session != session || ack.protocol_version != device_wire6::PROTOCOL_VERSION ||
-        ack.status != 1 ||
+    if (ack.actuator_count < actuator_count) {
+        std::fprintf(stderr, "Rkd6Endpoint: the layout wires %zu channels but the board has %u\n",
+            static_cast<std::size_t>(actuator_count), ack.actuator_count);
+        if (error) *error = RK_ERROR_MODEL_MISMATCH;
+        return {};
+    }
+    if (ack.step_tick_hz != step_tick_hz) {
+        std::fprintf(stderr, "Rkd6Endpoint: the deployment plans for a %u Hz step tick but the "
+            "board generates %u Hz\n", step_tick_hz, ack.step_tick_hz);
+        if (error) *error = RK_ERROR_MODEL_MISMATCH;
+        return {};
+    }
+    if (ack.config_digest != digest) {
+        std::fprintf(stderr, "Rkd6Endpoint: the device configured itself from a different session "
+            "than the host sent (digest %016llx, expected %016llx)\n",
+            static_cast<unsigned long long>(ack.config_digest),
+            static_cast<unsigned long long>(digest));
+        if (error) *error = RK_ERROR_MODEL_MISMATCH;
+        return {};
+    }
+    if (ack.status != 1 ||
         ack.actuator_count != actuator_count || ack.device_tick_hz == 0 ||
         ack.step_tick_hz == 0 || ack.segment_capacity == 0 || ack.max_degree > 5 ||
         (ack.profile != 1 && ack.profile != 2) ||
         (ack.profile == 2 && ack.max_degree != 1)) {
+        std::fprintf(stderr, "Rkd6Endpoint: the device refused the session configuration "
+            "(status %u, %u channels)\n", ack.status, ack.actuator_count);
         if (error) *error = RK_ERROR_UNSUPPORTED;
         return {};
     }
@@ -158,6 +219,42 @@ std::shared_ptr<Rkd6Endpoint> Rkd6Endpoint::attach(std::unique_ptr<Rkd6Transport
     endpoint->owner_period_ns_ = period_ns;
     if (error) *error = RK_OK;
     return endpoint;
+}
+
+rk_result Rkd6Endpoint::identify(std::unique_ptr<Rkd6Transport> transport,
+    std::uint64_t session, std::array<std::uint8_t, 16> &controller) {
+    if (!transport || session == 0) return RK_ERROR_INVALID_ARGUMENT;
+    // A session for the all-zero controller is one no board accepts; its refusal carries the
+    // board's own id, which is all this asks for.
+    device_wire6::SessionBegin6 begin{};
+    begin.session = session;
+    begin.protocol_version = device_wire6::PROTOCOL_VERSION;
+    begin.actuator_count = 1;
+    begin.max_degree = 5;
+    begin.step_tick_hz = 1;
+    begin.max_acceleration = 1.0f;
+    begin.actuator_max_acceleration[0] = 1.0f;
+    begin.steps_per_unit[0] = 1.0f;
+    begin.actuator_ratio[0] = 1.0f;
+    begin.link_loss_timeout_ns = 1;
+    std::vector<std::uint8_t> payload(begin.SIZE), frame, reply;
+    if (!device_wire6::encode(begin, payload) || !device_frame6::encode(1, payload, frame) ||
+        !transport->send(frame)) return RK_ERROR_BACKEND;
+    while (transport->receive(reply)) {
+        device_frame6::Frame decoded{};
+        if (!device_frame6::decode(reply, decoded)) return RK_ERROR_BACKEND;
+        device_wire6::SessionAck6 ack{};
+        if (decoded.kind != 2 || !device_wire6::decode(decoded.payload, ack) || ack.session != session)
+            continue;
+        if (ack.protocol_version != device_wire6::PROTOCOL_VERSION) {
+            std::fprintf(stderr, "Rkd6Endpoint: device speaks protocol %u, the host speaks %u\n",
+                ack.protocol_version, device_wire6::PROTOCOL_VERSION);
+            return RK_ERROR_UNSUPPORTED;
+        }
+        controller = ack.controller;
+        return RK_OK;
+    }
+    return RK_ERROR_BACKEND;
 }
 
 bool Rkd6Endpoint::send_record(std::uint8_t kind, std::span<const std::uint8_t> payload) {

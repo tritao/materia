@@ -23,10 +23,6 @@ struct DeviceActuator6 {
     std::string id;
 };
 
-std::array<std::uint8_t, 16> fingerprint_device_layout6(
-    std::array<std::uint8_t, 16> base, std::span<const DeviceActuator6> layout,
-    std::span<const rk_channel_declaration> channels = {});
-
 struct DeviceSegment6 {
     device_wire6::Segment6Header header{};
     std::vector<device_wire6::Segment6Coefficients> coefficients;

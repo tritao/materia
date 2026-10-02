@@ -16,7 +16,7 @@ fn write_all(port: &mut File, mut bytes: &[u8]) {
     }
 }
 
-pub fn run(joints: usize, fingerprint: [u8; 16]) {
+pub fn run(joints: usize, controller: [u8; 16]) {
     let mut args = std::env::args().skip(1);
     let port_fd: i32 = args.next().expect("PTY descriptor").parse().unwrap();
     let control_fd: i32 = args.next().expect("completion descriptor").parse().unwrap();
@@ -24,7 +24,7 @@ pub fn run(joints: usize, fingerprint: [u8; 16]) {
     let mut control = unsafe { File::from_raw_fd(control_fd) };
     let scale = [1_000.0; 64];
     let mut device = VirtualDevice::new(1_000_000, 40_000, 50_000, 0,
-        joints, scale, fingerprint, 2).expect("minimal RKD6 device");
+        joints, scale, controller, 2).expect("minimal RKD6 device");
     let start = Instant::now();
     let mut last_advance = Instant::now();
     let mut input = Vec::new();

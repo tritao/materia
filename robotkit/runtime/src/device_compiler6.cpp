@@ -30,46 +30,6 @@ CompiledDevicePlan6 failure(const char *message) {
 
 } // namespace
 
-std::array<std::uint8_t, 16> fingerprint_device_layout6(
-    std::array<std::uint8_t, 16> base, std::span<const DeviceActuator6> layout,
-    std::span<const rk_channel_declaration> channels) {
-    if (layout.empty() && channels.empty()) return base;
-    std::uint64_t hash = 14695981039346656037ULL;
-    auto mix = [&](std::uint64_t value) {
-        for (int byte = 0; byte < 8; ++byte) {
-            hash ^= static_cast<std::uint8_t>(value >> (8 * byte));
-            hash *= 1099511628211ULL;
-        }
-    };
-    for (auto byte : base) mix(byte);
-    mix(layout.size());
-    for (const auto &a : layout) {
-        for (unsigned char c : a.id) mix(c);
-        mix(0);
-        mix(a.joint); mix(std::bit_cast<std::uint64_t>(a.ratio));
-        mix(std::bit_cast<std::uint64_t>(a.offset));
-        mix(std::bit_cast<std::uint64_t>(a.steps_per_unit));
-        mix(std::bit_cast<std::uint64_t>(a.max_rate));
-        mix(a.direction_setup_ticks);
-        mix(std::bit_cast<std::uint64_t>(a.dual_drive_skew_bound));
-    }
-    mix(channels.size());
-    for (const auto &channel : channels) {
-        for (unsigned char c : channel.id) mix(c);
-        mix(channel.kind);
-        mix(channel.safe_value.kind);
-        mix(channel.safe_value.digital);
-        mix(std::bit_cast<std::uint64_t>(channel.safe_value.analog));
-        mix(std::bit_cast<std::uint64_t>(channel.safe_value.argument));
-        for (unsigned char c : channel.safe_value.command) mix(c);
-    }
-    for (int i = 0; i < 16; ++i) {
-        hash ^= hash >> 32; hash *= 1099511628211ULL;
-        base[i] = static_cast<std::uint8_t>(hash >> ((i % 8) * 8));
-    }
-    return base;
-}
-
 CompiledDevicePlan6 compile_device_segments6(
     std::span<const robotkit::TrajectorySegment> segments, std::uint64_t plan_id,
     bool ends_at_rest, std::uint64_t host_plan_start_ns,
