@@ -248,6 +248,18 @@ import machinekit.component.PortInterface;
 	@:id(5) var leaderZero:Float;
 }
 
+/**
+ * A stepper motor member driving a joint on a `volts` supply, its actuator given `margin` of the
+ * motor's holding torque (see `MachineAssembly.addMotor`).
+ */
+@:wire typedef MotorRecord = {
+	@:id(1) var actuator:String;
+	@:id(2) var joint:String;
+	@:id(3) var motor:String;
+	@:id(4) var volts:Float;
+	@:id(5) var margin:Float;
+}
+
 @:wire typedef AssemblySideRecord = {
 	@:id(1) var members:ReadOnlyArray<MemberRecord>;
 	@:id(2) var portConnections:ReadOnlyArray<PortConnectionRecord>;
@@ -261,6 +273,7 @@ import machinekit.component.PortInterface;
 	@:id(10) var ports:ReadOnlyArray<PortRecord>;
 	@:id(11) var included:ReadOnlyArray<IncludedRecord>;
 	@:id(12) @:optional var drives:ReadOnlyArray<DriveRecord>;
+	@:id(13) @:optional var motors:ReadOnlyArray<MotorRecord>;
 }
 
 /** Mechanical definition plus the MachineKit facts keyed by occurrence ID. */

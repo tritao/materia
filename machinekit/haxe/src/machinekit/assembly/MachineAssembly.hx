@@ -77,6 +77,8 @@ class MachineAssembly {
 	final nestedEntries:Array<MutableIncludedRecord> = [];
 	/** Couplings whose ratio their parts set, by coupling id. */
 	final drives:Array<machinekit.assembly.MachineAssemblyDescription.DriveRecord> = [];
+	/** Motors driving joints, by actuator id. */
+	final motors:Array<machinekit.assembly.MachineAssemblyDescription.MotorRecord> = [];
 	final massByDefinition:Map<String, machinekit.component.MassProperties> = [];
 
 	public function new() {}
@@ -164,6 +166,11 @@ class MachineAssembly {
 				var saved = [for (drive in drives) copyDrive(drive, "")];
 				saved.sort((a, b) -> Reflect.compare(a.coupling, b.coupling));
 				// Left out when empty, so descriptions without drives keep their saved form.
+				saved.length == 0 ? null : saved;
+			},
+			motors: {
+				var saved = [for (motor in motors) copyMotor(motor, "")];
+				saved.sort((a, b) -> Reflect.compare(a.actuator, b.actuator));
 				saved.length == 0 ? null : saved;
 			},
 			bomExtras: [for (entry in bomItems) {item: copyBomItem(entry.item), quantity: entry.quantity,
@@ -273,6 +280,9 @@ class MachineAssembly {
 		// The coupling decides whether there is one: a drive whose coupling was removed goes too.
 		if (description.machine.drives != null) for (drive in description.machine.drives)
 			if (result.applyDrive(drive)) result.drives.push(copyDrive(drive, ""));
+		// Motors too: their actuators follow the motor parts as they are now.
+		if (description.machine.motors != null) for (motor in description.machine.motors)
+			result.addMotorRecord(copyMotor(motor, ""));
 		for (connection in description.machine.portConnections)
 			result.connectPorts(connection.id, connection.fromInstance, connection.fromPort,
 				connection.toInstance, connection.toPort);
@@ -320,7 +330,10 @@ class MachineAssembly {
 		if (mechanical.couplings != null) for (coupling in mechanical.couplings)
 			if (StringTools.startsWith(coupling.id, prefix))
 				child.addCoupling(coupling.id.substr(prefix.length), coupling.source.substr(prefix.length),
-					coupling.target.substr(prefix.length), coupling.ratio, coupling.offset);
+					coupling.target.substr(prefix.length), coupling.ratio, coupling.offset, coupling.efficiency);
+		for (motor in motors) if (StringTools.startsWith(motor.actuator, prefix))
+			child.addMotorRecord({actuator: motor.actuator.substr(prefix.length), joint: motor.joint.substr(prefix.length),
+				motor: motor.motor.substr(prefix.length), volts: motor.volts, margin: motor.margin});
 		for (drive in drives) if (StringTools.startsWith(drive.coupling, prefix))
 			child.drives.push({coupling: drive.coupling.substr(prefix.length), kind: drive.kind,
 				members: [for (member in drive.members) member.substr(prefix.length)],
@@ -348,6 +361,9 @@ class MachineAssembly {
 		target.mechanical.joints = copy.joints;
 		target.mechanical.couplings = copy.couplings;
 		for (drive in drives) target.drives.push(copyDrive(drive, ""));
+		for (motor in motors) target.motors.push(copyMotor(motor, ""));
+		if (mechanical.actuators != null) target.mechanical.actuators = [for (actuator in mechanical.actuators)
+			copyActuator(actuator, "")];
 		for (entry in included) target.included.push({id: entry.id,
 			assembly: entry.assembly.snapshot(), pose: entry.pose == null ? null : copyFrame(entry.pose)});
 		for (entry in nestedEntries) target.nestedEntries.push({id: entry.id,
@@ -578,8 +594,9 @@ class MachineAssembly {
 			joint.closureTolerance);
 		if (assembly.mechanical.couplings != null) for (coupling in assembly.mechanical.couplings)
 			addCoupling(join(id, coupling.id), join(id, coupling.source), join(id, coupling.target),
-				coupling.ratio, coupling.offset);
+				coupling.ratio, coupling.offset, coupling.efficiency);
 		for (drive in assembly.drives) drives.push(copyDrive(drive, id));
+		for (motor in assembly.motors) addMotorRecord(copyMotor(motor, id));
 		for (connection in assembly.portConnections)
 			connectPorts(join(id, connection.id), join(id, connection.fromInstance),
 				connection.fromPort, join(id, connection.toInstance), connection.toPort);
@@ -642,7 +659,7 @@ class MachineAssembly {
 				alignment: alignment, leaderZero: leaderZero};
 		};
 		var ratio = driveRatio(record);
-		addCoupling(id, leader, follower, ratio, -ratio * leaderZero);
+		addCoupling(id, leader, follower, ratio, -ratio * leaderZero, driveEfficiency(record));
 		drives.push(record);
 		return ratio;
 	}
@@ -695,9 +712,60 @@ class MachineAssembly {
 			var ratio = driveRatio(drive);
 			coupling.ratio = ratio;
 			coupling.offset = -ratio * drive.leaderZero;
+			coupling.efficiency = driveEfficiency(drive);
 			return true;
 		}
 		return false;
+	}
+
+	/**
+	 * Share of power a drive passes on: a lead screw's from its thread and a typical nut friction,
+	 * and typical values for a gear mesh (0.98), a rack and pinion (0.95) and a timing belt (0.97).
+	 */
+	function driveEfficiency(drive:machinekit.assembly.MachineAssemblyDescription.DriveRecord):Float {
+		return switch drive.kind {
+			case "lead-screw": (cast(requireMember(drive.members[0]), machinekit.motion.LeadScrew)).thread.efficiency();
+			case "gear-mesh": 0.98;
+			case "rack-and-pinion": 0.95;
+			case "belt": 0.97;
+			case kind: throw 'Drive "${drive.coupling}" has unknown kind "$kind"';
+		};
+	}
+
+	/**
+	 * Stepper motor member `motor` drives joint `joint` on a `volts` supply. Its actuator, `id`,
+	 * gets `margin` of the motor's holding torque, its speed up to where pull-out torque falls to
+	 * that, and its rotor inertia. Rebuilding the assembly works them out again from the motor.
+	 */
+	public function addMotor(id:String, joint:String, motor:String, volts:Float, margin:Float = 0.5):Void
+		addMotorRecord({actuator: id, joint: joint, motor: motor, volts: volts, margin: margin});
+
+	function addMotorRecord(record:machinekit.assembly.MachineAssemblyDescription.MotorRecord):Void {
+		var member = requireMember(record.motor);
+		if (!Std.isOfType(member, machinekit.motion.NemaStepper)) throw 'Motor "${record.actuator}": "${record.motor}" is not a stepper motor';
+		var stepper:machinekit.motion.NemaStepper = cast member;
+		var rating = stepper.rating();
+		if (rating == null) throw 'Motor "${record.actuator}": ${stepper.variant.designation} has no torque rating';
+		if (mechanical.actuators == null) mechanical.actuators = [];
+		for (actuator in mechanical.actuators) if (actuator.id == record.actuator)
+			throw 'Duplicate assembly actuator "${record.actuator}"';
+		mechanical.actuators.push({id: record.actuator, joint: record.joint,
+			maxEffort: stepper.usableTorque(record.margin), maxRate: stepper.usableSpeed(record.volts, record.margin),
+			rotorInertia: rating.rotorInertia});
+		motors.push(copyMotor(record, ""));
+	}
+
+	static function copyMotor(motor:machinekit.assembly.MachineAssemblyDescription.MotorRecord,
+			prefix:String):machinekit.assembly.MachineAssemblyDescription.MotorRecord
+		return {actuator: join(prefix, motor.actuator), joint: join(prefix, motor.joint),
+			motor: join(prefix, motor.motor), volts: motor.volts, margin: motor.margin};
+
+	static function copyActuator(actuator:materia.assembly.AssemblyDefinition.AssemblyActuator,
+			prefix:String):materia.assembly.AssemblyDefinition.AssemblyActuator {
+		var copy:materia.assembly.AssemblyDefinition.AssemblyActuator = {id: join(prefix, actuator.id),
+			joint: join(prefix, actuator.joint), maxEffort: actuator.maxEffort, maxRate: actuator.maxRate};
+		if (actuator.rotorInertia != null) copy.rotorInertia = actuator.rotorInertia;
+		return copy;
 	}
 
 	static function copyDrive(drive:machinekit.assembly.MachineAssemblyDescription.DriveRecord,
@@ -706,11 +774,15 @@ class MachineAssembly {
 			members: [for (member in drive.members) join(prefix, member)], alignment: drive.alignment,
 			leaderZero: drive.leaderZero};
 
-	public function addCoupling(id:String, source:String, target:String, ratio:Float, offset:Float = 0):Void {
+	public function addCoupling(id:String, source:String, target:String, ratio:Float, offset:Float = 0,
+			?efficiency:Float):Void {
 		requireOperationId(id);
 		if (source == null || source.length == 0 || target == null || target.length == 0)
 			throw 'Assembly coupling "$id" needs source and target';
-		mechanical.couplings.push({id: id, source: source, target: target, ratio: ratio, offset: offset});
+		var coupling:materia.assembly.AssemblyDefinition.AssemblyJointCoupling = {id: id, source: source,
+			target: target, ratio: ratio, offset: offset};
+		if (efficiency != null) coupling.efficiency = efficiency;
+		mechanical.couplings.push(coupling);
 	}
 
 	public function connectPorts(id:String, fromInstance:String, fromPort:String,
@@ -903,7 +975,10 @@ class MachineAssembly {
 		}
 		if (mechanical.couplings != null) for (coupling in mechanical.couplings)
 			model.couple(join(prefix, coupling.id), join(prefix, coupling.source),
-				join(prefix, coupling.target), coupling.ratio, coupling.offset);
+				join(prefix, coupling.target), coupling.ratio, coupling.offset, coupling.efficiency);
+		if (mechanical.actuators != null) for (actuator in mechanical.actuators)
+			model.actuate(join(prefix, actuator.id), join(prefix, actuator.joint), actuator.maxEffort,
+				actuator.maxRate, actuator.rotorInertia);
 	}
 
 	public function components():Array<MachineAssemblyComponent>

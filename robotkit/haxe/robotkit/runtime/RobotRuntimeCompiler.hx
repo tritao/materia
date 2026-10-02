@@ -83,13 +83,16 @@ class RobotRuntimeCompiler {
             actuatorEffort += actuator.maxEffort * magnitude;
         case _:
       }
-      maxRate = tighterLimit(maxRate, actuatorRate);
+      // The joints coupled to this one and their motors limit it too, such as an axis by the
+      // motors turning its lead screws (see RobotModel.coupledLimits).
+      var coupled = robot.coupledLimits(joint.id);
+      maxRate = tighterLimit(tighterLimit(maxRate, actuatorRate), coupled.velocity);
       maxEffort = tighterLimit(maxEffort, actuatorEffort);
       var compiled = new RobotRuntimeJointBlueprint(index, nativeType, parent, child,
         joint.limits.lower, joint.limits.upper, maxEffort, maxRate,
         joint.parentFramePosition, joint.parentFrameRotation,
         joint.childFramePosition, joint.childFrameRotation, joint.axis,
-        joint.limits.maxAcceleration);
+        coupled.maxAcceleration);
       compiled.overtravel = joint.limits.overtravel;
       compiled.armature = joint.armature;
       compiled.damping = joint.damping;

@@ -128,6 +128,20 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(3) var target:String;
 	@:id(4) var ratio:Float;
 	@:id(5) var offset:Float;
+	/** Power delivered over power put in, between the joints, such as a lead screw's 0.4; 1 when absent. */
+	@:id(6) @:optional var efficiency:Null<Float>;
+}
+
+/**
+ * A motor driving a joint directly: its usable torque (N m) or force (N), its usable speed in the
+ * joint's units per second, and the inertia of its rotor (kg m²), which turns with the joint.
+ */
+@:wire typedef AssemblyActuator = {
+	@:id(1) var id:String;
+	@:id(2) var joint:String;
+	@:id(3) var maxEffort:Float;
+	@:id(4) var maxRate:Float;
+	@:id(5) @:optional var rotorInertia:Null<Float>;
 }
 
 /** A connector exported from a member of an assembly definition. */
@@ -146,6 +160,7 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(5) @:optional var couplings:Array<AssemblyJointCoupling>;
 	@:id(6) @:optional var exposedConnectors:Array<AssemblyExposedConnector>;
 	@:id(7) @:optional var mates:Array<AssemblyMate>;
+	@:id(8) @:optional var actuators:Array<AssemblyActuator>;
 }
 
 /**
@@ -165,6 +180,7 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(8) @:optional var assemblies:Array<AssemblySubdefinition>;
 	@:id(9) @:optional var exposedConnectors:Array<AssemblyExposedConnector>;
 	@:id(10) @:optional var mates:Array<AssemblyMate>;
+	@:id(11) @:optional var actuators:Array<AssemblyActuator>;
 }
 
 @:wire typedef AssemblyJointCoordinate = {

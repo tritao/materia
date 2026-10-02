@@ -25,6 +25,7 @@ import machinekit.assembly.FlangeBearingAssembly;
 import machinekit.standard.DeepGrooveBearing;
 import machinekit.assembly.LinearAxis;
 import machinekit.assembly.Drive;
+import machinekit.motion.NemaStepper;
 import machinekit.assembly.MachineAssemblyDescription;
 import machinekit.assembly.MachineAssemblyDescription.MemberSource;
 import machinekit.assembly.MachineAssemblyDescription.SavedValue;
@@ -153,6 +154,7 @@ class MachineAssemblyDescriptionTests {
 		suctionInterfaceRoundTrip();
 		documentRoundTrip();
 		drivesFollowTheirParts();
+		motorsDriveJoints();
 		changerDocumentRoundTrip();
 		fullEoatDocumentRoundTrip();
 		documentEditsAndUndo();
@@ -307,6 +309,73 @@ class MachineAssemblyDescriptionTests {
 		var reopened = MachineAssemblyDocuments.rebuildAssembly(document.element(root.id));
 		near(ratio(reopened, "lead").ratio, -Math.PI / 2, "a document edit to the screw's pitch changes its drive");
 		document.close();
+	}
+
+	/** A stepper's actuator comes from its ratings and supply, and follows the motor part. */
+	static function motorsDriveJoints():Void {
+		function near(actual:Float, expected:Float, what:String, tolerance:Float = 1e-12):Void
+			if (!(Math.abs(actual - expected) < tolerance)) throw '$what: $actual, expected $expected';
+		var motor = NemaStepper.frame(23);
+		// 1.26 N m holding; on 24 V its 2.5 mH winding passes rated 2.8 A up to 24 / (50 x 2.5 mH x 2.8 A).
+		var corner = 24 / (50 * 2.5e-3 * 2.8);
+		near(motor.pullOutTorque(corner / 2, 24), 1.26, "below the corner speed a stepper pulls its holding torque");
+		near(motor.pullOutTorque(2 * corner, 24), 0.63, "above it, its torque falls as 1 / speed");
+		near(motor.usableTorque(), 0.63, "half the holding torque is the usable torque");
+		near(motor.usableSpeed(24), 2 * corner, "and it holds that up to twice the corner speed");
+		near(motor.usableSpeed(48), 4 * corner, "a higher supply keeps the torque to a higher speed");
+		if (NemaStepper.frame(23, 70).rating() != null) throw "A generic-length motor has no rating";
+		// A Tr10 x 2 thread with a 0.1 friction nut passes about 40% of the motor's work to the nut.
+		var thread = new LeadScrewThread(MetricTrapezoidal, 10, 2);
+		near(thread.efficiency(), 0.403, "a Tr10 x 2 screw is about 40% efficient", 0.002);
+		near(thread.efficiency(0), 1, "a frictionless screw is lossless", 1e-12);
+		if (!(new LeadScrewThread(MetricTrapezoidal, 10, 2, 4).efficiency() > thread.efficiency()))
+			throw "A steeper lead is more efficient";
+
+		var assembly = new MachineAssembly();
+		assembly.addComponent("base", new RobotFlange(50));
+		assembly.addComponent("slider", new RobotFlange(50));
+		assembly.addComponent("motor", motor);
+		assembly.addComponent("screw", new LeadScrew(thread, 100));
+		assembly.addMateOnAxis("slide", "prismatic", "base", "face", "slider", "face", {x: 0, y: 1, z: 0});
+		assembly.addMateOnAxis("turn", "continuous", "base", "face", "screw", "input", {x: 0, y: 1, z: 0});
+		assembly.addDrive("lead", "slide", "turn", Drive.LeadScrew("screw", 1));
+		assembly.addMotor("drive", "turn", "motor", 24);
+		function definition(machine:MachineAssembly):materia.assembly.AssemblyDefinition {
+			var model = new AssemblyModel("mm");
+			machine.addTo(model, "");
+			return model.definition("motorised");
+		}
+		function actuatorsOf(definition:materia.assembly.AssemblyDefinition):Array<materia.assembly.AssemblyDefinition.AssemblyActuator> {
+			var actuators = definition.actuators;
+			if (actuators == null) throw "The assembly has no actuators";
+			return actuators;
+		}
+		function efficiencyOf(definition:materia.assembly.AssemblyDefinition):Float {
+			var couplings = definition.couplings;
+			if (couplings == null || couplings.length != 1) throw "The assembly has no coupling";
+			var efficiency = couplings[0].efficiency;
+			if (efficiency == null) throw "The coupling has no efficiency";
+			return efficiency;
+		}
+		var built = definition(assembly);
+		var actuators = actuatorsOf(built);
+		if (actuators.length != 1 || actuators[0].joint != "turn") throw "The motor drives its joint";
+		var rotor = actuators[0].rotorInertia;
+		near(actuators[0].maxEffort, 0.63, "the actuator gets the usable torque");
+		near(actuators[0].maxRate, 2 * corner, "and the usable speed");
+		near(rotor == null ? 0 : rotor, 3.0e-5, "and the rotor's inertia");
+		near(efficiencyOf(built), thread.efficiency(), "the lead screw's coupling carries its efficiency");
+		// Rebuilt with the NEMA 17 in the motor's place, the actuator follows the motor.
+		var description:MachineAssemblyDescription = haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(assembly.describe()));
+		description.machine.members = [for (member in description.machine.members) member.occurrence != "motor" ? member :
+			{occurrence: member.occurrence, material: member.material, source: switch member.source {
+				case Typed(id, values): Typed(id, [for (value in values) value.name != "model" ? value :
+					{name: "model", value: SavedValue.Token("17HS19-1684S1")}]);
+				case other: other;
+			}}];
+		var rebuilt = definition(MachineAssembly.fromDescription(description));
+		near(actuatorsOf(rebuilt)[0].maxEffort, 0.225, "a rebuilt motor's actuator follows the motor part");
+		near(efficiencyOf(rebuilt), thread.efficiency(), "and the screw keeps its efficiency");
 	}
 
 	static function documentRoundTrip():Void {

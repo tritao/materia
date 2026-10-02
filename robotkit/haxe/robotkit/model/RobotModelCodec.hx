@@ -95,6 +95,8 @@ class RobotModelCodec {
         throw 'Coupling ${coupling.id} references an unknown joint';
       if (followerIds.exists(coupling.follower))
         throw 'Joint ${coupling.follower} has multiple coupling leaders';
+      if (!(coupling.efficiency > 0 && coupling.efficiency <= 1))
+        throw 'Coupling ${coupling.id} has an invalid efficiency';
       couplingIds.set(coupling.id, true);
       followerIds.set(coupling.follower, true);
     }
@@ -144,7 +146,7 @@ class RobotModelCodec {
       actuators: [for (actuator in model.actuators) encodeActuator(actuator)],
       couplings: [for (coupling in model.couplings) {
         id: coupling.id, leader: coupling.leader, follower: coupling.follower,
-        ratio: coupling.ratio, offset: coupling.offset
+        ratio: coupling.ratio, offset: coupling.offset, efficiency: coupling.efficiency
       }],
       frames: [for (frame in model.frames) {
         id: frame.id, name: frame.name, link: frame.link.id,
@@ -235,6 +237,11 @@ class RobotModelCodec {
     for (record in array(root, "couplings")) {
       var coupling = new JointCoupling(text(record, "id"), text(record, "leader"),
         text(record, "follower"), number(record, "ratio"), number(record, "offset"));
+      var efficiency = optionalNumber(record, "efficiency");
+      if (efficiency != null) {
+        if (!(efficiency > 0 && efficiency <= 1)) throw 'Coupling ${coupling.id} has an invalid efficiency';
+        coupling.efficiency = efficiency;
+      }
       if (!joints.exists(coupling.leader) || !joints.exists(coupling.follower))
         throw 'Coupling ${coupling.id} references an unknown joint';
       if (couplingIds.exists(coupling.id) || followers.exists(coupling.follower))

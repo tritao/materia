@@ -160,13 +160,15 @@ class CncProgramPlayer implements SessionMember {
 			if (joint.length != 1 || Std.string(joint[0].type) != "prismatic")
 				throw 'CNC axis "$id" must be a prismatic joint of the machine';
 			var limits = joint[0].limits;
-			var lower = limits.lower, upper = limits.upper, velocity = limits.velocity, acceleration = limits.acceleration;
-			if (lower == null || upper == null || velocity == null || acceleration == null)
-				throw 'CNC axis "$id" needs travel, velocity and acceleration limits';
+			var lower = limits.lower, upper = limits.upper;
+			if (lower == null || upper == null) throw 'CNC axis "$id" needs travel limits';
 			var initial = placement.joint(id) * metresPerUnit;
 			start.push(initial);
-			// The axis is as fast as the joints turning with it allow, such as its lead screw.
+			// The axis is as fast as the joints turning with it and their motors allow, such as its
+			// lead screw and the motor turning it.
 			var coupled = robot.model.coupledLimits(id);
+			if (!(coupled.velocity > 0) || !(coupled.maxAcceleration > 0))
+				throw 'CNC axis "$id" needs velocity and acceleration limits, its own or its motors\'';
 			rapid = Math.max(rapid, coupled.velocity);
 			axes.push(new MotionAxisBlueprint(id, [id], lower * metresPerUnit, upper * metresPerUnit,
 				coupled.velocity, coupled.maxAcceleration, initial, [1.0], [-initial]));

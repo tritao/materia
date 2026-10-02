@@ -248,10 +248,6 @@ class TwistDrill extends MachineComponent {
 	}
 }
 
-/**
- * Step clamp holding the stock's edge to the spoilboard. Origin on the spoilboard under the stock
- * edge; the clamp reaches 8 mm over the stock along -X and stands on a riser outboard along +X.
- */
 /** Round spacer standing a motor off its mount, bored for the screw that holds it. Origin: one end, along +Z. */
 class Standoff extends MachineComponent {
 	public final diameter:Float;
@@ -276,6 +272,10 @@ class Standoff extends MachineComponent {
 	}
 }
 
+/**
+ * Step clamp holding the stock's edge to the spoilboard. Origin on the spoilboard under the stock
+ * edge; the clamp reaches 8 mm over the stock along -X and stands on a riser outboard along +X.
+ */
 class ToeClamp extends MachineComponent {
 	public final stockHeight:Float;
 
@@ -295,16 +295,14 @@ class ToeClamp extends MachineComponent {
 	}
 }
 
-/** Travel limit and speed of one linear axis, in millimetres and mm/s. */
+/**
+ * Travel of one linear axis, in millimetres. Its speed and acceleration are its motors' and
+ * screws', worked out from the parts.
+ */
 typedef RouterAxisSpec = {
 	var id:String;
 	var lower:Float;
 	var upper:Float;
-	var velocity:Float;
-	/** Peak axis force in newtons. */
-	var effort:Float;
-	/** Largest axis acceleration in mm/s². */
-	var acceleration:Float;
 	var initial:Float;
 }
 
@@ -317,7 +315,9 @@ typedef RouterAxisSpec = {
  * machine origin is the front-left corner of travel with Z at the top, so the spindle nose sits at
  * `noseAt(x, y, z)` in the assembly frame (floor at z = 0, bed centred on the origin).
  * Each motor turns its lead screw through a shaft coupling, on a continuous joint coupled to its
- * axis by the screw's lead: Y has two, one on each side of the gantry.
+ * axis by the screw's lead: Y has two, one on each side of the gantry. The motors are the screw
+ * joints' actuators, so each axis is as fast as its motors turn its screws, and accelerates as
+ * hard as their torque, through the screws' efficiency, moves its mass and turns its screws.
  */
 class CncRouter extends MachineAssembly {
 	public static inline var PROFILE:String = "HFS5-4040";
@@ -351,10 +351,12 @@ class CncRouter extends MachineAssembly {
 	/** Tool 2, loaded by hand when a program calls for it. */
 	public final drill = new TwistDrill(5.5, 28, 40);
 	public final specs:Array<RouterAxisSpec> = [
-		{id: "x", lower: 0, upper: 300, velocity: 80, effort: 400, acceleration: 500, initial: 150},
-		{id: "y", lower: 0, upper: 300, velocity: 80, effort: 600, acceleration: 400, initial: 150},
-		{id: "z", lower: -80, upper: 0, velocity: 40, effort: 400, acceleration: 300, initial: 0}
+		{id: "x", lower: 0, upper: 300, initial: 150},
+		{id: "y", lower: 0, upper: 300, initial: 150},
+		{id: "z", lower: -80, upper: 0, initial: 0}
 	];
+	/** The stepper drivers' supply, as on most desktop routers. */
+	public static inline var SUPPLY_VOLTS:Float = 24;
 
 	/** Room past each axis's travel before its rail blocks reach the rail ends, in millimetres. */
 	final overtravel = new Map<String, Float>();
@@ -555,6 +557,7 @@ class CncRouter extends MachineAssembly {
 		var ratio = addDrive('$id-lead', axis.id, '$id-turn', LeadScrew(id, alongAxis));
 		addMateOnAxis('$id-turn', "continuous", motor, 'to-$couplingId', couplingId, 'attach-$couplingId',
 			{x: along[0], y: along[1], z: along[2]}, ratio * axis.initial);
+		addMotor(motor, '$id-turn', motor, SUPPLY_VOLTS);
 	}
 
 	function component(id:String):MachineComponent {
@@ -585,8 +588,7 @@ class CncRouter extends MachineAssembly {
 		zeroPoses.set(id, pose);
 		connect(parent, id);
 		addMateOnAxis(spec.id, "prismatic", parent, 'to-$id', id, 'attach-$id', axis, spec.initial,
-			{lower: spec.lower, upper: spec.upper, velocity: spec.velocity, effort: spec.effort, overtravel: room,
-				acceleration: spec.acceleration});
+			{lower: spec.lower, upper: spec.upper, velocity: null, effort: null, overtravel: room});
 	}
 
 	/**

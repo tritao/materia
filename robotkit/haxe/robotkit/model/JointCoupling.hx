@@ -7,6 +7,8 @@ class JointCoupling {
   public final follower:JointId;
   public final ratio:Float;
   public final offset:Float;
+  /** Share of power passed from leader to follower or back, such as a lead screw's 0.4; 1 is lossless. */
+  public var efficiency:Float = 1.0;
 
   public function new(id:String, leader:JointId, follower:JointId,
       ratio:Float, offset:Float) {

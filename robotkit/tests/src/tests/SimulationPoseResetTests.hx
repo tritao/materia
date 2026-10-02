@@ -129,6 +129,50 @@ class SimulationPoseResetTests {
     if (Math.abs(model.coupledLimits("axis").velocity - Math.min(screwSpeed, beltSpeed)) > 1e-12)
       throw "an unlimited joint should take its followers' limit";
     if (model.coupledLimits("belt").velocity != 150) throw "a follower is not limited by its leader";
+
+    // A motor on the screw: 0.63 N m up to 137 rad/s, a 3e-5 kg m² rotor, through a 40% screw.
+    var motorModel = new RobotModel("motor axis");
+    var frame = motorModel.addLink(new Link("frame"));
+    var table = motorModel.addLink(new Link("table"));
+    var rotor = motorModel.addLink(new Link("rotor"));
+    table.mass = 10.0;
+    rotor.mass = 0.2;
+    rotor.centerOfMass = [0.0, 0.0, 0.0];
+    rotor.inertiaTensor = [1e-5, 0.0, 0.0, 0.0, 1e-5, 0.0, 0.0, 0.0, 4e-6];
+    var slide = motorModel.addJoint(new Joint("slide", JointType.Prismatic, frame, table));
+    var screwJoint = motorModel.addJoint(new Joint("screw", JointType.Continuous, frame, rotor));
+    slide.limits = new JointLimits(0, 0.3);
+    screwJoint.limits = new JointLimits(-1e9, 1e9);
+    screwJoint.axis = [0.0, 0.0, 1.0];
+    screwJoint.armature = 3e-5;
+    var screwLead = new JointCoupling("lead", "slide", "screw", Math.PI * 1000, 0.0);
+    screwLead.efficiency = 0.4;
+    motorModel.addCoupling(screwLead);
+    motorModel.addActuator(new robotkit.model.Actuator("motor", 0.63, 137.0,
+      robotkit.model.Transmission.SimpleTransmission("screw", 1.0, 0.0)));
+    var driven = motorModel.coupledLimits("slide");
+    var scale = Math.PI * 1000;
+    if (Math.abs(driven.velocity - 137.0 / scale) > 1e-12)
+      throw 'a motor caps its axis at its rate through the screw: ${driven.velocity}';
+    // a = eta s T / (m + eta (J_screw + J_rotor) s²), with the screw's own 4e-6 about its axis.
+    var expected = 0.4 * scale * 0.63 / (10.0 + 0.4 * (4e-6 + 3e-5) * scale * scale);
+    if (Math.abs(driven.maxAcceleration - expected) > expected * 1e-12)
+      throw 'a motor accelerates its axis by its force over mass and turning inertia: ${driven.maxAcceleration}, expected $expected';
+    // Two motors, one per screw, as on a gantry's two sides: twice the force and twice the turning inertia.
+    var second = motorModel.addLink(new Link("rotor2"));
+    second.mass = 0.2;
+    second.inertiaTensor = rotor.inertiaTensor.copy();
+    var other = motorModel.addJoint(new Joint("screw2", JointType.Continuous, frame, second));
+    other.limits = new JointLimits(-1e9, 1e9);
+    other.armature = 3e-5;
+    var otherLead = new JointCoupling("lead2", "slide", "screw2", -Math.PI * 1000, 0.0);
+    otherLead.efficiency = 0.4;
+    motorModel.addCoupling(otherLead);
+    motorModel.addActuator(new robotkit.model.Actuator("motor2", 0.63, 137.0,
+      robotkit.model.Transmission.SimpleTransmission("screw2", 1.0, 0.0)));
+    var pair = 2 * 0.4 * scale * 0.63 / (10.0 + 2 * 0.4 * (4e-6 + 3e-5) * scale * scale);
+    if (Math.abs(motorModel.coupledLimits("slide").maxAcceleration - pair) > pair * 1e-12)
+      throw "two motors add their force and their screws' turning inertia";
   }
 
   static function checkPose(simulation:Simulation, position:Array<Float>, rotation:Array<Float>,

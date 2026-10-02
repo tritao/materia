@@ -410,9 +410,21 @@ class ProjectSourceTests {
       var travel = joint.limits.upper - joint.limits.lower;
       check(Math.abs(travel - (Std.string(joint.id) == "z" ? 0.08 : 0.3)) < 1e-9,
         'router axis ${joint.id} travel is in metres, got $travel');
-      check(joint.limits.overtravel > 0 && joint.limits.maxAcceleration > 0,
-        'router axis ${joint.id} carries its overtravel and acceleration');
+      check(joint.limits.overtravel > 0, 'router axis ${joint.id} carries its overtravel');
     }
+    // Each axis is as fast as a 24 V NEMA 23 turns its Tr10 x 2 screw at half its holding torque:
+    // twice the 68.6 rad/s where its winding's reactance takes the supply, over pi rad per mm.
+    var turns = 2 * 24 / (50 * 2.5e-3 * 2.8) / (Math.PI * 1000);
+    var derived:Array<String> = [];
+    for (joint in axes) {
+      var limits = model.coupledLimits(joint.id);
+      check(Math.abs(limits.velocity - turns) < 1e-9,
+        'router axis ${joint.id} is as fast as its motor turns its screw: ${limits.velocity} m/s, expected $turns');
+      check(limits.maxAcceleration > 0.5 && limits.maxAcceleration < 50,
+        'router axis ${joint.id} accelerates as its motors move it: ${limits.maxAcceleration} m/s²');
+      derived.push('${joint.id} ${Math.round(limits.velocity * 1e4) / 10} mm/s, ${Math.round(limits.maxAcceleration * 100) / 100} m/s²');
+    }
+    Sys.println('cnc router axes from their motors: ${derived.join("; ")}');
     var job = generated.cncJob;
     check(job != null && job.loop && job.stock == "stock" && job.spindle == "spindle" && job.target != null &&
       job.loadedTool == 1 && [for (tool in job.tools) tool.number].join(",") == "1,2",

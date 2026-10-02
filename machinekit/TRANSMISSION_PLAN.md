@@ -170,22 +170,52 @@ Kinematics through the whole stack, with ratios still given as numbers.
   saved description and through a document. The router smoke checks its four
   screws turn through lead-screw drives.
 
-### X3 — Motors as actuators, limits derived
+### X3 — Motors as actuators, limits derived (done)
 
-- Motor catalogue data for NEMA 17/23: holding torque, a simple torque-speed
-  (pull-out) curve, rotor inertia and steps per revolution.
-- An `Actuator` comes from a motor part: max rate, effort and steps per
-  revolution. Device deployments get steps per unit from the motor, the
-  microstepping and the ratio.
-- Axis limits come from the drive: velocity from motor speed × travel per
-  radian (capped by screw critical speed later). Acceleration from motor
-  torque through the ratio, against the moving mass (CAD mass properties)
-  plus reflected rotor and screw inertia.
-- The router's hand-written `specs` go away.
-- Simulation actuates the joints that carry actuators (the motors) and lets
-  couplings move the rest, instead of a servo on every joint.
-- **Gate:** the router's derived limits are close to today's hand-written
-  ones, documented, and the plate still machines.
+- **Motor data.** `NemaStepper.ratingCatalog()` gives the three named
+  variants their holding torque, rated current, phase inductance, rotor
+  inertia and step angle. Torque and current match the product names. The
+  inductance and rotor inertia are typical datasheet values I supplied
+  from memory, marked unverified. `pullOutTorque(speed, volts)` is a
+  first-order model: the holding torque until the winding's reactance at
+  rated current takes the supply (V / (50 × L × I) for a 1.8° motor), then
+  falling as 1 / speed. `usableTorque(margin)` and `usableSpeed(volts,
+  margin)` give the torque the motor can be relied on for (half its holding
+  torque by default) and the speed it holds it to.
+- **Screw efficiency.** `LeadScrewThread.efficiency(friction = 0.1)` is
+  tan λ / tan(λ + φ') on the 15° flanks: 0.40 for Tr10 × 2. Drives put it on
+  their coupling (typical values for gears, racks and belts), and couplings
+  carry an optional `efficiency` through the assembly format, CadKit's
+  `AssemblyModel.couple`, the bridge and RobotKit's `JointCoupling`.
+- **Actuators.** `MachineAssembly.addMotor(id, joint, motor, volts, margin)`
+  records a `MotorRecord` (saved and rebuilt like drives) and puts an
+  `AssemblyActuator` {joint, maxEffort, maxRate, rotorInertia} in the
+  assembly format. The bridge makes it a RobotKit `Actuator` on that joint
+  (unit-converted and rebased to the initial placement) and adds the rotor
+  inertia to the joint's `armature`, which MuJoCo simulates.
+- **Derived limits.** `RobotModel.coupledLimits` caps a joint at each
+  actuator's rate through the ratios. For a sliding joint it caps
+  acceleration at Σ η·T·|ratio·scale| over the carried mass plus Σ η·(link
+  inertia about the axis + armature)·scale². `RobotRuntimeCompiler` gives
+  the runtime blueprint these limits, and the CNC player plans with them.
+  Gravity, friction and screw critical speed are left out.
+- **Router.** Its axis specs keep only travel. Each motor drives its screw
+  joint on a 24 V supply (`SUPPLY_VOLTS`). Derived: 43.7 mm/s on every axis
+  (a NEMA 23 holds half its torque to 1310 rpm, and a 2 mm lead turns that
+  into 43.7 mm/s), and 5.4 (Y, two motors), 5.6 (X) and 6.1 (Z) m/s². The
+  rotors dominate, reflected through π rad/mm. The plate machines in
+  184.9 s, against 196.3 s with the hand-written 80 mm/s and 0.3–0.5 m/s².
+  Most moves are short, so acceleration matters more than top speed.
+- **Checks.** A MachineKit test covers the torque model, the screw's 40%,
+  and an actuator following a motor swapped in a description. The RobotKit
+  test covers velocity and acceleration from one and from two motors. The
+  app test checks each router axis's derived speed against the motor's
+  numbers and prints the limits.
+- **Left for later.** Simulation still puts a servo on every joint;
+  actuating only the motor joints needs the runtime to command the
+  actuators. Device deployments don't yet take steps per unit from the
+  motor, its step angle, the microstepping and the ratio. Gravity on Z,
+  friction and screw critical speed are not modelled.
 
 ### X4 — Belts
 
