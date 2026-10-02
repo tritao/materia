@@ -1,5 +1,6 @@
 #include "robotkit_runtime.h"
 #include "robotkit_runtime.hpp"
+#include "coupling_terms.hpp"
 #if defined(RK_HAS_SERIAL_DEVICE)
 #include "robotkit_device_serial_endpoint.hpp"
 #endif
@@ -182,8 +183,8 @@ namespace {
 /**
  * Copies segment arrays into a batch over every robot joint: once, the runtime's one copy.
  * Source joint j drives robot joint joint_map[j], or joint j without a map. A robot joint no
- * source joint drives follows its leader when the blueprint couples it to one (a lead screw
- * turning with its axis), and otherwise holds its held position.
+ * source joint drives follows its leaders when the blueprint couples it to some (a lead screw
+ * turning with its axis, a CoreXY motor turning with two), and otherwise holds its held position.
  */
 rk_result copy_segments(const int64_t *starts_ns, const int64_t *durations_ns,
     const int32_t *degrees, uint32_t segment_count, const double *coefficients,
@@ -209,36 +210,15 @@ rk_result copy_segments(const int64_t *starts_ns, const int64_t *durations_ns,
     }
     if (source_joint_count < robot_joint_count && !held_positions)
         return RK_ERROR_INVALID_ARGUMENT;
-    // Couplings whose follower no source joint drives, ordered so each leader is final before
-    // its followers are derived from it.
-    uint32_t followed[RK_MAX_JOINT_COUPLINGS];
+    // Followers no source joint drives, ordered so each leader is final before the followers
+    // derived from it.
+    uint32_t followed[RK_MAX_JOINTS];
     uint32_t follow_count = 0;
     if (blueprint && blueprint->struct_size >= sizeof(*blueprint) &&
-        source_joint_count < robot_joint_count) {
-        bool pending[RK_MAX_TRAJECTORY_JOINTS]{};
-        uint32_t pending_count = 0;
-        for (uint32_t i = 0; i < blueprint->coupling_count; ++i) {
-            const auto follower = blueprint->couplings[i].follower;
-            if (follower >= robot_joint_count || blueprint->couplings[i].leader >= robot_joint_count)
-                return RK_ERROR_INVALID_ARGUMENT;
-            if (!driven[follower] && !pending[follower]) {
-                pending[follower] = true;
-                ++pending_count;
-            }
-        }
-        for (bool progress = true; progress && follow_count < pending_count;) {
-            progress = false;
-            for (uint32_t i = 0; i < blueprint->coupling_count; ++i) {
-                const auto &coupling = blueprint->couplings[i];
-                if (pending[coupling.follower] && !pending[coupling.leader]) {
-                    pending[coupling.follower] = false;
-                    followed[follow_count++] = i;
-                    progress = true;
-                }
-            }
-        }
-        if (follow_count < pending_count) return RK_ERROR_INVALID_ARGUMENT;
-    }
+        source_joint_count < robot_joint_count &&
+        !robotkit::internal::order_followers(blueprint->couplings, blueprint->coupling_count,
+            robot_joint_count, driven, followed, follow_count))
+        return RK_ERROR_INVALID_ARGUMENT;
     batch.segments.resize(segment_count);
     for (uint32_t index = 0; index < segment_count; ++index) {
         if (starts_ns[index] < starts_ns[0] || durations_ns[index] <= 0 || degrees[index] < 0 ||
@@ -256,11 +236,16 @@ rk_result copy_segments(const int64_t *starts_ns, const int64_t *durations_ns,
             for (uint32_t power = 0; power <= segment.degree; ++power)
                 segment.coefficients[targets[joint]].value[power] = source[joint * stride + power];
         for (uint32_t i = 0; i < follow_count; ++i) {
-            const auto &coupling = blueprint->couplings[followed[i]];
-            auto &follower = segment.coefficients[coupling.follower].value;
-            const auto &leader = segment.coefficients[coupling.leader].value;
-            for (uint32_t power = 0; power <= segment.degree; ++power)
-                follower[power] = coupling.ratio * leader[power] + (power == 0 ? coupling.offset : 0.0);
+            auto &follower = segment.coefficients[followed[i]].value;
+            for (uint32_t power = 0; power <= segment.degree; ++power) {
+                double sum = 0.0;
+                for (uint32_t k = 0; k < blueprint->coupling_count; ++k)
+                    if (blueprint->couplings[k].follower == followed[i])
+                        sum += blueprint->couplings[k].ratio *
+                                segment.coefficients[blueprint->couplings[k].leader].value[power] +
+                            (power == 0 ? blueprint->couplings[k].offset : 0.0);
+                follower[power] = sum;
+            }
         }
     }
     return RK_OK;

@@ -234,7 +234,11 @@ typedef struct nksim_joint_desc {
     double limit_impedance[5];
 } nksim_joint_desc;
 
-/** Follower = ratio * leader + offset, in joint coordinates. */
+/**
+ * One term of a follower's value, in joint coordinates: ratio * leader + offset. A follower with
+ * several couplings is the sum of their terms (a CoreXY motor follows both axes). Each leader and
+ * follower pair is coupled once, and the couplings may not form a cycle.
+ */
 typedef struct nksim_joint_coupling_desc {
     uint32_t struct_size NK_STRUCT_SIZE;
     nksim_joint leader;

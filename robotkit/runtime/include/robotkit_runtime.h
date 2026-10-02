@@ -87,7 +87,7 @@ enum {
     RK_PROCESS_CHANNEL_ID_BYTES = 48,
     RK_PROCESS_COMMAND_BYTES = 48,
     RK_MAX_JOINT_COUPLINGS = 512,
-    RK_API_VERSION = 23 /**< Sensor values live in one pool per state or snapshot, packed to what the robot's sensors report. */
+    RK_API_VERSION = 24 /**< A joint may have several couplings: it follows the sum of their terms. */
 };
 
 /** Result returned by RobotKit C ABI functions. */
@@ -410,9 +410,12 @@ typedef struct rk_event_record_batch {
  * its first shared tick.
  */
 /**
- * Joint follower's position is leader's times ratio plus offset. A follower with no velocity or
- * acceleration limit of its own moves within its leader's, scaled by the ratio's size, and a
- * plan that leaves the follower out turns it with its leader.
+ * One term of a follower joint's position: the leader's times ratio, plus offset. A follower with
+ * several couplings is the sum of their terms (a CoreXY motor follows both axes), so its value is
+ * the sum over its couplings of ratio times leader plus offset. A leader and follower pair is
+ * coupled once, and the couplings never form a cycle. A follower with no velocity or acceleration
+ * limit of its own moves within its leaders', scaled by the ratios' sizes and summed, and a plan
+ * that leaves the follower out turns it with its leaders.
  */
 typedef struct rk_robot_joint_coupling {
     rk_joint_id leader;
@@ -806,8 +809,8 @@ RK_API rk_result RK_CALL rk_robot_runtime_submit_segments(rk_robot_runtime runti
  * Atomically validates and accepts a plan or committed-horizon replacement. A replacement before
  * committed_until_ns returns RK_ERROR_INVALID_STATE with no queue mutation. The segments' joints
  * are source joints: source joint j drives robot joint joint_map[j], and joint_count is
- * source_joint_count. A robot joint no source joint drives follows its leader when the blueprint
- * couples it to one, and otherwise holds header->start_position. Events
+ * source_joint_count. A robot joint no source joint drives follows its leaders when the blueprint
+ * couples it to some (the sum of their terms), and otherwise holds header->start_position. Events
  * are sorted by path time from the plan's start.
  */
 RK_API rk_result RK_CALL rk_robot_runtime_submit_plan(rk_robot_runtime runtime,
