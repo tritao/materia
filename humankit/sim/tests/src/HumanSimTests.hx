@@ -2,15 +2,15 @@ import animkit.AnimationAsset;
 import humankit.HumanBodyProxy;
 import humankit.HumanCharacter;
 import humankit.HumanDescription;
-import humankit.HumanJob;
-import humankit.HumanJobSpec;
-import humankit.HumanBone;
-import humankit.HumanoidRig;
-import humankit.Pick;
-import humankit.Place;
-import humankit.ApproachFor;
-import humankit.WalkTo;
-import humankit.Wait;
+import humankit.job.HumanJob;
+import humankit.job.HumanJobSpec;
+import humankit.rig.HumanBone;
+import humankit.rig.HumanoidRig;
+import humankit.action.Pick;
+import humankit.action.Place;
+import humankit.action.ApproachFor;
+import humankit.action.WalkTo;
+import humankit.action.Wait;
 import humankit.facility.FacilityJobs;
 import materia.automation.facility.Facility;
 import materia.automation.facility.Lane;
@@ -34,6 +34,7 @@ import nativekit.sim.SimFrame;
 
 class HumanSimTests {
     static function main():Void {
+        if (Sys.getEnv("HUMANKIT_PROBE") != null) { ArmFlipProbe.run(Sys.getEnv("HUMANKIT_PROBE")); return; }
         PacedStepTests.run();
         WorkerResetTests.run();
         PlaceWithdrawTests.run();

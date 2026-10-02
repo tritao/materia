@@ -69,6 +69,13 @@ option(RK_BUILD_SIMKIT "Build the SimKit-backed RobotKit simulation" OFF)
 option(RK_BUILD_POLICY "Build the ONNX Runtime policy library (fetches a pinned prebuilt release)" OFF)
 option(RK_BUILD_VISIONKIT "Build the optional VisionKit camera geometry library" OFF)
 option(RK_BUILD_INFERENCE "Build the ONNX Runtime image inference library" OFF)
+# The browser has neither serial ports nor a Rust toolchain for the virtual board.
+set(_rk_device_default ON)
+if(EMSCRIPTEN)
+    set(_rk_device_default OFF)
+endif()
+option(RK_BUILD_VIRTUAL_DEVICE "Build the simulated device board (needs cargo)" ${_rk_device_default})
+option(RK_BUILD_SERIAL_DEVICE "Build the serial-port device endpoint" ${_rk_device_default})
 
 if(RK_BUILD_TESTS)
     find_package(Python3 COMPONENTS Interpreter REQUIRED)

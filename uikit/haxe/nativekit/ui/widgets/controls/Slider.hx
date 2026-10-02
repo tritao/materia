@@ -40,7 +40,7 @@ class Slider implements View {
 			?style:LayoutStyle) {
 		if (key == null || key.length == 0 || !finite(minimum) || !finite(maximum) ||
 			!finite(value) || !finite(step) || maximum <= minimum || step <= 0.0)
-			throw "Slider values and range are invalid";
+			throw 'Slider "$key" values and range are invalid: value $value, range $minimum to $maximum, step $step';
 		this.key = key;
 		this.label = label == null ? "" : label;
 		this.minimum = minimum;

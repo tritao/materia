@@ -51,6 +51,8 @@ class HumanWalker {
 	var y:Float = 0.0;
 	var heading:Float = 0.0;
 	var facing:Null<Float> = null;
+	/** How much of the pace the heading allows: 1 facing along the route, 0 facing across it or away from it. */
+	var paceShare:Float = 1.0;
 	var preserveHeading:Bool = false;
 	var retreating:Bool = false;
 
@@ -61,12 +63,13 @@ class HumanWalker {
 		var idle = character.asset.clipIndex(idleClip);
 		if (walk < 0 || idle < 0)
 			throw 'The character needs "$walkClip" and "$idleClip" clips';
-		gait = HumanGait.measure(character.asset, character.rig, walk);
+		var holds = character.legsAreChains();
+		gait = HumanGait.measure(character.asset, character.rig, walk, false, idle, holds);
 		routeGait = gait;
 		var carry = character.asset.clipIndex("walk_carry");
-		carryGait = carry < 0 ? null : HumanGait.measure(character.asset, character.rig, carry);
+		carryGait = carry < 0 ? null : HumanGait.measure(character.asset, character.rig, carry, false, idle, holds);
 		var back = character.asset.clipIndex("walk_bwd");
-		backGait = back < 0 ? null : HumanGait.measure(character.asset, character.rig, back, true);
+		backGait = back < 0 ? null : HumanGait.measure(character.asset, character.rig, back, true, idle, holds);
 		var left = HumanTurn.measure(character.asset, character.rig, character.asset.clipIndex("turn90_l"));
 		var right = HumanTurn.measure(character.asset, character.rig, character.asset.clipIndex("turn90_r"));
 		// Each is used for the direction it turns, whatever its name says.
@@ -104,7 +107,7 @@ class HumanWalker {
 		retreating = false;
 		var carryWalk = carryGait;
 		routeGait = carrying && carryWalk != null ? carryWalk : gait;
-		character.player.play(routeGait.clip, BLEND_SECONDS);
+		character.player.play(routeGait.clip, BLEND_SECONDS, true, routeGait.startTime);
 	}
 
 	/**
@@ -133,7 +136,7 @@ class HumanWalker {
 		// Backwards on the character's own backward walk, or else sliding in the idle pose.
 		var backWalk = backGait;
 		if (backWalk != null) routeGait = backWalk;
-		character.player.play(backWalk != null ? backWalk.clip : idleClip, BLEND_SECONDS);
+		character.player.play(backWalk != null ? backWalk.clip : idleClip, BLEND_SECONDS, true, backWalk != null ? backWalk.startTime : 0.0);
 	}
 
 	/** Sets the starting floor pose before a job begins. */
@@ -197,6 +200,20 @@ class HumanWalker {
 	public function isTurning():Bool
 		return facing != null || turnsLeft > 0;
 
+	/** Whether a turn clip is turning the body in model space right now (the root takes the turn up when it ends). */
+	public function turningByClip():Bool
+		return turnPlaying != null;
+
+	/**
+	 * How much of the pose showing is the idle one, whose feet are on the floor: 1 standing, 0 in a steady walk, and
+	 * in between while the walk fades in or out. A planted foot is held in the world while this is high.
+	 */
+	public function stanceShare():Float {
+		var weight = character.player.fadeWeight();
+		var playing = character.player.currentClip();
+		return playing == idleClip ? weight : (character.player.fading() ? 1.0 - weight : 0.0);
+	}
+
 	/** Whether the character stands still with its walk faded out: not walking, not turning, not mid-crossfade. */
 	public function settled():Bool
 		return !walking && facing == null && turnsLeft == 0 && !character.player.fading();
@@ -230,7 +247,11 @@ class HumanWalker {
 			velocity = Math.min(speed, velocity + acceleration * seconds);
 			if (!loop)
 				velocity = Math.min(velocity, Math.sqrt(2.0 * acceleration * Math.max(0.0, length - travelled)));
-			travelled += velocity * seconds;
+			// The root follows the route exactly while the heading chases it, so a body that walks while facing away from the way it
+			// goes moves sideways or backwards past its planted feet: it moves only as far as it faces along the route.
+			paceShare = 1.0;
+			if (!preserveHeading) paceShare = Math.max(0.0, Math.cos(wrap(tangentAt(travelled) - heading)));
+			travelled += velocity * paceShare * seconds;
 			if (loop)
 				travelled %= length;
 			else if (travelled >= length - 1e-6) {
@@ -258,7 +279,7 @@ class HumanWalker {
 			} else
 				heading = wrap(heading + (turn > 0.0 ? limit : -limit));
 		}
-		character.player.speed = walking && (!retreating || backGait != null) ? velocity / routeGait.naturalSpeed : 1.0;
+		character.player.speed = walking && (!retreating || backGait != null) ? velocity * paceShare / routeGait.naturalSpeed : 1.0;
 		character.advance(seconds);
 	}
 
@@ -272,18 +293,23 @@ class HumanWalker {
 			turnsLeft = 0;
 			return;
 		}
-		if (turnPlaying == null) {
-			turnPlaying = clip;
-			turnClock = 0.0;
-			if (character.player.currentClip() == clip.clip) character.player.restart(clip.clip, false);
-			else character.player.play(clip.clip, 0.15, false);
-		}
+		if (turnPlaying == null) startTurnClip(clip);
 		turnClock += seconds;
 		if (turnClock < clip.seconds) return;
 		heading = wrap(heading + clip.angle);
 		turnsLeft--;
 		turnPlaying = null;
+		// The root takes up the turn and the next clip starts (or the idle pose returns) in the same tick, so the one jump of the
+		// whole pose in the model's frame is at the one moment.
 		if (turnsLeft == 0) character.player.restart(idleClip);
+		else startTurnClip(clip);
+	}
+
+	function startTurnClip(clip:HumanTurn):Void {
+		turnPlaying = clip;
+		turnClock = 0.0;
+		if (character.player.currentClip() == clip.clip) character.player.restart(clip.clip, false);
+		else character.player.play(clip.clip, 0.15, false);
 	}
 
 	/** The character root: standing at the walker's position, turned to its heading. */

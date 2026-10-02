@@ -242,6 +242,10 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
     if (robot_desc && robot_desc->struct_size >=
         offsetof(rk_simulation_robot_desc, virtual_device_actuator_count) &&
         robot_desc->virtual_device_enabled) {
+#if !defined(RK_HAS_VIRTUAL_DEVICE)
+        // Built without the simulated board (RK_BUILD_VIRTUAL_DEVICE).
+        return RK_ERROR_UNSUPPORTED;
+#else
         VirtualDeviceConfig6 config;
         config.device_tick_hz = robot_desc->virtual_device_tick_hz;
         config.step_tick_hz = robot_desc->virtual_device_step_tick_hz;
@@ -285,6 +289,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         }
         virtual_endpoint = VirtualDeviceEndpoint::create(blueprint, config);
         if (!virtual_endpoint) return RK_ERROR_INVALID_ARGUMENT;
+#endif
     }
     try {
         auto binding = std::shared_ptr<SimulationRobot>(new SimulationRobot(*this));
@@ -1467,8 +1472,11 @@ void Simulation::cleanup() noexcept {
     Lock lock(session_);
     const auto world = stopped_world();
     if (world != 0) {
+        // One model recompile for the whole robot, not one per joint and body.
+        const bool batched = nksim_world_begin_topology_update(world) == NKSIM_OK;
         for (const auto joint : joints_) nksim_joint_destroy(world, joint);
         for (const auto body : bodies_) nksim_body_destroy(world, body);
+        if (batched) nksim_world_end_topology_update(world);
         for (const auto shape : link_shapes_) nksim_shape_destroy(world, shape);
         if (shape_ != 0) nksim_shape_destroy(world, shape_);
         nkscene_transaction transaction = 0;

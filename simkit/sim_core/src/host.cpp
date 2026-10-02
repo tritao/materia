@@ -43,6 +43,14 @@ void complete_request(const std::shared_ptr<StepRequest> &request, nksim_result 
     request->condition.notify_one();
 }
 
+// Builds without threads (Emscripten without pthreads) run an external host on the caller's thread: start()
+// publishes the first snapshot and step() steps inline. Realtime and unbounded hosts need their worker.
+#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
+constexpr bool host_threads = false;
+#else
+constexpr bool host_threads = true;
+#endif
+
 bool valid_host_mode(std::uint32_t mode) noexcept {
     return mode == NKSIM_HOST_MODE_REALTIME || mode == NKSIM_HOST_MODE_UNBOUNDED ||
         mode == NKSIM_HOST_MODE_EXTERNAL;
@@ -64,6 +72,19 @@ public:
         std::unique_lock lock(mutex);
         if (started)
             return NKSIM_ERROR_INVALID_STATE;
+        if (!host_threads) {
+            if (mode != NKSIM_HOST_MODE_EXTERNAL)
+                return NKSIM_ERROR_UNSUPPORTED;
+            started = true;
+            lock.unlock();
+            world->claim_thread();
+            const auto result = publish_snapshot();
+            std::lock_guard state(mutex);
+            last_error = result;
+            ready = true;
+            running = result == NKSIM_OK;
+            return result;
+        }
         started = true;
         worker = std::thread([this] { run(); });
         condition.wait(lock, [this] { return ready; });
@@ -85,6 +106,10 @@ public:
             std::lock_guard lock(mutex);
             if (!started)
                 return NKSIM_ERROR_INVALID_STATE;
+            if (!host_threads) {
+                running = false;
+                stop_requested = true;
+            }
             if (worker.joinable()) {
                 stop_requested = true;
                 condition.notify_all();
@@ -119,6 +144,16 @@ public:
         if (!out_result || !valid_struct_size(out_result->struct_size, sizeof(*out_result)))
             return NKSIM_ERROR_INVALID_ARGUMENT;
         auto request = std::make_shared<StepRequest>();
+        if (!host_threads) {
+            {
+                std::lock_guard lock(mutex);
+                if (!started || !running || stop_requested)
+                    return NKSIM_ERROR_INVALID_STATE;
+            }
+            perform_step(request);
+            *out_result = request->step;
+            return request->result;
+        }
         {
             std::lock_guard lock(mutex);
             if (!started || !running || stop_requested)

@@ -303,6 +303,10 @@ rk_result RobotRuntime::start() {
     if (externally_driven_ || running_ || stopping_ || endpoint_ == nullptr ||
         rk_robot_runtime_blueprint_validate(&blueprint_) != RK_OK)
         return RK_ERROR_INVALID_STATE;
+#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
+    // Only externally driven runtimes work in a build without threads.
+    return RK_ERROR_UNSUPPORTED;
+#endif
     running_ = true;
     worker_ = std::thread([this] { run(); });
     return RK_OK;
@@ -923,7 +927,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
     rk_command_kind final_kind = RK_COMMAND_NONE;
     uint64_t final_timestamp_ns = 0;
     rk_safety_state safety = RK_SAFETY_READY;
-    rk_robot_state current{};
+    rk_robot_state &current = owner_state_;
     {
         std::lock_guard state_lock(state_mutex_);
         current = state_;
@@ -1418,7 +1422,8 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
 
     const bool device_plan_cycle = endpoint_->executes_trajectory_queue() &&
         (!trajectory_.empty() || control_.trajectory_active || control_.stop_ramp_active);
-    rk_robot_command output{};
+    rk_robot_command &output = owner_output_;
+    std::memset(&output, 0, sizeof(output));
     output.struct_size = sizeof(output);
     output.timestamp_ns = has_command ? final_timestamp_ns : 0;
     if (lifecycle_command && !controlled_stop && final_kind != RK_COMMAND_HOLD &&
@@ -1513,7 +1518,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         output.kind = RK_COMMAND_JOINT_TARGETS;
         const auto period_seconds = std::chrono::duration<double>(period_).count();
         uint32_t active_count = 0;
-        rk_robot_state current{};
+        rk_robot_state &current = owner_target_state_;
         {
             std::lock_guard state_lock(state_mutex_);
             current = state_;

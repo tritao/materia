@@ -328,6 +328,10 @@ public:
     nksim_result start() {
         std::lock_guard lock(mutex);
         if (running_) return NKSIM_ERROR_INVALID_STATE;
+#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
+        // Running on its own needs a worker thread; without threads the owner steps the session.
+        return NKSIM_ERROR_UNSUPPORTED;
+#endif
         const auto hosted = ensure_host();
         if (hosted != NKSIM_OK) return hosted;
         sealed_ = true;
@@ -563,7 +567,7 @@ public:
                     const auto result = release_object(object_id);
                     if (result != NKSIM_OK) return result;
                 }
-        for (auto &part : found->second.parts) destroy_part(part);
+        batch_topology([&] { for (auto &part : found->second.parts) destroy_part(part); });
         actors_.erase(found);
         return NKSIM_OK;
     }
@@ -903,6 +907,13 @@ private:
         return NKSIM_OK;
     }
 
+    // Removes several parts with one backend rebuild rather than one per body; an update already open is joined.
+    template <typename Removal> void batch_topology(Removal removal) {
+        const bool batched = nksim_world_begin_topology_update(world_) == NKSIM_OK;
+        removal();
+        if (batched) (void)nksim_world_end_topology_update(world_);
+    }
+
     void destroy_part(Part &part) {
         if (part.body != 0) nksim_body_destroy(world_, part.body);
         if (part.shape != 0) nksim_shape_destroy(world_, part.shape);
@@ -1025,9 +1036,11 @@ private:
         stop();
         std::lock_guard lock(mutex);
         participants_.clear();
-        for (auto &[id, object] : objects_) destroy_part(object.part);
-        for (auto &[id, actor] : actors_)
-            for (auto &part : actor.parts) destroy_part(part);
+        batch_topology([&] {
+            for (auto &[id, object] : objects_) destroy_part(object.part);
+            for (auto &[id, actor] : actors_)
+                for (auto &part : actor.parts) destroy_part(part);
+        });
         objects_.clear();
         actors_.clear();
     }

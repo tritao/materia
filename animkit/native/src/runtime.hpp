@@ -37,6 +37,7 @@ struct IkChain {
     float pole[3] = {0.0f, 0.0f, 1.0f};
     float weight = 0.0f;
     float soften = 1.0f;
+    float keepEnd = 0.0f;
 };
 
 /**

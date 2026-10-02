@@ -26,7 +26,8 @@ guest="$build_dir/materia_guest.wasm"
 # Linear memory: the Emscripten host heap ends at host_limit and the guest's
 # managed heap fills the rest. Both sides must agree, so both are derived here.
 page_size=65536
-host_limit=${MATERIA_WEB_HOST_HEAP_BYTES:-134217728}
+# A scene with a CAD part, a worker and a stock simulation peaks near 240 MB of host heap while it simulates.
+host_limit=${MATERIA_WEB_HOST_HEAP_BYTES:-402653184}
 memory_size=${MATERIA_WEB_MEMORY_BYTES:-805306368}
 if (( host_limit % page_size != 0 || memory_size % page_size != 0 || host_limit >= memory_size )); then
 	echo "build.sh: memory sizes must be 64 KiB multiples with the host heap below the total" >&2
@@ -67,6 +68,8 @@ if [[ ! -f "$compiler" ]] || [[ -n $(find "$haxeon_dir/src" -name '*.hx' -newer 
 	"$haxeon_dir/.tools/haxe/haxe" --cwd "$haxeon_dir" -cp src -hl "$compiler" -main compiler.tools.HaxeonCompiler
 fi
 mapfile -t guest_arguments < <(python3 "$app_dir/web/tools/guest-arguments.py" "$app_dir/haxeon.json" "$build_dir/hxi")
+# The page's own services (materia.js), which only the browser guest imports.
+guest_arguments+=("--ffi-interface=$app_dir/web/MateriaWebFiles.hxi")
 (cd "$haxeon_dir" && LD_LIBRARY_PATH="$haxeon_dir/out:$haxeon_dir/.tools/hashlink${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
 	HAXEON_WASM_LEGACY_EXCEPTIONS=1 \
 	"$haxeon_dir/.tools/hashlink/hl" "$compiler" --target="$guest_target" --output="$guest" --entry=app.MainWeb \
@@ -86,22 +89,42 @@ exports="$build_dir/exports.json"
 node - "$guest" "$exports" <<'NODE'
 const fs = require("fs");
 const [guestPath, exportsPath] = process.argv.slice(2);
-const linked = new Set(["nativekit", "nativekit_gpu", "nativekit_ui", "nativekit_scene", "nativekit_scene_render"]);
+const linked = new Set(["nativekit", "nativekit_gpu", "nativekit_ui", "nativekit_scene", "nativekit_scene_render",
+  "nativekit_sim_core", "nativekit_sim_mujoco", "robotkit_runtime", "animkit_core", "stockkit_core"]);
+// CadKit links only with a browser build of OCCT (MATERIA_WEB_OCCT_DIR); otherwise it stays unavailable.
+if (process.env.MATERIA_WEB_OCCT_DIR) linked.add("cadkit-core");
 const module = new WebAssembly.Module(fs.readFileSync(guestPath));
 // haxeon-host.js allocates with malloc/free to hand the guest a host error message (haxeon.wasm.HostError).
 const names = new Set(["_main", "_malloc", "_free", "_nk_last_error", "_nkgpu_last_error", "_nkui_haxeon_memory_contract_status",
   "_nkui_haxeon_memory_contract_version", "_nkui_haxeon_memory_contract_page_size",
   "_nkui_haxeon_memory_contract_host_base", "_nkui_haxeon_memory_contract_host_limit",
   "_nkui_haxeon_memory_contract_guest_base", "_nkui_haxeon_memory_contract_guest_limit",
-  "_nkui_haxeon_memory_contract_memory_size"]);
+  "_nkui_haxeon_memory_contract_memory_size", "_nk_wasm_host_allocator_statistic"]);
 for (const entry of WebAssembly.Module.imports(module))
   if (entry.kind === "function" && linked.has(entry.module)) names.add("_" + entry.name);
 fs.writeFileSync(exportsPath, JSON.stringify([...names].sort()));
 NODE
+# MuJoCo and RobotKit fetch dependencies with FetchContent. Reuse sources desktop SimKit and RobotKit builds already
+# fetched (this checkout's or, from a worktree, the main checkout's), or MATERIA_WEB_DEPS; otherwise CMake downloads
+# them. The first directory holding a dependency wins.
+deps_args=()
+declare -A deps_seen=()
+main_checkout=$(cd "$(git -C "$materia_dir" rev-parse --git-common-dir)/.." && pwd)
+for deps_dir in "${MATERIA_WEB_DEPS:-}" "$materia_dir"/{simkit,robotkit}/build/_deps "$main_checkout"/{simkit,robotkit}/build/_deps; do
+	[[ -n "$deps_dir" && -d "$deps_dir" ]] || continue
+	for source in "$deps_dir"/*-src; do
+		[[ -d "$source" ]] || continue
+		name=$(basename "$source" -src)
+		[[ -z "${deps_seen[$name]:-}" ]] || continue
+		deps_seen[$name]=1
+		deps_args+=("-DFETCHCONTENT_SOURCE_DIR_${name^^}=$source")
+	done
+done
 source "$emsdk_dir/emsdk_env.sh" >/dev/null 2>&1
 emcmake cmake -S "$app_dir/web" -B "$build_dir/host" -G Ninja -DCMAKE_BUILD_TYPE="$build_type" \
 	-DMATERIA_WEB_GUEST_WASM="$guest" -DMATERIA_WEB_EXPORTS_FILE="$exports" \
-	-DNK_WASM_HOST_HEAP_LIMIT="$host_limit" -DMATERIA_WEB_GUEST_MEMORY_LIMIT="$memory_size" >/dev/null
+	-DNK_WASM_HOST_HEAP_LIMIT="$host_limit" -DMATERIA_WEB_GUEST_MEMORY_LIMIT="$memory_size" \
+	-DMATERIA_WEB_OCCT_DIR="${MATERIA_WEB_OCCT_DIR:-}" "${deps_args[@]}" >/dev/null
 cmake --build "$build_dir/host" --target materia_web
 # Instantiation stops at the first mismatched import; report them all here.
 node "$app_dir/web/tools/check-imports.js" "$guest" "$build_dir/host/materia_web.wasm" "$build_dir/host/materia_web.js"

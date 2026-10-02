@@ -265,6 +265,9 @@ void falling_body_updates_scene_and_snapshot() {
     assert(nksim_world_get_clock(world, &clock) == NKSIM_OK);
     assert(clock.step_index == 100);
     assert(std::abs(clock.time - 1.0) < 1e-12);
+    // Topology can be batched after stepping too (a session tears its bodies down this way).
+    assert(nksim_world_begin_topology_update(world) == NKSIM_OK);
+    assert(nksim_world_end_topology_update(world) == NKSIM_OK);
 
     nksim_body_state body_state{};
     body_state.struct_size = sizeof(body_state);

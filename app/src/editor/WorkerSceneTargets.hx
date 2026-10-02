@@ -2,7 +2,7 @@ package app.editor;
 
 import app.SceneObjectData;
 import app.EditorScene;
-import humankit.HumanJobTargets;
+import humankit.job.HumanJobTargets;
 import humankit.HumanTargetBox;
 
 /** Resolves document object IDs to the boxes used by HumanKit jobs. */

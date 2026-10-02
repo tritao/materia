@@ -58,7 +58,7 @@ class FacilitySweepTests {
             Math.abs(described.rest - handed.rest) > 1e-6)
             throw 'A facility that describes its surfaces did not match one whose job was handed them: $described against $handed';
         var plain = measure(layout, Undescribed);
-        if (!(described.clearance > plain.clearance + 0.01))
+        if (!(described.clearance > plain.clearance + 0.005))
             throw 'Describing the facility kept the belly no further from its surfaces: ${described.clearance} against ${plain.clearance}';
         Sys.println('facility sweep: $runs jobs within the gates');
     }

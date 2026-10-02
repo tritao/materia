@@ -1,4 +1,4 @@
-import humankit.HumanBone;
+import humankit.rig.HumanBone;
 
 /**
  * Pressing a wall panel with either hand, at three heights and three turns of the wall, through the same

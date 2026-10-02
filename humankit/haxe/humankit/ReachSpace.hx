@@ -6,6 +6,6 @@ enum abstract ReachSpace(Int) {
 	var World = 0;
 	/** The body's root frame: the target moves with the worker's feet but not with its torso. */
 	var Model = 1;
-	/** Relative to the chest: the target moves with the torso, so it stays in the same place against the shoulder as the body leans or straightens. */
-	var Torso = 2;
+	/** Relative to the limb's shoulder, in the model's axes: the target moves with the shoulder, so the arm keeps its shape as the body walks. */
+	var Shoulder = 2;
 }

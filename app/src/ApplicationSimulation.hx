@@ -384,11 +384,21 @@ class ApplicationSimulation {
     var elapsed = pumpStamp < 0.0 ? 0.0 : Math.max(0.0, now - pumpStamp);
     pumpStamp = now;
     var due = active.session.dueTicks(haxe.Int64.fromFloat(elapsed * 1.0e9), MAX_TICKS_PER_PUMP);
-    for (_ in 0...due) {
+    runTicks(due);
+  }
+
+  /**
+   * Runs `count` realtime ticks and presents once, as a frame of the running simulation does. Separate from `pump`
+   * so the cost of a frame can be measured without waiting on the wall clock.
+   */
+  public function runTicks(count:Int):Void {
+    var active = space;
+    if (active == null || !running) return;
+    for (_ in 0...count) {
       feedMembers();
       active.session.stepPaced();
     }
-    if (due > 0) presentMembers();
+    if (count > 0) presentMembers();
   }
 
   function feedMembers():Void {

@@ -137,6 +137,9 @@ typedef struct ak_bounds {
  * ancestors in that order but need not be direct parents. Positions are in scene space. weight blends
  * from the animated pose (0, which disables the chain) to the solution (1);
  * soften in (0, 1] eases the chain before it straightens, 1 for none.
+ * keep_end_rotation in [0, 1] turns the end joint back toward the orientation it had before the solve, in model
+ * space (0 leaves it turned with the shin and the rest of the chain, 1 restores it): a foot reached to a spot
+ * keeps lying flat on the floor instead of tilting with the leg.
  */
 typedef struct ak_two_bone_ik {
     uint32_t struct_size AK_STRUCT_SIZE;
@@ -147,6 +150,7 @@ typedef struct ak_two_bone_ik {
     float pole[3];
     float weight;
     float soften;
+    float keep_end_rotation;
 } ak_two_bone_ik;
 
 /** Returns this thread's last load failure, or an empty string. */

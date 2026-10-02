@@ -1,4 +1,4 @@
-import humankit.HumanJobTargets;
+import humankit.job.HumanJobTargets;
 import humankit.HumanTargetBox;
 
 class JobTargets implements HumanJobTargets {

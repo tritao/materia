@@ -22,6 +22,8 @@ class Page:
         self.socket = socket
         self.next_id = 0
         self.console = []
+        # Other protocol events, oldest first, for drivers that wait on one (file choosers, downloads).
+        self.events = []
 
     def command(self, method, params=None):
         self.next_id += 1
@@ -36,6 +38,8 @@ class Page:
                 text = " ".join(str(argument.get("value", argument.get("description", "")))
                                 for argument in params_.get("args", []))
                 self.console.append(f"[{params_.get('type')}] {text}")
+            elif event is not None and event != "Runtime.exceptionThrown":
+                self.events.append((event, params_))
             elif event == "Runtime.exceptionThrown":
                 details = params_.get("exceptionDetails", {})
                 self.console.append("[exception] " + (details.get("exception", {}).get("description")
