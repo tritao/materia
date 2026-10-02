@@ -530,9 +530,9 @@ bool TextEngine::measure_intrinsic_utf8(const char *text, const TextLayoutOption
                         SKB_ATTRIBUTE_SET_FROM_STATIC_ARRAY(attributes));
     const skb_rect2_t bounds = skb_layout_get_bounds(layout);
     const int32_t line_count = skb_layout_get_lines_count(layout);
-    const skb_layout_line_t *lines = skb_layout_get_lines(layout);
-    const bool has_baseline = line_count > 0 && lines && std::isfinite(lines[0].baseline);
-    const float baseline = has_baseline ? lines[0].baseline - bounds.y : 0.0f;
+    const float native_baseline = line_count > 0 ? skb_layout_get_line_at(layout, 0).baseline : 0.0f;
+    const bool has_baseline = line_count > 0 && std::isfinite(native_baseline);
+    const float baseline = has_baseline ? native_baseline - bounds.y : 0.0f;
     skb_layout_destroy(layout);
     const TextIntrinsicMetrics metrics{{bounds.x, bounds.y, bounds.width, bounds.height}, baseline,
                                        has_baseline};
@@ -628,14 +628,11 @@ bool TextEngine::layout_utf8(const char *text, float width, const TextLayoutOpti
                             layout_bounds.height};
     const auto offsets = utf8_codepoint_offsets(text);
     const int32_t lines_count = skb_layout_get_lines_count(retained->layout.get());
-    const skb_layout_line_t *lines = skb_layout_get_lines(retained->layout.get());
-    if (lines_count > 0 && !lines)
-        return false;
     layout_result.lines.reserve(static_cast<std::size_t>(std::max(lines_count, 0)));
     retained->line_ranges.reserve(static_cast<std::size_t>(std::max(lines_count, 0)));
     const int32_t text_count = skb_layout_get_text_count(retained->layout.get());
     for (int32_t index = 0; index < lines_count; ++index) {
-        const skb_layout_line_t &line = lines[index];
+        const auto line = skb_layout_get_line_at(retained->layout.get(), index);
         if (line.text_range.start < 0 || line.text_range.end < line.text_range.start ||
             line.text_range.end > text_count ||
             static_cast<std::size_t>(line.text_range.end) >= offsets.size())
@@ -668,8 +665,8 @@ bool TextEngine::layout_utf8(const char *text, float width, const TextLayoutOpti
 
 static bool same_rendered_line(const skb_layout_t *previous, const skb_layout_t *next,
                                int32_t old_index, int32_t new_index) {
-    const auto &a = skb_layout_get_lines(previous)[old_index];
-    const auto &b = skb_layout_get_lines(next)[new_index];
+    const auto a = skb_layout_get_line_at(previous, old_index);
+    const auto b = skb_layout_get_line_at(next, new_index);
     const auto same_bounds = [](skb_rect2_t x, skb_rect2_t y) {
         return x.x == y.x && x.y == y.y && x.width == y.width && x.height == y.height;
     };
@@ -687,11 +684,9 @@ static bool same_rendered_line(const skb_layout_t *previous, const skb_layout_t 
             skb_layout_get_text_at(next, b.text_range.start + i))
             return false;
     }
-    const auto *old_runs = skb_layout_get_layout_runs(previous);
-    const auto *new_runs = skb_layout_get_layout_runs(next);
     for (int32_t run = 0; run < a.layout_run_range.end - a.layout_run_range.start; ++run) {
-        const auto &x = old_runs[a.layout_run_range.start + run];
-        const auto &y = new_runs[b.layout_run_range.start + run];
+        const auto x = skb_layout_get_layout_run_at(previous, a.layout_run_range.start + run);
+        const auto y = skb_layout_get_layout_run_at(next, b.layout_run_range.start + run);
         auto old_bounds = x.bounds;
         auto new_bounds = y.bounds;
         old_bounds.x -= a.bounds.x;
@@ -752,11 +747,10 @@ bool TextEngine::edit_utf8(int32_t start, int32_t end, const char *replacement,
         const skb_rect2_t bounds = skb_layout_get_bounds(current->layout.get());
         layout_result.bounds = {bounds.x, bounds.y, bounds.width, bounds.height};
         const int32_t line_count = skb_layout_get_lines_count(current->layout.get());
-        const skb_layout_line_t *lines = skb_layout_get_lines(current->layout.get());
         std::vector<uint64_t> next_line_revisions;
         next_line_revisions.reserve(static_cast<std::size_t>(line_count));
         for (int32_t index = 0; index < line_count; ++index) {
-            const auto &line = lines[index];
+            const auto line = skb_layout_get_line_at(current->layout.get(), index);
             const auto &old_range = index < static_cast<int32_t>(current->line_ranges.size())
                 ? current->line_ranges[index] : line.text_range;
             const bool unchanged_text = line.text_range.start >= 0 &&
@@ -787,7 +781,7 @@ bool TextEngine::edit_utf8(int32_t start, int32_t end, const char *replacement,
         layout_result.lines.reserve(static_cast<std::size_t>(line_count));
         current->line_ranges.reserve(static_cast<std::size_t>(line_count));
         for (int32_t index = 0; index < line_count; ++index) {
-            const skb_layout_line_t &line = lines[index];
+            const auto line = skb_layout_get_line_at(current->layout.get(), index);
             current->line_ranges.push_back(line.text_range);
             const float top = std::min(line.bounds.y, line.culling_bounds.y);
             const float bottom = std::max(line.bounds.y + line.bounds.height,
