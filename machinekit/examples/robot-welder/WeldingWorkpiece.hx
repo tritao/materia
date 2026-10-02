@@ -6,6 +6,7 @@ import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 import machinekit.structural.FrameAssembly;
 import machinekit.structural.RectTube;
+import machinekit.welding.WeldMetal;
 import machinekit.welding.Weldment;
 
 /** One tube of a `FrameAssembly`, as a member of its own: the frame's geometry for that member, in the frame's own coordinates. */
@@ -61,6 +62,9 @@ class WeldingWorkpiece extends MachineAssembly {
 		addComponent("basePlate", new ArmBlock(PLATE_LENGTH, PLATE_WIDTH, PLATE_THICKNESS, "steel", "Base plate"));
 		addComponent("upright", new ArmBlock(uprightLength, UPRIGHT_THICKNESS, UPRIGHT_HEIGHT, "steel", "Upright"));
 		addMate("upright-mate", "fixed", "basePlate", "top", "upright", "base");
+		// The weld metal rides on the workpiece, at its origin, and carries the bead the welder lays.
+		addComponent("weldMetal", new WeldMetal());
+		addMate("weld-metal-mate", "fixed", "basePlate", "base", "weldMetal", "base");
 
 		// The tube frame: a beam lying on the table, its two posts standing on its top.
 		var tube = new RectTube(tubeSize, tubeSize, TUBE_WALL);
