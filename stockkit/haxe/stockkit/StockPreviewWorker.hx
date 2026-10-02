@@ -55,9 +55,14 @@ class StockPreviewWorker {
     }
     busy = true;
     condition.release();
+    // Only colouring by source reads the moves; the rest would copy the whole history.
+    var withHistory = switch coloring {
+      case BySource(_, _): true;
+      case _: false;
+    };
     var snapshot:Null<StockSnapshot> = null;
     try {
-      snapshot = source.snapshot();
+      snapshot = source.snapshot(withHistory);
     } catch (error:Dynamic) {
       condition.acquire();
       busy = false;
