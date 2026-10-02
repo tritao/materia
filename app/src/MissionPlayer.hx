@@ -296,11 +296,10 @@ class MissionPlayer implements SessionMember {
     settle();
   }
 
-  /**
-   * Back to the first step; the next tick starts it from wherever the reset put the robot. The
-   * session has already started the robot's runtime over, so the step that was running is dropped,
-   * not cancelled: a cancel would stop the fresh runtime.
-   */
+  /** The step that was running stops through the robot's runtime, which still answers until the session resets. */
+  public function beforeReset():Void runner.cancel();
+
+  /** Back to the first step; the next tick starts it from wherever the reset put the robot. */
   public function reset():Void {
     runner = new SkillRunner();
     stepIndex = 0;

@@ -704,6 +704,19 @@ class ProjectSourceTests {
       again = simulation.heldObjectIds().length > 0;
     }
     check(again, 'the mission picks again after a reset (${mission.failure})');
+    // A reset in the middle of a step cancels that step through the robot's runtime, still answering, and the
+    // mission starts over without a fault.
+    check(simulation.heldObjectIds().length > 0, "the workpiece is held when the reset comes");
+    check(simulation.reset(), "the arm simulation resets with a step running");
+    check(mission.failure == null && mission.stepIndex == 0 && mission.completed == 0,
+      'a reset mid-step starts the mission over without a failure (${mission.failure})');
+    var thrice = false;
+    until = simulation.activeSession().simulationTime() + 30;
+    while (!thrice && simulation.activeSession().simulationTime() < until) {
+      simulation.step();
+      thrice = simulation.heldObjectIds().length > 0;
+    }
+    check(thrice && mission.failure == null, 'the mission picks again after a reset mid-step (${mission.failure})');
     session.dispose();
     Sys.println('robot arm mission: ${log.join(", ")} s');
   }
@@ -800,7 +813,7 @@ class ProjectSourceTests {
     }
     var allocatedPerTick = (hl.Gc.totalAllocated() - allocatedBefore) / steps;
     var collections = hl.Gc.collections() - collectionsBefore;
-    // About 42 KB a tick when measured (2026-10-02, sensor values pooled per snapshot): mostly robot snapshots, then the stock's cut moves.
+    // About 46 KB a tick when measured (2026-10-02, sensor values pooled per snapshot): mostly robot snapshots, then the stock's cut moves.
     check(allocatedPerTick < 80000, 'the router allocates under 80 KB a simulated tick, got ${Math.round(allocatedPerTick)} bytes');
     // The pass ends with the drill; the next pass, started as this one is counted, loads the end mill again.
     var changes = tools.join(",");

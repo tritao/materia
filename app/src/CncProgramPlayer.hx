@@ -404,6 +404,8 @@ class CncProgramPlayer implements SessionMember {
 	}
 
 	/** The session is back at its start, and the robot with it: run the program again on fresh stock. */
+	public function beforeReset():Void {}
+
 	public function reset():Void {
 		motion = newMotion();
 		if (speedOverride != 1.0) motion.setSpeedOverride(speedOverride);

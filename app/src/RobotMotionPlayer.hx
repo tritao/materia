@@ -66,6 +66,8 @@ class RobotMotionPlayer implements SessionMember {
 		}
 	}
 
+	public function beforeReset():Void {}
+
 	public function reset():Void {}
 
 	public function present():Void {}
