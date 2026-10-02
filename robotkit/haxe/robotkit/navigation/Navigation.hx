@@ -175,7 +175,15 @@ class Navigation {
     var dy = goal.pose.y - state.pose.y;
     var goalDistance = Math.pow(dx * dx + dy * dy, 0.5);
     var headingError = Pose2.wrapAngle(goal.pose.yaw - state.pose.yaw);
-    if (currentTrajectory == null && goalDistance <= goal.positionTolerance) positionReached = true;
+    // Within the tolerance it keeps closing in while the goal still lies ahead in its direction of
+    // travel, and latches once it is close (a quarter of the tolerance), has gone past, or has stopped:
+    // braking can carry it on, but must not send it back along the path.
+    if (currentTrajectory == null && goalDistance <= goal.positionTolerance && !positionReached) {
+      var ahead = (goal.pose.x - state.pose.x) * Math.cos(state.pose.yaw) + (goal.pose.y - state.pose.y) * Math.sin(state.pose.yaw);
+      var travel = commandedLinearSpeed;
+      if (goalDistance <= 0.25 * goal.positionTolerance || Math.abs(travel) < 1e-3 || ahead * travel <= 0.0)
+        positionReached = true;
+    }
     if ((goalDistance <= goal.positionTolerance || positionReached) &&
         Math.abs(headingError) <= goal.headingTolerance) {
       base.stop(StopMode.Normal);

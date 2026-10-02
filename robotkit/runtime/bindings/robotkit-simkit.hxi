@@ -22,6 +22,11 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	const RK_MAX_LINK_HULLS = 512;
 	const RK_MAX_LINK_SHAPES = 256;
 	/**
+	 * Joints hold the robot's designed pose from the start, as servos enabled at power-on do, until
+	 * a command targets them; a reset holds them there again. Coupled followers follow their leader.
+	 */
+	const RK_SIMULATION_ROBOT_HOLD_AT_REST = 1;
+	/**
 	 * Contact involving one robot link. tool_piece_index is -1 for link geometry.
 	 * other_object is nonzero only for Object contacts. RobotLink contacts carry
 	 * zero-based other_robot/other_link; World covers unowned geometry.
@@ -451,13 +456,9 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		position: array<f64, 3> @offset(32);
 		rotation: array<f64, 4> @offset(56);
 	}
-	/**
-	 * Optional settings for one robot added to a Simulation. An initial_pose whose
-	 * struct_size is zero keeps the default placement.
-	 */
 	struct rk_simulation_robot_desc @layout(2470416, 8) {
 		struct_size: u32 @offset(0) @struct_size;
-		reserved0: u32 @offset(4);
+		flags: u32 @offset(4);
 		initial_pose: rk_simulation_pose @offset(8);
 		reserved: array<u64, 2> @offset(72);
 		virtual_device_enabled: u32 @offset(88);

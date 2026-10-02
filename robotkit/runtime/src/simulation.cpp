@@ -615,6 +615,14 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         const auto topology_result = nksim_world_end_topology_update(world);
         topology_update = false;
         require_sim(topology_result, "nksim_world_end_topology_update");
+        if (robot_desc && (robot_desc->flags & RK_SIMULATION_ROBOT_HOLD_AT_REST)) {
+            std::vector<uint8_t> held(blueprint.joint_count, 0);
+            for (uint32_t index = 0; index < blueprint.joint_count; ++index)
+                held[index] = binding->actuated_joints_[index];
+            for (uint32_t index = 0; index < blueprint.coupling_count; ++index)
+                held[blueprint.couplings[index].follower] = 0;
+            binding->hold_at_rest(std::move(held));
+        }
         bindings_.push_back(binding);
         virtual_bindings_.push_back(virtual_endpoint ? binding : nullptr);
         virtual_devices_.push_back(virtual_endpoint);

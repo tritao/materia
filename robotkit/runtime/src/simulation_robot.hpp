@@ -30,6 +30,12 @@ public:
         std::fill(commanded_.begin(), commanded_.end(), JointCommand{});
         stopped_ = false;
         reset_sensors();
+        queue_rest_holds();
+    }
+    /** Holds `joints` (flags by robot joint) at the designed pose until commanded, and after resets. */
+    void hold_at_rest(std::vector<uint8_t> joints) {
+        held_at_rest_ = std::move(joints);
+        queue_rest_holds();
     }
     void reset_sensors() noexcept {
         for (auto &sensor : sensors_) {
@@ -72,6 +78,8 @@ private:
     std::vector<nksim_joint> joints_;
     std::vector<uint8_t> actuated_joints_;
     std::vector<nksim_joint_target> pending_targets_;
+    std::vector<uint8_t> held_at_rest_;
+    void queue_rest_holds() noexcept;
     // Last target mode/value the backend holds per robot joint. Commands
     // applied during a tick are staged and only committed when the tick hands
     // them to the backend, so discarded commands never count as applied.

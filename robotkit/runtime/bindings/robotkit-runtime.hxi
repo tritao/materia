@@ -4,6 +4,14 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 * < Adds simulation virtual-device link-loss injection.
 	 */
 	const RK_API_VERSION = 21;
+	/**
+	 * < Keep the output, as a gripper holding a part must.
+	 */
+	const RK_CHANNEL_KEEP_ON_STOP = 1;
+	/**
+	 * < Go to the safe value, as a spindle or sprayer must.
+	 */
+	const RK_CHANNEL_SAFE_ON_STOP = 0;
 	const RK_COLLISION_APPROXIMATION_BOUNDS_BOX = 1;
 	const RK_COLLISION_APPROXIMATION_NONE = 0;
 	/**
@@ -339,6 +347,12 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 */
 	extern fn rk_robot_runtime_destroy(runtime: rk_robot_runtime) -> void;
 	/**
+	 * Reads a process channel's current output value without draining any events, as the device on
+	 * that channel sees it: the last value fired, or the declared safe value before any. Fails with
+	 * RK_ERROR_INVALID_ARGUMENT for a channel the robot does not declare.
+	 */
+	extern fn rk_robot_runtime_get_channel_value(runtime: rk_robot_runtime, channel: utf8, out_value: ptr<rk_event_value>) -> rk_result;
+	/**
 	 * Drains process-output changes. An overflow flag means earlier records were lost.
 	 */
 	extern fn rk_robot_runtime_poll_events(runtime: rk_robot_runtime, out_batch: ptr<rk_event_record_batch>) -> rk_result;
@@ -405,10 +419,11 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 * Validates a mutable native state value and its array counts.
 	 */
 	extern fn rk_robot_state_validate(state: ptr<const<rk_robot_state>>) -> rk_result;
-	struct rk_channel_declaration @layout(128, 8) {
+	struct rk_channel_declaration @layout(136, 8) {
 		id: array<c_char, 48> @offset(0);
 		kind: rk_event_kind @offset(48);
 		safe_value: rk_event_value @offset(56);
+		stop_policy: rk_channel_stop_policy @offset(128);
 	}
 	struct rk_event_record @layout(152, 8) {
 		plan_id: u64 @offset(0);
@@ -660,7 +675,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		limit_damping_ratio: f64 @offset(32);
 		limit_impedance: array<f64, 5> @offset(40);
 	}
-	struct rk_robot_runtime_blueprint @layout(267760, 8) {
+	struct rk_robot_runtime_blueprint @layout(268016, 8) {
 		/**
 		 * < Set to sizeof this struct.
 		 */
@@ -729,12 +744,12 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		/**
 		 * < Joint relations compiled from RobotModel v5.
 		 */
-		coupling_count: u32 @offset(210400);
-		couplings: array<rk_robot_joint_coupling, 512> @offset(210408);
+		coupling_count: u32 @offset(210656);
+		couplings: array<rk_robot_joint_coupling, 512> @offset(210664);
 		/**
 		 * Versioned: absent means no passive dynamics. Indexed by joint.
 		 */
-		joint_dynamics: array<rk_robot_joint_dynamics, 512> @offset(222696);
+		joint_dynamics: array<rk_robot_joint_dynamics, 512> @offset(222952);
 		/**
 		 * Versioned: how far, in joint units, an observed position may pass a
 		 * joint limit before the runtime faults. Zero keeps limits exact. A robot
@@ -742,7 +757,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		 * stops, needs room for a simulator's or joint's compliant stops.
 		 * Commanded positions must still lie within the limits.
 		 */
-		observed_limit_tolerance: f64 @offset(263656);
+		observed_limit_tolerance: f64 @offset(263912);
 		/**
 		 * Versioned: per-joint overtravel in joint units, indexed by joint: how
 		 * far a joint can travel past its position limits before it meets its end
@@ -752,7 +767,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		 * plus observed_limit_tolerance, and a simulation puts the joint's end
 		 * stops at the limits widened by it. Zero puts the stops at the limits.
 		 */
-		joint_overtravel: array<f64, 512> @offset(263664);
+		joint_overtravel: array<f64, 512> @offset(263920);
 	}
 	/**
 	 * One compiled joint and its limits in a RobotRuntimeBlueprint.
@@ -1061,6 +1076,11 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		value: rk_event_value @offset(56);
 		hold_policy: rk_event_hold_policy @offset(128);
 	}
+	/**
+	 * What a channel's output does when the robot stops on command or aborts its motion. Faults and
+	 * emergency stops always take every channel to its safe value.
+	 */
+	type rk_channel_stop_policy = u32;
 	/**
 	 * Kind of command batch submitted to a runtime mailbox.
 	 */

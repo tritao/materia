@@ -133,9 +133,18 @@ typedef struct rk_simulation_contact_pair {
  * Optional settings for one robot added to a Simulation. An initial_pose whose
  * struct_size is zero keeps the default placement.
  */
+/** rk_simulation_robot_desc.flags bits. */
+enum {
+    /**
+     * Joints hold the robot's designed pose from the start, as servos enabled at power-on do, until
+     * a command targets them; a reset holds them there again. Coupled followers follow their leader.
+     */
+    RK_SIMULATION_ROBOT_HOLD_AT_REST = 1
+};
+
 typedef struct rk_simulation_robot_desc {
     uint32_t struct_size RK_STRUCT_SIZE;
-    uint32_t reserved0;
+    uint32_t flags;
     rk_simulation_pose initial_pose;
     uint64_t reserved[2];
     /* Optional when struct_size includes this tail. 0 keeps the direct

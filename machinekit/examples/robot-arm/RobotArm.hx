@@ -123,6 +123,9 @@ typedef ArmJointSpec = {
  * vertical (j6 about the tool axis), while `j2`, `j3` and `j5` pitch about a horizontal axis.
  * Every housing belongs to the link before it, so each revolute mate joins a housing's rotor to
  * the next link's start.
+ *
+ * Built `withCell`, it stands in its own work cell: a table, two pads and a workpiece in front of it
+ * (-Y). Without, it is the arm alone, to stand on something else by its pedestal's `floor`.
  */
 class RobotArm extends MachineAssembly {
 	public static inline var PEDESTAL_HEIGHT:Float = 300;
@@ -152,7 +155,7 @@ class RobotArm extends MachineAssembly {
 	public final links:Array<ArmLink>;
 	public final specs:Array<ArmJointSpec>;
 
-	public function new() {
+	public function new(withCell:Bool = true) {
 		super();
 		pedestal = new Pedestal(flange, PEDESTAL_HEIGHT, 100);
 		var j1 = new ArmJoint(100, 70), j2 = new ArmJoint(100, 90), j3 = new ArmJoint(80, 90);
@@ -199,7 +202,8 @@ class RobotArm extends MachineAssembly {
 		exposeConnector("toolContact", "tool/cup", "contact");
 		// The ejector's compressed-air inlet is the arm's own service input.
 		exposePort("compressedAir", "tool/ejector", "air");
-		addCell();
+		exposeConnector("floor", "pedestal", "floor");
+		if (withCell) addCell();
 	}
 
 	/**

@@ -9,6 +9,7 @@ import robotkit.world.TrajectoryChunk;
 import robotkit.world.ExecutionPlanSubmission;
 import robotkit.world.FiredProcessEvent;
 import robotkit.world.ProcessEventCodec;
+import robotkit.world.ProcessEventValue;
 import robotkit.world.ProcessHoldPolicy;
 import robotkit.world.ProcessChannelDeclaration;
 import robotkit.world.ProcessTimedEvent;
@@ -318,6 +319,18 @@ class RobotRuntime {
     }
     scratchMutex.release();
     return {events:result, overflow:overflow};
+  }
+
+  /**
+   * A process channel's current output value, as the device on it sees it, without draining the
+   * events `pollEvents` reports.
+   */
+  public function channelValue(channel:String):ProcessEventValue {
+    ensureLive();
+    var value = new rk_event_value();
+    check(RobotKitRuntime.rk_robot_runtime_get_channel_value(owner.borrow(), channel, value),
+      'runtime.channelValue("$channel")');
+    return ProcessEventCodec.decode(value);
   }
 
   /** Submits all position targets in one native call. */

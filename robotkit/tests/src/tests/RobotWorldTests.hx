@@ -1793,9 +1793,16 @@ class RobotWorldTests {
     var sideways = new NavigationGoal(new Pose2(1.0, 0.0, Math.PI / 2), "odom", 0.05, 0.05);
     latchNavigation.follow(new Path([new Pose2(), sideways.pose], "odom"), sideways);
     latchNavigation.updateObservation(wheelSample("nav-latch", 2, 0.0), 0.1);
+    // 2 cm short of the goal, inside its 5 cm tolerance: the goal is still ahead, so it closes in.
     latchNavigation.updateObservation(wheelSample("nav-latch", 3, 9.8), 0.1);
-    check(spinning(latchRobot), "Navigation turns to the goal heading once within the position tolerance");
-    var latchStatus = latchNavigation.updateObservation(wheelSample("nav-latch", 4, 10.7), 0.1);
+    check(switch latchRobot.lastCommand {
+      case JointTargets(targets, _): targets[0].target > 0.0 && targets[1].target > 0.0;
+      case _: false;
+    }, "Navigation keeps closing in on a goal still ahead inside its tolerance");
+    // Rolled 1 cm past it: latched, it turns in place to the goal heading.
+    latchNavigation.updateObservation(wheelSample("nav-latch", 4, 10.1), 0.1);
+    check(spinning(latchRobot), "Navigation turns to the goal heading once it has reached the goal");
+    var latchStatus = latchNavigation.updateObservation(wheelSample("nav-latch", 5, 10.7), 0.1);
     check(switch latchStatus { case Following: true; case _: false; } && spinning(latchRobot),
       "Navigation keeps turning in place after rolling back out of the position tolerance");
 
@@ -4281,8 +4288,12 @@ class RobotWorldTests {
     var adapter = new ChannelToolAdapter();
     adapter.bindSprayerFlow("sprayer.flow", sprayer, 1.5);
     var recorded = new RobotRecording();
+    function flowing():Bool return switch runtime.channelValue("sprayer.flow") { case Digital(on): on; case _: false; };
+    check(!flowing(), "a channel reads its safe value before any event fires");
+    var seen = new Map<Int, Bool>();
     for (tick in 1...36) {
       simulationHarness.step(Int64.ofInt(tick * 10000000));
+      seen.set(tick, flowing());
       var batch = runtime.pollEvents();
       check(!batch.overflow, "runtime event polling stays within capacity");
       for (event in batch.events) {
@@ -4296,6 +4307,32 @@ class RobotWorldTests {
     equal(sprayer.history[1].timestampNs, Int64.ofInt(300000000),
       "sprayer receives the later scheduled trajectory time");
     equal(recorded.processEvents.length, 2, "recording captures fired runtime events");
+    check(seen.get(5) == false && seen.get(20) == true && seen.get(35) == false,
+      "a channel's value follows the events fired on it, without draining them");
+    simulationHarness.dispose();
+    // A commanded stop takes an ordinary channel to its safe value but leaves one that keeps on stop,
+    // such as a vacuum holding a part; that one still goes safe on an emergency stop.
+    var holdBlueprint = RobotRuntimeCompiler.compile(model);
+    holdBlueprint.channels.push(new ProcessChannelDeclaration("sprayer.flow", ProcessEventValue.Digital(false)));
+    holdBlueprint.channels.push(new ProcessChannelDeclaration("tool.vacuum", ProcessEventValue.Digital(false), true));
+    simulationHarness = new SimulationHarness();
+    var holdRuntime = simulationHarness.simulation.addRobot(holdBlueprint);
+    function on(channel:String):Bool return switch holdRuntime.channelValue(channel) { case Digital(value): value; case _: false; };
+    var holdSegment = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(500000000), [[0.0, 0.0]]);
+    holdRuntime.submitPlan(new ExecutionPlanSubmission(Int64.ofInt(701), Int64.ofInt(holdBlueprint.revision),
+      Int64.ofInt(holdBlueprint.calibrationRevision), RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
+      [0.0], [0.0], [0.0], [holdSegment], null, null, null, null, null, true,
+      [new ProcessTimedEvent(Int64.ofInt(50000000), "sprayer.flow", ProcessEventValue.Digital(true)),
+       new ProcessTimedEvent(Int64.ofInt(50000000), "tool.vacuum", ProcessEventValue.Digital(true))]), 1);
+    for (tick in 1...11) simulationHarness.step(Int64.ofInt(tick * 10000000));
+    check(on("sprayer.flow") && on("tool.vacuum"), "both channels turn on with the plan");
+    holdRuntime.submitStop(2, false);
+    // Let the stop run to completion, which clears the runtime's motion state.
+    for (tick in 11...80) simulationHarness.step(Int64.ofInt(tick * 10000000));
+    check(!on("sprayer.flow") && on("tool.vacuum"), "a commanded stop keeps a keep-on-stop channel and safes the rest");
+    holdRuntime.submitStop(3, true);
+    for (tick in 80...83) simulationHarness.step(Int64.ofInt(tick * 10000000));
+    check(!on("tool.vacuum"), "an emergency stop takes even a keep-on-stop channel safe");
     simulationHarness.dispose();
   }
 

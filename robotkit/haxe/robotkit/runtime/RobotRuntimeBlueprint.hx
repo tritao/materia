@@ -138,6 +138,8 @@ class RobotRuntimeBlueprint {
       var safe = ProcessEventCodec.encode(channel.safeValue);
       nativeChannel.set_kind(safe.get_kind());
       nativeChannel.set_safe_value(safe);
+      nativeChannel.set_stop_policy(channel.keepOnStop ? RobotKitRuntimeConstants.RK_CHANNEL_KEEP_ON_STOP
+        : RobotKitRuntimeConstants.RK_CHANNEL_SAFE_ON_STOP);
       value.set_channels(index, nativeChannel);
     }
     for (joint in 0...jointCount) {

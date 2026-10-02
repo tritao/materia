@@ -705,8 +705,9 @@ class ProgramCompiler {
       var pieces = Std.int(Math.max(1, Math.max(Math.ceil(length / cartesianResolution),
         Math.ceil(length * curvature / 0.25))));
       for (piece in 1...(pieces + 1)) {
-        var local = length * piece / pieces;
         var last = piece == pieces;
+        // Exactly the end: `length * pieces / pieces` can round one ulp past it.
+        var local = last ? length : length * piece / pieces;
         var next = last && k + 1 < path.primitives.length ? path.primitives[k + 1] : null;
         samples.push(next == null ?
           {distance: start + local, primitive: primitive, local: local, arriving: null} :
