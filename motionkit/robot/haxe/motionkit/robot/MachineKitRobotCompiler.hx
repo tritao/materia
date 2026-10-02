@@ -80,9 +80,11 @@ class MachineKitRobotCompiler {
       var ratio = 2.0 * Math.PI /
         (binding.axis.transmission.lead * binding.axis.transmission.direction *
           MILLIMETRES_TO_METRES);
-      model.addActuator(new Actuator('${binding.id}.motor.${binding.axis.motor.designation}',
+      var motor = new Actuator('${binding.id}.motor.${binding.axis.motor.designation}',
         0.0, maxVelocity * Math.abs(ratio),
-        Transmission.SimpleTransmission(shaftId, 1.0, 0.0)));
+        Transmission.SimpleTransmission(shaftId, 1.0, 0.0));
+      motor.fullStepsPerRevolution = fullSteps(binding.axis.motor);
+      model.addActuator(motor);
     }
     return MotionSystemBlueprint.fromRobotModel(model, axes);
   }
@@ -200,10 +202,18 @@ class MachineKitRobotCompiler {
     joint.limits.maxAcceleration = maxAcceleration;
     var travelPerRevolutionMetres = axis.nut.travelPerRevolution() * MILLIMETRES_TO_METRES;
     var ratio = 2.0 * Math.PI / travelPerRevolutionMetres;
-    model.addActuator(new Actuator('$id.motor.${axis.motor.designation}',
+    var motor = new Actuator('$id.motor.${axis.motor.designation}',
       0.0, maxVelocity * Math.abs(ratio),
-      Transmission.SimpleTransmission(joint.id, ratio, 0.0)));
+      Transmission.SimpleTransmission(joint.id, ratio, 0.0));
+    motor.fullStepsPerRevolution = fullSteps(axis.motor);
+    model.addActuator(motor);
     return joint;
+  }
+
+  /** Full steps in a turn of a stepper: its rating's step angle, or the NEMA standard 1.8 degrees. */
+  static function fullSteps(motor:machinekit.motion.NemaStepper):Float {
+    var rating = motor.rating();
+    return rating == null ? 200.0 : 360.0 / rating.stepAngle;
   }
 
   static function requireAxis(axis:LinearAxis, id:String):Void {

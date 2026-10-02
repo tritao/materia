@@ -209,6 +209,7 @@ class RobotWorldTests {
     testRobotResetPose();
     SimulationPoseResetTests.run(0);
     SimulationPoseResetTests.coupledLimits();
+    assertions += DeviceBindingTests.run();
     SharedSessionTests.run();
     testConfiguredSensors();
     testCameraFrameProtocol();
