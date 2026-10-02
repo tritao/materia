@@ -238,6 +238,38 @@ Kinematics through the whole stack, with ratios still given as numbers.
 - **Gate:** the CoreXY machine runs a program in simulation and on the
   virtual device, and moving one motor moves the head diagonally.
 
+### Device steps and identity (done)
+
+A real stepper board used to get no layout from the serial path: an identity
+map at a hard-coded 1000 steps per unit, and a layout fingerprint compiled into
+firmware, so any configuration change needed a reflash. Each fact now lives in
+one place.
+
+- **The model owns the motor.** `Actuator.fullStepsPerRevolution` (zero for a
+  non-stepper) comes from the stepper's rating (360 / step angle) through
+  `MachineAssembly.addMotor`, the assembly format and the RobotKit bridge. A
+  stepper's actuator coordinate is the rotor angle in radians.
+- **The deployment owns the wiring.** `DeviceLayout` channels name an
+  `actuator`, a `direction` (1 or -1), the driver's `microsteps`, and
+  optionally `direction_setup_ticks` and `skew_bound`. Microstepping lives
+  here, not in the model or the firmware: it is a driver setting.
+- **The board owns only board facts**: its channel count, pins, tick rates and
+  unique id (on an STM32G4, the 96-bit unique-ID register). Firmware is per
+  board type, not per machine.
+- **`DeviceBinding.bind(model, layout, stepTickHz)` joins them.** Per channel:
+  joint, ratio (signed by direction) and offset from the transmission, steps
+  per radian = full steps × microsteps / 2π, and a rate ceiling of
+  min(actuator rate, step tick / steps per radian). It fails loudly on a
+  stepper with no channel, a channel with no actuator or a non-stepper, or two
+  channels on one actuator. It also returns the model with those ceilings, which
+  `coupledLimits`, the runtime compiler and the CNC player plan on, so the
+  planner's limits are the device's real ceiling.
+- **Identity and agreement are checked while the session opens (RKD6 v12).**
+  The session names the controller it is for; the board refuses another id but
+  reports its own, so `robotd identify` can read it. The board acknowledges a
+  64-bit FNV-1a digest of the configuration it received, which the host
+  compares with its own, along with the channel count and the step tick.
+
 ### Later
 
 Belt stretch and screw backlash in simulation (following error), screw
