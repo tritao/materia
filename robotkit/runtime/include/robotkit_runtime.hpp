@@ -284,6 +284,8 @@ private:
         /** Source-clock time a velocity target lapses (0: never); see rk_robot_command.expires_at_ns. */
         uint64_t velocity_expiry_ns[RK_MAX_JOINTS]{};
         std::deque<QueuedEvent> events; ///< The trajectory queue itself is `trajectory_`.
+        /** End of the queue a device that executes it was running at its latest report. */
+        uint64_t device_queue_end_ns = 0;
         rk_event_value channel_values[RK_MAX_PROCESS_CHANNELS]{};
         rk_event_value last_fired_values[RK_MAX_PROCESS_CHANNELS]{};
         rk_event_hold_policy channel_hold_policies[RK_MAX_PROCESS_CHANNELS]{};

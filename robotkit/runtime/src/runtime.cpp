@@ -785,6 +785,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
             control_.trajectory_time_remainder_ns;
         if (control_.plan_just_submitted) {
             control_.plan_just_submitted = false;
+            control_.device_queue_end_ns = 0;
         } else if (!control_.stop_ramp_active && !control_.hold_requested &&
                    !control_.resume_requested) {
             // The runtime's copy of a device's queue follows the device: it
@@ -792,12 +793,17 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
             // ran on the owner clock alone would retire knots the device has
             // not executed (and take an append for a new plan). The device
             // reports its queue running from submission (path time 0 until it
-            // starts); once it has finished, or failed, the copy runs out on
-            // the owner clock.
-            if (device_running)
+            // starts). Once it has finished, or failed, the copy is done at
+            // once up to the end of the queue the device was running, and
+            // runs out on the owner clock through anything appended since.
+            if (device_running) {
                 time_ns = std::max(time_ns, static_cast<double>(device_path_time_ns));
-            else
+                control_.device_queue_end_ns = trajectory_.back().point.time_from_start_ns;
+            } else {
                 time_ns += static_cast<double>(period_ns);
+                if (endpoint_->executes_trajectory_queue())
+                    time_ns = std::max(time_ns, static_cast<double>(control_.device_queue_end_ns));
+            }
         } else if (control_.stop_ramp_active || control_.hold_requested) {
             // Path-following stop. A joint moves at rate * v and accelerates
             // at rate' * v + rate^2 * a, where v and a belong to the queued
