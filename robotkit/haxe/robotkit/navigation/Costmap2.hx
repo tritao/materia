@@ -20,8 +20,15 @@ class Costmap2 {
   public final unknownIsBlocked:Bool;
   public final inflationCostDistanceMeters:Float;
   public final inflationCostWeight:Float;
+  /** Counts the changes to the costs, so a view of them can tell when to redraw. */
+  public var revision(default, null):Int = 0;
 
   var dynamicObstacles:Array<Obstacle> = [];
+  /** The grid's own layer, kept apart so a change of dynamic obstacles does not rasterize the grid again. */
+  var staticBlocked:Array<Bool>;
+  var staticLethal:Array<Bool>;
+  var staticCosts:Array<Float>;
+  /** The costs in force: the static layer, or a copy of it with the dynamic obstacles drawn in. */
   var blockedValues:Array<Bool>;
   var lethalValues:Array<Bool>;
   var costs:Array<Float>;
@@ -64,13 +71,34 @@ class Costmap2 {
           (y + 0.5) * grid.resolutionMeters, halfCellDiagonal);
       }
     }
+    staticBlocked = blockedValues;
+    staticLethal = lethalValues;
+    staticCosts = costs;
+    drawDynamicObstacles();
+  }
+
+  /** The costs in force: the grid's layer, plus a disk per dynamic obstacle. */
+  function drawDynamicObstacles():Void {
+    revision++;
+    if (dynamicObstacles.length == 0) {
+      blockedValues = staticBlocked;
+      lethalValues = staticLethal;
+      costs = staticCosts;
+      return;
+    }
+    blockedValues = staticBlocked.copy();
+    lethalValues = staticLethal.copy();
+    costs = staticCosts.copy();
     for (obstacle in dynamicObstacles) {
       var local = obstacle.detection.pose.relativeTo(grid.origin);
       rasterizeObstacle(local.x, local.y, obstacle.radiusMeters);
     }
   }
 
-  /** Replaces the dynamic obstacle layer and refreshes costs. */
+  /**
+   * Replaces the dynamic obstacle layer and refreshes costs. An unchanged set (a sensor that has not
+   * scanned since) costs nothing; a changed one redraws only the disks, not the grid.
+   */
   public function setDynamicObstacles(obstacles:Array<Obstacle>):Void {
     if (obstacles == null) throw "Costmap2 obstacles cannot be null";
     for (obstacle in obstacles) {
@@ -78,13 +106,28 @@ class Costmap2 {
       if (obstacle.detection.frameId != grid.frameId)
         throw 'Dynamic obstacle ${obstacle.detection.id} is in frame ${obstacle.detection.frameId}; expected ${grid.frameId}';
     }
+    if (sameObstacles(obstacles)) return;
     dynamicObstacles = obstacles.copy();
-    refresh();
+    drawDynamicObstacles();
   }
 
   public function clearDynamicObstacles():Void {
     dynamicObstacles = [];
-    refresh();
+    drawDynamicObstacles();
+  }
+
+  /** The dynamic obstacles now in the layer. */
+  public function dynamicLayer():Array<Obstacle> return dynamicObstacles.copy();
+
+  function sameObstacles(next:Array<Obstacle>):Bool {
+    if (next.length != dynamicObstacles.length) return false;
+    for (index in 0...next.length) {
+      var a = next[index], b = dynamicObstacles[index];
+      if (a.radiusMeters != b.radiusMeters || a.detection.pose.x != b.detection.pose.x ||
+          a.detection.pose.y != b.detection.pose.y)
+        return false;
+    }
+    return true;
   }
 
   public function contains(x:Int, y:Int):Bool return grid.contains(x, y);

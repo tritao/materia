@@ -69,9 +69,7 @@ class LidarObstaclePerception implements Perception {
       if (frame == null || frame.kind != "lidar" || frame.values.length == 0) continue;
       var rays = frame.values.length;
       var fullCircle = Math.abs(fieldOfViewRadians - Math.PI * 2.0) <= 1e-6;
-      var angleIncrement = fullCircle
-        ? fieldOfViewRadians / rays
-        : (rays <= 1 ? 0.0 : fieldOfViewRadians / (rays - 1));
+      var angleIncrement = increment(rays, fieldOfViewRadians);
       var clusters:Array<Array<LidarPoint>> = [];
       var active:Array<LidarPoint> = [];
       for (index in 0...rays) {
@@ -81,7 +79,7 @@ class LidarObstaclePerception implements Perception {
           active = [];
           continue;
         }
-        var angle = startAngleRadians + angleIncrement * index;
+        var angle = bearing(index, rays, startAngleRadians, fieldOfViewRadians);
         var point = new LidarPoint(index, range * Math.cos(angle),
           range * Math.sin(angle), range);
         if (active.length > 0 && !connects(active[active.length - 1], point,
@@ -136,6 +134,19 @@ class LidarObstaclePerception implements Perception {
     }
     return new PerceptionSnapshot(detections, obstacles);
   }
+
+  /** Angle between adjacent rays of a scan of `rays` returns over `fieldOfViewRadians`. */
+  static function increment(rays:Int, fieldOfViewRadians:Float):Float {
+    var fullCircle = Math.abs(fieldOfViewRadians - Math.PI * 2.0) <= 1e-6;
+    return fullCircle
+      ? fieldOfViewRadians / rays
+      : (rays <= 1 ? 0.0 : fieldOfViewRadians / (rays - 1));
+  }
+
+  /** Bearing of ray `index` in the sensor frame, as the simulated sensor lays its rays out. */
+  public static function bearing(index:Int, rays:Int, startAngleRadians:Float,
+      fieldOfViewRadians:Float):Float
+    return startAngleRadians + increment(rays, fieldOfViewRadians) * index;
 
   function connects(from:LidarPoint, to:LidarPoint, angularStep:Float):Bool {
     var dx = to.x - from.x;

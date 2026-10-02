@@ -137,6 +137,7 @@ import robotkit.perception.FiducialTargetConfig;
 import robotkit.perception.Obstacle;
 import robotkit.perception.DockingTarget;
 import robotkit.perception.LidarObstaclePerception;
+import robotkit.perception.LidarMapFilter;
 import robotkit.perception.PinholeCameraIntrinsics;
 import robotkit.perception.PointCloudObstaclePerception;
 import robotkit.perception.GroundTruthPerception;
@@ -1962,6 +1963,38 @@ class RobotWorldTests {
     check(switch guard.state { case Blocked(_): true; case _: false; },
       "MotionGuard blocks when obstacle frame transforms are unavailable");
     guard.detach();
+
+    // Stopped short of an obstacle ahead and to the side, the base may turn away from it: it is held
+    // only by an obstacle within reach of its turning circle, not by the corridor it is not driving down.
+    var corner = new Obstacle(new Detection("corner", "obstacle", 1.0, new Pose2(0.5, 0.35), "map",
+      Int64.ofInt(1), Int64.ofInt(10), Int64.ofInt(10), "sim-clock", "host-clock"), 0.1);
+    var driving = new Navigation(base, localization, 0.2, 0.6, 1.0);
+    var corridorGuard = new MotionGuard(driving, null, 0.2, 2.0, 0.1, 0.5);
+    driving.follow(new Path([new Pose2(), new Pose2(5.0, 0.0, 0.0)], "map"));
+    corridorGuard.update(new PerceptionSnapshot([], [corner]), 0.1);
+    check(switch corridorGuard.state { case Blocked(_): true; case _: false; } &&
+      Math.abs(base.currentCommand().linear) < 1e-9,
+      "MotionGuard stops a base driving at an obstacle inside its margin");
+    driving.cancel();
+    driving.follow(new Path([new Pose2(0.0, 0.0, Math.PI * 0.75), new Pose2(-3.0, 3.0, Math.PI * 0.75)], "map"));
+    corridorGuard.update(new PerceptionSnapshot([], [corner]), 0.1);
+    check(switch corridorGuard.state { case Clear: true; case _: false; } &&
+      Math.abs(base.currentCommand().linear) < 1e-9 && Math.abs(base.currentCommand().angular) > 0.1,
+      'MotionGuard lets a stopped base turn away from an obstacle it cannot drive at (${Std.string(corridorGuard.state)}, ${base.currentCommand().linear}, ${base.currentCommand().angular})');
+    // Held short of it but asked to curve away, it pivots instead of stopping dead.
+    driving.cancel();
+    driving.follow(new Path([new Pose2(0.0, 0.0, -0.46), new Pose2(3.0, -1.5, -0.46)], "map"));
+    corridorGuard.update(new PerceptionSnapshot([], [corner]), 0.1);
+    check(switch corridorGuard.state { case Blocked(_): true; case _: false; } &&
+      Math.abs(base.currentCommand().linear) < 1e-9 && base.currentCommand().angular < -0.05,
+      'MotionGuard lets a base held short of an obstacle pivot away along its route (${Std.string(corridorGuard.state)}, ${base.currentCommand().linear}, ${base.currentCommand().angular})');
+    var touching = new Obstacle(new Detection("touching", "obstacle", 1.0, new Pose2(0.4, 0.3), "map",
+      Int64.ofInt(1), Int64.ofInt(10), Int64.ofInt(10), "sim-clock", "host-clock"), 0.1);
+    corridorGuard.update(new PerceptionSnapshot([], [touching]), 0.1);
+    check(switch corridorGuard.state { case Blocked(_): true; case _: false; } &&
+      Math.abs(base.currentCommand().angular) < 1e-9,
+      "MotionGuard holds a stopped base whose turn would swing into an obstacle");
+    corridorGuard.detach();
     robot.close();
     simulationHarness.dispose();
   }
@@ -2035,6 +2068,19 @@ class RobotWorldTests {
     dynamicCostmap.clearDynamicObstacles();
     check(dynamicCostmap.isTraversable(2, 2) && dynamicCostmap.cellCost(3, 2) == 0.0,
       "costmap clears removed dynamic obstacles");
+    // The grid's own layer survives dynamic changes, and an unchanged set is not redrawn.
+    dynamicGrid.setCell(0, 0, OccupancyCell.Occupied);
+    dynamicCostmap.refresh();
+    dynamicCostmap.setDynamicObstacles([dynamicObstacle]);
+    var drawn = dynamicCostmap.revision;
+    dynamicCostmap.setDynamicObstacles([dynamicObstacle]);
+    check(dynamicCostmap.revision == drawn && dynamicCostmap.dynamicLayer().length == 1 &&
+      !dynamicCostmap.isTraversable(0, 0) && !dynamicCostmap.isTraversable(2, 2),
+      "costmap keeps an unchanged dynamic layer as it is");
+    dynamicCostmap.clearDynamicObstacles();
+    check(dynamicCostmap.revision == drawn + 1 && !dynamicCostmap.isTraversable(0, 0) &&
+      dynamicCostmap.isTraversable(2, 2),
+      "costmap clearing the dynamic layer leaves the grid's obstacles");
 
     // A 0.1 m obstacle and a 0.3 m robot: a cell is lethal within 0.4 m of the
     // obstacle and blocked within 0.4 m plus half a 0.2 m cell diagonal.
@@ -2856,6 +2902,27 @@ class RobotWorldTests {
     equal(framedObstacle.radiusMeters, obstacles[0].radiusMeters,
       "frame-aware perception retains obstacle geometry");
     equal(lidar.frameId, "base", "frame-aware perception does not mutate input sensor frames");
+
+    // A map explains the returns that land on it: a wall at the first ray's hit point goes, the
+    // return on free floor stays.
+    var knownMap = new OccupancyGrid2(0.1, new Pose2(), 100, 50, "map", OccupancyCell.Free);
+    knownMap.setCell(40, 22, OccupancyCell.Occupied);
+    var mappedFrame = new SensorFrame("front-lidar", "lidar", "laser", Int64.ofInt(10), Int64.ofInt(140),
+      [1.0, 10.0, 2.0, 10.0], Int64.ofInt(150), "base", [0.2, 0.0, 0.3], laserMount.rotation,
+      "robot-boot", "host-clock");
+    var mappedSnapshot = new RobotSnapshot("framed-lidar", Int64.ofInt(10), Int64.ofInt(140), [0.75], [0.0], [0.0],
+      1, 0, Int64.ofInt(150), [mappedFrame], "robot-boot", "host-clock");
+    var unmapped = new FrameAwarePerception(perception, new FixedLocalization(mapEstimate)).observeRobotSnapshot(
+      mappedSnapshot, perceptionModel, articulatedBlueprint, "base");
+    equal(unmapped.obstacles().length, 2, "without a map both returns are obstacles");
+    var mappedPerception = new FrameAwarePerception(perception, new FixedLocalization(mapEstimate), null,
+      new LidarMapFilter(knownMap, 0.1, 10.0));
+    var leftOver = mappedPerception.observeRobotSnapshot(mappedSnapshot, perceptionModel, articulatedBlueprint, "base")
+      .obstacles();
+    check(leftOver.length == 1 && Math.abs(leftOver[0].detection.pose.x - 7.0) < 1e-9 &&
+      Math.abs(leftOver[0].detection.pose.y - 2.2) < 1e-9,
+      "a LiDAR map filter drops the returns the map explains and keeps the rest");
+    equal(mappedFrame.values.get(0), 1.0, "the map filter does not change the frame it was given");
 
     var detections = observed.detections();
     detections.pop();

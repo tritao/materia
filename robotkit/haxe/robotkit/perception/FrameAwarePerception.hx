@@ -20,14 +20,17 @@ class FrameAwarePerception implements Perception {
   public final source:Perception;
   public final localization:Localization;
   public var frames(default, null):FrameTree2;
+  /** Reads the sensor frames before `source` does, with each one's sensor placed in the reference frame. */
+  public final scanFilter:Null<ScanFilter>;
 
   public function new(source:Perception, localization:Localization,
-      ?frames:FrameTree2 = null) {
+      ?frames:FrameTree2 = null, ?scanFilter:ScanFilter) {
     if (source == null || localization == null)
       throw "Frame-aware perception requires a source and localization";
     this.source = source;
     this.localization = localization;
     this.frames = frames == null ? new FrameTree2() : frames;
+    this.scanFilter = scanFilter;
   }
 
   public function observe(sensorFrames:Array<SensorFrame>):PerceptionSnapshot {
@@ -36,7 +39,10 @@ class FrameAwarePerception implements Perception {
     if (estimate == null || estimate.quality == LocalizationQuality.Invalid)
       throw "Frame-aware perception requires a valid localization state";
 
-    var observed = source.observe(sensorFrames);
+    var filter = scanFilter;
+    var scans = filter == null ? sensorFrames : [for (frame in sensorFrames)
+      filter.applies(frame) ? filter.filter(frame, referenceFromFrame(frame.frameId, estimate)) : frame];
+    var observed = source.observe(scans);
     var detections = [for (value in observed.detections()) transformDetection(value, estimate)];
     var obstacles = [for (value in observed.obstacles()) new Obstacle(
       transformDetection(value.detection, estimate), value.radiusMeters)];
@@ -76,9 +82,13 @@ class FrameAwarePerception implements Perception {
   function transformPose(pose:Pose2, sourceFrame:String,
       estimate:LocalizationState):Pose2 {
     if (sourceFrame == estimate.referenceFrame) return pose;
-    var referenceFromSource = sourceFrame == estimate.bodyFrame
+    return referenceFromFrame(sourceFrame, estimate).compose(pose);
+  }
+
+  function referenceFromFrame(sourceFrame:String, estimate:LocalizationState):Pose2 {
+    if (sourceFrame == estimate.referenceFrame) return new Pose2();
+    return sourceFrame == estimate.bodyFrame
       ? estimate.pose
       : estimate.pose.compose(frames.lookup(estimate.bodyFrame, sourceFrame));
-    return referenceFromSource.compose(pose);
   }
 }
