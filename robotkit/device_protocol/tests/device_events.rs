@@ -1,6 +1,6 @@
 #![cfg(feature = "std")]
 use robotkit_device_protocol::device_wire6::{Event6, SessionBegin6};
-use robotkit_device_protocol::{DeviceEvents, Output, VirtualBoard};
+use robotkit_device_protocol::{DeviceEvents, Output, StopReason, VirtualBoard};
 
 fn session() -> SessionBegin6 {
     let mut session = SessionBegin6::decode(&[0; SessionBegin6::SIZE]).unwrap();
@@ -53,7 +53,7 @@ fn event_pair_follows_path_clock_across_hold_and_stop() {
         matches!(r.output, Output::Digital(_, _))).collect();
     assert_eq!(fired[0].ticks, 100);
     assert_eq!(fired[3].ticks, 300);
-    events.stop(&mut board);
+    events.stop(&mut board, StopReason::Stop);
     assert_eq!(board.digital(0), Some(false));
 }
 
@@ -71,6 +71,24 @@ fn replacement_discards_uncommitted_events() {
     events.commit(400);
     events.tick(400, &mut board);
     assert_eq!(board.digital(0), Some(true));
-    events.stop(&mut board);
+    events.stop(&mut board, StopReason::Stop);
     assert_eq!(board.digital(0), Some(false));
+}
+
+#[test]
+fn a_kept_channel_holds_through_a_commanded_stop_but_not_an_emergency_stop() {
+    let mut kept = session();
+    kept.channel_stop_policy[0] = 1;
+    for (reason, held) in [(StopReason::Stop, true), (StopReason::Abort, true),
+                           (StopReason::EmergencyStop, false), (StopReason::LinkLost, false)] {
+        let mut board = VirtualBoard::<1, 32>::new(1_000_000, 0, 0, [1.0]);
+        let mut events = DeviceEvents::<4>::new(&kept);
+        events.queue_begin(1, 0, 0).unwrap();
+        events.push(digital_event(1, 100, true)).unwrap();
+        events.commit(200);
+        events.tick(100, &mut board);
+        assert_eq!(board.digital(0), Some(true));
+        events.stop(&mut board, reason);
+        assert_eq!(board.digital(0), Some(held), "{reason:?}");
+    }
 }

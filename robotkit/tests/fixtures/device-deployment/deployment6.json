@@ -12,7 +12,7 @@
     "clock_sync_bound_ns": 30000000,
     "layout": "layout.json",
     "schema_lock": "../../../schema/device_wire6.lock.json",
-    "fingerprint": "f022b46c4eedc9f6a80701975071b832",
+    "fingerprint": "01a2050f045a044a4f789a6599b93473",
     "target_error": 1e-06
   }
 }
