@@ -83,9 +83,11 @@ class MissionPlayer implements SessionMember {
   public var failure(default, null):Null<String> = null;
 
   final robot:AssemblyRobot;
-  final runner = new SkillRunner();
+  var runner = new SkillRunner();
   /** The arm and its suction tool's vacuum sensor, when the mission picks and places. */
-  final handling:Null<HandlingPlanRunner>;
+  var handling:Null<HandlingPlanRunner>;
+  /** Makes the arm's handling runner afresh: a reset starts the robot's runtime over, plans and all. */
+  final newHandling:Null<Void->HandlingPlanRunner>;
   /** Where the tool's contact rides: its link and its frame there, in metres. */
   var toolLink:Int = -1;
   var toolTip:Null<AssemblyFrame> = null;
@@ -139,6 +141,7 @@ class MissionPlayer implements SessionMember {
     var suctions = [for (tool in project.robotTools) if (tool.kind == "suction") tool];
     if (!handles) {
       handling = null;
+      newHandling = null;
       vacuumSensor = null;
     } else {
       if (suctions.length != 1) throw 'A mission that picks needs one suction tool, the robot has ${suctions.length}';
@@ -156,8 +159,9 @@ class MissionPlayer implements SessionMember {
       tcp.position = [tip.x, tip.y, tip.z];
       tcp.rotation = [tip.qx, tip.qy, tip.qz, tip.qw];
       var arm = new Manipulator(model, model.links[0].id, tcp.id);
-      handling = HandlingPlanRunner.create(robot.robot, arm, () -> robot.runtime.pollEvents(), tool.channel,
+      newHandling = () -> HandlingPlanRunner.create(robot.robot, arm, () -> robot.runtime.pollEvents(), tool.channel,
         ARM_ACCELERATION);
+      handling = newHandling();
     }
   }
 
@@ -220,14 +224,19 @@ class MissionPlayer implements SessionMember {
     settle();
   }
 
-  /** Back to the first step; the next tick starts it from wherever the reset put the robot. */
+  /**
+   * Back to the first step; the next tick starts it from wherever the reset put the robot. The
+   * session has already started the robot's runtime over, so the step that was running is dropped,
+   * not cancelled: a cancel would stop the fresh runtime.
+   */
   public function reset():Void {
-    runner.cancel();
+    runner = new SkillRunner();
     stepIndex = 0;
     completed = 0;
     failure = null;
     grasped = null;
-    // The cancelled runner starts the first step on the next tick.
+    var make = newHandling;
+    if (make != null) handling = make();
   }
 
   public function present():Void {}

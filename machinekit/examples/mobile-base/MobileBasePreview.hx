@@ -46,24 +46,9 @@ class MobileBasePreview {
 		return SceneArtifact.encode(scene);
 	}
 
-	/**
-	 * The robot's tools as its arm's end effector declares them: each suction cup's contact, worked by
-	 * the effector's vacuum control channel and reporting on its pressure sensor when it has one.
-	 */
-	static function robotTools(robot:MobileBase, prefix:String):Array<materia.project.SceneArtifact.SceneArtifactRobotTool> {
-		var arm = robot.arm;
-		if (arm == null) return [];
-		var toolPrefix = prefix + "arm/tool";
-		var controls = machinekit.robotics.EndEffectorControls.derive(arm.tool, toolPrefix);
-		var channel = controls.vacuumChannel();
-		if (channel == null) throw "The arm's suction tool has no vacuum control";
-		return [for (suction in controls.suctions) {
-			var tool:materia.project.SceneArtifact.SceneArtifactRobotTool = {kind: "suction",
-				contact: {occurrence: toolPrefix + "/" + suction.member, connector: suction.connector}, channel: channel};
-			if (controls.vacuumSensor != null) tool.sensor = controls.vacuumSensor;
-			tool;
-		}];
-	}
+	/** The tools of the arm the base carries, if any. */
+	static function robotTools(robot:MobileBase, prefix:String):Array<materia.project.SceneArtifact.SceneArtifactRobotTool>
+		return robot.arm == null ? [] : AssemblyPreview.robotTools(robot.arm.tool, prefix + "arm/tool");
 
 	/** The drive of `robot`, whose joints carry `prefix`: wheel radius and track measured from its assembly. */
 	static function drive(robot:MobileBase, prefix:String):SceneArtifactMobileBase

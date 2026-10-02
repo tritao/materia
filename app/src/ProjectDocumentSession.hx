@@ -78,7 +78,6 @@ class ProjectDocumentSession {
   public var customMaterials(default, null):Array<MaterialDef> = [];
   public var robotMotions(default, null):Array<RobotMotionTrack> = [];
   /** Vacuum commands the open project ships with; they are not part of the saved document. */
-  public var robotGrips(default, null):Array<RobotGripEvent> = [];
   /** The project's machining job, run on its machine in the simulation. */
   public var cncJob(default, null):Null<CncJob> = null;
   /** The project's assembly is a wheeled robot that drives on the floor in the simulation. */
@@ -238,7 +237,7 @@ class ProjectDocumentSession {
     openGeneratedScene(generated.objects, manifestPath, generated.assembly,
       generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
       generated.localCentersByDefinition, generated.metresPerUnit,
-      generated.physical, generated.recipeDocument, generated.robotMotions, generated.robotGrips,
+      generated.physical, generated.recipeDocument, generated.robotMotions,
       generated.faceDescriptorsByDefinition, generated.cncJob, generated.mobileBase, generated.mission, generated.robotTools);
 
   /** Open generated geometry while retaining its source manifest. */
@@ -247,7 +246,7 @@ class ProjectDocumentSession {
       ?assemblyDefinition:AssemblyDefinition, ?assemblyState:AssemblyStateRecord,
       ?localCentersByDefinition:Map<String, Array<Float>>, metresPerUnit:Float = 1.0,
       ?physical:AssemblyPhysicalData, ?recipeText:String, ?motions:Array<RobotMotionTrack>,
-      ?grips:Array<RobotGripEvent>, ?faceDescriptors:Map<String, String>, ?cnc:CncJob,
+      ?faceDescriptors:Map<String, String>, ?cnc:CncJob,
       ?mobile:SceneArtifactMobileBase, ?work:SceneArtifactMission, ?tools:Array<SceneArtifactRobotTool>):Void {
     if (data == null || data.length == 0)
       throw "Generated project preview contains no scene objects";
@@ -283,7 +282,6 @@ class ProjectDocumentSession {
     installAssemblyRuntime(assemblyDefinition, runtime, localCentersByDefinition, metresPerUnit, null, faceDescriptors);
     projectPhysical = physical;
     robotMotions = motions == null ? [] : motions.copy();
-    robotGrips = grips == null ? [] : grips.copy();
     cncJob = cnc;
     mobileBase = mobile;
     mission = work;
@@ -371,7 +369,6 @@ class ProjectDocumentSession {
       overlaid.overlay, generatedDefinition, overlaid.problem);
     projectPhysical = generated.physical;
     robotMotions = generated.robotMotions == null ? [] : generated.robotMotions.copy();
-    robotGrips = generated.robotGrips == null ? [] : generated.robotGrips.copy();
     cncJob = generated.cncJob;
     mobileBase = generated.mobileBase;
     mission = generated.mission;
@@ -977,7 +974,6 @@ class ProjectDocumentSession {
     projectPhysical = null;
     customMaterials = [];
     robotMotions = [];
-    robotGrips = [];
     cncJob = null;
     mobileBase = null;
     mission = null;

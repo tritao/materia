@@ -8,6 +8,9 @@ import materia.assembly.AssemblyDefinition.AssemblyComponentDefinition;
 import materia.project.MaterialLibrary;
 import materia.project.SceneArtifact.SceneArtifactData;
 import materia.project.SceneArtifact.SceneArtifactPart;
+import materia.project.SceneArtifact.SceneArtifactRobotTool;
+import machinekit.robotics.EndEffector;
+import machinekit.robotics.EndEffectorControls;
 import materia.units.LengthUnit;
 
 /**
@@ -47,6 +50,23 @@ class AssemblyPreview {
 	 * takes the connectors of every occurrence that shares it; two occurrences may name the same
 	 * connector only with the same frame, since the scene holds one frame per name.
 	 */
+	/**
+	 * A robot's tools as its end effector `tool` declares them, its members' occurrences under
+	 * `prefix`: each suction cup's contact, worked by the effector's vacuum control channel and
+	 * reporting on its pressure sensor when it has one.
+	 */
+	public static function robotTools(tool:EndEffector, prefix:String):Array<SceneArtifactRobotTool> {
+		var controls = EndEffectorControls.derive(tool, prefix);
+		var channel = controls.vacuumChannel();
+		if (channel == null) throw "The suction tool has no vacuum control";
+		return [for (suction in controls.suctions) {
+			var entry:SceneArtifactRobotTool = {kind: "suction",
+				contact: {occurrence: prefix + "/" + suction.member, connector: suction.connector}, channel: channel};
+			if (controls.vacuumSensor != null) entry.sensor = controls.vacuumSensor;
+			entry;
+		}];
+	}
+
 	public static function shareDefinitions(definition:AssemblyDefinition, definitionByOccurrence:Map<String, String>):Void {
 		function sharedId(id:String):String {
 			var shared = definitionByOccurrence.get(id);

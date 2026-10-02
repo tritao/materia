@@ -79,7 +79,6 @@ class MateriaProjectRunner {
     var manifestPath = FileSystem.fullPath(projectPath);
     var motion = motionDocument(manifestPath);
     scene.robotMotions = projectMotions(motion, scene);
-    scene.robotGrips = RobotGripEvent.decode(motion == null ? null : Reflect.field(motion, "grips"));
     applyDynamicParts(manifestPath, scene);
     return scene;
   }
@@ -122,13 +121,15 @@ class MateriaProjectRunner {
 
   /**
    * Joint motion the project ships with. The manifest's optional `robotMotions` names a JSON file
-   * `{"version": 1, "tracks": [{"joint": "<assembly joint id>", "loop": true, "keys": [...]}],
-   * "grips": [{"time": 1.4, "link": "<assembly link id>", "action": "grip"}]}` beside it. Positions
-   * are joint coordinates relative to the generated initial pose, like every motion track, and the
-   * tracks drive the project's own assembly in a simulation.
+   * `{"version": 1, "tracks": [{"joint": "<assembly joint id>", "loop": true, "keys": [...]}]}`
+   * beside it. Positions are joint coordinates relative to the generated initial pose, like every
+   * motion track, and the tracks drive the project's own assembly in a simulation. Work with a
+   * tool (picking, placing) is a mission of skills, not timed commands beside the tracks.
    */
   static function projectMotions(document:Dynamic, scene:GeneratedAssemblyScene):Array<RobotMotionTrack> {
     if (document == null) return [];
+    if (Reflect.hasField(document, "grips"))
+      throw "Project motion grips are no longer supported: pick and place with the scene's mission";
     var definition = scene.assemblyDefinition;
     if (definition == null) throw "Project robot motions need a kinematic assembly";
     var raw:Array<Dynamic> = [for (track in (cast Reflect.field(document, "tracks"):Array<Dynamic>)) {
@@ -537,7 +538,7 @@ class MateriaProjectRunner {
       assemblyState: state.record(), localCentersByDefinition: generated.localCentersByDefinition,
       faceDescriptorsByDefinition: generated.faceDescriptorsByDefinition, metresPerUnit: generated.metresPerUnit, physical: generated.physical,
       recipeDocument: generated.recipeDocument, recipeDiagnostics: generated.recipeDiagnostics,
-      robotMotions: generated.robotMotions, robotGrips: generated.robotGrips, cncJob: generated.cncJob,
+      robotMotions: generated.robotMotions, cncJob: generated.cncJob,
       mobileBase: generated.mobileBase, mission: generated.mission, robotTools: generated.robotTools};
   }
 
@@ -683,8 +684,6 @@ typedef GeneratedAssemblyScene = {
   @:optional var recipeDiagnostics:Array<String>;
   /** Joint motion the project ships with, applied to its own assembly in simulation. */
   @:optional var robotMotions:Array<RobotMotionTrack>;
-  /** Vacuum commands that go with the motion: which tool grips or lets go, and when. */
-  @:optional var robotGrips:Array<RobotGripEvent>;
   /** The machining job the project's generator made for its machine, if any. */
   @:optional var cncJob:CncJob;
   /** The assembly is a wheeled robot driving on the floor, when the generator says so. */
