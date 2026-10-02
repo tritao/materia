@@ -75,6 +75,8 @@ class MachineAssembly {
 	final bomItems:Array<{item:BomItem, quantity:Int, mass:AssemblyBomMass}> = [];
 	final memberConnectorFrames:Array<{instanceId:String, name:String, frame:AssemblyFrame}> = [];
 	final nestedEntries:Array<MutableIncludedRecord> = [];
+	/** Couplings whose ratio their parts set, by coupling id. */
+	final drives:Array<machinekit.assembly.MachineAssemblyDescription.DriveRecord> = [];
 	final massByDefinition:Map<String, machinekit.component.MassProperties> = [];
 
 	public function new() {}
@@ -158,6 +160,12 @@ class MachineAssembly {
 			memberConnectors: [for (entry in memberConnectorFrames) {instanceId: entry.instanceId,
 				name: entry.name, frame: copyFrame(entry.frame)}],
 			tools: emptyTools,
+			drives: {
+				var saved = [for (drive in drives) copyDrive(drive, "")];
+				saved.sort((a, b) -> Reflect.compare(a.coupling, b.coupling));
+				// Left out when empty, so descriptions without drives keep their saved form.
+				saved.length == 0 ? null : saved;
+			},
 			bomExtras: [for (entry in bomItems) {item: copyBomItem(entry.item), quantity: entry.quantity,
 				mass: switch entry.mass {
 					case Unknown: machinekit.assembly.MachineAssemblyDescription.SavedBomMass.Unknown;
@@ -261,6 +269,10 @@ class MachineAssembly {
 		}
 		if (mechanical.couplings != null) for (coupling in mechanical.couplings)
 			result.addCoupling(coupling.id, coupling.source, coupling.target, coupling.ratio, coupling.offset);
+		// A driven coupling's ratio comes from its parts as they are now, not as they were saved.
+		// The coupling decides whether there is one: a drive whose coupling was removed goes too.
+		if (description.machine.drives != null) for (drive in description.machine.drives)
+			if (result.applyDrive(drive)) result.drives.push(copyDrive(drive, ""));
 		for (connection in description.machine.portConnections)
 			result.connectPorts(connection.id, connection.fromInstance, connection.fromPort,
 				connection.toInstance, connection.toPort);
@@ -309,6 +321,10 @@ class MachineAssembly {
 			if (StringTools.startsWith(coupling.id, prefix))
 				child.addCoupling(coupling.id.substr(prefix.length), coupling.source.substr(prefix.length),
 					coupling.target.substr(prefix.length), coupling.ratio, coupling.offset);
+		for (drive in drives) if (StringTools.startsWith(drive.coupling, prefix))
+			child.drives.push({coupling: drive.coupling.substr(prefix.length), kind: drive.kind,
+				members: [for (member in drive.members) member.substr(prefix.length)],
+				alignment: drive.alignment, leaderZero: drive.leaderZero});
 		for (connection in portConnections) if (StringTools.startsWith(connection.id, prefix) &&
 			StringTools.startsWith(connection.fromInstance, prefix) &&
 			StringTools.startsWith(connection.toInstance, prefix))
@@ -331,6 +347,7 @@ class MachineAssembly {
 		target.mechanical.occurrences = copy.occurrences;
 		target.mechanical.joints = copy.joints;
 		target.mechanical.couplings = copy.couplings;
+		for (drive in drives) target.drives.push(copyDrive(drive, ""));
 		for (entry in included) target.included.push({id: entry.id,
 			assembly: entry.assembly.snapshot(), pose: entry.pose == null ? null : copyFrame(entry.pose)});
 		for (entry in nestedEntries) target.nestedEntries.push({id: entry.id,
@@ -562,6 +579,7 @@ class MachineAssembly {
 		if (assembly.mechanical.couplings != null) for (coupling in assembly.mechanical.couplings)
 			addCoupling(join(id, coupling.id), join(id, coupling.source), join(id, coupling.target),
 				coupling.ratio, coupling.offset);
+		for (drive in assembly.drives) drives.push(copyDrive(drive, id));
 		for (connection in assembly.portConnections)
 			connectPorts(join(id, connection.id), join(id, connection.fromInstance),
 				connection.fromPort, join(id, connection.toInstance), connection.toPort);
@@ -606,6 +624,87 @@ class MachineAssembly {
 		addJoint({id: id, type: cast kind, role: AssemblyJointRole.Closure, parent: parent,
 			parentConnector: parentConnector, child: child, childConnector: childConnector,
 			axis: axis, limits: resolvedLimits(limits), defaultValue: 0}, tolerance);
+
+	/**
+	 * Couple joint `follower` to `leader` through the parts of `drive`, which set the ratio: the
+	 * follower sits at zero where the leader is at `leaderZero`. Rebuilding the assembly from its
+	 * description works the ratio out again from the parts' values then. Returns the ratio.
+	 */
+	public function addDrive(id:String, leader:String, follower:String, drive:Drive, leaderZero:Float = 0):Float {
+		var record:machinekit.assembly.MachineAssemblyDescription.DriveRecord = switch drive {
+			case LeadScrew(screw, alignment): {coupling: id, kind: "lead-screw", members: [screw],
+				alignment: alignment, leaderZero: leaderZero};
+			case GearMesh(driver, driven, alignment): {coupling: id, kind: "gear-mesh", members: [driver, driven],
+				alignment: alignment, leaderZero: leaderZero};
+			case RackAndPinion(pinion, alignment): {coupling: id, kind: "rack-and-pinion", members: [pinion],
+				alignment: alignment, leaderZero: leaderZero};
+			case Belt(pulley, alignment): {coupling: id, kind: "belt", members: [pulley],
+				alignment: alignment, leaderZero: leaderZero};
+		};
+		var ratio = driveRatio(record);
+		addCoupling(id, leader, follower, ratio, -ratio * leaderZero);
+		drives.push(record);
+		return ratio;
+	}
+
+	/** The drive behind coupling `id`, or null when its ratio is a plain number. */
+	public function drive(id:String):Null<machinekit.assembly.MachineAssemblyDescription.DriveRecord> {
+		for (entry in drives) if (entry.coupling == id) return copyDrive(entry, "");
+		return null;
+	}
+
+	/** Follower radians (or units) per leader unit, from the drive's parts as they are now. */
+	function driveRatio(drive:machinekit.assembly.MachineAssemblyDescription.DriveRecord):Float {
+		if (!(Math.abs(drive.alignment) == 1)) throw 'Drive "${drive.coupling}" needs an alignment of 1 or -1';
+		function part(index:Int):MachineComponent {
+			if (drive.members.length <= index) throw 'Drive "${drive.coupling}" names too few parts';
+			return requireMember(drive.members[index]);
+		}
+		function gear(index:Int):machinekit.transmission.SpurGear {
+			var member = part(index);
+			if (!Std.isOfType(member, machinekit.transmission.SpurGear))
+				throw 'Drive "${drive.coupling}": "${drive.members[index]}" is not a spur gear';
+			return cast member;
+		}
+		return switch drive.kind {
+			case "lead-screw":
+				var member = part(0);
+				if (!Std.isOfType(member, machinekit.motion.LeadScrew))
+					throw 'Drive "${drive.coupling}": "${drive.members[0]}" is not a lead screw';
+				var screw:machinekit.motion.LeadScrew = cast member;
+				2 * Math.PI * drive.alignment / screw.thread.signedLead();
+			case "gear-mesh":
+				-drive.alignment * gear(0).teeth / gear(1).teeth;
+			case "rack-and-pinion":
+				drive.alignment * 2 / gear(0).pitchDiameter;
+			case "belt":
+				var member = part(0);
+				var diameter = Std.isOfType(member, machinekit.transmission.TimingPulley)
+					? (cast(member, machinekit.transmission.TimingPulley)).pitchDiameter
+					: Std.isOfType(member, machinekit.transmission.Sprocket)
+					? (cast(member, machinekit.transmission.Sprocket)).pitchDiameter
+					: throw 'Drive "${drive.coupling}" needs a timing pulley or sprocket';
+				drive.alignment * 2 / diameter;
+			case kind: throw 'Drive "${drive.coupling}" has unknown kind "$kind"';
+		};
+	}
+
+	/** Set the ratio and offset of a driven coupling from its parts; false when it has no coupling. */
+	function applyDrive(drive:machinekit.assembly.MachineAssemblyDescription.DriveRecord):Bool {
+		if (mechanical.couplings != null) for (coupling in mechanical.couplings) if (coupling.id == drive.coupling) {
+			var ratio = driveRatio(drive);
+			coupling.ratio = ratio;
+			coupling.offset = -ratio * drive.leaderZero;
+			return true;
+		}
+		return false;
+	}
+
+	static function copyDrive(drive:machinekit.assembly.MachineAssemblyDescription.DriveRecord,
+			prefix:String):machinekit.assembly.MachineAssemblyDescription.DriveRecord
+		return {coupling: join(prefix, drive.coupling), kind: drive.kind,
+			members: [for (member in drive.members) join(prefix, member)], alignment: drive.alignment,
+			leaderZero: drive.leaderZero};
 
 	public function addCoupling(id:String, source:String, target:String, ratio:Float, offset:Float = 0):Void {
 		requireOperationId(id);

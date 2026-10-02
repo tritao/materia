@@ -24,6 +24,14 @@ import machinekit.transmission.SpurGear;
 import machinekit.assembly.FlangeBearingAssembly;
 import machinekit.standard.DeepGrooveBearing;
 import machinekit.assembly.LinearAxis;
+import machinekit.assembly.Drive;
+import machinekit.assembly.MachineAssemblyDescription;
+import machinekit.assembly.MachineAssemblyDescription.MemberSource;
+import machinekit.assembly.MachineAssemblyDescription.SavedValue;
+import machinekit.motion.LeadScrew;
+import machinekit.motion.LeadScrewThread;
+import machinekit.transmission.TimingPulley;
+import machinekit.transmission.TimingBeltProfile;
 import pickingstation.StorageRack;
 import pickingstation.PickingStationConfig;
 
@@ -144,6 +152,7 @@ class MachineAssemblyDescriptionTests {
 		includedConnectorRuntime();
 		suctionInterfaceRoundTrip();
 		documentRoundTrip();
+		drivesFollowTheirParts();
 		changerDocumentRoundTrip();
 		fullEoatDocumentRoundTrip();
 		documentEditsAndUndo();
@@ -235,6 +244,68 @@ class MachineAssemblyDescriptionTests {
 		var nestedShape = reopened.definitionOutput(nestedInstance, "body");
 		if (nestedShape.volume() <= 1) throw "Nested assembly retained placeholder geometry";
 		reopened.close();
+		document.close();
+	}
+
+	/** A coupling's ratio comes from the parts that drive it, so editing a part changes it. */
+	static function drivesFollowTheirParts():Void {
+		var assembly = new MachineAssembly();
+		assembly.addComponent("base", new RobotFlange(50));
+		assembly.addComponent("slider", new RobotFlange(50));
+		assembly.addComponent("screw", new LeadScrew(new LeadScrewThread(MetricTrapezoidal, 10, 2), 100));
+		assembly.addComponent("pulley", new TimingPulley(TimingBeltProfile.GT2, 20, 5, 8));
+		assembly.addComponent("driver", new SpurGear(1, 20, 6));
+		assembly.addComponent("driven", new SpurGear(1, 40, 6));
+		assembly.addMateOnAxis("slide", "prismatic", "base", "face", "slider", "face", {x: 0, y: 1, z: 0}, 10);
+		for (turning in ["screw", "pulley", "driver", "driven"])
+			assembly.addMateOnAxis('$turning-turn', "continuous", "base", "face", turning,
+				turning == "screw" ? "input" : "axis", {x: 0, y: 1, z: 0});
+		// A right-hand Tr10 x 2 screw: one turn moves its nut 2 mm back along the screw, from 10 mm.
+		var lead = assembly.addDrive("lead", "slide", "screw-turn", Drive.LeadScrew("screw", 1), 10);
+		var belt = assembly.addDrive("belt", "slide", "pulley-turn", Drive.Belt("pulley", -1), 10);
+		var mesh = assembly.addDrive("mesh", "driver-turn", "driven-turn", Drive.GearMesh("driver", "driven", 1));
+		function near(actual:Float, expected:Float, what:String):Void
+			if (!(Math.abs(actual - expected) < 1e-12)) throw '$what: $actual, expected $expected';
+		near(lead, -Math.PI, "a 2 mm right-hand lead turns the screw -pi rad per mm");
+		near(belt, -Math.PI / 20, "a 20-tooth GT2 pulley (40 mm round) turns 1 / pitch radius per mm");
+		near(mesh, -0.5, "a 20-tooth gear turns a 40-tooth one back at half speed");
+		function ratio(machine:MachineAssembly, id:String):{ratio:Float, offset:Float} {
+			for (coupling in machine.describe().mechanical.couplings) if (coupling.id == id)
+				return {ratio: coupling.ratio, offset: coupling.offset};
+			throw 'No coupling "$id"';
+		}
+		near(ratio(assembly, "lead").offset, 10 * Math.PI, "the screw is at zero where the slide is at 10 mm");
+		// Saved, then rebuilt with a 4 mm pitch: the ratio follows the thread, not the saved number.
+		var description = assembly.describe();
+		var drives = description.machine.drives;
+		if (drives == null || drives.length != 3) throw "The description lost its drives";
+		var leadDrive = assembly.drive("lead");
+		if (leadDrive == null) throw "The assembly lost its lead screw drive";
+		if (leadDrive.kind != "lead-screw" || leadDrive.members[0] != "screw")
+			throw "The lead screw drive names its screw";
+		var edited:MachineAssemblyDescription = haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(description));
+		edited.machine.members = [for (member in edited.machine.members) member.occurrence != "screw" ? member :
+			{occurrence: member.occurrence, material: member.material, source: switch member.source {
+				case Typed(id, values): Typed(id, [for (value in values) value.name != "pitch" ? value :
+					{name: "pitch", value: SavedValue.Number(4)}]);
+				case other: other;
+			}}];
+		var rebuilt = MachineAssembly.fromDescription(edited);
+		near(ratio(rebuilt, "lead").ratio, -Math.PI / 2, "a rebuilt drive takes its ratio from the edited screw");
+		near(ratio(rebuilt, "lead").offset, 10 * Math.PI / 2, "and keeps the screw at zero at 10 mm");
+		near(ratio(rebuilt, "mesh").ratio, -0.5, "an unedited drive keeps its ratio");
+		// Through a CadKit document, as the editor would change it.
+		var document = new Document();
+		var root = MachineAssemblyDocuments.defineAssembly(document, assembly);
+		var screwInstance:InstanceElement = null;
+		for (element in document.allElements()) {
+			var id = element.property("cadkit.assembly.id");
+			if (id != null && id.value == "screw") screwInstance = cast element;
+		}
+		if (screwInstance == null) throw "The screw is not a document instance";
+		screwInstance.setOverride("pitch", 4);
+		var reopened = MachineAssemblyDocuments.rebuildAssembly(document.element(root.id));
+		near(ratio(reopened, "lead").ratio, -Math.PI / 2, "a document edit to the screw's pitch changes its drive");
 		document.close();
 	}
 

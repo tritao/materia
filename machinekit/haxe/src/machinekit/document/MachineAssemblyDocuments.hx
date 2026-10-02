@@ -64,7 +64,7 @@ class MachineAssemblyDocuments {
 			portConnections: noConnections, portExposures: side.portExposures,
 			bomExtras: side.bomExtras, connectorExposures: side.connectorExposures,
 			memberConnectors: side.memberConnectors, endEffector: side.endEffector,
-			changer: side.changer, tools: side.tools
+			changer: side.changer, tools: side.tools, drives: side.drives
 		};
 		var toolRecords:Array<machinekit.assembly.MachineAssemblyDescription.ToolRecord> = [];
 		if (side.tools != null) for (tool in side.tools) {

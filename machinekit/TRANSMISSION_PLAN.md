@@ -136,18 +136,39 @@ Kinematics through the whole stack, with ratios still given as numbers.
   a device's queue as active until its copy has run out too, while the copy
   still follows the device's own report.
 
-### X2 — Ratios from parts
+### X2 — Ratios from parts (done)
 
-- CadKit coupling relationships gain a kind: `Ratio`, `Screw`, `Gear`,
-  `RackPinion`, `Belt`. Each references the occurrences that define it.
-- MachineKit components expose their transmission data in one shape:
-  `LeadScrewNut` (signed lead), `GearPair` (teeth), `Rack` with a `SpurGear`
-  (module, teeth), `TimingPulley` (pitch radius).
-- `LinearAxis` and the router use them. `MachineKitRobotCompiler` keeps one
-  lead-screw path, the coupling.
-- One naming across layers (`leader/follower`), and one argument order.
-- **Gate:** changing the screw's lead in the router changes the coupling
-  ratio and the derived axis limits with no other edit.
+- **Drives.** `machinekit.assembly.Drive` names the parts that set a
+  coupling's ratio: `LeadScrew(screw, alignment)` (2π·alignment / signed
+  lead), `GearMesh(driver, driven, alignment)` (−alignment·teeth ratio),
+  `RackAndPinion(pinion, alignment)` and `Belt(pulley, alignment)` (alignment
+  / pitch radius, from a `SpurGear`, `TimingPulley` or `Sprocket`).
+  `MachineAssembly.addDrive(id, leader, follower, drive, leaderZero)` adds
+  the coupling with the ratio worked out from the members and returns it. The
+  zero point is in leader units, so the offset follows the ratio.
+- **Saved and rebuilt.** A drive is MachineKit data: a `DriveRecord` in the
+  machine-side record (descriptions and CadKit documents), carried through
+  `include`, `rebuildIncluded` and `copyInto`. `fromDescription`, and so
+  `MachineAssemblyDocuments.rebuildAssembly`, works each driven ratio out
+  again from the parts' current values. Editing a screw's pitch in a document
+  therefore changes its coupling. Before, the saved number was copied through.
+  A drive whose coupling was removed goes with it.
+- **Users.** `CncRouter` and `LinearAxis` add their screws as lead-screw
+  drives.
+- **Decisions.**
+  - CadKit and the assembly format keep couplings as plain numbers: they
+    don't know what a pulley is, and MachineKit is the layer that does.
+  - `MachineKitRobotCompiler`'s two lead-screw paths stay. One is the
+    abstract model (the carriage with an actuator transmission, as URDF
+    does). The other is the physical one (a turning screw joint). Both take
+    the lead from the part.
+  - The layers' names (`source/target` in the assembly format,
+    `leader/follower` in RobotKit) stay. Renaming wire fields would break
+    saved files for no behaviour.
+- **Checks.** A MachineKit test covers a screw, a GT2 pulley and a gear mesh:
+  their ratios, the offset from the zero point, and an edited pitch through a
+  saved description and through a document. The router smoke checks its four
+  screws turn through lead-screw drives.
 
 ### X3 — Motors as actuators, limits derived
 

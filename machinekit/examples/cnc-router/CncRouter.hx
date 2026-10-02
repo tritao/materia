@@ -2,6 +2,7 @@ import cadkit.modeling.Location;
 import cadkit.modeling.Part;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
+import machinekit.assembly.Drive;
 import machinekit.assembly.MachineAssembly;
 import machinekit.component.ComponentDetail;
 import machinekit.component.Dimension;
@@ -384,7 +385,7 @@ class CncRouter extends MachineAssembly {
 			place('motorPlateY$name', new RouterPlate(66, 8, 62, "aluminium 6061", "Motor plate", motorY,
 				AssemblyFrames.compose(AssemblyFrames.inverse(platePose), motorPose)), platePose);
 			place('motorY$name', side < 0 ? motorY : NemaStepper.frame(23), motorPose);
-			drive(specs[1], 'screwY$name', 'motorY$name', new LeadScrew(thread, FRAME_LENGTH + 8 - shaft - 10),
+			driveScrew(specs[1], 'screwY$name', 'motorY$name', new LeadScrew(thread, FRAME_LENGTH + 8 - shaft - 10),
 				orient(side * 295, halfFrame + 8 - shaft, Y_SCREW_Z, up, [0, -1, 0]), [0, -1, 0], [0, 1, 0]);
 		}
 		var inner = 2 * (SIDE_X - 20);
@@ -424,7 +425,7 @@ class CncRouter extends MachineAssembly {
 		attach("railXUpper", LinearRail.metric(RAIL, railX), orient(-railX / 2, railXFace, beamZ[0], front, alongX), "beamUpper");
 		attach("railXLower", LinearRail.metric(RAIL, railX), orient(-railX / 2, railXFace, beamZ[1], front, alongX), "beamLower");
 		attach("motorX", NemaStepper.frame(23), motorXPose, "uprightRight");
-		drive(specs[0], "screwX", "motorX", new LeadScrew(thread, outside - shaft + beamLength / 2 - 4),
+		driveScrew(specs[0], "screwX", "motorX", new LeadScrew(thread, outside - shaft + beamLength / 2 - 4),
 			orient(outside - shaft, yb, X_SCREW_Z, up, [-1, 0, 0]), [-1, 0, 0], [1, 0, 0]);
 
 		// X carriage, riding the X rails on the beams' front faces.
@@ -464,7 +465,7 @@ class CncRouter extends MachineAssembly {
 			attach('standoffZ${corner++}', standoff, AssemblyFrames.translation(at.x, at.y, bracketTop), "motorBracketZ");
 		}
 		attach("motorZ", NemaStepper.frame(23), motorZPose, "motorBracketZ");
-		drive(specs[2], "screwZ", "motorZ", new LeadScrew(thread, zFace - shaft - (xPlateBottom + 2)),
+		driveScrew(specs[2], "screwZ", "motorZ", new LeadScrew(thread, zFace - shaft - (xPlateBottom + 2)),
 			orient(xc, screwZY, zFace - shaft, [0, 1, 0], [0, 0, -1]), [0, 0, -1], [0, 0, 1]);
 
 		// Z slide and spindle. The Z blocks sit at the top of their rails at z = 0.
@@ -538,7 +539,7 @@ class CncRouter extends MachineAssembly {
 	 * `axisDirection`) by the screw's lead. The coupling is centred on the shaft tip and turns
 	 * inside the mount's pilot bore.
 	 */
-	function drive(axis:RouterAxisSpec, id:String, motor:String, screw:LeadScrew, pose:AssemblyFrame,
+	function driveScrew(axis:RouterAxisSpec, id:String, motor:String, screw:LeadScrew, pose:AssemblyFrame,
 			along:Array<Float>, axisDirection:Array<Float>):Void {
 		var shaft = cast(component(motor), NemaStepper).variant.shaftDiameter;
 		var coupling = new ShaftCoupling(shaft, screw.thread.screwDiameter);
@@ -548,13 +549,12 @@ class CncRouter extends MachineAssembly {
 		zeroPoses.set(couplingId, {x: pose.x - along[0] * grip, y: pose.y - along[1] * grip, z: pose.z - along[2] * grip,
 			qx: pose.qx, qy: pose.qy, qz: pose.qz, qw: pose.qw});
 		connect(motor, couplingId);
-		// The nut, fixed to the axis, travels signedLead along the screw per turn of the screw.
+		attach(id, screw, pose, couplingId);
+		// The screw's thread sets the ratio; the joint starts where the axis puts it.
 		var alongAxis = along[0] * axisDirection[0] + along[1] * axisDirection[1] + along[2] * axisDirection[2];
-		var ratio = 2 * Math.PI * alongAxis / screw.thread.signedLead();
+		var ratio = addDrive('$id-lead', axis.id, '$id-turn', LeadScrew(id, alongAxis));
 		addMateOnAxis('$id-turn', "continuous", motor, 'to-$couplingId', couplingId, 'attach-$couplingId',
 			{x: along[0], y: along[1], z: along[2]}, ratio * axis.initial);
-		addCoupling('$id-lead', axis.id, '$id-turn', ratio);
-		attach(id, screw, pose, couplingId);
 	}
 
 	function component(id:String):MachineComponent {
