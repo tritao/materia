@@ -270,8 +270,60 @@ one place.
   64-bit FNV-1a digest of the configuration it received, which the host
   compares with its own, along with the channel count and the step tick.
 
+### X6 — Drive kinds, plan checks and drive-aware simulation
+
+Steppers and servos fail differently, so an actuator names its drive kind
+instead of carrying bare numbers. Drive-level behaviour only: no current
+loops, PWM or thermal mass.
+
+- **Drive kinds.**
+  - `Stepper`: full steps per revolution, rotor inertia, holding torque and
+    a pull-out torque–speed curve. Microstepping stays in the deployment's
+    wiring.
+  - `Servo`: rated and peak torque, rated and maximum speed, rotor inertia,
+    encoder counts and optional default gains, usually behind a gearbox
+    drive (ratio and efficiency).
+  - Both share a torque–speed curve (a few points), so `coupledLimits`
+    derives limits the same way for each.
+- **Plan check (stall predictor).** Along each plan, the torque each motor
+  needs is worked out from moving mass × acceleration through ratio and
+  efficiency, plus rotor and screw inertia, gravity on vertical axes, and
+  friction (nut drag, rail preload, a cutting-force allowance on feeds). It
+  is then checked against the drive.
+  - A stepper must stay under its pull-out curve, with margin, at every
+    point.
+  - A servo must stay under its peak torque, and its average (RMS) torque
+    over the move under its continuous rating.
+  - The check runs once per plan, the same for simulation and device.
+- **Screw critical speed.** A lead-screw drive caps its screw joint at the
+  first bending speed, from root diameter, unsupported length and end supports
+  (where its bearings sit), with margin. The router's Y screws, about 600 mm
+  with no far-end bearing, may whip near 700 rpm, about half their motor's
+  usable speed.
+- **Simulation by drive kind.**
+  - A stepper's joint follows its plan kinematically, as now. When the plan
+    check fails, it slips and keeps the error, as a real stepper loses steps.
+  - A servo gets a torque-limited servo on the motor joint only, with its
+    gains, and the coupling moves the rest. Use this for arms, wheels,
+    humanoids and the exosuit.
+  - Not force-driven simulation for steppers: it has the wrong failure mode
+    (lag instead of lost steps), is numerically stiff (hundreds of kg of
+    reflected inertia through a constraint), and needs gains tuned per
+    machine.
+- **Examples.** The robot arm (servos behind gearbox drives) and the mobile
+  base (wheel motors) take their limits from their drives instead of typed-in
+  numbers.
+- **Device.** Step edges are scheduled with hardware timers (STM32G4
+  output compare and DMA) instead of a 40 kHz software tick, which caps
+  16-microstep NEMA 23s near 25 mm/s and quantises step intervals into
+  velocity ripple. A Trinamic driver profile in the wiring covers model
+  (TMC5160/2160 for NEMA 23, TMC2209 for NEMA 17), current, chopper mode
+  and StallGuard. Motion still uses step/dir; SPI/UART carries
+  configuration, diagnostics and stall reports. The drivers' own ramp
+  generators stay unused, because paths are planned and coordinated by
+  MotionKit. Servo drives on a fieldbus wait for real hardware.
+
 ### Later
 
-Belt stretch and screw backlash in simulation (following error), screw
-critical speed and efficiency (back-driving a vertical Z), gearboxes as
-components, an editor UI to author couplings, and differentials.
+Belt stretch and screw backlash in simulation (following error), gearboxes as
+components, an editor UI to author couplings and drives, and differentials.
