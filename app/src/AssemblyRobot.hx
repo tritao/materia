@@ -224,14 +224,13 @@ class AssemblyRobot {
     // Process channels (a machine's spindle and coolant, a tool's vacuum) must be declared before the
     // robot is added.
     if (channels != null) for (channel in channels) blueprint.channels.push(channel);
-    // A suction tool keeps holding through a commanded stop, as when its base arrives somewhere carrying a part. A
-    // torch does the opposite: its arc and wire go safe, off, on any stop.
+    // Each robot tool brings its own channels with the stop policy it needs (RobotKit's `ToolChannels`): a suction tool
+    // keeps holding through a commanded stop, as when its base arrives somewhere carrying a part; a torch's arc and wire
+    // go off on any stop. A declaration made above that disagrees with the tool is refused.
     for (tool in session.robotTools) {
       var welder = tool.torch;
-      if (welder == null)
-        blueprint.channels.push(robotkit.tool.SuctionChannels.declaration(tool.channel));
-      else for (declaration in robotkit.tool.WeldChannels.declarations(tool.channel, welder.wireSpeedChannel, welder.voltageChannel))
-        blueprint.channels.push(declaration);
+      blueprint.addTool(welder == null ? new robotkit.tool.SuctionChannels(tool.channel)
+        : new robotkit.tool.WeldChannels(tool.channel, welder.wireSpeedChannel, welder.voltageChannel));
     }
     // A mobile robot stands at its origin on the floor; its root link is framed there.
     var origin = session.mobileBase == null ? null : session.mobileBase.origin;

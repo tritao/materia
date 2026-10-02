@@ -17,10 +17,11 @@ import robotkit.world.ProcessTimedEvent;
 import robotkit.world.TrajectorySegment;
 
 /**
- * The welder's channels in the real RobotKit runtime, declared with the same `WeldChannels.declarations` the app declares
- * them with: whatever stops the robot, the arc goes off and the wire stops; a suction tool on the same robot keeps its
- * vacuum through a commanded stop and an abort, as it does on a mobile base. The runtime enforces this on its own, so
- * it holds for every way of running the robot, not only the application's.
+ * The welder's channels in the real RobotKit runtime, set up only by adding the tools (`RobotRuntimeBlueprint.addTool`):
+ * the stop policy comes with the tool, not from the application that sets the robot up. Whatever stops the robot, the arc
+ * goes off and the wire stops; a suction tool on the same robot keeps its vacuum through a commanded stop and an abort,
+ * as it does on a mobile base. The runtime enforces this on its own, so it holds for every way of running the robot.
+ * A setup that declared one of the tool's channels another way is refused.
  */
 class WeldChannelTests {
   static var assertions = 0;
@@ -34,6 +35,7 @@ class WeldChannelTests {
     assertions = 0;
     testStopsTakeTheArcOff();
     testNothingChangesWithoutAStop();
+    testSetupCannotOverrideThePolicy();
     Sys.println('RobotKit weld channel tests passed ($assertions assertions)');
     return assertions;
   }
@@ -47,8 +49,9 @@ class WeldChannelTests {
     joint.limits.lower = -1.0;
     joint.limits.upper = 1.0;
     var blueprint = RobotRuntimeCompiler.compile(model);
-    for (declaration in WeldChannels.declarations(ARC, WIRE, VOLTAGE)) blueprint.channels.push(declaration);
-    blueprint.channels.push(SuctionChannels.declaration(SUCTION));
+    // The robot is set up with its tools and nothing else: the stop policy comes with each tool.
+    blueprint.addTool(new WeldChannels(ARC, WIRE, VOLTAGE));
+    blueprint.addTool(new SuctionChannels(SUCTION));
     var harness = new SimulationHarness();
     var runtime = harness.simulation.addRobot(blueprint);
     var segment = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(500000000), [[0.0, 0.0]]);
@@ -119,6 +122,37 @@ class WeldChannelTests {
     for (tick in 11...40) rig.harness.step(Int64.ofInt(tick * TICK));
     check(running(rig.runtime), "without a stop the arc keeps burning");
     rig.harness.dispose();
+  }
+
+  /** A setup that declared the arc to keep its output through a stop is refused by the torch, and one that agrees is accepted. */
+  static function testSetupCannotOverrideThePolicy():Void {
+    function blueprint():robotkit.runtime.RobotRuntimeBlueprint {
+      var model = new RobotModel("policy");
+      var base = model.addLink(new Link("base"));
+      var tool = model.addLink(new Link("tool"));
+      var joint = model.addJoint(new Joint("axis", JointType.Revolute, base, tool));
+      joint.limits.lower = -1.0;
+      joint.limits.upper = 1.0;
+      return RobotRuntimeCompiler.compile(model);
+    }
+    var wrong = blueprint();
+    wrong.channels.push(new robotkit.world.ProcessChannelDeclaration(ARC, ProcessEventValue.Digital(false), true));
+    var refused = false;
+    try wrong.addTool(new WeldChannels(ARC, WIRE, VOLTAGE)) catch (_:Dynamic) refused = true;
+    check(refused, "an arc declared to keep its output on a stop is refused by the torch that needs it off");
+    var wrongSafe = blueprint();
+    wrongSafe.channels.push(new robotkit.world.ProcessChannelDeclaration(WIRE, ProcessEventValue.Analog(4.0), false));
+    refused = false;
+    try wrongSafe.addTool(new WeldChannels(ARC, WIRE, VOLTAGE)) catch (_:Dynamic) refused = true;
+    check(refused, "a wire speed declared with another safe value is refused");
+    var agreeing = blueprint();
+    agreeing.channels.push(new robotkit.world.ProcessChannelDeclaration(ARC, ProcessEventValue.Digital(false), false));
+    agreeing.addTool(new WeldChannels(ARC, WIRE, VOLTAGE));
+    check(agreeing.channels.length == 3, "a declaration that agrees with the tool is not doubled");
+    var plain = blueprint();
+    plain.addTool(new WeldChannels(ARC, WIRE, VOLTAGE));
+    var kept = [for (channel in plain.channels) if (channel.keepOnStop) channel.id];
+    check(kept.join(",") == VOLTAGE, 'only the voltage setpoint keeps its output on a stop, got ${kept.join(",")}');
   }
 
   static function check(value:Bool, message:String):Void {
