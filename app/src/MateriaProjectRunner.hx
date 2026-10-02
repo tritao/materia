@@ -468,7 +468,7 @@ class MateriaProjectRunner {
       workOffset: machining.workOffset, loop: machining.loop == true,
       tools: [for (tool in machining.tools) Tool.shaped(tool.number, tool.length, CutterProfile.decode(tool.profile))],
       stock: stock, stockMesh: stockMesh, target: target == null ? null : partMesh(target),
-      toolPart: machining.toolPart, loadedTool: machining.loadedTool};
+      toolPart: machining.toolPart, loadedTool: machining.loadedTool, controller: machining.controller};
   }
 
   /** An artifact part's triangles, with vertices at the same place welded into one. */

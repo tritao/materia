@@ -41,7 +41,8 @@ class CncRouterPreview {
 			workOffset: [for (value in CncRouter.workOffset()) value / 1000],
 			tools: [for (tool in router.tools()) {number: tool.number, length: tool.length, profile: tool.profile().encode()}],
 			stock: "stock", sacrificial: ["spoilboard"], toolPart: "tool", loadedTool: 1,
-			target: TARGET_PART, loop: true};
+			target: TARGET_PART, loop: true,
+			controller: {microsteps: CncRouter.MICROSTEPS, stepTickHz: CncRouter.STEP_TICK_HZ}};
 		return SceneArtifact.encode(scene);
 	}
 

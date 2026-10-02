@@ -31,6 +31,10 @@ import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.JointLimits;
 import robotkit.model.JointCoupling;
+import robotkit.model.SteadyLoads;
+import robotkit.device.DeviceBinding;
+import robotkit.device.DeviceLayout;
+import motionkit.trajectory.PlanDiagnostic;
 import sys.FileSystem;
 import sys.io.File;
 import haxe.io.Bytes;
@@ -546,41 +550,75 @@ class ProjectSourceTests {
    * tools on the way: the stock loses exactly the plate's recesses and holes, nothing is cut from the
    * part, and no rapid or holder touches stock.
    */
-  static function checkCncRouter(root:String):Void {
-    var manifest = FileSystem.fullPath(root + "/machinekit/examples/cnc-router/materia.project.json");
+  /** The screw router's cycle time and worst drive deviation, for the belt router to be compared with. */
+  static var screwRouterSeconds = 0.0;
+  static var screwRouterDeviation = 0.0;
+
+  static function checkCncRouter(root:String, belts:Bool = false):Void {
+    var kind = belts ? "belt router" : "screw router";
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/cnc-router/" + (belts ? "belts/" : "") + "materia.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
     var definition:AssemblyDefinition = cast(generated.assemblyDefinition, AssemblyDefinition);
     var model = AssemblySimulationBridge.toRobotModel(definition, generated.physical).model;
     var axes = [for (joint in model.joints) if (joint.type == JointType.Prismatic) joint];
-    check([for (joint in axes) Std.string(joint.id)].join(",") == "y,x,z", "the router simulates axes y, x and z");
-    // Four rigid bodies and four lead screws, each screw turning with its coupling on the motor shaft.
-    check(model.joints.length == 7 && model.links.length == 8,
-      'the router simulates as four rigid bodies, four screws, three axes and four screw joints, got ' +
-      '${model.links.length} links and ${model.joints.length} joints');
-    var leads = [for (coupling in model.couplings) '${coupling.leader}:${Math.round(coupling.ratio)}'];
+    check([for (joint in axes) Std.string(joint.id)].join(",") == "y,x,z", 'the $kind simulates axes y, x and z');
+    var leads = [for (coupling in model.couplings) '${coupling.leader}:${Math.round(Math.abs(coupling.ratio))}'];
     leads.sort(Reflect.compare);
-    // A 2 mm lead turns its screw pi radians per millimetre: 3142 per metre.
-    check(leads.join(",") == "x:3142,y:3142,y:3142,z:3142", 'each axis turns its screws by their lead, got $leads');
+    if (belts) {
+      // Pulley and idler on x, a pair on each Y belt, and the Z screw; 1 / 6.366 mm is 157 rad per metre.
+      check(leads.join(",") == "x:157,x:157,y:157,y:157,y:157,y:157,z:3142", 'belt axes turn by their pulleys, got $leads');
+    } else {
+      // Four rigid bodies and four lead screws, each screw turning with its coupling on the motor shaft.
+      check(model.joints.length == 7 && model.links.length == 8,
+        'the router simulates as four rigid bodies, four screws, three axes and four screw joints, got ' +
+        '${model.links.length} links and ${model.joints.length} joints');
+      // A 2 mm lead turns its screw pi radians per millimetre: 3142 per metre.
+      check(leads.join(",") == "x:3142,y:3142,y:3142,z:3142", 'each axis turns its screws by their lead, got $leads');
+    }
     for (joint in axes) {
       var travel = joint.limits.upper - joint.limits.lower;
       check(Math.abs(travel - (Std.string(joint.id) == "z" ? 0.08 : 0.3)) < 1e-9,
-        'router axis ${joint.id} travel is in metres, got $travel');
-      check(joint.limits.overtravel > 0, 'router axis ${joint.id} carries its overtravel');
+        '$kind axis ${joint.id} travel is in metres, got $travel');
+      check(joint.limits.overtravel > 0, '$kind axis ${joint.id} carries its overtravel');
     }
-    // Each axis is as fast as a 24 V NEMA 23 turns its Tr10 x 2 screw at half its holding torque:
-    // twice the 68.6 rad/s where its winding's reactance takes the supply, over pi rad per mm.
-    var turns = 2 * 24 / (50 * 2.5e-3 * 2.8) / (Math.PI * 1000);
-    var derived:Array<String> = [];
-    for (joint in axes) {
-      var limits = model.coupledLimits(joint.id);
-      check(Math.abs(limits.velocity - turns) < 1e-9,
-        'router axis ${joint.id} is as fast as its motor turns its screw: ${limits.velocity} m/s, expected $turns');
-      check(limits.maxAcceleration > 0.5 && limits.maxAcceleration < 50,
-        'router axis ${joint.id} accelerates as its motors move it: ${limits.maxAcceleration} m/s²');
-      derived.push('${joint.id} ${Math.round(limits.velocity * 1e4) / 10} mm/s, ${Math.round(limits.maxAcceleration * 100) / 100} m/s²');
-    }
-    Sys.println('cnc router axes from their motors: ${derived.join("; ")}');
     var job = generated.cncJob;
+    var controller = job == null ? null : job.controller;
+    if (controller == null) throw "the router names the controller its steppers are wired to";
+    // Each axis is as fast as the slowest of: a 24 V NEMA 23 at half its holding torque (twice the
+    // 68.6 rad/s where its winding's reactance takes the supply), what the controller's step tick can
+    // generate at its microstepping (40 kHz over 3200 steps a turn: 78.5 rad/s), and the screw's
+    // critical speed, all through the axis's ratio to the motor.
+    var motorSpeed = 2 * 24 / (50 * 2.5e-3 * 2.8);
+    var stepSpeed = controller.stepTickHz / (200.0 * controller.microsteps / (2 * Math.PI));
+    var wired = DeviceBinding.bind(model, DeviceLayout.forActuators(model, controller.microsteps), controller.stepTickHz).model;
+    var steady = new SteadyLoads();
+    var derived:Array<String> = [], free:Array<String> = [];
+    for (joint in axes) {
+      var motorRatio = 0.0, critical = Math.POSITIVE_INFINITY, leadRatio = 0.0;
+      for (coupling in model.couplings) if (coupling.leader == joint.id) {
+        for (actuator in model.actuators) switch actuator.transmission {
+          case SimpleTransmission(target, _, _): if (target == coupling.follower) motorRatio = Math.abs(coupling.ratio);
+        }
+        for (follower in model.joints) if (follower.id == coupling.follower && follower.limits.velocity > 0)
+        {
+          critical = Math.min(critical, follower.limits.velocity / Math.abs(coupling.ratio));
+          leadRatio = Math.abs(coupling.ratio);
+        }
+      }
+      check(motorRatio > 0, '$kind axis ${joint.id} has a motor');
+      var expected = Math.min(Math.min(motorSpeed, stepSpeed) / motorRatio, critical);
+      var limits = wired.coupledLimits(joint.id, steady);
+      check(Math.abs(limits.velocity - expected) < 1e-9,
+        '$kind axis ${joint.id} is as fast as its motor, controller and screw allow: ${limits.velocity} m/s, expected $expected');
+      check(limits.maxAcceleration > 0.5 && limits.maxAcceleration < 50,
+        '$kind axis ${joint.id} accelerates as its motors move it: ${limits.maxAcceleration} m/s²');
+      derived.push('${joint.id} ${Math.round(limits.velocity * 1e4) / 10} mm/s, ${Math.round(limits.maxAcceleration * 100) / 100} m/s²' +
+        (critical < Math.POSITIVE_INFINITY ? ' (screw held to ${Math.round(critical * (Math.abs(leadRatio) > 0 ? leadRatio : 1) * 60 / (2 * Math.PI))} rpm)' : ''));
+      var bare = model.coupledLimits(joint.id);
+      free.push('${joint.id} ${Math.round(bare.velocity * 1e4) / 10} mm/s, ${Math.round(bare.maxAcceleration * 100) / 100} m/s²');
+    }
+    Sys.println('cnc $kind axes with the controller and steady loads: ${derived.join("; ")}');
+    Sys.println('cnc $kind axes from their motors and screws alone: ${free.join("; ")}');
     check(job != null && job.loop && job.stock == "stock" && job.spindle == "spindle" && job.target != null &&
       job.loadedTool == 1 && [for (tool in job.tools) tool.number].join(",") == "1,2",
       "the router generates a looping job that machines its stock to a target part with an end mill and a drill");
@@ -607,7 +645,9 @@ class ProjectSourceTests {
     }
     simulation.step();
     var start = toolPosition();
-    var screwStart = [partRotation("screwXCoupling"), partRotation("screwZCoupling")];
+    // The Z screw (and the X screw of the screw router) turns half a turn for every millimetre of its axis.
+    var screwParts = belts ? ["", "screwZCoupling"] : ["screwXCoupling", "screwZCoupling"];
+    var screwStart = [for (id in screwParts) id == "" ? [] : partRotation(id)];
     var lowest = 0.0, steps = 0, stepping = 0.0, tools:Array<Int> = [player.loadedTool];
     // Allocation is counted, not timed, so it holds whatever else the machine is doing.
     var allocatedBefore = hl.Gc.totalAllocated(), collectionsBefore = hl.Gc.collections();
@@ -622,7 +662,8 @@ class ProjectSourceTests {
         // The X and Z screws turn half a turn for every millimetre their axes move.
         var now = toolPosition();
         for (axis in [0, 2]) {
-          var before = screwStart[axis == 0 ? 0 : 1], after = partRotation(axis == 0 ? "screwXCoupling" : "screwZCoupling");
+          if (screwParts[axis == 0 ? 0 : 1] == "") continue;
+          var before = screwStart[axis == 0 ? 0 : 1], after = partRotation(screwParts[axis == 0 ? 0 : 1]);
           var dot = Math.abs(before[0] * after[0] + before[1] * after[1] + before[2] * after[2] + before[3] * after[3]);
           var turned = Math.PI * 1000 * (now[axis] - start[axis]);
           check(Math.abs(dot - Math.abs(Math.cos(turned / 2))) < 0.02,
@@ -639,6 +680,16 @@ class ProjectSourceTests {
     check(changes == "1,2" || changes == "1,2,1", 'the router starts with the end mill and changes to the drill, got $tools');
     var seconds = simulation.activeSession().simulationTime();
     check(player.passes == 1, 'the router finishes one pass of its program, at $seconds s');
+    // What the plan checks found over the pass: stepper stalls and the drives' stretch against the tolerance.
+    var checks = player.planChecks();
+    var stalls = checks.count(PlanDiagnosticKind.StepperStall), inaccurate = checks.count(PlanDiagnosticKind.Accuracy);
+    var checkedPlans = checks.plans, flaggedPlans = checks.flagged, worstRatio = checks.worstTorqueRatio;
+    var worstMotor = checks.worstMotor, worstDeviation = checks.worstDeviation, worstAxis = checks.worstAxis;
+    var worstFinding = [for (diagnostic in checks.diagnostics) if (diagnostic.kind == PlanDiagnosticKind.Accuracy) diagnostic];
+    worstFinding.sort((a, b) -> a.value < b.value ? 1 : a.value > b.value ? -1 : 0);
+    var accuracyExample = worstFinding.length == 0 ? "" : player.describe(worstFinding[0]);
+    check(checkedPlans > 0, "every plan the compiler makes is checked");
+    var stallExamples = [for (diagnostic in checks.diagnostics) if (diagnostic.kind == PlanDiagnosticKind.StepperStall) player.describe(diagnostic)];
     // From 54 mm above the stock the 40 mm drill, 10 mm longer than the end mill, goes through the
     // 20 mm plate and its 1.65 mm point and 0.5 mm more into the spoilboard.
     check(Math.abs(lowest + 0.06615) < 0.0005, 'the drill goes through the plate, lowest $lowest m');
@@ -650,7 +701,9 @@ class ProjectSourceTests {
       4 * 0.00275 * 0.00275 * (0.020 - 0.0054));
     check(Math.abs(stock.removed - recesses) < recesses * 0.02,
       'the stock loses the plate\'s recesses, ${stock.removed} m³ removed against $recesses');
-    check(stock.rapidContacts == 0 && stock.collisions == 0,
+    // A belt router's rapids are fast enough for the simulated carriage to lag its command by millimetres,
+    // so a rapid's label can reach a few ticks into a cut: those are counted and reported, not forbidden.
+    check((belts || stock.rapidContacts == 0) && stock.collisions == 0,
       'no rapid runs through the stock and the holder never touches it (${stock.rapidContacts}, ${stock.collisions})');
     var deviation = stock.deviation();
     check(deviation.gouge < 1e-9, 'nothing is cut from the finished plate, gouge ${deviation.gouge} m³');
@@ -664,46 +717,39 @@ class ProjectSourceTests {
       check(simulation.cncFailure() == null, 'the looping program starts its next pass: ${simulation.cncFailure()}');
     }
     session.dispose();
-    Sys.println('cnc router milled the motor plate in ${Math.round(seconds * 10) / 10} s of machining: removed ' +
+    Sys.println('cnc $kind milled the motor plate in ${Math.round(seconds * 10) / 10} s of machining: removed ' +
       '${Math.round(stock.removed * 1e10) / 10} mm³ of ${Math.round(recesses * 1e10) / 10}, leftover ' +
       '${Math.round(deviation.leftover * 1e10) / 10} mm³, gouge ${Math.round(deviation.gouge * 1e10) / 10} mm³; ' +
-      '${Math.round(stepping / steps * 1e5) / 100} ms per simulated tick');
-    Sys.println('cnc router per tick: motion ${Math.round(player.motionSeconds / steps * 1e5) / 100} ms, cutting ' +
+      '${Math.round(stepping / steps * 1e5) / 100} ms per simulated tick; ${stock.rapidContacts} ticks of rapid label cut');
+    Sys.println('cnc $kind plan check: $checkedPlans plans, $flaggedPlans flagged, $stalls stepper stalls, $inaccurate over the ' +
+      '${Math.round(player.checkOptions.tolerance * 1e6) / 1000} mm tolerance; worst torque ${Math.round(worstRatio * 1000) / 10}% of what ' +
+      '$worstMotor can give; worst deviation ${Math.round(worstDeviation * 1e5) / 100} mm on $worstAxis' +
+      (accuracyExample == "" ? "" : "; e.g. " + accuracyExample));
+    Sys.println('cnc $kind per tick: motion ${Math.round(player.motionSeconds / steps * 1e5) / 100} ms, cutting ' +
       '${Math.round(player.cuttingSeconds / steps * 1e5) / 100} ms, meshing ${Math.round(player.meshingSeconds / steps * 1e5) / 100} ms; ' +
       'compile ${Math.round(player.runSeconds * 1000)} ms, slowest update ${Math.round(player.slowestUpdate * 1000)} ms; ' +
       '${Math.round(allocatedPerTick / 100) / 10} KB allocated a tick, $collections collections');
+    check(stalls == 0, 'the planner\'s limits keep every stepper under its pull-out curve, got $stalls findings, e.g. ' +
+      stallExamples.slice(0, 3).join("; "));
+    if (belts) {
+      Sys.println('cnc belt router against the screw router: ${Math.round(seconds * 10) / 10} s against ${Math.round(screwRouterSeconds * 10) / 10} s, ' +
+        'worst drive deviation ${Math.round(worstDeviation * 1e5) / 100} mm against ${Math.round(screwRouterDeviation * 1e5) / 100} mm, ' +
+        '$inaccurate plans over the tolerance against none');
+      check(worstDeviation > 5 * screwRouterDeviation && inaccurate > 0,
+        "belts stretch much further than screws turn loose: the belt router has plans over the tolerance, the screw router none");
+    } else {
+      screwRouterSeconds = seconds;
+      screwRouterDeviation = worstDeviation;
+      check(inaccurate == 0, 'the screw router stays within its tolerance: $inaccurate plans over, e.g. $accuracyExample');
+    }
   }
 
   /**
-   * The belt-driven router's X and Y limits come from their pulleys: a 20-tooth GT2 pulley has a
-   * 6.366 mm pitch radius, so the same 24 V NEMA 23 that turns a screw to 43.7 mm/s moves a belt at
-   * 873 mm/s, and every belt axis is coupled to its motor pulley and its idler by that radius.
+   * The belt-driven router machines the same plate: its X and Y limits come from their pulleys (a
+   * 20-tooth GT2 pulley has a 6.366 mm pitch radius, so a belt axis moves 20 times as fast as a screw
+   * for the same motor speed) until the controller's step rate caps them, and its belts stretch.
    */
-  static function checkBeltRouter(root:String):Void {
-    var manifest = FileSystem.fullPath(root + "/machinekit/examples/cnc-router/belts/materia.project.json");
-    var generated = MateriaProjectRunner.loadProject(manifest);
-    var definition:AssemblyDefinition = cast(generated.assemblyDefinition, AssemblyDefinition);
-    var model = AssemblySimulationBridge.toRobotModel(definition, generated.physical).model;
-    var axes = [for (joint in model.joints) if (joint.type == JointType.Prismatic) joint];
-    check([for (joint in axes) Std.string(joint.id)].join(",") == "y,x,z", "the belt router simulates axes y, x and z");
-    // Pulley and idler on x, a pair on each Y belt, and the Z screw.
-    var ratios = [for (coupling in model.couplings) '${coupling.leader}:${Math.round(Math.abs(coupling.ratio))}'];
-    ratios.sort(Reflect.compare);
-    // 1 / 6.366 mm: 157 rad per metre.
-    check(ratios.join(",") == "x:157,x:157,y:157,y:157,y:157,y:157,z:3142", 'belt axes turn by their pulleys, got $ratios');
-    var pulleyRadius = 2 * 20 / (2 * Math.PI) / 1000;
-    var turns = 2 * 24 / (50 * 2.5e-3 * 2.8);
-    var derived:Array<String> = [];
-    for (joint in axes) {
-      var limits = model.coupledLimits(joint.id);
-      var expected = Std.string(joint.id) == "z" ? turns / (Math.PI * 1000) : turns * pulleyRadius;
-      check(Math.abs(limits.velocity - expected) < 1e-9,
-        'belt router axis ${joint.id} is as fast as its motor turns its pulley: ${limits.velocity} m/s, expected $expected');
-      check(limits.maxAcceleration > 0.5, 'belt router axis ${joint.id} accelerates: ${limits.maxAcceleration} m/s²');
-      derived.push('${joint.id} ${Math.round(limits.velocity * 1e4) / 10} mm/s, ${Math.round(limits.maxAcceleration * 100) / 100} m/s²');
-    }
-    Sys.println('cnc belt router axes from their motors: ${derived.join("; ")}');
-  }
+  static function checkBeltRouter(root:String):Void checkCncRouter(root, true);
 
   /**
    * The router's job answers the operator: it reports the line it runs, stops on a feed hold and
@@ -1063,6 +1109,15 @@ class ProjectSourceTests {
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "arm") {
       checkRobotArm(root);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "router") {
+      checkCncRouter(root);
+      checkBeltRouter(root);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "belts") {
+      checkBeltRouter(root);
       return 0;
     }
     var manifest = FileSystem.fullPath(root + "/cadkit/examples/modeling/materia.project.json");
