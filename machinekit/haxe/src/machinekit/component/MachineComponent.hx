@@ -52,6 +52,10 @@ class MachineComponent {
 			case VacuumSource(_, outputPort): port(outputPort);
 			case VacuumActuator(inletPort) | VacuumValve(inletPort) | ChangerLock(inletPort): port(inletPort);
 			case VacuumPressureSensor(vacuumPort, signalPort): port(vacuumPort); port(signalPort);
+			case ArcTorch(tcpConnector, controlPort): connector(tcpConnector); port(controlPort);
+			case WeldingSupply(processes, maxCurrentA, _):
+				if (processes == null || processes.length == 0 || !(maxCurrentA > 0))
+					throw 'Welding supply on "$designation" needs a process and a positive rated current';
 		}
 		capabilityList.push(capability);
 	}

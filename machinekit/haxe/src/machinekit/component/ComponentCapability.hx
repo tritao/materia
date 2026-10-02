@@ -1,5 +1,8 @@
 package machinekit.component;
 
+import machinekit.welding.WeldingControlInterface;
+import machinekit.welding.WeldingProcess;
+
 /** Physical and runtime capabilities declared by a component's constructor. */
 enum ComponentCapability {
 	Coupling(key:String, connector:String);
@@ -10,4 +13,10 @@ enum ComponentCapability {
 	VacuumValve(controlPort:String);
 	VacuumPressureSensor(vacuumPort:String, signalPort:String);
 	ChangerLock(inletPort:String);
+	/** An arc torch: `tcpConnector` is the wire tip at nominal stickout with +Z along the wire out of
+	 * the torch, and `controlPort` is the signal inlet that starts and stops the arc. */
+	ArcTorch(tcpConnector:String, controlPort:String);
+	/** A welding power source: the processes it runs, its rated current in amperes, and how a
+	 * controller drives it. */
+	WeldingSupply(processes:Array<WeldingProcess>, maxCurrentA:Float, controlInterface:WeldingControlInterface);
 }
