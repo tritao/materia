@@ -48,7 +48,7 @@ class FrameAwarePerception implements Perception {
     var observed = source.observe(scans);
     var detections = [for (value in observed.detections()) transformDetection(value, estimate)];
     var obstacles = [for (value in observed.obstacles()) new Obstacle(
-      transformDetection(value.detection, estimate), value.radiusMeters)];
+      transformDetection(value.detection, estimate), value.radiusMeters, value.halfLengthMeters)];
     var pallets = [for (value in observed.pallets()) new Pallet(
       transformDetection(value.detection, estimate), value.lengthMeters,
       value.widthMeters, value.heightMeters)];

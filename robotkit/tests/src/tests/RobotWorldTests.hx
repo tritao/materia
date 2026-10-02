@@ -189,6 +189,7 @@ class RobotWorldTests {
     testNavigation();
     testMotionGuard();
     testFullScan();
+    testSensedShapes();
     testGridPlanning();
     testNavigator();
     testGoToBlockedTimeout();
@@ -1946,7 +1947,7 @@ class RobotWorldTests {
       approachSpeed > 0.0 && approachSpeed < 0.6,
       "MotionGuard reduces navigation speed inside the stopping envelope");
 
-    simulationHarness.teleportObject(objectId, [0.65, 0.0, 0.0]);
+    simulationHarness.teleportObject(objectId, [0.55, 0.0, 0.0]);
     var blocked = observe(3);
     check(blocked.obstacles().length > 0,
       "simulated perception continues observing an obstacle near the footprint");
@@ -2002,8 +2003,97 @@ class RobotWorldTests {
       Math.abs(base.currentCommand().angular) < 1e-9,
       "MotionGuard holds a stopped base whose turn would swing into an obstacle");
     corridorGuard.detach();
+
+    // The guard judges the costmap's dynamic layer, so it holds for what the costmap remembers: an obstacle
+    // seen and then out of view still slows the base until the memory times out or a scan sees through it.
+    function at(x:Float, y:Float, yaw:Float = 0.0, half:Float = 0.0):Obstacle
+      return new Obstacle(new Detection("remembered", "obstacle", 1.0, new Pose2(x, y, yaw), "map", Int64.ofInt(1),
+        Int64.ofInt(1), Int64.ofInt(1), "sim-clock", "host-clock"), 0.1, half);
+    var memoryMap = new Costmap2(new OccupancyGrid2(0.5, new Pose2(-5.0, -5.0), 20, 20, "map", OccupancyCell.Free),
+      0.3, false, 0.0, 0.0, 3.0);
+    var remembering = new Navigation(base, localization, 0.2, 0.6, 1.0);
+    var rememberingGuard = new MotionGuard(remembering, null, 0.2, 2.0, 0.1, 0.5, memoryMap);
+    remembering.follow(new Path([new Pose2(), new Pose2(5.0, 0.0, 0.0)], "map"));
+    function held():Bool return switch rememberingGuard.state { case Clear: false; case _: true; };
+    memoryMap.senseObstacles([at(0.75, 0.0)], null, 0.1);
+    rememberingGuard.update(new PerceptionSnapshot([], [at(0.75, 0.0)]), 0.1);
+    check(held(), "MotionGuard slows for an obstacle in the costmap");
+    memoryMap.senseObstacles([], null, 1.0);
+    rememberingGuard.update(new PerceptionSnapshot(), 0.1);
+    check(held(), "MotionGuard still holds for an obstacle the sensor has lost sight of");
+    var blank = new SensorFrame("scan", "lidar", "base", Int64.ofInt(1), Int64.ofInt(1), [for (_ in 0...72) 6.0],
+      Int64.ofInt(1), "base", null, null, "sim-clock", "host-clock");
+    memoryMap.senseObstacles([], new LidarFreeSpace(6.0).viewing(blank, new Pose2(-3.0, 0.0, 0.0)), 0.1);
+    rememberingGuard.update(new PerceptionSnapshot(), 0.1);
+    check(!held() && memoryMap.dynamicLayer().length == 0, "MotionGuard lets go once a scan sees through the obstacle's place");
+    memoryMap.senseObstacles([at(0.75, 0.0)], null, 0.1);
+    memoryMap.senseObstacles([], null, 2.9);
+    rememberingGuard.update(new PerceptionSnapshot(), 0.1);
+    check(held(), "MotionGuard holds until the memory runs out");
+    memoryMap.senseObstacles([], null, 0.2);
+    rememberingGuard.update(new PerceptionSnapshot(), 0.1);
+    check(!held(), "MotionGuard releases when the memory runs out");
+    // A long wall beside the route is a segment, not a disk as wide as the wall is long.
+    memoryMap.senseObstacles([at(1.5, 0.6, 0.0, 1.5)], null, 0.1);
+    rememberingGuard.update(new PerceptionSnapshot(), 0.1);
+    check(!held(), "MotionGuard lets a base pass a long wall beside its corridor");
+    memoryMap.senseObstacles([at(0.9, 0.0, Math.PI / 2, 0.6)], null, 0.1);
+    rememberingGuard.update(new PerceptionSnapshot(), 0.1);
+    check(held(), "MotionGuard holds for a wall across its corridor");
+    rememberingGuard.detach();
     robot.close();
     simulationHarness.dispose();
+  }
+
+  /** Sensed objects are capsules along the visible surface: a flat wall is one thin segment of its own length. */
+  static function testSensedShapes():Void {
+    var scanner = new LidarObstaclePerception(10.0, 0.1, 0.05, 0.5, 0.1);
+    // A 1.2 m wall square across the view 2 m ahead, seen by 360 rays.
+    var face = [for (ray in 0...360) {
+      var angle = ray * Math.PI / 180.0;
+      var hit = Math.cos(angle) > 0.0 && Math.abs(2.0 * Math.tan(angle)) <= 0.6;
+      hit ? 2.0 / Math.cos(angle) : 10.0;
+    }];
+    var scan = new SensorFrame("scan", "lidar", "base", Int64.ofInt(1), Int64.ofInt(1), face, Int64.ofInt(1), "base",
+      null, null, "sim-clock", "host-clock");
+    var wall = scanner.observe([scan]).obstacles();
+    check(wall.length == 1 && Math.abs(wall[0].halfLengthMeters - 0.6) < 0.05 && wall[0].radiusMeters == 0.1 &&
+      Math.abs(Math.abs(wall[0].detection.pose.yaw) - Math.PI / 2) < 0.01 && Math.abs(wall[0].detection.pose.x - 2.0) < 0.01,
+      "a flat wall seen face-on is one segment of its own length");
+    // Seen from the map frame it keeps its length and turns with the robot.
+    var estimate = new LocalizationState(Int64.ofInt(1), new Pose2(1.0, 1.0, Math.PI / 2), "map", "base",
+      PoseCovariance2.zero(), Good, Int64.ofInt(1), Int64.ofInt(1), "sim-clock", "host-clock");
+    var inMap = new FrameAwarePerception(scanner, new FixedLocalization(estimate)).observe([scan]).obstacles();
+    check(inMap.length == 1 && Math.abs(inMap[0].halfLengthMeters - 0.6) < 0.05 && Math.abs(inMap[0].detection.pose.x - 1.0) < 0.01 &&
+      Math.abs(inMap[0].detection.pose.y - 3.0) < 0.01 && Math.abs(Math.sin(inMap[0].detection.pose.yaw)) < 0.01,
+      "a segment is carried into the map frame with its length and heading");
+    // A corner is two segments.
+    var corner = [for (ray in 0...360) 10.0];
+    for (ray in 0...360) {
+      var angle = ray * Math.PI / 180.0, c = Math.cos(angle), s = Math.sin(angle);
+      var near = 10.0;
+      // Walls x = 2 for y in [-0.6, 0] and y = -0.6 for x in [1.4, 2].
+      if (c > 1e-6) { var y = 2.0 * s / c; if (y <= 0.0 && y >= -0.6) near = 2.0 / c; }
+      if (s < -1e-6) { var x = -0.6 * c / s; if (x >= 1.4 && x <= 2.0) near = Math.min(near, -0.6 / s); }
+      corner[ray] = near;
+    }
+    var bent = scanner.observe([new SensorFrame("scan", "lidar", "base", Int64.ofInt(1), Int64.ofInt(1), corner,
+      Int64.ofInt(1), "base", null, null, "sim-clock", "host-clock")]).obstacles();
+    check(bent.length == 2, 'a corner is two segments (${bent.length})');
+    // On the costmap a segment blocks the cells along it and not far past its ends.
+    var map = new Costmap2(new OccupancyGrid2(0.1, new Pose2(), 100, 100, "map", OccupancyCell.Free), 0.0, false, 0.0, 0.0);
+    var along = new Obstacle(new Detection("wall", "obstacle", 1.0, new Pose2(5.0, 5.0, 0.0), "map", Int64.ofInt(1), Int64.ofInt(1),
+      Int64.ofInt(1), "sim-clock", "host-clock"), 0.1, 0.6);
+    map.senseObstacles([along], null, 0.1);
+    check(!map.isTraversable(54, 50) && !map.isTraversable(45, 50) && map.isTraversable(50, 53) &&
+      map.isTraversable(62, 50) && map.isTraversable(37, 50),
+      "a segment blocks the cells along it and nothing far past its ends or sides");
+    var cells = 0;
+    for (x in 0...100) for (y in 0...100) if (!map.isTraversable(x, y)) cells++;
+    check(cells < 12 * 4 + 20, 'a 1.2 m segment blocks a strip, not a wide disk (${cells} cells)');
+    var touched = map.revision;
+    map.senseObstacles([along], null, 0.1);
+    check(map.revision == touched, "an unchanged segment costs nothing");
   }
 
   static function testGridPlanning():Void {
@@ -2988,7 +3078,7 @@ class RobotWorldTests {
       clusteredObstacles[0].detection.confidence > perception.minConfidence &&
       clusteredObstacles[0].detection.pose.x > 1.9 &&
       Math.abs(clusteredObstacles[0].detection.pose.y) < 0.11 &&
-      clusteredObstacles[0].radiusMeters > perception.obstacleRadiusMeters,
+      clusteredObstacles[0].halfLengthMeters > 0.0,
       "LiDAR clustering merges nearby returns across the circular scan seam");
     var partialScan = new LidarObstaclePerception(10.0, 0.1, 0.05, 0.5,
       0.1, -Math.PI * 0.5, Math.PI).observe([new SensorFrame("front-scan", "lidar",

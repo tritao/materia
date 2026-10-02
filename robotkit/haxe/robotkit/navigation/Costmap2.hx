@@ -37,10 +37,13 @@ class Costmap2 {
   var staticBlocked:Array<Bool>;
   var staticLethal:Array<Bool>;
   var staticCosts:Array<Float>;
-  /** The costs in force: the static layer, or a copy of it with the dynamic obstacles drawn in. */
+  /** The costs in force: a copy of the static layer with the dynamic obstacles drawn in. */
   var blockedValues:Array<Bool>;
   var lethalValues:Array<Bool>;
   var costs:Array<Float>;
+  /** The cells the dynamic obstacles changed, so a new set restores them and draws, never copies the grid. */
+  var touchedCells:Array<Int> = [];
+  var touchedFlags:Array<Bool>;
 
   public function new(grid:OccupancyGrid2, footprintRadiusMeters:Float,
       ?unknownIsBlocked:Bool = true,
@@ -79,30 +82,35 @@ class Costmap2 {
       if (value == OccupancyCell.Occupied ||
           (unknownIsBlocked && value == OccupancyCell.Unknown)) {
         rasterizeObstacle((x + 0.5) * grid.resolutionMeters,
-          (y + 0.5) * grid.resolutionMeters, halfCellDiagonal);
+          (y + 0.5) * grid.resolutionMeters, (x + 0.5) * grid.resolutionMeters,
+          (y + 0.5) * grid.resolutionMeters, halfCellDiagonal, false);
       }
     }
     staticBlocked = blockedValues;
     staticLethal = lethalValues;
     staticCosts = costs;
-    drawDynamicObstacles();
-  }
-
-  /** The costs in force: the grid's layer, plus a disk per dynamic obstacle. */
-  function drawDynamicObstacles():Void {
-    revision++;
-    if (dynamicObstacles.length == 0) {
-      blockedValues = staticBlocked;
-      lethalValues = staticLethal;
-      costs = staticCosts;
-      return;
-    }
     blockedValues = staticBlocked.copy();
     lethalValues = staticLethal.copy();
     costs = staticCosts.copy();
+    touchedFlags = [for (_ in 0...count) false];
+    touchedCells = [];
+    drawDynamicObstacles();
+  }
+
+  /** The costs in force: the grid's layer, plus each dynamic obstacle's capsule; only the cells of the old and new ones are touched. */
+  function drawDynamicObstacles():Void {
+    revision++;
+    for (index in touchedCells) {
+      blockedValues[index] = staticBlocked[index];
+      lethalValues[index] = staticLethal[index];
+      costs[index] = staticCosts[index];
+      touchedFlags[index] = false;
+    }
+    touchedCells = [];
     for (obstacle in dynamicObstacles) {
-      var local = obstacle.detection.pose.relativeTo(grid.origin);
-      rasterizeObstacle(local.x, local.y, obstacle.radiusMeters);
+      var ends = obstacle.ends();
+      var from = ends[0].relativeTo(grid.origin), to = ends[1].relativeTo(grid.origin);
+      rasterizeObstacle(from.x, from.y, to.x, to.y, obstacle.radiusMeters, true);
     }
   }
 
@@ -138,19 +146,22 @@ class Costmap2 {
     var next = [for (obstacle in seen) new RememberedObstacle(obstacle, clockSeconds)];
     for (old in remembered) {
       if (clockSeconds - old.seenAt > obstacleMemorySeconds) continue;
-      var pose = old.obstacle.detection.pose;
       var resighted = false;
-      for (obstacle in seen) {
-        var dx = obstacle.detection.pose.x - pose.x, dy = obstacle.detection.pose.y - pose.y;
-        var reach = obstacle.radiusMeters + old.obstacle.radiusMeters;
-        if (dx * dx + dy * dy < reach * reach) { resighted = true; break; }
-      }
+      for (obstacle in seen)
+        if (obstacle.gapTo(old.obstacle) < obstacle.radiusMeters + old.obstacle.radiusMeters) { resighted = true; break; }
       if (resighted) continue;
-      if (view != null && view.freeAt(pose.x, pose.y, old.obstacle.radiusMeters)) continue;
+      if (view != null && seenThrough(old.obstacle, view)) continue;
       next.push(old);
     }
     remembered = next;
     setDynamicObstacles([for (entry in next) entry.obstacle]);
+  }
+
+  /** True when `view` sees free space past every part of the obstacle's capsule. */
+  static function seenThrough(obstacle:Obstacle, view:FreeSpaceView):Bool {
+    for (at in obstacle.disks(obstacle.radiusMeters))
+      if (!view.freeAt(at.x, at.y, obstacle.radiusMeters)) return false;
+    return true;
   }
 
   public function clearDynamicObstacles():Void {
@@ -166,8 +177,9 @@ class Costmap2 {
     if (next.length != dynamicObstacles.length) return false;
     for (index in 0...next.length) {
       var a = next[index], b = dynamicObstacles[index];
-      if (a.radiusMeters != b.radiusMeters || a.detection.pose.x != b.detection.pose.x ||
-          a.detection.pose.y != b.detection.pose.y)
+      if (a.radiusMeters != b.radiusMeters || a.halfLengthMeters != b.halfLengthMeters ||
+          a.detection.pose.x != b.detection.pose.x || a.detection.pose.y != b.detection.pose.y ||
+          a.detection.pose.yaw != b.detection.pose.yaw)
         return false;
     }
     return true;
@@ -194,38 +206,49 @@ class Costmap2 {
     return blockedValues[index] ? 1.0e300 : costs[index];
   }
 
-  function rasterizeObstacle(localX:Float, localY:Float,
-      obstacleRadiusMeters:Float):Void {
+  /** Blocks the cells within an obstacle capsule (the segment a to b, grown by `obstacleRadiusMeters`) and its robot-sized margin. */
+  function rasterizeObstacle(ax:Float, ay:Float, bx:Float, by:Float, obstacleRadiusMeters:Float,
+      dynamicLayer:Bool):Void {
     var resolution = grid.resolutionMeters;
     var cellRadius = resolution * Math.sqrt(2.0) * 0.5;
     var lethalRadius = obstacleRadiusMeters + footprintRadiusMeters;
     var hardRadius = lethalRadius + cellRadius;
     var extent = hardRadius + inflationCostDistanceMeters;
-    var minX = Std.int(Math.floor((localX - extent) / resolution));
-    var maxX = Std.int(Math.floor((localX + extent) / resolution));
-    var minY = Std.int(Math.floor((localY - extent) / resolution));
-    var maxY = Std.int(Math.floor((localY + extent) / resolution));
+    var minX = Std.int(Math.floor((Math.min(ax, bx) - extent) / resolution));
+    var maxX = Std.int(Math.floor((Math.max(ax, bx) + extent) / resolution));
+    var minY = Std.int(Math.floor((Math.min(ay, by) - extent) / resolution));
+    var maxY = Std.int(Math.floor((Math.max(ay, by) + extent) / resolution));
     if (minX < 0) minX = 0;
     if (minY < 0) minY = 0;
     if (maxX >= grid.width) maxX = grid.width - 1;
     if (maxY >= grid.height) maxY = grid.height - 1;
+    var sx = bx - ax, sy = by - ay;
+    var lengthSquared = sx * sx + sy * sy;
     for (y in minY...maxY + 1) for (x in minX...maxX + 1) {
       var centerX = (x + 0.5) * resolution;
       var centerY = (y + 0.5) * resolution;
-      var dx = centerX - localX;
-      var dy = centerY - localY;
+      var t = lengthSquared <= 1e-18 ? 0.0
+        : Math.max(0.0, Math.min(1.0, ((centerX - ax) * sx + (centerY - ay) * sy) / lengthSquared));
+      var dx = centerX - (ax + t * sx);
+      var dy = centerY - (ay + t * sy);
       var distance = Math.sqrt(dx * dx + dy * dy);
       var index = y * grid.width + x;
+      var changed = false;
       if (distance <= hardRadius) {
         blockedValues[index] = true;
         if (distance <= lethalRadius) lethalValues[index] = true;
+        changed = true;
       } else if (inflationCostDistanceMeters > 0.0) {
         var clearance = distance - hardRadius;
         if (clearance < inflationCostDistanceMeters) {
           var cost = inflationCostWeight *
             (1.0 - clearance / inflationCostDistanceMeters);
-          if (cost > costs[index]) costs[index] = cost;
+          if (cost > costs[index]) { costs[index] = cost; changed = true; }
         }
+      }
+      if (changed && dynamicLayer && !touchedFlags[index]) {
+        touchedFlags[index] = true;
+        touchedCells.push(index);
       }
     }
   }

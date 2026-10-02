@@ -39,6 +39,8 @@ class Navigator {
       throw "Navigator requires navigation, planner, costmap, and a positive retry interval";
     if (motionGuard != null && motionGuard.navigation != navigation)
       throw "Navigator MotionGuard must filter its Navigation instance";
+    if (motionGuard != null && motionGuard.costmap != null && motionGuard.costmap != costmap)
+      throw "Navigator MotionGuard must judge the costmap the Navigator plans on";
     this.navigation = navigation;
     this.planner = planner;
     this.costmap = costmap;

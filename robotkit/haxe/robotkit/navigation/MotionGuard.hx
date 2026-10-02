@@ -26,6 +26,11 @@ class MotionGuard {
   public final decelerationMetersPerSecondSquared:Float;
   public final marginMeters:Float;
   public final slowdownDistanceMeters:Float;
+  /**
+   * The costmap whose dynamic layer the guard judges instead of the latest observation, so it holds for
+   * what the costmap remembers (an obstacle behind it, or between two rays) and keeps no memory of its own.
+   */
+  public final costmap:Null<Costmap2>;
   public var state(default, null):MotionGuardState = Blocked("No perception observation");
 
   final points:Array<FootprintPoint>;
@@ -36,7 +41,7 @@ class MotionGuard {
       ?reactionTimeSeconds:Float = 0.2,
       ?decelerationMetersPerSecondSquared:Float,
       ?marginMeters:Float = 0.1,
-      ?slowdownDistanceMeters:Float = 0.5) {
+      ?slowdownDistanceMeters:Float = 0.5, ?costmap:Costmap2) {
     if (navigation == null) throw "MotionGuard requires Navigation";
     var selectedFootprint = footprint == null ? navigation.base.footprint : footprint;
     if (selectedFootprint == null) throw "MotionGuard requires a robot footprint";
@@ -54,6 +59,7 @@ class MotionGuard {
     this.decelerationMetersPerSecondSquared = chosenDeceleration;
     this.marginMeters = marginMeters;
     this.slowdownDistanceMeters = slowdownDistanceMeters;
+    this.costmap = costmap;
     points = this.footprint.vertices();
     if (navigation.hasCommandFilter())
       throw "Navigation already has a command filter";
@@ -93,6 +99,10 @@ class MotionGuard {
     state = Clear;
   }
 
+  /** What the guard judges: the costmap's dynamic layer, which remembers, when it has one; else the latest observation. */
+  function obstacleSet(latest:PerceptionSnapshot):Array<Obstacle>
+    return costmap == null ? latest.obstacles() : costmap.dynamicLayer();
+
   function filterCommand(desired:Twist2):Twist2 return evaluate(desired);
 
   function evaluate(desired:Twist2):Twist2 {
@@ -126,35 +136,39 @@ class MotionGuard {
     var nearest:Null<Obstacle> = null;
     var nearestClearance = 1.0e300;
     var nearestSweep = 1.0e300;
-    for (obstacle in observations.obstacles()) {
-      var localPose:Pose2;
-      if (obstacle.detection.frameId == localization.bodyFrame) {
-        localPose = obstacle.detection.pose;
-      } else if (obstacle.detection.frameId == localization.referenceFrame) {
-        localPose = obstacle.detection.pose.relativeTo(localization.pose);
-      } else {
-        return block('Obstacle ${obstacle.detection.id} has unresolved frame ${obstacle.detection.frameId}');
-      }
-
-      var sweepClearance = Math.sqrt(localPose.x * localPose.x + localPose.y * localPose.y) -
-        obstacle.radiusMeters - footprint.radius;
-      if (sweepClearance < nearestSweep) nearestSweep = sweepClearance;
-      if (turning) {
-        if (sweepClearance < nearestClearance) {
-          nearest = obstacle;
-          nearestClearance = sweepClearance;
+    for (obstacle in obstacleSet(observations)) {
+      var radius = obstacle.radiusMeters;
+      // A capsule is judged as the disks that cover it, each as a lone disk would be.
+      for (at in obstacle.disks(radius)) {
+        var localPose:Pose2;
+        if (obstacle.detection.frameId == localization.bodyFrame) {
+          localPose = at;
+        } else if (obstacle.detection.frameId == localization.referenceFrame) {
+          localPose = at.relativeTo(localization.pose);
+        } else {
+          return block('Obstacle ${obstacle.detection.id} has unresolved frame ${obstacle.detection.frameId}');
         }
-        continue;
-      }
-      var along = localPose.x * direction;
-      if (Math.abs(localPose.y) > lateralExtent + obstacle.radiusMeters + marginMeters)
-        continue;
-      if (along + obstacle.radiusMeters < -rearExtent - marginMeters)
-        continue;
-      var clearance = along - frontExtent - obstacle.radiusMeters;
-      if (clearance < nearestClearance) {
-        nearest = obstacle;
-        nearestClearance = clearance;
+
+        var sweepClearance = Math.sqrt(localPose.x * localPose.x + localPose.y * localPose.y) -
+          radius - footprint.radius;
+        if (sweepClearance < nearestSweep) nearestSweep = sweepClearance;
+        if (turning) {
+          if (sweepClearance < nearestClearance) {
+            nearest = obstacle;
+            nearestClearance = sweepClearance;
+          }
+          continue;
+        }
+        var along = localPose.x * direction;
+        if (Math.abs(localPose.y) > lateralExtent + radius + marginMeters)
+          continue;
+        if (along + radius < -rearExtent - marginMeters)
+          continue;
+        var clearance = along - frontExtent - radius;
+        if (clearance < nearestClearance) {
+          nearest = obstacle;
+          nearestClearance = clearance;
+        }
       }
     }
 
