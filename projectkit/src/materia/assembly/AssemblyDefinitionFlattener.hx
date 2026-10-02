@@ -118,6 +118,8 @@ class AssemblyDefinitionFlattener {
 		if (actuator.servoStiffness != null) copy.servoStiffness = actuator.servoStiffness;
 		if (actuator.servoDamping != null) copy.servoDamping = actuator.servoDamping;
 		if (actuator.encoder != null) copy.encoder = actuator.encoder;
+		if (actuator.gearRatio != null) copy.gearRatio = actuator.gearRatio;
+		if (actuator.gearEfficiency != null) copy.gearEfficiency = actuator.gearEfficiency;
 		return copy;
 	}
 

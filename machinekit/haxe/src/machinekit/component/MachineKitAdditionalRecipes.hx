@@ -7,6 +7,7 @@ import machinekit.motion.CasterWheel;
 import machinekit.motion.DriveWheel;
 import machinekit.motion.LinearScale;
 import machinekit.motion.ShaftCoupling;
+import machinekit.motion.ServoMotor;
 import machinekit.motion.ShaftEncoder;
 import machinekit.motion.SteppedShaft;
 import machinekit.motion.LeadScrewNut;
@@ -132,9 +133,11 @@ class MachineKitAdditionalRecipes {
 			v -> new SchmalzVacuumHose(v.token("stock"), route(v.token("route"))), true, false, ["route"]),
 		new ComponentType("machinekit.robotics.frame-bar", [n("width", 20), n("depth", 20), n("length", 100)],
 			v -> new FrameBar(v.number("width"), v.number("depth"), v.number("length")), true),
-		new ComponentType("machinekit.robotics.arm-joint", [n("diameter", 100), n("length", 70), n("flangePitchCircle", 0)],
+		new ComponentType("machinekit.robotics.arm-joint", [n("diameter", 100), n("length", 70), n("flangePitchCircle", 0),
+			c("servo", ["none"].concat([for (rating in ServoMotor.ratings()) rating.designation]), "none")],
 			v -> new ArmJoint(v.number("diameter"), v.number("length"),
-				v.number("flangePitchCircle") > 0 ? new RobotFlange(v.number("flangePitchCircle")) : null), true),
+				v.number("flangePitchCircle") > 0 ? new RobotFlange(v.number("flangePitchCircle")) : null,
+				v.token("servo") == "none" ? null : ServoMotor.model(v.token("servo"))), true),
 		new ComponentType("machinekit.robotics.arm-link", [n("length", 300), n("diameter", 80), n("wall", 5),
 			n("collarDiameter", 100), c("startAxis", ["+X", "-X", "+Z"], "+Z"), c("endAxis", ["+X", "-X", "+Z"], "+Z"),
 			n("endJointLength", 0)],

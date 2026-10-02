@@ -10,6 +10,8 @@ import machinekit.pneumatic.schmalz.SchmalzPushInFitting;
 import machinekit.pneumatic.schmalz.SchmalzSuctionCup;
 import machinekit.pneumatic.schmalz.SchmalzVacuumGenerator;
 import machinekit.pneumatic.schmalz.SchmalzVacuumHose;
+import machinekit.motion.Gearbox;
+import machinekit.motion.ServoMotor;
 import machinekit.robotics.ArmJoint;
 import machinekit.robotics.ArmLink;
 import machinekit.robotics.ArmLink.ArmAxis;
@@ -112,15 +114,21 @@ class ArmBlock extends MachineComponent {
 		return Part.box(width, depth, height);
 }
 
-/** One joint's motion limits and the pose it starts in, in radians and rad/s. */
+/**
+ * One joint's travel and starting pose (radians), and the drive behind it: a servo motor through a
+ * gearbox. The speed and torque limits come from that drive, not from typed-in numbers: `velocity` (rad/s)
+ * is the servo's maximum speed over the gearbox ratio, `effort` (N m) its peak torque through the gearbox.
+ */
 typedef ArmJointSpec = {
 	var id:String;
 	var lower:Float;
 	var upper:Float;
-	var velocity:Float;
-	/** Peak joint torque in N·m. */
-	var effort:Float;
 	var initial:Float;
+	/** The generic servo (`ServoMotor.ratings()`) inside the joint module. */
+	var servo:String;
+	var gearbox:Gearbox;
+	var velocity:Float;
+	var effort:Float;
 }
 
 /** Six-axis serial arm on a pedestal with a suction tool, in the classic shoulder/elbow/spherical-wrist layout.
@@ -153,12 +161,39 @@ class RobotArm extends MachineAssembly {
 	public final joints:Array<ArmJoint>;
 	public final links:Array<ArmLink>;
 	public final specs:Array<ArmJointSpec>;
+	/**
+	 * Efficiency of every joint's gearbox. Assumption: 0.85, about a strain-wave (harmonic) gearhead's
+	 * efficiency at speed; makers quote 0.7 to 0.9.
+	 */
+	public static inline var GEARBOX_EFFICIENCY:Float = 0.85;
+
+	/** A joint's spec with its limits worked out from its drive. */
+	static function spec(id:String, lower:Float, upper:Float, initial:Float, servo:String, ratio:Float):ArmJointSpec {
+		var motor = ServoMotor.model(servo).rating, gearbox = new Gearbox(ratio, GEARBOX_EFFICIENCY);
+		return {id: id, lower: lower, upper: upper, initial: initial, servo: servo, gearbox: gearbox,
+			velocity: gearbox.jointSpeed(motor.maxSpeed), effort: gearbox.jointTorque(motor.peakTorque)};
+	}
 
 	public function new(withCell:Bool = true) {
 		super();
 		pedestal = new Pedestal(flange, PEDESTAL_HEIGHT, 100);
-		var j1 = new ArmJoint(100, 70), j2 = new ArmJoint(100, 90), j3 = new ArmJoint(80, 90);
-		var j4 = new ArmJoint(70, 60), j5 = new ArmJoint(60, 70), j6 = new ArmJoint(55, 40, toolFlange);
+		var pi = Math.PI;
+		// The gearbox ratios are assumptions chosen so each joint's top speed lands where this arm's speeds were
+		// before they came from drives (2 to 4 rad/s), and the servo is the smallest generic one that carries the
+		// joint's torque: the shoulder and elbow 200 W, the wrist 50 W. j3 turns about -X, so a positive j3
+		// folds the forearm the opposite way from a positive j2.
+		specs = [
+			spec("j1", -2.9, 2.9, 0, "GENERIC-SERVO-200W", 250),
+			spec("j2", -1.9, 1.9, 0.4, "GENERIC-SERVO-200W", 250),
+			spec("j3", -2.4, 2.4, -1.4, "GENERIC-SERVO-200W", 220),
+			spec("j4", -3.1, 3.1, 0, "GENERIC-SERVO-50W", 175),
+			spec("j5", -2.1, 2.1, pi - 0.4 - 1.4, "GENERIC-SERVO-50W", 175),
+			spec("j6", -6.2, 6.2, 0, "GENERIC-SERVO-50W", 130)
+		];
+		function housing(index:Int, diameter:Float, length:Float, ?flange:RobotFlange):ArmJoint
+			return new ArmJoint(diameter, length, flange, ServoMotor.model(specs[index].servo));
+		var j1 = housing(0, 100, 70), j2 = housing(1, 100, 90), j3 = housing(2, 80, 90);
+		var j4 = housing(3, 70, 60), j5 = housing(4, 60, 70), j6 = housing(5, 55, 40, toolFlange);
 		joints = [j1, j2, j3, j4, j5, j6];
 		links = [
 			new ArmLink(90, 90, 5, 100, PlusZ, PlusX, j2.length),
@@ -166,16 +201,6 @@ class RobotArm extends MachineAssembly {
 			new ArmLink(260, 70, 4, 80, MinusX, PlusZ, j4.length),
 			new ArmLink(90, 60, 4, 70, PlusZ, PlusX, j5.length),
 			new ArmLink(60, 50, 4, 60, PlusX, PlusZ, j6.length)
-		];
-		var pi = Math.PI;
-		// j3 turns about -X, so a positive j3 folds the forearm the opposite way from a positive j2.
-		specs = [
-			{id: "j1", lower: -2.9, upper: 2.9, velocity: 2.0, effort: 300, initial: 0},
-			{id: "j2", lower: -1.9, upper: 1.9, velocity: 2.0, effort: 400, initial: 0.4},
-			{id: "j3", lower: -2.4, upper: 2.4, velocity: 2.4, effort: 250, initial: -1.4},
-			{id: "j4", lower: -3.1, upper: 3.1, velocity: 3.0, effort: 80, initial: 0},
-			{id: "j5", lower: -2.1, upper: 2.1, velocity: 3.0, effort: 60, initial: pi - 0.4 - 1.4},
-			{id: "j6", lower: -6.2, upper: 6.2, velocity: 4.0, effort: 30, initial: 0}
 		];
 		addComponent("pedestal", pedestal);
 		addComponent("baseFlange", flange);
@@ -194,6 +219,8 @@ class RobotArm extends MachineAssembly {
 		}
 		addComponent("toolFlange", toolFlange);
 		revolute(specs[5], "joint6", "tool", "toolFlange", "face");
+		// Each joint's servo, through its gearbox, drives it: the limits above are what the drives deliver.
+		for (index in 0...6) addMotor('drive_${specs[index].id}', specs[index].id, 'joint${index + 1}', 48, 0.5, specs[index].gearbox);
 		tool = ArmSuctionTool.build(toolFlange);
 		include("tool", tool);
 		addMate("tool-mount", "fixed", "toolFlange", "face", "tool/plate", "robot");

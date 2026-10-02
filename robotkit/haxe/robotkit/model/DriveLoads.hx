@@ -164,11 +164,11 @@ class DriveLoads {
         if (index < 0) continue;
         var motorRatio = transmissionRatio * ratios[index];
         if (motorRatio == 0.0) continue;
-        var motor = new MotorLoad(actuator, target, motorRatio, efficiencies[index],
+        var motor = new MotorLoad(actuator, target, motorRatio, efficiencies[index] * actuator.efficiency,
           model.turningInertia(reached[index]), drag[index] * Math.abs(transmissionRatio));
         motors.push(motor);
         motorJoints.push(reached[index]);
-        total += efficiencies[index] * actuator.planningEffort() * Math.abs(motorRatio);
+        total += efficiencies[index] * actuator.efficiency * actuator.planningEffort() * Math.abs(motorRatio);
     }
     if (motors.length == 0) return null;
     for (motor in motors)

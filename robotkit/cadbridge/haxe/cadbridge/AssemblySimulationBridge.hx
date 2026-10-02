@@ -280,8 +280,11 @@ class AssemblySimulationBridge {
       // units from its initial placement: joint = (actuator - initial) * factor.
       var factor = edge.type == AssemblyJointType.Prismatic ? scale : 1.0;
       var initial = placement.joint(actuator.joint);
+      // A gearbox turns the motor `gearRatio` times for one unit of the joint: the actuator coordinate is that much more.
+      var gear = actuator.gearRatio == null ? 1.0 : actuator.gearRatio;
       var added = new Actuator(actuator.id, actuator.maxEffort, actuator.maxRate,
-        Transmission.SimpleTransmission(driven.id, 1 / factor, -initial * factor));
+        Transmission.SimpleTransmission(driven.id, gear / factor, -initial * factor));
+      if (actuator.gearEfficiency != null) added.efficiency = actuator.gearEfficiency;
       var steps = actuator.fullStepsPerRevolution;
       if (steps != null) added.fullStepsPerRevolution = steps;
       var inertia = actuator.rotorInertia == null ? 0.0 : actuator.rotorInertia;
@@ -300,7 +303,8 @@ class AssemblySimulationBridge {
       if (actuator.encoder != null) added.encoder = actuator.encoder;
       model.addActuator(added);
       if (actuator.rotorInertia != null)
-        driven.armature += edge.type == AssemblyJointType.Prismatic ? 0.0 : actuator.rotorInertia;
+        // The rotor turns `gear` times as fast as the joint, so its inertia at the joint is `gear` squared times as much.
+        driven.armature += edge.type == AssemblyJointType.Prismatic ? 0.0 : actuator.rotorInertia * gear * gear;
     }
     // Encoders: sensors on joints. Counts per millimetre on a sliding joint, per revolution on a turning one.
     if (definition.encoders != null) for (encoder in definition.encoders) {

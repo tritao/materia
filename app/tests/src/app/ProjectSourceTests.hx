@@ -279,9 +279,49 @@ class ProjectSourceTests {
    * The mobile base opens as a wheeled robot on both backends: a commanded twist rolls its chassis and
    * every part on it over the floor, the wheels spin their own ways, and wheel odometry agrees.
    */
+  /**
+   * The runtime's speed and torque limits on each driven joint come from its drive, not from numbers typed in with
+   * the joint: the motor's maximum speed over the gearbox ratio, and its peak torque through the gearbox at its
+   * efficiency. Returns what each joint compiled to, as speed then torque.
+   */
+  static function checkLimitsFromDrives(session:ProjectDocumentSession, driven:Array<String>, label:String):Map<String, Array<Float>> {
+    var definition = session.projectAssemblyDefinition, physical = session.projectPhysical;
+    if (definition == null || physical == null) throw '$label has no assembly to build a robot from';
+    var model = AssemblySimulationBridge.toRobotModel(definition, physical, session.projectAssemblyState, null, null, session.mobileBase).model;
+    var compiled = RobotRuntimeCompiler.compile(model);
+    var found = new Map<String, Array<Float>>();
+    for (id in driven) {
+      var index = -1;
+      for (candidate in 0...model.joints.length) if (model.joints[candidate].id == id) index = candidate;
+      var motors:Array<robotkit.model.Actuator> = [];
+      for (actuator in model.actuators) switch actuator.transmission {
+        case SimpleTransmission(joint, _, _): if (joint == id) motors.push(actuator);
+      }
+      check(index >= 0 && motors.length == 1, '$label drives joint $id with exactly one motor');
+      var motor = motors[0];
+      var ratio = switch motor.transmission { case SimpleTransmission(_, ratio, _): Math.abs(ratio); };
+      var speed = motor.planningRate() / ratio, torque = motor.planningEffort() * ratio * motor.efficiency;
+      check(Math.abs(compiled.joints[index].maxRate - speed) <= 1e-9 * speed && Math.abs(compiled.joints[index].maxEffort - torque) <= 1e-9 * torque,
+        '$label joint $id is limited to ${compiled.joints[index].maxRate} rad/s and ${compiled.joints[index].maxEffort} N m, its drive gives $speed and $torque');
+      check(motor.drive != null && ratio > 1.0, '$label joint $id has a drive and a gearbox');
+      found.set(id, [compiled.joints[index].maxRate, compiled.joints[index].maxEffort]);
+    }
+    return found;
+  }
+
   static function checkMobileBase(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/mobile-base/materia.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
+    var limitSession = new ProjectDocumentSession(null, false);
+    limitSession.openGeneratedProject(generated, manifest);
+    var wheelSection = limitSession.mobileBase;
+    if (wheelSection == null) throw "the mobile base project should declare its drive";
+    var wheels = checkLimitsFromDrives(limitSession, [wheelSection.leftWheel, wheelSection.rightWheel], "the mobile base");
+    var wheelLimits = wheels.get(wheelSection.leftWheel);
+    // A NEMA 23 on 24 V turns 137 rad/s with half its holding torque (0.63 N m); the 10:1 gearhead at 90% makes that 13.7 rad/s and 5.7 N m.
+    check(wheelLimits != null && Math.abs(wheelLimits[0] - 13.71) < 0.02 && Math.abs(wheelLimits[1] - 5.67) < 0.01,
+      'the wheels run to ${wheelLimits == null ? 0 : wheelLimits[0]} rad/s and ${wheelLimits == null ? 0 : wheelLimits[1]} N m');
+    limitSession.dispose();
     var drive = generated.mobileBase;
     if (drive == null) throw "the mobile base project should declare its drive";
     var section:materia.project.SceneArtifact.SceneArtifactMobileBase = cast drive;
@@ -646,6 +686,11 @@ class ProjectSourceTests {
     var session = new ProjectDocumentSession(null, false);
     session.openGeneratedProject(generated, manifest);
     checkArmHierarchy(session);
+    var armLimits = checkLimitsFromDrives(session, ["j1", "j2", "j3", "j4", "j5", "j6"], "the arm");
+    var j1 = armLimits.get("j1"), j6 = armLimits.get("j6");
+    // The 200 W servo (1.91 N m peak, 5000 rpm) through a 250:1 gearbox at 0.85; the 50 W one through 130:1.
+    check(j1 != null && j6 != null && Math.abs(j1[0] - 2.094) < 0.001 && Math.abs(j1[1] - 405.9) < 0.5 &&
+      Math.abs(j6[0] - 4.028) < 0.001 && Math.abs(j6[1] - 52.7) < 0.2, 'the arm joints run to ${j1} and ${j6}');
     checkArmDrag(session, generated.metresPerUnit);
     checkFreeParts(definition, generated.physical);
     var simulation = new ApplicationSimulation(new RobotWorld());

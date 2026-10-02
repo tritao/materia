@@ -169,6 +169,14 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(16) @:optional var servoDamping:Null<Float>;
 	/** The id of the `AssemblyEncoder` that reads this motor, which a servo's feedback comes from; absent for none. */
 	@:id(17) @:optional var encoder:Null<String>;
+	/**
+	 * A gearbox between the motor and the joint: the motor turns `gearRatio` times for one turn (or one unit of
+	 * travel) of the joint, and the joint gets `gearEfficiency` of its power. `maxEffort`, `maxRate`, the
+	 * torque-speed curve and the rotor are then the motor's own, before the gearbox. Absent, the motor drives the
+	 * joint directly.
+	 */
+	@:id(18) @:optional var gearRatio:Null<Float>;
+	@:id(19) @:optional var gearEfficiency:Null<Float>;
 }
 
 /**

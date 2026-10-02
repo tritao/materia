@@ -129,7 +129,7 @@ class RobotModel {
         // An actuator coordinate moves |ratio| per unit of its joint, so |ratio| * scale per unit of `id`.
         var gearing = Math.abs(ratio) * scales[index];
         limits.velocity = tighten(limits.velocity, actuator.planningRate() / gearing);
-        force += efficiencies[index] * actuator.planningEffort() * gearing;
+        force += efficiencies[index] * actuator.efficiency * actuator.planningEffort() * gearing;
         driven = true;
     }
     if (driven && joint[0].type == JointType.Prismatic && force > 0) {

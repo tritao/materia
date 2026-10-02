@@ -101,6 +101,20 @@ class MobileBaseChecks {
 		if (drive == null) throw "Mobile base preview should declare its drive";
 		near(drive.wheelRadius, robot.wheel.radius / 1000, "declared wheel radius", 1e-12);
 		near(drive.trackWidth, 0.3, "declared track width", 1e-12);
+		// The wheel limits come from the wheels' drive: each stepper through its gearhead.
+		var wheelDrives = scene.assemblyDefinition == null ? null : scene.assemblyDefinition.actuators;
+		if (wheelDrives == null || wheelDrives.length != 2) throw "Mobile base should drive each wheel with a motor";
+		for (motor in wheelDrives) {
+			var ratioValue = motor.gearRatio, efficiencyValue = motor.gearEfficiency;
+			if (ratioValue == null || efficiencyValue == null || (motor.joint != "wheel_l" && motor.joint != "wheel_r"))
+				throw 'Mobile base motor ${motor.id} should drive a wheel through a gearhead';
+			var ratio:Float = ratioValue, efficiency:Float = efficiencyValue;
+			near(ratio, MobileBase.WHEEL_GEARBOX.ratio, "wheel gearhead ratio");
+			near(motor.maxRate / ratio, MobileBase.WHEEL_SPEED, "wheel speed is the stepper's over the gearhead ratio", 1e-9);
+			near(motor.maxEffort * ratio * efficiency, MobileBase.WHEEL_TORQUE, "wheel torque is the stepper's through the gearhead", 1e-9);
+		}
+		near(MobileBase.WHEEL_SPEED, 13.71, "the wheels turn at most about 13.7 rad/s", 0.01);
+		near(MobileBase.WHEEL_SPEED * drive.wheelRadius, 1.03, "which is about 1 m/s on the ground", 0.01);
 		// The wheels' top speed covers the drive's: straight, and turning in place.
 		if (!(MobileBase.MAX_LINEAR_SPEED / drive.wheelRadius <= MobileBase.WHEEL_SPEED &&
 				MobileBase.MAX_ANGULAR_SPEED * drive.trackWidth / 2 / drive.wheelRadius <= MobileBase.WHEEL_SPEED))

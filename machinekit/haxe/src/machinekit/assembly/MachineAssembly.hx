@@ -343,7 +343,8 @@ class MachineAssembly {
 					coupling.target.substr(prefix.length), coupling.ratio, coupling.offset, coupling.efficiency);
 		for (motor in motors) if (StringTools.startsWith(motor.actuator, prefix))
 			child.addMotorRecord({actuator: motor.actuator.substr(prefix.length), joint: motor.joint.substr(prefix.length),
-				motor: motor.motor.substr(prefix.length), volts: motor.volts, margin: motor.margin});
+				motor: motor.motor.substr(prefix.length), volts: motor.volts, margin: motor.margin,
+				gearRatio: motor.gearRatio, gearEfficiency: motor.gearEfficiency});
 		for (encoder in encoders) if (StringTools.startsWith(encoder.encoder, prefix))
 			child.addEncoderRecord({encoder: encoder.encoder.substr(prefix.length), joint: encoder.joint.substr(prefix.length),
 				part: encoder.part.substr(prefix.length),
@@ -848,8 +849,9 @@ class MachineAssembly {
 	 * speed up to where pull-out torque falls to that, for a servo its peak torque and maximum speed.
 	 * Rebuilding the assembly works them out again from the motor.
 	 */
-	public function addMotor(id:String, joint:String, motor:String, volts:Float, margin:Float = 0.5):Void
-		addMotorRecord({actuator: id, joint: joint, motor: motor, volts: volts, margin: margin});
+	public function addMotor(id:String, joint:String, motor:String, volts:Float, margin:Float = 0.5, ?gearbox:machinekit.motion.Gearbox):Void
+		addMotorRecord({actuator: id, joint: joint, motor: motor, volts: volts, margin: margin,
+			gearRatio: gearbox == null ? null : gearbox.ratio, gearEfficiency: gearbox == null ? null : gearbox.efficiency});
 
 	function addMotorRecord(record:machinekit.assembly.MachineAssemblyDescription.MotorRecord):Void {
 		var member = requireMember(record.motor);
@@ -858,7 +860,13 @@ class MachineAssembly {
 		if (mechanical.actuators == null) mechanical.actuators = [];
 		for (actuator in mechanical.actuators) if (actuator.id == record.actuator)
 			throw 'Duplicate assembly actuator "${record.actuator}"';
-		mechanical.actuators.push(motor.actuator(record.actuator, record.joint, record.volts, record.margin));
+		var added = motor.actuator(record.actuator, record.joint, record.volts, record.margin);
+		// A gearbox between the motor and the joint: the actuator stays the motor's own, the bridge scales it.
+		if (record.gearRatio != null) {
+			added.gearRatio = record.gearRatio;
+			added.gearEfficiency = record.gearEfficiency;
+		}
+		mechanical.actuators.push(added);
 		motors.push(copyMotor(record, ""));
 	}
 
@@ -900,7 +908,8 @@ class MachineAssembly {
 	static function copyMotor(motor:machinekit.assembly.MachineAssemblyDescription.MotorRecord,
 			prefix:String):machinekit.assembly.MachineAssemblyDescription.MotorRecord
 		return {actuator: join(prefix, motor.actuator), joint: join(prefix, motor.joint),
-			motor: join(prefix, motor.motor), volts: motor.volts, margin: motor.margin};
+			motor: join(prefix, motor.motor), volts: motor.volts, margin: motor.margin,
+			gearRatio: motor.gearRatio, gearEfficiency: motor.gearEfficiency};
 
 	static function copyActuator(actuator:materia.assembly.AssemblyDefinition.AssemblyActuator,
 			prefix:String):materia.assembly.AssemblyDefinition.AssemblyActuator {

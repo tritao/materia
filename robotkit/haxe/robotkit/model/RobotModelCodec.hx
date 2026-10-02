@@ -439,6 +439,7 @@ class RobotModelCodec {
       }
     };
     if (value.encoder != "") record.encoder = value.encoder;
+    if (value.efficiency != 1.0) record.efficiency = value.efficiency;
     // A bare stepper is its steps alone, as before drive kinds; anything with ratings gets a drive.
     var drive = value.drive;
     if (drive != null) {
@@ -477,6 +478,7 @@ class RobotModelCodec {
     if (value == null) throw "Robot actuator is null";
     nonNegative(value.servoStiffness, "actuator servoStiffness");
     nonNegative(value.servoDamping, "actuator servoDamping");
+    if (!(value.efficiency > 0.0 && value.efficiency <= 1.0)) throw "Actuator efficiency must be in (0, 1]";
     nonNegative(value.fullStepsPerRevolution, "actuator fullStepsPerRevolution");
     if (value.drive != null && !Std.isOfType(value.drive, StepperDrive) && !Std.isOfType(value.drive, ServoDrive))
       throw 'Actuator ${value.id} has an unsupported drive';
@@ -553,6 +555,10 @@ class RobotModelCodec {
       actuator.drive = readActuatorDrive(Reflect.field(value, "drive"));
     if (Reflect.hasField(value, "encoder") && Reflect.field(value, "encoder") != null)
       actuator.encoder = text(value, "encoder");
+    if (Reflect.hasField(value, "efficiency") && Reflect.field(value, "efficiency") != null) {
+      actuator.efficiency = number(value, "efficiency");
+      if (!(actuator.efficiency > 0.0 && actuator.efficiency <= 1.0)) throw "Actuator efficiency must be in (0, 1]";
+    }
     return actuator;
   }
 

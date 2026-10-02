@@ -811,11 +811,12 @@ class RobotWorldTests {
     var shaft = model.addEncoder(robotkit.model.Encoder.perRevolution("shaft", "turn", robotkit.model.EncoderKind.Incremental, 4096.0, true));
     var absolute = model.addEncoder(robotkit.model.Encoder.perRevolution("pulley", "turn", robotkit.model.EncoderKind.Absolute, 1024.0));
     legacy.encoder = "shaft";
+    legacy.efficiency = 0.85;
     check(model.encoderFor(legacy) == shaft, "a motor that names an encoder reads that one");
     check(RobotModelCodec.encode(model).toString() != plain, "encoders are saved");
     var restored = RobotModelCodec.decode(RobotModelCodec.encode(model));
     check(restored.encoders.length == 2 && restored.encoders[0].index && !restored.encoders[1].index &&
-      restored.encoders[1].kind == robotkit.model.EncoderKind.Absolute && restored.actuators[0].encoder == "shaft" &&
+      restored.encoders[1].kind == robotkit.model.EncoderKind.Absolute && restored.actuators[0].encoder == "shaft" && restored.actuators[0].efficiency == 0.85 &&
       Math.abs(restored.encoders[0].countsPerUnit - 4096.0 / (2.0 * Math.PI)) < 1e-9, "encoders and a motor's reference round-trip");
     equal(RobotModelCodec.encode(restored).toString(), RobotModelCodec.encode(model).toString(), "and byte for byte");
     model.addEncoder(robotkit.model.Encoder.perRevolution("shaft", "turn", robotkit.model.EncoderKind.Incremental, 1.0));

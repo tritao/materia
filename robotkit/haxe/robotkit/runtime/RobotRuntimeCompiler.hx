@@ -89,7 +89,7 @@ class RobotRuntimeCompiler {
           if (actuator.planningRate() > 0.0)
             actuatorRate = tighterLimit(actuatorRate, actuator.planningRate() / magnitude);
           if (actuator.planningEffort() > 0.0)
-            actuatorEffort += actuator.planningEffort() * magnitude;
+            actuatorEffort += actuator.planningEffort() * magnitude * actuator.efficiency;
         case _:
       }
       // The joints coupled to this one and their motors limit it too, such as an axis by the

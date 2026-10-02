@@ -316,9 +316,10 @@ one place.
 
 ### X6 — Drive kinds, plan checks and drive-aware simulation
 
-Status: X6a (drive kinds), X6b (plan check, accuracy, screw critical speed) and the
-belt-router gate are done (2026-10-02); X6c (simulation by drive kind), the examples
-and the hardware-timer device work are not.
+Status: X6a (drive kinds), X6b (plan check, accuracy, screw critical speed), the
+belt-router gate, X6c (simulation by drive kind), X6d's simulation side (encoders) and
+the examples are done (2026-10-02); the hardware-timer device work and the encoders'
+device counting are not.
 
 Steppers and servos fail differently, so an actuator names its drive kind
 instead of carrying bare numbers. Drive-level behaviour only: no current
@@ -437,20 +438,47 @@ loops, PWM or thermal mass.
   holds the far end and the nut floats, so it is not counted as a support. Results: Y
   (about 617 mm) 668 rpm, X 1037 rpm, Z (short) 9686 rpm, so Y is held to 22.3 mm/s,
   X to 34.6 and Z is not limited by it.
-- **Simulation by drive kind (X6c, not done).**
-  - A stepper's joint follows its plan kinematically, as now. When the plan
-    check fails, it slips and keeps the error, as a real stepper loses steps.
-  - A servo gets a torque-limited servo on the motor joint only, with its
-    gains, and the coupling moves the rest. Use this for arms, wheels,
-    humanoids and the exosuit.
-  - Not force-driven simulation for steppers: it has the wrong failure mode
-    (lag instead of lost steps), is numerically stiff (hundreds of kg of
-    reflected inertia through a constraint), and needs gains tuned per
-    machine.
-  - Left because it needs the runtime to command actuators instead of a servo per
-    joint (RobotKit native and SimKit), and a place where a plan's check findings
-    reach the runtime to slip the stepper joints from; the plan check already says
-    which ops and where, so the data is there.
+- **Simulation by drive kind (X6c, done).**
+  - **Stepper slip.** Where the plan check finds every motor of a stepper axis over its pull-out
+    curve (`ratio > 1` at a sample; all motors, because parallel motors on a rigid axis carry
+    each other), the axis does not advance: it falls behind its command by what the plan commands
+    over those samples, and keeps the error. `PlanCheck` records this as `PlanSlip` on
+    `PlanCheckResult.slips` (times and the cumulative distance lost, signed along the motion, plus
+    the total in full steps of the first motor). A plan the check passes has no slip, so passing
+    plans cannot change. Resync after a stall is not modelled: the rotor stays where it fell
+    behind, and the error is whole until reset (a real stepper would resync at some multiple of
+    four full steps; the error is the same size).
+  - **Where it runs, and why there.** Not in the plan (a slipped trajectory has velocity
+    jumps the runtime's continuity checks refuse, and the runtime and any monitor would then
+    see a plan that matches reality, hiding exactly what an encoder is for) and not in the runtime
+    (it has no model of a machine). It is an offset on the *commands* in the simulation endpoint:
+    `SimulationRobot` adds a per-joint `slip_` to every position or servo target
+    (`rk_simulation_set_joint_slip`, `Simulation.setJointSlip`), so the runtime's setpoint stays the
+    commanded one and the simulated joint is the real one. `motionkit.robot.StepperSlip` carries the
+    plan check's findings out as the plan runs (`ManipulatorMotion.slip`, fed each plan when it starts
+    and its elapsed time each update), puts the offset on the axis joint and, through the robot's
+    couplings, on each coupled joint (`ratio * offset`), and keeps the error across plans until `reset`.
+    The CNC player wires it for its machine. Native change, small: `simulation_robot.cpp/.hpp` (the
+    offset and servo routing below), `simulation.cpp` (the roles), one C function.
+  - **Servo motors carry coupled joints.** The blueprint gained `joint_servo` (stiffness and damping per
+    joint). `RobotRuntimeCompiler` gives a joint gains when an actuator with a `ServoDrive` is on it
+    *and the joint is in a coupling*: the actuator's `servoStiffness`/`servoDamping`, else a default of
+    the drive's peak torque per hundredth of a radian and a 10 ms damping time (assumptions,
+    `ServoDrive.defaultStiffness`), times the transmission ratio squared. In `Simulation::add_robot` a
+    joint with gains is a servo motor; every other joint in its coupling group is passive. The endpoint
+    sends a servo motor's position targets as servo targets (stiffness, damping, and the velocity the
+    successive positions imply) torque-limited by the joint's effort (the drive's peak), drops passive
+    joints' position targets, and holds only servo motors at rest. The coupling (a MuJoCo equality
+    constraint) moves the rest. A servo on an uncoupled joint, an arm's, keeps the computed-torque
+    tracking limited to its effort, so arms behave as before; steppers keep kinematic following.
+  - **Not force-driven simulation for steppers**, for the reasons already given: wrong failure mode
+    (lag instead of lost steps), numerically stiff (hundreds of kg of reflected inertia through a
+    constraint), and gains to tune per machine.
+  - **Tests.** `PlanCheckTests.testStepperSlip` (slip profile, whole steps, passing plans and servos lose
+    nothing, `StepperSlip` offsets through a coupling and carried across plans), and
+    `SimulationPoseResetTests.stepperSlip` (the offset on both backends) and `servoCoupling` (MuJoCo: the
+    servo carries its coupled joint; the coupled joint takes no commands). The belt and screw routers' plan
+    check numbers are unchanged (no stepper stalls, so no slip).
 - **Gate (done): the belt router machines the motor plate under honest limits.**
   - **The controller is declared with the machine.** A simulated machine says what its
     steppers are wired to the way a deployment does: the router's machining job
@@ -483,9 +511,52 @@ loops, PWM or thermal mass.
     millimetres, so a rapid's label reaches 6 ticks into a cut (screw router: none); the
     test counts and prints them for belts and forbids them for screws. The belts' stretch
     is a prediction by the accuracy check, not simulated.
-- **Examples.** The robot arm (servos behind gearbox drives) and the mobile
-  base (wheel motors) take their limits from their drives instead of typed-in
-  numbers.
+- **Examples (done).** The robot arm and the mobile base take their joint limits from their drives.
+  - **Gearbox.** A `Gearbox` (ratio, efficiency) sits between a motor and a turning joint:
+    `MachineAssembly.addMotor(id, joint, motor, volts, margin, gearbox)`, saved on the motor record. In
+    the assembly format an actuator gained `gearRatio` and `gearEfficiency`: its torque, speed, curve and
+    rotor are the motor's, before the gearbox. The bridge makes the transmission ratio `gearRatio`, puts
+    the efficiency on `Actuator.efficiency` (the codec writes it when not 1; `DriveLoads`, `coupledLimits`
+    and the runtime compiler use it) and the rotor's inertia on the joint's armature times the ratio squared.
+    A joint's speed limit is then the motor's maximum speed over the ratio, and its torque limit the motor's
+    peak through the ratio and the efficiency. Chosen over the existing `Drive.GearMesh` because a
+    gear mesh needs two gears on two joints (an extra motor joint and body per arm joint, which would
+    have reshaped the arm's joint list), and the gearbox is a fact about the actuator.
+  - **Servo motor.** `ServoMotor` is a minimal `MotorDrive` part with generic ratings (50, 100 and 200 W
+    on a 3000 rpm base: rated torque power over 3000 rpm, peak three times that, 5000 rpm at most,
+    131072 encoder counts). They are round assumptions in the range of common AC servo families, not a
+    vendor's datasheet. `ArmJoint` takes an optional servo (a recipe parameter) and is a `MotorDrive`
+    itself: the joint module has its motor inside.
+  - **Arm.** Each joint: servo and ratio chosen so the top speed lands near the old typed speed, and
+    the servo the smallest generic one that carries the torque; gearbox efficiency 0.85 (strain-wave
+    gearhead, assumption). Limits that used to be typed in, now derived:
+
+    | joint | servo | ratio | speed before / now (rad/s) | torque before / now (N m) |
+    |---|---|---|---|---|
+    | j1 | 200 W | 250 | 2.0 / 2.09 | 300 / 405.9 |
+    | j2 | 200 W | 250 | 2.0 / 2.09 | 400 / 405.9 |
+    | j3 | 200 W | 220 | 2.4 / 2.38 | 250 / 357.2 |
+    | j4 | 50 W | 175 | 3.0 / 2.99 | 80 / 71.0 |
+    | j5 | 50 W | 175 | 3.0 / 2.99 | 60 / 71.0 |
+    | j6 | 50 W | 130 | 4.0 / 4.03 | 30 / 52.7 |
+
+    The rotor inertia reflected through the ratio is 1.6 kg m² on j1/j2, 1.2 on j3 and 0.05 to 0.09 on the
+    wrist (armature). The pick-and-place mission in MuJoCo finishes at the same times as before (pick 5.8 s,
+    place 12.0, pick 17.2, place 23.5 s): its speeds are set by the planner's limits, which barely moved.
+  - **Mobile base.** Each wheel is its NEMA 23 through a 10:1 planetary gearhead at 0.9 (assumed; it is
+    not drawn, the wheel still sits on the motor's shaft) on 24 V with half the holding torque relied
+    on: usable speed 137.1 rad/s over 10 is 13.7 rad/s (1.03 m/s on the 75 mm wheel; it was a typed
+    12 rad/s) and 0.63 N m through the gearhead is 5.67 N m (it was a typed 1.2 N m, the holding
+    torque of the motor alone). `MAX_LINEAR_SPEED` (0.8 m/s) and the other drive limits stay as
+    operating limits (assumed) under what the wheels give; the preview check holds them to it. In
+    the app check the MuJoCo turn-in-place step (0 rad in 0.5 s) failed on the run just before this
+    change and passes after it (0.5 rad); the wheel torque is the one thing that changed there, but
+    that was not isolated. The mobile mission in MuJoCo now runs goTo 9.6 s, pick 15.1, goTo 23.6,
+    place 29.0, pick 34.5, goTo 41.0, place 46.6, goTo 57.6 s; there is no earlier run to compare.
+  - **Tests.** MachineKit smoke: the arm's drives (six servos, gearbox on each, joint limits equal what the
+    drive gives, j1 at 2.094 rad/s and 405.9 N m) and the base's (13.7 rad/s, 5.67 N m, 1.03 m/s); app
+    `checkLimitsFromDrives`: the compiled runtime limits of every arm and wheel joint equal the drive's;
+    CadBridge: gear ratio, efficiency, armature and compiled limits.
 - **Device.** Step edges are scheduled with hardware timers (STM32G4
   output compare and DMA) instead of a 40 kHz software tick, which caps
   16-microstep NEMA 23s near 25 mm/s and quantises step intervals into
@@ -498,48 +569,68 @@ loops, PWM or thermal mass.
 
 ### X6d — Encoders
 
+Status: the sensor, the parts, simulated counts, the lost-steps and following-error monitor and the
+load-side path error are done (2026-10-02). Device counting and index homing are not (bench).
+
 The plan check predicts stalls and path error; encoders observe them. An
 open-loop stepper's lost steps are invisible without one. Model encoders as
 sensors with a location, at drive level only: quantisation, no noise or
 latency.
 
-- **Sensor.** An encoder is its own sensor, attached to a joint. It has a
-  kind (incremental quadrature or absolute), counts per revolution or per mm,
-  and an optional index pulse. Where it sits decides what it sees:
-  - **Motor-side** (on the motor shaft) sees lost steps, stalls and a servo's
+- **Sensor (done).** `robotkit.model.Encoder` is a sensor attached to a joint: kind
+  (`EncoderKind` incremental or absolute), counts per joint unit (`Encoder.perRevolution`,
+  `Encoder.perMillimetre` make them from the usual figures) and an optional index (once a revolution,
+  or the reference mark at a sliding joint's zero). `RobotModel.encoders`, the codec (written only when
+  there are some, so other models keep their bytes) and `RobotModel.encoderFor(actuator)` carry it.
+  It is not compiled into the native runtime: a simulation reads it from joint positions, a device
+  reports its own counts. Where it sits decides what it sees:
+  - **Motor-side** (on a joint a motor drives directly) sees lost steps, stalls and a servo's
     following error, but not backlash or belt stretch.
-  - **Load-side** (a linear scale, or an encoder on the driven pulley) sees
-    where the carriage actually is, including stretch, backlash and pitch
-    error.
+  - **Load-side** (a linear scale, or an encoder on the driven pulley) sees where the carriage actually
+    is, including stretch, backlash and pitch error.
 
-  A servo drive references its encoder, and a closed-loop stepper is a
-  stepper drive plus an encoder. The servo drive's encoder count from X6a
-  becomes that reference, so the fact lives in one place.
-- **Parts.** MachineKit gets encoder components (a shaft encoder on a
-  motor's back shaft, a linear scale along a rail), placed and mated like
-  other parts, so the location comes from the assembly.
-- **Wiring.** Deployment layout channels name which board input reads which
-  encoder (layouts already carry `encoder_counts_per_rev`).
-- **Simulation.** Counts are quantised from the joint the encoder sits on.
-  With stepper slip (X6c) a motor-side encoder sees the slip the commanded
-  position hides, so stall detection is testable in simulation.
-- **Runtime.**
-  - Compare encoder and commanded positions and fault past a bound (the
-    blueprint's `following_error_bound`), naming lost steps.
-  - With a load-side encoder, report the measured path error: the observed
-    counterpart of the accuracy check.
-  - Monitoring only at first. Closing a position loop on a load-side
-    encoder belongs to real servo drives.
+  `Actuator.encoder` names the encoder that reads a motor, and a servo's own `encoderCounts` is what
+  models saved before this recorded: `encoderFor` makes an incremental encoder from it, so old models
+  read as before and a model that names an encoder holds the count in one place (the assembly format's
+  `AssemblyEncoder` and `AssemblyActuator.encoder`, through the flattener, `AssemblyModel.addEncoder`
+  and the bridge, which converts counts per millimetre to per metre).
+- **Parts (done).** `ShaftEncoder` (counts per revolution, absolute or incremental, index; mounting
+  face and axis) for a motor's back shaft and `LinearScale` (counts per millimetre along a strip) for a
+  rail, both recipes, placed and mated like other parts; they are `EncoderPart`s, and
+  `MachineAssembly.addEncoder(id, joint, part, ?motor)` records one, naming the motor it is the
+  feedback of when it is. Rebuilding asks the part again, as for motors; an included assembly's
+  encoders keep their prefix. Housing sizes are assumptions (38 mm, 22 mm; 10 x 2 mm strip).
+- **Wiring.** Left: deployment layout channels naming which board input reads which encoder (layouts
+  already carry `encoder_counts_per_rev`); needs the device work.
+- **Simulation (done).** `EncoderReading` quantises counts from the joint position (incremental from
+  the power-up position, absolute from the joint's zero, which for a robot built from an assembly is the
+  initial placement) and counts index pulses. With stepper slip (X6c) a motor-side encoder sees the slip
+  the commanded position hides.
+- **Runtime (done, monitoring only).** `robotkit.runtime.EncoderMonitor` compares each encoder with the
+  commanded position (the runtime's setpoint) every tick. A motor-side encoder past its bound latches a
+  finding: `LostSteps` naming the motor and how many full steps for a stepper, `FollowingError` otherwise.
+  The bound is the blueprint's `following_error_bound` for the joint when it has one, else (assumptions)
+  two full steps of a stepper's rotor or eight counts of anything else. A load-side encoder reports the
+  measured path error (`pathError`: latest, worst, RMS), the observed counterpart of the accuracy check,
+  and faults nothing. The CNC player runs it (`CncProgramPlayer.encoders`) when the machine has encoders.
+  Closing a position loop on a load-side encoder belongs to real servo drives. The monitor keeps the
+  hardware seam: a device feeds `EncoderReading` its counts and calls `evaluate`.
+- **Tests.** `PlanCheckTests.testEncoderSeesStepperSlip`: a gantry of weak steppers runs a program
+  through the simulation, loses its whole move to slip (0.05 m), and the motor-side encoder latches
+  `LostSteps` with the motor, the steps and the sign; strong motors lose nothing and the encoder is quiet.
+  `testLoadSideEncoderReportsPathError`: the same command with the load 0.3 mm short is no fault for the
+  motor-side encoder and a 0.3 mm path error for the scale; 40 lost steps on the screw are named as about
+  40. Plus RobotKit codec and quantisation, CadBridge, and the MachineKit parts and records.
 - **Device.** Count edges in hardware (STM32 timer quadrature mode) and report
   positions in the state frames. Index pulses support repeatable homing,
   together with limit switches at hardware bring-up. This needs the bench to
   verify.
 - **Order.** After X6c, since slip is what makes encoders observable in
   simulation:
-  1. the sensor and its parts;
-  2. simulated counts;
-  3. the lost-step / following-error fault;
-  4. load-side path error;
+  1. the sensor and its parts (done);
+  2. simulated counts (done);
+  3. the lost-step / following-error fault (done);
+  4. load-side path error (done);
   5. device counting.
 
 ### Later
