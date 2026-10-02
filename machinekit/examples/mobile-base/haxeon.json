@@ -2,8 +2,8 @@
 	"version": 1,
 	"package": { "name": "machinekit-mobile-base-example" },
 	"entry": "MobileBasePreview",
-	"sources": ["MobileBase.hx", "MobileBaseCell.hx", "MobileBasePreview.hx"],
-	"sourceRoots": ["."],
+	"sources": ["MobileBase.hx", "MobileBaseCell.hx", "MobileBasePreview.hx", "../robot-arm/RobotArm.hx"],
+	"sourceRoots": [".", "../robot-arm"],
 	"dependencies": {
 		"projectkit": { "path": "../../../projectkit" },
 		"cadkit": { "path": "../../../cadkit" },

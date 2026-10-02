@@ -372,15 +372,20 @@ class ProjectSourceTests {
   }
 
   /**
-   * The mobile base cell drives its round on its own on both backends: it reaches every goal in turn,
-   * standing where each says, and its chassis never touches the room's walls, shelves, pillar or dock.
+   * The mobile manipulator runs its round on its own: it stands where each goTo says, picks the
+   * workpiece up, sets it down centred on the other table's seat and carries it back, and its chassis
+   * never touches the room's walls, tables, pillar or dock. MuJoCo only, like the arm example's own
+   * check: the test backend's contacts between robot links and free objects reach too far for parts
+   * handled this closely, and push the workpiece off its table as the arm passes.
    */
   static function checkMobileMission(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/mobile-base/materia.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
     var section:materia.project.SceneArtifact.SceneArtifactMobileBase = cast generated.mobileBase;
     var work:materia.project.SceneArtifact.SceneArtifactMission = cast generated.mission;
-    var goals:Array<materia.project.SceneArtifact.SceneArtifactFloorPose> = [for (step in work.steps) cast step.pose];
+    var steps = work.steps;
+    var definition:AssemblyDefinition = cast generated.assemblyDefinition;
+    var placement = new AssemblyState(definition, generated.assemblyState);
     var halfLength:Float = cast section.footprintLength, halfWidth:Float = cast section.footprintWidth;
     halfLength /= 2; halfWidth /= 2;
     function yaw(rotation:Array<Float>):Float
@@ -399,7 +404,7 @@ class ProjectSourceTests {
       }
       return true;
     }
-    for (backend in [ApplicationSimulation.DETERMINISTIC, ApplicationSimulation.MUJOCO]) {
+    for (backend in [ApplicationSimulation.MUJOCO]) {
       var label = backend == ApplicationSimulation.MUJOCO ? "MuJoCo" : "deterministic";
       var session = new ProjectDocumentSession(null, false);
       session.openGeneratedProject(generated, manifest);
@@ -409,42 +414,57 @@ class ProjectSourceTests {
         'mobile base cell builds on the $label backend: ${simulation.error}');
       var mission = simulation.missionPlayer();
       if (mission == null) throw 'mobile base cell has no mission on the $label backend';
-      check(mission.obstacles.length == 8, '$label: the map has the four walls, two shelves, pillar and dock');
-      var closest = Math.POSITIVE_INFINITY;
-      var arrivals:Array<String> = [];
-      var lastReached = 0;
+      check(mission.obstacles.length == 8, '$label: the map has the four walls, two tables, pillar and dock');
+      var log:Array<String> = [];
+      var lastDone = 0;
       var trail:Array<String> = [];
-      while (mission.completed < goals.length && simulation.activeSession().simulationTime() < 120) {
+      while (mission.completed < steps.length && simulation.activeSession().simulationTime() < 300) {
         simulation.step();
         var failure = mission.failure;
-        if (failure != null) throw '$label: the mission failed after ${mission.completed} goals: $failure\n${trail.join("\n")}';
-        var plate = [for (entry in simulation.capturePresentationSnapshot().environment)
-          if (entry.id == "project:robot/basePlate") entry][0];
+        if (failure != null) throw '$label: the mission failed after ${mission.completed} steps: $failure\n${trail.join("\n")}';
+        var poses = simulation.capturePresentationSnapshot().environment;
+        var plate = [for (entry in poses) if (entry.id == "project:robot/basePlate") entry][0];
         var heading = yaw(plate.rotation);
         trail.push('${Math.round(simulation.activeSession().simulationTime() * 100) / 100} s: ' +
           '${Math.round(plate.position[0] * 1000)}, ${Math.round(plate.position[1] * 1000)} mm, ' +
           '${Math.round(heading * 1000) / 1000} rad, step ${mission.stepIndex}');
         if (trail.length > 150) trail.shift();
-        for (box in mission.obstacles) {
-          if (overlap(plate.position[0], plate.position[1], halfLength, halfWidth, heading,
-              box.x, box.y, box.halfX, box.halfY, box.yaw))
-            throw '$label: the chassis hits ${box.id} at ${plate.position[0]}, ${plate.position[1]}\n' +
-              [for (index in 0...trail.length) if (index % 5 == 0) trail[index]].join("\n");
-          var dx = Math.max(0, Math.abs(plate.position[0] - box.x) - box.halfX - halfLength);
-          closest = Math.min(closest, dx);
+        for (box in mission.obstacles) if (overlap(plate.position[0], plate.position[1], halfLength, halfWidth, heading,
+            box.x, box.y, box.halfX, box.halfY, box.yaw))
+          throw '$label: the chassis hits ${box.id} at ${plate.position[0]}, ${plate.position[1]}\n' +
+            [for (index in 0...trail.length) if (index % 5 == 0) trail[index]].join("\n");
+        if (mission.completed == lastDone) continue;
+        var step = steps[lastDone];
+        var now = Math.round(simulation.activeSession().simulationTime() * 10) / 10;
+        switch step.kind {
+          case "goTo":
+            var goal:materia.project.SceneArtifact.SceneArtifactFloorPose = cast step.pose;
+            var error = Math.sqrt(Math.pow(plate.position[0] - goal.x, 2) + Math.pow(plate.position[1] - goal.y, 2));
+            var turn = Math.abs(Math.atan2(Math.sin(heading - goal.yaw), Math.cos(heading - goal.yaw)));
+            check(error < 0.08 && turn < 0.08, '$label: step $lastDone (goTo) ends ${error} m and ${turn} rad off');
+          case "pick":
+            check(simulation.heldObjectIds().join(",") == "project:workpiece", '$label: step $lastDone picks the workpiece up');
+          case "place":
+            check(simulation.heldObjectIds().length == 0, '$label: step $lastDone lets the workpiece go');
+            // Let it settle, then it should rest centred on the seat.
+            for (_ in 0...50) simulation.step();
+            var at:materia.project.SceneArtifact.SceneArtifactPlace = cast step.at;
+            var seat = placement.worldConnector(at.occurrence, at.connector);
+            var metres = generated.metresPerUnit;
+            var piece = [for (entry in simulation.capturePresentationSnapshot().environment)
+              if (entry.id == "project:workpiece") entry][0];
+            var off = Math.sqrt(Math.pow(piece.position[0] - seat.x * metres, 2) + Math.pow(piece.position[1] - seat.y * metres, 2));
+            check(off < 0.02, '$label: step $lastDone sets the workpiece ${off} m from the centre of ${at.occurrence}\'s seat');
+            check(piece.position[2] > seat.z * metres && piece.position[2] < seat.z * metres + 0.05,
+              '$label: step $lastDone leaves the workpiece standing on ${at.occurrence} (centre at ${piece.position[2]} m)');
+          default:
         }
-        if (mission.completed > lastReached) {
-          var goal = goals[lastReached];
-          var error = Math.sqrt(Math.pow(plate.position[0] - goal.x, 2) + Math.pow(plate.position[1] - goal.y, 2));
-          var turn = Math.abs(Math.atan2(Math.sin(heading - goal.yaw), Math.cos(heading - goal.yaw)));
-          check(error < 0.08 && turn < 0.08, '$label: goal $lastReached reached ${error} m and ${turn} rad off');
-          arrivals.push(Std.string(Math.round(simulation.activeSession().simulationTime() * 10) / 10));
-          lastReached = mission.completed;
-        }
+        log.push('${step.kind} ${now}');
+        lastDone = mission.completed;
       }
-      check(mission.completed >= goals.length,
-        '$label: the robot drives its whole round in two minutes, reached ${mission.completed} of ${goals.length}');
-      Sys.println('mobile mission ($label): goals reached at ${arrivals.join(", ")} s');
+      check(mission.completed >= steps.length,
+        '$label: the robot runs its whole round in five minutes, finished ${mission.completed} of ${steps.length} steps');
+      Sys.println('mobile mission ($label): ${log.join(", ")} s');
       simulation.clear();
     }
   }

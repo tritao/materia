@@ -184,7 +184,7 @@ class ProjectKitTests {
     // A version 12 scene is the same bytes without the trailing mobile-base and mission sections.
     data.mobileBase = null;
     var plain = SceneArtifact.encode(data);
-    var older = Bytes.alloc(plain.length - 8);
+    var older = Bytes.alloc(plain.length - 12);
     older.blit(0, plain, 0, older.length);
     older.setInt32(4, 12);
     var read = SceneArtifact.decode(older);
@@ -221,7 +221,28 @@ class ProjectKitTests {
     rejects(function() SceneArtifact.encode(data), "mission pose that is not finite");
     secondPose.y = 0.0; mission.steps[1].kind = "fly";
     rejects(function() SceneArtifact.encode(data), "mission step of an unknown kind");
-    mission.steps[1].kind = "goTo"; data.mobileBase = null;
+    mission.steps[1].kind = "goTo";
+    // Picking and placing name connectors of occurrences, and the tool that holds.
+    mission.steps.push({kind: "pick", at: {occurrence: "mast", connector: "pin"}});
+    rejects(function() SceneArtifact.encode(data), "picking mission without a suction tool");
+    data.robotTools = [{kind: "suction", contact: {occurrence: "chassis", connector: "pin"}, channel: "tool/cup.enable",
+      sensor: "tool/sensor.pressureSignal"}];
+    var picked = SceneArtifact.decode(SceneArtifact.encode(data));
+    var picking = picked.mission, tools = picked.robotTools;
+    if (picking == null || tools == null || picking.steps[2].at == null) throw "picking mission round trip lost data";
+    var pickAt:materia.project.SceneArtifact.SceneArtifactPlace = cast picking.steps[2].at;
+    check(pickAt.occurrence == "mast" && tools.length == 1 && tools[0].channel == "tool/cup.enable" &&
+      tools[0].contact.connector == "pin" && tools[0].sensor == "tool/sensor.pressureSignal", "picking mission and tool round trip");
+    mission.steps.push({kind: "place", at: {occurrence: "mast", connector: "seat"}});
+    rejects(function() SceneArtifact.encode(data), "placing on a connector the occurrence lacks");
+    mission.steps.pop();
+    data.robotTools[0].contact.connector = "nowhere";
+    rejects(function() SceneArtifact.encode(data), "suction tool touching with a missing connector");
+    data.robotTools[0].contact.connector = "pin";
+    data.robotTools.push({kind: "suction", contact: {occurrence: "mast", connector: "pin"}, channel: "tool/cup.enable"});
+    rejects(function() SceneArtifact.encode(data), "two tools on one channel");
+    data.robotTools.pop(); mission.steps.pop(); data.robotTools = null;
+    data.mobileBase = null;
     rejects(function() SceneArtifact.encode(data), "driving mission without a mobile base");
     data.mobileBase = base; data.mission = null; data.assemblyDefinition = null;
     rejects(function() SceneArtifact.encode(data), "mobile base without its robot");

@@ -215,6 +215,8 @@ class MobileBase extends MachineAssembly {
 	public static inline var HUB_GAP:Float = 2;
 	public static inline var CASTER_X:Float = 230;
 	public static inline var LIDAR_X:Float = 220;
+	/** The payload seat, where an arm stands: on the centre line, turned so the arm works ahead (+X). */
+	public static inline var PAYLOAD_X:Float = 0;
 	/** Post centres, inset from the plate corners. */
 	public static inline var POST_X:Float = 260;
 	public static inline var POST_Y:Float = 180;
@@ -226,6 +228,8 @@ class MobileBase extends MachineAssembly {
 	public static inline var MAX_ANGULAR_SPEED:Float = 2.0;
 	public static inline var MAX_LINEAR_ACCELERATION:Float = 0.5;
 	public static inline var MAX_ANGULAR_ACCELERATION:Float = 1.5;
+	/** Turn of the payload seat about its up axis. */
+	public static final ARM_TURN:Float = Math.PI / 2;
 
 	public final motor:NemaStepper;
 	public final wheel:DriveWheel;
@@ -233,13 +237,20 @@ class MobileBase extends MachineAssembly {
 	public final bracket:MotorBracket;
 	public final post:TubePost;
 	public final lidar = new LidarPuck();
+	/** The arm on the payload seat, or null for the bare base. */
+	public final arm:Null<RobotArm>;
 
 	static final SIDES:Array<{name:String, sign:Int, joint:String}> = [{name: "Left", sign: 1, joint: "wheel_l"}, {name: "Right", sign: -1, joint: "wheel_r"}];
 	static final CORNERS:Array<{name:String, x:Int, y:Int}> = [{name: "FrontLeft", x: 1, y: 1}, {name: "FrontRight", x: 1, y: -1},
 		{name: "RearLeft", x: -1, y: 1}, {name: "RearRight", x: -1, y: -1}];
 
-	public function new() {
+	/**
+	 * The bare base, or with `arm` standing on the deck's payload seat by its pedestal's `floor`; the arm
+	 * then joins the robot as `arm/...`, its joints `arm/j1`..`arm/j6`.
+	 */
+	public function new(?arm:RobotArm) {
 		super();
+		this.arm = arm;
 		motor = NemaStepper.frame(23);
 		wheel = new DriveWheel(WHEEL_DIAMETER, WHEEL_WIDTH, motor.variant.shaftDiameter, 40, 10);
 		caster = new CasterWheel(75, 25, BASE_Z, 30, 60);
@@ -280,6 +291,12 @@ class MobileBase extends MachineAssembly {
 		addMate("lidar-mount", "fixed", "deck", "lidar", "lidar", "base");
 		exposeConnector("lidar", "lidar", "scan");
 		exposeConnector("deckTop", "deck", "payload");
+		if (arm != null) {
+			include("arm", arm);
+			addMate("arm-mount", "fixed", "deck", "payload", "arm/pedestal", "floor");
+			// The arm's tool runs on compressed air, which the base passes on as its own service input.
+			exposePort("compressedAir", "arm/tool/ejector", "air");
+		}
 	}
 
 	/** Seats on the base plate: brackets and casters underneath, the battery and posts on top. */
@@ -311,7 +328,9 @@ class MobileBase extends MachineAssembly {
 			frame: ChassisPlate.underneath(corner.x * POST_X, corner.y * POST_Y),
 			holes: [{x: corner.x * POST_X, y: corner.y * POST_Y, diameter: 8.4}]}];
 		seats.push({name: "lidar", frame: ChassisPlate.onTop(LIDAR_X, 0, DECK_THICKNESS), holes: []});
-		seats.push({name: "payload", frame: ChassisPlate.onTop(-60, 0, DECK_THICKNESS), holes: []});
+		// The arm's own cell lies along its -Y; a quarter turn about the seat's up axis brings that ahead.
+		seats.push({name: "payload", frame: AssemblyFrames.compose(ChassisPlate.onTop(PAYLOAD_X, 0, DECK_THICKNESS),
+			AssemblyFrames.turnY(ARM_TURN)), holes: []});
 		return seats;
 	}
 

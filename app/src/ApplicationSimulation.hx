@@ -52,6 +52,8 @@ class ApplicationSimulation {
   var simulatedObjects:Array<{id:String,object:SimObject}> = [];
   var motions:Null<RobotMotionPlayer> = null;
   var gripper:Null<RobotGripPlayer> = null;
+  /** The simulated tools on the session's robots. */
+  var tools:Null<SimulatedTools> = null;
   var cnc:Null<CncProgramPlayer> = null;
   /** The project's wheeled assembly's drive, when it has one. */
   var mobile:Null<robotkit.mobile.MobileBase> = null;
@@ -116,6 +118,7 @@ class ApplicationSimulation {
     members = [];
     if (motions != null) members.push(motions);
     if (gripper != null) members.push(gripper);
+    if (tools != null) members.push(tools);
     if (cnc != null) members.push(cnc);
     if (mission != null) members.push(mission);
     if (workforce != null) members.push(workforce);
@@ -237,10 +240,19 @@ class ApplicationSimulation {
           yaw: Math.atan2(2 * (rotation[3] * rotation[2] + rotation[0] * rotation[1]),
             1 - 2 * (rotation[1] * rotation[1] + rotation[2] * rotation[2]))});
       }
+      // The robot's tools act on the free objects after each step, as their channels say.
+      var candidateTools = new SimulatedTools([for (entry in candidateObjects) {id: entry.id, object: entry.object}]);
+      var freeObjects = [for (entry in candidateObjects) entry.object];
+      if (session != null && candidateAssembly != null) for (tool in session.robotTools) {
+        var carrier = candidateAssembly.part("project:" + tool.contact.occurrence);
+        candidate.addStepObserver(candidateTools.add(new robotkit.runtime.SimulatedSuctionTool(candidate,
+          candidateAssembly.runtime, assemblyIndex, carrier.linkIndex, tool.channel, freeObjects, tool.sensor)));
+      }
       var work = session == null ? null : session.mission;
       if (work != null) {
         if (candidateAssembly == null) throw "A mission needs the project's assembly";
-        candidateMission = new MissionPlayer(work, candidateAssembly, candidate, assemblyIndex, timestep, heldBoxes);
+        candidateMission = new MissionPlayer(work, candidateAssembly, candidate, assemblyIndex, timestep, heldBoxes,
+          candidateTools.objectsByScene(), session);
       }
 
       var objectsById:Map<String, SimObject> = new Map();
@@ -278,7 +290,8 @@ class ApplicationSimulation {
       motions = resolvedMotions.length == 0 ? null :
         new RobotMotionPlayer(world, createdSpace.session, resolvedMotions);
       gripper = resolvedGrips.length == 0 ? null : new RobotGripPlayer(createdSpace.session, candidate,
-        candidateRuntimes, candidateObjects, resolvedGrips, resolvedPeriod);
+        candidateRuntimes, candidateTools, resolvedGrips, resolvedPeriod);
+      tools = candidateTools;
       workforce = candidateWorkforce;
       if (cnc != null) cnc.dispose();
       cnc = candidateCnc;
@@ -360,7 +373,7 @@ class ApplicationSimulation {
   }
   public function isRunning():Bool return running;
   /** Scene ids of the objects the tool links are holding right now. */
-  public function heldObjectIds():Array<String> return gripper == null ? [] : gripper.heldIds();
+  public function heldObjectIds():Array<String> return tools == null ? [] : tools.heldIds();
 
   /** Why the project's CNC program stopped, or null while it runs or when there is none. */
   public function cncFailure():Null<String> return cnc == null ? null : cnc.failure;
@@ -493,7 +506,7 @@ class ApplicationSimulation {
       retired.dispose();
       retired.scene.setWorkerVisualsVisible(true);
     }
-    workforce = null; motions = null; gripper = null;
+    workforce = null; motions = null; gripper = null; tools = null;
     if (cnc != null) cnc.dispose();
     cnc = null; mobile = null; mission = null; refreshMembers();
     for (id in simulatedIds) { var robot=world.detach(id); if(robot!=null)robot.close(); }

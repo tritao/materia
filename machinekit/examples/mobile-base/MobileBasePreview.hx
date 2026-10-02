@@ -36,8 +36,33 @@ class MobileBasePreview {
 		section.robot = "robot";
 		section.origin = metres(MobileBaseCell.ORIGIN);
 		scene.mobileBase = section;
-		scene.mission = {loop: true, steps: [for (goal in MobileBaseCell.GOALS) {kind: "goTo", pose: metres(goal)}]};
+		scene.robotTools = robotTools(cell.robot, "robot/");
+		scene.mission = {loop: true,
+			steps: [for (step in MobileBaseCell.ROUND) switch step {
+				case GoTo(pose): {kind: "goTo", pose: metres(pose)};
+				case Pick(part, grasp): {kind: "pick", at: {occurrence: part, connector: grasp}};
+				case Place(table, seat): {kind: "place", at: {occurrence: table, connector: seat}};
+			}]};
 		return SceneArtifact.encode(scene);
+	}
+
+	/**
+	 * The robot's tools as its arm's end effector declares them: each suction cup's contact, worked by
+	 * the effector's vacuum control channel and reporting on its pressure sensor when it has one.
+	 */
+	static function robotTools(robot:MobileBase, prefix:String):Array<materia.project.SceneArtifact.SceneArtifactRobotTool> {
+		var arm = robot.arm;
+		if (arm == null) return [];
+		var toolPrefix = prefix + "arm/tool";
+		var controls = machinekit.robotics.EndEffectorControls.derive(arm.tool, toolPrefix);
+		var channel = controls.vacuumChannel();
+		if (channel == null) throw "The arm's suction tool has no vacuum control";
+		return [for (suction in controls.suctions) {
+			var tool:materia.project.SceneArtifact.SceneArtifactRobotTool = {kind: "suction",
+				contact: {occurrence: toolPrefix + "/" + suction.member, connector: suction.connector}, channel: channel};
+			if (controls.vacuumSensor != null) tool.sensor = controls.vacuumSensor;
+			tool;
+		}];
 	}
 
 	/** The drive of `robot`, whose joints carry `prefix`: wheel radius and track measured from its assembly. */
@@ -165,16 +190,54 @@ class MobileBaseChecks {
 			common.close(); a.close(); b.close();
 			if (volume > 1e-3) throw 'At its origin the robot\'s ${id} hits ${block.id}';
 		}
-		var radius = Math.sqrt(Math.pow(MobileBase.LENGTH / 2, 2) + Math.pow(MobileBase.WIDTH / 2, 2)) + 50;
+		// The chassis' corner radius plus the planner's half-cell margin.
+		var radius = Math.sqrt(Math.pow(MobileBase.LENGTH / 2, 2) + Math.pow(MobileBase.WIDTH / 2, 2)) + 40;
 		for (goal in MobileBaseCell.GOALS) for (block in blocks) {
-			var room:MobileBaseCell.RoomBlock = cast block.component;
-			var pose = state.worldPose(block.id);
-			var dx = Math.max(0, Math.abs(goal.x - pose.x) - room.length / 2);
-			var dy = Math.max(0, Math.abs(goal.y - pose.y) - room.width / 2);
+			if (block.id == "workpiece") continue;
+			var solid = posed(cell, state, block.id);
+			var box = solid.shape.bounds();
+			var minX = box.get_min().get_x(), maxX = box.get_max().get_x();
+			var minY = box.get_min().get_y(), maxY = box.get_max().get_y();
+			solid.close();
+			var dx = Math.max(0, Math.max(minX - goal.x, goal.x - maxX));
+			var dy = Math.max(0, Math.max(minY - goal.y, goal.y - maxY));
 			if (!(Math.sqrt(dx * dx + dy * dy) >= radius))
 				throw 'Goal at ${goal.x}, ${goal.y} is within ${Math.round(radius)} mm of ${block.id}';
 		}
+		// At each table the place seat is where the arm reaches, on the table top.
+		for (table in ["tableNorth", "tableEast"]) {
+			var seat = state.worldConnector(table, "placeSeat");
+			near(seat.z, MobileBaseCell.TABLE_TOP, '$table seat height', 1e-9);
+		}
+		checkArm(cell.robot);
 		Sys.println('mobile base cell: ${scene.parts.length} definitions, ${MobileBaseCell.GOALS.length} goals');
+	}
+
+	/**
+	 * The arm stands on the deck working ahead of the robot: in its ready pose the cup hangs ahead of the
+	 * chassis on the centre line, and no arm part meets a part of the base.
+	 */
+	static function checkArm(robot:MobileBase):Void {
+		var model = new AssemblyModel("mm");
+		robot.addTo(model, "");
+		var state = new AssemblyState(model.definition("mobile-manipulator"));
+		state.forwardKinematics();
+		var cup = state.worldConnector("arm/tool/cup", "contact");
+		if (!(cup.x > MobileBase.LENGTH / 2) || !(Math.abs(cup.y) < 50))
+			throw 'The arm should work ahead of the robot, its cup is at ${Math.round(cup.x)}, ${Math.round(cup.y)} mm';
+		var floor = state.worldConnector("arm/pedestal", "floor");
+		near(floor.z, MobileBase.DECK_Z + MobileBase.DECK_THICKNESS, "the arm stands on the deck", 1e-9);
+		var armIds = [for (entry in robot.components()) if (StringTools.startsWith(entry.id, "arm/")) entry.id];
+		var baseIds = [for (entry in robot.components()) if (!StringTools.startsWith(entry.id, "arm/")) entry.id];
+		for (a in armIds) for (b in baseIds) {
+			if (a == "arm/pedestal" && b == "deck") continue;
+			var first = posed(robot, state, a), second = posed(robot, state, b);
+			var common = first.intersect(second);
+			var volume = common.volume();
+			common.close(); first.close(); second.close();
+			if (volume > 1e-3) throw '$a collides with $b on the mobile manipulator: ${Math.round(volume)} mm³';
+		}
+		Sys.println('mobile manipulator: cup ahead at ${Math.round(cup.x)}, ${Math.round(cup.y)}, ${Math.round(cup.z)} mm');
 	}
 
 	static function posed(robot:MachineAssembly, state:AssemblyState, id:String):Part {

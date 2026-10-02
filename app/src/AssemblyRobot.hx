@@ -203,15 +203,32 @@ class AssemblyRobot {
       closures.push(new SimulationClosure(parent, child, type,
         closure.anchorParent, closure.axisParent));
     }
+    // Each tool reports on its vacuum sensor, mounted at the tool's contact on the link that carries it.
+    for (tool in session.robotTools) {
+      var sensorId = tool.sensor;
+      if (sensorId == null) continue;
+      var carrier = converted.partLinks.get(tool.contact.occurrence);
+      if (carrier == null) throw 'Robot tool "${tool.contact.occurrence}" is not part of the robot';
+      var sensor = converted.model.addSensor(new robotkit.model.Sensor(sensorId, "tool_vacuum_kpa", 0.0, sensorId));
+      var mount = converted.model.addFrame(new robotkit.model.Frame(sensorId + " mount", converted.model.links[carrier.link]));
+      mount.position = [carrier.offset.x, carrier.offset.y, carrier.offset.z];
+      sensor.frame = mount;
+    }
     var blueprint = RobotRuntimeCompiler.compile(converted.model, revision);
-    // Process channels (a machine's spindle and coolant) must be declared before the robot is added.
+    // Process channels (a machine's spindle and coolant, a tool's vacuum) must be declared before the
+    // robot is added.
     if (channels != null) for (channel in channels) blueprint.channels.push(channel);
+    // A tool keeps holding through a commanded stop, as when its base arrives somewhere carrying a part.
+    for (tool in session.robotTools)
+      blueprint.channels.push(new ProcessChannelDeclaration(tool.channel, robotkit.world.ProcessEventValue.Digital(false), true));
     // A mobile robot stands at its origin on the floor; its root link is framed there.
     var origin = session.mobileBase == null ? null : session.mobileBase.origin;
     var position = origin == null ? [0.0, 0.0, 0.0] : [origin.x, origin.y, 0.0];
     var rotation = origin == null ? [0.0, 0.0, 0.0, 1.0] : [0.0, 0.0, Math.sin(origin.yaw / 2), Math.cos(origin.yaw / 2)];
+    // Like a machine whose servos are on, its joints hold their designed pose until something commands
+    // them, such as an arm while its base drives.
     var runtime = candidate.addRobotAtPose(blueprint, position, rotation, null, null, null, closures, null, null, null, null,
-      linkHulls);
+      linkHulls, true);
     var robot = new SimulatedRobot(idFor(assembly), runtime, converted.model.name,
       [for (link in converted.model.links) link.id],
       [for (joint in converted.model.joints) joint.id]);

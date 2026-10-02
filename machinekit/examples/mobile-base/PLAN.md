@@ -89,9 +89,59 @@ port; `LidarObstaclePerception` feeds the costmap's dynamic layer and
 and replan. Editor overlays: planned path, costmap, lidar rays, odometry
 ghost.
 
-**M5. Mobile manipulator.** `RobotArm` included on the deck; the mission
-gains a pick at a shelf (`GoTo` a `WorkPatchPlanner` pose, arm motion, grip).
-Stretch: whole-body solving with KinematicsKit `RootMotion.Planar`.
+**M5. Mobile manipulator** (done). The robot arm stands on the deck's payload
+seat, turned to work ahead; the room's shelves became two tables with place
+seats and a free workpiece. The mission picks it at the north table, places it
+on the east table's seat, picks it again and brings it back, then parks at the
+dock: about a minute on MuJoCo, the part landing within a tenth of a millimetre
+of each seat centre.
+
+How it is built, each piece where it belongs:
+- *Tools from the CAD.* MachineKit's `EndEffectorControls` derives an end
+  effector's control channels, vacuum sensor and suction contacts from its
+  parts' capabilities (cadbridge's `deriveBindings` now delegates to it); the
+  generator writes them to the scene artifact's `robotTools` section.
+- *A simulated device on the robot.* RobotKit's `SimulatedSuctionTool` works
+  like the ejector it stands for: it reads its channel's output
+  (`RobotRuntime.channelValue`, a new native getter), seals on the free part the
+  tool link touches, carries it, lets go, and publishes `tool_vacuum_kpa` when
+  the tool has a sensor. The app's `RobotGripPlayer` drives the same device.
+- *Skills that only use the robot.* `HandlePart` runs a MotionKit program
+  (`HandlingPlanRunner`, `ManipulatorMotion` like every arm program) down onto
+  the part or seat read live, switches the tool channel there, and reads the
+  outcome on the vacuum sensor, or trusts the program without one.
+
+Faults this exposed and fixed: an uncommanded arm sagged under gravity and
+faulted the robot (simulated robots gain a hold-at-rest option, staged in the
+endpoint so it never competes with a first plan, which a hold command did with
+the CNC router's); a navigation stop on arrival took the vacuum to its safe value
+and dropped the part (process channels gain a stop policy: `keepOnStop`
+channels, as gripper and vacuum channels are, keep their output through a
+commanded stop or abort, still going safe on faults and emergency stops); the
+runtime's motion state, cleared by stops, also held the channel outputs (now
+kept apart, backed up and reset with the robot); MotionKit sampled a hair past
+a pose line's end in two places (numeric derivatives, last path sample), the
+error that made the wall-finishing scenario flaky; the cup has to press into the
+part (3 mm, as a compliant cup does) to meet it within the motion tolerance.
+
+Left from the restructure:
+- The arm example still streams joint tracks with timed grips, so its grips
+  actuate the suction device directly; moving it onto MotionKit plans with
+  `SetOutput` events would give every grip the channel path.
+- The arm's suction tool has no vacuum pressure sensor (it would need the hose
+  re-routed through an inline sensor), so its picks are trusted, not sensed.
+- The device protocol (`rkd6`) does not carry the stop policy yet; a real
+  device would still drop a held part on a commanded stop.
+- The test backend's robot-to-object contacts reach far enough to push the
+  workpiece off its table as the arm passes, so pick and place are checked on
+  MuJoCo only, like the arm example.
+- `WallFinishingScenarioTests` still fails intermittently on an unreachable
+  pose (an IK issue unrelated to the pose-line fix).
+
+The navigation latch from M3 also changed here: latching anywhere inside the
+goal tolerance left the base at the tolerance's edge with its heading off,
+which put the construction skills' work patches out of the arm's reach; it now
+keeps closing in while the goal lies ahead in its direction of travel.
 
 **M6. Physics-driven wheels (optional).** A floating base on MuJoCo with tire
 friction, so the wheels propel the chassis through contact: lift the
@@ -116,4 +166,4 @@ M7 are stretch goals.
 | M1 | done | c6e9da67, 512baf40 (plates own the layout, mates throughout) |
 | M2 | done | c2d81b4f (wheel directions), 11b9a6c9 (drive in the scene artifact, bridge, app) |
 | M3 | done | mission section, skill-hosting MissionPlayer, room cell, Navigation arrival fixes; haxeon 09279420 |
-| M5 | next | `pick`/`place` steps as RobotKit skills (live part pose, MotionKit IK and trajectory, shared vacuum gripper) |
+| M5 | done | b348ec51 (RobotKit tools, stop policy, HandlePart), next commit (robot tools section, app, cell) |
