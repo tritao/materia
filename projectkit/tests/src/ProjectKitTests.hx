@@ -308,6 +308,51 @@ class ProjectKitTests {
     rejects(function() SceneArtifact.encode(data), "a second torch");
     data.robotTools = [{kind: "suction", contact: {occurrence: "plate", connector: "tcp"}, channel: "cup.enable", torch: welder()}];
     rejects(function() SceneArtifact.encode(data), "a suction tool with a welder");
+    weldMission(data, torch);
+  }
+
+  /** A `weld` step names a seam of two occurrences, carries its geometry and process, and needs the robot's torch. */
+  static function weldMission(data:materia.project.SceneArtifact.SceneArtifactData,
+      torch:Void -> materia.project.SceneArtifact.SceneArtifactRobotTool):Void {
+    function seam():materia.project.SceneArtifact.SceneArtifactWeld
+      return {seam: "plate:f3|upright:f7", joint: "fillet", metal: "plate",
+        start: {position: [0.0, 0.0, 0.01], rotation: [0.0, 0.0, 0.0, 1.0]},
+        stop: {position: [0.18, 0.0, 0.01], rotation: [0.0, 0.0, 0.0, 1.0]},
+        normals: [[0.0, 0.0, 1.0], [0.0, -1.0, 0.0]], legSize: 0.005,
+        process: {wireSpeed: 8.0, voltage: 24.0, travelSpeed: 0.01, approach: 0.05, startDwell: 0.2, craterDwell: 0.3, burnback: 0.1}};
+    function mission(weld:materia.project.SceneArtifact.SceneArtifactWeld):materia.project.SceneArtifact.SceneArtifactMission
+      return {steps: [{kind: "weld", weld: weld}]};
+    data.robotTools = [torch()];
+    data.mission = mission(seam());
+    var back = SceneArtifact.decode(SceneArtifact.encode(data)).mission;
+    if (back == null || back.steps.length != 1 || back.steps[0].weld == null) throw "weld mission round trip lost the weld";
+    var weld:materia.project.SceneArtifact.SceneArtifactWeld = cast back.steps[0].weld;
+    check(weld.seam == "plate:f3|upright:f7" && weld.joint == "fillet" && weld.metal == "plate" && weld.stop.position[0] == 0.18 &&
+      weld.normals[1][1] == -1.0 && weld.legSize == 0.005 && weld.process.wireSpeed == 8.0 && weld.process.travelSpeed == 0.01 &&
+      weld.process.burnback == 0.1, "weld mission round trip");
+    function bad(change:materia.project.SceneArtifact.SceneArtifactWeld -> Void, message:String):Void {
+      var weld = seam();
+      change(weld);
+      data.mission = mission(weld);
+      rejects(function() SceneArtifact.encode(data), message);
+    }
+    bad(w -> w.seam = "plate:f3", "weld of a seam with one face");
+    bad(w -> w.seam = "ghost:f3|upright:f7", "weld of a seam on an occurrence the assembly lacks");
+    bad(w -> w.joint = "butt", "weld of a joint that is not deposited");
+    bad(w -> w.metal = "ghost", "weld metal on an occurrence the assembly lacks");
+    bad(w -> w.stop.position = [0.0, 0.0, 0.01], "weld of a seam with no length");
+    bad(w -> w.start.rotation = [0.0, 0.0, 0.0, 2.0], "weld whose rotation is not a unit quaternion");
+    bad(w -> w.normals = [[0.0, 0.0, 1.0]], "weld with one face normal");
+    bad(w -> w.normals[0] = [0.0, 0.0, 2.0], "weld with a face normal that is not a unit vector");
+    bad(w -> w.legSize = 0.0, "weld with no leg");
+    bad(w -> w.process.wireSpeed = 0.0, "weld with no wire speed");
+    bad(w -> w.process.travelSpeed = Math.NaN, "weld that travels at no number");
+    bad(w -> w.process.approach = 0.0, "weld with no approach");
+    bad(w -> w.process.craterDwell = -1.0, "weld with a negative crater dwell");
+    data.mission = mission(seam());
+    data.robotTools = null;
+    rejects(function() SceneArtifact.encode(data), "weld mission without a torch");
+    data.mission = null;
   }
 
   /** A machining job travels with its machine and names only what the scene has. */
