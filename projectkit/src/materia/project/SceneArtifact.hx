@@ -180,6 +180,8 @@ typedef SceneArtifactFloorPose = {
  * and `loadedTool` the number of the tool in the spindle when the job starts.
  * `target` names a part of the artifact that no occurrence uses: the finished part, in the stock's
  * frame, to compare the machined stock with. A looping job starts again when the program ends.
+ * `controller` is the controller the machine's steppers are nominally wired to: the machine's own
+ * limits are the motors' and drives', and the controller's step rate caps them further.
  */
 typedef SceneArtifactMachining = {
 	var program:String;
@@ -193,6 +195,17 @@ typedef SceneArtifactMachining = {
 	@:optional var loadedTool:Int;
 	@:optional var target:String;
 	@:optional var loop:Bool;
+	@:optional var controller:SceneArtifactController;
+}
+
+/**
+ * The nominal wiring of a machine's stepper drivers: every stepper driven at `microsteps` per full
+ * step from a controller that generates at most `stepTickHz` step edges a second per channel. The
+ * device binding turns them into each axis's step-rate ceiling.
+ */
+typedef SceneArtifactController = {
+	var microsteps:Int;
+	var stepTickHz:Int;
 }
 
 /** One tool of a machining job's tool table; see SceneArtifactMachining. */
@@ -636,6 +649,9 @@ class SceneArtifact {
 			fail('starts with tool ${machining.loadedTool}, which is not in its tool table');
 		if (machining.target != null && !parts.exists(machining.target))
 			fail('target "${machining.target}" is not one of its parts');
+		var controller = machining.controller;
+		if (controller != null && (controller.microsteps < 1 || controller.microsteps > 256 || controller.stepTickHz < 1))
+			fail("has a controller with no microsteps or step rate");
 	}
 
 	/** A machining job from its JSON section, typed field by field. */
@@ -668,6 +684,12 @@ class SceneArtifact {
 		if (target != null) machining.target = text(target);
 		var loop:Dynamic = Reflect.field(decoded, "loop");
 		if (loop != null) machining.loop = Std.isOfType(loop, Bool) ? (loop:Bool) : fail();
+		var controller:Dynamic = Reflect.field(decoded, "controller");
+		if (controller != null) {
+			var microsteps:Dynamic = Reflect.field(controller, "microsteps"), tick:Dynamic = Reflect.field(controller, "stepTickHz");
+			if (!Std.isOfType(microsteps, Int) || !Std.isOfType(tick, Int)) fail();
+			machining.controller = {microsteps: (microsteps:Int), stepTickHz: (tick:Int)};
+		}
 		return machining;
 	}
 

@@ -215,18 +215,62 @@ Kinematics through the whole stack, with ratios still given as numbers.
   actuating only the motor joints needs the runtime to command the
   actuators. Device deployments don't yet take steps per unit from the
   motor, its step angle, the microstepping and the ratio. Gravity on Z,
-  friction and screw critical speed are not modelled.
+  friction and screw critical speed are not modelled here (X6b models them).
 
-### X4 — Belts
+### X4 — Belts (done)
 
-- `TimingBelt`: a closed loop around pulleys and idlers. Its length and tooth
-  count come from the pitch, and one strand clamps to a carriage.
-- Belt couplings (pulley joint → carriage) derived from the pulley.
-- Rendering: the belt moves along its loop, and the pulleys and screws turn.
-- A machine that uses them. Either the router gets a belt-driven option on
-  X/Y, or a small belt gantry is added.
-- **Gate:** a belt axis machines a program; the belt's teeth move at carriage
-  speed.
+- **`TimingBelt`** (`machinekit.transmission`): a closed loop round `BeltWrap`s
+  (pitch-circle centre, pitch radius and which way the belt wraps: +1
+  counter-clockwise, -1 clockwise, as an idler on the belt's back does) given in
+  the belt's plane. The path is the oriented tangents between consecutive wraps
+  (also the crossed ones) and arcs on them. It reports the pitch length, the
+  nearest whole tooth count, the slack of that count (`slack()`) and the centre
+  adjustment that makes the loop whole teeth (`centreAdjustment()`: half the
+  slack, for two parallel runs with one pulley moved along them). `strands()`
+  and `pointAt(distance)` give the path, so a carriage can clamp a strand, and
+  `rotation(wrap, strand, travel)` gives which way a wrap turns while a carriage
+  on that strand moves. It chose whole teeth rather than a standard length
+  table: the router places its idler so the loop is whole teeth (20-tooth GT2
+  pulleys make a loop 20 teeth plus the centre distance in mm).
+  Geometry is the band only: `width` × `thickness` (1.38 mm for GT2, per profile)
+  centred on the pitch line, as a polygon with 7.5° arc steps. Teeth are omitted,
+  because they would change no clearance and cost an OCCT sweep.
+  A two-pulley belt has a recipe (`machinekit.transmission.timing-belt`:
+  profile, driver and idler teeth, centre distance, width); other layouts are
+  code-only. The idler is a `TimingPulley` (toothed idlers are common).
+- **Belt couplings** are the X2 `Drive.Belt(pulley, alignment)`: ratio =
+  alignment × 2 / pitch diameter, efficiency 0.97. The router takes the alignment
+  from the belt's `rotation`, and the smoke checks it from first principles (the
+  pulley's point on the clamped strand moves along the axis).
+- **Router.** `new CncRouter(belts = true)`, defaults stay screws. X: motor on a
+  plate bolted to the back of the gantry beams, shaft pointing forward into the
+  beam gap with a 20-tooth GT2 pulley, an idler on an axle plate at the other end
+  (centres ±222 mm, belt in the vertical plane, 464 teeth, 928 mm); the carriage
+  bracket clamps the lower strand and the upper passes above it. Y: one belt per
+  side in the vertical plane outside the frame (centres ±320 mm, 660 teeth,
+  1320 mm), motors on plates behind, idlers on axle plates in front; the gantry
+  bracket has a slot for the upper strand and clamps the lower. Z keeps its screw.
+  The pulleys and idlers turn on continuous joints coupled to their axes; the
+  motors stay actuators on the pulley joints, so limits are derived.
+  Bodies: pulleys and idlers add 6 joints and couplings.
+- **Numbers** (24 V NEMA 23, half holding torque): pitch radius 6.366 mm, so
+  every belt axis gets 873.1 mm/s (a screw axis gets 43.7), X 15.1 m/s², Y (two
+  motors) 12.8 m/s², Z unchanged. Those are limits, not feeds: a machining run
+  of the belt router was not done (the motion limits are 20 times the screw
+  router's, so the plate would machine far faster than the screws, not
+  comparable).
+- **Checks.** MachineKit smoke: belt maths (two-pulley length and teeth, slack
+  and adjustment, a triangle of pulleys, path wrap-around, geometry bounds,
+  recipe round trip) and the belt router: the nose still lands at machine
+  coordinates, every pulley turns travel / pitch radius (and the right way), belt
+  lengths are whole teeth, belts clear the frame, each bracket overlaps its belt
+  by exactly one strand's cross-section (6 × 1.38 × 40 mm³), and motors, plates,
+  idlers clear the gantry at the ends of travel. App test
+  (`checkBeltRouter`, project `machinekit/examples/cnc-router/belts`): couplings
+  1/6.366 mm for X and Y, derived speeds from the pulleys.
+- **Left.** The belt is frame-fixed geometry; showing teeth travelling (a mesh
+  updated per frame without OCCT) is not done. Belt stretch and a machining run
+  of the belt variant are left (done in X6).
 
 ### X5 — Couplings with more than one leader (CoreXY)
 
@@ -272,6 +316,10 @@ one place.
 
 ### X6 — Drive kinds, plan checks and drive-aware simulation
 
+Status: X6a (drive kinds), X6b (plan check, accuracy, screw critical speed) and the
+belt-router gate are done (2026-10-02); X6c (simulation by drive kind), the examples
+and the hardware-timer device work are not.
+
 Steppers and servos fail differently, so an actuator names its drive kind
 instead of carrying bare numbers. Drive-level behaviour only: no current
 loops, PWM or thermal mass.
@@ -285,22 +333,111 @@ loops, PWM or thermal mass.
     drive (ratio and efficiency).
   - Both share a torque–speed curve (a few points), so `coupledLimits`
     derives limits the same way for each.
-- **Plan check (stall predictor).** Along each plan, the torque each motor
-  needs is worked out from moving mass × acceleration through ratio and
-  efficiency, plus rotor and screw inertia, gravity on vertical axes, and
-  friction (nut drag, rail preload, a cutting-force allowance on feeds). It
-  is then checked against the drive.
-  - A stepper must stay under its pull-out curve, with margin, at every
-    point.
-  - A servo must stay under its peak torque, and its average (RMS) torque
-    over the move under its continuous rating.
-  - The check runs once per plan, the same for simulation and device.
-- **Screw critical speed.** A lead-screw drive caps its screw joint at the
-  first bending speed, from root diameter, unsupported length and end supports
-  (where its bearings sit), with margin. The router's Y screws, about 600 mm
-  with no far-end bearing, may whip near 700 rpm, about half their motor's
-  usable speed.
-- **Simulation by drive kind.**
+- **X6a, what was built.** `robotkit.model.ActuatorDrive` (module with
+  `StepperDrive` and `ServoDrive`) and `TorqueSpeedCurve` (speed/torque points joined
+  by lines, torque held below the first speed and zero above the last).
+  `Actuator.drive` is null for a bare effort and rate. `Actuator.fullStepsPerRevolution`
+  is now a property of the stepper drive (setting it makes a steps-only stepper), so the
+  device binding and older callers are unchanged. `maxEffort`/`maxRate` stay what a
+  planner may rely on: a stepper's usable share of holding torque and the speed it holds
+  it to, a servo's peak torque and maximum speed (`planningEffort()`/`planningRate()`
+  fall back to the drive's peak and maximum when a servo leaves them zero).
+  `RobotModel.coupledLimits` reads those, so steppers derive the same numbers as
+  before. A servo's gains stay on the actuator (`servoStiffness`, `servoDamping`).
+  The assembly format's `AssemblyActuator` gained optional `drive`, `torqueSpeed`
+  (alternating speed and torque), `holdingTorque`, `ratedTorque`, `peakTorque`,
+  `ratedSpeed`, `maxSpeed`, `encoderCounts` and the gains; CadKit's
+  `AssemblyModel.actuateDrive` takes a whole record; the bridge builds the drive.
+  `RobotModelCodec` still writes `fullStepsPerRevolution` for every stepper and adds a
+  `drive` object only for a stepper with ratings or a servo, so a model with a bare
+  stepper keeps its bytes and older models decode.
+  MachineKit: the `MotorDrive` interface (a part says its own actuator) is what
+  `MachineAssembly.addMotor` calls. `NemaStepper` implements it, with a pull-out curve
+  of the first-order model (`pullOutCurve`: points at 1, 1.1, 1.25 ... 8 times the
+  corner speed and at the usable speed; joining them by lines overstates the
+  hyperbola by at most about 1%). A servo motor part implements `MotorDrive` the same
+  way; no catalogue servo exists yet and the test uses a code-only one.
+- **X6b, plan check (stall predictor), what was built.**
+  - **Where it runs.** `ProgramCompiler.finish` runs `PlanCheck` on every plan the
+    compiler makes, once, and puts the result on `ExecutionPlan.checked`
+    (`PlanCheckResult`: structured `PlanDiagnostic`s, the worst torque ratio and
+    deviation). That is the one place outside tests that creates an
+    `ExecutionPlan`, so every program, toolpath, CNC, handling and arm plan goes
+    through it, for simulation and device alike; the check reads the plan's
+    polynomial segments (sampled at most every 4 ms), not any runtime. It does not
+    cover plans built straight from a `Trajectory` (`MotionSystem`'s direct paths,
+    `ServoPlan`), which never become an `ExecutionPlan`; a check there would sit in
+    `TrajectoryStream.motionSubmission` and is not done. The compiler's `planCheck` is
+    null until a caller attaches one (`PlanCheck(model, jointIds, options)`, jointIds
+    being the plan's joints in order); the CNC player attaches it.
+    `ManipulatorMotion.checks` sums what the plans it started found.
+  - **The model.** `robotkit.model.DriveLoads` finds each axis (a joint no coupling
+    leads to) with actuators in its coupling chain: the mass it moves (carried mass
+    plus armature, plus the turning inertia of coupled joints no motor drives,
+    reflected through their couplings), its gravity force along the axis (from the
+    joint frames, +Z up; a turning joint above it makes it worst case), and per
+    motor: ratio, efficiency, rotor inertia, drag and its share of the force. Torque
+    at a motor is `J·alpha + share·F/(ratio·eta) + drag` (eta flips when the load
+    drives the motor back), with `F = M·a + gravity + friction + cutting`. At the
+    planner's limit and no steady loads this is exactly the force balance
+    `coupledLimits` solves.
+  - **Steady loads are in the planner's limits too.**
+    `RobotModel.coupledLimits(id, steady)` now takes a `SteadyLoads` and leaves less
+    force for acceleration: the motors' drag, the axis's weight and rail friction come
+    off. Without that, a plan made at the limits would exceed the pull-out curve near
+    top speed by exactly those loads (the 0.5 holding-torque margin and the curve meet
+    at the usable speed), and the check would flag every move. Passing none keeps the
+    old numbers. The CNC player passes them.
+  - **Stepper.** At every sample, `|T|` against `margin × curve(|omega|)`, margin 1 by
+    default because the planner's 50% of holding torque is already the margin; beyond
+    the curve's last speed nothing is available. One `StepperStall` finding per motor
+    per plan, at the worst sample, with the samples over.
+  - **Servo.** The same against the envelope's peak (`ServoPeakTorque`), and the
+    time-weighted RMS torque over the plan against the rated torque
+    (`ServoRatedTorque`).
+  - **Assumed constants** (none is a datasheet value; each says so where it is
+    defined). Rail running friction 5 N per sliding axis (`SteadyLoads.railDrag`; rail
+    makers quote 0.002 to 0.005 of preload plus seal drag); lead-screw drag 0.02 N m
+    (about 1.6% of a NEMA 23's holding torque, nut preload and bearings), belt pulley
+    drag 0.005 N m (`DriveDefaults`, carried on the coupling as `drag`); cutting force
+    0 N unless `PlanCheckOptions.cuttingForce` and `cuttingFeedLimit` say so (applies to
+    moves programmed at or under that feed, in the sense that opposes the motion);
+    lead-screw backlash 0.05 mm (an anti-backlash nut on a Tr10 x 2; plain nuts are
+    0.1 to 0.3 mm); belt cord stiffness 2500 N per mm of width.
+  - **Warn or reject?** Warn by default; `PlanCheckOptions.rejects` makes the compiler
+    throw instead. A stall or an accuracy miss is a prediction from modelled friction
+    and stiffness, not a hard limit like joint range, so it should not stop a machine
+    that may run fine (a rapid with no load, a feed with no cutting); it should reach
+    the operator, who decides. A device deployment that prefers a stopped job to a
+    lost-steps job sets `rejects`.
+- **X6b, accuracy check.** Couplings carry optional `stiffness` (force at the leader
+  per unit of its travel), `backlash` (leader units) and `drag` (at the follower):
+  assembly format, CadKit `couple`, the bridge (to SI), `RobotModel`/codec (written only
+  when non-zero), `MachineAssembly` drive records (`setDriveStiffness`; defaults per
+  drive kind in `DriveDefaults`). A belt's is `TimingBelt.carriageStiffness`: EA (2500
+  N/mm of width, an assumption chosen on the soft side of what a ~400 N, 2.5%-elongation
+  6 mm fibreglass GT2 belt allows) times the two free lengths in parallel, the clamped
+  strand's length (carriage at its far end from the driver, the worst place) and the
+  rest of the loop the other way round; pretension, tooth compliance and the clamp are
+  left out. Parallel motors add stiffness, one rigid drive makes the axis rigid. Per
+  plan the check reports the worst `|M·a ± friction|/k` plus the nut's backlash when
+  the axis reverses (inside the plan, or against how the previous plan of the same
+  compiler left it; a worker's check forks fresh), against `PlanCheckOptions.tolerance`
+  (0.1 mm by default, an assumption for a hobby-class machine). Static sag from gravity
+  is calibrated away and left out.
+- **X6b, screw critical speed.** `LeadScrew.criticalSpeed(near, far, unsupported,
+  margin 0.8)`: `lambda² · d_r / (4 L²) · sqrt(E/rho)` for a solid round section of root
+  diameter `LeadScrewThread.rootDiameter()` (Tr10 x 2: 7.5 mm), `lambda` 1.875 for
+  fixed-free, 3.927 fixed-simple, 4.730 fixed-fixed, pi simple-simple (`ScrewSupport`
+  Free/Simple/Fixed; two free ends is an error). `MachineAssembly.supportScrew(drive,
+  near, far, unsupported?)` records it with the drive and sets the screw joint's
+  velocity limit, which `coupledLimits` carries to the axis through the ratio and a
+  rebuilt assembly works out again from the part. The router holds each screw fixed at
+  the motor (rigid coupling) and free at the far end over its whole length: nothing
+  holds the far end and the nut floats, so it is not counted as a support. Results: Y
+  (about 617 mm) 668 rpm, X 1037 rpm, Z (short) 9686 rpm, so Y is held to 22.3 mm/s,
+  X to 34.6 and Z is not limited by it.
+- **Simulation by drive kind (X6c, not done).**
   - A stepper's joint follows its plan kinematically, as now. When the plan
     check fails, it slips and keeps the error, as a real stepper loses steps.
   - A servo gets a torque-limited servo on the motor joint only, with its
@@ -310,6 +447,42 @@ loops, PWM or thermal mass.
     (lag instead of lost steps), is numerically stiff (hundreds of kg of
     reflected inertia through a constraint), and needs gains tuned per
     machine.
+  - Left because it needs the runtime to command actuators instead of a servo per
+    joint (RobotKit native and SimKit), and a place where a plan's check findings
+    reach the runtime to slip the stepper joints from; the plan check already says
+    which ops and where, so the data is there.
+- **Gate (done): the belt router machines the motor plate under honest limits.**
+  - **The controller is declared with the machine.** A simulated machine says what its
+    steppers are wired to the way a deployment does: the router's machining job
+    (`SceneArtifactMachining.controller`, optional, `{microsteps, stepTickHz}`) names the
+    nominal wiring (`CncRouter.MICROSTEPS` 16 on `STEP_TICK_HZ` 40 kHz, the RKD6 board's
+    software tick), and `CncProgramPlayer` binds the model to it with
+    `DeviceBinding.bind(model, DeviceLayout.forActuators(model, microsteps), tick)`,
+    the same call a device deployment makes, so the planner sees the real step-rate
+    ceiling (78.5 rad/s for a NEMA 23: 25 mm/s on a 2 mm lead, 500 mm/s on a 6.366 mm
+    belt pulley). Chosen over a separate layout file because the job is already what
+    "the generator made for its own machine, with everything needed to run it", the
+    player already builds its limits from it, and a project with no controller keeps the
+    old uncapped behaviour. Both routers declare it: one controller, one comparison.
+  - **Numbers** (24 V NEMA 23, 3 axes, the same motor-plate program, 0.5 mm stock rays):
+
+    | | screw router | belt router |
+    |---|---|---|
+    | axis limits (Y, X, Z) from motors, screws and pulleys alone | 22.3, 34.6, 43.7 mm/s; 5.4, 5.58, 6.12 m/s² | 873.1 (Y, X), 43.7 (Z) mm/s; 12.79, 15.1, 6.12 m/s² |
+    | axis limits as planned, with the controller and steady loads | 22.3, 25, 25 mm/s; 5.21, 5.37, 5.65 m/s² | 500, 500, 25 mm/s; 12.36, 14.19, 5.65 m/s² |
+    | cycle time (before: 184.9 s screw, uncapped) | 220.2 s | 201.6 s |
+    | material removed / leftover / gouge | 9914.9 / 63.5 / 0.6 mm³ | the same |
+    | plans checked / flagged | 126 / 0 | 126 / 57 |
+    | stepper stalls | 0 | 0 |
+    | worst torque against the pull-out curve | 56.7% | 56.5% |
+    | worst drive deviation (tolerance 0.1 mm) | 0.05 mm (the nut's backlash) | 1.9 mm (Y belts under 12 m/s²), 64 findings |
+
+    The belt router is only 8% faster: the 25 mm/s Z axis (the controller's cap on a
+    screw) and the cutting feeds dominate this program, not X and Y rapids. Its 500 mm/s
+    rapids are also fast enough for the simulated carriage to lag its command by
+    millimetres, so a rapid's label reaches 6 ticks into a cut (screw router: none); the
+    test counts and prints them for belts and forbids them for screws. The belts' stretch
+    is a prediction by the accuracy check, not simulated.
 - **Examples.** The robot arm (servos behind gearbox drives) and the mobile
   base (wheel motors) take their limits from their drives instead of typed-in
   numbers.
@@ -323,7 +496,55 @@ loops, PWM or thermal mass.
   generators stay unused, because paths are planned and coordinated by
   MotionKit. Servo drives on a fieldbus wait for real hardware.
 
+### X6d — Encoders
+
+The plan check predicts stalls and path error; encoders observe them. An
+open-loop stepper's lost steps are invisible without one. Model encoders as
+sensors with a location, at drive level only: quantisation, no noise or
+latency.
+
+- **Sensor.** An encoder is its own sensor, attached to a joint. It has a
+  kind (incremental quadrature or absolute), counts per revolution or per mm,
+  and an optional index pulse. Where it sits decides what it sees:
+  - **Motor-side** (on the motor shaft) sees lost steps, stalls and a servo's
+    following error, but not backlash or belt stretch.
+  - **Load-side** (a linear scale, or an encoder on the driven pulley) sees
+    where the carriage actually is, including stretch, backlash and pitch
+    error.
+
+  A servo drive references its encoder, and a closed-loop stepper is a
+  stepper drive plus an encoder. The servo drive's encoder count from X6a
+  becomes that reference, so the fact lives in one place.
+- **Parts.** MachineKit gets encoder components (a shaft encoder on a
+  motor's back shaft, a linear scale along a rail), placed and mated like
+  other parts, so the location comes from the assembly.
+- **Wiring.** Deployment layout channels name which board input reads which
+  encoder (layouts already carry `encoder_counts_per_rev`).
+- **Simulation.** Counts are quantised from the joint the encoder sits on.
+  With stepper slip (X6c) a motor-side encoder sees the slip the commanded
+  position hides, so stall detection is testable in simulation.
+- **Runtime.**
+  - Compare encoder and commanded positions and fault past a bound (the
+    blueprint's `following_error_bound`), naming lost steps.
+  - With a load-side encoder, report the measured path error: the observed
+    counterpart of the accuracy check.
+  - Monitoring only at first. Closing a position loop on a load-side
+    encoder belongs to real servo drives.
+- **Device.** Count edges in hardware (STM32 timer quadrature mode) and report
+  positions in the state frames. Index pulses support repeatable homing,
+  together with limit switches at hardware bring-up. This needs the bench to
+  verify.
+- **Order.** After X6c, since slip is what makes encoders observable in
+  simulation:
+  1. the sensor and its parts;
+  2. simulated counts;
+  3. the lost-step / following-error fault;
+  4. load-side path error;
+  5. device counting.
+
 ### Later
 
-Belt stretch and screw backlash in simulation (following error), gearboxes as
-components, an editor UI to author couplings and drives, and differentials.
+Belt teeth drawn and moving with the belt: a mesh built in Haxe and
+updated per frame, shifted by the coupled joint's travel. It doubles as a
+visual check on a drive's sign and ratio. Also gearboxes as components, an
+editor UI to author couplings and drives, and differentials.

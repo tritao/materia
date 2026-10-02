@@ -100,6 +100,24 @@ class AssemblyDefinitionFlattener {
 		return JsonWire.decode(JsonWire.encode(flat));
 	}
 
+	/** A copy of `actuator` under a new id, on a new joint, with every drive field. */
+	public static function copyActuator(actuator:AssemblyActuator, id:String, joint:String):AssemblyActuator {
+		var copy:AssemblyActuator = {id: id, joint: joint, maxEffort: actuator.maxEffort, maxRate: actuator.maxRate};
+		if (actuator.rotorInertia != null) copy.rotorInertia = actuator.rotorInertia;
+		if (actuator.fullStepsPerRevolution != null) copy.fullStepsPerRevolution = actuator.fullStepsPerRevolution;
+		if (actuator.drive != null) copy.drive = actuator.drive;
+		if (actuator.torqueSpeed != null) copy.torqueSpeed = actuator.torqueSpeed.copy();
+		if (actuator.holdingTorque != null) copy.holdingTorque = actuator.holdingTorque;
+		if (actuator.ratedTorque != null) copy.ratedTorque = actuator.ratedTorque;
+		if (actuator.peakTorque != null) copy.peakTorque = actuator.peakTorque;
+		if (actuator.ratedSpeed != null) copy.ratedSpeed = actuator.ratedSpeed;
+		if (actuator.maxSpeed != null) copy.maxSpeed = actuator.maxSpeed;
+		if (actuator.encoderCounts != null) copy.encoderCounts = actuator.encoderCounts;
+		if (actuator.servoStiffness != null) copy.servoStiffness = actuator.servoStiffness;
+		if (actuator.servoDamping != null) copy.servoDamping = actuator.servoDamping;
+		return copy;
+	}
+
 	static function expand(prefix:String, pose:AssemblyFrame, definitions:Array<AssemblyComponentDefinition>,
 			occurrences:Array<AssemblyComponentOccurrence>, joints:Array<KinematicJoint>, couplings:Array<AssemblyJointCoupling>,
 			mates:Null<Array<AssemblyMate>>, library:Map<String, AssemblySubdefinition>, flat:AssemblyDefinition, active:Map<String, Bool>,
@@ -169,16 +187,15 @@ class AssemblyDefinitionFlattener {
 			var expanded:AssemblyJointCoupling = {id: scoped(prefix, coupling.id), source: scoped(prefix, coupling.source),
 				target: scoped(prefix, coupling.target), ratio: coupling.ratio, offset: coupling.offset};
 			if (coupling.efficiency != null) expanded.efficiency = coupling.efficiency;
+			if (coupling.stiffness != null) expanded.stiffness = coupling.stiffness;
+			if (coupling.backlash != null) expanded.backlash = coupling.backlash;
+			if (coupling.drag != null) expanded.drag = coupling.drag;
 			flat.couplings.push(expanded);
 		}
 		if (actuators != null) {
 			if (flat.actuators == null) flat.actuators = [];
 			for (actuator in actuators) {
-				var expanded:AssemblyActuator = {id: scoped(prefix, actuator.id), joint: scoped(prefix, actuator.joint),
-					maxEffort: actuator.maxEffort, maxRate: actuator.maxRate};
-				if (actuator.rotorInertia != null) expanded.rotorInertia = actuator.rotorInertia;
-				if (actuator.fullStepsPerRevolution != null) expanded.fullStepsPerRevolution = actuator.fullStepsPerRevolution;
-				flat.actuators.push(expanded);
+				flat.actuators.push(copyActuator(actuator, scoped(prefix, actuator.id), scoped(prefix, actuator.joint)));
 			}
 		}
 		if (mates != null) for (mate in mates) {

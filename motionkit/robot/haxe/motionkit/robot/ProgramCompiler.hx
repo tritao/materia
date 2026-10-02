@@ -68,6 +68,13 @@ class ProgramCompiler {
   public final configurationSelector:Null<PathConfigurationSelector>;
   final jointIds:Null<Array<String>>;
   final couplings:Null<Array<JointCoupling>>;
+  /**
+   * The plan check every plan this compiler makes goes through, or null for none. Every planner of
+   * MotionKit makes its plans here (this is the one place that creates an `ExecutionPlan`), so
+   * attaching the check once covers programs, paths, toolpaths and handling alike, for simulation
+   * and device. Its findings are on `ExecutionPlan.checked`.
+   */
+  public var planCheck:Null<PlanCheck> = null;
 
   /**
    * This compiler for a planning thread, on a fork of its solver: the worker never shares solver
@@ -76,11 +83,14 @@ class ProgramCompiler {
   public function forWorker():ProgramCompiler {
     var forked = solver.fork();
     if (forked == solver) return this;
-    return new ProgramCompiler(forked, limits, frameId, maxVelocity, maxAcceleration, maxJerk,
+    var worker = new ProgramCompiler(forked, limits, frameId, maxVelocity, maxAcceleration, maxJerk,
       startTolerances, timing, cartesianResolution, maxJointJump, positionTolerance,
       orientationTolerance, ikTolerance,
       configurationSelector == null ? null : configurationSelector.withSolver(forked),
       perJointMaxJump, jointIds, couplings);
+    // The worker plans one program in order, so it remembers which way each axis last moved.
+    if (planCheck != null) worker.planCheck = planCheck.fork();
+    return worker;
   }
 
   public function new(solver:KinematicsSolver, limits:ValidationLimits,
@@ -367,6 +377,14 @@ class ProgramCompiler {
       if (pending.path != null) checkTaskSpace(plan, pending.path, pending.checkDistances,
         pending.checkTimes, pending.opIndex, pending.authoredPolyline,
         pending.blendTolerance, pending.taskSampleDistances);
+      var check = planCheck;
+      if (check != null && check.checks()) {
+        var result = check.check(plan, pending.opIndex, pending.feed);
+        result.locate(pending.times, pending.opDistances());
+        plan.checked = result;
+        if (check.options.rejects && result.diagnostics.length > 0)
+          throw 'plan check: ${[for (diagnostic in result.diagnostics) diagnostic.describe()].join("; ")}';
+      }
       pending.trajectory.dispose();
       if (projected != null) projected.dispose();
       return plan;
@@ -567,9 +585,11 @@ class ProgramCompiler {
         }
       }
       timed.releaseDistanceMap();
-      return new PendingMotion(index, startQ, positions[count], timed.trajectory, events,
+      var made = new PendingMotion(index, startQ, positions[count], timed.trajectory, events,
         path, distances, timeMap, authoredPolyline, blendTolerance,
         taskSampleDistances, checkDistances, checkTimes);
+      made.feed = feed;
+      return made;
     } catch (error:Dynamic) {
       timed.releaseDistanceMap();
       timed.trajectory.dispose();
@@ -832,6 +852,8 @@ class PendingMotion {
   public final blendTolerance:Float;
   /** Where this motion starts along its op's path, when the op is split at corners. */
   public var distanceOffset:Float = 0.0;
+  /** The programmed speed of a path move in m/s, 0 for a joint move. */
+  public var feed:Float = 0.0;
 
   public function new(opIndex:Int, startQ:Array<Float>, endQ:Array<Float>,
       trajectory:Trajectory, events:Array<TimedEvent>, path:Null<PosePath>,

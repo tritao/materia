@@ -17,6 +17,8 @@ class ExecutionPlan implements NativeSpanOwner {
   final owner:Ownedmk_plan_handle;
   var disposed:Bool = false;
   public final report:ValidationReport;
+  /** What a plan check found, set by the compiler that made the plan when it ran one. */
+  public var checked:Null<PlanCheckResult> = null;
   /** Validation claims carried with this plan's telemetry. */
   public function guarantees():ValidationGuarantees return report.guarantees();
   public final planId:Int64;

@@ -173,6 +173,18 @@ class SimulationPoseResetTests {
     var pair = 2 * 0.4 * scale * 0.63 / (10.0 + 2 * 0.4 * (4e-6 + 3e-5) * scale * scale);
     if (Math.abs(motorModel.coupledLimits("slide").maxAcceleration - pair) > pair * 1e-12)
       throw "two motors add their force and their screws' turning inertia";
+    // A servo with no explicit limits is held to its peak torque and maximum speed: 1.5 N m, 200 rad/s.
+    motorModel.actuators.splice(0, motorModel.actuators.length);
+    var servo = new robotkit.model.Actuator("servo", 0.0, 0.0, robotkit.model.Transmission.SimpleTransmission("screw", 1.0, 0.0));
+    servo.drive = new robotkit.model.ActuatorDrive.ServoDrive(0.5, 1.5, 100.0, 200.0, 3e-5, 4096.0);
+    motorModel.addActuator(servo);
+    // Only the first screw is driven now; the second joins the axis as turning inertia all the same.
+    var servoLimits = motorModel.coupledLimits("slide");
+    var servoExpected = 0.4 * scale * 1.5 / (10.0 + 2 * 0.4 * (4e-6 + 3e-5) * scale * scale);
+    if (Math.abs(servoLimits.velocity - 200.0 / scale) > 1e-12)
+      throw 'a servo caps its axis at its maximum speed: ${servoLimits.velocity}';
+    if (Math.abs(servoLimits.maxAcceleration - servoExpected) > servoExpected * 1e-12)
+      throw 'a servo accelerates its axis at its peak torque: ${servoLimits.maxAcceleration}, expected $servoExpected';
   }
 
   static function checkPose(simulation:Simulation, position:Array<Float>, rotation:Array<Float>,

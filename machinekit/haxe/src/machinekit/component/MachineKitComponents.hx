@@ -23,6 +23,7 @@ import machinekit.robotics.Pedestal;
 import machinekit.transmission.Sprocket;
 import machinekit.transmission.SpurGear;
 import machinekit.transmission.Rack;
+import machinekit.transmission.TimingBelt;
 import machinekit.transmission.TimingPulley;
 
 /** Registered, editable single-part generators. Parts whose inputs include lists, such as
@@ -80,7 +81,8 @@ class MachineKitComponents {
 			SpurGear.recipeType(),
 			Rack.recipeType(),
 			TimingPulley.standardRecipeType(),
-			TimingPulley.customRecipeType()
+			TimingPulley.customRecipeType(),
+			TimingBelt.pairRecipeType()
 		];
 		for (type in MachineKitAdditionalRecipes.all()) result.push(type);
 		return result;

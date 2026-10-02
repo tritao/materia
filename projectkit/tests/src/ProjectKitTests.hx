@@ -292,7 +292,8 @@ class ProjectKitTests {
     var job:materia.project.SceneArtifact.SceneArtifactMachining = {program: "G0 X1\nM2\n",
       axes: ["x", "y", "z"], spindle: "spindle", workOffset: [0.1, 0.1, -0.05],
       tools: [{number: 1, length: 0.03, profile: [[0.0, 0.0, 0.0, 0.0, 0.003, 0.0], [0.0, 0.0, 0.003, 0.0, 0.003, 0.02]]}],
-      stock: "bed", sacrificial: ["gantry"], toolPart: "spindle", loadedTool: 1, target: "finished", loop: true};
+      stock: "bed", sacrificial: ["gantry"], toolPart: "spindle", loadedTool: 1, target: "finished", loop: true,
+      controller: {microsteps: 16, stepTickHz: 40000}};
     var data:materia.project.SceneArtifact.SceneArtifactData = {lengthUnit: "mm", metresPerUnit: 0.001,
       parts: [part("body"), part("finished")], assemblyDefinition: machine, machining: job};
     var restored = SceneArtifact.decode(SceneArtifact.encode(data)).machining;
@@ -302,6 +303,14 @@ class ProjectKitTests {
       restored.target == "finished" && restored.loop == true, "machining job round trip");
     check(restored.tools.length == 1 && restored.tools[0].number == 1 && restored.tools[0].length == 0.03 &&
       restored.tools[0].profile[1][5] == 0.02, "machining tool table round trip");
+    var wiring = restored.controller;
+    check(wiring != null && wiring.microsteps == 16 && wiring.stepTickHz == 40000, "machining controller round trip");
+    job.controller = {microsteps: 0, stepTickHz: 40000};
+    rejects(function() SceneArtifact.encode(data), "machining controller with no microsteps");
+    Reflect.deleteField(job, "controller");
+    var bare = SceneArtifact.decode(SceneArtifact.encode(data)).machining;
+    check(bare != null && bare.controller == null, "a job names no controller unless it is given one");
+    job.controller = {microsteps: 16, stepTickHz: 40000};
     job.spindle = "missing";
     rejects(function() SceneArtifact.encode(data), "machining spindle outside the assembly");
     job.spindle = "spindle"; job.axes = ["x", "x", "z"];

@@ -62,7 +62,7 @@ class TimingPulley extends MachineComponent {
 		addConnector("back", Face, Solids.axial(0, 0, thickness));
 	}
 
-	static function profileDimensions(profile:TimingBeltProfile):{name:String, pitch:Float, pld:Float}
+	public static function profileDimensions(profile:TimingBeltProfile):{name:String, pitch:Float, pld:Float}
 		return switch (profile) {
 			case GT2: {name: "GT2", pitch: 2.0, pld: 0.254};
 			case HTD3M: {name: "HTD3M", pitch: 3.0, pld: 0.381};

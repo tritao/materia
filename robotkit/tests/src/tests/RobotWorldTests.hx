@@ -836,8 +836,19 @@ class RobotWorldTests {
     source.joints[2].limitImpedance = [0.0, 0.99, 0.01, 0.5, 2.0];
     source.joints[1].limits.overtravel = 0.004;
     source.actuators[0].servoStiffness = 75.0;
+    source.couplings[0].stiffness = 5.0e4;
+    source.couplings[0].backlash = 1.0e-4;
+    source.couplings[0].drag = 0.02;
     source.actuators[0].fullStepsPerRevolution = 200.0;
     source.actuators[0].servoDamping = 2.0;
+    // A bare stepper writes only its steps, as models did before drive kinds; one with ratings writes its drive.
+    var bare = RobotModelCodec.decode(RobotModelCodec.encode(source));
+    check(bare.actuators[0].drive != null && bare.actuators[0].fullStepsPerRevolution == 200.0 &&
+      !cast(bare.actuators[0].drive, robotkit.model.ActuatorDrive.StepperDrive).hasTorqueData(),
+      "a stepper known by its steps alone round-trips as such");
+    source.actuators[0].drive = new robotkit.model.ActuatorDrive.StepperDrive(200.0, 3e-5, 1.26,
+      new robotkit.model.TorqueSpeedCurve([0.0, 100.0, 400.0], [1.26, 1.26, 0.315]));
+    if (source.actuators.length > 1) source.actuators[1].drive = new robotkit.model.ActuatorDrive.ServoDrive(0.64, 1.9, 314.0, 500.0, 2e-5, 4096.0);
 
     var encoded = RobotModelCodec.encode(source);
     var restored = RobotModelCodec.decode(encoded);
@@ -902,7 +913,21 @@ class RobotWorldTests {
     check(restored.joints[2].limitTimeConstant == 0.008 && restored.joints[2].limitImpedance[1] == 0.99,
       "RobotModel codec preserves joint limit softness");
     equal(restored.actuators[0].servoStiffness, 75.0, "RobotModel codec preserves servo stiffness");
+    check(restored.couplings[0].stiffness == 5.0e4 && restored.couplings[0].backlash == 1.0e-4 && restored.couplings[0].drag == 0.02,
+      "RobotModel codec preserves a coupling's stiffness, backlash and drag");
     equal(restored.actuators[0].fullStepsPerRevolution, 200.0, "RobotModel codec preserves a stepper's full steps");
+    var restoredStepper = restored.actuators[0].drive;
+    check(restoredStepper != null && restoredStepper.kind() == "stepper" && restoredStepper.rotorInertia == 3e-5 &&
+      cast(restoredStepper, robotkit.model.ActuatorDrive.StepperDrive).holdingTorque == 1.26 &&
+      Math.abs(restoredStepper.curve.torqueAt(250.0) - 0.7875) < 1e-12 && restoredStepper.curve.torqueAt(500.0) == 0.0,
+      "RobotModel codec preserves a stepper's torque-speed curve");
+    if (restored.actuators.length > 1) {
+      var restoredServo = restored.actuators[1].drive;
+      check(restoredServo != null && restoredServo.kind() == "servo" && restoredServo.peakTorque() == 1.9 &&
+        cast(restoredServo, robotkit.model.ActuatorDrive.ServoDrive).encoderCounts == 4096.0 &&
+        restored.actuators[1].planningEffort() == 1.9,
+        "RobotModel codec preserves a servo's drive");
+    }
     var restoredSurface = restored.links[1].collisionShapes[1].surface;
     check(restoredSurface != null && restoredSurface.frictionDimensions == 4 &&
       restoredSurface.friction[0] == 0.7 && restoredSurface.contactTimeConstant == 0.01,
