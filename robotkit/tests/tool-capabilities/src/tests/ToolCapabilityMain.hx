@@ -6,5 +6,6 @@ class ToolCapabilityMain {
     ToolTests.run();
     ProcessTests.run();
     WeldTests.run();
+    ClearanceTests.run();
   }
 }

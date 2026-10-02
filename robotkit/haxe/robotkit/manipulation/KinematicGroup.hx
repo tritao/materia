@@ -235,6 +235,29 @@ class KinematicGroup {
     return RobotKinematics.toTransform3(referencePose(d).inverse().compose(d.snapshot.framePose(flangeFrameIndex)));
   }
 
+  /**
+   * The poses of the bodies of `links` in the reference frame at joint values `q`, in one evaluation: for placing what
+   * the links carry (collision hulls) as the arm moves.
+   */
+  public function linkPoses(q:Array<Float>, links:Array<LinkId>, ?data:KinematicGroupData):Array<Transform3> {
+    var d = evaluate(q, data);
+    var inverse = referencePose(d).inverse();
+    return [for (link in links) {
+      var body = model.bodyIndex(link);
+      if (body < 0) throw 'Link "$link" is not part of the model';
+      RobotKinematics.toTransform3(inverse.compose(d.snapshot.bodyPose(body)));
+    }];
+  }
+
+  /** Whether the link moves when one of the group's joints does (it is carried by such a joint, however far out). */
+  public function moves(link:LinkId):Bool {
+    for (joint in walk(robot, rootLink, link)) {
+      var index = model.jointIndex(joint.id);
+      if (index >= 0 && dofs.indexOf(model.jointDof[index]) >= 0) return true;
+    }
+    return false;
+  }
+
   /** The tool centre point's pose in the reference frame (the flange composed with `flange_T_tcp`). */
   public function tcpPose(q:Array<Float>, ?data:KinematicGroupData):Transform3
     return forwardKinematics(q, data).compose(flangeTTcp);
