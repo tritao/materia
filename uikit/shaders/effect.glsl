@@ -107,14 +107,25 @@ layout(binding=0) uniform texture2D tex;
 layout(binding=0) uniform sampler smp;
 layout(location=0) in vec2 uv;
 layout(location=0) out vec4 frag_color;
+
+// Pixels outside the source are transparent. Clamp-to-edge sampling would
+// smear content touching the target edge into the shadow, which happens when
+// the offset is at least the blur extent and leaves no margin on that side.
+float source_alpha(vec2 point) {
+    vec2 inside = step(vec2(0.0), point) * step(point, vec2(1.0));
+    return texture(sampler2D(tex, smp), point).a * inside.x * inside.y;
+}
+
 void main() {
     vec4 parameters = value[0];
     vec4 color = value[1];
     vec2 texel = value[2].xy;
     vec2 center = uv;
+    // Effect passes sample with v running bottom-up (v = 1 at the target's top
+    // edge), so a positive screen-space Y offset reads from a higher v.
     if (parameters.y > 0.5)
-        center -= vec2(parameters.z * texel.x, parameters.w * texel.y);
-    float alpha = texture(sampler2D(tex, smp), center).a;
+        center -= vec2(parameters.z * texel.x, -parameters.w * texel.y);
+    float alpha = source_alpha(center);
     float weight_sum = 1.0;
     if (parameters.x > 0.0001) {
         float sample_step = max(1.0, parameters.x * 0.5);
@@ -124,8 +135,7 @@ void main() {
             float normalized = offset_in_texels / parameters.x;
             float weight = exp(-0.5 * normalized * normalized);
             vec2 offset = direction * offset_in_texels;
-            alpha += (texture(sampler2D(tex, smp), center + offset).a +
-                      texture(sampler2D(tex, smp), center - offset).a) * weight;
+            alpha += (source_alpha(center + offset) + source_alpha(center - offset)) * weight;
             weight_sum += 2.0 * weight;
         }
     }
@@ -227,6 +237,15 @@ void main() {
             y += step_size;
         }
     }
+    // Outer shadows are clipped to outside the casting box, like CSS, so they
+    // never show through translucent surfaces or where a surface is missing.
+    vec2 box_half = base.zw * 0.5;
+    vec2 box_local = uv - (base.xy + box_half);
+    vec4 box_radii = value[2];
+    float box_corner = box_local.x < 0.0 ? (box_local.y < 0.0 ? box_radii.x : box_radii.w)
+                                         : (box_local.y < 0.0 ? box_radii.y : box_radii.z);
+    box_corner = max(0.0, min(box_corner, min(box_half.x, box_half.y)));
+    alpha *= clamp(rounded_rect_distance(box_local, box_half, box_corner) + 0.5, 0.0, 1.0);
     frag_color = vec4(color.rgb * color.a * alpha, color.a * alpha);
 }
 @end

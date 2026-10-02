@@ -142,6 +142,8 @@ int main(int argc, char **argv) {
     nkui_display_list backdrop_list{};
     nkui_display_list custom_effect_list{};
     nkui_display_list box_shadow_list{};
+    nkui_display_list box_shadow_probe_list{};
+    nkui_display_list drop_shadow_probe_list{};
     nkui_renderer renderer{};
     if (nkui_path_create(path_elements, 5, &path) != NKUI_OK ||
         nkui_paint_create_solid({0.08f, 0.45f, 0.16f, 1.0f}, &paint) != NKUI_OK ||
@@ -434,6 +436,67 @@ int main(int argc, char **argv) {
     if (nkui_display_list_submit(box_shadow_list, box_shadow_commands.data(),
                                  box_shadow_commands.size()) != NKUI_OK)
         return 5;
+
+    // Pixel probes: an opaque red box shadow on a cleared target, and a
+    // drop shadow whose offset exceeds its blur extent (no top margin).
+    if (nkui_display_list_create(&box_shadow_probe_list) != NKUI_OK ||
+        nkui_display_list_create(&drop_shadow_probe_list) != NKUI_OK)
+        return 5;
+    std::vector<uint8_t> box_shadow_probe_commands;
+    append(box_shadow_probe_commands,
+           nkui_draw_box_shadow_command{{NKUI_COMMAND_DRAW_BOX_SHADOW, NKUI_COMMAND_VERSION,
+                                         sizeof(nkui_draw_box_shadow_command)},
+                                        40.0f,
+                                        40.0f,
+                                        60.0f,
+                                        40.0f,
+                                        0.0f,
+                                        0.0f,
+                                        4.0f,
+                                        0.0f,
+                                        {0.0f, 0.0f, 0.0f, 0.0f},
+                                        {1.0f, 0.0f, 0.0f, 1.0f}});
+    if (nkui_display_list_submit(box_shadow_probe_list, box_shadow_probe_commands.data(),
+                                 box_shadow_probe_commands.size()) != NKUI_OK)
+        return 5;
+    const nkui_path_element probe_path_elements[] = {
+        {NKUI_PATH_MOVE_TO, {40.0f, 100.0f}},
+        {NKUI_PATH_LINE_TO, {100.0f, 100.0f}},
+        {NKUI_PATH_LINE_TO, {100.0f, 140.0f}},
+        {NKUI_PATH_LINE_TO, {40.0f, 140.0f}},
+        {NKUI_PATH_CLOSE, {}},
+    };
+    nkui_resource probe_path{}, probe_paint{};
+    if (nkui_path_create(probe_path_elements, 5, &probe_path) != NKUI_OK ||
+        nkui_paint_create_solid({0.0f, 1.0f, 0.0f, 0.5f}, &probe_paint) != NKUI_OK)
+        return 5;
+    std::vector<uint8_t> drop_shadow_probe_commands;
+    nkui_effect_op_command drop_shadow_probe{};
+    drop_shadow_probe.kind = NKUI_EFFECT_DROP_SHADOW;
+    drop_shadow_probe.color_matrix[0] = 1.0f;
+    drop_shadow_probe.color_matrix[3] = 10.0f;
+    drop_shadow_probe.color_matrix[4] = 1.0f;
+    drop_shadow_probe.color_matrix[7] = 1.0f;
+    append_layer(drop_shadow_probe_commands,
+                 make_layer(1.0f, 40.0f, 100.0f, 60.0f, 40.0f,
+                            NKUI_LAYER_ISOLATED | NKUI_LAYER_HAS_BOUNDS),
+                 {drop_shadow_probe});
+    append(drop_shadow_probe_commands,
+           nkui_resource_command{{NKUI_COMMAND_SET_PAINT, NKUI_COMMAND_VERSION,
+                                  sizeof(nkui_resource_command)},
+                                 probe_paint});
+    append(drop_shadow_probe_commands,
+           nkui_resource_command{{NKUI_COMMAND_DRAW_PATH, NKUI_COMMAND_VERSION,
+                                  sizeof(nkui_resource_command)},
+                                 probe_path});
+    append(drop_shadow_probe_commands,
+           nkui_command_header{NKUI_COMMAND_END_LAYER, NKUI_COMMAND_VERSION,
+                               sizeof(nkui_command_header)});
+    if (nkui_display_list_submit(drop_shadow_probe_list, drop_shadow_probe_commands.data(),
+                                 drop_shadow_probe_commands.size()) != NKUI_OK ||
+        nkui_resource_destroy(probe_paint) != NKUI_OK ||
+        nkui_resource_destroy(probe_path) != NKUI_OK)
+        return 5;
     if (nkui_display_list_create(&scale_list) != NKUI_OK)
         return 5;
     std::vector<uint8_t> scale_commands;
@@ -521,6 +584,42 @@ int main(int argc, char **argv) {
         if (!result && render_result == NKUI_OK && frames == 0)
             render_result =
                 nkui_renderer_render_frame(renderer, box_shadow_list, surface, &frame_info);
+        const auto red_at = [&](int x, int y) {
+            uint8_t pixel[4]{};
+            glReadPixels(x, height - 1 - y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
+            return static_cast<int>(pixel[0]);
+        };
+        if (!result && render_result == NKUI_OK && frames == 0) {
+            render_result = nkui_renderer_render_frame(renderer, box_shadow_probe_list, surface,
+                                                       &frame_info);
+            // Box (40,40 60x40), sigma 4: clipped inside, about half intensity
+            // just outside the edge, then a monotonic Gaussian falloff.
+            const int inside = red_at(70, 60);
+            const int edge = red_at(39, 60);
+            const int near = red_at(35, 60);
+            const int far = red_at(23, 60);
+            if (render_result == NKUI_OK &&
+                (inside > 8 || edge < 90 || edge > 140 || near >= edge || far >= near ||
+                 far > 8)) {
+                std::fprintf(stderr, "box-shadow probe inside=%d edge=%d near=%d far=%d\n",
+                             inside, edge, near, far);
+                result = 30;
+            }
+        }
+        if (!result && render_result == NKUI_OK && frames == 0) {
+            render_result = nkui_renderer_render_frame(renderer, drop_shadow_probe_list, surface,
+                                                       &frame_info);
+            // Half-transparent content (40,100 60x40), shadow offset 10 > 3 sigma.
+            // The top 10px must not pick up the content's edge row as shadow.
+            const int top_band = red_at(70, 104);
+            const int under = red_at(70, 125);
+            const int below = red_at(70, 145);
+            if (render_result == NKUI_OK && (top_band > 10 || under < 40 || below < 90)) {
+                std::fprintf(stderr, "drop-shadow probe top=%d under=%d below=%d\n", top_band,
+                             under, below);
+                result = 31;
+            }
+        }
         if (!result && render_result == NKUI_OK)
             render_result = nkui_renderer_render_frame(renderer, list, surface, &frame_info);
         if (render_result != NKUI_OK) {
@@ -885,6 +984,8 @@ int main(int argc, char **argv) {
     nkui_display_list_destroy(backdrop_list);
     nkui_display_list_destroy(custom_effect_list);
     nkui_display_list_destroy(box_shadow_list);
+    nkui_display_list_destroy(box_shadow_probe_list);
+    nkui_display_list_destroy(drop_shadow_probe_list);
     nkui_display_list_destroy(list);
     nkui_resource_destroy(text);
     nkui_resource_destroy(scale_text);
