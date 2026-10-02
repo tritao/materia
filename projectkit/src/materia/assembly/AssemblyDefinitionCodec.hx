@@ -176,6 +176,19 @@ class AssemblyDefinitionCodec {
 				throw 'Assembly has an invalid actuator "${actuator == null ? "" : actuator.id}"';
 			actuatorIds.set(actuator.id, true);
 		}
+		var encoders = definition.encoders == null ? [] : definition.encoders;
+		if (encoders.length > 4000) throw "Assembly has too many encoders";
+		var encoderIds = new Map<String, Bool>();
+		for (encoder in encoders) {
+			if (encoder == null || !validText(encoder.id) || encoderIds.exists(encoder.id) || movable.get(encoder.joint) == null ||
+				(encoder.kind != "incremental" && encoder.kind != "absolute") ||
+				!(encoder.counts > 0 && Math.isFinite(encoder.counts)))
+				throw 'Assembly has an invalid encoder "${encoder == null ? "" : encoder.id}"';
+			encoderIds.set(encoder.id, true);
+		}
+		for (actuator in actuators)
+			if (actuator.encoder != null && !encoderIds.exists(actuator.encoder))
+				throw 'Assembly actuator "${actuator.id}" names an unknown encoder "${actuator.encoder}"';
 		for (coupling in couplings) {
 			var seen = new Map<String, Bool>();
 			var current = coupling.target;

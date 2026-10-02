@@ -24,6 +24,11 @@ class Actuator {
    */
   public var drive:Null<ActuatorDrive> = null;
   /**
+   * The id of the `Encoder` that reads this motor, or empty for none. A servo's feedback comes from it
+   * (the servo drive's own `encoderCounts` is what models saved before encoders were sensors recorded).
+   */
+  public var encoder:String = "";
+  /**
    * Full steps in one turn of a stepper motor's rotor, 0 when this is not a stepper. A stepper's
    * actuator coordinate is the rotor angle in radians; microstepping is a property of the driver
    * wiring, so the deployment adds it. Setting it makes the actuator a stepper known only by its

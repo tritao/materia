@@ -639,6 +639,24 @@ class CadBridgeTests {
     check(servoDrive != null && servoDrive.kind() == "servo" && drives[1].planningEffort() == 1.8 &&
       drives[1].planningRate() == 500 && drives[1].servoStiffness == 12 && servoDrive.curve.torqueAt(400) < 1.8,
       "a servo's drive, peak torque and maximum speed reach the robot actuator");
+    // Encoders are sensors on joints: counts per millimetre on a sliding joint become per metre, per revolution on a
+    // turning one per radian, and a servo that names its encoder holds no count of its own.
+    var sensed = new AssemblyModel();
+    sensed.add("base");
+    sensed.add("slider");
+    sensed.connector("base", "mount", AssemblyFrames.identity());
+    sensed.connector("slider", "mount", AssemblyFrames.identity());
+    sensed.mateOnAxis("slide", "prismatic", "base", "mount", "slider", "mount",
+      {x: 0, y: 1, z: 0}, 0, {lower: 0, upper: 100, velocity: 20, effort: 50});
+    sensed.actuateDrive({id: "servo", joint: "slide", maxEffort: 0, maxRate: 0, drive: "servo", ratedTorque: 0.6,
+      peakTorque: 1.8, ratedSpeed: 300, maxSpeed: 500, encoder: "scale"});
+    sensed.addEncoder({id: "scale", joint: "slide", kind: "absolute", counts: 200, index: true});
+    var sensedModel = AssemblySimulationBridge.toRobotModel(sensed.definition("encoder-test"), parts).model;
+    check(sensedModel.encoders.length == 1 && sensedModel.encoders[0].countsPerUnit == 200000.0 &&
+      sensedModel.encoders[0].kind == robotkit.model.EncoderKind.Absolute && sensedModel.encoders[0].index &&
+      sensedModel.encoders[0].joint == sensedModel.joints[0].id, "an encoder's counts per millimetre reach the robot in counts per metre");
+    check(sensedModel.actuators[0].encoder == "scale" && sensedModel.encoderFor(sensedModel.actuators[0]) == sensedModel.encoders[0] &&
+      RobotRuntimeCompiler.validate(sensedModel).length == 0, "the servo's encoder is the sensor it names");
     // A coupling's stiffness, backlash and drag reach the robot coupling in SI units: a 100 N/mm drive on a
     // millimetre axis is 100000 N/m, 0.05 mm of backlash 5e-5 m, and a turning follower's drag is as given.
     var screwed = new AssemblyModel();

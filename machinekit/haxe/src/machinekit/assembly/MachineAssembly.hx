@@ -79,6 +79,8 @@ class MachineAssembly {
 	final drives:Array<machinekit.assembly.MachineAssemblyDescription.DriveRecord> = [];
 	/** Motors driving joints, by actuator id. */
 	final motors:Array<machinekit.assembly.MachineAssemblyDescription.MotorRecord> = [];
+	/** Encoders reading joints, by encoder id. */
+	final encoders:Array<machinekit.assembly.MachineAssemblyDescription.EncoderRecord> = [];
 	final massByDefinition:Map<String, machinekit.component.MassProperties> = [];
 
 	public function new() {}
@@ -171,6 +173,11 @@ class MachineAssembly {
 			motors: {
 				var saved = [for (motor in motors) copyMotor(motor, "")];
 				saved.sort((a, b) -> Reflect.compare(a.actuator, b.actuator));
+				saved.length == 0 ? null : saved;
+			},
+			encoders: {
+				var saved = [for (encoder in encoders) copyEncoder(encoder, "")];
+				saved.sort((a, b) -> Reflect.compare(a.encoder, b.encoder));
 				saved.length == 0 ? null : saved;
 			},
 			bomExtras: [for (entry in bomItems) {item: copyBomItem(entry.item), quantity: entry.quantity,
@@ -283,6 +290,9 @@ class MachineAssembly {
 		// Motors too: their actuators follow the motor parts as they are now.
 		if (description.machine.motors != null) for (motor in description.machine.motors)
 			result.addMotorRecord(copyMotor(motor, ""));
+		// Encoders after the motors they read, whose actuators they point at.
+		if (description.machine.encoders != null) for (encoder in description.machine.encoders)
+			result.addEncoderRecord(copyEncoder(encoder, ""));
 		for (connection in description.machine.portConnections)
 			result.connectPorts(connection.id, connection.fromInstance, connection.fromPort,
 				connection.toInstance, connection.toPort);
@@ -334,6 +344,10 @@ class MachineAssembly {
 		for (motor in motors) if (StringTools.startsWith(motor.actuator, prefix))
 			child.addMotorRecord({actuator: motor.actuator.substr(prefix.length), joint: motor.joint.substr(prefix.length),
 				motor: motor.motor.substr(prefix.length), volts: motor.volts, margin: motor.margin});
+		for (encoder in encoders) if (StringTools.startsWith(encoder.encoder, prefix))
+			child.addEncoderRecord({encoder: encoder.encoder.substr(prefix.length), joint: encoder.joint.substr(prefix.length),
+				part: encoder.part.substr(prefix.length),
+				actuator: encoder.actuator == null ? null : encoder.actuator.substr(prefix.length)});
 		for (drive in drives) if (StringTools.startsWith(drive.coupling, prefix))
 			{
 				var record:machinekit.assembly.MachineAssemblyDescription.DriveRecord = {coupling: drive.coupling.substr(prefix.length), kind: drive.kind,
@@ -371,6 +385,9 @@ class MachineAssembly {
 		target.mechanical.couplings = copy.couplings;
 		for (drive in drives) target.drives.push(copyDrive(drive, ""));
 		for (motor in motors) target.motors.push(copyMotor(motor, ""));
+		for (encoder in encoders) target.encoders.push(copyEncoder(encoder, ""));
+		if (mechanical.encoders != null) target.mechanical.encoders = [for (encoder in mechanical.encoders)
+			materia.assembly.AssemblyDefinitionFlattener.copyEncoder(encoder, encoder.id, encoder.joint)];
 		if (mechanical.actuators != null) target.mechanical.actuators = [for (actuator in mechanical.actuators)
 			copyActuator(actuator, "")];
 		for (entry in included) target.included.push({id: entry.id,
@@ -606,6 +623,7 @@ class MachineAssembly {
 				coupling.ratio, coupling.offset, coupling.efficiency);
 		for (drive in assembly.drives) drives.push(copyDrive(drive, id));
 		for (motor in assembly.motors) addMotorRecord(copyMotor(motor, id));
+		for (encoder in assembly.encoders) addEncoderRecord(copyEncoder(encoder, id));
 		for (connection in assembly.portConnections)
 			connectPorts(join(id, connection.id), join(id, connection.fromInstance),
 				connection.fromPort, join(id, connection.toInstance), connection.toPort);
@@ -844,15 +862,53 @@ class MachineAssembly {
 		motors.push(copyMotor(record, ""));
 	}
 
+	/**
+	 * Encoder member `part` (a shaft encoder, a linear scale, or any part that is an `EncoderPart`) reads
+	 * joint `joint`, as encoder `id`. Which joint it is on says what it sees: a motor's own joint, motor-side
+	 * (lost steps), or a joint the load moves through a drive, load-side (where the load is). `actuator` names
+	 * the motor it is the feedback of, when it is: that actuator then points at this encoder and holds no
+	 * count of its own. Rebuilding the assembly asks the part again.
+	 */
+	public function addEncoder(id:String, joint:String, part:String, ?actuator:String):Void
+		addEncoderRecord({encoder: id, joint: joint, part: part, actuator: actuator});
+
+	function addEncoderRecord(record:machinekit.assembly.MachineAssemblyDescription.EncoderRecord):Void {
+		var member = requireMember(record.part);
+		if (!Std.isOfType(member, machinekit.motion.EncoderPart)) throw 'Encoder "${record.encoder}": "${record.part}" is not an encoder part';
+		var part:machinekit.motion.EncoderPart = cast member;
+		if (mechanical.encoders == null) mechanical.encoders = [];
+		for (existing in mechanical.encoders) if (existing.id == record.encoder)
+			throw 'Duplicate assembly encoder "${record.encoder}"';
+		mechanical.encoders.push(part.encoder(record.encoder, record.joint));
+		if (record.actuator != null) {
+			var found = false;
+			if (mechanical.actuators != null) for (actuator in mechanical.actuators) if (actuator.id == record.actuator) {
+				actuator.encoder = record.encoder;
+				actuator.encoderCounts = null;
+				found = true;
+			}
+			if (!found) throw 'Encoder "${record.encoder}" reads unknown motor "${record.actuator}"';
+		}
+		encoders.push(copyEncoder(record, ""));
+	}
+
+	static function copyEncoder(encoder:machinekit.assembly.MachineAssemblyDescription.EncoderRecord,
+			prefix:String):machinekit.assembly.MachineAssemblyDescription.EncoderRecord
+		return {encoder: join(prefix, encoder.encoder), joint: join(prefix, encoder.joint), part: join(prefix, encoder.part),
+			actuator: encoder.actuator == null ? null : join(prefix, encoder.actuator)};
+
 	static function copyMotor(motor:machinekit.assembly.MachineAssemblyDescription.MotorRecord,
 			prefix:String):machinekit.assembly.MachineAssemblyDescription.MotorRecord
 		return {actuator: join(prefix, motor.actuator), joint: join(prefix, motor.joint),
 			motor: join(prefix, motor.motor), volts: motor.volts, margin: motor.margin};
 
 	static function copyActuator(actuator:materia.assembly.AssemblyDefinition.AssemblyActuator,
-			prefix:String):materia.assembly.AssemblyDefinition.AssemblyActuator
-		return materia.assembly.AssemblyDefinitionFlattener.copyActuator(actuator, join(prefix, actuator.id),
+			prefix:String):materia.assembly.AssemblyDefinition.AssemblyActuator {
+		var copy = materia.assembly.AssemblyDefinitionFlattener.copyActuator(actuator, join(prefix, actuator.id),
 			join(prefix, actuator.joint));
+		if (actuator.encoder != null) copy.encoder = join(prefix, actuator.encoder);
+		return copy;
+	}
 
 	static function copyDrive(drive:machinekit.assembly.MachineAssemblyDescription.DriveRecord,
 			prefix:String):machinekit.assembly.MachineAssemblyDescription.DriveRecord
@@ -1074,6 +1130,9 @@ class MachineAssembly {
 				coupling.stiffness, coupling.backlash, coupling.drag);
 		if (mechanical.actuators != null) for (actuator in mechanical.actuators)
 			model.actuateDrive(copyActuator(actuator, prefix));
+		if (mechanical.encoders != null) for (encoder in mechanical.encoders)
+			model.addEncoder(materia.assembly.AssemblyDefinitionFlattener.copyEncoder(encoder, join(prefix, encoder.id),
+				join(prefix, encoder.joint)));
 	}
 
 	public function components():Array<MachineAssemblyComponent>

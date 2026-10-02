@@ -87,6 +87,18 @@ class RobotModelCodec {
       if (actuators.exists(actuator.id)) throw 'Duplicate robot actuator ${actuator.id}';
       actuators.set(actuator.id, true);
     }
+    var encoderIds = new Map<String, Bool>();
+    for (encoder in model.encoders) {
+      if (encoder == null) throw "Robot encoder is null";
+      requireText(encoder.id, "encoder ID");
+      if (encoderIds.exists(encoder.id)) throw 'Duplicate robot encoder ${encoder.id}';
+      encoderIds.set(encoder.id, true);
+      if (!joints.exists(encoder.joint)) throw 'Encoder ${encoder.id} references unknown joint ${encoder.joint}';
+      finite(encoder.countsPerUnit, "encoder countsPerUnit");
+    }
+    for (actuator in model.actuators)
+      if (actuator.encoder != "" && !encoderIds.exists(actuator.encoder))
+        throw 'Actuator ${actuator.id} references unknown encoder ${actuator.encoder}';
     var couplingIds = new Map<String, Bool>();
     var followerIds = new Map<String, Bool>();
     for (coupling in model.couplings) {
@@ -120,7 +132,7 @@ class RobotModelCodec {
     if (model.forkMechanism != null) validateFork(model.forkMechanism, joints);
     var mobile = model.mobileBase == null ? null : encodeMobile(model.mobileBase);
     var fork = model.forkMechanism == null ? null : encodeFork(model.forkMechanism);
-    return Bytes.ofString(Json.stringify({
+    var document:Dynamic = {
       schemaVersion: VERSION,
       name: model.name,
       collisionApproximation: collisionName(model.collisionApproximation),
@@ -165,7 +177,25 @@ class RobotModelCodec {
         linkA: pair.linkA, shapeA: pair.shapeA, linkB: pair.linkB, shapeB: pair.shapeB,
         surface: encodeSurface(pair.surface)
       }]
-    }));
+    };
+    // Written only when there are some, so models without encoders keep their bytes.
+    if (model.encoders.length > 0) document.encoders = [for (encoder in model.encoders) encodeEncoder(encoder)];
+    return Bytes.ofString(Json.stringify(document));
+  }
+
+  static function encodeEncoder(encoder:Encoder):Dynamic {
+    var record:Dynamic = {id: encoder.id, joint: encoder.joint, kind: encoder.kind, countsPerUnit: encoder.countsPerUnit};
+    if (encoder.index) record.index = true;
+    return record;
+  }
+
+  static function readEncoder(record:Dynamic):Encoder {
+    var kind = text(record, "kind");
+    if (kind != EncoderKind.Incremental && kind != EncoderKind.Absolute) throw 'Unsupported encoder kind $kind';
+    var counts = number(record, "countsPerUnit");
+    if (!(counts > 0.0)) throw "Encoder countsPerUnit must be positive";
+    return new Encoder(text(record, "id"), text(record, "joint"), kind, counts,
+      Reflect.hasField(record, "index") && Reflect.field(record, "index") == true);
   }
 
   public static function decode(bytes:Bytes):RobotModel {
@@ -263,6 +293,19 @@ class RobotModelCodec {
             throw 'Actuator ${actuator.id} references unknown joint $jointId';
       }
       model.addActuator(actuator);
+    }
+    if (Reflect.hasField(root, "encoders")) {
+      var encoderIds = new Map<String, Bool>();
+      for (record in array(root, "encoders")) {
+        var encoder = readEncoder(record);
+        if (encoderIds.exists(encoder.id)) throw 'Duplicate robot encoder ${encoder.id}';
+        encoderIds.set(encoder.id, true);
+        if (!joints.exists(encoder.joint)) throw 'Encoder ${encoder.id} references unknown joint ${encoder.joint}';
+        model.addEncoder(encoder);
+      }
+      for (actuator in model.actuators)
+        if (actuator.encoder != "" && !encoderIds.exists(actuator.encoder))
+          throw 'Actuator ${actuator.id} references unknown encoder ${actuator.encoder}';
     }
 
     var frames = new Map<String, Frame>();
@@ -395,6 +438,7 @@ class RobotModelCodec {
           {kind: "simple", jointId: jointId, ratio: ratio, offset: offset};
       }
     };
+    if (value.encoder != "") record.encoder = value.encoder;
     // A bare stepper is its steps alone, as before drive kinds; anything with ratings gets a drive.
     var drive = value.drive;
     if (drive != null) {
@@ -507,6 +551,8 @@ class RobotModelCodec {
     // Models saved before drive kinds have no `drive`; a stepper's steps stand alone.
     if (Reflect.hasField(value, "drive") && Reflect.field(value, "drive") != null)
       actuator.drive = readActuatorDrive(Reflect.field(value, "drive"));
+    if (Reflect.hasField(value, "encoder") && Reflect.field(value, "encoder") != null)
+      actuator.encoder = text(value, "encoder");
     return actuator;
   }
 

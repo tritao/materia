@@ -31,6 +31,8 @@ class MotionKitBootstrapTests {
     if (Sys.getEnv("MOTIONKIT_PLANCHECK_ONLY") == "1") {
       new PlanCheckTests().testPlanCheck();
       new PlanCheckTests().testStepperSlip();
+      new PlanCheckTests().testEncoderSeesStepperSlip();
+      new PlanCheckTests().testLoadSideEncoderReportsPathError();
       new PlanCheckTests().testCompilerRunsPlanCheck();
       Sys.println('Plan check tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
@@ -49,6 +51,8 @@ class MotionKitBootstrapTests {
     }
     new PlanCheckTests().testPlanCheck();
     new PlanCheckTests().testStepperSlip();
+    new PlanCheckTests().testEncoderSeesStepperSlip();
+    new PlanCheckTests().testLoadSideEncoderReportsPathError();
     new PlanCheckTests().testCompilerRunsPlanCheck();
     processTests.testPoseProcessPath();
     processTests.testMotionEventContracts();

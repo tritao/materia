@@ -14,6 +14,8 @@ class RobotModel {
   /** Mechanical joint-to-joint relations, independent of actuator transmissions. */
   public final couplings:Array<JointCoupling> = [];
   public final sensors:Array<Sensor> = [];
+  /** Encoders on joints; they are read from joint positions rather than compiled into the runtime. */
+  public final encoders:Array<Encoder> = [];
   /** Explicit contacts between link collision shapes. */
   public final contactPairs:Array<ContactPair> = [];
   public final frames:Array<Frame> = [];
@@ -51,6 +53,29 @@ class RobotModel {
   public function addActuator(actuator:Actuator):Actuator {
     actuators.push(actuator);
     return actuator;
+  }
+
+  public function addEncoder(encoder:Encoder):Encoder {
+    encoders.push(encoder);
+    return encoder;
+  }
+
+  /**
+   * The encoder that reads `actuator`: the one it names, or, for a servo saved before encoders were
+   * sensors, one made from the servo drive's own count (incremental, on the actuator's joint).
+   */
+  public function encoderFor(actuator:Actuator):Null<Encoder> {
+    if (actuator.encoder != "") {
+      for (encoder in encoders) if (encoder.id == actuator.encoder) return encoder;
+      return null;
+    }
+    var drive = actuator.drive;
+    if (drive == null || !Std.isOfType(drive, ActuatorDrive.ServoDrive)) return null;
+    var counts = cast(drive, ActuatorDrive.ServoDrive).encoderCounts;
+    if (!(counts > 0.0)) return null;
+    return switch actuator.transmission {
+      case SimpleTransmission(jointId, _, _): Encoder.perRevolution(actuator.id + ".encoder", jointId, EncoderKind.Incremental, counts);
+    };
   }
 
   public function addCoupling(coupling:JointCoupling):JointCoupling {
@@ -218,6 +243,18 @@ class RobotModel {
             errors.push('actuator ${actuator.id} has an invalid transmission');
       }
     }
+    var encoderIds = new Map<String, Bool>();
+    for (encoder in encoders) {
+      if (encoder == null) { errors.push("robot has a null encoder"); continue; }
+      if (encoderIds.exists(encoder.id)) errors.push('duplicate encoder ID ${encoder.id}');
+      encoderIds.set(encoder.id, true);
+      var onJoint = false;
+      for (joint in joints) if (joint.id == encoder.joint) onJoint = true;
+      if (!onJoint) errors.push('encoder ${encoder.id} references unknown joint ${encoder.joint}');
+    }
+    for (actuator in actuators)
+      if (actuator != null && actuator.encoder != "" && !encoderIds.exists(actuator.encoder))
+        errors.push('actuator ${actuator.id} references unknown encoder ${actuator.encoder}');
     var couplingIds = new Map<String, Bool>();
     var followers = new Map<String, Bool>();
     for (coupling in couplings) {

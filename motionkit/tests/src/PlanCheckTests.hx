@@ -18,7 +18,13 @@ import motionkit.trajectory.ExecutionPlan;
 import motionkit.trajectory.PlanDiagnostic;
 import motionkit.trajectory.Trajectory;
 import motionkit.trajectory.ValidationLimits;
+import motionkit.robot.ManipulatorMotion;
 import robotkit.model.Actuator;
+import robotkit.model.Encoder;
+import robotkit.model.EncoderKind;
+import robotkit.runtime.EncoderMonitor;
+import robotkit.runtime.SimulationHarness;
+import robotkit.world.SimulatedRobot;
 import robotkit.model.ActuatorDrive.ServoDrive;
 import robotkit.model.ActuatorDrive.StepperDrive;
 import robotkit.model.Joint;
@@ -270,6 +276,118 @@ class PlanCheckTests extends MotionKitTestSupport {
   }
 
   /**
+   * Runs a program through a simulated XYZ gantry whose steppers are `weak` (they cannot hold the move, so the plan
+   * check predicts slip) or strong, with an encoder on the X motor, and returns what the encoder monitor saw.
+   */
+  function gantryRun(weak:Bool):GantryRun {
+    var blueprint = MachineKitRobotCompiler.compileXYZGantry(new LinearAxis(23, 10, 80), new LinearAxis(23, 10, 80),
+      new LinearAxis(23, 10, 80), 0.1, 0.4);
+    var model = blueprint.model;
+    for (actuator in model.actuators) {
+      actuator.maxEffort = weak ? 0.002 : 1e7;
+      actuator.maxRate = weak ? 100.0 : 1e5;
+      var torque = weak ? 0.004 : 1e7;
+      actuator.drive = new StepperDrive(200.0, 3e-5, torque, new TorqueSpeedCurve([0.0, actuator.maxRate], [torque, torque]));
+    }
+    // A linear scale reads the X carriage: the motor drives that joint directly, so it is motor-side.
+    model.addEncoder(Encoder.perMillimetre("x.scale", "x", EncoderKind.Incremental, 200.0));
+    var ids = [for (joint in model.joints) joint.id];
+    var solver = new AxisKinematics(blueprint);
+    var limits = new ValidationLimits(ids.length, Int64.ofInt(blueprint.runtime.revision),
+      Int64.ofInt(blueprint.runtime.calibrationRevision));
+    for (joint in 0...ids.length) {
+      limits.position(joint, -1.0, 1.0);
+      limits.velocity(joint, 0.1);
+      limits.acceleration(joint, 0.4);
+      limits.jerk(joint, 20.0);
+    }
+    var compiler = new ProgramCompiler(solver, limits, "work", [for (_ in ids) 0.1], [for (_ in ids) 0.4], [for (_ in ids) 20.0],
+      StartTolerances.uniform(ids.length, 0.00001, 0.02, 0.02));
+    compiler.planCheck = new PlanCheck(model, ids, new PlanCheckOptions());
+    var goal = [0.05, 0.0, 0.0];
+    var moving = new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(goal), new MotionOptions(), Blend.ExactStop)]);
+    var harness = new SimulationHarness(0.01);
+    var runtime = harness.simulation.addRobot(blueprint.runtime);
+    var robot = new SimulatedRobot("gantry", runtime, model.name, [for (link in model.links) link.name],
+      [for (joint in model.joints) joint.name]);
+    var motion = new ManipulatorMotion(robot, compiler, function(_) return null, function() return {events: [], overflow: false}, [0, 1, 2]);
+    var slip = new StepperSlip([], ["x" => 0, "y" => 1, "z" => 2], (joint, offset) -> harness.simulation.setJointSlip(0, joint, offset));
+    motion.slip = slip;
+    var monitor = new EncoderMonitor(model, [0.0, 0.0, 0.0]);
+    motion.run(moving);
+    var tick = 0, guard = 0;
+    var snapshot = robot.snapshot();
+    while (!motion.completed && motion.failure == null && guard++ < 3000) {
+      motion.update(0.01);
+      harness.step(Int64.ofInt(++tick));
+      snapshot = robot.snapshot();
+      monitor.observe([for (joint in 0...3) snapshot.positions.get(joint)], [for (joint in 0...3) snapshot.setpointPositions.get(joint)],
+        tick * 0.01);
+    }
+    var result = new GantryRun(monitor, slip, motion.completed, motion.failure, snapshot.positions.get(0),
+      snapshot.setpointPositions.get(0));
+    result.diagnostics = [for (diagnostic in motion.checks.diagnostics) diagnostic.toString()];
+    harness.dispose();
+    return result;
+  }
+
+  /**
+   * A stepper pushed over its curve slips in the simulation, keeps the error, and a motor-side encoder sees it
+   * against the command. A plan the motors can hold slips nowhere and the encoder stays quiet.
+   */
+  public function testEncoderSeesStepperSlip():Void {
+    var weak = gantryRun(true);
+    check(weak.completed, 'the weak machine runs its program (${weak.failure})');
+    check(weak.slip.slipped() && weak.slip.lost("x") > 0.0, 'its X axis lost distance: ${weak.slip.lost("x")}');
+    check(weak.position < weak.commanded - 1e-4, 'the simulated axis ends behind its command: ${weak.position} against ${weak.commanded}');
+    near(weak.commanded - weak.position, weak.slip.lost("x"), "by the distance the plan check predicted", 1e-5);
+    check(weak.monitor.faults(), "the encoder faults");
+    var found = weak.monitor.findings[0];
+    check(found.kind == robotkit.runtime.EncoderMonitor.EncoderFindingKind.LostSteps && found.encoder == "x.scale" && found.joint == "x",
+      'and names lost steps on the encoder\'s joint: ${found}');
+    check(found.motor.length > 0 && found.steps > robotkit.runtime.EncoderMonitor.STEPPER_BOUND_STEPS && found.error < 0.0,
+      'with the motor, how many steps, and the sign: ${found.describe()}');
+    var seen = weak.monitor.pathError("x.scale");
+    near(Math.abs(seen.last), weak.slip.lost("x"), "the encoder reads the error that was kept", 5e-6);
+
+    var strong = gantryRun(false);
+    check(strong.completed && !strong.slip.slipped() && !strong.monitor.faults(),
+      'motors that hold the move lose nothing and the encoder is quiet: ${strong.completed} ${strong.failure} ${strong.slip.lost("x")} ${strong.monitor.findings} ${strong.diagnostics}');
+    near(strong.position, strong.commanded, "the axis ends on its command", 1e-6);
+  }
+
+  /**
+   * A motor-side encoder cannot see what sits between the motor and the load, a load-side one can: the same
+   * command with the load 0.3 mm short of it (belt stretch) is no fault for the motor and a path error for the scale.
+   */
+  public function testLoadSideEncoderReportsPathError():Void {
+    var model = machine([1.0, 0.0, 0.0], false);
+    model.addEncoder(Encoder.perRevolution("motor.encoder", "screw", EncoderKind.Incremental, 4096.0, true));
+    model.addEncoder(Encoder.perMillimetre("axis.scale", "slide", EncoderKind.Absolute, 1000.0));
+    var monitor = new EncoderMonitor(model, [0.0, 0.0]);
+    check(monitor.motorSide(0) && !monitor.motorSide(1), "the encoder on the motor's joint is motor-side and the scale on the load's is load-side");
+    // The slide is commanded to 20 mm and the screw to the matching turns, but the load only gets 19.7 mm.
+    var turns = 0.02 * SCREW_RATIO;
+    for (step in 1...11) {
+      var fraction = step / 10.0;
+      monitor.observe([0.0197 * fraction, turns * fraction], [0.02 * fraction, turns * fraction], step * 0.01);
+    }
+    check(!monitor.faults(), "a motor that is where it was told has not lost steps");
+    var path = monitor.pathError("axis.scale");
+    near(path.last, -0.0003, "the load-side scale reports the path error", 1e-6);
+    check(path.peak >= Math.abs(path.last) - 1e-12 && path.rms > 0.0 && path.rms <= path.peak, "with its worst and RMS");
+    near(monitor.pathError("motor.encoder").peak, 0.0, "while the motor-side encoder sees none of it", 1e-3);
+    // Lost steps show on the motor-side encoder: the screw ends 40 full steps short of its command.
+    var lost = 40.0 * 2.0 * Math.PI / 200.0;
+    monitor.observe([0.02, turns - lost], [0.02, turns], 0.2);
+    check(monitor.faults() && monitor.findings[0].encoder == "motor.encoder" && Math.abs(monitor.findings[0].steps - 40.0) < 1.0,
+      'and names about 40 lost steps: ${monitor.findings}');
+    // Counts are whole counts: the reading is the position to the nearest one.
+    var reading = monitor.readings[1];
+    near(reading.position(), Math.fround(0.02 * 1000.0 * 1000.0) / 1e6, "an absolute scale reports whole counts", 1e-12);
+  }
+
+  /**
    * The compiler runs the check on every plan it makes, reports it on the plan, and rejects the plan
    * only when asked to.
    */
@@ -318,5 +436,25 @@ class PlanCheckTests extends MotionKitTestSupport {
     var rejected = false;
     try compiler(true).compile(moving, start, Int64.ofInt(3)) catch (error:Dynamic) rejected = Std.string(error).indexOf("plan check") >= 0;
     check(rejected, "a compiler set to reject refuses the plan");
+  }
+}
+
+/** What a simulated gantry run left: the encoder monitor, the slip it suffered, and where its X axis ended against its command. */
+private class GantryRun {
+  public final monitor:EncoderMonitor;
+  public final slip:StepperSlip;
+  public final completed:Bool;
+  public final failure:Null<String>;
+  public final position:Float;
+  public final commanded:Float;
+  public var diagnostics:Array<String> = [];
+
+  public function new(monitor:EncoderMonitor, slip:StepperSlip, completed:Bool, failure:Null<String>, position:Float, commanded:Float) {
+    this.monitor = monitor;
+    this.slip = slip;
+    this.completed = completed;
+    this.failure = failure;
+    this.position = position;
+    this.commanded = commanded;
   }
 }

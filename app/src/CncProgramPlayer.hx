@@ -31,6 +31,7 @@ import motionkit.robot.PlanCheck;
 import motionkit.robot.PlanCheck.PlanCheckOptions;
 import motionkit.robot.PlanCheckSummary;
 import motionkit.robot.StepperSlip;
+import robotkit.runtime.EncoderMonitor;
 import nativekit.sim.SimSession;
 import toolpathkit.motion.MachineBinding;
 import toolpathkit.motion.ToolpathMotion;
@@ -140,6 +141,12 @@ class CncProgramPlayer implements SessionMember {
 	 * check passes lose nothing.
 	 */
 	public final slip:StepperSlip;
+	/**
+	 * What the machine's encoders read against the commanded positions: a motor-side encoder names the steps a
+	 * stepper lost, a load-side one reports the path error. Monitoring only; it has nothing to read when the
+	 * machine has no encoders.
+	 */
+	public final encoders:EncoderMonitor;
 	/** The G-code line the machine is executing; 0 between lines. */
 	public var currentLine(default, null):Int = 0;
 	/** Speed of every move, as a fraction of the program's. */
@@ -275,6 +282,7 @@ class CncProgramPlayer implements SessionMember {
 		var robotIndex = spindleLink.robotIndex;
 		var axisJoint = new Map<String, Int>();
 		for (index in 0...job.axes.length) axisJoint.set(job.axes[index], planning.indices[index]);
+		encoders = new EncoderMonitor(robot.model, [for (_ in robot.model.joints) 0.0]);
 		slip = new StepperSlip(robot.robot.description().couplings, axisJoint,
 			(joint, offset) -> simulation.setJointSlip(robotIndex, joint, offset));
 		newMotion = () -> {
@@ -348,6 +356,10 @@ class CncProgramPlayer implements SessionMember {
 			clock = Sys.time();
 		}
 		motion.update(session.fixedTimestep());
+		if (encoders.readings.length > 0) {
+			var seen = robot.robot.snapshot();
+			encoders.observe(seen.positions.toArray(), seen.setpointPositions.toArray(), session.simulationTime());
+		}
 		var spent = Sys.time() - clock;
 		motionSeconds += spent;
 		slowestUpdate = Math.max(slowestUpdate, spent);
@@ -457,6 +469,7 @@ class CncProgramPlayer implements SessionMember {
 	/** The session is back at its start, and the robot with it: run the program again on fresh stock. */
 	public function reset():Void {
 		slip.reset();
+		encoders.reset([for (_ in robot.model.joints) 0.0]);
 		motion = newMotion();
 		if (speedOverride != 1.0) motion.setSpeedOverride(speedOverride);
 		restartRequest = null;

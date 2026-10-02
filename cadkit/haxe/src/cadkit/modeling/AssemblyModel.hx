@@ -207,6 +207,16 @@ class AssemblyModel {
 		data.actuators.push(materia.assembly.AssemblyDefinitionFlattener.copyActuator(actuator, actuator.id, actuator.joint));
 	}
 
+	/**
+	 * Puts an encoder on a joint: `kind` is "incremental" or "absolute", `counts` per revolution on a turning joint
+	 * and per millimetre on a sliding one. An encoder on a motor's joint is motor-side, and on a joint the load
+	 * moves through a drive it is load-side.
+	 */
+	public function addEncoder(encoder:materia.assembly.AssemblyDefinition.AssemblyEncoder):Void {
+		if (data.encoders == null) data.encoders = [];
+		data.encoders.push(materia.assembly.AssemblyDefinitionFlattener.copyEncoder(encoder, encoder.id, encoder.joint));
+	}
+
 	/** Exports reusable definitions and explicit tree/closure semantics. */
 	public function definition(id:String = "assembly"):AssemblyDefinition {
 		var copy:AssemblyDefinition = JsonWire.decode(JsonWire.encode(data));

@@ -272,6 +272,17 @@ import machinekit.component.PortInterface;
 	@:id(5) var margin:Float;
 }
 
+/**
+ * An encoder part reading a joint (see `MachineAssembly.addEncoder`), and the motor's actuator it
+ * reads when it is that motor's feedback.
+ */
+@:wire typedef EncoderRecord = {
+	@:id(1) var encoder:String;
+	@:id(2) var joint:String;
+	@:id(3) var part:String;
+	@:id(4) @:optional var actuator:Null<String>;
+}
+
 @:wire typedef AssemblySideRecord = {
 	@:id(1) var members:ReadOnlyArray<MemberRecord>;
 	@:id(2) var portConnections:ReadOnlyArray<PortConnectionRecord>;
@@ -286,6 +297,7 @@ import machinekit.component.PortInterface;
 	@:id(11) var included:ReadOnlyArray<IncludedRecord>;
 	@:id(12) @:optional var drives:ReadOnlyArray<DriveRecord>;
 	@:id(13) @:optional var motors:ReadOnlyArray<MotorRecord>;
+	@:id(14) @:optional var encoders:ReadOnlyArray<EncoderRecord>;
 }
 
 /** Mechanical definition plus the MachineKit facts keyed by occurrence ID. */

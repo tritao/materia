@@ -18,6 +18,8 @@ import robotkit.model.JointCoupling;
 import robotkit.model.Transmission;
 import robotkit.model.Actuator;
 import robotkit.model.ActuatorDrive;
+import robotkit.model.Encoder;
+import robotkit.model.EncoderKind;
 import robotkit.model.TorqueSpeedCurve;
 import robotkit.model.RobotDriveConfiguration;
 import robotkit.model.RobotMobileConfiguration;
@@ -294,9 +296,24 @@ class AssemblySimulationBridge {
           actuator.encoderCounts == null ? 0.0 : actuator.encoderCounts, curve);
       if (actuator.servoStiffness != null) added.servoStiffness = actuator.servoStiffness;
       if (actuator.servoDamping != null) added.servoDamping = actuator.servoDamping;
+      // The encoder that reads the motor is its own sensor; a servo that names one does not also hold a count.
+      if (actuator.encoder != null) added.encoder = actuator.encoder;
       model.addActuator(added);
       if (actuator.rotorInertia != null)
         driven.armature += edge.type == AssemblyJointType.Prismatic ? 0.0 : actuator.rotorInertia;
+    }
+    // Encoders: sensors on joints. Counts per millimetre on a sliding joint, per revolution on a turning one.
+    if (definition.encoders != null) for (encoder in definition.encoders) {
+      var edge:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
+      for (candidate in definition.joints) if (candidate.id == encoder.joint) edge = candidate;
+      var onJoint:Null<Joint> = null;
+      for (joint in model.joints) if (joint.id == encoder.joint) onJoint = joint;
+      if (edge == null || onJoint == null) throw 'Assembly encoder "${encoder.id}" reads no simulated joint';
+      var kind:EncoderKind = encoder.kind;
+      var index = encoder.index == true;
+      model.addEncoder(edge.type == AssemblyJointType.Prismatic
+        ? Encoder.perMillimetre(encoder.id, onJoint.id, kind, encoder.counts, index)
+        : Encoder.perRevolution(encoder.id, onJoint.id, kind, encoder.counts, index));
     }
     if (mobileBase != null) {
       for (wheel in [mobileBase.leftWheel, mobileBase.rightWheel])
