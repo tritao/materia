@@ -2,6 +2,7 @@ package robotkit.model;
 
 import haxe.Json;
 import haxe.io.Bytes;
+import robotkit.model.ActuatorDrive;
 import robotkit.model.CollisionShape;
 import robotkit.model.Transmission;
 
@@ -372,21 +373,57 @@ class RobotModelCodec {
     return shape;
   }
 
-  static function encodeActuator(value:Actuator):Dynamic return {
-    id: value.id, maxEffort: value.maxEffort, maxRate: value.maxRate,
-    servoStiffness: value.servoStiffness, servoDamping: value.servoDamping,
-    fullStepsPerRevolution: value.fullStepsPerRevolution,
-    transmission: switch value.transmission {
-      case SimpleTransmission(jointId, ratio, offset):
-        {kind: "simple", jointId: jointId, ratio: ratio, offset: offset};
+  static function encodeActuator(value:Actuator):Dynamic {
+    var record:Dynamic = {
+      id: value.id, maxEffort: value.maxEffort, maxRate: value.maxRate,
+      servoStiffness: value.servoStiffness, servoDamping: value.servoDamping,
+      fullStepsPerRevolution: value.fullStepsPerRevolution,
+      transmission: switch value.transmission {
+        case SimpleTransmission(jointId, ratio, offset):
+          {kind: "simple", jointId: jointId, ratio: ratio, offset: offset};
+      }
+    };
+    // A bare stepper is its steps alone, as before drive kinds; anything with ratings gets a drive.
+    var drive = value.drive;
+    if (drive != null) {
+      if (Std.isOfType(drive, StepperDrive)) {
+        var stepper:StepperDrive = cast drive;
+        if (stepper.hasTorqueData()) record.drive = {kind: "stepper", fullStepsPerRevolution: stepper.fullStepsPerRevolution,
+          rotorInertia: stepper.rotorInertia, holdingTorque: stepper.holdingTorque, curve: stepper.curve.flatten()};
+      } else if (Std.isOfType(drive, ServoDrive)) {
+        var servo:ServoDrive = cast drive;
+        record.drive = {kind: "servo", ratedTorque: servo.ratedTorque, peakTorque: servo.peakTorqueValue,
+          ratedSpeed: servo.ratedSpeed, maxSpeed: servo.maxSpeedValue, rotorInertia: servo.rotorInertia,
+          encoderCounts: servo.encoderCounts, curve: servo.curve.flatten()};
+      } else throw 'Actuator ${value.id} has an unsupported drive';
     }
-  };
+    return record;
+  }
+
+  static function readActuatorDrive(record:Dynamic):ActuatorDrive {
+    var curveValues:Dynamic = required(record, "curve");
+    if (!Std.isOfType(curveValues, Array)) throw "Invalid RobotModel field curve";
+    var curve = TorqueSpeedCurve.unflatten([for (entry in (cast curveValues : Array<Dynamic>)) {
+      if (!Std.isOfType(entry, Int) && !Std.isOfType(entry, Float)) throw "Invalid RobotModel field curve";
+      finite(entry, "curve");
+    }]);
+    return switch text(record, "kind") {
+      case "stepper": new StepperDrive(number(record, "fullStepsPerRevolution"), nonNegative(number(record, "rotorInertia"), "drive rotorInertia"),
+        nonNegative(number(record, "holdingTorque"), "drive holdingTorque"), curve);
+      case "servo": new ServoDrive(number(record, "ratedTorque"), number(record, "peakTorque"), number(record, "ratedSpeed"),
+        number(record, "maxSpeed"), nonNegative(number(record, "rotorInertia"), "drive rotorInertia"),
+        nonNegative(number(record, "encoderCounts"), "drive encoderCounts"), curve);
+      case kind: throw 'Unsupported actuator drive kind $kind';
+    };
+  }
 
   static function validateActuator(value:Actuator, joints:Map<String, Bool>):Void {
     if (value == null) throw "Robot actuator is null";
     nonNegative(value.servoStiffness, "actuator servoStiffness");
     nonNegative(value.servoDamping, "actuator servoDamping");
     nonNegative(value.fullStepsPerRevolution, "actuator fullStepsPerRevolution");
+    if (value.drive != null && !Std.isOfType(value.drive, StepperDrive) && !Std.isOfType(value.drive, ServoDrive))
+      throw 'Actuator ${value.id} has an unsupported drive';
     requireText(value.id, "actuator ID");
     finite(value.maxEffort, "actuator maxEffort");
     finite(value.maxRate, "actuator maxRate");
@@ -455,6 +492,9 @@ class RobotModelCodec {
     // Absent in models saved before steppers were recorded: not a stepper.
     if (Reflect.hasField(value, "fullStepsPerRevolution"))
       actuator.fullStepsPerRevolution = nonNegative(number(value, "fullStepsPerRevolution"), "actuator fullStepsPerRevolution");
+    // Models saved before drive kinds have no `drive`; a stepper's steps stand alone.
+    if (Reflect.hasField(value, "drive") && Reflect.field(value, "drive") != null)
+      actuator.drive = readActuatorDrive(Reflect.field(value, "drive"));
     return actuator;
   }
 

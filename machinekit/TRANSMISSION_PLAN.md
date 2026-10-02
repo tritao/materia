@@ -316,6 +316,8 @@ one place.
 
 ### X6 — Drive kinds, plan checks and drive-aware simulation
 
+Status: X6a (drive kinds) done, see below; X6b, X6 gate and X6c follow.
+
 Steppers and servos fail differently, so an actuator names its drive kind
 instead of carrying bare numbers. Drive-level behaviour only: no current
 loops, PWM or thermal mass.
@@ -329,6 +331,30 @@ loops, PWM or thermal mass.
     drive (ratio and efficiency).
   - Both share a torque–speed curve (a few points), so `coupledLimits`
     derives limits the same way for each.
+- **X6a, what was built.** `robotkit.model.ActuatorDrive` (module with
+  `StepperDrive` and `ServoDrive`) and `TorqueSpeedCurve` (speed/torque points joined
+  by lines, torque held below the first speed and zero above the last).
+  `Actuator.drive` is null for a bare effort and rate. `Actuator.fullStepsPerRevolution`
+  is now a property of the stepper drive (setting it makes a steps-only stepper), so the
+  device binding and older callers are unchanged. `maxEffort`/`maxRate` stay what a
+  planner may rely on: a stepper's usable share of holding torque and the speed it holds
+  it to, a servo's peak torque and maximum speed (`planningEffort()`/`planningRate()`
+  fall back to the drive's peak and maximum when a servo leaves them zero).
+  `RobotModel.coupledLimits` reads those, so steppers derive the same numbers as
+  before. A servo's gains stay on the actuator (`servoStiffness`, `servoDamping`).
+  The assembly format's `AssemblyActuator` gained optional `drive`, `torqueSpeed`
+  (alternating speed and torque), `holdingTorque`, `ratedTorque`, `peakTorque`,
+  `ratedSpeed`, `maxSpeed`, `encoderCounts` and the gains; CadKit's
+  `AssemblyModel.actuateDrive` takes a whole record; the bridge builds the drive.
+  `RobotModelCodec` still writes `fullStepsPerRevolution` for every stepper and adds a
+  `drive` object only for a stepper with ratings or a servo, so a model with a bare
+  stepper keeps its bytes and older models decode.
+  MachineKit: the `MotorDrive` interface (a part says its own actuator) is what
+  `MachineAssembly.addMotor` calls. `NemaStepper` implements it, with a pull-out curve
+  of the first-order model (`pullOutCurve`: points at 1, 1.1, 1.25 ... 8 times the
+  corner speed and at the usable speed; joining them by lines overstates the
+  hyperbola by at most about 1%). A servo motor part implements `MotorDrive` the same
+  way; no catalogue servo exists yet and the test uses a code-only one.
 - **Plan check (stall predictor).** Along each plan, the torque each motor
   needs is worked out from moving mass × acceleration through ratio and
   efficiency, plus rotor and screw inertia, gravity on vertical axes, and

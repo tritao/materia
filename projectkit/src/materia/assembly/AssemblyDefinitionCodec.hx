@@ -168,7 +168,8 @@ class AssemblyDefinitionCodec {
 				movable.get(actuator.joint) == null || !Math.isFinite(actuator.maxEffort) || actuator.maxEffort < 0 ||
 				!Math.isFinite(actuator.maxRate) || actuator.maxRate < 0 ||
 				(actuator.rotorInertia != null && !(actuator.rotorInertia >= 0 && Math.isFinite(actuator.rotorInertia))) ||
-				(actuator.fullStepsPerRevolution != null && !(actuator.fullStepsPerRevolution > 0 && Math.isFinite(actuator.fullStepsPerRevolution))))
+				(actuator.fullStepsPerRevolution != null && !(actuator.fullStepsPerRevolution > 0 && Math.isFinite(actuator.fullStepsPerRevolution))) ||
+				!validDrive(actuator))
 				throw 'Assembly has an invalid actuator "${actuator == null ? "" : actuator.id}"';
 			actuatorIds.set(actuator.id, true);
 		}
@@ -291,6 +292,29 @@ class AssemblyDefinitionCodec {
 
 	static function withinLimits(limits:AssemblyJointLimits, value:Float):Bool
 		return (limits.lower == null || value >= limits.lower) && (limits.upper == null || value <= limits.upper);
+
+	/** An actuator's drive fields: each present number finite and not negative, and a drive kind that needs its numbers has them. */
+	static function validDrive(actuator:AssemblyActuator):Bool {
+		for (value in [actuator.holdingTorque, actuator.ratedTorque, actuator.peakTorque, actuator.ratedSpeed, actuator.maxSpeed,
+				actuator.encoderCounts, actuator.servoStiffness, actuator.servoDamping])
+			if (value != null && !(value >= 0 && Math.isFinite(value))) return false;
+		var curve = actuator.torqueSpeed;
+		if (curve != null) {
+			if (curve.length == 0 || curve.length % 2 != 0) return false;
+			for (index in 0...curve.length) {
+				if (!(curve[index] >= 0 && Math.isFinite(curve[index]))) return false;
+				if (index >= 2 && index % 2 == 0 && !(curve[index] > curve[index - 2])) return false;
+			}
+		}
+		var kind = actuator.drive;
+		if (kind == null) return true;
+		if (kind == "stepper") return actuator.fullStepsPerRevolution != null && actuator.holdingTorque != null && curve != null;
+		if (kind == "servo")
+			return actuator.ratedTorque != null && actuator.peakTorque != null && actuator.ratedSpeed != null &&
+				actuator.maxSpeed != null && actuator.ratedTorque > 0 && actuator.peakTorque >= actuator.ratedTorque &&
+				actuator.ratedSpeed > 0 && actuator.maxSpeed >= actuator.ratedSpeed;
+		return false;
+	}
 
 	static function validText(value:Null<String>):Bool
 		return value != null && value.length > 0 && value.length <= 4096 &&

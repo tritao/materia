@@ -144,6 +144,23 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(5) @:optional var rotorInertia:Null<Float>;
 	/** Full steps in a turn of a stepper motor's rotor; absent for other motors. */
 	@:id(6) @:optional var fullStepsPerRevolution:Null<Float>;
+	/**
+	 * What drives the joint: "stepper" or "servo". With "stepper", `holdingTorque` and `torqueSpeed`
+	 * describe its pull-out curve; with "servo", the rated and peak torque and speed do. Absent, a
+	 * bare effort and rate (a stepper with only `fullStepsPerRevolution` is still understood).
+	 */
+	@:id(7) @:optional var drive:Null<String>;
+	/** Alternating speed (the joint's units per second) and torque (N m), points of the torque-speed curve. */
+	@:id(8) @:optional var torqueSpeed:Array<Float>;
+	@:id(9) @:optional var holdingTorque:Null<Float>;
+	@:id(10) @:optional var ratedTorque:Null<Float>;
+	@:id(11) @:optional var peakTorque:Null<Float>;
+	@:id(12) @:optional var ratedSpeed:Null<Float>;
+	@:id(13) @:optional var maxSpeed:Null<Float>;
+	@:id(14) @:optional var encoderCounts:Null<Float>;
+	/** Default servo gains in the actuator's units: effort per unit of position and velocity error. */
+	@:id(15) @:optional var servoStiffness:Null<Float>;
+	@:id(16) @:optional var servoDamping:Null<Float>;
 }
 
 /** A connector exported from a member of an assembly definition. */

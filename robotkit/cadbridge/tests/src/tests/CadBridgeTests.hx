@@ -619,6 +619,26 @@ class CadBridgeTests {
       "translated assembly is a valid RobotKit runtime model");
     check(translated.model.actuators.length == 1 && translated.model.actuators[0].fullStepsPerRevolution == 200,
       "a stepper's full steps reach the robot actuator");
+    // A drive kind with its torque-speed curve reaches the actuator, a servo's too, and a bare stepper stays a bare stepper.
+    var driven = new AssemblyModel();
+    driven.add("base");
+    driven.add("slider");
+    driven.connector("base", "mount", AssemblyFrames.identity());
+    driven.connector("slider", "mount", AssemblyFrames.identity());
+    driven.mateOnAxis("slide", "prismatic", "base", "mount", "slider", "mount",
+      {x: 0, y: 1, z: 0}, 0, {lower: 0, upper: 100, velocity: 20, effort: 50});
+    driven.actuateDrive({id: "stepper", joint: "slide", maxEffort: 0.6, maxRate: 100, rotorInertia: 3e-5,
+      fullStepsPerRevolution: 200, drive: "stepper", holdingTorque: 1.2, torqueSpeed: [0, 1.2, 100, 1.2, 400, 0.3]});
+    driven.actuateDrive({id: "servo", joint: "slide", maxEffort: 0, maxRate: 0, drive: "servo", ratedTorque: 0.6,
+      peakTorque: 1.8, ratedSpeed: 300, maxSpeed: 500, encoderCounts: 4096, servoStiffness: 12});
+    var drives = AssemblySimulationBridge.toRobotModel(driven.definition("drive-test"), parts).model.actuators;
+    var stepperDrive = drives[0].drive, servoDrive = drives[1].drive;
+    check(stepperDrive != null && stepperDrive.kind() == "stepper" && stepperDrive.curve.torqueAt(250) == 0.75 &&
+      drives[0].fullStepsPerRevolution == 200 && stepperDrive.rotorInertia == 3e-5,
+      "a stepper's drive and pull-out curve reach the robot actuator");
+    check(servoDrive != null && servoDrive.kind() == "servo" && drives[1].planningEffort() == 1.8 &&
+      drives[1].planningRate() == 500 && drives[1].servoStiffness == 12 && servoDrive.curve.torqueAt(400) < 1.8,
+      "a servo's drive, peak torque and maximum speed reach the robot actuator");
     check(translated.linkHulls.length == 2 && translated.linkHulls[0].link == 0 &&
       translated.linkHulls[1].link == 1 && translated.linkHulls[1].vertices.length <= 64 * 3,
       "physical-part view supplies each part's bounded hull on its link");

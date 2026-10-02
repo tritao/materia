@@ -733,25 +733,23 @@ class MachineAssembly {
 	}
 
 	/**
-	 * Stepper motor member `motor` drives joint `joint` on a `volts` supply. Its actuator, `id`,
-	 * gets `margin` of the motor's holding torque, its speed up to where pull-out torque falls to
-	 * that, and its rotor inertia. Rebuilding the assembly works them out again from the motor.
+	 * Motor member `motor` (a stepper, or any part that is a `MotorDrive`) drives joint `joint` on a
+	 * `volts` supply. Its actuator, `id`, gets the motor's drive kind and torque-speed curve, its rotor
+	 * inertia and its usable effort and rate: for a stepper `margin` of its holding torque and the
+	 * speed up to where pull-out torque falls to that, for a servo its peak torque and maximum speed.
+	 * Rebuilding the assembly works them out again from the motor.
 	 */
 	public function addMotor(id:String, joint:String, motor:String, volts:Float, margin:Float = 0.5):Void
 		addMotorRecord({actuator: id, joint: joint, motor: motor, volts: volts, margin: margin});
 
 	function addMotorRecord(record:machinekit.assembly.MachineAssemblyDescription.MotorRecord):Void {
 		var member = requireMember(record.motor);
-		if (!Std.isOfType(member, machinekit.motion.NemaStepper)) throw 'Motor "${record.actuator}": "${record.motor}" is not a stepper motor';
-		var stepper:machinekit.motion.NemaStepper = cast member;
-		var rating = stepper.rating();
-		if (rating == null) throw 'Motor "${record.actuator}": ${stepper.variant.designation} has no torque rating';
+		if (!Std.isOfType(member, machinekit.motion.MotorDrive)) throw 'Motor "${record.actuator}": "${record.motor}" is not a motor part';
+		var motor:machinekit.motion.MotorDrive = cast member;
 		if (mechanical.actuators == null) mechanical.actuators = [];
 		for (actuator in mechanical.actuators) if (actuator.id == record.actuator)
 			throw 'Duplicate assembly actuator "${record.actuator}"';
-		mechanical.actuators.push({id: record.actuator, joint: record.joint,
-			maxEffort: stepper.usableTorque(record.margin), maxRate: stepper.usableSpeed(record.volts, record.margin),
-			rotorInertia: rating.rotorInertia, fullStepsPerRevolution: 360.0 / rating.stepAngle});
+		mechanical.actuators.push(motor.actuator(record.actuator, record.joint, record.volts, record.margin));
 		motors.push(copyMotor(record, ""));
 	}
 
@@ -761,13 +759,9 @@ class MachineAssembly {
 			motor: join(prefix, motor.motor), volts: motor.volts, margin: motor.margin};
 
 	static function copyActuator(actuator:materia.assembly.AssemblyDefinition.AssemblyActuator,
-			prefix:String):materia.assembly.AssemblyDefinition.AssemblyActuator {
-		var copy:materia.assembly.AssemblyDefinition.AssemblyActuator = {id: join(prefix, actuator.id),
-			joint: join(prefix, actuator.joint), maxEffort: actuator.maxEffort, maxRate: actuator.maxRate};
-		if (actuator.rotorInertia != null) copy.rotorInertia = actuator.rotorInertia;
-		if (actuator.fullStepsPerRevolution != null) copy.fullStepsPerRevolution = actuator.fullStepsPerRevolution;
-		return copy;
-	}
+			prefix:String):materia.assembly.AssemblyDefinition.AssemblyActuator
+		return materia.assembly.AssemblyDefinitionFlattener.copyActuator(actuator, join(prefix, actuator.id),
+			join(prefix, actuator.joint));
 
 	static function copyDrive(drive:machinekit.assembly.MachineAssemblyDescription.DriveRecord,
 			prefix:String):machinekit.assembly.MachineAssemblyDescription.DriveRecord
@@ -978,8 +972,7 @@ class MachineAssembly {
 			model.couple(join(prefix, coupling.id), join(prefix, coupling.source),
 				join(prefix, coupling.target), coupling.ratio, coupling.offset, coupling.efficiency);
 		if (mechanical.actuators != null) for (actuator in mechanical.actuators)
-			model.actuate(join(prefix, actuator.id), join(prefix, actuator.joint), actuator.maxEffort,
-				actuator.maxRate, actuator.rotorInertia, actuator.fullStepsPerRevolution);
+			model.actuateDrive(copyActuator(actuator, prefix));
 	}
 
 	public function components():Array<MachineAssemblyComponent>

@@ -18,13 +18,14 @@ import machinekit.component.ConnectorRole;
 import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
+import materia.assembly.AssemblyDefinition.AssemblyActuator;
 import machinekit.standard.ClearanceFit;
 import machinekit.standard.SocketHeadCapScrew;
 
 /** Stepper motor built from a NEMA mounting interface and a named motor variant.
  * CAD frame: mounting face at z=0, body toward -Z, shaft along +Z.
  */
-class NemaStepper extends MachineComponent {
+class NemaStepper extends MachineComponent implements MotorDrive {
 	static var frameTable:Null<Catalog<NemaFrameInterface>>;
 	static var variantTable:Null<Catalog<StepperMotorVariant>>;
 	static var ratingTable:Null<Catalog<StepperMotorRating>>;
@@ -172,6 +173,40 @@ class NemaStepper extends MachineComponent {
 	public function usableSpeed(volts:Float, margin:Float = 0.5):Float {
 		usableTorque(margin);
 		return cornerSpeed(requireRating(), volts) / margin;
+	}
+
+	/**
+	 * The pull-out curve as torque-speed points (speed in rad/s, torque in N m, alternating): the
+	 * holding torque to the corner speed, then falling as 1 / speed. Points are close enough to the
+	 * hyperbola that joining them by lines overstates it by about 1% at most, and the curve ends at
+	 * the usable speed or eight times the corner, whichever is higher.
+	 */
+	public function pullOutCurve(volts:Float, margin:Float = 0.5):Array<Float> {
+		var rated = requireRating();
+		var corner = cornerSpeed(rated, volts);
+		var usable = 1.0 / margin;
+		var last = Math.max(8.0, usable);
+		var multiples = [1.0];
+		for (multiple in [1.1, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0, 16.0, 32.0, 64.0])
+			if (multiple <= last + 1e-9) multiples.push(multiple);
+		// The usable speed is a point of its own, so the planner's number is exact on the curve.
+		var present = false;
+		for (multiple in multiples) if (Math.abs(multiple - usable) < 1e-9) present = true;
+		if (!present && usable > 1.0) multiples.push(usable);
+		multiples.sort((a, b) -> a < b ? -1 : a > b ? 1 : 0);
+		var curve:Array<Float> = [0.0, rated.holdingTorque];
+		for (multiple in multiples) {
+			curve.push(multiple * corner);
+			curve.push(rated.holdingTorque / multiple);
+		}
+		return curve;
+	}
+
+	public function actuator(id:String, joint:String, volts:Float, margin:Float):AssemblyActuator {
+		var rated = requireRating();
+		return {id: id, joint: joint, maxEffort: usableTorque(margin), maxRate: usableSpeed(volts, margin),
+			rotorInertia: rated.rotorInertia, fullStepsPerRevolution: 360.0 / rated.stepAngle, drive: "stepper",
+			torqueSpeed: pullOutCurve(volts, margin), holdingTorque: rated.holdingTorque};
 	}
 
 	/** Shaft speed (rad/s) where the winding's reactance at rated current takes the whole supply. */

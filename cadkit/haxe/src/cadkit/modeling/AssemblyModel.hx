@@ -192,6 +192,15 @@ class AssemblyModel {
 		data.actuators.push(actuator);
 	}
 
+	/**
+	 * Puts a motor on a joint with everything a drive records: its kind (stepper or servo), torque-speed
+	 * curve, torques, speeds and encoder counts, as `AssemblyActuator` names them.
+	 */
+	public function actuateDrive(actuator:materia.assembly.AssemblyDefinition.AssemblyActuator):Void {
+		if (data.actuators == null) data.actuators = [];
+		data.actuators.push(materia.assembly.AssemblyDefinitionFlattener.copyActuator(actuator, actuator.id, actuator.joint));
+	}
+
 	/** Exports reusable definitions and explicit tree/closure semantics. */
 	public function definition(id:String = "assembly"):AssemblyDefinition {
 		var copy:AssemblyDefinition = JsonWire.decode(JsonWire.encode(data));
