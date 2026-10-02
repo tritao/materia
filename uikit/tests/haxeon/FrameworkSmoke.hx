@@ -2199,8 +2199,12 @@ class FrameworkSmoke {
 		var unavailableMenu = new Menu("unavailable-menu-smoke", [
 			new MenuItem("disabled-only", "Unavailable", null, false)
 		], 4.0, 4.0, function() { unavailableMenuDismissals++; });
-		context.submit(unavailableMenu, dialogFrame);
+		var unavailableMenuRoot = context.submit(unavailableMenu, dialogFrame);
 		if (context.focus.focusedId == null) return 1016;
+		// A menu that fits to the right of its anchor opens there.
+		var unavailableMenuBounds = unavailableMenuRoot.children[2].resolved;
+		if (unavailableMenuBounds == null || Math.abs(unavailableMenuBounds.x - 4.0) > 0.1 ||
+			Math.abs(unavailableMenuBounds.y - 4.0) > 0.1) return 1019;
 		context.key(UiEventKind.KeyDown, UiKey.Escape);
 		if (unavailableMenuDismissals != 1) return 1017;
 
@@ -2218,7 +2222,9 @@ class FrameworkSmoke {
 		if (overflowMenuBounds == null || overflowMenuBounds.x < 0 || overflowMenuBounds.y < 0 ||
 			overflowMenuBounds.x + overflowMenuBounds.width > 256.1 ||
 			overflowMenuBounds.y + overflowMenuBounds.height > 120.1) return 1008;
-		// The menu surface must follow the panel after edge clamping moves it.
+		// Without room to the right, the menu opens to the left of its anchor.
+		if (Math.abs(overflowMenuBounds.x + overflowMenuBounds.width - 250.0) > 0.1) return 1020;
+		// The menu surface must follow the panel after edge placement moves it.
 		var overflowSurfaceBounds = overflowMenuRoot.children[2].children[0].resolved;
 		if (overflowSurfaceBounds == null ||
 			Math.abs(overflowSurfaceBounds.x - overflowMenuBounds.x) > 0.1 ||

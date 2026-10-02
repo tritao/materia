@@ -38,6 +38,12 @@ class Popup implements View {
 	public var layerZIndex:Int;
 	/** Paint a square menu surface and its shadow beneath the popup content. */
 	public var menuSurface:Bool;
+	/**
+	 * Open to the left of the anchor when the popup does not fit to its right
+	 * but fits to its left, as native context menus do. Otherwise the popup is
+	 * shifted to stay inside the layer.
+	 */
+	public var flipHorizontally:Bool;
 	public var onDismiss:Void->Void;
 	public var hasDismissHandler(default, null):Bool;
 	public function new(key:String, child:View, x:Float = 0.0, y:Float = 0.0,
@@ -58,6 +64,7 @@ class Popup implements View {
 		backdropColor = null;
 		layerZIndex = 0;
 		menuSurface = false;
+		flipHorizontally = false;
 		hasDismissHandler = onDismiss != null;
 		this.onDismiss = onDismiss == null ? function() {} : onDismiss;
 	}
@@ -190,6 +197,10 @@ class Popup implements View {
 					if (bounds == null || anchor == null) return;
 					var left = anchor.x - bounds.x;
 					var top = anchor.y + anchor.height - bounds.y;
+					if (flipHorizontally && left + geometry.width > bounds.width) {
+						var flipped = anchor.x + anchor.width - bounds.x - geometry.width;
+						if (flipped >= 0.0) left = flipped;
+					}
 					if (top + geometry.height > bounds.height)
 						top = anchor.y - bounds.y - geometry.height;
 					left = Math.max(0.0, Math.min(left, bounds.width - geometry.width));

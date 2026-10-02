@@ -72,6 +72,7 @@ class Menu implements View {
 		popup.anchorRectProvider = function() return new Rect(x, y, 0.0, 0.0);
 		popup.label = "Menu";
 		popup.menuSurface = true;
+		popup.flipHorizontally = true;
 		popup.modal = true;
 		popup.dimBackdrop = false;
 		var root:RenderNode = popup.build(context);
