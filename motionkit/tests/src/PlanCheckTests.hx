@@ -12,6 +12,8 @@ import motionkit.robot.StartTolerances;
 import motionkit.robot.PlanCheck;
 import motionkit.robot.PlanCheck.PlanCheckOptions;
 import motionkit.robot.PlanCheckSummary;
+import motionkit.robot.StepperSlip;
+import robotkit.world.CoupledJoint;
 import motionkit.trajectory.ExecutionPlan;
 import motionkit.trajectory.PlanDiagnostic;
 import motionkit.trajectory.Trajectory;
@@ -206,6 +208,65 @@ class PlanCheckTests extends MotionKitTestSupport {
     summary.add(result);
     check(summary.plans == 2 && summary.flagged == 1 && summary.count(PlanDiagnosticKind.StepperStall) == 1 &&
       summary.worstMotor == "motor" && summary.worstTorqueRatio >= stalled.worstTorqueRatio, "the summary counts plans and findings");
+  }
+
+  /**
+   * A stepper pushed over its pull-out curve loses sync: the check says how far the axis falls behind
+   * its command, and `StepperSlip` turns that into offsets on the axis and the joints coupled to it.
+   * A plan the check passes loses nothing.
+   */
+  public function testStepperSlip():Void {
+    var options = new PlanCheckOptions();
+    options.steady = new SteadyLoads(5.0);
+    var flat = machine([1.0, 0.0, 0.0], false);
+    var limits = flat.coupledLimits("slide", options.steady);
+    var honest = plan(0.1, limits.velocity, limits.maxAcceleration);
+    var passed = new PlanCheck(flat, ["slide"], options).check(honest, 0, 0.0);
+    check(passed.diagnostics.length == 0 && passed.slips.length == 0, "a plan within the curve loses no steps");
+    honest.dispose();
+
+    var rough = plan(0.1, limits.velocity, 3.0 * limits.maxAcceleration);
+    var stalled = new PlanCheck(flat, ["slide"], options).check(rough, 4, 0.0);
+    check(stalled.slips.length == 1, "a plan over the curve loses steps on its axis");
+    var slip = stalled.slips[0];
+    check(slip.axis == "slide" && slip.motors.length == 1 && slip.motors[0] == "motor", "the slip names the axis and its motor");
+    check(slip.total() > 0.0 && slip.total() < 0.1, 'the axis falls behind by part of the move: ${slip.total()}');
+    near(slip.steps, slip.total() * SCREW_RATIO / (2.0 * Math.PI / 200.0), "lost distance is lost full steps through the ratio", 1e-9);
+    check(slip.steps > 1.0, 'enough to be several full steps: ${slip.steps}');
+    near(slip.lostAt(0.0), 0.0, "nothing is lost before the motor leaves its curve", 1e-12);
+    near(slip.lostAt(1e3), slip.total(), "all of it is lost by the end", 1e-12);
+    var mid = slip.lostAt(0.5 * (slip.times[0] + slip.times[slip.times.length - 1]));
+    check(mid > 0.0 && mid < slip.total(), "and it builds up while the motor is over the curve");
+    rough.dispose();
+
+    // A servo over its peak is not a slip: only steppers lose steps.
+    var servo = machine([1.0, 0.0, 0.0], true);
+    var violent = plan(0.002, 0.1, 4.0 * servo.coupledLimits("slide").maxAcceleration);
+    check(new PlanCheck(servo, ["slide"], options).check(violent, 0, 0.0).slips.length == 0, "a servo never slips");
+    violent.dispose();
+
+    // The offsets reach the axis and what turns with it, and are kept until reset.
+    var offsets = new Map<Int, Float>();
+    var carrying = new StepperSlip([new CoupledJoint(1, 0, SCREW_RATIO, 0.0)], ["slide" => 0], (joint, offset) -> offsets.set(joint, offset));
+    carrying.start(stalled);
+    carrying.update(0.0);
+    check(!carrying.slipped(), "no slip before the plan is over the curve");
+    carrying.update(1e3);
+    near(carrying.lost("slide"), slip.total(), "the slip carries out the check's total", 1e-12);
+    var axisOffset = offsets.get(0), screwOffset = offsets.get(1);
+    check(axisOffset != null && screwOffset != null, "the axis and its screw both get an offset");
+    if (axisOffset == null || screwOffset == null) return;
+    near(axisOffset, -slip.total(), "the axis sits behind its command", 1e-12);
+    near(screwOffset, -slip.total() * SCREW_RATIO, "the screw it turns follows through the coupling", 1e-9);
+    carrying.start(null);
+    carrying.update(5.0);
+    near(carrying.lost("slide"), slip.total(), "the error is kept after the plan", 1e-12);
+    carrying.start(stalled);
+    carrying.update(1e3);
+    near(carrying.lost("slide"), 2.0 * slip.total(), "and adds up over plans", 1e-12);
+    carrying.reset();
+    var axisBack = offsets.get(0), screwBack = offsets.get(1);
+    check(!carrying.slipped() && axisBack == 0.0 && screwBack == 0.0, "reset puts the joints back on their command");
   }
 
   /**

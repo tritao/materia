@@ -68,6 +68,45 @@ class PlanDiagnostic {
   static function round(value:Float):Float return Math.round(value * 1000.0) / 1000.0;
 }
 
+/**
+ * How far an axis falls behind its command in a plan because its stepper motors lost sync: the
+ * distance lost along the axis at the plan times where it was losing (signed along the motion,
+ * constant between those times' ends), and the whole-plan total as full steps of the first motor.
+ */
+class PlanSlip {
+  public final axis:String;
+  /** The actuators that lost sync together, all of the axis's motors. */
+  public final motors:Array<String>;
+  /** Plan times (s) and the cumulative distance lost then, in the axis's units; both rise together. */
+  public final times:Array<Float>;
+  public final lost:Array<Float>;
+  /** Full steps of the first motor the plan loses, a positive count. */
+  public final steps:Float;
+
+  public function new(axis:String, motors:Array<String>, times:Array<Float>, lost:Array<Float>, steps:Float) {
+    this.axis = axis;
+    this.motors = motors;
+    this.times = times;
+    this.lost = lost;
+    this.steps = steps;
+  }
+
+  /** The distance lost by plan time `time`: nothing before the first loss, the total after the last. */
+  public function lostAt(time:Float):Float {
+    if (times.length == 0 || time <= times[0]) return 0.0;
+    var last = times.length - 1;
+    if (time >= times[last]) return lost[last];
+    for (index in 1...times.length) if (time <= times[index]) {
+      var span = times[index] - times[index - 1];
+      return span > 0.0 ? lost[index - 1] + (time - times[index - 1]) / span * (lost[index] - lost[index - 1]) : lost[index];
+    }
+    return lost[last];
+  }
+
+  /** The distance the whole plan loses. */
+  public function total():Float return lost.length == 0 ? 0.0 : lost[lost.length - 1];
+}
+
 /** What checking one plan found: its diagnostics and how near the limits it came. */
 class PlanCheckResult {
   public final diagnostics:Array<PlanDiagnostic>;
@@ -77,9 +116,12 @@ class PlanCheckResult {
   /** The largest deviation an axis's drive allows, in metres (radians for a turning axis). */
   public final worstDeviation:Float;
   public final worstAxis:String;
+  /** Where steppers over their curve would lose sync, for a simulation to carry out; empty when none would. */
+  public final slips:Array<PlanSlip>;
 
   public function new(diagnostics:Array<PlanDiagnostic>, worstTorqueRatio:Float, worstMotor:String,
-      worstDeviation:Float, worstAxis:String) {
+      worstDeviation:Float, worstAxis:String, ?slips:Array<PlanSlip>) {
+    this.slips = slips == null ? [] : slips;
     this.diagnostics = diagnostics;
     this.worstTorqueRatio = worstTorqueRatio;
     this.worstMotor = worstMotor;

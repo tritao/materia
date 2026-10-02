@@ -122,6 +122,14 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
         for (uint32_t joint = 0; joint < blueprint->joint_count; ++joint)
             if (!is_finite(blueprint->joint_overtravel[joint]) || blueprint->joint_overtravel[joint] < 0.0)
                 return RK_ERROR_INVALID_ARGUMENT;
+    if (blueprint->struct_size >= offsetof(rk_robot_runtime_blueprint, joint_servo) +
+            sizeof(blueprint->joint_servo))
+        for (uint32_t joint = 0; joint < blueprint->joint_count; ++joint) {
+            const auto &servo = blueprint->joint_servo[joint];
+            if (!is_finite(servo.stiffness) || servo.stiffness < 0.0 ||
+                !is_finite(servo.damping) || servo.damping < 0.0)
+                return RK_ERROR_INVALID_ARGUMENT;
+        }
     constexpr auto channels_size = offsetof(rk_robot_runtime_blueprint, coupling_count);
     if (blueprint->struct_size > offsetof(rk_robot_runtime_blueprint, channel_count) &&
         blueprint->struct_size < channels_size) return RK_ERROR_INVALID_ARGUMENT;

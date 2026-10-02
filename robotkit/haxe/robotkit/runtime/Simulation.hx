@@ -458,6 +458,17 @@ class Simulation {
       "simulation.resetRobot");
   }
 
+  /**
+   * Puts one robot joint `offset` (joint units) behind its commanded position from the next command
+   * on, as a stepper that lost steps is, until reset. A joint's coupled joints need the matching
+   * offsets. Accepted while the simulation runs.
+   */
+  public function setJointSlip(robotIndex:Int, joint:Int, offset:Float):Void {
+    ensureLive();
+    check(RobotKitSimKit.rk_simulation_set_joint_slip(owner.borrow(), robotIndex, joint, offset),
+      "simulation.setJointSlip");
+  }
+
   /** Teleports one robot base while leaving the shared clock untouched. The
    * session must be stopped. */
   public function teleportRobot(robotIndex:Int, position:Array<Float>,

@@ -378,6 +378,13 @@ RK_API rk_result RK_CALL rk_simulation_get_rejection(
 /** Restores one attached robot's bodies and clears its runtime state. */
 RK_API rk_result RK_CALL rk_simulation_reset_robot(rk_simulation simulation,
                                                     uint32_t robot_index);
+/**
+ * Puts one robot joint `offset` (joint units) behind its commanded position from the next command
+ * on, as a stepper motor that lost steps is. The joint's coupled joints must be given the matching
+ * offsets. Accepted while the session runs; reset clears it.
+ */
+RK_API rk_result RK_CALL rk_simulation_set_joint_slip(
+    rk_simulation simulation, uint32_t robot_index, uint32_t joint, double offset);
 /** Teleports one attached robot's base while the simulation is stopped.
  * This does not change the pose restored by reset or resetRobot. */
 RK_API rk_result RK_CALL rk_simulation_teleport_robot(

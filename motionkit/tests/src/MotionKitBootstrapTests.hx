@@ -30,6 +30,7 @@ class MotionKitBootstrapTests {
     }
     if (Sys.getEnv("MOTIONKIT_PLANCHECK_ONLY") == "1") {
       new PlanCheckTests().testPlanCheck();
+      new PlanCheckTests().testStepperSlip();
       new PlanCheckTests().testCompilerRunsPlanCheck();
       Sys.println('Plan check tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
@@ -47,6 +48,7 @@ class MotionKitBootstrapTests {
       return;
     }
     new PlanCheckTests().testPlanCheck();
+    new PlanCheckTests().testStepperSlip();
     new PlanCheckTests().testCompilerRunsPlanCheck();
     processTests.testPoseProcessPath();
     processTests.testMotionEventContracts();

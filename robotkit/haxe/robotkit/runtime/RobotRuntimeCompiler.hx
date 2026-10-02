@@ -9,6 +9,7 @@ import robotkit.model.CollisionApproximation;
 import robotkit.model.RobotDriveConfiguration;
 import robotkit.model.RobotForkConfiguration;
 import robotkit.model.RobotMobileConfiguration;
+import robotkit.model.ActuatorDrive.ServoDrive;
 import robotkit.model.Transmission;
 import RobotKitRuntime;
 
@@ -55,6 +56,11 @@ class RobotRuntimeCompiler {
       for (shape in link.collisionShapes)
         result.linkCollisionShapes.push(new RobotRuntimeLinkShape(index, shape));
     }
+    var inCoupling = new Map<String, Bool>();
+    for (coupling in robot.couplings) {
+      inCoupling.set(coupling.leader, true);
+      inCoupling.set(coupling.follower, true);
+    }
     for (index in 0...robot.joints.length) {
       var joint:robotkit.model.Joint = robot.joints[index];
       var parent = robot.links.indexOf(joint.parent);
@@ -80,10 +86,10 @@ class RobotRuntimeCompiler {
           var magnitude = Math.abs(ratio);
           // Ideal lossless transmission: joint rate = actuator rate / |ratio|,
           // and joint effort = actuator effort * |ratio|.
-          if (actuator.maxRate > 0.0)
-            actuatorRate = tighterLimit(actuatorRate, actuator.maxRate / magnitude);
-          if (actuator.maxEffort > 0.0)
-            actuatorEffort += actuator.maxEffort * magnitude;
+          if (actuator.planningRate() > 0.0)
+            actuatorRate = tighterLimit(actuatorRate, actuator.planningRate() / magnitude);
+          if (actuator.planningEffort() > 0.0)
+            actuatorEffort += actuator.planningEffort() * magnitude;
         case _:
       }
       // The joints coupled to this one and their motors limit it too, such as an axis by the
@@ -97,6 +103,19 @@ class RobotRuntimeCompiler {
         joint.childFramePosition, joint.childFrameRotation, joint.axis,
         coupled.maxAcceleration);
       compiled.overtravel = joint.limits.overtravel;
+      // A servo motor whose joint is coupled to others carries them: it runs as a torque-limited servo
+      // and the coupling moves the rest. A servo on a joint with no couplings, such as an arm joint, keeps
+      // the computed-torque tracking limited to its effort. Stepper machines keep kinematic following.
+      if (inCoupling.exists(joint.id))
+        for (actuator in robot.actuators) switch actuator.transmission {
+          case SimpleTransmission(jointId, ratio, _) if (jointId == joint.id && Std.isOfType(actuator.drive, ServoDrive)):
+            var drive:ServoDrive = cast actuator.drive;
+            var stiffness = actuator.servoStiffness > 0.0 ? actuator.servoStiffness : drive.defaultStiffness();
+            var damping = actuator.servoDamping > 0.0 ? actuator.servoDamping : ServoDrive.defaultDamping(stiffness);
+            compiled.servoStiffness += stiffness * ratio * ratio;
+            compiled.servoDamping += damping * ratio * ratio;
+          case _:
+        }
       compiled.armature = joint.armature;
       compiled.damping = joint.damping;
       compiled.frictionLoss = joint.frictionLoss;

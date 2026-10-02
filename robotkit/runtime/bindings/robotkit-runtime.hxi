@@ -691,7 +691,17 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		limit_damping_ratio: f64 @offset(32);
 		limit_impedance: array<f64, 5> @offset(40);
 	}
-	struct rk_robot_runtime_blueprint @layout(268016, 8) {
+	/**
+	 * Servo gains for a motor joint that moves other joints through couplings. Zero stiffness is no servo.
+	 * A servo motor joint tracks its trajectory with force = stiffness (target - q) + damping (velocity
+	 * target - qdot), clamped to the joint's max_effort. Joints coupled to it, and the leaders it follows,
+	 * get no commands of their own: the coupling moves them. Gains are per unit of joint position and speed.
+	 */
+	struct rk_robot_joint_servo @layout(16, 8) {
+		stiffness: f64 @offset(0);
+		damping: f64 @offset(8);
+	}
+	struct rk_robot_runtime_blueprint @layout(276208, 8) {
 		/**
 		 * < Set to sizeof this struct.
 		 */
@@ -784,6 +794,10 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		 * stops at the limits widened by it. Zero puts the stops at the limits.
 		 */
 		joint_overtravel: array<f64, 512> @offset(263920);
+		/**
+		 * Versioned: absent means no servo motor joints. Indexed by joint.
+		 */
+		joint_servo: array<rk_robot_joint_servo, 512> @offset(268016);
 	}
 	/**
 	 * One compiled joint and its limits in a RobotRuntimeBlueprint.

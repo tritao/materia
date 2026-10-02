@@ -4,6 +4,7 @@ import haxe.Int64;
 import motionkit.trajectory.ExecutionPlan;
 import motionkit.trajectory.PlanDiagnostic;
 import robotkit.model.ActuatorDrive.ServoDrive;
+import robotkit.model.ActuatorDrive.StepperDrive;
 import robotkit.model.DriveLoads;
 import robotkit.model.DriveLoads.AxisLoad;
 import robotkit.model.RobotModel;
@@ -109,6 +110,12 @@ class PlanCheck {
     var firstDirection = [for (_ in loads) 0.0];
     var lastSeen = [for (_ in loads) 0.0];
     var reversed = [for (_ in loads) false];
+    // Lost motion per axis: while every motor of an axis is over its curve and all of them are steppers, the
+    // rotors have lost sync and the axis does not advance, so it falls behind by what the plan commands.
+    var lostTimes:Array<Array<Float>> = [for (_ in loads) []];
+    var lostValues:Array<Array<Float>> = [for (_ in loads) []];
+    var lostCumulative = [for (_ in loads) 0.0];
+    var wasLosing = [for (_ in loads) false];
     var duration = 0.0;
     var c = [for (_ in 0...stride) 0.0];
     for (segment in 0...count) {
@@ -140,6 +147,7 @@ class PlanCheck {
             if (lastSeen[axis] != 0.0 && lastSeen[axis] != direction) reversed[axis] = true;
             lastSeen[axis] = direction;
           }
+          var losing = load.motors.length > 0;
           for (index in 0...load.motors.length) {
             var motor = load.motors[index];
             var slot = motorIndex + index;
@@ -154,7 +162,22 @@ class PlanCheck {
               worstTime[slot] = begin + tau;
             }
             if (ratio > 1.0 + 1e-6) over[slot]++;
+            else losing = false;
+            if (!Std.isOfType(motor.actuator.drive, StepperDrive)) losing = false;
           }
+          if (losing) {
+            if (!wasLosing[axis]) {
+              lostTimes[axis].push(begin + tau);
+              lostValues[axis].push(lostCumulative[axis]);
+            }
+            lostCumulative[axis] += velocity * weight;
+            lostTimes[axis].push(begin + tau);
+            lostValues[axis].push(lostCumulative[axis]);
+          } else if (wasLosing[axis]) {
+            lostTimes[axis].push(begin + tau);
+            lostValues[axis].push(lostCumulative[axis]);
+          }
+          wasLosing[axis] = losing;
           if (load.stiffness > 0.0) {
             var deviation = Math.abs(load.mass * acceleration + (direction >= 0.0 ? 1.0 : -1.0) * resisting) / load.stiffness;
             if (deviation > worstDeviation[axis]) {
@@ -167,6 +190,7 @@ class PlanCheck {
       }
     }
     var diagnostics:Array<PlanDiagnostic> = [];
+    var slips:Array<PlanSlip> = [];
     var overallRatio = 0.0, overallMotor = "", overallDeviation = 0.0, overallAxis = "";
     var motorIndex = 0;
     for (axis in 0...loads.length) {
@@ -194,6 +218,12 @@ class PlanCheck {
         }
       }
       motorIndex += load.motors.length;
+      if (lostTimes[axis].length > 0 && lostCumulative[axis] != 0.0) {
+        var first = load.motors[0];
+        var drive:StepperDrive = cast first.actuator.drive;
+        var steps = Math.abs(lostCumulative[axis] * first.ratio) / (2.0 * Math.PI / drive.fullStepsPerRevolution);
+        slips.push(new PlanSlip(load.axis, [for (motor in load.motors) motor.actuator.id], lostTimes[axis], lostValues[axis], steps));
+      }
       if (load.stiffness > 0.0) {
         // A reversal at the start of this plan, against how the axis last moved, or inside it, loses the nut's backlash.
         var startsReversed = lastDirection[axis] != 0.0 && firstDirection[axis] != 0.0 && lastDirection[axis] != firstDirection[axis];
@@ -218,6 +248,6 @@ class PlanCheck {
       }
       if (lastSeen[axis] != 0.0) lastDirection[axis] = lastSeen[axis];
     }
-    return new PlanCheckResult(diagnostics, overallRatio, overallMotor, overallDeviation, overallAxis);
+    return new PlanCheckResult(diagnostics, overallRatio, overallMotor, overallDeviation, overallAxis, slips);
   }
 }

@@ -294,6 +294,17 @@ typedef struct rk_robot_joint_dynamics {
     double limit_impedance[5];
 } rk_robot_joint_dynamics;
 
+/**
+ * Servo gains for a motor joint that moves other joints through couplings. Zero stiffness is no servo.
+ * A servo motor joint tracks its trajectory with force = stiffness (target - q) + damping (velocity
+ * target - qdot), clamped to the joint's max_effort. Joints coupled to it, and the leaders it follows,
+ * get no commands of their own: the coupling moves them. Gains are per unit of joint position and speed.
+ */
+typedef struct rk_robot_joint_servo {
+    double stiffness;
+    double damping;
+} rk_robot_joint_servo;
+
 typedef struct rk_robot_runtime_link {
     double mass;
     double center_of_mass[3];
@@ -459,6 +470,8 @@ typedef struct rk_robot_runtime_blueprint {
      * stops at the limits widened by it. Zero puts the stops at the limits.
      */
     double joint_overtravel[RK_MAX_JOINTS];
+    /** Versioned: absent means no servo motor joints. Indexed by joint. */
+    rk_robot_joint_servo joint_servo[RK_MAX_JOINTS];
 } rk_robot_runtime_blueprint;
 
 /* ------------------------------------------------------------------------- */

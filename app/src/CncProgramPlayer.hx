@@ -30,6 +30,7 @@ import motionkit.robot.MotionSystemBlueprint;
 import motionkit.robot.PlanCheck;
 import motionkit.robot.PlanCheck.PlanCheckOptions;
 import motionkit.robot.PlanCheckSummary;
+import motionkit.robot.StepperSlip;
 import nativekit.sim.SimSession;
 import toolpathkit.motion.MachineBinding;
 import toolpathkit.motion.ToolpathMotion;
@@ -133,6 +134,12 @@ class CncProgramPlayer implements SessionMember {
 	public var failure(default, null):Null<String> = null;
 	/** What the plan check assumes and allows, as the player was given it. */
 	public final checkOptions:PlanCheckOptions;
+	/**
+	 * Steps the machine's steppers lose where the plan check finds them over their pull-out curve: the
+	 * simulated axis falls behind its command and keeps the error until the session resets. Plans the
+	 * check passes lose nothing.
+	 */
+	public final slip:StepperSlip;
 	/** The G-code line the machine is executing; 0 between lines. */
 	public var currentLine(default, null):Int = 0;
 	/** Speed of every move, as a fraction of the program's. */
@@ -265,19 +272,28 @@ class CncProgramPlayer implements SessionMember {
 		toolShape = job.toolPart == null ? null : toolShapeIn(job.toolPart, job.spindle, placement, project, metresPerUnit);
 		// Spindle-speed handshakes are always ready. A tool change is the operator loading that tool,
 		// which the stock then cuts with and the spindle shows.
-		newMotion = () -> new ManipulatorMotion(robot.robot, binding.compiler,
-			channel -> {
-				if (channel == "spindle.at_speed") return EventValue.Digital(true);
-				if (!StringTools.startsWith(channel, TOOL_CHANGE)) return null;
-				var number = Std.parseInt(channel.substr(TOOL_CHANGE.length));
-				if (number == null || !toolsByNumber.exists(number)) throw 'The machining program loads unknown tool $channel';
-				if (number != loadedTool) {
-					loadedTool = number;
-					if (stock != null) stock.load(toolsByNumber.get(number));
-				}
-				return EventValue.Digital(true);
-			},
-			() -> robot.runtime.pollEvents(), planning.indices);
+		var robotIndex = spindleLink.robotIndex;
+		var axisJoint = new Map<String, Int>();
+		for (index in 0...job.axes.length) axisJoint.set(job.axes[index], planning.indices[index]);
+		slip = new StepperSlip(robot.robot.description().couplings, axisJoint,
+			(joint, offset) -> simulation.setJointSlip(robotIndex, joint, offset));
+		newMotion = () -> {
+			var made = new ManipulatorMotion(robot.robot, binding.compiler,
+				channel -> {
+					if (channel == "spindle.at_speed") return EventValue.Digital(true);
+					if (!StringTools.startsWith(channel, TOOL_CHANGE)) return null;
+					var number = Std.parseInt(channel.substr(TOOL_CHANGE.length));
+					if (number == null || !toolsByNumber.exists(number)) throw 'The machining program loads unknown tool $channel';
+					if (number != loadedTool) {
+						loadedTool = number;
+						if (stock != null) stock.load(toolsByNumber.get(number));
+					}
+					return EventValue.Digital(true);
+				},
+				() -> robot.runtime.pollEvents(), planning.indices);
+			made.slip = slip;
+			return made;
+		};
 		motion = newMotion();
 	}
 
@@ -440,6 +456,7 @@ class CncProgramPlayer implements SessionMember {
 
 	/** The session is back at its start, and the robot with it: run the program again on fresh stock. */
 	public function reset():Void {
+		slip.reset();
 		motion = newMotion();
 		if (speedOverride != 1.0) motion.setSpeedOverride(speedOverride);
 		restartRequest = null;
