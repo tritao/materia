@@ -108,7 +108,7 @@ class RobotSnapshot {
       var config = layout[i];
       frames.push(new SensorFrame(config.id, config.kind, config.frameId,
         sample.get_sequence(), sample.get_source_timestamp_ns(),
-        [for (j in 0...sample.get_value_count()) sample.get_values(j)], sample.get_received_timestamp_ns(),
+        [for (j in 0...sample.get_value_count()) value.get_sensor_values(sample.get_value_offset() + j)], sample.get_received_timestamp_ns(),
         config.linkId, config.position.toArray(), config.rotation.toArray()));
     }
     // Standalone endpoints may only report joint state; expose configured

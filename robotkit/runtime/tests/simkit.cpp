@@ -8,6 +8,20 @@
 #include <thread>
 #include <memory>
 
+/** One sensor slot of a state or snapshot, its values copied out of the pool for reading. */
+struct SensorView {
+    uint64_t sequence;
+    uint64_t source_timestamp_ns;
+    uint32_t value_count;
+    double values[RK_MAX_SENSOR_VALUES];
+};
+template <typename T> SensorView sensor_of(const T &value, uint32_t slot) {
+    const auto &sample = value.sensors[slot];
+    SensorView view{sample.sequence, sample.source_timestamp_ns, sample.value_count, {}};
+    for (uint32_t i = 0; i < sample.value_count; ++i) view.values[i] = RK_SENSOR_VALUE(value, slot, i);
+    return view;
+}
+
 // rk_simulation_robot_desc is 1.7 MB. Tests keep it on the heap: with every
 // test inlined into main at -O3, stack copies overflow an 8 MB stack.
 
@@ -219,9 +233,9 @@ void shared_world_steps_once() {
     // joint position instead of staying at their identity rest orientation,
     // so each robot's small link box presents a slightly different face to
     // the other robot's LIDAR ray than the pre-F4 (always axis-aligned) box.
-    assert(std::abs(first_state.sensors[2].values[0] - 0.947662419923) < 1e-9);
-    assert(std::abs(second_state.sensors[2].values[4] - 0.945714778581) < 1e-9);
-    assert(first_state.sensors[2].values[4] == 10.0); // Own geometry excluded.
+    assert(std::abs(sensor_of(first_state, 2).values[0] - 0.947662419923) < 1e-9);
+    assert(std::abs(sensor_of(second_state, 2).values[4] - 0.945714778581) < 1e-9);
+    assert(sensor_of(first_state, 2).values[4] == 10.0); // Own geometry excluded.
     assert(std::abs(first_state.position[0] - 0.4) < 1e-12);
     assert(std::abs(second_state.position[0] + 0.3) < 1e-12);
 
@@ -235,7 +249,7 @@ void shared_world_steps_once() {
     assert(snapshot(first).sequence == 2);
     assert(snapshot(second).sequence == 2);
     assert(snapshot(first).sensors[1].sequence == 1);
-    assert(std::abs(snapshot(first).sensors[1].values[5] - 9.81) < 1e-9);
+    assert(std::abs(sensor_of(snapshot(first), 1).values[5] - 9.81) < 1e-9);
 
     rk_simulation_presentation presentation = RK_INVALID_SIMULATION_PRESENTATION;
     assert(rk_simulation_capture_presentation(simulation, &presentation) == RK_OK);
@@ -426,18 +440,18 @@ void sensor_geometry_and_reset() {
         box_half_extents);
     assert(step(session, 100) == RK_OK);
     const auto before = snapshot(robot);
-    assert(std::abs(before.sensors[2].values[0] - 1.75) < 1e-6);
-    assert(before.sensors[2].values[2] == 10.0);
+    assert(std::abs(sensor_of(before, 2).values[0] - 1.75) < 1e-6);
+    assert(sensor_of(before, 2).values[2] == 10.0);
     assert(step(session, 200) == RK_OK);
     assert(snapshot(robot).sensors[1].sequence == 1);
-    assert(std::abs(snapshot(robot).sensors[1].values[5] - 9.81) < 1e-9);
+    assert(std::abs(sensor_of(snapshot(robot), 1).values[5] - 9.81) < 1e-9);
     assert(before.sensors[1].sequence == 0); // Old observation remains unchanged.
     assert(stop(session) == RK_OK);
     assert(reset(session) == RK_OK);
     assert(snapshot(robot).sensor_count == 0);
     assert(step(session, 300) == RK_OK);
     assert(snapshot(robot).sensors[1].sequence == 0);
-    assert(std::abs(snapshot(robot).sensors[2].values[0] - 1.75) < 1e-6);
+    assert(std::abs(sensor_of(snapshot(robot), 2).values[0] - 1.75) < 1e-6);
     assert(stop(session) == RK_OK);
     rk_simulation_pose pose{};
     pose.struct_size = sizeof(pose);
@@ -447,15 +461,15 @@ void sensor_geometry_and_reset() {
     assert(step(session, 400) == RK_OK);
     assert(snapshot(robot).sensors[1].sequence == 0); // Teleport primes derivative.
     assert(step(session, 500) == RK_OK);
-    assert(std::abs(snapshot(robot).sensors[1].values[3] + 9.81) < 1e-9);
-    assert(std::abs(snapshot(robot).sensors[1].values[5]) < 1e-9);
+    assert(std::abs(sensor_of(snapshot(robot), 1).values[3] + 9.81) < 1e-9);
+    assert(std::abs(sensor_of(snapshot(robot), 1).values[5]) < 1e-9);
     assert(stop(session) == RK_OK);
     pose.rotation[1] = 0.0;
     pose.rotation[3] = 1.0;
     assert(rk_simulation_teleport_robot(simulation, 0, &pose) == RK_OK);
     remove_object(session, object);
     assert(step(session, 600) == RK_OK);
-    assert(snapshot(robot).sensors[2].values[0] == 10.0);
+    assert(sensor_of(snapshot(robot), 2).values[0] == 10.0);
     rk_simulation_destroy(simulation);
 
     // Free fall: accelerometer measures specific force, not gravity itself.
@@ -494,7 +508,7 @@ void driving_base_keeps_owner_sensors_and_reset_pose() {
         pose.position[0] = 0.1 * tick;
         assert(rk_simulation_drive_robot_base(simulation, 0, &pose) == RK_OK);
         assert(step(session, 200 + 100 * tick) == RK_OK);
-        const auto imu = snapshot(robot).sensors[1];
+        const auto imu = sensor_of(snapshot(robot), 1);
         assert(imu.sequence == static_cast<uint64_t>(1 + tick));
         assert(std::abs(imu.values[3] - (tick == 1 ? 1000.0 : 0.0)) < 1e-2);
         assert(std::abs(imu.values[4]) < 1e-9 && std::abs(imu.values[5] - 9.81) < 1e-9);
@@ -508,7 +522,7 @@ void driving_base_keeps_owner_sensors_and_reset_pose() {
         pose.rotation[3] = std::cos(0.005 * tick);
         assert(rk_simulation_drive_robot_base(simulation, 0, &pose) == RK_OK);
         assert(step(session, 700 + 100 * tick) == RK_OK);
-        const auto imu = snapshot(robot).sensors[1];
+        const auto imu = sensor_of(snapshot(robot), 1);
         assert(std::abs(imu.values[2] - 1.0) < 1e-3);
         assert(std::abs(imu.values[0]) < 1e-6 && std::abs(imu.values[1]) < 1e-6);
     }
@@ -624,7 +638,7 @@ void normal_stop_zeroes_wheel_velocities() {
         assert(state.velocity[0] == 0.0 && state.velocity[1] == 0.0);
         assert(state.position[0] == stopped.position[0]);
         assert(state.position[1] == stopped.position[1]);
-        assert(state.sensors[0].values[0] == stopped.position[0]); // Encoder sample.
+        assert(sensor_of(state, 0).values[0] == stopped.position[0]); // Encoder sample.
     }
 
     // A new command resumes motion without a safety reset.
@@ -711,7 +725,7 @@ void differential_drive_follows_applied_wheel_targets() {
     assert(std::abs(observed.position[1] - plant.y) < 1e-6);
     assert(std::abs(observed.position[2] - 0.3) < 1e-6);
     // Straight at constant speed: no rotation, no acceleration beyond gravity.
-    auto imu = snapshot(robot).sensors[1];
+    auto imu = sensor_of(snapshot(robot), 1);
     assert(imu.sequence > 0);
     for (int axis = 0; axis < 3; ++axis) assert(std::abs(imu.values[axis]) < 1e-4);
     assert(std::abs(imu.values[3]) < 1e-2 && std::abs(imu.values[4]) < 1e-2);
@@ -727,7 +741,7 @@ void differential_drive_follows_applied_wheel_targets() {
         assert(step(session, time += 100) == RK_OK);
     plant = drive_state(simulation);
     assert(std::abs(plant.yaw - (arc_start_yaw + 5 * dt)) < 1e-12);
-    imu = snapshot(robot).sensors[1];
+    imu = sensor_of(snapshot(robot), 1);
     assert(std::abs(imu.values[2] - 1.0) < 1e-3);
     assert(std::abs(imu.values[0]) < 1e-4 && std::abs(imu.values[1]) < 1e-4);
     assert(std::abs(imu.values[3]) < 2e-2);
@@ -752,7 +766,7 @@ void differential_drive_follows_applied_wheel_targets() {
     for (int tick = 0; tick < 3; ++tick)
         assert(step(session, time += 100) == RK_OK);
     assert(drive_state(simulation).x == before_stop.x);
-    imu = snapshot(robot).sensors[1];
+    imu = sensor_of(snapshot(robot), 1);
     for (int axis = 0; axis < 3; ++axis) assert(std::abs(imu.values[axis]) < 1e-4);
 
     // An emergency stop halts it too, and a safety reset does not resume the
@@ -792,7 +806,7 @@ void differential_drive_follows_applied_wheel_targets() {
            std::abs(plant.yaw - moving.yaw) < 1e-12);
     for (int tick = 0; tick < 2; ++tick) {
         assert(step(session, time += 100) == RK_OK);
-        imu = snapshot(robot).sensors[1];
+        imu = sensor_of(snapshot(robot), 1);
         assert(imu.sequence == imu_sequence + 1 + tick); // Sensors keep running.
         assert(std::abs(imu.values[3]) < 1e-2 && std::abs(imu.values[4]) < 1e-2);
     }
@@ -853,7 +867,7 @@ void driven_base_far_from_origin_reads_exact_imu() {
         assert(step(session, time += 100) == RK_OK);
     for (int tick = 0; tick < 100; ++tick) {
         assert(step(session, time += 100) == RK_OK);
-        const auto imu = snapshot(robot).sensors[1];
+        const auto imu = sensor_of(snapshot(robot), 1);
         for (int axis = 0; axis < 3; ++axis) assert(std::abs(imu.values[axis]) < 1e-9);
         assert(std::abs(imu.values[3]) < 1e-6 && std::abs(imu.values[4]) < 1e-6);
         assert(std::abs(imu.values[5] - 9.81) < 1e-6);
@@ -872,7 +886,7 @@ void driven_base_far_from_origin_reads_exact_imu() {
     assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
     for (int tick = 0; tick < 3; ++tick)
         assert(step(session, time += 100) == RK_OK);
-    auto imu = snapshot(robot).sensors[1];
+    auto imu = sensor_of(snapshot(robot), 1);
     assert(std::abs(imu.values[3]) < 1e-6 && std::abs(imu.values[4]) < 1e-6);
     assert(rk_simulation_get_robot_pose(simulation, 0, &observed) == RK_OK);
     assert(observed.position[0] == drive_state(simulation).x);
@@ -886,7 +900,7 @@ void driven_base_far_from_origin_reads_exact_imu() {
         assert(rk_simulation_drive_robot_base(simulation, 0, &pose) == RK_OK);
         assert(step(session, time += 100) == RK_OK);
         if (tick < 3) continue; // Start-up step, then the IMU's first difference.
-        imu = snapshot(robot).sensors[1];
+        imu = sensor_of(snapshot(robot), 1);
         assert(std::abs(imu.values[3]) < 1e-6 && std::abs(imu.values[4]) < 1e-6);
         assert(std::abs(imu.values[5] - 9.81) < 1e-6);
     }
@@ -994,7 +1008,7 @@ void differential_drive_keeps_authored_tilt() {
         const double world_rate[3] = {0.0, 0.0, 1.0};
         double body_rate[3];
         robotkit::sensors::rotate(observed.rotation, world_rate, body_rate, true);
-        const auto imu = snapshot(robot).sensors[1];
+        const auto imu = sensor_of(snapshot(robot), 1);
         for (int axis = 0; axis < 3; ++axis)
             assert(std::abs(imu.values[axis] - body_rate[axis]) < 1e-9);
     }
@@ -1131,7 +1145,7 @@ void omni_drive_follows_applied_wheel_targets() {
     assert(std::abs(plant.x - (center_x + (std::cos(end_yaw) * vy + std::sin(end_yaw) * vx) / omega)) < 1e-9);
     assert(std::abs(plant.y - (center_y + (std::sin(end_yaw) * vy - std::cos(end_yaw) * vx) / omega)) < 1e-9);
     // The IMU reads the yaw rate while turning.
-    const auto imu = snapshot(robot).sensors[1];
+    const auto imu = sensor_of(snapshot(robot), 1);
     assert(std::abs(imu.values[2] - omega) < 1e-3);
 
     // A normal stop halts the base on the tick it is applied.
@@ -1192,8 +1206,8 @@ void robots_attach_to_a_shared_session() {
     // The session's owner, not the robots, controls the clock.
     assert(nksim_session_step(session, 0, nullptr) == NKSIM_OK);
     const auto sample = snapshot(robot);
-    assert(std::abs(sample.sensors[2].values[0] - 1.75) < 1e-6);
-    assert(sample.sensors[2].values[4] == 10.0);
+    assert(std::abs(sensor_of(sample, 2).values[0] - 1.75) < 1e-6);
+    assert(sensor_of(sample, 2).values[4] == 10.0);
 
     nksim_frame frame = 0;
     assert(nksim_session_capture(session, &frame) == NKSIM_OK);

@@ -48,9 +48,11 @@ template <typename T> bool valid_sensors(const T &value) {
     if (value.sensor_count > RK_MAX_SENSORS) return false;
     for (uint32_t i = 0; i < value.sensor_count; ++i) {
         const auto &sample = value.sensors[i];
-        if (sample.value_count > RK_MAX_SENSOR_VALUES || (!sample.sequence && sample.value_count)) return false;
+        if (sample.value_count > RK_MAX_SENSOR_VALUES || (!sample.sequence && sample.value_count) ||
+            sample.value_offset > RK_SENSOR_VALUE_POOL ||
+            sample.value_count > RK_SENSOR_VALUE_POOL - sample.value_offset) return false;
         for (uint32_t j = 0; j < sample.value_count; ++j)
-            if (!is_finite(sample.values[j])) return false;
+            if (!is_finite(value.sensor_values[sample.value_offset + j])) return false;
     }
     return true;
 }
@@ -166,6 +168,8 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
             m[0]*(m[4]*m[8]-m[5]*m[7])-m[1]*(m[3]*m[8]-m[5]*m[6])+m[2]*(m[3]*m[7]-m[4]*m[6]) <= eps*eps*eps)
             return RK_ERROR_INVALID_ARGUMENT;
     }
+    // The sensors' values share one pool in every state, so what they report together must fit it.
+    uint64_t pooled_values = 0;
     for (uint32_t i = 0; i < blueprint->sensor_count; ++i) {
         const auto &sensor = blueprint->sensors[i];
         if (sensor.kind < RK_SENSOR_ENCODER || sensor.kind > RK_SENSOR_LIDAR ||
@@ -181,7 +185,10 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
             !is_finite(sensor.start_angle) || !is_finite(sensor.field_of_view) ||
             sensor.field_of_view < 0.0 || sensor.field_of_view > 6.283185307179586))
             return RK_ERROR_INVALID_ARGUMENT;
+        pooled_values += sensor.kind == RK_SENSOR_LIDAR ? sensor.ray_count
+            : sensor.kind == RK_SENSOR_IMU ? 6 : blueprint->joint_count;
     }
+    if (pooled_values > RK_SENSOR_VALUE_POOL) return RK_ERROR_INVALID_ARGUMENT;
     for (uint32_t index = 0; index < blueprint->joint_count; ++index) {
         const auto &joint = blueprint->joints[index];
         if (joint.joint != index || joint.type < RK_RUNTIME_JOINT_FIXED ||

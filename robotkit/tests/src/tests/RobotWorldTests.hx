@@ -188,6 +188,7 @@ class RobotWorldTests {
     testFiducialPerception();
     testNavigation();
     testMotionGuard();
+    testFullScan();
     testGridPlanning();
     testNavigator();
     testGoToBlockedTimeout();
@@ -4205,6 +4206,50 @@ class RobotWorldTests {
       RobotMessageType.CameraFrame, MessagePack.encode(wrongLength), 0,
       [haxe.io.Bytes.alloc(11)])),
       "camera protocol rejects malformed raw image dimensions on receipt");
+  }
+
+  /**
+   * A full 360-ray scan reaches Haxe intact beside an IMU's values, each at its own place in the state's
+   * value pool, and a snapshot is no larger than it was when sensors could report 64 values each.
+   */
+  static function testFullScan():Void {
+    var model = new RobotModel("full-scan");
+    var base = model.addLink(new Link("base", "link/base"));
+    var scan = model.addSensor(new robotkit.model.Sensor("scan", "lidar", 0, "sensor/scan"));
+    scan.rayCount = 360;
+    scan.maxRange = 6.0;
+    var imu = model.addSensor(new robotkit.model.Sensor("imu", "imu", 0, "sensor/imu"));
+    var blueprint = RobotRuntimeCompiler.compile(model);
+    var simulationHarness = new SimulationHarness();
+    var runtime = simulationHarness.simulation.addRobot(blueprint);
+    var robot = new SimulatedRobot("full-scan", runtime, "full-scan", ["base"], []);
+    simulationHarness.spawnBox([2.0, 0.0, 0.0], [0.25, 0.25, 0.25]);
+    simulationHarness.step(Int64.ofInt(1));
+    simulationHarness.step(Int64.ofInt(2));
+    var frames = robot.snapshot().sensors;
+    var found:Null<SensorFrame> = null, motion:Null<SensorFrame> = null;
+    for (frame in frames.toArray()) {
+      if (frame.sensorId == "sensor/scan") found = frame;
+      if (frame.sensorId == "sensor/imu") motion = frame;
+    }
+    if (found == null || motion == null) throw "the scan and the IMU are published";
+    var ranges:SensorFrame = cast found;
+    equal(ranges.values.length, 360, "a 360-ray scan keeps all its rays");
+    equal(cast(motion, SensorFrame).values.length, 6, "the IMU beside it keeps its six values");
+    check(Math.abs(ranges.values.get(0) - 1.75) < 1e-6, "the ray at the box reads its face");
+    var hits = 0, symmetric = true;
+    for (ray in 0...360) {
+      if (ranges.values.get(ray) < 6.0) hits++;
+      if (Math.abs(ranges.values.get(ray) - ranges.values.get((360 - ray) % 360)) > 1e-6) symmetric = false;
+    }
+    check(hits >= 10 && hits <= 25 && symmetric && ranges.values.get(180) == 6.0 && ranges.values.get(359) < 6.0,
+      "the rays on either side of the box read it, and the rest read their full range");
+    check(Math.abs(cast(motion, SensorFrame).values.get(5) - 9.81) < 1e-6, "the IMU's values are its own, not the scan's");
+    // Values live in a shared pool, not at every sensor's worst case: the snapshot is no larger than
+    // it was when eight sensors could report 64 values each (21008 bytes).
+    check(rk_robot_snapshot.size() <= 21008, "a robot snapshot is no larger than before sensors could report 360 values");
+    robot.close();
+    simulationHarness.dispose();
   }
 
   static function testConfiguredSensors():Void {

@@ -412,6 +412,13 @@ class RobotRuntimeCompiler {
         diagnostics.push(new RobotCompileDiagnostic("RK_FRAME_POSE", path, "mount requires finite translation and unit xyzw quaternion"));
     }
 
+    // The sensors' values share one pool in every state, so what they report together must fit it.
+    var pooledValues = 0;
+    for (sensor in robot.sensors) if (sensor != null)
+      pooledValues += sensor.kind == "lidar" ? sensor.rayCount : sensor.kind == "imu" ? 6
+        : sensor.kind == "joint_encoder" ? robot.joints.length : 0;
+    if (pooledValues > RobotKitRuntimeConstants.RK_SENSOR_VALUE_POOL)
+      diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_VALUES", "sensors", "sensors report more values together than a state holds"));
     var sensorIds = new Map<String, Bool>();
     var sensorNames = new Map<String, Bool>();
     if (robot.sensors.length > RobotKitRuntimeConstants.RK_MAX_SENSORS)

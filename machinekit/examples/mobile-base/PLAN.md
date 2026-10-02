@@ -121,9 +121,10 @@ z = 0), so what is dropped lands on it; it stays out of the map because only box
 robot's height are drawn there, and out of the scan because the plane is above it. The costmap
 remembers: an obstacle the lidar loses sight of stays in the dynamic layer for 20 s of simulation time
 unless a later scan sees through its place (`LidarFreeSpace`, carried on the perception snapshot), so a
-replan does not route back through it. RobotKit sensor samples now carry up to 360 values (C ABI version
-22; the wire and recording formats carry values as arrays and are unchanged), and the puck scans a ray
-a degree.
+replan does not route back through it. A RobotKit sensor reports up to 360 values, kept in one 512-value pool per state or snapshot that
+the sensors' samples index into (C ABI version 23), so a snapshot is no larger than before and a big
+scan costs only the robots that have one; the wire and recording formats carry values as arrays and
+are unchanged. The puck scans a ray a degree.
 
 Left over: `MotionGuard` still judges only the latest scan, so a remembered obstacle just out of sight
 beside the base does not stop it (the costmap routes round it); a lidar return is a point on a face, so a
