@@ -272,15 +272,85 @@ Kinematics through the whole stack, with ratios still given as numbers.
   updated per frame without OCCT) is not done. Belt stretch and a machining run
   of the belt variant are left (done in X6).
 
-### X5 — Couplings with more than one leader (CoreXY)
+### X5 — Couplings with more than one leader (CoreXY) (done)
 
-- `follower = Σ ratioᵢ × leaderᵢ + offset` across the assembly, KinematicsKit,
-  the RobotKit model and blueprint (ABI change), validation, the device
-  compiler, and SimKit. MuJoCo uses a fixed tendon with a tendon equality;
-  the core backend projects the sum.
-- A CoreXY gantry example, such as a plotter or a laser.
-- **Gate:** the CoreXY machine runs a program in simulation and on the
-  virtual device, and moving one motor moves the head diagonally.
+`follower = Σ ratioᵢ × leaderᵢ + Σ offsetᵢ` runs through every layer, and a CoreXY pen plotter
+(`machinekit/examples/corexy`) uses it. Decisions that differ from the sketch above:
+
+- **A coupling is one term, not a list of terms.** A follower with several couplings is the sum of
+  them. `AssemblyJointCoupling`, `JointCoupling`, the blueprint's `rk_robot_joint_coupling` and the
+  SimKit coupling keep their layout, so every single-leader file, document and blueprint reads and
+  writes byte for byte as before (the common case), and each term keeps its own efficiency, stiffness,
+  backlash and drag. The ABI change is in meaning: `RK_API_VERSION` is 24 (a follower may have several
+  couplings), the `.hxi` regenerated with `runtime/tools/check-hxi.sh`. Validation, everywhere: a
+  leader appears once per follower, no cycle through any chain of terms, finite non-zero ratios, and a
+  follower is still never `driven`. The old "one coupling per follower" rule is gone.
+- **Assembly, CadKit.** `AssemblyDefinitionCodec` checks pairs and cycles and sums the terms for a
+  saved state's consistency; `AssemblyState` recomputes each follower a changed joint reaches, sources
+  first; documents keep one `cadkit.coupling` relationship per term; the bridge subtracts a follower's
+  placement once, in its first term.
+- **KinematicsKit** gives every joint its affine map of the DOFs (`jointTermStart/Dof/Scale`,
+  `jointConstant`). A single-leader chain keeps `jointSource`, ratio and offset; a joint that sums
+  several is marked `COMBINED` (-2) and has one Jacobian column per term. Its limits bound a sum, not
+  a box, so they are not folded into the DOF ranges. The native kinematics (manipulator servoing)
+  refuses such a joint: nothing there uses one.
+- **Runtime.** `copy_segments` derives an undriven follower's sum in dependency order;
+  `coupled_values`, segment and plan validation, the device compiler (which checks the authored
+  follower against the sum and rewrites it) and the follower's default limits (the sum of
+  |ratio| × the leaders' limits, once every leader has one) all take the sum. A plan's rest tolerance
+  at its end is scaled for a coupled joint like its start tolerances are (`Σ|ratio| ×` the leaders'),
+  since a motor turning 314 rad per metre amplifies the planner's 1e-6 residual.
+- **SimKit.** The core backend enforces the sum in dependency order and refuses a repeated pair or a
+  cycle. MuJoCo keeps `mjEQ_JOINT` for one leader; for several it adds a fixed tendon
+  (`Σ ratioᵢ·qᵢ − q_follower`, wrapped with `mjs_wrapJoint`) and an `mjEQ_TENDON` holding it at
+  `−Σ offsetᵢ`. Like the joint equality it is measured from the joints' reference pose.
+- **Limits are boxes.** A follower with several leaders limits each leader by its limit over the sum
+  of the ratios' sizes (through chains, the L1 weight of the follower), so every combination of
+  axis speeds within the per-axis limits stays inside the motor's. A motor's force splits between the
+  axes it serves in proportion to the ratios (a half each for CoreXY), so each axis's acceleration
+  limit is a motor's force over the mass, not two motors': both axes at their limits at once need
+  exactly one motor's full force (`Fa = (Qx + Qy) / 2`). Moving along one axis alone could use twice
+  that; the box does not.
+- **Plan check.** Motors are counted once per actuator, not per axis: each sample adds what every axis
+  asks of a motor (its share of the axis force through the ratio, rotor inertia times its
+  acceleration) with one drag in the direction of its total speed, and the motor's speed is the sum
+  of its ratios times the axes' speeds. Along x = y one motor of a CoreXY stands almost still and
+  the other carries both axes.
+- **MotionKit.** `MotionSystemBlueprint.fromRobotModel` maps no axis to a joint that sums several
+  leaders; `ProgramCompiler` projects each follower as the sum, in order; `AxisKinematics` checks the
+  sums; `StepperSlip` carries a slipped axis's offset to a follower as the sum.
+- **The plotter** (`CoreXyPlotter`, 35 occurrences, 4 kg): two NEMA 17 on 24 V on the rear corners,
+  GT2 20-tooth pulleys (pitch radius 6.366 mm), two belts of five pulleys each on two levels (belt A
+  above B), closed through the carriage, whose clamp holds both gantry strands. Motor A turns
+  `(x − y) / R` and motor B `(x + y) / R`; a front or rear frame idler follows its belt's motor
+  (two couplings), a gantry end idler only `x` (one). 16 couplings, 10 pulley joints, two
+  prismatic axes (`x` ±35 mm, `y` ±35 mm). The signs and the 1/R come from the belts' own
+  geometry: the clamped strand's heading (`strands()[0].dx`) gives x, the strand from the gantry idler
+  to the front corner (`strands()[1].dy`) gives y, and the wrap's side gives the sense.
+  The belts are drawn at the home pose. The checks build each belt with the gantry moved and find its
+  length unchanged and the feed at the motor pulley equal to the coupling.
+- **Numbers** (24 V NEMA 17 17HS19-1684S1, half holding torque): the motors turn 204 rad/s at most
+  and give 0.225 N m, so each axis runs to 649.6 mm/s (204 / (2 × 157.1 rad per metre)); with no
+  steady loads x accelerates at 71.6 m/s² and y, which carries the gantry, at 34.0; with the plan check's
+  default friction 58.0 and 27.5. On a controller (16 microsteps, 40 kHz step tick) each motor is
+  capped at 78.5 rad/s and the axes at 250 mm/s. A 30 mm square planned at 95% of those limits needs no more than 96 and
+  132 rad/s of the motors and passes the plan check.
+- **Checks.** KinematicsKit (a combined joint's value and Jacobian, a cycle refused), CadKit
+  (`AssemblyCouplingSmoke`: sums, validation, document round trip), RobotKit (a model with a summed
+  follower: validation, FK, IK), native (`validation`, `c_api`, `device_compiler6`, `runtime`:
+  validation of commands, plans and segments, derived followers, summed limits, a cycle refused),
+  SimKit (core and MuJoCo: the sum and the tendon), MachineKit (the plotter's geometry, couplings and
+  clearances, and its drives in the robot model), MotionKit (`CoreXyTests`: a square run on the
+  deterministic backend, every pulley the sum of its terms at every tick, x alone turns the motors
+  alike and y alone against each other, and the plan check's diagonal case), and the app (`checkCoreXyPlotter`:
+  the project loads, the runtime blueprint carries 16 couplings and the MuJoCo world builds and holds).
+- **Left.** The plotter has no program player or CNC job in the app (a pen plot is not a machining job);
+  the gate "runs a program in simulation" is the MotionKit test, and "on the virtual device" is not done:
+  the RKD6 board's channels map one motor to one joint, and a CoreXY device layout names the two motors
+  (`DeviceBinding.bind` works on the actuators already). Belt stiffness is not set on the plotter's
+  drives (a CoreXY axis sees two belts in series, which `carriageStiffness` does not model), so its
+  accuracy check is rigid. The belts' idlers on the gantry and carriage do not model a moving strand's
+  exact wrap, only its feed. KinematicsKit's native manipulator kinematics does not take a combined joint.
 
 ### Device steps and identity (done)
 

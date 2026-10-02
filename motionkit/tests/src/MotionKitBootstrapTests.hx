@@ -44,6 +44,12 @@ class MotionKitBootstrapTests {
       Sys.println('MachineKit compiler tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
     }
+    if (Sys.getEnv("MOTIONKIT_COREXY_ONLY") == "1") {
+      new CoreXyTests().testPlotterDrawsASquare();
+      new CoreXyTests().testPlanCheckAddsTheAxesOnASharedMotor();
+      Sys.println('CoreXY tests passed (${MotionKitTestSupport.assertions} assertions)');
+      return;
+    }
     if (Sys.getEnv("MOTIONKIT_C4_ONLY") == "1") {
       kinematicsTests.testOpwKinematics();
       Sys.println('C4 focused tests passed (${MotionKitTestSupport.assertions} assertions)');
@@ -54,6 +60,8 @@ class MotionKitBootstrapTests {
     new PlanCheckTests().testEncoderSeesStepperSlip();
     new PlanCheckTests().testLoadSideEncoderReportsPathError();
     new PlanCheckTests().testCompilerRunsPlanCheck();
+    new CoreXyTests().testPlotterDrawsASquare();
+    new CoreXyTests().testPlanCheckAddsTheAxesOnASharedMotor();
     processTests.testPoseProcessPath();
     processTests.testMotionEventContracts();
     kinematicsTests.testKinematicsContract();

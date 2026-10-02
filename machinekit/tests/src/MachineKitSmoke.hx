@@ -8,6 +8,7 @@ import cadkit.InertiaTensor;
 import RobotArmPreview.RobotArmChecks;
 import CncRouterPreview.CncRouterChecks;
 import MobileBasePreview.MobileBaseChecks;
+import CoreXyPlotterPreview.CoreXyPlotterChecks;
 import machinekit.assembly.AssemblyPreview;
 import machinekit.assembly.LinearAxis;
 import machinekit.assembly.MachineAssembly;
@@ -2607,6 +2608,8 @@ class MachineKitSmoke {
 		RobotArmChecks.run();
 		CncRouterChecks.run();
 		MobileBaseChecks.run();
+		CoreXyPlotterChecks.run();
+		CoreXyDriveTests.run();
 		assemblyPreviewSharing();
 		RecipeContractTests.run();
 		componentRecipes();

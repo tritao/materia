@@ -1,0 +1,14 @@
+{
+	"format": "materia.project",
+	"version": 1,
+	"name": "CoreXY pen plotter",
+	"defaultEntrypoint": "plotter",
+	"build": { "system": "haxeon", "manifest": "haxeon.json" },
+	"entrypoints": {
+		"plotter": {
+			"kind": "cad-preview",
+			"module": "CoreXyPlotterPreview",
+			"function": "plotter"
+		}
+	}
+}

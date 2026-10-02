@@ -309,6 +309,47 @@ class ProjectSourceTests {
     return found;
   }
 
+  /**
+   * The CoreXY plotter's two motors follow both axes: each pulley is the sum of its couplings' terms, each
+   * axis is bound by both motors, and the shared simulation (MuJoCo, with fixed tendons for the sums) builds,
+   * steps and keeps the machine at rest.
+   */
+  static function checkCoreXyPlotter(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/corexy/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var session = new ProjectDocumentSession(null, false);
+    session.openGeneratedProject(generated, manifest);
+    var definition = session.projectAssemblyDefinition, physical = session.projectPhysical;
+    if (definition == null || physical == null) throw "the plotter has no assembly to build a robot from";
+    var model = AssemblySimulationBridge.toRobotModel(definition, physical, session.projectAssemblyState).model;
+    check(model.couplings.length == 16 && model.actuators.length == 2, 'the plotter has 16 belt couplings and two motors, got ${model.couplings.length} and ${model.actuators.length}');
+    var leaders = new Map<String, Int>();
+    for (coupling in model.couplings) leaders.set(coupling.follower, (leaders.exists(coupling.follower) ? leaders.get(coupling.follower) : 0) + 1);
+    check(leaders.get("pulleyA-turn") == 2 && leaders.get("pulleyB-turn") == 2 && leaders.get("idlerAStart-turn") == 1,
+      "each motor's pulley follows two axes, a gantry idler one");
+    var compiled = RobotRuntimeCompiler.compile(model);
+    check(compiled.couplings.length == 16, "the runtime blueprint carries a coupling for each term");
+    var xLimits = model.coupledLimits("x"), yLimits = model.coupledLimits("y");
+    check(Math.abs(xLimits.velocity - 0.6496) < 1e-3 && Math.abs(xLimits.velocity - yLimits.velocity) < 1e-12,
+      'both axes get 650 mm/s from the two motors, got ${xLimits.velocity} and ${yLimits.velocity}');
+    check(xLimits.maxAcceleration > yLimits.maxAcceleration && yLimits.maxAcceleration > 20,
+      'the carriage accelerates harder than the gantry it rides: ${xLimits.maxAcceleration} against ${yLimits.maxAcceleration}');
+    Sys.println('corexy plotter: axes to ${Math.round(xLimits.velocity * 1e4) / 10} mm/s and ${Math.round(xLimits.maxAcceleration * 1e3) / 1e3} m/s²');
+    var world = new RobotWorld();
+    var simulation = new ApplicationSimulation(world);
+    simulation.setBackend(ApplicationSimulation.MUJOCO);
+    check(simulation.rebuild(session.sensors, session.scene, session), "the plotter builds in the shared simulation: " + simulation.error);
+    for (_ in 0...200) simulation.step();
+    var observed = world.snapshot().robots();
+    check(observed.length == 1, "the plotter is the one robot in the world");
+    var snapshot = observed[0];
+    var worst = 0.0;
+    for (joint in 0...model.joints.length) worst = Math.max(worst, Math.abs(snapshot.positions.get(joint)));
+    check(worst < 1e-3, 'the plotter holds at rest, its joints at most $worst from their start');
+    simulation.dispose();
+    session.dispose();
+  }
+
   static function checkMobileBase(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/mobile-base/materia.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
@@ -1321,6 +1362,10 @@ class ProjectSourceTests {
       checkMissionOverlayEdge();
       return 0;
     }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "corexy") {
+      checkCoreXyPlotter(root);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "arm") {
       checkRobotArm(root);
       return 0;
@@ -1610,6 +1655,7 @@ class ProjectSourceTests {
     checkMates(root);
     checkCncRouter(root);
     checkBeltRouter(root);
+    checkCoreXyPlotter(root);
     checkMobileBase(root);
     checkMobileMission(root);
     checkMobileObstacle(root);
