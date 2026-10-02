@@ -168,7 +168,7 @@ class Popup implements View {
 					var bounds = panel.resolved;
 					if (bounds == null) return;
 					canvas.drawBoxShadow(new Rect(bounds.x - geometry.x, bounds.y - geometry.y,
-						bounds.width, bounds.height), 0.0, 3.0, 9.0, 0.0,
+						bounds.width, bounds.height), 0.0, 4.0, 16.0, 0.0,
 						[0.0, 0.0, 0.0, 0.0], shadow);
 				});
 				root.add(shadowLayer);
