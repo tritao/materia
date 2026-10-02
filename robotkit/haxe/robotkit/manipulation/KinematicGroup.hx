@@ -299,6 +299,22 @@ class KinematicGroup {
   }
 
   /**
+   * The swivel angle's gradient at `q`, one value per group DOF (dψ = G · dq), or null without a
+   * swivel or where the angle is undefined.
+   */
+  public function swivelJacobian(q:Array<Float>, ?data:KinematicGroupData):Null<Array<Float>> {
+    if (swivel == null) return null;
+    var d = evaluate(q, data);
+    var probe:SwivelTask = d.swivelProbe;
+    var width = layout.width;
+    var residual = [0.0], row = [for (_ in 0...width) 0.0];
+    try probe.evaluate(d.state, d.snapshot, layout, residual, row, 0) catch (_:Dynamic) return null;
+    var gradient = [for (i in 0...dofs.length) row[i]];
+    for (value in gradient) if (!Math.isFinite(value)) return null;
+    return gradient;
+  }
+
+  /**
    * Inverse kinematics: joint values that put the tool centre point (or the
    * flange, `options.atFlange`) at `target`, in the reference frame, or with
    * `options.rootPose` in the world while the base moves too. Within the

@@ -107,6 +107,29 @@ class LinearAlgebra {
     return solve(normal, rhs, n);
   }
 
+  /**
+   * The same damped step solved in row space: `Δ = Jᵀ (J Jᵀ + λ²I)⁻¹ e`. Equal to `dampedStep` for
+   * any λ > 0, but for a redundant chain (fewer rows than columns) the rows x rows system stays
+   * well-posed as λ → 0, where `JᵀJ` is rank-deficient; it then gives the minimum-norm step.
+   */
+  public static function dampedRowStep(jacobian:Array<Float>, rows:Int, stride:Int, columns:Array<Int>,
+      residual:Array<Float>, damping:Float):Null<Array<Float>> {
+    var gram = [for (_ in 0...rows * rows) 0.0];
+    for (a in 0...rows)
+      for (b in 0...rows) {
+        var sum = 0.0;
+        for (column in columns) sum += jacobian[a * stride + column] * jacobian[b * stride + column];
+        gram[a * rows + b] = a == b ? sum + damping * damping : sum;
+      }
+    var y = solve(gram, residual, rows);
+    if (y == null) return null;
+    return [for (column in columns) {
+      var sum = 0.0;
+      for (row in 0...rows) sum += jacobian[row * stride + column] * y[row];
+      sum;
+    }];
+  }
+
   /** Numerical rank by Gauss-Jordan elimination, with pivots at or below `tolerance` x max |entry| treated as zero. */
   public static function rank(matrix:Array<Float>, rows:Int, cols:Int, tolerance:Float):Int {
     if (rows == 0 || cols == 0) return 0;

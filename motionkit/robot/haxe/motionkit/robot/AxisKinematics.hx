@@ -93,7 +93,7 @@ class AxisKinematics implements KinematicsSolver {
   /** Nothing here changes once built. */
   public function fork():KinematicsSolver return this;
 
-  public function solveDifferential(q:Array<Float>, twist:Twist6):Null<Array<Float>> {
+  public function solveDifferential(q:Array<Float>, twist:Twist6, ?preferredRate:Array<Float>):Null<Array<Float>> {
     requireJoints(q);
     if (twist == null) throw "Axis differential IK needs a tool twist";
     if (Math.abs(twist.angularX) > 1e-12 || Math.abs(twist.angularY) > 1e-12 ||
