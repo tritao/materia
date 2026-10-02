@@ -284,6 +284,19 @@ class TextEditorLayout {
 	public function measure():TextMetrics
 		return new TextMetrics(0.0, 0.0, contentWidth, contentHeight);
 
+	/** First visual caret of a logical paragraph, using retained shaping geometry. */
+	public function paragraphCaret(index:Int):TextCaret {
+		ensureLive();
+		if (index < 0 || index >= paragraphLineCount) throw "Paragraph index out of bounds";
+		return caret(new TextPosition(offsets.paragraphRangeAtIndex(index).start, 0));
+	}
+
+	/** Logical paragraph containing a vertical position in the shaped document. */
+	public function paragraphIndexAtY(y:Float):Int {
+		ensureLive();
+		return offsets.paragraphIndexAtOffset(hitTest(0.0, y).offset);
+	}
+
 	/** Measures this retained content against the constraints of a Custom node. */
 	public function measureForConstraints(constraints:LayoutMeasureConstraints):LayoutMeasureResult {
 		ensureLive();

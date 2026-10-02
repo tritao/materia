@@ -84,6 +84,8 @@ class TextField implements View {
 	public var onDiagnostics:Null<TextEditorDiagnostics->Void>;
 	/** Current logical-screen caret bounds after layout, or null when clipped out. */
 	public var onCaretRect:Null<Null<Rect>->Void>;
+	/** Borrowed retained text geometry after layout, for aligned companion views. */
+	public var onLayoutResolved:Null<TextEditorLayout->ResolvedLayoutItem->Void>;
 	/** Semantic role override used by composite editable controls. */
 	public var semanticRole:AccessibilityRole;
 	/** Semantic action capabilities override used by composite editable controls. */
@@ -104,6 +106,7 @@ class TextField implements View {
 		this.document = document;
 		this.onSubmit = null;
 		this.onCaretRect = null;
+		this.onLayoutResolved = null;
 		this.colorRangeProvider = null;
 		this.decorationProvider = null;
 		this.selectionProvider = null;
@@ -456,6 +459,7 @@ class TextField implements View {
 			});
 			textNode.onResolved(function(geometry) {
 				editor.updateLayout(geometry.width);
+				if (onLayoutResolved != null) onLayoutResolved(editor.layout, geometry);
 				if (multiline && !readOnly && editorContent.resolved != null &&
 					editor.ensureCaretVisible(editorContent.resolved.height))
 					refresh();

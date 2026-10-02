@@ -328,6 +328,14 @@ class FrameworkSmoke {
 				if (Math.abs(actual.x - fresh.x) > 0.001 || Math.abs(actual.y - fresh.y) > 0.001)
 					throw "newline chunk caret differs at step " + step + " offset " + offset;
 			}
+			for (paragraph in 0...current.paragraphCount()) {
+				var start = current.paragraphRangeAtIndex(paragraph).start;
+				var actual = editor.layout.paragraphCaret(paragraph);
+				var fresh = expected.layout.caret(new TextPosition(start, 0));
+				if (Math.abs(actual.y - fresh.y) > 0.001 || Math.abs(actual.x - fresh.x) > 0.001 ||
+					editor.layout.paragraphIndexAtY(actual.y) != paragraph)
+					throw "logical paragraph geometry differs after newline edit";
+			}
 			expected.dispose();
 		}
 		editor.dispose();
