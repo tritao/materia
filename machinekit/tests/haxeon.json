@@ -2,7 +2,7 @@
 	"version": 1,
 	"package": { "name": "machinekit-tests" },
 	"entry": "MachineKitSmoke",
-	"sourceRoots": ["src", "../examples", "../examples/robot-arm", "../examples/cnc-router", "../examples/mobile-base"],
+	"sourceRoots": ["src", "../examples", "../examples/robot-arm", "../examples/cnc-router", "../examples/mobile-base", "../examples/robot-welder"],
 	"dependencies": {
 		"projectkit": { "path": "../../projectkit" },
 		"manufacturingkit": { "path": "../../manufacturingkit" },
