@@ -727,6 +727,26 @@ int main() {
         word_layout.id, 20, 0, 0, 1, GlyphMode::Alpha, {}, fixed_colors);
     const int32_t shifted_delta = static_cast<int32_t>(shifted_layout.lines[20].text_offset) -
         static_cast<int32_t>(word_layout.lines[20].text_offset);
+    auto moved_colors = fixed_colors;
+    moved_colors[0].start += shifted_delta;
+    moved_colors[0].end += shifted_delta;
+    const auto moved_colored_row = shifted.published_glyphs_for_line(
+        word_layout.id, 20, 0, 0, 1, GlyphMode::Alpha, {}, moved_colors);
+    if (!moved_colored_row || moved_colored_row == old_colored_row ||
+        moved_colored_row->publication_key != old_colored_row->publication_key ||
+        moved_colored_row->source_start != old_colored_row->source_start + shifted_delta ||
+        !shifted.prepared_glyphs_current(*moved_colored_row) ||
+        shifted.prepared_glyphs_current(*old_colored_row) ||
+        moved_colored_row->vertices.size() != old_colored_row->vertices.size())
+        return 144;
+    for (size_t index = 0; index < moved_colored_row->vertices.size(); ++index) {
+        const auto &actual = moved_colored_row->vertices[index];
+        const auto &previous = old_colored_row->vertices[index];
+        if (actual.x != previous.x || actual.y != previous.y ||
+            actual.red != previous.red || actual.green != previous.green ||
+            actual.blue != previous.blue || actual.alpha != previous.alpha)
+            return 145;
+    }
     if (!new_word_row || !new_colored_row || new_colored_row == old_colored_row ||
         shifted_delta == 0 || new_word_row == old_word_row ||
         new_word_row->source_start != old_word_row->source_start + shifted_delta ||

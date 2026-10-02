@@ -919,8 +919,9 @@ std::shared_ptr<const PreparedGlyphs> TextEngine::publish_glyphs(TextLayoutId id
                 continue;
         }
         relevant_ranges.push_back(range);
-        mix(static_cast<uint64_t>(range.start));
-        mix(static_cast<uint64_t>(range.end));
+        const int32_t color_origin = single_line ? layout->line_ranges[line_index].start : 0;
+        mix(static_cast<uint64_t>(range.start - color_origin));
+        mix(static_cast<uint64_t>(range.end - color_origin));
         mix(static_cast<uint64_t>(range.tint.red) << 24 |
             static_cast<uint64_t>(range.tint.green) << 16 |
             static_cast<uint64_t>(range.tint.blue) << 8 | range.tint.alpha);
@@ -929,7 +930,7 @@ std::shared_ptr<const PreparedGlyphs> TextEngine::publish_glyphs(TextLayoutId id
     if (const auto found = state_->published_glyphs.find(key);
         found != state_->published_glyphs.end()) {
         if (auto cached = found->second.lock()) {
-            if (single_line && relevant_ranges.empty() && cached->source_start >= 0 &&
+            if (single_line && cached->source_start >= 0 &&
                 cached->source_start != layout->line_ranges[line_index].start &&
                 cached->line_revision == layout->line_revisions[line_index]) {
                 const int32_t delta = layout->line_ranges[line_index].start - cached->source_start;
