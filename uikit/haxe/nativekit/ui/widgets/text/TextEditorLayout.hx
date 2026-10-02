@@ -198,7 +198,7 @@ class TextEditorLayout {
 			return;
 		}
 		if (nextOffsets.paragraphCount() != paragraphLineCount) {
-			setTextAfterParagraphEdit(nextOffsets, oldStart, oldEnd,
+			setTextAfterParagraphEdit(nextOffsets, oldStart, oldEnd, newStart, newEnd,
 				oldDocumentLength);
 			return;
 		}
@@ -297,7 +297,8 @@ class TextEditorLayout {
 
 	/** Keeps chunks outside a newline edit and repartitions only its neighborhood. */
 	function setTextAfterParagraphEdit(nextOffsets:TextDocument,
-			oldStart:Int, oldEnd:Int, oldDocumentLength:Int):Void {
+			oldStart:Int, oldEnd:Int, newStart:Int, newEnd:Int,
+			oldDocumentLength:Int):Void {
 		var previous = paragraphs;
 		var first = paragraphIndexAtOffsetIn(previous, oldStart, oldDocumentLength);
 		var last = paragraphIndexAtOffsetIn(previous, oldEnd, oldDocumentLength);
@@ -345,7 +346,19 @@ class TextEditorLayout {
 				record = new TextEditorParagraphRecord(chunkText,
 					TextLayout.create(fonts, chunkText, width, textStyle, paragraphStyle));
 			else if (record.text != chunkText) {
-				record.layout.update(chunkText, width, textStyle, paragraphStyle);
+				// Keep only source-mapped prefix/suffix portions. Repartitioned
+				// boundaries may change both ends of a chunk, so the middle
+				// replacement includes any newly assigned neighboring text.
+				var prefix = record.start == chunkStart ?
+					clamp(Std.int(Math.min(oldStart, newStart)) - chunkStart, 0,
+						Std.int(Math.min(record.end - record.start, chunkEnd - chunkStart))) : 0;
+				var suffix = record.end + delta == chunkEnd ?
+					Std.int(Math.min(record.end - Math.max(oldEnd, record.start),
+						chunkEnd - Math.max(newEnd, chunkStart))) : 0;
+				suffix = clamp(suffix, 0, Std.int(Math.min(record.end - record.start - prefix,
+					chunkEnd - chunkStart - prefix)));
+				record.layout.edit(prefix, record.end - record.start - suffix,
+					nextOffsets.sliceCodepoints(chunkStart + prefix, chunkEnd - suffix), chunkText);
 				record.renderRanges = null;
 				record.text = chunkText;
 			}

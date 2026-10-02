@@ -245,6 +245,41 @@ import nativekit.ui.host.UiApplication;
 import nativekit.ui.host.UiHostPendingResources;
 
 class FrameworkSmoke {
+	static function newlineChunksValid(fonts:FontCollection):Bool {
+		var value = new StringBuf();
+		for (line in 0...220)
+			value.add("é🙂 x " + line + "\n");
+		var editor = new TextEditorState(fonts, value.toString());
+		editor.paragraphStyle.lineHeight = 24.0;
+		editor.updateLayout(400.0);
+		for (step in 0...4) {
+			var offsets = new nativekit.editorkit.TextDocument(editor.text);
+			var start = step == 0 ? 0 : offsets.paragraphRangeAtIndex(step == 3 ? 190 : 63).start;
+			var end = step == 2 ? offsets.paragraphRangeAtIndex(67).start : start;
+			var inserted = step == 0 ? "\n" : (step == 2 ? "α🙂 joined\n" : "α\nβ\n");
+			if (!editor.replace(start, end, inserted))
+				throw "newline chunk replacement was ignored";
+			var expected = new TextEditorState(fonts, editor.text);
+			expected.paragraphStyle.lineHeight = 24.0;
+			expected.updateLayout(400.0);
+			var actualSize = editor.layout.measure();
+			var expectedSize = expected.layout.measure();
+			if (Math.abs(actualSize.height - expectedSize.height) > 0.001 ||
+				Math.abs(actualSize.width - expectedSize.width) > 0.001)
+				throw "newline chunk metrics differ from fresh layout";
+			var current = new nativekit.editorkit.TextDocument(editor.text);
+			for (offset in 0...current.codepointCount + 1) {
+				var actual = editor.layout.caret(new TextPosition(offset, 0));
+				var fresh = expected.layout.caret(new TextPosition(offset, 0));
+				if (Math.abs(actual.x - fresh.x) > 0.001 || Math.abs(actual.y - fresh.y) > 0.001)
+					throw "newline chunk caret differs at step " + step + " offset " + offset;
+			}
+			expected.dispose();
+		}
+		editor.dispose();
+		return true;
+	}
+
 	static function foregroundRangesValid(fonts:FontCollection):Bool {
 		var value = new StringBuf();
 		for (_ in 0...150)
@@ -396,6 +431,8 @@ class FrameworkSmoke {
 			return 2;
 		var fonts = FontCollection.create();
 		fonts.add(fontPath);
+		if (!newlineChunksValid(fonts))
+			return 310;
 		if (!foregroundRangesValid(fonts))
 			return 308;
 		if (!decorationRangesValid(fonts))
