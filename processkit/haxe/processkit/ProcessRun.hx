@@ -23,6 +23,8 @@ class ProcessRun {
   public var currentFeed(default, null):Float;
   public var lastProgramStart(default, null):Float = 0.0;
   public var interruptedAt(default, null):Float = 0.0;
+  /** Index, in the program `takeProgram` last returned, of the operation that follows the path. */
+  public var followOp(default, null):Int = 0;
   var pendingBackoff:Float = 0.0;
   var pausedForFeed:Bool = false;
 
@@ -57,7 +59,7 @@ class ProcessRun {
         if (device.fault() != null) interrupt(distance, "device fault", recipe.recoveryBackoff);
       case Active:
         if (device.fault() != null) interrupt(distance, "device fault", recipe.recoveryBackoff);
-        else if (distance >= path.length()) {
+        else if (distance >= path.length() && !disengages()) {
           device.safe();
           transition(ProcessRunState.Completion, path.length(), "path complete");
         }
@@ -86,14 +88,47 @@ class ProcessRun {
     lastProgramStart = startDistance;
     var continuation = ProcessPathSlice.from(path, startDistance);
     var events = processEvents(startDistance, currentFeed);
-    var program = new MotionProgram([
+    var approach = recipe.approachSpeed;
+    var engagement = recipe.engagement;
+    var ops:Array<MotionOp> = [
       MotionOp.MoveL(continuation.waypointAt(0.0).pose, path.frameId,
-        currentFeed, Blend.ExactStop),
-      MotionOp.FollowPath(continuation, path.frameId, currentFeed, events)
-    ]);
+        approach == null ? currentFeed : approach, Blend.ExactStop)
+    ];
+    if (engagement != null) for (op in engagement.entry) ops.push(op);
+    followOp = ops.length;
+    ops.push(MotionOp.FollowPath(continuation, path.frameId, currentFeed, events));
+    if (engagement != null) for (op in engagement.exit) ops.push(op);
+    var program = new MotionProgram(ops);
     transition(ProcessRunState.Active, startDistance,
       startDistance > 0.0 ? "resume after backoff" : "begin process");
     return program;
+  }
+
+  /**
+   * The run is over because the program it handed out is done, exit included: the device is made safe and the run
+   * completes. Needed only with an engagement that has an exit; without one the run completes by itself at the
+   * path's end.
+   */
+  public function finish():Void {
+    if (state != ProcessRunState.Active) throw "Only an active process run can finish";
+    device.safe();
+    transition(ProcessRunState.Completion, path.length(), "program complete");
+  }
+
+  /**
+   * Interrupts the run now, at path `distance`, for a reason the device did not report as a fault: the caller's own
+   * watch on the process, such as an arc that never established. Recovery follows as after a fault.
+   */
+  public function interruptNow(distance:Float, reason:String):Void {
+    requireDistance(distance);
+    if (state != ProcessRunState.Active && state != ProcessRunState.Ready && state != ProcessRunState.Recovery)
+      throw "Only a running process can be interrupted";
+    interrupt(distance, reason, recipe.recoveryBackoff);
+  }
+
+  function disengages():Bool {
+    var engagement = recipe.engagement;
+    return engagement != null && engagement.exit.length > 0;
   }
 
   function canRecover():Bool return motionSession.state == SessionState.Held ||
@@ -156,7 +191,7 @@ class ProcessRun {
         EventValue.Analog(active ? recipe.rateForSpeed(feed) : 0.0),
         active ? recipe.triggerLeadSeconds : 0.0, HoldPolicy.RestoreOnResume));
     }
-    events.push(new PathEvent(remaining, channel, EventValue.Analog(0.0)));
+    if (!disengages()) events.push(new PathEvent(remaining, channel, EventValue.Analog(0.0)));
     return events;
   }
 

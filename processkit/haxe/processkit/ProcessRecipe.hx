@@ -14,11 +14,15 @@ class ProcessRecipe {
   public final triggerLeadSeconds:Float;
   public final recoveryBackoff:Float;
   public final feedChangePolicy:FeedChangePolicy;
+  /** What engages the process before its path and disengages it after, or null for none. */
+  public final engagement:Null<ProcessEngagement>;
+  /** Feed of the move that brings the tool to the start of the path, or null for the process feed. */
+  public final approachSpeed:Null<Float>;
 
   public function new(minSpeed:Float, maxSpeed:Float, nominalSpeed:Float,
       standoff:Float, orientationPolicy:OrientationPolicy, passSpacing:Float,
       quantityPerDistance:Float, triggerLeadSeconds:Float, recoveryBackoff:Float,
-      feedChangePolicy:FeedChangePolicy) {
+      feedChangePolicy:FeedChangePolicy, ?engagement:ProcessEngagement, ?approachSpeed:Float) {
     if (!Math.isFinite(minSpeed) || minSpeed <= 0.0 ||
         !Math.isFinite(maxSpeed) || maxSpeed < minSpeed ||
         !Math.isFinite(nominalSpeed) || nominalSpeed < minSpeed ||
@@ -29,6 +33,10 @@ class ProcessRecipe {
         triggerLeadSeconds < 0.0 || !Math.isFinite(recoveryBackoff) ||
         recoveryBackoff < 0.0 || feedChangePolicy == null)
       throw "Process recipe needs finite positive speed, spacing, quantity and valid policy";
+    if (approachSpeed != null && !(approachSpeed > 0.0 && Math.isFinite(approachSpeed)))
+      throw "Process recipe approach speed must be finite and positive";
+    this.engagement = engagement;
+    this.approachSpeed = approachSpeed;
     this.minSpeed = minSpeed;
     this.maxSpeed = maxSpeed;
     this.nominalSpeed = nominalSpeed;

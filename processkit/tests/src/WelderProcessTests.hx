@@ -1,4 +1,20 @@
 import haxe.Int64;
+import motionkit.event.EventValue;
+import motionkit.kinematics.Pose3;
+import motionkit.path.OrientationPolicy;
+import motionkit.path.PoseLine;
+import motionkit.path.PosePath;
+import motionkit.path.PoseWaypoint;
+import motionkit.program.InputPredicate;
+import motionkit.program.MotionOp;
+import motionkit.program.MotionProgram;
+import motionkit.robot.MotionSession;
+import processkit.ChannelWelderOutputs;
+import processkit.FeedChangePolicy;
+import processkit.ProcessEngagement;
+import processkit.ProcessRecipe;
+import processkit.ProcessRun;
+import processkit.ProcessRunState;
 import processkit.WelderFeedback;
 import processkit.WelderOutputs;
 import processkit.WelderProcessDevice;
@@ -104,8 +120,124 @@ class WelderProcessTests {
     expectFailure(function() new WelderProcessDevice(supply, supply, {arc: "a", wireSpeed: "a", voltage: "v"}, {voltage: 24.0}),
       "channels must be distinct");
     expectFailure(function() new WelderProcessDevice(supply, supply, channels, {voltage: 0.0}), "a setpoint voltage must be positive");
+    runEngagement();
+    runChannelOutputs();
     Sys.println('ProcessKit welder tests passed ($assertions assertions)');
     return assertions;
+  }
+
+  static function seamPath():PosePath {
+    var start = new PoseWaypoint(new Pose3(0.0, 0.0, 0.0), 0.001, 0.001);
+    var end = new PoseWaypoint(new Pose3(0.18, 0.0, 0.0), 0.001, 0.001);
+    return new PosePath("arm-base", [new PoseLine(start, end, OrientationPolicy.Interpolated, 0.1, 0.0115)]);
+  }
+
+  static function kinds(program:MotionProgram):String
+    return [for (op in program.ops) switch op {
+      case MoveJ(_, _, _): "MoveJ";
+      case MoveL(_, _, _, _): "MoveL";
+      case MoveC(_, _, _, _, _): "MoveC";
+      case FollowPath(_, _, _, _): "FollowPath";
+      case Dwell(_): "Dwell";
+      case SetOutput(_, _): "SetOutput";
+      case WaitInput(_, _, _): "WaitInput";
+    }].join(",");
+
+  /**
+   * A process with an engagement: its entry follows the approach move and its exit the path; the path's events do not
+   * zero the process output at the end (the exit does); the run does not end at the path's end but when the caller says the
+   * program is done; and a restart engages again.
+   */
+  static function runEngagement():Void {
+    var supply = new ModelWelder();
+    var channels = {arc: "tool/torch.arc", wireSpeed: "tool/torch.wire_speed", voltage: "tool/torch.voltage"};
+    var device = new WelderProcessDevice(supply, supply, channels, {voltage: 24.0});
+    var entry = [MotionOp.SetOutput(channels.arc, EventValue.Digital(true)),
+      MotionOp.WaitInput("weld.arc_established", InputPredicate.Equals(EventValue.Digital(true)), 2.0), MotionOp.Dwell(0.15)];
+    var exit = [MotionOp.Dwell(0.15), MotionOp.SetOutput(channels.wireSpeed, EventValue.Analog(0.0)),
+      MotionOp.SetOutput(channels.arc, EventValue.Digital(false))];
+    var recipe = new ProcessRecipe(0.005, 0.03, 0.0115, 0.0, OrientationPolicy.Interpolated, 0.001, 8.0 / 0.0115, 0.0, 0.01,
+      FeedChangePolicy.Reject, new ProcessEngagement(entry, exit), 0.08);
+    var session = new MotionSession();
+    var run = new ProcessRun(recipe, seamPath(), device, channels.wireSpeed, session);
+    run.start();
+    run.update(0.0);
+    check(run.state == ProcessRunState.Ready, "a prepared welder is ready");
+    var program = run.takeProgram();
+    check(kinds(program) == "MoveL,SetOutput,WaitInput,Dwell,FollowPath,Dwell,SetOutput,SetOutput",
+      "the approach, then the entry, the path and the exit: " + kinds(program));
+    check(run.followOp == 4, "the path is the fifth operation");
+    switch program.ops[0] {
+      case MoveL(_, _, feed, _): near(feed, 0.08, "the approach moves at the recipe's approach speed");
+      case _: check(false, "the program begins with a straight move");
+    }
+    switch program.ops[4] {
+      case FollowPath(_, _, feed, events):
+        near(feed, 0.0115, "the seam is followed at the travel speed");
+        check(events.length == 1, "the path sets the wire speed once and does not zero it at the end");
+        switch events[0].value {
+          case Analog(rate): near(rate, 8.0, "the wire speed is the rate for the travel speed");
+          case _: check(false, "the wire speed is an analogue value");
+        }
+      case _: check(false, "the fifth operation follows the path");
+    }
+    run.update(0.18);
+    check(run.state == ProcessRunState.Active, "at the path's end the run stays active through the exit");
+    run.finish();
+    check(run.state == ProcessRunState.Completion && !supply.arc && supply.wireSpeed == 0.0, "finish ends the run and makes the device safe");
+    expectFailure(function() run.finish(), "a finished run cannot finish again");
+
+    // An interruption at 0.09 m restarts 10 mm back, and the restart engages again.
+    var again = new ProcessRun(recipe, seamPath(), device, channels.wireSpeed, session);
+    again.start();
+    again.update(0.0);
+    again.takeProgram();
+    again.interruptNow(0.09, "the arc did not establish");
+    check(again.state == ProcessRunState.ControlledInterruption && !supply.arc, "an interruption made safe");
+    again.update(0.09);
+    check(again.state == ProcessRunState.Recovery, "and recovers once the motion is at rest");
+    var restart = again.takeProgram();
+    near(again.lastProgramStart, 0.08, "the restart backs up the recovery distance");
+    check(kinds(restart) == kinds(program), "and engages and disengages again");
+    expectFailure(function() again.interruptNow(0.5, "off the path"), "an interruption has to be on the path");
+
+    // Without an engagement the run ends at the path's end, as it always did.
+    var plain = new ProcessRun(new ProcessRecipe(0.005, 0.03, 0.0115, 0.0, OrientationPolicy.Interpolated, 0.001, 8.0 / 0.0115, 0.0,
+      0.01, FeedChangePolicy.Reject), seamPath(), device, channels.wireSpeed, new MotionSession());
+    plain.start();
+    plain.update(0.0);
+    check(kinds(plain.takeProgram()) == "MoveL,FollowPath" && plain.followOp == 1, "a plain process is a move and a path");
+    plain.update(0.18);
+    check(plain.state == ProcessRunState.Completion, "and ends at the path's end");
+  }
+
+  /** The channel outputs hold writes until a program carries them out. */
+  static function runChannelOutputs():Void {
+    var channels = {arc: "a", wireSpeed: "w", voltage: "v"};
+    var outputs = new ChannelWelderOutputs(channels);
+    check(outputs.drain().length == 0, "nothing is written until something is");
+    outputs.setVoltage(24.0);
+    outputs.setArc(false);
+    outputs.setWireSpeed(0.0);
+    outputs.setWireSpeed(8.0);
+    var ops = outputs.drain();
+    check(ops.length == 3, "each channel written is one operation, the last write winning");
+    check(switch ops[0] {
+      case SetOutput("v", Analog(24.0)): true;
+      case _: false;
+    } && switch ops[1] {
+      case SetOutput("w", Analog(8.0)): true;
+      case _: false;
+    } && switch ops[2] {
+      case SetOutput("a", Digital(false)): true;
+      case _: false;
+    }, "the voltage first, then the wire, then the arc");
+    check(outputs.drain().length == 0, "and they are written once");
+  }
+
+  static function near(actual:Float, expected:Float, message:String):Void {
+    assertions++;
+    if (!(Math.abs(actual - expected) < 1e-9)) throw '$message: expected $expected, got $actual';
   }
 
   static function expectFailure(action:Void -> Void, message:String):Void {
