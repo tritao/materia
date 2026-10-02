@@ -21,13 +21,32 @@ import machinekit.robotics.RobotFlange;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
+/** What the arm carries on its tool flange: the end effector built for that flange, and the
+ * connectors and service inlets of it that the arm publishes as its own. The arm includes the
+ * effector as `tool`, so `expose` names its members `tool/<member>`.
+ */
+interface ArmTool {
+	function build(flange:RobotFlange):EndEffector;
+	/** Publishes the tool's connectors and the service inlets that must be supplied from outside. */
+	function expose(arm:MachineAssembly):Void;
+}
+
 /** Suction tool for the arm's ISO 9409-1 style tool flange: an adapter plate, a frame bar, and a
  * catalog ejector, cup, fitting and hose, arranged like the fixed EOAT in `examples/eoat`, with an
  * inline vacuum sensor between the ejector and the hose that tells a sealed cup from an open one.
- * Its `contact` working frame is the cup's contact face.
+ * Its `contact` working frame is the cup's contact face. The arm publishes `toolContact` and the
+ * ejector's `compressedAir` inlet.
  */
-class ArmSuctionTool {
-	public static function build(flange:RobotFlange):EndEffector {
+class ArmSuctionTool implements ArmTool {
+	public function new() {}
+
+	public function expose(arm:MachineAssembly):Void {
+		arm.exposeConnector("toolContact", "tool/cup", "contact");
+		// The ejector's compressed-air inlet is the arm's own service input.
+		arm.exposePort("compressedAir", "tool/ejector", "air");
+	}
+
+	public function build(flange:RobotFlange):EndEffector {
 		var result = new EndEffector();
 		result.addComponent("plate", new EndEffectorPlate(flange));
 		result.addComponent("bar", new FrameBar(30, 20, 90));
@@ -123,7 +142,7 @@ typedef ArmJointSpec = {
 	var initial:Float;
 }
 
-/** Six-axis serial arm on a pedestal with a suction tool, in the classic shoulder/elbow/spherical-wrist layout.
+/** Six-axis serial arm on a pedestal with the caller's tool (a suction tool by default), in the classic shoulder/elbow/spherical-wrist layout.
  *
  * At zero on every joint the arm points straight up. Joints `j1`, `j4` and `j6` turn about the
  * vertical (j6 about the tool axis), while `j2`, `j3` and `j5` pitch about a horizontal axis.
@@ -154,8 +173,9 @@ class RobotArm extends MachineAssembly {
 	public final links:Array<ArmLink>;
 	public final specs:Array<ArmJointSpec>;
 
-	public function new(withCell:Bool = true) {
+	public function new(withCell:Bool = true, ?armTool:ArmTool) {
 		super();
+		if (armTool == null) armTool = new ArmSuctionTool();
 		pedestal = new Pedestal(flange, PEDESTAL_HEIGHT, 100);
 		var j1 = new ArmJoint(100, 70), j2 = new ArmJoint(100, 90), j3 = new ArmJoint(80, 90);
 		var j4 = new ArmJoint(70, 60), j5 = new ArmJoint(60, 70), j6 = new ArmJoint(55, 40, toolFlange);
@@ -194,13 +214,11 @@ class RobotArm extends MachineAssembly {
 		}
 		addComponent("toolFlange", toolFlange);
 		revolute(specs[5], "joint6", "tool", "toolFlange", "face");
-		tool = ArmSuctionTool.build(toolFlange);
+		tool = armTool.build(toolFlange);
 		include("tool", tool);
 		addMate("tool-mount", "fixed", "toolFlange", "face", "tool/plate", "robot");
 		exposeConnector("toolFace", "toolFlange", "face");
-		exposeConnector("toolContact", "tool/cup", "contact");
-		// The ejector's compressed-air inlet is the arm's own service input.
-		exposePort("compressedAir", "tool/ejector", "air");
+		armTool.expose(this);
 		exposeConnector("floor", "pedestal", "floor");
 		if (withCell) addCell();
 	}
