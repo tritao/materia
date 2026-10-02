@@ -1,0 +1,156 @@
+# Transmissions plan
+
+Goal: machines drive their axes the way real ones do. Motors turn screws,
+pulleys and pinions; carriages follow at the ratio the parts give; and axis
+speed and acceleration limits come from the motor and the drive instead of
+being written by hand. Lead screws, belts, rack and pinion and gears are one
+concept, a linear coupling between joints. CoreXY-style drives are the same
+concept with more than one leader.
+
+## What exists (X0 survey, 2026-10-02)
+
+One coupling, `follower = leader × ratio + offset`, already runs end to end:
+
+- **Assembly** (`projectkit` `AssemblyJointCoupling {id, source, target,
+  ratio, offset}`): validated (non-zero ratio, one source per target, no
+  cycles, a target is never `driven`), flattened through nesting, and
+  propagated by `AssemblyState`. CadKit authors it with
+  `AssemblyModel.couple` and persists it as a `cadkit.coupling` relationship
+  between occurrences. Mate solving leaves coupled joints alone.
+- **KinematicsKit**: coupled joints share their source's degree of freedom
+  (scaled Jacobian columns, intersected ranges).
+- **RobotKit**: `JointCoupling {leader, follower, ratio, offset}` in
+  `RobotModel`, the runtime blueprint (`rk_robot_joint_coupling`, up to 512),
+  validation of plans, segments and commands (a consistency check, nothing
+  solved), the RKD6 device compiler, the CadKit bridge (mm→m rescaling) and
+  URDF `<mimic>`. Actuators reach joints through `SimpleTransmission`
+  (`joint = offset + actuator / ratio`); devices carry `steps_per_unit`.
+- **SimKit**: the core backend enforces couplings kinematically; MuJoCo uses
+  a joint equality (`mjEQ_JOINT`, polycoef offset and ratio).
+- **MotionKit**: `MotionSystemBlueprint` maps axes to scaled joints;
+  `ProgramCompiler` projects follower coefficients after timing.
+- **MachineKit**: `LinearAxis` couples its carriage to a turning screw through
+  `LeadScrewTransmission`; `LeadScrewNut`/`LeadScrewThread` give a signed
+  lead. `GearPair`, `Rack`, `SpurGear`, `TimingPulley` and `Sprocket` carry
+  pitch data but are geometry only.
+
+What is missing:
+
+- The CNC router models no drive train. Its four NEMA 23 motors and Tr10×2
+  screws are fixed parts, and its axis limits are hand-written `specs`.
+- `CncProgramPlayer`/`PlanExecutor` plan over a three-joint chain and hold every
+  other joint still. With coupled screws, the plans would fail segment validation.
+- `ToolpathMotionBinding` scales a follower's limits from the axis but never
+  lets a follower's own limit (screw or motor rpm) cap the axis.
+- MuJoCo gives every non-fixed joint its own motor and servo, coupled
+  followers included. The joint equality is relative to `qpos0`, so a
+  non-zero initial position may disagree with the coupling's offset.
+- Coupling ratios are bare numbers. Nothing derives them from a screw's lead,
+  a pulley's teeth or a gear pair. `MachineKitRobotCompiler` expresses a lead
+  screw two ways (a coupling, or a transmission on the prismatic joint).
+- CadKit documents drop `overtravel` and `acceleration` limits on save.
+- No motor data beyond dimensions: no torque, speed or rotor inertia.
+- Couplings have one leader, so CoreXY and differentials cannot be expressed.
+  No belt component exists.
+- Naming differs between layers (`source/target` vs `leader/follower`;
+  KinematicsKit's `couple(target, source)` order).
+
+## Design decisions
+
+- **One primitive.** A transmission is a linear coupling between joints. No
+  helical joint: a screw turns in its bearings (revolute), the nut's carriage
+  slides (prismatic), and a screw coupling ties them. Mates that leave a
+  screw motion stay rejected.
+- **The leader is the planned coordinate, not the cause.** A coupling is a
+  holonomic constraint, so either end can lead. Machine axes (the carriages)
+  lead, and screws, pulleys and motor rotors follow. That is what toolpaths
+  are planned in, and it lets one axis drive two screws (the router's dual
+  Y). Actuators sit on the motor joints and reach the axis through the
+  coupling, which the device compiler already handles.
+- **Ratios come from parts.** A coupling records its kind and the parts that
+  define it: screw (lead and hand of the screw), gear pair (teeth), rack and
+  pinion (module and teeth), belt (pulley pitch radius). The ratio is derived
+  from those parts, so it is stored in one place. A plain ratio stays for
+  imported `<mimic>` joints.
+- **Every coupled joint's limits bind the axis.** Axis velocity is the minimum
+  of its own limit and each follower's limit divided by |scale|. Motor joints
+  get their limits from the motor catalogue.
+- **Only declared actuators are actuated** in simulation, not every joint.
+
+## Milestones
+
+### X1 — The router turns its screws
+
+Kinematics through the whole stack, with ratios still given as numbers.
+
+- `CncRouter`: the screws sit on revolute joints in their bearings, and each
+  motor's rotor is a part of its screw's body, joined by the shaft coupling.
+  Couplings run from x, y and z to their screws, with the lead and sign taken
+  from the screw's thread. Dual Y means two screws follow `y`.
+- Planning keeps couplings. `CncProgramPlayer`, `PlanExecutor` and
+  `ProgramCompiler` plan the axes and project the followers, so plans pass
+  `validate_segments_for_blueprint`.
+- `ToolpathMotionBinding`: follower limits cap the axis.
+- SimKit/MuJoCo: actuate only joints with actuators (and plain joints with no
+  coupling). Set the equality reference so the offset holds at any initial
+  position.
+- CadKit documents keep `overtravel` and `acceleration`.
+- **Gate:** the router machines the motor plate as before (same removed
+  volume, cycle within 1%). A test checks screw speed = feed / lead. Screws
+  visibly turn in the editor. RobotKit, MotionKit, SimKit, CadKit and app
+  suites pass.
+
+### X2 — Ratios from parts
+
+- CadKit coupling relationships gain a kind: `Ratio`, `Screw`, `Gear`,
+  `RackPinion`, `Belt`. Each references the occurrences that define it.
+- MachineKit components expose their transmission data in one shape:
+  `LeadScrewNut` (signed lead), `GearPair` (teeth), `Rack` with a `SpurGear`
+  (module, teeth), `TimingPulley` (pitch radius).
+- `LinearAxis` and the router use them. `MachineKitRobotCompiler` keeps one
+  lead-screw path, the coupling.
+- One naming across layers (`leader/follower`), and one argument order.
+- **Gate:** changing the screw's lead in the router changes the coupling
+  ratio and the derived axis limits with no other edit.
+
+### X3 — Motors as actuators, limits derived
+
+- Motor catalogue data for NEMA 17/23: holding torque, a simple torque-speed
+  (pull-out) curve, rotor inertia and steps per revolution.
+- An `Actuator` comes from a motor part: max rate, effort and steps per
+  revolution. Device deployments get steps per unit from the motor, the
+  microstepping and the ratio.
+- Axis limits come from the drive: velocity from motor speed × travel per
+  radian (capped by screw critical speed later). Acceleration from motor
+  torque through the ratio, against the moving mass (CAD mass properties)
+  plus reflected rotor and screw inertia.
+- The router's hand-written `specs` go away.
+- **Gate:** the router's derived limits are close to today's hand-written
+  ones, documented, and the plate still machines.
+
+### X4 — Belts
+
+- `TimingBelt`: a closed loop around pulleys and idlers. Its length and tooth
+  count come from the pitch, and one strand clamps to a carriage.
+- Belt couplings (pulley joint → carriage) derived from the pulley.
+- Rendering: the belt moves along its loop, and the pulleys and screws turn.
+- A machine that uses them. Either the router gets a belt-driven option on
+  X/Y, or a small belt gantry is added.
+- **Gate:** a belt axis machines a program; the belt's teeth move at carriage
+  speed.
+
+### X5 — Couplings with more than one leader (CoreXY)
+
+- `follower = Σ ratioᵢ × leaderᵢ + offset` across the assembly, KinematicsKit,
+  the RobotKit model and blueprint (ABI change), validation, the device
+  compiler, and SimKit. MuJoCo uses a fixed tendon with a tendon equality;
+  the core backend projects the sum.
+- A CoreXY gantry example, such as a plotter or a laser.
+- **Gate:** the CoreXY machine runs a program in simulation and on the
+  virtual device, and moving one motor moves the head diagonally.
+
+### Later
+
+Belt stretch and screw backlash in simulation (following error), screw
+critical speed and efficiency (back-driving a vertical Z), gearboxes as
+components, an editor UI to author couplings, and differentials.
