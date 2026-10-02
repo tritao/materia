@@ -764,7 +764,7 @@ class ProjectSourceTests {
     }
     var allocatedPerTick = (hl.Gc.totalAllocated() - allocatedBefore) / steps;
     var collections = hl.Gc.collections() - collectionsBefore;
-    // About 56 KB a tick when measured (2026-10-02): mostly robot snapshots, then the stock's cut moves.
+    // About 42 KB a tick when measured (2026-10-02, sensor values pooled per snapshot): mostly robot snapshots, then the stock's cut moves.
     check(allocatedPerTick < 80000, 'the router allocates under 80 KB a simulated tick, got ${Math.round(allocatedPerTick)} bytes');
     // The pass ends with the drill; the next pass, started as this one is counted, loads the end mill again.
     var changes = tools.join(",");
