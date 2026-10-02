@@ -499,7 +499,7 @@ class ScriptOwnership {
       case "updateRate":
         if (numeric < 0 || numeric > 10000) throw "Invalid sensor update rate";
       case "rayCount":
-        if (item.kind != "integer" || numeric < 1 || numeric > 64) throw "Invalid LiDAR ray count";
+        if (item.kind != "integer" || numeric < 1 || numeric > 360) throw "Invalid LiDAR ray count";
       case "maxRange" | "mass":
         if (numeric <= 0) throw "Override value must be positive";
       case "fieldOfViewRadians":

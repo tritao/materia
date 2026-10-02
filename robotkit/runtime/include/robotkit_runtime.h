@@ -80,13 +80,13 @@ enum {
     RK_TRAJECTORY_COEFFICIENT_STRIDE = 6, /**< Coefficients per joint and segment: degree 0 through 5. */
     RK_MAX_TRAJECTORY_QUEUE_POINTS = 4096, /**< Maximum queued segment-start knots and events. */
     RK_MAX_SENSORS = 8,
-    RK_MAX_SENSOR_VALUES = 64,
+    RK_MAX_SENSOR_VALUES = 360, /**< Values one sensor reports: LiDAR rays, a degree apart round the circle. */
     RK_MAX_PROCESS_CHANNELS = 32,
     RK_MAX_EVENT_RECORDS = 64,
     RK_PROCESS_CHANNEL_ID_BYTES = 48,
     RK_PROCESS_COMMAND_BYTES = 48,
     RK_MAX_JOINT_COUPLINGS = 512,
-    RK_API_VERSION = 21 /**< Adds simulation virtual-device link-loss injection. */
+    RK_API_VERSION = 22 /**< Sensor samples carry up to 360 values. */
 };
 
 /** Result returned by RobotKit C ABI functions. */

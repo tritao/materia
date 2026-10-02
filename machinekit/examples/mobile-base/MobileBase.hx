@@ -169,8 +169,8 @@ class LidarPuck extends MachineComponent {
 	public static inline var DIAMETER:Float = 76;
 	public static inline var HEIGHT:Float = 70;
 	public static inline var SCAN_HEIGHT:Float = 50;
-	/** 64 returns (the most a RobotKit sensor reports), ten scans a second, out to six metres. */
-	public static inline var RAYS:Int = 64;
+	/** One return per degree (the most a RobotKit sensor reports), ten scans a second, out to six metres. */
+	public static inline var RAYS:Int = 360;
 	public static inline var RANGE:Float = 6;
 	public static inline var RATE:Float = 10;
 

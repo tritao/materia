@@ -251,7 +251,7 @@ class ProjectKitTests {
       sensed[0].maxRange == 6.0 && sensed[0].updateRate == 10.0, "robot sensor round trip");
     data.robotSensors[0].mount.connector = "nowhere";
     rejects(function() SceneArtifact.encode(data), "sensor mounted on a missing connector");
-    data.robotSensors[0].mount.connector = "pin"; data.robotSensors[0].rayCount = 65;
+    data.robotSensors[0].mount.connector = "pin"; data.robotSensors[0].rayCount = 361;
     rejects(function() SceneArtifact.encode(data), "sensor with more rays than a runtime reports");
     data.robotSensors[0].rayCount = 64; data.robotSensors.push({kind: "lidar", id: "chassis/scanner",
       mount: {occurrence: "chassis", connector: "pin"}, rayCount: 64, maxRange: 6.0, updateRate: 10.0});

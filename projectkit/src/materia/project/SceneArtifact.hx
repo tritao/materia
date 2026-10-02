@@ -427,7 +427,7 @@ class SceneArtifact {
 			for (component in flat.definitions) if (component.id == occurrence[0].definition)
 				for (connector in component.connectors) if (connector.name == mount.connector) found = true;
 			if (!found) fail('"${sensor.id}" has no mount connector "${mount.connector}" on "${mount.occurrence}"');
-			if (sensor.rayCount < 2 || sensor.rayCount > 64) fail('"${sensor.id}" needs 2 to 64 rays');
+			if (sensor.rayCount < 2 || sensor.rayCount > 360) fail('"${sensor.id}" needs 2 to 360 rays');
 			if (!finite(sensor.maxRange) || sensor.maxRange <= 0 || !finite(sensor.updateRate) || sensor.updateRate <= 0)
 				fail('"${sensor.id}" needs a positive range and rate');
 		}

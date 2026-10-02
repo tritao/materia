@@ -4241,7 +4241,7 @@ class RobotWorldTests {
     simulationHarness.step(Int64.ofInt(1));
     equal(robot.snapshot().sensors.get(1).values.get(0), noisyValue, "reset repeats seeded noise deterministically");
     robot.close(); simulationHarness.dispose(); replay.close();
-    scan.rayCount = 65;
+    scan.rayCount = 361;
     mount.rotation = [0.0, 0.0, 0.0, 0.0];
     noisy.updateRate = -1.0;
     var diagnostics = RobotRuntimeCompiler.validate(model);

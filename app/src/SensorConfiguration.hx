@@ -597,7 +597,7 @@ class SensorConfiguration {
       function(value)sensor.updateRate=value,0.0,10000.0,"Hz",0.1));
     if(sensor.kind=="lidar") {
       result.push(integer(sensor,"rays","Ray count",function()return sensor.rayCount,
-        function(value)sensor.rayCount=value,1,64));
+        function(value)sensor.rayCount=value,1,360));
       result.push(number(sensor,"range","Maximum range",function()return sensor.maxRange,
         function(value)sensor.maxRange=value,0.000001,1000000.0,"m",0.1));
       result.push(number(sensor,"start-angle","Start angle",function()return sensor.startAngleRadians,

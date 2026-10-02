@@ -686,7 +686,7 @@ class SceneEditingTests {
     var properties=sensors.properties();
     var raysProperty=[for(property in properties) if(StringTools.endsWith(property.id,":rays")) property][0];
     var rays=new PropertyBinding(raysProperty,sensors.context());
-    check(switch rays.apply(PropertyValue.Int(65)){case PropertyEditResult.Rejected(_):true;default:false;},
+    check(switch rays.apply(PropertyValue.Int(361)){case PropertyEditResult.Rejected(_):true;default:false;},
       "sensor UI rejects ray counts above runtime capacity");
     check(rays.apply(PropertyValue.Int(32))==PropertyEditResult.Applied,
       "sensor UI edits LiDAR resolution");
