@@ -175,6 +175,40 @@ rk_result validate_appended_path(
     return RK_OK;
 }
 
+/**
+  The blueprint with each coupled joint that has no velocity or acceleration limit of its own
+  given its leader's, scaled by the ratio: a lead screw turns as fast as its axis moves it. Its
+  motion is its leader's, so this bounds nothing new, but every stop and check that budgets
+  joint by joint then has a limit to work with.
+**/
+rk_robot_runtime_blueprint with_coupled_limits(rk_robot_runtime_blueprint blueprint) {
+    if (blueprint.struct_size < sizeof(blueprint)) return blueprint;
+    const auto count = std::min(blueprint.coupling_count,
+        static_cast<uint32_t>(RK_MAX_JOINT_COUPLINGS));
+    // Each pass settles at least one more link of every chain.
+    for (uint32_t pass = 0; pass < count; ++pass) {
+        bool changed = false;
+        for (uint32_t i = 0; i < count; ++i) {
+            const auto &coupling = blueprint.couplings[i];
+            if (coupling.leader >= blueprint.joint_count || coupling.follower >= blueprint.joint_count)
+                continue;
+            const auto &leader = blueprint.joints[coupling.leader];
+            auto &follower = blueprint.joints[coupling.follower];
+            const double scale = std::abs(coupling.ratio);
+            if (!(follower.max_velocity > 0.0) && leader.max_velocity > 0.0) {
+                follower.max_velocity = scale * leader.max_velocity;
+                changed = true;
+            }
+            if (!(follower.max_acceleration > 0.0) && leader.max_acceleration > 0.0) {
+                follower.max_acceleration = scale * leader.max_acceleration;
+                changed = true;
+            }
+        }
+        if (!changed) break;
+    }
+    return blueprint;
+}
+
 /** Queued knots, excluding the end marker, once `added` replaces it. */
 std::size_t knots_after_append(const std::deque<RobotRuntime::RuntimeTrajectoryPoint> &queue,
     const std::vector<RobotRuntime::RuntimeTrajectoryPoint> &added) {
@@ -271,7 +305,7 @@ rk_result InMemoryRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) {
 RobotRuntime::RobotRuntime(const rk_robot_runtime_blueprint &blueprint,
                            std::shared_ptr<RobotEndpoint> endpoint,
                  std::chrono::nanoseconds period)
-    : blueprint_(blueprint), endpoint_(std::move(endpoint)), period_(period) {
+    : blueprint_(with_coupled_limits(blueprint)), endpoint_(std::move(endpoint)), period_(period) {
     state_.struct_size = sizeof(state_);
     state_.joint_count = blueprint_.joint_count;
     state_.safety = endpoint_ ? endpoint_->initial_safety_state() : RK_SAFETY_READY;

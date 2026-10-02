@@ -43,8 +43,7 @@ What is missing:
 - `ToolpathMotionBinding` scales a follower's limits from the axis but never
   lets a follower's own limit (screw or motor rpm) cap the axis.
 - MuJoCo gives every non-fixed joint its own motor and servo, coupled
-  followers included. The joint equality is relative to `qpos0`, so a
-  non-zero initial position may disagree with the coupling's offset.
+  followers included.
 - Coupling ratios are bare numbers. Nothing derives them from a screw's lead,
   a pulley's teeth or a gear pair. `MachineKitRobotCompiler` expresses a lead
   screw two ways (a coupling, or a transmission on the prismatic joint).
@@ -79,26 +78,63 @@ What is missing:
 
 ## Milestones
 
-### X1 — The router turns its screws
+### X1 — The router turns its screws (done)
 
 Kinematics through the whole stack, with ratios still given as numbers.
 
-- `CncRouter`: the screws sit on revolute joints in their bearings, and each
-  motor's rotor is a part of its screw's body, joined by the shaft coupling.
-  Couplings run from x, y and z to their screws, with the lead and sign taken
-  from the screw's thread. Dual Y means two screws follow `y`.
-- Planning keeps couplings. `CncProgramPlayer`, `PlanExecutor` and
-  `ProgramCompiler` plan the axes and project the followers, so plans pass
-  `validate_segments_for_blueprint`.
-- `ToolpathMotionBinding`: follower limits cap the axis.
-- SimKit/MuJoCo: actuate only joints with actuators (and plain joints with no
-  coupling). Set the equality reference so the offset holds at any initial
-  position.
+- **Router.** Each motor turns its Tr10 × 2 screw through a standard shaft
+  coupling (`ShaftCoupling`, 6.35 to 10 mm). The coupling and screw ride a
+  continuous joint `<screw>-turn` on the motor's shaft line, and coupling
+  `<screw>-lead` ties it to x, y or z at 2π·(axis · screw direction) / signed
+  lead: π rad per mm here. Dual Y means two screws follow `y`. The motor mounts
+  (Y plates, right gantry upright, Z bracket) gained NEMA 23 pilot and bolt
+  holes (`RouterPlate` takes a motor and where its face sits), so the coupling
+  turns inside the pilot bore. The Z screw runs in a 13 mm gap between the X
+  and Z plates, too narrow for its coupling, so the Z motor stands on four
+  37 mm `Standoff`s above its bracket, as many real Z axes do. The router went
+  from 4 rigid bodies to 8 (4 screw bodies) and from 3 joints to 7.
+- **Plans stay in axis coordinates; the runtime turns the screws.** A plan
+  over a subset of joints used to hold the others still. Now a joint no
+  planned joint drives follows its coupling's leader, in topological order.
+  This happens in the native `copy_segments` (from the blueprint's couplings)
+  and in the Haxe `SegmentArrays` (from `RobotDescription.couplings`, filled by
+  `RuntimeRobotAdapter` from `RobotRuntime.couplings`) for robots that need
+  materialised segments. So `PlanExecutor` plans only the three axes, as
+  before, and the plans pass `validate_segments_for_blueprint`. A chunk's
+  declared start state and tolerances follow the same rule
+  (`SegmentArrays.robotValues` / `robotTolerances`). A screw's tolerance is
+  its axis's times |ratio|, because rounding slack that suits millimetres is
+  3142 times too tight for the screw's radians.
+- **Coupled joints without limits.** The runtime gives a follower with no
+  velocity or acceleration limit of its own its leader's, scaled by |ratio|,
+  when it takes the blueprint. Without that, a hold was refused (every joint
+  needs an acceleration limit) and a path-following stop could not brake.
+- **Limits.** `RobotModel.coupledLimits(id)` tightens a joint's velocity and
+  acceleration by every joint coupled to it, scaled back through the ratios.
+  `CncProgramPlayer` builds its axes and planning chain from it. The screws
+  have no limit of their own yet (X3 gives them the motor's). Cost: 0.43 ms
+  and 61 KB a simulated tick, against 0.39 ms and 56.5 KB, from four more
+  bodies and joints. Machining is unchanged: 196.3 s, same removed volume.
+- **SimKit/MuJoCo.** Followers keep their servo, which gets the same coupled
+  target, so it agrees with the joint equality. Actuating only the motor
+  joints belongs with X3, when actuators sit on them. The `qpos0` concern
+  was unfounded: the bridge measures every joint from its initial placement
+  and rebases the coupling offset to it.
 - CadKit documents keep `overtravel` and `acceleration`.
-- **Gate:** the router machines the motor plate as before (same removed
-  volume, cycle within 1%). A test checks screw speed = feed / lead. Screws
-  visibly turn in the editor. RobotKit, MotionKit, SimKit, CadKit and app
-  suites pass.
+- **Checks.** The MachineKit smoke checks that every screw turns π rad per
+  mm on all six travel corners, and that couplings, motors and standoffs clear
+  their mounts. The app router test checks the 8 bodies and 7 joints, the four
+  couplings (3142 rad/m each), and that the simulated X and Z couplings have
+  turned π rad per mm of axis travel every 1000 ticks. Native C API test: a
+  plan leaving a coupled joint out is accepted. It was rejected before.
+- **Found on main while testing.** `ProgramTests.testProgramPlanner` used the
+  pre-K6a `Manipulator(model, chain)` constructor. The RobotKit runtime's
+  copy of a device-executed queue now follows the device's path time
+  (`cb516ab4`), so it ran out a tick or two after the device reported the
+  queue finished. A plan submitted in between joined a finished device
+  queue and never ran (virtual-device CNC test). The runtime now publishes
+  a device's queue as active until its copy has run out too, while the copy
+  still follows the device's own report.
 
 ### X2 — Ratios from parts
 
@@ -125,6 +161,8 @@ Kinematics through the whole stack, with ratios still given as numbers.
   torque through the ratio, against the moving mass (CAD mass properties)
   plus reflected rotor and screw inertia.
 - The router's hand-written `specs` go away.
+- Simulation actuates the joints that carry actuators (the motors) and lets
+  couplings move the rest, instead of a servo on every joint.
 - **Gate:** the router's derived limits are close to today's hand-written
   ones, documented, and the plate still machines.
 

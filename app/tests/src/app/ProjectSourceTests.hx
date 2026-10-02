@@ -398,8 +398,14 @@ class ProjectSourceTests {
     var model = AssemblySimulationBridge.toRobotModel(definition, generated.physical).model;
     var axes = [for (joint in model.joints) if (joint.type == JointType.Prismatic) joint];
     check([for (joint in axes) Std.string(joint.id)].join(",") == "y,x,z", "the router simulates axes y, x and z");
-    check(model.joints.length == 3 && model.links.length == 4,
-      'the router simulates as four rigid bodies and its three axes, got ${model.links.length} links');
+    // Four rigid bodies and four lead screws, each screw turning with its coupling on the motor shaft.
+    check(model.joints.length == 7 && model.links.length == 8,
+      'the router simulates as four rigid bodies, four screws, three axes and four screw joints, got ' +
+      '${model.links.length} links and ${model.joints.length} joints');
+    var leads = [for (coupling in model.couplings) '${coupling.leader}:${Math.round(coupling.ratio)}'];
+    leads.sort(Reflect.compare);
+    // A 2 mm lead turns its screw pi radians per millimetre: 3142 per metre.
+    check(leads.join(",") == "x:3142,y:3142,y:3142,z:3142", 'each axis turns its screws by their lead, got $leads');
     for (joint in axes) {
       var travel = joint.limits.upper - joint.limits.lower;
       check(Math.abs(travel - (Std.string(joint.id) == "z" ? 0.08 : 0.3)) < 1e-9,
@@ -427,8 +433,14 @@ class ProjectSourceTests {
       check(tool.length == 1, "the router publishes its tool pose");
       return tool[0].position;
     }
+    function partRotation(id:String):Array<Float> {
+      var part = [for (pose in simulation.capturePresentationSnapshot().environment) if (pose.id == "project:" + id) pose];
+      check(part.length == 1, 'the router publishes the pose of $id');
+      return part[0].rotation;
+    }
     simulation.step();
     var start = toolPosition();
+    var screwStart = [partRotation("screwXCoupling"), partRotation("screwZCoupling")];
     var lowest = 0.0, steps = 0, stepping = 0.0, tools:Array<Int> = [player.loadedTool];
     // Allocation is counted, not timed, so it holds whatever else the machine is doing.
     var allocatedBefore = hl.Gc.totalAllocated(), collectionsBefore = hl.Gc.collections();
@@ -439,6 +451,17 @@ class ProjectSourceTests {
       check(simulation.cncFailure() == null, 'the router program runs: ${simulation.cncFailure()}');
       if (steps % 10 == 0) lowest = Math.min(lowest, toolPosition()[2] - start[2]);
       if (player.loadedTool != tools[tools.length - 1]) tools.push(player.loadedTool);
+      if (steps % 1000 == 0) {
+        // The X and Z screws turn half a turn for every millimetre their axes move.
+        var now = toolPosition();
+        for (axis in [0, 2]) {
+          var before = screwStart[axis == 0 ? 0 : 1], after = partRotation(axis == 0 ? "screwXCoupling" : "screwZCoupling");
+          var dot = Math.abs(before[0] * after[0] + before[1] * after[1] + before[2] * after[2] + before[3] * after[3]);
+          var turned = Math.PI * 1000 * (now[axis] - start[axis]);
+          check(Math.abs(dot - Math.abs(Math.cos(turned / 2))) < 0.02,
+            'the ${axis == 0 ? "X" : "Z"} screw turns with its axis: ${2 * Math.acos(Math.min(1.0, dot))} rad for $turned');
+        }
+      }
     }
     var allocatedPerTick = (hl.Gc.totalAllocated() - allocatedBefore) / steps;
     var collections = hl.Gc.collections() - collectionsBefore;

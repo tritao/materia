@@ -169,13 +169,15 @@ rk_result RK_CALL rk_robot_runtime_submit(rk_robot_runtime runtime, const rk_rob
 namespace {
 /**
  * Copies segment arrays into a batch over every robot joint: once, the runtime's one copy.
- * Source joint j drives robot joint joint_map[j], or joint j without a map; a robot joint
- * no source joint drives holds its held position.
+ * Source joint j drives robot joint joint_map[j], or joint j without a map. A robot joint no
+ * source joint drives follows its leader when the blueprint couples it to one (a lead screw
+ * turning with its axis), and otherwise holds its held position.
  */
 rk_result copy_segments(const int64_t *starts_ns, const int64_t *durations_ns,
     const int32_t *degrees, uint32_t segment_count, const double *coefficients,
     uint32_t coefficient_count, const int32_t *joint_map, uint32_t source_joint_count,
-    uint32_t robot_joint_count, const double *held_positions, robotkit::SegmentBatch &batch) {
+    uint32_t robot_joint_count, const double *held_positions,
+    const rk_robot_runtime_blueprint *blueprint, robotkit::SegmentBatch &batch) {
     constexpr uint32_t stride = RK_TRAJECTORY_COEFFICIENT_STRIDE;
     if (segment_count == 0 || segment_count > RK_MAX_TRAJECTORY_QUEUE_POINTS ||
         source_joint_count == 0 || source_joint_count > robot_joint_count ||
@@ -195,6 +197,36 @@ rk_result copy_segments(const int64_t *starts_ns, const int64_t *durations_ns,
     }
     if (source_joint_count < robot_joint_count && !held_positions)
         return RK_ERROR_INVALID_ARGUMENT;
+    // Couplings whose follower no source joint drives, ordered so each leader is final before
+    // its followers are derived from it.
+    uint32_t followed[RK_MAX_JOINT_COUPLINGS];
+    uint32_t follow_count = 0;
+    if (blueprint && blueprint->struct_size >= sizeof(*blueprint) &&
+        source_joint_count < robot_joint_count) {
+        bool pending[RK_MAX_TRAJECTORY_JOINTS]{};
+        uint32_t pending_count = 0;
+        for (uint32_t i = 0; i < blueprint->coupling_count; ++i) {
+            const auto follower = blueprint->couplings[i].follower;
+            if (follower >= robot_joint_count || blueprint->couplings[i].leader >= robot_joint_count)
+                return RK_ERROR_INVALID_ARGUMENT;
+            if (!driven[follower] && !pending[follower]) {
+                pending[follower] = true;
+                ++pending_count;
+            }
+        }
+        for (bool progress = true; progress && follow_count < pending_count;) {
+            progress = false;
+            for (uint32_t i = 0; i < blueprint->coupling_count; ++i) {
+                const auto &coupling = blueprint->couplings[i];
+                if (pending[coupling.follower] && !pending[coupling.leader]) {
+                    pending[coupling.follower] = false;
+                    followed[follow_count++] = i;
+                    progress = true;
+                }
+            }
+        }
+        if (follow_count < pending_count) return RK_ERROR_INVALID_ARGUMENT;
+    }
     batch.segments.resize(segment_count);
     for (uint32_t index = 0; index < segment_count; ++index) {
         if (starts_ns[index] < starts_ns[0] || durations_ns[index] <= 0 || degrees[index] < 0 ||
@@ -211,6 +243,13 @@ rk_result copy_segments(const int64_t *starts_ns, const int64_t *durations_ns,
         for (uint32_t joint = 0; joint < source_joint_count; ++joint)
             for (uint32_t power = 0; power <= segment.degree; ++power)
                 segment.coefficients[targets[joint]].value[power] = source[joint * stride + power];
+        for (uint32_t i = 0; i < follow_count; ++i) {
+            const auto &coupling = blueprint->couplings[followed[i]];
+            auto &follower = segment.coefficients[coupling.follower].value;
+            const auto &leader = segment.coefficients[coupling.leader].value;
+            for (uint32_t power = 0; power <= segment.degree; ++power)
+                follower[power] = coupling.ratio * leader[power] + (power == 0 ? coupling.offset : 0.0);
+        }
     }
     return RK_OK;
 }
@@ -228,7 +267,7 @@ rk_result RK_CALL rk_robot_runtime_submit_segments(rk_robot_runtime runtime,
         batch.tag = tag;
         const auto joints = value->blueprint().joint_count;
         const auto copied = copy_segments(starts_ns, durations_ns, degrees, segment_count,
-            coefficients, coefficient_count, nullptr, joints, joints, nullptr, batch);
+            coefficients, coefficient_count, nullptr, joints, joints, nullptr, nullptr, batch);
         return copied == RK_OK ? value->submit_segments(*command, std::move(batch)) : copied;
     } catch (const std::bad_alloc &) {
         return RK_ERROR_OUT_OF_MEMORY;
@@ -267,7 +306,8 @@ rk_result RK_CALL rk_robot_runtime_submit_plan(rk_robot_runtime runtime,
         plan.segments.tag = header->tag;
         const auto copied = copy_segments(starts_ns, durations_ns, degrees, segment_count,
             coefficients, coefficient_count, joint_map, source_joint_count,
-            value->blueprint().joint_count, header->start_position, plan.segments);
+            value->blueprint().joint_count, header->start_position, &value->blueprint(),
+            plan.segments);
         if (copied != RK_OK) return copied;
         plan.events.assign(events, events + event_count);
         return value->submit_plan(plan);

@@ -16,7 +16,7 @@ class AssemblyDocumentsSmoke {
 	public static function run():Void {
 		var frame = AssemblyFrames.identity();
 		var limits:materia.assembly.AssemblyDefinition.AssemblyJointLimits =
-			{lower: 0.0, upper: 100.0, velocity: null, effort: null};
+			{lower: 0.0, upper: 100.0, velocity: null, effort: null, overtravel: 2.5, acceleration: 400.0};
 		var original:AssemblyDefinition = {schemaVersion: AssemblyDefinitionCodec.VERSION, id: "document-assembly",
 			definitions: [{id: "root-part", connectors: [{name: "mount", frame: frame}]},
 				{id: "follower-part", connectors: [{name: "base", frame: frame}]}],

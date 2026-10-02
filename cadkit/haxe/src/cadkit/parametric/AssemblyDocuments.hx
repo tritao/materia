@@ -354,6 +354,8 @@ class AssemblyDocuments {
 			if (joint.limits.upper != null) quantity(relationship, "limitUpper", joint.limits.upper);
 			if (joint.limits.velocity != null) quantity(relationship, "limitVelocity", joint.limits.velocity);
 			if (joint.limits.effort != null) quantity(relationship, "limitEffort", joint.limits.effort);
+			if (joint.limits.overtravel != null) quantity(relationship, "limitOvertravel", joint.limits.overtravel);
+			if (joint.limits.acceleration != null) quantity(relationship, "limitAcceleration", joint.limits.acceleration);
 			relationship.setProperty(TypedProperty.quantity(PREFIX + "defaultValue", QuantityKind.Scalar, joint.defaultValue, "1"));
 			if (joint.closureTolerance != null)
 				relationship.setProperty(TypedProperty.quantity(PREFIX + "closureTolerance",
@@ -423,7 +425,9 @@ class AssemblyDocuments {
 		return {lower: optionalNumber(relationship, "limitLower"),
 			upper: optionalNumber(relationship, "limitUpper"),
 			velocity: optionalNumber(relationship, "limitVelocity"),
-			effort: optionalNumber(relationship, "limitEffort")};
+			effort: optionalNumber(relationship, "limitEffort"),
+			overtravel: optionalNumber(relationship, "limitOvertravel"),
+			acceleration: optionalNumber(relationship, "limitAcceleration")};
 	}
 
 	static function sortScope(scope:AssemblyDocumentScope):Void {

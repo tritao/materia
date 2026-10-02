@@ -91,6 +91,9 @@ class CncRouterChecks {
 				near(pose.x + pose.y + pose.z, start.x + start.y + start.z, '${fixed[i]} stays put', 1e-9);
 			}
 			checkBlocksOnRails(router, state);
+			// Tr10 × 2 right-hand screws pointing against their axes: half a turn per millimetre.
+			for (screw in [{id: "screwX", axis: 0}, {id: "screwYLeft", axis: 1}, {id: "screwYRight", axis: 1}, {id: "screwZ", axis: 2}])
+				near(state.joint(screw.id + "-turn"), Math.PI * position[screw.axis], '$label: ${screw.id} turns with its axis', 1e-9);
 		}
 
 		// Z reaches through the stock into the spoilboard, and at the top of travel the tool clears the clamps.
@@ -123,6 +126,16 @@ class CncRouterChecks {
 		checkClear(router, state, [150, 150, 0], ["zPlate", "spindle", "spindleClamp"], ["motorBracketZ", "motorZ", "xPlate", "screwZ"]);
 		checkClear(router, state, [150, 150, -80], ["zPlate", "spindle", "spindleClamp"], ["motorBracketZ", "motorZ", "xPlate", "screwZ"]);
 
+		// Each shaft coupling turns inside its mount's pilot bore, clear of the motor and the mount.
+		checkClear(router, state, [150, 150, 0], ["screwYLeftCoupling"], ["motorPlateYLeft", "motorYLeft"]);
+		checkClear(router, state, [150, 150, 0], ["motorYLeft"], ["motorPlateYLeft"]);
+		checkClear(router, state, [150, 150, 0], ["motorX"], ["uprightRight"]);
+		checkClear(router, state, [150, 150, 0], ["motorZ", "screwZCoupling"], ["motorBracketZ", "standoffZ1", "standoffZ2", "standoffZ3", "standoffZ4"]);
+		checkClear(router, state, [150, 150, 0], ["screwYRightCoupling"], ["motorPlateYRight"]);
+		checkClear(router, state, [0, 0, 0], ["screwXCoupling"], ["uprightRight", "xPlate", "nutBracketX"]);
+		checkClear(router, state, [300, 0, -80], ["screwXCoupling"], ["uprightRight", "xPlate", "nutBracketX"]);
+		checkClear(router, state, [150, 150, 0], ["screwZCoupling"], ["motorBracketZ", "zPlate", "blockZLeft", "blockZRight"]);
+		checkClear(router, state, [150, 150, -80], ["screwZCoupling"], ["motorBracketZ", "zPlate"]);
 		// Every axis has room past its travel before its blocks reach their rail ends.
 		near(router.axisOvertravel("x"), 62.65, "x overtravel", 1e-6);
 		near(router.axisOvertravel("y"), 6.65, "y overtravel", 1e-6);

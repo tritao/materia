@@ -100,6 +100,29 @@ int main(void) {
     assert(full_snapshot.queue_end_time_ns == 1000000000);
     rk_robot_runtime_destroy(plan_runtime);
 
+    /* A joint the plan leaves out follows its coupling's leader: a screw turning with its axis. */
+    static rk_robot_runtime_blueprint coupled;
+    coupled = blueprint;
+    coupled.joint_count = 2;
+    coupled.link_count = 3;
+    coupled.links[2] = coupled.links[1];
+    coupled.joints[1] = coupled.joints[0];
+    coupled.joints[1].joint = 1;
+    coupled.joints[1].parent_link = 1;
+    coupled.joints[1].child_link = 2;
+    coupled.joints[1].lower_limit = -10.0;
+    coupled.joints[1].upper_limit = 10.0;
+    coupled.coupling_count = 1;
+    coupled.couplings[0].leader = 0;
+    coupled.couplings[0].follower = 1;
+    coupled.couplings[0].ratio = 3.0;
+    rk_robot_runtime coupled_runtime = RK_INVALID_ROBOT_RUNTIME;
+    assert(rk_robot_runtime_create(&coupled, &coupled_runtime) == RK_OK);
+    /* Held still, the follower would break the coupling as soon as its leader moved. */
+    assert(rk_robot_runtime_submit_plan(coupled_runtime, &header, starts, durations, degrees,
+        1, coefficients, 6, joint_map, 1, NULL, 0) == RK_OK);
+    rk_robot_runtime_destroy(coupled_runtime);
+
     rk_robot_command command = {0};
     command.struct_size = sizeof(command);
     command.sequence = 1;

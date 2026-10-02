@@ -33,6 +33,8 @@ class RobotRuntime {
   final defaultMaxEfforts:Array<Float>;
   final sensorLayout:Array<RobotRuntimeSensorBlueprint>;
   public final channels:Array<ProcessChannelDeclaration>;
+  /** The blueprint's joint couplings: a joint a plan leaves out follows its leader. */
+  public final couplings:Array<robotkit.world.CoupledJoint>;
   final externalSensorLayout:Array<RobotRuntimeSensorBlueprint>;
   final externalMutex = new Mutex();
   final externalFrames:Map<String, SensorFrame> = new Map();
@@ -60,6 +62,8 @@ class RobotRuntime {
     defaultMaxEfforts = [for (joint in blueprint.joints) joint.maxEffort];
     sensorLayout = blueprint.nativeSensorLayout();
     channels = blueprint.channels.copy();
+    couplings = [for (coupling in blueprint.couplings)
+      new robotkit.world.CoupledJoint(coupling.follower, coupling.leader, coupling.ratio, coupling.offset)];
     externalSensorLayout = blueprint.externalSensorLayout();
   }
 

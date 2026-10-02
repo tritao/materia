@@ -378,6 +378,11 @@ typedef struct rk_event_record_batch {
  * realtime code is running and lets Simulation build several runtimes before
  * its first shared tick.
  */
+/**
+ * Joint follower's position is leader's times ratio plus offset. A follower with no velocity or
+ * acceleration limit of its own moves within its leader's, scaled by the ratio's size, and a
+ * plan that leaves the follower out turns it with its leader.
+ */
 typedef struct rk_robot_joint_coupling {
     rk_joint_id leader;
     rk_joint_id follower;
@@ -739,7 +744,8 @@ RK_API rk_result RK_CALL rk_robot_runtime_submit_segments(rk_robot_runtime runti
  * Atomically validates and accepts a plan or committed-horizon replacement. A replacement before
  * committed_until_ns returns RK_ERROR_INVALID_STATE with no queue mutation. The segments' joints
  * are source joints: source joint j drives robot joint joint_map[j], and joint_count is
- * source_joint_count; a robot joint no source joint drives holds header->start_position. Events
+ * source_joint_count. A robot joint no source joint drives follows its leader when the blueprint
+ * couples it to one, and otherwise holds header->start_position. Events
  * are sorted by path time from the plan's start.
  */
 RK_API rk_result RK_CALL rk_robot_runtime_submit_plan(rk_robot_runtime runtime,

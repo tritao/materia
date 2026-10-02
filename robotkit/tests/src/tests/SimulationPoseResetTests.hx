@@ -84,6 +84,10 @@ class SimulationPoseResetTests {
 
     var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(RobotRuntimeCompiler.compile(model));
+    // A plan leaving the follower out turns it with its source, so the runtime names the pair.
+    if (runtime.couplings.length != 1 || runtime.couplings[0].leader != 0 ||
+        runtime.couplings[0].follower != 1 || runtime.couplings[0].ratio != -2.0)
+      throw 'runtime did not report its coupling on backend $backend';
     runtime.submitPosition(0, 0.3, 1);
     for (index in 0...200) simulationHarness.step(Int64.ofInt(index));
     var q = runtime.snapshot().q;
@@ -91,6 +95,40 @@ class SimulationPoseResetTests {
     if (!(Math.abs(q.get(0)) > 0.1 && Math.abs(q.get(1) + 2.0 * q.get(0)) < tolerance))
       throw 'coupling did not follow source on backend $backend: ${q.get(0)}, ${q.get(1)}';
     simulationHarness.dispose();
+  }
+
+  /** A joint is as fast as every joint that turns with it allows: a lead screw caps its axis. */
+  public static function coupledLimits():Void {
+    var model = new RobotModel("screw axis");
+    var base = model.addLink(new Link("base"));
+    var carriage = model.addLink(new Link("carriage"));
+    var screw = model.addLink(new Link("screw"));
+    var pulley = model.addLink(new Link("pulley"));
+    var axis = model.addJoint(new Joint("axis", JointType.Prismatic, base, carriage));
+    var turn = model.addJoint(new Joint("turn", JointType.Revolute, base, screw));
+    var belt = model.addJoint(new Joint("belt", JointType.Revolute, base, pulley));
+    axis.limits = new JointLimits(0, 0.3, 0.08, 400, 0.5);
+    axis.limits.overtravel = 0.005;
+    // 2 mm lead: pi * 1000 rad per metre of travel. The screw turns at most 100 rad/s.
+    turn.limits = new JointLimits(-1e9, 1e9, 100, 0, 0);
+    // A belt off the screw at 1:2, limited to 150 rad/s and 2000 rad/s², with no limit of its own on speed below.
+    belt.limits = new JointLimits(-1e9, 1e9, 150, 0, 2000);
+    model.addCoupling(new JointCoupling("lead", "axis", "turn", -Math.PI * 1000, 0.0));
+    model.addCoupling(new JointCoupling("belt", "turn", "belt", 2.0, 0.0));
+    var limits = model.coupledLimits("axis");
+    var screwSpeed = 100 / (Math.PI * 1000), beltSpeed = 150 / (2 * Math.PI * 1000);
+    if (Math.abs(limits.velocity - Math.min(screwSpeed, beltSpeed)) > 1e-12)
+      throw 'coupled velocity limit ${limits.velocity}';
+    if (Math.abs(limits.maxAcceleration - Math.min(0.5, 2000 / (2 * Math.PI * 1000))) > 1e-12)
+      throw 'coupled acceleration limit ${limits.maxAcceleration}';
+    if (limits.lower != 0 || limits.upper != 0.3 || limits.effort != 400 || limits.overtravel != 0.005)
+      throw "coupled limits must keep the joint's own travel, effort and overtravel";
+    if (axis.limits.velocity != 0.08) throw "coupled limits must not change the model";
+    // A joint with no limit of its own takes its followers'.
+    axis.limits.velocity = 0;
+    if (Math.abs(model.coupledLimits("axis").velocity - Math.min(screwSpeed, beltSpeed)) > 1e-12)
+      throw "an unlimited joint should take its followers' limit";
+    if (model.coupledLimits("belt").velocity != 150) throw "a follower is not limited by its leader";
   }
 
   static function checkPose(simulation:Simulation, position:Array<Float>, rotation:Array<Float>,

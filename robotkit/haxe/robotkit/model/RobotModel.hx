@@ -58,6 +58,39 @@ class RobotModel {
     return coupling;
   }
 
+  /**
+   * Joint `id`'s limits with its velocity and acceleration tightened by every joint that moves
+   * with it through couplings, scaled back to `id`'s units: a lead screw's speed limit caps the
+   * axis it turns with. Zero still means unlimited.
+   */
+  public function coupledLimits(id:JointId):JointLimits {
+    var joint = [for (candidate in joints) if (candidate.id == id) candidate];
+    if (joint.length != 1) throw 'Robot model has no joint "$id"';
+    var own = joint[0].limits;
+    var limits = new JointLimits(own.lower, own.upper, own.velocity, own.effort, own.maxAcceleration);
+    limits.overtravel = own.overtravel;
+    function tighten(current:Float, bound:Float):Float
+      return bound <= 0.0 ? current : current <= 0.0 ? bound : Math.min(current, bound);
+    // Each joint reached so far, with how far it moves per unit of joint `id`.
+    var reached:Array<String> = [id];
+    var scales:Array<Float> = [1.0];
+    var next = 0;
+    while (next < reached.length) {
+      var leader = reached[next], leaderScale = scales[next];
+      next++;
+      for (coupling in couplings) if (coupling.leader == leader && reached.indexOf(coupling.follower) < 0) {
+        var scale = Math.abs(coupling.ratio) * leaderScale;
+        reached.push(coupling.follower);
+        scales.push(scale);
+        for (follower in joints) if (follower.id == coupling.follower) {
+          limits.velocity = tighten(limits.velocity, follower.limits.velocity / scale);
+          limits.maxAcceleration = tighten(limits.maxAcceleration, follower.limits.maxAcceleration / scale);
+        }
+      }
+    }
+    return limits;
+  }
+
   public function addSensor(sensor:Sensor):Sensor {
     sensors.push(sensor);
     return sensor;

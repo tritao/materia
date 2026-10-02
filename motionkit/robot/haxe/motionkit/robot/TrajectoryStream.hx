@@ -240,7 +240,7 @@ class TrajectoryStream {
     arrays, which go to the robot in place, after the caller selects events.
   **/
   public function programSubmission(plan:ExecutionPlan, arrays:SegmentArrays, first:Int,
-      last:Int, tag:Int64, startNs:Int64, endNs:Int64, expand:Array<Float> -> Array<Float> -> Array<Float>,
+      last:Int, tag:Int64, startNs:Int64, endNs:Int64,
       selectEvents:Int64 -> Int64 -> Bool -> Array<ProcessTimedEvent>,
       endsAtRest:Bool, jerkUnchecked:Bool):ExecutionPlanSubmission {
     var startSeconds = Int64.toFloat(startNs) * 1e-9;
@@ -248,37 +248,39 @@ class TrajectoryStream {
     var chunk = arrays.slice(first, last);
     var events = selectEvents(startNs, endNs, last == segments.count());
     var fixedPositions = arrays.heldPositions;
-    var positions = expand(state.positions, fixedPositions);
+    // Joints coupled to planned ones, such as lead screws, start where their leaders put them.
+    var positions = arrays.robotValues(state.positions, fixedPositions, true);
     var zero = [for (_ in fixedPositions) 0.0];
-    var startVelocity = expand(first == 0 ? plan.copyStartVelocities() :
-      state.velocities, zero);
-    var startAcceleration = expand(first == 0 ? plan.copyStartAccelerations() :
-      state.accelerations, zero);
+    var startVelocity = arrays.robotValues(first == 0 ? plan.copyStartVelocities() :
+      state.velocities, zero, false);
+    var startAcceleration = arrays.robotValues(first == 0 ? plan.copyStartAccelerations() :
+      state.accelerations, zero, false);
     // Linear chunks promise the preceding chord at a continuation anchor.
     if (chunk.degrees.get(0) == 1) {
       startAcceleration = zero.copy();
       startVelocity = first == 0 ? zero.copy() :
         [for (joint in 0...fixedPositions.length) arrays.coefficient(first - 1, joint, 1)];
     }
+    // A coupled joint allows its leader's error, scaled by the ratio: a lead screw's turns are
+    // its axis's travel times thousands.
     var tolerance = [for (_ in fixedPositions) 0.02];
-    var pTol = expand(first == 0 ? plan.copyPositionTolerances() :
-      [for (_ in state.positions) 0.02], tolerance);
-    var vTol = expand(first == 0 ? plan.copyVelocityTolerances() :
-      [for (_ in state.positions) 0.02], tolerance);
-    var aTol = expand(first == 0 ? plan.copyAccelerationTolerances() :
-      [for (_ in state.positions) 0.02], tolerance);
+    var sourceTolerance = [for (_ in state.positions) 0.02];
+    var pTol = arrays.robotTolerances(first == 0 ? plan.copyPositionTolerances() : sourceTolerance, tolerance);
+    var vTol = arrays.robotTolerances(first == 0 ? plan.copyVelocityTolerances() : sourceTolerance, tolerance);
+    var aTol = arrays.robotTolerances(first == 0 ? plan.copyAccelerationTolerances() : sourceTolerance, tolerance);
+    var scale = arrays.robotTolerances([for (_ in state.positions) 1.0], [for (_ in fixedPositions) 1.0]);
     if (!jerkUnchecked && first > 0)
-      aTol = [for (_ in fixedPositions) 1e-6];
+      aTol = [for (joint in 0...fixedPositions.length) 1e-6 * scale[joint]];
     if (chunk.degrees.get(0) > 1) {
-      var precedingAcceleration = first == 0 ? zero : expand(
-        plan.evaluate(Math.max(0.0, startSeconds - 1e-9)).accelerations, zero);
+      var precedingAcceleration = first == 0 ? zero : arrays.robotValues(
+        plan.evaluate(Math.max(0.0, startSeconds - 1e-9)).accelerations, zero, false);
       for (joint in 0...fixedPositions.length) {
         var polynomialAcceleration = 2.0 * chunk.coefficient(0, joint, 2);
         if (jerkUnchecked || first == 0) {
           aTol[joint] = Math.max(aTol[joint],
-            Math.abs(polynomialAcceleration - startAcceleration[joint]) + 1e-5);
+            Math.abs(polynomialAcceleration - startAcceleration[joint]) + 1e-5 * scale[joint]);
           aTol[joint] = Math.max(aTol[joint],
-            Math.abs(polynomialAcceleration - precedingAcceleration[joint]) + 1e-5);
+            Math.abs(polynomialAcceleration - precedingAcceleration[joint]) + 1e-5 * scale[joint]);
         }
         startAcceleration[joint] = polynomialAcceleration;
       }
