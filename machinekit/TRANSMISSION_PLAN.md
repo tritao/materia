@@ -496,6 +496,52 @@ loops, PWM or thermal mass.
   generators stay unused, because paths are planned and coordinated by
   MotionKit. Servo drives on a fieldbus wait for real hardware.
 
+### X6d — Encoders
+
+The plan check predicts stalls and path error; encoders observe them. An
+open-loop stepper's lost steps are invisible without one. Model encoders as
+sensors with a location, at drive level only: quantisation, no noise or
+latency.
+
+- **Sensor.** An encoder is its own sensor, attached to a joint. It has a
+  kind (incremental quadrature or absolute), counts per revolution or per mm,
+  and an optional index pulse. Where it sits decides what it sees:
+  - **Motor-side** (on the motor shaft) sees lost steps, stalls and a servo's
+    following error, but not backlash or belt stretch.
+  - **Load-side** (a linear scale, or an encoder on the driven pulley) sees
+    where the carriage actually is, including stretch, backlash and pitch
+    error.
+
+  A servo drive references its encoder, and a closed-loop stepper is a
+  stepper drive plus an encoder. The servo drive's encoder count from X6a
+  becomes that reference, so the fact lives in one place.
+- **Parts.** MachineKit gets encoder components (a shaft encoder on a
+  motor's back shaft, a linear scale along a rail), placed and mated like
+  other parts, so the location comes from the assembly.
+- **Wiring.** Deployment layout channels name which board input reads which
+  encoder (layouts already carry `encoder_counts_per_rev`).
+- **Simulation.** Counts are quantised from the joint the encoder sits on.
+  With stepper slip (X6c) a motor-side encoder sees the slip the commanded
+  position hides, so stall detection is testable in simulation.
+- **Runtime.**
+  - Compare encoder and commanded positions and fault past a bound (the
+    blueprint's `following_error_bound`), naming lost steps.
+  - With a load-side encoder, report the measured path error: the observed
+    counterpart of the accuracy check.
+  - Monitoring only at first. Closing a position loop on a load-side
+    encoder belongs to real servo drives.
+- **Device.** Count edges in hardware (STM32 timer quadrature mode) and report
+  positions in the state frames. Index pulses support repeatable homing,
+  together with limit switches at hardware bring-up. This needs the bench to
+  verify.
+- **Order.** After X6c, since slip is what makes encoders observable in
+  simulation:
+  1. the sensor and its parts;
+  2. simulated counts;
+  3. the lost-step / following-error fault;
+  4. load-side path error;
+  5. device counting.
+
 ### Later
 
 Belt teeth drawn and moving with the belt: a mesh built in Haxe and
