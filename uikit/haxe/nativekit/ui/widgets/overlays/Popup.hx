@@ -164,12 +164,18 @@ class Popup implements View {
 					LayoutVisualKind.Custom, shadowStyle);
 				shadowLayer.hitTestSelf = false;
 				var shadow = context.theme.tokens.selectionPopupShadow;
+				// A soft key shadow lifts the menu; a tight contact shadow at half
+				// strength defines its edge against similarly coloured content.
+				var contactShadow = Color.rgba(shadow.red, shadow.green, shadow.blue,
+					shadow.alpha * 0.5);
 				shadowLayer.onPaint(function(canvas, geometry) {
 					var bounds = panel.resolved;
 					if (bounds == null) return;
-					canvas.drawBoxShadow(new Rect(bounds.x - geometry.x, bounds.y - geometry.y,
-						bounds.width, bounds.height), 0.0, 4.0, 16.0, 0.0,
-						[0.0, 0.0, 0.0, 0.0], shadow);
+					var rect = new Rect(bounds.x - geometry.x, bounds.y - geometry.y,
+						bounds.width, bounds.height);
+					var square = [0.0, 0.0, 0.0, 0.0];
+					canvas.drawBoxShadow(rect, 0.0, 6.0, 20.0, 0.0, square, shadow);
+					canvas.drawBoxShadow(rect, 0.0, 1.0, 3.0, 0.0, square, contactShadow);
 				});
 				root.add(shadowLayer);
 			}
