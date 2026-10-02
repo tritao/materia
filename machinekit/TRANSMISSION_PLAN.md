@@ -339,6 +339,13 @@ loops, PWM or thermal mass.
   - A servo must stay under its peak torque, and its average (RMS) torque
     over the move under its continuous rating.
   - The check runs once per plan, the same for simulation and device.
+- **Accuracy check.** Along the same plan, the tool's worst deviation from
+  its path is checked against the machining tolerance:
+  - belt stretch under acceleration (force ÷ belt stiffness, from belt
+    width and free strand length);
+  - a backlash allowance per screw nut.
+  This flags corners where a belt machine will round or lag. Compliance is
+  checked here, not simulated as springs, for the same reasons as steppers.
 - **Screw critical speed.** A lead-screw drive caps its screw joint at the
   first bending speed, from root diameter, unsupported length and end supports
   (where its bearings sit), with margin. The router's Y screws, about 600 mm
@@ -354,6 +361,9 @@ loops, PWM or thermal mass.
     (lag instead of lost steps), is numerically stiff (hundreds of kg of
     reflected inertia through a constraint), and needs gains tuned per
     machine.
+- **Gate.** The belt router machines the motor plate under these limits:
+  the step-rate cap, the plan check and the accuracy check. Its cycle time
+  and accuracy are compared with the screw router's on the same part.
 - **Examples.** The robot arm (servos behind gearbox drives) and the mobile
   base (wheel motors) take their limits from their drives instead of typed-in
   numbers.
@@ -369,5 +379,7 @@ loops, PWM or thermal mass.
 
 ### Later
 
-Belt stretch and screw backlash in simulation (following error), gearboxes as
-components, an editor UI to author couplings and drives, and differentials.
+Belt teeth drawn and moving with the belt: a mesh built in Haxe and
+updated per frame, shifted by the coupled joint's travel. It doubles as a
+visual check on a drive's sign and ratio. Also gearboxes as components, an
+editor UI to author couplings and drives, and differentials.
