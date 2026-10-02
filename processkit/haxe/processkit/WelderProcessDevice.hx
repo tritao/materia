@@ -18,7 +18,10 @@ typedef WelderSetpoints = {voltage:Float};
  * - `prepare` sets the voltage setpoint and holds the wire still and the arc off;
  * - `ready` means the device was prepared and the supply reports no fault;
  * - `fault` is the supply's fault, in words;
- * - `safe` switches the arc off, then stops the wire, and leaves the device to be prepared again;
+ * - `safe` stops the wire, then switches the arc off (so the arc burns back and the wire does not stick), and leaves the
+ *   device to be prepared again. These are writes to the outputs, which a robot's channels carry out in that order when the
+ *   next program starts; when the robot stops for a fault or a stop command its arc and wire channels go to their safe
+ *   values at once (see `WeldChannelPolicy`), which is the immediate cut;
  * - `apply` carries out the fired process records: the arc channel takes a digital value or an analogue rate
  *   (above zero is on, as a process run emits it), the other two take analogue values.
  */
@@ -56,8 +59,8 @@ class WelderProcessDevice implements ProcessDevice {
 
   public function safe():Void {
     prepared = false;
-    outputs.setArc(false);
     outputs.setWireSpeed(0.0);
+    outputs.setArc(false);
   }
 
   public function apply(records:Array<FiredProcessEvent>):Void {

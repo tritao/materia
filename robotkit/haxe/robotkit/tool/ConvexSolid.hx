@@ -12,6 +12,8 @@ package robotkit.tool;
 class ConvexSolid {
   /** Hulls with more vertices than this are boxed (the triple search is cubic). */
   public static inline var EXACT_LIMIT:Int = 80;
+  /** The most sweeps over the planes the nearest-point search makes. */
+  public static inline var DYKSTRA_SWEEPS:Int = 200;
 
   final normals:Array<Float> = [];
   final offsets:Array<Float> = [];
@@ -92,15 +94,59 @@ class ConvexSolid {
   }
 
   /**
-   * How far the point is outside the solid: negative inside (how deep, to the nearest face), zero on the surface.
-   * Outside it is the largest distance to a face's plane, which is exact in front of a face and a little short
-   * beside an edge or corner.
+   * How far the point is outside the solid: negative inside (how deep, to the nearest face), zero on the surface. Outside
+   * it is the true distance to the solid. In front of a face that is the face plane's distance, found at once when the
+   * point's projection on that plane lies in the solid; beside an edge or at a corner (where the largest plane distance
+   * falls short, to 0.71 or 0.58 of the truth at its worst) it is found by projecting on the planes in turn with
+   * Dykstra's corrections, which converges to the nearest point of the intersection of the half-spaces.
    */
   public function distance(x:Float, y:Float, z:Float):Float {
-    var result = Math.NEGATIVE_INFINITY;
+    var result = Math.NEGATIVE_INFINITY, farthest = -1;
+    for (index in 0...offsets.length) {
+      var d = normals[3 * index] * x + normals[3 * index + 1] * y + normals[3 * index + 2] * z - offsets[index];
+      if (d > result) {
+        result = d;
+        farthest = index;
+      }
+    }
+    if (result <= 0.0) return result;
+    // The foot of the perpendicular on the farthest plane: if the solid is there, nothing is nearer.
+    var fx = x - normals[3 * farthest] * result, fy = y - normals[3 * farthest + 1] * result, fz = z - normals[3 * farthest + 2] * result;
+    var slack = 1e-9 * Math.max(1.0, result);
+    var inside = true;
     for (index in 0...offsets.length)
-      result = Math.max(result, normals[3 * index] * x + normals[3 * index + 1] * y + normals[3 * index + 2] * z - offsets[index]);
-    return result;
+      if (normals[3 * index] * fx + normals[3 * index + 1] * fy + normals[3 * index + 2] * fz - offsets[index] > slack) {
+        inside = false;
+        break;
+      }
+    if (inside) return result;
+    // Dykstra's alternating projections.
+    var count = offsets.length;
+    var qx = x, qy = y, qz = z;
+    var ix = [for (_ in 0...count) 0.0], iy = [for (_ in 0...count) 0.0], iz = [for (_ in 0...count) 0.0];
+    for (sweep in 0...DYKSTRA_SWEEPS) {
+      var moved = 0.0;
+      for (index in 0...count) {
+        var yx = qx + ix[index], yy = qy + iy[index], yz = qz + iz[index];
+        var d = normals[3 * index] * yx + normals[3 * index + 1] * yy + normals[3 * index + 2] * yz - offsets[index];
+        var px = yx, py = yy, pz = yz;
+        if (d > 0.0) {
+          px -= normals[3 * index] * d;
+          py -= normals[3 * index + 1] * d;
+          pz -= normals[3 * index + 2] * d;
+        }
+        ix[index] = yx - px;
+        iy[index] = yy - py;
+        iz[index] = yz - pz;
+        moved = Math.max(moved, Math.abs(px - qx) + Math.abs(py - qy) + Math.abs(pz - qz));
+        qx = px;
+        qy = py;
+        qz = pz;
+      }
+      if (moved < 1e-12 * Math.max(1.0, result)) break;
+    }
+    var dx = x - qx, dy = y - qy, dz = z - qz;
+    return Math.max(result, Math.sqrt(dx * dx + dy * dy + dz * dz));
   }
 
   /**

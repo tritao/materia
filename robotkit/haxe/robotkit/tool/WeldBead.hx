@@ -7,7 +7,8 @@ package robotkit.tool;
  * arc that went out show in it.
  *
  * **Deposition.** The wire melts into the joint as it is fed: in `dt` seconds the arc melts `wireSpeed · A · dt` of wire
- * (`A` the wire's cross-section), and `DEPOSITION_EFFICIENCY` of it reaches the bead, the rest being spatter and fume.
+ * (`A` the wire's cross-section), and `depositionEfficiency` of it reaches the bead, the rest being spatter and fume. The
+ * efficiency is a property of the wire and its gas, given with the wire (the scene's torch block).
  * That metal goes to the station of the seam the wire tip is over. Moving at travel speed `v`, a station receives the
  * metal of the time the tip is over it, so the cross-section is the deposition rate over travel speed:
  * `area = wireSpeed · A · efficiency / v`. Standing still piles it into one station, as a crater does.
@@ -22,8 +23,6 @@ package robotkit.tool;
  * the work, say) is `stray`. Lengths are metres, wire speed metres per minute, the wire's diameter millimetres.
  */
 class WeldBead {
-  /** Fraction of the melted wire that ends up in the bead. */
-  public static inline var DEPOSITION_EFFICIENCY:Float = 0.95;
   /** Length of one station along the seam, in metres. */
   public static inline var BIN:Float = 0.001;
   /** How far from the seam line the wire tip may be and still deposit into the seam, in metres. */
@@ -43,6 +42,8 @@ class WeldBead {
   public final legB:Array<Float>;
   public final length:Float;
   public final wireArea:Float;
+  /** Fraction of the melted wire that ends up in the bead. */
+  public final depositionEfficiency:Float;
   /** Number of stations. */
   public final count:Int;
   /** Metal deposited outside the seam, in cubic metres. */
@@ -61,12 +62,15 @@ class WeldBead {
 
   /**
    * `start` and `stop` bound the seam and `normalA`, `normalB` are the faces' outward unit normals, all in one frame.
-   * `wireDiameterMm` is the wire's diameter.
+   * `wireDiameterMm` is the wire's diameter and `depositionEfficiency` the fraction of its melted metal that reaches the bead.
    */
-  public function new(start:Array<Float>, stop:Array<Float>, normalA:Array<Float>, normalB:Array<Float>, wireDiameterMm:Float) {
+  public function new(start:Array<Float>, stop:Array<Float>, normalA:Array<Float>, normalB:Array<Float>, wireDiameterMm:Float,
+      depositionEfficiency:Float) {
     if (start == null || stop == null || normalA == null || normalB == null || start.length != 3 || stop.length != 3 ||
-        normalA.length != 3 || normalB.length != 3 || !(wireDiameterMm > 0))
-      throw "A weld bead needs a seam, the faces' normals and a wire diameter";
+        normalA.length != 3 || normalB.length != 3 || !(wireDiameterMm > 0) ||
+        !(depositionEfficiency > 0 && depositionEfficiency <= 1))
+      throw "A weld bead needs a seam, the faces' normals, a wire diameter and a deposition efficiency in (0, 1]";
+    this.depositionEfficiency = depositionEfficiency;
     var along = [for (axis in 0...3) stop[axis] - start[axis]];
     var seamLength = norm(along);
     if (!(seamLength > 1e-6)) throw "A weld bead needs a seam with a length";
@@ -112,12 +116,11 @@ class WeldBead {
       burning = true;
       episode++;
     }
-    var melted = Math.max(0.0, wireSpeed) / 60.0 * wireArea * dt * DEPOSITION_EFFICIENCY;
+    var melted = Math.max(0.0, wireSpeed) / 60.0 * wireArea * dt * depositionEfficiency;
     if (!(melted > 0)) return;
     var relative = [for (axis in 0...3) tip[axis] - start[axis]];
     var s = dot(relative, tangent);
-    var off = norm(minus(relative, scale(tangent, s)));
-    if (off > REACH || s < -OVERRUN || s > length + OVERRUN) {
+    if (over(tip) < 0.0) {
       stray += melted;
       return;
     }
@@ -130,6 +133,17 @@ class WeldBead {
     }
     if (index < changedFrom) changedFrom = index;
     if (index > changedTo) changedTo = index;
+  }
+
+  /**
+   * How far `tip` is from the seam line, in metres, when the tip is over the seam (within `REACH` of the line and no more
+   * than `OVERRUN` past either end), and -1 when it is not.
+   */
+  public function over(tip:Array<Float>):Float {
+    var relative = [for (axis in 0...3) tip[axis] - start[axis]];
+    var s = dot(relative, tangent);
+    var off = norm(minus(relative, scale(tangent, s)));
+    return off > REACH || s < -OVERRUN || s > length + OVERRUN ? -1.0 : off;
   }
 
   /** Length of station `i`, in metres: all `BIN` but perhaps the last. */

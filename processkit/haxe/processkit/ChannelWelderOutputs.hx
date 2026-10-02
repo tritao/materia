@@ -28,6 +28,7 @@ class ChannelWelderOutputs implements WelderOutputs {
 
   /** The writes held since the last call, as the operations that carry them out. */
   public function drain():Array<MotionOp> {
+    // The wire stops before the arc goes off (burnback), and the arc comes on after the wire is set.
     var ops:Array<MotionOp> = [];
     var on = arc, speed = wireSpeed, volts = voltage;
     if (volts != null) ops.push(MotionOp.SetOutput(channels.voltage, EventValue.Analog(volts)));

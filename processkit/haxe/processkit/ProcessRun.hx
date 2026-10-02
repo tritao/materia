@@ -25,8 +25,11 @@ class ProcessRun {
   public var interruptedAt(default, null):Float = 0.0;
   /** Index, in the program `takeProgram` last returned, of the operation that follows the path. */
   public var followOp(default, null):Int = 0;
+  /** Why the run failed to begin, when it is `Failed`. */
+  public var failure(default, null):Null<String> = null;
   var pendingBackoff:Float = 0.0;
   var pausedForFeed:Bool = false;
+  var preparing:Float = 0.0;
 
   public function new(recipe:ProcessRecipe, path:PosePath,
       device:ProcessDevice, channel:String, motionSession:MotionSession) {
@@ -48,13 +51,25 @@ class ProcessRun {
     transition(ProcessRunState.Preparation, 0.0, "prepare device");
   }
 
-  /** Observe a global authored path distance and advance the state machine. */
-  public function update(distance:Float):Void {
+  /**
+   * Observe a global authored path distance and advance the state machine. `dtSeconds` is the time since the last call,
+   * which the recipe's prepare timeout counts while the device is being prepared.
+   */
+  public function update(distance:Float, ?dtSeconds:Float):Void {
     requireDistance(distance);
     switch state {
       case Preparation:
-        if (device.fault() != null) return;
-        if (device.ready()) transition(ProcessRunState.Ready, distance, "device ready");
+        if (dtSeconds != null) preparing += dtSeconds;
+        var fault = device.fault();
+        if (fault == null && device.ready()) {
+          transition(ProcessRunState.Ready, distance, "device ready");
+          return;
+        }
+        var limit = recipe.prepareTimeout;
+        if (limit != null && preparing > limit) {
+          failure = fault == null ? "the device did not become ready" : 'the device did not become ready: $fault';
+          transition(ProcessRunState.Failed, distance, failure);
+        }
       case Ready:
         if (device.fault() != null) interrupt(distance, "device fault", recipe.recoveryBackoff);
       case Active:
@@ -70,12 +85,15 @@ class ProcessRun {
         }
       case Recovery:
         if (device.fault() != null) interrupt(distance, "device fault", recipe.recoveryBackoff);
-      case Completion | null:
+      case Completion | Failed | null:
     }
   }
 
-  /** The caller passes this program to ManipulatorMotion; ProcessRun never submits it. */
-  public function takeProgram():MotionProgram {
+  /**
+   * The caller passes this program to ManipulatorMotion; ProcessRun never submits it. A program may not end on an
+   * output change, so when the recipe's engagement exit ends on one the caller gives the `closing` motion that follows it.
+   */
+  public function takeProgram(?closing:MotionOp):MotionProgram {
     if (state != ProcessRunState.Ready && state != ProcessRunState.Recovery)
       throw "Process program is available only when ready or recovering";
     if (pausedForFeed) throw "Process feed override is paused";
@@ -98,6 +116,11 @@ class ProcessRun {
     followOp = ops.length;
     ops.push(MotionOp.FollowPath(continuation, path.frameId, currentFeed, events));
     if (engagement != null) for (op in engagement.exit) ops.push(op);
+    if (closing != null) ops.push(closing);
+    switch ops[ops.length - 1] {
+      case SetOutput(_, _): throw "A process program may not end on an output change: give the closing motion that follows the engagement exit";
+      default:
+    }
     var program = new MotionProgram(ops);
     transition(ProcessRunState.Active, startDistance,
       startDistance > 0.0 ? "resume after backoff" : "begin process");
@@ -163,7 +186,9 @@ class ProcessRun {
 
   function interrupt(distance:Float, reason:String, backoff:Float):Void {
     interruptedAt = distance;
-    pendingBackoff = backoff;
+    // The restart backs up from where the process had got to. An interruption before it got beyond the point this
+    // program began at (a re-strike that failed) laid nothing new, so it retries that same point and does not back up again.
+    pendingBackoff = distance > lastProgramStart + 1e-9 ? backoff : 0.0;
     device.safe();
     transition(ProcessRunState.ControlledInterruption, distance, reason);
   }

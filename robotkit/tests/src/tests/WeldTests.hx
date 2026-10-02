@@ -8,6 +8,7 @@ import robotkit.spatial.Vec3;
 import robotkit.tool.ConvexSolid;
 import robotkit.tool.GroundedWork;
 import robotkit.tool.WeldBead;
+import robotkit.tool.WeldPathBead;
 import robotkit.tool.WeldArcModel.WeldArcConfig;
 import robotkit.tool.WeldArcModel;
 import robotkit.tool.WeldChannelPolicy;
@@ -22,6 +23,8 @@ import robotkit.tool.WeldSensor;
 class WeldTests {
   static var assertions = 0;
   static inline var STEP = 0.01;
+  /** The deposition efficiency the beads here are given, as the scene's torch block would give it. */
+  static inline var EFFICIENCY = 0.95;
 
   public static function run():Int {
     assertions = 0;
@@ -43,6 +46,8 @@ class WeldTests {
     testBeadOnlyWhereTheArcBurns();
     testBeadOverlapAndGaps();
     testBeadFaces();
+    testPathBead();
+    testLegFollowsTravelSpeed();
     testWeldPlan();
     Sys.println('RobotKit weld tests passed ($assertions assertions)');
     return assertions;
@@ -75,6 +80,16 @@ class WeldTests {
     near(box.distance(0, 0, 3), 2.0, "distance in front of a face", 1e-9);
     near(box.distance(0, 0, 0), -1.0, "depth at the centre", 1e-9);
     near(box.distance(0, 0, 1), 0.0, "zero on the surface", 1e-9);
+    // Beside an edge and off a corner the distance is the true one, not the largest plane distance (0.71 and 0.58 of it).
+    near(box.distance(2, 2, 0), Math.sqrt(2), "distance beside an edge is the true distance", 1e-9);
+    near(box.distance(2, 2, 2), Math.sqrt(3), "distance off a corner is the true distance", 1e-9);
+    near(box.distance(3, 1, 1), 2.0, "distance in front of a face is the plane's", 1e-9);
+    near(box.distance(0.5, 0.2, 4), 3.0, "distance in front of a face off-centre is the plane's", 1e-9);
+    // A wedge's sharp edge: from (1, 3, 0.5) the nearest point of the solid is the slanted face's end.
+    var sharp = new ConvexSolid([0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 1, 2, 0, 1, 0, 2, 1]);
+    near(sharp.distance(0, 3, 0.5), 1.0, "distance past a wedge's end", 1e-9);
+    near(sharp.distance(4, -1, 0.5), Math.sqrt(5), "distance off a wedge's acute vertex", 1e-6);
+    near(sharp.distance(3, 3, 0.5), Math.sqrt(8), "distance in front of the wedge's slant", 1e-9);
     near(box.ray(0, 0, 4, 0, 0, -1, 10), 3.0, "a ray straight down meets the top", 1e-9);
     near(box.ray(0, 0, 0, 0, 0, -1, 10), 0.0, "a ray from inside meets it at once", 1e-9);
     check(box.ray(0, 0, 4, 0, 0, -1, 2) == Math.POSITIVE_INFINITY, "a face beyond the range is not met");
@@ -313,7 +328,7 @@ class WeldTests {
 
   /** A 100 mm seam along +X on the plate's top (z = 0) against an upright's face that looks toward -Y. */
   static function seam(?wire:Float = 1.2):WeldBead
-    return new WeldBead([0.0, 0.0, 0.0], [0.1, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -1.0, 0.0], wire);
+    return new WeldBead([0.0, 0.0, 0.0], [0.1, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -1.0, 0.0], wire, EFFICIENCY);
 
   /** The tip travels the seam from `from` to `to` (metres along it) at `speed` m/s, wire at `wire` m/min, in 1 ms steps. */
   static function travel(bead:WeldBead, from:Float, to:Float, speed:Float, wire:Float, ?arc:Bool = true):Void {
@@ -327,7 +342,7 @@ class WeldTests {
     near(bead.legA[1], -1.0, "the leg on the plate runs away from the upright", 1e-12);
     near(bead.legB[2], 1.0, "the leg on the upright runs up it", 1e-12);
     // 8 m/min of 1.2 mm wire at 11.46 mm/s deposits an equal-leg fillet of 5 mm.
-    var area = (8.0 / 60.0 * 1000.0) * (Math.PI * 0.6 * 0.6) * WeldBead.DEPOSITION_EFFICIENCY / (0.01146 * 1000.0);
+    var area = (8.0 / 60.0 * 1000.0) * (Math.PI * 0.6 * 0.6) * EFFICIENCY / (0.01146 * 1000.0);
     travel(bead, 0.0, 0.1, 0.01146, 8.0);
     near(bead.meanLeg(0.1, 0.9) * 1000.0, Math.sqrt(2.0 * area), "the leg is the deposition rate over travel speed", 0.02);
     near(bead.meanLeg(0.1, 0.9) * 1000.0, 5.0, "a fillet of 5 mm legs", 0.02);
@@ -398,40 +413,123 @@ class WeldTests {
   static function testWeldPlan():Void {
     var parameters:WeldParameters = {wireSpeed: 8.0, voltage: 24.0, travelSpeed: 0.0115, approach: 0.04, startDwell: 0.15,
       craterDwell: 0.15, burnback: 0.1};
-    var plan = new WeldPlan(new Transform3(new Vec3(0.1, 0.0, 0.0), Quat.identity()),
+    var plan = WeldPlan.straight(new Transform3(new Vec3(0.1, 0.0, 0.0), Quat.identity()),
       new Transform3(new Vec3(0.1, 0.5, 0.0), Quat.identity()), parameters);
     near(plan.length(), 0.5, "a plan's length is the seam's", 1e-12);
+    check(plan.segments.length == 1, "a straight seam is a path of one segment");
     // In a frame turned a quarter about Z and shifted 1 m along X, the start (0.1, 0, 0) lands at (1, 0.1, 0), the stop
     // (0.1, 0.5, 0) at (0.5, 0.1, 0), and the torch turns with the frame.
     var quarter = Quat.fromAxisAngle(new Vec3(0.0, 0.0, 1.0), Math.PI / 2);
     var moved = plan.transformed(new Transform3(new Vec3(1.0, 0.0, 0.0), quarter));
-    near(moved.start.translation.x, 1.0, "the start moves with the frame", 1e-12);
-    near(moved.start.translation.y, 0.1, "and turns with it", 1e-12);
-    near(moved.stop.translation.x, 0.5, "the stop likewise", 1e-12);
+    near(moved.start().translation.x, 1.0, "the start moves with the frame", 1e-12);
+    near(moved.start().translation.y, 0.1, "and turns with it", 1e-12);
+    near(moved.stop().translation.x, 0.5, "the stop likewise", 1e-12);
     near(moved.length(), 0.5, "turning keeps the length", 1e-12);
-    near(moved.start.rotation.angularDistance(quarter), 0.0, "the torch turns with the frame", 1e-9);
+    near(moved.start().rotation.angularDistance(quarter), 0.0, "the torch turns with the frame", 1e-9);
     check(moved.parameters == parameters, "the parameters go along");
     var failed = false;
-    try new WeldPlan(plan.start, plan.start, parameters) catch (_:Dynamic) failed = true;
+    try WeldPlan.straight(plan.start(), plan.start(), parameters) catch (_:Dynamic) failed = true;
     check(failed, "a plan needs a seam with a length");
     failed = false;
-    try new WeldPlan(plan.start, plan.stop, {wireSpeed: 0.0, voltage: 24.0, travelSpeed: 0.0115, approach: 0.04, startDwell: 0.0,
+    try WeldPlan.straight(plan.start(), plan.stop(), {wireSpeed: 0.0, voltage: 24.0, travelSpeed: 0.0115, approach: 0.04, startDwell: 0.0,
       craterDwell: 0.0, burnback: 0.0}) catch (_:Dynamic) failed = true;
     check(failed, "a plan needs a wire speed");
+    failed = false;
+    try WeldPlan.straight(plan.start(), plan.stop(), {wireSpeed: 8.0, voltage: 24.0, travelSpeed: 0.0115, approach: 0.04, startDwell: 0.0,
+      craterDwell: 0.0, burnback: 0.0}) catch (_:Dynamic) failed = true;
+    check(failed, "a plan needs a burnback, or the wire sticks in the pool");
+    // A chain: along +Y, then a corner and along -X (the torch turns a quarter about Z at the corner).
+    var turned = new Transform3(new Vec3(0.1, 0.5, 0.0), quarter);
+    var chain = new WeldPlan([new WeldSegment(plan.start(), plan.stop()), new WeldSegment(turned, new Transform3(new Vec3(-0.1, 0.5, 0.0), quarter))],
+      parameters);
+    near(chain.length(), 0.7, "a chain's length is the sum of its segments", 1e-12);
+    near(chain.stop().translation.x, -0.1, "a chain ends where its last segment does", 1e-12);
+    near(chain.transformed(new Transform3(new Vec3(1.0, 0.0, 0.0), quarter)).segments[1].start.translation.x, 0.5, "every segment moves with the frame", 1e-12);
+    failed = false;
+    try new WeldPlan([new WeldSegment(plan.start(), plan.stop()), new WeldSegment(plan.start(), plan.stop())], parameters) catch (_:Dynamic) failed = true;
+    check(failed, "a path's segments must join end to start");
+  }
+
+  /**
+   * An L of two seams, 100 mm along +X then 60 mm along +Y, on a plate (top z = 0) against uprights whose faces look
+   * toward -Y and -X. The wire travels it in one go: each seam gets the metal of the stretch the tip was over, the
+   * corner goes to the first seam, and metal put down away from both is stray.
+   */
+  static function testPathBead():Void {
+    var path = new WeldPathBead([[0.0, 0.0, 0.0], [0.1, 0.0, 0.0]], [[0.1, 0.0, 0.0], [0.1, 0.06, 0.0]],
+      [[[0.0, 0.0, 1.0], [0.0, -1.0, 0.0]], [[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0]]], 1.2, EFFICIENCY);
+    check(path.beads.length == 2 && path.beads[0].count == 100 && path.beads[1].count == 60, "a path bead has a bead per segment");
+    near(path.length(), 0.16, "its length is the segments' together", 1e-12);
+    // 8 m/min at 11.46 mm/s lays a 5 mm leg; the tip travels 100 mm, then 60 mm, 1 ms steps.
+    var speed = 0.01146;
+    var x = 0.0;
+    while (x < 0.1) {
+      path.step(0.001, true, 8.0, [x, 0.0, 0.0]);
+      x += speed * 0.001;
+    }
+    var y = 0.0;
+    while (y < 0.06) {
+      path.step(0.001, true, 8.0, [0.1, y, 0.0]);
+      y += speed * 0.001;
+    }
+    near(path.beads[0].meanLeg(0.1, 0.9), 0.005, "the first seam gets its leg", 2e-4);
+    near(path.beads[1].meanLeg(0.1, 0.9), 0.005, "so does the second", 2e-4);
+    check(path.gaps() == 0 && path.covered() == 160, "the path has metal along all of it, covering " + path.covered() + " stations");
+    check(path.stray < 0.02 * path.deposited, "and little went elsewhere");
+    near(path.deposited, path.beads[0].deposited + path.beads[1].deposited, "the deposit is the beads' together", 1e-15);
+    // Metal put down 3 cm off the second seam is stray.
+    var before = path.stray;
+    path.step(0.001, true, 8.0, [0.13, 0.03, 0.0]);
+    check(path.stray > before, "metal away from every seam is stray");
+    path.reset();
+    check(path.deposited == 0.0 && path.stray == 0.0 && path.covered() == 0, "a reset forgets it all");
+    var failed = false;
+    try new WeldPathBead([], [], [], 1.2, EFFICIENCY) catch (_:Dynamic) failed = true;
+    check(failed, "a path bead needs segments");
+  }
+
+  /**
+   * The leg a weld reaches is measured from the metal laid, not computed back from the recipe. Welding the same seam at
+   * other travel speeds than the recipe's, the leg follows the law the metal obeys (the section is the wire fed over
+   * the length travelled, so the leg goes as the square root of one over the speed), the metal in the bead is the wire
+   * fed times its efficiency whatever the speed, and a wire with another efficiency lays another leg.
+   */
+  static function testLegFollowsTravelSpeed():Void {
+    var wireSpeed = 8.0, diameter = 1.2, length = 0.1;
+    function weld(speed:Float, efficiency:Float):WeldBead {
+      var bead = new WeldBead([0.0, 0.0, 0.0], [length, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -1.0, 0.0], diameter, efficiency);
+      var steps = Math.round(length / speed / 0.001);
+      for (i in 0...steps) bead.step(0.001, true, wireSpeed, [length * (i + 0.5) / steps, 0.0, 0.0]);
+      return bead;
+    }
+    var reference = weld(0.01146, EFFICIENCY).meanLeg(0.1, 0.9);
+    near(reference, 0.005, "at the recipe's speed the leg is the one asked for", 1.5e-4);
+    for (factor in [0.5, 2.0, 0.25]) {
+      var leg = weld(0.01146 * factor, EFFICIENCY).meanLeg(0.1, 0.9);
+      near(leg / reference, Math.sqrt(1.0 / factor), 'at ${factor} of the speed the leg is ${Math.sqrt(1.0 / factor)} of the reference', 2e-3);
+    }
+    // Metal balance: the volume in the bead is the wire fed over the time it took, times the efficiency.
+    for (speed in [0.005, 0.01146, 0.02]) {
+      var bead = weld(speed, EFFICIENCY);
+      var fed = wireSpeed / 60.0 * (Math.PI * diameter * diameter / 4.0 * 1.0e-6) * (length / speed);
+      near(bead.deposited / (fed * EFFICIENCY), 1.0, "the bead holds the wire fed times its efficiency", 2e-3);
+    }
+    // A wire that deposits less lays a smaller leg, by the root of the ratio.
+    near(weld(0.01146, 0.8).meanLeg(0.1, 0.9) / reference, Math.sqrt(0.8 / EFFICIENCY), "a wire of another efficiency lays another leg", 2e-3);
   }
 
   static function testBeadFaces():Void {
     // Faces at 120 degrees (an obtuse T-joint corner): the legs run along each face, away from the corner.
     var s = Math.sqrt(0.75);
-    var bead = new WeldBead([0.0, 0.0, 0.0], [0.1, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -s, 0.5], 1.2);
+    var bead = new WeldBead([0.0, 0.0, 0.0], [0.1, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -s, 0.5], 1.2, EFFICIENCY);
     near(bead.legA[0] * bead.normalA[0] + bead.legA[1] * bead.normalA[1] + bead.legA[2] * bead.normalA[2], 0.0, "leg A lies in face A", 1e-12);
     near(bead.legB[0] * bead.normalB[0] + bead.legB[1] * bead.normalB[1] + bead.legB[2] * bead.normalB[2], 0.0, "leg B lies in face B", 1e-12);
     check(bead.legA[1] < 0 && bead.legB[2] > 0, "each leg leaves the corner toward the open side");
     var failed = false;
-    try new WeldBead([0.0, 0.0, 0.0], [0.1, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, 0.0, -2.0], 1.2) catch (_:Dynamic) failed = true;
+    try new WeldBead([0.0, 0.0, 0.0], [0.1, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, 0.0, -2.0], 1.2, EFFICIENCY) catch (_:Dynamic) failed = true;
     check(failed, "opposed faces have no corner to fill");
     failed = false;
-    try new WeldBead([0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -1.0, 0.0], 1.2) catch (_:Dynamic) failed = true;
+    try new WeldBead([0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -1.0, 0.0], 1.2, EFFICIENCY) catch (_:Dynamic) failed = true;
     check(failed, "a seam needs a length");
   }
 

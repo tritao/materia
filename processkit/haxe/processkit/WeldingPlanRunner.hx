@@ -8,6 +8,8 @@ import motionkit.kinematics.Pose3;
 import motionkit.path.OrientationPolicy;
 import motionkit.path.PoseLine;
 import motionkit.path.PosePath;
+import motionkit.path.PosePrimitive;
+import robotkit.spatial.Quat;
 import motionkit.path.PoseWaypoint;
 import motionkit.program.Blend;
 import motionkit.program.InputPredicate;
@@ -81,10 +83,20 @@ class WeldingPlanRunner implements robotkit.skill.WeldRunner {
   public static inline var LIFT:Float = 0.005;
   /** Speed of the approach to the start and of the retract, in metres per second. */
   public static inline var APPROACH_SPEED:Float = 0.08;
+  /** How long the welder may take to become ready before the weld is given up, in seconds. */
+  public static inline var PREPARE_TIMEOUT:Float = 2.0;
   /** How long a fault may stay up after the arm has stopped before the weld is given up, in seconds. */
   public static inline var CLEAR_TIMEOUT:Float = 5.0;
   /** Cartesian accuracy the seam is followed to, in metres. */
   public static inline var PATH_TOLERANCE:Float = 0.0005;
+  /** Spacing of the points along a segment where a roll is checked for reach, in metres. */
+  static inline var ROLL_STEP:Float = 0.004;
+  /** The rolls about the wire tried for a segment, in radians: a quarter turns, and the eighths between. */
+  static final ROLLS:Array<Float> = [0.0, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2, 3 * Math.PI / 4, -3 * Math.PI / 4, Math.PI];
+  /** How much of a segment, at most, the torch takes to turn to the next segment's angles at a corner, in metres... */
+  public static inline var CORNER_RAMP:Float = 0.012;
+  /** ...and as a fraction of the segment's length. */
+  public static inline var CORNER_SHARE:Float = 0.45;
 
   public final motion:ManipulatorMotion;
   public final channels:WelderChannels;
@@ -100,6 +112,8 @@ class WeldingPlanRunner implements robotkit.skill.WeldRunner {
   var restartCount:Int = 0;
   var waiting:Float = 0.0;
   var followIndex:Int = -1;
+  /** Index, in the program, of the wait for the arc to establish. */
+  var igniteIndex:Int = -1;
   var reachedPath:Bool = false;
   var programStart:Float = 0.0;
   var seam:Null<PosePath> = null;
@@ -152,15 +166,15 @@ class WeldingPlanRunner implements robotkit.skill.WeldRunner {
   public function completed():Bool return phase == Done;
   public function failure():Null<String> return failureMessage;
 
-  public function run(plan:WeldPlan):Void {
+  public function run(requested:WeldPlan):Void {
     if (running()) throw "A weld is already running";
+    var plan = withRolls(requested);
     this.plan = plan;
     var parameters = plan.parameters;
-    var start = pose(plan.start), stop = pose(plan.stop);
+    var stop = pose(plan.stop());
     var travel = parameters.travelSpeed;
-    seam = new PosePath(FRAME, [new PoseLine(new PoseWaypoint(start, PATH_TOLERANCE, 0.01),
-      new PoseWaypoint(stop, PATH_TOLERANCE, 0.01), OrientationPolicy.Interpolated, 0.1, travel)]);
-    retreat = along(stop, plan.stop, -parameters.approach);
+    seam = new PosePath(FRAME, pathOf(plan, travel));
+    retreat = along(stop, plan.stop(), -parameters.approach);
     // Arc on with the wire at the weld speed, held until the arc is established, then the start dwell.
     var entry:Array<MotionOp> = [
       MotionOp.SetOutput(channels.wireSpeed, EventValue.Analog(parameters.wireSpeed)),
@@ -173,11 +187,12 @@ class WeldingPlanRunner implements robotkit.skill.WeldRunner {
     if (parameters.craterDwell > 0) exit.push(MotionOp.Dwell(parameters.craterDwell));
     exit.push(MotionOp.SetOutput(channels.wireSpeed, EventValue.Analog(0.0)));
     if (parameters.burnback > 0) {
-      exit.push(MotionOp.MoveL(along(stop, plan.stop, -LIFT), FRAME, Math.max(LIFT / parameters.burnback, 0.01), Blend.ExactStop));
+      exit.push(MotionOp.MoveL(along(stop, plan.stop(), -LIFT), FRAME, Math.max(LIFT / parameters.burnback, 0.01), Blend.ExactStop));
     }
     exit.push(MotionOp.SetOutput(channels.arc, EventValue.Digital(false)));
     var recipe = new ProcessRecipe(travel * 0.5, travel * 2.0, travel, 0.0, OrientationPolicy.Interpolated, 0.001,
-      parameters.wireSpeed / travel, 0.0, BACKOFF, FeedChangePolicy.Reject, new ProcessEngagement(entry, exit), APPROACH_SPEED);
+      parameters.wireSpeed / travel, 0.0, BACKOFF, FeedChangePolicy.Reject, new ProcessEngagement(entry, exit), APPROACH_SPEED,
+      PREPARE_TIMEOUT);
     var device = new WelderProcessDevice(outputs, latest, channels, {voltage: parameters.voltage});
     var process = new ProcessRun(recipe, seam, device, channels.wireSpeed, motion.session);
     current = process;
@@ -196,22 +211,32 @@ class WeldingPlanRunner implements robotkit.skill.WeldRunner {
       switch phase {
         case Idle | Done | Failed:
         case Preparing:
-          process.update(0.0);
+          // A welder with a fault it holds (a wire stuck to the work) never becomes ready: say so rather than wait for ever.
+          process.update(0.0, dtSeconds);
           if (process.state == ProcessRunState.Ready) launch(true);
+          else if (process.state == ProcessRunState.Failed) fail(cast(process.failure, String));
         case Welding:
           motion.update(dtSeconds);
           var problem = motion.failure;
           if (problem != null && !motion.running) {
-            // The program failed on its own: an arc that never established is the welder's to retry, anything else is not.
-            if (problem.indexOf(ARC_ESTABLISHED) >= 0) {
+            // The program failed on its own: an arc that never established (it failed waiting for it) is the welder's
+            // to retry, anything else is not.
+            if (motion.progress().op == igniteIndex || problem.indexOf(ARC_ESTABLISHED) >= 0) {
               process.interruptNow(travelled(), "the arc did not establish");
               beginStop();
             } else
               fail(problem);
           } else if (problem == null) {
-            process.update(travelled());
-            if (process.state == ProcessRunState.ControlledInterruption) beginStop();
-            else if (motion.completed) {
+            // Once past the path the seam is welded: a fault in the crater, the burnback or the lift is not a reason to
+            // travel it again, only to finish ending the arc, which the rest of the program does and which clears it.
+            if (!pastPath()) {
+              process.update(travelled());
+              if (process.state == ProcessRunState.ControlledInterruption) {
+                beginStop();
+                return;
+              }
+            }
+            if (motion.completed) {
               process.finish();
               phase = Done;
             }
@@ -250,16 +275,18 @@ class WeldingPlanRunner implements robotkit.skill.WeldRunner {
   /** Starts the process run's program, the first time from a joint move to the approach pose. */
   function launch(first:Bool):Void {
     var process = cast(current, ProcessRun);
-    var body = process.takeProgram();
+    var retreatMove = MotionOp.MoveL(cast(retreat, Pose3), FRAME, APPROACH_SPEED, Blend.ExactStop);
+    var body = process.takeProgram(retreatMove);
     var ops:Array<MotionOp> = outputs.drain();
     if (first) {
       var current = cast(plan, WeldPlan);
-      ops.push(MotionOp.MoveJ(MoveTarget.PoseTarget(along(pose(current.start), current.start, -current.parameters.approach), FRAME,
+      ops.push(MotionOp.MoveJ(MoveTarget.PoseTarget(along(pose(current.start()), current.start(), -current.parameters.approach), FRAME,
         null), new MotionOptions(), Blend.ExactStop));
     }
     followIndex = ops.length + process.followOp;
+    // The entry is the two outputs, the wait for the arc, and perhaps a dwell, just before the path.
+    igniteIndex = followIndex - (cast(plan, WeldPlan).parameters.startDwell > 0 ? 2 : 1);
     ops = ops.concat(body.ops);
-    ops.push(MotionOp.MoveL(cast(retreat, Pose3), FRAME, APPROACH_SPEED, Blend.ExactStop));
     programStart = process.lastProgramStart;
     reachedPath = false;
     waiting = 0.0;
@@ -278,10 +305,151 @@ class WeldingPlanRunner implements robotkit.skill.WeldRunner {
     return reachedPath ? length : programStart;
   }
 
+  /** The program is past the path, in the crater fill, burnback, lift or retreat. */
+  function pastPath():Bool {
+    var op = motion.progress().op;
+    if (op == followIndex) reachedPath = true;
+    return reachedPath && (op > followIndex || op < 0);
+  }
+
   function fail(message:String):Void {
     try motion.abort() catch (_:Dynamic) {}
     failureMessage = message;
     phase = Failed;
+  }
+
+  /**
+   * The plan with the torch rolled about its wire where the arm needs it. A seam's frame fixes the wire (the work and
+   * travel angles) and, by its +X along the travel, also the torch's roll about the wire: the swan neck leads the way. That
+   * roll does not matter to the weld, but it decides whether the arm can hold the pose, and the sides of a tube, with the
+   * travel turning a quarter at each corner, ask for four different ones. So each segment takes the roll nearest the
+   * previous segment's (the first, the seam frame's own) at which the arm can follow it without leaving the arm's branch:
+   * from where the previous segment left it, through the corner's turn and along the segment every few millimetres (and,
+   * for the first, from the approach, for the last, to the lift). A segment with no such roll is left as given, for the
+   * planner to report.
+   */
+  function withRolls(plan:WeldPlan):WeldPlan {
+    var solver = motion.compiler.solver, tolerance = motion.compiler.ikTolerance;
+    function pose(at:Vec3, rotation:Quat):Pose3 return new Pose3(at.x, at.y, at.z, rotation.x, rotation.y, rotation.z, rotation.w);
+    /** Poses along a straight stretch, the orientation turning from one end's to the other's. */
+    function line(from:Vec3, fromRotation:Quat, to:Vec3, toRotation:Quat, into:Array<Pose3>):Void {
+      var steps = Std.int(Math.max(1.0, Math.ceil(to.sub(from).norm() / ROLL_STEP)));
+      for (step in 0...steps + 1) {
+        var fraction = step / steps;
+        into.push(pose(from.add(to.sub(from).scale(fraction)), fromRotation.slerp(toRotation, fraction)));
+      }
+    }
+    /** Whether the arm can follow `poses` in turn from one of `seeds`; the configuration it ends in, or null. */
+    function follow(poses:Array<Pose3>, seeds:Array<Array<Float>>):Null<Array<Float>> {
+      for (seed in seeds) {
+        var q:Null<Array<Float>> = solver.solvePose(poses[0], seed, tolerance);
+        for (index in 1...poses.length) {
+          if (q == null) break;
+          q = solver.solvePose(poses[index], q, tolerance);
+        }
+        if (q != null) return q;
+      }
+      return null;
+    }
+    var spinAxis = new Vec3(0.0, 0.0, 1.0);
+    var segments = plan.segments;
+    var rolled:Array<WeldSegment> = [];
+    var previous = 0.0;
+    var carry:Null<Array<Float>> = null;
+    for (index in 0...segments.length) {
+      var segment = segments[index];
+      var a = segment.start.translation, b = segment.stop.translation;
+      var length = segment.length();
+      var forward = b.sub(a).scale(1.0 / length);
+      var last = index == segments.length - 1;
+      var out = last ? 0.0 : Math.min(CORNER_RAMP, CORNER_SHARE * length);
+      var into = index == 0 ? 0.0 : Math.min(CORNER_RAMP, CORNER_SHARE * length);
+      var candidates = ROLLS.copy();
+      candidates.sort(function(x, y) return Reflect.compare(Math.abs(x - previous), Math.abs(y - previous)));
+      var chosen:Null<Float> = null;
+      var carried:Null<Array<Float>> = null;
+      for (roll in candidates) {
+        var spin = Quat.fromAxisAngle(spinAxis, roll);
+        var start = segment.start.rotation.multiply(spin), stop = segment.stop.rotation.multiply(spin);
+        var poses:Array<Pose3> = [];
+        var wireIn = segment.start.rotation.rotate(new Vec3(0.0, 0.0, 1.0));
+        if (index == 0) poses.push(pose(a.sub(wireIn.scale(plan.parameters.approach)), start));
+        var from = a, fromRotation = start;
+        if (index > 0) {
+          // The corner: the torch turns half way on the last stretch of the segment before and half on this one's first.
+          var before = rolled[index - 1];
+          var beforeLength = before.length();
+          var beforeOut = Math.min(CORNER_RAMP, CORNER_SHARE * beforeLength);
+          var back = before.stop.translation.sub(before.start.translation).scale(1.0 / beforeLength);
+          var middle = before.stop.rotation.slerp(start, 0.5);
+          line(before.stop.translation.sub(back.scale(beforeOut)), before.stop.rotation, before.stop.translation, middle, poses);
+          line(a, middle, a.add(forward.scale(into)), start, poses);
+          from = a.add(forward.scale(into));
+        }
+        var until = b.sub(forward.scale(out));
+        if (until.sub(from).norm() > 1e-6) line(from, fromRotation, until, stop, poses);
+        if (last) {
+          var wireOut = segment.stop.rotation.rotate(new Vec3(0.0, 0.0, 1.0));
+          poses.push(pose(b.sub(wireOut.scale(LIFT)), stop));
+          poses.push(pose(b.sub(wireOut.scale(plan.parameters.approach)), stop));
+        }
+        var seeds:Array<Array<Float>> = carry == null ? solver.sampleCandidates(poses[0], 8, tolerance) : [carry];
+        var ended = follow(poses, seeds);
+        if (ended != null) {
+          chosen = roll;
+          carried = ended;
+          break;
+        }
+      }
+      var roll = chosen == null ? previous : chosen;
+      previous = roll;
+      carry = carried;
+      var spin = Quat.fromAxisAngle(spinAxis, roll);
+      rolled.push(new WeldSegment(new Transform3(a, segment.start.rotation.multiply(spin)), new Transform3(b, segment.stop.rotation.multiply(spin))));
+    }
+    return new WeldPlan(rolled, plan.parameters);
+  }
+
+  /**
+   * The path the wire tip follows: a straight line per segment, the torch holding its orientation along it. Where
+   * the next segment's orientation differs (a corner), the torch turns as it passes: along the last `CORNER_RAMP` of one
+   * segment and the first of the next it turns half the way each, so that it meets the corner at the orientation midway
+   * between the two and has the next segment's own orientation once past it. The turn is part of the travel, at the
+   * travel speed, so the wire feed that keeps the deposit per length constant stays right, and no metal is piled
+   * where the torch would otherwise stand still to turn. The ramp is at most `CORNER_SHARE` of a segment's length.
+   */
+  static function pathOf(plan:WeldPlan, travel:Float):Array<PosePrimitive> {
+    var segments = plan.segments;
+    var primitives:Array<PosePrimitive> = [];
+    function waypoint(point:Vec3, rotation:Quat):PoseWaypoint
+      return new PoseWaypoint(new Pose3(point.x, point.y, point.z, rotation.x, rotation.y, rotation.z, rotation.w), PATH_TOLERANCE, 0.01);
+    function line(from:Vec3, fromRotation:Quat, to:Vec3, toRotation:Quat):Void
+      primitives.push(new PoseLine(waypoint(from, fromRotation), waypoint(to, toRotation), OrientationPolicy.Interpolated, 0.1, travel));
+    for (index in 0...segments.length) {
+      var segment = segments[index];
+      var a = segment.start.translation, b = segment.stop.translation;
+      var length = segment.length();
+      var direction = b.sub(a).scale(1.0 / length);
+      var startRotation = segment.start.rotation, stopRotation = segment.stop.rotation;
+      var before = index > 0 && segments[index - 1].stop.rotation.angularDistance(startRotation) > 1e-6;
+      var after = index + 1 < segments.length && stopRotation.angularDistance(segments[index + 1].start.rotation) > 1e-6;
+      var rampIn = before ? Math.min(CORNER_RAMP, CORNER_SHARE * length) : 0.0;
+      var rampOut = after ? Math.min(CORNER_RAMP, CORNER_SHARE * length) : 0.0;
+      var from = a;
+      if (before) {
+        var middle = segments[index - 1].stop.rotation.slerp(startRotation, 0.5);
+        var end = a.add(direction.scale(rampIn));
+        line(a, middle, end, startRotation);
+        from = end;
+      }
+      var until = after ? b.sub(direction.scale(rampOut)) : b;
+      if (until.sub(from).norm() > 1e-6) line(from, startRotation, until, stopRotation);
+      if (after) {
+        var middle = stopRotation.slerp(segments[index + 1].start.rotation, 0.5);
+        line(until, stopRotation, b, middle);
+      }
+    }
+    return primitives;
   }
 
   static function pose(frame:Transform3):Pose3 {

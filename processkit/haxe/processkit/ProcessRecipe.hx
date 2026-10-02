@@ -18,11 +18,13 @@ class ProcessRecipe {
   public final engagement:Null<ProcessEngagement>;
   /** Feed of the move that brings the tool to the start of the path, or null for the process feed. */
   public final approachSpeed:Null<Float>;
+  /** How long the device may take to become ready, in seconds, or null to wait for ever. */
+  public final prepareTimeout:Null<Float>;
 
   public function new(minSpeed:Float, maxSpeed:Float, nominalSpeed:Float,
       standoff:Float, orientationPolicy:OrientationPolicy, passSpacing:Float,
       quantityPerDistance:Float, triggerLeadSeconds:Float, recoveryBackoff:Float,
-      feedChangePolicy:FeedChangePolicy, ?engagement:ProcessEngagement, ?approachSpeed:Float) {
+      feedChangePolicy:FeedChangePolicy, ?engagement:ProcessEngagement, ?approachSpeed:Float, ?prepareTimeout:Float) {
     if (!Math.isFinite(minSpeed) || minSpeed <= 0.0 ||
         !Math.isFinite(maxSpeed) || maxSpeed < minSpeed ||
         !Math.isFinite(nominalSpeed) || nominalSpeed < minSpeed ||
@@ -35,6 +37,9 @@ class ProcessRecipe {
       throw "Process recipe needs finite positive speed, spacing, quantity and valid policy";
     if (approachSpeed != null && !(approachSpeed > 0.0 && Math.isFinite(approachSpeed)))
       throw "Process recipe approach speed must be finite and positive";
+    if (prepareTimeout != null && !(prepareTimeout > 0.0 && Math.isFinite(prepareTimeout)))
+      throw "Process recipe prepare timeout must be finite and positive";
+    this.prepareTimeout = prepareTimeout;
     this.engagement = engagement;
     this.approachSpeed = approachSpeed;
     this.minSpeed = minSpeed;
