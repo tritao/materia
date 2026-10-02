@@ -292,12 +292,20 @@ Done (see Progress). What was built and decided:
 Tests: `WeldTests` (RobotKit: solids, arc strike near work and not in air, ignition delay, burn-off current and
 voltage, arc lost, touch, no-arc timeout, power, stuck wire and burnback, safe channels, frame),
 `WelderProcessTests`, `ProjectKitTests.torchTool`, `CadBridgeTests.testTorchBindings`, and the MachineKit
-smoke's `checkTorchTool` (grounded work is the weldment). The first two and ProjectKit's run on the host with
-no native build; the cadbridge test and the app only type-check in this checkout (their native build needs
-submodules it does not have).
+smoke's `checkTorchTool` (grounded work is the weldment).
 
-Left open: `SimulatedWelder` itself (the part that reads channels and the simulation) is not run in any test
-here, since it needs a physics backend; everything it decides is in the tested model and work. Grounded work
+**Verification (done with W3).** W2 was first only compile-checked where it touches a physics backend. It has
+since been run for real, in the repo's own test projects: `robotkit/tests/tool-capabilities` (the tool, process
+and weld tests), `processkit/tests`, `projectkit/tests`, `robotkit/cadbridge/tests` (147 assertions, including
+`testTorchBindings`) and the MachineKit smoke all pass. `SimulatedWelder` runs against the real simulation, on
+MuJoCo and on the deterministic test backend, through the app's project-source suite: the robot-welder project
+opens, the torch tool is created with its grounded work from the collision hulls, a program moves the wire tip to
+the seam with the arc on, the arc strikes once the tip is at the work (after the model's 80 ms ignition delay) and burns
+at 250 A (8 m/min of 1.2 mm wire, as the burn-off law says), a one-tick dropout of the supply loses the arc with the `ArcLost` fault and
+the fault clears when the stop takes the arc channel to off, and a torch held 30 mm clear of the work faults with
+`NoArc` each time. Nothing in W2 needed fixing; what the runs added is W3.
+
+Left open: Grounded work
 must be a part of the assembly robot (a free workpiece is refused). `supplyReady` is an input of the simulated
 welder, not yet derived from the mains, gas or battery, which phase 2's energy model can give it. Shielding gas
 is not modelled. Touch is a binary contact, not a model of the sensing circuit. The W0 note that the arc was
@@ -318,6 +326,89 @@ kept apart in `arcs` is replaced by the `Arc` control above.
   and it is checked against the seam's leg size.
 - Tests: one fillet weld on MuJoCo; the bead's leg is within 0.5 mm of the
   target; an arc loss is injected and the run recovers.
+
+Done (see Progress). What was built and decided:
+- **The `weld` step.** A mission step `{kind: "weld", weld: SceneArtifactWeld}` names the seam by its W1 name
+  (`member:face|member:face`) and carries what the generator derived from it, so a player needs no CAD: the wire-tip
+  poses at the two ends (they carry the work and push angles), the two faces' outward normals (they say where the
+  metal sits), the joint type (only `fillet` is deposited), the declared leg, the part that carries the weld metal
+  (`metal`), and a `process`. Lengths are metres, as in the machining section. Straight seams only; a curved seam
+  would carry a list of frames. Validation checks the names against the assembly's occurrences, the poses, the
+  normals, ranges for every process value, and that the robot has exactly one torch.
+- **The process lives in the step, derived from the leg.** `machinekit.welding.WeldingRecipe.fillet(leg)` picks the
+  wire speed for the leg (`1.5·leg + 0.5` m/min), the voltage on a synergic line (`15 + 1.1·wire speed`), and the travel
+  speed at which that wire speed deposits an equal-leg fillet's section: `v = wire speed · wire area · efficiency / (leg²/2)`.
+  For the 5 mm leg: 8 m/min, 24 V, 11.46 mm/s, with 0.15 s start and crater dwells, 0.1 s burnback and a 40 mm approach.
+  The values are written into the step, not looked up by a recipe name: the artifact is explicit and a player needs
+  no table. The leg the weld reaches is then a result of the simulation, not of this arithmetic.
+- **`WeldSeam` skill** (RobotKit) is `HandlePart`'s sibling: a `WeldPlan` (the two tip poses and the parameters, read
+  when the skill starts and taken from the map frame to the base's), a `WeldRunner` boundary that RobotKit names and
+  ProcessKit implements, and the `tool_weld` sensor to read the outcome from. It succeeds when the runner is done and the
+  welder reports its arc out and no fault. It only uses the robot - the torch's channels, the arm's motion and the welder's
+  sensor - so a mobile base can run it from any station (phase 2).
+- **ProcessKit `ProcessRun` drives it, with two additions.** The model fit for the path and the recovery
+  (interrupt on a device fault, safe the device, re-approach `recoveryBackoff` before where it stopped, so the new bead
+  overlaps the old), but a weld has to be engaged before the path and disengaged after it. A `ProcessRecipe` now
+  carries an optional `ProcessEngagement`: operations that run after the approach move (`entry`) and after the path
+  (`exit`), run again by every restart. With an exit the path's events do not zero the process output at the path's end,
+  and the run ends when the caller says the program is done (`ProcessRun.finish`), not at the path's end. `interruptNow`
+  lets the caller interrupt for a reason the device did not report (an arc that never established), and `followOp` says
+  which operation follows the path. The recipe also has an `approachSpeed`, so the approach is not at the travel speed.
+  Nothing changes for a recipe without an engagement (the paint and dispense tests are unchanged).
+- **`WeldingPlanRunner` (ProcessKit)** is the `WeldRunner` over a `ManipulatorMotion` and a `WelderProcessDevice`. Its
+  program: `MoveJ` to the approach pose (the start, `approach` out along the wire), `MoveL` to the start, then the process
+  run's: wire speed and arc on (a restart's first move aims at the backed-up point on the seam), `WaitInput` on the
+  established arc with a 2 s timeout, the start dwell, `FollowPath` along the seam at the travel speed with the wire speed
+  that keeps the deposit per length constant, the crater dwell with the arc up, the wire stopped, a 5 mm lift over the
+  burnback time (the arc, with nothing feeding it, burns back; the model goes out without a fault) and the arc command
+  ended, then the retract to `approach` out along the wire from the seam's end. The runner watches the welder's fault while the program runs; a fault
+  makes the process run interrupt, the arm stops (`abort`, which takes the arc and wire channels to off), and once the
+  fault has cleared the run restarts; after `maxRestarts` (3) the weld fails with the reason. Where the plan says
+  "arc off; burnback (wire stops after arc off)" the order is the other way round on purpose: the model, like a real supply,
+  burns back when the wire stops first, and an arc commanded off while the wire still feeds sticks the wire (`WireStuck`).
+- **Outputs of a process device in simulation.** A channel can only be written by a motion program, so
+  `ChannelWelderOutputs` (the `WelderOutputs` of a welder worked through the robot's channels) holds the device's writes
+  (`prepare`, `safe`) and the runner puts them at the start of the next program as `SetOutput` operations. A stop already
+  takes the channels to their safe values, so a `safe` is the same value again. The input wait reads the established
+  arc from the same reading the device reads.
+- **MotionKit needed nothing.** Its output events attach to a motion (a `SetOutput` after a barrier leads the next move,
+  and a program may not end on one), which shaped the exit: the wire stop leads the lift, the arc command ends it.
+- **The bead** (`robotkit.tool.WeldBead`, pure) takes each tick the arc state, the wire speed and the wire tip, and
+  keeps the metal at each 1 mm station of the seam: melted wire (`wire speed · A · dt`) times the deposit efficiency (0.95)
+  goes to the station the tip is over, so a station's section is deposition over travel speed, and standing still piles
+  metal into a crater. An equal-leg triangular fillet's leg is `sqrt(2·area)`. It is the result that is compared with the
+  declared leg. Metal that lands off the seam is counted as `stray`, restarts are told apart (`runs(i)`), and a bare stretch
+  between metal is a `gap`.
+- **Showing it** (`app/WeldBeads`, a session member): the part named by the step's `metal` (a 1 mm speck of steel,
+  `machinekit.welding.WeldMetal`, mated to the workpiece's reference member, in the BOM as the weld metal) takes the bead as
+  runtime geometry in chunks of 20 stations, re-meshed at most every 0.1 s of simulation time and only where the bead grew,
+  with a triangular section per station, legs along the two faces, an end cap where the metal stops. A reset takes it off.
+- **`MissionPlayer`** runs `weld` as it runs `pick` and `place`, from the one torch tool (the arm's tool frame is the wire
+  tip). A mission that does not loop now stops after its last step; before it started the last step again, which for a weld
+  would have laid a second bead.
+- **The generator** (`RobotWelderPreview.cell`) finds the T-joint's `+y` seam from the geometry, places it where the
+  workpiece stands, and writes the mission; `RobotWelderChecks.checkMission` checks the seam, the leg the recipe's numbers
+  deposit, and the torch pointing down.
+
+Results (project-source suite, `PROJECT_SOURCE_ONLY=welder`): on MuJoCo and on the test backend the mission welds the
+180 mm seam in 20.2 s of simulation time: the arc burns for 1603 ticks (16 s) at up to 250 A, the wire tip stays within
+0.1 mm of the seam line, the bead is 180 mm long with no gap, its mean leg over the middle 70% is 5.0 mm (4.8 to 5.1) against
+the 5 mm asked for (the test allows 0.5 mm), and no metal misses the seam. A run that loses the arc half way (the supply
+drops out for one tick) stops, backs up 10 mm along the seam, strikes again and finishes in 21.6 s: one restart, an 11 mm
+overlap whose metal is doubled (the leg there is 9.4 mm, a restart hump), mean leg 5.2 mm, no gap. A seam held 30 mm clear of
+the work faults `NoArc` four times in 7.5 s and the weld fails with "the arc could not be held in 3 restarts".
+
+Left open: only straight seams of fillet joints are deposited (butt, lap and corner joints would need other sections, curved
+seams a path of frames). The section is a straight-faced triangle; real beads are convex and the leg for a given area
+differs by a few percent, which the equal-leg law does not capture, and a start hump and crater dip are shaped only by the
+dwells. The wire speed, voltage and travel speed come from a rule of thumb, not a synergic table; the voltage setpoint does
+not change the simulated arc beyond the arc length. The approach and retract are not checked for collisions (W4). The
+`WaitInput` timeout and the restart count are constants of the runner. A restart re-strikes where the arm stopped, a few
+millimetres past where the arc went out, so a long-lost arc leaves a bare stretch the backoff must cover (10 mm). Seam
+frames are the workpiece as designed: no pose correction yet (phase 2). The suite's teardown after the last MuJoCo test
+crashed now and then in the first runs (a double free or segmentation fault when the process exits, seen with the arm
+test too); the results are printed before it, and calling `simulation.clear()` before the session is disposed, as the
+mobile tests do, has not seen it since.
 
 **W4. Weld the whole weldment.** Generate the mission from the weldment's
 seams, so adding a member adds its seams. Order the seams to minimise air moves
@@ -401,7 +492,7 @@ Dependencies:
 | W0 | done | tool-agnostic arm; welding parts and capabilities; cell, checks, Start entry |
 | W1 | done | seams found from member faces (`WeldSeams`, `WeldSeam`, `Weldment`); workpiece with a tube frame; checks |
 | W2 | done | work clamp and derived grounded work; `torch` robot tool in the scene artifact; `SimulatedWelder` + `WeldArcModel`; `WelderProcessDevice`; tests |
-| W3 | | |
+| W3 | done | `weld` mission step; `WeldSeam` skill and `WeldBead`; process engagement and `WeldingPlanRunner`; weld metal part and recipe; bead as runtime geometry; welds on MuJoCo and the test backend, restart with overlap |
 | W4 | | |
 | W5 | | |
 | W6 | | |

@@ -14,6 +14,13 @@ exposed ports. The work lead goes to a magnetic work clamp on the weldment's
 base plate, and the scene's `torch` robot tool is derived from that: the arc
 returns through the plate and everything welded to it, and nothing else.
 
+The scene's mission welds one seam: the plate's T-joint with the upright. When the
+simulation runs, the arm approaches the seam, strikes the arc and waits for it, travels
+the seam at the speed that deposits the leg the weldment asks for, fills the crater,
+stops the wire and retracts, and the weld metal grows along the seam as the simulated
+welder deposits it. The recipe (`machinekit.welding.WeldingRecipe`) derives the wire
+speed, voltage and travel speed from the seam's leg size.
+
 - `ArmWeldingTool.hx` — the arm's welding end effector (an `ArmTool`): adapter
   plate and torch, with the `tcp` working frame at the wire tip.
 - `WeldingCell.hx` — the cell.
@@ -21,7 +28,7 @@ returns through the plate and everything welded to it, and nothing else.
   `Weldment` that says which joints are welded. Its seams are not authored: they
   are found from the members' faces (`machinekit.welding.WeldSeams`).
 - `WeldSeamChecks.hx` — checks of the derived seams: names, frames, edits, gaps.
-- `RobotWelderPreview.hx` — the project entrypoint and `RobotWelderChecks`
+- `RobotWelderPreview.hx` — the project entrypoint (which writes the weld mission) and `RobotWelderChecks`
   (services supplied, torch pose, reach of the derived seam frames, torch and arm
   clearances, bill of materials), run by the MachineKit smoke suite.
 - `PLAN.md` — where this example is going: seams from the CAD, a simulated
