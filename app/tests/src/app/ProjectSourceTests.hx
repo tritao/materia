@@ -590,9 +590,9 @@ class ProjectSourceTests {
     check(seen > 0, "the overlay shows the obstacle the lidar added to the costmap");
     var ghost = mission.overlay();
     if (ghost == null || ghost.odometry == null || ghost.outline.length < 3) throw "the overlay carries the odometry ghost";
-    // Wheel odometry drifts from the truth as the wheels slip (turning in place most); it stays near.
+    // Odometry from the wheel joints follows the base's drive to within a few centimetres over the round.
     var believed:robotkit.mobile.Pose2 = cast ghost.odometry, truth = chassis();
-    check(Math.sqrt(Math.pow(believed.x - truth[0], 2) + Math.pow(believed.y - truth[1], 2)) < 0.3,
+    check(Math.sqrt(Math.pow(believed.x - truth[0], 2) + Math.pow(believed.y - truth[1], 2)) < 0.05,
       'the odometry ghost follows the base (${Math.round(Math.sqrt(Math.pow(believed.x - truth[0], 2) + Math.pow(believed.y - truth[1], 2)) * 1000)} mm off)');
     var rest = boxFloorPose(), settled:Array<Float> = cast landed;
     check(Math.abs(rest[0] - settled[0]) < 0.03 && Math.abs(rest[1] - settled[1]) < 0.03,

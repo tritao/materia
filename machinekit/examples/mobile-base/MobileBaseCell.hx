@@ -52,8 +52,15 @@ class MobileBaseCell extends MachineAssembly {
 	public static inline var ROOM_WIDTH:Float = 4000;
 	public static inline var WALL:Float = 100;
 	public static inline var WALL_HEIGHT:Float = 400;
-	/** The floor slab under the room; its top is the assembly's z = 0. */
+	/** The floor slab under the room; its top is the assembly's z = 0, less `FLOOR_GAP`. */
 	public static inline var FLOOR:Float = 50;
+	/**
+	 * The base rolls on its drive, which holds its height at z = 0, so its wheels are tangent to the floor
+	 * by construction. Resting exactly on the slab, their hulls chatter against it and kick the wheel
+	 * joints (the odometry read 175 mm off the truth over a round); a millimetre of air between them
+	 * leaves the wheels to the drive (11 mm). What is dropped in the room still lands on the slab.
+	 */
+	public static inline var FLOOR_GAP:Float = 1;
 
 	public static final ORIGIN:FloorPose = {x: -1500, y: -1000, yaw: 0};
 	/** Facing the north table, the east table and the dock. */
@@ -79,9 +86,9 @@ class MobileBaseCell extends MachineAssembly {
 		var hx = ROOM_LENGTH / 2, hy = ROOM_WIDTH / 2;
 		var wallX = new RoomBlock(ROOM_LENGTH + 2 * WALL, WALL, WALL_HEIGHT, "painted steel", "Wall");
 		var wallY = new RoomBlock(WALL, ROOM_WIDTH, WALL_HEIGHT, "painted steel", "Wall");
-		// The floor is a slab the walls stand on the edge of, lowered so its top is z = 0: what is dropped in the room lands on it.
+		// The floor is a slab the walls stand on the edge of, lowered so its top is z = 0 (less the gap): what is dropped in the room lands on it.
 		addComponent("floor", new RoomBlock(ROOM_LENGTH + 2 * WALL, ROOM_WIDTH + 2 * WALL, FLOOR, "painted steel", "Floor"),
-			AssemblyFrames.translation(0, 0, -FLOOR));
+			AssemblyFrames.translation(0, 0, -FLOOR - FLOOR_GAP));
 		addComponent("wallNorth", wallX, AssemblyFrames.translation(0, hy + WALL / 2, 0));
 		addComponent("wallSouth", wallX, AssemblyFrames.translation(0, -hy - WALL / 2, 0));
 		addComponent("wallEast", wallY, AssemblyFrames.translation(hx + WALL / 2, 0, 0));

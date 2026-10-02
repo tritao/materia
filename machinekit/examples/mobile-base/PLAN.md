@@ -139,8 +139,12 @@ correctly and caught a stroke of an empty path.
 
 Left over: a sensed object is the visible surface only (a long wall seen end-on is its near end, and the
 unseen back of a box is not covered); a remembered obstacle that cannot be seen through stays for its
-full 20 s; wheel odometry drifts up to a few decimetres from the truth over a round (the ghost's whole
-use until slip is simulated); the overlays have a toggle but no finer controls (per overlay, colours).
+full 20 s; the overlays have a toggle but no finer controls (per overlay, colours).
+
+Odometry note: with the floor slab's top exactly at the wheels' tangent plane the wheel hulls chattered
+against it and kicked the wheel joints (a stall of the right wheel for a few ticks), so the wheel odometry
+drifted 175 mm from the base's drive over a round; the slab now sits a millimetre lower (`FLOOR_GAP`) and
+the drift is about 11 mm.
 
 **M5. Mobile manipulator** (done). The robot arm stands on the deck's payload
 seat, turned to work ahead; the room's shelves became two tables with place
