@@ -138,6 +138,8 @@ import robotkit.perception.Obstacle;
 import robotkit.perception.DockingTarget;
 import robotkit.perception.LidarObstaclePerception;
 import robotkit.perception.LidarMapFilter;
+import robotkit.perception.LidarFreeSpace;
+import robotkit.perception.FreeSpaceView;
 import robotkit.perception.PinholeCameraIntrinsics;
 import robotkit.perception.PointCloudObstaclePerception;
 import robotkit.perception.GroundTruthPerception;
@@ -2081,6 +2083,48 @@ class RobotWorldTests {
     check(dynamicCostmap.revision == drawn + 1 && !dynamicCostmap.isTraversable(0, 0) &&
       dynamicCostmap.isTraversable(2, 2),
       "costmap clearing the dynamic layer leaves the grid's obstacles");
+
+    // Obstacles the sensor has lost sight of stay for the costmap's memory, unless a scan sees through their place.
+    function sightingAt(x:Float, y:Float):Obstacle
+      return new Obstacle(new Detection("sighting", "obstacle", 1.0, new Pose2(x, y), "map", Int64.ofInt(1),
+        Int64.ofInt(1), Int64.ofInt(1), "sim-clock", "host-clock"), 0.3);
+    function scanOf(ranges:Array<Float>):FreeSpaceView
+      return new LidarFreeSpace(6.0).viewing(new SensorFrame("lidar", "lidar", "base", Int64.ofInt(1), Int64.ofInt(1),
+        ranges, Int64.ofInt(1), "base", null, null, "sim-clock", "host-clock"), new Pose2(0.0, 5.0, 0.0));
+    var memoryGrid = new OccupancyGrid2(0.5, new Pose2(), 20, 20, "map", OccupancyCell.Free);
+    var memory = new Costmap2(memoryGrid, 0.0, false, 0.0, 0.0, 5.0);
+    memory.senseObstacles([sightingAt(5.0, 5.0)], null, 0.1);
+    check(!memory.isTraversable(10, 10), "a sensed obstacle blocks the costmap");
+    memory.senseObstacles([], null, 1.0);
+    check(!memory.isTraversable(10, 10) && memory.dynamicLayer().length == 1,
+      "an obstacle out of view keeps blocking while the memory lasts");
+    var remembered = memory.revision;
+    memory.senseObstacles([], null, 0.0);
+    check(memory.revision == remembered, "an unchanged remembered layer costs nothing");
+    memory.senseObstacles([sightingAt(5.2, 5.0)], null, 1.0);
+    check(memory.dynamicLayer().length == 1 && memory.dynamicLayer()[0].detection.pose.x == 5.2,
+      "an obstacle seen again replaces its memory");
+    memory.senseObstacles([], null, 4.5);
+    check(!memory.isTraversable(10, 10), "a memory is counted from when the obstacle was last seen");
+    memory.senseObstacles([], null, 1.0);
+    check(memory.isTraversable(10, 10) && memory.dynamicLayer().length == 0,
+      "an obstacle out of view is forgotten when the memory runs out");
+    // The sensor at (0, 5) facing +x: 72 rays, one every five degrees, the first straight at the obstacle.
+    memory.senseObstacles([sightingAt(5.0, 5.0)], null, 0.1);
+    var nothing = [for (_ in 0...72) 6.0];
+    var seesBox = nothing.copy(); seesBox[0] = 4.8;
+    var occluded = nothing.copy(); occluded[0] = 3.0;
+    memory.senseObstacles([], scanOf(seesBox), 0.1);
+    check(!memory.isTraversable(10, 10), "a scan that still returns from the obstacle's place keeps it");
+    memory.senseObstacles([], scanOf(occluded), 0.1);
+    check(!memory.isTraversable(10, 10), "a scan that is blocked short of the obstacle's place says nothing of it");
+    memory.senseObstacles([], scanOf(nothing), 0.1);
+    check(memory.isTraversable(10, 10) && memory.dynamicLayer().length == 0,
+      "a scan that sees through the obstacle's place clears it");
+    var forgetful = new Costmap2(new OccupancyGrid2(0.5, new Pose2(), 20, 20, "map", OccupancyCell.Free), 0.0, false, 0.0, 0.0);
+    forgetful.senseObstacles([sightingAt(5.0, 5.0)], null, 0.1);
+    forgetful.senseObstacles([], null, 0.1);
+    check(forgetful.isTraversable(10, 10), "without a memory only the latest observation counts");
 
     // A 0.1 m obstacle and a 0.3 m robot: a cell is lethal within 0.4 m of the
     // obstacle and blocked within 0.4 m plus half a 0.2 m cell diagonal.

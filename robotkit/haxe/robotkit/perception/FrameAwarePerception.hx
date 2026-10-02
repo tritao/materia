@@ -22,15 +22,18 @@ class FrameAwarePerception implements Perception {
   public var frames(default, null):FrameTree2;
   /** Reads the sensor frames before `source` does, with each one's sensor placed in the reference frame. */
   public final scanFilter:Null<ScanFilter>;
+  /** Reports, with each observation, the free space the LiDAR scans show (in the reference frame). */
+  public final freeSpace:Null<LidarFreeSpace>;
 
   public function new(source:Perception, localization:Localization,
-      ?frames:FrameTree2 = null, ?scanFilter:ScanFilter) {
+      ?frames:FrameTree2 = null, ?scanFilter:ScanFilter, ?freeSpace:LidarFreeSpace) {
     if (source == null || localization == null)
       throw "Frame-aware perception requires a source and localization";
     this.source = source;
     this.localization = localization;
     this.frames = frames == null ? new FrameTree2() : frames;
     this.scanFilter = scanFilter;
+    this.freeSpace = freeSpace;
   }
 
   public function observe(sensorFrames:Array<SensorFrame>):PerceptionSnapshot {
@@ -54,7 +57,11 @@ class FrameAwarePerception implements Perception {
       new DockingTarget(detection,
         transformPose(value.approachPose, value.detection.frameId, estimate));
     }];
-    return new PerceptionSnapshot(detections, obstacles, pallets, dockingTargets);
+    var layout = freeSpace;
+    var views:Array<FreeSpaceView> = layout == null ? [] : [for (frame in sensorFrames)
+      if (frame.kind == "lidar" && frame.values.length > 0) layout.viewing(frame, referenceFromFrame(frame.frameId, estimate))];
+    return new PerceptionSnapshot(detections, obstacles, pallets, dockingTargets,
+      views.length == 0 ? null : new FreeSpaceViews(views));
   }
 
   /**
@@ -90,5 +97,17 @@ class FrameAwarePerception implements Perception {
     return sourceFrame == estimate.bodyFrame
       ? estimate.pose
       : estimate.pose.compose(frames.lookup(estimate.bodyFrame, sourceFrame));
+  }
+}
+
+/** Free where any of several views sees it free. */
+private class FreeSpaceViews implements FreeSpaceView {
+  final views:Array<FreeSpaceView>;
+
+  public function new(views:Array<FreeSpaceView>) this.views = views;
+
+  public function freeAt(x:Float, y:Float, radiusMeters:Float):Bool {
+    for (view in views) if (view.freeAt(x, y, radiusMeters)) return true;
+    return false;
   }
 }
