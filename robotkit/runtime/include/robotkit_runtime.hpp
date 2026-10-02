@@ -327,6 +327,8 @@ private:
     std::shared_ptr<RobotEndpoint> endpoint_;
     std::chrono::nanoseconds period_;
     uint64_t last_owner_timestamp_ns_ = 0;
+    /** Whether a device that executes the queue reported it running in its latest sample. */
+    bool device_queue_active_ = false;
     mutable std::mutex state_mutex_;
     rk_robot_state state_{};
     mutable std::mutex queue_mutex_;

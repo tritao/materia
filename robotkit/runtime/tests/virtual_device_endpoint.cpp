@@ -617,6 +617,9 @@ void runtime_hold_rest_resume_fires_final_event() {
         }
     }
     assert(completed && snapshot.fault_code == 0 && snapshot.trajectory_tag == 80);
+    // Finished means the runtime's copy of the queue has run out too: the setpoint is the
+    // plan's end, and the next plan starts afresh rather than joining a finished queue.
+    assert(std::abs(snapshot.setpoint_position[0] - 0.5) < 1e-12);
     for (int i = 0; i < 20; ++i) cycle();
     const auto events = endpoint->event_log();
     assert(events.size() == 2);

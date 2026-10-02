@@ -726,7 +726,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         state_backup_ = state_;
         state_backup_valid_ = true;
         // A device that executes the queue reports its own path clock.
-        device_running = endpoint_->executes_trajectory_queue() && state_.trajectory_active != 0;
+        device_running = endpoint_->executes_trajectory_queue() && device_queue_active_;
         device_path_time_ns = state_.trajectory_time_ns;
     }
     control_backup_ = control_;
@@ -1680,8 +1680,15 @@ rk_result RobotRuntime::publish_sample_impl(uint64_t timestamp_ns,
     next.received_timestamp_ns = 0;
     next.sensor_count = 0;
     const auto result = sample ? (next = *sample, sample_result) : endpoint_->sample(timestamp_ns, next);
-    if (endpoint_->executes_trajectory_queue())
+    if (endpoint_->executes_trajectory_queue()) {
         control_.diagnostic_code = endpoint_->diagnostic_code();
+        // The runtime's copy of the device's queue follows the device's path time, so it runs
+        // out a little after the device finishes, and until then a plan joins it. The queue is
+        // active until both are done: a plan submitted after that starts afresh instead of
+        // joining a queue the device has already finished.
+        device_queue_active_ = next.trajectory_active != 0;
+        if (control_.trajectory_active) next.trajectory_active = 1;
+    }
     next.mode = runtime_mode;
     if (!endpoint_->executes_trajectory_queue()) {
         next.trajectory_queue_depth = trajectory_queue_depth;

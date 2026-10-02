@@ -580,7 +580,7 @@ class ProgramTests extends MotionKitTestSupport {
   **/
   public function testProgramPlanner():Void {
     var fixture = buildContractArmFixture();
-    var solver = new ManipulatorKinematics(new Manipulator(fixture.model, fixture.chain), 1e-8);
+    var solver = new ManipulatorKinematics(fixture.arm, 1e-8);
     var limits = new ValidationLimits(6, Int64.ofInt(1), Int64.ofInt(1));
     for (joint in 0...6) limits.jerk(joint, 20.0);
     var compiler = new ProgramCompiler(solver, limits, "work", [for (_ in 0...6) 2.0],
