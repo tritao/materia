@@ -3,20 +3,15 @@ import machinekit.component.BomItem;
 import machinekit.component.Solids;
 import machinekit.welding.GasCylinder;
 import machinekit.welding.WeldingPowerSource;
+import machinekit.welding.Weldment;
 import machinekit.welding.WireFeeder;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
-/** A point on a seam in the cell's frame, in millimetres. */
-typedef SeamPoint = {x:Float, y:Float, z:Float};
-
-/** The two ends of one fillet seam, and the face of the upright it runs along. */
-typedef PlaceholderSeam = {id:String, start:SeamPoint, stop:SeamPoint};
-
 /**
  * A fixed MIG welding cell: the six-axis arm on its pedestal carrying a torch, a wire feeder on
  * its upper arm, the power source and the shielding gas cylinder on the floor behind it, and a
- * welding table in front with a plate T-joint held on it. The arm is included as `arm` and works
+ * welding table in front with the workpiece held on it. The arm is included as `arm` and works
  * the table in front of it (-Y).
  *
  * Services reach the torch the way they do on a real cell. The cylinder feeds the power source,
@@ -24,8 +19,9 @@ typedef PlaceholderSeam = {id:String, start:SeamPoint, stop:SeamPoint};
  * and the wire. The power source's `mains` inlet and its `control` input are the cell's own: they
  * go to the wall and to the robot's controller.
  *
- * The weldment is a placeholder for the seams of W1: a base plate and an upright standing on it, so
- * there are two fillet seams along the upright's long sides.
+ * The workpiece (`work`, a `WeldingWorkpiece`) is a plate T-joint with a small tube frame beside it. It
+ * sits on the table at `WORK_X`, `WORK_Y`, the plate's long edges held by two fixture bars. Its seams are
+ * found from its geometry (`weldment()`), not placed here.
  */
 class WeldingCell extends MachineAssembly {
 	/** The table is the arm's own work table, as tall as its cell's. */
@@ -33,21 +29,19 @@ class WeldingCell extends MachineAssembly {
 	/** The table stands in front of the arm (-Y), and the weldment sits on its centre line, in the arm's reach. */
 	public static inline var TABLE_CENTRE_Y:Float = -600;
 	public static inline var WORK_Y:Float = -480;
-	/** Base plate and upright, in millimetres. The upright stands on the plate's centre line. */
-	public static inline var PLATE_LENGTH:Float = 300;
-	public static inline var PLATE_WIDTH:Float = 150;
-	public static inline var PLATE_THICKNESS:Float = 10;
-	public static inline var UPRIGHT_THICKNESS:Float = 8;
-	public static inline var UPRIGHT_HEIGHT:Float = 80;
+	/** The workpiece's origin, the plate's centre, on the table. The plate and the tube frame beside it are both in the arm's reach. */
+	public static inline var WORK_X:Float = -155;
 	static inline var FIXTURE_SIZE:Float = 20;
 
 	public final arm = new RobotArm(false, new ArmWeldingTool());
 	public final feeder = new WireFeeder(150, 240, 180);
 	public final source = new WeldingPowerSource();
 	public final cylinder = new GasCylinder();
+	public final work:WeldingWorkpiece;
 
-	public function new() {
+	public function new(?workpiece:WeldingWorkpiece) {
 		super();
+		work = workpiece == null ? new WeldingWorkpiece() : workpiece;
 		include("arm", arm);
 		// The feeder rides on the upper arm, on the side the tube's centre line faces, and moves with it.
 		var tube = 40.0;
@@ -59,22 +53,20 @@ class WeldingCell extends MachineAssembly {
 		addComponent("source", source, at(-1000, 100, 0));
 		addComponent("cylinder", cylinder, at(-1000, 500, 0));
 
-		addComponent("table", new ArmTable(800, 500, TABLE_TOP), at(0, TABLE_CENTRE_Y, 0));
-		// The weldment sits at the arm's work position, and its fixtures hold the plate's long edges.
+		addComponent("table", new ArmTable(900, 500, TABLE_TOP), at(0, TABLE_CENTRE_Y, 0));
+		// The workpiece sits at the arm's work position, and its fixtures hold the plate's long edges.
 		var seatY = WORK_Y - TABLE_CENTRE_Y;
-		addMemberConnector("table", "weldmentSeat", Solids.axial(0, seatY, TABLE_TOP));
-		var stop = PLATE_WIDTH / 2 + FIXTURE_SIZE / 2;
-		addMemberConnector("table", "fixtureNearSeat", Solids.axial(0, seatY - stop, TABLE_TOP));
-		addMemberConnector("table", "fixtureFarSeat", Solids.axial(0, seatY + stop, TABLE_TOP));
-		var fixture = new ArmBlock(PLATE_LENGTH, FIXTURE_SIZE, FIXTURE_SIZE, "steel", "Fixture");
+		addMemberConnector("table", "weldmentSeat", Solids.axial(WORK_X, seatY, TABLE_TOP));
+		var stop = WeldingWorkpiece.PLATE_WIDTH / 2 + FIXTURE_SIZE / 2;
+		addMemberConnector("table", "fixtureNearSeat", Solids.axial(WORK_X, seatY - stop, TABLE_TOP));
+		addMemberConnector("table", "fixtureFarSeat", Solids.axial(WORK_X, seatY + stop, TABLE_TOP));
+		var fixture = new ArmBlock(WeldingWorkpiece.PLATE_LENGTH, FIXTURE_SIZE, FIXTURE_SIZE, "steel", "Fixture");
 		addComponent("fixtureNear", fixture);
 		addComponent("fixtureFar", fixture);
 		addMate("fixture-near-mate", "fixed", "table", "fixtureNearSeat", "fixtureNear", "base");
 		addMate("fixture-far-mate", "fixed", "table", "fixtureFarSeat", "fixtureFar", "base");
-		addComponent("basePlate", new ArmBlock(PLATE_LENGTH, PLATE_WIDTH, PLATE_THICKNESS, "steel", "Base plate"));
-		addMate("base-plate-mate", "fixed", "table", "weldmentSeat", "basePlate", "base");
-		addComponent("upright", new ArmBlock(PLATE_LENGTH, UPRIGHT_THICKNESS, UPRIGHT_HEIGHT, "steel", "Upright"));
-		addMate("upright-mate", "fixed", "basePlate", "top", "upright", "base");
+		include("work", work);
+		addMate("work-mate", "fixed", "table", "weldmentSeat", "work/basePlate", "base");
 
 		function line(partNumber:String, description:String):BomItem
 			return {partNumber: partNumber, description: description, quantity: 1, material: null};
@@ -93,13 +85,6 @@ class WeldingCell extends MachineAssembly {
 		exposePort("control", "source", "control");
 	}
 
-	/** The two fillet seams, along the upright's long sides where it meets the base plate's top. */
-	public static function seams():Array<PlaceholderSeam> {
-		var z = TABLE_TOP + PLATE_THICKNESS;
-		var half = PLATE_LENGTH / 2, offset = UPRIGHT_THICKNESS / 2;
-		return [for (side in [-1, 1]) {
-			var y = WORK_Y + side * offset;
-			{id: side < 0 ? "near" : "far", start: {x: -half, y: y, z: z}, stop: {x: half, y: y, z: z}};
-		}];
-	}
+	/** The welded joints, for the members of `work` as they are named in the cell. */
+	public function weldment():Weldment return work.weldment().prefixed("work/");
 }

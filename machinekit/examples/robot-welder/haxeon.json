@@ -2,7 +2,7 @@
 	"version": 1,
 	"package": { "name": "machinekit-robot-welder-example" },
 	"entry": "RobotWelderPreview",
-	"sources": ["ArmWeldingTool.hx", "WeldingCell.hx", "RobotWelderPreview.hx", "../robot-arm/RobotArm.hx"],
+	"sources": ["ArmWeldingTool.hx", "WeldingCell.hx", "WeldingWorkpiece.hx", "WeldSeamChecks.hx", "RobotWelderPreview.hx", "../robot-arm/RobotArm.hx"],
 	"sourceRoots": [".", "../robot-arm"],
 	"dependencies": {
 		"projectkit": { "path": "../../../projectkit" },

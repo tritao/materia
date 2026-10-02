@@ -4,7 +4,7 @@ A fixed MIG welding cell generated with MachineKit: the six-axis arm from
 `robot-arm` on its pedestal carrying a robot torch (22° or 45° swan neck, nozzle,
 contact tip, breakaway mount), a wire feeder on its upper arm, a welding power
 source and a shielding gas cylinder on the floor, and a welding table with a
-plate T-joint held on it.
+workpiece held on it: a plate T-joint and a small tube frame.
 
 Services reach the torch through ports, the way a real cell is cabled: the gas
 cylinder feeds the power source, which feeds the feeder with weld current, gas
@@ -14,11 +14,14 @@ exposed ports.
 
 - `ArmWeldingTool.hx` — the arm's welding end effector (an `ArmTool`): adapter
   plate and torch, with the `tcp` working frame at the wire tip.
-- `WeldingCell.hx` — the cell and its placeholder seams.
+- `WeldingCell.hx` — the cell.
+- `WeldingWorkpiece.hx` — the workpiece (plate T-joint and tube frame) and the
+  `Weldment` that says which joints are welded. Its seams are not authored: they
+  are found from the members' faces (`machinekit.welding.WeldSeams`).
+- `WeldSeamChecks.hx` — checks of the derived seams: names, frames, edits, gaps.
 - `RobotWelderPreview.hx` — the project entrypoint and `RobotWelderChecks`
-  (services supplied, torch pose, reach of the seams with the wire on their
-  bisector, torch and arm clearances, bill of materials), run by the MachineKit
-  smoke suite.
+  (services supplied, torch pose, reach of the derived seam frames, torch and arm
+  clearances, bill of materials), run by the MachineKit smoke suite.
 - `PLAN.md` — where this example is going: seams from the CAD, a simulated
   welder, missions, then the mobile welder.
 

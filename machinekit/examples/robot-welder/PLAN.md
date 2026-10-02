@@ -135,6 +135,87 @@ Checks:
 - editing a tube size keeps the seam, which follows the new edge;
 - a gap between members reports no seam.
 
+Done (see Progress). What was built and decided:
+- **Seams are found, never authored.** `machinekit.welding.WeldSeams.find(a, b)`
+  takes two members' parts (in one frame) and reads their B-reps through
+  CadKit's shape queries: faces with names, normals and boundary loops; edges
+  with end points and adjacent faces. It needs no native change. Two kinds of
+  contact between planar faces are looked for:
+  - *edge on face* (fillet, lap): an edge of one member lies on a face of the
+    other, and the member's face on that edge lies flat against it (opposite
+    normals): the contact. The member's other face on the edge is the side face.
+    The seam is the stretch of the edge where the other member's face continues
+    past it, toward the side face's normal (a probe point a little beside the
+    edge, tested in the face by even-odd over all its loops). Where the face
+    stops (a flush end) there is no corner, so no seam. Only edges on the
+    contact face's *outer* loop count, which leaves the inside of a hollow
+    section alone. Joint type: fillet when the contact is narrower than the side
+    face is tall (a T-joint), lap when it is wider.
+  - *edge to edge* (butt, corner): an edge of each member coincides and the
+    faces beside it meet flat; the seam is the groove the two other faces make.
+    Flat groove faces give a butt, others a corner (mitred or square, inside or
+    out).
+  Both directions are tried, and a seam found from both sides is kept once.
+- **Names.** A seam is `member:face|member:face`, the two faces being the ones the
+  weld metal fills against (the plate's top and the upright's side), ordered by
+  name, so the same pair always gives the same seam. `member` is the occurrence
+  id and `face` is the CadKit topological name in that member's geometry. A
+  second seam between the same two faces (a face cut into pieces) is numbered
+  `~1`, `~2`, … by position.
+- **Seam frame.** The tangent is `normalA × normalB` (so the direction is a result of the faces, and
+  the two sides of an upright run opposite ways; flat butt faces go the
+  positive way along the edge); `reversed()` flips it. The torch axis is the
+  bisector of the two outward normals, pointing into the open side. The work angle
+  tilts it about the tangent toward the first face; the travel angle then swings the wire toward the
+  direction of travel (push, positive; the default is 10°) or away (drag).
+  `SeamFrame.toAssemblyFrame()` gives the wire tip's pose: +Z along the wire,
+  +X along the travel. `frameAt(distance)` and `frameAtParameter(fraction)` sample.
+  Planar faces and straight edges only: planar-planar contact is always a line,
+  and CadKit has no face normal at a point yet, so curved seams (round tube
+  against a plate) are not found.
+- **Weldment.** `Weldment(reference, members)` declares the joints with
+  `join(a, b, legSize, passes, travelAngle, workAngle)`. `find(parts)` (or
+  `findIn(assembly, poses)`) returns the seams and a `Diagnostics`: a declared
+  pair with no seam is an error `weld.no-seam` naming the pair and the gap
+  between their bounds, never a silent skip, and `require()` throws on any. The
+  parts' pose is only used to place the parts: seams come out *in the
+  workpiece's frame* (the reference member's pose), so a workpiece pose
+  correction (phase 2's touch sensing) is just a different pose to
+  `SeamFrame.transformed`, and seams don't change when the whole workpiece moves.
+- **Tube perimeters** give one seam per side, since each side lies between a
+  different pair of faces and the faces' angle (and so the torch axis) changes at
+  every corner. `WeldSeams.chains(seams)` joins sides that meet end to end into
+  ordered, direction-corrected chains with a `closed` flag, for W4 to weld a
+  post as one run. The choice (a seam per side, a chain on top) keeps names and
+  frames simple and still lets a program corner-weld.
+- **The workpiece** (`WeldingWorkpiece`, a `MachineAssembly` included in the
+  cell as `work`): the base plate and upright, and a `FrameAssembly` with a
+  beam and two posts standing on it, each member its own occurrence
+  (`FrameMemberComponent`). The beam is 20 mm wider than the posts so a fillet
+  runs round each foot; with equal tubes the sides would be flush edges, which
+  are not fillets and are rightly not found. The upright is as long as the plate,
+  so its ends are flush and only its long sides are seams; a shorter upright gains
+  end seams. Ten seams in all: two of 180 mm and eight of 40 mm.
+- **Layout.** Posts 80 mm tall stand 140 mm apart, so the torch at 45° clears the
+  opposite post, and 110 mm from the upright, which the same clearance needs. The
+  plate is 180 mm long (was 300), the frame is 290 mm to its side, and the whole
+  workpiece sits at x = −155 so that every seam is in the arm's reach with the
+  10° push.
+- **Checks** (`WeldSeamChecks`, run from `RobotWelderChecks`): the T-joint's
+  seam names, ends and length equal the plate's; the torch axis is 45° to both
+  faces and square to the seam, the push and work angles do what they say; each
+  post has four fillet seams that chain into a closed loop; editing the upright
+  length and the tube size keeps every name and moves the edge (and the shorter
+  upright gains its end seams); the seams are the same on their own and in the
+  cell; a 0.5 mm gap reports no seam with the gap; lap, butt and mitred-corner
+  joints are told apart. The IK reach check and the clearance check now use the
+  derived seam frames.
+
+Left open: seams on curved faces; accessibility (a seam on the inside of a
+tight corner is found even if no torch fits there: W4's reach and clearance
+checks decide); touching tolerance (`WeldSeams.TOUCH`, 0.01 mm) is a constant;
+leg size is declared, not derived from the geometry.
+
 **W2. The welder as a simulated robot tool.**
 - The scene artifact's `robotTools` gains a `torch` kind with its channels:
   `weld.arc` (digital), `weld.wire_speed` and `weld.voltage` (analog), and the
@@ -248,7 +329,7 @@ Dependencies:
 | Step | State | Commits |
 | --- | --- | --- |
 | W0 | done | tool-agnostic arm; welding parts and capabilities; cell, checks, Start entry |
-| W1 | | |
+| W1 | done | seams found from member faces (`WeldSeams`, `WeldSeam`, `Weldment`); workpiece with a tube frame; checks |
 | W2 | | |
 | W3 | | |
 | W4 | | |

@@ -8,6 +8,7 @@ import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import machinekit.component.ComponentDetail;
 import machinekit.robotics.EndEffectorControls;
+import machinekit.welding.WeldSeam;
 import machinekit.welding.WeldingPowerSource;
 import machinekit.welding.WeldingTorch;
 import materia.assembly.AssemblyFrames;
@@ -32,9 +33,16 @@ class RobotWelderPreview {
 /** A pose of the arm: its six joint values, in radians. */
 typedef ArmPose = Array<Float>;
 
+/** An arm pose that reaches a place on a seam, and where that is. */
+typedef SeamPose = {
+	var label:String;
+	var angles:ArmPose;
+}
+
 /**
  * Geometry builds, the services reach the torch, the torch points down at the table, its neck
- * clears the arm, and the arm reaches the weldment's seams with the torch on their bisector.
+ * clears the arm, the weldment's seams are found from its geometry, and the arm reaches them with
+ * the torch in the seam frames.
  */
 class RobotWelderChecks {
 	static final JOINTS = ["arm/j1", "arm/j2", "arm/j3", "arm/j4", "arm/j5", "arm/j6"];
@@ -62,8 +70,9 @@ class RobotWelderChecks {
 		var ready = [for (spec in cell.arm.specs) spec.initial];
 		pose(state, ready);
 		checkReadyPose(cell, state);
-		var seams = checkReach(cell, state, ready);
-		checkClearance(cell, state, ready, seams);
+		var seams = WeldSeamChecks.run(cell, state);
+		var poses = checkReach(cell, state, ready, seams);
+		checkClearance(cell, state, ready, poses);
 
 		var bom = cell.billOfMaterials().lines();
 		var parts = [for (line in bom) line.partNumber];
@@ -119,24 +128,25 @@ class RobotWelderChecks {
 	}
 
 	/**
-	 * Every seam is within reach, at its start, middle and end, with the wire on the bisector of the
-	 * plate and the upright (45 degrees to both faces, into the corner). Returns the poses found.
+	 * Every seam is within reach, with the torch in the seam's frame: the wire on the bisector of the two faces,
+	 * tilted by the push angle. A long seam is tried at its start, middle and end, a short one (a tube side) at its
+	 * middle. Returns the poses found.
 	 */
-	static function checkReach(cell:WeldingCell, state:AssemblyState, ready:ArmPose):Array<ArmPose> {
-		var poses:Array<ArmPose> = [];
+	static function checkReach(cell:WeldingCell, state:AssemblyState, ready:ArmPose, seams:Array<WeldSeam>):Array<SeamPose> {
+		var poses:Array<SeamPose> = [];
 		var limits = [for (spec in cell.arm.specs) {lower: spec.lower, upper: spec.upper}];
-		for (seam in WeldingCell.seams()) {
-			// The upright's face looks away from its centre line, so the wire leans into the corner.
-			var lean = seam.start.y < WeldingCell.WORK_Y ? 1.0 : -1.0;
-			var direction = {x: 0.0, y: lean * Math.sqrt(0.5), z: -Math.sqrt(0.5)};
-			for (fraction in [0.0, 0.5, 1.0]) {
-				var target = {x: seam.start.x + fraction * (seam.stop.x - seam.start.x),
-					y: seam.start.y + fraction * (seam.stop.y - seam.start.y),
-					z: seam.start.z + fraction * (seam.stop.z - seam.start.z)};
+		// Seams are in the workpiece's frame, so the cell places them with the workpiece's pose.
+		var workpiece = state.worldPose("work/basePlate");
+		for (seam in seams) {
+			for (fraction in seam.length() > 100 ? [0.0, 0.5, 1.0] : [0.5]) {
+				var frame = seam.frameAtParameter(fraction).transformed(workpiece);
+				var target = {x: frame.position.x, y: frame.position.y, z: frame.position.z};
+				var wire = frame.wire();
 				var found:Null<Array<Float>> = null;
-				for (seed in seeds(ready)) if (found == null) found = ArmIk.solve(state, JOINTS, limits, target, direction, seed);
-				if (found == null) throw 'The ${seam.id} seam at ${target.x}, ${target.y} is out of reach of the torch';
-				poses.push(found);
+				for (seed in seeds(ready)) if (found == null)
+					found = ArmIk.solve(state, JOINTS, limits, target, {x: wire.x, y: wire.y, z: wire.z}, seed);
+				if (found == null) throw 'The seam ${seam.name()} at ${Math.round(target.x)}, ${Math.round(target.y)}, ${Math.round(target.z)} is out of reach of the torch';
+				poses.push({label: '${seam.name()} at $fraction', angles: found});
 			}
 		}
 		pose(state, ready);
@@ -148,18 +158,22 @@ class RobotWelderChecks {
 	 * mount) clears every other part of the arm and the feeder, and the table, equipment and weldment;
 	 * and the arm and feeder clear the table, equipment and weldment too.
 	 */
-	static function checkClearance(cell:WeldingCell, state:AssemblyState, ready:ArmPose, seams:Array<ArmPose>):Void {
+	static function checkClearance(cell:WeldingCell, state:AssemblyState, ready:ArmPose, seams:Array<SeamPose>):Void {
 		var moving = [for (entry in cell.components()) if (StringTools.startsWith(entry.id, "arm/")) entry.id];
 		moving.push("feeder");
-		var fixed = ["table", "source", "cylinder", "fixtureNear", "fixtureFar", "basePlate", "upright"];
-		for (angles in [ready].concat(seams)) {
-			pose(state, angles);
-			for (id in moving) {
-				// The tool's plate meets the flange it is bolted to, and the arm's own links meet at their joints.
-				if (id != "arm/tool/torch") for (other in fixed) checkApart(cell, state, id, other);
-				if (id != "arm/tool/torch" && !StringTools.startsWith(id, "arm/tool/")) checkApart(cell, state, "arm/tool/torch", id);
+		var fixed = ["table", "source", "cylinder", "fixtureNear", "fixtureFar"].concat(cell.weldment().members);
+		for (entry in [{label: "the ready pose", angles: ready}].concat(seams)) {
+			pose(state, entry.angles);
+			try {
+				for (id in moving) {
+					// The tool's plate meets the flange it is bolted to, and the arm's own links meet at their joints.
+					if (id != "arm/tool/torch") for (other in fixed) checkApart(cell, state, id, other);
+					if (id != "arm/tool/torch" && !StringTools.startsWith(id, "arm/tool/")) checkApart(cell, state, "arm/tool/torch", id);
+				}
+				for (other in fixed) checkApart(cell, state, "arm/tool/torch", other);
+			} catch (error:Dynamic) {
+				throw 'At ${entry.label}: $error';
 			}
-			for (other in fixed) checkApart(cell, state, "arm/tool/torch", other);
 		}
 		pose(state, ready);
 	}
