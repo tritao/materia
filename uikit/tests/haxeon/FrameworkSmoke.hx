@@ -2265,6 +2265,27 @@ class FrameworkSmoke {
 			!context.focus.focusedId.equals(tabsRoot.children[0].children[0].children[0].id))
 			return 98;
 
+		var tabMenus = 0;
+		var menuTab = "";
+		tabs.onTabContextMenu = function(key, event) { tabMenus++; menuTab = key; };
+		tabsRoot = context.submit(tabs, tabsFrame);
+		var tabContextGeometry = tabsRoot.children[0].children[1].children[0].resolved;
+		if (tabContextGeometry == null) return 1001;
+		context.pointerDown(tabContextGeometry.x + 2.0, tabContextGeometry.y + 2.0, 1);
+		context.pointerUp(tabContextGeometry.x + 2.0, tabContextGeometry.y + 2.0, 1);
+		if (tabMenus != 1 || menuTab != "second" || tabs.selectedKey != "first" || tabChanges != 2)
+			return 1002;
+		if (!context.focusWidget(tabsRoot.children[0].children[0].children[0].id)) return 1003;
+		context.key(UiEventKind.KeyDown, UiKey.F10);
+		if (tabMenus != 1) return 1004;
+		context.key(UiEventKind.KeyDown, UiKey.F10, UiModifier.Shift);
+		if (tabMenus != 2 || menuTab != "first" || tabs.selectedKey != "first") return 1005;
+		var lockedTabContextGeometry = tabsRoot.children[0].children[2].children[0].resolved;
+		if (lockedTabContextGeometry == null) return 1006;
+		context.pointerDown(lockedTabContextGeometry.x + 2.0, lockedTabContextGeometry.y + 2.0, 1);
+		context.pointerUp(lockedTabContextGeometry.x + 2.0, lockedTabContextGeometry.y + 2.0, 1);
+		if (tabMenus != 2 || tabs.selectedKey != "first") return 1007;
+
 		var theme = new Theme();
 		if (theme.tokens.textPrimary != theme.text || theme.tokens.textSecondary != theme.mutedText ||
 			theme.tokens.surface != theme.panelBackground || theme.tokens.focusRing != theme.buttonFocused ||
