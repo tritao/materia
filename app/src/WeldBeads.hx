@@ -169,6 +169,9 @@ class WeldBeads implements SessionMember {
     }
   }
 
+  /** The beads hold no pending runtime action to stop before the reset. */
+  public function beforeReset():Void {}
+
   /** A reset forgets the metal: the workpiece is bare again. */
   public function reset():Void {
     for (entry in paths) entry.path.reset();

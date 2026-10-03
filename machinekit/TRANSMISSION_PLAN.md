@@ -1631,6 +1631,11 @@ a machined bracket below the gantry. The original router remains the default. Fo
 checks compare the direct and folded robot models, test belt tooth fit and Z kinematics
 at three travel poses, check collisions around the folded stage, and exercise the folded
 Z stage together with the X/Y carriage belts.
+The folded checks live in MachineKit's test source and run from `MachineKitSmoke`;
+the router example keeps its existing runtime dependencies for the app's project-source
+compiler. A separate app build fix adds the lifecycle's empty `beforeReset` to weld-bead
+view state, which has no runtime work to cancel. The router-only source check then passes
+with unchanged default plate times of 220.2/201.6 s and belt deviation of 1.76 mm.
 
 At the same poses and limits, direct → folded Z baselines are:
 

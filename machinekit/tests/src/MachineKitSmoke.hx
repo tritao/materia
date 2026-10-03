@@ -2559,6 +2559,7 @@ class MachineKitSmoke {
 		EndEffectorExampleChecks.run();
 		RobotArmChecks.run();
 		CncRouterChecks.run();
+		FoldedZRouterCheck.main();
 		MobileBaseChecks.run();
 		RobotWelderChecks.run();
 		CoreXyPlotterChecks.run();
