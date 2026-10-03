@@ -221,6 +221,14 @@ MT1 implementation notes (in progress; final gate pending):
   10 mm T-slot mouths; head has a cartridge bore. Bodies and mounting holes carry semantic names.
 - ER20 cartridge and holder share the gauge-line frame; the generic 1.1 kW spindle motor is rated
   at 8000 rpm and capped at 10000 rpm, with assumed ratings and envelope.
+- MachineKit smoke passed on the current parts: computed casting masses are base 50.10 kg,
+  column 46.04 kg, saddle 28.41 kg, table 13.30 kg and head 30.67 kg. The 400/750 W servos
+  derive rated torques 1.273/2.387 N m at 3000 rpm; maximum speed is 5000 rpm (assumed).
+- The first gate passed MachineKit and the application build, but its application run was interrupted
+  (exit 130) during the router case. Following X7's documented workaround, run the replacement
+  full gate in a separate process session with `setsid`. This is a test-process interruption,
+  not a compiler bug. Arm mission 5.8/12/17.2/23.5 s and welder 20.2/19.9 s reproduced unchanged
+  before the interruption; the complete baseline audit remains pending.
 - Tests include recipe reconstruction, signed screw ratio, preload allowance, shaft stiffness,
   bearing boundaries, rail room, mounting frames, rated power and computed casting masses.
 
@@ -440,7 +448,7 @@ MT0 ─┬─ MT1 ── MT2 ─┬─ MT4 (reach study) ─┐
 | Step | State | Commits |
 |---|---|---|
 | MT0 | done: main and X7+X8 merged | c5438ba4d, 8ad034403 |
-| MT1 | in progress: drive catalogue, cast bodies and spindle parts; gate pending | |
+| MT1 | built: mill parts; full gate pending | 592affc2f, 7d9f192b1 |
 | MT2 | planned | |
 | MT3 | planned | |
 | MT4 | planned | |
