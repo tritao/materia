@@ -227,6 +227,40 @@ class TimingBelt extends MachineComponent {
 		return result;
 	}
 
+	/** A tooth-clearance allowance at the pitch line, mm, pending measured family data. */
+	public static function toothClearance(profile:TimingBeltProfile):Float
+		return TimingPulley.profileDimensions(profile).pitch * 0.01;
+
+	/** Same keeps direction about the belt normal; assembly attachments check the joint axes. */
+	public static function reduction(belt:TimingBelt, driver:TimingPulley, driven:TimingPulley,
+			alignment:Float):TransmissionRelation {
+		if (driver.beltProfile != belt.beltProfile || driven.beltProfile != belt.beltProfile)
+			throw new TransmissionDesignError("Belt and reduction pulley profiles differ; update the pulleys");
+		var ratio = alignment * driver.teeth / driven.teeth;
+		var result = new TransmissionRelation(ratio, DEFAULT_EFFICIENCY, null,
+			toothClearance(belt.beltProfile) / (driven.pitchDiameter / 2) / Math.abs(ratio), DEFAULT_DRAG);
+		result.setBasis("efficiency", ValueBasis.Assumed, "belt efficiency");
+		result.setBasis("drag", ValueBasis.Assumed, "belt drag");
+		result.setBasis("stiffness", ValueBasis.Assumed, "belt stiffness with pretension");
+		result.setBasis("backlash", ValueBasis.Assumed, "belt tooth clearance");
+		return result;
+	}
+
+	/** Free elastic lengths between two engaged pulleys; other wraps turn freely. */
+	public function freePaths(first:Int, second:Int):Array<Float> {
+		if (first == second || first < 0 || second < 0 || first >= loop.length || second >= loop.length)
+			throw new TransmissionDesignError("Belt reduction needs two distinct wraps");
+		var a = 0.0, index = first;
+		while (index != second) {
+			a += strandList[index].length;
+			index = (index + 1) % loop.length;
+			if (index != second) a += loop[index].radius * sweeps[index];
+		}
+		var b = length - a - loop[first].radius * sweeps[first] - loop[second].radius * sweeps[second];
+		if (!(a > 0 && b > 0)) throw new TransmissionDesignError("Belt has no free elastic paths between its pulleys");
+		return [a, b];
+	}
+
 	/**
 	 * Tensile stiffness of the belt's cords, EA in N, per millimetre of belt width. Assumption, not a
 	 * datasheet value (makers rate breaking strength and working tension, not stiffness): a 6 mm

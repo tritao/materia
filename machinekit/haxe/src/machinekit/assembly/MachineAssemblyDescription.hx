@@ -322,7 +322,7 @@ import machinekit.component.PortInterface;
 /** Physical clamp and pulley centres, in belt path order. The clamp names its attached strand. */
 @:wire typedef BeltPathRecord = {
 	@:id(1) var belt:String;
-	@:id(2) var clamp:ConnectorReference;
-	@:id(3) var strand:Int;
+	@:id(2) @:optional var clamp:Null<ConnectorReference>;
+	@:id(3) @:optional var strand:Int;
 	@:id(4) var wraps:ReadOnlyArray<ConnectorReference>;
 }

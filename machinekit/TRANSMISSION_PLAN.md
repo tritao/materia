@@ -1375,7 +1375,7 @@ the 24 V → supply-derived wheel limits and the `RobotArm.hx` changes.
 ### X10 — Belt reductions and loops between shafts
 
 Status: planned (2026-10-03), after X9. Shared belt-span elasticity approved; implementation
-has not started. Keep one commit per X10a–X10d and run the combined full suite after the
+is in progress: X10a implemented, X10b–X10d pending; final validation pending. Keep one commit per X10a–X10d and run the combined full suite after the
 complete milestone, as requested, rather than after each edit or step.
 
 X9c derives belt stiffness from the belt's path, but only for a belt clamped to a sliding
@@ -1428,6 +1428,12 @@ not a collection of independent springs replacing the belt.
   assembly's planning-coordinate convention. Preserve the intermediate shaft as an elastic
   coordinate until the solve eliminates it. Check that the two networks' compliances add in
   series at the axis, with squared ratio scaling, and that each spring is counted once.
+
+X10a implementation: source wire id 7, MachineKit schema 7, optional clamp for shaft-only
+paths, matching pulley pitch radii and rotary attachments, and assumed pretensioned stiffness.
+Tooth clearance is 1% of family pitch, pending measured data. Existing example numbers have
+not intentionally changed. The focused test project now includes the example roots and dependencies
+its source graph requires; the combined gate remains scheduled after X10d.
 
 #### X10b — Belt loops with several driven pulleys
 

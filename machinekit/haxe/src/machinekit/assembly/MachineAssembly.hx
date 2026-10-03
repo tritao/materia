@@ -68,7 +68,7 @@ private typedef MutableIncludedRecord = {var id:String; var pose:AssemblyFrame; 
 
 /** Reusable, prefixable assembly made from MachineComponents and named connector references. */
 class MachineAssembly {
-	public static inline var SCHEMA_VERSION:Int = 6;
+	public static inline var SCHEMA_VERSION:Int = 7;
 	/** Findings from rebuilding sources; invalid transmissions remain available for repair. */
 	public final diagnostics:Diagnostics = new Diagnostics();
 	final members:Array<AssemblyMember> = [];
@@ -369,11 +369,8 @@ class MachineAssembly {
 			child.addEncoderRecord({encoder: encoder.encoder.substr(prefix.length), joint: encoder.joint.substr(prefix.length),
 				part: encoder.part.substr(prefix.length),
 				actuator: encoder.actuator == null ? null : encoder.actuator.substr(prefix.length)});
-		for (path in beltPaths) if (StringTools.startsWith(path.belt, prefix)) child.addBeltPath({
-			belt: path.belt.substr(prefix.length), strand: path.strand,
-			clamp: {instanceId: path.clamp.instanceId.substr(prefix.length), connectorName: path.clamp.connectorName},
-			wraps: [for (wrap in path.wraps) {instanceId: wrap.instanceId.substr(prefix.length), connectorName: wrap.connectorName}]
-		});
+		for (path in beltPaths) if (StringTools.startsWith(path.belt, prefix))
+			child.addBeltPath(mapBeltPath(path, member -> member.substr(prefix.length)));
 		for (transmission in transmissions) if (StringTools.startsWith(transmission.coupling, prefix))
 			{
 				var record:machinekit.assembly.MachineAssemblyDescription.TransmissionRecord = {coupling: transmission.coupling.substr(prefix.length),
@@ -707,7 +704,7 @@ class MachineAssembly {
 			sense:Sense, leaderZero:Float = 0):Float {
 		var record:machinekit.assembly.MachineAssemblyDescription.TransmissionRecord = {
 			coupling: id, source: source, sense: sense, leaderZero: leaderZero};
-		var relation = resolveTransmission(record, leader, false);
+		var relation = resolveTransmission(record, leader, false, follower);
 		var ratio = relation.ratio;
 		addCoupling(id, leader, follower, ratio, -ratio * leaderZero, relation.efficiency);
 		writeTransmission(record, relation);
@@ -768,18 +765,24 @@ class MachineAssembly {
 	/** State the belt's physical clamp and pulley centres, in path order. */
 	public function addBeltPath(path:machinekit.assembly.MachineAssemblyDescription.BeltPathRecord):Void {
 		requireMember(path.belt);
-		requireConnector({instanceId: path.clamp.instanceId, connectorName: path.clamp.connectorName});
+		var clamp = path.clamp;
+		if (clamp != null) requireConnector({instanceId: clamp.instanceId, connectorName: clamp.connectorName});
 		for (wrap in path.wraps) requireConnector({instanceId: wrap.instanceId, connectorName: wrap.connectorName});
 		for (existing in beltPaths) if (existing.belt == path.belt) throw 'Duplicate belt path "${path.belt}"';
 		beltPaths.push(copyBeltPath(path, ""));
 	}
 
 	static function copyBeltPath(path:machinekit.assembly.MachineAssemblyDescription.BeltPathRecord,
-			prefix:String):machinekit.assembly.MachineAssemblyDescription.BeltPathRecord return {
-		belt: join(prefix, path.belt), strand: path.strand,
-		clamp: {instanceId: join(prefix, path.clamp.instanceId), connectorName: path.clamp.connectorName},
-		wraps: [for (wrap in path.wraps) {instanceId: join(prefix, wrap.instanceId), connectorName: wrap.connectorName}]
-	};
+			prefix:String):machinekit.assembly.MachineAssemblyDescription.BeltPathRecord
+		return mapBeltPath(path, member -> join(prefix, member));
+
+	static function mapBeltPath(path:machinekit.assembly.MachineAssemblyDescription.BeltPathRecord,
+			map:String->String):machinekit.assembly.MachineAssemblyDescription.BeltPathRecord {
+		var clamp = path.clamp;
+		return {belt: map(path.belt), strand: path.strand,
+			clamp: clamp == null ? null : {instanceId: map(clamp.instanceId), connectorName: clamp.connectorName},
+			wraps: [for (wrap in path.wraps) {instanceId: map(wrap.instanceId), connectorName: wrap.connectorName}]};
+	}
 
 	function refreshTransmissions():Void {
 		for (item in diagnostics.items.copy()) if (item.code == "transmission.parts") diagnostics.items.remove(item);
@@ -789,7 +792,7 @@ class MachineAssembly {
 	}
 
 	function resolveTransmission(record:machinekit.assembly.MachineAssemblyDescription.TransmissionRecord,
-			?leader:String, strict:Bool = true):machinekit.transmission.TransmissionRelation {
+			?leader:String, strict:Bool = true, ?follower:String):machinekit.transmission.TransmissionRelation {
 		var relation = machinekit.transmission.TransmissionResolver.resolve(record, requireMember);
 		switch record.source {
 			case TimingBelt(beltId, pulley):
@@ -802,6 +805,23 @@ class MachineAssembly {
 				} else {
 					var belt:machinekit.transmission.TimingBelt = cast requireMember(beltId);
 					var derived = machinekit.transmission.BeltStretch.stiffness(belt, paths[0], leader, pulley, mechanical);
+					if (record.stiffness == null) relation.stiffness = derived;
+				}
+			case BeltReduction(beltId, driver, driven):
+				if (mechanical.couplings != null) for (coupling in mechanical.couplings)
+					if (coupling.id == record.coupling) { leader = coupling.source; follower = coupling.target; }
+				var paths = [for (path in beltPaths) if (path.belt == beltId) path];
+				if (paths.length != 1 || leader == null || follower == null) {
+					if (strict) throw new machinekit.transmission.TransmissionDesignError('Belt "$beltId" needs its wrap attachments; add a belt path');
+				} else {
+					var belt:machinekit.transmission.TimingBelt = cast requireMember(beltId);
+					for (pulleyId in [driver, driven]) {
+						var part:machinekit.transmission.TimingPulley = cast requireMember(pulleyId);
+						var index = machinekit.transmission.BeltStretch.wrapIndex(paths[0], pulleyId);
+						if (Math.abs(belt.wraps()[index].radius - part.pitchDiameter / 2) > 1e-5)
+							throw new machinekit.transmission.TransmissionDesignError('Pulley "$pulleyId" tooth count does not match its belt wrap');
+					}
+					var derived = machinekit.transmission.BeltStretch.reduction(belt, paths[0], leader, follower, driver, driven, mechanical, relation);
 					if (record.stiffness == null) relation.stiffness = derived;
 				}
 			case _:

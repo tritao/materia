@@ -41,6 +41,11 @@ class TransmissionResolver {
 				if (!Std.isOfType(pulley, TimingPulley)) throw new TransmissionDesignError("Transmission needs a timing pulley");
 				var loop:TimingBelt = cast belt;
 				TimingBelt.relation(loop, cast pulley, alignment, switch record.source { case BeltIdler(_, _): true; case _: false; });
+			case BeltReduction(beltId, driverId, drivenId):
+				var belt = member(beltId), driver = member(driverId), driven = member(drivenId);
+				if (!Std.isOfType(belt, TimingBelt) || !Std.isOfType(driver, TimingPulley) || !Std.isOfType(driven, TimingPulley))
+					throw new TransmissionDesignError("Belt reduction needs a timing belt and two timing pulleys");
+				TimingBelt.reduction(cast belt, cast driver, cast driven, alignment);
 			case RollerChain(chain, sprocketId):
 				var sprocket = member(sprocketId);
 				if (!Std.isOfType(sprocket, Sprocket)) throw new TransmissionDesignError("Transmission needs a sprocket");
@@ -78,6 +83,7 @@ class TransmissionResolver {
 		case GearMesh(driver, driven): GearMesh(map(driver), map(driven));
 		case RackAndPinion(pinion, rack): RackAndPinion(map(pinion), rack == null ? null : map(rack));
 		case TimingBelt(belt, pulley): TimingBelt(map(belt), map(pulley));
+		case BeltReduction(belt, driver, driven): BeltReduction(map(belt), map(driver), map(driven));
 		case BeltIdler(belt, pulley): BeltIdler(map(belt), map(pulley));
 		case RollerChain(chain, sprocket): RollerChain(chain == null ? null : map(chain), map(sprocket));
 	};

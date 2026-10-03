@@ -160,6 +160,7 @@ class MachineAssemblyDescriptionTests {
 		suctionInterfaceRoundTrip();
 		documentRoundTrip();
 		transmissionsFollowTheirParts();
+		beltReductions();
 		motorsDriveJoints();
 		transmissionsCarryAllowances();
 		changerDocumentRoundTrip();
@@ -1023,6 +1024,46 @@ class MachineAssemblyDescriptionTests {
 		roundTrip(eoatSet.configuration("short"), "EOAT short configuration");
 		roundTrip(eoatSet.configuration("long"), "EOAT long configuration");
 	}
+	static function beltReductions():Void {
+		function close(actual:Float, expected:Float, label:String):Void {
+			if (Math.abs(actual - expected) > 1e-8) throw '$label: $actual versus $expected';
+		}
+		var belt = TimingBelt.twoPulley(GT2, 20, 40, 120, 6);
+		var assembly = new MachineAssembly();
+		assembly.addComponent("base", new RobotFlange(50));
+		assembly.addMemberConnector("base", "driver", AssemblyFrames.identity());
+		assembly.addMemberConnector("base", "driven", AssemblyFrames.translation(120, 0, 0));
+		assembly.addComponent("driver", new TimingPulley(GT2, 20, 8, 6));
+		assembly.addComponent("driven", new TimingPulley(GT2, 40, 8, 6), AssemblyFrames.translation(120, 0, 0));
+		assembly.addComponent("belt", belt);
+		assembly.addMateOnAxis("input", "continuous", "base", "driver", "driver", "front", {x: 0, y: 0, z: 1});
+		assembly.addMateOnAxis("output", "continuous", "base", "driven", "driven", "front", {x: 0, y: 0, z: 1});
+		assembly.addBeltPath({belt: "belt", wraps: [{instanceId: "driver", connectorName: "front"},
+			{instanceId: "driven", connectorName: "front"}]});
+		close(assembly.addTransmission("reduction", "input", "output", Transmission.BeltReduction("belt", "driver", "driven"), Same),
+			0.5, "belt reduction keeps direction and derives tooth ratio");
+		var definition = machinekit.assembly.FrozenAssemblyDefinitions.thaw(assembly.describe().mechanical);
+		var relation = definition.couplings[0], spring = relation.stiffness;
+		var paths = belt.freePaths(0, 1), radius = belt.wraps()[0].radius;
+		if (spring == null) throw "Belt reduction did not resolve its spring";
+		close(spring, 15000 * (1 / paths[0] + 1 / paths[1]) * radius * radius / 1000,
+			"two-pulley stiffness excludes engaged arcs and converts N mm to N m");
+		if (relation.backlash == null || relation.backlash <= 0) throw "Belt reduction needs an assumed tooth clearance";
+		if (!Equality.equals(assembly.describe(), MachineAssembly.decode(assembly.encode()).describe()))
+			throw "Belt reduction lost its source or attachments in a round trip";
+		var included = new MachineAssembly(); included.include("stage", assembly);
+		if (included.check().hasErrors()) throw "Included belt reduction did not prefix its pulley attachments";
+		assembly.setTransmissionOverrides("reduction", State(12), State(0.002), State(0.003));
+		var stated = machinekit.assembly.FrozenAssemblyDefinitions.thaw(assembly.describe().mechanical).couplings[0];
+		var statedSpring = stated.stiffness;
+		if (statedSpring == null) throw "Stated reduction spring disappeared";
+		close(statedSpring, 12, "reduction honors stated stiffness");
+		var wrong = false;
+		try TimingBelt.reduction(belt, new TimingPulley(HTD5M, 20, 8, 6), new TimingPulley(GT2, 40, 8, 6), 1)
+		catch (error:Dynamic) wrong = true;
+		if (!wrong) throw "Belt reduction accepted different tooth profiles";
+	}
+
 }
 
 /** A servo motor with no geometry, to drive a joint through the MotorDrive hook. */
@@ -1036,4 +1077,5 @@ private class TestServo extends machinekit.component.MachineComponent implements
 		return {id: id, joint: joint, maxEffort: 1.9, maxRate: 500, rotorInertia: 2e-5, drive: "servo",
 			ratedTorque: 0.64, peakTorque: 1.9, ratedSpeed: 314, maxSpeed: 500, encoderCounts: 4096,
 			torqueSpeed: [0, 1.9, 314, 1.9, 500, 0.64]};
+
 }
