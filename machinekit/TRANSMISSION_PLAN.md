@@ -1456,8 +1456,7 @@ reason.
 
 ### X10 — Belt reductions and loops between shafts
 
-Status: planned (2026-10-03), after X9. Shared belt-span elasticity approved; implementation
-is in progress: X10a–X10c implemented, X10d pending; final validation pending. Keep one commit per X10a–X10d and run the combined full suite after the
+Status: X10a–X10d implemented (2026-10-03); combined full-suite validation pending. Shared belt-span elasticity is implemented across MachineKit and RobotKit. Keep one commit per X10a–X10d and run the combined full suite after the
 complete milestone, as requested, rather than after each edit or step.
 
 X9c derives belt stiffness from the belt's path, but only for a belt clamped to a sliding
@@ -1620,6 +1619,34 @@ Add a belt reduction to an existing example rather than a new machine. For examp
 screw router's Z motor back beside its screw with a 2:1 `BeltReduction` (it then fits under the
 gantry), or give the robot arm's wrist a belt stage. Record how Z speed, acceleration and
 stiffness change against the direct-coupled Z, with a reason for each.
+
+X10d implementation: `CncRouter(false, true)` and `CncRouterPreview.foldedZRouter()` add an
+optional folded Z stage to the existing screw router. A 20-tooth motor pulley drives a
+40-tooth screw pulley through a 129-tooth GT2 belt; its two free spans compile into one
+elastic network. The screw and motor retain separate rotary joints, and the motor sits on
+a machined bracket below the gantry. The original router remains the default. Focused
+checks compare the direct and folded robot models, test belt tooth fit and Z kinematics
+at three travel poses, check collisions around the folded stage, and exercise the folded
+Z stage together with the X/Y carriage belts.
+
+At the same poses and limits, direct → folded Z baselines are:
+
+- Z speed 43.654 → 21.827 mm/s: the motor turns twice for each screw revolution, so its
+  unchanged rate cap allows half the axis speed.
+- Z acceleration 6117.5 → 3263.4 mm/s²: the 2:1 stage reflects more motor inertia into
+  the axis; belt loss and the extra hardware also contribute.
+- Z stiffness rigid (no finite compliance in the direct-coupler model) → 486.9 MN/m:
+  the 129-tooth belt's two actual free spans and the GT2 family's assumed tensile EA
+  supply the new elastic compliance.
+- Z backlash 0.0500 → 0.0505 mm: the GT2 family's assumed 1%-pitch tooth clearance
+  adds 0.0005 mm at the axis through the screw pulley and 2 mm lead.
+- Router mass 36.9 → 37.1 kg: pulleys, belt, bearing and the folded motor plate replace
+  the direct coupler and standoffs. These are rounded assembly masses.
+
+The belt and its radial screw support are represented as manufacturable parts. The
+screw's bearing journal and axial-retention machining are not detailed in this example;
+the bearing is fixed in the assembly model. Those details would be required before
+fabrication, but they do not affect the modeled drive ratio or belt-span solve.
 
 Validation: one commit per step, focused checks when needed during implementation, and the
 combined full suite (`/home/joao/dev/materia-cache/claude-scratch/x7-suite.sh <tag>`) after X10d.
