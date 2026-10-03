@@ -296,6 +296,8 @@ Done. What was built and decided:
 - Allocation is 68 KB per controller tick, below the unchanged 80 KB budget. All kit suites,
   MachineKit smoke and the full application gate pass; existing router, belt router, CoreXY,
   arm, mobile-base and welder measurements are unchanged. Only the added assertion counts grow.
+  The final gate is `mt-suite-mt2-final.txt` (every suite exit 0); native runtime and MuJoCo
+  assertion executables also pass. No haxeon compiler workaround was needed.
 
 **MT3. Cobot arm size classes.**
 - **Joint modules.** `CobotJoint` (`machinekit.robotics`) is a housing with a stator connector and a rotor connector.
@@ -506,7 +508,7 @@ MT0 ─┬─ MT1 ── MT2 ─┬─ MT4 (reach study) ─┐
 |---|---|---|
 | MT0 | done: main and X7+X8 merged | c5438ba4d, 8ad034403 |
 | MT1 | done | 592affc2f, 7d9f192b1, 5e40b76fe, 53248d881 |
-| MT2 | done | |
+| MT2 | done | 06c9bf5fd |
 | MT3 | planned | |
 | MT4 | planned | |
 | MT5 | planned | |
