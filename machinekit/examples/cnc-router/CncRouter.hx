@@ -1,3 +1,4 @@
+import machinekit.motion.PowerSupply;
 import machinekit.motion.MotorDriver;
 import cadkit.modeling.Location;
 import cadkit.modeling.Part;
@@ -657,11 +658,17 @@ class CncRouter extends MachineAssembly {
 	}
 
 	var driverIndex:Int = 0;
+	var supplyAdded:Bool = false;
 	/** Drivers live on the fixed frame, so their envelopes do not add carriage mass. */
 	function addDriver(motor:String):String {
 		var id = motor + "Driver";
-		attach(id, new MotorDriver("GENERIC-DM542", 2.8, MICROSTEPS, SUPPLY_VOLTS),
+		if (!supplyAdded) {
+			attach("powerSupply", new PowerSupply(SUPPLY_VOLTS, 20, 4), AssemblyFrames.translation(0, -320, 0), "sideLeft");
+			supplyAdded = true;
+		}
+		attach(id, new MotorDriver("GENERIC-DM542", 2.8, MICROSTEPS),
 			AssemblyFrames.translation(-180 + 125 * driverIndex++, -200, 0), "sideLeft");
+		connectPorts('$id-power', "powerSupply", 'power$driverIndex', id, "power");
 		return id;
 	}
 

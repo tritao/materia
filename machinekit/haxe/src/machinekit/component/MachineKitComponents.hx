@@ -17,6 +17,7 @@ import machinekit.motion.LinearRail;
 import machinekit.motion.LinearRailBlock;
 import machinekit.motion.NemaStepper;
 import machinekit.motion.MotorDriver;
+import machinekit.motion.PowerSupply;
 import machinekit.motion.PillowBlock;
 import machinekit.robotics.RobotFlange;
 import machinekit.robotics.EndEffectorPlate;
@@ -72,6 +73,7 @@ class MachineKitComponents {
 			NemaStepper.namedRecipeType(),
 			NemaStepper.genericRecipeType(),
 			MotorDriver.recipeType(),
+			PowerSupply.recipeType(),
 			FlangeBearingHousing.recipeType(),
 			LeadScrew.recipeType(),
 			LeadScrewNut.recipeType(),

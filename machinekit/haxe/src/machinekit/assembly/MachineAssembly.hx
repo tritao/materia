@@ -39,6 +39,10 @@ typedef MachineAssemblyComponent = { var id:String; var component:MachineCompone
 typedef MachineAssemblyConnector = { var instanceId:String; var connectorName:String; }
 typedef PortRef = { var instanceId:String; var portName:String; }
 typedef UpstreamResult = { var port:PortRef; var external:Bool; }
+private typedef MotorCompilation = {
+	var actuators:Array<materia.assembly.AssemblyDefinition.AssemblyActuator>;
+	var encoders:Array<materia.assembly.AssemblyDefinition.AssemblyEncoder>;
+}
 private typedef ServiceTrace = { var port:PortRef; var external:Bool; var supplied:Bool; var chain:Array<String>; }
 typedef MachineSubassembly = { var id:String; var assembly:MachineAssembly; var pose:Null<AssemblyFrame>; }
 /** BOM-only mass is a point-mass estimate, fixed or attached to a member. */
@@ -277,12 +281,8 @@ class MachineAssembly {
 			component.setMaterial(member.material);
 			result.addComponentAt(InstancePath.of(occurrence.id), component, occurrence.initialPose);
 		}
-		for (saved in description.machine.ports) {
-			var port = result.requireMember(saved.occurrence).port(saved.name);
-			if (port.kind != saved.kind || port.role != saved.role || port.required != saved.required ||
-				port.connector != saved.connector || !Equality.equals(port.iface, saved.iface))
-				throw 'Saved port "${saved.occurrence}/${saved.name}" differs from its recipe';
-		}
+		// Port records are snapshots for readers. Recipes own their current interfaces and required flags.
+
 		for (connector in description.machine.memberConnectors)
 			result.addMemberConnector(connector.instanceId, connector.name, connector.frame);
 		for (joint in mechanical.joints) {
@@ -299,17 +299,18 @@ class MachineAssembly {
 		// The coupling decides whether there is one: a transmission whose coupling was removed goes too.
 		if (description.machine.transmissions != null) for (transmission in description.machine.transmissions)
 			if (result.applyTransmission(transmission)) result.transmissions.push(copyTransmission(transmission, ""));
+		for (connection in description.machine.portConnections)
+			result.connectPorts(connection.id, connection.fromInstance, connection.fromPort,
+				connection.toInstance, connection.toPort);
+		for (entry in description.machine.portExposures)
+			result.exposePort(entry.name, entry.instanceId, entry.portName);
 		// Motors too: their actuators follow the motor parts as they are now.
 		if (description.machine.motors != null) for (motor in description.machine.motors)
 			result.addMotorRecord(copyMotor(motor, ""));
 		// Encoders after the motors they read, whose actuators they point at.
 		if (description.machine.encoders != null) for (encoder in description.machine.encoders)
 			result.addEncoderRecord(copyEncoder(encoder, ""));
-		for (connection in description.machine.portConnections)
-			result.connectPorts(connection.id, connection.fromInstance, connection.fromPort,
-				connection.toInstance, connection.toPort);
-		for (entry in description.machine.portExposures)
-			result.exposePort(entry.name, entry.instanceId, entry.portName);
+
 		for (entry in description.machine.connectorExposures)
 			result.exposeConnector(entry.name, entry.instanceId, entry.connectorName);
 		for (entry in description.machine.bomExtras) {
@@ -401,10 +402,6 @@ class MachineAssembly {
 		for (transmission in transmissions) target.transmissions.push(copyTransmission(transmission, ""));
 		for (motor in motors) target.motors.push(copyMotor(motor, ""));
 		for (encoder in encoders) target.encoders.push(copyEncoder(encoder, ""));
-		if (mechanical.encoders != null) target.mechanical.encoders = [for (encoder in mechanical.encoders)
-			materia.assembly.AssemblyDefinitionFlattener.copyEncoder(encoder, encoder.id, encoder.joint)];
-		if (mechanical.actuators != null) target.mechanical.actuators = [for (actuator in mechanical.actuators)
-			copyActuator(actuator, "")];
 		for (entry in included) target.included.push({id: entry.id,
 			assembly: entry.assembly.snapshot(), pose: entry.pose == null ? null : copyFrame(entry.pose)});
 		for (entry in nestedEntries) target.nestedEntries.push({id: entry.id,
@@ -791,19 +788,38 @@ class MachineAssembly {
 		addMotorRecord({actuator: id, joint: joint, motor: motor, driver: driver, margin: margin,
 			gearRatio: gearbox == null ? null : gearbox.ratio, gearEfficiency: gearbox == null ? null : gearbox.efficiency});
 
-	function addMotorRecord(record:machinekit.assembly.MachineAssemblyDescription.MotorRecord):Void {
+	function motorDriver(record:machinekit.assembly.MachineAssemblyDescription.MotorRecord):machinekit.motion.MotorDriver {
 		var member = requireMember(record.motor);
 		if (!Std.isOfType(member, machinekit.motion.MotorDrive)) throw 'Motor "${record.actuator}": "${record.motor}" is not a motor part';
-		var motor:machinekit.motion.MotorDrive = cast member;
-		if (mechanical.actuators == null) mechanical.actuators = [];
-		for (actuator in mechanical.actuators) if (actuator.id == record.actuator)
-			throw 'Duplicate assembly actuator "${record.actuator}"';
-		var driverMember = requireMember(record.driver);
-		if (!Std.isOfType(driverMember, machinekit.motion.MotorDriver))
+		var driver = requireMember(record.driver);
+		if (!Std.isOfType(driver, machinekit.motion.MotorDriver))
 			throw 'Motor "${record.actuator}": "${record.driver}" is not a driver part';
-		var driver:machinekit.motion.MotorDriver = cast driverMember;
-		if (driver.statedVoltage == null) throw 'Motor "${record.actuator}" needs a stated driver voltage until a supply is wired';
-		var added = motor.actuator(record.actuator, record.joint, driver.statedVoltage, record.margin, driver.current);
+		return cast driver;
+	}
+
+	/** A modelled supply wins over the explicit fallback; an exposed boundary has no voltage of its own. */
+	function driverVoltage(id:String, driver:machinekit.motion.MotorDriver, complete:Bool):Null<Float> {
+		var trace = traceUpstream(portRef(id, "power"));
+		var voltage = driver.statedVoltage;
+		if (trace.supplied && !trace.external) {
+			var source = complete ? upstream(id, "power").port : trace.port;
+			var part = requireMember(source.instanceId);
+			if (!Std.isOfType(part, machinekit.motion.ElectricalSource))
+				throw 'Power source "${source.instanceId}/${source.portName}" does not state an output voltage';
+			var supply:machinekit.motion.ElectricalSource = cast part;
+			voltage = supply.outputVoltage(source.portName);
+		} else if (!trace.supplied && trace.chain.length > 1) throw unsuppliedMessage(trace.chain);
+		if (voltage != null) machinekit.motion.MotorDriver.validateVoltage(driver.rating, voltage);
+		return voltage;
+	}
+
+	function resolveMotor(record:machinekit.assembly.MachineAssemblyDescription.MotorRecord,
+			complete:Bool):materia.assembly.AssemblyDefinition.AssemblyActuator {
+		var driver = motorDriver(record);
+		var voltage = driverVoltage(record.driver, driver, complete);
+		if (voltage == null) throw 'Motor "${record.actuator}" needs a wired supply or a stated driver voltage';
+		var motor:machinekit.motion.MotorDrive = cast requireMember(record.motor);
+		var added = motor.actuator(record.actuator, record.joint, voltage, record.margin, driver.current);
 		var stepper = driver.rating.family == machinekit.motion.MotorDriver.MotorDriverFamily.Stepper;
 		if ((stepper && added.drive != "stepper") || (!stepper && added.drive != "servo"))
 			throw 'Motor "${record.actuator}" and driver "${record.driver}" have different drive families';
@@ -814,23 +830,53 @@ class MachineAssembly {
 		var assumed = added.assumed == null ? [] : [for (label in added.assumed) label];
 		assumed.push("driver ratings");
 		added.assumed = assumed;
-		// A gearbox between the motor and the joint: the actuator stays the motor's own, the bridge scales it.
 		if (record.gearRatio != null) {
 			added.gearRatio = record.gearRatio;
 			added.gearEfficiency = record.gearEfficiency;
 		}
-		// A servo's intrinsic encoder is a sensor too. Its rotor count is expressed at the joint.
-		if (added.drive == "servo" && added.encoderCounts != null && added.encoderCounts > 0) {
-			if (mechanical.encoders == null) mechanical.encoders = [];
-			var id = record.actuator + ".encoder";
-			for (encoder in mechanical.encoders) if (encoder.id == id) throw 'Duplicate assembly encoder "$id"';
-			mechanical.encoders.push({id: id, joint: record.joint, kind: "incremental",
-				counts: added.encoderCounts * (added.gearRatio == null ? 1 : added.gearRatio)});
-			added.encoder = id;
-			added.encoderCounts = null;
+		return added;
+	}
+
+	function addMotorRecord(record:machinekit.assembly.MachineAssemblyDescription.MotorRecord):Void {
+		for (motor in motors) if (motor.actuator == record.actuator)
+			throw 'Duplicate assembly actuator "${record.actuator}"';
+		var driver = motorDriver(record);
+		// An incomplete module may be wired by its containing assembly. Validate known ratings now,
+		// and resolve the complete power graph when exporting the assembly's model.
+		if (driverVoltage(record.driver, driver, false) != null) {
+			var checked = resolveMotor(record, false);
 		}
-		mechanical.actuators.push(added);
 		motors.push(copyMotor(record, ""));
+	}
+
+	/** Compile every binding anew; connecting a supply after binding must not leave an old curve. */
+	function compileMotors():MotorCompilation {
+		var actuators = [for (record in motors) resolveMotor(record, true)];
+		var sensors:Array<materia.assembly.AssemblyDefinition.AssemblyEncoder> = [];
+		var sensorIds:Map<String, Bool> = [];
+		for (record in encoders) {
+			var part:machinekit.motion.EncoderPart = cast requireMember(record.part);
+			var sensor = part.encoder(record.encoder, record.joint);
+			sensors.push(sensor);
+			sensorIds.set(sensor.id, true);
+			if (record.actuator != null) for (actuator in actuators) if (actuator.id == record.actuator) {
+				actuator.encoder = record.encoder;
+				actuator.encoderCounts = null;
+			}
+		}
+		for (actuator in actuators) {
+			var counts = actuator.encoderCounts;
+			if (actuator.drive == "servo" && actuator.encoder == null && counts != null && counts > 0) {
+				var id = actuator.id + ".encoder";
+				if (sensorIds.exists(id)) throw 'Duplicate assembly encoder "$id"';
+				var gear = actuator.gearRatio;
+				sensors.push({id: id, joint: actuator.joint, kind: "incremental", counts: counts * (gear == null ? 1 : gear)});
+				sensorIds.set(id, true);
+				actuator.encoder = id;
+				actuator.encoderCounts = null;
+			}
+		}
+		return {actuators: actuators, encoders: sensors};
 	}
 
 	/**
@@ -846,30 +892,19 @@ class MachineAssembly {
 	function addEncoderRecord(record:machinekit.assembly.MachineAssemblyDescription.EncoderRecord):Void {
 		var member = requireMember(record.part);
 		if (!Std.isOfType(member, machinekit.motion.EncoderPart)) throw 'Encoder "${record.encoder}": "${record.part}" is not an encoder part';
-		var part:machinekit.motion.EncoderPart = cast member;
-		var added = part.encoder(record.encoder, record.joint);
-		var feedback:Null<materia.assembly.AssemblyDefinition.AssemblyActuator> = null;
+		for (existing in encoders) if (existing.encoder == record.encoder)
+			throw 'Duplicate assembly encoder "${record.encoder}"';
 		if (record.actuator != null) {
-			if (mechanical.actuators != null) for (actuator in mechanical.actuators)
-				if (actuator.id == record.actuator) feedback = actuator;
-			if (feedback == null) throw 'Encoder "${record.encoder}" reads unknown motor "${record.actuator}"';
+			var found = false;
+			for (motor in motors) if (motor.actuator == record.actuator) found = true;
+			if (!found) throw 'Encoder "${record.encoder}" reads unknown motor "${record.actuator}"';
 		}
-		var builtin:Null<String> = null;
-		if (feedback != null && feedback.encoder == feedback.id + ".encoder") {
-			var wired = false;
-			for (recorded in encoders) if (recorded.encoder == feedback.encoder) wired = true;
-			if (!wired) builtin = feedback.encoder;
-		}
-		if (mechanical.encoders != null) for (existing in mechanical.encoders)
-			if (existing.id == record.encoder && existing.id != builtin) throw 'Duplicate assembly encoder "${record.encoder}"';
-		if (mechanical.encoders == null) mechanical.encoders = [];
-		if (builtin != null) mechanical.encoders = [for (encoder in mechanical.encoders) if (encoder.id != builtin) encoder];
-		mechanical.encoders.push(added);
-		if (feedback != null) {
-			feedback.encoder = record.encoder;
-			feedback.encoderCounts = null;
-		}
-		encoders.push(copyEncoder(record, ""));
+		var part:machinekit.motion.EncoderPart = cast member;
+		var checked = part.encoder(record.encoder, record.joint);
+		var saved = copyEncoder(record, "");
+		if (record.actuator != null) for (previous in encoders)
+			if (previous.actuator == record.actuator) previous.actuator = null;
+		encoders.push(saved);
 	}
 
 	static function copyEncoder(encoder:machinekit.assembly.MachineAssemblyDescription.EncoderRecord,
@@ -1113,9 +1148,9 @@ class MachineAssembly {
 			model.couple(join(prefix, coupling.id), join(prefix, coupling.source),
 				join(prefix, coupling.target), coupling.ratio, coupling.offset, coupling.efficiency,
 				coupling.stiffness, coupling.backlash, coupling.drag, coupling.assumed);
-		if (mechanical.actuators != null) for (actuator in mechanical.actuators)
-			model.actuateDrive(copyActuator(actuator, prefix));
-		if (mechanical.encoders != null) for (encoder in mechanical.encoders)
+		var compiled = compileMotors();
+		for (actuator in compiled.actuators) model.actuateDrive(copyActuator(actuator, prefix));
+		for (encoder in compiled.encoders)
 			model.addEncoder(materia.assembly.AssemblyDefinitionFlattener.copyEncoder(encoder, join(prefix, encoder.id),
 				join(prefix, encoder.joint)));
 	}

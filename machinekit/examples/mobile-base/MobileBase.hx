@@ -119,19 +119,29 @@ class MotorBracket extends MachineComponent {
 }
 
 /** Battery pack: a box standing on its base (z=0), centred on its origin. */
-class BatteryPack extends MachineComponent {
+class BatteryPack extends MachineComponent implements machinekit.motion.ElectricalSource {
+	public final voltage:Float;
 	public final length:Float;
 	public final width:Float;
 	public final height:Float;
 
-	public function new(length:Float, width:Float, height:Float) {
+	public function new(length:Float, width:Float, height:Float, voltage:Float = 24) {
+		if (!(voltage > 0) || !Math.isFinite(voltage)) throw "Battery needs a finite positive voltage";
 		if (!(length > 0) || !(width > 0) || !(height > 0)) throw "Battery needs positive dimensions";
-		super('BATTERY-${Dimension.format(length)}x${Dimension.format(width)}x${Dimension.format(height)}',
+		super('BATTERY-${Dimension.format(length)}x${Dimension.format(width)}x${Dimension.format(height)}-${Dimension.format(voltage)}V',
 			"Battery pack", "plastic", true);
+		this.voltage = voltage;
 		this.length = length;
 		this.width = width;
 		this.height = height;
 		addConnector("base", Mount, Solids.axial(0, 0, 0));
+		for (side in ["Left", "Right"])
+			addPort({name: 'power$side', kind: ElectricalPower, role: Supply, iface: Unspecified, required: false});
+	}
+
+	public function outputVoltage(name:String):Float {
+		var output = port(name);
+		return voltage;
 	}
 
 	override public function hasGeometry():Bool return true;
@@ -235,7 +245,7 @@ class MobileBase extends MachineAssembly {
 	 */
 	public static final WHEEL_GEARBOX = new Gearbox(10, 0.9);
 	public static inline var WHEEL_SUPPLY:Float = 24;
-	static function wheelDriver():MotorDriver return new MotorDriver("GENERIC-DM542", 2.8, 16, WHEEL_SUPPLY);
+	static function wheelDriver(wired:Bool = false):MotorDriver return new MotorDriver("GENERIC-DM542", 2.8, 16, wired ? null : WHEEL_SUPPLY);
 	/** The motor's actuator as `MachineAssembly.addMotor` makes it, before the gearbox. */
 	static function wheelMotor():materia.assembly.AssemblyDefinition.AssemblyActuator {
 		var driver = wheelDriver();
@@ -290,6 +300,9 @@ class MobileBase extends MachineAssembly {
 		addComponent("basePlate", new ChassisPlate(LENGTH, WIDTH, BASE_THICKNESS, "Base plate", baseSeats(),
 			wheelSlots()), AssemblyFrames.translation(0, 0, BASE_Z));
 
+		addComponent("battery", new BatteryPack(260, 180, 110, WHEEL_SUPPLY));
+		addMate("battery-mount", "fixed", "basePlate", "battery", "battery", "base");
+
 		// Drives: the bracket hangs from its seat, the motor sits on the bracket, and the wheel turns on the motor's shaft.
 		for (side in SIDES) {
 			addComponent('bracket${side.name}', bracket);
@@ -303,9 +316,10 @@ class MobileBase extends MachineAssembly {
 				{x: 0, y: 1, z: 0}, 0, {lower: null, upper: null, velocity: WHEEL_SPEED, effort: WHEEL_TORQUE});
 			// The wheel's drive: the stepper through the gearhead, which is where those limits come from.
 			var driver = 'driver${side.name}';
-			addComponent(driver, wheelDriver());
+			addComponent(driver, wheelDriver(true));
 			addMemberConnector("basePlate", driver, Solids.axial(side.sign * 210, 0, BASE_THICKNESS));
 			addMate('$driver-mount', "fixed", "basePlate", driver, driver, "mount");
+			connectPorts('$driver-power', "battery", 'power${side.name}', driver, "power");
 			addMotor('drive${side.name}', side.joint, 'motor${side.name}', driver, 0.5, WHEEL_GEARBOX);
 		}
 
@@ -313,8 +327,7 @@ class MobileBase extends MachineAssembly {
 			addComponent('caster$end', caster);
 			addMate('caster$end-mount', "fixed", "basePlate", 'caster$end', 'caster$end', "mount");
 		}
-		addComponent("battery", new BatteryPack(260, 180, 110));
-		addMate("battery-mount", "fixed", "basePlate", "battery", "battery", "base");
+
 		for (corner in CORNERS) {
 			addComponent('post${corner.name}', post);
 			addMate('post${corner.name}-mount', "fixed", "basePlate", 'post${corner.name}', 'post${corner.name}', "base");

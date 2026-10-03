@@ -893,7 +893,7 @@ unchanged; the belt-router diagnostic now names its assumptions. No haxeon chang
 
 ### X8 — Motor, driver and controller
 
-Status: X8a/X8b complete (2026-10-03). X8c–X8e pending.
+Status: X8a–X8c complete (2026-10-03). X8d/X8e pending.
 
 Planned (2026-10-03); after X7. Today one call mixes three pieces of hardware:
 `MachineAssembly.addMotor(id, joint, motor, volts, margin, gearbox)` takes the supply voltage, the
@@ -986,6 +986,40 @@ X8b implementation:
   Router plate times, limits, torque usage and deviations retain X7's baselines; CoreXY drive limits,
   arm mission times and the mobile obstacle summary are unchanged. Only the hardware envelopes,
   fixed mass, BOM/part counts, explicit servo sensors and provenance labels change in the examples.
+
+X8c implementation:
+
+- `ElectricalSource` states the voltage at a supply port. Recipe-backed `PowerSupply` provides
+  one shared DC voltage/current rating and separate output ports; the service graph pairs each
+  physical port once, so driver feeds use distinct terminals rather than sharing one endpoint.
+  Its rectangular envelope is assumed. The example battery pack exposes left/right feeds at
+  its stated voltage; its BOM identity now includes voltage.
+- A modelled supply, traced with `upstream()`, wins over a driver's stated fallback. Without a
+  modelled supply, including an exposed external boundary, the driver must state its voltage.
+  Unknown modelled output voltages and voltages outside the driver range are errors. Aggregate
+  supply loading and voltage sag are not modelled; the DC current rating is not a phase-current
+  limit on the motor.
+- Motor and encoder bindings are source records. `addTo` compiles fresh actuator curves and
+  sensors from current parts and the completed power graph instead of retaining derived arrays
+  in the assembly. Late power wiring therefore updates a previously bound motor on compilation.
+  Incomplete modules may bind before their power is known; export requires a supplied graph or
+  stated voltage. Known ratings still validate when bound.
+- Recipe ports are authoritative. Saved port records are reader snapshots, regenerated on
+  reconstruction so changes to a driver's wired/fallback setting cannot leave stale required flags.
+  Power connections and exposures are restored before validating known motor ratings.
+- Rewiring feedback clears the old sensor record's motor association while retaining that sensor.
+  This gives each motor one feedback source and preserves it through canonical sensor sorting.
+- Router/CoreXY/arm supplies are fixed to their frames/pedestal. Each adds a 0.5832 kg assumed
+  aluminium envelope: router 36.3 → 36.9 kg, arm 149.8 → 150.4 kg and CoreXY 4.01 → 4.60 kg.
+  Router definitions/occurrences/BOM lines 32/60/31 → 33/61/32, arm definitions/occurrences
+  25/31 → 26/32 and CoreXY 16/37/16 → 17/38/17. Mobile base remains 28.6 kg: its existing battery
+  supplies both drivers. Carriage/arm moving masses and CoreXY drive limits remain unchanged.
+- Focused MachineKit smoke passed, including a supply edit from 24 to 48 V (the stepper rate
+  doubles), late wiring overriding fallback voltage, missing/range/unknown voltage failures,
+  included and nested power reconstruction, and canonically sorted feedback rewiring.
+- Validation: full `x7-suite-x8c-supplies.txt` gate passed all suites, application build and
+  project-source tests. Router times/deviations/limits, CoreXY drive limits, arm mission times
+  and the mobile obstacle summary remain unchanged from X8b.
 
 ### Later
 

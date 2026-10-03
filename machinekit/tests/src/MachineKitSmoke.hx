@@ -2613,6 +2613,7 @@ class MachineKitSmoke {
 		assemblyPreviewSharing();
 		RecipeContractTests.run();
 		MotorDriverTests.run();
+		PowerSupplyTests.run();
 		componentRecipes();
 		documentRecipes();
 		documentPreview();
