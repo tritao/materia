@@ -614,7 +614,7 @@ MT0 ─┬─ MT1 ── MT2 ─┬─ MT4 (reach study) ─┐
 | MT2 | done | 06c9bf5fd, 73a14c58e |
 | MT3 | done | 4d58cd5d3, 8a44aeb53 |
 | MT4 | done | c945a0dc8 |
-| MT5 | in progress: pneumatic parts and service wiring | |
+| MT5 | in progress: pneumatic parts and service wiring | 453d890ad |
 | MT6 | planned | |
 | MT7 | planned | |
 | MT8 | planned | |
