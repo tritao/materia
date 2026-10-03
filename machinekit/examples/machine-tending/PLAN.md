@@ -182,12 +182,11 @@ The current arm reaches about 0.73 m from shoulder to flange, and the gripper ad
 
 **MT0. Base.**
 - Branch `machine-tending` comes from local main 1048bf768, in the worktree `materia-worktrees/machine-tending`.
-- Merge before MT6:
-  - `mobile-welder`, for `ArmTool`, `ArmClearance`, `ConvexDistance`, `ProgramPlanner.shutdown()` and the mission machinery. Its W4 work was still uncommitted on 2026-10-03; wait for that session to commit it.
-  - `x7-transmissions` (X7 T1–T5, X8), for the transmission names MT1 builds on and the controller split MT6 derives membership from.
-- MT1–MT4 can start before X8, but they use the post-X7 `Transmission` API, so do not write against `Drive`.
-- MT3 does not need the welder branch. Once that branch is merged, the cobot takes the same `ArmTool` interface as `RobotArm`. If MT3 lands first, it defines the interface where the welder branch will expect it, in `machinekit.robotics`, and the merge moves `RobotArm` onto it.
-- Populate submodules only when a step needs them (clone each from the main checkout or a worktree at the pin): haxeon, nativekit, motionkit vendors, mujoco, coal, proxsuite, eigen. Check `df -h /` first; there was 9.9 GB free on 2026-10-03.
+- Done (2026-10-03): local main b99c948fa was merged in (c5438ba4d). It brings the robot welder through W4's stop policy and clearance: `ArmTool`, `ArmClearance`, `ConvexDistance`, `ProgramPlanner.shutdown()` and the mission machinery.
+- `x7-transmissions` through X8e (351e772c5) was merged after that (8ad034403). Its only conflict was `RobotArm.hx`, where X8's driver and gearbox members were kept, along with the welder's `armTool.build`.
+- Build on the X7 `Transmission` API and the X8 motor/driver/supply members (`addMotor(id, joint, motor, driver, margin, ?gearbox)`), never on the old `Drive` names.
+- `ArmTool` lives in the robot-arm example (`RobotArm.hx`). MT3 moves it into `machinekit.robotics`, so the library's `CobotArm` and the example `RobotArm` share it.
+- All submodules are populated: cloned with `--shared` from the x7 worktree at the same pins, with `coal` and `proxsuite` as symlinks to the kinematicskit worktree. Disk is tight, so check `df -h /` before large builds.
 - `CADKIT_OCCT_DIR` points at the shared prebuilt OCCT. Never rebuild it.
 
 **MT1. Mill parts.**
@@ -419,7 +418,7 @@ MT0 ─┬─ MT1 ── MT2 ─┬─ MT4 (reach study) ─┐
 
 | Step | State | Commits |
 |---|---|---|
-| MT0 | worktree created from 1048bf768; merges pending | |
+| MT0 | done: main and X7+X8 merged | c5438ba4d, 8ad034403 |
 | MT1 | planned | |
 | MT2 | planned | |
 | MT3 | planned | |
