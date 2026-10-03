@@ -90,9 +90,9 @@ checks the generic manufacturingkit sheet placement adapter using locally
 authored input; it does not depend on a MachineKit example. The island pocket
 is also cut with StockKit and compared with the finished part: no gouge, no
 rapid or shank through stock, and leftover only in the inside corners.
-Haxeon builds StockKit core and CadKit core from their package manifests. Set `CADKIT_OCCT_DIR` to a prebuilt OCCT
-install of the pinned source so the CadKit build does not compile OCCT, then run:
+Haxeon builds StockKit core and CadKit core from their package manifests, and CadKit finds its prebuilt OCCT
+automatically (see the CadKit README), so run:
 
 ```sh
-CADKIT_OCCT_DIR=/path/to/occt-install ./haxeon/scripts/haxeon run --project camkit/tests/haxeon.json
+./haxeon/scripts/haxeon run --project camkit/tests/haxeon.json
 ```

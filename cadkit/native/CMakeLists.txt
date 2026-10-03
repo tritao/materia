@@ -7,8 +7,8 @@ if(NOT DEFINED HAXEON_NATIVE_OUTPUT_DIR OR HAXEON_NATIVE_OUTPUT_DIR STREQUAL "")
 endif()
 file(MAKE_DIRECTORY "${HAXEON_NATIVE_OUTPUT_DIR}")
 
-# The shared CadKit core that the Haxe bindings load. Set CADKIT_OCCT_DIR to a prebuilt OCCT install of the pinned
-# source; without it this configure builds OCCT, which takes most of an hour.
+# The shared CadKit core that the Haxe bindings load. It needs a prebuilt OCCT install of the pinned source, which
+# cadkit/CMakeLists.txt finds in the shared cache or through CADKIT_OCCT_DIR (see cadkit/scripts/build-occt-prefix.sh).
 set(CADKIT_BUILD_TESTS OFF CACHE BOOL "Disable CadKit tests in the Haxeon build" FORCE)
 set(CADKIT_BUILD_SHARED ON CACHE BOOL "Build the CadKit core as a shared library" FORCE)
 set(BUILD_LIBRARY_TYPE Shared CACHE STRING "Build OCCT as shared libraries" FORCE)

@@ -10,11 +10,46 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 option(CADKIT_BUILD_TESTS "Build CadKit tests" ON)
 option(CADKIT_BUILD_OCCT "Build the pinned vendored OCCT source" ON)
 option(CADKIT_BUILD_SHARED "Build the CadKit core as a shared library" ON)
-# Building OCCT takes most of an hour. A prebuilt install of the same pinned
-# source (cmake --install of an OCCT build tree) can stand in for it; the
-# environment variable lets builds driven by other tools, such as haxeon, opt in.
+# Building OCCT takes most of an hour, so a build never starts one by accident. CadKit uses a prebuilt install of the
+# pinned source (cadkit/scripts/build-occt-prefix.sh creates it once), found in this order:
+#   1. CADKIT_OCCT_DIR (cache variable, or the environment variable of the same name, which lets tools such as haxeon
+#      opt in),
+#   2. the shared cache next to the checkout: <checkout>/../materia-cache/occt-<pinned revision>-release, where the
+#      revision is the last commit that touched third_party/occt (so a changed pin finds nothing and fails below),
+# and otherwise configuring stops, unless CADKIT_BUILD_OCCT_FROM_SOURCE (or the environment variable) opts in to
+# compiling the vendored OCCT.
+option(CADKIT_BUILD_OCCT_FROM_SOURCE "Compile the vendored OCCT instead of using a prebuilt install" OFF)
 set(CADKIT_OCCT_DIR "$ENV{CADKIT_OCCT_DIR}" CACHE PATH
     "Prefix of a prebuilt install of the pinned OCCT source, used instead of building it")
+
+if(NOT CADKIT_OCCT_DIR AND CADKIT_BUILD_OCCT AND NOT CADKIT_BUILD_OCCT_FROM_SOURCE AND NOT "$ENV{CADKIT_BUILD_OCCT_FROM_SOURCE}")
+    set(_cadkit_occt_cache "$ENV{MATERIA_CACHE_DIR}")
+    if(NOT _cadkit_occt_cache)
+        get_filename_component(_cadkit_occt_cache "${CMAKE_CURRENT_LIST_DIR}/../../materia-cache" ABSOLUTE)
+    endif()
+    set(_cadkit_occt_revision "")
+    find_package(Git QUIET)
+    if(GIT_FOUND)
+        execute_process(
+            COMMAND "${GIT_EXECUTABLE}" log -1 --abbrev=8 --format=%h -- third_party/occt
+            WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}"
+            OUTPUT_VARIABLE _cadkit_occt_revision
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET)
+    endif()
+    set(_cadkit_occt_candidate "${_cadkit_occt_cache}/occt-${_cadkit_occt_revision}-release")
+    if(_cadkit_occt_revision AND EXISTS "${_cadkit_occt_candidate}/lib/cmake/opencascade")
+        set(CADKIT_OCCT_DIR "${_cadkit_occt_candidate}" CACHE PATH "" FORCE)
+        message(STATUS "CadKit found a prebuilt OCCT at ${_cadkit_occt_candidate}")
+    else()
+        message(FATAL_ERROR
+            "CadKit needs a prebuilt OCCT and none was found.\n"
+            "  Expected: ${_cadkit_occt_candidate}\n"
+            "  Create it once (about an hour) with: cadkit/scripts/build-occt-prefix.sh\n"
+            "  Or point CADKIT_OCCT_DIR at an existing install of the pinned source.\n"
+            "  To compile OCCT as part of this build instead, pass -DCADKIT_BUILD_OCCT_FROM_SOURCE=ON.")
+    endif()
+endif()
 
 if(CADKIT_OCCT_DIR)
     find_package(OpenCASCADE CONFIG REQUIRED PATHS "${CADKIT_OCCT_DIR}" NO_DEFAULT_PATH)

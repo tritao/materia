@@ -23,3 +23,18 @@ library. Haxeon consumes its annotated C ABI from above; it is not a core
 dependency. The default build produces a shared `libcadkit-core` for
 Haxeon's dynamic FFI loader. See [`haxe/README.md`](haxe/README.md) for HXI
 generation and the runtime smoke test.
+
+## Building OCCT once
+
+Compiling OCCT takes most of an hour, so a build never starts it by accident. CadKit uses a prebuilt install of the
+pinned source, found through `CADKIT_OCCT_DIR` or in the shared cache at
+`<checkout>/../materia-cache/occt-<revision>-release` (the revision is the last commit that touched
+`third_party/occt`; `MATERIA_CACHE_DIR` moves the cache). Create it once with:
+
+```sh
+cadkit/scripts/build-occt-prefix.sh
+```
+
+Every checkout and worktree next to that cache then finds it automatically. If it is missing, configuring fails with
+that instruction. To compile OCCT as part of one build instead, pass `-DCADKIT_BUILD_OCCT_FROM_SOURCE=ON` (or set the
+environment variable of the same name). A changed OCCT pin changes the revision, so the old prefix is not reused.
