@@ -705,7 +705,7 @@ latency.
 
 ### X7 — Transmissions compile from their parts
 
-Status: T0–T2 done (2026-10-03); T3–T5 not started.
+Status: T0–T3 done (2026-10-03); T4–T5 not started.
 Worktree `x7-transmissions`.
 
 T1: one resolved relation and part-level equations replace the assembly's ratio, efficiency
@@ -802,6 +802,34 @@ including the app project-source suite. All T1 engineering baselines remain unch
 
 Numbers move in this step. Record the new baselines in this plan with a one-line reason each.
 
+Implementation decisions: screw and nut threads must match; part edits must update both mating
+threads. Generic nut assumptions are plain bronze 0.15 mm / 0.01 N m, anti-backlash 0.05 mm /
+0.02 N m (the old defaults), ball nut 0.01 mm / 0.005 N m and 90% efficiency. Sliding nuts
+use friction 0.1. Gear and rack compatibility is checked when resolving their relations.
+`setTransmissionOverrides` states stiffness/backlash/drag; calling it with none clears the
+overrides and resolves the current parts. A rejected support proposal leaves the old record intact. Inclusion and included-assembly
+reconstruction also resolve their copied sources; they previously dropped coupling allowances.
+For CoreXY's summed motor coordinates, axis compliance is the sum of each belt-path compliance
+weighted by the square of its force share: equal shares give `K_axis = 4 / (1/K_A + 1/K_B)`.
+Independent parallel drives retain their additive stiffness. Sprockets retain the previous
+0.97 efficiency and 0.005 N m drag as separate chain-family assumptions; chain stretch and
+chordal variation remain unmodelled, since no chain-member recipe exists yet.
+Router geometry: 29 → 31 definitions, 52 → 56 occurrences, 28 → 30 BOM lines,
+33.0 → 33.1 kg: four actual nuts, with separate flanged and barrel recipes.
+CoreXY planned-limit worst deviation 0 → 0.088 mm: the two belts now contribute
+their actual compliance instead of being treated as rigid; speed and acceleration are unchanged.
+
+T3 router baselines (motor plate, same controller and feeds):
+- Belt X free acceleration 15.10 → 15.08 m/s²: X carries the new Z nut.
+- Belt planned Y/X acceleration 12.36 / 14.19 → 12.35 / 14.18 m/s²: both axes carry its added moving mass.
+- Belt worst torque 56.5 → 56.6%: the moving nut changes the planned load and sampled trajectory.
+- Belt worst deviation 1.90 → 1.89 mm: the added mass changes acceleration limits and sampled forces;
+  belt stiffness itself is unchanged for these unchanged loops (the old frozen value used the same equation).
+- Screw 220.2 s / 0.05 mm and belt 201.6 s remain unchanged, as do the 0 / 57 flagged plans,
+  0 stalls, and 0 / 64 accuracy findings. The screw router's rounded limits and torque remain unchanged.
+
+
+
 - **Belt stiffness** from the belt member on every resolve (`TimingBelt.carriageStiffness(strand)`).
   `setDriveStiffness` is gone, replaced by a stated override. CoreXY: each motor's transmission
   resolves its own belt; record the two-belt series stiffness the X5 notes left open.
@@ -820,6 +848,9 @@ Numbers move in this step. Record the new baselines in this plan with a one-line
 - **Fixed efficiencies** (gear 0.98, rack 0.95, belt 0.97) become each part family's documented
   defaults, marked assumed (T5).
 - Delete `DriveDefaults`.
+
+T3 validation: focused CoreXY and standalone MachineKit pass; every suite in
+`x7-suite-t3-complete.txt`, including the app project-source suite, passes.
 
 #### T4 — One model of a screw
 

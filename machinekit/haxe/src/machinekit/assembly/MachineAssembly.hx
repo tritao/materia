@@ -369,6 +369,7 @@ class MachineAssembly {
 				record.near = transmission.near;
 				record.far = transmission.far;
 				record.unsupported = transmission.unsupported;
+				child.applyTransmission(record);
 				child.transmissions.push(record);
 			}
 		for (connection in portConnections) if (StringTools.startsWith(connection.id, prefix) &&
@@ -631,7 +632,11 @@ class MachineAssembly {
 		if (assembly.mechanical.couplings != null) for (coupling in assembly.mechanical.couplings)
 			addCoupling(join(id, coupling.id), join(id, coupling.source), join(id, coupling.target),
 				coupling.ratio, coupling.offset, coupling.efficiency);
-		for (transmission in assembly.transmissions) transmissions.push(copyTransmission(transmission, id));
+		for (transmission in assembly.transmissions) {
+			var record = copyTransmission(transmission, id);
+			applyTransmission(record);
+			transmissions.push(record);
+		}
 		for (motor in assembly.motors) addMotorRecord(copyMotor(motor, id));
 		for (encoder in assembly.encoders) addEncoderRecord(copyEncoder(encoder, id));
 		for (connection in assembly.portConnections)
@@ -696,17 +701,18 @@ class MachineAssembly {
 		return ratio;
 	}
 
-	/**
-	 * Gives transmission `id` the stiffness of its belt or other compliant link, in N per unit of the leader's
-	 * travel (N/mm for a machine axis); without it the drive is rigid. A belt's comes from
-	 * `TimingBelt.carriageStiffness`. It is kept with the transmission, but is not worked out again from
-	 * the belt when the assembly is rebuilt.
-	 */
-	public function setTransmissionStiffness(id:String, stiffness:Float):Void {
-		if (!(stiffness > 0) || !Math.isFinite(stiffness)) throw 'Transmission "$id" needs a positive stiffness';
+	/** State measured or datasheet allowances explicitly; rebuilding keeps these overrides. */
+	public function setTransmissionOverrides(id:String, ?stiffness:Float, ?backlash:Float, ?drag:Float):Void {
 		for (entry in transmissions) if (entry.coupling == id) {
+			var proposed = copyTransmission(entry, "");
+			proposed.stiffness = stiffness;
+			proposed.backlash = backlash;
+			proposed.drag = drag;
+			var relation = machinekit.transmission.TransmissionResolver.resolve(proposed, requireMember);
 			entry.stiffness = stiffness;
-			applyTransmission(entry);
+			entry.backlash = backlash;
+			entry.drag = drag;
+			writeTransmission(entry, relation);
 			return;
 		}
 		throw 'No transmission "$id"';
@@ -722,10 +728,14 @@ class MachineAssembly {
 			?unsupported:Float):Float {
 		for (entry in transmissions) if (entry.coupling == id) {
 			if (!switch entry.source { case LeadScrew(_, _): true; default: false; }) throw 'Transmission "$id" is not a lead screw';
+			var proposed = copyTransmission(entry, "");
+			proposed.near = near;
+			proposed.far = far;
+			proposed.unsupported = unsupported;
+			var relation = machinekit.transmission.TransmissionResolver.resolve(proposed, requireMember);
 			entry.near = near;
 			entry.far = far;
 			entry.unsupported = unsupported;
-			var relation = machinekit.transmission.TransmissionResolver.resolve(entry, requireMember);
 			writeTransmission(entry, relation);
 			var cap = relation.followerSpeedCap;
 			if (cap == null) throw 'Transmission "$id" has no supports';

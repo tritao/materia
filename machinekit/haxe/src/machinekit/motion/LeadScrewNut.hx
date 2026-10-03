@@ -36,34 +36,41 @@ class LeadScrewNut extends MachineComponent {
 	public final boltCircleDiameter:Float;
 	public final boltCount:Int;
 	public final mountScrew:String;
+	/** A barrel nut has no flange and is retained by its bracket. */
+	public final flanged:Bool;
+	public final kind:LeadScrewNutKind;
 
-	public function new(thread:LeadScrewThread, boltCount:Int = 4) {
+	public function new(thread:LeadScrewThread, boltCount:Int = 4, flanged:Bool = true, kind:LeadScrewNutKind = AntiBacklash) {
+		if (kind == null) throw "Lead screw nut needs a kind";
 		if (thread == null) throw "Lead screw nut needs a thread specification";
 		var screwDiameter = thread.screwDiameter;
 		var lead = thread.lead;
-		if (boltCount < 3) throw "Lead screw nut needs at least 3 mounting bolts";
+		if (flanged && boltCount < 3) throw "Lead screw nut needs at least 3 mounting bolts";
 		// Proportioned on the common T8 nut (10.2 mm body, 16 mm bolt circle, 22 mm flange, M3).
-		var bodyDia = screwDiameter * 1.3;
+		// A barrel nut fits a narrow carriage gap; a flanged body follows the common T8 proportions.
+		var bodyDia = screwDiameter * (flanged ? 1.3 : 1.2);
 		var bodyLen = screwDiameter * 2;
 		var flangeThick = Math.max(3, screwDiameter * 0.3);
 		var mountScrewSize = screwDiameter <= 8 ? "M3" : screwDiameter <= 12 ? "M4" : "M5";
 		var screw = SocketHeadCapScrew.catalog().get(mountScrewSize);
 		// Holes keep 1 mm of material to the body and the screw heads 1 mm to the flange rim.
 		var boltRadius = bodyDia / 2 + screw.clearanceMedium / 2 + 1;
-		if (2 * boltRadius * Math.sin(Math.PI / boltCount) < screw.clearanceMedium + 1)
+		if (flanged && 2 * boltRadius * Math.sin(Math.PI / boltCount) < screw.clearanceMedium + 1)
 			throw "Lead screw nut bolt count leaves too little material between mounting holes";
 		var flangeDia = 2 * Math.max(screwDiameter * 1.5, boltRadius + screw.headDiameter / 2 + 1);
 		var diameterText = Dimension.format(screwDiameter), leadText = Dimension.format(lead);
-		super('LEADNUT-${thread.designation}', 'Lead screw nut, ${thread.designation}, $leadText mm lead', "bronze");
+		super('LEADNUT-${thread.designation}${flanged ? "" : "-BARREL"}${kind == AntiBacklash ? "" : "-" + Std.string(kind)}', 'Lead screw nut, ${thread.designation}, $leadText mm lead', "bronze");
 		this.thread = thread;
 		this.screwDiameter = screwDiameter;
 		this.lead = lead;
 		bodyDiameter = bodyDia;
 		bodyLength = bodyLen;
-		flangeDiameter = flangeDia;
-		flangeThickness = flangeThick;
-		boltCircleDiameter = 2 * boltRadius;
-		this.boltCount = boltCount;
+		flangeDiameter = flanged ? flangeDia : bodyDia;
+		flangeThickness = flanged ? flangeThick : 0;
+		boltCircleDiameter = flanged ? 2 * boltRadius : 0;
+		this.boltCount = flanged ? boltCount : 0;
+		this.flanged = flanged;
+		this.kind = kind;
 		mountScrew = mountScrewSize;
 		addConnector("bore", Axis, Solids.axial(0, 0, bodyLength / 2));
 		addConnector("mountFace", Face, Solids.axial(0, 0, bodyLength + flangeThickness));
@@ -71,6 +78,30 @@ class LeadScrewNut extends MachineComponent {
 		for (point in boltPattern())
 			addConnector('mount${i++}', Mount, Solids.axial(point.x, point.y, bodyLength + flangeThickness));
 	}
+
+	/** Assumed reversal clearance, mm: plain bronze 0.15, preloaded 0.05, ball nut 0.01. */
+	public function backlash():Float return switch kind {
+		case PlainBronze: 0.15;
+		case AntiBacklash: 0.05;
+		case BallNut: 0.01;
+	};
+
+	/** Assumed running torque, N m, including nut preload and support bearing drag. */
+	public function drag():Float return switch kind {
+		case PlainBronze: 0.01;
+		case AntiBacklash: 0.02;
+		case BallNut: 0.005;
+	};
+
+	/** Sliding nuts use a greased steel/bronze friction of 0.1; ball nuts assume 90% efficiency. */
+	public function efficiency():Float return kind == BallNut ? 0.9 : thread.efficiency(0.1);
+
+	static function parseKind(value:String):LeadScrewNutKind return switch value {
+		case "PlainBronze": PlainBronze;
+		case "AntiBacklash": AntiBacklash;
+		case "BallNut": BallNut;
+		default: throw 'Unknown lead screw nut kind "$value"';
+	};
 
 	/** Mount bolt centres on the flange face, counter-clockwise from angle 0. */
 	public function boltPattern():Array<{x:Float, y:Float}> {
@@ -97,6 +128,7 @@ class LeadScrewNut extends MachineComponent {
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var body = Solids.named(Part.cylinderSpan(bodyDiameter / 2, 0, bodyLength), "body");
+		if (!flanged) return Solids.cut(body, [Part.cylinderSpan(screwDiameter / 2, -0.1, bodyLength + 0.1)]);
 		var flange = Solids.named(Part.cylinderSpan(flangeDiameter / 2, bodyLength, bodyLength + flangeThickness), "flange");
 		var solidPart = Solids.union([body, flange]);
 		var boreTool = Solids.named(Part.cylinderSpan(screwDiameter / 2, -0.1, bodyLength + flangeThickness + 0.1), "bore");
@@ -115,15 +147,16 @@ class LeadScrewNut extends MachineComponent {
 	public static function recipeType():ComponentType {
 		if (recipeTypeCache == null)
 			recipeTypeCache = new ComponentType("machinekit.motion.lead-screw-nut",
-			ComponentRecipeSupport.threadParameters().concat([ComponentRecipeSupport.count("boltCount", 4)]),
-			v -> new LeadScrewNut(ComponentRecipeSupport.thread(v), v.integer("boltCount")));
+			ComponentRecipeSupport.threadParameters().concat([ComponentRecipeSupport.count("boltCount", 4), ComponentRecipeSupport.flag("flanged", true),
+				ComponentRecipeSupport.choice("kind", ["PlainBronze", "AntiBacklash", "BallNut"], "AntiBacklash")]),
+			v -> new LeadScrewNut(ComponentRecipeSupport.thread(v), v.integer("boltCount"), v.boolean("flanged"), parseKind(v.token("kind"))));
 		return recipeTypeCache;
 	}
 
 	override public function componentType():Null<ComponentType> return Std.isExactType(this, LeadScrewNut) ? recipeType() : null;
 
 	override public function values():ComponentValues {
-		return ComponentRecipeSupport.threadValues(this.thread).setInteger("boltCount", this.boltCount)
+		return ComponentRecipeSupport.threadValues(this.thread).setInteger("boltCount", this.boltCount).setBoolean("flanged", flanged).setToken("kind", Std.string(kind))
 			.setToken("material", materialSpec());
 	}
 

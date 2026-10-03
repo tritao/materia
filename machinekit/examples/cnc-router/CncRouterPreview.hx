@@ -133,9 +133,11 @@ class CncRouterChecks {
 		checkClear(router, state, [150, 150, -80], ["zPlate", "spindle", "spindleClamp"], ["motorBracketZ", "motorZ", "xPlate", "screwZ"]);
 
 		// Each screw's turn is a lead-screw drive, so its thread sets the ratio.
+		checkClear(router, state, [150, 150, 0], ["screwZNut"], ["xPlate", "zPlate", "motorBracketZ"]);
+		checkClear(router, state, [150, 150, -80], ["screwZNut"], ["xPlate", "zPlate", "motorBracketZ"]);
 		for (screw in ["screwX", "screwYLeft", "screwYRight", "screwZ"]) {
 			var drive = router.transmissionFor(screw + "-lead");
-			if (drive == null || !switch drive.source { case LeadScrew(id, nut): id == screw && nut == null; default: false; })
+			if (drive == null || !switch drive.source { case LeadScrew(id, nut): id == screw && nut == screw + "Nut"; default: false; })
 				throw '$screw should turn through a lead-screw drive';
 		}
 		// Each shaft coupling turns inside its mount's pilot bore, clear of the motor and the mount.

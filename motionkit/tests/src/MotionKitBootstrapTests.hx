@@ -45,6 +45,7 @@ class MotionKitBootstrapTests {
       return;
     }
     if (Sys.getEnv("MOTIONKIT_COREXY_ONLY") == "1") {
+      new CoreXyTests().testTwoBeltCompliance();
       new CoreXyTests().testPlotterDrawsASquare();
       new CoreXyTests().testPlanCheckAddsTheAxesOnASharedMotor();
       Sys.println('CoreXY tests passed (${MotionKitTestSupport.assertions} assertions)');
@@ -69,6 +70,7 @@ class MotionKitBootstrapTests {
     new PlanCheckTests().testEncoderSeesStepperSlip();
     new PlanCheckTests().testLoadSideEncoderReportsPathError();
     new PlanCheckTests().testCompilerRunsPlanCheck();
+    new CoreXyTests().testTwoBeltCompliance();
     new CoreXyTests().testPlotterDrawsASquare();
     new CoreXyTests().testPlanCheckAddsTheAxesOnASharedMotor();
     processTests.testPoseProcessPath();

@@ -3,7 +3,7 @@ package machinekit.assembly;
 /** Parts that define a coupling. The leader is the coordinate motion is planned in. */
 @:wire enum Transmission {
 	/** The nut rides the leader's slide; the screw turns on the follower. */
-	@:id(1) LeadScrew(screw:String, nut:Null<String>);
+	@:id(1) LeadScrew(screw:String, nut:String);
 	/** The driver turns on the leader and meshes with the follower's gear. */
 	@:id(2) GearMesh(driver:String, driven:String);
 	/** The follower's pinion rolls along the leader's rack. */

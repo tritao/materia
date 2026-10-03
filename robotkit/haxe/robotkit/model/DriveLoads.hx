@@ -140,6 +140,7 @@ class DriveLoads {
     var backlash:Array<Float> = [0.0];
     var drag:Array<Float> = [0.0];
     var rigid:Array<Bool> = [true];
+    var combined:Array<Bool> = [false];
     var next = 0;
     while (next < reached.length) {
       var leader = reached[next], leaderRatio = ratios[next];
@@ -157,6 +158,9 @@ class DriveLoads {
         var soft = coupling.stiffness > 0.0;
         compliance.push(compliance[at] + (soft ? 1.0 / (coupling.stiffness * leaderScale * leaderScale) : 0.0));
         rigid.push(rigid[at] && !soft);
+        var terms = 0;
+        for (term in model.couplings) if (term.follower == coupling.follower) terms++;
+        combined.push(combined[at] || terms > 1);
         backlash.push(backlash[at] + coupling.backlash / leaderScale);
         // Drag is in the follower's units; further down the chain it reaches the motor through the ratios.
         drag.push(drag[at] * Math.abs(coupling.ratio) + coupling.drag);
@@ -200,14 +204,21 @@ class DriveLoads {
     // Motors in parallel share the deflection, so their stiffnesses add; one rigid drive makes the
     // axis rigid, whatever softer ones do. Backlash takes the loosest drive.
     var stiffness = 0.0, loose = 0.0, anyRigid = false;
+    var seriesCompliance = 0.0, sharedCoordinates = false;
     for (motor in motors) {
       var index = -1;
       for (candidate in 0...reached.length) if (reached[candidate].id == motor.joint) index = candidate;
+      sharedCoordinates = sharedCoordinates || combined[index];
+      seriesCompliance += motor.share * motor.share * compliance[index];
       if (rigid[index]) anyRigid = true;
       else stiffness += 1.0 / compliance[index];
       loose = Math.max(loose, backlash[index]);
     }
-    load.stiffness = anyRigid ? 0.0 : stiffness;
+    // A summed motor coordinate (CoreXY) depends on every motor path. Reflect each
+    // path's compliance by the square of its force share (strain energy). With equal
+    // shares, K_axis = 4 / (1/K_A + 1/K_B); a rigid belt cannot mask the other belt.
+    load.stiffness = sharedCoordinates ? (seriesCompliance > 0.0 ? 1.0 / seriesCompliance : 0.0)
+      : (anyRigid ? 0.0 : stiffness);
     load.backlash = loose;
     return load;
   }

@@ -19,10 +19,11 @@ import machinekit.component.Solids;
  */
 class LeadScrew extends MachineComponent {
 	/** Resolve the coupling from these parts. */
-	public static function relation(screw:LeadScrew, alignment:Float):machinekit.transmission.TransmissionRelation
+	public static function relation(screw:LeadScrew, nut:LeadScrewNut, alignment:Float):machinekit.transmission.TransmissionRelation {
+		if (screw.thread.designation != nut.thread.designation) throw "Lead screw and nut threads must match";
 		return new machinekit.transmission.TransmissionRelation(2 * Math.PI * alignment / screw.thread.signedLead(),
-			screw.thread.efficiency(), null, machinekit.assembly.DriveDefaults.LEAD_SCREW_BACKLASH,
-			machinekit.assembly.DriveDefaults.LEAD_SCREW_DRAG);
+			nut.efficiency(), null, nut.backlash(), nut.drag());
+	}
 
 	public final thread:LeadScrewThread;
 	public final totalLength:Float;

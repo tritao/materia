@@ -26,7 +26,6 @@ import machinekit.standard.DeepGrooveBearing;
 import machinekit.assembly.LinearAxis;
 import machinekit.assembly.Transmission;
 import machinekit.assembly.Sense;
-import machinekit.assembly.DriveDefaults;
 import machinekit.motion.ScrewSupport;
 import machinekit.transmission.TimingBelt;
 import machinekit.motion.NemaStepper;
@@ -319,7 +318,7 @@ class MachineAssemblyDescriptionTests {
 		if (!switch leadDrive.source { case LeadScrew(screw, nut): screw == "screw" && nut == "nut"; default: false; })
 			throw "The lead screw drive names its screw";
 		var edited:MachineAssemblyDescription = haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(description));
-		edited.machine.members = [for (member in edited.machine.members) member.occurrence != "screw" ? member :
+		edited.machine.members = [for (member in edited.machine.members) (member.occurrence != "screw" && member.occurrence != "nut") ? member :
 			{occurrence: member.occurrence, material: member.material, source: switch member.source {
 				case Typed(id, values): Typed(id, [for (value in values) value.name != "pitch" ? value :
 					{name: "pitch", value: SavedValue.Number(4)}]);
@@ -335,6 +334,7 @@ class MachineAssemblyDescriptionTests {
 		var screwInstance:InstanceElement = null;
 		for (element in document.allElements()) {
 			var id = element.property("cadkit.assembly.id");
+			if (id != null && id.value == "nut") (cast element:InstanceElement).setOverride("pitch", 4);
 			if (id != null && id.value == "screw") screwInstance = cast element;
 		}
 		if (screwInstance == null) throw "The screw is not a document instance";
@@ -346,8 +346,10 @@ class MachineAssemblyDescriptionTests {
 
 	/** A drive's allowances: a screw's critical speed, its nut's backlash and drag, a belt's stiffness. */
 	static function transmissionsCarryAllowances():Void {
-		function near(actual:Float, expected:Float, what:String, tolerance:Float = 1e-9):Void
+		function near(actual:Null<Float>, expected:Float, what:String, tolerance:Float = 1e-9):Void {
+			if (actual == null) throw '$what: missing value';
 			if (!(Math.abs(actual - expected) <= tolerance * Math.max(1, Math.abs(expected)))) throw '$what: $actual, expected $expected';
+		}
 		var thread = new LeadScrewThread(MetricTrapezoidal, 10, 2);
 		near(thread.rootDiameter(), 7.5, "a Tr10 x 2 thread's root is 7.5 mm");
 		var rpm = 60 / (2 * Math.PI);
@@ -377,6 +379,10 @@ class MachineAssemblyDescriptionTests {
 			machine.addTo(model, "");
 			return model.definition("allowances");
 		}
+		function term(machine:MachineAssembly, id:String):materia.assembly.AssemblyDefinition.AssemblyJointCoupling {
+			for (coupling in definition(machine).couplings) if (coupling.id == id) return coupling;
+			throw 'Missing coupling "$id"';
+		}
 		function turnLimit(built:materia.assembly.AssemblyDefinition):Float {
 			for (joint in built.joints) if (joint.id == "turn") {
 				var velocity = joint.limits.velocity;
@@ -387,13 +393,13 @@ class MachineAssemblyDescriptionTests {
 		}
 		var built = definition(assembly);
 		near(turnLimit(built), cap, "the screw's joint is capped at it");
-		var resolved = LeadScrew.relation(long, 1);
+		var resolved = LeadScrew.relation(long, new LeadScrewNut(thread), 1);
 		near(resolved.ratio, 2 * Math.PI / thread.signedLead(), "the screw resolves its ratio and efficiency together");
 		near(resolved.efficiency, thread.efficiency(), "the resolved efficiency comes from the thread");
 		var coupling = built.couplings[0];
 		var backlash = coupling.backlash, drag = coupling.drag, stiffness = coupling.stiffness;
-		near(backlash == null ? 0 : backlash, DriveDefaults.LEAD_SCREW_BACKLASH, "a screw drive has its nut's backlash allowance");
-		near(drag == null ? 0 : drag, DriveDefaults.LEAD_SCREW_DRAG, "and its drag");
+		near(backlash == null ? 0 : backlash, new LeadScrewNut(thread).backlash(), "a screw drive has its nut's backlash allowance");
+		near(drag == null ? 0 : drag, new LeadScrewNut(thread).drag(), "and its drag");
 		if (stiffness != null) throw "A screw drive is rigid until it is given a stiffness";
 		// Rebuilt from the description with a different screw length, the cap follows the part.
 		var description:MachineAssemblyDescription = haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(assembly.describe()));
@@ -413,13 +419,69 @@ class MachineAssemblyDescriptionTests {
 		assembly.addComponent("belt-part", belt);
 		assembly.addMateOnAxis("pulley-turn", "continuous", "base", "face", "pulley", "axis", {x: 0, y: 1, z: 0});
 		assembly.addTransmission("belt", "slide", "pulley-turn", Transmission.TimingBelt("belt-part", "pulley", 0));
-		assembly.setTransmissionStiffness("belt", belt.carriageStiffness(0));
 		var withBelt = definition(assembly);
 		var beltCoupling = withBelt.couplings[1];
 		var beltStiffness = beltCoupling.stiffness, beltDrag = beltCoupling.drag, beltBacklash = beltCoupling.backlash;
 		near(beltStiffness == null ? 0 : beltStiffness, belt.carriageStiffness(0), "the belt's stiffness reaches its coupling");
-		near(beltDrag == null ? 0 : beltDrag, DriveDefaults.BELT_DRAG, "with a belt's drag");
+		near(beltDrag == null ? 0 : beltDrag, TimingBelt.DEFAULT_DRAG, "with a belt's drag");
 		if (beltBacklash != null) throw "A belt has no backlash";
+
+		function changed(memberId:String, field:String, value:SavedValue):MachineAssembly {
+			var description:MachineAssemblyDescription = haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(assembly.describe()));
+			description.machine.members = [for (member in description.machine.members) member.occurrence != memberId ? member :
+				{occurrence: member.occurrence, material: member.material, source: switch member.source {
+					case Typed(id, values): Typed(id, [for (entry in values) entry.name != field ? entry : {name: field, value: value}]);
+					case other: other;
+				}}];
+			return MachineAssembly.fromDescription(description);
+		}
+		near(term(changed("belt-part", "width", SavedValue.Number(12)), "belt").stiffness,
+			2 * belt.carriageStiffness(0), "rebuilt belt stiffness follows its width");
+		var longer = TimingBelt.twoPulley(GT2, 20, 20, 888, 6);
+		near(term(changed("belt-part", "centreDistance", SavedValue.Number(888)), "belt").stiffness,
+			longer.carriageStiffness(0), "rebuilt belt stiffness follows its length");
+		var plain = term(changed("nut", "kind", SavedValue.Token("PlainBronze")), "lead");
+		near(plain.backlash, 0.15, "a changed nut kind changes backlash");
+		near(plain.drag, 0.01, "a changed nut kind changes drag");
+		var ball = term(changed("nut", "kind", SavedValue.Token("BallNut")), "lead");
+		near(ball.efficiency, 0.9, "a changed ball nut changes efficiency");
+		near(ball.backlash, 0.01, "a changed ball nut changes backlash");
+		near(turnLimit(definition(changed("screw", "length", SavedValue.Number(300)))), cap * 4,
+			"a changed screw length recomputes its critical speed");
+		var beltDocument = new Document();
+		var beltRoot = MachineAssemblyDocuments.defineAssembly(beltDocument, assembly);
+		for (element in beltDocument.allElements()) {
+			var id = element.property("cadkit.assembly.id");
+			if (id != null && id.value == "belt-part") (cast element:InstanceElement).setOverride("width", 12);
+		}
+		near(term(MachineAssemblyDocuments.rebuildAssembly(beltDocument.element(beltRoot.id)), "belt").stiffness,
+			2 * belt.carriageStiffness(0), "a document belt edit recomputes stiffness");
+		beltDocument.close();
+		var nested = new MachineAssembly();
+		nested.include("unit", assembly);
+		near(term(nested, "unit/belt").stiffness, belt.carriageStiffness(0), "an included belt keeps its stiffness");
+		near(term(nested, "unit/lead").backlash, 0.05, "an included nut keeps its backlash");
+		var restored = MachineAssembly.decode(nested.encode());
+		near(term(restored.subassemblies()[0].assembly, "belt").stiffness, belt.carriageStiffness(0),
+			"a reconstructed included assembly resolves its belt");
+		assembly.setTransmissionOverrides("belt", 123, 0.2, 0.01);
+		var measured = term(changed("belt-part", "width", SavedValue.Number(12)), "belt");
+		near(measured.stiffness, 123, "a stated stiffness survives a part edit");
+		near(measured.backlash, 0.2, "a stated backlash survives a part edit");
+		near(measured.drag, 0.01, "a stated drag survives a part edit");
+		assembly.setTransmissionOverrides("belt");
+		near(term(assembly, "belt").stiffness, belt.carriageStiffness(0), "clearing an override resolves the part again");
+
+		var gearA = new SpurGear(1, 20, 6, SpurGear.STANDARD_PRESSURE_ANGLE, 0, 0.1);
+		var gearB = new SpurGear(1, 40, 6, SpurGear.STANDARD_PRESSURE_ANGLE, 0, 0.2);
+		near(machinekit.transmission.GearPair.relation(gearA, gearB, 1).backlash, 0.03,
+			"gear tangential backlash becomes driver radians");
+		var rack = new machinekit.transmission.Rack(1, 20, 6, SpurGear.STANDARD_PRESSURE_ANGLE, null, 0.05);
+		near(machinekit.transmission.Rack.relation(gearA, rack, 1).backlash, 0.15,
+			"rack and pinion clearances add in millimetres");
+		near(machinekit.transmission.Rack.relation(gearA, null, 1).backlash, 0.1,
+			"an unmodelled rack still carries the pinion allowance");
+
 	}
 
 	/** A stepper's actuator comes from its ratings and supply, and follows the motor part. */
