@@ -4588,7 +4588,7 @@ class RobotWorldTests {
     var motor = new Actuator("axis-motor", 0.0, 0.0, Transmission.SimpleTransmission("joint/axis", 1.0, 0.0));
     motor.fullStepsPerRevolution = 200.0;
     model.addActuator(motor);
-    var layout = DeviceLayout.forActuators(model, 16);
+    var layout = new DeviceLayout([new DeviceChannel(0, "", motor.id, 1, 16)]);
     var robot:Null<SerialRobot> = null;
     var failed = false;
     try robot = new SerialRobot("serial-probe", model,

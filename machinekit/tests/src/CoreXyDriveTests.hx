@@ -44,7 +44,7 @@ class CoreXyDriveTests {
 		if (!(x.maxAcceleration > y.maxAcceleration && y.maxAcceleration > 20 && x.maxAcceleration < 200))
 			throw 'the carriage should accelerate harder than the gantry it rides on: ${x.maxAcceleration} against ${y.maxAcceleration}';
 		// A controller's step rate caps the motors, and through them both axes: 16 microsteps at 40 kHz is 78.5 rad/s.
-		var binding = DeviceBinding.bind(model, DeviceLayout.forActuators(model, 16), 40000);
+		var binding = DeviceBinding.bind(model, DeviceLayout.forActuators(model), 40000);
 		if (binding.channels.length != 2) throw "the plotter's two motors take two channels";
 		var ceiling = 40000.0 / (200.0 * 16.0 / (2 * Math.PI));
 		near(binding.model.actuators[0].planningRate(), ceiling, "the step rate is each motor's ceiling", 1e-6);

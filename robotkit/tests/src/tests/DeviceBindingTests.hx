@@ -88,10 +88,23 @@ class DeviceBindingTests {
     var restored = robotkit.model.RobotModelCodec.decode(robotkit.model.RobotModelCodec.encode(settings));
     check(restored.actuators[0].microsteps == 32 && restored.actuators[0].maxStepRate == 200000,
       "driver settings survive the robot model codec");
-    check(DeviceLayout.forActuators(restored, 4).channels[0].microsteps == 32,
-      "a model's driver setting takes precedence over legacy layout defaults");
-    check(DeviceLayout.forActuators(axisModel(), 4).channels[0].microsteps == 4,
-      "legacy models retain their explicit layout default");
+    check(DeviceLayout.forActuators(restored).channels[0].microsteps == 32,
+      "an automatic layout derives microsteps from the driver");
+    check(DeviceLayout.forActuators(axisModel()).channels[0].microsteps == 1,
+      "an automatic legacy layout uses full steps");
+    fails(function() DeviceBinding.bind(restored, layout, 40000), "microsteps disagree",
+      "wiring cannot silently override the modelled driver setting");
+    var pulseLimited = axisModel(0.0);
+    pulseLimited.actuators[0].microsteps = 16;
+    pulseLimited.actuators[0].maxStepRate = 10000;
+    var automatic = DeviceLayout.forActuators(pulseLimited);
+    var fastBoard = DeviceBinding.bind(pulseLimited, automatic, 100000);
+    near(fastBoard.channels[0].maxRate, 10000.0 / fastBoard.channels[0].stepsPerUnit,
+      "a faster board clock respects the driver's maximum pulse rate");
+    var slowBoard = DeviceBinding.bind(pulseLimited, automatic, 5000);
+    near(slowBoard.channels[0].maxRate, 5000.0 / slowBoard.channels[0].stepsPerUnit,
+      "a slower board clock remains the pulse ceiling");
+    near(pulseLimited.actuators[0].maxRate, 0.0, "driver binding does not mutate the source model");
     return assertions;
   }
 

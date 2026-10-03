@@ -893,9 +893,9 @@ unchanged; the belt-router diagnostic now names its assumptions. No haxeon chang
 
 ### X8 — Motor, driver and controller
 
-Status: X8a–X8d complete (2026-10-03). X8e pending.
+Status: X8a–X8e complete (2026-10-03).
 
-Planned (2026-10-03); after X7. Today one call mixes three pieces of hardware:
+Implemented (2026-10-03), after X7. Before this milestone, one call mixed three pieces of hardware:
 `MachineAssembly.addMotor(id, joint, motor, volts, margin, gearbox)` takes the supply voltage, the
 torque margin and the gearbox as numbers. Microsteps live in the machining job's `controller`
 (`SceneArtifact`, `CncProgramPlayer`) and reach `DeviceLayout` channels. The step tick rate lives
@@ -1049,6 +1049,34 @@ X8d implementation:
   project-source tests. Rebuild tests cover edited ratio/efficiency/basis, regenerated feedback
   counts, wrong member types and nested member prefixes. Router plate times/deviations, CoreXY
   limits, arm/mobile mission times and the mobile obstacle summary remain unchanged from X8c.
+
+
+X8e implementation:
+
+- Machining jobs retain only `controller.stepTickHz`. Their decoder discards legacy job microsteps,
+  and subsequent saves omit them; driver settings come from the machine's actuator model.
+  `DeviceLayout.forActuators` no longer accepts a global microstep setting. It derives each channel
+  from its actuator, using full steps only for legacy models without driver settings.
+- Explicit channel wiring must agree with modelled microsteps. Legacy RobotModels without the
+  optional driver fields may retain explicit per-channel microsteps; existing device deployments
+  use this representation. Legacy virtual-device fixtures now state their channel wiring directly.
+- Pulse frequency is capped by `min(controller.stepTickHz, driver.maxStepRate)` before conversion
+  to actuator rate. A faster board clock is valid: it idles between pulses. The tightened model
+  supplies that same ceiling to planning and virtual/device execution without changing the source.
+- `SerialDeployment` already has controller identity/timing separate from channel wiring and no
+  global microsteps, so its schema does not change. Runtime protocol and robotd documentation now
+  describe driver-setting agreement and the driver input-rate ceiling.
+- Tests cover model codec settings, mismatched wiring, faster/slower controller clocks, immutable
+  source rates, legacy channel settings and discarding obsolete job settings. The legacy artifact
+  fixture replaces its length-prefixed JSON section: haxeon cannot add fields to a fixed anonymous
+  record or cast a dynamic object into that record. `IrGenerator` lowers a dynamic cast through
+  `checkedCast`/`safeCast`, not structural field reconstruction; reflection delegates to HashLink's
+  existing-field setters. The fixture avoids both restrictions without changing haxeon.
+- Validation: focused ProjectKit passed (100 assertions), then the full `x7-suite-x8e-complete.txt`
+  gate passed every suite, application build and project-source tests. RobotKit world passed
+  4906 assertions and MotionKit 9756. All X8d engineering baselines are unchanged: router plate
+  times 220.2/201.6 s, deviations 0.05/1.89 mm, CoreXY 204.1 rad/s, 649.6 mm/s and 71.6/34 m/s²,
+  arm/mobile mission times and the mobile obstacle summary. No scope remains in X7 or X8.
 
 ### Later
 

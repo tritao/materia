@@ -51,8 +51,9 @@ Serial hosting requires a deployment JSON file (schema v5). It refers to the
 canonical semantic robot model and gives the UART path, baud, `f32` target
 error budget, the `controller` id of the board it is for and a layout. The
 layout wires ordered RKD6 channels to model actuators: each channel names its
-actuator, the driver's `direction` and `microsteps`. The motor's full steps and
-the transmission come from the model; `robotd` joins them in
+actuator, the driver's `direction` and `microsteps`. Microsteps must match the
+model's driver setting when present; legacy models may state them in the layout.
+The motor's full steps, transmission and driver pulse-rate ceiling come from the model; `robotd` joins them in
 `robotkit.device.DeviceBinding` into each channel's joint, ratio, steps per unit
 and rate ceiling, and plans on the model with those ceilings. A stepper with no
 channel, or a channel with no stepper, is refused before the UART opens. When

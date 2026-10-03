@@ -172,10 +172,13 @@ the chip already has, and a configuration change never needs a reflash.
 Deployment schema v5 implies RKD6 and omits `protocol`. Its `device.controller`
 is the 32-hex-digit unique id of the board; the layout wires channels to the
 model's actuators (see `robotkit.device.DeviceBinding`). The motor's full steps
-come from the machine model, direction and microstepping from the layout, and
-the step tick from `device.step_tick_hz`; the binding derives each channel's
+and driver microstepping come from the machine model. The layout states direction
+and confirms the driver's microsteps (legacy models may state them only in the layout).
+The step tick comes from `device.step_tick_hz`; the binding derives each channel's
 steps per radian, ratio, rate ceiling and direction setup, and refuses a
-stepper without a channel or a channel without a stepper. Earlier deployment
+stepper without a channel or a channel without a stepper. Pulse frequency is bounded
+by both the board tick and the driver's maximum step input rate; a faster board clock
+can idle between pulses. Earlier deployment
 versions, which named a compiled `fingerprint`, are rejected. The POSIX serial
 endpoint, virtual endpoint, PTY harness and two-joint Nucleo stub share this
 protocol.

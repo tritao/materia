@@ -199,12 +199,10 @@ typedef SceneArtifactMachining = {
 }
 
 /**
- * The nominal wiring of a machine's stepper drivers: every stepper driven at `microsteps` per full
- * step from a controller that generates at most `stepTickHz` step edges a second per channel. The
- * device binding turns them into each axis's step-rate ceiling.
+ * The controller generates at most `stepTickHz` step edges a second per channel. Driver
+ * microstepping and input-rate limits belong to the machine's actuators; binding combines them.
  */
 typedef SceneArtifactController = {
-	var microsteps:Int;
 	var stepTickHz:Int;
 }
 
@@ -650,8 +648,8 @@ class SceneArtifact {
 		if (machining.target != null && !parts.exists(machining.target))
 			fail('target "${machining.target}" is not one of its parts');
 		var controller = machining.controller;
-		if (controller != null && (controller.microsteps < 1 || controller.microsteps > 256 || controller.stepTickHz < 1))
-			fail("has a controller with no microsteps or step rate");
+		if (controller != null && controller.stepTickHz < 1)
+			fail("has a controller with no step rate");
 	}
 
 	/** A machining job from its JSON section, typed field by field. */
@@ -686,9 +684,9 @@ class SceneArtifact {
 		if (loop != null) machining.loop = Std.isOfType(loop, Bool) ? (loop:Bool) : fail();
 		var controller:Dynamic = Reflect.field(decoded, "controller");
 		if (controller != null) {
-			var microsteps:Dynamic = Reflect.field(controller, "microsteps"), tick:Dynamic = Reflect.field(controller, "stepTickHz");
-			if (!Std.isOfType(microsteps, Int) || !Std.isOfType(tick, Int)) fail();
-			machining.controller = {microsteps: (microsteps:Int), stepTickHz: (tick:Int)};
+			var tick:Dynamic = Reflect.field(controller, "stepTickHz");
+			if (!Std.isOfType(tick, Int)) fail();
+			machining.controller = {stepTickHz: (tick:Int)};
 		}
 		return machining;
 	}

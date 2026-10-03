@@ -863,8 +863,8 @@ class ProjectSourceTests {
     // generate at its microstepping (40 kHz over 3200 steps a turn: 78.5 rad/s), and the screw's
     // critical speed, all through the axis's ratio to the motor.
     var motorSpeed = 2 * 24 / (50 * 2.5e-3 * 2.8);
-    var stepSpeed = controller.stepTickHz / (200.0 * controller.microsteps / (2 * Math.PI));
-    var wired = DeviceBinding.bind(model, DeviceLayout.forActuators(model, controller.microsteps), controller.stepTickHz).model;
+    var stepSpeed = controller.stepTickHz / (200.0 * DeviceLayout.forActuators(model).channels[0].microsteps / (2 * Math.PI));
+    var wired = DeviceBinding.bind(model, DeviceLayout.forActuators(model), controller.stepTickHz).model;
     var steady = new SteadyLoads();
     var derived:Array<String> = [], free:Array<String> = [];
     for (joint in axes) {

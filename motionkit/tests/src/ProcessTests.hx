@@ -465,7 +465,8 @@ class ProcessTests extends MotionKitTestSupport {
     var options = new VirtualDeviceOptions();
     // 200 full steps at 16 microsteps a turn.
     var binding = DeviceBinding.bind(blueprint.model,
-      DeviceLayout.forActuators(blueprint.model, 16, 2), options.stepTickHz);
+      new DeviceLayout([for (index in 0...blueprint.model.actuators.length)
+        new robotkit.device.DeviceChannel(index, "", blueprint.model.actuators[index].id, 1, 16, 2)]), options.stepTickHz);
     near(binding.channels[0].ratio, ratio, "the binding takes the screw's ratio from the model");
     options.actuators = binding.virtualActuators();
     var simulationHarness = new SimulationHarness(0.01);
