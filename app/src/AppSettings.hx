@@ -21,6 +21,9 @@ class AppSettings {
   /** Metres between grid lines, and the snapping step. */
   public static inline var GRID_SPACING:String = "editors/3d/grid/spacing";
 
+  /** Whether a running simulation draws its robots' sensor rays and mission overlays (route, costmap, odometry). */
+  public static inline var SIMULATION_OVERLAYS:String = "editors/3d/simulation/show_overlays";
+
   public static final LIGHTING_PRESETS:Array<String> = ["studio", "soft", "contrast"];
 
   /** A registry holding every setting the editor defines. */
@@ -54,6 +57,10 @@ class AppSettings {
     registry.define(LIGHTING, PropertyType.Enum, PropertyValue.Enum("studio"), lighting);
 
     registry.define(GRID_VISIBLE, PropertyType.Bool, PropertyValue.Bool(true));
+    var overlays = new SettingOptions();
+    overlays.label = "Show Simulation Overlays";
+    overlays.tooltip = "Draw lidar rays, and a mission's route, costmap, sensed obstacles and odometry, while a simulation runs.";
+    registry.define(SIMULATION_OVERLAYS, PropertyType.Bool, PropertyValue.Bool(true), overlays);
     var snap = new SettingOptions();
     snap.tooltip = "Round dragged and placed objects to the grid spacing.";
     registry.define(GRID_SNAP, PropertyType.Bool, PropertyValue.Bool(false), snap);

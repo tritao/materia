@@ -155,6 +155,8 @@ class HumanWorkforce implements SessionMember {
 		}
 	}
 
+	public function beforeReset():Void {}
+
 	public function reset():Void {
 		for (entry in entries) {
 			var worker = entry.worker;

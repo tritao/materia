@@ -12,6 +12,7 @@ import motionkit.event.EventValue;
 import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.PathRequest;
+import motionkit.kinematics.RedundantPathSolver;
 import motionkit.kinematics.Pose3;
 import motionkit.path.OrientationPolicy;
 import motionkit.path.CornerBlender;
@@ -490,11 +491,19 @@ class ProgramCompiler {
     var previous = startQ.copy();
     var pathPoses = [for (sample in samples) sample.primitive.waypointAt(sample.local).pose];
     var selected:Array<Null<Array<Float>>> = [];
+    var redundancyRates:Null<Array<Array<Float>>> = null;
     if (configurationSelector != null)
       for (q in configurationSelector.selectPoses(distances, pathPoses, startQ, ikTolerance)) selected.push(q);
-    else
-      selected = solver.solvePath(new PathRequest(distances, pathPoses, startQ, ikTolerance, perJointMaxJump, maxVelocity,
-        48));
+    else {
+      var request = new PathRequest(distances, pathPoses, startQ, ikTolerance, perJointMaxJump, maxVelocity, 48);
+      // A redundant solver also reports how its redundancy changes along the path it chose, exactly.
+      if (Std.isOfType(solver, RedundantPathSolver)) {
+        var redundant:RedundantPathSolver = cast solver;
+        var solved = redundant.solvePathWithRates(request);
+        selected = solved.configurations;
+        redundancyRates = solved.redundancyRates;
+      } else selected = solver.solvePath(request);
+    }
     for (sample in 0...(count + 1)) {
       var distance = distances[sample];
       var solved = selected[sample];
@@ -519,11 +528,11 @@ class ProgramCompiler {
     for (k in 0...samples.length) {
       var sample = samples[k], q = positions[k];
       var leaving = sample.primitive.derivativesAt(sample.local);
-      var chord = pathChord(distances, positions, k);
-      var rate = jointRate(q, leaving.linear, leaving.angular, chord);
+      var redundancy = redundancyRates == null ? null : redundancyRates[k];
+      var rate = jointRate(q, leaving.linear, leaving.angular, redundancy);
       if (rate == null) throw 'Motion program op $index has no joint velocity along the path at distance ${sample.distance}';
       first.push(rate);
-      second.push(jointCurvature(q, rate, leaving));
+      second.push(jointCurvature(q, rate, leaving, redundancy));
       var arriving = sample.arriving;
       if (arriving == null) secondBefore.push(second[k]);
       else {
@@ -534,7 +543,7 @@ class ProgramCompiler {
           Math.abs(before.angular[axis] - leaving.angular[axis])));
         if (turn > 1e-6)
           throw 'Motion program op $index turns a corner at path distance ${sample.distance}: blend it or stop there';
-        secondBefore.push(jointCurvature(q, rate, before));
+        secondBefore.push(jointCurvature(q, rate, before, redundancy));
       }
     }
     var timed = timing.time(new JointPathSamples(distances, positions, first, second, secondBefore),
@@ -771,32 +780,22 @@ class ProgramCompiler {
 
   /** dq/ds for a pose moving at `linear` and `angular` per metre of path, or null at a singularity. */
   function jointRate(q:Array<Float>, linear:Array<Float>, angular:Array<Float>,
-      ?chord:Array<Float>):Null<Array<Float>>
+      ?redundancyRate:Array<Float>):Null<Array<Float>>
     return solver.solveDifferential(q, new Twist6(linear[0], linear[1], linear[2],
-      angular[0], angular[1], angular[2]), chord);
-
-  /**
-    dq/ds of the solved samples around sample `k`, centred where it can be: a redundant solver takes
-    its self-motion from it, so the rates follow the redundancy the path search chose.
-  **/
-  static function pathChord(distances:Array<Float>, positions:Array<Array<Float>>, k:Int):Array<Float> {
-    var before = k > 0 ? k - 1 : k, after = k + 1 < positions.length ? k + 1 : k;
-    var span = distances[after] - distances[before];
-    return [for (joint in 0...positions[k].length)
-      span > 0.0 ? (positions[after][joint] - positions[before][joint]) / span : 0.0];
-  }
+      angular[0], angular[1], angular[2]), redundancyRate);
 
   /**
     d²q/ds²: how dq/ds changes along the path, from the pose's second
     derivative and the kinematics' change between nearby configurations.
     Exact for a Cartesian machine, whose kinematics do not change.
   **/
-  function jointCurvature(q:Array<Float>, rate:Array<Float>, pose:PoseDerivatives):Array<Float> {
+  function jointCurvature(q:Array<Float>, rate:Array<Float>, pose:PoseDerivatives,
+      ?redundancyRate:Array<Float>):Array<Float> {
     var step = 1e-6;
     function at(sign:Float):Null<Array<Float>>
       return jointRate([for (joint in 0...q.length) q[joint] + sign * step * rate[joint]],
         [for (axis in 0...3) pose.linear[axis] + sign * step * pose.linearSecond[axis]],
-        [for (axis in 0...3) pose.angular[axis] + sign * step * pose.angularSecond[axis]], rate);
+        [for (axis in 0...3) pose.angular[axis] + sign * step * pose.angularSecond[axis]], redundancyRate);
     var ahead = at(1.0), behind = at(-1.0);
     if (ahead == null || behind == null) return [for (_ in q) 0.0];
     return [for (joint in 0...q.length) (ahead[joint] - behind[joint]) / (2.0 * step)];

@@ -4,6 +4,8 @@ import kinematicskit.LinearAlgebra;
 import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.PathRequest;
+import motionkit.kinematics.PathSolution;
+import motionkit.kinematics.RedundantPathSolver;
 import motionkit.kinematics.Pose3;
 import motionkit.kinematics.Twist6;
 import robotkit.manipulation.IKResult;
@@ -23,7 +25,7 @@ import robotkit.spatial.Vec3;
  * chooses the swivel (or a cell's external-axis values) along a whole path
  * with `RedundancyResolver`.
  */
-class ManipulatorKinematics implements KinematicsSolver {
+class ManipulatorKinematics implements RedundantPathSolver {
   /** The group solved: an arm (`Manipulator`), or an arm with external axes and a work frame. */
   public final manipulator:KinematicGroup;
   /**
@@ -140,10 +142,14 @@ class ManipulatorKinematics implements KinematicsSolver {
    * with external axes their values, both through `RedundancyResolver`; a
    * plain arm follows point by point, each sample seeded by the last.
    */
-  public function solvePath(request:PathRequest):Array<Null<Array<Float>>> {
+  public function solvePath(request:PathRequest):Array<Null<Array<Float>>>
+    return solvePathWithRates(request).configurations;
+
+  /** The path and, for a redundant group, the exact rate of its redundancy along it (see `RedundancyResolver`). */
+  public function solvePathWithRates(request:PathRequest):PathSolution {
     var named = parameterization;
-    if (named == null) return request.followPointByPoint(this);
-    return new RedundancyResolver(named).solvePath(this, request);
+    if (named == null) return new PathSolution(request.followPointByPoint(this));
+    return new RedundancyResolver(named).solve(this, request);
   }
 
   /** How the group's redundancy is named, if it has any: its swivel, else its external axes. */
@@ -151,7 +157,7 @@ class ManipulatorKinematics implements KinematicsSolver {
 
 
   public function solveDifferential(q:Array<Float>, twist:Twist6,
-      ?preferredRate:Array<Float>):Null<Array<Float>> {
+      ?redundancyRate:Array<Float>):Null<Array<Float>> {
     if (q == null || q.length != jointCount())
       throw 'Differential IK requires ${jointCount()} joint values';
     if (twist == null) throw "Differential IK requires a tool twist";
@@ -159,35 +165,22 @@ class ManipulatorKinematics implements KinematicsSolver {
     var jacobian = manipulator.tcpJacobian(q);
     var columns = [for (joint in 0...n) joint];
     if (n <= 6) return LinearAlgebra.dampedStep(jacobian, 6, n, columns, twist.toArray(), differentialDamping);
-    var preferred = preferredRate;
-    if (preferred != null && preferred.length != n) throw 'Differential IK preferred rate needs $n values';
     var rows = 6, target = twist.toArray();
-    // The redundancy moves exactly as the preferred rate moves it: its values' rows join the
-    // tool's, G q̇ = G p, as long as they leave a solvable system.
-    var named = preferred == null || parameterization == null ? null : parameterization.valuesJacobian(q);
+    // The redundancy moves exactly at the asked rate: its values' rows join the tool's, G q̇ = ṗ, as long
+    // as they leave a solvable system. A group with redundancy left over takes the smallest rate.
+    var named = redundancyRate == null || parameterization == null ? null : parameterization.valuesJacobian(q);
     if (named != null && 6 + parameterization.dimension() <= n) {
       var extra = parameterization.dimension();
+      var asked:Array<Float> = cast redundancyRate;
+      if (asked.length != extra) throw 'Differential IK redundancy rate needs $extra values';
       for (k in 0...extra) {
-        var rate = 0.0;
-        for (joint in 0...n) {
-          jacobian.push(named[k * n + joint]);
-          rate += named[k * n + joint] * preferred[joint];
-        }
-        target.push(rate);
+        for (joint in 0...n) jacobian.push(named[k * n + joint]);
+        target.push(asked[k]);
       }
       rows += extra;
     }
-    // A redundant group's JᵀJ is rank-deficient: solve in row space instead, for
-    // q̇ = p + A⁺(b - A p), the rate nearest the preferred one p that meets every row.
-    if (preferred != null)
-      for (row in 0...rows) {
-        var made = 0.0;
-        for (joint in 0...n) made += jacobian[row * n + joint] * preferred[joint];
-        target[row] -= made;
-      }
-    var step = LinearAlgebra.dampedRowStep(jacobian, rows, n, columns, target, differentialDamping);
-    if (step == null || preferred == null) return step;
-    return [for (joint in 0...n) step[joint] + preferred[joint]];
+    // A redundant group's JᵀJ is rank-deficient: solve in row space instead.
+    return LinearAlgebra.dampedRowStep(jacobian, rows, n, columns, target, differentialDamping);
   }
 
   function options(tolerance:IkTolerance):IkOptions {

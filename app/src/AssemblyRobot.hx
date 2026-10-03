@@ -195,10 +195,20 @@ class AssemblyRobot {
     // collision phase; the runtime's generic 10 cm robot box is not a part shape.
     converted.model.collisionApproximation = CollisionApproximation.None;
     // Each part collides through its own hull on its body's link, unless the user turned it off.
+    // A wheeled base rolls by its drive plant, which stands for its wheels' contact with the floor: their
+    // hulls would only chatter against the floor and kick the wheel joints the odometry reads.
+    var rolling = new Map<Int, Bool>();
+    if (converted.model.mobileBase != null) switch (converted.model.mobileBase.drive) {
+      case Differential(left, right, _, _):
+        for (joint in converted.model.joints)
+          if (joint.id == left || joint.id == right) rolling.set(converted.model.links.indexOf(joint.child), true);
+      case _:
+    }
     var linkHulls:Array<SimulationLinkHull> = [];
     for (hull in converted.linkHulls) {
       var record = sceneParts.get("project:" + hull.part);
-      if (record != null && record.collisionEnabled) linkHulls.push({link: hull.link, vertices: hull.vertices});
+      if (record != null && record.collisionEnabled && !rolling.exists(hull.link))
+        linkHulls.push({link: hull.link, vertices: hull.vertices});
     }
     if (converted.closureIds.length > 0 && !supportsClosures)
       throw "Assembly closures require MuJoCo equality constraints: " +

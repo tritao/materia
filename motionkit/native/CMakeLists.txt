@@ -66,6 +66,10 @@ set(BUILD_WITH_PINOCCHIO OFF)
 set(BUILD_WITH_qpOASES OFF)
 set(BUILD_WITH_GLPK OFF)
 add_subdirectory(vendor/toppra/cpp EXCLUDE_FROM_ALL)
+# TOPP-RA maps the legacy BUILD_TESTS set above onto the BUILD_TESTING *cache* entry. Left switched off, the
+# next configure of the same tree drops these tests while the first one's CTest files linger, so ctest
+# lists them and reports "Not Run".
+set(BUILD_TESTING ${MK_OWN_BUILD_TESTING} CACHE BOOL "Build tests" FORCE)
 set(BUILD_TESTING ${MK_OWN_BUILD_TESTING})
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 get_target_property(MK_TOPPRA_SOURCES toppra SOURCES)

@@ -467,6 +467,8 @@ class CncProgramPlayer implements SessionMember {
 	}
 
 	/** The session is back at its start, and the robot with it: run the program again on fresh stock. */
+	public function beforeReset():Void {}
+
 	public function reset():Void {
 		slip.reset();
 		encoders.reset([for (_ in robot.model.joints) 0.0]);
