@@ -591,7 +591,7 @@ MT0 ─┬─ MT1 ── MT2 ─┬─ MT4 (reach study) ─┐
 | MT1 | done | 592affc2f, 7d9f192b1, 5e40b76fe, 53248d881 |
 | MT2 | done | 06c9bf5fd, 73a14c58e |
 | MT3 | done | 4d58cd5d3, 8a44aeb53 |
-| MT4 | done | pending commit |
+| MT4 | done | c945a0dc8 |
 | MT5 | planned | |
 | MT6 | planned | |
 | MT7 | planned | |
