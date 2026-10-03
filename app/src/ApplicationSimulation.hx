@@ -160,7 +160,7 @@ class ApplicationSimulation {
       }
       var createdSpace = SimulationSpace.create(backend, timestep);
       candidateSpace = createdSpace;
-      candidate = Simulation.inSession(createdSpace.session);
+      candidate = Simulation.inSpace(createdSpace);
       for (index in 0...models.length) {
         var editable=models[index];
         var blueprint = RobotRuntimeCompiler.compile(editable.model, appliedRevision + 1);

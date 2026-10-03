@@ -648,15 +648,21 @@ class ProgramCompiler {
     if (failure != null) throw failure;
   }
 
-  static function distanceToSegment(point:Pose3, start:Pose3, end:Pose3):Float {
-    var dx = end.x - start.x, dy = end.y - start.y, dz = end.z - start.z;
+  static function distanceToSegment(point:Pose3, start:Pose3, end:Pose3):Float
+    return pointToSegmentDistance(point.x, point.y, point.z, start.x, start.y, start.z,
+      end.x, end.y, end.z);
+
+  /** Distance uses coordinates directly; authored polylines are checked at every trajectory sample. */
+  static function pointToSegmentDistance(px:Float, py:Float, pz:Float,
+      sx:Float, sy:Float, sz:Float, ex:Float, ey:Float, ez:Float):Float {
+    var dx = ex - sx, dy = ey - sy, dz = ez - sz;
     var lengthSquared = dx * dx + dy * dy + dz * dz;
     var fraction = lengthSquared <= 0.0 ? 0.0 : Math.max(0.0, Math.min(1.0,
-      ((point.x - start.x) * dx + (point.y - start.y) * dy +
-        (point.z - start.z) * dz) / lengthSquared));
-    var x = point.x - start.x - fraction * dx;
-    var y = point.y - start.y - fraction * dy;
-    var z = point.z - start.z - fraction * dz;
+      ((px - sx) * dx + (py - sy) * dy +
+        (pz - sz) * dz) / lengthSquared));
+    var x = px - sx - fraction * dx;
+    var y = py - sy - fraction * dy;
+    var z = pz - sz - fraction * dz;
     return Math.sqrt(x * x + y * y + z * z);
   }
 
@@ -665,9 +671,8 @@ class ProgramCompiler {
     for (primitive in geometry.primitives) {
       var candidate = if (Std.isOfType(primitive, LineSegment)) {
         var line:LineSegment = cast primitive;
-        distanceToSegment(point,
-          new Pose3(line.start.x, line.start.y, line.start.z),
-          new Pose3(line.end.x, line.end.y, line.end.z));
+        pointToSegmentDistance(point.x, point.y, point.z,
+          line.start.x, line.start.y, line.start.z, line.end.x, line.end.y, line.end.z);
       } else if (Std.isOfType(primitive, ArcSegment)) {
         var arc:ArcSegment = cast primitive;
         var angle = Math.atan2(point.y - arc.center.y,

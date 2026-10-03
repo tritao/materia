@@ -25,7 +25,7 @@ class SpindleCartridge extends MachineComponent {
 
 	override public function hasGeometry():Bool return true;
 	override public function geometry(detail:ComponentDetail = Preview):Part return Solids.union([
-		Solids.named(Part.cylinderSpan(17, Er20Holder.LENGTH, 30), "nose"),
+		Solids.named(Part.cylinderSpan(Er20Holder.DIAMETER / 2, Er20Holder.LENGTH, 30), "nose"),
 		Solids.named(Part.cylinderSpan(DIAMETER / 2, 30, LENGTH), "body"),
 		Solids.named(Part.cylinderSpan(10, LENGTH, LENGTH + 30), "drive-shaft")]);
 
@@ -44,6 +44,8 @@ class SpindleCartridge extends MachineComponent {
  */
 class Er20Holder extends MachineComponent {
 	public static inline var LENGTH:Float = 25;
+	public static inline var DIAMETER:Float = 34;
+	public static inline var BORE_DIAMETER:Float = 6;
 	public function new() {
 		super("HOLDER-ER20-D6", "ER20 holder, 6 mm collet (assumed envelope)", "steel");
 		addConnector("gaugeLine", Mount, Solids.axial(0, 0, 0));
@@ -51,8 +53,8 @@ class Er20Holder extends MachineComponent {
 	}
 	override public function hasGeometry():Bool return true;
 	override public function geometry(detail:ComponentDetail = Preview):Part return Solids.cut(
-		Solids.named(Part.cylinderSpan(17, 0, LENGTH), "collet-nut"),
-		[Solids.named(Part.cylinderSpan(3, -0.1, LENGTH + 0.1), "tool-bore")]);
+		Solids.named(Part.cylinderSpan(DIAMETER / 2, 0, LENGTH), "collet-nut"),
+		[Solids.named(Part.cylinderSpan(BORE_DIAMETER / 2, -0.1, LENGTH + 0.1), "tool-bore")]);
 	static var holderRecipe:Null<ComponentType>;
 	public static function recipeType():ComponentType {
 		if (holderRecipe == null) holderRecipe = new ComponentType("machinekit.milling.er20-holder", [], v -> new Er20Holder());

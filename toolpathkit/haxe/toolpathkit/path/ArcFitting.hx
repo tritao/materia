@@ -68,9 +68,12 @@ class ArcFitting {
 
   /** The arc through points `from` to `to`, if it stays within `tolerance` of their lines. */
   static function circleThrough(points:Array<Point3>, from:Int, to:Int, tolerance:Float):Null<PathGeometry> {
-    // A circle through three spread points; a closed run's ends coincide, so use thirds.
-    var a = points[from], b = points[from + Std.int((to - from) / 3)],
-      c = points[from + Std.int(2 * (to - from) / 3)];
+    // Open arcs must interpolate both ends: adjoining moves and G-code's modal start
+    // refer to those exact points. Closed runs have coincident ends, so use thirds.
+    var a = points[from], end = points[to];
+    var closed = a.distanceTo(end) <= 1e-12;
+    var b = points[from + Std.int((to - from) / (closed ? 3 : 2))];
+    var c = closed ? points[from + Std.int(2 * (to - from) / 3)] : end;
     var d = 2.0 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
     if (Math.abs(d) < 1e-18) return null;
     var aa = a.x * a.x + a.y * a.y, bb = b.x * b.x + b.y * b.y, cc = c.x * c.x + c.y * c.y;

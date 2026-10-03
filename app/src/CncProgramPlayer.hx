@@ -98,6 +98,8 @@ class CncProgramPlayer implements SessionMember {
 	/** Machine coordinates from the axis joints' positions, and those joints' indices on the robot. */
 	final solver:AxisKinematics;
 	final axisJoints:Array<Int>;
+	/** Peak observed following error per machine axis, metres, aligned with the drive interval end. */
+	public final axisTrackingPeak:Array<Float> = [];
 	var program:MotionProgram;
 	var sourceMap:ToolpathSourceMap;
 	final kindByLine = new Map<Int, MoveKind>();
@@ -177,12 +179,14 @@ class CncProgramPlayer implements SessionMember {
 		var placement = new AssemblyState(definition, state);
 		checkOptions = check == null ? new PlanCheckOptions() : check.copy();
 		var steady = checkOptions.steady;
-		// The controller's step rate caps what the motors could do: the same binding a device deployment makes.
+		// Pulse timing caps stepper channels; servos retain their own motor/driver limits.
 		var machineModel = robot.model;
 		var wiring = job.controller;
-		if (wiring != null)
-			machineModel = DeviceBinding.bind(robot.model, DeviceLayout.forActuators(robot.model),
-				wiring.stepTickHz).model;
+		if (wiring != null) {
+			var pulseLayout = DeviceLayout.forSteppers(robot.model);
+			if (pulseLayout.channels.length > 0)
+				machineModel = DeviceBinding.bind(robot.model, pulseLayout, wiring.stepTickHz).model;
+		}
 		var axes:Array<MotionAxisBlueprint> = [];
 		var start:Array<Float> = [];
 		// Rapids ask for the fastest axis speed; the planner still holds each joint to its own limit.
@@ -282,6 +286,7 @@ class CncProgramPlayer implements SessionMember {
 		var robotIndex = spindleLink.robotIndex;
 		var axisJoint = new Map<String, Int>();
 		for (index in 0...job.axes.length) axisJoint.set(job.axes[index], planning.indices[index]);
+		for (_ in axisJoints) axisTrackingPeak.push(0.0);
 		encoders = new EncoderMonitor(robot.model, [for (_ in robot.model.joints) 0.0]);
 		slip = new StepperSlip(robot.robot.description().couplings, axisJoint,
 			(joint, offset) -> simulation.setJointSlip(robotIndex, joint, offset));
@@ -359,6 +364,11 @@ class CncProgramPlayer implements SessionMember {
 		if (encoders.readings.length > 0) {
 			var seen = robot.robot.snapshot();
 			encoders.observe(seen.positions.toArray(), seen.setpointPositions.toArray(), session.simulationTime());
+			for (axis in 0...axisJoints.length) {
+				var joint = axisJoints[axis];
+				axisTrackingPeak[axis] = Math.max(axisTrackingPeak[axis],
+					Math.abs(seen.positions.get(joint) - seen.setpointPositions.get(joint)));
+			}
 		}
 		var spent = Sys.time() - clock;
 		motionSeconds += spent;
@@ -389,6 +399,7 @@ class CncProgramPlayer implements SessionMember {
 			commandedProvenance = nowProvenance;
 			cuttingSeconds += Sys.time() - clock;
 		}
+
 	}
 
 	/** What the plan checks have found in the plans the machine has started: stall and accuracy findings and how near the drives came. */

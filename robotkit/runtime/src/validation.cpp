@@ -133,6 +133,15 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
                 !is_finite(servo.damping) || servo.damping < 0.0)
                 return RK_ERROR_INVALID_ARGUMENT;
         }
+    if (blueprint->struct_size >= sizeof(*blueprint)) {
+        if (blueprint->coupling_count > RK_MAX_JOINT_COUPLINGS) return RK_ERROR_INVALID_ARGUMENT;
+        for (uint32_t joint = 0; joint < blueprint->joint_count; ++joint)
+            if (!is_finite(blueprint->servo_reflected_inertia[joint]) || blueprint->servo_reflected_inertia[joint] < 0.0)
+                return RK_ERROR_INVALID_ARGUMENT;
+        for (uint32_t coupling = 0; coupling < blueprint->coupling_count; ++coupling)
+            if (!is_finite(blueprint->coupling_stiffness[coupling]) || blueprint->coupling_stiffness[coupling] < 0.0)
+                return RK_ERROR_INVALID_ARGUMENT;
+    }
     constexpr auto channels_size = offsetof(rk_robot_runtime_blueprint, coupling_count);
     if (blueprint->struct_size > offsetof(rk_robot_runtime_blueprint, channel_count) &&
         blueprint->struct_size < channels_size) return RK_ERROR_INVALID_ARGUMENT;
@@ -243,9 +252,15 @@ rk_result RK_CALL rk_robot_command_validate(const rk_robot_command *command) {
     if (command->kind == RK_COMMAND_TRAJECTORY_SEGMENTS && command->target_count != 0)
         return RK_ERROR_INVALID_ARGUMENT;
 
+    if (!is_finite(command->reference_duration) || command->reference_duration < 0.0)
+        return RK_ERROR_INVALID_ARGUMENT;
     bool targeted[RK_MAX_JOINTS]{};
     for (uint32_t index = 0; index < command->target_count; ++index) {
         const auto &target = command->targets[index];
+        if (index < RK_MAX_SERVO_JOINTS &&
+            (!is_finite(command->reference_end_position[index]) || !is_finite(command->reference_end_velocity[index]) ||
+             !is_finite(command->servos[index].velocity)))
+            return RK_ERROR_INVALID_ARGUMENT;
         if (target.joint >= RK_MAX_JOINTS || !valid_target_mode(target.mode) ||
             !is_finite(target.target) || !is_finite(target.max_rate) ||
             !is_finite(target.max_effort) || target.max_rate < 0.0 || target.max_effort < 0.0)

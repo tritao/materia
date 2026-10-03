@@ -13,6 +13,12 @@ class SimWorld {
     var pendingJointTargets:Array<nksim_joint_target> = [];
     var disposed:Bool = false;
 
+    /** Sets drive integration requirements before stepping. */
+    public function configureIntegration(substeps:Int, integrator:Int):Void {
+        check(NativeKitSim.nksim_world_configure_integration(nativeHandle(), substeps, integrator),
+            "world.configureIntegration");
+    }
+
     public function new(scene:Scene, ?options:SimWorldOptions,
             ?nativeOwner:Ownednksim_world) {
         this.scene = scene;

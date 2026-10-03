@@ -445,6 +445,7 @@ class RobotModelCodec {
           {kind: "simple", jointId: jointId, ratio: ratio, offset: offset};
       }
     };
+    if (value.positionLoopRate > 0) record.positionLoopRate = value.positionLoopRate;
     if (value.encoder != "") record.encoder = value.encoder;
     if (value.assumed.length > 0) record.assumed = value.assumed.copy();
     if (value.microsteps != null) record.microsteps = value.microsteps;
@@ -559,6 +560,8 @@ class RobotModelCodec {
     };
     var actuator = new Actuator(text(value, "id"), number(value, "maxEffort"),
       number(value, "maxRate"), parsed);
+    if (Reflect.hasField(value, "positionLoopRate"))
+      actuator.positionLoopRate = nonNegative(number(value, "positionLoopRate"), "actuator positionLoopRate");
     actuator.servoStiffness = nonNegative(number(value, "servoStiffness"), "actuator servoStiffness");
     actuator.servoDamping = nonNegative(number(value, "servoDamping"), "actuator servoDamping");
     // Absent in models saved before steppers were recorded: not a stepper.

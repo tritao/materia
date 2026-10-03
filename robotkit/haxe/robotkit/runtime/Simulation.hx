@@ -52,6 +52,15 @@ class Simulation {
   }
 
   /** Attaches robots to a stopped session the caller owns, steps, and outlives. */
+  var space:Null<SimulationSpace> = null;
+
+  /** Attaches robots and lets their drives configure the owned physics world. */
+  public static function inSpace(space:SimulationSpace):Simulation {
+    var result = new Simulation(space.session);
+    result.space = space;
+    return result;
+  }
+
   public static function inSession(session:SimSession):Simulation
     return new Simulation(session);
 
@@ -103,6 +112,7 @@ class Simulation {
       ?toolLink:Int, ?toolMargin:Float, ?toolGap:Float, ?linkHulls:Array<SimulationLinkHull>,
       holdAtRest:Bool = false):RobotRuntime {
     ensureLive();
+    if (space != null) space.requireDrives(blueprint);
     var robotDesc:Null<rk_simulation_robot_desc> = null;
     if (initialPose != null || virtualDevice != null) {
       robotDesc = new rk_simulation_robot_desc();

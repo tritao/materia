@@ -115,6 +115,14 @@ class RobotRuntimeCompiler {
             var damping = actuator.servoDamping > 0.0 ? actuator.servoDamping : ServoDrive.defaultDamping(stiffness);
             compiled.servoStiffness += stiffness * ratio * ratio;
             compiled.servoDamping += damping * ratio * ratio;
+            compiled.positionLoopRate = Math.max(compiled.positionLoopRate, actuator.positionLoopRate);
+            for (load in robotkit.model.DriveLoads.of(robot))
+              if (load.motors.length == 1) {
+                var motor = load.motors[0];
+                if (motor.actuator.id == actuator.id)
+                  compiled.reflectedInertia += (motor.rotorInertia + load.mass / (motor.ratio * motor.ratio))
+                    * ratio * ratio;
+              }
           case _:
         }
       compiled.armature = joint.armature;
@@ -144,8 +152,10 @@ class RobotRuntimeCompiler {
         if (robot.joints[index].id == coupling.leader) leader = index;
         if (robot.joints[index].id == coupling.follower) follower = index;
       }
-      result.couplings.push(new RobotRuntimeJointCouplingBlueprint(
-        leader, follower, coupling.ratio, coupling.offset));
+      var compiledCoupling = new RobotRuntimeJointCouplingBlueprint(
+        leader, follower, coupling.ratio, coupling.offset);
+      compiledCoupling.stiffness = coupling.stiffness / (coupling.ratio * coupling.ratio);
+      result.couplings.push(compiledCoupling);
     }
     var children = [for (joint in robot.joints) joint.child];
     var root = robot.links[0];

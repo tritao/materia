@@ -21,6 +21,8 @@ class Actuator {
    */
   public var servoStiffness:Float = 0.0;
   public var servoDamping:Float = 0.0;
+  /** Position-loop frequency supplied by the driver, Hz; zero when unspecified. */
+  public var positionLoopRate:Float = 0.0;
   /**
    * What kind of motor this is and what it can deliver, or null for a bare effort and rate. For a
    * stepper or a servo, `maxEffort` and `maxRate` are the torque and speed a planner may rely

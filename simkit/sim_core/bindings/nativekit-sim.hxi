@@ -275,6 +275,7 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	extern fn nksim_world_reset(world: nksim_world) -> nksim_result;
 	extern fn nksim_world_set_joint_targets(world: nksim_world, targets: ptr<const<nksim_joint_target>> @in_array("count"), count: u32) -> nksim_result;
 	extern fn nksim_world_snapshot(world: nksim_world, out_snapshot: ptr<nksim_snapshot> @out @owned) -> nksim_result;
+	extern fn nksim_world_configure_integration(world: nksim_world, substeps: u32, integrator: u32) -> nksim_result;
 	extern fn nksim_world_step(world: nksim_world, out_result: ptr<nksim_step_result> @inout) -> nksim_result;
 	/**
 	 * One kinematic body of an actor.
@@ -384,12 +385,13 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	/**
 	 * Follower = ratio * leader + offset, in joint coordinates.
 	 */
-	struct nksim_joint_coupling_desc @layout(32, 8) {
+	struct nksim_joint_coupling_desc @layout(40, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		leader: nksim_joint @offset(4);
 		follower: nksim_joint @offset(8);
 		ratio: f64 @offset(16);
 		offset: f64 @offset(24);
+		stiffness: f64 @offset(32);
 	}
 	struct nksim_joint_desc @layout(288, 8) {
 		struct_size: u32 @offset(0) @struct_size;
@@ -431,7 +433,7 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		reserved0: u32 @offset(32);
 		reserved: array<u64, 2> @offset(40);
 	}
-	struct nksim_joint_target @layout(64, 8) {
+	struct nksim_joint_target @layout(96, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		joint: nksim_joint @offset(4);
 		mode: u32 @offset(8);
@@ -441,6 +443,10 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		stiffness: f64 @offset(40);
 		damping: f64 @offset(48);
 		feedforward: f64 @offset(56);
+		end_position: f64 @offset(64);
+		end_velocity: f64 @offset(72);
+		reference_duration: f64 @offset(80);
+		reflected_inertia: f64 @offset(88);
 	}
 	struct nksim_object_desc @layout(160, 8) {
 		struct_size: u32 @offset(0) @struct_size;

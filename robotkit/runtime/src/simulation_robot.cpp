@@ -116,14 +116,18 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
             target.target += slip_[source.joint];
         if (source.mode == RK_TARGET_POSITION && source.joint < servo_.size() &&
             servo_[source.joint].stiffness > 0.0) {
-            // A servo motor tracks the position with its gains, and the speed the positions imply.
+            // The drive interpolates the analytic trajectory reference within this cycle.
             const auto &gains = servo_[source.joint];
-            const auto &previous = staged[source.joint];
             target.mode = NKSIM_JOINT_TARGET_SERVO;
             target.stiffness = gains.stiffness;
             target.damping = gains.damping;
-            target.velocity = previous.mode == NKSIM_JOINT_TARGET_SERVO && step_ > 0.0
-                ? (target.target - previous.target) / step_ : 0.0;
+            if (index < RK_MAX_SERVO_JOINTS) {
+                target.velocity = command.servos[index].velocity;
+                target.end_position = command.reference_end_position[index];
+                target.end_velocity = command.reference_end_velocity[index];
+                target.reference_duration = command.reference_duration;
+                target.reflected_inertia = reflected_inertia_[source.joint];
+            }
         }
         if (source.mode == RK_TARGET_SERVO) {
             const auto &servo = command.servos[index];

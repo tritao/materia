@@ -80,6 +80,11 @@ struct JointRecord {
     double target_stiffness = 0.0;
     double target_damping = 0.0;
     double target_feedforward = 0.0;
+    double end_position = 0.0;
+    double end_velocity = 0.0;
+    double reflected_inertia = 0.0;
+    double reference_duration = 0.0;
+    double reference_epoch = 0.0;
 };
 
 double dot(const Vec3 &a, const Vec3 &b) {
@@ -725,6 +730,11 @@ public:
             record.target_stiffness = targets[index].stiffness;
             record.target_damping = targets[index].damping;
             record.target_feedforward = targets[index].feedforward;
+            record.end_position = targets[index].end_position;
+            record.end_velocity = targets[index].end_velocity;
+            record.reflected_inertia = targets[index].reflected_inertia;
+            record.reference_duration = targets[index].reference_duration;
+            record.reference_epoch = data ? data->time : 0.0;
         }
         return NKSIM_OK;
     }
@@ -805,10 +815,40 @@ public:
         }
     }
 
+    nksim_result configure_integration(std::uint32_t integrator) override {
+        const int selected = integrator == NKSIM_INTEGRATOR_IMPLICIT_FAST ? mjINT_IMPLICITFAST
+            : integrator == NKSIM_INTEGRATOR_RK4 ? mjINT_RK4 : mjINT_EULER;
+        spec->option.integrator = selected;
+        if (model) model->opt.integrator = selected;
+        return NKSIM_OK;
+    }
+
     nksim_result step(double dt, std::uint32_t substeps) override {
         if (!model || !data || !std::isfinite(dt) || dt <= 0.0 || substeps == 0)
             return NKSIM_ERROR_INVALID_ARGUMENT;
         model->opt.timestep = dt / static_cast<double>(substeps);
+        // MuJoCo solref uses mass-normalised stiffness. Derive its time constant
+        // from the follower inertia and transmission stiffness, never below 2 dt.
+        for (const auto &coupling : couplings) {
+            double compliance = 0.0;
+            bool specified = true;
+            for (const auto &term : couplings) if (term.follower == coupling.follower) {
+                if (term.stiffness > 0.0) compliance += 1.0 / term.stiffness;
+                else specified = false;
+            }
+            if (!specified || compliance <= 0.0) continue;
+            const auto &follower = joints.at(coupling.follower);
+            const int jid = model_joint_id(follower);
+            const std::string name = "nksim_drive_coupling_" + std::to_string(coupling.follower);
+            const int equality = mj_name2id(model, mjOBJ_EQUALITY, name.c_str());
+            if (jid < 0 || equality < 0) continue;
+            const int dof = model->jnt_dofadr[jid];
+            const double inverse_inertia = model->dof_invweight0[dof];
+            if (!(inverse_inertia > 0.0)) continue;
+            model->eq_solref[2 * equality] = std::max(2.0 * model->opt.timestep,
+                std::sqrt(compliance / inverse_inertia));
+            model->eq_solref[2 * equality + 1] = 1.0;
+        }
         const auto drives = kinematic_drives();
         for (std::uint32_t index = 0; index < substeps; ++index) {
             if (!drives.empty())
@@ -1141,6 +1181,8 @@ private:
                 const auto leader = joints.find(coupling.leader);
                 auto *equality = mjs_addEquality(spec, nullptr);
                 if (!equality) return NKSIM_ERROR_OUT_OF_MEMORY;
+                const std::string name = "nksim_drive_coupling_" + std::to_string(coupling.follower);
+                mjs_setName(equality->element, name.c_str());
                 equality->type = mjEQ_JOINT;
                 equality->objtype = mjOBJ_JOINT;
                 mjs_setString(equality->name1, follower->second.name.c_str());
@@ -1167,6 +1209,8 @@ private:
             }
             auto *equality = mjs_addEquality(spec, nullptr);
             if (!equality) return NKSIM_ERROR_OUT_OF_MEMORY;
+            const std::string name = "nksim_drive_coupling_" + std::to_string(coupling.follower);
+            mjs_setName(equality->element, name.c_str());
             equality->type = mjEQ_TENDON;
             equality->objtype = mjOBJ_TENDON;
             mjs_setString(equality->name1, tendon_name.c_str());
@@ -1902,17 +1946,37 @@ private:
                 const bool servoing = joint.target_mode == NKSIM_JOINT_TARGET_SERVO;
                 auto *servo_gain = model->actuator_gainprm + mjNGAIN * servo;
                 auto *servo_bias = model->actuator_biasprm + mjNBIAS * servo;
+                double reference = joint.target, velocity = joint.target_velocity, acceleration = 0.0;
+                if (joint.reference_duration > 0.0) {
+                    const double duration = joint.reference_duration;
+                    const double t = std::clamp(data->time - joint.reference_epoch, 0.0, duration);
+                    // Hermite in dimensional time: q(t) = q0 + v0 t + c2 t² + c3 t³.
+                    const double delta = joint.end_position - joint.target;
+                    const double c2 = (3.0 * delta / duration - 2.0 * joint.target_velocity
+                        - joint.end_velocity) / duration;
+                    const double c3 = (-2.0 * delta / duration + joint.target_velocity
+                        + joint.end_velocity) / (duration * duration);
+                    reference += t * (joint.target_velocity + t * (c2 + t * c3));
+                    velocity += t * (2.0 * c2 + 3.0 * t * c3);
+                    acceleration = 2.0 * c2 + 6.0 * t * c3;
+                }
                 servo_gain[0] = servoing ? joint.target_stiffness : 0.0;
                 servo_bias[0] = servoing
-                    ? joint.target_damping * joint.target_velocity + joint.target_feedforward : 0.0;
+                    ? joint.target_damping * velocity + joint.target_feedforward
+                        + joint.reflected_inertia * acceleration : 0.0;
                 servo_bias[1] = servoing ? -joint.target_stiffness : 0.0;
                 servo_bias[2] = servoing ? -joint.target_damping : 0.0;
-                data->ctrl[servo] = servoing ? joint.target : 0.0;
+                data->ctrl[servo] = servoing ? reference : 0.0;
                 // Every mode clamps to this same bound, so a joint-level clamp
                 // changes nothing for the motor's already-clamped torque.
                 const auto joint_model = model_joint_id(joint);
                 const auto limit = joint.target_max_force > 0.0
                     ? joint.target_max_force : joint.desc.max_force;
+                // MuJoCo's implicit derivative recognises actuator force saturation. A
+                // joint-only clamp leaves the full damping derivative active after saturation.
+                model->actuator_forcelimited[servo] = limit > 0.0 ? 1 : 0;
+                model->actuator_forcerange[2 * servo] = limit > 0.0 ? -limit : 0.0;
+                model->actuator_forcerange[2 * servo + 1] = limit > 0.0 ? limit : 0.0;
                 if (joint_model >= 0) {
                     model->jnt_actfrclimited[joint_model] = limit > 0.0 ? 1 : 0;
                     model->jnt_actfrcrange[2 * joint_model] = limit > 0.0 ? -limit : 0.0;

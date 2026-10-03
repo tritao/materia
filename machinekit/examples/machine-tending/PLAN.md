@@ -242,6 +242,61 @@ Done. What was built and decided:
 - Start-page entry.
 - `ProjectSourceTests.checkBenchMill` mirrors `checkCncRouter`: removed volume within 2 % of closed form, no gouge, `rapidContacts == 0`, `collisions == 0`, allocation budget, no stalls.
 
+Done. What was built and decided:
+- X/Y are moving-table coordinates: the table and saddle move against their positive CNC axes,
+  while the head moves with Z. The zero poses derive from rail/block heights, casting seats,
+  cartridge mount and tool length; overtravel is measured from rail room.
+- Fitting the swept saddle and real bearing supports changed the designed base depth to 550 mm
+  and saddle depth to 130 mm. The X nut needs matching clearance recesses in the saddle and
+  table; its flange adapter and the Y screw bore share dimensions with `BallNut`.
+- SFU1605 now has assumed 12 mm machined journals (50 mm input, 25 mm output), so the BK12/BF12
+  seats and coupling fit physical shaft surfaces. Screw speed still conservatively uses full length.
+- The single-tool exercise has a 22 mm seat 7 mm deep, two blind 10 mm fastening recesses 5 mm
+  deep, and a 12 × 8 mm contour pocket 3 mm deep with 3.5 mm corners. Blind recesses keep this
+  first setup a single 6 mm tool exercise. The seat is centred; the contour is forward of it,
+  leaving the back-corner toe clamps clear. CAM reads pocket boundaries and floors from the solid.
+- The CNC player previously applied a pulse-channel binding to every actuator, which rejected
+  servo motors. It now derives pulse channels only for steppers and retains the servo motor/driver
+  limits; mixed-drive binding tests cover this. RobotKit world assertions grow from 4926 to 4930.
+- The rounded contour exposed an open-arc fitting defect: approximating the last vertex
+  moved the fitted endpoint, making the following G-code arc inconsistent with its modal start.
+  Open fits now interpolate both endpoints; closed-circle fits keep their existing construction.
+  Three regression assertions raise CamKit from 12308 to 12311. The full gate preserves both
+  router cycle times, removal, plan checks and tracking deviations.
+- A contour corner exactly equal to the cutter radius collapses the sampled polygon offset.
+  Giving the contour a larger designed radius avoids that degeneration without changing CamKit.
+
+- Keep the controller period at 10 ms. The runtime supplies exact polynomial position and velocity
+  at both tick endpoints. The drive evaluates their cubic Hermite interpolant at physics substeps,
+  and adds reflected inertia times its second derivative as torque feedforward. Endpoint prediction
+  shares the existing hold/resume clock integration; straight stop ramps supply their analytic endpoints.
+  Reported servo-machine setpoints use the interval end, matching the measured physics timestamp.
+- The generic servo amplifier assumes a 4000 Hz position loop. The blueprint reports the fastest
+  specified loop and a conservative gain/inertia interval of `0.5 sqrt(J/k)`. SimulationSpace chooses
+  the stricter interval and implicit-fast integration; ApplicationSimulation only attaches the space.
+  The driver rate is optional assembly field 23 and survives nested assembly flattening.
+- Coupling stiffness comes from the X7 transmission relation, converted to follower coordinates
+  (`k_follower = k_leader / ratio²`). MuJoCo derives critical-damping solref from follower inertia,
+  with a lower time constant of twice the physics timestep. No transmission-wide hardening override.
+  See [MuJoCo solver parameters](https://mujoco.readthedocs.io/en/stable/modeling.html#solver-parameters).
+- A HashLink allocation census identified over ten million temporary endpoint `Pose3` objects
+  in the authored-path distance check. Evaluate point-to-line distance directly from coordinates,
+  preserving its arithmetic, task-space samples and tolerance. No allocation budget or tick change.
+- Native tests cover Hermite tracking of an accelerating reference at 10 ms, force saturation with
+  implicit integration, and matching tick endpoints across hold/resume/stop and a queued replan. All native MuJoCo and
+  runtime tests pass, including normal queue underflow and a stop that outlives the queued path.
+- The 72-member mill derives X rapid 15.10 m/min and Y/Z rapid 25.00 m/min; acceleration limits
+  are X 30.06, Y 31.09 and Z 30.03 m/s². The job cuts at 1.2 m/min with an 8000 rpm spindle.
+- At the 10 ms controller period, the drive requires an interval no longer than 0.248589 ms:
+  41 physics substeps. Peak tracking error is X 0.07537, Y 0.05032 and Z 0.02937 mm.
+- The bearing block takes 49.98 s: 3716.58 of 3702.78 mm³ removed, leftover 7.22 mm³, gouge
+  0.58 mm³ (within the 1 mm³ numerical cutting allowance), no rapid contacts or collisions.
+  Its 77 plans include 56 flagged plans: 42 peak-torque and 35 rated-RMS-torque findings.
+  There are no stalls or accuracy findings. These torque findings remain visible sizing limits.
+- Allocation is 68 KB per controller tick, below the unchanged 80 KB budget. All kit suites,
+  MachineKit smoke and the full application gate pass; existing router, belt router, CoreXY,
+  arm, mobile-base and welder measurements are unchanged. Only the added assertion counts grow.
+
 **MT3. Cobot arm size classes.**
 - **Joint modules.** `CobotJoint` (`machinekit.robotics`) is a housing with a stator connector and a rotor connector.
   - It contains a `ServoMotor` with a `Gearbox` (strain-wave, ratio about 100, efficiency assumed), plus an output encoder through `addEncoder` (X6d).
@@ -450,8 +505,8 @@ MT0 ─┬─ MT1 ── MT2 ─┬─ MT4 (reach study) ─┐
 | Step | State | Commits |
 |---|---|---|
 | MT0 | done: main and X7+X8 merged | c5438ba4d, 8ad034403 |
-| MT1 | done | 592affc2f, 7d9f192b1, 5e40b76fe |
-| MT2 | planned | |
+| MT1 | done | 592affc2f, 7d9f192b1, 5e40b76fe, 53248d881 |
+| MT2 | done | |
 | MT3 | planned | |
 | MT4 | planned | |
 | MT5 | planned | |

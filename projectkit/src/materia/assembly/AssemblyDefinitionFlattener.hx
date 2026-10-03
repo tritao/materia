@@ -109,6 +109,7 @@ class AssemblyDefinitionFlattener {
 		if (actuator.fullStepsPerRevolution != null) copy.fullStepsPerRevolution = actuator.fullStepsPerRevolution;
 		if (actuator.microsteps != null) copy.microsteps = actuator.microsteps;
 		if (actuator.maxStepRate != null) copy.maxStepRate = actuator.maxStepRate;
+		if (actuator.positionLoopRate != null) copy.positionLoopRate = actuator.positionLoopRate;
 		if (actuator.drive != null) copy.drive = actuator.drive;
 		if (actuator.torqueSpeed != null) copy.torqueSpeed = actuator.torqueSpeed.copy();
 		if (actuator.holdingTorque != null) copy.holdingTorque = actuator.holdingTorque;

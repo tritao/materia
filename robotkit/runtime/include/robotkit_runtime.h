@@ -87,7 +87,7 @@ enum {
     RK_PROCESS_CHANNEL_ID_BYTES = 48,
     RK_PROCESS_COMMAND_BYTES = 48,
     RK_MAX_JOINT_COUPLINGS = 512,
-    RK_API_VERSION = 24 /**< A joint may have several couplings: it follows the sum of their terms. */
+    RK_API_VERSION = 25 /**< Servo drive endpoint references and physical coupling stiffness. */
 };
 
 /** Result returned by RobotKit C ABI functions. */
@@ -475,6 +475,10 @@ typedef struct rk_robot_runtime_blueprint {
     double joint_overtravel[RK_MAX_JOINTS];
     /** Versioned: absent means no servo motor joints. Indexed by joint. */
     rk_robot_joint_servo joint_servo[RK_MAX_JOINTS];
+    /** Joint-coordinate inertia known to the servo drive, for acceleration feedforward. */
+    double servo_reflected_inertia[RK_MAX_JOINTS];
+    /** Coupling stiffness in follower-coordinate effort per unit of follower travel. */
+    double coupling_stiffness[RK_MAX_JOINT_COUPLINGS];
 } rk_robot_runtime_blueprint;
 
 /* ------------------------------------------------------------------------- */
@@ -576,6 +580,11 @@ typedef struct rk_robot_command {
      * the deadline. Position, effort and servo targets hold their value.
      */
     uint64_t expires_at_ns;
+    /** Analytic trajectory end state, parallel to targets. Start velocity is in servos.
+     * A positive duration requests cubic Hermite interpolation; zero holds the direct target. */
+    double reference_end_position[RK_MAX_SERVO_JOINTS];
+    double reference_end_velocity[RK_MAX_SERVO_JOINTS];
+    double reference_duration;
 } rk_robot_command;
 
 /** Mutable native state used internally while a runtime publishes a snapshot. */

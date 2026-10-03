@@ -191,6 +191,8 @@ enum abstract AssemblyMateKind(String) from String to String {
 	/** Driver setting and input ceiling; absent for legacy and non-stepper actuators. */
 	@:id(21) @:optional var microsteps:Null<Int>;
 	@:id(22) @:optional var maxStepRate:Null<Float>;
+	/** Servo driver position-loop frequency in Hz; absent for other actuators. */
+	@:id(23) @:optional var positionLoopRate:Null<Float>;
 }
 
 /**

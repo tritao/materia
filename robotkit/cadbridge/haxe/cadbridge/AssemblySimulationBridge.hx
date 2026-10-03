@@ -304,6 +304,7 @@ class AssemblySimulationBridge {
       else if (actuator.drive == "servo" && rated != null && peak != null && ratedSpeed != null && topSpeed != null)
         added.drive = new ServoDrive(rated, peak, ratedSpeed, topSpeed, inertia,
           actuator.encoderCounts == null ? 0.0 : actuator.encoderCounts, curve);
+      if (actuator.positionLoopRate != null) added.positionLoopRate = actuator.positionLoopRate;
       if (actuator.servoStiffness != null) added.servoStiffness = actuator.servoStiffness;
       if (actuator.servoDamping != null) added.servoDamping = actuator.servoDamping;
       // The encoder that reads the motor is its own sensor; a servo that names one does not also hold a count.

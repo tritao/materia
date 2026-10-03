@@ -533,7 +533,7 @@ nksim_result World::set_joint_targets(const nksim_joint_target *targets, std::ui
     for (std::uint32_t index = 0; index < count; ++index) {
         // The servo terms are an optional tail; older callers stop before it.
         const auto &source = targets[index];
-        const bool has_servo = source.struct_size >= sizeof(source);
+        const bool has_servo = source.struct_size >= offsetof(nksim_joint_target, end_position);
         if (!valid_struct_size(source.struct_size, offsetof(nksim_joint_target, velocity)))
             return NKSIM_ERROR_INVALID_ARGUMENT;
         if (source.mode < NKSIM_JOINT_TARGET_POSITION || source.mode > NKSIM_JOINT_TARGET_SERVO ||
@@ -557,6 +557,16 @@ nksim_result World::set_joint_targets(const nksim_joint_target *targets, std::ui
             target.stiffness = source.stiffness;
             target.damping = source.damping;
             target.feedforward = source.feedforward;
+            if (source.struct_size >= sizeof(source)) {
+                if (!std::isfinite(source.end_position) || !std::isfinite(source.end_velocity) ||
+                    !std::isfinite(source.reflected_inertia) || source.reflected_inertia < 0.0 ||
+                    !std::isfinite(source.reference_duration) || source.reference_duration < 0.0)
+                    return NKSIM_ERROR_INVALID_ARGUMENT;
+                target.end_position = source.end_position;
+                target.end_velocity = source.end_velocity;
+                target.reflected_inertia = source.reflected_inertia;
+                target.reference_duration = source.reference_duration;
+            }
         }
         backend_targets.push_back(target);
     }
@@ -1139,8 +1149,10 @@ nksim_result World::couple_joint(const nksim_joint_coupling_desc &desc) {
     if (!leader || !follower) return NKSIM_ERROR_INVALID_HANDLE;
     if (leader->desc.type == NKSIM_JOINT_FIXED || follower->desc.type == NKSIM_JOINT_FIXED)
         return NKSIM_ERROR_INVALID_ARGUMENT;
+    const double stiffness = desc.struct_size >= sizeof(desc) ? desc.stiffness : 0.0;
+    if (!std::isfinite(stiffness) || stiffness < 0.0) return NKSIM_ERROR_INVALID_ARGUMENT;
     return backend->joint_couple({leader->backend_joint, follower->backend_joint,
-                                  desc.ratio, desc.offset});
+                                  desc.ratio, desc.offset, stiffness});
 }
 
 nksim_result World::create_closure(const nksim_closure_desc &desc) {
@@ -1231,6 +1243,17 @@ nksim_result create_world_with_backend(const nksim_world_desc &provided,
 
 } // namespace nksim
 
+nksim_result nksim::World::configure_integration(std::uint32_t substeps, std::uint32_t integrator) {
+    if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
+    if (clock.time != 0.0) return NKSIM_ERROR_INVALID_STATE;
+    if (substeps == 0 || integrator > NKSIM_INTEGRATOR_RK4) return NKSIM_ERROR_INVALID_ARGUMENT;
+    const auto result = backend->configure_integration(integrator);
+    if (result != NKSIM_OK) return result;
+    world_desc.physics_substeps = substeps;
+    world_desc.integrator = integrator;
+    return NKSIM_OK;
+}
+
 extern "C" {
 
 nksim_result NKSIM_CALL nksim_world_create(const nksim_world_desc *desc,
@@ -1250,6 +1273,12 @@ void NKSIM_CALL nksim_world_destroy(nksim_world world) {
     auto &state = nksim::registry();
     std::lock_guard lock(state.mutex);
     state.worlds.remove(world);
+}
+
+nksim_result NKSIM_CALL nksim_world_configure_integration(nksim_world world,
+        uint32_t substeps, uint32_t integrator) {
+    const auto value = nksim::resolve_world(world);
+    return value ? value->configure_integration(substeps, integrator) : NKSIM_ERROR_INVALID_HANDLE;
 }
 
 nksim_result NKSIM_CALL nksim_world_step(nksim_world world, nksim_step_result *out_result) {

@@ -1140,6 +1140,78 @@ class ProjectSourceTests {
   static var screwRouterSeconds = 0.0;
   static var screwRouterDeviation = 0.0;
 
+  /** The moving-table mill machines its single-tool bearing block in the shared backend. */
+  static function checkBenchMill(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/bench-mill/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var definition:AssemblyDefinition = cast(generated.assemblyDefinition, AssemblyDefinition);
+    var model = AssemblySimulationBridge.toRobotModel(definition, generated.physical).model;
+    var axes = [for (joint in model.joints) if (joint.type == JointType.Prismatic) joint];
+    check([for (joint in axes) Std.string(joint.id)].join(",") == "y,x,z", "mill has three mechanical axes");
+    var blueprint = RobotRuntimeCompiler.compile(model);
+    check(blueprint.fastestPositionLoopRate() == 4000, "mill driver loop rate survives project generation");
+    check(blueprint.servoStabilityInterval() > 0 && Math.isFinite(blueprint.servoStabilityInterval()),
+      "mill servo stability bound comes from its reflected inertia");
+    var limits:Array<String> = [];
+    for (joint in axes) {
+      var rate = model.coupledLimits(joint.id, new SteadyLoads());
+      check(rate.velocity >= 8.0 / 60, 'mill ${joint.id} rapid reaches 8 m/min, got ${rate.velocity}');
+      limits.push('${joint.id}: ${Math.round(rate.velocity * 6000) / 100} m/min, ${Math.round(rate.maxAcceleration * 100) / 100} m/s²');
+    }
+    Sys.println('bench mill derived limits: ${limits.join("; ")}');
+    var session = new ProjectDocumentSession(null, false);
+    var simulation = new ApplicationSimulation(new RobotWorld());
+    session.openGeneratedScene(generated.objects, manifest, generated.assembly,
+      generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
+      generated.localCentersByDefinition, generated.metresPerUnit, generated.physical,
+      generated.recipeDocument, generated.robotMotions, null, generated.cncJob);
+    simulation.setBackend(ApplicationSimulation.MUJOCO);
+    try {
+      check(simulation.rebuild(session.sensors, session.scene, session), "mill builds: " + simulation.error);
+      var player = simulation.cncPlayer();
+      if (player == null) throw "Mill has no CNC player";
+      simulation.step(); // Compile and initialise before counting steady runtime allocations, as on the router.
+      var allocated = hl.Gc.totalAllocated(), ticks = 0;
+      while (player.passes == 0 && simulation.activeSession().simulationTime() < 600 && ticks++ < 1000000) {
+        simulation.step();
+        check(simulation.cncFailure() == null, 'mill CNC job runs: ${simulation.cncFailure()}');
+      }
+      var bytes = (hl.Gc.totalAllocated() - allocated) / ticks;
+      check(player.passes == 1, "mill completes one pass");
+      var stock = simulation.machiningStock();
+      if (stock == null) throw "Mill has no stock";
+      var removal = (Math.PI * (121 * 7 + 2 * 25 * 5) + (96 - (4 - Math.PI) * 12.25) * 3) / 1e9;
+      var deviation = stock.deviation();
+      Sys.println('bench mill tracking at 10 ms (axis order x,y,z), peak mm: ' +
+        [for (error in player.axisTrackingPeak) error * 1000].join(", "));
+      Sys.println('bench mill measurement: ${simulation.activeSession().simulationTime()} s, ${stock.removed * 1e9}/${removal * 1e9} mm³, ' +
+        'leftover ${deviation.leftover * 1e9}, gouge ${deviation.gouge * 1e9}, rapid ${stock.rapidContacts}, collisions ${stock.collisions}, ' +
+        '${player.planChecks().plans} plans, $ticks ticks, $bytes bytes/tick');
+      check(Math.abs(stock.removed - removal) < removal * 0.02, "mill removal matches the bearing block closed form");
+      check(deviation.leftover < removal * 0.02, 'mill leaves only slivers: ${deviation.leftover}');
+      check(deviation.gouge < 1e-9, 'mill does not gouge: ${deviation.gouge}');
+      check(stock.rapidContacts == 0 && stock.collisions == 0,
+        'mill rapids and holder clear stock: ${stock.rapidContacts}, ${stock.collisions}');
+      var checks = player.planChecks();
+      Sys.println('mill drive findings: ${checks.count(PlanDiagnosticKind.ServoPeakTorque)} peak torque, ' +
+        '${checks.count(PlanDiagnosticKind.ServoRatedTorque)} rated RMS torque; physics interval required by the drive: ' +
+        '${Math.min(1.0 / blueprint.fastestPositionLoopRate(), blueprint.servoStabilityInterval())} s');
+      check(checks.count(PlanDiagnosticKind.StepperStall) == 0, "mill drives never stall");
+      check(checks.count(PlanDiagnosticKind.Accuracy) == 0, "mill drive compliance stays within tolerance");
+      Sys.println('bench mill bearing block: ${Math.round(simulation.activeSession().simulationTime() * 10) / 10} s, ' +
+        '${Math.round(stock.removed * 1e10) / 10}/${Math.round(removal * 1e10) / 10} mm³ removed, ' +
+        '${Math.round(deviation.leftover * 1e10) / 10} mm³ leftover, ${Math.round(deviation.gouge * 1e10) / 10} mm³ gouge; ' +
+        '${checks.plans} plans, ${checks.flagged} flagged; ${Math.round(bytes / 100) / 10} KB/tick');
+      simulation.dispose();
+      session.dispose();
+      check(bytes < 80000, 'mill allocates below 80 KB/tick, got $bytes');
+    } catch (error:Dynamic) {
+      simulation.dispose();
+      session.dispose();
+      throw error;
+    }
+  }
+
   static function checkCncRouter(root:String, belts:Bool = false):Void {
     var kind = belts ? "belt router" : "screw router";
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/cnc-router/" + (belts ? "belts/" : "") + "materia.project.json");
@@ -1717,6 +1789,10 @@ class ProjectSourceTests {
       checkRobotWelder(root);
       return 0;
     }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mill") {
+      checkBenchMill(root);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "router") {
       checkCncRouter(root);
       checkBeltRouter(root);
@@ -2001,6 +2077,7 @@ class ProjectSourceTests {
     checkRobotArm(root);
     checkRobotWelder(root);
     checkMates(root);
+    checkBenchMill(root);
     checkCncRouter(root);
     checkBeltRouter(root);
     checkCoreXyPlotter(root);

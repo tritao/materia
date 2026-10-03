@@ -820,6 +820,7 @@ class MachineAssembly {
 		if (voltage == null) throw 'Motor "${record.actuator}" needs a wired supply or a stated driver voltage';
 		var motor:machinekit.motion.MotorDrive = cast requireMember(record.motor);
 		var added = motor.actuator(record.actuator, record.joint, voltage, record.margin, driver.current);
+		if (driver.rating.positionLoopRate > 0) added.positionLoopRate = driver.rating.positionLoopRate;
 		var stepper = driver.rating.family == machinekit.motion.MotorDriver.MotorDriverFamily.Stepper;
 		if ((stepper && added.drive != "stepper") || (!stepper && added.drive != "servo"))
 			throw 'Motor "${record.actuator}" and driver "${record.driver}" have different drive families';

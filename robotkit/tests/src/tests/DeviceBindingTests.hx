@@ -46,6 +46,18 @@ class DeviceBindingTests {
       "planning limits see the device's real ceiling through the screw");
     near(model.coupledLimits("axis").velocity, 100.0 / leadRatio, "an unbound model keeps the actuator's own limit");
 
+    var mixed = axisModel();
+    var servo = new Actuator("servo", 2.0, 500.0, Transmission.SimpleTransmission("turn", 1.0, 0.0));
+    mixed.actuators.insert(0, servo);
+    var pulseLayout = DeviceLayout.forSteppers(mixed, 3);
+    check(pulseLayout.channels.length == 1 && pulseLayout.channels[0].index == 0 &&
+      pulseLayout.channels[0].actuator == "motor", "mixed layouts compact only the stepper pulse channels");
+    check(pulseLayout.channels[0].directionSetupTicks == 3, "stepper layouts preserve direction setup timing");
+    var mixedBinding = DeviceBinding.bind(mixed, pulseLayout, 20000);
+    near(mixedBinding.model.actuators[0].maxRate, 500.0, "a pulse clock never caps the servo's speed");
+    check(DeviceLayout.forSteppers(plainServoModel()).channels.length == 0,
+      "a servo-only model has no pulse channels");
+
     // A slower actuator keeps its own rate; no authored rate takes the ceiling.
     var slow = DeviceBinding.bind(axisModel(10.0), layout, 20000);
     near(slow.channels[0].maxRate, 10.0, "an actuator slower than the step tick keeps its rate");
@@ -124,4 +136,10 @@ class DeviceBindingTests {
     model.addActuator(motor);
     return model;
   }
+  static function plainServoModel():RobotModel {
+    var model = axisModel();
+    model.actuators[0].fullStepsPerRevolution = 0;
+    return model;
+  }
+
 }

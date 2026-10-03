@@ -585,6 +585,8 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             coupling.follower = binding->joints_[source.follower];
             coupling.ratio = source.ratio;
             coupling.offset = source.offset;
+            if (blueprint.struct_size >= sizeof(blueprint))
+                coupling.stiffness = blueprint.coupling_stiffness[index];
             require_sim(nksim_joint_couple(world, &coupling), "nksim_joint_couple");
         }
         for (uint32_t index = 0; index < contact_pair_count; ++index) {
@@ -624,6 +626,10 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         // take no commands of their own.
         binding->slip_.assign(blueprint.joint_count, 0.0);
         binding->servo_.assign(blueprint.joint_count, rk_robot_joint_servo{});
+        binding->reflected_inertia_.assign(blueprint.joint_count, 0.0);
+        if (blueprint.struct_size >= sizeof(blueprint))
+            std::copy_n(blueprint.servo_reflected_inertia, blueprint.joint_count,
+                binding->reflected_inertia_.begin());
         binding->passive_.assign(blueprint.joint_count, 0);
         binding->step_ = fixed_timestep_;
         if (blueprint.struct_size >= offsetof(rk_robot_runtime_blueprint, joint_servo) +

@@ -2110,6 +2110,104 @@ void expired_velocity_targets_brake_within_limits(const rk_robot_runtime_bluepri
     assert(fault_code() == 0);
 }
 
+void trajectory_drive_endpoints_join_through_hold_resume_and_stop(
+        const rk_robot_runtime_blueprint &blueprint) {
+    auto bounded = blueprint;
+    for (uint32_t joint = 0; joint < bounded.joint_count; ++joint)
+        bounded.joints[joint].max_acceleration = 0.2;
+    auto endpoint = std::make_shared<EchoEndpoint>(bounded.joint_count);
+    robotkit::RobotRuntime runtime(bounded, endpoint, std::chrono::milliseconds(10));
+    robotkit::SegmentBatch batch{};
+    auto &segment = batch.segments.emplace_back();
+    segment.duration_ns = 2'000'000'000;
+    segment.degree = 3;
+    segment.joint_count = bounded.joint_count;
+    for (uint32_t joint = 0; joint < bounded.joint_count; ++joint) {
+        const double sign = joint == 0 ? 1.0 : -1.0;
+        segment.coefficients[joint].value[2] = 0.0;
+        segment.coefficients[joint].value[3] = sign * 0.01;
+    }
+    robotkit::PlanRequest plan{};
+    plan.sequence = 1;
+    plan.plan_id = 80;
+    plan.model_revision = bounded.revision;
+    plan.calibration_revision = bounded.calibration_revision;
+    plan.segments = batch;
+    assert(runtime.submit_plan(plan) == RK_OK);
+    uint64_t timestamp = 0;
+    rk_robot_command previous{};
+    for (int cycle = 0; cycle < 150; ++cycle) {
+        if (cycle == 5) {
+            auto replacement = plan;
+            replacement.sequence = 2;
+            replacement.plan_id = 81;
+            replacement.replace_after_plan_id = 80;
+            replacement.replace_after_time_ns = 200'000'000;
+            auto &next = replacement.segments.segments[0];
+            next.duration_ns = 1'800'000'000;
+            for (uint32_t joint = 0; joint < bounded.joint_count; ++joint) {
+                const double sign = joint == 0 ? 1.0 : -1.0;
+                replacement.start_position[joint] = sign * 0.00008;
+                replacement.start_velocity[joint] = sign * 0.0012;
+                replacement.start_acceleration[joint] = sign * 0.012;
+                next.coefficients[joint].value[0] = replacement.start_position[joint];
+                next.coefficients[joint].value[1] = replacement.start_velocity[joint];
+                next.coefficients[joint].value[2] = sign * 0.006;
+            }
+            assert(runtime.submit_plan(replacement) == RK_OK);
+        }
+        if (cycle == 10) assert(runtime.submit(lifecycle_command(3, RK_COMMAND_HOLD)) == RK_OK);
+        if (cycle == 40) assert(runtime.submit(lifecycle_command(4, RK_COMMAND_RESUME)) == RK_OK);
+        if (cycle == 70) assert(runtime.submit(lifecycle_command(5, RK_COMMAND_STOP)) == RK_OK);
+        apply_cycle(runtime, timestamp);
+        const auto &command = endpoint->last_command;
+        if (previous.reference_duration > 0.0 && command.reference_duration > 0.0)
+            for (uint32_t joint = 0; joint < bounded.joint_count; ++joint) {
+                assert(std::abs(command.targets[joint].target - previous.reference_end_position[joint]) < 1e-10);
+                assert(std::abs(command.servos[joint].velocity - previous.reference_end_velocity[joint]) < 1e-10);
+            }
+        previous = command;
+    }
+}
+
+void trajectory_drive_endpoints_join_at_queue_exhaustion(
+        const rk_robot_runtime_blueprint &blueprint) {
+    for (bool stop : {false, true}) {
+        auto bounded = blueprint;
+        for (uint32_t joint = 0; joint < bounded.joint_count; ++joint)
+            bounded.joints[joint].max_acceleration = 1.0;
+        auto endpoint = std::make_shared<EchoEndpoint>(bounded.joint_count);
+        robotkit::RobotRuntime runtime(bounded, endpoint, std::chrono::milliseconds(10));
+        robotkit::PlanRequest plan{};
+        plan.sequence = 1;
+        plan.plan_id = 90;
+        plan.model_revision = bounded.revision;
+        plan.calibration_revision = bounded.calibration_revision;
+        plan.ends_at_rest = false;
+        auto &segment = plan.segments.segments.emplace_back();
+        segment.duration_ns = 100'000'000;
+        segment.degree = 1;
+        segment.joint_count = bounded.joint_count;
+        for (uint32_t joint = 0; joint < bounded.joint_count; ++joint)
+            segment.coefficients[joint].value[1] = 1.0;
+        assert(runtime.submit_plan(plan) == RK_OK);
+        uint64_t timestamp = 0;
+        rk_robot_command previous{};
+        for (int cycle = 0; cycle < 150; ++cycle) {
+            if (stop && cycle == 6)
+                assert(runtime.submit(lifecycle_command(2, RK_COMMAND_STOP)) == RK_OK);
+            apply_cycle(runtime, timestamp);
+            const auto &command = endpoint->last_command;
+            if (previous.reference_duration > 0.0 && command.target_count > 0)
+                for (uint32_t joint = 0; joint < bounded.joint_count; ++joint) {
+                    assert(std::abs(command.targets[joint].target - previous.reference_end_position[joint]) < 1e-10);
+                    assert(std::abs(command.servos[joint].velocity - previous.reference_end_velocity[joint]) < 1e-10);
+                }
+            previous = command;
+        }
+    }
+}
+
 int main() {
     static_assert(sizeof(rk_robot_command) < 20'000,
         "trajectory payload must not be embedded in the command mailbox value");
@@ -2130,6 +2228,8 @@ int main() {
         joint.parent_frame_rotation[3] = joint.child_frame_rotation[3] = 1.0;
         joint.axis[2] = 1.0;
     }
+    trajectory_drive_endpoints_join_at_queue_exhaustion(blueprint);
+    trajectory_drive_endpoints_join_through_hold_resume_and_stop(blueprint);
     presampled_publication_does_not_sample_again(blueprint);
     same_cycle_target_batches_merge_per_joint(blueprint);
     partial_targets_and_ordered_trajectory_commands(blueprint);

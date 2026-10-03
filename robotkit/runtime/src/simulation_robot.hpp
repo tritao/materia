@@ -85,6 +85,7 @@ private:
     std::vector<double> slip_;
     /** Servo gains per joint: a joint with stiffness runs as a servo on its position targets. */
     std::vector<rk_robot_joint_servo> servo_;
+    std::vector<double> reflected_inertia_;
     /** Joints that only move through couplings to a servo joint: they get no targets of their own. */
     std::vector<uint8_t> passive_;
     /** Seconds between commands, to estimate a servo's velocity target from successive positions. */

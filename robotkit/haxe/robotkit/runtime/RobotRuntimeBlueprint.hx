@@ -21,6 +21,19 @@ class RobotRuntimeBlueprint {
   public final linkCount:Int;
   public final frameCount:Int;
   public final joints:Array<RobotRuntimeJointBlueprint> = [];
+  /** Fastest specified drive position loop, Hz. */
+  public function fastestPositionLoopRate():Float {
+    var rate = 0.0;
+    for (joint in joints) rate = Math.max(rate, joint.positionLoopRate);
+    return rate;
+  }
+  /** Conservative integration interval from servo gain and reflected inertia, seconds. */
+  public function servoStabilityInterval():Float {
+    var interval = Math.POSITIVE_INFINITY;
+    for (joint in joints) if (joint.servoStiffness > 0 && joint.reflectedInertia > 0)
+      interval = Math.min(interval, 0.5 * Math.sqrt(joint.reflectedInertia / joint.servoStiffness));
+    return interval;
+  }
   public final couplings:Array<RobotRuntimeJointCouplingBlueprint> = [];
   public final sensors:Array<RobotRuntimeSensorBlueprint> = [];
   public final channels:Array<ProcessChannelDeclaration> = [];
@@ -183,8 +196,10 @@ class RobotRuntimeBlueprint {
     if (couplings.length > RobotKitRuntimeConstants.RK_MAX_JOINT_COUPLINGS)
       throw "Too many runtime joint couplings";
     value.set_coupling_count(couplings.length);
-    for (index in 0...couplings.length)
+    for (index in 0...couplings.length) {
       value.set_couplings(index, couplings[index].nativeValue());
+      value.set_coupling_stiffness(index, couplings[index].stiffness);
+    }
     value.set_link_count(linkCount);
     value.set_frame_count(frameCount);
     value.set_collision_approximation(collisionApproximation);
@@ -218,6 +233,7 @@ class RobotRuntimeBlueprint {
       servo.set_stiffness(joint.servoStiffness);
       servo.set_damping(joint.servoDamping);
       value.set_joint_servo(index, servo);
+      value.set_servo_reflected_inertia(index, joint.reflectedInertia);
     }
     if (links.length != linkCount) throw "RobotKit runtime blueprint is missing link physical properties";
     for (index in 0...links.length) value.set_links(index, links[index].nativeValue());

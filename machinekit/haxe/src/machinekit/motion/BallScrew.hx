@@ -8,8 +8,20 @@ import machinekit.component.ComponentRecipeSupport;
  * The shaft, support critical speed and transmission use the same screw model as sliding screws.
  */
 class BallScrew extends LeadScrew {
+	/** Assumed machined bearing journals, shared by support and coupling placement. */
+	public static inline var JOURNAL_DIAMETER:Float = 12;
+	public static inline var JOURNAL_LENGTH:Float = 25;
+	public static inline var INPUT_JOURNAL_LENGTH:Float = 50;
 	public function new(length:Float) {
 		super(new LeadScrewThread(Ball, 16, 5), length);
+		if (length <= INPUT_JOURNAL_LENGTH + JOURNAL_LENGTH) throw "Ball screw needs a race between its journals";
+	}
+
+	override public function geometry(detail:machinekit.component.ComponentDetail = Preview):cadkit.modeling.Part {
+		return machinekit.component.Solids.union([
+			machinekit.component.Solids.named(cadkit.modeling.Part.cylinderSpan(JOURNAL_DIAMETER / 2, 0, INPUT_JOURNAL_LENGTH), "input-journal"),
+			machinekit.component.Solids.named(cadkit.modeling.Part.cylinderSpan(thread.screwDiameter / 2, INPUT_JOURNAL_LENGTH, totalLength - JOURNAL_LENGTH), "race"),
+			machinekit.component.Solids.named(cadkit.modeling.Part.cylinderSpan(JOURNAL_DIAMETER / 2, totalLength - JOURNAL_LENGTH, totalLength), "output-journal")]);
 	}
 
 	public static function sfu1605(length:Float):BallScrew return new BallScrew(length);
