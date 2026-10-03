@@ -16,9 +16,15 @@ The machines are built from parts as the router and CoreXY plotter are. Their li
 drives, and nothing is written twice. See [TRANSMISSION_PLAN.md](TRANSMISSION_PLAN.md) for the drive
 model this builds on.
 
-Branch `gantries`, worktree `/home/joao/dev/materia-worktrees/gantries`. It was created from
-`x7-transmissions` at `aaa2b911a` (X7 T1). That commit includes transmissions X1–X6 and X5 multi-leader
-couplings (merged with local main 1048bf768).
+Branch `gantries`, worktree `/home/joao/dev/materia-worktrees/gantries`. It is based on
+`x7-transmissions` at `b9270efa9`:
+- transmissions X1–X6, X7 T1–T5 and X8;
+- X9a–X9d, still in the X9 session's final validation (unverified fixups, so `x7-transmissions` may
+  be rewritten);
+- local main 1048bf768.
+
+The survey below was taken at `aaa2b911a` (X7 T1). X7–X9 renamed `Drive`→`Transmission`, split the
+motor and driver, and put the drive-derived limits into the compiled `RobotModel`.
 
 ## What exists (survey 2026-10-03, at aaa2b911a)
 
@@ -248,10 +254,10 @@ only in their frame and spec.**
 - Put them in the Progress section.
 
 **G1. Planning limits from the drives** (G-D3).
-- **Do this after G4.** X9a (on `x7-transmissions`) already writes `coupledLimits` into the compiled
-  `RobotModel` joint limits, keeps missing limits as `Null`, and makes the mission planner and jogging
-  use them. Rebase this step on that: what is left is per-joint acceleration and jerk instead of one
-  scalar, `PlanCheck` in missions, and `SteadyLoads`. Drop anything X9 already did.
+- X9a (in this branch's base) already writes `coupledLimits` into the compiled `RobotModel` joint
+  limits, keeps missing limits as `Null`, and makes the mission planner and jogging use them. Start
+  from that. What is left: per-joint acceleration and jerk instead of one scalar, `PlanCheck` in
+  missions, and `SteadyLoads`. Drop anything X9 already did.
 - Add `PlanningLimits` (motionkit-robot, next to `PlanCheck`) and replace the scalar-acceleration
   arguments of `HandlingPlanRunner.create`, `SurfacePlanRunner.create` and
   `ToolpathPlanRunner.create` with it.
@@ -301,13 +307,15 @@ only in their frame and spec.**
 
 ### Phase B — the gantry assembly (needs X7 T2 committed)
 
-**G4. Merge X7, X8 and X9.**
-- X7 and X8 are committed (2026-10-03). X9 (review fixes, no legacy compatibility, belt and load
-  model) is in progress. Its commits are unverified until the X9d full-suite gate. Merge
-  `x7-transmissions` into `gantries` once its plan's X9 status line says the gate passed, not
-  before.
-- After the merge, rerun the full suite and re-record the G0 baselines. X7–X9 moved numbers on
-  purpose; take the new values from their plan. From here on, write against `Transmission`/`addTransmission`.
+**G4. Take X9's final state.**
+- The branch already contains X7, X8 and X9a–d up to `b9270efa9`. When the X9 session finishes (its
+  plan's X9 status line says the full-suite gate passed), bring its final commits in:
+  - if `x7-transmissions` still contains `b9270efa9`, merge it;
+  - if it was rewritten (fixups squashed), `git rebase --onto <new x7-transmissions> b9270efa9
+    gantries`.
+- Then rerun the full suite and re-record the baselines.
+- Until then, nothing waits on G4. A suite failure that is X9's (it fails the same way at
+  `b9270efa9` without your changes) is noted and not fixed here. From here on, write against `Transmission`/`addTransmission`.
 - Merge again at later step boundaries whenever X7 or X8 has new committed steps, so the gantry
   never diverges from the drive API. Resolve conflicts in favour of X7's API.
 - If X8 has landed, use `addMotor(…, driver, …)`.
@@ -489,15 +497,15 @@ only in their frame and spec.**
 ## Order
 
 **Updated 2026-10-03:**
-- Start with G0 → G2 → G3 on the branch as it is. X9 does not touch IK or external axes.
-- Then wait for the X9 gate, do G4, then G1, then continue with Phase B.
-- While waiting, G10's part and format design may go ahead on paper, but not in code. It touches
-  `MachineAssembly`, which X9 is still changing.
+- The branch is based on X9's committed work, so Phases A, B and C can all go ahead now.
+- G4 is only taking X9's final commits when it finishes; do it at the next step boundary after
+  that.
 - Saved data follows X9's policy: one schema version per format, no migration or compatibility code.
 
 ```
-G0 → G2 → G3 ──────────────────────────────────┐
-         (X9 gate passed) → G4 → G1 → G5 → G6 → G7 → G8 → G9
+G0 → G1 → G2 → G3 ─────────────────────────────┐
+                 G0 → G5 → G6 → G7 → G8 → G9
+            (X9 finished) → G4 at the next step boundary
                                     G6 → G10 → G11 → G12 → G13
             (mobile-welder on main) → G14 → G15
                               G3 + G6 → G16 → G17 → G18
