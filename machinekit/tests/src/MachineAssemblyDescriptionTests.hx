@@ -44,6 +44,11 @@ import pickingstation.PickingStationConfig;
 
 class MachineAssemblyDescriptionTests {
 	public static function main():Void {
+		if (Sys.getEnv("MACHINEKIT_BELT_ONLY") == "1") {
+			beltReductions(); BeltElasticityTests.run();
+			Sys.println("Belt reduction and shared-span checks passed");
+			return;
+		}
 		run();
 	}
 
@@ -161,6 +166,7 @@ class MachineAssemblyDescriptionTests {
 		documentRoundTrip();
 		transmissionsFollowTheirParts();
 		beltReductions();
+		BeltElasticityTests.run();
 		motorsDriveJoints();
 		transmissionsCarryAllowances();
 		changerDocumentRoundTrip();
@@ -1044,6 +1050,9 @@ class MachineAssemblyDescriptionTests {
 			0.5, "belt reduction keeps direction and derives tooth ratio");
 		var definition = machinekit.assembly.FrozenAssemblyDefinitions.thaw(assembly.describe().mechanical);
 		var relation = definition.couplings[0], spring = relation.stiffness;
+		if (definition.elasticNetworks == null || definition.elasticNetworks.length != 1 ||
+				definition.elasticNetworks[0].couplings.length != 1 || definition.elasticNetworks[0].spans.length != 2)
+			throw "A shaft belt must compile to one two-span network";
 		var paths = belt.freePaths(0, 1), radius = belt.wraps()[0].radius;
 		if (spring == null) throw "Belt reduction did not resolve its spring";
 		close(spring, 15000 * (1 / paths[0] + 1 / paths[1]) * radius * radius / 1000,
@@ -1053,6 +1062,10 @@ class MachineAssemblyDescriptionTests {
 			throw "Belt reduction lost its source or attachments in a round trip";
 		var included = new MachineAssembly(); included.include("stage", assembly);
 		if (included.check().hasErrors()) throw "Included belt reduction did not prefix its pulley attachments";
+		var prefixed = machinekit.assembly.FrozenAssemblyDefinitions.thaw(included.describe().mechanical).elasticNetworks;
+		if (prefixed == null || prefixed.length != 1 || prefixed[0].id != "stage/belt" ||
+				prefixed[0].couplings[0] != "stage/reduction" || prefixed[0].spans[0].terms[0].joint != "stage/input")
+			throw "Included belt network did not namespace every physical and joint reference";
 		assembly.setTransmissionOverrides("reduction", State(12), State(0.002), State(0.003));
 		var stated = machinekit.assembly.FrozenAssemblyDefinitions.thaw(assembly.describe().mechanical).couplings[0];
 		var statedSpring = stated.stiffness;

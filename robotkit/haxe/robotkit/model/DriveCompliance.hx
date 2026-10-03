@@ -6,7 +6,19 @@ import robotkit.model.DriveLoads.AxisLoad;
 class DriveCompliance {
   public final compliance:Array<Array<Float>>;
 
-  public function new(loads:Array<AxisLoad>) {
+  public function new(loads:Array<AxisLoad>, ?model:RobotModel) {
+    if (model != null && model.elasticNetworks.length > 0) {
+      var solved = new ElasticSolve(model, loads);
+      compliance = solved.compliance;
+      for (axis in 0...loads.length) {
+        loads[axis].elastic = this;
+        loads[axis].stiffness = compliance[axis][axis] > 1e-20 ? 1.0 / compliance[axis][axis] : 0.0;
+        loads[axis].backlash = solved.backlash[axis];
+        for (network in model.elasticNetworks)
+          EngineeringAssumptions.merge(loads[axis].assumptions, network.assumptions);
+      }
+      return;
+    }
     var count = loads.length;
     var ids:Array<String> = [];
     for (load in loads) for (motor in load.motors) if (ids.indexOf(motor.actuator.id) < 0) ids.push(motor.actuator.id);
@@ -79,7 +91,7 @@ class DriveCompliance {
     return result;
   }
 
-  static function invert(matrix:Array<Array<Float>>):Array<Array<Float>> {
+  public static function invert(matrix:Array<Array<Float>>):Array<Array<Float>> {
     var count = matrix.length;
     var work = [for (i in 0...count) matrix[i].concat([for (j in 0...count) i == j ? 1.0 : 0.0])];
     for (column in 0...count) {

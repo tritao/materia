@@ -136,7 +136,7 @@ class DriveLoads {
       var load = axisLoad(model, joint, loads);
       if (load != null) result.push(load);
     }
-    if (result.length > 0) { var elastic = new DriveCompliance(result); }
+    if (result.length > 0) { var elastic = new DriveCompliance(result, model); }
     return result;
   }
 

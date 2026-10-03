@@ -16,7 +16,7 @@ import materia.units.LengthUnit;
 
 /** Versioned transport and validation for reusable assembly definitions and states. */
 class AssemblyDefinitionCodec {
-	public static inline var VERSION:Int = 2;
+	public static inline var VERSION:Int = 3;
 
 	public static function encode(definition:AssemblyDefinition):String {
 		validate(definition);
@@ -164,6 +164,33 @@ class AssemblyDefinitionCodec {
 			if (!sourcesByTarget.exists(coupling.target)) sourcesByTarget.set(coupling.target, []);
 			sourcesByTarget.get(coupling.target).push(coupling.source);
 		}
+		var networkIds = new Map<String, Bool>(), owned = new Map<String, Bool>();
+		if (definition.elasticNetworks != null) for (network in definition.elasticNetworks) {
+			if (!validText(network.id) || networkIds.exists(network.id) || network.spans.length == 0)
+				throw "Assembly has an invalid elastic network";
+			networkIds.set(network.id, true);
+			for (id in network.couplings) {
+				if (!names.exists(id) || owned.exists(id)) throw "Elastic networks require distinct, existing motion couplings";
+				owned.set(id, true);
+			}
+			var clearanceJoints = new Map<String, Bool>();
+			if (network.clearances != null) for (clearance in network.clearances) {
+				if (!movable.exists(clearance.joint) || clearanceJoints.exists(clearance.joint) || !Math.isFinite(clearance.allowance) || clearance.allowance < 0)
+					throw "Elastic network has an invalid tooth-clearance coordinate";
+				clearanceJoints.set(clearance.joint, true);
+			}
+			for (span in network.spans) {
+				if (!(span.stiffness > 0) || !Math.isFinite(span.stiffness) || span.terms.length == 0)
+					throw "Elastic span needs positive finite stiffness and coordinate terms";
+				var terms = new Map<String, Bool>();
+				for (term in span.terms) {
+					if (!movable.exists(term.joint) || terms.exists(term.joint) || !Math.isFinite(term.coefficient) || term.coefficient == 0)
+						throw "Elastic span has an invalid or duplicate coordinate";
+					terms.set(term.joint, true);
+				}
+			}
+		}
+
 		var actuators = definition.actuators == null ? [] : definition.actuators;
 		if (actuators.length > 4000) throw "Assembly has too many actuators";
 		var actuatorIds = new Map<String, Bool>();

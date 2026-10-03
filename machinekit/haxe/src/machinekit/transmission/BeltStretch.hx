@@ -14,6 +14,7 @@ class BeltStretch {
 	public static function reduction(belt:TimingBelt, path:BeltPathRecord, leader:String,
 			follower:String, driver:String, driven:String, mechanical:AssemblyDefinition, relation:TransmissionRelation):Float {
 		var definition:AssemblyDefinition = JsonWire.decode(JsonWire.encode(mechanical));
+		definition.elasticNetworks = null;
 		definition.couplings = []; definition.actuators = []; definition.encoders = [];
 		var state = new AssemblyState(definition);
 		var posed = posedBelt(belt, path, state);
@@ -60,6 +61,10 @@ class BeltStretch {
 		if (!found) throw new TransmissionDesignError('Pulley "$pulley" does not turn with joint "$jointId"');
 		var world = AssemblyFrames.transformVector(state.worldConnector(axis.parent, axis.parentConnector), axis.axis.x, axis.axis.y, axis.axis.z);
 		var local = AssemblyFrames.transformVector(AssemblyFrames.inverse(state.worldPose(belt)), world.x, world.y, world.z);
+		var centre = state.worldPose(pulley), origin = state.worldConnector(axis.parent, axis.parentConnector);
+		var offset = AssemblyFrames.transformVector(AssemblyFrames.inverse(state.worldPose(belt)), centre.x - origin.x, centre.y - origin.y, centre.z - origin.z);
+		if (Math.abs(offset.x) > 1e-5 || Math.abs(offset.y) > 1e-5)
+			throw new TransmissionDesignError('Pulley "$pulley" is eccentric to joint "$jointId"; align its shaft centre');
 		if (Math.abs(local.x) > 1e-5 || Math.abs(local.y) > 1e-5 || Math.abs(local.z) < 1e-5)
 			throw new TransmissionDesignError('Pulley "$pulley" joint axis is not normal to its belt');
 		return local.z > 0 ? 1.0 : -1.0;
@@ -68,6 +73,7 @@ class BeltStretch {
 	public static function stiffness(belt:TimingBelt, path:BeltPathRecord, leader:String,
 			pulley:String, mechanical:AssemblyDefinition):Float {
 		var definition:AssemblyDefinition = JsonWire.decode(JsonWire.encode(mechanical));
+		definition.elasticNetworks = null;
 		definition.couplings = [];
 		definition.actuators = [];
 		definition.encoders = [];
@@ -122,7 +128,7 @@ class BeltStretch {
 		return weakest;
 	}
 
-	static function posedBelt(belt:TimingBelt, path:BeltPathRecord, state:AssemblyState):TimingBelt {
+	public static function posedBelt(belt:TimingBelt, path:BeltPathRecord, state:AssemblyState):TimingBelt {
 		var inverse = AssemblyFrames.inverse(state.worldPose(path.belt));
 		var original = belt.wraps();
 		var wraps:Array<BeltWrap> = [];

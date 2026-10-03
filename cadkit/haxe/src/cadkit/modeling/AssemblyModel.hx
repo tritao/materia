@@ -207,6 +207,12 @@ class AssemblyModel {
 		data.encoders.push(materia.assembly.AssemblyDefinitionFlattener.copyEncoder(encoder, encoder.id, encoder.joint));
 	}
 
+	/** Add derived span energies separately from nominal motion couplings. */
+	public function addElasticNetwork(network:materia.assembly.AssemblyDefinition.AssemblyElasticNetwork):Void {
+		if (data.elasticNetworks == null) data.elasticNetworks = [];
+		data.elasticNetworks.push(materia.assembly.AssemblyDefinitionFlattener.copyElasticNetwork(network, id -> id));
+	}
+
 	/** Exports reusable definitions and explicit tree/closure semantics. */
 	public function definition(id:String = "assembly"):AssemblyDefinition {
 		var copy:AssemblyDefinition = JsonWire.decode(JsonWire.encode(data));

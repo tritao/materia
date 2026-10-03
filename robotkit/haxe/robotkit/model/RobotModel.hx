@@ -4,7 +4,7 @@ import robotkit.model.Transmission;
 
 /** Editable static definition of a robot's links, joints, and sensors. */
 class RobotModel {
-  public static inline var CURRENT_VERSION:Int = 7;
+  public static inline var CURRENT_VERSION:Int = 8;
   public final schemaVersion:Int = CURRENT_VERSION;
   public final name:String;
   public final links:Array<Link> = [];
@@ -13,6 +13,8 @@ class RobotModel {
   public final actuators:Array<Actuator> = [];
   /** Mechanical joint-to-joint relations, independent of actuator transmissions. */
   public final couplings:Array<JointCoupling> = [];
+  /** Physical elastic networks, independent of the nominal motion equations. */
+  public final elasticNetworks:Array<ElasticNetwork> = [];
   public final sensors:Array<Sensor> = [];
   /** Encoders on joints; they are read from joint positions rather than compiled into the runtime. */
   public final encoders:Array<Encoder> = [];

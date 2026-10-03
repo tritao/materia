@@ -118,6 +118,16 @@ class RobotModelCodec {
       couplingIds.set(coupling.id, true);
       pairs.set(coupling.follower + "\n" + coupling.leader, true);
     }
+    var networkIds:Array<String> = [], networkOwners:Array<String> = [];
+    for (network in model.elasticNetworks) {
+      network.validate(model.joints, model.couplings);
+      if (networkIds.indexOf(network.id) >= 0) throw "Duplicate elastic network";
+      networkIds.push(network.id);
+      for (owner in network.couplings) {
+        if (networkOwners.indexOf(owner) >= 0) throw "A motion coupling belongs to several elastic networks";
+        networkOwners.push(owner);
+      }
+    }
     var cycle = JointCoupling.cycleThrough(model.couplings);
     if (cycle != null) throw 'Joint $cycle depends on itself through its couplings';
     var sensors = new Map<String, Bool>();
@@ -168,6 +178,8 @@ class RobotModelCodec {
       }],
       actuators: [for (actuator in model.actuators) encodeActuator(actuator)],
       couplings: [for (coupling in model.couplings) encodeCoupling(coupling)],
+      elasticNetworks: [for (network in model.elasticNetworks) {id: network.id, couplings: network.couplings,
+        spans: network.spans, assumptions: network.assumptions, clearances: network.clearances}],
       frames: [for (frame in model.frames) {
         id: frame.id, name: frame.name, link: frame.link.id,
         position: frame.position, rotation: frame.rotation
@@ -190,6 +202,7 @@ class RobotModelCodec {
     };
     // Written only when there are some, so models without encoders keep their bytes.
     if (model.encoders.length > 0) document.encoders = [for (encoder in model.encoders) encodeEncoder(encoder)];
+    if (model.elasticNetworks.length == 0) Reflect.deleteField(document, "elasticNetworks");
     return Bytes.ofString(Json.stringify(document));
   }
 
@@ -307,6 +320,23 @@ class RobotModelCodec {
     var cycle = JointCoupling.cycleThrough(model.couplings);
     if (cycle != null) throw 'Joint $cycle depends on itself through its couplings';
 
+    for (record in (Reflect.hasField(root, "elasticNetworks") ? array(root, "elasticNetworks") : [])) {
+      var spans:Array<robotkit.model.ElasticNetwork.ElasticSpan> = [];
+      for (span in array(record, "spans")) {
+        var terms:Array<robotkit.model.ElasticNetwork.ElasticTerm> = [];
+        for (term in array(span, "terms")) terms.push({joint: text(term, "joint"), coefficient: number(term, "coefficient")});
+        spans.push({stiffness: number(span, "stiffness"), terms: terms});
+      }
+      var owners:Array<String> = [];
+      for (owner in array(record, "couplings")) owners.push(Std.string(owner));
+      var network = new ElasticNetwork(text(record, "id"), owners, spans);
+      network.assumptions = readAssumptions(record);
+      for (clearance in array(record, "clearances"))
+        network.clearances.push({joint: text(clearance, "joint"), allowance: number(clearance, "allowance")});
+      network.validate(model.joints, model.couplings);
+      model.elasticNetworks.push(network);
+    }
+
     var actuatorIds = new Map<String, Bool>();
     for (record in array(root, "actuators")) {
       var actuator = readActuator(record);
@@ -381,6 +411,15 @@ class RobotModelCodec {
     }
     var fork:Dynamic = required(root, "forkMechanism");
     if (fork != null) model.forkMechanism = readFork(fork);
+    var networkNames:Array<String> = [], owners:Array<String> = [];
+    for (network in model.elasticNetworks) {
+      if (networkNames.indexOf(network.id) >= 0) throw "Duplicate elastic network";
+      networkNames.push(network.id);
+      for (owner in network.couplings) {
+        if (owners.indexOf(owner) >= 0) throw "A coupling belongs to several elastic networks";
+        owners.push(owner);
+      }
+    }
     return model;
   }
 

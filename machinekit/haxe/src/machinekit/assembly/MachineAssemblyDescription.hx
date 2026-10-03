@@ -91,6 +91,27 @@ import machinekit.component.PortInterface;
 	@:id(4) final joints:ReadOnlyArray<FrozenJoint>;
 	@:id(5) @:optional final couplings:ReadOnlyArray<FrozenCoupling>;
 	@:id(6) @:optional final exposedConnectors:ReadOnlyArray<FrozenExposedConnector>;
+	@:id(10) @:optional final elasticNetworks:ReadOnlyArray<FrozenElasticNetwork>;
+}
+
+@:wire typedef FrozenElasticTerm = {
+	@:id(1) final joint:String;
+	@:id(2) final coefficient:Float;
+}
+@:wire typedef FrozenElasticSpan = {
+	@:id(1) final stiffness:Float;
+	@:id(2) final terms:ReadOnlyArray<FrozenElasticTerm>;
+}
+@:wire typedef FrozenElasticClearance = {
+	@:id(1) final joint:String;
+	@:id(2) final allowance:Float;
+}
+@:wire typedef FrozenElasticNetwork = {
+	@:id(1) final id:String;
+	@:id(2) final couplings:ReadOnlyArray<String>;
+	@:id(3) final spans:ReadOnlyArray<FrozenElasticSpan>;
+	@:id(4) @:optional final assumptions:ReadOnlyArray<materia.assembly.AssemblyDefinition.QuantityAssumption>;
+	@:id(5) @:optional final clearances:ReadOnlyArray<FrozenElasticClearance>;
 }
 
 @:wire typedef FrozenAssemblyDefinition = {
@@ -103,6 +124,7 @@ import machinekit.component.PortInterface;
 	@:id(7) @:optional final couplings:ReadOnlyArray<FrozenCoupling>;
 	@:id(8) @:optional final assemblies:ReadOnlyArray<FrozenAssemblySubdefinition>;
 	@:id(9) @:optional final exposedConnectors:ReadOnlyArray<FrozenExposedConnector>;
+	@:id(13) @:optional final elasticNetworks:ReadOnlyArray<FrozenElasticNetwork>;
 }
 
 /** Serializable recipe inputs. The constructor IDs are part of the wire schema. */

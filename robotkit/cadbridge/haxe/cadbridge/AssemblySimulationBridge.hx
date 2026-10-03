@@ -277,6 +277,30 @@ class AssemblySimulationBridge {
         {quantity: value.quantity, label: value.label}];
       if (coupling.assumed != null) added.assumed = [for (label in coupling.assumed) label];
     }
+    if (definition.elasticNetworks != null) for (network in definition.elasticNetworks) {
+      var spans:Array<robotkit.model.ElasticNetwork.ElasticSpan> = [];
+      for (span in network.spans) {
+        var terms:Array<robotkit.model.ElasticNetwork.ElasticTerm> = [];
+        for (term in span.terms) {
+          var edge:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
+          for (candidate in definition.joints) if (candidate.id == term.joint) edge = candidate;
+          if (edge == null) throw 'Elastic network "${network.id}" references no simulated joint';
+          var coordinateScale = edge.type == AssemblyJointType.Prismatic ? scale : 1.0;
+          terms.push({joint: term.joint, coefficient: term.coefficient * scale / coordinateScale});
+        }
+        spans.push({stiffness: span.stiffness / scale, terms: terms});
+      }
+      var added = new robotkit.model.ElasticNetwork(network.id, network.couplings.copy(), spans);
+      if (network.assumptions != null) added.assumptions = network.assumptions.copy();
+      if (network.clearances != null) for (clearance in network.clearances) {
+        var coordinateScale = 1.0;
+        for (edge in definition.joints) if (edge.id == clearance.joint && edge.type == AssemblyJointType.Prismatic)
+          coordinateScale = scale;
+        added.clearances.push({joint: clearance.joint, allowance: clearance.allowance * coordinateScale});
+      }
+      added.validate(model.joints, model.couplings);
+      model.elasticNetworks.push(added);
+    }
     // A motor on a joint: its effort and rate in robot units, and its rotor turning with the joint.
     if (definition.actuators != null) for (actuator in definition.actuators) {
       var driven:Null<Joint> = null;

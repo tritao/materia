@@ -1375,7 +1375,7 @@ the 24 V → supply-derived wheel limits and the `RobotArm.hx` changes.
 ### X10 — Belt reductions and loops between shafts
 
 Status: planned (2026-10-03), after X9. Shared belt-span elasticity approved; implementation
-is in progress: X10a implemented, X10b–X10d pending; final validation pending. Keep one commit per X10a–X10d and run the combined full suite after the
+is in progress: X10a–X10b implemented, X10c–X10d pending; final validation pending. Keep one commit per X10a–X10d and run the combined full suite after the
 complete milestone, as requested, rather than after each edit or step.
 
 X9c derives belt stiffness from the belt's path, but only for a belt clamped to a sliding
@@ -1439,8 +1439,12 @@ its source graph requires; the combined gate remains scheduled after X10d.
 
 - One belt can drive several pulleys: a Z-sync loop driving 2–4 lead-screw pulleys from one motor,
   or a reduction with a tensioner idler.
-  - Each driven pulley gets its own `BeltReduction(belt, driver, drivenN)`; idlers on the loop use
-    `BeltIdler`.
+  - Use `BeltReduction(belt, driver, drivenN)` for each new motion relation; idlers on the
+    loop use `BeltIdler`. When a screw already follows a common carriage through a `LeadScrew`
+    relation, do not add another motion term to that follower: the terms would sum and double
+    its travel. Its attached rotary pulley is still a loaded terminal of the same belt network.
+    Loaded rotary terminals are derived from the wrap attachments and fixed shaft mounts;
+    explicit `BeltIdler` sources identify free terminals.
   - These source records describe motion relations and reference the same belt network; they
     must not compile into independent copies of its springs.
   - Resolve a driven pulley's scalar stiffness with the other driven pulleys free only for
@@ -1479,6 +1483,24 @@ predict `2F/(3k)`, understating deflection by one third.
   invariance to source-record order, and that referencing one belt several times does not
   multiply its stiffness. Reject unresolved attachments and unsupported elastic mechanisms
   with a useful diagnostic instead of treating them as rigid.
+
+X10b implementation: AssemblyDefinition schema 3, MachineKit schema 8 and RobotModel schema 8
+carry derived network snapshots with stable new wire ids. Each shaft belt owns its motion
+couplings once, and its spans preserve shaft coordinates through the constrained energy solve.
+Adjoining spans share one tooth-contact clearance. A stated two-terminal spring scales the
+whole network; pairwise stiffness overrides on a multi-output belt are rejected.
+
+The supported shaft-loop model has fixed free-path geometry. Rebuild checks joint perturbations
+and authored travel endpoints, rejecting moving tensioners/eccentric paths whose stretch Jacobian
+is not represented. Carriage belts remain their existing scalar elastic paths; a separate
+shaft-reduction belt and carriage belt combine in the same constrained solve. A loop mixing shaft
+reduction and carriage sources is explicitly rejected pending a full geometric span Jacobian,
+rather than silently counting their springs twice. This preserves current carriage/CoreXY
+baselines and leaves the generic span-coordinate format available for that extension.
+
+Focused analytic checks cover the three-span matrix, load combinations, contact clearance,
+source order, serialization, common-axis screw constraints and series compliance. The combined
+suite is pending X10d; no existing example baseline has intentionally changed in X10b.
 
 #### X10c — Belt-path cleanup
 

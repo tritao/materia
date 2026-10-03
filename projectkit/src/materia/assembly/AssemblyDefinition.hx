@@ -149,6 +149,33 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(11) @:optional var assumptions:Null<ReadOnlyArray<QuantityAssumption>>;
 }
 
+/** A derived elastic span; displacement coefficients use assembly length per joint unit. */
+@:wire typedef AssemblyElasticTerm = {
+	@:id(1) var joint:String;
+	@:id(2) var coefficient:Float;
+}
+
+@:wire typedef AssemblyElasticSpan = {
+	/** Axial force per assembly length, N/mm in a millimetre assembly. */
+	@:id(1) var stiffness:Float;
+	@:id(2) var terms:Array<AssemblyElasticTerm>;
+}
+
+/** One physical elastic network replaces the scalar springs of its listed motion couplings. */
+@:wire typedef AssemblyElasticClearance = {
+	@:id(1) var joint:String;
+	/** Bounded tooth motion in this joint's coordinate units. */
+	@:id(2) var allowance:Float;
+}
+
+@:wire typedef AssemblyElasticNetwork = {
+	@:id(1) var id:String;
+	@:id(2) var couplings:Array<String>;
+	@:id(3) var spans:Array<AssemblyElasticSpan>;
+	@:id(4) @:optional var assumptions:Array<QuantityAssumption>;
+	@:id(5) @:optional var clearances:Array<AssemblyElasticClearance>;
+}
+
 /**
  * A motor driving a joint directly: its usable torque (N m) or force (N), its usable speed in the
  * joint's units per second, and the inertia of its rotor (kg m²), which turns with the joint.
@@ -231,6 +258,7 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(7) @:optional var mates:Array<AssemblyMate>;
 	@:id(8) @:optional var actuators:Array<AssemblyActuator>;
 	@:id(9) @:optional var encoders:Array<AssemblyEncoder>;
+	@:id(10) @:optional var elasticNetworks:Array<AssemblyElasticNetwork>;
 }
 
 /**
@@ -252,6 +280,7 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(10) @:optional var mates:Array<AssemblyMate>;
 	@:id(11) @:optional var actuators:Array<AssemblyActuator>;
 	@:id(12) @:optional var encoders:Array<AssemblyEncoder>;
+	@:id(13) @:optional var elasticNetworks:Array<AssemblyElasticNetwork>;
 }
 
 @:wire typedef AssemblyJointCoordinate = {

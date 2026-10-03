@@ -68,7 +68,7 @@ private typedef MutableIncludedRecord = {var id:String; var pose:AssemblyFrame; 
 
 /** Reusable, prefixable assembly made from MachineComponents and named connector references. */
 class MachineAssembly {
-	public static inline var SCHEMA_VERSION:Int = 7;
+	public static inline var SCHEMA_VERSION:Int = 8;
 	/** Findings from rebuilding sources; invalid transmissions remain available for repair. */
 	public final diagnostics:Diagnostics = new Diagnostics();
 	final members:Array<AssemblyMember> = [];
@@ -789,6 +789,23 @@ class MachineAssembly {
 		for (transmission in transmissions) {
 			var refreshed = applyTransmission(transmission);
 		}
+		mechanical.elasticNetworks = null;
+		for (path in beltPaths) {
+			var reduction = false;
+			for (record in transmissions) switch record.source {
+				case BeltReduction(belt, _, _) if (belt == path.belt): reduction = true;
+				case _:
+			}
+			if (!reduction) continue;
+			try {
+				var belt:machinekit.transmission.TimingBelt = cast requireMember(path.belt);
+				var network = machinekit.transmission.BeltElasticity.build(belt, path, transmissions, mechanical, requireMember);
+				if (mechanical.elasticNetworks == null) mechanical.elasticNetworks = [];
+				mechanical.elasticNetworks.push(network);
+			} catch (error:machinekit.transmission.TransmissionDesignError)
+				diagnostics.error("transmission.parts", path.belt, error.message);
+		}
+
 	}
 
 	function resolveTransmission(record:machinekit.assembly.MachineAssemblyDescription.TransmissionRecord,
@@ -1294,6 +1311,8 @@ class MachineAssembly {
 			model.couple(join(prefix, coupling.id), join(prefix, coupling.source),
 				join(prefix, coupling.target), coupling.ratio, coupling.offset, coupling.efficiency,
 				coupling.stiffness, coupling.backlash, coupling.drag, coupling.assumed, coupling.assumptions);
+		if (mechanical.elasticNetworks != null) for (network in mechanical.elasticNetworks)
+			model.addElasticNetwork(materia.assembly.AssemblyDefinitionFlattener.copyElasticNetwork(network, id -> join(prefix, id)));
 		var compiled = compileMotors();
 		for (actuator in compiled.actuators) model.actuateDrive(copyActuator(actuator, prefix));
 		for (encoder in compiled.encoders)
