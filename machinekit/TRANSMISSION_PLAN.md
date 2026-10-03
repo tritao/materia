@@ -1374,7 +1374,9 @@ the 24 V → supply-derived wheel limits and the `RobotArm.hx` changes.
 
 ### X10 — Belt reductions and loops between shafts
 
-Status: planned (2026-10-03), after X9.
+Status: planned (2026-10-03), after X9. Shared belt-span elasticity approved; implementation
+has not started. Keep one commit per X10a–X10d and run the combined full suite after the
+complete milestone, as requested, rather than after each edit or step.
 
 X9c derives belt stiffness from the belt's path, but only for a belt clamped to a sliding
 carriage: `BeltStretch` throws unless the leader is prismatic. Common drives that turn a shaft
@@ -1390,6 +1392,11 @@ through a belt can't be modelled with real parts:
 Faking these as `GearMesh` gets the direction wrong (a belt keeps the turning direction) and has
 no belt stretch.
 
+One physical belt must compile to one elastic network. MachineKit owns its attachments,
+geometry and belt-family assumptions; RobotKit solves the derived span network under the
+combined loads. Pairwise stiffness is a result of that network under stated boundary conditions,
+not a collection of independent springs replacing the belt.
+
 #### X10a — `BeltReduction`
 
 - New source kind `BeltReduction(belt, driver, driven)`. Both pulleys are `TimingPulley` members
@@ -1397,24 +1404,30 @@ no belt stretch.
   - **Ratio:** `driver.teeth / driven.teeth` (follower radians per leader radian). A belt keeps
     the turning direction, so `Same` means both turn the same way about the belt plane's normal.
   - **Efficiency and drag:** the belt family's values, as for `TimingBelt`.
-  - **Stiffness at the leader (N·m/rad), from the same belt-path code:**
+  - **Stiffness at the leader (N·m/rad), as the two-terminal case of the span network:**
     - hold the driven pulley's teeth in place;
     - turn the leader by a small angle;
     - measure the stretch of the two belt paths between the pulleys;
     - stiffness = `EA · (da²/a + db²/b)`, with the stretch per radian.
 
-    For a pretensioned two-pulley loop this is `EA (1/L₁ + 1/L₂) r_driver²`. Without pretension
-    only the tight span carries load, so record which case is modelled and label it assumed.
+    For a pretensioned two-pulley loop this is `EA (1/L₁ + 1/L₂) r_driver²`, where the free
+    lengths end at tooth engagement, rather than the middles of the engaged pulley arcs.
+    Convert N·mm/rad to N·m/rad at the assembly boundary. Record the assumed pretensioned
+    operating mode. A slack span cannot be modelled as a bilateral linear spring: either solve
+    tension-only spans with stated pretension and load direction, or reject the unsupported
+    mode explicitly; do not silently apply the two-span formula without pretension.
   - **Backlash:** a timing-belt tooth-clearance allowance at the driven pulley's pitch circle,
     converted to leader radians. It is an assumed belt-family value until there's catalog data.
-- `BeltStretch` generalises from "clamp on a sliding leader" to "a held point on the loop and a
-  moving point". A clamp on a carriage (prismatic leader) and a held pulley tooth (revolute
-  leader) are the two cases of one function. Remove the prismatic-only check.
+- `BeltStretch` generalises to elastic paths between attachments. A clamp on a carriage
+  (prismatic leader) and teeth engaged on a pulley (revolute leader) use the same span-energy
+  calculation. Remove the prismatic-only check. Validate that each pulley follows its stated
+  joint and that its axis is aligned with the belt-plane normal; account for local axis signs.
 - **Router or CoreXY-style axis drive through a reduction:** a motor pulley drives a big pulley
   whose shaft carries the carriage belt's drive pulley. That is `BeltReduction` from motor to
-  shaft plus `TimingBelt` from shaft to carriage. `DriveLoads`/`DriveCompliance` already chain
-  compliance through couplings; check that the reduction's spring and the carriage belt's spring
-  add in series at the axis.
+  shaft plus `TimingBelt` from shaft to carriage, with coupling orientation following the
+  assembly's planning-coordinate convention. Preserve the intermediate shaft as an elastic
+  coordinate until the solve eliminates it. Check that the two networks' compliances add in
+  series at the axis, with squared ratio scaling, and that each spring is counted once.
 
 #### X10b — Belt loops with several driven pulleys
 
@@ -1422,9 +1435,44 @@ no belt stretch.
   or a reduction with a tensioner idler.
   - Each driven pulley gets its own `BeltReduction(belt, driver, drivenN)`; idlers on the loop use
     `BeltIdler`.
-  - Each driven pulley's stiffness is resolved with the other driven pulleys free.
-  - The shared-axis stiffness rule from X9c handles the screws' combined load.
-  - Check: a loop's tooth count and its wraps must agree, as for any belt.
+  - These source records describe motion relations and reference the same belt network; they
+    must not compile into independent copies of its springs.
+  - Resolve a driven pulley's scalar stiffness with the other driven pulleys free only for
+    reporting and two-terminal verification. Combined loads use the full network.
+  - Check: a loop's tooth count, wrap radii, pulley profiles and attachment order must agree,
+    as for any belt. Free idlers pass tension and contribute their bearing drag and inertia;
+    they do not anchor the belt elastically.
+
+The original shared-axis claim was incomplete: X9c's motor-coordinate Jacobian handles CoreXY
+loads, but cannot represent independent stretch between several loaded pulleys on one loop.
+For three equal free spans with stiffness `k = EA/L`, holding the motor gives the two outputs
+the stiffness matrix `k [[2, -1], [-1, 2]]`. Either output with the other free measures `1.5k`.
+With equal force `F` on both, the actual deflection is `F/k` at each; independent `1.5k` springs
+predict `2F/(3k)`, understating deflection by one third.
+
+- **MachineKit:** derive each free span's length and attachment-displacement coefficients
+  from the posed belt path. Split a span at a clamp; exclude engaged arcs at loaded pulleys;
+  retain the free paths through freely turning idlers. Each span contributes energy
+  `EA/(2L) · (delta_length)²`. Preserve pulley coordinates and shared belt identity so the
+  solver can distinguish separate loads. Material stiffness and tooth-clearance assumptions
+  live in the belt family; overrides have an explicit scope and cannot duplicate a network.
+- **Assembly bridge:** carry the derived network into RobotKit with explicit units and joint
+  references. Save physical sources and attachments as the authority, and derive the network
+  on every rebuild. If a derived snapshot is stored, replace it from those sources on load.
+  Keep existing wire ids stable, allocate new ids and bump affected current schema versions;
+  reject older schemas as in X9b, without adding compatibility paths.
+- **RobotKit:** assemble span energies together with other transmission springs, held-motor
+  constraints and the actual mechanical constraints joining screws to a common carriage.
+  Apply loads at the coordinates they act on, then eliminate internal coordinates to obtain
+  axis deflections. Nominal motion couplings must not rigidly suppress the stretch being
+  solved. A shared motor's summed motion relation alone is not a multi-screw constraint.
+  Keep existing non-belt drive behavior and the CoreXY coordinate mapping intact.
+- **Checks:** verify the analytic two-pulley spring, the three-span matrix above (equal,
+  unequal and single-output loads), a free idler, 2–4 screw outputs on a common axis, and a
+  carriage belt in series with a reduction. Check signs, units, energy symmetry, force balance,
+  invariance to source-record order, and that referencing one belt several times does not
+  multiply its stiffness. Reject unresolved attachments and unsupported elastic mechanisms
+  with a useful diagnostic instead of treating them as rigid.
 
 #### X10c — Belt-path cleanup
 
@@ -1434,8 +1482,12 @@ no belt stretch.
 - `BeltStretch` copies the whole assembly through JSON encode/decode on every resolve. Pose a
   shared copy once per rebuild for all belts, and measure the router's rebuild time before and
   after.
-- Record in the plan that belt stiffness is the weakest over the sampled travel (a conservative
-  constant), and that mid-travel deviation is therefore overstated.
+- Record the pose-sampling policy. The existing scalar stiffness is the weakest over sampled
+  travel, a conservative constant that overstates mid-travel deviation. For a shared network,
+  preserve each complete sampled matrix: independent minima of matrix entries or pairwise
+  springs do not establish a conservative network. Evaluate the network at the requested pose,
+  or use a documented conservative envelope over complete samples; do not claim an envelope
+  covers unsampled travel without justification.
 
 #### X10d — Example
 
@@ -1444,8 +1496,11 @@ screw router's Z motor back beside its screw with a 2:1 `BeltReduction` (it then
 gantry), or give the robot arm's wrist a belt stage. Record how Z speed, acceleration and
 stiffness change against the direct-coupled Z, with a reason for each.
 
-Validation as in X7–X9: one commit per step with the full suite passing, and every changed number
-recorded here with a reason.
+Validation: one commit per step, focused checks when needed during implementation, and the
+combined full suite (`/home/joao/dev/materia-cache/claude-scratch/x7-suite.sh <tag>`) after X10d.
+Record the final gate result, every changed baseline with its physical reason, and the router
+rebuild timings here. Reconcile any fixes into their owning step commits. Do not claim untested
+intermediate commits passed the full suite. No pushing, merging into main or submodule changes.
 
 ### Later
 
