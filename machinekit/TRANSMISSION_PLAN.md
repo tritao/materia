@@ -1372,6 +1372,88 @@ and 3 goals.
 Merge order: X7–X9 onto local main first, then rebase the `mobile-welder` branch. It must take
 the 24 V → supply-derived wheel limits and the `RobotArm.hx` changes.
 
+#### X9e — Review fixes for X9
+
+Status: planned (2026-10-03), from a review of X9 on local main `4b952231f` (X9 merged with the
+robot welder). X9 fixed what X9a–d set out to fix, but broke things outside its test gate and left
+some model errors. Fix them in this order. The gate is the **full** set: `x7-suite.sh` plus the app's
+worker demo (`WorkerDemoTests`), the humanoid tools and the robot welder checks, which X9's gate
+didn't cover.
+
+**Breaks (fix first):**
+
+- **Worker examples don't open.** `app/examples/worker-rack-to-table.materia` and
+  `worker-gallery.materia` embed a `cadkit.document` at v9. Since X9b only v11 loads, so the Start
+  page examples and `--worker-demo` fail. Regenerate rack-to-table with the current code, then the
+  gallery from it (`app/tools/make-worker-gallery.py`). Add both to the gate.
+- **Plan check uses the wrong axes for partial plans.** `PlanCheck.hx` (around line 205) builds
+  forces only for the plan's axes, but `loads[0].elastic` is a `DriveCompliance` over every driven
+  axis in the model, and `DriveCompliance.deflections` never checks the size.
+  - Build the compliance for the plan's axes: other axes are held by their own drives.
+  - Make `deflections` reject a size mismatch.
+  - Test with a model that has a driven axis outside the plan, ordered before the plan's axes.
+- **Under-actuated coupled pairs throw everywhere.** `DriveLoads.of` always inverts the shared
+  matrix (`DriveCompliance.invert` throws "singular coupling Jacobian"), and `RobotModel.steadyForce`
+  and the effective limits go through it.
+  - A CoreXY with one motor bound (mid-edit) must give a design diagnostic and per-axis limits
+    from what is driven, not a throw.
+  - Build loads and the matrix once per model, not once per `forAxis` call.
+- **Humanoid mixed scene arm is frozen.** `robotkit/tools/humanoid/src/humanoid/MixedScene.hx:55`
+  sets `velocity = 0.0`, which X9a made a real cap of 0. Use `null` or a real cap. Make its check
+  prove the arm moves, not just that it matches the arm alone.
+- **Sensor documents don't reload.** `app/src/SensorConfiguration.hx` saves missing limits as
+  `null` but loads them with `finite()`. Load them as nullable, and save `maxAcceleration` and the
+  mechanical limits too. Test the round-trip with a URDF joint that has no velocity limit.
+
+**Model errors:**
+
+- **Gearbox input inertia.** `Gearbox`'s default 5e-5 kg·m² for every size is about 17× the 50 W
+  servo's rotor; real 60 mm planetary and size 14–17 strain-wave heads are about 1e-6–8e-6. Scale it
+  with gearbox size (or take it from catalog entries), labelled assumed. Re-record the arm's numbers.
+- **Idler drag.** `BeltIdler` resolves with the belt family's drag, so CoreXY (5 idlers a belt) counts
+  belt drag about 6× and applies it to both axes even when an idler doesn't turn. Use an idler
+  bearing drag, and apply it only along the axes that turn that idler. Re-record CoreXY's
+  acceleration (57.96 → 38.26 m/s² came from this).
+- **Belt stiffness minimum on 2-D paths.** `BeltStretch` samples only the leader's own travel, with
+  other joints at their defaults. For a clamp that moves with two axes (CoreXY), search the joint
+  workspace (corners plus the balanced-length points) for the softest pose. With no travel limits,
+  report that the minimum is unknown instead of using the default pose alone.
+- **Mobile base envelope vs acceleration.** `robotkit/mobile/MobileBase.hx` scales the command to
+  the velocity envelope after `motionLimits.constrain`, so a turn request can cut forward speed in
+  one tick. Apply the envelope before the acceleration limits, so deceleration stays within them.
+  Make the preview check test something `constrain()` doesn't guarantee by construction.
+- **Rebuilt end effectors keep diagnostics.** `MachineAssembly.copyInto` (used by
+  `EndEffector.fromDescription` and `EndEffectorSet.fromDescription`) drops `diagnostics`, so a
+  tool's design error resurfaces as a throw in `addTo`. Copy them.
+- **Smaller:**
+  - Gearbox mass: derive it from size (or catalog) on every rebuild, not a saved `massKg`, and
+    label it assumed.
+  - A stated stiffness skips the belt-geometry derivation instead of failing with it.
+  - `MachineKitRobotCompiler` must not save a requested planning speed/acceleration as a mechanical
+    limit.
+  - A stated effort of 0 means the same in runtime, simulation and MuJoCo (today: fault vs unlimited).
+  - `writeTransmission` clears a screw speed cap when a later resolve has none.
+  - The recipe-catalog test covers every catalog-backed parameter, not only ones named `servo`.
+
+**Stale docs from X9b:**
+
+- `robotkit/robotd/README.md` (layout channels no longer state `microsteps`; layouts carry
+  `schemaVersion: 1`) and `robotkit/runtime/DEVICE_PROTOCOL.md` ("legacy models may state them").
+- CadKit: `MODELING.md` ("older documents remain readable"), `TopologyFingerprint.hx` comments,
+  `cadkit/plans/TOPOLOGICAL_NAMING.md` and `CONSTRAINT_SOLVING.md` (the deleted pre-v10
+  `BOX_FILLET_V10` case is still listed as passing).
+- `projectkit/README.md` (scene artifact v10) and `machinekit/TODO.md` (compatibility reader).
+
+Also record in this plan that X9b removed CadKit `DocumentCodec` v1–v10 and the BimKit v2 import,
+beyond the kits X9b listed. The user accepted it with the no-compatibility policy.
+
+**Watch:** the welder arm now plans at its drive caps (2.09–4.03 rad/s) instead of the 2.0 rad/s
+fallback. Check the robot welder's timing expectations (`ProjectSourceTests.checkRobotWelder`) and
+re-record any that move.
+
+Each fix is committed with the full gate passing, and each changed number is recorded here with a
+reason.
+
 ### X10 — Belt reductions and loops between shafts
 
 Status: planned (2026-10-03), after X9. Shared belt-span elasticity approved; implementation
