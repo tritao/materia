@@ -13,6 +13,17 @@ to work.
   - `d7d3d0f14`: swept clearance of an arm and its tool against the cell's hulls (`ArmClearance`, `ClearanceTests`).
 - **The merge has not been built or run.** It resolved seven conflicts, all additions from both sides. The one
   behavioural change is that `MissionPlayer.toolArm` now uses main's `robot.toolFrames` for both suction and torch.
+- **Main has moved on, and it does not compile.** Local `main`, also pushed to origin, is `b99c948fa`: it adds
+  transmissions X5–X7 T1 on top of the welder merge.
+  - The welder merge left `app/WeldBeads.hx` without `SessionMember.beforeReset`, so the app does not compile there.
+  - This branch has the fix cherry-picked as `83d120520`, the same change as the machine-tending branch's `8dd23bec7`.
+  - Main gets the fix when this work or machine-tending is synced.
+- **The committed branch merges with main cleanly.** The uncommitted draft overlaps main in two files:
+  - `machinekit/examples/robot-arm/RobotArm.hx`: the draft adds `ArmTool.ready()` and overrides `specs[i].initial`,
+    while main (X8) rebuilt `ArmJointSpec` around a servo and gearbox through a `spec(...)` helper;
+  - `app/tests/src/app/ProjectSourceTests.hx`.
+- **Another session builds on this code.** A Codex session in the `machine-tending` worktree (MT1–MT5) uses `ArmTool`,
+  `ArmClearance` and the mission machinery from this branch. Its gripper tool implements `ArmTool`.
 - **Uncommitted W4 work in progress** sits in the worktree from a session that stopped midway. Its state is unknown, and
   it may not compile:
   - `processkit/WeldCorner.hx`: the corner-turn rule;
@@ -45,6 +56,12 @@ to work.
   - run RobotKit world tests and the MotionKit suite only when you touched those kits;
   - never rerun suites you didn't affect, and run heavy suites one at a time (parallel heavy runs get killed with exit
     137).
+- **No legacy compatibility** (the user's rule). Old saved data is not migrated or quietly reinterpreted. Each saved
+  format has one current schema version, and anything else is rejected with one generic message. When a format changes,
+  bump its version, delete the old handling, and regenerate examples and fixtures instead of keeping legacy ones.
+- **Don't break the other session's API.** Don't add required methods to `ArmTool`: machine-tending implements it, and
+  Haxe interfaces have no default methods. Put optional tool data in the constructor of `RobotArm` or of the tool instead.
+  Keep `ArmClearance` and the `MissionPlayer` step machinery source-compatible, or call out every change in your report.
 - **Model cleanly.** Derive things from the CAD (seams, frames, wire, stickout, grounding, names). Put each policy in the
   layer that owns it. Respect `robotkit/ARCHITECTURE.md`: Cartesian, tool and work concepts stay above `RobotRuntime` and
   the native runtime. Match the surrounding code's style and comment density.
@@ -133,8 +150,19 @@ Goal: the cell's default mission welds every seam of the weldment. That is 10 se
 tube posts with four 40 mm sides each, welded as chains. Every approach, weld path and retract must be checked clear,
 and nothing in the mission may be hard-coded.
 
-0. **Check the starting point.** Compile everything the merge and the draft touch: run each affected kit suite once,
-   then the app `--compiler-only` build. Fix the draft until it compiles.
+0. **Bring in main, then check the starting point.**
+   1. Set the draft aside with `git stash push -u -m mobile-welder-w4-draft-<date>` and record its SHA from
+      `git stash list --format='%H %gs'`.
+   2. Merge `main` into `mobile-welder`. It merges cleanly.
+   3. Restore the draft with `git stash apply <sha>`.
+   4. Resolve `RobotArm.hx` onto main's servo/gearbox `spec(...)` layout. Give the welding tool's ready pose without
+      adding a method to `ArmTool` (see the ground rules). Resolve `ProjectSourceTests.hx` too.
+   5. Drop the stash entry, finding its current index by its tag first.
+   6. Delete the pre-path weld decoding in `SceneArtifact.hx`: the "A weld written before paths existed" branch in the
+      weld step's decoder. A step without `path` is rejected.
+   7. Compile everything the merge and the draft touch: each affected kit suite once, then the app `--compiler-only`
+      build. Fix the draft until it compiles.
+   8. Run `PROJECT_SOURCE_ONLY=welder` and `arm` once. This merge also checks main's X8 arm drives against the welder.
 1. **Corner-turn length is derived, not fixed** (`WeldCorner`). Derive it from the reorientation angle and the wrist's
    angular speed and acceleration limits at the weld's travel speed, so the tool tip keeps travel speed while turning.
    - Bound it, at most 45% of either segment, and document the rule.
@@ -198,7 +226,8 @@ still meaningful.
    - The recipe splits a leg beyond a single-pass maximum (about 8 mm) into root, fill and cap passes, with their own
      process values and torch offsets in the seam frame (toward each face, and lifted by the metal already deposited).
    - The scene file's `weld` step gains `passes`: one path and process per pass, or a pass list over one path. Choose
-     cleanly, keep older steps loading, and validate.
+     cleanly and validate. Under the no-legacy rule, bump the scene artifact version, reject older ones, and regenerate
+     the examples.
    - **Earlier beads count as grounded work for later passes,** so arc length and touch see the deposited metal: grounded
      work gains the bead's runtime geometry, or a convex approximation per station.
    - Interpass: an optional dwell (a stand-in for cooling).
