@@ -8,29 +8,54 @@ enum EndEffectorControl {
 	Gripper(channel:String, member:String, openPort:String, closePort:String);
 	Vacuum(channel:String, member:String, inletPort:String);
 	Lock(channel:String, member:String, inletPort:String);
+	/** An arc torch's trigger: the channel that lights its arc and the control inlet it drives. */
+	Arc(channel:String, member:String, controlPort:String);
 }
 
 /** Where a suction cup meets what it holds: its member and its contact connector. */
 typedef SuctionContact = {member:String, connector:String};
 
 /**
+ * An arc torch and the channels that work it, named `<prefix>/<member>.<signal>`:
+ * - `channel`, digital: lights the arc (the `Arc` control);
+ * - `wireSpeedChannel`, analog: the wire feed speed, in metres per minute;
+ * - `voltageChannel`, analog: the voltage setpoint, in volts;
+ * - `sensor`, a `tool_weld` frame: arc established, current (A), voltage (V), touch, fault code and the
+ *   mains power the supply draws (W), in that order.
+ * `controlPort` is the inlet the channels drive through the feeder and the supply, and
+ * `tcpConnector` is the wire tip.
+ */
+typedef ArcTorchControl = {
+	member:String, channel:String, wireSpeedChannel:String, voltageChannel:String, sensor:String,
+	controlPort:String, tcpConnector:String
+};
+
+/**
  * What it takes to run an end effector, read from the capabilities its parts declare: the digital
  * controls that work its gripper, vacuum and changer lock, each on a channel named
  * `<prefix>/<member>.<action>`; the vacuum pressure sensor, if it has one, as
- * `<prefix>/<member>.<signal port>`; and where its suction cups touch. Each control drives a
- * consumer inlet of the right service that its configuration supplies. A runtime, real or simulated,
- * binds these; nothing here depends on one.
+ * `<prefix>/<member>.<signal port>`; where its suction cups touch; and its arc torches, each with
+ * the arc channel `<prefix>/<member>.arc` and, with it, the wire speed, voltage and weld sensor of an
+ * `ArcTorchControl`. Each control drives a consumer inlet of the right
+ * service that its configuration supplies. A runtime, real or simulated, binds these; nothing here
+ * depends on one.
  */
 class EndEffectorControls {
 	public final controls:Array<EndEffectorControl>;
 	public final vacuumSensor:Null<String>;
 	public final suctions:Array<SuctionContact>;
+	public final arcs:Array<ArcTorchControl>;
 
-	function new(controls:Array<EndEffectorControl>, vacuumSensor:Null<String>, suctions:Array<SuctionContact>) {
+	function new(controls:Array<EndEffectorControl>, vacuumSensor:Null<String>, suctions:Array<SuctionContact>,
+			arcs:Array<ArcTorchControl>) {
 		this.controls = controls;
 		this.vacuumSensor = vacuumSensor;
 		this.suctions = suctions;
+		this.arcs = arcs;
 	}
+
+	/** The first arc torch's channel, or null when the effector has none. */
+	public function arcChannel():Null<String> return arcs.length == 0 ? null : arcs[0].channel;
 
 	/** The vacuum control's channel, or null when the effector has none. */
 	public function vacuumChannel():Null<String> {
@@ -45,6 +70,7 @@ class EndEffectorControls {
 		if (configuration == null) throw "End effector configuration is required";
 		var controls:Array<EndEffectorControl> = [];
 		var suctions:Array<SuctionContact> = [];
+		var arcs:Array<ArcTorchControl> = [];
 		var sensorId:Null<String> = null;
 		var hasGripper = false, hasVacuum = false, hasLock = false;
 		var hasExplicitVacuumValve = false;
@@ -87,11 +113,17 @@ class EndEffectorControls {
 					sensorId = '$name.$signalPort';
 				case Suction(_, _, _, contactConnector):
 					suctions.push({member: member.id, connector: contactConnector});
+				case ArcTorch(tcpConnector, controlPort):
+					requireInlet(configuration, member.id, controlPort, [PortKind.Signal]);
+					if (arcs.length > 0) throw "Ambiguous arc torch runtime ports";
+					controls.push(Arc('$name.arc', member.id, controlPort));
+					arcs.push({member: member.id, channel: '$name.arc', wireSpeedChannel: '$name.wire_speed',
+						voltageChannel: '$name.voltage', sensor: '$name.weld', controlPort: controlPort, tcpConnector: tcpConnector});
 				case _:
 			}
 		}
 		if (sensorId != null && !hasVacuum) throw "Vacuum pressure sensor has no bound vacuum actuator";
-		return new EndEffectorControls(controls, sensorId, suctions);
+		return new EndEffectorControls(controls, sensorId, suctions, arcs);
 	}
 
 	static function requireInlet(configuration:EndEffector, instanceId:String, portName:String, allowed:Array<PortKind>):Void {

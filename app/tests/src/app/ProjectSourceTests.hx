@@ -823,6 +823,318 @@ class ProjectSourceTests {
   }
 
   /**
+   * The welding cell opens with its torch and a mission that welds one T-joint fillet. On MuJoCo the arm welds it: the
+   * simulated welder lights the arc at the seam's start, the torch follows the seam, and the bead the welder deposited
+   * reaches the leg the weldment asked for along the seam's length. A second run loses the arc part-way: the weld is
+   * interrupted, the torch re-approaches and restarts with an overlap, and the bead is continuous.
+   */
+  static function checkRobotWelder(root:String):Void {
+    checkRobotWelderOn(root, ApplicationSimulation.MUJOCO, "MuJoCo");
+    checkRobotWelderOn(root, ApplicationSimulation.DETERMINISTIC, "test backend");
+    checkWeldInTheAir(root);
+    checkWeldCraterFault(root);
+    checkWeldFollowsWorkpiece(root);
+    checkWeldPost(root);
+  }
+
+  /** A welder cell open in the simulation on MuJoCo, from one of the example's manifests. */
+  static function openWelder(root:String, manifestName:String, ?adjust:app.MateriaProjectRunner.GeneratedAssemblyScene -> Void):{session:ProjectDocumentSession,
+      simulation:ApplicationSimulation, mission:MissionPlayer, welder:robotkit.runtime.SimulatedWelder, beads:WeldBeads} {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-welder/" + manifestName);
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    if (adjust != null) adjust(generated);
+    var session = new ProjectDocumentSession(null, false);
+    session.openGeneratedProject(generated, manifest);
+    var simulation = new ApplicationSimulation(new RobotWorld());
+    simulation.setBackend(ApplicationSimulation.MUJOCO);
+    check(simulation.rebuild(session.sensors, session.scene, session), "the welding cell builds: " + simulation.error);
+    var mission = simulation.missionPlayer(), welder = simulation.welder(), beads = simulation.weldBeads();
+    if (mission == null || welder == null || beads == null) throw "the welding cell has no mission, welder or weld metal";
+    return {session: session, simulation: simulation, mission: mission, welder: welder, beads: beads};
+  }
+
+  /**
+   * A dropout of the supply while the crater is being filled, after the torch has travelled the whole seam, does not make
+   * the torch travel the seam again: the arc ends as the program ends it, the weld is finished, with no restart and no
+   * stretch welded twice.
+   */
+  static function checkWeldCraterFault(root:String):Void {
+    var cell = openWelder(root, "materia.project.json");
+    var simulation = cell.simulation, mission = cell.mission, welder = cell.welder;
+    var path = cell.beads.beadOf(0);
+    var bead = path.beads[0];
+    var target = 0.005;
+    var dropped = false;
+    var limit = simulation.activeSession().simulationTime() + 90;
+    while (mission.completed < 1 && simulation.activeSession().simulationTime() < limit) {
+      simulation.step();
+      if (mission.failure != null) throw 'the weld failed after ${simulation.activeSession().simulationTime()} s: ${mission.failure}';
+      // The crater fill piles metal into the last station: when it has, the supply drops out for a moment.
+      if (!dropped && bead.leg(bead.count - 1) > 1.25 * target) {
+        welder.supplyReady = false;
+        simulation.step();
+        welder.supplyReady = true;
+        dropped = true;
+      }
+    }
+    check(dropped, "the crater fill was reached");
+    check(mission.completed >= 1 && mission.failure == null, "the weld finishes in spite of the dropout in the crater: " + mission.failure);
+    var overlap = 0;
+    for (station in 0...bead.count) if (bead.runs(station) >= 2) overlap++;
+    check(mission.weldRestarts() == 0 && overlap == 0, 'a fault after the seam is travelled does not weld it again (${mission.weldRestarts()} restarts, $overlap mm overlap)');
+    check(Math.abs(bead.extent() - bead.length) <= 0.004 && bead.gaps() == 0, "and the bead is the seam's length, whole");
+    for (_ in 0...15) simulation.step();
+    check(!welder.reading().arc && welder.reading().fault == 0, "the arc is out and the welder clear afterwards");
+    Sys.println('robot welder: a dropout in the crater: finished in ${Math.round(simulation.activeSession().simulationTime() * 10) / 10} s, no restart');
+    simulation.clear();
+    cell.session.dispose();
+  }
+
+  /**
+   * The workpiece is not where it was designed: its table stands a few millimetres and degrees off. The weld step is
+   * given relative to the workpiece's reference member, so the weld finds the seam where the workpiece is: the wire tip
+   * follows the seam in its real place, and the bead is as good as for the workpiece as designed.
+   */
+  static function checkWeldFollowsWorkpiece(root:String):Void {
+    var shiftX = 6.0, shiftY = -4.0, turn = 3.0 * Math.PI / 180.0;
+    var cell = openWelder(root, "materia.project.json", function(generated) {
+      var definition = generated.assemblyDefinition;
+      if (definition == null) throw "the welding cell has an assembly";
+      var table = [for (occurrence in definition.occurrences) if (occurrence.id == "table") occurrence];
+      if (table.length != 1) throw "the welding cell has a table";
+      var pose = table[0].initialPose;
+      // The table's own origin is its centre; its pose is turned about it and moved (millimetres).
+      var q = [pose.qx, pose.qy, pose.qz, pose.qw], r = [0.0, 0.0, Math.sin(turn / 2), Math.cos(turn / 2)];
+      pose.qx = r[3] * q[0] + r[0] * q[3] + r[1] * q[2] - r[2] * q[1];
+      pose.qy = r[3] * q[1] - r[0] * q[2] + r[1] * q[3] + r[2] * q[0];
+      pose.qz = r[3] * q[2] + r[0] * q[1] - r[1] * q[0] + r[2] * q[3];
+      pose.qw = r[3] * q[3] - r[0] * q[0] - r[1] * q[1] - r[2] * q[2];
+      pose.x += shiftX;
+      pose.y += shiftY;
+    });
+    var simulation = cell.simulation, mission = cell.mission, welder = cell.welder, beads = cell.beads;
+    var generated = MateriaProjectRunner.loadProject(FileSystem.fullPath(root + "/machinekit/examples/robot-welder/materia.project.json"));
+    var weld:materia.project.SceneArtifact.SceneArtifactWeld = cast cast(generated.mission, materia.project.SceneArtifact.SceneArtifactMission).steps[0].weld;
+    var live = beads.referenceOf(0);
+    // Where the plate stood as designed: the seam's start in the world is the start in the plate's frame placed by the plate's pose.
+    var designed = new cadkit.modeling.AssemblyState(cast generated.assemblyDefinition, generated.assemblyState).worldPose("work/basePlate");
+    var moved = Math.sqrt(Math.pow(live.position[0] - designed.x * 0.001, 2) + Math.pow(live.position[1] - designed.y * 0.001, 2));
+    check(moved > 0.005, 'the workpiece stands ${moved * 1000} mm from where it was designed');
+    // The seam in the world as the plate really stands: the path's ends turned and placed by the plate's live pose.
+    function world(point:Array<Float>):Array<Float> {
+      var turned = AssemblyRobot.rotate(live.rotation, point);
+      return [for (axis in 0...3) turned[axis] + live.position[axis]];
+    }
+    var segment = weld.path[0];
+    var from = world(segment.start.position), to = world(segment.stop.position);
+    var along = [for (axis in 0...3) to[axis] - from[axis]];
+    var length = Math.sqrt(along[0] * along[0] + along[1] * along[1] + along[2] * along[2]);
+    var unit = [for (axis in 0...3) along[axis] / length];
+    var strayed = 0.0;
+    var limit = simulation.activeSession().simulationTime() + 90;
+    while (mission.completed < 1 && simulation.activeSession().simulationTime() < limit) {
+      simulation.step();
+      if (mission.failure != null) throw 'the weld failed after ${simulation.activeSession().simulationTime()} s: ${mission.failure}';
+      if (welder.reading().arc) {
+        var tip = welder.tip();
+        var relative = [for (axis in 0...3) tip[axis] - from[axis]];
+        var s = relative[0] * unit[0] + relative[1] * unit[1] + relative[2] * unit[2];
+        var off = Math.sqrt(Math.max(0.0, relative[0] * relative[0] + relative[1] * relative[1] + relative[2] * relative[2] - s * s));
+        strayed = Math.max(strayed, off);
+      }
+    }
+    check(mission.completed >= 1, "the weld of the displaced workpiece finishes");
+    var bead = beads.beadOf(0).beads[0];
+    check(strayed < 0.0008, 'the wire tip stayed within ${strayed * 1000} mm of the seam where the workpiece really is');
+    var achieved = bead.meanLeg(0.15, 0.85);
+    check(Math.abs(achieved - weld.legSize) <= 0.0005, 'the bead leg ${achieved * 1000} mm is within 0.5 mm of the ${weld.legSize * 1000} mm asked for');
+    check(Math.abs(bead.extent() - bead.length) <= 0.004 && bead.gaps() == 0 && beads.beadOf(0).stray < 0.1 * beads.beadOf(0).deposited,
+      "the bead is the seam's length, whole, and on the seam");
+    Sys.println('robot welder: workpiece ${Math.round(moved * 10000) / 10} mm off its design: tip within ${Math.round(strayed * 10000) / 10} mm of the seam, leg ${Math.round(achieved * 10000) / 10} mm');
+    simulation.clear();
+    cell.session.dispose();
+  }
+
+  /**
+   * One tube post's perimeter welds as a single step: four sides, the torch turning at each corner. The wire tip follows
+   * the four sides, and each side gets a bead of the leg asked for between its corners.
+   */
+  static function checkWeldPost(root:String):Void {
+    var cell = openWelder(root, "materia.post.project.json");
+    var simulation = cell.simulation, mission = cell.mission, welder = cell.welder, beads = cell.beads;
+    var generated = MateriaProjectRunner.loadProject(FileSystem.fullPath(root + "/machinekit/examples/robot-welder/materia.post.project.json"));
+    var weld:materia.project.SceneArtifact.SceneArtifactWeld = cast cast(generated.mission, materia.project.SceneArtifact.SceneArtifactMission).steps[0].weld;
+    check(weld.path.length == 4, "the post's step is a path of four sides");
+    var path = beads.beadOf(0);
+    var strayed = 0.0;
+    var restarts = 0;
+    var limit = simulation.activeSession().simulationTime() + 120;
+    while (mission.completed < 1 && simulation.activeSession().simulationTime() < limit) {
+      simulation.step();
+      if (mission.failure != null) throw 'the post weld failed after ${simulation.activeSession().simulationTime()} s: ${mission.failure}';
+      if (welder.reading().arc) {
+        // The tip is over some side (the bead decides which); how far from its line is the smallest distance to any side.
+        var tip = beads.toFrame(0, welder.tip());
+        var best = 1e9;
+        for (bead in path.beads) {
+          var relative = [for (axis in 0...3) tip[axis] - bead.start[axis]];
+          var along = relative[0] * bead.tangent[0] + relative[1] * bead.tangent[1] + relative[2] * bead.tangent[2];
+          var clamped = Math.min(bead.length, Math.max(0.0, along));
+          var off = Math.sqrt(Math.pow(relative[0] - bead.tangent[0] * clamped, 2) + Math.pow(relative[1] - bead.tangent[1] * clamped, 2) +
+            Math.pow(relative[2] - bead.tangent[2] * clamped, 2));
+          best = Math.min(best, off);
+        }
+        strayed = Math.max(strayed, best);
+      }
+    }
+    check(mission.completed >= 1, 'the post weld finishes within ${simulation.activeSession().simulationTime()} s');
+    restarts = mission.weldRestarts();
+    check(restarts == 0, 'the post is welded without losing the arc ($restarts restarts)');
+    check(strayed < 0.0015, 'the wire tip stayed within ${strayed * 1000} mm of the post\'s seams');
+    var legs:Array<Float> = [];
+    for (bead in path.beads) {
+      var leg = bead.meanLeg(0.3, 0.7);
+      legs.push(Math.round(leg * 10000) / 10);
+      check(Math.abs(leg - weld.legSize) <= 0.0006, 'a side\'s bead leg ${leg * 1000} mm is within 0.6 mm of the ${weld.legSize * 1000} mm asked for');
+      check(bead.extent() > bead.length - 0.004, 'a side is welded from corner to corner (${bead.extent() * 1000} mm of ${bead.length * 1000})');
+    }
+    check(path.gaps() == 0 && path.stray < 0.1 * path.deposited, "the post's bead has no gap and little missed the seams");
+    Sys.println('robot welder: post of four sides in one step: ${Math.round(simulation.activeSession().simulationTime() * 10) / 10} s, tip within ${Math.round(strayed * 10000) / 10} mm, legs ${legs.join("/")} mm');
+    simulation.clear();
+    cell.session.dispose();
+  }
+
+  /**
+   * A seam the torch holds the wire clear of the work never strikes: the supply faults for want of an arc, the weld retries
+   * its limited restarts, and then the mission stops with the reason, the arc out and no metal laid.
+   */
+  static function checkWeldInTheAir(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-welder/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var work:materia.project.SceneArtifact.SceneArtifactMission = cast generated.mission;
+    var seam:materia.project.SceneArtifact.SceneArtifactWeld = cast work.steps[0].weld;
+    // Move the seam off the work, 30 mm out of the corner on its open side: the torch follows it 30 mm above the plate and
+    // 30 mm from the upright.
+    for (end in [seam.path[0].start, seam.path[0].stop]) {
+      end.position[1] += 0.03;
+      end.position[2] += 0.03;
+    }
+    var session = new ProjectDocumentSession(null, false);
+    session.openGeneratedProject(generated, manifest);
+    var simulation = new ApplicationSimulation(new RobotWorld());
+    simulation.setBackend(ApplicationSimulation.MUJOCO);
+    check(simulation.rebuild(session.sensors, session.scene, session), "the welding cell builds: " + simulation.error);
+    var mission = simulation.missionPlayer(), welder = simulation.welder(), beads = simulation.weldBeads();
+    if (mission == null || welder == null || beads == null) throw "the welding cell has no mission, welder or weld metal";
+    var faults = 0, previous = 0;
+    var limit = simulation.activeSession().simulationTime() + 120;
+    while (mission.failure == null && simulation.activeSession().simulationTime() < limit) {
+      simulation.step();
+      var fault = welder.reading().fault;
+      if (fault != 0 && previous == 0) faults++;
+      previous = fault;    }
+    var failure = mission.failure;
+    check(failure != null && failure.indexOf("restarts") >= 0, "a weld in the air gives up after its restarts: " + failure);
+    check(faults >= 3, "the supply faulted for want of an arc each time ($faults)");
+    check(!welder.reading().arc && beads.beadOf(0).deposited == 0.0, "no arc burned and no metal was laid");
+    Sys.println('robot welder: a seam in the air: ${failure} after ${Math.round(simulation.activeSession().simulationTime() * 10) / 10} s, $faults no-arc faults');
+    simulation.clear();
+    session.dispose();
+  }
+
+  static function checkRobotWelderOn(root:String, backend:Int, label:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-welder/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var tools = generated.robotTools;
+    check(tools != null && tools.length == 1 && tools[0].kind == "torch" && tools[0].torch != null, "the cell carries a torch tool");
+    var work:materia.project.SceneArtifact.SceneArtifactMission = cast generated.mission;
+    check(work != null && work.steps.length == 1 && work.steps[0].kind == "weld", "the cell's mission welds one seam");
+    var seam:materia.project.SceneArtifact.SceneArtifactWeld = cast work.steps[0].weld;
+    var session = new ProjectDocumentSession(null, false);
+    session.openGeneratedProject(generated, manifest);
+    var simulation = new ApplicationSimulation(new RobotWorld());
+    simulation.setBackend(backend);
+    check(simulation.rebuild(session.sensors, session.scene, session), "the welding cell builds in the simulation: " + simulation.error);
+    var mission = simulation.missionPlayer(), welder = simulation.welder(), beads = simulation.weldBeads();
+    if (mission == null || welder == null || beads == null) throw "the welding cell has no mission, welder or weld metal";
+    simulation.step();
+    var restPose = welder.reading();
+    check(!restPose.arc && restPose.fault == 0 && !restPose.touch, "the torch rests with its arc out, no fault and no touch");
+    var path = beads.beadOf(0);
+    var bead = path.beads[0];
+    var target = seam.path.length == 1 ? seam.legSize : seam.legSize;
+    var log:Array<String> = [];
+    for (run in 0...2) {
+      if (run == 1) {
+        check(simulation.reset(), "the welding cell resets");
+        check(path.covered() == 0 && path.deposited == 0, "a reset leaves the workpiece bare");
+        check(session.scene.runtimePartNodes("project:" + seam.metal).length == 0, "a reset takes the bead off the weld metal part");
+        simulation.step();
+      }
+      var lost = false, established = 0, current = 0.0, peak = 0.0, lowest = 1e9, previousArc = false, ignited = 0.0, strayed = 0.0;
+      var limit = simulation.activeSession().simulationTime() + 90;
+      while (mission.completed < 1 && simulation.activeSession().simulationTime() < limit) {
+        simulation.step();
+        var failure = mission.failure;
+        if (failure != null) throw 'run $run: the weld failed after ${simulation.activeSession().simulationTime()} s: $failure';
+        var reading = welder.reading();
+        if (reading.arc) {
+          // How far the wire tip strays from the seam line while the arc burns.
+          var tip = beads.toFrame(0, welder.tip());
+          var relative = [for (axis in 0...3) tip[axis] - bead.start[axis]];
+          var along = relative[0] * bead.tangent[0] + relative[1] * bead.tangent[1] + relative[2] * bead.tangent[2];
+          var off = Math.sqrt(Math.max(0.0, relative[0] * relative[0] + relative[1] * relative[1] + relative[2] * relative[2] - along * along));
+          strayed = Math.max(strayed, off);
+          established++;
+          current = reading.currentA;
+          peak = Math.max(peak, current);
+          lowest = Math.min(lowest, current);
+          if (!previousArc && ignited == 0.0) ignited = simulation.activeSession().simulationTime();
+        }
+        previousArc = reading.arc;
+        // The second run loses the arc once, half way along the seam: the supply drops out for a moment.
+        if (run == 1 && !lost && bead.extent() > bead.length / 2) {
+          welder.supplyReady = false;
+          simulation.step();
+          welder.supplyReady = true;
+          lost = true;
+        }
+      }
+      check(mission.completed >= 1, 'run $run: the weld finishes within 90 s (${mission.stepIndex}, ${simulation.activeSession().simulationTime()} s)');
+      // The bead is shown on the weld metal part, one mesh chunk per 20 mm of seam, once the last growth is meshed.
+      for (_ in 0...15) simulation.step();
+      var shown = session.scene.runtimePartNodes("project:" + seam.metal).length;
+      check(shown == Math.ceil(bead.count / WeldBeads.CHUNK), 'run $run: the weld metal shows as $shown mesh chunks');
+      var reading = welder.reading();
+      check(!reading.arc && reading.fault == 0, 'run $run: the arc is out and the welder is clear afterwards');
+      check(established > 100, 'run $run: the arc was established for ${established} ticks');
+      check(peak > 200 && peak < 300, 'run $run: the arc ran near 250 A, peaking at $peak A');
+      check(strayed < 0.002, 'run $run: the wire tip stayed within ${strayed * 1000} mm of the seam while the arc burned');
+      // The bead: the leg reached is a result, compared with the leg asked for; the bead runs the seam's length.
+      var achieved = bead.meanLeg(0.15, 0.85);
+      var range = bead.legRange(0.15, 0.85);
+      check(Math.abs(achieved - target) <= 0.0005, 'run $run: the bead leg ${achieved * 1000} mm is within 0.5 mm of the ${target * 1000} mm asked for');
+      check(bead.gaps() == 0, 'run $run: the bead has no gap (${bead.gaps()} stations bare)');
+      check(Math.abs(bead.extent() - bead.length) <= 0.004, 'run $run: the bead is ${bead.extent() * 1000} mm long on a ${bead.length * 1000} mm seam');
+      check(path.stray < 0.1 * path.deposited, 'run $run: little metal missed the seam (${path.stray / path.deposited})');
+      var overlap = 0;
+      for (station in 0...bead.count) if (bead.runs(station) >= 2) overlap++;
+      if (run == 0) check(overlap == 0 && mission.weldRestarts() == 0, 'run 0: an undisturbed weld has no restart and no overlap');
+      else {
+        check(mission.weldRestarts() == 1, 'run 1: the weld restarted once (${mission.weldRestarts()})');
+        check(overlap >= 5 && overlap <= 25, 'run 1: the restart overlaps the bead by $overlap mm');
+      }
+      log.push('run $run: ${Math.round(simulation.activeSession().simulationTime() * 10) / 10} s, leg ${Math.round(achieved * 10000) / 10} mm ' +
+        '(${Math.round(range.min * 10000) / 10}..${Math.round(range.max * 10000) / 10}), bead ${Math.round(bead.extent() * 1000)} mm, ' +
+        '${established} ticks of arc up to ${Math.round(peak)} A, tip within ${Math.round(strayed * 10000) / 10} mm of the seam, ${overlap} mm overlap, ${mission.weldRestarts()} restarts, stray ' +
+        '${Math.round(100 * path.stray / path.deposited)}%');
+    }
+    simulation.clear();
+    session.dispose();
+    for (line in log) Sys.println('robot welder ($label): ' + line);
+  }
+
+  /**
    * The router example opens, its axes simulate as prismatic joints in metres, and its CNC job, CAM
    * made from a NEMA 23 motor plate, mills and drills the plate out of the stock in real time, changing
    * tools on the way: the stock loses exactly the plate's recesses and holes, nothing is cut from the
@@ -1354,6 +1666,16 @@ class ProjectSourceTests {
   }
 
   public static function main():Int {
+    var code = checks();
+    // No worker may still be planning when the process exits: the native library's destructors would run under it.
+    var planning = motionkit.robot.ProgramPlanner.active();
+    if (planning > 0) Sys.println('$planning program planners still planning at the end; waiting for them');
+    var running = motionkit.robot.ProgramPlanner.shutdown();
+    if (running != 0) throw 'The process is ending with $running program planners still running';
+    return code;
+  }
+
+  static function checks():Int {
     var flat = Bytes.alloc(4 * 24);
     for (index in 0...4) {
       flat.setDouble(index * 24, (index & 1) == 0 ? 0.0 : 2.0);
@@ -1382,7 +1704,7 @@ class ProjectSourceTests {
       root = parent;
     }
     Sys.setCwd(root);
-    // PROJECT_SOURCE_ONLY=mobile or =arm runs just those example's checks, for iterating on them.
+    // PROJECT_SOURCE_ONLY=mobile, =arm or =welder runs just those example's checks, for iterating on them.
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile") {
       checkMobileBase(root);
       checkMobileMission(root);
@@ -1396,6 +1718,10 @@ class ProjectSourceTests {
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "arm") {
       checkRobotArm(root);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "welder") {
+      checkRobotWelder(root);
       return 0;
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "router") {
@@ -1680,6 +2006,7 @@ class ProjectSourceTests {
     session.dispose();
     if (FileSystem.exists(output)) FileSystem.deleteFile(output);
     checkRobotArm(root);
+    checkRobotWelder(root);
     checkMates(root);
     checkCncRouter(root);
     checkBeltRouter(root);

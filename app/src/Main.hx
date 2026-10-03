@@ -759,7 +759,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
         startJob = null;
         startLoading = null;
       }
-      documents.requestClose(close);
+      // The process may not exit while a program is still being planned on a worker thread (see ProgramPlanner).
+      documents.requestClose(function() {
+        motionkit.robot.ProgramPlanner.shutdown();
+        close();
+      });
     };
     treeModel = new EditorSceneTree(scene, session.projectAssemblyDefinition, session.generatedLabels());
     if (hostContext != null) {

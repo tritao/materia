@@ -1,8 +1,10 @@
 package robotkit.runtime;
 
 import RobotKitRuntime;
+import robotkit.tool.ToolChannels;
 import robotkit.world.ProcessChannelDeclaration;
 import robotkit.world.ProcessEventCodec;
+import robotkit.world.ProcessEventValue;
 
 /**
  * Immutable-at-execution compiled robot description consumed by RobotRuntime.
@@ -23,6 +25,34 @@ class RobotRuntimeBlueprint {
   public final sensors:Array<RobotRuntimeSensorBlueprint> = [];
   public final channels:Array<ProcessChannelDeclaration> = [];
   public final links:Array<RobotRuntimeLinkBlueprint> = [];
+  /**
+   * Sets a tool's channels up with the safe values and stop policy the tool owns (`ToolChannels`). A channel the robot's
+   * setup declared already must say the same, or the tool is refused: a torch's arc cannot be left to keep its output
+   * through a stop because the setup declared it so.
+   */
+  public function addTool(tool:ToolChannels):Void {
+    if (tool == null) throw "A tool is required";
+    for (declaration in tool.declarations()) {
+      var existing:Null<ProcessChannelDeclaration> = null;
+      for (channel in channels) if (channel.id == declaration.id) existing = channel;
+      if (existing == null) {
+        channels.push(declaration);
+        continue;
+      }
+      if (existing.keepOnStop != declaration.keepOnStop || !RobotRuntimeBlueprint.sameValue(existing.safeValue, declaration.safeValue))
+        throw 'Channel "${declaration.id}" is declared with another safe value or stop policy than its tool needs (the tool ' +
+          (declaration.keepOnStop ? "keeps" : "drops") + " its output on a stop)";
+    }
+  }
+
+  static function sameValue(a:ProcessEventValue, b:ProcessEventValue):Bool
+    return switch [a, b] {
+      case [Digital(x), Digital(y)]: x == y;
+      case [Analog(x), Analog(y)]: x == y;
+      case [Process(c, x), Process(d, y)]: c == d && x == y;
+      case _: false;
+    };
+
   public var collisionApproximation:Int = RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
   /** MuJoCo self-collision is enabled unless this opt-out is set false. */
   public var selfCollision:Bool = true;

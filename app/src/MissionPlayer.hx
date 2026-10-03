@@ -10,7 +10,15 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.project.SceneArtifact.SceneArtifactMission;
 import materia.project.SceneArtifact.SceneArtifactMissionStep;
 import materia.project.SceneArtifact.SceneArtifactPlace;
+import materia.project.SceneArtifact.SceneArtifactRobotTool;
+import materia.project.SceneArtifact.SceneArtifactTorchPose;
+import materia.project.SceneArtifact.SceneArtifactWeld;
 import motionkit.robot.HandlingPlanRunner;
+import processkit.WeldingPlanRunner;
+import robotkit.skill.WeldPlan;
+import robotkit.skill.WeldSeam;
+import robotkit.spatial.Quat;
+import robotkit.spatial.Transform3;
 import robotkit.manipulation.Manipulator;
 import robotkit.model.Frame;
 import robotkit.skill.HandlePart;
@@ -77,7 +85,10 @@ typedef MissionOverlay = {
  * `place` are RobotKit's `HandlePart` with the robot's suction tool: the arm runs a MotionKit program
  * down onto the part's grasp connector, or onto its seat with the held part, read where they are when
  * the step starts; the program switches the tool's channel on the robot, the simulated tool holds or
- * lets go, and the skill reads the outcome on the tool's vacuum sensor.
+ * lets go, and the skill reads the outcome on the tool's vacuum sensor. `weld` is RobotKit's `WeldSeam` with the robot's
+ * torch: the arm runs a process run's MotionKit program along the seam the step carries, the program switches the torch's
+ * channels on the robot, the simulated welder strikes and holds the arc, and the skill reads the outcome on the torch's
+ * weld sensor (`WeldBeads` lays the metal beside it). A mission that does not loop stops after its last step.
  *
  * A robot with a lidar sees what the map lacks: RobotKit's `LidarObstaclePerception` reads each scan with
  * the returns the map explains removed (`LidarMapFilter`), the obstacles it finds join the costmap's
@@ -123,6 +134,8 @@ class MissionPlayer implements SessionMember {
   public var completed(default, null):Int = 0;
   /** Why the mission stopped, or null while it runs. */
   public var failure(default, null):Null<String> = null;
+  /** Every step is done and the mission does not loop: nothing more to run until a reset. */
+  public var finished(default, null):Bool = false;
 
   final robot:AssemblyRobot;
   var runner = new SkillRunner();
@@ -130,6 +143,10 @@ class MissionPlayer implements SessionMember {
   var handling:Null<HandlingPlanRunner>;
   /** Makes the arm's handling runner afresh: a reset starts the robot's runtime over, plans and all. */
   final newHandling:Null<Void->HandlingPlanRunner>;
+  /** The arm and its torch, when the mission welds; and the torch's weld sensor. */
+  var welding:Null<WeldingPlanRunner>;
+  final newWelding:Null<Void->WeldingPlanRunner>;
+  final weldSensor:Null<String>;
   /** Where the tool's contact rides: its link and its frame there, in metres. */
   var toolLink:Int = -1;
   var toolTip:Null<AssemblyFrame> = null;
@@ -208,7 +225,10 @@ class MissionPlayer implements SessionMember {
       wheels = new WheelOdometryLocalization(base, FRAME, robot.rootLink);
     }
     var handles = [for (step in mission.steps) if (step.kind == "pick" || step.kind == "place") step].length > 0;
+    var welds = [for (step in mission.steps) if (step.kind == "weld") step].length > 0;
+    if (handles && welds) throw "A mission picks and places, or it welds: the robot works with one tool on its arm";
     var suctions = [for (tool in project.robotTools) if (tool.kind == "suction") tool];
+    var torches = [for (tool in project.robotTools) if (tool.kind == "torch") tool];
     if (!handles) {
       handling = null;
       newHandling = null;
@@ -217,19 +237,39 @@ class MissionPlayer implements SessionMember {
       if (suctions.length != 1) throw 'A mission that picks needs one suction tool, the robot has ${suctions.length}';
       var tool = suctions[0];
       vacuumSensor = tool.sensor;
-      // The arm's tool frame: the tool's contact connector on the link that carries it.
-      var part = robot.part("project:" + tool.contact.occurrence);
-      var tcp = robot.toolFrames.get(tool.contact.occurrence);
-      if (tcp == null) throw 'The robot has no frame for tool "${tool.contact.occurrence}"';
-      toolLink = part.linkIndex;
-      toolTip = {x: tcp.position[0], y: tcp.position[1], z: tcp.position[2],
-        qx: tcp.rotation[0], qy: tcp.rotation[1], qz: tcp.rotation[2], qw: tcp.rotation[3]};
-      var model = robot.model;
-      var arm = new Manipulator(model, model.links[0].id, tcp.id);
+      var arm = toolArm(tool);
       newHandling = () -> HandlingPlanRunner.create(robot.robot, arm, () -> robot.runtime.pollEvents(), tool.channel,
         ARM_ACCELERATION);
       handling = newHandling();
     }
+    if (!welds) {
+      welding = null;
+      newWelding = null;
+      weldSensor = null;
+    } else {
+      if (torches.length != 1) throw 'A mission that welds needs one torch, the robot has ${torches.length}';
+      var tool = torches[0];
+      var torch = tool.torch;
+      if (torch == null || tool.sensor == null) throw "The robot's torch needs its welder and weld sensor";
+      weldSensor = tool.sensor;
+      var arm = toolArm(tool);
+      var channels = {arc: tool.channel, wireSpeed: torch.wireSpeedChannel, voltage: torch.voltageChannel};
+      newWelding = () -> WeldingPlanRunner.create(robot.robot, arm, () -> robot.runtime.pollEvents(), channels, ARM_ACCELERATION);
+      welding = newWelding();
+    }
+  }
+
+  /** The arm that works the tool: its tool frame is the tool's contact connector, on the link that carries it. */
+  function toolArm(tool:SceneArtifactRobotTool):Manipulator {
+    // The arm's tool frame: the tool's contact connector on the link that carries it, made with the robot.
+    var part = robot.part("project:" + tool.contact.occurrence);
+    var tcp = robot.toolFrames.get(tool.contact.occurrence);
+    if (tcp == null) throw 'The robot has no frame for tool "${tool.contact.occurrence}"';
+    toolLink = part.linkIndex;
+    toolTip = {x: tcp.position[0], y: tcp.position[1], z: tcp.position[2],
+      qx: tcp.rotation[0], qy: tcp.rotation[1], qz: tcp.rotation[2], qw: tcp.rotation[3]};
+    var model = robot.model;
+    return new Manipulator(model, model.links[0].id, tcp.id);
   }
 
   /** The boxes that stand in the robot's way: above the floor and below its height; the floor itself and overhead boxes are not. */
@@ -280,7 +320,7 @@ class MissionPlayer implements SessionMember {
   }
 
   public function feed():Void {
-    if (failure != null) return;
+    if (failure != null || finished) return;
     var snapshot = robot.robot.snapshot();
     localization.update(snapshot);
     trackWheels(snapshot);
@@ -305,12 +345,27 @@ class MissionPlayer implements SessionMember {
     stepIndex = 0;
     completed = 0;
     failure = null;
+    finished = false;
     grasped = null;
     wheelsSeeded = false;
     scanned = null;
     sensed = new PerceptionSnapshot();
     var make = newHandling;
     if (make != null) handling = make();
+    var makeWelding = newWelding;
+    if (makeWelding != null) welding = makeWelding();
+  }
+
+  /** The index of the weld step the robot is welding now, or -1 when it is not welding. */
+  public function weldingStep():Int {
+    if (failure != null || runner.status() != Running || mission.steps[stepIndex].kind != "weld") return -1;
+    return stepIndex;
+  }
+
+  /** How many times the arc was lost and the weld restarted, in the weld running or last run. */
+  public function weldRestarts():Int {
+    var active = welding;
+    return active == null ? 0 : active.restarts();
   }
 
   public function present():Void {}
@@ -322,7 +377,7 @@ class MissionPlayer implements SessionMember {
       if (stepIndex + 1 < mission.steps.length || mission.loop == true)
         stepIndex = (stepIndex + 1) % mission.steps.length;
       else
-        failure = null;
+        finished = true;
     case Failed(message):
       failure = 'step $stepIndex (${mission.steps[stepIndex].kind}): $message';
     case _:
@@ -341,9 +396,36 @@ class MissionPlayer implements SessionMember {
       case "place":
         var at:SceneArtifactPlace = cast step.at;
         return HandlePart.place(cast handling, localization, () -> placeContact(at), vacuumSensor);
+      case "weld":
+        var weld:SceneArtifactWeld = cast step.weld;
+        return new WeldSeam(cast welding, localization, () -> weldPlan(weld), cast weldSensor);
       default:
         throw 'Mission step kind "${step.kind}" is not supported';
     }
+  }
+
+  /** The world pose of a weld's reference member now, or the world's own when the weld names none. */
+  function referenceFrame(weld:SceneArtifactWeld):Transform3 {
+    if (weld.frame == null || weld.frame == "") return Transform3.identity();
+    var live = AssemblyRobot.partPose(simulation, robot.part("project:" + weld.frame));
+    return new Transform3(new Vec3(live.position[0], live.position[1], live.position[2]),
+      new Quat(live.rotation[0], live.rotation[1], live.rotation[2], live.rotation[3]));
+  }
+
+  /**
+   * The weld a mission step describes, as a plan in the map frame (the world). Its path is given relative to the
+   * workpiece's reference member, and that member is found where it stands when the step starts, as a pick finds its part,
+   * so the weld follows a workpiece that is not where it was designed. A weld with no frame is in the assembly as designed.
+   */
+  function weldPlan(weld:SceneArtifactWeld):WeldPlan {
+    var frame = referenceFrame(weld);
+    function pose(torch:SceneArtifactTorchPose):Transform3
+      return frame.compose(new Transform3(new Vec3(torch.position[0], torch.position[1], torch.position[2]),
+        new Quat(torch.rotation[0], torch.rotation[1], torch.rotation[2], torch.rotation[3])));
+    var process = weld.process;
+    return new WeldPlan([for (segment in weld.path) new WeldSegment(pose(segment.start), pose(segment.stop))],
+      {wireSpeed: process.wireSpeed, voltage: process.voltage, travelSpeed: process.travelSpeed, approach: process.approach,
+        startDwell: process.startDwell, craterDwell: process.craterDwell, burnback: process.burnback});
   }
 
   /**

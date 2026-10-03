@@ -58,6 +58,8 @@ class ApplicationSimulation {
   var mobile:Null<robotkit.mobile.MobileBase> = null;
   /** The work the assembly robot does on its own, when its project ships a mission. */
   var mission:Null<MissionPlayer> = null;
+  /** The weld metal the mission's welds lay, when it welds. */
+  var beads:Null<WeldBeads> = null;
   var workforce:Null<HumanWorkforce> = null;
   /** Everything that follows the session's lifecycle, in the order it is fed. */
   var members:Array<SessionMember> = [];
@@ -119,6 +121,7 @@ class ApplicationSimulation {
     if (tools != null) members.push(tools);
     if (cnc != null) members.push(cnc);
     if (mission != null) members.push(mission);
+    if (beads != null) members.push(beads);
     if (workforce != null) members.push(workforce);
     for (participant in participants) members.push(participant);
   }
@@ -138,6 +141,7 @@ class ApplicationSimulation {
     var candidateCnc:Null<CncProgramPlayer> = null;
     var candidateMobile:Null<robotkit.mobile.MobileBase> = null;
     var candidateMission:Null<MissionPlayer> = null;
+    var candidateBeads:Null<WeldBeads> = null;
     var candidateAssembly:Null<AssemblyRobot> = null;
     var assemblyIndex = -1;
     var heldBoxes:Array<MissionPlayer.FloorObstacle> = [];
@@ -223,6 +227,11 @@ class ApplicationSimulation {
       var candidateTools = new SimulatedTools([for (entry in candidateObjects) {id: entry.id, object: entry.object}]);
       var freeObjects = [for (entry in candidateObjects) entry.object];
       if (session != null && candidateAssembly != null) for (tool in session.robotTools) {
+        if (tool.kind == "torch") {
+          candidate.addStepObserver(candidateTools.addWelder(SimulatedTools.welderFor(candidate, candidateAssembly,
+            assemblyIndex, tool, session)));
+          continue;
+        }
         var carrier = candidateAssembly.part("project:" + tool.contact.occurrence);
         candidate.addStepObserver(candidateTools.add(new robotkit.runtime.SimulatedSuctionTool(candidate,
           candidateAssembly.runtime, assemblyIndex, carrier.linkIndex, tool.channel, freeObjects, tool.sensor)));
@@ -232,6 +241,15 @@ class ApplicationSimulation {
         if (candidateAssembly == null) throw "A mission needs the project's assembly";
         candidateMission = new MissionPlayer(work, candidateAssembly, candidate, assemblyIndex, timestep, heldBoxes,
           candidateTools.objectsByScene(), session);
+        // A mission that welds lays the weld metal as the welder deposits it.
+        var welds = [for (step in work.steps) if (step.kind == "weld") step].length > 0;
+        if (welds) {
+          var active:ProjectDocumentSession = cast session;
+          var torch = [for (tool in active.robotTools) if (tool.kind == "torch") tool][0].torch;
+          if (candidateTools.welders.length != 1 || torch == null) throw "A mission that welds needs the robot's one simulated welder";
+          candidateBeads = new WeldBeads(candidateMission, candidateTools.welders[0], candidate, candidateAssembly.parts, scene,
+            timestep, torch.wireDiameterMm, torch.depositionEfficiency);
+        }
       }
 
       var objectsById:Map<String, SimObject> = new Map();
@@ -274,6 +292,8 @@ class ApplicationSimulation {
       cnc = candidateCnc;
       mobile = candidateMobile;
       mission = candidateMission;
+      if (beads != null) beads.dispose();
+      beads = candidateBeads;
       refreshMembers();
       assemblyParts = candidateAssemblyParts;
       appliedRevision++;
@@ -364,6 +384,10 @@ class ApplicationSimulation {
   public function mobileBase():Null<robotkit.mobile.MobileBase> return mobile;
   /** The mission the assembly robot is running, or null when its project ships none. */
   public function missionPlayer():Null<MissionPlayer> return mission;
+  /** The weld metal the mission has laid, or null when it does not weld. */
+  public function weldBeads():Null<WeldBeads> return beads;
+  /** The simulated welder on the assembly's torch, or null when it has none. */
+  public function welder():Null<robotkit.runtime.SimulatedWelder> return tools == null || tools.welders.length == 0 ? null : tools.welders[0];
 
   /** The stock the project's CNC program is cutting, or null when it cuts none. */
   public function machiningStock():Null<MachiningStock> return cnc == null ? null : cnc.stock;
@@ -498,7 +522,11 @@ class ApplicationSimulation {
     }
     workforce = null; motions = null; tools = null;
     if (cnc != null) cnc.dispose();
-    cnc = null; mobile = null; mission = null; refreshMembers();
+    if (beads != null) beads.dispose();
+    cnc = null; mobile = null; mission = null; beads = null; refreshMembers();
+    // A mission's programs are planned on worker threads that finish the plan they are on after they are cancelled; the
+    // world they plan for goes now, so wait for them (see ProgramPlanner).
+    motionkit.robot.ProgramPlanner.shutdown();
     for (id in simulatedIds) { var robot=world.detach(id); if(robot!=null)robot.close(); }
     simulatedIds.resize(0);
     simulatedLinks.resize(0); simulatedObjects.resize(0);

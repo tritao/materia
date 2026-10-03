@@ -4,6 +4,7 @@ import haxe.Int64;
 import motionkit.program.MotionProgram;
 import motionkit.trajectory.ExecutionPlan;
 import sys.thread.Condition;
+import sys.thread.Mutex;
 import sys.thread.Thread;
 
 private enum PlannedStep {
@@ -21,8 +22,18 @@ private enum PlannedStep {
   which `poll`s them into `blocks`. The worker owns the compilation; the frame
   thread owns `blocks` and every plan in it, so neither touches the other's
   objects. A speed scale set while planning applies to motion not yet planned.
+
+  A worker is inside MotionKit's native library while it plans, and `dispose` returns at once without waiting for it:
+  the worker finishes the plan it is on and stops. A process that exits while workers are still planning runs the
+  native library's static destructors under them, which crashes the worker (a use after destruction of the
+  library's handle tables, seen as a segmentation fault or double free when a program exited just after a weld
+  that gave up mid-plan). Whoever ends the process, or tears a world down, calls `shutdown` first.
 **/
 class ProgramPlanner {
+  /** Planners whose worker has not yet stopped, under `registry`. */
+  static final live:Array<ProgramPlanner> = [];
+  static final registry = new Mutex();
+
   /** What is planned so far; frame thread only. */
   public final blocks:ProgramBlocks = new ProgramBlocks();
   /** Why planning stopped, if it failed. */
@@ -51,7 +62,33 @@ class ProgramPlanner {
     var compilation = compiler.forWorker().begin(program, initialQ, firstPlanId, firstOp, speedScale,
       new WorkerSink(this));
     var self = this;
+    registry.acquire();
+    live.push(this);
+    registry.release();
     Thread.create(function() self.work(compilation));
+  }
+
+  /** How many planners have a worker that has not stopped yet. */
+  public static function active():Int {
+    registry.acquire();
+    var count = live.length;
+    registry.release();
+    return count;
+  }
+
+  /**
+   * Cancels every planner and waits for its worker to stop, up to `timeoutSeconds` in all, so that no worker is inside
+   * the native library when the process exits or the world is torn down. Returns how many workers were still running
+   * when the time ran out (none, normally).
+   */
+  public static function shutdown(timeoutSeconds:Float = 30.0):Int {
+    registry.acquire();
+    var planners = live.copy();
+    registry.release();
+    for (planner in planners) planner.dispose();
+    var polls = Std.int(Math.ceil(timeoutSeconds / 0.005));
+    while (active() > 0 && polls-- > 0) Sys.sleep(0.005);
+    return active();
   }
 
   /** Moves what the worker has planned since the last poll into `blocks`; true if anything came. */
@@ -141,6 +178,9 @@ class ProgramPlanner {
     stopped = true;
     condition.broadcast();
     condition.release();
+    registry.acquire();
+    live.remove(this);
+    registry.release();
   }
 
   /** Seconds of planned motion after the started plans; call under `condition`. */

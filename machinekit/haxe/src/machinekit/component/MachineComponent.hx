@@ -52,6 +52,18 @@ class MachineComponent {
 			case VacuumSource(_, outputPort): port(outputPort);
 			case VacuumActuator(inletPort) | VacuumValve(inletPort) | ChangerLock(inletPort): port(inletPort);
 			case VacuumPressureSensor(vacuumPort, signalPort): port(vacuumPort); port(signalPort);
+			case ArcTorch(tcpConnector, controlPort): connector(tcpConnector); port(controlPort);
+			case WeldingSupply(processes, maxCurrentA, _, efficiency):
+				if (processes == null || processes.length == 0 || !(maxCurrentA > 0))
+					throw 'Welding supply on "$designation" needs a process and a positive rated current';
+				if (!(efficiency > 0 && efficiency <= 1))
+					throw 'Welding supply on "$designation" needs an efficiency in (0, 1]';
+			case WireFeed(wireDiameterMm, maxSpeedMPerMin, depositionEfficiency):
+				if (!(wireDiameterMm > 0) || !(maxSpeedMPerMin > 0))
+					throw 'Wire feed on "$designation" needs a positive wire diameter and speed';
+				if (!(depositionEfficiency > 0 && depositionEfficiency <= 1))
+					throw 'Wire feed on "$designation" needs a deposition efficiency in (0, 1]';
+			case WorkReturn(leadPort, contactConnector): port(leadPort); connector(contactConnector);
 			case PlanarScanner(scanConnector, rayCount, maxRangeMeters, rateHz):
 				connector(scanConnector);
 				if (rayCount < 2 || !(maxRangeMeters > 0) || !(rateHz > 0))
