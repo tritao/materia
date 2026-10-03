@@ -705,7 +705,7 @@ latency.
 
 ### X7 — Transmissions compile from their parts
 
-Status: T0–T3 done (2026-10-03); T4–T5 not started.
+Status: T0–T4 done (2026-10-03); T5 not started.
 Worktree `x7-transmissions`.
 
 T1: one resolved relation and part-level equations replace the assembly's ratio, efficiency
@@ -856,8 +856,11 @@ T3 validation: focused CoreXY and standalone MachineKit pass; every suite in
 
 `LinearAxis` builds its carriage-to-screw relation through `addTransmission(LeadScrew(...))` only.
 `LinearAxis.setTravel` sets the carriage joint and lets `AssemblyState` propagate the coupling.
-`LeadScrewTransmission` is deleted (its only other users are `MachineKitSmoke` checks, which move to
-the coupling).
+`LeadScrewTransmission` is deleted. Code inspection found that only `LinearAxis` still used it;
+the smoke checks already exercise the coupling, including handedness, travel and prefixed axes.
+
+T4 validation: every suite in `x7-suite-t4-single-model.txt` passes, including the
+app project-source suite; all T3 engineering baselines remain unchanged.
 
 #### T5 — Provenance of engineering values
 
