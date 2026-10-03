@@ -893,6 +893,8 @@ unchanged; the belt-router diagnostic now names its assumptions. No haxeon chang
 
 ### X8 — Motor, driver and controller
 
+Status: X8a complete (2026-10-03). X8b–X8e pending.
+
 Planned (2026-10-03); after X7. Today one call mixes three pieces of hardware:
 `MachineAssembly.addMotor(id, joint, motor, volts, margin, gearbox)` takes the supply voltage, the
 torque margin and the gearbox as numbers. Microsteps live in the machining job's `controller`
@@ -927,6 +929,25 @@ Target split:
 Steps: X8a driver part + catalog; X8b `addMotor` with a driver, the curve from motor + driver, and
 microsteps in the actuator (MotorRecord schema bump, router/CoreXY/arm/base updated); X8c supply via
 ports; X8d gearbox member; X8e job/deployment cleanup (`controller.microsteps` removed, step-rate check).
+
+X8a implementation:
+
+- `MotorDriver` is a recipe-backed part with an assumed envelope, BOM identity and mount connector.
+  Its catalog separates stepper and servo families and step/dir and bus control. Generic entries are
+  `GENERIC-TMC2209`, `GENERIC-DM542` and `GENERIC-SERVO-AMP`; no entry claims verified vendor ratings.
+- Current is an explicit A rms setting; microsteps are validated powers of two within the entry's
+  limit (one for a servo). Supply voltage, when stated on the driver, must lie within its range.
+  Power in, motor out and command in are service ports. Power in is required without a stated
+  voltage; controller commands and motor wiring can remain implicit in the actuator binding.
+- Generic step-input ceilings are assumed 250 kHz and 200 kHz, with assumed maximum rms currents
+  of 2 A and 3 A respectively. The generic servo amplifier uses bus control and has no step-input
+  ceiling. These are editable catalog assumptions, not product-selection guarantees.
+- Driver recipes round-trip settings, BOM and ports. Cross-recipe checks cover every catalog entry;
+  focused tests reject excessive current, unsupported microsteps and out-of-range voltage. Existing
+  examples and actuator calculations are unchanged in this step.
+- Validation: full `x7-suite-x8a-drivers.txt` gate passed all suites, application build and
+  project-source tests. All X7 engineering baselines are unchanged: router plates 220.2/201.6 s,
+  belt deviation 1.89 mm and CoreXY 204.1 rad/s, 649.6 mm/s, 71.6/34 m/s².
 
 ### Later
 

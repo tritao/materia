@@ -2612,6 +2612,7 @@ class MachineKitSmoke {
 		CoreXyDriveTests.run();
 		assemblyPreviewSharing();
 		RecipeContractTests.run();
+		MotorDriverTests.run();
 		componentRecipes();
 		documentRecipes();
 		documentPreview();
