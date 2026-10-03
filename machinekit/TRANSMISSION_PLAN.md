@@ -1372,6 +1372,81 @@ and 3 goals.
 Merge order: X7–X9 onto local main first, then rebase the `mobile-welder` branch. It must take
 the 24 V → supply-derived wheel limits and the `RobotArm.hx` changes.
 
+### X10 — Belt reductions and loops between shafts
+
+Status: planned (2026-10-03), after X9.
+
+X9c derives belt stiffness from the belt's path, but only for a belt clamped to a sliding
+carriage: `BeltStretch` throws unless the leader is prismatic. Common drives that turn a shaft
+through a belt can't be modelled with real parts:
+
+- folded-back motors on ball or lead screws (1:1 or 2:1);
+- rotary 4th axes (3:1–6:1);
+- belt-driven spindles;
+- Z-sync loops tying two or four lead screws to one motor (Voron Trident, many printers);
+- belt reduction stages (Voron 2.4 Z 80:16);
+- belt-driven arm joints (Moveo/Thor-style arms, SCARA, wrist motors moved toward the base).
+
+Faking these as `GearMesh` gets the direction wrong (a belt keeps the turning direction) and has
+no belt stretch.
+
+#### X10a — `BeltReduction`
+
+- New source kind `BeltReduction(belt, driver, driven)`. Both pulleys are `TimingPulley` members
+  on the same belt; the driver turns on the leader joint, the driven pulley on the follower.
+  - **Ratio:** `driver.teeth / driven.teeth` (follower radians per leader radian). A belt keeps
+    the turning direction, so `Same` means both turn the same way about the belt plane's normal.
+  - **Efficiency and drag:** the belt family's values, as for `TimingBelt`.
+  - **Stiffness at the leader (N·m/rad), from the same belt-path code:**
+    - hold the driven pulley's teeth in place;
+    - turn the leader by a small angle;
+    - measure the stretch of the two belt paths between the pulleys;
+    - stiffness = `EA · (da²/a + db²/b)`, with the stretch per radian.
+
+    For a pretensioned two-pulley loop this is `EA (1/L₁ + 1/L₂) r_driver²`. Without pretension
+    only the tight span carries load, so record which case is modelled and label it assumed.
+  - **Backlash:** a timing-belt tooth-clearance allowance at the driven pulley's pitch circle,
+    converted to leader radians. It is an assumed belt-family value until there's catalog data.
+- `BeltStretch` generalises from "clamp on a sliding leader" to "a held point on the loop and a
+  moving point". A clamp on a carriage (prismatic leader) and a held pulley tooth (revolute
+  leader) are the two cases of one function. Remove the prismatic-only check.
+- **Router or CoreXY-style axis drive through a reduction:** a motor pulley drives a big pulley
+  whose shaft carries the carriage belt's drive pulley. That is `BeltReduction` from motor to
+  shaft plus `TimingBelt` from shaft to carriage. `DriveLoads`/`DriveCompliance` already chain
+  compliance through couplings; check that the reduction's spring and the carriage belt's spring
+  add in series at the axis.
+
+#### X10b — Belt loops with several driven pulleys
+
+- One belt can drive several pulleys: a Z-sync loop driving 2–4 lead-screw pulleys from one motor,
+  or a reduction with a tensioner idler.
+  - Each driven pulley gets its own `BeltReduction(belt, driver, drivenN)`; idlers on the loop use
+    `BeltIdler`.
+  - Each driven pulley's stiffness is resolved with the other driven pulleys free.
+  - The shared-axis stiffness rule from X9c handles the screws' combined load.
+  - Check: a loop's tooth count and its wraps must agree, as for any belt.
+
+#### X10c — Belt-path cleanup
+
+- `BeltPathRecord.strand` is still a hand-picked index (which span the clamp sits on). Derive it
+  from the clamp connector's position: the straight span the clamp point lies on, within a
+  tolerance. Reject a clamp that is on no span, or on a wrap.
+- `BeltStretch` copies the whole assembly through JSON encode/decode on every resolve. Pose a
+  shared copy once per rebuild for all belts, and measure the router's rebuild time before and
+  after.
+- Record in the plan that belt stiffness is the weakest over the sampled travel (a conservative
+  constant), and that mid-travel deviation is therefore overstated.
+
+#### X10d — Example
+
+Add a belt reduction to an existing example rather than a new machine. For example, fold the
+screw router's Z motor back beside its screw with a 2:1 `BeltReduction` (it then fits under the
+gantry), or give the robot arm's wrist a belt stage. Record how Z speed, acceleration and
+stiffness change against the direct-coupled Z, with a reason for each.
+
+Validation as in X7–X9: one commit per step with the full suite passing, and every changed number
+recorded here with a reason.
+
 ### Later
 
 Belt teeth drawn and moving with the belt: a mesh built in Haxe and
