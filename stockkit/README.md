@@ -220,10 +220,9 @@ and `sk_stock_cut` returns per-move results and a summary.
 
 Haxeon builds `stockkit_core` automatically from `stockkit/haxeon.json` when
 StockKit, CamKit, or the app needs it. Haxeon also adds the built library to
-the test runtime path. Run the Haxe tests with only the CadKit native build on
-`LD_LIBRARY_PATH`:
+the test runtime path, and builds CadKit's core the same way (`cadkit/haxeon.json`). Set `CADKIT_OCCT_DIR` to a
+prebuilt OCCT install of the pinned source so that build does not compile OCCT, then run the Haxe tests:
 
 ```sh
-LD_LIBRARY_PATH=/path/to/cadkit/build/debug/core:/path/to/cadkit/build/debug/lin64/gcc/libd \
-  ./haxeon/scripts/haxeon run --project stockkit/tests/haxeon.json
+CADKIT_OCCT_DIR=/path/to/occt-install ./haxeon/scripts/haxeon run --project stockkit/tests/haxeon.json
 ```
