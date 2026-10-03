@@ -79,6 +79,7 @@ class MachineKitComponents {
 			PowerSupply.recipeType(),
 			Gearbox.recipeType(),
 			GearedArmJoint.recipeType(),
+			machinekit.robotics.CobotJoint.moduleRecipeType(),
 			FlangeBearingHousing.recipeType(),
 			LeadScrew.recipeType(),
 			machinekit.motion.BallScrew.ballRecipeType(),

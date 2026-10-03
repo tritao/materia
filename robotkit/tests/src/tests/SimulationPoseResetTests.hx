@@ -48,9 +48,38 @@ class SimulationPoseResetTests {
     boxSimulationHarness.step(Int64.ofInt(0));
     boxSimulationHarness.dispose();
     if (backend == 1) toolProximity();
+    driveReferenceCompilation();
     coupling(backend);
     stepperSlip(backend);
     if (backend == 1) servoCoupling();
+  }
+
+  /** Explicit gains opt a geared joint into its physical drive, without
+   * reflecting its already-joint-coordinate inertia through the reduction twice.
+   */
+  static function driveReferenceCompilation():Void {
+    var model = new RobotModel("explicit servo loop");
+    var base = model.addLink(new Link("base"));
+    var load = model.addLink(new Link("load"));
+    load.mass = 1.0;
+    load.inertiaTensor = [0.2, 0.0, 0.0, 0.0, 0.2, 0.0, 0.0, 0.0, 0.2];
+    var joint = model.addJoint(new Joint("joint", JointType.Revolute, base, load));
+    joint.armature = 0.05;
+    var actuator = new Actuator("servo", 0, 0, Transmission.SimpleTransmission(joint.id, 100, 0));
+    actuator.drive = new ServoDrive(1, 2, 100, 200, 5e-6, 4096);
+    actuator.positionLoopRate = 4000;
+    model.addActuator(actuator);
+    var legacy = RobotRuntimeCompiler.compile(model);
+    if (legacy.joints[0].servoStiffness != 0 || legacy.fastestPositionLoopRate() != 0)
+      throw "Unspecified uncoupled gains must retain the existing tracking model";
+    actuator.servoStiffness = 200;
+    actuator.servoDamping = 1;
+    var physical = RobotRuntimeCompiler.compile(model);
+    if (physical.joints[0].servoStiffness != 2e6 || physical.joints[0].servoDamping != 1e4 ||
+        physical.fastestPositionLoopRate() != 4000)
+      throw "Explicit motor gains must be reflected to the joint drive";
+    if (Math.abs(physical.joints[0].reflectedInertia - 0.25) > 1e-12)
+      throw "An uncoupled geared joint must not reflect its load inertia twice";
   }
 
   /** A joint a stepper lost steps on sits its slip behind the command, and what it turns with goes along. */

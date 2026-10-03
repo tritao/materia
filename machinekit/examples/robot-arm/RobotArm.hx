@@ -1,3 +1,5 @@
+import machinekit.robotics.ArmTool;
+import machinekit.robotics.ArmSuctionTool;
 import machinekit.motion.PowerSupply;
 import machinekit.motion.MotorDriver;
 import cadkit.modeling.Vector;
@@ -25,61 +27,6 @@ import machinekit.robotics.Pedestal;
 import machinekit.robotics.RobotFlange;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
-
-/** What the arm carries on its tool flange: the end effector built for that flange, and the
- * connectors and service inlets of it that the arm publishes as its own. The arm includes the
- * effector as `tool`, so `expose` names its members `tool/<member>`.
- */
-interface ArmTool {
-	function build(flange:RobotFlange):EndEffector;
-	/** Publishes the tool's connectors and the service inlets that must be supplied from outside. */
-	function expose(arm:MachineAssembly):Void;
-}
-
-/** Suction tool for the arm's ISO 9409-1 style tool flange: an adapter plate, a frame bar, and a
- * catalog ejector, cup, fitting and hose, arranged like the fixed EOAT in `examples/eoat`, with an
- * inline vacuum sensor between the ejector and the hose that tells a sealed cup from an open one.
- * Its `contact` working frame is the cup's contact face. The arm publishes `toolContact` and the
- * ejector's `compressedAir` inlet.
- */
-class ArmSuctionTool implements ArmTool {
-	public function new() {}
-
-	public function expose(arm:MachineAssembly):Void {
-		arm.exposeConnector("toolContact", "tool/cup", "contact");
-		// The ejector's compressed-air inlet is the arm's own service input.
-		arm.exposePort("compressedAir", "tool/ejector", "air");
-	}
-
-	public function build(flange:RobotFlange):EndEffector {
-		var result = new EndEffector();
-		result.addComponent("plate", new EndEffectorPlate(flange));
-		result.addComponent("bar", new FrameBar(30, 20, 90));
-		result.addComponent("ejector", new SchmalzVacuumGenerator("10.02.01.00563"));
-		result.addComponent("cup", new SchmalzSuctionCup("10.01.01.11401"));
-		result.addComponent("fitting", new SchmalzPushInFitting("10.08.02.00203"));
-		result.addComponent("sensor", new VacuumPressureSensor(4));
-		result.addComponent("hose", new SchmalzVacuumHose("10.07.09.00001", [
-			new Vector(20, 0, 40), new Vector(35, 0, 60),
-			new Vector(35, 0, 100), new Vector(-30, 0, 100), new Vector(0, 0, 90)]));
-		result.mount("plate", "robot");
-		result.addMate("bar-mate", "fixed", "plate", "tool", "bar", "base");
-		result.addMemberConnector("bar", "ejector-seat", Solids.axial(20, 0, 20));
-		result.addMate("ejector-mate", "fixed", "bar", "ejector-seat", "ejector", "mount");
-		result.addMemberConnector("bar", "sensor-seat", Solids.axial(-25, 0, 20));
-		result.addMate("sensor-mate", "fixed", "bar", "sensor-seat", "sensor", "mount");
-		result.addMate("cup-mate", "fixed", "bar", "end", "cup", "mount");
-		result.addMate("fitting-mate", "fixed", "cup", "mount", "fitting", "mount");
-		result.addMate("hose-mate", "fixed", "bar", "base", "hose", "mount");
-		result.connectPorts("ejector-sensor", "ejector", "vacuum", "sensor", "vacuumIn");
-		result.connectPorts("sensor-hose", "sensor", "vacuumOut", "hose", "input");
-		result.connectPorts("hose-fitting", "hose", "output", "fitting", "hose");
-		result.connectPorts("fitting-cup", "fitting", "thread", "cup", "vacuum");
-		result.exposePort("compressedAir", "ejector", "air");
-		result.workingFrame("contact", "cup", "contact", true);
-		return result;
-	}
-}
 
 /** Work table: a slab on four legs, standing on the floor (z=0) with its top at `height`. The origin
  * is the centre of the footprint. */

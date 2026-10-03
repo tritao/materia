@@ -1,0 +1,26 @@
+{
+	"version": 1,
+	"package": {
+		"name": "machinekit-cobot-arm-example"
+	},
+	"entry": "CobotArmPreview",
+	"sources": [
+		"CobotArmPreview.hx"
+	],
+	"sourceRoots": [
+		"."
+	],
+	"dependencies": {
+		"projectkit": {
+			"path": "../../../projectkit"
+		},
+		"cadkit": {
+			"path": "../../../cadkit"
+		},
+		"machinekit": {
+			"path": "../../"
+		}
+	},
+	"target": "host",
+	"outputDir": "build"
+}

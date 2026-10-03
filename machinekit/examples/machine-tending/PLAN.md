@@ -302,28 +302,66 @@ Done. What was built and decided:
 **MT3. Cobot arm size classes.**
 - **Joint modules.** `CobotJoint` (`machinekit.robotics`) is a housing with a stator connector and a rotor connector.
   - It contains a `ServoMotor` with a `Gearbox` (strain-wave, ratio about 100, efficiency assumed), plus an output encoder through `addEncoder` (X6d).
-  - It comes in sizes 0–4. Reference torques (rated / peak, N·m, approximate public figures): 0 = 12, 1 = 28, 2 = 56, 3 = 150, 4 = 330. Speeds are 180–360 °/s for small sizes and 120 °/s for size 4.
+  - It comes in sizes 0–4. Reference torques (N·m, assumed engineering values): 0 = 12, 1 = 28, 2 = 56, 3 = 150, 4 = 330 (assumed rated torques; peak twice rated). Speeds are 180–360 °/s for small sizes and 120 °/s for size 4.
   - Each size's diameter, length and mass are chosen so the class masses below come out within about 10 %.
 - **Links.** `CobotLink` is a round tube between two module seats, with the lateral offset of the cobot layout built into its end caps. Each link is one part, so it gets one convex hull.
-- **Classes.** `CobotArm(cls:CobotClass, ?tool:ArmTool)`, with class lengths in the usual d1/a2/a3/d4/d5/d6 form. These are reference values from the published DH tables of the typical classes, to be checked against the datasheets when the catalogue is written:
+- **Classes.** `CobotArm(cls:CobotClass, ?tool:ArmTool)`, with class lengths in the usual d1/a2/a3/d4/d5/d6 form. Dimensions are checked against the maker's [DH table](https://www.universal-robots.com/developer/hardware-and-motion/robot-motion-dh-parameters/); payload, joint speeds and mass against the [November 2023 technical data sheet](https://www.universal-robots.com/media/1829346/11_2023_collective_data-sheet.pdf). The table gives magnitudes of a2/a3; DH uses negative values:
 
   | Class | Reach | Payload | d1 | a2 | a3 | d4 | d5 | d6 | Modules J1–J3 / J4–J6 | Mass |
   |---|---|---|---|---|---|---|---|---|---|---|
-  | `Reach500` (UR3 class) | 500 mm | 3 kg | 151.9 | 243.6 | 213.2 | 131.1 | 85.4 | 92.1 | 2 / 0 | ≈ 11 kg |
-  | `Reach850` (UR5 class) | 850 mm | 5 kg | 162.5 | 425.0 | 392.2 | 133.3 | 99.7 | 99.6 | 3 / 1 | ≈ 21 kg |
-  | `Reach900` (UR16 class) | 900 mm | 16 kg | 180.7 | 478.4 | 360.0 | 174.2 | 119.9 | 116.6 | 4·4·3 / 2 | ≈ 33 kg |
-  | `Reach1300` (UR10 class) | 1300 mm | 12.5 kg | 180.7 | 612.7 | 571.6 | 174.2 | 119.9 | 116.6 | 4·4·3 / 2 | ≈ 34 kg |
+  | `Reach500` (UR3 class) | 500 mm | 3 kg | 151.85 | 243.55 | 213.2 | 131.05 | 85.35 | 92.1 | 2 / 0 | 11.2 kg |
+  | `Reach850` (UR5 class) | 850 mm | 5 kg | 162.5 | 425.0 | 392.2 | 133.3 | 99.7 | 99.6 | 3 / 1 | 20.6 kg |
+  | `Reach900` (UR16 class) | 900 mm | 16 kg | 180.7 | 478.4 | 360.0 | 174.15 | 119.85 | 116.55 | 4·4·3 / 2 | 33.1 kg |
+  | `Reach1300` (UR10 class) | 1300 mm | 12.5 kg | 180.7 | 612.7 | 571.55 | 174.15 | 119.85 | 116.55 | 4·4·3 / 2 | 33.5 kg |
 
 - **Mounting.** `CobotArm` stands on a `RobotFlange` base plate. The cell can put it on a `Pedestal` or a riser of any height.
 - **Tool.** The tool flange is an ISO 9409-1-50-4-M6 pattern, so `ArmTool`s fit every class. `tcp` and `ready()` work as on `RobotArm`.
 - **IK.** KinematicsKit's numeric IK (DLS for tracking, LM for reaching) works on this layout. An analytic solver for the UR-type layout, with its eight closed-form branches, is a later option.
 - **Checks** (`CobotArmChecks` in the MachineKit smoke suite), for every class:
   - FK of the flange at zero and at four poses equals the DH table within 0.01 mm;
-  - reach (shoulder to flange, fully stretched) within 1 % of the class reach;
+  - shoulder-to-flange distance at DH zero equals the distance derived from the verified DH offsets;
+    the published nominal reach remains class metadata, rather than changing DH lengths to fit it;
   - mass within 10 % of the reference;
   - no self-overlap at zero or at the joint limits taken one joint at a time;
-  - the X6 plan check holds the rated payload at the reach, stretched horizontally, without exceeding rated torque on any joint.
+  - assembly-derived gravity moments hold the rated payload at the horizontally stretched DH-zero
+    pose without exceeding rated torque on any joint. X6 steady loads currently model sliding
+    gravity only, so its rotary plan check cannot establish this static holding claim.
 - **Preview.** `CobotArmPreview.arm(cls)` gives a project entry per class with a short looping motion, like `robot-arm`, so each class can be looked at and simulated alone. `ProjectSourceTests.checkCobotArms` runs each class's motion on MuJoCo: joint tracking within 1 mrad, no collisions.
+
+Done. What was built and decided:
+- `ArmTool` and the existing suction implementation move into `machinekit.robotics`; the arm
+  and welder keep the same construction, connectors and service wiring.
+- Four size classes use the verified e-series DH offsets, joint speed limits and reference masses.
+  Housing dimensions, internal construction, 100:1 reduction, 0.85 efficiency, torque ratings,
+  80%-of-maximum rated motor speed, rotor inertia and output encoders remain assumed values.
+  Position-loop stiffness assumes peak torque at 10 mrad motor error; damping is critical for
+  the stated rotor inertia. Explicit gains select the physical interpolated drive model.
+- Link seats subtract the preceding module length from DH translation, and the final seat
+  subtracts the real flange thickness. Tube routes clear stator rims and gearheads leave room
+  for the base flange pilot. Five FK poses and the full-turn limits pass for every class.
+- Computed arm masses (offboard amplifiers/supply and optional tool excluded) are 11.450,
+  19.484, 33.119 and 33.380 kg. The rated-payload shoulder moments are 29.666, 95.026,
+  234.048 and 288.315 N m; elbow moments are 10.402, 35.134, 89.853 and 123.446 N m.
+- The proposed 1% equality between catalogue reach and a fully stretched DH flange distance
+  does not follow from the verified offsets. Keep the source geometry and check its explicit
+  shoulder reference distance instead; do not rescale a2/a3 to force the catalogue label.
+- Each class gets a project/Start-page entry and a planned free-motion loop through a generic
+  `moveJoints` mission step. Typed targets are absolute mechanical coordinates in radians/metres;
+  MotionKit `MoveJ` and the trajectory runtime execute them. The 1 mrad check applies to free
+  motion: the handling runner deliberately presses 3 mm into a rigid blank, so contact reaction
+  forces make its pick dwell unsuitable for a free-motion tracking requirement. Existing arm
+  handling tests continue to cover that separate behavior.
+- The three-step free-motion loop takes 2.06 s (206 ticks) for each class. Peak errors,
+  in class order, are 0.00475, 0.00631, 0.01115 and 0.01723 mrad at the unchanged 10 ms
+  controller tick; no self-collision. The DH-zero shoulder reference distances are 515.462,
+  855.569, 895.425 and 1225.283 mm.
+- The complete `mt3-session` gate passes every kit, CAD, MachineKit smoke, application build
+  and full project-source suite. ProjectKit grows from 146 to 151 assertions for mission-data
+  round trip, duplicate/unknown/nonfinite targets and SI conversion of mechanical limits.
+  All router, belt, CoreXY, arm, mobile, welder and MT2 mill measurements are unchanged.
+- The first gate's application run received SIGINT (exit 130) during a project compilation,
+  with no assertion failure. A separate session with SIGINT ignored completed the replacement
+  full gate. No materia code change or haxeon compiler workaround was needed for it.
 
 **MT4. Enclosure, door, vise and reach.**
 - Panels, front frame pieces, chip tray, stand and cabinet as separate parts. The door rides a prismatic joint on its guide, but no actuator moves it yet.
@@ -508,8 +546,8 @@ MT0 ─┬─ MT1 ── MT2 ─┬─ MT4 (reach study) ─┐
 |---|---|---|
 | MT0 | done: main and X7+X8 merged | c5438ba4d, 8ad034403 |
 | MT1 | done | 592affc2f, 7d9f192b1, 5e40b76fe, 53248d881 |
-| MT2 | done | 06c9bf5fd |
-| MT3 | planned | |
+| MT2 | done | 06c9bf5fd, 73a14c58e |
+| MT3 | done | |
 | MT4 | planned | |
 | MT5 | planned | |
 | MT6 | planned | |

@@ -34,6 +34,7 @@ typedef AssemblyPart = {id:String, robotIndex:Int, linkIndex:Int, offset:materia
  * physical data and the scene's part objects.
  */
 class AssemblyRobot {
+  public static function missionFrameName(at:SceneArtifactPlace):String return "mission:" + at.occurrence + "/" + at.connector;
   public final robot:SimulatedRobot;
   public final runtime:RobotRuntime;
   public final model:RobotModel;
@@ -53,10 +54,12 @@ class AssemblyRobot {
   public final rootLink:String;
   /** The frame of each tool's contact on the robot's model, by the contact's occurrence. */
   public final toolFrames:Map<String, robotkit.model.Frame>;
+  /** Connector frames used as endpoints of planned mission chains. */
+  public final missionFrames:Map<String, robotkit.model.Frame>;
 
   function new(robot:SimulatedRobot, runtime:RobotRuntime, model:RobotModel, blueprint:RobotRuntimeBlueprint,
       parts:Array<AssemblyPart>, hulls:Array<cadbridge.AssemblySimulationBridge.AssemblyLinkHull>, warnings:Array<String>,
-      mobile:Null<MobileBase>, toolFrames:Map<String, robotkit.model.Frame>) {
+      mobile:Null<MobileBase>, toolFrames:Map<String, robotkit.model.Frame>, missionFrames:Map<String, robotkit.model.Frame>) {
     this.robot = robot;
     this.runtime = runtime;
     this.model = model;
@@ -66,6 +69,7 @@ class AssemblyRobot {
     this.warnings = warnings;
     this.mobile = mobile;
     this.toolFrames = toolFrames;
+    this.missionFrames = missionFrames;
     var children = [for (joint in model.joints) joint.child];
     var roots = [for (link in model.links) if (children.indexOf(link) < 0) link];
     if (roots.length != 1) throw "The assembly robot needs exactly one root link";
@@ -282,6 +286,12 @@ class AssemblyRobot {
       sensor.maxRange = scanner.maxRange;
       sensor.frame = mountFrame(scanner.id + " mount", scanner.mount);
     }
+    var missionFrames = new Map<String, robotkit.model.Frame>();
+    if (session.mission != null) for (step in session.mission.steps) if (step.kind == "moveJoints") {
+      var at:SceneArtifactPlace = cast step.at;
+      var name = missionFrameName(at);
+      if (!missionFrames.exists(name)) missionFrames.set(name, mountFrame(name, at));
+    }
     var blueprint = RobotRuntimeCompiler.compile(converted.model, revision);
     // Process channels (a machine's spindle and coolant, a tool's vacuum) must be declared before the
     // robot is added.
@@ -324,6 +334,6 @@ class AssemblyRobot {
         offset: placed.offset, center: [for (coordinate in center) coordinate * physical.metresPerUnit]});
     }
     return new AssemblyRobot(robot, runtime, converted.model, blueprint, parts, converted.linkHulls, warnings, mobile,
-      toolFrames);
+      toolFrames, missionFrames);
   }
 }

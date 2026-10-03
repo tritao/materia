@@ -104,27 +104,27 @@ class RobotRuntimeCompiler {
         joint.childFramePosition, joint.childFrameRotation, joint.axis,
         coupled.maxAcceleration);
       compiled.overtravel = joint.limits.overtravel;
-      // A servo motor whose joint is coupled to others carries them: it runs as a torque-limited servo
-      // and the coupling moves the rest. A servo on a joint with no couplings, such as an arm joint, keeps
-      // the computed-torque tracking limited to its effort. Stepper machines keep kinematic following.
-      if (inCoupling.exists(joint.id))
-        for (actuator in robot.actuators) switch actuator.transmission {
-          case SimpleTransmission(jointId, ratio, _) if (jointId == joint.id && Std.isOfType(actuator.drive, ServoDrive)):
-            var drive:ServoDrive = cast actuator.drive;
-            var stiffness = actuator.servoStiffness > 0.0 ? actuator.servoStiffness : drive.defaultStiffness();
-            var damping = actuator.servoDamping > 0.0 ? actuator.servoDamping : ServoDrive.defaultDamping(stiffness);
-            compiled.servoStiffness += stiffness * ratio * ratio;
-            compiled.servoDamping += damping * ratio * ratio;
-            compiled.positionLoopRate = Math.max(compiled.positionLoopRate, actuator.positionLoopRate);
-            for (load in robotkit.model.DriveLoads.of(robot))
-              if (load.motors.length == 1) {
-                var motor = load.motors[0];
-                if (motor.actuator.id == actuator.id)
-                  compiled.reflectedInertia += (motor.rotorInertia + load.mass / (motor.ratio * motor.ratio))
-                    * ratio * ratio;
-              }
-          case _:
-        }
+      // Coupled servos carry their followers. An uncoupled drive with explicit
+      // physical gains uses the same position loop; unspecified gains retain
+      // the existing computed-torque model. Stepper following is unchanged.
+      for (actuator in robot.actuators) switch actuator.transmission {
+        case SimpleTransmission(jointId, ratio, _) if (jointId == joint.id && Std.isOfType(actuator.drive, ServoDrive) &&
+            (inCoupling.exists(joint.id) || actuator.servoStiffness > 0.0 || actuator.servoDamping > 0.0)):
+          var drive:ServoDrive = cast actuator.drive;
+          var stiffness = actuator.servoStiffness > 0.0 ? actuator.servoStiffness : drive.defaultStiffness();
+          var damping = actuator.servoDamping > 0.0 ? actuator.servoDamping : ServoDrive.defaultDamping(stiffness);
+          compiled.servoStiffness += stiffness * ratio * ratio;
+          compiled.servoDamping += damping * ratio * ratio;
+          compiled.positionLoopRate = Math.max(compiled.positionLoopRate, actuator.positionLoopRate);
+          for (load in robotkit.model.DriveLoads.of(robot))
+            if (load.motors.length == 1) {
+              var motor = load.motors[0];
+              if (motor.actuator.id == actuator.id)
+                compiled.reflectedInertia += load.axis == joint.id ? load.mass :
+                  (motor.rotorInertia + load.mass / (motor.ratio * motor.ratio)) * ratio * ratio;
+            }
+        case _:
+      }
       compiled.armature = joint.armature;
       compiled.damping = joint.damping;
       compiled.frictionLoss = joint.frictionLoss;

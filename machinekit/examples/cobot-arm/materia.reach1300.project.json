@@ -1,0 +1,32 @@
+{
+	"format": "materia.project",
+	"version": 1,
+	"name": "Cobot reach1300",
+	"defaultEntrypoint": "reach1300",
+	"build": {
+		"system": "haxeon",
+		"manifest": "haxeon.json"
+	},
+	"entrypoints": {
+		"reach500": {
+			"kind": "cad-preview",
+			"module": "CobotArmPreview",
+			"function": "reach500"
+		},
+		"reach850": {
+			"kind": "cad-preview",
+			"module": "CobotArmPreview",
+			"function": "reach850"
+		},
+		"reach900": {
+			"kind": "cad-preview",
+			"module": "CobotArmPreview",
+			"function": "reach900"
+		},
+		"reach1300": {
+			"kind": "cad-preview",
+			"module": "CobotArmPreview",
+			"function": "reach1300"
+		}
+	}
+}

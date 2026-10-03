@@ -206,6 +206,22 @@ class ProjectKitTests {
     base.robot = "missing";
     rejects(function() SceneArtifact.encode(data), "mobile base robot subtree without occurrences");
     base.robot = null; base.origin = {x: 1.0, y: -0.5, yaw: 0.25};
+    var jointStep:materia.project.SceneArtifact.SceneArtifactMissionStep = {
+      kind: "moveJoints", at: {occurrence: "mast", connector: "pin"}, joints: [{joint: "lift", position: 0.02}]};
+    data.mission = {steps: [jointStep]};
+    var jointBack = SceneArtifact.decode(SceneArtifact.encode(data)).mission;
+    check(jointBack != null && jointBack.steps[0].joints[0].position == 0.02 &&
+      jointBack.steps[0].joints[0].joint == "lift", "absolute joint mission round trip in metres");
+    jointStep.joints.push({joint: "lift", position: 0.03});
+    rejects(function() SceneArtifact.encode(data), "joint mission repeats a joint");
+    jointStep.joints.pop(); jointStep.joints[0].joint = "missing";
+    rejects(function() SceneArtifact.encode(data), "joint mission names an unknown joint");
+    jointStep.joints[0].joint = "lift"; jointStep.joints[0].position = Math.NaN;
+    rejects(function() SceneArtifact.encode(data), "joint mission targets a nonfinite position");
+    jointStep.joints[0].position = 0.02;
+    robot.joints[2].limits.upper = 10.0;
+    rejects(function() SceneArtifact.encode(data), "joint mission respects millimetre mechanical limits");
+    robot.joints[2].limits.upper = null;
     var mission:materia.project.SceneArtifact.SceneArtifactMission = {loop: true, steps: [
       {kind: "goTo", pose: {x: 2.0, y: 1.0, yaw: Math.PI}}, {kind: "goTo", pose: {x: 0.0, y: 0.0, yaw: 0.0}}]};
     data.mission = mission;

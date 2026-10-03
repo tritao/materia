@@ -1,3 +1,4 @@
+import machinekit.robotics.ArmTool;
 import machinekit.assembly.MachineAssembly;
 import machinekit.robotics.EndEffector;
 import machinekit.robotics.EndEffectorPlate;

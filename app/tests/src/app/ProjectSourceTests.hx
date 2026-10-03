@@ -40,6 +40,7 @@ import sys.io.File;
 import haxe.io.Bytes;
 
 /** Save and reopen a generated project without persisting its mesh buffers. */
+@:access(app.MissionPlayer)
 class ProjectSourceTests {
   static function check(value:Bool, message:String):Void {
     if (!value) throw message;
@@ -720,6 +721,57 @@ class ProjectSourceTests {
    * the workpiece off its pad, sets it on the other, and brings it back, each pick confirmed by the
    * tool's vacuum sensor, and a reset puts the workpiece back for the next run.
    */
+  static function checkCobotArms(root:String):Void {
+    for (size in [500, 850, 900, 1300]) {
+      var filename = size == 850 ? "materia.project.json" : 'materia.reach$size.project.json';
+      var manifest = FileSystem.fullPath(root + "/machinekit/examples/cobot-arm/" + filename);
+      var generated = MateriaProjectRunner.loadProject(manifest);
+      check(generated.robotMotions == null || generated.robotMotions.length == 0,
+        "the cobot runs its declared mission through the planner");
+      var session = new ProjectDocumentSession(null, false);
+      session.openGeneratedProject(generated, manifest);
+      var joints = ["j1", "j2", "j3", "j4", "j5", "j6"];
+      var limits = checkLimitsFromDrives(session, joints, "the cobot");
+      var world = new RobotWorld();
+      var simulation = new ApplicationSimulation(world);
+      simulation.setBackend(ApplicationSimulation.MUJOCO);
+      check(simulation.rebuild(session.sensors, session.scene, session), "cobot builds: " + simulation.error);
+      var mission = simulation.missionPlayer();
+      if (mission == null) throw "The cobot preview has no looping mission";
+      var indexes:Array<Int> = [];
+      for (name in joints) {
+        var found = -1;
+        for (i in 0...mission.robot.model.joints.length)
+          if (mission.robot.model.joints[i].name == name) found = i;
+        check(found >= 0, 'the cobot has joint $name');
+        indexes.push(found);
+      }
+      var worst = 0.0, ticks = 0;
+      var peak = [0.0, 0, 0, 0, 0, 0];
+      while (mission.completed < 3 && simulation.activeSession().simulationTime() < 90) {
+        simulation.step(); ticks++;
+        if (mission.failure != null) throw 'Cobot $size mission: ${mission.failure}';
+        var seen = mission.robot.robot.snapshot();
+        check(seen.faultCode == 0, "the cobot runtime stays healthy");
+        for (i in 0...indexes.length) {
+          var index = indexes[i];
+          var error = Math.abs(seen.positions.get(index) - seen.setpointPositions.get(index));
+          peak[i] = Math.max(peak[i], error);
+          worst = Math.max(worst, error);
+        }
+        for (contact in mission.simulation.robotContacts(mission.robot.runtime))
+          if (contact.active && contact.distance < -1e-5 &&
+              contact.otherKind == robotkit.runtime.RobotContactOtherKind.RobotLink)
+            throw 'Cobot $size self collision: links ${contact.linkIndex}, ${contact.otherLink}, ${contact.distance} m';
+      }
+      check(mission.completed >= 3, 'cobot $size completes its motion: ${mission.completed} steps');
+      Sys.println('cobot $size peaks rad: $peak');
+      check(worst < 0.001, 'cobot $size joint tracking below 1 mrad, got $worst rad');
+      Sys.println('cobot $size: ${simulation.activeSession().simulationTime()} s, peak joint tracking ${worst * 1000} mrad, $ticks ticks');
+      simulation.dispose(); session.dispose();
+    }
+  }
+
   static function checkRobotArm(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-arm/materia.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
@@ -1789,6 +1841,10 @@ class ProjectSourceTests {
       checkRobotWelder(root);
       return 0;
     }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "cobot") {
+      checkCobotArms(root);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mill") {
       checkBenchMill(root);
       return 0;
@@ -2075,6 +2131,7 @@ class ProjectSourceTests {
     session.dispose();
     if (FileSystem.exists(output)) FileSystem.deleteFile(output);
     checkRobotArm(root);
+    checkCobotArms(root);
     checkRobotWelder(root);
     checkMates(root);
     checkBenchMill(root);

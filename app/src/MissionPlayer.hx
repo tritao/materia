@@ -14,6 +14,17 @@ import materia.project.SceneArtifact.SceneArtifactRobotTool;
 import materia.project.SceneArtifact.SceneArtifactTorchPose;
 import materia.project.SceneArtifact.SceneArtifactWeld;
 import motionkit.robot.HandlingPlanRunner;
+import motionkit.robot.ManipulatorMotion;
+import motionkit.robot.ManipulatorKinematics;
+import motionkit.robot.ProgramCompiler;
+import motionkit.robot.StartTolerances;
+import motionkit.robot.MotionProgramSkill;
+import motionkit.trajectory.ValidationLimits;
+import motionkit.program.MotionProgram;
+import motionkit.program.MotionOp;
+import motionkit.program.MoveTarget;
+import motionkit.program.Blend;
+import motionkit.MotionOptions;
 import processkit.WeldingPlanRunner;
 import robotkit.skill.WeldPlan;
 import robotkit.skill.WeldSeam;
@@ -139,6 +150,7 @@ class MissionPlayer implements SessionMember {
 
   final robot:AssemblyRobot;
   var runner = new SkillRunner();
+  var jointMotions = new Map<String, ManipulatorMotion>();
   /** The arm and its suction tool's vacuum sensor, when the mission picks and places. */
   var handling:Null<HandlingPlanRunner>;
   /** Makes the arm's handling runner afresh: a reset starts the robot's runtime over, plans and all. */
@@ -342,6 +354,7 @@ class MissionPlayer implements SessionMember {
   /** Back to the first step; the next tick starts it from wherever the reset put the robot. */
   public function reset():Void {
     runner = new SkillRunner();
+    jointMotions = new Map<String, ManipulatorMotion>();
     stepIndex = 0;
     completed = 0;
     failure = null;
@@ -385,6 +398,8 @@ class MissionPlayer implements SessionMember {
 
   function skillFor(step:SceneArtifactMissionStep):Skill {
     switch step.kind {
+      case "moveJoints":
+        return jointMove(step);
       case "goTo":
         var activeNavigator:Navigator = cast navigator;
         return new GoTo(activeNavigator, new NavigationGoal(floorPose(step), FRAME, POSITION_TOLERANCE, HEADING_TOLERANCE),
@@ -402,6 +417,60 @@ class MissionPlayer implements SessionMember {
       default:
         throw 'Mission step kind "${step.kind}" is not supported';
     }
+  }
+
+  /** Plans absolute mechanical coordinates on the chain ending at the named connector. */
+  function jointMove(step:SceneArtifactMissionStep):Skill {
+    var at:SceneArtifactPlace = cast step.at;
+    var name = AssemblyRobot.missionFrameName(at);
+    var frame = robot.missionFrames.get(name);
+    if (frame == null) throw 'The robot has no mission frame "$name"';
+    var arm = new Manipulator(robot.model, robot.model.links[0].id, frame.id);
+    var count = arm.group.count();
+    var indices = [for (target in arm.toJointTargets([for (_ in 0...count) 0.0])) target.joint];
+    var motion = jointMotions.get(name);
+    if (motion == null) {
+      var limits = new ValidationLimits(count, Int64.ofInt(1), Int64.ofInt(0));
+      var velocities:Array<Float> = [];
+      var accelerations:Array<Float> = [];
+      for (i in 0...count) {
+        var bound = arm.group.limitsOf(i);
+        if (bound.lower < bound.upper) limits.position(i, bound.lower, bound.upper);
+        var speed = bound.velocity > 0 ? bound.velocity : 2.0;
+        velocities.push(speed);
+        limits.velocity(i, speed);
+        var acceleration = bound.maxAcceleration > 0 ? Math.min(ARM_ACCELERATION, bound.maxAcceleration) : ARM_ACCELERATION;
+        accelerations.push(acceleration);
+        limits.acceleration(i, acceleration);
+        limits.jerk(i, 20.0);
+      }
+      var compiler = new ProgramCompiler(new ManipulatorKinematics(arm, 1e-8), limits, FRAME,
+        velocities, accelerations, [for (_ in 0...count) 20.0],
+        StartTolerances.uniform(count, 0.005, ARM_ACCELERATION * 0.01, 0.2));
+      motion = new ManipulatorMotion(robot.robot, compiler, (_) -> null, () -> robot.runtime.pollEvents(), indices);
+      jointMotions.set(name, motion);
+    }
+    var q = motion.commandedPositions();
+    if (q == null) {
+      var positions = robot.robot.snapshot().positions;
+      q = [for (index in indices) positions.get(index)];
+    }
+    for (target in step.joints) {
+      var found = false;
+      for (i in 0...count) {
+        var joint = robot.model.joints[indices[i]];
+        if (joint.name != target.joint) continue;
+        if (placement == null || assembly == null) throw "Joint motion needs an assembly placement";
+        var authored = [for (item in assembly.joints) if (item.id == target.joint) item];
+        if (authored.length != 1) throw 'No mechanical joint "${target.joint}"';
+        var scale = Std.string(authored[0].type) == "prismatic" ? metres : 1.0;
+        q[i] = target.position - placement.joint(target.joint) * scale;
+        found = true;
+      }
+      if (!found) throw 'Joint "${target.joint}" is outside the chain ending at "$name"';
+    }
+    return new MotionProgramSkill(motion, new MotionProgram([
+      MotionOp.MoveJ(MoveTarget.JointTarget(q), new MotionOptions(), Blend.ExactStop)]));
   }
 
   /** The world pose of a weld's reference member now, or the world's own when the weld names none. */
