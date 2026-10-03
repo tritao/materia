@@ -76,6 +76,8 @@ class ProgramCompiler {
    * plan chunks run their checks at their submission boundaries.
    */
   public var planCheck:Null<PlanCheck> = null;
+  /** Linear motor sums for machines whose axis velocities use the single-axis envelope. */
+  public var motorSpace:Null<MotorSpaceConstraints> = null;
 
   /**
    * This compiler for a planning thread, on a fork of its solver: the worker never shares solver
@@ -91,6 +93,7 @@ class ProgramCompiler {
       perJointMaxJump, jointIds, couplings);
     // The worker plans one program in order, so it remembers which way each axis last moved.
     if (planCheck != null) worker.planCheck = planCheck.fork();
+    worker.motorSpace = motorSpace;
     return worker;
   }
 
@@ -251,8 +254,9 @@ class ProgramCompiler {
           var velocity = effective(maxVelocity, options.maxVelocity);
           var acceleration = effective(maxAcceleration, options.maxAcceleration);
           var jerk = effective(maxJerk, options.maxJerk);
-          var generated = Trajectory.generateStateToState(q, zeros(), zeros(), goal,
-            velocity, acceleration, jerk);
+          var motors = motorSpace;
+          var generated = motors == null ? Trajectory.generateStateToState(q, zeros(), zeros(), goal,
+            velocity, acceleration, jerk) : motors.move(q, goal, velocity, acceleration, jerk);
           var pending = new PendingMotion(index, q, goal, generated, [], null, null);
           c.pending = pending;
           attachLeadingOutputs(pending, c.leadingOutputs);
@@ -375,6 +379,8 @@ class ProgramCompiler {
     var plan:Null<ExecutionPlan> = null;
     var projected:Null<Trajectory> = null;
     try {
+      var motors = motorSpace;
+      if (motors != null) motors.validate(pending.trajectory);
       if (couplingIndices.length > 0) projected = projectCouplings(pending.trajectory);
       plan = ExecutionPlan.create(projected == null ? pending.trajectory : projected,
         pending.path == null ? limits : limits.withoutJerk(), id, pending.startQ,
@@ -545,8 +551,10 @@ class ProgramCompiler {
         secondBefore.push(jointCurvature(q, rate, before, redundancy));
       }
     }
-    var timed = timing.time(new JointPathSamples(distances, positions, first, second, secondBefore),
-      new PathTimingLimits(maxVelocity, maxAcceleration, caps));
+    var jointPath = new JointPathSamples(distances, positions, first, second, secondBefore);
+    var timingLimits = new PathTimingLimits(maxVelocity, maxAcceleration, caps);
+    var motors = motorSpace;
+    var timed = motors == null ? timing.time(jointPath, timingLimits) : motors.time(timing, jointPath, timingLimits);
     try {
       var events:Array<TimedEvent> = [];
       for (event in authoredEvents) {

@@ -54,6 +54,39 @@ class CoreXyTests extends MotionKitTestSupport {
     return found;
   }
 
+  public function testMotorSpaceTiming():Void {
+    var motors = new motionkit.robot.MotorSpaceConstraints([[1.0, 1.0], [1.0, -1.0]], [1.0, 1.0]);
+    function move(goal:Array<Float>):Trajectory
+      return motors.move([0.0, 0.0], goal, [1.0, 1.0], [100.0, 100.0], [10000.0, 10000.0]);
+    var single = move([1.0, 0.0]), diagonal = move([1.0, 1.0]), opposite = move([1.0, -1.0]);
+    motors.validate(single); motors.validate(diagonal); motors.validate(opposite);
+    check(single.durationSeconds() < diagonal.durationSeconds() * 0.6,
+      "a single-axis move uses both motors' full speed rather than their diagonal box");
+    near(diagonal.durationSeconds(), opposite.durationSeconds(), "both diagonals obey the motor that carries their sum", 1e-8);
+    var peak = single.evaluate(single.durationSeconds() / 2.0).velocities[0];
+    near(peak, 1.0, "single-axis cruise reaches the full motor speed", 1e-8);
+    near(diagonal.evaluate(diagonal.durationSeconds() / 2.0).velocities[0], 0.5,
+      "diagonal cruise divides the moving motor's speed between the two axes", 1e-8);
+    function time(goal:Array<Float>):motionkit.planner.TimedPath {
+      var zero = [0.0, 0.0];
+      var path = new motionkit.planner.JointPathSamples([0.0, 1.0], [zero, goal], [goal, goal], [zero, zero]);
+      return motors.time(new motionkit.planner.ToppraPathTiming(), path,
+        new motionkit.planner.PathTimingLimits([1.0, 1.0], [100.0, 100.0]));
+    }
+    var timedSingle = time([1.0, 0.0]), timedDiagonal = time([1.0, 1.0]);
+    motors.validate(timedSingle.trajectory); motors.validate(timedDiagonal.trajectory);
+    check(timedSingle.trajectory.jointCount() == 2, "motor timing returns only the authored axes");
+    check(timedSingle.trajectory.durationSeconds() < timedDiagonal.trajectory.durationSeconds() * 0.6,
+      "Cartesian path timing also uses direction-dependent motor speed limits");
+    near(timedSingle.distanceToTime(1.0), timedSingle.trajectory.durationSeconds(), "motor timing preserves its distance map", 1e-8);
+    var tooFast = Trajectory.fromPositionSamples([0.0, 1.0], [[0.0, 0.0], [1.0, 1.0]]);
+    var rejected = false;
+    try motors.validate(tooFast) catch (_:Dynamic) rejected = true;
+    check(rejected, "a lowered path exceeding a motor's sum is rejected");
+    for (trajectory in [single, diagonal, opposite, tooFast, timedSingle.trajectory, timedDiagonal.trajectory]) trajectory.dispose();
+    timedSingle.releaseDistanceMap(); timedDiagonal.releaseDistanceMap();
+  }
+
   public function testTwoBeltCompliance():Void {
     var model = new RobotModel("two-belts");
     var base = model.addLink(new Link("base"));
@@ -100,6 +133,7 @@ class CoreXyTests extends MotionKitTestSupport {
     var model = AssemblySimulationBridge.toRobotModel(scene.assemblyDefinition, AssemblyPhysicalPartView.fromSceneArtifact(scene),
       scene.assemblyState).model;
     var steady = new PlanCheckOptions().steady;
+    model.materializeLimits(true);
     var runtimeBlueprint = RobotRuntimeCompiler.compile(model, 1);
     var index = new Map<String, Int>();
     for (joint in 0...model.joints.length) index.set(model.joints[joint].id, joint);
@@ -114,7 +148,7 @@ class CoreXyTests extends MotionKitTestSupport {
       var source = model.joints[slot(index, id)];
       var joint = planning.addJoint(new Joint(id, source.type, parent, child, source.id));
       joint.axis = source.axis.copy();
-      joint.limits = model.coupledLimits(id, steady);
+      joint.limits = model.coupledLimits(id, steady, true);
       driven.push(slot(index, id));
       parent = child;
     }
@@ -138,6 +172,7 @@ class CoreXyTests extends MotionKitTestSupport {
     var options = new PlanCheckOptions();
     options.steady = steady;
     compiler.planCheck = new PlanCheck(model, ids, options);
+    compiler.motorSpace = motionkit.robot.MotorSpaceConstraints.of(model, ids);
     // A 30 mm square, then its diagonal both ways.
     var corners = [[0.03, 0.0], [0.03, 0.03], [0.0, 0.03], [0.0, 0.0], [0.03, 0.03], [0.0, 0.0]];
     var program = new MotionProgram([for (corner in corners)

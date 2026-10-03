@@ -1761,8 +1761,8 @@ Worktree: `motion-loose-ends`, based on local main `712019dbc`. Work through the
 
 1. **Direct motion and live servo plan checks — implemented.** `PlanCheck` reads a shared polynomial-segment interface; native program arrays remain in place. `MotionSystem` checks a complete direct trajectory once before its first chunk, including smooth replacements. `ServoSession` checks each live plan chunk before submission. Both expose configurable checks and retained findings. Program checks keep their existing policy. Focused MotionKit plan-check gate: 74 assertions passed, including rejection before submission and report-only refill coverage.
 2. **Belt-router rapid contact — in validation.** CNC exact stops wait for measured axis positions within 10 µm before advancing. The stock test now requires zero rapid contacts for both routers.
-3. **CoreXY motor-space constraints — pending.**
-4. **CoreXY belt stiffness — verify current X7/X9 implementation.**
+3. **CoreXY motor-space constraints — implemented and verified.** Opted-in planners enforce linear motor velocity sums for jerk-limited joint moves and TOPP-RA path timing, with polynomial-extrema validation after lowering. Their model uses the single-axis velocity envelope; conservative scalar acceleration limits stay in force. The default box remains available for planners without these constraints. Focused CoreXY gate: 64 assertions passed; the real plotter plans at 1299.2 mm/s single-axis limits and completes its square/diagonals in 79 ticks without drive overload.
+4. **CoreXY belt stiffness — already implemented on main, verified.** The current network stiffness solve covers both belts and cross-axis deflection, including unequal belt stiffness and rigid paths. The real plotter reports 0.133 mm worst drive deviation in the CoreXY gate; it is no longer treated as rigid.
 5. **Draw and animate belt teeth — pending.**
 6. **Plotter virtual device and app player — pending.**
 7. **Native summed-joint kinematics — pending.**
