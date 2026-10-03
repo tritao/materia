@@ -64,6 +64,12 @@ class LayoutRenderableContent implements LayoutContent {
 		return list;
 	}
 
+	/** Invalidates drawing while preserving intrinsic measurement and shaped resources. */
+	public function invalidatePaint():Void {
+		paintedVersion = -1;
+		paintedGeometry = null;
+	}
+
 	/** Clears the retained command stream; the next layout render repaints it. */
 	public function clear():Void {
 		canvas.reset();

@@ -115,6 +115,13 @@ showcase and framework tests live under `examples/ui_haxeon` and
 `tests/haxeon`; generated bindings are checked with
 `tools/check-hxi.sh`.
 
+Retained `TextLayout` foreground overrides use `setColorRanges` with sorted,
+disjoint `TextColorRange` values. Offsets count Unicode codepoints, and each
+shaped cluster uses its first codepoint's color. Ranges reuse measured geometry
+and glyph atlas entries; an empty array clears them. Replacing text or updating
+the layout clears ranges, while `setColor` changes the fallback color and keeps
+overrides. Color changes invalidate the affected resource's raster cache.
+
 The virtualization paths can be measured independently with:
 
 ```sh

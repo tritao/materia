@@ -3,6 +3,7 @@ package nativekit.ui.widgets.text;
 import nativekit.ffi.NativeKitTypes.TextEditAction;
 import FontCollection;
 import Color;
+import TextColorRange;
 import LayoutMeasureConstraints;
 import LayoutMeasureResult;
 import LayoutMeasuredContent;
@@ -17,6 +18,9 @@ import nativekit.editorkit.TextOffsetMap;
 /** Persistent editable text, selection and IME composition state for one widget ID. */
 class TextEditorState {
 	static inline var caretBlinkHalfPeriod:Float = 0.5;
+	// Real width arrives during measurement. Avoid a one-pixel provisional
+	// layout that creates a visual line per character across large documents.
+	static inline var initialLayoutWidth:Float = 1.0e30;
 
 	public var text(get, never):String;
 	public var selectionStart(default, null):Int;
@@ -39,11 +43,13 @@ class TextEditorState {
 	public var draggingSelection:Bool;
 	public final layout:TextEditorLayout;
 	public final renderContent:LayoutRenderableContent;
+	var presentationRevision:Int = -1;
 	public final textStyle:TextStyle;
 	public final paragraphStyle:ParagraphStyle;
 	/** Cached conversions between document code points, UTF-8 bytes and UTF-16 units. */
 	var offsets:TextDocument;
-	final renderMeasurement:LayoutMeasuredContent;
+	/** Measurement-only provider for widgets that place painting in separate layers. */
+	public final renderMeasurement:LayoutMeasuredContent;
 	var renderColor:Color;
 	var lastLayoutWidth:Float;
 	var lastLayoutRevision:Int;
@@ -84,7 +90,7 @@ class TextEditorState {
 		compositionEnd = -1;
 		focused = false;
 		draggingSelection = false;
-		layout = new TextEditorLayout(fonts, initialText, 1.0, this.textStyle,
+		layout = new TextEditorLayout(fonts, initialText, initialLayoutWidth, this.textStyle,
 			this.paragraphStyle, offsets);
 		renderColor = Color.rgba(1.0, 1.0, 1.0, 1.0);
 		renderMeasurement = new LayoutMeasuredContent(function(constraints:LayoutMeasureConstraints) {
@@ -96,9 +102,9 @@ class TextEditorState {
 			var visible = geometry.visibleLocalBounds();
 			canvas.translate(0.0, -scrollOffsetY);
 			layout.paint(canvas, renderColor, scrollOffsetY + visible.y,
-				scrollOffsetY + visible.y + visible.height);
+				scrollOffsetY + visible.y + visible.height, visible.x, visible.x + visible.width, false);
 		});
-		lastLayoutWidth = 1.0;
+		lastLayoutWidth = initialLayoutWidth;
 		lastLayoutRevision = offsets.revision;
 		lastPointerClickTime = -1.0;
 		lastPointerClickX = 0.0;
@@ -140,6 +146,18 @@ class TextEditorState {
 	}
 
 	/** Uses a caller-owned document as the source of truth for this editor. */
+	/** Presentation callbacks may change without text or measurement changing. */
+	public function configurePresentation(foreground:Null<(Int, Int)->Array<TextColorRange>>,
+			decorations:Null<(Int, Int)->Array<TextDecoration>>, revision:Int):Void {
+		ensureLive();
+		if (revision != presentationRevision || foreground != layout.colorRangeProvider ||
+			decorations != layout.decorationProvider)
+			renderContent.invalidatePaint();
+		layout.colorRangeProvider = foreground;
+		layout.decorationProvider = decorations;
+		presentationRevision = revision;
+	}
+
 	public function syncDocument(document:TextDocument):Bool {
 		ensureLive();
 		if (document == null)
@@ -354,6 +372,19 @@ class TextEditorState {
 			previousAnchorAffinity != selectionAnchorAffinity ||
 			previousFocusAffinity != selectionFocusAffinity ||
 			previousCompositionStart != compositionStart || previousCompositionEnd != compositionEnd;
+	}
+
+	/** Imports an external anchored selection only when its logical value differs. */
+	public function setAnchoredSelection(value:TextSelection):Bool {
+		ensureLive();
+		if (value == null) throw "Anchored selection is required";
+		if (value.anchor == selectionAnchor && value.focus == selectionFocus &&
+			value.anchorAffinity == selectionAnchorAffinity && value.focusAffinity == selectionFocusAffinity)
+			return false;
+		placeCaret(value.anchor, false, value.anchorAffinity);
+		placeCaret(value.focus, true, value.focusAffinity);
+		resetCaretBlink(Sys.time());
+		return true;
 	}
 
 	public function setSelection(start:Int, end:Int, ?focusAffinity:Int = 0):Bool {

@@ -11,6 +11,10 @@ if [[ ! -f "$artifact" ]]; then
 fi
 
 export HAXEON_HOME="$haxeon_root"
-export LD_LIBRARY_PATH="$haxeon_root/out:$haxeon_root/.tools/hashlink:$repo_root/app/build/host/native/app${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+native_paths=""
+for dir in "$repo_root"/app/build/host/native/*/; do
+	native_paths="$native_paths:${dir%/}"
+done
+export LD_LIBRARY_PATH="$haxeon_root/out:$haxeon_root/.tools/hashlink$native_paths${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 cd "$repo_root"
 exec "$haxeon_root/.tools/hashlink/hl" "$artifact" "$@"

@@ -13,6 +13,7 @@ import ParagraphStyle;
 import Rect;
 import ResolvedLayoutItem;
 import TextStyle;
+import TextColorRange;
 import Transform2D;
 import nativekit.ui.core.BuildContext;
 import nativekit.ui.core.Key;
@@ -49,6 +50,24 @@ class TextField implements View {
 	public final style:LayoutStyle;
 	public final textStyle:Null<TextStyle>;
 	public final textColor:Null<Color>;
+	/** Sorted, disjoint absolute codepoint foreground ranges for a visible chunk. */
+	public var colorRangeProvider:Null<(Int, Int)->Array<TextColorRange>>;
+	/** Backgrounds and underlines in absolute document codepoint coordinates. */
+	public var decorationProvider:Null<(Int, Int)->Array<TextDecoration>>;
+	/** Increment when state captured by presentation providers changes. */
+	public var presentationRevision:Int = 0;
+	/** Optional controlled selection, queried on rebuild after shared-document synchronization. */
+	public var selectionProvider:Null<Void->TextSelection>;
+	/** Reports widget selection after edit callbacks have synchronized a caller-owned document. */
+	public var onSelectionChange:Null<TextSelection->Void>;
+	/** Additional owner-controlled selections; the primary stays in selectionProvider. */
+	public var additionalSelectionProvider:Null<Void->Array<TextSelection>>;
+	/** Handles navigation of all selections when additional carets are present. */
+	public var onNavigationIntent:Null<(TextNavigationIntent, TextEditorLayout)->Bool>;
+	/** Return true after applying an operation to the controlled document. */
+	public var onEditIntent:Null<TextEditIntent->Bool>;
+	/** Optional aggregate selected text for clipboard copy/cut. */
+	public var selectionTextProvider:Null<Void->Null<String>>;
 	/** Typed selector classes used by composite fields such as ComboBox. */
 	public var classes:Array<String>;
 	public var enabled:Bool;
@@ -63,6 +82,10 @@ class TextField implements View {
 	public var document:Null<TextDocument>;
 	public var onSubmit:Null<String->Void>;
 	public var onDiagnostics:Null<TextEditorDiagnostics->Void>;
+	/** Current logical-screen caret bounds after layout, or null when clipped out. */
+	public var onCaretRect:Null<Null<Rect>->Void>;
+	/** Borrowed retained text geometry after layout, for aligned companion views. */
+	public var onLayoutResolved:Null<TextEditorLayout->ResolvedLayoutItem->Void>;
 	/** Semantic role override used by composite editable controls. */
 	public var semanticRole:AccessibilityRole;
 	/** Semantic action capabilities override used by composite editable controls. */
@@ -82,6 +105,16 @@ class TextField implements View {
 		this.onEdit = onEdit;
 		this.document = document;
 		this.onSubmit = null;
+		this.onCaretRect = null;
+		this.onLayoutResolved = null;
+		this.colorRangeProvider = null;
+		this.decorationProvider = null;
+		this.selectionProvider = null;
+		this.onSelectionChange = null;
+		this.additionalSelectionProvider = null;
+		this.onNavigationIntent = null;
+		this.onEditIntent = null;
+		this.selectionTextProvider = null;
 		this.label = label;
 		this.placeholder = null;
 		this.multiline = multiline;
@@ -140,7 +173,17 @@ class TextField implements View {
 				if (editor.tailFollowing)
 					editor.scrollToEnd();
 			}
+			if (selectionProvider != null)
+				editor.setAnchoredSelection(selectionProvider());
+			var additionalSelections = additionalSelectionProvider == null ? [] : additionalSelectionProvider();
+			var hasAdditionalCaret = false;
+			for (selection in additionalSelections) {
+				if (selection.anchor == selection.focus) hasAdditionalCaret = true;
+				if (selection.anchor > editor.documentLength() || selection.focus > editor.documentLength())
+					throw "Additional selection is outside the document";
+			}
 			editor.updateStyle(resolved.textStyle, resolved.paragraphStyle);
+			editor.configurePresentation(colorRangeProvider, decorationProvider, presentationRevision);
 
 			var flags = context.interactionStates.get(id);
 			flags = StyleStateUtil.withState(flags, StyleState.Disabled, !enabled);
@@ -184,9 +227,30 @@ class TextField implements View {
 			editorContentStyle.clipVertical = multiline;
 			var editorContent = new RenderNode(context.id("editor-content"),
 				LayoutVisualKind.Box, editorContentStyle);
+			if (decorationProvider != null) {
+				var backgroundStyle = new LayoutStyle();
+				backgroundStyle.width = LayoutAxis.grow();
+				backgroundStyle.height = LayoutAxis.grow();
+				backgroundStyle.positioning = LayoutPositioning.Absolute;
+				backgroundStyle.zIndex = 0;
+				var backgroundNode = new RenderNode(context.id("editor-background"),
+					LayoutVisualKind.Custom, backgroundStyle);
+				backgroundNode.hitTestSelf = false;
+				backgroundNode.onPaint(function(canvas, geometry) {
+					if (!editor.isDisposed()) {
+						var visible = geometry.visibleLocalBounds();
+						canvas.translate(0.0, -editor.scrollOffsetY);
+						editor.layout.paintDecorations(canvas, true,
+							editor.scrollOffsetY + visible.y,
+							editor.scrollOffsetY + visible.y + visible.height,
+							visible.x, visible.x + visible.width);
+					}
+				});
+				editorContent.add(backgroundNode);
+			}
 			// Unfocused, unselected fields need only their text node. State changes
 			// invalidate the frame before selection or caret decoration is painted.
-			if (editor.selectionStart != editor.selectionEnd) {
+			if (editor.selectionStart != editor.selectionEnd || additionalSelections.length > 0) {
 				var selectionStyle = new LayoutStyle();
 				selectionStyle.width = LayoutAxis.grow();
 				selectionStyle.height = LayoutAxis.grow();
@@ -197,7 +261,7 @@ class TextField implements View {
 				selectionNode.hitTestSelf = false;
 				selectionNode.onPaint(function(canvas, _) {
 					if (!editor.isDisposed())
-						paintSelection(canvas, editor, context.textInput.isOwner(id), context.theme);
+						paintSelection(canvas, editor, context.textInput.isOwner(id), context.theme, additionalSelections);
 				});
 				editorContent.add(selectionNode);
 			}
@@ -205,15 +269,20 @@ class TextField implements View {
 				placeholder.length > 0;
 			// Single-line fields use the text node so their full value and theme
 			// foreground update together as the editor content changes.
-			var useTextNode = showsPlaceholder || !multiline;
+			var useTextNode = showsPlaceholder || (!multiline && colorRangeProvider == null && decorationProvider == null);
 			var textNode = new RenderNode(context.id("text"),
 				useTextNode ? LayoutVisualKind.Text : LayoutVisualKind.Custom, textNodeStyle);
 			if (showsPlaceholder)
 				textNode.layout.text = placeholder;
 			else if (useTextNode)
 				textNode.layout.text = editor.layoutText();
-			else
+			else {
+				// Clay orders absolute paint layers independently of flow content.
+				// Keep glyphs above decoration/selection layers, while a separate
+				// measurement-only node supplies their shared intrinsic size.
+				textNodeStyle.positioning = LayoutPositioning.Absolute;
 				textNode.layout.intrinsicContent = editor.renderContent;
+			}
 			var textNodeTextStyle = new TextStyle(editor.textStyle.fontSize,
 				editor.textStyle.font, editor.textStyle.letterSpacing);
 			var fontSource = computed.source(StyleProperty.FontSize);
@@ -233,6 +302,15 @@ class TextField implements View {
 				editor.setRenderColor(textNodeColor);
 			}
 			editorContent.add(textNode);
+			if (!useTextNode) {
+				var measureStyle = new LayoutStyle();
+				measureStyle.width = LayoutAxis.grow();
+				measureStyle.height = LayoutAxis.grow();
+				var measureNode = new RenderNode(context.id("editor-measure"), LayoutVisualKind.Custom, measureStyle);
+				measureNode.hitTestSelf = false;
+				measureNode.layout.intrinsicContent = editor.renderMeasurement;
+				editorContent.add(measureNode);
+			}
 			if (editor.focused) {
 				var paintStyle = new LayoutStyle();
 				paintStyle.width = LayoutAxis.grow();
@@ -246,16 +324,16 @@ class TextField implements View {
 					if (!editor.isDisposed()) {
 						var now = Sys.time();
 						var active = context.textInput.isOwner(id);
-						if (active && !readOnly && editor.selectionStart == editor.selectionEnd)
+						if (active && !readOnly && (editor.selectionStart == editor.selectionEnd || hasAdditionalCaret))
 							context.textInput.requestCaretFrameAt(editor.nextCaretBlinkTime(now));
-						paintEditorDecorations(canvas, editor, active, context.theme, now, !readOnly);
+						paintEditorDecorations(canvas, editor, active, context.theme, now, !readOnly, additionalSelections);
 					}
 				});
 				editorContent.add(paintNode);
 			}
 			node.add(editorContent);
 
-			var updateState = function() {
+			var refreshState = function() {
 				if (document == null || onChange != null)
 					value = editor.layoutText();
 				semantics.setValueProvider(function() return editor.text, editor.documentLength());
@@ -266,13 +344,47 @@ class TextField implements View {
 					editor.ensureCaretVisible(editorContent.resolved.height))
 					refresh();
 			};
-			var publishTextChange = function(previousRevision:Int) {
+			var publishSelection = function() {
+				var handler = onSelectionChange;
+				if (handler != null)
+					handler(new TextSelection(editor.selectionAnchor, editor.selectionFocus,
+						editor.selectionAnchorAffinity, editor.selectionFocusAffinity));
+			};
+			var updateState = function() {
+				publishSelection();
+				refreshState();
+			};
+			var delegateEdit = function(intent:TextEditIntent):Bool {
+				var handler = onEditIntent;
+				if (handler == null || !handler(intent)) return false;
+				if (document != null) editor.syncDocument(document);
+				else editor.syncExternal(value);
+				if (selectionProvider != null) editor.setAnchoredSelection(selectionProvider());
+				editor.resetCaretBlink(Sys.time());
 				updateState();
+				return true;
+			};
+			var copyCurrentSelection = function():Bool {
+				if (selectionTextProvider != null) {
+					var selectedText = selectionTextProvider();
+					if (selectedText == null) return false;
+					context.clipboard.writeText(selectedText);
+				} else {
+					if (editor.selectionStart == editor.selectionEnd) return false;
+					copySelection(context.clipboard, editor);
+				}
+				return true;
+			};
+			var publishTextChange = function(previousRevision:Int) {
+				if (document == null || onChange != null)
+					value = editor.layoutText();
 				if (editor.documentRevision() != previousRevision &&
 					editor.lastEditTransaction != null && onEdit != null)
 					onEdit(editor.lastEditTransaction);
 				if (editor.documentRevision() != previousRevision && onChange != null)
 					onChange(value);
+				publishSelection();
+				refreshState();
 			};
 			var publishDiagnostics = function(caretRect:Null<Rect>) {
 				if (onDiagnostics == null)
@@ -301,6 +413,14 @@ class TextField implements View {
 				var caretRect = new Rect(Math.min(screenTopX, screenBottomX), Math.min(screenTopY, screenBottomY),
 					Math.max(1.0, absolute(screenBottomX - screenTopX)),
 					Math.max(1.0, absolute(screenBottomY - screenTopY)));
+				var caretHandler = onCaretRect;
+				if (caretHandler != null) {
+					var clip = geometry.clipBounds;
+					var visible = geometry.visible && caretRect.x < clip.x + clip.width &&
+						caretRect.x + caretRect.width > clip.x && caretRect.y < clip.y + clip.height &&
+						caretRect.y + caretRect.height > clip.y;
+					caretHandler(visible ? caretRect : null);
+				}
 				publishDiagnostics(caretRect);
 				if (!editor.focused || !context.textInput.isOwner(id) || context.platformSurface == null ||
 					context.platformSurface.isDisposed())
@@ -339,6 +459,7 @@ class TextField implements View {
 			});
 			textNode.onResolved(function(geometry) {
 				editor.updateLayout(geometry.width);
+				if (onLayoutResolved != null) onLayoutResolved(editor.layout, geometry);
 				if (multiline && !readOnly && editorContent.resolved != null &&
 					editor.ensureCaretVisible(editorContent.resolved.height))
 					refresh();
@@ -434,6 +555,39 @@ class TextField implements View {
 				#else
 					(event.modifiers & UiModifier.Control) != 0;
 				#end
+				if (additionalSelections.length > 0 && onNavigationIntent != null) {
+					var navigation:Null<TextNavigationIntent> = switch (event.key) {
+						case UiKey.Left: wordNavigation ? Word(-1, extend, macWordNavigation) : Character(-1, extend);
+						case UiKey.Right: wordNavigation ? Word(1, extend, macWordNavigation) : Character(1, extend);
+						case UiKey.Up: wordNavigation ? Paragraph(-1, extend, macWordNavigation) :
+							multiline ? VisualLine(-1, extend) : null;
+						case UiKey.Down: wordNavigation ? Paragraph(1, extend, macWordNavigation) :
+							multiline ? VisualLine(1, extend) : null;
+						case UiKey.Home: LineBoundary(false, extend);
+						case UiKey.End: LineBoundary(true, extend);
+						case _: null;
+					};
+					#if (mac || ios)
+					if ((event.modifiers & UiModifier.Super) != 0 && event.key == UiKey.Up)
+						navigation = DocumentBoundary(false, extend);
+					else if ((event.modifiers & UiModifier.Super) != 0 && event.key == UiKey.Down)
+						navigation = DocumentBoundary(true, extend);
+					#end
+					if (command && (event.key == UiKey.Home || event.key == UiKey.End))
+						navigation = DocumentBoundary(event.key == UiKey.End, extend);
+					if (navigation != null && onNavigationIntent(navigation, editor.layout)) {
+						refresh();
+						editor.resetCaretBlink(Sys.time());
+						event.preventDefault();
+						return;
+					}
+				}
+				if (!readOnly) {
+					var consumed = event.key == UiKey.Backspace ? delegateEdit(DeleteBackward) :
+						event.key == UiKey.Delete ? delegateEdit(DeleteForward) :
+						event.key == UiKey.Enter && multiline ? delegateEdit(Insert("\n")) : false;
+					if (consumed) { event.preventDefault(); return; }
+				}
 				var handled = true;
 				var changed = false;
 				var textEdited = false;
@@ -441,9 +595,10 @@ class TextField implements View {
 				if (command && event.key == UiKey.A)
 					changed = editor.selectAll();
 				else if (command && event.key == UiKey.C)
-					copySelection(context.clipboard, editor);
+					copyCurrentSelection();
 				else if (command && event.key == UiKey.X) {
-					copySelection(context.clipboard, editor);
+					copyCurrentSelection();
+					if (!readOnly && delegateEdit(Insert(""))) { event.preventDefault(); return; }
 					if (!readOnly) {
 						changed = editor.replace(editor.selectionStart, editor.selectionEnd, "");
 						textEdited = true;
@@ -455,6 +610,7 @@ class TextField implements View {
 						context.clipboard.readText(function(pasted) {
 							if (editor.isDisposed() || !editor.focused)
 								return;
+							if (delegateEdit(Paste(pasted))) return;
 							var beforePaste = editor.documentRevision();
 							if (editor.insert(pasted)) {
 								editor.resetCaretBlink(Sys.time());
@@ -538,6 +694,7 @@ class TextField implements View {
 				});
 
 			node.on(UiEventKind.TextInput, function(event) {
+				if (enabled && !readOnly && delegateEdit(Insert(event.text))) return;
 				var previousRevision = editor.documentRevision();
 				if (enabled && !readOnly && editor.insert(event.text)) {
 					editor.resetCaretBlink(Sys.time());
@@ -603,9 +760,13 @@ class TextField implements View {
 	}
 
 	static function paintSelection(canvas:Canvas, editor:TextEditorState,
-			active:Bool, theme:nativekit.ui.theme.Theme):Void {
+			active:Bool, theme:nativekit.ui.theme.Theme, additional:Array<TextSelection>):Void {
+		canvas.translate(0.0, -editor.scrollOffsetY);
+		for (selection in additional)
+			for (rect in editor.layout.selectionRects(new TextPosition(selection.anchor, selection.anchorAffinity),
+				new TextPosition(selection.focus, selection.focusAffinity)))
+				canvas.fillRectIfPositive(rect, active ? theme.textSelection : theme.textSelectionInactive);
 		if (editor.selectionStart != editor.selectionEnd) {
-			canvas.translate(0.0, -editor.scrollOffsetY);
 			for (rect in editor.layout.selectionRects(editor.anchorPosition(), editor.focusPosition()))
 				canvas.fillRectIfPositive(rect, active ? theme.textSelection : theme.textSelectionInactive);
 		}
@@ -613,7 +774,7 @@ class TextField implements View {
 
 	static function paintEditorDecorations(canvas:Canvas, editor:TextEditorState,
 			active:Bool, theme:nativekit.ui.theme.Theme, timeSeconds:Float,
-			showCaret:Bool = true):Void {
+			showCaret:Bool = true, ?additional:Array<TextSelection>):Void {
 		if (editor.scrollOffsetY != 0.0)
 			canvas.translate(0.0, -editor.scrollOffsetY);
 		if (active && editor.compositionStart >= 0 && editor.compositionStart != editor.compositionEnd) {
@@ -621,6 +782,14 @@ class TextField implements View {
 				canvas.fillRectIfPositive(new Rect(rect.x, rect.y + rect.height - 1.0, rect.width, 1.0),
 					Color.rgba(0.95, 0.75, 0.24, 1.0));
 		}
+		if (showCaret && active && additional != null && editor.isCaretVisible(timeSeconds))
+			for (selection in additional) if (selection.anchor == selection.focus) {
+				var caret = editor.layout.caret(new TextPosition(selection.focus, selection.focusAffinity));
+				var topX = caret.x + caret.ascender * caret.slope;
+				var bottomX = caret.x + caret.descender * caret.slope;
+				canvas.fillRectIfPositive(new Rect(Math.min(topX, bottomX), caret.y + Math.min(caret.ascender, caret.descender),
+					Math.max(1.0, absolute(bottomX - topX)), Math.max(1.0, absolute(caret.descender - caret.ascender))), theme.textCaret);
+			}
 		if (showCaret && active && editor.selectionStart == editor.selectionEnd &&
 				editor.isCaretVisible(timeSeconds)) {
 			var caret = editor.layout.caret(editor.focusPosition());

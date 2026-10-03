@@ -50,6 +50,7 @@ class UiContext {
 	/** Current document/selection context used by command-bound UI. */
 	public var commandContext(default, null):CommandContext;
 	public var root(default, null):Null<RenderNode>;
+	var pendingFocus:Null<WidgetId> = null;
 	/** Called when an active animation needs another host frame. */
 	public var onAnimationFrameRequested:Null<Void->Void>;
 	var submittedStateRevision:Int;
@@ -127,6 +128,7 @@ class UiContext {
 		hitTestIds = [];
 		disposed = false;
 		buildContext.setFocusRequester(function(id) { return focusWidget(id); });
+		buildContext.setDeferredFocusRequester(function(id) { ensureLive(); pendingFocus = id; commands.refresh(); });
 		customCanvases = new Map();
 		customLists = new Map();
 		customGeometries = new Map();
@@ -371,6 +373,9 @@ class UiContext {
 		diagnosticStage = 9;
 		var previousFocus = focus.focusedId;
 		focus.rebuild(next);
+		var requestedFocus = pendingFocus;
+		pendingFocus = null;
+		if (requestedFocus != null) focus.focus(requestedFocus);
 		var nextFocus = focus.focusedId;
 		var focusChanged = (previousFocus == null && nextFocus != null) ||
 			(previousFocus != null && (nextFocus == null || !previousFocus.equals(nextFocus)));
@@ -928,6 +933,7 @@ class UiContext {
 	public function dispose():Void {
 		if (disposed)
 			return;
+		pendingFocus = null;
 		session.clearCustomPaints();
 		for (nodeId in customCanvases.keys()) {
 			var canvas = customCanvases.get(nodeId);

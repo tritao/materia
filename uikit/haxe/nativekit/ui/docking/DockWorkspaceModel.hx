@@ -53,13 +53,13 @@ class DockWorkspaceModel {
 	/** Installs a validated default layout and makes it the active layout. */
 	public function setDefaultLayout(layout:DockNode):Void {
 		validateLayout(layout);
-		defaultRoot = DockNodeTools.clone(layout);
+		defaultRoot = normalizeGroups(layout);
 		setRoot(layout);
 	}
 
 	public function setRoot(layout:DockNode):Void {
 		validateLayout(layout);
-		root = DockNodeTools.normalize(DockNodeTools.clone(layout));
+		root = normalizeGroups(layout);
 		activePanelId = chooseActive(activePanelId);
 		touch();
 	}
@@ -103,12 +103,66 @@ class DockWorkspaceModel {
 			touch();
 			return true;
 		}
+		if (!canShareTabs(panelId, target)) {
+			for (candidate in panelIds())
+				if (canShareTabs(panelId, candidate)) return dock(panelId, candidate, DockDropZone.Center);
+			return dock(panelId, target, DockDropZone.Bottom);
+		}
 		return dock(panelId, target, DockDropZone.Center);
 	}
 
-	public function dock(panelId:String, targetPanelId:String, zone:DockDropZone):Bool {
+	public function canShareTabs(firstId:String, secondId:String):Bool {
+		var first = get(firstId), second = get(secondId);
+		if (first == null || second == null) return false;
+		var a = first.grouping, b = second.grouping;
+		if (a == null || b == null) return a == null && b == null;
+		return a.shareTabs && b.shareTabs && a.group == b.group;
+	}
+
+	public function canDock(panelId:String, targetPanelId:String, zone:DockDropZone):Bool {
 		if (get(panelId) == null || get(targetPanelId) == null || zone == null ||
-			panelId == targetPanelId || !isOpen(targetPanelId))
+			panelId == targetPanelId || !isOpen(targetPanelId)) return false;
+		return switch zone {
+			case Center | TabBefore | TabAfter: canShareTabs(panelId, targetPanelId);
+			case Left | Right | Top | Bottom: true;
+		};
+	}
+
+	/** Repairs older layouts against current grouping rules without losing panels. */
+	function normalizeGroups(node:DockNode):DockNode {
+		return groupedLayout(DockNodeTools.normalize(node));
+	}
+
+	function groupedLayout(node:DockNode):DockNode {
+		return switch node {
+			case Empty: DockNode.Empty;
+			case Panel(id): DockNode.Panel(id);
+			case Split(axis, ratio, first, second):
+				DockNode.Split(axis, ratio, groupedLayout(first), groupedLayout(second));
+			case Tabs(ids, active):
+				var groups:Array<Array<String>> = [];
+				for (id in ids) {
+					var found = false;
+					for (group in groups) if (canShareTabs(id, group[0])) {
+						group.push(id);
+						found = true;
+						break;
+					}
+					if (!found) groups.push([id]);
+				}
+				var result = DockNode.Empty;
+				for (index in 0...groups.length) {
+					var group = groups[groups.length - index - 1];
+					var leaf = group.length == 1 ? DockNode.Panel(group[0]) :
+						DockNode.Tabs(group, group.indexOf(active) >= 0 ? active : group[0]);
+					result = index == 0 ? leaf : DockNode.Split(DockSplitAxis.Vertical, 0.72, leaf, result);
+				}
+				result;
+		};
+	}
+
+	public function dock(panelId:String, targetPanelId:String, zone:DockDropZone):Bool {
+		if (!canDock(panelId, targetPanelId, zone))
 			return false;
 		var next = DockNodeTools.dock(root, panelId, targetPanelId, zone);
 		if (DockNodeTools.validate(next, panelMap()) != null)
@@ -146,7 +200,7 @@ class DockWorkspaceModel {
 			return false;
 		if (DockNodeTools.validate(snapshot.root, panelMap()) != null)
 			return false;
-		root = DockNodeTools.normalize(DockNodeTools.clone(snapshot.root));
+		root = normalizeGroups(snapshot.root);
 		activePanelId = snapshot.activePanelId != null && isOpen(snapshot.activePanelId) ?
 			snapshot.activePanelId : DockNodeTools.firstPanel(root);
 		touch();
@@ -168,7 +222,7 @@ class DockWorkspaceModel {
 			return false;
 		if (DockNodeTools.validate(compatible, panelMap()) != null)
 			return false;
-		root = DockNodeTools.normalize(DockNodeTools.clone(compatible));
+		root = normalizeGroups(compatible);
 		activePanelId = snapshot.activePanelId != null && isOpen(snapshot.activePanelId) ?
 			snapshot.activePanelId : DockNodeTools.firstPanel(root);
 		touch();

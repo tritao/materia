@@ -54,7 +54,7 @@ void hash_runtime_command_geometry(uint64_t &hash, const RenderCommand &command)
 }
 
 void hash_runtime_resource(uint64_t &hash, const FrameResources &resources, ResourceId resource) {
-    hash_runtime_u32(hash, resource.value);
+    hash_runtime_u32(hash, resources.source_identity(resource).value);
     hash_runtime_u64(hash, resources.content_generation(resource));
     if (const auto *surface = resources.surface(resource)) {
         hash_runtime_u32(hash, 1u);

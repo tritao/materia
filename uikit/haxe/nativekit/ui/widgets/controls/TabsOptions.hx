@@ -12,6 +12,7 @@ class TabsOptions {
 	public var onTabDragMove:Null<String->UiEvent->Void>;
 	public var onTabDragEnd:Null<String->UiEvent->Void>;
 	public var onTabDragCancel:Null<String->UiEvent->Void>;
+	public var onTabContextMenu:Null<String->UiEvent->Void>;
 	public var onTabHeaderBuilt:Null<String->RenderNode->Void>;
 
 	public function new() {
@@ -22,5 +23,6 @@ class TabsOptions {
 		onTabDragEnd = null;
 		onTabDragCancel = null;
 		onTabHeaderBuilt = null;
+		onTabContextMenu = null;
 	}
 }
