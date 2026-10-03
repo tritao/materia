@@ -608,8 +608,10 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 - **Blocked steps.** Before each step, check its prerequisite exactly as written. If it is
   missing, do not work around it (no writing against `Drive`, no stand-in signal bus): mark the
   step `blocked: <what is missing>` in the Progress table, commit, and go on to the next unblocked
-  step. When no unblocked step is left, stop and end with a short report listing each blocked step
-  and the commit or branch it waits for. When resumed, re-check blocked steps first.
+  step. When no unblocked step is left, re-check every blocked step once (a dependency may have
+  landed meanwhile) and do any that are now unblocked. Then stop and end with a short report
+  listing each blocked step and the commit or branch it waits for. When resumed, re-check blocked
+  steps first.
 
 - Commit after each step (or sub-step) with a message naming the step, e.g.
   `Sheet metal: fold sheets as forward kinematics (SM1)`, and update the Progress table below in
