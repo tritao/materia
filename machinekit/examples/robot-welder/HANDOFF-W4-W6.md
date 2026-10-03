@@ -88,6 +88,48 @@ to work.
   2. If `main` moved, merge `main` into `mobile-welder` first, then fast-forward.
   3. Never touch the checked-out branch of the shared checkout.
 
+## Coordination with the RobotKit restructuring
+
+Another session is restructuring RobotKit at the same time, in the `robotkit-restructure` worktree, following
+`robotkit/RESTRUCTURE_PLAN.md`. On 2026-10-04 it was in R0, splitting trajectory storage and validation into
+TrajectoryKit. The two sessions take turns on main at agreed sync points.
+
+**Order of work:**
+
+| Stage | Welder session | Restructure session |
+| --- | --- | --- |
+| Now | W4 | R0, R1, R2 (little overlap with W4) |
+| Sync point A | W4 lands on main, then **pause** (read and plan only) | Merges main, then does R3 and R4 at a quiet point |
+| Sync point B | Merges main, fixes imports, then does W5 | Continues R5, R6 |
+| W6 | Starts only once R0's protocol rename and `RuntimeEndpoint` are on main | — |
+
+**Why this order:**
+- **R3 moves the files W4 edits** (`WeldPlan`, `WeldRunner`, `WeldSeam` and `SimulatedWelder`, into ProcessKit).
+- **R4 rewrites imports everywhere,** including ProcessKit's welder code, since `FiredProcessEvent` and other
+  `robotkit.world` types move.
+- **Editing a file while another branch moves it is what makes merges painful,** so the welder session is quiet while
+  R3 and R4 run.
+- **W5's weave lives in `motionkit/path`,** which R0 is changing (`PathTimeLaw`, `NativeJointPath`). Build it on R0's
+  layout, after sync point B.
+
+**Rules:**
+- **Ownership.**
+  - This session owns `machinekit/haxe/src/machinekit/welding`, the welding parts of ProcessKit, the `robot-welder`
+    example and the app's welder pieces (`WeldBeads`, the weld parts of `MissionPlayer` and `SimulatedTools`).
+  - The restructure session owns RobotKit's structure, TrajectoryKit and the device protocol's naming.
+  - Don't edit the other session's files, apart from fixing the compile errors its moves cause after a merge.
+- **New welding code goes in ProcessKit** (or `machinekit.welding` for the CAD side), never in `robotkit.skill` or
+  `robotkit.tool`, so R3 has nothing more to move.
+- **Before starting any milestone, merge main.** At that point:
+  - if main contains R3 or R4 (welder files moved out of `robotkit.skill` and `robotkit.tool`, or `robotkit.world`
+    split up), fix imports and paths first, with nothing else in the same commit;
+  - if the restructure session has announced that R3 or R4 is under way but it hasn't reached main yet, stop and
+    report rather than continuing to edit the welder files it moves.
+- **Sync often.** Fast-forward main as soon as a milestone's checks pass, so the restructure session's next merge
+  picks it up. Report the sync in your milestone report: the main SHA, and that W4/W5/W6 has landed.
+- **The machine-tending session** (`machine-tending` worktree) also builds on `ArmTool`, `ArmClearance` and the mission
+  code. Keep those source-compatible, as the ground rules say.
+
 ## Test recipes
 
 Run all of these from the worktree root, with these variables set:
