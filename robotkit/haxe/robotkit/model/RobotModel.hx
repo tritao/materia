@@ -4,7 +4,7 @@ import robotkit.model.Transmission;
 
 /** Editable static definition of a robot's links, joints, and sensors. */
 class RobotModel {
-  public static inline var CURRENT_VERSION:Int = 6;
+  public static inline var CURRENT_VERSION:Int = 8;
   public final schemaVersion:Int = CURRENT_VERSION;
   public final name:String;
   public final links:Array<Link> = [];
@@ -13,7 +13,11 @@ class RobotModel {
   public final actuators:Array<Actuator> = [];
   /** Mechanical joint-to-joint relations, independent of actuator transmissions. */
   public final couplings:Array<JointCoupling> = [];
+  /** Physical elastic networks, independent of the nominal motion equations. */
+  public final elasticNetworks:Array<ElasticNetwork> = [];
   public final sensors:Array<Sensor> = [];
+  /** Encoders on joints; they are read from joint positions rather than compiled into the runtime. */
+  public final encoders:Array<Encoder> = [];
   /** Explicit contacts between link collision shapes. */
   public final contactPairs:Array<ContactPair> = [];
   public final frames:Array<Frame> = [];
@@ -53,6 +57,17 @@ class RobotModel {
     return actuator;
   }
 
+  public function addEncoder(encoder:Encoder):Encoder {
+    encoders.push(encoder);
+    return encoder;
+  }
+
+  /** The sensor explicitly wired as this actuator's feedback. */
+  public function encoderFor(actuator:Actuator):Null<Encoder> {
+    for (encoder in encoders) if (encoder.id == actuator.encoder) return encoder;
+    return null;
+  }
+
   public function addCoupling(coupling:JointCoupling):JointCoupling {
     couplings.push(coupling);
     return coupling;
@@ -64,35 +79,60 @@ class RobotModel {
    * turns with; a motor caps it at its rate through the ratios. For a sliding joint driven by
    * actuators, acceleration is also capped at their summed force, through each coupling's
    * efficiency, over the mass the joint carries plus every coupled joint's turning inertia (rotor
-   * armature included) seen through the ratio. Gravity and friction are left out. Zero still
-   * means unlimited. With `steady` loads, the force left for acceleration is what the motors give
+   * armature included) seen through the ratio. Gravity and friction are left out. A missing limit is null; zero is a stopped joint. With `steady` loads, the force left for acceleration is what the motors give
    * less their drag, the axis's rail friction and its weight (see `SteadyLoads`).
+   *
+   * A follower that sums several leaders (a CoreXY motor) binds each leader inside a box: the axis's
+   * speed is limited to the follower's limit over the sum of the ratios' magnitudes (through chains,
+   * `couplingWeight`), so every combination of moves within the per-axis limits stays inside it.
+   * Each axis likewise gets only its share of such a motor's force, in proportion to its ratio.
    */
   public function coupledLimits(id:JointId, ?steady:SteadyLoads):JointLimits {
     var joint = [for (candidate in joints) if (candidate.id == id) candidate];
     if (joint.length != 1) throw 'Robot model has no joint "$id"';
-    var own = joint[0].limits;
+    var own = joint[0].mechanicalLimits;
+    if (own == null) own = joint[0].limits;
     var limits = new JointLimits(own.lower, own.upper, own.velocity, own.effort, own.maxAcceleration);
+    limits.assumptions = [for (value in own.assumptions) {quantity: value.quantity, label: value.label}];
     limits.overtravel = own.overtravel;
-    function tighten(current:Float, bound:Float):Float
-      return bound <= 0.0 ? current : current <= 0.0 ? bound : Math.min(current, bound);
+    limits.velocityLimiter = own.velocityLimiter;
+    function tighten(current:Null<Float>, bound:Null<Float>):Null<Float>
+      return bound == null ? current : current == null ? bound : Math.min(current, bound);
     // Each joint reached so far, how far it moves per unit of joint `id`, and the efficiency of
     // the couplings between them.
     var reached:Array<String> = [id];
     var scales:Array<Float> = [1.0];
     var efficiencies:Array<Float> = [1.0];
+    // How far each joint bounds the axis's box (see above) and the share of its force the axis may use.
+    var boxes:Array<Float> = [1.0];
+    var shares:Array<Float> = [1.0];
+    var axisWeight = couplingWeight(id, 0);
     var next = 0;
     while (next < reached.length) {
       var leader = reached[next], leaderScale = scales[next], leaderEfficiency = efficiencies[next];
+      var leaderShare = shares[next];
       next++;
       for (coupling in couplings) if (coupling.leader == leader && reached.indexOf(coupling.follower) < 0) {
         var scale = Math.abs(coupling.ratio) * leaderScale;
+        var terms = 0.0;
+        for (other in couplings) if (other.follower == coupling.follower) terms += Math.abs(other.ratio);
+        var box = couplingWeight(coupling.follower, 0) / axisWeight;
         reached.push(coupling.follower);
         scales.push(scale);
+        boxes.push(box);
+        shares.push(leaderShare * Math.abs(coupling.ratio) / terms);
         efficiencies.push(leaderEfficiency * coupling.efficiency);
         for (follower in joints) if (follower.id == coupling.follower) {
-          limits.velocity = tighten(limits.velocity, follower.limits.velocity / scale);
-          limits.maxAcceleration = tighten(limits.maxAcceleration, follower.limits.maxAcceleration / scale);
+          var mechanical = follower.mechanicalLimits;
+          if (mechanical == null) mechanical = follower.limits;
+          var velocity = mechanical.velocity, acceleration = mechanical.maxAcceleration;
+          if (velocity != null) {
+            if (limits.velocity == null || velocity / box <= limits.velocity)
+              for (value in mechanical.assumptions) if (value.quantity == "speed limit")
+                EngineeringAssumptions.add(limits.assumptions, value.quantity, value.label);
+            limits.velocity = tighten(limits.velocity, velocity / box);
+          }
+          if (acceleration != null) limits.maxAcceleration = tighten(limits.maxAcceleration, acceleration / box);
         }
       }
     }
@@ -103,13 +143,27 @@ class RobotModel {
         if (index < 0) continue;
         // An actuator coordinate moves |ratio| per unit of its joint, so |ratio| * scale per unit of `id`.
         var gearing = Math.abs(ratio) * scales[index];
-        limits.velocity = tighten(limits.velocity, actuator.planningRate() / gearing);
-        force += efficiencies[index] * actuator.planningEffort() * gearing;
-        driven = true;
+        var motorRate = actuator.planningRate();
+        if (motorRate != null) {
+          var rate = motorRate / (Math.abs(ratio) * boxes[index]);
+          if (limits.velocity == null || rate <= limits.velocity) {
+            for (value in actuator.assumptions) if (value.quantity == "speed limit")
+              EngineeringAssumptions.add(limits.assumptions, value.quantity, value.label);
+            var limiter = actuator.rateLimiter();
+            if (limiter != "") limits.velocityLimiter = limiter;
+          }
+          limits.velocity = tighten(limits.velocity, rate);
+        }
+        var effort = actuator.planningEffort();
+        if (effort != null) {
+          force += efficiencies[index] * actuator.efficiency * effort * gearing * shares[index];
+          driven = true;
+        }
     }
-    if (driven && joint[0].type == JointType.Prismatic && force > 0) {
+    if (driven) limits.effort = tighten(limits.effort, force);
+    if (driven && joint[0].type == JointType.Prismatic) {
       // A drive that cannot carry the steady loads has nothing left to accelerate with.
-      if (steady != null) force = Math.max(steadyForce(joint[0], force, steady), 1e-9);
+      if (steady != null) force = Math.max(steadyForce(joint[0], force, steady), 0.0);
       var inertia = carriedMass(joint[0]) + joint[0].armature;
       for (index in 1...reached.length) for (follower in joints) if (follower.id == reached[index])
         inertia += efficiencies[index] * turningInertia(follower) * scales[index] * scales[index];
@@ -118,13 +172,54 @@ class RobotModel {
     return limits;
   }
 
+  /** Materialise all drive caps from one snapshot, then fill missing follower caps from their leaders. */
+  public function materializeLimits():Void {
+    for (joint in joints) if (joint.mechanicalLimits == null) joint.mechanicalLimits = joint.limits.copy();
+    var effective = [for (joint in joints) coupledLimits(joint.id)];
+    for (_ in 0...couplings.length) for (index in 0...joints.length) {
+      var velocity = 0.0, acceleration = 0.0;
+      var any = false, hasVelocity = true, hasAcceleration = true;
+      for (coupling in couplings) if (coupling.follower == joints[index].id) {
+        any = true;
+        var leader = [for (slot in 0...joints.length) if (joints[slot].id == coupling.leader) slot][0];
+        var rate = effective[leader].velocity, accel = effective[leader].maxAcceleration;
+        if (rate == null) hasVelocity = false; else velocity += Math.abs(coupling.ratio) * rate;
+        if (accel == null) hasAcceleration = false; else acceleration += Math.abs(coupling.ratio) * accel;
+      }
+      if (any && hasVelocity && effective[index].velocity == null) effective[index].velocity = velocity;
+      if (any && hasAcceleration && effective[index].maxAcceleration == null) effective[index].maxAcceleration = acceleration;
+    }
+    for (index in 0...joints.length) {
+      joints[index].limits.velocity = effective[index].velocity;
+      joints[index].limits.velocityLimiter = effective[index].velocityLimiter;
+      joints[index].limits.assumptions = effective[index].assumptions;
+      joints[index].limits.effort = effective[index].effort;
+      joints[index].limits.maxAcceleration = effective[index].maxAcceleration;
+    }
+  }
+
+  /**
+   * How far a joint can move per unit of every joint that leads it moving at once the worst way: the
+   * sum of its couplings' ratio magnitudes, each times its leader's weight. A joint no coupling
+   * follows weighs 1.
+   */
+  function couplingWeight(id:JointId, depth:Int):Float {
+    if (depth > couplings.length) return 1.0;
+    var weight = 0.0, any = false;
+    for (coupling in couplings) if (coupling.follower == id) {
+      any = true;
+      weight += Math.abs(coupling.ratio) * couplingWeight(coupling.leader, depth + 1);
+    }
+    return any ? weight : 1.0;
+  }
+
   /**
    * The force a sliding axis's drive has left for accelerating, N: `force` less each motor's drag
    * through its ratio, the axis's rail friction and its weight along its direction (the worst
    * way, as it has to accelerate both up and down).
    */
   function steadyForce(joint:Joint, force:Float, steady:SteadyLoads):Float {
-    var load = DriveLoads.forAxis(this, joint.id, steady);
+    var load = DriveLoads.basicForAxis(this, joint.id, steady);
     var left = force;
     if (load != null) {
       for (motor in load.motors)
@@ -202,8 +297,8 @@ class RobotModel {
       }
       if (ids.exists(actuator.id)) errors.push('duplicate actuator ID ${actuator.id}');
       ids.set(actuator.id, true);
-      if (!Math.isFinite(actuator.maxEffort) || actuator.maxEffort < 0.0 ||
-          !Math.isFinite(actuator.maxRate) || actuator.maxRate < 0.0)
+      if ((actuator.maxEffort != null && (!Math.isFinite(actuator.maxEffort) || actuator.maxEffort < 0.0)) ||
+          (actuator.maxRate != null && (!Math.isFinite(actuator.maxRate) || actuator.maxRate < 0.0)))
         errors.push('actuator ${actuator.id} has invalid limits');
       if (actuator.transmission == null) {
         errors.push('actuator ${actuator.id} has no transmission');
@@ -218,15 +313,28 @@ class RobotModel {
             errors.push('actuator ${actuator.id} has an invalid transmission');
       }
     }
+    var encoderIds = new Map<String, Bool>();
+    for (encoder in encoders) {
+      if (encoder == null) { errors.push("robot has a null encoder"); continue; }
+      if (encoderIds.exists(encoder.id)) errors.push('duplicate encoder ID ${encoder.id}');
+      encoderIds.set(encoder.id, true);
+      var onJoint = false;
+      for (joint in joints) if (joint.id == encoder.joint) onJoint = true;
+      if (!onJoint) errors.push('encoder ${encoder.id} references unknown joint ${encoder.joint}');
+    }
+    for (actuator in actuators)
+      if (actuator != null && actuator.encoder != "" && !encoderIds.exists(actuator.encoder))
+        errors.push('actuator ${actuator.id} references unknown encoder ${actuator.encoder}');
     var couplingIds = new Map<String, Bool>();
-    var followers = new Map<String, Bool>();
+    var pairs = new Map<String, Bool>();
     for (coupling in couplings) {
       if (coupling == null) { errors.push("robot has a null joint coupling"); continue; }
       if (couplingIds.exists(coupling.id)) errors.push('duplicate joint coupling ID ${coupling.id}');
       couplingIds.set(coupling.id, true);
-      if (followers.exists(coupling.follower))
-        errors.push('joint ${coupling.follower} has multiple coupling leaders');
-      followers.set(coupling.follower, true);
+      var pair = coupling.follower + "\n" + coupling.leader;
+      if (pairs.exists(pair))
+        errors.push('joint ${coupling.follower} is coupled to ${coupling.leader} more than once');
+      pairs.set(pair, true);
       var hasLeader = false, hasFollower = false;
       for (joint in joints) {
         if (joint.id == coupling.leader) hasLeader = true;
@@ -234,6 +342,13 @@ class RobotModel {
       }
       if (!hasLeader || !hasFollower)
         errors.push('joint coupling ${coupling.id} references an unknown joint');
+    }
+    var cycle = JointCoupling.cycleThrough(couplings);
+    if (cycle != null) errors.push('joint $cycle depends on itself through its couplings');
+    if (errors.length == 0) {
+      var uncontrolled = DriveLoads.uncontrolledAxes(DriveLoads.of(this));
+      if (uncontrolled.length > 0)
+        errors.push('under-actuated coupled axes: ${uncontrolled.join(", ")}; bind independent motors before solving shared stiffness');
     }
     return errors;
   }

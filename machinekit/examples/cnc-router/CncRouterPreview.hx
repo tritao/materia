@@ -30,8 +30,8 @@ class CncRouterPreview {
 	 * Geometry, joints and initial pose of the router (parts with equal designations share geometry),
 	 * and its machining job: CAM made from the motor plate it mills, with the plate as the target.
 	 */
-	public static function router(belts:Bool = false):Bytes {
-		var router = new CncRouter(belts);
+	public static function router(belts:Bool = false, foldedZ:Bool = false):Bytes {
+		var router = new CncRouter(belts, foldedZ);
 		var scene = AssemblyPreview.scene(router, ASSEMBLY_ID);
 		var plate = motorPlate();
 		var part = plate.geometry(ComponentDetail.Preview);
@@ -42,12 +42,15 @@ class CncRouterPreview {
 			tools: [for (tool in router.tools()) {number: tool.number, length: tool.length, profile: tool.profile().encode()}],
 			stock: "stock", sacrificial: ["spoilboard"], toolPart: "tool", loadedTool: 1,
 			target: TARGET_PART, loop: true,
-			controller: {microsteps: CncRouter.MICROSTEPS, stepTickHz: CncRouter.STEP_TICK_HZ}};
+			controller: {stepTickHz: CncRouter.STEP_TICK_HZ}};
 		return SceneArtifact.encode(scene);
 	}
 
 	/** The same router with belts on X and Y instead of lead screws. */
 	public static function beltRouter():Bytes return router(true);
+
+	/** The same screw router with the Z motor folded below the gantry through a 2:1 belt. */
+	public static function foldedZRouter():Bytes return router(false, true);
 
 	/** The part the router mills from its stock block. */
 	public static function motorPlate():NemaMountPlate
@@ -56,7 +59,7 @@ class CncRouterPreview {
 
 /** Geometry builds, the axes move the tool where machine coordinates say, and nothing collides. */
 class CncRouterChecks {
-	static function near(actual:Float, expected:Float, message:String, tolerance:Float = 1e-6):Void {
+	public static function near(actual:Float, expected:Float, message:String, tolerance:Float = 1e-6):Void {
 		if (!(Math.abs(actual - expected) <= tolerance))
 			throw '$message: expected $expected, got $actual';
 	}
@@ -133,9 +136,11 @@ class CncRouterChecks {
 		checkClear(router, state, [150, 150, -80], ["zPlate", "spindle", "spindleClamp"], ["motorBracketZ", "motorZ", "xPlate", "screwZ"]);
 
 		// Each screw's turn is a lead-screw drive, so its thread sets the ratio.
+		checkClear(router, state, [150, 150, 0], ["screwZNut"], ["xPlate", "zPlate", "motorBracketZ"]);
+		checkClear(router, state, [150, 150, -80], ["screwZNut"], ["xPlate", "zPlate", "motorBracketZ"]);
 		for (screw in ["screwX", "screwYLeft", "screwYRight", "screwZ"]) {
-			var drive = router.drive(screw + "-lead");
-			if (drive == null || drive.kind != "lead-screw" || drive.members[0] != screw)
+			var drive = router.transmissionFor(screw + "-lead");
+			if (drive == null || !switch drive.source { case LeadScrew(id, nut): id == screw && nut == screw + "Nut"; default: false; })
 				throw '$screw should turn through a lead-screw drive';
 		}
 		// Each shaft coupling turns inside its mount's pilot bore, clear of the motor and the mount.
@@ -166,6 +171,7 @@ class CncRouterChecks {
 			'${bom.length} BOM lines, ${Math.round(mass * 10) / 10} kg');
 		runBelts();
 	}
+
 
 	/**
 	 * The belt-driven router: its pulleys turn travel over their pitch radius (and the right way, by
@@ -199,7 +205,7 @@ class CncRouterChecks {
 			// Turning by about moves a point straight below the axis by about x (0, 0, -1) = (-about.y, about.x, 0).
 			var about = joint.axis;
 			var along = -about.y * pulley.direction[0] + about.x * pulley.direction[1];
-			near(drive.alignment, along, '${pulley.id} turns the way its lower strand moves', 1e-9);
+			near(machinekit.assembly.Sense.SenseTools.sign(drive.sense), along, '${pulley.id} turns the way its lower strand moves', 1e-9);
 		}
 		var positions = [[150.0, 150, 0], [0.0, 0, 0], [300.0, 300, -80], [0.0, 300, -80], [300.0, 0, -40], [37.5, 212, -12.5]];
 		for (position in positions) {
@@ -215,7 +221,7 @@ class CncRouterChecks {
 			for (pulley in pulleys) {
 				var drive = beltDrive(router, pulley.id);
 				var turned = state.joint(pulley.id + "-turn");
-				near(turned, drive.alignment * position[pulley.axis] / radius, '${pulley.id} turns travel over its pitch radius', 1e-9);
+				near(turned, machinekit.assembly.Sense.SenseTools.sign(drive.sense) * position[pulley.axis] / radius, '${pulley.id} turns travel over its pitch radius', 1e-9);
 			}
 			near(state.joint("screwZ-turn"), Math.PI * position[2], "Z still turns its screw", 1e-9);
 		}
@@ -261,10 +267,10 @@ class CncRouterChecks {
 		Sys.println('cnc router belts: ${report.join("; ")}');
 	}
 
-	static function beltDrive(router:CncRouter, pulley:String):machinekit.assembly.MachineAssemblyDescription.DriveRecord {
-		var drive = router.drive(pulley + "-belt");
+	static function beltDrive(router:CncRouter, pulley:String):machinekit.assembly.MachineAssemblyDescription.TransmissionRecord {
+		var drive = router.transmissionFor(pulley + "-belt");
 		if (drive == null) throw '$pulley should turn through a belt drive';
-		if (drive.kind != "belt" || drive.members[0] != pulley) throw '$pulley should turn through a belt drive';
+		if (!switch drive.source { case TimingBelt(_, id), BeltIdler(_, id): id == pulley; default: false; }) throw '$pulley should turn through a belt drive';
 		return drive;
 	}
 
@@ -288,7 +294,7 @@ class CncRouterChecks {
 	}
 
 	/** No member of `moving` intersects a member of `others` at machine position `at`. */
-	static function checkClear(router:CncRouter, state:AssemblyState, at:Array<Float>, moving:Array<String>,
+	public static function checkClear(router:CncRouter, state:AssemblyState, at:Array<Float>, moving:Array<String>,
 			others:Array<String>):Void {
 		for (a in moving) for (b in others) {
 			var volume = overlap(router, state, at, a, b);

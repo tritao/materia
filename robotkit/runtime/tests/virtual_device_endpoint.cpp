@@ -23,8 +23,8 @@ RunResult run(VirtualDeviceConfig6 config, bool cut = false, bool replace = fals
     blueprint.owner_period_ns = 10'000'000;
     blueprint.joints[0].lower_limit = -10;
     blueprint.joints[0].upper_limit = 10;
-    blueprint.joints[0].max_velocity = 10;
-    blueprint.joints[0].max_acceleration = 10;
+    blueprint.joints[0].max_velocity = (blueprint.joints[0].limit_flags |= RK_LIMIT_VELOCITY, 10);
+    blueprint.joints[0].max_acceleration = (blueprint.joints[0].limit_flags |= RK_LIMIT_ACCELERATION, 10);
     auto endpoint = VirtualDeviceEndpoint::create(blueprint, config);
     assert(endpoint);
     rk_robot_state state{};
@@ -112,8 +112,8 @@ void dual_drive_layout() {
     blueprint.owner_period_ns = 10'000'000;
     blueprint.joints[0].lower_limit = -1;
     blueprint.joints[0].upper_limit = 1;
-    blueprint.joints[0].max_velocity = 0.02;
-    blueprint.joints[0].max_acceleration = 1;
+    blueprint.joints[0].max_velocity = (blueprint.joints[0].limit_flags |= RK_LIMIT_VELOCITY, 0.02);
+    blueprint.joints[0].max_acceleration = (blueprint.joints[0].limit_flags |= RK_LIMIT_ACCELERATION, 1);
     VirtualDeviceConfig6 config;
     config.controller.fill(7);
     config.clock_bound_ns = 5'000'000;
@@ -181,6 +181,71 @@ void dual_drive_layout() {
     assert(missed->diagnostic_code() == RK_FAULT_DUAL_DRIVE_SKEW);
 }
 
+void motor_feedback_reconstructs_leaders() {
+    rk_robot_runtime_blueprint blueprint{};
+    blueprint.struct_size = sizeof(blueprint);
+    blueprint.joint_count = 5;
+    blueprint.owner_period_ns = 10'000'000;
+    for (auto &joint : blueprint.joints) {
+        joint.lower_limit = -10;
+        joint.upper_limit = 10;
+        joint.max_velocity = 10;
+        joint.max_acceleration = 10;
+        joint.limit_flags = RK_LIMIT_VELOCITY | RK_LIMIT_ACCELERATION;
+    }
+    blueprint.coupling_count = 5;
+    blueprint.couplings[0] = {0, 2, 2.0, 0.02};
+    blueprint.couplings[1] = {1, 2, 3.0, 0.0};
+    blueprint.couplings[2] = {0, 3, 2.0, -0.03};
+    blueprint.couplings[3] = {1, 3, -3.0, 0.0};
+    blueprint.couplings[4] = {2, 4, 0.5, 0.01};
+    VirtualDeviceConfig6 config;
+    config.clock_bound_ns = 5'000'000;
+    config.actuators = {{2, 1.0, 0.02, 100'000.0, 0.1},
+                        {3, 1.0, -0.03, 100'000.0, 0.1}};
+    config.actuators[0].id = "motor.a";
+    config.actuators[1].id = "motor.b";
+    auto endpoint = VirtualDeviceEndpoint::create(blueprint, config);
+    assert(endpoint);
+    rk_robot_state state{};
+    endpoint->sample(0, state);
+    for (std::uint64_t now = 2'000'000; now <= 120'000'000; now += 2'000'000)
+        endpoint->sample(now, state);
+    PlanRequest plan{};
+    plan.plan_id = 57;
+    plan.sequence = 1;
+    plan.ends_at_rest = 1;
+    plan.start_position[2] = 0.02;
+    plan.start_position[3] = -0.03;
+    plan.start_position[4] = 0.02;
+    plan.segments.segments.resize(1);
+    auto &segment = plan.segments.segments[0];
+    segment.duration_ns = 1'000'000'000;
+    segment.degree = 1;
+    segment.joint_count = 5;
+    segment.coefficients[0].value[1] = 0.01;
+    segment.coefficients[1].value[1] = 0.02;
+    segment.coefficients[2].value[0] = 0.02;
+    segment.coefficients[2].value[1] = 0.08;
+    segment.coefficients[3].value[0] = -0.03;
+    segment.coefficients[3].value[1] = -0.04;
+    segment.coefficients[4].value[0] = 0.02;
+    segment.coefficients[4].value[1] = 0.04;
+    assert(endpoint->submit_device_plan(plan, 0, 120'000'000, 20'000'000, blueprint) == RK_OK);
+    for (std::uint64_t now = 130'000'000; now <= 1'220'000'000; now += 10'000'000)
+        assert(endpoint->sample(now, state) == RK_OK);
+    assert(std::abs(state.position[0] - 0.01) < 1e-5);
+    assert(std::abs(state.position[1] - 0.02) < 1e-5);
+    assert(std::abs(state.position[4] - 0.06) < 1e-5);
+    const auto joints = endpoint->joint_positions();
+    assert(std::abs(joints[0] - 0.01) < 1e-5);
+    assert(std::abs(joints[1] - 0.02) < 1e-5);
+    assert(std::abs(joints[4] - 0.06) < 1e-5);
+    // One motor cannot observe both independent CoreXY coordinates.
+    config.actuators.resize(1);
+    assert(!VirtualDeviceEndpoint::create(blueprint, config));
+}
+
 void lead_screw_carriage_coupling() {
     rk_robot_runtime_blueprint blueprint{};
     blueprint.struct_size = sizeof(blueprint);
@@ -189,8 +254,8 @@ void lead_screw_carriage_coupling() {
     for (auto &joint : blueprint.joints) {
         joint.lower_limit = -10;
         joint.upper_limit = 10;
-        joint.max_velocity = 10;
-        joint.max_acceleration = 10;
+        joint.max_velocity = (joint.limit_flags |= RK_LIMIT_VELOCITY, 10);
+        joint.max_acceleration = (joint.limit_flags |= RK_LIMIT_ACCELERATION, 10);
     }
     // One screw revolution advances the carriage by 8 mm, from a 1 mm offset.
     blueprint.coupling_count = 1;
@@ -260,8 +325,8 @@ void minimal_midstream_replacement() {
     blueprint.owner_period_ns = 10'000'000;
     blueprint.joints[0].lower_limit = -10;
     blueprint.joints[0].upper_limit = 10;
-    blueprint.joints[0].max_velocity = 1;
-    blueprint.joints[0].max_acceleration = 10;
+    blueprint.joints[0].max_velocity = (blueprint.joints[0].limit_flags |= RK_LIMIT_VELOCITY, 1);
+    blueprint.joints[0].max_acceleration = (blueprint.joints[0].limit_flags |= RK_LIMIT_ACCELERATION, 10);
     VirtualDeviceConfig6 config;
     config.profile = 2;
     config.controller.fill(4);
@@ -317,8 +382,8 @@ void host_stall_keeps_device_moving() {
     blueprint.owner_period_ns = 10'000'000;
     blueprint.joints[0].lower_limit = -10;
     blueprint.joints[0].upper_limit = 10;
-    blueprint.joints[0].max_velocity = 10;
-    blueprint.joints[0].max_acceleration = 10;
+    blueprint.joints[0].max_velocity = (blueprint.joints[0].limit_flags |= RK_LIMIT_VELOCITY, 10);
+    blueprint.joints[0].max_acceleration = (blueprint.joints[0].limit_flags |= RK_LIMIT_ACCELERATION, 10);
     VirtualDeviceConfig6 config;
     config.controller.fill(5);
     config.steps_per_unit = {1'000};
@@ -365,8 +430,8 @@ void midsegment_replacement_keeps_events() {
     blueprint.owner_period_ns = 10'000'000;
     blueprint.joints[0].lower_limit = -10;
     blueprint.joints[0].upper_limit = 10;
-    blueprint.joints[0].max_velocity = 1;
-    blueprint.joints[0].max_acceleration = 10;
+    blueprint.joints[0].max_velocity = (blueprint.joints[0].limit_flags |= RK_LIMIT_VELOCITY, 1);
+    blueprint.joints[0].max_acceleration = (blueprint.joints[0].limit_flags |= RK_LIMIT_ACCELERATION, 10);
     blueprint.channel_count = 1;
     std::strcpy(blueprint.channels[0].id, "sprayer.flow");
     blueprint.channels[0].kind = RK_EVENT_DIGITAL;
@@ -449,8 +514,8 @@ std::vector<VirtualEventRecord6> run_event_pair(bool hold, bool stop, bool keep_
     blueprint.owner_period_ns = 10'000'000;
     blueprint.joints[0].lower_limit = -10;
     blueprint.joints[0].upper_limit = 10;
-    blueprint.joints[0].max_velocity = 1;
-    blueprint.joints[0].max_acceleration = 10;
+    blueprint.joints[0].max_velocity = (blueprint.joints[0].limit_flags |= RK_LIMIT_VELOCITY, 1);
+    blueprint.joints[0].max_acceleration = (blueprint.joints[0].limit_flags |= RK_LIMIT_ACCELERATION, 10);
     blueprint.channel_count = 1;
     std::strcpy(blueprint.channels[0].id, "sprayer.flow");
     blueprint.channels[0].kind = RK_EVENT_DIGITAL;
@@ -544,8 +609,8 @@ void runtime_hold_rest_resume_fires_final_event() {
     joint.axis[0] = 1.0;
     joint.lower_limit = -1.0;
     joint.upper_limit = 1.0;
-    joint.max_velocity = 1.0;
-    joint.max_acceleration = 2.0;
+    joint.max_velocity = (joint.limit_flags |= RK_LIMIT_VELOCITY, 1.0);
+    joint.max_acceleration = (joint.limit_flags |= RK_LIMIT_ACCELERATION, 2.0);
     blueprint.channel_count = 1;
     std::strcpy(blueprint.channels[0].id, "sprayer.flow");
     blueprint.channels[0].kind = RK_EVENT_DIGITAL;
@@ -643,6 +708,7 @@ void runtime_hold_rest_resume_fires_final_event() {
 }
 
 int main() {
+    motor_feedback_reconstructs_leaders();
     dual_drive_layout();
     lead_screw_carriage_coupling();
     minimal_midstream_replacement();
@@ -722,8 +788,8 @@ int main() {
     blueprint.owner_period_ns = 10'000'000;
     blueprint.joints[0].lower_limit = -10;
     blueprint.joints[0].upper_limit = 10;
-    blueprint.joints[0].max_velocity = 10;
-    blueprint.joints[0].max_acceleration = 10;
+    blueprint.joints[0].max_velocity = (blueprint.joints[0].limit_flags |= RK_LIMIT_VELOCITY, 10);
+    blueprint.joints[0].max_acceleration = (blueprint.joints[0].limit_flags |= RK_LIMIT_ACCELERATION, 10);
     for (const auto profile : {1, 2}) {
         config.profile = profile;
         config.target_error = profile == 2 ? 0.002 : 1e-5;

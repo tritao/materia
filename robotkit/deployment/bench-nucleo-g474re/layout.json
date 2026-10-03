@@ -1,6 +1,1 @@
-{
-  "channels": [
-    {"index": 0, "actuator": "actuator/left-wheel", "direction": 1, "microsteps": 16},
-    {"index": 1, "actuator": "actuator/right-wheel", "direction": 1, "microsteps": 16}
-  ]
-}
+{"schemaVersion":1,"channels":[{"actuator":"actuator/left-wheel","direction":1,"direction_setup_ticks":0,"index":0,"skew_bound":0},{"actuator":"actuator/right-wheel","direction":1,"direction_setup_ticks":0,"index":1,"skew_bound":0}]}

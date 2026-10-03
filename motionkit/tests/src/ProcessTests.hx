@@ -188,15 +188,14 @@ class ProcessTests extends MotionKitTestSupport {
   public function testLinearAxisCompilesToRobotModel():Void {
     var axis = new LinearAxis(23, 10, 80);
     var blueprint = MachineKitRobotCompiler.compileLinearAxis(axis, "x", 0.1, 0.4);
-    check(blueprint.model.links.length == 2, "linear axis compiles base and carriage links");
-    check(blueprint.model.joints.length == 1, "linear axis compiles one prismatic joint");
+    check(blueprint.model.links.length == 3, "linear axis compiles frame, carriage and screw rigid bodies");
+    check(blueprint.model.joints.length == 2, "linear axis compiles travel and motor shaft joints");
     var joint = blueprint.model.joints[0];
-    check(joint.id == "x" && joint.name == "x", "linear axis uses a stable joint ID");
+    check(joint.id == "x/carriage-slide" && joint.name == "x/carriage-slide", "linear axis uses a stable joint ID");
     check(joint.type == robotkit.model.JointType.Prismatic, "linear axis is prismatic");
-    near(joint.parentFramePosition[2], (axis.screwStart + axis.travelMin) * 0.001,
-      "MachineKit travel origin is converted to metres");
     near(joint.limits.upper, 0.08, "MachineKit stroke becomes the logical upper limit");
-    near(joint.limits.velocity, 0.1, "compiled actuator rate is retained");
+    near(joint.limits.requireVelocity(), Math.min(0.1, axis.motor.usableSpeed(24) /
+      Math.abs(blueprint.model.couplings[0].ratio)), "compiled axis keeps the motor-derived rate");
     check(blueprint.model.actuators.length == 1 &&
       blueprint.model.actuators[0].id.indexOf(axis.motor.designation) >= 0,
       "compiled actuator retains motor identity");
@@ -204,10 +203,12 @@ class ProcessTests extends MotionKitTestSupport {
       (axis.nut.travelPerRevolution() * MachineKitRobotCompiler.MILLIMETRES_TO_METRES);
     check(switch blueprint.model.actuators[0].transmission {
       case SimpleTransmission(jointId, ratio, offset):
-        jointId == joint.id && Math.abs(ratio - expectedRatio) < 1e-9 && offset == 0.0;
-    }, "compiled actuator carries the lead-screw rad/m ratio");
-    check(expectedRatio < 0.0,
-      "right-hand screw actuator rotates negative to move the carriage along +Z");
+        jointId == "x/coupling" && ratio == 1.0 && offset == 0.0;
+    }, "the motor drives its physical shaft joint");
+    near(blueprint.model.couplings[0].ratio, expectedRatio, "the resolved assembly supplies the screw ratio");
+    check(expectedRatio < 0.0, "right-hand screw rotates negative to move the carriage along +Z");
+    check(blueprint.model.actuators[0].assumed.indexOf("rotor inertia") >= 0,
+      "physical axis compilation retains its motor assumption labels");
     near(blueprint.axes[0].jointScales[0], 1.0,
       "transmission-derived single-joint mapping keeps the old scale");
     near(blueprint.axes[0].jointOffsets[0], 0.0,
@@ -218,12 +219,11 @@ class ProcessTests extends MotionKitTestSupport {
     var axis = new LinearAxis(23, 10, 80);
     var blueprint = MachineKitRobotCompiler.compileLinearAxis(axis, "x", 0.1, 0.4);
     var actuator = blueprint.model.actuators[0];
-    var ratio = switch actuator.transmission {
-      case SimpleTransmission(_, value, _): Math.abs(value);
-    };
+    var ratio = Math.abs(blueprint.model.couplings[0].ratio);
     actuator.maxRate = 0.02 * ratio;
+    blueprint.model.materializeLimits();
     var limited = RobotRuntimeCompiler.compile(blueprint.model);
-    near(limited.joints[0].maxRate, 0.02,
+    near(limited.joints[0].requireRate(), 0.02,
       "lead-screw motor rate converts to the tighter joint-space limit");
     var simulationHarness = new SimulationHarness(0.01);
     var simulation = simulationHarness.simulation;
@@ -309,13 +309,15 @@ class ProcessTests extends MotionKitTestSupport {
     near(robot.snapshot().positions.get(0), 0.015,
       "negative jog follows the same logical axis API", 1e-5);
 
-    var clamped = planned(machine.jog("x", 0.1, 2.0));
+    var jogging = machine.axis("x");
+    if (jogging == null) throw "compiled axis has no logical x mapping";
+    var clamped = planned(machine.jog("x", jogging.maxVelocity, 2.0));
     near(clamped.evaluate(clamped.durationSeconds()).positions[0], 0.08,
       "jog clamps its endpoint to the authored upper limit");
     runMotion(machine, simulationHarness);
     near(robot.snapshot().positions.get(0), 0.08,
       "clamped jog stops at the axis limit", 1e-5);
-    throws(function() machine.jog("x", 0.1001, 1.0),
+    throws(function() machine.jog("x", jogging.maxVelocity * 1.001, 1.0),
       "jog rejects a velocity above the axis rate limit");
     throws(function() machine.jog("x", 0.0, 1.0),
       "jog rejects a zero velocity");
@@ -327,38 +329,31 @@ class ProcessTests extends MotionKitTestSupport {
     var yAxis = new LinearAxis(23, 10, 60);
     var zAxis = new LinearAxis(23, 10, 40);
     var blueprint = MachineKitRobotCompiler.compileXYZGantry(xAxis, yAxis, zAxis, 0.1, 0.4);
-    check(blueprint.model.links.length == 4, "XYZ gantry compiles one base and three carriages");
-    check(blueprint.model.joints.length == 3, "XYZ gantry compiles three prismatic joints");
+    check(blueprint.model.links.length == 7, "XYZ gantry compiles its frame, three carriages and three motor shafts");
+    check(blueprint.model.joints.length == 6, "XYZ gantry retains three travels and three shaft joints");
     for (i in 0...3) {
       var joint = blueprint.model.joints[i];
-      check(joint.id == ["x", "y", "z"][i], "XYZ gantry uses stable joint IDs");
+      check(joint.id == ["x/carriage-slide", "y/carriage-slide", "z/carriage-slide"][i], "XYZ gantry uses stable joint IDs");
       check(joint.type == robotkit.model.JointType.Prismatic,
         "XYZ gantry joints are prismatic");
-      near(joint.limits.velocity, 0.1, "XYZ gantry retains the actuator rate limit");
+      near(joint.limits.requireVelocity(), Math.min(0.1, [xAxis, yAxis, zAxis][i].motor.usableSpeed(24) /
+        Math.abs(blueprint.model.couplings[i].ratio)), "XYZ gantry retains each physical motor rate limit");
     }
-    near(blueprint.model.joints[0].parentFramePosition[0],
-      (xAxis.screwStart + xAxis.travelMin) * 0.001, "X carriage frame is compiled in metres");
-    near(blueprint.model.joints[1].parentFramePosition[1],
-      (yAxis.screwStart + yAxis.travelMin) * 0.001, "Y carriage frame is compiled in metres");
-    near(blueprint.model.joints[2].parentFramePosition[0],
-      -(zAxis.screwStart + zAxis.travelMin) * 0.001,
-      "Z carriage frame compensates the inherited gantry orientation");
-
     // The carriage is a link, not a flange frame: use the compiled model directly.
     var gantry = RobotKinematics.compile(blueprint.model);
-    var carriage = gantry.bodyIndex("z.carriage");
+    var carriage = gantry.bodyIndex("z/carriage");
     var gantrySnapshot = KinematicSnapshot.of(new KinematicState(gantry));
     var tip = gantrySnapshot.bodyPose(carriage);
-    near(tip.x, (xAxis.screwStart + xAxis.travelMin) * 0.001,
-      "XYZ gantry forward kinematics preserves X origin");
-    near(tip.y, (yAxis.screwStart + yAxis.travelMin) * 0.001,
-      "XYZ gantry forward kinematics preserves Y origin");
-    near(tip.z, (zAxis.screwStart + zAxis.travelMin) * 0.001,
-      "XYZ gantry forward kinematics preserves Z origin");
-    if (gantry.dofCount() != 3 || gantry.bodyParentJoint[gantry.bodyIndex("gantry.base")] >= 0)
-      throw "XYZ gantry should compile to three DOFs under its root base";
+    near(tip.x, (xAxis.screwStart + xAxis.travelMin - xAxis.carriage.connector("bore").frame.z) * 0.001,
+      "XYZ gantry forward kinematics preserves the physical X carriage origin");
+    near(tip.y, (yAxis.screwStart + yAxis.travelMin - yAxis.carriage.connector("bore").frame.z) * 0.001,
+      "XYZ gantry forward kinematics preserves the physical Y carriage origin");
+    near(tip.z, (zAxis.screwStart + zAxis.travelMin - zAxis.carriage.connector("bore").frame.z) * 0.001,
+      "XYZ gantry forward kinematics preserves the physical Z carriage origin");
+    if (gantry.dofCount() != 3 || gantry.bodyParentJoint[gantry.bodyIndex("assembly-root")] >= 0)
+      throw "XYZ gantry should retain three independent DOFs and their coupled shafts under its root base";
     var flatJacobian = gantrySnapshot.bodyJacobian(carriage);
-    var jacobian = [for (row in 0...6) [for (column in 0...3) flatJacobian[row * 3 + column]]];
+    var jacobian = [for (row in 0...6) [for (column in 0...3) flatJacobian[row * gantry.dofCount() + column]]];
     near(jacobian[0][0], 1.0, "XYZ gantry X joint moves along world X");
     near(jacobian[1][1], 1.0, "XYZ gantry Y joint moves along world Y");
     near(jacobian[2][2], 1.0, "XYZ gantry Z joint moves along world Z");
@@ -416,15 +411,27 @@ class ProcessTests extends MotionKitTestSupport {
       new MotionOptions(0.05, 0.2));
     check(cornerMove.segments().length > 1, "MotionSystem exposes buffered line-path planning");
     var axisSolver = new AxisKinematics(blueprint);
-    var limits = new ValidationLimits(3, Int64.ofInt(blueprint.runtime.revision),
+    var ids = [for (joint in blueprint.model.joints) joint.id];
+    var scales = [for (_ in ids) 0.0];
+    for (axis in blueprint.axes) for (slot in 0...axis.jointIds.length)
+      scales[ids.indexOf(axis.jointIds[slot])] = Math.abs(axis.jointScales[slot]);
+    var velocity = [for (joint in blueprint.model.joints) joint.limits.requireVelocity()];
+    var acceleration = [for (joint in blueprint.model.joints) joint.limits.requireAcceleration()];
+    var jerk = [for (scale in scales) 10.0 * scale];
+    var limits = new ValidationLimits(ids.length, Int64.ofInt(blueprint.runtime.revision),
       Int64.ofInt(blueprint.runtime.calibrationRevision));
-    for (joint in 0...3) limits.position(joint,
-      blueprint.model.joints[joint].limits.lower,
-      blueprint.model.joints[joint].limits.upper);
-    var compiler = new ProgramCompiler(axisSolver, limits, "work",
-      [for (_ in 0...3) 0.1], [for (_ in 0...3) 0.4],
-      [for (_ in 0...3) 10.0], StartTolerances.uniform(3, 0.02, 0.02, 0.02),
-      null, 0.005);
+    for (joint in 0...ids.length) {
+      var bound = blueprint.model.joints[joint].limits;
+      limits.position(joint, bound.lower, bound.upper);
+      limits.velocity(joint, velocity[joint]);
+      limits.acceleration(joint, acceleration[joint]);
+      limits.jerk(joint, jerk[joint]);
+    }
+    var compiler = new ProgramCompiler(axisSolver, limits, "work", velocity, acceleration, jerk,
+      new StartTolerances([for (scale in scales) 0.02 * scale],
+        [for (scale in scales) 0.02 * scale], [for (scale in scales) 0.02 * scale]),
+      null, 0.005, 0.5, 0.005, 0.02, null, null,
+      [for (scale in scales) 0.5 * scale], ids, blueprint.model.couplings);
     var pose = (point:PathPoint) -> new PoseWaypoint(
       new Pose3(point.x, point.y, point.z), 0.005, 0.02);
     var programPath = new PosePath("work", [
@@ -465,8 +472,12 @@ class ProcessTests extends MotionKitTestSupport {
     var options = new VirtualDeviceOptions();
     // 200 full steps at 16 microsteps a turn.
     var binding = DeviceBinding.bind(blueprint.model,
-      DeviceLayout.forActuators(blueprint.model, 16, 2), options.stepTickHz);
-    near(binding.channels[0].ratio, ratio, "the binding takes the screw's ratio from the model");
+      new DeviceLayout([for (index in 0...blueprint.model.actuators.length)
+        new robotkit.device.DeviceChannel(index, blueprint.model.actuators[index].id, 1, 2)]), options.stepTickHz);
+    near(blueprint.model.couplings[0].ratio, ratio, "the physical coupling takes its ratio from the screw");
+    near(binding.channels[0].ratio, 1.0, "the binding drives the explicit motor shaft in radians");
+    check(blueprint.model.joints[binding.channels[0].jointIndex].id == blueprint.axes[0].jointIds[1],
+      "the virtual channel addresses the physical motor shaft");
     options.actuators = binding.virtualActuators();
     var simulationHarness = new SimulationHarness(0.01);
     var simulation = simulationHarness.simulation;
@@ -476,14 +487,18 @@ class ProcessTests extends MotionKitTestSupport {
       [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name]);
     var machine = MotionSystem.fromBlueprint(robot, blueprint);
-    var before = simulation.linkPose(0, 1);
+    var carriage = -1;
+    for (index in 0...blueprint.model.links.length)
+      if (blueprint.model.links[index].id == "x/carriage") carriage = index;
+    if (carriage < 0) throw "compiled axis has no physical carriage";
+    var before = simulation.linkPose(0, carriage);
     machine.moveAxes([new AxisTarget("x", 0.02)], new MotionOptions(0.01, 0.04));
     runMotion(machine, simulationHarness);
     for (tick in 0...20) simulationHarness.step(Int64.ofInt(tick));
     var finalJoint = robot.snapshot().positions.get(0);
     check(Math.abs(finalJoint - 0.02) <= 1.0 / 400000.0 + 1e-6,
       "MachineKit lead screw follows the virtual RKD6 step position");
-    var after = simulation.linkPose(0, 1);
+    var after = simulation.linkPose(0, carriage);
     check(Math.abs(after.position[2] - before.position[2] - 0.02) <=
       1.0 / 400000.0 + 1e-6, "lead screw step position moves the SimKit carriage");
     simulationHarness.dispose();

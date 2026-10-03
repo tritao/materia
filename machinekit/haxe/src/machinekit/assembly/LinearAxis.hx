@@ -12,7 +12,6 @@ import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 import machinekit.motion.LeadScrew;
 import machinekit.motion.LeadScrewNut;
-import machinekit.motion.LeadScrewTransmission;
 import machinekit.motion.LeadScrewThread;
 import machinekit.motion.LeadScrewThread.LeadScrewThreadFamily;
 import machinekit.motion.LeadScrewThread.LeadScrewHand;
@@ -102,9 +101,9 @@ class Carriage extends MachineComponent {
 }
 
 /** Parametric lead-screw axis. The screw rotates through a coupling; a separate prismatic
- * joint keeps the carriage oriented to the fixed frame. `setTravel` applies the nut's lead to
- * both joint coordinates. The default uses two fixed round guide rods passing through linear
- * bearings carried by the carriage; `forRailProfile()` selects a catalog-backed profile rail
+ * joint keeps the carriage oriented to the fixed frame. `setTravel` sets the carriage coordinate;
+ * its transmission coupling turns the screw. The default uses two fixed round guide rods passing
+ * through linear bearings carried by the carriage; `forRailProfile()` selects a catalog-backed profile rail
  * and block closure instead. The nut's flange mounts on the carriage's motor-facing side.
  *
  * Layout along the screw: coupling, flange bearing A, end margin, carriage travel, end margin,
@@ -123,7 +122,6 @@ class LinearAxis extends MachineAssembly {
 	public final coupling:ShaftCoupling;
 	public final screw:LeadScrew;
 	public final nut:LeadScrewNut;
-	public final transmission:LeadScrewTransmission;
 	public final guideRodA:SteppedShaft;
 	public final guideRodB:SteppedShaft;
 	public final guideBearingA:LinearBearing;
@@ -200,10 +198,6 @@ class LinearAxis extends MachineAssembly {
 		bearingAPosition = coupling.length / 2 + COUPLING_GAP + depth / 2;
 		travelMin = bearingAPosition + depth / 2 + margin + carriage.length / 2;
 		travelMax = travelMin + stroke;
-		// The carriage coordinate is +Z. A right-hand screw needs negative rotation to move the
-		// nut along +Z; a left-hand screw needs positive rotation.
-		transmission = new LeadScrewTransmission("coupling", "carriage-slide", nut.lead, travelMin, stroke,
-			threadSpec.hand == RightHand ? -1 : 1);
 		bearingBPosition = travelMax + carriage.length / 2 + margin + depth / 2;
 		length = bearingBPosition + depth / 2;
 		screwStart = motor.connector("shaftTip").frame.z;
@@ -281,7 +275,7 @@ class LinearAxis extends MachineAssembly {
 			// The carriage can pass either end of its stroke by the end margin before it meets a bearing housing.
 			{lower: travelMin, upper: travelMax, velocity: null, effort: null, overtravel: margin});
 		// The screw's thread sets the ratio: the carriage moves along the screw's turning axis.
-		addDrive("lead-screw", "carriage-slide", "coupling", Drive.LeadScrew("screw", 1), transmission.linearOffset);
+		addTransmission("lead-screw", "carriage-slide", "coupling", Transmission.LeadScrew("screw", "leadNut"), Same, travelMin);
 		addMate("nut-carriage", "fixed", "carriage", "nutMount", "leadNut", "mountFace");
 		exposeConnector("motorShaft", "motor", "shaftTip");
 		exposeConnector("carriageBore", "carriage", "bore");
@@ -334,17 +328,11 @@ class LinearAxis extends MachineAssembly {
 		}
 	}
 
-	/** Apply the screw-to-nut transmission to both assembly coordinates. Travel is measured
-	 * from the carriage's lower limit, and one screw turn advances it by `nut.lead`.
-	 */
+	/** Set travel from the carriage's lower limit; AssemblyState propagates the screw coupling. */
 	public function setTravel(state:AssemblyState, travel:Float, prefix:String = ""):Void {
-		if (prefix == null || prefix.length == 0) {
-			transmission.setTravel(state, travel);
-			return;
-		}
 		if (!Math.isFinite(travel) || travel < 0 || travel > stroke)
 			throw "Linear axis travel is outside its stroke";
-		state.setJoint(MachineAssembly.join(prefix, "carriage-slide"), transmission.linearOffset + travel);
+		state.setJoint(MachineAssembly.join(prefix, "carriage-slide"), travelMin + travel);
 		state.forwardKinematics();
 	}
 

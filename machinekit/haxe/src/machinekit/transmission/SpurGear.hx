@@ -115,14 +115,14 @@ class SpurGear extends MachineComponent {
 	 * must share a module and pressure angle. Backlash changes tooth thickness, not centre distance.
 	 */
 	public function centerDistance(other:SpurGear):Float {
-		if (moduleSize != other.moduleSize) throw "Meshing gears must share a module";
+		if (moduleSize != other.moduleSize) throw new machinekit.transmission.TransmissionDesignError("Meshing gears have different modules; update the driven gear to match the driver");
 		if (Math.abs(pressureAngle - other.pressureAngle) > 1e-10)
-			throw "Meshing gears must share a pressure angle";
+			throw new machinekit.transmission.TransmissionDesignError("Meshing gears have different pressure angles; update the driven gear to match the driver");
 		var teethSum = teeth + other.teeth;
 		var shiftedInvolute = involuteRollAngle(pitchDiameter / 2, baseDiameter / 2)
 			+ 2 * (profileShift + other.profileShift) * Math.tan(pressureAngle) / teethSum;
 		if (shiftedInvolute < -1e-12 || !Math.isFinite(shiftedInvolute))
-			throw "Meshing gear profile shifts produce an invalid operating pressure angle";
+			throw new machinekit.transmission.TransmissionDesignError("Gear profile shifts cannot mesh; choose compatible profile shifts");
 		var operatingAngle = solveInvolute(shiftedInvolute);
 		return (pitchDiameter + other.pitchDiameter) / 2 * Math.cos(pressureAngle) / Math.cos(operatingAngle);
 	}

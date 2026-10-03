@@ -733,6 +733,7 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
             limits.struct_size = sizeof(limits);
             limits.joint_count = joint_count;
             for (uint32_t j = 0; j < joint_count; ++j) {
+                limits.derivative_claimed[j] = 3u;
                 limits.max_velocity[j] = max_velocity[j];
                 limits.max_acceleration[j] = max_acceleration[j];
             }

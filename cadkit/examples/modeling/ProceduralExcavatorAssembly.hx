@@ -1,6 +1,5 @@
 import cadkit.modeling.AssemblyModel;
 import materia.assembly.AssemblyFrames;
-import materia.assembly.AssemblyRecord;
 import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyStateRecord;
 import materia.assembly.AssemblyDefinition.AssemblyJointRole;
@@ -9,7 +8,6 @@ import materia.assembly.AssemblyDefinition.AssemblyJointRole;
 class ProceduralExcavatorAssembly {
 	static inline var DEG:Float = Math.PI / 180;
 
-	public static function build():AssemblyRecord return buildModel().record();
 
 	public static function buildDefinition():AssemblyDefinition return buildModel().definition("excavator");
 

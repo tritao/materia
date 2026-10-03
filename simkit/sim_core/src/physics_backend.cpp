@@ -212,16 +212,23 @@ public:
         couplings.erase(std::remove_if(couplings.begin(), couplings.end(),
             [id](const auto &value) { return value.leader == id || value.follower == id; }),
             couplings.end());
+        order_followers();
         return joints.size() == before ? NKSIM_ERROR_INVALID_HANDLE : NKSIM_OK;
     }
 
     nksim_result joint_couple(const BackendJointCoupling &coupling) override {
         if (!find_joint(coupling.leader) || !find_joint(coupling.follower))
             return NKSIM_ERROR_INVALID_HANDLE;
+        // A follower with several couplings is the sum of their terms: each leader once, no cycles.
         for (const auto &existing : couplings)
-            if (existing.follower == coupling.follower)
+            if (existing.follower == coupling.follower && existing.leader == coupling.leader)
                 return NKSIM_ERROR_INVALID_ARGUMENT;
         couplings.push_back(coupling);
+        if (!order_followers()) {
+            couplings.pop_back();
+            order_followers();
+            return NKSIM_ERROR_INVALID_ARGUMENT;
+        }
         enforce_couplings();
         return recompute_articulated_poses(0.0);
     }
@@ -423,13 +430,49 @@ public:
     }
 
 private:
+    /**
+     * Fills `follower_order` with each coupled joint after the coupled joints among its leaders.
+     * Returns false, leaving it partial, when the couplings form a cycle.
+     */
+    bool order_followers() {
+        follower_order.clear();
+        std::vector<std::uint64_t> pending;
+        for (const auto &coupling : couplings)
+            if (std::find(pending.begin(), pending.end(), coupling.follower) == pending.end())
+                pending.push_back(coupling.follower);
+        while (!pending.empty()) {
+            bool progress = false;
+            for (auto at = pending.begin(); at != pending.end();) {
+                bool ready = true;
+                for (const auto &coupling : couplings)
+                    if (coupling.follower == *at &&
+                        std::find(pending.begin(), pending.end(), coupling.leader) != pending.end())
+                        ready = false;
+                if (!ready) { ++at; continue; }
+                follower_order.push_back(*at);
+                at = pending.erase(at);
+                progress = true;
+            }
+            if (!progress) return false;
+        }
+        return true;
+    }
+
     void enforce_couplings() {
-        for (const auto &coupling : couplings) {
-            const auto *leader = find_joint(coupling.leader);
-            auto *follower = find_joint(coupling.follower);
-            if (!leader || !follower) continue;
-            follower->state.position = coupling.ratio * leader->state.position + coupling.offset;
-            follower->state.velocity = coupling.ratio * leader->state.velocity;
+        if (follower_order.empty() && !couplings.empty()) order_followers();
+        for (const auto id : follower_order) {
+            auto *follower = find_joint(id);
+            if (!follower) continue;
+            double position = 0.0, velocity = 0.0;
+            for (const auto &coupling : couplings) {
+                if (coupling.follower != id) continue;
+                const auto *leader = find_joint(coupling.leader);
+                if (!leader) continue;
+                position += coupling.ratio * leader->state.position + coupling.offset;
+                velocity += coupling.ratio * leader->state.velocity;
+            }
+            follower->state.position = position;
+            follower->state.velocity = velocity;
         }
     }
     TestJoint *parent_joint(std::uint64_t body_id) noexcept {
@@ -556,6 +599,7 @@ private:
     std::vector<TestBody> bodies;
     std::vector<TestJoint> joints;
     std::vector<BackendJointCoupling> couplings;
+    std::vector<std::uint64_t> follower_order;
     std::uint64_t next_body = 1;
     std::uint64_t next_joint = 1;
 };

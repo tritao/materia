@@ -21,25 +21,3 @@ package materia.assembly;
 	*/
 	@:id(3) @:optional var reference:String;
 }
-
-typedef AssemblyInstance = {
-	var id:String;
-	var pose:AssemblyFrame;
-	var connectors:Array<AssemblyConnector>;
-}
-
-/** Legacy assembly snapshot record. New kinematic definitions use AssemblyDefinition. */
-typedef AssemblyJoint = {
-	var id:String;
-	var kind:String;
-	var parent:String;
-	var parentConnector:String;
-	var child:String;
-	var childConnector:String;
-	var value:Float;
-}
-
-typedef AssemblyRecord = {
-	var instances:Array<AssemblyInstance>;
-	var joints:Array<AssemblyJoint>;
-}

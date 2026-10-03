@@ -12,7 +12,8 @@ interface MotorDrive {
   /**
    * The actuator `id` on joint `joint`: its usable effort and rate, its rotor inertia, and its
    * drive kind with torque-speed curve. `volts` is the supply (it moves a stepper's pull-out
-   * curve), `margin` the share of a stepper's torque to rely on; a servo ignores both.
+   * curve), `margin` the share of a stepper's torque to rely on and `current` its driver setting
+   * in A rms. Absent current means rated current. Servo ratings do not model winding current.
    */
-  function actuator(id:String, joint:String, volts:Float, margin:Float):AssemblyActuator;
+  function actuator(id:String, joint:String, volts:Float, margin:Float, ?current:Float):AssemblyActuator;
 }

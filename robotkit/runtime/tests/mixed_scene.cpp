@@ -64,7 +64,7 @@ void add_joint(rk_robot_runtime_blueprint &model, uint32_t type, uint32_t parent
     joint.child_link = child;
     joint.lower_limit = lower;
     joint.upper_limit = upper;
-    joint.max_effort = effort;
+    joint.max_effort = (joint.limit_flags |= RK_LIMIT_EFFORT, effort);
     for (int i = 0; i < 3; ++i) {
         joint.parent_frame_position[i] = offset[i];
         joint.axis[i] = axis[i];

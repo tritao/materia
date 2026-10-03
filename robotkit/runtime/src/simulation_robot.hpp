@@ -24,6 +24,7 @@ public:
         staged_valid_ = false;
     }
     void reset() noexcept {
+        std::fill(slip_.begin(), slip_.end(), 0.0);
         pending_targets_.clear();
         staged_valid_ = false;
         staged_stopped_ = false;
@@ -77,6 +78,17 @@ private:
     std::vector<nksim_body> bodies_;
     std::vector<nksim_joint> joints_;
     std::vector<uint8_t> actuated_joints_;
+    /**
+     * Distance, per joint, the simulated joint is behind its commanded position, as a stepper that
+     * lost steps is: added to every position or servo target. Zero is none; reset clears it.
+     */
+    std::vector<double> slip_;
+    /** Servo gains per joint: a joint with stiffness runs as a servo on its position targets. */
+    std::vector<rk_robot_joint_servo> servo_;
+    /** Joints that only move through couplings to a servo joint: they get no targets of their own. */
+    std::vector<uint8_t> passive_;
+    /** Seconds between commands, to estimate a servo's velocity target from successive positions. */
+    double step_ = 0.01;
     std::vector<nksim_joint_target> pending_targets_;
     std::vector<uint8_t> held_at_rest_;
     void queue_rest_holds() noexcept;

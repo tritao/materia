@@ -2,6 +2,7 @@ package robotkit.runtime;
 
 import robotkit.model.RobotModel;
 import robotkit.model.Joint;
+import robotkit.model.JointCoupling;
 import robotkit.model.JointType;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Vec3;
@@ -9,6 +10,7 @@ import robotkit.model.CollisionApproximation;
 import robotkit.model.RobotDriveConfiguration;
 import robotkit.model.RobotForkConfiguration;
 import robotkit.model.RobotMobileConfiguration;
+import robotkit.model.ActuatorDrive.ServoDrive;
 import robotkit.model.Transmission;
 import RobotKitRuntime;
 
@@ -55,6 +57,11 @@ class RobotRuntimeCompiler {
       for (shape in link.collisionShapes)
         result.linkCollisionShapes.push(new RobotRuntimeLinkShape(index, shape));
     }
+    var inCoupling = new Map<String, Bool>();
+    for (coupling in robot.couplings) {
+      inCoupling.set(coupling.leader, true);
+      inCoupling.set(coupling.follower, true);
+    }
     for (index in 0...robot.joints.length) {
       var joint:robotkit.model.Joint = robot.joints[index];
       var parent = robot.links.indexOf(joint.parent);
@@ -71,32 +78,25 @@ class RobotRuntimeCompiler {
         default:
           throw 'Joint ${joint.name} has unknown type ${joint.type}';
       };
-      var maxEffort = joint.limits.effort;
-      var maxRate = joint.limits.velocity;
-      var actuatorEffort = 0.0;
-      var actuatorRate = 0.0;
-      for (actuator in robot.actuators) switch actuator.transmission {
-        case SimpleTransmission(jointId, ratio, _) if (jointId == joint.id):
-          var magnitude = Math.abs(ratio);
-          // Ideal lossless transmission: joint rate = actuator rate / |ratio|,
-          // and joint effort = actuator effort * |ratio|.
-          if (actuator.maxRate > 0.0)
-            actuatorRate = tighterLimit(actuatorRate, actuator.maxRate / magnitude);
-          if (actuator.maxEffort > 0.0)
-            actuatorEffort += actuator.maxEffort * magnitude;
-        case _:
-      }
-      // The joints coupled to this one and their motors limit it too, such as an axis by the
-      // motors turning its lead screws (see RobotModel.coupledLimits).
-      var coupled = robot.coupledLimits(joint.id);
-      maxRate = tighterLimit(tighterLimit(maxRate, actuatorRate), coupled.velocity);
-      maxEffort = tighterLimit(maxEffort, actuatorEffort);
       var compiled = new RobotRuntimeJointBlueprint(index, nativeType, parent, child,
-        joint.limits.lower, joint.limits.upper, maxEffort, maxRate,
+        joint.limits.lower, joint.limits.upper, joint.limits.effort, joint.limits.velocity,
         joint.parentFramePosition, joint.parentFrameRotation,
         joint.childFramePosition, joint.childFrameRotation, joint.axis,
-        coupled.maxAcceleration);
+        joint.limits.maxAcceleration);
       compiled.overtravel = joint.limits.overtravel;
+      // A servo motor whose joint is coupled to others carries them: it runs as a torque-limited servo
+      // and the coupling moves the rest. A servo on a joint with no couplings, such as an arm joint, keeps
+      // the computed-torque tracking limited to its effort. Stepper machines keep kinematic following.
+      if (inCoupling.exists(joint.id))
+        for (actuator in robot.actuators) switch actuator.transmission {
+          case SimpleTransmission(jointId, ratio, _) if (jointId == joint.id && Std.isOfType(actuator.drive, ServoDrive)):
+            var drive:ServoDrive = cast actuator.drive;
+            var stiffness = actuator.servoStiffness > 0.0 ? actuator.servoStiffness : drive.defaultStiffness();
+            var damping = actuator.servoDamping > 0.0 ? actuator.servoDamping : ServoDrive.defaultDamping(stiffness);
+            compiled.servoStiffness += stiffness * ratio * ratio;
+            compiled.servoDamping += damping * ratio * ratio;
+          case _:
+        }
       compiled.armature = joint.armature;
       compiled.damping = joint.damping;
       compiled.frictionLoss = joint.frictionLoss;
@@ -144,12 +144,6 @@ class RobotRuntimeCompiler {
         sensor.startAngleRadians, sensor.fieldOfViewRadians));
     }
     return result;
-  }
-
-  static function tighterLimit(first:Float, second:Float):Float {
-    if (first == 0.0) return second;
-    if (second == 0.0) return first;
-    return Math.min(first, second);
   }
 
   /** Returns all semantic diagnostics without attempting native lowering. */
@@ -337,7 +331,7 @@ class RobotRuntimeCompiler {
     if (robot.couplings.length > RobotKitRuntimeConstants.RK_MAX_JOINT_COUPLINGS)
       diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_LIMIT", "couplings", "too many joint couplings"));
     var couplingIds = new Map<String, Bool>();
-    var followers = new Map<String, Bool>();
+    var pairs = new Map<String, Bool>();
     for (index in 0...robot.couplings.length) {
       var coupling = robot.couplings[index];
       var path = 'couplings[$index]';
@@ -348,9 +342,9 @@ class RobotRuntimeCompiler {
       if (couplingIds.exists(coupling.id))
         diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_ID", path, "duplicate joint coupling ID"));
       couplingIds.set(coupling.id, true);
-      if (followers.exists(coupling.follower))
-        diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_FOLLOWER", path, "joint has multiple leaders"));
-      followers.set(coupling.follower, true);
+      if (pairs.exists(coupling.follower + "\n" + coupling.leader))
+        diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_FOLLOWER", path, "joint is coupled to the same leader twice"));
+      pairs.set(coupling.follower + "\n" + coupling.leader, true);
       if (!jointIds.exists(coupling.leader) || !jointIds.exists(coupling.follower))
         diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_JOINT", path, "coupling references an unknown joint"));
       for (joint in robot.joints) if (joint != null &&
@@ -361,6 +355,9 @@ class RobotRuntimeCompiler {
       if (!Math.isFinite(coupling.ratio) || coupling.ratio == 0.0 || !Math.isFinite(coupling.offset))
         diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_VALUE", path, "invalid coupling ratio or offset"));
     }
+    var cycle = JointCoupling.cycleThrough([for (coupling in robot.couplings) if (coupling != null) coupling]);
+    if (cycle != null)
+      diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_CYCLE", "couplings", 'joint $cycle depends on itself through its couplings'));
     for (index in 0...robot.actuators.length) {
       var actuator = robot.actuators[index];
       var path = 'actuators[$index]';
@@ -376,10 +373,18 @@ class RobotRuntimeCompiler {
         diagnostics.push(new RobotCompileDiagnostic("RK_ACTUATOR_ID_DUPLICATE", '$path.id',
           'duplicate actuator ID "${actuator.id}"'));
       else actuatorIds.set(actuator.id, true);
-      if (!Math.isFinite(actuator.maxEffort) || actuator.maxEffort < 0.0 ||
-          !Math.isFinite(actuator.maxRate) || actuator.maxRate < 0.0)
+      if ((actuator.maxEffort != null && (!Math.isFinite(actuator.maxEffort) || actuator.maxEffort < 0.0)) ||
+          (actuator.maxRate != null && (!Math.isFinite(actuator.maxRate) || actuator.maxRate < 0.0)))
         diagnostics.push(new RobotCompileDiagnostic("RK_ACTUATOR_LIMIT", path,
           "actuator limits must be finite and non-negative"));
+      if (actuator.fullStepsPerRevolution > 0.0 &&
+          (actuator.microsteps == null || actuator.maxStepRate == null))
+        diagnostics.push(new RobotCompileDiagnostic("RK_STEPPER_DRIVER", path,
+          "stepper requires microsteps and a driver step-rate ceiling"));
+      if (actuator.microsteps != null && (actuator.microsteps < 1 || actuator.microsteps > 1024))
+        diagnostics.push(new RobotCompileDiagnostic("RK_STEPPER_DRIVER", path, "microsteps must be from 1 to 1024"));
+      if (actuator.maxStepRate != null && (!Math.isFinite(actuator.maxStepRate) || actuator.maxStepRate <= 0.0))
+        diagnostics.push(new RobotCompileDiagnostic("RK_STEPPER_DRIVER", path, "driver step-rate ceiling must be positive"));
       if (actuator.transmission == null)
         diagnostics.push(new RobotCompileDiagnostic("RK_TRANSMISSION_NULL", '$path.transmission',
           "actuator transmission is missing"));

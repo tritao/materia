@@ -33,7 +33,7 @@ class ToolpathPlanRunner implements robotkit.skill.ToolpathPlanRunner {
     for (joint in 0...count) {
       var bound = manipulator.group.limitsOf(joint);
       if (bound.lower < bound.upper) limits.position(joint, bound.lower, bound.upper);
-      limits.velocity(joint, bound.velocity > 0.0 ? bound.velocity : 10.0);
+      limits.velocity(joint, bound.velocity != null ? bound.velocity : 10.0);
       limits.acceleration(joint, maxAcceleration);
       limits.jerk(joint, 20.0);
     }
@@ -41,7 +41,7 @@ class ToolpathPlanRunner implements robotkit.skill.ToolpathPlanRunner {
     var compiler = new ProgramCompiler(solver, limits, frameId,
       [for (joint in 0...count) {
         var speed = manipulator.group.limitsOf(joint).velocity;
-        speed > 0.0 ? speed : 10.0;
+        speed != null ? speed : 10.0;
       }], [for (_ in 0...count) maxAcceleration], [for (_ in 0...count) 20.0],
       StartTolerances.uniform(count, positionTolerance,
         maxAcceleration * 0.01, 20.0 * 0.01),

@@ -1,5 +1,7 @@
 package robotkit.mobile;
 
+import kinematicskit.UnicycleEnvelope;
+
 import robotkit.world.JointTarget;
 import robotkit.world.Robot;
 import robotkit.world.RobotCommand;
@@ -18,6 +20,7 @@ class MobileBase {
   public final nominalMotionLimits:MotionLimits;
   public var motionLimits(default, null):MotionLimits;
   public final footprint:Null<Footprint>;
+  public var velocityEnvelope(default, null):Null<UnicycleEnvelope> = null;
   public var safetyStopRequired(default, null):Bool = false;
   var previousCommand:Twist2 = new Twist2();
 
@@ -54,9 +57,18 @@ class MobileBase {
     };
     var footprint = config.footprintLength == null ? null : Footprint.rectangle(
       config.footprintLength, cast config.footprintWidth);
-    return new MobileBase(robot, drive, new MotionLimits(config.maxLinearSpeed,
+    var result = new MobileBase(robot, drive, new MotionLimits(config.maxLinearSpeed,
       config.maxAngularSpeed, config.maxLinearAcceleration,
       config.maxAngularAcceleration), footprint);
+    if (Std.isOfType(drive, DifferentialDrive)) {
+      var differential:DifferentialDrive = cast drive;
+      var left = blueprint.joints[differential.leftWheelJoint].maxRate;
+      var right = blueprint.joints[differential.rightWheelJoint].maxRate;
+      if (left != null || right != null) result.velocityEnvelope = new UnicycleEnvelope(
+        Math.min(left == null ? Math.POSITIVE_INFINITY : left, right == null ? Math.POSITIVE_INFINITY : right) * differential.wheelRadius,
+        differential.trackWidth);
+    }
+    return result;
   }
 
   static function requireJoint(robot:Robot, index:Int, expectedName:String):Void {
@@ -95,14 +107,45 @@ class MobileBase {
   /** Blocks MobileBase commands while a user-level policy requires a stop. */
   public function applySafetyStop(required:Bool):Void safetyStopRequired = required;
 
+  /** Maximum translation speed for a path curvature, including simultaneous wheel motion. */
+  public function pathSpeed(curvature:Float):Float
+    return velocityEnvelope == null ? motionLimits.maxLinearSpeed : Math.min(motionLimits.maxLinearSpeed, velocityEnvelope.pathSpeed(curvature));
+
   public function currentCommand():Twist2
     return new Twist2(previousCommand.linear, previousCommand.angular, previousCommand.lateral);
 
   /** Limits a body command and submits all drive joints as one RobotCommand. */
   public function command(twist:Twist2, ?durationSeconds:Float):Twist2 {
     if (safetyStopRequired) throw "MobileBase command rejected by an active safety stop";
-    var bounded = motionLimits.constrain(twist, previousCommand, durationSeconds);
+    var bounded = motionLimits.constrain(twist, previousCommand,
+      velocityEnvelope == null ? durationSeconds : null);
     bounded = driveModel.constrain(bounded);
+    if (velocityEnvelope != null) {
+      var allowed = velocityEnvelope.constrain(bounded.linear, bounded.angular);
+      bounded = new Twist2(allowed.linear, allowed.angular, bounded.lateral);
+      if (durationSeconds != null) {
+        bounded = motionLimits.constrain(bounded, previousCommand, durationSeconds);
+        var envelope:UnicycleEnvelope = cast velocityEnvelope;
+        if (Math.abs(bounded.linear) + Math.abs(bounded.angular) * envelope.trackWidth / 2 >
+            envelope.groundSpeed + 1e-12) {
+          // Independent acceleration clamps can leave the wheel envelope.
+          // The segment from the previous feasible command stays inside both
+          // acceleration bounds; stop it at the envelope boundary.
+          var low = 0.0, high = 1.0;
+          for (_ in 0...30) {
+            var middle = (low + high) / 2;
+            var linear = previousCommand.linear + middle * (bounded.linear - previousCommand.linear);
+            var angular = previousCommand.angular + middle * (bounded.angular - previousCommand.angular);
+            if (Math.abs(linear) + Math.abs(angular) * envelope.trackWidth / 2 <= envelope.groundSpeed)
+              low = middle;
+            else high = middle;
+          }
+          bounded = new Twist2(previousCommand.linear + low * (bounded.linear - previousCommand.linear),
+            previousCommand.angular + low * (bounded.angular - previousCommand.angular),
+            previousCommand.lateral + low * (bounded.lateral - previousCommand.lateral));
+        }
+      }
+    }
     var targets = driveModel.targets(bounded);
     if (targets == null || targets.length == 0)
       throw "Drive model produced no joint targets";

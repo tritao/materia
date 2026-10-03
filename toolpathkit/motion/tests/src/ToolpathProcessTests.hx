@@ -289,7 +289,7 @@ class ToolpathProcessTests extends ToolpathTestSupport {
     check(cnc.binding.travel != null,
       "CNC binding derives a machine travel envelope");
     var travelError = "";
-    try ToolpathTestSupport.compileCnc(binding, cnc, "G21 G0 X500\nM2\n", [0.0, 0.0, 0.0],
+    try ToolpathTestSupport.compileCnc(binding, cnc, "G21 G0 X500\nM2\n", [for (_ in blueprint.model.joints) 0.0],
       Int64.ofInt(899))
     catch (error:Dynamic) travelError = Std.string(error);
     check(travelError.indexOf("G-code line 1") >= 0 &&
@@ -297,7 +297,7 @@ class ToolpathProcessTests extends ToolpathTestSupport {
       'bound CNC travel error names the G-code line and axis: $travelError');
     var result = ToolpathTestSupport.compileCnc(binding, cnc, "G21 G90 G17\nS12000 M3\nG0 X10 Y10\n" +
       "F600 G1 X20\nG3 X10 Y20 I-10 J0\nM5\nM2\n",
-      [0.0, 0.0, 0.0], Int64.ofInt(900));
+      [for (_ in blueprint.model.joints) 0.0], Int64.ofInt(900));
     check(result.blocks.length > 0, "CNC ProgramCompiler emits execution blocks");
     var last = result.blocks[result.blocks.length - 1].plans;
     check(last.length > 0, "CNC arc is lowered into an execution plan");
@@ -309,14 +309,14 @@ class ToolpathProcessTests extends ToolpathTestSupport {
     cnc.controller.toolLibrary.set(new Tool(2, 0.0, 0.002));
     var compensated = ToolpathTestSupport.compileCnc(binding, cnc, "G21 G90 F600 G41 D2 G1 X10\n" +
       "G1 X20\nG1 X20 Y10\nG40 G1 X20 Y20\nM2\n",
-      [0.0, 0.0, 0.0], Int64.ofInt(925));
+      [for (_ in blueprint.model.joints) 0.0], Int64.ofInt(925));
     check(compensated.blocks.length > 0,
       "compensated contour lowers through MotionKit");
     compensated.dispose();
     for (arc in ["G17 G2 X5 Y5 Z5 I5 J0",
         "G18 G3 X5 Y5 Z5 I5 K0", "G19 G2 X5 Y5 Z5 J5 K0"]) {
       var helix = ToolpathTestSupport.compileCnc(binding, cnc, 'G21 G90 F600 $arc\nM2\n',
-        [0.0, 0.0, 0.0], Int64.ofInt(950));
+        [for (_ in blueprint.model.joints) 0.0], Int64.ofInt(950));
       var block = helix.blocks[helix.blocks.length - 1];
       var finalPlan = block.plans[block.plans.length - 1];
       var finalPose = binding.solver.forward(

@@ -202,7 +202,7 @@ typedef struct nksim_joint_desc {
     double axis_a[3]; /**< Unit vector in body_a's own frame. */
     double lower_limit;
     double upper_limit;
-    double max_force;
+    double max_force; /**< 0: unspecified; negative: explicitly unpowered; positive: force ceiling. */
     /**
      * Joint-frame orientation relative to body_a/body_b (x, y, z, w),
      * appended after the original fields so an old struct prefix remains
@@ -234,7 +234,11 @@ typedef struct nksim_joint_desc {
     double limit_impedance[5];
 } nksim_joint_desc;
 
-/** Follower = ratio * leader + offset, in joint coordinates. */
+/**
+ * One term of a follower's value, in joint coordinates: ratio * leader + offset. A follower with
+ * several couplings is the sum of their terms (a CoreXY motor follows both axes). Each leader and
+ * follower pair is coupled once, and the couplings may not form a cycle.
+ */
 typedef struct nksim_joint_coupling_desc {
     uint32_t struct_size NK_STRUCT_SIZE;
     nksim_joint leader;
@@ -268,7 +272,7 @@ typedef struct nksim_joint_target {
     nksim_joint joint;
     uint32_t mode;
     double target;
-    double max_force;
+    double max_force; /**< 0: inherit joint ceiling; negative: unpowered; positive: override ceiling. */
     /* NKSIM_JOINT_TARGET_SERVO terms, read when struct_size includes them. */
     double velocity;
     double stiffness;

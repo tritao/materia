@@ -23,7 +23,7 @@ int main(void) {
     blueprint.joints[0].child_link = 1;
     blueprint.joints[0].lower_limit = -1.0;
     blueprint.joints[0].upper_limit = 1.0;
-    blueprint.joints[0].max_effort = 3.0;
+    blueprint.joints[0].max_effort = (blueprint.joints[0].limit_flags |= RK_LIMIT_EFFORT, 3.0);
     blueprint.joints[0].parent_frame_rotation[3] = 1.0;
     blueprint.joints[0].child_frame_rotation[3] = 1.0;
     blueprint.joints[0].axis[2] = 1.0;
@@ -122,6 +122,37 @@ int main(void) {
     assert(rk_robot_runtime_submit_plan(coupled_runtime, &header, starts, durations, degrees,
         1, coefficients, 6, joint_map, 1, NULL, 0) == RK_OK);
     rk_robot_runtime_destroy(coupled_runtime);
+
+    /* A joint with two couplings follows the sum of their leaders: 3 a - 2 b. */
+    static rk_robot_runtime_blueprint summed;
+    summed = coupled;
+    summed.joint_count = 3;
+    summed.link_count = 4;
+    summed.links[3] = summed.links[2];
+    summed.joints[2] = summed.joints[1];
+    summed.joints[2].joint = 2;
+    summed.joints[2].parent_link = 2;
+    summed.joints[2].child_link = 3;
+    summed.coupling_count = 2;
+    summed.couplings[0].leader = 0;
+    summed.couplings[0].follower = 2;
+    summed.couplings[0].ratio = 3.0;
+    summed.couplings[1].leader = 1;
+    summed.couplings[1].follower = 2;
+    summed.couplings[1].ratio = -2.0;
+    rk_robot_runtime summed_runtime = RK_INVALID_ROBOT_RUNTIME;
+    assert(rk_robot_runtime_create(&summed, &summed_runtime) == RK_OK);
+    const double two_leaders[] = {0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.2, 0.0, 0.0};
+    const int32_t leader_map[] = {0, 1};
+    assert(rk_robot_runtime_submit_plan(summed_runtime, &header, starts, durations, degrees,
+        1, two_leaders, 12, leader_map, 2, NULL, 0) == RK_OK);
+    rk_robot_runtime_destroy(summed_runtime);
+    /* A cycle through the sum is refused when the runtime is created. */
+    summed.couplings[summed.coupling_count].leader = 2;
+    summed.couplings[summed.coupling_count].follower = 0;
+    summed.couplings[summed.coupling_count].ratio = 1.0;
+    summed.coupling_count++;
+    assert(rk_robot_runtime_create(&summed, &summed_runtime) != RK_OK);
 
     rk_robot_command command = {0};
     command.struct_size = sizeof(command);

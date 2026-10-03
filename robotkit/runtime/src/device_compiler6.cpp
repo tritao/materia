@@ -1,4 +1,5 @@
 #include "device_compiler6.hpp"
+#include "coupling_terms.hpp"
 #include "motionkit.h"
 #include <algorithm>
 #include <bit>
@@ -124,21 +125,33 @@ CompiledDevicePlan6 compile_device_segments6(
         // exact relation for the trajectory sent to the device.
         if (blueprint.coupling_count > RK_MAX_JOINT_COUPLINGS)
             return reject("invalid joint coupling layout");
+        // A follower is the sum of its couplings' terms, taken once its leaders are final.
+        std::uint32_t followers[RK_MAX_JOINTS], follower_count = 0;
         for (std::uint32_t relation = 0; relation < blueprint.coupling_count; ++relation) {
             const auto &coupling = blueprint.couplings[relation];
             if (coupling.leader >= source.joint_count ||
                 coupling.follower >= source.joint_count ||
                 !std::isfinite(coupling.ratio) || !std::isfinite(coupling.offset))
                 return reject("invalid joint coupling layout");
+        }
+        if (!robotkit::internal::order_followers(blueprint.couplings, blueprint.coupling_count,
+                source.joint_count, nullptr, followers, follower_count))
+            return reject("invalid joint coupling layout");
+        for (std::uint32_t index = 0; index < follower_count; ++index) {
+            const auto follower = followers[index];
             for (std::uint32_t degree = 0; degree <= source.degree; ++degree) {
-                const auto expected = coupling.ratio *
-                    source.coefficients[coupling.leader].value[degree] +
-                    (degree == 0 ? coupling.offset : 0.0);
+                double expected = 0.0;
+                for (std::uint32_t relation = 0; relation < blueprint.coupling_count; ++relation) {
+                    const auto &coupling = blueprint.couplings[relation];
+                    if (coupling.follower == follower)
+                        expected += coupling.ratio * source.coefficients[coupling.leader].value[degree] +
+                            (degree == 0 ? coupling.offset : 0.0);
+                }
                 if (!std::isfinite(expected) ||
-                    !std::isfinite(source.coefficients[coupling.follower].value[degree]) ||
-                    std::abs(source.coefficients[coupling.follower].value[degree] - expected) > 1e-6)
+                    !std::isfinite(source.coefficients[follower].value[degree]) ||
+                    std::abs(source.coefficients[follower].value[degree] - expected) > 1e-6)
                     return reject("coupled follower trajectory mismatch");
-                source.coefficients[coupling.follower].value[degree] = expected;
+                source.coefficients[follower].value[degree] = expected;
             }
         }
         expected_ns += source.duration_ns;
@@ -237,7 +250,9 @@ CompiledDevicePlan6 compile_device_segments6(
     limits.struct_size = sizeof(limits);
     limits.joint_count = blueprint.joint_count;
     limits.executor_time_resolution_ns = resolution_ns;
-    limits.max_continuity_jump[0] = 1e-6;
+    // Both neighbouring float segments approximate the same authored seam within
+    // target_error, so their positions may differ by twice that declared error.
+    limits.max_continuity_jump[0] = 2.0 * target_error;
     for (std::uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
         const auto &source = blueprint.joints[joint];
         limits.position_claimed[joint] = 1;
@@ -245,6 +260,8 @@ CompiledDevicePlan6 compile_device_segments6(
         limits.position_upper[joint] = source.upper_limit;
         limits.max_velocity[joint] = source.max_velocity;
         limits.max_acceleration[joint] = source.max_acceleration;
+        limits.derivative_claimed[joint] = ((source.limit_flags & RK_LIMIT_VELOCITY) ? 1u : 0u) |
+            ((source.limit_flags & RK_LIMIT_ACCELERATION) ? 2u : 0u);
     }
     mk_validation_report report{};
     report.struct_size = sizeof(report);

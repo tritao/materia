@@ -132,18 +132,27 @@ class ProgramTests extends MotionKitTestSupport {
       new LinearAxis(23, 10, 80), new LinearAxis(23, 10, 80),
       new LinearAxis(23, 10, 80), 0.1, 0.4);
     var solver = new AxisKinematics(blueprint);
-    var limits = new ValidationLimits(3, Int64.ofInt(blueprint.runtime.revision),
+    var model = blueprint.model;
+    var ids = [for (joint in model.joints) joint.id];
+    var count = ids.length;
+    var scales = [for (_ in ids) 0.0];
+    for (axis in blueprint.axes) for (slot in 0...axis.jointIds.length)
+      scales[ids.indexOf(axis.jointIds[slot])] = Math.abs(axis.jointScales[slot]);
+    var speeds = [for (joint in model.joints) joint.limits.requireVelocity()];
+    var accelerations = [for (joint in model.joints) joint.limits.requireAcceleration()];
+    var jerks = [for (scale in scales) 10.0 * scale];
+    var limits = new ValidationLimits(count, Int64.ofInt(blueprint.runtime.revision),
       Int64.ofInt(blueprint.runtime.calibrationRevision));
-    for (joint in 0...3) {
-      limits.position(joint, 0.0, 0.08);
-      limits.velocity(joint, 0.1);
-      limits.acceleration(joint, 0.4);
-      limits.jerk(joint, 10.0);
+    for (joint in 0...count) {
+      var bound = model.joints[joint].limits;
+      limits.position(joint, bound.lower, bound.upper);
+      limits.velocity(joint, speeds[joint]);
+      limits.acceleration(joint, accelerations[joint]);
+      limits.jerk(joint, jerks[joint]);
     }
     var rejectedLength = false;
-    try new ProgramCompiler(solver, limits, "work", [0.1, 0.1, 0.1],
-      [0.4, 0.4, 0.4], [10.0, 10.0, 10.0],
-      new StartTolerances([0.00001], [0.02, 0.02, 0.02], [0.02, 0.02, 0.02]))
+    try new ProgramCompiler(solver, limits, "work", speeds, accelerations, jerks,
+      new StartTolerances([0.00001], [for (_ in ids) 0.02], [for (_ in ids) 0.02]))
     catch (_:Dynamic) rejectedLength = true;
     check(rejectedLength, "program compiler rejects incomplete start tolerances");
     var rejectedNegative = false;
@@ -157,12 +166,19 @@ class ProgramTests extends MotionKitTestSupport {
     catch (_:Dynamic) rejectedNonfinite = true;
     check(rejectedNonfinite, "program compiler rejects non-finite start tolerances");
 
-    var compiler = new ProgramCompiler(solver, limits, "work", [0.1, 0.1, 0.1],
-      [0.4, 0.4, 0.4], [10.0, 10.0, 10.0],
-      StartTolerances.uniform(3, 0.00001, 0.02, 0.02));
+    var compiler = new ProgramCompiler(solver, limits, "work", speeds, accelerations, jerks,
+      new StartTolerances([for (scale in scales) 0.00001 * scale],
+        [for (scale in scales) 0.02 * scale], [for (scale in scales) 0.02 * scale]),
+      null, 0.01, 0.5, 0.005, 0.02, null, null,
+      [for (scale in scales) 0.5 * scale], ids, model.couplings);
+    var start = [for (_ in ids) 0.0], goal = start.copy();
+    for (slot in 0...blueprint.axes[0].jointIds.length) {
+      var joint = ids.indexOf(blueprint.axes[0].jointIds[slot]);
+      start[joint] = blueprint.axes[0].jointScales[slot] * 0.001;
+      goal[joint] = blueprint.axes[0].jointScales[slot] * 0.01;
+    }
     var compiled = compiler.compile(new MotionProgram([MotionOp.MoveJ(
-      MoveTarget.JointTarget([0.01, 0.0, 0.0]), new MotionOptions(),
-      Blend.ExactStop)]), [0.001, 0.0, 0.0], Int64.ofInt(812));
+      MoveTarget.JointTarget(goal), new MotionOptions(), Blend.ExactStop)]), start, Int64.ofInt(812));
     var plan = compiled.blocks[0].plans[0];
     near(plan.copyPositionTolerances()[0], 0.00001,
       "program compiler preserves tight start position tolerance", 1e-12);

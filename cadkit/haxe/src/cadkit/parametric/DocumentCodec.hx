@@ -61,15 +61,6 @@ import cadkit.parametric.RelationshipId;
 class DocumentCodec {
 	public static inline var FORMAT:String = "cadkit.document";
 	public static inline var VERSION:Int = 11;
-	static final migrations:Map<String, (Document, Int)->Void> = [];
-
-	/** Register a domain-owned migration without coupling the codec to that domain. */
-	public static function registerMigration(id:String, migration:(Document, Int)->Void):Void {
-		if (id == null || id.length == 0 || migration == null)
-			throw new ParametricError("document migration needs an ID and callback");
-		migrations.set(id, migration);
-	}
-
 	public static function encode(document:Document):String {
 		var encodedFeatures:Array<Dynamic> = [];
 		for (index in 0...document.featureCount()) {
@@ -240,14 +231,14 @@ class DocumentCodec {
 			if (stringField(root, "format") != FORMAT)
 				throw new ParametricError("unsupported document format");
 			var version = intField(root, "version");
-			if (version < 1 || version > VERSION)
-				throw new ParametricError("unsupported document version");
-			var implicitOutput = version >= 5 ? optionalBool(root, "implicitOutput", true) : true;
-			var lengthUnit = version >= 6 ? stringField(root, "lengthUnit") : "mm";
+			if (version != VERSION)
+				throw new ParametricError('schema v$version is unsupported; expected v$VERSION');
+			var implicitOutput = optionalBool(root, "implicitOutput", true);
+			var lengthUnit = stringField(root, "lengthUnit");
 
 			var records:Array<Dynamic> = cast requiredField(root, "features");
 			var sourceDocumentId = optionalString(root, "documentId");
-			var targetDocument:Document = version == 1 || clone ? new Document(null, implicitOutput, lengthUnit)
+			var targetDocument:Document = clone ? new Document(null, implicitOutput, lengthUnit)
 				: new Document(new DocumentId(stringField(root, "documentId")), implicitOutput, lengthUnit);
 			document = targetDocument;
 			var decodeElementReferenceInDocument = function(value:Dynamic) {
@@ -394,112 +385,105 @@ class DocumentCodec {
 			var rawOutput:Dynamic = Reflect.field(root, "output");
 			if (rawOutput != null)
 				document.setOutput(requiredFeature(document, integerValue(rawOutput, "output")));
-			if (version == 1) {
-				document.installElement("Model", document.outputFeature(), new ElementId());
-			} else {
-				var definitionRecords:Array<Dynamic> = cast requiredField(root, "definitions");
-				for (definitionRecord in definitionRecords) {
-					var inputRecords:Array<Dynamic> = cast requiredField(definitionRecord, "inputs");
-					var inputs:Array<DefinitionInput> = [];
-					for (inputRecord in inputRecords) {
-						var kind = stringField(inputRecord, "kind");
-						var value:Dynamic = version >= 7 ? requiredField(inputRecord, "value") : numberField(inputRecord, "value");
-						var rawAllowed:Dynamic = version >= 7 ? Reflect.field(inputRecord, "allowedValues") : null;
-						inputs.push(new DefinitionInput(stringField(inputRecord, "name"), kind, stringField(inputRecord, "unit"),
-							value, rawAllowed == null ? null : cast rawAllowed, optionalBool(inputRecord, "editedByUser", false)));
-					}
-					var outputRecords:Array<Dynamic> = cast requiredField(definitionRecord, "outputs");
-					var outputs:Array<DefinitionOutput> = [];
-					for (outputRecord in outputRecords) {
-						var purpose = stringField(outputRecord, "purpose");
-						if (purpose == "connector") continue;
-						outputs.push(new DefinitionOutput(stringField(outputRecord, "name"), purpose));
-					}
-					var subgraph:Null<DefinitionSubgraph> = null;
-					var rawSubgraph:Dynamic = Reflect.field(definitionRecord, "subgraph");
-					if (rawSubgraph != null) {
-						var inputBindings = new Map<String, String>();
-						var rawInputBindings:Array<Dynamic> = cast requiredField(rawSubgraph, "inputBindings");
-						for (binding in rawInputBindings) {
-							var inputName = stringField(binding, "input");
-							if (inputBindings.exists(inputName))
-								throw new ParametricError("duplicate subgraph input binding: " + inputName);
-							inputBindings.set(inputName, stringField(binding, "parameter"));
-						}
-						var outputFeatures = new Map<String, Int>();
-						var rawOutputFeatures:Array<Dynamic> = cast requiredField(rawSubgraph, "outputFeatures");
-						for (output in rawOutputFeatures) {
-							var outputName = stringField(output, "output");
-							if (outputFeatures.exists(outputName))
-								throw new ParametricError("duplicate subgraph output binding: " + outputName);
-							outputFeatures.set(outputName, intField(output, "feature"));
-						}
-						subgraph = new DefinitionSubgraph(stringField(rawSubgraph, "graph"), inputBindings, outputFeatures);
-					}
-					var definition = document.installDefinition(new DefinitionId(stringField(definitionRecord, "id")), stringField(definitionRecord, "name"),
-						stringField(definitionRecord, "recipe"), inputs, outputs, subgraph);
-					definition.restoreRevision(intField(definitionRecord, "revision"));
-					for (propertyRecord in optionalPropertyRecords(definitionRecord)) {
-						var property = decodeTypedProperty(propertyRecord, remapDocumentId);
-						definition.restoreProperty(property.name, property);
-					}
+			var definitionRecords:Array<Dynamic> = cast requiredField(root, "definitions");
+			for (definitionRecord in definitionRecords) {
+				var inputRecords:Array<Dynamic> = cast requiredField(definitionRecord, "inputs");
+				var inputs:Array<DefinitionInput> = [];
+				for (inputRecord in inputRecords) {
+					var kind = stringField(inputRecord, "kind");
+					var value:Dynamic = requiredField(inputRecord, "value");
+					var rawAllowed:Dynamic = Reflect.field(inputRecord, "allowedValues");
+					inputs.push(new DefinitionInput(stringField(inputRecord, "name"), kind, stringField(inputRecord, "unit"),
+						value, rawAllowed == null ? null : cast rawAllowed, optionalBool(inputRecord, "editedByUser", false)));
 				}
-				var elementRecords:Array<Dynamic> = cast requiredField(root, "elements");
-				for (elementRecord in elementRecords) {
-					var kind = stringField(elementRecord, "kind");
-					var eid = new ElementId(stringField(elementRecord, "id"));
-					var ename = stringField(elementRecord, "name");
-					if (kind == "geometry")
-						document.installElement(ename, requiredFeature(document, intField(elementRecord, "output")), eid);
-					else if (kind == "instance") {
-						var overrideRecords:Array<Dynamic> = cast requiredField(elementRecord, "overrides");
-						var overrides = new Map<String, Dynamic>();
-						for (overrideRecord in overrideRecords)
-							overrides.set(stringField(overrideRecord, "name"), version >= 7 ?
-								requiredField(overrideRecord, "value") : numberField(overrideRecord, "value"));
-						document.installInstance(ename, eid, new DefinitionId(stringField(elementRecord, "definition")), overrides);
-					} else if (kind == "level") {
-						var relative:Dynamic = Reflect.field(elementRecord, "relativeTo");
-						document.installLevel(ename, eid, numberField(elementRecord, "elevation"), numberField(elementRecord, "offset"),
-							relative == null ? null : decodeElementReferenceInDocument(relative));
-					} else if (kind == "reference-plane") {
-						var p = requiredField(elementRecord, "plane");
-						document.installReferencePlane(ename, eid,
-							new Plane(decodeVector(requiredField(p, "origin")), decodeVector(requiredField(p, "xDirection")),
-								decodeVector(requiredField(p, "normal"))));
-					} else if (kind == ElementKind.Object) {
-						document.installObject(ename, eid);
-					} else
-						throw new ParametricError("unsupported element kind: " + kind);
+				var outputRecords:Array<Dynamic> = cast requiredField(definitionRecord, "outputs");
+				var outputs:Array<DefinitionOutput> = [];
+				for (outputRecord in outputRecords) {
+					var purpose = stringField(outputRecord, "purpose");
+					outputs.push(new DefinitionOutput(stringField(outputRecord, "name"), purpose));
 				}
-				for (elementRecord in elementRecords) {
-					var loaded = document.element(new ElementId(stringField(elementRecord, "id")));
-					var rawParent:Dynamic = Reflect.field(elementRecord, "parent");
-					document.restoreElementPlacement(loaded, decodePlacement(requiredField(elementRecord, "placement")),
-						rawParent == null ? null : decodeElementReferenceInDocument(rawParent));
-					for (propertyRecord in optionalPropertyRecords(elementRecord)) {
-						var property = decodeTypedProperty(propertyRecord, remapDocumentId);
-						loaded.restoreProperty(property.name, property);
+				var subgraph:Null<DefinitionSubgraph> = null;
+				var rawSubgraph:Dynamic = Reflect.field(definitionRecord, "subgraph");
+				if (rawSubgraph != null) {
+					var inputBindings = new Map<String, String>();
+					var rawInputBindings:Array<Dynamic> = cast requiredField(rawSubgraph, "inputBindings");
+					for (binding in rawInputBindings) {
+						var inputName = stringField(binding, "input");
+						if (inputBindings.exists(inputName))
+							throw new ParametricError("duplicate subgraph input binding: " + inputName);
+						inputBindings.set(inputName, stringField(binding, "parameter"));
 					}
-					document.worldPlacement(loaded);
+					var outputFeatures = new Map<String, Int>();
+					var rawOutputFeatures:Array<Dynamic> = cast requiredField(rawSubgraph, "outputFeatures");
+					for (output in rawOutputFeatures) {
+						var outputName = stringField(output, "output");
+						if (outputFeatures.exists(outputName))
+							throw new ParametricError("duplicate subgraph output binding: " + outputName);
+						outputFeatures.set(outputName, intField(output, "feature"));
+					}
+					subgraph = new DefinitionSubgraph(stringField(rawSubgraph, "graph"), inputBindings, outputFeatures);
 				}
-			var rawRelationshipRecords:Dynamic = Reflect.field(root, "relationships");
-			if (rawRelationshipRecords != null && !Std.isOfType(rawRelationshipRecords, Array))
-				throw new ParametricError("document relationships field is not an array");
-			var relationshipRecords:Array<Dynamic> = rawRelationshipRecords == null ? [] : cast rawRelationshipRecords;
-			for (relationshipRecord in relationshipRecords) {
-				var relationship = document.installRelationship(new RelationshipId(stringField(relationshipRecord, "id")),
-					stringField(relationshipRecord, "type"), decodeElementReferenceInDocument(requiredField(relationshipRecord, "source")),
-					decodeElementReferenceInDocument(requiredField(relationshipRecord, "target")));
-				for (propertyRecord in optionalPropertyRecords(relationshipRecord)) {
+				var definition = document.installDefinition(new DefinitionId(stringField(definitionRecord, "id")), stringField(definitionRecord, "name"),
+					stringField(definitionRecord, "recipe"), inputs, outputs, subgraph);
+				definition.restoreRevision(intField(definitionRecord, "revision"));
+				for (propertyRecord in optionalPropertyRecords(definitionRecord)) {
 					var property = decodeTypedProperty(propertyRecord, remapDocumentId);
-					relationship.restoreProperty(property.name, property);
+					definition.restoreProperty(property.name, property);
 				}
 			}
-				document.validatePersistentReferences();
+			var elementRecords:Array<Dynamic> = cast requiredField(root, "elements");
+			for (elementRecord in elementRecords) {
+				var kind = stringField(elementRecord, "kind");
+				var eid = new ElementId(stringField(elementRecord, "id"));
+				var ename = stringField(elementRecord, "name");
+				if (kind == "geometry")
+					document.installElement(ename, requiredFeature(document, intField(elementRecord, "output")), eid);
+				else if (kind == "instance") {
+					var overrideRecords:Array<Dynamic> = cast requiredField(elementRecord, "overrides");
+					var overrides = new Map<String, Dynamic>();
+					for (overrideRecord in overrideRecords)
+						overrides.set(stringField(overrideRecord, "name"), requiredField(overrideRecord, "value"));
+					document.installInstance(ename, eid, new DefinitionId(stringField(elementRecord, "definition")), overrides);
+				} else if (kind == "level") {
+					var relative:Dynamic = Reflect.field(elementRecord, "relativeTo");
+					document.installLevel(ename, eid, numberField(elementRecord, "elevation"), numberField(elementRecord, "offset"),
+						relative == null ? null : decodeElementReferenceInDocument(relative));
+				} else if (kind == "reference-plane") {
+					var p = requiredField(elementRecord, "plane");
+					document.installReferencePlane(ename, eid,
+						new Plane(decodeVector(requiredField(p, "origin")), decodeVector(requiredField(p, "xDirection")),
+							decodeVector(requiredField(p, "normal"))));
+				} else if (kind == ElementKind.Object) {
+					document.installObject(ename, eid);
+				} else
+					throw new ParametricError("unsupported element kind: " + kind);
 			}
+			for (elementRecord in elementRecords) {
+				var loaded = document.element(new ElementId(stringField(elementRecord, "id")));
+				var rawParent:Dynamic = Reflect.field(elementRecord, "parent");
+				document.restoreElementPlacement(loaded, decodePlacement(requiredField(elementRecord, "placement")),
+					rawParent == null ? null : decodeElementReferenceInDocument(rawParent));
+				for (propertyRecord in optionalPropertyRecords(elementRecord)) {
+					var property = decodeTypedProperty(propertyRecord, remapDocumentId);
+					loaded.restoreProperty(property.name, property);
+				}
+				document.worldPlacement(loaded);
+			}
+		var rawRelationshipRecords:Dynamic = Reflect.field(root, "relationships");
+		if (rawRelationshipRecords != null && !Std.isOfType(rawRelationshipRecords, Array))
+			throw new ParametricError("document relationships field is not an array");
+		var relationshipRecords:Array<Dynamic> = rawRelationshipRecords == null ? [] : cast rawRelationshipRecords;
+		for (relationshipRecord in relationshipRecords) {
+			var relationship = document.installRelationship(new RelationshipId(stringField(relationshipRecord, "id")),
+				stringField(relationshipRecord, "type"), decodeElementReferenceInDocument(requiredField(relationshipRecord, "source")),
+				decodeElementReferenceInDocument(requiredField(relationshipRecord, "target")));
+			for (propertyRecord in optionalPropertyRecords(relationshipRecord)) {
+				var property = decodeTypedProperty(propertyRecord, remapDocumentId);
+				relationship.restoreProperty(property.name, property);
+			}
+		}
+			document.validatePersistentReferences();
 
-			for (migration in migrations) migration(document, version);
 			if (evaluate)
 				document.recompute();
 			return document;
@@ -1297,9 +1281,9 @@ class DocumentCodec {
 			dz: fingerprint.dz,
 			measure: fingerprint.measure
 		};
-		// Where an edge's position was taken; records without one (before version 10) used its first vertex.
+		// Where the edge position was taken.
 		if (fingerprint.kind == CadKit.ShapeKind.Edge) Reflect.setField(record, "anchor", fingerprint.midpoint ? "midpoint" : "start");
-		// The element's topological name (since version 11) and the naming rules that made it (TN-D13).
+		// The element's topological name and the naming rules that made it (TN-D13).
 		if (fingerprint.name != null) {
 			Reflect.setField(record, "name", fingerprint.name);
 			Reflect.setField(record, "naming", cadkit.Shape.namingScheme());
@@ -1308,6 +1292,9 @@ class DocumentCodec {
 	}
 
 	public static function decodeFingerprint(record:Dynamic, kind:CadKit.ShapeKind):TopologyFingerprint {
+		if (kind == CadKit.ShapeKind.Edge && Reflect.field(record, "anchor") != "midpoint"
+			&& Reflect.field(record, "anchor") != "start")
+			throw new ParametricError("Edge fingerprint requires a stated anchor");
 		return TopologyFingerprint.fromData(kind, surfaceKind(stringField(record, "surface")), curveKind(stringField(record, "curve")),
 			numberField(record, "x"), numberField(record, "y"), numberField(record, "z"), numberField(record, "dx"), numberField(record, "dy"),
 			numberField(record, "dz"), numberField(record, "measure"), Reflect.field(record, "anchor") == "midpoint",

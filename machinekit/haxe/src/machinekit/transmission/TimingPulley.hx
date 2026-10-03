@@ -20,6 +20,7 @@ import machinekit.component.Solids;
  * lies in the belt cords outside the pulley, so OD = pitch diameter - 2 * PLD.
  */
 class TimingPulley extends MachineComponent {
+
 	public final beltProfile:TimingBeltProfile;
 	public final pitch:Float;
 	public final pitchLineDifferential:Float;

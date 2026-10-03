@@ -560,7 +560,10 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 ? blueprint.joint_overtravel[index] : 0.0;
             desc.lower_limit = source.lower_limit - overtravel;
             desc.upper_limit = source.upper_limit + overtravel;
-            desc.max_force = source.max_effort;
+            // SimKit uses zero for an unspecified force ceiling. A negative
+            // sentinel preserves an explicit zero-effort RobotKit limit.
+            desc.max_force = (source.limit_flags & RK_LIMIT_EFFORT) && source.max_effort == 0.0
+                ? -1.0 : source.max_effort;
             if (blueprint.struct_size >= offsetof(rk_robot_runtime_blueprint, joint_dynamics) +
                     sizeof(blueprint.joint_dynamics)) {
                 const auto &dynamics = blueprint.joint_dynamics[index];
@@ -620,6 +623,31 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             std::copy_n(source.axis_parent, 3, closure.axis_a);
             require_sim(nksim_closure_create(world, &closure), "nksim_closure_create");
         }
+        // Servo motor joints (see rk_robot_joint_servo) carry the joints coupled to them, which then
+        // take no commands of their own.
+        binding->slip_.assign(blueprint.joint_count, 0.0);
+        binding->servo_.assign(blueprint.joint_count, rk_robot_joint_servo{});
+        binding->passive_.assign(blueprint.joint_count, 0);
+        binding->step_ = fixed_timestep_;
+        if (blueprint.struct_size >= offsetof(rk_robot_runtime_blueprint, joint_servo) +
+                sizeof(blueprint.joint_servo)) {
+            std::copy_n(blueprint.joint_servo, blueprint.joint_count, binding->servo_.begin());
+            std::vector<uint32_t> group(blueprint.joint_count);
+            for (uint32_t index = 0; index < blueprint.joint_count; ++index) group[index] = index;
+            const auto find = [&group](uint32_t joint) {
+                while (group[joint] != joint) joint = group[joint] = group[group[joint]];
+                return joint;
+            };
+            for (uint32_t index = 0; index < blueprint.coupling_count; ++index)
+                group[find(blueprint.couplings[index].leader)] = find(blueprint.couplings[index].follower);
+            std::vector<uint8_t> driven(blueprint.joint_count, 0);
+            for (uint32_t index = 0; index < blueprint.joint_count; ++index)
+                if (binding->servo_[index].stiffness > 0.0) driven[find(index)] = 1;
+            for (uint32_t index = 0; index < blueprint.coupling_count; ++index)
+                for (const auto joint : {blueprint.couplings[index].leader, blueprint.couplings[index].follower})
+                    if (driven[find(joint)] && binding->servo_[joint].stiffness <= 0.0)
+                        binding->passive_[joint] = 1;
+        }
         const auto topology_result = nksim_world_end_topology_update(world);
         topology_update = false;
         require_sim(topology_result, "nksim_world_end_topology_update");
@@ -629,6 +657,11 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 held[index] = binding->actuated_joints_[index];
             for (uint32_t index = 0; index < blueprint.coupling_count; ++index)
                 held[blueprint.couplings[index].follower] = 0;
+            // A servo motor is held at rest by its servo, wherever it sits in its couplings.
+            for (uint32_t index = 0; index < blueprint.joint_count; ++index) {
+                if (binding->servo_[index].stiffness > 0.0) held[index] = binding->actuated_joints_[index];
+                if (binding->passive_[index]) held[index] = 0;
+            }
             binding->hold_at_rest(std::move(held));
         }
         bindings_.push_back(binding);
@@ -693,6 +726,20 @@ rk_result Simulation::reset_robots() {
         if (auto binding = bindings_[index].lock()) binding->reset();
         runtimes_[index]->reset_state();
     }
+    return RK_OK;
+}
+
+rk_result Simulation::set_joint_slip(uint32_t robot_index, uint32_t joint, double offset) {
+    // The tick lock orders this between completed host steps, like a base drive.
+    Lock lock(session_);
+    if (robot_index >= bindings_.size() || !std::isfinite(offset))
+        return RK_ERROR_INVALID_ARGUMENT;
+    auto binding = bindings_[robot_index].lock();
+    if (!binding)
+        return RK_ERROR_INVALID_HANDLE;
+    if (joint >= binding->slip_.size())
+        return RK_ERROR_INVALID_ARGUMENT;
+    binding->slip_[joint] = offset;
     return RK_OK;
 }
 

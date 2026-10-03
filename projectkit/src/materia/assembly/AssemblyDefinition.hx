@@ -1,5 +1,7 @@
 package materia.assembly;
 
+import haxe.ds.ReadOnlyArray;
+
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.assembly.AssemblyRecord.AssemblyConnector;
 
@@ -66,6 +68,7 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(5) @:optional var overtravel:Null<Float>;
 	/** Largest acceleration the joint's drive can give, in the joint's units per second squared. */
 	@:id(6) @:optional var acceleration:Null<Float>;
+	@:id(7) @:optional var assumptions:Null<ReadOnlyArray<QuantityAssumption>>;
 }
 
 /** Connectors belong to a reusable component definition, not an occurrence. */
@@ -121,7 +124,12 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(12) @:optional var driven:Bool;
 }
 
-/** Target coordinate = source coordinate × ratio + offset. */
+/**
+ * Target coordinate = source coordinate × ratio + offset. A target with several couplings is the sum of
+ * their terms: target = Σ (ratioᵢ × sourceᵢ + offsetᵢ), as a CoreXY motor follows both axes. Each coupling
+ * is one term, with its own efficiency, stiffness, backlash and drag. Every (source, target) pair is
+ * unique and the terms never form a cycle.
+ */
 @:wire typedef AssemblyJointCoupling = {
 	@:id(1) var id:String;
 	@:id(2) var source:String;
@@ -136,6 +144,36 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(8) @:optional var backlash:Null<Float>;
 	/** Constant resisting effort the coupling adds at the target while it moves (N m for a turning target). */
 	@:id(9) @:optional var drag:Null<Float>;
+	/** Engineering inputs assumed by the source of this coupling; absent when none. */
+	@:id(10) @:optional var assumed:Null<ReadOnlyArray<String>>;
+	@:id(11) @:optional var assumptions:Null<ReadOnlyArray<QuantityAssumption>>;
+}
+
+/** A derived elastic span; displacement coefficients use assembly length per joint unit. */
+@:wire typedef AssemblyElasticTerm = {
+	@:id(1) var joint:String;
+	@:id(2) var coefficient:Float;
+}
+
+@:wire typedef AssemblyElasticSpan = {
+	/** Axial force per assembly length, N/mm in a millimetre assembly. */
+	@:id(1) var stiffness:Float;
+	@:id(2) var terms:Array<AssemblyElasticTerm>;
+}
+
+/** One physical elastic network replaces the scalar springs of its listed motion couplings. */
+@:wire typedef AssemblyElasticClearance = {
+	@:id(1) var joint:String;
+	/** Bounded tooth motion in this joint's coordinate units. */
+	@:id(2) var allowance:Float;
+}
+
+@:wire typedef AssemblyElasticNetwork = {
+	@:id(1) var id:String;
+	@:id(2) var couplings:Array<String>;
+	@:id(3) var spans:Array<AssemblyElasticSpan>;
+	@:id(4) @:optional var assumptions:Array<QuantityAssumption>;
+	@:id(5) @:optional var clearances:Array<AssemblyElasticClearance>;
 }
 
 /**
@@ -167,6 +205,39 @@ enum abstract AssemblyMateKind(String) from String to String {
 	/** Default servo gains in the actuator's units: effort per unit of position and velocity error. */
 	@:id(15) @:optional var servoStiffness:Null<Float>;
 	@:id(16) @:optional var servoDamping:Null<Float>;
+	/** The id of the `AssemblyEncoder` that reads this motor, which a servo's feedback comes from; absent for none. */
+	@:id(17) @:optional var encoder:Null<String>;
+	/**
+	 * A gearbox between the motor and the joint: the motor turns `gearRatio` times for one turn (or one unit of
+	 * travel) of the joint, and the joint gets `gearEfficiency` of its power. `maxEffort`, `maxRate`, the
+	 * torque-speed curve and the rotor are then the motor's own, before the gearbox. Absent, the motor drives the
+	 * joint directly.
+	 */
+	@:id(18) @:optional var gearRatio:Null<Float>;
+	@:id(19) @:optional var gearEfficiency:Null<Float>;
+	/** Engineering inputs assumed by this motor's rating or curve; absent when none. */
+	@:id(20) @:optional var assumed:Null<ReadOnlyArray<String>>;
+	/** Driver setting and input ceiling; required for step/dir actuators and absent for other drives. */
+	@:id(21) @:optional var microsteps:Null<Int>;
+	@:id(22) @:optional var maxStepRate:Null<Float>;
+	@:id(23) @:optional var assumptions:Null<ReadOnlyArray<QuantityAssumption>>;
+}
+
+/**
+ * An encoder on a joint: it reads the joint's travel in counts. Which joint it sits on says what it
+ * sees. On a motor's own joint it is motor-side and sees the rotor (lost steps, a servo's following
+ * error, but not backlash or belt stretch); on a joint the load moves through a drive it is load-side
+ * and sees where the load is.
+ */
+@:wire typedef AssemblyEncoder = {
+	@:id(1) var id:String;
+	@:id(2) var joint:String;
+	/** "incremental" (quadrature counts from where it was powered up) or "absolute" (the position itself). */
+	@:id(3) var kind:String;
+	/** Counts per revolution on a turning joint, per millimetre on a sliding joint. */
+	@:id(4) var counts:Float;
+	/** An index pulse once a revolution on a turning joint, at the reference mark on a sliding one. */
+	@:id(5) @:optional var index:Null<Bool>;
 }
 
 /** A connector exported from a member of an assembly definition. */
@@ -186,6 +257,8 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(6) @:optional var exposedConnectors:Array<AssemblyExposedConnector>;
 	@:id(7) @:optional var mates:Array<AssemblyMate>;
 	@:id(8) @:optional var actuators:Array<AssemblyActuator>;
+	@:id(9) @:optional var encoders:Array<AssemblyEncoder>;
+	@:id(10) @:optional var elasticNetworks:Array<AssemblyElasticNetwork>;
 }
 
 /**
@@ -206,6 +279,8 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(9) @:optional var exposedConnectors:Array<AssemblyExposedConnector>;
 	@:id(10) @:optional var mates:Array<AssemblyMate>;
 	@:id(11) @:optional var actuators:Array<AssemblyActuator>;
+	@:id(12) @:optional var encoders:Array<AssemblyEncoder>;
+	@:id(13) @:optional var elasticNetworks:Array<AssemblyElasticNetwork>;
 }
 
 @:wire typedef AssemblyJointCoordinate = {
@@ -224,4 +299,10 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(2) var definition:String;
 	@:id(3) var jointCoordinates:Array<AssemblyJointCoordinate>;
 	@:id(4) var rootPoses:Array<AssemblyRootPose>;
+}
+
+/** An engineering assumption attached to the quantity that uses it. */
+@:wire typedef QuantityAssumption = {
+	@:id(1) var quantity:String;
+	@:id(2) var label:String;
 }

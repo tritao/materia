@@ -65,6 +65,8 @@ class AssemblyState {
 		}
 	}
 
+	var orderedTargets:Array<String>;
+
 	public function setJoint(id:String, value:Float):Void {
 		var joint = joints.get(id);
 		if (joint == null || joint.role != AssemblyJointRole.Tree ||
@@ -77,21 +79,48 @@ class AssemblyState {
 		for (coupling in couplings) if (coupling.target == id)
 			throw 'Joint "$id" is driven by coupled joint "${coupling.source}"';
 		var updates = new Map<String, Float>();
-		collectCoupledValues(id, value, updates);
+		updates.set(id, value);
+		// A target is the sum of its terms, so recompute each one a changed joint reaches, sources first.
+		var changed = new Map<String, Bool>();
+		changed.set(id, true);
+		for (target in couplingOrder()) {
+			var reached = false, sum = 0.0;
+			for (coupling in couplings) if (coupling.target == target) {
+				if (changed.exists(coupling.source)) reached = true;
+				var updated = updates.get(coupling.source), stored = coordinates.get(coupling.source);
+				var source = 0.0;
+				if (updated != null) source = updated;
+				else if (stored != null) source = stored;
+				sum += source * coupling.ratio + coupling.offset;
+			}
+			if (!reached) continue;
+			var follower = joints.get(target);
+			if (follower == null || !Math.isFinite(sum) ||
+				(follower.limits.lower != null && sum < follower.limits.lower) ||
+				(follower.limits.upper != null && sum > follower.limits.upper))
+				throw 'Coupled joint "$target" coordinate is outside its limits';
+			updates.set(target, sum);
+			changed.set(target, true);
+		}
 		for (jointId in updates.keys()) coordinates.set(jointId, updates.get(jointId));
 		dirty = true;
 	}
 
-	function collectCoupledValues(id:String, value:Float, updates:Map<String, Float>):Void {
-		var joint = joints.get(id);
-		if (joint == null || !Math.isFinite(value) ||
-			(joint.limits.lower != null && value < joint.limits.lower) ||
-			(joint.limits.upper != null && value > joint.limits.upper))
-			throw 'Coupled joint "$id" coordinate is outside its limits';
-		updates.set(id, value);
-		if (definition.couplings != null) for (coupling in definition.couplings)
-			if (coupling.source == id)
-				collectCoupledValues(coupling.target, value * coupling.ratio + coupling.offset, updates);
+	/** Coupled joints with every source before the joints it feeds (the validated terms have no cycle). */
+	function couplingOrder():Array<String> {
+		if (orderedTargets != null) return orderedTargets;
+		var couplings = definition.couplings == null ? [] : definition.couplings;
+		var order:Array<String> = [], placed = new Map<String, Bool>();
+		var targets = [for (coupling in couplings) coupling.target];
+		function place(target:String):Void {
+			if (placed.exists(target)) return;
+			placed.set(target, true);
+			for (coupling in couplings) if (coupling.target == target && targets.indexOf(coupling.source) >= 0)
+				place(coupling.source);
+			order.push(target);
+		}
+		for (target in targets) place(target);
+		return orderedTargets = order;
 	}
 
 	public function joint(id:String):Float {

@@ -202,11 +202,26 @@ class NemaStepper extends MachineComponent implements MotorDrive {
 		return curve;
 	}
 
-	public function actuator(id:String, joint:String, volts:Float, margin:Float):AssemblyActuator {
+	public function actuator(id:String, joint:String, volts:Float, margin:Float, ?current:Float):AssemblyActuator {
 		var rated = requireRating();
-		return {id: id, joint: joint, maxEffort: usableTorque(margin), maxRate: usableSpeed(volts, margin),
+		var amps = current == null ? rated.ratedCurrent : current;
+		if (!(amps > 0 && amps <= rated.ratedCurrent) || !Math.isFinite(amps))
+			throw "Stepper driver current must be positive and at most the motor's rated current";
+		var scale = amps / rated.ratedCurrent;
+		// At lower current, holding torque scales with current and the reactance corner rises.
+		// Reuse the rated-current curve at the equivalent voltage, then scale its torque points.
+		var curve = pullOutCurve(volts / scale, margin);
+		for (index in 0...Std.int(curve.length / 2)) curve[2 * index + 1] *= scale;
+		var assumed = ["stepper inductance", "rotor inertia"];
+		if (scale != 1) assumed.push("stepper current scaling");
+		return {id: id, joint: joint, maxEffort: usableTorque(margin) * scale, maxRate: usableSpeed(volts / scale, margin),
 			rotorInertia: rated.rotorInertia, fullStepsPerRevolution: 360.0 / rated.stepAngle, drive: "stepper",
-			torqueSpeed: pullOutCurve(volts, margin), holdingTorque: rated.holdingTorque};
+			torqueSpeed: curve, holdingTorque: rated.holdingTorque * scale, assumed: assumed,
+			assumptions: [{quantity: "inertia", label: "rotor inertia"},
+				{quantity: "motor curve", label: "stepper inductance"},
+				{quantity: "speed limit", label: "stepper inductance"}].concat(scale == 1 ? [] :
+				[{quantity: "motor curve", label: "stepper current scaling"},
+				 {quantity: "speed limit", label: "stepper current scaling"}])};
 	}
 
 	/** Shaft speed (rad/s) where the winding's reactance at rated current takes the whole supply. */

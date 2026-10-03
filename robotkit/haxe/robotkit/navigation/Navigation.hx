@@ -284,6 +284,7 @@ class Navigation {
       speed = Math.min(speed,
         Math.pow(maxLateralAcceleration / Math.abs(curvature), 0.5));
     }
+    speed = Math.min(speed, base.pathSpeed(curvature));
     var linearSpeed = direction * speed;
     var angularRate = linearSpeed * curvature;
     if (angularRate > maxAngularSpeed) angularRate = maxAngularSpeed;

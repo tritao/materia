@@ -31,25 +31,25 @@ class DeviceBindingTests {
 
     var model = axisModel();
     // 200 full steps at 16 microsteps a turn, on a 20 kHz step tick.
-    var layout = DeviceLayout.decode(Bytes.ofString('{"channels": [
-      {"index": 0, "actuator": "motor", "direction": -1, "microsteps": 16, "direction_setup_ticks": 2}]}'));
+    var layout = DeviceLayout.decode(Bytes.ofString('{"schemaVersion":1,"channels": [
+      {"index": 0, "actuator": "motor", "direction": -1, "direction_setup_ticks": 2}]}'));
     var binding = DeviceBinding.bind(model, layout, 20000);
     var channel = binding.channels[0];
     near(channel.stepsPerUnit, 3200.0 / (2.0 * Math.PI), "steps per radian from the motor's steps and the driver's microsteps");
     near(channel.ratio, -1.0, "a reversed driver flips the device ratio");
     check(channel.jointIndex == 1 && channel.directionSetupTicks == 2, "the joint comes from the transmission");
     near(channel.maxRate, 20000.0 / channel.stepsPerUnit, "the step tick caps the actuator's rate below its own 100 rad/s");
-    near(model.actuators[0].maxRate, 100.0, "binding leaves the model alone");
-    near(binding.model.actuators[0].maxRate, channel.maxRate, "the tightened model carries the cap");
+    near(model.actuators[0].requireRate(), 100.0, "binding leaves the model alone");
+    near(binding.model.actuators[0].requireRate(), channel.maxRate, "the tightened model carries the cap");
     var leadRatio = Math.PI * 1000.0;
-    near(binding.model.coupledLimits("axis").velocity, channel.maxRate / leadRatio,
+    near(binding.model.coupledLimits("axis").requireVelocity(), channel.maxRate / leadRatio,
       "planning limits see the device's real ceiling through the screw");
-    near(model.coupledLimits("axis").velocity, 100.0 / leadRatio, "an unbound model keeps the actuator's own limit");
+    near(model.coupledLimits("axis").requireVelocity(), 100.0 / leadRatio, "an unbound model keeps the actuator's own limit");
 
     // A slower actuator keeps its own rate; no authored rate takes the ceiling.
     var slow = DeviceBinding.bind(axisModel(10.0), layout, 20000);
     near(slow.channels[0].maxRate, 10.0, "an actuator slower than the step tick keeps its rate");
-    var unlimited = DeviceBinding.bind(axisModel(0.0), layout, 20000);
+    var unlimited = DeviceBinding.bind(axisModel(null), layout, 20000);
     near(unlimited.channels[0].maxRate, 20000.0 / channel.stepsPerUnit, "an unlimited actuator takes the step tick's ceiling");
     var options = binding.virtualActuators();
     check(options.length == 1 && options[0].id == "motor" && options[0].jointIndex == 1 &&
@@ -57,20 +57,18 @@ class DeviceBindingTests {
 
     fails(function() DeviceBinding.bind(model, new DeviceLayout([]), 20000), "from 1 to 64",
       "an empty layout is refused");
-    fails(function() DeviceBinding.bind(model, new DeviceLayout([new DeviceChannel(0, "turn")]), 20000),
-      "names no actuator", "a joint-only channel cannot be wired");
-    fails(function() DeviceBinding.bind(model, new DeviceLayout([new DeviceChannel(0, "", "ghost")]), 20000),
+    fails(function() DeviceBinding.bind(model, new DeviceLayout([new DeviceChannel(0, "ghost")]), 20000),
       "does not have", "a channel for an unknown actuator is refused");
-    fails(function() DeviceBinding.bind(model, new DeviceLayout([new DeviceChannel(0, "axis", "motor")]), 20000),
-      "drives \"turn\"", "a channel that disagrees on the joint is refused");
     fails(function() DeviceBinding.bind(model,
-      new DeviceLayout([new DeviceChannel(0, "", "motor"), new DeviceChannel(1, "", "motor")]), 20000),
+      new DeviceLayout([new DeviceChannel(0, "motor"), new DeviceChannel(1, "motor")]), 20000),
       "from channels 0 and 1", "an actuator on two channels is refused");
-    fails(function() DeviceBinding.bind(model, new DeviceLayout([new DeviceChannel(1, "", "motor")]), 20000),
+    fails(function() DeviceBinding.bind(model, new DeviceLayout([new DeviceChannel(1, "motor")]), 20000),
       "out of order", "channels must be contiguous from zero");
     var second = axisModel();
-    var spare = new Actuator("spare", 0.0, 10.0, Transmission.SimpleTransmission("turn", 1.0, 0.0));
+    var spare = new Actuator("spare", null, 10.0, Transmission.SimpleTransmission("turn", 1.0, 0.0));
     spare.fullStepsPerRevolution = 200.0;
+    spare.microsteps = 16;
+    spare.maxStepRate = 200000;
     second.addActuator(spare);
     fails(function() DeviceBinding.bind(second, layout, 20000), "has no channel",
       "a stepper with no channel is refused, never mapped by default");
@@ -78,15 +76,45 @@ class DeviceBindingTests {
     plain.actuators[0].fullStepsPerRevolution = 0.0;
     fails(function() DeviceBinding.bind(plain, layout, 20000), "not a stepper",
       "a channel on an actuator with no steps is refused");
-    fails(function() DeviceLayout.decode(Bytes.ofString('{"channels": [{"index": 0, "actuator": "motor", "direction": 2}]}')),
+    fails(function() DeviceLayout.decode(Bytes.ofString('{"schemaVersion":1,"channels": [{"index": 0, "actuator": "motor", "direction": 2}]}')),
       "direction", "a direction other than 1 or -1 is refused");
-    fails(function() DeviceLayout.decode(Bytes.ofString('{"channels": [{"index": 0, "actuator": "motor", "microsteps": 0}]}')),
-      "microsteps", "zero microsteps are refused");
+    fails(function() DeviceLayout.decode(Bytes.ofString('{"schemaVersion":1,"channels": [{"index": 0, "actuator": "motor", "microsteps": 0}]}')),
+      "wiring only", "channel microsteps are refused");
+    var settings = axisModel();
+    settings.actuators[0].microsteps = 32;
+    settings.actuators[0].maxStepRate = 200000;
+    var restored = robotkit.model.RobotModelCodec.decode(robotkit.model.RobotModelCodec.encode(settings));
+    check(restored.actuators[0].microsteps == 32 && restored.actuators[0].maxStepRate == 200000,
+      "driver settings survive the robot model codec");
+    var missingDriver = axisModel();
+    missingDriver.actuators[0].microsteps = null;
+    fails(function() DeviceBinding.bind(missingDriver, layout, 40000), "requires microsteps",
+      "a stepper without driver settings is refused");
+    var pulseLimited = axisModel(null);
+    pulseLimited.actuators[0].microsteps = 16;
+    pulseLimited.actuators[0].maxStepRate = 10000;
+    var driverCeiling = 10000.0 * 2 * Math.PI / (200 * 16);
+    near(pulseLimited.actuators[0].requireRate(), driverCeiling,
+      "driver input rate caps the motor before a controller is bound");
+    near(pulseLimited.coupledLimits("axis").requireVelocity(), driverCeiling / leadRatio,
+      "unbound axis planning includes its driver's pulse ceiling");
+    check(pulseLimited.coupledLimits("axis").velocityLimiter == "driver step input",
+      "the axis names its driver speed ceiling");
+    var automatic = DeviceLayout.forActuators(pulseLimited);
+    var fastBoard = DeviceBinding.bind(pulseLimited, automatic, 100000);
+    near(fastBoard.channels[0].maxRate, 10000.0 / fastBoard.channels[0].stepsPerUnit,
+      "a faster board clock respects the driver's maximum pulse rate");
+    var slowBoard = DeviceBinding.bind(pulseLimited, automatic, 5000);
+    near(slowBoard.channels[0].maxRate, 5000.0 / slowBoard.channels[0].stepsPerUnit,
+      "a slower board clock remains the pulse ceiling");
+    check(slowBoard.model.joints[0].limits.velocityLimiter == "controller tick",
+      "the axis names its controller speed ceiling");
+    check(pulseLimited.actuators[0].maxRate == null, "driver binding keeps the source motor speed unspecified");
     return assertions;
   }
 
   /** A carriage on a 2 mm lead screw turned by a 200-step motor that can spin at `rate` rad/s. */
-  static function axisModel(rate:Float = 100.0):RobotModel {
+  static function axisModel(rate:Null<Float> = 100.0):RobotModel {
     var model = new RobotModel("screw axis");
     var base = model.addLink(new Link("base"));
     var carriage = model.addLink(new Link("carriage"));
@@ -94,10 +122,12 @@ class DeviceBindingTests {
     var axis = model.addJoint(new Joint("axis", JointType.Prismatic, base, carriage));
     var turn = model.addJoint(new Joint("turn", JointType.Revolute, base, screw));
     axis.limits = new JointLimits(0, 0.3, 0.08, 400, 0.5);
-    turn.limits = new JointLimits(-1e9, 1e9, 0, 0, 0);
+    turn.limits = new JointLimits(-1e9, 1e9);
     model.addCoupling(new JointCoupling("lead", "axis", "turn", -Math.PI * 1000, 0.0));
     var motor = new Actuator("motor", 0.6, rate, Transmission.SimpleTransmission("turn", 1.0, 0.0));
     motor.fullStepsPerRevolution = 200.0;
+    motor.microsteps = 16;
+    motor.maxStepRate = 200000;
     model.addActuator(motor);
     return model;
   }

@@ -23,6 +23,32 @@ class MotionKitBootstrapTests {
       Sys.println('Circular focused tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
     }
+    if (Sys.getEnv("MOTIONKIT_PLANNER_LIMITS_ONLY") == "1") {
+      plannerTests.testMoveLinearUsesPlannerLimits();
+      Sys.println('Planner limits tests passed (${MotionKitTestSupport.assertions} assertions)');
+      return;
+    }
+    if (Sys.getEnv("MOTIONKIT_CONTINUOUS_JOG_ONLY") == "1") {
+      sessionTests.testContinuousJog();
+      Sys.println('Continuous jog tests passed (${MotionKitTestSupport.assertions} assertions)');
+      return;
+    }
+    if (Sys.getEnv("MOTIONKIT_SESSION_END_ONLY") == "1") {
+      sessionTests.testImmediateMotionReplacesNativeQueue();
+      sessionTests.testSmoothReplacementRetriesLateSubmission();
+      sessionTests.testFreeRunningSmoothReplacement();
+      sessionTests.testContinuousJog();
+      sessionTests.testLateJogReplacementRejectsLateArrival();
+      sessionTests.testPathHoldsStayOnPathWithinLimits();
+      sessionTests.testDualMotorAxisChangesStayWithinJointLimits();
+      Sys.println('Session end tests passed (${MotionKitTestSupport.assertions} assertions)');
+      return;
+    }
+    if (Sys.getEnv("MOTIONKIT_HOLD_ONLY") == "1") {
+      sessionTests.testHoldDecelerationStaysWithinLimitsThroughoutMove();
+      Sys.println('Hold limit tests passed (${MotionKitTestSupport.assertions} assertions)');
+      return;
+    }
     if (Sys.getEnv("MOTIONKIT_BLEND_ONLY") == "1") {
       plannerTests.testToleranceBlend();
       Sys.println('Blend focused tests passed (${MotionKitTestSupport.assertions} assertions)');
@@ -30,6 +56,9 @@ class MotionKitBootstrapTests {
     }
     if (Sys.getEnv("MOTIONKIT_PLANCHECK_ONLY") == "1") {
       new PlanCheckTests().testPlanCheck();
+      new PlanCheckTests().testStepperSlip();
+      new PlanCheckTests().testEncoderSeesStepperSlip();
+      new PlanCheckTests().testLoadSideEncoderReportsPathError();
       new PlanCheckTests().testCompilerRunsPlanCheck();
       Sys.println('Plan check tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
@@ -39,6 +68,13 @@ class MotionKitBootstrapTests {
       processTests.testCompiledXYZGantryRunsThroughSimulation();
       processTests.testMachineKitLeadScrewThroughVirtualDevice();
       Sys.println('MachineKit compiler tests passed (${MotionKitTestSupport.assertions} assertions)');
+      return;
+    }
+    if (Sys.getEnv("MOTIONKIT_COREXY_ONLY") == "1") {
+      new CoreXyTests().testTwoBeltCompliance();
+      new CoreXyTests().testPlotterDrawsASquare();
+      new CoreXyTests().testPlanCheckAddsTheAxesOnASharedMotor();
+      Sys.println('CoreXY tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
     }
     if (Sys.getEnv("MOTIONKIT_REDUNDANCY_ONLY") == "1") {
@@ -56,7 +92,13 @@ class MotionKitBootstrapTests {
       return;
     }
     new PlanCheckTests().testPlanCheck();
+    new PlanCheckTests().testStepperSlip();
+    new PlanCheckTests().testEncoderSeesStepperSlip();
+    new PlanCheckTests().testLoadSideEncoderReportsPathError();
     new PlanCheckTests().testCompilerRunsPlanCheck();
+    new CoreXyTests().testTwoBeltCompliance();
+    new CoreXyTests().testPlotterDrawsASquare();
+    new CoreXyTests().testPlanCheckAddsTheAxesOnASharedMotor();
     processTests.testPoseProcessPath();
     processTests.testMotionEventContracts();
     kinematicsTests.testKinematicsContract();

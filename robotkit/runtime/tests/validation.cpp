@@ -16,7 +16,9 @@ int main() {
         blueprint.links[i].inertia_tensor[0] = blueprint.links[i].inertia_tensor[4] = blueprint.links[i].inertia_tensor[8] = 1.0;
     }
     blueprint.joints[0] = {0, RK_RUNTIME_JOINT_REVOLUTE, 0, 1, -1.0, 1.0, 3.0};
+    blueprint.joints[0].limit_flags |= RK_LIMIT_EFFORT;
     blueprint.joints[1] = {1, RK_RUNTIME_JOINT_REVOLUTE, 1, 2, -1.0, 1.0, 3.0};
+    blueprint.joints[1].limit_flags |= RK_LIMIT_EFFORT;
     for (auto &joint : blueprint.joints) {
         joint.parent_frame_rotation[3] = joint.child_frame_rotation[3] = 1.0;
         joint.axis[2] = 1.0;
@@ -97,6 +99,56 @@ int main() {
     plan.start_position[1] = -0.2;
     assert(robotkit::validate_plan_for_blueprint(plan, blueprint) == RK_ERROR_INVALID_ARGUMENT);
     blueprint.coupling_count = 0;
+
+    // A follower with two couplings is the sum of their terms: 2 a - 3 b + 0.1 + 0.05.
+    auto multi = blueprint;
+    multi.joint_count = 3;
+    multi.link_count = 4;
+    multi.links[3] = multi.links[2];
+    multi.joints[2] = {2, RK_RUNTIME_JOINT_REVOLUTE, 2, 3, -10.0, 10.0, 3.0};
+    multi.joints[2].limit_flags |= RK_LIMIT_EFFORT;
+    multi.joints[2].parent_frame_rotation[3] = multi.joints[2].child_frame_rotation[3] = 1.0;
+    multi.joints[2].axis[2] = 1.0;
+    multi.coupling_count = 2;
+    multi.couplings[0] = {0, 2, 2.0, 0.1};
+    multi.couplings[1] = {1, 2, -3.0, 0.05};
+    assert(rk_robot_runtime_blueprint_validate(&multi) == RK_OK);
+    multi.couplings[multi.coupling_count++] = {0, 2, 1.0, 0.0};
+    assert(rk_robot_runtime_blueprint_validate(&multi) == RK_ERROR_INVALID_ARGUMENT);
+    multi.coupling_count = 2;
+    multi.couplings[multi.coupling_count++] = {2, 0, 1.0, 0.0};
+    assert(rk_robot_runtime_blueprint_validate(&multi) == RK_ERROR_INVALID_ARGUMENT);
+    multi.coupling_count = 2;
+    rk_robot_command sum{};
+    sum.struct_size = sizeof(sum);
+    sum.sequence = 1;
+    sum.kind = RK_COMMAND_JOINT_TARGETS;
+    sum.target_count = 3;
+    sum.targets[0] = {0, RK_TARGET_POSITION, 0.2, 2.0, 3.0};
+    sum.targets[1] = {1, RK_TARGET_POSITION, -0.1, 2.0, 3.0};
+    sum.targets[2] = {2, RK_TARGET_POSITION, 0.85, 2.0, 3.0};
+    assert(rk_robot_command_validate_for_blueprint(&sum, &multi) == RK_OK);
+    sum.targets[2].target = 0.8;
+    assert(rk_robot_command_validate_for_blueprint(&sum, &multi) == RK_ERROR_INVALID_ARGUMENT);
+    sum.targets[2].target = 0.85;
+    sum.target_count = 2;
+    sum.targets[1] = sum.targets[2];
+    assert(rk_robot_command_validate_for_blueprint(&sum, &multi) == RK_ERROR_INVALID_ARGUMENT);
+    robotkit::SegmentBatch summed{};
+    summed.segments.resize(1);
+    summed.segments[0].duration_ns = 10'000'000;
+    summed.segments[0].degree = 1;
+    summed.segments[0].joint_count = 3;
+    summed.segments[0].coefficients[0].value[0] = 0.2;
+    summed.segments[0].coefficients[0].value[1] = 1.0;
+    summed.segments[0].coefficients[1].value[0] = -0.1;
+    summed.segments[0].coefficients[1].value[1] = -2.0;
+    summed.segments[0].coefficients[2].value[0] = 0.85;
+    summed.segments[0].coefficients[2].value[1] = 2.0 * 1.0 + -3.0 * -2.0;
+    assert(robotkit::validate_segments_for_blueprint(summed, multi) == RK_OK);
+    summed.segments[0].coefficients[2].value[1] += 0.5;
+    assert(robotkit::validate_segments_for_blueprint(summed, multi) == RK_ERROR_INVALID_ARGUMENT);
+
     trajectory.segments[0].time_from_start_ns = 1;
     assert(robotkit::validate_segments(trajectory) == RK_ERROR_INVALID_ARGUMENT);
     trajectory.segments[0].time_from_start_ns = 0;

@@ -7,7 +7,6 @@ import materia.assembly.AssemblyDefinition.AssemblyStateRecord;
 import materia.assembly.AssemblyBodies;
 import materia.assembly.AssemblyDefinitionCodec;
 import materia.assembly.AssemblyFrames;
-import materia.assembly.AssemblyRecord;
 import materia.project.Appearance.Appearances;
 import materia.project.MaterialLibrary;
 import materia.project.MaterialDef;
@@ -48,16 +47,6 @@ class ProjectKitTests {
 
   static function assembly():Void {
     var frame = AssemblyFrames.identity();
-    var legacy:AssemblyRecord = {instances: [
-      {id: "base", pose: frame, connectors: [{name: "pin", frame: frame}]},
-      {id: "arm", pose: frame, connectors: [{name: "pin", frame: frame}]}],
-      joints: [{id: "hinge", kind: "revolute", parent: "base", parentConnector: "pin",
-        child: "arm", childConnector: "pin", value: 0.5}]};
-    near(AssemblyCodec.decode(AssemblyCodec.encode(legacy)).joints[0].value, 0.5,
-      "legacy assembly round trip");
-    legacy.instances[1].id = "base";
-    rejects(function() AssemblyCodec.encode(legacy), "duplicate legacy ID");
-
     var model = definition();
     var decoded = AssemblyDefinitionCodec.decode(AssemblyDefinitionCodec.encode(model));
     check(decoded.joints[0].role == AssemblyJointRole.Tree, "tree role round trip");
@@ -72,13 +61,6 @@ class ProjectKitTests {
       AssemblyDefinitionCodec.encodeState(model, state));
     near(restored.jointCoordinates[0].value, 0.25, "state coordinate round trip");
     near(restored.rootPoses[0].pose.z, 3, "state root round trip");
-    // The older JSON form, keyed by field name with a schemaVersion, is refused with its reason.
-    check(refusal(function() AssemblyDefinitionCodec.decode(
-        '{"schemaVersion":1,"id":"fixture","definitions":[],"occurrences":[],"joints":[]}'))
-      .indexOf("old JSON format") >= 0, "old definition JSON refused with a reason");
-    check(refusal(function() AssemblyDefinitionCodec.decodeState(model,
-        '{"schemaVersion":1,"definition":"fixture","jointCoordinates":[],"rootPoses":[]}'))
-      .indexOf("old JSON format") >= 0, "old state JSON refused with a reason");
     state.jointCoordinates[0].value = 2;
     rejects(function() AssemblyDefinitionCodec.encodeState(model, state),
       "state outside joint limits");
@@ -146,11 +128,7 @@ class ProjectKitTests {
     data.parts.pop(); data.parts[0].indices.setInt32(0, 99);
     rejects(function() SceneArtifact.encode(data), "out of range mesh index");
     data.parts[0].indices.setInt32(0, 0);
-    for (version in 2...6) {
-      var legacy = legacyScene(version, vertices, normals, indices);
-      check(SceneArtifact.decode(legacy).parts[0].id == "part",
-        'scene version $version reader');
-    }
+
   }
 
   /** A mobile base names its robot's wheel joints and carries positive dimensions and limits. */
@@ -181,15 +159,6 @@ class ProjectKitTests {
     check(restored.leftWheel == "wheel_l" && restored.rightWheel == "wheel_r" && restored.wheelRadius == 0.075 &&
       restored.trackWidth == 0.3 && restored.maxAngularAcceleration == 1.5 && restored.footprintWidth == 0.44,
       "mobile base round trip");
-    // A version 12 scene is the same bytes without the trailing mobile-base and mission sections.
-    data.mobileBase = null;
-    var plain = SceneArtifact.encode(data);
-    var older = Bytes.alloc(plain.length - 16);
-    older.blit(0, plain, 0, older.length);
-    older.setInt32(4, 12);
-    var read = SceneArtifact.decode(older);
-    var readDefinition:AssemblyDefinition = cast read.assemblyDefinition;
-    check(read.mobileBase == null && readDefinition.id == "robot", "scene version 12 reader");
     data.mobileBase = base;
     base.rightWheel = "lift";
     rejects(function() SceneArtifact.encode(data), "mobile base wheel on a sliding joint");
@@ -256,14 +225,6 @@ class ProjectKitTests {
     data.robotSensors[0].rayCount = 64; data.robotSensors.push({kind: "lidar", id: "chassis/scanner",
       mount: {occurrence: "chassis", connector: "pin"}, rayCount: 64, maxRange: 6.0, updateRate: 10.0});
     rejects(function() SceneArtifact.encode(data), "two sensors with one id");
-    // A version 13 artifact has no sensors section: it still reads, without sensors.
-    data.robotSensors = null;
-    var current = SceneArtifact.encode(data);
-    var thirteen = Bytes.alloc(current.length - 4);
-    thirteen.blit(0, current, 0, thirteen.length);
-    thirteen.setInt32(4, 13);
-    check(SceneArtifact.decode(thirteen).robotSensors == null && SceneArtifact.decode(thirteen).mobileBase != null,
-      "version 13 scene artifacts still read");
     data.mobileBase = null;
     rejects(function() SceneArtifact.encode(data), "driving mission without a mobile base");
     data.mobileBase = base; data.mission = null; data.assemblyDefinition = null;
@@ -447,7 +408,7 @@ class ProjectKitTests {
       axes: ["x", "y", "z"], spindle: "spindle", workOffset: [0.1, 0.1, -0.05],
       tools: [{number: 1, length: 0.03, profile: [[0.0, 0.0, 0.0, 0.0, 0.003, 0.0], [0.0, 0.0, 0.003, 0.0, 0.003, 0.02]]}],
       stock: "bed", sacrificial: ["gantry"], toolPart: "spindle", loadedTool: 1, target: "finished", loop: true,
-      controller: {microsteps: 16, stepTickHz: 40000}};
+      controller: {stepTickHz: 40000}};
     var data:materia.project.SceneArtifact.SceneArtifactData = {lengthUnit: "mm", metresPerUnit: 0.001,
       parts: [part("body"), part("finished")], assemblyDefinition: machine, machining: job};
     var restored = SceneArtifact.decode(SceneArtifact.encode(data)).machining;
@@ -458,13 +419,15 @@ class ProjectKitTests {
     check(restored.tools.length == 1 && restored.tools[0].number == 1 && restored.tools[0].length == 0.03 &&
       restored.tools[0].profile[1][5] == 0.02, "machining tool table round trip");
     var wiring = restored.controller;
-    check(wiring != null && wiring.microsteps == 16 && wiring.stepTickHz == 40000, "machining controller round trip");
-    job.controller = {microsteps: 0, stepTickHz: 40000};
-    rejects(function() SceneArtifact.encode(data), "machining controller with no microsteps");
+    check(wiring != null && wiring.stepTickHz == 40000, "machining controller round trip");
+    check(haxe.Json.stringify(restored.controller).indexOf("microsteps") < 0,
+      "machining jobs do not save driver microstepping");
+    job.controller = {stepTickHz: 0};
+    rejects(function() SceneArtifact.encode(data), "machining controller with no step rate");
     Reflect.deleteField(job, "controller");
     var bare = SceneArtifact.decode(SceneArtifact.encode(data)).machining;
     check(bare != null && bare.controller == null, "a job names no controller unless it is given one");
-    job.controller = {microsteps: 16, stepTickHz: 40000};
+    job.controller = {stepTickHz: 40000};
     job.spindle = "missing";
     rejects(function() SceneArtifact.encode(data), "machining spindle outside the assembly");
     job.spindle = "spindle"; job.axes = ["x", "x", "z"];
@@ -479,29 +442,6 @@ class ProjectKitTests {
     rejects(function() SceneArtifact.encode(data), "machining job without its machine");
   }
 
-  static function legacyScene(version:Int, vertices:Bytes, normals:Bytes, indices:Bytes):Bytes {
-    var size = 20 + 8 + 8 + 12 + 12 + (version >= 4 ? 4 : 0) +
-      vertices.length + normals.length + indices.length + (version >= 3 ? 4 : 0);
-    var bytes = Bytes.alloc(size), at = 0;
-    for (byte in [77, 84, 82, 71]) bytes.set(at++, byte);
-    bytes.setInt32(at, version); at += 4;
-    bytes.setDouble(at, 0.001); at += 8;
-    bytes.setInt32(at, 1); at += 4;
-    for (name in ["part", "Part"]) {
-      bytes.setInt32(at, name.length); at += 4;
-      var value = Bytes.ofString(name);
-      bytes.blit(at, value, 0, value.length); at += value.length;
-    }
-    for (color in [0.2, 0.3, 0.4]) { bytes.setFloat(at, color); at += 4; }
-    for (count in [4, 12, 0]) { bytes.setInt32(at, count); at += 4; }
-    if (version >= 4) { bytes.setInt32(at, 0); at += 4; }
-    for (stream in [vertices, normals, indices]) {
-      bytes.blit(at, stream, 0, stream.length); at += stream.length;
-    }
-    if (version >= 3) { bytes.setInt32(at, 0); at += 4; }
-    check(at == size, "legacy scene fixture size");
-    return bytes;
-  }
 
   static function bodies():Void {
     var frame = AssemblyFrames.identity();

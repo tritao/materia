@@ -5,7 +5,8 @@
   },
   "entry": "MotionKitBootstrapTests",
   "sourceRoots": [
-    "src"
+    "src",
+    "../../machinekit/examples/corexy"
   ],
   "dependencies": {
     "cadbridge": {

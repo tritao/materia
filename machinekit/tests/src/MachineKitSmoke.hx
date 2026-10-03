@@ -9,6 +9,7 @@ import RobotArmPreview.RobotArmChecks;
 import CncRouterPreview.CncRouterChecks;
 import MobileBasePreview.MobileBaseChecks;
 import RobotWelderPreview.RobotWelderChecks;
+import CoreXyPlotterPreview.CoreXyPlotterChecks;
 import machinekit.assembly.AssemblyPreview;
 import machinekit.assembly.LinearAxis;
 import machinekit.assembly.MachineAssembly;
@@ -649,55 +650,6 @@ class MachineKitSmoke {
 		var loaded = DocumentCodec.decode(saved);
 		check(MachineKitDocuments.bom(loaded).lines().length == 2, "recipe BOM survives save and reload");
 		loaded.close();
-		var legacyTools:Dynamic = haxe.Json.parse(saved);
-		var legacyToolDefinitions:Array<Dynamic> = cast Reflect.field(legacyTools, "definitions");
-		var removedToolInputs = 0;
-		for (record in legacyToolDefinitions) {
-			var inputs:Array<Dynamic> = cast Reflect.field(record, "inputs");
-			var kept:Array<Dynamic> = [];
-			for (input in inputs) {
-				var name:String = Reflect.field(input, "name");
-				if (StringTools.startsWith(name, "tool_")) removedToolInputs++;
-				else kept.push(input);
-			}
-			Reflect.setField(record, "inputs", kept);
-		}
-		check(removedToolInputs > 0, "legacy recipe fixture removes typed tool inputs");
-		var legacyToolsDocument = DocumentCodec.decode(haxe.Json.stringify(legacyTools));
-		var legacyBearing = legacyToolsDocument.createInstance("Legacy bearing",
-			legacyToolsDocument.definition(first.definitionId));
-		check(legacyToolsDocument.definitionOutput(legacyBearing, "bearingSeat").volume() > 0,
-			"legacy recipe evaluates newly parameterized tools from defaults");
-		legacyToolsDocument.close();
-		var legacy:Dynamic = haxe.Json.parse(saved);
-		Reflect.setField(legacy, "version", 7);
-		var legacyDefinitions:Array<Dynamic> = cast Reflect.field(legacy, "definitions");
-		for (record in legacyDefinitions) {
-			var legacyOutputs:Array<Dynamic> = cast Reflect.field(record, "outputs");
-			legacyOutputs.push({name: "back", purpose: "connector"});
-			var legacyProperties:Array<Dynamic> = cast Reflect.field(record, "properties");
-			if (legacyProperties != null)
-				legacyProperties.push({name: "machinekit.partNumber", type: "text", value: "stale"});
-		}
-		var loadedLegacy = DocumentCodec.decode(haxe.Json.stringify(legacy));
-		check(loadedLegacy.definition(first.definitionId).outputs().length == definition.outputs().length,
-			"version 7 connector outputs are discarded");
-		check(loadedLegacy.definition(first.definitionId).property("machinekit.partNumber") == null,
-			"version 7 derived metadata is discarded");
-		loadedLegacy.close();
-		var versionEight:Dynamic = haxe.Json.parse(saved);
-		Reflect.setField(versionEight, "version", 8);
-		var versionEightDefinitions:Array<Dynamic> = cast Reflect.field(versionEight, "definitions");
-		for (record in versionEightDefinitions) {
-			var properties:Dynamic = Reflect.field(record, "properties");
-			var keptProperties:Array<Dynamic> = properties == null ? [] : cast properties;
-			keptProperties.push({name: "machinekit.partNumber", type: "text", value: "version-eight"});
-			Reflect.setField(record, "properties", keptProperties);
-		}
-		var loadedVersionEight = DocumentCodec.decode(haxe.Json.stringify(versionEight));
-		check(loadedVersionEight.definition(first.definitionId).property("machinekit.partNumber") != null,
-			"legacy property cleanup only runs for version 7");
-		loadedVersionEight.close();
 		check(document.undo() && second.resolvedToken("designation") == "608", "recipe override undo");
 		check(MachineKitDocuments.bom(document).quantity("608-2Z") == 2, "BOM follows undo");
 		check(document.redo() && second.resolvedToken("designation") == "6000", "recipe override redo");
@@ -1398,8 +1350,8 @@ class MachineKitSmoke {
 		part.close();
 
 		var pinion = new SpurGear(2, 18, 12);
-		throws(() -> pinion.centerDistance(new SpurGear(2.5, 20, 12)), "share a module");
-		throws(() -> GearPair.mesh(pinion, new SpurGear(2, 20, 12, 25 * Math.PI / 180)), "share a pressure angle");
+		throws(() -> pinion.centerDistance(new SpurGear(2.5, 20, 12)), "different modules");
+		throws(() -> GearPair.mesh(pinion, new SpurGear(2, 20, 12, 25 * Math.PI / 180)), "different pressure angles");
 		var pair = GearPair.mesh(pinion, gear);
 		MachineAssemblyDescriptionTests.roundTrip(pair, "gear pair");
 		near(pair.centerDistance, (pinion.pitchDiameter + gear.pitchDiameter) / 2, "gear pair centre distance");
@@ -1436,7 +1388,7 @@ class MachineKitSmoke {
 		throws(() -> GearPair.mesh(
 			new SpurGear(2, 40, 12, SpurGear.STANDARD_PRESSURE_ANGLE, -0.9),
 			new SpurGear(2, 40, 12, SpurGear.STANDARD_PRESSURE_ANGLE, -0.9)),
-			"invalid operating pressure angle");
+			"compatible profile shifts");
 		var shiftedASolid = shiftedPair.a.geometry(), shiftedBSolid = shiftedPair.b.geometry();
 		var shiftedMaxPenetration = 0.0;
 		for (sample in 0...9) {
@@ -2607,10 +2559,16 @@ class MachineKitSmoke {
 		EndEffectorExampleChecks.run();
 		RobotArmChecks.run();
 		CncRouterChecks.run();
+		FoldedZRouterCheck.main();
 		MobileBaseChecks.run();
 		RobotWelderChecks.run();
+		CoreXyPlotterChecks.run();
+		CoreXyDriveTests.run();
 		assemblyPreviewSharing();
 		RecipeContractTests.run();
+		MotorDriverTests.run();
+		PowerSupplyTests.run();
+		GearboxTests.run();
 		componentRecipes();
 		documentRecipes();
 		documentPreview();

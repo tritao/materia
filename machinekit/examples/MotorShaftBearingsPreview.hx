@@ -105,7 +105,7 @@ class MotorShaftBearingsPreview {
 		AssemblyPreview.shareDefinitions(definition, definitionByOccurrence);
 		return SceneArtifact.encode({lengthUnit: "mm",
 			metresPerUnit: LengthUnit.metresPerUnit("mm"), parts: parts,
-			assembly: model.record(), assemblyDefinition: definition,
+			assemblyDefinition: definition,
 			assemblyState: state, recipeDocument: DocumentCodec.encode(editable), recipeDiagnostics: diagnostics});
 	}
 

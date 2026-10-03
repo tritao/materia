@@ -13,7 +13,7 @@ class Link {
   public var collisionShapes:Array<CollisionShape> = [];
 
   public function new(name:String, ?id:LinkId) {
-    // Legacy callers use the initial name once; imports pass the stored ID.
+    // Authors can use the initial name once; imports pass the stored ID.
     this.id = id == null ? name : id;
     this.name = name;
   }

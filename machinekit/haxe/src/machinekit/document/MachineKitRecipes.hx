@@ -22,19 +22,12 @@ import machinekit.component.ToolSpec;
 
 /** CadKit evaluator registration for editable MachineKit single-part recipes. */
 class MachineKitRecipes {
-	/** Document version since which edited defaults are recorded explicitly (older ones are recovered). */
-	static inline var EDITED_DEFAULTS_VERSION:Int = 9;
 
 	static var evaluators:Map<String, MachineKitRecipeEvaluator> = [];
 	static var components:Map<String, {key:String, component:MachineComponent}> = [];
 	static var watchedDocuments:Map<String, Bool> = [];
-	static var legacyMigrationRegistered:Bool = false;
 
 	public static function register():Void {
-		if (!legacyMigrationRegistered) {
-			DocumentCodec.registerMigration("machinekit.legacy-derived-properties", migrateLegacyProperties);
-			legacyMigrationRegistered = true;
-		}
 		for (type in MachineKitComponents.all()) {
 			var evaluator = evaluators.get(type.id);
 			if (evaluator == null) {
@@ -101,7 +94,7 @@ class MachineKitRecipes {
 		for (input in definition.inputs()) inputNames.set(input.name, true);
 		for (parameter in tool.parameters()) {
 			var name = ToolSpec.inputName(tool.name, parameter.name);
-			if (!inputNames.exists(name)) continue;
+			if (!inputNames.exists(name)) throw 'Recipe tool input "$name" is missing';
 			var raw = instance.resolvedValue(name);
 			switch parameter.type {
 			case Optional(inner): setOptional(values, parameter.name, inner, cast raw);
@@ -139,7 +132,6 @@ class MachineKitRecipes {
 			var previous = sys.FileSystem.exists(tracePath) ? sys.io.File.getContent(tracePath) : "";
 			sys.io.File.saveContent(tracePath, previous + "reconcile\n");
 		}
-		var savedVersion = documentVersion(savedText);
 		var saved:cadkit.parametric.Document;
 		try saved = DocumentCodec.decode(savedText) catch (error:Dynamic) throw error;
 		try {
@@ -219,7 +211,6 @@ class MachineKitRecipes {
 			}
 
 			var processedDefaults:Map<String, Bool> = new Map();
-			var reportedLegacyDefaults = false;
 			for (entry in entries) {
 				var groupKey = entry.freshDefinition.id.value + ":" + entry.oldDefinition.id.value;
 				var definition = targetDefinitions.get(groupKey);
@@ -249,13 +240,7 @@ class MachineKitRecipes {
 							diagnostics.push('Saved input "${input.name}" on "${entry.id}" is no longer valid: ${Std.string(error)}');
 							continue;
 						}
-						var legacyEdit = savedVersion < EDITED_DEFAULTS_VERSION
-							&& Std.string(normalized) != Std.string(input.defaultValue);
-						if (legacyEdit && !reportedLegacyDefaults) {
-							diagnostics.push('Saved defaults were recovered from a pre-v9 project; re-save this project to record edited defaults explicitly');
-							reportedLegacyDefaults = true;
-						}
-						if (oldInput.editedByUser || legacyEdit)
+						if (oldInput.editedByUser)
 							definition.setUserEditedTypedDefault(input.name, value);
 					}
 					for (oldInput in entry.oldDefinition.inputs())
@@ -320,11 +305,6 @@ class MachineKitRecipes {
 		return Json.stringify({recipe: definition.recipe, values: values});
 	}
 
-	static function documentVersion(text:String):Int {
-		var root:Dynamic = Json.parse(text), version:Dynamic = Reflect.field(root, "version");
-		if (!Std.isOfType(version, Int)) throw "Saved recipe document has no integer version";
-		return cast version;
-	}
 
 	static function watchDocument(document:cadkit.parametric.Document, identity:String):Void {
 		if (watchedDocuments.exists(identity)) return;
@@ -338,15 +318,6 @@ class MachineKitRecipes {
 		});
 	}
 
-	static function migrateLegacyProperties(document:cadkit.parametric.Document, version:Int):Void {
-		if (version != 7) return;
-		var derived = ["machinekit.partNumber", "machinekit.material", "machinekit.catalog.source",
-			"machinekit.catalog.designation"];
-		for (definition in document.allDefinitions())
-			for (name in derived) if (definition.property(name) != null) definition.restoreProperty(name, null);
-		for (element in document.allElements())
-			for (name in derived) if (element.property(name) != null) element.restoreProperty(name, null);
-	}
 }
 
 private typedef RecipeReconcileEntry = {

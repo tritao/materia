@@ -167,7 +167,34 @@ import robotkit.skill.SkillRunner;
 class RobotWorldTests {
   static var assertions = 0;
 
+  /** Rewrite authored current models/layouts through their codecs; unsupported versions stay rejection fixtures. */
+  static function regenerateFixtures(directory:String):Void {
+    for (name in sys.FileSystem.readDirectory(directory)) {
+      var path = directory + "/" + name;
+      if (sys.FileSystem.isDirectory(path)) regenerateFixtures(path);
+      else if (StringTools.endsWith(name, ".json")) {
+        var value:Dynamic = haxe.Json.parse(sys.io.File.getContent(path));
+        if (Reflect.field(value, "schemaVersion") == RobotModel.CURRENT_VERSION && Reflect.hasField(value, "links")) {
+          var model = RobotModelCodec.decode(sys.io.File.getBytes(path));
+          sys.io.File.saveBytes(path, RobotModelCodec.encode(model));
+        } else if (Reflect.field(value, "schemaVersion") == DeviceLayout.VERSION && Reflect.hasField(value, "channels") && !Reflect.hasField(value, "device") && !Reflect.hasField(value, "model")) {
+          var layout = DeviceLayout.decode(sys.io.File.getBytes(path));
+          sys.io.File.saveBytes(path, DeviceLayout.encode(layout));
+        }
+      }
+    }
+  }
+
+
   public static function main():Void {
+    if (Sys.getEnv("ROBOTKIT_REGENERATE_FIXTURES") == "1") {
+      var root = Sys.getCwd();
+      if (!sys.FileSystem.exists(root + "/robotkit/tests/fixtures")) root += "/../..";
+      regenerateFixtures(root + "/robotkit/tests/fixtures");
+      regenerateFixtures(root + "/robotkit/deployment/bench-nucleo-g474re");
+      Sys.println("Current RobotKit fixtures regenerated");
+      return;
+    }
     // ROBOTKIT_ONLY=construction runs just the construction skills (they plan arm motions through MotionKit).
     if (Sys.getEnv("ROBOTKIT_ONLY") == "construction") {
       Sys.println('RobotKit construction skills passed (${ConstructionSkillTests.run()} assertions)');
@@ -184,6 +211,7 @@ class RobotWorldTests {
     testMobileLayer();
     testModelDrivenConfiguration();
     testRobotModelCodec();
+    testEncoders();
     testMjcfWalkerImport();
     testUrdfWalkerImport();
     testLocalization();
@@ -699,6 +727,16 @@ class RobotWorldTests {
         Math.abs(targets[1].target - 4.0) < 1e-9;
       case _: false;
     }, "MobileBase factory commands the joints selected by authored roles");
+    check(mobile.velocityEnvelope != null, "wheel rates supply a coupled velocity envelope");
+    var previousTwist = mobile.currentCommand();
+    var turning = mobile.command(new Twist2(1.0, 2.0), 0.01);
+    check(Math.abs(turning.linear - previousTwist.linear) <= mobile.motionLimits.maxLinearAcceleration * 0.01 + 1e-9 &&
+      Math.abs(turning.angular - previousTwist.angular) <= mobile.motionLimits.maxAngularAcceleration * 0.01 + 1e-9,
+      "coupled wheel-speed limiting must not jump past the acceleration limit in one tick");
+    var wheelEnvelope = mobile.velocityEnvelope;
+    if (wheelEnvelope == null) throw "Mobile base lost its wheel envelope";
+    check(Math.abs(turning.linear) + Math.abs(turning.angular) * wheelEnvelope.trackWidth / 2 <= wheelEnvelope.groundSpeed + 1e-9,
+      "the acceleration-limited command remains inside the wheel-speed envelope");
 
     var forks = Forks.fromRobot(robot, model);
     var blueprintForks = Forks.fromBlueprint(robot, blueprint);
@@ -799,6 +837,55 @@ class RobotWorldTests {
     rightWheel.axis = [0.0, 1.0, 0.0];
   }
 
+  /** Encoders are sensors on joints that read quantised counts, saved with the model and found through the motors that name them. */
+  static function testEncoders():Void {
+    var model = new RobotModel("encoded");
+    var base = model.addLink(new Link("base"));
+    var arm = model.addLink(new Link("arm"));
+    var turn = model.addJoint(new Joint("turn", JointType.Continuous, base, arm));
+    turn.limits = new JointLimits(-1e9, 1e9);
+    var servo = new Actuator("servo", null, null, Transmission.SimpleTransmission("turn", 1.0, 0.0));
+    servo.drive = new robotkit.model.ActuatorDrive.ServoDrive(0.3, 1.2, 100.0, 200.0, 1e-5, 2048.0);
+    model.addActuator(servo);
+    var plain = RobotModelCodec.encode(model).toString();
+    check(plain.indexOf("encoders") < 0, "a model without encoders keeps its bytes");
+    check(model.encoderFor(servo) == null, "feedback requires a wired encoder sensor");
+    var shaft = model.addEncoder(robotkit.model.Encoder.perRevolution("shaft", "turn", robotkit.model.EncoderKind.Incremental, 4096.0, true));
+    var absolute = model.addEncoder(robotkit.model.Encoder.perRevolution("pulley", "turn", robotkit.model.EncoderKind.Absolute, 1024.0));
+    servo.encoder = "shaft";
+    servo.efficiency = 0.85;
+    check(model.encoderFor(servo) == shaft, "a motor that names an encoder reads that one");
+    check(RobotModelCodec.encode(model).toString() != plain, "encoders are saved");
+    var restored = RobotModelCodec.decode(RobotModelCodec.encode(model));
+    check(restored.encoders.length == 2 && restored.encoders[0].index && !restored.encoders[1].index &&
+      restored.encoders[1].kind == robotkit.model.EncoderKind.Absolute && restored.actuators[0].encoder == "shaft" && restored.actuators[0].efficiency == 0.85 &&
+      Math.abs(restored.encoders[0].countsPerUnit - 4096.0 / (2.0 * Math.PI)) < 1e-9, "encoders and a motor's reference round-trip");
+    equal(RobotModelCodec.encode(restored).toString(), RobotModelCodec.encode(model).toString(), "and byte for byte");
+    model.addEncoder(robotkit.model.Encoder.perRevolution("shaft", "turn", robotkit.model.EncoderKind.Incremental, 1.0));
+    var duplicated = false;
+    try RobotModelCodec.encode(model) catch (_:Dynamic) duplicated = true;
+    check(duplicated, "a duplicate encoder id is refused");
+    model.encoders.pop();
+
+    // Counts are whole counts from power-up (incremental) or from zero (absolute); an index pulse marks each turn.
+    var power = 0.3;
+    var counted = new robotkit.model.EncoderReading(shaft, power);
+    counted.sample(power + 2.0 * Math.PI * 2.5);
+    equal(counted.count, 4096.0 * 2.5, "an incremental encoder counts from where it powered up");
+    check(counted.indexPulses == 2, "and passes an index pulse each turn");
+    counted.sample(power + 0.1 * shaft.resolution());
+    equal(counted.count, 0.0, "a tenth of a count reads as none");
+    counted.sample(power + 0.6 * shaft.resolution());
+    equal(counted.count, 1.0, "and 0.6 of one as one");
+    var counts = new robotkit.model.EncoderReading(absolute, power);
+    counts.sample(1.0);
+    equal(counts.count, Math.fround(1.0 * 1024.0 / (2.0 * Math.PI)), "an absolute encoder counts from the joint's zero");
+    check(Math.abs(counts.position() - 1.0) <= 0.5 * absolute.resolution(), "its position is within half a count of the joint's");
+    var invalid = false;
+    try new robotkit.model.Encoder("bad", "turn", robotkit.model.EncoderKind.Incremental, 0.0) catch (_:Dynamic) invalid = true;
+    check(invalid, "an encoder needs a resolution");
+  }
+
   static function testRobotModelCodec():Void {
     var source = configuredForkliftModel();
     source.collisionApproximation = robotkit.model.CollisionApproximation.None;
@@ -841,6 +928,8 @@ class RobotWorldTests {
     source.couplings[0].backlash = 1.0e-4;
     source.couplings[0].drag = 0.02;
     source.actuators[0].fullStepsPerRevolution = 200.0;
+    source.actuators[0].microsteps = 16;
+    source.actuators[0].maxStepRate = 200000;
     source.actuators[0].servoDamping = 2.0;
     // A bare stepper writes only its steps, as models did before drive kinds; one with ratings writes its drive.
     var bare = RobotModelCodec.decode(RobotModelCodec.encode(source));
@@ -851,6 +940,12 @@ class RobotWorldTests {
       new robotkit.model.TorqueSpeedCurve([0.0, 100.0, 400.0], [1.26, 1.26, 0.315]));
     if (source.actuators.length > 1) source.actuators[1].drive = new robotkit.model.ActuatorDrive.ServoDrive(0.64, 1.9, 314.0, 500.0, 2e-5, 4096.0);
 
+    check(RobotModelCodec.encode(source).toString().indexOf('"assumed"') < 0,
+      "models without provenance keep the field absent");
+    source.couplings[0].assumed = ["belt stiffness", "belt drag"];
+    source.couplings[0].assumptions = [{quantity: "stiffness", label: "belt stiffness"}, {quantity: "drag", label: "belt drag"}];
+    source.actuators[0].assumed = ["rotor inertia"];
+    source.actuators[0].assumptions = [{quantity: "inertia", label: "rotor inertia"}];
     var encoded = RobotModelCodec.encode(source);
     var restored = RobotModelCodec.decode(encoded);
     equal(restored.schemaVersion, RobotModel.CURRENT_VERSION,
@@ -868,6 +963,11 @@ class RobotWorldTests {
     equal(restored.actuators.length, 2,
       "v5 RobotModel accepts two actuators on one joint");
     equal(restored.couplings.length, 1, "v5 RobotModel preserves joint couplings");
+    check(restored.couplings[0].assumed.join(",") == "belt stiffness,belt drag" &&
+      restored.actuators[0].assumed.join(",") == "rotor inertia", "RobotModel codec preserves engineering assumptions");
+    equal(restored.couplings[0].assumptions[0].quantity, "stiffness", "codec preserves quantity provenance");
+    equal(restored.actuators[0].assumptions[0].quantity, "inertia", "codec preserves motor quantity provenance");
+
     equal(restored.couplings[0].offset, 0.25,
       "v5 RobotModel preserves coupling offset independently of transmissions");
     equal(restored.actuators[0].maxRate, 12.0,
@@ -898,16 +998,6 @@ class RobotWorldTests {
       case _: false;
     }, "RobotModel codec round-trips Ackermann drive configuration");
 
-    var channelRecords = [for (index in 0...source.joints.length)
-      {index: index, joint: source.joints[index].id}];
-    var deviceLayout = DeviceLayout.decode(haxe.io.Bytes.ofString(
-      haxe.Json.stringify({channels: channelRecords})));
-    deviceLayout.validateAgainst(source);
-    var wrongLayout = new DeviceLayout([for (index in 0...source.joints.length)
-      new DeviceChannel(index, source.joints[source.joints.length - index - 1].id)]);
-    throws(function() wrongLayout.validateAgainst(source),
-      "device channel mapping rejects order that differs from semantic model joints");
-
     equal(restored.floatingBase, false, "RobotModel codec preserves a fixed base");
     equal(restored.joints[2].damping, 1.5, "RobotModel codec preserves joint damping");
     equal(restored.joints[2].frictionLoss, 0.3, "RobotModel codec preserves joint friction loss");
@@ -926,7 +1016,7 @@ class RobotWorldTests {
       var restoredServo = restored.actuators[1].drive;
       check(restoredServo != null && restoredServo.kind() == "servo" && restoredServo.peakTorque() == 1.9 &&
         cast(restoredServo, robotkit.model.ActuatorDrive.ServoDrive).encoderCounts == 4096.0 &&
-        restored.actuators[1].planningEffort() == 1.9,
+        restored.actuators[1].requireEffort() == 1.9,
         "RobotModel codec preserves a servo's drive");
     }
     var restoredSurface = restored.links[1].collisionShapes[1].surface;
@@ -2730,19 +2820,17 @@ class RobotWorldTests {
       Math.abs(imuValue(snapshot, 3)) < 2e-2 && Math.abs(imuValue(snapshot, 4) - 0.5) < 2e-2,
       "IMU measures the arc's yaw rate and centripetal acceleration");
 
-    // 0.8 m/s with 1.5 rad/s asks 11.75 rad/s of the right wheel; the runtime
-    // saturates that wheel alone at its 10 rad/s limit and the plant rolls by
-    // the applied rates.
+    // Combined motion is scaled before submission, preserving curvature at the wheel ceiling.
     base.command(new Twist2(0.8, 1.5));
     var saturatedStart = plant.pose;
     plant.step(Int64.ofInt(tick++));
     var expectedSaturated = saturatedStart.integrateDisplacement(
-      (4.25 + 10.0) * 0.1 * 0.02 * 0.5, (10.0 - 4.25) * 0.1 * 0.02 / 0.5);
+      (4.25 / 1.175 + 10.0) * 0.1 * 0.02 * 0.5, (10.0 - 4.25 / 1.175) * 0.1 * 0.02 / 0.5);
     check(Math.abs(plant.pose.x - expectedSaturated.x) < 1e-9 &&
       Math.abs(plant.pose.y - expectedSaturated.y) < 1e-9 &&
       Math.abs(plant.pose.yaw - expectedSaturated.yaw) < 1e-9 &&
-      plant.appliedWheelRates().right == 10.0,
-      "DifferentialDrivePlant rolls by the runtime's rate-limited wheel targets");
+      Math.abs(plant.appliedWheelRates().right - 10.0) < 1e-12,
+      "DifferentialDrivePlant preserves curvature within the compiled wheel envelope");
 
     // Wheel targets submitted straight to the robot, bypassing MobileBase,
     // drive the chassis on the tick they are applied.
@@ -4483,7 +4571,7 @@ class RobotWorldTests {
     check(Math.abs(current.binding.channels[0].stepsPerUnit - 3200.0 / (2.0 * Math.PI)) < 1e-9,
       "steps per radian come from the model and the wiring");
     equal(current.binding.channels[2].jointIndex, 2, "the lift's channel drives the lift joint");
-    check(current.binding.model.actuators[2].maxRate > 0.0,
+    check(current.binding.model.actuators[2].requireRate() > 0.0,
       "the binding's model carries the step tick's rate ceiling");
     // Deployments that named a compiled fingerprint say what to change.
     var legacy = sys.io.File.getContent(fixture + "deployment-v3.json");
@@ -4496,9 +4584,9 @@ class RobotWorldTests {
       return message;
     }
     var v3 = loads(legacy);
-    check(v3.indexOf("schemaVersion 5") >= 0 && v3.indexOf("device.controller") >= 0, "v3 is rejected with what to change: " + v3);
+    check(v3.indexOf("schema v3 is unsupported; expected v5") >= 0, "old deployments have one schema rejection: " + v3);
     var v4 = loads(StringTools.replace(legacy, "\"schemaVersion\": 3", "\"schemaVersion\": 4"));
-    check(v4.indexOf("schemaVersion 5") >= 0, "v4 is rejected with what to change");
+    check(v4.indexOf("schema v4 is unsupported; expected v5") >= 0, "v4 uses the same schema rejection");
     var withFingerprint = loads(StringTools.replace(sys.io.File.getContent(fixture + "deployment.json"),
       "\"controller\"", "\"fingerprint\""));
     check(withFingerprint.indexOf("fingerprint is gone") >= 0, "a v5 file with a fingerprint is rejected");
@@ -4527,10 +4615,12 @@ class RobotWorldTests {
     joint.limits.lower = -1.0;
     joint.limits.upper = 1.0;
     joint.limits.effort = 1.0;
-    var motor = new Actuator("axis-motor", 0.0, 0.0, Transmission.SimpleTransmission("joint/axis", 1.0, 0.0));
+    var motor = new Actuator("axis-motor", null, null, Transmission.SimpleTransmission("joint/axis", 1.0, 0.0));
     motor.fullStepsPerRevolution = 200.0;
+    motor.microsteps = 16;
+    motor.maxStepRate = 200000;
     model.addActuator(motor);
-    var layout = DeviceLayout.forActuators(model, 16);
+    var layout = new DeviceLayout([new DeviceChannel(0, motor.id)]);
     var robot:Null<SerialRobot> = null;
     var failed = false;
     try robot = new SerialRobot("serial-probe", model,
@@ -5223,11 +5313,13 @@ class RobotWorldTests {
     joint.limits.velocity = 2.0;
     model.addActuator(new Actuator("shoulder-motor", 100.0, 1.0,
       Transmission.SimpleTransmission(joint.id, 2.0, 0.0)));
+    model.materializeLimits();
+    equal(model.joints[0].limits.requireVelocity(), 0.5, "the compiled model derives its motor speed cap");
     var blueprint = RobotRuntimeCompiler.compile(model);
     equal(blueprint.joints[0].maxRate, 0.5,
-      "runtime blueprint converts actuator rate to joint rate");
+      "runtime blueprint reads the compiled joint rate");
     equal(blueprint.joints[0].maxEffort, 200.0,
-      "runtime blueprint converts actuator effort to joint effort");
+      "runtime blueprint reads the compiled joint effort");
 
     var simulationHarness = new SimulationHarness(0.1);
 
@@ -5321,18 +5413,35 @@ class RobotWorldTests {
       Transmission.SimpleTransmission(joint.id, 2.0, 0.0)));
     var second = model.addActuator(new Actuator("second", 40.0, 0.3,
       Transmission.SimpleTransmission(joint.id, -1.0, 0.0)));
+    model.materializeLimits();
     var limits = RobotRuntimeCompiler.compile(model).joints[0];
     equal(limits.maxRate, 0.3, "multiple actuators use the slowest joint rate");
     equal(limits.maxEffort, 240.0, "multiple actuators sum joint effort");
     second.transmission = Transmission.SimpleTransmission(joint.id, 1.0, 0.0);
+    model.materializeLimits();
     var positive = RobotRuntimeCompiler.compile(model).joints[0];
     equal(positive.maxRate, limits.maxRate, "negative ratio keeps the same rate limit");
     equal(positive.maxEffort, limits.maxEffort, "negative ratio keeps the same effort limit");
-    joint.limits.velocity = 0.2;
-    joint.limits.effort = 200.0;
+    joint.mechanicalLimits.velocity = 0.2;
+    joint.mechanicalLimits.effort = 200.0;
+    model.materializeLimits();
     var tighter = RobotRuntimeCompiler.compile(model).joints[0];
     equal(tighter.maxRate, 0.2, "joint rate remains the tighter claim");
     equal(tighter.maxEffort, 200.0, "joint effort remains the tighter claim");
+    joint.mechanicalLimits.velocity = 2.0;
+    second.maxRate = 0.8;
+    model.materializeLimits();
+    equal(joint.limits.velocity, 0.5, "a rebuild can raise a formerly tighter motor cap");
+    model.materializeLimits();
+    equal(joint.limits.velocity, 0.5, "effective limits do not feed back into mechanical facts");
+    var copied = RobotModelCodec.decode(RobotModelCodec.encode(model));
+    copied.actuators[0].maxRate = 2.0;
+    copied.materializeLimits();
+    equal(copied.joints[0].limits.velocity, 0.8, "saved mechanical facts survive a rebuild");
+    joint.mechanicalLimits.velocity = 0.0;
+    model.materializeLimits();
+    equal(RobotRuntimeCompiler.compile(model).joints[0].maxRate, 0.0,
+      "a stated zero velocity remains a stopped joint");
   }
 
   static function check(value:Bool, message:String):Void {

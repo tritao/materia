@@ -1,3 +1,4 @@
+import machinekit.motion.ServoMotor;
 import machinekit.assembly.AssemblyPreview;
 import haxe.io.Bytes;
 import cadkit.modeling.AssemblyModel;
@@ -47,6 +48,26 @@ class RobotArmChecks {
 		var revolutes = [for (joint in definition.joints) if (Std.string(joint.type) == "revolute") joint.id];
 		if (revolutes.join(",") != "j1,j2,j3,j4,j5,j6") throw "Robot arm should have joints j1 to j6";
 
+		// Every joint is driven by a servo through a gearbox, and its limits are what that drive gives: the servo's maximum
+		// speed over the ratio and its peak torque through the gearbox at its efficiency.
+		var actuators = definition.actuators;
+		if (actuators == null || actuators.length != 6) throw "Robot arm should have a servo on each of its six joints";
+		for (spec in robot.specs) {
+			var drive = [for (actuator in actuators) if (actuator.joint == spec.id) actuator];
+			if (drive.length != 1 || drive[0].drive != "servo") throw 'Robot arm joint ${spec.id} should have one servo drive';
+			var peakValue = drive[0].peakTorque, topValue = drive[0].maxSpeed, ratioValue = drive[0].gearRatio, efficiencyValue = drive[0].gearEfficiency;
+			if (peakValue == null || topValue == null || ratioValue == null || efficiencyValue == null) throw 'Robot arm joint ${spec.id} has an incomplete drive';
+			var peak:Float = peakValue, top:Float = topValue, ratio:Float = ratioValue, efficiency:Float = efficiencyValue;
+			near(ratio, spec.gearbox.ratio, '${spec.id} gearbox ratio');
+			near(efficiency, RobotArm.GEARBOX_EFFICIENCY, '${spec.id} gearbox efficiency');
+			near(spec.gearbox.jointSpeed(ServoMotor.model(spec.servo).rating.maxSpeed), top / ratio, '${spec.id} speed limit is the servo\'s over the ratio', 1e-9);
+			near(spec.gearbox.jointTorque(ServoMotor.model(spec.servo).rating.peakTorque), peak * ratio * efficiency, '${spec.id} torque limit is the servo\'s through the gearbox', 1e-9);
+			var edge = [for (joint in definition.joints) if (joint.id == spec.id) joint][0];
+			var edgeSpeed = edge.limits.velocity, edgeEffort = edge.limits.effort;
+			if (edgeSpeed != null || edgeEffort != null) throw 'Joint ${spec.id} should derive its drive limits at compilation';
+		}
+		near(robot.specs[0].gearbox.jointSpeed(ServoMotor.model(robot.specs[0].servo).rating.maxSpeed), 2.094, "j1 runs at about 2.1 rad/s", 1e-3);
+		near(robot.specs[0].gearbox.jointTorque(ServoMotor.model(robot.specs[0].servo).rating.peakTorque), 405.9, "and carries about 406 N m", 0.1);
 		var model = new AssemblyModel("mm");
 		robot.addTo(model, "");
 		var straight = new AssemblyState(model.definition(RobotArmPreview.ASSEMBLY_ID));
@@ -75,6 +96,7 @@ class RobotArmChecks {
 			'axis ${Math.round(approach.x * 100) / 100}, ${Math.round(approach.y * 100) / 100}, ${Math.round(approach.z * 100) / 100}');
 		var moving = robot.toolFlange.massProperties().mass;
 		for (joint in robot.joints) moving += joint.massProperties().mass;
+		for (spec in robot.specs) moving += spec.gearbox.massProperties().mass;
 		for (link in robot.links) moving += link.massProperties().mass;
 		moving += robot.tool.massPropertiesAtMount().mass;
 		Sys.println('robot arm: ${Math.round(moving * 10) / 10} kg above the base flange, ' +

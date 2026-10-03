@@ -1,6 +1,7 @@
 package cadkit.modeling;
 
-import materia.assembly.AssemblyRecord;
+import haxe.ds.ReadOnlyArray;
+
 import materia.assembly.AssemblyCodec;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
@@ -155,19 +156,6 @@ class AssemblyModel {
 		solved = null;
 	}
 
-	public function record():AssemblyRecord {
-		var state = solvedState();
-		var result:AssemblyRecord = {instances: [for (occurrence in data.occurrences) {
-			id: occurrence.id, pose: state.worldPose(occurrence.id),
-			connectors: requireComponent(occurrence.id).connectors.copy()
-		}], joints: [for (joint in data.joints) {
-			id: joint.id, kind: cast joint.type, parent: joint.parent,
-			parentConnector: joint.parentConnector, child: joint.child,
-			childConnector: joint.childConnector, value: joint.defaultValue
-		}]};
-		AssemblyCodec.validate(result);
-		return result;
-	}
 
 	/**
 	 * Couples a target coordinate to a source using target = source × ratio + offset. `efficiency`
@@ -177,13 +165,15 @@ class AssemblyModel {
 	 * means rigid, tight and free-running.
 	 */
 	public function couple(id:String, source:String, target:String, ratio:Float, offset:Float = 0,
-			?efficiency:Float, ?stiffness:Float, ?backlash:Float, ?drag:Float):Void {
+			?efficiency:Float, ?stiffness:Float, ?backlash:Float, ?drag:Float, ?assumed:ReadOnlyArray<String>, ?assumptions:ReadOnlyArray<materia.assembly.AssemblyDefinition.QuantityAssumption>):Void {
 		var coupling:materia.assembly.AssemblyDefinition.AssemblyJointCoupling = {id: id, source: source,
 			target: target, ratio: ratio, offset: offset};
 		if (efficiency != null) coupling.efficiency = efficiency;
 		if (stiffness != null) coupling.stiffness = stiffness;
 		if (backlash != null) coupling.backlash = backlash;
 		if (drag != null) coupling.drag = drag;
+		if (assumed != null && assumed.length > 0) coupling.assumed = [for (label in assumed) label];
+		if (assumptions != null && assumptions.length > 0) coupling.assumptions = [for (entry in assumptions) {quantity: entry.quantity, label: entry.label}];
 		data.couplings.push(coupling);
 		solved = null;
 	}
@@ -205,6 +195,22 @@ class AssemblyModel {
 	public function actuateDrive(actuator:materia.assembly.AssemblyDefinition.AssemblyActuator):Void {
 		if (data.actuators == null) data.actuators = [];
 		data.actuators.push(materia.assembly.AssemblyDefinitionFlattener.copyActuator(actuator, actuator.id, actuator.joint));
+	}
+
+	/**
+	 * Puts an encoder on a joint: `kind` is "incremental" or "absolute", `counts` per revolution on a turning joint
+	 * and per millimetre on a sliding one. An encoder on a motor's joint is motor-side, and on a joint the load
+	 * moves through a drive it is load-side.
+	 */
+	public function addEncoder(encoder:materia.assembly.AssemblyDefinition.AssemblyEncoder):Void {
+		if (data.encoders == null) data.encoders = [];
+		data.encoders.push(materia.assembly.AssemblyDefinitionFlattener.copyEncoder(encoder, encoder.id, encoder.joint));
+	}
+
+	/** Add derived span energies separately from nominal motion couplings. */
+	public function addElasticNetwork(network:materia.assembly.AssemblyDefinition.AssemblyElasticNetwork):Void {
+		if (data.elasticNetworks == null) data.elasticNetworks = [];
+		data.elasticNetworks.push(materia.assembly.AssemblyDefinitionFlattener.copyElasticNetwork(network, id -> id));
 	}
 
 	/** Exports reusable definitions and explicit tree/closure semantics. */

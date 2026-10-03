@@ -666,10 +666,15 @@ public:
         if (joints.find(coupling.leader) == joints.end() ||
             joints.find(coupling.follower) == joints.end())
             return NKSIM_ERROR_INVALID_HANDLE;
+        // A follower with several couplings is the sum of their terms: each leader once, no cycles.
         for (const auto &existing : couplings)
-            if (existing.follower == coupling.follower)
+            if (existing.follower == coupling.follower && existing.leader == coupling.leader)
                 return NKSIM_ERROR_INVALID_ARGUMENT;
         couplings.push_back(coupling);
+        if (couplings_cyclic()) {
+            couplings.pop_back();
+            return NKSIM_ERROR_INVALID_ARGUMENT;
+        }
         return topology_update ? NKSIM_OK : rebuild();
     }
 
@@ -1088,6 +1093,11 @@ private:
              element = mjs_nextElement(spec, element)) equalities.push_back(element);
         for (auto element = equalities.rbegin(); element != equalities.rend(); ++element)
             if (mjs_delete(spec, *element) != 0) return NKSIM_ERROR_BACKEND;
+        std::vector<mjsElement *> tendons;
+        for (auto *element = mjs_firstElement(spec, mjOBJ_TENDON); element;
+             element = mjs_nextElement(spec, element)) tendons.push_back(element);
+        for (auto element = tendons.rbegin(); element != tendons.rend(); ++element)
+            if (mjs_delete(spec, *element) != 0) return NKSIM_ERROR_BACKEND;
         std::vector<mjsElement *> meshes;
         for (auto *element = mjs_firstElement(spec, mjOBJ_MESH); element;
              element = mjs_nextElement(spec, element)) meshes.push_back(element);
@@ -1114,19 +1124,53 @@ private:
         const auto actuator_result = add_joint_actuators();
         if (actuator_result != NKSIM_OK)
             return actuator_result;
-        for (const auto &coupling : couplings) {
-            const auto leader = joints.find(coupling.leader);
+        for (std::size_t index = 0; index < couplings.size(); ++index) {
+            const auto &coupling = couplings[index];
             const auto follower = joints.find(coupling.follower);
-            if (leader == joints.end() || follower == joints.end())
+            if (follower == joints.end() || joints.find(coupling.leader) == joints.end())
                 return NKSIM_ERROR_INVALID_STATE;
+            std::size_t terms = 0;
+            bool first = true;
+            for (std::size_t other = 0; other < couplings.size(); ++other)
+                if (couplings[other].follower == coupling.follower) {
+                    ++terms;
+                    if (other < index) first = false;
+                }
+            if (terms == 1) {
+                // One leader: a joint equality, follower = ratio * leader + offset.
+                const auto leader = joints.find(coupling.leader);
+                auto *equality = mjs_addEquality(spec, nullptr);
+                if (!equality) return NKSIM_ERROR_OUT_OF_MEMORY;
+                equality->type = mjEQ_JOINT;
+                equality->objtype = mjOBJ_JOINT;
+                mjs_setString(equality->name1, follower->second.name.c_str());
+                mjs_setString(equality->name2, leader->second.name.c_str());
+                equality->data[0] = coupling.offset;
+                equality->data[1] = coupling.ratio;
+                continue;
+            }
+            if (!first) continue;
+            // Several leaders: a fixed tendon of sum(ratio_i * leader_i) - follower, held by a tendon
+            // equality at minus the summed offsets, so follower = sum(ratio_i * leader_i + offset_i).
+            // Like the joint equality, the constraint is measured from the joints' reference pose.
+            const std::string tendon_name = "nksim_coupling_" + std::to_string(coupling.follower);
+            auto *tendon = mjs_addTendon(spec, nullptr);
+            if (!tendon) return NKSIM_ERROR_OUT_OF_MEMORY;
+            if (mjs_setName(tendon->element, tendon_name.c_str()) != 0) return NKSIM_ERROR_BACKEND;
+            if (!mjs_wrapJoint(tendon, follower->second.name.c_str(), -1.0)) return NKSIM_ERROR_BACKEND;
+            double offsets = 0.0;
+            for (const auto &term : couplings) {
+                if (term.follower != coupling.follower) continue;
+                const auto leader = joints.find(term.leader);
+                if (!mjs_wrapJoint(tendon, leader->second.name.c_str(), term.ratio)) return NKSIM_ERROR_BACKEND;
+                offsets += term.offset;
+            }
             auto *equality = mjs_addEquality(spec, nullptr);
             if (!equality) return NKSIM_ERROR_OUT_OF_MEMORY;
-            equality->type = mjEQ_JOINT;
-            equality->objtype = mjOBJ_JOINT;
-            mjs_setString(equality->name1, follower->second.name.c_str());
-            mjs_setString(equality->name2, leader->second.name.c_str());
-            equality->data[0] = coupling.offset;
-            equality->data[1] = coupling.ratio;
+            equality->type = mjEQ_TENDON;
+            equality->objtype = mjOBJ_TENDON;
+            mjs_setString(equality->name1, tendon_name.c_str());
+            equality->data[0] = -offsets;
         }
         for (std::size_t closure_index = 0; closure_index < closures.size(); ++closure_index) {
             const auto &closure = closures[closure_index];
@@ -1855,7 +1899,9 @@ private:
             // Outside servo mode every term is zero, so it exerts nothing.
             const auto servo = model_actuator_id(joint, "servo");
             if (servo >= 0) {
-                const bool servoing = joint.target_mode == NKSIM_JOINT_TARGET_SERVO;
+                const auto limit = joint.target_max_force != 0.0
+                    ? joint.target_max_force : joint.desc.max_force;
+                const bool servoing = joint.target_mode == NKSIM_JOINT_TARGET_SERVO && limit >= 0.0;
                 auto *servo_gain = model->actuator_gainprm + mjNGAIN * servo;
                 auto *servo_bias = model->actuator_biasprm + mjNBIAS * servo;
                 servo_gain[0] = servoing ? joint.target_stiffness : 0.0;
@@ -1867,8 +1913,6 @@ private:
                 // Every mode clamps to this same bound, so a joint-level clamp
                 // changes nothing for the motor's already-clamped torque.
                 const auto joint_model = model_joint_id(joint);
-                const auto limit = joint.target_max_force > 0.0
-                    ? joint.target_max_force : joint.desc.max_force;
                 if (joint_model >= 0) {
                     model->jnt_actfrclimited[joint_model] = limit > 0.0 ? 1 : 0;
                     model->jnt_actfrcrange[2 * joint_model] = limit > 0.0 ? -limit : 0.0;
@@ -1904,9 +1948,10 @@ private:
                 break;
             }
 
-            const auto max_force = joint.target_max_force > 0.0
+            const auto max_force = joint.target_max_force != 0.0
                 ? joint.target_max_force : joint.desc.max_force;
-            if (max_force > 0.0) {
+            if (max_force < 0.0) torque = 0.0;
+            else if (max_force > 0.0) {
                 if (torque > max_force) torque = max_force;
                 if (torque < -max_force) torque = -max_force;
             }
@@ -1945,6 +1990,28 @@ private:
     std::vector<std::uint64_t> body_order;
     std::unordered_map<std::uint64_t, JointRecord> joints;
     std::vector<std::uint64_t> joint_order;
+    /** True when the couplings, read as terms of their followers, depend on themselves. */
+    bool couplings_cyclic() const {
+        std::vector<std::uint64_t> pending;
+        for (const auto &coupling : couplings)
+            if (std::find(pending.begin(), pending.end(), coupling.follower) == pending.end())
+                pending.push_back(coupling.follower);
+        while (!pending.empty()) {
+            bool progress = false;
+            for (auto at = pending.begin(); at != pending.end();) {
+                bool ready = true;
+                for (const auto &coupling : couplings)
+                    if (coupling.follower == *at &&
+                        std::find(pending.begin(), pending.end(), coupling.leader) != pending.end())
+                        ready = false;
+                if (!ready) { ++at; continue; }
+                at = pending.erase(at);
+                progress = true;
+            }
+            if (!progress) return true;
+        }
+        return false;
+    }
     std::vector<nksim::BackendJointCoupling> couplings;
     std::vector<nksim::BackendClosure> closures;
     std::unordered_map<std::uint64_t, mjsBody *> rebuild_bodies;

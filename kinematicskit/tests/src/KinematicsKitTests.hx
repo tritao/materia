@@ -32,6 +32,7 @@ class KinematicsKitTests {
     testPrismaticAndRootPose();
     testBranchingForest();
     testCouplings();
+    testMultiLeaderCouplings();
     testJacobianMatchesFiniteDifferences();
     testCompileErrors();
     testClosuresAreNotTreeEdges();
@@ -175,6 +176,47 @@ class KinematicsKitTests {
     tight.couple("q", "p", 1.0, 0.0);
     var tightModel = tight.build();
     check(tightModel.dofLower[0] == 0.0 && tightModel.dofUpper[0] == 1.0, "tighter coupled limits win");
+  }
+
+  static function testMultiLeaderCouplings():Void {
+    // A CoreXY head: slides x and y; belt joints a = x + y, b = x - y, and a joint following a.
+    var builder = new KinematicModelBuilder();
+    var base = builder.addBody("base"), bx = builder.addBody("bx"), head = builder.addBody("head");
+    var ba = builder.addBody("ba"), bb = builder.addBody("bb"), bc = builder.addBody("bc");
+    var z = new Vector3(0.0, 0.0, 1.0);
+    builder.addJoint("x", JointKind.Prismatic, base, bx, Transform.identity(), Transform.identity(), new Vector3(1.0, 0.0, 0.0), -1.0, 1.0);
+    builder.addJoint("y", JointKind.Prismatic, bx, head, Transform.identity(), Transform.identity(), new Vector3(0.0, 1.0, 0.0), -1.0, 1.0);
+    builder.addJoint("a", JointKind.Revolute, base, ba, Transform.identity(), Transform.identity(), z);
+    builder.addJoint("b", JointKind.Revolute, base, bb, Transform.identity(), Transform.identity(), z);
+    builder.addJoint("c", JointKind.Revolute, base, bc, Transform.identity(), Transform.identity(), z);
+    var tip = builder.addFrame("tip", ba, Transform.translation(1.0, 0.0, 0.0));
+    builder.couple("a", "x", 1.0, 0.0);
+    builder.couple("a", "y", 1.0, 0.25);
+    builder.couple("b", "x", 1.0, 0.0);
+    builder.couple("b", "y", -1.0, 0.0);
+    builder.couple("c", "a", 2.0, 0.0);
+    var model = builder.build();
+    check(model.dofCount() == 2, "the leaders are the only DOFs");
+    var snapshot = KinematicSnapshot.of(new KinematicState(model, [0.5, 0.25]));
+    check(near(snapshot.jointValue(model.jointIndex("a")), 1.0, 1e-15), "a = x + y + offset");
+    check(near(snapshot.jointValue(model.jointIndex("b")), 0.25, 1e-15), "b = x - y");
+    check(near(snapshot.jointValue(model.jointIndex("c")), 2.0, 1e-15), "c follows the combined a");
+    var ia = model.jointIndex("a");
+    check(model.jointTermStart[ia + 1] - model.jointTermStart[ia] == 2, "a sums two terms");
+    check(model.dofIndex("a") == -1, "a combined joint has no DOF of its own");
+    var jacobian = snapshot.frameJacobian(tip);
+    // Rotating about z by a = x + y moves the tip along y: d(tipY)/dx = d(tipY)/dy = cos(a).
+    check(near(jacobian[model.dofCount() + 0], Math.cos(1.0), 1e-12) && near(jacobian[model.dofCount() + 1], Math.cos(1.0), 1e-12),
+      "a combined joint's Jacobian sums its terms");
+    var threw = false;
+    var twice = new KinematicModelBuilder();
+    var tb = twice.addBody("base"), t1 = twice.addBody("one"), t2 = twice.addBody("two");
+    twice.addJoint("p", JointKind.Revolute, tb, t1, Transform.identity(), Transform.identity(), z);
+    twice.addJoint("q", JointKind.Revolute, tb, t2, Transform.identity(), Transform.identity(), z);
+    twice.couple("p", "q", 1.0, 0.0);
+    twice.couple("q", "p", 1.0, 0.0);
+    try twice.build() catch (error:Dynamic) threw = true;
+    check(threw, "terms that form a cycle are rejected");
   }
 
   static function testJacobianMatchesFiniteDifferences():Void {

@@ -25,8 +25,13 @@ void SimulationRobot::queue_rest_holds() noexcept {
         target.joint = joints_[joint];
         target.mode = NKSIM_JOINT_TARGET_POSITION;
         target.target = 0.0;
+        if (joint < servo_.size() && servo_[joint].stiffness > 0.0) {
+            target.mode = NKSIM_JOINT_TARGET_SERVO;
+            target.stiffness = servo_[joint].stiffness;
+            target.damping = servo_[joint].damping;
+        }
         pending_targets_.push_back(target);
-        staged_commands()[joint] = {NKSIM_JOINT_TARGET_POSITION, 0.0};
+        staged_commands()[joint] = {target.mode, 0.0};
     }
 }
 
@@ -97,12 +102,29 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
         // command a whole robot, fixed mounting joints included, rely on this.
         if (source.joint >= actuated_joints_.size() || !actuated_joints_[source.joint])
             continue;
+        const bool positional = source.mode == RK_TARGET_POSITION || source.mode == RK_TARGET_SERVO;
+        // A joint a servo motor moves through couplings is not commanded; the coupling carries it.
+        if (positional && source.joint < passive_.size() && passive_[source.joint])
+            continue;
         nksim_joint_target target{};
         target.struct_size = sizeof(target);
         target.joint = joints_[source.joint];
         target.mode = source.mode;
         target.target = source.target;
         target.max_force = source.max_effort;
+        if (positional && source.joint < slip_.size())
+            target.target += slip_[source.joint];
+        if (source.mode == RK_TARGET_POSITION && source.joint < servo_.size() &&
+            servo_[source.joint].stiffness > 0.0) {
+            // A servo motor tracks the position with its gains, and the speed the positions imply.
+            const auto &gains = servo_[source.joint];
+            const auto &previous = staged[source.joint];
+            target.mode = NKSIM_JOINT_TARGET_SERVO;
+            target.stiffness = gains.stiffness;
+            target.damping = gains.damping;
+            target.velocity = previous.mode == NKSIM_JOINT_TARGET_SERVO && step_ > 0.0
+                ? (target.target - previous.target) / step_ : 0.0;
+        }
         if (source.mode == RK_TARGET_SERVO) {
             const auto &servo = command.servos[index];
             target.velocity = servo.velocity;
@@ -111,7 +133,7 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
             target.feedforward = servo.feedforward;
         }
         pending_targets_.push_back(target);
-        staged[source.joint] = {source.mode, source.target};
+        staged[source.joint] = {target.mode, target.target};
     }
     return RK_OK;
 }

@@ -1,5 +1,6 @@
 #include "rkd6_endpoint.hpp"
 #include "device_frame6.hpp"
+#include "coupling_terms.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -217,9 +218,112 @@ std::shared_ptr<Rkd6Endpoint> Rkd6Endpoint::attach(std::unique_ptr<Rkd6Transport
     auto endpoint = std::shared_ptr<Rkd6Endpoint>(new Rkd6Endpoint(
         std::move(transport), ack, target_error, clock_bound_ns, link_latency_ns,
         std::vector<DeviceActuator6>(layout.begin(), layout.end()), blueprint.joint_count));
+    if (!endpoint->configure_feedback(blueprint)) {
+        if (error) *error = RK_ERROR_MODEL_MISMATCH;
+        return {};
+    }
     endpoint->owner_period_ns_ = period_ns;
     if (error) *error = RK_OK;
     return endpoint;
+}
+
+bool Rkd6Endpoint::configure_feedback(const rk_robot_runtime_blueprint &blueprint) {
+    feedback_couplings_.assign(blueprint.couplings, blueprint.couplings + blueprint.coupling_count);
+    std::array<std::uint32_t, RK_MAX_JOINTS> order{};
+    std::uint32_t count = 0;
+    if (!internal::order_followers(blueprint.couplings, blueprint.coupling_count,
+            joint_count_, nullptr, order.data(), count)) return false;
+    feedback_followers_.assign(order.begin(), order.begin() + count);
+    std::vector<bool> follower(joint_count_, false), measured(joint_count_, false);
+    for (auto joint : feedback_followers_) follower[joint] = true;
+    for (std::size_t i = 0; i < (layout_.empty() ? joint_count_ : layout_.size()); ++i) {
+        const auto joint = layout_.empty() ? i : layout_[i].joint;
+        if (!measured[joint]) feedback_joints_.push_back(joint);
+        measured[joint] = true;
+    }
+    const auto n = joint_count_;
+    std::vector<double> jacobian(n * n, 0.0), offsets(n, 0.0);
+    for (std::size_t joint = 0; joint < n; ++joint)
+        if (!follower[joint]) jacobian[joint * n + joint] = 1.0;
+    for (auto joint : feedback_followers_)
+        for (const auto &term : feedback_couplings_) if (term.follower == joint) {
+            offsets[joint] += term.offset + term.ratio * offsets[term.leader];
+            for (std::size_t root = 0; root < n; ++root)
+                jacobian[joint * n + root] += term.ratio * jacobian[term.leader * n + root];
+        }
+    for (std::size_t root = 0; root < n; ++root) if (!follower[root]) {
+        bool observed = false;
+        for (auto joint : feedback_joints_) observed |= jacobian[joint * n + root] != 0;
+        if (observed) feedback_roots_.push_back(root);
+    }
+    const auto roots = feedback_roots_.size(), rows = feedback_joints_.size();
+    std::vector<double> scale(roots, 0.0), a(rows * roots), inverse(roots * roots, 0.0);
+    for (std::size_t k = 0; k < roots; ++k) {
+        for (auto joint : feedback_joints_)
+            scale[k] = std::hypot(scale[k], jacobian[joint * n + feedback_roots_[k]]);
+        for (std::size_t row = 0; row < rows; ++row)
+            a[row * roots + k] = jacobian[feedback_joints_[row] * n + feedback_roots_[k]] / scale[k];
+        inverse[k * roots + k] = 1.0;
+    }
+    std::vector<double> normal(roots * roots, 0.0);
+    for (std::size_t i = 0; i < roots; ++i)
+        for (std::size_t j = 0; j < roots; ++j)
+            for (std::size_t row = 0; row < rows; ++row)
+                normal[i * roots + j] += a[row * roots + i] * a[row * roots + j];
+    for (std::size_t k = 0; k < roots; ++k) {
+        auto pivot = k;
+        for (std::size_t i = k + 1; i < roots; ++i)
+            if (std::abs(normal[i * roots + k]) > std::abs(normal[pivot * roots + k])) pivot = i;
+        // An unobservable combination of leaders cannot be reconstructed from this wiring.
+        if (std::abs(normal[pivot * roots + k]) < 1e-12) return false;
+        for (std::size_t j = 0; j < roots; ++j) {
+            std::swap(normal[k * roots + j], normal[pivot * roots + j]);
+            std::swap(inverse[k * roots + j], inverse[pivot * roots + j]);
+        }
+        const auto diagonal = normal[k * roots + k];
+        for (std::size_t j = 0; j < roots; ++j) {
+            normal[k * roots + j] /= diagonal;
+            inverse[k * roots + j] /= diagonal;
+        }
+        for (std::size_t i = 0; i < roots; ++i) if (i != k) {
+            const auto factor = normal[i * roots + k];
+            for (std::size_t j = 0; j < roots; ++j) {
+                normal[i * roots + j] -= factor * normal[k * roots + j];
+                inverse[i * roots + j] -= factor * inverse[k * roots + j];
+            }
+        }
+    }
+    feedback_inverse_.assign(roots * rows, 0.0);
+    for (std::size_t i = 0; i < roots; ++i)
+        for (std::size_t row = 0; row < rows; ++row)
+            for (std::size_t j = 0; j < roots; ++j)
+                feedback_inverse_[i * rows + row] += inverse[i * roots + j] * a[row * roots + j] / scale[i];
+    for (auto joint : feedback_joints_) feedback_offsets_.push_back(offsets[joint]);
+    return true;
+}
+
+void Rkd6Endpoint::reconstruct_feedback(rk_robot_state &state) const {
+    const auto rows = feedback_joints_.size();
+    std::array<double, RK_MAX_JOINTS> positions{}, velocities{};
+    for (std::size_t row = 0; row < rows; ++row) {
+        positions[row] = state.position[feedback_joints_[row]] - feedback_offsets_[row];
+        velocities[row] = state.velocity[feedback_joints_[row]];
+    }
+    for (std::size_t i = 0; i < feedback_roots_.size(); ++i) {
+        const auto root = feedback_roots_[i];
+        state.position[root] = state.velocity[root] = 0.0;
+        for (std::size_t row = 0; row < rows; ++row) {
+            state.position[root] += feedback_inverse_[i * rows + row] * positions[row];
+            state.velocity[root] += feedback_inverse_[i * rows + row] * velocities[row];
+        }
+    }
+    for (auto joint : feedback_followers_) {
+        if (std::find(feedback_joints_.begin(), feedback_joints_.end(), joint) != feedback_joints_.end()) continue;
+        state.position[joint] = internal::coupled_follower_value(feedback_couplings_.data(),
+            feedback_couplings_.size(), joint, state.position, true);
+        state.velocity[joint] = internal::coupled_follower_value(feedback_couplings_.data(),
+            feedback_couplings_.size(), joint, state.velocity, false);
+    }
 }
 
 rk_result Rkd6Endpoint::identify(std::unique_ptr<Rkd6Transport> transport,
@@ -737,6 +841,7 @@ rk_result Rkd6Endpoint::sample(std::uint64_t timestamp_ns, rk_robot_state &state
         state.velocity[mapping.joint] = actuators_[i].velocity / mapping.ratio;
         state.effort[mapping.joint] += actuators_[i].effort * mapping.ratio;
     }
+    reconstruct_feedback(state);
     state.trajectory_queue_depth = ack_.segment_capacity - status_.remaining_segments;
     // Motion is still to come while segments wait to be sent, or were sent
     // and end after the device's path clock: the device reports its own

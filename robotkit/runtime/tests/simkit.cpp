@@ -41,6 +41,7 @@ rk_robot_runtime_blueprint blueprint(uint64_t revision) {
     value.joints[0] = {
         0, RK_RUNTIME_JOINT_REVOLUTE, 0, 1, -3.14, 3.14, 100.0,
     };
+    value.joints[0].limit_flags |= RK_LIMIT_EFFORT;
     value.joints[0].parent_frame_rotation[3] = 1.0;
     value.joints[0].child_frame_rotation[3] = 1.0;
     value.joints[0].axis[2] = 1.0;
@@ -575,6 +576,7 @@ rk_robot_runtime_blueprint wheeled_blueprint() {
     for (uint32_t joint = 0; joint < value.joint_count; ++joint) {
         value.joints[joint] = {joint, RK_RUNTIME_JOINT_REVOLUTE, 0, joint + 1,
                                -1000.0, 1000.0, 100.0};
+    value.joints[joint].limit_flags |= RK_LIMIT_EFFORT;
         value.joints[joint].parent_frame_rotation[3] = 1.0;
         value.joints[joint].child_frame_rotation[3] = 1.0;
         value.joints[joint].axis[1] = 1.0;

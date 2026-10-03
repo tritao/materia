@@ -8,6 +8,18 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
  * axis so the teeth interleave.
  */
 class GearPair extends MachineAssembly {
+	/** Assumed power efficiency of a single lubricated spur mesh. */
+	public static inline var DEFAULT_EFFICIENCY:Float = 0.98;
+
+	/** Resolve the coupling from these parts. */
+	public static function relation(driver:SpurGear, driven:SpurGear, alignment:Float):TransmissionRelation {
+		var result = new TransmissionRelation(-alignment * driver.teeth / driven.teeth, DEFAULT_EFFICIENCY,
+			null, mesh(driver, driven).backlash / (driver.pitchDiameter / 2));
+		result.setBasis("efficiency", ValueBasis.Assumed, "gear efficiency");
+		result.setBasis("stiffness", machinekit.transmission.ValueBasis.Assumed, "rigid");
+		return result;
+	}
+
 	public final a:SpurGear;
 	public final b:SpurGear;
 	public final centerDistance:Float;
@@ -30,7 +42,7 @@ class GearPair extends MachineAssembly {
 		var distance = a.centerDistance(b);
 		var baseRadiusSum = (a.baseDiameter + b.baseDiameter) / 2;
 		if (!(distance > baseRadiusSum + 1e-10))
-			throw "Meshing gear profile shifts produce an invalid operating pressure angle";
+			throw new machinekit.transmission.TransmissionDesignError("Gear profile shifts cannot mesh; choose compatible profile shifts");
 		centerDistance = distance;
 		operatingPressureAngle = Math.acos(baseRadiusSum / distance);
 		backlash = a.backlash + b.backlash;

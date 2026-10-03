@@ -112,7 +112,7 @@ class Trajectory {
       direction.push(sign);
       if (Math.abs(yawSlope) > maxCurvature + 1e-8)
         throw "Path curvature exceeds the drive model's steering limit";
-      var cap = configuredMaxSpeed;
+      var cap = Math.min(configuredMaxSpeed, base.pathSpeed(yawSlope));
       if (Math.abs(yawSlope) > 1e-9) {
         cap = Math.min(cap, base.motionLimits.maxAngularSpeed / Math.abs(yawSlope));
         cap = Math.min(cap, Math.pow(maxLateralAcceleration / Math.abs(yawSlope), 0.5));

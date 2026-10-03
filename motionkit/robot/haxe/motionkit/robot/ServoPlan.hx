@@ -63,7 +63,7 @@ class ServoPlan {
     accelerationLimits = [];
     for (k in 0...indices.length) {
       var limit = manipulator.group.limitsOf(k).maxAcceleration;
-      if (!(limit > 0.0)) throw 'Servo plans need an acceleration limit on arm joint $k';
+      if (limit == null || !(limit > 0.0)) throw 'Servo plans need an acceleration limit on arm joint $k';
       accelerationLimits.push(0.999 * limit);
     }
     endPosition = [for (_ in 0...jointCount) 0.0];

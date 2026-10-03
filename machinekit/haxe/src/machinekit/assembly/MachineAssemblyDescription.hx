@@ -47,6 +47,7 @@ import machinekit.component.PortInterface;
 	@:id(4) final effort:Null<Float>;
 	@:id(5) @:optional final overtravel:Null<Float>;
 	@:id(6) @:optional final acceleration:Null<Float>;
+	@:id(7) @:optional final assumptions:Null<ReadOnlyArray<materia.assembly.AssemblyDefinition.QuantityAssumption>>;
 }
 
 @:wire typedef FrozenJoint = {
@@ -69,6 +70,12 @@ import machinekit.component.PortInterface;
 	@:id(3) final target:String;
 	@:id(4) final ratio:Float;
 	@:id(5) final offset:Float;
+	@:id(6) @:optional final efficiency:Null<Float>;
+	@:id(7) @:optional final stiffness:Null<Float>;
+	@:id(8) @:optional final backlash:Null<Float>;
+	@:id(9) @:optional final drag:Null<Float>;
+	@:id(10) @:optional final assumed:Null<ReadOnlyArray<String>>;
+	@:id(11) @:optional final assumptions:Null<ReadOnlyArray<materia.assembly.AssemblyDefinition.QuantityAssumption>>;
 }
 
 @:wire typedef FrozenExposedConnector = {
@@ -84,6 +91,27 @@ import machinekit.component.PortInterface;
 	@:id(4) final joints:ReadOnlyArray<FrozenJoint>;
 	@:id(5) @:optional final couplings:ReadOnlyArray<FrozenCoupling>;
 	@:id(6) @:optional final exposedConnectors:ReadOnlyArray<FrozenExposedConnector>;
+	@:id(10) @:optional final elasticNetworks:ReadOnlyArray<FrozenElasticNetwork>;
+}
+
+@:wire typedef FrozenElasticTerm = {
+	@:id(1) final joint:String;
+	@:id(2) final coefficient:Float;
+}
+@:wire typedef FrozenElasticSpan = {
+	@:id(1) final stiffness:Float;
+	@:id(2) final terms:ReadOnlyArray<FrozenElasticTerm>;
+}
+@:wire typedef FrozenElasticClearance = {
+	@:id(1) final joint:String;
+	@:id(2) final allowance:Float;
+}
+@:wire typedef FrozenElasticNetwork = {
+	@:id(1) final id:String;
+	@:id(2) final couplings:ReadOnlyArray<String>;
+	@:id(3) final spans:ReadOnlyArray<FrozenElasticSpan>;
+	@:id(4) @:optional final assumptions:ReadOnlyArray<materia.assembly.AssemblyDefinition.QuantityAssumption>;
+	@:id(5) @:optional final clearances:ReadOnlyArray<FrozenElasticClearance>;
 }
 
 @:wire typedef FrozenAssemblyDefinition = {
@@ -96,6 +124,7 @@ import machinekit.component.PortInterface;
 	@:id(7) @:optional final couplings:ReadOnlyArray<FrozenCoupling>;
 	@:id(8) @:optional final assemblies:ReadOnlyArray<FrozenAssemblySubdefinition>;
 	@:id(9) @:optional final exposedConnectors:ReadOnlyArray<FrozenExposedConnector>;
+	@:id(13) @:optional final elasticNetworks:ReadOnlyArray<FrozenElasticNetwork>;
 }
 
 /** Serializable recipe inputs. The constructor IDs are part of the wire schema. */
@@ -212,6 +241,10 @@ import machinekit.component.PortInterface;
 	@:id(7) var endEffector:EndEffectorRecord;
 	@:id(8) var ports:ReadOnlyArray<PortRecord>;
 	@:id(9) var included:ReadOnlyArray<IncludedRecord>;
+	@:id(10) @:optional var transmissions:ReadOnlyArray<TransmissionRecord>;
+	@:id(11) @:optional var motors:ReadOnlyArray<MotorRecord>;
+	@:id(12) @:optional var encoders:ReadOnlyArray<EncoderRecord>;
+	@:id(13) @:optional var beltPaths:ReadOnlyArray<BeltPathRecord>;
 }
 
 @:wire typedef BomExtraRecord = {
@@ -235,41 +268,52 @@ import machinekit.component.PortInterface;
 	@:id(3) Attached(kg:Float, instanceId:String, x:Float, y:Float, z:Float);
 }
 
-/**
- * A coupling whose ratio its parts set (see `Drive`): `kind` is "lead-screw", "gear-mesh",
- * "rack-and-pinion" or "belt", `members` the parts in the order the drive names them, and the
- * follower sits at zero where the leader is at `leaderZero`.
- */
-@:wire typedef DriveRecord = {
+/** Source of a derived coupling; the follower is zero at `leaderZero`. */
+@:wire typedef TransmissionRecord = {
 	@:id(1) var coupling:String;
-	@:id(2) var kind:String;
-	@:id(3) var members:ReadOnlyArray<String>;
-	@:id(4) var alignment:Float;
+	@:id(12) var source:Transmission;
+	@:id(13) var sense:Sense;
 	@:id(5) var leaderZero:Float;
-	/** Stiffness of the drive at the leader, N per leader unit (mm); absent means rigid. */
+	/** Stated stiffness at the leader, N per leader unit. */
 	@:id(6) @:optional var stiffness:Null<Float>;
-	/** Lost motion on reversal, in leader units; absent takes the drive kind's allowance (see `DriveDefaults`). */
+	/** Stated lost motion on reversal, in leader units. */
 	@:id(7) @:optional var backlash:Null<Float>;
-	/** Drag torque at the follower while it moves, N m; absent takes the drive kind's allowance. */
+	/** Stated drag torque at the follower, N m. */
 	@:id(8) @:optional var drag:Null<Float>;
-	/** How a lead screw's end nearest its motor is held: "free", "simple" or "fixed". */
-	@:id(9) @:optional var nearSupport:Null<String>;
-	/** How its far end is held. */
-	@:id(10) @:optional var farSupport:Null<String>;
-	/** Longest unsupported stretch of the screw in mm; absent means the whole screw. */
+	@:id(9) @:optional var near:Null<machinekit.motion.ScrewSupport>;
+	@:id(10) @:optional var far:Null<machinekit.motion.ScrewSupport>;
+	/** Longest unsupported stretch in mm; absent means the whole screw. */
 	@:id(11) @:optional var unsupported:Null<Float>;
 }
 
+@:wire typedef DescriptionVersion = {
+	@:id(3) @:optional var schemaVersion:Int;
+}
+
 /**
- * A stepper motor member driving a joint on a `volts` supply, its actuator given `margin` of the
- * motor's holding torque (see `MachineAssembly.addMotor`).
+ * Motor and driver members driving a joint, its actuator given `margin` of the motor's holding
+ * torque (see `MachineAssembly.addMotor`). Voltage and current come from the driver.
  */
 @:wire typedef MotorRecord = {
 	@:id(1) var actuator:String;
 	@:id(2) var joint:String;
 	@:id(3) var motor:String;
-	@:id(4) var volts:Float;
+	@:id(8) var driver:String;
 	@:id(5) var margin:Float;
+	/** A gearbox between the motor and the joint (see `Gearbox`); absent for a direct drive. */
+	// Retired numeric reduction ids 6 and 7.
+	@:id(9) @:optional var gearbox:Null<String>;
+}
+
+/**
+ * An encoder part reading a joint (see `MachineAssembly.addEncoder`), and the motor's actuator it
+ * reads when it is that motor's feedback.
+ */
+@:wire typedef EncoderRecord = {
+	@:id(1) var encoder:String;
+	@:id(2) var joint:String;
+	@:id(3) var part:String;
+	@:id(4) @:optional var actuator:Null<String>;
 }
 
 @:wire typedef AssemblySideRecord = {
@@ -284,8 +328,10 @@ import machinekit.component.PortInterface;
 	@:id(9) @:optional var tools:ReadOnlyArray<ToolRecord>;
 	@:id(10) var ports:ReadOnlyArray<PortRecord>;
 	@:id(11) var included:ReadOnlyArray<IncludedRecord>;
-	@:id(12) @:optional var drives:ReadOnlyArray<DriveRecord>;
+	@:id(12) @:optional var transmissions:ReadOnlyArray<TransmissionRecord>;
 	@:id(13) @:optional var motors:ReadOnlyArray<MotorRecord>;
+	@:id(14) @:optional var encoders:ReadOnlyArray<EncoderRecord>;
+	@:id(15) @:optional var beltPaths:ReadOnlyArray<BeltPathRecord>;
 }
 
 /** Mechanical definition plus the MachineKit facts keyed by occurrence ID. */
@@ -293,4 +339,11 @@ import machinekit.component.PortInterface;
 	@:id(1) var mechanical:FrozenAssemblyDefinition;
 	@:id(2) var machine:AssemblySideRecord;
 	@:id(3) @:optional var schemaVersion:Int;
+}
+
+/** Physical clamp and pulley centres, in belt path order. The clamp span follows its geometry. */
+@:wire typedef BeltPathRecord = {
+	@:id(1) var belt:String;
+	@:id(2) @:optional var clamp:Null<ConnectorReference>;
+	@:id(4) var wraps:ReadOnlyArray<ConnectorReference>;
 }

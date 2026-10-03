@@ -43,8 +43,8 @@ int main(int argc, char **argv) {
     blueprint.owner_period_ns = 10'000'000;
     blueprint.joints[0].lower_limit = -10;
     blueprint.joints[0].upper_limit = 10;
-    blueprint.joints[0].max_velocity = 10;
-    blueprint.joints[0].max_acceleration = 10;
+    blueprint.joints[0].max_velocity = (blueprint.joints[0].limit_flags |= RK_LIMIT_VELOCITY, 10);
+    blueprint.joints[0].max_acceleration = (blueprint.joints[0].limit_flags |= RK_LIMIT_ACCELERATION, 10);
     std::array<std::uint8_t, 16> controller{};
     for (std::size_t i = 0; i < controller.size(); ++i) controller[i] = i;
     // The board's id is readable without configuring it, and a deployment for another id is refused.

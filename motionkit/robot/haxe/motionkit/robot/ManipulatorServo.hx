@@ -78,12 +78,15 @@ class ManipulatorServo {
     limits.ramped = ramped;
     limits.velocity = velocityLimits != null ? velocityLimits.copy() : [for (joint in 0...n) {
       var speed = manipulator.group.limitsOf(joint).velocity;
-      speed > 0.0 ? speed : Math.POSITIVE_INFINITY;
+      speed != null ? speed : Math.POSITIVE_INFINITY;
     }];
     if (previousVelocity != null) {
       limits.previousVelocity = previousVelocity.copy();
       limits.acceleration = accelerationLimits != null ? accelerationLimits.copy()
-        : [for (joint in 0...n) manipulator.group.limitsOf(joint).maxAcceleration];
+        : [for (joint in 0...n) {
+          var acceleration = manipulator.group.limitsOf(joint).maxAcceleration;
+          acceleration == null ? Math.POSITIVE_INFINITY : acceleration;
+        }];
     }
     task.setTwist(twist.toArray(), dt);
     var solved = DifferentialIk.step(problem, manipulator.stateOf(q), dt, qp, limits, 1.0, damping, workspace,

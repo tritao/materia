@@ -1,4 +1,5 @@
 #include "robotkit_runtime.hpp"
+#include "coupling_terms.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -111,7 +112,7 @@ RobotRuntime::RuntimeSegment native_segment(const robotkit::TrajectorySegment &i
 
 void evaluate_knot(const RobotRuntime::RuntimeTrajectoryPoint &knot, uint64_t time_ns,
                    double *positions, double *velocities = nullptr,
-                   double *accelerations = nullptr) {
+                   double *accelerations = nullptr, double *jerks = nullptr) {
     mk_trajectory_state evaluated{};
     if (knot.has_segment) {
         const auto elapsed = time_ns > knot.point.time_from_start_ns
@@ -126,6 +127,7 @@ void evaluate_knot(const RobotRuntime::RuntimeTrajectoryPoint &knot, uint64_t ti
     std::copy_n(evaluated.position, evaluated.joint_count, positions);
     if (velocities) std::copy_n(evaluated.velocity, evaluated.joint_count, velocities);
     if (accelerations) std::copy_n(evaluated.acceleration, evaluated.joint_count, accelerations);
+    if (jerks) std::copy_n(evaluated.jerk, evaluated.joint_count, jerks);
 }
 
 /**
@@ -177,6 +179,8 @@ rk_result validate_appended_path(
         limits.position_upper[joint] = source.upper_limit;
         limits.max_velocity[joint] = source.max_velocity;
         limits.max_acceleration[joint] = source.max_acceleration;
+        limits.derivative_claimed[joint] = ((source.limit_flags & RK_LIMIT_VELOCITY) ? 1u : 0u) |
+            ((source.limit_flags & RK_LIMIT_ACCELERATION) ? 2u : 0u);
     }
     mk_validation_report report{};
     report.struct_size = sizeof(report);
@@ -188,38 +192,10 @@ rk_result validate_appended_path(
     return RK_OK;
 }
 
-/**
-  The blueprint with each coupled joint that has no velocity or acceleration limit of its own
-  given its leader's, scaled by the ratio: a lead screw turns as fast as its axis moves it. Its
-  motion is its leader's, so this bounds nothing new, but every stop and check that budgets
-  joint by joint then has a limit to work with.
-**/
-rk_robot_runtime_blueprint with_coupled_limits(rk_robot_runtime_blueprint blueprint) {
-    if (blueprint.struct_size < sizeof(blueprint)) return blueprint;
-    const auto count = std::min(blueprint.coupling_count,
-        static_cast<uint32_t>(RK_MAX_JOINT_COUPLINGS));
-    // Each pass settles at least one more link of every chain.
-    for (uint32_t pass = 0; pass < count; ++pass) {
-        bool changed = false;
-        for (uint32_t i = 0; i < count; ++i) {
-            const auto &coupling = blueprint.couplings[i];
-            if (coupling.leader >= blueprint.joint_count || coupling.follower >= blueprint.joint_count)
-                continue;
-            const auto &leader = blueprint.joints[coupling.leader];
-            auto &follower = blueprint.joints[coupling.follower];
-            const double scale = std::abs(coupling.ratio);
-            if (!(follower.max_velocity > 0.0) && leader.max_velocity > 0.0) {
-                follower.max_velocity = scale * leader.max_velocity;
-                changed = true;
-            }
-            if (!(follower.max_acceleration > 0.0) && leader.max_acceleration > 0.0) {
-                follower.max_acceleration = scale * leader.max_acceleration;
-                changed = true;
-            }
-        }
-        if (!changed) break;
-    }
-    return blueprint;
+/** Missing acceleration has no numeric sentinel: presence is carried in the blueprint. */
+double acceleration_limit(const rk_robot_runtime_joint &joint) {
+    return (joint.limit_flags & RK_LIMIT_ACCELERATION) ? joint.max_acceleration
+        : std::numeric_limits<double>::infinity();
 }
 
 /** Queued knots, excluding the end marker, once `added` replaces it. */
@@ -318,7 +294,7 @@ rk_result InMemoryRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) {
 RobotRuntime::RobotRuntime(const rk_robot_runtime_blueprint &blueprint,
                            std::shared_ptr<RobotEndpoint> endpoint,
                  std::chrono::nanoseconds period)
-    : blueprint_(with_coupled_limits(blueprint)), endpoint_(std::move(endpoint)), period_(period) {
+    : blueprint_(blueprint), endpoint_(std::move(endpoint)), period_(period) {
     for (uint32_t i = 0; i < blueprint_.channel_count && i < RK_MAX_PROCESS_CHANNELS; ++i)
         channel_outputs_[i] = blueprint_.channels[i].safe_value;
     state_.struct_size = sizeof(state_);
@@ -465,6 +441,7 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
         double anchor_position[RK_MAX_TRAJECTORY_JOINTS]{};
         double anchor_velocity[RK_MAX_TRAJECTORY_JOINTS]{};
         double anchor_acceleration[RK_MAX_TRAJECTORY_JOINTS]{};
+        double anchor_jerk[RK_MAX_TRAJECTORY_JOINTS]{};
         bool check_anchor_velocity = queue.empty();
         bool check_anchor_acceleration = queue.empty();
         if (queue.empty()) {
@@ -505,7 +482,7 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
                 }
             }
             evaluate_knot(*anchor, base_time, anchor_position, anchor_velocity,
-                anchor_acceleration);
+                anchor_acceleration, anchor_jerk);
             check_anchor_velocity = anchor->has_segment;
             check_anchor_acceleration = anchor->has_segment && anchor->segment.degree != 1;
             if (replace && (!anchor->has_segment || anchor->segment.degree < 2))
@@ -525,9 +502,21 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
                 ? plan.velocity_tolerance[joint] : default_tolerance;
             const double requested_acceleration_tolerance = plan.acceleration_tolerance[joint] > 0.0
                 ? plan.acceleration_tolerance[joint] : default_tolerance;
+            // Independently lowered phases meet at a rounded nanosecond boundary. Their
+            // extrapolated acceleration gap is bounded by half a tick times both jerks.
+            // Keep the C2 check strict beyond that physical clock quantization, including
+            // when a screw ratio magnifies a tiny carriage-coordinate rounding error.
+            const double first_jerk = first.degree >= 3 ? 6.0 * first.coefficients[joint].value[3] : 0.0;
+            const auto &joint_limits = blueprint_.joints[joint];
+            const double acceleration_scale = (joint_limits.limit_flags & RK_LIMIT_ACCELERATION)
+                ? joint_limits.max_acceleration : std::max(std::abs(anchor_acceleration[joint]),
+                    std::abs(2.0 * first.coefficients[joint].value[2]));
+            const double quantized_acceleration = std::min(
+                0.5e-9 * (std::abs(anchor_jerk[joint]) + std::abs(first_jerk)),
+                1e-6 * std::max(1.0, acceleration_scale));
             const double acceleration_tolerance = !queue.empty() &&
                 (plan.flags & RK_PLAN_JERK_UNCHECKED) == 0
-                ? std::min(requested_acceleration_tolerance, default_tolerance)
+                ? std::min(requested_acceleration_tolerance, std::max(default_tolerance, quantized_acceleration))
                 : requested_acceleration_tolerance;
             if (std::abs(plan.start_position[joint] - anchor_position[joint]) > position_tolerance ||
                 (check_anchor_velocity &&
@@ -553,12 +542,28 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
             mk_trajectory_state endpoint{};
             motionkit::evaluate_segment(segment,
                 static_cast<double>(terminal.duration_ns) * 1e-9, endpoint);
+            // A coupled joint moves its leaders' amount times the ratios, so its rest tolerance is theirs
+            // scaled the same way (a screw turns 3142 rad for a metre, a belt pulley 157).
+            double rest_scale[RK_MAX_JOINTS];
+            std::fill_n(rest_scale, blueprint_.joint_count, 1.0);
+            uint32_t followers[RK_MAX_JOINTS], follower_count = 0;
+            if (blueprint_.struct_size >= sizeof(blueprint_) &&
+                internal::order_followers(blueprint_.couplings, blueprint_.coupling_count,
+                    blueprint_.joint_count, nullptr, followers, follower_count))
+                for (uint32_t index = 0; index < follower_count; ++index) {
+                    double sum = 0.0;
+                    for (uint32_t k = 0; k < blueprint_.coupling_count; ++k)
+                        if (blueprint_.couplings[k].follower == followers[index])
+                            sum += std::abs(blueprint_.couplings[k].ratio) *
+                                rest_scale[blueprint_.couplings[k].leader];
+                    rest_scale[followers[index]] = std::max(1.0, sum);
+                }
             for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
                 // TOPP-RA can stop with nonzero endpoint acceleration. A
                 // checked-jerk plan must also join the held state smoothly.
-                if (std::abs(endpoint.velocity[joint]) > 1e-6 ||
+                if (std::abs(endpoint.velocity[joint]) > 1e-6 * rest_scale[joint] ||
                     ((plan.flags & RK_PLAN_JERK_UNCHECKED) == 0 &&
-                     std::abs(endpoint.acceleration[joint]) > 1e-6))
+                     std::abs(endpoint.acceleration[joint]) > 1e-6 * rest_scale[joint]))
                     return RK_ERROR_INVALID_ARGUMENT;
         }
         // A replacement keeps the queue only up to its anchor, so it works on a copy.
@@ -866,7 +871,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                     const double braking = std::max(0.0, std::max(
                         -direction * accelerations[joint], -direction * recent[joint]));
                     max_decrease = std::min(max_decrease,
-                        (blueprint_.joints[joint].max_acceleration - rate * braking) / speed);
+                        (acceleration_limit(blueprint_.joints[joint]) - rate * braking) / speed);
                 }
                 // No joint moving: the trajectory is at rest and can stop now.
                 // A non-positive bound means the trajectory already brakes at
@@ -933,7 +938,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                     const double path_acceleration = std::max(std::abs(estimate.acceleration[joint]),
                         std::abs(estimate.recent_acceleration[joint]));
                     max_increase = std::min(max_increase,
-                        std::max(0.0, blueprint_.joints[joint].max_acceleration -
+                        std::max(0.0, acceleration_limit(blueprint_.joints[joint]) -
                             rate * path_acceleration) / speed);
                 }
                 const double next_rate = !std::isfinite(max_increase) ? 1.0 :
@@ -1027,7 +1032,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         double duration_seconds = 2.0 * static_cast<double>(period_ns) / 1'000'000'000.0;
         double limited_duration = 0.0;
         for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
-            const auto acceleration = blueprint_.joints[joint].max_acceleration;
+            const auto acceleration = acceleration_limit(blueprint_.joints[joint]);
             if (std::isfinite(acceleration) && acceleration > 0.0)
                 limited_duration = std::max(limited_duration,
                     std::abs(velocities[joint]) / acceleration);
@@ -1074,7 +1079,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         refresh_trajectory_progress();
         bool has_acceleration_limits = true;
         for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
-            const auto acceleration = blueprint_.joints[joint].max_acceleration;
+            const auto acceleration = acceleration_limit(blueprint_.joints[joint]);
             if (!std::isfinite(acceleration) || acceleration <= 0.0) {
                 has_acceleration_limits = false;
                 break;
@@ -1214,7 +1219,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                         trajectory_.back().ends_at_rest) {
                         double ramp_duration = 2.0 * std::chrono::duration<double>(period_).count();
                         for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
-                            const double acceleration = blueprint_.joints[joint].max_acceleration;
+                            const double acceleration = acceleration_limit(blueprint_.joints[joint]);
                             if (std::isfinite(acceleration) && acceleration > 0.0)
                                 ramp_duration = std::max(ramp_duration,
                                     std::abs(velocities[joint]) / acceleration);
@@ -1254,7 +1259,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                     control_.stop_ramp_active)
                     return RK_ERROR_INVALID_STATE;
                 for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
-                    if (blueprint_.joints[joint].max_acceleration <= 0.0)
+                    if (acceleration_limit(blueprint_.joints[joint]) <= 0.0)
                         return RK_ERROR_UNSUPPORTED;
                 if (endpoint_->executes_trajectory_queue()) {
                     const auto result = apply_intermediate_lifecycle(value);
@@ -1314,7 +1319,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                     const double effort = target.mode == RK_TARGET_EFFORT ? target.target
                         : target.mode == RK_TARGET_SERVO ? value.servos[target_index].feedforward
                         : 0.0;
-                    if (joint.max_effort > 0.0 && std::abs(effort) > joint.max_effort) {
+                    if ((joint.limit_flags & RK_LIMIT_EFFORT) && std::abs(effort) > joint.max_effort) {
                         latch_fault();
                         return RK_ERROR_LIMIT;
                     }
@@ -1568,6 +1573,9 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
             if (!control_.active[joint])
                 continue;
             auto target = control_.targets[joint];
+            const auto &compiled_joint = blueprint_.joints[joint];
+            if (target.mode == RK_TARGET_VELOCITY && (compiled_joint.limit_flags & RK_LIMIT_VELOCITY))
+                target.target = std::clamp(target.target, -compiled_joint.max_velocity, compiled_joint.max_velocity);
             if (target.mode == RK_TARGET_VELOCITY && target.max_rate > 0.0)
                 target.target = std::clamp(target.target, -target.max_rate, target.max_rate);
             const uint64_t expiry = control_.velocity_expiry_ns[joint];
@@ -1577,8 +1585,8 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                 current.source_timestamp_ns >= expiry) {
                 // A lapsed velocity target: brake to zero within the joint's
                 // acceleration limit, then hold an exact zero.
-                const double acceleration = blueprint_.joints[joint].max_acceleration;
-                const double step = acceleration > 0.0 && std::isfinite(period_seconds)
+                const double acceleration = acceleration_limit(blueprint_.joints[joint]);
+                const double step = acceleration >= 0.0 && std::isfinite(period_seconds)
                     ? acceleration * period_seconds : std::numeric_limits<double>::infinity();
                 const double speed = std::max(0.0, std::abs(target.target) - step);
                 target.target = std::copysign(speed, target.target);
@@ -1596,8 +1604,13 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                     control_.reference_initialized[joint] = true;
                 }
                 const double delta = target.target - control_.position_reference[joint];
-                if (target.max_rate > 0.0 && std::isfinite(period_seconds)) {
-                    const double maximum_delta = target.max_rate * period_seconds;
+                double position_rate = std::numeric_limits<double>::infinity();
+                if ((compiled_joint.limit_flags & RK_LIMIT_VELOCITY) != 0)
+                    position_rate = compiled_joint.max_velocity;
+                if (target.max_rate > 0.0)
+                    position_rate = std::min(position_rate, target.max_rate);
+                if (std::isfinite(position_rate) && std::isfinite(period_seconds)) {
+                    const double maximum_delta = position_rate * period_seconds;
                     control_.position_reference[joint] += std::clamp(
                         delta, -maximum_delta, maximum_delta);
                 } else {

@@ -18,6 +18,8 @@ import robotkit.model.JointCoupling;
 import robotkit.model.Transmission;
 import robotkit.model.Actuator;
 import robotkit.model.ActuatorDrive;
+import robotkit.model.Encoder;
+import robotkit.model.EncoderKind;
 import robotkit.model.TorqueSpeedCurve;
 import robotkit.model.RobotDriveConfiguration;
 import robotkit.model.RobotMobileConfiguration;
@@ -237,12 +239,16 @@ class AssemblySimulationBridge {
       var factor = edge.type == AssemblyJointType.Prismatic ? scale : 1.0;
       joint.limits = new JointLimits(edge.limits.lower == null ? -1e9 : (edge.limits.lower - initial) * factor,
         edge.limits.upper == null ? 1e9 : (edge.limits.upper - initial) * factor,
-        edge.limits.velocity == null ? 0 : edge.limits.velocity * factor,
-        edge.limits.effort == null ? 0 : edge.limits.effort);
+        edge.limits.velocity == null ? null : edge.limits.velocity * factor,
+        edge.limits.effort);
+      if (edge.limits.assumptions != null) joint.limits.assumptions = [for (value in edge.limits.assumptions)
+        {quantity: value.quantity, label: value.label}];
       if (edge.limits.acceleration != null) joint.limits.maxAcceleration = edge.limits.acceleration * factor;
       joint.limits.overtravel = edge.limits.overtravel != null ? edge.limits.overtravel * factor :
         edge.type == AssemblyJointType.Prismatic ? DEFAULT_PRISMATIC_OVERTRAVEL : DEFAULT_ROTARY_OVERTRAVEL;
     }
+    // A follower summing several couplings' terms has its placement taken off once, in its first.
+    var offsetTargets = new Map<String, Bool>();
     if (definition.couplings != null) for (coupling in definition.couplings) {
       var leader:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
       var follower:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
@@ -256,8 +262,9 @@ class AssemblySimulationBridge {
       var leaderScale = leader.type == AssemblyJointType.Prismatic ? scale : 1.0;
       var followerScale = follower.type == AssemblyJointType.Prismatic ? scale : 1.0;
       var ratio = coupling.ratio * followerScale / leaderScale;
-      var offset = (coupling.ratio * placement.joint(coupling.source) + coupling.offset -
-        placement.joint(coupling.target)) * followerScale;
+      var placed = offsetTargets.exists(coupling.target) ? 0.0 : placement.joint(coupling.target);
+      offsetTargets.set(coupling.target, true);
+      var offset = (coupling.ratio * placement.joint(coupling.source) + coupling.offset - placed) * followerScale;
       var added = model.addCoupling(new JointCoupling(coupling.id, coupling.source,
         coupling.target, ratio, offset));
       if (coupling.efficiency != null) added.efficiency = coupling.efficiency;
@@ -266,6 +273,33 @@ class AssemblySimulationBridge {
       if (stiffness != null) added.stiffness = stiffness / leaderScale;
       if (backlash != null) added.backlash = backlash * leaderScale;
       if (drag != null) added.drag = drag * followerScale;
+      if (coupling.assumptions != null) added.assumptions = [for (value in coupling.assumptions)
+        {quantity: value.quantity, label: value.label}];
+      if (coupling.assumed != null) added.assumed = [for (label in coupling.assumed) label];
+    }
+    if (definition.elasticNetworks != null) for (network in definition.elasticNetworks) {
+      var spans:Array<robotkit.model.ElasticNetwork.ElasticSpan> = [];
+      for (span in network.spans) {
+        var terms:Array<robotkit.model.ElasticNetwork.ElasticTerm> = [];
+        for (term in span.terms) {
+          var edge:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
+          for (candidate in definition.joints) if (candidate.id == term.joint) edge = candidate;
+          if (edge == null) throw 'Elastic network "${network.id}" references no simulated joint';
+          var coordinateScale = edge.type == AssemblyJointType.Prismatic ? scale : 1.0;
+          terms.push({joint: term.joint, coefficient: term.coefficient * scale / coordinateScale});
+        }
+        spans.push({stiffness: span.stiffness / scale, terms: terms});
+      }
+      var added = new robotkit.model.ElasticNetwork(network.id, network.couplings.copy(), spans);
+      if (network.assumptions != null) added.assumptions = network.assumptions.copy();
+      if (network.clearances != null) for (clearance in network.clearances) {
+        var coordinateScale = 1.0;
+        for (edge in definition.joints) if (edge.id == clearance.joint && edge.type == AssemblyJointType.Prismatic)
+          coordinateScale = scale;
+        added.clearances.push({joint: clearance.joint, allowance: clearance.allowance * coordinateScale});
+      }
+      added.validate(model.joints, model.couplings);
+      model.elasticNetworks.push(added);
     }
     // A motor on a joint: its effort and rate in robot units, and its rotor turning with the joint.
     if (definition.actuators != null) for (actuator in definition.actuators) {
@@ -278,8 +312,14 @@ class AssemblySimulationBridge {
       // units from its initial placement: joint = (actuator - initial) * factor.
       var factor = edge.type == AssemblyJointType.Prismatic ? scale : 1.0;
       var initial = placement.joint(actuator.joint);
+      // A gearbox turns the motor `gearRatio` times for one unit of the joint: the actuator coordinate is that much more.
+      var gear = actuator.gearRatio == null ? 1.0 : actuator.gearRatio;
       var added = new Actuator(actuator.id, actuator.maxEffort, actuator.maxRate,
-        Transmission.SimpleTransmission(driven.id, 1 / factor, -initial * factor));
+        Transmission.SimpleTransmission(driven.id, gear / factor, -initial * factor));
+      if (actuator.gearEfficiency != null) added.efficiency = actuator.gearEfficiency;
+      if (actuator.assumed != null) added.assumed = [for (label in actuator.assumed) label];
+      added.microsteps = actuator.microsteps;
+      added.maxStepRate = actuator.maxStepRate;
       var steps = actuator.fullStepsPerRevolution;
       if (steps != null) added.fullStepsPerRevolution = steps;
       var inertia = actuator.rotorInertia == null ? 0.0 : actuator.rotorInertia;
@@ -294,9 +334,28 @@ class AssemblySimulationBridge {
           actuator.encoderCounts == null ? 0.0 : actuator.encoderCounts, curve);
       if (actuator.servoStiffness != null) added.servoStiffness = actuator.servoStiffness;
       if (actuator.servoDamping != null) added.servoDamping = actuator.servoDamping;
+      // The encoder that reads the motor is its own sensor; a servo that names one does not also hold a count.
+      if (actuator.encoder != null) added.encoder = actuator.encoder;
+      if (actuator.assumptions != null) added.assumptions = [for (value in actuator.assumptions)
+        {quantity: value.quantity, label: value.label}];
       model.addActuator(added);
       if (actuator.rotorInertia != null)
-        driven.armature += edge.type == AssemblyJointType.Prismatic ? 0.0 : actuator.rotorInertia;
+        // The rotor turns `gear` times as fast as the joint, so its inertia at the joint is `gear` squared times as much.
+        driven.armature += edge.type == AssemblyJointType.Prismatic ? 0.0 : actuator.rotorInertia * gear * gear;
+    }
+    model.materializeLimits();
+    // Encoders: sensors on joints. Counts per millimetre on a sliding joint, per revolution on a turning one.
+    if (definition.encoders != null) for (encoder in definition.encoders) {
+      var edge:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
+      for (candidate in definition.joints) if (candidate.id == encoder.joint) edge = candidate;
+      var onJoint:Null<Joint> = null;
+      for (joint in model.joints) if (joint.id == encoder.joint) onJoint = joint;
+      if (edge == null || onJoint == null) throw 'Assembly encoder "${encoder.id}" reads no simulated joint';
+      var kind:EncoderKind = encoder.kind;
+      var index = encoder.index == true;
+      model.addEncoder(edge.type == AssemblyJointType.Prismatic
+        ? Encoder.perMillimetre(encoder.id, onJoint.id, kind, encoder.counts, index)
+        : Encoder.perRevolution(encoder.id, onJoint.id, kind, encoder.counts, index));
     }
     if (mobileBase != null) {
       for (wheel in [mobileBase.leftWheel, mobileBase.rightWheel])

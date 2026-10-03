@@ -574,6 +574,21 @@ class SceneEditingTests {
   }
 
   static function sensorConfiguration():Void {
+    var urdfSensors = new SensorConfiguration();
+    var urdfLink = urdfSensors.model.addLink(new Link("Unbounded URDF joint link", "link/unbounded"));
+    var urdfJoint = urdfSensors.model.addJoint(new Joint("unbounded", JointType.Revolute,
+      urdfSensors.model.links[0], urdfLink, "joint/unbounded"));
+    urdfJoint.limits = new JointLimits(-1.0, 1.0, null, 5.0, 0.7);
+    urdfJoint.mechanicalLimits = new JointLimits(-1.2, 1.2, 2.0, 8.0, 1.2);
+    urdfJoint.mechanicalLimits.overtravel = 0.1;
+    var urdfRestored = new SensorConfiguration(haxe.Json.parse(haxe.Json.stringify(urdfSensors.records())));
+    var restoredLimits = urdfRestored.model.joints[0].limits;
+    var restoredMechanical = urdfRestored.model.joints[0].mechanicalLimits;
+    check(restoredLimits.velocity == null && restoredLimits.maxAcceleration == 0.7 &&
+      restoredMechanical != null && restoredMechanical.velocity == 2.0 &&
+      restoredMechanical.maxAcceleration == 1.2 && restoredMechanical.overtravel == 0.1,
+      "sensor document preserves nullable URDF limits and mechanical ceilings");
+    urdfRestored.dispose(); urdfSensors.dispose();
     var authored = new SensorConfiguration();
     var base = authored.model.links[0];
     var left = authored.model.addLink(new Link("Left wheel", "link/left"));

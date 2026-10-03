@@ -1,5 +1,7 @@
 package robotkit.model;
 
+import robotkit.model.EngineeringAssumptions.QuantityAssumption;
+
 /** One motor's place in the drive of an axis: how the axis's motion and force reach its rotor. */
 class MotorLoad {
   public final actuator:Actuator;
@@ -15,6 +17,11 @@ class MotorLoad {
   public final drag:Float;
   /** Share of the axis's force this motor carries, from what each could deliver. */
   public var share:Float = 1.0;
+  /** Rotor-coordinate spring and lost motion; zero stiffness states a rigid path. */
+  public var stiffness:Float = 0.0;
+  public var backlash:Float = 0.0;
+  public var assumed:Array<String> = [];
+  public var assumptions:Array<QuantityAssumption> = [];
 
   public function new(actuator:Actuator, joint:JointId, ratio:Float, efficiency:Float, rotorInertia:Float, drag:Float) {
     this.actuator = actuator;
@@ -48,8 +55,12 @@ class AxisLoad {
   public final motors:Array<MotorLoad> = [];
   /** Stiffness of the axis's drive against force on the axis, N/m; 0 when rigid. */
   public var stiffness:Float = 0.0;
+  public var elastic:Null<DriveCompliance> = null;
   /** Lost motion on reversal at the axis, in its units, summed along the drive. */
   public var backlash:Float = 0.0;
+  /** Assumptions along the axis's motor paths, with duplicates removed. */
+  public var assumed:Array<String> = [];
+  public var assumptions:Array<QuantityAssumption> = [];
   /** Running friction of the axis, in N: the joint's own dry friction, or the assumed rail drag of a sliding axis. */
   public final friction:Float;
 
@@ -82,13 +93,21 @@ class AxisLoad {
    * efficiency the other way.
    */
   public function motorTorque(motor:MotorLoad, velocity:Float, acceleration:Float, resisting:Float):Float {
+    var speed = motor.ratio * velocity;
+    var drag = speed > 1e-12 ? motor.drag : speed < -1e-12 ? -motor.drag : 0.0;
+    return motorTorqueWithoutDrag(motor, velocity, acceleration, resisting) + drag;
+  }
+
+  /**
+   * As `motorTorque`, less drag. A motor that serves several axes (CoreXY) takes the sum of this
+   * over its axes, and one drag in the direction of its total motion.
+   */
+  public function motorTorqueWithoutDrag(motor:MotorLoad, velocity:Float, acceleration:Float, resisting:Float):Float {
     var load = force(velocity, acceleration, resisting);
     var perUnit = motor.share * load / motor.ratio;
     var motoring = load * velocity >= 0.0;
     var transmitted = motoring ? perUnit / motor.efficiency : perUnit * motor.efficiency;
-    var speed = motor.ratio * velocity;
-    var drag = speed > 1e-12 ? motor.drag : speed < -1e-12 ? -motor.drag : 0.0;
-    return motor.rotorInertia * motor.ratio * acceleration + transmitted + drag;
+    return motor.rotorInertia * motor.ratio * acceleration + transmitted;
   }
 }
 
@@ -103,23 +122,71 @@ class DriveLoads {
 
   /** The load on axis `id`, or null when it is not an axis or no actuator drives it. */
   public static function forAxis(model:RobotModel, id:JointId, ?steady:SteadyLoads):Null<AxisLoad> {
-    for (joint in model.joints) if (joint.id == id) {
-      for (coupling in model.couplings) if (coupling.follower == id) return null;
-      return axisLoad(model, joint, steady == null ? new SteadyLoads() : steady);
-    }
+    for (load in of(model, steady)) if (load.axis == id) return load;
     return null;
   }
 
-  public static function of(model:RobotModel, ?steady:SteadyLoads):Array<AxisLoad> {
+  /** Steady force needs this axis's drag and gravity, not a shared stiffness inversion. */
+  public static function basicForAxis(model:RobotModel, id:JointId, ?steady:SteadyLoads):Null<AxisLoad> {
+    for (joint in model.joints) if (joint.id == id)
+      return axisLoad(model, joint, steady == null ? new SteadyLoads() : steady);
+    return null;
+  }
+
+  public static function of(model:RobotModel, ?steady:SteadyLoads, ?axisIds:Array<String>):Array<AxisLoad> {
     var loads = steady == null ? new SteadyLoads() : steady;
     var followers = new Map<String, Bool>();
     for (coupling in model.couplings) followers.set(coupling.follower, true);
     var result:Array<AxisLoad> = [];
     for (joint in model.joints) {
-      if (followers.exists(joint.id)) continue;
+      if (followers.exists(joint.id) || (axisIds != null && axisIds.indexOf(joint.id) < 0)) continue;
       var load = axisLoad(model, joint, loads);
       if (load != null) result.push(load);
     }
+    // A partly wired coupled drive still has useful per-axis speed and force
+    // bounds. Its shared stiffness has no unique inverse until every degree
+    // of freedom has an independent motor constraint.
+    if (result.length > 0) {
+      var elastic = new DriveCompliance(result, model);
+    }
+    return result;
+  }
+
+  /** Axes whose motor-coordinate Jacobian has insufficient independent rows. */
+  public static function uncontrolledAxes(loads:Array<AxisLoad>):Array<String> {
+    var rows:Array<Array<Float>> = [], motors:Array<String> = [];
+    for (load in loads) for (motor in load.motors)
+      if (motors.indexOf(motor.actuator.id) < 0) motors.push(motor.actuator.id);
+    for (id in motors) {
+      var row = [for (_ in loads) 0.0];
+      for (axis in 0...loads.length) for (motor in loads[axis].motors)
+        if (motor.actuator.id == id) row[axis] = motor.ratio;
+      rows.push(row);
+    }
+    var pivoted:Array<Bool> = [for (_ in loads) false], rank = 0;
+    for (column in 0...loads.length) {
+      var pivot = -1;
+      for (row in rank...rows.length) if (Math.abs(rows[row][column]) > 1e-10) {pivot = row; break;}
+      if (pivot < 0) continue;
+      var swap = rows[rank]; rows[rank] = rows[pivot]; rows[pivot] = swap;
+      var scale = rows[rank][column];
+      for (at in column...loads.length) rows[rank][at] /= scale;
+      for (row in rank + 1...rows.length) {
+        var factor = rows[row][column];
+        for (at in column...loads.length) rows[row][at] -= factor * rows[rank][at];
+      }
+      pivoted[column] = true; rank++;
+      if (rank == rows.length) break;
+    }
+    return [for (axis in 0...loads.length) if (!pivoted[axis]) loads[axis].axis];
+  }
+
+  /** A summed follower includes every upstream path, even when two paths reach the same joint. */
+  static function derivative(model:RobotModel, joint:JointId, axis:JointId):Float {
+    if (joint == axis) return 1.0;
+    var result = 0.0;
+    for (coupling in model.couplings) if (coupling.follower == joint)
+      result += coupling.ratio * derivative(model, coupling.leader, axis);
     return result;
   }
 
@@ -131,7 +198,8 @@ class DriveLoads {
     var compliance:Array<Float> = [0.0];
     var backlash:Array<Float> = [0.0];
     var drag:Array<Float> = [0.0];
-    var rigid:Array<Bool> = [true];
+    var assumed:Array<Array<String>> = [[]];
+    var quantities:Array<Array<QuantityAssumption>> = [[]];
     var next = 0;
     while (next < reached.length) {
       var leader = reached[next], leaderRatio = ratios[next];
@@ -140,15 +208,21 @@ class DriveLoads {
         var follower:Null<Joint> = null;
         for (candidate in model.joints) if (candidate.id == coupling.follower) follower = candidate;
         if (follower == null || reached.indexOf(follower) >= 0) continue;
-        var ratio = coupling.ratio * leaderRatio;
+        var ratio = derivative(model, follower.id, axis.id);
+        if (ratio == 0.0) continue;
         reached.push(follower);
+        var labels = assumed[at].copy();
+        for (label in coupling.assumed) if (labels.indexOf(label) < 0) labels.push(label);
+        assumed.push(labels);
+        var fields = quantities[at].copy();
+        EngineeringAssumptions.merge(fields, coupling.assumptions);
+        quantities.push(fields);
         ratios.push(ratio);
         efficiencies.push(efficiencies[at] * coupling.efficiency);
         // Stiffness is at the coupling's leader, which moves |leaderRatio| per unit of the axis.
         var leaderScale = Math.abs(leaderRatio);
         var soft = coupling.stiffness > 0.0;
         compliance.push(compliance[at] + (soft ? 1.0 / (coupling.stiffness * leaderScale * leaderScale) : 0.0));
-        rigid.push(rigid[at] && !soft);
         backlash.push(backlash[at] + coupling.backlash / leaderScale);
         // Drag is in the follower's units; further down the chain it reaches the motor through the ratios.
         drag.push(drag[at] * Math.abs(coupling.ratio) + coupling.drag);
@@ -164,15 +238,21 @@ class DriveLoads {
         if (index < 0) continue;
         var motorRatio = transmissionRatio * ratios[index];
         if (motorRatio == 0.0) continue;
-        var motor = new MotorLoad(actuator, target, motorRatio, efficiencies[index],
+        var motor = new MotorLoad(actuator, target, motorRatio, efficiencies[index] * actuator.efficiency,
           model.turningInertia(reached[index]), drag[index] * Math.abs(transmissionRatio));
+        motor.stiffness = compliance[index] > 0.0 ? 1.0 / (compliance[index] * motorRatio * motorRatio) : 0.0;
+        motor.backlash = backlash[index] * Math.abs(motorRatio);
+        motor.assumed = assumed[index].copy();
+        motor.assumptions = quantities[index].copy();
+        EngineeringAssumptions.merge(motor.assumptions, actuator.assumptions);
+        for (label in actuator.assumed) if (motor.assumed.indexOf(label) < 0) motor.assumed.push(label);
         motors.push(motor);
         motorJoints.push(reached[index]);
-        total += efficiencies[index] * actuator.planningEffort() * Math.abs(motorRatio);
+        total += efficiencies[index] * actuator.efficiency * actuator.requireEffort() * Math.abs(motorRatio);
     }
     if (motors.length == 0) return null;
     for (motor in motors)
-      motor.share = total > 0.0 ? motor.efficiency * motor.actuator.planningEffort() * Math.abs(motor.ratio) / total : 1.0 / motors.length;
+      motor.share = total > 0.0 ? motor.efficiency * motor.actuator.requireEffort() * Math.abs(motor.ratio) / total : 1.0 / motors.length;
     var sliding = axis.type == JointType.Prismatic;
     var mass = sliding ? model.carriedMass(axis) + axis.armature : model.turningInertia(axis);
     // Coupled joints that no motor turns are inertia on the axis, through their own couplings.
@@ -187,20 +267,29 @@ class DriveLoads {
         gravityForce = carried * steady.gravity;
       } else gravityForce = carried * steady.gravity * along;
     }
-    var load = new AxisLoad(axis.id, sliding, mass, gravityForce, worst, steady.friction(axis));
-    for (motor in motors) load.motors.push(motor);
-    // Motors in parallel share the deflection, so their stiffnesses add; one rigid drive makes the
-    // axis rigid, whatever softer ones do. Backlash takes the loosest drive.
-    var stiffness = 0.0, loose = 0.0, anyRigid = false;
-    for (motor in motors) {
-      var index = -1;
-      for (candidate in 0...reached.length) if (reached[candidate].id == motor.joint) index = candidate;
-      if (rigid[index]) anyRigid = true;
-      else stiffness += 1.0 / compliance[index];
-      loose = Math.max(loose, backlash[index]);
+    var passiveDrag = 0.0;
+    for (index in 1...reached.length) if (motorJoints.indexOf(reached[index]) < 0) {
+      var jointDrag = 0.0;
+      for (coupling in model.couplings) if (coupling.follower == reached[index].id)
+        jointDrag = Math.max(jointDrag, coupling.drag);
+      passiveDrag += jointDrag * Math.abs(ratios[index]);
     }
-    load.stiffness = anyRigid ? 0.0 : stiffness;
-    load.backlash = loose;
+    var load = new AxisLoad(axis.id, sliding, mass, gravityForce, worst, steady.friction(axis) + passiveDrag);
+    for (index in 1...reached.length) if (motorJoints.indexOf(reached[index]) < 0)
+      for (value in quantities[index]) if (value.quantity == "drag") {
+        EngineeringAssumptions.add(load.assumptions, value.quantity, value.label);
+        for (motor in motors) EngineeringAssumptions.add(motor.assumptions, value.quantity, value.label);
+      }
+    for (motor in motors) {
+      load.motors.push(motor);
+      EngineeringAssumptions.merge(load.assumptions, motor.assumptions);
+      for (label in motor.assumed) if (load.assumed.indexOf(label) < 0) load.assumed.push(label);
+    }
+    if (sliding && axis.frictionLoss <= 0.0)
+      EngineeringAssumptions.add(load.assumptions, "drag", "rail drag");
+    if (sliding && axis.frictionLoss <= 0.0) for (motor in motors)
+      EngineeringAssumptions.add(motor.assumptions, "drag", "rail drag");
+    load.assumed.sort(Reflect.compare);
     return load;
   }
 

@@ -25,6 +25,11 @@ class ManipulatorMotion {
   public final session:MotionSession = new MotionSession();
   /** What the plan checks found in the plans this motion has started, if its compiler runs one. */
   public final checks:PlanCheckSummary = new PlanCheckSummary();
+  /**
+   * Carries out the stepper slip the plan checks predict, when a simulation sets one. It is fed each plan
+   * as it starts and its elapsed time while it runs.
+   */
+  public var slip:Null<StepperSlip> = null;
   final input:String -> Null<EventValue>;
   final eventSource:Void -> {events:Array<FiredProcessEvent>, overflow:Bool};
   final executor:PlanExecutor;
@@ -40,6 +45,8 @@ class ManipulatorMotion {
   var pendingProgram:Null<MotionProgram>;
   var programCompleted:Bool = false;
   var planStarted:Bool = false;
+  /** Past any plan's end, to bring a finished plan's slip to its total. */
+  static inline final plansEnd = 1e12;
   var nextPlanId:Int64 = Int64.ofInt(1);
   var events:Array<FiredProcessEvent> = [];
   var lastCommandedQ:Null<Array<Float>> = null;
@@ -133,6 +140,8 @@ class ManipulatorMotion {
         var problem = planning.failure;
         if (problem != null) throw problem;
       }
+      var carrying = slip;
+      if (carrying != null && planStarted) carrying.update(executor.completed ? plansEnd : executor.elapsedSeconds);
       if (executor.completed && planStarted) { planIndex++; planStarted = false; }
       advance(dtSeconds);
     } catch (error:Dynamic) { fail(Std.string(error), !session.isFaulted()); }
@@ -207,6 +216,8 @@ class ManipulatorMotion {
         if (!planStarted) {
           var checked = block.plans[planIndex].checked;
           if (checked != null) checks.add(checked);
+          var carrying = slip;
+          if (carrying != null) carrying.start(checked);
           executor.start(block.plans[planIndex], true);
           planStarted = true;
           startedPlans++;

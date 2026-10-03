@@ -16,7 +16,7 @@ import materia.units.LengthUnit;
 
 /** Versioned transport and validation for reusable assembly definitions and states. */
 class AssemblyDefinitionCodec {
-	public static inline var VERSION:Int = 2;
+	public static inline var VERSION:Int = 3;
 
 	public static function encode(definition:AssemblyDefinition):String {
 		validate(definition);
@@ -24,8 +24,6 @@ class AssemblyDefinitionCodec {
 	}
 
 	public static function decode(text:String):AssemblyDefinition {
-		if (Reflect.hasField(Json.parse(text), "schemaVersion"))
-			throw "Assembly definitions in the old JSON format are no longer supported";
 		var result:AssemblyDefinition = JsonWire.decode(text);
 		validate(result);
 		return result;
@@ -37,14 +35,14 @@ class AssemblyDefinitionCodec {
 	}
 
 	public static function decodeState(definition:AssemblyDefinition, text:String):AssemblyStateRecord {
-		if (Reflect.hasField(Json.parse(text), "schemaVersion"))
-			throw "Assembly states in the old JSON format are no longer supported";
 		var decoded:AssemblyStateRecord = JsonWire.decode(text);
 		validateState(definition, decoded);
 		return decoded;
 	}
 
 	public static function validate(definition:AssemblyDefinition):Void {
+		if (definition != null && definition.schemaVersion != VERSION)
+			throw 'schema v${definition.schemaVersion} is unsupported; expected v$VERSION';
 		if (definition != null && definition.assemblies != null && definition.assemblies.length > 0) {
 			validateFlat(AssemblyDefinitionFlattener.flatten(definition));
 			return;
@@ -146,11 +144,12 @@ class AssemblyDefinitionCodec {
 		var couplings = definition.couplings == null ? [] : definition.couplings;
 		if (couplings.length > 4000) throw "Assembly has too many coupled joints";
 		var targets = new Map<String, Bool>(), names = new Map<String, Bool>();
-		var sourceByTarget = new Map<String, String>();
+		var sourcesByTarget = new Map<String, Array<String>>();
 		for (coupling in couplings) {
 			if (coupling == null || !validText(coupling.id) || names.exists(coupling.id) ||
 				coupling.source == coupling.target || movable.get(coupling.source) == null ||
-				movable.get(coupling.target) == null || targets.exists(coupling.target) ||
+				movable.get(coupling.target) == null ||
+				(sourcesByTarget.exists(coupling.target) && sourcesByTarget.get(coupling.target).indexOf(coupling.source) >= 0) ||
 				!Math.isFinite(coupling.ratio) || coupling.ratio == 0 || !Math.isFinite(coupling.offset) ||
 				(coupling.efficiency != null && !(coupling.efficiency > 0 && coupling.efficiency <= 1)) ||
 				(coupling.stiffness != null && !(coupling.stiffness > 0 && Math.isFinite(coupling.stiffness))) ||
@@ -161,8 +160,37 @@ class AssemblyDefinitionCodec {
 				throw 'Assembly joint "${coupling.target}" is driven by a coupling, so it cannot also be an input';
 			names.set(coupling.id, true);
 			targets.set(coupling.target, true);
-			sourceByTarget.set(coupling.target, coupling.source);
+			// A target with several couplings is the sum of their terms (see AssemblyJointCoupling).
+			if (!sourcesByTarget.exists(coupling.target)) sourcesByTarget.set(coupling.target, []);
+			sourcesByTarget.get(coupling.target).push(coupling.source);
 		}
+		var networkIds = new Map<String, Bool>(), owned = new Map<String, Bool>();
+		if (definition.elasticNetworks != null) for (network in definition.elasticNetworks) {
+			if (!validText(network.id) || networkIds.exists(network.id) || network.spans.length == 0)
+				throw "Assembly has an invalid elastic network";
+			networkIds.set(network.id, true);
+			for (id in network.couplings) {
+				if (!names.exists(id) || owned.exists(id)) throw "Elastic networks require distinct, existing motion couplings";
+				owned.set(id, true);
+			}
+			var clearanceJoints = new Map<String, Bool>();
+			if (network.clearances != null) for (clearance in network.clearances) {
+				if (!movable.exists(clearance.joint) || clearanceJoints.exists(clearance.joint) || !Math.isFinite(clearance.allowance) || clearance.allowance < 0)
+					throw "Elastic network has an invalid tooth-clearance coordinate";
+				clearanceJoints.set(clearance.joint, true);
+			}
+			for (span in network.spans) {
+				if (!(span.stiffness > 0) || !Math.isFinite(span.stiffness) || span.terms.length == 0)
+					throw "Elastic span needs positive finite stiffness and coordinate terms";
+				var terms = new Map<String, Bool>();
+				for (term in span.terms) {
+					if (!movable.exists(term.joint) || terms.exists(term.joint) || !Math.isFinite(term.coefficient) || term.coefficient == 0)
+						throw "Elastic span has an invalid or duplicate coordinate";
+					terms.set(term.joint, true);
+				}
+			}
+		}
+
 		var actuators = definition.actuators == null ? [] : definition.actuators;
 		if (actuators.length > 4000) throw "Assembly has too many actuators";
 		var actuatorIds = new Map<String, Bool>();
@@ -176,23 +204,39 @@ class AssemblyDefinitionCodec {
 				throw 'Assembly has an invalid actuator "${actuator == null ? "" : actuator.id}"';
 			actuatorIds.set(actuator.id, true);
 		}
-		for (coupling in couplings) {
-			var seen = new Map<String, Bool>();
-			var current = coupling.target;
-			while (true) {
-				if (seen.exists(current)) throw "Assembly coupled joints contain a cycle";
-				seen.set(current, true);
-				var next = sourceByTarget.get(current);
-				if (next == null) break;
-				current = next;
-			}
+		var encoders = definition.encoders == null ? [] : definition.encoders;
+		if (encoders.length > 4000) throw "Assembly has too many encoders";
+		var encoderIds = new Map<String, Bool>();
+		for (encoder in encoders) {
+			if (encoder == null || !validText(encoder.id) || encoderIds.exists(encoder.id) || movable.get(encoder.joint) == null ||
+				(encoder.kind != "incremental" && encoder.kind != "absolute") ||
+				!(encoder.counts > 0 && Math.isFinite(encoder.counts)))
+				throw 'Assembly has an invalid encoder "${encoder == null ? "" : encoder.id}"';
+			encoderIds.set(encoder.id, true);
 		}
+		for (actuator in actuators)
+			if (actuator.encoder != null && !encoderIds.exists(actuator.encoder))
+				throw 'Assembly actuator "${actuator.id}" names an unknown encoder "${actuator.encoder}"';
+		// No joint may depend on itself through any chain of terms: depth-first search, 1 on the path, 2 done.
+		var visiting = new Map<String, Int>();
+		function visit(joint:String):Void {
+			var mark = visiting.get(joint);
+			if (mark == 2) return;
+			if (mark == 1) throw "Assembly coupled joints contain a cycle";
+			visiting.set(joint, 1);
+			var sources = sourcesByTarget.get(joint);
+			if (sources != null) for (source in sources) visit(source);
+			visiting.set(joint, 2);
+		}
+		for (coupling in couplings) visit(coupling.target);
 	}
 
 	public static function validateState(definition:AssemblyDefinition, state:AssemblyStateRecord):Void {
 		validate(definition);
 		state = AssemblyDefinitionFlattener.flattenState(definition, state);
 		definition = AssemblyDefinitionFlattener.flatten(definition);
+		if (state != null && state.schemaVersion != VERSION)
+			throw 'schema v${state.schemaVersion} is unsupported; expected v$VERSION';
 		if (state == null || state.schemaVersion != VERSION || state.definition != definition.id ||
 			state.jointCoordinates == null || state.rootPoses == null ||
 			state.jointCoordinates.length > definition.joints.length ||
@@ -212,15 +256,23 @@ class AssemblyDefinitionCodec {
 			values.set(coordinate.joint, true);
 			coordinateValues.set(coordinate.joint, coordinate.value);
 		}
-		if (definition.couplings != null) for (coupling in definition.couplings) {
-			var source = coordinateValues.get(coupling.source);
-			var target = coordinateValues.get(coupling.target);
-			var sourceJoint = joints.get(coupling.source), targetJoint = joints.get(coupling.target);
-			if (sourceJoint == null || targetJoint == null) throw "Assembly coupling has a missing joint";
-			if (source == null) source = sourceJoint.defaultValue;
-			if (target == null) target = targetJoint.defaultValue;
-			if (Math.abs(target - (source * coupling.ratio + coupling.offset)) > 1e-7)
-				throw 'Assembly coupling "${coupling.id}" has inconsistent state';
+		if (definition.couplings != null) {
+			var expected = new Map<String, Float>();
+			for (coupling in definition.couplings) {
+				var source = coordinateValues.get(coupling.source);
+				var sourceJoint = joints.get(coupling.source), targetJoint = joints.get(coupling.target);
+				if (sourceJoint == null || targetJoint == null) throw "Assembly coupling has a missing joint";
+				if (source == null) source = sourceJoint.defaultValue;
+				var sum = expected.get(coupling.target);
+				expected.set(coupling.target, (sum == null ? 0.0 : sum) + source * coupling.ratio + coupling.offset);
+			}
+			for (target => sum in expected) {
+				var value = coordinateValues.get(target);
+				var targetJoint = joints.get(target);
+				if (targetJoint == null) throw "Assembly coupling has a missing joint";
+				if (value == null) value = targetJoint.defaultValue;
+				if (Math.abs(value - sum) > 1e-7) throw 'Assembly coupling on "$target" has inconsistent state';
+			}
 		}
 
 		var roots = rootOccurrences(definition);
@@ -301,6 +353,10 @@ class AssemblyDefinitionCodec {
 		for (value in [actuator.holdingTorque, actuator.ratedTorque, actuator.peakTorque, actuator.ratedSpeed, actuator.maxSpeed,
 				actuator.encoderCounts, actuator.servoStiffness, actuator.servoDamping])
 			if (value != null && !(value >= 0 && Math.isFinite(value))) return false;
+		if (actuator.microsteps != null && (actuator.microsteps < 1 || actuator.microsteps > 1024)) return false;
+		if (actuator.maxStepRate != null && (!(actuator.maxStepRate > 0) || !Math.isFinite(actuator.maxStepRate))) return false;
+		if (actuator.gearRatio != null && !(actuator.gearRatio > 0 && Math.isFinite(actuator.gearRatio))) return false;
+		if (actuator.gearEfficiency != null && !(actuator.gearEfficiency > 0 && actuator.gearEfficiency <= 1)) return false;
 		var curve = actuator.torqueSpeed;
 		if (curve != null) {
 			if (curve.length == 0 || curve.length % 2 != 0) return false;
@@ -309,9 +365,12 @@ class AssemblyDefinitionCodec {
 				if (index >= 2 && index % 2 == 0 && !(curve[index] > curve[index - 2])) return false;
 			}
 		}
+		if (actuator.fullStepsPerRevolution != null && actuator.fullStepsPerRevolution > 0
+			&& (actuator.microsteps == null || actuator.maxStepRate == null)) return false;
 		var kind = actuator.drive;
 		if (kind == null) return true;
-		if (kind == "stepper") return actuator.fullStepsPerRevolution != null && actuator.holdingTorque != null && curve != null;
+		if (kind == "stepper") return actuator.fullStepsPerRevolution != null && actuator.holdingTorque != null && curve != null
+			&& actuator.microsteps != null && actuator.maxStepRate != null;
 		if (kind == "servo")
 			return actuator.ratedTorque != null && actuator.peakTorque != null && actuator.ratedSpeed != null &&
 				actuator.maxSpeed != null && actuator.ratedTorque > 0 && actuator.peakTorque >= actuator.ratedTorque &&

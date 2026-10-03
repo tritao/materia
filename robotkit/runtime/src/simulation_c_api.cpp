@@ -215,6 +215,12 @@ rk_result RK_CALL rk_simulation_reset_robot(rk_simulation simulation, uint32_t r
     return value ? value->reset_robot(robot_index) : RK_ERROR_INVALID_HANDLE;
 }
 
+rk_result RK_CALL rk_simulation_set_joint_slip(rk_simulation simulation, uint32_t robot_index,
+                                                uint32_t joint, double offset) {
+    const auto value = resolve(simulation);
+    return value ? value->set_joint_slip(robot_index, joint, offset) : RK_ERROR_INVALID_HANDLE;
+}
+
 rk_result RK_CALL rk_simulation_teleport_robot(rk_simulation simulation, uint32_t robot_index,
                                                 const rk_simulation_pose *pose) {
     if (!pose)

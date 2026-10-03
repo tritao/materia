@@ -705,9 +705,9 @@ class KinematicsTests extends MotionKitTestSupport {
     first.limits.upper = 0.08;
     second.limits.lower = -0.16;
     second.limits.upper = 0.01;
-    model.addActuator(new Actuator("left-motor", 0.0, 1.0,
+    model.addActuator(new Actuator("left-motor", null, 1.0,
       Transmission.SimpleTransmission(first.id, 1.0, 0.0)));
-    model.addActuator(new Actuator("right-motor", 0.0, 1.0,
+    model.addActuator(new Actuator("right-motor", null, 1.0,
       Transmission.SimpleTransmission(second.id, -0.5, 0.01)));
     var authored = new MotionAxisBlueprint("x", [first.id, second.id],
       0.0, 0.08, 0.08, 0.4);

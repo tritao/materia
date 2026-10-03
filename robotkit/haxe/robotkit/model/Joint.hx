@@ -7,6 +7,8 @@ class Joint {
   public final parent:Link;
   public final child:Link;
   public var limits:JointLimits;
+  /** Mechanical inputs retained when `limits` becomes the compiled effective result. */
+  public var mechanicalLimits:Null<JointLimits>;
   public var parentFramePosition:Array<Float> = [0.0, 0.0, 0.0];
   public var parentFrameRotation:Array<Float> = [0.0, 0.0, 0.0, 1.0];
   public var childFramePosition:Array<Float> = [0.0, 0.0, 0.0];
@@ -28,7 +30,7 @@ class Joint {
   public var limitImpedance:Array<Float> = [0.0, 0.0, 0.0, 0.0, 0.0];
 
   public function new(name:String, type:JointType, parent:Link, child:Link, ?id:JointId) {
-    // Legacy callers use the initial name once; imports pass the stored ID.
+    // Authors can use the initial name once; imports pass the stored ID.
     this.id = id == null ? name : id;
     this.name = name;
     this.type = type;

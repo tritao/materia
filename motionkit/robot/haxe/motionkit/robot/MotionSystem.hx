@@ -47,6 +47,7 @@ class MotionSystem {
   var activeTrajectory:Null<Trajectory> = null;
   var queuedTrajectories:Array<Trajectory> = [];
   final stream:TrajectoryStream;
+  final jointTolerances:Array<Float>;
   final session:MotionSession = new MotionSession();
   var activeStationary:Bool = false;
   var elapsedSeconds(get, never):Float;
@@ -91,12 +92,16 @@ class MotionSystem {
     this.replacementMarginOwnerPeriods = blueprint.replacementMarginOwnerPeriods;
     this.replacementOwnerPeriodSeconds = blueprint.replacementOwnerPeriodSeconds;
     this.axes = [];
+    jointTolerances = [for (_ in description.joints) 1e-6];
     var axisIds = new Map<String, Bool>();
     for (axisBlueprint in blueprint.axes) {
       var axis = new MotionAxis(axisBlueprint, description.joints);
       if (axisIds.exists(axis.id)) throw 'Duplicate motion axis "${axis.id}"';
       axisIds.set(axis.id, true);
       this.axes.push(axis);
+      var tolerance = [for (_ in description.joints) 0.0];
+      axis.writeLogicalDelta(tolerance, 1e-6);
+      for (joint in axis.jointIndices) jointTolerances[joint] = Math.abs(tolerance[joint]);
     }
     axisPlanner = new AxisPlanner(this.axes, fixedTimestepSeconds);
     pathPlanner = new PathPlanner(this.axes, fixedTimestepSeconds,
@@ -477,7 +482,7 @@ class MotionSystem {
       planFromState:TrajectoryState -> Trajectory):Null<Trajectory> {
     if (executing == null) return null;
     try {
-      return TrajectoryStream.replaceWithRetry(executing, syncFromRuntime,
+      return stream.replaceWithRetry(executing, syncFromRuntime,
         replacementOwnerPeriodSeconds, replacementMarginOwnerPeriods, planFromState,
         (planned, state, observation, anchorNs) ->
           submitSmoothReplacement(planned, state, observation, anchorNs, jogAxis));
@@ -490,7 +495,7 @@ class MotionSystem {
   function submitSmoothReplacement(planned:Trajectory, state:TrajectoryState,
       observation:RobotSnapshot, anchorNs:Int64, jogAxis:Null<String>):Trajectory {
     var tag = stream.submitSmoothReplacement(planned, state, observation,
-      anchorNs, modelRevision, calibrationRevision);
+      anchorNs, modelRevision, calibrationRevision, jointTolerances);
     setActive(planned);
     session.jogAxis = jogAxis;
     bufferedTotalSeconds = planned.durationSeconds();
@@ -613,7 +618,7 @@ class MotionSystem {
       stream.fill(session,
         (first, last, tag, startNs, _) -> stream.motionSubmission(
           trajectoryValue, first, last, tag, startNs, modelRevision,
-          calibrationRevision, jerkUnchecked),
+          calibrationRevision, jerkUnchecked, jointTolerances),
         (first, last, error) ->
           'plan chunk [$first,$last] of ${trajectoryValue.segments().length}: $error');
     } catch (error:Dynamic) {

@@ -589,7 +589,7 @@ void effort_target_respects_max_force_clamp() {
         joint_desc.body_a = base;
         joint_desc.body_b = wheel;
         joint_desc.axis_a[2] = 1.0;
-        joint_desc.max_force = 1000.0; // Unclamped at the joint description itself.
+        joint_desc.max_force = max_force < 0.0 ? max_force : 1000.0;
         nksim_joint joint = 0;
         assert(nksim_joint_create(world, &joint_desc, &joint) == NKSIM_OK);
         nksim_joint_target target{};
@@ -615,6 +615,7 @@ void effort_target_respects_max_force_clamp() {
     const auto at_limit = run(10.0, 10.0);
     assert(std::abs(clamped - at_limit) < 1e-9);
     assert(std::abs(clamped) > 1e-6); // The clamp still lets it move.
+    assert(std::abs(run(500.0, -1.0)) < 1e-12); // RobotKit's explicit zero-effort limit disables force.
 }
 
 void kinematic_root_child_velocity_matches_joint_across_substeps() {
@@ -1728,6 +1729,72 @@ void coupled_prismatic_joints_use_equality_and_convex_collision() {
     nkscene_scene_destroy(scene);
 }
 
+// A follower with two leaders is held by a fixed tendon and a tendon equality, like a CoreXY
+// motor turning with both axes.
+void a_follower_with_two_leaders_uses_a_tendon_equality() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    nksim_world_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.scene = scene;
+    desc.fixed_timestep = 0.01;
+    desc.physics_substeps = 2;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
+    const auto base = make_body(world, make_node(scene, 0.0), NKSIM_MOTION_STATIC, 0.0);
+    nksim_joint_desc joint{};
+    joint.struct_size = sizeof(joint);
+    joint.type = NKSIM_JOINT_PRISMATIC;
+    joint.body_a = base;
+    joint.axis_a[0] = 1.0;
+    joint.lower_limit = -1.0;
+    joint.upper_limit = 1.0;
+    joint.max_force = 100.0;
+    nksim_joint joints[3] = {};
+    for (auto &handle : joints) {
+        joint.body_b = make_body(world, make_node(scene, 0.0), NKSIM_MOTION_DYNAMIC, 1.0);
+        assert(nksim_joint_create(world, &joint, &handle) == NKSIM_OK);
+    }
+    // follower = 2 a - 3 b + 0.1 + 0.05.
+    nksim_joint_coupling_desc term{};
+    term.struct_size = sizeof(term);
+    term.follower = joints[2];
+    term.leader = joints[0];
+    term.ratio = 2.0;
+    term.offset = 0.1;
+    assert(nksim_joint_couple(world, &term) == NKSIM_OK);
+    assert(nksim_joint_couple(world, &term) == NKSIM_ERROR_INVALID_ARGUMENT);
+    nksim_joint_coupling_desc cycle{};
+    cycle.struct_size = sizeof(cycle);
+    cycle.follower = joints[0];
+    cycle.leader = joints[2];
+    cycle.ratio = 1.0;
+    assert(nksim_joint_couple(world, &cycle) == NKSIM_ERROR_INVALID_ARGUMENT);
+    term.leader = joints[1];
+    term.ratio = -3.0;
+    term.offset = 0.05;
+    assert(nksim_joint_couple(world, &term) == NKSIM_OK);
+    nksim_joint_target commands[2]{};
+    for (int index = 0; index < 2; ++index) {
+        commands[index].struct_size = sizeof(commands[index]);
+        commands[index].joint = joints[index];
+        commands[index].mode = NKSIM_JOINT_TARGET_POSITION;
+        commands[index].target = index == 0 ? 0.1 : -0.05;
+        commands[index].max_force = 100.0;
+    }
+    assert(nksim_world_set_joint_targets(world, commands, 2) == NKSIM_OK);
+    step_world(world, 400);
+    nksim_joint_state state[3]{};
+    for (int index = 0; index < 3; ++index) {
+        state[index].struct_size = sizeof(state[index]);
+        assert(nksim_joint_get_state(world, joints[index], &state[index]) == NKSIM_OK);
+    }
+    assert(std::abs(state[0].position) > 0.05 && std::abs(state[1].position) > 0.02);
+    assert(std::abs(state[2].position - (2.0 * state[0].position - 3.0 * state[1].position + 0.15)) < 0.02);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
 // A part of one machine can start inside another part's hull: a lead screw
 // runs through its nut bracket, whose convex hull fills the bore. Such pairs
 // overlap at rest, so the backend must exclude them like overlapping boxes,
@@ -2284,6 +2351,7 @@ int main() {
     body_without_inertials_has_center_of_mass_at_origin();
     applied_force_and_torque_act_on_their_own_axes();
     coupled_prismatic_joints_use_equality_and_convex_collision();
+    a_follower_with_two_leaders_uses_a_tendon_equality();
     convex_hulls_overlapping_at_rest_do_not_collide();
     assembly_closures_compile_as_equalities();
     compound_shape_preserves_an_l_shaped_gap();

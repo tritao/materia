@@ -152,7 +152,8 @@ class ToolpathTestSupport extends MotionKitTestSupport {
       options = new VirtualDeviceOptions();
       // The motors' 200 full steps at 16 microsteps a turn, wired in model order.
       var binding = DeviceBinding.bind(blueprint.model,
-        DeviceLayout.forActuators(blueprint.model, 16, 2), options.stepTickHz);
+        new DeviceLayout([for (index in 0...blueprint.model.actuators.length)
+        new robotkit.device.DeviceChannel(index, blueprint.model.actuators[index].id, 1, 2)]), options.stepTickHz);
       options.actuators = binding.virtualActuators();
     }
     var simulationHarness = new SimulationHarness(0.01);

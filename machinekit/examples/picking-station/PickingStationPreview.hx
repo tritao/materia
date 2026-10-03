@@ -39,7 +39,7 @@ class PickingStationPreview {
 		AssemblyPreview.shareDefinitions(definition, definitionByOccurrence);
 		return SceneArtifact.encode({lengthUnit: "mm",
 			metresPerUnit: LengthUnit.metresPerUnit("mm"), parts: parts,
-			assembly: model.record(), assemblyDefinition: definition,
+			assemblyDefinition: definition,
 			assemblyState: model.initialState("picking-station").record()});
 	}
 

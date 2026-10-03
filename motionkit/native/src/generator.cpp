@@ -134,6 +134,14 @@ mk_result generate(const mk_state_to_state_request &request, Trajectory &traject
             segment.coefficients[joint].value[1] = velocity;
             segment.coefficients[joint].value[2] = acceleration / 2.0;
             segment.coefficients[joint].value[3] = midpoint_jerk[joint] / 6.0;
+            if (begin == 0) {
+                // A sub-nanosecond initial phase can collapse into the next
+                // phase. Keep the requested start state exact at time zero;
+                // its quantization belongs to the subsequent phase seam.
+                segment.coefficients[joint].value[0] = request.current_position[joint];
+                segment.coefficients[joint].value[1] = request.current_velocity[joint];
+                segment.coefficients[joint].value[2] = request.current_acceleration[joint] / 2.0;
+            }
         }
         if (!trajectory.append(segment)) return MK_ERROR_GENERATION;
     }

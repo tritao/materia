@@ -87,7 +87,7 @@ enum {
     RK_PROCESS_CHANNEL_ID_BYTES = 48,
     RK_PROCESS_COMMAND_BYTES = 48,
     RK_MAX_JOINT_COUPLINGS = 512,
-    RK_API_VERSION = 23 /**< Sensor values live in one pool per state or snapshot, packed to what the robot's sensors report. */
+    RK_API_VERSION = 24 /**< A joint may have several couplings: it follows the sum of their terms. */
 };
 
 /** Result returned by RobotKit C ABI functions. */
@@ -258,6 +258,8 @@ enum {
 /* RobotRuntime descriptions                                                 */
 /* ------------------------------------------------------------------------- */
 
+enum { RK_LIMIT_EFFORT = 1, RK_LIMIT_VELOCITY = 2, RK_LIMIT_ACCELERATION = 4 };
+
 /** One compiled joint and its limits in a RobotRuntimeBlueprint. */
 typedef struct rk_robot_runtime_joint {
     rk_joint_id joint; /**< Stable index of this joint within the blueprint. */
@@ -272,8 +274,9 @@ typedef struct rk_robot_runtime_joint {
     double child_frame_position[3];
     double child_frame_rotation[4]; /**< Unit quaternion xyzw. */
     double axis[3]; /**< Unit vector in the parent joint frame. */
-    double max_acceleration; /**< Maximum joint acceleration, or zero when unspecified. */
-    double max_velocity; /**< Maximum joint speed, or zero when unspecified. */
+    double max_acceleration; /**< Maximum joint acceleration when RK_LIMIT_ACCELERATION is claimed. */
+    double max_velocity; /**< Maximum joint speed when RK_LIMIT_VELOCITY is claimed. */
+    uint32_t limit_flags; /**< RK_LIMIT_* presence bits; a claimed zero limit prohibits motion. */
 } rk_robot_runtime_joint;
 
 enum { RK_COLLISION_APPROXIMATION_NONE = 0, RK_COLLISION_APPROXIMATION_BOUNDS_BOX = 1 };
@@ -293,6 +296,17 @@ typedef struct rk_robot_joint_dynamics {
     double limit_damping_ratio;
     double limit_impedance[5];
 } rk_robot_joint_dynamics;
+
+/**
+ * Servo gains for a motor joint that moves other joints through couplings. Zero stiffness is no servo.
+ * A servo motor joint tracks its trajectory with force = stiffness (target - q) + damping (velocity
+ * target - qdot), clamped to the joint's max_effort. Joints coupled to it, and the leaders it follows,
+ * get no commands of their own: the coupling moves them. Gains are per unit of joint position and speed.
+ */
+typedef struct rk_robot_joint_servo {
+    double stiffness;
+    double damping;
+} rk_robot_joint_servo;
 
 typedef struct rk_robot_runtime_link {
     double mass;
@@ -399,9 +413,12 @@ typedef struct rk_event_record_batch {
  * its first shared tick.
  */
 /**
- * Joint follower's position is leader's times ratio plus offset. A follower with no velocity or
- * acceleration limit of its own moves within its leader's, scaled by the ratio's size, and a
- * plan that leaves the follower out turns it with its leader.
+ * One term of a follower joint's position: the leader's times ratio, plus offset. A follower with
+ * several couplings is the sum of their terms (a CoreXY motor follows both axes), so its value is
+ * the sum over its couplings of ratio times leader plus offset. A leader and follower pair is
+ * coupled once, and the couplings never form a cycle. A follower with no velocity or acceleration
+ * limit of its own moves within its leaders', scaled by the ratios' sizes and summed, and a plan
+ * that leaves the follower out turns it with its leaders.
  */
 typedef struct rk_robot_joint_coupling {
     rk_joint_id leader;
@@ -459,6 +476,8 @@ typedef struct rk_robot_runtime_blueprint {
      * stops at the limits widened by it. Zero puts the stops at the limits.
      */
     double joint_overtravel[RK_MAX_JOINTS];
+    /** Versioned: absent means no servo motor joints. Indexed by joint. */
+    rk_robot_joint_servo joint_servo[RK_MAX_JOINTS];
 } rk_robot_runtime_blueprint;
 
 /* ------------------------------------------------------------------------- */
@@ -793,8 +812,8 @@ RK_API rk_result RK_CALL rk_robot_runtime_submit_segments(rk_robot_runtime runti
  * Atomically validates and accepts a plan or committed-horizon replacement. A replacement before
  * committed_until_ns returns RK_ERROR_INVALID_STATE with no queue mutation. The segments' joints
  * are source joints: source joint j drives robot joint joint_map[j], and joint_count is
- * source_joint_count. A robot joint no source joint drives follows its leader when the blueprint
- * couples it to one, and otherwise holds header->start_position. Events
+ * source_joint_count. A robot joint no source joint drives follows its leaders when the blueprint
+ * couples it to some (the sum of their terms), and otherwise holds header->start_position. Events
  * are sorted by path time from the plan's start.
  */
 RK_API rk_result RK_CALL rk_robot_runtime_submit_plan(rk_robot_runtime runtime,

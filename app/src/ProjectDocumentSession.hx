@@ -1,5 +1,7 @@
 package app;
 
+import materia.assembly.AssemblyRecord.AssemblyFrame;
+
 import app.CncProgramPlayer.CncJob;
 import app.MateriaProjectRunner.GeneratedAssemblyScene;
 import materia.project.SceneArtifact.SceneArtifactMission;
@@ -28,7 +30,6 @@ import materia.project.Appearance;
 import materia.units.LengthUnit;
 import materia.project.MaterialDef;
 import materia.project.MaterialLibrary;
-import materia.assembly.AssemblyRecord;
 import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyComponentOccurrence;
 import materia.assembly.AssemblyDefinition.AssemblyJointRole;
@@ -67,7 +68,6 @@ class ProjectDocumentSession {
   public var generation(default, null):Int = 0;
   public var scriptOwnership(default,null):Null<ScriptOwnership> = null;
   public var projectReference(default,null):Null<String> = null;
-  public var projectAssembly(default,null):Null<AssemblyRecord> = null;
   public var projectAssemblyDefinition(default,null):Null<AssemblyDefinition> = null;
   public var projectAssemblyState(default,null):Null<AssemblyStateRecord> = null;
   public var projectPhysical(default,null):Null<AssemblyPhysicalData> = null;
@@ -237,7 +237,7 @@ class ProjectDocumentSession {
 
   /** Open everything a project's generator made, retaining its source manifest. */
   public function openGeneratedProject(generated:GeneratedAssemblyScene, manifestPath:String):Void
-    openGeneratedScene(generated.objects, manifestPath, generated.assembly,
+    openGeneratedScene(generated.objects, manifestPath,
       generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
       generated.localCentersByDefinition, generated.metresPerUnit,
       generated.physical, generated.recipeDocument, generated.robotMotions,
@@ -246,7 +246,7 @@ class ProjectDocumentSession {
 
   /** Open generated geometry while retaining its source manifest. */
   public function openGeneratedScene(data:Array<SceneObjectData>, ?manifestPath:String,
-      ?assembly:AssemblyRecord, ?geometryBySnapshot:Map<String, GeometryData>,
+      ?geometryBySnapshot:Map<String, GeometryData>,
       ?assemblyDefinition:AssemblyDefinition, ?assemblyState:AssemblyStateRecord,
       ?localCentersByDefinition:Map<String, Array<Float>>, metresPerUnit:Float = 1.0,
       ?physical:AssemblyPhysicalData, ?recipeText:String, ?motions:Array<RobotMotionTrack>,
@@ -283,7 +283,6 @@ class ProjectDocumentSession {
     var nextRecipe = decodeRecipe(recipeText);
     replace(next, nextSensors, null, null, nextBim, nextDocument);
     recipeDocument = nextRecipe;
-    projectAssembly = assembly;
     installAssemblyRuntime(assemblyDefinition, runtime, localCentersByDefinition, metresPerUnit, null, faceDescriptors);
     projectPhysical = physical;
     robotMotions = motions == null ? [] : motions.copy();
@@ -369,7 +368,6 @@ class ProjectDocumentSession {
     projectBaseline = baseline;
     staleProjectEdits = diagnostics;
     staleProjectRecord = diagnostics.length == 0 ? null : project;
-    projectAssembly = generated.assembly;
     installAssemblyRuntime(generated.assemblyDefinition, runtime,
       generated.localCentersByDefinition, generated.metresPerUnit, dependentJoints, generated.faceDescriptorsByDefinition,
       overlaid.overlay, generatedDefinition, overlaid.problem);
@@ -416,7 +414,6 @@ class ProjectDocumentSession {
     for (id in dependencies) assemblyDependentJoints.set(id, true);
     for (occurrence in definition.occurrences) assemblyOccurrenceIds.set("project:" + occurrence.id, true);
     projectAssemblyState = state.record();
-    projectAssembly = MateriaProjectRunner.legacySnapshot(definition, state);
     if (assemblyMates.mates.length > 0 && assemblyMateProblem == null) layMates(state);
   }
 
@@ -881,11 +878,9 @@ class ProjectDocumentSession {
         rotation: [pose.qx, pose.qy, pose.qz, pose.qw]});
     }
     var nextRecord = candidate.record();
-    var nextCompatibility = MateriaProjectRunner.legacySnapshot(definition, candidate);
     scene.setAssemblyOccurrenceTransforms(transforms);
     assemblyRuntime = candidate;
     projectAssemblyState = nextRecord;
-    projectAssembly = nextCompatibility;
     assemblyRevision++;
   }
 
@@ -975,7 +970,6 @@ class ProjectDocumentSession {
     projectBaseline = null;
     staleProjectEdits = [];
     staleProjectRecord = null;
-    projectAssembly = null;
     projectAssemblyDefinition = null;
     projectAssemblyState = null;
     projectPhysical = null;
@@ -1050,7 +1044,6 @@ class ProjectDocumentSession {
     var data = materializeProject(generated.objects, saved.record, saved.authored, diagnostics, customMaterials);
     scene.refreshGenerated(data, generated.geometryBySnapshot);
     projectBaseline = generated.objects;
-    projectAssembly = generated.assembly;
     installAssemblyRuntime(generated.assemblyDefinition,
       generated.assemblyDefinition == null ? null : new AssemblyState(generated.assemblyDefinition, stateRecord),
       generated.localCentersByDefinition, generated.metresPerUnit, saved.record.assemblyDependentJoints,

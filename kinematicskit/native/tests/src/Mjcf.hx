@@ -10,7 +10,7 @@ import kinematicskit.Transform;
  */
 class Mjcf {
   public static function write(model:KinematicModel):String {
-    for (joint in 0...model.jointCount()) if (model.jointSource[joint] >= 0) throw "MJCF export does not support couplings";
+    for (joint in 0...model.jointCount()) if (model.jointSource[joint] != -1) throw "MJCF export does not support couplings";
     if (model.closureCount() > 0) throw "MJCF export does not support closures";
     var out = new StringBuf();
     out.add('<mujoco model="kinematicskit-oracle"><compiler angle="radian"/><worldbody>');

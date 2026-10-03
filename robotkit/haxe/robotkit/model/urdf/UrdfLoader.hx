@@ -112,8 +112,8 @@ class UrdfLoader {
       var limit = child(element, "limit");
       var limits = new JointLimits();
       if (limit != null) {
-        limits.effort = Math.abs(number(limit, "effort", 0.0));
-        limits.velocity = Math.abs(number(limit, "velocity", 0.0));
+        limits.effort = limit.exists("effort") ? Math.abs(number(limit, "effort", 0.0)) : null;
+        limits.velocity = limit.exists("velocity") ? Math.abs(number(limit, "velocity", 0.0)) : null;
         if (jointType == JointType.Revolute || jointType == JointType.Prismatic) {
           limits.lower = number(limit, "lower", 0.0);
           limits.upper = number(limit, "upper", 0.0);
@@ -153,8 +153,8 @@ class UrdfLoader {
       if (reductionElement == null) reductionElement = child(element, "mechanicalReduction");
       if (reductionElement != null) reduction = parseNumber(text(reductionElement), "mechanicalReduction");
       if (reduction == 0.0) throw 'URDF transmission for ${joint.name} has zero reduction';
-      var effort = joint.limits.effort / Math.abs(reduction);
-      model.addActuator(new Actuator("actuator/" + required(actuatorElement, "name"), effort, 0.0,
+      var effort:Null<Float> = joint.limits.effort == null ? null : joint.limits.effort / Math.abs(reduction);
+      model.addActuator(new Actuator("actuator/" + required(actuatorElement, "name"), effort, null,
         SimpleTransmission(joint.id, reduction, 0.0)));
     }
     return new UrdfImport(model, warnings);

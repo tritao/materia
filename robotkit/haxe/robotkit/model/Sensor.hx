@@ -17,7 +17,7 @@ class Sensor {
   public var noiseSeed:Int = 1;
 
   public function new(name:String, kind:String, ?updateRate:Float = 0.0, ?id:SensorId) {
-    // Legacy callers use the initial name once; imports pass the stored ID.
+    // Authors can use the initial name once; imports pass the stored ID.
     this.id = id == null ? name : id;
     this.name = name;
     this.kind = kind;
