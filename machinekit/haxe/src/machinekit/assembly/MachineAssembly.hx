@@ -864,6 +864,23 @@ class MachineAssembly {
 		motors.push(copyMotor(record, ""));
 	}
 
+	/** Gauge pressure at a pneumatic consumer, resolved from its current service wiring. */
+	public function airPressure(instanceId:String, portName:String):Float {
+		var consumer = portRef(instanceId, portName);
+		var input = requirePort(consumer);
+		if (input.kind != Pneumatic || input.role != Consumer)
+			throw '"$instanceId/$portName" is not a pneumatic consumer';
+		var source = upstream(instanceId, portName);
+		if (source.external) throw 'Air pressure at "$instanceId/$portName" needs a modelled supply';
+		var part = requireMember(source.port.instanceId);
+		if (!Std.isOfType(part, machinekit.pneumatic.PressureSource))
+			throw 'Air source "${source.port.instanceId}/${source.port.portName}" does not state pressure';
+		var supply:machinekit.pneumatic.PressureSource = cast part;
+		var pressure = supply.outputPressure(source.port.portName);
+		if (!(pressure >= 0) || !Math.isFinite(pressure)) throw "Air pressure must be finite and nonnegative";
+		return pressure;
+	}
+
 	/** Compile every binding anew; connecting a supply after binding must not leave an old curve. */
 	function compileMotors():MotorCompilation {
 		var actuators = [for (record in motors) resolveMotor(record, true)];

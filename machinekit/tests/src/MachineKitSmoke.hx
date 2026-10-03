@@ -2620,6 +2620,7 @@ class MachineKitSmoke {
 		RecipeContractTests.run();
 		MotorDriverTests.run();
 		MillPartTests.run();
+		PneumaticPartTests.run();
 		PowerSupplyTests.run();
 		GearboxTests.run();
 		componentRecipes();

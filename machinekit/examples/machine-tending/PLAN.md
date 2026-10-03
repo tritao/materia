@@ -447,6 +447,28 @@ Done. What was built and decided:
   - a blocked door times out with the switch never reached;
   - the trajectory runtime rejects a plan that touches a process-driven joint.
 
+
+Parts checkpoint (MT5 remains in progress):
+- Added reconstructible ISO 6432 / ISO 15552 cylinder recipes, a separate moving rod,
+  single/double-solenoid 5/2 valve and regulated air supply. Bore/rod pairs are reference
+  values; body envelopes, installed fittings, material and flow-limited speeds are assumed.
+- Pressure is resolved from the current service graph through valves and the reused manifold,
+  using `PressureSource.outputPressure`. Connected hose BOM entries survive reconstruction.
+- Checked all 13 bore/rod pairs against the rounded theoretical 6 bar force tables in
+  [Festo DSNU (2012), p. 13](https://ftp.festo.com/Public/PNEUMATIC/SOFTWARE_SERVICE/Documentation/2012/EN/DSNU-ISO_EN.PDF)
+  and [Festo DSBC (2024), p. 14](https://www.festo.com/media/pim/132/D15000100122132.pdf).
+  Rod sizes agree with the annular areas implied by these tables; this is a reference model,
+  not a vendor geometry or flow model.
+- At 6 bar: 25/10 mm door cylinder gives 294.5243 N advancing and 247.4004 N retracting;
+  32/12 mm vise cylinder gives 482.5486 N advancing and 414.6902 N retracting. These are
+  calculated theoretical forces, not measured joint constraint forces.
+- Validation: the full MachineKit smoke entry passed after the naming fix, including all
+  13 force-table rows, valve state transitions, manifold pressure tracing, hose BOM and
+  saved-assembly reconstruction. The full multi-kit/app gate awaits the completed step.
+- Still to build: saved actuator/sensor bindings and the format extension; RobotKit process
+  drives and native sensors; physical door, vise and spindle integration; timing, constraint
+  force, blocked-door and trajectory-rejection tests; the full MT5 baseline gate.
+
 **MT6. Controllers, robots and signals.**
 - Controller parts:
   - `CncController` cabinet: digital I/O ports, axis driver outputs, valve outputs;
@@ -592,7 +614,7 @@ MT0 ─┬─ MT1 ── MT2 ─┬─ MT4 (reach study) ─┐
 | MT2 | done | 06c9bf5fd, 73a14c58e |
 | MT3 | done | 4d58cd5d3, 8a44aeb53 |
 | MT4 | done | c945a0dc8 |
-| MT5 | planned | |
+| MT5 | in progress: pneumatic parts and service wiring | |
 | MT6 | planned | |
 | MT7 | planned | |
 | MT8 | planned | |
