@@ -462,11 +462,10 @@ Demo parts (all in material A unless noted):
   - depth: closed form equals the numeric three-circle construction within 1 µm over 20°–150°;
   - a calibration entry overrides the analytic depth and radius.
 
-### Phase B: the press brake and bend planning (MachineKit; after X7)
+### Phase B: the press brake and bend planning (MachineKit; only SM8 waits for X7)
 
 **SM7. Tooling catalogue.**
-- Prerequisite: merge `x7-transmissions` once X7 (T1–T5) is done; write against `Transmission`,
-  not `Drive`. Check `git log x7-transmissions` before starting.
+- No prerequisite: tooling is plain parts, with no transmissions or drives.
 - `machinekit.pressbrake`: `PunchProfile` (straight, gooseneck, acute; tip radius, included angle,
   height, relief shape as a 2D polygon), `DieProfile` (V width, angle, shoulder radius, height;
   single V and multi-V blocks), `ToolSegment` (length from the standard set, horns), `ToolStation`
@@ -478,6 +477,10 @@ Demo parts (all in material A unless noted):
   stations and stations past the bed.
 
 **SM8. The press brake assembly.**
+- Prerequisite: X7 done, meaning a commit whose message contains `X7 T5` is on
+  `x7-transmissions` or on local `main` (`git log --oneline main x7-transmissions | grep 'X7 T5'`).
+  Then merge whichever has it into `sheet-metal` and write against `Transmission`, never `Drive`.
+  If it is not there yet, skip SM8 and continue with SM9 (see Working rules).
 - `machinekit/examples/press-brake/PressBrake extends MachineAssembly`: side frames, bed, ram,
   hydraulic cylinders Y1/Y2 (new `Hydraulic` actuator kind: bore, rod, stroke, phase speeds,
   speed-change point; projectkit format bump), torsion-bar coupling (profile `StopControlled`),
@@ -491,6 +494,10 @@ Demo parts (all in material A unless noted):
   scripted stroke.
 
 **SM9. Single-bend setup.**
+- Independent of SM8: it takes a `PressGeometry` (bed, die-top height, punch line, ram envelope,
+  backgauge travel and finger shape, as plain numbers in `machinekit.pressbrake.planning`) filled
+  from the reference numbers. SM8 later derives the same `PressGeometry` from the assembly, and a
+  check asserts they agree.
 - `BendSetup.plan(sheet, state, bend, station, orientation, gaugeEdge, process)`: backgauge X and
   R from the evaluated state in the press frame (SM-D10), depth and overbend from SM6, tonnage
   check, minimum flange check, finger contact points, the part's swing envelope.
@@ -500,8 +507,9 @@ Demo parts (all in material A unless noted):
 
 **SM10. Bend sequence search.**
 - `BendSequencer` per SM-D10: states, actions, feasibility, cost, best-first search, diagnostics.
-  `SheetCollisionQuery` on KinematicsKit's `CollisionWorld` (merge the `collision` branch or
-  cherry-pick CL1 if it is not on main yet; check first).
+  `SheetCollisionQuery` on KinematicsKit's `CollisionWorld`. If `CollisionWorld` is not on
+  `sheet-metal` yet, merge the `collision` branch (CL1 is commit 335ef1b98); if the merge does not
+  apply cleanly, abort it, mark SM10 blocked and continue.
 - Output `BendProgram`: ordered steps (station, orientation, gauge edge, X, R, depth, overbend,
   grip, regrip/flip markers, expected time).
 - Robot grip feasibility is a pluggable check (`GripCheck`): Phase B uses a geometric stand-in
@@ -586,18 +594,22 @@ Demo parts (all in material A unless noted):
 ```
 SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
                           ├─ SM5
-                          └─ SM6 ─────────────┐
-           (X7 merged) ── SM7 ── SM8 ── SM9 ──┴─ SM10
+                          └─ SM6 ── SM7 ── SM9 ── SM10   (collision CL1 merged)
+                         (X7 T5 merged) ── SM8 ──┘ (agreement check with SM9's PressGeometry)
  (MT3, MT5–MT8, MT10 merged) ── SM11 ── SM12 ── SM13 ── SM14 ── SM15 ── SM16
                                                        SM17, SM18 later
 ```
 
-- Phase A (SM0–SM6) has no dependency outside this branch. Do it first, in order.
-- SM7 waits for X7 on `x7-transmissions`; SM10 needs coal's `CollisionWorld` (branch `collision`).
-- Phase C waits for the machine-tending steps listed; when they are missing, stop after SM10 and
-  report what is blocked.
+- Unblocked now: SM0–SM7, SM9, and SM10 once the `collision` merge applies.
+- SM8 waits for X7 T5. Phase C waits for the machine-tending steps listed.
 
 ## Working rules
+
+- **Blocked steps.** Before each step, check its prerequisite exactly as written. If it is
+  missing, do not work around it (no writing against `Drive`, no stand-in signal bus): mark the
+  step `blocked: <what is missing>` in the Progress table, commit, and go on to the next unblocked
+  step. When no unblocked step is left, stop and end with a short report listing each blocked step
+  and the commit or branch it waits for. When resumed, re-check blocked steps first.
 
 - Commit after each step (or sub-step) with a message naming the step, e.g.
   `Sheet metal: fold sheets as forward kinematics (SM1)`, and update the Progress table below in
