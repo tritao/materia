@@ -10,9 +10,11 @@ class Actuator {
   /** Driver facts are optional for models saved before amplifier parts. */
   public var microsteps:Null<Int>;
   public var maxStepRate:Null<Float>;
+  /** The bound controller, when its clock further limits the driver. */
+  public var speedLimiter:String = "";
   /** Limits are in the actuator's effort and coordinate units, not joint units. */
-  public var maxEffort:Float;
-  public var maxRate:Float;
+  public var maxEffort:Null<Float>;
+  public var maxRate:Null<Float>;
   public var transmission:Transmission;
   /**
    * Default servo gains in actuator units, such as an MJCF position
@@ -69,17 +71,47 @@ class Actuator {
    * The torque a planner may rely on at any speed. A stepper's `maxEffort` is its usable share of
    * holding torque; a servo's is its peak torque, and the drive's peak when none is set.
    */
-  public function planningEffort():Float {
-    var current = drive;
-    if (current == null || !Std.isOfType(current, ServoDrive)) return maxEffort;
-    return maxEffort > 0.0 ? Math.min(maxEffort, current.peakTorque()) : current.peakTorque();
+  public function planningEffort():Null<Float> {
+    var current = drive, effort = maxEffort;
+    if (current == null || !Std.isOfType(current, ServoDrive)) return effort;
+    return effort == null ? current.peakTorque() : Math.min(effort, current.peakTorque());
   }
 
-  /** The speed a planner may rely on, in actuator units: a servo falls back to its maximum speed. */
-  public function planningRate():Float {
-    var current = drive;
-    if (current == null || !Std.isOfType(current, ServoDrive)) return maxRate;
-    return maxRate > 0.0 ? Math.min(maxRate, current.maxSpeed()) : current.maxSpeed();
+  /** Missing motor speed stays missing until a stated drive or driver supplies a cap. */
+  public function planningRate():Null<Float> {
+    var current = drive, rate = maxRate;
+    if (current != null && Std.isOfType(current, ServoDrive))
+      rate = rate == null ? current.maxSpeed() : Math.min(rate, current.maxSpeed());
+    var setting = microsteps, inputRate = maxStepRate;
+    if (fullStepsPerRevolution > 0 && setting != null && inputRate != null) {
+      var ceiling = inputRate * 2 * Math.PI / (fullStepsPerRevolution * setting);
+      rate = rate == null ? ceiling : Math.min(rate, ceiling);
+    }
+    return rate;
+  }
+
+  public function requireRate():Float {
+    var value = planningRate();
+    if (value == null) throw 'Actuator "$id" has no planning speed';
+    return value;
+  }
+
+  public function requireEffort():Float {
+    var value = planningEffort();
+    if (value == null) throw 'Actuator "$id" has no planning effort';
+    return value;
+  }
+
+  /** The hardware ceiling that is active at the motor's planning rate. */
+  public function rateLimiter():String {
+    if (speedLimiter != "") return speedLimiter;
+    var input = maxStepRate, setting = microsteps;
+    if (input == null || setting == null || fullStepsPerRevolution <= 0) return "";
+    var ceiling = input * 2 * Math.PI / (fullStepsPerRevolution * setting);
+    var current = drive, motorRate = maxRate;
+    if (current != null && Std.isOfType(current, ServoDrive))
+      motorRate = motorRate == null ? current.maxSpeed() : Math.min(motorRate, current.maxSpeed());
+    return motorRate == null || ceiling <= motorRate ? "driver step input" : "";
   }
 
   /** The torque-speed curve the plan check holds this actuator to: its drive's, or flat at its effort and rate. */
@@ -87,15 +119,15 @@ class Actuator {
     var current = drive;
     if (current != null && (!Std.isOfType(current, StepperDrive) || cast(current, StepperDrive).hasTorqueData()))
       return current.curve;
-    return TorqueSpeedCurve.flat(maxEffort, maxRate > 0.0 ? maxRate : 1e9);
+    return TorqueSpeedCurve.flat(requireEffort(), requireRate());
   }
 
-  public function new(id:String, maxEffort:Float, maxRate:Float,
+  public function new(id:String, maxEffort:Null<Float>, maxRate:Null<Float>,
       transmission:Transmission) {
     if (id == null || StringTools.trim(id).length == 0)
       throw "Actuator ID must be non-empty";
-    if (!Math.isFinite(maxEffort) || maxEffort < 0.0 ||
-        !Math.isFinite(maxRate) || maxRate < 0.0)
+    if ((maxEffort != null && (!Math.isFinite(maxEffort) || maxEffort < 0.0)) ||
+        (maxRate != null && (!Math.isFinite(maxRate) || maxRate < 0.0)))
       throw "Actuator limits must be finite and non-negative";
     if (transmission == null) throw "Actuator transmission is required";
     switch transmission {

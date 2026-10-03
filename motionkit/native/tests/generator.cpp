@@ -284,6 +284,32 @@ void zero_origin_travel_limit_is_translation_invariant() {
     }
 }
 
+void collapsed_initial_phase_keeps_requested_state() {
+    auto request = standard(3);
+    for (uint32_t joint = 0; joint < 3; ++joint) {
+        request.target_position[joint] = 0.0;
+        request.max_velocity[joint] = std::nextafter(0.04, 1.0);
+        request.max_acceleration[joint] = 0.4;
+        request.max_jerk[joint] = 40.0;
+    }
+    request.current_position[0] = 0.026999999999999996;
+    request.current_velocity[0] = 0.04;
+    request.target_position[0] = request.current_position[0] + 0.02;
+    mk_trajectory_handle trajectory{};
+    int32_t result = -999;
+    assert(mk_generate_state_to_state(&request, &trajectory, &result) == MK_OK);
+    mk_trajectory_state state{};
+    state.struct_size = sizeof(state);
+    assert(mk_trajectory_evaluate(trajectory, 0, &state) == MK_OK);
+    for (uint32_t joint = 0; joint < 3; ++joint) {
+        assert(state.position[joint] == request.current_position[joint]);
+        assert(state.velocity[joint] == request.current_velocity[joint]);
+        assert(state.acceleration[joint] == request.current_acceleration[joint]);
+    }
+    expect_all_pass(trajectory, request);
+    mk_trajectory_destroy(trajectory);
+}
+
 } // namespace
 
 int main() {
@@ -294,4 +320,5 @@ int main() {
     invalid_input_maps_result();
     unchanged_state_has_one_nanosecond_segment();
     zero_origin_travel_limit_is_translation_invariant();
+    collapsed_initial_phase_keeps_requested_state();
 }

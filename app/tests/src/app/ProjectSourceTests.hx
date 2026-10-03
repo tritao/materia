@@ -307,11 +307,15 @@ class ProjectSourceTests {
       check(index >= 0 && motors.length == 1, '$label drives joint $id with exactly one motor');
       var motor = motors[0];
       var ratio = switch motor.transmission { case SimpleTransmission(_, ratio, _): Math.abs(ratio); };
-      var speed = motor.planningRate() / ratio, torque = motor.planningEffort() * ratio * motor.efficiency;
-      check(Math.abs(compiled.joints[index].maxRate - speed) <= 1e-9 * speed && Math.abs(compiled.joints[index].maxEffort - torque) <= 1e-9 * torque,
-        '$label joint $id is limited to ${compiled.joints[index].maxRate} rad/s and ${compiled.joints[index].maxEffort} N m, its drive gives $speed and $torque');
+      var speed = motor.requireRate() / ratio, torque = motor.requireEffort() * ratio * motor.efficiency;
+      var effective = model.joints[index].limits;
+      check(effective.velocity != null && effective.effort != null &&
+        Math.abs(effective.requireVelocity() - speed) <= 1e-9 * speed && Math.abs(effective.requireEffort() - torque) <= 1e-9 * torque,
+        '$label compiled model preserves the drive limits used by mission planning and jogging on $id');
+      check(Math.abs(compiled.joints[index].requireRate() - speed) <= 1e-9 * speed && Math.abs(compiled.joints[index].requireEffort() - torque) <= 1e-9 * torque,
+        '$label joint $id is limited to ${compiled.joints[index].requireRate()} rad/s and ${compiled.joints[index].requireEffort()} N m, its drive gives $speed and $torque');
       check(motor.drive != null && ratio > 1.0, '$label joint $id has a drive and a gearbox');
-      found.set(id, [compiled.joints[index].maxRate, compiled.joints[index].maxEffort]);
+      found.set(id, [compiled.joints[index].requireRate(), compiled.joints[index].requireEffort()]);
     }
     return found;
   }
@@ -337,11 +341,11 @@ class ProjectSourceTests {
     var compiled = RobotRuntimeCompiler.compile(model);
     check(compiled.couplings.length == 16, "the runtime blueprint carries a coupling for each term");
     var xLimits = model.coupledLimits("x"), yLimits = model.coupledLimits("y");
-    check(Math.abs(xLimits.velocity - 0.6496) < 1e-3 && Math.abs(xLimits.velocity - yLimits.velocity) < 1e-12,
-      'both axes get 650 mm/s from the two motors, got ${xLimits.velocity} and ${yLimits.velocity}');
-    check(xLimits.maxAcceleration > yLimits.maxAcceleration && yLimits.maxAcceleration > 20,
-      'the carriage accelerates harder than the gantry it rides: ${xLimits.maxAcceleration} against ${yLimits.maxAcceleration}');
-    Sys.println('corexy plotter: axes to ${Math.round(xLimits.velocity * 1e4) / 10} mm/s and ${Math.round(xLimits.maxAcceleration * 1e3) / 1e3} m/s²');
+    check(Math.abs(xLimits.requireVelocity() - 0.6496) < 1e-3 && Math.abs(xLimits.requireVelocity() - yLimits.requireVelocity()) < 1e-12,
+      'both axes get 650 mm/s from the two motors, got ${xLimits.requireVelocity()} and ${yLimits.requireVelocity()}');
+    check(xLimits.requireAcceleration() > yLimits.requireAcceleration() && yLimits.requireAcceleration() > 20,
+      'the carriage accelerates harder than the gantry it rides: ${xLimits.requireAcceleration()} against ${yLimits.requireAcceleration()}');
+    Sys.println('corexy plotter: axes to ${Math.round(xLimits.requireVelocity() * 1e4) / 10} mm/s and ${Math.round(xLimits.requireAcceleration() * 1e3) / 1e3} m/s²');
     var world = new RobotWorld();
     var simulation = new ApplicationSimulation(world);
     simulation.setBackend(ApplicationSimulation.MUJOCO);
@@ -873,23 +877,25 @@ class ProjectSourceTests {
         for (actuator in model.actuators) switch actuator.transmission {
           case SimpleTransmission(target, _, _): if (target == coupling.follower) motorRatio = Math.abs(coupling.ratio);
         }
-        for (follower in model.joints) if (follower.id == coupling.follower && follower.limits.velocity > 0)
-        {
-          critical = Math.min(critical, follower.limits.velocity / Math.abs(coupling.ratio));
-          leadRatio = Math.abs(coupling.ratio);
+        for (follower in model.joints) if (follower.id == coupling.follower) {
+          var mechanical = follower.mechanicalLimits;
+          if (mechanical != null && mechanical.velocity != null) {
+            critical = Math.min(critical, mechanical.requireVelocity() / Math.abs(coupling.ratio));
+            leadRatio = Math.abs(coupling.ratio);
+          }
         }
       }
       check(motorRatio > 0, '$kind axis ${joint.id} has a motor');
       var expected = Math.min(Math.min(motorSpeed, stepSpeed) / motorRatio, critical);
       var limits = wired.coupledLimits(joint.id, steady);
-      check(Math.abs(limits.velocity - expected) < 1e-9,
-        '$kind axis ${joint.id} is as fast as its motor, controller and screw allow: ${limits.velocity} m/s, expected $expected');
-      check(limits.maxAcceleration > 0.5 && limits.maxAcceleration < 50,
-        '$kind axis ${joint.id} accelerates as its motors move it: ${limits.maxAcceleration} m/s²');
-      derived.push('${joint.id} ${Math.round(limits.velocity * 1e4) / 10} mm/s, ${Math.round(limits.maxAcceleration * 100) / 100} m/s²' +
+      check(Math.abs(limits.requireVelocity() - expected) < 1e-9,
+        '$kind axis ${joint.id} is as fast as its motor, controller and screw allow: ${limits.requireVelocity()} m/s, expected $expected');
+      check(limits.requireAcceleration() > 0.5 && limits.requireAcceleration() < 50,
+        '$kind axis ${joint.id} accelerates as its motors move it: ${limits.requireAcceleration()} m/s²');
+      derived.push('${joint.id} ${Math.round(limits.requireVelocity() * 1e4) / 10} mm/s, ${Math.round(limits.requireAcceleration() * 100) / 100} m/s²' +
         (critical < Math.POSITIVE_INFINITY ? ' (screw held to ${Math.round(critical * (Math.abs(leadRatio) > 0 ? leadRatio : 1) * 60 / (2 * Math.PI))} rpm)' : ''));
       var bare = model.coupledLimits(joint.id);
-      free.push('${joint.id} ${Math.round(bare.velocity * 1e4) / 10} mm/s, ${Math.round(bare.maxAcceleration * 100) / 100} m/s²');
+      free.push('${joint.id} ${Math.round(bare.requireVelocity() * 1e4) / 10} mm/s, ${Math.round(bare.requireAcceleration() * 100) / 100} m/s²');
     }
     Sys.println('cnc $kind axes with the controller and steady loads: ${derived.join("; ")}');
     Sys.println('cnc $kind axes from their motors and screws alone: ${free.join("; ")}');

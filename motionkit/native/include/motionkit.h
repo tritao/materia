@@ -285,6 +285,7 @@ typedef struct mk_limits {
     double max_velocity[MK_MAX_JOINTS];
     double max_acceleration[MK_MAX_JOINTS];
     double max_jerk[MK_MAX_JOINTS];
+    uint32_t derivative_claimed[MK_MAX_JOINTS]; /**< Bits 1, 2, 4 claim velocity, acceleration, jerk, including zero. */
     double max_continuity_jump[3]; /**< Optional C0, C1, C2 jump claims. */
     /** Zero defaults to 1 ns. Round non-integer device tick periods up (e.g. 5.88 ns to 6 ns). */
     uint64_t executor_time_resolution_ns;

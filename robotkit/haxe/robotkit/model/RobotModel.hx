@@ -89,8 +89,7 @@ class RobotModel {
    * turns with; a motor caps it at its rate through the ratios. For a sliding joint driven by
    * actuators, acceleration is also capped at their summed force, through each coupling's
    * efficiency, over the mass the joint carries plus every coupled joint's turning inertia (rotor
-   * armature included) seen through the ratio. Gravity and friction are left out. Zero still
-   * means unlimited. With `steady` loads, the force left for acceleration is what the motors give
+   * armature included) seen through the ratio. Gravity and friction are left out. A missing limit is null; zero is a stopped joint. With `steady` loads, the force left for acceleration is what the motors give
    * less their drag, the axis's rail friction and its weight (see `SteadyLoads`).
    *
    * A follower that sums several leaders (a CoreXY motor) binds each leader inside a box: the axis's
@@ -101,11 +100,13 @@ class RobotModel {
   public function coupledLimits(id:JointId, ?steady:SteadyLoads):JointLimits {
     var joint = [for (candidate in joints) if (candidate.id == id) candidate];
     if (joint.length != 1) throw 'Robot model has no joint "$id"';
-    var own = joint[0].limits;
+    var own = joint[0].mechanicalLimits;
+    if (own == null) own = joint[0].limits;
     var limits = new JointLimits(own.lower, own.upper, own.velocity, own.effort, own.maxAcceleration);
     limits.overtravel = own.overtravel;
-    function tighten(current:Float, bound:Float):Float
-      return bound <= 0.0 ? current : current <= 0.0 ? bound : Math.min(current, bound);
+    limits.velocityLimiter = own.velocityLimiter;
+    function tighten(current:Null<Float>, bound:Null<Float>):Null<Float>
+      return bound == null ? current : current == null ? bound : Math.min(current, bound);
     // Each joint reached so far, how far it moves per unit of joint `id`, and the efficiency of
     // the couplings between them.
     var reached:Array<String> = [id];
@@ -131,8 +132,11 @@ class RobotModel {
         shares.push(leaderShare * Math.abs(coupling.ratio) / terms);
         efficiencies.push(leaderEfficiency * coupling.efficiency);
         for (follower in joints) if (follower.id == coupling.follower) {
-          limits.velocity = tighten(limits.velocity, follower.limits.velocity / box);
-          limits.maxAcceleration = tighten(limits.maxAcceleration, follower.limits.maxAcceleration / box);
+          var mechanical = follower.mechanicalLimits;
+          if (mechanical == null) mechanical = follower.limits;
+          var velocity = mechanical.velocity, acceleration = mechanical.maxAcceleration;
+          if (velocity != null) limits.velocity = tighten(limits.velocity, velocity / box);
+          if (acceleration != null) limits.maxAcceleration = tighten(limits.maxAcceleration, acceleration / box);
         }
       }
     }
@@ -143,19 +147,56 @@ class RobotModel {
         if (index < 0) continue;
         // An actuator coordinate moves |ratio| per unit of its joint, so |ratio| * scale per unit of `id`.
         var gearing = Math.abs(ratio) * scales[index];
-        limits.velocity = tighten(limits.velocity, actuator.planningRate() / (Math.abs(ratio) * boxes[index]));
-        force += efficiencies[index] * actuator.efficiency * actuator.planningEffort() * gearing * shares[index];
-        driven = true;
+        var motorRate = actuator.planningRate();
+        if (motorRate != null) {
+          var rate = motorRate / (Math.abs(ratio) * boxes[index]);
+          if (limits.velocity == null || rate <= limits.velocity) {
+            var limiter = actuator.rateLimiter();
+            if (limiter != "") limits.velocityLimiter = limiter;
+          }
+          limits.velocity = tighten(limits.velocity, rate);
+        }
+        var effort = actuator.planningEffort();
+        if (effort != null) {
+          force += efficiencies[index] * actuator.efficiency * effort * gearing * shares[index];
+          driven = true;
+        }
     }
-    if (driven && joint[0].type == JointType.Prismatic && force > 0) {
+    if (driven) limits.effort = tighten(limits.effort, force);
+    if (driven && joint[0].type == JointType.Prismatic) {
       // A drive that cannot carry the steady loads has nothing left to accelerate with.
-      if (steady != null) force = Math.max(steadyForce(joint[0], force, steady), 1e-9);
+      if (steady != null) force = Math.max(steadyForce(joint[0], force, steady), 0.0);
       var inertia = carriedMass(joint[0]) + joint[0].armature;
       for (index in 1...reached.length) for (follower in joints) if (follower.id == reached[index])
         inertia += efficiencies[index] * turningInertia(follower) * scales[index] * scales[index];
       limits.maxAcceleration = tighten(limits.maxAcceleration, force / inertia);
     }
     return limits;
+  }
+
+  /** Materialise all drive caps from one snapshot, then fill missing follower caps from their leaders. */
+  public function materializeLimits():Void {
+    for (joint in joints) if (joint.mechanicalLimits == null) joint.mechanicalLimits = joint.limits.copy();
+    var effective = [for (joint in joints) coupledLimits(joint.id)];
+    for (_ in 0...couplings.length) for (index in 0...joints.length) {
+      var velocity = 0.0, acceleration = 0.0;
+      var any = false, hasVelocity = true, hasAcceleration = true;
+      for (coupling in couplings) if (coupling.follower == joints[index].id) {
+        any = true;
+        var leader = [for (slot in 0...joints.length) if (joints[slot].id == coupling.leader) slot][0];
+        var rate = effective[leader].velocity, accel = effective[leader].maxAcceleration;
+        if (rate == null) hasVelocity = false; else velocity += Math.abs(coupling.ratio) * rate;
+        if (accel == null) hasAcceleration = false; else acceleration += Math.abs(coupling.ratio) * accel;
+      }
+      if (any && hasVelocity && effective[index].velocity == null) effective[index].velocity = velocity;
+      if (any && hasAcceleration && effective[index].maxAcceleration == null) effective[index].maxAcceleration = acceleration;
+    }
+    for (index in 0...joints.length) {
+      joints[index].limits.velocity = effective[index].velocity;
+      joints[index].limits.velocityLimiter = effective[index].velocityLimiter;
+      joints[index].limits.effort = effective[index].effort;
+      joints[index].limits.maxAcceleration = effective[index].maxAcceleration;
+    }
   }
 
   /**
@@ -257,8 +298,8 @@ class RobotModel {
       }
       if (ids.exists(actuator.id)) errors.push('duplicate actuator ID ${actuator.id}');
       ids.set(actuator.id, true);
-      if (!Math.isFinite(actuator.maxEffort) || actuator.maxEffort < 0.0 ||
-          !Math.isFinite(actuator.maxRate) || actuator.maxRate < 0.0)
+      if ((actuator.maxEffort != null && (!Math.isFinite(actuator.maxEffort) || actuator.maxEffort < 0.0)) ||
+          (actuator.maxRate != null && (!Math.isFinite(actuator.maxRate) || actuator.maxRate < 0.0)))
         errors.push('actuator ${actuator.id} has invalid limits');
       if (actuator.transmission == null) {
         errors.push('actuator ${actuator.id} has no transmission');

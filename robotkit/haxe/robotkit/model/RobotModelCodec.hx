@@ -69,12 +69,17 @@ class RobotModelCodec {
       nonNegative(joint.limitTimeConstant, "joint limitTimeConstant");
       nonNegative(joint.limitDampingRatio, "joint limitDampingRatio");
       vector(joint.limitImpedance, 5, "joint limitImpedance");
+      var mechanical = joint.mechanicalLimits;
+      if (mechanical != null) {
+        var error = mechanical.validate();
+        if (error != null) throw 'joint mechanical limits: $error';
+      }
       finite(joint.limits.lower, "joint limits.lower");
       finite(joint.limits.upper, "joint limits.upper");
-      finite(joint.limits.velocity, "joint limits.velocity");
-      finite(joint.limits.effort, "joint limits.effort");
-      finite(joint.limits.maxAcceleration, "joint limits.maxAcceleration");
-      if (joint.limits.maxAcceleration < 0.0)
+      if (joint.limits.velocity != null) finite(joint.limits.velocity, "joint limits.velocity");
+      if (joint.limits.effort != null) finite(joint.limits.effort, "joint limits.effort");
+      if (joint.limits.maxAcceleration != null) finite(joint.limits.maxAcceleration, "joint limits.maxAcceleration");
+      if (joint.limits.maxAcceleration != null && joint.limits.maxAcceleration < 0.0)
         throw "joint limits.maxAcceleration must be non-negative";
       finite(joint.limits.overtravel, "joint limits.overtravel");
       if (joint.limits.overtravel < 0.0)
@@ -146,7 +151,7 @@ class RobotModelCodec {
         collisionShapes: [for (shape in link.collisionShapes) encodeCollisionShape(shape)]
       }],
       joints: [for (joint in model.joints) {
-        id: joint.id, name: joint.name, type: jointTypeName(joint.type),
+        var record:Dynamic = {id: joint.id, name: joint.name, type: jointTypeName(joint.type),
         parentLink: joint.parent.id, childLink: joint.child.id,
         limits: encodeLimits(joint.limits),
         parentFramePosition: joint.parentFramePosition,
@@ -156,7 +161,10 @@ class RobotModelCodec {
         axis: joint.axis,
         dynamics: {armature: joint.armature, damping: joint.damping, frictionLoss: joint.frictionLoss,
           limitTimeConstant: joint.limitTimeConstant, limitDampingRatio: joint.limitDampingRatio,
-          limitImpedance: joint.limitImpedance}
+          limitImpedance: joint.limitImpedance}};
+        var mechanical = joint.mechanicalLimits;
+        if (mechanical != null) record.mechanicalLimits = encodeLimits(mechanical);
+        record;
       }],
       actuators: [for (actuator in model.actuators) encodeActuator(actuator)],
       couplings: [for (coupling in model.couplings) encodeCoupling(coupling)],
@@ -243,10 +251,18 @@ class RobotModelCodec {
       var joint = model.addJoint(new Joint(text(record, "name"),
         readJointType(text(record, "type")), parent, child, id));
       var limits:Dynamic = required(record, "limits");
-      var maxAcceleration = number(limits, "maxAcceleration");
+      var maxAcceleration = nullableNumber(limits, "maxAcceleration");
       joint.limits = new JointLimits(number(limits, "lower"), number(limits, "upper"),
-        number(limits, "velocity"), number(limits, "effort"), maxAcceleration);
-      // Written only when a joint has some, so older models without it still load.
+        nullableNumber(limits, "velocity"), nullableNumber(limits, "effort"), maxAcceleration);
+      if (Reflect.hasField(record, "mechanicalLimits")) {
+        var mechanical:Dynamic = required(record, "mechanicalLimits");
+        joint.mechanicalLimits = new JointLimits(number(mechanical, "lower"), number(mechanical, "upper"),
+          nullableNumber(mechanical, "velocity"), nullableNumber(mechanical, "effort"), nullableNumber(mechanical, "maxAcceleration"));
+        if (Reflect.hasField(mechanical, "overtravel")) joint.mechanicalLimits.overtravel = number(mechanical, "overtravel");
+        if (Reflect.hasField(mechanical, "velocityLimiter")) joint.mechanicalLimits.velocityLimiter = text(mechanical, "velocityLimiter");
+      }
+      if (Reflect.hasField(limits, "velocityLimiter")) joint.limits.velocityLimiter = text(limits, "velocityLimiter");
+      // Written only when a joint has overtravel.
       if (Reflect.hasField(limits, "overtravel")) joint.limits.overtravel = number(limits, "overtravel");
       joint.parentFramePosition = vectorField(record, "parentFramePosition", 3);
       joint.parentFrameRotation = vectorField(record, "parentFrameRotation", 4);
@@ -445,6 +461,7 @@ class RobotModelCodec {
           {kind: "simple", jointId: jointId, ratio: ratio, offset: offset};
       }
     };
+    if (value.speedLimiter != "") record.speedLimiter = value.speedLimiter;
     if (value.encoder != "") record.encoder = value.encoder;
     if (value.assumed.length > 0) record.assumed = value.assumed.copy();
     if (value.microsteps != null) record.microsteps = value.microsteps;
@@ -497,9 +514,9 @@ class RobotModelCodec {
     if (value.drive != null && !Std.isOfType(value.drive, StepperDrive) && !Std.isOfType(value.drive, ServoDrive))
       throw 'Actuator ${value.id} has an unsupported drive';
     requireText(value.id, "actuator ID");
-    finite(value.maxEffort, "actuator maxEffort");
-    finite(value.maxRate, "actuator maxRate");
-    if (value.maxEffort < 0.0 || value.maxRate < 0.0)
+    if (value.maxEffort != null) finite(value.maxEffort, "actuator maxEffort");
+    if (value.maxRate != null) finite(value.maxRate, "actuator maxRate");
+    if ((value.maxEffort != null && value.maxEffort < 0.0) || (value.maxRate != null && value.maxRate < 0.0))
       throw "Actuator limits must be non-negative";
     if (value.transmission == null) throw "Actuator transmission is required";
     switch value.transmission {
@@ -557,8 +574,9 @@ class RobotModelCodec {
         number(transmission, "ratio"), number(transmission, "offset"));
       case kind: throw 'Unsupported transmission kind $kind';
     };
-    var actuator = new Actuator(text(value, "id"), number(value, "maxEffort"),
-      number(value, "maxRate"), parsed);
+    var actuator = new Actuator(text(value, "id"), nullableNumber(value, "maxEffort"),
+      nullableNumber(value, "maxRate"), parsed);
+    if (Reflect.hasField(value, "speedLimiter")) actuator.speedLimiter = text(value, "speedLimiter");
     actuator.servoStiffness = nonNegative(number(value, "servoStiffness"), "actuator servoStiffness");
     actuator.servoDamping = nonNegative(number(value, "servoDamping"), "actuator servoDamping");
     // Absent in models saved before steppers were recorded: not a stepper.
@@ -678,9 +696,16 @@ class RobotModelCodec {
   }
 
   /** Overtravel is written only when a joint has some, so models without it keep their bytes. */
+  static function nullableNumber(value:Dynamic, name:String):Null<Float> {
+    if (!Reflect.hasField(value, name)) throw 'Missing RobotModel field $name';
+    var field:Dynamic = Reflect.field(value, name);
+    return field == null ? null : number(value, name);
+  }
+
   static function encodeLimits(limits:JointLimits):Dynamic {
     var result:Dynamic = {lower: limits.lower, upper: limits.upper, velocity: limits.velocity,
       effort: limits.effort, maxAcceleration: limits.maxAcceleration};
+    if (limits.velocityLimiter != "") Reflect.setField(result, "velocityLimiter", limits.velocityLimiter);
     if (limits.overtravel > 0.0) Reflect.setField(result, "overtravel", limits.overtravel);
     return result;
   }

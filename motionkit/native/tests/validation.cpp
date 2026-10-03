@@ -6,6 +6,7 @@
 #include <cstring>
 #include <atomic>
 #include <thread>
+#include <initializer_list>
 
 namespace {
 
@@ -385,7 +386,45 @@ void plans_across_threads() {
     mk_trajectory_destroy(trajectory);
 }
 
+void continuity_position_units_and_origin() {
+    for (const double extent : {251.0, 2e9})
+    for (const double scale : {1.0, 1.0 / 3141.592653589793})
+        for (const double origin : {0.0, 100.0})
+            for (const double gap : {1.37e-7, 1e-4}) {
+                mk_trajectory_handle trajectory{};
+                assert(mk_trajectory_create(1, &trajectory) == MK_OK);
+                mk_segment segment{};
+                segment.struct_size = sizeof(segment);
+                segment.joint_count = 1;
+                segment.degree = 1;
+                segment.duration_ns = 1'000'000'000;
+                segment.coefficients[0].value[0] = origin;
+                segment.coefficients[0].value[1] = 137.0 * scale;
+                assert(mk_trajectory_append_segment(trajectory, &segment) == MK_OK);
+                segment.t0_ns = segment.duration_ns;
+                segment.coefficients[0].value[0] = origin + (137.0 + gap) * scale;
+                segment.coefficients[0].value[1] = 0;
+                assert(mk_trajectory_append_segment(trajectory, &segment) == MK_OK);
+                mk_limits limits{};
+                limits.struct_size = sizeof(limits);
+                limits.joint_count = 1;
+                limits.position_claimed[0] = 1;
+                limits.position_lower[0] = origin;
+                limits.position_upper[0] = origin + extent * scale;
+                limits.max_continuity_jump[0] = 1e-9 * scale;
+                limits.executor_time_resolution_ns = 1;
+                mk_validation_report report{};
+                report.struct_size = sizeof(report);
+                assert(mk_validate(trajectory, &limits, &report) == MK_OK);
+                assert(report.checks[MK_CHECK_CONTINUITY].status ==
+                    (gap < 1e-6 ? MK_CHECK_UNCHECKED : MK_CHECK_FAILED));
+                assert(report.checks[MK_CHECK_CONTINUITY].tolerance < 1e-6 * scale);
+                mk_trajectory_destroy(trajectory);
+            }
+}
+
 int main() {
+    continuity_position_units_and_origin();
     velocity_extremum_and_plan_rejection();
     position_extremum_between_samples();
     quintic_quartic_critical_point();

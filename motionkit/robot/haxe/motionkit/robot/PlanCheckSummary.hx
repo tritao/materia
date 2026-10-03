@@ -11,6 +11,8 @@ class PlanCheckSummary {
   /** Plans with at least one finding. */
   public var flagged(default, null):Int = 0;
   public final diagnostics:Array<PlanDiagnostic> = [];
+  /** Hardware ceilings that explain the compiled planning speeds. */
+  public final speedLimits:Array<String> = [];
   public var findings(default, null):Int = 0;
   public var worstTorqueRatio(default, null):Float = 0.0;
   public var worstMotor(default, null):String = "";
@@ -22,6 +24,7 @@ class PlanCheckSummary {
 
   public function add(result:PlanCheckResult):Void {
     plans++;
+    for (limit in result.speedLimits) if (speedLimits.indexOf(limit) < 0) speedLimits.push(limit);
     if (result.diagnostics.length > 0) flagged++;
     for (diagnostic in result.diagnostics) {
       findings++;
@@ -53,6 +56,7 @@ class PlanCheckSummary {
     worstDeviation = 0.0;
     worstAxis = "";
     while (diagnostics.length > 0) diagnostics.pop();
+    while (speedLimits.length > 0) speedLimits.pop();
     byKind.clear();
   }
 }

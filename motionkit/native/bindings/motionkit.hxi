@@ -197,7 +197,7 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") {
 	/**
 	 * Zero motion limits are unclaimed. Position limits use an explicit flag so zero is usable.
 	 */
-	struct mk_limits @layout(2872, 8) {
+	struct mk_limits @layout(3128, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		joint_count: u32 @offset(4);
 		model_revision: u64 @offset(8);
@@ -209,13 +209,17 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") {
 		max_acceleration: array<f64, 64> @offset(1816);
 		max_jerk: array<f64, 64> @offset(2328);
 		/**
+		 * < Bits 1, 2, 4 claim velocity, acceleration, jerk, including zero.
+		 */
+		derivative_claimed: array<u32, 64> @offset(2840);
+		/**
 		 * < Optional C0, C1, C2 jump claims.
 		 */
-		max_continuity_jump: array<f64, 3> @offset(2840);
+		max_continuity_jump: array<f64, 3> @offset(3096);
 		/**
 		 * Zero defaults to 1 ns. Round non-integer device tick periods up (e.g. 5.88 ns to 6 ns).
 		 */
-		executor_time_resolution_ns: u64 @offset(2864);
+		executor_time_resolution_ns: u64 @offset(3120);
 	}
 	/**
 	 * OPW's seven geometric parameters and manufacturer joint conventions.

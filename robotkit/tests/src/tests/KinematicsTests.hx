@@ -321,7 +321,7 @@ class KinematicsTests {
       joint.axis = axes[i];
       joint.limits.lower = -2.0 * Math.PI;
       joint.limits.upper = 2.0 * Math.PI;
-      joint.limits.velocity = 0.0;
+      joint.limits.velocity = null;
     }
     var flangeOffset = new Vec3(0.0, d6, 0.0);
     var flange = model.addFrame(new Frame("flange", links[6]));

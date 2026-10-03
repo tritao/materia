@@ -133,6 +133,9 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	const RK_FAULT_QUEUE_REVISION_MISMATCH = 6;
 	const RK_FAULT_RAMP_LIMIT = 3;
 	const RK_FAULT_TRAJECTORY_UNDERFLOW = 2;
+	const RK_LIMIT_ACCELERATION = 4;
+	const RK_LIMIT_EFFORT = 1;
+	const RK_LIMIT_VELOCITY = 2;
 	const RK_MAX_EVENT_RECORDS = 64;
 	/**
 	 * < Maximum joints carried by one fixed-size ABI value.
@@ -407,8 +410,8 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 * Atomically validates and accepts a plan or committed-horizon replacement. A replacement before
 	 * committed_until_ns returns RK_ERROR_INVALID_STATE with no queue mutation. The segments' joints
 	 * are source joints: source joint j drives robot joint joint_map[j], and joint_count is
-	 * source_joint_count. A robot joint no source joint drives follows its leader when the blueprint
-	 * couples it to one, and otherwise holds header->start_position. Events
+	 * source_joint_count. A robot joint no source joint drives follows its leaders when the blueprint
+	 * couples it to some (the sum of their terms), and otherwise holds header->start_position. Events
 	 * are sorted by path time from the plan's start.
 	 */
 	extern fn rk_robot_runtime_submit_plan(runtime: rk_robot_runtime, header: ptr<const<rk_plan_header>>, starts_ns: ptr<const<i64>> @in_array("segment_count"), durations_ns: ptr<const<i64>> @in_array("segment_count"), degrees: ptr<const<i32>> @in_array("segment_count"), segment_count: u32, coefficients: ptr<const<f64>> @in_array("coefficient_count"), coefficient_count: u32, joint_map: ptr<const<i32>> @in_array("source_joint_count"), source_joint_count: u32, events: ptr<const<rk_timed_event>> @in_array("event_count"), event_count: u32) -> rk_result;
@@ -701,7 +704,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		stiffness: f64 @offset(0);
 		damping: f64 @offset(8);
 	}
-	struct rk_robot_runtime_blueprint @layout(276208, 8) {
+	struct rk_robot_runtime_blueprint @layout(280304, 8) {
 		/**
 		 * < Set to sizeof this struct.
 		 */
@@ -736,46 +739,46 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		floating_base: u32 @offset(36);
 		reserved: array<u64, 1> @offset(40);
 		joints: array<rk_robot_runtime_joint, 512> @offset(48);
-		links: array<rk_robot_runtime_link, 1024> @offset(98352);
+		links: array<rk_robot_runtime_link, 1024> @offset(102448);
 		/**
 		 * < Zero selects the default base-mounted simulation sensors.
 		 */
-		sensor_count: u32 @offset(204848);
-		sensors: array<rk_sensor_config, 8> @offset(204856);
+		sensor_count: u32 @offset(208944);
+		sensors: array<rk_sensor_config, 8> @offset(208952);
 		/**
 		 * < Optional compiled calibration identity; zero is unspecified.
 		 */
-		calibration_revision: u64 @offset(205752);
+		calibration_revision: u64 @offset(209848);
 		/**
 		 * < Zero selects two owner periods.
 		 */
-		commit_lead_ns: u64 @offset(205760);
+		commit_lead_ns: u64 @offset(209856);
 		/**
 		 * < Per-joint SI-unit bound; zero disables this check.
 		 */
-		following_error_bound: array<f64, 64> @offset(205768);
+		following_error_bound: array<f64, 64> @offset(209864);
 		/**
 		 * < Zero selects the 10 ms default; versioned by struct_size.
 		 */
-		owner_period_ns: u64 @offset(206280);
+		owner_period_ns: u64 @offset(210376);
 		/**
 		 * < Zero selects 2 ms; one-way target-streaming budget.
 		 */
-		serial_processing_allowance_ns: u64 @offset(206288);
+		serial_processing_allowance_ns: u64 @offset(210384);
 		/**
 		 * < Versioned: absent means no process channels.
 		 */
-		channel_count: u32 @offset(206296);
-		channels: array<rk_channel_declaration, 32> @offset(206304);
+		channel_count: u32 @offset(210392);
+		channels: array<rk_channel_declaration, 32> @offset(210400);
 		/**
 		 * < Joint relations compiled from RobotModel v5.
 		 */
-		coupling_count: u32 @offset(210656);
-		couplings: array<rk_robot_joint_coupling, 512> @offset(210664);
+		coupling_count: u32 @offset(214752);
+		couplings: array<rk_robot_joint_coupling, 512> @offset(214760);
 		/**
 		 * Versioned: absent means no passive dynamics. Indexed by joint.
 		 */
-		joint_dynamics: array<rk_robot_joint_dynamics, 512> @offset(222952);
+		joint_dynamics: array<rk_robot_joint_dynamics, 512> @offset(227048);
 		/**
 		 * Versioned: how far, in joint units, an observed position may pass a
 		 * joint limit before the runtime faults. Zero keeps limits exact. A robot
@@ -783,7 +786,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		 * stops, needs room for a simulator's or joint's compliant stops.
 		 * Commanded positions must still lie within the limits.
 		 */
-		observed_limit_tolerance: f64 @offset(263912);
+		observed_limit_tolerance: f64 @offset(268008);
 		/**
 		 * Versioned: per-joint overtravel in joint units, indexed by joint: how
 		 * far a joint can travel past its position limits before it meets its end
@@ -793,16 +796,16 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		 * plus observed_limit_tolerance, and a simulation puts the joint's end
 		 * stops at the limits widened by it. Zero puts the stops at the limits.
 		 */
-		joint_overtravel: array<f64, 512> @offset(263920);
+		joint_overtravel: array<f64, 512> @offset(268016);
 		/**
 		 * Versioned: absent means no servo motor joints. Indexed by joint.
 		 */
-		joint_servo: array<rk_robot_joint_servo, 512> @offset(268016);
+		joint_servo: array<rk_robot_joint_servo, 512> @offset(272112);
 	}
 	/**
 	 * One compiled joint and its limits in a RobotRuntimeBlueprint.
 	 */
-	struct rk_robot_runtime_joint @layout(192, 8) {
+	struct rk_robot_runtime_joint @layout(200, 8) {
 		/**
 		 * < Stable index of this joint within the blueprint.
 		 */
@@ -846,13 +849,17 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		 */
 		axis: array<f64, 3> @offset(152);
 		/**
-		 * < Maximum joint acceleration, or zero when unspecified.
+		 * < Maximum joint acceleration when RK_LIMIT_ACCELERATION is claimed.
 		 */
 		max_acceleration: f64 @offset(176);
 		/**
-		 * < Maximum joint speed, or zero when unspecified.
+		 * < Maximum joint speed when RK_LIMIT_VELOCITY is claimed.
 		 */
 		max_velocity: f64 @offset(184);
+		/**
+		 * < RK_LIMIT_* presence bits; a claimed zero limit prohibits motion.
+		 */
+		limit_flags: u32 @offset(192);
 	}
 	struct rk_robot_runtime_link @layout(104, 8) {
 		mass: f64 @offset(0);

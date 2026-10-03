@@ -113,6 +113,8 @@ class PlanSlip {
 /** What checking one plan found: its diagnostics and how near the limits it came. */
 class PlanCheckResult {
   public final diagnostics:Array<PlanDiagnostic>;
+  /** Active hardware speed ceilings; these explain planning limits rather than flagging violations. */
+  public var speedLimits:Array<String> = [];
   /** The largest torque a motor needed over what its drive gives at that speed (1 is exactly at the limit); 0 when no motor is checked. */
   public final worstTorqueRatio:Float;
   public final worstMotor:String;

@@ -72,9 +72,12 @@ public:
     }
 
 private:
+    friend class VirtualDeviceEndpoint;
     Rkd6Endpoint(std::unique_ptr<Rkd6Transport>, device_wire6::SessionAck6,
         double target_error, std::uint64_t clock_bound_ns, std::uint64_t link_latency_ns,
         std::vector<DeviceActuator6> layout, std::uint32_t joint_count);
+    bool configure_feedback(const rk_robot_runtime_blueprint &blueprint);
+    void reconstruct_feedback(rk_robot_state &state) const;
     bool send_record(std::uint8_t kind, std::span<const std::uint8_t> payload);
     bool send_segment(const DeviceSegment6 &segment);
     bool send_commit(std::uint64_t through_ticks);
@@ -103,6 +106,10 @@ private:
     device_wire6::SessionAck6 ack_{};
     std::vector<DeviceActuator6> layout_;
     std::uint32_t joint_count_ = 0;
+    /** Rows of the measured joint Jacobian inverted onto its independent leaders. */
+    std::vector<std::uint32_t> feedback_roots_, feedback_joints_, feedback_followers_;
+    std::vector<double> feedback_inverse_, feedback_offsets_;
+    std::vector<rk_robot_joint_coupling> feedback_couplings_;
     ClockEstimator6 clock_;
     double target_error_;
     std::uint64_t link_latency_ns_;

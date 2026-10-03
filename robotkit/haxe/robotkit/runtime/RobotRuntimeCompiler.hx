@@ -78,31 +78,11 @@ class RobotRuntimeCompiler {
         default:
           throw 'Joint ${joint.name} has unknown type ${joint.type}';
       };
-      var maxEffort = joint.limits.effort;
-      var maxRate = joint.limits.velocity;
-      var actuatorEffort = 0.0;
-      var actuatorRate = 0.0;
-      for (actuator in robot.actuators) switch actuator.transmission {
-        case SimpleTransmission(jointId, ratio, _) if (jointId == joint.id):
-          var magnitude = Math.abs(ratio);
-          // Ideal lossless transmission: joint rate = actuator rate / |ratio|,
-          // and joint effort = actuator effort * |ratio|.
-          if (actuator.planningRate() > 0.0)
-            actuatorRate = tighterLimit(actuatorRate, actuator.planningRate() / magnitude);
-          if (actuator.planningEffort() > 0.0)
-            actuatorEffort += actuator.planningEffort() * magnitude * actuator.efficiency;
-        case _:
-      }
-      // The joints coupled to this one and their motors limit it too, such as an axis by the
-      // motors turning its lead screws (see RobotModel.coupledLimits).
-      var coupled = robot.coupledLimits(joint.id);
-      maxRate = tighterLimit(tighterLimit(maxRate, actuatorRate), coupled.velocity);
-      maxEffort = tighterLimit(maxEffort, actuatorEffort);
       var compiled = new RobotRuntimeJointBlueprint(index, nativeType, parent, child,
-        joint.limits.lower, joint.limits.upper, maxEffort, maxRate,
+        joint.limits.lower, joint.limits.upper, joint.limits.effort, joint.limits.velocity,
         joint.parentFramePosition, joint.parentFrameRotation,
         joint.childFramePosition, joint.childFrameRotation, joint.axis,
-        coupled.maxAcceleration);
+        joint.limits.maxAcceleration);
       compiled.overtravel = joint.limits.overtravel;
       // A servo motor whose joint is coupled to others carries them: it runs as a torque-limited servo
       // and the coupling moves the rest. A servo on a joint with no couplings, such as an arm joint, keeps
@@ -164,12 +144,6 @@ class RobotRuntimeCompiler {
         sensor.startAngleRadians, sensor.fieldOfViewRadians));
     }
     return result;
-  }
-
-  static function tighterLimit(first:Float, second:Float):Float {
-    if (first == 0.0) return second;
-    if (second == 0.0) return first;
-    return Math.min(first, second);
   }
 
   /** Returns all semantic diagnostics without attempting native lowering. */
@@ -399,8 +373,8 @@ class RobotRuntimeCompiler {
         diagnostics.push(new RobotCompileDiagnostic("RK_ACTUATOR_ID_DUPLICATE", '$path.id',
           'duplicate actuator ID "${actuator.id}"'));
       else actuatorIds.set(actuator.id, true);
-      if (!Math.isFinite(actuator.maxEffort) || actuator.maxEffort < 0.0 ||
-          !Math.isFinite(actuator.maxRate) || actuator.maxRate < 0.0)
+      if ((actuator.maxEffort != null && (!Math.isFinite(actuator.maxEffort) || actuator.maxEffort < 0.0)) ||
+          (actuator.maxRate != null && (!Math.isFinite(actuator.maxRate) || actuator.maxRate < 0.0)))
         diagnostics.push(new RobotCompileDiagnostic("RK_ACTUATOR_LIMIT", path,
           "actuator limits must be finite and non-negative"));
       if (actuator.transmission == null)

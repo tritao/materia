@@ -204,7 +204,7 @@ class TrajectoryStream {
 
   public function motionSubmission(trajectory:Trajectory, first:Int, last:Int, tag:Int64,
       startNs:Int64, modelRevision:Int64, calibrationRevision:Int64,
-      jerkUnchecked:Bool):ExecutionPlanSubmission {
+      jerkUnchecked:Bool, jointTolerances:Array<Float>):ExecutionPlanSubmission {
     var startSeconds = Int64.toFloat(startNs) * 1e-9;
     var payload:Array<TrajectorySegment> = [];
     for (index in first...last)
@@ -221,17 +221,26 @@ class TrajectoryStream {
           velocity[joint] = segments.coefficient(first - 1, joint, 1);
       acceleration = [for (_ in state.positions) 0.0];
     }
-    var accelerationTolerance = [for (_ in state.positions) 0.0];
+    var accelerationTolerance = jointTolerances.copy();
+    if (!jerkUnchecked && first > 0 && segments.degree(first) != 1) {
+      // Ruckig phases meet on a rounded nanosecond boundary. State the clock
+      // allowance here; the runtime also bounds it by the compiled acceleration cap.
+      var previous = trajectory.evaluate(Math.max(0.0, startSeconds - 1e-9));
+      for (joint in 0...state.positions.length)
+        accelerationTolerance[joint] = jointTolerances[joint] +
+          0.5e-9 * (Math.abs(previous.jerks[joint]) + Math.abs(state.jerks[joint]));
+    }
     if (jerkUnchecked && segments.degree(first) != 1) {
       var previousAcceleration = first == 0 ?
         [for (_ in state.positions) 0.0] :
         trajectory.evaluate(Math.max(0.0, startSeconds - 1e-9)).accelerations;
       for (joint in 0...state.positions.length)
         accelerationTolerance[joint] =
-          Math.abs(acceleration[joint] - previousAcceleration[joint]) + 1e-5;
+          Math.abs(acceleration[joint] - previousAcceleration[joint]) + 10.0 * jointTolerances[joint];
     }
     return new ExecutionPlanSubmission(tag, modelRevision, calibrationRevision, 1,
-      state.positions, velocity, acceleration, payload, null, null, null, null,
+      state.positions, velocity, acceleration, payload, null, null,
+      jointTolerances, jointTolerances,
       accelerationTolerance, last == segments.count(), null, jerkUnchecked);
   }
 
@@ -269,8 +278,10 @@ class TrajectoryStream {
     var vTol = arrays.robotTolerances(first == 0 ? plan.copyVelocityTolerances() : sourceTolerance, tolerance);
     var aTol = arrays.robotTolerances(first == 0 ? plan.copyAccelerationTolerances() : sourceTolerance, tolerance);
     var scale = arrays.robotTolerances([for (_ in state.positions) 1.0], [for (_ in fixedPositions) 1.0]);
+    // Retain the authored tolerances; the runtime caps checked-C2 seams by its
+    // nanosecond rounding bound in the robot's actual joint units.
     if (!jerkUnchecked && first > 0)
-      aTol = [for (joint in 0...fixedPositions.length) 1e-6 * scale[joint]];
+      aTol = arrays.robotTolerances(plan.copyAccelerationTolerances(), tolerance);
     if (chunk.degrees.get(0) > 1) {
       var precedingAcceleration = first == 0 ? zero : arrays.robotValues(
         plan.evaluate(Math.max(0.0, startSeconds - 1e-9)).accelerations, zero, false);
@@ -330,20 +341,21 @@ class TrajectoryStream {
 
   public function submitSmoothReplacement(planned:Trajectory, state:TrajectoryState,
       observation:RobotSnapshot, anchorNs:Int64, modelRevision:Int64,
-      calibrationRevision:Int64):Int64 {
+      calibrationRevision:Int64, jointTolerances:Array<Float>):Int64 {
     var tag = nextMotionTag;
     var payload = [for (segment in planned.segments())
       new TrajectorySegment(segment.timeFromStartNs, segment.durationNs,
         segment.coefficients)];
     robot.submit(RobotCommand.ExecutionPlan(new ExecutionPlanSubmission(tag,
       modelRevision, calibrationRevision, 1, state.positions, state.velocities,
-      state.accelerations, payload, observation.activePlanId, anchorNs)));
+      state.accelerations, payload, observation.activePlanId, anchorNs,
+      jointTolerances, jointTolerances, jointTolerances)));
     nextMotionTag = Int64.add(nextMotionTag, Int64.ofInt(1));
     return tag;
   }
 
   /** Reobserve the committed horizon after a rejected replacement. */
-  public static function replaceWithRetry(executing:Trajectory,
+  public function replaceWithRetry(executing:Trajectory,
       observe:Void -> RobotSnapshot, ownerPeriodSeconds:Float, marginPeriods:Int,
       planFromState:TrajectoryState -> Trajectory,
       submit:Trajectory -> TrajectoryState -> RobotSnapshot -> Int64 -> Trajectory
@@ -353,8 +365,17 @@ class TrajectoryStream {
       if (!observation.trajectoryActive ||
           Int64.compare(observation.activePlanId, Int64.ofInt(0)) == 0)
         return null;
-      var startNs = Int64.sub(observation.trajectoryTimeNs,
-        observation.trajectoryTagTimeNs);
+      // Tags name streamed chunks. Recover the trajectory origin using the
+      // chunk's recorded offset, rather than treating every tag as time zero.
+      var chunkStart = references.get(Int64.toStr(observation.trajectoryTag));
+      var localNs = Int64.ofInt(0);
+      if (chunkStart != null)
+        localNs = Int64.add(Trajectory.nanoseconds(chunkStart), observation.trajectoryTagTimeNs);
+      else if (Int64.compare(observation.trajectoryTimeNs, Int64.ofInt(0)) != 0)
+        return null;
+      // Before the first owner cycle the accepted queue has no observed tag
+      // yet. Its trajectory clock is still zero, so that origin is known.
+      var startNs = Int64.sub(observation.trajectoryTimeNs, localNs);
       var marginNs = Trajectory.nanoseconds(ownerPeriodSeconds * marginPeriods);
       var anchorNs = Int64.add(observation.committedUntilNs, marginNs);
       var localSeconds = Int64.toFloat(Int64.sub(anchorNs, startNs)) * 1e-9;

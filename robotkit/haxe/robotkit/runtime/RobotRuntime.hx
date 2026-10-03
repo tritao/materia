@@ -31,8 +31,8 @@ import sys.thread.Mutex;
 class RobotRuntime {
   @:allow(robotkit.runtime.Simulation)
   final owner:Ownedrk_robot_runtime;
-  final defaultMaxRates:Array<Float>;
-  final defaultMaxEfforts:Array<Float>;
+  final defaultMaxRates:Array<Null<Float>>;
+  final defaultMaxEfforts:Array<Null<Float>>;
   final sensorLayout:Array<RobotRuntimeSensorBlueprint>;
   public final channels:Array<ProcessChannelDeclaration>;
   /** The blueprint's joint couplings: a joint a plan leaves out follows its leader. */
@@ -220,10 +220,11 @@ class RobotRuntime {
         command.set_servos(index, servo);
       }
       target.set_target(targetValue.target);
-      target.set_max_rate(targetValue.joint < defaultMaxRates.length
-        ? defaultMaxRates[targetValue.joint] : 0.0);
-      target.set_max_effort(targetValue.joint < defaultMaxEfforts.length
-        ? defaultMaxEfforts[targetValue.joint] : 0.0);
+      // Native joint presence bits enforce the compiled caps. A command may further tighten them.
+      var rate = targetValue.joint < defaultMaxRates.length ? defaultMaxRates[targetValue.joint] : null;
+      var effort = targetValue.joint < defaultMaxEfforts.length ? defaultMaxEfforts[targetValue.joint] : null;
+      if (rate != null) target.set_max_rate(rate);
+      if (effort != null) target.set_max_effort(effort);
       command.set_targets(index, target);
     }
     check(RobotKitRuntime.rk_robot_runtime_submit(owner.borrow(), command),

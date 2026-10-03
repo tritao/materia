@@ -12,6 +12,7 @@ import motionkit.Feed;
 import motionkit.MotionOptions;
 import motionkit.Pose;
 import motionkit.axis.MotionAxisBlueprint;
+import motionkit.axis.MotionAxis;
 import motionkit.event.ChannelDeclaration;
 import motionkit.event.ChannelKind;
 import motionkit.event.EventValue;
@@ -120,12 +121,16 @@ class StreamTests extends MotionKitTestSupport {
     var blueprint = MachineKitRobotCompiler.compileLinearAxis(
       new LinearAxis(23, 10, 80), "x", 0.1, 0.4);
     var source = new RobotRecording();
+    var initial = [for (_ in blueprint.model.joints) 0.0];
+    var axisMapping = new MotionAxis(blueprint.axes[0],
+      [for (joint in blueprint.model.joints) joint.id]);
+    axisMapping.writeLogicalPosition(initial, axisMapping.homePosition);
     source.recordSnapshot(new RobotSnapshot("plan-replay", Int64.ofInt(0),
-      Int64.ofInt(0), [0.0], [0.0], [0.0], 0, 0));
+      Int64.ofInt(0), initial, [for (_ in initial) 0.0], [for (_ in initial) 0.0], 0, 0));
     var description = new RobotDescription("plan-replay", blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name]);
-    var capabilities = new RobotCapabilities("plan-replay", 1,
+    var capabilities = new RobotCapabilities("plan-replay", blueprint.model.joints.length,
       true, false, false, false, true, true);
     var unsupported = new ReplayRobot("plan-replay", source, description);
     throws(function() MotionSystem.fromBlueprint(unsupported, blueprint),
@@ -268,9 +273,17 @@ class StreamTests extends MotionKitTestSupport {
     var recording = new RobotRecording();
     var instrumented = new RecordingRobot(robot, recording);
     var machine = MotionSystem.fromBlueprint(instrumented, blueprint);
+    var axisMapping = machine.axis("x");
+    if (axisMapping == null) throw "Long buffered axis is missing";
+    var samples:Array<Array<Float>> = [];
+    for (index in 0...601) {
+      var sample = [for (_ in blueprint.model.joints) 0.0];
+      axisMapping.writeLogicalPosition(sample, 0.05 * index / 600.0);
+      samples.push(sample);
+    }
     var trajectory = Trajectory.fromPositionSamples(
       [for (index in 0...601) index * 0.01],
-      [for (index in 0...601) [0.05 * index / 600.0]]);
+      samples);
     machine.queueTrajectory(trajectory);
     function submittedSegments():Int {
       var total = 0;
@@ -330,9 +343,17 @@ class StreamTests extends MotionKitTestSupport {
       blueprint.model.name, [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name]);
     var machine = MotionSystem.fromBlueprint(robot, blueprint);
+    var axisMapping = machine.axis("x");
+    if (axisMapping == null) throw "Hold refill axis is missing";
+    var samples:Array<Array<Float>> = [];
+    for (index in 0...2001) {
+      var sample = [for (_ in blueprint.model.joints) 0.0];
+      axisMapping.writeLogicalPosition(sample, 0.06 * index / 2000.0);
+      samples.push(sample);
+    }
     machine.queueTrajectory(Trajectory.fromPositionSamples(
       [for (index in 0...2001) index * 0.005],
-      [for (index in 0...2001) [0.06 * index / 2000.0]]));
+      samples));
 
     var tick = 0;
     var previousPreHoldPosition = 0.0;

@@ -41,6 +41,13 @@ class RecipeContractTests {
 		checkRebuild(new SuctionCup(40, 18, 900, 0.2, "CUP-CUSTOM", Thread("G1/8"), "Custom cup"));
 		checkRebuild(new VacuumGenerator(80, "GEN-CUSTOM", PushIn(4), Thread("G1/4"), "Custom generator"));
 		for (type in MachineKitComponents.all()) {
+			for (parameter in type.parameters()) if (parameter.name == "servo") switch parameter.type {
+				case Choice(options):
+					for (rating in machinekit.motion.ServoMotor.ratings())
+						check(options.indexOf(rating.designation) >= 0,
+							'${type.id}: servo choices omit catalog entry ${rating.designation}');
+				case _: throw '${type.id}: servo selection needs catalog-derived choices';
+			}
 			var seenValues:Map<String, Bool> = [];
 			var partNumbers:Map<String, String> = [];
 			for (values in cases(type)) {

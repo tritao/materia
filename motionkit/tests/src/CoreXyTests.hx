@@ -108,8 +108,8 @@ class CoreXyTests extends MotionKitTestSupport {
       driven.push(slot(index, id));
       parent = child;
     }
-    var velocities = [for (joint in planning.joints) joint.limits.velocity];
-    var accelerations = [for (joint in planning.joints) joint.limits.maxAcceleration];
+    var velocities = [for (joint in planning.joints) joint.limits.requireVelocity()];
+    var accelerations = [for (joint in planning.joints) joint.limits.requireAcceleration()];
     check(velocities[0] > 0.0 && accelerations[0] > 0.0 && accelerations[1] > 0.0, "the axes have limits from their motors");
     near(velocities[1], velocities[0], "X and Y are as fast as each other", 1e-12);
     check(accelerations[1] < accelerations[0], "Y accelerates less, carrying the gantry as well as the carriage");
@@ -185,8 +185,8 @@ class CoreXyTests extends MotionKitTestSupport {
 
   /** A plan for the two axes from `from` to `to` within `scale` times their limits. */
   function plan(model:RobotModel, from:Array<Float>, to:Array<Float>, scale:Float, steady:SteadyLoads):ExecutionPlan {
-    var velocities = [for (id in ["x", "y"]) scale * model.coupledLimits(id, steady).velocity];
-    var accelerations = [for (id in ["x", "y"]) scale * model.coupledLimits(id, steady).maxAcceleration];
+    var velocities = [for (id in ["x", "y"]) scale * model.coupledLimits(id, steady).requireVelocity()];
+    var accelerations = [for (id in ["x", "y"]) scale * model.coupledLimits(id, steady).requireAcceleration()];
     var trajectory = Trajectory.generateStateToState(from, [0.0, 0.0], [0.0, 0.0], to, velocities, accelerations,
       [for (limit in accelerations) limit * 500.0]);
     var limits = new ValidationLimits(2, Int64.ofInt(1), Int64.ofInt(1));

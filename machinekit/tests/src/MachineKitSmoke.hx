@@ -1398,8 +1398,8 @@ class MachineKitSmoke {
 		part.close();
 
 		var pinion = new SpurGear(2, 18, 12);
-		throws(() -> pinion.centerDistance(new SpurGear(2.5, 20, 12)), "share a module");
-		throws(() -> GearPair.mesh(pinion, new SpurGear(2, 20, 12, 25 * Math.PI / 180)), "share a pressure angle");
+		throws(() -> pinion.centerDistance(new SpurGear(2.5, 20, 12)), "different modules");
+		throws(() -> GearPair.mesh(pinion, new SpurGear(2, 20, 12, 25 * Math.PI / 180)), "different pressure angles");
 		var pair = GearPair.mesh(pinion, gear);
 		MachineAssemblyDescriptionTests.roundTrip(pair, "gear pair");
 		near(pair.centerDistance, (pinion.pitchDiameter + gear.pitchDiameter) / 2, "gear pair centre distance");
@@ -1436,7 +1436,7 @@ class MachineKitSmoke {
 		throws(() -> GearPair.mesh(
 			new SpurGear(2, 40, 12, SpurGear.STANDARD_PRESSURE_ANGLE, -0.9),
 			new SpurGear(2, 40, 12, SpurGear.STANDARD_PRESSURE_ANGLE, -0.9)),
-			"invalid operating pressure angle");
+			"compatible profile shifts");
 		var shiftedASolid = shiftedPair.a.geometry(), shiftedBSolid = shiftedPair.b.geometry();
 		var shiftedMaxPenetration = 0.0;
 		for (sample in 0...9) {

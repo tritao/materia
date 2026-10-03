@@ -261,7 +261,7 @@ class SessionTests extends MotionKitTestSupport {
     heldRig.dispose();
 
     var jogRig = new SessionTransitionRig("session-jog");
-    jogRig.machine.jog("x", 0.05, 2.0);
+    jogRig.machine.jog("x", 0.04, 2.0);
     jogRig.advance(10);
     var beforeReplacement = jogRig.robot.planCount();
     expect(jogRig, "running + jog replacement", Running, 1, () -> {
@@ -669,7 +669,7 @@ class SessionTests extends MotionKitTestSupport {
       check(result != null || machine.isMoving(),
         "free-running jog applies a replacement or defers behind a stop");
       var observation = robot.snapshot();
-      check(Math.abs(observation.velocities.get(0)) <= 0.08 + 1e-5,
+      check(Math.abs(observation.velocities.get(0)) <= blueprint.axes[0].maxVelocity + 1e-5,
         "free-running replacement stays within velocity limit");
       check(observation.positions.get(0) >= -1e-6 &&
         observation.positions.get(0) <= 0.08 + 1e-6,
@@ -711,7 +711,7 @@ class SessionTests extends MotionKitTestSupport {
           '$label move replaced at tick $eventTick stays within the first move');
 
         var jogged = gantryTrial(queueSupport, eventTick,
-          machine -> machine.jog("x", -0.05, 0.5), false);
+          machine -> machine.jog("x", -0.04, 0.5), false);
         var jogPeak = peakSecondDifference(jogged);
         if (jogPeak > worstJog) {
           worstJog = jogPeak;
@@ -745,13 +745,13 @@ class SessionTests extends MotionKitTestSupport {
     var limit = 0.4;
     for (queueSupport in [true]) {
       var label = "buffered";
-      for (secondVelocity in [0.08, 0.02, -0.05]) {
+      for (secondVelocity in [0.043, 0.02, -0.04]) {
         var eventTick = 10;
         while (eventTick <= 150) {
           var continued = false;
           var positions = gantryTrial(queueSupport, eventTick, machine -> {
             continued = machine.jog("x", secondVelocity, 1.0) != null;
-          }, false, machine -> machine.jog("x", 0.05, 2.0));
+          }, false, machine -> machine.jog("x", 0.04, 2.0));
           var context = '$label jog changed to $secondVelocity at tick $eventTick';
           check(continued, '$context continues without stopping first');
           check(peakSecondDifference(positions) <= limit * 1.05,
@@ -785,7 +785,7 @@ class SessionTests extends MotionKitTestSupport {
       [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name]));
     var machine = MotionSystem.fromBlueprint(robot, blueprint);
-    machine.jog("x", 0.05, 2.0);
+    var originalJog = planned(machine.jog("x", 0.04, 2.5));
     var positions:Array<Float> = [];
     var tick = 0;
     function step():Void {
@@ -794,7 +794,12 @@ class SessionTests extends MotionKitTestSupport {
       positions.push(robot.snapshot().positions.get(0));
       if (tick > 2000) throw "late jog splice did not settle";
     }
-    for (_ in 0...40) step();
+    // The slower physical axis needs a longer jog. Let the bounded stream
+    // queue its final deceleration before deliberately delaying a replacement.
+    for (_ in 0...80) step();
+    check(Int64.compare(robot.snapshot().trajectoryDurationNs,
+      Trajectory.nanoseconds(originalJog.durationSeconds())) >= 0,
+      "late replacement starts after the entire original jog is queued");
     robot.lagging = true;
     check(machine.jog("x", 0.02, 1.0) != null, "jog change is planned as a continuation");
     for (_ in 0...8) step();

@@ -157,7 +157,7 @@ bool valid_limits(const Trajectory &trajectory, const mk_limits &limits) {
         limits.joint_count != trajectory.joint_count() || trajectory.segment_count() == 0)
         return false;
     for (uint32_t joint = 0; joint < limits.joint_count; ++joint) {
-        if (limits.position_claimed[joint] > 1 ||
+        if (limits.position_claimed[joint] > 1 || (limits.derivative_claimed[joint] & ~7u) ||
             !std::isfinite(limits.max_velocity[joint]) || limits.max_velocity[joint] < 0.0 ||
             !std::isfinite(limits.max_acceleration[joint]) || limits.max_acceleration[joint] < 0.0 ||
             !std::isfinite(limits.max_jerk[joint]) || limits.max_jerk[joint] < 0.0)
@@ -276,13 +276,13 @@ mk_result validate(const Trajectory &trajectory, const mk_limits &limits,
         if (!limits.position_claimed[joint]) {
             unchecked[MK_CHECK_POSITION] = true; assumption(report, "position limit", joint);
         }
-        if (limits.max_velocity[joint] == 0.0) {
+        if (!(limits.derivative_claimed[joint] & 1) && limits.max_velocity[joint] == 0.0) {
             unchecked[MK_CHECK_VELOCITY] = true; assumption(report, "velocity limit", joint);
         }
-        if (limits.max_acceleration[joint] == 0.0) {
+        if (!(limits.derivative_claimed[joint] & 2) && limits.max_acceleration[joint] == 0.0) {
             unchecked[MK_CHECK_ACCELERATION] = true; assumption(report, "acceleration limit", joint);
         }
-        if (limits.max_jerk[joint] == 0.0) {
+        if (!(limits.derivative_claimed[joint] & 4) && limits.max_jerk[joint] == 0.0) {
             unchecked[MK_CHECK_JERK] = true; assumption(report, "jerk limit", joint);
         }
     }
@@ -304,9 +304,9 @@ mk_result validate(const Trajectory &trajectory, const mk_limits &limits,
             int degree = static_cast<int>(segment.degree);
             for (uint32_t order = 0; order <= 3; ++order) {
                 const bool claimed = order == 0 ? limits.position_claimed[joint] != 0 :
-                    order == 1 ? limits.max_velocity[joint] > 0.0 :
-                    order == 2 ? limits.max_acceleration[joint] > 0.0 :
-                                 limits.max_jerk[joint] > 0.0;
+                    order == 1 ? ((limits.derivative_claimed[joint] & 1) || limits.max_velocity[joint] > 0.0) :
+                    order == 2 ? ((limits.derivative_claimed[joint] & 2) || limits.max_acceleration[joint] > 0.0) :
+                                 ((limits.derivative_claimed[joint] & 4) || limits.max_jerk[joint] > 0.0);
                 if (claimed) {
                     std::vector<long double> times{0.0L, duration};
                     const auto next = derivative(polynomial, degree);
@@ -370,8 +370,16 @@ mk_result validate(const Trajectory &trajectory, const mk_limits &limits,
             for (uint32_t order = 0; order < 3; ++order) {
                 const double limit = limits.max_continuity_jump[order];
                 if (limit > 0.0) {
-                    const double tolerance = comparison_tolerance(std::abs(limit),
-                        maxima[joint][order + 1], report.executor_time_resolution_ns);
+                    // C0 uses position uncertainty, capped by one clock quantum of
+                    // observed travel. An unbounded continuous-joint range must not
+                    // turn a tiny continuity claim into an unrestricted jump.
+                    const double tolerance = order == 0 && limits.position_claimed[joint]
+                        ? std::min(position_comparison_tolerance(limits.position_lower[joint],
+                            limits.position_upper[joint], maxima[joint][1],
+                            report.executor_time_resolution_ns), maxima[joint][1] * 1e-9 *
+                                std::max<uint64_t>(1, report.executor_time_resolution_ns))
+                        : comparison_tolerance(std::abs(limit), maxima[joint][order + 1],
+                            report.executor_time_resolution_ns);
                     const double margin = limit - jumps[order];
                     const double scale = std::max({limit, tolerance, 1e-30});
                     observe(report, scores, MK_CHECK_CONTINUITY, joint, order,

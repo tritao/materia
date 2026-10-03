@@ -200,7 +200,8 @@ class CncProgramPlayer implements SessionMember {
 			// lead screw and the motor turning it.
 			// Gravity, rail friction and the drives' drag come off what the motors can accelerate with.
 			var coupled = machineModel.coupledLimits(id, steady);
-			if (!(coupled.velocity > 0) || !(coupled.maxAcceleration > 0))
+			if (coupled.velocity == null || coupled.maxAcceleration == null ||
+					!(coupled.velocity > 0) || !(coupled.maxAcceleration > 0))
 				throw 'CNC axis "$id" needs velocity and acceleration limits, its own or its motors\'';
 			rapid = Math.max(rapid, coupled.velocity);
 			axes.push(new MotionAxisBlueprint(id, [id], lower * metresPerUnit, upper * metresPerUnit,

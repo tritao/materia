@@ -217,6 +217,9 @@ import machinekit.component.PortInterface;
 	@:id(7) var endEffector:EndEffectorRecord;
 	@:id(8) var ports:ReadOnlyArray<PortRecord>;
 	@:id(9) var included:ReadOnlyArray<IncludedRecord>;
+	@:id(10) @:optional var transmissions:ReadOnlyArray<TransmissionRecord>;
+	@:id(11) @:optional var motors:ReadOnlyArray<MotorRecord>;
+	@:id(12) @:optional var encoders:ReadOnlyArray<EncoderRecord>;
 }
 
 @:wire typedef BomExtraRecord = {

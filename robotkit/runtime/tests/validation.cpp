@@ -16,7 +16,9 @@ int main() {
         blueprint.links[i].inertia_tensor[0] = blueprint.links[i].inertia_tensor[4] = blueprint.links[i].inertia_tensor[8] = 1.0;
     }
     blueprint.joints[0] = {0, RK_RUNTIME_JOINT_REVOLUTE, 0, 1, -1.0, 1.0, 3.0};
+    blueprint.joints[0].limit_flags |= RK_LIMIT_EFFORT;
     blueprint.joints[1] = {1, RK_RUNTIME_JOINT_REVOLUTE, 1, 2, -1.0, 1.0, 3.0};
+    blueprint.joints[1].limit_flags |= RK_LIMIT_EFFORT;
     for (auto &joint : blueprint.joints) {
         joint.parent_frame_rotation[3] = joint.child_frame_rotation[3] = 1.0;
         joint.axis[2] = 1.0;
@@ -104,6 +106,7 @@ int main() {
     multi.link_count = 4;
     multi.links[3] = multi.links[2];
     multi.joints[2] = {2, RK_RUNTIME_JOINT_REVOLUTE, 2, 3, -10.0, 10.0, 3.0};
+    multi.joints[2].limit_flags |= RK_LIMIT_EFFORT;
     multi.joints[2].parent_frame_rotation[3] = multi.joints[2].child_frame_rotation[3] = 1.0;
     multi.joints[2].axis[2] = 1.0;
     multi.coupling_count = 2;

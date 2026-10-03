@@ -386,7 +386,7 @@ void trajectory_stop_follows_path_and_reports_tag(
     const rk_robot_runtime_blueprint &blueprint) {
     auto slow_blueprint = blueprint;
     for (auto &joint : slow_blueprint.joints)
-        joint.max_acceleration = 1.0;
+        joint.max_acceleration = (joint.limit_flags |= RK_LIMIT_ACCELERATION, 1.0);
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(slow_blueprint.joint_count);
     robotkit::RobotRuntime runtime(slow_blueprint, endpoint, std::chrono::milliseconds(100));
     uint64_t timestamp = 0;
@@ -481,7 +481,7 @@ void trajectory_chunk_extends_running_stop(
     const rk_robot_runtime_blueprint &blueprint) {
     auto slow_blueprint = blueprint;
     for (auto &joint : slow_blueprint.joints)
-        joint.max_acceleration = 1.0;
+        joint.max_acceleration = (joint.limit_flags |= RK_LIMIT_ACCELERATION, 1.0);
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(slow_blueprint.joint_count);
     robotkit::RobotRuntime runtime(slow_blueprint, endpoint, std::chrono::milliseconds(100));
     uint64_t timestamp = 0;
@@ -525,7 +525,7 @@ void trajectory_stop_counts_trajectory_braking(
     constexpr double limit = 1.0;
     auto limited = blueprint;
     for (auto &joint : limited.joints)
-        joint.max_acceleration = limit;
+        joint.max_acceleration = (joint.limit_flags |= RK_LIMIT_ACCELERATION, limit);
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(limited.joint_count);
     robotkit::RobotRuntime runtime(limited, endpoint, std::chrono::milliseconds(10));
     uint64_t timestamp = 0;
@@ -556,7 +556,7 @@ void stop_beyond_queued_path_ramps_within_limits(
     constexpr double limit = 1.0;
     auto limited = blueprint;
     for (auto &joint : limited.joints)
-        joint.max_acceleration = limit;
+        joint.max_acceleration = (joint.limit_flags |= RK_LIMIT_ACCELERATION, limit);
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(limited.joint_count);
     robotkit::RobotRuntime runtime(limited, endpoint, std::chrono::milliseconds(10));
     uint64_t timestamp = 0;
@@ -592,7 +592,7 @@ void stop_ramp_stays_within_travel(const rk_robot_runtime_blueprint &blueprint) 
     constexpr double limit = 1.0;
     auto limited = blueprint;
     for (auto &joint : limited.joints)
-        joint.max_acceleration = limit;
+        joint.max_acceleration = (joint.limit_flags |= RK_LIMIT_ACCELERATION, limit);
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(limited.joint_count);
     robotkit::RobotRuntime runtime(limited, endpoint, std::chrono::milliseconds(10));
     uint64_t timestamp = 0;
@@ -684,7 +684,7 @@ void invalid_trajectory_chunk_is_atomic(
 void trajectory_chunk_speed_is_limited(const rk_robot_runtime_blueprint &blueprint) {
     auto limited = blueprint;
     for (auto &joint : limited.joints)
-        joint.max_velocity = 1.0;
+        joint.max_velocity = (joint.limit_flags |= RK_LIMIT_VELOCITY, 1.0);
 
     {
         // 0.1 m in 100 ms is 1 m/s: exactly at the limit.
@@ -868,7 +868,7 @@ void device_queue_endpoint_does_not_receive_sampled_targets(
 void plan_events_follow_path_clock(const rk_robot_runtime_blueprint &source) {
     auto blueprint = source;
     for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint)
-        blueprint.joints[joint].max_acceleration = 100.0;
+        blueprint.joints[joint].max_acceleration = (blueprint.joints[joint].limit_flags |= RK_LIMIT_ACCELERATION, 100.0);
     blueprint.channel_count = 1;
     std::strcpy(blueprint.channels[0].id, "sprayer.flow");
     blueprint.channels[0].kind = RK_EVENT_DIGITAL;
@@ -1159,8 +1159,8 @@ void ruckig_segments_match_motionkit_evaluation(
     const rk_robot_runtime_blueprint &blueprint) {
     auto limited = blueprint;
     for (auto &joint : limited.joints) {
-        joint.max_velocity = 1.0;
-        joint.max_acceleration = 2.0;
+        joint.max_velocity = (joint.limit_flags |= RK_LIMIT_VELOCITY, 1.0);
+        joint.max_acceleration = (joint.limit_flags |= RK_LIMIT_ACCELERATION, 2.0);
     }
     mk_state_to_state_request request{};
     request.struct_size = sizeof(request);
@@ -1195,7 +1195,7 @@ void ruckig_segments_match_motionkit_evaluation(
 
 void overacceleration_segment_is_rejected(const rk_robot_runtime_blueprint &blueprint) {
     auto limited = blueprint;
-    for (auto &joint : limited.joints) joint.max_acceleration = 1.0;
+    for (auto &joint : limited.joints) joint.max_acceleration = (joint.limit_flags |= RK_LIMIT_ACCELERATION, 1.0);
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(limited.joint_count);
     robotkit::RobotRuntime runtime(limited, endpoint, std::chrono::milliseconds(10));
     auto chunk = linear_segment_chunk(0.0, 0.0, 100'000'000);
@@ -1223,7 +1223,7 @@ void segment_junction_jump_is_rejected(const rk_robot_runtime_blueprint &bluepri
 
 void stop_braking_uses_segment_degree(const rk_robot_runtime_blueprint &blueprint) {
     auto limited = blueprint;
-    for (auto &joint : limited.joints) joint.max_acceleration = 1.0;
+    for (auto &joint : limited.joints) joint.max_acceleration = (joint.limit_flags |= RK_LIMIT_ACCELERATION, 1.0);
     const auto profile = [](double t) {
         if (t <= 0.2) return 0.5 * t;
         const double braking = std::min(t - 0.2, 0.5);
@@ -1265,8 +1265,8 @@ void ruckig_segment_stop_uses_analytic_braking(
     const rk_robot_runtime_blueprint &blueprint) {
     auto limited = blueprint;
     for (auto &joint : limited.joints) {
-        joint.max_velocity = 1.0;
-        joint.max_acceleration = 1.0;
+        joint.max_velocity = (joint.limit_flags |= RK_LIMIT_VELOCITY, 1.0);
+        joint.max_acceleration = (joint.limit_flags |= RK_LIMIT_ACCELERATION, 1.0);
     }
     mk_state_to_state_request request{};
     request.struct_size = sizeof(request);
@@ -1438,8 +1438,8 @@ void partial_targets_and_ordered_trajectory_commands(
 void declared_plan_completion_and_underflow(const rk_robot_runtime_blueprint &source) {
     auto blueprint = source;
     for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
-        blueprint.joints[joint].max_acceleration = 1.0;
-        blueprint.joints[joint].max_velocity = 1.0;
+        blueprint.joints[joint].max_acceleration = (blueprint.joints[joint].limit_flags |= RK_LIMIT_ACCELERATION, 1.0);
+        blueprint.joints[joint].max_velocity = (blueprint.joints[joint].limit_flags |= RK_LIMIT_VELOCITY, 1.0);
     }
     auto make_plan = [&](uint64_t id, bool ends_at_rest, bool smooth) {
         robotkit::PlanRequest plan{};
@@ -1665,14 +1665,13 @@ void discarded_tick_restores_trajectory(const rk_robot_runtime_blueprint &bluepr
     }
 }
 
-void hold_with_unlimited_follower(const rk_robot_runtime_blueprint &source) {
-    // A lead screw with no acceleration limit of its own turns within its axis's: a hold
-    // brakes the axis, and the screw with it, instead of being refused.
+void hold_with_compiled_follower(const rk_robot_runtime_blueprint &source) {
+    // The compiled model supplies the screw's effective caps; runtime lowering preserves them.
     auto blueprint = source;
-    blueprint.joints[0].max_acceleration = 1.0;
-    blueprint.joints[0].max_velocity = 1.0;
-    blueprint.joints[1].max_acceleration = 0.0;
-    blueprint.joints[1].max_velocity = 0.0;
+    blueprint.joints[0].max_acceleration = (blueprint.joints[0].limit_flags |= RK_LIMIT_ACCELERATION, 1.0);
+    blueprint.joints[0].max_velocity = (blueprint.joints[0].limit_flags |= RK_LIMIT_VELOCITY, 1.0);
+    blueprint.joints[1].max_acceleration = (blueprint.joints[1].limit_flags |= RK_LIMIT_ACCELERATION, 1.0);
+    blueprint.joints[1].max_velocity = (blueprint.joints[1].limit_flags |= RK_LIMIT_VELOCITY, 1.0);
     blueprint.coupling_count = 1;
     blueprint.couplings[0] = {0, 1, -1.0, 0.0};
     auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
@@ -1708,11 +1707,11 @@ void follower_with_two_leaders_takes_their_summed_limits(const rk_robot_runtime_
     blueprint.joints[2].parent_link = 2;
     blueprint.joints[2].child_link = 3;
     for (uint32_t joint = 0; joint < 2; ++joint) {
-        blueprint.joints[joint].max_acceleration = 1.0 + joint;
-        blueprint.joints[joint].max_velocity = 1.0 + joint;
+        blueprint.joints[joint].max_acceleration = (blueprint.joints[joint].limit_flags |= RK_LIMIT_ACCELERATION, 1.0 + joint);
+        blueprint.joints[joint].max_velocity = (blueprint.joints[joint].limit_flags |= RK_LIMIT_VELOCITY, 1.0 + joint);
     }
-    blueprint.joints[2].max_acceleration = 0.0;
-    blueprint.joints[2].max_velocity = 0.0;
+    blueprint.joints[2].max_acceleration = (blueprint.joints[2].limit_flags |= RK_LIMIT_ACCELERATION, 8.0);
+    blueprint.joints[2].max_velocity = (blueprint.joints[2].limit_flags |= RK_LIMIT_VELOCITY, 8.0);
     blueprint.coupling_count = 2;
     blueprint.couplings[0] = {0, 2, 2.0, 0.0};
     blueprint.couplings[1] = {1, 2, -3.0, 0.0};
@@ -1725,8 +1724,8 @@ void follower_with_two_leaders_takes_their_summed_limits(const rk_robot_runtime_
 void native_hold_resume_and_abort(const rk_robot_runtime_blueprint &source) {
     auto blueprint = source;
     for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
-        blueprint.joints[joint].max_acceleration = 1.0;
-        blueprint.joints[joint].max_velocity = 1.0;
+        blueprint.joints[joint].max_acceleration = (blueprint.joints[joint].limit_flags |= RK_LIMIT_ACCELERATION, 1.0);
+        blueprint.joints[joint].max_velocity = (blueprint.joints[joint].limit_flags |= RK_LIMIT_VELOCITY, 1.0);
     }
     auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
     robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
@@ -1781,8 +1780,8 @@ void native_hold_resume_and_abort(const rk_robot_runtime_blueprint &source) {
 void smooth_path_hold_respects_acceleration(const rk_robot_runtime_blueprint &source) {
     auto blueprint = source;
     for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
-        blueprint.joints[joint].max_acceleration = 1.0;
-        blueprint.joints[joint].max_velocity = 1.0;
+        blueprint.joints[joint].max_acceleration = (blueprint.joints[joint].limit_flags |= RK_LIMIT_ACCELERATION, 1.0);
+        blueprint.joints[joint].max_velocity = (blueprint.joints[joint].limit_flags |= RK_LIMIT_VELOCITY, 1.0);
     }
     for (int hold_after : {3, 14}) {
         auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
@@ -1846,8 +1845,8 @@ void presampled_publication_does_not_sample_again(const rk_robot_runtime_bluepri
 void plan_end_braking_stays_on_path(const rk_robot_runtime_blueprint &source) {
     auto blueprint = source;
     for (auto &joint : blueprint.joints) {
-        joint.max_velocity = 1.0;
-        joint.max_acceleration = 1.0;
+        joint.max_velocity = (joint.limit_flags |= RK_LIMIT_VELOCITY, 1.0);
+        joint.max_acceleration = (joint.limit_flags |= RK_LIMIT_ACCELERATION, 1.0);
     }
     mk_state_to_state_request request{};
     request.struct_size = sizeof(request);
@@ -2025,11 +2024,65 @@ void single_precision_reading_at_a_limit_is_not_a_fault(const rk_robot_runtime_b
     }
 }
 
+void stated_zero_speed_stops_position_commands(const rk_robot_runtime_blueprint &source) {
+    auto blueprint = source;
+    blueprint.joints[0].limit_flags |= RK_LIMIT_VELOCITY;
+    blueprint.joints[0].max_velocity = 0.0;
+    auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
+    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(10));
+    assert(runtime.publish_sample(10'000'000) == RK_OK);
+    rk_robot_command command{};
+    command.struct_size = sizeof(command);
+    command.kind = RK_COMMAND_JOINT_TARGETS;
+    command.sequence = 1;
+    command.target_count = 1;
+    command.targets[0] = {0, RK_TARGET_POSITION, 0.5, 0.0, 0.0};
+    assert(runtime.submit(command) == RK_OK);
+    assert(runtime.apply_pending_commands() == RK_OK);
+    assert(endpoint->last_command.targets[0].target == 0.0);
+}
+
+void quantized_motor_seams_keep_the_c2_bound(const rk_robot_runtime_blueprint &source) {
+    auto blueprint = source;
+    for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
+        blueprint.joints[joint].limit_flags |= RK_LIMIT_ACCELERATION;
+        blueprint.joints[joint].max_acceleration = 100.0;
+    }
+    for (double gap : {4e-6, 1e-4}) {
+        auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
+        robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(10));
+        robotkit::PlanRequest first{};
+        first.sequence = 1; first.plan_id = 401;
+        first.model_revision = blueprint.revision;
+        first.calibration_revision = blueprint.calibration_revision;
+        first.segments = linear_segment_chunk(0.0, 0.0, 1000, 401);
+        auto &segment = first.segments.segments[0];
+        segment.degree = 3;
+        for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint)
+            segment.coefficients[joint].value[3] = 10000.0 / 6.0;
+        assert(runtime.submit_plan(first) == RK_OK);
+        auto second = first;
+        second.sequence = 2; second.plan_id = 402;
+        for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
+            second.start_position[joint] = 10000.0 * 1e-18 / 6.0;
+            second.start_velocity[joint] = 10000.0 * 1e-12 / 2.0;
+            second.start_acceleration[joint] = 0.01 + gap;
+            second.acceleration_tolerance[joint] = 0.001;
+            auto &coefficients = second.segments.segments[0].coefficients[joint].value;
+            coefficients[0] = second.start_position[joint];
+            coefficients[1] = second.start_velocity[joint];
+            coefficients[2] = second.start_acceleration[joint] / 2.0;
+            coefficients[3] = -10000.0 / 6.0;
+        }
+        assert(runtime.submit_plan(second) == (gap < 1e-5 ? RK_OK : RK_ERROR_INVALID_STATE));
+    }
+}
+
 void expired_velocity_targets_brake_within_limits(const rk_robot_runtime_blueprint &blueprint) {
     // Joint 0 brakes at 2 rad/s^2; joint 1 has no acceleration limit.
     auto limited = blueprint;
-    limited.joints[0].max_acceleration = 2.0;
-    limited.joints[1].max_acceleration = 0.0;
+    limited.joints[0].max_acceleration = (limited.joints[0].limit_flags |= RK_LIMIT_ACCELERATION, 2.0);
+    limited.joints[1].max_acceleration = (limited.joints[1].limit_flags &= ~RK_LIMIT_ACCELERATION, 0.0);
     auto endpoint = std::make_shared<EchoEndpoint>(limited.joint_count);
     robotkit::RobotRuntime runtime(limited, endpoint, std::chrono::milliseconds(10));
     uint64_t timestamp = 10'000'000;
@@ -2125,7 +2178,9 @@ int main() {
         blueprint.links[i].inertia_tensor[0] = blueprint.links[i].inertia_tensor[4] = blueprint.links[i].inertia_tensor[8] = 1.0;
     }
     blueprint.joints[0] = {0, RK_RUNTIME_JOINT_REVOLUTE, 0, 1, -1.0, 1.0, 3.0};
+    blueprint.joints[0].limit_flags |= RK_LIMIT_EFFORT;
     blueprint.joints[1] = {1, RK_RUNTIME_JOINT_REVOLUTE, 1, 2, -1.0, 1.0, 3.0};
+    blueprint.joints[1].limit_flags |= RK_LIMIT_EFFORT;
     for (auto &joint : blueprint.joints) {
         joint.parent_frame_rotation[3] = joint.child_frame_rotation[3] = 1.0;
         joint.axis[2] = 1.0;
@@ -2141,6 +2196,8 @@ int main() {
     trajectory_stop_counts_trajectory_braking(blueprint);
     stop_beyond_queued_path_ramps_within_limits(blueprint);
     stop_ramp_stays_within_travel(blueprint);
+    stated_zero_speed_stops_position_commands(blueprint);
+    quantized_motor_seams_keep_the_c2_bound(blueprint);
     expired_velocity_targets_brake_within_limits(blueprint);
     plan_end_does_not_restore_earlier_targets(blueprint);
     single_precision_reading_at_a_limit_is_not_a_fault(blueprint);
@@ -2166,7 +2223,7 @@ int main() {
     plan_start_ignores_chunking(blueprint);
     discarded_tick_restores_trajectory(blueprint);
     native_hold_resume_and_abort(blueprint);
-    hold_with_unlimited_follower(blueprint);
+    hold_with_compiled_follower(blueprint);
     follower_with_two_leaders_takes_their_summed_limits(blueprint);
     plan_end_braking_stays_on_path(blueprint);
     smooth_path_hold_respects_acceleration(blueprint);
@@ -2251,6 +2308,7 @@ int main() {
     mixed_blueprint.joint_count = 3;
     mixed_blueprint.link_count = 4;
     mixed_blueprint.joints[2] = {2, RK_RUNTIME_JOINT_REVOLUTE, 2, 3, -1.0, 1.0, 3.0};
+    mixed_blueprint.joints[2].limit_flags |= RK_LIMIT_EFFORT;
     mixed_blueprint.joints[2].parent_frame_rotation[3] = 1.0;
     mixed_blueprint.joints[2].child_frame_rotation[3] = 1.0;
     mixed_blueprint.joints[2].axis[2] = 1.0;

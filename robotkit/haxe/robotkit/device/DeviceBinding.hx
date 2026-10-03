@@ -106,15 +106,21 @@ class DeviceBinding {
       var driverRate = actuator.maxStepRate;
       var pulseRate:Float = driverRate == null ? stepTickHz : Math.min(stepTickHz, driverRate);
       var ceiling = pulseRate / stepsPerUnit;
-      var rate = actuator.maxRate > 0.0 ? Math.min(actuator.maxRate, ceiling) : ceiling;
+      var motorRate = actuator.planningRate();
+      var rate = motorRate == null ? ceiling : Math.min(motorRate, ceiling);
       bound.push(new BoundChannel(position, name, jointIndex, ratio * channel.direction, offset,
         stepsPerUnit, rate, channel.directionSetupTicks, channel.skewBound));
       var capped = find(tightened, name);
-      if (capped != null) capped.maxRate = rate;
+      if (capped != null) {
+        if ((driverRate == null || stepTickHz < driverRate) &&
+            (motorRate == null || rate < motorRate)) capped.speedLimiter = "controller tick";
+        capped.maxRate = rate;
+      }
     }
     for (actuator in robot.actuators)
       if (actuator.fullStepsPerRevolution > 0.0 && !wired.exists(actuator.id))
         throw 'Stepper actuator "${actuator.id}" has no channel in the device layout';
+    tightened.materializeLimits();
     return new DeviceBinding(bound, tightened, stepTickHz);
   }
 

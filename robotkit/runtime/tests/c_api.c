@@ -23,7 +23,7 @@ int main(void) {
     blueprint.joints[0].child_link = 1;
     blueprint.joints[0].lower_limit = -1.0;
     blueprint.joints[0].upper_limit = 1.0;
-    blueprint.joints[0].max_effort = 3.0;
+    blueprint.joints[0].max_effort = (blueprint.joints[0].limit_flags |= RK_LIMIT_EFFORT, 3.0);
     blueprint.joints[0].parent_frame_rotation[3] = 1.0;
     blueprint.joints[0].child_frame_rotation[3] = 1.0;
     blueprint.joints[0].axis[2] = 1.0;

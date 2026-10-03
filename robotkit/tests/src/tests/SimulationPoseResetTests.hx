@@ -100,9 +100,10 @@ class SimulationPoseResetTests {
       motor.limits = new JointLimits(-100, 100);
       // The arm turns once for five turns of the motor.
       model.addCoupling(new JointCoupling("gearbox", "arm", "motor", 5.0, 0.0));
-      var actuator = new Actuator("servo", 0.0, 0.0, Transmission.SimpleTransmission("motor", 1.0, 0.0));
+      var actuator = new Actuator("servo", null, null, Transmission.SimpleTransmission("motor", 1.0, 0.0));
       actuator.drive = new ServoDrive(peak / 2.0, peak, 100.0, 200.0, 1e-4, 4096.0);
       model.addActuator(actuator);
+      model.materializeLimits();
       return model;
     };
     var compiled = RobotRuntimeCompiler.compile(build(1.2));
@@ -190,25 +191,28 @@ class SimulationPoseResetTests {
     axis.limits = new JointLimits(0, 0.3, 0.08, 400, 0.5);
     axis.limits.overtravel = 0.005;
     // 2 mm lead: pi * 1000 rad per metre of travel. The screw turns at most 100 rad/s.
-    turn.limits = new JointLimits(-1e9, 1e9, 100, 0, 0);
+    turn.limits = new JointLimits(-1e9, 1e9, 100);
     // A belt off the screw at 1:2, limited to 150 rad/s and 2000 rad/s², with no limit of its own on speed below.
-    belt.limits = new JointLimits(-1e9, 1e9, 150, 0, 2000);
+    belt.limits = new JointLimits(-1e9, 1e9, 150, null, 2000);
     model.addCoupling(new JointCoupling("lead", "axis", "turn", -Math.PI * 1000, 0.0));
     model.addCoupling(new JointCoupling("belt", "turn", "belt", 2.0, 0.0));
     var limits = model.coupledLimits("axis");
     var screwSpeed = 100 / (Math.PI * 1000), beltSpeed = 150 / (2 * Math.PI * 1000);
-    if (Math.abs(limits.velocity - Math.min(screwSpeed, beltSpeed)) > 1e-12)
-      throw 'coupled velocity limit ${limits.velocity}';
-    if (Math.abs(limits.maxAcceleration - Math.min(0.5, 2000 / (2 * Math.PI * 1000))) > 1e-12)
-      throw 'coupled acceleration limit ${limits.maxAcceleration}';
+    if (Math.abs(limits.requireVelocity() - Math.min(screwSpeed, beltSpeed)) > 1e-12)
+      throw 'coupled velocity limit ${limits.requireVelocity()}';
+    if (Math.abs(limits.requireAcceleration() - Math.min(0.5, 2000 / (2 * Math.PI * 1000))) > 1e-12)
+      throw 'coupled acceleration limit ${limits.requireAcceleration()}';
     if (limits.lower != 0 || limits.upper != 0.3 || limits.effort != 400 || limits.overtravel != 0.005)
       throw "coupled limits must keep the joint's own travel, effort and overtravel";
-    if (axis.limits.velocity != 0.08) throw "coupled limits must not change the model";
+    if (axis.limits.requireVelocity() != 0.08) throw "coupled limits must not change the model";
     // A joint with no limit of its own takes its followers'.
-    axis.limits.velocity = 0;
-    if (Math.abs(model.coupledLimits("axis").velocity - Math.min(screwSpeed, beltSpeed)) > 1e-12)
+    axis.limits.velocity = null;
+    if (Math.abs(model.coupledLimits("axis").requireVelocity() - Math.min(screwSpeed, beltSpeed)) > 1e-12)
       throw "an unlimited joint should take its followers' limit";
-    if (model.coupledLimits("belt").velocity != 150) throw "a follower is not limited by its leader";
+    axis.limits.velocity = 0;
+    if (model.coupledLimits("axis").requireVelocity() != 0) throw "a stated zero velocity must remain a stopped joint";
+    axis.limits.velocity = null;
+    if (model.coupledLimits("belt").requireVelocity() != 150) throw "a follower is not limited by its leader";
 
     // A motor on the screw: 0.63 N m up to 137 rad/s, a 3e-5 kg m² rotor, through a 40% screw.
     var motorModel = new RobotModel("motor axis");
@@ -232,12 +236,12 @@ class SimulationPoseResetTests {
       robotkit.model.Transmission.SimpleTransmission("screw", 1.0, 0.0)));
     var driven = motorModel.coupledLimits("slide");
     var scale = Math.PI * 1000;
-    if (Math.abs(driven.velocity - 137.0 / scale) > 1e-12)
-      throw 'a motor caps its axis at its rate through the screw: ${driven.velocity}';
+    if (Math.abs(driven.requireVelocity() - 137.0 / scale) > 1e-12)
+      throw 'a motor caps its axis at its rate through the screw: ${driven.requireVelocity()}';
     // a = eta s T / (m + eta (J_screw + J_rotor) s²), with the screw's own 4e-6 about its axis.
     var expected = 0.4 * scale * 0.63 / (10.0 + 0.4 * (4e-6 + 3e-5) * scale * scale);
-    if (Math.abs(driven.maxAcceleration - expected) > expected * 1e-12)
-      throw 'a motor accelerates its axis by its force over mass and turning inertia: ${driven.maxAcceleration}, expected $expected';
+    if (Math.abs(driven.requireAcceleration() - expected) > expected * 1e-12)
+      throw 'a motor accelerates its axis by its force over mass and turning inertia: ${driven.requireAcceleration()}, expected $expected';
     // Two motors, one per screw, as on a gantry's two sides: twice the force and twice the turning inertia.
     var second = motorModel.addLink(new Link("rotor2"));
     second.mass = 0.2;
@@ -251,20 +255,20 @@ class SimulationPoseResetTests {
     motorModel.addActuator(new robotkit.model.Actuator("motor2", 0.63, 137.0,
       robotkit.model.Transmission.SimpleTransmission("screw2", 1.0, 0.0)));
     var pair = 2 * 0.4 * scale * 0.63 / (10.0 + 2 * 0.4 * (4e-6 + 3e-5) * scale * scale);
-    if (Math.abs(motorModel.coupledLimits("slide").maxAcceleration - pair) > pair * 1e-12)
+    if (Math.abs(motorModel.coupledLimits("slide").requireAcceleration() - pair) > pair * 1e-12)
       throw "two motors add their force and their screws' turning inertia";
     // A servo with no explicit limits is held to its peak torque and maximum speed: 1.5 N m, 200 rad/s.
     motorModel.actuators.splice(0, motorModel.actuators.length);
-    var servo = new robotkit.model.Actuator("servo", 0.0, 0.0, robotkit.model.Transmission.SimpleTransmission("screw", 1.0, 0.0));
+    var servo = new robotkit.model.Actuator("servo", null, null, robotkit.model.Transmission.SimpleTransmission("screw", 1.0, 0.0));
     servo.drive = new robotkit.model.ActuatorDrive.ServoDrive(0.5, 1.5, 100.0, 200.0, 3e-5, 4096.0);
     motorModel.addActuator(servo);
     // Only the first screw is driven now; the second joins the axis as turning inertia all the same.
     var servoLimits = motorModel.coupledLimits("slide");
     var servoExpected = 0.4 * scale * 1.5 / (10.0 + 2 * 0.4 * (4e-6 + 3e-5) * scale * scale);
-    if (Math.abs(servoLimits.velocity - 200.0 / scale) > 1e-12)
-      throw 'a servo caps its axis at its maximum speed: ${servoLimits.velocity}';
-    if (Math.abs(servoLimits.maxAcceleration - servoExpected) > servoExpected * 1e-12)
-      throw 'a servo accelerates its axis at its peak torque: ${servoLimits.maxAcceleration}, expected $servoExpected';
+    if (Math.abs(servoLimits.requireVelocity() - 200.0 / scale) > 1e-12)
+      throw 'a servo caps its axis at its maximum speed: ${servoLimits.requireVelocity()}';
+    if (Math.abs(servoLimits.requireAcceleration() - servoExpected) > servoExpected * 1e-12)
+      throw 'a servo accelerates its axis at its peak torque: ${servoLimits.requireAcceleration()}, expected $servoExpected';
   }
 
   static function checkPose(simulation:Simulation, position:Array<Float>, rotation:Array<Float>,

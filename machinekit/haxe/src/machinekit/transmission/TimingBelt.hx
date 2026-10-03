@@ -216,7 +216,7 @@ class TimingBelt extends MachineComponent {
 
 	/** Resolve from the current loop geometry and width, never a saved stiffness. */
 	public static function relation(belt:TimingBelt, pulley:TimingPulley, strand:Int, alignment:Float):TransmissionRelation {
-		if (belt.beltProfile != pulley.beltProfile) throw "Belt and pulley profiles must match";
+		if (belt.beltProfile != pulley.beltProfile) throw new machinekit.transmission.TransmissionDesignError("Belt and pulley profiles differ; update the belt to match the pulley");
 		var result = new TransmissionRelation(alignment * 2 / pulley.pitchDiameter, DEFAULT_EFFICIENCY,
 			belt.carriageStiffness(strand), null, DEFAULT_DRAG);
 		result.setBasis("stiffness", ValueBasis.Assumed, "belt stiffness");

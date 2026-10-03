@@ -189,11 +189,11 @@ class DriveLoads {
         for (label in actuator.assumed) if (motor.assumed.indexOf(label) < 0) motor.assumed.push(label);
         motors.push(motor);
         motorJoints.push(reached[index]);
-        total += efficiencies[index] * actuator.efficiency * actuator.planningEffort() * Math.abs(motorRatio);
+        total += efficiencies[index] * actuator.efficiency * actuator.requireEffort() * Math.abs(motorRatio);
     }
     if (motors.length == 0) return null;
     for (motor in motors)
-      motor.share = total > 0.0 ? motor.efficiency * motor.actuator.planningEffort() * Math.abs(motor.ratio) / total : 1.0 / motors.length;
+      motor.share = total > 0.0 ? motor.efficiency * motor.actuator.requireEffort() * Math.abs(motor.ratio) / total : 1.0 / motors.length;
     var sliding = axis.type == JointType.Prismatic;
     var mass = sliding ? model.carriedMass(axis) + axis.armature : model.turningInertia(axis);
     // Coupled joints that no motor turns are inertia on the axis, through their own couplings.

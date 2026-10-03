@@ -1,4 +1,5 @@
 import machinekit.motion.MotorDriver;
+import machinekit.assembly.AllowanceEdit;
 import haxeon.Equality;
 import machinekit.assembly.MachineAssembly;
 import machinekit.robotics.RobotFlange;
@@ -300,7 +301,7 @@ class MachineAssemblyDescriptionTests {
 		// A right-hand Tr10 x 2 screw: one turn moves its nut 2 mm back along the screw, from 10 mm.
 		var lead = assembly.addTransmission("lead", "slide", "screw-turn", Transmission.LeadScrew("screw", "nut"), Same, 10);
 		var belt = assembly.addTransmission("belt", "slide", "pulley-turn", Transmission.TimingBelt("belt-part", "pulley", 0), Opposite, 10);
-		var mesh = assembly.addTransmission("mesh", "driver-turn", "driven-turn", Transmission.GearMesh("driver", "driven"));
+		var mesh = assembly.addTransmission("mesh", "driver-turn", "driven-turn", Transmission.GearMesh("driver", "driven"), Same);
 		function near(actual:Float, expected:Float, what:String):Void
 			if (!(Math.abs(actual - expected) < 1e-12)) throw '$what: $actual, expected $expected';
 		near(lead, -Math.PI, "a 2 mm right-hand lead turns the screw -pi rad per mm");
@@ -374,7 +375,7 @@ class MachineAssemblyDescriptionTests {
 		assembly.addComponent("nut", new LeadScrewNut(thread));
 		assembly.addMateOnAxis("slide", "prismatic", "base", "face", "slider", "face", {x: 0, y: 1, z: 0});
 		assembly.addMateOnAxis("turn", "continuous", "base", "face", "screw", "input", {x: 0, y: 1, z: 0});
-		assembly.addTransmission("lead", "slide", "turn", Transmission.LeadScrew("screw", "nut"));
+		assembly.addTransmission("lead", "slide", "turn", Transmission.LeadScrew("screw", "nut"), Same);
 		var cap = assembly.supportScrew("lead", Fixed, Free);
 		near(cap, long.criticalSpeed(Fixed, Free), "the cap is the screw's critical speed");
 		function definition(machine:MachineAssembly):materia.assembly.AssemblyDefinition {
@@ -429,7 +430,7 @@ class MachineAssemblyDescriptionTests {
 		assembly.addComponent("pulley", new TimingPulley(GT2, 20, 8, 6));
 		assembly.addComponent("belt-part", belt);
 		assembly.addMateOnAxis("pulley-turn", "continuous", "base", "face", "pulley", "axis", {x: 0, y: 1, z: 0});
-		assembly.addTransmission("belt", "slide", "pulley-turn", Transmission.TimingBelt("belt-part", "pulley", 0));
+		assembly.addTransmission("belt", "slide", "pulley-turn", Transmission.TimingBelt("belt-part", "pulley", 0), Same);
 		var withBelt = definition(assembly);
 		var beltCoupling = withBelt.couplings[1];
 		var beltStiffness = beltCoupling.stiffness, beltDrag = beltCoupling.drag, beltBacklash = beltCoupling.backlash;
@@ -446,6 +447,19 @@ class MachineAssemblyDescriptionTests {
 				}}];
 			return MachineAssembly.fromDescription(description);
 		}
+		var incompatible = changed("nut", "pitch", SavedValue.Number(3));
+		if (!incompatible.check().hasErrors() || incompatible.check().items[0].message.indexOf("update the nut") < 0)
+			throw "An incompatible nut rebuilds with an actionable transmission diagnostic";
+		var unresolvedIncluded = new MachineAssembly();
+		unresolvedIncluded.include("bad", incompatible);
+		if (!unresolvedIncluded.check().hasErrors()) throw "Including an unresolved transmission retains its diagnostic";
+		var edited = changed("belt-part", "width", SavedValue.Number(12));
+		if (edited.check().warnings().length == 0 || edited.check().warnings().join(" ").indexOf("belt") < 0)
+			throw "A rebuilt coupling warns about the transmission whose stored snapshot changed";
+		var readOnly = false;
+		try assembly.addCoupling("belt", "turn", "pulley-turn", 2) catch (error:Dynamic)
+			readOnly = Std.string(error).indexOf("read-only") >= 0;
+		if (!readOnly) throw "A transmission-owned coupling must reject edits by id";
 		near(term(changed("belt-part", "width", SavedValue.Number(12)), "belt").stiffness,
 			2 * belt.carriageStiffness(0), "rebuilt belt stiffness follows its width");
 		var longer = TimingBelt.twoPulley(GT2, 20, 20, 888, 6);
@@ -475,7 +489,7 @@ class MachineAssemblyDescriptionTests {
 		var restored = MachineAssembly.decode(nested.encode());
 		near(term(restored.subassemblies()[0].assembly, "belt").stiffness, belt.carriageStiffness(0),
 			"a reconstructed included assembly resolves its belt");
-		assembly.setTransmissionOverrides("belt", 123, 0.2, 0.01);
+		assembly.setTransmissionOverrides("belt", State(123), State(0.2), State(0.01));
 		var measured = term(changed("belt-part", "width", SavedValue.Number(12)), "belt");
 		near(measured.stiffness, 123, "a stated stiffness survives a part edit");
 		near(measured.backlash, 0.2, "a stated backlash survives a part edit");
@@ -484,11 +498,22 @@ class MachineAssemblyDescriptionTests {
 			measured.assumed.indexOf("belt drag") >= 0 || measured.assumed.indexOf("belt efficiency") < 0)
 			throw "Stated overrides remove only their own assumption labels";
 
-		assembly.setTransmissionOverrides("belt");
+		assembly.setTransmissionOverrides("belt", Clear);
+		near(term(assembly, "belt").backlash, 0.2, "clearing stiffness leaves stated backlash alone");
+		near(term(assembly, "belt").drag, 0.01, "clearing stiffness leaves stated drag alone");
+		assembly.setTransmissionOverrides("belt", Leave, Clear, Clear);
 		near(term(assembly, "belt").stiffness, belt.carriageStiffness(0), "clearing an override resolves the part again");
 		var beltAssumed = term(assembly, "belt").assumed;
 		if (beltAssumed == null || beltAssumed.indexOf("belt stiffness") < 0) throw "Clearing overrides restores part provenance";
 		assembly.addCoupling("plain", "turn", "pulley-turn", 2, 0, 0.8, 1000, 0.03, 0.001, ["plain compliance"]);
+		assembly.addComponent("chain-sprocket", machinekit.transmission.Sprocket.forChain("ANSI40", 20, 6, 5));
+		var chainDescription = assembly.describe();
+		for (record in chainDescription.machine.transmissions) if (record.coupling == "belt")
+			record.source = Transmission.RollerChain("nut", "chain-sprocket");
+		var badChain = MachineAssembly.fromDescription(chainDescription);
+		var chainErrors = [for (item in badChain.check().items) if (item.code == "transmission.parts") item.message];
+		if (chainErrors.length != 1 || chainErrors[0].indexOf("not a roller chain") < 0)
+			throw "A non-chain member rebuilds with a named chain repair diagnostic";
 		var plainSaved = term(MachineAssembly.decode(assembly.encode()), "plain");
 		near(plainSaved.efficiency, 0.8, "a plain coupling keeps its efficiency through the frozen schema");
 		near(plainSaved.stiffness, 1000, "a plain coupling keeps its stiffness through the frozen schema");
@@ -543,7 +568,7 @@ class MachineAssemblyDescriptionTests {
 		assembly.addComponent("nut", new LeadScrewNut(thread));
 		assembly.addMateOnAxis("slide", "prismatic", "base", "face", "slider", "face", {x: 0, y: 1, z: 0});
 		assembly.addMateOnAxis("turn", "continuous", "base", "face", "screw", "input", {x: 0, y: 1, z: 0});
-		assembly.addTransmission("lead", "slide", "turn", Transmission.LeadScrew("screw", "nut"));
+		assembly.addTransmission("lead", "slide", "turn", Transmission.LeadScrew("screw", "nut"), Same);
 		assembly.addComponent("driver", new MotorDriver("GENERIC-DM542", 2.8, 16, 24));
 		assembly.addMotor("drive", "turn", "motor", "driver");
 		function definition(machine:MachineAssembly):materia.assembly.AssemblyDefinition {
@@ -686,6 +711,16 @@ class MachineAssemblyDescriptionTests {
 		if (closedEncoders == null || closedEncoders[0].counts != 1024 || closedEncoders[0].index == true)
 			throw "A shaft encoder without an index records none";
 		if (actuatorsOf(closedDefinition)[0].encoder != "closed-encoder") throw "A stepper's encoder is recorded on its actuator";
+		var bindingDocument = new Document();
+		var bindingRoot = MachineAssemblyDocuments.defineAssembly(bindingDocument, closed);
+		var bindingReopened = DocumentCodec.decode(DocumentCodec.encode(bindingDocument), false, false);
+		var restoredBinding = MachineAssemblyDocuments.rebuildAssembly(bindingReopened.element(bindingRoot.id));
+		var restoredDefinition = definition(restoredBinding);
+		if (!Equality.equals(restoredDefinition.actuators, closedDefinition.actuators) ||
+			!Equality.equals(restoredDefinition.encoders, closedDefinition.encoders))
+			throw "Document load must recompile the motor and retain its wired encoder binding";
+		bindingReopened.close();
+		bindingDocument.close();
 		var railed = new MachineAssembly();
 		railed.addComponent("base", new RobotFlange(50));
 		railed.addComponent("slider", new RobotFlange(50));

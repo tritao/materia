@@ -301,6 +301,11 @@ class PlanCheck {
       labels.sort(Reflect.compare);
       diagnostic.assumed = labels;
     }
-    return new PlanCheckResult(diagnostics, overallRatio, overallMotor, overallDeviation, overallAxis, slips);
+    var result = new PlanCheckResult(diagnostics, overallRatio, overallMotor, overallDeviation, overallAxis, slips);
+    for (load in loads) {
+      var limiter = model.coupledLimits(load.axis, options.steady).velocityLimiter;
+      if (limiter != "") result.speedLimits.push('${load.axis} limited by $limiter');
+    }
+    return result;
   }
 }

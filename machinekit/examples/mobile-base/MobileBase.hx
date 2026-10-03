@@ -210,7 +210,7 @@ class LidarPuck extends MachineComponent {
  * The robot drives along +X with its axles along Y; the assembly origin is on the floor (z = 0)
  * midway between the wheels' floor contacts. The plates own the layout: every part mates to a
  * named seat on the base plate or the deck through its own connector, and each wheel's bore mates
- * to its motor's shaft on continuous joint `wheel_l` (+Y side) or `wheel_r`. Each joint turns about
+ * to its gearhead's output on continuous joint `wheel_l` (+Y side) or `wheel_r`. Each joint turns about
  * its own shaft, which points outward, so a positive speed rolls the left wheel forward and the
  * right wheel backward, as each motor's encoder counts it.
  */
@@ -241,7 +241,7 @@ class MobileBase extends MachineAssembly {
 	 * The wheel drive: each NEMA 23 turns its wheel through a 10:1 gearhead at 90% efficiency, on a 24 V
 	 * supply with half the holding torque relied on (`NemaStepper.actuator`'s default margin). The gearhead
 	 * ratio, its efficiency and the supply are assumptions (a planetary gearhead on a NEMA 23 is typically 3:1
-	 * to 100:1 at 0.8 to 0.95); the gearhead is not drawn, the wheel sits on the motor's shaft.
+	 * to 100:1 at 0.8 to 0.95). The model includes the gearhead housing between motor and wheel.
 	 */
 	public static final WHEEL_GEARBOX = new Gearbox(10, 0.9, 60, 40, 6.35, true);
 	public static inline var WHEEL_SUPPLY:Float = 24;

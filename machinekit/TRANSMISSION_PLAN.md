@@ -1080,7 +1080,7 @@ X8e implementation:
 
 ### X9 — Review fixes, no legacy compatibility, and the belt and load model
 
-Status: planned (2026-10-03), from a review of X7/X8 (`45d44846..351e772c`). The full suite passed
+Status: X9a in progress; X9b–X9d pending (2026-10-03), from a review of X7/X8 (`45d44846..351e772c`). The full suite passed
 at `351e772c`, but the review found two confirmed bugs (arm and wheel joints lost their limits;
 CoreXY Y takes the X strand's belt stiffness) plus model gaps and loose ends.
 
@@ -1095,6 +1095,28 @@ Each step is committed with the full suite passing (`x7-suite.sh`). Each number 
 recorded here with a one-line reason, as in X7/X8.
 
 #### X9a — Correctness
+
+Progress: catalog selectors, document motor/encoder sources, required sense, per-field overrides,
+read-only derived couplings and chain type/spec checks are implemented. Rebuilds retain incompatible
+transmissions with actionable diagnostics and warn when resolved values replace a saved coupling.
+Nullable effective limits now reach the compiled model and native runtime; native presence bits
+separate missing caps from stated zeros. Runtime lowering no longer derives coupled caps. The axis
+convenience compilers use the physical assembly and its resolved transmissions, retaining rated
+motor assumptions; they state a 24 V rated-current drive with 16 microsteps and the generic DM542
+step-input rating. Each stage's grounded preview parts attach to its motor body. Driver/controller
+ceilings are named in plan-check `speedLimits` (informational, not plan violations). Prior focused
+checks passed before these edits. Mechanical limits are retained separately from effective limits,
+so rebuilds cannot feed derived follower caps back into the sources and motor edits can raise caps.
+Validation of the complete milestone is deferred until X9d, at the user's request; intermediate
+commits remain unverified until that gate.
+
+X9a number changes: convenience NEMA 23 / 10 mm screw axes requested at 100 mm/s now cap near
+43.7 mm/s: they use the actual 24 V rated-current motor curve through the resolved screw, rather
+than a synthetic rated motor. Existing router plate baselines remain 220.2 / 201.6 s in the app gate.
+
+Haxeon issue: `ExpressionTyper.comparison` contextually types its right operand as the left Int
+before numeric promotion; a Float-valued conditional therefore fails E1003. The local workaround
+uses `driverRate == null || stepTickHz < driverRate`. Haxeon is unchanged.
 
 - **Compiled joint limits.** `RobotModel` is the compiled model, so it holds the effective
   limits.

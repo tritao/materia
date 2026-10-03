@@ -69,6 +69,8 @@ private typedef MutableIncludedRecord = {var id:String; var pose:AssemblyFrame; 
 /** Reusable, prefixable assembly made from MachineComponents and named connector references. */
 class MachineAssembly {
 	public static inline var SCHEMA_VERSION:Int = 5;
+	/** Findings from rebuilding sources; invalid transmissions remain available for repair. */
+	public final diagnostics:Diagnostics = new Diagnostics();
 	final members:Array<AssemblyMember> = [];
 	final mechanical:AssemblyDefinition = {schemaVersion: AssemblyDefinitionCodec.VERSION,
 		id: "assembly", lengthUnit: "mm", definitions: [], occurrences: [], joints: [], couplings: []};
@@ -298,7 +300,7 @@ class MachineAssembly {
 		// A driven coupling's ratio comes from its parts as they are now, not as they were saved.
 		// The coupling decides whether there is one: a transmission whose coupling was removed goes too.
 		if (description.machine.transmissions != null) for (transmission in description.machine.transmissions)
-			if (result.applyTransmission(transmission)) result.transmissions.push(copyTransmission(transmission, ""));
+			if (result.applyTransmission(transmission, true)) result.transmissions.push(copyTransmission(transmission, ""));
 		for (connection in description.machine.portConnections)
 			result.connectPorts(connection.id, connection.fromInstance, connection.fromPort,
 				connection.toInstance, connection.toPort);
@@ -691,7 +693,7 @@ class MachineAssembly {
 	 * description works the ratio out again from the parts' values then. Returns the ratio.
 	 */
 	public function addTransmission(id:String, leader:String, follower:String, source:Transmission,
-			sense:Sense = Same, leaderZero:Float = 0):Float {
+			sense:Sense, leaderZero:Float = 0):Float {
 		var record:machinekit.assembly.MachineAssemblyDescription.TransmissionRecord = {
 			coupling: id, source: source, sense: sense, leaderZero: leaderZero};
 		var relation = machinekit.transmission.TransmissionResolver.resolve(record, requireMember);
@@ -702,22 +704,29 @@ class MachineAssembly {
 		return ratio;
 	}
 
-	/** State measured or datasheet allowances explicitly; rebuilding keeps these overrides. */
-	public function setTransmissionOverrides(id:String, ?stiffness:Float, ?backlash:Float, ?drag:Float):Void {
+	/** Change each stated allowance independently; rebuilding keeps the fields left alone. */
+	public function setTransmissionOverrides(id:String, stiffness:AllowanceEdit = Leave,
+			backlash:AllowanceEdit = Leave, drag:AllowanceEdit = Leave):Void {
 		for (entry in transmissions) if (entry.coupling == id) {
 			var proposed = copyTransmission(entry, "");
-			proposed.stiffness = stiffness;
-			proposed.backlash = backlash;
-			proposed.drag = drag;
+			proposed.stiffness = editAllowance(entry.stiffness, stiffness);
+			proposed.backlash = editAllowance(entry.backlash, backlash);
+			proposed.drag = editAllowance(entry.drag, drag);
 			var relation = machinekit.transmission.TransmissionResolver.resolve(proposed, requireMember);
-			entry.stiffness = stiffness;
-			entry.backlash = backlash;
-			entry.drag = drag;
+			entry.stiffness = proposed.stiffness;
+			entry.backlash = proposed.backlash;
+			entry.drag = proposed.drag;
 			writeTransmission(entry, relation);
 			return;
 		}
 		throw 'No transmission "$id"';
 	}
+
+	static function editAllowance(current:Null<Float>, edit:AllowanceEdit):Null<Float> return switch edit {
+		case Leave: current;
+		case Clear: null;
+		case State(value): value;
+	};
 
 	/**
 	 * Says how the ends of lead screw transmission `id` are held (`near` is the end by its motor), over
@@ -752,9 +761,29 @@ class MachineAssembly {
 	}
 
 	/** Recompute all derived coupling data together from the transmission's parts. */
-	function applyTransmission(transmission:machinekit.assembly.MachineAssemblyDescription.TransmissionRecord):Bool {
+	function applyTransmission(transmission:machinekit.assembly.MachineAssemblyDescription.TransmissionRecord,
+			compareSnapshot:Bool = false):Bool {
 		if (mechanical.couplings != null) for (coupling in mechanical.couplings) if (coupling.id == transmission.coupling) {
-			return writeTransmission(transmission, machinekit.transmission.TransmissionResolver.resolve(transmission, requireMember));
+			// Missing members are malformed data, even when another member has the wrong kind.
+			var checked = machinekit.transmission.TransmissionResolver.mapSource(transmission.source, id -> {
+				requireMember(id);
+				return id;
+			});
+			try {
+				var before:Array<Null<Float>> = [coupling.ratio, coupling.offset, coupling.efficiency, coupling.stiffness, coupling.backlash, coupling.drag];
+				var assumedBefore = coupling.assumed;
+				var relation = machinekit.transmission.TransmissionResolver.resolve(transmission, requireMember);
+				writeTransmission(transmission, relation);
+				var after:Array<Null<Float>> = [coupling.ratio, coupling.offset, coupling.efficiency, coupling.stiffness, coupling.backlash, coupling.drag];
+				if (compareSnapshot && (!Equality.equals(before, after) ||
+						!Equality.equals(assumedBefore, coupling.assumed)))
+					diagnostics.warning("transmission.snapshot", transmission.coupling,
+						'Transmission "${transmission.coupling}" changed; its current parts replace the stored coupling');
+			} catch (error:machinekit.transmission.TransmissionDesignError) {
+				diagnostics.error("transmission.parts", transmission.coupling,
+					'Transmission "${transmission.coupling}" is unresolved: ${error.message}');
+			}
+			return true;
 		}
 		return false;
 	}
@@ -957,6 +986,7 @@ class MachineAssembly {
 
 	public function addCoupling(id:String, source:String, target:String, ratio:Float, offset:Float = 0,
 			?efficiency:Float, ?stiffness:Float, ?backlash:Float, ?drag:Float, ?assumed:ReadOnlyArray<String>):Void {
+		if (transmissionFor(id) != null) throw 'Transmission coupling "$id" is read-only; edit its parts or allowances';
 		requireOperationId(id);
 		if (source == null || source.length == 0 || target == null || target.length == 0)
 			throw 'Assembly coupling "$id" needs source and target';
@@ -1039,6 +1069,7 @@ class MachineAssembly {
 	public function check():Diagnostics {
 		var result = new Diagnostics();
 		checkStructure(result);
+		for (item in diagnostics.items) result.add(item.severity, item.code, item.subject, item.message);
 		checkServices(result);
 		return result;
 	}
@@ -1141,6 +1172,7 @@ class MachineAssembly {
 	/** Populate an existing model. All member and joint ids receive the supplied prefix. */
 	public function addTo(model:AssemblyModel, prefix:String, ?pose:AssemblyFrame):Void {
 		validateStructure();
+		diagnostics.throwIfErrors();
 		for (occurrence in mechanical.occurrences) {
 			var localPose = pose == null ? occurrence.initialPose :
 				AssemblyFrames.compose(pose, occurrence.initialPose);

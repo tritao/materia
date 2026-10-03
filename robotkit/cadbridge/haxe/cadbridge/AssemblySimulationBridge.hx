@@ -239,8 +239,8 @@ class AssemblySimulationBridge {
       var factor = edge.type == AssemblyJointType.Prismatic ? scale : 1.0;
       joint.limits = new JointLimits(edge.limits.lower == null ? -1e9 : (edge.limits.lower - initial) * factor,
         edge.limits.upper == null ? 1e9 : (edge.limits.upper - initial) * factor,
-        edge.limits.velocity == null ? 0 : edge.limits.velocity * factor,
-        edge.limits.effort == null ? 0 : edge.limits.effort);
+        edge.limits.velocity == null ? null : edge.limits.velocity * factor,
+        edge.limits.effort);
       if (edge.limits.acceleration != null) joint.limits.maxAcceleration = edge.limits.acceleration * factor;
       joint.limits.overtravel = edge.limits.overtravel != null ? edge.limits.overtravel * factor :
         edge.type == AssemblyJointType.Prismatic ? DEFAULT_PRISMATIC_OVERTRAVEL : DEFAULT_ROTARY_OVERTRAVEL;
@@ -313,6 +313,7 @@ class AssemblySimulationBridge {
         // The rotor turns `gear` times as fast as the joint, so its inertia at the joint is `gear` squared times as much.
         driven.armature += edge.type == AssemblyJointType.Prismatic ? 0.0 : actuator.rotorInertia * gear * gear;
     }
+    model.materializeLimits();
     // Encoders: sensors on joints. Counts per millimetre on a sliding joint, per revolution on a turning one.
     if (definition.encoders != null) for (encoder in definition.encoders) {
       var edge:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;

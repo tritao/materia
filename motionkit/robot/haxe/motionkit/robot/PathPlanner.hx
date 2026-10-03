@@ -98,12 +98,14 @@ class PathPlanner {
     validatePathLimits(planningPath, [xAxis, yAxis, zAxis]);
     var maxVelocity = [for (_ in start) 1e8];
     var maxAcceleration = [for (_ in start) 1e8];
+    var jointUnits = [for (_ in start) 1.0];
     var requested = motionOptions == null ? new MotionOptions() : motionOptions;
     for (direct in [xAxis, yAxis, zAxis]) {
       var unit = [for (_ in start) 0.0];
       direct.writeLogicalDelta(unit, 1.0);
       for (joint in direct.jointIndices) {
         var scale = Math.abs(unit[joint]);
+        jointUnits[joint] = scale;
         maxVelocity[joint] = direct.maxVelocity * scale;
         maxAcceleration[joint] = direct.maxAcceleration * scale;
         if (requested.maxAcceleration > 0.0)
@@ -206,9 +208,11 @@ class PathPlanner {
           entry.axis.writeLogicalDelta(qDoublePrime, entry.second);
         }
         distances.push(distance);
-        positions.push(q);
-        first.push(qPrime);
-        second.push(qDoublePrime);
+        // The lowering tolerance is a Cartesian distance. Retiming and
+        // Hermite fitting use equivalent carriage units for every shaft too.
+        positions.push([for (joint in 0...start.length) q[joint] / jointUnits[joint]]);
+        first.push([for (joint in 0...start.length) qPrime[joint] / jointUnits[joint]]);
+        second.push([for (joint in 0...start.length) qDoublePrime[joint] / jointUnits[joint]]);
       }
       var jointPath = new JointPathSamples(distances, positions, first, second);
       var speedCaps = requested.maxVelocity > 0.0
@@ -216,8 +220,8 @@ class PathPlanner {
       // Leave room for nanosecond stage rounding and Hermite coefficient
       // roundoff before the runtime validates exact polynomial extrema.
       var limits = new PathTimingLimits(
-        [for (value in maxVelocity) value * 0.999],
-        [for (value in maxAcceleration) value * 0.999], speedCaps,
+        [for (joint in 0...start.length) maxVelocity[joint] / jointUnits[joint] * 0.999],
+        [for (joint in 0...start.length) maxAcceleration[joint] / jointUnits[joint] * 0.999], speedCaps,
         junctionSpeeds[primitiveIndex], junctionSpeeds[primitiveIndex + 1]);
       var loweringTolerance = options.exactStop ? 1e-6 :
         Math.min(1e-6, options.blendTolerance * 0.01);
@@ -226,7 +230,8 @@ class PathPlanner {
       var sampleCount = Std.int(Math.ceil(pieceDuration / 0.001));
       for (sampleIndex in 0...(sampleCount + 1)) {
         var localTime = pieceDuration * sampleIndex / sampleCount;
-        var actual = timed.trajectory.evaluate(localTime).positions;
+        var normalizedActual = timed.trajectory.evaluate(localTime).positions;
+        var actual = [for (joint in 0...start.length) normalizedActual[joint] * jointUnits[joint]];
         var tool = new PathPoint(xAxis.logicalPosition(actual),
           yAxis.logicalPosition(actual), zAxis.logicalPosition(actual));
         var deviation = distanceToAuthoredPath(tool, path);
@@ -236,9 +241,24 @@ class PathPlanner {
         }
       }
       var pieceSegments = timed.trajectory.segments();
-      for (segment in pieceSegments)
+      for (segment in pieceSegments) {
+        // Fit each independent coordinate once. Followers come from the axis mapping,
+        // rather than independent Hermite fits whose large coefficients can drift apart.
+        var coefficients = [for (joint in 0...start.length)
+          [for (value in segment.coefficients[joint]) value * jointUnits[joint]]];
+        for (power in 0...coefficients[0].length) {
+          var values = [for (joint in 0...start.length) coefficients[joint][power]];
+          for (direct in [xAxis, yAxis, zAxis]) {
+            var logical = power == 0 ? direct.logicalPosition(values) :
+              values[direct.jointIndices[0]] / direct.jointScale(0);
+            if (power == 0) direct.writeLogicalPosition(values, logical);
+            else direct.writeLogicalDelta(values, logical);
+          }
+          for (joint in 0...start.length) coefficients[joint][power] = values[joint];
+        }
         segments.push({timeFromStartNs: Int64.add(offset, segment.timeFromStartNs),
-          durationNs: segment.durationNs, coefficients: segment.coefficients});
+          durationNs: segment.durationNs, coefficients: coefficients});
+      }
       var last = pieceSegments[pieceSegments.length - 1];
       offset = Int64.add(offset, Int64.add(last.timeFromStartNs, last.durationNs));
       timed.releaseDistanceMap();
@@ -260,8 +280,8 @@ class PathPlanner {
     var validation = new ValidationLimits(start.length, modelRevision, calibrationRevision);
     validation.continuity(0, 1e-9);
     for (joint in 0...start.length) {
-      validation.velocity(joint, maxVelocity[joint]);
-      validation.acceleration(joint, maxAcceleration[joint]);
+      validation.velocity(joint, maxVelocity[joint] / jointUnits[joint]);
+      validation.acceleration(joint, maxAcceleration[joint] / jointUnits[joint]);
     }
     for (direct in [xAxis, yAxis, zAxis]) {
       var lower = start.copy();
@@ -269,10 +289,18 @@ class PathPlanner {
       direct.writeLogicalPosition(lower, direct.lowerLimit);
       direct.writeLogicalPosition(upper, direct.upperLimit);
       for (joint in direct.jointIndices)
-        validation.position(joint, Math.min(lower[joint], upper[joint]),
-          Math.max(lower[joint], upper[joint]));
+        validation.position(joint, Math.min(lower[joint], upper[joint]) / jointUnits[joint],
+          Math.max(lower[joint], upper[joint]) / jointUnits[joint]);
     }
-    var report = result.validate(validation);
+    // Cartesian claims are in metres. Validate every mapped shaft in equivalent
+    // carriage units, so a screw ratio does not turn a 1 nm seam claim into radians.
+    var normalized = Trajectory.fromSegments([for (segment in segments) {
+      timeFromStartNs: segment.timeFromStartNs, durationNs: segment.durationNs,
+      coefficients: [for (joint in 0...start.length)
+        [for (value in segment.coefficients[joint]) value / jointUnits[joint]]]
+    }]);
+    var report = normalized.validate(validation);
+    normalized.dispose();
     var tolerance = options.exactStop || options.blendTolerance == 0.0
       ? 1e-5 : options.blendTolerance;
     report.setTaskSpace(worstTaskDeviation <= tolerance
@@ -335,8 +363,9 @@ class PathPlanner {
         var point = primitive.pointAt(length * sampleIndex / 64.0);
         var coordinates = [point.x, point.y, point.z];
         for (i in 0...3) {
-          if (coordinates[i] < directAxes[i].lowerLimit ||
-              coordinates[i] > directAxes[i].upperLimit)
+          var roundoff = 1e-12 * Math.max(1.0, directAxes[i].upperLimit - directAxes[i].lowerLimit);
+          if (coordinates[i] < directAxes[i].lowerLimit - roundoff ||
+              coordinates[i] > directAxes[i].upperLimit + roundoff)
             throw 'Axis "${["x", "y", "z"][i]}" path point ${coordinates[i]} is outside its limits';
         }
       }

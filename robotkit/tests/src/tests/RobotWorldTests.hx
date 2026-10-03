@@ -806,7 +806,7 @@ class RobotWorldTests {
     var arm = model.addLink(new Link("arm"));
     var turn = model.addJoint(new Joint("turn", JointType.Continuous, base, arm));
     turn.limits = new JointLimits(-1e9, 1e9);
-    var legacy = new Actuator("legacy", 0.0, 0.0, Transmission.SimpleTransmission("turn", 1.0, 0.0));
+    var legacy = new Actuator("legacy", null, null, Transmission.SimpleTransmission("turn", 1.0, 0.0));
     legacy.drive = new robotkit.model.ActuatorDrive.ServoDrive(0.3, 1.2, 100.0, 200.0, 1e-5, 2048.0);
     model.addActuator(legacy);
     var plain = RobotModelCodec.encode(model).toString();
@@ -984,7 +984,7 @@ class RobotWorldTests {
       var restoredServo = restored.actuators[1].drive;
       check(restoredServo != null && restoredServo.kind() == "servo" && restoredServo.peakTorque() == 1.9 &&
         cast(restoredServo, robotkit.model.ActuatorDrive.ServoDrive).encoderCounts == 4096.0 &&
-        restored.actuators[1].planningEffort() == 1.9,
+        restored.actuators[1].requireEffort() == 1.9,
         "RobotModel codec preserves a servo's drive");
     }
     var restoredSurface = restored.links[1].collisionShapes[1].surface;
@@ -4541,7 +4541,7 @@ class RobotWorldTests {
     check(Math.abs(current.binding.channels[0].stepsPerUnit - 3200.0 / (2.0 * Math.PI)) < 1e-9,
       "steps per radian come from the model and the wiring");
     equal(current.binding.channels[2].jointIndex, 2, "the lift's channel drives the lift joint");
-    check(current.binding.model.actuators[2].maxRate > 0.0,
+    check(current.binding.model.actuators[2].requireRate() > 0.0,
       "the binding's model carries the step tick's rate ceiling");
     // Deployments that named a compiled fingerprint say what to change.
     var legacy = sys.io.File.getContent(fixture + "deployment-v3.json");
@@ -4585,7 +4585,7 @@ class RobotWorldTests {
     joint.limits.lower = -1.0;
     joint.limits.upper = 1.0;
     joint.limits.effort = 1.0;
-    var motor = new Actuator("axis-motor", 0.0, 0.0, Transmission.SimpleTransmission("joint/axis", 1.0, 0.0));
+    var motor = new Actuator("axis-motor", null, null, Transmission.SimpleTransmission("joint/axis", 1.0, 0.0));
     motor.fullStepsPerRevolution = 200.0;
     model.addActuator(motor);
     var layout = new DeviceLayout([new DeviceChannel(0, "", motor.id, 1, 16)]);
@@ -5281,11 +5281,13 @@ class RobotWorldTests {
     joint.limits.velocity = 2.0;
     model.addActuator(new Actuator("shoulder-motor", 100.0, 1.0,
       Transmission.SimpleTransmission(joint.id, 2.0, 0.0)));
+    model.materializeLimits();
+    equal(model.joints[0].limits.requireVelocity(), 0.5, "the compiled model derives its motor speed cap");
     var blueprint = RobotRuntimeCompiler.compile(model);
     equal(blueprint.joints[0].maxRate, 0.5,
-      "runtime blueprint converts actuator rate to joint rate");
+      "runtime blueprint reads the compiled joint rate");
     equal(blueprint.joints[0].maxEffort, 200.0,
-      "runtime blueprint converts actuator effort to joint effort");
+      "runtime blueprint reads the compiled joint effort");
 
     var simulationHarness = new SimulationHarness(0.1);
 
@@ -5379,18 +5381,35 @@ class RobotWorldTests {
       Transmission.SimpleTransmission(joint.id, 2.0, 0.0)));
     var second = model.addActuator(new Actuator("second", 40.0, 0.3,
       Transmission.SimpleTransmission(joint.id, -1.0, 0.0)));
+    model.materializeLimits();
     var limits = RobotRuntimeCompiler.compile(model).joints[0];
     equal(limits.maxRate, 0.3, "multiple actuators use the slowest joint rate");
     equal(limits.maxEffort, 240.0, "multiple actuators sum joint effort");
     second.transmission = Transmission.SimpleTransmission(joint.id, 1.0, 0.0);
+    model.materializeLimits();
     var positive = RobotRuntimeCompiler.compile(model).joints[0];
     equal(positive.maxRate, limits.maxRate, "negative ratio keeps the same rate limit");
     equal(positive.maxEffort, limits.maxEffort, "negative ratio keeps the same effort limit");
-    joint.limits.velocity = 0.2;
-    joint.limits.effort = 200.0;
+    joint.mechanicalLimits.velocity = 0.2;
+    joint.mechanicalLimits.effort = 200.0;
+    model.materializeLimits();
     var tighter = RobotRuntimeCompiler.compile(model).joints[0];
     equal(tighter.maxRate, 0.2, "joint rate remains the tighter claim");
     equal(tighter.maxEffort, 200.0, "joint effort remains the tighter claim");
+    joint.mechanicalLimits.velocity = 2.0;
+    second.maxRate = 0.8;
+    model.materializeLimits();
+    equal(joint.limits.velocity, 0.5, "a rebuild can raise a formerly tighter motor cap");
+    model.materializeLimits();
+    equal(joint.limits.velocity, 0.5, "effective limits do not feed back into mechanical facts");
+    var copied = RobotModelCodec.decode(RobotModelCodec.encode(model));
+    copied.actuators[0].maxRate = 2.0;
+    copied.materializeLimits();
+    equal(copied.joints[0].limits.velocity, 0.8, "saved mechanical facts survive a rebuild");
+    joint.mechanicalLimits.velocity = 0.0;
+    model.materializeLimits();
+    equal(RobotRuntimeCompiler.compile(model).joints[0].maxRate, 0.0,
+      "a stated zero velocity remains a stopped joint");
   }
 
   static function check(value:Bool, message:String):Void {

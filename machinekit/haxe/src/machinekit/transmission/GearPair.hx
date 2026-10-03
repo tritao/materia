@@ -41,7 +41,7 @@ class GearPair extends MachineAssembly {
 		var distance = a.centerDistance(b);
 		var baseRadiusSum = (a.baseDiameter + b.baseDiameter) / 2;
 		if (!(distance > baseRadiusSum + 1e-10))
-			throw "Meshing gear profile shifts produce an invalid operating pressure angle";
+			throw new machinekit.transmission.TransmissionDesignError("Gear profile shifts cannot mesh; choose compatible profile shifts");
 		centerDistance = distance;
 		operatingPressureAngle = Math.acos(baseRadiusSum / distance);
 		backlash = a.backlash + b.backlash;

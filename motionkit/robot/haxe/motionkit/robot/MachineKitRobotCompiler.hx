@@ -1,12 +1,16 @@
 package motionkit.robot;
 
 import cadkit.modeling.AssemblyModel;
+import cadbridge.AssemblySimulationBridge;
+import machinekit.assembly.MachineAssembly;
+import materia.assembly.AssemblyFrames;
+import robotkit.model.ActuatorDrive.StepperDrive;
+import robotkit.model.TorqueSpeedCurve;
 import machinekit.assembly.LinearAxis;
 import motionkit.axis.MotionAxisBlueprint;
 import robotkit.model.Actuator;
 import robotkit.model.Joint;
 import robotkit.model.JointType;
-import robotkit.model.Link;
 import robotkit.model.RobotModel;
 import robotkit.model.Transmission;
 
@@ -79,12 +83,40 @@ class MachineKitRobotCompiler {
       var binding = bindings[index];
       var shaftId = binding.shaftJointId;
       var ratio = ratios[index];
-      var motor = new Actuator('${binding.id}.motor.${binding.axis.motor.designation}',
-        0.0, maxVelocity * Math.abs(ratio),
+      // This convenience compiler states a 24 V, rated-current drive. The motor part owns its curve.
+      var source = binding.axis.motor.actuator('${binding.id}.motor.${binding.axis.motor.designation}', shaftId, 24, 0.5);
+      var motor = new Actuator(source.id, source.maxEffort,
+        Math.min(source.maxRate, maxVelocity * Math.abs(ratio)),
         Transmission.SimpleTransmission(shaftId, 1.0, 0.0));
-      motor.fullStepsPerRevolution = fullSteps(binding.axis.motor);
+      var steps = source.fullStepsPerRevolution, inertia = source.rotorInertia, holding = source.holdingTorque, curve = source.torqueSpeed;
+      if (steps == null || inertia == null || holding == null || curve == null)
+        throw "Axis motor must supply stepper ratings and a torque-speed curve";
+      motor.drive = new StepperDrive(steps, inertia, holding, TorqueSpeedCurve.unflatten(curve));
+      var assumptions = source.assumed;
+      if (assumptions != null) motor.assumed = [for (label in assumptions) label];
+      motor.assumed.push("convenience compiler 24 V drive");
+      motor.microsteps = 16;
+      motor.maxStepRate = machinekit.motion.MotorDriver.catalog().get("GENERIC-DM542").maximumStepRate;
+      motor.assumed.push("motor driver ratings");
       model.addActuator(motor);
+      for (joint in model.joints) {
+        if (joint.id == shaftId) joint.armature += inertia;
+        if (joint.id == binding.travelJointId) {
+          var mechanical = joint.mechanicalLimits;
+          if (mechanical == null) mechanical = joint.limits;
+          mechanical.velocity = maxVelocity;
+          mechanical.maxAcceleration = maxAcceleration;
+        }
+      }
     }
+    model.materializeLimits();
+    axes = [for (binding in bindings) {
+      var limits = [for (joint in model.joints) if (joint.id == binding.travelJointId) joint.limits][0];
+      new MotionAxisBlueprint(binding.id, [binding.travelJointId, binding.shaftJointId],
+        0.0, binding.axis.stroke * MILLIMETRES_TO_METRES,
+        limits.velocity == null ? maxVelocity : limits.velocity,
+        limits.maxAcceleration == null ? maxAcceleration : limits.maxAcceleration);
+    }];
     return MotionSystemBlueprint.fromRobotModel(model, axes);
   }
 
@@ -96,33 +128,18 @@ class MachineKitRobotCompiler {
   public static function compileLinearAxis(axis:LinearAxis, axisId:String,
       ?maxVelocity:Float = DEFAULT_MAX_VELOCITY,
       ?maxAcceleration:Float = DEFAULT_MAX_ACCELERATION):MotionSystemBlueprint {
-    var model = compileLinearAxisModel(axis, axisId, maxVelocity, maxAcceleration);
-    var joint = model.joints[0];
-    var axisBlueprint = new MotionAxisBlueprint(axisId, [joint.id], 0.0,
-      axis.stroke * MILLIMETRES_TO_METRES, maxVelocity, maxAcceleration);
-    return MotionSystemBlueprint.fromRobotModel(model, [axisBlueprint]);
-  }
-
-  /** Compiles only the stable RobotKit model for callers that own the runtime step. */
-  public static function compileLinearAxisModel(axis:LinearAxis, axisId:String,
-      ?maxVelocity:Float = DEFAULT_MAX_VELOCITY,
-      ?maxAcceleration:Float = DEFAULT_MAX_ACCELERATION):RobotModel {
     requireAxis(axis, axisId);
     requireId(axisId);
-    if (!Math.isFinite(maxVelocity) || maxVelocity < 0.0)
-      throw "Linear-axis maximum velocity must be finite and non-negative";
-    if (!Math.isFinite(maxAcceleration) || maxAcceleration < 0.0)
-      throw "Linear-axis maximum acceleration must be finite and non-negative";
-
-    var model = new RobotModel('linear-axis-$axisId');
-    var base = model.addLink(new Link('${axisId}.base'));
-    var carriage = model.addLink(new Link('${axisId}.carriage'));
-    var carriageStart = machineAxisStart(axis, 'axis-$axisId');
-    addPrismaticJoint(model, axisId, base, carriage, axis,
-      [0.0, 0.0, 0.0, 1.0], [0.0, 0.0, carriageStart],
-      maxVelocity, maxAcceleration);
-    return model;
+    var assembly = new MachineAssembly();
+    assembly.include(axisId, axis);
+    return compilePhysicalAxes(assembly, [axisId], [axis], maxVelocity, maxAcceleration);
   }
+
+  /** Compiles the same part-level assembly used by the complete motion blueprint. */
+  public static function compileLinearAxisModel(axis:LinearAxis, axisId:String,
+      ?maxVelocity:Float = DEFAULT_MAX_VELOCITY,
+      ?maxAcceleration:Float = DEFAULT_MAX_ACCELERATION):RobotModel
+    return compileLinearAxis(axis, axisId, maxVelocity, maxAcceleration).model;
 
   /** Compiles three MachineKit axes into one serial XYZ gantry robot. */
   public static function compileXYZGantry(xAxis:LinearAxis, yAxis:LinearAxis, zAxis:LinearAxis,
@@ -136,35 +153,84 @@ class MachineKitRobotCompiler {
     if (!Math.isFinite(maxAcceleration) || maxAcceleration < 0.0)
       throw "Gantry maximum acceleration must be finite and non-negative";
 
-    var model = new RobotModel("xyz-gantry");
-    var base = model.addLink(new Link("gantry.base"));
-    var xCarriage = model.addLink(new Link("x.carriage"));
-    var yCarriage = model.addLink(new Link("y.carriage"));
-    var zCarriage = model.addLink(new Link("z.carriage"));
-    var halfSqrt = Math.sqrt(0.5);
-    var xStart = machineAxisStart(xAxis, "x-axis");
-    var yStart = machineAxisStart(yAxis, "y-axis");
-    var zStart = machineAxisStart(zAxis, "z-axis");
-    // MachineKit LinearAxis is authored along local +Z. Rotate each carriage
-    // frame into the corresponding machine coordinate direction.
-    addPrismaticJoint(model, "x", base, xCarriage, xAxis,
-      [0.0, halfSqrt, 0.0, halfSqrt],
-      [xStart, 0.0, 0.0], maxVelocity, maxAcceleration);
-    addPrismaticJoint(model, "y", xCarriage, yCarriage, yAxis,
-      [-halfSqrt, 0.0, 0.0, halfSqrt],
-      [0.0, yStart, 0.0], maxVelocity, maxAcceleration);
-    // The inherited Y-carriage frame is R_y(90°) * R_x(-90°). Use its
-    // inverse for Z and express the travel origin along local -X so both the
-    // Z joint axis and its origin land on world +Z.
-    addPrismaticJoint(model, "z", yCarriage, zCarriage, zAxis,
-      [0.5, -0.5, -0.5, 0.5],
-      [-zStart, 0.0, 0.0], maxVelocity, maxAcceleration);
+    var assembly = new MachineAssembly();
+    var axes = [xAxis, yAxis, zAxis];
+    var ids = ["x", "y", "z"];
+    var half = Math.sqrt(0.5);
+    var rotations = [
+      {x: 0.0, y: 0.0, z: 0.0, qx: 0.0, qy: half, qz: 0.0, qw: half},
+      {x: 0.0, y: 0.0, z: 0.0, qx: -half, qy: 0.0, qz: 0.0, qw: half},
+      AssemblyFrames.identity()
+    ];
+    for (index in 0...3) {
+      assembly.include(ids[index], axes[index], rotations[index]);
+      if (index > 0) {
+        // The stage mount fixes the next motor to the preceding carriage with its machine orientation.
+        var relative = AssemblyFrames.compose(AssemblyFrames.inverse(rotations[index - 1]), rotations[index]);
+        assembly.addMemberConnector(ids[index - 1] + "/carriage", "stage", relative);
+        assembly.addMemberConnector(ids[index] + "/motor", "stage", AssemblyFrames.identity());
+        assembly.addMate(ids[index] + ".mount", "fixed", ids[index - 1] + "/carriage", "stage",
+          ids[index] + "/motor", "stage");
+      }
+    }
+    return compilePhysicalAxes(assembly, ids, axes, maxVelocity, maxAcceleration);
+  }
 
-    return MotionSystemBlueprint.fromRobotModel(model, [
-      axisBlueprint("x", xAxis, maxVelocity, maxAcceleration),
-      axisBlueprint("y", yAxis, maxVelocity, maxAcceleration),
-      axisBlueprint("z", zAxis, maxVelocity, maxAcceleration)
-    ]);
+  /** Compile actual members and joints; their resolved transmissions are the only screw ratios. */
+  static function compilePhysicalAxes(assembly:MachineAssembly, ids:Array<String>, axes:Array<LinearAxis>,
+      maxVelocity:Float, maxAcceleration:Float):MotionSystemBlueprint {
+    // LinearAxis's grounded preview parts belong to its motor body when it is a moving stage.
+    for (index in 0...ids.length) {
+      var id = ids[index];
+      var flat = materia.assembly.AssemblyDefinitionFlattener.flatten(
+        machinekit.assembly.FrozenAssemblyDefinitions.thaw(axes[index].describe().mechanical));
+      var motorPose = [for (entry in flat.occurrences) if (entry.id == "motor") entry.initialPose][0];
+      var children = [for (joint in flat.joints) if (joint.role == materia.assembly.AssemblyDefinition.AssemblyJointRole.Tree) joint.child];
+      for (entry in flat.occurrences) if (entry.id != "motor" && children.indexOf(entry.id) < 0) {
+        var connector = "root/" + entry.id;
+        assembly.addMemberConnector(id + "/motor", connector,
+          AssemblyFrames.compose(AssemblyFrames.inverse(motorPose), entry.initialPose));
+        assembly.addMemberConnector(id + "/" + entry.id, "stageRoot", AssemblyFrames.identity());
+        assembly.addMate(id + "/ground/" + entry.id, "fixed", id + "/motor", connector,
+          id + "/" + entry.id, "stageRoot");
+      }
+    }
+    var mechanical = new AssemblyModel();
+    assembly.addTo(mechanical, "");
+    var definition = mechanical.definition("machinekit-axes");
+    var parts:Array<cadbridge.AssemblySimulationBridge.AssemblyPhysicalPart> = [];
+    var components = assembly.components();
+    for (entry in definition.definitions) {
+      var occurrence = [for (candidate in definition.occurrences) if (candidate.definition == entry.id) candidate][0];
+      var component = [for (candidate in components) if (candidate.id == occurrence.id) candidate.component][0];
+      var mass = component.massProperties();
+      var inertia = mass.inertia;
+      if (inertia == null) throw 'Axis member "${occurrence.id}" needs inertia';
+      // Express known kg and kg mm² as unit-density mm³ and mm⁵ for the bridge.
+      parts.push({id: entry.id, materialId: component.materialSpec(), density: 1.0,
+        volume: mass.mass * 1e9,
+        centerOfMass: [mass.centreOfMass.x, mass.centreOfMass.y, mass.centreOfMass.z],
+        inertia: [inertia.xx * 1e9, inertia.xy * 1e9, inertia.xz * 1e9,
+          inertia.xy * 1e9, inertia.yy * 1e9, inertia.yz * 1e9,
+          inertia.xz * 1e9, inertia.yz * 1e9, inertia.zz * 1e9]});
+    }
+    var physical = AssemblySimulationBridge.toRobotModel(definition, {metresPerUnit: MILLIMETRES_TO_METRES, parts: parts});
+    // Put logical travels first for deterministic XYZ indexing; retain every physical motor joint.
+    physical.model.joints.sort((a, b) -> {
+      var first = ids.indexOf(a.id.split("/")[0]), second = ids.indexOf(b.id.split("/")[0]);
+      if (a.type != JointType.Prismatic) first += ids.length;
+      if (b.type != JointType.Prismatic) second += ids.length;
+      return first == second ? Reflect.compare(a.id, b.id) : first - second;
+    });
+    var bindings:Array<AssemblyAxisBinding> = [];
+    for (index in 0...ids.length) {
+      var id = ids[index];
+      var motor = physical.partLinks.get(id + "/motor");
+      if (motor == null) throw 'Axis "$id" has no motor body';
+      bindings.push({id: id, axis: axes[index], motorLinkId: physical.model.links[motor.link].id,
+        shaftJointId: id + "/coupling", travelJointId: id + "/carriage-slide"});
+    }
+    return compileAssemblyAxes(physical.model, bindings, maxVelocity, maxAcceleration);
   }
 
   /** Read the axis's resolved coupling, then convert its mm leader to SI. */
@@ -173,54 +239,6 @@ class MachineKitRobotCompiler {
     if (couplings != null) for (coupling in couplings)
       if (coupling.id == "lead-screw") return coupling.ratio / MILLIMETRES_TO_METRES;
     throw "Linear axis has no resolved lead-screw coupling";
-  }
-
-  /** Read the carriage datum through MachineAssembly's prefix-aware connector API. */
-  static function machineAxisStart(axis:LinearAxis, prefix:String):Float {
-    var mechanical = new AssemblyModel();
-    axis.addTo(mechanical, prefix);
-    var connector = axis.connector("carriageBore", prefix);
-    return mechanical.initialState('machinekit-$prefix').worldConnector(connector.instanceId,
-      connector.connectorName).z;
-  }
-
-  static function axisBlueprint(id:String, axis:LinearAxis, maxVelocity:Float,
-      maxAcceleration:Float):MotionAxisBlueprint {
-    return new MotionAxisBlueprint(id, [id], 0.0,
-      axis.stroke * MILLIMETRES_TO_METRES, maxVelocity, maxAcceleration);
-  }
-
-  static function addPrismaticJoint(model:RobotModel, id:String, parent:Link, child:Link,
-      axis:LinearAxis, frameRotation:Array<Float>, framePositionMillimetres:Array<Float>,
-      maxVelocity:Float, maxAcceleration:Float):Joint {
-    var joint = model.addJoint(new Joint(id, JointType.Prismatic, parent, child, id));
-    // MachineKit reports millimetres; RobotKit uses metres and a zeroed
-    // machine coordinate at travelMin.
-    joint.parentFramePosition = [
-      framePositionMillimetres[0] * MILLIMETRES_TO_METRES,
-      framePositionMillimetres[1] * MILLIMETRES_TO_METRES,
-      framePositionMillimetres[2] * MILLIMETRES_TO_METRES
-    ];
-    joint.parentFrameRotation = frameRotation.copy();
-    joint.axis = [0.0, 0.0, 1.0];
-    joint.limits.lower = 0.0;
-    joint.limits.upper = axis.stroke * MILLIMETRES_TO_METRES;
-    joint.limits.velocity = maxVelocity;
-    joint.limits.maxAcceleration = maxAcceleration;
-    var travelPerRevolutionMetres = axis.nut.travelPerRevolution() * MILLIMETRES_TO_METRES;
-    var ratio = 2.0 * Math.PI / travelPerRevolutionMetres;
-    var motor = new Actuator('$id.motor.${axis.motor.designation}',
-      0.0, maxVelocity * Math.abs(ratio),
-      Transmission.SimpleTransmission(joint.id, ratio, 0.0));
-    motor.fullStepsPerRevolution = fullSteps(axis.motor);
-    model.addActuator(motor);
-    return joint;
-  }
-
-  /** Full steps in a turn of a stepper: its rating's step angle, or the NEMA standard 1.8 degrees. */
-  static function fullSteps(motor:machinekit.motion.NemaStepper):Float {
-    var rating = motor.rating();
-    return rating == null ? 200.0 : 360.0 / rating.stepAngle;
   }
 
   static function requireAxis(axis:LinearAxis, id:String):Void {

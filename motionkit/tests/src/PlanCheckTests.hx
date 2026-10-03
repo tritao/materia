@@ -70,8 +70,8 @@ class PlanCheckTests extends MotionKitTestSupport {
     model.addCoupling(lead);
     var motor = new Actuator("motor", 0.63, 137.1, Transmission.SimpleTransmission("screw", 1.0, 0.0));
     if (servo) {
-      motor.maxEffort = 0.0;
-      motor.maxRate = 0.0;
+      motor.maxEffort = null;
+      motor.maxRate = null;
       motor.drive = new ServoDrive(0.3, 1.2, 300.0, 500.0, 3e-5, 4096.0);
     } else {
       // A NEMA 23 on 24 V: 1.26 N m to 68.6 rad/s, then falling as 1 / speed.
@@ -109,12 +109,12 @@ class PlanCheckTests extends MotionKitTestSupport {
     // The planner's own limits, with the steady loads taken off, never ask for more than the drive gives.
     var limits = flat.coupledLimits("slide", options.steady);
     var free = flat.coupledLimits("slide");
-    check(limits.maxAcceleration < free.maxAcceleration, "steady loads leave less force to accelerate with");
+    check(limits.requireAcceleration() < free.requireAcceleration(), "steady loads leave less force to accelerate with");
     // force = 0.4 * 0.63 * pi*1000 less the nut's drag and rail friction, over mass and rotor inertia.
     var force = 0.4 * (0.63 - 0.02) * SCREW_RATIO - 5.0;
     var expected = force / (10.0 + 0.4 * (4e-6 + 3e-5) * SCREW_RATIO * SCREW_RATIO);
-    near(limits.maxAcceleration, expected, "acceleration under steady loads is the force left over the inertia", 1e-9);
-    var honest = plan(0.1, limits.velocity, limits.maxAcceleration);
+    near(limits.requireAcceleration(), expected, "acceleration under steady loads is the force left over the inertia", 1e-9);
+    var honest = plan(0.1, limits.requireVelocity(), limits.requireAcceleration());
     var result = new PlanCheck(flat, ["slide"], options).check(honest, 7, 0.0);
     check(result.diagnostics.length == 0, 'a plan at the planner\'s own limits passes: ${result.diagnostics}');
     check(result.worstTorqueRatio > 0.4 && result.worstTorqueRatio <= 1.0 + 1e-6,
@@ -123,7 +123,7 @@ class PlanCheckTests extends MotionKitTestSupport {
     honest.dispose();
 
     // Three times the acceleration is more than the curve gives: a stall, named by op, motor and axis.
-    var rough = plan(0.1, limits.velocity, 3.0 * limits.maxAcceleration);
+    var rough = plan(0.1, limits.requireVelocity(), 3.0 * limits.requireAcceleration());
     var stalled = new PlanCheck(flat, ["slide"], options).check(rough, 12, 0.0);
     check(kinds(stalled, PlanDiagnosticKind.StepperStall) == 1, "a plan beyond the pull-out curve is flagged once per motor");
     var found = stalled.diagnostics[0];
@@ -169,8 +169,8 @@ class PlanCheckTests extends MotionKitTestSupport {
     // A servo: peak torque bounds each sample, rated torque bounds the RMS over the plan.
     var servo = machine([1.0, 0.0, 0.0], true);
     var servoLimits = servo.coupledLimits("slide");
-    near(servoLimits.velocity, 500.0 / SCREW_RATIO, "a servo's axis speed comes from its maximum speed", 1e-9);
-    var brisk = plan(0.002, 0.1, 0.9 * servoLimits.maxAcceleration);
+    near(servoLimits.requireVelocity(), 500.0 / SCREW_RATIO, "a servo's axis speed comes from its maximum speed", 1e-9);
+    var brisk = plan(0.002, 0.1, 0.9 * servoLimits.requireAcceleration());
     var servoResult = new PlanCheck(servo, ["slide"], options).check(brisk, 3, 0.0);
     check(kinds(servoResult, PlanDiagnosticKind.ServoPeakTorque) == 0, "a servo under its peak torque is not flagged for it");
     check(kinds(servoResult, PlanDiagnosticKind.ServoRatedTorque) == 1,
@@ -178,7 +178,7 @@ class PlanCheckTests extends MotionKitTestSupport {
     var servoFinding = servoResult.diagnostics[0];
     check(servoFinding.value > servoFinding.limit && Math.abs(servoFinding.limit - 0.3) < 1e-12, "the RMS finding gives the rated torque as its limit");
     brisk.dispose();
-    var violent = plan(0.002, 0.1, 4.0 * servoLimits.maxAcceleration);
+    var violent = plan(0.002, 0.1, 4.0 * servoLimits.requireAcceleration());
     check(kinds(new PlanCheck(servo, ["slide"], options).check(violent, 3, 0.0), PlanDiagnosticKind.ServoPeakTorque) == 1,
       "a servo over its peak torque is flagged");
     violent.dispose();
@@ -226,12 +226,12 @@ class PlanCheckTests extends MotionKitTestSupport {
     options.steady = new SteadyLoads(5.0);
     var flat = machine([1.0, 0.0, 0.0], false);
     var limits = flat.coupledLimits("slide", options.steady);
-    var honest = plan(0.1, limits.velocity, limits.maxAcceleration);
+    var honest = plan(0.1, limits.requireVelocity(), limits.requireAcceleration());
     var passed = new PlanCheck(flat, ["slide"], options).check(honest, 0, 0.0);
     check(passed.diagnostics.length == 0 && passed.slips.length == 0, "a plan within the curve loses no steps");
     honest.dispose();
 
-    var rough = plan(0.1, limits.velocity, 3.0 * limits.maxAcceleration);
+    var rough = plan(0.1, limits.requireVelocity(), 3.0 * limits.requireAcceleration());
     var stalled = new PlanCheck(flat, ["slide"], options).check(rough, 4, 0.0);
     check(stalled.slips.length == 1, "a plan over the curve loses steps on its axis");
     var slip = stalled.slips[0];
@@ -247,7 +247,7 @@ class PlanCheckTests extends MotionKitTestSupport {
 
     // A servo over its peak is not a slip: only steppers lose steps.
     var servo = machine([1.0, 0.0, 0.0], true);
-    var violent = plan(0.002, 0.1, 4.0 * servo.coupledLimits("slide").maxAcceleration);
+    var violent = plan(0.002, 0.1, 4.0 * servo.coupledLimits("slide").requireAcceleration());
     check(new PlanCheck(servo, ["slide"], options).check(violent, 0, 0.0).slips.length == 0, "a servo never slips");
     violent.dispose();
 
@@ -287,33 +287,45 @@ class PlanCheckTests extends MotionKitTestSupport {
       actuator.maxEffort = weak ? 0.002 : 1e7;
       actuator.maxRate = weak ? 100.0 : 1e5;
       var torque = weak ? 0.004 : 1e7;
-      actuator.drive = new StepperDrive(200.0, 3e-5, torque, new TorqueSpeedCurve([0.0, actuator.maxRate], [torque, torque]));
+      actuator.drive = new StepperDrive(200.0, 3e-5, torque, new TorqueSpeedCurve([0.0, actuator.requireRate()], [torque, torque]));
     }
-    // A linear scale reads the X carriage: the motor drives that joint directly, so it is motor-side.
-    model.addEncoder(Encoder.perMillimetre("x.scale", "x", EncoderKind.Incremental, 200.0));
+    // Explicit motor feedback detects lost steps; the load-side scale measures carriage error.
+    model.addEncoder(Encoder.perRevolution("x.encoder", blueprint.axes[0].jointIds[1], EncoderKind.Incremental, 2000.0));
+    model.addEncoder(Encoder.perMillimetre("x.scale", "x/carriage-slide", EncoderKind.Incremental, 200.0));
     var ids = [for (joint in model.joints) joint.id];
     var solver = new AxisKinematics(blueprint);
     var limits = new ValidationLimits(ids.length, Int64.ofInt(blueprint.runtime.revision),
       Int64.ofInt(blueprint.runtime.calibrationRevision));
+    var scales = [for (_ in ids) 0.0];
+    for (axis in blueprint.axes) for (slot in 0...axis.jointIds.length)
+      scales[ids.indexOf(axis.jointIds[slot])] = Math.abs(axis.jointScales[slot]);
+    var speeds = [for (joint in model.joints) joint.limits.requireVelocity()];
+    var accelerations = [for (joint in model.joints) joint.limits.requireAcceleration()];
+    var jerks = [for (scale in scales) 20.0 * scale];
     for (joint in 0...ids.length) {
-      limits.position(joint, -1.0, 1.0);
-      limits.velocity(joint, 0.1);
-      limits.acceleration(joint, 0.4);
-      limits.jerk(joint, 20.0);
+      var bound = model.joints[joint].limits;
+      limits.position(joint, bound.lower, bound.upper);
+      limits.velocity(joint, speeds[joint]);
+      limits.acceleration(joint, accelerations[joint]);
+      limits.jerk(joint, jerks[joint]);
     }
-    var compiler = new ProgramCompiler(solver, limits, "work", [for (_ in ids) 0.1], [for (_ in ids) 0.4], [for (_ in ids) 20.0],
-      StartTolerances.uniform(ids.length, 0.00001, 0.02, 0.02));
+    var compiler = new ProgramCompiler(solver, limits, "work", speeds, accelerations, jerks,
+      new StartTolerances([for (scale in scales) 0.00001 * scale],
+        [for (scale in scales) 0.02 * scale], [for (scale in scales) 0.02 * scale]));
     compiler.planCheck = new PlanCheck(model, ids, new PlanCheckOptions());
-    var goal = [0.05, 0.0, 0.0];
+    var goal = [for (_ in ids) 0.0];
+    for (slot in 0...blueprint.axes[0].jointIds.length)
+      goal[ids.indexOf(blueprint.axes[0].jointIds[slot])] = blueprint.axes[0].jointScales[slot] * 0.05;
     var moving = new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(goal), new MotionOptions(), Blend.ExactStop)]);
     var harness = new SimulationHarness(0.01);
     var runtime = harness.simulation.addRobot(blueprint.runtime);
     var robot = new SimulatedRobot("gantry", runtime, model.name, [for (link in model.links) link.name],
       [for (joint in model.joints) joint.name]);
-    var motion = new ManipulatorMotion(robot, compiler, function(_) return null, function() return {events: [], overflow: false}, [0, 1, 2]);
-    var slip = new StepperSlip([], ["x" => 0, "y" => 1, "z" => 2], (joint, offset) -> harness.simulation.setJointSlip(0, joint, offset));
+    var motion = new ManipulatorMotion(robot, compiler, function(_) return null, function() return {events: [], overflow: false}, [for (joint in 0...ids.length) joint]);
+    var slip = new StepperSlip([for (coupling in model.couplings) new CoupledJoint(ids.indexOf(coupling.follower),
+      ids.indexOf(coupling.leader), coupling.ratio, coupling.offset)], [for (joint in 0...ids.length) ids[joint] => joint], (joint, offset) -> harness.simulation.setJointSlip(0, joint, offset));
     motion.slip = slip;
-    var monitor = new EncoderMonitor(model, [0.0, 0.0, 0.0]);
+    var monitor = new EncoderMonitor(model, [for (_ in ids) 0.0]);
     motion.run(moving);
     var tick = 0, guard = 0;
     var snapshot = robot.snapshot();
@@ -321,11 +333,13 @@ class PlanCheckTests extends MotionKitTestSupport {
       motion.update(0.01);
       harness.step(Int64.ofInt(++tick));
       snapshot = robot.snapshot();
-      monitor.observe([for (joint in 0...3) snapshot.positions.get(joint)], [for (joint in 0...3) snapshot.setpointPositions.get(joint)],
+      monitor.observe([for (joint in 0...ids.length) snapshot.positions.get(joint)], [for (joint in 0...ids.length) snapshot.setpointPositions.get(joint)],
         tick * 0.01);
     }
     var result = new GantryRun(monitor, slip, motion.completed, motion.failure, snapshot.positions.get(0),
       snapshot.setpointPositions.get(0));
+    result.motorJoint = blueprint.axes[0].jointIds[1];
+    result.motorRatio = blueprint.axes[0].jointScales[1] / blueprint.axes[0].jointScales[0];
     result.diagnostics = [for (diagnostic in motion.checks.diagnostics) diagnostic.toString()];
     harness.dispose();
     return result;
@@ -338,17 +352,17 @@ class PlanCheckTests extends MotionKitTestSupport {
   public function testEncoderSeesStepperSlip():Void {
     var weak = gantryRun(true);
     check(weak.completed, 'the weak machine runs its program (${weak.failure})');
-    check(weak.slip.slipped() && weak.slip.lost("x") > 0.0, 'its X axis lost distance: ${weak.slip.lost("x")}');
+    check(weak.slip.slipped() && weak.slip.lost("x/carriage-slide") > 0.0, 'its X axis lost distance: ${weak.slip.lost("x/carriage-slide")}');
     check(weak.position < weak.commanded - 1e-4, 'the simulated axis ends behind its command: ${weak.position} against ${weak.commanded}');
-    near(weak.commanded - weak.position, weak.slip.lost("x"), "by the distance the plan check predicted", 1e-5);
+    near(weak.commanded - weak.position, weak.slip.lost("x/carriage-slide"), "by the distance the plan check predicted", 1e-5);
     check(weak.monitor.faults(), "the encoder faults");
     var found = weak.monitor.findings[0];
-    check(found.kind == robotkit.runtime.EncoderMonitor.EncoderFindingKind.LostSteps && found.encoder == "x.scale" && found.joint == "x",
+    check(found.kind == robotkit.runtime.EncoderMonitor.EncoderFindingKind.LostSteps && found.encoder == "x.encoder" && found.joint == weak.motorJoint,
       'and names lost steps on the encoder\'s joint: ${found}');
-    check(found.motor.length > 0 && found.steps > robotkit.runtime.EncoderMonitor.STEPPER_BOUND_STEPS && found.error < 0.0,
+    check(found.motor.length > 0 && found.steps > robotkit.runtime.EncoderMonitor.STEPPER_BOUND_STEPS && found.error * weak.motorRatio < 0.0,
       'with the motor, how many steps, and the sign: ${found.describe()}');
     var seen = weak.monitor.pathError("x.scale");
-    near(Math.abs(seen.last), weak.slip.lost("x"), "the encoder reads the error that was kept", 5e-6);
+    near(Math.abs(seen.last), weak.slip.lost("x/carriage-slide"), "the encoder reads the error that was kept", 5e-6);
 
     var strong = gantryRun(false);
     check(strong.completed && !strong.slip.slipped() && !strong.monitor.faults(),
@@ -421,7 +435,8 @@ class PlanCheckTests extends MotionKitTestSupport {
     }
     var start = [for (_ in ids) 0.0];
     var goal = start.copy();
-    for (index in 0...ids.length) if (model.joints[index].type == robotkit.model.JointType.Prismatic) goal[index] = 0.05;
+    for (axis in blueprint.axes) for (slot in 0...axis.jointIds.length)
+      goal[ids.indexOf(axis.jointIds[slot])] = axis.jointScales[slot] * 0.05;
     var moving = new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(goal), new MotionOptions(), Blend.ExactStop)]);
     var compiled = compiler(false).compile(moving, start, Int64.ofInt(1));
     var plan = compiled.blocks[0].plans[0];
@@ -441,6 +456,8 @@ class PlanCheckTests extends MotionKitTestSupport {
 
 /** What a simulated gantry run left: the encoder monitor, the slip it suffered, and where its X axis ended against its command. */
 private class GantryRun {
+  public var motorJoint:String = "";
+  public var motorRatio:Float = 1.0;
   public final monitor:EncoderMonitor;
   public final slip:StepperSlip;
   public final completed:Bool;

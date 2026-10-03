@@ -475,11 +475,20 @@ class PlannerTests extends MotionKitTestSupport {
       [for (joint in blueprint.model.joints) joint.name]);
     var machine = MotionSystem.fromBlueprint(robot, blueprint);
     var options = new MotionOptions(0.2, 2.0);
+    var gentle = planned(machine.moveLinear(Pose.xyz(0.02, 0.0, 0.0),
+      Feed.metresPerSecond(0.2), new MotionOptions(0.2, 0.4)));
+    var gentleAcceleration = peakChordAcceleration(gentle, 0);
+    check(gentleAcceleration <= 0.4 + 1e-6, "moveLinear obeys the lower authored acceleration");
+    runMotion(machine, simulationHarness);
+    machine.home();
+    runMotion(machine, simulationHarness);
     var xOnly = planned(machine.moveLinear(Pose.xyz(0.02, 0.0, 0.0),
       Feed.metresPerSecond(0.2), options));
     var peakAcceleration = peakChordAcceleration(xOnly, 0);
-    check(peakAcceleration > 1.9,
-      "moveLinear uses an authored 2 m/s² acceleration limit");
+    // At the motor's 43.7 mm/s cap, the retiming grid need not reach 2 m/s².
+    // Raising the authored cap must still raise acceleration, within that cap.
+    check(peakAcceleration > 2.0 * gentleAcceleration && peakAcceleration <= 2.0 + 1e-6,
+      'moveLinear uses its authored acceleration cap ($gentleAcceleration -> $peakAcceleration)');
 
     runMotion(machine, simulationHarness);
 
@@ -488,6 +497,10 @@ class PlannerTests extends MotionKitTestSupport {
     for (joint in 0...3)
       check(peakChordAcceleration(diagonal, joint) <= 2.0 + 1e-6,
         "diagonal moveLinear chords stay within per-axis acceleration caps");
+    throws(function() {
+      var outside = machine.moveLinear(Pose.xyz(0.080000001, 0.0, 0.0),
+        Feed.metresPerSecond(0.2), options);
+    }, "path limits reject a 1 nm excursion while accepting homing roundoff");
     simulationHarness.dispose();
   }
 
@@ -582,8 +595,15 @@ class PlannerTests extends MotionKitTestSupport {
     var blendedRig = gantryRig(true);
     var blended = blendedRig.machine.movePath(path, PathPlanningOptions.blend(0.0005),
       new MotionOptions(0.08, 0.4));
-    check(blended.durationSeconds() < exact.durationSeconds(),
-      '0.5 mm fillet ${blended.durationSeconds()} is faster than exact stop ${exact.durationSeconds()}');
+    // A tiny fillet can cost time under conservative junction limits. A
+    // larger permitted deviation demonstrates the speed/tolerance tradeoff.
+    var widerRig = gantryRig(true);
+    var wider = widerRig.machine.movePath(path, PathPlanningOptions.blend(0.002),
+      new MotionOptions(0.08, 0.4));
+    check(wider.durationSeconds() < exact.durationSeconds(),
+      '2 mm fillet ${wider.durationSeconds()} is faster than exact stop ${exact.durationSeconds()}');
+    Sys.println('cartesian blends: exact ${exact.durationSeconds()} s, 0.5 mm ${blended.durationSeconds()} s, 2 mm ${wider.durationSeconds()} s');
+    widerRig.harness.dispose();
     var closestCorner = 1.0;
     var cornerSpeed = 0.0;
     for (index in 0...501) {
@@ -693,9 +713,13 @@ class PlannerTests extends MotionKitTestSupport {
       var limits = new ValidationLimits(count,
         Int64.ofInt(blueprint.runtime.revision),
         Int64.ofInt(blueprint.runtime.calibrationRevision));
-      var velocity = [for (_ in 0...count) 0.1];
-      var acceleration = [for (_ in 0...count) 0.4];
-      var jerk = [for (_ in 0...count) 10.0];
+      var ids = [for (joint in blueprint.model.joints) joint.id];
+      var scales = [for (_ in ids) 0.0];
+      for (axis in blueprint.axes) for (slot in 0...axis.jointIds.length)
+        scales[ids.indexOf(axis.jointIds[slot])] = Math.abs(axis.jointScales[slot]);
+      var velocity = [for (joint in blueprint.model.joints) joint.limits.requireVelocity()];
+      var acceleration = [for (joint in blueprint.model.joints) joint.limits.requireAcceleration()];
+      var jerk = [for (scale in scales) 10.0 * scale];
       for (joint in 0...count) {
         var bounds = blueprint.model.joints[joint].limits;
         if (bounds.lower < bounds.upper)
@@ -705,8 +729,10 @@ class PlannerTests extends MotionKitTestSupport {
         limits.jerk(joint, jerk[joint]);
       }
       var compiler = new ProgramCompiler(solver, limits, "work", velocity,
-        acceleration, jerk, StartTolerances.uniform(count,
-          0.0005, 0.004, 0.01));
+        acceleration, jerk, new StartTolerances([for (scale in scales) 0.0005 * scale],
+          [for (scale in scales) 0.004 * scale], [for (scale in scales) 0.01 * scale]),
+        null, 0.01, 0.5, 0.005, 0.02, null, null,
+        [for (scale in scales) 0.5 * scale], ids, blueprint.model.couplings);
       var primitive = new TestCircularPosePrimitive(circular, 0.05);
       var path = new PosePath("work", [primitive]).withAuthoredGeometry(authored, 0.001);
       var compiled = compiler.compile(new MotionProgram([

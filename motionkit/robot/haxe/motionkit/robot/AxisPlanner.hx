@@ -121,37 +121,51 @@ class AxisPlanner {
 
   function nativeLogicalPlan(start:Array<Float>, velocity:Array<Float>,
       acceleration:Array<Float>, target:Array<Float>, limits:MotionLimits):Trajectory {
-    var maxVelocity = [for (_ in start) 0.0];
-    var maxAcceleration = [for (_ in start) 0.0];
-    var maxJerk = [for (_ in start) 0.0];
+    var logicalStart:Array<Float> = [], logicalVelocity:Array<Float> = [];
+    var logicalAcceleration:Array<Float> = [], logicalTarget:Array<Float> = [];
+    var maxVelocity:Array<Float> = [], maxAcceleration:Array<Float> = [], maxJerk:Array<Float> = [];
+    var mapped = [for (_ in start) false];
     for (axisValue in axes) {
-      var scales = [for (_ in start) 0.0];
-      axisValue.writeLogicalDelta(scales, 1.0);
-      var velocityLimit = limits.maxVelocity > 0.0 ?
-        Math.min(axisValue.maxVelocity, limits.maxVelocity) : axisValue.maxVelocity;
-      var accelerationLimit = limits.maxAcceleration > 0.0 ?
-        Math.min(axisValue.maxAcceleration, limits.maxAcceleration) : axisValue.maxAcceleration;
-      var jerkLimit = limits.maxJerk > 0.0 ? limits.maxJerk :
-        accelerationLimit / fixedTimestepSeconds;
       for (joint in axisValue.jointIndices) {
-        var scale = Math.abs(scales[joint]);
-        var speed = velocityLimit * scale;
-        var accel = accelerationLimit * scale;
-        var jerk = jerkLimit * scale;
-        maxVelocity[joint] = maxVelocity[joint] <= 0.0 ? speed :
-          Math.min(maxVelocity[joint], speed);
-        maxAcceleration[joint] = maxAcceleration[joint] <= 0.0 ? accel :
-          Math.min(maxAcceleration[joint], accel);
-        maxJerk[joint] = maxJerk[joint] <= 0.0 ? jerk : Math.min(maxJerk[joint], jerk);
+        if (mapped[joint]) throw 'Joint $joint belongs to more than one logical axis';
+        mapped[joint] = true;
       }
+      var primary = axisValue.jointIndices[0], scale = axisValue.jointScale(0);
+      logicalStart.push(axisValue.logicalPosition(start));
+      logicalVelocity.push(velocity[primary] / scale);
+      logicalAcceleration.push(acceleration[primary] / scale);
+      logicalTarget.push(axisValue.logicalPosition(target));
+      var speed = limits.maxVelocity > 0.0 ?
+        Math.min(axisValue.maxVelocity, limits.maxVelocity) : axisValue.maxVelocity;
+      var accel = limits.maxAcceleration > 0.0 ?
+        Math.min(axisValue.maxAcceleration, limits.maxAcceleration) : axisValue.maxAcceleration;
+      var jerk = limits.maxJerk > 0.0 ? limits.maxJerk : accel / fixedTimestepSeconds;
+      if (speed <= 0.0 || accel <= 0.0 || jerk <= 0.0)
+        throw 'Axis "${axisValue.id}" needs positive velocity, acceleration and jerk limits';
+      maxVelocity.push(speed); maxAcceleration.push(accel); maxJerk.push(jerk);
     }
     for (joint in 0...start.length)
-      if (maxVelocity[joint] <= 0.0 || maxAcceleration[joint] <= 0.0 ||
-          maxJerk[joint] <= 0.0)
-        throw 'Joint $joint needs positive velocity, acceleration and jerk limits';
-    var native = Trajectory.generateStateToState(start, velocity, acceleration, target,
-      maxVelocity, maxAcceleration, maxJerk);
-    return native;
+      if (!mapped[joint]) throw 'Joint $joint needs a logical axis mapping';
+    var native = Trajectory.generateStateToState(logicalStart, logicalVelocity,
+      logicalAcceleration, logicalTarget, maxVelocity, maxAcceleration, maxJerk);
+    var lowered = native.segments();
+    var physical:Array<{timeFromStartNs:haxe.Int64, durationNs:haxe.Int64,
+      coefficients:Array<Array<Float>>}> = [];
+    for (segment in lowered) {
+      var coefficients:Array<Array<Float>> = [for (_ in start) []];
+      for (power in 0...segment.coefficients[0].length) {
+        var values = power == 0 ? start.copy() : [for (_ in start) 0.0];
+        for (index in 0...axes.length) {
+          if (power == 0) axes[index].writeLogicalPosition(values, segment.coefficients[index][power]);
+          else axes[index].writeLogicalDelta(values, segment.coefficients[index][power]);
+        }
+        for (joint in 0...start.length) coefficients[joint].push(values[joint]);
+      }
+      physical.push({timeFromStartNs: segment.timeFromStartNs, durationNs: segment.durationNs,
+        coefficients: coefficients});
+    }
+    native.dispose();
+    return Trajectory.fromSegments(physical);
   }
 
   function resolveLimits(targets:Array<AxisTarget>, options:MotionOptions):MotionLimits {
