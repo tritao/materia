@@ -705,7 +705,7 @@ latency.
 
 ### X7 — Transmissions compile from their parts
 
-Status: T0 and T1 done (2026-10-03); T2–T5 not started.
+Status: T0–T2 done (2026-10-03); T3–T5 not started.
 Worktree `x7-transmissions`.
 
 T1: one resolved relation and part-level equations replace the assembly's ratio, efficiency
@@ -761,10 +761,21 @@ Decisions:
 
 #### T2 — Typed source, schema v3, rename
 
+Implementation: `Transmission`, `Sense` and wire `ScrewSupport` replace the string source and
+support records. `TransmissionRecord.source` and `sense` use new wire IDs 12 and 13; retired
+v2 IDs 2–4 are not reused. The machine description and document carry schema v3, checked
+before decoding the old source form. `transmissionFor(id)` returns a detached source record;
+its name avoids the old `LinearAxis.transmission` field that T4 removes. Physical router nuts move to T3: adding even the small Z nut changes the belt router's
+acceleration (14.19 → 14.18 m/s² for X with steady loads), contradicting T2's unchanged-baseline
+gate. T2 permits a null nut reference for the router during this transition; T3 makes it
+mandatory and installs the nuts while changing engineering values. CoreXY already had both belt members, so its sources
+now name those existing loops explicitly. Chain relations keep T1's old sprocket-as-belt
+allowances in T2; their family defaults belong to T3.
+
 - A wire enum for the source, roughly:
-  - `LeadScrew(screw, nut)`. The nut is a `LeadScrewNut` member: `LinearAxis` already has one; the
-    router models its nut brackets but no nuts, so it gains a Tr10×2 nut member on each bracket (on
-    the leader's slide, so it rides with the carriage). This adds BOM lines and mass.
+  - `LeadScrew(screw, nut)`. `LinearAxis` already has a `LeadScrewNut` member. The router's
+    nut reference is temporarily nullable in T2; T3 adds the physical nuts and makes the
+    binding mandatory, so T2 leaves its dynamics unchanged.
   - `GearMesh(driver, driven)`
   - `RackAndPinion(pinion, rack:Null<String>)`
   - `TimingBelt(belt, pulley, strand:Int)`, with the belt a member (the router already adds `beltX`
@@ -782,8 +793,10 @@ Decisions:
   wire enum, not the `"free"/"simple"/"fixed"` strings. Deriving the support from the bearing parts
   at each end is a later step, not part of X7.
 - **Gate:** the same relation values as T1 (ratios, efficiencies, allowances, caps). The source
-  changed, but the relation must not have. The router's new nut mass may move times slightly;
-  if it does, record why.
+  changed, but the relation must not have. Physical nut mass is introduced in T3 so all performance baselines stay unchanged in T2.
+
+T2 validation: standalone MachineKit and every suite in `x7-suite-t2-baseline.txt` pass,
+including the app project-source suite. All T1 engineering baselines remain unchanged.
 
 #### T3 — Derive what was frozen
 
@@ -795,6 +808,10 @@ Numbers move in this step. Record the new baselines in this plan with a one-line
 - **Gear backlash** from `GearPair.backlash` (tangential at the pitch circle), converted to leader
   units (radians: divide by the driver's pitch radius). **Rack and pinion** takes the pinion's (plus
   the rack's, if it states one), in mm.
+- **Router nuts.** Add a Tr10×2 nut member to each sliding body here rather than in T2,
+  because their mass changes acceleration. Z uses a barrel nut (no flange, body diameter
+  1.2 times the screw diameter) to fit its existing 13 mm plate gap; the flanged X/Y nut
+  cannot fit there. Check clearance at both ends of Z travel.
 - **Lead-screw backlash, drag and nut friction** from the nut. `LeadScrewNut` gains a nut kind
   (`PlainBronze`, `AntiBacklash`, `BallNut`, …) with catalog allowances. Today's
   `DriveDefaults.LEAD_SCREW_BACKLASH` (0.05 mm) and drag (0.02 N m) become the `AntiBacklash`

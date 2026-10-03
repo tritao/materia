@@ -281,7 +281,7 @@ class LinearAxis extends MachineAssembly {
 			// The carriage can pass either end of its stroke by the end margin before it meets a bearing housing.
 			{lower: travelMin, upper: travelMax, velocity: null, effort: null, overtravel: margin});
 		// The screw's thread sets the ratio: the carriage moves along the screw's turning axis.
-		addDrive("lead-screw", "carriage-slide", "coupling", Drive.LeadScrew("screw", 1), transmission.linearOffset);
+		addTransmission("lead-screw", "carriage-slide", "coupling", Transmission.LeadScrew("screw", "leadNut"), Same, transmission.linearOffset);
 		addMate("nut-carriage", "fixed", "carriage", "nutMount", "leadNut", "mountFace");
 		exposeConnector("motorShaft", "motor", "shaftTip");
 		exposeConnector("carriageBore", "carriage", "bore");

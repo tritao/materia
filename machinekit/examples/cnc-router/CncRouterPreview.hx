@@ -134,8 +134,8 @@ class CncRouterChecks {
 
 		// Each screw's turn is a lead-screw drive, so its thread sets the ratio.
 		for (screw in ["screwX", "screwYLeft", "screwYRight", "screwZ"]) {
-			var drive = router.drive(screw + "-lead");
-			if (drive == null || drive.kind != "lead-screw" || drive.members[0] != screw)
+			var drive = router.transmissionFor(screw + "-lead");
+			if (drive == null || !switch drive.source { case LeadScrew(id, nut): id == screw && nut == null; default: false; })
 				throw '$screw should turn through a lead-screw drive';
 		}
 		// Each shaft coupling turns inside its mount's pilot bore, clear of the motor and the mount.
@@ -199,7 +199,7 @@ class CncRouterChecks {
 			// Turning by about moves a point straight below the axis by about x (0, 0, -1) = (-about.y, about.x, 0).
 			var about = joint.axis;
 			var along = -about.y * pulley.direction[0] + about.x * pulley.direction[1];
-			near(drive.alignment, along, '${pulley.id} turns the way its lower strand moves', 1e-9);
+			near(machinekit.assembly.Sense.SenseTools.sign(drive.sense), along, '${pulley.id} turns the way its lower strand moves', 1e-9);
 		}
 		var positions = [[150.0, 150, 0], [0.0, 0, 0], [300.0, 300, -80], [0.0, 300, -80], [300.0, 0, -40], [37.5, 212, -12.5]];
 		for (position in positions) {
@@ -215,7 +215,7 @@ class CncRouterChecks {
 			for (pulley in pulleys) {
 				var drive = beltDrive(router, pulley.id);
 				var turned = state.joint(pulley.id + "-turn");
-				near(turned, drive.alignment * position[pulley.axis] / radius, '${pulley.id} turns travel over its pitch radius', 1e-9);
+				near(turned, machinekit.assembly.Sense.SenseTools.sign(drive.sense) * position[pulley.axis] / radius, '${pulley.id} turns travel over its pitch radius', 1e-9);
 			}
 			near(state.joint("screwZ-turn"), Math.PI * position[2], "Z still turns its screw", 1e-9);
 		}
@@ -261,10 +261,10 @@ class CncRouterChecks {
 		Sys.println('cnc router belts: ${report.join("; ")}');
 	}
 
-	static function beltDrive(router:CncRouter, pulley:String):machinekit.assembly.MachineAssemblyDescription.DriveRecord {
-		var drive = router.drive(pulley + "-belt");
+	static function beltDrive(router:CncRouter, pulley:String):machinekit.assembly.MachineAssemblyDescription.TransmissionRecord {
+		var drive = router.transmissionFor(pulley + "-belt");
 		if (drive == null) throw '$pulley should turn through a belt drive';
-		if (drive.kind != "belt" || drive.members[0] != pulley) throw '$pulley should turn through a belt drive';
+		if (!switch drive.source { case TimingBelt(_, id, _): id == pulley; default: false; }) throw '$pulley should turn through a belt drive';
 		return drive;
 	}
 

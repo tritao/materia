@@ -2,13 +2,15 @@ import cadkit.modeling.Location;
 import cadkit.modeling.Part;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
-import machinekit.assembly.Drive;
+import machinekit.assembly.Transmission;
 import machinekit.assembly.MachineAssembly;
 import machinekit.component.ComponentDetail;
 import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 import machinekit.motion.LeadScrew;
+import machinekit.assembly.Transmission;
+import machinekit.assembly.Sense.SenseTools;
 import machinekit.motion.LeadScrewThread;
 import machinekit.motion.LeadScrewThread.LeadScrewThreadFamily;
 import machinekit.motion.ScrewSupport;
@@ -666,7 +668,8 @@ class CncRouter extends MachineAssembly {
 		attach(id, screw, pose, couplingId);
 		// The screw's thread sets the ratio; the joint starts where the axis puts it.
 		var alongAxis = along[0] * axisDirection[0] + along[1] * axisDirection[1] + along[2] * axisDirection[2];
-		var ratio = addDrive('$id-lead', axis.id, '$id-turn', LeadScrew(id, alongAxis));
+		var ratio = addTransmission('$id-lead', axis.id, '$id-turn', Transmission.LeadScrew(id, null),
+			SenseTools.fromAlignment(alongAxis));
 		addMateOnAxis('$id-turn', "continuous", motor, 'to-$couplingId', couplingId, 'attach-$couplingId',
 			{x: along[0], y: along[1], z: along[2]}, ratio * axis.initial);
 		// The motor holds the screw's input end through the coupling. Nothing holds the far end, and the
@@ -695,10 +698,12 @@ class CncRouter extends MachineAssembly {
 	 * counter-clockwise about `about` as the carriage moves positively.
 	 */
 	function turnWithBelt(axis:RouterAxisSpec, id:String, parent:String, about:Array<Float>, rotation:Int,
-			?driven:TimingBelt):Void {
-		var ratio = addDrive('$id-belt', axis.id, '$id-turn', Belt(id, rotation));
+			beltId:String, driving:Bool = false):Void {
+		var ratio = addTransmission('$id-belt', axis.id, '$id-turn', Transmission.TimingBelt(beltId, id, 0),
+			SenseTools.fromAlignment(rotation));
+		var driven:TimingBelt = cast component(beltId);
 		// The belt's stretch is in the driving pulley's drive: its idler only follows.
-		if (driven != null) setDriveStiffness('$id-belt', driven.carriageStiffness(0));
+		if (driving) setTransmissionStiffness('$id-belt', driven.carriageStiffness(0));
 		addMateOnAxis('$id-turn', "continuous", parent, 'to-$id', id, 'attach-$id', {x: about[0], y: about[1], z: about[2]},
 			ratio * axis.initial);
 	}
@@ -730,13 +735,13 @@ class CncRouter extends MachineAssembly {
 		attach("beltX", belt, plane, "beamUpper");
 		var turn = belt.rotation(0, 0, -1, 0);
 		hang("pulleyX", beltPulley(), plane, "motorX");
-		turnWithBelt(specs[0], "pulleyX", "motorX", [0, 1, 0], turn, belt);
+		turnWithBelt(specs[0], "pulleyX", "motorX", [0, 1, 0], turn, "beltX", true);
 		var idlerPlate = AssemblyFrames.translation(-xm, plateY, plateZ);
 		attach("idlerPlateX", new RouterPlate(60, BELT_PLATE, 64, "aluminium 6061", "Idler plate"), idlerPlate, "beamUpper");
 		attach("axleX", new BeltAxle(motorY.variant.shaftDiameter, shaft - BELT_PLATE), orient(-xm, yb + 20, X_SCREW_Z, up, [0, -1, 0]),
 			"idlerPlateX");
 		hang("idlerX", beltPulley(), orient(-xm, tip, X_SCREW_Z, up, [0, 1, 0]), "axleX");
-		turnWithBelt(specs[0], "idlerX", "axleX", [0, 1, 0], belt.rotation(1, 0, -1, 0));
+		turnWithBelt(specs[0], "idlerX", "axleX", [0, 1, 0], belt.rotation(1, 0, -1, 0), "beltX");
 		addMotor("motorX", "pulleyX-turn", "motorX", SUPPLY_VOLTS);
 	}
 
@@ -759,13 +764,13 @@ class CncRouter extends MachineAssembly {
 		var plane = orient(s * Y_BELT_X + BELT_WIDTH / 2, end, Y_SCREW_Z, up, [-1, 0, 0]);
 		place('beltY$name', belt, plane);
 		hang('pulleyY$name', beltPulley(), plane, 'motorY$name');
-		turnWithBelt(specs[1], 'pulleyY$name', 'motorY$name', [-1, 0, 0], belt.rotation(0, 0, -1, 0), belt);
+		turnWithBelt(specs[1], 'pulleyY$name', 'motorY$name', [-1, 0, 0], belt.rotation(0, 0, -1, 0), 'beltY$name', true);
 		var idlerPlate = AssemblyFrames.translation(plateX, -end, 0);
 		place('idlerPlateY$name', new RouterPlate(BELT_PLATE, 60, 60, "aluminium 6061", "Idler plate"), idlerPlate);
 		attach('axleY$name', new BeltAxle(motorY.variant.shaftDiameter, shaft - BELT_PLATE),
 			orient(s * (inner + shaft - BELT_PLATE), -end, Y_SCREW_Z, up, [-s, 0, 0]), 'idlerPlateY$name');
 		hang('idlerY$name', beltPulley(), orient(s * Y_BELT_X + BELT_WIDTH / 2, -end, Y_SCREW_Z, up, [-1, 0, 0]), 'axleY$name');
-		turnWithBelt(specs[1], 'idlerY$name', 'axleY$name', [-1, 0, 0], belt.rotation(1, 0, -1, 0));
+		turnWithBelt(specs[1], 'idlerY$name', 'axleY$name', [-1, 0, 0], belt.rotation(1, 0, -1, 0), 'beltY$name');
 		addMotor('motorY$name', 'pulleyY$name-turn', 'motorY$name', SUPPLY_VOLTS);
 	}
 

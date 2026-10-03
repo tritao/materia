@@ -1,5 +1,6 @@
 import cadkit.modeling.Part;
-import machinekit.assembly.Drive;
+import machinekit.assembly.Transmission;
+import machinekit.assembly.Sense.SenseTools;
 import machinekit.assembly.MachineAssembly;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;
@@ -170,7 +171,7 @@ class CoreXyPlotter extends MachineAssembly {
 						AssemblyFrames.translation(wrap.x, wrap.y, BASE_TOP), "base");
 				}
 				hang(id, beltPulley(), pose, parent);
-				turnWithBelt(id, parent, belt, wrap, true);
+				turnWithBelt(id, parent, 'belt$letter', belt, wrap, true);
 			}
 		}
 
@@ -196,7 +197,7 @@ class CoreXyPlotter extends MachineAssembly {
 				attach(pin, new PlotterPin(motor.variant.shaftDiameter, pinLength - (bracketBase + 6 - BASE_TOP), "Idler pin"),
 					AssemblyFrames.translation(wrap.x, wrap.y, bracketBase + 6), wrap.x < 0 ? "bracketLeft" : "bracketRight");
 				hang(id, beltPulley(), AssemblyFrames.translation(wrap.x, wrap.y, level), pin);
-				turnWithBelt(id, pin, belts[b], wrap, false);
+				turnWithBelt(id, pin, 'belt$letter', belts[b], wrap, false);
 			}
 		}
 
@@ -243,13 +244,14 @@ class CoreXyPlotter extends MachineAssembly {
 	 * on frame follows both axes and one on the gantry only x. The pulley turns the way its belt goes
 	 * round it (`BeltWrap.side`).
 	 */
-	function turnWithBelt(id:String, parent:String, belt:TimingBelt, wrap:BeltWrap, onFrame:Bool):Void {
+	function turnWithBelt(id:String, parent:String, beltId:String, belt:TimingBelt, wrap:BeltWrap, onFrame:Bool):Void {
 		var strands = belt.strands();
 		var signs = [sign(strands[0].dx)];
 		if (onFrame) signs.push(sign(strands[1].dy));
 		var axes = ["x", "y"];
 		for (index in 0...signs.length)
-			addDrive('$id-${axes[index]}', axes[index], '$id-turn', Belt(id, wrap.side * signs[index]));
+			addTransmission('$id-${axes[index]}', axes[index], '$id-turn', Transmission.TimingBelt(beltId, id, 0),
+				SenseTools.fromAlignment(wrap.side * signs[index]));
 		addMateOnAxis('$id-turn', "continuous", parent, 'to-$id', id, 'attach-$id', {x: 0, y: 0, z: 1}, 0);
 	}
 

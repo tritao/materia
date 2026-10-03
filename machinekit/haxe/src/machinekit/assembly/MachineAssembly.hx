@@ -62,6 +62,7 @@ private typedef MutableIncludedRecord = {var id:String; var pose:AssemblyFrame; 
 
 /** Reusable, prefixable assembly made from MachineComponents and named connector references. */
 class MachineAssembly {
+	public static inline var SCHEMA_VERSION:Int = 3;
 	final members:Array<AssemblyMember> = [];
 	final mechanical:AssemblyDefinition = {schemaVersion: AssemblyDefinitionCodec.VERSION,
 		id: "assembly", lengthUnit: "mm", definitions: [], occurrences: [], joints: [], couplings: []};
@@ -76,7 +77,7 @@ class MachineAssembly {
 	final memberConnectorFrames:Array<{instanceId:String, name:String, frame:AssemblyFrame}> = [];
 	final nestedEntries:Array<MutableIncludedRecord> = [];
 	/** Couplings whose ratio their parts set, by coupling id. */
-	final drives:Array<machinekit.assembly.MachineAssemblyDescription.DriveRecord> = [];
+	final transmissions:Array<machinekit.assembly.MachineAssemblyDescription.TransmissionRecord> = [];
 	/** Motors driving joints, by actuator id. */
 	final motors:Array<machinekit.assembly.MachineAssemblyDescription.MotorRecord> = [];
 	/** Encoders reading joints, by encoder id. */
@@ -151,7 +152,7 @@ class MachineAssembly {
 			fromInstance: connection.fromInstance, fromPort: connection.fromPort,
 			toInstance: connection.toInstance, toPort: connection.toPort}];
 		savedConnections.sort((a, b) -> Reflect.compare(a.id, b.id));
-		return {schemaVersion: 2, mechanical: FrozenAssemblyDefinitions.freeze(mechanical), machine: {
+		return {schemaVersion: SCHEMA_VERSION, mechanical: FrozenAssemblyDefinitions.freeze(mechanical), machine: {
 			members: sources,
 			ports: savedPorts,
 			included: [for (entry in nestedEntries) {id: entry.id, pose: copyFrame(entry.pose),
@@ -164,10 +165,10 @@ class MachineAssembly {
 			memberConnectors: [for (entry in memberConnectorFrames) {instanceId: entry.instanceId,
 				name: entry.name, frame: copyFrame(entry.frame)}],
 			tools: emptyTools,
-			drives: {
-				var saved = [for (drive in drives) copyDrive(drive, "")];
+			transmissions: {
+				var saved = [for (transmission in transmissions) copyTransmission(transmission, "")];
 				saved.sort((a, b) -> Reflect.compare(a.coupling, b.coupling));
-				// Left out when empty, so descriptions without drives keep their saved form.
+				// Left out when empty, so descriptions without transmissions keep their saved form.
 				saved.length == 0 ? null : saved;
 			},
 			motors: {
@@ -232,12 +233,20 @@ class MachineAssembly {
 			case _:
 		}
 
-	public static function decode(text:String):MachineAssembly
+	public static function decode(text:String):MachineAssembly {
+		var version:machinekit.assembly.MachineAssemblyDescription.DescriptionVersion = JsonWire.decode(text);
+		checkDescriptionVersion(version.schemaVersion);
 		return fromDescription(JsonWire.decode(text));
+	}
+
+	static function checkDescriptionVersion(version:Null<Int>):Void {
+		if (version != SCHEMA_VERSION) throw 'Machine assembly schema v$version is unsupported; expected v$SCHEMA_VERSION typed transmissions';
+	}
 
 	/** Rebuild through registered recipes; no component object is stored in the description. */
 	public static function fromDescription(description:MachineAssemblyDescription):MachineAssembly {
 		if (description == null || description.machine == null) throw "Missing machine assembly description";
+		checkDescriptionVersion(description.schemaVersion);
 		var savedMechanical = FrozenAssemblyDefinitions.thaw(description.mechanical);
 		AssemblyDefinitionCodec.validate(savedMechanical);
 		var mechanical = AssemblyDefinitionFlattener.flatten(savedMechanical);
@@ -284,9 +293,9 @@ class MachineAssembly {
 		if (mechanical.couplings != null) for (coupling in mechanical.couplings)
 			result.addCoupling(coupling.id, coupling.source, coupling.target, coupling.ratio, coupling.offset);
 		// A driven coupling's ratio comes from its parts as they are now, not as they were saved.
-		// The coupling decides whether there is one: a drive whose coupling was removed goes too.
-		if (description.machine.drives != null) for (drive in description.machine.drives)
-			if (result.applyDrive(drive)) result.drives.push(copyDrive(drive, ""));
+		// The coupling decides whether there is one: a transmission whose coupling was removed goes too.
+		if (description.machine.transmissions != null) for (transmission in description.machine.transmissions)
+			if (result.applyTransmission(transmission)) result.transmissions.push(copyTransmission(transmission, ""));
 		// Motors too: their actuators follow the motor parts as they are now.
 		if (description.machine.motors != null) for (motor in description.machine.motors)
 			result.addMotorRecord(copyMotor(motor, ""));
@@ -349,18 +358,18 @@ class MachineAssembly {
 			child.addEncoderRecord({encoder: encoder.encoder.substr(prefix.length), joint: encoder.joint.substr(prefix.length),
 				part: encoder.part.substr(prefix.length),
 				actuator: encoder.actuator == null ? null : encoder.actuator.substr(prefix.length)});
-		for (drive in drives) if (StringTools.startsWith(drive.coupling, prefix))
+		for (transmission in transmissions) if (StringTools.startsWith(transmission.coupling, prefix))
 			{
-				var record:machinekit.assembly.MachineAssemblyDescription.DriveRecord = {coupling: drive.coupling.substr(prefix.length), kind: drive.kind,
-					members: [for (member in drive.members) member.substr(prefix.length)],
-					alignment: drive.alignment, leaderZero: drive.leaderZero};
-				record.stiffness = drive.stiffness;
-				record.backlash = drive.backlash;
-				record.drag = drive.drag;
-				record.nearSupport = drive.nearSupport;
-				record.farSupport = drive.farSupport;
-				record.unsupported = drive.unsupported;
-				child.drives.push(record);
+				var record:machinekit.assembly.MachineAssemblyDescription.TransmissionRecord = {coupling: transmission.coupling.substr(prefix.length),
+					source: machinekit.transmission.TransmissionResolver.mapSource(transmission.source, member -> member.substr(prefix.length)),
+					sense: transmission.sense, leaderZero: transmission.leaderZero};
+				record.stiffness = transmission.stiffness;
+				record.backlash = transmission.backlash;
+				record.drag = transmission.drag;
+				record.near = transmission.near;
+				record.far = transmission.far;
+				record.unsupported = transmission.unsupported;
+				child.transmissions.push(record);
 			}
 		for (connection in portConnections) if (StringTools.startsWith(connection.id, prefix) &&
 			StringTools.startsWith(connection.fromInstance, prefix) &&
@@ -384,7 +393,7 @@ class MachineAssembly {
 		target.mechanical.occurrences = copy.occurrences;
 		target.mechanical.joints = copy.joints;
 		target.mechanical.couplings = copy.couplings;
-		for (drive in drives) target.drives.push(copyDrive(drive, ""));
+		for (transmission in transmissions) target.transmissions.push(copyTransmission(transmission, ""));
 		for (motor in motors) target.motors.push(copyMotor(motor, ""));
 		for (encoder in encoders) target.encoders.push(copyEncoder(encoder, ""));
 		if (mechanical.encoders != null) target.mechanical.encoders = [for (encoder in mechanical.encoders)
@@ -622,7 +631,7 @@ class MachineAssembly {
 		if (assembly.mechanical.couplings != null) for (coupling in assembly.mechanical.couplings)
 			addCoupling(join(id, coupling.id), join(id, coupling.source), join(id, coupling.target),
 				coupling.ratio, coupling.offset, coupling.efficiency);
-		for (drive in assembly.drives) drives.push(copyDrive(drive, id));
+		for (transmission in assembly.transmissions) transmissions.push(copyTransmission(transmission, id));
 		for (motor in assembly.motors) addMotorRecord(copyMotor(motor, id));
 		for (encoder in assembly.encoders) addEncoderRecord(copyEncoder(encoder, id));
 		for (connection in assembly.portConnections)
@@ -671,93 +680,79 @@ class MachineAssembly {
 			axis: axis, limits: resolvedLimits(limits), defaultValue: 0}, tolerance);
 
 	/**
-	 * Couple joint `follower` to `leader` through the parts of `drive`, which set the ratio: the
+	 * Couple joint `follower` to `leader` through the parts of `source`, which set the ratio: the
 	 * follower sits at zero where the leader is at `leaderZero`. Rebuilding the assembly from its
 	 * description works the ratio out again from the parts' values then. Returns the ratio.
 	 */
-	public function addDrive(id:String, leader:String, follower:String, drive:Drive, leaderZero:Float = 0):Float {
-		var record:machinekit.assembly.MachineAssemblyDescription.DriveRecord = switch drive {
-			case LeadScrew(screw, alignment): {coupling: id, kind: "lead-screw", members: [screw],
-				alignment: alignment, leaderZero: leaderZero};
-			case GearMesh(driver, driven, alignment): {coupling: id, kind: "gear-mesh", members: [driver, driven],
-				alignment: alignment, leaderZero: leaderZero};
-			case RackAndPinion(pinion, alignment): {coupling: id, kind: "rack-and-pinion", members: [pinion],
-				alignment: alignment, leaderZero: leaderZero};
-			case Belt(pulley, alignment): {coupling: id, kind: "belt", members: [pulley],
-				alignment: alignment, leaderZero: leaderZero};
-		};
+	public function addTransmission(id:String, leader:String, follower:String, source:Transmission,
+			sense:Sense = Same, leaderZero:Float = 0):Float {
+		var record:machinekit.assembly.MachineAssemblyDescription.TransmissionRecord = {
+			coupling: id, source: source, sense: sense, leaderZero: leaderZero};
 		var relation = machinekit.transmission.TransmissionResolver.resolve(record, requireMember);
 		var ratio = relation.ratio;
 		addCoupling(id, leader, follower, ratio, -ratio * leaderZero, relation.efficiency);
-		writeDrive(record, relation);
-		drives.push(record);
+		writeTransmission(record, relation);
+		transmissions.push(record);
 		return ratio;
 	}
 
 	/**
-	 * Gives drive `id` the stiffness of its belt or other compliant link, in N per unit of the leader's
+	 * Gives transmission `id` the stiffness of its belt or other compliant link, in N per unit of the leader's
 	 * travel (N/mm for a machine axis); without it the drive is rigid. A belt's comes from
-	 * `TimingBelt.carriageStiffness`. It is kept with the drive, but is not worked out again from
+	 * `TimingBelt.carriageStiffness`. It is kept with the transmission, but is not worked out again from
 	 * the belt when the assembly is rebuilt.
 	 */
-	public function setDriveStiffness(id:String, stiffness:Float):Void {
-		if (!(stiffness > 0) || !Math.isFinite(stiffness)) throw 'Drive "$id" needs a positive stiffness';
-		for (entry in drives) if (entry.coupling == id) {
+	public function setTransmissionStiffness(id:String, stiffness:Float):Void {
+		if (!(stiffness > 0) || !Math.isFinite(stiffness)) throw 'Transmission "$id" needs a positive stiffness';
+		for (entry in transmissions) if (entry.coupling == id) {
 			entry.stiffness = stiffness;
-			applyDrive(entry);
+			applyTransmission(entry);
 			return;
 		}
-		throw 'No drive "$id"';
+		throw 'No transmission "$id"';
 	}
 
 	/**
-	 * Says how the ends of lead screw drive `id` are held (`near` is the end by its motor), over
+	 * Says how the ends of lead screw transmission `id` are held (`near` is the end by its motor), over
 	 * `unsupported` mm (the whole screw by default). The screw's joint is then capped at 80% of its first
 	 * bending speed (`LeadScrew.criticalSpeed`); the cap flows through `RobotModel.coupledLimits` to
 	 * its axis. Call it once the screw's joint exists. Returns the cap in rad/s.
 	 */
 	public function supportScrew(id:String, near:machinekit.motion.ScrewSupport, far:machinekit.motion.ScrewSupport,
 			?unsupported:Float):Float {
-		for (entry in drives) if (entry.coupling == id) {
-			if (entry.kind != "lead-screw") throw 'Drive "$id" is not a lead screw';
-			entry.nearSupport = supportName(near);
-			entry.farSupport = supportName(far);
+		for (entry in transmissions) if (entry.coupling == id) {
+			if (!switch entry.source { case LeadScrew(_, _): true; default: false; }) throw 'Transmission "$id" is not a lead screw';
+			entry.near = near;
+			entry.far = far;
 			entry.unsupported = unsupported;
 			var relation = machinekit.transmission.TransmissionResolver.resolve(entry, requireMember);
-			writeDrive(entry, relation);
+			writeTransmission(entry, relation);
 			var cap = relation.followerSpeedCap;
-			if (cap == null) throw 'Drive "$id" has no supports';
+			if (cap == null) throw 'Transmission "$id" has no supports';
 			return cap;
 		}
-		throw 'No drive "$id"';
+		throw 'No transmission "$id"';
 	}
 
-	static function supportName(support:machinekit.motion.ScrewSupport):String
-		return switch support {
-			case Free: "free";
-			case Simple: "simple";
-			case Fixed: "fixed";
-		};
-
-	/** The drive behind coupling `id`, or null when its ratio is a plain number. */
-	public function drive(id:String):Null<machinekit.assembly.MachineAssemblyDescription.DriveRecord> {
-		for (entry in drives) if (entry.coupling == id) return copyDrive(entry, "");
+	/** The transmission behind coupling `id`, or null when its ratio is a plain number. */
+	public function transmissionFor(id:String):Null<machinekit.assembly.MachineAssemblyDescription.TransmissionRecord> {
+		for (entry in transmissions) if (entry.coupling == id) return copyTransmission(entry, "");
 		return null;
 	}
 
-	/** Recompute all derived coupling data together from the drive's parts. */
-	function applyDrive(drive:machinekit.assembly.MachineAssemblyDescription.DriveRecord):Bool {
-		if (mechanical.couplings != null) for (coupling in mechanical.couplings) if (coupling.id == drive.coupling) {
-			return writeDrive(drive, machinekit.transmission.TransmissionResolver.resolve(drive, requireMember));
+	/** Recompute all derived coupling data together from the transmission's parts. */
+	function applyTransmission(transmission:machinekit.assembly.MachineAssemblyDescription.TransmissionRecord):Bool {
+		if (mechanical.couplings != null) for (coupling in mechanical.couplings) if (coupling.id == transmission.coupling) {
+			return writeTransmission(transmission, machinekit.transmission.TransmissionResolver.resolve(transmission, requireMember));
 		}
 		return false;
 	}
 
-	function writeDrive(drive:machinekit.assembly.MachineAssemblyDescription.DriveRecord,
+	function writeTransmission(transmission:machinekit.assembly.MachineAssemblyDescription.TransmissionRecord,
 			relation:machinekit.transmission.TransmissionRelation):Bool {
-		if (mechanical.couplings != null) for (coupling in mechanical.couplings) if (coupling.id == drive.coupling) {
+		if (mechanical.couplings != null) for (coupling in mechanical.couplings) if (coupling.id == transmission.coupling) {
 			coupling.ratio = relation.ratio;
-			coupling.offset = -relation.ratio * drive.leaderZero;
+			coupling.offset = -relation.ratio * transmission.leaderZero;
 			coupling.efficiency = relation.efficiency;
 			coupling.stiffness = relation.stiffness;
 			coupling.backlash = relation.backlash;
@@ -846,18 +841,18 @@ class MachineAssembly {
 		return copy;
 	}
 
-	static function copyDrive(drive:machinekit.assembly.MachineAssemblyDescription.DriveRecord,
-			prefix:String):machinekit.assembly.MachineAssemblyDescription.DriveRecord
+	static function copyTransmission(transmission:machinekit.assembly.MachineAssemblyDescription.TransmissionRecord,
+			prefix:String):machinekit.assembly.MachineAssemblyDescription.TransmissionRecord
 	{
-		var copy:machinekit.assembly.MachineAssemblyDescription.DriveRecord = {coupling: join(prefix, drive.coupling), kind: drive.kind,
-			members: [for (member in drive.members) join(prefix, member)], alignment: drive.alignment,
-			leaderZero: drive.leaderZero};
-		copy.stiffness = drive.stiffness;
-		copy.backlash = drive.backlash;
-		copy.drag = drive.drag;
-		copy.nearSupport = drive.nearSupport;
-		copy.farSupport = drive.farSupport;
-		copy.unsupported = drive.unsupported;
+		var copy:machinekit.assembly.MachineAssemblyDescription.TransmissionRecord = {coupling: join(prefix, transmission.coupling),
+			source: machinekit.transmission.TransmissionResolver.mapSource(transmission.source, member -> join(prefix, member)), sense: transmission.sense,
+			leaderZero: transmission.leaderZero};
+		copy.stiffness = transmission.stiffness;
+		copy.backlash = transmission.backlash;
+		copy.drag = transmission.drag;
+		copy.near = transmission.near;
+		copy.far = transmission.far;
+		copy.unsupported = transmission.unsupported;
 		return copy;
 	}
 

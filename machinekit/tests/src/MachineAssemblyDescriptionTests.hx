@@ -24,7 +24,8 @@ import machinekit.transmission.SpurGear;
 import machinekit.assembly.FlangeBearingAssembly;
 import machinekit.standard.DeepGrooveBearing;
 import machinekit.assembly.LinearAxis;
-import machinekit.assembly.Drive;
+import machinekit.assembly.Transmission;
+import machinekit.assembly.Sense;
 import machinekit.assembly.DriveDefaults;
 import machinekit.motion.ScrewSupport;
 import machinekit.transmission.TimingBelt;
@@ -33,6 +34,7 @@ import machinekit.assembly.MachineAssemblyDescription;
 import machinekit.assembly.MachineAssemblyDescription.MemberSource;
 import machinekit.assembly.MachineAssemblyDescription.SavedValue;
 import machinekit.motion.LeadScrew;
+import machinekit.motion.LeadScrewNut;
 import machinekit.motion.LeadScrewThread;
 import machinekit.transmission.TimingPulley;
 import machinekit.transmission.TimingBeltProfile;
@@ -156,9 +158,9 @@ class MachineAssemblyDescriptionTests {
 		includedConnectorRuntime();
 		suctionInterfaceRoundTrip();
 		documentRoundTrip();
-		drivesFollowTheirParts();
+		transmissionsFollowTheirParts();
 		motorsDriveJoints();
-		drivesCarryAllowances();
+		transmissionsCarryAllowances();
 		changerDocumentRoundTrip();
 		fullEoatDocumentRoundTrip();
 		documentEditsAndUndo();
@@ -254,12 +256,39 @@ class MachineAssemblyDescriptionTests {
 	}
 
 	/** A coupling's ratio comes from the parts that drive it, so editing a part changes it. */
-	static function drivesFollowTheirParts():Void {
+	static function transmissionsFollowTheirParts():Void {
+		var oldRejected = false;
+		var oldVersion:machinekit.assembly.MachineAssemblyDescription.DescriptionVersion = {schemaVersion: 2};
+		var oldText = haxeon.wire.JsonWire.encode(oldVersion);
+		try MachineAssembly.decode(oldText) catch (error:Dynamic)
+			oldRejected = Std.string(error).indexOf("expected v3 typed transmissions") >= 0;
+		if (!oldRejected) throw "The v2 string transmission schema needs a clear rejection";
+		var sources:Array<Transmission> = [Transmission.LeadScrew("screw", "nut"),
+			Transmission.GearMesh("driver", "driven"), Transmission.RackAndPinion("pinion", null),
+			Transmission.TimingBelt("belt", "pulley", 0), Transmission.RollerChain(null, "sprocket")];
+		for (source in sources) {
+			var record:machinekit.assembly.MachineAssemblyDescription.TransmissionRecord = {
+				coupling: "term", source: source, sense: Opposite, leaderZero: 10};
+			var saved = haxeon.wire.JsonWire.encode(record);
+			var restored:machinekit.assembly.MachineAssemblyDescription.TransmissionRecord = haxeon.wire.JsonWire.decode(saved);
+			if (!Equality.equals(record, restored)) throw "A typed transmission lost its source or sense on the wire";
+			var mapped = machinekit.transmission.TransmissionResolver.mapSource(source, id -> "unit/" + id);
+			if (Equality.equals(source, mapped)) throw "An included transmission lost its member prefix";
+		}
+		var sprocket = machinekit.transmission.Sprocket.forChain("ANSI25", 20, 5, 8);
+		var chainRecord:machinekit.assembly.MachineAssemblyDescription.TransmissionRecord = {
+			coupling: "chain", source: Transmission.RollerChain(null, "sprocket"), sense: Opposite, leaderZero: 0};
+		var chainRelation = machinekit.transmission.TransmissionResolver.resolve(chainRecord, id -> sprocket);
+		if (Math.abs(chainRelation.ratio + 2 / sprocket.pitchDiameter) > 1e-12 || chainRelation.efficiency != 0.97)
+			throw "Splitting chains from belts must preserve the relation in T2";
+
 		var assembly = new MachineAssembly();
 		assembly.addComponent("base", new RobotFlange(50));
 		assembly.addComponent("slider", new RobotFlange(50));
 		assembly.addComponent("screw", new LeadScrew(new LeadScrewThread(MetricTrapezoidal, 10, 2), 100));
+		assembly.addComponent("nut", new LeadScrewNut(new LeadScrewThread(MetricTrapezoidal, 10, 2)));
 		assembly.addComponent("pulley", new TimingPulley(TimingBeltProfile.GT2, 20, 5, 8));
+		assembly.addComponent("belt-part", TimingBelt.twoPulley(GT2, 20, 20, 444, 6));
 		assembly.addComponent("driver", new SpurGear(1, 20, 6));
 		assembly.addComponent("driven", new SpurGear(1, 40, 6));
 		assembly.addMateOnAxis("slide", "prismatic", "base", "face", "slider", "face", {x: 0, y: 1, z: 0}, 10);
@@ -267,9 +296,9 @@ class MachineAssemblyDescriptionTests {
 			assembly.addMateOnAxis('$turning-turn', "continuous", "base", "face", turning,
 				turning == "screw" ? "input" : "axis", {x: 0, y: 1, z: 0});
 		// A right-hand Tr10 x 2 screw: one turn moves its nut 2 mm back along the screw, from 10 mm.
-		var lead = assembly.addDrive("lead", "slide", "screw-turn", Drive.LeadScrew("screw", 1), 10);
-		var belt = assembly.addDrive("belt", "slide", "pulley-turn", Drive.Belt("pulley", -1), 10);
-		var mesh = assembly.addDrive("mesh", "driver-turn", "driven-turn", Drive.GearMesh("driver", "driven", 1));
+		var lead = assembly.addTransmission("lead", "slide", "screw-turn", Transmission.LeadScrew("screw", "nut"), Same, 10);
+		var belt = assembly.addTransmission("belt", "slide", "pulley-turn", Transmission.TimingBelt("belt-part", "pulley", 0), Opposite, 10);
+		var mesh = assembly.addTransmission("mesh", "driver-turn", "driven-turn", Transmission.GearMesh("driver", "driven"));
 		function near(actual:Float, expected:Float, what:String):Void
 			if (!(Math.abs(actual - expected) < 1e-12)) throw '$what: $actual, expected $expected';
 		near(lead, -Math.PI, "a 2 mm right-hand lead turns the screw -pi rad per mm");
@@ -283,11 +312,11 @@ class MachineAssemblyDescriptionTests {
 		near(ratio(assembly, "lead").offset, 10 * Math.PI, "the screw is at zero where the slide is at 10 mm");
 		// Saved, then rebuilt with a 4 mm pitch: the ratio follows the thread, not the saved number.
 		var description = assembly.describe();
-		var drives = description.machine.drives;
-		if (drives == null || drives.length != 3) throw "The description lost its drives";
-		var leadDrive = assembly.drive("lead");
+		var transmissions = description.machine.transmissions;
+		if (transmissions == null || transmissions.length != 3) throw "The description lost its transmissions";
+		var leadDrive = assembly.transmissionFor("lead");
 		if (leadDrive == null) throw "The assembly lost its lead screw drive";
-		if (leadDrive.kind != "lead-screw" || leadDrive.members[0] != "screw")
+		if (!switch leadDrive.source { case LeadScrew(screw, nut): screw == "screw" && nut == "nut"; default: false; })
 			throw "The lead screw drive names its screw";
 		var edited:MachineAssemblyDescription = haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(description));
 		edited.machine.members = [for (member in edited.machine.members) member.occurrence != "screw" ? member :
@@ -316,7 +345,7 @@ class MachineAssemblyDescriptionTests {
 	}
 
 	/** A drive's allowances: a screw's critical speed, its nut's backlash and drag, a belt's stiffness. */
-	static function drivesCarryAllowances():Void {
+	static function transmissionsCarryAllowances():Void {
 		function near(actual:Float, expected:Float, what:String, tolerance:Float = 1e-9):Void
 			if (!(Math.abs(actual - expected) <= tolerance * Math.max(1, Math.abs(expected)))) throw '$what: $actual, expected $expected';
 		var thread = new LeadScrewThread(MetricTrapezoidal, 10, 2);
@@ -337,9 +366,10 @@ class MachineAssemblyDescriptionTests {
 		assembly.addComponent("base", new RobotFlange(50));
 		assembly.addComponent("slider", new RobotFlange(50));
 		assembly.addComponent("screw", long);
+		assembly.addComponent("nut", new LeadScrewNut(thread));
 		assembly.addMateOnAxis("slide", "prismatic", "base", "face", "slider", "face", {x: 0, y: 1, z: 0});
 		assembly.addMateOnAxis("turn", "continuous", "base", "face", "screw", "input", {x: 0, y: 1, z: 0});
-		assembly.addDrive("lead", "slide", "turn", Drive.LeadScrew("screw", 1));
+		assembly.addTransmission("lead", "slide", "turn", Transmission.LeadScrew("screw", "nut"));
 		var cap = assembly.supportScrew("lead", Fixed, Free);
 		near(cap, long.criticalSpeed(Fixed, Free), "the cap is the screw's critical speed");
 		function definition(machine:MachineAssembly):materia.assembly.AssemblyDefinition {
@@ -369,8 +399,8 @@ class MachineAssemblyDescriptionTests {
 		var description:MachineAssemblyDescription = haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(assembly.describe()));
 		var again = definition(MachineAssembly.fromDescription(description));
 		near(turnLimit(again), cap, "a rebuilt screw keeps its cap");
-		var driveRecord = assembly.drive("lead");
-		if (driveRecord == null || driveRecord.nearSupport != "fixed" || driveRecord.farSupport != "free") throw "The drive records how its screw is held";
+		var driveRecord = assembly.transmissionFor("lead");
+		if (driveRecord == null || driveRecord.near != Fixed || driveRecord.far != Free) throw "The drive records how its screw is held";
 		caught = false;
 		try assembly.supportScrew("lead", Free, Free) catch (error:Dynamic) caught = true;
 		if (!caught) throw "Two free ends are refused";
@@ -380,9 +410,10 @@ class MachineAssemblyDescriptionTests {
 		near(belt.carriageStiffness(0), 2500 * 6 * (1 / 444 + 1 / (belt.length - 444)), "a belt carriage's stiffness is EA over its two free lengths");
 		near(belt.carriageStiffness(0) / TimingBelt.twoPulley(GT2, 20, 20, 444, 12).carriageStiffness(0), 0.5, "a wider belt is proportionally stiffer");
 		assembly.addComponent("pulley", new TimingPulley(GT2, 20, 8, 6));
+		assembly.addComponent("belt-part", belt);
 		assembly.addMateOnAxis("pulley-turn", "continuous", "base", "face", "pulley", "axis", {x: 0, y: 1, z: 0});
-		assembly.addDrive("belt", "slide", "pulley-turn", Drive.Belt("pulley", 1));
-		assembly.setDriveStiffness("belt", belt.carriageStiffness(0));
+		assembly.addTransmission("belt", "slide", "pulley-turn", Transmission.TimingBelt("belt-part", "pulley", 0));
+		assembly.setTransmissionStiffness("belt", belt.carriageStiffness(0));
 		var withBelt = definition(assembly);
 		var beltCoupling = withBelt.couplings[1];
 		var beltStiffness = beltCoupling.stiffness, beltDrag = beltCoupling.drag, beltBacklash = beltCoupling.backlash;
@@ -416,9 +447,10 @@ class MachineAssemblyDescriptionTests {
 		assembly.addComponent("slider", new RobotFlange(50));
 		assembly.addComponent("motor", motor);
 		assembly.addComponent("screw", new LeadScrew(thread, 100));
+		assembly.addComponent("nut", new LeadScrewNut(thread));
 		assembly.addMateOnAxis("slide", "prismatic", "base", "face", "slider", "face", {x: 0, y: 1, z: 0});
 		assembly.addMateOnAxis("turn", "continuous", "base", "face", "screw", "input", {x: 0, y: 1, z: 0});
-		assembly.addDrive("lead", "slide", "turn", Drive.LeadScrew("screw", 1));
+		assembly.addTransmission("lead", "slide", "turn", Transmission.LeadScrew("screw", "nut"));
 		assembly.addMotor("drive", "turn", "motor", 24);
 		function definition(machine:MachineAssembly):materia.assembly.AssemblyDefinition {
 			var model = new AssemblyModel("mm");

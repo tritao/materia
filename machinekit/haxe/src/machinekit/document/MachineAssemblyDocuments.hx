@@ -64,7 +64,7 @@ class MachineAssemblyDocuments {
 			portConnections: noConnections, portExposures: side.portExposures,
 			bomExtras: side.bomExtras, connectorExposures: side.connectorExposures,
 			memberConnectors: side.memberConnectors, endEffector: side.endEffector,
-			changer: side.changer, tools: side.tools, drives: side.drives, motors: side.motors
+			changer: side.changer, tools: side.tools, transmissions: side.transmissions, motors: side.motors
 		};
 		var toolRecords:Array<machinekit.assembly.MachineAssemblyDescription.ToolRecord> = [];
 		if (side.tools != null) for (tool in side.tools) {
@@ -78,6 +78,7 @@ class MachineAssemblyDocuments {
 					endEffector: tool.machine.endEffector}});
 		}
 		saved.tools = toolRecords;
+		root.setProperty(TypedProperty.text(PREFIX + "schemaVersion", Std.string(MachineAssembly.SCHEMA_VERSION)));
 		root.setProperty(TypedProperty.text(PREFIX + "side", JsonWire.encode(saved)));
 		var endpoints = new Map<String, Element>();
 		for (element in document.allElements()) if (element.kind == "instance" && belongsToCadKit(element, root)) {
@@ -198,6 +199,8 @@ class MachineAssemblyDocuments {
 	}
 
 	public static function describeAssembly(root:Element):MachineAssemblyDescription {
+		if (propertyText(root, PREFIX + "schemaVersion") != Std.string(MachineAssembly.SCHEMA_VERSION))
+			throw "Machine assembly document schema is unsupported; expected v3 typed transmissions";
 		var property = root.property(PREFIX + "side");
 		if (property == null) throw "Assembly document has no MachineKit side record";
 		var savedText:String = cast property.value;
@@ -306,7 +309,7 @@ class MachineAssemblyDocuments {
 			rows.sort((a, b) -> Reflect.compare(a.id, b.id));
 			tool.machine.portConnections = rows;
 		}
-		return {schemaVersion: 2, mechanical: machinekit.assembly.FrozenAssemblyDefinitions.freeze(AssemblyDocuments.toDefinition(root)), machine: side};
+		return {schemaVersion: MachineAssembly.SCHEMA_VERSION, mechanical: machinekit.assembly.FrozenAssemblyDefinitions.freeze(AssemblyDocuments.toDefinition(root)), machine: side};
 	}
 
 	public static function rebuildAssembly(root:Element):MachineAssembly {
