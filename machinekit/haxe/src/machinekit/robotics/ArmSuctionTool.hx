@@ -53,4 +53,3 @@ class ArmSuctionTool implements ArmTool {
 		return result;
 	}
 }
-

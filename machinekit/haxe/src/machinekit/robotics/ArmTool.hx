@@ -11,4 +11,3 @@ interface ArmTool {
 	/** Publishes the tool's connectors and the service inlets that must be supplied from outside. */
 	function expose(arm:MachineAssembly):Void;
 }
-
