@@ -290,6 +290,8 @@ class AssemblySimulationBridge {
         Transmission.SimpleTransmission(driven.id, gear / factor, -initial * factor));
       if (actuator.gearEfficiency != null) added.efficiency = actuator.gearEfficiency;
       if (actuator.assumed != null) added.assumed = [for (label in actuator.assumed) label];
+      added.microsteps = actuator.microsteps;
+      added.maxStepRate = actuator.maxStepRate;
       var steps = actuator.fullStepsPerRevolution;
       if (steps != null) added.fullStepsPerRevolution = steps;
       var inertia = actuator.rotorInertia == null ? 0.0 : actuator.rotorInertia;

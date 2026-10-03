@@ -1,3 +1,4 @@
+import machinekit.motion.MotorDriver;
 import cadkit.modeling.Part;
 import machinekit.assembly.Transmission;
 import machinekit.assembly.Sense.SenseTools;
@@ -221,8 +222,12 @@ class CoreXyPlotter extends MachineAssembly {
 		exposeConnector("penTip", "pen", "tip");
 
 		// Each stepper turns its belt's driving pulley.
-		addMotor("motorA", "pulleyA-turn", "motorA", SUPPLY_VOLTS);
-		addMotor("motorB", "pulleyB-turn", "motorB", SUPPLY_VOLTS);
+		for (entry in [{id: "A", x: -30.0}, {id: "B", x: 30.0}]) {
+			var driver = 'driver${entry.id}';
+			attach(driver, new MotorDriver("GENERIC-TMC2209", 1.68, 16, SUPPLY_VOLTS),
+				AssemblyFrames.translation(entry.x, -BASE_DEPTH / 2 + 20, BASE_TOP), "base");
+			addMotor('motor${entry.id}', 'pulley${entry.id}-turn', 'motor${entry.id}', driver);
+		}
 	}
 
 	/** Room past the travel of axis `id` before its rail block reaches the rail's end, in millimetres. */

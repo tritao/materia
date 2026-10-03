@@ -1,3 +1,4 @@
+import machinekit.motion.MotorDriver;
 import haxeon.Equality;
 import machinekit.assembly.MachineAssembly;
 import machinekit.robotics.RobotFlange;
@@ -256,12 +257,14 @@ class MachineAssemblyDescriptionTests {
 
 	/** A coupling's ratio comes from the parts that drive it, so editing a part changes it. */
 	static function transmissionsFollowTheirParts():Void {
-		var oldRejected = false;
-		var oldVersion:machinekit.assembly.MachineAssemblyDescription.DescriptionVersion = {schemaVersion: 2};
-		var oldText = haxeon.wire.JsonWire.encode(oldVersion);
-		try MachineAssembly.decode(oldText) catch (error:Dynamic)
-			oldRejected = Std.string(error).indexOf("expected v3 typed transmissions") >= 0;
-		if (!oldRejected) throw "The v2 string transmission schema needs a clear rejection";
+		for (version in [2, 3]) {
+			var oldRejected = false;
+			var oldVersion:machinekit.assembly.MachineAssemblyDescription.DescriptionVersion = {schemaVersion: version};
+			var oldText = haxeon.wire.JsonWire.encode(oldVersion);
+			try MachineAssembly.decode(oldText) catch (error:Dynamic)
+				oldRejected = Std.string(error).indexOf('expected v${MachineAssembly.SCHEMA_VERSION} typed motor drivers') >= 0;
+			if (!oldRejected) throw 'The v$version machine schema needs a clear rejection';
+		}
 		var sources:Array<Transmission> = [Transmission.LeadScrew("screw", "nut"),
 			Transmission.GearMesh("driver", "driven"), Transmission.RackAndPinion("pinion", null),
 			Transmission.TimingBelt("belt", "pulley", 0), Transmission.RollerChain(null, "sprocket")];
@@ -541,7 +544,8 @@ class MachineAssemblyDescriptionTests {
 		assembly.addMateOnAxis("slide", "prismatic", "base", "face", "slider", "face", {x: 0, y: 1, z: 0});
 		assembly.addMateOnAxis("turn", "continuous", "base", "face", "screw", "input", {x: 0, y: 1, z: 0});
 		assembly.addTransmission("lead", "slide", "turn", Transmission.LeadScrew("screw", "nut"));
-		assembly.addMotor("drive", "turn", "motor", 24);
+		assembly.addComponent("driver", new MotorDriver("GENERIC-DM542", 2.8, 16, 24));
+		assembly.addMotor("drive", "turn", "motor", "driver");
 		function definition(machine:MachineAssembly):materia.assembly.AssemblyDefinition {
 			var model = new AssemblyModel("mm");
 			machine.addTo(model, "");
@@ -568,6 +572,51 @@ class MachineAssemblyDescriptionTests {
 		near(rotor == null ? 0 : rotor, 3.0e-5, "and the rotor's inertia");
 		var steps = actuators[0].fullStepsPerRevolution;
 		near(steps == null ? 0 : steps, 200, "and 200 full steps a turn from its 1.8 degree step");
+		if (actuators[0].microsteps != 16 || actuators[0].maxStepRate != 200000)
+			throw "The actuator must carry its driver setting and step-input ceiling";
+		function driverChanged(current:Float, voltage:Float, microsteps:Int):MachineAssembly {
+			var description:MachineAssemblyDescription = haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(assembly.describe()));
+			description.machine.members = [for (member in description.machine.members) member.occurrence != "driver" ? member :
+				{occurrence: member.occurrence, material: member.material, source: switch member.source {
+					case Typed(id, values): Typed(id, [for (entry in values) {name: entry.name, value: switch entry.name {
+						case "current": SavedValue.Number(current);
+						case "voltage": SavedValue.Number(voltage);
+						case "microsteps": SavedValue.Integer(microsteps);
+						default: entry.value;
+					}}]);
+					case other: other;
+				}}];
+			return MachineAssembly.fromDescription(description);
+		}
+		var derated = actuatorsOf(definition(driverChanged(1.4, 24, 32)))[0];
+		near(derated.maxEffort, 0.315, "half driver current halves usable holding torque");
+		near(derated.maxRate, 4 * corner, "half driver current raises the reactance corner");
+		if (derated.microsteps != 32 || derated.maxStepRate != 200000)
+			throw "Editing a driver must rebuild its actuator settings";
+		var higherVoltage = actuatorsOf(definition(driverChanged(2.8, 48, 16)))[0];
+		near(higherVoltage.maxRate, 4 * corner, "driver voltage rebuilds the torque-speed curve");
+		near(higherVoltage.maxEffort, 0.63, "voltage does not change holding torque");
+		var changedCurve = robotkit.model.TorqueSpeedCurve.unflatten(derated.torqueSpeed);
+		near(changedCurve.torqueAt(0), 0.63, "the derated curve scales its holding torque");
+		near(changedCurve.torqueAt(4 * corner), 0.315, "the curve and planning limits agree after derating");
+		var prefixed = new MachineAssembly();
+		prefixed.include("unit", driverChanged(1.4, 24, 32));
+		var prefixedMotor = actuatorsOf(definition(prefixed))[0];
+		if (prefixedMotor.id != "unit/drive" || prefixedMotor.microsteps != 32)
+			throw "Included motor and driver references must retain their prefix";
+		near(prefixedMotor.maxEffort, derated.maxEffort, "inclusion resolves the same current-limited torque");
+		var rejectedDriver = false;
+		try assembly.addMotor("bad-driver", "turn", "motor", "base") catch (_:Dynamic) rejectedDriver = true;
+		if (!rejectedDriver) throw "A non-driver member cannot supply an actuator";
+		assembly.addComponent("wrong-family", new MotorDriver("GENERIC-SERVO-AMP", 1, 1, 24));
+		rejectedDriver = false;
+		try assembly.addMotor("bad-family", "turn", "motor", "wrong-family") catch (error:Dynamic)
+			rejectedDriver = Std.string(error).indexOf("different drive families") >= 0;
+		if (!rejectedDriver) throw "Motor and driver families must match";
+		rejectedDriver = false;
+		try driverChanged(3, 24, 16) catch (_:Dynamic) rejectedDriver = true;
+		if (!rejectedDriver) throw "Driver current above the motor's rating must be rejected";
+		if (actuatorsOf(definition(assembly)).length != 1) throw "Rejected bindings must leave the original actuator intact";
 		near(efficiencyOf(built), thread.efficiency(), "the lead screw's coupling carries its efficiency");
 		var stepper = actuators[0];
 		if (stepper.drive != "stepper") throw "A NEMA motor's actuator is a stepper drive";
@@ -586,28 +635,41 @@ class MachineAssemblyDescriptionTests {
 		servoMachine.addComponent("base", new RobotFlange(50));
 		servoMachine.addComponent("servo", new TestServo());
 		servoMachine.addMateOnAxis("turn", "continuous", "base", "face", "servo", "shaft", {x: 0, y: 1, z: 0});
-		servoMachine.addMotor("servo-drive", "turn", "servo", 48);
+		servoMachine.addComponent("driver", new MotorDriver("GENERIC-SERVO-AMP", 5, 1, 48));
+		servoMachine.addMotor("servo-drive", "turn", "servo", "driver");
 		var servoActuator = actuatorsOf(definition(servoMachine))[0];
 		if (servoActuator.drive != "servo") throw "A servo part's actuator is a servo drive";
 		near(servoActuator.maxEffort, 1.9, "a servo's usable effort is its peak torque");
 		near(servoActuator.maxRate, 500, "and its usable rate its maximum speed");
 		var ratedTorque = servoActuator.ratedTorque, encoder = servoActuator.encoderCounts, servoSteps = servoActuator.fullStepsPerRevolution;
 		near(ratedTorque == null ? 0 : ratedTorque, 0.64, "its rated torque is kept");
-		near(encoder == null ? 0 : encoder, 4096, "and its encoder counts");
+		if (encoder != null || servoActuator.encoder != "servo-drive.encoder")
+			throw "A servo's intrinsic encoder must be an actual sensor";
+		var intrinsic = definition(servoMachine).encoders;
+		if (intrinsic == null || intrinsic.length != 1 || intrinsic[0].counts != 4096)
+			throw "A servo's intrinsic sensor must retain its encoder counts";
 		if (servoSteps != null) throw "A servo has no full steps";
 		// A shaft encoder on the servo's back shaft is its feedback: the actuator points at it and holds no count of its own,
 		// and a linear scale on a rail's carriage joint is a separate, load-side encoder. Both come back from a saved description.
 		servoMachine.addComponent("encoder", new machinekit.motion.ShaftEncoder(4096));
 		servoMachine.addMate("encoder-mount", "fixed", "servo", "shaft", "encoder", "mount");
-		servoMachine.addEncoder("servo-encoder", "turn", "encoder", "servo-drive");
+		servoMachine.addEncoder("servo-drive.encoder", "turn", "encoder", "servo-drive");
 		var feedback = definition(servoMachine);
 		var encoders = feedback.encoders;
 		if (encoders == null || encoders.length != 1) throw "The assembly records its encoder";
 		if (encoders[0].joint != "turn" || encoders[0].kind != "incremental" || encoders[0].counts != 4096 || encoders[0].index != true)
 			throw "A shaft encoder records its kind, counts and index on its joint";
 		var feedbackActuator = actuatorsOf(feedback)[0];
-		if (feedbackActuator.encoder != "servo-encoder" || feedbackActuator.encoderCounts != null)
+		if (feedbackActuator.encoder != "servo-drive.encoder" || feedbackActuator.encoderCounts != null)
 			throw "The motor it reads points at the encoder and holds no count of its own";
+		// A wired encoder can use the intrinsic sensor's conventional id. Later feedback keeps it as a sensor.
+		servoMachine.addComponent("second-encoder", new machinekit.motion.ShaftEncoder(8192));
+		servoMachine.addMate("second-encoder-mount", "fixed", "servo", "shaft", "second-encoder", "mount");
+		servoMachine.addEncoder("alternate-feedback", "turn", "second-encoder", "servo-drive");
+		var rewired = definition(servoMachine);
+		if (rewired.encoders == null || rewired.encoders.length != 2 ||
+			actuatorsOf(rewired)[0].encoder != "alternate-feedback")
+			throw "Rewiring must retain the previous explicitly wired sensor, even with the intrinsic id";
 		// A closed-loop stepper: the same encoder on a NEMA motor's joint, which comes back from a saved description.
 		var closed = new MachineAssembly();
 		closed.addComponent("base", new RobotFlange(50));
@@ -615,7 +677,8 @@ class MachineAssemblyDescriptionTests {
 		closed.addComponent("encoder", new machinekit.motion.ShaftEncoder(1024, false, false));
 		closed.addMateOnAxis("turn", "continuous", "base", "face", "motor", "shaftAxis", {x: 0, y: 1, z: 0});
 		closed.addMate("encoder-mount", "fixed", "motor", "mountFace", "encoder", "mount");
-		closed.addMotor("closed-drive", "turn", "motor", 24);
+		closed.addComponent("driver", new MotorDriver("GENERIC-DM542", 2.8, 16, 24));
+		closed.addMotor("closed-drive", "turn", "motor", "driver");
 		closed.addEncoder("closed-encoder", "turn", "encoder", "closed-drive");
 		roundTrip(closed, "closed-loop stepper", false);
 		var closedDefinition = definition(closed);
@@ -650,6 +713,12 @@ class MachineAssemblyDescriptionTests {
 			{occurrence: member.occurrence, material: member.material, source: switch member.source {
 				case Typed(id, values): Typed(id, [for (value in values) value.name != "model" ? value :
 					{name: "model", value: SavedValue.Token("17HS19-1684S1")}]);
+				case other: other;
+			}}];
+		description.machine.members = [for (member in description.machine.members) member.occurrence != "driver" ? member :
+			{occurrence: member.occurrence, material: member.material, source: switch member.source {
+				case Typed(id, values): Typed(id, [for (entry in values) entry.name != "current" ? entry :
+					{name: "current", value: SavedValue.Number(1.68)}]);
 				case other: other;
 			}}];
 		var rebuilt = definition(MachineAssembly.fromDescription(description));
@@ -918,9 +987,8 @@ private class TestServo extends machinekit.component.MachineComponent implements
 		addConnector("shaft", machinekit.component.ConnectorRole.Axis, machinekit.component.Solids.axial(0, 0, 0));
 	}
 
-	public function actuator(id:String, joint:String, volts:Float, margin:Float):materia.assembly.AssemblyDefinition.AssemblyActuator
+	public function actuator(id:String, joint:String, volts:Float, margin:Float, ?current:Float):materia.assembly.AssemblyDefinition.AssemblyActuator
 		return {id: id, joint: joint, maxEffort: 1.9, maxRate: 500, rotorInertia: 2e-5, drive: "servo",
 			ratedTorque: 0.64, peakTorque: 1.9, ratedSpeed: 314, maxSpeed: 500, encoderCounts: 4096,
 			torqueSpeed: [0, 1.9, 314, 1.9, 500, 0.64]};
 }
-

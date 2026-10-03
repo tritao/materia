@@ -1,3 +1,4 @@
+import machinekit.motion.MotorDriver;
 import cadkit.modeling.Align;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
@@ -234,9 +235,14 @@ class MobileBase extends MachineAssembly {
 	 */
 	public static final WHEEL_GEARBOX = new Gearbox(10, 0.9);
 	public static inline var WHEEL_SUPPLY:Float = 24;
+	static function wheelDriver():MotorDriver return new MotorDriver("GENERIC-DM542", 2.8, 16, WHEEL_SUPPLY);
 	/** The motor's actuator as `MachineAssembly.addMotor` makes it, before the gearbox. */
-	static function wheelMotor():materia.assembly.AssemblyDefinition.AssemblyActuator
-		return NemaStepper.frame(23).actuator("wheel", "wheel", WHEEL_SUPPLY, 0.5);
+	static function wheelMotor():materia.assembly.AssemblyDefinition.AssemblyActuator {
+		var driver = wheelDriver();
+		var voltage = driver.statedVoltage;
+		if (voltage == null) throw "The nominal wheel driver needs a stated supply voltage";
+		return NemaStepper.frame(23).actuator("wheel", "wheel", voltage, 0.5, driver.current);
+	}
 	/**
 	 * Wheel speed limit in rad/s and torque in N·m, from the drive: the stepper's usable speed over the gearhead
 	 * ratio (about 13.7 rad/s, a little over 1 m/s on the 75 mm wheel) and its usable torque through the gearhead.
@@ -296,7 +302,11 @@ class MobileBase extends MachineAssembly {
 			addMateOnAxis(side.joint, "continuous", 'motor${side.name}', "wheelSeat", 'wheel${side.name}', "bore",
 				{x: 0, y: 1, z: 0}, 0, {lower: null, upper: null, velocity: WHEEL_SPEED, effort: WHEEL_TORQUE});
 			// The wheel's drive: the stepper through the gearhead, which is where those limits come from.
-			addMotor('drive${side.name}', side.joint, 'motor${side.name}', WHEEL_SUPPLY, 0.5, WHEEL_GEARBOX);
+			var driver = 'driver${side.name}';
+			addComponent(driver, wheelDriver());
+			addMemberConnector("basePlate", driver, Solids.axial(side.sign * 210, 0, BASE_THICKNESS));
+			addMate('$driver-mount', "fixed", "basePlate", driver, driver, "mount");
+			addMotor('drive${side.name}', side.joint, 'motor${side.name}', driver, 0.5, WHEEL_GEARBOX);
 		}
 
 		for (end in ["Front", "Rear"]) {

@@ -264,14 +264,15 @@ import machinekit.component.PortInterface;
 }
 
 /**
- * A stepper motor member driving a joint on a `volts` supply, its actuator given `margin` of the
- * motor's holding torque (see `MachineAssembly.addMotor`).
+ * Motor and driver members driving a joint, its actuator given `margin` of the motor's holding
+ * torque (see `MachineAssembly.addMotor`). Voltage and current come from the driver.
  */
 @:wire typedef MotorRecord = {
 	@:id(1) var actuator:String;
 	@:id(2) var joint:String;
 	@:id(3) var motor:String;
-	@:id(4) var volts:Float;
+	/** id 4 retired: supply voltage now belongs to the driver. */
+	@:id(8) var driver:String;
 	@:id(5) var margin:Float;
 	/** A gearbox between the motor and the joint (see `Gearbox`); absent for a direct drive. */
 	@:id(6) @:optional var gearRatio:Null<Float>;

@@ -107,6 +107,8 @@ class AssemblyDefinitionFlattener {
 		var copy:AssemblyActuator = {id: id, joint: joint, maxEffort: actuator.maxEffort, maxRate: actuator.maxRate};
 		if (actuator.rotorInertia != null) copy.rotorInertia = actuator.rotorInertia;
 		if (actuator.fullStepsPerRevolution != null) copy.fullStepsPerRevolution = actuator.fullStepsPerRevolution;
+		if (actuator.microsteps != null) copy.microsteps = actuator.microsteps;
+		if (actuator.maxStepRate != null) copy.maxStepRate = actuator.maxStepRate;
 		if (actuator.drive != null) copy.drive = actuator.drive;
 		if (actuator.torqueSpeed != null) copy.torqueSpeed = actuator.torqueSpeed.copy();
 		if (actuator.holdingTorque != null) copy.holdingTorque = actuator.holdingTorque;

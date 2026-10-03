@@ -893,7 +893,7 @@ unchanged; the belt-router diagnostic now names its assumptions. No haxeon chang
 
 ### X8 — Motor, driver and controller
 
-Status: X8a complete (2026-10-03). X8b–X8e pending.
+Status: X8a/X8b complete (2026-10-03). X8c–X8e pending.
 
 Planned (2026-10-03); after X7. Today one call mixes three pieces of hardware:
 `MachineAssembly.addMotor(id, joint, motor, volts, margin, gearbox)` takes the supply voltage, the
@@ -948,6 +948,44 @@ X8a implementation:
 - Validation: full `x7-suite-x8a-drivers.txt` gate passed all suites, application build and
   project-source tests. All X7 engineering baselines are unchanged: router plates 220.2/201.6 s,
   belt deviation 1.89 mm and CoreXY 204.1 rad/s, 649.6 mm/s, 71.6/34 m/s².
+
+X8b implementation:
+
+- `addMotor` now names a driver member. Schema v4 retires MotorRecord's voltage id 4 and adds
+  driver id 8; v2/v3 descriptions and older documents are rejected before decoding their side data.
+  Copies, inclusions and rebuilds resolve both member references again. Gearbox numbers remain
+  until X8d. Driver voltage is explicitly stated in this step; wired supplies follow in X8c.
+- A stepper's driver current must be positive and at most its motor rating. Lower current scales
+  holding torque linearly and raises the existing reactance corner inversely with current. The
+  same rated-current curve equation supplies both the planning limits and sampled curve. Current
+  scaling is an assumption; back EMF, decay mode and resonance remain outside this model.
+- Servo ratings have no winding-current or torque-constant datum, so amplifier current validates
+  against the amplifier rating but does not invent a servo derating equation. Servo torque/speed
+  stays intrinsic. Motor and driver families must match. Generic driver ratings join the actuator's
+  assumption labels.
+- Optional actuator fields 21/22 carry microsteps and the driver's maximum step-input rate through
+  flattening, the CAD bridge and RobotModel's codec. DeviceLayout uses the actuator setting before
+  its legacy default. Legacy models omit these fields and retain their saved bytes. Deployment
+  enforcement and removal of job microsteps remain X8e.
+- An intrinsic servo encoder is now an actual sensor, replaced by separately wired feedback.
+  Its counts are expressed at the joint, including gearbox reduction, rather than retaining an
+  inline motor count as the new model's feedback. Sensor references are prefixed on inclusion.
+  Explicit encoder records distinguish wired feedback from the generated sensor even when they
+  use the same conventional id; later rewiring retains the previous wired sensor.
+- Router and CoreXY drivers are fixed to their frames, arm amplifiers to the pedestal and wheel
+  drivers to the base plate outside the battery footprint. Assumed solid envelopes add fixed mass:
+  router 33.1 → 36.3 kg (four DM542-class drivers), mobile base 27 → 28.6 kg (two), CoreXY
+  3.99 → 4.01 kg (two TMC2209-class drivers). Their additional definitions/occurrences/BOM lines
+  are respectively 31/56/30 → 32/60/31, 9/16/9 → 10/18/10 and 15/35/15 → 16/37/16.
+  Arm total mass 146.9 → 149.8 kg and definitions/occurrences 24/25 → 25/31: six assumed
+  servo-amplifier envelopes on the pedestal; its 20.6 kg moving mass is unchanged.
+- Focused MachineKit smoke passed after correcting the wheel driver's connector frame and
+  confirming no intersections at either tested wheel angle. CoreXY drive limits remain unchanged.
+- Validation: full `x7-suite-x8b-hierarchy.txt` gate passed every suite, application build and
+  project-source tests. The arm hierarchy test checks its six amplifiers by id under the pedestal.
+  Router plate times, limits, torque usage and deviations retain X7's baselines; CoreXY drive limits,
+  arm mission times and the mobile obstacle summary are unchanged. Only the hardware envelopes,
+  fixed mass, BOM/part counts, explicit servo sensors and provenance labels change in the examples.
 
 ### Later
 

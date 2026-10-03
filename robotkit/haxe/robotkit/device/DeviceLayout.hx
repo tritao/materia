@@ -18,8 +18,11 @@ class DeviceLayout {
   /** One channel per model actuator, in order, all wired the same: for simulation and tests. */
   public static function forActuators(model:RobotModel, microsteps:Int = 1,
       directionSetupTicks:Int = 0):DeviceLayout
-    return new DeviceLayout([for (index in 0...model.actuators.length)
-      new DeviceChannel(index, "", model.actuators[index].id, 1, microsteps, directionSetupTicks)]);
+    return new DeviceLayout([for (index in 0...model.actuators.length) {
+      var actuator = model.actuators[index];
+      var setting = actuator.microsteps;
+      new DeviceChannel(index, "", actuator.id, 1, setting == null ? microsteps : setting, directionSetupTicks);
+    }]);
 
   public static function decode(bytes:Bytes):DeviceLayout {
     var root:Dynamic;

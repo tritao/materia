@@ -1,3 +1,4 @@
+import machinekit.motion.MotorDriver;
 import cadkit.modeling.Location;
 import cadkit.modeling.Part;
 import cadkit.modeling.Plane;
@@ -655,6 +656,15 @@ class CncRouter extends MachineAssembly {
 		addMate('$id-mount', "fixed", parent, 'to-$id', id, 'attach-$id');
 	}
 
+	var driverIndex:Int = 0;
+	/** Drivers live on the fixed frame, so their envelopes do not add carriage mass. */
+	function addDriver(motor:String):String {
+		var id = motor + "Driver";
+		attach(id, new MotorDriver("GENERIC-DM542", 2.8, MICROSTEPS, SUPPLY_VOLTS),
+			AssemblyFrames.translation(-180 + 125 * driverIndex++, -200, 0), "sideLeft");
+		return id;
+	}
+
 	/**
 	 * Motor `motor` turns lead screw `id` (at `pose`, its input end on the shaft tip, pointing
 	 * along world direction `along`) through a shaft coupling. Coupling and screw turn together on
@@ -684,7 +694,7 @@ class CncRouter extends MachineAssembly {
 		// nut floats on the carriage, so it is no support: fixed at the motor, free at the far end, over
 		// the whole screw. That is what sets the screw's top speed.
 		supportScrew('$id-lead', Fixed, Free);
-		addMotor(motor, '$id-turn', motor, SUPPLY_VOLTS);
+		addMotor(motor, '$id-turn', motor, addDriver(motor));
 	}
 
 	/** Attach the source nut to its carriage once the bracket exists. */
@@ -756,7 +766,7 @@ class CncRouter extends MachineAssembly {
 			"idlerPlateX");
 		hang("idlerX", beltPulley(), orient(-xm, tip, X_SCREW_Z, up, [0, 1, 0]), "axleX");
 		turnWithBelt(specs[0], "idlerX", "axleX", [0, 1, 0], belt.rotation(1, 0, -1, 0), "beltX");
-		addMotor("motorX", "pulleyX-turn", "motorX", SUPPLY_VOLTS);
+		addMotor("motorX", "pulleyX-turn", "motorX", addDriver("motorX"));
 	}
 
 	/**
@@ -785,7 +795,7 @@ class CncRouter extends MachineAssembly {
 			orient(s * (inner + shaft - BELT_PLATE), -end, Y_SCREW_Z, up, [-s, 0, 0]), 'idlerPlateY$name');
 		hang('idlerY$name', beltPulley(), orient(s * Y_BELT_X + BELT_WIDTH / 2, -end, Y_SCREW_Z, up, [-1, 0, 0]), 'axleY$name');
 		turnWithBelt(specs[1], 'idlerY$name', 'axleY$name', [-1, 0, 0], belt.rotation(1, 0, -1, 0), 'beltY$name');
-		addMotor('motorY$name', 'pulleyY$name-turn', 'motorY$name', SUPPLY_VOLTS);
+		addMotor('motorY$name', 'pulleyY$name-turn', 'motorY$name', addDriver('motorY$name'));
 	}
 
 	function component(id:String):MachineComponent {

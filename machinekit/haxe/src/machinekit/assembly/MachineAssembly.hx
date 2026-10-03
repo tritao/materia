@@ -64,7 +64,7 @@ private typedef MutableIncludedRecord = {var id:String; var pose:AssemblyFrame; 
 
 /** Reusable, prefixable assembly made from MachineComponents and named connector references. */
 class MachineAssembly {
-	public static inline var SCHEMA_VERSION:Int = 3;
+	public static inline var SCHEMA_VERSION:Int = 4;
 	final members:Array<AssemblyMember> = [];
 	final mechanical:AssemblyDefinition = {schemaVersion: AssemblyDefinitionCodec.VERSION,
 		id: "assembly", lengthUnit: "mm", definitions: [], occurrences: [], joints: [], couplings: []};
@@ -242,7 +242,7 @@ class MachineAssembly {
 	}
 
 	static function checkDescriptionVersion(version:Null<Int>):Void {
-		if (version != SCHEMA_VERSION) throw 'Machine assembly schema v$version is unsupported; expected v$SCHEMA_VERSION typed transmissions';
+		if (version != SCHEMA_VERSION) throw 'Machine assembly schema v$version is unsupported; expected v$SCHEMA_VERSION typed motor drivers';
 	}
 
 	/** Rebuild through registered recipes; no component object is stored in the description. */
@@ -356,7 +356,7 @@ class MachineAssembly {
 					coupling.stiffness, coupling.backlash, coupling.drag, coupling.assumed);
 		for (motor in motors) if (StringTools.startsWith(motor.actuator, prefix))
 			child.addMotorRecord({actuator: motor.actuator.substr(prefix.length), joint: motor.joint.substr(prefix.length),
-				motor: motor.motor.substr(prefix.length), volts: motor.volts, margin: motor.margin,
+				motor: motor.motor.substr(prefix.length), driver: motor.driver.substr(prefix.length), margin: motor.margin,
 				gearRatio: motor.gearRatio, gearEfficiency: motor.gearEfficiency});
 		for (encoder in encoders) if (StringTools.startsWith(encoder.encoder, prefix))
 			child.addEncoderRecord({encoder: encoder.encoder.substr(prefix.length), joint: encoder.joint.substr(prefix.length),
@@ -782,13 +782,13 @@ class MachineAssembly {
 
 	/**
 	 * Motor member `motor` (a stepper, or any part that is a `MotorDrive`) drives joint `joint` on a
-	 * `volts` supply. Its actuator, `id`, gets the motor's drive kind and torque-speed curve, its rotor
+	 * driver member `driver`. Its actuator, `id`, gets the motor's drive kind and torque-speed curve, its rotor
 	 * inertia and its usable effort and rate: for a stepper `margin` of its holding torque and the
 	 * speed up to where pull-out torque falls to that, for a servo its peak torque and maximum speed.
-	 * Rebuilding the assembly works them out again from the motor.
+	 * Rebuilding the assembly works them out again from the motor and driver settings.
 	 */
-	public function addMotor(id:String, joint:String, motor:String, volts:Float, margin:Float = 0.5, ?gearbox:machinekit.motion.Gearbox):Void
-		addMotorRecord({actuator: id, joint: joint, motor: motor, volts: volts, margin: margin,
+	public function addMotor(id:String, joint:String, motor:String, driver:String, margin:Float = 0.5, ?gearbox:machinekit.motion.Gearbox):Void
+		addMotorRecord({actuator: id, joint: joint, motor: motor, driver: driver, margin: margin,
 			gearRatio: gearbox == null ? null : gearbox.ratio, gearEfficiency: gearbox == null ? null : gearbox.efficiency});
 
 	function addMotorRecord(record:machinekit.assembly.MachineAssemblyDescription.MotorRecord):Void {
@@ -798,11 +798,36 @@ class MachineAssembly {
 		if (mechanical.actuators == null) mechanical.actuators = [];
 		for (actuator in mechanical.actuators) if (actuator.id == record.actuator)
 			throw 'Duplicate assembly actuator "${record.actuator}"';
-		var added = motor.actuator(record.actuator, record.joint, record.volts, record.margin);
+		var driverMember = requireMember(record.driver);
+		if (!Std.isOfType(driverMember, machinekit.motion.MotorDriver))
+			throw 'Motor "${record.actuator}": "${record.driver}" is not a driver part';
+		var driver:machinekit.motion.MotorDriver = cast driverMember;
+		if (driver.statedVoltage == null) throw 'Motor "${record.actuator}" needs a stated driver voltage until a supply is wired';
+		var added = motor.actuator(record.actuator, record.joint, driver.statedVoltage, record.margin, driver.current);
+		var stepper = driver.rating.family == machinekit.motion.MotorDriver.MotorDriverFamily.Stepper;
+		if ((stepper && added.drive != "stepper") || (!stepper && added.drive != "servo"))
+			throw 'Motor "${record.actuator}" and driver "${record.driver}" have different drive families';
+		if (stepper) {
+			added.microsteps = driver.microsteps;
+			added.maxStepRate = driver.rating.maximumStepRate;
+		}
+		var assumed = added.assumed == null ? [] : [for (label in added.assumed) label];
+		assumed.push("driver ratings");
+		added.assumed = assumed;
 		// A gearbox between the motor and the joint: the actuator stays the motor's own, the bridge scales it.
 		if (record.gearRatio != null) {
 			added.gearRatio = record.gearRatio;
 			added.gearEfficiency = record.gearEfficiency;
+		}
+		// A servo's intrinsic encoder is a sensor too. Its rotor count is expressed at the joint.
+		if (added.drive == "servo" && added.encoderCounts != null && added.encoderCounts > 0) {
+			if (mechanical.encoders == null) mechanical.encoders = [];
+			var id = record.actuator + ".encoder";
+			for (encoder in mechanical.encoders) if (encoder.id == id) throw 'Duplicate assembly encoder "$id"';
+			mechanical.encoders.push({id: id, joint: record.joint, kind: "incremental",
+				counts: added.encoderCounts * (added.gearRatio == null ? 1 : added.gearRatio)});
+			added.encoder = id;
+			added.encoderCounts = null;
 		}
 		mechanical.actuators.push(added);
 		motors.push(copyMotor(record, ""));
@@ -822,18 +847,27 @@ class MachineAssembly {
 		var member = requireMember(record.part);
 		if (!Std.isOfType(member, machinekit.motion.EncoderPart)) throw 'Encoder "${record.encoder}": "${record.part}" is not an encoder part';
 		var part:machinekit.motion.EncoderPart = cast member;
-		if (mechanical.encoders == null) mechanical.encoders = [];
-		for (existing in mechanical.encoders) if (existing.id == record.encoder)
-			throw 'Duplicate assembly encoder "${record.encoder}"';
-		mechanical.encoders.push(part.encoder(record.encoder, record.joint));
+		var added = part.encoder(record.encoder, record.joint);
+		var feedback:Null<materia.assembly.AssemblyDefinition.AssemblyActuator> = null;
 		if (record.actuator != null) {
-			var found = false;
-			if (mechanical.actuators != null) for (actuator in mechanical.actuators) if (actuator.id == record.actuator) {
-				actuator.encoder = record.encoder;
-				actuator.encoderCounts = null;
-				found = true;
-			}
-			if (!found) throw 'Encoder "${record.encoder}" reads unknown motor "${record.actuator}"';
+			if (mechanical.actuators != null) for (actuator in mechanical.actuators)
+				if (actuator.id == record.actuator) feedback = actuator;
+			if (feedback == null) throw 'Encoder "${record.encoder}" reads unknown motor "${record.actuator}"';
+		}
+		var builtin:Null<String> = null;
+		if (feedback != null && feedback.encoder == feedback.id + ".encoder") {
+			var wired = false;
+			for (recorded in encoders) if (recorded.encoder == feedback.encoder) wired = true;
+			if (!wired) builtin = feedback.encoder;
+		}
+		if (mechanical.encoders != null) for (existing in mechanical.encoders)
+			if (existing.id == record.encoder && existing.id != builtin) throw 'Duplicate assembly encoder "${record.encoder}"';
+		if (mechanical.encoders == null) mechanical.encoders = [];
+		if (builtin != null) mechanical.encoders = [for (encoder in mechanical.encoders) if (encoder.id != builtin) encoder];
+		mechanical.encoders.push(added);
+		if (feedback != null) {
+			feedback.encoder = record.encoder;
+			feedback.encoderCounts = null;
 		}
 		encoders.push(copyEncoder(record, ""));
 	}
@@ -846,7 +880,7 @@ class MachineAssembly {
 	static function copyMotor(motor:machinekit.assembly.MachineAssemblyDescription.MotorRecord,
 			prefix:String):machinekit.assembly.MachineAssemblyDescription.MotorRecord
 		return {actuator: join(prefix, motor.actuator), joint: join(prefix, motor.joint),
-			motor: join(prefix, motor.motor), volts: motor.volts, margin: motor.margin,
+			motor: join(prefix, motor.motor), driver: join(prefix, motor.driver), margin: motor.margin,
 			gearRatio: motor.gearRatio, gearEfficiency: motor.gearEfficiency};
 
 	static function copyActuator(actuator:materia.assembly.AssemblyDefinition.AssemblyActuator,

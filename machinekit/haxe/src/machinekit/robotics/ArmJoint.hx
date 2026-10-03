@@ -64,10 +64,10 @@ class ArmJoint extends MachineComponent implements MotorDrive {
 			.setToken("material", materialSpec());
 
 	/** The servo inside the module as an actuator on joint `joint`; a module with no servo is not a motor. */
-	public function actuator(id:String, joint:String, volts:Float, margin:Float):AssemblyActuator {
+	public function actuator(id:String, joint:String, volts:Float, margin:Float, ?current:Float):AssemblyActuator {
 		var motor = servo;
 		if (motor == null) throw 'Arm joint "$designation" has no servo to drive a joint';
-		return motor.actuator(id, joint, volts, margin);
+		return motor.actuator(id, joint, volts, margin, current);
 	}
 
 	override public function hasGeometry():Bool return true;

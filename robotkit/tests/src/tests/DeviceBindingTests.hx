@@ -82,6 +82,16 @@ class DeviceBindingTests {
       "direction", "a direction other than 1 or -1 is refused");
     fails(function() DeviceLayout.decode(Bytes.ofString('{"channels": [{"index": 0, "actuator": "motor", "microsteps": 0}]}')),
       "microsteps", "zero microsteps are refused");
+    var settings = axisModel();
+    settings.actuators[0].microsteps = 32;
+    settings.actuators[0].maxStepRate = 200000;
+    var restored = robotkit.model.RobotModelCodec.decode(robotkit.model.RobotModelCodec.encode(settings));
+    check(restored.actuators[0].microsteps == 32 && restored.actuators[0].maxStepRate == 200000,
+      "driver settings survive the robot model codec");
+    check(DeviceLayout.forActuators(restored, 4).channels[0].microsteps == 32,
+      "a model's driver setting takes precedence over legacy layout defaults");
+    check(DeviceLayout.forActuators(axisModel(), 4).channels[0].microsteps == 4,
+      "legacy models retain their explicit layout default");
     return assertions;
   }
 

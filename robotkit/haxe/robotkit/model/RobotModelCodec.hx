@@ -447,6 +447,8 @@ class RobotModelCodec {
     };
     if (value.encoder != "") record.encoder = value.encoder;
     if (value.assumed.length > 0) record.assumed = value.assumed.copy();
+    if (value.microsteps != null) record.microsteps = value.microsteps;
+    if (value.maxStepRate != null) record.maxStepRate = value.maxStepRate;
     if (value.efficiency != 1.0) record.efficiency = value.efficiency;
     // A bare stepper is its steps alone, as before drive kinds; anything with ratings gets a drive.
     var drive = value.drive;
@@ -488,6 +490,10 @@ class RobotModelCodec {
     nonNegative(value.servoDamping, "actuator servoDamping");
     if (!(value.efficiency > 0.0 && value.efficiency <= 1.0)) throw "Actuator efficiency must be in (0, 1]";
     nonNegative(value.fullStepsPerRevolution, "actuator fullStepsPerRevolution");
+    if (value.microsteps != null && (value.microsteps < 1 || value.microsteps > 1024))
+      throw "Actuator microsteps must be an integer from 1 to 1024";
+    if (value.maxStepRate != null && (!(value.maxStepRate > 0) || !Math.isFinite(value.maxStepRate)))
+      throw "Actuator maxStepRate must be finite and positive";
     if (value.drive != null && !Std.isOfType(value.drive, StepperDrive) && !Std.isOfType(value.drive, ServoDrive))
       throw 'Actuator ${value.id} has an unsupported drive';
     requireText(value.id, "actuator ID");
@@ -566,6 +572,17 @@ class RobotModelCodec {
     if (Reflect.hasField(value, "efficiency") && Reflect.field(value, "efficiency") != null) {
       actuator.efficiency = number(value, "efficiency");
       if (!(actuator.efficiency > 0.0 && actuator.efficiency <= 1.0)) throw "Actuator efficiency must be in (0, 1]";
+    }
+    if (Reflect.hasField(value, "microsteps")) {
+      var microsteps = number(value, "microsteps");
+      if (microsteps < 1 || microsteps > 1024 || microsteps != Std.int(microsteps))
+        throw "Actuator microsteps must be an integer from 1 to 1024";
+      actuator.microsteps = Std.int(microsteps);
+    }
+    if (Reflect.hasField(value, "maxStepRate")) {
+      var rate = number(value, "maxStepRate");
+      if (!(rate > 0) || !Math.isFinite(rate)) throw "Actuator maxStepRate must be finite and positive";
+      actuator.maxStepRate = rate;
     }
     actuator.assumed = readAssumed(value);
     return actuator;

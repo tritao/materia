@@ -75,7 +75,7 @@ class ServoMotor extends MachineComponent implements MotorDrive {
 	}
 
 	/** The actuator: a servo drive with its peak torque and maximum speed as the limits a planner may rely on. */
-	public function actuator(id:String, joint:String, volts:Float, margin:Float):AssemblyActuator
+	public function actuator(id:String, joint:String, volts:Float, margin:Float, ?current:Float):AssemblyActuator
 		return {id: id, joint: joint, maxEffort: rating.peakTorque, maxRate: rating.maxSpeed, rotorInertia: rating.rotorInertia, drive: "servo",
 			ratedTorque: rating.ratedTorque, peakTorque: rating.peakTorque, ratedSpeed: rating.ratedSpeed, maxSpeed: rating.maxSpeed,
 			encoderCounts: rating.encoderCounts,

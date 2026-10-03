@@ -326,6 +326,8 @@ class AssemblyDefinitionCodec {
 		for (value in [actuator.holdingTorque, actuator.ratedTorque, actuator.peakTorque, actuator.ratedSpeed, actuator.maxSpeed,
 				actuator.encoderCounts, actuator.servoStiffness, actuator.servoDamping])
 			if (value != null && !(value >= 0 && Math.isFinite(value))) return false;
+		if (actuator.microsteps != null && (actuator.microsteps < 1 || actuator.microsteps > 1024)) return false;
+		if (actuator.maxStepRate != null && (!(actuator.maxStepRate > 0) || !Math.isFinite(actuator.maxStepRate))) return false;
 		if (actuator.gearRatio != null && !(actuator.gearRatio > 0 && Math.isFinite(actuator.gearRatio))) return false;
 		if (actuator.gearEfficiency != null && !(actuator.gearEfficiency > 0 && actuator.gearEfficiency <= 1)) return false;
 		var curve = actuator.torqueSpeed;
