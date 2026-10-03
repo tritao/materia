@@ -275,8 +275,8 @@ import machinekit.component.PortInterface;
 	@:id(8) var driver:String;
 	@:id(5) var margin:Float;
 	/** A gearbox between the motor and the joint (see `Gearbox`); absent for a direct drive. */
-	@:id(6) @:optional var gearRatio:Null<Float>;
-	@:id(7) @:optional var gearEfficiency:Null<Float>;
+	// Retired numeric reduction ids 6 and 7.
+	@:id(9) @:optional var gearbox:Null<String>;
 }
 
 /**

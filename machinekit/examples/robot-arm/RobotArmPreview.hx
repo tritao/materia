@@ -1,3 +1,4 @@
+import machinekit.motion.ServoMotor;
 import machinekit.assembly.AssemblyPreview;
 import haxe.io.Bytes;
 import cadkit.modeling.AssemblyModel;
@@ -59,15 +60,14 @@ class RobotArmChecks {
 			var peak:Float = peakValue, top:Float = topValue, ratio:Float = ratioValue, efficiency:Float = efficiencyValue;
 			near(ratio, spec.gearbox.ratio, '${spec.id} gearbox ratio');
 			near(efficiency, RobotArm.GEARBOX_EFFICIENCY, '${spec.id} gearbox efficiency');
-			near(spec.velocity, top / ratio, '${spec.id} speed limit is the servo\'s over the ratio', 1e-9);
-			near(spec.effort, peak * ratio * efficiency, '${spec.id} torque limit is the servo\'s through the gearbox', 1e-9);
+			near(spec.gearbox.jointSpeed(ServoMotor.model(spec.servo).rating.maxSpeed), top / ratio, '${spec.id} speed limit is the servo\'s over the ratio', 1e-9);
+			near(spec.gearbox.jointTorque(ServoMotor.model(spec.servo).rating.peakTorque), peak * ratio * efficiency, '${spec.id} torque limit is the servo\'s through the gearbox', 1e-9);
 			var edge = [for (joint in definition.joints) if (joint.id == spec.id) joint][0];
 			var edgeSpeed = edge.limits.velocity, edgeEffort = edge.limits.effort;
-			near(edgeSpeed == null ? 0 : edgeSpeed, spec.velocity, '${spec.id} joint speed limit', 1e-9);
-			near(edgeEffort == null ? 0 : edgeEffort, spec.effort, '${spec.id} joint torque limit', 1e-9);
+			if (edgeSpeed != null || edgeEffort != null) throw 'Joint ${spec.id} should derive its drive limits at compilation';
 		}
-		near(robot.specs[0].velocity, 2.094, "j1 runs at about 2.1 rad/s", 1e-3);
-		near(robot.specs[0].effort, 405.9, "and carries about 406 N m", 0.1);
+		near(robot.specs[0].gearbox.jointSpeed(ServoMotor.model(robot.specs[0].servo).rating.maxSpeed), 2.094, "j1 runs at about 2.1 rad/s", 1e-3);
+		near(robot.specs[0].gearbox.jointTorque(ServoMotor.model(robot.specs[0].servo).rating.peakTorque), 405.9, "and carries about 406 N m", 0.1);
 		var model = new AssemblyModel("mm");
 		robot.addTo(model, "");
 		var straight = new AssemblyState(model.definition(RobotArmPreview.ASSEMBLY_ID));
@@ -96,6 +96,7 @@ class RobotArmChecks {
 			'axis ${Math.round(approach.x * 100) / 100}, ${Math.round(approach.y * 100) / 100}, ${Math.round(approach.z * 100) / 100}');
 		var moving = robot.toolFlange.massProperties().mass;
 		for (joint in robot.joints) moving += joint.massProperties().mass;
+		for (spec in robot.specs) moving += spec.gearbox.massProperties().mass;
 		for (link in robot.links) moving += link.massProperties().mass;
 		moving += robot.tool.massPropertiesAtMount().mass;
 		Sys.println('robot arm: ${Math.round(moving * 10) / 10} kg above the base flange, ' +

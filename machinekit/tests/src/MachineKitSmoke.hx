@@ -2614,6 +2614,7 @@ class MachineKitSmoke {
 		RecipeContractTests.run();
 		MotorDriverTests.run();
 		PowerSupplyTests.run();
+		GearboxTests.run();
 		componentRecipes();
 		documentRecipes();
 		documentPreview();

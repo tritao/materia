@@ -207,7 +207,7 @@ class ProjectSourceTests {
     count("project:pedestal", 2);
     // Seven bodies chain seven levels deep; the last body's own Parts node is the eighth.
     check(rows == 14 && depth == 8, 'the arm shows 7 bodies and 7 collapsed Parts nodes, got $rows rows, depth $depth');
-    var pedestalParts = ["baseFlange", "joint1", "driver1", "driver2", "driver3", "driver4", "driver5", "driver6", "powerSupply"];
+    var pedestalParts = ["baseFlange", "joint1", "gearbox1", "driver1", "driver2", "driver3", "driver4", "driver5", "driver6", "powerSupply"];
     check(tree.childCount("parts:pedestal") == pedestalParts.length && tree.childCount("parts:toolFlange") == 7,
       "a body's Parts node holds the parts fixed to its root");
     for (id in pedestalParts) {

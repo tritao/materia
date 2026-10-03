@@ -243,7 +243,7 @@ class MobileBase extends MachineAssembly {
 	 * ratio, its efficiency and the supply are assumptions (a planetary gearhead on a NEMA 23 is typically 3:1
 	 * to 100:1 at 0.8 to 0.95); the gearhead is not drawn, the wheel sits on the motor's shaft.
 	 */
-	public static final WHEEL_GEARBOX = new Gearbox(10, 0.9);
+	public static final WHEEL_GEARBOX = new Gearbox(10, 0.9, 60, 40, 6.35, true);
 	public static inline var WHEEL_SUPPLY:Float = 24;
 	static function wheelDriver(wired:Bool = false):MotorDriver return new MotorDriver("GENERIC-DM542", 2.8, 16, wired ? null : WHEEL_SUPPLY);
 	/** The motor's actuator as `MachineAssembly.addMotor` makes it, before the gearbox. */
@@ -303,7 +303,7 @@ class MobileBase extends MachineAssembly {
 		addComponent("battery", new BatteryPack(260, 180, 110, WHEEL_SUPPLY));
 		addMate("battery-mount", "fixed", "basePlate", "battery", "battery", "base");
 
-		// Drives: the bracket hangs from its seat, the motor sits on the bracket, and the wheel turns on the motor's shaft.
+		// Drives: the bracket hangs from its seat, the motor sits on the bracket, and the wheel turns at the gearhead output.
 		for (side in SIDES) {
 			addComponent('bracket${side.name}', bracket);
 			addMate('bracket${side.name}-mount', "fixed", "basePlate", 'bracket${side.name}', 'bracket${side.name}', "top");
@@ -311,16 +311,19 @@ class MobileBase extends MachineAssembly {
 			addMate('motor${side.name}-mount', "fixed", 'bracket${side.name}', "motorSeat", 'motor${side.name}', "mountFace");
 			// The hub stands off the shaft's root by the bracket and the gap past it.
 			addMemberConnector('motor${side.name}', "wheelSeat", Solids.axial(0, 0, BRACKET_THICKNESS + HUB_GAP));
+			var gearbox = 'gearbox${side.name}';
+			addComponent(gearbox, WHEEL_GEARBOX);
+			addMate('$gearbox-mount', "fixed", 'motor${side.name}', "wheelSeat", gearbox, "input");
 			addComponent('wheel${side.name}', wheel);
-			addMateOnAxis(side.joint, "continuous", 'motor${side.name}', "wheelSeat", 'wheel${side.name}', "bore",
-				{x: 0, y: 1, z: 0}, 0, {lower: null, upper: null, velocity: WHEEL_SPEED, effort: WHEEL_TORQUE});
+			addMateOnAxis(side.joint, "continuous", gearbox, "output", 'wheel${side.name}', "bore",
+				{x: 0, y: 1, z: 0}, 0, {lower: null, upper: null, velocity: null, effort: null});
 			// The wheel's drive: the stepper through the gearhead, which is where those limits come from.
 			var driver = 'driver${side.name}';
 			addComponent(driver, wheelDriver(true));
 			addMemberConnector("basePlate", driver, Solids.axial(side.sign * 210, 0, BASE_THICKNESS));
 			addMate('$driver-mount', "fixed", "basePlate", driver, driver, "mount");
 			connectPorts('$driver-power', "battery", 'power${side.name}', driver, "power");
-			addMotor('drive${side.name}', side.joint, 'motor${side.name}', driver, 0.5, WHEEL_GEARBOX);
+			addMotor('drive${side.name}', side.joint, 'motor${side.name}', driver, 0.5, gearbox);
 		}
 
 		for (end in ["Front", "Rear"]) {
@@ -384,7 +387,7 @@ class MobileBase extends MachineAssembly {
 
 	/** A slot for each wheel to turn through, a few millimetres clear of its tread. */
 	function wheelSlots():Array<{x:Float, y:Float, length:Float, width:Float}> {
-		var centreY = BRACKET_Y + BRACKET_THICKNESS + HUB_GAP + wheel.hubLength + WHEEL_WIDTH / 2;
+		var centreY = BRACKET_Y + BRACKET_THICKNESS + HUB_GAP + WHEEL_GEARBOX.length + wheel.hubLength + WHEEL_WIDTH / 2;
 		var length = 2 * Math.sqrt(Math.pow(wheel.radius + 4, 2) - Math.pow(BASE_Z - wheel.radius, 2));
 		return [for (side in SIDES) {x: 0, y: side.sign * centreY, length: length, width: WHEEL_WIDTH + 12}];
 	}

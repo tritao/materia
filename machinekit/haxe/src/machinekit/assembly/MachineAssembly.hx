@@ -68,7 +68,7 @@ private typedef MutableIncludedRecord = {var id:String; var pose:AssemblyFrame; 
 
 /** Reusable, prefixable assembly made from MachineComponents and named connector references. */
 class MachineAssembly {
-	public static inline var SCHEMA_VERSION:Int = 4;
+	public static inline var SCHEMA_VERSION:Int = 5;
 	final members:Array<AssemblyMember> = [];
 	final mechanical:AssemblyDefinition = {schemaVersion: AssemblyDefinitionCodec.VERSION,
 		id: "assembly", lengthUnit: "mm", definitions: [], occurrences: [], joints: [], couplings: []};
@@ -246,7 +246,7 @@ class MachineAssembly {
 	}
 
 	static function checkDescriptionVersion(version:Null<Int>):Void {
-		if (version != SCHEMA_VERSION) throw 'Machine assembly schema v$version is unsupported; expected v$SCHEMA_VERSION typed motor drivers';
+		if (version != SCHEMA_VERSION) throw 'Machine assembly schema v$version is unsupported; expected v$SCHEMA_VERSION typed gearbox members';
 	}
 
 	/** Rebuild through registered recipes; no component object is stored in the description. */
@@ -358,7 +358,7 @@ class MachineAssembly {
 		for (motor in motors) if (StringTools.startsWith(motor.actuator, prefix))
 			child.addMotorRecord({actuator: motor.actuator.substr(prefix.length), joint: motor.joint.substr(prefix.length),
 				motor: motor.motor.substr(prefix.length), driver: motor.driver.substr(prefix.length), margin: motor.margin,
-				gearRatio: motor.gearRatio, gearEfficiency: motor.gearEfficiency});
+				gearbox: motor.gearbox == null ? null : motor.gearbox.substr(prefix.length)});
 		for (encoder in encoders) if (StringTools.startsWith(encoder.encoder, prefix))
 			child.addEncoderRecord({encoder: encoder.encoder.substr(prefix.length), joint: encoder.joint.substr(prefix.length),
 				part: encoder.part.substr(prefix.length),
@@ -784,9 +784,9 @@ class MachineAssembly {
 	 * speed up to where pull-out torque falls to that, for a servo its peak torque and maximum speed.
 	 * Rebuilding the assembly works them out again from the motor and driver settings.
 	 */
-	public function addMotor(id:String, joint:String, motor:String, driver:String, margin:Float = 0.5, ?gearbox:machinekit.motion.Gearbox):Void
+	public function addMotor(id:String, joint:String, motor:String, driver:String, margin:Float = 0.5, ?gearbox:String):Void
 		addMotorRecord({actuator: id, joint: joint, motor: motor, driver: driver, margin: margin,
-			gearRatio: gearbox == null ? null : gearbox.ratio, gearEfficiency: gearbox == null ? null : gearbox.efficiency});
+			gearbox: gearbox});
 
 	function motorDriver(record:machinekit.assembly.MachineAssemblyDescription.MotorRecord):machinekit.motion.MotorDriver {
 		var member = requireMember(record.motor);
@@ -830,9 +830,23 @@ class MachineAssembly {
 		var assumed = added.assumed == null ? [] : [for (label in added.assumed) label];
 		assumed.push("driver ratings");
 		added.assumed = assumed;
-		if (record.gearRatio != null) {
-			added.gearRatio = record.gearRatio;
-			added.gearEfficiency = record.gearEfficiency;
+		var gearbox = record.gearbox;
+		if (gearbox != null) {
+			var part = requireMember(gearbox);
+			if (!Std.isOfType(part, machinekit.motion.Gearbox)) throw 'Motor "${record.actuator}": "$gearbox" is not a gearbox part';
+			var gear:machinekit.motion.Gearbox = cast part;
+			var housing = requireMember(record.motor);
+			if (Std.isOfType(housing, machinekit.robotics.GearedArmJoint)) {
+				var pocket:machinekit.robotics.GearedArmJoint = cast housing;
+				if (gear.diameter >= pocket.pocketDiameter || gear.length + 0.5 >= pocket.pocketLength)
+					throw 'Gearbox "$gearbox" does not fit motor housing "${record.motor}"';
+			}
+			added.gearRatio = gear.ratio;
+			added.gearEfficiency = gear.efficiency;
+			if (gear.assumed) {
+				assumed.push("gearbox ratio");
+				assumed.push("gearbox efficiency");
+			}
 		}
 		return added;
 	}
@@ -916,7 +930,7 @@ class MachineAssembly {
 			prefix:String):machinekit.assembly.MachineAssemblyDescription.MotorRecord
 		return {actuator: join(prefix, motor.actuator), joint: join(prefix, motor.joint),
 			motor: join(prefix, motor.motor), driver: join(prefix, motor.driver), margin: motor.margin,
-			gearRatio: motor.gearRatio, gearEfficiency: motor.gearEfficiency};
+			gearbox: motor.gearbox == null ? null : join(prefix, motor.gearbox)};
 
 	static function copyActuator(actuator:materia.assembly.AssemblyDefinition.AssemblyActuator,
 			prefix:String):materia.assembly.AssemblyDefinition.AssemblyActuator {

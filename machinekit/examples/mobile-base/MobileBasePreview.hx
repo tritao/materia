@@ -94,13 +94,13 @@ class MobileBaseChecks {
 			near(centre.x, 0, '$id sits on the centre line of the base', 1e-9);
 		}
 		for (id in ["casterFront", "casterRear"]) near(state.worldConnector(id, "floor").z, 0, '$id touches the floor', 1e-9);
-		near(robot.trackWidth(), 300, "track width", 1e-9);
+		near(robot.trackWidth(), 380, "track width", 1e-9);
 		near(state.worldConnector("wheelLeft", "centre").y, -state.worldConnector("wheelRight", "centre").y,
 			"the wheels are symmetric about the centre line", 1e-9);
 		var drive = scene.mobileBase;
 		if (drive == null) throw "Mobile base preview should declare its drive";
 		near(drive.wheelRadius, robot.wheel.radius / 1000, "declared wheel radius", 1e-12);
-		near(drive.trackWidth, 0.3, "declared track width", 1e-12);
+		near(drive.trackWidth, 0.38, "declared track width", 1e-12);
 		// The wheel limits come from the wheels' drive: each stepper through its gearhead.
 		var wheelDrives = scene.assemblyDefinition == null ? null : scene.assemblyDefinition.actuators;
 		if (wheelDrives == null || wheelDrives.length != 2) throw "Mobile base should drive each wheel with a motor";

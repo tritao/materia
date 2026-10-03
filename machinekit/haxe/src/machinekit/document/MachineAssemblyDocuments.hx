@@ -200,7 +200,7 @@ class MachineAssemblyDocuments {
 
 	public static function describeAssembly(root:Element):MachineAssemblyDescription {
 		if (propertyText(root, PREFIX + "schemaVersion") != Std.string(MachineAssembly.SCHEMA_VERSION))
-			throw 'Machine assembly document schema is unsupported; expected v${MachineAssembly.SCHEMA_VERSION} typed motor drivers';
+			throw 'Machine assembly document schema is unsupported; expected v${MachineAssembly.SCHEMA_VERSION} typed gearbox members';
 		var property = root.property(PREFIX + "side");
 		if (property == null) throw "Assembly document has no MachineKit side record";
 		var savedText:String = cast property.value;

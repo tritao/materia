@@ -893,7 +893,7 @@ unchanged; the belt-router diagnostic now names its assumptions. No haxeon chang
 
 ### X8 — Motor, driver and controller
 
-Status: X8a–X8c complete (2026-10-03). X8d/X8e pending.
+Status: X8a–X8d complete (2026-10-03). X8e pending.
 
 Planned (2026-10-03); after X7. Today one call mixes three pieces of hardware:
 `MachineAssembly.addMotor(id, joint, motor, volts, margin, gearbox)` takes the supply voltage, the
@@ -918,7 +918,7 @@ Target split:
   driver members. The torque–speed curve resolves from motor + driver (voltage, current; a lower
   current setting scales the torque). Microsteps go into `AssemblyActuator`, so `DeviceLayout` derives
   them from the model, and the job's `controller.microsteps` goes away.
-- **Gearbox**: a member reference (the `Gearbox` part exists), not `gearRatio`/`gearEfficiency`
+- **Gearbox**: a member reference (`Gearbox` starts as a plain drive value; X8d makes it a recipe-backed part), not `gearRatio`/`gearEfficiency`
   numbers on the motor record.
 - **Controller** (the board: step tick rate, bus cycle, channel count, identity) stays deployment
   data (`SerialDeployment`, the job's `controller.stepTickHz`). The model never carries it. The
@@ -1020,6 +1020,35 @@ X8c implementation:
 - Validation: full `x7-suite-x8c-supplies.txt` gate passed all suites, application build and
   project-source tests. Router times/deviations/limits, CoreXY drive limits, arm mission times
   and the mobile obstacle summary remain unchanged from X8b.
+
+
+X8d implementation:
+
+- Schema v5 retires MotorRecord reduction/efficiency ids 6/7 and adds optional gearbox member
+  id 9. Compilation resolves current parts, including prefixed and reconstructed members, and
+  regenerates intrinsic motor-side feedback counts. Wrong component types are errors.
+- `Gearbox` was a plain value, not a physical part as the target originally claimed. It now has
+  a recipe, BOM identity, input/output connectors and an assumed bored cylindrical aluminium
+  envelope. Ratio/efficiency are stated unless its saved basis says assumed; example gearheads
+  retain their assumed ratios and efficiencies. Teeth, bearings, backlash and compliance remain
+  outside this drive-level model. The bore clears the input shaft; detailed output shafts are omitted.
+- `GearedArmJoint` is a separate recipe for a steel module with a machined pocket. Existing
+  `ArmJoint` recipe inputs stay unchanged. Independent pocket dimensions reject oversized gearheads;
+  installing separate gearheads does not double-count solid housing material. Original exterior
+  dimensions and joint frames are unchanged. Arm and wheel joint effort/rate limits are no longer
+  frozen copies of drive limits: compilation derives those limits from current actuator ratings.
+- The mobile base installs each 40 mm gearhead between its motor and wheel. Track width changes
+  300 → 380 mm from the solved geometry; clearance slots follow the relocated wheels. Drive ratios,
+  motor curves, wheel radius and operating speed policy are unchanged.
+- Arm mass above the base flange 20.6 → 18.3 kg, total 150.4 → 148.1 kg: six steel pockets
+  are replaced by smaller assumed aluminium gearhead envelopes. Definitions/occurrences
+  26/32 → 32/38: six separately dimensioned gearbox members. Mobile base 28.6 → 29.3 kg:
+  two gearhead envelopes plus relocated clearance slots; definitions/occurrences/BOM lines
+  10/18/10 → 11/20/11. Combined mobile cell definitions 41 → 48: its wheel and arm gearheads.
+- Validation: full `x7-suite-x8d-gearheads.txt` gate passed all suites, application build and
+  project-source tests. Rebuild tests cover edited ratio/efficiency/basis, regenerated feedback
+  counts, wrong member types and nested member prefixes. Router plate times/deviations, CoreXY
+  limits, arm/mobile mission times and the mobile obstacle summary remain unchanged from X8c.
 
 ### Later
 

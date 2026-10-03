@@ -1,26 +1,61 @@
 package machinekit.motion;
 
-/**
- * A gearbox between a motor and the joint it drives: the motor turns `ratio` times for one turn of the
- * joint, and the joint gets `efficiency` of the motor's power. Through it a joint's torque is the
- * motor's times the ratio times the efficiency, and its speed the motor's over the ratio, which is
- * how a joint's limits come from its drive rather than from numbers typed in with the joint. Drive-level
- * only: backlash and compliance are left out.
+import cadkit.modeling.Part;
+import machinekit.component.ComponentDetail;
+import machinekit.component.ComponentType;
+import machinekit.component.ComponentValues;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.Dimension;
+import machinekit.component.MachineComponent;
+import machinekit.component.Solids;
+
+/** A drive-level reduction in an assumed cylindrical housing. Ratio and efficiency are stated
+ * unless explicitly marked assumed. Teeth, shaft bearings, backlash and compliance are not modelled.
  */
-class Gearbox {
-  public final ratio:Float;
-  public final efficiency:Float;
+class Gearbox extends MachineComponent {
+	static var recipe:Null<ComponentType>;
+	public final ratio:Float;
+	public final efficiency:Float;
+	public final diameter:Float;
+	public final length:Float;
+	public final bore:Float;
+	public final assumed:Bool;
 
-  public function new(ratio:Float, efficiency:Float) {
-    if (!(ratio > 0.0) || !Math.isFinite(ratio)) throw "A gearbox needs a positive ratio";
-    if (!(efficiency > 0.0 && efficiency <= 1.0)) throw "A gearbox's efficiency is above 0 and at most 1";
-    this.ratio = ratio;
-    this.efficiency = efficiency;
-  }
+	public function new(ratio:Float, efficiency:Float, diameter:Float = 60, length:Float = 40,
+			bore:Float = 8, assumed:Bool = false) {
+		for (value in [ratio, efficiency, diameter, length, bore])
+			if (!(value > 0) || !Math.isFinite(value)) throw "A gearbox needs finite positive ratings and dimensions";
+		if (efficiency > 1 || bore >= diameter) throw "A gearbox needs efficiency at most one and a bore inside its housing";
+		super('GEARBOX-${Dimension.format(ratio)}-${Dimension.format(efficiency)}-' +
+			'${Dimension.format(diameter)}x${Dimension.format(length)}-B${Dimension.format(bore)}-' + (assumed ? "ASSUMED" : "STATED"),
+			'Gearbox, ${Dimension.format(ratio)}:1', "aluminium 6061");
+		this.ratio = ratio;
+		this.efficiency = efficiency;
+		this.diameter = diameter;
+		this.length = length;
+		this.bore = bore;
+		this.assumed = assumed;
+		addConnector("input", Mount, Solids.axial(0, 0, 0));
+		addConnector("output", Mount, Solids.axial(0, 0, length));
+	}
 
-  /** The joint's peak torque (N m) with a motor of `motorTorque`. */
-  public function jointTorque(motorTorque:Float):Float return motorTorque * ratio * efficiency;
-
-  /** The joint's top speed (rad/s) with a motor of `motorSpeed`. */
-  public function jointSpeed(motorSpeed:Float):Float return motorSpeed / ratio;
+	public function jointTorque(motorTorque:Float):Float return motorTorque * ratio * efficiency;
+	public function jointSpeed(motorSpeed:Float):Float return motorSpeed / ratio;
+	public static function recipeType():ComponentType {
+		if (recipe == null) recipe = new ComponentType("machinekit.motion.gearbox", [
+			ComponentRecipeSupport.scalar("ratio", 10), ComponentRecipeSupport.scalar("efficiency", 0.9),
+			ComponentRecipeSupport.length("diameter", 60), ComponentRecipeSupport.length("length", 40),
+			ComponentRecipeSupport.length("bore", 8), ComponentRecipeSupport.choice("basis", ["stated", "assumed"], "stated")
+		], v -> new Gearbox(v.number("ratio"), v.number("efficiency"), v.number("diameter"), v.number("length"),
+			v.number("bore"), v.token("basis") == "assumed"));
+		return recipe;
+	}
+	override public function componentType():Null<ComponentType> return Std.isExactType(this, Gearbox) ? recipeType() : null;
+	override public function values():ComponentValues return new ComponentValues().setNumber("ratio", ratio)
+		.setNumber("efficiency", efficiency).setNumber("diameter", diameter).setNumber("length", length)
+		.setNumber("bore", bore).setToken("basis", assumed ? "assumed" : "stated").setToken("material", materialSpec());
+	override public function hasGeometry():Bool return true;
+	override public function geometry(detail:ComponentDetail = Preview):Part
+		return Solids.cut(Solids.named(Part.cylinderSpan(diameter / 2, 0, length), "body"),
+			[Solids.named(Part.cylinderSpan(bore / 2, -1, length + 1), "bore")]);
 }

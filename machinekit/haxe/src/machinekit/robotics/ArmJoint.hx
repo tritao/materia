@@ -30,12 +30,12 @@ class ArmJoint extends MachineComponent implements MotorDrive {
 	/** The servo motor inside the module, or null when it is only a housing. */
 	public final servo:Null<ServoMotor>;
 
-	public function new(diameter:Float, length:Float, ?flange:RobotFlange, ?servo:ServoMotor) {
+	public function new(diameter:Float, length:Float, ?flange:RobotFlange, ?servo:ServoMotor, variant:String = "") {
 		if (!Math.isFinite(diameter) || !Math.isFinite(length) || !(diameter > 0) || !(length > 0))
 			throw "Arm joint needs a positive diameter and length";
 		var text = '${Dimension.format(diameter)}x${Dimension.format(length)}';
 		var base = flange == null ? 'ARM-JOINT-D$text' : 'ARM-JOINT-D$text-${flange.designation}';
-		super(servo == null ? base : '$base-${servo.designation}', 'Arm joint module, $text mm' +
+		super((servo == null ? base : '$base-${servo.designation}') + variant, 'Arm joint module, $text mm' +
 			(servo == null ? "" : ' with ${servo.designation}'), "steel 12.9", true);
 		this.servo = servo;
 		this.diameter = diameter;
