@@ -357,6 +357,9 @@ class MachineAssemblyDescriptionTests {
 		}
 		var built = definition(assembly);
 		near(turnLimit(built), cap, "the screw's joint is capped at it");
+		var resolved = LeadScrew.relation(long, 1);
+		near(resolved.ratio, 2 * Math.PI / thread.signedLead(), "the screw resolves its ratio and efficiency together");
+		near(resolved.efficiency, thread.efficiency(), "the resolved efficiency comes from the thread");
 		var coupling = built.couplings[0];
 		var backlash = coupling.backlash, drag = coupling.drag, stiffness = coupling.stiffness;
 		near(backlash == null ? 0 : backlash, DriveDefaults.LEAD_SCREW_BACKLASH, "a screw drive has its nut's backlash allowance");

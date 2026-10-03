@@ -686,9 +686,10 @@ class MachineAssembly {
 			case Belt(pulley, alignment): {coupling: id, kind: "belt", members: [pulley],
 				alignment: alignment, leaderZero: leaderZero};
 		};
-		var ratio = driveRatio(record);
-		addCoupling(id, leader, follower, ratio, -ratio * leaderZero, driveEfficiency(record));
-		applyDriveAllowances(record);
+		var relation = machinekit.transmission.TransmissionResolver.resolve(record, requireMember);
+		var ratio = relation.ratio;
+		addCoupling(id, leader, follower, ratio, -ratio * leaderZero, relation.efficiency);
+		writeDrive(record, relation);
 		drives.push(record);
 		return ratio;
 	}
@@ -722,8 +723,9 @@ class MachineAssembly {
 			entry.nearSupport = supportName(near);
 			entry.farSupport = supportName(far);
 			entry.unsupported = unsupported;
-			applyDrive(entry);
-			var cap = screwCap(entry);
+			var relation = machinekit.transmission.TransmissionResolver.resolve(entry, requireMember);
+			writeDrive(entry, relation);
+			var cap = relation.followerSpeedCap;
 			if (cap == null) throw 'Drive "$id" has no supports';
 			return cap;
 		}
@@ -737,109 +739,34 @@ class MachineAssembly {
 			case Fixed: "fixed";
 		};
 
-	static function supportOf(name:String):machinekit.motion.ScrewSupport
-		return switch name {
-			case "free": Free;
-			case "simple": Simple;
-			case "fixed": Fixed;
-			case other: throw 'Unknown screw support "$other"';
-		};
-
-	/** A lead screw's speed cap in rad/s from how its ends are held, or null when no supports are recorded. */
-	function screwCap(drive:machinekit.assembly.MachineAssemblyDescription.DriveRecord):Null<Float> {
-		var near = drive.nearSupport, far = drive.farSupport;
-		if (drive.kind != "lead-screw" || near == null || far == null) return null;
-		var screw:machinekit.motion.LeadScrew = cast requireMember(drive.members[0]);
-		return screw.criticalSpeed(supportOf(near), supportOf(far), drive.unsupported,
-			machinekit.assembly.DriveDefaults.CRITICAL_SPEED_MARGIN);
-	}
-
-	/** Puts a drive's stiffness, backlash and drag on its coupling, and a screw's critical speed on its joint. */
-	function applyDriveAllowances(drive:machinekit.assembly.MachineAssemblyDescription.DriveRecord):Void {
-		var coupling:Null<materia.assembly.AssemblyDefinition.AssemblyJointCoupling> = null;
-		if (mechanical.couplings != null) for (entry in mechanical.couplings) if (entry.id == drive.coupling) coupling = entry;
-		if (coupling == null) return;
-		coupling.stiffness = drive.stiffness;
-		var backlash = drive.backlash, drag = drive.drag;
-		if (backlash == null && drive.kind == "lead-screw") backlash = machinekit.assembly.DriveDefaults.LEAD_SCREW_BACKLASH;
-		if (drag == null) drag = switch drive.kind {
-			case "lead-screw": machinekit.assembly.DriveDefaults.LEAD_SCREW_DRAG;
-			case "belt": machinekit.assembly.DriveDefaults.BELT_DRAG;
-			case _: null;
-		};
-		coupling.backlash = backlash;
-		coupling.drag = drag;
-		var cap = screwCap(drive);
-		if (cap != null) for (joint in mechanical.joints) if (joint.id == coupling.target) joint.limits.velocity = cap;
-	}
-
 	/** The drive behind coupling `id`, or null when its ratio is a plain number. */
 	public function drive(id:String):Null<machinekit.assembly.MachineAssemblyDescription.DriveRecord> {
 		for (entry in drives) if (entry.coupling == id) return copyDrive(entry, "");
 		return null;
 	}
 
-	/** Follower radians (or units) per leader unit, from the drive's parts as they are now. */
-	function driveRatio(drive:machinekit.assembly.MachineAssemblyDescription.DriveRecord):Float {
-		if (!(Math.abs(drive.alignment) == 1)) throw 'Drive "${drive.coupling}" needs an alignment of 1 or -1';
-		function part(index:Int):MachineComponent {
-			if (drive.members.length <= index) throw 'Drive "${drive.coupling}" names too few parts';
-			return requireMember(drive.members[index]);
-		}
-		function gear(index:Int):machinekit.transmission.SpurGear {
-			var member = part(index);
-			if (!Std.isOfType(member, machinekit.transmission.SpurGear))
-				throw 'Drive "${drive.coupling}": "${drive.members[index]}" is not a spur gear';
-			return cast member;
-		}
-		return switch drive.kind {
-			case "lead-screw":
-				var member = part(0);
-				if (!Std.isOfType(member, machinekit.motion.LeadScrew))
-					throw 'Drive "${drive.coupling}": "${drive.members[0]}" is not a lead screw';
-				var screw:machinekit.motion.LeadScrew = cast member;
-				2 * Math.PI * drive.alignment / screw.thread.signedLead();
-			case "gear-mesh":
-				-drive.alignment * gear(0).teeth / gear(1).teeth;
-			case "rack-and-pinion":
-				drive.alignment * 2 / gear(0).pitchDiameter;
-			case "belt":
-				var member = part(0);
-				var diameter = Std.isOfType(member, machinekit.transmission.TimingPulley)
-					? (cast(member, machinekit.transmission.TimingPulley)).pitchDiameter
-					: Std.isOfType(member, machinekit.transmission.Sprocket)
-					? (cast(member, machinekit.transmission.Sprocket)).pitchDiameter
-					: throw 'Drive "${drive.coupling}" needs a timing pulley or sprocket';
-				drive.alignment * 2 / diameter;
-			case kind: throw 'Drive "${drive.coupling}" has unknown kind "$kind"';
-		};
-	}
-
-	/** Set the ratio and offset of a driven coupling from its parts; false when it has no coupling. */
+	/** Recompute all derived coupling data together from the drive's parts. */
 	function applyDrive(drive:machinekit.assembly.MachineAssemblyDescription.DriveRecord):Bool {
 		if (mechanical.couplings != null) for (coupling in mechanical.couplings) if (coupling.id == drive.coupling) {
-			var ratio = driveRatio(drive);
-			coupling.ratio = ratio;
-			coupling.offset = -ratio * drive.leaderZero;
-			coupling.efficiency = driveEfficiency(drive);
-			applyDriveAllowances(drive);
-			return true;
+			return writeDrive(drive, machinekit.transmission.TransmissionResolver.resolve(drive, requireMember));
 		}
 		return false;
 	}
 
-	/**
-	 * Share of power a drive passes on: a lead screw's from its thread and a typical nut friction,
-	 * and typical values for a gear mesh (0.98), a rack and pinion (0.95) and a timing belt (0.97).
-	 */
-	function driveEfficiency(drive:machinekit.assembly.MachineAssemblyDescription.DriveRecord):Float {
-		return switch drive.kind {
-			case "lead-screw": (cast(requireMember(drive.members[0]), machinekit.motion.LeadScrew)).thread.efficiency();
-			case "gear-mesh": 0.98;
-			case "rack-and-pinion": 0.95;
-			case "belt": 0.97;
-			case kind: throw 'Drive "${drive.coupling}" has unknown kind "$kind"';
-		};
+	function writeDrive(drive:machinekit.assembly.MachineAssemblyDescription.DriveRecord,
+			relation:machinekit.transmission.TransmissionRelation):Bool {
+		if (mechanical.couplings != null) for (coupling in mechanical.couplings) if (coupling.id == drive.coupling) {
+			coupling.ratio = relation.ratio;
+			coupling.offset = -relation.ratio * drive.leaderZero;
+			coupling.efficiency = relation.efficiency;
+			coupling.stiffness = relation.stiffness;
+			coupling.backlash = relation.backlash;
+			coupling.drag = relation.drag;
+			if (relation.followerSpeedCap != null) for (joint in mechanical.joints)
+				if (joint.id == coupling.target) joint.limits.velocity = relation.followerSpeedCap;
+			return true;
+		}
+		return false;
 	}
 
 	/**

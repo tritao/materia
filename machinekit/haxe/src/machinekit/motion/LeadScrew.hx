@@ -18,6 +18,12 @@ import machinekit.component.Solids;
  * the flank profile, reliefs and machined ends are not generated.
  */
 class LeadScrew extends MachineComponent {
+	/** Resolve the coupling from these parts. */
+	public static function relation(screw:LeadScrew, alignment:Float):machinekit.transmission.TransmissionRelation
+		return new machinekit.transmission.TransmissionRelation(2 * Math.PI * alignment / screw.thread.signedLead(),
+			screw.thread.efficiency(), null, machinekit.assembly.DriveDefaults.LEAD_SCREW_BACKLASH,
+			machinekit.assembly.DriveDefaults.LEAD_SCREW_DRAG);
+
 	public final thread:LeadScrewThread;
 	public final totalLength:Float;
 

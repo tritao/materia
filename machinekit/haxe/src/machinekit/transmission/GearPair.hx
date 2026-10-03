@@ -8,6 +8,10 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
  * axis so the teeth interleave.
  */
 class GearPair extends MachineAssembly {
+	/** Resolve the coupling from these parts. */
+	public static function relation(driver:SpurGear, driven:SpurGear, alignment:Float):TransmissionRelation
+		return new TransmissionRelation(-alignment * driver.teeth / driven.teeth, 0.98);
+
 	public final a:SpurGear;
 	public final b:SpurGear;
 	public final centerDistance:Float;

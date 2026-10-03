@@ -705,8 +705,15 @@ latency.
 
 ### X7 — Transmissions compile from their parts
 
-Status: planned (2026-10-03), after an architecture review of `1048bf7`. T0 (merge of local main)
-done in worktree `x7-transmissions`.
+Status: T0 and T1 done (2026-10-03); T2–T5 not started.
+Worktree `x7-transmissions`.
+
+T1: one resolved relation and part-level equations replace the assembly's ratio, efficiency
+and allowance switches. Fixed efficiencies and `DriveDefaults` are unchanged. Standalone
+MachineKit and the full `x7-suite-t1-session.txt` gate pass: screw plate 220.2 s, belt plate
+201.6 s, belt deviation 1.9 mm; CoreXY 204.1 rad/s, 649.6 mm/s, 71.6 / 34 m/s².
+Earlier gate runs received external
+SIGINT; running tests in a separate process session (`setsid`) lets MachineKit finish.
 
 Through X6 a drive was a prototype for finding the semantics. `Drive` is an enum, but
 `MachineAssembly` holds three string switches (`driveRatio`, `driveEfficiency`,
