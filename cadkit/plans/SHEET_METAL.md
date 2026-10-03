@@ -31,8 +31,9 @@ The work spans kits:
 
 ## What exists
 
-Surveyed 2026-10-03 on local main 1048bf768, plus the `machine-tending`, `mobile-welder`,
-`x7-transmissions` and `collision` branches.
+Surveyed 2026-10-03, updated 2026-10-04 on local main 712019dbc (= origin/main), plus the
+`machine-tending` and `collision` branches. Since 1048bf768, main gained transmissions X7–X10 and
+the robot welder (W0–W4); see "On main since the first survey" below.
 
 **CadKit native core** (`cadkit/core/include/cadkit.h`, Haxe binding generated into
 `cadkit/haxe/abi/CadKit.hxi` from the header's `CADKIT_HXI_*` annotations):
@@ -51,8 +52,8 @@ Surveyed 2026-10-03 on local main 1048bf768, plus the `machine-tending`, `mobile
 **CadKit parametric layer** (`cadkit/haxe/src/cadkit/parametric/`):
 - `Feature` (`evaluate`, `commitEvaluation`/`discardEvaluation`, `registerParameter`,
   `dependencies`, `serializationType`), `Document` (staged atomic recompute, transactions,
-  undo/redo), `DocumentCodec` (versioned JSON, dispatches on `featureType` strings around lines
-  270–335 and 579–742), `recording/DocumentBuilder`.
+  undo/redo), `DocumentCodec` (format `cadkit.document`, one supported `VERSION`, dispatches on
+  `featureType` strings in its decode and encode paths), `recording/DocumentBuilder`.
 - Features: box, cylinder, extrude, revolve, sweep, loft, shell, offset, fillet, chamfer,
   boolean, mirror, patterns, hole, pocket, transform, sketch, constrained sketch, datum sketch,
   imported STEP, tool collection, definition output.
@@ -72,14 +73,39 @@ Surveyed 2026-10-03 on local main 1048bf768, plus the `machine-tending`, `mobile
 - No DXF anywhere. No sheet metal, press brake, bend tooling or bending code anywhere.
 - MachineKit has the component/connector/port/capability model, `ParallelGripper` (envelope
   only), suction tools, `LinearRailSystem`, lead screws, `ServoMotor`, `Gearbox`, encoders,
-  `PortKind.Signal`, and the X-series transmissions on their branches.
-- Planned on `machine-tending` (MT plan, not built yet) and needed here: cobot arms in size
-  classes (MT3), pneumatic actuators + digital switches + presence sensors (MT5), two
-  controllers per cell + `CellSignals` (MT6), a machine-side robot-interface state machine
-  pattern (MT7), a real parallel gripper and `gripper` robot-tool kind (MT8), mission steps
-  `signal`/`waitFor`/`moveVia` (MT10).
-- Collision: `kinematicskit` `CollisionWorld` on coal (branch `collision`, CL1). `ArmClearance`
-  on the welder branch. No collision-aware planner (CL6).
+  `LinearScale`, `PortKind.Signal`.
+
+**On main since the first survey (X7–X10, welder)**
+- `MachineAssembly.addTransmission(id, leader, follower, source:Transmission, ...)` with typed
+  sources resolved by `TransmissionResolver` into one `TransmissionRelation` (allowances,
+  efficiency, stiffness, provenance of assumed values); `supportScrew`, `addBeltPath`, belt
+  elasticity and shared belt spans (X10).
+- `addMotor(id, joint, motor, driver, margin, ?gearbox)`: motor, driver (`MotorDriver`), supply
+  (`PowerSupply`, voltage from the power service graph) and gearbox members are separate parts;
+  drivers own microsteps and pulse ceilings (X8). Effective joint limits are compiled from the
+  physical assembly (X9a). `addEncoder`.
+- Robot welder merged: `ArmTool`, `RobotArm(withCell, ?armTool)`, `robotkit.manipulation.ArmClearance`
+  and `robotkit.tool.ConvexSolid` (swept clearance of arm and tool hulls), `ProgramPlanner.shutdown()`,
+  weld mission steps, ProcessKit `WeldingPlanRunner`/`WelderProcessDevice`.
+- `machinekit/TRANSMISSION_PLAN.md` records the conventions; read it before SM8a.
+- **No backward compatibility** (X9b, and the rule in `robotkit/RESTRUCTURE_PLAN.md`): one
+  schema version per saved format, older versions rejected with one generic message; bump versions
+  when a format changes, regenerate fixtures, delete old paths. No migrations, shims or aliases.
+- RobotKit restructuring plan (`robotkit/RESTRUCTURE_PLAN.md`, 315e5e2d8, planned, starts after X9e): process-specific skills and
+  simulated process tools move from RobotKit to ProcessKit (R3); a new robot kind is a
+  `RobotProfile`, never a `RobotModel` field (R2); `TrajectoryChunk` is removed in favour of
+  execution plans (R1), which changes the D5 streaming API.
+
+**On the `machine-tending` branch (not on main yet) and needed here**
+- Done there: `BallScrew`/`BallNut`/BK–BF supports and HGR rails (MT1), `BenchMill` (MT2),
+  `CobotArm` size classes `Reach500/850/900/1300` (MT3; tending chose Reach850 on a 550 mm riser),
+  enclosure and reach study (MT4).
+- In progress / planned there: pneumatic actuators as process-driven joints, `addSwitch`
+  (`joint_switch` sensors), `addPresence` (MT5); two controllers per cell + `CellSignals` (MT6);
+  the machine-side `RobotInterface` state machine pattern (MT7); a real parallel gripper and the
+  `gripper` robot-tool kind (MT8); mission steps `signal`/`waitFor`/`moveVia` (MT10).
+- Collision: `kinematicskit` `CollisionWorld` on coal exists only on branch `collision` (CL1,
+  335ef1b98, unmerged). No collision-aware planner (CL6).
 - SimKit: `hold_object`/`release_object`, kinematic actors, MuJoCo weld equalities (used for
   closures in `mujoco_backend.cpp`). No deformable bodies.
 - RobotKit: no regrasp, no force control, D5 streamed Cartesian servoing exists (MotionKit Lane D).
@@ -210,8 +236,10 @@ table in `tools/README.md`.
 - Ram on prismatic joints driven by two hydraulic cylinders. The torsion bar of the reference
   machine is a coupling Y2 = Y1 (X5 coupling). A closed-loop Y1/Y2 machine is a variant without
   the coupling and with a linear scale per side.
-- Hydraulic cylinders are actuators like MT5's pneumatic ones: force `p·A`, speed limited per
-  phase (approach, working, return) by pump flow, the phase change at the speed-change point.
+- Hydraulic cylinders are actuators on the same process-driven-joint mechanism as MT5's
+  pneumatic ones (one mechanism, a second actuator kind; never a parallel implementation): force
+  `p·A`, speed limited per phase (approach, working, return) by pump flow, the phase change at the
+  speed-change point.
 - The mechanical depth stop is its own axis (motor + screw) on stop-controlled machines.
 - Backgauge X (and optional R) are axes with servo drives and X7 transmissions; fingers are parts
   with contact switches (MT5 `addSwitch`).
@@ -241,9 +269,13 @@ table in `tools/README.md`.
 - Search: best-first with an admissible heuristic (remaining bends × minimum bend time). If no
   sequence exists, return the deepest failing states with named reasons ("flange B3 shorter than
   minimum 8.4 mm at V12", "flange W2 hits punch at 62°").
-- Collision goes through a narrow interface `SheetCollisionQuery` implemented on KinematicsKit's
-  coal `CollisionWorld`; walls are decomposed into convex prisms (outline → convex pieces), bend
-  zones into a few convex segments. Switch the implementation to collisionkit when CL2–CL4 land.
+- Collision goes through a narrow interface `SheetCollisionQuery`. Every piece involved is a
+  convex prism: walls decomposed into convex pieces of their outline, bend zones into a few
+  segments, tool segments (gooseneck profiles split into convex parts), and the machine as a few
+  boxes. The first implementation is an exact separating-axis test for convex prisms inside the
+  planner package, recorded as interim. When coal's collision world (collisionkit, CL2–CL4) is on
+  main, switch the implementation and delete the interim one.
+- MachineKit must not depend on RobotKit, so the planner does not use `robotkit.tool.ConvexSolid`.
 
 **SM-D11. In simulation the sheet is welded wall bodies whose relative poses are the sheet's FK.**
 - Each wall (and each bend zone, as a few segments) is a MuJoCo body with convex geoms. Neighbours
@@ -306,7 +338,7 @@ table in `tools/README.md`.
   keeps final authority over valves, e-stops, curtain and guards, and our controller only
   requests.
 
-## Reference numbers (fixed in SM7, SM8, SM13; assumed until checked against a spec sheet)
+## Reference numbers (fixed in SM7, SM8a, SM13; assumed until checked against a spec sheet)
 
 | Item | Value |
 |---|---|
@@ -333,14 +365,16 @@ Demo parts (all in material A unless noted):
 ### Phase A: sheet metal design (CadKit; can start now)
 
 **SM0. Base and setup.**
-- Worktree `/home/joao/dev/materia-worktrees/sheet-metal`, branch `sheet-metal` from local main
-  1048bf768. Commit on this branch; do not create other branches.
-- Phase A needs only the `haxeon` submodule. The `mobile-base` worktree is at the same commit
-  (1048bf768) with populated submodules: `git clone --no-checkout
-  /home/joao/dev/materia-worktrees/mobile-base/haxeon <wt>/haxeon`, check out the pinned sha
+- Worktree `/home/joao/dev/materia-worktrees/sheet-metal`, branch `sheet-metal`, rebased on local
+  main 712019dbc (= origin/main) on 2026-10-04. Commit on this branch; do not create other
+  branches.
+- Phase A needs only the `haxeon` submodule (pin 03ce62d4). The `x7-transmissions` worktree is at
+  the same commit as main with populated submodules: `git clone --no-checkout
+  /home/joao/dev/materia-worktrees/x7-transmissions/haxeon <wt>/haxeon`, check out the pinned sha
   (`git submodule status`), and copy `haxeon/.tools/` and `haxeon/out/haxeon_runtime.hdll` from
-  that worktree. Write guarded paths in destructive commands (`"${WT:?}"/...`).
-- CadKit native: `cadkit/core` is unchanged between origin/main 3fd620e4 and 1048bf768, so use
+  that worktree. Phase B also needs `nativekit` and the kits' vendors for the MachineKit suite;
+  clone them the same way. Write guarded paths in destructive commands (`"${WT:?}"/...`).
+- CadKit native: `cadkit/core` is unchanged between origin/main 3fd620e4 and 712019dbc, so use
   `CADKIT_BUILD_ROOT=/home/joao/dev/materia-worktrees/topological-naming/cadkit/build/debug`
   until SM5 changes the native core. The shared checkout's build lacks `cad_shape_stamp_names`.
 - When SM5 needs a native build: configure CadKit in the worktree with
@@ -348,7 +382,9 @@ Demo parts (all in material A unless noted):
   configure (`-DCADKIT_BUILD_OCCT=OFF`). Never build OCCT.
 - Tests: `cadkit/scripts/test-haxeon` with `CADKIT_SMOKE_ENTRY=<entry>`. Add a
   `SheetMetalSmoke.hx` entry in `cadkit/haxe/tests/` and keep `HaxeonSmoke` passing.
-- Disk: check `df -h /` first (9.8 GB free on 2026-10-03). Populate other submodules only when a
+- Full gate for phase B and C changes: `/home/joao/dev/materia-cache/claude-scratch/x7-suite.sh`
+  (the transmissions sessions' suite; copy and adapt it, do not edit the original).
+- Disk: check `df -h /` first (14 GB free on 2026-10-04). Populate other submodules only when a
   later step needs them.
 - Read `cadkit/ARCHITECTURE.md`, `cadkit/haxe/MODELING.md`, `cadkit/plans/TOPOLOGICAL_NAMING.md`
   before writing code; match their conventions.
@@ -393,7 +429,9 @@ Demo parts (all in material A unless noted):
 **SM3. Sheet features in the document.**
 - `SheetFeature extends Feature` (SM-D5) with `sheet()` and the folded shape as `shape`.
 - Features (each with `serializationType`, parameters through `registerParameter`, codec branches
-  in `DocumentCodec`, builder helpers in `DocumentBuilder`):
+  in `DocumentCodec`, builder helpers in `DocumentBuilder`). New feature types extend the current
+  document schema; if anything existing changes shape, bump `DocumentCodec.VERSION` and regenerate
+  fixtures, with no reader for the old version:
   - `sheet-base`: from a closed constrained-sketch profile, thickness, material reference, side
     (profile is side A or side B);
   - `sheet-edge-flange`: on one or more wall edges (persistent references to
@@ -451,9 +489,10 @@ Demo parts (all in material A unless noted):
 **SM6. Bend process model.**
 - `BendProcess`, `AirBending`, `CalibrationTable` per SM-D8, in `cadkit.sheetmetal.process`
   (pure; tooling geometry enters as plain numbers so CadKit does not depend on MachineKit).
-- `MaterialDef` gains optional `mechanical {uts, yield, youngs}` and optional `sheet {kFactor
-  table, minRadiusRatio, grain}` in `projectkit`. Optional fields keep old projects loading; add a
-  codec test that a v-current project without them still loads.
+- `MaterialDef` gains `mechanical {uts, yield, youngs}` (optional: not every material is
+  structural) and `sheet {kFactorTable, minRadiusRatio, grain}` (optional: only sheet materials)
+  in `projectkit`. Extend the current schema, bump its version if the codec requires it, and
+  regenerate fixtures and example projects; no compatibility path (repo rule).
 - `BendRule.Process(tooling)`: flat pattern for a chosen punch/die.
 - Tests:
   - natural radius, tonnage and minimum flange against the formulas for material A at V8/V12/V16;
@@ -462,7 +501,7 @@ Demo parts (all in material A unless noted):
   - depth: closed form equals the numeric three-circle construction within 1 µm over 20°–150°;
   - a calibration entry overrides the analytic depth and radius.
 
-### Phase B: the press brake and bend planning (MachineKit; only SM8 waits for X7)
+### Phase B: the press brake and bend planning (MachineKit; only SM8b waits, for MT5)
 
 **SM7. Tooling catalogue.**
 - No prerequisite: tooling is plain parts, with no transmissions or drives.
@@ -476,17 +515,33 @@ Demo parts (all in material A unless noted):
 - Tests: catalogue rows; a station's length equals the sum of segments; a layout rejects overlapping
   stations and stations past the bed.
 
-**SM8. The press brake assembly.**
-- Prerequisite: X7 done, meaning a commit whose message contains `X7 T5` is on
-  `x7-transmissions` or on local `main` (`git log --oneline main x7-transmissions | grep 'X7 T5'`).
-  Then merge whichever has it into `sheet-metal` and write against `Transmission`, never `Drive`.
-  If it is not there yet, skip SM8 and continue with SM9 (see Working rules).
-- `machinekit/examples/press-brake/PressBrake extends MachineAssembly`: side frames, bed, ram,
-  hydraulic cylinders Y1/Y2 (new `Hydraulic` actuator kind: bore, rod, stroke, phase speeds,
-  speed-change point; projectkit format bump), torsion-bar coupling (profile `StopControlled`),
-  depth-stop axis, backgauge X (+R) with servo drives and transmissions, fingers with contact
-  switches, front sheet supports, light curtain part with a `Signal` port, tool clamps, a
-  `ToolLayout`.
+**SM8a. The press brake assembly (unblocked: X7–X10 are on main).**
+- `machinekit/examples/press-brake/PressBrake extends MachineAssembly`, in the cnc-router idiom:
+  side frames, bed, ram on prismatic joints, torsion-bar coupling Y2 = Y1 (profile
+  `StopControlled`), depth-stop axis (motor + screw), backgauge X (+R), fingers, front sheet
+  supports, light curtain part with a `Signal` port, tool clamps, a `ToolLayout`.
+- Drives through main's APIs: `addTransmission` with typed `Transmission` sources, `supportScrew`,
+  `addMotor(id, joint, motor, driver, margin, ?gearbox)` with `ServoMotor` + `MotorDriver` for the
+  backgauge and depth stop, `addEncoder`, `LinearScale` on the ram. Backgauge X is a ball screw if
+  MT1's `BallScrew` is on main by then; otherwise a timing belt from main. Record which, and
+  switch to the ball screw when it lands.
+- The hydraulic cylinders are parts (bore, rod, stroke) mated to the ram; their actuation is SM8b.
+- `PressGeometry.of(pressBrake)` derives SM9's plain-number geometry from the assembly, and a
+  check asserts it equals the reference `PressGeometry`.
+- `PressBrakeChecks` in the MachineKit smoke suite: tonnage capacity vs the SM6 formula for the
+  bed length; open height and throat clear the tallest tooling and P1–P5 at every stroke
+  position; backgauge reach covers the demo parts' gauge distances; BOM.
+- `press-brake/materia.project.json` and a Start-page entry showing the machine alone (joints
+  moved by the editor, no actuation yet).
+
+**SM8b. Hydraulic actuation.**
+- Prerequisite: MT5's pneumatic actuators and process-driven joints are on local `main`
+  (`git log --oneline main | grep 'machine tending MT5'` shows the MT5 completion commit, and the
+  `Pneumatic` actuator kind exists in projectkit). Until then this step is blocked.
+- Add the `Hydraulic` actuator kind beside `Pneumatic` on the same mechanism (bore, rod, stroke,
+  supply pressure, phase speeds, speed-change point), `addCylinder` for the ram cylinders with a
+  valve block part, and the switches (top, speed change, bottom, finger contacts) through
+  `addSwitch`. Bump the projectkit format and regenerate fixtures.
 - `PressBrakeChecks` in the MachineKit smoke suite: tonnage capacity vs the SM6 formula for the
   bed length; open height and throat clear the tallest tooling and P1–P5 at every stroke
   position; backgauge reach covers the demo parts' gauge distances; BOM.
@@ -494,10 +549,9 @@ Demo parts (all in material A unless noted):
   scripted stroke.
 
 **SM9. Single-bend setup.**
-- Independent of SM8: it takes a `PressGeometry` (bed, die-top height, punch line, ram envelope,
-  backgauge travel and finger shape, as plain numbers in `machinekit.pressbrake.planning`) filled
-  from the reference numbers. SM8 later derives the same `PressGeometry` from the assembly, and a
-  check asserts they agree.
+- It takes a `PressGeometry` (bed, die-top height, punch line, ram envelope, backgauge travel and
+  finger shape, as plain numbers in `machinekit.pressbrake.planning`) filled from the reference
+  numbers, so it does not wait for SM8a; SM8a checks that the assembly agrees.
 - `BendSetup.plan(sheet, state, bend, station, orientation, gaugeEdge, process)`: backgauge X and
   R from the evaluated state in the press frame (SM-D10), depth and overbend from SM6, tonnage
   check, minimum flange check, finger contact points, the part's swing envelope.
@@ -507,9 +561,8 @@ Demo parts (all in material A unless noted):
 
 **SM10. Bend sequence search.**
 - `BendSequencer` per SM-D10: states, actions, feasibility, cost, best-first search, diagnostics.
-  `SheetCollisionQuery` on KinematicsKit's `CollisionWorld`. If `CollisionWorld` is not on
-  `sheet-metal` yet, merge the `collision` branch (CL1 is commit 335ef1b98); if the merge does not
-  apply cleanly, abort it, mark SM10 blocked and continue.
+  `SheetCollisionQuery` with the interim exact convex-prism test (SM-D10); do not merge the
+  `collision` branch.
 - Output `BendProgram`: ordered steps (station, orientation, gauge edge, X, R, depth, overbend,
   grip, regrip/flip markers, expected time).
 - Robot grip feasibility is a pluggable check (`GripCheck`): Phase B uses a geometric stand-in
@@ -519,11 +572,11 @@ Demo parts (all in material A unless noted):
   P5 needs a station with gaps; a crafted part with a flange that hits the punch in every order
   returns the collision diagnosis; the search is deterministic.
 
-### Phase C: simulated press and bending cell (after machine-tending MT3, MT5, MT6, MT8, MT10 and the welder merge)
+### Phase C: simulated press and bending cell (after machine-tending MT3, MT5–MT8 and MT10 are on main)
 
 **SM11. Simulated press and its interface.**
-- Prerequisites: check that `machine-tending` has landed MT5 (actuators, switches), MT6
-  (controllers, `CellSignals`) and MT7's pattern; if not, stop and report.
+- Prerequisites on local `main`: SM8b done, and machine-tending MT6 (controllers, `CellSignals`)
+  and MT7 (`RobotInterface` pattern) merged. Otherwise blocked.
 - Hydraulic ram as a process-driven joint (MT5 style) with phase speeds and the speed-change point;
   depth stop and backgauge on the press controller; finger switches; retract of the fingers as
   the ram passes the clamping point.
@@ -546,13 +599,19 @@ Demo parts (all in material A unless noted):
 - `machinekit/examples/press-brake/BendingCell`: press, cobot (`CobotArm` class from the reach
   study), vacuum gripper `ArmTool`, blank stack table, centring table, regrip table, outfeed table,
   fence, controller cabinets and wiring.
-- Reach study (`BendingReach`): grip poses on P1–P4 at the press through their whole swing, the
-  stack, the centring and regrip tables, with 10 % joint margin; start with `Reach1300`, record the
-  class and riser here.
+- Prerequisites on local `main`: SM11, SM12, and machine-tending MT3 (`CobotArm`), MT8 (gripper
+  kind) and MT10 (mission steps) merged.
+- Reach study (`BendingReach`, like MT4's `TendingReach`): grip poses on P1–P4 at the press through
+  their whole swing, the stack, the centring and regrip tables, with 10 % joint margin; start with
+  `Reach1300` (the bed and the tables spread wider than the tending cell), try `Reach850` on a
+  riser, record the class and riser here.
 - Mission steps: reuse MT10's `signal`, `waitFor`, `moveVia`, oriented `pick`/`place`; add `bend`
   (register to fingers by creeping until both switches make → `request_stroke` → follow streamed
-  from the ram position → release or keep → retract) and `regrip`. RobotKit `BendFollow` skill, a
-  ProcessKit device for the press handshake, app `MissionPlayer` mapping, scene validation.
+  from the ram position → release or keep → retract) and `regrip`. The `BendFollow` skill and the
+  press-handshake device live in ProcessKit (process-specific, per RobotKit restructuring R3; put
+  them there even if R3 has not run yet); RobotKit only gains generic pieces if needed. Use the
+  streaming API that exists after R1 (execution plans), not `TrajectoryChunk`, if R1 has landed.
+  App `MissionPlayer` mapping and scene validation as for the weld step.
 - `BendingMission.generate(cell, part, program)` from the SM10 program.
 - Acceptance (`ProjectSourceTests.checkPressBrakeCell`, MuJoCo): P1 from the stack to the outfeed;
   angle within ±0.5° after one calibration pass; follow deviation below 1 mm; 0 collisions;
@@ -594,19 +653,23 @@ Demo parts (all in material A unless noted):
 ```
 SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
                           ├─ SM5
-                          └─ SM6 ── SM7 ── SM9 ── SM10   (collision CL1 merged)
-                         (X7 T5 merged) ── SM8 ──┘ (agreement check with SM9's PressGeometry)
- (MT3, MT5–MT8, MT10 merged) ── SM11 ── SM12 ── SM13 ── SM14 ── SM15 ── SM16
+                          └─ SM6 ── SM7 ─┬─ SM9 ── SM10
+                                         └─ SM8a (agrees with SM9's PressGeometry)
+                              (MT5 on main) ── SM8b
+   (SM8b + MT6, MT7 on main) ── SM11 ── SM12 ── SM13 (MT3, MT8, MT10 on main) ── SM14 ── SM15 ── SM16
                                                        SM17, SM18 later
 ```
 
-- Unblocked now: SM0–SM7, SM9, and SM10 once the `collision` merge applies.
-- SM8 waits for X7 T5. Phase C waits for the machine-tending steps listed.
+- Unblocked now (2026-10-04): SM0–SM7, SM8a, SM9, SM10.
+- SM8b waits for MT5 on main; phase C waits for MT6–MT8 and MT10 on main.
 
 ## Working rules
 
+- **Dependencies count only when they are on local `main`.** To pick one up, merge local `main`
+  into `sheet-metal` (`git merge main`), rerun the affected suites, and commit. Never merge another
+  session's live branch (`machine-tending`, `collision`, ...).
 - **Blocked steps.** Before each step, check its prerequisite exactly as written. If it is
-  missing, do not work around it (no writing against `Drive`, no stand-in signal bus): mark the
+  missing, do not work around it (no stand-in actuator mechanism or signal bus): mark the
   step `blocked: <what is missing>` in the Progress table, commit, and go on to the next unblocked
   step. When no unblocked step is left, re-check every blocked step once (a dependency may have
   landed meanwhile) and do any that are now unblocked. Then stop and end with a short report
@@ -628,7 +691,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 
 | Step | State | Commits |
 |---|---|---|
-| SM0 | worktree created from 1048bf768 | |
+| SM0 | worktree created; rebased on 712019dbc | |
 | SM1 | planned | |
 | SM2 | planned | |
 | SM3 | planned | |
@@ -637,7 +700,8 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM5 | planned | |
 | SM6 | planned | |
 | SM7 | planned | |
-| SM8 | planned | |
+| SM8a | planned | |
+| SM8b | planned (waits for MT5 on main) | |
 | SM9 | planned | |
 | SM10 | planned | |
 | SM11 | planned | |
