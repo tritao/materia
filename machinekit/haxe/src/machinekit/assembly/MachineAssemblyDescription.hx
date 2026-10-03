@@ -270,6 +270,20 @@ import machinekit.component.PortInterface;
 	@:id(3) var motor:String;
 	@:id(4) var volts:Float;
 	@:id(5) var margin:Float;
+	/** A gearbox between the motor and the joint (see `Gearbox`); absent for a direct drive. */
+	@:id(6) @:optional var gearRatio:Null<Float>;
+	@:id(7) @:optional var gearEfficiency:Null<Float>;
+}
+
+/**
+ * An encoder part reading a joint (see `MachineAssembly.addEncoder`), and the motor's actuator it
+ * reads when it is that motor's feedback.
+ */
+@:wire typedef EncoderRecord = {
+	@:id(1) var encoder:String;
+	@:id(2) var joint:String;
+	@:id(3) var part:String;
+	@:id(4) @:optional var actuator:Null<String>;
 }
 
 @:wire typedef AssemblySideRecord = {
@@ -286,6 +300,7 @@ import machinekit.component.PortInterface;
 	@:id(11) var included:ReadOnlyArray<IncludedRecord>;
 	@:id(12) @:optional var drives:ReadOnlyArray<DriveRecord>;
 	@:id(13) @:optional var motors:ReadOnlyArray<MotorRecord>;
+	@:id(14) @:optional var encoders:ReadOnlyArray<EncoderRecord>;
 }
 
 /** Mechanical definition plus the MachineKit facts keyed by occurrence ID. */

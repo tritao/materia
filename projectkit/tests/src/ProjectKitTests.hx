@@ -270,6 +270,160 @@ class ProjectKitTests {
     rejects(function() SceneArtifact.encode(data), "mobile base without its robot");
   }
 
+  /** A torch tool carries its welder with it, and names only what the assembly has. */
+  static function torchTool():Void {
+    var vertices = Bytes.alloc(96), normals = Bytes.alloc(96), indices = Bytes.alloc(48);
+    vertices.setDouble(24, 1); vertices.setDouble(56, 1); vertices.setDouble(88, 1);
+    var corners = [0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3];
+    for (i in 0...corners.length) indices.setInt32(i * 4, corners[i]);
+    var frame = AssemblyFrames.identity();
+    var cell:AssemblyDefinition = {schemaVersion: AssemblyDefinitionCodec.VERSION, id: "cell", lengthUnit: "mm",
+      definitions: [{id: "body", connectors: [{name: "tcp", frame: frame}]}],
+      occurrences: [for (id in ["torch", "plate", "upright"]) {id: id, definition: "body", initialPose: frame}], joints: []};
+    function welder():materia.project.SceneArtifact.SceneArtifactTorch
+      return {wireSpeedChannel: "tool/torch.wire_speed", voltageChannel: "tool/torch.voltage", groundedWork: ["plate", "upright"],
+        maxCurrentA: 350.0, efficiency: 0.88, wireDiameterMm: 1.2, stickoutMm: 15.0, maxWireSpeedMPerMin: 20.0, depositionEfficiency: 0.95};
+    function torch():materia.project.SceneArtifact.SceneArtifactRobotTool
+      return {kind: "torch", contact: {occurrence: "torch", connector: "tcp"}, channel: "tool/torch.arc",
+        sensor: "tool/torch.weld", torch: welder()};
+    var data:materia.project.SceneArtifact.SceneArtifactData = {lengthUnit: "mm", metresPerUnit: 0.001,
+      parts: [{id: "body", name: "body", red: 0.5, green: 0.5, blue: 0.5, vertexCount: 4, indexCount: 12,
+        vertices: vertices, normals: normals, indices: indices, faceRanges: []}],
+      assemblyDefinition: cell, robotTools: [torch()]};
+    var restored = SceneArtifact.decode(SceneArtifact.encode(data)).robotTools;
+    if (restored == null || restored.length != 1 || restored[0].torch == null) throw "torch tool round trip lost the tool";
+    var back:materia.project.SceneArtifact.SceneArtifactTorch = cast restored[0].torch;
+    check(restored[0].kind == "torch" && restored[0].channel == "tool/torch.arc" && restored[0].sensor == "tool/torch.weld" &&
+      restored[0].contact.connector == "tcp" && back.wireSpeedChannel == "tool/torch.wire_speed" &&
+      back.voltageChannel == "tool/torch.voltage" && back.groundedWork.join(",") == "plate,upright" && back.maxCurrentA == 350.0 &&
+      back.efficiency == 0.88 && back.wireDiameterMm == 1.2 && back.stickoutMm == 15.0, "torch tool round trip");
+    // A suction tool beside it keeps working, and the torch's channels may not collide with it.
+    data.robotTools = [torch(), {kind: "suction", contact: {occurrence: "plate", connector: "tcp"}, channel: "cup.enable"}];
+    var both = SceneArtifact.decode(SceneArtifact.encode(data)).robotTools;
+    check(both != null && both.length == 2, "torch beside a suction tool");
+    data.robotTools = [torch()];
+    function bad(change:(materia.project.SceneArtifact.SceneArtifactRobotTool, materia.project.SceneArtifact.SceneArtifactTorch) -> Void,
+        message:String):Void {
+      var tool = torch(), welding = welder();
+      tool.torch = welding;
+      change(tool, welding);
+      data.robotTools = [tool];
+      rejects(function() SceneArtifact.encode(data), message);
+    }
+    bad((tool, w) -> tool.torch = null, "torch without its welder");
+    bad((tool, w) -> tool.sensor = null, "torch without its weld sensor");
+    bad((tool, w) -> tool.contact.connector = "nowhere", "torch whose wire tip is no connector");
+    bad((tool, w) -> w.groundedWork = [], "torch with no grounded work");
+    bad((tool, w) -> w.groundedWork = ["plate", "ghost"], "torch grounded on an occurrence the assembly lacks");
+    bad((tool, w) -> w.groundedWork = ["plate", "plate"], "torch grounded on one occurrence twice");
+    bad((tool, w) -> w.voltageChannel = "tool/torch.arc", "torch whose voltage shares the arc channel");
+    bad((tool, w) -> w.wireSpeedChannel = "", "torch with an unnamed wire speed channel");
+    bad((tool, w) -> w.maxCurrentA = 0, "torch with no supply rating");
+    bad((tool, w) -> w.efficiency = 1.2, "torch with a supply that gives more than it takes");
+    bad((tool, w) -> w.wireDiameterMm = Math.NaN, "torch with a wire that is not a number");
+    bad((tool, w) -> w.stickoutMm = 0, "torch with no stickout");
+    bad((tool, w) -> w.depositionEfficiency = 1.5, "torch whose wire deposits more than it melts");
+    bad((tool, w) -> w.maxWireSpeedMPerMin = 0, "torch whose feeder cannot feed");
+    bad((tool, w) -> tool.kind = "plasma", "tool of an unknown kind");
+    data.robotTools = [torch(), torch()];
+    data.robotTools[1].channel = "tool/other.arc";
+    data.robotTools[1].torch = {wireSpeedChannel: "w2", voltageChannel: "v2", groundedWork: ["plate"], maxCurrentA: 350.0,
+      efficiency: 0.88, wireDiameterMm: 1.2, stickoutMm: 15.0, maxWireSpeedMPerMin: 20.0, depositionEfficiency: 0.95};
+    rejects(function() SceneArtifact.encode(data), "a second torch");
+    data.robotTools = [{kind: "suction", contact: {occurrence: "plate", connector: "tcp"}, channel: "cup.enable", torch: welder()}];
+    rejects(function() SceneArtifact.encode(data), "a suction tool with a welder");
+    weldMission(data, torch);
+  }
+
+  /**
+   * A `weld` step is a path of line segments, each naming the seam of two occurrences it lies along, relative to the
+   * workpiece's reference member; it carries its process, and needs the robot's torch.
+   */
+  static function weldMission(data:materia.project.SceneArtifact.SceneArtifactData,
+      torch:Void -> materia.project.SceneArtifact.SceneArtifactRobotTool):Void {
+    // Wires pointing down into the corner from the open side: 30 degrees off the plate's normal toward the upright (or the
+    // second upright, whose face looks along -X).
+    var intoY = [0.96593, 0.0, 0.0, -0.25882];
+    var intoX = [0.0, 0.96593, 0.0, 0.25882];
+    function segment(seam:String, from:Array<Float>, to:Array<Float>, normals:Array<Array<Float>>, rotation:Array<Float>):materia.project.SceneArtifact.SceneArtifactWeldSegment
+      return {kind: "line", seam: seam, joint: "fillet", start: {position: from, rotation: rotation}, stop: {position: to, rotation: rotation},
+        normals: normals};
+    function line():materia.project.SceneArtifact.SceneArtifactWeldSegment
+      return segment("plate:f3|upright:f7", [0.0, 0.0, 0.01], [0.18, 0.0, 0.01], [[0.0, 0.0, 1.0], [0.0, -1.0, 0.0]], intoY);
+    function second():materia.project.SceneArtifact.SceneArtifactWeldSegment
+      return segment("plate:f3|plate:f9", [0.18, 0.0, 0.01], [0.18, 0.06, 0.01], [[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0]], intoX);
+    function seam():materia.project.SceneArtifact.SceneArtifactWeld
+      return {frame: "plate", metal: "plate", path: [line()], legSize: 0.005,
+        process: {wireSpeed: 8.0, voltage: 24.0, travelSpeed: 0.01, approach: 0.05, startDwell: 0.2, craterDwell: 0.3, burnback: 0.1}};
+    function mission(weld:materia.project.SceneArtifact.SceneArtifactWeld):materia.project.SceneArtifact.SceneArtifactMission
+      return {steps: [{kind: "weld", weld: weld}]};
+    data.robotTools = [torch()];
+    data.mission = mission(seam());
+    var back = SceneArtifact.decode(SceneArtifact.encode(data)).mission;
+    if (back == null || back.steps.length != 1 || back.steps[0].weld == null) throw "weld mission round trip lost the weld";
+    var weld:materia.project.SceneArtifact.SceneArtifactWeld = cast back.steps[0].weld;
+    check(weld.frame == "plate" && weld.path.length == 1 && weld.path[0].seam == "plate:f3|upright:f7" && weld.path[0].joint == "fillet" &&
+      weld.path[0].kind == "line" && weld.metal == "plate" && weld.path[0].stop.position[0] == 0.18 &&
+      weld.path[0].normals[1][1] == -1.0 && weld.legSize == 0.005 && weld.process.wireSpeed == 8.0 && weld.process.travelSpeed == 0.01 &&
+      weld.process.burnback == 0.1, "weld mission round trip");
+    // A chained seam is one weld of several segments, each with its own faces.
+    var chain = seam();
+    chain.path = [line(), second()];
+    data.mission = mission(chain);
+    var chainBack = SceneArtifact.decode(SceneArtifact.encode(data)).mission;
+    if (chainBack == null) throw "chained weld round trip lost the mission";
+    var chained:materia.project.SceneArtifact.SceneArtifactWeld = cast chainBack.steps[0].weld;
+    check(chained.path.length == 2 && chained.path[1].normals[1][0] == -1.0 && chained.path[1].stop.position[1] == 0.06,
+      "a chained weld keeps its segments");
+    // A weld written before paths existed carries its one seam on itself, in the assembly frame: it reads as one segment.
+    var legacy = haxe.Json.parse('{"seam":"plate:f3|upright:f7","joint":"fillet","metal":"plate","start":{"position":[0,0,0.01],"rotation":[0.96593,0,0,-0.25882]},' +
+      '"stop":{"position":[0.18,0,0.01],"rotation":[0.96593,0,0,-0.25882]},"normals":[[0,0,1],[0,-1,0]],"legSize":0.005,' +
+      '"process":{"wireSpeed":8,"voltage":24,"travelSpeed":0.01,"approach":0.05,"startDwell":0.2,"craterDwell":0.3,"burnback":0.1}}');
+    var migrated:materia.project.SceneArtifact.SceneArtifactMission = @:privateAccess SceneArtifact.decodeMission({steps: [{kind: "weld", weld: legacy}]});
+    var old:materia.project.SceneArtifact.SceneArtifactWeld = cast migrated.steps[0].weld;
+    check(old.path.length == 1 && old.path[0].seam == "plate:f3|upright:f7" && old.path[0].stop.position[0] == 0.18 && old.frame == null,
+      "an older weld step becomes a path of one segment in the assembly frame");
+    function first(w:materia.project.SceneArtifact.SceneArtifactWeld):materia.project.SceneArtifact.SceneArtifactWeldSegment return w.path[0];
+    function bad(change:materia.project.SceneArtifact.SceneArtifactWeld -> Void, message:String):Void {
+      var weld = seam();
+      change(weld);
+      data.mission = mission(weld);
+      rejects(function() SceneArtifact.encode(data), message);
+    }
+    bad(function(w) { var g = first(w); g.seam = "plate:f3"; }, "weld of a seam with one face");
+    bad(function(w) { var g = first(w); g.seam = "ghost:f3|upright:f7"; }, "weld of a seam on an occurrence the assembly lacks");
+    bad(function(w) { var g = first(w); g.joint = "butt"; }, "weld of a joint that is not deposited");
+    bad(function(w) { var g = first(w); g.kind = "arc"; }, "weld of a segment that is not a line");
+    bad(w -> w.metal = "ghost", "weld metal on an occurrence the assembly lacks");
+    bad(w -> w.frame = "ghost", "weld placed by an occurrence the assembly lacks");
+    bad(w -> w.path = [], "weld of no path");
+    bad(function(w) { var g = first(w); g.stop.position = [0.0, 0.0, 0.01]; }, "weld of a seam with no length");
+    bad(function(w) { var g = first(w); g.start.rotation = [0.0, 0.0, 0.0, 2.0]; }, "weld whose rotation is not a unit quaternion");
+    bad(function(w) { var g = first(w); g.normals = [[0.0, 0.0, 1.0]]; }, "weld with one face normal");
+    bad(function(w) { var g = first(w); g.normals[0] = [0.0, 0.0, 2.0]; }, "weld with a face normal that is not a unit vector");
+    bad(function(w) { var g = first(w); g.normals = [[0.0, 0.0, 1.0], [0.0, 0.0, -1.0]]; }, "weld between parallel faces");
+    bad(function(w) { var g = first(w); g.normals = [[0.0, 0.0, 1.0], [0.0, 0.0, 1.0]]; }, "weld between the same face twice");
+    bad(function(w) { var g = first(w); g.start.rotation = [0.0, 0.0, 0.0, 1.0]; g.stop.rotation = [0.0, 0.0, 0.0, 1.0]; }, "weld whose wire points out of the corner");
+    bad(w -> w.path = [line(), segment("plate:f3|plate:f9", [0.5, 0.0, 0.01], [0.5, 0.06, 0.01], [[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0]], intoX)],
+      "a path whose segments do not join");
+    bad(w -> w.legSize = 0.0, "weld with no leg");
+    bad(w -> w.process.wireSpeed = 0.0, "weld with no wire speed");
+    bad(w -> w.process.wireSpeed = 25.0, "weld that asks the feeder for more wire than it can feed");
+    bad(w -> w.process.travelSpeed = Math.NaN, "weld that travels at no number");
+    bad(w -> w.process.approach = 0.0, "weld with no approach");
+    bad(w -> w.process.craterDwell = -1.0, "weld with a negative crater dwell");
+    bad(w -> w.process.burnback = 0.0, "weld with no burnback");
+    data.mission = mission(seam());
+    // The robot's arm carries one tool: a mission cannot both pick and weld.
+    data.mission = {steps: [{kind: "weld", weld: seam()}, {kind: "pick", at: {occurrence: "plate", connector: "tcp"}}]};
+    data.robotTools = [torch(), {kind: "suction", contact: {occurrence: "upright", connector: "tcp"}, channel: "cup.enable"}];
+    rejects(function() SceneArtifact.encode(data), "a mission that picks and welds");
+    data.mission = mission(seam());
+    data.robotTools = null;
+    rejects(function() SceneArtifact.encode(data), "weld mission without a torch");
+    data.mission = null;
+  }
+
   /** A machining job travels with its machine and names only what the scene has. */
   static function machining():Void {
     var vertices = Bytes.alloc(96), normals = Bytes.alloc(96), indices = Bytes.alloc(48);
@@ -395,7 +549,7 @@ class ProjectKitTests {
     near(LengthUnit.metresPerUnit("in"), 0.0254, "inches");
     check(LengthUnit.fromScale(0.01) == "cm", "scale to centimetres");
     rejects(function() LengthUnit.metresPerUnit("feet"), "unsupported unit");
-    assembly(); frames(); scene(); machining(); mobileBase(); bodies();
+    assembly(); frames(); scene(); machining(); mobileBase(); torchTool(); bodies();
     check(MaterialLibrary.require("steel-c45").physical.density == 7850, "steel density");
     check(MaterialLibrary.fromSpec("steel C45") == "steel-c45", "material lookup");
     rejects(function() MaterialLibrary.require("unknown"), "unknown material");

@@ -240,9 +240,10 @@ class AssemblyMateSolver {
 				for (k in 0...kinematicskit.JacobianLayout.columnsFor(layout.rootModes[block])) if (freeColumn(firstColumn + k)) moves = true;
 			}
 			for (joint in model.bodyChain[body]) {
-				var dof = model.jointDof[joint];
-				var column = dof < 0 ? -1 : layout.columnOfDof[dof];
-				if (column >= 0 && freeColumn(column)) moves = true;
+				for (term in model.jointTermStart[joint]...model.jointTermStart[joint + 1]) {
+					var column = layout.columnOfDof[model.jointTermDof[term]];
+					if (column >= 0 && freeColumn(column)) moves = true;
+				}
 			}
 			if (moves) result.push(occurrence.id);
 		}

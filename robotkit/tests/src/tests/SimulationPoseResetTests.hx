@@ -10,6 +10,9 @@ import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.JointLimits;
 import robotkit.model.JointCoupling;
+import robotkit.model.Actuator;
+import robotkit.model.ActuatorDrive.ServoDrive;
+import robotkit.model.Transmission;
 import haxe.Int64;
 import robotkit.tool.ToolCollisionShape;
 import robotkit.spatial.Vec3;
@@ -46,6 +49,83 @@ class SimulationPoseResetTests {
     boxSimulationHarness.dispose();
     if (backend == 1) toolProximity();
     coupling(backend);
+    stepperSlip(backend);
+    if (backend == 1) servoCoupling();
+  }
+
+  /** A joint a stepper lost steps on sits its slip behind the command, and what it turns with goes along. */
+  static function stepperSlip(backend:Int):Void {
+    var model = new RobotModel("slipping pair");
+    var base = model.addLink(new Link("base"));
+    var first = model.addLink(new Link("first"));
+    var second = model.addLink(new Link("second"));
+    var source = model.addJoint(new Joint("source", JointType.Revolute, base, first));
+    var follower = model.addJoint(new Joint("follower", JointType.Revolute, base, second));
+    source.limits = new JointLimits(-2, 2);
+    follower.limits = new JointLimits(-2, 2);
+    model.addCoupling(new JointCoupling("gears", source.id, follower.id, -2.0, 0.0));
+    var harness = new SimulationHarness(0.01, 1, backend);
+    var runtime = harness.simulation.addRobot(RobotRuntimeCompiler.compile(model));
+    runtime.submitPosition(0, 0.3, 1);
+    for (index in 0...100) harness.step(Int64.ofInt(index));
+    var tolerance = backend == 0 ? 1e-9 : 0.02;
+    var q = runtime.snapshot().q;
+    if (Math.abs(q.get(0) - 0.3) > tolerance) throw 'pair did not reach its command on backend $backend: ${q.get(0)}';
+    harness.simulation.setJointSlip(0, 0, -0.05);
+    for (index in 100...300) harness.step(Int64.ofInt(index));
+    q = runtime.snapshot().q;
+    if (Math.abs(q.get(0) - 0.25) > tolerance || Math.abs(q.get(1) + 2.0 * q.get(0)) > tolerance)
+      throw 'slip did not hold the joint behind its command on backend $backend: ${q.get(0)}, ${q.get(1)}';
+    harness.simulation.setJointSlip(0, 0, 0.0);
+    for (index in 300...500) harness.step(Int64.ofInt(index));
+    if (Math.abs(runtime.snapshot().q.get(0) - 0.3) > tolerance)
+      throw 'clearing the slip did not put the joint back on its command on backend $backend';
+    harness.dispose();
+  }
+
+  /** A servo on a motor joint carries the joint coupled to it, which takes no commands of its own. */
+  static function servoCoupling():Void {
+    var build = (peak:Float) -> {
+      var model = new RobotModel("servo pair");
+      var base = model.addLink(new Link("base"));
+      var load = model.addLink(new Link("load"));
+      var rotor = model.addLink(new Link("rotor"));
+      load.mass = 1.0;
+      load.inertiaTensor = [0.01, 0.0, 0.0, 0.0, 0.01, 0.0, 0.0, 0.0, 0.01];
+      rotor.mass = 0.1;
+      rotor.inertiaTensor = [1e-4, 0.0, 0.0, 0.0, 1e-4, 0.0, 0.0, 0.0, 1e-4];
+      var arm = model.addJoint(new Joint("arm", JointType.Revolute, base, load));
+      var motor = model.addJoint(new Joint("motor", JointType.Continuous, base, rotor));
+      arm.limits = new JointLimits(-2, 2);
+      motor.limits = new JointLimits(-100, 100);
+      // The arm turns once for five turns of the motor.
+      model.addCoupling(new JointCoupling("gearbox", "arm", "motor", 5.0, 0.0));
+      var actuator = new Actuator("servo", 0.0, 0.0, Transmission.SimpleTransmission("motor", 1.0, 0.0));
+      actuator.drive = new ServoDrive(peak / 2.0, peak, 100.0, 200.0, 1e-4, 4096.0);
+      model.addActuator(actuator);
+      return model;
+    };
+    var compiled = RobotRuntimeCompiler.compile(build(1.2));
+    if (!(compiled.joints[1].servoStiffness > 0.0) || compiled.joints[0].servoStiffness != 0.0)
+      throw 'only the motor joint is a servo: ${compiled.joints[0].servoStiffness}, ${compiled.joints[1].servoStiffness}';
+    if (compiled.joints[1].maxEffort != 1.2) throw 'the servo limits its joint to its peak torque: ${compiled.joints[1].maxEffort}';
+    var harness = new SimulationHarness(0.001, 1, 1);
+    var runtime = harness.simulation.addRobot(compiled);
+    // The plan commands the whole chain, as a trajectory does: the arm to 0.3, its motor to 1.5.
+    runtime.submitPositions([0.3, 1.5], 1);
+    for (index in 0...1500) harness.step(Int64.ofInt(index));
+    var q = runtime.snapshot().q;
+    if (Math.abs(q.get(0) - 0.3) > 0.02 || Math.abs(q.get(1) - 1.5) > 0.1)
+      throw 'the servo did not carry its coupled joint to the command: ${q.get(0)}, ${q.get(1)}';
+    harness.dispose();
+    // The arm alone is not commanded: with no target for the motor it stays put.
+    var idle = new SimulationHarness(0.001, 1, 1);
+    var held = idle.simulation.addRobot(RobotRuntimeCompiler.compile(build(1.2)));
+    held.submitPosition(0, 0.3, 1);
+    for (index in 0...500) idle.step(Int64.ofInt(index));
+    if (Math.abs(held.snapshot().q.get(0)) > 0.02)
+      throw 'a joint moved only through its coupling must not be commanded: ${held.snapshot().q.get(0)}';
+    idle.dispose();
   }
 
   static function toolProximity():Void {

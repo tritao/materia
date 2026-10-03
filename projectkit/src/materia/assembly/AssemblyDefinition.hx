@@ -121,7 +121,12 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(12) @:optional var driven:Bool;
 }
 
-/** Target coordinate = source coordinate × ratio + offset. */
+/**
+ * Target coordinate = source coordinate × ratio + offset. A target with several couplings is the sum of
+ * their terms: target = Σ (ratioᵢ × sourceᵢ + offsetᵢ), as a CoreXY motor follows both axes. Each coupling
+ * is one term, with its own efficiency, stiffness, backlash and drag. Every (source, target) pair is
+ * unique and the terms never form a cycle.
+ */
 @:wire typedef AssemblyJointCoupling = {
 	@:id(1) var id:String;
 	@:id(2) var source:String;
@@ -167,6 +172,33 @@ enum abstract AssemblyMateKind(String) from String to String {
 	/** Default servo gains in the actuator's units: effort per unit of position and velocity error. */
 	@:id(15) @:optional var servoStiffness:Null<Float>;
 	@:id(16) @:optional var servoDamping:Null<Float>;
+	/** The id of the `AssemblyEncoder` that reads this motor, which a servo's feedback comes from; absent for none. */
+	@:id(17) @:optional var encoder:Null<String>;
+	/**
+	 * A gearbox between the motor and the joint: the motor turns `gearRatio` times for one turn (or one unit of
+	 * travel) of the joint, and the joint gets `gearEfficiency` of its power. `maxEffort`, `maxRate`, the
+	 * torque-speed curve and the rotor are then the motor's own, before the gearbox. Absent, the motor drives the
+	 * joint directly.
+	 */
+	@:id(18) @:optional var gearRatio:Null<Float>;
+	@:id(19) @:optional var gearEfficiency:Null<Float>;
+}
+
+/**
+ * An encoder on a joint: it reads the joint's travel in counts. Which joint it sits on says what it
+ * sees. On a motor's own joint it is motor-side and sees the rotor (lost steps, a servo's following
+ * error, but not backlash or belt stretch); on a joint the load moves through a drive it is load-side
+ * and sees where the load is.
+ */
+@:wire typedef AssemblyEncoder = {
+	@:id(1) var id:String;
+	@:id(2) var joint:String;
+	/** "incremental" (quadrature counts from where it was powered up) or "absolute" (the position itself). */
+	@:id(3) var kind:String;
+	/** Counts per revolution on a turning joint, per millimetre on a sliding joint. */
+	@:id(4) var counts:Float;
+	/** An index pulse once a revolution on a turning joint, at the reference mark on a sliding one. */
+	@:id(5) @:optional var index:Null<Bool>;
 }
 
 /** A connector exported from a member of an assembly definition. */
@@ -186,6 +218,7 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(6) @:optional var exposedConnectors:Array<AssemblyExposedConnector>;
 	@:id(7) @:optional var mates:Array<AssemblyMate>;
 	@:id(8) @:optional var actuators:Array<AssemblyActuator>;
+	@:id(9) @:optional var encoders:Array<AssemblyEncoder>;
 }
 
 /**
@@ -206,6 +239,7 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(9) @:optional var exposedConnectors:Array<AssemblyExposedConnector>;
 	@:id(10) @:optional var mates:Array<AssemblyMate>;
 	@:id(11) @:optional var actuators:Array<AssemblyActuator>;
+	@:id(12) @:optional var encoders:Array<AssemblyEncoder>;
 }
 
 @:wire typedef AssemblyJointCoordinate = {

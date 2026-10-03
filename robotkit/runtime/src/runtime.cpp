@@ -1,4 +1,5 @@
 #include "robotkit_runtime.hpp"
+#include "coupling_terms.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -190,9 +191,10 @@ rk_result validate_appended_path(
 
 /**
   The blueprint with each coupled joint that has no velocity or acceleration limit of its own
-  given its leader's, scaled by the ratio: a lead screw turns as fast as its axis moves it. Its
-  motion is its leader's, so this bounds nothing new, but every stop and check that budgets
-  joint by joint then has a limit to work with.
+  given its leaders', scaled by the ratios and summed: a lead screw turns as fast as its axis
+  moves it, and a CoreXY motor as fast as both axes together can turn it. Its motion is its
+  leaders', so this bounds nothing new, but every stop and check that budgets joint by joint then
+  has a limit to work with. A follower waits until every leader has the limit.
 **/
 rk_robot_runtime_blueprint with_coupled_limits(rk_robot_runtime_blueprint blueprint) {
     if (blueprint.struct_size < sizeof(blueprint)) return blueprint;
@@ -203,17 +205,29 @@ rk_robot_runtime_blueprint with_coupled_limits(rk_robot_runtime_blueprint bluepr
         bool changed = false;
         for (uint32_t i = 0; i < count; ++i) {
             const auto &coupling = blueprint.couplings[i];
-            if (coupling.leader >= blueprint.joint_count || coupling.follower >= blueprint.joint_count)
+            if (coupling.leader >= blueprint.joint_count || coupling.follower >= blueprint.joint_count ||
+                !robotkit::internal::first_term_of_follower(blueprint.couplings, i))
                 continue;
-            const auto &leader = blueprint.joints[coupling.leader];
             auto &follower = blueprint.joints[coupling.follower];
-            const double scale = std::abs(coupling.ratio);
-            if (!(follower.max_velocity > 0.0) && leader.max_velocity > 0.0) {
-                follower.max_velocity = scale * leader.max_velocity;
+            double velocity = 0.0, acceleration = 0.0;
+            bool has_velocity = true, has_acceleration = true;
+            for (uint32_t k = 0; k < count; ++k) {
+                const auto &term = blueprint.couplings[k];
+                if (term.follower != coupling.follower) continue;
+                if (term.leader >= blueprint.joint_count) { has_velocity = has_acceleration = false; break; }
+                const auto &leader = blueprint.joints[term.leader];
+                const double scale = std::abs(term.ratio);
+                if (leader.max_velocity > 0.0) velocity += scale * leader.max_velocity;
+                else has_velocity = false;
+                if (leader.max_acceleration > 0.0) acceleration += scale * leader.max_acceleration;
+                else has_acceleration = false;
+            }
+            if (!(follower.max_velocity > 0.0) && has_velocity) {
+                follower.max_velocity = velocity;
                 changed = true;
             }
-            if (!(follower.max_acceleration > 0.0) && leader.max_acceleration > 0.0) {
-                follower.max_acceleration = scale * leader.max_acceleration;
+            if (!(follower.max_acceleration > 0.0) && has_acceleration) {
+                follower.max_acceleration = acceleration;
                 changed = true;
             }
         }
@@ -553,12 +567,28 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
             mk_trajectory_state endpoint{};
             motionkit::evaluate_segment(segment,
                 static_cast<double>(terminal.duration_ns) * 1e-9, endpoint);
+            // A coupled joint moves its leaders' amount times the ratios, so its rest tolerance is theirs
+            // scaled the same way (a screw turns 3142 rad for a metre, a belt pulley 157).
+            double rest_scale[RK_MAX_JOINTS];
+            std::fill_n(rest_scale, blueprint_.joint_count, 1.0);
+            uint32_t followers[RK_MAX_JOINTS], follower_count = 0;
+            if (blueprint_.struct_size >= sizeof(blueprint_) &&
+                internal::order_followers(blueprint_.couplings, blueprint_.coupling_count,
+                    blueprint_.joint_count, nullptr, followers, follower_count))
+                for (uint32_t index = 0; index < follower_count; ++index) {
+                    double sum = 0.0;
+                    for (uint32_t k = 0; k < blueprint_.coupling_count; ++k)
+                        if (blueprint_.couplings[k].follower == followers[index])
+                            sum += std::abs(blueprint_.couplings[k].ratio) *
+                                rest_scale[blueprint_.couplings[k].leader];
+                    rest_scale[followers[index]] = std::max(1.0, sum);
+                }
             for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
                 // TOPP-RA can stop with nonzero endpoint acceleration. A
                 // checked-jerk plan must also join the held state smoothly.
-                if (std::abs(endpoint.velocity[joint]) > 1e-6 ||
+                if (std::abs(endpoint.velocity[joint]) > 1e-6 * rest_scale[joint] ||
                     ((plan.flags & RK_PLAN_JERK_UNCHECKED) == 0 &&
-                     std::abs(endpoint.acceleration[joint]) > 1e-6))
+                     std::abs(endpoint.acceleration[joint]) > 1e-6 * rest_scale[joint]))
                     return RK_ERROR_INVALID_ARGUMENT;
         }
         // A replacement keeps the queue only up to its anchor, so it works on a copy.

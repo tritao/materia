@@ -28,6 +28,11 @@ import machinekit.component.Solids;
  * Connectors: `front`, `back` (faces) and `axis` (mid-thickness), all with +Y along +Z.
  */
 class Sprocket extends MachineComponent {
+	/** Resolve the coupling from these parts. */
+	public static function relation(sprocket:Sprocket, alignment:Float):TransmissionRelation
+		return new TransmissionRelation(alignment * 2 / sprocket.pitchDiameter, 0.97, null, null,
+			machinekit.assembly.DriveDefaults.BELT_DRAG);
+
 	static var chainTable:Null<Catalog<RollerChainSpec>>;
 	public final chain:Null<String>;
 

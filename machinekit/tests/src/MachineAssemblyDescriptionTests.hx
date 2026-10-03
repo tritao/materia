@@ -357,6 +357,9 @@ class MachineAssemblyDescriptionTests {
 		}
 		var built = definition(assembly);
 		near(turnLimit(built), cap, "the screw's joint is capped at it");
+		var resolved = LeadScrew.relation(long, 1);
+		near(resolved.ratio, 2 * Math.PI / thread.signedLead(), "the screw resolves its ratio and efficiency together");
+		near(resolved.efficiency, thread.efficiency(), "the resolved efficiency comes from the thread");
 		var coupling = built.couplings[0];
 		var backlash = coupling.backlash, drag = coupling.drag, stiffness = coupling.stiffness;
 		near(backlash == null ? 0 : backlash, DriveDefaults.LEAD_SCREW_BACKLASH, "a screw drive has its nut's backlash allowance");
@@ -470,6 +473,55 @@ class MachineAssemblyDescriptionTests {
 		near(ratedTorque == null ? 0 : ratedTorque, 0.64, "its rated torque is kept");
 		near(encoder == null ? 0 : encoder, 4096, "and its encoder counts");
 		if (servoSteps != null) throw "A servo has no full steps";
+		// A shaft encoder on the servo's back shaft is its feedback: the actuator points at it and holds no count of its own,
+		// and a linear scale on a rail's carriage joint is a separate, load-side encoder. Both come back from a saved description.
+		servoMachine.addComponent("encoder", new machinekit.motion.ShaftEncoder(4096));
+		servoMachine.addMate("encoder-mount", "fixed", "servo", "shaft", "encoder", "mount");
+		servoMachine.addEncoder("servo-encoder", "turn", "encoder", "servo-drive");
+		var feedback = definition(servoMachine);
+		var encoders = feedback.encoders;
+		if (encoders == null || encoders.length != 1) throw "The assembly records its encoder";
+		if (encoders[0].joint != "turn" || encoders[0].kind != "incremental" || encoders[0].counts != 4096 || encoders[0].index != true)
+			throw "A shaft encoder records its kind, counts and index on its joint";
+		var feedbackActuator = actuatorsOf(feedback)[0];
+		if (feedbackActuator.encoder != "servo-encoder" || feedbackActuator.encoderCounts != null)
+			throw "The motor it reads points at the encoder and holds no count of its own";
+		// A closed-loop stepper: the same encoder on a NEMA motor's joint, which comes back from a saved description.
+		var closed = new MachineAssembly();
+		closed.addComponent("base", new RobotFlange(50));
+		closed.addComponent("motor", motor);
+		closed.addComponent("encoder", new machinekit.motion.ShaftEncoder(1024, false, false));
+		closed.addMateOnAxis("turn", "continuous", "base", "face", "motor", "shaftAxis", {x: 0, y: 1, z: 0});
+		closed.addMate("encoder-mount", "fixed", "motor", "mountFace", "encoder", "mount");
+		closed.addMotor("closed-drive", "turn", "motor", 24);
+		closed.addEncoder("closed-encoder", "turn", "encoder", "closed-drive");
+		roundTrip(closed, "closed-loop stepper", false);
+		var closedDefinition = definition(closed);
+		var closedEncoders = closedDefinition.encoders;
+		if (closedEncoders == null || closedEncoders[0].counts != 1024 || closedEncoders[0].index == true)
+			throw "A shaft encoder without an index records none";
+		if (actuatorsOf(closedDefinition)[0].encoder != "closed-encoder") throw "A stepper's encoder is recorded on its actuator";
+		var railed = new MachineAssembly();
+		railed.addComponent("base", new RobotFlange(50));
+		railed.addComponent("slider", new RobotFlange(50));
+		railed.addComponent("scale", new machinekit.motion.LinearScale(300, 200, true, false));
+		railed.addMateOnAxis("slide", "prismatic", "base", "face", "slider", "face", {x: 0, y: 1, z: 0});
+		railed.addMate("scale-mount", "fixed", "base", "face", "scale", "mount");
+		railed.addEncoder("scale-encoder", "slide", "scale");
+		var scaleEncoders = definition(railed).encoders;
+		if (scaleEncoders == null || scaleEncoders.length != 1 || scaleEncoders[0].kind != "absolute" || scaleEncoders[0].counts != 200 ||
+			scaleEncoders[0].index == true) throw "A linear scale records absolute counts per millimetre and no index";
+		roundTrip(railed, "rail with a linear scale", false);
+		// A nested assembly's encoders keep their prefix and their motor's.
+		var host = new MachineAssembly();
+		host.addComponent("floor", new RobotFlange(50));
+		host.include("cell", closed);
+		var hosted = definition(host).encoders;
+		if (hosted == null || hosted.length != 1 || hosted[0].id != "cell/closed-encoder" || hosted[0].joint != "cell/turn" ||
+			actuatorsOf(definition(host))[0].encoder != "cell/closed-encoder") throw "An included assembly's encoder is prefixed with it";
+		var rejected = false;
+		try railed.addEncoder("bad", "slide", "base") catch (_:Dynamic) rejected = true;
+		if (!rejected) throw "A part that is not an encoder cannot read a joint";
 		// Rebuilt with the NEMA 17 in the motor's place, the actuator follows the motor.
 		var description:MachineAssemblyDescription = haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(assembly.describe()));
 		description.machine.members = [for (member in description.machine.members) member.occurrence != "motor" ? member :

@@ -14,6 +14,8 @@ class RobotModel {
   /** Mechanical joint-to-joint relations, independent of actuator transmissions. */
   public final couplings:Array<JointCoupling> = [];
   public final sensors:Array<Sensor> = [];
+  /** Encoders on joints; they are read from joint positions rather than compiled into the runtime. */
+  public final encoders:Array<Encoder> = [];
   /** Explicit contacts between link collision shapes. */
   public final contactPairs:Array<ContactPair> = [];
   public final frames:Array<Frame> = [];
@@ -53,6 +55,29 @@ class RobotModel {
     return actuator;
   }
 
+  public function addEncoder(encoder:Encoder):Encoder {
+    encoders.push(encoder);
+    return encoder;
+  }
+
+  /**
+   * The encoder that reads `actuator`: the one it names, or, for a servo saved before encoders were
+   * sensors, one made from the servo drive's own count (incremental, on the actuator's joint).
+   */
+  public function encoderFor(actuator:Actuator):Null<Encoder> {
+    if (actuator.encoder != "") {
+      for (encoder in encoders) if (encoder.id == actuator.encoder) return encoder;
+      return null;
+    }
+    var drive = actuator.drive;
+    if (drive == null || !Std.isOfType(drive, ActuatorDrive.ServoDrive)) return null;
+    var counts = cast(drive, ActuatorDrive.ServoDrive).encoderCounts;
+    if (!(counts > 0.0)) return null;
+    return switch actuator.transmission {
+      case SimpleTransmission(jointId, _, _): Encoder.perRevolution(actuator.id + ".encoder", jointId, EncoderKind.Incremental, counts);
+    };
+  }
+
   public function addCoupling(coupling:JointCoupling):JointCoupling {
     couplings.push(coupling);
     return coupling;
@@ -67,6 +92,11 @@ class RobotModel {
    * armature included) seen through the ratio. Gravity and friction are left out. Zero still
    * means unlimited. With `steady` loads, the force left for acceleration is what the motors give
    * less their drag, the axis's rail friction and its weight (see `SteadyLoads`).
+   *
+   * A follower that sums several leaders (a CoreXY motor) binds each leader inside a box: the axis's
+   * speed is limited to the follower's limit over the sum of the ratios' magnitudes (through chains,
+   * `couplingWeight`), so every combination of moves within the per-axis limits stays inside it.
+   * Each axis likewise gets only its share of such a motor's force, in proportion to its ratio.
    */
   public function coupledLimits(id:JointId, ?steady:SteadyLoads):JointLimits {
     var joint = [for (candidate in joints) if (candidate.id == id) candidate];
@@ -81,18 +111,28 @@ class RobotModel {
     var reached:Array<String> = [id];
     var scales:Array<Float> = [1.0];
     var efficiencies:Array<Float> = [1.0];
+    // How far each joint bounds the axis's box (see above) and the share of its force the axis may use.
+    var boxes:Array<Float> = [1.0];
+    var shares:Array<Float> = [1.0];
+    var axisWeight = couplingWeight(id, 0);
     var next = 0;
     while (next < reached.length) {
       var leader = reached[next], leaderScale = scales[next], leaderEfficiency = efficiencies[next];
+      var leaderShare = shares[next];
       next++;
       for (coupling in couplings) if (coupling.leader == leader && reached.indexOf(coupling.follower) < 0) {
         var scale = Math.abs(coupling.ratio) * leaderScale;
+        var terms = 0.0;
+        for (other in couplings) if (other.follower == coupling.follower) terms += Math.abs(other.ratio);
+        var box = couplingWeight(coupling.follower, 0) / axisWeight;
         reached.push(coupling.follower);
         scales.push(scale);
+        boxes.push(box);
+        shares.push(leaderShare * Math.abs(coupling.ratio) / terms);
         efficiencies.push(leaderEfficiency * coupling.efficiency);
         for (follower in joints) if (follower.id == coupling.follower) {
-          limits.velocity = tighten(limits.velocity, follower.limits.velocity / scale);
-          limits.maxAcceleration = tighten(limits.maxAcceleration, follower.limits.maxAcceleration / scale);
+          limits.velocity = tighten(limits.velocity, follower.limits.velocity / box);
+          limits.maxAcceleration = tighten(limits.maxAcceleration, follower.limits.maxAcceleration / box);
         }
       }
     }
@@ -103,8 +143,8 @@ class RobotModel {
         if (index < 0) continue;
         // An actuator coordinate moves |ratio| per unit of its joint, so |ratio| * scale per unit of `id`.
         var gearing = Math.abs(ratio) * scales[index];
-        limits.velocity = tighten(limits.velocity, actuator.planningRate() / gearing);
-        force += efficiencies[index] * actuator.planningEffort() * gearing;
+        limits.velocity = tighten(limits.velocity, actuator.planningRate() / (Math.abs(ratio) * boxes[index]));
+        force += efficiencies[index] * actuator.efficiency * actuator.planningEffort() * gearing * shares[index];
         driven = true;
     }
     if (driven && joint[0].type == JointType.Prismatic && force > 0) {
@@ -116,6 +156,21 @@ class RobotModel {
       limits.maxAcceleration = tighten(limits.maxAcceleration, force / inertia);
     }
     return limits;
+  }
+
+  /**
+   * How far a joint can move per unit of every joint that leads it moving at once the worst way: the
+   * sum of its couplings' ratio magnitudes, each times its leader's weight. A joint no coupling
+   * follows weighs 1.
+   */
+  function couplingWeight(id:JointId, depth:Int):Float {
+    if (depth > couplings.length) return 1.0;
+    var weight = 0.0, any = false;
+    for (coupling in couplings) if (coupling.follower == id) {
+      any = true;
+      weight += Math.abs(coupling.ratio) * couplingWeight(coupling.leader, depth + 1);
+    }
+    return any ? weight : 1.0;
   }
 
   /**
@@ -218,15 +273,28 @@ class RobotModel {
             errors.push('actuator ${actuator.id} has an invalid transmission');
       }
     }
+    var encoderIds = new Map<String, Bool>();
+    for (encoder in encoders) {
+      if (encoder == null) { errors.push("robot has a null encoder"); continue; }
+      if (encoderIds.exists(encoder.id)) errors.push('duplicate encoder ID ${encoder.id}');
+      encoderIds.set(encoder.id, true);
+      var onJoint = false;
+      for (joint in joints) if (joint.id == encoder.joint) onJoint = true;
+      if (!onJoint) errors.push('encoder ${encoder.id} references unknown joint ${encoder.joint}');
+    }
+    for (actuator in actuators)
+      if (actuator != null && actuator.encoder != "" && !encoderIds.exists(actuator.encoder))
+        errors.push('actuator ${actuator.id} references unknown encoder ${actuator.encoder}');
     var couplingIds = new Map<String, Bool>();
-    var followers = new Map<String, Bool>();
+    var pairs = new Map<String, Bool>();
     for (coupling in couplings) {
       if (coupling == null) { errors.push("robot has a null joint coupling"); continue; }
       if (couplingIds.exists(coupling.id)) errors.push('duplicate joint coupling ID ${coupling.id}');
       couplingIds.set(coupling.id, true);
-      if (followers.exists(coupling.follower))
-        errors.push('joint ${coupling.follower} has multiple coupling leaders');
-      followers.set(coupling.follower, true);
+      var pair = coupling.follower + "\n" + coupling.leader;
+      if (pairs.exists(pair))
+        errors.push('joint ${coupling.follower} is coupled to ${coupling.leader} more than once');
+      pairs.set(pair, true);
       var hasLeader = false, hasFollower = false;
       for (joint in joints) {
         if (joint.id == coupling.leader) hasLeader = true;
@@ -235,6 +303,8 @@ class RobotModel {
       if (!hasLeader || !hasFollower)
         errors.push('joint coupling ${coupling.id} references an unknown joint');
     }
+    var cycle = JointCoupling.cycleThrough(couplings);
+    if (cycle != null) errors.push('joint $cycle depends on itself through its couplings');
     return errors;
   }
 }

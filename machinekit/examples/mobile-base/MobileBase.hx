@@ -8,6 +8,7 @@ import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 import machinekit.motion.CasterWheel;
 import machinekit.motion.DriveWheel;
+import machinekit.motion.Gearbox;
 import machinekit.motion.NemaStepper;
 import machinekit.structural.RectTube;
 import materia.assembly.AssemblyFrames;
@@ -225,10 +226,27 @@ class MobileBase extends MachineAssembly {
 	/** Post centres, inset from the plate corners. */
 	public static inline var POST_X:Float = 260;
 	public static inline var POST_Y:Float = 180;
-	/** Wheel speed limit in rad/s (about 0.9 m/s) and the stepper's holding torque in N·m. */
-	public static inline var WHEEL_SPEED:Float = 12;
-	public static inline var WHEEL_TORQUE:Float = 1.2;
-	/** Drive limits: m/s, rad/s, m/s², rad/s². */
+	/**
+	 * The wheel drive: each NEMA 23 turns its wheel through a 10:1 gearhead at 90% efficiency, on a 24 V
+	 * supply with half the holding torque relied on (`NemaStepper.actuator`'s default margin). The gearhead
+	 * ratio, its efficiency and the supply are assumptions (a planetary gearhead on a NEMA 23 is typically 3:1
+	 * to 100:1 at 0.8 to 0.95); the gearhead is not drawn, the wheel sits on the motor's shaft.
+	 */
+	public static final WHEEL_GEARBOX = new Gearbox(10, 0.9);
+	public static inline var WHEEL_SUPPLY:Float = 24;
+	/** The motor's actuator as `MachineAssembly.addMotor` makes it, before the gearbox. */
+	static function wheelMotor():materia.assembly.AssemblyDefinition.AssemblyActuator
+		return NemaStepper.frame(23).actuator("wheel", "wheel", WHEEL_SUPPLY, 0.5);
+	/**
+	 * Wheel speed limit in rad/s and torque in N·m, from the drive: the stepper's usable speed over the gearhead
+	 * ratio (about 13.7 rad/s, a little over 1 m/s on the 75 mm wheel) and its usable torque through the gearhead.
+	 */
+	public static final WHEEL_SPEED:Float = WHEEL_GEARBOX.jointSpeed(wheelMotor().maxRate);
+	public static final WHEEL_TORQUE:Float = WHEEL_GEARBOX.jointTorque(wheelMotor().maxEffort);
+	/**
+	 * Drive limits the base is run at: m/s, rad/s, m/s², rad/s². Operating limits, assumed, set under what the
+	 * wheels can do (`WHEEL_SPEED` times the wheel radius is the ground speed they top out at).
+	 */
 	public static inline var MAX_LINEAR_SPEED:Float = 0.8;
 	public static inline var MAX_ANGULAR_SPEED:Float = 2.0;
 	public static inline var MAX_LINEAR_ACCELERATION:Float = 0.5;
@@ -277,6 +295,8 @@ class MobileBase extends MachineAssembly {
 			addComponent('wheel${side.name}', wheel);
 			addMateOnAxis(side.joint, "continuous", 'motor${side.name}', "wheelSeat", 'wheel${side.name}', "bore",
 				{x: 0, y: 1, z: 0}, 0, {lower: null, upper: null, velocity: WHEEL_SPEED, effort: WHEEL_TORQUE});
+			// The wheel's drive: the stepper through the gearhead, which is where those limits come from.
+			addMotor('drive${side.name}', side.joint, 'motor${side.name}', WHEEL_SUPPLY, 0.5, WHEEL_GEARBOX);
 		}
 
 		for (end in ["Front", "Rear"]) {

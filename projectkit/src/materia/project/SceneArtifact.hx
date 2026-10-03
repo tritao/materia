@@ -92,12 +92,38 @@ typedef SceneArtifactRobotSensor = {
  * capabilities say: a `suction` tool seals on what touches the occurrence `contact.occurrence` at its
  * connector `contact.connector` while the digital process channel `channel` is on, and reports the
  * vacuum it pulls on the sensor `sensor` when it has one.
+ *
+ * A `torch` tool is a MIG/MAG welding torch: `contact` is the connector at its wire tip (the tool point),
+ * `channel` is the digital channel that lights its arc, `sensor` is its `tool_weld` sensor, and `torch`
+ * describes the welder behind it. The kind is part of the same JSON section, so it needs no format version.
  */
 typedef SceneArtifactRobotTool = {
 	var kind:String;
 	var contact:SceneArtifactPlace;
 	var channel:String;
 	@:optional var sensor:String;
+	@:optional var torch:SceneArtifactTorch;
+}
+
+/**
+ * The welder a `torch` robot tool runs on. `wireSpeedChannel` (metres per minute) and `voltageChannel` (volts)
+ * are its analogue setpoints. The weld circuit closes through the occurrences in `groundedWork` (the work
+ * clamp's member and what is welded to it); the arc strikes only against them. `maxCurrentA` is the supply's
+ * rating, `efficiency` the fraction of the mains power it delivers to the arc, `wireDiameterMm` the wire's
+ * diameter and `stickoutMm` the wire's extension past the contact tip. `maxWireSpeedMPerMin` is the feeder's top
+ * wire speed and `depositionEfficiency` the fraction of the melted wire that reaches the weld; the weld steps' recipes
+ * were made for this wire, and the simulated weld deposits with the same figure.
+ */
+typedef SceneArtifactTorch = {
+	var wireSpeedChannel:String;
+	var voltageChannel:String;
+	var groundedWork:Array<String>;
+	var maxCurrentA:Float;
+	var efficiency:Float;
+	var wireDiameterMm:Float;
+	var stickoutMm:Float;
+	var maxWireSpeedMPerMin:Float;
+	var depositionEfficiency:Float;
 }
 
 /**
@@ -146,11 +172,86 @@ typedef SceneArtifactMission = {
  *   `at.connector`, wherever the part is when the step starts.
  * - `place`: set what the tool holds down with its base on the connector `at.connector` of
  *   `at.occurrence`, and let go.
+ * - `weld`: weld the seam `weld` describes with the robot's torch.
  */
 typedef SceneArtifactMissionStep = {
 	var kind:String;
 	@:optional var pose:SceneArtifactFloorPose;
 	@:optional var at:SceneArtifactPlace;
+	@:optional var weld:SceneArtifactWeld;
+}
+
+/**
+ * A weld to run and how. What is welded is a result of the CAD, never authored: `path` is the seams as the CAD
+ * found them, run one after the other as one weld (a straight seam is a path of one segment, the four sides of a
+ * tube a path of four), and the rest is what the generator derived from them, so a player needs no CAD to weld
+ * them. Lengths are metres, whatever the scene's unit.
+ * - `path` is the segments in order, each starting where the one before ends. The torch strikes the arc at the
+ *   start of the first, keeps it up along the whole path and ends it at the end of the last. Where one segment's
+ *   torch angles differ from the next one's, as at the corner of a tube, the torch turns from one to the other
+ *   as it passes the joint. The joints of a path may differ, but the process is one, so they ask for one leg.
+ * - `frame` is the occurrence the path is relative to, the workpiece's reference member: every pose and normal in the
+ *   path is in that occurrence's own frame (metres, with its normals turned with it). A player finds the occurrence where it
+ *   stands when the step starts and places the path by it, so the weld follows a workpiece that is not where it was
+ *   designed. Without a `frame` the path is in the assembly as designed (the form welds took before it existed).
+ * - `metal` is the occurrence that carries the weld metal: the part the bead is shown on as the welder lays it.
+ * - `legSize` is the leg the weldment asks for.
+ * - `process` is how the weld is run (see SceneArtifactWeldProcess); the generator derived it from the leg,
+ *   so the leg the weld reaches is a result that the declared one is checked against.
+ *
+ * A step written before paths existed has `seam`, `joint`, `start`, `stop` and `normals` on the weld itself, for
+ * one straight seam; reading it makes that the single segment of a path.
+ */
+typedef SceneArtifactWeld = {
+	@:optional var frame:String;
+	var metal:String;
+	var path:Array<SceneArtifactWeldSegment>;
+	var legSize:Float;
+	var process:SceneArtifactWeldProcess;
+}
+
+/**
+ * One primitive of a weld path, the piece of a seam the CAD found. `kind` says what shape it is: only a `line` so far,
+ * straight from `start` to `stop` with the torch holding its orientation; an `arc` for a curved seam would add its
+ * centre and sweep, and be another kind.
+ * - `seam` is its name as the CAD found it (`member:face|member:face`, the two faces the weld metal fills against,
+ *   each in the geometry of the occurrence `member`).
+ * - `joint` is how the members meet; only a `fillet` is deposited so far.
+ * - `start` and `stop` are the poses of the wire tip at the two ends: +Z along the wire out of the torch, +X along
+ *   the direction of travel as far as it is square to the wire. They carry the work and travel angles.
+ * - `normals` are the two faces' outward unit normals, which say where the weld metal sits (the fillet
+ *   fills the corner they leave open).
+ */
+typedef SceneArtifactWeldSegment = {
+	var kind:String;
+	var seam:String;
+	var joint:String;
+	var start:SceneArtifactTorchPose;
+	var stop:SceneArtifactTorchPose;
+	var normals:Array<Array<Float>>;
+}
+
+/** A pose in the assembly frame: position in metres and an xyzw rotation. */
+typedef SceneArtifactTorchPose = {
+	var position:Array<Float>;
+	var rotation:Array<Float>;
+}
+
+/**
+ * How a seam is welded: the wire speed (metres per minute) and voltage (volts) of the arc, the travel
+ * speed along the seam (metres per second), and the sequence around it. The torch approaches from `approach`
+ * metres out along the wire, strikes the arc at the start and holds until it is established, dwells
+ * `startDwell` seconds, travels the seam, dwells `craterDwell` seconds at its end to fill the crater, stops the
+ * wire, lets the arc burn back for `burnback` seconds, and retracts.
+ */
+typedef SceneArtifactWeldProcess = {
+	var wireSpeed:Float;
+	var voltage:Float;
+	var travelSpeed:Float;
+	var approach:Float;
+	var startDwell:Float;
+	var craterDwell:Float;
+	var burnback:Float;
 }
 
 /** A connector of an occurrence in the assembly. */
@@ -407,8 +508,10 @@ class SceneArtifact {
 		if (definition == null) fail("needs the robot's assembly definition");
 		var flat = AssemblyDefinitionFlattener.flatten(cast definition);
 		var channels = new Map<String, Bool>();
+		var torches = 0;
 		for (tool in tools) {
-			if (tool == null || tool.kind != "suction") fail('kind "${tool == null ? null : tool.kind}" is unknown');
+			if (tool == null || (tool.kind != "suction" && tool.kind != "torch"))
+				fail('kind "${tool == null ? null : tool.kind}" is unknown');
 			var contact = tool.contact;
 			var occurrence = contact == null ? [] : [for (item in flat.occurrences) if (item.id == contact.occurrence) item];
 			if (occurrence.length != 1) fail("touches with no occurrence of the assembly");
@@ -420,6 +523,42 @@ class SceneArtifact {
 				fail("needs a channel of its own");
 			channels.set(tool.channel, true);
 			if (tool.sensor != null && tool.sensor.length == 0) fail("has an empty sensor name");
+			if (tool.kind == "suction") {
+				if (tool.torch != null) fail("is a suction tool with a torch description");
+				continue;
+			}
+			// A torch is worked on three channels and reports on one sensor; the weld circuit closes through its work.
+			var welder = tool.torch;
+			if (welder == null) {
+				fail("is a torch with no welder description");
+				return;
+			}
+			if (tool.sensor == null) fail("is a torch with no weld sensor");
+			if (++torches > 1) fail("is a second torch: the robot welds with one");
+			for (name in [welder.wireSpeedChannel, welder.voltageChannel]) {
+				if (name == null || name.length == 0 || channels.exists(name)) fail("needs wire speed and voltage channels of its own");
+				channels.set(name, true);
+			}
+			if (welder.groundedWork == null || welder.groundedWork.length == 0)
+				fail("is a torch with no grounded work: the arc has nothing to return through");
+			var grounded = new Map<String, Bool>();
+			for (id in welder.groundedWork) {
+				if (grounded.exists(id) || [for (item in flat.occurrences) if (item.id == id) item].length != 1)
+					fail('names grounded work "$id", which is not a distinct occurrence of the assembly');
+				grounded.set(id, true);
+			}
+			if (!(finite(welder.maxCurrentA) && welder.maxCurrentA > 0 && welder.maxCurrentA <= 2000))
+				fail("needs a supply rating between 0 and 2000 A");
+			if (!(finite(welder.efficiency) && welder.efficiency > 0 && welder.efficiency <= 1))
+				fail("needs a supply efficiency in (0, 1]");
+			if (!(finite(welder.wireDiameterMm) && welder.wireDiameterMm >= 0.5 && welder.wireDiameterMm <= 4.0))
+				fail("needs a wire between 0.5 and 4 mm");
+			if (!(finite(welder.stickoutMm) && welder.stickoutMm > 0 && welder.stickoutMm <= 50))
+				fail("needs a stickout between 0 and 50 mm");
+			if (!(finite(welder.maxWireSpeedMPerMin) && welder.maxWireSpeedMPerMin >= 1 && welder.maxWireSpeedMPerMin <= 60))
+				fail("needs a top wire speed between 1 and 60 m/min");
+			if (!(finite(welder.depositionEfficiency) && welder.depositionEfficiency > 0.3 && welder.depositionEfficiency <= 1))
+				fail("needs a deposition efficiency between 0.3 and 1");
 		}
 	}
 
@@ -485,6 +624,20 @@ class SceneArtifact {
 				contact: {occurrence: text(contact, "occurrence"), connector: text(contact, "connector")},
 				channel: text(raw, "channel")};
 			if (Reflect.field(raw, "sensor") != null) tool.sensor = text(raw, "sensor");
+			var welder:Dynamic = Reflect.field(raw, "torch");
+			if (welder != null) {
+				function number(name:String):Float {
+					var item:Dynamic = Reflect.field(welder, name);
+					return Std.isOfType(item, Float) || Std.isOfType(item, Int) ? (item:Float) : fail();
+				}
+				var work:Dynamic = Reflect.field(welder, "groundedWork");
+				if (!Std.isOfType(work, Array)) fail();
+				tool.torch = {wireSpeedChannel: text(welder, "wireSpeedChannel"), voltageChannel: text(welder, "voltageChannel"),
+					groundedWork: [for (id in (cast work:Array<Dynamic>)) Std.isOfType(id, String) ? (id:String) : fail()],
+					maxCurrentA: number("maxCurrentA"), efficiency: number("efficiency"),
+					wireDiameterMm: number("wireDiameterMm"), stickoutMm: number("stickoutMm"),
+					maxWireSpeedMPerMin: number("maxWireSpeedMPerMin"), depositionEfficiency: number("depositionEfficiency")};
+			}
 			tool;
 		}];
 	}
@@ -506,7 +659,7 @@ class SceneArtifact {
 				for (connector in component.connectors) if (connector.name == place.connector) return true;
 			return false;
 		}
-		var handles = false;
+		var handles = false, welds = false;
 		for (index in 0...mission.steps.length) {
 			var step = mission.steps[index];
 			if (step == null) fail('step $index is empty');
@@ -517,11 +670,144 @@ class SceneArtifact {
 				case "pick" | "place":
 					handles = true;
 					if (!exists(step.at)) fail('step $index names no connector of an occurrence in the assembly');
+				case "weld":
+					welds = true;
+					validateWeld(step.weld, index, flat, fail);
 				default: fail('step $index has unknown kind "${step.kind}"');
 			}
 		}
 		var suctions = data.robotTools == null ? 0 : [for (tool in data.robotTools) if (tool.kind == "suction") tool].length;
-		if (handles && suctions != 1) fail("picks and places, but the robot has $suctions suction tools, not one");
+		if (handles && suctions != 1) fail('picks and places, but the robot has $suctions suction tools, not one');
+		var torches = data.robotTools == null ? 0 : [for (tool in data.robotTools) if (tool.kind == "torch") tool].length;
+		if (welds && torches != 1) fail('welds, but the robot has $torches torches, not one');
+		var tools = data.robotTools;
+		if (welds && torches == 1 && tools != null) {
+			var feeder = [for (tool in tools) if (tool.kind == "torch") tool][0].torch;
+			if (feeder != null) for (index in 0...mission.steps.length) {
+				var weld = mission.steps[index].weld;
+				if (weld != null && weld.process != null && weld.process.wireSpeed > feeder.maxWireSpeedMPerMin)
+					fail('step $index needs ${weld.process.wireSpeed} m/min of wire, past the feeder\'s top speed of ${feeder.maxWireSpeedMPerMin} m/min');
+			}
+		}
+		if (welds && handles) fail("picks and places and welds: the robot's arm carries one tool, a suction cup or a torch");
+	}
+
+	static function validateWeld(weld:Null<SceneArtifactWeld>, index:Int, flat:Null<AssemblyDefinition>, fail:String -> Void):Void {
+		if (weld == null) { fail('step $index welds nothing'); return; }
+		if (flat == null || weld.metal == null || [for (item in flat.occurrences) if (item.id == weld.metal) item].length != 1)
+			fail('step $index puts its weld metal on "${weld.metal}", which is not an occurrence of the assembly');
+		if (weld.frame != null && weld.frame != "" && (flat == null || [for (item in flat.occurrences) if (item.id == weld.frame) item].length != 1))
+			fail('step $index places its path by "${weld.frame}", which is not an occurrence of the assembly');
+		if (weld.path == null || weld.path.length == 0) { fail('step $index welds no path'); return; }
+		if (weld.path.length > 64) fail('step $index welds a path of more than 64 segments');
+		function pose(value:Null<SceneArtifactTorchPose>, label:String):Void {
+			if (value == null || value.position == null || value.position.length != 3 || value.rotation == null || value.rotation.length != 4) {
+				fail('step $index has no $label pose');
+				return;
+			}
+			for (number in value.position.concat(value.rotation)) if (!finite(number)) fail('step $index has a $label pose that is not finite');
+			var norm = Math.sqrt(value.rotation[0] * value.rotation[0] + value.rotation[1] * value.rotation[1] +
+				value.rotation[2] * value.rotation[2] + value.rotation[3] * value.rotation[3]);
+			if (Math.abs(norm - 1) > 1e-3) fail('step $index has a $label rotation that is not a unit quaternion');
+		}
+		var previous:Null<SceneArtifactWeldSegment> = null;
+		for (number in 0...weld.path.length) {
+			var segment = weld.path[number];
+			if (segment == null) { fail('step $index has an empty segment'); return; }
+			var label = weld.path.length == 1 ? "" : ' segment $number';
+			if (segment.kind != "line") fail('step $index$label is a "${segment.kind}", and only lines are welded');
+			var halves = segment.seam == null ? [] : segment.seam.split("|");
+			if (halves.length != 2) fail('step $index$label names no seam (member:face|member:face), got "${segment.seam}"');
+			// Each half starts with the occurrence whose geometry names the face.
+			for (half in halves) {
+				var colon = half.indexOf(":");
+				var member = colon > 0 ? half.substr(0, colon) : half;
+				if (flat == null || [for (item in flat.occurrences) if (item.id == member) item].length != 1)
+					fail('step $index$label welds a seam of "$member", which is not an occurrence of the assembly');
+			}
+			if (segment.joint != "fillet") fail('step $index$label welds a "${segment.joint}" joint, and only fillets are deposited');
+			pose(segment.start, "start");
+			pose(segment.stop, "stop");
+			var length = 0.0;
+			for (axis in 0...3) length += (segment.stop.position[axis] - segment.start.position[axis]) * (segment.stop.position[axis] - segment.start.position[axis]);
+			if (!(length > 1e-8)) fail('step $index$label has a seam with no length');
+			if (previous != null) {
+				var gap = 0.0;
+				for (axis in 0...3) gap += (segment.start.position[axis] - previous.stop.position[axis]) * (segment.start.position[axis] - previous.stop.position[axis]);
+				if (!(gap < 1e-10)) fail('step $index$label does not start where the segment before it ends');
+			}
+			previous = segment;
+			if (segment.normals == null || segment.normals.length != 2) fail('step $index$label needs the two faces\' normals');
+			else for (normal in segment.normals) {
+				if (normal == null || normal.length != 3) { fail('step $index$label has a face normal that is not a vector'); continue; }
+				var norm = 0.0;
+				for (component in normal) {
+					if (!finite(component)) fail('step $index$label has a face normal that is not finite');
+					norm += component * component;
+				}
+				if (Math.abs(Math.sqrt(norm) - 1) > 1e-3) fail('step $index$label has a face normal that is not a unit vector');
+			}
+			var a = segment.normals[0], b = segment.normals[1];
+			var cosine = a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+			if (Math.abs(cosine) > 1 - 1e-6) fail('step $index$label has faces that are parallel, which make no corner to fill');
+			// The wire (+Z of the tip pose) points into the corner from its open side: against the sum of the outward normals.
+			for (end in [segment.start, segment.stop]) {
+				var q = end.rotation;
+				var wire = [2 * (q[0] * q[2] + q[3] * q[1]), 2 * (q[1] * q[2] - q[3] * q[0]), 1 - 2 * (q[0] * q[0] + q[1] * q[1])];
+				if (!(wire[0] * (a[0] + b[0]) + wire[1] * (a[1] + b[1]) + wire[2] * (a[2] + b[2]) < 0))
+					fail('step $index$label has a wire that points out of the corner, not into it');
+			}
+		}
+		if (!(finite(weld.legSize) && weld.legSize > 0 && weld.legSize <= 0.05)) fail('step $index needs a leg size between 0 and 50 mm');
+		var process = weld.process;
+		if (process == null) { fail('step $index has no process'); return; }
+		if (!(finite(process.wireSpeed) && process.wireSpeed >= 1 && process.wireSpeed <= 30)) fail('step $index needs a wire speed between 1 and 30 m/min');
+		if (!(finite(process.voltage) && process.voltage > 0 && process.voltage <= 60)) fail('step $index needs a voltage between 0 and 60 V');
+		if (!(finite(process.travelSpeed) && process.travelSpeed > 0 && process.travelSpeed <= 0.05)) fail('step $index needs a travel speed between 0 and 50 mm/s');
+		if (!(finite(process.approach) && process.approach > 0 && process.approach <= 0.5)) fail('step $index needs an approach distance between 0 and 500 mm');
+		for (seconds in [process.startDwell, process.craterDwell])
+			if (!(finite(seconds) && seconds >= 0 && seconds <= 10)) fail('step $index needs dwell times between 0 and 10 s');
+		if (!(finite(process.burnback) && process.burnback >= 0.05 && process.burnback <= 10))
+			fail('step $index needs a burnback between 0.05 and 10 s: with none the wire sticks in the pool');
+	}
+
+	/** A weld from its JSON section, typed field by field. */
+	static function decodeWeld(raw:Dynamic):SceneArtifactWeld {
+		function fail():Dynamic throw "Scene artifact weld is invalid";
+		function number(value:Dynamic, name:String):Float {
+			var item:Dynamic = Reflect.field(value, name);
+			return Std.isOfType(item, Float) || Std.isOfType(item, Int) ? (item:Float) : fail();
+		}
+		function numbers(value:Dynamic, count:Int):Array<Float> {
+			if (!Std.isOfType(value, Array) || (cast value:Array<Dynamic>).length != count) fail();
+			return [for (item in (cast value:Array<Dynamic>)) Std.isOfType(item, Float) || Std.isOfType(item, Int) ? (item:Float) : fail()];
+		}
+		function pose(value:Dynamic):SceneArtifactTorchPose {
+			if (value == null) fail();
+			return {position: numbers(Reflect.field(value, "position"), 3), rotation: numbers(Reflect.field(value, "rotation"), 4)};
+		}
+		function segment(item:Dynamic):SceneArtifactWeldSegment {
+			var kind:Dynamic = Reflect.field(item, "kind"), seam:Dynamic = Reflect.field(item, "seam"), joint:Dynamic = Reflect.field(item, "joint");
+			var normals:Dynamic = Reflect.field(item, "normals");
+			if (!Std.isOfType(kind, String) || !Std.isOfType(seam, String) || !Std.isOfType(joint, String) || !Std.isOfType(normals, Array)) fail();
+			return {kind: kind, seam: seam, joint: joint, start: pose(Reflect.field(item, "start")), stop: pose(Reflect.field(item, "stop")),
+				normals: [for (normal in (cast normals:Array<Dynamic>)) numbers(normal, 3)]};
+		}
+		var metal:Dynamic = Reflect.field(raw, "metal"), process:Dynamic = Reflect.field(raw, "process"), path:Dynamic = Reflect.field(raw, "path");
+		if (!Std.isOfType(metal, String) || process == null) fail();
+		// A weld written before paths existed carried its one straight seam on itself.
+		var segments:Array<SceneArtifactWeldSegment> = path == null
+			? [segment({kind: "line", seam: Reflect.field(raw, "seam"), joint: Reflect.field(raw, "joint"), start: Reflect.field(raw, "start"),
+				stop: Reflect.field(raw, "stop"), normals: Reflect.field(raw, "normals")})]
+			: Std.isOfType(path, Array) ? [for (item in (cast path:Array<Dynamic>)) segment(item)] : fail();
+		var frame:Dynamic = Reflect.field(raw, "frame");
+		if (frame != null && !Std.isOfType(frame, String)) fail();
+		var weld:SceneArtifactWeld = {metal: metal, path: segments, legSize: number(raw, "legSize"),
+			process: {wireSpeed: number(process, "wireSpeed"), voltage: number(process, "voltage"),
+				travelSpeed: number(process, "travelSpeed"), approach: number(process, "approach"),
+				startDwell: number(process, "startDwell"), craterDwell: number(process, "craterDwell"), burnback: number(process, "burnback")}};
+		if (frame != null) weld.frame = frame;
+		return weld;
 	}
 
 	/** A mission from its JSON section, typed field by field. */
@@ -546,6 +832,8 @@ class SceneArtifact {
 			if (pose != null) step.pose = {x: number(pose, "x"), y: number(pose, "y"), yaw: number(pose, "yaw")};
 			var at:Dynamic = Reflect.field(raw, "at");
 			if (at != null) step.at = place(at);
+			var weld:Dynamic = Reflect.field(raw, "weld");
+			if (weld != null) step.weld = decodeWeld(weld);
 			step;
 		}]};
 		var loop:Dynamic = Reflect.field(decoded, "loop");

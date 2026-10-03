@@ -681,6 +681,15 @@ class ProgramTests extends MotionKitTestSupport {
     while (!paced.isStopped() && waited++ < 200) Sys.sleep(0.01);
     check(paced.isStopped() && delivered[0].isClosed() && delivered[1].isClosed(),
       "disposing a waiting planner stops its worker and disposes its plans");
+
+    // Shutting down cancels every planner and waits for its worker, so that none is planning when the process exits.
+    var running = new ProgramPlanner(compiler, program, start, Int64.ofInt(500), 0, 1.0, 1e9);
+    var waiting = new ProgramPlanner(compiler, program, start, Int64.ofInt(600), 0, 1.0, 1e-6);
+    check(ProgramPlanner.active() >= 2, "planners with a worker still going are counted");
+    check(ProgramPlanner.shutdown() == 0 && ProgramPlanner.active() == 0 && running.isStopped() && waiting.isStopped(),
+      "a shutdown stops every worker and waits for them");
+    running.dispose();
+    waiting.dispose();
   }
 
   public function testManipulatorMotion():Void {

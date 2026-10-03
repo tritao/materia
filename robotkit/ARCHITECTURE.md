@@ -1097,6 +1097,19 @@ simulation carry it there, lets go when the channel turns off, and publishes
 targets and runs no plan has no channel events, so such a tool can also be
 actuated directly for scripted playback.
 
+`runtime.SimulatedWelder` is the same kind of device for a MIG/MAG torch. It
+reads three channels (arc, digital; wire speed, m/min; voltage, V), finds the
+wire tip on its link, asks the grounded work (`tool.WeldWork`, convex solids on
+the links that carry them) how far the tip is and whether the wire points at it,
+lets `tool.WeldArcModel` say what the circuit does, and publishes one
+`tool_weld` frame (arc established, current A, voltage V, touch, fault code,
+mains power W; `tool.WeldSensor`). The arc, current, voltage, touch, fault and
+power rules are documented on `WeldArcModel`; the arc channel is not
+`keepOnStop`, so a stop takes the arc off. The geometry is a distance and a ray
+against the work rather than a physics contact because the wire is not a
+collision shape and the arc strikes across a gap. The model has no geometry and
+no clock of its own, so it is tested without a physics backend.
+
 A simulated robot added with `holdAtRest` (`RK_SIMULATION_ROBOT_HOLD_AT_REST`)
 holds its actuated joints at their designed pose from the start, and again after
 a reset, until a command targets them, as servos enabled at power-on do; coupled

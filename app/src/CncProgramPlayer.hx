@@ -30,6 +30,8 @@ import motionkit.robot.MotionSystemBlueprint;
 import motionkit.robot.PlanCheck;
 import motionkit.robot.PlanCheck.PlanCheckOptions;
 import motionkit.robot.PlanCheckSummary;
+import motionkit.robot.StepperSlip;
+import robotkit.runtime.EncoderMonitor;
 import nativekit.sim.SimSession;
 import toolpathkit.motion.MachineBinding;
 import toolpathkit.motion.ToolpathMotion;
@@ -133,6 +135,18 @@ class CncProgramPlayer implements SessionMember {
 	public var failure(default, null):Null<String> = null;
 	/** What the plan check assumes and allows, as the player was given it. */
 	public final checkOptions:PlanCheckOptions;
+	/**
+	 * Steps the machine's steppers lose where the plan check finds them over their pull-out curve: the
+	 * simulated axis falls behind its command and keeps the error until the session resets. Plans the
+	 * check passes lose nothing.
+	 */
+	public final slip:StepperSlip;
+	/**
+	 * What the machine's encoders read against the commanded positions: a motor-side encoder names the steps a
+	 * stepper lost, a load-side one reports the path error. Monitoring only; it has nothing to read when the
+	 * machine has no encoders.
+	 */
+	public final encoders:EncoderMonitor;
 	/** The G-code line the machine is executing; 0 between lines. */
 	public var currentLine(default, null):Int = 0;
 	/** Speed of every move, as a fraction of the program's. */
@@ -265,19 +279,29 @@ class CncProgramPlayer implements SessionMember {
 		toolShape = job.toolPart == null ? null : toolShapeIn(job.toolPart, job.spindle, placement, project, metresPerUnit);
 		// Spindle-speed handshakes are always ready. A tool change is the operator loading that tool,
 		// which the stock then cuts with and the spindle shows.
-		newMotion = () -> new ManipulatorMotion(robot.robot, binding.compiler,
-			channel -> {
-				if (channel == "spindle.at_speed") return EventValue.Digital(true);
-				if (!StringTools.startsWith(channel, TOOL_CHANGE)) return null;
-				var number = Std.parseInt(channel.substr(TOOL_CHANGE.length));
-				if (number == null || !toolsByNumber.exists(number)) throw 'The machining program loads unknown tool $channel';
-				if (number != loadedTool) {
-					loadedTool = number;
-					if (stock != null) stock.load(toolsByNumber.get(number));
-				}
-				return EventValue.Digital(true);
-			},
-			() -> robot.runtime.pollEvents(), planning.indices);
+		var robotIndex = spindleLink.robotIndex;
+		var axisJoint = new Map<String, Int>();
+		for (index in 0...job.axes.length) axisJoint.set(job.axes[index], planning.indices[index]);
+		encoders = new EncoderMonitor(robot.model, [for (_ in robot.model.joints) 0.0]);
+		slip = new StepperSlip(robot.robot.description().couplings, axisJoint,
+			(joint, offset) -> simulation.setJointSlip(robotIndex, joint, offset));
+		newMotion = () -> {
+			var made = new ManipulatorMotion(robot.robot, binding.compiler,
+				channel -> {
+					if (channel == "spindle.at_speed") return EventValue.Digital(true);
+					if (!StringTools.startsWith(channel, TOOL_CHANGE)) return null;
+					var number = Std.parseInt(channel.substr(TOOL_CHANGE.length));
+					if (number == null || !toolsByNumber.exists(number)) throw 'The machining program loads unknown tool $channel';
+					if (number != loadedTool) {
+						loadedTool = number;
+						if (stock != null) stock.load(toolsByNumber.get(number));
+					}
+					return EventValue.Digital(true);
+				},
+				() -> robot.runtime.pollEvents(), planning.indices);
+			made.slip = slip;
+			return made;
+		};
 		motion = newMotion();
 	}
 
@@ -332,6 +356,10 @@ class CncProgramPlayer implements SessionMember {
 			clock = Sys.time();
 		}
 		motion.update(session.fixedTimestep());
+		if (encoders.readings.length > 0) {
+			var seen = robot.robot.snapshot();
+			encoders.observe(seen.positions.toArray(), seen.setpointPositions.toArray(), session.simulationTime());
+		}
 		var spent = Sys.time() - clock;
 		motionSeconds += spent;
 		slowestUpdate = Math.max(slowestUpdate, spent);
@@ -442,6 +470,8 @@ class CncProgramPlayer implements SessionMember {
 	public function beforeReset():Void {}
 
 	public function reset():Void {
+		slip.reset();
+		encoders.reset([for (_ in robot.model.joints) 0.0]);
 		motion = newMotion();
 		if (speedOverride != 1.0) motion.setSpeedOverride(speedOverride);
 		restartRequest = null;

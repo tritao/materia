@@ -30,6 +30,9 @@ class MotionKitBootstrapTests {
     }
     if (Sys.getEnv("MOTIONKIT_PLANCHECK_ONLY") == "1") {
       new PlanCheckTests().testPlanCheck();
+      new PlanCheckTests().testStepperSlip();
+      new PlanCheckTests().testEncoderSeesStepperSlip();
+      new PlanCheckTests().testLoadSideEncoderReportsPathError();
       new PlanCheckTests().testCompilerRunsPlanCheck();
       Sys.println('Plan check tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
@@ -39,6 +42,12 @@ class MotionKitBootstrapTests {
       processTests.testCompiledXYZGantryRunsThroughSimulation();
       processTests.testMachineKitLeadScrewThroughVirtualDevice();
       Sys.println('MachineKit compiler tests passed (${MotionKitTestSupport.assertions} assertions)');
+      return;
+    }
+    if (Sys.getEnv("MOTIONKIT_COREXY_ONLY") == "1") {
+      new CoreXyTests().testPlotterDrawsASquare();
+      new CoreXyTests().testPlanCheckAddsTheAxesOnASharedMotor();
+      Sys.println('CoreXY tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
     }
     if (Sys.getEnv("MOTIONKIT_REDUNDANCY_ONLY") == "1") {
@@ -56,7 +65,12 @@ class MotionKitBootstrapTests {
       return;
     }
     new PlanCheckTests().testPlanCheck();
+    new PlanCheckTests().testStepperSlip();
+    new PlanCheckTests().testEncoderSeesStepperSlip();
+    new PlanCheckTests().testLoadSideEncoderReportsPathError();
     new PlanCheckTests().testCompilerRunsPlanCheck();
+    new CoreXyTests().testPlotterDrawsASquare();
+    new CoreXyTests().testPlanCheckAddsTheAxesOnASharedMotor();
     processTests.testPoseProcessPath();
     processTests.testMotionEventContracts();
     kinematicsTests.testKinematicsContract();

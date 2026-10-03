@@ -66,15 +66,21 @@ class AxisKinematics implements KinematicsSolver {
           (result[index] < bounds.lower - tolerance.position ||
            result[index] > bounds.upper + tolerance.position)) return null;
     }
+    // A follower is the sum of its couplings' terms.
+    var sums = new Map<String, Float>();
     for (coupling in blueprint.model.couplings) {
       var leader = -1, follower = -1;
       for (index in 0...blueprint.model.joints.length) {
         if (blueprint.model.joints[index].id == coupling.leader) leader = index;
         if (blueprint.model.joints[index].id == coupling.follower) follower = index;
       }
-      if (leader >= 0 && follower >= 0 &&
-          Math.abs(result[follower] - coupling.ratio * result[leader] -
-            coupling.offset) > tolerance.position) return null;
+      if (leader < 0 || follower < 0) continue;
+      var sum = sums.get(coupling.follower);
+      sums.set(coupling.follower, (sum == null ? 0.0 : sum) + coupling.ratio * result[leader] + coupling.offset);
+    }
+    for (index in 0...blueprint.model.joints.length) {
+      var sum = sums.get(blueprint.model.joints[index].id);
+      if (sum != null && Math.abs(result[index] - sum) > tolerance.position) return null;
     }
     return result;
   }

@@ -54,6 +54,9 @@ class EndEffectorRuntimeBridge {
           if (changerLock != null) throw "End effector has duplicate changer-lock bindings";
           requireInlet(configuration, instanceId, inletPort, [PortKind.Pneumatic]);
           changerLock = new SimulatedChangerLock();
+        case Arc(_, instanceId, controlPort):
+          // The arc has no tool runtime: the robot's welder works it over its channels. The inlet still has to be fed.
+          requireInlet(configuration, instanceId, controlPort, [PortKind.Signal]);
       }
     }
     var tool = EndEffectorBridge.toTool(configuration, frameName, state,
@@ -63,6 +66,7 @@ class EndEffectorRuntimeBridge {
       case Gripper(channel, _, _, _): runtime.bindGripper(channel);
       case Vacuum(channel, _, _): runtime.bindVacuum(channel);
       case Lock(channel, _, _): runtime.bindChangerLock(channel);
+      case Arc(_, _, _):
     }
     return runtime;
   }
@@ -76,6 +80,7 @@ class EndEffectorRuntimeBridge {
       case Gripper(channel, member, openPort, closePort): EndEffectorControlBinding.Gripper(channel, member, openPort, closePort);
       case Vacuum(channel, member, inletPort): EndEffectorControlBinding.Vacuum(channel, member, inletPort);
       case Lock(channel, member, inletPort): EndEffectorControlBinding.Lock(channel, member, inletPort);
+      case Arc(channel, member, controlPort): EndEffectorControlBinding.Arc(channel, member, controlPort);
     }];
     return {controls: controls, vacuumSensorId: derived.vacuumSensor};
   }

@@ -41,6 +41,11 @@ public:
                         const rk_simulation_robot_desc *robot_desc = nullptr);
     rk_result cut_virtual_device_link(uint32_t robot_index, bool cut);
     rk_result reset_robot(uint32_t robot_index);
+    /**
+     * Holds one robot joint `offset` behind (or ahead of) its commanded position from the next
+     * command on, as a stepper that has lost steps is. Reset clears it.
+     */
+    rk_result set_joint_slip(uint32_t robot_index, uint32_t joint, double offset);
     rk_result teleport_robot(uint32_t robot_index, const rk_simulation_pose &pose);
     rk_result set_joint_positions(uint32_t robot_index, const double *positions, uint32_t count);
     /**

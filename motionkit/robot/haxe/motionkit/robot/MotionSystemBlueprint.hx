@@ -92,6 +92,10 @@ class MotionSystemBlueprint {
           var leader = axis.jointIds.indexOf(coupling.leader);
           var follower = axis.jointIds.indexOf(coupling.follower);
           if (leader < 0 || follower < 0) continue;
+          // A joint that sums several leaders (a CoreXY motor) moves with no one axis: it maps to none.
+          var terms = 0;
+          for (other in model.couplings) if (other.follower == coupling.follower) terms++;
+          if (terms > 1) continue;
           coupled = true;
           if (resolved[leader]) {
             scales[follower] = coupling.ratio * scales[leader];

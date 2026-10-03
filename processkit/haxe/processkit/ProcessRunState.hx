@@ -7,4 +7,6 @@ enum ProcessRunState {
   ControlledInterruption;
   Recovery;
   Completion;
+  /** The process could not begin: the device did not become ready in time. */
+  Failed;
 }

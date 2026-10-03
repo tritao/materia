@@ -57,6 +57,8 @@ import machinekit.pneumatic.SuctionCup;
 import machinekit.pneumatic.VacuumGenerator;
 import machinekit.pneumatic.VacuumPressureSensor;
 import machinekit.pneumatic.VacuumControlValve;
+import machinekit.welding.WeldingInterfaces;
+import machinekit.welding.WeldingTorch;
 import robotkit.tool.ToolCollisionShape;
 import robotkit.tool.ToolCollisionShapes;
 import robotkit.tool.ToolRuntimeSelection;
@@ -90,6 +92,7 @@ class CadBridgeTests {
     testSchmalzEndEffector();
     testEndEffectorRuntimeBridge();
     testDerivedRuntimeBindings();
+    testTorchBindings();
     testAssemblySimulationBridge();
     testMobileBaseBridge();
     testFaceBridgeOnPlainBoxFace();
@@ -585,6 +588,37 @@ class CadBridgeTests {
       "gripper valve command derives from declared open and close ports");
   }
 
+  /** A welding torch derives an arc control, bound to its signal inlet, and its other channels. */
+  static function testTorchBindings():Void {
+    var services = ["power", "gas", "wire", "control"];
+    var set = new EndEffectorSet();
+    set.addComponent("base", new BridgeWelderSourcePart());
+    set.mount("base", "mount");
+    for (name in services) set.exposePort(name, "base", name);
+    set.changer("manual", "base", "contact", [for (name in services) {robot: name, tool: name}]);
+    var tool = new EndEffector();
+    tool.addComponent("torch", new WeldingTorch(45));
+    tool.mount("torch", "robot");
+    for (name in services) tool.exposePort(name, "torch", name);
+    tool.workingFrame("tcp", "torch", "tcp", true);
+    set.addTool("weld", tool);
+    var bindings = EndEffectorRuntimeBridge.deriveBindings(set, "weld");
+    check(bindings.controls.length == 1 && bindings.vacuumSensorId == null, "a torch derives one control and no vacuum sensor");
+    switch bindings.controls[0] {
+      case Arc(channel, instanceId, controlPort):
+        check(channel == "weld/tool/torch.arc" && instanceId == "tool/torch" && controlPort == "control",
+          "the arc control is the torch's trigger channel on its signal inlet");
+      case _: check(false, "a torch derives an arc binding");
+    }
+    var derived = machinekit.robotics.EndEffectorControls.derive(set.configuration("weld"), "weld");
+    check(derived.arcs.length == 1 && derived.arcs[0].wireSpeedChannel == "weld/tool/torch.wire_speed" &&
+      derived.arcs[0].voltageChannel == "weld/tool/torch.voltage" && derived.arcs[0].sensor == "weld/tool/torch.weld" &&
+      derived.arcs[0].tcpConnector == "tcp", "the torch's analogue channels and weld sensor are named after its member");
+    var runtime = EndEffectorRuntimeBridge.toRuntimeFromDesign(set, "weld", "tcp");
+    check(runtime.runtime.gripper == null && runtime.runtime.vacuum == null && runtime.runtime.channelDeclarations().length == 0,
+      "the arc is worked by the robot's welder, so the kinematic tool runtime declares no channel for it");
+  }
+
   static function testAssemblySimulationBridge():Void {
     var assembly = new AssemblyModel();
     assembly.add("base");
@@ -639,6 +673,44 @@ class CadBridgeTests {
     check(servoDrive != null && servoDrive.kind() == "servo" && drives[1].planningEffort() == 1.8 &&
       drives[1].planningRate() == 500 && drives[1].servoStiffness == 12 && servoDrive.curve.torqueAt(400) < 1.8,
       "a servo's drive, peak torque and maximum speed reach the robot actuator");
+    // A gearbox between a servo and a turning joint: the actuator turns `gearRatio` times for one turn of the joint, the joint
+    // is limited to the servo's speed over the ratio and its torque through the ratio at the efficiency, and the rotor's
+    // inertia at the joint is the ratio squared times its own.
+    var geared = new AssemblyModel();
+    geared.add("base");
+    geared.add("slider");
+    geared.connector("base", "mount", AssemblyFrames.identity());
+    geared.connector("slider", "mount", AssemblyFrames.identity());
+    geared.mateOnAxis("turn", "revolute", "base", "mount", "slider", "mount",
+      {x: 0, y: 1, z: 0}, 0, {lower: -3, upper: 3, velocity: 100, effort: 1000});
+    geared.actuateDrive({id: "servo", joint: "turn", maxEffort: 2.0, maxRate: 500, rotorInertia: 2e-5, drive: "servo", ratedTorque: 0.6,
+      peakTorque: 2.0, ratedSpeed: 300, maxSpeed: 500, gearRatio: 100, gearEfficiency: 0.8});
+    var gearedModel = AssemblySimulationBridge.toRobotModel(geared.definition("gear-test"), parts).model;
+    var gearedMotor = gearedModel.actuators[0];
+    var gearing = switch gearedMotor.transmission { case SimpleTransmission(_, ratio, _): ratio; };
+    check(gearing == 100.0 && gearedMotor.efficiency == 0.8, "a gearbox's ratio and efficiency reach the robot actuator");
+    check(Math.abs(gearedModel.joints[0].armature - 2e-5 * 100.0 * 100.0) < 1e-12, "the rotor's inertia is seen through the ratio squared");
+    var gearedJoint = RobotRuntimeCompiler.compile(gearedModel).joints[0];
+    check(Math.abs(gearedJoint.maxRate - 5.0) < 1e-12 && Math.abs(gearedJoint.maxEffort - 160.0) < 1e-9,
+      'the joint is limited to its drive: ${gearedJoint.maxRate} rad/s and ${gearedJoint.maxEffort} N m');
+    // Encoders are sensors on joints: counts per millimetre on a sliding joint become per metre, per revolution on a
+    // turning one per radian, and a servo that names its encoder holds no count of its own.
+    var sensed = new AssemblyModel();
+    sensed.add("base");
+    sensed.add("slider");
+    sensed.connector("base", "mount", AssemblyFrames.identity());
+    sensed.connector("slider", "mount", AssemblyFrames.identity());
+    sensed.mateOnAxis("slide", "prismatic", "base", "mount", "slider", "mount",
+      {x: 0, y: 1, z: 0}, 0, {lower: 0, upper: 100, velocity: 20, effort: 50});
+    sensed.actuateDrive({id: "servo", joint: "slide", maxEffort: 0, maxRate: 0, drive: "servo", ratedTorque: 0.6,
+      peakTorque: 1.8, ratedSpeed: 300, maxSpeed: 500, encoder: "scale"});
+    sensed.addEncoder({id: "scale", joint: "slide", kind: "absolute", counts: 200, index: true});
+    var sensedModel = AssemblySimulationBridge.toRobotModel(sensed.definition("encoder-test"), parts).model;
+    check(sensedModel.encoders.length == 1 && sensedModel.encoders[0].countsPerUnit == 200000.0 &&
+      sensedModel.encoders[0].kind == robotkit.model.EncoderKind.Absolute && sensedModel.encoders[0].index &&
+      sensedModel.encoders[0].joint == sensedModel.joints[0].id, "an encoder's counts per millimetre reach the robot in counts per metre");
+    check(sensedModel.actuators[0].encoder == "scale" && sensedModel.encoderFor(sensedModel.actuators[0]) == sensedModel.encoders[0] &&
+      RobotRuntimeCompiler.validate(sensedModel).length == 0, "the servo's encoder is the sensor it names");
     // A coupling's stiffness, backlash and drag reach the robot coupling in SI units: a 100 N/mm drive on a
     // millimetre axis is 100000 N/m, 0.05 mm of backlash 5e-5 m, and a turning follower's drag is as given.
     var screwed = new AssemblyModel();
@@ -1038,6 +1110,22 @@ private class BridgeServiceSourcePart extends MachineComponent {
         iface: Unspecified, required: false});
     addPort({name: "valveCommand", kind: Signal, role: Supply,
       iface: Plug("digital-valve", 2), required: false});
+    declareMass(1, new Vector(0, 0, 5), InertiaTensor.zero());
+  }
+
+  override public function geometry(detail:ComponentDetail = Preview):Part
+    return Part.box(10, 10, 10);
+}
+
+private class BridgeWelderSourcePart extends MachineComponent {
+  public function new() {
+    super("BRIDGE-WELDER-SOURCE", "welding service source fixture", "steel", true);
+    addConnector("mount", Mount, Solids.axial(0, 0, 0));
+    addConnector("contact", Face, Solids.axial(0, 0, 10));
+    addPort({name: "power", kind: ElectricalPower, role: Supply, iface: WeldingInterfaces.weldCable(), required: false});
+    addPort({name: "gas", kind: Gas, role: Supply, iface: WeldingInterfaces.gas(), required: false});
+    addPort({name: "wire", kind: Wire, role: Supply, iface: WeldingInterfaces.wireLiner(), required: false});
+    addPort({name: "control", kind: Signal, role: Supply, iface: WeldingInterfaces.control(), required: false});
     declareMass(1, new Vector(0, 0, 5), InertiaTensor.zero());
   }
 

@@ -240,6 +240,12 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 */
 	extern fn rk_simulation_set_joint_positions(simulation: rk_simulation, robot_index: u32, positions: ptr<const<f64>> @in_array("count"), count: u32) -> rk_result;
 	/**
+	 * Puts one robot joint `offset` (joint units) behind its commanded position from the next command
+	 * on, as a stepper motor that lost steps is. The joint's coupled joints must be given the matching
+	 * offsets. Accepted while the session runs; reset clears it.
+	 */
+	extern fn rk_simulation_set_joint_slip(simulation: rk_simulation, robot_index: u32, joint: u32, offset: f64) -> rk_result;
+	/**
 	 * Couples one robot's three omni-wheel velocity targets to its kinematic base.
 	 *
 	 * Behaves like rk_simulation_set_differential_drive, including its floor,

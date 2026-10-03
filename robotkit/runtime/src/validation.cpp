@@ -1,4 +1,5 @@
 #include "robotkit_runtime.hpp"
+#include "coupling_terms.hpp"
 
 #include <cmath>
 #include <algorithm>
@@ -36,7 +37,9 @@ bool coupled_values(const rk_robot_runtime_blueprint *blueprint, const double *v
     if (!has_couplings(blueprint)) return true;
     for (uint32_t i = 0; i < blueprint->coupling_count; ++i) {
         const auto &c = blueprint->couplings[i];
-        const double expected = values[c.leader] * c.ratio + (include_offset ? c.offset : 0.0);
+        if (!robotkit::internal::first_term_of_follower(blueprint->couplings, i)) continue;
+        const double expected = robotkit::internal::coupled_follower_value(blueprint->couplings,
+            blueprint->coupling_count, c.follower, values, include_offset);
         if (!is_finite(values[c.follower]) ||
             std::abs(values[c.follower] - expected) > tolerance)
             return false;
@@ -122,6 +125,14 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
         for (uint32_t joint = 0; joint < blueprint->joint_count; ++joint)
             if (!is_finite(blueprint->joint_overtravel[joint]) || blueprint->joint_overtravel[joint] < 0.0)
                 return RK_ERROR_INVALID_ARGUMENT;
+    if (blueprint->struct_size >= offsetof(rk_robot_runtime_blueprint, joint_servo) +
+            sizeof(blueprint->joint_servo))
+        for (uint32_t joint = 0; joint < blueprint->joint_count; ++joint) {
+            const auto &servo = blueprint->joint_servo[joint];
+            if (!is_finite(servo.stiffness) || servo.stiffness < 0.0 ||
+                !is_finite(servo.damping) || servo.damping < 0.0)
+                return RK_ERROR_INVALID_ARGUMENT;
+        }
     constexpr auto channels_size = offsetof(rk_robot_runtime_blueprint, coupling_count);
     if (blueprint->struct_size > offsetof(rk_robot_runtime_blueprint, channel_count) &&
         blueprint->struct_size < channels_size) return RK_ERROR_INVALID_ARGUMENT;
@@ -151,9 +162,14 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
                 blueprint->joints[c.follower].type == RK_RUNTIME_JOINT_FIXED)
                 return RK_ERROR_INVALID_ARGUMENT;
             for (uint32_t j = 0; j < i; ++j)
-                if (c.follower == blueprint->couplings[j].follower)
+                if (c.follower == blueprint->couplings[j].follower &&
+                    c.leader == blueprint->couplings[j].leader)
                     return RK_ERROR_INVALID_ARGUMENT;
         }
+        uint32_t order[RK_MAX_JOINTS], ordered = 0;
+        if (!robotkit::internal::order_followers(blueprint->couplings, blueprint->coupling_count,
+                blueprint->joint_count, nullptr, order, ordered))
+            return RK_ERROR_INVALID_ARGUMENT;
     }
     for (uint32_t i = 0; i < blueprint->link_count; ++i) {
         const auto &link = blueprint->links[i];
@@ -260,19 +276,26 @@ rk_result RK_CALL rk_robot_command_validate_for_blueprint(
             return RK_ERROR_INVALID_ARGUMENT;
     }
     if (has_couplings(blueprint) && command->kind == RK_COMMAND_JOINT_TARGETS) {
+        // A follower's target is the sum of its terms, so every leader must be targeted in its mode.
         for (uint32_t i = 0; i < blueprint->coupling_count; ++i) {
             const auto &c = blueprint->couplings[i];
-            const rk_joint_target *leader = nullptr, *follower = nullptr;
-            for (uint32_t j = 0; j < command->target_count; ++j) {
-                if (command->targets[j].joint == c.leader) leader = &command->targets[j];
+            if (!robotkit::internal::first_term_of_follower(blueprint->couplings, i)) continue;
+            const rk_joint_target *follower = nullptr;
+            for (uint32_t j = 0; j < command->target_count; ++j)
                 if (command->targets[j].joint == c.follower) follower = &command->targets[j];
+            if (!follower || follower->mode == RK_TARGET_EFFORT) continue;
+            const bool positional = follower->mode == RK_TARGET_POSITION || follower->mode == RK_TARGET_SERVO;
+            double expected = 0.0;
+            for (uint32_t k = 0; k < blueprint->coupling_count; ++k) {
+                const auto &term = blueprint->couplings[k];
+                if (term.follower != c.follower) continue;
+                const rk_joint_target *leader = nullptr;
+                for (uint32_t j = 0; j < command->target_count; ++j)
+                    if (command->targets[j].joint == term.leader) leader = &command->targets[j];
+                if (!leader || follower->mode != leader->mode) return RK_ERROR_INVALID_ARGUMENT;
+                expected += term.ratio * leader->target + (positional ? term.offset : 0.0);
             }
-            if (follower && follower->mode != RK_TARGET_EFFORT &&
-                (!leader || follower->mode != leader->mode ||
-                std::abs(follower->target - c.ratio * leader->target -
-                    (follower->mode == RK_TARGET_POSITION || follower->mode == RK_TARGET_SERVO
-                        ? c.offset : 0.0)) > 1e-6))
-                return RK_ERROR_INVALID_ARGUMENT;
+            if (std::abs(follower->target - expected) > 1e-6) return RK_ERROR_INVALID_ARGUMENT;
         }
     }
     return RK_OK;
@@ -361,9 +384,14 @@ rk_result validate_segments_for_blueprint(const SegmentBatch &batch,
         for (const auto &segment : batch.segments)
             for (uint32_t i = 0; i < blueprint.coupling_count; ++i) {
                 const auto &c = blueprint.couplings[i];
+                if (!robotkit::internal::first_term_of_follower(blueprint.couplings, i)) continue;
                 for (uint32_t degree = 0; degree <= segment.degree; ++degree) {
-                    const double expected = c.ratio * segment.coefficients[c.leader].value[degree] +
-                        (degree == 0 ? c.offset : 0.0);
+                    double expected = 0.0;
+                    for (uint32_t k = 0; k < blueprint.coupling_count; ++k)
+                        if (blueprint.couplings[k].follower == c.follower)
+                            expected += blueprint.couplings[k].ratio *
+                                    segment.coefficients[blueprint.couplings[k].leader].value[degree] +
+                                (degree == 0 ? blueprint.couplings[k].offset : 0.0);
                     if (std::abs(segment.coefficients[c.follower].value[degree] - expected) > 1e-6)
                         return RK_ERROR_INVALID_ARGUMENT;
                 }

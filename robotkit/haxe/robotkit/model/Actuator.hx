@@ -24,6 +24,18 @@ class Actuator {
    */
   public var drive:Null<ActuatorDrive> = null;
   /**
+   * The id of the `Encoder` that reads this motor, or empty for none. A servo's feedback comes from it
+   * (the servo drive's own `encoderCounts` is what models saved before encoders were sensors recorded).
+   */
+  public var encoder:String = "";
+  /**
+   * Share of the motor's power its transmission delivers to the joint, such as a gearbox's 0.9; 1 is
+   * lossless. The transmission's ratio is the gearbox ratio: the actuator turns `ratio` times for one turn
+   * of the joint, so the joint gets the motor's torque times the ratio times this, at the motor's speed over
+   * the ratio.
+   */
+  public var efficiency:Float = 1.0;
+  /**
    * Full steps in one turn of a stepper motor's rotor, 0 when this is not a stepper. A stepper's
    * actuator coordinate is the rotor angle in radians; microstepping is a property of the driver
    * wiring, so the deployment adds it. Setting it makes the actuator a stepper known only by its

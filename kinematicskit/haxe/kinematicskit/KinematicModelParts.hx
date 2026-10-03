@@ -24,6 +24,10 @@ class KinematicModelParts {
   var jointRatio:Array<Float>;
   var jointOffset:Array<Float>;
   var jointScale:Array<Float>;
+  var jointTermStart:Array<Int>;
+  var jointTermDof:Array<Int>;
+  var jointTermScale:Array<Float>;
+  var jointConstant:Array<Float>;
   var jointLower:Array<Float>;
   var jointUpper:Array<Float>;
   var jointDefault:Array<Float>;
