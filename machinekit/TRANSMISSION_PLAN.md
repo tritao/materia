@@ -1472,11 +1472,10 @@ the folded-Z network, but did not establish correct behavior for every mixed mac
 - Finish the shared belt-span calculation for both carriage clamps and rotary attachments;
   validate path wrap count before indexing; specify pretension and reject load cases that
   would slacken a span. Record the cost of posing a copy on each `describe()` rebuild.
-- The app's dynamic project build exposed an HXI ordering defect: `PackageResolver.resolveFiles`
-  alphabetizes RobotKit's interfaces, registering `RobotKitInference` before its declared
-  `RobotKitRuntime` dependency. The X10 workaround was to leave CadBridge out of the router
-  example and keep the bridge assertions in MachineKit tests. Record and test that haxeon
-  issue separately; do not claim the underlying compiler defect was fixed.
+- Verify the suspected HXI ordering defect before changing haxeon: `PackageResolver.resolveFiles`
+  alphabetizes RobotKit's interfaces, but the pinned haxeon also orders them by declared
+  dependencies before registration. Keep the router's CadBridge assertions in MachineKit tests;
+  record whether the compiler issue actually remains.
 
 The completed fix pass has a passing full gate, and each changed engineering number is recorded
 here with a reason.
@@ -1523,10 +1522,13 @@ independent linear/angular acceleration caps, then stays inside their convex int
 the first X9e gate found that scaling both acceleration deltas together delayed steering and
 hit a table, while the corrected focused mobile run follows the original route.
 
-The haxeon HXI dependency-order defect remains: `PackageResolver.resolveFiles` sorts interface
-files alphabetically, so `RobotKitInference` may register before its declared `RobotKitRuntime`
-dependency, which `Compiler` validates immediately. X10's local example workaround remains; a
-separate haxeon regression and compiler fix are still needed. No haxeon source was changed here.
+The suspected haxeon HXI dependency-order defect was already fixed in the pinned submodule by
+`bd014aec` (2026-09-29). `PackageResolver.resolveFiles` still sorts interface paths, but
+`CompilerSession` calls `HxiInterfaceOrder.dependenciesFirst` before registration and immediate
+composition validation. `HxiInterfaceOrderMain` tests a dependent path that sorts first; X9e's app
+build log also shows `RobotKitRuntime` loading before `RobotKitInference`. No further compiler
+change or submodule pin change is needed for this issue. The CadBridge assertions remain in
+MachineKit tests; keeping them out of the router example is no longer required by HXI ordering.
 
 ### X10 — Belt reductions and loops between shafts
 
