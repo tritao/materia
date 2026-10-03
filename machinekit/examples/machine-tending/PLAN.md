@@ -204,6 +204,9 @@ The current arm reaches about 0.73 m from shoulder to flange, and the gripper ad
 - Tests: MachineKit unit tests for the ball-screw ratio and efficiency, catalogue rows, part masses, and connector frames.
 
 MT1 implementation notes (in progress; final gate pending):
+- First full gate `mt1-parts` exposed an unwanted MachineKit → ToolpathKit dependency in the
+  spindle holder-profile adapter. Keep the spindle mechanical library independent; the CNC
+  example will derive its cutter holder profile from these dimensions in MT2.
 - Reuse the existing `Transmission.LeadScrew` resolver: `BallScrew` and `BallNut` are recipe-backed
   screw/nut parts, with a `Ball` race family and a separate `PreloadedBallNut` allowance. Existing
   sliding screws and unpreloaded ball-nut allowances are unchanged. SFU1605 is 16 mm diameter,

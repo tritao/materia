@@ -6,7 +6,6 @@ import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
-import toolpathkit.tool.CutterProfile;
 
 /** ER20 cartridge, origin at its gauge line and body along +Z. Bearing and nose envelopes are
  * assumed reference dimensions; the gauge line is the controlled point for G43.
@@ -23,9 +22,6 @@ class SpindleCartridge extends MachineComponent {
 		addConnector("mount", Mount, Solids.axial(0, 0, 30));
 		addConnector("pulley", Axis, Solids.axial(0, 0, LENGTH));
 	}
-
-	public function holding(cutter:CutterProfile):CutterProfile
-		return cutter.withHolder(0.034, Er20Holder.LENGTH / 1000);
 
 	override public function hasGeometry():Bool return true;
 	override public function geometry(detail:ComponentDetail = Preview):Part return Solids.union([
