@@ -39,6 +39,7 @@ class MachineKitRobotCompiler {
         !Math.isFinite(maxAcceleration) || maxAcceleration <= 0)
       throw "Assembly axis limits must be finite and positive";
     var axes:Array<MotionAxisBlueprint> = [];
+    var ratios:Array<Float> = [];
     var used = new Map<String, Bool>();
     // Validate the entire mapping before changing the supplied model.
     for (binding in bindings) {
@@ -55,14 +56,14 @@ class MachineKitRobotCompiler {
       if (shaft == null || travel == null || shaft.type != JointType.Continuous ||
           travel.type != JointType.Prismatic || shaft.parent.id != binding.motorLinkId)
         throw 'Assembly axis "${binding.id}" has no matching motor shaft and carriage joints';
-      var expected = 2.0 * Math.PI /
-        (binding.axis.transmission.lead * binding.axis.transmission.direction *
-          MILLIMETRES_TO_METRES);
+      var expected = assemblyScrewRatio(binding.axis);
       var matched = false;
       for (coupling in model.couplings)
         if (coupling.leader == travel.id && coupling.follower == shaft.id &&
-            Math.abs(coupling.ratio - expected) <= Math.abs(expected) * 1e-8)
+            Math.abs(coupling.ratio - expected) <= Math.abs(expected) * 1e-8) {
           matched = true;
+          ratios.push(coupling.ratio);
+        }
       if (!matched)
         throw 'Assembly axis "${binding.id}" has no matching lead-screw joint coupling';
       for (actuator in model.actuators) switch actuator.transmission {
@@ -77,9 +78,7 @@ class MachineKitRobotCompiler {
     for (index in 0...bindings.length) {
       var binding = bindings[index];
       var shaftId = binding.shaftJointId;
-      var ratio = 2.0 * Math.PI /
-        (binding.axis.transmission.lead * binding.axis.transmission.direction *
-          MILLIMETRES_TO_METRES);
+      var ratio = ratios[index];
       var motor = new Actuator('${binding.id}.motor.${binding.axis.motor.designation}',
         0.0, maxVelocity * Math.abs(ratio),
         Transmission.SimpleTransmission(shaftId, 1.0, 0.0));
@@ -166,6 +165,14 @@ class MachineKitRobotCompiler {
       axisBlueprint("y", yAxis, maxVelocity, maxAcceleration),
       axisBlueprint("z", zAxis, maxVelocity, maxAcceleration)
     ]);
+  }
+
+  /** Read the axis's resolved coupling, then convert its mm leader to SI. */
+  static function assemblyScrewRatio(axis:LinearAxis):Float {
+    var couplings = axis.describe().mechanical.couplings;
+    if (couplings != null) for (coupling in couplings)
+      if (coupling.id == "lead-screw") return coupling.ratio / MILLIMETRES_TO_METRES;
+    throw "Linear axis has no resolved lead-screw coupling";
   }
 
   /** Read the carriage datum through MachineAssembly's prefix-aware connector API. */

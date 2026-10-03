@@ -856,11 +856,12 @@ T3 validation: focused CoreXY and standalone MachineKit pass; every suite in
 
 `LinearAxis` builds its carriage-to-screw relation through `addTransmission(LeadScrew(...))` only.
 `LinearAxis.setTravel` sets the carriage joint and lets `AssemblyState` propagate the coupling.
-`LeadScrewTransmission` is deleted. Code inspection found that only `LinearAxis` still used it;
-the smoke checks already exercise the coupling, including handedness, travel and prefixed axes.
+`LeadScrewTransmission` is deleted. The smoke checks already exercise the coupling, including handedness, travel and prefixed axes.
+`MachineKitRobotCompiler` also used the helper: it now validates against the assembly's resolved
+coupling and takes motor speed from the matching RobotKit coupling, without a second screw equation.
 
-T4 validation: every suite in `x7-suite-t4-single-model.txt` passes, including the
-app project-source suite; all T3 engineering baselines remain unchanged.
+T4 validation: focused MachineKit/MotionKit compiler checks and every suite in
+`x7-suite-t4-complete.txt` pass, including the app; all T3 engineering baselines remain unchanged.
 
 #### T5 — Provenance of engineering values
 
