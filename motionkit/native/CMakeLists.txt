@@ -112,7 +112,7 @@ else()
         "${CMAKE_CURRENT_SOURCE_DIR}/vendor/shims/no_openmp")
 endif()
 
-add_library(motionkit_core ${MK_LIBRARY_TYPE} src/trajectory.cpp src/validation.cpp src/generator.cpp src/path.cpp src/opw.cpp src/configuration.cpp)
+add_library(motionkit_core ${MK_LIBRARY_TYPE} ../../trajectorykit/native/src/trajectory.cpp ../../trajectorykit/native/src/validation.cpp src/generator.cpp src/path.cpp src/opw.cpp src/configuration.cpp)
 target_compile_features(motionkit_core PUBLIC cxx_std_17)
 target_link_libraries(motionkit_core PRIVATE ruckig::ruckig toppra Eigen3::Eigen motionkit_descartes_core)
 target_include_directories(motionkit_core PUBLIC
