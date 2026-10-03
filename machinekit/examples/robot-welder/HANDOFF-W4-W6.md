@@ -13,15 +13,24 @@ to work.
   - `d7d3d0f14`: swept clearance of an arm and its tool against the cell's hulls (`ArmClearance`, `ClearanceTests`).
 - **The merge has not been built or run.** It resolved seven conflicts, all additions from both sides. The one
   behavioural change is that `MissionPlayer.toolArm` now uses main's `robot.toolFrames` for both suction and torch.
-- **Main has moved on, and it does not compile.** Local `main`, also pushed to origin, is `b99c948fa`: it adds
-  transmissions X5–X7 T1 on top of the welder merge.
-  - The welder merge left `app/WeldBeads.hx` without `SessionMember.beforeReset`, so the app does not compile there.
-  - This branch has the fix cherry-picked as `83d120520`, the same change as the machine-tending branch's `8dd23bec7`.
-  - Main gets the fix when this work or machine-tending is synced.
-- **The committed branch merges with main cleanly.** The uncommitted draft overlaps main in two files:
-  - `machinekit/examples/robot-arm/RobotArm.hx`: the draft adds `ArmTool.ready()` and overrides `specs[i].initial`,
-    while main (X8) rebuilt `ArmJointSpec` around a servo and gearbox through a `spec(...)` helper;
-  - `app/tests/src/app/ProjectSourceTests.hx`.
+- **This branch is synced with main** (2026-10-04). Local `main` `712019dbc` (transmissions X7–X10, the `WeldBeads`
+  compile fix, and `robotkit/RESTRUCTURE_PLAN.md`) is merged in as `bb044fa83`. It has not been built or run since.
+- **The draft is restored on top of that merge**, uncommitted (26 files). Two things were changed while restoring it:
+  - **Its `RobotArm.hx` change was dropped** in favour of main's version. The draft had added a required
+    `ArmTool.ready()` against the old spec table, which the ground rules below forbid.
+  - **`ArmWeldingTool.ready()` is therefore unwired.** The welding tool's ready pose still has to be given, from
+    `WeldingCell` or the tool's constructor.
+
+  The draft's other changes to files main also changed (`ProjectSourceTests.hx`, `AssemblyPreview.hx`,
+  `WeldingPlanRunner.hx`) applied without conflicts. They have not been compiled yet.
+- **RobotKit is about to be restructured; read `robotkit/RESTRUCTURE_PLAN.md`.** Two phases affect this work:
+  - **R3 moves process semantics out of RobotKit into ProcessKit:** `WeldPlan`, `WeldRunner`, `WeldSeam`,
+    `SimulatedWelder` and the arc model, behind RobotKit's generic tool interfaces. Put new welding code in ProcessKit
+    from the start (`processkit`, or `machinekit.welding` for CAD-side pieces), not in `robotkit.skill` or
+    `robotkit.tool`. Don't do R3's moves yourself unless the user asks; they are scheduled at a quiet point.
+  - **R0 renames the device protocol** (the `RKD6` marker against wire version 12) and puts `RobotRuntime` behind a
+    `RuntimeEndpoint`. W6 builds on both, so check R0's state before starting W6. If R0 hasn't landed, use the
+    protocol's current names, keep W6's protocol-facing code in one place, and say so in the report.
 - **Another session builds on this code.** A Codex session in the `machine-tending` worktree (MT1–MT5) uses `ArmTool`,
   `ArmClearance` and the mission machinery from this branch. Its gripper tool implements `ArmTool`.
   - It is also reworking `RobotArm.hx` for drive geometry (`GearedArmJoint`, gearbox size, driver and power-supply
@@ -155,19 +164,18 @@ Goal: the cell's default mission welds every seam of the weldment. That is 10 se
 tube posts with four 40 mm sides each, welded as chains. Every approach, weld path and retract must be checked clear,
 and nothing in the mission may be hard-coded.
 
-0. **Bring in main, then check the starting point.**
-   1. Set the draft aside with `git stash push -u -m mobile-welder-w4-draft-<date>` and record its SHA from
-      `git stash list --format='%H %gs'`.
-   2. Merge `main` into `mobile-welder`. It merges cleanly.
-   3. Restore the draft with `git stash apply <sha>`.
-   4. Resolve `RobotArm.hx` onto main's servo/gearbox `spec(...)` layout. Give the welding tool's ready pose without
-      adding a method to `ArmTool` (see the ground rules). Resolve `ProjectSourceTests.hx` too.
-   5. Drop the stash entry, finding its current index by its tag first.
-   6. Delete the pre-path weld decoding in `SceneArtifact.hx`: the "A weld written before paths existed" branch in the
+0. **Check the starting point.** Main is already merged.
+   1. If `main` moved again, bring it in the same way: set the draft aside with
+      `git stash push -u -m mobile-welder-w4-draft-<date>`, record its SHA from `git stash list --format='%H %gs'`,
+      merge `main`, restore the draft with `git stash apply <sha>`, then drop the stash entry, finding its current index
+      by its tag first.
+   2. Wire the welding tool's ready pose without touching `RobotArm.hx` or adding a method to `ArmTool` (see the ground
+      rules). Then remove `ArmWeldingTool.ready()`.
+   3. Delete the pre-path weld decoding in `SceneArtifact.hx`: the "A weld written before paths existed" branch in the
       weld step's decoder. A step without `path` is rejected.
-   7. Compile everything the merge and the draft touch: each affected kit suite once, then the app `--compiler-only`
+   4. Compile everything the merge and the draft touch: each affected kit suite once, then the app `--compiler-only`
       build. Fix the draft until it compiles.
-   8. Run `PROJECT_SOURCE_ONLY=welder` and `arm` once. This merge also checks main's X8 arm drives against the welder.
+   5. Run `PROJECT_SOURCE_ONLY=welder` and `arm` once. This merge also checks main's X8 arm drives against the welder.
 1. **Corner-turn length is derived, not fixed** (`WeldCorner`). Derive it from the reorientation angle and the wrist's
    angular speed and acceleration limits at the weld's travel speed, so the tool tip keeps travel speed while turning.
    - Bound it, at most 45% of either segment, and document the rule.
