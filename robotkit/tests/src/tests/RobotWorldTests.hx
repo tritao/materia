@@ -902,6 +902,10 @@ class RobotWorldTests {
       new robotkit.model.TorqueSpeedCurve([0.0, 100.0, 400.0], [1.26, 1.26, 0.315]));
     if (source.actuators.length > 1) source.actuators[1].drive = new robotkit.model.ActuatorDrive.ServoDrive(0.64, 1.9, 314.0, 500.0, 2e-5, 4096.0);
 
+    check(RobotModelCodec.encode(source).toString().indexOf('"assumed"') < 0,
+      "models without provenance keep the field absent");
+    source.couplings[0].assumed = ["belt stiffness", "belt drag"];
+    source.actuators[0].assumed = ["rotor inertia"];
     var encoded = RobotModelCodec.encode(source);
     var restored = RobotModelCodec.decode(encoded);
     equal(restored.schemaVersion, RobotModel.CURRENT_VERSION,
@@ -919,6 +923,9 @@ class RobotWorldTests {
     equal(restored.actuators.length, 2,
       "v5 RobotModel accepts two actuators on one joint");
     equal(restored.couplings.length, 1, "v5 RobotModel preserves joint couplings");
+    check(restored.couplings[0].assumed.join(",") == "belt stiffness,belt drag" &&
+      restored.actuators[0].assumed.join(",") == "rotor inertia", "RobotModel codec preserves engineering assumptions");
+
     equal(restored.couplings[0].offset, 0.25,
       "v5 RobotModel preserves coupling offset independently of transmissions");
     equal(restored.actuators[0].maxRate, 12.0,

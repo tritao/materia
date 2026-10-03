@@ -35,6 +35,8 @@ class PlanDiagnostic {
   public final limit:Float;
   /** How many samples of the plan were over. */
   public final samples:Int;
+  /** Assumed model inputs behind this finding. */
+  public var assumed:Array<String> = [];
 
   public function new(kind:PlanDiagnosticKind, opIndex:Int, subject:String, axis:String, timeSeconds:Float,
       value:Float, limit:Float, samples:Int) {
@@ -55,12 +57,13 @@ class PlanDiagnostic {
   public function describe(line:Int = 0):String {
     var where = (line > 0 ? 'line $line, ' : '') + 'op $opIndex' + (pathDistance >= 0.0 ? ' at ${round(pathDistance * 1000.0)} mm' : '') +
       ' (${round(timeSeconds)} s into the plan)';
-    return switch kind {
+    var description = switch kind {
       case Accuracy: '$where: axis $axis deviates ${round(value * 1000.0)} mm against a tolerance of ${round(limit * 1000.0)} mm';
       case ServoRatedTorque: '$where: motor $subject on $axis runs at ${round(value)} N m RMS against ${round(limit)} N m rated';
       case _: '$where: motor $subject on $axis needs ${round(value)} N m against ${round(limit)} N m available' +
         ' (${Std.int(Math.round(100.0 * (ratio() - 1.0)))}% over, $samples samples)';
     };
+    return description + (assumed.length == 0 ? "" : ' (assumed: ${assumed.join(", ")})');
   }
 
   public function toString():String return '${kind}: ' + describe();

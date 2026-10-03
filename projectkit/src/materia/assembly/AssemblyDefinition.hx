@@ -1,5 +1,7 @@
 package materia.assembly;
 
+import haxe.ds.ReadOnlyArray;
+
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.assembly.AssemblyRecord.AssemblyConnector;
 
@@ -141,6 +143,8 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(8) @:optional var backlash:Null<Float>;
 	/** Constant resisting effort the coupling adds at the target while it moves (N m for a turning target). */
 	@:id(9) @:optional var drag:Null<Float>;
+	/** Engineering inputs assumed by the source of this coupling; absent when none. */
+	@:id(10) @:optional var assumed:Null<ReadOnlyArray<String>>;
 }
 
 /**
@@ -182,6 +186,8 @@ enum abstract AssemblyMateKind(String) from String to String {
 	 */
 	@:id(18) @:optional var gearRatio:Null<Float>;
 	@:id(19) @:optional var gearEfficiency:Null<Float>;
+	/** Engineering inputs assumed by this motor's rating or curve; absent when none. */
+	@:id(20) @:optional var assumed:Null<ReadOnlyArray<String>>;
 }
 
 /**

@@ -5,6 +5,8 @@ import robotkit.model.Transmission;
 
 class Actuator {
   public final id:String;
+  /** Assumed engineering inputs carried from the model's source. */
+  public var assumed:Array<String> = [];
   /** Limits are in the actuator's effort and coordinate units, not joint units. */
   public var maxEffort:Float;
   public var maxRate:Float;

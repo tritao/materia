@@ -29,6 +29,7 @@ class TransmissionResolver {
 				if (record.near != null && record.far != null)
 					result.followerSpeedCap = (cast(screw, machinekit.motion.LeadScrew)).criticalSpeed(record.near,
 						record.far, record.unsupported);
+				if (result.followerSpeedCap != null) result.setBasis("followerSpeedCap", ValueBasis.Assumed, "screw critical-speed margin");
 				result;
 			case GearMesh(driver, driven): GearPair.relation(gear(driver), gear(driven), alignment);
 			case RackAndPinion(pinion, rack):
@@ -47,9 +48,18 @@ class TransmissionResolver {
 				if (!Std.isOfType(sprocket, Sprocket)) throw "Transmission needs a sprocket";
 				Sprocket.relation(cast sprocket, alignment);
 		};
-		if (record.stiffness != null) relation.stiffness = record.stiffness;
-		if (record.backlash != null) relation.backlash = record.backlash;
-		if (record.drag != null) relation.drag = record.drag;
+		if (record.stiffness != null) {
+			relation.stiffness = record.stiffness;
+			relation.setBasis("stiffness", ValueBasis.Stated);
+		}
+		if (record.backlash != null) {
+			relation.backlash = record.backlash;
+			relation.setBasis("backlash", ValueBasis.Stated);
+		}
+		if (record.drag != null) {
+			relation.drag = record.drag;
+			relation.setBasis("drag", ValueBasis.Stated);
+		}
 		return relation;
 	}
 

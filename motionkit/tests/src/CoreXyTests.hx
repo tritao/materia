@@ -208,10 +208,15 @@ class CoreXyTests extends MotionKitTestSupport {
     var scene = SceneArtifact.decode(CoreXyPlotterPreview.plotter());
     var model = AssemblySimulationBridge.toRobotModel(scene.assemblyDefinition, AssemblyPhysicalPartView.fromSceneArtifact(scene),
       scene.assemblyState).model;
+    model = robotkit.model.RobotModelCodec.decode(robotkit.model.RobotModelCodec.encode(model));
     var options = new PlanCheckOptions();
     var check = new PlanCheck(model, ["x", "y"], options);
     var loads = check.axisLoads();
     this.check(loads.length == 2 && loads[0].motors.length == 2 && loads[1].motors.length == 2, "each axis is carried by both motors");
+    for (load in loads) this.check(load.assumed.indexOf("belt stiffness") >= 0 &&
+      load.assumed.indexOf("stepper inductance") >= 0 && load.assumed.indexOf("rotor inertia") >= 0,
+      "part assumptions survive the assembly bridge and RobotModel codec into the axis load");
+
     var found = ["motorA", "motorB"];
     for (load in loads) for (motor in load.motors) this.check(found.indexOf(motor.actuator.id) >= 0, "and they are the plotter's two");
     near(loads[0].motors[0].share, 0.5, "each motor carries half of an axis's force", 1e-12);
@@ -231,6 +236,9 @@ class CoreXyTests extends MotionKitTestSupport {
     function flagged(move:Array<Float>):String {
       var rough = plan(model, [0.0, 0.0], move, 3.0, options.steady);
       var result = check.check(rough, 2, 0.0);
+      for (diagnostic in result.diagnostics) this.check(diagnostic.assumed.indexOf("belt stiffness") >= 0 &&
+        diagnostic.describe().indexOf("assumed:") >= 0, "plan findings expose the source assumptions");
+
       var names = [for (diagnostic in result.diagnostics) if (diagnostic.kind == motionkit.trajectory.PlanDiagnostic.PlanDiagnosticKind.StepperStall) diagnostic.subject];
       names.sort(Reflect.compare);
       rough.dispose();

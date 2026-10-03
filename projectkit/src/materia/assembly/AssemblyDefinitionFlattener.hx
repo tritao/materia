@@ -120,6 +120,7 @@ class AssemblyDefinitionFlattener {
 		if (actuator.encoder != null) copy.encoder = actuator.encoder;
 		if (actuator.gearRatio != null) copy.gearRatio = actuator.gearRatio;
 		if (actuator.gearEfficiency != null) copy.gearEfficiency = actuator.gearEfficiency;
+		if (actuator.assumed != null && actuator.assumed.length > 0) copy.assumed = [for (label in actuator.assumed) label];
 		return copy;
 	}
 
@@ -202,6 +203,7 @@ class AssemblyDefinitionFlattener {
 			if (coupling.stiffness != null) expanded.stiffness = coupling.stiffness;
 			if (coupling.backlash != null) expanded.backlash = coupling.backlash;
 			if (coupling.drag != null) expanded.drag = coupling.drag;
+			if (coupling.assumed != null && coupling.assumed.length > 0) expanded.assumed = [for (label in coupling.assumed) label];
 			flat.couplings.push(expanded);
 		}
 		if (actuators != null) {

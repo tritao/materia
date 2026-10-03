@@ -396,6 +396,14 @@ class MachineAssemblyDescriptionTests {
 		var resolved = LeadScrew.relation(long, new LeadScrewNut(thread), 1);
 		near(resolved.ratio, 2 * Math.PI / thread.signedLead(), "the screw resolves its ratio and efficiency together");
 		near(resolved.efficiency, thread.efficiency(), "the resolved efficiency comes from the thread");
+		if (resolved.basis("ratio") != machinekit.transmission.ValueBasis.Derived ||
+			resolved.basis("backlash") != machinekit.transmission.ValueBasis.Assumed)
+			throw "A relation distinguishes derived motion from assumed nut allowances";
+		var basis = machinekit.transmission.ValueBasis.Catalog;
+		var savedBasis = haxeon.wire.JsonWire.encode(basis);
+		var restoredBasis:machinekit.transmission.ValueBasis = haxeon.wire.JsonWire.decode(savedBasis);
+		if (basis != restoredBasis) throw "The value basis lost its wire identity";
+
 		var coupling = built.couplings[0];
 		var backlash = coupling.backlash, drag = coupling.drag, stiffness = coupling.stiffness;
 		near(backlash == null ? 0 : backlash, new LeadScrewNut(thread).backlash(), "a screw drive has its nut's backlash allowance");
@@ -469,8 +477,21 @@ class MachineAssemblyDescriptionTests {
 		near(measured.stiffness, 123, "a stated stiffness survives a part edit");
 		near(measured.backlash, 0.2, "a stated backlash survives a part edit");
 		near(measured.drag, 0.01, "a stated drag survives a part edit");
+		if (measured.assumed == null || measured.assumed.indexOf("belt stiffness") >= 0 ||
+			measured.assumed.indexOf("belt drag") >= 0 || measured.assumed.indexOf("belt efficiency") < 0)
+			throw "Stated overrides remove only their own assumption labels";
+
 		assembly.setTransmissionOverrides("belt");
 		near(term(assembly, "belt").stiffness, belt.carriageStiffness(0), "clearing an override resolves the part again");
+		var beltAssumed = term(assembly, "belt").assumed;
+		if (beltAssumed == null || beltAssumed.indexOf("belt stiffness") < 0) throw "Clearing overrides restores part provenance";
+		assembly.addCoupling("plain", "turn", "pulley-turn", 2, 0, 0.8, 1000, 0.03, 0.001, ["plain compliance"]);
+		var plainSaved = term(MachineAssembly.decode(assembly.encode()), "plain");
+		near(plainSaved.efficiency, 0.8, "a plain coupling keeps its efficiency through the frozen schema");
+		near(plainSaved.stiffness, 1000, "a plain coupling keeps its stiffness through the frozen schema");
+		if (plainSaved.assumed == null || plainSaved.assumed.indexOf("plain compliance") < 0)
+			throw "The frozen schema retains a plain coupling's assumptions";
+
 
 		var gearA = new SpurGear(1, 20, 6, SpurGear.STANDARD_PRESSURE_ANGLE, 0, 0.1);
 		var gearB = new SpurGear(1, 40, 6, SpurGear.STANDARD_PRESSURE_ANGLE, 0, 0.2);
@@ -488,6 +509,13 @@ class MachineAssemblyDescriptionTests {
 	static function motorsDriveJoints():Void {
 		function near(actual:Float, expected:Float, what:String, tolerance:Float = 1e-12):Void
 			if (!(Math.abs(actual - expected) < tolerance)) throw '$what: $actual, expected $expected';
+		var genericServo = machinekit.motion.ServoMotor.model("GENERIC-SERVO-50W");
+		var genericActuator = genericServo.actuator("generic", "joint", 24, 0.5);
+		if (genericActuator.assumed == null || genericActuator.assumed.indexOf("servo ratings") < 0)
+			throw "Generic servo ratings must say they are assumed";
+		var statedServo = new machinekit.motion.ServoMotor(genericServo.rating);
+		if (statedServo.actuator("stated", "joint", 24, 0.5).assumed != null)
+			throw "Explicit servo ratings must retain their stated basis";
 		var motor = NemaStepper.frame(23);
 		// 1.26 N m holding; on 24 V its 2.5 mH winding passes rated 2.8 A up to 24 / (50 x 2.5 mH x 2.8 A).
 		var corner = 24 / (50 * 2.5e-3 * 2.8);

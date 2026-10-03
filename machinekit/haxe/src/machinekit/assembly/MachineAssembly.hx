@@ -1,5 +1,7 @@
 package machinekit.assembly;
 
+import haxe.ds.ReadOnlyArray;
+
 import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.AssemblyState;
 import cadkit.modeling.Vector;
@@ -291,7 +293,8 @@ class MachineAssembly {
 				joint.child, joint.childConnector, joint.axis, joint.closureTolerance, joint.limits);
 		}
 		if (mechanical.couplings != null) for (coupling in mechanical.couplings)
-			result.addCoupling(coupling.id, coupling.source, coupling.target, coupling.ratio, coupling.offset);
+			result.addCoupling(coupling.id, coupling.source, coupling.target, coupling.ratio, coupling.offset,
+				coupling.efficiency, coupling.stiffness, coupling.backlash, coupling.drag, coupling.assumed);
 		// A driven coupling's ratio comes from its parts as they are now, not as they were saved.
 		// The coupling decides whether there is one: a transmission whose coupling was removed goes too.
 		if (description.machine.transmissions != null) for (transmission in description.machine.transmissions)
@@ -349,7 +352,8 @@ class MachineAssembly {
 		if (mechanical.couplings != null) for (coupling in mechanical.couplings)
 			if (StringTools.startsWith(coupling.id, prefix))
 				child.addCoupling(coupling.id.substr(prefix.length), coupling.source.substr(prefix.length),
-					coupling.target.substr(prefix.length), coupling.ratio, coupling.offset, coupling.efficiency);
+					coupling.target.substr(prefix.length), coupling.ratio, coupling.offset, coupling.efficiency,
+					coupling.stiffness, coupling.backlash, coupling.drag, coupling.assumed);
 		for (motor in motors) if (StringTools.startsWith(motor.actuator, prefix))
 			child.addMotorRecord({actuator: motor.actuator.substr(prefix.length), joint: motor.joint.substr(prefix.length),
 				motor: motor.motor.substr(prefix.length), volts: motor.volts, margin: motor.margin,
@@ -631,7 +635,7 @@ class MachineAssembly {
 			joint.closureTolerance);
 		if (assembly.mechanical.couplings != null) for (coupling in assembly.mechanical.couplings)
 			addCoupling(join(id, coupling.id), join(id, coupling.source), join(id, coupling.target),
-				coupling.ratio, coupling.offset, coupling.efficiency);
+				coupling.ratio, coupling.offset, coupling.efficiency, coupling.stiffness, coupling.backlash, coupling.drag, coupling.assumed);
 		for (transmission in assembly.transmissions) {
 			var record = copyTransmission(transmission, id);
 			applyTransmission(record);
@@ -767,6 +771,8 @@ class MachineAssembly {
 			coupling.stiffness = relation.stiffness;
 			coupling.backlash = relation.backlash;
 			coupling.drag = relation.drag;
+			var assumed = relation.assumed;
+			coupling.assumed = assumed.length == 0 ? null : assumed;
 			if (relation.followerSpeedCap != null) for (joint in mechanical.joints)
 				if (joint.id == coupling.target) joint.limits.velocity = relation.followerSpeedCap;
 			return true;
@@ -867,13 +873,17 @@ class MachineAssembly {
 	}
 
 	public function addCoupling(id:String, source:String, target:String, ratio:Float, offset:Float = 0,
-			?efficiency:Float):Void {
+			?efficiency:Float, ?stiffness:Float, ?backlash:Float, ?drag:Float, ?assumed:ReadOnlyArray<String>):Void {
 		requireOperationId(id);
 		if (source == null || source.length == 0 || target == null || target.length == 0)
 			throw 'Assembly coupling "$id" needs source and target';
 		var coupling:materia.assembly.AssemblyDefinition.AssemblyJointCoupling = {id: id, source: source,
 			target: target, ratio: ratio, offset: offset};
 		if (efficiency != null) coupling.efficiency = efficiency;
+		if (stiffness != null) coupling.stiffness = stiffness;
+		if (backlash != null) coupling.backlash = backlash;
+		if (drag != null) coupling.drag = drag;
+		if (assumed != null && assumed.length > 0) coupling.assumed = [for (label in assumed) label];
 		mechanical.couplings.push(coupling);
 	}
 
@@ -1068,7 +1078,7 @@ class MachineAssembly {
 		if (mechanical.couplings != null) for (coupling in mechanical.couplings)
 			model.couple(join(prefix, coupling.id), join(prefix, coupling.source),
 				join(prefix, coupling.target), coupling.ratio, coupling.offset, coupling.efficiency,
-				coupling.stiffness, coupling.backlash, coupling.drag);
+				coupling.stiffness, coupling.backlash, coupling.drag, coupling.assumed);
 		if (mechanical.actuators != null) for (actuator in mechanical.actuators)
 			model.actuateDrive(copyActuator(actuator, prefix));
 		if (mechanical.encoders != null) for (encoder in mechanical.encoders)

@@ -38,6 +38,7 @@ class ServoMotor extends MachineComponent implements MotorDrive {
 	static var table:Null<Array<ServoRating>>;
 
 	public final rating:ServoRating;
+	public final ratingsBasis:machinekit.transmission.ValueBasis;
 
 	public static function ratings():Array<ServoRating> {
 		if (table == null) {
@@ -58,16 +59,17 @@ class ServoMotor extends MachineComponent implements MotorDrive {
 
 	/** The generic servo named `designation`. */
 	public static function model(designation:String):ServoMotor {
-		for (rating in ratings()) if (rating.designation == designation) return new ServoMotor(rating);
+		for (rating in ratings()) if (rating.designation == designation) return new ServoMotor(rating, machinekit.transmission.ValueBasis.Assumed);
 		throw 'Unknown servo motor "$designation"; known: ${[for (rating in ratings()) rating.designation].join(", ")}';
 	}
 
-	public function new(rating:ServoRating) {
+	public function new(rating:ServoRating, ratingsBasis:machinekit.transmission.ValueBasis = Stated) {
 		if (!(rating.ratedTorque > 0) || !(rating.peakTorque >= rating.ratedTorque) || !(rating.ratedSpeed > 0) ||
 			!(rating.maxSpeed >= rating.ratedSpeed) || !(rating.rotorInertia >= 0) || !(rating.encoderCounts >= 0))
 			throw "A servo needs 0 < rated torque <= peak torque, 0 < rated speed <= maximum speed and finite ratings";
 		super(rating.designation, 'Servo motor, ${Dimension.format(rating.peakTorque)} N m peak', "aluminium 6061", true);
 		this.rating = rating;
+		this.ratingsBasis = ratingsBasis;
 		addConnector("mountFace", Mount, Solids.axial(0, 0, 0));
 		addConnector("shaftAxis", Axis, Solids.axial(0, 0, 0));
 	}
@@ -77,7 +79,8 @@ class ServoMotor extends MachineComponent implements MotorDrive {
 		return {id: id, joint: joint, maxEffort: rating.peakTorque, maxRate: rating.maxSpeed, rotorInertia: rating.rotorInertia, drive: "servo",
 			ratedTorque: rating.ratedTorque, peakTorque: rating.peakTorque, ratedSpeed: rating.ratedSpeed, maxSpeed: rating.maxSpeed,
 			encoderCounts: rating.encoderCounts,
-			torqueSpeed: [0, rating.peakTorque, rating.ratedSpeed, rating.peakTorque, rating.maxSpeed, rating.ratedTorque]};
+			torqueSpeed: [0, rating.peakTorque, rating.ratedSpeed, rating.peakTorque, rating.maxSpeed, rating.ratedTorque],
+			assumed: ratingsBasis == Assumed ? ["servo ratings"] : null};
 
 	override public function hasGeometry():Bool return true;
 

@@ -69,6 +69,11 @@ import machinekit.component.PortInterface;
 	@:id(3) final target:String;
 	@:id(4) final ratio:Float;
 	@:id(5) final offset:Float;
+	@:id(6) @:optional final efficiency:Null<Float>;
+	@:id(7) @:optional final stiffness:Null<Float>;
+	@:id(8) @:optional final backlash:Null<Float>;
+	@:id(9) @:optional final drag:Null<Float>;
+	@:id(10) @:optional final assumed:Null<ReadOnlyArray<String>>;
 }
 
 @:wire typedef FrozenExposedConnector = {

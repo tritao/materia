@@ -705,7 +705,7 @@ latency.
 
 ### X7 — Transmissions compile from their parts
 
-Status: T0–T4 done (2026-10-03); T5 not started.
+Status: T0–T5 done (2026-10-03).
 Worktree `x7-transmissions`.
 
 T1: one resolved relation and part-level equations replace the assembly's ratio, efficiency
@@ -868,6 +868,15 @@ T4 validation: focused MachineKit/MotionKit compiler checks and every suite in
 The plan check turns these numbers into stall and accuracy claims, so it should say which inputs
 were assumed.
 
+Implementation: relation bases project to sorted assumption labels; stated overrides remove the
+corresponding label. The critical-speed safety margin is also labelled assumed. Generic servo
+models mark their ratings assumed; explicitly supplied servo ratings default to stated.
+The frozen coupling schema previously omitted efficiency and allowances; it now carries matching
+wire IDs 6–10 so those values and their provenance survive plain-coupling rebuilds as well as
+transmission rebuilds. Copies and namespace changes retain labels. RobotKit writes them only
+when nonempty, and plan findings name the assumptions along the relevant motor paths.
+
+
 - A small wire enum `ValueBasis { Derived; Catalog; Stated; Assumed; }` and, on the resolved
   relation and on a motor's actuator, the set of fields whose basis is `Assumed`. Not a wrapper
   around every float: generics and the wire format make `EngineeringValue<T>` costly for little gain.
@@ -877,6 +886,10 @@ were assumed.
   non-empty, so other models keep their bytes.
 - Sources of `Assumed` today: the T3 family defaults, `TimingBelt.cordStiffnessPerMm`,
   `NemaStepper.ratingCatalog` inductance/rotor inertia, the generic `ServoMotor` ratings.
+
+T5 validation: standalone MachineKit, focused CoreXY provenance checks and every suite in
+`x7-suite-t5-provenance.txt` pass, including the app. All T3 engineering baselines remain
+unchanged; the belt-router diagnostic now names its assumptions. No haxeon changes were needed.
 
 ### X8 — Motor, driver and controller
 

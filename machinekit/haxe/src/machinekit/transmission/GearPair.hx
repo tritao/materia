@@ -13,8 +13,10 @@ class GearPair extends MachineAssembly {
 
 	/** Resolve the coupling from these parts. */
 	public static function relation(driver:SpurGear, driven:SpurGear, alignment:Float):TransmissionRelation {
-		return new TransmissionRelation(-alignment * driver.teeth / driven.teeth, DEFAULT_EFFICIENCY,
-		null, mesh(driver, driven).backlash / (driver.pitchDiameter / 2));
+		var result = new TransmissionRelation(-alignment * driver.teeth / driven.teeth, DEFAULT_EFFICIENCY,
+			null, mesh(driver, driven).backlash / (driver.pitchDiameter / 2));
+		result.setBasis("efficiency", ValueBasis.Assumed, "gear efficiency");
+		return result;
 	}
 
 	public final a:SpurGear;
