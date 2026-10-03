@@ -211,6 +211,13 @@ class RobotRuntimeBlueprint {
       dynamics.set_limit_damping_ratio(joint.limitDampingRatio);
       for (term in 0...5) dynamics.set_limit_impedance(term, joint.limitImpedance[term]);
       value.set_joint_dynamics(index, dynamics);
+      if (!Math.isFinite(joint.servoStiffness) || joint.servoStiffness < 0.0 ||
+          !Math.isFinite(joint.servoDamping) || joint.servoDamping < 0.0)
+        throw "Joint servo gains must be finite and non-negative";
+      var servo = new rk_robot_joint_servo();
+      servo.set_stiffness(joint.servoStiffness);
+      servo.set_damping(joint.servoDamping);
+      value.set_joint_servo(index, servo);
     }
     if (links.length != linkCount) throw "RobotKit runtime blueprint is missing link physical properties";
     for (index in 0...links.length) value.set_links(index, links[index].nativeValue());

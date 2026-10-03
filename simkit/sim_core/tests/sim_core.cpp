@@ -912,6 +912,89 @@ void kinematic_root_twist_carries_to_its_links() {
 
 } // namespace
 
+void a_follower_with_two_leaders_is_the_sum_of_its_terms() {
+    // A CoreXY motor follows both axes: follower = 2 a - 3 b + 0.1 + 0.05.
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    nksim_world_desc world_desc{};
+    world_desc.struct_size = sizeof(world_desc);
+    world_desc.scene = scene;
+    world_desc.fixed_timestep = 0.01;
+    world_desc.physics_substeps = 1;
+    nksim_world world = 0;
+    assert(nksim_world_create(&world_desc, &world) == NKSIM_OK);
+    nksim_body_desc base_desc{};
+    base_desc.struct_size = sizeof(base_desc);
+    base_desc.node = make_node(scene, 0.0);
+    base_desc.motion_type = NKSIM_MOTION_STATIC;
+    nksim_body base = 0;
+    assert(nksim_body_create(world, &base_desc, &base) == NKSIM_OK);
+    nksim_joint joints[3] = {};
+    for (auto &joint : joints) {
+        nksim_body_desc body_desc{};
+        body_desc.struct_size = sizeof(body_desc);
+        body_desc.node = make_node(scene, 0.0);
+        body_desc.motion_type = NKSIM_MOTION_DYNAMIC;
+        body_desc.mass = 1.0;
+        nksim_body body = 0;
+        assert(nksim_body_create(world, &body_desc, &body) == NKSIM_OK);
+        nksim_joint_desc joint_desc{};
+        joint_desc.struct_size = sizeof(joint_desc);
+        joint_desc.type = NKSIM_JOINT_PRISMATIC;
+        joint_desc.body_a = base;
+        joint_desc.body_b = body;
+        joint_desc.axis_a[0] = 1.0;
+        joint_desc.lower_limit = -10.0;
+        joint_desc.upper_limit = 10.0;
+        joint_desc.max_force = 1000.0;
+        assert(nksim_joint_create(world, &joint_desc, &joint) == NKSIM_OK);
+    }
+    nksim_joint_coupling_desc term{};
+    term.struct_size = sizeof(term);
+    term.follower = joints[2];
+    term.leader = joints[0];
+    term.ratio = 2.0;
+    term.offset = 0.1;
+    assert(nksim_joint_couple(world, &term) == NKSIM_OK);
+    // The same leader twice, and a cycle through the sum, are refused.
+    assert(nksim_joint_couple(world, &term) == NKSIM_ERROR_INVALID_ARGUMENT);
+    nksim_joint_coupling_desc cycle{};
+    cycle.struct_size = sizeof(cycle);
+    cycle.follower = joints[0];
+    cycle.leader = joints[2];
+    cycle.ratio = 1.0;
+    assert(nksim_joint_couple(world, &cycle) == NKSIM_ERROR_INVALID_ARGUMENT);
+    term.leader = joints[1];
+    term.ratio = -3.0;
+    term.offset = 0.05;
+    assert(nksim_joint_couple(world, &term) == NKSIM_OK);
+    nksim_joint_target targets[2]{};
+    for (int index = 0; index < 2; ++index) {
+        targets[index].struct_size = sizeof(targets[index]);
+        targets[index].joint = joints[index];
+        targets[index].mode = NKSIM_JOINT_TARGET_POSITION;
+        targets[index].target = index == 0 ? 0.4 : -0.2;
+        targets[index].max_force = 1000.0;
+    }
+    assert(nksim_world_set_joint_targets(world, targets, 2) == NKSIM_OK);
+    for (int index = 0; index < 20; ++index) {
+        nksim_step_result step{};
+        step.struct_size = sizeof(step);
+        assert(nksim_world_step(world, &step) == NKSIM_OK);
+        nkscene_change_set_destroy(step.scene_changes);
+    }
+    nksim_joint_state state[3]{};
+    for (int index = 0; index < 3; ++index) {
+        state[index].struct_size = sizeof(state[index]);
+        assert(nksim_joint_get_state(world, joints[index], &state[index]) == NKSIM_OK);
+    }
+    assert(std::abs(state[0].position) > 0.05 && std::abs(state[1].position) > 0.02);
+    assert(std::abs(state[2].position - (2.0 * state[0].position - 3.0 * state[1].position + 0.15)) < 1e-9);
+    assert(std::abs(state[2].velocity - (2.0 * state[0].velocity - 3.0 * state[1].velocity)) < 1e-9);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
 int main() {
     offset_convex_fallback_uses_its_bounds_center();
     turned_box_contacts_reach_only_the_box();
@@ -923,5 +1006,6 @@ int main() {
     kinematic_body_velocity_follows_node_motion();
     driven_kinematic_body_is_exact_far_from_origin();
     kinematic_root_twist_carries_to_its_links();
+    a_follower_with_two_leaders_is_the_sum_of_its_terms();
     return 0;
 }

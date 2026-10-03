@@ -93,6 +93,15 @@ class ServoDrive extends ActuatorDrive {
     return new TorqueSpeedCurve([0.0, ratedSpeed, maxSpeed], [peakTorque, peakTorque, ratedTorque]);
   }
 
+  /**
+   * Stiffness a simulation gives this servo when none is authored: its peak torque for a hundredth
+   * of a radian of error, N m per rad. An assumption for a stiff positioning servo, not a datasheet value.
+   */
+  public function defaultStiffness():Float return peakTorqueValue / 0.01;
+
+  /** Damping that goes with `stiffness` when none is authored: a 10 ms damping time, an assumption. */
+  public static function defaultDamping(stiffness:Float):Float return stiffness * 0.01;
+
   override public function kind():String return "servo";
   override public function peakTorque():Float return peakTorqueValue;
   override public function maxSpeed():Float return maxSpeedValue;

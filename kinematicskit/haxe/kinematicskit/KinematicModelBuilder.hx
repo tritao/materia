@@ -67,7 +67,10 @@ class KinematicModelBuilder {
     return joints.length - 1;
   }
 
-  /** Drives `target`'s value as `ratio * value(source) + offset`; the target gets no DOF of its own. */
+  /**
+   * Drives `target`'s value as `ratio * value(source) + offset`; the target gets no DOF of its own.
+   * Coupling a target to several sources sums their terms: `Σ ratioᵢ * value(sourceᵢ) + Σ offsetᵢ`.
+   */
   public function couple(target:String, source:String, ratio:Float, offset:Float):Void {
     if (!Math.isFinite(ratio) || ratio == 0.0 || !Math.isFinite(offset))
       throw 'Kinematic coupling of "$target" needs a finite non-zero ratio and finite offset';
@@ -150,8 +153,9 @@ class KinematicModelBuilder {
         throw 'Kinematic tree contains a cycle through body "${bodyIds[body]}"';
     }
 
-    // Couplings: resolve each coupled joint to the DOF that ultimately drives it.
-    var couplingOf = new Map<Int, CouplingSpec>();
+    // Couplings: a coupled joint is the sum of its couplings' terms. Resolve each to the DOFs that
+    // ultimately drive it.
+    var couplingsOf = new Map<Int, Array<CouplingSpec>>();
     for (coupling in couplings) {
       var target = jointIndexById.get(coupling.target);
       var source = jointIndexById.get(coupling.source);
@@ -160,8 +164,11 @@ class KinematicModelBuilder {
       if (target == source) throw 'Kinematic joint "${coupling.target}" cannot drive itself';
       if (joints[target].kind == JointKind.Fixed || joints[source].kind == JointKind.Fixed)
         throw 'Kinematic coupling "${coupling.target}" <- "${coupling.source}" needs two movable joints';
-      if (couplingOf.exists(target)) throw 'Kinematic joint "${coupling.target}" is driven by two couplings';
-      couplingOf.set(target, coupling);
+      var terms = couplingsOf.get(target);
+      if (terms == null) { terms = []; couplingsOf.set(target, terms); }
+      for (term in terms) if (term.source == coupling.source)
+        throw 'Kinematic joint "${coupling.target}" is coupled to "${coupling.source}" twice';
+      terms.push(coupling);
     }
 
     var jointDof = [for (_ in 0...jointCount) -1];
@@ -171,7 +178,7 @@ class KinematicModelBuilder {
     var jointScale = [for (_ in 0...jointCount) 0.0];
     var dofJoint:Array<Int> = [];
     for (index in 0...jointCount) {
-      if (joints[index].kind == JointKind.Fixed || couplingOf.exists(index)) continue;
+      if (joints[index].kind == JointKind.Fixed || couplingsOf.exists(index)) continue;
       jointDof[index] = dofJoint.length;
       jointScale[index] = 1.0;
       dofJoint.push(index);
@@ -183,47 +190,73 @@ class KinematicModelBuilder {
       resolved[index] = true;
       valueOrder.push(index);
     }
-    // Composite affine map from the driving DOF value, used for limits and Jacobian scale.
-    var jointA = [for (index in 0...jointCount) jointDof[index] >= 0 ? 1.0 : 0.0];
-    var jointB = [for (_ in 0...jointCount) 0.0];
+    // Each joint as an affine map of the DOF values: its terms (a DOF and its scale) and constant.
+    var termDofs:Array<Array<Int>> = [for (index in 0...jointCount) jointDof[index] >= 0 ? [jointDof[index]] : []];
+    var termScales:Array<Array<Float>> = [for (index in 0...jointCount) jointDof[index] >= 0 ? [1.0] : []];
+    var constants = [for (_ in 0...jointCount) 0.0];
+    var visiting = [for (_ in 0...jointCount) false];
     for (index in 0...jointCount) if (!resolved[index]) {
-      var path:Array<Int> = [];
-      var current = index;
-      while (!resolved[current]) {
-        if (path.indexOf(current) >= 0)
-          throw 'Kinematic couplings form a cycle through joint "${joints[current].id}"';
-        path.push(current);
-        var link:CouplingSpec = couplingOf.get(current);
-        var next = jointIndexById.get(link.source);
-        if (next == null) throw 'Kinematic coupling source "${link.source}" is not a joint';
-        current = next;
-      }
-      var i = path.length - 1;
-      while (i >= 0) {
-        var target = path[i];
-        var coupling:CouplingSpec = couplingOf.get(target);
-        var source = jointIndexById.get(coupling.source);
-        if (source == null) throw 'Kinematic coupling source "${coupling.source}" is not a joint';
-        jointSource[target] = source;
-        jointRatio[target] = coupling.ratio;
-        jointOffset[target] = coupling.offset;
-        jointDof[target] = jointDof[source];
-        jointA[target] = jointA[source] * coupling.ratio;
-        jointB[target] = jointB[source] * coupling.ratio + coupling.offset;
-        jointScale[target] = jointA[target];
-        resolved[target] = true;
-        valueOrder.push(target);
-        i--;
+      // Depth first: a joint resolves after every source it sums.
+      var stack = [index], next = [0];
+      visiting[index] = true;
+      while (stack.length > 0) {
+        var current = stack[stack.length - 1];
+        var terms = couplingsOf.get(current);
+        if (terms == null) throw 'Kinematic joint "${joints[current].id}" has no coupling';
+        var cursor = next[next.length - 1];
+        if (cursor < terms.length) {
+          next[next.length - 1] = cursor + 1;
+          var source = sourceIndex(terms[cursor]);
+          if (resolved[source]) continue;
+          if (visiting[source])
+            throw 'Kinematic couplings form a cycle through joint "${joints[source].id}"';
+          visiting[source] = true;
+          stack.push(source);
+          next.push(0);
+          continue;
+        }
+        var dofs:Array<Int> = [], scales:Array<Float> = [], constant = 0.0;
+        for (term in terms) {
+          var source = sourceIndex(term);
+          for (k in 0...termDofs[source].length) {
+            var at = dofs.indexOf(termDofs[source][k]);
+            if (at < 0) { dofs.push(termDofs[source][k]); scales.push(termScales[source][k] * term.ratio); }
+            else scales[at] += termScales[source][k] * term.ratio;
+          }
+          constant += constants[source] * term.ratio + term.offset;
+        }
+        termDofs[current] = dofs;
+        termScales[current] = scales;
+        constants[current] = constant;
+        // One term from a single-DOF joint keeps the chained form (source, ratio, offset).
+        if (terms.length == 1 && termDofs[sourceIndex(terms[0])].length == 1
+            && jointSource[sourceIndex(terms[0])] != KinematicModel.COMBINED) {
+          jointSource[current] = sourceIndex(terms[0]);
+          jointRatio[current] = terms[0].ratio;
+          jointOffset[current] = terms[0].offset;
+          jointDof[current] = dofs[0];
+          jointScale[current] = scales[0];
+        } else {
+          jointSource[current] = KinematicModel.COMBINED;
+          jointDof[current] = dofs.length > 0 ? dofs[0] : -1;
+          jointScale[current] = dofs.length > 0 ? scales[0] : 0.0;
+        }
+        resolved[current] = true;
+        visiting[current] = false;
+        valueOrder.push(current);
+        stack.pop();
+        next.pop();
       }
     }
 
-    // DOF ranges: each driving joint's own limits, narrowed by every coupled joint's limits.
+    // DOF ranges: each driving joint's own limits, narrowed by every singly-driven coupled joint's
+    // limits. A combined joint's limits bound a sum of DOFs, not a box, so they are not folded in.
     var dofCount = dofJoint.length;
     var dofLower = [for (dof in 0...dofCount) joints[dofJoint[dof]].lower];
     var dofUpper = [for (dof in 0...dofCount) joints[dofJoint[dof]].upper];
     for (index in 0...jointCount) if (jointSource[index] >= 0) {
       var dof = jointDof[index];
-      var a = jointA[index], b = jointB[index];
+      var a = termScales[index][0], b = constants[index];
       var lo = (joints[index].lower - b) / a, hi = (joints[index].upper - b) / a;
       if (a < 0.0) { var swap = lo; lo = hi; hi = swap; }
       if (!Math.isNaN(lo) && lo > dofLower[dof]) dofLower[dof] = lo;
@@ -272,6 +305,15 @@ class KinematicModelBuilder {
     parts.jointRatio = jointRatio;
     parts.jointOffset = jointOffset;
     parts.jointScale = jointScale;
+    var termStart = [0], termDof:Array<Int> = [], termScale:Array<Float> = [];
+    for (index in 0...jointCount) {
+      for (k in 0...termDofs[index].length) { termDof.push(termDofs[index][k]); termScale.push(termScales[index][k]); }
+      termStart.push(termDof.length);
+    }
+    parts.jointTermStart = termStart;
+    parts.jointTermDof = termDof;
+    parts.jointTermScale = termScale;
+    parts.jointConstant = constants;
     parts.jointLower = [for (joint in joints) joint.lower];
     parts.jointUpper = [for (joint in joints) joint.upper];
     parts.jointDefault = [for (joint in joints) joint.defaultValue];
@@ -301,6 +343,12 @@ class KinematicModelBuilder {
     var result:Array<Float> = [];
     for (closure in closures) { result.push(closure.ax); result.push(closure.ay); result.push(closure.az); }
     return result;
+  }
+
+  function sourceIndex(coupling:CouplingSpec):Int {
+    var index = jointIndexById.get(coupling.source);
+    if (index == null) throw 'Kinematic coupling source "${coupling.source}" is not a joint';
+    return index;
   }
 
   static function flatten(values:Array<Transform>):Array<Float> {

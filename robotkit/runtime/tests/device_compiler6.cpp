@@ -83,6 +83,26 @@ int main() {
         std::span(&segment, 1), 9, true, 1'000'000'000ULL,
         clock, blueprint, 1'000'000, 40'000, 5, 1e-6);
     assert(!inconsistent.ok && inconsistent.error == "coupled follower trajectory mismatch");
+    // A follower with two leaders: 2 a - 3 b + 0.1 + 0.05.
+    blueprint.joint_count = 3;
+    blueprint.joints[2] = blueprint.joints[1];
+    blueprint.coupling_count = 2;
+    blueprint.couplings[0] = {0, 2, 2.0, 0.1};
+    blueprint.couplings[1] = {1, 2, -3.0, 0.05};
+    segment.joint_count = 3;
+    segment.coefficients[1].value[0] = -0.02;
+    segment.coefficients[1].value[1] = 0.001;
+    segment.coefficients[2].value[0] = 2.0 * 0.01 + 0.1 + -3.0 * -0.02 + 0.05;
+    segment.coefficients[2].value[1] = 2.0 * 0.002 + -3.0 * 0.001;
+    auto summed = robotkit::compile_device_segments6(
+        std::span(&segment, 1), 10, true, 1'000'000'000ULL,
+        clock, blueprint, 1'000'000, 40'000, 5, 1e-6);
+    assert(summed.ok);
+    segment.coefficients[2].value[1] += 0.001;
+    auto unsummed = robotkit::compile_device_segments6(
+        std::span(&segment, 1), 10, true, 1'000'000'000ULL,
+        clock, blueprint, 1'000'000, 40'000, 5, 1e-6);
+    assert(!unsummed.ok && unsummed.error == "coupled follower trajectory mismatch");
     blueprint.coupling_count = 0;
     blueprint.joint_count = 1;
     blueprint.owner_period_ns = 10'000'000;

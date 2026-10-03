@@ -80,7 +80,12 @@ class KinematicSnapshot {
     for (joint in model.jointValueOrder) {
       var source = model.jointSource[joint];
       if (source >= 0) values[joint] = values[source] * model.jointRatio[joint] + model.jointOffset[joint];
-      else {
+      else if (source == KinematicModel.COMBINED) {
+        var sum = model.jointConstant[joint];
+        for (term in model.jointTermStart[joint]...model.jointTermStart[joint + 1])
+          sum += model.jointTermScale[term] * q[model.jointTermDof[term]];
+        values[joint] = sum;
+      } else {
         var dof = model.jointDof[joint];
         values[joint] = dof < 0 ? 0.0 : q[dof];
       }
@@ -159,22 +164,25 @@ class KinematicSnapshot {
     if (result.length > size) result.resize(size);
     for (i in 0...size) result[i] = 0.0;
     for (joint in model.bodyChain[body]) {
-      var dof = model.jointDof[joint];
-      var scale = model.jointScale[joint];
       var a = joint * 3;
       var ax = axes[a], ay = axes[a + 1], az = axes[a + 2];
-      if (model.jointKind[joint] == JointKind.Prismatic) {
-        result[dof] += scale * ax;
-        result[n + dof] += scale * ay;
-        result[2 * n + dof] += scale * az;
-      } else {
-        var rx = px - origins[a], ry = py - origins[a + 1], rz = pz - origins[a + 2];
-        result[dof] += scale * (ay * rz - az * ry);
-        result[n + dof] += scale * (az * rx - ax * rz);
-        result[2 * n + dof] += scale * (ax * ry - ay * rx);
-        result[3 * n + dof] += scale * ax;
-        result[4 * n + dof] += scale * ay;
-        result[5 * n + dof] += scale * az;
+      var prismatic = model.jointKind[joint] == JointKind.Prismatic;
+      var rx = px - origins[a], ry = py - origins[a + 1], rz = pz - origins[a + 2];
+      for (term in model.jointTermStart[joint]...model.jointTermStart[joint + 1]) {
+        var dof = model.jointTermDof[term];
+        var scale = model.jointTermScale[term];
+        if (prismatic) {
+          result[dof] += scale * ax;
+          result[n + dof] += scale * ay;
+          result[2 * n + dof] += scale * az;
+        } else {
+          result[dof] += scale * (ay * rz - az * ry);
+          result[n + dof] += scale * (az * rx - ax * rz);
+          result[2 * n + dof] += scale * (ax * ry - ay * rx);
+          result[3 * n + dof] += scale * ax;
+          result[4 * n + dof] += scale * ay;
+          result[5 * n + dof] += scale * az;
+        }
       }
     }
     return result;
@@ -191,23 +199,26 @@ class KinematicSnapshot {
     var w = layout.width;
     for (i in 0...6 * w) out[i] = 0.0;
     for (joint in model.bodyChain[body]) {
-      var column = layout.columnOfDof[model.jointDof[joint]];
-      if (column < 0) continue;
-      var scale = model.jointScale[joint];
       var a = joint * 3;
       var ax = axes[a], ay = axes[a + 1], az = axes[a + 2];
-      if (model.jointKind[joint] == JointKind.Prismatic) {
-        out[column] += scale * ax;
-        out[w + column] += scale * ay;
-        out[2 * w + column] += scale * az;
-      } else {
-        var rx = px - origins[a], ry = py - origins[a + 1], rz = pz - origins[a + 2];
-        out[column] += scale * (ay * rz - az * ry);
-        out[w + column] += scale * (az * rx - ax * rz);
-        out[2 * w + column] += scale * (ax * ry - ay * rx);
-        out[3 * w + column] += scale * ax;
-        out[4 * w + column] += scale * ay;
-        out[5 * w + column] += scale * az;
+      var prismatic = model.jointKind[joint] == JointKind.Prismatic;
+      var rx = px - origins[a], ry = py - origins[a + 1], rz = pz - origins[a + 2];
+      for (term in model.jointTermStart[joint]...model.jointTermStart[joint + 1]) {
+        var column = layout.columnOfDof[model.jointTermDof[term]];
+        if (column < 0) continue;
+        var scale = model.jointTermScale[term];
+        if (prismatic) {
+          out[column] += scale * ax;
+          out[w + column] += scale * ay;
+          out[2 * w + column] += scale * az;
+        } else {
+          out[column] += scale * (ay * rz - az * ry);
+          out[w + column] += scale * (az * rx - ax * rz);
+          out[2 * w + column] += scale * (ax * ry - ay * rx);
+          out[3 * w + column] += scale * ax;
+          out[4 * w + column] += scale * ay;
+          out[5 * w + column] += scale * az;
+        }
       }
     }
     // A moving root: the world twist about the root's origin moves the point by v + ω × (p − o).

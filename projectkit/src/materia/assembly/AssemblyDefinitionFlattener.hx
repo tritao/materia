@@ -6,6 +6,7 @@ import materia.assembly.AssemblyDefinition.AssemblyComponentOccurrence;
 import materia.assembly.AssemblyDefinition.AssemblyExposedConnector;
 import materia.assembly.AssemblyDefinition.AssemblyJointCoupling;
 import materia.assembly.AssemblyDefinition.AssemblyActuator;
+import materia.assembly.AssemblyDefinition.AssemblyEncoder;
 import materia.assembly.AssemblyDefinition.AssemblyMate;
 import materia.assembly.AssemblyDefinition.AssemblySubdefinition;
 import materia.assembly.AssemblyDefinition.AssemblyStateRecord;
@@ -83,16 +84,17 @@ class AssemblyDefinitionFlattener {
 		flat.lengthUnit = source.lengthUnit;
 		flat.couplings = [];
 		if (source.actuators != null) flat.actuators = [];
+		if (source.encoders != null) flat.encoders = [];
 		var active = new Map<String, Bool>();
 		var rootMembers = expand("", AssemblyFrames.identity(), source.definitions, source.occurrences, source.joints,
-			source.couplings, source.mates, library, flat, active, source.actuators);
+			source.couplings, source.mates, library, flat, active, source.actuators, source.encoders);
 		exposed(source.exposedConnectors, rootMembers, source.id);
 		for (entry in source.assemblies) {
 			var unused:AssemblyDefinition = {schemaVersion: source.schemaVersion, id: entry.id,
 				definitions: [], occurrences: [], joints: [], couplings: []};
 			active.set(entry.id, true);
 			var members = expand("", AssemblyFrames.identity(), entry.definitions, entry.occurrences, entry.joints,
-				entry.couplings, entry.mates, library, unused, active, entry.actuators);
+				entry.couplings, entry.mates, library, unused, active, entry.actuators, entry.encoders);
 			active.remove(entry.id);
 			exposed(entry.exposedConnectors, members, entry.id);
 			AssemblyDefinitionCodec.validate(unused);
@@ -115,13 +117,23 @@ class AssemblyDefinitionFlattener {
 		if (actuator.encoderCounts != null) copy.encoderCounts = actuator.encoderCounts;
 		if (actuator.servoStiffness != null) copy.servoStiffness = actuator.servoStiffness;
 		if (actuator.servoDamping != null) copy.servoDamping = actuator.servoDamping;
+		if (actuator.encoder != null) copy.encoder = actuator.encoder;
+		if (actuator.gearRatio != null) copy.gearRatio = actuator.gearRatio;
+		if (actuator.gearEfficiency != null) copy.gearEfficiency = actuator.gearEfficiency;
+		return copy;
+	}
+
+	/** A copy of `encoder` under a new id, on a new joint. */
+	public static function copyEncoder(encoder:AssemblyEncoder, id:String, joint:String):AssemblyEncoder {
+		var copy:AssemblyEncoder = {id: id, joint: joint, kind: encoder.kind, counts: encoder.counts};
+		if (encoder.index != null) copy.index = encoder.index;
 		return copy;
 	}
 
 	static function expand(prefix:String, pose:AssemblyFrame, definitions:Array<AssemblyComponentDefinition>,
 			occurrences:Array<AssemblyComponentOccurrence>, joints:Array<KinematicJoint>, couplings:Array<AssemblyJointCoupling>,
 			mates:Null<Array<AssemblyMate>>, library:Map<String, AssemblySubdefinition>, flat:AssemblyDefinition, active:Map<String, Bool>,
-			?actuators:Array<AssemblyActuator>):Map<String, FlatMember> {
+			?actuators:Array<AssemblyActuator>, ?encoders:Array<AssemblyEncoder>):Map<String, FlatMember> {
 		if (definitions == null || occurrences == null || joints == null) throw "Nested assembly has missing members or joints";
 		var localDefinitions = new Map<String, AssemblyComponentDefinition>();
 		var emittedDefinitions = new Map<String, Bool>();
@@ -154,7 +166,7 @@ class AssemblyDefinitionFlattener {
 				if (nested == null) throw 'Assembly "$path" references a missing nested definition';
 				active.set(nested.id, true);
 				var children = expand(path, worldPose, nested.definitions, nested.occurrences, nested.joints,
-					nested.couplings, nested.mates, library, flat, active, nested.actuators);
+					nested.couplings, nested.mates, library, flat, active, nested.actuators, nested.encoders);
 				active.remove(nested.id);
 				connectors = exposed(nested.exposedConnectors, children, path);
 			} else {
@@ -195,8 +207,15 @@ class AssemblyDefinitionFlattener {
 		if (actuators != null) {
 			if (flat.actuators == null) flat.actuators = [];
 			for (actuator in actuators) {
-				flat.actuators.push(copyActuator(actuator, scoped(prefix, actuator.id), scoped(prefix, actuator.joint)));
+				var copy = copyActuator(actuator, scoped(prefix, actuator.id), scoped(prefix, actuator.joint));
+				if (actuator.encoder != null) copy.encoder = scoped(prefix, actuator.encoder);
+				flat.actuators.push(copy);
 			}
+		}
+		if (encoders != null) {
+			if (flat.encoders == null) flat.encoders = [];
+			for (encoder in encoders)
+				flat.encoders.push(copyEncoder(encoder, scoped(prefix, encoder.id), scoped(prefix, encoder.joint)));
 		}
 		if (mates != null) for (mate in mates) {
 			var first = endpoint(members, mate.first, mate.firstConnector, prefix);

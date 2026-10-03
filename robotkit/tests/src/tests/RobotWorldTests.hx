@@ -184,6 +184,7 @@ class RobotWorldTests {
     testMobileLayer();
     testModelDrivenConfiguration();
     testRobotModelCodec();
+    testEncoders();
     testMjcfWalkerImport();
     testUrdfWalkerImport();
     testLocalization();
@@ -797,6 +798,57 @@ class RobotWorldTests {
       if (value.code == "RK_ROLE_WHEEL_AXIS" && value.path == "mobileBase.drive.rightWheelJointId") hasAxisError = true;
     check(hasAxisError, "robot model validation rejects a wheel joint that does not turn about the lateral axis");
     rightWheel.axis = [0.0, 1.0, 0.0];
+  }
+
+  /** Encoders are sensors on joints that read quantised counts, saved with the model and found through the motors that name them. */
+  static function testEncoders():Void {
+    var model = new RobotModel("encoded");
+    var base = model.addLink(new Link("base"));
+    var arm = model.addLink(new Link("arm"));
+    var turn = model.addJoint(new Joint("turn", JointType.Continuous, base, arm));
+    turn.limits = new JointLimits(-1e9, 1e9);
+    var legacy = new Actuator("legacy", 0.0, 0.0, Transmission.SimpleTransmission("turn", 1.0, 0.0));
+    legacy.drive = new robotkit.model.ActuatorDrive.ServoDrive(0.3, 1.2, 100.0, 200.0, 1e-5, 2048.0);
+    model.addActuator(legacy);
+    var plain = RobotModelCodec.encode(model).toString();
+    check(plain.indexOf("encoders") < 0, "a model without encoders keeps its bytes");
+    var inferred = model.encoderFor(legacy);
+    check(inferred != null && Math.abs(inferred.countsPerUnit - 2048.0 / (2.0 * Math.PI)) < 1e-9 &&
+      inferred.kind == robotkit.model.EncoderKind.Incremental, "a servo saved with its own count still has an encoder to read");
+    var shaft = model.addEncoder(robotkit.model.Encoder.perRevolution("shaft", "turn", robotkit.model.EncoderKind.Incremental, 4096.0, true));
+    var absolute = model.addEncoder(robotkit.model.Encoder.perRevolution("pulley", "turn", robotkit.model.EncoderKind.Absolute, 1024.0));
+    legacy.encoder = "shaft";
+    legacy.efficiency = 0.85;
+    check(model.encoderFor(legacy) == shaft, "a motor that names an encoder reads that one");
+    check(RobotModelCodec.encode(model).toString() != plain, "encoders are saved");
+    var restored = RobotModelCodec.decode(RobotModelCodec.encode(model));
+    check(restored.encoders.length == 2 && restored.encoders[0].index && !restored.encoders[1].index &&
+      restored.encoders[1].kind == robotkit.model.EncoderKind.Absolute && restored.actuators[0].encoder == "shaft" && restored.actuators[0].efficiency == 0.85 &&
+      Math.abs(restored.encoders[0].countsPerUnit - 4096.0 / (2.0 * Math.PI)) < 1e-9, "encoders and a motor's reference round-trip");
+    equal(RobotModelCodec.encode(restored).toString(), RobotModelCodec.encode(model).toString(), "and byte for byte");
+    model.addEncoder(robotkit.model.Encoder.perRevolution("shaft", "turn", robotkit.model.EncoderKind.Incremental, 1.0));
+    var duplicated = false;
+    try RobotModelCodec.encode(model) catch (_:Dynamic) duplicated = true;
+    check(duplicated, "a duplicate encoder id is refused");
+    model.encoders.pop();
+
+    // Counts are whole counts from power-up (incremental) or from zero (absolute); an index pulse marks each turn.
+    var power = 0.3;
+    var counted = new robotkit.model.EncoderReading(shaft, power);
+    counted.sample(power + 2.0 * Math.PI * 2.5);
+    equal(counted.count, 4096.0 * 2.5, "an incremental encoder counts from where it powered up");
+    check(counted.indexPulses == 2, "and passes an index pulse each turn");
+    counted.sample(power + 0.1 * shaft.resolution());
+    equal(counted.count, 0.0, "a tenth of a count reads as none");
+    counted.sample(power + 0.6 * shaft.resolution());
+    equal(counted.count, 1.0, "and 0.6 of one as one");
+    var counts = new robotkit.model.EncoderReading(absolute, power);
+    counts.sample(1.0);
+    equal(counts.count, Math.fround(1.0 * 1024.0 / (2.0 * Math.PI)), "an absolute encoder counts from the joint's zero");
+    check(Math.abs(counts.position() - 1.0) <= 0.5 * absolute.resolution(), "its position is within half a count of the joint's");
+    var invalid = false;
+    try new robotkit.model.Encoder("bad", "turn", robotkit.model.EncoderKind.Incremental, 0.0) catch (_:Dynamic) invalid = true;
+    check(invalid, "an encoder needs a resolution");
   }
 
   static function testRobotModelCodec():Void {

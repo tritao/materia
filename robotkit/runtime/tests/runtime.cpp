@@ -1697,6 +1697,31 @@ void hold_with_unlimited_follower(const rk_robot_runtime_blueprint &source) {
     assert(std::abs(snapshot.position[1] + snapshot.position[0]) < 1e-9);
 }
 
+void follower_with_two_leaders_takes_their_summed_limits(const rk_robot_runtime_blueprint &source) {
+    // A CoreXY motor follows both axes: with no limit of its own it moves as fast as the two together turn it.
+    auto blueprint = source;
+    blueprint.joint_count = 3;
+    blueprint.link_count = std::max(blueprint.link_count, 4u);
+    blueprint.links[3] = blueprint.links[2];
+    blueprint.joints[2] = blueprint.joints[1];
+    blueprint.joints[2].joint = 2;
+    blueprint.joints[2].parent_link = 2;
+    blueprint.joints[2].child_link = 3;
+    for (uint32_t joint = 0; joint < 2; ++joint) {
+        blueprint.joints[joint].max_acceleration = 1.0 + joint;
+        blueprint.joints[joint].max_velocity = 1.0 + joint;
+    }
+    blueprint.joints[2].max_acceleration = 0.0;
+    blueprint.joints[2].max_velocity = 0.0;
+    blueprint.coupling_count = 2;
+    blueprint.couplings[0] = {0, 2, 2.0, 0.0};
+    blueprint.couplings[1] = {1, 2, -3.0, 0.0};
+    auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
+    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+    assert(std::abs(runtime.blueprint().joints[2].max_velocity - (2.0 * 1.0 + 3.0 * 2.0)) < 1e-12);
+    assert(std::abs(runtime.blueprint().joints[2].max_acceleration - (2.0 * 1.0 + 3.0 * 2.0)) < 1e-12);
+}
+
 void native_hold_resume_and_abort(const rk_robot_runtime_blueprint &source) {
     auto blueprint = source;
     for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
@@ -2142,6 +2167,7 @@ int main() {
     discarded_tick_restores_trajectory(blueprint);
     native_hold_resume_and_abort(blueprint);
     hold_with_unlimited_follower(blueprint);
+    follower_with_two_leaders_takes_their_summed_limits(blueprint);
     plan_end_braking_stays_on_path(blueprint);
     smooth_path_hold_respects_acceleration(blueprint);
     ruckig_segment_stop_uses_analytic_braking(blueprint);

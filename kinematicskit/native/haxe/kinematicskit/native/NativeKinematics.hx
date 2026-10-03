@@ -50,6 +50,8 @@ class NativeKinematics {
     for (body in 0...model.bodyCount()) ints.push(model.bodyParentJoint[body]);
     for (body in model.bodyOrder) ints.push(body);
     for (joint in 0...model.jointCount()) {
+      if (model.jointSource[joint] == KinematicModel.COMBINED)
+        throw 'Native kinematics does not support joint "${model.jointIds[joint]}", which sums several coupling leaders';
       ints.push(cast model.jointKind[joint]);
       ints.push(model.jointParent[joint]);
       ints.push(model.jointChild[joint]);

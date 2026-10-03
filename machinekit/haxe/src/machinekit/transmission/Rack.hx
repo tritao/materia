@@ -24,6 +24,10 @@ import machinekit.component.Solids;
  * extruded along local +X for `faceWidth`.
  */
 class Rack extends MachineComponent {
+	/** Resolve the coupling from these parts. */
+	public static function relation(pinion:SpurGear, alignment:Float):TransmissionRelation
+		return new TransmissionRelation(alignment * 2 / pinion.pitchDiameter, 0.95);
+
 	public final moduleSize:Float;
 	public final teethCount:Int;
 	public final faceWidth:Float;

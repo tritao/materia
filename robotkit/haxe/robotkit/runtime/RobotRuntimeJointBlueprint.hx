@@ -25,6 +25,13 @@ class RobotRuntimeJointBlueprint {
   /** Passive dynamics: reflected inertia, viscous damping and dry friction. */
   /** How far past its limits the joint's end stops sit; see `JointLimits.overtravel`. */
   public var overtravel:Float = 0.0;
+  /**
+   * Servo gains of a motor joint that moves other joints through couplings (torque per unit of joint
+   * position and of joint speed); zero stiffness is no servo. The joints coupled to it take no
+   * commands of their own in a simulation.
+   */
+  public var servoStiffness:Float = 0.0;
+  public var servoDamping:Float = 0.0;
   public var armature:Float = 0.0;
   public var damping:Float = 0.0;
   public var frictionLoss:Float = 0.0;
