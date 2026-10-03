@@ -34,7 +34,9 @@ Surveyed 2026-10-03 on local main 1048bf768, plus the `mobile-welder` and `x7-tr
 
 **Arm and tools**
 - `machinekit/examples/robot-arm/RobotArm`: six revolute joints, ServoMotor and gearbox drives (X6), and a reach of about 0.73 m from the shoulder to the flange.
+- Its wrist is inline (roll–pitch–roll). It is not the cobot layout of UR-type arms (shoulder, elbow and wrist 1 parallel; offset wrist).
 - On the welder branch, `ArmTool` (`build`/`expose`/`ready`) and `RobotArm(withCell, ?armTool)`.
+- MotionKit has analytic IK only for spherical wrists (`OpwKinematics`). Everything else uses KinematicsKit's numeric IK.
 
 **Missions**
 - `app/MissionPlayer` runs scene `mission` steps `goTo`, `pick`, `place` and `weld`.
@@ -139,7 +141,24 @@ Surveyed 2026-10-03 on local main 1048bf768, plus the `mobile-welder` and `x7-tr
 - The enclosure is panels, and the front is split around the door opening, so each part's hull is honest.
 - T-slots and pockets stay in the CAD solids. Collision sees their hulls, which is fine for a table or a vise body.
 
-## The machine (starting numbers, fixed in MT1–MT3)
+**MT-D11. Cobot arms in size classes.**
+- A new `CobotArm` family has the UR-type layout:
+  - base pan;
+  - shoulder, elbow and wrist 1 about parallel axes;
+  - wrist 2 at right angles, then wrist 3 roll;
+  - lateral offsets between the joint modules.
+- Size classes follow the published sizes of the typical cobot classes. The names are generic, so no trade names appear in code.
+- Each class fixes:
+  - its kinematic lengths;
+  - which joint module size sits at each joint;
+  - joint speed limits;
+  - rated payload;
+  - total mass.
+- Joints are one family of modules in sizes 0–4: a housing, a servo and a strain-wave gearbox (ratio about 100). The sizes share a catalogue of diameter, length, rated and peak torque, speed and mass.
+- Classes are built from that catalogue, not from per-arm numbers. Datasheet figures are reference values, marked assumed like the existing `ServoMotor` rows, and the X6 plan check confirms that each class's drives carry its rated payload.
+- `RobotArm` stays as it is, so the arm, welder and router examples are not touched.
+
+## The machine (starting numbers, fixed in MT1–MT4)
 
 | Item | Value |
 |---|---|
@@ -157,16 +176,17 @@ Surveyed 2026-10-03 on local main 1048bf768, plus the `mobile-welder` and `x7-tr
 | Air | FRL unit, then a manifold with 5/2 valves (door, vise; gripper on the arm) |
 | Part | 608-bearing block from a 60 × 40 × 20 mm 6061 blank: Ø22 seat, two Ø10 counterbores and a contour pocket, one 6 mm end mill |
 
-The arm reaches about 0.73 m from shoulder to flange, and the gripper adds about 0.15 m. Reaching through the door to a vise brought to the load position is near that limit. MT3 runs the reach study before the gripper or the cell are built. The likely result is a parameterised `RobotArm` with longer links and a riser, with the drives re-sized by the X6 plan check.
+The current arm reaches about 0.73 m from shoulder to flange, and the gripper adds about 0.15 m. That is marginal through a door to a vise brought to the load position, so the cell uses a cobot from MT3 instead. The 850 mm class is the usual choice for tending a benchtop mill, and the 1300 mm class is the alternative. The MT4 reach study picks the class and the riser height before the gripper or the cell are built.
 
 ## Steps
 
 **MT0. Base.**
 - Branch `machine-tending` comes from local main 1048bf768, in the worktree `materia-worktrees/machine-tending`.
-- Merge before MT5:
+- Merge before MT6:
   - `mobile-welder`, for `ArmTool`, `ArmClearance`, `ConvexDistance`, `ProgramPlanner.shutdown()` and the mission machinery. Its W4 work was still uncommitted on 2026-10-03; wait for that session to commit it.
-  - `x7-transmissions` (X7 T1–T5, X8), for the transmission names MT1 builds on and the controller split MT5 derives membership from.
-- MT1–MT3 can start before X8, but they use the post-X7 `Transmission` API, so do not write against `Drive`.
+  - `x7-transmissions` (X7 T1–T5, X8), for the transmission names MT1 builds on and the controller split MT6 derives membership from.
+- MT1–MT4 can start before X8, but they use the post-X7 `Transmission` API, so do not write against `Drive`.
+- MT3 does not need the welder branch. Once that branch is merged, the cobot takes the same `ArmTool` interface as `RobotArm`. If MT3 lands first, it defines the interface where the welder branch will expect it, in `machinekit.robotics`, and the merge moves `RobotArm` onto it.
 - Populate submodules only when a step needs them (clone each from the main checkout or a worktree at the pin): haxeon, nativekit, motionkit vendors, mujoco, coal, proxsuite, eigen. Check `df -h /` first; there was 9.9 GB free on 2026-10-03.
 - `CADKIT_OCCT_DIR` points at the shared prebuilt OCCT. Never rebuild it.
 
@@ -186,13 +206,39 @@ The arm reaches about 0.73 m from shoulder to flange, and the gripper adds about
 
 **MT2. The bench mill without enclosure.**
 - `BenchMill extends MachineAssembly`, in the cnc-router idiom: `place`/`attach`/`slide`, overtravel from the rail room, `addTransmission`, `supportScrew`, `addMotor`, and `addEncoder` for the servos.
-- The spindle belt is `TimingBelt`. The spindle is a continuous joint, not planned. It runs from `spindle.speed` once MT4 provides process-driven joints; until then it stays fixed.
+- The spindle belt is `TimingBelt`. The spindle is a continuous joint, not planned. It runs from `spindle.speed` once MT5 provides process-driven joints; until then it stays fixed.
 - `BenchMillChecks` in the MachineKit smoke suite cover FK of the gauge line at travel corners, no overlap at the ends of travel, screw ratios, a servo-derived feed of at least 8 m/min rapid, and the BOM.
 - `bench-mill/materia.project.json` uses a toe-clamped blank first, with the stock as an assembly part, as on the router. The single-tool bearing-block job comes from `BearingBlockJob` (CamKit) and goes into `scene.machining`.
 - Start-page entry.
 - `ProjectSourceTests.checkBenchMill` mirrors `checkCncRouter`: removed volume within 2 % of closed form, no gouge, `rapidContacts == 0`, `collisions == 0`, allocation budget, no stalls.
 
-**MT3. Enclosure, door, vise and reach.**
+**MT3. Cobot arm size classes.**
+- **Joint modules.** `CobotJoint` (`machinekit.robotics`) is a housing with a stator connector and a rotor connector.
+  - It contains a `ServoMotor` with a `Gearbox` (strain-wave, ratio about 100, efficiency assumed), plus an output encoder through `addEncoder` (X6d).
+  - It comes in sizes 0–4. Reference torques (rated / peak, N·m, approximate public figures): 0 = 12, 1 = 28, 2 = 56, 3 = 150, 4 = 330. Speeds are 180–360 °/s for small sizes and 120 °/s for size 4.
+  - Each size's diameter, length and mass are chosen so the class masses below come out within about 10 %.
+- **Links.** `CobotLink` is a round tube between two module seats, with the lateral offset of the cobot layout built into its end caps. Each link is one part, so it gets one convex hull.
+- **Classes.** `CobotArm(cls:CobotClass, ?tool:ArmTool)`, with class lengths in the usual d1/a2/a3/d4/d5/d6 form. These are reference values from the published DH tables of the typical classes, to be checked against the datasheets when the catalogue is written:
+
+  | Class | Reach | Payload | d1 | a2 | a3 | d4 | d5 | d6 | Modules J1–J3 / J4–J6 | Mass |
+  |---|---|---|---|---|---|---|---|---|---|---|
+  | `Reach500` (UR3 class) | 500 mm | 3 kg | 151.9 | 243.6 | 213.2 | 131.1 | 85.4 | 92.1 | 2 / 0 | ≈ 11 kg |
+  | `Reach850` (UR5 class) | 850 mm | 5 kg | 162.5 | 425.0 | 392.2 | 133.3 | 99.7 | 99.6 | 3 / 1 | ≈ 21 kg |
+  | `Reach900` (UR16 class) | 900 mm | 16 kg | 180.7 | 478.4 | 360.0 | 174.2 | 119.9 | 116.6 | 4·4·3 / 2 | ≈ 33 kg |
+  | `Reach1300` (UR10 class) | 1300 mm | 12.5 kg | 180.7 | 612.7 | 571.6 | 174.2 | 119.9 | 116.6 | 4·4·3 / 2 | ≈ 34 kg |
+
+- **Mounting.** `CobotArm` stands on a `RobotFlange` base plate. The cell can put it on a `Pedestal` or a riser of any height.
+- **Tool.** The tool flange is an ISO 9409-1-50-4-M6 pattern, so `ArmTool`s fit every class. `tcp` and `ready()` work as on `RobotArm`.
+- **IK.** KinematicsKit's numeric IK (DLS for tracking, LM for reaching) works on this layout. An analytic solver for the UR-type layout, with its eight closed-form branches, is a later option.
+- **Checks** (`CobotArmChecks` in the MachineKit smoke suite), for every class:
+  - FK of the flange at zero and at four poses equals the DH table within 0.01 mm;
+  - reach (shoulder to flange, fully stretched) within 1 % of the class reach;
+  - mass within 10 % of the reference;
+  - no self-overlap at zero or at the joint limits taken one joint at a time;
+  - the X6 plan check holds the rated payload at the reach, stretched horizontally, without exceeding rated torque on any joint.
+- **Preview.** `CobotArmPreview.arm(cls)` gives a project entry per class with a short looping motion, like `robot-arm`, so each class can be looked at and simulated alone. `ProjectSourceTests.checkCobotArms` runs each class's motion on MuJoCo: joint tracking within 1 mrad, no collisions.
+
+**MT4. Enclosure, door, vise and reach.**
 - Panels, front frame pieces, chip tray, stand and cabinet as separate parts. The door rides a prismatic joint on its guide, but no actuator moves it yet.
 - `PneumaticVise`:
   - body and fixed jaw;
@@ -207,9 +253,9 @@ The arm reaches about 0.73 m from shoulder to flange, and the gripper adds about
   - the head at Z top clears the door opening;
   - the vise opening holds the blank with 1.5 mm clearance per side;
   - every enclosure part's hull error ratio is within the warning threshold.
-- **Reach study** (static check `TendingReach`): solve IK for the gripper at the vise (load position, tool down), at every tray slot and at the via-poses outside and inside the door, with at least 10 % joint margin and away from wrist singularity. If the current arm fails, add `ArmSpec` (link lengths, pedestal or riser height) to `RobotArm`, size the drives with the X6 plan check, and record the chosen arm here.
+- **Reach study** (static check `TendingReach`): solve IK for the gripper at the vise (load position, tool down), at every tray slot and at the via-poses outside and inside the door, with at least 10 % joint margin and away from wrist singularity. Start with `Reach850` and try riser heights in 50 mm steps. Use `Reach1300` if no height works, or if the margin is under 10 %. Record the chosen class and riser here.
 
-**MT4. Pneumatics as actuators; switches and presence.**
+**MT5. Pneumatics as actuators; switches and presence.**
 - Parts:
   - `PneumaticCylinder` (bore, rod, stroke, catalogue: ISO 6432 / ISO 15552 sizes), with ports A and B;
   - `SolenoidValve` (5/2, single or double solenoid) with ports P, A, B and a `Signal` coil;
@@ -233,7 +279,7 @@ The arm reaches about 0.73 m from shoulder to flange, and the gripper adds about
   - a blocked door times out with the switch never reached;
   - the trajectory runtime rejects a plan that touches a process-driven joint.
 
-**MT5. Controllers, robots and signals.**
+**MT6. Controllers, robots and signals.**
 - Controller parts:
   - `CncController` cabinet: digital I/O ports, axis driver outputs, valve outputs;
   - `RobotController` cabinet.
@@ -254,7 +300,7 @@ The arm reaches about 0.73 m from shoulder to flange, and the gripper adds about
   - `checkBenchMill` unchanged;
   - router, arm and welder project tests unchanged, since a project with no controllers keeps one robot.
 
-**MT6. The mill's robot interface.**
+**MT7. The mill's robot interface.**
 - `cnckit.controller.RobotInterface` is a pure state machine with:
   - **inputs:** `robot.request_door_open/close`, `robot.request_clamp/unclamp`, `robot.cycle_start`, `robot.clear`, `robot.fault_reset`, plus switches and presence;
   - **outputs:** `cnc.ready`, `cnc.door_open`, `cnc.door_closed`, `cnc.clamped`, `cnc.unclamped`, `cnc.part_present`, `cnc.in_cycle`, `cnc.cycle_complete`, `cnc.alarm` (with code), and the door and vise valve outputs.
@@ -269,7 +315,7 @@ The arm reaches about 0.73 m from shoulder to flange, and the gripper adds about
   - pure tests: every interlock refusal and timeout;
   - a scripted-signal sim test with no robot: open door, place the blank by script, clamp, close, start, wait for complete, open, unclamp. Volume as in MT2.
 
-**MT7. The parallel gripper, for real.**
+**MT8. The parallel gripper, for real.**
 - `ParallelGripper` becomes an assembly:
   - a body;
   - two jaws on prismatic joints, the second mirror-coupled (ratio −1, X5 coupling);
@@ -287,7 +333,7 @@ The arm reaches about 0.73 m from shoulder to flange, and the gripper adds about
   - a missing blank reports a miss;
   - the existing suction mission still passes.
 
-**MT8. Blanks, trays and stock on free bodies.**
+**MT9. Blanks, trays and stock on free bodies.**
 - `PartTray` (grid of pockets with chamfers, `slot-r-c` seat connectors, presence sensor per slot optional) for infeed and outfeed, on a cell table.
 - N blanks are `dynamicParts` (free boxes) in the infeed slots.
 - `MachiningStock` gets one stock per blank. The stock follows the blank's object pose, and the stock is chosen by which blank the vise's presence sensor sees when the cycle starts.
@@ -299,8 +345,8 @@ The arm reaches about 0.73 m from shoulder to flange, and the gripper adds about
   - the finished part's mass is within 2 % of the CAD target's;
   - nothing reports `rapidContacts` or `collisions`.
 
-**MT9. The tending cell and its mission.**
-- `TendingCell` includes the mill (`include("mill", new BenchMill(...))`), the arm with `ArmGripperTool` on the riser chosen in MT3, the trays, the cabinets, the air supply and the wiring.
+**MT10. The tending cell and its mission.**
+- `TendingCell` includes the mill (`include("mill", new BenchMill(...))`), the `CobotArm` class with `ArmGripperTool` on the riser chosen in MT4, the trays, the cabinets, the air supply and the wiring.
 - `machine-tending/materia.project.json`, plus a Start-page entry.
 - Mission steps, each with a timeout:
   - `signal{name, value}`;
@@ -325,7 +371,7 @@ The arm reaches about 0.73 m from shoulder to flange, and the gripper adds about
   - cycle time and spindle use reported;
   - the welder, router and arm tests are unchanged.
 
-**MT10. Faults and recovery.**
+**MT11. Faults and recovery.**
 - Injected faults, each ending in the safe state with a named mission failure and an alarm code:
   - empty infeed slot;
   - missed grasp;
@@ -337,7 +383,7 @@ The arm reaches about 0.73 m from shoulder to flange, and the gripper adds about
 - After `robot.fault_reset` and the cause removed, the mission resumes at the step that failed. Parts already finished stay finished.
 - Tests: one scenario per fault.
 
-**MT11. Throughput.**
+**MT12. Throughput.**
 - Pre-staging: while the mill cuts, the arm picks the next blank and waits outside the door.
 - A dual gripper (two grippers at 90° on one plate, `ArmTool`) swaps the finished part and the next blank in one door opening.
 - The timeline is a per-cycle breakdown: door, load, clamp, cut, unload, idle. The panel shows spindle use.
@@ -358,16 +404,16 @@ The arm reaches about 0.73 m from shoulder to flange, and the gripper adds about
 ## Order
 
 ```
-MT0 ─┬─ MT1 ── MT2 ── MT3 (reach study) ─┐
-     │                                   ├─ MT5 ── MT6 ─┐
-     └─ (welder + X7/X8 merged) ─────────┘              ├─ MT9 ── MT10 ── MT11
-                       MT4 (after MT3) ── MT7 ── MT8 ───┘
+MT0 ─┬─ MT1 ── MT2 ─┬─ MT4 (reach study) ─┐
+     ├─ MT3 (arms) ─┘                     ├─ MT6 ── MT7 ─┐
+     └─ (welder + X7/X8 merged) ──────────┘              ├─ MT10 ── MT11 ── MT12
+                        MT5 (after MT4) ── MT8 ── MT9 ───┘
 ```
 
-- MT1–MT3 need only X7's transmission API.
-- MT4 is independent of controllers, but the gripper (MT7) and the vise and door actuation need it.
-- MT5 needs X8 wiring.
-- MT9 needs everything before it.
+- MT1–MT4 need only X7's transmission API. MT3 can run in parallel with MT1–MT2.
+- MT5 is independent of controllers, but the gripper (MT8) and the vise and door actuation need it.
+- MT6 needs X8 wiring.
+- MT10 needs everything before it.
 
 ## Progress
 
@@ -385,3 +431,4 @@ MT0 ─┬─ MT1 ── MT2 ── MT3 (reach study) ─┐
 | MT9 | planned | |
 | MT10 | planned | |
 | MT11 | planned | |
+| MT12 | planned | |
