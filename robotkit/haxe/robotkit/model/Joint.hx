@@ -30,7 +30,7 @@ class Joint {
   public var limitImpedance:Array<Float> = [0.0, 0.0, 0.0, 0.0, 0.0];
 
   public function new(name:String, type:JointType, parent:Link, child:Link, ?id:JointId) {
-    // Legacy callers use the initial name once; imports pass the stored ID.
+    // Authors can use the initial name once; imports pass the stored ID.
     this.id = id == null ? name : id;
     this.name = name;
     this.type = type;

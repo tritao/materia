@@ -213,7 +213,7 @@ class RobotModelCodec {
     try root = Json.parse(bytes.toString()) catch (_:Dynamic)
       throw "Malformed RobotModel artifact";
     var version = fieldInt(root, "schemaVersion");
-    if (version != VERSION) throw 'Unsupported RobotModel schema version $version; expected $VERSION';
+    if (version != VERSION) throw 'schema v$version is unsupported; expected v$VERSION';
 
     var model = new RobotModel(text(root, "name"));
     model.collisionApproximation = readCollision(text(root, "collisionApproximation"));
@@ -455,7 +455,6 @@ class RobotModelCodec {
     var record:Dynamic = {
       id: value.id, maxEffort: value.maxEffort, maxRate: value.maxRate,
       servoStiffness: value.servoStiffness, servoDamping: value.servoDamping,
-      fullStepsPerRevolution: value.fullStepsPerRevolution,
       transmission: switch value.transmission {
         case SimpleTransmission(jointId, ratio, offset):
           {kind: "simple", jointId: jointId, ratio: ratio, offset: offset};
@@ -467,12 +466,11 @@ class RobotModelCodec {
     if (value.microsteps != null) record.microsteps = value.microsteps;
     if (value.maxStepRate != null) record.maxStepRate = value.maxStepRate;
     if (value.efficiency != 1.0) record.efficiency = value.efficiency;
-    // A bare stepper is its steps alone, as before drive kinds; anything with ratings gets a drive.
     var drive = value.drive;
     if (drive != null) {
       if (Std.isOfType(drive, StepperDrive)) {
         var stepper:StepperDrive = cast drive;
-        if (stepper.hasTorqueData()) record.drive = {kind: "stepper", fullStepsPerRevolution: stepper.fullStepsPerRevolution,
+        record.drive = {kind: "stepper", fullStepsPerRevolution: stepper.fullStepsPerRevolution,
           rotorInertia: stepper.rotorInertia, holdingTorque: stepper.holdingTorque, curve: stepper.curve.flatten()};
       } else if (Std.isOfType(drive, ServoDrive)) {
         var servo:ServoDrive = cast drive;
@@ -507,6 +505,8 @@ class RobotModelCodec {
     nonNegative(value.servoDamping, "actuator servoDamping");
     if (!(value.efficiency > 0.0 && value.efficiency <= 1.0)) throw "Actuator efficiency must be in (0, 1]";
     nonNegative(value.fullStepsPerRevolution, "actuator fullStepsPerRevolution");
+    if (value.fullStepsPerRevolution > 0 && (value.microsteps == null || value.maxStepRate == null))
+      throw 'Stepper actuator "${value.id}" requires microsteps and a driver step-rate ceiling';
     if (value.microsteps != null && (value.microsteps < 1 || value.microsteps > 1024))
       throw "Actuator microsteps must be an integer from 1 to 1024";
     if (value.maxStepRate != null && (!(value.maxStepRate > 0) || !Math.isFinite(value.maxStepRate)))
@@ -579,10 +579,6 @@ class RobotModelCodec {
     if (Reflect.hasField(value, "speedLimiter")) actuator.speedLimiter = text(value, "speedLimiter");
     actuator.servoStiffness = nonNegative(number(value, "servoStiffness"), "actuator servoStiffness");
     actuator.servoDamping = nonNegative(number(value, "servoDamping"), "actuator servoDamping");
-    // Absent in models saved before steppers were recorded: not a stepper.
-    if (Reflect.hasField(value, "fullStepsPerRevolution"))
-      actuator.fullStepsPerRevolution = nonNegative(number(value, "fullStepsPerRevolution"), "actuator fullStepsPerRevolution");
-    // Models saved before drive kinds have no `drive`; a stepper's steps stand alone.
     if (Reflect.hasField(value, "drive") && Reflect.field(value, "drive") != null)
       actuator.drive = readActuatorDrive(Reflect.field(value, "drive"));
     if (Reflect.hasField(value, "encoder") && Reflect.field(value, "encoder") != null)
@@ -602,6 +598,8 @@ class RobotModelCodec {
       if (!(rate > 0) || !Math.isFinite(rate)) throw "Actuator maxStepRate must be finite and positive";
       actuator.maxStepRate = rate;
     }
+    if (actuator.fullStepsPerRevolution > 0 && (actuator.microsteps == null || actuator.maxStepRate == null))
+      throw 'Stepper actuator "${actuator.id}" requires microsteps and a driver step-rate ceiling';
     actuator.assumed = readAssumed(value);
     return actuator;
   }

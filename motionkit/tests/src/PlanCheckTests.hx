@@ -75,6 +75,8 @@ class PlanCheckTests extends MotionKitTestSupport {
       motor.drive = new ServoDrive(0.3, 1.2, 300.0, 500.0, 3e-5, 4096.0);
     } else {
       // A NEMA 23 on 24 V: 1.26 N m to 68.6 rad/s, then falling as 1 / speed.
+      motor.microsteps = 16;
+      motor.maxStepRate = 200000;
       motor.drive = new StepperDrive(200.0, 3e-5, 1.26, new TorqueSpeedCurve([0.0, 68.6, 137.2, 274.4], [1.26, 1.26, 0.63, 0.315]));
     }
     model.addActuator(motor);

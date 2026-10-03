@@ -47,7 +47,7 @@ class StepperDrive extends ActuatorDrive {
     this.holdingTorque = holdingTorque;
   }
 
-  /** A stepper known only by its steps, as in models saved before ratings were recorded. */
+  /** A stepper with a stated step count and no torque ratings. */
   public static function stepsOnly(fullStepsPerRevolution:Float):StepperDrive
     return new StepperDrive(fullStepsPerRevolution, 0.0, 0.0, TorqueSpeedCurve.flat(0.0, 1.0));
 

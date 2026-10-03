@@ -246,7 +246,6 @@ import machinekit.component.PortInterface;
 /** Source of a derived coupling; the follower is zero at `leaderZero`. */
 @:wire typedef TransmissionRecord = {
 	@:id(1) var coupling:String;
-	// IDs 2–4 belonged to the v2 string form and are retired.
 	@:id(12) var source:Transmission;
 	@:id(13) var sense:Sense;
 	@:id(5) var leaderZero:Float;
@@ -274,7 +273,6 @@ import machinekit.component.PortInterface;
 	@:id(1) var actuator:String;
 	@:id(2) var joint:String;
 	@:id(3) var motor:String;
-	/** id 4 retired: supply voltage now belongs to the driver. */
 	@:id(8) var driver:String;
 	@:id(5) var margin:Float;
 	/** A gearbox between the motor and the joint (see `Gearbox`); absent for a direct drive. */

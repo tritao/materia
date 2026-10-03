@@ -4,7 +4,7 @@ import robotkit.model.Transmission;
 
 /** Editable static definition of a robot's links, joints, and sensors. */
 class RobotModel {
-  public static inline var CURRENT_VERSION:Int = 6;
+  public static inline var CURRENT_VERSION:Int = 7;
   public final schemaVersion:Int = CURRENT_VERSION;
   public final name:String;
   public final links:Array<Link> = [];
@@ -60,22 +60,10 @@ class RobotModel {
     return encoder;
   }
 
-  /**
-   * The encoder that reads `actuator`: the one it names, or, for a servo saved before encoders were
-   * sensors, one made from the servo drive's own count (incremental, on the actuator's joint).
-   */
+  /** The sensor explicitly wired as this actuator's feedback. */
   public function encoderFor(actuator:Actuator):Null<Encoder> {
-    if (actuator.encoder != "") {
-      for (encoder in encoders) if (encoder.id == actuator.encoder) return encoder;
-      return null;
-    }
-    var drive = actuator.drive;
-    if (drive == null || !Std.isOfType(drive, ActuatorDrive.ServoDrive)) return null;
-    var counts = cast(drive, ActuatorDrive.ServoDrive).encoderCounts;
-    if (!(counts > 0.0)) return null;
-    return switch actuator.transmission {
-      case SimpleTransmission(jointId, _, _): Encoder.perRevolution(actuator.id + ".encoder", jointId, EncoderKind.Incremental, counts);
-    };
+    for (encoder in encoders) if (encoder.id == actuator.encoder) return encoder;
+    return null;
   }
 
   public function addCoupling(coupling:JointCoupling):JointCoupling {

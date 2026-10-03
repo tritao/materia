@@ -243,18 +243,17 @@ class MachineAssembly {
 
 	public static function decode(text:String):MachineAssembly {
 		var version:machinekit.assembly.MachineAssemblyDescription.DescriptionVersion = JsonWire.decode(text);
-		checkDescriptionVersion(version.schemaVersion);
+		if (version.schemaVersion != SCHEMA_VERSION)
+			throw 'schema v${version.schemaVersion} is unsupported; expected v$SCHEMA_VERSION';
 		return fromDescription(JsonWire.decode(text));
 	}
 
-	static function checkDescriptionVersion(version:Null<Int>):Void {
-		if (version != SCHEMA_VERSION) throw 'Machine assembly schema v$version is unsupported; expected v$SCHEMA_VERSION typed gearbox members';
-	}
 
 	/** Rebuild through registered recipes; no component object is stored in the description. */
 	public static function fromDescription(description:MachineAssemblyDescription):MachineAssembly {
 		if (description == null || description.machine == null) throw "Missing machine assembly description";
-		checkDescriptionVersion(description.schemaVersion);
+		if (description.schemaVersion != SCHEMA_VERSION)
+			throw 'schema v${description.schemaVersion} is unsupported; expected v$SCHEMA_VERSION';
 		var savedMechanical = FrozenAssemblyDefinitions.thaw(description.mechanical);
 		AssemblyDefinitionCodec.validate(savedMechanical);
 		var mechanical = AssemblyDefinitionFlattener.flatten(savedMechanical);

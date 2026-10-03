@@ -593,7 +593,8 @@ class CadBridgeTests {
     assembly.connector("slider", "mount", AssemblyFrames.identity());
     assembly.mateOnAxis("slide", "prismatic", "base", "mount", "slider", "mount",
       {x: 0, y: 1, z: 0}, 0, {lower: 0, upper: 100, velocity: 20, effort: 50});
-    assembly.actuate("drive", "slide", 10, 5, null, 200);
+    assembly.actuateDrive({id: "drive", joint: "slide", maxEffort: 10, maxRate: 5,
+      fullStepsPerRevolution: 200, microsteps: 16, maxStepRate: 200000});
     var vertices = Bytes.alloc(4 * 24);
     var points = [0.0, 0.0, 0.0, 10.0, 0.0, 0.0,
       0.0, 10.0, 0.0, 0.0, 0.0, 10.0];
@@ -628,7 +629,7 @@ class CadBridgeTests {
     driven.mateOnAxis("slide", "prismatic", "base", "mount", "slider", "mount",
       {x: 0, y: 1, z: 0}, 0, {lower: 0, upper: 100, velocity: 20, effort: 50});
     driven.actuateDrive({id: "stepper", joint: "slide", maxEffort: 0.6, maxRate: 100, rotorInertia: 3e-5,
-      fullStepsPerRevolution: 200, drive: "stepper", holdingTorque: 1.2, torqueSpeed: [0, 1.2, 100, 1.2, 400, 0.3]});
+      fullStepsPerRevolution: 200, microsteps: 16, maxStepRate: 200000, drive: "stepper", holdingTorque: 1.2, torqueSpeed: [0, 1.2, 100, 1.2, 400, 0.3]});
     driven.actuateDrive({id: "servo", joint: "slide", maxEffort: 1.8, maxRate: 500, drive: "servo", ratedTorque: 0.6,
       peakTorque: 1.8, ratedSpeed: 300, maxSpeed: 500, encoderCounts: 4096, servoStiffness: 12});
     var drives = AssemblySimulationBridge.toRobotModel(driven.definition("drive-test"), parts).model.actuators;

@@ -188,7 +188,7 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(19) @:optional var gearEfficiency:Null<Float>;
 	/** Engineering inputs assumed by this motor's rating or curve; absent when none. */
 	@:id(20) @:optional var assumed:Null<ReadOnlyArray<String>>;
-	/** Driver setting and input ceiling; absent for legacy and non-stepper actuators. */
+	/** Driver setting and input ceiling; required for step/dir actuators and absent for other drives. */
 	@:id(21) @:optional var microsteps:Null<Int>;
 	@:id(22) @:optional var maxStepRate:Null<Float>;
 }

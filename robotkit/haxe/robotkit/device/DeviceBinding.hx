@@ -37,8 +37,7 @@ class BoundChannel {
 /**
  * The join of a machine model and a deployment's wiring into the device's actuator layout. The
  * model owns the motor's full steps and the transmission; the layout owns which channel drives
- * which actuator and its direction. Microstepping is a model driver setting, checked against
- * the wiring (legacy models may state it in the layout); the board owns the step tick.
+ * which actuator and its direction. Microstepping is a model driver setting; the board owns the step tick.
  * Nothing falls back to a default: a stepper without a channel, or a channel without a stepper,
  * is an error.
  */
@@ -92,19 +91,11 @@ class DeviceBinding {
       var jointIndex = -1;
       for (index in 0...robot.joints.length) if (robot.joints[index].id == jointId) jointIndex = index;
       if (jointIndex < 0) throw 'Actuator "$name" drives joint "$jointId", which the model does not have';
-      if (channel.jointId != "" && channel.jointId != jointId)
-        throw 'Device layout channel $position says joint "${channel.jointId}" but actuator "$name" drives "$jointId"';
-      // The rotor angle in radians is the actuator coordinate; one turn is the motor's full steps
-      // times the driver's microsteps.
-      if (channel.microsteps < 1 || channel.microsteps > 1024)
-        throw 'Device layout channel $position microsteps must be from 1 to 1024';
-      var setting = actuator.microsteps;
-      if (setting != null && setting != channel.microsteps)
-        throw 'Device layout channel $position microsteps disagree with actuator "$name" driver setting';
-      var stepsPerUnit = actuator.fullStepsPerRevolution * channel.microsteps / (2.0 * Math.PI);
-      // A faster board clock can idle between pulses; the driver still bounds pulse frequency.
-      var driverRate = actuator.maxStepRate;
-      var pulseRate:Float = driverRate == null ? stepTickHz : Math.min(stepTickHz, driverRate);
+      var setting = actuator.microsteps, driverRate = actuator.maxStepRate;
+      if (setting == null || driverRate == null)
+        throw 'Stepper actuator "$name" requires microsteps and a driver step-rate ceiling';
+      var stepsPerUnit = actuator.fullStepsPerRevolution * setting / (2.0 * Math.PI);
+      var pulseRate:Float = Math.min(stepTickHz, driverRate);
       var ceiling = pulseRate / stepsPerUnit;
       var motorRate = actuator.planningRate();
       var rate = motorRate == null ? ceiling : Math.min(motorRate, ceiling);
@@ -112,7 +103,7 @@ class DeviceBinding {
         stepsPerUnit, rate, channel.directionSetupTicks, channel.skewBound));
       var capped = find(tightened, name);
       if (capped != null) {
-        if ((driverRate == null || stepTickHz < driverRate) &&
+        if ((stepTickHz < driverRate) &&
             (motorRate == null || rate < motorRate)) capped.speedLimiter = "controller tick";
         capped.maxRate = rate;
       }

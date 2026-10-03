@@ -14,7 +14,7 @@ class Tool {
   public final flangeTTcp:Transform3;
   public final collision:ToolCollisionShape;
   public final mass:Float;
-  /** Null when a legacy mass-only tool has no trustworthy centre of mass. */
+  /** Null when the tool has no stated centre of mass. */
   public final massProperties:Null<MassProperties>;
 
   public function new(id:ToolId, name:String, flangeTTcp:Transform3,

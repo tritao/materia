@@ -132,26 +132,7 @@ class MachineKitRecipeProjectTests {
 		Reflect.setField(designation, "value", "6000");
 		assertReconciledLoads(jsonText(droppedRowSource), sourceText, "is no longer valid");
 
-		var oldVersionSaved = json(sourceText);
-		Reflect.setField(oldVersionSaved, "version", 8);
-		var definitions:Array<Dynamic> = cast Reflect.field(oldVersionSaved, "definitions");
-		for (definition in definitions) {
-			var inputs:Array<Dynamic> = cast Reflect.field(definition, "inputs");
-			for (index in 0...inputs.length) {
-				var oldInput = inputs[index], legacyInput:Dynamic = {};
-				for (field in Reflect.fields(oldInput)) if (field != "editedByUser")
-					Reflect.setField(legacyInput, field, Reflect.field(oldInput, field));
-				inputs[index] = legacyInput;
-			}
-		}
-		Reflect.setField(inputRecord(definitionRecord(oldVersionSaved, "bearingB"), "designation"), "value", "6000");
-		diagnostics = [];
-		result = MachineKitRecipes.reconcile(sourceText, jsonText(oldVersionSaved), diagnostics);
-		loaded = DocumentCodec.decode(result.text);
-		check(occurrence(loaded, "bearingB").resolvedToken("designation") == "6000"
-			&& hasDiagnostic(diagnostics, "re-save this project"),
-			"version 8 edited defaults are recovered and prompt the user to re-save");
-		loaded.close();
+
 	}
 
 	static function removeToolInputs(projectText:String):String {
@@ -189,7 +170,7 @@ class MachineKitRecipeProjectTests {
 		var destination = "/tmp/materia-machinekit-recipe-" + Sys.getPid() + ".materia.json";
 		var tracePath = destination + ".reconcile-trace";
 		try {
-			session.openGeneratedScene(generated.objects, manifest, generated.assembly,
+			session.openGeneratedScene(generated.objects, manifest,
 				generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
                 generated.localCentersByDefinition, generated.metresPerUnit,
                 generated.physical, generated.recipeDocument);
@@ -251,34 +232,6 @@ class MachineKitRecipeProjectTests {
 				"removed source part produces a diagnostic");
 			check(hasDiagnostic(session.staleEdits(), "no longer exists in source"),
 				"removed from source diagnostic reaches the app");
-			var oldVersionSaved = json(Reflect.field(project, "recipeDocument"));
-			Reflect.setField(oldVersionSaved, "version", 8);
-			Reflect.setField(inputRecord(definitionRecord(oldVersionSaved, "bearingB"), "designation"), "value", "6000");
-			var oldDefinitions:Array<Dynamic> = cast Reflect.field(oldVersionSaved, "definitions");
-			for (definition in oldDefinitions) {
-				var inputs:Array<Dynamic> = cast Reflect.field(definition, "inputs");
-				for (index in 0...inputs.length) {
-					var oldInput = inputs[index], legacyInput:Dynamic = {};
-					for (field in Reflect.fields(oldInput)) if (field != "editedByUser")
-						Reflect.setField(legacyInput, field, Reflect.field(oldInput, field));
-					inputs[index] = legacyInput;
-				}
-			}
-			Reflect.setField(project, "recipeDocument", jsonText(oldVersionSaved));
-			File.saveContent(destination, jsonText(project));
-			File.saveContent(tracePath, "");
-			Sys.putEnv("MATERIA_RECONCILE_TRACE", tracePath);
-			try session.open(destination) catch (error:Dynamic) {
-				Sys.putEnv("MATERIA_RECONCILE_TRACE", "");
-				throw error;
-			}
-			Sys.putEnv("MATERIA_RECONCILE_TRACE", "");
-			check(countDiagnostic(session.staleEdits(), "re-save this project") == 1,
-				"version 8 project prompts to re-save exactly once");
-			check(hasDiagnostic(session.staleEdits(), "no longer exists in source"),
-				"removed from source diagnostic survives version 8 load");
-			check(File.getContent(tracePath) == "reconcile\n",
-				"saved recipe is reconciled exactly once per load");
 			Reflect.setField(project, "recipeDocument", jsonText(saved));
 			for (record in kept) if (Reflect.field(record, "kind") == "instance"
 				&& Reflect.field(record, "name") == "bearingA") {

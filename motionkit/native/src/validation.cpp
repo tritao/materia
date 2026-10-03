@@ -276,13 +276,13 @@ mk_result validate(const Trajectory &trajectory, const mk_limits &limits,
         if (!limits.position_claimed[joint]) {
             unchecked[MK_CHECK_POSITION] = true; assumption(report, "position limit", joint);
         }
-        if (!(limits.derivative_claimed[joint] & 1) && limits.max_velocity[joint] == 0.0) {
+        if (!(limits.derivative_claimed[joint] & 1)) {
             unchecked[MK_CHECK_VELOCITY] = true; assumption(report, "velocity limit", joint);
         }
-        if (!(limits.derivative_claimed[joint] & 2) && limits.max_acceleration[joint] == 0.0) {
+        if (!(limits.derivative_claimed[joint] & 2)) {
             unchecked[MK_CHECK_ACCELERATION] = true; assumption(report, "acceleration limit", joint);
         }
-        if (!(limits.derivative_claimed[joint] & 4) && limits.max_jerk[joint] == 0.0) {
+        if (!(limits.derivative_claimed[joint] & 4)) {
             unchecked[MK_CHECK_JERK] = true; assumption(report, "jerk limit", joint);
         }
     }
@@ -304,9 +304,9 @@ mk_result validate(const Trajectory &trajectory, const mk_limits &limits,
             int degree = static_cast<int>(segment.degree);
             for (uint32_t order = 0; order <= 3; ++order) {
                 const bool claimed = order == 0 ? limits.position_claimed[joint] != 0 :
-                    order == 1 ? ((limits.derivative_claimed[joint] & 1) || limits.max_velocity[joint] > 0.0) :
-                    order == 2 ? ((limits.derivative_claimed[joint] & 2) || limits.max_acceleration[joint] > 0.0) :
-                                 ((limits.derivative_claimed[joint] & 4) || limits.max_jerk[joint] > 0.0);
+                    order == 1 ? (limits.derivative_claimed[joint] & 1) :
+                    order == 2 ? (limits.derivative_claimed[joint] & 2) :
+                                 (limits.derivative_claimed[joint] & 4);
                 if (claimed) {
                     std::vector<long double> times{0.0L, duration};
                     const auto next = derivative(polynomial, degree);

@@ -377,6 +377,14 @@ class RobotRuntimeCompiler {
           (actuator.maxRate != null && (!Math.isFinite(actuator.maxRate) || actuator.maxRate < 0.0)))
         diagnostics.push(new RobotCompileDiagnostic("RK_ACTUATOR_LIMIT", path,
           "actuator limits must be finite and non-negative"));
+      if (actuator.fullStepsPerRevolution > 0.0 &&
+          (actuator.microsteps == null || actuator.maxStepRate == null))
+        diagnostics.push(new RobotCompileDiagnostic("RK_STEPPER_DRIVER", path,
+          "stepper requires microsteps and a driver step-rate ceiling"));
+      if (actuator.microsteps != null && (actuator.microsteps < 1 || actuator.microsteps > 1024))
+        diagnostics.push(new RobotCompileDiagnostic("RK_STEPPER_DRIVER", path, "microsteps must be from 1 to 1024"));
+      if (actuator.maxStepRate != null && (!Math.isFinite(actuator.maxStepRate) || actuator.maxStepRate <= 0.0))
+        diagnostics.push(new RobotCompileDiagnostic("RK_STEPPER_DRIVER", path, "driver step-rate ceiling must be positive"));
       if (actuator.transmission == null)
         diagnostics.push(new RobotCompileDiagnostic("RK_TRANSMISSION_NULL", '$path.transmission',
           "actuator transmission is missing"));

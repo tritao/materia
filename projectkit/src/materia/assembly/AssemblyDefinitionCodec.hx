@@ -24,8 +24,6 @@ class AssemblyDefinitionCodec {
 	}
 
 	public static function decode(text:String):AssemblyDefinition {
-		if (Reflect.hasField(Json.parse(text), "schemaVersion"))
-			throw "Assembly definitions in the old JSON format are no longer supported";
 		var result:AssemblyDefinition = JsonWire.decode(text);
 		validate(result);
 		return result;
@@ -37,14 +35,14 @@ class AssemblyDefinitionCodec {
 	}
 
 	public static function decodeState(definition:AssemblyDefinition, text:String):AssemblyStateRecord {
-		if (Reflect.hasField(Json.parse(text), "schemaVersion"))
-			throw "Assembly states in the old JSON format are no longer supported";
 		var decoded:AssemblyStateRecord = JsonWire.decode(text);
 		validateState(definition, decoded);
 		return decoded;
 	}
 
 	public static function validate(definition:AssemblyDefinition):Void {
+		if (definition != null && definition.schemaVersion != VERSION)
+			throw 'schema v${definition.schemaVersion} is unsupported; expected v$VERSION';
 		if (definition != null && definition.assemblies != null && definition.assemblies.length > 0) {
 			validateFlat(AssemblyDefinitionFlattener.flatten(definition));
 			return;
@@ -210,6 +208,8 @@ class AssemblyDefinitionCodec {
 		validate(definition);
 		state = AssemblyDefinitionFlattener.flattenState(definition, state);
 		definition = AssemblyDefinitionFlattener.flatten(definition);
+		if (state != null && state.schemaVersion != VERSION)
+			throw 'schema v${state.schemaVersion} is unsupported; expected v$VERSION';
 		if (state == null || state.schemaVersion != VERSION || state.definition != definition.id ||
 			state.jointCoordinates == null || state.rootPoses == null ||
 			state.jointCoordinates.length > definition.joints.length ||
@@ -338,9 +338,12 @@ class AssemblyDefinitionCodec {
 				if (index >= 2 && index % 2 == 0 && !(curve[index] > curve[index - 2])) return false;
 			}
 		}
+		if (actuator.fullStepsPerRevolution != null && actuator.fullStepsPerRevolution > 0
+			&& (actuator.microsteps == null || actuator.maxStepRate == null)) return false;
 		var kind = actuator.drive;
 		if (kind == null) return true;
-		if (kind == "stepper") return actuator.fullStepsPerRevolution != null && actuator.holdingTorque != null && curve != null;
+		if (kind == "stepper") return actuator.fullStepsPerRevolution != null && actuator.holdingTorque != null && curve != null
+			&& actuator.microsteps != null && actuator.maxStepRate != null;
 		if (kind == "servo")
 			return actuator.ratedTorque != null && actuator.peakTorque != null && actuator.ratedSpeed != null &&
 				actuator.maxSpeed != null && actuator.ratedTorque > 0 && actuator.peakTorque >= actuator.ratedTorque &&

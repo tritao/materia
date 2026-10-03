@@ -61,12 +61,12 @@ class InspectorPanel {
     if (simulation.isActive()) rows.push(new KeyedView("simulation-hint",
       new Text(HierarchyPanel.SIMULATION_LOCK_HINT, null, appearance.theme.tokens.textSecondary,
         TextStyleOverride.text(12.0))));
-    var assembly = session.projectAssembly;
+    var assembly = session.projectAssemblyDefinition;
     if (assembly != null && StringTools.startsWith(selected.id, "project:")) {
       var instanceId = selected.id.substr(8);
       var jointLines:Array<String> = [];
       for (joint in assembly.joints) if (joint.parent == instanceId || joint.child == instanceId)
-        jointLines.push(joint.id + " · " + joint.kind + " · " +
+        jointLines.push(joint.id + " · " + joint.type + " · " +
           joint.parentConnector + " → " + joint.childConnector);
       if (jointLines.length > 0)
         rows.push(new KeyedView("assembly-joints", textLines("assembly-joint-lines", jointLines)));

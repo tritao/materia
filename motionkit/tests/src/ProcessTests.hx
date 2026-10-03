@@ -473,7 +473,7 @@ class ProcessTests extends MotionKitTestSupport {
     // 200 full steps at 16 microsteps a turn.
     var binding = DeviceBinding.bind(blueprint.model,
       new DeviceLayout([for (index in 0...blueprint.model.actuators.length)
-        new robotkit.device.DeviceChannel(index, "", blueprint.model.actuators[index].id, 1, 16, 2)]), options.stepTickHz);
+        new robotkit.device.DeviceChannel(index, blueprint.model.actuators[index].id, 1, 2)]), options.stepTickHz);
     near(blueprint.model.couplings[0].ratio, ratio, "the physical coupling takes its ratio from the screw");
     near(binding.channels[0].ratio, 1.0, "the binding drives the explicit motor shaft in radians");
     check(blueprint.model.joints[binding.channels[0].jointIndex].id == blueprint.axes[0].jointIds[1],

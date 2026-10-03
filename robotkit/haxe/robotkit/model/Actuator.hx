@@ -7,7 +7,7 @@ class Actuator {
   public final id:String;
   /** Assumed engineering inputs carried from the model's source. */
   public var assumed:Array<String> = [];
-  /** Driver facts are optional for models saved before amplifier parts. */
+  /** Driver settings and input ceiling, required for stepper actuators. */
   public var microsteps:Null<Int>;
   public var maxStepRate:Null<Float>;
   /** The bound controller, when its clock further limits the driver. */
@@ -32,7 +32,7 @@ class Actuator {
   public var drive:Null<ActuatorDrive> = null;
   /**
    * The id of the `Encoder` that reads this motor, or empty for none. A servo's feedback comes from it
-   * (the servo drive's own `encoderCounts` is what models saved before encoders were sensors recorded).
+   * (the drive also states its feedback resolution).
    */
   public var encoder:String = "";
   /**

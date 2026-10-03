@@ -41,12 +41,7 @@ class SerialDeployment {
     var directory = Path.directory(path);
     var config:Dynamic = Json.parse(sys.io.File.getContent(path));
     var version:Dynamic = Reflect.field(config, "schemaVersion");
-    if (version == 3 || version == 4)
-      throw 'robotd: deployment schema v$version names a compiled device fingerprint, which firmware no longer carries; ' +
-        'update the file to schemaVersion 5: replace device.fingerprint with device.controller (the board\'s unique id, ' +
-        'from `robotd identify <path> <baud>`), drop device.schema_lock, and wire each layout channel to a model actuator ' +
-        '(see runtime/DEVICE_PROTOCOL.md)';
-    if (version != 5) throw "robotd: unsupported deployment schema version";
+    if (version != 5) throw 'schema v$version is unsupported; expected v5';
     var modelPath = Path.join([directory, requiredString(config, "model")]);
     robot = RobotModelCodec.decode(sys.io.File.getBytes(modelPath));
     cameras = new Map();

@@ -263,7 +263,7 @@ class MachineAssemblyDescriptionTests {
 			var oldVersion:machinekit.assembly.MachineAssemblyDescription.DescriptionVersion = {schemaVersion: version};
 			var oldText = haxeon.wire.JsonWire.encode(oldVersion);
 			try MachineAssembly.decode(oldText) catch (error:Dynamic)
-				oldRejected = Std.string(error).indexOf('expected v${MachineAssembly.SCHEMA_VERSION} typed gearbox members') >= 0;
+				oldRejected = Std.string(error).indexOf('expected v${MachineAssembly.SCHEMA_VERSION}') >= 0;
 			if (!oldRejected) throw 'The v$version machine schema needs a clear rejection';
 		}
 		var sources:Array<Transmission> = [Transmission.LeadScrew("screw", "nut"),

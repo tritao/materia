@@ -16,7 +16,6 @@ class AssemblyModelSmoke {
 		if (namedA.id != "a" || namedB.id != "b" || reversed.definition().id != "assembly")
 			throw "Definition export changed the model id";
 		near(reversed.definition().occurrences[2].initialPose.x, 0, "definition retains recorded placement");
-		near(reversed.record().instances[2].pose.x, 115, "legacy record retains solved pose");
 		throws(() -> reversed.place("leaf", AssemblyFrames.identity()), "cannot be placed independently");
 		reversed.place("root", at(200));
 		near(reversed.pose("leaf").x, 215, "root placement invalidates cached solve");

@@ -178,8 +178,8 @@ int main() {
     limits.struct_size = sizeof(limits);
     limits.joint_count = 2;
     for (int joint = 0; joint < 2; ++joint) {
-        limits.max_velocity[joint] = 10.0;
-        limits.max_acceleration[joint] = 20.0;
+        limits.max_velocity[joint] = (limits.derivative_claimed[joint] |= 1, 10.0);
+        limits.max_acceleration[joint] = (limits.derivative_claimed[joint] |= 2, 20.0);
     }
     mk_validation_report report{};
     report.struct_size = sizeof(report);

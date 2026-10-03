@@ -205,16 +205,6 @@ class ElementSmoke {
 		catch (error:Dynamic)
 			failed = true;
 		check(failed, "unsupported document versions are rejected");
-		var implicitOutput:Dynamic = Json.parse(encoded);
-		Reflect.setField(implicitOutput, "version", 1);
-		Reflect.setField(implicitOutput, "output", null);
-		Reflect.setField(implicitOutput, "elements", null);
-		var migrated = DocumentCodec.decode(Json.stringify(implicitOutput));
-		check(migrated.elementCount() == 1
-			&& migrated.elementAt(0).name == "Model"
-			&& migrated.elementAt(0).output == migrated.outputFeature(),
-			"implicit version-one output migrates into the element registry");
-
 		var duplicateIds:Dynamic = Json.parse(encoded);
 		var duplicateRecords:Array<Dynamic> = cast Reflect.field(duplicateIds, "elements");
 		duplicateRecords.push({id: persistedElement.id.value, name: "Duplicate", output: persistedBox.id.toInt()});
@@ -234,7 +224,6 @@ class ElementSmoke {
 			failed = true;
 		check(failed, "dangling persisted element outputs are rejected");
 
-		migrated.close();
 		cloned.close();
 		opened.close();
 		persisted.close();
@@ -591,17 +580,6 @@ class ElementSmoke {
 		loaded.close();
 		doc.close();
 
-		var legacy = new Document();
-		legacy.createDefinition("Legacy", "cadkit.test.box", [new DefinitionInput("width", ParameterKind.Length, "mm", 10),
-			new DefinitionInput("height", ParameterKind.Length, "mm", 20),
-			new DefinitionInput("depth", ParameterKind.Length, "mm", 30)],
-			[new DefinitionOutput("body", DefinitionOutput.Geometry)]);
-		var legacyRecord:Dynamic = Json.parse(DocumentCodec.encode(legacy));
-		Reflect.setField(legacyRecord, "version", 2);
-		var legacyLoaded = DocumentCodec.decode(Json.stringify(legacyRecord));
-		check(legacyLoaded.allDefinitions().length == 1 && legacyLoaded.allDefinitions()[0].input("width").defaultValue == 10,
-			"version 2 numeric definitions remain readable");
-		legacyLoaded.close();
-		legacy.close();
+
 	}
 }

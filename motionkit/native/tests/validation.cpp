@@ -34,8 +34,8 @@ void velocity_extremum_and_plan_rejection() {
     mk_limits limits{};
     limits.struct_size = sizeof(limits);
     limits.joint_count = 1;
-    limits.max_velocity[0] = 0.7;
-    limits.max_acceleration[0] = 4.0;
+    limits.max_velocity[0] = (limits.derivative_claimed[0] |= 1, 0.7);
+    limits.max_acceleration[0] = (limits.derivative_claimed[0] |= 2, 4.0);
     limits.model_revision = 12;
     limits.calibration_revision = 3;
     mk_validation_report report{};
@@ -69,7 +69,7 @@ void velocity_extremum_and_plan_rejection() {
     assert(plan.id == 0);
     assert(report.checks[MK_CHECK_VELOCITY].status == MK_CHECK_FAILED);
 
-    limits.max_velocity[0] = 0.8;
+    limits.max_velocity[0] = (limits.derivative_claimed[0] |= 1, 0.8);
     assert(mk_validate(trajectory, &limits, &report) == MK_OK);
     assert(report.checks[MK_CHECK_VELOCITY].status == MK_CHECK_PASSED);
     assert(mk_plan_create(trajectory, &spec, &limits, &plan, &report) == MK_OK);
@@ -188,8 +188,8 @@ void explicit_quantization_tolerance() {
     mk_limits limits{};
     limits.struct_size = sizeof(limits);
     limits.joint_count = 1;
-    limits.max_acceleration[0] = 2.0;
-    limits.max_jerk[0] = 5.0;
+    limits.max_acceleration[0] = (limits.derivative_claimed[0] |= 2, 2.0);
+    limits.max_jerk[0] = (limits.derivative_claimed[0] |= 4, 5.0);
     mk_validation_report report{};
     report.struct_size = sizeof(report);
     assert(mk_validate(trajectory, &limits, &report) == MK_OK);
@@ -208,7 +208,7 @@ void explicit_quantization_tolerance() {
     assert(mk_plan_create(trajectory, &spec, &limits, &plan, &report) == MK_OK);
     assert(plan.id != 0);
     mk_plan_destroy(plan);
-    limits.max_acceleration[0] = 2.0 - 1e-7;
+    limits.max_acceleration[0] = (limits.derivative_claimed[0] |= 2, 2.0 - 1e-7);
     assert(mk_validate(trajectory, &limits, &report) == MK_OK);
     assert(report.checks[MK_CHECK_ACCELERATION].status == MK_CHECK_FAILED);
     mk_trajectory_destroy(trajectory);
@@ -227,7 +227,7 @@ void nonfinite_extrema_rejected() {
     mk_limits limits{};
     limits.struct_size = sizeof(limits);
     limits.joint_count = 1;
-    limits.max_acceleration[0] = 1.0;
+    limits.max_acceleration[0] = (limits.derivative_claimed[0] |= 2, 1.0);
     mk_validation_report report{};
     report.struct_size = sizeof(report);
     assert(mk_validate(trajectory, &limits, &report) == MK_ERROR_INVALID_ARGUMENT);
@@ -248,7 +248,7 @@ void executor_resolution_and_tolerance_cap() {
     mk_limits limits{};
     limits.struct_size = sizeof(limits);
     limits.joint_count = 1;
-    limits.max_acceleration[0] = 2.0;
+    limits.max_acceleration[0] = (limits.derivative_claimed[0] |= 2, 2.0);
     limits.executor_time_resolution_ns = 2;
     mk_validation_report report{};
     report.struct_size = sizeof(report);
@@ -346,8 +346,8 @@ void plans_across_threads() {
     mk_limits limits{};
     limits.struct_size = sizeof(limits);
     limits.joint_count = 1;
-    limits.max_velocity[0] = 0.8;
-    limits.max_acceleration[0] = 4.0;
+    limits.max_velocity[0] = (limits.derivative_claimed[0] |= 1, 0.8);
+    limits.max_acceleration[0] = (limits.derivative_claimed[0] |= 2, 4.0);
     mk_plan_spec spec{};
     spec.struct_size = sizeof(spec);
     spec.plan_id = 1;

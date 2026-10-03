@@ -2,7 +2,6 @@ package cadkit.modeling;
 
 import haxe.ds.ReadOnlyArray;
 
-import materia.assembly.AssemblyRecord;
 import materia.assembly.AssemblyCodec;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
@@ -157,19 +156,6 @@ class AssemblyModel {
 		solved = null;
 	}
 
-	public function record():AssemblyRecord {
-		var state = solvedState();
-		var result:AssemblyRecord = {instances: [for (occurrence in data.occurrences) {
-			id: occurrence.id, pose: state.worldPose(occurrence.id),
-			connectors: requireComponent(occurrence.id).connectors.copy()
-		}], joints: [for (joint in data.joints) {
-			id: joint.id, kind: cast joint.type, parent: joint.parent,
-			parentConnector: joint.parentConnector, child: joint.child,
-			childConnector: joint.childConnector, value: joint.defaultValue
-		}]};
-		AssemblyCodec.validate(result);
-		return result;
-	}
 
 	/**
 	 * Couples a target coordinate to a source using target = source × ratio + offset. `efficiency`

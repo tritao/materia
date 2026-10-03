@@ -42,7 +42,7 @@ class AssemblyPreview {
 		var state = model.initialState(assemblyId).record();
 		shareDefinitions(definition, definitionByOccurrence);
 		return {lengthUnit: "mm", metresPerUnit: LengthUnit.metresPerUnit("mm"), parts: parts,
-			assembly: model.record(), assemblyDefinition: definition, assemblyState: state};
+			assemblyDefinition: definition, assemblyState: state};
 	}
 
 	/**

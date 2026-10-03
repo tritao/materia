@@ -31,8 +31,8 @@ class DeviceBindingTests {
 
     var model = axisModel();
     // 200 full steps at 16 microsteps a turn, on a 20 kHz step tick.
-    var layout = DeviceLayout.decode(Bytes.ofString('{"channels": [
-      {"index": 0, "actuator": "motor", "direction": -1, "microsteps": 16, "direction_setup_ticks": 2}]}'));
+    var layout = DeviceLayout.decode(Bytes.ofString('{"schemaVersion":1,"channels": [
+      {"index": 0, "actuator": "motor", "direction": -1, "direction_setup_ticks": 2}]}'));
     var binding = DeviceBinding.bind(model, layout, 20000);
     var channel = binding.channels[0];
     near(channel.stepsPerUnit, 3200.0 / (2.0 * Math.PI), "steps per radian from the motor's steps and the driver's microsteps");
@@ -57,20 +57,18 @@ class DeviceBindingTests {
 
     fails(function() DeviceBinding.bind(model, new DeviceLayout([]), 20000), "from 1 to 64",
       "an empty layout is refused");
-    fails(function() DeviceBinding.bind(model, new DeviceLayout([new DeviceChannel(0, "turn")]), 20000),
-      "names no actuator", "a joint-only channel cannot be wired");
-    fails(function() DeviceBinding.bind(model, new DeviceLayout([new DeviceChannel(0, "", "ghost")]), 20000),
+    fails(function() DeviceBinding.bind(model, new DeviceLayout([new DeviceChannel(0, "ghost")]), 20000),
       "does not have", "a channel for an unknown actuator is refused");
-    fails(function() DeviceBinding.bind(model, new DeviceLayout([new DeviceChannel(0, "axis", "motor")]), 20000),
-      "drives \"turn\"", "a channel that disagrees on the joint is refused");
     fails(function() DeviceBinding.bind(model,
-      new DeviceLayout([new DeviceChannel(0, "", "motor"), new DeviceChannel(1, "", "motor")]), 20000),
+      new DeviceLayout([new DeviceChannel(0, "motor"), new DeviceChannel(1, "motor")]), 20000),
       "from channels 0 and 1", "an actuator on two channels is refused");
-    fails(function() DeviceBinding.bind(model, new DeviceLayout([new DeviceChannel(1, "", "motor")]), 20000),
+    fails(function() DeviceBinding.bind(model, new DeviceLayout([new DeviceChannel(1, "motor")]), 20000),
       "out of order", "channels must be contiguous from zero");
     var second = axisModel();
     var spare = new Actuator("spare", null, 10.0, Transmission.SimpleTransmission("turn", 1.0, 0.0));
     spare.fullStepsPerRevolution = 200.0;
+    spare.microsteps = 16;
+    spare.maxStepRate = 200000;
     second.addActuator(spare);
     fails(function() DeviceBinding.bind(second, layout, 20000), "has no channel",
       "a stepper with no channel is refused, never mapped by default");
@@ -78,22 +76,20 @@ class DeviceBindingTests {
     plain.actuators[0].fullStepsPerRevolution = 0.0;
     fails(function() DeviceBinding.bind(plain, layout, 20000), "not a stepper",
       "a channel on an actuator with no steps is refused");
-    fails(function() DeviceLayout.decode(Bytes.ofString('{"channels": [{"index": 0, "actuator": "motor", "direction": 2}]}')),
+    fails(function() DeviceLayout.decode(Bytes.ofString('{"schemaVersion":1,"channels": [{"index": 0, "actuator": "motor", "direction": 2}]}')),
       "direction", "a direction other than 1 or -1 is refused");
-    fails(function() DeviceLayout.decode(Bytes.ofString('{"channels": [{"index": 0, "actuator": "motor", "microsteps": 0}]}')),
-      "microsteps", "zero microsteps are refused");
+    fails(function() DeviceLayout.decode(Bytes.ofString('{"schemaVersion":1,"channels": [{"index": 0, "actuator": "motor", "microsteps": 0}]}')),
+      "wiring only", "channel microsteps are refused");
     var settings = axisModel();
     settings.actuators[0].microsteps = 32;
     settings.actuators[0].maxStepRate = 200000;
     var restored = robotkit.model.RobotModelCodec.decode(robotkit.model.RobotModelCodec.encode(settings));
     check(restored.actuators[0].microsteps == 32 && restored.actuators[0].maxStepRate == 200000,
       "driver settings survive the robot model codec");
-    check(DeviceLayout.forActuators(restored).channels[0].microsteps == 32,
-      "an automatic layout derives microsteps from the driver");
-    check(DeviceLayout.forActuators(axisModel()).channels[0].microsteps == 1,
-      "an automatic legacy layout uses full steps");
-    fails(function() DeviceBinding.bind(restored, layout, 40000), "microsteps disagree",
-      "wiring cannot silently override the modelled driver setting");
+    var missingDriver = axisModel();
+    missingDriver.actuators[0].microsteps = null;
+    fails(function() DeviceBinding.bind(missingDriver, layout, 40000), "requires microsteps",
+      "a stepper without driver settings is refused");
     var pulseLimited = axisModel(null);
     pulseLimited.actuators[0].microsteps = 16;
     pulseLimited.actuators[0].maxStepRate = 10000;
@@ -130,6 +126,8 @@ class DeviceBindingTests {
     model.addCoupling(new JointCoupling("lead", "axis", "turn", -Math.PI * 1000, 0.0));
     var motor = new Actuator("motor", 0.6, rate, Transmission.SimpleTransmission("turn", 1.0, 0.0));
     motor.fullStepsPerRevolution = 200.0;
+    motor.microsteps = 16;
+    motor.maxStepRate = 200000;
     model.addActuator(motor);
     return model;
   }

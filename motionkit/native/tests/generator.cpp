@@ -62,9 +62,9 @@ mk_validation_report validate_all(mk_trajectory_handle trajectory,
         limits.position_claimed[joint] = 1;
         limits.position_lower[joint] = lower;
         limits.position_upper[joint] = upper;
-        limits.max_velocity[joint] = request.max_velocity[joint];
-        limits.max_acceleration[joint] = request.max_acceleration[joint];
-        limits.max_jerk[joint] = request.max_jerk[joint];
+        limits.max_velocity[joint] = (limits.derivative_claimed[joint] |= 1, request.max_velocity[joint]);
+        limits.max_acceleration[joint] = (limits.derivative_claimed[joint] |= 2, request.max_acceleration[joint]);
+        limits.max_jerk[joint] = (limits.derivative_claimed[joint] |= 4, request.max_jerk[joint]);
     }
     for (auto &jump : limits.max_continuity_jump) jump = 1e-5;
     mk_validation_report report{};

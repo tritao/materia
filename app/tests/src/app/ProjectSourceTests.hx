@@ -867,8 +867,9 @@ class ProjectSourceTests {
     // generate at its microstepping (40 kHz over 3200 steps a turn: 78.5 rad/s), and the screw's
     // critical speed, all through the axis's ratio to the motor.
     var motorSpeed = 2 * 24 / (50 * 2.5e-3 * 2.8);
-    var stepSpeed = controller.stepTickHz / (200.0 * DeviceLayout.forActuators(model).channels[0].microsteps / (2 * Math.PI));
-    var wired = DeviceBinding.bind(model, DeviceLayout.forActuators(model), controller.stepTickHz).model;
+    var binding = DeviceBinding.bind(model, DeviceLayout.forActuators(model), controller.stepTickHz);
+    var stepSpeed = controller.stepTickHz / binding.channels[0].stepsPerUnit;
+    var wired = binding.model;
     var steady = new SteadyLoads();
     var derived:Array<String> = [], free:Array<String> = [];
     for (joint in axes) {
@@ -904,7 +905,7 @@ class ProjectSourceTests {
       "the router generates a looping job that machines its stock to a target part with an end mill and a drill");
     var session = new ProjectDocumentSession(null, false);
     var simulation = new ApplicationSimulation(new RobotWorld());
-    session.openGeneratedScene(generated.objects, manifest, generated.assembly,
+    session.openGeneratedScene(generated.objects, manifest,
       generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
       generated.localCentersByDefinition, generated.metresPerUnit, generated.physical,
       generated.recipeDocument, generated.robotMotions, null, generated.cncJob);
@@ -1040,7 +1041,7 @@ class ProjectSourceTests {
     var generated = MateriaProjectRunner.loadProject(manifest);
     var session = new ProjectDocumentSession(null, false);
     var simulation = new ApplicationSimulation(new RobotWorld());
-    session.openGeneratedScene(generated.objects, manifest, generated.assembly,
+    session.openGeneratedScene(generated.objects, manifest,
       generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
       generated.localCentersByDefinition, generated.metresPerUnit, generated.physical,
       generated.recipeDocument, generated.robotMotions, null, generated.cncJob);
@@ -1138,7 +1139,7 @@ class ProjectSourceTests {
     var descriptors = generated.faceDescriptorsByDefinition;
     check(descriptors != null && descriptors.exists("plate") && descriptors.exists("pin"), "the project describes its faces");
     var session = new ProjectDocumentSession(null, false);
-    session.openGeneratedScene(generated.objects, manifest, generated.assembly, generated.geometryBySnapshot,
+    session.openGeneratedScene(generated.objects, manifest, generated.geometryBySnapshot,
       generated.assemblyDefinition, generated.assemblyState, generated.localCentersByDefinition, generated.metresPerUnit,
       generated.physical, generated.recipeDocument, generated.robotMotions, descriptors);
     check(session.assemblyMateStatus() == null, "a project without mates shows no mate status");
@@ -1190,7 +1191,7 @@ class ProjectSourceTests {
   static function checkMateJoint(manifest:String, generated:MateriaProjectRunner.GeneratedAssemblyScene):Void {
     var descriptors = generated.faceDescriptorsByDefinition;
     var session = new ProjectDocumentSession(null, false);
-    session.openGeneratedScene(generated.objects, manifest, generated.assembly, generated.geometryBySnapshot,
+    session.openGeneratedScene(generated.objects, manifest, generated.geometryBySnapshot,
       generated.assemblyDefinition, generated.assemblyState, generated.localCentersByDefinition, generated.metresPerUnit,
       generated.physical, generated.recipeDocument, generated.robotMotions, descriptors);
     var top = describedFace(descriptors, "plate", "plane", 1), bore = describedFace(descriptors, "plate", "axis", 0);
@@ -1239,7 +1240,7 @@ class ProjectSourceTests {
   static function checkMatePick(manifest:String, generated:MateriaProjectRunner.GeneratedAssemblyScene):Void {
     var descriptors = generated.faceDescriptorsByDefinition;
     var session = new ProjectDocumentSession(null, false);
-    session.openGeneratedScene(generated.objects, manifest, generated.assembly, generated.geometryBySnapshot,
+    session.openGeneratedScene(generated.objects, manifest, generated.geometryBySnapshot,
       generated.assemblyDefinition, generated.assemblyState, generated.localCentersByDefinition, generated.metresPerUnit,
       generated.physical, generated.recipeDocument, generated.robotMotions, descriptors);
     check(session.canMateFaces(), "a project with described faces can be mated");
@@ -1445,7 +1446,7 @@ class ProjectSourceTests {
     var machineSession = new ProjectDocumentSession(null, false);
     var machineWorld = new RobotWorld();
     var machineSimulation = new ApplicationSimulation(machineWorld);
-      machineSession.openGeneratedScene(machineScene.objects, machineManifest, machineScene.assembly,
+      machineSession.openGeneratedScene(machineScene.objects, machineManifest,
         machineScene.geometryBySnapshot, machineScene.assemblyDefinition, machineScene.assemblyState,
         machineScene.localCentersByDefinition, machineScene.metresPerUnit,
         machineScene.physical, machineScene.recipeDocument);
@@ -1591,7 +1592,7 @@ class ProjectSourceTests {
     var output = "/tmp/materia-project-source-" + Sys.getPid() + ".materia.json";
     var stage = "open generated scene";
     try {
-      session.openGeneratedScene(generated, manifest, generatedScene.assembly,
+      session.openGeneratedScene(generated, manifest,
         generatedScene.geometryBySnapshot, generatedScene.assemblyDefinition,
         generatedScene.assemblyState, generatedScene.localCentersByDefinition,
         generatedScene.metresPerUnit, generatedScene.physical,
@@ -1611,7 +1612,7 @@ class ProjectSourceTests {
         restored.restoreLiveState(live);
         check(restored.isDirty() && restored.path == null,
           "unsaved project stays untitled and dirty after reload");
-        check(restored.projectReference == manifest && restored.projectAssembly != null,
+        check(restored.projectReference == manifest && restored.projectAssemblyDefinition != null,
           "reload keeps the generated project and assembly");
         check(restored.sensors.robotModels().length == 0,
           "reload keeps a generated assembly free of an implicit sensor robot");
