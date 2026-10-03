@@ -266,7 +266,7 @@ class CncRouterChecks {
 	static function beltDrive(router:CncRouter, pulley:String):machinekit.assembly.MachineAssemblyDescription.TransmissionRecord {
 		var drive = router.transmissionFor(pulley + "-belt");
 		if (drive == null) throw '$pulley should turn through a belt drive';
-		if (!switch drive.source { case TimingBelt(_, id, _): id == pulley; default: false; }) throw '$pulley should turn through a belt drive';
+		if (!switch drive.source { case TimingBelt(_, id), BeltIdler(_, id): id == pulley; default: false; }) throw '$pulley should turn through a belt drive';
 		return drive;
 	}
 

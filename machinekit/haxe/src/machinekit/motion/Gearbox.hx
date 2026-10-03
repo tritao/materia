@@ -20,12 +20,16 @@ class Gearbox extends MachineComponent {
 	public final length:Float;
 	public final bore:Float;
 	public final assumed:Bool;
+	/** Equivalent rotating inertia at the input shaft, kg m². */
+	public final inputInertia:Float;
+	public final inertiaAssumed:Bool;
 
 	public function new(ratio:Float, efficiency:Float, diameter:Float = 60, length:Float = 40,
-			bore:Float = 8, assumed:Bool = false) {
+			bore:Float = 8, assumed:Bool = false, inputInertia:Float = 0.00005, inertiaAssumed:Bool = true) {
 		for (value in [ratio, efficiency, diameter, length, bore])
 			if (!(value > 0) || !Math.isFinite(value)) throw "A gearbox needs finite positive ratings and dimensions";
 		if (efficiency > 1 || bore >= diameter) throw "A gearbox needs efficiency at most one and a bore inside its housing";
+		if (!Math.isFinite(inputInertia) || inputInertia < 0) throw "Gearbox input inertia must be finite and non-negative";
 		super('GEARBOX-${Dimension.format(ratio)}-${Dimension.format(efficiency)}-' +
 			'${Dimension.format(diameter)}x${Dimension.format(length)}-B${Dimension.format(bore)}-' + (assumed ? "ASSUMED" : "STATED"),
 			'Gearbox, ${Dimension.format(ratio)}:1', "aluminium 6061");
@@ -35,6 +39,8 @@ class Gearbox extends MachineComponent {
 		this.length = length;
 		this.bore = bore;
 		this.assumed = assumed;
+		this.inputInertia = inputInertia;
+		this.inertiaAssumed = inertiaAssumed;
 		addConnector("input", Mount, Solids.axial(0, 0, 0));
 		addConnector("output", Mount, Solids.axial(0, 0, length));
 	}
@@ -45,15 +51,18 @@ class Gearbox extends MachineComponent {
 		if (recipe == null) recipe = new ComponentType("machinekit.motion.gearbox", [
 			ComponentRecipeSupport.scalar("ratio", 10), ComponentRecipeSupport.scalar("efficiency", 0.9),
 			ComponentRecipeSupport.length("diameter", 60), ComponentRecipeSupport.length("length", 40),
-			ComponentRecipeSupport.length("bore", 8), ComponentRecipeSupport.choice("basis", ["stated", "assumed"], "stated")
+			ComponentRecipeSupport.length("bore", 8), ComponentRecipeSupport.choice("basis", ["stated", "assumed"], "stated"),
+			ComponentRecipeSupport.scalar("inputInertia", 0.00005),
+			ComponentRecipeSupport.choice("inertiaBasis", ["stated", "assumed"], "assumed")
 		], v -> new Gearbox(v.number("ratio"), v.number("efficiency"), v.number("diameter"), v.number("length"),
-			v.number("bore"), v.token("basis") == "assumed"));
+			v.number("bore"), v.token("basis") == "assumed", v.number("inputInertia"), v.token("inertiaBasis") == "assumed"));
 		return recipe;
 	}
 	override public function componentType():Null<ComponentType> return Std.isExactType(this, Gearbox) ? recipeType() : null;
 	override public function values():ComponentValues return new ComponentValues().setNumber("ratio", ratio)
 		.setNumber("efficiency", efficiency).setNumber("diameter", diameter).setNumber("length", length)
-		.setNumber("bore", bore).setToken("basis", assumed ? "assumed" : "stated").setToken("material", materialSpec());
+		.setNumber("bore", bore).setToken("basis", assumed ? "assumed" : "stated").setNumber("inputInertia", inputInertia)
+		.setToken("inertiaBasis", inertiaAssumed ? "assumed" : "stated").setToken("material", materialSpec());
 	override public function hasGeometry():Bool return true;
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Solids.cut(Solids.named(Part.cylinderSpan(diameter / 2, 0, length), "body"),

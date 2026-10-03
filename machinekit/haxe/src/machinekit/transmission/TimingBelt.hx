@@ -215,12 +215,14 @@ class TimingBelt extends MachineComponent {
 	public static inline var DEFAULT_DRAG:Float = 0.005;
 
 	/** Resolve from the current loop geometry and width, never a saved stiffness. */
-	public static function relation(belt:TimingBelt, pulley:TimingPulley, strand:Int, alignment:Float):TransmissionRelation {
+	public static function relation(belt:TimingBelt, pulley:TimingPulley, alignment:Float, idler:Bool = false):TransmissionRelation {
 		if (belt.beltProfile != pulley.beltProfile) throw new machinekit.transmission.TransmissionDesignError("Belt and pulley profiles differ; update the belt to match the pulley");
-		var result = new TransmissionRelation(alignment * 2 / pulley.pitchDiameter, DEFAULT_EFFICIENCY,
-			belt.carriageStiffness(strand), null, DEFAULT_DRAG);
-		result.setBasis("stiffness", ValueBasis.Assumed, "belt stiffness");
-		result.setBasis("efficiency", ValueBasis.Assumed, "belt efficiency");
+		var result = new TransmissionRelation(alignment * 2 / pulley.pitchDiameter, idler ? 1.0 : DEFAULT_EFFICIENCY,
+			null, null, DEFAULT_DRAG);
+		if (!idler) {
+			result.setBasis("stiffness", ValueBasis.Assumed, "belt stiffness");
+			result.setBasis("efficiency", ValueBasis.Assumed, "belt efficiency");
+		}
 		result.setBasis("drag", ValueBasis.Assumed, "belt drag");
 		return result;
 	}
@@ -288,6 +290,38 @@ class TimingBelt extends MachineComponent {
 		if (!(Math.abs(along) > 0.5 * Math.sqrt(travelX * travelX + travelY * travelY)))
 			throw 'Timing belt strand $strand does not run along the carriage\'s travel';
 		return loop[wrap].side * (along > 0 ? 1 : -1);
+	}
+
+	/** Arc phase held by a stationary driving pulley, halfway through its contact. */
+	public function anchorPhase(wrap:Int):Float return arrivals[wrap] + loop[wrap].side * sweeps[wrap] / 2;
+
+	/** Distance from the start of strand 0 to a material point held on a driving pulley. */
+	public function anchorDistance(wrap:Int, phase:Float):Float {
+		var progress = loop[wrap].side * (phase - arrivals[wrap]);
+		progress -= 2 * Math.PI * Math.floor(progress / (2 * Math.PI));
+		if (progress > sweeps[wrap] + 1e-6)
+			throw new TransmissionDesignError("Belt leaves its held drive anchor; update the wrap attachments");
+		var distance = 0.0;
+		for (index in 0...loop.length) {
+			distance += strandList[index].length;
+			var next = (index + 1) % loop.length;
+			if (next == wrap) return distance + loop[wrap].radius * progress;
+			distance += loop[next].radius * sweeps[next];
+		}
+		throw "Belt has no such drive wrap";
+	}
+
+	/** The physical clamp is attached to a stated strand; its point must lie on that run. */
+	public function clampDistance(strand:Int, x:Float, y:Float):Float {
+		if (strand < 0 || strand >= strandList.length) throw "Belt clamp strand is out of range";
+		var run = strandList[strand];
+		var along = (x - run.startX) * run.dx + (y - run.startY) * run.dy;
+		var across = (x - run.startX) * run.dy - (y - run.startY) * run.dx;
+		if (along < -1e-5 || along > run.length + 1e-5 || Math.abs(across) > 1e-5)
+			throw new TransmissionDesignError("Belt clamp leaves its attached strand; update its connector or the belt path");
+		var distance = along;
+		for (index in 0...strand) distance += strandList[index].length + loop[index + 1].radius * sweeps[index + 1];
+		return distance;
 	}
 
 	/**

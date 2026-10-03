@@ -64,7 +64,7 @@ class MachineAssemblyDocuments {
 			portConnections: noConnections, portExposures: side.portExposures,
 			bomExtras: side.bomExtras, connectorExposures: side.connectorExposures,
 			memberConnectors: side.memberConnectors, endEffector: side.endEffector,
-			changer: side.changer, tools: side.tools, transmissions: side.transmissions, motors: side.motors, encoders: side.encoders
+			changer: side.changer, tools: side.tools, transmissions: side.transmissions, beltPaths: side.beltPaths, motors: side.motors, encoders: side.encoders
 		};
 		var toolRecords:Array<machinekit.assembly.MachineAssemblyDescription.ToolRecord> = [];
 		if (side.tools != null) for (tool in side.tools) {
@@ -75,7 +75,7 @@ class MachineAssemblyDocuments {
 					portExposures: tool.machine.portExposures, bomExtras: tool.machine.bomExtras,
 					connectorExposures: tool.machine.connectorExposures,
 					memberConnectors: tool.machine.memberConnectors,
-					endEffector: tool.machine.endEffector, transmissions: tool.machine.transmissions,
+					endEffector: tool.machine.endEffector, transmissions: tool.machine.transmissions, beltPaths: tool.machine.beltPaths,
 					motors: tool.machine.motors, encoders: tool.machine.encoders}});
 		}
 		saved.tools = toolRecords;

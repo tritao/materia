@@ -35,13 +35,12 @@ class TransmissionResolver {
 			case RackAndPinion(pinion, rack):
 				if (rack != null && !Std.isOfType(member(rack), Rack)) throw new TransmissionDesignError("Transmission needs a rack");
 				Rack.relation(gear(pinion), rack == null ? null : cast member(rack), alignment);
-			case TimingBelt(beltId, pulleyId, strand):
+			case TimingBelt(beltId, pulleyId) | BeltIdler(beltId, pulleyId):
 				var belt = member(beltId), pulley = member(pulleyId);
 				if (!Std.isOfType(belt, TimingBelt)) throw new TransmissionDesignError("Transmission needs a timing belt");
 				if (!Std.isOfType(pulley, TimingPulley)) throw new TransmissionDesignError("Transmission needs a timing pulley");
 				var loop:TimingBelt = cast belt;
-				if (strand < 0 || strand >= loop.strands().length) throw "Transmission belt strand is out of range";
-				TimingBelt.relation(loop, cast pulley, strand, alignment);
+				TimingBelt.relation(loop, cast pulley, alignment, switch record.source { case BeltIdler(_, _): true; case _: false; });
 			case RollerChain(chain, sprocketId):
 				var sprocket = member(sprocketId);
 				if (!Std.isOfType(sprocket, Sprocket)) throw new TransmissionDesignError("Transmission needs a sprocket");
@@ -78,7 +77,8 @@ class TransmissionResolver {
 		case LeadScrew(screw, nut): LeadScrew(map(screw), map(nut));
 		case GearMesh(driver, driven): GearMesh(map(driver), map(driven));
 		case RackAndPinion(pinion, rack): RackAndPinion(map(pinion), rack == null ? null : map(rack));
-		case TimingBelt(belt, pulley, strand): TimingBelt(map(belt), map(pulley), strand);
+		case TimingBelt(belt, pulley): TimingBelt(map(belt), map(pulley));
+		case BeltIdler(belt, pulley): BeltIdler(map(belt), map(pulley));
 		case RollerChain(chain, sprocket): RollerChain(chain == null ? null : map(chain), map(sprocket));
 	};
 }

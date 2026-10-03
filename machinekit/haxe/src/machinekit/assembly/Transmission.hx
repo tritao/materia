@@ -11,10 +11,12 @@ package machinekit.assembly;
 	/** The follower's pinion rolls along the leader's rack. Same maps positive rack travel to
 	 * positive pinion rotation. */
 	@:id(3) RackAndPinion(pinion:String, rack:Null<String>);
-	/** The pulley turns with the belt clamped to the leader on `strand`. Same maps positive belt
+	/** The driving pulley turns with the belt clamped to the leader. Same maps positive belt
 	 * travel to positive pulley rotation. */
-	@:id(4) TimingBelt(belt:String, pulley:String, strand:Int);
+	@:id(4) TimingBelt(belt:String, pulley:String);
 	/** A roller chain is a separate family from a timing belt. Same maps positive chain travel
 	 * to positive sprocket rotation. */
 	@:id(5) RollerChain(chain:Null<String>, sprocket:String);
+	/** An idler follows belt motion and contributes bearing drag, without delivering torque. */
+	@:id(6) BeltIdler(belt:String, pulley:String);
 }

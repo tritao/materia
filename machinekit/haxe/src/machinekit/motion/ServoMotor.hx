@@ -58,10 +58,25 @@ class ServoMotor extends MachineComponent implements MotorDrive {
 	}
 
 	/** The generic servo named `designation`. */
-	public static function model(designation:String):ServoMotor {
-		for (rating in ratings()) if (rating.designation == designation) return new ServoMotor(rating, machinekit.transmission.ValueBasis.Assumed);
+	public static function model(designation:String, basis:machinekit.transmission.ValueBasis = Assumed):ServoMotor {
+		for (rating in ratings()) if (rating.designation == designation) return new ServoMotor(rating, basis);
 		throw 'Unknown servo motor "$designation"; known: ${[for (rating in ratings()) rating.designation].join(", ")}';
 	}
+
+	public static function basisFromToken(token:String):machinekit.transmission.ValueBasis return switch token {
+		case "derived": Derived;
+		case "catalog": Catalog;
+		case "stated": Stated;
+		case "assumed": Assumed;
+		case _: throw 'Unknown servo ratings basis "$token"';
+	};
+
+	public function basisToken():String return switch ratingsBasis {
+		case Derived: "derived";
+		case Catalog: "catalog";
+		case Stated: "stated";
+		case Assumed: "assumed";
+	};
 
 	public function new(rating:ServoRating, ratingsBasis:machinekit.transmission.ValueBasis = Stated) {
 		if (!(rating.ratedTorque > 0) || !(rating.peakTorque >= rating.ratedTorque) || !(rating.ratedSpeed > 0) ||
@@ -80,7 +95,9 @@ class ServoMotor extends MachineComponent implements MotorDrive {
 			ratedTorque: rating.ratedTorque, peakTorque: rating.peakTorque, ratedSpeed: rating.ratedSpeed, maxSpeed: rating.maxSpeed,
 			encoderCounts: rating.encoderCounts,
 			torqueSpeed: [0, rating.peakTorque, rating.ratedSpeed, rating.peakTorque, rating.maxSpeed, rating.ratedTorque],
-			assumed: ratingsBasis == Assumed ? ["servo ratings"] : null};
+			assumed: ratingsBasis == Assumed ? ["servo ratings"] : null,
+			assumptions: ratingsBasis == Assumed ? [{quantity: "motor curve", label: "servo ratings"},
+				{quantity: "inertia", label: "servo ratings"}, {quantity: "speed limit", label: "servo ratings"}] : null};
 
 	override public function hasGeometry():Bool return true;
 

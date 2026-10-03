@@ -38,7 +38,7 @@ class EndEffectorSet extends EndEffector {
 				portExposures: tool.machine.portExposures, bomExtras: tool.machine.bomExtras,
 				connectorExposures: tool.machine.connectorExposures,
 				memberConnectors: tool.machine.memberConnectors,
-				endEffector: tool.machine.endEffector, transmissions: tool.machine.transmissions,
+				endEffector: tool.machine.endEffector, transmissions: tool.machine.transmissions, beltPaths: tool.machine.beltPaths,
 				motors: tool.machine.motors, encoders: tool.machine.encoders}});
 		}
 		description.machine.tools = toolRecords;
@@ -66,7 +66,7 @@ class EndEffectorSet extends EndEffector {
 				portConnections: entry.machine.portConnections,
 				portExposures: entry.machine.portExposures, bomExtras: entry.machine.bomExtras,
 				connectorExposures: entry.machine.connectorExposures,
-				memberConnectors: entry.machine.memberConnectors, transmissions: entry.machine.transmissions,
+				memberConnectors: entry.machine.memberConnectors, transmissions: entry.machine.transmissions, beltPaths: entry.machine.beltPaths,
 			motors: entry.machine.motors, encoders: entry.machine.encoders};
 			machine.endEffector = entry.machine.endEffector;
 			var tool:MachineAssemblyDescription = {schemaVersion: MachineAssembly.SCHEMA_VERSION, mechanical: entry.mechanical, machine: machine};

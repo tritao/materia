@@ -47,6 +47,7 @@ import machinekit.component.PortInterface;
 	@:id(4) final effort:Null<Float>;
 	@:id(5) @:optional final overtravel:Null<Float>;
 	@:id(6) @:optional final acceleration:Null<Float>;
+	@:id(7) @:optional final assumptions:Null<ReadOnlyArray<materia.assembly.AssemblyDefinition.QuantityAssumption>>;
 }
 
 @:wire typedef FrozenJoint = {
@@ -74,6 +75,7 @@ import machinekit.component.PortInterface;
 	@:id(8) @:optional final backlash:Null<Float>;
 	@:id(9) @:optional final drag:Null<Float>;
 	@:id(10) @:optional final assumed:Null<ReadOnlyArray<String>>;
+	@:id(11) @:optional final assumptions:Null<ReadOnlyArray<materia.assembly.AssemblyDefinition.QuantityAssumption>>;
 }
 
 @:wire typedef FrozenExposedConnector = {
@@ -220,6 +222,7 @@ import machinekit.component.PortInterface;
 	@:id(10) @:optional var transmissions:ReadOnlyArray<TransmissionRecord>;
 	@:id(11) @:optional var motors:ReadOnlyArray<MotorRecord>;
 	@:id(12) @:optional var encoders:ReadOnlyArray<EncoderRecord>;
+	@:id(13) @:optional var beltPaths:ReadOnlyArray<BeltPathRecord>;
 }
 
 @:wire typedef BomExtraRecord = {
@@ -306,6 +309,7 @@ import machinekit.component.PortInterface;
 	@:id(12) @:optional var transmissions:ReadOnlyArray<TransmissionRecord>;
 	@:id(13) @:optional var motors:ReadOnlyArray<MotorRecord>;
 	@:id(14) @:optional var encoders:ReadOnlyArray<EncoderRecord>;
+	@:id(15) @:optional var beltPaths:ReadOnlyArray<BeltPathRecord>;
 }
 
 /** Mechanical definition plus the MachineKit facts keyed by occurrence ID. */
@@ -313,4 +317,12 @@ import machinekit.component.PortInterface;
 	@:id(1) var mechanical:FrozenAssemblyDefinition;
 	@:id(2) var machine:AssemblySideRecord;
 	@:id(3) @:optional var schemaVersion:Int;
+}
+
+/** Physical clamp and pulley centres, in belt path order. The clamp names its attached strand. */
+@:wire typedef BeltPathRecord = {
+	@:id(1) var belt:String;
+	@:id(2) var clamp:ConnectorReference;
+	@:id(3) var strand:Int;
+	@:id(4) var wraps:ReadOnlyArray<ConnectorReference>;
 }

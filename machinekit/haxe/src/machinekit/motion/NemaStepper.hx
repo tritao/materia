@@ -216,7 +216,12 @@ class NemaStepper extends MachineComponent implements MotorDrive {
 		if (scale != 1) assumed.push("stepper current scaling");
 		return {id: id, joint: joint, maxEffort: usableTorque(margin) * scale, maxRate: usableSpeed(volts / scale, margin),
 			rotorInertia: rated.rotorInertia, fullStepsPerRevolution: 360.0 / rated.stepAngle, drive: "stepper",
-			torqueSpeed: curve, holdingTorque: rated.holdingTorque * scale, assumed: assumed};
+			torqueSpeed: curve, holdingTorque: rated.holdingTorque * scale, assumed: assumed,
+			assumptions: [{quantity: "inertia", label: "rotor inertia"},
+				{quantity: "motor curve", label: "stepper inductance"},
+				{quantity: "speed limit", label: "stepper inductance"}].concat(scale == 1 ? [] :
+				[{quantity: "motor curve", label: "stepper current scaling"},
+				 {quantity: "speed limit", label: "stepper current scaling"}])};
 	}
 
 	/** Shaft speed (rad/s) where the winding's reactance at rated current takes the whole supply. */

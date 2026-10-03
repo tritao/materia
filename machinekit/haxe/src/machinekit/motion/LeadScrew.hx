@@ -26,6 +26,7 @@ class LeadScrew extends MachineComponent {
 		result.setBasis("efficiency", machinekit.transmission.ValueBasis.Assumed, "nut friction");
 		result.setBasis("backlash", machinekit.transmission.ValueBasis.Assumed, "nut backlash");
 		result.setBasis("drag", machinekit.transmission.ValueBasis.Assumed, "nut drag");
+		result.setBasis("stiffness", machinekit.transmission.ValueBasis.Assumed, "rigid");
 		return result;
 	}
 

@@ -78,7 +78,17 @@ class CoreXyTests extends MotionKitTestSupport {
     near(axisStiffness(), 4000, "independent parallel belts add stiffness", 1e-9);
     model.addCoupling(new robotkit.model.JointCoupling("ya", "y", "a", 1, 0));
     model.addCoupling(new robotkit.model.JointCoupling("yb", "y", "b", -1, 0));
-    near(axisStiffness(), 3000, "unequal CoreXY belts combine through series compliance", 1e-9);
+    near(axisStiffness(), 3000, "unequal CoreXY belts combine through the full stiffness matrix", 1e-9);
+    var shared = robotkit.model.DriveLoads.of(model);
+    var displaced = shared[0].elastic.deflections([1.0, 0.0]);
+    near(displaced[0], 1.0 / 3000, "unequal belts deflect under X load", 1e-9);
+    near(displaced[1], 1.0 / 6000, "unequal belts produce the derived cross-axis deflection", 1e-9);
+    a.backlash = 0.002;
+    b.backlash = 0.004;
+    var lost = robotkit.model.DriveLoads.forAxis(model, "x");
+    if (lost == null) throw "The shared drive lost its X axis";
+    near(lost.backlash, 0.003,
+      "independent motor lost motion has its worst Jacobian projection", 1e-9);
     a.stiffness = 0;
     near(axisStiffness(), 12000, "a rigid CoreXY belt leaves the other belt compliant", 1e-9);
     b.stiffness = 0;
@@ -170,7 +180,7 @@ class CoreXyTests extends MotionKitTestSupport {
     var finished = robot.snapshot();
     var endX = finished.positions.get(slot(index, "x")), endY = finished.positions.get(slot(index, "y"));
     check(motion.completed, 'the program completes (${motion.failure})');
-    check(motion.checks.diagnostics.length == 0, 'a program at 95% of the axes\' limits asks no motor for more than it gives: ${[for (d in motion.checks.diagnostics) d.toString()]}');
+    check([for (finding in motion.checks.diagnostics) if (finding.kind != motionkit.trajectory.PlanDiagnostic.PlanDiagnosticKind.Accuracy) finding].length == 0, 'a program at 95% of the axes\' limits asks no motor for more than it gives: ${[for (d in motion.checks.diagnostics) d.toString()]}');
     near(endX, 0.0, "the square ends where it began, x", 1e-6);
     near(endY, 0.0, "the square ends where it began, y", 1e-6);
     check(worstSum < 1e-9, 'every pulley is the sum of its couplings\' terms all along: $worstSum');
@@ -184,9 +194,13 @@ class CoreXyTests extends MotionKitTestSupport {
   }
 
   /** A plan for the two axes from `from` to `to` within `scale` times their limits. */
-  function plan(model:RobotModel, from:Array<Float>, to:Array<Float>, scale:Float, steady:SteadyLoads):ExecutionPlan {
+  function plan(model:RobotModel, from:Array<Float>, to:Array<Float>, scale:Float, steady:SteadyLoads, coordinated:Bool = false):ExecutionPlan {
     var velocities = [for (id in ["x", "y"]) scale * model.coupledLimits(id, steady).requireVelocity()];
     var accelerations = [for (id in ["x", "y"]) scale * model.coupledLimits(id, steady).requireAcceleration()];
+    if (coordinated) {
+      velocities[0] = velocities[1] = Math.min(velocities[0], velocities[1]);
+      accelerations[0] = accelerations[1] = Math.min(accelerations[0], accelerations[1]);
+    }
     var trajectory = Trajectory.generateStateToState(from, [0.0, 0.0], [0.0, 0.0], to, velocities, accelerations,
       [for (limit in accelerations) limit * 500.0]);
     var limits = new ValidationLimits(2, Int64.ofInt(1), Int64.ofInt(1));
@@ -221,23 +235,27 @@ class CoreXyTests extends MotionKitTestSupport {
     for (load in loads) for (motor in load.motors) this.check(found.indexOf(motor.actuator.id) >= 0, "and they are the plotter's two");
     near(loads[0].motors[0].share, 0.5, "each motor carries half of an axis's force", 1e-12);
     var worstDeviation = 0.0;
-    // At the planner's own limits, every move passes.
+    // At the planner's motor limits, no move stalls; accuracy still reflects actual belt stretch.
     for (move in [[0.03, 0.0], [0.0, 0.03], [0.03, 0.03], [0.03, -0.03]]) {
       var honest = plan(model, [0.0, 0.0], move, 1.0, options.steady);
       var result = check.check(honest, 1, 0.0);
       worstDeviation = Math.max(worstDeviation, result.worstDeviation);
-      this.check(result.diagnostics.length == 0, 'a move to ${move} at the axes\' limits passes: ${[for (d in result.diagnostics) d.toString()]} ratio ${result.worstTorqueRatio}');
+      this.check([for (finding in result.diagnostics) if (finding.kind != motionkit.trajectory.PlanDiagnostic.PlanDiagnosticKind.Accuracy) finding].length == 0, 'a move to ${move} at the axes\' limits passes: ${[for (d in result.diagnostics) d.toString()]} ratio ${result.worstTorqueRatio}');
       honest.dispose();
     }
     this.check(worstDeviation > 0.0, "the actual belts predict nonzero CoreXY deflection");
     Sys.println('corexy belt accuracy: ${Math.round(worstDeviation * 1e6) / 1000} mm worst deviation at planned limits');
     // Far above them, a move along one axis overloads both motors alike, and one along the diagonal the motor that
-    // turns, not the one that stands still.
+    // turns. Equal X/Y caps make the diagonal exactly straight, keeping the other motor still.
     function flagged(move:Array<Float>):String {
-      var rough = plan(model, [0.0, 0.0], move, 3.0, options.steady);
+      var rough = plan(model, [0.0, 0.0], move, 10.0, options.steady, move[0] == move[1]);
       var result = check.check(rough, 2, 0.0);
-      for (diagnostic in result.diagnostics) this.check(diagnostic.assumed.indexOf("belt stiffness") >= 0 &&
-        diagnostic.describe().indexOf("assumed:") >= 0, "plan findings expose the source assumptions");
+      for (diagnostic in result.diagnostics) {
+        var accuracy = diagnostic.kind == motionkit.trajectory.PlanDiagnostic.PlanDiagnosticKind.Accuracy;
+        this.check((diagnostic.assumed.indexOf("belt stiffness") >= 0) == accuracy,
+          "only accuracy findings use the belt stiffness assumption");
+        this.check(diagnostic.describe().indexOf("assumed:") >= 0, "findings expose the assumptions they use");
+      }
 
       var names = [for (diagnostic in result.diagnostics) if (diagnostic.kind == motionkit.trajectory.PlanDiagnostic.PlanDiagnosticKind.StepperStall) diagnostic.subject];
       names.sort(Reflect.compare);

@@ -1,9 +1,12 @@
 package robotkit.model;
 
+import robotkit.model.EngineeringAssumptions.QuantityAssumption;
+
 import robotkit.model.ActuatorDrive;
 import robotkit.model.Transmission;
 
 class Actuator {
+  public var assumptions:Array<QuantityAssumption> = [];
   public final id:String;
   /** Assumed engineering inputs carried from the model's source. */
   public var assumed:Array<String> = [];

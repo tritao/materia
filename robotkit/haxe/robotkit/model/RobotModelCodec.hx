@@ -261,6 +261,8 @@ class RobotModelCodec {
         if (Reflect.hasField(mechanical, "overtravel")) joint.mechanicalLimits.overtravel = number(mechanical, "overtravel");
         if (Reflect.hasField(mechanical, "velocityLimiter")) joint.mechanicalLimits.velocityLimiter = text(mechanical, "velocityLimiter");
       }
+      joint.limits.assumptions = readAssumptions(limits);
+      if (joint.mechanicalLimits != null) joint.mechanicalLimits.assumptions = readAssumptions(Reflect.field(record, "mechanicalLimits"));
       if (Reflect.hasField(limits, "velocityLimiter")) joint.limits.velocityLimiter = text(limits, "velocityLimiter");
       // Written only when a joint has overtravel.
       if (Reflect.hasField(limits, "overtravel")) joint.limits.overtravel = number(limits, "overtravel");
@@ -292,6 +294,7 @@ class RobotModelCodec {
       if (Reflect.hasField(record, "backlash")) coupling.backlash = nonNegative(number(record, "backlash"), "coupling backlash");
       if (Reflect.hasField(record, "drag")) coupling.drag = nonNegative(number(record, "drag"), "coupling drag");
       coupling.assumed = readAssumed(record);
+      coupling.assumptions = readAssumptions(record);
       if (!joints.exists(coupling.leader) || !joints.exists(coupling.follower))
         throw 'Coupling ${coupling.id} references an unknown joint';
       var pair = coupling.follower + "\n" + coupling.leader;
@@ -447,6 +450,7 @@ class RobotModelCodec {
     if (coupling.stiffness != 0.0) record.stiffness = nonNegative(coupling.stiffness, "coupling stiffness");
     if (coupling.backlash != 0.0) record.backlash = nonNegative(coupling.backlash, "coupling backlash");
     if (coupling.drag != 0.0) record.drag = nonNegative(coupling.drag, "coupling drag");
+    if (coupling.assumptions.length > 0) record.assumptions = coupling.assumptions.copy();
     if (coupling.assumed.length > 0) record.assumed = coupling.assumed.copy();
     return record;
   }
@@ -462,6 +466,7 @@ class RobotModelCodec {
     };
     if (value.speedLimiter != "") record.speedLimiter = value.speedLimiter;
     if (value.encoder != "") record.encoder = value.encoder;
+    if (value.assumptions.length > 0) record.assumptions = value.assumptions.copy();
     if (value.assumed.length > 0) record.assumed = value.assumed.copy();
     if (value.microsteps != null) record.microsteps = value.microsteps;
     if (value.maxStepRate != null) record.maxStepRate = value.maxStepRate;
@@ -601,6 +606,7 @@ class RobotModelCodec {
     if (actuator.fullStepsPerRevolution > 0 && (actuator.microsteps == null || actuator.maxStepRate == null))
       throw 'Stepper actuator "${actuator.id}" requires microsteps and a driver step-rate ceiling';
     actuator.assumed = readAssumed(value);
+    actuator.assumptions = readAssumptions(value);
     return actuator;
   }
 
@@ -703,6 +709,7 @@ class RobotModelCodec {
   static function encodeLimits(limits:JointLimits):Dynamic {
     var result:Dynamic = {lower: limits.lower, upper: limits.upper, velocity: limits.velocity,
       effort: limits.effort, maxAcceleration: limits.maxAcceleration};
+    if (limits.assumptions.length > 0) Reflect.setField(result, "assumptions", limits.assumptions.copy());
     if (limits.velocityLimiter != "") Reflect.setField(result, "velocityLimiter", limits.velocityLimiter);
     if (limits.overtravel > 0.0) Reflect.setField(result, "overtravel", limits.overtravel);
     return result;
@@ -788,6 +795,19 @@ class RobotModelCodec {
   static function finite(value:Float, name:String):Float {
     if (!Math.isFinite(value)) throw 'RobotModel field $name must be finite';
     return value;
+  }
+
+  static function readAssumptions(value:Dynamic):Array<robotkit.model.EngineeringAssumptions.QuantityAssumption> {
+    var result:Array<robotkit.model.EngineeringAssumptions.QuantityAssumption> = [];
+    if (!Reflect.hasField(value, "assumptions")) return result;
+    var rows:Dynamic = Reflect.field(value, "assumptions");
+    if (!Std.isOfType(rows, Array)) throw "Engineering assumptions must be an array";
+    for (row in (cast rows:Array<Dynamic>)) {
+      var quantity = text(row, "quantity"), label = text(row, "label");
+      if (quantity == "" || label == "") throw "Engineering assumptions need a quantity and a label";
+      robotkit.model.EngineeringAssumptions.add(result, quantity, label);
+    }
+    return result;
   }
 
   static function readAssumed(value:Dynamic):Array<String> {

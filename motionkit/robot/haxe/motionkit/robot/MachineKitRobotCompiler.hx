@@ -94,6 +94,10 @@ class MachineKitRobotCompiler {
       motor.drive = new StepperDrive(steps, inertia, holding, TorqueSpeedCurve.unflatten(curve));
       var assumptions = source.assumed;
       if (assumptions != null) motor.assumed = [for (label in assumptions) label];
+      if (source.assumptions != null) motor.assumptions = [for (value in source.assumptions)
+        {quantity: value.quantity, label: value.label}];
+      robotkit.model.EngineeringAssumptions.add(motor.assumptions, "motor curve", "convenience compiler 24 V drive");
+      robotkit.model.EngineeringAssumptions.add(motor.assumptions, "speed limit", "convenience compiler 24 V drive");
       motor.assumed.push("convenience compiler 24 V drive");
       motor.microsteps = 16;
       motor.maxStepRate = machinekit.motion.MotorDriver.catalog().get("GENERIC-DM542").maximumStepRate;

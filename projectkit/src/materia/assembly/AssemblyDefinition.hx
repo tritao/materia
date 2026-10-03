@@ -68,6 +68,7 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(5) @:optional var overtravel:Null<Float>;
 	/** Largest acceleration the joint's drive can give, in the joint's units per second squared. */
 	@:id(6) @:optional var acceleration:Null<Float>;
+	@:id(7) @:optional var assumptions:Null<ReadOnlyArray<QuantityAssumption>>;
 }
 
 /** Connectors belong to a reusable component definition, not an occurrence. */
@@ -145,6 +146,7 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(9) @:optional var drag:Null<Float>;
 	/** Engineering inputs assumed by the source of this coupling; absent when none. */
 	@:id(10) @:optional var assumed:Null<ReadOnlyArray<String>>;
+	@:id(11) @:optional var assumptions:Null<ReadOnlyArray<QuantityAssumption>>;
 }
 
 /**
@@ -191,6 +193,7 @@ enum abstract AssemblyMateKind(String) from String to String {
 	/** Driver setting and input ceiling; required for step/dir actuators and absent for other drives. */
 	@:id(21) @:optional var microsteps:Null<Int>;
 	@:id(22) @:optional var maxStepRate:Null<Float>;
+	@:id(23) @:optional var assumptions:Null<ReadOnlyArray<QuantityAssumption>>;
 }
 
 /**
@@ -267,4 +270,10 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(2) var definition:String;
 	@:id(3) var jointCoordinates:Array<AssemblyJointCoordinate>;
 	@:id(4) var rootPoses:Array<AssemblyRootPose>;
+}
+
+/** An engineering assumption attached to the quantity that uses it. */
+@:wire typedef QuantityAssumption = {
+	@:id(1) var quantity:String;
+	@:id(2) var label:String;
 }

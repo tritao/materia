@@ -38,6 +38,17 @@ class TransmissionRelation {
 		return result;
 	}
 
+	/** Assumption labels stay attached to the field that uses them. */
+	public function assumptions():Array<materia.assembly.AssemblyDefinition.QuantityAssumption> {
+		var result:Array<materia.assembly.AssemblyDefinition.QuantityAssumption> = [];
+		for (field in labels.keys()) {
+			var label = labels.get(field);
+			if (label != null) result.push({quantity: field == "followerSpeedCap" ? "speed limit" : field, label: label});
+		}
+		result.sort((a, b) -> Reflect.compare(a.quantity + "/" + a.label, b.quantity + "/" + b.label));
+		return result;
+	}
+
 	public function new(ratio:Float, efficiency:Float, ?stiffness:Float, ?backlash:Float,
 			?drag:Float, ?followerSpeedCap:Float) {
 		this.ratio = ratio;

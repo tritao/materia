@@ -10,6 +10,7 @@ enum abstract PlanDiagnosticKind(String) from String to String {
   var ServoRatedTorque = "servo-rated-torque";
   /** The axis's drive stretches or lags by more than the tolerance. */
   var Accuracy = "accuracy";
+
 }
 
 /**
@@ -18,6 +19,12 @@ enum abstract PlanDiagnosticKind(String) from String to String {
  * many samples were over.
  */
 class PlanDiagnostic {
+  /** Quantities used by each finding's calculation. */
+  public static function quantities(kind:PlanDiagnosticKind):Array<String> return switch kind {
+    case PlanDiagnosticKind.Accuracy: ["stiffness", "backlash", "drag", "steady loads"];
+    case _: ["motor curve", "inertia", "efficiency", "drag"];
+  };
+
   public final kind:PlanDiagnosticKind;
   /** The program op the plan came from, -1 when unknown. */
   public final opIndex:Int;

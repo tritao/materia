@@ -34,6 +34,7 @@ class Rack extends MachineComponent {
 		var result = new TransmissionRelation(alignment * 2 / pinion.pitchDiameter, DEFAULT_EFFICIENCY,
 			null, pinion.backlash + (rack == null ? 0 : rack.backlash));
 		result.setBasis("efficiency", ValueBasis.Assumed, "rack efficiency");
+		result.setBasis("stiffness", machinekit.transmission.ValueBasis.Assumed, "rigid");
 		return result;
 	}
 

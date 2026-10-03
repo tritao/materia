@@ -608,6 +608,10 @@ class CncRouter extends MachineAssembly {
 			mountNut("screwX", "nutBracketX", orient(xc + 20, yb, X_SCREW_Z, up, [-1, 0, 0]));
 		}
 		mountNut("screwZ", "zPlate", orient(xc, screwZY, zPlateBottom + 30, [0, 1, 0], [0, 0, 1]));
+		if (belts) {
+			attachBeltPath("beltX", "beltBracketX", "pulleyX", "idlerX");
+			for (name in ["Left", "Right"]) attachBeltPath("beltY" + name, "beltBracketY" + name, "pulleyY" + name, "idlerY" + name);
+		}
 		exposeConnector("nose", "spindle", "nose");
 		exposeConnector("toolTip", "tool", "tip");
 	}
@@ -731,9 +735,20 @@ class CncRouter extends MachineAssembly {
 	 * rotation sign applies), coupled to `axis` through its belt. `rotation` is +1 when it turns
 	 * counter-clockwise about `about` as the carriage moves positively.
 	 */
+	function attachBeltPath(beltId:String, clampId:String, driver:String, idler:String):Void {
+		var belt:TimingBelt = cast component(beltId);
+		var run = belt.strands()[0];
+		var world = AssemblyFrames.transformPoint(zeroPoses.get(beltId), (run.startX + run.endX) / 2, (run.startY + run.endY) / 2, 0);
+		if (beltId == "beltX") world.x -= specs[0].initial;
+		else world.y -= specs[1].initial;
+		addMemberConnector(clampId, "beltClamp", AssemblyFrames.compose(AssemblyFrames.inverse(zeroPoses.get(clampId)), AssemblyFrames.translation(world.x, world.y, world.z)));
+		addBeltPath({belt: beltId, strand: 0, clamp: {instanceId: clampId, connectorName: "beltClamp"},
+			wraps: [{instanceId: driver, connectorName: "attach-" + driver}, {instanceId: idler, connectorName: "attach-" + idler}]});
+	}
+
 	function turnWithBelt(axis:RouterAxisSpec, id:String, parent:String, about:Array<Float>, rotation:Int,
 			beltId:String):Void {
-		var ratio = addTransmission('$id-belt', axis.id, '$id-turn', Transmission.TimingBelt(beltId, id, 0),
+		var ratio = addTransmission('$id-belt', axis.id, '$id-turn', (StringTools.startsWith(id, "idler") ? Transmission.BeltIdler(beltId, id) : Transmission.TimingBelt(beltId, id)),
 			SenseTools.fromAlignment(rotation));
 		addMateOnAxis('$id-turn', "continuous", parent, 'to-$id', id, 'attach-$id', {x: about[0], y: about[1], z: about[2]},
 			ratio * axis.initial);

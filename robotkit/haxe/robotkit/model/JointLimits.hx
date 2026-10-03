@@ -1,6 +1,9 @@
 package robotkit.model;
 
+import robotkit.model.EngineeringAssumptions.QuantityAssumption;
+
 class JointLimits {
+  public var assumptions:Array<QuantityAssumption> = [];
   public var lower:Float;
   public var upper:Float;
   public var velocity:Null<Float>;
@@ -27,6 +30,7 @@ class JointLimits {
 
   public function copy():JointLimits {
     var result = new JointLimits(lower, upper, velocity, effort, maxAcceleration);
+    result.assumptions = [for (value in assumptions) {quantity: value.quantity, label: value.label}];
     result.overtravel = overtravel;
     result.velocityLimiter = velocityLimiter;
     return result;

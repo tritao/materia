@@ -68,7 +68,7 @@ private typedef MutableIncludedRecord = {var id:String; var pose:AssemblyFrame; 
 
 /** Reusable, prefixable assembly made from MachineComponents and named connector references. */
 class MachineAssembly {
-	public static inline var SCHEMA_VERSION:Int = 5;
+	public static inline var SCHEMA_VERSION:Int = 6;
 	/** Findings from rebuilding sources; invalid transmissions remain available for repair. */
 	public final diagnostics:Diagnostics = new Diagnostics();
 	final members:Array<AssemblyMember> = [];
@@ -87,6 +87,7 @@ class MachineAssembly {
 	/** Couplings whose ratio their parts set, by coupling id. */
 	final transmissions:Array<machinekit.assembly.MachineAssemblyDescription.TransmissionRecord> = [];
 	/** Motors driving joints, by actuator id. */
+	final beltPaths:Array<machinekit.assembly.MachineAssemblyDescription.BeltPathRecord> = [];
 	final motors:Array<machinekit.assembly.MachineAssemblyDescription.MotorRecord> = [];
 	/** Encoders reading joints, by encoder id. */
 	final encoders:Array<machinekit.assembly.MachineAssemblyDescription.EncoderRecord> = [];
@@ -96,6 +97,7 @@ class MachineAssembly {
 
 	/** Capture a portable description. Code-only members remain visible but cannot be saved. */
 	public function describe():MachineAssemblyDescription {
+		refreshTransmissions();
 		validateStructure();
 		var mechanical = cloneDefinition(this.mechanical);
 		var sources:Array<machinekit.assembly.MachineAssemblyDescription.MemberRecord> = [];
@@ -162,6 +164,7 @@ class MachineAssembly {
 		savedConnections.sort((a, b) -> Reflect.compare(a.id, b.id));
 		return {schemaVersion: SCHEMA_VERSION, mechanical: FrozenAssemblyDefinitions.freeze(mechanical), machine: {
 			members: sources,
+			beltPaths: beltPaths.length == 0 ? null : [for (path in beltPaths) copyBeltPath(path, "")],
 			ports: savedPorts,
 			included: [for (entry in nestedEntries) {id: entry.id, pose: copyFrame(entry.pose),
 				mechanical: FrozenAssemblyDefinitions.freeze(entry.mechanical)}],
@@ -295,7 +298,9 @@ class MachineAssembly {
 		}
 		if (mechanical.couplings != null) for (coupling in mechanical.couplings)
 			result.addCoupling(coupling.id, coupling.source, coupling.target, coupling.ratio, coupling.offset,
-				coupling.efficiency, coupling.stiffness, coupling.backlash, coupling.drag, coupling.assumed);
+				coupling.efficiency, coupling.stiffness, coupling.backlash, coupling.drag, coupling.assumed, coupling.assumptions);
+		if (description.machine.beltPaths != null) for (path in description.machine.beltPaths)
+			result.addBeltPath(copyBeltPath(path, ""));
 		// A driven coupling's ratio comes from its parts as they are now, not as they were saved.
 		// The coupling decides whether there is one: a transmission whose coupling was removed goes too.
 		if (description.machine.transmissions != null) for (transmission in description.machine.transmissions)
@@ -355,7 +360,7 @@ class MachineAssembly {
 			if (StringTools.startsWith(coupling.id, prefix))
 				child.addCoupling(coupling.id.substr(prefix.length), coupling.source.substr(prefix.length),
 					coupling.target.substr(prefix.length), coupling.ratio, coupling.offset, coupling.efficiency,
-					coupling.stiffness, coupling.backlash, coupling.drag, coupling.assumed);
+					coupling.stiffness, coupling.backlash, coupling.drag, coupling.assumed, coupling.assumptions);
 		for (motor in motors) if (StringTools.startsWith(motor.actuator, prefix))
 			child.addMotorRecord({actuator: motor.actuator.substr(prefix.length), joint: motor.joint.substr(prefix.length),
 				motor: motor.motor.substr(prefix.length), driver: motor.driver.substr(prefix.length), margin: motor.margin,
@@ -364,6 +369,11 @@ class MachineAssembly {
 			child.addEncoderRecord({encoder: encoder.encoder.substr(prefix.length), joint: encoder.joint.substr(prefix.length),
 				part: encoder.part.substr(prefix.length),
 				actuator: encoder.actuator == null ? null : encoder.actuator.substr(prefix.length)});
+		for (path in beltPaths) if (StringTools.startsWith(path.belt, prefix)) child.addBeltPath({
+			belt: path.belt.substr(prefix.length), strand: path.strand,
+			clamp: {instanceId: path.clamp.instanceId.substr(prefix.length), connectorName: path.clamp.connectorName},
+			wraps: [for (wrap in path.wraps) {instanceId: wrap.instanceId.substr(prefix.length), connectorName: wrap.connectorName}]
+		});
 		for (transmission in transmissions) if (StringTools.startsWith(transmission.coupling, prefix))
 			{
 				var record:machinekit.assembly.MachineAssemblyDescription.TransmissionRecord = {coupling: transmission.coupling.substr(prefix.length),
@@ -400,6 +410,7 @@ class MachineAssembly {
 		target.mechanical.occurrences = copy.occurrences;
 		target.mechanical.joints = copy.joints;
 		target.mechanical.couplings = copy.couplings;
+		for (path in beltPaths) target.beltPaths.push(copyBeltPath(path, ""));
 		for (transmission in transmissions) target.transmissions.push(copyTransmission(transmission, ""));
 		for (motor in motors) target.motors.push(copyMotor(motor, ""));
 		for (encoder in encoders) target.encoders.push(copyEncoder(encoder, ""));
@@ -633,7 +644,8 @@ class MachineAssembly {
 			joint.closureTolerance);
 		if (assembly.mechanical.couplings != null) for (coupling in assembly.mechanical.couplings)
 			addCoupling(join(id, coupling.id), join(id, coupling.source), join(id, coupling.target),
-				coupling.ratio, coupling.offset, coupling.efficiency, coupling.stiffness, coupling.backlash, coupling.drag, coupling.assumed);
+				coupling.ratio, coupling.offset, coupling.efficiency, coupling.stiffness, coupling.backlash, coupling.drag, coupling.assumed, coupling.assumptions);
+		for (path in assembly.beltPaths) addBeltPath(copyBeltPath(path, id));
 		for (transmission in assembly.transmissions) {
 			var record = copyTransmission(transmission, id);
 			applyTransmission(record);
@@ -695,7 +707,7 @@ class MachineAssembly {
 			sense:Sense, leaderZero:Float = 0):Float {
 		var record:machinekit.assembly.MachineAssemblyDescription.TransmissionRecord = {
 			coupling: id, source: source, sense: sense, leaderZero: leaderZero};
-		var relation = machinekit.transmission.TransmissionResolver.resolve(record, requireMember);
+		var relation = resolveTransmission(record, leader, false);
 		var ratio = relation.ratio;
 		addCoupling(id, leader, follower, ratio, -ratio * leaderZero, relation.efficiency);
 		writeTransmission(record, relation);
@@ -711,7 +723,7 @@ class MachineAssembly {
 			proposed.stiffness = editAllowance(entry.stiffness, stiffness);
 			proposed.backlash = editAllowance(entry.backlash, backlash);
 			proposed.drag = editAllowance(entry.drag, drag);
-			var relation = machinekit.transmission.TransmissionResolver.resolve(proposed, requireMember);
+			var relation = resolveTransmission(proposed, null, false);
 			entry.stiffness = proposed.stiffness;
 			entry.backlash = proposed.backlash;
 			entry.drag = proposed.drag;
@@ -741,7 +753,7 @@ class MachineAssembly {
 			proposed.near = near;
 			proposed.far = far;
 			proposed.unsupported = unsupported;
-			var relation = machinekit.transmission.TransmissionResolver.resolve(proposed, requireMember);
+			var relation = resolveTransmission(proposed, null, false);
 			entry.near = near;
 			entry.far = far;
 			entry.unsupported = unsupported;
@@ -751,6 +763,50 @@ class MachineAssembly {
 			return cap;
 		}
 		throw 'No transmission "$id"';
+	}
+
+	/** State the belt's physical clamp and pulley centres, in path order. */
+	public function addBeltPath(path:machinekit.assembly.MachineAssemblyDescription.BeltPathRecord):Void {
+		requireMember(path.belt);
+		requireConnector({instanceId: path.clamp.instanceId, connectorName: path.clamp.connectorName});
+		for (wrap in path.wraps) requireConnector({instanceId: wrap.instanceId, connectorName: wrap.connectorName});
+		for (existing in beltPaths) if (existing.belt == path.belt) throw 'Duplicate belt path "${path.belt}"';
+		beltPaths.push(copyBeltPath(path, ""));
+	}
+
+	static function copyBeltPath(path:machinekit.assembly.MachineAssemblyDescription.BeltPathRecord,
+			prefix:String):machinekit.assembly.MachineAssemblyDescription.BeltPathRecord return {
+		belt: join(prefix, path.belt), strand: path.strand,
+		clamp: {instanceId: join(prefix, path.clamp.instanceId), connectorName: path.clamp.connectorName},
+		wraps: [for (wrap in path.wraps) {instanceId: join(prefix, wrap.instanceId), connectorName: wrap.connectorName}]
+	};
+
+	function refreshTransmissions():Void {
+		for (item in diagnostics.items.copy()) if (item.code == "transmission.parts") diagnostics.items.remove(item);
+		for (transmission in transmissions) {
+			var refreshed = applyTransmission(transmission);
+		}
+	}
+
+	function resolveTransmission(record:machinekit.assembly.MachineAssemblyDescription.TransmissionRecord,
+			?leader:String, strict:Bool = true):machinekit.transmission.TransmissionRelation {
+		var relation = machinekit.transmission.TransmissionResolver.resolve(record, requireMember);
+		switch record.source {
+			case TimingBelt(beltId, pulley):
+				if (leader == null && mechanical.couplings != null) for (coupling in mechanical.couplings)
+					if (coupling.id == record.coupling) leader = coupling.source;
+				var paths = [for (path in beltPaths) if (path.belt == beltId) path];
+				if (paths.length != 1 || leader == null) {
+					if (strict) throw new machinekit.transmission.TransmissionDesignError(
+						'Belt "$beltId" needs its clamp and wrap attachments; add a belt path');
+				} else {
+					var belt:machinekit.transmission.TimingBelt = cast requireMember(beltId);
+					var derived = machinekit.transmission.BeltStretch.stiffness(belt, paths[0], leader, pulley, mechanical);
+					if (record.stiffness == null) relation.stiffness = derived;
+				}
+			case _:
+		}
+		return relation;
 	}
 
 	/** The transmission behind coupling `id`, or null when its ratio is a plain number. */
@@ -771,7 +827,7 @@ class MachineAssembly {
 			try {
 				var before:Array<Null<Float>> = [coupling.ratio, coupling.offset, coupling.efficiency, coupling.stiffness, coupling.backlash, coupling.drag];
 				var assumedBefore = coupling.assumed;
-				var relation = machinekit.transmission.TransmissionResolver.resolve(transmission, requireMember);
+				var relation = resolveTransmission(transmission, null, true);
 				writeTransmission(transmission, relation);
 				var after:Array<Null<Float>> = [coupling.ratio, coupling.offset, coupling.efficiency, coupling.stiffness, coupling.backlash, coupling.drag];
 				if (compareSnapshot && (!Equality.equals(before, after) ||
@@ -796,10 +852,15 @@ class MachineAssembly {
 			coupling.stiffness = relation.stiffness;
 			coupling.backlash = relation.backlash;
 			coupling.drag = relation.drag;
-			var assumed = relation.assumed;
+			var fields = relation.assumptions();
+			coupling.assumptions = [for (value in fields) if (value.quantity != "speed limit") value];
+			var assumed = [for (value in fields) if (value.quantity != "speed limit") value.label];
 			coupling.assumed = assumed.length == 0 ? null : assumed;
 			if (relation.followerSpeedCap != null) for (joint in mechanical.joints)
-				if (joint.id == coupling.target) joint.limits.velocity = relation.followerSpeedCap;
+				if (joint.id == coupling.target) {
+					joint.limits.velocity = relation.followerSpeedCap;
+					joint.limits.assumptions = [for (value in fields) if (value.quantity == "speed limit") value];
+				}
 			return true;
 		}
 		return false;
@@ -855,6 +916,9 @@ class MachineAssembly {
 			added.microsteps = driver.microsteps;
 			added.maxStepRate = driver.rating.maximumStepRate;
 		}
+		var quantities = added.assumptions == null ? [] : [for (value in added.assumptions) value];
+		added.assumptions = quantities;
+		quantities.push({quantity: "speed limit", label: "driver ratings"});
 		var assumed = added.assumed == null ? [] : [for (label in added.assumed) label];
 		assumed.push("driver ratings");
 		added.assumed = assumed;
@@ -869,11 +933,17 @@ class MachineAssembly {
 				if (gear.diameter >= pocket.pocketDiameter || gear.length + 0.5 >= pocket.pocketLength)
 					throw 'Gearbox "$gearbox" does not fit motor housing "${record.motor}"';
 			}
+			added.rotorInertia = (added.rotorInertia == null ? 0.0 : added.rotorInertia) + gear.inputInertia;
+			if (gear.inertiaAssumed) {
+				assumed.push("gearbox input inertia");
+				quantities.push({quantity: "inertia", label: "gearbox input inertia"});
+			}
 			added.gearRatio = gear.ratio;
 			added.gearEfficiency = gear.efficiency;
 			if (gear.assumed) {
 				assumed.push("gearbox ratio");
 				assumed.push("gearbox efficiency");
+				quantities.push({quantity: "efficiency", label: "gearbox efficiency"});
 			}
 		}
 		return added;
@@ -889,6 +959,12 @@ class MachineAssembly {
 			var checked = resolveMotor(record, false);
 		}
 		motors.push(copyMotor(record, ""));
+	}
+
+	/** Resolve one motor binding from the current parts and power connections. */
+	public function actuatorFor(id:String):materia.assembly.AssemblyDefinition.AssemblyActuator {
+		for (record in motors) if (record.actuator == id) return resolveMotor(record, true);
+		throw 'Missing assembly actuator "$id"';
 	}
 
 	/** Compile every binding anew; connecting a supply after binding must not leave an old curve. */
@@ -984,7 +1060,8 @@ class MachineAssembly {
 	}
 
 	public function addCoupling(id:String, source:String, target:String, ratio:Float, offset:Float = 0,
-			?efficiency:Float, ?stiffness:Float, ?backlash:Float, ?drag:Float, ?assumed:ReadOnlyArray<String>):Void {
+			?efficiency:Float, ?stiffness:Float, ?backlash:Float, ?drag:Float, ?assumed:ReadOnlyArray<String>,
+			?assumptions:ReadOnlyArray<materia.assembly.AssemblyDefinition.QuantityAssumption>):Void {
 		if (transmissionFor(id) != null) throw 'Transmission coupling "$id" is read-only; edit its parts or allowances';
 		requireOperationId(id);
 		if (source == null || source.length == 0 || target == null || target.length == 0)
@@ -995,6 +1072,8 @@ class MachineAssembly {
 		if (stiffness != null) coupling.stiffness = stiffness;
 		if (backlash != null) coupling.backlash = backlash;
 		if (drag != null) coupling.drag = drag;
+		if (assumptions != null && assumptions.length > 0) coupling.assumptions = [for (value in assumptions)
+			{quantity: value.quantity, label: value.label}];
 		if (assumed != null && assumed.length > 0) coupling.assumed = [for (label in assumed) label];
 		mechanical.couplings.push(coupling);
 	}
@@ -1066,6 +1145,7 @@ class MachineAssembly {
 
 	/** Collect structural and service faults without stopping at the first one. */
 	public function check():Diagnostics {
+		refreshTransmissions();
 		var result = new Diagnostics();
 		checkStructure(result);
 		for (item in diagnostics.items) result.add(item.severity, item.code, item.subject, item.message);
@@ -1170,6 +1250,7 @@ class MachineAssembly {
 
 	/** Populate an existing model. All member and joint ids receive the supplied prefix. */
 	public function addTo(model:AssemblyModel, prefix:String, ?pose:AssemblyFrame):Void {
+		refreshTransmissions();
 		validateStructure();
 		diagnostics.throwIfErrors();
 		for (occurrence in mechanical.occurrences) {
@@ -1192,7 +1273,7 @@ class MachineAssembly {
 		if (mechanical.couplings != null) for (coupling in mechanical.couplings)
 			model.couple(join(prefix, coupling.id), join(prefix, coupling.source),
 				join(prefix, coupling.target), coupling.ratio, coupling.offset, coupling.efficiency,
-				coupling.stiffness, coupling.backlash, coupling.drag, coupling.assumed);
+				coupling.stiffness, coupling.backlash, coupling.drag, coupling.assumed, coupling.assumptions);
 		var compiled = compileMotors();
 		for (actuator in compiled.actuators) model.actuateDrive(copyActuator(actuator, prefix));
 		for (encoder in compiled.encoders)

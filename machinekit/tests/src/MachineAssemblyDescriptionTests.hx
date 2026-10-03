@@ -268,7 +268,7 @@ class MachineAssemblyDescriptionTests {
 		}
 		var sources:Array<Transmission> = [Transmission.LeadScrew("screw", "nut"),
 			Transmission.GearMesh("driver", "driven"), Transmission.RackAndPinion("pinion", null),
-			Transmission.TimingBelt("belt", "pulley", 0), Transmission.RollerChain(null, "sprocket")];
+			Transmission.TimingBelt("belt", "pulley"), Transmission.RollerChain(null, "sprocket")];
 		for (source in sources) {
 			var record:machinekit.assembly.MachineAssemblyDescription.TransmissionRecord = {
 				coupling: "term", source: source, sense: Opposite, leaderZero: 10};
@@ -300,7 +300,7 @@ class MachineAssemblyDescriptionTests {
 				turning == "screw" ? "input" : "axis", {x: 0, y: 1, z: 0});
 		// A right-hand Tr10 x 2 screw: one turn moves its nut 2 mm back along the screw, from 10 mm.
 		var lead = assembly.addTransmission("lead", "slide", "screw-turn", Transmission.LeadScrew("screw", "nut"), Same, 10);
-		var belt = assembly.addTransmission("belt", "slide", "pulley-turn", Transmission.TimingBelt("belt-part", "pulley", 0), Opposite, 10);
+		var belt = assembly.addTransmission("belt", "slide", "pulley-turn", Transmission.BeltIdler("belt-part", "pulley"), Opposite, 10);
 		var mesh = assembly.addTransmission("mesh", "driver-turn", "driven-turn", Transmission.GearMesh("driver", "driven"), Same);
 		function near(actual:Float, expected:Float, what:String):Void
 			if (!(Math.abs(actual - expected) < 1e-12)) throw '$what: $actual, expected $expected';
@@ -428,13 +428,24 @@ class MachineAssemblyDescriptionTests {
 		near(belt.carriageStiffness(0), 2500 * 6 * (1 / 444 + 1 / (belt.length - 444)), "a belt carriage's stiffness is EA over its two free lengths");
 		near(belt.carriageStiffness(0) / TimingBelt.twoPulley(GT2, 20, 20, 444, 12).carriageStiffness(0), 0.5, "a wider belt is proportionally stiffer");
 		assembly.addComponent("pulley", new TimingPulley(GT2, 20, 8, 6));
-		assembly.addComponent("belt-part", belt);
+		assembly.addComponent("belt-part", belt, {x: 0, y: 0, z: 0, qx: 0, qy: -Math.sqrt(0.5), qz: 0, qw: Math.sqrt(0.5)});
 		assembly.addMateOnAxis("pulley-turn", "continuous", "base", "face", "pulley", "axis", {x: 0, y: 1, z: 0});
-		assembly.addTransmission("belt", "slide", "pulley-turn", Transmission.TimingBelt("belt-part", "pulley", 0), Same);
+		assembly.addComponent("belt-idler", new TimingPulley(GT2, 20, 8, 6), materia.assembly.AssemblyFrames.translation(0, 0, 444));
+		var beltState = new cadkit.modeling.AssemblyState(machinekit.assembly.FrozenAssemblyDefinitions.thaw(assembly.describe().mechanical));
+		assembly.addMemberConnector("pulley", "beltWrap", materia.assembly.AssemblyFrames.inverse(beltState.worldPose("pulley")));
+		assembly.addMemberConnector("slider", "beltClamp", materia.assembly.AssemblyFrames.compose(
+			materia.assembly.AssemblyFrames.inverse(beltState.worldPose("slider")), materia.assembly.AssemblyFrames.translation(0, -belt.wraps()[0].radius, 222)));
+		assembly.addBeltPath({belt: "belt-part", strand: 0, clamp: {instanceId: "slider", connectorName: "beltClamp"},
+			wraps: [{instanceId: "pulley", connectorName: "beltWrap"}, {instanceId: "belt-idler", connectorName: "front"}]});
+		assembly.addTransmission("belt", "slide", "pulley-turn", Transmission.TimingBelt("belt-part", "pulley"), Same);
+		var run = belt.strands()[0];
+		var delta = belt.clampDistance(0, 222, run.startY) - belt.anchorDistance(0, belt.anchorPhase(0));
+		var a = delta - belt.length * Math.floor(delta / belt.length);
+		var attachedStiffness = 2500 * 6 * (1 / a + 1 / (belt.length - a));
 		var withBelt = definition(assembly);
 		var beltCoupling = withBelt.couplings[1];
 		var beltStiffness = beltCoupling.stiffness, beltDrag = beltCoupling.drag, beltBacklash = beltCoupling.backlash;
-		near(beltStiffness == null ? 0 : beltStiffness, belt.carriageStiffness(0), "the belt's stiffness reaches its coupling");
+		near(beltStiffness == null ? 0 : beltStiffness, attachedStiffness, "the belt's stiffness reaches its coupling");
 		near(beltDrag == null ? 0 : beltDrag, TimingBelt.DEFAULT_DRAG, "with a belt's drag");
 		if (beltBacklash != null) throw "A belt has no backlash";
 
@@ -461,10 +472,9 @@ class MachineAssemblyDescriptionTests {
 			readOnly = Std.string(error).indexOf("read-only") >= 0;
 		if (!readOnly) throw "A transmission-owned coupling must reject edits by id";
 		near(term(changed("belt-part", "width", SavedValue.Number(12)), "belt").stiffness,
-			2 * belt.carriageStiffness(0), "rebuilt belt stiffness follows its width");
-		var longer = TimingBelt.twoPulley(GT2, 20, 20, 888, 6);
-		near(term(changed("belt-part", "centreDistance", SavedValue.Number(888)), "belt").stiffness,
-			longer.carriageStiffness(0), "rebuilt belt stiffness follows its length");
+			2 * attachedStiffness, "rebuilt belt stiffness follows its width");
+		if (!changed("belt-part", "centreDistance", SavedValue.Number(888)).check().hasErrors())
+			throw "A belt length edit requires matching wrap attachments";
 		var plain = term(changed("nut", "kind", SavedValue.Token("PlainBronze")), "lead");
 		near(plain.backlash, 0.15, "a changed nut kind changes backlash");
 		near(plain.drag, 0.01, "a changed nut kind changes drag");
@@ -480,14 +490,14 @@ class MachineAssemblyDescriptionTests {
 			if (id != null && id.value == "belt-part") (cast element:InstanceElement).setOverride("width", 12);
 		}
 		near(term(MachineAssemblyDocuments.rebuildAssembly(beltDocument.element(beltRoot.id)), "belt").stiffness,
-			2 * belt.carriageStiffness(0), "a document belt edit recomputes stiffness");
+			2 * attachedStiffness, "a document belt edit recomputes stiffness");
 		beltDocument.close();
 		var nested = new MachineAssembly();
 		nested.include("unit", assembly);
-		near(term(nested, "unit/belt").stiffness, belt.carriageStiffness(0), "an included belt keeps its stiffness");
+		near(term(nested, "unit/belt").stiffness, attachedStiffness, "an included belt keeps its stiffness");
 		near(term(nested, "unit/lead").backlash, 0.05, "an included nut keeps its backlash");
 		var restored = MachineAssembly.decode(nested.encode());
-		near(term(restored.subassemblies()[0].assembly, "belt").stiffness, belt.carriageStiffness(0),
+		near(term(restored.subassemblies()[0].assembly, "belt").stiffness, attachedStiffness,
 			"a reconstructed included assembly resolves its belt");
 		assembly.setTransmissionOverrides("belt", State(123), State(0.2), State(0.01));
 		var measured = term(changed("belt-part", "width", SavedValue.Number(12)), "belt");
@@ -502,7 +512,7 @@ class MachineAssemblyDescriptionTests {
 		near(term(assembly, "belt").backlash, 0.2, "clearing stiffness leaves stated backlash alone");
 		near(term(assembly, "belt").drag, 0.01, "clearing stiffness leaves stated drag alone");
 		assembly.setTransmissionOverrides("belt", Leave, Clear, Clear);
-		near(term(assembly, "belt").stiffness, belt.carriageStiffness(0), "clearing an override resolves the part again");
+		near(term(assembly, "belt").stiffness, attachedStiffness, "clearing an override resolves the part again");
 		var beltAssumed = term(assembly, "belt").assumed;
 		if (beltAssumed == null || beltAssumed.indexOf("belt stiffness") < 0) throw "Clearing overrides restores part provenance";
 		assembly.addCoupling("plain", "turn", "pulley-turn", 2, 0, 0.8, 1000, 0.03, 0.001, ["plain compliance"]);

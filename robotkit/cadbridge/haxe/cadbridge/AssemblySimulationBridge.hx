@@ -241,6 +241,8 @@ class AssemblySimulationBridge {
         edge.limits.upper == null ? 1e9 : (edge.limits.upper - initial) * factor,
         edge.limits.velocity == null ? null : edge.limits.velocity * factor,
         edge.limits.effort);
+      if (edge.limits.assumptions != null) joint.limits.assumptions = [for (value in edge.limits.assumptions)
+        {quantity: value.quantity, label: value.label}];
       if (edge.limits.acceleration != null) joint.limits.maxAcceleration = edge.limits.acceleration * factor;
       joint.limits.overtravel = edge.limits.overtravel != null ? edge.limits.overtravel * factor :
         edge.type == AssemblyJointType.Prismatic ? DEFAULT_PRISMATIC_OVERTRAVEL : DEFAULT_ROTARY_OVERTRAVEL;
@@ -271,6 +273,8 @@ class AssemblySimulationBridge {
       if (stiffness != null) added.stiffness = stiffness / leaderScale;
       if (backlash != null) added.backlash = backlash * leaderScale;
       if (drag != null) added.drag = drag * followerScale;
+      if (coupling.assumptions != null) added.assumptions = [for (value in coupling.assumptions)
+        {quantity: value.quantity, label: value.label}];
       if (coupling.assumed != null) added.assumed = [for (label in coupling.assumed) label];
     }
     // A motor on a joint: its effort and rate in robot units, and its rotor turning with the joint.
@@ -308,6 +312,8 @@ class AssemblySimulationBridge {
       if (actuator.servoDamping != null) added.servoDamping = actuator.servoDamping;
       // The encoder that reads the motor is its own sensor; a servo that names one does not also hold a count.
       if (actuator.encoder != null) added.encoder = actuator.encoder;
+      if (actuator.assumptions != null) added.assumptions = [for (value in actuator.assumptions)
+        {quantity: value.quantity, label: value.label}];
       model.addActuator(added);
       if (actuator.rotorInertia != null)
         // The rotor turns `gear` times as fast as the joint, so its inertia at the joint is `gear` squared times as much.

@@ -16,6 +16,7 @@ class GearPair extends MachineAssembly {
 		var result = new TransmissionRelation(-alignment * driver.teeth / driven.teeth, DEFAULT_EFFICIENCY,
 			null, mesh(driver, driven).backlash / (driver.pitchDiameter / 2));
 		result.setBasis("efficiency", ValueBasis.Assumed, "gear efficiency");
+		result.setBasis("stiffness", machinekit.transmission.ValueBasis.Assumed, "rigid");
 		return result;
 	}
 

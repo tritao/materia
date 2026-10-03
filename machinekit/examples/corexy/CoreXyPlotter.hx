@@ -217,6 +217,14 @@ class CoreXyPlotter extends MachineAssembly {
 		var padTop = levelA + BELT_WIDTH + 2;
 		attach("clamp", new PlotterBlock(24, 9, padTop - padBase, "aluminium 6061", "Belt clamp"),
 			AssemblyFrames.translation(0, blockFront - 4.5, padBase), "carriagePlate");
+		for (b in 0...2) {
+			var letter = b == 0 ? "A" : "B";
+			addMemberConnector("clamp", "belt" + letter, AssemblyFrames.compose(
+				AssemblyFrames.inverse(zeroPoses.get("clamp")), AssemblyFrames.translation(0, -R, b == 0 ? levelA : levelB)));
+			addBeltPath({belt: "belt" + letter, strand: 0, clamp: {instanceId: "clamp", connectorName: "belt" + letter},
+				wraps: [for (id in ["idler" + letter + "Start", "idler" + letter + "End", "idler" + letter + "Front", "pulley" + letter, "idler" + letter + "Rear"])
+					{instanceId: id, connectorName: "attach-" + id}]});
+		}
 		var penLength = padBase - PEN_BASE;
 		attach("pen", new PlotterPin(8, penLength, "Pen", "plastic"),
 			AssemblyFrames.translation(0, blockFront - 6 - 4, PEN_BASE), "carriagePlate");
@@ -260,7 +268,7 @@ class CoreXyPlotter extends MachineAssembly {
 		if (onFrame) signs.push(sign(strands[1].dy));
 		var axes = ["x", "y"];
 		for (index in 0...signs.length)
-			addTransmission('$id-${axes[index]}', axes[index], '$id-turn', Transmission.TimingBelt(beltId, id, 0),
+			addTransmission('$id-${axes[index]}', axes[index], '$id-turn', (id == "pulleyA" || id == "pulleyB" ? Transmission.TimingBelt(beltId, id) : Transmission.BeltIdler(beltId, id)),
 				SenseTools.fromAlignment(wrap.side * signs[index]));
 		addMateOnAxis('$id-turn', "continuous", parent, 'to-$id', id, 'attach-$id', {x: 0, y: 0, z: 1}, 0);
 	}

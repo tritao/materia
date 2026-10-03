@@ -1211,6 +1211,17 @@ Delete, with their tests and fixtures:
 
 #### X9c — Belt and load model
 
+Progress: implementation recorded; final milestone validation pending. Belt paths save an explicit
+clamp connector and wrap connectors in loop order (approved by the user), so assembly poses identify
+moving wraps. Assembly schema v6 saves these sources and rebuilds them, including nested tools.
+Drive stiffness uses both elastic paths to a held drive pulley and the weakest sampled travel pose;
+part length and attachment routing must agree. Idlers carry no elastic spring. The shared drive
+compliance is the inverse of Jᵀ diag(K_motor) J with rigid motor constraints; motor lost motion is
+projected through the full Jacobian. Plan checks apply the force vector including gravity to this
+compliance. Missing catalog belt modulus, rail drag and gearbox input inertia stay labelled
+assumptions. Per-quantity provenance follows rebuilds and each diagnostic selects the fields it uses.
+
+
 Numbers move in this step; re-record the baselines.
 
 - **Belt stiffness from geometry.** `TimingBelt(belt, pulley)` drops the hand-picked strand

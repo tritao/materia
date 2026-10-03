@@ -1,5 +1,7 @@
 package robotkit.model;
 
+import robotkit.model.EngineeringAssumptions.QuantityAssumption;
+
 /**
  * One term of a follower joint's coordinate, in SI units: the follower is the sum of its couplings,
  * `Σ (ratio * leader + offset)`. Most followers have one coupling (a lead screw follows its axis); a
@@ -8,6 +10,7 @@ package robotkit.model;
  * the couplings never form a cycle (see `cycleThrough`).
  */
 class JointCoupling {
+  public var assumptions:Array<QuantityAssumption> = [];
   public final id:String;
   /** Assumed engineering inputs carried from the model's source. */
   public var assumed:Array<String> = [];

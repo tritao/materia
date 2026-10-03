@@ -200,6 +200,9 @@ class PlanCheck {
           }
           if (slotOver[slot]) over[slot]++;
         }
+        var forces = [for (axis in 0...loads.length) loads[axis].force(velocities[axis], accelerations[axis],
+          loads[axis].friction + (cutting && loads[axis].sliding ? options.cuttingForce : 0.0))];
+        var elastic = loads.length > 0 && loads[0].elastic != null ? loads[0].elastic.deflections(forces) : [];
         for (axis in 0...loads.length) {
           var load = loads[axis];
           var velocity = velocities[axis], acceleration = accelerations[axis];
@@ -224,7 +227,7 @@ class PlanCheck {
           }
           wasLosing[axis] = losing;
           if (load.stiffness > 0.0) {
-            var deviation = Math.abs(load.mass * acceleration + (direction >= 0.0 ? 1.0 : -1.0) * resisting) / load.stiffness;
+            var deviation = Math.abs(elastic[axis]);
             if (deviation > worstDeviation[axis]) {
               worstDeviation[axis] = deviation;
               worstDeviationTime[axis] = begin + tau;
@@ -293,10 +296,10 @@ class PlanCheck {
       var labels:Array<String> = [];
       for (load in loads) {
         if (diagnostic.kind == PlanDiagnosticKind.Accuracy) {
-          if (load.axis == diagnostic.axis) for (label in load.assumed)
+          if (load.axis == diagnostic.axis) for (label in robotkit.model.EngineeringAssumptions.labels(load.assumptions, PlanDiagnostic.quantities(diagnostic.kind)))
             if (labels.indexOf(label) < 0) labels.push(label);
         } else for (motor in load.motors) if (motor.actuator.id == diagnostic.subject)
-          for (label in motor.assumed) if (labels.indexOf(label) < 0) labels.push(label);
+          for (label in robotkit.model.EngineeringAssumptions.labels(motor.assumptions, PlanDiagnostic.quantities(diagnostic.kind))) if (labels.indexOf(label) < 0) labels.push(label);
       }
       labels.sort(Reflect.compare);
       diagnostic.assumed = labels;

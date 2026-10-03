@@ -91,6 +91,7 @@ class RobotModel {
     var own = joint[0].mechanicalLimits;
     if (own == null) own = joint[0].limits;
     var limits = new JointLimits(own.lower, own.upper, own.velocity, own.effort, own.maxAcceleration);
+    limits.assumptions = [for (value in own.assumptions) {quantity: value.quantity, label: value.label}];
     limits.overtravel = own.overtravel;
     limits.velocityLimiter = own.velocityLimiter;
     function tighten(current:Null<Float>, bound:Null<Float>):Null<Float>
@@ -123,7 +124,12 @@ class RobotModel {
           var mechanical = follower.mechanicalLimits;
           if (mechanical == null) mechanical = follower.limits;
           var velocity = mechanical.velocity, acceleration = mechanical.maxAcceleration;
-          if (velocity != null) limits.velocity = tighten(limits.velocity, velocity / box);
+          if (velocity != null) {
+            if (limits.velocity == null || velocity / box <= limits.velocity)
+              for (value in mechanical.assumptions) if (value.quantity == "speed limit")
+                EngineeringAssumptions.add(limits.assumptions, value.quantity, value.label);
+            limits.velocity = tighten(limits.velocity, velocity / box);
+          }
           if (acceleration != null) limits.maxAcceleration = tighten(limits.maxAcceleration, acceleration / box);
         }
       }
@@ -139,6 +145,8 @@ class RobotModel {
         if (motorRate != null) {
           var rate = motorRate / (Math.abs(ratio) * boxes[index]);
           if (limits.velocity == null || rate <= limits.velocity) {
+            for (value in actuator.assumptions) if (value.quantity == "speed limit")
+              EngineeringAssumptions.add(limits.assumptions, value.quantity, value.label);
             var limiter = actuator.rateLimiter();
             if (limiter != "") limits.velocityLimiter = limiter;
           }
@@ -182,6 +190,7 @@ class RobotModel {
     for (index in 0...joints.length) {
       joints[index].limits.velocity = effective[index].velocity;
       joints[index].limits.velocityLimiter = effective[index].velocityLimiter;
+      joints[index].limits.assumptions = effective[index].assumptions;
       joints[index].limits.effort = effective[index].effort;
       joints[index].limits.maxAcceleration = effective[index].maxAcceleration;
     }
