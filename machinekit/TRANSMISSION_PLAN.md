@@ -1582,6 +1582,9 @@ baselines and leaves the generic span-coordinate format available for that exten
 Focused analytic checks cover the three-span matrix, load combinations, contact clearance,
 source order, serialization, common-axis screw constraints and series compliance. The combined
 suite is pending X10d; no existing example baseline has intentionally changed in X10b.
+The first combined run exposed seven authored RobotModel JSON fixtures at schema v7; X10b's
+RobotModel v8 bump requires their current-schema headers to be v8. Their physical data and
+numbers are unchanged. RobotKit's full test project passed after the fixture update.
 
 #### X10c — Belt-path cleanup
 
