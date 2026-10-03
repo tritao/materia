@@ -442,7 +442,7 @@ class MachineAssemblyDescriptionTests {
 		assembly.addMemberConnector("pulley", "beltWrap", materia.assembly.AssemblyFrames.inverse(beltState.worldPose("pulley")));
 		assembly.addMemberConnector("slider", "beltClamp", materia.assembly.AssemblyFrames.compose(
 			materia.assembly.AssemblyFrames.inverse(beltState.worldPose("slider")), materia.assembly.AssemblyFrames.translation(0, -belt.wraps()[0].radius, 222)));
-		assembly.addBeltPath({belt: "belt-part", strand: 0, clamp: {instanceId: "slider", connectorName: "beltClamp"},
+		assembly.addBeltPath({belt: "belt-part", clamp: {instanceId: "slider", connectorName: "beltClamp"},
 			wraps: [{instanceId: "pulley", connectorName: "beltWrap"}, {instanceId: "belt-idler", connectorName: "front"}]});
 		assembly.addTransmission("belt", "slide", "pulley-turn", Transmission.TimingBelt("belt-part", "pulley"), Same);
 		var run = belt.strands()[0];
@@ -1035,6 +1035,16 @@ class MachineAssemblyDescriptionTests {
 			if (Math.abs(actual - expected) > 1e-8) throw '$label: $actual versus $expected';
 		}
 		var belt = TimingBelt.twoPulley(GT2, 20, 40, 120, 6);
+		var run = belt.strands()[0];
+		var middleX = (run.startX + run.endX) / 2, middleY = (run.startY + run.endY) / 2;
+		close(belt.clampDistanceAt(middleX, middleY), belt.clampDistance(0, middleX, middleY),
+			"clamp span follows the physical connector");
+		var wrapRejected = false;
+		try belt.clampDistanceAt(run.startX, run.startY) catch (error:Dynamic) wrapRejected = true;
+		if (!wrapRejected) throw "A clamp on a pulley wrap must be rejected";
+		var missingRejected = false;
+		try belt.clampDistanceAt(middleX, middleY + 3) catch (error:Dynamic) missingRejected = true;
+		if (!missingRejected) throw "A clamp outside straight spans must be rejected";
 		var assembly = new MachineAssembly();
 		assembly.addComponent("base", new RobotFlange(50));
 		assembly.addMemberConnector("base", "driver", AssemblyFrames.identity());

@@ -742,7 +742,7 @@ class CncRouter extends MachineAssembly {
 		if (beltId == "beltX") world.x -= specs[0].initial;
 		else world.y -= specs[1].initial;
 		addMemberConnector(clampId, "beltClamp", AssemblyFrames.compose(AssemblyFrames.inverse(zeroPoses.get(clampId)), AssemblyFrames.translation(world.x, world.y, world.z)));
-		addBeltPath({belt: beltId, strand: 0, clamp: {instanceId: clampId, connectorName: "beltClamp"},
+		addBeltPath({belt: beltId, clamp: {instanceId: clampId, connectorName: "beltClamp"},
 			wraps: [{instanceId: driver, connectorName: "attach-" + driver}, {instanceId: idler, connectorName: "attach-" + idler}]});
 	}
 

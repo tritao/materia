@@ -4,28 +4,30 @@ import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyElasticNetwork;
 import materia.assembly.AssemblyDefinition.AssemblyElasticSpan;
 import materia.assembly.AssemblyDefinition.AssemblyJointType;
+import materia.assembly.AssemblyDefinition.AssemblyJointRole;
 import machinekit.assembly.MachineAssemblyDescription.BeltPathRecord;
 import machinekit.assembly.MachineAssemblyDescription.TransmissionRecord;
 import machinekit.component.MachineComponent;
 import cadkit.modeling.AssemblyState;
-import haxeon.wire.JsonWire;
 
 /** Compile one shaft belt's physical spans, regardless of how many motion records refer to it. */
 class BeltElasticity {
 	public static function build(belt:TimingBelt, path:BeltPathRecord, records:Array<TransmissionRecord>,
-			mechanical:AssemblyDefinition, member:String->MachineComponent):AssemblyElasticNetwork {
-		var definition:AssemblyDefinition = JsonWire.decode(JsonWire.encode(mechanical));
-		definition.couplings = []; definition.actuators = []; definition.encoders = [];
-		definition.elasticNetworks = null;
+			mechanical:AssemblyDefinition, member:String->MachineComponent,
+			?context:BeltPoseContext):AssemblyElasticNetwork {
+		if (context == null) context = new BeltPoseContext(mechanical);
+		context.reset();
+		var definition = context.definition;
 		var samples:Array<{joint:String, positions:Array<Float>, zero:Float}> = [];
-		for (joint in definition.joints) if (joint.type != AssemblyJointType.Fixed) {
+		for (joint in definition.joints) if (joint.role == AssemblyJointRole.Tree && joint.type != AssemblyJointType.Fixed) {
 			var positions = [joint.defaultValue + 0.001, joint.defaultValue - 0.001];
-			if (joint.limits.lower != null) positions.push(joint.limits.lower);
-			if (joint.limits.upper != null) positions.push(joint.limits.upper);
+			for (source in mechanical.joints) if (source.id == joint.id) {
+				if (source.limits.lower != null) positions.push(source.limits.lower);
+				if (source.limits.upper != null) positions.push(source.limits.upper);
+			}
 			samples.push({joint: joint.id, positions: positions, zero: joint.defaultValue});
-			joint.limits.lower = null; joint.limits.upper = null;
 		}
-		var state = new AssemblyState(definition);
+		var state = context.state;
 		var posed = BeltStretch.posedBelt(belt, path, state);
 		if (Math.abs(posed.length - belt.length) > 1e-4)
 			throw new TransmissionDesignError("Belt length does not match its wrap attachments");

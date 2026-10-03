@@ -345,7 +345,25 @@ class TimingBelt extends MachineComponent {
 		throw "Belt has no such drive wrap";
 	}
 
-	/** The physical clamp is attached to a stated strand; its point must lie on that run. */
+	/** Distance to the unique straight span containing a physical clamp. A tangent is a wrap. */
+	public function clampDistanceAt(x:Float, y:Float):Float {
+		var found = -1;
+		for (index in 0...strandList.length) {
+			var run = strandList[index];
+			var along = (x - run.startX) * run.dx + (y - run.startY) * run.dy;
+			var across = (x - run.startX) * run.dy - (y - run.startY) * run.dx;
+			if (Math.abs(across) <= 1e-5 && along >= -1e-5 && along <= run.length + 1e-5) {
+				if (along <= 1e-5 || along >= run.length - 1e-5)
+					throw new TransmissionDesignError("Belt clamp lies on a wrap; move its connector inside a straight span");
+				if (found >= 0) throw new TransmissionDesignError("Belt clamp lies on several spans; give it one straight attachment");
+				found = index;
+			}
+		}
+		if (found < 0) throw new TransmissionDesignError("Belt clamp lies on no straight span; update its connector");
+		return clampDistance(found, x, y);
+	}
+
+	/** Distance along a specified straight span; callers can derive that span with `clampDistanceAt`. */
 	public function clampDistance(strand:Int, x:Float, y:Float):Float {
 		if (strand < 0 || strand >= strandList.length) throw "Belt clamp strand is out of range";
 		var run = strandList[strand];

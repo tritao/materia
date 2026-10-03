@@ -1,7 +1,6 @@
 package machinekit.transmission;
 
 import cadkit.modeling.AssemblyState;
-import haxeon.wire.JsonWire;
 import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyJointType;
 import materia.assembly.AssemblyFrames;
@@ -12,11 +11,11 @@ import machinekit.transmission.TimingBelt.BeltWrap;
 class BeltStretch {
 	/** Two loaded pulley attachments, with every intermediate wrap free to turn. */
 	public static function reduction(belt:TimingBelt, path:BeltPathRecord, leader:String,
-			follower:String, driver:String, driven:String, mechanical:AssemblyDefinition, relation:TransmissionRelation):Float {
-		var definition:AssemblyDefinition = JsonWire.decode(JsonWire.encode(mechanical));
-		definition.elasticNetworks = null;
-		definition.couplings = []; definition.actuators = []; definition.encoders = [];
-		var state = new AssemblyState(definition);
+			follower:String, driver:String, driven:String, mechanical:AssemblyDefinition, relation:TransmissionRelation,
+			?context:BeltPoseContext):Float {
+		if (context == null) context = new BeltPoseContext(mechanical);
+		context.reset();
+		var definition = context.definition, state = context.state;
 		var posed = posedBelt(belt, path, state);
 		if (Math.abs(posed.length - belt.length) > 1e-4)
 			throw new TransmissionDesignError("Belt length does not match its wrap attachments");
@@ -71,29 +70,26 @@ class BeltStretch {
 	}
 
 	public static function stiffness(belt:TimingBelt, path:BeltPathRecord, leader:String,
-			pulley:String, mechanical:AssemblyDefinition):Float {
-		var definition:AssemblyDefinition = JsonWire.decode(JsonWire.encode(mechanical));
-		definition.elasticNetworks = null;
-		definition.couplings = [];
-		definition.actuators = [];
-		definition.encoders = [];
+			pulley:String, mechanical:AssemblyDefinition, ?context:BeltPoseContext):Float {
+		if (context == null) context = new BeltPoseContext(mechanical);
+		context.reset();
+		var definition = context.definition;
 		var axis:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
 		for (joint in definition.joints) if (joint.id == leader) axis = joint;
 		if (axis == null || axis.type != AssemblyJointType.Prismatic)
 			throw new TransmissionDesignError('Belt "$path.belt" needs a sliding leader; attach its clamp to the axis');
-		var lower = axis.limits.lower, upper = axis.limits.upper;
-		var positions = [axis.defaultValue];
-		if (axis.limits.lower != null) positions.push(axis.limits.lower);
-		if (axis.limits.upper != null) positions.push(axis.limits.upper);
-		for (joint in definition.joints) {
-			joint.limits.lower = null;
-			joint.limits.upper = null;
+		var lower:Null<Float> = null, upper:Null<Float> = null;
+		for (joint in mechanical.joints) if (joint.id == leader) {
+			lower = joint.limits.lower; upper = joint.limits.upper;
 		}
+		var positions = [axis.defaultValue];
+		if (lower != null) positions.push(lower);
+		if (upper != null) positions.push(upper);
 		var anchor = -1;
 		for (index in 0...path.wraps.length) if (path.wraps[index].instanceId == pulley) anchor = index;
 		if (anchor < 0 || path.wraps.length != belt.wraps().length)
 			throw new TransmissionDesignError('Belt "${path.belt}" needs one attachment per wrap, including driving pulley "$pulley"');
-		var state = new AssemblyState(definition);
+		var state = context.state;
 		var neutral = posedBelt(belt, path, state);
 		if (Math.abs(neutral.length - belt.length) > 1e-4) throw new TransmissionDesignError(
 			'Belt "${path.belt}" length does not match its wraps; update the belt path or pulley attachments');
@@ -150,9 +146,7 @@ class BeltStretch {
 		var world = state.worldConnector(clamp.instanceId, clamp.connectorName);
 		var point = AssemblyFrames.transformPoint(AssemblyFrames.inverse(state.worldPose(path.belt)), world.x, world.y, world.z);
 		if (Math.abs(point.z) > 1e-5) throw new TransmissionDesignError("Belt clamp leaves its plane; align its attachment with axis travel");
-		var strand = path.strand;
-		if (strand == null) throw new TransmissionDesignError("Carriage belt needs its clamp strand");
-		var difference = belt.clampDistance(strand, point.x, point.y) - belt.anchorDistance(anchor, phase);
+		var difference = belt.clampDistanceAt(point.x, point.y) - belt.anchorDistance(anchor, phase);
 		var a = difference - belt.length * Math.floor(difference / belt.length);
 		var b = belt.length - a;
 		if (!(a > 1e-6 && b > 1e-6))

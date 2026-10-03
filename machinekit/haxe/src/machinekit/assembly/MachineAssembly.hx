@@ -68,7 +68,7 @@ private typedef MutableIncludedRecord = {var id:String; var pose:AssemblyFrame; 
 
 /** Reusable, prefixable assembly made from MachineComponents and named connector references. */
 class MachineAssembly {
-	public static inline var SCHEMA_VERSION:Int = 8;
+	public static inline var SCHEMA_VERSION:Int = 9;
 	/** Findings from rebuilding sources; invalid transmissions remain available for repair. */
 	public final diagnostics:Diagnostics = new Diagnostics();
 	final members:Array<AssemblyMember> = [];
@@ -303,8 +303,9 @@ class MachineAssembly {
 			result.addBeltPath(copyBeltPath(path, ""));
 		// A driven coupling's ratio comes from its parts as they are now, not as they were saved.
 		// The coupling decides whether there is one: a transmission whose coupling was removed goes too.
+		var beltContext = result.beltPaths.length == 0 ? null : new machinekit.transmission.BeltPoseContext(result.mechanical);
 		if (description.machine.transmissions != null) for (transmission in description.machine.transmissions)
-			if (result.applyTransmission(transmission, true)) result.transmissions.push(copyTransmission(transmission, ""));
+			if (result.applyTransmission(transmission, true, beltContext)) result.transmissions.push(copyTransmission(transmission, ""));
 		for (connection in description.machine.portConnections)
 			result.connectPorts(connection.id, connection.fromInstance, connection.fromPort,
 				connection.toInstance, connection.toPort);
@@ -779,15 +780,16 @@ class MachineAssembly {
 	static function mapBeltPath(path:machinekit.assembly.MachineAssemblyDescription.BeltPathRecord,
 			map:String->String):machinekit.assembly.MachineAssemblyDescription.BeltPathRecord {
 		var clamp = path.clamp;
-		return {belt: map(path.belt), strand: path.strand,
+		return {belt: map(path.belt),
 			clamp: clamp == null ? null : {instanceId: map(clamp.instanceId), connectorName: clamp.connectorName},
 			wraps: [for (wrap in path.wraps) {instanceId: map(wrap.instanceId), connectorName: wrap.connectorName}]};
 	}
 
 	function refreshTransmissions():Void {
 		for (item in diagnostics.items.copy()) if (item.code == "transmission.parts") diagnostics.items.remove(item);
+		var context = beltPaths.length == 0 ? null : new machinekit.transmission.BeltPoseContext(mechanical);
 		for (transmission in transmissions) {
-			var refreshed = applyTransmission(transmission);
+			var refreshed = applyTransmission(transmission, false, context);
 		}
 		mechanical.elasticNetworks = null;
 		for (path in beltPaths) {
@@ -799,7 +801,7 @@ class MachineAssembly {
 			if (!reduction) continue;
 			try {
 				var belt:machinekit.transmission.TimingBelt = cast requireMember(path.belt);
-				var network = machinekit.transmission.BeltElasticity.build(belt, path, transmissions, mechanical, requireMember);
+				var network = machinekit.transmission.BeltElasticity.build(belt, path, transmissions, mechanical, requireMember, context);
 				if (mechanical.elasticNetworks == null) mechanical.elasticNetworks = [];
 				mechanical.elasticNetworks.push(network);
 			} catch (error:machinekit.transmission.TransmissionDesignError)
@@ -809,7 +811,8 @@ class MachineAssembly {
 	}
 
 	function resolveTransmission(record:machinekit.assembly.MachineAssemblyDescription.TransmissionRecord,
-			?leader:String, strict:Bool = true, ?follower:String):machinekit.transmission.TransmissionRelation {
+			?leader:String, strict:Bool = true, ?follower:String,
+			?context:machinekit.transmission.BeltPoseContext):machinekit.transmission.TransmissionRelation {
 		var relation = machinekit.transmission.TransmissionResolver.resolve(record, requireMember);
 		switch record.source {
 			case TimingBelt(beltId, pulley):
@@ -821,7 +824,7 @@ class MachineAssembly {
 						'Belt "$beltId" needs its clamp and wrap attachments; add a belt path');
 				} else {
 					var belt:machinekit.transmission.TimingBelt = cast requireMember(beltId);
-					var derived = machinekit.transmission.BeltStretch.stiffness(belt, paths[0], leader, pulley, mechanical);
+					var derived = machinekit.transmission.BeltStretch.stiffness(belt, paths[0], leader, pulley, mechanical, context);
 					if (record.stiffness == null) relation.stiffness = derived;
 				}
 			case BeltReduction(beltId, driver, driven):
@@ -838,7 +841,7 @@ class MachineAssembly {
 						if (Math.abs(belt.wraps()[index].radius - part.pitchDiameter / 2) > 1e-5)
 							throw new machinekit.transmission.TransmissionDesignError('Pulley "$pulleyId" tooth count does not match its belt wrap');
 					}
-					var derived = machinekit.transmission.BeltStretch.reduction(belt, paths[0], leader, follower, driver, driven, mechanical, relation);
+					var derived = machinekit.transmission.BeltStretch.reduction(belt, paths[0], leader, follower, driver, driven, mechanical, relation, context);
 					if (record.stiffness == null) relation.stiffness = derived;
 				}
 			case _:
@@ -854,7 +857,7 @@ class MachineAssembly {
 
 	/** Recompute all derived coupling data together from the transmission's parts. */
 	function applyTransmission(transmission:machinekit.assembly.MachineAssemblyDescription.TransmissionRecord,
-			compareSnapshot:Bool = false):Bool {
+			compareSnapshot:Bool = false, ?context:machinekit.transmission.BeltPoseContext):Bool {
 		if (mechanical.couplings != null) for (coupling in mechanical.couplings) if (coupling.id == transmission.coupling) {
 			// Missing members are malformed data, even when another member has the wrong kind.
 			var checked = machinekit.transmission.TransmissionResolver.mapSource(transmission.source, id -> {
@@ -864,7 +867,7 @@ class MachineAssembly {
 			try {
 				var before:Array<Null<Float>> = [coupling.ratio, coupling.offset, coupling.efficiency, coupling.stiffness, coupling.backlash, coupling.drag];
 				var assumedBefore = coupling.assumed;
-				var relation = resolveTransmission(transmission, null, true);
+				var relation = resolveTransmission(transmission, null, true, null, context);
 				writeTransmission(transmission, relation);
 				var after:Array<Null<Float>> = [coupling.ratio, coupling.offset, coupling.efficiency, coupling.stiffness, coupling.backlash, coupling.drag];
 				if (compareSnapshot && (!Equality.equals(before, after) ||

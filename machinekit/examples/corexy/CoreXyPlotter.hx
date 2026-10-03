@@ -221,7 +221,7 @@ class CoreXyPlotter extends MachineAssembly {
 			var letter = b == 0 ? "A" : "B";
 			addMemberConnector("clamp", "belt" + letter, AssemblyFrames.compose(
 				AssemblyFrames.inverse(zeroPoses.get("clamp")), AssemblyFrames.translation(0, -R, b == 0 ? levelA : levelB)));
-			addBeltPath({belt: "belt" + letter, strand: 0, clamp: {instanceId: "clamp", connectorName: "belt" + letter},
+			addBeltPath({belt: "belt" + letter, clamp: {instanceId: "clamp", connectorName: "belt" + letter},
 				wraps: [for (id in ["idler" + letter + "Start", "idler" + letter + "End", "idler" + letter + "Front", "pulley" + letter, "idler" + letter + "Rear"])
 					{instanceId: id, connectorName: "attach-" + id}]});
 		}

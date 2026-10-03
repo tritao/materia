@@ -1375,7 +1375,7 @@ the 24 V → supply-derived wheel limits and the `RobotArm.hx` changes.
 ### X10 — Belt reductions and loops between shafts
 
 Status: planned (2026-10-03), after X9. Shared belt-span elasticity approved; implementation
-is in progress: X10a–X10b implemented, X10c–X10d pending; final validation pending. Keep one commit per X10a–X10d and run the combined full suite after the
+is in progress: X10a–X10c implemented, X10d pending; final validation pending. Keep one commit per X10a–X10d and run the combined full suite after the
 complete milestone, as requested, rather than after each edit or step.
 
 X9c derives belt stiffness from the belt's path, but only for a belt clamped to a sliding
@@ -1516,6 +1516,21 @@ suite is pending X10d; no existing example baseline has intentionally changed in
   springs do not establish a conservative network. Evaluate the network at the requested pose,
   or use a documented conservative envelope over complete samples; do not claim an envelope
   covers unsampled travel without justification.
+
+X10c implementation: the stored clamp-strand field (former wire id 3) is removed, with
+MachineKit schema 9; its connector is projected onto the unique straight span. A connector on
+a tangent/wrap or on no span is rejected. Existing CoreXY/router clamps keep their geometry.
+A `BeltPoseContext` clones and unbounds the assembly once per rebuild, then resets its pose
+before each belt resolves. It also serves the shaft-loop network and saved-data rebuilds.
+
+Router `describe()` benchmark, three timed rebuilds after one warmup in the same test entry:
+screw router 0.027 → 0.036 s/rebuild (wall-time variation; it has no belt path and does not
+allocate a pose context); belt router 0.123 → 0.059 s/rebuild (one posed copy serves its three
+belts). These are local wall timings, not a real-time guarantee. X9c's carriage stiffness is
+the minimum over authored default, ends of travel and any interior balance point. This
+constant is conservative for the sampled travel and overstates mid-travel deviation; it does
+not prove a bound outside those samples. A shaft network requires fixed free-path geometry over
+sampled motion; it rejects moving paths rather than claiming a constant remains valid.
 
 #### X10d — Example
 
