@@ -10,8 +10,32 @@ class ElasticSolve {
   public function new(model:RobotModel, loads:Array<AxisLoad>) {
     var ids:Array<String> = [];
     for (load in loads) ids.push(load.axis);
+    // A saved model may contain a separate, unactuated mechanism. It cannot
+    // affect these loaded axes and must not make their stiffness matrix singular.
+    var connected = ids.copy(), changed = true;
+    while (changed) {
+      changed = false;
+      for (coupling in model.couplings) {
+        if (connected.indexOf(coupling.leader) >= 0 && connected.indexOf(coupling.follower) < 0) {
+          connected.push(coupling.follower); changed = true;
+        }
+        if (connected.indexOf(coupling.follower) >= 0 && connected.indexOf(coupling.leader) < 0) {
+          connected.push(coupling.leader); changed = true;
+        }
+      }
+      for (network in model.elasticNetworks) {
+        var touches = false;
+        for (span in network.spans) for (term in span.terms)
+          if (connected.indexOf(term.joint) >= 0) touches = true;
+        if (touches) for (span in network.spans) for (term in span.terms)
+          if (connected.indexOf(term.joint) < 0) { connected.push(term.joint); changed = true; }
+      }
+    }
+    var networks = [for (network in model.elasticNetworks)
+      if ([for (span in network.spans) for (term in span.terms) if (connected.indexOf(term.joint) >= 0) term].length > 0)
+        network];
     var owned:Array<String> = [];
-    for (network in model.elasticNetworks) {
+    for (network in networks) {
       network.validate(model.joints, model.couplings);
       for (id in network.couplings) {
         if (owned.indexOf(id) >= 0) throw "A motion coupling belongs to several elastic networks";
@@ -30,7 +54,7 @@ class ElasticSolve {
     var rigid:Array<Array<Float>> = [], basis:Array<Array<Float>> = [];
     var softLosses:Array<{row:Array<Float>, stiffness:Float, bound:Float}> = [];
     var rigidLosses:Array<{index:Int, bound:Float}> = [];
-    for (network in model.elasticNetworks) for (span in network.spans) {
+    for (network in networks) for (span in network.spans) {
       var row = [for (_ in 0...count) 0.0];
       for (term in span.terms) row[ids.indexOf(term.joint)] = term.coefficient;
       spring(stiffness, row, span.stiffness);
@@ -47,7 +71,7 @@ class ElasticSolve {
         if (owned.indexOf(coupling.id) >= 0)
           throw "A summed follower cannot mix a network motion term and an independent scalar transmission";
         row[ids.indexOf(coupling.leader)] -= coupling.ratio;
-        loss += Math.abs(coupling.ratio) * coupling.backlash;
+        loss = Math.max(loss, Math.abs(coupling.ratio) * coupling.backlash);
         if (coupling.stiffness > 0) {
           var reflected = coupling.stiffness / (coupling.ratio * coupling.ratio);
           k = k == 0.0 ? reflected : Math.min(k, reflected);
@@ -76,7 +100,7 @@ class ElasticSolve {
     compliance = [for (i in 0...loads.length) [for (j in 0...loads.length) inverse[i][j]]];
     backlash = [for (_ in loads) 0.0];
     // Contact clearances shift all adjoining spans together, preserving their correlation.
-    for (network in model.elasticNetworks) for (clearance in network.clearances) {
+    for (network in networks) for (clearance in network.clearances) {
       var effort = [for (_ in 0...count) 0.0];
       for (span in network.spans) {
         var coefficient = 0.0;

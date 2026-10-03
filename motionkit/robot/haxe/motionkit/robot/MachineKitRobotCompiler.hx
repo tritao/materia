@@ -86,7 +86,7 @@ class MachineKitRobotCompiler {
       // This convenience compiler states a 24 V, rated-current drive. The motor part owns its curve.
       var source = binding.axis.motor.actuator('${binding.id}.motor.${binding.axis.motor.designation}', shaftId, 24, 0.5);
       var motor = new Actuator(source.id, source.maxEffort,
-        Math.min(source.maxRate, maxVelocity * Math.abs(ratio)),
+        source.maxRate,
         Transmission.SimpleTransmission(shaftId, 1.0, 0.0));
       var steps = source.fullStepsPerRevolution, inertia = source.rotorInertia, holding = source.holdingTorque, curve = source.torqueSpeed;
       if (steps == null || inertia == null || holding == null || curve == null)
@@ -105,12 +105,6 @@ class MachineKitRobotCompiler {
       model.addActuator(motor);
       for (joint in model.joints) {
         if (joint.id == shaftId) joint.armature += inertia;
-        if (joint.id == binding.travelJointId) {
-          var mechanical = joint.mechanicalLimits;
-          if (mechanical == null) mechanical = joint.limits;
-          mechanical.velocity = maxVelocity;
-          mechanical.maxAcceleration = maxAcceleration;
-        }
       }
     }
     model.materializeLimits();
@@ -118,8 +112,8 @@ class MachineKitRobotCompiler {
       var limits = [for (joint in model.joints) if (joint.id == binding.travelJointId) joint.limits][0];
       new MotionAxisBlueprint(binding.id, [binding.travelJointId, binding.shaftJointId],
         0.0, binding.axis.stroke * MILLIMETRES_TO_METRES,
-        limits.velocity == null ? maxVelocity : limits.velocity,
-        limits.maxAcceleration == null ? maxAcceleration : limits.maxAcceleration);
+        limits.velocity == null ? maxVelocity : Math.min(maxVelocity, limits.velocity),
+        limits.maxAcceleration == null ? maxAcceleration : Math.min(maxAcceleration, limits.maxAcceleration));
     }];
     return MotionSystemBlueprint.fromRobotModel(model, axes);
   }

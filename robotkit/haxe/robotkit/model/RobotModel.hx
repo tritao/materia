@@ -219,7 +219,7 @@ class RobotModel {
    * way, as it has to accelerate both up and down).
    */
   function steadyForce(joint:Joint, force:Float, steady:SteadyLoads):Float {
-    var load = DriveLoads.forAxis(this, joint.id, steady);
+    var load = DriveLoads.basicForAxis(this, joint.id, steady);
     var left = force;
     if (load != null) {
       for (motor in load.motors)
@@ -345,6 +345,11 @@ class RobotModel {
     }
     var cycle = JointCoupling.cycleThrough(couplings);
     if (cycle != null) errors.push('joint $cycle depends on itself through its couplings');
+    if (errors.length == 0) {
+      var uncontrolled = DriveLoads.uncontrolledAxes(DriveLoads.of(this));
+      if (uncontrolled.length > 0)
+        errors.push('under-actuated coupled axes: ${uncontrolled.join(", ")}; bind independent motors before solving shared stiffness');
+    }
     return errors;
   }
 }

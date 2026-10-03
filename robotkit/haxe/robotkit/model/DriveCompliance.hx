@@ -7,15 +7,54 @@ class DriveCompliance {
   public final compliance:Array<Array<Float>>;
 
   public function new(loads:Array<AxisLoad>, ?model:RobotModel) {
-    if (model != null && model.elasticNetworks.length > 0) {
-      var solved = new ElasticSolve(model, loads);
-      compliance = solved.compliance;
-      for (axis in 0...loads.length) {
+    if (model != null) {
+      var count = loads.length;
+      compliance = [for (_ in 0...count) [for (_ in 0...count) 0.0]];
+      var touches = [for (network in model.elasticNetworks)
+        [for (load in loads) networkTouches(model, load.axis, network)]];
+      var assigned = [for (_ in 0...count) false];
+      for (start in 0...count) if (!assigned[start]) {
+        var group = [start]; assigned[start] = true;
+        var changed = true;
+        while (changed) {
+          changed = false;
+          for (candidate in 0...count) if (!assigned[candidate]) {
+            var connected = false;
+            for (member in group) {
+              for (a in loads[member].motors) for (b in loads[candidate].motors)
+                if (a.actuator.id == b.actuator.id) connected = true;
+              for (network in touches) if (network[member] && network[candidate]) connected = true;
+            }
+            if (connected) { group.push(candidate); assigned[candidate] = true; changed = true; }
+          }
+        }
+        var block = [for (index in group) loads[index]];
+        if (DriveLoads.uncontrolledAxes(block).length > 0) continue;
+        var hasNetwork = false;
+        for (network in touches) for (index in group) if (network[index]) hasNetwork = true;
+        var matrix:Array<Array<Float>>;
+        var losses:Array<Float> = [];
+        if (hasNetwork) {
+          var solved = new ElasticSolve(model, block);
+          matrix = solved.compliance;
+          losses = solved.backlash;
+        } else {
+          var scalar = new DriveCompliance(block);
+          matrix = scalar.compliance;
+          losses = [for (load in block) load.backlash];
+        }
+        for (row in 0...group.length) {
+          var axis = group[row];
+          for (column in 0...group.length) compliance[axis][group[column]] = matrix[row][column];
+          loads[axis].backlash = losses[row];
+          for (networkIndex in 0...model.elasticNetworks.length)
+            if (touches[networkIndex][axis])
+              EngineeringAssumptions.merge(loads[axis].assumptions, model.elasticNetworks[networkIndex].assumptions);
+        }
+      }
+      for (axis in 0...count) {
         loads[axis].elastic = this;
         loads[axis].stiffness = compliance[axis][axis] > 1e-20 ? 1.0 / compliance[axis][axis] : 0.0;
-        loads[axis].backlash = solved.backlash[axis];
-        for (network in model.elasticNetworks)
-          EngineeringAssumptions.merge(loads[axis].assumptions, network.assumptions);
       }
       return;
     }
@@ -82,6 +121,8 @@ class DriveCompliance {
   }
 
   public function deflections(forces:Array<Float>):Array<Float> {
+    if (forces.length != compliance.length)
+      throw 'Drive compliance needs ${compliance.length} axis forces, got ${forces.length}';
     var result:Array<Float> = [];
     for (row in compliance) {
       var value = 0.0;
@@ -89,6 +130,31 @@ class DriveCompliance {
       result.push(value);
     }
     return result;
+  }
+
+  static function networkTouches(model:RobotModel, axis:String, target:ElasticNetwork):Bool {
+    var reached = [axis], changed = true;
+    while (changed) {
+      changed = false;
+      for (coupling in model.couplings) {
+        if (reached.indexOf(coupling.leader) >= 0 && reached.indexOf(coupling.follower) < 0) {
+          reached.push(coupling.follower); changed = true;
+        }
+        if (reached.indexOf(coupling.follower) >= 0 && reached.indexOf(coupling.leader) < 0) {
+          reached.push(coupling.leader); changed = true;
+        }
+      }
+      for (network in model.elasticNetworks) {
+        var touches = false;
+        for (span in network.spans) for (term in span.terms)
+          if (reached.indexOf(term.joint) >= 0) touches = true;
+        if (touches) for (span in network.spans) for (term in span.terms)
+          if (reached.indexOf(term.joint) < 0) { reached.push(term.joint); changed = true; }
+      }
+    }
+    for (span in target.spans) for (term in span.terms)
+      if (reached.indexOf(term.joint) >= 0) return true;
+    return false;
   }
 
   public static function invert(matrix:Array<Array<Float>>):Array<Array<Float>> {

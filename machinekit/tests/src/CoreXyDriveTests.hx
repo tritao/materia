@@ -5,6 +5,7 @@ import robotkit.device.DeviceBinding;
 import robotkit.device.DeviceLayout;
 import robotkit.model.DriveLoads;
 import robotkit.model.RobotModel;
+import robotkit.model.SteadyLoads;
 
 /**
  * The CoreXY plotter's drives in the robot model: each motor follows both axes, and each axis is bound
@@ -25,6 +26,17 @@ class CoreXyDriveTests {
 			throw 'the plotter should have 16 belt couplings and two motors, got ${model.couplings.length} and ${model.actuators.length}';
 		var errors = model.validate();
 		if (errors.length > 0) throw 'the plotter model should validate: $errors';
+		var partlyWired = robotkit.model.RobotModelCodec.decode(robotkit.model.RobotModelCodec.encode(model));
+		partlyWired.actuators.pop();
+		var partialLoads = DriveLoads.of(partlyWired);
+		if (partialLoads.length != 2 || partialLoads[0].stiffness != 0 || partialLoads[1].stiffness != 0)
+			throw "One bound CoreXY motor must retain two per-axis loads without a singular-matrix throw";
+		var partialErrors = partlyWired.validate();
+		if (partialErrors.length == 0 || partialErrors[0].indexOf("under-actuated") < 0)
+			throw 'One bound CoreXY motor needs a design diagnostic: $partialErrors';
+		if (!(partlyWired.coupledLimits("x", new SteadyLoads()).requireEffort() > 0 &&
+			partlyWired.coupledLimits("y", new SteadyLoads()).requireEffort() > 0))
+			throw "One bound CoreXY motor still gives per-axis effort limits";
 		// Each motor's pulley is the sum of two terms, one per axis, of one pitch radius per radian: 1 / R in radians per metre.
 		for (id in ["pulleyA-turn", "pulleyB-turn"]) {
 			var terms = [for (coupling in model.couplings) if (coupling.follower == id) coupling];

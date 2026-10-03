@@ -14,6 +14,7 @@ import cadkit.modeling.AssemblyState;
 class BeltElasticity {
 	public static function build(belt:TimingBelt, path:BeltPathRecord, records:Array<TransmissionRecord>,
 			mechanical:AssemblyDefinition, member:String->MachineComponent,
+			actuators:Array<materia.assembly.AssemblyDefinition.AssemblyActuator>,
 			?context:BeltPoseContext):AssemblyElasticNetwork {
 		if (context == null) context = new BeltPoseContext(mechanical);
 		context.reset();
@@ -67,7 +68,7 @@ class BeltElasticity {
 		for (at in 0...indexes.length) {
 			var next = (at + 1) % indexes.length;
 			var length = posed.freePaths(indexes[at], indexes[next])[0];
-			spans.push({stiffness: ea / length, terms: [
+			spans.push({stiffness: BeltStretch.spanStiffness(ea, length), terms: [
 				{joint: joints[at], coefficient: radii[at]}, {joint: joints[next], coefficient: -radii[next]}]});
 		}
 		// This shaft-loop model requires fixed free-path lengths; do not silently omit a
@@ -90,10 +91,18 @@ class BeltElasticity {
 			for (coupling in mechanical.couplings) if (coupling.id == statedCoupling) source = coupling.source;
 			var at = joints.indexOf(source);
 			if (at < 0) throw new TransmissionDesignError("Stated belt stiffness needs its rotary leader");
-			var derived = ea * (1 / posed.freePaths(indexes[0], indexes[1])[0] + 1 / posed.freePaths(indexes[0], indexes[1])[1]) * radii[at] * radii[at] / 1000;
+			var paths = posed.freePaths(indexes[0], indexes[1]);
+			var derived = BeltStretch.energy(ea, paths, radii[at], radii[at]) / 1000;
 			for (span in spans) span.stiffness *= stated / derived;
 		}
 		var clearances:Array<materia.assembly.AssemblyDefinition.AssemblyElasticClearance> = [];
+		var drivers:Array<String> = [];
+		for (record in records) switch record.source {
+			case BeltReduction(id, driver, _) if (id == path.belt):
+				var driverJoint = rotaryJoint(definition, driver);
+				if (driverJoint != null && drivers.indexOf(driverJoint) < 0) drivers.push(driverJoint);
+			case _:
+		}
 		for (record in records) switch record.source {
 			case BeltReduction(id, driver, driven) if (id == path.belt):
 				var drivenJoint = rotaryJoint(definition, driven), driverJoint = rotaryJoint(definition, driver);
@@ -109,9 +118,32 @@ class BeltElasticity {
 				if (!found) clearances.push({joint: drivenJoint, allowance: clearance});
 			case _:
 		}
+		// A screw linked to the carriage by a lead-screw relation can still be a
+		// loaded contact even when no extra belt motion record names that pulley.
+		for (at in 0...joints.length) if (drivers.indexOf(joints[at]) < 0) {
+			var found = false;
+			for (entry in clearances) if (entry.joint == joints[at]) found = true;
+			if (!found) clearances.push({joint: joints[at],
+				allowance: TimingBelt.toothClearance(belt.beltProfile) / Math.abs(radii[at])});
+		}
 
+		var peakDifference = 0.0;
+		for (actuator in actuators) {
+			var at = joints.indexOf(actuator.joint);
+			if (at < 0) continue;
+			var torque = actuator.maxEffort;
+			if (actuator.holdingTorque != null) torque = Math.max(torque, actuator.holdingTorque);
+			if (actuator.peakTorque != null) torque = Math.max(torque, actuator.peakTorque);
+			if (actuator.gearRatio != null) torque *= actuator.gearRatio;
+			if (actuator.gearEfficiency != null) torque *= actuator.gearEfficiency;
+			peakDifference += torque * 1000 / Math.abs(radii[at]);
+		}
+		if (peakDifference > 0) belt.checkTension(peakDifference, belt.assumedPretension());
+		var assumptions:Array<materia.assembly.AssemblyDefinition.QuantityAssumption> = [
+			{quantity: "pretension", label: 'assumed ${belt.assumedPretension()} N; working limit ${belt.assumedWorkingTension()} N'}];
+		if (stated == null) assumptions.push({quantity: "stiffness", label: "belt stiffness with pretension"});
 		return {id: path.belt, couplings: owners, spans: spans, clearances: clearances,
-			assumptions: stated == null ? [{quantity: "stiffness", label: "belt stiffness with pretension"}] : []};
+			assumptions: assumptions};
 	}
 
 	/** Follow rigid attachments to the rotary shaft carrying this pulley. */

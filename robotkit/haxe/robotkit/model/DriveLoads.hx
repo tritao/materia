@@ -126,18 +126,59 @@ class DriveLoads {
     return null;
   }
 
-  public static function of(model:RobotModel, ?steady:SteadyLoads):Array<AxisLoad> {
+  /** Steady force needs this axis's drag and gravity, not a shared stiffness inversion. */
+  public static function basicForAxis(model:RobotModel, id:JointId, ?steady:SteadyLoads):Null<AxisLoad> {
+    for (joint in model.joints) if (joint.id == id)
+      return axisLoad(model, joint, steady == null ? new SteadyLoads() : steady);
+    return null;
+  }
+
+  public static function of(model:RobotModel, ?steady:SteadyLoads, ?axisIds:Array<String>):Array<AxisLoad> {
     var loads = steady == null ? new SteadyLoads() : steady;
     var followers = new Map<String, Bool>();
     for (coupling in model.couplings) followers.set(coupling.follower, true);
     var result:Array<AxisLoad> = [];
     for (joint in model.joints) {
-      if (followers.exists(joint.id)) continue;
+      if (followers.exists(joint.id) || (axisIds != null && axisIds.indexOf(joint.id) < 0)) continue;
       var load = axisLoad(model, joint, loads);
       if (load != null) result.push(load);
     }
-    if (result.length > 0) { var elastic = new DriveCompliance(result, model); }
+    // A partly wired coupled drive still has useful per-axis speed and force
+    // bounds. Its shared stiffness has no unique inverse until every degree
+    // of freedom has an independent motor constraint.
+    if (result.length > 0) {
+      var elastic = new DriveCompliance(result, model);
+    }
     return result;
+  }
+
+  /** Axes whose motor-coordinate Jacobian has insufficient independent rows. */
+  public static function uncontrolledAxes(loads:Array<AxisLoad>):Array<String> {
+    var rows:Array<Array<Float>> = [], motors:Array<String> = [];
+    for (load in loads) for (motor in load.motors)
+      if (motors.indexOf(motor.actuator.id) < 0) motors.push(motor.actuator.id);
+    for (id in motors) {
+      var row = [for (_ in loads) 0.0];
+      for (axis in 0...loads.length) for (motor in loads[axis].motors)
+        if (motor.actuator.id == id) row[axis] = motor.ratio;
+      rows.push(row);
+    }
+    var pivoted:Array<Bool> = [for (_ in loads) false], rank = 0;
+    for (column in 0...loads.length) {
+      var pivot = -1;
+      for (row in rank...rows.length) if (Math.abs(rows[row][column]) > 1e-10) {pivot = row; break;}
+      if (pivot < 0) continue;
+      var swap = rows[rank]; rows[rank] = rows[pivot]; rows[pivot] = swap;
+      var scale = rows[rank][column];
+      for (at in column...loads.length) rows[rank][at] /= scale;
+      for (row in rank + 1...rows.length) {
+        var factor = rows[row][column];
+        for (at in column...loads.length) rows[row][at] -= factor * rows[rank][at];
+      }
+      pivoted[column] = true; rank++;
+      if (rank == rows.length) break;
+    }
+    return [for (axis in 0...loads.length) if (!pivoted[axis]) loads[axis].axis];
   }
 
   /** A summed follower includes every upstream path, even when two paths reach the same joint. */
@@ -227,9 +268,12 @@ class DriveLoads {
       } else gravityForce = carried * steady.gravity * along;
     }
     var passiveDrag = 0.0;
-    for (index in 1...reached.length) if (motorJoints.indexOf(reached[index]) < 0)
+    for (index in 1...reached.length) if (motorJoints.indexOf(reached[index]) < 0) {
+      var jointDrag = 0.0;
       for (coupling in model.couplings) if (coupling.follower == reached[index].id)
-        passiveDrag += coupling.drag * Math.abs(ratios[index]);
+        jointDrag = Math.max(jointDrag, coupling.drag);
+      passiveDrag += jointDrag * Math.abs(ratios[index]);
+    }
     var load = new AxisLoad(axis.id, sliding, mass, gravityForce, worst, steady.friction(axis) + passiveDrag);
     for (index in 1...reached.length) if (motorJoints.indexOf(reached[index]) < 0)
       for (value in quantities[index]) if (value.quantity == "drag") {

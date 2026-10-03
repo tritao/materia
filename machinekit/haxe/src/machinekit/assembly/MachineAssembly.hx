@@ -401,6 +401,8 @@ class MachineAssembly {
 
 	/** Copy builder state for a derived assembly or an owned tool snapshot. */
 	public function copyInto(target:MachineAssembly):Void {
+		for (item in diagnostics.items)
+			target.diagnostics.add(item.severity, item.code, item.subject, item.message);
 		for (member in members) target.members.push({id: member.id,
 			component: copyComponent(member.component)});
 		var copy = cloneDefinition(mechanical);
@@ -792,6 +794,12 @@ class MachineAssembly {
 			var refreshed = applyTransmission(transmission, false, context);
 		}
 		mechanical.elasticNetworks = null;
+		var beltActuators:Array<materia.assembly.AssemblyDefinition.AssemblyActuator> = [];
+		if (beltPaths.length > 0) for (record in motors) {
+			var driver = motorDriver(record);
+			if (driverVoltage(record.driver, driver, false) != null)
+				beltActuators.push(resolveMotor(record, false));
+		}
 		for (path in beltPaths) {
 			var reduction = false;
 			for (record in transmissions) switch record.source {
@@ -801,7 +809,7 @@ class MachineAssembly {
 			if (!reduction) continue;
 			try {
 				var belt:machinekit.transmission.TimingBelt = cast requireMember(path.belt);
-				var network = machinekit.transmission.BeltElasticity.build(belt, path, transmissions, mechanical, requireMember, context);
+				var network = machinekit.transmission.BeltElasticity.build(belt, path, transmissions, mechanical, requireMember, beltActuators, context);
 				if (mechanical.elasticNetworks == null) mechanical.elasticNetworks = [];
 				mechanical.elasticNetworks.push(network);
 			} catch (error:machinekit.transmission.TransmissionDesignError)
@@ -896,11 +904,21 @@ class MachineAssembly {
 			coupling.assumptions = [for (value in fields) if (value.quantity != "speed limit") value];
 			var assumed = [for (value in fields) if (value.quantity != "speed limit") value.label];
 			coupling.assumed = assumed.length == 0 ? null : assumed;
-			if (relation.followerSpeedCap != null) for (joint in mechanical.joints)
-				if (joint.id == coupling.target) {
+			for (joint in mechanical.joints) if (joint.id == coupling.target) {
+				var hadScrewCap = false;
+				if (joint.limits.assumptions != null) for (value in joint.limits.assumptions)
+					if (value.quantity == "speed limit" && value.label == "screw critical-speed margin") hadScrewCap = true;
+				if (relation.followerSpeedCap != null) {
 					joint.limits.velocity = relation.followerSpeedCap;
 					joint.limits.assumptions = [for (value in fields) if (value.quantity == "speed limit") value];
+				} else if (hadScrewCap) {
+					joint.limits.velocity = null;
+					var remaining:Array<materia.assembly.AssemblyDefinition.QuantityAssumption> = [];
+					if (joint.limits.assumptions != null) for (value in joint.limits.assumptions)
+						if (!(value.quantity == "speed limit" && value.label == "screw critical-speed margin")) remaining.push(value);
+					joint.limits.assumptions = remaining;
 				}
+			}
 			return true;
 		}
 		return false;
@@ -1544,6 +1562,9 @@ class MachineAssembly {
 				velocity: joint.limits.velocity, effort: joint.limits.effort, overtravel: joint.limits.overtravel,
 				acceleration: joint.limits.acceleration},
 			defaultValue: joint.defaultValue};
+		if (joint.limits.assumptions != null && joint.limits.assumptions.length > 0)
+			saved.limits.assumptions = [for (value in joint.limits.assumptions)
+				{quantity: value.quantity, label: value.label}];
 		if (joint.role == AssemblyJointRole.Closure && tolerance != null)
 			saved.closureTolerance = tolerance;
 		mechanical.joints.push(saved);

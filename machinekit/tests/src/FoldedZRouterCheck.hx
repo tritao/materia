@@ -15,6 +15,15 @@ class FoldedZRouterCheck {
 		var geometry = combined.describe();
 		if (geometry.mechanical.elasticNetworks == null || geometry.mechanical.elasticNetworks.length != 1 ||
 			combined.check().hasErrors()) throw "The folded Z stage must combine with the router's X/Y carriage belts";
+		var combinedScene = SceneArtifact.decode(CncRouterPreview.router(true, true));
+		var combinedModel = AssemblySimulationBridge.toRobotModel(combinedScene.assemblyDefinition,
+			AssemblyPhysicalPartView.fromSceneArtifact(combinedScene), combinedScene.assemblyState).model;
+		var combinedLoads = DriveLoads.of(combinedModel);
+		if (combinedLoads.length != 3) throw "Mixed carriage and shaft belts need three driven axes";
+		for (axis in combinedLoads) if (axis.axis == "x" || axis.axis == "y") {
+			for (assumption in axis.assumptions) if (assumption.label == "belt stiffness with pretension")
+				throw 'Folded Z belt assumption leaked onto ${axis.axis}';
+		}
 	}
 	/** Compare the new shaft-belt Z stage with the existing direct Z on the same router. */
 	public static function runFoldedZ():Void {
@@ -38,12 +47,30 @@ class FoldedZRouterCheck {
 		if (stage == null || !switch stage.source { case BeltReduction("beltZ", "pulleyScrewZ", "pulleyMotorZ"): true; case _: false; })
 			throw "Folded Z must compile from its actual two pulleys";
 		var directZ = direct.coupledLimits("z"), foldedZ = converted.coupledLimits("z");
+		CncRouterChecks.near(directZ.requireVelocity() * 1000, 43.6539272481, "direct Z speed baseline", 1e-6);
+		CncRouterChecks.near(foldedZ.requireVelocity() * 1000, 21.8269636240, "folded Z speed baseline", 1e-6);
+		CncRouterChecks.near(directZ.requireAcceleration() * 1000, 6117.45629356, "direct Z acceleration baseline", 1e-3);
+		CncRouterChecks.near(foldedZ.requireAcceleration() * 1000, 3263.41002285, "folded Z acceleration baseline", 1e-3);
 		CncRouterChecks.near(foldedZ.requireVelocity() * 2, directZ.requireVelocity(), "the two-to-one belt uses twice the motor rate", 1e-9);
 		if (!(foldedZ.requireAcceleration() > 0 && foldedZ.requireAcceleration() < directZ.requireAcceleration()))
 			throw "The folded motor's inertia must tighten the Z acceleration bound";
 		var directLoad = DriveLoads.forAxis(direct, "z"), foldedLoad = DriveLoads.forAxis(converted, "z");
 		if (directLoad == null || foldedLoad == null || foldedLoad.stiffness <= 0 || directLoad.stiffness != 0)
 			throw "Folded Z must add the belt's elastic compliance to the direct screw";
+		CncRouterChecks.near(foldedLoad.stiffness / 1e6, 486.86732785, "folded Z stiffness baseline, MN/m", 0.01);
+		CncRouterChecks.near(directLoad.backlash * 1000, 0.05, "direct Z backlash baseline", 1e-6);
+		CncRouterChecks.near(foldedLoad.backlash * 1000, 0.0505, "folded Z backlash baseline", 1e-6);
+		CncRouterChecks.near(new CncRouter().massProperties().mass, 36.9, "direct router mass baseline", 0.1);
+		CncRouterChecks.near(folded.massProperties().mass, 37.1, "folded router mass baseline", 0.1);
+		if (CncRouter.FoldedZMotorPlate.TENSION_TRAVEL < 4.0)
+			throw "Folded Z motor plate needs at least 4 mm of slot adjustment";
+		var centre = belt.wraps()[1].x - belt.wraps()[0].x;
+		var outward = CncRouter.FoldedZMotorPlate.TENSION_TRAVEL / 2 * 70 / centre;
+		var reachablePretension = TimingBelt.cordStiffnessPerMm(belt.beltProfile) * belt.width *
+			2 * outward / belt.length;
+		if (reachablePretension <= belt.assumedPretension())
+			throw "Folded Z slot cannot reach the stated installed pretension";
+		belt.checkTension(1.26 / (20 * 2 / (2 * Math.PI) / 1000), belt.assumedPretension());
 		var state = new AssemblyState(foldedScene.assemblyDefinition);
 		for (position in [[150.0, 150, 0], [0.0, 0, -80], [300.0, 300, -80]]) {
 			state.setJoint("x", position[0]); state.setJoint("y", position[1]); state.setJoint("z", position[2]);

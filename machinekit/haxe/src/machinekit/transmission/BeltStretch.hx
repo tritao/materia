@@ -20,17 +20,31 @@ class BeltStretch {
 		if (Math.abs(posed.length - belt.length) > 1e-4)
 			throw new TransmissionDesignError("Belt length does not match its wrap attachments");
 		var first = wrapIndex(path, driver), second = wrapIndex(path, driven);
+		var contact = contactDirection(belt, first, second);
+		if (relation.ratio * contact < 0)
+			throw new TransmissionDesignError('Belt "${path.belt}" Sense disagrees with its pulley contact sides');
 		var driverSign = axisSign(definition, state, path.belt, leader, driver);
 		var drivenSign = axisSign(definition, state, path.belt, follower, driven);
-		relation.ratio *= driverSign * drivenSign;
+		relation.ratio = Math.abs(relation.ratio) * contact * driverSign * drivenSign;
 		var paths = posed.freePaths(first, second);
 		var radius = posed.wraps()[first].radius;
 		return energy(TimingBelt.cordStiffnessPerMm(belt.beltProfile) * belt.width,
 			paths, radius, -radius) / 1000;
 	}
 
+	/** Relative pulley direction about the belt normal, from its physical contact sides. */
+	public static function contactDirection(belt:TimingBelt, first:Int, second:Int):Int
+		return belt.wraps()[first].side * belt.wraps()[second].side;
+
 	public static function energy(ea:Float, lengths:Array<Float>, da:Float, db:Float):Float
-		return ea * (da * da / lengths[0] + db * db / lengths[1]);
+		return spanStiffness(ea, lengths[0]) * da * da + spanStiffness(ea, lengths[1]) * db * db;
+
+	/** Axial spring of one free belt span, shared by clamp and rotary drives. */
+	public static function spanStiffness(ea:Float, length:Float):Float {
+		if (!(ea > 0) || !(length > 0) || !Math.isFinite(length))
+			throw new TransmissionDesignError("Belt span needs positive cord rigidity and free length");
+		return ea / length;
+	}
 
 	public static function wrapIndex(path:BeltPathRecord, member:String):Int {
 		var found = -1;
@@ -78,13 +92,6 @@ class BeltStretch {
 		for (joint in definition.joints) if (joint.id == leader) axis = joint;
 		if (axis == null || axis.type != AssemblyJointType.Prismatic)
 			throw new TransmissionDesignError('Belt "$path.belt" needs a sliding leader; attach its clamp to the axis');
-		var lower:Null<Float> = null, upper:Null<Float> = null;
-		for (joint in mechanical.joints) if (joint.id == leader) {
-			lower = joint.limits.lower; upper = joint.limits.upper;
-		}
-		var positions = [axis.defaultValue];
-		if (lower != null) positions.push(lower);
-		if (upper != null) positions.push(upper);
 		var anchor = -1;
 		for (index in 0...path.wraps.length) if (path.wraps[index].instanceId == pulley) anchor = index;
 		if (anchor < 0 || path.wraps.length != belt.wraps().length)
@@ -93,31 +100,60 @@ class BeltStretch {
 		var neutral = posedBelt(belt, path, state);
 		if (Math.abs(neutral.length - belt.length) > 1e-4) throw new TransmissionDesignError(
 			'Belt "${path.belt}" length does not match its wraps; update the belt path or pulley attachments');
+		var heldPhase = neutral.anchorPhase(anchor);
+		var baseline = lengths(neutral, path, state, anchor, heldPhase);
+		var sampled:Array<{id:String, lower:Float, upper:Float, zero:Float}> = [];
+		for (joint in definition.joints) if (joint.role == materia.assembly.AssemblyDefinition.AssemblyJointRole.Tree &&
+				joint.type == AssemblyJointType.Prismatic) {
+			var source:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
+			for (candidate in mechanical.joints) if (candidate.id == joint.id) source = candidate;
+			var lower = source == null ? null : source.limits.lower;
+			var upper = source == null ? null : source.limits.upper;
+			context.reset();
+			state.setJoint(joint.id, upper == null ? joint.defaultValue + 1 : upper);
+			var moved = lengths(posedBelt(belt, path, state), path, state, anchor, heldPhase);
+			if (joint.id == leader || Math.abs(moved[0] - baseline[0]) > 1e-5 ||
+					Math.abs(moved[1] - baseline[1]) > 1e-5) {
+				if (lower == null || upper == null)
+					throw new TransmissionDesignError('Belt "${path.belt}" has no known weakest stiffness without limits for joint "${joint.id}"');
+				sampled.push({id: joint.id, lower: lower, upper: upper, zero: joint.defaultValue});
+			}
+		}
+		if (sampled.length > 5)
+			throw new TransmissionDesignError('Belt "${path.belt}" spans too many moving axes for the sampled stiffness envelope');
+		var others = [for (joint in sampled) if (joint.id != leader) joint];
+		var poses:Array<Array<Float>> = [[]];
+		for (joint in others) {
+			var next:Array<Array<Float>> = [];
+			for (pose in poses) for (position in [joint.lower, joint.zero, joint.upper])
+				next.push(pose.concat([position]));
+			poses = next;
+		}
+		var lead = [for (joint in sampled) if (joint.id == leader) joint][0];
 		var weakest = Math.POSITIVE_INFINITY;
 		var epsilon = 0.001;
-		var heldPhase = neutral.anchorPhase(anchor);
-		var consideredInterior = false;
-		for (position in positions) {
-			state.setJoint(leader, position);
-			var posed = posedBelt(belt, path, state);
-			var phase = heldPhase;
-			var current = lengths(posed, path, state, anchor, phase);
-			state.setJoint(leader, position + epsilon);
-			var plus = lengths(posedBelt(belt, path, state), path, state, anchor, phase);
-			state.setJoint(leader, position - epsilon);
-			var minus = lengths(posedBelt(belt, path, state), path, state, anchor, phase);
-			var da = (plus[0] - minus[0]) / (2 * epsilon);
-			var db = (plus[1] - minus[1]) / (2 * epsilon);
-			// A constant-length loop is weakest when its two elastic paths have equal lengths.
-			if (!consideredInterior && Math.abs(da + db) < 1e-5 && Math.abs(da - db) > 1e-6) {
-				consideredInterior = true;
-				var balanced = position + (current[1] - current[0]) / (da - db);
-				if (lower != null && upper != null && balanced > lower && balanced < upper)
-					positions.push(balanced);
+		for (pose in poses) {
+			context.reset();
+			for (index in 0...others.length) state.setJoint(others[index].id, pose[index]);
+			var positions = [lead.lower, lead.zero, lead.upper];
+			var at = 0;
+			while (at < positions.length) {
+				var position = positions[at++];
+				state.setJoint(leader, position);
+				var current = lengths(posedBelt(belt, path, state), path, state, anchor, heldPhase);
+				state.setJoint(leader, position + epsilon);
+				var plus = lengths(posedBelt(belt, path, state), path, state, anchor, heldPhase);
+				state.setJoint(leader, position - epsilon);
+				var minus = lengths(posedBelt(belt, path, state), path, state, anchor, heldPhase);
+				var da = (plus[0] - minus[0]) / (2 * epsilon);
+				var db = (plus[1] - minus[1]) / (2 * epsilon);
+				if (at == 2 && Math.abs(da + db) < 1e-5 && Math.abs(da - db) > 1e-6) {
+					var balanced = position + (current[1] - current[0]) / (da - db);
+					if (balanced > lead.lower && balanced < lead.upper) positions.push(balanced);
+				}
+				weakest = Math.min(weakest,
+					energy(TimingBelt.cordStiffnessPerMm(belt.beltProfile) * belt.width, current, da, db));
 			}
-			var ea = TimingBelt.cordStiffnessPerMm(belt.beltProfile) * belt.width;
-			var stiffness = energy(ea, current, da, db);
-			weakest = Math.min(weakest, stiffness);
 		}
 		if (!(weakest > 0) || !Math.isFinite(weakest))
 			throw new TransmissionDesignError('Belt "${path.belt}" clamp does not resist "$leader"; update its clamp and wrap attachments');
@@ -127,6 +163,8 @@ class BeltStretch {
 	public static function posedBelt(belt:TimingBelt, path:BeltPathRecord, state:AssemblyState):TimingBelt {
 		var inverse = AssemblyFrames.inverse(state.worldPose(path.belt));
 		var original = belt.wraps();
+		if (path.wraps == null || path.wraps.length != original.length)
+			throw new TransmissionDesignError('Belt "${path.belt}" path has ${path.wraps == null ? 0 : path.wraps.length} wrap attachments for ${original.length} wraps');
 		var wraps:Array<BeltWrap> = [];
 		for (index in 0...path.wraps.length) {
 			var reference = path.wraps[index];

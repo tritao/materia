@@ -103,6 +103,18 @@ class PlanCheckTests extends MotionKitTestSupport {
   }
 
   public function testPlanCheck():Void {
+    var partial = machine([1.0, 0.0, 0.0], false, 2000.0);
+    var unrelated = partial.addJoint(new Joint("first", JointType.Prismatic,
+      partial.links[0], partial.addLink(new Link("first-body"))));
+    unrelated.limits = new JointLimits(-1.0, 1.0);
+    partial.joints.remove(unrelated);
+    partial.joints.unshift(unrelated);
+    partial.addActuator(new Actuator("first-motor", 1.0, 1.0,
+      Transmission.SimpleTransmission("first", 1.0, 0.0)));
+    var one = new PlanCheck(partial, ["slide"]);
+    this.check(one.axisLoads().length == 1 && one.axisLoads()[0].axis == "slide" &&
+      one.axisLoads()[0].elastic != null && one.axisLoads()[0].elastic.deflections([10.0]).length == 1,
+      "a partial plan uses its own driven axis even when another comes first in the model");
     var options = new PlanCheckOptions();
     options.steady = new SteadyLoads(5.0);
     var flat = machine([1.0, 0.0, 0.0], false);

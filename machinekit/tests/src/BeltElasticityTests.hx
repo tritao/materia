@@ -72,5 +72,57 @@ class BeltElasticityTests {
 		var changed = DriveLoads.forAxis(series, "axis");
 		if (changed == null) throw "Series drive disappeared";
 		near(changed.stiffness, load.stiffness, "network ownership prevents double-counting scalar reports");
+
+		var mixed = model(["screw", "shaft", "motor", "orphan", "orphanOutput"]);
+		var reduction = mixed.addCoupling(new JointCoupling("reduction", "shaft", "motor", 2, 0));
+		mixed.elasticNetworks.push(new ElasticNetwork("driven-belt", ["reduction"], [
+			{stiffness: 4000, terms: [{joint: "shaft", coefficient: 1.0}, {joint: "motor", coefficient: -0.5}]}]));
+		mixed.elasticNetworks[0].assumptions.push({quantity: "stiffness", label: "belt stiffness with pretension"});
+		mixed.elasticNetworks.push(new ElasticNetwork("unbound-belt", [], [
+			{stiffness: 4000, terms: [{joint: "orphan", coefficient: 1.0}, {joint: "orphanOutput", coefficient: -1.0}]}]));
+		hold(mixed, "screw"); hold(mixed, "motor");
+		var mixedLoads = DriveLoads.of(mixed);
+		if (mixedLoads.length != 2) throw "Mixed machine needs its screw and belt axes";
+		var screw:Null<AxisLoad> = null, shaft:Null<AxisLoad> = null;
+		for (item in mixedLoads) if (item.axis == "screw") screw = item else if (item.axis == "shaft") shaft = item;
+		if (screw == null || shaft == null || screw.stiffness != 0 || shaft.stiffness <= 0)
+			throw "Independent screw must stay rigid beside a shaft-belt network";
+		for (assumption in screw.assumptions) if (assumption.label == "belt stiffness with pretension")
+			throw "Belt assumptions leaked onto an independent screw";
+		var screwOnly = DriveLoads.of(mixed, null, ["screw"]);
+		if (screwOnly.length != 1 || screwOnly[0].elastic == null) throw "Partial plan must retain its own compliance";
+		near(screwOnly[0].elastic.deflections([10])[0], 0, "held independent screw has no belt deflection");
+		var wrongSize = false;
+		try screwOnly[0].elastic.deflections([]) catch (_:Dynamic) wrongSize = true;
+		if (!wrongSize) throw "Compliance must reject a partial force vector of the wrong size";
+
+		var summed = model(["out", "first", "second"]);
+		var first = summed.addCoupling(new JointCoupling("first-path", "first", "out", 1, 0));
+		first.backlash = 0.1;
+		var second = summed.addCoupling(new JointCoupling("second-path", "second", "out", 1, 0));
+		second.backlash = 0.2;
+		summed.elasticNetworks.push(new ElasticNetwork("other-belt", [], [
+			{stiffness: 4000, terms: [{joint: "first", coefficient: 1.0}, {joint: "second", coefficient: -1.0}]}]));
+		hold(summed, "first"); hold(summed, "second");
+		near(new ElasticSolve(summed, [new AxisLoad("out", false, 1, 0, false, 0)]).backlash[0], 0.2,
+			"parallel coupling lost motion takes its largest bound");
+
+		var partial = model(["x", "y", "motor", "screw", "screwMotor"]);
+		partial.addCoupling(new JointCoupling("x-to-motor", "x", "motor", 2, 0));
+		partial.addCoupling(new JointCoupling("y-to-motor", "y", "motor", 2, 0));
+		partial.elasticNetworks.push(new ElasticNetwork("one-belt", [], [
+			{stiffness: 4000, terms: [{joint: "x", coefficient: 1.0}, {joint: "motor", coefficient: -0.5}]}]));
+		var screwPath = partial.addCoupling(new JointCoupling("screw-path", "screw", "screwMotor", 2, 0));
+		screwPath.stiffness = 1000;
+		hold(partial, "motor"); hold(partial, "screwMotor");
+		var partialLoads = DriveLoads.of(partial);
+		if (partialLoads.length != 3 || partialLoads[0].stiffness != 0 || partialLoads[1].stiffness != 0 ||
+			partialLoads[2].stiffness <= 0 || partialLoads[2].elastic == null)
+			throw "A partly bound coupled pair must not suppress its independent screw's stiffness";
+		var partialErrors = partial.validate();
+		if (partialErrors.length == 0 || partialErrors[0].indexOf("under-actuated") < 0)
+			throw 'A partly bound coupled pair needs a design diagnostic: $partialErrors';
+		if (!(partial.coupledLimits("x").requireEffort() > 0 && partial.coupledLimits("y").requireEffort() > 0))
+			throw "Partly bound coupled axes retain the per-axis limit of their bound motor";
 	}
 }

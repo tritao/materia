@@ -173,7 +173,8 @@ Deployment schema v5 implies RKD6 and omits `protocol`. Its `device.controller`
 is the 32-hex-digit unique id of the board; the layout wires channels to the
 model's actuators (see `robotkit.device.DeviceBinding`). The motor's full steps
 and driver microstepping come from the machine model. The layout states direction
-and confirms the driver's microsteps (legacy models may state them only in the layout).
+and uses the driver's microsteps from the model. Layout schema v1 rejects
+driver settings on channels.
 The step tick comes from `device.step_tick_hz`; the binding derives each channel's
 steps per radian, ratio, rate ceiling and direction setup, and refuses a
 stepper without a channel or a channel without a stepper. Pulse frequency is bounded

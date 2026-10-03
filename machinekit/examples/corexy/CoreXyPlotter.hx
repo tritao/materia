@@ -267,13 +267,13 @@ class CoreXyPlotter extends MachineAssembly {
 		var signs = [sign(strands[0].dx)];
 		if (onFrame) signs.push(sign(strands[1].dy));
 		var axes = ["x", "y"];
-		for (index in 0...signs.length)
+		for (index in 0...signs.length) if (signs[index] != 0)
 			addTransmission('$id-${axes[index]}', axes[index], '$id-turn', (id == "pulleyA" || id == "pulleyB" ? Transmission.TimingBelt(beltId, id) : Transmission.BeltIdler(beltId, id)),
 				SenseTools.fromAlignment(wrap.side * signs[index]));
 		addMateOnAxis('$id-turn', "continuous", parent, 'to-$id', id, 'attach-$id', {x: 0, y: 0, z: 1}, 0);
 	}
 
-	static function sign(value:Float):Int return value > 0 ? 1 : -1;
+	static function sign(value:Float):Int return value > 1e-9 ? 1 : value < -1e-9 ? -1 : 0;
 
 	function component(id:String):MachineComponent {
 		for (entry in components()) if (entry.id == id) return entry.component;

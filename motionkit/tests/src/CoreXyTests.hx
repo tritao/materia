@@ -245,8 +245,10 @@ class CoreXyTests extends MotionKitTestSupport {
     }
     this.check(worstDeviation > 0.0, "the actual belts predict nonzero CoreXY deflection");
     Sys.println('corexy belt accuracy: ${Math.round(worstDeviation * 1e6) / 1000} mm worst deviation at planned limits');
-    // Far above them, a move along one axis overloads both motors alike, and one along the diagonal the motor that
-    // turns. Equal X/Y caps make the diagonal exactly straight, keeping the other motor still.
+    // Far above them, a move along one axis overloads both motors alike. On a
+    // diagonal, motor A stands still but must hold the unequal X/Y inertial
+    // loads; at ten times the allowed acceleration that holding load also
+    // exceeds its torque ceiling.
     function flagged(move:Array<Float>):String {
       var rough = plan(model, [0.0, 0.0], move, 10.0, options.steady, move[0] == move[1]);
       var result = check.check(rough, 2, 0.0);
@@ -265,7 +267,11 @@ class CoreXyTests extends MotionKitTestSupport {
     this.check(flagged([0.03, 0.0]) == "motorA,motorB", "x alone overloads both motors");
     this.check(flagged([0.0, 0.03]) == "motorA,motorB", "y alone overloads both motors");
     var diagonal = flagged([0.03, 0.03]);
-    this.check(diagonal.indexOf("motorB") >= 0 && diagonal.indexOf("motorA") < 0,
-      'a move along x = y overloads the motor that turns, not the one standing still: $diagonal');
+    var motorASpeedRatio = 0.0;
+    for (load in loads) for (motor in load.motors) if (motor.actuator.id == "motorA")
+      motorASpeedRatio += motor.ratio;
+    near(motorASpeedRatio, 0.0, "motor A stands still on an X=Y diagonal", 1e-9);
+    this.check(diagonal == "motorA,motorB",
+      'the unequal inertial loads also overload the stationary motor on a violent diagonal: $diagonal');
   }
 }

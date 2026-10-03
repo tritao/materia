@@ -211,19 +211,21 @@ class TimingBelt extends MachineComponent {
 
 	/** Assumed power efficiency of a timing belt drive. */
 	public static inline var DEFAULT_EFFICIENCY:Float = 0.97;
-	/** Assumed pulley and idler bearing drag, N m. */
+	/** Assumed belt-drive drag at a powered pulley, N m. */
 	public static inline var DEFAULT_DRAG:Float = 0.005;
+	/** Assumed rolling-bearing drag at a free idler, N m. */
+	public static inline var IDLER_BEARING_DRAG:Float = 0.0002;
 
 	/** Resolve from the current loop geometry and width, never a saved stiffness. */
 	public static function relation(belt:TimingBelt, pulley:TimingPulley, alignment:Float, idler:Bool = false):TransmissionRelation {
 		if (belt.beltProfile != pulley.beltProfile) throw new machinekit.transmission.TransmissionDesignError("Belt and pulley profiles differ; update the belt to match the pulley");
 		var result = new TransmissionRelation(alignment * 2 / pulley.pitchDiameter, idler ? 1.0 : DEFAULT_EFFICIENCY,
-			null, null, DEFAULT_DRAG);
+			null, null, idler ? IDLER_BEARING_DRAG : DEFAULT_DRAG);
 		if (!idler) {
 			result.setBasis("stiffness", ValueBasis.Assumed, "belt stiffness");
 			result.setBasis("efficiency", ValueBasis.Assumed, "belt efficiency");
 		}
-		result.setBasis("drag", ValueBasis.Assumed, "belt drag");
+		result.setBasis("drag", ValueBasis.Assumed, idler ? "idler bearing drag" : "belt drag");
 		return result;
 	}
 
@@ -273,6 +275,25 @@ class TimingBelt extends MachineComponent {
 			case GT2: 2500.0;
 			case _: throw "No belt stiffness is recorded for this profile";
 		};
+
+	/** Assumed 2.5% breaking strain with a 1.5 working factor; replace with a belt maker's rating. */
+	public function assumedWorkingTension():Float
+		return cordStiffnessPerMm(beltProfile) * width * 0.025 / 1.5;
+
+	/** Assumed installed tension: 20 N per mm of GT2 width until a tensioner setting is measured. */
+	public function assumedPretension():Float
+		return width * 20.0;
+
+	/** A belt under differential pulley force must keep both spans taut and below its working limit. */
+	public function checkTension(differential:Float, pretension:Float):Void {
+		if (!(pretension > 0) || !Math.isFinite(pretension) || !Math.isFinite(differential))
+			throw new TransmissionDesignError("Belt needs positive finite pretension and finite transmitted force");
+		var half = Math.abs(differential) / 2;
+		if (pretension <= half)
+			throw new TransmissionDesignError("Belt load slackens a span; increase pretension or reduce motor force");
+		if (pretension + half > assumedWorkingTension())
+			throw new TransmissionDesignError("Belt tight span exceeds its assumed working tension");
+	}
 
 	/**
 	 * Stiffness at a carriage clamped on strand `strand`, in N/mm of carriage travel, in the worst

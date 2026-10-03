@@ -380,7 +380,8 @@ class MachineAssemblyDescriptionTests {
 		assembly.addComponent("slider", new RobotFlange(50));
 		assembly.addComponent("screw", long);
 		assembly.addComponent("nut", new LeadScrewNut(thread));
-		assembly.addMateOnAxis("slide", "prismatic", "base", "face", "slider", "face", {x: 0, y: 1, z: 0});
+		assembly.addMateOnAxis("slide", "prismatic", "base", "face", "slider", "face", {x: 0, y: 1, z: 0}, 0,
+			{lower: -1e-9, upper: 1e-9, velocity: null, effort: null});
 		assembly.addMateOnAxis("turn", "continuous", "base", "face", "screw", "input", {x: 0, y: 1, z: 0});
 		assembly.addTransmission("lead", "slide", "turn", Transmission.LeadScrew("screw", "nut"), Same);
 		var cap = assembly.supportScrew("lead", Fixed, Free);
@@ -424,6 +425,14 @@ class MachineAssemblyDescriptionTests {
 		var description:MachineAssemblyDescription = haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(assembly.describe()));
 		var again = definition(MachineAssembly.fromDescription(description));
 		near(turnLimit(again), cap, "a rebuilt screw keeps its cap");
+		var transmissions = description.machine.transmissions;
+		if (transmissions == null || transmissions.length != 1) throw "Rebuilt screw transmission disappeared";
+		var unsupported = transmissions[0];
+		unsupported.near = null; unsupported.far = null;
+		var withoutSupport = MachineAssembly.fromDescription(description);
+		var reset = definition(withoutSupport), resetLimit:Null<Float> = null;
+		for (joint in reset.joints) if (joint.id == "turn") resetLimit = joint.limits.velocity;
+		if (resetLimit != null) throw "Removing screw support must clear its stale critical-speed cap";
 		var driveRecord = assembly.transmissionFor("lead");
 		if (driveRecord == null || driveRecord.near != Fixed || driveRecord.far != Free) throw "The drive records how its screw is held";
 		caught = false;
@@ -1058,6 +1067,18 @@ class MachineAssemblyDescriptionTests {
 			{instanceId: "driven", connectorName: "front"}]});
 		close(assembly.addTransmission("reduction", "input", "output", Transmission.BeltReduction("belt", "driver", "driven"), Same),
 			0.5, "belt reduction keeps direction and derives tooth ratio");
+		var wrongSense = false;
+		try machinekit.transmission.BeltStretch.reduction(belt,
+			{belt: "belt", wraps: [{instanceId: "driver", connectorName: "front"},
+				{instanceId: "driven", connectorName: "front"}]}, "input", "output", "driver", "driven",
+			machinekit.assembly.FrozenAssemblyDefinitions.thaw(assembly.describe().mechanical),
+			TimingBelt.reduction(belt, new TimingPulley(GT2, 20, 8, 6), new TimingPulley(GT2, 40, 8, 6), -1))
+		catch (error:machinekit.transmission.TransmissionDesignError) wrongSense = true;
+		if (!wrongSense) throw "Opposite Sense on a plain loop must be rejected";
+		var serpentine = new TimingBelt(GT2, 6, [new BeltWrap(0, 0, 10, 1),
+			new BeltWrap(100, 0, 10, -1), new BeltWrap(50, 60, 10, 1)]);
+		if (machinekit.transmission.BeltStretch.contactDirection(serpentine, 0, 1) != -1)
+			throw "Back-side serpentine contact must reverse pulley direction";
 		var definition = machinekit.assembly.FrozenAssemblyDefinitions.thaw(assembly.describe().mechanical);
 		var relation = definition.couplings[0], spring = relation.stiffness;
 		if (definition.elasticNetworks == null || definition.elasticNetworks.length != 1 ||

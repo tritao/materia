@@ -41,12 +41,16 @@ class RecipeContractTests {
 		checkRebuild(new SuctionCup(40, 18, 900, 0.2, "CUP-CUSTOM", Thread("G1/8"), "Custom cup"));
 		checkRebuild(new VacuumGenerator(80, "GEN-CUSTOM", PushIn(4), Thread("G1/4"), "Custom generator"));
 		for (type in MachineKitComponents.all()) {
-			for (parameter in type.parameters()) if (parameter.name == "servo") switch parameter.type {
-				case Choice(options):
-					for (rating in machinekit.motion.ServoMotor.ratings())
-						check(options.indexOf(rating.designation) >= 0,
-							'${type.id}: servo choices omit catalog entry ${rating.designation}');
-				case _: throw '${type.id}: servo selection needs catalog-derived choices';
+			for (parameter in type.parameters()) switch parameter.type {
+				case CatalogDesignation(index):
+					for (designation in index.designations()) {
+						var selection = type.create(type.defaults().setToken(parameter.name, designation));
+						check(selection.values().token(parameter.name) == designation,
+							'${type.id}: ${parameter.name} lost catalog entry $designation');
+						check(type.create(selection.values()).values().token(parameter.name) == designation,
+							'${type.id}: ${parameter.name} changed catalog entry $designation on rebuild');
+					}
+				default:
 			}
 			var seenValues:Map<String, Bool> = [];
 			var partNumbers:Map<String, String> = [];

@@ -727,6 +727,16 @@ class RobotWorldTests {
         Math.abs(targets[1].target - 4.0) < 1e-9;
       case _: false;
     }, "MobileBase factory commands the joints selected by authored roles");
+    check(mobile.velocityEnvelope != null, "wheel rates supply a coupled velocity envelope");
+    var previousTwist = mobile.currentCommand();
+    var turning = mobile.command(new Twist2(1.0, 2.0), 0.01);
+    check(Math.abs(turning.linear - previousTwist.linear) <= mobile.motionLimits.maxLinearAcceleration * 0.01 + 1e-9 &&
+      Math.abs(turning.angular - previousTwist.angular) <= mobile.motionLimits.maxAngularAcceleration * 0.01 + 1e-9,
+      "coupled wheel-speed limiting must not jump past the acceleration limit in one tick");
+    var wheelEnvelope = mobile.velocityEnvelope;
+    if (wheelEnvelope == null) throw "Mobile base lost its wheel envelope";
+    check(Math.abs(turning.linear) + Math.abs(turning.angular) * wheelEnvelope.trackWidth / 2 <= wheelEnvelope.groundSpeed + 1e-9,
+      "the acceleration-limited command remains inside the wheel-speed envelope");
 
     var forks = Forks.fromRobot(robot, model);
     var blueprintForks = Forks.fromBlueprint(robot, blueprint);

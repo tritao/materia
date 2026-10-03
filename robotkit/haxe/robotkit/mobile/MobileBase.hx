@@ -117,11 +117,34 @@ class MobileBase {
   /** Limits a body command and submits all drive joints as one RobotCommand. */
   public function command(twist:Twist2, ?durationSeconds:Float):Twist2 {
     if (safetyStopRequired) throw "MobileBase command rejected by an active safety stop";
-    var bounded = motionLimits.constrain(twist, previousCommand, durationSeconds);
+    var bounded = motionLimits.constrain(twist, previousCommand,
+      velocityEnvelope == null ? durationSeconds : null);
     bounded = driveModel.constrain(bounded);
     if (velocityEnvelope != null) {
       var allowed = velocityEnvelope.constrain(bounded.linear, bounded.angular);
       bounded = new Twist2(allowed.linear, allowed.angular, bounded.lateral);
+      if (durationSeconds != null) {
+        bounded = motionLimits.constrain(bounded, previousCommand, durationSeconds);
+        var envelope:UnicycleEnvelope = cast velocityEnvelope;
+        if (Math.abs(bounded.linear) + Math.abs(bounded.angular) * envelope.trackWidth / 2 >
+            envelope.groundSpeed + 1e-12) {
+          // Independent acceleration clamps can leave the wheel envelope.
+          // The segment from the previous feasible command stays inside both
+          // acceleration bounds; stop it at the envelope boundary.
+          var low = 0.0, high = 1.0;
+          for (_ in 0...30) {
+            var middle = (low + high) / 2;
+            var linear = previousCommand.linear + middle * (bounded.linear - previousCommand.linear);
+            var angular = previousCommand.angular + middle * (bounded.angular - previousCommand.angular);
+            if (Math.abs(linear) + Math.abs(angular) * envelope.trackWidth / 2 <= envelope.groundSpeed)
+              low = middle;
+            else high = middle;
+          }
+          bounded = new Twist2(previousCommand.linear + low * (bounded.linear - previousCommand.linear),
+            previousCommand.angular + low * (bounded.angular - previousCommand.angular),
+            previousCommand.lateral + low * (bounded.lateral - previousCommand.lateral));
+        }
+      }
     }
     var targets = driveModel.targets(bounded);
     if (targets == null || targets.length == 0)

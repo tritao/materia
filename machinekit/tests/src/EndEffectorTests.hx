@@ -81,6 +81,12 @@ class EndEffectorTests {
 		if (findings.length != 2 || findings[0].code != "eoat.missing-mount" ||
 			findings[1].code != "eoat.invalid-frame" || findings[1].subject != "bad")
 			throw "End effector diagnostics must collect mount and frame faults";
+		broken.diagnostics.error("transmission.parts", "plate", "A source part cannot rebuild");
+		var copiedBroken = new EndEffector();
+		broken.copyInto(copiedBroken);
+		if (copiedBroken.diagnostics.items.length != 1 ||
+			copiedBroken.diagnostics.items[0].code != "transmission.parts")
+			throw "End effector copies must retain diagnostic findings";
 
 		var missing = new EndEffector();
 		missing.addComponent("plate", new EndEffectorTestPart("PLATE", 1));

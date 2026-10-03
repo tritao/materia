@@ -202,7 +202,7 @@ typedef struct nksim_joint_desc {
     double axis_a[3]; /**< Unit vector in body_a's own frame. */
     double lower_limit;
     double upper_limit;
-    double max_force;
+    double max_force; /**< 0: unspecified; negative: explicitly unpowered; positive: force ceiling. */
     /**
      * Joint-frame orientation relative to body_a/body_b (x, y, z, w),
      * appended after the original fields so an old struct prefix remains
@@ -272,7 +272,7 @@ typedef struct nksim_joint_target {
     nksim_joint joint;
     uint32_t mode;
     double target;
-    double max_force;
+    double max_force; /**< 0: inherit joint ceiling; negative: unpowered; positive: override ceiling. */
     /* NKSIM_JOINT_TARGET_SERVO terms, read when struct_size includes them. */
     double velocity;
     double stiffness;

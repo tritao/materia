@@ -108,6 +108,8 @@ class FoldedZBearingPlate extends MachineComponent {
 
 /** Two short webs lead from the screw bearing to a motor pad forward and to its right. */
 class FoldedZMotorPlate extends MachineComponent {
+	/** Total X adjustment; its projection onto the screw-to-motor line tensions the loop. */
+	public static inline var TENSION_TRAVEL:Float = 5.0;
 	public final motor:NemaStepper;
 	public final x:Float;
 	public final y:Float;
@@ -122,12 +124,16 @@ class FoldedZMotorPlate extends MachineComponent {
 			Part.box(16, -y + 32, 8).translated(new Vector(x, (y + 20) / 2, 0)),
 			Part.box(70, 70, 8).translated(new Vector(x, y, 0))]);
 		if (detail == Envelope) return body;
-		var holes:Array<Part> = [Part.cylinderSpan(motor.variant.shaftDiameter / 2 + 1, -1, 10).translated(new Vector(x, y, 0))];
-		for (bolt in motor.boltPattern()) holes.push(Part.cylinderSpan(
-			motor.mountScrew(10).clearanceDiameter(ClearanceFit.Medium) / 2, -1, 10)
-			.translated(new Vector(x + bolt.x, y + bolt.y, 0)));
+		var holes:Array<Part> = [slot(x, y, (motor.spec.pilotDiameter + 0.2) / 2)];
+		for (bolt in motor.boltPattern()) holes.push(slot(x + bolt.x, y + bolt.y,
+			motor.mountScrew(10).clearanceDiameter(ClearanceFit.Medium) / 2));
 		return Solids.cut(body, holes);
 	}
+	static function slot(x:Float, y:Float, radius:Float):Part
+		return Solids.union([
+			Part.cylinderSpan(radius, -1, 10).translated(new Vector(x - TENSION_TRAVEL / 2, y, 0)),
+			Part.cylinderSpan(radius, -1, 10).translated(new Vector(x + TENSION_TRAVEL / 2, y, 0)),
+			Part.box(TENSION_TRAVEL, 2 * radius, 11).translated(new Vector(x, y, -1))]);
 }
 
 /**

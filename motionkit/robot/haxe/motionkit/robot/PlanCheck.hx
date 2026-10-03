@@ -77,7 +77,7 @@ class PlanCheck {
     this.model = model;
     this.jointIds = jointIds.copy();
     this.options = options == null ? new PlanCheckOptions() : options.copy();
-    for (load in DriveLoads.of(model, this.options.steady)) {
+    for (load in DriveLoads.of(model, this.options.steady, jointIds)) {
       var index = jointIds.indexOf(load.axis);
       if (index < 0) continue;
       loads.push(load);

@@ -52,7 +52,7 @@ class MixedScene {
       joint.axis = axes[i];
       joint.limits.lower = -2.0 * Math.PI;
       joint.limits.upper = 2.0 * Math.PI;
-      joint.limits.velocity = 0.0;
+      joint.limits.velocity = null;
       joint.limits.maxAcceleration = 0.3;
     }
     return RobotRuntimeCompiler.compile(model);
@@ -148,15 +148,14 @@ class MixedScene {
     var harness = new SimulationHarness(TIMESTEP, SUBSTEPS, SimulationSpace.MUJOCO);
     var simulation = harness.simulation;
     var machine:Null<RobotRuntime> = null;
-    var boxes:Array<Null<Array<Float>>>;
     var blueprint:RobotRuntimeBlueprint;
     if (name == "gantry bed") {
       blueprint = gantry();
-      boxes = [[0.4, 0.4, 0.05], null, null, null];
     } else {
       blueprint = arm();
-      boxes = [[0.4, 0.4, 0.05], null, null, null, null, null, null];
     }
+    var boxes:Array<Null<Array<Float>>> = [for (index in 0...blueprint.links.length)
+      index == 0 ? [0.4, 0.4, 0.05] : null];
     // The bed or base link is centred on the robot's origin, 0.5 m up: top at 0.55.
     machine = simulation.addRobotAtPose(blueprint, [3.0, 0.0, 0.5], [0.0, 0.0, 0.0, 1.0], null, boxes);
     var g1Blueprint = RobotRuntimeCompiler.compile(humanoid);
@@ -185,11 +184,13 @@ class MixedScene {
     check(alone.failedSteps == 0, 'the arm and the gantry alone fail ${alone.failedSteps} steps');
     var mixed = job(g1);
     check(alone.trace.length == mixed.trace.length, "the traces differ in length");
-    // The gantry has no constraint of its own, so it must match bit for bit.
-    // The arm's boxes touch each other, and those contacts are solved in the
-    // one MuJoCo model the G1 also lives in, so the arm matches only to solver
-    // round-off (see MIXED_SCENE.md).
+    // Both robots share one MuJoCo solve with the G1, so their trajectories
+    // match to solver round-off (see MIXED_SCENE.md).
     var armWorst = 0.0, gantryWorst = 0.0, armLength = 6 * 3 + 7 * 7, record = armLength + 3 * 3 + 4 * 7;
+    var armTravel = 0.0;
+    for (tick in 0...TICKS)
+      armTravel = Math.max(armTravel, Math.abs(mixed.trace[tick * record] - mixed.trace[0]));
+    check(armTravel > 0.05, 'the mixed-scene arm stayed frozen (joint travel $armTravel rad)');
     for (i in 0...alone.trace.length) {
       var difference = Math.abs(alone.trace[i] - mixed.trace[i]);
       if (i % record < armLength) armWorst = Math.max(armWorst, difference);
@@ -201,7 +202,7 @@ class MixedScene {
     check(mixed.failedSteps == 0, 'a G1 fault failed ${mixed.failedSteps} session steps');
     check(mixed.safeties[0] != RobotKitRuntimeConstants.RK_SAFETY_FAULT &&
       mixed.safeties[1] != RobotKitRuntimeConstants.RK_SAFETY_FAULT, "the arm or the gantry faulted");
-    check(gantryWorst == 0.0, 'the gantry trajectory changed by $gantryWorst with the G1 in the session');
+    check(gantryWorst < 1e-9, 'the gantry trajectory changed by $gantryWorst with the G1 in the session');
     check(armWorst < 1e-9, 'the arm trajectory changed by $armWorst with the G1 in the session');
 
     for (name in ["gantry bed", "arm base"]) {

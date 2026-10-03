@@ -277,14 +277,7 @@ class SensorConfiguration {
       centerOfMass:link.centerOfMass.copy(), inertiaTensor:link.inertiaTensor.copy(),
       visualGeometry:link.visualGeometry, collisionGeometry:link.collisionGeometry,
       collisionShapes:[for (shape in link.collisionShapes) RobotModelCodec.encodeCollisionShape(shape)]}],
-    joints: [for (joint in value.joints) {id:joint.id, name:joint.name, type:joint.type,
-      parentId:joint.parent.id, childId:joint.child.id,
-      parentFramePosition:joint.parentFramePosition.copy(),
-      parentFrameRotation:joint.parentFrameRotation.copy(),
-      childFramePosition:joint.childFramePosition.copy(),
-      childFrameRotation:joint.childFrameRotation.copy(), axis:joint.axis.copy(),
-      limits:{lower:joint.limits.lower,upper:joint.limits.upper,
-        velocity:joint.limits.velocity,effort:joint.limits.effort}}],
+    joints: [for (joint in value.joints) jointRecord(joint)],
     frames: [for (frame in value.frames) {id:frame.id, name:frame.name, linkId:frame.link.id,
       position:frame.position.copy(), rotation:frame.rotation.copy()}],
     mobileBase: mobileRecord(value.mobileBase),
@@ -295,6 +288,18 @@ class SensorConfiguration {
       noiseSeed:sensor.noiseSeed, startAngleRadians:sensor.startAngleRadians,
       fieldOfViewRadians:sensor.fieldOfViewRadians}]
   };
+  static function jointRecord(joint:Joint):Dynamic {
+    var record:Dynamic={id:joint.id, name:joint.name, type:joint.type,
+      parentId:joint.parent.id, childId:joint.child.id,
+      parentFramePosition:joint.parentFramePosition.copy(),
+      parentFrameRotation:joint.parentFrameRotation.copy(),
+      childFramePosition:joint.childFramePosition.copy(),
+      childFrameRotation:joint.childFrameRotation.copy(), axis:joint.axis.copy(),
+      limits:limitsRecord(joint.limits)};
+    var mechanical=joint.mechanicalLimits;
+    if(mechanical!=null)Reflect.setField(record,"mechanicalLimits",limitsRecord(mechanical));
+    return record;
+  }
 
   static function mobileRecord(value:Null<RobotMobileConfiguration>):Dynamic {
     if (value == null) return null;
@@ -433,8 +438,9 @@ class SensorConfiguration {
       }
       var limits:Dynamic=Reflect.field(value,"limits");
       if(limits==null)throw "Sensor joint requires limits";
-      joint.limits=new JointLimits(finite(limits,"lower"),finite(limits,"upper"),
-        finite(limits,"velocity"),finite(limits,"effort"));
+      joint.limits=readLimits(limits);
+      var mechanical:Dynamic=Reflect.field(value,"mechanicalLimits");
+      if(mechanical!=null)joint.mechanicalLimits=readLimits(mechanical);
       model.addJoint(joint);
     }
     var mobileData:Dynamic = Reflect.field(data, "mobileBase");
@@ -555,6 +561,28 @@ class SensorConfiguration {
     var result:Float = cast field;
     if (!Math.isFinite(result)) throw 'Non-finite sensor document field $name';
     return result;
+  }
+  static function limitsRecord(limits:JointLimits):Dynamic {
+    var record:Dynamic={lower:limits.lower,upper:limits.upper,velocity:limits.velocity,
+      effort:limits.effort};
+    if(limits.maxAcceleration!=null)Reflect.setField(record,"maxAcceleration",limits.maxAcceleration);
+    if(limits.overtravel!=0.0)Reflect.setField(record,"overtravel",limits.overtravel);
+    if(limits.assumptions.length>0)Reflect.setField(record,"assumptions",
+      [for (item in limits.assumptions) {quantity:item.quantity,label:item.label}]);
+    if(limits.velocityLimiter!="")Reflect.setField(record,"velocityLimiter",limits.velocityLimiter);
+    return record;
+  }
+  static function readLimits(value:Dynamic):JointLimits {
+    var limits=new JointLimits(finite(value,"lower"),finite(value,"upper"),
+      optionalFinite(value,"velocity"),optionalFinite(value,"effort"),optionalFinite(value,"maxAcceleration"));
+    var overtravel=optionalFinite(value,"overtravel");
+    if(overtravel!=null)limits.overtravel=overtravel;
+    var limiter=optionalString(value,"velocityLimiter");
+    if(limiter!=null)limits.velocityLimiter=limiter;
+    var assumptions:Dynamic=Reflect.field(value,"assumptions");
+    if(assumptions!=null)for(item in cast(assumptions,Array<Dynamic>))
+      limits.assumptions.push({quantity:requiredString(item,"quantity"),label:requiredString(item,"label")});
+    return limits;
   }
   static function vector(value:Dynamic, name:String, count:Int):Array<Float> {
     var items = requiredArray(value, name); if (items.length != count) throw 'Invalid sensor document vector $name';

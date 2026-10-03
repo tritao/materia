@@ -44,6 +44,11 @@ class MotionKitBootstrapTests {
       Sys.println('Session end tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
     }
+    if (Sys.getEnv("MOTIONKIT_HOLD_ONLY") == "1") {
+      sessionTests.testHoldDecelerationStaysWithinLimitsThroughoutMove();
+      Sys.println('Hold limit tests passed (${MotionKitTestSupport.assertions} assertions)');
+      return;
+    }
     if (Sys.getEnv("MOTIONKIT_BLEND_ONLY") == "1") {
       plannerTests.testToleranceBlend();
       Sys.println('Blend focused tests passed (${MotionKitTestSupport.assertions} assertions)');

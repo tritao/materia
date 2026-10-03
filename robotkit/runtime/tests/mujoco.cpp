@@ -695,6 +695,9 @@ static void actuator_limit_stalls_then_lifts() {
     const auto strong = run_gravity_arm(gravity_arm(20.0, 0.0, 2.0), lift, 3.0);
     assert(std::abs(strong.position + 0.3) < 0.01);
     assert(std::abs(strong.effort) < 20.0);
+    const auto unpowered = run_gravity_arm(gravity_arm(0.0), lift, 1.0);
+    assert(unpowered.position > 0.2);
+    assert(std::abs(unpowered.effort) < 1e-8);
 }
 
 // A servo target is a plain PD with feedforward: it sags by load / stiffness,

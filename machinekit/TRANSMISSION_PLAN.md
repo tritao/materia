@@ -1374,11 +1374,10 @@ the 24 V → supply-derived wheel limits and the `RobotArm.hx` changes.
 
 #### X9e — Review fixes for X9
 
-Status: planned (2026-10-03), from a review of X9 on local main `4b952231f` (X9 merged with the
-robot welder). X9 fixed what X9a–d set out to fix, but broke things outside its test gate and left
-some model errors. Fix them in this order. The gate is the **full** set: `x7-suite.sh` plus the app's
-worker demo (`WorkerDemoTests`), the humanoid tools and the robot welder checks, which X9's gate
-didn't cover.
+Status: complete (2026-10-03). `x7-suite-x9e-final2.txt` reports 11/11 kit suites, CadKit,
+MachineKit, app build and project-source suite at exit 0. Focused app worker/scene tests,
+humanoid tests and mixed-scene command, and native RobotKit/SimKit MuJoCo tests also passed.
+This review follows X9 on local main `4b952231f` (X9 merged with the robot welder).
 
 **Breaks (fix first):**
 
@@ -1447,6 +1446,10 @@ didn't cover.
 Also record in this plan that X9b removed CadKit `DocumentCodec` v1–v10 and the BimKit v2 import,
 beyond the kits X9b listed. The user accepted it with the no-compatibility policy.
 
+X9b also removed CadKit `DocumentCodec` v1–v10 and the BimKit v2 import. The
+user accepted both under the no-compatibility policy; old fixtures and docs
+describing those readers are historical only.
+
 **Watch:** the welder arm now plans at its drive caps (2.09–4.03 rad/s) instead of the 2.0 rad/s
 fallback. Check the robot welder's timing expectations (`ProjectSourceTests.checkRobotWelder`) and
 re-record any that move.
@@ -1475,8 +1478,55 @@ the folded-Z network, but did not establish correct behavior for every mixed mac
   example and keep the bridge assertions in MachineKit tests. Record and test that haxeon
   issue separately; do not claim the underlying compiler defect was fixed.
 
-Each fix is committed with the full gate passing, and each changed number is recorded here with a
-reason.
+The completed fix pass has a passing full gate, and each changed engineering number is recorded
+here with a reason.
+
+X9e resolves belt-network compliance only for axes connected by shared motors or elastic spans;
+independent screw axes retain their own solve and assumptions. Under-actuated groups keep a design
+diagnostic and per-axis limits without blocking independent groups. A pulley reduction gets its
+direction from the belt's contact sides and posed joint axes; an incompatible authored Sense is a
+design error. Every loaded screw pulley in a Z-sync loop receives tooth clearance. Belts use the
+same free-span spring calculation for carriage and shaft attachments, validate their wrap count,
+and state assumed pretension and a working-tension bound. The folded-Z motor pilot and bolts have
+5 mm tensioning slots; its 6 mm GT2 belt uses an assumed 120 N pretension and 250 N working limit.
+The folded stage still asserts 43.653927/21.826964 mm/s, 6117.456/3263.410 mm/s²,
+486.867 MN/m, 0.05/0.0505 mm backlash, and 36.9/37.1 kg with the baseline router.
+`describe()` still poses a copy for each rebuild: pose context is shared across its belt paths,
+but the copy remains proportional to assembly size and is not cached across rebuilds.
+
+X9e numerical changes from the X10 gate (per-tick wall times and collection counts are performance
+observations, not engineering baselines):
+
+- Assumed input inertia for a 60 x 40 mm gearbox 5e-5 → 5e-6 kg·m²: the size-scaled steel-class
+  estimate replaces a single oversized value. Other sizes scale with the authored diameter and
+  length; mass is recomputed from those dimensions on each rebuild. Arm mass stays 20.3 kg above
+  the flange, 150.1 kg in all, and pick/place stays 5.8/12/17.2/23.5 s.
+- Belt router controller-limited Y/X acceleration 12.25/14.06 → 12.35/14.17 m/s²: passive idlers
+  contribute bearing drag only where their pulley actually turns. Bare motor limits stay
+  12.79/15.08 m/s². Worst motor utilization 56.4 → 56.5%, and over-tolerance findings 76 → 64:
+  corrected idler drag and the 2-D softest-pose belt stiffness change the retimed load projection.
+  Worst deviation 1.759 → 1.758 mm, at line 252/op 9 → line 171/op 4: the new weakest path and
+  sampled load move the governing finding. The rounded 1.76 mm worst deviation remains unchanged.
+- MotionKit CoreXY planned X/Y acceleration 38.264/21.306 → 57.409/27.415 m/s²: unpowered
+  zero-ratio idlers no longer charge both axes bearing drag. The square takes 85 → 79 ticks and
+  peak motor rates 86.8/124.5 → 96.2/131.9 rad/s because the corrected drives accelerate more
+  strongly. Worst deviation 0.148 → 0.133 mm: the changed load and 2-D workspace stiffness alter
+  its elastic deflection. Bare speed and acceleration remain 204.1 rad/s, 649.6 mm/s and
+  71.5/34 m/s².
+
+The screw and belt router plate times remain 220.2/201.6 s; screw deviation/utilization remain
+0.05 mm/56.7%, and the belt keeps 57 flagged plans with no stepper stalls. The robot welder's
+20.2/21.6 s MuJoCo runs and four-side 19.9 s run match the X10 app log. The mobile cell keeps
+9.6/15.1/25.2/30.6/36.1/47.8/53.2/61 s mission steps and a 65 s obstacle round with 416 mm
+closest clearance and one replan. The mobile limiter now applies the wheel envelope before
+independent linear/angular acceleration caps, then stays inside their convex intersection;
+the first X9e gate found that scaling both acceleration deltas together delayed steering and
+hit a table, while the corrected focused mobile run follows the original route.
+
+The haxeon HXI dependency-order defect remains: `PackageResolver.resolveFiles` sorts interface
+files alphabetically, so `RobotKitInference` may register before its declared `RobotKitRuntime`
+dependency, which `Compiler` validates immediately. X10's local example workaround remains; a
+separate haxeon regression and compiler fix are still needed. No haxeon source was changed here.
 
 ### X10 — Belt reductions and loops between shafts
 
