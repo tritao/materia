@@ -1456,8 +1456,11 @@ reason.
 
 ### X10 — Belt reductions and loops between shafts
 
-Status: X10a–X10d implemented (2026-10-03); combined full-suite validation pending. Shared belt-span elasticity is implemented across MachineKit and RobotKit. Keep one commit per X10a–X10d and run the combined full suite after the
-complete milestone, as requested, rather than after each edit or step.
+Status: X10a–X10d complete (2026-10-03). Shared belt-span elasticity is implemented across
+MachineKit and RobotKit. The combined full suite passed after the complete milestone:
+`x7-suite-x10-final3.txt` reports 13/13 kit/CadKit stages, app build and project-source suite
+at exit 0. The intermediate X10a–X10d commits were checked with focused tests; the combined
+gate was run on the completed tree, as requested.
 
 X9c derives belt stiffness from the belt's path, but only for a belt clamped to a sliding
 carriage: `BeltStretch` throws unless the leader is prismatic. Common drives that turn a shaft
@@ -1514,7 +1517,7 @@ X10a implementation: source wire id 7, MachineKit schema 7, optional clamp for s
 paths, matching pulley pitch radii and rotary attachments, and assumed pretensioned stiffness.
 Tooth clearance is 1% of family pitch, pending measured data. Existing example numbers have
 not intentionally changed. The focused test project now includes the example roots and dependencies
-its source graph requires; the combined gate remains scheduled after X10d.
+its source graph requires; the completed milestone passed the combined gate.
 
 #### X10b — Belt loops with several driven pulleys
 
@@ -1580,8 +1583,8 @@ rather than silently counting their springs twice. This preserves current carria
 baselines and leaves the generic span-coordinate format available for that extension.
 
 Focused analytic checks cover the three-span matrix, load combinations, contact clearance,
-source order, serialization, common-axis screw constraints and series compliance. The combined
-suite is pending X10d; no existing example baseline has intentionally changed in X10b.
+source order, serialization, common-axis screw constraints and series compliance. No existing
+example baseline intentionally changed in X10b.
 The first combined run exposed seven authored RobotModel JSON fixtures at schema v7; X10b's
 RobotModel v8 bump requires their current-schema headers to be v8. Their physical data and
 numbers are unchanged. RobotKit's full test project passed after the fixture update.
@@ -1655,6 +1658,12 @@ The belt and its radial screw support are represented as manufacturable parts. T
 screw's bearing journal and axial-retention machining are not detailed in this example;
 the bearing is fixed in the assembly model. Those details would be required before
 fabrication, but they do not affect the modeled drive ratio or belt-span solve.
+
+Final combined gate: screw and belt router plates remain 220.2/201.6 s; belt worst deviation
+remains 1.76 mm. CoreXY remains 204.1 rad/s at its motors, 649.6 mm/s at its axes and
+71.5/34 m/s² (71.549 m/s² unrounded for X in the app). These are X9 baselines, unchanged
+by X10. The optional folded Z values above are the only intentionally changed example
+performance figures in this milestone. Router rebuild timings are recorded under X10c.
 
 Validation: one commit per step, focused checks when needed during implementation, and the
 combined full suite (`/home/joao/dev/materia-cache/claude-scratch/x7-suite.sh <tag>`) after X10d.
