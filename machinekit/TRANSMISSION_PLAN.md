@@ -1451,6 +1451,30 @@ beyond the kits X9b listed. The user accepted it with the no-compatibility polic
 fallback. Check the robot welder's timing expectations (`ProjectSourceTests.checkRobotWelder`) and
 re-record any that move.
 
+**X10 review findings to fix in the same pass (2026-10-03):** The passing X10 gate exercised
+the folded-Z network, but did not establish correct behavior for every mixed machine.
+
+- A network anywhere switches every axis to `ElasticSolve`. Scope assumptions, compliance,
+  backlash, and diagnostics to the network's connected axes. Test a CoreXY and an independent
+  screw axis alongside a shaft-belt network. Preserve the largest lost-motion allowance for
+  several couplings driving one joint, and keep an unbound motor from breaking unrelated axes.
+- Derive belt-reduction direction from the pulley contact sides and axes of the posed path;
+  validate authored `Sense` against that direction. Check an ordinary two-pulley loop and a
+  back-side serpentine wrap. A sign that only follows the authored coupling is insufficient.
+- Give every loaded screw pulley in a Z-sync loop the tooth-contact clearance, including
+  outputs joined by lead-screw constraints rather than their own reduction record.
+- Make the folded-Z motor mount tensionable with an explicit range and verify belt working
+  tension against a stated catalog or engineering limit. Assert its expected speed,
+  acceleration, stiffness, backlash and mass so those numbers cannot drift silently.
+- Finish the shared belt-span calculation for both carriage clamps and rotary attachments;
+  validate path wrap count before indexing; specify pretension and reject load cases that
+  would slacken a span. Record the cost of posing a copy on each `describe()` rebuild.
+- The app's dynamic project build exposed an HXI ordering defect: `PackageResolver.resolveFiles`
+  alphabetizes RobotKit's interfaces, registering `RobotKitInference` before its declared
+  `RobotKitRuntime` dependency. The X10 workaround was to leave CadBridge out of the router
+  example and keep the bridge assertions in MachineKit tests. Record and test that haxeon
+  issue separately; do not claim the underlying compiler defect was fixed.
+
 Each fix is committed with the full gate passing, and each changed number is recorded here with a
 reason.
 
