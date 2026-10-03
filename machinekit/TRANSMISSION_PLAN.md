@@ -703,9 +703,162 @@ latency.
   4. load-side path error (done);
   5. device counting.
 
+### X7 — Transmissions compile from their parts
+
+Status: planned (2026-10-03), after an architecture review of `1048bf7`. T0 (merge of local main)
+done in worktree `x7-transmissions`.
+
+Through X6 a drive was a prototype for finding the semantics. `Drive` is an enum, but
+`MachineAssembly` holds three string switches (`driveRatio`, `driveEfficiency`,
+`applyDriveAllowances`) that cast members to `LeadScrew`, `SpurGear`, `TimingPulley` or `Sprocket`
+and supply fixed efficiencies (0.98, 0.95, 0.97). `DriveRecord.kind` and the screw supports are
+strings on the wire. Some allowances are frozen numbers: `setDriveStiffness` keeps a belt's stiffness
+as a scalar that a rebuild does not work out again, a gear mesh never takes `GearPair.backlash`, and
+a screw's backlash and drag are `DriveDefaults` whatever its nut is. `Belt` also covers roller chains.
+
+X7 turns this into a small compiler: a **transmission** (the saved source: which parts, how they are
+arranged) resolves to a **relation** (ratio, efficiency, stiffness, backlash, drag, speed cap) that
+the assembly writes onto its `AssemblyJointCoupling`. The coupling is derived data. While a
+transmission exists, its coupling is never edited independently, and a rebuild always overwrites it.
+
+Decisions:
+
+- **Name.** The source concept is a *transmission*: `Drive` becomes `Transmission`, `addDrive`
+  becomes `addTransmission`, `DriveRecord` becomes `TransmissionRecord`, and `DriveDefaults` goes
+  away (T3). "Drive" is left for motor electronics (`StepperDrive`/`ServoDrive`, X8's drivers).
+- **A closed wire enum, not an open interface.** Transmissions are saved and read back, so the
+  source is a `@:wire enum`, and the dispatch is one exhaustive `switch` the compiler checks. The
+  equations live with the parts (`LeadScrew` with `LeadScrewNut`, `GearPair`, `Rack`/`SpurGear`,
+  `TimingBelt` with `TimingPulley`, `Sprocket`/`RollerChainSpec`), not in `MachineAssembly`.
+- **One result.** Ratio, efficiency, stiffness, backlash, drag and speed cap are resolved together
+  as one `TransmissionRelation`, so no allowance can come from a different place than the ratio.
+- **Coupling origin stays MachineKit-side.** ProjectKit does not learn about transmissions. A
+  coupling is derived when the machine-side record names it. `MachineAssembly` refuses direct
+  ratio/offset/allowance edits on such a coupling.
+- **Stated overrides stay explicit.** A machine that knows better (a measured belt stiffness, a
+  datasheet backlash) states it on the transmission, and the override is marked as stated (T5).
+
+#### T1 — One resolved relation, numbers unchanged
+
+- `machinekit.transmission.TransmissionRelation` (plain class): `ratio`, `efficiency`,
+  `stiffness:Null<Float>`, `backlash:Null<Float>`, `drag:Null<Float>`, `followerSpeedCap:Null<Float>`
+  (the screw's critical speed), in the coupling's units.
+- Each kind's equations move out of `MachineAssembly` into a static function next to its parts.
+  `MachineAssembly` keeps one call (resolve, then write the coupling and the joint's speed cap) in
+  `addDrive`/`applyDrive`.
+- Keep today's values exactly, `DriveDefaults` and the fixed efficiencies included. This step is a
+  pure move.
+- **Gate:** MachineKit, MotionKit, robotkit/cadbridge and the app's project-source suite pass, with
+  the same printed numbers: screw router plate 220.2 s, belt router 201.6 s with 1.9 mm worst
+  deviation, CoreXY motors 204.1 rad/s with axes to 649.6 mm/s, 71.6 (x) and 34 (y) m/s².
+
+#### T2 — Typed source, schema v3, rename
+
+- A wire enum for the source, roughly:
+  - `LeadScrew(screw, nut)`. The nut is a `LeadScrewNut` member: `LinearAxis` already has one; the
+    router models its nut brackets but no nuts, so it gains a Tr10×2 nut member on each bracket (on
+    the leader's slide, so it rides with the carriage). This adds BOM lines and mass.
+  - `GearMesh(driver, driven)`
+  - `RackAndPinion(pinion, rack:Null<String>)`
+  - `TimingBelt(belt, pulley, strand:Int)`, with the belt a member (the router already adds `beltX`
+    and `beltY…`; CoreXY adds its two belts)
+  - `RollerChain(chain:Null<String>, sprocket)`. Split from belts: a chain differs in compliance,
+    backlash, efficiency and chordal speed variation. No example uses it yet; the tests do.
+- `alignment:Float` (checked to be ±1 at runtime) becomes a wire enum `Sense { Same; Opposite; }`.
+- `TransmissionRecord`: `{coupling, source:<the enum>, sense, leaderZero, stiffness?, backlash?,
+  drag?, near?, far?, unsupported?}`; stiffness, backlash and drag are stated overrides.
+- Schema version 2 → 3. No saved JSON in the repo has drive kinds; examples and fixtures rebuild.
+  A v2 description is rejected with a clear message (no reader for the string form).
+- Rename throughout (machinekit, examples, tests, docs).
+- Screw supports: `supportScrew` stays (it needs the screw's joint to exist), but the record keeps
+  `near`/`far` as the existing `machinekit.motion.ScrewSupport` enum (`Free`/`Simple`/`Fixed`) made a
+  wire enum, not the `"free"/"simple"/"fixed"` strings. Deriving the support from the bearing parts
+  at each end is a later step, not part of X7.
+- **Gate:** the same relation values as T1 (ratios, efficiencies, allowances, caps). The source
+  changed, but the relation must not have. The router's new nut mass may move times slightly;
+  if it does, record why.
+
+#### T3 — Derive what was frozen
+
+Numbers move in this step. Record the new baselines in this plan with a one-line reason each.
+
+- **Belt stiffness** from the belt member on every resolve (`TimingBelt.carriageStiffness(strand)`).
+  `setDriveStiffness` is gone, replaced by a stated override. CoreXY: each motor's transmission
+  resolves its own belt; record the two-belt series stiffness the X5 notes left open.
+- **Gear backlash** from `GearPair.backlash` (tangential at the pitch circle), converted to leader
+  units (radians: divide by the driver's pitch radius). **Rack and pinion** takes the pinion's (plus
+  the rack's, if it states one), in mm.
+- **Lead-screw backlash, drag and nut friction** from the nut. `LeadScrewNut` gains a nut kind
+  (`PlainBronze`, `AntiBacklash`, `BallNut`, …) with catalog allowances. Today's
+  `DriveDefaults.LEAD_SCREW_BACKLASH` (0.05 mm) and drag (0.02 N m) become the `AntiBacklash`
+  values, so the router's numbers stay put if its nuts are that kind. Efficiency stays
+  `thread.efficiency()`, with the nut kind's friction where it differs (a ball nut is ~0.9).
+- **Fixed efficiencies** (gear 0.98, rack 0.95, belt 0.97) become each part family's documented
+  defaults, marked assumed (T5).
+- Delete `DriveDefaults`.
+
+#### T4 — One model of a screw
+
+`LinearAxis` builds its carriage-to-screw relation through `addTransmission(LeadScrew(...))` only.
+`LinearAxis.setTravel` sets the carriage joint and lets `AssemblyState` propagate the coupling.
+`LeadScrewTransmission` is deleted (its only other users are `MachineKitSmoke` checks, which move to
+the coupling).
+
+#### T5 — Provenance of engineering values
+
+The plan check turns these numbers into stall and accuracy claims, so it should say which inputs
+were assumed.
+
+- A small wire enum `ValueBasis { Derived; Catalog; Stated; Assumed; }` and, on the resolved
+  relation and on a motor's actuator, the set of fields whose basis is `Assumed`. Not a wrapper
+  around every float: generics and the wire format make `EngineeringValue<T>` costly for little gain.
+- Carried as an optional `assumed:ReadOnlyArray<String>` on projectkit `AssemblyJointCoupling` and
+  `AssemblyActuator`, then RobotKit `JointCoupling`/actuator via the CadKit bridge, then the `PlanCheck`
+  diagnostics: "predicted deviation 1.9 mm (assumed: belt stiffness, drag)". Written only when
+  non-empty, so other models keep their bytes.
+- Sources of `Assumed` today: the T3 family defaults, `TimingBelt.cordStiffnessPerMm`,
+  `NemaStepper.ratingCatalog` inductance/rotor inertia, the generic `ServoMotor` ratings.
+
+### X8 — Motor, driver and controller
+
+Planned (2026-10-03); after X7. Today one call mixes three pieces of hardware:
+`MachineAssembly.addMotor(id, joint, motor, volts, margin, gearbox)` takes the supply voltage, the
+torque margin and the gearbox as numbers. Microsteps live in the machining job's `controller`
+(`SceneArtifact`, `CncProgramPlayer`) and reach `DeviceLayout` channels. The step tick rate lives
+there too, and in `SerialDeployment`. A stepper's torque–speed curve depends on its driver (current,
+voltage, decay mode), and microsteps are a driver setting, so neither belongs to the motor or the
+job.
+
+Target split:
+
+- **Motor** (part): intrinsic only (holding torque, inductance, resistance, rotor inertia, step
+  angle; for a servo, rated/peak torque and speed). Unchanged from today's catalogs.
+- **Driver** (new part, `machinekit.motion.MotorDriver`; stepper and servo families): supply-voltage
+  range, current setting (A rms), microsteps, maximum step input rate, control mode. It has a BOM
+  line and service ports: power in, motor out, step/dir or bus in. Generic catalog entries, marked
+  assumed (e.g. a TMC2209-class and a DM542-class stepper driver, a generic servo amplifier).
+- **Supply**: the driver's voltage comes from the service graph (`upstream()` from its power port to
+  a supply part), not a number on `addMotor`. A machine without a modelled supply states the voltage
+  on the driver.
+- **Actuator binding**: `addMotor(id, joint, motor, driver, margin, ?gearbox)` names the motor and
+  driver members. The torque–speed curve resolves from motor + driver (voltage, current; a lower
+  current setting scales the torque). Microsteps go into `AssemblyActuator`, so `DeviceLayout` derives
+  them from the model, and the job's `controller.microsteps` goes away.
+- **Gearbox**: a member reference (the `Gearbox` part exists), not `gearRatio`/`gearEfficiency`
+  numbers on the motor record.
+- **Controller** (the board: step tick rate, bus cycle, channel count, identity) stays deployment
+  data (`SerialDeployment`, the job's `controller.stepTickHz`). The model never carries it. The
+  binding checks the driver's maximum step rate against it.
+- **Encoders** stay sensors (X6d). A servo's built-in encoder is a spec on the motor that adds an
+  encoder sensor on its joint when no separate encoder is wired.
+
+Steps: X8a driver part + catalog; X8b `addMotor` with a driver, the curve from motor + driver, and
+microsteps in the actuator (MotorRecord schema bump, router/CoreXY/arm/base updated); X8c supply via
+ports; X8d gearbox member; X8e job/deployment cleanup (`controller.microsteps` removed, step-rate check).
+
 ### Later
 
 Belt teeth drawn and moving with the belt: a mesh built in Haxe and
 updated per frame, shifted by the coupled joint's travel. It doubles as a
-visual check on a drive's sign and ratio. Also gearboxes as components, an
-editor UI to author couplings and drives, and differentials.
+visual check on a drive's sign and ratio. Also an editor UI to author transmissions, and
+differentials and planetaries (relations over more than two joints, beyond X5's summed terms).
