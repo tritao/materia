@@ -52,6 +52,7 @@ class BenchMill extends MachineAssembly {
 	public static inline var STOCK_DEPTH:Float = 40;
 	public static inline var STOCK_HEIGHT:Float = 20;
 	public static inline var STEP_TICK_HZ:Int = 40000;
+	public final vise:Null<machinekit.milling.PneumaticVise>;
 	public final base = new MillBase();
 	public final column = new MillColumn();
 	public final saddle = new MillSaddle();
@@ -70,8 +71,9 @@ class BenchMill extends MachineAssembly {
 	final zeroPoses = new Map<String, AssemblyFrame>();
 	final overtravel = new Map<String, Float>();
 
-	public function new() {
+	public function new(withVise:Bool = false) {
 		super();
+		vise = withVise ? new machinekit.milling.PneumaticVise(STOCK_DEPTH, STOCK_WIDTH) : null;
 		var railSpec = LinearRailBlock.metric(RAIL).spec;
 		var up = [0.0, 0, 1], alongX = [1.0, 0, 0], alongY = [0.0, 1, 0];
 		var baseTop = base.height;
@@ -136,12 +138,22 @@ class BenchMill extends MachineAssembly {
 		addMateOnAxis("spindle-turn", "continuous", "head", "to-spindle", "spindle", "attach-spindle", {x: 0, y: 0, z: 1});
 		attach("holder", holder, gaugeZero, "spindle");
 		attach("tool", tool, AssemblyFrames.translation(0, spindleY, gaugeZero.z - tool.stickout), "spindle");
-		attach("stock", new RouterPlate(STOCK_WIDTH, STOCK_DEPTH, STOCK_HEIGHT, "aluminium 6061", "Bearing block blank"),
-			AssemblyFrames.translation(tableX, saddleY, tableTop), "table");
-		// Both clamps hold the back corners, clear of the bearing seat and fastening recesses.
-		for (side in [-1, 1]) attach(side < 0 ? "clampLeft" : "clampRight", new ToeClamp(STOCK_HEIGHT),
-			AssemblyFrames.fromRotationMatrix(tableX + side * (STOCK_WIDTH / 2 - 8), saddleY + STOCK_DEPTH / 2, tableTop,
-				[0.0, -1, 0, 1.0, 0, 0, 0.0, 0, 1]), "table");
+		if (vise == null) {
+			attach("stock", new RouterPlate(STOCK_WIDTH, STOCK_DEPTH, STOCK_HEIGHT, "aluminium 6061", "Bearing block blank"),
+				AssemblyFrames.translation(tableX, saddleY, tableTop), "table");
+			// Both clamps hold the back corners, clear of the bearing seat and fastening recesses.
+			for (side in [-1, 1]) attach(side < 0 ? "clampLeft" : "clampRight", new ToeClamp(STOCK_HEIGHT),
+				AssemblyFrames.fromRotationMatrix(tableX + side * (STOCK_WIDTH / 2 - 8), saddleY + STOCK_DEPTH / 2, tableTop,
+					[0.0, -1, 0, 1.0, 0, 0, 0.0, 0, 1]), "table");
+		} else {
+			include("vise", vise, AssemblyFrames.translation(tableX, saddleY, tableTop));
+			zeroPoses.set("vise/body", AssemblyFrames.translation(tableX, saddleY, tableTop));
+			connect("table", "vise/body");
+			addMate("vise-mount", "fixed", "table", "to-vise/body", "vise/body", "attach-vise/body");
+			attach("stock", new RouterPlate(STOCK_WIDTH, STOCK_DEPTH, STOCK_HEIGHT, "aluminium 6061", "Bearing block blank"),
+				AssemblyFrames.translation(tableX, saddleY, tableTop + vise.datum.z), "vise/body");
+		}
+
 		exposeConnector("gaugeLine", "spindle", "gaugeLine");
 		exposeConnector("toolTip", "tool", "tip");
 		attach("powerSupply", new PowerSupply(48, 40, 4), AssemblyFrames.translation(-190, columnPose.y, 0), "base");
@@ -266,6 +278,10 @@ class BenchMill extends MachineAssembly {
 	}
 
 	public function workOffset():Array<Float> {
+		if (vise != null) {
+			var datum = AssemblyFrames.compose(zeroPose("vise/body"), vise.datum);
+			return [datum.x - gaugeZero.x, datum.y - gaugeZero.y, datum.z + STOCK_HEIGHT - gaugeZero.z];
+		}
 		var stock = zeroPose("stock");
 		return [stock.x - STOCK_WIDTH / 2 - gaugeZero.x, stock.y - STOCK_DEPTH / 2 - gaugeZero.y,
 			stock.z + STOCK_HEIGHT - gaugeZero.z];
@@ -276,10 +292,15 @@ class BenchMill extends MachineAssembly {
 		var origin = AssemblyFrames.translation(stock.x - STOCK_WIDTH / 2, stock.y - STOCK_DEPTH / 2, stock.z + STOCK_HEIGHT);
 		var inverse = AssemblyFrames.inverse(origin);
 		var result:Array<Fixture> = [];
-		for (entry in components()) if (entry.id == "clampLeft" || entry.id == "clampRight") {
+		var model = new cadkit.modeling.AssemblyModel("mm");
+		addTo(model, "");
+		var state = new cadkit.modeling.AssemblyState(model.definition("mill-fixtures"));
+		for (spec in specs) state.setJoint(spec.id, 0);
+		for (entry in components()) if (entry.id == "clampLeft" || entry.id == "clampRight" ||
+			entry.id == "vise/fixedJaw" || entry.id == "vise/movingJaw" || entry.id == "vise/endStop") {
 			var part = entry.component.geometry();
 			var bounds = part.shape.bounds(), minimum = bounds.get_min(), maximum = bounds.get_max();
-			var pose = AssemblyFrames.compose(inverse, zeroPose(entry.id));
+			var pose = AssemblyFrames.compose(inverse, state.worldPose(entry.id));
 			var low = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
 			var high = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
 			for (x in [minimum.get_x(), maximum.get_x()]) for (y in [minimum.get_y(), maximum.get_y()])

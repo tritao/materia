@@ -27,7 +27,7 @@ class BearingBlockJob {
 	static inline final BLEND = 0.00001;
 
 	/** The G-code that makes the plate's features on `mill`, read from its faces. */
-	public static function program(router:BenchMill, plate:BearingBlock, part:Part):String {
+	public static function program(router:BenchMill, plate:BearingBlock, part:Part, ?loadPosition:Array<Float>):String {
 		var faces = part.shape.faces().all();
 		// Work coordinates put the stock's front-left top corner at zero.
 		var shiftX = WIDTH / 2, shiftY = DEPTH / 2, top = HEIGHT;
@@ -55,7 +55,31 @@ class BearingBlockJob {
 		}
 		var controller = new CncController();
 		for (tool in tools) controller.toolLibrary.set(tool);
-		return CncWriter.write(job.finish(setup), controller);
+		var program = job.finish(setup);
+		if (loadPosition != null) {
+			var frame = toolpathkit.path.ToolpathFrame.of(program);
+			var last = new Point3(start[0] / 1000, start[1] / 1000, start[2] / 1000);
+			for (op in program.ops) {
+				frame.advance(op);
+				switch op {
+					case Move(_, geometry, _, _, _):
+						var p = toolpathkit.path.GeometryTools.pointAt(geometry, toolpathkit.path.GeometryTools.length(geometry));
+						var shift = frame.toMachine();
+						// Scene G54 is external to the CAM setup's work-coordinate origin.
+						last = new Point3(p.x + shift[0] + offset[0] / 1000,
+							p.y + shift[1] + offset[1] / 1000, p.z + shift[2] + offset[2] / 1000);
+					case _:
+				}
+			}
+			var end = program.ops.pop();
+			var raised = new Point3(last.x, last.y, loadPosition[2] / 1000);
+			var load = new Point3(loadPosition[0] / 1000, loadPosition[1] / 1000, loadPosition[2] / 1000);
+			var span = toolpathkit.path.Provenance.cam(program.ops.length + 1, "vise-load-position");
+			program.ops.push(toolpathkit.path.ToolpathOp.MachineMove(Rapid, Line(last, raised), 0, 0, span));
+			program.ops.push(toolpathkit.path.ToolpathOp.MachineMove(Rapid, Line(raised, load), 0, 0, span));
+			program.ops.push(end);
+		}
+		return CncWriter.write(program, controller);
 	}
 
 	/** Height of the floor under a recess outline: the upward face whose centre lies inside it. */

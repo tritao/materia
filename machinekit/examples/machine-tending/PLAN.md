@@ -372,13 +372,56 @@ Done. What was built and decided:
   - a `datum` connector.
 - The work offset comes from the datum (MT-D6). Remove the hand-typed offset path for this machine.
 - The load position comes from geometry: the axis values that bring the vise datum nearest the door opening.
-- The job runs on a blank seated against the datum, still as an assembly part.
+- Export the job on a blank seated against the datum, still as an assembly part. Keep the running bare-mill entrypoint for this step; enable the enclosed physical cut in MT5 after its jaw has a real clamp force. A free unactuated jaw cannot hold its preset during table acceleration.
 - Checks:
   - the door slides clear of the panels over its whole stroke;
   - the head at Z top clears the door opening;
   - the vise opening holds the blank with 1.5 mm clearance per side;
   - every enclosure part's hull error ratio is within the warning threshold.
 - **Reach study** (static check `TendingReach`): solve IK for the gripper at the vise (load position, tool down), at every tray slot and at the via-poses outside and inside the door, with at least 10 % joint margin and away from wrist singularity. Start with `Reach850` and try riser heights in 50 mm steps. Use `Reach1300` if no height works, or if the margin is under 10 %. Record the chosen class and riser here.
+
+Done. What was built and decided:
+- `MillPanel` is recipe-backed; enclosure walls, roof, four front-frame pieces, chip tray,
+  stand deck/legs and six cabinet panels are separate convex parts. The window uses reference
+  polycarbonate density 1200 kg/m³. The default bare-mill project keeps running; a separate
+  enclosed Start-page project previews the mechanics until MT5 supplies clamping force.
+- The mill's swept part bounds are [-585, -455, 0]..[445, 275, 900] mm. They determine panel
+  positions on the 750 mm stand and 2 mm tray. The 450 × 400 mm opening spans Z 878..1278 mm,
+  with its top 10 mm below the retracted head. The door travels 460 mm; an invariant Y
+  separating plane proves clearance over its complete X stroke, with CAD samples as a second
+  check. Every panel/window hull stays within 5% error.
+- The preset vise has 43 mm open jaw separation for the 40 mm blank (1.5 mm per side), a 6 mm
+  guided air stroke, two 10 mm parallels and an end stop. Its datum derives from the actual
+  locating faces, giving G54 [95, 55, -230] mm. Projection of that datum onto the table travel
+  gives the load position [95, 150, 0] mm. The typed toolpath ends with retract-then-position
+  `MachineMove` operations; export/recompile verifies their final G53 coordinates.
+- Static `TendingReach` chooses **Reach850 on a 550 mm riser**, with 15 poses (vise, two door
+  via-poses, twelve tray slots), 27.24693% minimum joint margin and minimum |sin(q5)| ≈ 1.
+  It checks the actual mill and open-door hulls with 5 mm clearance (1 mm for the tool at the
+  vise); the grasped blank is the intended contact target. The future gripper is explicitly
+  an assumed 80 × 50 × 150 mm body/finger envelope with 16 mm opening travel, not an MT8
+  operational gripper. World TCP frames and solved joints are returned for the later cell.
+- The doorway must pass the wrist as well as the tool: via height comes from its header,
+  tool length and wrist-module geometry. Numeric IK checks alternate elbow/wrist branches
+  when its first solution hits a panel; the first outfeed solution otherwise crossed the
+  right front frame. No clearance or joint-margin threshold was relaxed.
+- Clearance queries now skip nearest-point projection when a separating hull face already
+  proves the required distance. Close points keep the exact solver, including corner and
+  penetration checks. This preserves collision decisions and makes full mill-hull checks
+  practical; three RobotKit regressions cover the distance cutoff.
+- A diagnostic enclosed MuJoCo cut exposed the unactuated jaw drifting during table
+  acceleration (fault at 35.86 s). MT4 therefore exports and verifies the seated job but
+  leaves its physical cycle for MT5, instead of adding an artificial jaw lock or motor.
+  With the vise mass, derived acceleration is X 29.56 / Y 30.55 / Z 30.03 m/s²; rapid rates
+  remain X 15.10 / Y 25 / Z 25 m/min.
+- Full gate `mt4-final` passed every kit, CAD, MachineKit smoke, application build and complete
+  project-source suite. The focused RobotKit tool/process/weld/clearance suite also passed,
+  including the three new distance-cutoff assertions. All starting baselines and MT3 class
+  tracking numbers are unchanged. The bare mill still takes 49.98 s, removes 3716.5811 mm³,
+  and tracks X/Y/Z within 0.075366/0.050317/0.029369 mm at 10 ms. Its allocation measurement
+  is 67.5 KB/tick after moving fault-message construction off the test's successful tick path;
+  this is a measurement-harness change, not a simulation performance claim. The enclosed
+  project generation contains 103 parts and all five mechanical slides.
 
 **MT5. Pneumatics as actuators; switches and presence.**
 - Parts:
@@ -547,8 +590,8 @@ MT0 ─┬─ MT1 ── MT2 ─┬─ MT4 (reach study) ─┐
 | MT0 | done: main and X7+X8 merged | c5438ba4d, 8ad034403 |
 | MT1 | done | 592affc2f, 7d9f192b1, 5e40b76fe, 53248d881 |
 | MT2 | done | 06c9bf5fd, 73a14c58e |
-| MT3 | done | 4d58cd5d3 |
-| MT4 | planned | |
+| MT3 | done | 4d58cd5d3, 8a44aeb53 |
+| MT4 | done | pending commit |
 | MT5 | planned | |
 | MT6 | planned | |
 | MT7 | planned | |

@@ -80,6 +80,7 @@ class MachineKitComponents {
 			Gearbox.recipeType(),
 			GearedArmJoint.recipeType(),
 			machinekit.robotics.CobotJoint.moduleRecipeType(),
+			machinekit.milling.MillPanel.recipeType(),
 			FlangeBearingHousing.recipeType(),
 			LeadScrew.recipeType(),
 			machinekit.motion.BallScrew.ballRecipeType(),

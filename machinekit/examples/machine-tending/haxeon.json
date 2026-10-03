@@ -1,19 +1,19 @@
 {
 	"version": 1,
 	"package": {
-		"name": "machinekit-bench-mill-example"
+		"name": "machinekit-tending-reach"
 	},
-	"entry": "BenchMillPreview",
+	"entry": "TendingReach",
 	"sources": [
-		"BenchMill.hx",
-		"BenchMillPreview.hx",
-		"BearingBlock.hx",
-		"BearingBlockJob.hx",
-		"../cnc-router/CncRouter.hx",
-		"EnclosedBenchMill.hx"
+		"TendingReach.hx",
+		"TendingToolEnvelope.hx",
+		"../bench-mill/EnclosedBenchMill.hx",
+		"../bench-mill/BenchMill.hx",
+		"../cnc-router/CncRouter.hx"
 	],
 	"sourceRoots": [
 		".",
+		"../bench-mill",
 		"../cnc-router"
 	],
 	"dependencies": {
@@ -26,8 +26,11 @@
 		"machinekit": {
 			"path": "../../"
 		},
-		"manufacturingkit": {
-			"path": "../../../manufacturingkit"
+		"robotkit": {
+			"path": "../../../robotkit"
+		},
+		"cadbridge": {
+			"path": "../../../robotkit/cadbridge"
 		},
 		"toolpathkit": {
 			"path": "../../../toolpathkit"

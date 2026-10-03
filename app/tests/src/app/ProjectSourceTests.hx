@@ -1198,7 +1198,10 @@ class ProjectSourceTests {
     var generated = MateriaProjectRunner.loadProject(manifest);
     var definition:AssemblyDefinition = cast(generated.assemblyDefinition, AssemblyDefinition);
     var model = AssemblySimulationBridge.toRobotModel(definition, generated.physical).model;
-    var axes = [for (joint in model.joints) if (joint.type == JointType.Prismatic) joint];
+    var job = generated.cncJob;
+    if (job == null) throw "Mill project has no CNC job";
+    var axisNames = job.axes;
+    var axes = [for (joint in model.joints) if (axisNames.indexOf(Std.string(joint.id)) >= 0) joint];
     check([for (joint in axes) Std.string(joint.id)].join(",") == "y,x,z", "mill has three mechanical axes");
     var blueprint = RobotRuntimeCompiler.compile(model);
     check(blueprint.fastestPositionLoopRate() == 4000, "mill driver loop rate survives project generation");
@@ -1226,7 +1229,12 @@ class ProjectSourceTests {
       var allocated = hl.Gc.totalAllocated(), ticks = 0;
       while (player.passes == 0 && simulation.activeSession().simulationTime() < 600 && ticks++ < 1000000) {
         simulation.step();
-        check(simulation.cncFailure() == null, 'mill CNC job runs: ${simulation.cncFailure()}');
+        var failure = simulation.cncFailure();
+        if (failure != null) {
+          var observed = simulation.snapshot().robots()[0];
+          throw 'Mill CNC fault at ${simulation.activeSession().simulationTime()} s: $failure; joints ' +
+            [for (i in 0...model.joints.length) '${model.joints[i].id}=${observed.positions.get(i)}'].join(", ");
+        }
       }
       var bytes = (hl.Gc.totalAllocated() - allocated) / ticks;
       check(player.passes == 1, "mill completes one pass");
@@ -1262,6 +1270,22 @@ class ProjectSourceTests {
       session.dispose();
       throw error;
     }
+  }
+
+  /** The mechanical enclosure stays a preview until the pneumatic clamp is available. */
+  static function checkEnclosedMillProject(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/bench-mill/materia.enclosed.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var definition:AssemblyDefinition = cast generated.assemblyDefinition;
+    var model = AssemblySimulationBridge.toRobotModel(definition, generated.physical).model;
+    check([for (joint in model.joints) if (joint.type == JointType.Prismatic) joint].length == 5,
+      "enclosed project retains three mill axes, door and jaw");
+    check(generated.cncJob == null, "mechanical preview waits for the pneumatic clamp before cutting");
+    var state = new AssemblyState(definition);
+    var opening = state.worldConnector("chipTray", "doorOpening");
+    var datum = state.worldConnector("mill/vise/body", "datum");
+    check(opening.y < datum.y && opening.z < datum.z, "door opening and vise datum survive project generation");
+    Sys.println('enclosed mill project: ${generated.objects.length} objects, five mechanical slides');
   }
 
   static function checkCncRouter(root:String, belts:Bool = false):Void {
@@ -1847,6 +1871,7 @@ class ProjectSourceTests {
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mill") {
       checkBenchMill(root);
+      checkEnclosedMillProject(root);
       return 0;
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "router") {
@@ -2135,6 +2160,7 @@ class ProjectSourceTests {
     checkRobotWelder(root);
     checkMates(root);
     checkBenchMill(root);
+    checkEnclosedMillProject(root);
     checkCncRouter(root);
     checkBeltRouter(root);
     checkCoreXyPlotter(root);

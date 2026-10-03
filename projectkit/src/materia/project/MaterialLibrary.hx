@@ -26,6 +26,7 @@ class MaterialLibrary {
     material("rubber", "Rubber", [0.10, 0.10, 0.11], 0.0, 0.90, 1100, "rubber"),
     material("nitrile-rubber", "Nitrile rubber", [0.10, 0.10, 0.11], 0.0, 0.90, 1100, "nitrile rubber NBR"),
     material("plastic", "Engineering plastic", [0.28, 0.30, 0.32], 0.0, 0.55, 1200, "plastic"),
+    material("polycarbonate", "Polycarbonate", [0.58, 0.74, 0.79], 0.0, 0.2, 1200, "polycarbonate"),
     material("polyurethane", "Polyurethane", [0.26, 0.34, 0.37], 0.0, 0.65, 1200, "polyurethane PU"),
     material("plywood-birch", "Birch plywood", [0.70, 0.55, 0.34], 0.0, 0.72, 680, "birch plywood"),
     material("cast-iron", "Cast iron", [0.35, 0.37, 0.39], 0.60, 0.55, 7200, "cast iron"),

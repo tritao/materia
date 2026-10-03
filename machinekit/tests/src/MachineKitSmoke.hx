@@ -2609,6 +2609,8 @@ class MachineKitSmoke {
 		RobotArmChecks.run();
 		CncRouterChecks.run();
 		BenchMillPreview.BenchMillChecks.run();
+		BenchMillPreview.EnclosedMillChecks.run();
+		TendingReach.run();
 		CobotArmPreview.CobotArmChecks.run();
 		MobileBaseChecks.run();
 		RobotWelderChecks.run();

@@ -225,6 +225,18 @@ class ConvexSolid {
   }
 
   /**
+   * Exact distance when it can be below `threshold`; otherwise a lower bound at least that large.
+   * A separating face already proves a clearance test, without a nearest-point projection.
+   */
+  public function distanceBelow(x:Float, y:Float, z:Float, threshold:Float):Float {
+    for (index in 0...offsets.length) {
+      var d = normals[3 * index] * x + normals[3 * index + 1] * y + normals[3 * index + 2] * z - offsets[index];
+      if (d >= threshold) return d;
+    }
+    return distance(x, y, z);
+  }
+
+  /**
    * Where the ray from `o` along the unit vector `d` first meets the solid: the distance along it, zero when it starts
    * inside, or positive infinity when it misses or the solid is farther than `range`.
    */

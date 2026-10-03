@@ -183,19 +183,19 @@ class ArmClearance {
     var inverseB = tb.inverse();
     var inverseA = ta.inverse();
     var local = inverseB.transformPoint(centreA);
-    var coarse = b.solid.distance(local.x, local.y, local.z) - a.radius;
+    var coarse = b.solid.distanceBelow(local.x, local.y, local.z, a.radius + enough) - a.radius;
     if (coarse > enough) return coarse;
     local = inverseA.transformPoint(centreB);
-    coarse = a.solid.distance(local.x, local.y, local.z) - b.radius;
+    coarse = a.solid.distanceBelow(local.x, local.y, local.z, b.radius + enough) - b.radius;
     if (coarse > enough) return coarse;
     var best = Math.POSITIVE_INFINITY;
-    best = Math.min(best, sampled(a.points, inverseB.compose(ta), b.solid));
+    best = Math.min(best, sampled(a.points, inverseB.compose(ta), b.solid, enough));
     if (best < enough) return best;
-    return Math.min(best, sampled(b.points, inverseA.compose(tb), a.solid));
+    return Math.min(best, sampled(b.points, inverseA.compose(tb), a.solid, enough));
   }
 
   /** The least distance from `points` (x, y, z triples), taken through `target_T_points`, to `target`. */
-  static function sampled(points:Array<Float>, targetFromPoints:Transform3, target:ConvexSolid):Float {
+  static function sampled(points:Array<Float>, targetFromPoints:Transform3, target:ConvexSolid, enough:Float):Float {
     var q = targetFromPoints.rotation;
     var t = targetFromPoints.translation;
     var xx = q.x * q.x, yy = q.y * q.y, zz = q.z * q.z;
@@ -207,7 +207,7 @@ class ArmClearance {
     var count = Std.int(points.length / 3);
     for (i in 0...count) {
       var x = points[3 * i], y = points[3 * i + 1], z = points[3 * i + 2];
-      var d = target.distance(r00 * x + r01 * y + r02 * z + t.x, r10 * x + r11 * y + r12 * z + t.y, r20 * x + r21 * y + r22 * z + t.z);
+      var d = target.distanceBelow(r00 * x + r01 * y + r02 * z + t.x, r10 * x + r11 * y + r12 * z + t.y, r20 * x + r21 * y + r22 * z + t.z, enough);
       if (d < best) best = d;
     }
     return best;
