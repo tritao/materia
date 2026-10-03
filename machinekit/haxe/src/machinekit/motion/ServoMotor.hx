@@ -30,7 +30,7 @@ typedef ServoRating = {
  * through a `Gearbox`.
  *
  * The named ratings are generic: round numbers in the range of the 3000 rpm AC servo families made at 50,
- * 100 and 200 W (rated torque is power over 3000 rpm, peak three times that, 5000 rpm at most, a little
+ * 100, 200, 400 and 750 W (rated torque is power over 3000 rpm, peak three times that, 5000 rpm at most, a little
  * under 20 bits' worth of encoder). They are assumptions, not a vendor's datasheet.
  * CAD frame: mounting face at z=0, body toward -Z, shaft along +Z. Connectors: `mountFace`, `shaftAxis`.
  */
@@ -51,15 +51,25 @@ class ServoMotor extends MachineComponent implements MotorDrive {
 			table = [
 				generic("GENERIC-SERVO-50W", 50, 3.0e-6, 40, 70),
 				generic("GENERIC-SERVO-100W", 100, 5.0e-6, 40, 85),
-				generic("GENERIC-SERVO-200W", 200, 2.5e-5, 60, 100)
+				generic("GENERIC-SERVO-200W", 200, 2.5e-5, 60, 100),
+				generic("GENERIC-SERVO-400W", 400, 5.0e-5, 60, 130),
+				generic("GENERIC-SERVO-750W", 750, 1.2e-4, 80, 145)
 			];
 		}
 		return table;
 	}
 
+	static var namedRecipe:Null<machinekit.component.ComponentType>;
+	public static function namedRecipeType():machinekit.component.ComponentType {
+		if (namedRecipe == null) namedRecipe = new machinekit.component.ComponentType("machinekit.motion.servo-motor",
+			[machinekit.component.ComponentRecipeSupport.choice("designation", [for (row in ratings()) row.designation],
+				"GENERIC-SERVO-200W")], v -> model(v.token("designation")));
+		return namedRecipe;
+	}
+
 	/** The generic servo named `designation`. */
 	public static function model(designation:String):ServoMotor {
-		for (rating in ratings()) if (rating.designation == designation) return new ServoMotor(rating, machinekit.transmission.ValueBasis.Assumed);
+		for (rating in ratings()) if (rating.designation == designation) return new CatalogServoMotor(rating);
 		throw 'Unknown servo motor "$designation"; known: ${[for (rating in ratings()) rating.designation].join(", ")}';
 	}
 
@@ -86,4 +96,14 @@ class ServoMotor extends MachineComponent implements MotorDrive {
 
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Solids.named(Part.cylinderSpan(rating.bodyDiameter / 2, -rating.bodyLength, 0), "body");
+}
+
+/** A catalogue servo keeps its source designation in saved assemblies. Explicit rating objects
+ * remain code-only, so reconstruction never silently replaces their stated or edited ratings.
+ */
+private class CatalogServoMotor extends ServoMotor {
+	public function new(rating:ServoRating) super(rating, Assumed);
+	override public function componentType():Null<machinekit.component.ComponentType> return ServoMotor.namedRecipeType();
+	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues()
+		.setToken("designation", rating.designation).setToken("material", materialSpec());
 }

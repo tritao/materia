@@ -8,6 +8,8 @@ import machinekit.component.Dimension;
 enum LeadScrewThreadFamily {
 	MetricTrapezoidal;
 	Acme;
+	/** Recirculating ball race; pitch is the axial lead for a single start. */
+	Ball;
 }
 
 enum LeadScrewHand {
@@ -16,6 +18,8 @@ enum LeadScrewHand {
 }
 
 class LeadScrewThread {
+	/** Assumed rolling efficiency for the generic ball-race family. */
+	public static inline var BALL_EFFICIENCY:Float = 0.9;
 	public final family:LeadScrewThreadFamily;
 	public final screwDiameter:Float;
 	public final pitch:Float;
@@ -31,6 +35,7 @@ class LeadScrewThread {
 		if (!(screwDiameter > 0) || !Math.isFinite(screwDiameter))
 			throw "Lead screw thread needs a positive screw diameter";
 		if (!(pitch > 0) || !Math.isFinite(pitch)) throw "Lead screw thread needs a positive pitch";
+		if (family == Ball && screwDiameter <= 3) throw "Ball race needs a positive root diameter";
 		if (starts < 1) throw "Lead screw thread needs at least one start";
 		if (hand == null) throw "Lead screw thread needs a hand";
 		var calculatedLead = pitch * starts;
@@ -41,7 +46,7 @@ class LeadScrewThread {
 		this.starts = starts;
 		this.hand = hand;
 		lead = calculatedLead;
-		var familyCode = family == MetricTrapezoidal ? "TR" : "ACME";
+		var familyCode = family == MetricTrapezoidal ? "TR" : family == Acme ? "ACME" : "BALL";
 		var handCode = hand == RightHand ? "RH" : "LH";
 		designation = '${familyCode}-D${Dimension.format(screwDiameter)}-P${Dimension.format(pitch)}-S$starts-$handCode';
 	}
@@ -60,6 +65,7 @@ class LeadScrewThread {
 	 */
 	public function efficiency(friction:Float = 0.1):Float {
 		if (!(friction >= 0) || !Math.isFinite(friction)) throw "Lead screw friction must be non-negative";
+		if (family == Ball) return BALL_EFFICIENCY;
 		var pitchDiameter = screwDiameter - pitch / 2;
 		var leadAngle = Math.atan(lead / (Math.PI * pitchDiameter));
 		var frictionAngle = Math.atan(friction / Math.cos(15 * Math.PI / 180));
@@ -73,6 +79,8 @@ class LeadScrewThread {
 	 * pitch, which is close for a 29 degree thread with its crest clearance.
 	 */
 	public function rootDiameter():Float {
+		// Assumed race root for the generic SFU envelope; not a vendor tolerance.
+		if (family == Ball) return screwDiameter - 3;
 		if (family == Acme) return screwDiameter - pitch;
 		var clearance = pitch <= 5 ? 0.25 : pitch <= 12 ? 0.5 : 1.0;
 		return screwDiameter - pitch - 2 * clearance;

@@ -203,6 +203,24 @@ The current arm reaches about 0.73 m from shoulder to flange, and the gripper ad
 - Spindle: `SpindleCartridge` (gauge line connector, ER20 nose), `Er20Holder`, `SpindleMotor` (1.1 kW, max rpm), with the existing `EndMill`.
 - Tests: MachineKit unit tests for the ball-screw ratio and efficiency, catalogue rows, part masses, and connector frames.
 
+MT1 implementation notes (in progress; final gate pending):
+- Reuse the existing `Transmission.LeadScrew` resolver: `BallScrew` and `BallNut` are recipe-backed
+  screw/nut parts, with a `Ball` race family and a separate `PreloadedBallNut` allowance. Existing
+  sliding screws and unpreloaded ball-nut allowances are unchanged. SFU1605 is 16 mm diameter,
+  5 mm lead, 90% assumed efficiency, zero assumed preloaded reversal clearance and 0.02 N m drag.
+- The ball-screw relation derives shaft-only axial stiffness from race root and full length:
+  a 400 mm shaft with an assumed 13 mm race root gives 66366.7 N/mm. Nut/bearing compliance is
+  omitted and explicitly labelled assumed; measured total stiffness can override the relation.
+- BK12/BF12 support envelopes map to `Fixed`/`Simple`. HGR15/HGH15CA reference rail/block
+  dimensions and the 400/750 W servo rows are explicitly assumed. Named standalone servos now
+  have recipes; custom rating objects remain code-only. HTD-5M already exists.
+- Cast base/column have cores and machined rail pads; saddle has a screw bore; table has three
+  10 mm T-slot mouths; head has a cartridge bore. Bodies and mounting holes carry semantic names.
+- ER20 cartridge and holder share the gauge-line frame; the generic 1.1 kW spindle motor is rated
+  at 8000 rpm and capped at 10000 rpm, with assumed ratings and envelope.
+- Tests include recipe reconstruction, signed screw ratio, preload allowance, shaft stiffness,
+  bearing boundaries, rail room, mounting frames, rated power and computed casting masses.
+
 **MT2. The bench mill without enclosure.**
 - `BenchMill extends MachineAssembly`, in the cnc-router idiom: `place`/`attach`/`slide`, overtravel from the rail room, `addTransmission`, `supportScrew`, `addMotor`, and `addEncoder` for the servos.
 - The spindle belt is `TimingBelt`. The spindle is a continuous joint, not planned. It runs from `spindle.speed` once MT5 provides process-driven joints; until then it stays fixed.
@@ -419,7 +437,7 @@ MT0 ─┬─ MT1 ── MT2 ─┬─ MT4 (reach study) ─┐
 | Step | State | Commits |
 |---|---|---|
 | MT0 | done: main and X7+X8 merged | c5438ba4d, 8ad034403 |
-| MT1 | planned | |
+| MT1 | in progress: drive catalogue, cast bodies and spindle parts; gate pending | |
 | MT2 | planned | |
 | MT3 | planned | |
 | MT4 | planned | |

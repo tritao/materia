@@ -16,6 +16,16 @@ import machinekit.component.Solids;
 import machinekit.standard.ClearanceFit;
 import machinekit.standard.SocketHeadCapScrew;
 
+/** Explicit flange dimensions, mm, for catalogue nuts with independently specified geometry. */
+typedef ScrewNutDimensions = {
+	var bodyDiameter:Float;
+	var bodyLength:Float;
+	var flangeDiameter:Float;
+	var flangeThickness:Float;
+	var boltCircleDiameter:Float;
+	var mountScrew:String;
+}
+
 /** ACME/trapezoidal lead screw nut: a flanged block with a bore matching the screw diameter and
  * a mounting bolt pattern on the flange face, for driving a carriage. The thread itself is
  * semantic (`LeadScrewThread` family, diameter, pitch, starts and hand), not modelled.
@@ -39,8 +49,9 @@ class LeadScrewNut extends MachineComponent {
 	/** A barrel nut has no flange and is retained by its bracket. */
 	public final flanged:Bool;
 	public final kind:LeadScrewNutKind;
+	final explicitDimensions:Bool;
 
-	public function new(thread:LeadScrewThread, boltCount:Int = 4, flanged:Bool = true, kind:LeadScrewNutKind = AntiBacklash) {
+	public function new(thread:LeadScrewThread, boltCount:Int = 4, flanged:Bool = true, kind:LeadScrewNutKind = AntiBacklash, ?dimensions:ScrewNutDimensions) {
 		if (kind == null) throw "Lead screw nut needs a kind";
 		if (thread == null) throw "Lead screw nut needs a thread specification";
 		var screwDiameter = thread.screwDiameter;
@@ -48,16 +59,20 @@ class LeadScrewNut extends MachineComponent {
 		if (flanged && boltCount < 3) throw "Lead screw nut needs at least 3 mounting bolts";
 		// Proportioned on the common T8 nut (10.2 mm body, 16 mm bolt circle, 22 mm flange, M3).
 		// A barrel nut fits a narrow carriage gap; a flanged body follows the common T8 proportions.
-		var bodyDia = screwDiameter * (flanged ? 1.3 : 1.2);
-		var bodyLen = screwDiameter * 2;
-		var flangeThick = Math.max(3, screwDiameter * 0.3);
-		var mountScrewSize = screwDiameter <= 8 ? "M3" : screwDiameter <= 12 ? "M4" : "M5";
+		var bodyDia = dimensions == null ? screwDiameter * (flanged ? 1.3 : 1.2) : dimensions.bodyDiameter;
+		var bodyLen = dimensions == null ? screwDiameter * 2 : dimensions.bodyLength;
+		var flangeThick = dimensions == null ? Math.max(3, screwDiameter * 0.3) : dimensions.flangeThickness;
+		var mountScrewSize = dimensions == null ? (screwDiameter <= 8 ? "M3" : screwDiameter <= 12 ? "M4" : "M5") : dimensions.mountScrew;
 		var screw = SocketHeadCapScrew.catalog().get(mountScrewSize);
 		// Holes keep 1 mm of material to the body and the screw heads 1 mm to the flange rim.
-		var boltRadius = bodyDia / 2 + screw.clearanceMedium / 2 + 1;
+		var boltRadius = dimensions == null ? bodyDia / 2 + screw.clearanceMedium / 2 + 1 : dimensions.boltCircleDiameter / 2;
 		if (flanged && 2 * boltRadius * Math.sin(Math.PI / boltCount) < screw.clearanceMedium + 1)
 			throw "Lead screw nut bolt count leaves too little material between mounting holes";
-		var flangeDia = 2 * Math.max(screwDiameter * 1.5, boltRadius + screw.headDiameter / 2 + 1);
+		var flangeDia = dimensions == null ? 2 * Math.max(screwDiameter * 1.5, boltRadius + screw.headDiameter / 2 + 1) : dimensions.flangeDiameter;
+		if (!(bodyDia > screwDiameter) || !(bodyLen > 0) || !(flangeThick > 0) ||
+			(flanged && (!(boltRadius > bodyDia / 2 + screw.clearanceMedium / 2) ||
+			!(flangeDia / 2 > boltRadius + screw.clearanceMedium / 2))))
+			throw "Nut dimensions must leave material around its bore and mounting holes";
 		var diameterText = Dimension.format(screwDiameter), leadText = Dimension.format(lead);
 		super('LEADNUT-${thread.designation}${flanged ? "" : "-BARREL"}${kind == AntiBacklash ? "" : "-" + Std.string(kind)}', 'Lead screw nut, ${thread.designation}, $leadText mm lead', "bronze");
 		this.thread = thread;
@@ -71,6 +86,7 @@ class LeadScrewNut extends MachineComponent {
 		this.boltCount = flanged ? boltCount : 0;
 		this.flanged = flanged;
 		this.kind = kind;
+		explicitDimensions = dimensions != null;
 		mountScrew = mountScrewSize;
 		addConnector("bore", Axis, Solids.axial(0, 0, bodyLength / 2));
 		addConnector("mountFace", Face, Solids.axial(0, 0, bodyLength + flangeThickness));
@@ -84,6 +100,7 @@ class LeadScrewNut extends MachineComponent {
 		case PlainBronze: 0.15;
 		case AntiBacklash: 0.05;
 		case BallNut: 0.01;
+		case PreloadedBallNut: 0;
 	};
 
 	/** Assumed running torque, N m, including nut preload and support bearing drag. */
@@ -91,15 +108,17 @@ class LeadScrewNut extends MachineComponent {
 		case PlainBronze: 0.01;
 		case AntiBacklash: 0.02;
 		case BallNut: 0.005;
+		case PreloadedBallNut: 0.02;
 	};
 
 	/** Sliding nuts use a greased steel/bronze friction of 0.1; ball nuts assume 90% efficiency. */
-	public function efficiency():Float return kind == BallNut ? 0.9 : thread.efficiency(0.1);
+	public function efficiency():Float return (kind == BallNut || kind == PreloadedBallNut) ? LeadScrewThread.BALL_EFFICIENCY : thread.efficiency(0.1);
 
 	static function parseKind(value:String):LeadScrewNutKind return switch value {
 		case "PlainBronze": PlainBronze;
 		case "AntiBacklash": AntiBacklash;
 		case "BallNut": BallNut;
+		case "PreloadedBallNut": PreloadedBallNut;
 		default: throw 'Unknown lead screw nut kind "$value"';
 	};
 
@@ -148,12 +167,12 @@ class LeadScrewNut extends MachineComponent {
 		if (recipeTypeCache == null)
 			recipeTypeCache = new ComponentType("machinekit.motion.lead-screw-nut",
 			ComponentRecipeSupport.threadParameters().concat([ComponentRecipeSupport.count("boltCount", 4), ComponentRecipeSupport.flag("flanged", true),
-				ComponentRecipeSupport.choice("kind", ["PlainBronze", "AntiBacklash", "BallNut"], "AntiBacklash")]),
+				ComponentRecipeSupport.choice("kind", ["PlainBronze", "AntiBacklash", "BallNut", "PreloadedBallNut"], "AntiBacklash")]),
 			v -> new LeadScrewNut(ComponentRecipeSupport.thread(v), v.integer("boltCount"), v.boolean("flanged"), parseKind(v.token("kind"))));
 		return recipeTypeCache;
 	}
 
-	override public function componentType():Null<ComponentType> return Std.isExactType(this, LeadScrewNut) ? recipeType() : null;
+	override public function componentType():Null<ComponentType> return Std.isExactType(this, LeadScrewNut) && !explicitDimensions ? recipeType() : null;
 
 	override public function values():ComponentValues {
 		return ComponentRecipeSupport.threadValues(this.thread).setInteger("boltCount", this.boltCount).setBoolean("flanged", flanged).setToken("kind", Std.string(kind))

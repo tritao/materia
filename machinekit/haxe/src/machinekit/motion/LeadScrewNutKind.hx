@@ -5,4 +5,5 @@ enum LeadScrewNutKind {
 	PlainBronze;
 	AntiBacklash;
 	BallNut;
+	PreloadedBallNut;
 }
