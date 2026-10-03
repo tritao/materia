@@ -71,10 +71,9 @@ class ProgramCompiler {
   final jointIds:Null<Array<String>>;
   final couplings:Null<Array<JointCoupling>>;
   /**
-   * The plan check every plan this compiler makes goes through, or null for none. Every planner of
-   * MotionKit makes its plans here (this is the one place that creates an `ExecutionPlan`), so
-   * attaching the check once covers programs, paths, toolpaths and handling alike, for simulation
-   * and device. Its findings are on `ExecutionPlan.checked`.
+   * The plan check every compiled program goes through, or null for none, for simulation and device.
+   * Its findings are on `ExecutionPlan.checked`. Direct MotionSystem moves and live ServoSession
+   * plan chunks run their checks at their submission boundaries.
    */
   public var planCheck:Null<PlanCheck> = null;
 

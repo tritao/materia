@@ -33,6 +33,12 @@ import RobotKitRuntime;
  */
 class MotionSystem {
   public final robot:Robot;
+  /** Drive-check settings shared by immediate, queued, path and replacement motion. */
+  public var planCheck(get, set):Null<PlanCheck>;
+  public var planChecks(get, never):PlanCheckSummary;
+  function get_planCheck():Null<PlanCheck> return stream.planCheck;
+  function set_planCheck(value:Null<PlanCheck>):Null<PlanCheck> return stream.planCheck = value;
+  function get_planChecks():PlanCheckSummary return stream.planChecks;
   public final axes:Array<MotionAxis>;
   final axisPlanner:AxisPlanner;
   final pathPlanner:PathPlanner;
@@ -81,6 +87,7 @@ class MotionSystem {
     }
     this.robot = robot;
     stream = new TrajectoryStream(robot);
+    stream.planCheck = new PlanCheck(blueprint.model, [for (joint in blueprint.model.joints) joint.id]);
     this.modelRevision = Int64.ofInt(blueprint.runtime.revision);
     this.calibrationRevision = Int64.ofInt(blueprint.runtime.calibrationRevision);
     this.fixedTimestepSeconds = blueprint.fixedTimestepSeconds;

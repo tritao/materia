@@ -1753,3 +1753,19 @@ Belt teeth drawn and moving with the belt: a mesh built in Haxe and
 updated per frame, shifted by the coupled joint's travel. It doubles as a
 visual check on a drive's sign and ratio. Also an editor UI to author transmissions, and
 differentials and planetaries (relations over more than two joints, beyond X5's summed terms).
+
+
+### Loose-end follow-through (2026-10-04)
+
+Worktree: `motion-loose-ends`, based on local main `712019dbc`. Work through the ten reviewed loose ends in their original order.
+
+1. **Direct motion and live servo plan checks — implemented.** `PlanCheck` reads a shared polynomial-segment interface; native program arrays remain in place. `MotionSystem` checks a complete direct trajectory once before its first chunk, including smooth replacements. `ServoSession` checks each live plan chunk before submission. Both expose configurable checks and retained findings. Program checks keep their existing policy. Focused MotionKit plan-check gate: 74 assertions passed, including rejection before submission and report-only refill coverage.
+2. **Belt-router rapid contact — in validation.** CNC exact stops wait for measured axis positions within 10 µm before advancing. The stock test now requires zero rapid contacts for both routers.
+3. **CoreXY motor-space constraints — pending.**
+4. **CoreXY belt stiffness — verify current X7/X9 implementation.**
+5. **Draw and animate belt teeth — pending.**
+6. **Plotter virtual device and app player — pending.**
+7. **Native summed-joint kinematics — pending.**
+8. **Boards with unused actuator channels — pending.**
+9. **Serial-port flake and sim_core_host abort — pending.**
+10. **MuJoCo wall-finishing approach failure — pending.**

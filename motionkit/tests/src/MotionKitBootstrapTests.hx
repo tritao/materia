@@ -60,6 +60,8 @@ class MotionKitBootstrapTests {
       new PlanCheckTests().testEncoderSeesStepperSlip();
       new PlanCheckTests().testLoadSideEncoderReportsPathError();
       new PlanCheckTests().testCompilerRunsPlanCheck();
+      new PlanCheckTests().testDirectMotionRunsPlanCheck();
+      new PlanCheckTests().testServoStreamRunsPlanCheck();
       Sys.println('Plan check tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
     }
@@ -96,6 +98,8 @@ class MotionKitBootstrapTests {
     new PlanCheckTests().testEncoderSeesStepperSlip();
     new PlanCheckTests().testLoadSideEncoderReportsPathError();
     new PlanCheckTests().testCompilerRunsPlanCheck();
+    new PlanCheckTests().testDirectMotionRunsPlanCheck();
+    new PlanCheckTests().testServoStreamRunsPlanCheck();
     new CoreXyTests().testTwoBeltCompliance();
     new CoreXyTests().testPlotterDrawsASquare();
     new CoreXyTests().testPlanCheckAddsTheAxesOnASharedMotor();

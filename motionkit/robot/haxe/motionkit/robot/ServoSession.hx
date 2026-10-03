@@ -60,6 +60,8 @@ class ServoTick {
  */
 class ServoSession {
   public final robot:Robot;
+  public var planCheck:Null<PlanCheck>;
+  public final planChecks:PlanCheckSummary = new PlanCheckSummary();
   public final manipulator:Manipulator;
   final servo:ManipulatorServo;
   final indices:Array<Int>;
@@ -88,6 +90,7 @@ class ServoSession {
     this.controlPeriod = controlPeriod;
     this.robot = robot;
     this.manipulator = manipulator;
+    planCheck = new PlanCheck(manipulator.robot, [for (joint in manipulator.robot.joints) joint.id]);
     this.restVelocity = restVelocity;
     servo = new ManipulatorServo(manipulator, damping);
     indices = manipulator.jointIndices();
@@ -183,6 +186,15 @@ class ServoSession {
       var velocity = step.velocity.copy();
       if (!live) for (i in 0...velocity.length) if (Math.abs(velocity[i]) <= restVelocity) velocity[i] = 0.0;
       var submission = plan.chunk(velocity, periodNs, !live && isAtRest(velocity));
+      var check = planCheck;
+      if (check != null && check.checks()) {
+        var result = check.checkSegments(new motionkit.robot.TrajectoryStream.ArrayStreamSegments(
+          [for (segment in submission.segments) {timeFromStartNs: segment.timeFromStartNs,
+            durationNs: segment.durationNs, coefficients: segment.coefficients}]));
+        planChecks.add(result);
+        if (check.options.rejects && result.diagnostics.length > 0)
+          throw 'plan check: ${[for (diagnostic in result.diagnostics) diagnostic.describe()].join("; ")}';
+      }
       try robot.submit(RobotCommand.ExecutionPlan(submission)) catch (error:RobotRuntimeError) {
         // The queue moved on underneath (it ran dry): start a new stream next update.
         if (error.status != RobotKitRuntimeConstants.RK_ERROR_INVALID_STATE) throw error;
