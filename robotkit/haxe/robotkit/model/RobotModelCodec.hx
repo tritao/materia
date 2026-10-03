@@ -275,6 +275,7 @@ class RobotModelCodec {
       if (Reflect.hasField(record, "stiffness")) coupling.stiffness = nonNegative(number(record, "stiffness"), "coupling stiffness");
       if (Reflect.hasField(record, "backlash")) coupling.backlash = nonNegative(number(record, "backlash"), "coupling backlash");
       if (Reflect.hasField(record, "drag")) coupling.drag = nonNegative(number(record, "drag"), "coupling drag");
+      coupling.assumed = readAssumed(record);
       if (!joints.exists(coupling.leader) || !joints.exists(coupling.follower))
         throw 'Coupling ${coupling.id} references an unknown joint';
       var pair = coupling.follower + "\n" + coupling.leader;
@@ -430,6 +431,7 @@ class RobotModelCodec {
     if (coupling.stiffness != 0.0) record.stiffness = nonNegative(coupling.stiffness, "coupling stiffness");
     if (coupling.backlash != 0.0) record.backlash = nonNegative(coupling.backlash, "coupling backlash");
     if (coupling.drag != 0.0) record.drag = nonNegative(coupling.drag, "coupling drag");
+    if (coupling.assumed.length > 0) record.assumed = coupling.assumed.copy();
     return record;
   }
 
@@ -444,6 +446,9 @@ class RobotModelCodec {
       }
     };
     if (value.encoder != "") record.encoder = value.encoder;
+    if (value.assumed.length > 0) record.assumed = value.assumed.copy();
+    if (value.microsteps != null) record.microsteps = value.microsteps;
+    if (value.maxStepRate != null) record.maxStepRate = value.maxStepRate;
     if (value.efficiency != 1.0) record.efficiency = value.efficiency;
     // A bare stepper is its steps alone, as before drive kinds; anything with ratings gets a drive.
     var drive = value.drive;
@@ -485,6 +490,10 @@ class RobotModelCodec {
     nonNegative(value.servoDamping, "actuator servoDamping");
     if (!(value.efficiency > 0.0 && value.efficiency <= 1.0)) throw "Actuator efficiency must be in (0, 1]";
     nonNegative(value.fullStepsPerRevolution, "actuator fullStepsPerRevolution");
+    if (value.microsteps != null && (value.microsteps < 1 || value.microsteps > 1024))
+      throw "Actuator microsteps must be an integer from 1 to 1024";
+    if (value.maxStepRate != null && (!(value.maxStepRate > 0) || !Math.isFinite(value.maxStepRate)))
+      throw "Actuator maxStepRate must be finite and positive";
     if (value.drive != null && !Std.isOfType(value.drive, StepperDrive) && !Std.isOfType(value.drive, ServoDrive))
       throw 'Actuator ${value.id} has an unsupported drive';
     requireText(value.id, "actuator ID");
@@ -564,6 +573,18 @@ class RobotModelCodec {
       actuator.efficiency = number(value, "efficiency");
       if (!(actuator.efficiency > 0.0 && actuator.efficiency <= 1.0)) throw "Actuator efficiency must be in (0, 1]";
     }
+    if (Reflect.hasField(value, "microsteps")) {
+      var microsteps = number(value, "microsteps");
+      if (microsteps < 1 || microsteps > 1024 || microsteps != Std.int(microsteps))
+        throw "Actuator microsteps must be an integer from 1 to 1024";
+      actuator.microsteps = Std.int(microsteps);
+    }
+    if (Reflect.hasField(value, "maxStepRate")) {
+      var rate = number(value, "maxStepRate");
+      if (!(rate > 0) || !Math.isFinite(rate)) throw "Actuator maxStepRate must be finite and positive";
+      actuator.maxStepRate = rate;
+    }
+    actuator.assumed = readAssumed(value);
     return actuator;
   }
 
@@ -744,6 +765,16 @@ class RobotModelCodec {
   static function finite(value:Float, name:String):Float {
     if (!Math.isFinite(value)) throw 'RobotModel field $name must be finite';
     return value;
+  }
+
+  static function readAssumed(value:Dynamic):Array<String> {
+    if (!Reflect.hasField(value, "assumed")) return [];
+    return [for (item in array(value, "assumed")) {
+      if (!Std.isOfType(item, String)) throw "Assumed input labels must be strings";
+      var label:String = cast item;
+      requireText(label, "assumed input");
+      label;
+    }];
   }
 
   static function requireText(value:String, name:String):Void {

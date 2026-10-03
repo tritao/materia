@@ -1,3 +1,5 @@
+import machinekit.motion.PowerSupply;
+import machinekit.motion.MotorDriver;
 import cadkit.modeling.Vector;
 import cadkit.modeling.Part;
 import machinekit.assembly.MachineAssembly;
@@ -13,6 +15,7 @@ import machinekit.pneumatic.schmalz.SchmalzVacuumHose;
 import machinekit.motion.Gearbox;
 import machinekit.motion.ServoMotor;
 import machinekit.robotics.ArmJoint;
+import machinekit.robotics.GearedArmJoint;
 import machinekit.robotics.ArmLink;
 import machinekit.robotics.ArmLink.ArmAxis;
 import machinekit.robotics.EndEffector;
@@ -135,8 +138,7 @@ class ArmBlock extends MachineComponent {
 
 /**
  * One joint's travel and starting pose (radians), and the drive behind it: a servo motor through a
- * gearbox. The speed and torque limits come from that drive, not from typed-in numbers: `velocity` (rad/s)
- * is the servo's maximum speed over the gearbox ratio, `effort` (N m) its peak torque through the gearbox.
+ * gearbox. Compilation derives speed and torque limits from the current drive members.
  */
 typedef ArmJointSpec = {
 	var id:String;
@@ -146,8 +148,6 @@ typedef ArmJointSpec = {
 	/** The generic servo (`ServoMotor.ratings()`) inside the joint module. */
 	var servo:String;
 	var gearbox:Gearbox;
-	var velocity:Float;
-	var effort:Float;
 }
 
 /** Six-axis serial arm on a pedestal with the caller's tool (a suction tool by default), in the classic shoulder/elbow/spherical-wrist layout.
@@ -186,11 +186,10 @@ class RobotArm extends MachineAssembly {
 	 */
 	public static inline var GEARBOX_EFFICIENCY:Float = 0.85;
 
-	/** A joint's spec with its limits worked out from its drive. */
+	/** A joint's position bounds and the source drive parts. */
 	static function spec(id:String, lower:Float, upper:Float, initial:Float, servo:String, ratio:Float):ArmJointSpec {
-		var motor = ServoMotor.model(servo).rating, gearbox = new Gearbox(ratio, GEARBOX_EFFICIENCY);
-		return {id: id, lower: lower, upper: upper, initial: initial, servo: servo, gearbox: gearbox,
-			velocity: gearbox.jointSpeed(motor.maxSpeed), effort: gearbox.jointTorque(motor.peakTorque)};
+		var gearbox = new Gearbox(ratio, GEARBOX_EFFICIENCY, 60, 40, 8, true);
+		return {id: id, lower: lower, upper: upper, initial: initial, servo: servo, gearbox: gearbox};
 	}
 
 	public function new(withCell:Bool = true, ?armTool:ArmTool) {
@@ -210,8 +209,13 @@ class RobotArm extends MachineAssembly {
 			spec("j5", -2.1, 2.1, pi - 0.4 - 1.4, "GENERIC-SERVO-50W", 175),
 			spec("j6", -6.2, 6.2, 0, "GENERIC-SERVO-50W", 130)
 		];
-		function housing(index:Int, diameter:Float, length:Float, ?flange:RobotFlange):ArmJoint
-			return new ArmJoint(diameter, length, flange, ServoMotor.model(specs[index].servo));
+		function housing(index:Int, diameter:Float, length:Float, ?flange:RobotFlange):ArmJoint {
+			var source = specs[index].gearbox;
+			var gear = new Gearbox(source.ratio, source.efficiency, diameter * 0.6, length * 0.5, 8, true);
+			specs[index].gearbox = gear;
+			return new GearedArmJoint(diameter, length, gear.diameter + 1, gear.length + 1,
+				flange, ServoMotor.model(specs[index].servo));
+		}
 		var j1 = housing(0, 100, 70), j2 = housing(1, 100, 90), j3 = housing(2, 80, 90);
 		var j4 = housing(3, 70, 60), j5 = housing(4, 60, 70), j6 = housing(5, 55, 40, toolFlange);
 		joints = [j1, j2, j3, j4, j5, j6];
@@ -239,8 +243,21 @@ class RobotArm extends MachineAssembly {
 		}
 		addComponent("toolFlange", toolFlange);
 		revolute(specs[5], "joint6", "tool", "toolFlange", "face");
+		addComponent("powerSupply", new PowerSupply(48, 30, 6));
+		addMemberConnector("pedestal", "powerSupply", Solids.axial(-300, 0, 0));
+		addMate("powerSupply-mount", "fixed", "pedestal", "powerSupply", "powerSupply", "mount");
 		// Each joint's servo, through its gearbox, drives it: the limits above are what the drives deliver.
-		for (index in 0...6) addMotor('drive_${specs[index].id}', specs[index].id, 'joint${index + 1}', 48, 0.5, specs[index].gearbox);
+		for (index in 0...6) {
+			var driver = 'driver${index + 1}';
+			addComponent(driver, new MotorDriver("GENERIC-SERVO-AMP", 5));
+			addMemberConnector("pedestal", driver, Solids.axial(300, (index - 2.5) * 70, 0));
+			addMate('$driver-mount', "fixed", "pedestal", driver, driver, "mount");
+			connectPorts('$driver-power', "powerSupply", 'power${index + 1}', driver, "power");
+			var gearbox = 'gearbox${index + 1}';
+			addComponent(gearbox, specs[index].gearbox);
+			addMate('$gearbox-mount', "fixed", 'joint${index + 1}', "gearbox", gearbox, "input");
+			addMotor('drive_${specs[index].id}', specs[index].id, 'joint${index + 1}', driver, 0.5, gearbox);
+		}
 		tool = armTool.build(toolFlange);
 		include("tool", tool);
 		addMate("tool-mount", "fixed", "toolFlange", "face", "tool/plate", "robot");
@@ -268,6 +285,6 @@ class RobotArm extends MachineAssembly {
 			childConnector:String):Void {
 		addMateOnAxis(spec.id, "revolute", housing, rotorConnector, child, childConnector,
 			{x: 0, y: 1, z: 0}, spec.initial,
-			{lower: spec.lower, upper: spec.upper, velocity: spec.velocity, effort: spec.effort});
+			{lower: spec.lower, upper: spec.upper, velocity: null, effort: null});
 	}
 }

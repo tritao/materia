@@ -54,6 +54,37 @@ class CoreXyTests extends MotionKitTestSupport {
     return found;
   }
 
+  public function testTwoBeltCompliance():Void {
+    var model = new RobotModel("two-belts");
+    var base = model.addLink(new Link("base"));
+    for (id in ["x", "y", "a", "b"]) {
+      var body = model.addLink(new Link(id + ".body"));
+      model.addJoint(new Joint(id, id == "x" || id == "y" ? robotkit.model.JointType.Prismatic
+        : robotkit.model.JointType.Continuous, base, body));
+    }
+    function axisStiffness():Float {
+      var load = robotkit.model.DriveLoads.forAxis(model, "x");
+      if (load == null) throw "The belt model lost its X drive";
+      return load.stiffness;
+    }
+    var a = new robotkit.model.JointCoupling("xa", "x", "a", 1, 0);
+    var b = new robotkit.model.JointCoupling("xb", "x", "b", 1, 0);
+    a.stiffness = 1000;
+    b.stiffness = 3000;
+    model.addCoupling(a);
+    model.addCoupling(b);
+    model.addActuator(new robotkit.model.Actuator("a.motor", 1, 1, robotkit.model.Transmission.SimpleTransmission("a", 1, 0)));
+    model.addActuator(new robotkit.model.Actuator("b.motor", 1, 1, robotkit.model.Transmission.SimpleTransmission("b", 1, 0)));
+    near(axisStiffness(), 4000, "independent parallel belts add stiffness", 1e-9);
+    model.addCoupling(new robotkit.model.JointCoupling("ya", "y", "a", 1, 0));
+    model.addCoupling(new robotkit.model.JointCoupling("yb", "y", "b", -1, 0));
+    near(axisStiffness(), 3000, "unequal CoreXY belts combine through series compliance", 1e-9);
+    a.stiffness = 0;
+    near(axisStiffness(), 12000, "a rigid CoreXY belt leaves the other belt compliant", 1e-9);
+    b.stiffness = 0;
+    near(axisStiffness(), 0, "two rigid paths have no deflection", 1e-9);
+  }
+
   public function testPlotterDrawsASquare():Void {
     var scene = SceneArtifact.decode(CoreXyPlotterPreview.plotter());
     var model = AssemblySimulationBridge.toRobotModel(scene.assemblyDefinition, AssemblyPhysicalPartView.fromSceneArtifact(scene),
@@ -177,26 +208,38 @@ class CoreXyTests extends MotionKitTestSupport {
     var scene = SceneArtifact.decode(CoreXyPlotterPreview.plotter());
     var model = AssemblySimulationBridge.toRobotModel(scene.assemblyDefinition, AssemblyPhysicalPartView.fromSceneArtifact(scene),
       scene.assemblyState).model;
+    model = robotkit.model.RobotModelCodec.decode(robotkit.model.RobotModelCodec.encode(model));
     var options = new PlanCheckOptions();
     var check = new PlanCheck(model, ["x", "y"], options);
     var loads = check.axisLoads();
     this.check(loads.length == 2 && loads[0].motors.length == 2 && loads[1].motors.length == 2, "each axis is carried by both motors");
+    for (load in loads) this.check(load.assumed.indexOf("belt stiffness") >= 0 &&
+      load.assumed.indexOf("stepper inductance") >= 0 && load.assumed.indexOf("rotor inertia") >= 0,
+      "part assumptions survive the assembly bridge and RobotModel codec into the axis load");
+
     var found = ["motorA", "motorB"];
     for (load in loads) for (motor in load.motors) this.check(found.indexOf(motor.actuator.id) >= 0, "and they are the plotter's two");
     near(loads[0].motors[0].share, 0.5, "each motor carries half of an axis's force", 1e-12);
+    var worstDeviation = 0.0;
     // At the planner's own limits, every move passes.
     for (move in [[0.03, 0.0], [0.0, 0.03], [0.03, 0.03], [0.03, -0.03]]) {
       var honest = plan(model, [0.0, 0.0], move, 1.0, options.steady);
       var result = check.check(honest, 1, 0.0);
+      worstDeviation = Math.max(worstDeviation, result.worstDeviation);
       this.check(result.diagnostics.length == 0, 'a move to ${move} at the axes\' limits passes: ${[for (d in result.diagnostics) d.toString()]} ratio ${result.worstTorqueRatio}');
       honest.dispose();
     }
+    this.check(worstDeviation > 0.0, "the actual belts predict nonzero CoreXY deflection");
+    Sys.println('corexy belt accuracy: ${Math.round(worstDeviation * 1e6) / 1000} mm worst deviation at planned limits');
     // Far above them, a move along one axis overloads both motors alike, and one along the diagonal the motor that
     // turns, not the one that stands still.
     function flagged(move:Array<Float>):String {
       var rough = plan(model, [0.0, 0.0], move, 3.0, options.steady);
       var result = check.check(rough, 2, 0.0);
-      var names = [for (diagnostic in result.diagnostics) diagnostic.subject];
+      for (diagnostic in result.diagnostics) this.check(diagnostic.assumed.indexOf("belt stiffness") >= 0 &&
+        diagnostic.describe().indexOf("assumed:") >= 0, "plan findings expose the source assumptions");
+
+      var names = [for (diagnostic in result.diagnostics) if (diagnostic.kind == motionkit.trajectory.PlanDiagnostic.PlanDiagnosticKind.StepperStall) diagnostic.subject];
       names.sort(Reflect.compare);
       rough.dispose();
       return names.join(",");

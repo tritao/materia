@@ -9,6 +9,8 @@ package robotkit.model;
  */
 class JointCoupling {
   public final id:String;
+  /** Assumed engineering inputs carried from the model's source. */
+  public var assumed:Array<String> = [];
   public final leader:JointId;
   public final follower:JointId;
   public final ratio:Float;

@@ -73,8 +73,8 @@ class CoreXyPlotterChecks {
 		for (term in TERMS) expectedCouplings += (term.x != 0 ? 1 : 0) + (term.y != 0 ? 1 : 0);
 		if (couplings.length != expectedCouplings) throw 'CoreXY plotter should have $expectedCouplings couplings, got ${couplings.length}';
 		for (coupling in couplings) {
-			var drive = plotter.drive(coupling.id);
-			if (drive == null || drive.kind != "belt" || drive.members[0] + "-turn" != coupling.target)
+			var drive = plotter.transmissionFor(coupling.id);
+			if (drive == null || !switch drive.source { case TimingBelt(_, pulley, _): pulley + "-turn" == coupling.target; default: false; })
 				throw 'coupling ${coupling.id} should be the belt drive of its pulley';
 			near(Math.abs(coupling.ratio), 1 / radius, '${coupling.id} turns one pitch radius per radian', 1e-12);
 		}

@@ -705,7 +705,7 @@ latency.
 
 ### X7 — Transmissions compile from their parts
 
-Status: T0 and T1 done (2026-10-03); T2–T5 not started.
+Status: T0–T5 done (2026-10-03).
 Worktree `x7-transmissions`.
 
 T1: one resolved relation and part-level equations replace the assembly's ratio, efficiency
@@ -761,10 +761,21 @@ Decisions:
 
 #### T2 — Typed source, schema v3, rename
 
+Implementation: `Transmission`, `Sense` and wire `ScrewSupport` replace the string source and
+support records. `TransmissionRecord.source` and `sense` use new wire IDs 12 and 13; retired
+v2 IDs 2–4 are not reused. The machine description and document carry schema v3, checked
+before decoding the old source form. `transmissionFor(id)` returns a detached source record;
+its name avoids the old `LinearAxis.transmission` field that T4 removes. Physical router nuts move to T3: adding even the small Z nut changes the belt router's
+acceleration (14.19 → 14.18 m/s² for X with steady loads), contradicting T2's unchanged-baseline
+gate. T2 permits a null nut reference for the router during this transition; T3 makes it
+mandatory and installs the nuts while changing engineering values. CoreXY already had both belt members, so its sources
+now name those existing loops explicitly. Chain relations keep T1's old sprocket-as-belt
+allowances in T2; their family defaults belong to T3.
+
 - A wire enum for the source, roughly:
-  - `LeadScrew(screw, nut)`. The nut is a `LeadScrewNut` member: `LinearAxis` already has one; the
-    router models its nut brackets but no nuts, so it gains a Tr10×2 nut member on each bracket (on
-    the leader's slide, so it rides with the carriage). This adds BOM lines and mass.
+  - `LeadScrew(screw, nut)`. `LinearAxis` already has a `LeadScrewNut` member. The router's
+    nut reference is temporarily nullable in T2; T3 adds the physical nuts and makes the
+    binding mandatory, so T2 leaves its dynamics unchanged.
   - `GearMesh(driver, driven)`
   - `RackAndPinion(pinion, rack:Null<String>)`
   - `TimingBelt(belt, pulley, strand:Int)`, with the belt a member (the router already adds `beltX`
@@ -782,12 +793,42 @@ Decisions:
   wire enum, not the `"free"/"simple"/"fixed"` strings. Deriving the support from the bearing parts
   at each end is a later step, not part of X7.
 - **Gate:** the same relation values as T1 (ratios, efficiencies, allowances, caps). The source
-  changed, but the relation must not have. The router's new nut mass may move times slightly;
-  if it does, record why.
+  changed, but the relation must not have. Physical nut mass is introduced in T3 so all performance baselines stay unchanged in T2.
+
+T2 validation: standalone MachineKit and every suite in `x7-suite-t2-baseline.txt` pass,
+including the app project-source suite. All T1 engineering baselines remain unchanged.
 
 #### T3 — Derive what was frozen
 
 Numbers move in this step. Record the new baselines in this plan with a one-line reason each.
+
+Implementation decisions: screw and nut threads must match; part edits must update both mating
+threads. Generic nut assumptions are plain bronze 0.15 mm / 0.01 N m, anti-backlash 0.05 mm /
+0.02 N m (the old defaults), ball nut 0.01 mm / 0.005 N m and 90% efficiency. Sliding nuts
+use friction 0.1. Gear and rack compatibility is checked when resolving their relations.
+`setTransmissionOverrides` states stiffness/backlash/drag; calling it with none clears the
+overrides and resolves the current parts. A rejected support proposal leaves the old record intact. Inclusion and included-assembly
+reconstruction also resolve their copied sources; they previously dropped coupling allowances.
+For CoreXY's summed motor coordinates, axis compliance is the sum of each belt-path compliance
+weighted by the square of its force share: equal shares give `K_axis = 4 / (1/K_A + 1/K_B)`.
+Independent parallel drives retain their additive stiffness. Sprockets retain the previous
+0.97 efficiency and 0.005 N m drag as separate chain-family assumptions; chain stretch and
+chordal variation remain unmodelled, since no chain-member recipe exists yet.
+Router geometry: 29 → 31 definitions, 52 → 56 occurrences, 28 → 30 BOM lines,
+33.0 → 33.1 kg: four actual nuts, with separate flanged and barrel recipes.
+CoreXY planned-limit worst deviation 0 → 0.088 mm: the two belts now contribute
+their actual compliance instead of being treated as rigid; speed and acceleration are unchanged.
+
+T3 router baselines (motor plate, same controller and feeds):
+- Belt X free acceleration 15.10 → 15.08 m/s²: X carries the new Z nut.
+- Belt planned Y/X acceleration 12.36 / 14.19 → 12.35 / 14.18 m/s²: both axes carry its added moving mass.
+- Belt worst torque 56.5 → 56.6%: the moving nut changes the planned load and sampled trajectory.
+- Belt worst deviation 1.90 → 1.89 mm: the added mass changes acceleration limits and sampled forces;
+  belt stiffness itself is unchanged for these unchanged loops (the old frozen value used the same equation).
+- Screw 220.2 s / 0.05 mm and belt 201.6 s remain unchanged, as do the 0 / 57 flagged plans,
+  0 stalls, and 0 / 64 accuracy findings. The screw router's rounded limits and torque remain unchanged.
+
+
 
 - **Belt stiffness** from the belt member on every resolve (`TimingBelt.carriageStiffness(strand)`).
   `setDriveStiffness` is gone, replaced by a stated override. CoreXY: each motor's transmission
@@ -795,6 +836,10 @@ Numbers move in this step. Record the new baselines in this plan with a one-line
 - **Gear backlash** from `GearPair.backlash` (tangential at the pitch circle), converted to leader
   units (radians: divide by the driver's pitch radius). **Rack and pinion** takes the pinion's (plus
   the rack's, if it states one), in mm.
+- **Router nuts.** Add a Tr10×2 nut member to each sliding body here rather than in T2,
+  because their mass changes acceleration. Z uses a barrel nut (no flange, body diameter
+  1.2 times the screw diameter) to fit its existing 13 mm plate gap; the flanged X/Y nut
+  cannot fit there. Check clearance at both ends of Z travel.
 - **Lead-screw backlash, drag and nut friction** from the nut. `LeadScrewNut` gains a nut kind
   (`PlainBronze`, `AntiBacklash`, `BallNut`, …) with catalog allowances. Today's
   `DriveDefaults.LEAD_SCREW_BACKLASH` (0.05 mm) and drag (0.02 N m) become the `AntiBacklash`
@@ -804,17 +849,33 @@ Numbers move in this step. Record the new baselines in this plan with a one-line
   defaults, marked assumed (T5).
 - Delete `DriveDefaults`.
 
+T3 validation: focused CoreXY and standalone MachineKit pass; every suite in
+`x7-suite-t3-complete.txt`, including the app project-source suite, passes.
+
 #### T4 — One model of a screw
 
 `LinearAxis` builds its carriage-to-screw relation through `addTransmission(LeadScrew(...))` only.
 `LinearAxis.setTravel` sets the carriage joint and lets `AssemblyState` propagate the coupling.
-`LeadScrewTransmission` is deleted (its only other users are `MachineKitSmoke` checks, which move to
-the coupling).
+`LeadScrewTransmission` is deleted. The smoke checks already exercise the coupling, including handedness, travel and prefixed axes.
+`MachineKitRobotCompiler` also used the helper: it now validates against the assembly's resolved
+coupling and takes motor speed from the matching RobotKit coupling, without a second screw equation.
+
+T4 validation: focused MachineKit/MotionKit compiler checks and every suite in
+`x7-suite-t4-complete.txt` pass, including the app; all T3 engineering baselines remain unchanged.
 
 #### T5 — Provenance of engineering values
 
 The plan check turns these numbers into stall and accuracy claims, so it should say which inputs
 were assumed.
+
+Implementation: relation bases project to sorted assumption labels; stated overrides remove the
+corresponding label. The critical-speed safety margin is also labelled assumed. Generic servo
+models mark their ratings assumed; explicitly supplied servo ratings default to stated.
+The frozen coupling schema previously omitted efficiency and allowances; it now carries matching
+wire IDs 6–10 so those values and their provenance survive plain-coupling rebuilds as well as
+transmission rebuilds. Copies and namespace changes retain labels. RobotKit writes them only
+when nonempty, and plan findings name the assumptions along the relevant motor paths.
+
 
 - A small wire enum `ValueBasis { Derived; Catalog; Stated; Assumed; }` and, on the resolved
   relation and on a motor's actuator, the set of fields whose basis is `Assumed`. Not a wrapper
@@ -826,9 +887,15 @@ were assumed.
 - Sources of `Assumed` today: the T3 family defaults, `TimingBelt.cordStiffnessPerMm`,
   `NemaStepper.ratingCatalog` inductance/rotor inertia, the generic `ServoMotor` ratings.
 
+T5 validation: standalone MachineKit, focused CoreXY provenance checks and every suite in
+`x7-suite-t5-provenance.txt` pass, including the app. All T3 engineering baselines remain
+unchanged; the belt-router diagnostic now names its assumptions. No haxeon changes were needed.
+
 ### X8 — Motor, driver and controller
 
-Planned (2026-10-03); after X7. Today one call mixes three pieces of hardware:
+Status: X8a–X8e complete (2026-10-03).
+
+Implemented (2026-10-03), after X7. Before this milestone, one call mixed three pieces of hardware:
 `MachineAssembly.addMotor(id, joint, motor, volts, margin, gearbox)` takes the supply voltage, the
 torque margin and the gearbox as numbers. Microsteps live in the machining job's `controller`
 (`SceneArtifact`, `CncProgramPlayer`) and reach `DeviceLayout` channels. The step tick rate lives
@@ -851,7 +918,7 @@ Target split:
   driver members. The torque–speed curve resolves from motor + driver (voltage, current; a lower
   current setting scales the torque). Microsteps go into `AssemblyActuator`, so `DeviceLayout` derives
   them from the model, and the job's `controller.microsteps` goes away.
-- **Gearbox**: a member reference (the `Gearbox` part exists), not `gearRatio`/`gearEfficiency`
+- **Gearbox**: a member reference (`Gearbox` starts as a plain drive value; X8d makes it a recipe-backed part), not `gearRatio`/`gearEfficiency`
   numbers on the motor record.
 - **Controller** (the board: step tick rate, bus cycle, channel count, identity) stays deployment
   data (`SerialDeployment`, the job's `controller.stepTickHz`). The model never carries it. The
@@ -862,6 +929,154 @@ Target split:
 Steps: X8a driver part + catalog; X8b `addMotor` with a driver, the curve from motor + driver, and
 microsteps in the actuator (MotorRecord schema bump, router/CoreXY/arm/base updated); X8c supply via
 ports; X8d gearbox member; X8e job/deployment cleanup (`controller.microsteps` removed, step-rate check).
+
+X8a implementation:
+
+- `MotorDriver` is a recipe-backed part with an assumed envelope, BOM identity and mount connector.
+  Its catalog separates stepper and servo families and step/dir and bus control. Generic entries are
+  `GENERIC-TMC2209`, `GENERIC-DM542` and `GENERIC-SERVO-AMP`; no entry claims verified vendor ratings.
+- Current is an explicit A rms setting; microsteps are validated powers of two within the entry's
+  limit (one for a servo). Supply voltage, when stated on the driver, must lie within its range.
+  Power in, motor out and command in are service ports. Power in is required without a stated
+  voltage; controller commands and motor wiring can remain implicit in the actuator binding.
+- Generic step-input ceilings are assumed 250 kHz and 200 kHz, with assumed maximum rms currents
+  of 2 A and 3 A respectively. The generic servo amplifier uses bus control and has no step-input
+  ceiling. These are editable catalog assumptions, not product-selection guarantees.
+- Driver recipes round-trip settings, BOM and ports. Cross-recipe checks cover every catalog entry;
+  focused tests reject excessive current, unsupported microsteps and out-of-range voltage. Existing
+  examples and actuator calculations are unchanged in this step.
+- Validation: full `x7-suite-x8a-drivers.txt` gate passed all suites, application build and
+  project-source tests. All X7 engineering baselines are unchanged: router plates 220.2/201.6 s,
+  belt deviation 1.89 mm and CoreXY 204.1 rad/s, 649.6 mm/s, 71.6/34 m/s².
+
+X8b implementation:
+
+- `addMotor` now names a driver member. Schema v4 retires MotorRecord's voltage id 4 and adds
+  driver id 8; v2/v3 descriptions and older documents are rejected before decoding their side data.
+  Copies, inclusions and rebuilds resolve both member references again. Gearbox numbers remain
+  until X8d. Driver voltage is explicitly stated in this step; wired supplies follow in X8c.
+- A stepper's driver current must be positive and at most its motor rating. Lower current scales
+  holding torque linearly and raises the existing reactance corner inversely with current. The
+  same rated-current curve equation supplies both the planning limits and sampled curve. Current
+  scaling is an assumption; back EMF, decay mode and resonance remain outside this model.
+- Servo ratings have no winding-current or torque-constant datum, so amplifier current validates
+  against the amplifier rating but does not invent a servo derating equation. Servo torque/speed
+  stays intrinsic. Motor and driver families must match. Generic driver ratings join the actuator's
+  assumption labels.
+- Optional actuator fields 21/22 carry microsteps and the driver's maximum step-input rate through
+  flattening, the CAD bridge and RobotModel's codec. DeviceLayout uses the actuator setting before
+  its legacy default. Legacy models omit these fields and retain their saved bytes. Deployment
+  enforcement and removal of job microsteps remain X8e.
+- An intrinsic servo encoder is now an actual sensor, replaced by separately wired feedback.
+  Its counts are expressed at the joint, including gearbox reduction, rather than retaining an
+  inline motor count as the new model's feedback. Sensor references are prefixed on inclusion.
+  Explicit encoder records distinguish wired feedback from the generated sensor even when they
+  use the same conventional id; later rewiring retains the previous wired sensor.
+- Router and CoreXY drivers are fixed to their frames, arm amplifiers to the pedestal and wheel
+  drivers to the base plate outside the battery footprint. Assumed solid envelopes add fixed mass:
+  router 33.1 → 36.3 kg (four DM542-class drivers), mobile base 27 → 28.6 kg (two), CoreXY
+  3.99 → 4.01 kg (two TMC2209-class drivers). Their additional definitions/occurrences/BOM lines
+  are respectively 31/56/30 → 32/60/31, 9/16/9 → 10/18/10 and 15/35/15 → 16/37/16.
+  Arm total mass 146.9 → 149.8 kg and definitions/occurrences 24/25 → 25/31: six assumed
+  servo-amplifier envelopes on the pedestal; its 20.6 kg moving mass is unchanged.
+- Focused MachineKit smoke passed after correcting the wheel driver's connector frame and
+  confirming no intersections at either tested wheel angle. CoreXY drive limits remain unchanged.
+- Validation: full `x7-suite-x8b-hierarchy.txt` gate passed every suite, application build and
+  project-source tests. The arm hierarchy test checks its six amplifiers by id under the pedestal.
+  Router plate times, limits, torque usage and deviations retain X7's baselines; CoreXY drive limits,
+  arm mission times and the mobile obstacle summary are unchanged. Only the hardware envelopes,
+  fixed mass, BOM/part counts, explicit servo sensors and provenance labels change in the examples.
+
+X8c implementation:
+
+- `ElectricalSource` states the voltage at a supply port. Recipe-backed `PowerSupply` provides
+  one shared DC voltage/current rating and separate output ports; the service graph pairs each
+  physical port once, so driver feeds use distinct terminals rather than sharing one endpoint.
+  Its rectangular envelope is assumed. The example battery pack exposes left/right feeds at
+  its stated voltage; its BOM identity now includes voltage.
+- A modelled supply, traced with `upstream()`, wins over a driver's stated fallback. Without a
+  modelled supply, including an exposed external boundary, the driver must state its voltage.
+  Unknown modelled output voltages and voltages outside the driver range are errors. Aggregate
+  supply loading and voltage sag are not modelled; the DC current rating is not a phase-current
+  limit on the motor.
+- Motor and encoder bindings are source records. `addTo` compiles fresh actuator curves and
+  sensors from current parts and the completed power graph instead of retaining derived arrays
+  in the assembly. Late power wiring therefore updates a previously bound motor on compilation.
+  Incomplete modules may bind before their power is known; export requires a supplied graph or
+  stated voltage. Known ratings still validate when bound.
+- Recipe ports are authoritative. Saved port records are reader snapshots, regenerated on
+  reconstruction so changes to a driver's wired/fallback setting cannot leave stale required flags.
+  Power connections and exposures are restored before validating known motor ratings.
+- Rewiring feedback clears the old sensor record's motor association while retaining that sensor.
+  This gives each motor one feedback source and preserves it through canonical sensor sorting.
+- Router/CoreXY/arm supplies are fixed to their frames/pedestal. Each adds a 0.5832 kg assumed
+  aluminium envelope: router 36.3 → 36.9 kg, arm 149.8 → 150.4 kg and CoreXY 4.01 → 4.60 kg.
+  Router definitions/occurrences/BOM lines 32/60/31 → 33/61/32, arm definitions/occurrences
+  25/31 → 26/32 and CoreXY 16/37/16 → 17/38/17. Mobile base remains 28.6 kg: its existing battery
+  supplies both drivers. Carriage/arm moving masses and CoreXY drive limits remain unchanged.
+- Focused MachineKit smoke passed, including a supply edit from 24 to 48 V (the stepper rate
+  doubles), late wiring overriding fallback voltage, missing/range/unknown voltage failures,
+  included and nested power reconstruction, and canonically sorted feedback rewiring.
+- Validation: full `x7-suite-x8c-supplies.txt` gate passed all suites, application build and
+  project-source tests. Router times/deviations/limits, CoreXY drive limits, arm mission times
+  and the mobile obstacle summary remain unchanged from X8b.
+
+
+X8d implementation:
+
+- Schema v5 retires MotorRecord reduction/efficiency ids 6/7 and adds optional gearbox member
+  id 9. Compilation resolves current parts, including prefixed and reconstructed members, and
+  regenerates intrinsic motor-side feedback counts. Wrong component types are errors.
+- `Gearbox` was a plain value, not a physical part as the target originally claimed. It now has
+  a recipe, BOM identity, input/output connectors and an assumed bored cylindrical aluminium
+  envelope. Ratio/efficiency are stated unless its saved basis says assumed; example gearheads
+  retain their assumed ratios and efficiencies. Teeth, bearings, backlash and compliance remain
+  outside this drive-level model. The bore clears the input shaft; detailed output shafts are omitted.
+- `GearedArmJoint` is a separate recipe for a steel module with a machined pocket. Existing
+  `ArmJoint` recipe inputs stay unchanged. Independent pocket dimensions reject oversized gearheads;
+  installing separate gearheads does not double-count solid housing material. Original exterior
+  dimensions and joint frames are unchanged. Arm and wheel joint effort/rate limits are no longer
+  frozen copies of drive limits: compilation derives those limits from current actuator ratings.
+- The mobile base installs each 40 mm gearhead between its motor and wheel. Track width changes
+  300 → 380 mm from the solved geometry; clearance slots follow the relocated wheels. Drive ratios,
+  motor curves, wheel radius and operating speed policy are unchanged.
+- Arm mass above the base flange 20.6 → 18.3 kg, total 150.4 → 148.1 kg: six steel pockets
+  are replaced by smaller assumed aluminium gearhead envelopes. Definitions/occurrences
+  26/32 → 32/38: six separately dimensioned gearbox members. Mobile base 28.6 → 29.3 kg:
+  two gearhead envelopes plus relocated clearance slots; definitions/occurrences/BOM lines
+  10/18/10 → 11/20/11. Combined mobile cell definitions 41 → 48: its wheel and arm gearheads.
+- Validation: full `x7-suite-x8d-gearheads.txt` gate passed all suites, application build and
+  project-source tests. Rebuild tests cover edited ratio/efficiency/basis, regenerated feedback
+  counts, wrong member types and nested member prefixes. Router plate times/deviations, CoreXY
+  limits, arm/mobile mission times and the mobile obstacle summary remain unchanged from X8c.
+
+
+X8e implementation:
+
+- Machining jobs retain only `controller.stepTickHz`. Their decoder discards legacy job microsteps,
+  and subsequent saves omit them; driver settings come from the machine's actuator model.
+  `DeviceLayout.forActuators` no longer accepts a global microstep setting. It derives each channel
+  from its actuator, using full steps only for legacy models without driver settings.
+- Explicit channel wiring must agree with modelled microsteps. Legacy RobotModels without the
+  optional driver fields may retain explicit per-channel microsteps; existing device deployments
+  use this representation. Legacy virtual-device fixtures now state their channel wiring directly.
+- Pulse frequency is capped by `min(controller.stepTickHz, driver.maxStepRate)` before conversion
+  to actuator rate. A faster board clock is valid: it idles between pulses. The tightened model
+  supplies that same ceiling to planning and virtual/device execution without changing the source.
+- `SerialDeployment` already has controller identity/timing separate from channel wiring and no
+  global microsteps, so its schema does not change. Runtime protocol and robotd documentation now
+  describe driver-setting agreement and the driver input-rate ceiling.
+- Tests cover model codec settings, mismatched wiring, faster/slower controller clocks, immutable
+  source rates, legacy channel settings and discarding obsolete job settings. The legacy artifact
+  fixture replaces its length-prefixed JSON section: haxeon cannot add fields to a fixed anonymous
+  record or cast a dynamic object into that record. `IrGenerator` lowers a dynamic cast through
+  `checkedCast`/`safeCast`, not structural field reconstruction; reflection delegates to HashLink's
+  existing-field setters. The fixture avoids both restrictions without changing haxeon.
+- Validation: focused ProjectKit passed (100 assertions), then the full `x7-suite-x8e-complete.txt`
+  gate passed every suite, application build and project-source tests. RobotKit world passed
+  4906 assertions and MotionKit 9756. All X8d engineering baselines are unchanged: router plate
+  times 220.2/201.6 s, deviations 0.05/1.89 mm, CoreXY 204.1 rad/s, 649.6 mm/s and 71.6/34 m/s²,
+  arm/mobile mission times and the mobile obstacle summary. No scope remains in X7 or X8.
 
 ### Later
 

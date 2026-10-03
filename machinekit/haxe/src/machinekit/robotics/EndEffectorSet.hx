@@ -67,7 +67,7 @@ class EndEffectorSet extends EndEffector {
 				connectorExposures: entry.machine.connectorExposures,
 				memberConnectors: entry.machine.memberConnectors};
 			machine.endEffector = entry.machine.endEffector;
-			var tool:MachineAssemblyDescription = {mechanical: entry.mechanical, machine: machine};
+			var tool:MachineAssemblyDescription = {schemaVersion: MachineAssembly.SCHEMA_VERSION, mechanical: entry.mechanical, machine: machine};
 			result.addTool(entry.id, EndEffector.fromDescription(tool));
 		}
 		return result;

@@ -28,10 +28,17 @@ import machinekit.component.Solids;
  * Connectors: `front`, `back` (faces) and `axis` (mid-thickness), all with +Y along +Z.
  */
 class Sprocket extends MachineComponent {
+	/** Assumed chain efficiency and bearing drag; chain stretch and chordal variation are not modelled. */
+	public static inline var DEFAULT_EFFICIENCY:Float = 0.97;
+	public static inline var DEFAULT_DRAG:Float = 0.005;
+
 	/** Resolve the coupling from these parts. */
-	public static function relation(sprocket:Sprocket, alignment:Float):TransmissionRelation
-		return new TransmissionRelation(alignment * 2 / sprocket.pitchDiameter, 0.97, null, null,
-			machinekit.assembly.DriveDefaults.BELT_DRAG);
+	public static function relation(sprocket:Sprocket, alignment:Float):TransmissionRelation {
+		var result = new TransmissionRelation(alignment * 2 / sprocket.pitchDiameter, DEFAULT_EFFICIENCY, null, null, DEFAULT_DRAG);
+		result.setBasis("efficiency", ValueBasis.Assumed, "chain efficiency");
+		result.setBasis("drag", ValueBasis.Assumed, "chain drag");
+		return result;
+	}
 
 	static var chainTable:Null<Catalog<RollerChainSpec>>;
 	public final chain:Null<String>;

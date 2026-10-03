@@ -1,3 +1,4 @@
+import machinekit.motion.MotorDriver;
 import cadkit.modeling.Align;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
@@ -118,19 +119,29 @@ class MotorBracket extends MachineComponent {
 }
 
 /** Battery pack: a box standing on its base (z=0), centred on its origin. */
-class BatteryPack extends MachineComponent {
+class BatteryPack extends MachineComponent implements machinekit.motion.ElectricalSource {
+	public final voltage:Float;
 	public final length:Float;
 	public final width:Float;
 	public final height:Float;
 
-	public function new(length:Float, width:Float, height:Float) {
+	public function new(length:Float, width:Float, height:Float, voltage:Float = 24) {
+		if (!(voltage > 0) || !Math.isFinite(voltage)) throw "Battery needs a finite positive voltage";
 		if (!(length > 0) || !(width > 0) || !(height > 0)) throw "Battery needs positive dimensions";
-		super('BATTERY-${Dimension.format(length)}x${Dimension.format(width)}x${Dimension.format(height)}',
+		super('BATTERY-${Dimension.format(length)}x${Dimension.format(width)}x${Dimension.format(height)}-${Dimension.format(voltage)}V',
 			"Battery pack", "plastic", true);
+		this.voltage = voltage;
 		this.length = length;
 		this.width = width;
 		this.height = height;
 		addConnector("base", Mount, Solids.axial(0, 0, 0));
+		for (side in ["Left", "Right"])
+			addPort({name: 'power$side', kind: ElectricalPower, role: Supply, iface: Unspecified, required: false});
+	}
+
+	public function outputVoltage(name:String):Float {
+		var output = port(name);
+		return voltage;
 	}
 
 	override public function hasGeometry():Bool return true;
@@ -232,11 +243,16 @@ class MobileBase extends MachineAssembly {
 	 * ratio, its efficiency and the supply are assumptions (a planetary gearhead on a NEMA 23 is typically 3:1
 	 * to 100:1 at 0.8 to 0.95); the gearhead is not drawn, the wheel sits on the motor's shaft.
 	 */
-	public static final WHEEL_GEARBOX = new Gearbox(10, 0.9);
+	public static final WHEEL_GEARBOX = new Gearbox(10, 0.9, 60, 40, 6.35, true);
 	public static inline var WHEEL_SUPPLY:Float = 24;
+	static function wheelDriver(wired:Bool = false):MotorDriver return new MotorDriver("GENERIC-DM542", 2.8, 16, wired ? null : WHEEL_SUPPLY);
 	/** The motor's actuator as `MachineAssembly.addMotor` makes it, before the gearbox. */
-	static function wheelMotor():materia.assembly.AssemblyDefinition.AssemblyActuator
-		return NemaStepper.frame(23).actuator("wheel", "wheel", WHEEL_SUPPLY, 0.5);
+	static function wheelMotor():materia.assembly.AssemblyDefinition.AssemblyActuator {
+		var driver = wheelDriver();
+		var voltage = driver.statedVoltage;
+		if (voltage == null) throw "The nominal wheel driver needs a stated supply voltage";
+		return NemaStepper.frame(23).actuator("wheel", "wheel", voltage, 0.5, driver.current);
+	}
 	/**
 	 * Wheel speed limit in rad/s and torque in N·m, from the drive: the stepper's usable speed over the gearhead
 	 * ratio (about 13.7 rad/s, a little over 1 m/s on the 75 mm wheel) and its usable torque through the gearhead.
@@ -284,7 +300,10 @@ class MobileBase extends MachineAssembly {
 		addComponent("basePlate", new ChassisPlate(LENGTH, WIDTH, BASE_THICKNESS, "Base plate", baseSeats(),
 			wheelSlots()), AssemblyFrames.translation(0, 0, BASE_Z));
 
-		// Drives: the bracket hangs from its seat, the motor sits on the bracket, and the wheel turns on the motor's shaft.
+		addComponent("battery", new BatteryPack(260, 180, 110, WHEEL_SUPPLY));
+		addMate("battery-mount", "fixed", "basePlate", "battery", "battery", "base");
+
+		// Drives: the bracket hangs from its seat, the motor sits on the bracket, and the wheel turns at the gearhead output.
 		for (side in SIDES) {
 			addComponent('bracket${side.name}', bracket);
 			addMate('bracket${side.name}-mount', "fixed", "basePlate", 'bracket${side.name}', 'bracket${side.name}', "top");
@@ -292,19 +311,26 @@ class MobileBase extends MachineAssembly {
 			addMate('motor${side.name}-mount', "fixed", 'bracket${side.name}', "motorSeat", 'motor${side.name}', "mountFace");
 			// The hub stands off the shaft's root by the bracket and the gap past it.
 			addMemberConnector('motor${side.name}', "wheelSeat", Solids.axial(0, 0, BRACKET_THICKNESS + HUB_GAP));
+			var gearbox = 'gearbox${side.name}';
+			addComponent(gearbox, WHEEL_GEARBOX);
+			addMate('$gearbox-mount', "fixed", 'motor${side.name}', "wheelSeat", gearbox, "input");
 			addComponent('wheel${side.name}', wheel);
-			addMateOnAxis(side.joint, "continuous", 'motor${side.name}', "wheelSeat", 'wheel${side.name}', "bore",
-				{x: 0, y: 1, z: 0}, 0, {lower: null, upper: null, velocity: WHEEL_SPEED, effort: WHEEL_TORQUE});
+			addMateOnAxis(side.joint, "continuous", gearbox, "output", 'wheel${side.name}', "bore",
+				{x: 0, y: 1, z: 0}, 0, {lower: null, upper: null, velocity: null, effort: null});
 			// The wheel's drive: the stepper through the gearhead, which is where those limits come from.
-			addMotor('drive${side.name}', side.joint, 'motor${side.name}', WHEEL_SUPPLY, 0.5, WHEEL_GEARBOX);
+			var driver = 'driver${side.name}';
+			addComponent(driver, wheelDriver(true));
+			addMemberConnector("basePlate", driver, Solids.axial(side.sign * 210, 0, BASE_THICKNESS));
+			addMate('$driver-mount', "fixed", "basePlate", driver, driver, "mount");
+			connectPorts('$driver-power', "battery", 'power${side.name}', driver, "power");
+			addMotor('drive${side.name}', side.joint, 'motor${side.name}', driver, 0.5, gearbox);
 		}
 
 		for (end in ["Front", "Rear"]) {
 			addComponent('caster$end', caster);
 			addMate('caster$end-mount', "fixed", "basePlate", 'caster$end', 'caster$end', "mount");
 		}
-		addComponent("battery", new BatteryPack(260, 180, 110));
-		addMate("battery-mount", "fixed", "basePlate", "battery", "battery", "base");
+
 		for (corner in CORNERS) {
 			addComponent('post${corner.name}', post);
 			addMate('post${corner.name}-mount', "fixed", "basePlate", 'post${corner.name}', 'post${corner.name}', "base");
@@ -361,7 +387,7 @@ class MobileBase extends MachineAssembly {
 
 	/** A slot for each wheel to turn through, a few millimetres clear of its tread. */
 	function wheelSlots():Array<{x:Float, y:Float, length:Float, width:Float}> {
-		var centreY = BRACKET_Y + BRACKET_THICKNESS + HUB_GAP + wheel.hubLength + WHEEL_WIDTH / 2;
+		var centreY = BRACKET_Y + BRACKET_THICKNESS + HUB_GAP + WHEEL_GEARBOX.length + wheel.hubLength + WHEEL_WIDTH / 2;
 		var length = 2 * Math.sqrt(Math.pow(wheel.radius + 4, 2) - Math.pow(BASE_Z - wheel.radius, 2));
 		return [for (side in SIDES) {x: 0, y: side.sign * centreY, length: length, width: WHEEL_WIDTH + 12}];
 	}

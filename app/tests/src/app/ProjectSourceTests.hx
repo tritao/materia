@@ -207,8 +207,15 @@ class ProjectSourceTests {
     count("project:pedestal", 2);
     // Seven bodies chain seven levels deep; the last body's own Parts node is the eighth.
     check(rows == 14 && depth == 8, 'the arm shows 7 bodies and 7 collapsed Parts nodes, got $rows rows, depth $depth');
-    check(tree.childCount("parts:pedestal") == 2 && tree.childCount("parts:toolFlange") == 7,
+    var pedestalParts = ["baseFlange", "joint1", "gearbox1", "driver1", "driver2", "driver3", "driver4", "driver5", "driver6", "powerSupply"];
+    check(tree.childCount("parts:pedestal") == pedestalParts.length && tree.childCount("parts:toolFlange") == 7,
       "a body's Parts node holds the parts fixed to its root");
+    for (id in pedestalParts) {
+      var found = false;
+      for (index in 0...tree.childCount("parts:pedestal"))
+        if (tree.childKeyAt("parts:pedestal", index) == "project:" + id) found = true;
+      check(found, 'pedestal fixed parts include $id');
+    }
     check(tree.isGroup("parts:toolFlange") && !tree.isGroup("project:turret"), "Parts nodes are not selectable objects");
     check(!tree.initiallyExpanded("parts:toolFlange"), "Parts nodes start collapsed");
     session.scene.select("project:tool/cup");
@@ -1168,8 +1175,8 @@ class ProjectSourceTests {
     // generate at its microstepping (40 kHz over 3200 steps a turn: 78.5 rad/s), and the screw's
     // critical speed, all through the axis's ratio to the motor.
     var motorSpeed = 2 * 24 / (50 * 2.5e-3 * 2.8);
-    var stepSpeed = controller.stepTickHz / (200.0 * controller.microsteps / (2 * Math.PI));
-    var wired = DeviceBinding.bind(model, DeviceLayout.forActuators(model, controller.microsteps), controller.stepTickHz).model;
+    var stepSpeed = controller.stepTickHz / (200.0 * DeviceLayout.forActuators(model).channels[0].microsteps / (2 * Math.PI));
+    var wired = DeviceBinding.bind(model, DeviceLayout.forActuators(model), controller.stepTickHz).model;
     var steady = new SteadyLoads();
     var derived:Array<String> = [], free:Array<String> = [];
     for (joint in axes) {

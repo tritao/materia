@@ -289,6 +289,18 @@ class PlanCheck {
       }
       if (lastSeen[axis] != 0.0) lastDirection[axis] = lastSeen[axis];
     }
+    for (diagnostic in diagnostics) {
+      var labels:Array<String> = [];
+      for (load in loads) {
+        if (diagnostic.kind == PlanDiagnosticKind.Accuracy) {
+          if (load.axis == diagnostic.axis) for (label in load.assumed)
+            if (labels.indexOf(label) < 0) labels.push(label);
+        } else for (motor in load.motors) if (motor.actuator.id == diagnostic.subject)
+          for (label in motor.assumed) if (labels.indexOf(label) < 0) labels.push(label);
+      }
+      labels.sort(Reflect.compare);
+      diagnostic.assumed = labels;
+    }
     return new PlanCheckResult(diagnostics, overallRatio, overallMotor, overallDeviation, overallAxis, slips);
   }
 }

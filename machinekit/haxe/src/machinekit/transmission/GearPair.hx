@@ -8,9 +8,16 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
  * axis so the teeth interleave.
  */
 class GearPair extends MachineAssembly {
+	/** Assumed power efficiency of a single lubricated spur mesh. */
+	public static inline var DEFAULT_EFFICIENCY:Float = 0.98;
+
 	/** Resolve the coupling from these parts. */
-	public static function relation(driver:SpurGear, driven:SpurGear, alignment:Float):TransmissionRelation
-		return new TransmissionRelation(-alignment * driver.teeth / driven.teeth, 0.98);
+	public static function relation(driver:SpurGear, driven:SpurGear, alignment:Float):TransmissionRelation {
+		var result = new TransmissionRelation(-alignment * driver.teeth / driven.teeth, DEFAULT_EFFICIENCY,
+			null, mesh(driver, driven).backlash / (driver.pitchDiameter / 2));
+		result.setBasis("efficiency", ValueBasis.Assumed, "gear efficiency");
+		return result;
+	}
 
 	public final a:SpurGear;
 	public final b:SpurGear;

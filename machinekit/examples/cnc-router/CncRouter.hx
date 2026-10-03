@@ -1,14 +1,19 @@
+import machinekit.motion.PowerSupply;
+import machinekit.motion.MotorDriver;
 import cadkit.modeling.Location;
 import cadkit.modeling.Part;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
-import machinekit.assembly.Drive;
+import machinekit.assembly.Transmission;
 import machinekit.assembly.MachineAssembly;
 import machinekit.component.ComponentDetail;
 import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 import machinekit.motion.LeadScrew;
+import machinekit.motion.LeadScrewNut;
+import machinekit.assembly.Transmission;
+import machinekit.assembly.Sense.SenseTools;
 import machinekit.motion.LeadScrewThread;
 import machinekit.motion.LeadScrewThread.LeadScrewThreadFamily;
 import machinekit.motion.ScrewSupport;
@@ -597,6 +602,12 @@ class CncRouter extends MachineAssembly {
 			AssemblyFrames.translation(xc, toolY, zPlateBottom + 5), "zPlate");
 		attach("spindle", spindle, AssemblyFrames.translation(xc, toolY, MACHINE_ZERO_Z), "spindleClamp");
 		attach("tool", tool, AssemblyFrames.translation(xc, toolY, MACHINE_ZERO_Z - tool.stickout), "spindle");
+		if (!belts) {
+			mountNut("screwYLeft", "nutBracketYLeft", orient(-295, yb + 20, Y_SCREW_Z, up, [0, -1, 0]));
+			mountNut("screwYRight", "nutBracketYRight", orient(295, yb + 20, Y_SCREW_Z, up, [0, -1, 0]));
+			mountNut("screwX", "nutBracketX", orient(xc + 20, yb, X_SCREW_Z, up, [-1, 0, 0]));
+		}
+		mountNut("screwZ", "zPlate", orient(xc, screwZY, zPlateBottom + 30, [0, 1, 0], [0, 0, 1]));
 		exposeConnector("nose", "spindle", "nose");
 		exposeConnector("toolTip", "tool", "tip");
 	}
@@ -646,6 +657,21 @@ class CncRouter extends MachineAssembly {
 		addMate('$id-mount', "fixed", parent, 'to-$id', id, 'attach-$id');
 	}
 
+	var driverIndex:Int = 0;
+	var supplyAdded:Bool = false;
+	/** Drivers live on the fixed frame, so their envelopes do not add carriage mass. */
+	function addDriver(motor:String):String {
+		var id = motor + "Driver";
+		if (!supplyAdded) {
+			attach("powerSupply", new PowerSupply(SUPPLY_VOLTS, 20, 4), AssemblyFrames.translation(0, -320, 0), "sideLeft");
+			supplyAdded = true;
+		}
+		attach(id, new MotorDriver("GENERIC-DM542", 2.8, MICROSTEPS),
+			AssemblyFrames.translation(-180 + 125 * driverIndex++, -200, 0), "sideLeft");
+		connectPorts('$id-power', "powerSupply", 'power$driverIndex', id, "power");
+		return id;
+	}
+
 	/**
 	 * Motor `motor` turns lead screw `id` (at `pose`, its input end on the shaft tip, pointing
 	 * along world direction `along`) through a shaft coupling. Coupling and screw turn together on
@@ -666,14 +692,25 @@ class CncRouter extends MachineAssembly {
 		attach(id, screw, pose, couplingId);
 		// The screw's thread sets the ratio; the joint starts where the axis puts it.
 		var alongAxis = along[0] * axisDirection[0] + along[1] * axisDirection[1] + along[2] * axisDirection[2];
-		var ratio = addDrive('$id-lead', axis.id, '$id-turn', LeadScrew(id, alongAxis));
+		addComponent(id + "Nut", new LeadScrewNut(screw.thread, 4, axis.id != "z"));
+		var ratio = addTransmission('$id-lead', axis.id, '$id-turn', Transmission.LeadScrew(id, id + "Nut"),
+			SenseTools.fromAlignment(alongAxis));
 		addMateOnAxis('$id-turn', "continuous", motor, 'to-$couplingId', couplingId, 'attach-$couplingId',
 			{x: along[0], y: along[1], z: along[2]}, ratio * axis.initial);
 		// The motor holds the screw's input end through the coupling. Nothing holds the far end, and the
 		// nut floats on the carriage, so it is no support: fixed at the motor, free at the far end, over
 		// the whole screw. That is what sets the screw's top speed.
 		supportScrew('$id-lead', Fixed, Free);
-		addMotor(motor, '$id-turn', motor, SUPPLY_VOLTS);
+		addMotor(motor, '$id-turn', motor, addDriver(motor));
+	}
+
+	/** Attach the source nut to its carriage once the bracket exists. */
+	function mountNut(screw:String, parent:String, face:AssemblyFrame):Void {
+		var id = screw + "Nut";
+		var nut:LeadScrewNut = cast component(id);
+		zeroPoses.set(id, AssemblyFrames.compose(face, AssemblyFrames.translation(0, 0, -nut.bodyLength - nut.flangeThickness)));
+		connect(parent, id);
+		addMate('$id-mount', "fixed", parent, 'to-$id', id, 'attach-$id');
 	}
 
 	/** Pitch radius of the 20-tooth GT2 belt pulleys, in millimetres. */
@@ -695,10 +732,9 @@ class CncRouter extends MachineAssembly {
 	 * counter-clockwise about `about` as the carriage moves positively.
 	 */
 	function turnWithBelt(axis:RouterAxisSpec, id:String, parent:String, about:Array<Float>, rotation:Int,
-			?driven:TimingBelt):Void {
-		var ratio = addDrive('$id-belt', axis.id, '$id-turn', Belt(id, rotation));
-		// The belt's stretch is in the driving pulley's drive: its idler only follows.
-		if (driven != null) setDriveStiffness('$id-belt', driven.carriageStiffness(0));
+			beltId:String):Void {
+		var ratio = addTransmission('$id-belt', axis.id, '$id-turn', Transmission.TimingBelt(beltId, id, 0),
+			SenseTools.fromAlignment(rotation));
 		addMateOnAxis('$id-turn', "continuous", parent, 'to-$id', id, 'attach-$id', {x: about[0], y: about[1], z: about[2]},
 			ratio * axis.initial);
 	}
@@ -730,14 +766,14 @@ class CncRouter extends MachineAssembly {
 		attach("beltX", belt, plane, "beamUpper");
 		var turn = belt.rotation(0, 0, -1, 0);
 		hang("pulleyX", beltPulley(), plane, "motorX");
-		turnWithBelt(specs[0], "pulleyX", "motorX", [0, 1, 0], turn, belt);
+		turnWithBelt(specs[0], "pulleyX", "motorX", [0, 1, 0], turn, "beltX");
 		var idlerPlate = AssemblyFrames.translation(-xm, plateY, plateZ);
 		attach("idlerPlateX", new RouterPlate(60, BELT_PLATE, 64, "aluminium 6061", "Idler plate"), idlerPlate, "beamUpper");
 		attach("axleX", new BeltAxle(motorY.variant.shaftDiameter, shaft - BELT_PLATE), orient(-xm, yb + 20, X_SCREW_Z, up, [0, -1, 0]),
 			"idlerPlateX");
 		hang("idlerX", beltPulley(), orient(-xm, tip, X_SCREW_Z, up, [0, 1, 0]), "axleX");
-		turnWithBelt(specs[0], "idlerX", "axleX", [0, 1, 0], belt.rotation(1, 0, -1, 0));
-		addMotor("motorX", "pulleyX-turn", "motorX", SUPPLY_VOLTS);
+		turnWithBelt(specs[0], "idlerX", "axleX", [0, 1, 0], belt.rotation(1, 0, -1, 0), "beltX");
+		addMotor("motorX", "pulleyX-turn", "motorX", addDriver("motorX"));
 	}
 
 	/**
@@ -759,14 +795,14 @@ class CncRouter extends MachineAssembly {
 		var plane = orient(s * Y_BELT_X + BELT_WIDTH / 2, end, Y_SCREW_Z, up, [-1, 0, 0]);
 		place('beltY$name', belt, plane);
 		hang('pulleyY$name', beltPulley(), plane, 'motorY$name');
-		turnWithBelt(specs[1], 'pulleyY$name', 'motorY$name', [-1, 0, 0], belt.rotation(0, 0, -1, 0), belt);
+		turnWithBelt(specs[1], 'pulleyY$name', 'motorY$name', [-1, 0, 0], belt.rotation(0, 0, -1, 0), 'beltY$name');
 		var idlerPlate = AssemblyFrames.translation(plateX, -end, 0);
 		place('idlerPlateY$name', new RouterPlate(BELT_PLATE, 60, 60, "aluminium 6061", "Idler plate"), idlerPlate);
 		attach('axleY$name', new BeltAxle(motorY.variant.shaftDiameter, shaft - BELT_PLATE),
 			orient(s * (inner + shaft - BELT_PLATE), -end, Y_SCREW_Z, up, [-s, 0, 0]), 'idlerPlateY$name');
 		hang('idlerY$name', beltPulley(), orient(s * Y_BELT_X + BELT_WIDTH / 2, -end, Y_SCREW_Z, up, [-1, 0, 0]), 'axleY$name');
-		turnWithBelt(specs[1], 'idlerY$name', 'axleY$name', [-1, 0, 0], belt.rotation(1, 0, -1, 0));
-		addMotor('motorY$name', 'pulleyY$name-turn', 'motorY$name', SUPPLY_VOLTS);
+		turnWithBelt(specs[1], 'idlerY$name', 'axleY$name', [-1, 0, 0], belt.rotation(1, 0, -1, 0), 'beltY$name');
+		addMotor('motorY$name', 'pulleyY$name-turn', 'motorY$name', addDriver('motorY$name'));
 	}
 
 	function component(id:String):MachineComponent {

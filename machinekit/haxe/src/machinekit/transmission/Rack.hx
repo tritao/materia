@@ -24,9 +24,18 @@ import machinekit.component.Solids;
  * extruded along local +X for `faceWidth`.
  */
 class Rack extends MachineComponent {
+	/** Assumed power efficiency of a lubricated rack and pinion. */
+	public static inline var DEFAULT_EFFICIENCY:Float = 0.95;
+
 	/** Resolve the coupling from these parts. */
-	public static function relation(pinion:SpurGear, alignment:Float):TransmissionRelation
-		return new TransmissionRelation(alignment * 2 / pinion.pitchDiameter, 0.95);
+	public static function relation(pinion:SpurGear, rack:Null<Rack>, alignment:Float):TransmissionRelation {
+		if (rack != null && (rack.moduleSize != pinion.moduleSize || rack.pressureAngle != pinion.pressureAngle))
+			throw "Rack and pinion module and pressure angle must match";
+		var result = new TransmissionRelation(alignment * 2 / pinion.pitchDiameter, DEFAULT_EFFICIENCY,
+			null, pinion.backlash + (rack == null ? 0 : rack.backlash));
+		result.setBasis("efficiency", ValueBasis.Assumed, "rack efficiency");
+		return result;
+	}
 
 	public final moduleSize:Float;
 	public final teethCount:Int;
@@ -34,9 +43,12 @@ class Rack extends MachineComponent {
 	public final pressureAngle:Float;
 	public final length:Float;
 	public final barHeight:Float;
+	/** Tangential reversal clearance at the pitch line, mm. */
+	public final backlash:Float;
 
 	public function new(moduleSize:Float, teethCount:Int, faceWidth:Float,
-			pressureAngle:Float = SpurGear.STANDARD_PRESSURE_ANGLE, ?barHeight:Float) {
+			pressureAngle:Float = SpurGear.STANDARD_PRESSURE_ANGLE, ?barHeight:Float, backlash:Float = 0) {
+		if (!Math.isFinite(backlash) || backlash < 0) throw "Rack backlash must be finite and non-negative";
 		if (!(moduleSize > 0)) throw "Rack needs a positive module";
 		if (teethCount < 1) throw "Rack needs at least one tooth";
 		if (!(faceWidth > 0)) throw "Rack needs a positive face width";
@@ -46,7 +58,7 @@ class Rack extends MachineComponent {
 			throw "Rack bar height must be finite and non-negative";
 		var length = teethCount * Math.PI * moduleSize;
 		var moduleText = Dimension.format(moduleSize);
-		var designation = 'RACK-M$moduleText-${teethCount}T';
+		var designation = 'RACK-M$moduleText-${teethCount}T${backlash == 0 ? "" : "-B" + Dimension.format(backlash)}';
 		var description = 'Rack module $moduleText, ${teethCount} teeth';
 		super(designation, description, "steel");
 		this.moduleSize = moduleSize;
@@ -54,6 +66,7 @@ class Rack extends MachineComponent {
 		this.faceWidth = faceWidth;
 		this.pressureAngle = pressureAngle;
 		this.barHeight = resolvedBarHeight;
+		this.backlash = backlash;
 		this.length = length;
 		addConnector("axis", ConnectorRole.Axis, Solids.axial(faceWidth / 2, 0, length / 2));
 		addConnector("pitch", ConnectorRole.Pitch, Solids.axial(faceWidth / 2, 0, 0));
@@ -97,9 +110,9 @@ class Rack extends MachineComponent {
 				ComponentRecipeSupport.length("faceWidth", 10),
 				new ComponentParameter("pressureAngle", Angle, Number(SpurGear.STANDARD_PRESSURE_ANGLE), "rad",
 					SpurGear.MIN_PRESSURE_ANGLE, SpurGear.MAX_PRESSURE_ANGLE),
-				ComponentRecipeSupport.length("barHeight", 3)
+				ComponentRecipeSupport.length("barHeight", 3), ComponentRecipeSupport.length("backlash", 0)
 			], v -> new Rack(v.number("moduleSize"), v.integer("teethCount"), v.number("faceWidth"),
-				v.number("pressureAngle"), v.number("barHeight")), true);
+				v.number("pressureAngle"), v.number("barHeight"), v.number("backlash")), true);
 		return recipeTypeCache;
 	}
 
@@ -107,6 +120,6 @@ class Rack extends MachineComponent {
 
 	override public function values():ComponentValues return new ComponentValues()
 		.setNumber("moduleSize", moduleSize).setInteger("teethCount", teethCount).setNumber("faceWidth", faceWidth)
-		.setNumber("pressureAngle", pressureAngle).setNumber("barHeight", barHeight)
+		.setNumber("pressureAngle", pressureAngle).setNumber("barHeight", barHeight).setNumber("backlash", backlash)
 		.setToken("material", materialSpec());
 }

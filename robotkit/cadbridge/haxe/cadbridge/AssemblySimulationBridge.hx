@@ -271,6 +271,7 @@ class AssemblySimulationBridge {
       if (stiffness != null) added.stiffness = stiffness / leaderScale;
       if (backlash != null) added.backlash = backlash * leaderScale;
       if (drag != null) added.drag = drag * followerScale;
+      if (coupling.assumed != null) added.assumed = [for (label in coupling.assumed) label];
     }
     // A motor on a joint: its effort and rate in robot units, and its rotor turning with the joint.
     if (definition.actuators != null) for (actuator in definition.actuators) {
@@ -288,6 +289,9 @@ class AssemblySimulationBridge {
       var added = new Actuator(actuator.id, actuator.maxEffort, actuator.maxRate,
         Transmission.SimpleTransmission(driven.id, gear / factor, -initial * factor));
       if (actuator.gearEfficiency != null) added.efficiency = actuator.gearEfficiency;
+      if (actuator.assumed != null) added.assumed = [for (label in actuator.assumed) label];
+      added.microsteps = actuator.microsteps;
+      added.maxStepRate = actuator.maxStepRate;
       var steps = actuator.fullStepsPerRevolution;
       if (steps != null) added.fullStepsPerRevolution = steps;
       var inertia = actuator.rotorInertia == null ? 0.0 : actuator.rotorInertia;

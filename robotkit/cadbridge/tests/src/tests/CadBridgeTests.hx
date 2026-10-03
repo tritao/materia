@@ -827,7 +827,7 @@ class CadBridgeTests {
     var mobile:robotkit.runtime.RobotRuntimeMobileConfiguration = cast configuration.mobileBase;
     check(switch mobile.drive {
       case robotkit.runtime.RobotRuntimeDriveConfiguration.Differential(_, _, _, _, radius, track, left, right):
-        left == 1 && right == -1 && approx(radius, 0.075, 1e-12) && approx(track, 0.3, 1e-12);
+        left == 1 && right == -1 && approx(radius, 0.075, 1e-12) && approx(track, 0.38, 1e-12);
       case _: false;
     }, "each wheel's direction comes from its shaft: the right one rolls back on a positive rate");
 

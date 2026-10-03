@@ -30,12 +30,12 @@ class ArmJoint extends MachineComponent implements MotorDrive {
 	/** The servo motor inside the module, or null when it is only a housing. */
 	public final servo:Null<ServoMotor>;
 
-	public function new(diameter:Float, length:Float, ?flange:RobotFlange, ?servo:ServoMotor) {
+	public function new(diameter:Float, length:Float, ?flange:RobotFlange, ?servo:ServoMotor, variant:String = "") {
 		if (!Math.isFinite(diameter) || !Math.isFinite(length) || !(diameter > 0) || !(length > 0))
 			throw "Arm joint needs a positive diameter and length";
 		var text = '${Dimension.format(diameter)}x${Dimension.format(length)}';
 		var base = flange == null ? 'ARM-JOINT-D$text' : 'ARM-JOINT-D$text-${flange.designation}';
-		super(servo == null ? base : '$base-${servo.designation}', 'Arm joint module, $text mm' +
+		super((servo == null ? base : '$base-${servo.designation}') + variant, 'Arm joint module, $text mm' +
 			(servo == null ? "" : ' with ${servo.designation}'), "steel 12.9", true);
 		this.servo = servo;
 		this.diameter = diameter;
@@ -64,10 +64,10 @@ class ArmJoint extends MachineComponent implements MotorDrive {
 			.setToken("material", materialSpec());
 
 	/** The servo inside the module as an actuator on joint `joint`; a module with no servo is not a motor. */
-	public function actuator(id:String, joint:String, volts:Float, margin:Float):AssemblyActuator {
+	public function actuator(id:String, joint:String, volts:Float, margin:Float, ?current:Float):AssemblyActuator {
 		var motor = servo;
 		if (motor == null) throw 'Arm joint "$designation" has no servo to drive a joint';
-		return motor.actuator(id, joint, volts, margin);
+		return motor.actuator(id, joint, volts, margin, current);
 	}
 
 	override public function hasGeometry():Bool return true;

@@ -68,7 +68,7 @@ typedef CncJob = {
 	/** The tool in the spindle when the job starts. */
 	@:optional var loadedTool:Int;
 	/** The controller the machine's steppers are nominally wired to; its step rate caps the axes. */
-	@:optional var controller:{microsteps:Int, stepTickHz:Int};
+	@:optional var controller:{stepTickHz:Int};
 }
 
 /**
@@ -181,7 +181,7 @@ class CncProgramPlayer implements SessionMember {
 		var machineModel = robot.model;
 		var wiring = job.controller;
 		if (wiring != null)
-			machineModel = DeviceBinding.bind(robot.model, DeviceLayout.forActuators(robot.model, wiring.microsteps),
+			machineModel = DeviceBinding.bind(robot.model, DeviceLayout.forActuators(robot.model),
 				wiring.stepTickHz).model;
 		var axes:Array<MotionAxisBlueprint> = [];
 		var start:Array<Float> = [];

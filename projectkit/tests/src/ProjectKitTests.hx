@@ -447,7 +447,7 @@ class ProjectKitTests {
       axes: ["x", "y", "z"], spindle: "spindle", workOffset: [0.1, 0.1, -0.05],
       tools: [{number: 1, length: 0.03, profile: [[0.0, 0.0, 0.0, 0.0, 0.003, 0.0], [0.0, 0.0, 0.003, 0.0, 0.003, 0.02]]}],
       stock: "bed", sacrificial: ["gantry"], toolPart: "spindle", loadedTool: 1, target: "finished", loop: true,
-      controller: {microsteps: 16, stepTickHz: 40000}};
+      controller: {stepTickHz: 40000}};
     var data:materia.project.SceneArtifact.SceneArtifactData = {lengthUnit: "mm", metresPerUnit: 0.001,
       parts: [part("body"), part("finished")], assemblyDefinition: machine, machining: job};
     var restored = SceneArtifact.decode(SceneArtifact.encode(data)).machining;
@@ -458,13 +458,40 @@ class ProjectKitTests {
     check(restored.tools.length == 1 && restored.tools[0].number == 1 && restored.tools[0].length == 0.03 &&
       restored.tools[0].profile[1][5] == 0.02, "machining tool table round trip");
     var wiring = restored.controller;
-    check(wiring != null && wiring.microsteps == 16 && wiring.stepTickHz == 40000, "machining controller round trip");
-    job.controller = {microsteps: 0, stepTickHz: 40000};
-    rejects(function() SceneArtifact.encode(data), "machining controller with no microsteps");
+    check(wiring != null && wiring.stepTickHz == 40000, "machining controller round trip");
+    check(haxe.Json.stringify(restored.controller).indexOf("microsteps") < 0,
+      "machining jobs do not save driver microstepping");
+    // Replace the length-prefixed JSON section to test an actual legacy artifact. Fixed anonymous
+    // records cannot acquire fields or be cast from dynamic objects in haxeon.
+    var encoded = SceneArtifact.encode(data), original = Bytes.ofString(haxe.Json.stringify(job));
+    var legacyJob:Dynamic = haxe.Json.parse(haxe.Json.stringify(job));
+    Reflect.setField(Reflect.field(legacyJob, "controller"), "microsteps", 4);
+    var replacement = Bytes.ofString(haxe.Json.stringify(legacyJob)), section = -1;
+    var last = encoded.length - original.length + 1;
+    for (index in 0...last) if (encoded.get(index) == original.get(0)) {
+      var matches = true;
+      for (byte in 0...original.length) if (encoded.get(index + byte) != original.get(byte)) {
+        matches = false;
+        break;
+      }
+      if (matches) { section = index; break; }
+    }
+    if (section < 4) throw "Legacy machining fixture needs its JSON section";
+    var legacyBytes = Bytes.alloc(encoded.length + replacement.length - original.length);
+    legacyBytes.blit(0, encoded, 0, section);
+    legacyBytes.setInt32(section - 4, replacement.length);
+    legacyBytes.blit(section, replacement, 0, replacement.length);
+    legacyBytes.blit(section + replacement.length, encoded, section + original.length,
+      encoded.length - section - original.length);
+    var oldRestored = SceneArtifact.decode(legacyBytes).machining;
+    check(oldRestored != null && haxe.Json.stringify(oldRestored.controller).indexOf("microsteps") < 0,
+      "legacy job microsteps are discarded rather than overriding the machine's drivers");
+    job.controller = {stepTickHz: 0};
+    rejects(function() SceneArtifact.encode(data), "machining controller with no step rate");
     Reflect.deleteField(job, "controller");
     var bare = SceneArtifact.decode(SceneArtifact.encode(data)).machining;
     check(bare != null && bare.controller == null, "a job names no controller unless it is given one");
-    job.controller = {microsteps: 16, stepTickHz: 40000};
+    job.controller = {stepTickHz: 40000};
     job.spindle = "missing";
     rejects(function() SceneArtifact.encode(data), "machining spindle outside the assembly");
     job.spindle = "spindle"; job.axes = ["x", "x", "z"];

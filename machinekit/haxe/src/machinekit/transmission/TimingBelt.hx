@@ -209,6 +209,22 @@ class TimingBelt extends MachineComponent {
 
 	public function wraps():Array<BeltWrap> return loop.copy();
 
+	/** Assumed power efficiency of a timing belt drive. */
+	public static inline var DEFAULT_EFFICIENCY:Float = 0.97;
+	/** Assumed pulley and idler bearing drag, N m. */
+	public static inline var DEFAULT_DRAG:Float = 0.005;
+
+	/** Resolve from the current loop geometry and width, never a saved stiffness. */
+	public static function relation(belt:TimingBelt, pulley:TimingPulley, strand:Int, alignment:Float):TransmissionRelation {
+		if (belt.beltProfile != pulley.beltProfile) throw "Belt and pulley profiles must match";
+		var result = new TransmissionRelation(alignment * 2 / pulley.pitchDiameter, DEFAULT_EFFICIENCY,
+			belt.carriageStiffness(strand), null, DEFAULT_DRAG);
+		result.setBasis("stiffness", ValueBasis.Assumed, "belt stiffness");
+		result.setBasis("efficiency", ValueBasis.Assumed, "belt efficiency");
+		result.setBasis("drag", ValueBasis.Assumed, "belt drag");
+		return result;
+	}
+
 	/**
 	 * Tensile stiffness of the belt's cords, EA in N, per millimetre of belt width. Assumption, not a
 	 * datasheet value (makers rate breaking strength and working tension, not stiffness): a 6 mm

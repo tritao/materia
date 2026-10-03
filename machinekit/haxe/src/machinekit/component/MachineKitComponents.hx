@@ -16,6 +16,10 @@ import machinekit.motion.LinearBearing;
 import machinekit.motion.LinearRail;
 import machinekit.motion.LinearRailBlock;
 import machinekit.motion.NemaStepper;
+import machinekit.motion.MotorDriver;
+import machinekit.motion.PowerSupply;
+import machinekit.motion.Gearbox;
+import machinekit.robotics.GearedArmJoint;
 import machinekit.motion.PillowBlock;
 import machinekit.robotics.RobotFlange;
 import machinekit.robotics.EndEffectorPlate;
@@ -70,6 +74,10 @@ class MachineKitComponents {
 			LinearRailBlock.recipeType(),
 			NemaStepper.namedRecipeType(),
 			NemaStepper.genericRecipeType(),
+			MotorDriver.recipeType(),
+			PowerSupply.recipeType(),
+			Gearbox.recipeType(),
+			GearedArmJoint.recipeType(),
 			FlangeBearingHousing.recipeType(),
 			LeadScrew.recipeType(),
 			LeadScrewNut.recipeType(),

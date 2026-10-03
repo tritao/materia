@@ -1,5 +1,7 @@
 package cadkit.modeling;
 
+import haxe.ds.ReadOnlyArray;
+
 import materia.assembly.AssemblyRecord;
 import materia.assembly.AssemblyCodec;
 import materia.assembly.AssemblyFrames;
@@ -177,13 +179,14 @@ class AssemblyModel {
 	 * means rigid, tight and free-running.
 	 */
 	public function couple(id:String, source:String, target:String, ratio:Float, offset:Float = 0,
-			?efficiency:Float, ?stiffness:Float, ?backlash:Float, ?drag:Float):Void {
+			?efficiency:Float, ?stiffness:Float, ?backlash:Float, ?drag:Float, ?assumed:ReadOnlyArray<String>):Void {
 		var coupling:materia.assembly.AssemblyDefinition.AssemblyJointCoupling = {id: id, source: source,
 			target: target, ratio: ratio, offset: offset};
 		if (efficiency != null) coupling.efficiency = efficiency;
 		if (stiffness != null) coupling.stiffness = stiffness;
 		if (backlash != null) coupling.backlash = backlash;
 		if (drag != null) coupling.drag = drag;
+		if (assumed != null && assumed.length > 0) coupling.assumed = [for (label in assumed) label];
 		data.couplings.push(coupling);
 		solved = null;
 	}

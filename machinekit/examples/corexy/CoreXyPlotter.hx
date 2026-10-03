@@ -1,5 +1,8 @@
+import machinekit.motion.PowerSupply;
+import machinekit.motion.MotorDriver;
 import cadkit.modeling.Part;
-import machinekit.assembly.Drive;
+import machinekit.assembly.Transmission;
+import machinekit.assembly.Sense.SenseTools;
 import machinekit.assembly.MachineAssembly;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;
@@ -170,7 +173,7 @@ class CoreXyPlotter extends MachineAssembly {
 						AssemblyFrames.translation(wrap.x, wrap.y, BASE_TOP), "base");
 				}
 				hang(id, beltPulley(), pose, parent);
-				turnWithBelt(id, parent, belt, wrap, true);
+				turnWithBelt(id, parent, 'belt$letter', belt, wrap, true);
 			}
 		}
 
@@ -196,7 +199,7 @@ class CoreXyPlotter extends MachineAssembly {
 				attach(pin, new PlotterPin(motor.variant.shaftDiameter, pinLength - (bracketBase + 6 - BASE_TOP), "Idler pin"),
 					AssemblyFrames.translation(wrap.x, wrap.y, bracketBase + 6), wrap.x < 0 ? "bracketLeft" : "bracketRight");
 				hang(id, beltPulley(), AssemblyFrames.translation(wrap.x, wrap.y, level), pin);
-				turnWithBelt(id, pin, belts[b], wrap, false);
+				turnWithBelt(id, pin, 'belt$letter', belts[b], wrap, false);
 			}
 		}
 
@@ -219,9 +222,17 @@ class CoreXyPlotter extends MachineAssembly {
 			AssemblyFrames.translation(0, blockFront - 6 - 4, PEN_BASE), "carriagePlate");
 		exposeConnector("penTip", "pen", "tip");
 
+		// Supply and drivers stay on the fixed frame; the supply's service port sets their voltage.
+		attach("powerSupply", new PowerSupply(SUPPLY_VOLTS, 10, 2),
+			AssemblyFrames.translation(BASE_WIDTH / 2 + 70, 0, BASE_TOP), "base");
 		// Each stepper turns its belt's driving pulley.
-		addMotor("motorA", "pulleyA-turn", "motorA", SUPPLY_VOLTS);
-		addMotor("motorB", "pulleyB-turn", "motorB", SUPPLY_VOLTS);
+		for (entry in [{id: "A", x: -30.0}, {id: "B", x: 30.0}]) {
+			var driver = 'driver${entry.id}';
+			attach(driver, new MotorDriver("GENERIC-TMC2209", 1.68, 16),
+				AssemblyFrames.translation(entry.x, -BASE_DEPTH / 2 + 20, BASE_TOP), "base");
+			connectPorts('$driver-power', "powerSupply", entry.id == "A" ? "power1" : "power2", driver, "power");
+			addMotor('motor${entry.id}', 'pulley${entry.id}-turn', 'motor${entry.id}', driver);
+		}
 	}
 
 	/** Room past the travel of axis `id` before its rail block reaches the rail's end, in millimetres. */
@@ -243,13 +254,14 @@ class CoreXyPlotter extends MachineAssembly {
 	 * on frame follows both axes and one on the gantry only x. The pulley turns the way its belt goes
 	 * round it (`BeltWrap.side`).
 	 */
-	function turnWithBelt(id:String, parent:String, belt:TimingBelt, wrap:BeltWrap, onFrame:Bool):Void {
+	function turnWithBelt(id:String, parent:String, beltId:String, belt:TimingBelt, wrap:BeltWrap, onFrame:Bool):Void {
 		var strands = belt.strands();
 		var signs = [sign(strands[0].dx)];
 		if (onFrame) signs.push(sign(strands[1].dy));
 		var axes = ["x", "y"];
 		for (index in 0...signs.length)
-			addDrive('$id-${axes[index]}', axes[index], '$id-turn', Belt(id, wrap.side * signs[index]));
+			addTransmission('$id-${axes[index]}', axes[index], '$id-turn', Transmission.TimingBelt(beltId, id, 0),
+				SenseTools.fromAlignment(wrap.side * signs[index]));
 		addMateOnAxis('$id-turn', "continuous", parent, 'to-$id', id, 'attach-$id', {x: 0, y: 0, z: 1}, 0);
 	}
 
