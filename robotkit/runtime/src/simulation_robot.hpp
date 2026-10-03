@@ -92,6 +92,8 @@ private:
     struct SensorState {
         rk_sensor_config config{};
         rk_sensor_sample sample{};
+        /** The latest acquisition's values, held between acquisitions of a slower sensor. */
+        double values[RK_SENSOR_VALUE_POOL]{};
         double previous_time = -1.0;
         double previous_velocity[3]{};
         double next_due = 0.0;

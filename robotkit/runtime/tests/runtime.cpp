@@ -194,7 +194,7 @@ public:
         state.sensor_count = 1;
         state.sensors[0].sequence = 1;
         state.sensors[0].value_count = 1;
-        state.sensors[0].values[0] = 1.0;
+        RK_SENSOR_VALUE(state, 0, 0) = 1.0;
         return RK_OK;
     }
 
@@ -1665,6 +1665,38 @@ void discarded_tick_restores_trajectory(const rk_robot_runtime_blueprint &bluepr
     }
 }
 
+void hold_with_unlimited_follower(const rk_robot_runtime_blueprint &source) {
+    // A lead screw with no acceleration limit of its own turns within its axis's: a hold
+    // brakes the axis, and the screw with it, instead of being refused.
+    auto blueprint = source;
+    blueprint.joints[0].max_acceleration = 1.0;
+    blueprint.joints[0].max_velocity = 1.0;
+    blueprint.joints[1].max_acceleration = 0.0;
+    blueprint.joints[1].max_velocity = 0.0;
+    blueprint.coupling_count = 1;
+    blueprint.couplings[0] = {0, 1, -1.0, 0.0};
+    auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
+    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+    assert(runtime.blueprint().joints[1].max_acceleration == 1.0);
+    assert(runtime.blueprint().joints[1].max_velocity == 1.0);
+    robotkit::PlanRequest plan{};
+    plan.sequence = 1;
+    plan.plan_id = 212;
+    plan.model_revision = blueprint.revision;
+    plan.calibration_revision = blueprint.calibration_revision;
+    plan.ends_at_rest = 1;
+    plan.segments = linear_segment_chunk(0.0, 0.2, 2'000'000'000, 212);
+    assert(runtime.submit_plan(plan) == RK_OK);
+    uint64_t timestamp = 0;
+    for (int step = 0; step < 3; ++step) apply_cycle(runtime, timestamp);
+    assert(runtime.submit(lifecycle_command(2, RK_COMMAND_HOLD)) == RK_OK);
+    for (int step = 0; step < 7; ++step) apply_cycle(runtime, timestamp);
+    rk_robot_snapshot snapshot{};
+    assert(runtime.snapshot_full(snapshot) == RK_OK);
+    assert(snapshot.session_state == RK_SESSION_HELD && snapshot.fault_code == 0);
+    assert(std::abs(snapshot.position[1] + snapshot.position[0]) < 1e-9);
+}
+
 void native_hold_resume_and_abort(const rk_robot_runtime_blueprint &source) {
     auto blueprint = source;
     for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
@@ -2109,6 +2141,7 @@ int main() {
     plan_start_ignores_chunking(blueprint);
     discarded_tick_restores_trajectory(blueprint);
     native_hold_resume_and_abort(blueprint);
+    hold_with_unlimited_follower(blueprint);
     plan_end_braking_stays_on_path(blueprint);
     smooth_path_hold_respects_acceleration(blueprint);
     ruckig_segment_stop_uses_analytic_braking(blueprint);

@@ -437,7 +437,7 @@ class MateriaProjectRunner {
       metresPerUnit: scale, physical: {metresPerUnit: scale, parts: physicalParts},
       recipeDocument: artifact.recipeDocument, recipeDiagnostics: artifact.recipeDiagnostics,
       cncJob: machiningJob(artifact, records, scale), mobileBase: artifact.mobileBase, mission: artifact.mission,
-      robotTools: artifact.robotTools};
+      robotTools: artifact.robotTools, robotSensors: artifact.robotSensors};
   }
 
   /**
@@ -468,7 +468,7 @@ class MateriaProjectRunner {
       workOffset: machining.workOffset, loop: machining.loop == true,
       tools: [for (tool in machining.tools) Tool.shaped(tool.number, tool.length, CutterProfile.decode(tool.profile))],
       stock: stock, stockMesh: stockMesh, target: target == null ? null : partMesh(target),
-      toolPart: machining.toolPart, loadedTool: machining.loadedTool};
+      toolPart: machining.toolPart, loadedTool: machining.loadedTool, controller: machining.controller};
   }
 
   /** An artifact part's triangles, with vertices at the same place welded into one. */
@@ -539,7 +539,8 @@ class MateriaProjectRunner {
       faceDescriptorsByDefinition: generated.faceDescriptorsByDefinition, metresPerUnit: generated.metresPerUnit, physical: generated.physical,
       recipeDocument: generated.recipeDocument, recipeDiagnostics: generated.recipeDiagnostics,
       robotMotions: generated.robotMotions, cncJob: generated.cncJob,
-      mobileBase: generated.mobileBase, mission: generated.mission, robotTools: generated.robotTools};
+      mobileBase: generated.mobileBase, mission: generated.mission, robotTools: generated.robotTools,
+      robotSensors: generated.robotSensors};
   }
 
   static function addOccurrenceRecord(records:Array<SceneObjectData>, component:SceneArtifactPart,
@@ -692,4 +693,6 @@ typedef GeneratedAssemblyScene = {
   @:optional var mission:materia.project.SceneArtifact.SceneArtifactMission;
   /** The tools the assembly's robot works with, as its parts declare them. */
   @:optional var robotTools:Array<materia.project.SceneArtifact.SceneArtifactRobotTool>;
+  /** The sensors on the assembly's robot, as its parts declare them. */
+  @:optional var robotSensors:Array<materia.project.SceneArtifact.SceneArtifactRobotSensor>;
 }

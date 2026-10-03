@@ -15,6 +15,10 @@ import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.JointLimits;
 import robotkit.model.JointCoupling;
+import robotkit.model.Transmission;
+import robotkit.model.Actuator;
+import robotkit.model.ActuatorDrive;
+import robotkit.model.TorqueSpeedCurve;
 import robotkit.model.RobotDriveConfiguration;
 import robotkit.model.RobotMobileConfiguration;
 import materia.project.SceneArtifact.SceneArtifactMobileBase;
@@ -254,8 +258,45 @@ class AssemblySimulationBridge {
       var ratio = coupling.ratio * followerScale / leaderScale;
       var offset = (coupling.ratio * placement.joint(coupling.source) + coupling.offset -
         placement.joint(coupling.target)) * followerScale;
-      model.addCoupling(new JointCoupling(coupling.id, coupling.source,
+      var added = model.addCoupling(new JointCoupling(coupling.id, coupling.source,
         coupling.target, ratio, offset));
+      if (coupling.efficiency != null) added.efficiency = coupling.efficiency;
+      // Stiffness and backlash are in the leader's units, which a sliding leader measures in assembly units.
+      var stiffness = coupling.stiffness, backlash = coupling.backlash, drag = coupling.drag;
+      if (stiffness != null) added.stiffness = stiffness / leaderScale;
+      if (backlash != null) added.backlash = backlash * leaderScale;
+      if (drag != null) added.drag = drag * followerScale;
+    }
+    // A motor on a joint: its effort and rate in robot units, and its rotor turning with the joint.
+    if (definition.actuators != null) for (actuator in definition.actuators) {
+      var driven:Null<Joint> = null;
+      for (joint in model.joints) if (joint.id == actuator.joint) driven = joint;
+      var edge:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
+      for (candidate in definition.joints) if (candidate.id == actuator.joint) edge = candidate;
+      if (driven == null || edge == null) throw 'Assembly actuator "${actuator.id}" drives no simulated joint';
+      // The actuator works in assembly units from the joint's zero; the robot joint is in SI
+      // units from its initial placement: joint = (actuator - initial) * factor.
+      var factor = edge.type == AssemblyJointType.Prismatic ? scale : 1.0;
+      var initial = placement.joint(actuator.joint);
+      var added = new Actuator(actuator.id, actuator.maxEffort, actuator.maxRate,
+        Transmission.SimpleTransmission(driven.id, 1 / factor, -initial * factor));
+      var steps = actuator.fullStepsPerRevolution;
+      if (steps != null) added.fullStepsPerRevolution = steps;
+      var inertia = actuator.rotorInertia == null ? 0.0 : actuator.rotorInertia;
+      // The drive's speeds are in the actuator's own units, like `maxRate`.
+      var curve = actuator.torqueSpeed == null ? null : TorqueSpeedCurve.unflatten(actuator.torqueSpeed);
+      var holding = actuator.holdingTorque;
+      var rated = actuator.ratedTorque, peak = actuator.peakTorque, ratedSpeed = actuator.ratedSpeed, topSpeed = actuator.maxSpeed;
+      if (actuator.drive == "stepper" && steps != null && curve != null && holding != null)
+        added.drive = new StepperDrive(steps, inertia, holding, curve);
+      else if (actuator.drive == "servo" && rated != null && peak != null && ratedSpeed != null && topSpeed != null)
+        added.drive = new ServoDrive(rated, peak, ratedSpeed, topSpeed, inertia,
+          actuator.encoderCounts == null ? 0.0 : actuator.encoderCounts, curve);
+      if (actuator.servoStiffness != null) added.servoStiffness = actuator.servoStiffness;
+      if (actuator.servoDamping != null) added.servoDamping = actuator.servoDamping;
+      model.addActuator(added);
+      if (actuator.rotorInertia != null)
+        driven.armature += edge.type == AssemblyJointType.Prismatic ? 0.0 : actuator.rotorInertia;
     }
     if (mobileBase != null) {
       for (wheel in [mobileBase.leftWheel, mobileBase.rightWheel])

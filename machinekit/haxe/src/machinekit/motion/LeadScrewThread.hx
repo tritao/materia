@@ -51,4 +51,30 @@ class LeadScrewThread {
 	 */
 	public function signedLead():Float
 		return hand == RightHand ? -lead : lead;
+
+	/**
+	 * Share of the motor's work that reaches the nut when the screw drives it: tan λ / tan(λ + φ'),
+	 * with λ the lead angle at the pitch diameter and φ' the friction angle on the 15° flanks of a
+	 * trapezoidal or Acme thread. `friction` is the nut's sliding friction coefficient; 0.1 is
+	 * typical of a greased bronze or plastic nut on steel.
+	 */
+	public function efficiency(friction:Float = 0.1):Float {
+		if (!(friction >= 0) || !Math.isFinite(friction)) throw "Lead screw friction must be non-negative";
+		var pitchDiameter = screwDiameter - pitch / 2;
+		var leadAngle = Math.atan(lead / (Math.PI * pitchDiameter));
+		var frictionAngle = Math.atan(friction / Math.cos(15 * Math.PI / 180));
+		return Math.tan(leadAngle) / Math.tan(leadAngle + frictionAngle);
+	}
+
+	/**
+	 * Diameter at the bottom of the thread, mm, which sets how the screw bends. Metric trapezoidal
+	 * (ISO 2904): the nominal diameter less the pitch and twice the crest clearance, 0.25 mm up to a
+	 * 5 mm pitch, 0.5 mm to 12 mm and 1 mm above (Tr10 x 2: 7.5 mm). Acme: the diameter less the
+	 * pitch, which is close for a 29 degree thread with its crest clearance.
+	 */
+	public function rootDiameter():Float {
+		if (family == Acme) return screwDiameter - pitch;
+		var clearance = pitch <= 5 ? 0.25 : pitch <= 12 ? 0.5 : 1.0;
+		return screwDiameter - pitch - 2 * clearance;
+	}
 }

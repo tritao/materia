@@ -152,11 +152,18 @@ int main() {
     state.sensor_count = 1;
     state.sensors[0].sequence = 1;
     state.sensors[0].value_count = 6;
-    state.sensors[0].values[0] = NAN;
+    RK_SENSOR_VALUE(state, 0, 0) = NAN;
     assert(rk_robot_state_validate(&state) == RK_ERROR_INVALID_ARGUMENT);
-    state.sensors[0].values[0] = 0.0;
+    RK_SENSOR_VALUE(state, 0, 0) = 0.0;
     state.sensors[0].value_count = RK_MAX_SENSOR_VALUES + 1;
     assert(rk_robot_state_validate(&state) == RK_ERROR_INVALID_ARGUMENT);
+    // A full scan fits the pool; values running past its end do not.
+    state.sensors[0].value_count = RK_MAX_SENSOR_VALUES;
+    for (uint32_t i = 0; i < RK_MAX_SENSOR_VALUES; ++i) RK_SENSOR_VALUE(state, 0, i) = 1.0;
+    assert(rk_robot_state_validate(&state) == RK_OK);
+    state.sensors[0].value_offset = RK_SENSOR_VALUE_POOL - RK_MAX_SENSOR_VALUES + 1;
+    assert(rk_robot_state_validate(&state) == RK_ERROR_INVALID_ARGUMENT);
+    state.sensors[0].value_offset = 0;
     state.sensors[0].sequence = 0;
     state.sensors[0].value_count = 1;
     assert(rk_robot_state_validate(&state) == RK_ERROR_INVALID_ARGUMENT);
@@ -177,6 +184,16 @@ int main() {
     sensor.ray_count = RK_MAX_SENSOR_VALUES + 1;
     assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_ERROR_INVALID_ARGUMENT);
     sensor.ray_count = 16;
+    // Scans that are each allowed but together overfill the shared value pool are not.
+    blueprint.sensor_count = 2;
+    blueprint.sensors[1] = sensor;
+    blueprint.sensors[0].ray_count = RK_MAX_SENSOR_VALUES;
+    blueprint.sensors[1].ray_count = RK_SENSOR_VALUE_POOL - RK_MAX_SENSOR_VALUES;
+    assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_OK);
+    blueprint.sensors[1].ray_count += 1;
+    assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_ERROR_INVALID_ARGUMENT);
+    blueprint.sensor_count = 1;
+    blueprint.sensors[0].ray_count = 16;
     sensor.rotation[3] = 0.0;
     assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_ERROR_INVALID_ARGUMENT);
     sensor.rotation[3] = 1.0;

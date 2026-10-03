@@ -161,6 +161,7 @@ class Main {
           arg.indexOf("--robot=") != 0 && arg.indexOf("--setup-script=") != 0 &&
           arg.indexOf("--project=") != 0 && arg.indexOf("--project-action=") != 0 &&
           arg.indexOf("--example=") != 0 && arg.indexOf("--example-settle=") != 0 && arg != "--example-play" &&
+          arg.indexOf("--frame=") != 0 &&
           arg != "--record" && arg.indexOf("--record=") != 0 &&
           arg.indexOf("--character=") != 0 && arg.indexOf("--character-clip=") != 0 &&
           arg.indexOf("--character-hold=") != 0 && arg.indexOf("--character-display=") != 0 &&
@@ -170,7 +171,7 @@ class Main {
           arg != "--worker-demo-trace") {
         Sys.println("Usage: materia [--reset-workspace] [--snapshot [--simulate]] [--demo] " +
           "[--lab] [--dark] [--perspective] [--story=ID] [--width=PX] [--height=PX] " +
-          "[--capture-dir=PATH] [--frames=N|--capture-seconds=N] [--msaa=SAMPLES] " +
+          "[--capture-dir=PATH] [--frames=N|--capture-seconds=N] [--msaa=SAMPLES] [--frame=OBJECT-ID] " +
           "[--robot=HOST:PORT] [--setup-script=REFERENCE] [--project=PATH] " +
           "[--project-action=ID] [--record[=PATH]] [--character=GLTF [--character-clip=NAME] " +
           "[--character-hold=GLTF] [--character-display=mesh|capsules|skeleton] " +
@@ -305,7 +306,27 @@ class Main {
     host.captureSeconds = diagnostics.captureSeconds;
     var activeEditor:Null<ReferenceEditorApp> = null;
     // A launch project builds in the background; captures wait for it so they show the project.
-    host.captureReady = function() return activeEditor == null || !activeEditor.openingProject();
+    // `--simulate` presses Play once that project is open, so a capture can show a running simulation.
+    var playOnOpen = args.indexOf("--simulate") >= 0;
+    // `--frame=ID` frames the camera on that scene object once the project is open, leaving nothing selected.
+    var frameId:Null<String> = null;
+    for (arg in args) if (arg.indexOf("--frame=") == 0) frameId = arg.substr(8);
+    host.captureReady = function() {
+      var ready = activeEditor == null || !activeEditor.openingProject();
+      if (ready && playOnOpen && activeEditor != null) {
+        playOnOpen = false;
+        activeEditor.commands.execute("sim.play");
+      }
+      if (ready && frameId != null && activeEditor != null && activeEditor.perspectiveViewport != null) {
+        var id:String = cast frameId;
+        frameId = null;
+        if (activeEditor.scene.select(id)) {
+          activeEditor.perspectiveViewport.frameSelected();
+          activeEditor.scene.select("scene");
+        }
+      }
+      return ready;
+    };
     host.continuousFrames = function() return activeEditor != null &&
       (activeEditor.simulation.isRunning() || diagnostics.robotHost != null ||
         activeEditor.hasCharacterPreview());
@@ -586,6 +607,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   final consoleDocument:TextDocument = new TextDocument("");
   final logLengths:Array<Int> = [];
   var gridVisible:Bool;
+  var simulationOverlaysVisible:Bool = true;
   var gridSnapEnabled:Bool;
   var gridSpacing:Float;
   /** The viewport's lighting preset number, from the saved setting. */
@@ -813,6 +835,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         "assembly.mate-perpendicular",
         "assembly.convert-to-joint",
         "scene.toggle-grid",
+        "scene.toggle-simulation-overlays",
         "scene.toggle-grid-snap",
         "scene.grid-spacing-0.1",
         "scene.grid-spacing-0.2",
@@ -843,7 +866,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         "editor.save-as", "scene.export-step", "editor.undo", "editor.redo",
         "scene.frame-selected", "scene.reset-perspective",
         "scene.lighting-studio", "scene.lighting-soft", "scene.lighting-contrast",
-        "scene.toggle-grid", "editor.toggle-dark-theme", "start.show", "editor.command-palette", "editor.settings",
+        "scene.toggle-grid", "scene.toggle-simulation-overlays", "editor.toggle-dark-theme", "start.show", "editor.command-palette", "editor.settings",
         "workspace.reset"
       ], Math.max(8.0, viewportWidth - 228.0), FILE_BAR_HEIGHT, commands, ui.commandContext,
         function() { toolbarMenuVisible = false; invalidateView(); },
@@ -1572,6 +1595,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function readViewSettings():Void {
     var store = preferences.store;
     gridVisible = store.getBool(AppSettings.GRID_VISIBLE);
+    simulationOverlaysVisible = store.getBool(AppSettings.SIMULATION_OVERLAYS);
     gridSnapEnabled = store.getBool(AppSettings.GRID_SNAP);
     gridSpacing = store.getFloat(AppSettings.GRID_SPACING);
     lightingPreset = Std.int(Math.max(0, AppSettings.LIGHTING_PRESETS.indexOf(store.getString(AppSettings.LIGHTING))));
@@ -1773,6 +1797,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
       var frame = framePresentation;
       perspectiveViewport.setSimulationState(simulation.isActive(),frame == null ? [] : frame.environment,
         frame == null ? 0 : frame.revision,frame == null ? [] : frame.robots);
+      var mission = simulation.missionPlayer();
+      perspectiveViewport.setSimulationOverlays(simulationOverlaysVisible);
+      perspectiveViewport.setMissionOverlay(mission == null || !simulation.isActive() || !simulationOverlaysVisible ? null : mission.overlay());
     }
     return perspectiveViewport == null
       ? new Text("Perspective rendering requires the desktop GPU host.")

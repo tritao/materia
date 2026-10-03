@@ -1,5 +1,6 @@
 package robotkit.model;
 
+import robotkit.model.ActuatorDrive;
 import robotkit.model.Transmission;
 
 class Actuator {
@@ -15,6 +16,62 @@ class Actuator {
    */
   public var servoStiffness:Float = 0.0;
   public var servoDamping:Float = 0.0;
+  /**
+   * What kind of motor this is and what it can deliver, or null for a bare effort and rate. For a
+   * stepper or a servo, `maxEffort` and `maxRate` are the torque and speed a planner may rely
+   * on (a stepper's usable share of its holding torque, a servo's peak torque and maximum speed),
+   * and the drive carries the rest: the torque-speed curve the plan check compares against.
+   */
+  public var drive:Null<ActuatorDrive> = null;
+  /**
+   * Full steps in one turn of a stepper motor's rotor, 0 when this is not a stepper. A stepper's
+   * actuator coordinate is the rotor angle in radians; microstepping is a property of the driver
+   * wiring, so the deployment adds it. Setting it makes the actuator a stepper known only by its
+   * steps, unless it already is one.
+   */
+  public var fullStepsPerRevolution(get, set):Float;
+
+  function get_fullStepsPerRevolution():Float {
+    var current = drive;
+    return current != null && Std.isOfType(current, StepperDrive) ? cast(current, StepperDrive).fullStepsPerRevolution : 0.0;
+  }
+
+  function set_fullStepsPerRevolution(value:Float):Float {
+    var current = drive;
+    if (value > 0.0) {
+      if (current == null || !Std.isOfType(current, StepperDrive) ||
+          cast(current, StepperDrive).fullStepsPerRevolution != value)
+        drive = current != null && Std.isOfType(current, StepperDrive) ?
+          new StepperDrive(value, current.rotorInertia, cast(current, StepperDrive).holdingTorque, current.curve) :
+          StepperDrive.stepsOnly(value);
+    } else if (current != null && Std.isOfType(current, StepperDrive)) drive = null;
+    return value;
+  }
+
+  /**
+   * The torque a planner may rely on at any speed. A stepper's `maxEffort` is its usable share of
+   * holding torque; a servo's is its peak torque, and the drive's peak when none is set.
+   */
+  public function planningEffort():Float {
+    var current = drive;
+    if (current == null || !Std.isOfType(current, ServoDrive)) return maxEffort;
+    return maxEffort > 0.0 ? Math.min(maxEffort, current.peakTorque()) : current.peakTorque();
+  }
+
+  /** The speed a planner may rely on, in actuator units: a servo falls back to its maximum speed. */
+  public function planningRate():Float {
+    var current = drive;
+    if (current == null || !Std.isOfType(current, ServoDrive)) return maxRate;
+    return maxRate > 0.0 ? Math.min(maxRate, current.maxSpeed()) : current.maxSpeed();
+  }
+
+  /** The torque-speed curve the plan check holds this actuator to: its drive's, or flat at its effort and rate. */
+  public function torqueCurve():TorqueSpeedCurve {
+    var current = drive;
+    if (current != null && (!Std.isOfType(current, StepperDrive) || cast(current, StepperDrive).hasTorqueData()))
+      return current.curve;
+    return TorqueSpeedCurve.flat(maxEffort, maxRate > 0.0 ? maxRate : 1e9);
+  }
 
   public function new(id:String, maxEffort:Float, maxRate:Float,
       transmission:Transmission) {

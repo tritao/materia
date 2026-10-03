@@ -539,8 +539,9 @@ class KinematicsTests extends MotionKitTestSupport {
       ticks++;
     }
     check(rested, '$label: a stopped servo comes to rest');
-    // Braking starts at the end of the queue, one lead ahead.
-    check(ticks * dt <= peak / accel + lead + 0.03, '$label: braking takes about v/a (${ticks * dt} s for $peak rad/s)');
+    // Braking starts at the end of the queue, one lead ahead. A device's queue is done once the
+    // runtime's copy of it has run out too, an owner period after the device finishes.
+    check(ticks * dt <= peak / accel + lead + dt + 0.03, '$label: braking takes about v/a (${ticks * dt} s for $peak rad/s)');
     check(worstAcceleration(first) <= slack, '$label: braking stays within the acceleration limits (${worstAcceleration(first)})');
     for (_ in 0...10) advance();
     check(still(9), '$label: the arm stays at rest');

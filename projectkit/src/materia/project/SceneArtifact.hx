@@ -68,6 +68,23 @@ typedef SceneArtifactData = {
 	@:optional var mission:SceneArtifactMission;
 	/** The tools the assembly's robot works with; see SceneArtifactRobotTool. */
 	@:optional var robotTools:Array<SceneArtifactRobotTool>;
+	/** The sensors on the assembly's robot; see SceneArtifactRobotSensor. */
+	@:optional var robotSensors:Array<SceneArtifactRobotSensor>;
+}
+
+/**
+ * A sensor on the assembly's robot (since version 14), as its part declares it. A `lidar` scans the
+ * horizontal plane of the connector `mount.connector` of the occurrence `mount.occurrence`, `rayCount`
+ * rays round the full circle from the connector's +X axis, seeing out to `maxRange` metres and scanning
+ * `updateRate` times a second. `id` names it in the robot's observations.
+ */
+typedef SceneArtifactRobotSensor = {
+	var kind:String;
+	var id:String;
+	var mount:SceneArtifactPlace;
+	var rayCount:Int;
+	var maxRange:Float;
+	var updateRate:Float;
 }
 
 /**
@@ -264,6 +281,8 @@ typedef SceneArtifactFloorPose = {
  * and `loadedTool` the number of the tool in the spindle when the job starts.
  * `target` names a part of the artifact that no occurrence uses: the finished part, in the stock's
  * frame, to compare the machined stock with. A looping job starts again when the program ends.
+ * `controller` is the controller the machine's steppers are nominally wired to: the machine's own
+ * limits are the motors' and drives', and the controller's step rate caps them further.
  */
 typedef SceneArtifactMachining = {
 	var program:String;
@@ -277,6 +296,17 @@ typedef SceneArtifactMachining = {
 	@:optional var loadedTool:Int;
 	@:optional var target:String;
 	@:optional var loop:Bool;
+	@:optional var controller:SceneArtifactController;
+}
+
+/**
+ * The nominal wiring of a machine's stepper drivers: every stepper driven at `microsteps` per full
+ * step from a controller that generates at most `stepTickHz` step edges a second per channel. The
+ * device binding turns them into each axis's step-rate ceiling.
+ */
+typedef SceneArtifactController = {
+	var microsteps:Int;
+	var stepTickHz:Int;
 }
 
 /** One tool of a machining job's tool table; see SceneArtifactMachining. */
@@ -288,7 +318,7 @@ typedef SceneArtifactTool = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 13;
+	public static inline var VERSION:Int = 14;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -319,8 +349,10 @@ class SceneArtifact {
 		if (mission.length > 1000000) throw "Scene artifact mission is too large";
 		var robotTools = data.robotTools == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.robotTools));
 		if (robotTools.length > 100000) throw "Scene artifact robot tools are too large";
+		var robotSensors = data.robotSensors == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.robotSensors));
+		if (robotSensors.length > 100000) throw "Scene artifact robot sensors are too large";
 		var length = 40 + unitText.length + assembly.length + assemblyDefinition.length + assemblyState.length + recipeDocument.length + recipeDiagnostics.length + 4
-			+ machining.length + 4 + mobileBase.length + 4 + mission.length + 4 + robotTools.length + 4;
+			+ machining.length + 4 + mobileBase.length + 4 + mission.length + 4 + robotTools.length + 4 + robotSensors.length + 4;
 		for (part in data.parts) {
 			validatePart(part, true);
 			var id = Bytes.ofString(part.id), name = Bytes.ofString(part.name);
@@ -416,6 +448,8 @@ class SceneArtifact {
 		result.blit(offset, mission, 0, mission.length); offset += mission.length;
 		offset = putInt(result, offset, robotTools.length);
 		result.blit(offset, robotTools, 0, robotTools.length); offset += robotTools.length;
+		offset = putInt(result, offset, robotSensors.length);
+		result.blit(offset, robotSensors, 0, robotSensors.length); offset += robotSensors.length;
 		if (offset != result.length) throw "Scene artifact size mismatch";
 		return result;
 	}
@@ -464,6 +498,7 @@ class SceneArtifact {
 		if (data.machining != null) validateMachining(data.machining, ids, data.assemblyDefinition);
 		if (data.mobileBase != null) validateMobileBase(data.mobileBase, data.assemblyDefinition);
 		if (data.robotTools != null) validateRobotTools(data.robotTools, data);
+		if (data.robotSensors != null) validateRobotSensors(data.robotSensors, data);
 		if (data.mission != null) validateMission(data.mission, data);
 	}
 
@@ -525,6 +560,53 @@ class SceneArtifact {
 			if (!(finite(welder.depositionEfficiency) && welder.depositionEfficiency > 0.3 && welder.depositionEfficiency <= 1))
 				fail("needs a deposition efficiency between 0.3 and 1");
 		}
+	}
+
+	static function validateRobotSensors(sensors:Array<SceneArtifactRobotSensor>, data:SceneArtifactData):Void {
+		function fail(detail:String):Void throw 'Scene artifact robot sensor $detail';
+		var definition = data.assemblyDefinition;
+		if (definition == null) fail("needs the robot's assembly definition");
+		var flat = AssemblyDefinitionFlattener.flatten(cast definition);
+		var ids = new Map<String, Bool>();
+		for (sensor in sensors) {
+			if (sensor == null || sensor.kind != "lidar") fail('kind "${sensor == null ? null : sensor.kind}" is unknown');
+			if (sensor.id == null || sensor.id.length == 0 || ids.exists(sensor.id)) fail("needs an id of its own");
+			ids.set(sensor.id, true);
+			var mount = sensor.mount;
+			var occurrence = mount == null ? [] : [for (item in flat.occurrences) if (item.id == mount.occurrence) item];
+			if (occurrence.length != 1) fail('"${sensor.id}" is mounted on no occurrence of the assembly');
+			var found = false;
+			for (component in flat.definitions) if (component.id == occurrence[0].definition)
+				for (connector in component.connectors) if (connector.name == mount.connector) found = true;
+			if (!found) fail('"${sensor.id}" has no mount connector "${mount.connector}" on "${mount.occurrence}"');
+			if (sensor.rayCount < 2 || sensor.rayCount > 360) fail('"${sensor.id}" needs 2 to 360 rays');
+			if (!finite(sensor.maxRange) || sensor.maxRange <= 0 || !finite(sensor.updateRate) || sensor.updateRate <= 0)
+				fail('"${sensor.id}" needs a positive range and rate');
+		}
+	}
+
+	/** Robot sensors from their JSON section, typed field by field. */
+	static function decodeRobotSensors(decoded:Dynamic):Array<SceneArtifactRobotSensor> {
+		function fail():Dynamic throw "Scene artifact robot sensors are invalid";
+		function text(value:Dynamic, name:String):String {
+			var item:Dynamic = Reflect.field(value, name);
+			return Std.isOfType(item, String) ? item : fail();
+		}
+		function number(value:Dynamic, name:String):Float {
+			var item:Dynamic = Reflect.field(value, name);
+			return Std.isOfType(item, Float) || Std.isOfType(item, Int) ? (item:Float) : fail();
+		}
+		if (!Std.isOfType(decoded, Array)) fail();
+		return [for (raw in (cast decoded:Array<Dynamic>)) {
+			var mount:Dynamic = Reflect.field(raw, "mount");
+			if (mount == null) fail();
+			var rays = number(raw, "rayCount");
+			if (rays != Math.floor(rays)) fail();
+			var sensor:SceneArtifactRobotSensor = {kind: text(raw, "kind"), id: text(raw, "id"),
+				mount: {occurrence: text(mount, "occurrence"), connector: text(mount, "connector")},
+				rayCount: Std.int(rays), maxRange: number(raw, "maxRange"), updateRate: number(raw, "updateRate")};
+			sensor;
+		}];
 	}
 
 	/** Robot tools from their JSON section, typed field by field. */
@@ -855,6 +937,9 @@ class SceneArtifact {
 			fail('starts with tool ${machining.loadedTool}, which is not in its tool table');
 		if (machining.target != null && !parts.exists(machining.target))
 			fail('target "${machining.target}" is not one of its parts');
+		var controller = machining.controller;
+		if (controller != null && (controller.microsteps < 1 || controller.microsteps > 256 || controller.stepTickHz < 1))
+			fail("has a controller with no microsteps or step rate");
 	}
 
 	/** A machining job from its JSON section, typed field by field. */
@@ -887,6 +972,12 @@ class SceneArtifact {
 		if (target != null) machining.target = text(target);
 		var loop:Dynamic = Reflect.field(decoded, "loop");
 		if (loop != null) machining.loop = Std.isOfType(loop, Bool) ? (loop:Bool) : fail();
+		var controller:Dynamic = Reflect.field(decoded, "controller");
+		if (controller != null) {
+			var microsteps:Dynamic = Reflect.field(controller, "microsteps"), tick:Dynamic = Reflect.field(controller, "stepTickHz");
+			if (!Std.isOfType(microsteps, Int) || !Std.isOfType(tick, Int)) fail();
+			machining.controller = {microsteps: (microsteps:Int), stepTickHz: (tick:Int)};
+		}
 		return machining;
 	}
 
@@ -975,7 +1066,7 @@ private class SceneArtifactReader {
 			throw "Scene artifact has an invalid signature";
 		var version = readInt();
 		if (version != 2 && version != 3 && version != 4 && version != 5 && version != 6 && version != 7 &&
-			version != 8 && version != 9 && version != 10 && version != 11 && version != 12 && version != SceneArtifact.VERSION)
+			version != 8 && version != 9 && version != 10 && version != 11 && version != 12 && version != 13 && version != SceneArtifact.VERSION)
 			throw 'Unsupported scene artifact version $version';
 		var metresPerUnit = readDouble();
 		var lengthUnit = version >= 8 ? readText() : null;
@@ -1092,12 +1183,19 @@ private class SceneArtifactReader {
 			if (toolsLength > 0)
 				robotTools = @:privateAccess SceneArtifact.decodeRobotTools(haxe.Json.parse(readBytes(toolsLength).getString(0, toolsLength)));
 		}
+		var robotSensors:Null<Array<SceneArtifactRobotSensor>> = null;
+		if (version >= 14) {
+			var sensorsLength = readInt();
+			if (sensorsLength < 0 || sensorsLength > 100000) throw "Scene artifact robot sensors are too large";
+			if (sensorsLength > 0)
+				robotSensors = @:privateAccess SceneArtifact.decodeRobotSensors(haxe.Json.parse(readBytes(sensorsLength).getString(0, sensorsLength)));
+		}
 		if (offset != source.length) throw "Scene artifact contains trailing data";
 		var result:SceneArtifactData = {metresPerUnit: metresPerUnit, lengthUnit: lengthUnit,
 			parts: parts, assembly: assembly,
 			assemblyDefinition: assemblyDefinition, assemblyState: assemblyState, recipeDocument: recipeDocument,
 			recipeDiagnostics: recipeDiagnostics, machining: machining, mobileBase: mobileBase, mission: mission,
-			robotTools: robotTools};
+			robotTools: robotTools, robotSensors: robotSensors};
 		@:privateAccess SceneArtifact.validateHeader(result);
 		return result;
 	}

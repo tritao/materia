@@ -137,6 +137,9 @@ import robotkit.perception.FiducialTargetConfig;
 import robotkit.perception.Obstacle;
 import robotkit.perception.DockingTarget;
 import robotkit.perception.LidarObstaclePerception;
+import robotkit.perception.LidarMapFilter;
+import robotkit.perception.LidarFreeSpace;
+import robotkit.perception.FreeSpaceView;
 import robotkit.perception.PinholeCameraIntrinsics;
 import robotkit.perception.PointCloudObstaclePerception;
 import robotkit.perception.GroundTruthPerception;
@@ -165,6 +168,11 @@ class RobotWorldTests {
   static var assertions = 0;
 
   public static function main():Void {
+    // ROBOTKIT_ONLY=construction runs just the construction skills (they plan arm motions through MotionKit).
+    if (Sys.getEnv("ROBOTKIT_ONLY") == "construction") {
+      Sys.println('RobotKit construction skills passed (${ConstructionSkillTests.run()} assertions)');
+      return;
+    }
     testPolynomialTrajectoryChunk();
     testAttachDetachAndIdentity();
     testSequenceAndTopology();
@@ -185,6 +193,8 @@ class RobotWorldTests {
     testFiducialPerception();
     testNavigation();
     testMotionGuard();
+    testFullScan();
+    testSensedShapes();
     testGridPlanning();
     testNavigator();
     testGoToBlockedTimeout();
@@ -208,6 +218,8 @@ class RobotWorldTests {
     testSensorResetPublication();
     testRobotResetPose();
     SimulationPoseResetTests.run(0);
+    SimulationPoseResetTests.coupledLimits();
+    assertions += DeviceBindingTests.run();
     SharedSessionTests.run();
     testConfiguredSensors();
     testCameraFrameProtocol();
@@ -825,7 +837,19 @@ class RobotWorldTests {
     source.joints[2].limitImpedance = [0.0, 0.99, 0.01, 0.5, 2.0];
     source.joints[1].limits.overtravel = 0.004;
     source.actuators[0].servoStiffness = 75.0;
+    source.couplings[0].stiffness = 5.0e4;
+    source.couplings[0].backlash = 1.0e-4;
+    source.couplings[0].drag = 0.02;
+    source.actuators[0].fullStepsPerRevolution = 200.0;
     source.actuators[0].servoDamping = 2.0;
+    // A bare stepper writes only its steps, as models did before drive kinds; one with ratings writes its drive.
+    var bare = RobotModelCodec.decode(RobotModelCodec.encode(source));
+    check(bare.actuators[0].drive != null && bare.actuators[0].fullStepsPerRevolution == 200.0 &&
+      !cast(bare.actuators[0].drive, robotkit.model.ActuatorDrive.StepperDrive).hasTorqueData(),
+      "a stepper known by its steps alone round-trips as such");
+    source.actuators[0].drive = new robotkit.model.ActuatorDrive.StepperDrive(200.0, 3e-5, 1.26,
+      new robotkit.model.TorqueSpeedCurve([0.0, 100.0, 400.0], [1.26, 1.26, 0.315]));
+    if (source.actuators.length > 1) source.actuators[1].drive = new robotkit.model.ActuatorDrive.ServoDrive(0.64, 1.9, 314.0, 500.0, 2e-5, 4096.0);
 
     var encoded = RobotModelCodec.encode(source);
     var restored = RobotModelCodec.decode(encoded);
@@ -890,6 +914,21 @@ class RobotWorldTests {
     check(restored.joints[2].limitTimeConstant == 0.008 && restored.joints[2].limitImpedance[1] == 0.99,
       "RobotModel codec preserves joint limit softness");
     equal(restored.actuators[0].servoStiffness, 75.0, "RobotModel codec preserves servo stiffness");
+    check(restored.couplings[0].stiffness == 5.0e4 && restored.couplings[0].backlash == 1.0e-4 && restored.couplings[0].drag == 0.02,
+      "RobotModel codec preserves a coupling's stiffness, backlash and drag");
+    equal(restored.actuators[0].fullStepsPerRevolution, 200.0, "RobotModel codec preserves a stepper's full steps");
+    var restoredStepper = restored.actuators[0].drive;
+    check(restoredStepper != null && restoredStepper.kind() == "stepper" && restoredStepper.rotorInertia == 3e-5 &&
+      cast(restoredStepper, robotkit.model.ActuatorDrive.StepperDrive).holdingTorque == 1.26 &&
+      Math.abs(restoredStepper.curve.torqueAt(250.0) - 0.7875) < 1e-12 && restoredStepper.curve.torqueAt(500.0) == 0.0,
+      "RobotModel codec preserves a stepper's torque-speed curve");
+    if (restored.actuators.length > 1) {
+      var restoredServo = restored.actuators[1].drive;
+      check(restoredServo != null && restoredServo.kind() == "servo" && restoredServo.peakTorque() == 1.9 &&
+        cast(restoredServo, robotkit.model.ActuatorDrive.ServoDrive).encoderCounts == 4096.0 &&
+        restored.actuators[1].planningEffort() == 1.9,
+        "RobotModel codec preserves a servo's drive");
+    }
     var restoredSurface = restored.links[1].collisionShapes[1].surface;
     check(restoredSurface != null && restoredSurface.frictionDimensions == 4 &&
       restoredSurface.friction[0] == 0.7 && restoredSurface.contactTimeConstant == 0.01,
@@ -1939,7 +1978,7 @@ class RobotWorldTests {
       approachSpeed > 0.0 && approachSpeed < 0.6,
       "MotionGuard reduces navigation speed inside the stopping envelope");
 
-    simulationHarness.teleportObject(objectId, [0.65, 0.0, 0.0]);
+    simulationHarness.teleportObject(objectId, [0.55, 0.0, 0.0]);
     var blocked = observe(3);
     check(blocked.obstacles().length > 0,
       "simulated perception continues observing an obstacle near the footprint");
@@ -1963,8 +2002,129 @@ class RobotWorldTests {
     check(switch guard.state { case Blocked(_): true; case _: false; },
       "MotionGuard blocks when obstacle frame transforms are unavailable");
     guard.detach();
+
+    // Stopped short of an obstacle ahead and to the side, the base may turn away from it: it is held
+    // only by an obstacle within reach of its turning circle, not by the corridor it is not driving down.
+    var corner = new Obstacle(new Detection("corner", "obstacle", 1.0, new Pose2(0.5, 0.35), "map",
+      Int64.ofInt(1), Int64.ofInt(10), Int64.ofInt(10), "sim-clock", "host-clock"), 0.1);
+    var driving = new Navigation(base, localization, 0.2, 0.6, 1.0);
+    var corridorGuard = new MotionGuard(driving, null, 0.2, 2.0, 0.1, 0.5);
+    driving.follow(new Path([new Pose2(), new Pose2(5.0, 0.0, 0.0)], "map"));
+    corridorGuard.update(new PerceptionSnapshot([], [corner]), 0.1);
+    check(switch corridorGuard.state { case Blocked(_): true; case _: false; } &&
+      Math.abs(base.currentCommand().linear) < 1e-9,
+      "MotionGuard stops a base driving at an obstacle inside its margin");
+    driving.cancel();
+    driving.follow(new Path([new Pose2(0.0, 0.0, Math.PI * 0.75), new Pose2(-3.0, 3.0, Math.PI * 0.75)], "map"));
+    corridorGuard.update(new PerceptionSnapshot([], [corner]), 0.1);
+    check(switch corridorGuard.state { case Clear: true; case _: false; } &&
+      Math.abs(base.currentCommand().linear) < 1e-9 && Math.abs(base.currentCommand().angular) > 0.1,
+      'MotionGuard lets a stopped base turn away from an obstacle it cannot drive at (${Std.string(corridorGuard.state)}, ${base.currentCommand().linear}, ${base.currentCommand().angular})');
+    // Held short of it but asked to curve away, it pivots instead of stopping dead.
+    driving.cancel();
+    driving.follow(new Path([new Pose2(0.0, 0.0, -0.46), new Pose2(3.0, -1.5, -0.46)], "map"));
+    corridorGuard.update(new PerceptionSnapshot([], [corner]), 0.1);
+    check(switch corridorGuard.state { case Blocked(_): true; case _: false; } &&
+      Math.abs(base.currentCommand().linear) < 1e-9 && base.currentCommand().angular < -0.05,
+      'MotionGuard lets a base held short of an obstacle pivot away along its route (${Std.string(corridorGuard.state)}, ${base.currentCommand().linear}, ${base.currentCommand().angular})');
+    var touching = new Obstacle(new Detection("touching", "obstacle", 1.0, new Pose2(0.4, 0.3), "map",
+      Int64.ofInt(1), Int64.ofInt(10), Int64.ofInt(10), "sim-clock", "host-clock"), 0.1);
+    corridorGuard.update(new PerceptionSnapshot([], [touching]), 0.1);
+    check(switch corridorGuard.state { case Blocked(_): true; case _: false; } &&
+      Math.abs(base.currentCommand().angular) < 1e-9,
+      "MotionGuard holds a stopped base whose turn would swing into an obstacle");
+    corridorGuard.detach();
+
+    // The guard judges the costmap's dynamic layer, so it holds for what the costmap remembers: an obstacle
+    // seen and then out of view still slows the base until the memory times out or a scan sees through it.
+    function at(x:Float, y:Float, yaw:Float = 0.0, half:Float = 0.0):Obstacle
+      return new Obstacle(new Detection("remembered", "obstacle", 1.0, new Pose2(x, y, yaw), "map", Int64.ofInt(1),
+        Int64.ofInt(1), Int64.ofInt(1), "sim-clock", "host-clock"), 0.1, half);
+    var memoryMap = new Costmap2(new OccupancyGrid2(0.5, new Pose2(-5.0, -5.0), 20, 20, "map", OccupancyCell.Free),
+      0.3, false, 0.0, 0.0, 3.0);
+    var remembering = new Navigation(base, localization, 0.2, 0.6, 1.0);
+    var rememberingGuard = new MotionGuard(remembering, null, 0.2, 2.0, 0.1, 0.5, memoryMap);
+    remembering.follow(new Path([new Pose2(), new Pose2(5.0, 0.0, 0.0)], "map"));
+    function held():Bool return switch rememberingGuard.state { case Clear: false; case _: true; };
+    memoryMap.senseObstacles([at(0.75, 0.0)], null, 0.1);
+    rememberingGuard.update(new PerceptionSnapshot([], [at(0.75, 0.0)]), 0.1);
+    check(held(), "MotionGuard slows for an obstacle in the costmap");
+    memoryMap.senseObstacles([], null, 1.0);
+    rememberingGuard.update(new PerceptionSnapshot(), 0.1);
+    check(held(), "MotionGuard still holds for an obstacle the sensor has lost sight of");
+    var blank = new SensorFrame("scan", "lidar", "base", Int64.ofInt(1), Int64.ofInt(1), [for (_ in 0...72) 6.0],
+      Int64.ofInt(1), "base", null, null, "sim-clock", "host-clock");
+    memoryMap.senseObstacles([], new LidarFreeSpace(6.0).viewing(blank, new Pose2(-3.0, 0.0, 0.0)), 0.1);
+    rememberingGuard.update(new PerceptionSnapshot(), 0.1);
+    check(!held() && memoryMap.dynamicLayer().length == 0, "MotionGuard lets go once a scan sees through the obstacle's place");
+    memoryMap.senseObstacles([at(0.75, 0.0)], null, 0.1);
+    memoryMap.senseObstacles([], null, 2.9);
+    rememberingGuard.update(new PerceptionSnapshot(), 0.1);
+    check(held(), "MotionGuard holds until the memory runs out");
+    memoryMap.senseObstacles([], null, 0.2);
+    rememberingGuard.update(new PerceptionSnapshot(), 0.1);
+    check(!held(), "MotionGuard releases when the memory runs out");
+    // A long wall beside the route is a segment, not a disk as wide as the wall is long.
+    memoryMap.senseObstacles([at(1.5, 0.6, 0.0, 1.5)], null, 0.1);
+    rememberingGuard.update(new PerceptionSnapshot(), 0.1);
+    check(!held(), "MotionGuard lets a base pass a long wall beside its corridor");
+    memoryMap.senseObstacles([at(0.9, 0.0, Math.PI / 2, 0.6)], null, 0.1);
+    rememberingGuard.update(new PerceptionSnapshot(), 0.1);
+    check(held(), "MotionGuard holds for a wall across its corridor");
+    rememberingGuard.detach();
     robot.close();
     simulationHarness.dispose();
+  }
+
+  /** Sensed objects are capsules along the visible surface: a flat wall is one thin segment of its own length. */
+  static function testSensedShapes():Void {
+    var scanner = new LidarObstaclePerception(10.0, 0.1, 0.05, 0.5, 0.1);
+    // A 1.2 m wall square across the view 2 m ahead, seen by 360 rays.
+    var face = [for (ray in 0...360) {
+      var angle = ray * Math.PI / 180.0;
+      var hit = Math.cos(angle) > 0.0 && Math.abs(2.0 * Math.tan(angle)) <= 0.6;
+      hit ? 2.0 / Math.cos(angle) : 10.0;
+    }];
+    var scan = new SensorFrame("scan", "lidar", "base", Int64.ofInt(1), Int64.ofInt(1), face, Int64.ofInt(1), "base",
+      null, null, "sim-clock", "host-clock");
+    var wall = scanner.observe([scan]).obstacles();
+    check(wall.length == 1 && Math.abs(wall[0].halfLengthMeters - 0.6) < 0.05 && wall[0].radiusMeters == 0.1 &&
+      Math.abs(Math.abs(wall[0].detection.pose.yaw) - Math.PI / 2) < 0.01 && Math.abs(wall[0].detection.pose.x - 2.0) < 0.01,
+      "a flat wall seen face-on is one segment of its own length");
+    // Seen from the map frame it keeps its length and turns with the robot.
+    var estimate = new LocalizationState(Int64.ofInt(1), new Pose2(1.0, 1.0, Math.PI / 2), "map", "base",
+      PoseCovariance2.zero(), Good, Int64.ofInt(1), Int64.ofInt(1), "sim-clock", "host-clock");
+    var inMap = new FrameAwarePerception(scanner, new FixedLocalization(estimate)).observe([scan]).obstacles();
+    check(inMap.length == 1 && Math.abs(inMap[0].halfLengthMeters - 0.6) < 0.05 && Math.abs(inMap[0].detection.pose.x - 1.0) < 0.01 &&
+      Math.abs(inMap[0].detection.pose.y - 3.0) < 0.01 && Math.abs(Math.sin(inMap[0].detection.pose.yaw)) < 0.01,
+      "a segment is carried into the map frame with its length and heading");
+    // A corner is two segments.
+    var corner = [for (ray in 0...360) 10.0];
+    for (ray in 0...360) {
+      var angle = ray * Math.PI / 180.0, c = Math.cos(angle), s = Math.sin(angle);
+      var near = 10.0;
+      // Walls x = 2 for y in [-0.6, 0] and y = -0.6 for x in [1.4, 2].
+      if (c > 1e-6) { var y = 2.0 * s / c; if (y <= 0.0 && y >= -0.6) near = 2.0 / c; }
+      if (s < -1e-6) { var x = -0.6 * c / s; if (x >= 1.4 && x <= 2.0) near = Math.min(near, -0.6 / s); }
+      corner[ray] = near;
+    }
+    var bent = scanner.observe([new SensorFrame("scan", "lidar", "base", Int64.ofInt(1), Int64.ofInt(1), corner,
+      Int64.ofInt(1), "base", null, null, "sim-clock", "host-clock")]).obstacles();
+    check(bent.length == 2, 'a corner is two segments (${bent.length})');
+    // On the costmap a segment blocks the cells along it and not far past its ends.
+    var map = new Costmap2(new OccupancyGrid2(0.1, new Pose2(), 100, 100, "map", OccupancyCell.Free), 0.0, false, 0.0, 0.0);
+    var along = new Obstacle(new Detection("wall", "obstacle", 1.0, new Pose2(5.0, 5.0, 0.0), "map", Int64.ofInt(1), Int64.ofInt(1),
+      Int64.ofInt(1), "sim-clock", "host-clock"), 0.1, 0.6);
+    map.senseObstacles([along], null, 0.1);
+    check(!map.isTraversable(54, 50) && !map.isTraversable(45, 50) && map.isTraversable(50, 53) &&
+      map.isTraversable(62, 50) && map.isTraversable(37, 50),
+      "a segment blocks the cells along it and nothing far past its ends or sides");
+    var cells = 0;
+    for (x in 0...100) for (y in 0...100) if (!map.isTraversable(x, y)) cells++;
+    check(cells < 12 * 4 + 20, 'a 1.2 m segment blocks a strip, not a wide disk (${cells} cells)');
+    var touched = map.revision;
+    map.senseObstacles([along], null, 0.1);
+    check(map.revision == touched, "an unchanged segment costs nothing");
   }
 
   static function testGridPlanning():Void {
@@ -2036,6 +2196,61 @@ class RobotWorldTests {
     dynamicCostmap.clearDynamicObstacles();
     check(dynamicCostmap.isTraversable(2, 2) && dynamicCostmap.cellCost(3, 2) == 0.0,
       "costmap clears removed dynamic obstacles");
+    // The grid's own layer survives dynamic changes, and an unchanged set is not redrawn.
+    dynamicGrid.setCell(0, 0, OccupancyCell.Occupied);
+    dynamicCostmap.refresh();
+    dynamicCostmap.setDynamicObstacles([dynamicObstacle]);
+    var drawn = dynamicCostmap.revision;
+    dynamicCostmap.setDynamicObstacles([dynamicObstacle]);
+    check(dynamicCostmap.revision == drawn && dynamicCostmap.dynamicLayer().length == 1 &&
+      !dynamicCostmap.isTraversable(0, 0) && !dynamicCostmap.isTraversable(2, 2),
+      "costmap keeps an unchanged dynamic layer as it is");
+    dynamicCostmap.clearDynamicObstacles();
+    check(dynamicCostmap.revision == drawn + 1 && !dynamicCostmap.isTraversable(0, 0) &&
+      dynamicCostmap.isTraversable(2, 2),
+      "costmap clearing the dynamic layer leaves the grid's obstacles");
+
+    // Obstacles the sensor has lost sight of stay for the costmap's memory, unless a scan sees through their place.
+    function sightingAt(x:Float, y:Float):Obstacle
+      return new Obstacle(new Detection("sighting", "obstacle", 1.0, new Pose2(x, y), "map", Int64.ofInt(1),
+        Int64.ofInt(1), Int64.ofInt(1), "sim-clock", "host-clock"), 0.3);
+    function scanOf(ranges:Array<Float>):FreeSpaceView
+      return new LidarFreeSpace(6.0).viewing(new SensorFrame("lidar", "lidar", "base", Int64.ofInt(1), Int64.ofInt(1),
+        ranges, Int64.ofInt(1), "base", null, null, "sim-clock", "host-clock"), new Pose2(0.0, 5.0, 0.0));
+    var memoryGrid = new OccupancyGrid2(0.5, new Pose2(), 20, 20, "map", OccupancyCell.Free);
+    var memory = new Costmap2(memoryGrid, 0.0, false, 0.0, 0.0, 5.0);
+    memory.senseObstacles([sightingAt(5.0, 5.0)], null, 0.1);
+    check(!memory.isTraversable(10, 10), "a sensed obstacle blocks the costmap");
+    memory.senseObstacles([], null, 1.0);
+    check(!memory.isTraversable(10, 10) && memory.dynamicLayer().length == 1,
+      "an obstacle out of view keeps blocking while the memory lasts");
+    var remembered = memory.revision;
+    memory.senseObstacles([], null, 0.0);
+    check(memory.revision == remembered, "an unchanged remembered layer costs nothing");
+    memory.senseObstacles([sightingAt(5.2, 5.0)], null, 1.0);
+    check(memory.dynamicLayer().length == 1 && memory.dynamicLayer()[0].detection.pose.x == 5.2,
+      "an obstacle seen again replaces its memory");
+    memory.senseObstacles([], null, 4.5);
+    check(!memory.isTraversable(10, 10), "a memory is counted from when the obstacle was last seen");
+    memory.senseObstacles([], null, 1.0);
+    check(memory.isTraversable(10, 10) && memory.dynamicLayer().length == 0,
+      "an obstacle out of view is forgotten when the memory runs out");
+    // The sensor at (0, 5) facing +x: 72 rays, one every five degrees, the first straight at the obstacle.
+    memory.senseObstacles([sightingAt(5.0, 5.0)], null, 0.1);
+    var nothing = [for (_ in 0...72) 6.0];
+    var seesBox = nothing.copy(); seesBox[0] = 4.8;
+    var occluded = nothing.copy(); occluded[0] = 3.0;
+    memory.senseObstacles([], scanOf(seesBox), 0.1);
+    check(!memory.isTraversable(10, 10), "a scan that still returns from the obstacle's place keeps it");
+    memory.senseObstacles([], scanOf(occluded), 0.1);
+    check(!memory.isTraversable(10, 10), "a scan that is blocked short of the obstacle's place says nothing of it");
+    memory.senseObstacles([], scanOf(nothing), 0.1);
+    check(memory.isTraversable(10, 10) && memory.dynamicLayer().length == 0,
+      "a scan that sees through the obstacle's place clears it");
+    var forgetful = new Costmap2(new OccupancyGrid2(0.5, new Pose2(), 20, 20, "map", OccupancyCell.Free), 0.0, false, 0.0, 0.0);
+    forgetful.senseObstacles([sightingAt(5.0, 5.0)], null, 0.1);
+    forgetful.senseObstacles([], null, 0.1);
+    check(forgetful.isTraversable(10, 10), "without a memory only the latest observation counts");
 
     // A 0.1 m obstacle and a 0.3 m robot: a cell is lethal within 0.4 m of the
     // obstacle and blocked within 0.4 m plus half a 0.2 m cell diagonal.
@@ -2858,6 +3073,27 @@ class RobotWorldTests {
       "frame-aware perception retains obstacle geometry");
     equal(lidar.frameId, "base", "frame-aware perception does not mutate input sensor frames");
 
+    // A map explains the returns that land on it: a wall at the first ray's hit point goes, the
+    // return on free floor stays.
+    var knownMap = new OccupancyGrid2(0.1, new Pose2(), 100, 50, "map", OccupancyCell.Free);
+    knownMap.setCell(40, 22, OccupancyCell.Occupied);
+    var mappedFrame = new SensorFrame("front-lidar", "lidar", "laser", Int64.ofInt(10), Int64.ofInt(140),
+      [1.0, 10.0, 2.0, 10.0], Int64.ofInt(150), "base", [0.2, 0.0, 0.3], laserMount.rotation,
+      "robot-boot", "host-clock");
+    var mappedSnapshot = new RobotSnapshot("framed-lidar", Int64.ofInt(10), Int64.ofInt(140), [0.75], [0.0], [0.0],
+      1, 0, Int64.ofInt(150), [mappedFrame], "robot-boot", "host-clock");
+    var unmapped = new FrameAwarePerception(perception, new FixedLocalization(mapEstimate)).observeRobotSnapshot(
+      mappedSnapshot, perceptionModel, articulatedBlueprint, "base");
+    equal(unmapped.obstacles().length, 2, "without a map both returns are obstacles");
+    var mappedPerception = new FrameAwarePerception(perception, new FixedLocalization(mapEstimate), null,
+      new LidarMapFilter(knownMap, 0.1, 10.0));
+    var leftOver = mappedPerception.observeRobotSnapshot(mappedSnapshot, perceptionModel, articulatedBlueprint, "base")
+      .obstacles();
+    check(leftOver.length == 1 && Math.abs(leftOver[0].detection.pose.x - 7.0) < 1e-9 &&
+      Math.abs(leftOver[0].detection.pose.y - 2.2) < 1e-9,
+      "a LiDAR map filter drops the returns the map explains and keeps the rest");
+    equal(mappedFrame.values.get(0), 1.0, "the map filter does not change the frame it was given");
+
     var detections = observed.detections();
     detections.pop();
     var scanRanges = [for (_ in 0...64) 10.0];
@@ -2873,7 +3109,7 @@ class RobotWorldTests {
       clusteredObstacles[0].detection.confidence > perception.minConfidence &&
       clusteredObstacles[0].detection.pose.x > 1.9 &&
       Math.abs(clusteredObstacles[0].detection.pose.y) < 0.11 &&
-      clusteredObstacles[0].radiusMeters > perception.obstacleRadiusMeters,
+      clusteredObstacles[0].halfLengthMeters > 0.0,
       "LiDAR clustering merges nearby returns across the circular scan seam");
     var partialScan = new LidarObstaclePerception(10.0, 0.1, 0.05, 0.5,
       0.1, -Math.PI * 0.5, Math.PI).observe([new SensorFrame("front-scan", "lidar",
@@ -4097,6 +4333,50 @@ class RobotWorldTests {
       "camera protocol rejects malformed raw image dimensions on receipt");
   }
 
+  /**
+   * A full 360-ray scan reaches Haxe intact beside an IMU's values, each at its own place in the state's
+   * value pool, and a snapshot is no larger than it was when sensors could report 64 values each.
+   */
+  static function testFullScan():Void {
+    var model = new RobotModel("full-scan");
+    var base = model.addLink(new Link("base", "link/base"));
+    var scan = model.addSensor(new robotkit.model.Sensor("scan", "lidar", 0, "sensor/scan"));
+    scan.rayCount = 360;
+    scan.maxRange = 6.0;
+    var imu = model.addSensor(new robotkit.model.Sensor("imu", "imu", 0, "sensor/imu"));
+    var blueprint = RobotRuntimeCompiler.compile(model);
+    var simulationHarness = new SimulationHarness();
+    var runtime = simulationHarness.simulation.addRobot(blueprint);
+    var robot = new SimulatedRobot("full-scan", runtime, "full-scan", ["base"], []);
+    simulationHarness.spawnBox([2.0, 0.0, 0.0], [0.25, 0.25, 0.25]);
+    simulationHarness.step(Int64.ofInt(1));
+    simulationHarness.step(Int64.ofInt(2));
+    var frames = robot.snapshot().sensors;
+    var found:Null<SensorFrame> = null, motion:Null<SensorFrame> = null;
+    for (frame in frames.toArray()) {
+      if (frame.sensorId == "sensor/scan") found = frame;
+      if (frame.sensorId == "sensor/imu") motion = frame;
+    }
+    if (found == null || motion == null) throw "the scan and the IMU are published";
+    var ranges:SensorFrame = cast found;
+    equal(ranges.values.length, 360, "a 360-ray scan keeps all its rays");
+    equal(cast(motion, SensorFrame).values.length, 6, "the IMU beside it keeps its six values");
+    check(Math.abs(ranges.values.get(0) - 1.75) < 1e-6, "the ray at the box reads its face");
+    var hits = 0, symmetric = true;
+    for (ray in 0...360) {
+      if (ranges.values.get(ray) < 6.0) hits++;
+      if (Math.abs(ranges.values.get(ray) - ranges.values.get((360 - ray) % 360)) > 1e-6) symmetric = false;
+    }
+    check(hits >= 10 && hits <= 25 && symmetric && ranges.values.get(180) == 6.0 && ranges.values.get(359) < 6.0,
+      "the rays on either side of the box read it, and the rest read their full range");
+    check(Math.abs(cast(motion, SensorFrame).values.get(5) - 9.81) < 1e-6, "the IMU's values are its own, not the scan's");
+    // Values live in a shared pool, not at every sensor's worst case: the snapshot is no larger than
+    // it was when eight sensors could report 64 values each (21008 bytes).
+    check(rk_robot_snapshot.size() <= 21008, "a robot snapshot is no larger than before sensors could report 360 values");
+    robot.close();
+    simulationHarness.dispose();
+  }
+
   static function testConfiguredSensors():Void {
     var model = new RobotModel("configured");
     var base = model.addLink(new Link("base", "link/stable"));
@@ -4175,7 +4455,7 @@ class RobotWorldTests {
     simulationHarness.step(Int64.ofInt(1));
     equal(robot.snapshot().sensors.get(1).values.get(0), noisyValue, "reset repeats seeded noise deterministically");
     robot.close(); simulationHarness.dispose(); replay.close();
-    scan.rayCount = 65;
+    scan.rayCount = 361;
     mount.rotation = [0.0, 0.0, 0.0, 0.0];
     noisy.updateRate = -1.0;
     var diagnostics = RobotRuntimeCompiler.validate(model);
@@ -4194,19 +4474,43 @@ class RobotWorldTests {
     if (!sys.FileSystem.exists(fixture + "deployment.json"))
       fixture = Sys.getCwd() + "/fixtures/device-deployment/";
     var current = new SerialDeployment(fixture + "deployment.json");
-    equal(current.protocol, "rkd6", "v4 deployment implies RKD6");
-    var scheduled = new SerialDeployment(fixture + "deployment6.json");
-    equal(scheduled.protocol, "rkd6", "v3 reader accepts RKD6");
-    equal(scheduled.stepTickHz, 40000, "v3 step tick rate");
-    equal(scheduled.clockSyncBoundNs, haxe.Int64.ofInt(30000000), "v3 sync bound");
-    var rejected = haxe.Json.parse(sys.io.File.getContent(fixture + "deployment6.json"));
-    Reflect.setField(Reflect.field(rejected, "device"), "protocol", "rkd5");
-    var rejectedPath = fixture + "rejected-rkd5-${Sys.getPid()}.json";
-    sys.io.File.saveContent(rejectedPath, haxe.Json.stringify(rejected));
-    var message = "";
-    try new SerialDeployment(rejectedPath) catch (error:Dynamic) message = Std.string(error);
-    sys.FileSystem.deleteFile(rejectedPath);
-    check(message.indexOf("rkd5 is unsupported") >= 0, "v3 reader rejects RKD5 clearly");
+    equal(current.protocol, "rkd6", "v5 deployment implies RKD6");
+    equal(current.stepTickHz, 40000, "v5 step tick rate");
+    equal(current.clockSyncBoundNs, haxe.Int64.ofInt(30000000), "v5 sync bound");
+    equal(current.controller, "0123456789abcdef0123456789abcdef", "v5 names the board it is for");
+    equal(current.binding.channels.length, 3, "the layout wires three channels");
+    // 200 full steps at 16 microsteps a turn; the lift's 8 mm lead gives its ratio.
+    check(Math.abs(current.binding.channels[0].stepsPerUnit - 3200.0 / (2.0 * Math.PI)) < 1e-9,
+      "steps per radian come from the model and the wiring");
+    equal(current.binding.channels[2].jointIndex, 2, "the lift's channel drives the lift joint");
+    check(current.binding.model.actuators[2].maxRate > 0.0,
+      "the binding's model carries the step tick's rate ceiling");
+    // Deployments that named a compiled fingerprint say what to change.
+    var legacy = sys.io.File.getContent(fixture + "deployment-v3.json");
+    var legacyPath = fixture + "legacy-${Sys.getPid()}.json";
+    function loads(text:String):String {
+      sys.io.File.saveContent(legacyPath, text);
+      var message = "";
+      try new SerialDeployment(legacyPath) catch (error:Dynamic) message = Std.string(error);
+      sys.FileSystem.deleteFile(legacyPath);
+      return message;
+    }
+    var v3 = loads(legacy);
+    check(v3.indexOf("schemaVersion 5") >= 0 && v3.indexOf("device.controller") >= 0, "v3 is rejected with what to change: " + v3);
+    var v4 = loads(StringTools.replace(legacy, "\"schemaVersion\": 3", "\"schemaVersion\": 4"));
+    check(v4.indexOf("schemaVersion 5") >= 0, "v4 is rejected with what to change");
+    var withFingerprint = loads(StringTools.replace(sys.io.File.getContent(fixture + "deployment.json"),
+      "\"controller\"", "\"fingerprint\""));
+    check(withFingerprint.indexOf("fingerprint is gone") >= 0, "a v5 file with a fingerprint is rejected");
+    var unwired = haxe.Json.parse(sys.io.File.getContent(fixture + "deployment.json"));
+    var unwiredLayout = haxe.Json.parse(sys.io.File.getContent(fixture + "layout.json"));
+    var unwiredChannels:Array<Dynamic> = Reflect.field(unwiredLayout, "channels");
+    unwiredChannels.pop();
+    sys.io.File.saveContent(fixture + "layout-unwired-${Sys.getPid()}.json", haxe.Json.stringify(unwiredLayout));
+    Reflect.setField(Reflect.field(unwired, "device"), "layout", "layout-unwired-${Sys.getPid()}.json");
+    var unwiredMessage = loads(haxe.Json.stringify(unwired));
+    sys.FileSystem.deleteFile(fixture + "layout-unwired-${Sys.getPid()}.json");
+    check(unwiredMessage.indexOf("has no channel") >= 0, "a stepper without a channel fails loudly: " + unwiredMessage);
     var bench = Sys.getCwd() + "/robotkit/deployment/bench-nucleo-g474re/deployment.json";
     if (!sys.FileSystem.exists(bench))
       bench = Sys.getCwd() + "/../deployment/bench-nucleo-g474re/deployment.json";
@@ -4217,28 +4521,36 @@ class RobotWorldTests {
 
   static function testSerialRobotUnavailableDevice():Void {
     var model = new RobotModel("serial probe");
-    model.addLink(new Link("base", "base"));
+    var base = model.addLink(new Link("base", "base"));
+    var tool = model.addLink(new Link("tool", "tool"));
+    var joint = model.addJoint(new Joint("axis", JointType.Revolute, base, tool, "joint/axis"));
+    joint.limits.lower = -1.0;
+    joint.limits.upper = 1.0;
+    joint.limits.effort = 1.0;
+    var motor = new Actuator("axis-motor", 0.0, 0.0, Transmission.SimpleTransmission("joint/axis", 1.0, 0.0));
+    motor.fullStepsPerRevolution = 200.0;
+    model.addActuator(motor);
+    var layout = DeviceLayout.forActuators(model, 16);
     var robot:Null<SerialRobot> = null;
     var failed = false;
     try robot = new SerialRobot("serial-probe", model,
       '/dev/robotkit-missing-${Sys.getPid()}',
-      "000102030405060708090a0b0c0d0e0f", 1e-6) catch (_:Dynamic) failed = true;
+      "000102030405060708090a0b0c0d0e0f", layout, 1e-6) catch (_:Dynamic) failed = true;
     if (robot != null) robot.close();
     check(failed, "serial adapter reports an unavailable device path through Haxe FFI");
-    var tool = model.addLink(new Link("tool", "tool"));
-    var joint = model.addJoint(new Joint("axis", JointType.Revolute,
-      model.links[0], tool, "joint/axis"));
-    joint.limits.lower = -1.0;
-    joint.limits.upper = 1.0;
-    joint.limits.effort = 1.0;
     var timingMessage = "";
     try new SerialRobot("under-period", model,
       '/dev/robotkit-missing-${Sys.getPid()}',
-      "000102030405060708090a0b0c0d0e0f", 1e-6, 115200,
+      "000102030405060708090a0b0c0d0e0f", layout, 1e-6, 115200,
       Int64.ofInt(1000000), Int64.ofInt(2000000))
     catch (error:Dynamic) timingMessage = Std.string(error);
     check(timingMessage.indexOf("runtime.createSerial") >= 0,
       "serial construction reports an unavailable device");
+    var unwiredMessage = "";
+    try new SerialRobot("unwired", model, '/dev/robotkit-missing-${Sys.getPid()}',
+      "000102030405060708090a0b0c0d0e0f", new DeviceLayout([]), 1e-6)
+    catch (error:Dynamic) unwiredMessage = Std.string(error);
+    check(unwiredMessage.indexOf("from 1 to 64") >= 0, "a serial robot needs a wired layout, not a default one");
   }
 
   static function testProcessChannelDeployment():Void {
@@ -4246,7 +4558,7 @@ class RobotWorldTests {
       "fixtures/device-deployment/deployment.json");
     equal(deployment.channels.length, 1, "deployment declares one process channel");
     equal(deployment.channels[0].id, "sprayer.flow", "deployment keeps channel ID");
-    var blueprint = RobotRuntimeCompiler.compile(deployment.robot);
+    var blueprint = RobotRuntimeCompiler.compile(deployment.binding.model);
     for (channel in deployment.channels) blueprint.channels.push(channel);
     var simulationHarness = new SimulationHarness();
 

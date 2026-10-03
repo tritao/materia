@@ -6,9 +6,11 @@ class PerceptionSnapshot {
   final obstacleValues:Array<Obstacle>;
   final palletValues:Array<Pallet>;
   final dockingValues:Array<DockingTarget>;
+  final free:Null<FreeSpaceView>;
 
   public function new(?detections:Array<Detection>, ?obstacles:Array<Obstacle>,
-      ?pallets:Array<Pallet>, ?dockingTargets:Array<DockingTarget>) {
+      ?pallets:Array<Pallet>, ?dockingTargets:Array<DockingTarget>, ?freeSpace:FreeSpaceView) {
+    free = freeSpace;
     detectionValues = detections == null ? [] : detections.copy();
     obstacleValues = obstacles == null ? [] : obstacles.copy();
     palletValues = pallets == null ? [] : pallets.copy();
@@ -19,6 +21,8 @@ class PerceptionSnapshot {
     for (value in dockingValues) if (value == null) throw "Perception docking targets cannot be null";
   }
 
+  /** The places the sensors see through, when they report it; null when they do not. */
+  public function freeSpace():Null<FreeSpaceView> return free;
   public function detections():Array<Detection> return detectionValues.copy();
   public function obstacles():Array<Obstacle> return obstacleValues.copy();
   public function pallets():Array<Pallet> return palletValues.copy();

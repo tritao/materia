@@ -9,6 +9,8 @@ import cadkit.modeling.Vector;
 import machinekit.component.ComponentDetail;
 import machinekit.motion.LinearRail;
 import machinekit.motion.NemaStepper;
+import machinekit.transmission.TimingBelt;
+import machinekit.transmission.TimingPulley;
 import materia.assembly.AssemblyFrames;
 import materia.project.SceneArtifact;
 
@@ -28,8 +30,8 @@ class CncRouterPreview {
 	 * Geometry, joints and initial pose of the router (parts with equal designations share geometry),
 	 * and its machining job: CAM made from the motor plate it mills, with the plate as the target.
 	 */
-	public static function router():Bytes {
-		var router = new CncRouter();
+	public static function router(belts:Bool = false):Bytes {
+		var router = new CncRouter(belts);
 		var scene = AssemblyPreview.scene(router, ASSEMBLY_ID);
 		var plate = motorPlate();
 		var part = plate.geometry(ComponentDetail.Preview);
@@ -39,9 +41,13 @@ class CncRouterPreview {
 			workOffset: [for (value in CncRouter.workOffset()) value / 1000],
 			tools: [for (tool in router.tools()) {number: tool.number, length: tool.length, profile: tool.profile().encode()}],
 			stock: "stock", sacrificial: ["spoilboard"], toolPart: "tool", loadedTool: 1,
-			target: TARGET_PART, loop: true};
+			target: TARGET_PART, loop: true,
+			controller: {microsteps: CncRouter.MICROSTEPS, stepTickHz: CncRouter.STEP_TICK_HZ}};
 		return SceneArtifact.encode(scene);
 	}
+
+	/** The same router with belts on X and Y instead of lead screws. */
+	public static function beltRouter():Bytes return router(true);
 
 	/** The part the router mills from its stock block. */
 	public static function motorPlate():NemaMountPlate
@@ -91,6 +97,9 @@ class CncRouterChecks {
 				near(pose.x + pose.y + pose.z, start.x + start.y + start.z, '${fixed[i]} stays put', 1e-9);
 			}
 			checkBlocksOnRails(router, state);
+			// Tr10 × 2 right-hand screws pointing against their axes: half a turn per millimetre.
+			for (screw in [{id: "screwX", axis: 0}, {id: "screwYLeft", axis: 1}, {id: "screwYRight", axis: 1}, {id: "screwZ", axis: 2}])
+				near(state.joint(screw.id + "-turn"), Math.PI * position[screw.axis], '$label: ${screw.id} turns with its axis', 1e-9);
 		}
 
 		// Z reaches through the stock into the spoilboard, and at the top of travel the tool clears the clamps.
@@ -123,6 +132,22 @@ class CncRouterChecks {
 		checkClear(router, state, [150, 150, 0], ["zPlate", "spindle", "spindleClamp"], ["motorBracketZ", "motorZ", "xPlate", "screwZ"]);
 		checkClear(router, state, [150, 150, -80], ["zPlate", "spindle", "spindleClamp"], ["motorBracketZ", "motorZ", "xPlate", "screwZ"]);
 
+		// Each screw's turn is a lead-screw drive, so its thread sets the ratio.
+		for (screw in ["screwX", "screwYLeft", "screwYRight", "screwZ"]) {
+			var drive = router.drive(screw + "-lead");
+			if (drive == null || drive.kind != "lead-screw" || drive.members[0] != screw)
+				throw '$screw should turn through a lead-screw drive';
+		}
+		// Each shaft coupling turns inside its mount's pilot bore, clear of the motor and the mount.
+		checkClear(router, state, [150, 150, 0], ["screwYLeftCoupling"], ["motorPlateYLeft", "motorYLeft"]);
+		checkClear(router, state, [150, 150, 0], ["motorYLeft"], ["motorPlateYLeft"]);
+		checkClear(router, state, [150, 150, 0], ["motorX"], ["uprightRight"]);
+		checkClear(router, state, [150, 150, 0], ["motorZ", "screwZCoupling"], ["motorBracketZ", "standoffZ1", "standoffZ2", "standoffZ3", "standoffZ4"]);
+		checkClear(router, state, [150, 150, 0], ["screwYRightCoupling"], ["motorPlateYRight"]);
+		checkClear(router, state, [0, 0, 0], ["screwXCoupling"], ["uprightRight", "xPlate", "nutBracketX"]);
+		checkClear(router, state, [300, 0, -80], ["screwXCoupling"], ["uprightRight", "xPlate", "nutBracketX"]);
+		checkClear(router, state, [150, 150, 0], ["screwZCoupling"], ["motorBracketZ", "zPlate", "blockZLeft", "blockZRight"]);
+		checkClear(router, state, [150, 150, -80], ["screwZCoupling"], ["motorBracketZ", "zPlate"]);
 		// Every axis has room past its travel before its blocks reach their rail ends.
 		near(router.axisOvertravel("x"), 62.65, "x overtravel", 1e-6);
 		near(router.axisOvertravel("y"), 6.65, "y overtravel", 1e-6);
@@ -139,6 +164,113 @@ class CncRouterChecks {
 		var mass = router.massProperties().mass;
 		Sys.println('cnc router: ${scene.parts.length} definitions, ${definition.occurrences.length} occurrences, ' +
 			'${bom.length} BOM lines, ${Math.round(mass * 10) / 10} kg');
+		runBelts();
+	}
+
+	/**
+	 * The belt-driven router: its pulleys turn travel over their pitch radius (and the right way, by
+	 * the rule of a belt's strand), its belts are whole teeth long, clear the frame and are clamped on
+	 * exactly one strand each, and its motors, plates and idlers clear the gantry.
+	 */
+	static function runBelts():Void {
+		var router = new CncRouter(true);
+		var scene = AssemblyPreview.scene(router, CncRouterPreview.ASSEMBLY_ID);
+		var definition = scene.assemblyDefinition;
+		if (definition == null || definition.occurrences.length != router.components().length)
+			throw "belt router preview has the wrong number of occurrences";
+		var prismatic = [for (joint in definition.joints) if (Std.string(joint.type) == "prismatic") joint.id];
+		if (prismatic.join(",") != "y,x,z") throw 'belt router should have prismatic joints y, x, z, got $prismatic';
+		var motors = [for (entry in router.components()) if (Std.isOfType(entry.component, NemaStepper)) entry.id];
+		if (motors.length != 4) throw 'belt router should have four stepper motors, got $motors';
+
+		var model = new AssemblyModel("mm");
+		router.addTo(model, "");
+		var state = new AssemblyState(model.definition(CncRouterPreview.ASSEMBLY_ID));
+		var radius = 2 * 20 / (2 * Math.PI);
+		// Each pulley's drive is a belt drive of its pulley, and turns the way a belt clamped on the lower
+		// strand makes it: the strand's point on the pulley moves along the axis with the carriage.
+		var pulleys = [{id: "pulleyX", axis: 0, direction: [1.0, 0, 0]}, {id: "idlerX", axis: 0, direction: [1.0, 0, 0]},
+			{id: "pulleyYLeft", axis: 1, direction: [0.0, 1, 0]}, {id: "idlerYLeft", axis: 1, direction: [0.0, 1, 0]},
+			{id: "pulleyYRight", axis: 1, direction: [0.0, 1, 0]}, {id: "idlerYRight", axis: 1, direction: [0.0, 1, 0]}];
+		for (pulley in pulleys) {
+			var drive = beltDrive(router, pulley.id);
+			var joint = [for (candidate in definition.joints) if (candidate.id == pulley.id + "-turn") candidate][0];
+			// The lower strand's point on the pulley is straight below its axis.
+			// Turning by about moves a point straight below the axis by about x (0, 0, -1) = (-about.y, about.x, 0).
+			var about = joint.axis;
+			var along = -about.y * pulley.direction[0] + about.x * pulley.direction[1];
+			near(drive.alignment, along, '${pulley.id} turns the way its lower strand moves', 1e-9);
+		}
+		var positions = [[150.0, 150, 0], [0.0, 0, 0], [300.0, 300, -80], [0.0, 300, -80], [300.0, 0, -40], [37.5, 212, -12.5]];
+		for (position in positions) {
+			state.setJoint("x", position[0]);
+			state.setJoint("y", position[1]);
+			state.setJoint("z", position[2]);
+			state.forwardKinematics();
+			var expected = CncRouter.noseAt(position[0], position[1], position[2]);
+			var nose = state.worldConnector("spindle", "nose");
+			near(nose.x, expected.x, 'belt router nose, x', 1e-6);
+			near(nose.y, expected.y, 'belt router nose, y', 1e-6);
+			near(nose.z, expected.z, 'belt router nose, z', 1e-6);
+			for (pulley in pulleys) {
+				var drive = beltDrive(router, pulley.id);
+				var turned = state.joint(pulley.id + "-turn");
+				near(turned, drive.alignment * position[pulley.axis] / radius, '${pulley.id} turns travel over its pitch radius', 1e-9);
+			}
+			near(state.joint("screwZ-turn"), Math.PI * position[2], "Z still turns its screw", 1e-9);
+		}
+
+		// Whole teeth: 20-tooth GT2 pulleys put the loop at the centre distance plus 20 teeth.
+		var report:Array<String> = [];
+		for (id in ["beltX", "beltYLeft", "beltYRight"]) {
+			var loop = belt(router, id);
+			near(loop.slack(), 0, '$id is a whole number of teeth long', 1e-6);
+			near(loop.centreAdjustment(), 0, '$id needs no centre adjustment', 1e-6);
+			report.push('$id ${loop.teeth} teeth, ${Math.round(loop.length * 100) / 100} mm');
+		}
+		near(belt(router, "beltX").length, 2 * 444 + 40, "X belt length", 1e-6);
+		near(belt(router, "beltYLeft").length, 2 * 640 + 40, "Y belt length", 1e-6);
+
+		// Each belt clears the frame, and its carriage's bracket holds exactly its lower strand: a band
+		// 6 mm wide and 1.38 mm thick through the bracket's 40 mm.
+		var clamp = 6 * 1.38 * 40;
+		var xFrame = ["beamUpper", "beamLower", "uprightLeft", "uprightRight", "motorPlateX", "idlerPlateX", "xPlate", "blockXUpper",
+			"blockXLower", "zPlate", "motorBracketZ", "motorZ", "screwZ", "spindle", "spindleClamp", "axleX"];
+		for (at in [[0.0, 0, 0], [300.0, 300, -80], [150.0, 150, 0]]) {
+			checkClear(router, state, at, ["beltX"], xFrame);
+			near(overlap(router, state, at, "beltX", "beltBracketX"), clamp, "the X bracket clamps one strand", 0.5);
+		}
+		var yFrame = ["sideLeft", "sideRight", "railYLeft", "railYRight", "crossFront", "crossMiddle", "crossBack", "spoilboard",
+			"blockYLeft", "blockYRight", "uprightLeft", "uprightRight", "motorPlateYLeft", "motorPlateYRight", "idlerPlateYLeft",
+			"idlerPlateYRight", "motorYLeft", "motorYRight", "axleYLeft", "axleYRight"];
+		for (at in [[150.0, 0, 0], [150.0, 300, 0], [150.0, 150, 0]]) {
+			checkClear(router, state, at, ["beltYLeft", "beltYRight"], yFrame);
+			near(overlap(router, state, at, "beltYLeft", "beltBracketYLeft"), clamp, "the left Y bracket clamps one strand", 0.5);
+			near(overlap(router, state, at, "beltYRight", "beltBracketYRight"), clamp, "the right Y bracket clamps one strand", 0.5);
+		}
+		// Motors, plates and idlers clear the gantry and carriage at the ends of travel.
+		var gantry = ["uprightLeft", "uprightRight", "beltBracketYLeft", "beltBracketYRight", "beamUpper", "beamLower", "blockYLeft",
+			"blockYRight", "motorX", "motorPlateX", "idlerPlateX", "pulleyX", "idlerX"];
+		var ends = ["motorPlateYLeft", "motorPlateYRight", "motorYLeft", "motorYRight", "pulleyYLeft", "pulleyYRight"];
+		checkClear(router, state, [150, 300, 0], gantry, ends);
+		checkClear(router, state, [150, 0, 0], gantry, ["idlerPlateYLeft", "idlerPlateYRight", "idlerYLeft", "idlerYRight", "axleYLeft", "axleYRight"]);
+		checkClear(router, state, [300, 300, -80], ["motorX", "motorPlateX", "idlerPlateX", "pulleyX", "idlerX"],
+			["crossBack", "sideLeft", "sideRight", "spoilboard"]);
+		checkClear(router, state, [300, 0, 0], ["xPlate", "beltBracketX", "blockXUpper", "blockXLower"], ["pulleyX", "idlerX", "motorX", "motorPlateX", "idlerPlateX"]);
+		checkClear(router, state, [0, 0, 0], ["xPlate", "beltBracketX", "blockXUpper", "blockXLower"], ["pulleyX", "idlerX", "motorX", "motorPlateX", "idlerPlateX"]);
+		Sys.println('cnc router belts: ${report.join("; ")}');
+	}
+
+	static function beltDrive(router:CncRouter, pulley:String):machinekit.assembly.MachineAssemblyDescription.DriveRecord {
+		var drive = router.drive(pulley + "-belt");
+		if (drive == null) throw '$pulley should turn through a belt drive';
+		if (drive.kind != "belt" || drive.members[0] != pulley) throw '$pulley should turn through a belt drive';
+		return drive;
+	}
+
+	static function belt(router:CncRouter, id:String):TimingBelt {
+		for (entry in router.components()) if (entry.id == id) return cast entry.component;
+		throw 'belt router has no member "$id"';
 	}
 
 	/** Every rail block stays within its rail's usable length. */

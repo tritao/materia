@@ -326,7 +326,7 @@
         },
         {
           "length": 16,
-          "name": "device_fingerprint",
+          "name": "controller",
           "type": "u8"
         },
         {
@@ -368,9 +368,14 @@
           "length": 1,
           "name": "profile",
           "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "config_digest",
+          "type": "u64"
         }
       ],
-      "size": 45
+      "size": 53
     },
     "SessionBegin6": {
       "endian": "little",
@@ -387,7 +392,7 @@
         },
         {
           "length": 16,
-          "name": "model_fingerprint",
+          "name": "expected_controller",
           "type": "u8"
         },
         {

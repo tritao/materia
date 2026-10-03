@@ -166,6 +166,7 @@ rk_result SimulationRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) 
     }
     const double now = status.simulation_time;
     state.sensor_count = static_cast<uint32_t>(sensors_.size());
+    uint32_t value_cursor = 0;
     for (uint32_t slot = 0; slot < sensors_.size(); ++slot) {
         auto &sensor = sensors_[slot];
         const auto &config = sensor.config;
@@ -196,10 +197,10 @@ rk_result SimulationRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) 
             sample.source_timestamp_ns = state.source_timestamp_ns;
             if (config.kind == RK_SENSOR_ENCODER) {
                 sample.value_count = state.joint_count;
-                std::copy_n(state.position, state.joint_count, sample.values);
+                std::copy_n(state.position, state.joint_count, sensor.values);
             } else if (config.kind == RK_SENSOR_IMU) {
                 sample.value_count = 6;
-                sensors::imu(rotation, base->angular_velocity, acceleration, simulation_.gravity_, sample.values);
+                sensors::imu(rotation, base->angular_velocity, acceleration, simulation_.gravity_, sensor.values);
             } else {
                 sample.value_count = config.ray_count;
                 const double field_of_view = config.field_of_view > 0.0
@@ -231,14 +232,14 @@ rk_result SimulationRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) 
                         range = sensors::ray_box(origin, direction, body.position, body.rotation,
                                                  robot_extents, range);
                     }
-                    sample.values[ray] = range;
+                    sensor.values[ray] = range;
                 }
             }
             for (uint32_t i = 0; i < sample.value_count; ++i) {
                 if (config.noise_stddev > 0.0)
-                    sample.values[i] += config.noise_stddev * sensors::gaussian(sensor.random);
+                    sensor.values[i] += config.noise_stddev * sensors::gaussian(sensor.random);
                 if (config.kind == RK_SENSOR_LIDAR)
-                    sample.values[i] = std::clamp(sample.values[i], 0.0, config.max_range);
+                    sensor.values[i] = std::clamp(sensor.values[i], 0.0, config.max_range);
             }
             if (config.update_rate > 0.0) {
                 // Acquisition cannot outpace physics. Capping also prevents
@@ -247,7 +248,12 @@ rk_result SimulationRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) 
                 sensor.next_due = (std::floor(now * rate + 1e-9) + 1.0) / rate;
             }
         }
+        // Pack this slot's values after the previous slots' in the state's pool.
+        if (value_cursor + sensor.sample.value_count > RK_SENSOR_VALUE_POOL) return RK_ERROR_BACKEND;
         state.sensors[slot] = sensor.sample;
+        state.sensors[slot].value_offset = value_cursor;
+        std::copy_n(sensor.values, sensor.sample.value_count, state.sensor_values + value_cursor);
+        value_cursor += sensor.sample.value_count;
     }
     return RK_OK;
 }

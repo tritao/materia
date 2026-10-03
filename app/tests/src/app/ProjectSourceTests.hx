@@ -31,6 +31,10 @@ import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.JointLimits;
 import robotkit.model.JointCoupling;
+import robotkit.model.SteadyLoads;
+import robotkit.device.DeviceBinding;
+import robotkit.device.DeviceLayout;
+import motionkit.trajectory.PlanDiagnostic;
 import sys.FileSystem;
 import sys.io.File;
 import haxe.io.Bytes;
@@ -456,6 +460,174 @@ class ProjectSourceTests {
   }
 
   /**
+   * The base sees what the room's map lacks. A box dropped on the route ahead of the moving base, as if it
+   * had fallen off a shelf, is read off the lidar: the base slows, stops short of it without touching it,
+   * replans round it, and still completes its round (so the lidar never mistakes the room for obstacles
+   * either). MuJoCo, like the mission check.
+   */
+  static function checkMobileObstacle(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/mobile-base/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var section:materia.project.SceneArtifact.SceneArtifactMobileBase = cast generated.mobileBase;
+    var work:materia.project.SceneArtifact.SceneArtifactMission = cast generated.mission;
+    var halfLength:Float = cast section.footprintLength, halfWidth:Float = cast section.footprintWidth;
+    halfLength /= 2; halfWidth /= 2;
+    var session = new ProjectDocumentSession(null, false);
+    session.openGeneratedProject(generated, manifest);
+    check(session.robotSensors.length == 1 && session.robotSensors[0].kind == "lidar",
+      "the mobile base cell mounts one lidar on the robot");
+    var simulation = new ApplicationSimulation(new RobotWorld());
+    simulation.setBackend(ApplicationSimulation.MUJOCO);
+    check(simulation.rebuild(session.sensors, session.scene, session), 'mobile base cell builds: ${simulation.error}');
+    var mission = simulation.missionPlayer();
+    if (mission == null) throw "mobile base cell has no mission";
+    check(mission.guard != null, "a mission with a lidar guards the base's motion");
+    var active = simulation.activeSession();
+    if (active == null) throw "mobile base cell has no session";
+    var dt = simulation.timestep;
+    function yaw(rotation:Array<Float>):Float
+      return Math.atan2(2 * (rotation[3] * rotation[2] + rotation[0] * rotation[1]),
+        1 - 2 * (rotation[1] * rotation[1] + rotation[2] * rotation[2]));
+    /** The chassis' pose on the floor: x, y, heading. */
+    function chassis():Array<Float> {
+      var plate = [for (entry in simulation.capturePresentationSnapshot().environment) if (entry.id == "project:robot/basePlate") entry][0];
+      return [plate.position[0], plate.position[1], yaw(plate.rotation)];
+    }
+    /** Gap between two rectangles on the floor (centre, half extents, heading), negative when they overlap. */
+    function gap(a:Array<Float>, ahx:Float, ahy:Float, b:Array<Float>, bhx:Float, bhy:Float):Float {
+      var worst = Math.NEGATIVE_INFINITY;
+      for (angle in [a[2], a[2] + Math.PI / 2, b[2], b[2] + Math.PI / 2]) {
+        var ux = Math.cos(angle), uy = Math.sin(angle);
+        function reach(hx:Float, hy:Float, heading:Float):Float
+          return hx * Math.abs(Math.cos(heading) * ux + Math.sin(heading) * uy) +
+            hy * Math.abs(-Math.sin(heading) * ux + Math.cos(heading) * uy);
+        var separation = Math.abs((b[0] - a[0]) * ux + (b[1] - a[1]) * uy) - reach(ahx, ahy, a[2]) - reach(bhx, bhy, b[2]);
+        if (separation > worst) worst = separation;
+      }
+      return worst;
+    }
+    var trail:Array<String> = [];
+    function step():Void {
+      simulation.step();
+      var failure = mission.failure;
+      if (failure != null) throw 'the mission failed after ${mission.completed} steps: $failure\n${trail.join("\n")}';
+    }
+    // Cruise down the first leg.
+    step();
+    var before = chassis();
+    var speed = 0.0;
+    while (speed < 0.4 && active.simulationTime() < 20) {
+      step();
+      var now = chassis();
+      speed = Math.sqrt(Math.pow(now[0] - before[0], 2) + Math.pow(now[1] - before[1], 2)) / dt;
+      before = now;
+    }
+    check(speed >= 0.4 && mission.stepIndex == 0, 'the base cruises down its first leg (${speed} m/s)');
+    var cruise = speed;
+    // The route ahead of the base: drop the box on it, close enough that braking is called for.
+    var overlay = mission.overlay();
+    if (overlay == null) throw "a driving mission draws its overlay";
+    var route = overlay.route;
+    var nearest = 0;
+    for (index in 0...route.length) {
+      var near = Math.pow(route[nearest].x - before[0], 2) + Math.pow(route[nearest].y - before[1], 2);
+      if (Math.pow(route[index].x - before[0], 2) + Math.pow(route[index].y - before[1], 2) < near) nearest = index;
+    }
+    var travelled = 0.0, spot = route[nearest];
+    for (index in nearest + 1...route.length) {
+      travelled += Math.sqrt(Math.pow(route[index].x - route[index - 1].x, 2) + Math.pow(route[index].y - route[index - 1].y, 2));
+      spot = route[index];
+      if (travelled >= DROP_AHEAD) break;
+    }
+    // The box falls onto the cell's floor slab.
+    var half = [0.2, 0.2, 0.25];
+    active.stop();
+    var box = active.createObject(nativekit.sim.MotionType.Dynamic, nativekit.sim.SimShape.box(half[0], half[1], half[2]),
+      new nativekit.sim.SimPose(spot.x, spot.y, half[2] + 0.05, 0, 0, 0, 1), 2.0);
+    var dropped = active.simulationTime();
+    function boxFloorPose():Array<Float> {
+      var frame = active.capture();
+      var pose = frame.objectPose(box);
+      frame.dispose();
+      return [pose.x, pose.y, yaw([pose.qx, pose.qy, pose.qz, pose.qw])];
+    }
+    var landed:Null<Array<Float>> = null;
+    var slowest = cruise, stopped = false, approached = false, replans = 0, closest = Math.POSITIVE_INFINITY;
+    var seen = 0;
+    var position = chassis();
+    var steps = work.steps.length;
+    while (mission.completed < steps && active.simulationTime() < 300) {
+      step();
+      var now = chassis();
+      speed = Math.sqrt(Math.pow(now[0] - position[0], 2) + Math.pow(now[1] - position[1], 2)) / dt;
+      position = now;
+      var guard = mission.guard;
+      if (guard != null) switch guard.state {
+        case Approaching(_, _, _): approached = true;
+        case _:
+      }
+      if (mission.stepIndex == 0) replans = Std.int(Math.max(replans, mission.replans()));
+      var pose = boxFloorPose();
+      if (active.simulationTime() > dropped + 0.5) {
+        if (landed == null) landed = pose;
+        var clear = gap(now, halfLength, halfWidth, pose, half[0], half[1]);
+        closest = Math.min(closest, clear);
+        if (clear <= 0.0) throw 'the chassis touches the dropped box at ${now[0]}, ${now[1]}\n${trail.join("\n")}';
+        if (mission.stepIndex == 0 && clear < 1.5) {
+          slowest = Math.min(slowest, speed);
+          if (speed < 0.02) {
+            stopped = true;
+            var view = mission.overlay();
+            if (view != null) seen = Std.int(Math.max(seen, view.obstacles.length));
+          }
+        }
+      }
+      trail.push('${Math.round(active.simulationTime() * 100) / 100} s: ${Math.round(now[0] * 1000)}, ${Math.round(now[1] * 1000)} mm, ' +
+        '${Math.round(speed * 100) / 100} m/s, step ${mission.stepIndex}, replans ${mission.replans()}, ${Std.string(mission.guard == null ? null : mission.guard.state)}, ${mission.sensed.obstacles().length} sensed');
+      if (trail.length > 400) trail.shift();
+    }
+    check(mission.completed >= steps, 'the robot still runs its whole round in five minutes, finished ${mission.completed} of ${steps} steps (${mission.navigating()})\n' +
+      [for (index in 0...trail.length) if (index % 8 == 0) trail[index]].join("\n"));
+    check(approached && slowest < cruise * 0.5, 'the base slows for the box (${cruise} m/s down to ${slowest} m/s)');
+    check(stopped, 'the base stops short of the box (slowest ${slowest} m/s)');
+    check(replans > 0, 'the base replans round the box (${replans} replans)');
+    check(seen > 0, "the overlay shows the obstacle the lidar added to the costmap");
+    var ghost = mission.overlay();
+    if (ghost == null || ghost.odometry == null || ghost.outline.length < 3) throw "the overlay carries the odometry ghost";
+    // Odometry from the wheel joints follows the base's drive to within a few centimetres over the round.
+    var believed:robotkit.mobile.Pose2 = cast ghost.odometry, truth = chassis();
+    check(Math.sqrt(Math.pow(believed.x - truth[0], 2) + Math.pow(believed.y - truth[1], 2)) < 0.05,
+      'the odometry ghost follows the base (${Math.round(Math.sqrt(Math.pow(believed.x - truth[0], 2) + Math.pow(believed.y - truth[1], 2)) * 1000)} mm off)');
+    var rest = boxFloorPose(), settled:Array<Float> = cast landed;
+    check(Math.abs(rest[0] - settled[0]) < 0.03 && Math.abs(rest[1] - settled[1]) < 0.03,
+      'the base never pushes the box (${Math.round(Math.sqrt(Math.pow(rest[0] - settled[0], 2) + Math.pow(rest[1] - settled[1], 2)) * 1000)} mm)');
+    Sys.println('mobile obstacle: cruise ${Math.round(cruise * 100) / 100} m/s, slowest ${Math.round(slowest * 1000) / 1000} m/s, ' +
+      'closest ${Math.round(closest * 1000)} mm, ${replans} replans, round done at ${Math.round(active.simulationTime())} s');
+    simulation.clear();
+  }
+
+  /** The overlay outlines the costmap's blocked area as runs: a 2 x 2 block, a cell of margin all round, is four sides of 2 m. */
+  static function checkMissionOverlayEdge():Void {
+    var grid = new robotkit.navigation.OccupancyGrid2(0.5, new robotkit.mobile.Pose2(1.0, 2.0), 6, 5, "map",
+      robotkit.navigation.OccupancyCell.Free);
+    for (x in 2...4) for (y in 1...3) grid.setCell(x, y, robotkit.navigation.OccupancyCell.Occupied);
+    var edge = MissionOverlayView.blockedEdge(new robotkit.navigation.Costmap2(grid, 0.0, false, 0.0, 0.0));
+    check(edge.length == 16, 'the blocked area has four edge runs (${edge.length / 4})');
+    var total = 0.0, low = Math.POSITIVE_INFINITY, high = Math.NEGATIVE_INFINITY;
+    for (run in 0...4) {
+      var dx = edge[run * 4 + 2] - edge[run * 4], dy = edge[run * 4 + 3] - edge[run * 4 + 1];
+      total += Math.sqrt(dx * dx + dy * dy);
+      low = Math.min(low, Math.min(edge[run * 4], edge[run * 4 + 2]));
+      high = Math.max(high, Math.max(edge[run * 4], edge[run * 4 + 2]));
+    }
+    check(Math.abs(total - 8.0) < 1e-9 && Math.abs(low - 1.5) < 1e-9 && Math.abs(high - 3.5) < 1e-9,
+      'the edge runs round the blocked area in map coordinates (length ${total}, x ${low} to ${high})');
+  }
+
+  /** How far along its route (m) the base has the box dropped ahead of it. */
+  static inline var DROP_AHEAD:Float = 1.2;
+
+  /**
    * The arm example opens with its suction tool and its mission, and on MuJoCo the arm works it: picks
    * the workpiece off its pad, sets it on the other, and brings it back, each pick confirmed by the
    * tool's vacuum sensor, and a reset puts the workpiece back for the next run.
@@ -536,6 +708,19 @@ class ProjectSourceTests {
       again = simulation.heldObjectIds().length > 0;
     }
     check(again, 'the mission picks again after a reset (${mission.failure})');
+    // A reset in the middle of a step cancels that step through the robot's runtime, still answering, and the
+    // mission starts over without a fault.
+    check(simulation.heldObjectIds().length > 0, "the workpiece is held when the reset comes");
+    check(simulation.reset(), "the arm simulation resets with a step running");
+    check(mission.failure == null && mission.stepIndex == 0 && mission.completed == 0,
+      'a reset mid-step starts the mission over without a failure (${mission.failure})');
+    var thrice = false;
+    until = simulation.activeSession().simulationTime() + 30;
+    while (!thrice && simulation.activeSession().simulationTime() < until) {
+      simulation.step();
+      thrice = simulation.heldObjectIds().length > 0;
+    }
+    check(thrice && mission.failure == null, 'the mission picks again after a reset mid-step (${mission.failure})');
     session.dispose();
     Sys.println('robot arm mission: ${log.join(", ")} s');
   }
@@ -858,23 +1043,75 @@ class ProjectSourceTests {
    * tools on the way: the stock loses exactly the plate's recesses and holes, nothing is cut from the
    * part, and no rapid or holder touches stock.
    */
-  static function checkCncRouter(root:String):Void {
-    var manifest = FileSystem.fullPath(root + "/machinekit/examples/cnc-router/materia.project.json");
+  /** The screw router's cycle time and worst drive deviation, for the belt router to be compared with. */
+  static var screwRouterSeconds = 0.0;
+  static var screwRouterDeviation = 0.0;
+
+  static function checkCncRouter(root:String, belts:Bool = false):Void {
+    var kind = belts ? "belt router" : "screw router";
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/cnc-router/" + (belts ? "belts/" : "") + "materia.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
     var definition:AssemblyDefinition = cast(generated.assemblyDefinition, AssemblyDefinition);
     var model = AssemblySimulationBridge.toRobotModel(definition, generated.physical).model;
     var axes = [for (joint in model.joints) if (joint.type == JointType.Prismatic) joint];
-    check([for (joint in axes) Std.string(joint.id)].join(",") == "y,x,z", "the router simulates axes y, x and z");
-    check(model.joints.length == 3 && model.links.length == 4,
-      'the router simulates as four rigid bodies and its three axes, got ${model.links.length} links');
+    check([for (joint in axes) Std.string(joint.id)].join(",") == "y,x,z", 'the $kind simulates axes y, x and z');
+    var leads = [for (coupling in model.couplings) '${coupling.leader}:${Math.round(Math.abs(coupling.ratio))}'];
+    leads.sort(Reflect.compare);
+    if (belts) {
+      // Pulley and idler on x, a pair on each Y belt, and the Z screw; 1 / 6.366 mm is 157 rad per metre.
+      check(leads.join(",") == "x:157,x:157,y:157,y:157,y:157,y:157,z:3142", 'belt axes turn by their pulleys, got $leads');
+    } else {
+      // Four rigid bodies and four lead screws, each screw turning with its coupling on the motor shaft.
+      check(model.joints.length == 7 && model.links.length == 8,
+        'the router simulates as four rigid bodies, four screws, three axes and four screw joints, got ' +
+        '${model.links.length} links and ${model.joints.length} joints');
+      // A 2 mm lead turns its screw pi radians per millimetre: 3142 per metre.
+      check(leads.join(",") == "x:3142,y:3142,y:3142,z:3142", 'each axis turns its screws by their lead, got $leads');
+    }
     for (joint in axes) {
       var travel = joint.limits.upper - joint.limits.lower;
       check(Math.abs(travel - (Std.string(joint.id) == "z" ? 0.08 : 0.3)) < 1e-9,
-        'router axis ${joint.id} travel is in metres, got $travel');
-      check(joint.limits.overtravel > 0 && joint.limits.maxAcceleration > 0,
-        'router axis ${joint.id} carries its overtravel and acceleration');
+        '$kind axis ${joint.id} travel is in metres, got $travel');
+      check(joint.limits.overtravel > 0, '$kind axis ${joint.id} carries its overtravel');
     }
     var job = generated.cncJob;
+    var controller = job == null ? null : job.controller;
+    if (controller == null) throw "the router names the controller its steppers are wired to";
+    // Each axis is as fast as the slowest of: a 24 V NEMA 23 at half its holding torque (twice the
+    // 68.6 rad/s where its winding's reactance takes the supply), what the controller's step tick can
+    // generate at its microstepping (40 kHz over 3200 steps a turn: 78.5 rad/s), and the screw's
+    // critical speed, all through the axis's ratio to the motor.
+    var motorSpeed = 2 * 24 / (50 * 2.5e-3 * 2.8);
+    var stepSpeed = controller.stepTickHz / (200.0 * controller.microsteps / (2 * Math.PI));
+    var wired = DeviceBinding.bind(model, DeviceLayout.forActuators(model, controller.microsteps), controller.stepTickHz).model;
+    var steady = new SteadyLoads();
+    var derived:Array<String> = [], free:Array<String> = [];
+    for (joint in axes) {
+      var motorRatio = 0.0, critical = Math.POSITIVE_INFINITY, leadRatio = 0.0;
+      for (coupling in model.couplings) if (coupling.leader == joint.id) {
+        for (actuator in model.actuators) switch actuator.transmission {
+          case SimpleTransmission(target, _, _): if (target == coupling.follower) motorRatio = Math.abs(coupling.ratio);
+        }
+        for (follower in model.joints) if (follower.id == coupling.follower && follower.limits.velocity > 0)
+        {
+          critical = Math.min(critical, follower.limits.velocity / Math.abs(coupling.ratio));
+          leadRatio = Math.abs(coupling.ratio);
+        }
+      }
+      check(motorRatio > 0, '$kind axis ${joint.id} has a motor');
+      var expected = Math.min(Math.min(motorSpeed, stepSpeed) / motorRatio, critical);
+      var limits = wired.coupledLimits(joint.id, steady);
+      check(Math.abs(limits.velocity - expected) < 1e-9,
+        '$kind axis ${joint.id} is as fast as its motor, controller and screw allow: ${limits.velocity} m/s, expected $expected');
+      check(limits.maxAcceleration > 0.5 && limits.maxAcceleration < 50,
+        '$kind axis ${joint.id} accelerates as its motors move it: ${limits.maxAcceleration} m/s²');
+      derived.push('${joint.id} ${Math.round(limits.velocity * 1e4) / 10} mm/s, ${Math.round(limits.maxAcceleration * 100) / 100} m/s²' +
+        (critical < Math.POSITIVE_INFINITY ? ' (screw held to ${Math.round(critical * (Math.abs(leadRatio) > 0 ? leadRatio : 1) * 60 / (2 * Math.PI))} rpm)' : ''));
+      var bare = model.coupledLimits(joint.id);
+      free.push('${joint.id} ${Math.round(bare.velocity * 1e4) / 10} mm/s, ${Math.round(bare.maxAcceleration * 100) / 100} m/s²');
+    }
+    Sys.println('cnc $kind axes with the controller and steady loads: ${derived.join("; ")}');
+    Sys.println('cnc $kind axes from their motors and screws alone: ${free.join("; ")}');
     check(job != null && job.loop && job.stock == "stock" && job.spindle == "spindle" && job.target != null &&
       job.loadedTool == 1 && [for (tool in job.tools) tool.number].join(",") == "1,2",
       "the router generates a looping job that machines its stock to a target part with an end mill and a drill");
@@ -894,8 +1131,16 @@ class ProjectSourceTests {
       check(tool.length == 1, "the router publishes its tool pose");
       return tool[0].position;
     }
+    function partRotation(id:String):Array<Float> {
+      var part = [for (pose in simulation.capturePresentationSnapshot().environment) if (pose.id == "project:" + id) pose];
+      check(part.length == 1, 'the router publishes the pose of $id');
+      return part[0].rotation;
+    }
     simulation.step();
     var start = toolPosition();
+    // The Z screw (and the X screw of the screw router) turns half a turn for every millimetre of its axis.
+    var screwParts = belts ? ["", "screwZCoupling"] : ["screwXCoupling", "screwZCoupling"];
+    var screwStart = [for (id in screwParts) id == "" ? [] : partRotation(id)];
     var lowest = 0.0, steps = 0, stepping = 0.0, tools:Array<Int> = [player.loadedTool];
     // Allocation is counted, not timed, so it holds whatever else the machine is doing.
     var allocatedBefore = hl.Gc.totalAllocated(), collectionsBefore = hl.Gc.collections();
@@ -906,16 +1151,38 @@ class ProjectSourceTests {
       check(simulation.cncFailure() == null, 'the router program runs: ${simulation.cncFailure()}');
       if (steps % 10 == 0) lowest = Math.min(lowest, toolPosition()[2] - start[2]);
       if (player.loadedTool != tools[tools.length - 1]) tools.push(player.loadedTool);
+      if (steps % 1000 == 0) {
+        // The X and Z screws turn half a turn for every millimetre their axes move.
+        var now = toolPosition();
+        for (axis in [0, 2]) {
+          if (screwParts[axis == 0 ? 0 : 1] == "") continue;
+          var before = screwStart[axis == 0 ? 0 : 1], after = partRotation(screwParts[axis == 0 ? 0 : 1]);
+          var dot = Math.abs(before[0] * after[0] + before[1] * after[1] + before[2] * after[2] + before[3] * after[3]);
+          var turned = Math.PI * 1000 * (now[axis] - start[axis]);
+          check(Math.abs(dot - Math.abs(Math.cos(turned / 2))) < 0.02,
+            'the ${axis == 0 ? "X" : "Z"} screw turns with its axis: ${2 * Math.acos(Math.min(1.0, dot))} rad for $turned');
+        }
+      }
     }
     var allocatedPerTick = (hl.Gc.totalAllocated() - allocatedBefore) / steps;
     var collections = hl.Gc.collections() - collectionsBefore;
-    // About 56 KB a tick when measured (2026-10-02): mostly robot snapshots, then the stock's cut moves.
+    // About 46 KB a tick when measured (2026-10-02, sensor values pooled per snapshot): mostly robot snapshots, then the stock's cut moves.
     check(allocatedPerTick < 80000, 'the router allocates under 80 KB a simulated tick, got ${Math.round(allocatedPerTick)} bytes');
     // The pass ends with the drill; the next pass, started as this one is counted, loads the end mill again.
     var changes = tools.join(",");
     check(changes == "1,2" || changes == "1,2,1", 'the router starts with the end mill and changes to the drill, got $tools');
     var seconds = simulation.activeSession().simulationTime();
     check(player.passes == 1, 'the router finishes one pass of its program, at $seconds s');
+    // What the plan checks found over the pass: stepper stalls and the drives' stretch against the tolerance.
+    var checks = player.planChecks();
+    var stalls = checks.count(PlanDiagnosticKind.StepperStall), inaccurate = checks.count(PlanDiagnosticKind.Accuracy);
+    var checkedPlans = checks.plans, flaggedPlans = checks.flagged, worstRatio = checks.worstTorqueRatio;
+    var worstMotor = checks.worstMotor, worstDeviation = checks.worstDeviation, worstAxis = checks.worstAxis;
+    var worstFinding = [for (diagnostic in checks.diagnostics) if (diagnostic.kind == PlanDiagnosticKind.Accuracy) diagnostic];
+    worstFinding.sort((a, b) -> a.value < b.value ? 1 : a.value > b.value ? -1 : 0);
+    var accuracyExample = worstFinding.length == 0 ? "" : player.describe(worstFinding[0]);
+    check(checkedPlans > 0, "every plan the compiler makes is checked");
+    var stallExamples = [for (diagnostic in checks.diagnostics) if (diagnostic.kind == PlanDiagnosticKind.StepperStall) player.describe(diagnostic)];
     // From 54 mm above the stock the 40 mm drill, 10 mm longer than the end mill, goes through the
     // 20 mm plate and its 1.65 mm point and 0.5 mm more into the spoilboard.
     check(Math.abs(lowest + 0.06615) < 0.0005, 'the drill goes through the plate, lowest $lowest m');
@@ -927,7 +1194,9 @@ class ProjectSourceTests {
       4 * 0.00275 * 0.00275 * (0.020 - 0.0054));
     check(Math.abs(stock.removed - recesses) < recesses * 0.02,
       'the stock loses the plate\'s recesses, ${stock.removed} m³ removed against $recesses');
-    check(stock.rapidContacts == 0 && stock.collisions == 0,
+    // A belt router's rapids are fast enough for the simulated carriage to lag its command by millimetres,
+    // so a rapid's label can reach a few ticks into a cut: those are counted and reported, not forbidden.
+    check((belts || stock.rapidContacts == 0) && stock.collisions == 0,
       'no rapid runs through the stock and the holder never touches it (${stock.rapidContacts}, ${stock.collisions})');
     var deviation = stock.deviation();
     check(deviation.gouge < 1e-9, 'nothing is cut from the finished plate, gouge ${deviation.gouge} m³');
@@ -941,15 +1210,39 @@ class ProjectSourceTests {
       check(simulation.cncFailure() == null, 'the looping program starts its next pass: ${simulation.cncFailure()}');
     }
     session.dispose();
-    Sys.println('cnc router milled the motor plate in ${Math.round(seconds * 10) / 10} s of machining: removed ' +
+    Sys.println('cnc $kind milled the motor plate in ${Math.round(seconds * 10) / 10} s of machining: removed ' +
       '${Math.round(stock.removed * 1e10) / 10} mm³ of ${Math.round(recesses * 1e10) / 10}, leftover ' +
       '${Math.round(deviation.leftover * 1e10) / 10} mm³, gouge ${Math.round(deviation.gouge * 1e10) / 10} mm³; ' +
-      '${Math.round(stepping / steps * 1e5) / 100} ms per simulated tick');
-    Sys.println('cnc router per tick: motion ${Math.round(player.motionSeconds / steps * 1e5) / 100} ms, cutting ' +
+      '${Math.round(stepping / steps * 1e5) / 100} ms per simulated tick; ${stock.rapidContacts} ticks of rapid label cut');
+    Sys.println('cnc $kind plan check: $checkedPlans plans, $flaggedPlans flagged, $stalls stepper stalls, $inaccurate over the ' +
+      '${Math.round(player.checkOptions.tolerance * 1e6) / 1000} mm tolerance; worst torque ${Math.round(worstRatio * 1000) / 10}% of what ' +
+      '$worstMotor can give; worst deviation ${Math.round(worstDeviation * 1e5) / 100} mm on $worstAxis' +
+      (accuracyExample == "" ? "" : "; e.g. " + accuracyExample));
+    Sys.println('cnc $kind per tick: motion ${Math.round(player.motionSeconds / steps * 1e5) / 100} ms, cutting ' +
       '${Math.round(player.cuttingSeconds / steps * 1e5) / 100} ms, meshing ${Math.round(player.meshingSeconds / steps * 1e5) / 100} ms; ' +
       'compile ${Math.round(player.runSeconds * 1000)} ms, slowest update ${Math.round(player.slowestUpdate * 1000)} ms; ' +
       '${Math.round(allocatedPerTick / 100) / 10} KB allocated a tick, $collections collections');
+    check(stalls == 0, 'the planner\'s limits keep every stepper under its pull-out curve, got $stalls findings, e.g. ' +
+      stallExamples.slice(0, 3).join("; "));
+    if (belts) {
+      Sys.println('cnc belt router against the screw router: ${Math.round(seconds * 10) / 10} s against ${Math.round(screwRouterSeconds * 10) / 10} s, ' +
+        'worst drive deviation ${Math.round(worstDeviation * 1e5) / 100} mm against ${Math.round(screwRouterDeviation * 1e5) / 100} mm, ' +
+        '$inaccurate plans over the tolerance against none');
+      check(worstDeviation > 5 * screwRouterDeviation && inaccurate > 0,
+        "belts stretch much further than screws turn loose: the belt router has plans over the tolerance, the screw router none");
+    } else {
+      screwRouterSeconds = seconds;
+      screwRouterDeviation = worstDeviation;
+      check(inaccurate == 0, 'the screw router stays within its tolerance: $inaccurate plans over, e.g. $accuracyExample');
+    }
   }
+
+  /**
+   * The belt-driven router machines the same plate: its X and Y limits come from their pulleys (a
+   * 20-tooth GT2 pulley has a 6.366 mm pitch radius, so a belt axis moves 20 times as fast as a screw
+   * for the same motor speed) until the controller's step rate caps them, and its belts stretch.
+   */
+  static function checkBeltRouter(root:String):Void checkCncRouter(root, true);
 
   /**
    * The router's job answers the operator: it reports the line it runs, stops on a feed hold and
@@ -1315,6 +1608,8 @@ class ProjectSourceTests {
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile") {
       checkMobileBase(root);
       checkMobileMission(root);
+      checkMobileObstacle(root);
+      checkMissionOverlayEdge();
       return 0;
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "arm") {
@@ -1323,6 +1618,15 @@ class ProjectSourceTests {
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "welder") {
       checkRobotWelder(root);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "router") {
+      checkCncRouter(root);
+      checkBeltRouter(root);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "belts") {
+      checkBeltRouter(root);
       return 0;
     }
     var manifest = FileSystem.fullPath(root + "/cadkit/examples/modeling/materia.project.json");
@@ -1601,8 +1905,11 @@ class ProjectSourceTests {
     checkRobotWelder(root);
     checkMates(root);
     checkCncRouter(root);
+    checkBeltRouter(root);
     checkMobileBase(root);
     checkMobileMission(root);
+    checkMobileObstacle(root);
+    checkMissionOverlayEdge();
     checkCncControls(root);
     checkBackgroundLaunch(root);
     return 0;

@@ -627,6 +627,7 @@ class CadBridgeTests {
     assembly.connector("slider", "mount", AssemblyFrames.identity());
     assembly.mateOnAxis("slide", "prismatic", "base", "mount", "slider", "mount",
       {x: 0, y: 1, z: 0}, 0, {lower: 0, upper: 100, velocity: 20, effort: 50});
+    assembly.actuate("drive", "slide", 10, 5, null, 200);
     var vertices = Bytes.alloc(4 * 24);
     var points = [0.0, 0.0, 0.0, 10.0, 0.0, 0.0,
       0.0, 10.0, 0.0, 0.0, 0.0, 10.0];
@@ -650,6 +651,52 @@ class CadBridgeTests {
       "assembly limits and material mass convert to SI units");
     check(RobotRuntimeCompiler.validate(translated.model).length == 0,
       "translated assembly is a valid RobotKit runtime model");
+    check(translated.model.actuators.length == 1 && translated.model.actuators[0].fullStepsPerRevolution == 200,
+      "a stepper's full steps reach the robot actuator");
+    // A drive kind with its torque-speed curve reaches the actuator, a servo's too, and a bare stepper stays a bare stepper.
+    var driven = new AssemblyModel();
+    driven.add("base");
+    driven.add("slider");
+    driven.connector("base", "mount", AssemblyFrames.identity());
+    driven.connector("slider", "mount", AssemblyFrames.identity());
+    driven.mateOnAxis("slide", "prismatic", "base", "mount", "slider", "mount",
+      {x: 0, y: 1, z: 0}, 0, {lower: 0, upper: 100, velocity: 20, effort: 50});
+    driven.actuateDrive({id: "stepper", joint: "slide", maxEffort: 0.6, maxRate: 100, rotorInertia: 3e-5,
+      fullStepsPerRevolution: 200, drive: "stepper", holdingTorque: 1.2, torqueSpeed: [0, 1.2, 100, 1.2, 400, 0.3]});
+    driven.actuateDrive({id: "servo", joint: "slide", maxEffort: 0, maxRate: 0, drive: "servo", ratedTorque: 0.6,
+      peakTorque: 1.8, ratedSpeed: 300, maxSpeed: 500, encoderCounts: 4096, servoStiffness: 12});
+    var drives = AssemblySimulationBridge.toRobotModel(driven.definition("drive-test"), parts).model.actuators;
+    var stepperDrive = drives[0].drive, servoDrive = drives[1].drive;
+    check(stepperDrive != null && stepperDrive.kind() == "stepper" && stepperDrive.curve.torqueAt(250) == 0.75 &&
+      drives[0].fullStepsPerRevolution == 200 && stepperDrive.rotorInertia == 3e-5,
+      "a stepper's drive and pull-out curve reach the robot actuator");
+    check(servoDrive != null && servoDrive.kind() == "servo" && drives[1].planningEffort() == 1.8 &&
+      drives[1].planningRate() == 500 && drives[1].servoStiffness == 12 && servoDrive.curve.torqueAt(400) < 1.8,
+      "a servo's drive, peak torque and maximum speed reach the robot actuator");
+    // A coupling's stiffness, backlash and drag reach the robot coupling in SI units: a 100 N/mm drive on a
+    // millimetre axis is 100000 N/m, 0.05 mm of backlash 5e-5 m, and a turning follower's drag is as given.
+    var screwed = new AssemblyModel();
+    for (member in ["base", "slider", "screw"]) {
+      screwed.add(member);
+      screwed.connector(member, "mount", AssemblyFrames.identity());
+    }
+    screwed.mateOnAxis("slide", "prismatic", "base", "mount", "slider", "mount",
+      {x: 0, y: 1, z: 0}, 0, {lower: 0, upper: 100, velocity: 20, effort: 50});
+    screwed.mateOnAxis("turn", "continuous", "base", "mount", "screw", "mount",
+      {x: 0, y: 1, z: 0}, 0, {lower: null, upper: null, velocity: 70, effort: 0});
+    screwed.couple("lead", "slide", "turn", Math.PI, 0, 0.4, 100.0, 0.05, 0.02);
+    var screwParts = AssemblyPhysicalPartView.fromSceneArtifact({metresPerUnit: 0.001,
+      parts: [for (id in ["base", "slider", "screw"]) {
+        id: id, name: id, red: 0.5, green: 0.5, blue: 0.5,
+        materialId: "machined-steel", materialDensity: 7850.0,
+        volume: 1000000.0, centerOfMass: [0.0, 0.0, 0.0],
+        inertia: [10000000000.0, 0, 0, 0, 10000000000.0, 0, 0, 0, 10000000000.0],
+        vertexCount: 4, indexCount: 0, vertices: vertices,
+        normals: Bytes.alloc(0), indices: Bytes.alloc(0), faceRanges: []
+      }]});
+    var lead = AssemblySimulationBridge.toRobotModel(screwed.definition("lead-test"), screwParts).model.couplings[0];
+    check(Math.abs(lead.stiffness - 1.0e5) < 1e-6 && Math.abs(lead.backlash - 5e-5) < 1e-15 && lead.drag == 0.02 &&
+      Math.abs(lead.efficiency - 0.4) < 1e-15, "a coupling's stiffness, backlash and drag reach the robot in SI units");
     check(translated.linkHulls.length == 2 && translated.linkHulls[0].link == 0 &&
       translated.linkHulls[1].link == 1 && translated.linkHulls[1].vertices.length <= 64 * 3,
       "physical-part view supplies each part's bounded hull on its link");

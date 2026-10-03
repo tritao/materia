@@ -212,10 +212,10 @@ class ProgramTests extends MotionKitTestSupport {
     // Point by point, the elbow no longer drifts with each solve.
     var solver = new ManipulatorKinematics(arm, 1e-8);
 
-    // A joint rate for a tool twist moves the swivel exactly as the preferred rate does.
-    var preferred = [0.1, -0.2, 0.05, 0.3, -0.1, 0.2, 0.15];
+    // A joint rate for a tool twist moves the swivel exactly at the asked rate.
+    var askedSwivelRate = 0.7;
     var twist = new motionkit.kinematics.Twist6(0.05, 0.0, -0.02, 0.0, 0.1, 0.0);
-    var rate = solver.solveDifferential(start, twist, preferred);
+    var rate = solver.solveDifferential(start, twist, [askedSwivelRate]);
     check(rate != null, "a 7-axis arm has a joint rate for a tool twist");
     var tool = arm.tcpJacobian(start), wanted = twist.toArray();
     for (row in 0...6) {
@@ -224,12 +224,9 @@ class ProgramTests extends MotionKitTestSupport {
       near(made, wanted[row], 'the rate makes the twist (row $row)', 1e-9);
     }
     var gradient = arm.swivelJacobian(start);
-    var swivelRate = 0.0, preferredSwivelRate = 0.0;
-    for (j in 0...7) {
-      swivelRate += gradient[j] * rate[j];
-      preferredSwivelRate += gradient[j] * preferred[j];
-    }
-    near(swivelRate, preferredSwivelRate, "the swivel moves as the preferred rate moves it", 1e-9);
+    var swivelRate = 0.0;
+    for (j in 0...7) swivelRate += gradient[j] * rate[j];
+    near(swivelRate, askedSwivelRate, "the swivel moves at the asked rate", 1e-9);
     var step = 1e-6;
     near(gradient[3], (arm.swivelAngle([for (j in 0...7) j == 3 ? start[j] + step : start[j]]) -
       arm.swivelAngle([for (j in 0...7) j == 3 ? start[j] - step : start[j]])) / (2 * step),
@@ -261,6 +258,34 @@ class ProgramTests extends MotionKitTestSupport {
         check(solved != null, 'the line solves point by point at $f');
         for (j in 0...7) pointTravel += Math.abs(solved[j] - chain[j]);
         chain = solved;
+      }
+    }
+
+    // The resolver's rate of its smoothed swivel along the line is the curve's own derivative: it matches the
+    // centred difference of the solved swivels (which sit exactly on that curve) to the difference's own accuracy.
+    {
+      var distances = [for (i in 0...36) 0.5 * i / 35.0], poses:Array<Pose3> = [];
+      for (i in 0...36) {
+        var f = i / 35.0;
+        poses.push(new Pose3(startPose.x - 0.1 * f, startPose.y + 0.3 * f, startPose.z - 0.15 * f, startPose.qx,
+          startPose.qy, startPose.qz, startPose.qw));
+      }
+      var solved = solver.solvePathWithRates(new motionkit.kinematics.PathRequest(distances, poses, start, tolerance,
+        [for (_ in 0...7) 0.5], [for (_ in 0...7) 2.0], 48));
+      var exact = solved.redundancyRates;
+      check(exact != null && exact.length == 36 && exact[0].length == 1, "a redundant path reports its swivel rates");
+      if (exact != null) {
+        var worstRate = 0.0, scale = 0.0;
+        // Away from the ends: the first sample is pinned to the start, which the smoothed curve is not.
+        for (i in 4...32) {
+          var turn = arm.swivelAngle(solved.configurations[i + 1]) - arm.swivelAngle(solved.configurations[i - 1]);
+          while (turn > Math.PI) turn -= 2.0 * Math.PI;
+          while (turn < -Math.PI) turn += 2.0 * Math.PI;
+          worstRate = Math.max(worstRate, Math.abs(exact[i][0] - turn / (distances[i + 1] - distances[i - 1])));
+          scale = Math.max(scale, Math.abs(exact[i][0]));
+        }
+        check(worstRate <= 0.05 * Math.max(scale, 1e-3) + 1e-4,
+          'the swivel rates are the smoothed curve\'s derivative (worst ${worstRate} against a scale of ${scale})');
       }
     }
 

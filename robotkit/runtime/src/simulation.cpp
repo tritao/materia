@@ -257,7 +257,10 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         config.frame_drop_rate = robot_desc->virtual_device_drop_rate;
         config.corruption_rate = robot_desc->virtual_device_corruption_rate;
         config.seed = robot_desc->virtual_device_seed;
-        std::copy_n(robot_desc->virtual_device_fingerprint, 16, config.fingerprint.begin());
+        // An all-zero id names no board, so a caller that leaves it unset gets the default.
+        if (std::any_of(robot_desc->virtual_device_controller,
+                robot_desc->virtual_device_controller + 16, [](auto byte) { return byte != 0; }))
+            std::copy_n(robot_desc->virtual_device_controller, 16, config.controller.begin());
         config.steps_per_unit.assign(robot_desc->virtual_device_steps_per_unit,
             robot_desc->virtual_device_steps_per_unit + blueprint.joint_count);
         config.target_error = robot_desc->virtual_device_target_error;

@@ -64,6 +64,10 @@ class MachineComponent {
 				if (!(depositionEfficiency > 0 && depositionEfficiency <= 1))
 					throw 'Wire feed on "$designation" needs a deposition efficiency in (0, 1]';
 			case WorkReturn(leadPort, contactConnector): port(leadPort); connector(contactConnector);
+			case PlanarScanner(scanConnector, rayCount, maxRangeMeters, rateHz):
+				connector(scanConnector);
+				if (rayCount < 2 || !(maxRangeMeters > 0) || !(rateHz > 0))
+					throw 'Planar scanner on "$designation" needs rays, a range and a rate';
 		}
 		capabilityList.push(capability);
 	}

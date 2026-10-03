@@ -47,23 +47,29 @@ The TCP listener defaults to `127.0.0.1`. `--listen` accepts an explicit IPv4
 address, including `0.0.0.0` to bind all interfaces. The RobotKit TCP protocol
 does not authenticate clients; use an isolated robot network or SSH tunnel.
 
-Serial hosting requires a deployment JSON file. It refers to the canonical
-semantic robot model and gives the UART path, baud, `f32` target error budget,
-and layout fingerprint. Its device section points to a device layout and the
-matching schema lock. The layout maps ordered RKD6 actuator channels to joint IDs in the
-model. `robotd` loads the complete `RobotModel`, recomputes the fingerprint from
-the exact layout bytes and schema lock, and checks the channel order before
-opening the UART. `RobotModelCodec` reads the versioned v4 model artifact;
-the device fingerprint still covers only the physical layout and wire schema.
+Serial hosting requires a deployment JSON file (schema v5). It refers to the
+canonical semantic robot model and gives the UART path, baud, `f32` target
+error budget, the `controller` id of the board it is for and a layout. The
+layout wires ordered RKD6 channels to model actuators: each channel names its
+actuator, the driver's `direction` and `microsteps`. The motor's full steps and
+the transmission come from the model; `robotd` joins them in
+`robotkit.device.DeviceBinding` into each channel's joint, ratio, steps per unit
+and rate ceiling, and plans on the model with those ceilings. A stepper with no
+channel, or a channel with no stepper, is refused before the UART opens. When
+the session opens the board must report the deployment's controller id and
+acknowledge the same configuration digest; see
+[`../runtime/DEVICE_PROTOCOL.md`](../runtime/DEVICE_PROTOCOL.md). A v3 or v4
+file, which named a compiled fingerprint, is rejected with what to change.
+
+`robotd identify DEVICE_PATH BAUD` prints the controller id of the board on a
+port, for the deployment's `device.controller`.
 
 See [`../tests/fixtures/device-deployment/deployment.json`](../tests/fixtures/device-deployment/deployment.json)
 and its referenced [`robot.json`](../tests/fixtures/device-deployment/robot.json)
-for the PTY fixture. Its calibration and fingerprint are test values; a physical
-deployment needs measured values. Generate the deployed fingerprint from the
-exact layout bytes with `python3 ../tools/device_fingerprint.py layout.json
---schema-lock device_wire6.lock.json --rust firmware_fingerprint.rs`, then put
-the printed hex value in `deployment.json` and compile the Rust constant into
-the MCU firmware. Include that exact schema lock file in the deployment directory.
+for the PTY fixture. Its calibration and controller id are test values; a physical
+deployment needs measured values and the board's real id. The bench deployment
+in [`../deployment/bench-nucleo-g474re`](../deployment/bench-nucleo-g474re/README.md)
+carries a placeholder id until `robotd identify` reads the board's.
 
 The protocol and world TCP clients are integration tests rather than robotd
 runtime modes. Run them through `../tests/world-tcp.sh`.

@@ -1,4 +1,5 @@
 //! In-process RKD6 device. The C ABI only moves complete validated frames.
+use robotkit_device_protocol::config_digest::{config_digest6, controller_matches};
 use robotkit_device_protocol::device_wire6::*;
 use robotkit_device_protocol::frame6::{decode_frame6, encode_frame6, MAX_FRAME_SIZE};
 use robotkit_device_protocol::{
@@ -19,7 +20,7 @@ pub struct VirtualDevice {
     events: Option<DeviceEvents<EVENT_CAPACITY>>,
     final_safe_applied: bool,
     steps: StepGenerator<ACTUATORS>,
-    fingerprint: [u8; 16],
+    controller: [u8; 16],
     count: usize,
     session: u64,
     channel_kind: [u8; CHANNELS],
@@ -40,7 +41,7 @@ impl VirtualDevice {
         drift_ppm: i32,
         count: usize,
         steps_per_unit: [f64; ACTUATORS],
-        fingerprint: [u8; 16],
+        controller: [u8; 16],
         profile: u8,
     ) -> Option<Self> {
         if tick_hz == 0
@@ -61,7 +62,7 @@ impl VirtualDevice {
             core: None,
             events: None,
             final_safe_applied: false,
-            fingerprint,
+            controller,
             count,
             session: 0,
             channel_kind: [0; CHANNELS],
@@ -103,7 +104,8 @@ impl VirtualDevice {
                 let mut ack = SessionAck6 {
                     session: begin.session,
                     protocol_version: PROTOCOL_VERSION,
-                    device_fingerprint: self.fingerprint,
+                    controller: self.controller,
+                    config_digest: config_digest6(&payload[..SessionBegin6::SIZE]),
                     status: 0,
                     device_tick_hz: self.board.tick_hz(),
                     segment_capacity: if self.profile == 2 { MINIMAL_CAPACITY as u16 } else { CAPACITY as u16 },
@@ -113,7 +115,7 @@ impl VirtualDevice {
                     actuator_count: self.count as u8,
                     profile: self.profile,
                 };
-                if begin.model_fingerprint == self.fingerprint
+                if controller_matches(&begin.expected_controller, &self.controller)
                     && begin.actuator_count as usize == self.count
                     && begin.step_tick_hz == self.step_tick_hz
                     && begin.session != 0
@@ -407,10 +409,10 @@ pub unsafe extern "C" fn rkd_virtual_create(
     drift_ppm: i32,
     actuator_count: u32,
     steps_per_unit: *const f64,
-    fingerprint: *const u8,
+    controller: *const u8,
     profile: u8,
 ) -> *mut VirtualDevice {
-    if steps_per_unit.is_null() || fingerprint.is_null() || actuator_count as usize > ACTUATORS {
+    if steps_per_unit.is_null() || controller.is_null() || actuator_count as usize > ACTUATORS {
         return std::ptr::null_mut();
     }
     let mut scale = [1.0; ACTUATORS];
@@ -418,8 +420,8 @@ pub unsafe extern "C" fn rkd_virtual_create(
         steps_per_unit,
         actuator_count as usize,
     ));
-    let mut fp = [0; 16];
-    fp.copy_from_slice(std::slice::from_raw_parts(fingerprint, 16));
+    let mut id = [0; 16];
+    id.copy_from_slice(std::slice::from_raw_parts(controller, 16));
     VirtualDevice::new(
         tick_hz,
         step_tick_hz,
@@ -427,7 +429,7 @@ pub unsafe extern "C" fn rkd_virtual_create(
         drift_ppm,
         actuator_count as usize,
         scale,
-        fp,
+        id,
         profile,
     )
     .map_or(std::ptr::null_mut(), |v| Box::into_raw(Box::new(v)))
@@ -625,15 +627,15 @@ mod tests {
 
     #[test]
     fn session_queue_and_step_position() {
-        let fingerprint = [7; 16];
+        let controller = [7; 16];
         let mut scale = [1.0; ACTUATORS];
         scale[0] = 1_000.0;
         let mut device =
-            VirtualDevice::new(1_000_000, 40_000, 50_000, 0, 1, scale, fingerprint, 1).unwrap();
+            VirtualDevice::new(1_000_000, 40_000, 50_000, 0, 1, scale, controller, 1).unwrap();
         let begin = SessionBegin6 {
             session: 9,
             protocol_version: PROTOCOL_VERSION,
-            model_fingerprint: fingerprint,
+            expected_controller: controller,
             actuator_count: 1,
             max_degree: 5,
             step_tick_hz: 40_000,
@@ -699,5 +701,65 @@ mod tests {
             device.core.as_ref().unwrap().path_clock()
         );
         assert!(!device.core.as_ref().unwrap().underflow());
+    }
+
+    fn begin_for(expected: [u8; 16]) -> SessionBegin6 {
+        SessionBegin6 {
+            session: 9,
+            protocol_version: PROTOCOL_VERSION,
+            expected_controller: expected,
+            actuator_count: 1,
+            max_degree: 5,
+            step_tick_hz: 40_000,
+            max_acceleration: 10.0,
+            actuator_max_acceleration: [10.0; 64],
+            steps_per_unit: [1_000.0; 64], max_rate: [0.0; 64],
+            direction_setup_ticks: [0; 64], actuator_joint: [0; 64],
+            actuator_ratio: [1.0; 64], dual_drive_skew_bound: [0.0; 64],
+            link_loss_timeout_ns: 2_000_000_000,
+            channel_count: 0, channel_id: [0; 1536], channel_kind: [0; 32],
+            safe_digital: [0; 32], safe_analog: [0.0; 32],
+            safe_argument: [0.0; 32], safe_command: [0; 1536], channel_stop_policy: [0; 32],
+        }
+    }
+
+    fn ack_to(device: &mut VirtualDevice, begin: &SessionBegin6) -> (SessionAck6, Vec<u8>) {
+        let mut payload = vec![0; SessionBegin6::SIZE];
+        begin.encode(&mut payload).unwrap();
+        device.outbox.clear();
+        assert!(send::<SessionBegin6>(device, 1, &payload));
+        let frame = device.outbox.pop_front().unwrap();
+        let (kind, body) = decode_frame6(&frame).unwrap();
+        assert_eq!(kind, 2);
+        (SessionAck6::decode(body).unwrap(), payload)
+    }
+
+    #[test]
+    fn session_names_its_controller_and_acknowledges_the_digest() {
+        let controller = [7; 16];
+        let mut scale = [1.0; ACTUATORS];
+        scale[0] = 1_000.0;
+        let mut device =
+            VirtualDevice::new(1_000_000, 40_000, 50_000, 0, 1, scale, controller, 1).unwrap();
+        // A configuration for another board, and one that asks the board to identify itself, are
+        // refused, and the refusal still says who the board is.
+        for expected in [[8; 16], [0; 16]] {
+            let (ack, _) = ack_to(&mut device, &begin_for(expected));
+            assert_eq!(ack.status, 0);
+            assert_eq!(ack.controller, controller);
+            assert!(device.core.is_none());
+        }
+        let (ack, payload) = ack_to(&mut device, &begin_for(controller));
+        assert_eq!(ack.status, 1);
+        assert_eq!(ack.controller, controller);
+        assert_eq!(ack.config_digest, config_digest6(&payload));
+        // The session id is not part of the digest; any other field is.
+        let mut other = begin_for(controller);
+        other.session = 10;
+        let (again, _) = ack_to(&mut device, &other);
+        assert_eq!(again.config_digest, ack.config_digest);
+        other.max_acceleration = 11.0;
+        let (changed, _) = ack_to(&mut device, &other);
+        assert_ne!(changed.config_digest, ack.config_digest);
     }
 }

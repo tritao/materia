@@ -153,6 +153,8 @@ class CharacterPreview implements SessionParticipant {
 	}
 
 	/** The session rewound to its start: walk again from there. */
+	public function beforeReset():Void {}
+
 	public function reset():Void {
 		angle = 0.0;
 		simulationTime = 0.0;

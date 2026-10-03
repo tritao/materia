@@ -18,15 +18,17 @@ import machinekit.component.ConnectorRole;
 import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
+import materia.assembly.AssemblyDefinition.AssemblyActuator;
 import machinekit.standard.ClearanceFit;
 import machinekit.standard.SocketHeadCapScrew;
 
 /** Stepper motor built from a NEMA mounting interface and a named motor variant.
  * CAD frame: mounting face at z=0, body toward -Z, shaft along +Z.
  */
-class NemaStepper extends MachineComponent {
+class NemaStepper extends MachineComponent implements MotorDrive {
 	static var frameTable:Null<Catalog<NemaFrameInterface>>;
 	static var variantTable:Null<Catalog<StepperMotorVariant>>;
+	static var ratingTable:Null<Catalog<StepperMotorRating>>;
 
 	/** Frame mounting dimensions; kept as `spec` for existing callers. */
 	public final spec:NemaFrameInterface;
@@ -66,6 +68,26 @@ class NemaStepper extends MachineComponent {
 			}, standard: null, standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope,
 				verifiedFields: ["bodyFace", "bodyLength", "shaftDiameter", "shaftLength"]}));
 		return variantTable;
+	}
+
+	/**
+	 * Ratings of the named variants. Holding torque and rated current are the ones the products are
+	 * named by; inductance and rotor inertia are typical datasheet values, not checked against
+	 * the linked pages.
+	 */
+	public static function ratingCatalog():Catalog<StepperMotorRating> {
+		if (ratingTable == null)
+			ratingTable = new Catalog("stepper motor rating", spec -> spec.designation, [
+				{designation: "17HS19-1684S1", holdingTorque: 0.45, ratedCurrent: 1.68, phaseInductance: 2.8e-3,
+					rotorInertia: 8.2e-6, stepAngle: 1.8},
+				{designation: "23HS22-2804S", holdingTorque: 1.26, ratedCurrent: 2.8, phaseInductance: 2.5e-3,
+					rotorInertia: 3.0e-5, stepAngle: 1.8},
+				{designation: "34HS31-5504S", holdingTorque: 4.5, ratedCurrent: 5.5, phaseInductance: 3.2e-3,
+					rotorInertia: 1.4e-4, stepAngle: 1.8},
+			], spec -> ({source: variantCatalog().metadata(spec.designation).source, standard: null,
+				standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope,
+				verifiedFields: ["holdingTorque", "ratedCurrent", "stepAngle"]}));
+		return ratingTable;
 	}
 
 	/** Named manufacturer variant. */
@@ -120,6 +142,85 @@ class NemaStepper extends MachineComponent {
 		addConnector("shaftTip", Shaft, Solids.axial(0, 0, variant.shaftLength));
 		var i = 1;
 		for (point in boltPattern()) addConnector('bolt${i++}', Mount, Solids.axial(point.x, point.y, 0));
+	}
+
+	/** The motor's ratings, or null for a variant without them, such as a generic length. */
+	public function rating():Null<StepperMotorRating>
+		return ratingCatalog().exists(variant.designation) ? ratingCatalog().get(variant.designation) : null;
+
+	/**
+	 * Pull-out torque at shaft speed `speed` (rad/s) on a `volts` supply, in N m: the holding torque
+	 * until the winding's inductance keeps its current below rated, then falling as 1 / speed. A
+	 * first-order model: back EMF, the driver's current regulation and resonance are left out.
+	 */
+	public function pullOutTorque(speed:Float, volts:Float):Float {
+		var rated = requireRating();
+		var corner = cornerSpeed(rated, volts);
+		var magnitude = Math.abs(speed);
+		return magnitude <= corner ? rated.holdingTorque : rated.holdingTorque * corner / magnitude;
+	}
+
+	/**
+	 * Torque and speed the motor can be relied on for on a `volts` supply: `margin` of its holding
+	 * torque, up to the speed where its pull-out torque falls to that. Half is the usual margin
+	 * that keeps a stepper from missing steps.
+	 */
+	public function usableTorque(margin:Float = 0.5):Float {
+		if (!(margin > 0 && margin <= 1)) throw "Stepper torque margin must be in (0, 1]";
+		return requireRating().holdingTorque * margin;
+	}
+
+	public function usableSpeed(volts:Float, margin:Float = 0.5):Float {
+		usableTorque(margin);
+		return cornerSpeed(requireRating(), volts) / margin;
+	}
+
+	/**
+	 * The pull-out curve as torque-speed points (speed in rad/s, torque in N m, alternating): the
+	 * holding torque to the corner speed, then falling as 1 / speed. Points are close enough to the
+	 * hyperbola that joining them by lines overstates it by about 1% at most, and the curve ends at
+	 * the usable speed or eight times the corner, whichever is higher.
+	 */
+	public function pullOutCurve(volts:Float, margin:Float = 0.5):Array<Float> {
+		var rated = requireRating();
+		var corner = cornerSpeed(rated, volts);
+		var usable = 1.0 / margin;
+		var last = Math.max(8.0, usable);
+		var multiples = [1.0];
+		for (multiple in [1.1, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0, 16.0, 32.0, 64.0])
+			if (multiple <= last + 1e-9) multiples.push(multiple);
+		// The usable speed is a point of its own, so the planner's number is exact on the curve.
+		var present = false;
+		for (multiple in multiples) if (Math.abs(multiple - usable) < 1e-9) present = true;
+		if (!present && usable > 1.0) multiples.push(usable);
+		multiples.sort((a, b) -> a < b ? -1 : a > b ? 1 : 0);
+		var curve:Array<Float> = [0.0, rated.holdingTorque];
+		for (multiple in multiples) {
+			curve.push(multiple * corner);
+			curve.push(rated.holdingTorque / multiple);
+		}
+		return curve;
+	}
+
+	public function actuator(id:String, joint:String, volts:Float, margin:Float):AssemblyActuator {
+		var rated = requireRating();
+		return {id: id, joint: joint, maxEffort: usableTorque(margin), maxRate: usableSpeed(volts, margin),
+			rotorInertia: rated.rotorInertia, fullStepsPerRevolution: 360.0 / rated.stepAngle, drive: "stepper",
+			torqueSpeed: pullOutCurve(volts, margin), holdingTorque: rated.holdingTorque};
+	}
+
+	/** Shaft speed (rad/s) where the winding's reactance at rated current takes the whole supply. */
+	static function cornerSpeed(rated:StepperMotorRating, volts:Float):Float {
+		if (!(volts > 0) || !Math.isFinite(volts)) throw "Stepper supply voltage must be positive";
+		// A two-phase hybrid stepper has 90 / step angle rotor teeth: its electrical frequency.
+		var teeth = 90 / rated.stepAngle;
+		return volts / (teeth * rated.phaseInductance * rated.ratedCurrent);
+	}
+
+	function requireRating():StepperMotorRating {
+		var rated = rating();
+		if (rated == null) throw '${variant.designation} has no torque rating';
+		return rated;
 	}
 
 	/** Bolt centres on the mounting face, counter-clockwise from (+,+). */

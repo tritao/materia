@@ -21,7 +21,9 @@ struct VirtualDeviceConfig6 {
     double frame_drop_rate = 0;
     double corruption_rate = 0;
     std::uint64_t seed = 1;
-    std::array<std::uint8_t, 16> fingerprint{};
+    /** The virtual board's unique id, which a deployment must name; "Virtual-Device-1" by default. */
+    std::array<std::uint8_t, 16> controller{'V', 'i', 'r', 't', 'u', 'a', 'l', '-',
+        'D', 'e', 'v', 'i', 'c', 'e', '-', '1'};
     std::vector<double> steps_per_unit;
     std::vector<DeviceActuator6> actuators;
     double target_error = 1e-5;
@@ -64,7 +66,7 @@ public:
         const rk_robot_runtime_blueprint &) override;
     void cut_link(bool cut);
     bool miss_next_steps(std::uint32_t actuator, std::uint32_t count);
-    std::array<std::uint8_t, 16> fingerprint() const noexcept { return fingerprint_; }
+    std::array<std::uint8_t, 16> controller() const noexcept { return controller_; }
     std::vector<double> actuator_positions() const;
     std::vector<double> joint_positions() const;
     std::vector<float> channel_values() const;
@@ -75,14 +77,14 @@ private:
     class Link;
     VirtualDeviceEndpoint(std::shared_ptr<Rkd6Endpoint> inner, Link *link,
         std::vector<DeviceActuator6> actuators, std::uint32_t joint_count,
-        std::array<std::uint8_t, 16> fingerprint)
+        std::array<std::uint8_t, 16> controller)
         : inner_(std::move(inner)), link_(link), actuators_(std::move(actuators)),
-          joint_count_(joint_count), fingerprint_(fingerprint) {}
+          joint_count_(joint_count), controller_(controller) {}
     std::shared_ptr<Rkd6Endpoint> inner_;
     Link *link_;
     std::vector<DeviceActuator6> actuators_;
     std::uint32_t joint_count_;
-    std::array<std::uint8_t, 16> fingerprint_;
+    std::array<std::uint8_t, 16> controller_;
 };
 
 } // namespace robotkit

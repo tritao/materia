@@ -28,6 +28,12 @@ class MotionKitBootstrapTests {
       Sys.println('Blend focused tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
     }
+    if (Sys.getEnv("MOTIONKIT_PLANCHECK_ONLY") == "1") {
+      new PlanCheckTests().testPlanCheck();
+      new PlanCheckTests().testCompilerRunsPlanCheck();
+      Sys.println('Plan check tests passed (${MotionKitTestSupport.assertions} assertions)');
+      return;
+    }
     if (Sys.getEnv("MOTIONKIT_MACHINEKIT_ONLY") == "1") {
       processTests.testLinearAxisCompilesToRobotModel();
       processTests.testCompiledXYZGantryRunsThroughSimulation();
@@ -35,11 +41,22 @@ class MotionKitBootstrapTests {
       Sys.println('MachineKit compiler tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
     }
+    if (Sys.getEnv("MOTIONKIT_REDUNDANCY_ONLY") == "1") {
+      kinematicsTests.testKinematicsContract();
+      programTests.testProgramCompiler();
+      programTests.testRedundantArmPaths();
+      programTests.testCoordinatedExternalAxes();
+      kinematicsTests.testPathConfigurationSelector();
+      Sys.println('Redundancy focused tests passed (${MotionKitTestSupport.assertions} assertions)');
+      return;
+    }
     if (Sys.getEnv("MOTIONKIT_C4_ONLY") == "1") {
       kinematicsTests.testOpwKinematics();
       Sys.println('C4 focused tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
     }
+    new PlanCheckTests().testPlanCheck();
+    new PlanCheckTests().testCompilerRunsPlanCheck();
     processTests.testPoseProcessPath();
     processTests.testMotionEventContracts();
     kinematicsTests.testKinematicsContract();

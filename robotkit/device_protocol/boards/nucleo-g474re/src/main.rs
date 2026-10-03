@@ -7,12 +7,25 @@ use embedded_hal_old::serial::{Read, Write};
 use nb::Error::WouldBlock;
 use panic_halt as _;
 use robotkit_device_protocol::{Board, ScheduledCore, ScheduledSegment, StopReason};
+use robotkit_device_protocol::config_digest::{config_digest6, controller_matches};
 use robotkit_device_protocol::device_wire6::*;
 use robotkit_device_protocol::frame6::{decode_frame6, encode_frame6,
     slide_to_frame_marker, MAX_FRAME_SIZE};
 use stm32g4xx_hal::{prelude::*, pwr::PwrExt, rcc, serial::FullConfig, stm32};
 
-mod fingerprint;
+/// Base of the STM32G4's factory-programmed 96-bit unique device ID (RM0440, "Unique device ID").
+const UID_BASE: *const u32 = 0x1FFF_7590 as *const u32;
+
+/// The board's controller id: its 12 unique-ID bytes, zero-padded to the 16 the protocol carries.
+fn controller_id() -> [u8; 16] {
+    let mut id = [0u8; 16];
+    for word in 0..3 {
+        // SAFETY: the unique-ID words are read-only memory present on every STM32G4.
+        let value = unsafe { core::ptr::read_volatile(UID_BASE.add(word)) };
+        id[word * 4..word * 4 + 4].copy_from_slice(&value.to_le_bytes());
+    }
+    id
+}
 
 const JOINTS: usize = 2;
 const ACTUATORS: usize = 64;
@@ -88,13 +101,15 @@ fn handle<T: Write<u8>>(input: &[u8], board: &mut StubBoard,
     match kind {
         1 => {
             let Ok(begin) = SessionBegin6::decode(payload) else { return; };
-            let accepted = begin.model_fingerprint == fingerprint::MODEL_FINGERPRINT &&
+            // The board reports its own id even when it refuses, so `robotd identify` can read it.
+            let own = controller_id();
+            let accepted = controller_matches(&begin.expected_controller, &own) &&
                 begin.actuator_count as usize == JOINTS && begin.session != 0 &&
                 begin.step_tick_hz == 40_000 && begin.channel_count == 0 &&
                 begin.actuator_max_acceleration[..JOINTS].iter().all(|v| v.is_finite() && *v > 0.0);
             let mut ack = SessionAck6 {
                 session: begin.session, protocol_version: PROTOCOL_VERSION,
-                device_fingerprint: fingerprint::MODEL_FINGERPRINT, status: accepted as u8,
+                controller: own, config_digest: config_digest6(payload), status: accepted as u8,
                 device_tick_hz: TICK_HZ, segment_capacity: CAPACITY as u16,
                 event_capacity: 0, step_tick_hz: 40_000, max_degree: 1,
                 actuator_count: JOINTS as u8, profile: 2,

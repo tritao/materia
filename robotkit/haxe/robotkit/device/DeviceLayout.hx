@@ -4,13 +4,22 @@ import haxe.Json;
 import haxe.io.Bytes;
 import robotkit.model.RobotModel;
 
-/** Physical-channel mapping, kept separate from the semantic RobotModel. */
+/**
+ * Physical-channel mapping and driver wiring, kept separate from the semantic RobotModel. Each
+ * wired channel names a model actuator, its direction and microstepping; DeviceBinding joins them.
+ */
 class DeviceLayout {
   public final channels:Array<DeviceChannel>;
 
   public function new(channels:Array<DeviceChannel>) {
     this.channels = channels;
   }
+
+  /** One channel per model actuator, in order, all wired the same: for simulation and tests. */
+  public static function forActuators(model:RobotModel, microsteps:Int = 1,
+      directionSetupTicks:Int = 0):DeviceLayout
+    return new DeviceLayout([for (index in 0...model.actuators.length)
+      new DeviceChannel(index, "", model.actuators[index].id, 1, microsteps, directionSetupTicks)]);
 
   public static function decode(bytes:Bytes):DeviceLayout {
     var root:Dynamic;
@@ -23,10 +32,30 @@ class DeviceLayout {
     for (record in channelRecords) {
       var index:Dynamic = Reflect.field(record, "index");
       var joint:Dynamic = Reflect.field(record, "joint");
-      if (!Std.isOfType(index, Int) || !Std.isOfType(joint, String) ||
-          StringTools.trim(joint).length == 0)
-        throw "robotd: device layout channel requires an integer index and joint ID";
-      channels.push(new DeviceChannel(index, joint));
+      var actuator:Dynamic = Reflect.field(record, "actuator");
+      // A legacy layout names the joint; a wired one names the actuator, whose joint the model gives.
+      var namesJoint = Std.isOfType(joint, String) && StringTools.trim(joint).length > 0;
+      var namesActuator = Std.isOfType(actuator, String) && StringTools.trim(actuator).length > 0;
+      if (!Std.isOfType(index, Int) || !(namesJoint || namesActuator))
+        throw "robotd: device layout channel requires an integer index and an actuator or joint ID";
+      var direction:Dynamic = Reflect.field(record, "direction");
+      if (direction == null) direction = 1;
+      if (direction != 1 && direction != -1)
+        throw 'robotd: device layout channel $index direction must be 1 or -1';
+      var microsteps:Dynamic = Reflect.field(record, "microsteps");
+      if (microsteps == null) microsteps = 1;
+      if (!Std.isOfType(microsteps, Int) || microsteps < 1 || microsteps > 1024)
+        throw 'robotd: device layout channel $index microsteps must be an integer from 1 to 1024';
+      var setup:Dynamic = Reflect.field(record, "direction_setup_ticks");
+      if (setup == null) setup = 0;
+      if (!Std.isOfType(setup, Int) || setup < 0 || setup > 65535)
+        throw 'robotd: device layout channel $index direction_setup_ticks must be an integer from 0 to 65535';
+      var skew:Dynamic = Reflect.field(record, "skew_bound");
+      if (skew == null) skew = 0.0;
+      if ((!Std.isOfType(skew, Int) && !Std.isOfType(skew, Float)) || !Math.isFinite(skew) || skew < 0)
+        throw 'robotd: device layout channel $index skew_bound must be a finite nonnegative number';
+      channels.push(new DeviceChannel(index, namesJoint ? joint : "",
+        namesActuator ? actuator : null, direction, microsteps, setup, skew));
     }
     return new DeviceLayout(channels);
   }

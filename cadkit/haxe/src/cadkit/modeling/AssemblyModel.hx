@@ -169,10 +169,42 @@ class AssemblyModel {
 		return result;
 	}
 
-	/** Couples a target coordinate to a source using target = source × ratio + offset. */
-	public function couple(id:String, source:String, target:String, ratio:Float, offset:Float = 0):Void {
-		data.couplings.push({id: id, source: source, target: target, ratio: ratio, offset: offset});
+	/**
+	 * Couples a target coordinate to a source using target = source × ratio + offset. `efficiency`
+	 * is the share of power the coupling passes on, such as a lead screw's; null means lossless.
+	 * `stiffness` (force per unit of source travel), `backlash` (lost motion in the source's units)
+	 * and `drag` (constant resisting effort at the target) describe a compliant or loose drive; null
+	 * means rigid, tight and free-running.
+	 */
+	public function couple(id:String, source:String, target:String, ratio:Float, offset:Float = 0,
+			?efficiency:Float, ?stiffness:Float, ?backlash:Float, ?drag:Float):Void {
+		var coupling:materia.assembly.AssemblyDefinition.AssemblyJointCoupling = {id: id, source: source,
+			target: target, ratio: ratio, offset: offset};
+		if (efficiency != null) coupling.efficiency = efficiency;
+		if (stiffness != null) coupling.stiffness = stiffness;
+		if (backlash != null) coupling.backlash = backlash;
+		if (drag != null) coupling.drag = drag;
+		data.couplings.push(coupling);
 		solved = null;
+	}
+
+	/** Puts a motor on joint `joint`: its usable effort and rate, in the joint's units, and rotor inertia. */
+	public function actuate(id:String, joint:String, maxEffort:Float, maxRate:Float, ?rotorInertia:Float, ?fullStepsPerRevolution:Float):Void {
+		if (data.actuators == null) data.actuators = [];
+		var actuator:materia.assembly.AssemblyDefinition.AssemblyActuator = {id: id, joint: joint,
+			maxEffort: maxEffort, maxRate: maxRate};
+		if (rotorInertia != null) actuator.rotorInertia = rotorInertia;
+		if (fullStepsPerRevolution != null) actuator.fullStepsPerRevolution = fullStepsPerRevolution;
+		data.actuators.push(actuator);
+	}
+
+	/**
+	 * Puts a motor on a joint with everything a drive records: its kind (stepper or servo), torque-speed
+	 * curve, torques, speeds and encoder counts, as `AssemblyActuator` names them.
+	 */
+	public function actuateDrive(actuator:materia.assembly.AssemblyDefinition.AssemblyActuator):Void {
+		if (data.actuators == null) data.actuators = [];
+		data.actuators.push(materia.assembly.AssemblyDefinitionFlattener.copyActuator(actuator, actuator.id, actuator.joint));
 	}
 
 	/** Exports reusable definitions and explicit tree/closure semantics. */

@@ -94,6 +94,8 @@ import machinekit.transmission.GearPair;
 import machinekit.transmission.Rack;
 import machinekit.transmission.Sprocket;
 import machinekit.transmission.SpurGear;
+import machinekit.transmission.TimingBelt;
+import machinekit.transmission.TimingBelt.BeltWrap;
 import machinekit.transmission.TimingPulley;
 import machinekit.transmission.TimingBeltProfile;
 import materia.assembly.AssemblyFrames;
@@ -2136,6 +2138,31 @@ class MachineKitSmoke {
 		check(pulleyBox.maxX <= pulley.outsideDiameter / 2 + 1e-6, "timing pulley stays within its outside radius");
 		check(pulleyBox.maxX > pulley.grooveDiameter / 2, "timing pulley lands extend past the groove circle");
 		pulleyPart.close();
+
+		// A belt round two 20-tooth GT2 pulleys: two centre distances plus one pulley circumference.
+		var belt = TimingBelt.twoPulley(GT2, 20, 20, 100, 6);
+		near(belt.length, 2 * 100 + 40, "two-pulley belt length");
+		check(belt.teeth == 120, "two-pulley belt tooth count");
+		near(belt.centreAdjustment(), 0, "a whole-tooth belt needs no centre adjustment");
+		var longer = TimingBelt.twoPulley(GT2, 20, 20, 100.5, 6);
+		check(longer.teeth == 121, "a belt 1 mm longer rounds to the next tooth");
+		near(longer.slack(), 1, "its slack is the tooth length less the path");
+		near(longer.centreAdjustment(), 0.5, "moving one pulley by half the slack makes it whole teeth", 1e-9);
+		var strand = belt.strands()[0];
+		near(strand.startY, -(2 * 20 / (2 * Math.PI)), "the first strand runs below the pulleys");
+		near(belt.pointAt(belt.length + 10).x, belt.pointAt(10).x, "the path wraps round at its length");
+		near(belt.pointAt(belt.strands()[0].length + 10).x, 100 + 20 / Math.PI, "the path follows the far pulley", 1e-9);
+		check(belt.rotation(0, 0, 1, 0) == 1 && belt.rotation(0, 0, -1, 0) == -1, "a pulley turns with the strand it carries");
+		var triangle = new TimingBelt(GT2, 6, [new BeltWrap(0, 0, 10), new BeltWrap(100, 0, 10), new BeltWrap(50, 60, 10)]);
+		near(triangle.length, 100 + 2 * Math.sqrt(50 * 50 + 60 * 60) + 2 * Math.PI * 10, "a belt round three equal pulleys is their triangle plus one circle", 1e-6);
+		var beltPart = belt.geometry();
+		solid(beltPart, "timing belt");
+		var beltBox = bounds(beltPart);
+		near(beltBox.maxX, 100 + 2 * 20 / (2 * Math.PI) + 1.38 / 2, "timing belt band reaches past the pitch line by half its thickness", 0.01);
+		beltPart.close();
+		check(MachineKitComponents.byId("machinekit.transmission.timing-belt").create(
+			MachineKitComponents.byId("machinekit.transmission.timing-belt").defaults()) != null, "timing belt recipe builds");
+		check(belt.componentType() != null && belt.componentType().create(belt.values()).designation == belt.designation, "belt rebuilds from its recipe");
 
 		var thread = new LeadScrewThread(MetricTrapezoidal, 8, 2);
 		var nut = new LeadScrewNut(thread);

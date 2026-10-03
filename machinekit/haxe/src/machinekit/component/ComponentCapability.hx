@@ -27,4 +27,10 @@ enum ComponentCapability {
 	 * inlet the work lead from the power source plugs into, and `contactConnector` is where the
 	 * clamp meets the work (mate it to the workpiece). */
 	WorkReturn(leadPort:String, contactConnector:String);
+	/**
+	 * A planar scanner: it sweeps `rayCount` rays round the horizontal plane of its connector
+	 * `scanConnector` (zero bearing along the connector's +X), seeing out to `maxRangeMeters`, and
+	 * scans `rateHz` times a second.
+	 */
+	PlanarScanner(scanConnector:String, rayCount:Int, maxRangeMeters:Float, rateHz:Float);
 }

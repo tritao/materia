@@ -91,6 +91,8 @@ class SimulatedTools implements SessionMember {
 
 	public function feed():Void {}
 
+	public function beforeReset():Void {}
+
 	public function reset():Void {
 		for (tool in tools) tool.reset();
 		for (welder in welders) welder.reset();

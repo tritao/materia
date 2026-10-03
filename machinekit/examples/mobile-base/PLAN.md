@@ -83,11 +83,72 @@ route behind the robot (it arced into the shelf it faced). A haxeon fix came out
 of it too: a same-package type now outranks a same-named unpackaged one
 (UiKit's `Path` hid `robotkit.navigation.Path` in the app).
 
-**M4. Sensing and safety.** The lidar sensor mounts at the robot's `lidar`
-port; `LidarObstaclePerception` feeds the costmap's dynamic layer and
-`MotionGuard`. A dynamic box dropped on the route makes the base slow, stop
-and replan. Editor overlays: planned path, costmap, lidar rays, odometry
-ghost.
+**M4. Sensing and safety** (done). The lidar mounts at the robot's `lidar` port and the base sees what
+its map lacks. A box dropped on the route ahead of the moving base is read off the lidar: the base
+slows, stops short of it without touching it, replans round it and finishes its round (the test drops
+it 1.2 m ahead; about 0.3 m is left between them at the closest).
+
+How it is built, each piece where it belongs:
+- *The lidar from the CAD.* `LidarPuck` declares a `PlanarScanner` capability (scan connector, 360 rays,
+  6 m, 10 Hz), as a suction cup declares its contact; `AssemblyPreview.robotSensors` turns the robot's
+  declared scanners into the scene artifact's new `robotSensors` section (format 14; 13 still reads),
+  mounted at the puck's `scan` connector. The app's `AssemblyRobot` puts the sensor on the link that
+  carries the puck, at that connector's frame (so the scan plane and zero bearing are the CAD's), and
+  the simulation raycasts it against the session's objects, the room's blocks and anything dropped in.
+  The arm's tool contact is now a frame of the robot model too, derived the same way, rather than one
+  the mission added after compiling.
+- *Perception.* The room is not an obstacle: `LidarMapFilter` (a `ScanFilter` that `FrameAwarePerception`
+  applies with each sensor's place in the map frame) drops the returns that land on the mission's own
+  occupancy grid, and `LidarObstaclePerception` clusters the rest. `MissionPlayer` reads each scan
+  once; its obstacles, in the map frame, go to `Navigator`.
+- *Costmap and replanning.* `Navigator` puts them in `Costmap2`'s dynamic layer (now redrawn alone,
+  and not at all when the scan is unchanged, instead of rasterizing the whole grid every tick) and
+  replans when the rest of the route is blocked, as before; nothing in the app plans.
+- *Guard.* `MotionGuard` wraps the follower: it scales the command down inside the stopping envelope
+  and zeroes it at the margin. Driving it showed it deadlocking: held short of an obstacle, the base
+  could not even turn away, because any obstacle ahead zeroed the whole command. A base that is only
+  turning, or held but asked to curve away, is now held only by an obstacle within its footprint's
+  turning circle (RobotKit tests).
+- *Overlays.* `MissionPlayer.overlay` hands the viewport the route, the costmap and the obstacles in its
+  dynamic layer, the guard state and the wheel odometry's pose (`WheelOdometryLocalization` run beside
+  the truth from the start pose); `MissionOverlayView` draws them on the floor: the route (red while
+  the guard holds the base), the edge of the blocked area, sensed obstacles as circles, the odometry
+  footprint. The lidar rays are the viewport's existing sensor drawing. Lines only, a few hundred a
+  frame; the costmap edge is rebuilt only when the costs change.
+
+Added after the first cut: the room has a floor slab (modelled like the walls, its top the assembly's
+z = 0), so what is dropped lands on it; it stays out of the map because only boxes that rise into the
+robot's height are drawn there, and out of the scan because the plane is above it. The costmap
+remembers: an obstacle the lidar loses sight of stays in the dynamic layer for 20 s of simulation time
+unless a later scan sees through its place (`LidarFreeSpace`, carried on the perception snapshot), so a
+replan does not route back through it. A RobotKit sensor reports up to 360 values, kept in one 512-value pool per state or snapshot that
+the sensors' samples index into (C ABI version 23), so a snapshot is no larger than before and a big
+scan costs only the robots that have one; the wire and recording formats carry values as arrays and
+are unchanged. The puck scans a ray a degree.
+
+Then polished: the sensed shapes are capsules (`Obstacle` has a half length along its heading;
+`LidarObstaclePerception` fits each cluster of hits with a Douglas-Peucker run of segments, so a flat
+wall is a thin segment of its own length, a corner two, and a lone return a disk), `Costmap2` draws
+them and redraws only the cells a change touches, and `MotionGuard` takes the costmap and judges its
+dynamic layer, so it holds for what the costmap remembers and keeps no memory of its own. The
+simulation overlays (sensor rays and the mission's route, costmap edge, obstacles and odometry) have a
+"Toggle simulation overlays" command in the view menus, saved as the editor setting
+`editors/3d/simulation/show_overlays`. A capture of the running cell
+(`--project=... --simulate --capture-dir=... --capture-seconds=N` under xvfb) showed them reading
+correctly and caught a stroke of an empty path.
+
+Left over: a sensed object is the visible surface only (a long wall seen end-on is its near end, and the
+unseen back of a box is not covered); a remembered obstacle that cannot be seen through stays for its
+full 20 s (anything quicker would be a guess: the lidar either sees through the place or it does not, and
+the only other evidence, the footprint having been there, almost never applies); the overlays have a
+toggle but no finer controls (per overlay, colours), and the costmap edge also outlines the walls'
+surroundings outside the room.
+
+Odometry note: with the floor slab's top exactly at the wheels' tangent plane the wheel hulls chattered
+against it and kicked the wheel joints (a stall of the right wheel for a few ticks), so the wheel odometry
+drifted 175 mm from the base's drive over a round. The drive plant stands for the wheels' contact with the
+floor, so while the base rolls kinematically its wheel links carry no collision hulls (`AssemblyRobot`);
+the drift is about 11 mm. M6 gives the wheels back their contact when they roll on physics.
 
 **M5. Mobile manipulator** (done). The robot arm stands on the deck's payload
 seat, turned to work ahead; the room's shelves became two tables with place
@@ -124,19 +185,12 @@ a pose line's end in two places (numeric derivatives, last path sample), the
 error that made the wall-finishing scenario flaky; the cup has to press into the
 part (3 mm, as a compliant cup does) to meet it within the motion tolerance.
 
-Left from the restructure:
-- The arm example still streams joint tracks with timed grips, so its grips
-  actuate the suction device directly; moving it onto MotionKit plans with
-  `SetOutput` events would give every grip the channel path.
-- The arm's suction tool has no vacuum pressure sensor (it would need the hose
-  re-routed through an inline sensor), so its picks are trusted, not sensed.
-- The device protocol (`rkd6`) does not carry the stop policy yet; a real
-  device would still drop a held part on a commanded stop.
-- The test backend's robot-to-object contacts reach far enough to push the
-  workpiece off its table as the arm passes, so pick and place are checked on
-  MuJoCo only, like the arm example.
-- `WallFinishingScenarioTests` still fails intermittently on an unreachable
-  pose (an IK issue unrelated to the pose-line fix).
+Left from the restructure, all done since: the arm example now runs MotionKit plans with `SetOutput`
+events (every grip takes the channel path) and its suction tool has an inline `VacuumPressureSensor`, so
+its picks are sensed; the device protocol (`rkd6`, version 12) carries a channel's stop policy; the
+deterministic backend's robot-to-object contacts are oriented boxes, so the workpiece is no longer pushed
+off its table by the passing arm; and `WallFinishingScenarioTests` no longer fails intermittently (the
+kinematics data is per thread). Pick and place are still checked on MuJoCo only, as the arm example is.
 
 The navigation latch from M3 also changed here: latching anywhere inside the
 goal tolerance left the base at the tolerance's edge with its heading off,
@@ -166,4 +220,5 @@ M7 are stretch goals.
 | M1 | done | c6e9da67, 512baf40 (plates own the layout, mates throughout) |
 | M2 | done | c2d81b4f (wheel directions), 11b9a6c9 (drive in the scene artifact, bridge, app) |
 | M3 | done | mission section, skill-hosting MissionPlayer, room cell, Navigation arrival fixes; haxeon 09279420 |
+| M4 | done | RobotKit (dynamic layer, scan filter, guard turning), planar scanner and scene artifact 14, app sensing and overlays |
 | M5 | done | b348ec51 (RobotKit tools, stop policy, HandlePart), next commit (robot tools section, app, cell) |

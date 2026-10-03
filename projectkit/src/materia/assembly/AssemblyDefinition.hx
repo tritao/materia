@@ -128,6 +128,45 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(3) var target:String;
 	@:id(4) var ratio:Float;
 	@:id(5) var offset:Float;
+	/** Power delivered over power put in, between the joints, such as a lead screw's 0.4; 1 when absent. */
+	@:id(6) @:optional var efficiency:Null<Float>;
+	/** Force at the source per unit of source travel (N per assembly unit; N m/rad for a turning source); absent is rigid. */
+	@:id(7) @:optional var stiffness:Null<Float>;
+	/** Lost motion on reversal, in the source's units. */
+	@:id(8) @:optional var backlash:Null<Float>;
+	/** Constant resisting effort the coupling adds at the target while it moves (N m for a turning target). */
+	@:id(9) @:optional var drag:Null<Float>;
+}
+
+/**
+ * A motor driving a joint directly: its usable torque (N m) or force (N), its usable speed in the
+ * joint's units per second, and the inertia of its rotor (kg m²), which turns with the joint.
+ */
+@:wire typedef AssemblyActuator = {
+	@:id(1) var id:String;
+	@:id(2) var joint:String;
+	@:id(3) var maxEffort:Float;
+	@:id(4) var maxRate:Float;
+	@:id(5) @:optional var rotorInertia:Null<Float>;
+	/** Full steps in a turn of a stepper motor's rotor; absent for other motors. */
+	@:id(6) @:optional var fullStepsPerRevolution:Null<Float>;
+	/**
+	 * What drives the joint: "stepper" or "servo". With "stepper", `holdingTorque` and `torqueSpeed`
+	 * describe its pull-out curve; with "servo", the rated and peak torque and speed do. Absent, a
+	 * bare effort and rate (a stepper with only `fullStepsPerRevolution` is still understood).
+	 */
+	@:id(7) @:optional var drive:Null<String>;
+	/** Alternating speed (the joint's units per second) and torque (N m), points of the torque-speed curve. */
+	@:id(8) @:optional var torqueSpeed:Array<Float>;
+	@:id(9) @:optional var holdingTorque:Null<Float>;
+	@:id(10) @:optional var ratedTorque:Null<Float>;
+	@:id(11) @:optional var peakTorque:Null<Float>;
+	@:id(12) @:optional var ratedSpeed:Null<Float>;
+	@:id(13) @:optional var maxSpeed:Null<Float>;
+	@:id(14) @:optional var encoderCounts:Null<Float>;
+	/** Default servo gains in the actuator's units: effort per unit of position and velocity error. */
+	@:id(15) @:optional var servoStiffness:Null<Float>;
+	@:id(16) @:optional var servoDamping:Null<Float>;
 }
 
 /** A connector exported from a member of an assembly definition. */
@@ -146,6 +185,7 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(5) @:optional var couplings:Array<AssemblyJointCoupling>;
 	@:id(6) @:optional var exposedConnectors:Array<AssemblyExposedConnector>;
 	@:id(7) @:optional var mates:Array<AssemblyMate>;
+	@:id(8) @:optional var actuators:Array<AssemblyActuator>;
 }
 
 /**
@@ -165,6 +205,7 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(8) @:optional var assemblies:Array<AssemblySubdefinition>;
 	@:id(9) @:optional var exposedConnectors:Array<AssemblyExposedConnector>;
 	@:id(10) @:optional var mates:Array<AssemblyMate>;
+	@:id(11) @:optional var actuators:Array<AssemblyActuator>;
 }
 
 @:wire typedef AssemblyJointCoordinate = {

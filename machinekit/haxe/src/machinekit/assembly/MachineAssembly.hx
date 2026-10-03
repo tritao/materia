@@ -75,6 +75,10 @@ class MachineAssembly {
 	final bomItems:Array<{item:BomItem, quantity:Int, mass:AssemblyBomMass}> = [];
 	final memberConnectorFrames:Array<{instanceId:String, name:String, frame:AssemblyFrame}> = [];
 	final nestedEntries:Array<MutableIncludedRecord> = [];
+	/** Couplings whose ratio their parts set, by coupling id. */
+	final drives:Array<machinekit.assembly.MachineAssemblyDescription.DriveRecord> = [];
+	/** Motors driving joints, by actuator id. */
+	final motors:Array<machinekit.assembly.MachineAssemblyDescription.MotorRecord> = [];
 	final massByDefinition:Map<String, machinekit.component.MassProperties> = [];
 
 	public function new() {}
@@ -158,6 +162,17 @@ class MachineAssembly {
 			memberConnectors: [for (entry in memberConnectorFrames) {instanceId: entry.instanceId,
 				name: entry.name, frame: copyFrame(entry.frame)}],
 			tools: emptyTools,
+			drives: {
+				var saved = [for (drive in drives) copyDrive(drive, "")];
+				saved.sort((a, b) -> Reflect.compare(a.coupling, b.coupling));
+				// Left out when empty, so descriptions without drives keep their saved form.
+				saved.length == 0 ? null : saved;
+			},
+			motors: {
+				var saved = [for (motor in motors) copyMotor(motor, "")];
+				saved.sort((a, b) -> Reflect.compare(a.actuator, b.actuator));
+				saved.length == 0 ? null : saved;
+			},
 			bomExtras: [for (entry in bomItems) {item: copyBomItem(entry.item), quantity: entry.quantity,
 				mass: switch entry.mass {
 					case Unknown: machinekit.assembly.MachineAssemblyDescription.SavedBomMass.Unknown;
@@ -261,6 +276,13 @@ class MachineAssembly {
 		}
 		if (mechanical.couplings != null) for (coupling in mechanical.couplings)
 			result.addCoupling(coupling.id, coupling.source, coupling.target, coupling.ratio, coupling.offset);
+		// A driven coupling's ratio comes from its parts as they are now, not as they were saved.
+		// The coupling decides whether there is one: a drive whose coupling was removed goes too.
+		if (description.machine.drives != null) for (drive in description.machine.drives)
+			if (result.applyDrive(drive)) result.drives.push(copyDrive(drive, ""));
+		// Motors too: their actuators follow the motor parts as they are now.
+		if (description.machine.motors != null) for (motor in description.machine.motors)
+			result.addMotorRecord(copyMotor(motor, ""));
 		for (connection in description.machine.portConnections)
 			result.connectPorts(connection.id, connection.fromInstance, connection.fromPort,
 				connection.toInstance, connection.toPort);
@@ -308,7 +330,23 @@ class MachineAssembly {
 		if (mechanical.couplings != null) for (coupling in mechanical.couplings)
 			if (StringTools.startsWith(coupling.id, prefix))
 				child.addCoupling(coupling.id.substr(prefix.length), coupling.source.substr(prefix.length),
-					coupling.target.substr(prefix.length), coupling.ratio, coupling.offset);
+					coupling.target.substr(prefix.length), coupling.ratio, coupling.offset, coupling.efficiency);
+		for (motor in motors) if (StringTools.startsWith(motor.actuator, prefix))
+			child.addMotorRecord({actuator: motor.actuator.substr(prefix.length), joint: motor.joint.substr(prefix.length),
+				motor: motor.motor.substr(prefix.length), volts: motor.volts, margin: motor.margin});
+		for (drive in drives) if (StringTools.startsWith(drive.coupling, prefix))
+			{
+				var record:machinekit.assembly.MachineAssemblyDescription.DriveRecord = {coupling: drive.coupling.substr(prefix.length), kind: drive.kind,
+					members: [for (member in drive.members) member.substr(prefix.length)],
+					alignment: drive.alignment, leaderZero: drive.leaderZero};
+				record.stiffness = drive.stiffness;
+				record.backlash = drive.backlash;
+				record.drag = drive.drag;
+				record.nearSupport = drive.nearSupport;
+				record.farSupport = drive.farSupport;
+				record.unsupported = drive.unsupported;
+				child.drives.push(record);
+			}
 		for (connection in portConnections) if (StringTools.startsWith(connection.id, prefix) &&
 			StringTools.startsWith(connection.fromInstance, prefix) &&
 			StringTools.startsWith(connection.toInstance, prefix))
@@ -331,6 +369,10 @@ class MachineAssembly {
 		target.mechanical.occurrences = copy.occurrences;
 		target.mechanical.joints = copy.joints;
 		target.mechanical.couplings = copy.couplings;
+		for (drive in drives) target.drives.push(copyDrive(drive, ""));
+		for (motor in motors) target.motors.push(copyMotor(motor, ""));
+		if (mechanical.actuators != null) target.mechanical.actuators = [for (actuator in mechanical.actuators)
+			copyActuator(actuator, "")];
 		for (entry in included) target.included.push({id: entry.id,
 			assembly: entry.assembly.snapshot(), pose: entry.pose == null ? null : copyFrame(entry.pose)});
 		for (entry in nestedEntries) target.nestedEntries.push({id: entry.id,
@@ -561,7 +603,9 @@ class MachineAssembly {
 			joint.closureTolerance);
 		if (assembly.mechanical.couplings != null) for (coupling in assembly.mechanical.couplings)
 			addCoupling(join(id, coupling.id), join(id, coupling.source), join(id, coupling.target),
-				coupling.ratio, coupling.offset);
+				coupling.ratio, coupling.offset, coupling.efficiency);
+		for (drive in assembly.drives) drives.push(copyDrive(drive, id));
+		for (motor in assembly.motors) addMotorRecord(copyMotor(motor, id));
 		for (connection in assembly.portConnections)
 			connectPorts(join(id, connection.id), join(id, connection.fromInstance),
 				connection.fromPort, join(id, connection.toInstance), connection.toPort);
@@ -607,11 +651,233 @@ class MachineAssembly {
 			parentConnector: parentConnector, child: child, childConnector: childConnector,
 			axis: axis, limits: resolvedLimits(limits), defaultValue: 0}, tolerance);
 
-	public function addCoupling(id:String, source:String, target:String, ratio:Float, offset:Float = 0):Void {
+	/**
+	 * Couple joint `follower` to `leader` through the parts of `drive`, which set the ratio: the
+	 * follower sits at zero where the leader is at `leaderZero`. Rebuilding the assembly from its
+	 * description works the ratio out again from the parts' values then. Returns the ratio.
+	 */
+	public function addDrive(id:String, leader:String, follower:String, drive:Drive, leaderZero:Float = 0):Float {
+		var record:machinekit.assembly.MachineAssemblyDescription.DriveRecord = switch drive {
+			case LeadScrew(screw, alignment): {coupling: id, kind: "lead-screw", members: [screw],
+				alignment: alignment, leaderZero: leaderZero};
+			case GearMesh(driver, driven, alignment): {coupling: id, kind: "gear-mesh", members: [driver, driven],
+				alignment: alignment, leaderZero: leaderZero};
+			case RackAndPinion(pinion, alignment): {coupling: id, kind: "rack-and-pinion", members: [pinion],
+				alignment: alignment, leaderZero: leaderZero};
+			case Belt(pulley, alignment): {coupling: id, kind: "belt", members: [pulley],
+				alignment: alignment, leaderZero: leaderZero};
+		};
+		var ratio = driveRatio(record);
+		addCoupling(id, leader, follower, ratio, -ratio * leaderZero, driveEfficiency(record));
+		applyDriveAllowances(record);
+		drives.push(record);
+		return ratio;
+	}
+
+	/**
+	 * Gives drive `id` the stiffness of its belt or other compliant link, in N per unit of the leader's
+	 * travel (N/mm for a machine axis); without it the drive is rigid. A belt's comes from
+	 * `TimingBelt.carriageStiffness`. It is kept with the drive, but is not worked out again from
+	 * the belt when the assembly is rebuilt.
+	 */
+	public function setDriveStiffness(id:String, stiffness:Float):Void {
+		if (!(stiffness > 0) || !Math.isFinite(stiffness)) throw 'Drive "$id" needs a positive stiffness';
+		for (entry in drives) if (entry.coupling == id) {
+			entry.stiffness = stiffness;
+			applyDrive(entry);
+			return;
+		}
+		throw 'No drive "$id"';
+	}
+
+	/**
+	 * Says how the ends of lead screw drive `id` are held (`near` is the end by its motor), over
+	 * `unsupported` mm (the whole screw by default). The screw's joint is then capped at 80% of its first
+	 * bending speed (`LeadScrew.criticalSpeed`); the cap flows through `RobotModel.coupledLimits` to
+	 * its axis. Call it once the screw's joint exists. Returns the cap in rad/s.
+	 */
+	public function supportScrew(id:String, near:machinekit.motion.ScrewSupport, far:machinekit.motion.ScrewSupport,
+			?unsupported:Float):Float {
+		for (entry in drives) if (entry.coupling == id) {
+			if (entry.kind != "lead-screw") throw 'Drive "$id" is not a lead screw';
+			entry.nearSupport = supportName(near);
+			entry.farSupport = supportName(far);
+			entry.unsupported = unsupported;
+			applyDrive(entry);
+			var cap = screwCap(entry);
+			if (cap == null) throw 'Drive "$id" has no supports';
+			return cap;
+		}
+		throw 'No drive "$id"';
+	}
+
+	static function supportName(support:machinekit.motion.ScrewSupport):String
+		return switch support {
+			case Free: "free";
+			case Simple: "simple";
+			case Fixed: "fixed";
+		};
+
+	static function supportOf(name:String):machinekit.motion.ScrewSupport
+		return switch name {
+			case "free": Free;
+			case "simple": Simple;
+			case "fixed": Fixed;
+			case other: throw 'Unknown screw support "$other"';
+		};
+
+	/** A lead screw's speed cap in rad/s from how its ends are held, or null when no supports are recorded. */
+	function screwCap(drive:machinekit.assembly.MachineAssemblyDescription.DriveRecord):Null<Float> {
+		var near = drive.nearSupport, far = drive.farSupport;
+		if (drive.kind != "lead-screw" || near == null || far == null) return null;
+		var screw:machinekit.motion.LeadScrew = cast requireMember(drive.members[0]);
+		return screw.criticalSpeed(supportOf(near), supportOf(far), drive.unsupported,
+			machinekit.assembly.DriveDefaults.CRITICAL_SPEED_MARGIN);
+	}
+
+	/** Puts a drive's stiffness, backlash and drag on its coupling, and a screw's critical speed on its joint. */
+	function applyDriveAllowances(drive:machinekit.assembly.MachineAssemblyDescription.DriveRecord):Void {
+		var coupling:Null<materia.assembly.AssemblyDefinition.AssemblyJointCoupling> = null;
+		if (mechanical.couplings != null) for (entry in mechanical.couplings) if (entry.id == drive.coupling) coupling = entry;
+		if (coupling == null) return;
+		coupling.stiffness = drive.stiffness;
+		var backlash = drive.backlash, drag = drive.drag;
+		if (backlash == null && drive.kind == "lead-screw") backlash = machinekit.assembly.DriveDefaults.LEAD_SCREW_BACKLASH;
+		if (drag == null) drag = switch drive.kind {
+			case "lead-screw": machinekit.assembly.DriveDefaults.LEAD_SCREW_DRAG;
+			case "belt": machinekit.assembly.DriveDefaults.BELT_DRAG;
+			case _: null;
+		};
+		coupling.backlash = backlash;
+		coupling.drag = drag;
+		var cap = screwCap(drive);
+		if (cap != null) for (joint in mechanical.joints) if (joint.id == coupling.target) joint.limits.velocity = cap;
+	}
+
+	/** The drive behind coupling `id`, or null when its ratio is a plain number. */
+	public function drive(id:String):Null<machinekit.assembly.MachineAssemblyDescription.DriveRecord> {
+		for (entry in drives) if (entry.coupling == id) return copyDrive(entry, "");
+		return null;
+	}
+
+	/** Follower radians (or units) per leader unit, from the drive's parts as they are now. */
+	function driveRatio(drive:machinekit.assembly.MachineAssemblyDescription.DriveRecord):Float {
+		if (!(Math.abs(drive.alignment) == 1)) throw 'Drive "${drive.coupling}" needs an alignment of 1 or -1';
+		function part(index:Int):MachineComponent {
+			if (drive.members.length <= index) throw 'Drive "${drive.coupling}" names too few parts';
+			return requireMember(drive.members[index]);
+		}
+		function gear(index:Int):machinekit.transmission.SpurGear {
+			var member = part(index);
+			if (!Std.isOfType(member, machinekit.transmission.SpurGear))
+				throw 'Drive "${drive.coupling}": "${drive.members[index]}" is not a spur gear';
+			return cast member;
+		}
+		return switch drive.kind {
+			case "lead-screw":
+				var member = part(0);
+				if (!Std.isOfType(member, machinekit.motion.LeadScrew))
+					throw 'Drive "${drive.coupling}": "${drive.members[0]}" is not a lead screw';
+				var screw:machinekit.motion.LeadScrew = cast member;
+				2 * Math.PI * drive.alignment / screw.thread.signedLead();
+			case "gear-mesh":
+				-drive.alignment * gear(0).teeth / gear(1).teeth;
+			case "rack-and-pinion":
+				drive.alignment * 2 / gear(0).pitchDiameter;
+			case "belt":
+				var member = part(0);
+				var diameter = Std.isOfType(member, machinekit.transmission.TimingPulley)
+					? (cast(member, machinekit.transmission.TimingPulley)).pitchDiameter
+					: Std.isOfType(member, machinekit.transmission.Sprocket)
+					? (cast(member, machinekit.transmission.Sprocket)).pitchDiameter
+					: throw 'Drive "${drive.coupling}" needs a timing pulley or sprocket';
+				drive.alignment * 2 / diameter;
+			case kind: throw 'Drive "${drive.coupling}" has unknown kind "$kind"';
+		};
+	}
+
+	/** Set the ratio and offset of a driven coupling from its parts; false when it has no coupling. */
+	function applyDrive(drive:machinekit.assembly.MachineAssemblyDescription.DriveRecord):Bool {
+		if (mechanical.couplings != null) for (coupling in mechanical.couplings) if (coupling.id == drive.coupling) {
+			var ratio = driveRatio(drive);
+			coupling.ratio = ratio;
+			coupling.offset = -ratio * drive.leaderZero;
+			coupling.efficiency = driveEfficiency(drive);
+			applyDriveAllowances(drive);
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Share of power a drive passes on: a lead screw's from its thread and a typical nut friction,
+	 * and typical values for a gear mesh (0.98), a rack and pinion (0.95) and a timing belt (0.97).
+	 */
+	function driveEfficiency(drive:machinekit.assembly.MachineAssemblyDescription.DriveRecord):Float {
+		return switch drive.kind {
+			case "lead-screw": (cast(requireMember(drive.members[0]), machinekit.motion.LeadScrew)).thread.efficiency();
+			case "gear-mesh": 0.98;
+			case "rack-and-pinion": 0.95;
+			case "belt": 0.97;
+			case kind: throw 'Drive "${drive.coupling}" has unknown kind "$kind"';
+		};
+	}
+
+	/**
+	 * Motor member `motor` (a stepper, or any part that is a `MotorDrive`) drives joint `joint` on a
+	 * `volts` supply. Its actuator, `id`, gets the motor's drive kind and torque-speed curve, its rotor
+	 * inertia and its usable effort and rate: for a stepper `margin` of its holding torque and the
+	 * speed up to where pull-out torque falls to that, for a servo its peak torque and maximum speed.
+	 * Rebuilding the assembly works them out again from the motor.
+	 */
+	public function addMotor(id:String, joint:String, motor:String, volts:Float, margin:Float = 0.5):Void
+		addMotorRecord({actuator: id, joint: joint, motor: motor, volts: volts, margin: margin});
+
+	function addMotorRecord(record:machinekit.assembly.MachineAssemblyDescription.MotorRecord):Void {
+		var member = requireMember(record.motor);
+		if (!Std.isOfType(member, machinekit.motion.MotorDrive)) throw 'Motor "${record.actuator}": "${record.motor}" is not a motor part';
+		var motor:machinekit.motion.MotorDrive = cast member;
+		if (mechanical.actuators == null) mechanical.actuators = [];
+		for (actuator in mechanical.actuators) if (actuator.id == record.actuator)
+			throw 'Duplicate assembly actuator "${record.actuator}"';
+		mechanical.actuators.push(motor.actuator(record.actuator, record.joint, record.volts, record.margin));
+		motors.push(copyMotor(record, ""));
+	}
+
+	static function copyMotor(motor:machinekit.assembly.MachineAssemblyDescription.MotorRecord,
+			prefix:String):machinekit.assembly.MachineAssemblyDescription.MotorRecord
+		return {actuator: join(prefix, motor.actuator), joint: join(prefix, motor.joint),
+			motor: join(prefix, motor.motor), volts: motor.volts, margin: motor.margin};
+
+	static function copyActuator(actuator:materia.assembly.AssemblyDefinition.AssemblyActuator,
+			prefix:String):materia.assembly.AssemblyDefinition.AssemblyActuator
+		return materia.assembly.AssemblyDefinitionFlattener.copyActuator(actuator, join(prefix, actuator.id),
+			join(prefix, actuator.joint));
+
+	static function copyDrive(drive:machinekit.assembly.MachineAssemblyDescription.DriveRecord,
+			prefix:String):machinekit.assembly.MachineAssemblyDescription.DriveRecord
+	{
+		var copy:machinekit.assembly.MachineAssemblyDescription.DriveRecord = {coupling: join(prefix, drive.coupling), kind: drive.kind,
+			members: [for (member in drive.members) join(prefix, member)], alignment: drive.alignment,
+			leaderZero: drive.leaderZero};
+		copy.stiffness = drive.stiffness;
+		copy.backlash = drive.backlash;
+		copy.drag = drive.drag;
+		copy.nearSupport = drive.nearSupport;
+		copy.farSupport = drive.farSupport;
+		copy.unsupported = drive.unsupported;
+		return copy;
+	}
+
+	public function addCoupling(id:String, source:String, target:String, ratio:Float, offset:Float = 0,
+			?efficiency:Float):Void {
 		requireOperationId(id);
 		if (source == null || source.length == 0 || target == null || target.length == 0)
 			throw 'Assembly coupling "$id" needs source and target';
-		mechanical.couplings.push({id: id, source: source, target: target, ratio: ratio, offset: offset});
+		var coupling:materia.assembly.AssemblyDefinition.AssemblyJointCoupling = {id: id, source: source,
+			target: target, ratio: ratio, offset: offset};
+		if (efficiency != null) coupling.efficiency = efficiency;
+		mechanical.couplings.push(coupling);
 	}
 
 	public function connectPorts(id:String, fromInstance:String, fromPort:String,
@@ -804,7 +1070,10 @@ class MachineAssembly {
 		}
 		if (mechanical.couplings != null) for (coupling in mechanical.couplings)
 			model.couple(join(prefix, coupling.id), join(prefix, coupling.source),
-				join(prefix, coupling.target), coupling.ratio, coupling.offset);
+				join(prefix, coupling.target), coupling.ratio, coupling.offset, coupling.efficiency,
+				coupling.stiffness, coupling.backlash, coupling.drag);
+		if (mechanical.actuators != null) for (actuator in mechanical.actuators)
+			model.actuateDrive(copyActuator(actuator, prefix));
 	}
 
 	public function components():Array<MachineAssemblyComponent>

@@ -21,7 +21,7 @@ public:
         if (scale.size() != count) return;
         device_ = rkd_virtual_create(config.device_tick_hz, config.step_tick_hz,
             config.offset_ticks, config.drift_ppm, count, scale.data(),
-            config.fingerprint.data(), config.profile);
+            config.controller.data(), config.profile);
     }
     ~Link() override { rkd_virtual_destroy(device_); }
     bool valid() const noexcept { return device_ != nullptr; }
@@ -197,18 +197,15 @@ std::shared_ptr<VirtualDeviceEndpoint> VirtualDeviceEndpoint::create(
         for (std::size_t j = 0; j < i; ++j)
             if (config.actuators[j].id == config.actuators[i].id) return {};
     }
-    const auto base_fingerprint = config.fingerprint;
-    config.fingerprint = fingerprint_device_layout6(base_fingerprint, config.actuators,
-        std::span(blueprint.channels, blueprint.channel_count));
     auto transport = std::make_unique<Link>(config, count);
     if (!transport->valid()) return {};
     auto *link = transport.get();
-    auto inner = Rkd6Endpoint::attach(std::move(transport), blueprint, base_fingerprint,
+    auto inner = Rkd6Endpoint::attach(std::move(transport), blueprint, config.controller,
         config.seed ? config.seed : 1, config.target_error, config.clock_bound_ns,
         config.latency_ns, config.step_tick_hz, config.link_loss_timeout_ns, config.actuators);
     if (!inner) return {};
     return std::shared_ptr<VirtualDeviceEndpoint>(new VirtualDeviceEndpoint(std::move(inner), link,
-        std::move(config.actuators), blueprint.joint_count, config.fingerprint));
+        std::move(config.actuators), blueprint.joint_count, config.controller));
 }
 
 rk_result VirtualDeviceEndpoint::apply(const rk_robot_command &command) {

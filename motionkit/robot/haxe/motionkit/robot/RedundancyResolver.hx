@@ -3,6 +3,7 @@ package motionkit.robot;
 import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.PathRequest;
+import motionkit.kinematics.PathSolution;
 import motionkit.kinematics.Pose3;
 
 /** One configuration in the beam: its cheapest cost from the path's start, and the previous sample's candidate it came from. */
@@ -48,7 +49,11 @@ class RedundancyResolver {
   }
 
   /** The path for `request`. Throws, naming the sample, where no candidate continues. */
-  public function solvePath(solver:KinematicsSolver, request:PathRequest):Array<Null<Array<Float>>> {
+  public function solvePath(solver:KinematicsSolver, request:PathRequest):Array<Null<Array<Float>>>
+    return solve(solver, request).configurations;
+
+  /** The path for `request` and, when the route was smoothed, the exact rate of its redundancy along it. */
+  public function solve(solver:KinematicsSolver, request:PathRequest):PathSolution {
     var costs = parameterization.costFactors();
     var weights = [for (j in 0...request.velocity.length) costs[j] / request.velocity[j]];
     var rates = parameterization.ratesPerMetre();
@@ -75,8 +80,8 @@ class RedundancyResolver {
     chosen.reverse();
     var refined = refine(request, chosen);
     var result:Array<Null<Array<Float>>> = [];
-    for (q in (refined != null ? refined : chosen)) result.push(q);
-    return result;
+    for (q in (refined != null ? refined.configurations : chosen)) result.push(q);
+    return new PathSolution(result, refined == null ? null : refined.rates);
   }
 
   function grow(target:Pose3, previous:Array<Candidate>, steps:Array<Float>, weights:Array<Float>,
@@ -146,8 +151,13 @@ class RedundancyResolver {
     return Math.sqrt(squared);
   }
 
-  /** The chosen route with its redundancy smoothed and re-solved exactly, or null where that fails. */
-  function refine(request:PathRequest, chosen:Array<Array<Float>>):Null<Array<Array<Float>>> {
+  /**
+   * The chosen route with its redundancy smoothed and re-solved exactly, with the rate (per metre) of that
+   * smoothed curve at every sample, or null where re-solving fails. The smoothed value at sample i is
+   * Σ w_j a_j / Σ w_j, w_j = exp(-½((j-i)/σ)²), a smooth function of i; its derivative in i is
+   * Σ w_j' (a_j - v_i) / Σ w_j with w_j' = w_j (j-i)/σ², and a metre of path is the local sample spacing.
+   */
+  function refine(request:PathRequest, chosen:Array<Array<Float>>):Null<{configurations:Array<Array<Float>>, rates:Array<Array<Float>>}> {
     var count = chosen.length;
     if (count < 3) return null;
     var dimension = parameterization.dimension();
@@ -166,6 +176,8 @@ class RedundancyResolver {
     }
     var radius = Std.int(Math.max(3, Math.round(count / 8)));
     var sigma = radius / 2.0;
+    // Out to four sigma, where the Gaussian is spent (3e-4): cut earlier, the window's edge would show in its derivative.
+    var reach = Std.int(Math.ceil(4.0 * sigma));
     // Beyond each end the values are reflected through it (v(-k) = 2·v(0) - v(k)), so a window
     // cut short by an end does not bend a steady trend there.
     function at(j:Int, d:Int):Float {
@@ -173,17 +185,32 @@ class RedundancyResolver {
       if (j >= count) return 2.0 * values[count - 1][d] - values[2 * (count - 1) - j][d];
       return values[j][d];
     }
-    var smoothed = [values[0].copy()];
-    for (i in 1...count) {
-      var row = [for (_ in 0...dimension) 0.0], weights = 0.0;
-      for (j in (i - radius)...(i + radius + 1)) {
+    var smoothed:Array<Array<Float>> = [];
+    var rates:Array<Array<Float>> = [];
+    for (i in 0...count) {
+      var row = [for (_ in 0...dimension) 0.0], slope = [for (_ in 0...dimension) 0.0];
+      var weights = 0.0, slopeWeights = 0.0;
+      for (j in (i - reach)...(i + reach + 1)) {
         if (j < -(count - 1) || j > 2 * (count - 1)) continue;
         var w = Math.exp(-0.5 * Math.pow((j - i) / sigma, 2));
-        for (d in 0...dimension) row[d] += w * at(j, d);
+        var dw = w * (j - i) / (sigma * sigma);
+        for (d in 0...dimension) {
+          var a = at(j, d);
+          row[d] += w * a;
+          slope[d] += dw * a;
+        }
         weights += w;
+        slopeWeights += dw;
       }
-      smoothed.push([for (d in 0...dimension) row[d] / weights]);
+      var value = [for (d in 0...dimension) row[d] / weights];
+      // Metres per sample here: centred where the neighbours allow.
+      var before = i > 0 ? i - 1 : i, after = i + 1 < count ? i + 1 : i;
+      var spacing = (request.distances[after] - request.distances[before]) / (after - before);
+      smoothed.push(value);
+      rates.push([for (d in 0...dimension) (slope[d] - value[d] * slopeWeights) / weights / spacing]);
     }
+    // The first sample stays where the route starts.
+    smoothed[0] = values[0].copy();
     var refined = [chosen[0].copy()];
     for (i in 1...count) {
       var seed = refined[i - 1];
@@ -192,6 +219,6 @@ class RedundancyResolver {
       for (joint in 0...solved.length) if (Math.abs(solved[joint] - seed[joint]) > request.maxJump[joint]) return null;
       refined.push(solved.copy());
     }
-    return refined;
+    return {configurations: refined, rates: rates};
   }
 }

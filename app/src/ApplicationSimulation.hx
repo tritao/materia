@@ -361,7 +361,10 @@ class ApplicationSimulation {
   public function reset():Bool {
     var active = space;
     if (active == null) return false;
-    active.session.stop(); active.session.reset(); running = false; presentAssemblyPhysics = false;
+    active.session.stop();
+    // Members stop what they run while the robots' runtimes still answer; the session's reset starts them over.
+    for (member in members) member.beforeReset();
+    active.session.reset(); running = false; presentAssemblyPhysics = false;
     pumpStamp = -1.0;
     // The session's own reset has restored its objects and actors; what lives beside it follows.
     for (member in members) member.reset();

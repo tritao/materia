@@ -4,6 +4,7 @@ import app.CncProgramPlayer.CncJob;
 import app.MateriaProjectRunner.GeneratedAssemblyScene;
 import materia.project.SceneArtifact.SceneArtifactMission;
 import materia.project.SceneArtifact.SceneArtifactMobileBase;
+import materia.project.SceneArtifact.SceneArtifactRobotSensor;
 import materia.project.SceneArtifact.SceneArtifactRobotTool;
 
 import sys.io.File;
@@ -86,6 +87,8 @@ class ProjectDocumentSession {
   public var mission(default, null):Null<SceneArtifactMission> = null;
   /** The tools the project's robot works with, simulated on their links. */
   public var robotTools(default, null):Array<SceneArtifactRobotTool> = [];
+  /** The sensors on the project's robot, simulated where their parts mount them. */
+  public var robotSensors(default, null):Array<SceneArtifactRobotSensor> = [];
   var assemblyRuntime:Null<AssemblyState> = null;
   /** Mates authored over the generated assembly, and the face connectors they name (see `ProjectAssemblyMates`). */
   public var assemblyMates(default, null):ProjectAssemblyMates = ProjectAssemblyMates.empty();
@@ -238,7 +241,8 @@ class ProjectDocumentSession {
       generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
       generated.localCentersByDefinition, generated.metresPerUnit,
       generated.physical, generated.recipeDocument, generated.robotMotions,
-      generated.faceDescriptorsByDefinition, generated.cncJob, generated.mobileBase, generated.mission, generated.robotTools);
+      generated.faceDescriptorsByDefinition, generated.cncJob, generated.mobileBase, generated.mission, generated.robotTools,
+      generated.robotSensors);
 
   /** Open generated geometry while retaining its source manifest. */
   public function openGeneratedScene(data:Array<SceneObjectData>, ?manifestPath:String,
@@ -247,7 +251,8 @@ class ProjectDocumentSession {
       ?localCentersByDefinition:Map<String, Array<Float>>, metresPerUnit:Float = 1.0,
       ?physical:AssemblyPhysicalData, ?recipeText:String, ?motions:Array<RobotMotionTrack>,
       ?faceDescriptors:Map<String, String>, ?cnc:CncJob,
-      ?mobile:SceneArtifactMobileBase, ?work:SceneArtifactMission, ?tools:Array<SceneArtifactRobotTool>):Void {
+      ?mobile:SceneArtifactMobileBase, ?work:SceneArtifactMission, ?tools:Array<SceneArtifactRobotTool>,
+      ?sensors:Array<SceneArtifactRobotSensor>):Void {
     if (data == null || data.length == 0)
       throw "Generated project preview contains no scene objects";
     var reference = manifestPath == null ? null : FileSystem.fullPath(manifestPath);
@@ -286,6 +291,7 @@ class ProjectDocumentSession {
     mobileBase = mobile;
     mission = work;
     robotTools = tools == null ? [] : tools.copy();
+    robotSensors = sensors == null ? [] : sensors.copy();
     if (reference != null) {
       projectReference = reference;
       projectBaseline = data;
@@ -373,6 +379,7 @@ class ProjectDocumentSession {
     mobileBase = generated.mobileBase;
     mission = generated.mission;
     robotTools = generated.robotTools == null ? [] : generated.robotTools.copy();
+    robotSensors = generated.robotSensors == null ? [] : generated.robotSensors.copy();
   }
 
   function configureAssembly(target:EditorScene, definition:Null<AssemblyDefinition>):Void {
@@ -978,6 +985,7 @@ class ProjectDocumentSession {
     mobileBase = null;
     mission = null;
     robotTools = [];
+    robotSensors = [];
     assemblyRuntime = null;
     assemblyLocalCentersByDefinition = null;
     assemblyMetresPerUnit = 1.0;

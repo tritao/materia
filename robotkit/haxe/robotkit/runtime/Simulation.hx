@@ -111,8 +111,8 @@ class Simulation {
         makePose([0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]) : initialPose);
       if (virtualDevice != null) {
         if (blueprint.jointCount > 64 || virtualDevice.actuators.length > 64 ||
-            virtualDevice.fingerprint.length != 32 ||
-            !~/^[0-9a-fA-F]{32}$/.match(virtualDevice.fingerprint) ||
+            virtualDevice.controller.length != 32 ||
+            !~/^[0-9a-fA-F]{32}$/.match(virtualDevice.controller) ||
             (virtualDevice.stepsPerUnit.length != 0 &&
              virtualDevice.stepsPerUnit.length != blueprint.jointCount))
           throw "Simulation virtual device configuration is invalid";
@@ -132,8 +132,8 @@ class Simulation {
           robotDesc.set_virtual_device_steps_per_unit(i,
             virtualDevice.stepsPerUnit.length == 0 ? 1000.0 : virtualDevice.stepsPerUnit[i]);
         for (i in 0...16)
-          robotDesc.set_virtual_device_fingerprint(i,
-            Std.parseInt("0x" + virtualDevice.fingerprint.substr(i * 2, 2)));
+          robotDesc.set_virtual_device_controller(i,
+            Std.parseInt("0x" + virtualDevice.controller.substr(i * 2, 2)));
         robotDesc.set_virtual_device_target_error(virtualDevice.targetError);
         robotDesc.set_virtual_device_clock_bound_ns(virtualDevice.clockBoundNs);
         robotDesc.set_virtual_device_link_loss_timeout_ns(virtualDevice.linkLossTimeoutNs);

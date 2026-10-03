@@ -151,13 +151,30 @@ class AssemblyDefinitionCodec {
 			if (coupling == null || !validText(coupling.id) || names.exists(coupling.id) ||
 				coupling.source == coupling.target || movable.get(coupling.source) == null ||
 				movable.get(coupling.target) == null || targets.exists(coupling.target) ||
-				!Math.isFinite(coupling.ratio) || coupling.ratio == 0 || !Math.isFinite(coupling.offset))
+				!Math.isFinite(coupling.ratio) || coupling.ratio == 0 || !Math.isFinite(coupling.offset) ||
+				(coupling.efficiency != null && !(coupling.efficiency > 0 && coupling.efficiency <= 1)) ||
+				(coupling.stiffness != null && !(coupling.stiffness > 0 && Math.isFinite(coupling.stiffness))) ||
+				(coupling.backlash != null && !(coupling.backlash >= 0 && Math.isFinite(coupling.backlash))) ||
+				(coupling.drag != null && !(coupling.drag >= 0 && Math.isFinite(coupling.drag))))
 				throw "Assembly has an invalid coupled joint";
 			if (movable.get(coupling.target).driven == true)
 				throw 'Assembly joint "${coupling.target}" is driven by a coupling, so it cannot also be an input';
 			names.set(coupling.id, true);
 			targets.set(coupling.target, true);
 			sourceByTarget.set(coupling.target, coupling.source);
+		}
+		var actuators = definition.actuators == null ? [] : definition.actuators;
+		if (actuators.length > 4000) throw "Assembly has too many actuators";
+		var actuatorIds = new Map<String, Bool>();
+		for (actuator in actuators) {
+			if (actuator == null || !validText(actuator.id) || actuatorIds.exists(actuator.id) ||
+				movable.get(actuator.joint) == null || !Math.isFinite(actuator.maxEffort) || actuator.maxEffort < 0 ||
+				!Math.isFinite(actuator.maxRate) || actuator.maxRate < 0 ||
+				(actuator.rotorInertia != null && !(actuator.rotorInertia >= 0 && Math.isFinite(actuator.rotorInertia))) ||
+				(actuator.fullStepsPerRevolution != null && !(actuator.fullStepsPerRevolution > 0 && Math.isFinite(actuator.fullStepsPerRevolution))) ||
+				!validDrive(actuator))
+				throw 'Assembly has an invalid actuator "${actuator == null ? "" : actuator.id}"';
+			actuatorIds.set(actuator.id, true);
 		}
 		for (coupling in couplings) {
 			var seen = new Map<String, Bool>();
@@ -278,6 +295,29 @@ class AssemblyDefinitionCodec {
 
 	static function withinLimits(limits:AssemblyJointLimits, value:Float):Bool
 		return (limits.lower == null || value >= limits.lower) && (limits.upper == null || value <= limits.upper);
+
+	/** An actuator's drive fields: each present number finite and not negative, and a drive kind that needs its numbers has them. */
+	static function validDrive(actuator:AssemblyActuator):Bool {
+		for (value in [actuator.holdingTorque, actuator.ratedTorque, actuator.peakTorque, actuator.ratedSpeed, actuator.maxSpeed,
+				actuator.encoderCounts, actuator.servoStiffness, actuator.servoDamping])
+			if (value != null && !(value >= 0 && Math.isFinite(value))) return false;
+		var curve = actuator.torqueSpeed;
+		if (curve != null) {
+			if (curve.length == 0 || curve.length % 2 != 0) return false;
+			for (index in 0...curve.length) {
+				if (!(curve[index] >= 0 && Math.isFinite(curve[index]))) return false;
+				if (index >= 2 && index % 2 == 0 && !(curve[index] > curve[index - 2])) return false;
+			}
+		}
+		var kind = actuator.drive;
+		if (kind == null) return true;
+		if (kind == "stepper") return actuator.fullStepsPerRevolution != null && actuator.holdingTorque != null && curve != null;
+		if (kind == "servo")
+			return actuator.ratedTorque != null && actuator.peakTorque != null && actuator.ratedSpeed != null &&
+				actuator.maxSpeed != null && actuator.ratedTorque > 0 && actuator.peakTorque >= actuator.ratedTorque &&
+				actuator.ratedSpeed > 0 && actuator.maxSpeed >= actuator.ratedSpeed;
+		return false;
+	}
 
 	static function validText(value:Null<String>):Bool
 		return value != null && value.length > 0 && value.length <= 4096 &&

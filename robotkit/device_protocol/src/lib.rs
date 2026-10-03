@@ -3,6 +3,7 @@
 #[cfg(feature = "std")]
 extern crate std;
 
+pub mod config_digest;
 pub mod device_wire6;
 pub mod frame6;
 mod board;

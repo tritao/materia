@@ -1,5 +1,8 @@
+import cadkit.modeling.Location;
 import cadkit.modeling.Part;
+import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
+import machinekit.assembly.Drive;
 import machinekit.assembly.MachineAssembly;
 import machinekit.component.ComponentDetail;
 import machinekit.component.Dimension;
@@ -8,9 +11,15 @@ import machinekit.component.Solids;
 import machinekit.motion.LeadScrew;
 import machinekit.motion.LeadScrewThread;
 import machinekit.motion.LeadScrewThread.LeadScrewThreadFamily;
+import machinekit.motion.ScrewSupport;
 import machinekit.motion.LinearRail;
 import machinekit.motion.LinearRailBlock;
 import machinekit.motion.NemaStepper;
+import machinekit.motion.ShaftCoupling;
+import machinekit.standard.ClearanceFit;
+import machinekit.transmission.TimingBelt;
+import machinekit.transmission.TimingBeltProfile;
+import machinekit.transmission.TimingPulley;
 import machinekit.structural.TSlotExtrusion;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
@@ -43,20 +52,37 @@ class RouterPlate extends MachineComponent {
 	public final width:Float;
 	public final depth:Float;
 	public final height:Float;
+	/** The motor this plate mounts, or null: its pilot and bolt holes go through the plate. */
+	public final motor:Null<NemaStepper>;
+	/** The motor's face in the plate's frame, its shaft pointing into the plate. */
+	public final motorFace:Null<AssemblyFrame>;
 
-	public function new(width:Float, depth:Float, height:Float, material:String, name:String) {
+	public function new(width:Float, depth:Float, height:Float, material:String, name:String, ?motor:NemaStepper,
+			?motorFace:AssemblyFrame) {
 		if (!(width > 0) || !(depth > 0) || !(height > 0)) throw "Plate needs positive dimensions";
-		super('${name.toUpperCase()}-${Dimension.format(width)}x${Dimension.format(depth)}x${Dimension.format(height)}',
-			name, material, true);
+		if ((motor == null) != (motorFace == null)) throw "A motor mount needs both the motor and where its face sits";
+		super('${name.toUpperCase()}-${Dimension.format(width)}x${Dimension.format(depth)}x${Dimension.format(height)}' +
+			(motor == null ? "" : '-NEMA${motor.spec.frame}'), name, material, true);
 		this.width = width;
 		this.depth = depth;
 		this.height = height;
+		this.motor = motor;
+		this.motorFace = motorFace;
 	}
 
 	override public function hasGeometry():Bool return true;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Part.box(width, depth, height);
+	override public function geometry(detail:ComponentDetail = Preview):Part {
+		var box = Part.box(width, depth, height);
+		var mounted = motor, face = motorFace;
+		if (mounted == null || face == null || detail == Envelope) return box;
+		var cutout = mounted.mountingCutout(width + depth + height);
+		var x = AssemblyFrames.transformVector(face, 1, 0, 0), z = AssemblyFrames.transformVector(face, 0, 0, 1);
+		var placed = cutout.placed(new Location(new Plane(new Vector(face.x, face.y, face.z), new Vector(x.x, x.y, x.z),
+			new Vector(z.x, z.y, z.z))));
+		cutout.close();
+		return Solids.cut(box, [placed]);
+	}
 }
 
 /**
@@ -100,6 +126,74 @@ class XNutBracket extends MachineComponent {
 		return Solids.cut(body, [Part.cylinderAlong(CncRouter.SCREW_CLEARANCE, new Vector(-25, 0, CncRouter.X_SCREW_Z),
 			new Vector(1, 0, 0), 50)]);
 	}
+}
+
+/**
+ * Block on the back of the X carriage plate that clamps the lower strand of the X belt between the
+ * gantry beams. The strand runs through it at height `strandZ`; it ends `far` behind the gantry's
+ * centre plane, past the belt's far edge. The upper strand passes above it.
+ */
+class XBeltBracket extends MachineComponent {
+	public final far:Float;
+	public final strandZ:Float;
+
+	public function new(far:Float, strandZ:Float) {
+		super('XBELT-BRACKET-F${Dimension.format(far)}-Z${Dimension.format(strandZ)}', "X belt clamp bracket", "aluminium 6061", true);
+		this.far = far;
+		this.strandZ = strandZ;
+	}
+
+	override public function hasGeometry():Bool return true;
+
+	override public function geometry(detail:ComponentDetail = Preview):Part
+		// From the carriage plate's back face (y = -33) to past the belt, 13 mm tall about the strand.
+		return Part.box(40, far + 33, 13).translated(new Vector(0, (far - 33) / 2, strandZ - 6));
+}
+
+/**
+ * Bracket on a gantry upright like `YNutBracket`, but clamping the lower strand of the Y belt on its
+ * side: the strand runs through the leg, and a slot lets the upper strand, at height `upperZ`,
+ * pass. The belt runs along Y at x = side·35 from the upright.
+ */
+class YBeltBracket extends MachineComponent {
+	public final side:Int;
+	public final upperZ:Float;
+
+	public function new(side:Int, upperZ:Float) {
+		if (side != 1 && side != -1) throw "Belt bracket side must be 1 or -1";
+		super('YBELT-BRACKET-${side > 0 ? "R" : "L"}-Z${Dimension.format(upperZ)}', 'Y belt bracket, ${side > 0 ? "right" : "left"}',
+			"aluminium 6061", true);
+		this.side = side;
+		this.upperZ = upperZ;
+	}
+
+	override public function hasGeometry():Bool return true;
+
+	override public function geometry(detail:ComponentDetail = Preview):Part {
+		var tab = Part.box(54, 40, 10).translated(new Vector(side * 33, 0, 53));
+		var leg = Part.box(38, 40, 48).translated(new Vector(side * 41, 0, 15));
+		var body = Solids.union([tab, leg]);
+		if (detail == Envelope) return body;
+		return Solids.cut(body, [Part.box(10, 60, 5).translated(new Vector(side * 35, 0, upperZ - 2.5))]);
+	}
+}
+
+/** Pin an idler pulley turns on. Origin: its base, with the pin along +Z. */
+class BeltAxle extends MachineComponent {
+	public final diameter:Float;
+	public final length:Float;
+
+	public function new(diameter:Float, length:Float) {
+		if (!(diameter > 0) || !(length > 0)) throw "Belt axle needs a positive diameter and length";
+		super('AXLE-D${Dimension.format(diameter)}-L${Dimension.format(length)}', 'Idler axle, ${Dimension.format(diameter)} mm', "steel", true);
+		this.diameter = diameter;
+		this.length = length;
+	}
+
+	override public function hasGeometry():Bool return true;
+
+	override public function geometry(detail:ComponentDetail = Preview):Part
+		return Part.cylinderSpan(diameter / 2, 0, length);
 }
 
 /** Block clamping the spindle to the front of the Z plate. Origin on the spindle axis at the clamp's base. */
@@ -226,6 +320,30 @@ class TwistDrill extends MachineComponent {
 	}
 }
 
+/** Round spacer standing a motor off its mount, bored for the screw that holds it. Origin: one end, along +Z. */
+class Standoff extends MachineComponent {
+	public final diameter:Float;
+	public final length:Float;
+	public final bore:Float;
+
+	public function new(diameter:Float, length:Float, bore:Float) {
+		if (!(bore > 0) || !(diameter > bore) || !(length > 0)) throw "Standoff needs a bore inside a positive diameter and length";
+		super('STANDOFF-D${Dimension.format(diameter)}-L${Dimension.format(length)}', 'Standoff ${Dimension.format(diameter)} x ${Dimension.format(length)} mm',
+			"aluminium 6061", true);
+		this.diameter = diameter;
+		this.length = length;
+		this.bore = bore;
+	}
+
+	override public function hasGeometry():Bool return true;
+
+	override public function geometry(detail:ComponentDetail = Preview):Part {
+		var body = Part.cylinderSpan(diameter / 2, 0, length);
+		if (detail == Envelope) return body;
+		return Solids.cut(body, [Part.cylinderSpan(bore / 2, -0.1, length + 0.1)]);
+	}
+}
+
 /**
  * Step clamp holding the stock's edge to the spoilboard. Origin on the spoilboard under the stock
  * edge; the clamp reaches 8 mm over the stock along -X and stands on a riser outboard along +X.
@@ -249,16 +367,14 @@ class ToeClamp extends MachineComponent {
 	}
 }
 
-/** Travel limit and speed of one linear axis, in millimetres and mm/s. */
+/**
+ * Travel of one linear axis, in millimetres. Its speed and acceleration are its motors' and
+ * screws', worked out from the parts.
+ */
 typedef RouterAxisSpec = {
 	var id:String;
 	var lower:Float;
 	var upper:Float;
-	var velocity:Float;
-	/** Peak axis force in newtons. */
-	var effort:Float;
-	/** Largest axis acceleration in mm/s². */
-	var acceleration:Float;
 	var initial:Float;
 }
 
@@ -270,7 +386,15 @@ typedef RouterAxisSpec = {
  * Joints `x`, `y` and `z` are prismatic and read in machine coordinates, in millimetres: the
  * machine origin is the front-left corner of travel with Z at the top, so the spindle nose sits at
  * `noseAt(x, y, z)` in the assembly frame (floor at z = 0, bed centred on the origin).
- * Lead screws and motors are placed as fixed parts; the screws do not turn with the axes.
+ * Each motor turns its lead screw through a shaft coupling, on a continuous joint coupled to its
+ * axis by the screw's lead: Y has two, one on each side of the gantry. The motors are the screw
+ * joints' actuators, so each axis is as fast as its motors turn its screws, and accelerates as
+ * hard as their torque, through the screws' efficiency, moves its mass and turns its screws.
+ *
+ * With `belts`, X and Y run on GT2 belts instead: a 20-tooth pulley on each motor and an idler of the
+ * same size at the far end, Y with one belt per side, each clamped on one strand to the carriage.
+ * The pulleys turn on continuous joints coupled to their axes by their pitch radius, so the same
+ * motors give the speed and acceleration a belt does. Z keeps its screw.
  */
 class CncRouter extends MachineAssembly {
 	public static inline var PROFILE:String = "HFS5-4040";
@@ -296,18 +420,39 @@ class CncRouter extends MachineAssembly {
 	public static inline var SCREW_CLEARANCE:Float = 5.5;
 	public static inline var Y_SCREW_Z:Float = 30;
 	public static inline var X_SCREW_Z:Float = 198;
+	/** Belt drive: teeth on every pulley, belt width, and motor plate thickness. */
+	public static inline var BELT_TEETH:Int = 20;
+	public static inline var BELT_WIDTH:Float = 6;
+	static inline var BELT_PLATE:Float = 8;
+	/** Y belts run in the vertical plane x = ±Y_BELT_X, pulley centres ±Y_BELT_END from the middle in y. */
+	public static inline var Y_BELT_X:Float = 295;
+	public static inline var Y_BELT_END:Float = 320;
+	/** The X belt runs in the gantry's gap, pulley centres ±X_BELT_END from the middle in x. */
+	public static inline var X_BELT_END:Float = 222;
 
 	public final motorY:NemaStepper;
+	/** True when X and Y run on belts instead of lead screws. */
+	public final belts:Bool;
 	public final spindle = new RouterSpindle();
 	/** The tool in the spindle, tool 1. */
 	public final tool = new EndMill(6, 22, 30);
 	/** Tool 2, loaded by hand when a program calls for it. */
 	public final drill = new TwistDrill(5.5, 28, 40);
 	public final specs:Array<RouterAxisSpec> = [
-		{id: "x", lower: 0, upper: 300, velocity: 80, effort: 400, acceleration: 500, initial: 150},
-		{id: "y", lower: 0, upper: 300, velocity: 80, effort: 600, acceleration: 400, initial: 150},
-		{id: "z", lower: -80, upper: 0, velocity: 40, effort: 400, acceleration: 300, initial: 0}
+		{id: "x", lower: 0, upper: 300, initial: 150},
+		{id: "y", lower: 0, upper: 300, initial: 150},
+		{id: "z", lower: -80, upper: 0, initial: 0}
 	];
+	/** The stepper drivers' supply, as on most desktop routers. */
+	public static inline var SUPPLY_VOLTS:Float = 24;
+	/**
+	 * Nominal wiring of the stepper drivers: 16 microsteps per full step, the usual setting of
+	 * desktop drivers, on a controller generating 40 kHz step edges (the RKD6 board's software step
+	 * tick, `robotkit/runtime/DEVICE_PROTOCOL.md`). Together they cap each axis: a NEMA 23 at 16
+	 * microsteps is 3200 steps a turn, so 40 kHz turns it 78.5 rad/s, 12.5 turns a second.
+	 */
+	public static inline var MICROSTEPS:Int = 16;
+	public static inline var STEP_TICK_HZ:Int = 40000;
 
 	/** Room past each axis's travel before its rail blocks reach the rail ends, in millimetres. */
 	final overtravel = new Map<String, Float>();
@@ -315,8 +460,9 @@ class CncRouter extends MachineAssembly {
 	/** Pose of every member with all axes at zero, used to derive mate connectors. */
 	final zeroPoses = new Map<String, AssemblyFrame>();
 
-	public function new() {
+	public function new(belts:Bool = false) {
 		super();
+		this.belts = belts;
 		motorY = NemaStepper.frame(23);
 		var shaft = motorY.variant.shaftLength;
 		var profile = TSlotExtrusion.forProfile(PROFILE);
@@ -332,12 +478,18 @@ class CncRouter extends MachineAssembly {
 			var name = side < 0 ? "Left" : "Right";
 			place('side$name', new ExtrusionMember(profile, FRAME_LENGTH), orient(side * SIDE_X, -halfFrame, 20, up, alongY));
 			place('railY$name', LinearRail.metric(RAIL, FRAME_LENGTH - 40), orient(side * SIDE_X, -halfFrame + 20, railTop, up, alongY));
-			place('motorPlateY$name', new RouterPlate(66, 8, 62, "aluminium 6061", "Motor plate"),
-				AssemblyFrames.translation(side * 295, halfFrame + 4, 0));
+			if (belts) {
+				beltY(side, name, shaft);
+				continue;
+			}
 			// The motor stands behind its plate with the shaft pointing forward through it.
-			place('motorY$name', side < 0 ? motorY : NemaStepper.frame(23), orient(side * 295, halfFrame + 8, Y_SCREW_Z, up, [0, -1, 0]));
-			place('screwY$name', new LeadScrew(thread, FRAME_LENGTH + 8 - shaft - 10),
-				orient(side * 295, halfFrame + 8 - shaft, Y_SCREW_Z, up, [0, -1, 0]));
+			var motorPose = orient(side * 295, halfFrame + 8, Y_SCREW_Z, up, [0, -1, 0]);
+			var platePose = AssemblyFrames.translation(side * 295, halfFrame + 4, 0);
+			place('motorPlateY$name', new RouterPlate(66, 8, 62, "aluminium 6061", "Motor plate", motorY,
+				AssemblyFrames.compose(AssemblyFrames.inverse(platePose), motorPose)), platePose);
+			place('motorY$name', side < 0 ? motorY : NemaStepper.frame(23), motorPose);
+			driveScrew(specs[1], 'screwY$name', 'motorY$name', new LeadScrew(thread, FRAME_LENGTH + 8 - shaft - 10),
+				orient(side * 295, halfFrame + 8 - shaft, Y_SCREW_Z, up, [0, -1, 0]), [0, -1, 0], [0, 1, 0]);
 		}
 		var inner = 2 * (SIDE_X - 20);
 		for (entry in [{id: "crossFront", y: -halfFrame + 20}, {id: "crossMiddle", y: 0.0}, {id: "crossBack", y: halfFrame - 20}])
@@ -361,19 +513,33 @@ class CncRouter extends MachineAssembly {
 		var beamZ = [233.0, 163];
 		attach("beamUpper", new ExtrusionMember(profile, beamLength), orient(-beamLength / 2, yb, beamZ[0], up, alongX), "uprightLeft");
 		attach("beamLower", new ExtrusionMember(profile, beamLength), orient(-beamLength / 2, yb, beamZ[1], up, alongX), "uprightLeft");
-		attach("uprightRight", upright, AssemblyFrames.translation(SIDE_X, yb, uprightTop), "beamUpper");
+		// The right upright carries the X motor, so it has the motor's pilot and bolt holes.
+		var outside = SIDE_X + 6;
+		var uprightRightPose = AssemblyFrames.translation(SIDE_X, yb, uprightTop);
+		var motorXPose = orient(outside, yb, X_SCREW_Z, up, [-1, 0, 0]);
+		attach("uprightRight", belts ? new RouterPlate(12, 100, 200, "aluminium 6061", "Gantry upright")
+			: new RouterPlate(12, 100, 200, "aluminium 6061", "Gantry upright", motorY,
+			AssemblyFrames.compose(AssemblyFrames.inverse(uprightRightPose), motorXPose)), uprightRightPose, "beamUpper");
 		attach("blockYRight", LinearRailBlock.metric(RAIL), orient(SIDE_X, yb, railTop, up, alongY), "uprightRight");
-		attach("nutBracketYLeft", new YNutBracket(-1), AssemblyFrames.translation(-SIDE_X, yb, 0), "uprightLeft");
-		attach("nutBracketYRight", new YNutBracket(1), AssemblyFrames.translation(SIDE_X, yb, 0), "uprightRight");
+		if (belts) {
+			for (side in [-1, 1])
+				attach('beltBracketY${side < 0 ? "Left" : "Right"}', new YBeltBracket(side, Y_SCREW_Z + beltRadius()),
+					AssemblyFrames.translation(side * SIDE_X, yb, 0), side < 0 ? "uprightLeft" : "uprightRight");
+		} else {
+			attach("nutBracketYLeft", new YNutBracket(-1), AssemblyFrames.translation(-SIDE_X, yb, 0), "uprightLeft");
+			attach("nutBracketYRight", new YNutBracket(1), AssemblyFrames.translation(SIDE_X, yb, 0), "uprightRight");
+		}
 		var front = [0.0, -1, 0];
 		var railX = 2 * (SIDE_X - 20);
 		var railXFace = yb - 20 - railSpec.railHeight;
 		attach("railXUpper", LinearRail.metric(RAIL, railX), orient(-railX / 2, railXFace, beamZ[0], front, alongX), "beamUpper");
 		attach("railXLower", LinearRail.metric(RAIL, railX), orient(-railX / 2, railXFace, beamZ[1], front, alongX), "beamLower");
-		var outside = SIDE_X + 6;
-		attach("motorX", NemaStepper.frame(23), orient(outside, yb, X_SCREW_Z, up, [-1, 0, 0]), "uprightRight");
-		attach("screwX", new LeadScrew(thread, outside - shaft + beamLength / 2 - 4),
-			orient(outside - shaft, yb, X_SCREW_Z, up, [-1, 0, 0]), "uprightRight");
+		if (belts) beltX(yb, shaft);
+		else {
+			attach("motorX", NemaStepper.frame(23), motorXPose, "uprightRight");
+			driveScrew(specs[0], "screwX", "motorX", new LeadScrew(thread, outside - shaft + beamLength / 2 - 4),
+				orient(outside - shaft, yb, X_SCREW_Z, up, [-1, 0, 0]), [-1, 0, 0], [1, 0, 0]);
+		}
 
 		// X carriage, riding the X rails on the beams' front faces.
 		var xc = MACHINE_ZERO_X;
@@ -385,7 +551,8 @@ class CncRouter extends MachineAssembly {
 		attach("xPlate", new RouterPlate(120, plateThickness, xPlateHeight, "aluminium 6061", "X carriage plate"),
 			AssemblyFrames.translation(xc, blockFace - plateThickness / 2, xPlateBottom), "blockXUpper");
 		attach("blockXLower", LinearRailBlock.metric(RAIL), orient(xc, railXFace, beamZ[1], front, alongX), "xPlate");
-		attach("nutBracketX", new XNutBracket(), AssemblyFrames.translation(xc, yb, 0), "xPlate");
+		if (belts) attach("beltBracketX", new XBeltBracket(BELT_FAR_X(shaft), X_SCREW_Z - beltRadius()), AssemblyFrames.translation(xc, yb, 0), "xPlate");
+		else attach("nutBracketX", new XNutBracket(), AssemblyFrames.translation(xc, yb, 0), "xPlate");
 		var xPlateFront = blockFace - plateThickness;
 		var railZFace = xPlateFront - railSpec.railHeight;
 		var railZ = xPlateHeight;
@@ -396,11 +563,24 @@ class CncRouter extends MachineAssembly {
 		}
 		var xPlateTop = xPlateBottom + xPlateHeight;
 		var screwZY = railZFace + 1;
-		attach("motorBracketZ", new RouterPlate(70, 49, 8, "aluminium 6061", "Z motor bracket"),
-			AssemblyFrames.translation(xc, blockFace - 24.5, xPlateTop), "xPlate");
-		attach("motorZ", NemaStepper.frame(23), orient(xc, screwZY, xPlateTop + 8, [0, 1, 0], [0, 0, -1]), "motorBracketZ");
-		attach("screwZ", new LeadScrew(thread, xPlateTop + 8 - shaft - (xPlateBottom + 2)),
-			orient(xc, screwZY, xPlateTop + 8 - shaft, [0, 1, 0], [0, 0, -1]), "motorBracketZ");
+		// The Z screw runs in the narrow gap between the X and Z plates, too narrow for its coupling, so
+		// the motor stands on four spacers above its bracket and the coupling turns between them.
+		var bracketPose = AssemblyFrames.translation(xc, blockFace - 24.5, xPlateTop);
+		var bracketTop = xPlateTop + 8;
+		var coupling = new ShaftCoupling(motorY.variant.shaftDiameter, thread.screwDiameter);
+		var zFace = bracketTop + 1 + coupling.length / 2 + shaft;
+		var motorZPose = orient(xc, screwZY, zFace, [0, 1, 0], [0, 0, -1]);
+		attach("motorBracketZ", new RouterPlate(70, 49, 8, "aluminium 6061", "Z motor bracket", motorY,
+			AssemblyFrames.compose(AssemblyFrames.inverse(bracketPose), motorZPose)), bracketPose, "xPlate");
+		var standoff = new Standoff(8, zFace - bracketTop, motorY.mountScrew(10).clearanceDiameter(ClearanceFit.Medium));
+		var corner = 1;
+		for (bolt in motorY.boltPattern()) {
+			var at = AssemblyFrames.transformPoint(motorZPose, bolt.x, bolt.y, 0);
+			attach('standoffZ${corner++}', standoff, AssemblyFrames.translation(at.x, at.y, bracketTop), "motorBracketZ");
+		}
+		attach("motorZ", NemaStepper.frame(23), motorZPose, "motorBracketZ");
+		driveScrew(specs[2], "screwZ", "motorZ", new LeadScrew(thread, zFace - shaft - (xPlateBottom + 2)),
+			orient(xc, screwZY, zFace - shaft, [0, 1, 0], [0, 0, -1]), [0, 0, -1], [0, 0, 1]);
 
 		// Z slide and spindle. The Z blocks sit at the top of their rails at z = 0.
 		var zBlock = xPlateTop - railSpec.railEndMargin - railSpec.blockLength / 2 - 0.5;
@@ -466,7 +646,134 @@ class CncRouter extends MachineAssembly {
 		addMate('$id-mount', "fixed", parent, 'to-$id', id, 'attach-$id');
 	}
 
-	/** A member sliding on `parent` along a world axis; `pose` is where it sits at coordinate zero. */
+	/**
+	 * Motor `motor` turns lead screw `id` (at `pose`, its input end on the shaft tip, pointing
+	 * along world direction `along`) through a shaft coupling. Coupling and screw turn together on
+	 * a continuous joint `id-turn`, which coupling `id-lead` ties to `axis` (moving along world
+	 * `axisDirection`) by the screw's lead. The coupling is centred on the shaft tip and turns
+	 * inside the mount's pilot bore.
+	 */
+	function driveScrew(axis:RouterAxisSpec, id:String, motor:String, screw:LeadScrew, pose:AssemblyFrame,
+			along:Array<Float>, axisDirection:Array<Float>):Void {
+		var shaft = cast(component(motor), NemaStepper).variant.shaftDiameter;
+		var coupling = new ShaftCoupling(shaft, screw.thread.screwDiameter);
+		var grip = coupling.length / 2;
+		var couplingId = id + "Coupling";
+		addComponent(couplingId, coupling);
+		zeroPoses.set(couplingId, {x: pose.x - along[0] * grip, y: pose.y - along[1] * grip, z: pose.z - along[2] * grip,
+			qx: pose.qx, qy: pose.qy, qz: pose.qz, qw: pose.qw});
+		connect(motor, couplingId);
+		attach(id, screw, pose, couplingId);
+		// The screw's thread sets the ratio; the joint starts where the axis puts it.
+		var alongAxis = along[0] * axisDirection[0] + along[1] * axisDirection[1] + along[2] * axisDirection[2];
+		var ratio = addDrive('$id-lead', axis.id, '$id-turn', LeadScrew(id, alongAxis));
+		addMateOnAxis('$id-turn', "continuous", motor, 'to-$couplingId', couplingId, 'attach-$couplingId',
+			{x: along[0], y: along[1], z: along[2]}, ratio * axis.initial);
+		// The motor holds the screw's input end through the coupling. Nothing holds the far end, and the
+		// nut floats on the carriage, so it is no support: fixed at the motor, free at the far end, over
+		// the whole screw. That is what sets the screw's top speed.
+		supportScrew('$id-lead', Fixed, Free);
+		addMotor(motor, '$id-turn', motor, SUPPLY_VOLTS);
+	}
+
+	/** Pitch radius of the 20-tooth GT2 belt pulleys, in millimetres. */
+	static function beltRadius():Float
+		return TimingPulley.profileDimensions(GT2).pitch * BELT_TEETH / (2 * Math.PI);
+
+	/** Where the X belt's far edge lies behind the gantry's centre plane, with a millimetre of margin. */
+	static function BELT_FAR_X(shaft:Float):Float
+		return BELT_PLATE + 20 - shaft + BELT_WIDTH + 1;
+
+	/** A GT2 pulley of the router's size, bored for the motor shaft. */
+	function beltPulley():TimingPulley
+		return new TimingPulley(GT2, BELT_TEETH, motorY.variant.shaftDiameter, BELT_WIDTH);
+
+	/**
+	 * Pulley member `id`, already added at `pose` with its origin on its axis, turns on a continuous
+	 * joint `id-turn` about world direction `about` (the belt plane's normal, so the belt's own
+	 * rotation sign applies), coupled to `axis` through its belt. `rotation` is +1 when it turns
+	 * counter-clockwise about `about` as the carriage moves positively.
+	 */
+	function turnWithBelt(axis:RouterAxisSpec, id:String, parent:String, about:Array<Float>, rotation:Int,
+			?driven:TimingBelt):Void {
+		var ratio = addDrive('$id-belt', axis.id, '$id-turn', Belt(id, rotation));
+		// The belt's stretch is in the driving pulley's drive: its idler only follows.
+		if (driven != null) setDriveStiffness('$id-belt', driven.carriageStiffness(0));
+		addMateOnAxis('$id-turn', "continuous", parent, 'to-$id', id, 'attach-$id', {x: about[0], y: about[1], z: about[2]},
+			ratio * axis.initial);
+	}
+
+	/** Adds `component` at `pose` as a child of `parent` without a mate: the caller adds the joint. */
+	function hang(id:String, component:MachineComponent, pose:AssemblyFrame, parent:String):Void {
+		addComponent(id, component);
+		zeroPoses.set(id, pose);
+		connect(parent, id);
+	}
+
+	/**
+	 * X on a belt. The motor sits behind the gantry beams on a plate bolted to their back, its shaft
+	 * pointing forward into the gap between them, where its pulley takes the belt; the idler turns on
+	 * an axle in a second plate at the other end. The belt's lower strand (strand 0) is clamped to the
+	 * carriage's bracket.
+	 */
+	function beltX(yb:Float, shaft:Float):Void {
+		var up = [0.0, 0, 1];
+		var xm = X_BELT_END, tip = yb + BELT_PLATE + 20 - shaft;
+		var plateY = yb + 20 + BELT_PLATE / 2, plateZ = X_SCREW_Z - 32;
+		var motorPose = orient(xm, yb + 20 + BELT_PLATE, X_SCREW_Z, up, [0, -1, 0]);
+		var platePose = AssemblyFrames.translation(xm, plateY, plateZ);
+		attach("motorPlateX", new RouterPlate(60, BELT_PLATE, 64, "aluminium 6061", "Motor plate", motorY,
+			AssemblyFrames.compose(AssemblyFrames.inverse(platePose), motorPose)), platePose, "beamUpper");
+		attach("motorX", NemaStepper.frame(23), motorPose, "motorPlateX");
+		var belt = TimingBelt.twoPulley(GT2, BELT_TEETH, BELT_TEETH, 2 * xm, BELT_WIDTH);
+		var plane = orient(xm, tip, X_SCREW_Z, up, [0, 1, 0]);
+		attach("beltX", belt, plane, "beamUpper");
+		var turn = belt.rotation(0, 0, -1, 0);
+		hang("pulleyX", beltPulley(), plane, "motorX");
+		turnWithBelt(specs[0], "pulleyX", "motorX", [0, 1, 0], turn, belt);
+		var idlerPlate = AssemblyFrames.translation(-xm, plateY, plateZ);
+		attach("idlerPlateX", new RouterPlate(60, BELT_PLATE, 64, "aluminium 6061", "Idler plate"), idlerPlate, "beamUpper");
+		attach("axleX", new BeltAxle(motorY.variant.shaftDiameter, shaft - BELT_PLATE), orient(-xm, yb + 20, X_SCREW_Z, up, [0, -1, 0]),
+			"idlerPlateX");
+		hang("idlerX", beltPulley(), orient(-xm, tip, X_SCREW_Z, up, [0, 1, 0]), "axleX");
+		turnWithBelt(specs[0], "idlerX", "axleX", [0, 1, 0], belt.rotation(1, 0, -1, 0));
+		addMotor("motorX", "pulleyX-turn", "motorX", SUPPLY_VOLTS);
+	}
+
+	/**
+	 * Y on a belt, one per side, in the vertical plane outside the frame. The motor stands on a plate
+	 * behind the frame with its shaft pointing inward through it to the pulley; the idler turns on an
+	 * axle at the front. The lower strand (strand 0) is clamped to the gantry's bracket.
+	 */
+	function beltY(side:Int, name:String, shaft:Float):Void {
+		var up = [0.0, 0, 1], s:Float = side;
+		var inner = Y_BELT_X - BELT_WIDTH / 2;
+		var faceX = s * (inner + shaft), plateX = s * (inner + shaft - BELT_PLATE / 2);
+		var end = Y_BELT_END;
+		var motorPose = orient(faceX, end, Y_SCREW_Z, up, [-s, 0, 0]);
+		var platePose = AssemblyFrames.translation(plateX, end, 0);
+		place('motorPlateY$name', new RouterPlate(BELT_PLATE, 60, 60, "aluminium 6061", "Motor plate", motorY,
+			AssemblyFrames.compose(AssemblyFrames.inverse(platePose), motorPose)), platePose);
+		place('motorY$name', side < 0 ? motorY : NemaStepper.frame(23), motorPose);
+		var belt = TimingBelt.twoPulley(GT2, BELT_TEETH, BELT_TEETH, 2 * end, BELT_WIDTH);
+		var plane = orient(s * Y_BELT_X + BELT_WIDTH / 2, end, Y_SCREW_Z, up, [-1, 0, 0]);
+		place('beltY$name', belt, plane);
+		hang('pulleyY$name', beltPulley(), plane, 'motorY$name');
+		turnWithBelt(specs[1], 'pulleyY$name', 'motorY$name', [-1, 0, 0], belt.rotation(0, 0, -1, 0), belt);
+		var idlerPlate = AssemblyFrames.translation(plateX, -end, 0);
+		place('idlerPlateY$name', new RouterPlate(BELT_PLATE, 60, 60, "aluminium 6061", "Idler plate"), idlerPlate);
+		attach('axleY$name', new BeltAxle(motorY.variant.shaftDiameter, shaft - BELT_PLATE),
+			orient(s * (inner + shaft - BELT_PLATE), -end, Y_SCREW_Z, up, [-s, 0, 0]), 'idlerPlateY$name');
+		hang('idlerY$name', beltPulley(), orient(s * Y_BELT_X + BELT_WIDTH / 2, -end, Y_SCREW_Z, up, [-1, 0, 0]), 'axleY$name');
+		turnWithBelt(specs[1], 'idlerY$name', 'axleY$name', [-1, 0, 0], belt.rotation(1, 0, -1, 0));
+		addMotor('motorY$name', 'pulleyY$name-turn', 'motorY$name', SUPPLY_VOLTS);
+	}
+
+	function component(id:String):MachineComponent {
+		for (entry in components()) if (entry.id == id) return entry.component;
+		throw 'CNC router has no member "$id" yet';
+	}
+
 	/**
 	 * A rail block sliding on its rail (`parent`) along a world axis; `pose` is where it sits at
 	 * coordinate zero. The axis's overtravel is the room its block has left on the rail at either end
@@ -490,8 +797,7 @@ class CncRouter extends MachineAssembly {
 		zeroPoses.set(id, pose);
 		connect(parent, id);
 		addMateOnAxis(spec.id, "prismatic", parent, 'to-$id', id, 'attach-$id', axis, spec.initial,
-			{lower: spec.lower, upper: spec.upper, velocity: spec.velocity, effort: spec.effort, overtravel: room,
-				acceleration: spec.acceleration});
+			{lower: spec.lower, upper: spec.upper, velocity: null, effort: null, overtravel: room});
 	}
 
 	/**

@@ -7,9 +7,11 @@ import cnckit.CncCompiler;
 import cnckit.CncController;
 import cnckit.CncDiagnostic.CncSeverity;
 import robotkit.model.Joint;
-import robotkit.model.JointLimits;
 import robotkit.model.Link;
 import robotkit.model.RobotModel;
+import robotkit.device.DeviceBinding;
+import robotkit.device.DeviceLayout;
+import robotkit.model.SteadyLoads;
 import robotkit.runtime.Simulation;
 import robotkit.world.ProcessChannelDeclaration;
 import robotkit.world.ProcessEventValue;
@@ -25,6 +27,9 @@ import motionkit.program.MotionProgram;
 import motionkit.robot.AxisKinematics;
 import motionkit.robot.ManipulatorMotion;
 import motionkit.robot.MotionSystemBlueprint;
+import motionkit.robot.PlanCheck;
+import motionkit.robot.PlanCheck.PlanCheckOptions;
+import motionkit.robot.PlanCheckSummary;
 import nativekit.sim.SimSession;
 import toolpathkit.motion.MachineBinding;
 import toolpathkit.motion.ToolpathMotion;
@@ -60,6 +65,8 @@ typedef CncJob = {
 	@:optional var toolPart:String;
 	/** The tool in the spindle when the job starts. */
 	@:optional var loadedTool:Int;
+	/** The controller the machine's steppers are nominally wired to; its step rate caps the axes. */
+	@:optional var controller:{microsteps:Int, stepTickHz:Int};
 }
 
 /**
@@ -124,6 +131,8 @@ class CncProgramPlayer implements SessionMember {
 	var passCounted = false;
 	/** Why the program stopped, when it failed. */
 	public var failure(default, null):Null<String> = null;
+	/** What the plan check assumes and allows, as the player was given it. */
+	public final checkOptions:PlanCheckOptions;
 	/** The G-code line the machine is executing; 0 between lines. */
 	public var currentLine(default, null):Int = 0;
 	/** Speed of every move, as a fraction of the program's. */
@@ -142,7 +151,7 @@ class CncProgramPlayer implements SessionMember {
 	 * with that pose as its offset.
 	 */
 	public function new(job:CncJob, robot:AssemblyRobot, simulation:Simulation,
-			project:ProjectDocumentSession, session:SimSession) {
+			project:ProjectDocumentSession, session:SimSession, ?check:PlanCheckOptions) {
 		if (job.axes.length != 3) throw "A CNC job needs its X, Y and Z axes";
 		var definition = project.projectAssemblyDefinition, physical = project.projectPhysical;
 		if (definition == null || physical == null) throw "A CNC job needs the project's machine";
@@ -152,6 +161,14 @@ class CncProgramPlayer implements SessionMember {
 		this.loop = job.loop;
 		this.source = job.source;
 		var placement = new AssemblyState(definition, state);
+		checkOptions = check == null ? new PlanCheckOptions() : check.copy();
+		var steady = checkOptions.steady;
+		// The controller's step rate caps what the motors could do: the same binding a device deployment makes.
+		var machineModel = robot.model;
+		var wiring = job.controller;
+		if (wiring != null)
+			machineModel = DeviceBinding.bind(robot.model, DeviceLayout.forActuators(robot.model, wiring.microsteps),
+				wiring.stepTickHz).model;
 		var axes:Array<MotionAxisBlueprint> = [];
 		var start:Array<Float> = [];
 		// Rapids ask for the fastest axis speed; the planner still holds each joint to its own limit.
@@ -161,14 +178,19 @@ class CncProgramPlayer implements SessionMember {
 			if (joint.length != 1 || Std.string(joint[0].type) != "prismatic")
 				throw 'CNC axis "$id" must be a prismatic joint of the machine';
 			var limits = joint[0].limits;
-			var lower = limits.lower, upper = limits.upper, velocity = limits.velocity, acceleration = limits.acceleration;
-			if (lower == null || upper == null || velocity == null || acceleration == null)
-				throw 'CNC axis "$id" needs travel, velocity and acceleration limits';
+			var lower = limits.lower, upper = limits.upper;
+			if (lower == null || upper == null) throw 'CNC axis "$id" needs travel limits';
 			var initial = placement.joint(id) * metresPerUnit;
 			start.push(initial);
-			rapid = Math.max(rapid, velocity * metresPerUnit);
+			// The axis is as fast as the joints turning with it and their motors allow, such as its
+			// lead screw and the motor turning it.
+			// Gravity, rail friction and the drives' drag come off what the motors can accelerate with.
+			var coupled = machineModel.coupledLimits(id, steady);
+			if (!(coupled.velocity > 0) || !(coupled.maxAcceleration > 0))
+				throw 'CNC axis "$id" needs velocity and acceleration limits, its own or its motors\'';
+			rapid = Math.max(rapid, coupled.velocity);
 			axes.push(new MotionAxisBlueprint(id, [id], lower * metresPerUnit, upper * metresPerUnit,
-				velocity * metresPerUnit, acceleration * metresPerUnit, initial, [1.0], [-initial]));
+				coupled.velocity, coupled.maxAcceleration, initial, [1.0], [-initial]));
 		}
 		// Plan over the three axes alone: the machine's other joints are fixed mounts, and planning
 		// them all made compiling a short program take many seconds.
@@ -176,10 +198,13 @@ class CncProgramPlayer implements SessionMember {
 		var top = [for (joint in definition.joints) if (joint.id == job.axes[2]) joint][0].limits.upper;
 		if (top == null) throw "The machine's Z axis needs an upper limit";
 		recipe = new MachiningRecipe(0.01, 0.0, top * metresPerUnit - 0.001);
-		var planning = planningModel(robot.model, job.axes);
+		var planning = planningModel(machineModel, job.axes, steady);
 		var machine = new MachineBinding("machine", job.axes[0], job.axes[1], job.axes[2], rapid);
 		var binding = new ToolpathMotionBinding(machine,
 			new MotionSystemBlueprint(planning.model, robot.blueprint, axes, session.fixedTimestep()));
+		// Every plan the compiler makes is checked against the motors' drives: torque along the plan and
+		// the drives' stretch. The findings are on the plan, and summed in `planChecks()`.
+		binding.compiler.planCheck = new PlanCheck(machineModel, job.axes, checkOptions);
 		var controller = new CncController();
 		for (tool in job.tools) {
 			controller.toolLibrary.set(tool);
@@ -338,6 +363,19 @@ class CncProgramPlayer implements SessionMember {
 		}
 	}
 
+	/** What the plan checks have found in the plans the machine has started: stall and accuracy findings and how near the drives came. */
+	public function planChecks():PlanCheckSummary return motion.checks;
+
+	/** A finding in words, with the G-code line of its op when the program knows it. */
+	public function describe(diagnostic:motionkit.trajectory.PlanDiagnostic):String {
+		var line = 0;
+		if (diagnostic.opIndex >= 0 && sourceMap != null) {
+			var found = sourceMap.provenanceAt(diagnostic.opIndex, Math.max(0.0, diagnostic.pathDistance));
+			if (found != null) line = found.line;
+		}
+		return diagnostic.describe(line);
+	}
+
 	/** The program's G-code, one entry per line. */
 	public function sourceLines():Array<String> return source.split("\n");
 
@@ -401,6 +439,8 @@ class CncProgramPlayer implements SessionMember {
 	}
 
 	/** The session is back at its start, and the robot with it: run the program again on fresh stock. */
+	public function beforeReset():Void {}
+
 	public function reset():Void {
 		motion = newMotion();
 		if (speedOverride != 1.0) motion.setSpeedOverride(speedOverride);
@@ -454,9 +494,11 @@ class CncProgramPlayer implements SessionMember {
 
 	/**
 	 * A serial chain of just the machine's axis joints, with their types, axes and limits, for the
-	 * planner, and each joint's index in the full model, where plans are executed.
+	 * planner, and each joint's index in the full model, where plans are executed. Joints coupled
+	 * to an axis, such as its lead screws, are left out: the runtime turns them with their axis,
+	 * and their limits are folded into the axis's.
 	 */
-	static function planningModel(model:RobotModel, axes:Array<String>):{model:RobotModel, indices:Array<Int>} {
+	static function planningModel(model:RobotModel, axes:Array<String>, steady:SteadyLoads):{model:RobotModel, indices:Array<Int>} {
 		var planning = new RobotModel(model.name + ".axes");
 		var parent = planning.addLink(new Link("machine.base"));
 		var indices:Array<Int> = [];
@@ -468,9 +510,7 @@ class CncProgramPlayer implements SessionMember {
 			var child = planning.addLink(new Link(id + ".carriage"));
 			var joint = planning.addJoint(new Joint(id, source.type, parent, child, source.id));
 			joint.axis = source.axis.copy();
-			var limits = source.limits;
-			joint.limits = new JointLimits(limits.lower, limits.upper, limits.velocity, limits.effort, limits.maxAcceleration);
-			joint.limits.overtravel = limits.overtravel;
+			joint.limits = model.coupledLimits(source.id, steady);
 			indices.push(index);
 			parent = child;
 		}

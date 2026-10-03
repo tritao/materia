@@ -33,6 +33,10 @@ class SceneViewCommands {
       app.preferences.store.set(AppSettings.GRID_VISIBLE, PropertyValue.Bool(!app.gridVisible));
       app.log(app.gridVisible ? "Grid enabled" : "Grid disabled");
     }, null, null, function() return app.gridVisible));
+    app.commands.register(new Command("scene.toggle-simulation-overlays", "Toggle simulation overlays", function() {
+      app.preferences.store.set(AppSettings.SIMULATION_OVERLAYS, PropertyValue.Bool(!app.simulationOverlaysVisible));
+      app.log(app.simulationOverlaysVisible ? "Simulation overlays shown" : "Simulation overlays hidden");
+    }, null, null, function() return app.simulationOverlaysVisible));
     app.commands.register(new Command("scene.toggle-grid-snap", "Toggle grid snapping", function() {
       app.preferences.store.set(AppSettings.GRID_SNAP, PropertyValue.Bool(!app.gridSnapEnabled));
       app.log(app.gridSnapEnabled ? "Grid snapping enabled" : "Grid snapping disabled");

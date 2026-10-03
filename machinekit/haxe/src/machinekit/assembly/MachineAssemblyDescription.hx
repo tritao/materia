@@ -235,6 +235,43 @@ import machinekit.component.PortInterface;
 	@:id(3) Attached(kg:Float, instanceId:String, x:Float, y:Float, z:Float);
 }
 
+/**
+ * A coupling whose ratio its parts set (see `Drive`): `kind` is "lead-screw", "gear-mesh",
+ * "rack-and-pinion" or "belt", `members` the parts in the order the drive names them, and the
+ * follower sits at zero where the leader is at `leaderZero`.
+ */
+@:wire typedef DriveRecord = {
+	@:id(1) var coupling:String;
+	@:id(2) var kind:String;
+	@:id(3) var members:ReadOnlyArray<String>;
+	@:id(4) var alignment:Float;
+	@:id(5) var leaderZero:Float;
+	/** Stiffness of the drive at the leader, N per leader unit (mm); absent means rigid. */
+	@:id(6) @:optional var stiffness:Null<Float>;
+	/** Lost motion on reversal, in leader units; absent takes the drive kind's allowance (see `DriveDefaults`). */
+	@:id(7) @:optional var backlash:Null<Float>;
+	/** Drag torque at the follower while it moves, N m; absent takes the drive kind's allowance. */
+	@:id(8) @:optional var drag:Null<Float>;
+	/** How a lead screw's end nearest its motor is held: "free", "simple" or "fixed". */
+	@:id(9) @:optional var nearSupport:Null<String>;
+	/** How its far end is held. */
+	@:id(10) @:optional var farSupport:Null<String>;
+	/** Longest unsupported stretch of the screw in mm; absent means the whole screw. */
+	@:id(11) @:optional var unsupported:Null<Float>;
+}
+
+/**
+ * A stepper motor member driving a joint on a `volts` supply, its actuator given `margin` of the
+ * motor's holding torque (see `MachineAssembly.addMotor`).
+ */
+@:wire typedef MotorRecord = {
+	@:id(1) var actuator:String;
+	@:id(2) var joint:String;
+	@:id(3) var motor:String;
+	@:id(4) var volts:Float;
+	@:id(5) var margin:Float;
+}
+
 @:wire typedef AssemblySideRecord = {
 	@:id(1) var members:ReadOnlyArray<MemberRecord>;
 	@:id(2) var portConnections:ReadOnlyArray<PortConnectionRecord>;
@@ -247,6 +284,8 @@ import machinekit.component.PortInterface;
 	@:id(9) @:optional var tools:ReadOnlyArray<ToolRecord>;
 	@:id(10) var ports:ReadOnlyArray<PortRecord>;
 	@:id(11) var included:ReadOnlyArray<IncludedRecord>;
+	@:id(12) @:optional var drives:ReadOnlyArray<DriveRecord>;
+	@:id(13) @:optional var motors:ReadOnlyArray<MotorRecord>;
 }
 
 /** Mechanical definition plus the MachineKit facts keyed by occurrence ID. */

@@ -55,7 +55,8 @@ class PlanExecutor {
     if (ExecutionPlan.COEFFICIENT_STRIDE != SegmentArrays.STRIDE)
       throw "MotionKit and RobotKit disagree on the segment coefficient layout";
     var arrays = new SegmentArrays(plan.segmentStarts(), plan.segmentDurations(),
-      plan.segmentDegrees(), plan.segmentCoefficients(), jointIndices, fixedPositions);
+      plan.segmentDegrees(), plan.segmentCoefficients(), jointIndices, fixedPositions,
+      robot.description().couplings);
     planArrays = arrays;
     this.plan = plan;
     this.endsAtRest = endsAtRest;
@@ -164,7 +165,7 @@ class PlanExecutor {
     var active = plan, arrays = planArrays;
     if (active == null || arrays == null) throw "PlanExecutor needs an active plan";
     return stream.programSubmission(active, arrays, first, last, tag, startNs, endNs,
-      expanded, chunkEvents, endsAtRest, jerkUnchecked);
+      chunkEvents, endsAtRest, jerkUnchecked);
   }
 
   function chunkEvents(startNs:Int64, endNs:Int64,
@@ -191,10 +192,4 @@ class PlanExecutor {
     return events;
   }
 
-  function expanded(values:Array<Float>, baseline:Array<Float>):Array<Float> {
-    var result = baseline.copy();
-    for (joint in 0...jointIndices.length)
-      result[jointIndices[joint]] = values[joint];
-    return result;
-  }
 }
