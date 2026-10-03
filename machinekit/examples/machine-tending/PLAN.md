@@ -167,7 +167,7 @@ The arm reaches about 0.73 m from shoulder to flange, and the gripper adds about
   - `mobile-welder`, for `ArmTool`, `ArmClearance`, `ConvexDistance`, `ProgramPlanner.shutdown()` and the mission machinery. Its W4 work was still uncommitted on 2026-10-03; wait for that session to commit it.
   - `x7-transmissions` (X7 T1–T5, X8), for the transmission names MT1 builds on and the controller split MT5 derives membership from.
 - MT1–MT3 can start before X8, but they use the post-X7 `Transmission` API, so do not write against `Drive`.
-- Populate submodules only when a step needs them, (clone each from the main checkout or a worktree at the pin): haxeon, nativekit, motionkit vendors, mujoco, coal, proxsuite, eigen. Check `df -h /` first; there was 9.9 GB free on 2026-10-03.
+- Populate submodules only when a step needs them (clone each from the main checkout or a worktree at the pin): haxeon, nativekit, motionkit vendors, mujoco, coal, proxsuite, eigen. Check `df -h /` first; there was 9.9 GB free on 2026-10-03.
 - `CADKIT_OCCT_DIR` points at the shared prebuilt OCCT. Never rebuild it.
 
 **MT1. Mill parts.**
