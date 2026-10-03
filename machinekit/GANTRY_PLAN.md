@@ -17,11 +17,13 @@ drives, and nothing is written twice. See [TRANSMISSION_PLAN.md](TRANSMISSION_PL
 model this builds on.
 
 Branch `gantries`, worktree `/home/joao/dev/materia-worktrees/gantries`. It is based on local main
-`4b952231f`:
+`712019dbc`:
 - transmissions X1–X9 complete, with X9's full-suite gate passed;
 - the robot welder W0–W3 and the first part of W4: torch tools, `weld` steps, `WeldingPlanRunner`,
   `ArmClearance`;
-- the X10 plan.
+- transmissions X10 (belt reductions and loops between shafts, its gate passed) and the X9e review
+  fixes;
+- the RobotKit restructuring plan, `robotkit/RESTRUCTURE_PLAN.md`.
 
 The merge commit says it was not built or tested after the merge.
 
@@ -242,7 +244,31 @@ only in their frame and spec.**
   the same robot from two players.
 - Cells with several independent robots wait for MT6 `controllers`.
 
-## Steps
+## Coordination with the RobotKit restructuring (R0–R6)
+
+`robotkit/RESTRUCTURE_PLAN.md` was planned on 2026-10-03, to start after X9e, which is now on main.
+It moves and renames code this plan touches. Rules:
+
+- **Placement (R2).** New robot *kinds* are a `RobotProfile`, never a new `RobotModel` field.
+  - G3's derived external axes belong in the `Manipulator(…)` profile once R2 has landed. Until
+    then, derive them in `Manipulator`, in one function that R2 can move as is.
+  - Switches (G10) are physical sensors, so they belong on the model, as encoders are.
+  - "Referenced" (G11) is runtime state, so it belongs in the runtime.
+- **Process code (R3).** `SurfacePlanRunner`, `ToolpathPlanRunner`, `WeldPlan`/`WeldRunner`/`WeldSeam`
+  and `SimulatedWelder` move to ProcessKit. Keep G1's and G15's changes to them small and
+  self-contained, so they merge across that move. If R3 has landed, edit them in ProcessKit.
+- **Packages (R5).**
+  - Generic gantry mechanisms go in RobotKit core or autonomy: `HomingCycle` in MotionKit,
+    `PlanningLimits` in motionkit-robot.
+  - Simulation-only pieces (`SwitchReading`'s simulated trips) go where `robotkit-sim` will be.
+  - Nothing new may make RobotKit core depend on SimKit or VisionKit.
+- **Device protocol (R0).**
+  - G8 and G13 change RKD. If R0's renaming is in flight, do G13 after it lands, and use the new
+    naming and versioning scheme.
+  - G8's grouping fix is small; do it under the current names if R0 hasn't started.
+- **Merging.** Restructuring phases arrive through local main (G4). Their moves are mechanical
+  commits, so merge them as soon as they land rather than letting the branch drift.
+
 
 ### Phase A — planning (no machinekit assembly changes; can start now)
 
