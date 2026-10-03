@@ -24,6 +24,11 @@ to work.
   - `app/tests/src/app/ProjectSourceTests.hx`.
 - **Another session builds on this code.** A Codex session in the `machine-tending` worktree (MT1–MT5) uses `ArmTool`,
   `ArmClearance` and the mission machinery from this branch. Its gripper tool implements `ArmTool`.
+  - It is also reworking `RobotArm.hx` for drive geometry (`GearedArmJoint`, gearbox size, driver and power-supply
+    members); that branch was at MT2, `73a14c58e`, on 2026-10-03.
+  - **Keep the welder's change to `RobotArm.hx` as small as possible, ideally none.** Give the welding tool's ready pose
+    from `WeldingCell` or the tool's constructor, not by editing the arm's spec table, so the next sync does not collide
+    with theirs.
 - **Uncommitted W4 work in progress** sits in the worktree from a session that stopped midway. Its state is unknown, and
   it may not compile:
   - `processkit/WeldCorner.hx`: the corner-turn rule;
