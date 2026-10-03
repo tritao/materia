@@ -16,15 +16,18 @@ The machines are built from parts as the router and CoreXY plotter are. Their li
 drives, and nothing is written twice. See [TRANSMISSION_PLAN.md](TRANSMISSION_PLAN.md) for the drive
 model this builds on.
 
-Branch `gantries`, worktree `/home/joao/dev/materia-worktrees/gantries`. It is based on
-`x7-transmissions` at `b9270efa9`:
-- transmissions X1–X6, X7 T1–T5 and X8;
-- X9a–X9d, still in the X9 session's final validation (unverified fixups, so `x7-transmissions` may
-  be rewritten);
-- local main 1048bf768.
+Branch `gantries`, worktree `/home/joao/dev/materia-worktrees/gantries`. It is based on local main
+`4b952231f`:
+- transmissions X1–X9 complete, with X9's full-suite gate passed;
+- the robot welder W0–W3 and the first part of W4: torch tools, `weld` steps, `WeldingPlanRunner`,
+  `ArmClearance`;
+- the X10 plan.
+
+The merge commit says it was not built or tested after the merge.
 
 The survey below was taken at `aaa2b911a` (X7 T1). X7–X9 renamed `Drive`→`Transmission`, split the
-motor and driver, and put the drive-derived limits into the compiled `RobotModel`.
+motor and driver, put the drive-derived limits into the compiled `RobotModel`, and removed
+saved-data compatibility.
 
 ## What exists (survey 2026-10-03, at aaa2b911a)
 
@@ -307,19 +310,14 @@ only in their frame and spec.**
 
 ### Phase B — the gantry assembly (needs X7 T2 committed)
 
-**G4. Take X9's final state.**
-- The branch already contains X7, X8 and X9a–d up to `b9270efa9`. When the X9 session finishes (its
-  plan's X9 status line says the full-suite gate passed), bring its final commits in:
-  - if `x7-transmissions` still contains `b9270efa9`, merge it;
-  - if it was rewritten (fixups squashed), `git rebase --onto <new x7-transmissions> b9270efa9
-    gantries`.
-- Then rerun the full suite and re-record the baselines.
-- Until then, nothing waits on G4. A suite failure that is X9's (it fails the same way at
-  `b9270efa9` without your changes) is noted and not fixed here. From here on, write against `Transmission`/`addTransmission`.
-- Merge again at later step boundaries whenever X7 or X8 has new committed steps, so the gantry
-  never diverges from the drive API. Resolve conflicts in favour of X7's API.
-- If X8 has landed, use `addMotor(…, driver, …)`.
-- Never merge uncommitted work from another worktree.
+**G4. Keep up with main.**
+- X7–X9 are already in the base (main `4b952231f`).
+- At step boundaries, merge local `main` when it gains work this plan uses:
+  - X10, belt reductions and loops between shafts, from `x7-transmissions`. It matters for belt
+    axes in G5–G7.
+  - Machine-tending MT1–MT3: ball screws, HGR rails, `CobotArm`, the shared tool interface.
+  - The rest of the welder's W4–W6.
+- Never merge those branches directly: only what has reached `main`.
 
 **G5. Shared axis builder** (G-D6).
 - Extract the duplicated helpers from `CncRouter` and `CoreXyPlotter` into
@@ -441,7 +439,7 @@ only in their frame and spec.**
   - Nucleo `cargo check --offline`;
   - pin assignment written down for the bench but not verified (no hardware).
 
-### Phase D — rotary heads and the process gantry (needs `mobile-welder` merged to local main)
+### Phase D — rotary heads and the process gantry
 
 **G14. Rotary heads.**
 - `machinekit.gantry.RotaryHead` assemblies:
@@ -455,8 +453,9 @@ only in their frame and spec.**
   needed (G-D1).
 
 **G15. Gantry welder example** (kind 2).
-- Prerequisite: merge local main once `mobile-welder` is merged there, or `mobile-welder` itself if
-  its owner says it is finished. Never pick up its uncommitted W4.
+- The welding stack is on main: torch tools, `weld` steps and `WeldingPlanRunner`. W4–W6 (whole
+  weldment, weave and multipass, real I/O) are being finished by another session. Use what is on
+  main, and pick up more via G4 when it lands.
 - `machinekit/examples/gantry-welder/`: a `CaHead` gantry with the welding torch on the flange,
   welding the robot-welder weldment (plate T-joint + tube frame) on a table.
 - `WeldingPlanRunner`:
@@ -497,24 +496,22 @@ only in their frame and spec.**
 ## Order
 
 **Updated 2026-10-03:**
-- The branch is based on X9's committed work, so Phases A, B and C can all go ahead now.
-- G4 is only taking X9's final commits when it finishes; do it at the next step boundary after
-  that.
+- The branch is based on main with X7–X9 and the welder merged, so every phase can go ahead now.
+- G4 is just keeping up with main.
 - Saved data follows X9's policy: one schema version per format, no migration or compatibility code.
 
 ```
 G0 → G1 → G2 → G3 ─────────────────────────────┐
                  G0 → G5 → G6 → G7 → G8 → G9
-            (X9 finished) → G4 at the next step boundary
+                                  G6 → G14 → G15
+            (main gains X10 / MT1–MT3 / W4–W6) → G4 at the next step boundary
                                     G6 → G10 → G11 → G12 → G13
-            (mobile-welder on main) → G14 → G15
                               G3 + G6 → G16 → G17 → G18
 ```
 
-- Phase A can start at once. If X7 T2 still isn't committed when G3 is done, go on to anything
-  that doesn't need the assembly API (G13's protocol design, G2 follow-ups), and check again.
-- Phase D waits for `mobile-welder`. If it hasn't landed when B, C and E are done, stop and report
-  instead of merging unfinished work.
+- Phase D's gantry welder uses the welding stack already on main. Whole-weldment features come with
+  W4–W6 through G4. If they haven't landed by the end, weld the seams main supports and report
+  the rest.
 
 ## Later
 
