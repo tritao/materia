@@ -584,6 +584,7 @@ class FrameworkSmoke {
 			return 30;
 		if (!commandHistoryValid(context))
 			return 230;
+		if (!smoothScrollValid(context)) throw "smooth scrolling motion or lifetime regression";
 		if (!sidebarValid(context)) throw "sidebar registry, persistence or lazy provider regression";
 		if (!dockWorkspaceValid(context))
 			return 231;
@@ -4693,6 +4694,51 @@ class FrameworkSmoke {
 		if (disabledRuns != 0)
 			return false;
 		return true;
+	}
+
+	static function smoothScrollValid(context:UiContext):Bool {
+		var motion = new ScrollController(); motion.configureAnimation(true);
+		motion.scrollBy(0, 100); motion.advance(1.0 / 60.0);
+		if (motion.offsetY <= 40 || motion.offsetY >= 100) return false;
+		for (_ in 0...7) motion.advance(1.0 / 60.0);
+		if (motion.offsetY < 99) return false;
+		motion.jumpTo(0, 0); motion.scrollBy(0, 100); motion.advance(1.0 / 60.0);
+		var before = motion.offsetY; motion.scrollBy(0, -20); motion.advance(1.0 / 60.0);
+		if (motion.offsetY >= before) return false;
+		var slow = new ScrollController(), fast = new ScrollController();
+		slow.configureAnimation(true); fast.configureAnimation(true);
+		slow.scrollBy(1000, 1000); fast.scrollBy(1000, 1000);
+		for (_ in 0...3) slow.advance(1.0 / 30.0);
+		for (_ in 0...12) fast.advance(1.0 / 120.0);
+		if (Math.abs(slow.offsetY - fast.offsetY) > 0.000001) return false;
+		motion.jumpTo(0, 30); if (motion.advance(0.1) || motion.offsetY != 30) return false;
+		motion.configureAnimation(true, 0); motion.scrollBy(0, 10);
+		if (motion.offsetY != 40) return false;
+		motion.configureAnimation(true); motion.scrollBy(0, 100); motion.configureAnimation(false);
+		if (motion.offsetY != 140 || motion.advance(0.1)) return false;
+		var style = new LayoutStyle(); style.width = LayoutAxis.fixed(200); style.height = LayoutAxis.fixed(100);
+		var content = new LayoutStyle(); content.width = LayoutAxis.fixed(200); content.height = LayoutAxis.fixed(1000);
+		var frame = new LayoutFrame(200, 100); frame.deltaSeconds = 0;
+		var mounted = new ScrollController(); mounted.configureAnimation(true);
+		context.submit(new ScrollView("smooth-lifetime", new Column("content", [], content), style, ScrollAxis.Vertical, mounted), frame);
+		context.scroll(20, 20, 0, 100);
+		if (mounted.offsetY != 0 || context.animations.activeCount != 1) return false;
+		frame.deltaSeconds = 1.0 / 60.0;
+		context.submit(new ScrollView("smooth-lifetime", new Column("content", [], content), style, ScrollAxis.Vertical, mounted), frame);
+		if (mounted.offsetY <= 40 || mounted.offsetY >= 100) return false;
+		var replacement = new ScrollController(); replacement.configureAnimation(true);
+		frame.deltaSeconds = 0;
+		context.submit(new ScrollView("smooth-lifetime", new Column("content", [], content), style, ScrollAxis.Vertical, replacement), frame);
+		if (context.animations.activeCount != 0) return false;
+		replacement.scrollBy(0, 100);
+		if (context.animations.activeCount != 1) return false;
+		// Moving a supplied controller creates the new mount before retiring the old one.
+		context.submit(new ScrollView("smooth-moved", new Column("content", [], content), style, ScrollAxis.Vertical, replacement), frame);
+		if (context.animations.activeCount != 1) throw "old scroll mount detached replacement binding";
+		context.animations.advance(1.0 / 60.0);
+		if (replacement.offsetY <= 40) return false;
+		context.submit(new Text("unmounted"), frame);
+		return context.animations.activeCount == 0 && !replacement.advance(0.1);
 	}
 
 	static function sidebarValid(context:UiContext):Bool {
