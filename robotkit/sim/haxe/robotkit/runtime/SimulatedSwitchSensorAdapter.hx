@@ -62,7 +62,10 @@ class SimulatedSwitchSensorAdapter implements SimulationStepObserver {
     var positions = readPositions();
     if (positions == null || positions.length != jointCount)
       throw "Switch actual-position reader returned the wrong joint count";
-    var counters = runtime.snapshot().q.toArray();
+    // Use the joint sample's source time, avoiding rounding differences between
+    // the session's floating-point clock and the observer's integer tick clock.
+    var snapshot = runtime.snapshot();
+    var counters = snapshot.q.toArray();
     sequence = Int64.add(sequence, Int64.ofInt(1));
     for (i in 0...readings.length) {
       var value = readings[i];
@@ -74,7 +77,7 @@ class SimulatedSwitchSensorAdapter implements SimulationStepObserver {
         drives[i].position(positions[joint]);
       runtime.publishSensorFrame(value.source.id,
         [active ? 1.0 : 0.0, edge == null ? 0.0 : 1.0, edge == null ? 0.0 : edge, value.closingEdges], sequence,
-        sourceTimestampNs, clockId, null);
+        snapshot.sourceTimestampNs, clockId, null);
     }
   }
 }

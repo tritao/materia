@@ -2297,3 +2297,15 @@ own infeed/target pad footprint and height. Other fixed-root contacts, moving
 link contacts and deeper penetration still fail. Recompiling the app test
 entry for the justified picker retry. G12 is not verified and G13 is unstarted
 until the picker completes.
+
+### G12 checkpoint — switch and joint source timestamps
+
+The carton-support assertion compiled and the picker advanced into homing,
+where switchZhome failed freshness validation. Simulation publishes joint
+snapshots using a floating-point session-time conversion, but the Haxe step
+observer had stamped switches from its separately accumulated integer clock.
+A rounding difference can place a switch in the future relative to its joint
+observation, which the strict validator correctly rejects. Switch publication
+now uses the timestamp of the same runtime joint snapshot used for its counter
+conversion. Sequence checks and clock compatibility remain strict. Recompiling
+the app entry for a picker retry; this is not yet a verified homing integration.
