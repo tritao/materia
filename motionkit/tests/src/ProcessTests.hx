@@ -222,7 +222,7 @@ class ProcessTests extends MotionKitTestSupport {
     var ratio = Math.abs(blueprint.model.couplings[0].ratio);
     actuator.maxRate = 0.02 * ratio;
     blueprint.model.materializeLimits();
-    var limited = RobotRuntimeCompiler.compile(blueprint.model);
+    var limited = RobotRuntimeCompiler.compile(blueprint.model, new robotkit.profile.RobotProfile());
     near(limited.joints[0].requireRate(), 0.02,
       "lead-screw motor rate converts to the tighter joint-space limit");
     var simulationHarness = new SimulationHarness(0.01);

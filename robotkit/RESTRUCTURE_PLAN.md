@@ -119,6 +119,24 @@ local main before R2 begins.
 
 ## R2 — `RobotModel` is mechanical truth; interpretation is a profile
 
+Completed on 2026-10-04 after R1's main merge `bce647683`. Mechanical role
+configuration types moved in a separate commit. RobotModel schema 9 contains
+mechanical truth only; RobotProfile schema 1 owns composable mobile and fork
+roles. The compiler requires both records and validates stable IDs. CAD,
+authoring/undo, manipulation, factories, robotd and deployment consumers use
+that pair. SerialDeployment is schema 6; saved authoring records explicitly
+contain canonical model and profile records. Earlier formats are rejected.
+
+All required checks passed: workspace (4,950 RobotWorld and 9,865 MotionKit
+assertions), all 52 compile targets, all RobotKit suites and managed TCP modes,
+16 native tests, device host/MCU, robotd, humanoid, welder, completed worker demo,
+8 MotionKit Release and 3 CAD tests, four-platform ABI audits and exact planner
+fixture comparison. The additional complete app suite passed, including worker
+and gallery documents. The updated MJCF importer compiled and matched the
+complete current JSON fixture semantically. The consumers runner initially
+found old saved worker records; after conversion its worker demo passed in a
+separate run. R2 is merged to local main before R3 begins.
+
 - `RobotModel` keeps what physically exists: links, joints (including `floatingBase`, which changes
   the rigid-body topology), actuators, transmissions, couplings, elastic networks, sensors,
   frames and collision.

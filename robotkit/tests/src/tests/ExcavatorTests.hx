@@ -66,7 +66,7 @@ class ExcavatorTests {
 
     var simulation = simulationHarness.simulation;
     var robot = new SimulatedRobot("two-pass-toolpath",
-      simulation.addRobot(RobotRuntimeCompiler.compile(fixture.model)),
+      simulation.addRobot(RobotRuntimeCompiler.compile(fixture.model, new robotkit.profile.RobotProfile())),
       fixture.model.name, [for (link in fixture.model.links) link.name],
       [for (joint in fixture.model.joints) joint.name]);
     var seed = [0.0, 0.0, 0.0, 0.0];
@@ -193,7 +193,7 @@ class ExcavatorTests {
 
   static function testDigTrenchScenario():Void {
     var fixture = buildExcavatorFixture();
-    var blueprint = RobotRuntimeCompiler.compile(fixture.model);
+    var blueprint = RobotRuntimeCompiler.compile(fixture.model, new robotkit.profile.RobotProfile());
     var simulationHarness = new SimulationHarness(0.02);
 
     var simulation = simulationHarness.simulation;
@@ -272,7 +272,7 @@ class ExcavatorTests {
 
   static function testGradeRegionScenario():Void {
     var fixture = buildExcavatorFixture();
-    var blueprint = RobotRuntimeCompiler.compile(fixture.model);
+    var blueprint = RobotRuntimeCompiler.compile(fixture.model, new robotkit.profile.RobotProfile());
     var simulationHarness = new SimulationHarness(0.02);
 
     var simulation = simulationHarness.simulation;
@@ -326,7 +326,7 @@ class ExcavatorTests {
 
   static function testDumpAtMovesToTarget():Void {
     var fixture = buildExcavatorFixture();
-    var blueprint = RobotRuntimeCompiler.compile(fixture.model);
+    var blueprint = RobotRuntimeCompiler.compile(fixture.model, new robotkit.profile.RobotProfile());
     var simulationHarness = new SimulationHarness(0.02);
 
     var simulation = simulationHarness.simulation;

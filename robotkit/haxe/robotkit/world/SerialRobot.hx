@@ -15,7 +15,7 @@ import robotkit.deployment.SerialDeployment;
 class SerialRobot implements Robot {
   final adapter:RuntimeRobotAdapter;
 
-  public function new(id:RobotId, model:RobotModel, devicePath:String,
+  public function new(id:RobotId, model:RobotModel, profile:robotkit.profile.RobotProfile, devicePath:String,
       controllerHex:String, layout:DeviceLayout, maxTargetError:Float, ?baud:Int = 115200,
       ?ownerPeriodNs:haxe.Int64, ?processingAllowanceNs:haxe.Int64,
       ?channels:Array<ProcessChannelDeclaration>, ?stepTickHz:Int = 40000,
@@ -26,7 +26,7 @@ class SerialRobot implements Robot {
     if (layout == null) throw "SerialRobot requires a device layout";
     var binding = DeviceBinding.bind(model, layout, stepTickHz);
     // The runtime plans on the binding's model, whose actuator rates are what the step tick can drive.
-    var blueprint:RobotRuntimeBlueprint = RobotRuntimeCompiler.compile(binding.model);
+    var blueprint:RobotRuntimeBlueprint = RobotRuntimeCompiler.compile(binding.model, profile);
     if (channels != null)
       for (channel in channels) blueprint.channels.push(channel);
     if (ownerPeriodNs != null) blueprint.ownerPeriodNs = ownerPeriodNs;
@@ -42,7 +42,7 @@ class SerialRobot implements Robot {
   /** Opens a serial robot from the same versioned deployment as robotd. */
   public static function fromDeployment(id:RobotId, path:String):SerialRobot {
     var deployment = new SerialDeployment(path);
-    return new SerialRobot(id, deployment.robot, deployment.serialPath,
+    return new SerialRobot(id, deployment.robot, deployment.profile, deployment.serialPath,
       deployment.controller, deployment.layout, deployment.targetError, deployment.baud,
       deployment.ownerPeriodNs, deployment.processingAllowanceNs, deployment.channels,
       deployment.stepTickHz, deployment.linkLossTimeoutNs, deployment.clockSyncBoundNs);

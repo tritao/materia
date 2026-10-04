@@ -19,6 +19,7 @@ import robotkit.perception.PerceptionPipelineRegistry;
  */
 class SerialDeployment {
   public final robot:RobotModel;
+  public final profile:robotkit.profile.RobotProfile;
   /** The channel layout derived from the model and the wiring, with the tightened model to plan on. */
   public final binding:DeviceBinding;
   public final layout:DeviceLayout;
@@ -41,9 +42,10 @@ class SerialDeployment {
     var directory = Path.directory(path);
     var config:Dynamic = Json.parse(sys.io.File.getContent(path));
     var version:Dynamic = Reflect.field(config, "schemaVersion");
-    if (version != 5) throw 'schema v$version is unsupported; expected v5';
+    if (version != 6) throw "Unsupported robot deployment schema version";
     var modelPath = Path.join([directory, requiredString(config, "model")]);
     robot = RobotModelCodec.decode(sys.io.File.getBytes(modelPath));
+    profile = robotkit.profile.RobotProfileCodec.fromRecord(Reflect.field(config, "profile"));
     cameras = new Map();
     var cameraRows:Dynamic = Reflect.field(config, "cameras");
     if (cameraRows != null) {

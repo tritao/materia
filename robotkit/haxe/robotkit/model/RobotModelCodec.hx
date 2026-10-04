@@ -1,5 +1,6 @@
 package robotkit.model;
 
+
 import haxe.Json;
 import haxe.io.Bytes;
 import robotkit.model.ActuatorDrive;
@@ -145,10 +146,6 @@ class RobotModelCodec {
       finite(sensor.fieldOfViewRadians, "sensor fieldOfViewRadians");
       finite(sensor.noiseStddev, "sensor noiseStddev");
     }
-    if (model.mobileBase != null) validateMobile(model.mobileBase, joints);
-    if (model.forkMechanism != null) validateFork(model.forkMechanism, joints);
-    var mobile = model.mobileBase == null ? null : encodeMobile(model.mobileBase);
-    var fork = model.forkMechanism == null ? null : encodeFork(model.forkMechanism);
     var document:Dynamic = {
       schemaVersion: VERSION,
       name: model.name,
@@ -193,8 +190,6 @@ class RobotModelCodec {
         fieldOfViewRadians: sensor.fieldOfViewRadians,
         noiseStddev: sensor.noiseStddev, noiseSeed: sensor.noiseSeed
       }],
-      mobileBase: mobile,
-      forkMechanism: fork,
       contactPairs: [for (pair in model.contactPairs) {
         linkA: pair.linkA, shapeA: pair.shapeA, linkB: pair.linkB, shapeB: pair.shapeB,
         surface: encodeSurface(pair.surface)
@@ -226,7 +221,9 @@ class RobotModelCodec {
     try root = Json.parse(bytes.toString()) catch (_:Dynamic)
       throw "Malformed RobotModel artifact";
     var version = fieldInt(root, "schemaVersion");
-    if (version != VERSION) throw 'schema v$version is unsupported; expected v$VERSION';
+    if (version != VERSION) throw "Unsupported RobotModel schema version";
+    if (Reflect.hasField(root, "mobileBase") || Reflect.hasField(root, "forkMechanism"))
+      throw "RobotModel cannot contain interpretation profiles";
 
     var model = new RobotModel(text(root, "name"));
     model.collisionApproximation = readCollision(text(root, "collisionApproximation"));
@@ -395,8 +392,6 @@ class RobotModelCodec {
       sensor.noiseSeed = fieldInt(record, "noiseSeed");
     }
 
-    var mobile:Dynamic = required(root, "mobileBase");
-    if (mobile != null) model.mobileBase = readMobile(mobile);
     for (record in array(root, "contactPairs")) {
       var linkA = text(record, "linkA"), linkB = text(record, "linkB");
       var shapeA = fieldInt(record, "shapeA"), shapeB = fieldInt(record, "shapeB");
@@ -409,8 +404,6 @@ class RobotModelCodec {
       if (error != null) throw error;
       model.contactPairs.push(new ContactPair(linkA, shapeA, linkB, shapeB, surface));
     }
-    var fork:Dynamic = required(root, "forkMechanism");
-    if (fork != null) model.forkMechanism = readFork(fork);
     var networkNames:Array<String> = [], owners:Array<String> = [];
     for (network in model.elasticNetworks) {
       if (networkNames.indexOf(network.id) >= 0) throw "Duplicate elastic network";
@@ -572,45 +565,6 @@ class RobotModelCodec {
     }
   }
 
-  static function validateMobile(value:RobotMobileConfiguration,
-      joints:Map<String, Bool>):Void {
-    switch value.drive {
-      case Differential(left, right, radius, track):
-        requireJointReference(left, joints, "left wheel");
-        requireJointReference(right, joints, "right wheel");
-        finite(radius, "mobileBase wheelRadius");
-        finite(track, "mobileBase trackWidth");
-      case Ackermann(steering, drive, wheelBase, radius, angle):
-        requireJointReference(steering, joints, "steering");
-        requireJointReference(drive, joints, "drive wheel");
-        finite(wheelBase, "mobileBase wheelBase");
-        finite(radius, "mobileBase wheelRadius");
-        finite(angle, "mobileBase maxSteeringAngle");
-      case _: throw "Unsupported RobotModel drive configuration";
-    }
-    finite(value.maxLinearSpeed, "mobileBase maxLinearSpeed");
-    finite(value.maxAngularSpeed, "mobileBase maxAngularSpeed");
-    finite(value.maxLinearAcceleration, "mobileBase maxLinearAcceleration");
-    finite(value.maxAngularAcceleration, "mobileBase maxAngularAcceleration");
-    if (value.footprintLength != null) finite(value.footprintLength, "mobileBase footprintLength");
-    if (value.footprintWidth != null) finite(value.footprintWidth, "mobileBase footprintWidth");
-  }
-
-  static function validateFork(value:RobotForkConfiguration,
-      joints:Map<String, Bool>):Void {
-    requireJointReference(value.liftJointId, joints, "fork lift");
-    if (value.tiltJointId != null) requireJointReference(value.tiltJointId, joints, "fork tilt");
-    if (value.spreadJointId != null) requireJointReference(value.spreadJointId, joints, "fork spread");
-    finite(value.maxMassKg, "forkMechanism maxMassKg");
-    finite(value.maxLoadMomentKgMeters, "forkMechanism maxLoadMomentKgMeters");
-    finite(value.maxLiftHeightMeters, "forkMechanism maxLiftHeightMeters");
-  }
-
-  static function requireJointReference(id:String, joints:Map<String, Bool>, role:String):Void {
-    requireText(id, '$role joint ID');
-    if (!joints.exists(id)) throw 'RobotModel $role role references unknown joint $id';
-  }
-
   static function readActuator(value:Dynamic):Actuator {
     var transmission = required(value, "transmission");
     var parsed:Transmission = switch text(transmission, "kind") {
@@ -647,53 +601,6 @@ class RobotModelCodec {
     actuator.assumed = readAssumed(value);
     actuator.assumptions = readAssumptions(value);
     return actuator;
-  }
-
-  static function encodeMobile(value:RobotMobileConfiguration):Dynamic return {
-    drive: encodeDrive(value.drive),
-    maxLinearSpeed: value.maxLinearSpeed, maxAngularSpeed: value.maxAngularSpeed,
-    maxLinearAcceleration: value.maxLinearAcceleration,
-    maxAngularAcceleration: value.maxAngularAcceleration,
-    footprintLength: value.footprintLength, footprintWidth: value.footprintWidth
-  };
-
-  static function encodeDrive(value:RobotDriveConfiguration):Dynamic return switch value {
-    case Differential(left, right, radius, track):
-      {kind: "differential", leftWheelJoint: left, rightWheelJoint: right,
-        wheelRadius: radius, trackWidth: track};
-    case Ackermann(steering, drive, wheelBase, radius, maxAngle):
-      {kind: "ackermann", steeringJoint: steering, driveWheelJoint: drive,
-        wheelBase: wheelBase, wheelRadius: radius, maxSteeringAngle: maxAngle};
-    case _: throw "Unsupported RobotModel drive configuration";
-  };
-
-  static function readMobile(value:Dynamic):RobotMobileConfiguration {
-    return new RobotMobileConfiguration(readDrive(required(value, "drive")),
-      number(value, "maxLinearSpeed"), number(value, "maxAngularSpeed"),
-      number(value, "maxLinearAcceleration"), number(value, "maxAngularAcceleration"),
-      optionalNumber(value, "footprintLength"), optionalNumber(value, "footprintWidth"));
-  }
-
-  static function readDrive(value:Dynamic):RobotDriveConfiguration return switch text(value, "kind") {
-    case "differential": RobotDriveConfiguration.Differential(text(value, "leftWheelJoint"),
-      text(value, "rightWheelJoint"), number(value, "wheelRadius"), number(value, "trackWidth"));
-    case "ackermann": RobotDriveConfiguration.Ackermann(text(value, "steeringJoint"),
-      text(value, "driveWheelJoint"), number(value, "wheelBase"), number(value, "wheelRadius"),
-      number(value, "maxSteeringAngle"));
-    case kind: throw 'Unsupported RobotModel drive configuration $kind';
-  };
-
-  static function encodeFork(value:RobotForkConfiguration):Dynamic return {
-    liftJoint: value.liftJointId, tiltJoint: value.tiltJointId, spreadJoint: value.spreadJointId,
-    maxMassKg: value.maxMassKg, maxLoadMomentKgMeters: value.maxLoadMomentKgMeters,
-    maxLiftHeightMeters: value.maxLiftHeightMeters
-  };
-
-  static function readFork(value:Dynamic):RobotForkConfiguration {
-    return new RobotForkConfiguration(text(value, "liftJoint"),
-      number(value, "maxMassKg"), number(value, "maxLoadMomentKgMeters"),
-      number(value, "maxLiftHeightMeters"), optionalText(value, "tiltJoint"),
-      optionalText(value, "spreadJoint"));
   }
 
   static function collisionName(value:CollisionApproximation):String return switch value {

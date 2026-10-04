@@ -23,10 +23,184 @@
     "selectedRobotId": "materia/robot",
     "robots": [
       {
+        "schemaVersion": 1,
         "robotId": "materia/robot",
-        "name": "Materia robot",
-        "modelVersion": 6,
-        "collisionApproximation": "bounds-box",
+        "model": {
+          "name": "Materia robot",
+          "collisionApproximation": "bounds-box",
+          "links": [
+            {
+              "centerOfMass": [
+                0,
+                0,
+                0
+              ],
+              "collisionGeometry": null,
+              "collisionShapes": [],
+              "id": "base",
+              "inertiaTensor": [
+                1,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                1
+              ],
+              "mass": 1,
+              "name": "Base",
+              "visualGeometry": null
+            },
+            {
+              "centerOfMass": [
+                0,
+                0,
+                0
+              ],
+              "collisionGeometry": null,
+              "collisionShapes": [
+                {
+                  "kind": "sphere",
+                  "size": [
+                    0.12
+                  ],
+                  "position": [
+                    0.45,
+                    0,
+                    0
+                  ],
+                  "rotation": [
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "surface": null,
+                  "contact": "layers"
+                }
+              ],
+              "id": "worker-demo-arm",
+              "inertiaTensor": [
+                1,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                1
+              ],
+              "mass": 1,
+              "name": "Demo arm",
+              "visualGeometry": null
+            }
+          ],
+          "joints": [
+            {
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "childFramePosition": [
+                0,
+                0,
+                0
+              ],
+              "childFrameRotation": [
+                0,
+                0,
+                0,
+                1
+              ],
+              "id": "worker-demo-pivot",
+              "limits": {
+                "effort": 5,
+                "lower": -0.8,
+                "upper": 0.8,
+                "velocity": 2,
+                "maxAcceleration": null
+              },
+              "name": "Arm pivot",
+              "parentFramePosition": [
+                0,
+                0,
+                1.3
+              ],
+              "parentFrameRotation": [
+                0,
+                0,
+                0,
+                1
+              ],
+              "type": "revolute",
+              "parentLink": "base",
+              "childLink": "worker-demo-arm",
+              "dynamics": {
+                "armature": 0,
+                "damping": 0,
+                "frictionLoss": 0,
+                "limitTimeConstant": 0,
+                "limitDampingRatio": 0,
+                "limitImpedance": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ]
+              }
+            }
+          ],
+          "frames": [
+            {
+              "id": "base/sensors",
+              "name": "Base sensor mount",
+              "position": [
+                0,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0,
+                1
+              ],
+              "link": "base"
+            }
+          ],
+          "sensors": [
+            {
+              "fieldOfViewRadians": 6.283185307179586,
+              "id": "sensor/1",
+              "kind": "lidar",
+              "maxRange": 10,
+              "name": "lidar 1",
+              "noiseSeed": 1,
+              "noiseStddev": 0,
+              "rayCount": 8,
+              "startAngleRadians": 0,
+              "updateRate": 0,
+              "frame": "base/sensors"
+            }
+          ],
+          "schemaVersion": 9,
+          "floatingBase": false,
+          "actuators": [],
+          "encoders": [],
+          "couplings": [],
+          "elasticNetworks": [],
+          "contactPairs": []
+        },
+        "profile": {
+          "schemaVersion": 1,
+          "mobileBase": null,
+          "forkMechanism": null
+        },
         "pose": {
           "position": [
             3,
@@ -39,154 +213,7 @@
             0,
             1
           ]
-        },
-        "links": [
-          {
-            "centerOfMass": [
-              0,
-              0,
-              0
-            ],
-            "collisionGeometry": null,
-            "collisionShapes": [],
-            "id": "base",
-            "inertiaTensor": [
-              1,
-              0,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              1
-            ],
-            "mass": 1,
-            "name": "Base",
-            "visualGeometry": null
-          },
-          {
-            "centerOfMass": [
-              0,
-              0,
-              0
-            ],
-            "collisionGeometry": null,
-            "collisionShapes": [
-              {
-                "kind": "sphere",
-                "size": [
-                  0.12
-                ],
-                "position": [
-                  0.45,
-                  0,
-                  0
-                ],
-                "rotation": [
-                  0,
-                  0,
-                  0,
-                  1
-                ],
-                "surface": null,
-                "contact": "layers"
-              }
-            ],
-            "id": "worker-demo-arm",
-            "inertiaTensor": [
-              1,
-              0,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              1
-            ],
-            "mass": 1,
-            "name": "Demo arm",
-            "visualGeometry": null
-          }
-        ],
-        "joints": [
-          {
-            "axis": [
-              0,
-              0,
-              1
-            ],
-            "childFramePosition": [
-              0,
-              0,
-              0
-            ],
-            "childFrameRotation": [
-              0,
-              0,
-              0,
-              1
-            ],
-            "childId": "worker-demo-arm",
-            "id": "worker-demo-pivot",
-            "limits": {
-              "effort": 5,
-              "lower": -0.8,
-              "upper": 0.8,
-              "velocity": 2
-            },
-            "name": "Arm pivot",
-            "parentFramePosition": [
-              0,
-              0,
-              1.3
-            ],
-            "parentFrameRotation": [
-              0,
-              0,
-              0,
-              1
-            ],
-            "parentId": "base",
-            "type": "revolute"
-          }
-        ],
-        "frames": [
-          {
-            "id": "base/sensors",
-            "linkId": "base",
-            "name": "Base sensor mount",
-            "position": [
-              0,
-              0,
-              0
-            ],
-            "rotation": [
-              0,
-              0,
-              0,
-              1
-            ]
-          }
-        ],
-        "mobileBase": null,
-        "forkMechanism": null,
-        "sensors": [
-          {
-            "fieldOfViewRadians": 6.283185307179586,
-            "frameId": "base/sensors",
-            "id": "sensor/1",
-            "kind": "lidar",
-            "maxRange": 10,
-            "name": "lidar 1",
-            "noiseSeed": 1,
-            "noiseStddev": 0,
-            "rayCount": 8,
-            "startAngleRadians": 0,
-            "updateRate": 0
-          }
-        ]
+        }
       }
     ],
     "humans": [

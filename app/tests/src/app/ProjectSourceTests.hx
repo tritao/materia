@@ -58,7 +58,7 @@ class ProjectSourceTests {
     var simulationHarness = new SimulationHarness(0.01, 1, backend);
 
     var simulation = simulationHarness.simulation;
-    var runtime = simulation.addRobot(RobotRuntimeCompiler.compile(model));
+    var runtime = simulation.addRobot(RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()));
     runtime.submitPosition(0, 0.3, 1);
     for (index in 0...200) simulationHarness.step(Int64.ofInt(index));
     var q = runtime.snapshot().q;
@@ -75,7 +75,7 @@ class ProjectSourceTests {
     var simulationHarness = new SimulationHarness(0.01, 1, backend);
 
     var simulation = simulationHarness.simulation;
-    simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model), [0.0, 0.0, 0.0],
+    simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()), [0.0, 0.0, 0.0],
       [0.0, 0.0, 0.0, 1.0], null, [enabled ? [0.5, 0.5, 0.5] : null]);
     var box = simulationHarness.spawnBox([0.0, 0.0, 1.25], [0.1, 0.1, 0.1], true, 1.0);
     for (index in 0...200) simulationHarness.step(Int64.ofInt(index));
@@ -98,7 +98,7 @@ class ProjectSourceTests {
     var simulationHarness = new SimulationHarness(0.01, 1, backend);
 
     var simulation = simulationHarness.simulation;
-    simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model), [0.0, 0.0, 0.0],
+    simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()), [0.0, 0.0, 0.0],
       [0.0, 0.0, 0.0, 1.0], null, null, [enabled ? vertices : null]);
     var box = simulationHarness.spawnBox([0.0, 0.0, 1.25], [0.1, 0.1, 0.1], true, 1.0);
     for (index in 0...200) simulationHarness.step(Int64.ofInt(index));
@@ -119,7 +119,7 @@ class ProjectSourceTests {
       var simulationHarness = new SimulationHarness(0.01, 1, backend);
 
       var simulation = simulationHarness.simulation;
-      simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model), [0.0, 0.0, 0.0],
+      simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()), [0.0, 0.0, 0.0],
         [0.0, 0.0, 0.0, 1.0], null, null, [wedge]);
       var box = simulationHarness.spawnBox([0.35, 0.0, 1.25], [0.1, 0.1, 0.1], true, 1.0);
       for (index in 0...200) simulationHarness.step(Int64.ofInt(index));
@@ -159,7 +159,7 @@ class ProjectSourceTests {
         var simulationHarness = new SimulationHarness(0.01, 1, backend);
 
         var simulation = simulationHarness.simulation;
-        simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model), [0.0, 0.0, 0.0],
+        simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()), [0.0, 0.0, 0.0],
           [0.0, 0.0, 0.0, 1.0], null, null, [enabled ? hull : null]);
         var box = simulationHarness.spawnBox([0.0, 0.0, top + 0.5], [0.05, 0.05, 0.05], true, 1.0);
         for (index in 0...200) simulationHarness.step(Int64.ofInt(index));
@@ -295,7 +295,7 @@ class ProjectSourceTests {
     var definition = session.projectAssemblyDefinition, physical = session.projectPhysical;
     if (definition == null || physical == null) throw '$label has no assembly to build a robot from';
     var model = AssemblySimulationBridge.toRobotModel(definition, physical, session.projectAssemblyState, null, null, session.mobileBase).model;
-    var compiled = RobotRuntimeCompiler.compile(model);
+    var compiled = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     var found = new Map<String, Array<Float>>();
     for (id in driven) {
       var index = -1;
@@ -338,7 +338,7 @@ class ProjectSourceTests {
     for (coupling in model.couplings) leaders.set(coupling.follower, (leaders.exists(coupling.follower) ? leaders.get(coupling.follower) : 0) + 1);
     check(leaders.get("pulleyA-turn") == 2 && leaders.get("pulleyB-turn") == 2 && leaders.get("idlerAStart-turn") == 1,
       "each motor's pulley follows two axes, a gantry idler one");
-    var compiled = RobotRuntimeCompiler.compile(model);
+    var compiled = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     check(compiled.couplings.length == 16, "the runtime blueprint carries a coupling for each term");
     var xLimits = model.coupledLimits("x"), yLimits = model.coupledLimits("y");
     check(Math.abs(xLimits.requireVelocity() - 0.6496) < 1e-3 && Math.abs(xLimits.requireVelocity() - yLimits.requireVelocity()) < 1e-12,

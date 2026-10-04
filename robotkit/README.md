@@ -141,15 +141,15 @@ disabling contacts between that robot's own links.
 
 `robotkit.world.SimulatedRobot` adapts one simulation-owned runtime to the same
 `Robot` interface used by `RemoteRobot`. `robotkit.world.SerialRobot` compiles
-an authored `RobotModel`, opens a POSIX serial device, and owns its standalone
+an authored `RobotModel` with its `RobotProfile`, opens a POSIX serial device, and owns its standalone
 runtime. Both can be attached to `RobotWorld` and used through the same command
 and snapshot interfaces. The serial endpoint executes RKD6 scheduled plans. It receives queue status and
 actuator state from the device. `robotd --server --deployment=FILE` hosts that
 endpoint behind the existing remote protocol; see
 [the device protocol](runtime/DEVICE_PROTOCOL.md).
 
-Use `new SerialRobot(id, model, devicePath, controllerHex, layout, maxTargetError)`
-or `RobotRuntime.createSerial(...)`. The controller is the board's unique id
+Use `new SerialRobot(id, model, profile, devicePath, controllerHex, layout, maxTargetError)`.
+For direct runtime ownership, pass a `SerialRuntimeEndpoint` to `RobotRuntime.create(blueprint, endpoint)`. The controller is the board's unique id
 (`robotd identify` prints it) and the layout wires its channels to the model's
 actuators; the error budget bounds the converted
 trajectory's position error in the joint's SI units. Serial devices do not
@@ -206,7 +206,7 @@ wheel rate. `Pose2`, `Twist2`, and `Footprint` are transport-neutral values.
 `DifferentialOdometry` integrates wheel-position changes from `RobotSnapshot`
 and resets its encoder baseline when the source clock identity changes.
 
-Drive roles can be authored on `RobotModel` with stable joint IDs instead of
+Drive roles can be authored on `RobotProfile` with stable joint IDs instead of
 repeating runtime array positions and wheel geometry in application factories.
 The compiler resolves those roles against the model's joint ordering and stores
 the resolved configuration on `RobotRuntimeBlueprint`. It rejects missing or
@@ -215,10 +215,11 @@ creation. Factories also check the live robot description against the compiled
 joint ordering before exposing a control view.
 
 ```haxe
-model.mobileBase = new RobotMobileConfiguration(
+var profile = new RobotProfile();
+profile.mobileBase = new RobotMobileConfiguration(
   RobotDriveConfiguration.Differential(leftWheelId, rightWheelId, 0.1, 0.5),
   1.5, 1.2, 0.8, 1.5, 0.8, 0.55);
-var blueprint = RobotRuntimeCompiler.compile(model);
+var blueprint = RobotRuntimeCompiler.compile(model, profile);
 var base = MobileBase.fromBlueprint(robot, blueprint);
 base.command(new Twist2(0.6, 0.2), 0.02);
 ```
@@ -330,9 +331,9 @@ Fork axes can use model-owned joint limits and IDs. Compile the model once and
 construct both views from its blueprint:
 
 ```haxe
-model.forkMechanism = new RobotForkConfiguration(liftJointId,
+profile.forkMechanism = new RobotForkConfiguration(liftJointId,
   1000.0, 600.0, 1.8, tiltJointId, spreadJointId);
-var blueprint = RobotRuntimeCompiler.compile(model);
+var blueprint = RobotRuntimeCompiler.compile(model, profile);
 var base = MobileBase.fromBlueprint(robot, blueprint);
 var forks = Forks.fromBlueprint(robot, blueprint);
 ```

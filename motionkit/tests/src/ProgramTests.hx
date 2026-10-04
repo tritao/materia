@@ -379,7 +379,7 @@ class ProgramTests extends MotionKitTestSupport {
     for (k in 0...32) lines.push(new PoseLine(new PoseWaypoint(points[k], 0.0005, 0.005),
       new PoseWaypoint(points[k + 1], 0.0005, 0.005), OrientationPolicy.Interpolated, 0.1, 0.1));
     var path = new PosePath("work", lines);
-    var blueprint = RobotRuntimeCompiler.compile(fixture.model);
+    var blueprint = RobotRuntimeCompiler.compile(fixture.model, new robotkit.profile.RobotProfile());
     var limits = new ValidationLimits(8, Int64.ofInt(blueprint.revision), Int64.ofInt(blueprint.calibrationRevision));
     for (joint in 0...8) limits.jerk(joint, 20.0);
     var compiler = new ProgramCompiler(solver, limits, "work", [for (_ in 0...8) 1.0], [for (_ in 0...8) 2.0],
@@ -713,7 +713,7 @@ class ProgramTests extends MotionKitTestSupport {
     for (joint in fixture.model.joints) joint.limits.maxAcceleration = 4.0;
     var simulationHarness = new SimulationHarness(0.01);
     var simulation = simulationHarness.simulation;
-    var blueprint = RobotRuntimeCompiler.compile(fixture.model);
+    var blueprint = RobotRuntimeCompiler.compile(fixture.model, new robotkit.profile.RobotProfile());
     blueprint.channels.push(new ProcessChannelDeclaration("sprayer.enabled",
       ProcessEventValue.Digital(false)));
     var runtime = simulation.addRobot(blueprint);
@@ -788,7 +788,7 @@ class ProgramTests extends MotionKitTestSupport {
 
     var pathSimulationHarness = new SimulationHarness(0.01);
     var pathSimulation = pathSimulationHarness.simulation;
-    var pathBlueprint = RobotRuntimeCompiler.compile(fixture.model);
+    var pathBlueprint = RobotRuntimeCompiler.compile(fixture.model, new robotkit.profile.RobotProfile());
     pathBlueprint.channels.push(new ProcessChannelDeclaration("sprayer.enabled",
       ProcessEventValue.Digital(false)));
     var pathRuntime = pathSimulation.addRobot(pathBlueprint);
@@ -862,7 +862,7 @@ class ProgramTests extends MotionKitTestSupport {
     for (joint in fixture.model.joints) joint.limits.maxAcceleration = 4.0;
     var simulationHarness = new SimulationHarness(0.01);
     var simulation = simulationHarness.simulation;
-    var blueprint = RobotRuntimeCompiler.compile(fixture.model);
+    var blueprint = RobotRuntimeCompiler.compile(fixture.model, new robotkit.profile.RobotProfile());
     blueprint.channels.push(new ProcessChannelDeclaration("paint.flow",
       ProcessEventValue.Analog(0.0)));
     var runtime = simulation.addRobot(blueprint);
@@ -999,7 +999,7 @@ class ProgramTests extends MotionKitTestSupport {
     for (joint in fixture.model.joints) joint.limits.maxAcceleration = 4.0;
     var simulationHarness = new SimulationHarness(0.01);
     var simulation = simulationHarness.simulation;
-    var runtime = simulation.addRobot(RobotRuntimeCompiler.compile(fixture.model));
+    var runtime = simulation.addRobot(RobotRuntimeCompiler.compile(fixture.model, new robotkit.profile.RobotProfile()));
     var robot = new FaultingArmRobot("session-arm", runtime, fixture.model.name,
       [for (link in fixture.model.links) link.name],
       [for (joint in fixture.model.joints) joint.name]);

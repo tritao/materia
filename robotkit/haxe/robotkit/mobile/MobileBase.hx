@@ -24,9 +24,9 @@ class MobileBase {
   public var safetyStopRequired(default, null):Bool = false;
   var previousCommand:Twist2 = new Twist2();
 
-  /** Builds the mobile view from roles and dimensions authored on a RobotModel. */
-  public static function fromRobot(robot:Robot, model:RobotModel):MobileBase
-    return fromBlueprint(robot, RobotRuntimeCompiler.compile(model));
+  /** Builds the mobile view from roles and dimensions authored on a RobotProfile, resolved against a RobotModel. */
+  public static function fromRobot(robot:Robot, model:RobotModel, profile:robotkit.profile.RobotProfile):MobileBase
+    return fromBlueprint(robot, RobotRuntimeCompiler.compile(model, profile));
 
   /** Builds the mobile view from a previously compiled robot blueprint. */
   public static function fromBlueprint(robot:Robot,

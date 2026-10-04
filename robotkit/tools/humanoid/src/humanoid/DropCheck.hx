@@ -31,7 +31,7 @@ class DropCheck {
     var model = RobotModelCodec.decode(sys.io.File.getBytes(args[0]));
     if (!model.floatingBase) throw "DropCheck needs a floating-base robot";
     var height = args.length > 1 ? Std.parseFloat(args[1]) : 0.8;
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     // A leg pressed onto its compliant knee stop passes it slightly.
     blueprint.observedLimitTolerance = 0.05;
     var harness = new SimulationHarness(TIMESTEP, 2, SimulationSpace.MUJOCO);

@@ -94,6 +94,7 @@ class WorldTcpIntegration {
     var simulation = simulationHarness.simulation;
     var failure:Dynamic = null;
     try {
+      var profile = new robotkit.profile.RobotProfile();
       var model = new robotkit.model.RobotModel("demo-forklift");
       var base = model.addLink(new robotkit.model.Link("base"));
       var leftWheel = model.addLink(new robotkit.model.Link("left wheel", "link/left-wheel"));
@@ -117,10 +118,10 @@ class WorldTcpIntegration {
       liftJoint.limits.upper = 1.0;
       liftJoint.limits.velocity = 2.0;
       liftJoint.limits.effort = 100.0;
-      model.mobileBase = new robotkit.model.RobotMobileConfiguration(
-        robotkit.model.RobotDriveConfiguration.Differential("joint/left-wheel",
+      profile.mobileBase = new robotkit.profile.RobotMobileConfiguration(
+        robotkit.profile.RobotDriveConfiguration.Differential("joint/left-wheel",
           "joint/right-wheel", 0.1, 0.5), 0.5, 1.0, 1.0, 1.0);
-      model.forkMechanism = new robotkit.model.RobotForkConfiguration("joint/lift",
+      profile.forkMechanism = new robotkit.profile.RobotForkConfiguration("joint/lift",
         1000.0, 600.0, 1.0);
       var mount = model.addFrame(new robotkit.model.Frame("sensor mount", base, "demo/sensor-mount"));
       mount.position = [0.2, 0.0, 0.0];
@@ -134,7 +135,7 @@ class WorldTcpIntegration {
         camera.frame = mount;
       }
       var localRuntime = simulation.addRobot(
-        robotkit.runtime.RobotRuntimeCompiler.compile(model));
+        robotkit.runtime.RobotRuntimeCompiler.compile(model, profile));
       var local = new robotkit.world.SimulatedRobot("local", localRuntime, model.name,
         [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
       if (cameraFixture) {
@@ -311,7 +312,7 @@ class WorldTcpIntegration {
         return state.positions.length == 3 && state.positions.get(0) == 0.25
           && state.velocities.get(1) > 0.0 && state.efforts.get(2) != 0.0;
       }, "atomic mixed-mode target batch did not reach robotd runtime");
-      var mobileBase = MobileBase.fromRobot(remote, model);
+      var mobileBase = MobileBase.fromRobot(remote, model, profile);
       var localization = new WheelOdometryLocalization(mobileBase);
       var current = remote.snapshot();
       var estimate = localization.update(current);
@@ -360,7 +361,7 @@ class WorldTcpIntegration {
       var assignmentValue = new Dispatcher(fleet).dispatch(mission);
       if (assignmentValue == null) throw "serial robot was not assigned the facility mission";
       var assignment:FleetAssignment = cast assignmentValue;
-      var missionFactory = new SerialTransportSkillFactory(model);
+      var missionFactory = new SerialTransportSkillFactory(model, profile);
       var executor = new MissionExecutor(fleet, assignment, facility, missionFactory);
       executor.start();
       var missionStatus = executor.status;
@@ -401,8 +402,11 @@ class WorldTcpIntegration {
 
 private class SerialTransportSkillFactory implements materia.automation.mission.TaskSkillFactory {
   final model:robotkit.model.RobotModel;
+  final profile:robotkit.profile.RobotProfile;
 
-  public function new(model:robotkit.model.RobotModel) this.model = model;
+  public function new(model:robotkit.model.RobotModel, profile:robotkit.profile.RobotProfile) {
+    this.model = model; this.profile = profile;
+  }
 
   public function create(task:Task, robot:robotkit.world.Robot,
       facility:Facility):robotkit.skill.Skill {
@@ -411,7 +415,7 @@ private class SerialTransportSkillFactory implements materia.automation.mission.
         var transport:Transport = cast task;
         var route = new FacilityRouter(facility).route(
           transport.pickupStationId, transport.destinationStationId);
-        var base = MobileBase.fromRobot(robot, model);
+        var base = MobileBase.fromRobot(robot, model, profile);
         var localization = new WheelOdometryLocalization(base, route.path.frameId);
         var navigation = new Navigation(base, localization, 0.2,
           route.maximumSpeedMetersPerSecond, 1.0);

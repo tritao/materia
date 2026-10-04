@@ -433,7 +433,7 @@ class KinematicsTests extends MotionKitTestSupport {
     var fixture = buildContractArmFixture();
     for (joint in fixture.model.joints) { joint.limits.velocity = 2.0; joint.limits.maxAcceleration = 4.0; }
     fixture.model.joints[0].limits.upper = 1.2;
-    var blueprint = RobotRuntimeCompiler.compile(fixture.model);
+    var blueprint = RobotRuntimeCompiler.compile(fixture.model, new robotkit.profile.RobotProfile());
     var harness = new SimulationHarness(0.01);
     var options:Null<VirtualDeviceOptions> = null;
     if (virtual) {
@@ -588,7 +588,7 @@ class KinematicsTests extends MotionKitTestSupport {
     for (joint in fixture.model.joints) { joint.limits.velocity = 2.0; joint.limits.maxAcceleration = 4.0; }
     fixture.model.joints[0].limits.upper = 1.2;
     var harness = new SimulationHarness(0.01);
-    var runtime = harness.simulation.addRobot(RobotRuntimeCompiler.compile(fixture.model));
+    var runtime = harness.simulation.addRobot(RobotRuntimeCompiler.compile(fixture.model, new robotkit.profile.RobotProfile()));
     var robot = new SimulatedRobot("servo-arm", runtime, fixture.model.name,
       [for (link in fixture.model.links) link.name], [for (joint in fixture.model.joints) joint.name]);
     var arm = fixture.arm;

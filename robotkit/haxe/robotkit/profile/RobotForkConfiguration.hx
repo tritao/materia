@@ -1,4 +1,6 @@
-package robotkit.model;
+package robotkit.profile;
+
+import robotkit.model.JointId;
 
 /** Authored fork-axis roles and application-level payload/lift envelope. */
 class RobotForkConfiguration {

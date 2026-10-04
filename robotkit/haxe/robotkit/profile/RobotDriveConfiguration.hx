@@ -1,4 +1,6 @@
-package robotkit.model;
+package robotkit.profile;
+
+import robotkit.model.JointId;
 
 /** Authored joint roles and geometry for a supported mobile drive layout. */
 enum RobotDriveConfiguration {

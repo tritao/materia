@@ -100,7 +100,7 @@ class CoreXyTests extends MotionKitTestSupport {
     var model = AssemblySimulationBridge.toRobotModel(scene.assemblyDefinition, AssemblyPhysicalPartView.fromSceneArtifact(scene),
       scene.assemblyState).model;
     var steady = new PlanCheckOptions().steady;
-    var runtimeBlueprint = RobotRuntimeCompiler.compile(model, 1);
+    var runtimeBlueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile(), 1);
     var index = new Map<String, Int>();
     for (joint in 0...model.joints.length) index.set(model.joints[joint].id, joint);
     var radius = 1e-3 * CoreXyPlotter.TEETH * 2.0 / (2.0 * Math.PI);

@@ -39,9 +39,9 @@ import robotkit.model.Link;
 import robotkit.model.RobotModel;
 import robotkit.model.CollisionApproximation;
 import robotkit.runtime.RobotRuntimeCompiler;
-import robotkit.model.RobotDriveConfiguration;
-import robotkit.model.RobotMobileConfiguration;
-import robotkit.model.RobotForkConfiguration;
+import robotkit.profile.RobotDriveConfiguration;
+import robotkit.profile.RobotMobileConfiguration;
+import robotkit.profile.RobotForkConfiguration;
 import sys.FileSystem;
 import sys.io.File;
 import haxe.io.Bytes;
@@ -612,15 +612,15 @@ class SceneEditingTests {
     addJoint("joint/lift", "mast lift", JointType.Prismatic, mast, 0.0, 2.0);
     addJoint("joint/tilt", "fork tilt", JointType.Revolute, carriage, -0.5, 0.5);
     addJoint("joint/spread", "fork spread", JointType.Prismatic, forksLink, 0.0, 0.8);
-    authored.model.mobileBase = new RobotMobileConfiguration(
+    authored.profile.mobileBase = new RobotMobileConfiguration(
       RobotDriveConfiguration.Differential("joint/left", "joint/right", 0.1, 0.5),
       1.0, 1.5, 0.8, 1.0, 2.0, 1.0);
-    authored.model.forkMechanism = new RobotForkConfiguration("joint/lift",
+    authored.profile.forkMechanism = new RobotForkConfiguration("joint/lift",
       1000.0, 600.0, 1.8, "joint/tilt", "joint/spread");
     var reopenedAuthored = new SensorConfiguration(
       haxe.Json.parse(haxe.Json.stringify(authored.records())));
-    var reopenedMobile:Null<RobotMobileConfiguration> = reopenedAuthored.model.mobileBase;
-    var reopenedForks:Null<RobotForkConfiguration> = reopenedAuthored.model.forkMechanism;
+    var reopenedMobile:Null<RobotMobileConfiguration> = reopenedAuthored.profile.mobileBase;
+    var reopenedForks:Null<RobotForkConfiguration> = reopenedAuthored.profile.forkMechanism;
     check(reopenedMobile != null && reopenedForks != null &&
       reopenedAuthored.diagnostics().length == 0,
       "Materia robot records preserve and validate authored mechanism roles");
@@ -637,25 +637,25 @@ class SceneEditingTests {
     } && forkConfig.liftJointId == "joint/lift" &&
       forkConfig.tiltJointId == "joint/tilt" && forkConfig.spreadJointId == "joint/spread",
       "save and reopen retain drive geometry and named fork axes");
-    authored.model.forkMechanism = null;
-    authored.model.mobileBase = new RobotMobileConfiguration(
+    authored.profile.forkMechanism = null;
+    authored.profile.mobileBase = new RobotMobileConfiguration(
       RobotDriveConfiguration.Ackermann("joint/tilt", "joint/left", 1.2, 0.1, 0.5),
       1.0, 1.5);
     var reopenedAckermann = new SensorConfiguration(
       haxe.Json.parse(haxe.Json.stringify(authored.records())));
-    var ackermannConfig:RobotMobileConfiguration = cast reopenedAckermann.model.mobileBase;
+    var ackermannConfig:RobotMobileConfiguration = cast reopenedAckermann.profile.mobileBase;
     check(switch ackermannConfig.drive {
       case Ackermann(steeringId, wheelId, wheelBase, radius, angle):
         steeringId == "joint/tilt" && wheelId == "joint/left" &&
           wheelBase == 1.2 && radius == 0.1 && angle == 0.5;
       case _: false;
     }, "save and reopen retain Ackermann steering roles and dimensions");
-    authored.model.mobileBase = new RobotMobileConfiguration(
+    authored.profile.mobileBase = new RobotMobileConfiguration(
       RobotDriveConfiguration.Holonomic(["joint/left", "joint/right", "joint/tilt"], 0.1, 0.3),
       1.0, 1.5);
     var reopenedHolonomic = new SensorConfiguration(
       haxe.Json.parse(haxe.Json.stringify(authored.records())));
-    var holonomicConfig:RobotMobileConfiguration = cast reopenedHolonomic.model.mobileBase;
+    var holonomicConfig:RobotMobileConfiguration = cast reopenedHolonomic.profile.mobileBase;
     check(switch holonomicConfig.drive {
       case Holonomic(ids, radius, baseRadius):
         ids.length == 3 && ids[0] == "joint/left" && ids[1] == "joint/right" &&
@@ -834,7 +834,7 @@ class SceneEditingTests {
       restoredJoint.parentFramePosition[0]==0.25&&restoredJoint.childFramePosition[1]==0.1&&
       restoredJoint.axis[0]==1.0,
       "RobotModel v2 physical properties, geometry references, joint frames, and axis survive reload");
-    var compiled=RobotRuntimeCompiler.compile(session.sensors.model);
+    var compiled=RobotRuntimeCompiler.compile(session.sensors.model, new robotkit.profile.RobotProfile());
     check(compiled.links.length==2&&compiled.links[1].mass==2.5&&
       compiled.joints[0].axis[0]==1.0&&compiled.identity.visualGeometry(1)=="geometry/arm-visual"&&
       compiled.identity.collisionGeometry(1)=="geometry/arm-collision",
@@ -847,11 +847,10 @@ class SceneEditingTests {
     var legacyRecord:Dynamic={robotId:"legacy/robot",name:"Legacy robot",
       links:legacyLinks,joints:legacyJoints,
       frames:emptyLegacyFrames,sensors:emptyLegacySensors};
-    var migrated=new SensorConfiguration(legacyRecord);
-    check(migrated.model.schemaVersion==RobotModel.CURRENT_VERSION&&migrated.model.links[0].mass==1.0&&
-      migrated.model.links[0].inertiaTensor[0]==1.0&&migrated.model.joints[0].axis[2]==1.0&&
-      migrated.model.collisionApproximation==CollisionApproximation.BoundsBox,
-      "version 1 robot records migrate to version 2 physical defaults");
+    var legacyRejected = false;
+    try new SensorConfiguration(legacyRecord) catch (error:Dynamic)
+      legacyRejected = Std.string(error) == "Unsupported robot authoring schema version";
+    check(legacyRejected, "the robot authoring record rejects older unversioned formats");
     session.sensors.selectRobot("materia/robot");
     var restoredFrame = session.sensors.model.sensors[0].frame;
     check(restoredFrame != null && session.sensors.model.sensors[0].updateRate == 20.0 &&
