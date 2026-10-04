@@ -14,17 +14,15 @@ class WeldChannels implements ToolChannels {
   public final arc:String;
   public final wireSpeed:String;
   public final voltage:String;
+  public final job:Null<String>;
 
-  public function new(arc:String, wireSpeed:String, voltage:String) {
+  public function new(arc:String, wireSpeed:String, voltage:String, job:Null<String> = null) {
     this.arc = arc;
     this.wireSpeed = wireSpeed;
     this.voltage = voltage;
+    this.job = job;
   }
 
   public function declarations():Array<ProcessChannelDeclaration>
-    return [
-      new ProcessChannelDeclaration(arc, ProcessEventValue.Digital(false), WeldChannelPolicy.ARC_KEEPS_ON_STOP),
-      new ProcessChannelDeclaration(wireSpeed, ProcessEventValue.Analog(0.0), WeldChannelPolicy.WIRE_SPEED_KEEPS_ON_STOP),
-      new ProcessChannelDeclaration(voltage, ProcessEventValue.Analog(0.0), WeldChannelPolicy.VOLTAGE_KEEPS_ON_STOP)
-    ];
+    return WeldContract.declarations(arc, wireSpeed, voltage, job);
 }

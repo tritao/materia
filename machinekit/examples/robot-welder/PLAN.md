@@ -720,6 +720,17 @@ W5 implementation notes (completed, 2026-10-04):
 Then carry them over RKD6 like other process channels, with the arc channel
 going safe (off) on every stop.
 
+W6 implementation notes (started after W5 main sync, 2026-10-04):
+- R0 is complete on main: generation 6 / wire revision 12 naming is frozen and `RuntimeEndpoint` exists.
+  `main` was merged before starting W6. `WeldContract` owns channel declarations and the six-value feedback layout;
+  `WeldChannels` and `WeldSensor` refer to it. Arc is digital, wire is m/min, voltage is V, and an optional job is
+  a nonnegative integer carried as an analog value. Arc and wire go safe on commanded stops; fault and emergency
+  stop safe every output. Voltage and job may retain their setpoints on an ordinary stop.
+- Device-side welding must use the scheduler's existing safe channel policy, including its link watchdog.
+  A Modbus connection failure cannot rely on a final network write to stop the physical source: the register map
+  must express a device watchdog/lease, and the fake server must enforce its expiry independently of the host.
+  The same process mission must run through each backend rather than replacing it with backend-specific scripts.
+
 ## Phase 2: mobile welder
 
 These are the hardware choices made on 2026-10-02: a 48 V LFP pack (16s,

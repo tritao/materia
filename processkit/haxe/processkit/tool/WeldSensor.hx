@@ -24,14 +24,14 @@ typedef WeldReading = {
  * a Modbus supply) publishes the same frame.
  */
 class WeldSensor {
-  public static inline var KIND:String = "tool_weld";
-  public static inline var ARC:Int = 0;
-  public static inline var CURRENT:Int = 1;
-  public static inline var VOLTAGE:Int = 2;
-  public static inline var TOUCH:Int = 3;
-  public static inline var FAULT:Int = 4;
-  public static inline var POWER:Int = 5;
-  public static inline var COUNT:Int = 6;
+  public static inline var KIND:String = WeldContract.SENSOR_KIND;
+  public static inline var ARC:Int = WeldContract.ARC;
+  public static inline var CURRENT:Int = WeldContract.CURRENT;
+  public static inline var VOLTAGE:Int = WeldContract.VOLTAGE;
+  public static inline var TOUCH:Int = WeldContract.TOUCH;
+  public static inline var FAULT:Int = WeldContract.FAULT;
+  public static inline var POWER:Int = WeldContract.POWER;
+  public static inline var COUNT:Int = WeldContract.SENSOR_COUNT;
 
   public static function values(reading:WeldReading):Array<Float>
     return [reading.arc ? 1.0 : 0.0, reading.currentA, reading.voltageV, reading.touch ? 1.0 : 0.0, reading.fault, reading.powerW];
