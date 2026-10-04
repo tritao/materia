@@ -74,6 +74,13 @@ public:
 class HomingStopEndpoint final : public robotkit::RobotEndpoint {
 public:
     double velocity = 0.0;
+    double positions[2] = {0.25, -0.25};
+    double leader_rebase_delta = 0.0;
+    rk_result rebase_counters(const uint32_t *joints, const double *deltas, uint32_t count) override {
+        for (uint32_t i = 0; i < count; ++i) positions[joints[i]] -= deltas[i];
+        positions[0] += leader_rebase_delta;
+        return RK_OK;
+    }
     bool executes_trajectory_queue() const noexcept override { return true; }
     rk_result apply(const rk_robot_command &) override { return RK_OK; }
     rk_result device_homing_control(const rk_device_homing_control &) override { return RK_OK; }
@@ -82,7 +89,7 @@ public:
         state.struct_size = sizeof(state);
         state.joint_count = 2;
         state.source_timestamp_ns = state.received_timestamp_ns = timestamp;
-        state.position[0] = 0.25; state.position[1] = -0.25;
+        state.position[0] = positions[0]; state.position[1] = positions[1];
         state.velocity[0] = velocity;
         state.trajectory_active = 0; state.trajectory_queue_depth = 0;
         state.session_state = RK_SESSION_IDLE;
@@ -2657,6 +2664,26 @@ int main() {
         stop_endpoint->velocity = 0.0;
         assert(stopped.publish_sample(300'000'000) == RK_OK);
         assert(stopped.device_homing_status(1) == RK_OK);
+    }
+    {
+        auto calibrated_blueprint = std::make_unique<rk_robot_runtime_blueprint>(blueprint);
+        calibrated_blueprint->coupling_count = 1;
+        calibrated_blueprint->couplings[0] = {0, 1, -1.0, 0.0};
+        auto calibrated_endpoint = std::make_shared<HomingStopEndpoint>();
+        calibrated_endpoint->positions[1] = -0.24;
+        calibrated_endpoint->leader_rebase_delta = 0.005;
+        auto calibrated = std::make_unique<robotkit::RobotRuntime>(*calibrated_blueprint, calibrated_endpoint);
+        assert(calibrated->publish_sample(100'000'000) == RK_OK);
+        const uint32_t shaft = 1;
+        const double side_zero = 0.01;
+        assert(calibrated->calibrate_home_drives(&shaft, &side_zero, 1) == RK_OK);
+        auto calibrated_state = std::make_unique<rk_robot_snapshot>();
+        calibrated_state->struct_size = sizeof(*calibrated_state);
+        assert(calibrated->snapshot_full(*calibrated_state) == RK_OK);
+        // Retain individual measured feedback but hand off a coupled command.
+        assert(std::abs(calibrated_state->position[1] - -0.23) < 1e-12);
+        assert(std::abs(calibrated_state->setpoint_position[0] - 0.255) < 1e-12);
+        assert(std::abs(calibrated_state->setpoint_position[1] - -0.255) < 1e-12);
     }
     return 0;
 }

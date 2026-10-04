@@ -146,6 +146,42 @@ impl<const A: usize> StepGenerator<A> {
         Some((board.step_count(actuator) as f64 - self.counter_origin_steps[actuator]) / self.steps_per_unit[actuator])
     }
 
+    /// Fit stationary physical counters to the deployment's independent axes.
+    /// Individual motor measurements remain separate; paired queue coordinates
+    /// share their leader, as they do in host feedback reconstruction.
+    pub fn stopped_targets<B: Board>(&self, board: &B, joints: &[u8; A],
+        ratios: &[f32; A], count: usize) -> Option<[f32; A]> {
+        if count > A { return None; }
+        let mut positions = [0.0; A];
+        for a in 0..count {
+            let ratio = ratios[a] as f64;
+            if !ratio.is_finite() || ratio == 0.0 { return None; }
+            let mut numerator = 0.0;
+            let mut denominator = 0.0;
+            for b in 0..count {
+                if joints[b] != joints[a] { continue; }
+                let r = ratios[b] as f64;
+                if !r.is_finite() || r == 0.0 { return None; }
+                numerator += r * self.counter_position(board, b)?;
+                denominator += r * r;
+            }
+            positions[a] = (ratio * numerator / denominator) as f32;
+        }
+        Some(positions)
+    }
+
+    /// Adopt a new stationary queue frame without issuing a physical step.
+    /// The owner must validate rest and the queue's expected state first.
+    pub fn anchor_stopped_targets<B: Board>(&mut self, board: &B, targets: [f32; A]) -> bool {
+        if targets.iter().any(|v| !v.is_finite()) { return false; }
+        for a in 0..A {
+            self.nominal_steps[a] = targets[a] as f64 * self.steps_per_unit[a];
+            self.alignment_steps[a] = board.step_count(a) as f64 -
+                self.counter_origin_steps[a] - self.nominal_steps[a];
+        }
+        true
+    }
+
     /// Preserve the physical alignment while restoring normal skew bounds.
     pub fn end_homing_pair(&mut self) {
         self.held.fill(None);

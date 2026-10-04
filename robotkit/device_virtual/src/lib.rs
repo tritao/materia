@@ -29,6 +29,8 @@ pub struct VirtualDevice {
     session: u64,
     channel_kind: [u8; CHANNELS],
     input_count: usize,
+    actuator_joint: [u8; ACTUATORS],
+    actuator_ratio: [f32; ACTUATORS],
     homing_scope: Option<u64>,
     control_sequence: u64,
     homing_stop: bool,
@@ -78,6 +80,8 @@ impl VirtualDevice {
             session: 0,
             channel_kind: [0; CHANNELS],
             input_count: 0,
+            actuator_joint: [0; ACTUATORS],
+            actuator_ratio: [1.0; ACTUATORS],
             homing_scope: None,
             control_sequence: 0,
             homing_stop: false,
@@ -240,6 +244,8 @@ impl VirtualDevice {
                     if let Some(welder) = self.welder.as_mut() { welder.reset(); }
                     self.weld_sequence = 0;
                     self.steps = generator;
+                    self.actuator_joint = begin.actuator_joint;
+                    self.actuator_ratio = begin.actuator_ratio;
                     self.homing_scope = None;
                     self.control_sequence = 0;
                     self.homing_stop = false;
@@ -344,13 +350,14 @@ impl VirtualDevice {
                 if begin.actuator_count as usize != self.active_count {
                     return false;
                 }
-                if self.core.as_ref().unwrap().is_stopped() &&
-                    self.core.as_ref().unwrap().stop_reason() == Some(StopReason::Stop) {
+                let stopped = self.core.as_ref().unwrap().is_stopped() &&
+                    self.core.as_ref().unwrap().stop_reason() == Some(StopReason::Stop);
+                if stopped {
                     let mut positions = self.core.as_ref().unwrap().positions();
                     if self.profile == 1 {
-                        for (i, position) in positions.iter_mut().enumerate().take(self.count) {
-                            *position = self.steps.counter_position(&self.board, i).unwrap() as f32;
-                        }
+                        let Some(projected) = self.steps.stopped_targets(&self.board,
+                            &self.actuator_joint, &self.actuator_ratio, self.count) else { return false; };
+                        positions = projected;
                     }
                     if self.core.as_mut().unwrap().prepare_stopped_queue(now, positions).is_err() {
                         return false;
@@ -372,6 +379,10 @@ impl VirtualDevice {
                     eprintln!("  expected positions={:?} velocities={:?}; actual positions={:?} velocities={:?}",
                         &begin.expected_position[..self.count], &begin.expected_velocity[..self.count],
                         &core.positions()[..self.count], &core.velocities()[..self.count]);
+                    return false;
+                }
+                if stopped && self.profile == 1 &&
+                    !self.steps.anchor_stopped_targets(&self.board, self.core.as_ref().unwrap().positions()) {
                     return false;
                 }
                 self.events.as_mut().unwrap().queue_begin(begin.queue_revision,
@@ -1137,6 +1148,87 @@ mod tests {
         assert_eq!(ack_to(&mut device, &begin).0.status, 0);
         assert_eq!(device.active_count, 0);
         assert!(device.core.is_none());
+    }
+
+    #[test]
+    fn paired_homing_rebase_hands_off_a_stationary_wire_queue() {
+        let controller = [7; 16];
+        let mut device = VirtualDevice::new(1_000_000, 40_000, 0, 0, 2,
+            [1000.0; ACTUATORS], controller, 1).unwrap();
+        let mut begin = begin_for(controller);
+        begin.actuator_count = 2;
+        begin.dual_drive_skew_bound[0] = 0.01;
+        begin.dual_drive_skew_bound[1] = 0.01;
+        assert_eq!(ack_to(&mut device, &begin).0.status, 1);
+        let scope = |device: &mut VirtualDevice, sequence, action| {
+            let record = HomingScope6 { session: 9, sequence, scope: 1,
+                action, first: 0, second: 1, skew_bound: 0.02 };
+            let mut body = [0; HomingScope6::SIZE];
+            record.encode(&mut body).unwrap();
+            assert!(send::<HomingScope6>(device, 17, &body));
+        };
+        let side = |device: &mut VirtualDevice, sequence, hold| {
+            let record = HomingSide6 { session: 9, sequence, scope: 1, actuator: 0, hold };
+            let mut body = [0; HomingSide6::SIZE];
+            record.encode(&mut body).unwrap();
+            assert!(send::<HomingSide6>(device, 18, &body));
+        };
+        let queue = |device: &mut VirtualDevice, revision, position, speed, duration, purpose| {
+            let t0 = device.board.now_ticks();
+            let mut expected = [0.0; ACTUATORS]; expected[..2].fill(position);
+            let record = QueueBegin6 { queue_revision: revision, replace_after_ticks: t0,
+                expected_position: expected, expected_velocity: [0.0; ACTUATORS], actuator_count: 2 };
+            let mut body = [0; QueueBegin6::SIZE]; record.encode(&mut body).unwrap();
+            assert!(send::<QueueBegin6>(device, 5, &body));
+            let header = Segment6Header { queue_revision: revision, plan_id: revision,
+                t0_ticks: t0, duration_ticks: duration, degree: 1,
+                actuator_count: 2, ends_at_rest: 1, purpose };
+            let mut segment = vec![0; Segment6Header::SIZE + 2 * Segment6Coefficients::SIZE];
+            header.encode(&mut segment[..Segment6Header::SIZE]).unwrap();
+            for actuator in 0..2 {
+                let row = Segment6Coefficients { actuator, c0: position, c1: speed,
+                    c2: 0.0, c3: 0.0, c4: 0.0, c5: 0.0 };
+                let start = Segment6Header::SIZE + actuator as usize * Segment6Coefficients::SIZE;
+                row.encode(&mut segment[start..start + Segment6Coefficients::SIZE]).unwrap();
+            }
+            assert!(send::<Segment6Header>(device, 6, &segment));
+            let mut commit = [0; Commit6::SIZE];
+            Commit6 { through_ticks: t0 + duration }.encode(&mut commit).unwrap();
+            assert!(send::<Commit6>(device, 7, &commit));
+        };
+        scope(&mut device, 1, 0);
+        assert_eq!(device.homing_scope, Some(1));
+        side(&mut device, 2, 1);
+        queue(&mut device, 1, 0.0, 0.01, 400_000, 2);
+        assert!(device.advance(400_000_000));
+        assert_eq!((device.board.step_count(0), device.board.step_count(1)), (0, 4));
+        scope(&mut device, 3, 2);
+        assert!(device.advance(401_000_000));
+        side(&mut device, 4, 0);
+        // The normalized leader is halfway between the separate physical sides.
+        queue(&mut device, 2, 0.002, 0.0, 1_000_000, 2);
+        assert!(device.advance(411_000_000));
+        assert_eq!((device.board.step_count(0), device.board.step_count(1)), (0, 4));
+        scope(&mut device, 5, 2);
+        assert!(device.advance(412_000_000));
+        let batch = HomingCounterBatch6 { session: 9, sequence: 6, scope: 1,
+            first: 0, second: 1, first_delta: 0.0, second_delta: 0.004 };
+        let mut body = [0; HomingCounterBatch6::SIZE]; batch.encode(&mut body).unwrap();
+        assert!(send::<HomingCounterBatch6>(&mut device, 20, &body));
+        assert_eq!(device.steps.counter_position(&device.board, 1), Some(0.0));
+        scope(&mut device, 7, 1);
+        assert_eq!(device.homing_scope, None);
+        queue(&mut device, 3, 0.0, 0.0, 1_000_000, 0);
+        assert!(device.advance(425_000_000));
+        assert_eq!((device.board.step_count(0), device.board.step_count(1)), (0, 4));
+        assert_eq!(device.core.as_ref().unwrap().stop_reason(), None);
+        for sequence in 1..=7 {
+            let ack = device.outbox.iter().filter_map(|frame| {
+                let (kind, body) = decode_frame6(frame).ok()?;
+                if kind == 19 { HomingControlAck6::decode(body).ok() } else { None }
+            }).find(|ack| ack.sequence == sequence).unwrap();
+            assert_eq!(ack.accepted, 1);
+        }
     }
 
 }

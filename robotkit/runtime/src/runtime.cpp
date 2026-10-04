@@ -11,6 +11,17 @@
 
 namespace robotkit {
 
+namespace {
+void project_commanded_couplings(const rk_robot_runtime_blueprint &blueprint, double *positions) {
+    uint32_t followers[RK_MAX_JOINTS], count = 0;
+    if (!internal::order_followers(blueprint.couplings, blueprint.coupling_count,
+            blueprint.joint_count, nullptr, followers, count)) return;
+    for (uint32_t index = 0; index < count; ++index)
+        positions[followers[index]] = internal::coupled_follower_value(blueprint.couplings,
+            blueprint.coupling_count, followers[index], positions, true);
+}
+}
+
 rk_result RobotRuntime::poll_events(rk_event_record_batch &out_batch) {
     if (out_batch.struct_size < sizeof(out_batch)) return RK_ERROR_INVALID_ARGUMENT;
     std::lock_guard owner_lock(owner_mutex_);
@@ -661,6 +672,11 @@ rk_result RobotRuntime::calibrate_home_drives(const uint32_t *joints, const doub
     } else {
         for (uint32_t i = 0; i < count; ++i) state_.position[joints[i]] -= deltas[i];
     }
+    if (queued_endpoint) std::copy_n(state_.position, blueprint_.joint_count, commanded_position_);
+    // Independently captured sides are observations in the rebased frame.
+    // Their commanded coordinates must again follow the nominal coupling;
+    // retaining pre-calibration side offsets makes the next coupled plan jump.
+    project_commanded_couplings(blueprint_, commanded_position_);
     pending_drive_calibration_.reset();
     ++blueprint_.calibration_revision;
     state_backup_valid_ = false;
@@ -2342,6 +2358,7 @@ rk_result RobotRuntime::publish_sample_impl(uint64_t timestamp_ns,
             std::all_of(next.velocity, next.velocity + blueprint_.joint_count,
                 [](double velocity) { return std::abs(velocity) <= 1e-6; })) {
             std::copy_n(next.position, blueprint_.joint_count, commanded_position_);
+            project_commanded_couplings(blueprint_, commanded_position_);
             pending_device_stop_source_.reset();
         }
         if (pending_device_stop_source_ && next.safety != RK_SAFETY_FAULT &&
@@ -2358,6 +2375,7 @@ rk_result RobotRuntime::publish_sample_impl(uint64_t timestamp_ns,
             // not evidence of the held motor coordinates; seed only once.
             for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
                 if (!control_.active[joint]) commanded_position_[joint] = next.position[joint];
+            project_commanded_couplings(blueprint_, commanded_position_);
             device_anchor_initialized_ = true;
         }
         // After velocity control stops, use its observed resting position as

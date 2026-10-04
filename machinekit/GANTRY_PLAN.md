@@ -3280,3 +3280,42 @@ The latest buffered retry passed admission and hold/resume assertions, then hit
 its absolute tick deadline because setup homing had advanced that same clock.
 Count the unchanged 2000-tick job budget relative to job start, and start on the
 next tick after homing. Compilation/retry of this fixture correction is pending.
+
+
+### Phase C — hand off calibrated physical sides to a coupled queue
+
+The router's Y return was rejected because independently held motor coordinates
+were copied into nominal coupled command anchors. After stationary feedback and
+counter calibration, native commands now reconstruct followers in dependency
+order from the independent leader coordinates. Individual measured motor
+positions remain available, including residual physical side disagreement.
+Queued calibration refreshes the leader anchor from the acknowledged rebased
+sample before reconstructing followers.
+
+The virtual device now fits stopped counter positions to the independent axes
+named by the deployment, using its actuator ratios. It validates the new queue
+against that shared leader and anchors its pulse generator to the resulting
+nominal targets without changing physical steps. This also prevents a restored
+counter frame from applying an old squaring alignment a second time.
+
+Coverage includes a native calibration regression with distinct measured and
+commanded follower coordinates, a pulse-generator stop/rebase/handoff regression,
+and a complete wire transaction with scope/side controls, Stop, restart,
+counter batch, scope end, and a stationary ordinary queue. Every control ACK is
+checked and both physical counters remain unchanged across handoff.
+The virtual Rust library tests are now part of native CTest.
+
+Validation: native build and **19/19 CTest** passed; all three virtual-device Rust
+library tests passed; Nucleo `cargo check --offline` passed. The actual router
+**homes through the virtual RKD6 device**, returns within the existing
+50-micrometre assertions, and marks every prismatic axis referenced.
+
+Full MotionKit advanced through buffered execution and the hold-deceleration
+sweep, then reached another fixture that submitted an ordinary gantry plan
+without homing. Session trials and the shared gantry trial now establish real
+references using the same robot/MotionSystem; their sampling clock continues
+through setup. The latest full retry is running, not yet claimed green.
+MachineKit compilation passed, but its naming audit found ambiguous split roller
+faces in the new limit switch. A geometry ownership fix is being checked.
+Geometry/mass/acceleration audits and the remaining full Phase C gate still
+remain. G13 is in progress; G14 has not started.

@@ -121,3 +121,41 @@ fn independent_counter_rebase_is_atomic_and_preserves_physical_steps() {
     assert_eq!(board.step_count(0), 0);
     assert_eq!(board.step_count(1), 3);
 }
+
+#[test]
+fn stopped_pair_queue_handoff_preserves_steps_and_uses_the_shared_leader() {
+    let mut board = VirtualBoard::<2, 1>::new(1000, 0, 0, [1000.0; 2]);
+    let mut generator = StepGenerator::new([1000.0; 2], [0; 2], [0.0; 2], 1000).unwrap();
+    assert!(generator.set_skew_group(SkewGroup {
+        first: 0, second: 1, first_ratio: 1.0, second_ratio: 1.0, bound: 0.01,
+    }));
+    assert!(generator.begin_homing_pair(0, 1, 0.02));
+    assert!(generator.hold_homing_side(&board, 0));
+    for tick in 1..=4 {
+        board.advance_host_ns(tick * 1_000_000);
+        generator.tick_with_purpose(&mut board, [0.004; 2], 2).unwrap();
+    }
+    assert!(generator.release_homing_side(0));
+    assert_eq!((board.step_count(0), board.step_count(1)), (0, 4));
+    let targets = generator.stopped_targets(&board, &[0, 0], &[1.0, 1.0], 2).unwrap();
+    assert_eq!(targets, [0.002; 2]);
+    assert!(generator.anchor_stopped_targets(&board, targets));
+    board.advance_host_ns(5_000_000);
+    generator.tick_with_purpose(&mut board, targets, 2).unwrap();
+    assert_eq!((board.step_count(0), board.step_count(1)), (0, 4));
+    assert!(generator.rebase_homing_counters(&[(0, 0.0), (1, 0.004)]));
+    let rebased = generator.stopped_targets(&board, &[0, 0], &[1.0, 1.0], 2).unwrap();
+    assert_eq!(rebased, [0.0; 2]);
+    assert!(generator.anchor_stopped_targets(&board, rebased));
+    generator.end_homing_pair();
+    for tick in 6..=9 {
+        board.advance_host_ns(tick * 1_000_000);
+        generator.tick(&mut board, rebased).unwrap();
+    }
+    assert_eq!((board.step_count(0), board.step_count(1)), (0, 4));
+    for tick in 10..=12 {
+        board.advance_host_ns(tick * 1_000_000);
+        generator.tick(&mut board, [0.003; 2]).unwrap();
+    }
+    assert_eq!((board.step_count(0), board.step_count(1)), (3, 7));
+}

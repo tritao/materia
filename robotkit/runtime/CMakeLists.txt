@@ -136,6 +136,10 @@ if(RK_BUILD_TESTS)
         target_link_libraries(robotkit_virtual_device_endpoint_tests PRIVATE RobotKit::runtime)
         add_test(NAME robotkit_virtual_device_endpoint COMMAND robotkit_virtual_device_endpoint_tests)
         set_tests_properties(robotkit_virtual_device_endpoint PROPERTIES LABELS "robot;runtime;virtual" TIMEOUT 30)
+        add_test(NAME robotkit_device_virtual_rust COMMAND ${RK_VIRTUAL_CARGO_EXECUTABLE}
+            test --offline --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/../device_virtual/Cargo.toml
+            --target-dir ${CMAKE_CURRENT_BINARY_DIR}/cargo-virtual-tests --lib)
+        set_tests_properties(robotkit_device_virtual_rust PROPERTIES LABELS "robot;rust;virtual" TIMEOUT 60)
     endif()
 
 
