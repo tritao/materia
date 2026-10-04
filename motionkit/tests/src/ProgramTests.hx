@@ -134,6 +134,9 @@ class ProgramTests extends MotionKitTestSupport {
     var solver = new AxisKinematics(blueprint);
     var model = blueprint.model;
     var ids = [for (joint in model.joints) joint.id];
+    var simulationHarness = new SimulationHarness(0.01);
+    var runtime = simulationHarness.simulation.addRobot(blueprint.runtime);
+    homeGantryFixture(blueprint, runtime, simulationHarness);
     var count = ids.length;
     var scales = [for (_ in ids) 0.0];
     for (axis in blueprint.axes) for (slot in 0...axis.jointIds.length)
@@ -142,7 +145,7 @@ class ProgramTests extends MotionKitTestSupport {
     var accelerations = [for (joint in model.joints) joint.limits.requireAcceleration()];
     var jerks = [for (scale in scales) 10.0 * scale];
     var limits = new ValidationLimits(count, Int64.ofInt(blueprint.runtime.revision),
-      Int64.ofInt(blueprint.runtime.calibrationRevision));
+      runtime.snapshot().calibrationRevision);
     for (joint in 0...count) {
       var bound = model.joints[joint].limits;
       limits.position(joint, bound.lower, bound.upper);
@@ -182,9 +185,6 @@ class ProgramTests extends MotionKitTestSupport {
     var plan = compiled.blocks[0].plans[0];
     near(plan.copyPositionTolerances()[0], 0.00001,
       "program compiler preserves tight start position tolerance", 1e-12);
-    var simulationHarness = new SimulationHarness(0.01);
-    var simulation = simulationHarness.simulation;
-    var runtime = simulation.addRobot(blueprint.runtime);
     var segments = [for (segment in plan.segments())
       new TrajectorySegment(segment.timeFromStartNs, segment.durationNs,
         segment.coefficients)];

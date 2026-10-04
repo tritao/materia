@@ -242,6 +242,25 @@ class MotionKitTestSupport {
     return compiled;
   }
 
+  /** Establish actual switch references before fixtures submit ordinary gantry plans. */
+  public function homeGantryFixture(blueprint:MotionSystemBlueprint,
+      runtime:robotkit.runtime.RobotRuntime, harness:SimulationHarness):Int {
+    var model = blueprint.model;
+    var robot = new SimulatedRobot("homing-fixture", runtime, model.name,
+      [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
+    var homing = new MotionSystem(robot, blueprint);
+    homing.configureRuntimeHoming(runtime, () -> {}, harness.simulation.homingSides(0));
+    var tick = 1;
+    harness.step(Int64.ofInt(tick));
+    homing.home();
+    while (homing.homingStatus() != "Complete" && tick < 60000) {
+      harness.step(Int64.ofInt(++tick));
+      homing.update(0.01);
+    }
+    check(homing.homingStatus() == "Complete", "Gantry fixture establishes physical switch references");
+    return tick;
+  }
+
   /**
    * Starts a streamed x move, injects an event at eventTick, optionally
    * resumes once the machine has come to rest, and runs until everything has

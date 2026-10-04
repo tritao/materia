@@ -675,7 +675,9 @@ class CncRouter extends AxisBuilder {
 	function buildHome(axis:RouterAxisSpec, suffix:String, fixed:String, moving:String,
 			point:Array<Float>, dimensions:Array<Float>, direction:Array<Float>, side:Int, shaft:String):Void {
 		var room = axisOvertravel(axis.id);
-		if (room <= 1) throw "Router home requires physical guide overtravel";
+		var sensor = new machinekit.motion.ProximitySwitch();
+		if (!Math.isFinite(room) || room <= 4 * sensor.switchRepeatability())
+			throw "Router home uncertainty does not fit its physical guide overtravel";
 		var trigger = "homeTrigger" + suffix;
 		attach(trigger, new RouterPlate(dimensions[0], dimensions[1], dimensions[2], "steel", "Home trigger"),
 			AssemblyFrames.translation(point[0], point[1], point[2] - dimensions[2] / 2), moving);
@@ -684,7 +686,6 @@ class CncRouter extends AxisBuilder {
 		addMemberConnector(trigger, "trip", AssemblyFrames.translation(direction[0] * side * half,
 			direction[1] * side * half, dimensions[2] / 2 + direction[2] * side * half));
 		var travel = (side < 0 ? axis.lower : axis.upper) + side * room * 0.25;
-		var sensor = new machinekit.motion.ProximitySwitch();
 		var normal = [for (value in direction) -side * value];
 		var face = [for (i in 0...3) point[i] + direction[i] * (travel + side * half)];
 		var origin = [for (i in 0...3) face[i] - normal[i] * (sensor.spec.length + sensor.spec.sensingDistance)];

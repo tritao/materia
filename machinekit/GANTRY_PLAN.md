@@ -3112,3 +3112,19 @@ past the earlier slip-fixture failure into CoreXY checks; still running. The
 router-device-home retry (72026) is compiling the updated project entrypoint.
 No successful router homing or full phase pass is claimed yet. G13 remains
 incomplete and G14 is not started.
+
+### Phase C — fit Z home uncertainty to actual guide room
+
+Router device retry reached physical assembly generation and rejected Z's
+0.5 mm overtravel under a copied 1 mm minimum. Replaced that arbitrary minimum
+with the actual quarter-room trip uncertainty check: room must exceed four
+times the sensor repeatability. Z's 0.125 mm trip leaves the declared 0.02 mm
+band inside its physical end stop; addSwitch still validates both sides of that
+band. Router example rebuild is running (15530); execution remains pending.
+
+The full MotionKit retry passed slip/CoreXY checks then reached another
+unreferenced gantry fixture in testProgramStartTolerances. Added reusable actual
+sensor homing setup to MotionKitTestSupport and used it before building this
+test's compiler/validation limits, stamped with the post-home revision. Its
+start-position mismatch assertion remains unchanged. MotionKit recompilation is
+running (23979); no full-suite pass is claimed. G13/Phase C remain incomplete.
