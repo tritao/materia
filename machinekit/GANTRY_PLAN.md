@@ -2982,3 +2982,18 @@ The fixture is included in the full project-source phase suite.
 No builds/tests ran. This new fixture is unverified and may expose integration
 issues at Phase C; it is not evidence that device router homing already passes.
 Nucleo input/control support and bench pin documentation remain pending.
+
+### G13 — Nucleo bench GPIO inputs and captured State6 observations
+
+The minimal Nucleo bench target now configures PB0/PB1 as pull-up GPIO inputs,
+accepts up to two explicitly bound session inputs and seeds capture state without
+fabricated edges. Its main loop samples inputs in the DWT clock and publishes
+input bits plus closing/opening counts and captured ticks/steps in State6. Input
+counter exhaustion triggers emergency stop. Controlled ordinary stop no longer
+publishes a spurious generic fault. Board and deployment READMEs document the
+PB0/PB1 assignments as hardware unverified, with no assumed connector numbering.
+
+No builds/tests ran. Nucleo cargo check --offline is queued for Phase C. The
+board retains its honest minimal profile: no physical motor outputs, captured
+step counts zero, no scoped motor holds/calibration. Router homing verification
+uses the full virtual device fixture and remains unverified. G13 is incomplete.
