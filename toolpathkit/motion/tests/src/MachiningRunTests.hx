@@ -31,9 +31,9 @@ import toolpathkit.tool.ToolLibrary;
 
 class MachiningRunTests {
   public static function run():Void {
-    var blueprint = MachineKitRobotCompiler.compileXYZGantry(
-      new LinearAxis(23, 10, 200), new LinearAxis(23, 10, 200),
-      new LinearAxis(23, 10, 200), 0.02, 0.08);
+    var blueprint = MachineKitRobotCompiler.compileGantry(
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(200, 200, 200)),
+      0.02, 0.08);
     for (channel in ["spindle.speed", "spindle.direction"])
       blueprint.runtime.channels.push(new ProcessChannelDeclaration(channel,
         ProcessEventValue.Analog(0.0)));
@@ -212,9 +212,9 @@ class MachiningRunTests {
     is set to `override` a little way in, so the rest is planned again.
   **/
   static function pocketTicks(override:Float):Int {
-    var blueprint = MachineKitRobotCompiler.compileXYZGantry(
-      new LinearAxis(23, 10, 200), new LinearAxis(23, 10, 200),
-      new LinearAxis(23, 10, 200), 0.02, 0.08);
+    var blueprint = MachineKitRobotCompiler.compileGantry(
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(200, 200, 200)),
+      0.02, 0.08);
     for (channel in ["spindle.speed", "spindle.direction"])
       blueprint.runtime.channels.push(new ProcessChannelDeclaration(channel,
         ProcessEventValue.Analog(0.0)));

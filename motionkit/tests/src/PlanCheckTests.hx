@@ -473,8 +473,9 @@ class PlanCheckTests extends MotionKitTestSupport {
    * check predicts slip) or strong, with an encoder on the X motor, and returns what the encoder monitor saw.
    */
   function gantryRun(weak:Bool):GantryRun {
-    var blueprint = MachineKitRobotCompiler.compileXYZGantry(new LinearAxis(23, 10, 80), new LinearAxis(23, 10, 80),
-      new LinearAxis(23, 10, 80), 0.1, 0.4);
+    var blueprint = MachineKitRobotCompiler.compileGantry(
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(80, 80, 80)),
+      0.1, 0.4);
     var model = blueprint.model;
     for (actuator in model.actuators) {
       actuator.maxEffort = weak ? 0.002 : 1e7;
@@ -484,7 +485,7 @@ class PlanCheckTests extends MotionKitTestSupport {
     }
     // Explicit motor feedback detects lost steps; the load-side scale measures carriage error.
     model.addEncoder(Encoder.perRevolution("x.encoder", blueprint.axes[0].jointIds[1], EncoderKind.Incremental, 2000.0));
-    model.addEncoder(Encoder.perMillimetre("x.scale", "x/carriage-slide", EncoderKind.Incremental, 200.0));
+    model.addEncoder(Encoder.perMillimetre("x.scale", "x", EncoderKind.Incremental, 200.0));
     var ids = [for (joint in model.joints) joint.id];
     var solver = new AxisKinematics(blueprint);
     var limits = new ValidationLimits(ids.length, Int64.ofInt(blueprint.runtime.revision),
@@ -545,9 +546,9 @@ class PlanCheckTests extends MotionKitTestSupport {
   public function testEncoderSeesStepperSlip():Void {
     var weak = gantryRun(true);
     check(weak.completed, 'the weak machine runs its program (${weak.failure})');
-    check(weak.slip.slipped() && weak.slip.lost("x/carriage-slide") > 0.0, 'its X axis lost distance: ${weak.slip.lost("x/carriage-slide")}');
+    check(weak.slip.slipped() && weak.slip.lost("x") > 0.0, 'its X axis lost distance: ${weak.slip.lost("x")}');
     check(weak.position < weak.commanded - 1e-4, 'the simulated axis ends behind its command: ${weak.position} against ${weak.commanded}');
-    near(weak.commanded - weak.position, weak.slip.lost("x/carriage-slide"), "by the distance the plan check predicted", 1e-5);
+    near(weak.commanded - weak.position, weak.slip.lost("x"), "by the distance the plan check predicted", 1e-5);
     check(weak.monitor.faults(), "the encoder faults");
     var found = weak.monitor.findings[0];
     check(found.kind == robotkit.runtime.EncoderMonitor.EncoderFindingKind.LostSteps && found.encoder == "x.encoder" && found.joint == weak.motorJoint,
@@ -555,7 +556,7 @@ class PlanCheckTests extends MotionKitTestSupport {
     check(found.motor.length > 0 && found.steps > robotkit.runtime.EncoderMonitor.STEPPER_BOUND_STEPS && found.error * weak.motorRatio < 0.0,
       'with the motor, how many steps, and the sign: ${found.describe()}');
     var seen = weak.monitor.pathError("x.scale");
-    near(Math.abs(seen.last), weak.slip.lost("x/carriage-slide"), "the encoder reads the error that was kept", 5e-6);
+    near(Math.abs(seen.last), weak.slip.lost("x"), "the encoder reads the error that was kept", 5e-6);
 
     var strong = gantryRun(false);
     check(strong.completed && !strong.slip.slipped() && !strong.monitor.faults(),
@@ -599,8 +600,9 @@ class PlanCheckTests extends MotionKitTestSupport {
    * only when asked to.
    */
   public function testCompilerRunsPlanCheck():Void {
-    var blueprint = MachineKitRobotCompiler.compileXYZGantry(new LinearAxis(23, 10, 80), new LinearAxis(23, 10, 80),
-      new LinearAxis(23, 10, 80), 0.1, 0.4);
+    var blueprint = MachineKitRobotCompiler.compileGantry(
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(80, 80, 80)),
+      0.1, 0.4);
     var model = blueprint.model;
     // Motors that cannot hold their axes: a stepper of 0.002 N m against a 0.4 m/s² axis.
     for (actuator in model.actuators) {

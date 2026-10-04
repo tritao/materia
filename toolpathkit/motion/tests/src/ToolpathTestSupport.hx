@@ -141,9 +141,9 @@ class ToolpathTestSupport extends MotionKitTestSupport {
     return binding.compile(parsed.program, joints, planId);
   }
   public function cncTrial(virtualDevice:Bool, ?linkLoss:Bool = false):Array<Float> {
-    var blueprint = MachineKitRobotCompiler.compileXYZGantry(
-      new LinearAxis(23, 10, 200), new LinearAxis(23, 10, 200),
-      new LinearAxis(23, 10, 200), 0.01, 0.04);
+    var blueprint = MachineKitRobotCompiler.compileGantry(
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(200, 200, 200)),
+      0.01, 0.04);
     for (channel in ["spindle.speed", "spindle.direction"])
       blueprint.runtime.channels.push(new ProcessChannelDeclaration(channel,
         ProcessEventValue.Analog(0.0)));

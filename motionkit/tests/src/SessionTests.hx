@@ -428,9 +428,9 @@ class SessionTests extends MotionKitTestSupport {
       "hold during a queued trajectory preserves later motion", 1e-5);
     queuedSimulationHarness.dispose();
 
-    var squareBlueprint = MachineKitRobotCompiler.compileXYZGantry(
-      new LinearAxis(23, 10, 80), new LinearAxis(23, 10, 80),
-      new LinearAxis(23, 10, 80), 0.08, 0.2);
+    var squareBlueprint = MachineKitRobotCompiler.compileGantry(
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(80, 80, 80)),
+      0.08, 0.2);
     var squareSimulationHarness = new SimulationHarness(0.01);
     var squareSimulation = squareSimulationHarness.simulation;
     var squareRuntime = squareSimulation.addRobot(squareBlueprint.runtime);

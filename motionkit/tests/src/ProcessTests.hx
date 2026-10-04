@@ -325,44 +325,34 @@ class ProcessTests extends MotionKitTestSupport {
   }
 
   public function testCompiledXYZGantryRunsThroughSimulation():Void {
-    var xAxis = new LinearAxis(23, 10, 80);
-    var yAxis = new LinearAxis(23, 10, 60);
-    var zAxis = new LinearAxis(23, 10, 40);
-    var blueprint = MachineKitRobotCompiler.compileXYZGantry(xAxis, yAxis, zAxis, 0.1, 0.4);
-    check(blueprint.model.links.length == 7, "XYZ gantry compiles its frame, three carriages and three motor shafts");
-    check(blueprint.model.joints.length == 6, "XYZ gantry retains three travels and three shaft joints");
+    var assembly = new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(80, 60, 40));
+    var blueprint = MachineKitRobotCompiler.compileGantry(assembly, 0.1, 0.4);
+    check(blueprint.model.joints.length == blueprint.model.couplings.length + 3 && blueprint.model.actuators.length == 4,
+      "physical gantry retains XYZ, four motor shafts and its passive idlers");
     for (i in 0...3) {
       var joint = blueprint.model.joints[i];
-      check(joint.id == ["x/carriage-slide", "y/carriage-slide", "z/carriage-slide"][i], "XYZ gantry uses stable joint IDs");
-      check(joint.type == robotkit.model.JointType.Prismatic,
-        "XYZ gantry joints are prismatic");
-      near(joint.limits.requireVelocity(), Math.min(0.1, [xAxis, yAxis, zAxis][i].motor.usableSpeed(24) /
-        Math.abs(blueprint.model.couplings[i].ratio)), "XYZ gantry retains each physical motor rate limit");
+      check(joint.id == ["x", "y", "z"][i], "physical gantry uses stable XYZ leader IDs");
+      check(joint.type == robotkit.model.JointType.Prismatic, "XYZ leaders are prismatic");
+      var limits = blueprint.model.coupledLimits(joint.id);
+      near(blueprint.axes[i].maxVelocity, Math.min(0.1, limits.requireVelocity()),
+        "logical job ceiling respects the physical drive");
     }
-    // The carriage is a link, not a flange frame: use the compiled model directly.
     var gantry = RobotKinematics.compile(blueprint.model);
-    var carriage = gantry.bodyIndex("z/carriage");
+    var flange = [for (frame in blueprint.model.frames) if (frame.flangeIncludePath != null) frame][0];
+    var carriage = gantry.bodyIndex(flange.link.id);
     var gantrySnapshot = KinematicSnapshot.of(new KinematicState(gantry));
-    var tip = gantrySnapshot.bodyPose(carriage);
-    near(tip.x, (xAxis.screwStart + xAxis.travelMin - xAxis.carriage.connector("bore").frame.z) * 0.001,
-      "XYZ gantry forward kinematics preserves the physical X carriage origin");
-    near(tip.y, (yAxis.screwStart + yAxis.travelMin - yAxis.carriage.connector("bore").frame.z) * 0.001,
-      "XYZ gantry forward kinematics preserves the physical Y carriage origin");
-    near(tip.z, (zAxis.screwStart + zAxis.travelMin - zAxis.carriage.connector("bore").frame.z) * 0.001,
-      "XYZ gantry forward kinematics preserves the physical Z carriage origin");
-    if (gantry.dofCount() != 3 || gantry.bodyParentJoint[gantry.bodyIndex("assembly-root")] >= 0)
-      throw "XYZ gantry should retain three independent DOFs and their coupled shafts under its root base";
+    var tip = gantrySnapshot.framePose(gantry.frameIndex(flange.id));
+    near(tip.x, assembly.flangeZero.x * 0.001, "physical flange zero X");
+    near(tip.y, assembly.flangeZero.y * 0.001, "physical flange zero Y");
+    near(tip.z, assembly.flangeZero.z * 0.001, "physical flange zero Z");
+    check(gantry.dofCount() == 3, "four driven shafts retain three independent coordinates");
     var flatJacobian = gantrySnapshot.bodyJacobian(carriage);
-    var jacobian = [for (row in 0...6) [for (column in 0...3) flatJacobian[row * gantry.dofCount() + column]]];
-    near(jacobian[0][0], 1.0, "XYZ gantry X joint moves along world X");
-    near(jacobian[1][1], 1.0, "XYZ gantry Y joint moves along world Y");
-    near(jacobian[2][2], 1.0, "XYZ gantry Z joint moves along world Z");
-    near(jacobian[1][0], 0.0, "XYZ gantry X joint has no world Y component");
-    near(jacobian[2][0], 0.0, "XYZ gantry X joint has no world Z component");
-    near(jacobian[0][1], 0.0, "XYZ gantry Y joint has no world X component");
-    near(jacobian[2][1], 0.0, "XYZ gantry Y joint has no world Z component");
-    near(jacobian[0][2], 0.0, "XYZ gantry Z joint has no world X component");
-    near(jacobian[1][2], 0.0, "XYZ gantry Z joint has no world Y component");
+    for (axis in 0...3) {
+      var column = gantry.dofIndex(["x", "y", "z"][axis]);
+      for (row in 0...6) near(flatJacobian[row * gantry.dofCount() + column],
+        row == axis ? (axis == 2 ? -1.0 : 1.0) : 0.0,
+        "physical gantry moves X/Y horizontally and Z downward");
+    }
 
     var simulationHarness = new SimulationHarness(0.01);
     var simulation = simulationHarness.simulation;

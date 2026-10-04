@@ -128,9 +128,9 @@ class ProgramTests extends MotionKitTestSupport {
   public function new() { super(); }
 
   public function testProgramStartTolerances():Void {
-    var blueprint = MachineKitRobotCompiler.compileXYZGantry(
-      new LinearAxis(23, 10, 80), new LinearAxis(23, 10, 80),
-      new LinearAxis(23, 10, 80), 0.1, 0.4);
+    var blueprint = MachineKitRobotCompiler.compileGantry(
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(80, 80, 80)),
+      0.1, 0.4);
     var solver = new AxisKinematics(blueprint);
     var model = blueprint.model;
     var ids = [for (joint in model.joints) joint.id];

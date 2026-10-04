@@ -155,10 +155,9 @@ class StreamTests extends MotionKitTestSupport {
   }
 
   public function testBufferedExecution():Void {
-    var xAxis = new LinearAxis(23, 10, 80);
-    var yAxis = new LinearAxis(23, 10, 60);
-    var zAxis = new LinearAxis(23, 10, 40);
-    var blueprint = MachineKitRobotCompiler.compileXYZGantry(xAxis, yAxis, zAxis, 0.1, 0.4);
+    var blueprint = MachineKitRobotCompiler.compileGantry(
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(80, 60, 40)),
+      0.1, 0.4);
     var simulationHarness = new SimulationHarness(0.01);
     var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);

@@ -234,8 +234,9 @@ class MotionKitTestSupport {
   public function gantryBlueprint():MotionSystemBlueprint {
     var compiled = gantryBlueprint_;
     if (compiled == null) {
-      compiled = MachineKitRobotCompiler.compileXYZGantry(new LinearAxis(23, 10, 200),
-        new LinearAxis(23, 10, 60), new LinearAxis(23, 10, 40), 0.1, 0.4);
+      compiled = MachineKitRobotCompiler.compileGantry(
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(200, 60, 40)),
+      0.1, 0.4);
       gantryBlueprint_ = compiled;
     }
     return compiled;

@@ -559,8 +559,8 @@ G0 → G1 → G2 → G3 ──────────────────�
 | G5 | complete; full gate passed | `13e993340`; shared axis builder and physical rack regression |
 | G6 | implemented; build/runtime validation deferred at user request | `d11e4dacb` |
 | G7 | implemented; build/runtime validation deferred at user request | `11e9bc82b` |
-| G8 | implementation added; runtime and firmware verification deferred | see progress notes |
-| G9 | planned | — |
+| G8 | implementation added; runtime and firmware verification deferred | `823de3191`, `6ac44c34e` |
+| G9 | implementation added; migration verification deferred | see progress notes |
 | G10 | planned | — |
 | G11 | planned | — |
 | G12 | planned | — |
@@ -1138,3 +1138,35 @@ implementation; its fault enum supports skew but the board does not yet run
 the step generator. Hardware integration belongs to G13. Firmware compile,
 runtime timing and hardware fault proof remain deferred; no build or test
 was run after the user's stop-testing instruction.
+
+
+### G9 — one physical gantry compilation path
+
+Retire the public `compileXYZGantry` and `compileAssemblyAxes` APIs. All
+MotionKit/ToolpathKit XYZ callers and humanoid MixedScene now construct the
+actual `Gantry` and call `compileGantry`, which passes its saved mechanical
+assembly, actuator metadata and component mass/inertia through
+`AssemblySimulationBridge`. There is no post-bridge drive attachment for a
+gantry. The old private drive attachment remains limited to the existing
+single `LinearAxis` adapter; its fixture and API are retained.
+
+The logical motion view orders X, Y and Z first while retaining all motor
+shafts and passive belt idlers. It maps each leader's one-input follower chain
+and caps job speeds/accelerations by the model's coupled drive limits. Job
+ceilings do not overwrite motor ratings. Fixture dimensions are preserved;
+their old three-Tr10-axis mechanism is replaced with the authored GantrySpec
+defaults (belt X/Y, screw Z, dual Y). Existing single-axis IDs are retained.
+Gantry encoder/slip checks use the real `x` leader.
+
+Update mechanical assertions for downward Z, physical flange zero, authored
+leader IDs and the extra idler/dual-drive topology. The Toolpath physical
+fixture still checks upstream hull conversion independently of motion mapping.
+MixedScene sends targets for all joints, derives shaft/idler targets through
+couplings, derives trace dimensions from the compiled topology, and bounds
+its sinusoidal amplitude by the physical rate/acceleration. Its G1 bed/base
+collision setup remains in place.
+
+Changed speed, acceleration, stall, cycle and trace numbers cannot be measured
+while testing is stopped. Compilation, MixedScene execution and all migrated
+fixture results remain deferred; source review does not prove those outcomes.
+No build or test was run for G9.

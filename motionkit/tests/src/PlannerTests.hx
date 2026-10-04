@@ -464,9 +464,9 @@ class PlannerTests extends MotionKitTestSupport {
   }
 
   public function testMoveLinearUsesPlannerLimits():Void {
-    var blueprint = MachineKitRobotCompiler.compileXYZGantry(
-      new LinearAxis(23, 10, 80), new LinearAxis(23, 10, 80),
-      new LinearAxis(23, 10, 80), 0.2, 2.0);
+    var blueprint = MachineKitRobotCompiler.compileGantry(
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(80, 80, 80)),
+      0.2, 2.0);
     var simulationHarness = new SimulationHarness(0.01);
     var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
@@ -705,9 +705,9 @@ class PlannerTests extends MotionKitTestSupport {
         blendedRig.machine.lastPathPlanningDiagnostics.length == 1,
         'helical $plane stays executable with an exact-stop blend fallback');
       blendedRig.harness.dispose();
-      var blueprint = MachineKitRobotCompiler.compileXYZGantry(
-        new LinearAxis(23, 10, 200), new LinearAxis(23, 10, 200),
-        new LinearAxis(23, 10, 200), 0.1, 0.4);
+      var blueprint = MachineKitRobotCompiler.compileGantry(
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(200, 200, 200)),
+      0.1, 0.4);
       var solver = new AxisKinematics(blueprint, "x", "y", "z");
       var count = solver.jointCount();
       var limits = new ValidationLimits(count,
