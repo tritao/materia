@@ -1,4 +1,6 @@
 //! Device-side arc simulation. The scheduler owns output safety; this model observes its outputs.
+use robotkit_device_protocol::weld_contract as contract;
+
 #[derive(Clone, Copy, Debug)]
 pub struct WelderConfig {
     pub sensor_slot: u8,
@@ -26,16 +28,16 @@ pub struct VirtualWelder {
     elapsed: f64,
     established: bool,
     fault: u8,
-    values: [f32; 6],
+    values: [f32; contract::SENSOR_COUNT],
 }
 impl VirtualWelder {
     pub fn new(config: WelderConfig) -> Option<Self> {
         config.valid().then_some(Self { config, grounded: false, elapsed: 0.0,
-            established: false, fault: 0, values: [0.0; 6] })
+            established: false, fault: 0, values: [0.0; contract::SENSOR_COUNT] })
     }
-    pub fn values(&self) -> [f32; 6] { self.values }
+    pub fn values(&self) -> [f32; contract::SENSOR_COUNT] { self.values }
     pub fn faulted(&self) -> bool { self.fault != 0 }
-    pub fn reset(&mut self) { self.elapsed = 0.0; self.established = false; self.fault = 0; self.values = [0.0; 6]; }
+    pub fn reset(&mut self) { self.elapsed = 0.0; self.established = false; self.fault = 0; self.values = [0.0; contract::SENSOR_COUNT]; }
 
     pub fn tick(&mut self, dt: f64, arc: bool, wire_m_per_min: f32, voltage_v: f32) {
         if !arc {
@@ -55,9 +57,12 @@ impl VirtualWelder {
         }
         let current = if self.established { (wire_m_per_min * 30.0).min(350.0) } else { 0.0 };
         let voltage = if self.established { voltage_v } else { 0.0 };
-        self.values = [self.established as u8 as f32, current, voltage,
-            (!arc && self.grounded) as u8 as f32, self.fault as f32,
-            current * voltage / self.config.efficiency];
+        self.values[contract::ARC] = self.established as u8 as f32;
+        self.values[contract::CURRENT] = current;
+        self.values[contract::VOLTAGE] = voltage;
+        self.values[contract::TOUCH] = (!arc && self.grounded) as u8 as f32;
+        self.values[contract::FAULT] = self.fault as f32;
+        self.values[contract::POWER] = current * voltage / self.config.efficiency;
     }
 }
 

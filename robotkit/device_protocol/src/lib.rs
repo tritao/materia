@@ -22,3 +22,7 @@ pub use virtual_board::*;
 
 #[path = "../boards/welder_retrofit.rs"]
 pub mod welder_retrofit;
+
+// Sensor layout generated from ProcessKit's canonical welding channel contract.
+#[path = "../../../processkit/schema/weld_contract.rs"]
+pub mod weld_contract;

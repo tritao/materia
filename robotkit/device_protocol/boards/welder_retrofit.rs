@@ -1,4 +1,6 @@
 //! Retrofit supply I/O: digital optoMOS trigger, isolated 0–10 V outputs and calibrated sensing.
+use crate::weld_contract as contract;
+
 #[derive(Clone, Copy)]
 pub struct RetrofitConfig {
     pub wire_at_10v: f32,
@@ -51,7 +53,7 @@ impl RetrofitWelder {
     pub fn reset<I: RetrofitIo>(&mut self, io: &mut I) {
         self.safe(io); self.fault = 0; self.no_arc_elapsed = 0.0; self.short_elapsed = 0.0;
     }
-    pub fn tick<I: RetrofitIo>(&mut self, io: &mut I, dt: f64, arc: bool, wire: f32, volts: f32) -> [f32; 6] {
+    pub fn tick<I: RetrofitIo>(&mut self, io: &mut I, dt: f64, arc: bool, wire: f32, volts: f32) -> [f32; contract::SENSOR_COUNT] {
         let c = self.config;
         let current_input = io.current_input_v(); let voltage_input = io.arc_voltage_input_v();
         if !dt.is_finite() || dt < 0.0 || !wire.is_finite() || wire < 0.0 ||
@@ -74,7 +76,13 @@ impl RetrofitWelder {
             io.wire_output_v((wire / c.wire_at_10v * 10.0).min(10.0));
             io.trigger(true);
         }
-        [established as u8 as f32, current, voltage, io.touch_input() as u8 as f32,
-            self.fault as f32, current * voltage / c.efficiency]
+        let mut values = [0.0; contract::SENSOR_COUNT];
+        values[contract::ARC] = established as u8 as f32;
+        values[contract::CURRENT] = current;
+        values[contract::VOLTAGE] = voltage;
+        values[contract::TOUCH] = io.touch_input() as u8 as f32;
+        values[contract::FAULT] = self.fault as f32;
+        values[contract::POWER] = current * voltage / c.efficiency;
+        values
     }
 }
