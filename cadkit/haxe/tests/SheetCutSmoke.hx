@@ -9,6 +9,7 @@ import cadkit.parametric.SelectionRecipe;
 import cadkit.parametric.features.ConstrainedSketchFeature;
 import cadkit.parametric.recording.DocumentBuilder;
 import cadkit.sheetmetal.SheetBaseFeature;
+import cadkit.sheetmetal.BoundaryOrigin;
 import cadkit.sheetmetal.SheetCutFeature;
 import cadkit.sheetmetal.SheetDemoParts;
 import cadkit.sheetmetal.SheetDiagnosis;
@@ -23,6 +24,9 @@ import cadkit.sketch.SketchConstraint;
 
 /** Through-wall cuts follow staged solved geometry and persistent support faces on either sheet side. */
 class SheetCutSmoke {
+	static function purpose(origin:BoundaryOrigin):String {
+		return switch (origin) { case Authored: "authored"; case Cut(owner): "cut " + owner; case Relief(owner): "relief " + owner; };
+	}
 	static var assertions:Int = 0;
 	static function check(value:Bool, message:String):Void { assertions++; if (!value) throw message; }
 	static function near(actual:Float, expected:Float, message:String):Void { check(Math.abs(actual - expected) < 1e-6, message); }
@@ -66,15 +70,20 @@ class SheetCutSmoke {
 			near(cut.sheet().wall(1).outline.area(), 200 - Math.PI, "exact attached circular cut area");
 			near(cut.currentShape().volume(), (200 - Math.PI) * 1.5, "cut maps onto the rotated wall");
 			check(CadKit.shapeValidChecked(cut.currentShape().borrowHandle()) != 0, "cut native solid is valid");
+			var originalPurpose = cut.sheet().wall(1).outline.origin(1, 0);
+			check(switch (originalPurpose) { case Cut(_): true; case _: false; }, "cut holes carry explicit boundary purpose");
 			var originalNames = names(cut); var loaded = DocumentCodec.decode(DocumentCodec.encode(document));
 			var restored = Std.downcast(loaded.featureById(cut.id.toInt()), SheetCutFeature); if (restored == null) throw "unexpected saved cut type";
+			check(purpose(restored.sheet().wall(1).outline.origin(1, 0)) == purpose(originalPurpose), "cut purpose derives again after codec rebuild");
 			check(restored.side == side && restored.wall == 1, "cut wall and side round trip"); check(names(restored) == originalNames, "cut face names round trip");
 			hole.dimension("hole-radius").set(2); document.recompute(); near(cut.sheet().wall(1).outline.area(), 200 - 4 * Math.PI, "cut sees the staged sketch radius");
 			check(names(cut) == originalNames, "cut radius edit retains authored boundary names");
+			check(purpose(cut.sheet().wall(1).outline.origin(1, 0)) == purpose(originalPurpose), "radius edits derive cut purpose again");
 			check(document.undo(), "undo cut sketch edit"); document.recompute(); near(cut.sheet().wall(1).outline.area(), 200 - Math.PI, "undo restores exact cut");
 			check(document.redo(), "redo cut sketch edit"); document.recompute();
 			base.thickness.set(3); document.recompute(); near(cut.currentShape().volume(), (200 - 4 * Math.PI) * 3, "attached side follows staged stock thickness");
 			check(names(cut) == originalNames, "cut names survive thickness edits");
+			check(purpose(cut.sheet().wall(1).outline.origin(1, 0)) == purpose(originalPurpose), "thickness edits retain cut purpose");
 			var volume = cut.currentShape().volume(); hole.dimension("hole-radius").set(100); var refused = false;
 			try { document.recompute(); } catch (error:Dynamic) { var failure = Std.downcast(error, RecomputeError); if (failure != null) {
 				var diagnosis = Std.downcast(failure.cause, SheetDiagnosis); if (diagnosis != null) refused = diagnosis.code == "sheet.cut-empty";

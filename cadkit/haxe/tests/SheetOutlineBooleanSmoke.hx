@@ -58,5 +58,5 @@ class SheetOutlineBooleanSmoke {
 		check(empty, "cut consuming a wall has a named diagnosis");
 		return assertions;
 	}
-	static function main():Void { trace("Outline difference smoke passed (" + run() + " assertions)"); }
+	static function main():Void { trace("Outline boolean smoke passed (" + run() + " assertions)"); }
 }

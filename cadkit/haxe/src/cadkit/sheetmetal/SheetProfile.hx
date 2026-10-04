@@ -20,7 +20,7 @@ class SheetProfile {
 		if (Math.abs(source.normal.dot(target.normal)) < 1 - 1e-9)
 			throw new SheetDiagnosis("sheet.cut-plane", "Developed region planes must be parallel");
 		var orientation = source.normal.dot(target.normal) > 0 ? 1 : -1;
-		var mapped:Array<Array<Segment>> = []; var identities = outline.identities();
+		var mapped:Array<Array<Segment>> = []; var identities = outline.identities(); var origins = outline.origins();
 		for (loop in outline.loops()) {
 			var segments:Array<Segment> = [];
 			for (segment in loop) {
@@ -36,11 +36,11 @@ class SheetProfile {
 				var reversed:Array<Segment> = []; var index = segments.length;
 				while (index > 0) { var segment = segments[--index]; reversed.push(segment.isLine() ? Segment.line(segment.end, segment.start)
 					: Segment.arc(segment.arcCenter(), segment.radius, segment.startAngle + segment.sweep, -segment.sweep)); }
-				segments = reversed; identities[mapped.length].reverse();
+				segments = reversed; identities[mapped.length].reverse(); origins[mapped.length].reverse();
 			}
 			mapped.push(segments);
 		}
-		return new WallOutline(mapped[0], mapped.slice(1), identities);
+		return new WallOutline(mapped[0], mapped.slice(1), identities, origins);
 	}
 	static function loop(curves:Array<ProfileCurve>, source:Plane, target:Plane, clockwise:Bool):{segments:Array<Segment>, identities:Array<String>} {
 		var segments:Array<Segment> = []; var identities:Array<String> = []; var area = 0.0;

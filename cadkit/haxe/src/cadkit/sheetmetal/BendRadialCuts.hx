@@ -5,7 +5,7 @@ import cadkit.sheetmetal.BendRadialCuts.RadialCutEvent;
 /** Exact hole-free, Y-monotone radial sectors derived from authored cuts at a collapsed hem axis. */
 class BendRadialCuts {
 	static function splitExtrema(outline:WallOutline):WallOutline {
-		var segments:Array<Segment> = []; var identities:Array<String> = []; var loop = outline.loops()[0];
+		var segments:Array<Segment> = []; var identities:Array<String> = []; var origins:Array<BoundaryOrigin> = []; var loop = outline.loops()[0];
 		for (i in 0...loop.length) {
 			var segment = loop[i]; var identity = outline.identity(0, i); var fractions = [0.0, 1.0];
 			if (!segment.isLine()) for (sign in [-1.0, 1.0]) {
@@ -14,14 +14,14 @@ class BendRadialCuts {
 			}
 			fractions.sort(function(a:Float, b:Float):Int { return a < b ? -1 : a > b ? 1 : 0; });
 			for (j in 0...(fractions.length - 1)) {
-				var first = fractions[j]; var last = fractions[j + 1];
+				var first = fractions[j]; var last = fractions[j + 1]; origins.push(outline.origin(0, i));
 				segments.push(segment.isLine() ? segment : Segment.arc(segment.arcCenter(), segment.radius,
 					segment.startAngle + segment.sweep * first, segment.sweep * (last - first)));
 				identities.push(fractions.length == 2 ? identity : "radial:" + identity.length + ":" + identity + ":"
 					+ role(segment, first) + ":" + role(segment, last));
 			}
 		}
-		return new WallOutline(segments, [], [identities]);
+		return new WallOutline(segments, [], [identities], [origins]);
 	}
 	static function role(segment:Segment, fraction:Float):String {
 		if (fraction == 0) return "start"; if (fraction == 1) return "end";

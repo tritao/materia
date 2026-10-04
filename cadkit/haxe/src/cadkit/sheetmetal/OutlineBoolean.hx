@@ -5,32 +5,33 @@ import cadkit.sheetmetal.OutlineBoolean.OutlineMode;
 /** Analytic line/arc region booleans; callers choose whether disconnected components are valid. */
 class OutlineBoolean {
 	static inline var EPS:Float = 1e-8;
-	public static function subtract(source:WallOutline, tool:WallOutline, owner:String):WallOutline {
-		var result = regions(source, tool, owner);
+	public static function subtract(source:WallOutline, tool:WallOutline, owner:String, ?origin:BoundaryOrigin):WallOutline {
+		var result = regions(source, tool, owner, origin);
 		if (result.length == 0) throw new SheetDiagnosis("sheet.cut-empty", "Cut removes the entire wall");
 		if (result.length != 1) throw new SheetDiagnosis("sheet.cut-disconnected", "Cut splits the wall into separate regions");
 		return result[0];
 	}
 	/** Bend strips may have separate patches joined through their neighbouring walls. */
-	public static function regions(source:WallOutline, tool:WallOutline, owner:String):Array<WallOutline> {
-		return combine(source, tool, owner, Difference);
+	public static function regions(source:WallOutline, tool:WallOutline, owner:String, ?origin:BoundaryOrigin):Array<WallOutline> {
+		return combine(source, tool, owner, Difference, origin == null ? BoundaryOrigin.Cut(owner) : origin);
 	}
 	public static function intersection(source:WallOutline, tool:WallOutline, owner:String):Array<WallOutline> {
-		return combine(source, tool, owner, Intersection);
+		return combine(source, tool, owner, Intersection, BoundaryOrigin.Cut(owner));
 	}
+	/** Preserve authored identities; contributing contours must use distinct identity namespaces. */
 	public static function union(source:WallOutline, tool:WallOutline):Array<WallOutline> {
-		return combine(source, tool, "", Union);
+		return combine(source, tool, "", Union, BoundaryOrigin.Authored);
 	}
-	static function combine(source:WallOutline, tool:WallOutline, owner:String, mode:OutlineMode):Array<WallOutline> {
+	static function combine(source:WallOutline, tool:WallOutline, owner:String, mode:OutlineMode, origin:BoundaryOrigin):Array<WallOutline> {
 		var pieces:Array<OutlinePiece> = [];
-		collect(source, tool, false, owner, pieces, mode);
-		collect(tool, source, true, owner, pieces, mode);
+		collect(source, tool, false, owner, pieces, mode, origin);
+		collect(tool, source, true, owner, pieces, mode, origin);
 		var loops:Array<Array<Segment>> = [];
-		var ids:Array<Array<String>> = [];
+		var ids:Array<Array<String>> = []; var roles:Array<Array<BoundaryOrigin>> = [];
 		while (pieces.length > 0) {
 			var first = pieces.shift();
 			if (first == null) throw new SheetDiagnosis("sheet.cut-boundary", "Cut boundary has no initial segment");
-			var loop = [first.segment]; var names = [first.identity];
+			var loop = [first.segment]; var names = [first.identity]; var origins = [first.origin];
 			var end = first.segment.end;
 			while (end.distance(first.segment.start) > EPS) {
 				var candidate = -1;
@@ -40,9 +41,9 @@ class OutlineBoolean {
 				}
 				if (candidate < 0) throw new SheetDiagnosis("sheet.cut-boundary", "Cut boundary does not close");
 				var next = pieces[candidate]; pieces.splice(candidate, 1);
-				loop.push(next.segment); names.push(next.identity); end = next.segment.end;
+				loop.push(next.segment); names.push(next.identity); origins.push(next.origin); end = next.segment.end;
 			}
-			loops.push(loop); ids.push(names);
+			loops.push(loop); ids.push(names); roles.push(origins);
 		}
 		var outers:Array<Int> = []; var holes:Array<Int> = [];
 		for (i in 0...loops.length) {
@@ -63,14 +64,14 @@ class OutlineBoolean {
 		}
 		var result:Array<WallOutline> = [];
 		for (outer in outers) {
-			var nested:Array<Array<Segment>> = []; var names = [ids[outer]];
-			for (hole in holes) if (owners.get(hole) == outer) { nested.push(loops[hole]); names.push(ids[hole]); }
-			result.push(new WallOutline(loops[outer], nested, names));
+			var nested:Array<Array<Segment>> = []; var names = [ids[outer]]; var origins = [roles[outer]];
+			for (hole in holes) if (owners.get(hole) == outer) { nested.push(loops[hole]); names.push(ids[hole]); origins.push(roles[hole]); }
+			result.push(new WallOutline(loops[outer], nested, names, origins));
 		}
 		return result;
 	}
 
-	static function collect(outline:WallOutline, other:WallOutline, reverse:Bool, owner:String, result:Array<OutlinePiece>, mode:OutlineMode):Void {
+	static function collect(outline:WallOutline, other:WallOutline, reverse:Bool, owner:String, result:Array<OutlinePiece>, mode:OutlineMode, origin:BoundaryOrigin):Void {
 		var boundaries = outline.loops();
 		for (i in 0...boundaries.length) for (j in 0...boundaries[i].length) {
 			var segment = boundaries[i][j];
@@ -106,7 +107,7 @@ class OutlineBoolean {
 					+ endpointKey(segment, other, retained[k].start) + ":" + endpointKey(segment, other, retained[k].end);
 				var duplicate = false;
 				for (existing in result) if (same(existing.segment, retained[k])) duplicate = true;
-				if (!duplicate) result.push(new OutlinePiece(retained[k], name));
+				if (!duplicate) result.push(new OutlinePiece(retained[k], name, reverse && mode != Union ? origin : outline.origin(i, j)));
 			}
 		}
 	}
@@ -172,7 +173,8 @@ class OutlineBoolean {
 private class OutlinePiece {
 	public final segment:Segment;
 	public final identity:String;
-	public function new(segment:Segment, identity:String) { this.segment = segment; this.identity = identity; }
+	public final origin:BoundaryOrigin;
+	public function new(segment:Segment, identity:String, origin:BoundaryOrigin) { this.segment = segment; this.identity = identity; this.origin = origin; }
 }
 
 /** Operation choice is transient geometry policy, never saved feature state. */

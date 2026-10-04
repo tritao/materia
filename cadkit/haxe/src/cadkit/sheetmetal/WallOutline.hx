@@ -4,15 +4,18 @@ package cadkit.sheetmetal;
 class WallOutline {
 	final boundaries:Array<Array<Segment>>;
 	final segmentIds:Array<Array<String>>;
+	final boundaryOrigins:Array<Array<BoundaryOrigin>>;
 
-	public function new(outer:Array<Segment>, ?holes:Array<Array<Segment>>, ?identities:Array<Array<String>>) {
+	public function new(outer:Array<Segment>, ?holes:Array<Array<Segment>>, ?identities:Array<Array<String>>, ?origins:Array<Array<BoundaryOrigin>>) {
 		boundaries = [outer.copy()];
 		if (holes != null)
 			for (hole in holes)
 				boundaries.push(hole.copy());
 		if (identities != null && identities.length != boundaries.length)
 			throw new SheetDiagnosis("sheet.invalid-outline-identity", "Segment identities must cover every loop");
-		segmentIds = [];
+		if (origins != null && origins.length != boundaries.length)
+			throw new SheetDiagnosis("sheet.invalid-boundary-origin", "Boundary origins must cover every loop");
+		segmentIds = []; boundaryOrigins = [];
 		var seen:Map<String, Bool> = new Map();
 		for (i in 0...boundaries.length) {
 			var ids = identities == null ? [for (j in 0...boundaries[i].length) i + ":" + j] : identities[i].copy();
@@ -24,6 +27,15 @@ class WallOutline {
 				seen.set(id, true);
 			}
 			segmentIds.push(ids);
+			var roles:Array<BoundaryOrigin> = origins == null ? [for (segment in boundaries[i]) Authored] : origins[i].copy();
+			if (roles.length != boundaries[i].length)
+				throw new SheetDiagnosis("sheet.invalid-boundary-origin", "Boundary origins must cover every segment");
+			for (role in roles) switch (role) {
+				case Cut(owner), Relief(owner): if (owner == null || owner.length == 0)
+					throw new SheetDiagnosis("sheet.invalid-boundary-origin", "Cut and relief boundaries need an authored owner");
+				case Authored: {}
+			}
+			boundaryOrigins.push(roles);
 		}
 		for (i in 0...boundaries.length) {
 			var loop = boundaries[i];
@@ -69,6 +81,11 @@ class WallOutline {
 	public function identities():Array<Array<String>> {
 		return [for (ids in segmentIds) ids.copy()];
 	}
+	/** Typed purpose survives splitting, contour mapping and naming independently. */
+	public function origin(loop:Int, index:Int):BoundaryOrigin {
+		var checked = segment(loop, index); return boundaryOrigins[loop][index];
+	}
+	public function origins():Array<Array<BoundaryOrigin>> { return [for (roles in boundaryOrigins) roles.copy()]; }
 	/** Material membership away from the boundary, accounting for every authored hole. */
 	public function contains(point:Point2):Bool {
 		if (!OutlineGeometry.contains(boundaries[0], point)) return false;
@@ -87,6 +104,7 @@ class WallOutline {
 		holes.push(hole);
 		var ids = identities();
 		ids.push([for (j in 0...hole.length) boundaries.length + ":" + j]);
-		return new WallOutline(boundaries[0], holes, ids);
+		var roles = origins(); roles.push([for (segment in hole) Authored]);
+		return new WallOutline(boundaries[0], holes, ids, roles);
 	}
 }

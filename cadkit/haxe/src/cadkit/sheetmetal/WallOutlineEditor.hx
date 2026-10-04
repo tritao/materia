@@ -27,7 +27,7 @@ class WallOutlineEditor {
 		loop[previous] = replaceEnd(loop[previous], start);
 		loop[next] = replaceStart(loop[next], end);
 		loop[edge.segment] = Segment.line(start, end);
-		return new WallOutline(loops[0], loops.slice(1), outline.identities());
+		return new WallOutline(loops[0], loops.slice(1), outline.identities(), outline.origins());
 	}
 	static function crossing(neighbour:Segment, origin:Point2, tx:Float, ty:Float, old:Point2):Point2 {
 		if (neighbour.isLine()) {

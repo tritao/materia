@@ -12,7 +12,7 @@ class FlangeGeometry {
 			throw new SheetDiagnosis("sheet.invalid-flange-gap", "End gaps consume the entire bend edge");
 		if (gap1 == 0 && gap2 == 0) return new FlangeBoundary(outline, selected);
 		var loops = outline.loops();
-		var identities = outline.identities();
+		var identities = outline.identities(); var origins = outline.origins();
 		var id = outline.identity(selected.loop, selected.segment);
 		var first = edge.point(gap1 / length);
 		var last = edge.point(1 - gap2 / length);
@@ -29,15 +29,15 @@ class FlangeGeometry {
 			replacementIds.push("fragment:" + id.length + ":" + id + ":gap:2");
 		}
 		var boundary:Array<Segment> = [];
-		var boundaryIds:Array<String> = [];
+		var boundaryIds:Array<String> = []; var boundaryOrigins:Array<BoundaryOrigin> = [];
 		for (i in 0...loops[selected.loop].length) {
 			if (i == selected.segment) {
-				for (segment in replacement) boundary.push(segment);
+				for (segment in replacement) { boundary.push(segment); boundaryOrigins.push(outline.origin(selected.loop, selected.segment)); }
 				for (identity in replacementIds) boundaryIds.push(identity);
-			} else { boundary.push(loops[selected.loop][i]); boundaryIds.push(identities[selected.loop][i]); }
+			} else { boundary.push(loops[selected.loop][i]); boundaryIds.push(identities[selected.loop][i]); boundaryOrigins.push(origins[selected.loop][i]); }
 		}
-		loops[selected.loop] = boundary; identities[selected.loop] = boundaryIds;
-		return new FlangeBoundary(new WallOutline(loops[0], loops.slice(1), identities), new WallEdge(attachment, selected.loop));
+		loops[selected.loop] = boundary; identities[selected.loop] = boundaryIds; origins[selected.loop] = boundaryOrigins;
+		return new FlangeBoundary(new WallOutline(loops[0], loops.slice(1), identities, origins), new WallEdge(attachment, selected.loop));
 	}
 	public static function wall(leg:Float, width:Float, extend1:Float, extend2:Float):FlangeBoundary {
 		nonnegative(extend1, "extend1"); nonnegative(extend2, "extend2");

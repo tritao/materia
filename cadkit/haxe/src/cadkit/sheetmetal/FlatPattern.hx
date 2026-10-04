@@ -27,7 +27,7 @@ class FlatPattern {
 	static function identified(outline:WallOutline, owner:String):WallOutline {
 		var identities = outline.identities();
 		for (i in 0...identities.length) for (j in 0...identities[i].length) identities[i][j] = owner + ":edge:" + identities[i][j];
-		var loops = outline.loops(); return new WallOutline(loops[0], loops.slice(1), identities);
+		var loops = outline.loops(); return new WallOutline(loops[0], loops.slice(1), identities, outline.origins());
 	}
 	public static function of(sheet:Sheet):FlatPattern {
 		var evaluated = sheet.evaluate(sheet.flat()); var plane = sheet.placement.plane; var grain = sheet.material.grainAngle;
