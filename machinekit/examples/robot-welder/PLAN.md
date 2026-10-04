@@ -606,7 +606,7 @@ W5 design note while waiting for R3/R4 (2026-10-04; implementation has not start
   (12.5, 18.75 and 18.75 mm²). Derive offsets from the seam's face normals and previously deposited height.
   Earlier station geometry must participate in both grounded-work sensing and clearance before later passes ignite.
 
-W5 implementation notes (in progress, 2026-10-04):
+W5 implementation notes (completed, 2026-10-04):
 - The intermediate 20.5/20.9 s seam timings and 106.0 s whole-cell cycle came from duplicate skill updates in
   `switch pass.update(...)`: the running pass's host clock advanced twice per snapshot. Native motion and deposited
   interior area were correct, but each 0.15 s start/crater dwell lasted only seven observed ticks. The strengthened
@@ -620,7 +620,11 @@ W5 implementation notes (in progress, 2026-10-04):
   one strike, 27.17 s. Three-pass 10 mm: 9.999 mm leg, three strikes, 65.55 s. The later-pass strike checks verify
   preceding bead deposition, a tip within 0.6 mm of that bead's surface, and available deposited clearance hulls.
   The complete entry/weld/exit is checked clear, sampled every five simulation ticks; both beads cover the seam
-  without gaps and end with the arc off. MachineKit smoke and the shared arm/mobile app gates remain pending.
+  without gaps and end with the arc off. MachineKit smoke passes, including the CAD-derived 10-seam / 680 mm
+  mission in four runs. Shared app checks pass: arm 23.5 s; mobile 400 mm in 1 s on both backends, mission 61 s,
+  obstacle round 65 s with one replan and 416 mm closest clearance.
+  Focused suites pass: MotionKit weave 738 assertions; ProcessKit 55 welder, 44 planning, 16 rate, 106 weave,
+  13 pass-sequencer, 12 deposited-work, 19 offset and 23 process assertions; ProjectKit 138; CAD recipes 33.
 - `WeldPassPath` intersects adjacent offset lines at CAD chain corners rather than leaving gaps between shifted
   segments. A closed chain includes its final join. Zero offsets preserve the exact original path object;
   skew/parallel joins that cannot meet and offsets consuming more than 45% of an adjacent side are rejected.
@@ -779,5 +783,5 @@ Dependencies:
 | W2 | done | work clamp and derived grounded work; `torch` robot tool in the scene artifact; `SimulatedWelder` + `WeldArcModel`; `WelderProcessDevice`; tests |
 | W3 | done (+ hardening: paths, live workpiece frame, exit crash, safety tests) | `weld` mission step; `WeldSeam` skill and `WeldBead`; process engagement and `WeldingPlanRunner`; weld metal part and recipe; bead as runtime geometry; welds on MuJoCo and the test backend, restart with overlap |
 | W4 | Done (2026-10-04) | Whole CAD weldment: 10 seams / 680 mm in 4 runs; swept clearance and derived corner turns; 106.5 s on both backends, legs 4.9–5.1 mm; affected gates pass. Timing changes recorded above. |
-| W5 | | |
+| W5 | Done (2026-10-04) | Seam-progress weave; CAD-derived pass recipes; deposited bead grounding and clearance; scene schema 16 rejects older versions; smaller restart hump. Woven 7 mm measures 6.998 mm, three-pass 10 mm measures 9.999 mm on both backends; all affected gates pass. |
 | W6 | | |
