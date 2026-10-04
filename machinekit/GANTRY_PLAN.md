@@ -2574,3 +2574,22 @@ This query is a publication prerequisite, not publication itself: a device switc
 sensor adapter must still retain sequence/freshness and account for reference
 rebasing before publishing JointSwitchFrame. Virtual wrapper forwarding/config,
 device homing controls and hardware GPIO remain pending.
+
+### G13 — publish device switch frames during serial observation
+
+Added DeviceSwitchSensorAdapter to read copied native captures and publish the
+existing extended JointSwitchFrame payload. It skips duplicate/older device
+samples, defers samples newer than the copied joint snapshot, rejects regressing
+or unrepresentable closure counters and future captures, and subtracts the
+runtime leader reference offset from captured SI positions. Closure counts remain
+device counts; host polling does not invent edges. Published source timestamps
+and clock IDs match the serial runtime's device clock.
+
+RobotRuntime can install one sensor poller; snapshot serializes polling after
+copying native joint state and before combining external sensor frames. A new
+serial runtime factory installs the adapter, and SerialRobot/RobotHost serial
+paths use it. This also routes limit frames through existing limit aggregation.
+No builds/tests ran; the Phase C gate must verify FFI calls and pinned-compiler
+compatibility. Virtual-device wrapping/configuration, physical side hold/counter
+rebasing, homing-purpose transport, GPIO and the virtual-router homing fixture
+remain G13 work. Device homing is not yet complete.

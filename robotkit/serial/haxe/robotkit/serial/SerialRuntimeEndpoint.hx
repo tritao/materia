@@ -61,6 +61,23 @@ class SerialRuntimeEndpoint {
     return new NativeRuntimeEndpoint(result.out_runtime);
   }
 
+  /** Create a runtime with its physical device switches published during observation. */
+  public static function createRuntime(blueprint:RobotRuntimeBlueprint,
+      devicePath:String, controllerHex:String, binding:DeviceBinding, maxTargetError:Float,
+      baud:Int = 115200, ?linkLossTimeoutNs:haxe.Int64, ?clockSyncBoundNs:haxe.Int64):RobotRuntime {
+    var endpoint = create(blueprint, devicePath, controllerHex, binding, maxTargetError,
+      baud, linkLossTimeoutNs, clockSyncBoundNs);
+    var runtime = RobotRuntime.create(blueprint, endpoint, "robotkit.device");
+    try {
+      var switches = new robotkit.device.DeviceSwitchSensorAdapter(blueprint, runtime, binding);
+      runtime.installSensorPoller(snapshot -> switches.poll(snapshot));
+      return runtime;
+    } catch (error:Dynamic) {
+      runtime.dispose();
+      throw error;
+    }
+  }
+
   /** Reads the unique id (32 lowercase hex digits) of the board on a serial port. */
   public static function identify(devicePath:String, baud:Int):String {
     if (devicePath == null || StringTools.trim(devicePath).length == 0)

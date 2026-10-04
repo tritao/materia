@@ -43,6 +43,8 @@ class RobotRuntime {
   final externalSensorLayout:Array<RobotRuntimeSensorBlueprint>;
   final externalMutex = new Mutex();
   final externalFrames:Map<String, SensorFrame> = new Map();
+  final sensorPollMutex = new Mutex();
+  var sensorPoller:Null<RobotSnapshot->Void> = null;
   final limitJoints:Map<String, Int> = new Map();
 
   /**
@@ -510,6 +512,13 @@ class RobotRuntime {
     }
   }
 
+  /** Install a device sensor source before exposing the runtime to consumers. */
+  public function installSensorPoller(poll:RobotSnapshot->Void):Void {
+    ensureLive();
+    if (poll == null || sensorPoller != null) throw "Runtime device sensor source is already installed or missing";
+    sensorPoller = poll;
+  }
+
   /** Reads the latest published native state without advancing time. */
   public function snapshot():RobotSnapshot {
     ensureLive();
@@ -525,6 +534,12 @@ class RobotRuntime {
       throw error;
     }
     scratchMutex.release();
+    var poll = sensorPoller;
+    if (poll != null) {
+      sensorPollMutex.acquire();
+      try poll(native) catch (error:Dynamic) { sensorPollMutex.release(); throw error; }
+      sensorPollMutex.release();
+    }
     if (externalSensorLayout.length == 0) return native;
     var frames = native.sensors.toArray();
     externalMutex.acquire();
