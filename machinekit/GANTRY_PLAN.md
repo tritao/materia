@@ -3462,3 +3462,21 @@ the target would overrun the sensor face before the guide end. The next fix must
 orient sensing sideways and route its bracket outside the swept target,
 retaining the derived trip points and full overtravel checks. Merely exempting
 the mount or dropping the overtravel gate would not complete G10/G13.
+
+
+### Phase C — sense across the target and route bored brackets outside its sweep
+
+Gantry proximity sensors now face perpendicular to axis travel. X/Z read the
+target's forward face; Y reads its underside. Their named leading-edge
+connectors still derive the same scalar trip coordinates. Y targets sit outboard
+of the feet and their sensor housings end below the moving drive supports.
+X brackets route over the full carriage/rack-motor envelope; Z brackets route
+over the target's full homing sweep and descend in front of it. A shared bored
+section-bracket primitive provides actual mounting holes for sensors and motors.
+Side/front frame spacing includes these fixture envelopes. All parts retain
+generic assumption provenance. This redesign awaits compilation and the full
+normal/overtravel clearance gate. The independent app gate remains active.
+
+Compiler-only passed for the sideways sensors and bored bracket routes (1044
+sources). The normal/overtravel geometry gate is running on the redesigned
+layout. App fault-recovery fixtures remain in progress.

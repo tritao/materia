@@ -138,26 +138,23 @@ class GantryNutMount extends MachineComponent {
 	}
 }
 
-/** Frame/carriage bridge with clearance for the actual motor shaft. */
-class GantryMotorSupport extends GantryPlate {
-	public final mountedMotor:NemaStepper;
-	public final shaftFace:AssemblyFrame;
+/** Connected bracket sections with a bored mounting interface. */
+class GantryBoredBracket extends GantryPlate {
+	public final boreFace:AssemblyFrame;
 	public final clearanceDiameter:Float;
 	public final sections:Array<Array<Float>>;
-	public function new(name:String, width:Float, depth:Float, height:Float, motor:NemaStepper,
-			shaftFace:AssemblyFrame, ?sections:Array<Array<Float>>, ?clearanceDiameter:Float) {
-		var bore = clearanceDiameter == null ? motor.variant.shaftDiameter + 0.5 : clearanceDiameter;
-		if (!Math.isFinite(bore) || bore < motor.variant.shaftDiameter + 0.5)
-			throw "Motor support clearance must cover its shaft";
-		super(name + "-BORE" + Dimension.format(bore), width, depth, height);
-		this.clearanceDiameter = bore;
-		mountedMotor = motor; this.shaftFace = shaftFace;
+	public function new(name:String, width:Float, depth:Float, height:Float,
+			boreFace:AssemblyFrame, clearanceDiameter:Float, ?sections:Array<Array<Float>>) {
+		if (!Math.isFinite(clearanceDiameter) || clearanceDiameter <= 0)
+			throw "Bracket needs a positive bore diameter";
+		super(name + "-BORE" + Dimension.format(clearanceDiameter), width, depth, height);
+		this.boreFace = boreFace; this.clearanceDiameter = clearanceDiameter;
 		this.sections = sections == null ? [[-width / 2, -depth / 2, 0.0, width / 2, depth / 2, height]] : [for (section in sections) section.copy()];
-		if (this.sections.length == 0) throw "Motor support needs a solid section";
+		if (this.sections.length == 0) throw "Bracket needs a solid section";
 		for (section in this.sections) {
-			if (section.length != 6) throw "Motor support section needs six bounds";
-			for (value in section) if (!Math.isFinite(value)) throw "Motor support bounds must be finite";
-			for (axis in 0...3) if (section[axis + 3] <= section[axis]) throw "Motor support section must have positive volume";
+			if (section.length != 6) throw "Bracket section needs six bounds";
+			for (value in section) if (!Math.isFinite(value)) throw "Bracket bounds must be finite";
+			for (axis in 0...3) if (section[axis + 3] <= section[axis]) throw "Bracket section must have positive volume";
 		}
 	}
 	override public function geometry(detail:ComponentDetail = Preview):Part {
@@ -171,14 +168,28 @@ class GantryMotorSupport extends GantryPlate {
 			}
 			var body = parts.length == 1 ? parts[0] : Solids.union(parts);
 			if (parts.length != 1) owned.push(body);
-			var extent = width + depth + height + mountedMotor.variant.shaftLength;
+			var extent = width + depth + height;
 			var bore = Part.cylinderSpan(clearanceDiameter / 2, -extent, extent);
 			owned.push(bore);
-			var x = AssemblyFrames.transformVector(shaftFace, 1, 0, 0), z = AssemblyFrames.transformVector(shaftFace, 0, 0, 1);
-			var tool = bore.placed(new Location(new Plane(new Vector(shaftFace.x, shaftFace.y, shaftFace.z),
+			var x = AssemblyFrames.transformVector(boreFace, 1, 0, 0), z = AssemblyFrames.transformVector(boreFace, 0, 0, 1);
+			var tool = bore.placed(new Location(new Plane(new Vector(boreFace.x, boreFace.y, boreFace.z),
 				new Vector(x.x, x.y, x.z), new Vector(z.x, z.y, z.z))));
 			owned.push(tool); bore.close();
 			return Solids.cut(body, [tool]);
 		});
+	}
+}
+
+/** Frame/carriage bridge with clearance for the actual motor shaft or pinion. */
+class GantryMotorSupport extends GantryBoredBracket {
+	public final mountedMotor:NemaStepper;
+	public final shaftFace:AssemblyFrame;
+	public function new(name:String, width:Float, depth:Float, height:Float, motor:NemaStepper,
+			shaftFace:AssemblyFrame, ?sections:Array<Array<Float>>, ?clearanceDiameter:Float) {
+		var bore = clearanceDiameter == null ? motor.variant.shaftDiameter + 0.5 : clearanceDiameter;
+		if (!Math.isFinite(bore) || bore < motor.variant.shaftDiameter + 0.5)
+			throw "Motor support clearance must cover its shaft";
+		super(name, width, depth, height, shaftFace, bore, sections);
+		mountedMotor = motor; this.shaftFace = shaftFace;
 	}
 }

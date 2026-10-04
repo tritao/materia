@@ -9,6 +9,7 @@ import machinekit.gantry.GantryParts.GantryIdlerPin;
 import machinekit.gantry.GantryParts.GantryBeltClamp;
 import machinekit.gantry.GantryParts.GantryNutMount;
 import machinekit.gantry.GantryParts.GantryMotorSupport;
+import machinekit.gantry.GantryParts.GantryBoredBracket;
 import machinekit.component.MachineComponent;
 import machinekit.motion.LinearRail;
 import machinekit.motion.LinearRailBlock;
@@ -48,14 +49,16 @@ class Gantry extends AxisBuilder {
 		var flange = new RobotFlange(50);
 		// The flange's rear rim must clear the column's projecting rail by 3 mm.
 		var toolReach = Math.max(spec.toolReach, flange.flangeDiameter / 2 + 3 - (guide.blockHeight - guide.railHeight + 4));
-		railMargin = Math.max(Math.max(80, frame.size / 2 + 60), guide.railEndMargin + guide.blockLength / 2 + 20);
+		railMargin = Math.max(Math.max(80, Math.max(frame.size / 2 + 66, 89)), guide.railEndMargin + guide.blockLength / 2 + 20);
 		var guideOvertravel = railMargin - guide.railEndMargin - guide.blockLength / 2;
 		var left = -railMargin - spec.sideExtension - guideOvertravel;
 		var right = spec.travelX + railMargin + spec.sideExtension + guideOvertravel;
 		// Keep the front crossmember ahead of the full vertical carriage sweep.
 		var columnY = -(beam.size / 2 + frame.height / 2 + 40);
 		var carriageFront = columnY - frame.height / 2 - guide.blockHeight - 8 - toolReach;
-		var front = Math.min(-railMargin, carriageFront - frame.size / 2 - 3 - guideOvertravel) - spec.frontExtension;
+		var switchSpec = machinekit.motion.ProximitySwitch.catalog().get("GENERIC-INDUCTIVE-M8");
+		var sensorFront = columnY - frame.height / 2 - guide.blockHeight - 3 - switchSpec.length - switchSpec.sensingDistance - 6;
+		var front = Math.min(-railMargin, Math.min(carriageFront, sensorFront) - frame.size / 2 - 3 - guideOvertravel) - spec.frontExtension;
 		var back = spec.travelY + railMargin;
 		var frameZ = spec.travelZ + 350 + spec.frameLift;
 		var endAllowance = Math.max(frame.size / 2, NemaStepper.frame(spec.motorFrame).variant.shaftLength + 6);
@@ -135,8 +138,8 @@ class Gantry extends AxisBuilder {
 		var zDriveX = 40 + Math.max((NemaStepper.frame(spec.motorFrame).spec.face + 12) / 2, 30) + 12 + 3;
 		buildDrive(axes[2], spec.driveZ, "Z", "zColumn", "zCarriage",
 			[zDriveX, zPlateY, xPlateZ - railMargin - zDriveDrop], [0.0, 0, -1]);
-		buildSwitches(axes[1], "YLeft", "frameLeft", "beamFootLeft", 0, 1, alongY);
-		if (spec.dualY) buildSwitches(axes[1], "YRight", "frameRight", "beamFootRight", 0, -1, alongY);
+		buildSwitches(axes[1], "YLeft", "frameLeft", "beamFootLeft", 0, -1, alongY);
+		if (spec.dualY) buildSwitches(axes[1], "YRight", "frameRight", "beamFootRight", 0, 1, alongY);
 		buildSwitches(axes[0], "X", "beam", "xCarriage", 1, -1, alongX);
 		buildSwitches(axes[2], "Z", "zColumn", "zCarriage", 0, -1, [0.0, 0, -1]);
 	}
@@ -157,13 +160,18 @@ class Gantry extends AxisBuilder {
 		dimensions[outboardAxis] = 40;
 		for (i in 0...3) if (Math.abs(direction[i]) > 0.5)
 			dimensions[i] = bounds.max[i] - bounds.min[i] + 6;
+		if (StringTools.startsWith(suffix, "Y")) {
+			point[outboardAxis] = (sign < 0 ? bounds.min[outboardAxis] : bounds.max[outboardAxis]) + sign * 7;
+			dimensions[outboardAxis] = 20;
+			point[2] = bounds.min[2] + 2;
+		}
 		// Z workpieces rise in front of the column. Keep the fixed switches
 		// alongside it; the outboard trigger stays clear of the rear beam.
 		if (suffix == "Z") {
-			// A 20 mm tab covers both sensor lanes and overlaps the carriage
+			// A 26 mm tab carries the sideways sensor field and overlaps the carriage
 			// by 3 mm without reaching the Y rails or frame at the X travel corners.
-			point[outboardAxis] = (sign < 0 ? bounds.min[outboardAxis] : bounds.max[outboardAxis]) + sign * 7;
-			dimensions[outboardAxis] = 20;
+			point[outboardAxis] = (sign < 0 ? bounds.min[outboardAxis] : bounds.max[outboardAxis]) + sign * 10;
+			dimensions[outboardAxis] = 26;
 			var column = mountBounds(component(fixed), zeroPose(fixed));
 			var rearBeam = mountBounds(component("beam"), zeroPose("beam"));
 			var rearFoot = mountBounds(component("beamFootLeft"), zeroPose("beamFootLeft"));
@@ -189,43 +197,72 @@ class Gantry extends AxisBuilder {
 			var travel = (side < 0 ? axis.lower : axis.upper) + side * room * (kind == "home" ? 0.25 : 0.75);
 			var id = "switch" + suffix + kind;
 			var sensor = new machinekit.motion.ProximitySwitch();
-			var normal = [for (value in direction) -side * value];
-			var face = [for (i in 0...3) point[i] + direction[i] * (travel + side * half)];
-			// Home and negative-limit tubes share the end of travel but occupy
-			// separate lanes across the trigger face (M8 bodies, 10 mm centres).
-			face[outboardAxis] += (kind == "negativeLimit" ? -sign : sign) * 5;
-			if (suffix == "Z") {
-				var homeMount = mountBounds(component("switchYLefthomeMount"), zeroPose("switchYLefthomeMount"));
-				var limitMount = mountBounds(component("switchYLeftnegativeLimitMount"), zeroPose("switchYLeftnegativeLimitMount"));
-				face[1] = (limitMount.max[1] + homeMount.min[1]) / 2;
-			}
+			// Sense perpendicular to travel so the trigger can pass the tube safely.
+			var normal = suffix == "X" || suffix == "Z" ? [0.0, 1, 0] : [0.0, 0, 1];
+			var face = [for (i in 0...3) point[i] + direction[i] * (travel + side * half) - normal[i] * dimensions[i] / 2];
 			var contact = [for (i in 0...3) face[i] - direction[i] * travel];
 			addMemberConnector(trigger, kind + suffix, AssemblyFrames.translation(
 				contact[0] - point[0], contact[1] - point[1], contact[2] - point[2] + dimensions[2] / 2));
 			var origin = [for (i in 0...3) face[i] - normal[i] * (sensor.spec.length + sensor.spec.sensingDistance)];
-			var transverse = outboardAxis == 0 ? [1.0, 0, 0] : [0.0, 1, 0];
-			var pose = AxisBuilder.orient(origin[0], origin[1], origin[2], transverse, normal);
-			// A supported mounting block extends from the fixed member to the sensor's rear mount.
-			var host = mountBounds(component(fixed), zeroPose(fixed));
-			var lo:Array<Float> = [], hi:Array<Float> = [];
-			for (i in 0...3) {
-				var anchor = Math.max(host.min[i], Math.min(host.max[i], origin[i]));
-				var lower = Math.min(anchor, origin[i]) - 3, upper = Math.max(anchor, origin[i]) + 3;
-				// At a frame end, stop the support at its face rather than projecting
-				// material into the carriage's end-of-travel envelope.
-				if (Math.abs(direction[i]) > 0.5) {
-					if (origin[i] < host.min[i]) upper = host.min[i];
-					if (origin[i] > host.max[i]) lower = host.max[i];
-				}
-				lo.push(lower); hi.push(upper);
-			}
+			var pose = AxisBuilder.orient(origin[0], origin[1], origin[2], direction, normal);
 			var mount = id + "Mount";
-			attach(mount, new GantryPlate("switch mount", hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]),
-				AssemblyFrames.translation((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2]), fixed);
+			mountSwitch(mount, fixed, moving, trigger, suffix, origin, pose, sensor.spec.diameter);
 			attach(id, sensor, pose, mount);
 			addSwitch(id, axis.id, id, {instanceId: trigger, connectorName: kind + suffix},
 				side, kind == "home" ? "home" : "limit", suffix == "YRight" ? 2 : 1, driveJoint);
 		}
+	}
+
+	/** Route bored brackets around the complete moving envelope, including homing travel. */
+	function mountSwitch(id:String, fixed:String, moving:String, trigger:String, suffix:String,
+			origin:Array<Float>, sensorPose:AssemblyFrame, diameter:Float):Void {
+		var host = mountBounds(component(fixed), zeroPose(fixed));
+		var carriage = mountBounds(component(moving), zeroPose(moving));
+		var target = mountBounds(component(trigger), zeroPose(trigger));
+		var half = 6.0, clearance = 3.0;
+		var path:Array<Array<Float>>;
+		if (suffix == "X") {
+			var rear = carriage.max[1], top = carriage.max[2];
+			switch spec.driveX {
+				case Rack(_, _, _):
+					var motor:NemaStepper = cast component("motorX");
+					var motorPose = zeroPose("motorX");
+					var plate = mountBounds(component("motorXPlate"), zeroPose("motorXPlate"));
+					rear = Math.max(rear, Math.max(plate.max[1], motorPose.y + motor.bodyLength));
+					top = Math.max(top, Math.max(plate.max[2], motorPose.z + motor.variant.bodyFace / 2));
+				case _:
+			}
+			var rearPost = rear + half + clearance, overhead = top + half + clearance;
+			var baseZ = (host.min[2] + host.max[2]) / 2;
+			path = [[origin[0], host.max[1] - half, baseZ], [origin[0], rearPost, baseZ],
+				[origin[0], rearPost, overhead], [origin[0], origin[1], overhead], origin];
+		} else if (suffix == "Z") {
+			var overhead = target.max[2] + axisOvertravel("z") + half + clearance;
+			var anchorZ = Math.max(host.min[2] + half, Math.min(host.max[2] - half, overhead));
+			path = [[host.min[0] + half, host.min[1] + half, anchorZ],
+				[host.min[0] + half, host.min[1] + half, overhead],
+				[origin[0], host.min[1] + half, overhead], [origin[0], origin[1], overhead], origin];
+		} else {
+			var anchor = [for (i in 0...3) Math.max(host.min[i], Math.min(host.max[i], origin[i]))];
+			path = [anchor, origin];
+		}
+		var lo = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
+		var hi = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
+		var sections:Array<Array<Float>> = [];
+		for (index in 1...path.length) {
+			var a = path[index - 1], b = path[index];
+			var lower = [for (i in 0...3) Math.min(a[i], b[i]) - half];
+			var upper = [for (i in 0...3) Math.max(a[i], b[i]) + half];
+			for (i in 0...3) { lo[i] = Math.min(lo[i], lower[i]); hi[i] = Math.max(hi[i], upper[i]); }
+			sections.push(lower.concat(upper));
+		}
+		var pose = AssemblyFrames.translation((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2]);
+		for (section in sections) for (i in 0...3) {
+			var offset = i == 2 ? lo[2] : (lo[i] + hi[i]) / 2;
+			section[i] -= offset; section[i + 3] -= offset;
+		}
+		attach(id, new GantryBoredBracket(id, hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2],
+			AssemblyFrames.compose(AssemblyFrames.inverse(pose), sensorPose), diameter + 0.5, sections), pose, fixed);
 	}
 
 	function addDriver(motorId:String):String {
