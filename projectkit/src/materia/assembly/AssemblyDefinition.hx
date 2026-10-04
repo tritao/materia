@@ -253,6 +253,22 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(5) @:optional var index:Null<Bool>;
 }
 
+/** Geometry-derived switch event on a prismatic joint, in assembly coordinate units. */
+@:wire typedef AssemblySwitch = {
+	@:id(1) var id:String;
+	@:id(2) var joint:String;
+	@:id(3) var part:String;
+	@:id(4) var connector:String;
+	@:id(5) var trigger:String;
+	@:id(6) var triggerConnector:String;
+	@:id(7) var role:String;
+	@:id(8) var side:Int;
+	@:id(9) var trip:Float;
+	@:id(10) var hysteresis:Float;
+	@:id(11) var repeatability:Float;
+	@:id(12) var seed:Int;
+}
+
 /** A connector exported from a member of an assembly definition. */
 @:wire typedef AssemblyExposedConnector = {
 	@:id(1) var name:String;
@@ -273,6 +289,7 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(9) @:optional var encoders:Array<AssemblyEncoder>;
 	@:id(10) @:optional var elasticNetworks:Array<AssemblyElasticNetwork>;
 	@:id(11) @:optional var sensors:Array<AssemblySensor>;
+	@:id(12) @:optional var switches:Array<AssemblySwitch>;
 }
 
 /**
@@ -296,6 +313,7 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(12) @:optional var encoders:Array<AssemblyEncoder>;
 	@:id(13) @:optional var elasticNetworks:Array<AssemblyElasticNetwork>;
 	@:id(14) @:optional var sensors:Array<AssemblySensor>;
+	@:id(15) @:optional var switches:Array<AssemblySwitch>;
 }
 
 @:wire typedef AssemblyJointCoordinate = {

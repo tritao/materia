@@ -217,6 +217,10 @@ class AssemblyModel {
 			data.schemaVersion = AssemblyDefinitionCodec.SENSOR_VERSION;
 		if (data.sensors == null) data.sensors = [];
 		data.sensors.push(materia.assembly.AssemblyDefinitionFlattener.copySensor(sensor, sensor.id, ""));
+	/** Add a geometry-derived switch record; the definition codec validates its references. */
+	public function addSwitch(contact:materia.assembly.AssemblyDefinition.AssemblySwitch):Void {
+		if (data.switches == null) data.switches = [];
+		data.switches.push(haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(contact)));
 	}
 
 	/** Add derived span energies separately from nominal motion couplings. */

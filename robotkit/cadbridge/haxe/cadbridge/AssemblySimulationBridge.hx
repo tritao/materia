@@ -462,6 +462,27 @@ class AssemblySimulationBridge {
         added.maxRange = range * scale;
       }
     }
+    // Switch coordinates use the same placed zero as the monitored robot joint.
+    if (definition.switches != null) for (contact in definition.switches) {
+      var edge:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
+      for (candidate in definition.joints) if (candidate.id == contact.joint) edge = candidate;
+      if (edge == null || edge.type != AssemblyJointType.Prismatic)
+        throw 'Assembly switch "${contact.id}" requires a prismatic monitored joint';
+      var occurrence = [for (item in definition.occurrences) if (item.id == contact.part) item][0];
+      if (occurrence == null) throw 'Assembly switch "${contact.id}" has no physical part';
+      var component = definitions.get(occurrence.definition);
+      var mount = AssemblyFrames.compose(offsetOf(contact.part), connector(component, contact.connector));
+      var frame = model.addFrame(new Frame(contact.id + " switch mount", linkOf(contact.part)));
+      frame.position = [mount.x * scale, mount.y * scale, mount.z * scale];
+      frame.rotation = [mount.qx, mount.qy, mount.qz, mount.qw];
+      var added = new robotkit.model.JointSwitch(contact.id, contact.joint, frame.id, contact.role,
+        contact.side, (contact.trip - placement.joint(contact.joint)) * scale,
+        contact.hysteresis * scale, contact.repeatability * scale, contact.seed);
+      model.addSwitch(added);
+      var sensor = new robotkit.model.Sensor(contact.id, "joint_switch", 0.0, contact.id);
+      sensor.frame = frame;
+      model.addSensor(sensor);
+    }
     // Preserve the physical flange and its owning include after fixed parts collapse into links.
     for (occurrence in definition.occurrences) {
       if (free.exists(occurrence.id)) continue;

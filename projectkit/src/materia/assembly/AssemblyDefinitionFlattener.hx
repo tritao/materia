@@ -90,7 +90,7 @@ class AssemblyDefinitionFlattener {
 		var active = new Map<String, Bool>();
 		var rootMembers = expand("", AssemblyFrames.identity(), source.definitions, source.occurrences, source.joints,
 			source.couplings, source.mates, library, flat, active, source.actuators, source.encoders,
-			source.sensors, source.elasticNetworks);
+			source.sensors, source.elasticNetworks, source.switches);
 		exposed(source.exposedConnectors, rootMembers, source.id);
 		for (entry in source.assemblies) {
 			var unused:AssemblyDefinition = {schemaVersion: source.schemaVersion, id: entry.id,
@@ -98,7 +98,7 @@ class AssemblyDefinitionFlattener {
 			active.set(entry.id, true);
 			var members = expand("", AssemblyFrames.identity(), entry.definitions, entry.occurrences, entry.joints,
 				entry.couplings, entry.mates, library, unused, active, entry.actuators, entry.encoders,
-				entry.sensors, entry.elasticNetworks);
+				entry.sensors, entry.elasticNetworks, entry.switches);
 			active.remove(entry.id);
 			exposed(entry.exposedConnectors, members, entry.id);
 			AssemblyDefinitionCodec.validate(unused);
@@ -183,7 +183,7 @@ class AssemblyDefinitionFlattener {
 			mates:Null<Array<AssemblyMate>>, library:Map<String, AssemblySubdefinition>, flat:AssemblyDefinition, active:Map<String, Bool>,
 			?actuators:Array<AssemblyActuator>, ?encoders:Array<AssemblyEncoder>,
 			?sensors:Array<AssemblySensor>,
-			?networks:Array<materia.assembly.AssemblyDefinition.AssemblyElasticNetwork>):Map<String, FlatMember> {
+			?networks:Array<materia.assembly.AssemblyDefinition.AssemblyElasticNetwork>, ?switches:Array<materia.assembly.AssemblyDefinition.AssemblySwitch>):Map<String, FlatMember> {
 		if (definitions == null || occurrences == null || joints == null) throw "Nested assembly has missing members or joints";
 		var localDefinitions = new Map<String, AssemblyComponentDefinition>();
 		var emittedDefinitions = new Map<String, Bool>();
@@ -217,7 +217,7 @@ class AssemblyDefinitionFlattener {
 				active.set(nested.id, true);
 				var children = expand(path, worldPose, nested.definitions, nested.occurrences, nested.joints,
 					nested.couplings, nested.mates, library, flat, active, nested.actuators, nested.encoders,
-					nested.sensors, nested.elasticNetworks);
+					nested.sensors, nested.elasticNetworks, nested.switches);
 				active.remove(nested.id);
 				connectors = exposed(nested.exposedConnectors, children, path);
 			} else {
@@ -284,6 +284,17 @@ class AssemblyDefinitionFlattener {
 		if (sensors != null) {
 			if (flat.sensors == null) flat.sensors = [];
 			for (sensor in sensors) flat.sensors.push(copySensor(sensor, sensor.id, prefix));
+		}
+		if (switches != null) {
+			if (flat.switches == null) flat.switches = [];
+			for (contact in switches) {
+				var part = endpoint(members, contact.part, contact.connector, prefix);
+				var trigger = endpoint(members, contact.trigger, contact.triggerConnector, prefix);
+				flat.switches.push({id: scoped(prefix, contact.id), joint: scoped(prefix, contact.joint),
+					part: part.occurrence, connector: part.connector, trigger: trigger.occurrence,
+					triggerConnector: trigger.connector, role: contact.role, side: contact.side,
+					trip: contact.trip, hysteresis: contact.hysteresis, repeatability: contact.repeatability, seed: contact.seed});
+			}
 		}
 		if (mates != null) for (mate in mates) {
 			var first = endpoint(members, mate.first, mate.firstConnector, prefix);

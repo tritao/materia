@@ -256,6 +256,22 @@ class AssemblyDefinitionCodec {
 		}
 		if (sensors.length > 0 && definition.schemaVersion < SENSOR_VERSION)
 			throw "Native assembly sensors require schema v$SENSOR_VERSION";
+		var switches = definition.switches == null ? [] : definition.switches;
+		if (switches.length > 4000) throw "Assembly has too many switches";
+		var switchIds = new Map<String, Bool>();
+		for (contact in switches) {
+			if (contact == null) throw "Assembly has a null switch";
+			var part = occurrences.get(contact.part), trigger = occurrences.get(contact.trigger);
+			if (!validText(contact.id) || switchIds.exists(contact.id) || movable.get(contact.joint) == null ||
+				part == null || trigger == null || part.id == trigger.id ||
+				!hasConnector(definitions.get(part.definition), contact.connector) ||
+				!hasConnector(definitions.get(trigger.definition), contact.triggerConnector) ||
+				(contact.role != "home" && contact.role != "limit") || (contact.side != -1 && contact.side != 1) ||
+				!Math.isFinite(contact.trip) || !Math.isFinite(contact.hysteresis) || contact.hysteresis < 0 ||
+				!Math.isFinite(contact.repeatability) || contact.repeatability < 0)
+				throw 'Assembly has an invalid switch "${contact.id}"';
+			switchIds.set(contact.id, true);
+		}
 		var encoders = definition.encoders == null ? [] : definition.encoders;
 		if (encoders.length > 4000) throw "Assembly has too many encoders";
 		var encoderIds = new Map<String, Bool>();

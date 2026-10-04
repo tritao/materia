@@ -1196,3 +1196,31 @@ optional AssemblySwitch wire metadata with flatten/freeze/codec support,
 geometry-derived MachineAssembly.addSwitch, bridge lowering, physical Gantry
 home/limit placement and observer installation. No compilation or test runs
 have been made; this is preparatory implementation, not a completed G10.
+
+
+### G10 — physical switch parts and assembly records
+
+Add recipe/catalog-backed `LimitSwitch` and `ProximitySwitch` components and
+register both in MachineKitComponents. The roller part has a housing, lever,
+roller, mount holes, a pretravel-adjusted trip connector and Signal port. The
+inductive M8/M12 parts expose mount, sensing face, sensing-gap trip connector,
+Signal and power ports. Housing, gap, hysteresis and repeatability values are
+authored generic assumptions; catalog metadata marks them Unverified and
+GenericApproximation with no verified fields or vendor rating claims. Their
+designations generate ordinary component BOM lines. Physical threading and
+vendor-specific mounting certification are not claimed for these envelopes.
+
+Add optional AssemblySwitch wire field 14 at the root and 11 in nested
+subdefinitions. Frozen switch fields retain the same wire IDs. Flattening
+resolves both switch and trigger connector endpoints, prefixes switch/joint
+IDs and keeps trip coordinates unchanged under nested placement. The assembly
+codec validates endpoints, roles, sides, finite thresholds and duplicate IDs.
+CadKit AssemblyModel can retain these records. The simulation bridge creates
+a frame on the actual switch part's collapsed rigid link, subtracts the saved
+joint placement from the trip coordinate, converts distances to SI and creates
+the JointSwitch plus external digital Sensor together.
+
+These are preparatory changes. MachineAssembly geometry-derived addSwitch,
+its include/rebuild/export paths, Gantry placement and application observer
+installation remain pending. No builds or tests were run; recipe geometry,
+wire compatibility and bridge lowering remain unverified at runtime.
