@@ -102,6 +102,77 @@ class PlanCheckTests extends MotionKitTestSupport {
     return count;
   }
 
+  /** Drive rejection occurs before the first chunk reaches the runtime, and a whole move is checked once. */
+  public function testDirectMotionRunsPlanCheck():Void {
+    var blueprint = MachineKitRobotCompiler.compileLinearAxis(new LinearAxis(23, 10, 80), "x", 0.05, 0.2);
+    for (actuator in blueprint.model.actuators)
+      actuator.drive = new StepperDrive(200.0, 3e-5, 0.0001,
+        new TorqueSpeedCurve([0.0, 1000.0], [0.0001, 0.0001]));
+    var harness = new SimulationHarness(0.01);
+    var runtime = harness.simulation.addRobot(blueprint.runtime);
+    var robot = new SimulatedRobot("checked-direct", runtime, blueprint.model.name,
+      [for (link in blueprint.model.links) link.name], [for (joint in blueprint.model.joints) joint.name]);
+    var recording = new robotkit.recording.RobotRecording();
+    var machine = new motionkit.robot.MotionSystem(new robotkit.recording.RecordingRobot(robot, recording), blueprint);
+    var directCheck:PlanCheck = machine.planCheck;
+    directCheck.options.rejects = true;
+    var rejected = false;
+    try machine.moveAxes([new motionkit.AxisTarget("x", 0.07)], new MotionOptions(0.05, 0.2))
+      catch (error:Dynamic) rejected = Std.string(error).indexOf("plan check") >= 0;
+    check(rejected, "a direct move rejects a predicted stall");
+    check(machine.planChecks.flagged == 1, "the direct rejection retains its findings");
+    for (command in recording.commands) switch command {
+      case ExecutionPlan(_): throw "a rejected drive check must not submit motion";
+      case _:
+    }
+    machine.reset();
+    harness.step(Int64.ofInt(1));
+    directCheck.options.rejects = false;
+    machine.planChecks.reset();
+    machine.moveAxes([new motionkit.AxisTarget("x", 0.07)], new MotionOptions(0.05, 0.2));
+    var tick = 0;
+    while (machine.isMoving() && tick < 1000) {
+      machine.update();
+      harness.step(Int64.ofInt(++tick));
+    }
+    check(!machine.isMoving(), "a report-only direct move completes");
+    check(machine.planChecks.plans == 1 && machine.planChecks.flagged == 1,
+      "refilling a direct move checks its whole trajectory only once");
+    harness.dispose();
+  }
+
+  public function testServoStreamRunsPlanCheck():Void {
+    var fixture = buildContractArmFixture();
+    for (joint in fixture.model.joints) {
+      joint.limits.velocity = 2.0;
+      joint.limits.maxAcceleration = 4.0;
+    }
+    var actuator = new Actuator("weak-servo", null, null,
+      Transmission.SimpleTransmission(fixture.model.joints[0].id, 1.0, 0.0));
+    actuator.drive = new ServoDrive(0.00001, 0.00002, 100.0, 200.0, 1e-3, 4096.0);
+    fixture.model.addActuator(actuator);
+    var blueprint = robotkit.runtime.RobotRuntimeCompiler.compile(fixture.model,
+      new robotkit.profile.RobotProfile());
+    var harness = new SimulationHarness(0.01);
+    var runtime = harness.simulation.addRobot(blueprint);
+    var robot = new SimulatedRobot("checked-servo", runtime, fixture.model.name,
+      [for (link in fixture.model.links) link.name], [for (joint in fixture.model.joints) joint.name]);
+    var recording = new robotkit.recording.RobotRecording();
+    var session = new motionkit.robot.ServoSession(new robotkit.recording.RecordingRobot(robot, recording), fixture.arm,
+      0.01, 1e-3, 1e-4, new motionkit.robot.ServoPlan.ServoPlanOptions(
+        Int64.ofInt(blueprint.revision), Int64.ofInt(blueprint.calibrationRevision)));
+    var servoCheck:PlanCheck = session.planCheck;
+    servoCheck.options.rejects = true;
+    check(session.command(new motionkit.kinematics.Twist6(0.0, 0.0, 0.0, 0.0, 0.0, 0.1),
+      1, session.nowNs() + Int64.ofInt(100000000)) == null, "a live servo command is accepted");
+    var rejected = false;
+    try session.update() catch (error:Dynamic) rejected = Std.string(error).indexOf("plan check") >= 0;
+    check(rejected && session.planChecks.flagged == 1, "a live servo chunk rejects a predicted overload");
+    check(recording.commands.length == 0, "an overloaded servo chunk never reaches the runtime");
+    session.dispose();
+    harness.dispose();
+  }
+
   public function testPlanCheck():Void {
     var partial = machine([1.0, 0.0, 0.0], false, 2000.0);
     var unrelated = partial.addJoint(new Joint("first", JointType.Prismatic,

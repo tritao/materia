@@ -68,7 +68,11 @@ CompiledDevicePlan6 compile_device_segments6(
                 return failure("invalid source segment");
             for (std::uint64_t offset = 0; offset < source.duration_ns;) {
                 if (lowered.size() >= 100'000) return failure("minimal profile segment limit");
-                const auto duration = std::min<std::uint64_t>(period, source.duration_ns - offset);
+                // Linear polynomials need no chord approximation. Longer pieces give
+                // the shallow board queue time to absorb a host scheduling stall;
+                // keep boundaries so uncommitted motion can still be replaced.
+                const auto piece_period = source.degree <= 1 ? std::max<std::uint64_t>(period, 100'000'000) : period;
+                const auto duration = std::min<std::uint64_t>(piece_period, source.duration_ns - offset);
                 auto piece = source;
                 piece.time_from_start_ns = expected + offset;
                 piece.duration_ns = duration;

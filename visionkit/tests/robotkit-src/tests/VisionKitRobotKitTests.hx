@@ -8,7 +8,7 @@ import robotkit.deployment.SerialDeployment;
 import robotkit.perception.FiducialPerception;
 import robotkit.streams.ImageDetection;
 import robotkit.streams.ImageDetectionObservation;
-import robotkit.streams.ImageDetectionLifter;
+import robotkit.perception.ImageDetectionLifter;
 import robotkit.inference.ObjectDetectorPipeline;
 import robotkit.mobile.Pose3;
 import robotkit.perception.FiducialTargetConfig;

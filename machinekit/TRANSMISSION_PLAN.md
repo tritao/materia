@@ -268,9 +268,8 @@ Kinematics through the whole stack, with ratios still given as numbers.
   idlers clear the gantry at the ends of travel. App test
   (`checkBeltRouter`, project `machinekit/examples/cnc-router/belts`): couplings
   1/6.366 mm for X and Y, derived speeds from the pulleys.
-- **Left.** The belt is frame-fixed geometry; showing teeth travelling (a mesh
-  updated per frame without OCCT) is not done. Belt stretch and a machining run
-  of the belt variant are left (done in X6).
+- **Left at X4.** Belt stretch and machining were completed in X6. Toothed,
+  posed display geometry was subsequently completed in the loose-end follow-through below.
 
 ### X5 — Couplings with more than one leader (CoreXY) (done)
 
@@ -327,7 +326,8 @@ Kinematics through the whole stack, with ratios still given as numbers.
   prismatic axes (`x` ±35 mm, `y` ±35 mm). The signs and the 1/R come from the belts' own
   geometry: the clamped strand's heading (`strands()[0].dx`) gives x, the strand from the gantry idler
   to the front corner (`strands()[1].dy`) gives y, and the wrap's side gives the sense.
-  The belts are drawn at the home pose. The checks build each belt with the gantry moved and find its
+  At X5 the belts were drawn at home; posed display geometry now follows physical attachment frames.
+  The checks build each belt with the gantry moved and find its
   length unchanged and the feed at the motor pulley equal to the coupling.
 - **Numbers** (24 V NEMA 17 17HS19-1684S1, half holding torque): the motors turn 204 rad/s at most
   and give 0.225 N m, so each axis runs to 649.6 mm/s (204 / (2 × 157.1 rad per metre)); with no
@@ -344,13 +344,11 @@ Kinematics through the whole stack, with ratios still given as numbers.
   deterministic backend, every pulley the sum of its terms at every tick, x alone turns the motors
   alike and y alone against each other, and the plan check's diagonal case), and the app (`checkCoreXyPlotter`:
   the project loads, the runtime blueprint carries 16 couplings and the MuJoCo world builds and holds).
-- **Left.** The plotter has no program player or CNC job in the app (a pen plot is not a machining job);
-  the gate "runs a program in simulation" is the MotionKit test, and "on the virtual device" is not done:
-  the RKD6 board's channels map one motor to one joint, and a CoreXY device layout names the two motors
-  (`DeviceBinding.bind` works on the actuators already). Belt stiffness is not set on the plotter's
-  drives (a CoreXY axis sees two belts in series, which `carriageStiffness` does not model), so its
-  accuracy check is rigid. The belts' idlers on the gantry and carriage do not model a moving strand's
-  exact wrap, only its feed. KinematicsKit's native manipulator kinematics does not take a combined joint.
+- **Follow-through.** The plotter now plays an independent-axis program through its virtual
+  device in the app. The network stiffness solve includes both belts, posed display teeth follow
+  attachment frames, and native manipulator kinematics supports combined joints. See the
+  loose-end results below. The idler joint model still represents belt feed rather than exact
+  changing angular wrap.
 
 ### Device steps and identity (done)
 
@@ -435,10 +433,8 @@ loops, PWM or thermal mass.
     deviation). That is the one place outside tests that creates an
     `ExecutionPlan`, so every program, toolpath, CNC, handling and arm plan goes
     through it, for simulation and device alike; the check reads the plan's
-    polynomial segments (sampled at most every 4 ms), not any runtime. It does not
-    cover plans built straight from a `Trajectory` (`MotionSystem`'s direct paths,
-    `ServoPlan`), which never become an `ExecutionPlan`; a check there would sit in
-    `TrajectoryStream.motionSubmission` and is not done. The compiler's `planCheck` is
+    polynomial segments (sampled at most every 4 ms), not any runtime. Direct `Trajectory` and live `ServoPlan` paths do not become an `ExecutionPlan`;
+    the loose-end follow-through adds their checks at the stream submission boundaries. The compiler's `planCheck` is
     null until a caller attaches one (`PlanCheck(model, jointIds, options)`, jointIds
     being the plan's joints in order); the CNC player attaches it.
     `ManipulatorMotion.checks` sums what the plans it started found.
@@ -1207,7 +1203,7 @@ widen this allowance unchecked.
 #### X9b — Remove legacy compatibility
 
 Progress: complete, verified by the combined milestone gate. Scene artifacts now have
-one schema (v15), with no snapshot section or old-version readers. App previews and the inspector
+one schema (v16), with no snapshot section or old-version readers. App previews and the inspector
 read the current assembly definition/state directly. RobotModel v7 saves drive records and nullable
 caps; layouts use schema v1 and actuator wiring only. Stepper models require driver settings.
 
@@ -1377,6 +1373,30 @@ the 24 V → supply-derived wheel limits and the `RobotArm.hx` changes.
 Status: complete (2026-10-03). `x7-suite-x9e-final2.txt` reports 11/11 kit suites, CadKit,
 MachineKit, app build and project-source suite at exit 0. Focused app worker/scene tests,
 humanoid tests and mixed-scene command, and native RobotKit/SimKit MuJoCo tests also passed.
+Follow-up review: complete (2026-10-04). `x7-suite-x9e-review-final2.txt` reports all 11 kit
+suites, CadKit, MachineKit, app build and project-source suite at exit 0. The default app
+entry point and four-platform RobotKit HXI audit also passed. Belt rebuilds resolve only
+motors on the shaft network and catch electrical/curve/family faults as `transmission.parts`
+diagnostics. Partial scalar plans solve the complete shared-axis compliance before projection;
+validation builds the raw motor Jacobian without invoking an elastic solve. Recipe contracts
+again exercise every catalog designation and servo Choice option. General Choice parameters
+can require companion values and are not independently varied. Both belt-motion endpoints are
+probed, every loaded pulley receives tooth clearance, and tension uses usable actuator torque
+rather than holding/overload torque. URDF's zero-effort sentinel remains unspecified.
+
+Controlled stop/resume acceleration is plan metadata, capped by physical limits and preserved
+through streaming, replacement, wire plans and recordings. It does not alter mechanical limits
+or reject deliberate overload trajectories. Hold/jog/replace tests again enforce their requested
+0.4 m/s²; the third jog argument is duration, not an acceleration override. Remove the temporary
+`APP_X9E_ONLY` and `MOTIONKIT_HOLD_ONLY` entry-point branches.
+The native host executor consumes these per-plan limits; RKD6 firmware still uses its
+session-level limits and needs a separate device-protocol extension to consume them.
+
+Follow-up number change: folded-Z backlash 0.0505 → 0.0510 mm because the leader screw contact
+also contributes its tooth clearance; both contacts project through the same screw lead.
+The unequal-spring scalar CoreXY regression changes x-only compliance from 0.0002 to
+0.0003125 m/N: omitted y carries zero force and can deflect instead of being held rigidly.
+
 This review follows X9 on local main `4b952231f` (X9 merged with the robot welder).
 
 **Breaks (fix first):**
@@ -1388,7 +1408,8 @@ This review follows X9 on local main `4b952231f` (X9 merged with the robot welde
 - **Plan check uses the wrong axes for partial plans.** `PlanCheck.hx` (around line 205) builds
   forces only for the plan's axes, but `loads[0].elastic` is a `DriveCompliance` over every driven
   axis in the model, and `DriveCompliance.deflections` never checks the size.
-  - Build the compliance for the plan's axes: other axes are held by their own drives.
+  - Solve every connected elastic coordinate, then project onto the plan's axes; omitted axes
+    have zero applied force, not an extra rigid constraint.
   - Make `deflections` reject a size mismatch.
   - Test with a model that has a driven axis outside the plan, ordered before the plan's axes.
 - **Under-actuated coupled pairs throw everywhere.** `DriveLoads.of` always inverts the shared
@@ -1489,7 +1510,7 @@ same free-span spring calculation for carriage and shaft attachments, validate t
 and state assumed pretension and a working-tension bound. The folded-Z motor pilot and bolts have
 5 mm tensioning slots; its 6 mm GT2 belt uses an assumed 120 N pretension and 250 N working limit.
 The folded stage still asserts 43.653927/21.826964 mm/s, 6117.456/3263.410 mm/s²,
-486.867 MN/m, 0.05/0.0505 mm backlash, and 36.9/37.1 kg with the baseline router.
+486.867 MN/m, 0.05/0.0510 mm backlash, and 36.9/37.1 kg with the baseline router.
 `describe()` still poses a copy for each rebuild: pose context is shared across its belt paths,
 but the copy remains proportional to assembly size and is not cached across rebuilds.
 
@@ -1749,7 +1770,30 @@ intermediate commits passed the full suite. No pushing, merging into main or sub
 
 ### Later
 
-Belt teeth drawn and moving with the belt: a mesh built in Haxe and
-updated per frame, shifted by the coupled joint's travel. It doubles as a
-visual check on a drive's sign and ratio. Also an editor UI to author transmissions, and
-differentials and planetaries (relations over more than two joints, beyond X5's summed terms).
+Belt teeth and posed display geometry are now implemented by the loose-end follow-through below.
+An editor UI to author transmissions, differentials and planetaries remain later work.
+
+
+### Loose-end follow-through (2026-10-04)
+
+Worktree: `motion-loose-ends`, based on local main `712019dbc`. Work through the ten reviewed loose ends in their original order.
+
+1. **Direct motion and live servo plan checks — implemented.** `PlanCheck` reads a shared polynomial-segment interface; native program arrays remain in place. `MotionSystem` checks a complete direct trajectory once before its first chunk, including smooth replacements. `ServoSession` checks each live plan chunk before submission. Both expose configurable checks and retained findings. Program checks keep their existing policy. Focused MotionKit plan-check gate: 74 assertions passed, including rejection before submission and report-only refill coverage.
+2. **Belt-router rapid contact — implemented and verified.** CNC exact stops wait for measured axis positions within 10 µm before advancing. The stock test requires zero rapid contacts for both routers; the belt-router motor-plate cycle passed with zero contacts in 215.1 s machining.
+3. **CoreXY motor-space constraints — implemented and verified.** Opted-in planners enforce linear motor velocity sums for jerk-limited joint moves and TOPP-RA path timing, with polynomial-extrema validation after lowering. Their model uses the single-axis velocity envelope; conservative scalar acceleration limits stay in force. The default box remains available for planners without these constraints. Focused CoreXY gate: 64 assertions passed; the real plotter plans at 1299.2 mm/s single-axis limits and completes its square/diagonals in 79 ticks without drive overload.
+4. **CoreXY belt stiffness — already implemented on main, verified.** The current network stiffness solve covers both belts and cross-axis deflection, including unequal belt stiffness and rigid paths. The real plotter reports 0.133 mm worst drive deviation in the CoreXY gate; it is no longer treated as rigid.
+5. **Draw and animate belt teeth — implemented and verified.** Preview geometry draws trapezoidal display teeth; posed belts rebuild from physical pulley attachment frames on presentation, with tooth phase from the driving pulley. Scene artifact v16 carries validated moving-belt metadata. The display gate checks periodic phase and connector validation; app playback verifies display updates and reset. CAD mass and collision geometry remain the authored backing belt.
+6. **Plotter virtual device and app player — implemented and verified.** The generated independent-axis program plays the square and diagonals through the normal plan stream and simulation session lifecycle, including looping and reset. Physical and full virtual-board CoreXY trials pass (79 and 129 ticks), with a 25 µm device-resolution allowance and 5% conversion headroom. The generated plotter also opts the app into its streamed virtual stepper board. The MuJoCo app playback/reset check passes; resetting recreates the virtual board and clock state before replay. The full MotionKit suite passed 67,499 assertions.
+7. **Native summed-joint kinematics — implemented and verified.** Native model format 2 carries sparse weighted joint terms through forward kinematics and Jacobians, including nested and cancelling sums. Native parity and malformed-model checks passed 695 assertions.
+8. **Boards with unused actuator channels — implemented and verified.** Boards negotiate a positive active actuator count up to physical capacity; telemetry and stepping use that count, preserving unused outputs. Virtual-device Rust checks, the protocol suite (32 tests), and the Nucleo cross-build pass.
+9. **Serial-port flake and sim_core_host abort — implemented and verified.** Minimal-profile exact linear motion uses bounded 100 ms pieces to avoid exhausting a shallow queue. Commit replenishment maintains the 500 ms stall horizon; a 300 ms host-stall regression and midstream replacements pass. The serial PTY test passed 100 consecutive runs. SimKit pause waits for an in-flight step to publish before returning; its repeated pause/resume test passed 30 runs (100 cycles per run).
+10. **MuJoCo wall-finishing approach failure — implemented and verified.** Approach planning retries an unsuccessful local tracking solve with the reaching solver. The MuJoCo regression passed 64 assertions, with 99.60% coverage, no exclusion contact and negligible tracking error.
+
+
+Final validation: full MotionKit suite 67,499 assertions; after the final queue/reset changes,
+CoreXY 57,683 assertions, ProjectKit 131 assertions, app virtual-plotter playback/reset, and
+native runtime/compiler/endpoint tests pass. Native kinematics: 695 assertions. Router stock
+regressions: both variants have zero rapid contacts. MuJoCo wall finishing: 64 assertions.
+Serial PTY: 100 consecutive passes. Protocol/virtual-board Rust suites and Nucleo cross-build
+pass. No physical board was exercised; channel negotiation was checked in firmware build and
+virtual protocol tests. All changes remain on `motion-loose-ends`; no remote publication.

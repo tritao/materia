@@ -165,7 +165,15 @@ class AxisPlanner {
         coefficients: coefficients});
     }
     native.dispose();
-    return Trajectory.fromSegments(physical);
+    var result = Trajectory.fromSegments(physical);
+    var caps = [for (_ in start) 0.0];
+    for (index in 0...axes.length) {
+      var mappedCaps = [for (_ in start) 0.0];
+      axes[index].writeLogicalDelta(mappedCaps, maxAcceleration[index]);
+      for (joint in 0...start.length) if (axes[index].containsJoint(joint)) caps[joint] = Math.abs(mappedCaps[joint]);
+    }
+    result.controlAcceleration = caps;
+    return result;
   }
 
   function resolveLimits(targets:Array<AxisTarget>, options:MotionOptions):MotionLimits {

@@ -292,6 +292,16 @@ class AssemblyRobot {
       var name = missionFrameName(at);
       if (!missionFrames.exists(name)) missionFrames.set(name, mountFrame(name, at));
     }
+    var machine = session.machineMotion;
+    var device:Null<robotkit.runtime.VirtualDeviceOptions> = null;
+    if (machine != null && machine.virtualDevice == true) {
+      var binding = robotkit.device.DeviceBinding.bind(converted.model,
+        robotkit.device.DeviceLayout.forActuators(converted.model), 40000);
+      converted.model = binding.model;
+      device = new robotkit.runtime.VirtualDeviceOptions();
+      device.actuators = binding.virtualActuators();
+    }
+    if (machine != null && machine.program != null) converted.model.materializeLimits(true);
     var blueprint = RobotRuntimeCompiler.compile(converted.model, converted.profile, revision);
     // Process channels (a machine's spindle and coolant, a tool's vacuum) must be declared before the
     // robot is added.
@@ -310,7 +320,7 @@ class AssemblyRobot {
     var rotation = origin == null ? [0.0, 0.0, 0.0, 1.0] : [0.0, 0.0, Math.sin(origin.yaw / 2), Math.cos(origin.yaw / 2)];
     // Like a machine whose servos are on, its joints hold their designed pose until something commands
     // them, such as an arm while its base drives.
-    var runtime = candidate.addRobotAtPose(blueprint, position, rotation, null, null, null, closures, null, null, null, null,
+    var runtime = candidate.addRobotAtPose(blueprint, position, rotation, device, null, null, closures, null, null, null, null,
       linkHulls, true);
     var robot = new SimulatedRobot(idFor(assembly), runtime, converted.model.name,
       [for (link in converted.model.links) link.id],

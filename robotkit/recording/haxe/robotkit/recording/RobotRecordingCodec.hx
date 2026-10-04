@@ -108,6 +108,7 @@ class RobotRecordingCodec {
     msg.accelerationTolerances = value.accelerationTolerances.toArray();
     msg.endsAtRest = value.endsAtRest;
     msg.jerkUnchecked = value.jerkUnchecked;
+    msg.controlAcceleration = value.statedControlAcceleration();
     msg.segments = [for (segment in value.segments) segmentMsg(segment)];
     msg.events = [for (event in value.events) timedEvent(event)];
     msg.replaceAfterPlanId = value.replaceAfterPlanId;
@@ -127,7 +128,7 @@ class RobotRecordingCodec {
       [for (segment in msg.segments) readSegment(segment)], msg.replaceAfterPlanId,
       msg.replaceAfterTimeNs, msg.positionTolerances, msg.velocityTolerances,
       msg.accelerationTolerances, msg.endsAtRest,
-      [for (event in msg.events) readTimedEvent(event)], msg.jerkUnchecked);
+      [for (event in msg.events) readTimedEvent(event)], msg.jerkUnchecked, null, msg.controlAcceleration);
   }
   static function timedEvent(value:ProcessTimedEvent):RecordingTimedEventMsg {
     var msg = new RecordingTimedEventMsg();

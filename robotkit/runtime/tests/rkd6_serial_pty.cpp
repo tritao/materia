@@ -83,8 +83,9 @@ int main(int argc, char **argv) {
         std::this_thread::sleep_for(10ms);
     }
     if (!moved || state.safety != RK_SAFETY_READY)
-        std::fprintf(stderr, "serial smoke: moved=%d position=%f safety=%u diagnostic=%d\n",
-            moved, state.position[0], state.safety, endpoint->diagnostic_code());
+        std::fprintf(stderr, "serial smoke: moved=%d position=%f safety=%u diagnostic=%d reason=%s\n",
+            moved, state.position[0], state.safety, endpoint->diagnostic_code(),
+            endpoint->fault_reason() ? endpoint->fault_reason() : "none");
     assert(moved && state.safety == RK_SAFETY_READY);
     endpoint.reset();
     ::close(control[1]);

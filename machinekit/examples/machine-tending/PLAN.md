@@ -536,6 +536,23 @@ Done. What was built and decided:
   ProjectKit from 136 to 143; RobotKit world remains 4993. The complete sequential gate is
   `mt-suite-final-w5.txt`; all kits, MachineKit smoke, app build and project-source pass.
 
+**Post-MT5 local main sync (RobotKit R7, motion loose ends and transmission X9e).**
+- The merged runtime keeps the machine tending process channels and servo reference clock while
+  applying main's per-plan acceleration budget to stops and resumes. A plan's control-acceleration
+  vector is per joint, so a two-joint, one-segment pneumatic plan must allocate two entries.
+  The merged mission builder retains joint-motion frames alongside main's virtual device, and
+  motion completion waits for a settled final state.
+- Main's measured-endpoint and exact-stop changes move the bare mill from 51.12 to 51.19 s
+  (5111 to 5118 ticks) and the enclosed mill from 51.73 to 51.92 s. Removed volume and
+  0.075366/0.050317/0.029369 mm X/Y/Z peak tracking remain stable. The door remains
+  1.50/1.79 s and the vise 0.18 s at 482.55 N. The same stop-policy change moves the screw
+  router from 220.2 to 232.2 s and the belt router from 201.7 to 215.2 s; both retain 128
+  plans, their material-removal figures and 0.05/1.76 mm worst deviations. CoreXY, arm,
+  mobile, cobot and welder measurements remain unchanged.
+- The latest RobotKit world suite passes 4997 assertions, MotionKit 67533, and toolpath motion
+  2952 scenario assertions; the other kit counts and MachineKit smoke remain as above. The
+  full sequential gate is `mt-suite-main-sync-final.txt`.
+
 **MT6. Controllers, robots and signals.**
 - Controller parts:
   - `CncController` cabinet: digital I/O ports, axis driver outputs, valve outputs;

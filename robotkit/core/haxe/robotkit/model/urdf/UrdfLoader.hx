@@ -112,7 +112,9 @@ class UrdfLoader {
       var limit = child(element, "limit");
       var limits = new JointLimits();
       if (limit != null) {
-        limits.effort = limit.exists("effort") ? Math.abs(number(limit, "effort", 0.0)) : null;
+        var effort = limit.exists("effort") ? Math.abs(number(limit, "effort", 0.0)) : 0.0;
+        // URDF exporters use zero when no effort rating is supplied.
+        limits.effort = effort > 0.0 ? effort : null;
         limits.velocity = limit.exists("velocity") ? Math.abs(number(limit, "velocity", 0.0)) : null;
         if (jointType == JointType.Revolute || jointType == JointType.Prismatic) {
           limits.lower = number(limit, "lower", 0.0);

@@ -96,6 +96,27 @@ class BeltElasticityTests {
 		try screwOnly[0].elastic.deflections([]) catch (_:Dynamic) wrongSize = true;
 		if (!wrongSize) throw "Compliance must reject a partial force vector of the wrong size";
 
+		// Validation must not invert an incomplete/malformed elastic spring system.
+		var invalidElastic = model(["axis", "motor"]);
+		invalidElastic.addCoupling(new JointCoupling("path", "axis", "motor", 2, 0));
+		hold(invalidElastic, "motor");
+		invalidElastic.elasticNetworks.push(new ElasticNetwork("missing-spring", ["path"], []));
+		var invalidErrors = invalidElastic.validate();
+		if (invalidErrors.length == 0) throw "Invalid belt spans must be a validation error, never a raw solve throw";
+
+		var sharedScalar = model(["x", "y", "left", "right"]);
+		for (entry in [{id: "xl", leader: "x", motor: "left", ratio: 1.0, spring: 1000.0},
+			{id: "yl", leader: "y", motor: "left", ratio: 1.0, spring: 1000.0},
+			{id: "xr", leader: "x", motor: "right", ratio: 1.0, spring: 4000.0},
+			{id: "yr", leader: "y", motor: "right", ratio: -1.0, spring: 4000.0}]) {
+			var path = sharedScalar.addCoupling(new JointCoupling(entry.id, entry.leader, entry.motor, entry.ratio, 0));
+			path.stiffness = entry.spring;
+		}
+		hold(sharedScalar, "left"); hold(sharedScalar, "right");
+		var xPlan = DriveLoads.of(sharedScalar, null, ["x"]);
+		near(xPlan[0].elastic.deflections([1])[0], (1.0 / 1000 + 1.0 / 4000) / 4,
+			"partial scalar CoreXY leaves Y free instead of using 1/(1000+4000)");
+
 		var summed = model(["out", "first", "second"]);
 		var first = summed.addCoupling(new JointCoupling("first-path", "first", "out", 1, 0));
 		first.backlash = 0.1;

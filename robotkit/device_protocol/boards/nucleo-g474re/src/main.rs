@@ -61,7 +61,7 @@ fn send<T: Write<u8>>(tx: &mut T, kind: u8, payload: &[u8], frame: &mut [u8; MAX
 }
 
 fn publish<T: Write<u8>>(tx: &mut T, core: &ScheduledCore<ACTUATORS, CAPACITY>,
-    board: &StubBoard, session: u64, received_bytes: u64, frame: &mut [u8; MAX_FRAME_SIZE]) {
+    board: &StubBoard, session: u64, active_count: usize, received_bytes: u64, frame: &mut [u8; MAX_FRAME_SIZE]) {
     let fault = match core.stop_reason() {
         None => 0, Some(StopReason::Underflow) => 2,
         Some(StopReason::LinkLost) => 3, Some(StopReason::DualDriveSkew) => 4,
@@ -80,21 +80,21 @@ fn publish<T: Write<u8>>(tx: &mut T, core: &ScheduledCore<ACTUATORS, CAPACITY>,
     send(tx, 14, &body[..QueueStatus6::SIZE], frame);
     let header = State6Header {
         session, timestamp_ticks: board.ticks, accepted_sequence: 0,
-        safety: if fault == 0 { 0 } else { 3 }, fault, actuator_count: JOINTS as u8,
+        safety: if fault == 0 { 0 } else { 3 }, fault, actuator_count: active_count as u8,
         reserved: 0, path_clock_ticks: core.path_clock(),
     };
     header.encode(&mut body[..State6Header::SIZE]).ok();
-    for i in 0..JOINTS {
+    for i in 0..active_count {
         let row = ActuatorState6 { position: board.position[i], velocity: board.velocity[i],
             effort: 0.0, step_count: 0 };
         let start = State6Header::SIZE + i * ActuatorState6::SIZE;
         row.encode(&mut body[start..start + ActuatorState6::SIZE]).ok();
     }
-    send(tx, 15, &body, frame);
+    send(tx, 15, &body[..State6Header::SIZE + active_count * ActuatorState6::SIZE], frame);
 }
 
 fn handle<T: Write<u8>>(input: &[u8], board: &mut StubBoard,
-    core: &mut Option<ScheduledCore<ACTUATORS, CAPACITY>>, session: &mut u64,
+    core: &mut Option<ScheduledCore<ACTUATORS, CAPACITY>>, session: &mut u64, active_count: &mut usize,
     received_bytes: &mut u64, tx: &mut T, frame: &mut [u8; MAX_FRAME_SIZE]) {
     let Ok((kind, payload)) = decode_frame6(input) else { return; };
     if kind != 1 { if let Some(core) = core.as_mut() { core.note_host_frame(board.ticks); } }
@@ -104,32 +104,33 @@ fn handle<T: Write<u8>>(input: &[u8], board: &mut StubBoard,
             // The board reports its own id even when it refuses, so `robotd identify` can read it.
             let own = controller_id();
             let accepted = controller_matches(&begin.expected_controller, &own) &&
-                begin.actuator_count as usize == JOINTS && begin.session != 0 &&
+                begin.actuator_count > 0 && begin.actuator_count as usize <= JOINTS && begin.session != 0 &&
                 begin.step_tick_hz == 40_000 && begin.channel_count == 0 &&
-                begin.actuator_max_acceleration[..JOINTS].iter().all(|v| v.is_finite() && *v > 0.0);
+                begin.actuator_max_acceleration[..begin.actuator_count as usize].iter().all(|v| v.is_finite() && *v > 0.0);
             let mut ack = SessionAck6 {
                 session: begin.session, protocol_version: PROTOCOL_VERSION,
                 controller: own, config_digest: config_digest6(payload), status: accepted as u8,
                 device_tick_hz: TICK_HZ, segment_capacity: CAPACITY as u16,
                 event_capacity: 0, step_tick_hz: 40_000, max_degree: 1,
-                actuator_count: JOINTS as u8, profile: 2,
+                actuator_count: if accepted { begin.actuator_count } else { JOINTS as u8 }, profile: 2,
             };
             if accepted {
                 let mut limits = [1.0; ACTUATORS];
-                limits[..JOINTS].copy_from_slice(&begin.actuator_max_acceleration[..JOINTS]);
+                limits[..begin.actuator_count as usize].copy_from_slice(&begin.actuator_max_acceleration[..begin.actuator_count as usize]);
                 let link_ticks = begin.link_loss_timeout_ns / 1_000;
                 let mut next = ScheduledCore::new(TICK_HZ, limits,
                     [-1.0e12; ACTUATORS], [1.0e12; ACTUATORS], link_ticks.max(1));
                 next.initialize_clock(board.ticks);
                 *core = Some(next);
                 *session = begin.session;
+                *active_count = begin.actuator_count as usize;
                 // The count starts after the frame that begins the session, as the host's does.
                 *received_bytes = 0;
             } else { ack.status = 0; }
             let mut bytes = [0u8; SessionAck6::SIZE];
             ack.encode(&mut bytes).ok();
             send(tx, 2, &bytes, frame);
-            if let Some(core) = core.as_ref() { publish(tx, core, board, *session, *received_bytes, frame); }
+            if let Some(core) = core.as_ref() { publish(tx, core, board, *session, *active_count, *received_bytes, frame); }
         }
         3 => {
             let Ok(request) = TimeSyncRequest::decode(payload) else { return; };
@@ -141,7 +142,7 @@ fn handle<T: Write<u8>>(input: &[u8], board: &mut StubBoard,
         }
         5 => {
             let Ok(begin) = QueueBegin6::decode(payload) else { return; };
-            if begin.actuator_count as usize != JOINTS { return; }
+            if begin.actuator_count as usize != *active_count { return; }
             if let Some(core) = core.as_mut() {
                 core.queue_begin_with_state(begin.queue_revision, begin.replace_after_ticks,
                     begin.expected_position, begin.expected_velocity).ok();
@@ -149,9 +150,9 @@ fn handle<T: Write<u8>>(input: &[u8], board: &mut StubBoard,
         }
         6 => {
             let Ok(header) = Segment6Header::decode(&payload[..Segment6Header::SIZE]) else { return; };
-            if header.degree > 1 || header.actuator_count as usize != JOINTS { return; }
+            if header.degree > 1 || header.actuator_count as usize != *active_count { return; }
             let mut coefficients = [[0.0; 6]; ACTUATORS];
-            for (i, slot) in coefficients.iter_mut().enumerate().take(JOINTS) {
+            for (i, slot) in coefficients.iter_mut().enumerate().take(*active_count) {
                 let offset = Segment6Header::SIZE + i * Segment6Coefficients::SIZE;
                 let Ok(row) = Segment6Coefficients::decode(&payload[offset..offset + Segment6Coefficients::SIZE]) else { return; };
                 if row.actuator as usize != i { return; }
@@ -193,6 +194,7 @@ fn main() -> ! {
     let mut board = StubBoard::new();
     let mut core: Option<ScheduledCore<ACTUATORS, CAPACITY>> = None;
     let mut session = 0u64;
+    let mut active_count = 0usize;
     let mut received_bytes = 0u64;
     let mut last_state = 0u64;
     let mut input = [0u8; MAX_FRAME_SIZE];
@@ -206,7 +208,7 @@ fn main() -> ! {
         if let Some(core) = core.as_mut() { core.tick(&mut board); }
         if board.ticks.saturating_sub(last_state) >= STATE_PERIOD_TICKS {
             if let Some(core) = core.as_ref() {
-                publish(&mut tx, core, &board, session, received_bytes, &mut output);
+                publish(&mut tx, core, &board, session, active_count, received_bytes, &mut output);
             }
             last_state = board.ticks;
         }
@@ -231,7 +233,7 @@ fn main() -> ! {
                     }
                     if input_len == size {
                         if decode_frame6(&input[..size]).is_ok() {
-                            handle(&input[..size], &mut board, &mut core, &mut session,
+                            handle(&input[..size], &mut board, &mut core, &mut session, &mut active_count,
                                 &mut received_bytes, &mut tx, &mut output);
                             input_len = 0;
                         } else {

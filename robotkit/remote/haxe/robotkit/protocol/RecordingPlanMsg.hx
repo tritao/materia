@@ -20,5 +20,7 @@ class RecordingPlanMsg {
   @:id(15) public var replaceAfterPlanId:haxe.Int64;
   @:id(16) public var replaceAfterTimeNs:haxe.Int64;
 
+  @:optional @:id(17) public var controlAcceleration:Null<Array<Float>>;
+
   public function new() {}
 }

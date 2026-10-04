@@ -27,6 +27,7 @@ class NativeKinematicsTests {
   public static function main():Void {
     testForwardAndJacobianParity();
     testRejectsBadInput();
+    testSummedCouplings();
     testUnboundedQpMatchesDampedStep();
     testBoundedQpMeetsOptimalityConditions();
     testWarmStartHelps();
@@ -74,6 +75,47 @@ class NativeKinematicsTests {
     check(worstJacobian == 0.0, 'native Jacobians are bit-identical to the Haxe snapshot (worst $worstJacobian)');
   }
 
+  static function testSummedCouplings():Void {
+    var builder = new KinematicModelBuilder();
+    var parent = builder.addBody("root");
+    for (id in ["a", "b", "sum", "nested", "cancel"]) {
+      var child = builder.addBody(id);
+      builder.addJoint(id, id == "sum" ? JointKind.Prismatic : JointKind.Revolute, parent, child,
+        Transform.translation(0.1, 0.2, 0.3), Transform.identity(), new Vector3(0, 0, 1));
+      parent = child;
+    }
+    builder.couple("sum", "a", 2.0, 0.1);
+    builder.couple("sum", "b", -0.5, 0.2);
+    builder.couple("nested", "sum", -0.3, 0.4);
+    builder.couple("cancel", "nested", 1.0, 0.0);
+    builder.couple("cancel", "sum", 0.3, 0.0);
+    var model = builder.build(), native = new NativeKinematics(model), snapshot = new KinematicSnapshot(model);
+    for (q in [[0.0, 0.0], [0.7, -0.4], [-1.2, 1.1]]) {
+      snapshot.evaluate(new KinematicState(model, q));
+      var poses = native.forward(q);
+      for (body in 0...model.bodyCount()) {
+        var pose = snapshot.bodyPose(body);
+        var expected = [pose.x, pose.y, pose.z, pose.qx, pose.qy, pose.qz, pose.qw];
+        for (i in 0...7) check(poses[7 * body + i] == expected[i], "summed and nested coupling FK matches Haxe");
+        var point = [pose.x + 0.1, pose.y - 0.2, pose.z + 0.3], columns = [1, 0];
+        var jacobian = [for (_ in 0...12) 0.0];
+        snapshot.pointJacobianColumns(body, point[0], point[1], point[2], new JacobianLayout(model, columns), jacobian);
+        var actual = native.pointJacobian(q, body, point, columns);
+        for (i in 0...12) check(actual[i] == jacobian[i], "summed coupling Jacobian matches Haxe");
+      }
+    }
+    native.dispose();
+    var ints = NativeKinematics.packInts(model), reals = NativeKinematics.packReals(model);
+    var starts = 6 + 2 * model.bodyCount() + 7 * model.jointCount() + model.frameCount();
+    ints[starts + model.jointCount()]++;
+    check(KinematicsKitNative.kk_model_create(ints, reals).status == KinematicsKitNativeConstants.KK_ERROR_INVALID_ARGUMENT,
+      "malformed CSR boundaries are rejected");
+    ints = NativeKinematics.packInts(model);
+    ints[ints.length - 1] = model.dofCount();
+    check(KinematicsKitNative.kk_model_create(ints, reals).status == KinematicsKitNativeConstants.KK_ERROR_INVALID_ARGUMENT,
+      "out-of-range term DOFs are rejected");
+  }
+
   static function testRejectsBadInput():Void {
     var model = randomForest(new Rng(9));
     var native = new NativeKinematics(model);
@@ -86,7 +128,7 @@ class NativeKinematicsTests {
     native.dispose();
     rejects(() -> native.forward([for (_ in 0...model.dofCount()) 0.0]), "a disposed model is rejected");
     var ints = NativeKinematics.packInts(model), reals = NativeKinematics.packReals(model);
-    ints[0] = 2;
+    ints[0] = 99;
     check(KinematicsKitNative.kk_model_create(ints, reals).status == KinematicsKitNativeConstants.KK_ERROR_INVALID_ARGUMENT,
       "an unknown packed format is rejected");
   }

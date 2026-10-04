@@ -44,14 +44,12 @@ class NativeKinematics {
     owner.close();
   }
 
-  /** The integer half of the packed model (format 1). */
+  /** The integer half of the packed model (format 2). */
   public static function packInts(model:KinematicModel):Array<Int> {
-    var ints = [1, model.bodyCount(), model.jointCount(), model.dofCount(), model.frameCount()];
+    var ints = [2, model.bodyCount(), model.jointCount(), model.dofCount(), model.frameCount(), model.jointTermDof.length];
     for (body in 0...model.bodyCount()) ints.push(model.bodyParentJoint[body]);
     for (body in model.bodyOrder) ints.push(body);
     for (joint in 0...model.jointCount()) {
-      if (model.jointSource[joint] == KinematicModel.COMBINED)
-        throw 'Native kinematics does not support joint "${model.jointIds[joint]}", which sums several coupling leaders';
       ints.push(cast model.jointKind[joint]);
       ints.push(model.jointParent[joint]);
       ints.push(model.jointChild[joint]);
@@ -61,10 +59,12 @@ class NativeKinematics {
     for (joint in model.jointOrder) ints.push(joint);
     for (joint in model.jointValueOrder) ints.push(joint);
     for (frame in 0...model.frameCount()) ints.push(model.frameBody[frame]);
+    for (value in model.jointTermStart) ints.push(value);
+    for (value in model.jointTermDof) ints.push(value);
     return ints;
   }
 
-  /** The floating-point half of the packed model (format 1). */
+  /** The floating-point half of the packed model (format 2). */
   public static function packReals(model:KinematicModel):Array<Float> {
     var reals:Array<Float> = [];
     for (pose in model.bodyRootPoses) {
@@ -80,6 +80,8 @@ class NativeKinematics {
       reals.push(model.jointScale[joint]);
     }
     for (value in model.frameOffset) reals.push(value);
+    for (value in model.jointConstant) reals.push(value);
+    for (value in model.jointTermScale) reals.push(value);
     return reals;
   }
 

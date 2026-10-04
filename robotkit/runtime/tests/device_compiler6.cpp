@@ -29,6 +29,13 @@ int main() {
     assert(accepted.ok && accepted.segments.size() == 1);
     assert(accepted.segments[0].header.t0_ticks == 1'050'000);
     assert(accepted.segments[0].header.duration_ticks == 1'000'000);
+    auto minimal_line = robotkit::compile_device_segments6(
+        std::span(&segment, 1), 7, true, 1'000'000'000ULL,
+        clock, blueprint, 1'000'000, 40'000, 1, 1e-6);
+    assert(minimal_line.ok && minimal_line.segments.size() == 10);
+    assert(minimal_line.segments[0].header.duration_ticks == 100'000);
+    assert(!minimal_line.segments[0].header.ends_at_rest);
+    assert(minimal_line.segments.back().header.ends_at_rest);
     auto rejected = robotkit::compile_device_segments6(
         std::span(&segment, 1), 7, true, 1'000'000'000ULL,
         clock, blueprint, 1'000'000, 40'000, 5, 0.0);

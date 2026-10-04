@@ -549,6 +549,9 @@ typedef struct rk_plan_header {
     double position_tolerance[RK_MAX_TRAJECTORY_JOINTS];
     double velocity_tolerance[RK_MAX_TRAJECTORY_JOINTS];
     double acceleration_tolerance[RK_MAX_TRAJECTORY_JOINTS];
+    /** Per-plan controlled stop/resume acceleration; zero uses the physical rating.
+     * Does not constrain trajectory admission or deliberate overload experiments. */
+    double control_acceleration[RK_MAX_TRAJECTORY_JOINTS];
 } rk_plan_header;
 
 /** Non-latched runtime diagnostic; safety remains READY. */

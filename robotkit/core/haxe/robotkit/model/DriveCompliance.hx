@@ -6,7 +6,12 @@ import robotkit.model.DriveLoads.AxisLoad;
 class DriveCompliance {
   public final compliance:Array<Array<Float>>;
 
-  public function new(loads:Array<AxisLoad>, ?model:RobotModel) {
+  public function new(loads:Array<AxisLoad>, ?model:RobotModel, ?matrix:Array<Array<Float>>) {
+    if (matrix != null) {
+      compliance = matrix;
+      for (load in loads) load.elastic = this;
+      return;
+    }
     if (model != null) {
       var count = loads.length;
       compliance = [for (_ in 0...count) [for (_ in 0...count) 0.0]];
@@ -118,6 +123,13 @@ class DriveCompliance {
         loads[axis].backlash += Math.abs(factor) * losses[motor];
       }
     }
+  }
+
+  /** Omitted axes carry zero external force; their elastic coordinates remain free. */
+  public static function project(solved:DriveCompliance, all:Array<AxisLoad>, selected:Array<AxisLoad>):DriveCompliance {
+    var indices = [for (load in selected) all.indexOf(load)];
+    return new DriveCompliance(selected, null,
+      [for (row in indices) [for (column in indices) solved.compliance[row][column]]]);
   }
 
   public function deflections(forces:Array<Float>):Array<Float> {

@@ -822,17 +822,11 @@ class MachineAssembly {
 
 	function refreshTransmissions():Void {
 		for (item in diagnostics.items.copy()) if (item.code == "transmission.parts") diagnostics.items.remove(item);
-		var context = beltPaths.length == 0 ? null : new machinekit.transmission.BeltPoseContext(mechanical);
+		var context:Null<machinekit.transmission.BeltPoseContext> = beltPaths.length == 0 ? null : new machinekit.transmission.BeltPoseContext(mechanical);
 		for (transmission in transmissions) {
 			var refreshed = applyTransmission(transmission, false, context);
 		}
 		mechanical.elasticNetworks = null;
-		var beltActuators:Array<materia.assembly.AssemblyDefinition.AssemblyActuator> = [];
-		if (beltPaths.length > 0) for (record in motors) {
-			var driver = motorDriver(record);
-			if (driverVoltage(record.driver, driver, false) != null)
-				beltActuators.push(resolveMotor(record, false));
-		}
 		for (path in beltPaths) {
 			var reduction = false;
 			for (record in transmissions) switch record.source {
@@ -841,12 +835,27 @@ class MachineAssembly {
 			}
 			if (!reduction) continue;
 			try {
+				var beltContext:machinekit.transmission.BeltPoseContext = cast context;
+				var beltActuators:Array<materia.assembly.AssemblyDefinition.AssemblyActuator> = [];
+				for (record in motors) {
+					var drives = false;
+					for (wrap in path.wraps)
+						if (machinekit.transmission.BeltElasticity.rotaryJoint(beltContext.definition, wrap.instanceId) == record.joint) drives = true;
+					if (drives) {
+						var driver = motorDriver(record);
+						if (driverVoltage(record.driver, driver, false) != null)
+							beltActuators.push(resolveMotor(record, false));
+					}
+				}
 				var belt:machinekit.transmission.TimingBelt = cast requireMember(path.belt);
 				var network = machinekit.transmission.BeltElasticity.build(belt, path, transmissions, mechanical, requireMember, beltActuators, context);
 				if (mechanical.elasticNetworks == null) mechanical.elasticNetworks = [];
 				mechanical.elasticNetworks.push(network);
-			} catch (error:machinekit.transmission.TransmissionDesignError)
+			} catch (error:machinekit.transmission.TransmissionDesignError) {
 				diagnostics.error("transmission.parts", path.belt, error.message);
+			} catch (error:Dynamic) {
+				diagnostics.error("transmission.parts", path.belt, Std.string(error));
+			}
 		}
 
 	}

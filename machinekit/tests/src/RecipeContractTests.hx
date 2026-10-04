@@ -135,6 +135,10 @@ class RecipeContractTests {
 			case CatalogDesignation(index):
 				for (designation in index.designations())
 					result.push(type.defaults().setToken(parameter.name, designation));
+			case Choice(options) if (parameter.name == "servo"):
+				// Servo selections are complete catalog configurations. Other choices can
+				// depend on companion values, such as a thread's interface name and size.
+				for (option in options) result.push(type.defaults().setToken(parameter.name, option));
 			default:
 		}
 		return result;

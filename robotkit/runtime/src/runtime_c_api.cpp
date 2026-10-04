@@ -276,7 +276,7 @@ rk_result RK_CALL rk_robot_runtime_submit_plan(rk_robot_runtime runtime,
     const int32_t *degrees, uint32_t segment_count, const double *coefficients,
     uint32_t coefficient_count, const int32_t *joint_map, uint32_t source_joint_count,
     const rk_timed_event *events, uint32_t event_count) {
-    if (!header || header->struct_size < sizeof(*header) || !joint_map ||
+    if (!header || header->struct_size < offsetof(rk_plan_header, control_acceleration) || !joint_map ||
         header->ends_at_rest > 1 || (event_count > 0 && !events) ||
         event_count > RK_MAX_TRAJECTORY_QUEUE_POINTS)
         return RK_ERROR_INVALID_ARGUMENT;
@@ -300,6 +300,8 @@ rk_result RK_CALL rk_robot_runtime_submit_plan(rk_robot_runtime runtime,
         std::copy_n(header->velocity_tolerance, RK_MAX_TRAJECTORY_JOINTS, plan.velocity_tolerance);
         std::copy_n(header->acceleration_tolerance, RK_MAX_TRAJECTORY_JOINTS,
             plan.acceleration_tolerance);
+        if (header->struct_size >= sizeof(*header))
+            std::copy_n(header->control_acceleration, RK_MAX_TRAJECTORY_JOINTS, plan.control_acceleration);
         plan.segments.tag = header->tag;
         const auto copied = copy_segments(starts_ns, durations_ns, degrees, segment_count,
             coefficients, coefficient_count, joint_map, source_joint_count,

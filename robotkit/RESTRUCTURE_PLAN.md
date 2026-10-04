@@ -1,6 +1,7 @@
 # RobotKit restructuring plan
 
-Status: in progress (2026-10-04), in `robotkit-restructure`, based on local main
+Status: R0–R6 done and merged into local main (2026-10-04); R7 (review fixes) planned.
+R0–R6 ran in `robotkit-restructure`, based on local main
 `712019dbc` after transmissions X9e, then synchronized with `575c06898`
 (the concurrent exosuit-followon merge). Each phase is validated, committed and merged
 to local main before the next phase begins. Mechanical moves remain separate commits.
@@ -338,6 +339,155 @@ without --auth was also verified to stop before opening its listener.
 - **robotd authentication.** robotd currently "does not authenticate clients". Add authenticated
   identities and authorization (who may observe, who may command, who may change deployment) to the
   robotd session model before any physical deployment beyond a bench on an isolated network.
+
+## R7 — Review fixes for R0–R6
+
+Status: planned (2026-10-04), from a read-only review of R0–R6 on local main `9162a8c83`. The
+overall shape is right:
+- core's dependencies are exactly NativeKit and TrajectoryKit;
+- the R3–R5 mechanical commits change only packages and imports;
+- no re-export shims or aliases were left;
+- robotd authentication is mandatory, with no default credential.
+
+The review also found two compile breaks, fixed in the merge `564237cd6`:
+- MotionKit's `PlanCheckTests` used `robotkit.world.RobotRecording`;
+- VisionKit's RobotKit test imported `ImageDetectionLifter` from `robotkit.streams`.
+
+VisionKit's RobotKit test now runs in the gate's consumer stage. The rest is below, most urgent
+first. The gate is `tools/robotkit-restructure-suite.sh` (all stages).
+
+### R7a — robotd session security
+
+- **One client must not be able to block control.**
+  - `RobotServer` gives the controller slot to the first accepted socket before any Hello
+    (`RobotServer.hx` around line 301), and `sendFault(…, fatal = true)` sends the fault but
+    never closes the socket. A client with no token or a wrong token holds the slot indefinitely,
+    and every real controller is demoted to observer.
+  - Assign the slot only after a successful Hello.
+  - Close the connection after any fatal fault.
+  - Add a Hello deadline, and cap unauthenticated connections and failed attempts per peer.
+  - Bound frame buffering before authentication (frames can declare up to 16 MB × 65 parts).
+  - Test: a silent client, then a wrong-token client, then a valid controller gets control.
+- **State the threat model.** The token is a static bearer secret sent in cleartext, with no
+  challenge, nonce or expiry, and frames after Hello have no integrity. The README must say that
+  robotd requires an isolated robot network or a tunnel (WireGuard/SSH) until the transport is
+  authenticated. Plan TLS-PSK or HMAC challenge-response with per-session keys as the next step,
+  before any deployment off an isolated network.
+- **Auth file:**
+  - refuse to start if it is group- or world-writable or not owned by the robotd user;
+  - document random tokens of at least 128 bits;
+  - salt the digests or use a KDF.
+
+  The file also maps deployment names to paths, so it is a trust root.
+- **Deployment changes:** validate a new deployment fully (open the serial device, compile the
+  blueprint) before disposing the running host, and keep the old host on failure. Test a
+  successful change, not only denials.
+- **Remove the `legacy` subscription mode** (`OutboundScheduler`): empty subscriptions mean
+  essential-only. Apply the "no bulk data on the control connection" rule to the effective
+  families, not the requested ones. Update the raw test clients
+  (`tests/integration/authentication.py`) that send empty subscriptions.
+- Remove `RobotServer.handleLegacyJointTarget` if nothing current sends that message.
+- Make the unreachable 426 "unsupported protocol" fault reachable (version check before decode),
+  or remove it.
+- `RemoteRobot`'s bulk stream connection: reconnect after a drop, and report a stream fault
+  instead of going silently stale.
+
+### R7b — Finish "execution plans only" and capabilities
+
+- **Remove the native raw-segment path:** `RK_COMMAND_TRAJECTORY_SEGMENTS`,
+  `supports_trajectory_queue` and `rk_robot_runtime_submit_segments` (`robotkit_runtime.h`), with
+  their implementation in `runtime_c_api.cpp`, `runtime.cpp` and `validation.cpp`, and the
+  `tests/c_api.c` cases. Bump `RK_API_VERSION`. Execution plans are then the only buffered input
+  at every layer.
+- **Delete `RecordingSchemas.legacyCommand()`,** its acceptance in `McapRecordingReader`, and its
+  generator in `tools/recording/generate_schemas.py`. Bump the recording version for X9e's
+  `controlAcceleration` (field 17), and bump the plan-submission version for the same field.
+  The no-compatibility policy applies.
+- **Capabilities that tell the truth.** Read hold/resume, timed events, replacement, timing,
+  control modes and polynomial/segment limits from the endpoint, not from Haxe constants
+  (`RobotRuntime.hx` around lines 110–122). A serial/RKD endpoint must not advertise the
+  simulation's contract.
+  - Enforce the limits where plans enter: `RemoteRobot.submit` and robotd, not only
+    `RuntimeRobotAdapter`.
+  - `MotionSystem`/`PlanExecutor` reject a robot without `holdResume` at construction, instead of
+    `hold()` throwing after session state has changed.
+
+### R7c — Profiles as typed roles
+
+- **A missing profile is an error, not an empty one.** `KinematicGroup` defaults to
+  `new RobotProfile()`, so `MissionPlayer`'s `Manipulator` (built without a profile) silently stops
+  moving a mobile base. Pass the robot's profile everywhere a `Manipulator` or `KinematicGroup` is
+  built.
+- Give worldd's `WorldHost.addSimulatedRobot` a profile parameter.
+- Turn `RobotProfile`'s two nullable fields into typed roles as R2 planned (`DifferentialBase`,
+  `HolonomicBase`, `ForkMechanism`, `Manipulator`, …), so a new robot kind is a new role, not a new
+  field and schema bump.
+- `RobotProfileCodec` errors name the field and the path (e.g. inside `deployment.json`).
+
+### R7d — Package leaks
+
+- **MotionKit must not need ONNX.** `motionkit/robot/haxeon.json` depends on `robotkit-policy`
+  for one enum (`CommandRejection`, used by `ServoSession`). Move that enum to core, or to a small
+  shared package, and drop the dependency.
+- **Simulation must not need autonomy.** `robotkit/sim` depends on `robotkit-autonomy` for
+  `MobileBase`/`HolonomicDrive` (used by the drive plants), which pulls in KinematicsKit
+  (`UnicycleEnvelope`) and VisionKit. Move the drive kinematics the plants need into core (or
+  sim), so sim depends on core and SimKit only.
+- **worldd must not need ONNX.** Move `WorldHost` out of the inference package into its own
+  worldd package; inference stays optional.
+- Remove `robotkit-autonomy`'s unused dependency on `robotkit-remote`. Declare inference's
+  VisionKit dependency explicitly.
+- `tools/check-robotkit-packages.py` checks every package's dependency closure, not only the
+  umbrella. Assert that core, sim and motionkit-robot never reach ONNX, KinematicsKit or
+  VisionKit. Packages split across two source roots (`robotkit.mobile`, `runtime`, `skill`,
+  `safety`, `localization`) need the standalone compile of each package in the gate.
+
+### R7e — Process leftovers and the endpoint API
+
+- **Move the process tools:** `Sprayer`, `Sander`, `SurfaceTool` and their `Simulated*` versions
+  go to ProcessKit. `ToolRuntime`/`ChannelToolAdapter` get a generic tool registration instead of
+  hard-wired process tools.
+- **Remove the copied weld validator.** Delete `RobotRuntime`'s hand-copied `tool_weld` sensor
+  validator (magic indices). Sensor-kind validation is registered by the package that owns the
+  kind (ProcessKit's `WeldSensor`).
+- Move the process tests (weld, work, excavator, wall finishing, terrain, construction skills) from
+  `robotkit/tests` to ProcessKit, so RobotKit's tests don't depend on ProcessKit.
+- **`RuntimeEndpoint` as planned:**
+  - a small start/submit/observe/stop surface, not the 13-method native ABI;
+  - not exposed as a public field of `RobotRuntime`;
+  - closing it goes through the runtime and raises `RobotRuntimeError`.
+- **The blueprint once.** `RobotRuntime.create(blueprint, endpoint)` takes the blueprint twice
+  without checking. The endpoint carries the blueprint it was built from, and the runtime uses
+  that one. Make simulation and virtual-device endpoints real factories, and replace
+  `Simulation`'s unchecked `cast runtime.endpoint:NativeRuntimeEndpoint` with a typed path.
+- **TrajectoryKit's own names:**
+  - C ABI `tc_*` (or similar), not `mk_*`/`MK_API_VERSION`;
+  - its own C++ namespace, not `namespace motionkit`;
+  - Haxe types (`ExecutionPlan`, `Trajectory`, `ValidationReport`) in the TrajectoryKit package, not
+    `motionkit.trajectory`;
+  - its tests in `trajectorykit/native/tests`, not compiled from MotionKit's sources (they now run
+    twice).
+- **One trajectory registry per process.** Check that MotionKit and RobotKit load a single
+  `trajectory_core` on every platform (handles are only valid in one registry). Make the static
+  and shared build modes agree.
+
+### R7f — Protocol and documentation
+
+- **`DEVICE_PROTOCOL.md` must state one rule before hardware ships.** Peers require the exact wire
+  revision, and a post-release change is a new revision that every board must be reflashed for (or
+  a new generation). Remove "negotiate a new version", which doesn't exist (`rkd6_endpoint.cpp`
+  and `frame6.rs` check equality). Rename "Protocol version 8–12" in the body to "wire revision".
+- **Stale paths:**
+  - `robotkit/ARCHITECTURE.md` (`robotkit.process`, `robotkit.work`,
+    `runtime.SimulatedWelder`);
+  - `motionkit/plans/*`, `CONSTRUCTION_ROADMAP.md`, `FOLLOWUP_PLAN.md`,
+    `kinematicskit/plans/KINEMATICS.md` (`robotkit/haxe/robotkit/...`);
+  - `machinekit/examples/mobile-base/PLAN.md` (`RobotModel.mobileBase`);
+  - the robotd README ("validates the selected record").
+- Bump the `materia.scene` envelope version, since its robot records changed in R2.
+
+Each part is committed with the full gate passing, and this file records what moved and any number
+that changed.
 
 ## Later (only when needed)
 

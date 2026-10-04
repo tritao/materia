@@ -359,13 +359,33 @@ class ProjectSourceTests {
     var simulation = new ApplicationSimulation(world);
     simulation.setBackend(ApplicationSimulation.MUJOCO);
     check(simulation.rebuild(session.sensors, session.scene, session), "the plotter builds in the shared simulation: " + simulation.error);
-    for (_ in 0...200) simulation.step();
+    var player = simulation.programPlayer();
+    if (player == null) throw "the generated plotter has no app program player";
+    check(generated.machineMotion != null && generated.machineMotion.virtualDevice == true && generated.machineMotion.belts.length == 2,
+      "the plotter artifact carries its two physical belt routes");
+    simulation.capturePresentationSnapshot();
+    var initialDisplays = simulation.beltDisplayUpdates();
+    var moving = false;
+    var tick = 0;
+    while (player.passes == 0 && player.failure == null && tick++ < 1000) {
+      simulation.step();
+      var seen = world.snapshot().robots()[0];
+      for (joint in 0...model.joints.length)
+        if (model.joints[joint].id == "x" && Math.abs(seen.positions.get(joint)) > 0.01) moving = true;
+      if (tick % 40 == 0) simulation.capturePresentationSnapshot();
+    }
+    check(player.failure == null && player.passes > 0 && moving,
+      'the plotter plays its square and diagonals in the app (${player.failure}, $tick ticks)');
+    check(simulation.beltDisplayUpdates() > initialDisplays, "belt geometry follows the presented moving pose");
+    check(simulation.reset(), "the plotter simulation resets");
+    check(player.passes == 0, "reset clears the program's pass count");
     var observed = world.snapshot().robots();
     check(observed.length == 1, "the plotter is the one robot in the world");
-    var snapshot = observed[0];
     var worst = 0.0;
-    for (joint in 0...model.joints.length) worst = Math.max(worst, Math.abs(snapshot.positions.get(joint)));
-    check(worst < 1e-3, 'the plotter holds at rest, its joints at most $worst from their start');
+    for (joint in 0...model.joints.length) worst = Math.max(worst, Math.abs(observed[0].positions.get(joint)));
+    check(worst < 1e-3, 'reset restores the plotter to home, its joints at most $worst from home');
+    for (_ in 0...25) simulation.step();
+    check(player.motion.running && player.failure == null, "the plotter's program restarts after reset");
     simulation.dispose();
     session.dispose();
   }
@@ -1790,9 +1810,9 @@ class ProjectSourceTests {
       4 * 0.00275 * 0.00275 * (0.020 - 0.0054));
     check(Math.abs(stock.removed - recesses) < recesses * 0.02,
       'the stock loses the plate\'s recesses, ${stock.removed} m³ removed against $recesses');
-    // A belt router's rapids are fast enough for the simulated carriage to lag its command by millimetres,
-    // so a rapid's label can reach a few ticks into a cut: those are counted and reported, not forbidden.
-    check((belts || stock.rapidContacts == 0) && stock.collisions == 0,
+    // Both routers settle their measured axes before advancing an exact-stop move, so a rapid
+    // may not remove stock even when a belt carriage lags during its preceding move.
+    check(stock.rapidContacts == 0 && stock.collisions == 0,
       'no rapid runs through the stock and the holder never touches it (${stock.rapidContacts}, ${stock.collisions})');
     var deviation = stock.deviation();
     check(deviation.gouge < 1e-9, 'nothing is cut from the finished plate, gouge ${deviation.gouge} m³');

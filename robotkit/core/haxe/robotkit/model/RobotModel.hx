@@ -82,9 +82,11 @@ class RobotModel {
    * A follower that sums several leaders (a CoreXY motor) binds each leader inside a box: the axis's
    * speed is limited to the follower's limit over the sum of the ratios' magnitudes (through chains,
    * `couplingWeight`), so every combination of moves within the per-axis limits stays inside it.
+   * `motorSpaceVelocity` returns the single-axis velocity envelope instead: callers must enforce the
+   * coupled motor velocity sums in their planner and retain follower limits in the runtime.
    * Each axis likewise gets only its share of such a motor's force, in proportion to its ratio.
    */
-  public function coupledLimits(id:JointId, ?steady:SteadyLoads):JointLimits {
+  public function coupledLimits(id:JointId, ?steady:SteadyLoads, ?motorSpaceVelocity:Bool = false):JointLimits {
     var joint = [for (candidate in joints) if (candidate.id == id) candidate];
     if (joint.length != 1) throw 'Robot model has no joint "$id"';
     var own = joint[0].mechanicalLimits;
@@ -114,6 +116,7 @@ class RobotModel {
         var terms = 0.0;
         for (other in couplings) if (other.follower == coupling.follower) terms += Math.abs(other.ratio);
         var box = couplingWeight(coupling.follower, 0) / axisWeight;
+        var velocityScale = motorSpaceVelocity ? scale : box;
         reached.push(coupling.follower);
         scales.push(scale);
         boxes.push(box);
@@ -124,10 +127,10 @@ class RobotModel {
           if (mechanical == null) mechanical = follower.limits;
           var velocity = mechanical.velocity, acceleration = mechanical.maxAcceleration;
           if (velocity != null) {
-            if (limits.velocity == null || velocity / box <= limits.velocity)
+            if (limits.velocity == null || velocity / velocityScale <= limits.velocity)
               for (value in mechanical.assumptions) if (value.quantity == "speed limit")
                 EngineeringAssumptions.add(limits.assumptions, value.quantity, value.label);
-            limits.velocity = tighten(limits.velocity, velocity / box);
+            limits.velocity = tighten(limits.velocity, velocity / velocityScale);
           }
           if (acceleration != null) limits.maxAcceleration = tighten(limits.maxAcceleration, acceleration / box);
         }
@@ -142,7 +145,7 @@ class RobotModel {
         var gearing = Math.abs(ratio) * scales[index];
         var motorRate = actuator.planningRate();
         if (motorRate != null) {
-          var rate = motorRate / (Math.abs(ratio) * boxes[index]);
+          var rate = motorRate / (Math.abs(ratio) * (motorSpaceVelocity ? scales[index] : boxes[index]));
           if (limits.velocity == null || rate <= limits.velocity) {
             for (value in actuator.assumptions) if (value.quantity == "speed limit")
               EngineeringAssumptions.add(limits.assumptions, value.quantity, value.label);
@@ -170,9 +173,9 @@ class RobotModel {
   }
 
   /** Materialise all drive caps from one snapshot, then fill missing follower caps from their leaders. */
-  public function materializeLimits():Void {
+  public function materializeLimits(?motorSpaceVelocity:Bool = false):Void {
     for (joint in joints) if (joint.mechanicalLimits == null) joint.mechanicalLimits = joint.limits.copy();
-    var effective = [for (joint in joints) coupledLimits(joint.id)];
+    var effective = [for (joint in joints) coupledLimits(joint.id, null, motorSpaceVelocity)];
     for (_ in 0...couplings.length) for (index in 0...joints.length) {
       var velocity = 0.0, acceleration = 0.0;
       var any = false, hasVelocity = true, hasAcceleration = true;
@@ -340,10 +343,24 @@ class RobotModel {
       if (!hasLeader || !hasFollower)
         errors.push('joint coupling ${coupling.id} references an unknown joint');
     }
+    var networkIds = new Map<String, Bool>();
+    var networkOwners = new Map<String, String>();
+    for (network in elasticNetworks) {
+      if (network == null) { errors.push("robot has a null elastic network"); continue; }
+      if (networkIds.exists(network.id)) errors.push('duplicate elastic network ID ${network.id}');
+      networkIds.set(network.id, true);
+      try {
+        network.validate(joints, couplings);
+        for (owner in network.couplings) {
+          if (networkOwners.exists(owner)) errors.push('coupling $owner belongs to more than one elastic network');
+          networkOwners.set(owner, network.id);
+        }
+      } catch (error:Dynamic) errors.push(Std.string(error));
+    }
     var cycle = JointCoupling.cycleThrough(couplings);
     if (cycle != null) errors.push('joint $cycle depends on itself through its couplings');
     if (errors.length == 0) {
-      var uncontrolled = DriveLoads.uncontrolledAxes(DriveLoads.of(this));
+      var uncontrolled = DriveLoads.uncontrolledModelAxes(this);
       if (uncontrolled.length > 0)
         errors.push('under-actuated coupled axes: ${uncontrolled.join(", ")}; bind independent motors before solving shared stiffness');
     }

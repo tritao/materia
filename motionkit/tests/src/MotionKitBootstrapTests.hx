@@ -44,11 +44,6 @@ class MotionKitBootstrapTests {
       Sys.println('Session end tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
     }
-    if (Sys.getEnv("MOTIONKIT_HOLD_ONLY") == "1") {
-      sessionTests.testHoldDecelerationStaysWithinLimitsThroughoutMove();
-      Sys.println('Hold limit tests passed (${MotionKitTestSupport.assertions} assertions)');
-      return;
-    }
     if (Sys.getEnv("MOTIONKIT_BLEND_ONLY") == "1") {
       plannerTests.testToleranceBlend();
       Sys.println('Blend focused tests passed (${MotionKitTestSupport.assertions} assertions)');
@@ -60,6 +55,8 @@ class MotionKitBootstrapTests {
       new PlanCheckTests().testEncoderSeesStepperSlip();
       new PlanCheckTests().testLoadSideEncoderReportsPathError();
       new PlanCheckTests().testCompilerRunsPlanCheck();
+      new PlanCheckTests().testDirectMotionRunsPlanCheck();
+      new PlanCheckTests().testServoStreamRunsPlanCheck();
       Sys.println('Plan check tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
     }
@@ -72,6 +69,8 @@ class MotionKitBootstrapTests {
     }
     if (Sys.getEnv("MOTIONKIT_COREXY_ONLY") == "1") {
       new CoreXyTests().testTwoBeltCompliance();
+      new CoreXyTests().testMotorSpaceTiming();
+      new CoreXyTests().testBeltDisplay();
       new CoreXyTests().testPlotterDrawsASquare();
       new CoreXyTests().testPlanCheckAddsTheAxesOnASharedMotor();
       Sys.println('CoreXY tests passed (${MotionKitTestSupport.assertions} assertions)');
@@ -96,7 +95,11 @@ class MotionKitBootstrapTests {
     new PlanCheckTests().testEncoderSeesStepperSlip();
     new PlanCheckTests().testLoadSideEncoderReportsPathError();
     new PlanCheckTests().testCompilerRunsPlanCheck();
+    new PlanCheckTests().testDirectMotionRunsPlanCheck();
+    new PlanCheckTests().testServoStreamRunsPlanCheck();
     new CoreXyTests().testTwoBeltCompliance();
+    new CoreXyTests().testMotorSpaceTiming();
+    new CoreXyTests().testBeltDisplay();
     new CoreXyTests().testPlotterDrawsASquare();
     new CoreXyTests().testPlanCheckAddsTheAxesOnASharedMotor();
     processTests.testPoseProcessPath();

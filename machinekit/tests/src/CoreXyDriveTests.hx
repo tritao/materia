@@ -21,11 +21,35 @@ class CoreXyDriveTests {
 		var model = AssemblySimulationBridge.toRobotModel(scene.assemblyDefinition, AssemblyPhysicalPartView.fromSceneArtifact(scene),
 			scene.assemblyState).model;
 		var plotter = new CoreXyPlotter();
+		var beltDescription = plotter.describe();
+		var atUpper = machinekit.assembly.FrozenAssemblyDefinitions.thaw(beltDescription.mechanical);
+		for (joint in atUpper.joints) if (joint.id == "y") {
+			joint.limits.lower = null; joint.limits.upper = joint.defaultValue;
+		}
+		var carriageBelt:machinekit.transmission.TimingBelt = null;
+		for (member in plotter.components()) if (member.id == "beltA") carriageBelt = cast member.component;
+		var missingEnvelope = false;
+		for (path in beltDescription.machine.beltPaths) if (path.belt == "beltA") {
+			try machinekit.transmission.BeltStretch.stiffness(carriageBelt, path, "x", "pulleyA", atUpper)
+			catch (error:machinekit.transmission.TransmissionDesignError)
+				missingEnvelope = error.message.indexOf('without limits for joint "y"') >= 0;
+		}
+		if (!missingEnvelope) throw "A moving belt axis at its upper default must still require a complete stiffness envelope";
 		var radius = plotter.pulleyRadius / 1000;
 		if (model.couplings.length != 16 || model.actuators.length != 2)
 			throw 'the plotter should have 16 belt couplings and two motors, got ${model.couplings.length} and ${model.actuators.length}';
 		var errors = model.validate();
 		if (errors.length > 0) throw 'the plotter model should validate: $errors';
+		// Leaving Y out of a plan must leave its elastic coordinate free, not clamp it.
+		var allLoads = DriveLoads.of(model);
+		var xOnly = DriveLoads.of(model, null, ["x"]);
+		var fullX = [for (load in allLoads) if (load.axis == "x") load][0];
+		near(xOnly[0].stiffness, fullX.stiffness, "partial CoreXY stiffness retains omitted free axis", 1e-6);
+		near(xOnly[0].backlash, fullX.backlash, "partial CoreXY lost motion retains full Jacobian", 1e-12);
+		var fullForces = [for (load in allLoads) load.axis == "x" ? 10.0 : 0.0];
+		var fullDeflections = allLoads[0].elastic.deflections(fullForces);
+		near(xOnly[0].elastic.deflections([10.0])[0], fullDeflections[allLoads.indexOf(fullX)],
+			"partial CoreXY zero load on omitted axis", 1e-12);
 		var partlyWired = robotkit.model.RobotModelCodec.decode(robotkit.model.RobotModelCodec.encode(model));
 		partlyWired.actuators.pop();
 		var partialLoads = DriveLoads.of(partlyWired);

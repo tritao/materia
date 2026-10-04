@@ -521,7 +521,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 * A plan's identity and start state, submitted with its segments and events by
 	 * rk_robot_runtime_submit_plan. Replacement time is in the active plan's trajectory clock.
 	 */
-	struct rk_plan_header @layout(3144, 8) {
+	struct rk_plan_header @layout(3656, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		required_capabilities: u32 @offset(4);
 		/**
@@ -560,6 +560,11 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		position_tolerance: array<f64, 64> @offset(1608);
 		velocity_tolerance: array<f64, 64> @offset(2120);
 		acceleration_tolerance: array<f64, 64> @offset(2632);
+		/**
+		 * Per-plan controlled stop/resume acceleration; zero uses the physical rating.
+		 * Does not constrain trajectory admission or deliberate overload experiments.
+		 */
+		control_acceleration: array<f64, 64> @offset(3144);
 	}
 	struct rk_recording_message @layout(160, 8) {
 		struct_size: u32 @offset(0) @struct_size;

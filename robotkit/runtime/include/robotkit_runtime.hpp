@@ -56,6 +56,7 @@ struct PlanRequest {
     double position_tolerance[RK_MAX_TRAJECTORY_JOINTS]{};
     double velocity_tolerance[RK_MAX_TRAJECTORY_JOINTS]{};
     double acceleration_tolerance[RK_MAX_TRAJECTORY_JOINTS]{};
+    double control_acceleration[RK_MAX_TRAJECTORY_JOINTS]{};
     SegmentBatch segments;
     std::vector<rk_timed_event> events;
 };
@@ -251,6 +252,7 @@ public:
         uint64_t tag = 0;
         uint64_t plan_id = 0;
         bool ends_at_rest = true;
+        double control_acceleration[RK_MAX_TRAJECTORY_JOINTS]{};
     };
 
     /** Internal phases used by Simulation to coordinate multiple runtimes. */
@@ -303,6 +305,7 @@ private:
         uint64_t active_plan_id = 0;
         /** Trajectory clock rate; below 1 only while a path-following stop runs. */
         double trajectory_rate = 1.0;
+        double control_acceleration[RK_MAX_TRAJECTORY_JOINTS]{};
         double trajectory_time_remainder_ns = 0.0;
         uint64_t stop_ramp_time_ns = 0;
         uint64_t stop_ramp_duration_ns = 0;

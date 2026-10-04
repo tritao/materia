@@ -53,8 +53,10 @@ class McapRecordingReader {
         throw 'Read recording schema failed with RobotKit status ${schema.status}';
       var encoded = schema.schema.toString();
       var separator = encoded.indexOf("\n");
-      if (separator < 0 || encoded.substr(0, separator) != channel.wireClass ||
-          encoded.substr(separator + 1) != channel.schemaData) {
+      var data = separator < 0 ? "" : encoded.substr(separator + 1);
+      var compatible = data == channel.schemaData ||
+        (name == "command" && data == RecordingSchemas.legacyCommand());
+      if (separator < 0 || encoded.substr(0, separator) != channel.wireClass || !compatible) {
         if (strict) throw 'Recording schema mismatch for channel $name';
         skippedUnknown++;
         continue;
