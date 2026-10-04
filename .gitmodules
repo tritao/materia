@@ -62,3 +62,39 @@
 [submodule "motionkit/native/vendor/eigen"]
 	path = motionkit/native/vendor/eigen
 	url = https://gitlab.com/libeigen/eigen.git
+[submodule "simkit/vendor/mujoco-deps/ccd"]
+	path = simkit/vendor/mujoco-deps/ccd
+	url = https://github.com/danfis/libccd.git
+	shallow = true
+[submodule "simkit/vendor/mujoco-deps/lodepng"]
+	path = simkit/vendor/mujoco-deps/lodepng
+	url = https://github.com/lvandeve/lodepng.git
+	shallow = true
+[submodule "simkit/vendor/mujoco-deps/marchingcubecpp"]
+	path = simkit/vendor/mujoco-deps/marchingcubecpp
+	url = https://github.com/aparis69/MarchingCubeCpp.git
+	shallow = true
+[submodule "simkit/vendor/mujoco-deps/miniz"]
+	path = simkit/vendor/mujoco-deps/miniz
+	url = https://github.com/richgel999/miniz.git
+	shallow = true
+[submodule "simkit/vendor/mujoco-deps/qhull"]
+	path = simkit/vendor/mujoco-deps/qhull
+	url = https://github.com/qhull/qhull.git
+	shallow = true
+[submodule "simkit/vendor/mujoco-deps/tinyobjloader"]
+	path = simkit/vendor/mujoco-deps/tinyobjloader
+	url = https://github.com/tinyobjloader/tinyobjloader.git
+	shallow = true
+[submodule "simkit/vendor/mujoco-deps/tinyxml2"]
+	path = simkit/vendor/mujoco-deps/tinyxml2
+	url = https://github.com/leethomason/tinyxml2.git
+	shallow = true
+[submodule "robotkit/vendor/mcap"]
+	path = robotkit/vendor/mcap
+	url = https://github.com/foxglove/mcap.git
+	shallow = true
+[submodule "robotkit/vendor/lz4"]
+	path = robotkit/vendor/lz4
+	url = https://github.com/lz4/lz4.git
+	shallow = true
