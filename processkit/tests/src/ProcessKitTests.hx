@@ -14,8 +14,8 @@ import processkit.ProcessRun;
 import processkit.ProcessRunState;
 import robotkit.tool.ChannelToolAdapter;
 import robotkit.tool.SimulatedSprayer;
-import robotkit.world.FiredProcessEvent;
-import robotkit.world.ProcessEventValue;
+import robotkit.execution.FiredProcessEvent;
+import robotkit.execution.ProcessEventValue;
 
 class ProcessKitTests {
   static var assertions = 0;

@@ -2,8 +2,8 @@ package motionkit.robot;
 
 import haxe.Int64;
 import robotkit.manipulation.Manipulator;
-import robotkit.world.ExecutionPlanSubmission;
-import robotkit.world.TrajectorySegment;
+import robotkit.execution.ExecutionPlanSubmission;
+import robotkit.execution.TrajectorySegment;
 
 /** Settings for servoing through streamed plan chunks (see `ServoSession`). */
 class ServoPlanOptions {

@@ -10,11 +10,11 @@ import robotkit.runtime.RobotRuntime;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.SimulationHarness;
 import robotkit.tool.SuctionChannels;
-import robotkit.tool.WeldChannels;
-import robotkit.world.ExecutionPlanSubmission;
-import robotkit.world.ProcessEventValue;
-import robotkit.world.ProcessTimedEvent;
-import robotkit.world.TrajectorySegment;
+import processkit.tool.WeldChannels;
+import robotkit.execution.ExecutionPlanSubmission;
+import robotkit.execution.ProcessEventValue;
+import robotkit.execution.ProcessTimedEvent;
+import robotkit.execution.TrajectorySegment;
 
 /**
  * The welder's channels in the real RobotKit runtime, set up only by adding the tools (`RobotRuntimeBlueprint.addTool`):
@@ -48,7 +48,7 @@ class WeldChannelTests {
     var joint = model.addJoint(new Joint("axis", JointType.Revolute, base, tool));
     joint.limits.lower = -1.0;
     joint.limits.upper = 1.0;
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     // The robot is set up with its tools and nothing else: the stop policy comes with each tool.
     blueprint.addTool(new WeldChannels(ARC, WIRE, VOLTAGE));
     blueprint.addTool(new SuctionChannels(SUCTION));
@@ -133,20 +133,20 @@ class WeldChannelTests {
       var joint = model.addJoint(new Joint("axis", JointType.Revolute, base, tool));
       joint.limits.lower = -1.0;
       joint.limits.upper = 1.0;
-      return RobotRuntimeCompiler.compile(model);
+      return RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     }
     var wrong = blueprint();
-    wrong.channels.push(new robotkit.world.ProcessChannelDeclaration(ARC, ProcessEventValue.Digital(false), true));
+    wrong.channels.push(new robotkit.execution.ProcessChannelDeclaration(ARC, ProcessEventValue.Digital(false), true));
     var refused = false;
     try wrong.addTool(new WeldChannels(ARC, WIRE, VOLTAGE)) catch (_:Dynamic) refused = true;
     check(refused, "an arc declared to keep its output on a stop is refused by the torch that needs it off");
     var wrongSafe = blueprint();
-    wrongSafe.channels.push(new robotkit.world.ProcessChannelDeclaration(WIRE, ProcessEventValue.Analog(4.0), false));
+    wrongSafe.channels.push(new robotkit.execution.ProcessChannelDeclaration(WIRE, ProcessEventValue.Analog(4.0), false));
     refused = false;
     try wrongSafe.addTool(new WeldChannels(ARC, WIRE, VOLTAGE)) catch (_:Dynamic) refused = true;
     check(refused, "a wire speed declared with another safe value is refused");
     var agreeing = blueprint();
-    agreeing.channels.push(new robotkit.world.ProcessChannelDeclaration(ARC, ProcessEventValue.Digital(false), false));
+    agreeing.channels.push(new robotkit.execution.ProcessChannelDeclaration(ARC, ProcessEventValue.Digital(false), false));
     agreeing.addTool(new WeldChannels(ARC, WIRE, VOLTAGE));
     check(agreeing.channels.length == 3, "a declaration that agrees with the tool is not doubled");
     var plain = blueprint();

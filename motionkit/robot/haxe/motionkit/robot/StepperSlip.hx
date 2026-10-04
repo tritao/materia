@@ -2,7 +2,7 @@ package motionkit.robot;
 
 import motionkit.trajectory.PlanDiagnostic.PlanCheckResult;
 import motionkit.trajectory.PlanDiagnostic.PlanSlip;
-import robotkit.world.CoupledJoint;
+import robotkit.core.CoupledJoint;
 
 /**
  * Carries out what a plan check predicts for steppers: where the motors of an axis would lose sync, the

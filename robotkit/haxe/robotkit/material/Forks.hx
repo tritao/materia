@@ -1,9 +1,9 @@
 package robotkit.material;
 
-import robotkit.world.JointTarget;
-import robotkit.world.JointTargetMode;
-import robotkit.world.Robot;
-import robotkit.world.RobotCommand;
+import robotkit.core.JointTarget;
+import robotkit.core.JointTargetMode;
+import robotkit.core.Robot;
+import robotkit.core.RobotCommand;
 import robotkit.model.RobotModel;
 import robotkit.runtime.RobotRuntimeBlueprint;
 import robotkit.runtime.RobotRuntimeCompiler;
@@ -21,9 +21,9 @@ class Forks {
   final tiltIndex:Null<Int>;
   final spreadIndex:Null<Int>;
 
-  /** Builds the fork view from roles and limits authored on a RobotModel. */
-  public static function fromRobot(robot:Robot, model:RobotModel):Forks
-    return fromBlueprint(robot, RobotRuntimeCompiler.compile(model));
+  /** Builds the fork view from roles and limits authored on a RobotProfile, resolved against a RobotModel. */
+  public static function fromRobot(robot:Robot, model:RobotModel, profile:robotkit.profile.RobotProfile):Forks
+    return fromBlueprint(robot, RobotRuntimeCompiler.compile(model, profile));
 
   /** Builds the fork view from a previously compiled robot blueprint. */
   public static function fromBlueprint(robot:Robot,
@@ -106,7 +106,7 @@ class Forks {
     if (spread != null) targets.push(JointTarget.position(cast spreadIndex, spread));
     var capabilities = robot.capabilities();
     if (capabilities.jointCount > 0) {
-      if (!capabilities.supportsPosition)
+      if (!capabilities.accepts(robotkit.core.JointTargetMode.Position))
         throw "Robot does not support fork position targets";
       for (target in targets) if (target.joint >= capabilities.jointCount)
         throw 'Fork target joint ${target.joint} exceeds robot joint count ${capabilities.jointCount}';
@@ -124,7 +124,7 @@ class Forks {
     return index;
   }
 
-  static function readAxis(snapshot:robotkit.world.RobotSnapshot,
+  static function readAxis(snapshot:robotkit.core.RobotSnapshot,
       config:ForkAxisConfig, index:Int):ForkAxisState {
     if (snapshot.positions.length <= index || snapshot.velocities.length <= index ||
         snapshot.efforts.length <= index)

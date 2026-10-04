@@ -2,10 +2,10 @@ package robotkit.mobile;
 
 import kinematicskit.UnicycleEnvelope;
 
-import robotkit.world.JointTarget;
-import robotkit.world.Robot;
-import robotkit.world.RobotCommand;
-import robotkit.world.StopMode;
+import robotkit.core.JointTarget;
+import robotkit.core.Robot;
+import robotkit.core.RobotCommand;
+import robotkit.core.StopMode;
 import robotkit.model.RobotModel;
 import robotkit.runtime.RobotRuntimeBlueprint;
 import robotkit.runtime.RobotRuntimeCompiler;
@@ -24,9 +24,9 @@ class MobileBase {
   public var safetyStopRequired(default, null):Bool = false;
   var previousCommand:Twist2 = new Twist2();
 
-  /** Builds the mobile view from roles and dimensions authored on a RobotModel. */
-  public static function fromRobot(robot:Robot, model:RobotModel):MobileBase
-    return fromBlueprint(robot, RobotRuntimeCompiler.compile(model));
+  /** Builds the mobile view from roles and dimensions authored on a RobotProfile, resolved against a RobotModel. */
+  public static function fromRobot(robot:Robot, model:RobotModel, profile:robotkit.profile.RobotProfile):MobileBase
+    return fromBlueprint(robot, RobotRuntimeCompiler.compile(model, profile));
 
   /** Builds the mobile view from a previously compiled robot blueprint. */
   public static function fromBlueprint(robot:Robot,
@@ -154,14 +154,7 @@ class MobileBase {
       for (target in targets) {
         if (target.joint >= capabilities.jointCount)
           throw 'Drive model targets joint ${target.joint}, but robot has ${capabilities.jointCount} joints';
-        var supported = switch target.mode {
-          case robotkit.world.JointTargetMode.Position: capabilities.supportsPosition;
-          case robotkit.world.JointTargetMode.Velocity: capabilities.supportsVelocity;
-          case robotkit.world.JointTargetMode.Effort: capabilities.supportsEffort;
-          // A servo commands a position and an effort at once.
-          case robotkit.world.JointTargetMode.Servo:
-            capabilities.supportsPosition && capabilities.supportsEffort;
-        };
+        var supported = capabilities.accepts(target.mode);
         if (!supported)
           throw 'Robot does not support ${Std.string(target.mode)} joint targets';
       }

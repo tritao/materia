@@ -1,10 +1,11 @@
 package robotkit.model;
 
+
 import robotkit.model.Transmission;
 
 /** Editable static definition of a robot's links, joints, and sensors. */
 class RobotModel {
-  public static inline var CURRENT_VERSION:Int = 8;
+  public static inline var CURRENT_VERSION:Int = 9;
   public final schemaVersion:Int = CURRENT_VERSION;
   public final name:String;
   public final links:Array<Link> = [];
@@ -28,10 +29,6 @@ class RobotModel {
    * floating joint: runtime joints stay one-DOF.
    */
   public var floatingBase:Bool = false;
-  /** Semantic mobile roles authored against stable joint IDs. */
-  public var mobileBase:Null<RobotMobileConfiguration> = null;
-  /** Semantic fork roles authored against stable joint IDs. */
-  public var forkMechanism:Null<RobotForkConfiguration> = null;
 
   public function addFrame(frame:Frame):Frame {
     frames.push(frame);
@@ -275,7 +272,7 @@ class RobotModel {
   /**
    * Performs the lightweight model checks used by editors.
    *
-   * Runtime creation must use `RobotRuntimeCompiler.validate()` or `compile()`;
+   * Runtime creation must use `RobotRuntimeCompiler.validate(model, profile)` or `compile()`;
    * that pass also checks backend support and graph topology and returns
    * structured diagnostics.
    */

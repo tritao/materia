@@ -1,8 +1,8 @@
 package robotkit.tool;
 
 import haxe.Int64;
-import robotkit.world.RobotSnapshot;
-import robotkit.world.SensorFrame;
+import robotkit.core.RobotSnapshot;
+import robotkit.core.SensorFrame;
 
 private typedef ToolFeedbackBinding = {
   var runtime:ToolRuntime;

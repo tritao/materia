@@ -11,7 +11,7 @@ class Welcome {
   @:id(7) public var leaseTimeoutMs:Int;
   @:id(8) public var capabilities:Array<String>;
 
-  public function new(?protocolVersion:Int = 1, ?serverName:String = "robotd",
+  public function new(?protocolVersion:Int = RobotFrame.VERSION, ?serverName:String = "robotd",
       ?sessionId:haxe.Int64 = null, ?robotId:haxe.Int64 = null,
       ?controlGranted:Bool = false, ?leaseId:haxe.Int64 = null,
       ?leaseTimeoutMs:Int = 0, ?capabilities:Array<String>) {

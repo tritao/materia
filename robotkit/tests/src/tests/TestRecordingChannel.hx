@@ -2,10 +2,10 @@ package tests;
 
 import haxe.io.Bytes;
 import haxeon.wire.MessagePack;
-import robotkit.world.RecordingChannel;
-import robotkit.world.RobotRecordingEntry;
-import robotkit.world.RobotRecordingEvent;
-import robotkit.world.RobotId;
+import robotkit.recording.RecordingChannel;
+import robotkit.recording.RobotRecordingEntry;
+import robotkit.recording.RobotRecordingEvent;
+import robotkit.core.RobotId;
 
 class TestRecordingChannel implements RecordingChannel<TestRecordingPayload> {
   public function new() {}

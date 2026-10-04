@@ -297,7 +297,7 @@ external controller backend.
 
 ## 8. Backends and capabilities (§17, §18)
 
-- `rk_robot_capabilities` / `robotkit.world.RobotCapabilities` has five
+- `rk_robot_capabilities` / `robotkit.core.RobotCapabilities` has five
   booleans: position, velocity, effort, prediction and trajectory queue.
   - Position, velocity and effort are hardcoded to 1 in
     `runtime/src/runtime_c_api.cpp`.
@@ -411,7 +411,7 @@ that builds on the repo instead:
 4. **Unify the two path systems.**
    - Arm toolpaths should go through timed chunks instead of per-tick
      `JointTargets` (`FinishSurface.hx:249`).
-   - `robotkit.process.Toolpath` becomes a facade over MotionKit paths with
+   - `processkit.path.Toolpath` becomes a facade over MotionKit paths with
      orientation.
    - `processOn` becomes an event keyed to path progress (§13).
 5. **RKD6 scheduled segments.** Clock mapping, queue revision, commit and

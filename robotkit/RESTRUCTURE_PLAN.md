@@ -1,7 +1,9 @@
 # RobotKit restructuring plan
 
-Status: planned (2026-10-03), after an outside architecture review of `main`. Start after
-transmissions X9e has landed on local main.
+Status: in progress (2026-10-04), in `robotkit-restructure`, based on local main
+`712019dbc` after transmissions X9e, then synchronized with `575c06898`
+(the concurrent exosuit-followon merge). Each phase is validated, committed and merged
+to local main before the next phase begins. Mechanical moves remain separate commits.
 
 The review's verdict, which this plan accepts: the core execution design is right. The problem is
 scope and taxonomy. RobotKit has become "everything robotics": `robotkit/haxeon.json` makes
@@ -30,7 +32,7 @@ boundaries and removes duplicates. It does not change the execution architecture
   deprecated aliases.
 - **Moves and renames are mechanical commits** with no behaviour change, separate from commits that
   change behaviour, so they are easy to review and to merge other branches across.
-- **Gate:** each phase's final commit passes the full suite (`x7-suite.sh` or its successor), plus the
+- **Gate:** each phase's final commit passes the full suite (`tools/robotkit-restructure-suite.sh`, the maintained successor to `x7-suite.sh`), plus the
   RobotKit native tests, robotd, the device compiler tests, the humanoid tools, the worker demo and
   the robot welder checks.
 - **Coordinate:** phases R3–R5 touch files that other live branches edit (robot welder, humanoid,
@@ -38,6 +40,20 @@ boundaries and removes duplicates. It does not change the execution architecture
   in this file which branches must rebase.
 
 ## R0 — Before hardware ships (cheap now, expensive later)
+
+Completed on 2026-10-04. Generation-6 naming is frozen independently of wire
+revision 12; MotionKit and RobotKit share the planner-free `trajectory_core`;
+RobotRuntime takes an endpoint, with serial construction in its factory.
+
+The maintained phase gate passed against synchronized main `575c06898`: full
+workspace tests (including 4,939 RobotWorld and 9,865 MotionKit assertions), all
+52 compile targets, all RobotKit suites (16 native tests, device host/MCU,
+recording/wire checks, CAD bridge, MuJoCo and managed TCP scenarios), robotd,
+humanoid tools, welder and completed worker demo. Both C interfaces passed the
+four-platform ABI audit; all 8 MotionKit Release and 3 CAD native tests passed.
+Generated runtime fixtures match the checked-in curves exactly. Source moves,
+protocol documentation, endpoint changes and validation fixes are separate
+commits. R0 is merged to local main before R1 begins.
 
 - **Device protocol naming.** The sync marker is `RKD6` and the wire version is 12, which invites
   "why is RKD6 version 12?". `DEVICE_PROTOCOL.md` says no hardware has shipped and in-place changes
@@ -62,6 +78,25 @@ boundaries and removes duplicates. It does not change the execution architecture
 
 ## R1 — One buffered execution abstraction, structured capabilities
 
+Completed on 2026-10-04, after R0's main merge `7db70f2cf`. The public command
+and runtime APIs now use execution plans exclusively; polynomial payloads remain
+as plan segments. Capabilities carry accepted modes, execution limits/features,
+timing and stream kinds, and shared validation guarantees. Adapter policies can
+reduce endpoint support and are enforced when accepting plans. Recording is
+version 7 and the remote envelope/handshake is version 2; previous versions are
+rejected. Recording fixtures and raw TCP clients are regenerated, with a
+reproducible fixture generator.
+
+All phase gate checks passed: full workspace (4,946 RobotWorld and 9,865 MotionKit
+assertions), all 52 compile targets, all RobotKit suites (16 native tests, device
+host/MCU, schemas, CAD bridge, MuJoCo and every managed TCP mode), robotd,
+humanoid, welder, completed worker demo, 8 MotionKit Release and 3 CAD tests,
+four-platform C ABI audits and exact runtime-fixture comparison. The full runner
+received SIGTERM while launching the welder after its preceding suites passed;
+the unchanged welder, worker and remaining native checks passed in separate runs.
+Mechanical guarantee-type movement remains a separate commit. R1 is merged to
+local main before R2 begins.
+
 - **Remove `TrajectoryChunk`.** `RobotCommand` keeps three kinds:
   - immediate control: `JointTargets`;
   - planned control: `ExecutionPlan` (`ExecutionPlanSubmission`);
@@ -84,6 +119,24 @@ boundaries and removes duplicates. It does not change the execution architecture
 
 ## R2 — `RobotModel` is mechanical truth; interpretation is a profile
 
+Completed on 2026-10-04 after R1's main merge `bce647683`. Mechanical role
+configuration types moved in a separate commit. RobotModel schema 9 contains
+mechanical truth only; RobotProfile schema 1 owns composable mobile and fork
+roles. The compiler requires both records and validates stable IDs. CAD,
+authoring/undo, manipulation, factories, robotd and deployment consumers use
+that pair. SerialDeployment is schema 6; saved authoring records explicitly
+contain canonical model and profile records. Earlier formats are rejected.
+
+All required checks passed: workspace (4,950 RobotWorld and 9,865 MotionKit
+assertions), all 52 compile targets, all RobotKit suites and managed TCP modes,
+16 native tests, device host/MCU, robotd, humanoid, welder, completed worker demo,
+8 MotionKit Release and 3 CAD tests, four-platform ABI audits and exact planner
+fixture comparison. The additional complete app suite passed, including worker
+and gallery documents. The updated MJCF importer compiled and matched the
+complete current JSON fixture semantically. The consumers runner initially
+found old saved worker records; after conversion its worker demo passed in a
+separate run. R2 is merged to local main before R3 begins.
+
 - `RobotModel` keeps what physically exists: links, joints (including `floatingBase`, which changes
   the rigid-body topology), actuators, transmissions, couplings, elastic networks, sensors,
   frames and collision.
@@ -98,6 +151,26 @@ boundaries and removes duplicates. It does not change the execution architecture
   profile, never a new `RobotModel` field.
 
 ## R3 — Process and work semantics out of RobotKit
+
+Completed on 2026-10-04. ProcessKit now owns work geometry, process paths,
+finishing/scanning/welding/earthwork skills, simulated weld tools and arc
+models. Surface registration, work-patch planning and process MotionKit
+lowering moved with their domain dependencies. CAD face and wall work-surface
+bridges moved too, preventing a CAD bridge / MotionKit / ProcessKit cycle.
+RobotKit retains generic robot, skill and tool mechanisms and the frozen
+external sensor frame validation contract. Mechanical moves are separate
+from boundary fixes and documentation; no old import aliases remain.
+
+All required gate stages passed: workspace (4,950 RobotWorld and 9,865 MotionKit
+assertions), all 52 compile targets, all RobotKit suites and managed TCP modes,
+16 native tests, device host/MCU, robotd, humanoid, welder, completed worker demo,
+8 MotionKit Release and 3 CAD tests, four-platform ABI audits and exact planner
+fixture comparison. R3 is merged to local main before R4 begins.
+
+Started from the quiet point immediately after R2 main merge `8be94384e`.
+Live branches with committed changes to moved modules require rebase/import
+updates: drywall-scoped-d8 (1 modules), gantries (2 modules), machine-tending (13 modules), mobile-welder (1 modules), motion-loose-ends (1 modules).
+Other worktrees and their uncommitted work remain untouched.
 
 - Move `robotkit.work` (16 files: `BucketSweep`, `DigCyclePlanner`, `EarthworkRegion`, `HeightMap`,
   `CoverageMap`, `RasterToolpathGenerator`, `WorkSurface`, …) and `robotkit.process` (`Toolpath`,
@@ -115,6 +188,29 @@ boundaries and removes duplicates. It does not change the execution architecture
   so this finishes an extraction that is underway.
 
 ## R4 — Split `robotkit.world`
+
+Completed on 2026-10-04. The world namespace now contains only RobotWorld,
+WorldSnapshot, RobotWorldEvent and RobotWorldSubscription. Robot contracts,
+capabilities and observations live in core; execution plans and process events
+in execution; recorder/replay types in recording; adapters in their endpoint
+namespaces; CameraImage in streams. Imports and recording generators were
+updated repository-wide, without re-export aliases. The move is a separate
+mechanical commit.
+
+All required checks passed: workspace suites (4,950 RobotWorld and 9,865 MotionKit
+assertions), all 52 compile targets, all RobotKit suites and managed TCP modes,
+16 native tests, device host/MCU, robotd, humanoid, welder, completed worker demo,
+8 MotionKit Release and 3 CAD tests, four-platform ABI audits and exact planner
+fixture comparison. The initial workspace run exposed an existing race in the
+planner shutdown test: an unbounded worker could finish before its registration
+was counted. Both test workers now wait on bounded lookahead; the complete
+MotionKit suite passed separately after that deterministic test fix. Every other
+workspace suite passed in the initial run. R4 is merged before R5 begins.
+
+Started from the quiet point immediately after R3 main merge `d1a42c128`.
+Live branches with committed changes to affected files require rebase/import
+updates: drywall-scoped-d8 (12 files), gantries (10 files), machine-tending (21 files), machinekit-restructure (1 files), mobile-welder (2 files), motion-loose-ends (10 files), sketching (1 files), uikit-extract (1 files), x7-transmissions (8 files).
+Other worktrees and their uncommitted work remain untouched.
 
 `robotkit.world` has 54 files and really means "miscellaneous public types". In one mechanical
 commit, move them to:

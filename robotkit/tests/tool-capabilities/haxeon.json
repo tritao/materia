@@ -1,11 +1,23 @@
 {
   "version": 1,
-  "package": { "name": "robotkit-tool-capability-tests" },
+  "package": {
+    "name": "robotkit-tool-capability-tests"
+  },
   "entry": "tests.ToolCapabilityMain",
-  "sourceRoots": ["../src", "src"],
+  "sourceRoots": [
+    "../src",
+    "src"
+  ],
   "dependencies": {
-    "robotkit": { "path": "../.." },
-    "motionkit-robot": { "path": "../../../motionkit/robot" }
+    "robotkit": {
+      "path": "../.."
+    },
+    "motionkit-robot": {
+      "path": "../../../motionkit/robot"
+    },
+    "processkit": {
+      "path": "../../../processkit"
+    }
   },
   "target": "host",
   "outputDir": "build"

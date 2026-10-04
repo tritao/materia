@@ -5,9 +5,9 @@ import motionkit.kinematics.Twist6;
 import robotkit.manipulation.Manipulator;
 import robotkit.policy.VelocityReference.CommandRejection;
 import robotkit.runtime.RobotRuntimeError;
-import robotkit.world.JointTarget;
-import robotkit.world.Robot;
-import robotkit.world.RobotCommand;
+import robotkit.core.JointTarget;
+import robotkit.core.Robot;
+import robotkit.core.RobotCommand;
 
 /** What one servo tick did. */
 class ServoTick {
@@ -92,7 +92,7 @@ class ServoSession {
     servo = new ManipulatorServo(manipulator, damping);
     indices = manipulator.jointIndices();
     commanded = [for (_ in indices) 0.0];
-    if (plans != null && !robot.capabilities().supportsExecutionPlans)
+    if (plans != null && !robot.capabilities().execution.plans)
       throw "Servo plans need a robot that executes plans";
     plan = plans == null ? null : new ServoPlan(plans, manipulator, robot.snapshot().positions.length);
   }
@@ -155,7 +155,7 @@ class ServoSession {
     return new ServoTick(commanded.copy(), !live, !live && isAtRest(commanded), step);
   }
 
-  function updatePlan(snapshot:robotkit.world.RobotSnapshot):ServoTick {
+  function updatePlan(snapshot:robotkit.core.RobotSnapshot):ServoTick {
     var plan:ServoPlan = this.plan;
     var active = snapshot.trajectoryActive;
     // The stream drained: it ended at rest, or ran dry and the robot braked it.

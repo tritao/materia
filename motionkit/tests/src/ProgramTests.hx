@@ -50,9 +50,9 @@ import motionkit.path.PosePrimitive;
 import motionkit.path.PoseArc;
 import motionkit.path.PoseWaypoint;
 import motionkit.path.OrientationPolicy;
-import motionkit.robot.ToolpathPosePath;
-import robotkit.process.Toolpath;
-import robotkit.process.ToolpathPoint;
+import processkit.motion.ToolpathPosePath;
+import processkit.path.Toolpath;
+import processkit.path.ToolpathPoint;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
 import robotkit.spatial.Quat;
@@ -71,7 +71,7 @@ import motionkit.program.MoveTarget;
 import motionkit.trajectory.MotionLimits;
 import motionkit.trajectory.Trajectory;
 import motionkit.trajectory.ExecutionPlan;
-import motionkit.trajectory.ValidationGuarantee;
+import trajectorykit.validation.ValidationGuarantee;
 import motionkit.trajectory.PlanLimitError;
 import motionkit.trajectory.ValidationLimits;
 import robotkit.model.Joint;
@@ -90,25 +90,25 @@ import robotkit.runtime.VirtualActuatorOptions;
 import robotkit.runtime.RobotRuntimeError;
 import robotkit.runtime.RobotRuntimeCompiler;
 import RobotKitRuntime;
-import robotkit.world.RecordingRobot;
-import robotkit.world.ReplayRobot;
-import robotkit.world.RobotRecording;
-import robotkit.world.SimulatedRobot;
-import robotkit.world.RobotCommand;
-import robotkit.world.Robot;
-import robotkit.world.RobotCapabilities;
-import robotkit.world.RobotDescription;
-import robotkit.world.RobotFault;
-import robotkit.world.RobotId;
-import robotkit.world.RobotSnapshot;
-import robotkit.world.RobotStatus;
-import robotkit.world.RuntimeRobotAdapter;
-import robotkit.world.SensorFrame;
-import robotkit.world.StopMode;
-import robotkit.world.ExecutionPlanSubmission;
-import robotkit.world.ProcessChannelDeclaration;
-import robotkit.world.ProcessEventValue;
-import robotkit.world.TrajectorySegment;
+import robotkit.recording.RecordingRobot;
+import robotkit.recording.ReplayRobot;
+import robotkit.recording.RobotRecording;
+import robotkit.simulation.SimulatedRobot;
+import robotkit.core.RobotCommand;
+import robotkit.core.Robot;
+import robotkit.core.RobotCapabilities;
+import robotkit.core.RobotDescription;
+import robotkit.core.RobotFault;
+import robotkit.core.RobotId;
+import robotkit.core.RobotSnapshot;
+import robotkit.core.RobotStatus;
+import robotkit.runtime.RuntimeRobotAdapter;
+import robotkit.core.SensorFrame;
+import robotkit.core.StopMode;
+import robotkit.execution.ExecutionPlanSubmission;
+import robotkit.execution.ProcessChannelDeclaration;
+import robotkit.execution.ProcessEventValue;
+import robotkit.execution.TrajectorySegment;
 
 import MotionKitTestSupport.WristBranchSolver;
 import MotionKitTestSupport.PlanarSolver;
@@ -313,8 +313,8 @@ class ProgramTests extends MotionKitTestSupport {
     var line = compiler.compile(new MotionProgram([MotionOp.MoveL(endPose, "work", 0.1, Blend.ExactStop)]), start,
       Int64.ofInt(400));
     var plan = line.blocks[0].plans[0];
-    check(plan.report.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
-      MotionKitNativeConstants.MK_CHECK_PASSED, "the 7-axis line meets the Cartesian tolerance");
+    check(plan.report.checks[TrajectoryCoreConstants.MK_CHECK_TASK_SPACE].status ==
+      TrajectoryCoreConstants.MK_CHECK_PASSED, "the 7-axis line meets the Cartesian tolerance");
     var samples = 200;
     var angles:Array<Float> = [];
     var worstJump = 0.0, planTravel = 0.0;
@@ -379,7 +379,7 @@ class ProgramTests extends MotionKitTestSupport {
     for (k in 0...32) lines.push(new PoseLine(new PoseWaypoint(points[k], 0.0005, 0.005),
       new PoseWaypoint(points[k + 1], 0.0005, 0.005), OrientationPolicy.Interpolated, 0.1, 0.1));
     var path = new PosePath("work", lines);
-    var blueprint = RobotRuntimeCompiler.compile(fixture.model);
+    var blueprint = RobotRuntimeCompiler.compile(fixture.model, new robotkit.profile.RobotProfile());
     var limits = new ValidationLimits(8, Int64.ofInt(blueprint.revision), Int64.ofInt(blueprint.calibrationRevision));
     for (joint in 0...8) limits.jerk(joint, 20.0);
     var compiler = new ProgramCompiler(solver, limits, "work", [for (_ in 0...8) 1.0], [for (_ in 0...8) 2.0],
@@ -390,8 +390,8 @@ class ProgramTests extends MotionKitTestSupport {
     var plans = [for (block in compiled.blocks) for (plan in block.plans) plan];
     check(plans.length == 32, 'the circle is planned side by side (${plans.length} plans)');
     for (plan in plans)
-      check(plan.report.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
-        MotionKitNativeConstants.MK_CHECK_PASSED, "the tool follows the circle on the turning workpiece");
+      check(plan.report.checks[TrajectoryCoreConstants.MK_CHECK_TASK_SPACE].status ==
+        TrajectoryCoreConstants.MK_CHECK_PASSED, "the tool follows the circle on the turning workpiece");
     var plan = plans[plans.length - 1];
     var turned = 0.0, railMoved = 0.0, armMoved = 0.0;
     var first = plans[0].evaluate(0.0).positions;
@@ -411,7 +411,7 @@ class ProgramTests extends MotionKitTestSupport {
     var runtime = harness.simulation.addRobot(blueprint);
     var robot = new SimulatedRobot("workcell", runtime, fixture.model.name, [for (link in fixture.model.links) link.name],
       [for (joint in fixture.model.joints) joint.name]);
-    robot.submit(RobotCommand.JointTargets([for (j in 0...8) robotkit.world.JointTarget.position(j, entry[j])], null));
+    robot.submit(RobotCommand.JointTargets([for (j in 0...8) robotkit.core.JointTarget.position(j, entry[j])], null));
     var tick = 0;
     for (_ in 0...300) harness.step(Int64.ofInt(++tick));
     // Executed through the program runner, which streams the long plan to the runtime in chunks.
@@ -463,8 +463,8 @@ class ProgramTests extends MotionKitTestSupport {
     check(compiled.blocks.length == 1 && compiled.blocks[0].plans.length == 1,
       "program compiler lowers a joint move to one plan");
     check(compiled.blocks[0].plans[0].report.checks[
-      MotionKitNativeConstants.MK_CHECK_JERK].status ==
-      MotionKitNativeConstants.MK_CHECK_PASSED,
+      TrajectoryCoreConstants.MK_CHECK_JERK].status ==
+      TrajectoryCoreConstants.MK_CHECK_PASSED,
       "Ruckig MoveJ reports jerk checked");
     near(compiled.blocks[0].plans[0].evaluate(
       compiled.blocks[0].plans[0].durationSeconds).positions[0], goal[0],
@@ -501,8 +501,8 @@ class ProgramTests extends MotionKitTestSupport {
       "path event is placed inside the timed path");
     near(Int64.toFloat(pathPlan.events[1].timeNs) * 1e-9,
       pathPlan.durationSeconds, "SetOutput fires at the prior move end", 1e-9);
-    check(pathPlan.report.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
-      MotionKitNativeConstants.MK_CHECK_PASSED,
+    check(pathPlan.report.checks[TrajectoryCoreConstants.MK_CHECK_TASK_SPACE].status ==
+      TrajectoryCoreConstants.MK_CHECK_PASSED,
       "sampled task-space validation is recorded in the plan");
     check(switch pathPlan.guarantees().taskSpace {
       case Sampled(resolutionNs): Int64.compare(resolutionNs, Int64.ofInt(1000000)) <= 0;
@@ -513,8 +513,8 @@ class ProgramTests extends MotionKitTestSupport {
     var line = compiler.compile(new MotionProgram([MotionOp.MoveL(endPose,
       "work", 0.1, Blend.ExactStop)]), start, Int64.ofInt(300));
     check(line.blocks[0].plans[0].report.checks[
-      MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
-      MotionKitNativeConstants.MK_CHECK_PASSED,
+      TrajectoryCoreConstants.MK_CHECK_TASK_SPACE].status ==
+      TrajectoryCoreConstants.MK_CHECK_PASSED,
       "MoveL meets the sampled Cartesian tolerance");
     line.dispose();
     var poseMove = compiler.compile(new MotionProgram([MotionOp.MoveJ(
@@ -600,8 +600,8 @@ class ProgramTests extends MotionKitTestSupport {
       freePath, "work", 0.1, [])]), [0.0, 0.0, 0.0, 0.0, 0.1, 0.0],
       Int64.ofInt(502));
     check(freePlan.blocks[0].plans[0].report.checks[
-      MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
-      MotionKitNativeConstants.MK_CHECK_PASSED,
+      TrajectoryCoreConstants.MK_CHECK_TASK_SPACE].status ==
+      TrajectoryCoreConstants.MK_CHECK_PASSED,
       "FreeAboutTool accepts a free twist about the tool axis");
     freePlan.dispose();
 
@@ -617,13 +617,13 @@ class ProgramTests extends MotionKitTestSupport {
       blended.notes.length == 1 && blended.notes[0].indexOf("tolerance blended") >= 0,
       "planar MoveL corner uses C3 tolerance blending in one timed plan");
     var blendedPlan = blended.blocks[0].plans[0];
-    check(blendedPlan.report.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
-      MotionKitNativeConstants.MK_CHECK_PASSED,
+    check(blendedPlan.report.checks[TrajectoryCoreConstants.MK_CHECK_TASK_SPACE].status ==
+      TrajectoryCoreConstants.MK_CHECK_PASSED,
       "blended Cartesian plan passes authored-corner task-space validation");
-    check(blendedPlan.report.checks[MotionKitNativeConstants.MK_CHECK_JERK].status ==
-      MotionKitNativeConstants.MK_CHECK_UNCHECKED,
+    check(blendedPlan.report.checks[TrajectoryCoreConstants.MK_CHECK_JERK].status ==
+      TrajectoryCoreConstants.MK_CHECK_UNCHECKED,
       "TOPP-RA Cartesian plan reports jerk unchecked");
-    near(blendedPlan.report.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].limit,
+    near(blendedPlan.report.checks[TrajectoryCoreConstants.MK_CHECK_TASK_SPACE].limit,
       0.005, "blended task-space report uses the authored tolerance");
     blended.dispose();
     // A 150 degree authored corner stresses the fillet setback formula.
@@ -635,8 +635,8 @@ class ProgramTests extends MotionKitTestSupport {
           0.05 * Math.sin(turn)), "work", 0.1, Blend.ExactStop)
       ]), [for (_ in 0...6) 0.0], Int64.ofInt(504));
     var shallowCheck = shallow.blocks[0].plans[0].report.checks[
-      MotionKitNativeConstants.MK_CHECK_TASK_SPACE];
-    check(shallowCheck.status == MotionKitNativeConstants.MK_CHECK_PASSED &&
+      TrajectoryCoreConstants.MK_CHECK_TASK_SPACE];
+    check(shallowCheck.status == TrajectoryCoreConstants.MK_CHECK_PASSED &&
       shallowCheck.value <= 0.001 + 1e-9 && shallowCheck.limit == 0.001,
       "150 degree authored corner is checked against its tolerance");
     shallow.dispose();
@@ -698,9 +698,12 @@ class ProgramTests extends MotionKitTestSupport {
     check(paced.isStopped() && delivered[0].isClosed() && delivered[1].isClosed(),
       "disposing a waiting planner stops its worker and disposes its plans");
 
-    // Shutting down cancels every planner and waits for its worker, so that none is planning when the process exits.
-    var running = new ProgramPlanner(compiler, program, start, Int64.ofInt(500), 0, 1.0, 1e9);
+    // Keep both workers waiting on bounded lookahead before checking their registration.
+    // An unbounded worker may finish before active() is observed.
+    var running = new ProgramPlanner(compiler, program, start, Int64.ofInt(500), 0, 1.0, 1e-6);
     var waiting = new ProgramPlanner(compiler, program, start, Int64.ofInt(600), 0, 1.0, 1e-6);
+    running.waitForMore();
+    waiting.waitForMore();
     check(ProgramPlanner.active() >= 2, "planners with a worker still going are counted");
     check(ProgramPlanner.shutdown() == 0 && ProgramPlanner.active() == 0 && running.isStopped() && waiting.isStopped(),
       "a shutdown stops every worker and waits for them");
@@ -713,7 +716,7 @@ class ProgramTests extends MotionKitTestSupport {
     for (joint in fixture.model.joints) joint.limits.maxAcceleration = 4.0;
     var simulationHarness = new SimulationHarness(0.01);
     var simulation = simulationHarness.simulation;
-    var blueprint = RobotRuntimeCompiler.compile(fixture.model);
+    var blueprint = RobotRuntimeCompiler.compile(fixture.model, new robotkit.profile.RobotProfile());
     blueprint.channels.push(new ProcessChannelDeclaration("sprayer.enabled",
       ProcessEventValue.Digital(false)));
     var runtime = simulation.addRobot(blueprint);
@@ -728,7 +731,7 @@ class ProgramTests extends MotionKitTestSupport {
     var unsupported = new RuntimeRobotAdapter("unsupported-arm", runtime,
       fixture.model.name, [for (link in fixture.model.links) link.name],
       [for (joint in fixture.model.joints) joint.name], false, false,
-      "simulated runtime fault", false);
+      "simulated runtime fault", robotkit.core.ExecutionCapabilities.unavailable());
     throws(function() new ManipulatorMotion(unsupported, compiler,
       function(_) return null, function() return runtime.pollEvents()),
       "manipulator requires plan support at construction");
@@ -788,7 +791,7 @@ class ProgramTests extends MotionKitTestSupport {
 
     var pathSimulationHarness = new SimulationHarness(0.01);
     var pathSimulation = pathSimulationHarness.simulation;
-    var pathBlueprint = RobotRuntimeCompiler.compile(fixture.model);
+    var pathBlueprint = RobotRuntimeCompiler.compile(fixture.model, new robotkit.profile.RobotProfile());
     pathBlueprint.channels.push(new ProcessChannelDeclaration("sprayer.enabled",
       ProcessEventValue.Digital(false)));
     var pathRuntime = pathSimulation.addRobot(pathBlueprint);
@@ -862,7 +865,7 @@ class ProgramTests extends MotionKitTestSupport {
     for (joint in fixture.model.joints) joint.limits.maxAcceleration = 4.0;
     var simulationHarness = new SimulationHarness(0.01);
     var simulation = simulationHarness.simulation;
-    var blueprint = RobotRuntimeCompiler.compile(fixture.model);
+    var blueprint = RobotRuntimeCompiler.compile(fixture.model, new robotkit.profile.RobotProfile());
     blueprint.channels.push(new ProcessChannelDeclaration("paint.flow",
       ProcessEventValue.Analog(0.0)));
     var runtime = simulation.addRobot(blueprint);
@@ -999,7 +1002,7 @@ class ProgramTests extends MotionKitTestSupport {
     for (joint in fixture.model.joints) joint.limits.maxAcceleration = 4.0;
     var simulationHarness = new SimulationHarness(0.01);
     var simulation = simulationHarness.simulation;
-    var runtime = simulation.addRobot(RobotRuntimeCompiler.compile(fixture.model));
+    var runtime = simulation.addRobot(RobotRuntimeCompiler.compile(fixture.model, new robotkit.profile.RobotProfile()));
     var robot = new FaultingArmRobot("session-arm", runtime, fixture.model.name,
       [for (link in fixture.model.links) link.name],
       [for (joint in fixture.model.joints) joint.name]);

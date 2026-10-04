@@ -68,3 +68,11 @@ if(VK_BUILD_TESTS)
         target_compile_options(visionkit_fiducial_tests PRIVATE -UNDEBUG)
     endif()
 endif()
+
+# Haxeon's CMake provider loads this library from its requested output directory.
+if(DEFINED HAXEON_NATIVE_OUTPUT_DIR)
+    set_target_properties(visionkit_core PROPERTIES
+        LIBRARY_OUTPUT_DIRECTORY "${HAXEON_NATIVE_OUTPUT_DIR}"
+        RUNTIME_OUTPUT_DIRECTORY "${HAXEON_NATIVE_OUTPUT_DIR}"
+        ARCHIVE_OUTPUT_DIRECTORY "${HAXEON_NATIVE_OUTPUT_DIR}")
+endif()

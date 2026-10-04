@@ -1,12 +1,12 @@
 package tests;
 
 import haxe.Int64;
-import motionkit.robot.SurfacePlanRunner;
+import processkit.motion.SurfacePlanRunner;
 import motionkit.robot.ProgramCompiler;
 import motionkit.planner.SimplePathTiming;
 import robotkit.tool.ChannelToolAdapter;
-import robotkit.world.ProcessChannelDeclaration;
-import robotkit.world.ProcessEventValue;
+import robotkit.execution.ProcessChannelDeclaration;
+import robotkit.execution.ProcessEventValue;
 import robotkit.model.RobotModel;
 import robotkit.model.Link;
 import robotkit.model.Joint;
@@ -14,22 +14,22 @@ import robotkit.model.JointType;
 import robotkit.model.JointLimits;
 import robotkit.model.Frame;
 import robotkit.model.Sensor;
-import robotkit.model.RobotDriveConfiguration;
-import robotkit.model.RobotMobileConfiguration;
+import robotkit.profile.RobotDriveConfiguration;
+import robotkit.profile.RobotMobileConfiguration;
 import robotkit.spatial.Vec3;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
 import robotkit.manipulation.Manipulator;
-import robotkit.manipulation.WorkPatchPlanner;
+import processkit.manipulation.WorkPatchPlanner;
 import robotkit.tool.SimulatedSprayer;
-import robotkit.work.WorkSurface;
-import robotkit.work.Polygon2;
-import robotkit.work.Point2;
-import robotkit.work.CoverageMap;
-import robotkit.work.Provenance;
-import robotkit.work.SourceKind;
-import robotkit.perception.SimulatedSurfaceScanner;
-import robotkit.perception.SurfaceRegistration;
+import processkit.work.WorkSurface;
+import processkit.work.Polygon2;
+import processkit.work.Point2;
+import processkit.work.CoverageMap;
+import processkit.work.Provenance;
+import processkit.work.SourceKind;
+import processkit.perception.SimulatedSurfaceScanner;
+import processkit.perception.SurfaceRegistration;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationHarness;
@@ -50,15 +50,15 @@ import robotkit.perception.PerceptionSnapshot;
 import robotkit.skill.SkillRunner;
 import robotkit.skill.GoTo;
 import robotkit.skill.SkillStatus;
-import robotkit.world.SimulatedRobot;
-import robotkit.world.RecordingRobot;
-import robotkit.world.ReplayRobot;
-import robotkit.world.McapRobotRecording;
-import robotkit.world.McapRecordingReader;
-import robotkit.world.RobotDescription;
-import robotkit.world.RobotCapabilities;
-import robotkit.world.RobotCommand;
-import robotkit.world.RobotSnapshot;
+import robotkit.simulation.SimulatedRobot;
+import robotkit.recording.RecordingRobot;
+import robotkit.recording.ReplayRobot;
+import robotkit.recording.McapRobotRecording;
+import robotkit.recording.McapRecordingReader;
+import robotkit.core.RobotDescription;
+import robotkit.core.RobotCapabilities;
+import robotkit.core.RobotCommand;
+import robotkit.core.RobotSnapshot;
 
 /**
  * M9 acceptance test: a simulated wall-finishing robot (omni base + UR-class
@@ -125,7 +125,7 @@ class WallFinishingScenarioTests {
     var manipulator = fixture.arm.withTool(fixture.flangeTTcp);
     var linkNames = [for (link in model.links) link.name];
     var jointNames = [for (joint in model.joints) joint.name];
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    var blueprint = RobotRuntimeCompiler.compile(model, fixture.profile);
     // This synthetic DH arm has no authored collision meshes. The default
     // per-link bounds boxes overlap while the elbow folds during approach,
     // creating a false self-contact that blocks the planned MoveJ near 2.8 rad.
@@ -428,7 +428,11 @@ class WallFinishingScenarioTests {
     // -- replay: re-run the same command stream against a ReplayRobot --
     var replayDescription = new RobotDescription("wall-finishing-robot", "recorded wall-finishing robot",
       linkNames, jointNames);
-    var replayCapabilities = new RobotCapabilities("wall-finishing-robot", jointNames.length, true, true, true, false);
+    var replayCapabilities = new RobotCapabilities("wall-finishing-robot",
+      jointNames.length,
+      [robotkit.core.JointTargetMode.Position, robotkit.core.JointTargetMode.Velocity, robotkit.core.JointTargetMode.Effort],
+      robotkit.core.ExecutionCapabilities.unavailable(),
+      new robotkit.core.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked));
     var replay = new ReplayRobot("wall-finishing-robot", recording, replayDescription, replayCapabilities);
     var replayed = 0;
     for (command in recording.commands) {
@@ -478,7 +482,8 @@ class WallFinishingScenarioTests {
    * fixture, attached directly to the base link) + sprayer flange offset +
    * a base-mounted lidar-kind "scanner" sensor.
    */
-  static function buildWallFinishingRobotModel():{model:RobotModel, arm:Manipulator, flangeTTcp:Transform3, linkTFlange:Transform3} {
+  static function buildWallFinishingRobotModel():{model:RobotModel, profile:robotkit.profile.RobotProfile, arm:Manipulator, flangeTTcp:Transform3, linkTFlange:Transform3} {
+    var profile = new robotkit.profile.RobotProfile();
     var model = new RobotModel("wall-finishing-robot");
     var base = model.addLink(new Link("base", "link/base"));
 
@@ -495,7 +500,7 @@ class WallFinishingScenarioTests {
       model.addJoint(joint);
       wheelIds.push(joint.id);
     }
-    model.mobileBase = new RobotMobileConfiguration(
+    profile.mobileBase = new RobotMobileConfiguration(
       RobotDriveConfiguration.Holonomic(wheelIds, wheelRadius, baseRadius),
       0.4, 0.6, 0.5, 1.0, 0.5, 0.5);
 
@@ -531,7 +536,7 @@ class WallFinishingScenarioTests {
     var flangeOffset = new Vec3(0.0, d6, 0.0);
     var flange = model.addFrame(new Frame("flange", links[6], "frame/flange"));
     flange.position = flangeOffset.toArray();
-    var arm = new Manipulator(model, base.id, flange.id);
+    var arm = new Manipulator(model, base.id, flange.id, null, null, null, profile);
 
     var scannerFrame = model.addFrame(new Frame("scanner mount", base, "frame/scanner"));
     scannerFrame.position = [0.3, 0.0, 0.1];
@@ -542,7 +547,7 @@ class WallFinishingScenarioTests {
 
     var flangeTTcp = new Transform3(new Vec3(0.0, 0.0, 0.08), robotkit.spatial.Quat.identity());
     var linkTFlange = new Transform3(flangeOffset, robotkit.spatial.Quat.identity());
-    return { model: model, arm: arm, flangeTTcp: flangeTTcp, linkTFlange: linkTFlange };
+    return { model: model, profile: profile, arm: arm, flangeTTcp: flangeTTcp, linkTFlange: linkTFlange };
   }
 
   static function check(value:Bool, message:String):Void {

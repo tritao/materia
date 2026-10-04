@@ -47,9 +47,9 @@ import motionkit.path.PoseLine;
 import motionkit.path.PoseArc;
 import motionkit.path.PoseWaypoint;
 import motionkit.path.OrientationPolicy;
-import motionkit.robot.ToolpathPosePath;
-import robotkit.process.Toolpath;
-import robotkit.process.ToolpathPoint;
+import processkit.motion.ToolpathPosePath;
+import processkit.path.Toolpath;
+import processkit.path.ToolpathPoint;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
 import robotkit.spatial.Quat;
@@ -68,7 +68,7 @@ import motionkit.program.MoveTarget;
 import motionkit.trajectory.MotionLimits;
 import motionkit.trajectory.Trajectory;
 import motionkit.trajectory.ExecutionPlan;
-import motionkit.trajectory.ValidationGuarantee;
+import trajectorykit.validation.ValidationGuarantee;
 import motionkit.trajectory.PlanLimitError;
 import motionkit.trajectory.ValidationLimits;
 import robotkit.model.Joint;
@@ -87,25 +87,25 @@ import robotkit.runtime.VirtualActuatorOptions;
 import robotkit.runtime.RobotRuntimeError;
 import robotkit.runtime.RobotRuntimeCompiler;
 import RobotKitRuntime;
-import robotkit.world.RecordingRobot;
-import robotkit.world.ReplayRobot;
-import robotkit.world.RobotRecording;
-import robotkit.world.SimulatedRobot;
-import robotkit.world.RobotCommand;
-import robotkit.world.Robot;
-import robotkit.world.RobotCapabilities;
-import robotkit.world.RobotDescription;
-import robotkit.world.RobotFault;
-import robotkit.world.RobotId;
-import robotkit.world.RobotSnapshot;
-import robotkit.world.RobotStatus;
-import robotkit.world.RuntimeRobotAdapter;
-import robotkit.world.SensorFrame;
-import robotkit.world.StopMode;
-import robotkit.world.ExecutionPlanSubmission;
-import robotkit.world.ProcessChannelDeclaration;
-import robotkit.world.ProcessEventValue;
-import robotkit.world.TrajectorySegment;
+import robotkit.recording.RecordingRobot;
+import robotkit.recording.ReplayRobot;
+import robotkit.recording.RobotRecording;
+import robotkit.simulation.SimulatedRobot;
+import robotkit.core.RobotCommand;
+import robotkit.core.Robot;
+import robotkit.core.RobotCapabilities;
+import robotkit.core.RobotDescription;
+import robotkit.core.RobotFault;
+import robotkit.core.RobotId;
+import robotkit.core.RobotSnapshot;
+import robotkit.core.RobotStatus;
+import robotkit.runtime.RuntimeRobotAdapter;
+import robotkit.core.SensorFrame;
+import robotkit.core.StopMode;
+import robotkit.execution.ExecutionPlanSubmission;
+import robotkit.execution.ProcessChannelDeclaration;
+import robotkit.execution.ProcessEventValue;
+import robotkit.execution.TrajectorySegment;
 
 import MotionKitTestSupport.WristBranchSolver;
 import MotionKitTestSupport.PlanarSolver;
@@ -399,7 +399,7 @@ class SessionTests extends MotionKitTestSupport {
     queuedMachine.queueAxes([new AxisTarget("x", 0.02)], options);
     queuedMachine.queueAxes([new AxisTarget("x", 0.05)], options);
     var firstTag = switch (recording.commands[0]) {
-      case RobotCommand.TrajectoryChunk(chunk): chunk.tag;
+      case RobotCommand.ExecutionPlan(plan): plan.planId;
       case _: Int64.ofInt(0);
     };
     tick = 0;
@@ -456,13 +456,13 @@ class SessionTests extends MotionKitTestSupport {
     check(cornerStops >= 3, "TOPP-RA square stops at every authored corner");
     var squareReport = squareMachine.lastPathValidationReport;
     if (squareReport == null) throw "TOPP-RA path did not record validation";
-    check(squareReport.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
-      MotionKitNativeConstants.MK_CHECK_PASSED &&
-      squareReport.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].method ==
-      MotionKitNativeConstants.MK_CHECK_METHOD_SAMPLED,
+    check(squareReport.checks[TrajectoryCoreConstants.MK_CHECK_TASK_SPACE].status ==
+      TrajectoryCoreConstants.MK_CHECK_PASSED &&
+      squareReport.checks[TrajectoryCoreConstants.MK_CHECK_TASK_SPACE].method ==
+      TrajectoryCoreConstants.MK_CHECK_METHOD_SAMPLED,
       "TOPP-RA task-space check reports sampled path tolerance");
-    check(squareReport.checks[MotionKitNativeConstants.MK_CHECK_JERK].status ==
-      MotionKitNativeConstants.MK_CHECK_UNCHECKED,
+    check(squareReport.checks[TrajectoryCoreConstants.MK_CHECK_JERK].status ==
+      TrajectoryCoreConstants.MK_CHECK_UNCHECKED,
       "TOPP-RA reports jerk as unchecked");
     var invalidPathRejected = false;
     try squareMachine.queuePath(null) catch (_:Dynamic) invalidPathRejected = true;
@@ -606,8 +606,6 @@ class SessionTests extends MotionKitTestSupport {
         check(true, "immediate replacement submits the new plan");
       case JointTargets(_, _):
         throw "immediate replacement did not submit a plan";
-      case TrajectoryChunk(_):
-        throw "immediate replacement submitted a legacy point chunk";
       case Hold | Resume | Abort:
         throw "immediate replacement unexpectedly submitted a lifecycle command";
     }
@@ -933,7 +931,7 @@ class SessionTests extends MotionKitTestSupport {
           if (recording != null)
             for (command in recording.commands)
               switch command {
-                case JointTargets(_, _) | TrajectoryChunk(_):
+                case JointTargets(_, _):
                   throw "MotionSystem submitted a non-plan motion command";
                 case ExecutionPlan(plan):
                   worstSkew = Math.max(worstSkew,

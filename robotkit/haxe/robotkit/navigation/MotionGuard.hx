@@ -75,7 +75,7 @@ class MotionGuard {
   }
 
   /** Updates localization and obstacle data from the same robot observation. */
-  public function updateObservation(snapshot:robotkit.world.RobotSnapshot,
+  public function updateObservation(snapshot:robotkit.core.RobotSnapshot,
       perception:PerceptionSnapshot, durationSeconds:Float):MotionGuardState {
     updatePerception(perception);
     navigation.updateObservation(snapshot, durationSeconds);

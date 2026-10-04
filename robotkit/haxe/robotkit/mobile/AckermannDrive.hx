@@ -1,6 +1,6 @@
 package robotkit.mobile;
 
-import robotkit.world.JointTarget;
+import robotkit.core.JointTarget;
 
 /** Bicycle-model Ackermann steering plus one driven wheel joint. */
 class AckermannDrive implements DriveModel {

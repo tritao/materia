@@ -1,7 +1,7 @@
 package robotkit.perception;
 
 import robotkit.model.RobotModel;
-import robotkit.world.SensorFrame;
+import robotkit.core.SensorFrame;
 
 /**
  * Unprojects calibrated depth images into a mounted 3D point cloud, then

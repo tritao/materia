@@ -1,6 +1,6 @@
 package robotkit.perception;
 
-import robotkit.world.SensorFrame;
+import robotkit.core.SensorFrame;
 
 /** Converts transport-neutral sensor observations into semantic values. */
 interface Perception {

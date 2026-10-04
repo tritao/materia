@@ -5,7 +5,7 @@ import robotkit.model.RobotModelCodec;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.SimulationHarness;
 import robotkit.runtime.SimulationSpace;
-import robotkit.world.JointTarget;
+import robotkit.core.JointTarget;
 
 /**
  * Starts an imported humanoid in a pose on a floor and holds that pose with
@@ -31,7 +31,7 @@ class StandCheck {
       lineSearchIterations: Std.parseInt(args[8])
     });
     var simulation = harness.simulation;
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     blueprint.observedLimitTolerance = 0.05;
     var runtime = simulation.addRobotAtPose(blueprint, pose.rootPosition, pose.rootRotation);
     harness.spawnPlane();

@@ -5,7 +5,7 @@
         {
           "id": 1,
           "name": "robotId",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 2,
@@ -25,7 +25,7 @@
         {
           "id": 5,
           "name": "expiryNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         }
       ],
       "kind": "class"
@@ -55,7 +55,7 @@
         {
           "id": 1,
           "name": "robotId",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 2,
@@ -75,17 +75,17 @@
         {
           "id": 5,
           "name": "sequence",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 6,
           "name": "sourceTimestampNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 7,
           "name": "receivedTimestampNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 8,
@@ -140,12 +140,12 @@
         {
           "id": 1,
           "name": "robotId",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 2,
           "name": "leaseId",
-          "type": "haxe.Int64"
+          "type": "Int64"
         }
       ],
       "kind": "class"
@@ -155,7 +155,7 @@
         {
           "id": 1,
           "name": "robotId",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 2,
@@ -175,12 +175,62 @@
       ],
       "kind": "class"
     },
+    "ExecutionCapabilitiesMsg": {
+      "fields": [
+        {
+          "id": 1,
+          "name": "plans",
+          "type": "Bool"
+        },
+        {
+          "id": 2,
+          "name": "maximumPolynomialDegree",
+          "type": "Int"
+        },
+        {
+          "id": 3,
+          "name": "maximumJoints",
+          "type": "Int"
+        },
+        {
+          "id": 4,
+          "name": "maximumSegments",
+          "type": "Int"
+        },
+        {
+          "id": 5,
+          "name": "timedEvents",
+          "type": "Bool"
+        },
+        {
+          "id": 6,
+          "name": "replacementBoundaries",
+          "type": "Bool"
+        },
+        {
+          "id": 7,
+          "name": "holdResume",
+          "type": "Bool"
+        },
+        {
+          "id": 8,
+          "name": "polynomialLimits",
+          "type": "String"
+        },
+        {
+          "id": 9,
+          "name": "samplingResolutionNs",
+          "type": "Int64"
+        }
+      ],
+      "kind": "class"
+    },
     "Fault": {
       "fields": [
         {
           "id": 1,
           "name": "robotId",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 2,
@@ -205,7 +255,7 @@
         {
           "id": 1,
           "name": "robotId",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 2,
@@ -225,7 +275,7 @@
         {
           "id": 5,
           "name": "expiryNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         }
       ],
       "kind": "class"
@@ -395,7 +445,7 @@
         {
           "id": 1,
           "name": "robotId",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 2,
@@ -415,12 +465,12 @@
         {
           "id": 5,
           "name": "sequence",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 6,
           "name": "expiryNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         }
       ],
       "kind": "class"
@@ -475,7 +525,7 @@
         {
           "id": 1,
           "name": "robotId",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 2,
@@ -507,12 +557,12 @@
         {
           "id": 1,
           "name": "timeFromStartNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 2,
           "name": "durationNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 3,
@@ -637,17 +687,7 @@
         {
           "id": 4,
           "name": "expiryNs",
-          "type": "haxe.Int64"
-        },
-        {
-          "id": 5,
-          "name": "tag",
-          "type": "haxe.Int64"
-        },
-        {
-          "id": 6,
-          "name": "segments",
-          "type": "Array<RecordingSegmentMsg>"
+          "type": "Int64"
         },
         {
           "id": 7,
@@ -752,17 +792,17 @@
         {
           "id": 1,
           "name": "planId",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 2,
           "name": "modelRevision",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 3,
           "name": "calibrationRevision",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 4,
@@ -822,12 +862,12 @@
         {
           "id": 15,
           "name": "replaceAfterPlanId",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 16,
           "name": "replaceAfterTimeNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         }
       ],
       "kind": "class"
@@ -837,7 +877,7 @@
         {
           "id": 1,
           "name": "planId",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 2,
@@ -852,12 +892,12 @@
         {
           "id": 4,
           "name": "scheduledTimeNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 5,
           "name": "appliedOwnerTimeNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 6,
@@ -907,12 +947,12 @@
         {
           "id": 1,
           "name": "timeFromStartNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 2,
           "name": "durationNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 3,
@@ -942,17 +982,17 @@
         {
           "id": 4,
           "name": "sequence",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 5,
           "name": "sourceTimestampNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 6,
           "name": "receivedTimestampNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 7,
@@ -1007,17 +1047,17 @@
         {
           "id": 2,
           "name": "sourceSequence",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 3,
           "name": "sourceTimestampNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 4,
           "name": "receivedTimestampNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 5,
@@ -1077,22 +1117,22 @@
         {
           "id": 16,
           "name": "trajectoryTimeNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 17,
           "name": "trajectoryDurationNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 18,
           "name": "trajectoryTag",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 19,
           "name": "trajectoryTagTimeNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 20,
@@ -1102,17 +1142,17 @@
         {
           "id": 21,
           "name": "activePlanId",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 22,
           "name": "committedUntilNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 23,
           "name": "queueEndTimeNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         }
       ],
       "kind": "class"
@@ -1122,7 +1162,7 @@
         {
           "id": 1,
           "name": "timeNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 2,
@@ -1172,12 +1212,12 @@
         {
           "id": 3,
           "name": "sourceTimestampNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 4,
           "name": "receivedTimestampNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 5,
@@ -1192,7 +1232,7 @@
         {
           "id": 1,
           "name": "robotId",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 2,
@@ -1201,33 +1241,23 @@
         },
         {
           "id": 3,
-          "name": "supportsPosition",
-          "type": "Bool"
+          "name": "controlModes",
+          "type": "Array<String>"
         },
         {
           "id": 4,
-          "name": "supportsVelocity",
-          "type": "Bool"
+          "name": "execution",
+          "type": "ExecutionCapabilitiesMsg"
         },
         {
           "id": 5,
-          "name": "supportsEffort",
-          "type": "Bool"
+          "name": "timing",
+          "type": "TimingCapabilitiesMsg"
         },
         {
           "id": 6,
-          "name": "supportsPrediction",
-          "type": "Bool"
-        },
-        {
-          "id": 7,
-          "name": "supportsTrajectoryQueue",
-          "type": "Bool"
-        },
-        {
-          "id": 8,
-          "name": "supportsExecutionPlans",
-          "type": "Bool"
+          "name": "streams",
+          "type": "Array<String>"
         }
       ],
       "kind": "class"
@@ -1237,7 +1267,7 @@
         {
           "id": 1,
           "name": "robotId",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 2,
@@ -1262,17 +1292,17 @@
         {
           "id": 1,
           "name": "robotId",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 2,
           "name": "sequence",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 3,
           "name": "sourceTimestampNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 4,
@@ -1302,7 +1332,7 @@
         {
           "id": 9,
           "name": "receivedTimestampNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 10,
@@ -1322,22 +1352,22 @@
         {
           "id": 13,
           "name": "trajectoryTimeNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 14,
           "name": "trajectoryDurationNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 15,
           "name": "trajectoryTag",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 16,
           "name": "trajectoryTagTimeNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 17,
@@ -1347,17 +1377,17 @@
         {
           "id": 18,
           "name": "activePlanId",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 19,
           "name": "committedUntilNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 20,
           "name": "queueEndTimeNs",
-          "type": "haxe.Int64"
+          "type": "Int64"
         }
       ],
       "kind": "class"
@@ -1367,7 +1397,7 @@
         {
           "id": 1,
           "name": "robotId",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 2,
@@ -1442,7 +1472,7 @@
         {
           "id": 1,
           "name": "robotId",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 2,
@@ -1472,6 +1502,31 @@
       ],
       "kind": "class"
     },
+    "TimingCapabilitiesMsg": {
+      "fields": [
+        {
+          "id": 1,
+          "name": "deadlines",
+          "type": "Bool"
+        },
+        {
+          "id": 2,
+          "name": "clockMapping",
+          "type": "Bool"
+        },
+        {
+          "id": 3,
+          "name": "prediction",
+          "type": "String"
+        },
+        {
+          "id": 4,
+          "name": "samplingResolutionNs",
+          "type": "Int64"
+        }
+      ],
+      "kind": "class"
+    },
     "Welcome": {
       "fields": [
         {
@@ -1487,12 +1542,12 @@
         {
           "id": 3,
           "name": "sessionId",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 4,
           "name": "robotId",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 5,
@@ -1502,7 +1557,7 @@
         {
           "id": 6,
           "name": "leaseId",
-          "type": "haxe.Int64"
+          "type": "Int64"
         },
         {
           "id": 7,

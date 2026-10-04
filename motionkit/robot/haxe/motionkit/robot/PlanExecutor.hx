@@ -3,14 +3,14 @@ package motionkit.robot;
 import haxe.Int64;
 import motionkit.event.TimedEvent;
 import motionkit.trajectory.ExecutionPlan;
-import robotkit.world.ExecutionPlanSubmission;
-import robotkit.world.ProcessEventValue;
-import robotkit.world.ProcessHoldPolicy;
-import robotkit.world.ProcessTimedEvent;
-import robotkit.world.Robot;
-import robotkit.world.RobotCommand;
-import robotkit.world.RobotSnapshot;
-import robotkit.world.SegmentArrays;
+import robotkit.execution.ExecutionPlanSubmission;
+import robotkit.execution.ProcessEventValue;
+import robotkit.execution.ProcessHoldPolicy;
+import robotkit.execution.ProcessTimedEvent;
+import robotkit.core.Robot;
+import robotkit.core.RobotCommand;
+import robotkit.core.RobotSnapshot;
+import robotkit.execution.SegmentArrays;
 
 /** Submits a validated plan in bounded chunks and tracks its owner-clock progress. */
 class PlanExecutor {
@@ -32,8 +32,7 @@ class PlanExecutor {
 
   public function new(robot:Robot, ?jointIndices:Array<Int>,
       ?session:MotionSession) {
-    if (robot == null || !robot.capabilities().supportsExecutionPlans ||
-        !robot.capabilities().supportsTrajectoryQueue)
+    if (robot == null || !robot.capabilities().execution.plans)
       throw "PlanExecutor requires execution plan and trajectory queue support";
     this.robot = robot;
     ownsSession = session == null;
@@ -60,8 +59,8 @@ class PlanExecutor {
     planArrays = arrays;
     this.plan = plan;
     this.endsAtRest = endsAtRest;
-    jerkUnchecked = plan.report.checks[MotionKitNativeConstants.MK_CHECK_JERK].status ==
-      MotionKitNativeConstants.MK_CHECK_UNCHECKED;
+    jerkUnchecked = plan.report.checks[TrajectoryCoreConstants.MK_CHECK_JERK].status ==
+      TrajectoryCoreConstants.MK_CHECK_UNCHECKED;
     completed = false;
     stream.beginSegments(new TrajectoryStream.NativeStreamSegments(arrays), plan.durationSeconds);
     deferredRefill = false;

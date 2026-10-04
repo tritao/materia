@@ -4,7 +4,7 @@ import robotkit.navigation.NavigationGoal;
 import robotkit.navigation.Navigator;
 import robotkit.navigation.NavigatorStatus;
 import robotkit.perception.PerceptionSnapshot;
-import robotkit.world.RobotSnapshot;
+import robotkit.core.RobotSnapshot;
 
 /** Plans, follows, and replans a route to a framed goal. */
 class GoTo implements Skill {

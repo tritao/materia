@@ -1,6 +1,6 @@
 package robotkit.skill;
 
-import robotkit.world.RobotSnapshot;
+import robotkit.core.RobotSnapshot;
 
 /** Stateful task primitive advanced by the application/control loop. */
 interface Skill {

@@ -1,7 +1,7 @@
 package robotkit.perception;
 
 import robotkit.mobile.Pose2;
-import robotkit.world.SensorFrame;
+import robotkit.core.SensorFrame;
 
 /** Extracts planar obstacle clusters from XYZ point-cloud sensor frames. */
 class PointCloudObstaclePerception implements Perception {

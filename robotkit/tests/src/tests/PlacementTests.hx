@@ -9,18 +9,18 @@ import robotkit.spatial.Vec3;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
 import robotkit.manipulation.Manipulator;
-import robotkit.manipulation.ReachabilityChecker;
-import robotkit.manipulation.WorkPatchPlanner;
+import processkit.manipulation.ReachabilityChecker;
+import processkit.manipulation.WorkPatchPlanner;
 import robotkit.manipulation.BaseObstacle;
 import robotkit.manipulation.ToolBoxObstacle;
 import robotkit.manipulation.ToolClearanceChecker;
 import robotkit.manipulation.ToolClearanceShape;
 import robotkit.tool.ToolCollisionShape;
-import robotkit.process.ToolpathPoint;
-import robotkit.process.Toolpath;
-import robotkit.work.WorkSurface;
-import robotkit.work.Polygon2;
-import robotkit.work.Point2;
+import processkit.path.ToolpathPoint;
+import processkit.path.Toolpath;
+import processkit.work.WorkSurface;
+import processkit.work.Polygon2;
+import processkit.work.Point2;
 
 /** M8 acceptance tests for robotkit.manipulation: ReachabilityChecker, WorkPatchPlanner. */
 class PlacementTests {

@@ -1,7 +1,7 @@
 package robotkit.mobile;
 
 import haxe.Int64;
-import robotkit.world.RobotSnapshot;
+import robotkit.core.RobotSnapshot;
 
 /**
  * Wheel-position odometry for a three-wheel omni/kiwi base (see

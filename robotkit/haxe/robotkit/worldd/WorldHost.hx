@@ -4,9 +4,9 @@ import haxe.Int64;
 import robotkit.model.RobotModel;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.SimulationHarness;
-import robotkit.world.RemoteRobot;
+import robotkit.remote.RemoteRobot;
 import robotkit.world.RobotWorld;
-import robotkit.world.SimulatedRobot;
+import robotkit.simulation.SimulatedRobot;
 import robotkit.deployment.PerceptionPipelineConfig;
 import robotkit.deployment.SerialDeployment;
 import robotkit.perception.PerceptionHost;
@@ -29,7 +29,7 @@ class WorldHost {
 
   public function addSimulatedRobot(id:String, model:RobotModel):SimulatedRobot {
     ensureOpen();
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     var runtime = simulation.simulation.addRobot(blueprint);
     var robot = new SimulatedRobot(id, runtime, model.name,
       [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);

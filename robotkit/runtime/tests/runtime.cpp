@@ -1,3 +1,4 @@
+#include "runtime_trajectory_fixtures.hpp"
 // This test uses assert for setup calls; keep them active in Release builds.
 #include "robotkit_runtime.hpp"
 
@@ -1162,19 +1163,8 @@ void ruckig_segments_match_motionkit_evaluation(
         joint.max_velocity = (joint.limit_flags |= RK_LIMIT_VELOCITY, 1.0);
         joint.max_acceleration = (joint.limit_flags |= RK_LIMIT_ACCELERATION, 2.0);
     }
-    mk_state_to_state_request request{};
-    request.struct_size = sizeof(request);
-    request.joint_count = 2;
-    request.target_position[0] = 0.5;
-    request.target_position[1] = -0.5;
-    for (uint32_t joint = 0; joint < 2; ++joint) {
-        request.max_velocity[joint] = 1.0;
-        request.max_acceleration[joint] = 2.0;
-        request.max_jerk[joint] = 4.0;
-    }
     mk_trajectory_handle trajectory{};
-    int32_t result = 0;
-    assert(mk_generate_state_to_state(&request, &trajectory, &result) == MK_OK);
+    assert(runtime_fixtures::rest_two(&trajectory) == MK_OK);
     auto chunk = segments_from_native(trajectory);
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(limited.joint_count);
     robotkit::RobotRuntime runtime(limited, endpoint, std::chrono::milliseconds(10));
@@ -1268,20 +1258,8 @@ void ruckig_segment_stop_uses_analytic_braking(
         joint.max_velocity = (joint.limit_flags |= RK_LIMIT_VELOCITY, 1.0);
         joint.max_acceleration = (joint.limit_flags |= RK_LIMIT_ACCELERATION, 1.0);
     }
-    mk_state_to_state_request request{};
-    request.struct_size = sizeof(request);
-    request.joint_count = 2;
-    for (uint32_t joint = 0; joint < 2; ++joint) {
-        const double sign = joint == 0 ? 1.0 : -1.0;
-        request.current_velocity[joint] = sign * 0.5;
-        request.target_position[joint] = sign * 0.25;
-        request.max_velocity[joint] = 1.0;
-        request.max_acceleration[joint] = 1.0;
-        request.max_jerk[joint] = 4.0;
-    }
     mk_trajectory_handle trajectory{};
-    int32_t ruckig_result = 0;
-    assert(mk_generate_state_to_state(&request, &trajectory, &ruckig_result) == MK_OK);
+    assert(runtime_fixtures::moving_two(&trajectory) == MK_OK);
     int64_t duration = 0;
     assert(mk_trajectory_duration_ns(trajectory, &duration) == MK_OK);
     int64_t braking_time = -1;
@@ -1848,19 +1826,8 @@ void plan_end_braking_stays_on_path(const rk_robot_runtime_blueprint &source) {
         joint.max_velocity = (joint.limit_flags |= RK_LIMIT_VELOCITY, 1.0);
         joint.max_acceleration = (joint.limit_flags |= RK_LIMIT_ACCELERATION, 1.0);
     }
-    mk_state_to_state_request request{};
-    request.struct_size = sizeof(request);
-    request.joint_count = blueprint.joint_count;
-    for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
-        const double sign = joint == 0 ? 1.0 : -1.0;
-        request.target_position[joint] = sign * 0.25;
-        request.max_velocity[joint] = 1.0;
-        request.max_acceleration[joint] = 1.0;
-        request.max_jerk[joint] = 4.0;
-    }
     mk_trajectory_handle native{};
-    int32_t result = 0;
-    assert(mk_generate_state_to_state(&request, &native, &result) == MK_OK);
+    assert(runtime_fixtures::rest_short_two(&native) == MK_OK);
     auto ruckig = segments_from_native(native);
     int64_t ruckig_duration = 0;
     assert(mk_trajectory_duration_ns(native, &ruckig_duration) == MK_OK);

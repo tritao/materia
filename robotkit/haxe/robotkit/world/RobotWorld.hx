@@ -1,5 +1,15 @@
 package robotkit.world;
 
+import robotkit.core.Robot;
+import robotkit.core.RobotCommand;
+import robotkit.core.RobotDescription;
+import robotkit.core.RobotHealthSummary;
+import robotkit.core.RobotId;
+import robotkit.core.RobotSnapshot;
+import robotkit.core.RobotStatus;
+import robotkit.core.RobotThreadToken;
+import robotkit.core.StopMode;
+
 import sys.thread.Mutex;
 import nativekit.ffi.NativeKit;
 

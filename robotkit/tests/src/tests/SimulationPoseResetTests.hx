@@ -65,7 +65,7 @@ class SimulationPoseResetTests {
     follower.limits = new JointLimits(-2, 2);
     model.addCoupling(new JointCoupling("gears", source.id, follower.id, -2.0, 0.0));
     var harness = new SimulationHarness(0.01, 1, backend);
-    var runtime = harness.simulation.addRobot(RobotRuntimeCompiler.compile(model));
+    var runtime = harness.simulation.addRobot(RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()));
     runtime.submitPosition(0, 0.3, 1);
     for (index in 0...100) harness.step(Int64.ofInt(index));
     var tolerance = backend == 0 ? 1e-9 : 0.02;
@@ -106,7 +106,7 @@ class SimulationPoseResetTests {
       model.materializeLimits();
       return model;
     };
-    var compiled = RobotRuntimeCompiler.compile(build(1.2));
+    var compiled = RobotRuntimeCompiler.compile(build(1.2), new robotkit.profile.RobotProfile());
     if (!(compiled.joints[1].servoStiffness > 0.0) || compiled.joints[0].servoStiffness != 0.0)
       throw 'only the motor joint is a servo: ${compiled.joints[0].servoStiffness}, ${compiled.joints[1].servoStiffness}';
     if (compiled.joints[1].maxEffort != 1.2) throw 'the servo limits its joint to its peak torque: ${compiled.joints[1].maxEffort}';
@@ -121,7 +121,7 @@ class SimulationPoseResetTests {
     harness.dispose();
     // The arm alone is not commanded: with no target for the motor it stays put.
     var idle = new SimulationHarness(0.001, 1, 1);
-    var held = idle.simulation.addRobot(RobotRuntimeCompiler.compile(build(1.2)));
+    var held = idle.simulation.addRobot(RobotRuntimeCompiler.compile(build(1.2), new robotkit.profile.RobotProfile()));
     held.submitPosition(0, 0.3, 1);
     for (index in 0...500) idle.step(Int64.ofInt(index));
     if (Math.abs(held.snapshot().q.get(0)) > 0.02)
@@ -164,7 +164,7 @@ class SimulationPoseResetTests {
     var simulationHarness = new SimulationHarness(0.01, 1, backend);
 
     var simulation = simulationHarness.simulation;
-    var runtime = simulation.addRobot(RobotRuntimeCompiler.compile(model));
+    var runtime = simulation.addRobot(RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()));
     // A plan leaving the follower out turns it with its source, so the runtime names the pair.
     if (runtime.couplings.length != 1 || runtime.couplings[0].leader != 0 ||
         runtime.couplings[0].follower != 1 || runtime.couplings[0].ratio != -2.0)

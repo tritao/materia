@@ -3,7 +3,7 @@ package robotkit.perception;
 import haxe.Int64;
 import robotkit.mobile.Pose2;
 import robotkit.mobile.Pose3;
-import robotkit.world.SensorFrame;
+import robotkit.core.SensorFrame;
 import visionkit.CameraModel;
 
 /** Synchronous image-to-planar adapter. Depth is axial camera X in metres. */

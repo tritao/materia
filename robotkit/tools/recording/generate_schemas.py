@@ -41,7 +41,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     lock = json.loads(args.lock.read_text())
-    lines = ["package robotkit.world;", "", "// Generated from the RKF1 schema lock. Do not edit by hand.",
+    lines = ["package robotkit.recording;", "", "// Generated from the RKF1 schema lock. Do not edit by hand.",
              "class RecordingSchemas {", "  public static function forChannel(name:String):String return switch name {"]
     for topic, root in ROOTS.items():
         lines.append(f'    case "{topic}": {json.dumps(schema(root, lock["declarations"]))};')

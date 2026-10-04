@@ -1,41 +1,53 @@
 {
-	"version": 1,
-	"package": { "name": "robotkit-world-tests-mujoco" },
-	"entry": "tests.WallFinishingMuJoCoRunner",
-	"sourceRoots": ["../src"],
-	"dependencies": {
-		"nativekit": { "path": "../../../nativekit" },
-		"robotkit": { "path": "../.." },
-		"motionkit-robot": { "path": "../../../motionkit/robot" }
-	},
-	"native": {
-		"cmake": {
-			"source": "../../robotd/native-mujoco",
-			"target": "robotd_native",
-			"inputs": [
-				"../../robotd/native-mujoco/CMakeLists.txt",
-				"../../robotd/native/CMakeLists.txt",
-				"../../CMakeLists.txt",
-				"../../runtime/CMakeLists.txt",
-				"../../runtime/include/robotkit_runtime.h",
-				"../../runtime/include/robotkit_simkit.h",
-				"../../../motionkit/native/CMakeLists.txt",
-				"../../../motionkit/native/include/motionkit.h",
-				"../../../motionkit/native/src/trajectory.cpp",
-				"../../../motionkit/native/src/validation.cpp",
-				"../../../motionkit/native/src/generator.cpp",
-				"../../../motionkit/native/vendor/ruckig/CMakeLists.txt",
-				"../../../nativekit/CMakeLists.txt",
-				"../../../simkit/CMakeLists.txt",
-				"../../inference/CMakeLists.txt",
-				"../../inference/src/inference.cpp",
-				"../../inference/include/robotkit_inference.h",
-				"../../policy/CMakeLists.txt",
-				"../../policy/src/policy.cpp",
-				"../../policy/include/robotkit_policy.h"
-			]
-		}
-	},
-	"target": "host",
-	"outputDir": "build"
+  "version": 1,
+  "package": {
+    "name": "robotkit-world-tests-mujoco"
+  },
+  "entry": "tests.WallFinishingMuJoCoRunner",
+  "sourceRoots": [
+    "../src"
+  ],
+  "dependencies": {
+    "nativekit": {
+      "path": "../../../nativekit"
+    },
+    "robotkit": {
+      "path": "../.."
+    },
+    "motionkit-robot": {
+      "path": "../../../motionkit/robot"
+    },
+    "processkit": {
+      "path": "../../../processkit"
+    }
+  },
+  "native": {
+    "cmake": {
+      "source": "../../robotd/native-mujoco",
+      "target": "robotd_native",
+      "inputs": [
+        "../../robotd/native-mujoco/CMakeLists.txt",
+        "../../robotd/native/CMakeLists.txt",
+        "../../CMakeLists.txt",
+        "../../runtime/CMakeLists.txt",
+        "../../runtime/include/robotkit_runtime.h",
+        "../../runtime/include/robotkit_simkit.h",
+        "../../../trajectorykit/native/src/trajectory.cpp",
+        "../../../trajectorykit/native/src/validation.cpp",
+        "../../../trajectorykit/native/CMakeLists.txt",
+        "../../../trajectorykit/native/include/trajectory_core.h",
+        "../../../trajectorykit/native/include/trajectory_core.hpp",
+        "../../../nativekit/CMakeLists.txt",
+        "../../../simkit/CMakeLists.txt",
+        "../../inference/CMakeLists.txt",
+        "../../inference/src/inference.cpp",
+        "../../inference/include/robotkit_inference.h",
+        "../../policy/CMakeLists.txt",
+        "../../policy/src/policy.cpp",
+        "../../policy/include/robotkit_policy.h"
+      ]
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
 }

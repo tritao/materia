@@ -2,7 +2,7 @@ package robotkit.perception;
 
 import robotkit.mobile.Pose2;
 import robotkit.runtime.RobotRuntimeSensorBlueprint;
-import robotkit.world.SensorFrame;
+import robotkit.core.SensorFrame;
 
 /**
  * What a planar LiDAR's scans say about free space. A scan sees past a disk when every ray that would

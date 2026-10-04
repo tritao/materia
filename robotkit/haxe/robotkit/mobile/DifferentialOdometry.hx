@@ -1,7 +1,7 @@
 package robotkit.mobile;
 
 import haxe.Int64;
-import robotkit.world.RobotSnapshot;
+import robotkit.core.RobotSnapshot;
 
 /** Wheel-position odometry that resets its integration baseline on source-clock changes. */
 class DifferentialOdometry {

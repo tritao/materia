@@ -1,5 +1,6 @@
 package motionkit.robot;
 
+import TrajectoryCore;
 import MotionKitNative;
 import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.KinematicsSolver;
@@ -240,7 +241,7 @@ class OpwKinematics implements KinematicsSolver {
     var quaternion = [local.rotation.x, local.rotation.y, local.rotation.z, local.rotation.w];
     for (index in 0...4) nativePose.set_quaternion(index, quaternion[index]);
     var result = MotionKitNative.mk_opw_inverse(native, nativePose, 8);
-    if (result.status != MotionKitNativeConstants.MK_OK)
+    if (result.status != TrajectoryCoreConstants.MK_OK)
       throw 'OPW inverse failed with MotionKit error ${result.status}';
     var candidates:Array<Array<Float>> = [];
     for (solution in result.out_solutions) {
@@ -295,7 +296,7 @@ class OpwKinematics implements KinematicsSolver {
   function opwForward(q:Array<Float>):Transform3 {
     if (q == null || q.length != 6) throw "OPW forward needs six joint values";
     var result = MotionKitNative.mk_opw_forward(native, q);
-    if (result.status != MotionKitNativeConstants.MK_OK)
+    if (result.status != TrajectoryCoreConstants.MK_OK)
       throw 'OPW forward failed with MotionKit error ${result.status}';
     var pose = result.out_pose;
     return new Transform3(new Vec3(pose.get_position(0), pose.get_position(1),

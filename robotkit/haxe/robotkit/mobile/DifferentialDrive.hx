@@ -1,6 +1,6 @@
 package robotkit.mobile;
 
-import robotkit.world.JointTarget;
+import robotkit.core.JointTarget;
 
 /**
  * Differential-drive wheel velocity mapping. A wheel's direction is +1 when a

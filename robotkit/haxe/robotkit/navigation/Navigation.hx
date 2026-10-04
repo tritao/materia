@@ -6,8 +6,8 @@ import robotkit.localization.LocalizationState;
 import robotkit.mobile.MobileBase;
 import robotkit.mobile.Pose2;
 import robotkit.mobile.Twist2;
-import robotkit.world.RobotSnapshot;
-import robotkit.world.StopMode;
+import robotkit.core.RobotSnapshot;
+import robotkit.core.StopMode;
 
 /** Application-frequency pure-pursuit path follower over localization and MobileBase. */
 class Navigation {

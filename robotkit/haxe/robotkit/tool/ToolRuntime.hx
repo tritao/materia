@@ -1,7 +1,7 @@
 package robotkit.tool;
 
-import robotkit.world.ProcessChannelDeclaration;
-import robotkit.world.ProcessEventValue;
+import robotkit.execution.ProcessChannelDeclaration;
+import robotkit.execution.ProcessEventValue;
 
 /**
  * One mounted tool and its independently controlled capabilities. A physical

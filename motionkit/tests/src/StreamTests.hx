@@ -48,9 +48,9 @@ import motionkit.path.PoseLine;
 import motionkit.path.PoseArc;
 import motionkit.path.PoseWaypoint;
 import motionkit.path.OrientationPolicy;
-import motionkit.robot.ToolpathPosePath;
-import robotkit.process.Toolpath;
-import robotkit.process.ToolpathPoint;
+import processkit.motion.ToolpathPosePath;
+import processkit.path.Toolpath;
+import processkit.path.ToolpathPoint;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
 import robotkit.spatial.Quat;
@@ -69,7 +69,7 @@ import motionkit.program.MoveTarget;
 import motionkit.trajectory.MotionLimits;
 import motionkit.trajectory.Trajectory;
 import motionkit.trajectory.ExecutionPlan;
-import motionkit.trajectory.ValidationGuarantee;
+import trajectorykit.validation.ValidationGuarantee;
 import motionkit.trajectory.PlanLimitError;
 import motionkit.trajectory.ValidationLimits;
 import robotkit.model.Joint;
@@ -88,25 +88,25 @@ import robotkit.runtime.VirtualActuatorOptions;
 import robotkit.runtime.RobotRuntimeError;
 import robotkit.runtime.RobotRuntimeCompiler;
 import RobotKitRuntime;
-import robotkit.world.RecordingRobot;
-import robotkit.world.ReplayRobot;
-import robotkit.world.RobotRecording;
-import robotkit.world.SimulatedRobot;
-import robotkit.world.RobotCommand;
-import robotkit.world.Robot;
-import robotkit.world.RobotCapabilities;
-import robotkit.world.RobotDescription;
-import robotkit.world.RobotFault;
-import robotkit.world.RobotId;
-import robotkit.world.RobotSnapshot;
-import robotkit.world.RobotStatus;
-import robotkit.world.RuntimeRobotAdapter;
-import robotkit.world.SensorFrame;
-import robotkit.world.StopMode;
-import robotkit.world.ExecutionPlanSubmission;
-import robotkit.world.ProcessChannelDeclaration;
-import robotkit.world.ProcessEventValue;
-import robotkit.world.TrajectorySegment;
+import robotkit.recording.RecordingRobot;
+import robotkit.recording.ReplayRobot;
+import robotkit.recording.RobotRecording;
+import robotkit.simulation.SimulatedRobot;
+import robotkit.core.RobotCommand;
+import robotkit.core.Robot;
+import robotkit.core.RobotCapabilities;
+import robotkit.core.RobotDescription;
+import robotkit.core.RobotFault;
+import robotkit.core.RobotId;
+import robotkit.core.RobotSnapshot;
+import robotkit.core.RobotStatus;
+import robotkit.runtime.RuntimeRobotAdapter;
+import robotkit.core.SensorFrame;
+import robotkit.core.StopMode;
+import robotkit.execution.ExecutionPlanSubmission;
+import robotkit.execution.ProcessChannelDeclaration;
+import robotkit.execution.ProcessEventValue;
+import robotkit.execution.TrajectorySegment;
 
 import MotionKitTestSupport.WristBranchSolver;
 import MotionKitTestSupport.PlanarSolver;
@@ -130,8 +130,11 @@ class StreamTests extends MotionKitTestSupport {
     var description = new RobotDescription("plan-replay", blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name]);
-    var capabilities = new RobotCapabilities("plan-replay", blueprint.model.joints.length,
-      true, false, false, false, true, true);
+    var capabilities = new RobotCapabilities("plan-replay",
+      blueprint.model.joints.length,
+      [robotkit.core.JointTargetMode.Position],
+      new robotkit.core.ExecutionCapabilities(true, 5, 64, 4096, true, true, true, trajectorykit.validation.ValidationGuarantee.Unchecked),
+      new robotkit.core.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked));
     var unsupported = new ReplayRobot("plan-replay", source, description);
     throws(function() MotionSystem.fromBlueprint(unsupported, blueprint),
       "MotionSystem rejects a robot without queue and plan capabilities");
@@ -166,7 +169,7 @@ class StreamTests extends MotionKitTestSupport {
     var instrumented = new RecordingRobot(robot, recording);
     var machine = MotionSystem.fromBlueprint(instrumented, blueprint);
     var options = new MotionOptions(0.05, 0.2);
-    check(machine.robot.capabilities().supportsTrajectoryQueue,
+    check(machine.robot.capabilities().execution.plans,
       "simulation runtime advertises trajectory queue support");
 
     var first = planned(machine.queueAxes([new AxisTarget("x", 0.02)], options));
@@ -179,8 +182,6 @@ class StreamTests extends MotionKitTestSupport {
     near(machine.progress(), 0.0, "buffer starts with zero progress");
     check(recording.commands.length == 1, "buffer submits the first move as one plan");
     switch recording.commands[0] {
-      case TrajectoryChunk(chunk):
-        throw "buffer submitted a legacy point chunk";
       case JointTargets(_, _):
         throw "buffer unexpectedly fell back to sample-by-sample targets";
       case ExecutionPlan(plan):
@@ -317,8 +318,6 @@ class StreamTests extends MotionKitTestSupport {
     check(recording.commands.length >= 3,
       "long trajectory refills native chunks before the queue drains");
     for (command in recording.commands) switch command {
-      case RobotCommand.TrajectoryChunk(chunk):
-        throw "long trajectory submitted a legacy point chunk";
       case RobotCommand.JointTargets(_, _):
         throw "long trajectory unexpectedly fell back to sample-by-sample targets";
       case RobotCommand.ExecutionPlan(plan):

@@ -1,7 +1,7 @@
 package robotkit.perception;
 
 import robotkit.mobile.Pose3;
-import robotkit.world.SensorFrame;
+import robotkit.core.SensorFrame;
 import visionkit.CameraCalibration;
 import visionkit.ImageView;
 import visionkit.MarkerDetector;

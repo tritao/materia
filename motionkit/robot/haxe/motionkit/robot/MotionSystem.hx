@@ -11,11 +11,11 @@ import motionkit.planner.PathPlanningOptions;
 import motionkit.trajectory.Trajectory;
 import motionkit.trajectory.TrajectoryState;
 import motionkit.trajectory.ValidationReport;
-import MotionKitNative;
-import robotkit.world.Robot;
-import robotkit.world.RobotCommand;
-import robotkit.world.RobotSnapshot;
-import robotkit.world.StopMode;
+import TrajectoryCore;
+import robotkit.core.Robot;
+import robotkit.core.RobotCommand;
+import robotkit.core.RobotSnapshot;
+import robotkit.core.StopMode;
 import robotkit.runtime.RobotRuntimeError;
 import RobotKitRuntime;
 
@@ -67,8 +67,7 @@ class MotionSystem {
 
   public function new(robot:Robot, blueprint:MotionSystemBlueprint) {
     if (robot == null || blueprint == null) throw "Motion system needs a robot and blueprint";
-    if (!robot.capabilities().supportsTrajectoryQueue ||
-        !robot.capabilities().supportsExecutionPlans)
+    if (!robot.capabilities().execution.plans)
       throw "MotionSystem requires a robot with trajectory queue and execution plan support";
     var description = robot.description();
     if (description == null || description.joints.length != blueprint.model.joints.length)
@@ -407,8 +406,8 @@ class MotionSystem {
     lastPathPlanningDiagnostics = result.diagnostics;
     if (result.report != null)
       pathJerkUnchecked.set(result.trajectory,
-        result.report.checks[MotionKitNativeConstants.MK_CHECK_JERK].status ==
-        MotionKitNativeConstants.MK_CHECK_UNCHECKED);
+        result.report.checks[TrajectoryCoreConstants.MK_CHECK_JERK].status ==
+        TrajectoryCoreConstants.MK_CHECK_UNCHECKED);
     return result.trajectory;
   }
 

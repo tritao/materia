@@ -28,7 +28,7 @@ import robotkit.model.LinkId;
 import robotkit.model.RobotModel;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
-import robotkit.world.JointTarget;
+import robotkit.core.JointTarget;
 import sys.thread.Tls;
 
 /**
@@ -81,6 +81,7 @@ class KinematicGroup {
   /** Weight of an external axis's step damping, in the units of the tool task (1 m weighs like 1 rad). */
   public final externalWeight:Float;
 
+  public final profile:robotkit.profile.RobotProfile;
   final path:Array<Joint>;
   final dofs:Array<Int>;
   final jointModelIndices:Array<Int>;
@@ -102,8 +103,9 @@ class KinematicGroup {
    */
   public function new(robot:RobotModel, rootLink:LinkId, flangeFrame:FrameId, ?workFrame:FrameId,
       ?flangeTTcp:Transform3, ?swivel:ArmSwivel, ?externalAxes:Array<JointId>, ?externalWeight:Float = 0.3,
-      ?compiled:KinematicModel) {
+      ?compiled:KinematicModel, ?profile:robotkit.profile.RobotProfile) {
     if (robot == null) throw "A kinematic group requires a robot model";
+    this.profile = profile == null ? new robotkit.profile.RobotProfile() : profile;
     if (!(externalWeight >= 0.0) || !Math.isFinite(externalWeight)) throw "External axis weight must be non-negative";
     var flange = frameOf(robot, flangeFrame);
     this.robot = robot;
@@ -193,7 +195,7 @@ class KinematicGroup {
    * for instantaneous motion of a differential drive.
    */
   public function baseMotion():RootMotion
-    return robot.floatingBase ? RootMotion.Floating : robot.mobileBase != null ? RootMotion.Planar : RootMotion.Fixed;
+    return robot.floatingBase ? RootMotion.Floating : profile.mobileBase != null ? RootMotion.Planar : RootMotion.Fixed;
 
   /** Each thread's working data for the groups it evaluated most recently, the latest first. */
   static final threadData = new Tls<Array<KinematicGroupData>>();

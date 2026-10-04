@@ -1,6 +1,8 @@
 package motionkit.trajectory;
 
-import MotionKitNative;
+import trajectorykit.validation.ValidationGuarantee;
+
+import TrajectoryCore;
 import haxe.Int64;
 
 /** Snapshot of native extrema and their claimed limits. */
@@ -25,7 +27,7 @@ class ValidationReport {
     for (index in 0...unresolvedAssumptionCount) {
       var assumption = native.get_assumptions(index);
       var text = new StringBuf();
-      for (letter in 0...MotionKitNativeConstants.MK_ASSUMPTION_LENGTH) {
+      for (letter in 0...TrajectoryCoreConstants.MK_ASSUMPTION_LENGTH) {
         var code = assumption.get_text(letter);
         if (code == 0) break;
         text.addChar(code);
@@ -33,7 +35,7 @@ class ValidationReport {
       unresolvedAssumptions.push(text.toString());
     }
     checks = [];
-    for (index in 0...MotionKitNativeConstants.MK_CHECK_COUNT) {
+    for (index in 0...TrajectoryCoreConstants.MK_CHECK_COUNT) {
       var check = native.get_checks(index);
       checks.push(ValidationCheck.fromNative(check));
     }
@@ -42,36 +44,36 @@ class ValidationReport {
   /** Records a task-space check sampled by the planner's kinematics layer. */
   public function setTaskSpace(status:Int, worst:Float, timeSeconds:Float,
       tolerance:Float, resolutionNs:Int64):Void {
-    var result = MotionKitNative.mk_report_set_task_space(native, status, worst,
+    var result = TrajectoryCore.mk_report_set_task_space(native, status, worst,
       timeSeconds, tolerance, resolutionNs);
-    if (result != MotionKitNativeConstants.MK_OK)
+    if (result != TrajectoryCoreConstants.MK_OK)
       throw 'validationReport.setTaskSpace failed with MotionKit error $result';
-    checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE] = ValidationCheck.fromNative(
-      native.get_checks(MotionKitNativeConstants.MK_CHECK_TASK_SPACE));
+    checks[TrajectoryCoreConstants.MK_CHECK_TASK_SPACE] = ValidationCheck.fromNative(
+      native.get_checks(TrajectoryCoreConstants.MK_CHECK_TASK_SPACE));
   }
 
   public function hasFailure():Bool {
     for (check in checks)
-      if (check.status == MotionKitNativeConstants.MK_CHECK_FAILED) return true;
+      if (check.status == TrajectoryCoreConstants.MK_CHECK_FAILED) return true;
     return false;
   }
 
   /** Summarizes each check without treating sampled coverage as a proof. */
   public function guarantees():ValidationGuarantees {
     return new ValidationGuarantees(
-      guarantee(MotionKitNativeConstants.MK_CHECK_POSITION),
-      guarantee(MotionKitNativeConstants.MK_CHECK_VELOCITY),
-      guarantee(MotionKitNativeConstants.MK_CHECK_ACCELERATION),
-      guarantee(MotionKitNativeConstants.MK_CHECK_JERK),
-      guarantee(MotionKitNativeConstants.MK_CHECK_CONTINUITY),
-      guarantee(MotionKitNativeConstants.MK_CHECK_TASK_SPACE));
+      guarantee(TrajectoryCoreConstants.MK_CHECK_POSITION),
+      guarantee(TrajectoryCoreConstants.MK_CHECK_VELOCITY),
+      guarantee(TrajectoryCoreConstants.MK_CHECK_ACCELERATION),
+      guarantee(TrajectoryCoreConstants.MK_CHECK_JERK),
+      guarantee(TrajectoryCoreConstants.MK_CHECK_CONTINUITY),
+      guarantee(TrajectoryCoreConstants.MK_CHECK_TASK_SPACE));
   }
 
   function guarantee(index:Int):ValidationGuarantee {
     var check = checks[index];
-    if (check.status == MotionKitNativeConstants.MK_CHECK_FAILED) return Failed;
-    if (check.status != MotionKitNativeConstants.MK_CHECK_PASSED) return Unchecked;
-    return check.method == MotionKitNativeConstants.MK_CHECK_METHOD_SAMPLED ?
+    if (check.status == TrajectoryCoreConstants.MK_CHECK_FAILED) return Failed;
+    if (check.status != TrajectoryCoreConstants.MK_CHECK_PASSED) return Unchecked;
+    return check.method == TrajectoryCoreConstants.MK_CHECK_METHOD_SAMPLED ?
       Sampled(check.resolutionNs) : Proven;
   }
 }

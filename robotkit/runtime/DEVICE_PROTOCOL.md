@@ -1,4 +1,17 @@
-# RobotKit scheduled device protocol (RKD6)
+# RobotKit scheduled device protocol (generation 6, wire revision 12)
+
+The protocol name is **RKD generation 6, wire revision 12**. The four-byte sync
+marker `RKD6` identifies the scheduled-execution generation, not the wire revision.
+`PROTOCOL_VERSION` identifies the wire revision; peers must agree on its exact value
+(currently 12). A receiver never infers a revision from the marker or accepts an older
+revision. The `6` suffix in `device_wire6`, `device_frame6`, `Rkd6Endpoint`,
+`rkd6_endpoint`, `device_compiler6`, `robotkit_device_compiler6` and the serial C API
+likewise means generation 6. Keep these generation names when incrementing a wire
+revision. A new generation requires a new marker and a new set of identifiers.
+
+This naming scheme is fixed for the first hardware release. No hardware has shipped;
+wire layout changes still require a revision bump and regenerated current fixtures.
+After hardware ships, a wire revision is immutable.
 
 The four-byte sync marker is `RKD6`. A frame is marker (4), message type (1), reserved zero
 (1), little-endian payload length (2), payload, then little-endian CRC-32/IEEE

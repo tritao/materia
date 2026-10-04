@@ -1,7 +1,7 @@
 package robotkit.behavior;
 
 import haxe.Int64;
-import robotkit.world.Robot;
+import robotkit.core.Robot;
 
 /** Runs identical application behavior against simulated or remote adapters. */
 class WorldBehaviorRunner {
@@ -20,10 +20,10 @@ class WorldBehaviorRunner {
     var key = observationKey(snapshot);
     var events = robot.events(lastEventOrdinal, 256);
     if (hasObservation && key == lastObservationKey && events.length == 0) return 0;
-    if (events.length > 0) lastEventOrdinal = robotkit.world.RobotEventRing.ordinalOf(events[events.length - 1]);
+    if (events.length > 0) lastEventOrdinal = robotkit.core.RobotEventRing.ordinalOf(events[events.length - 1]);
     hasObservation = true;
     lastObservationKey = key;
-    var commands:Array<robotkit.world.RobotCommand> = [];
+    var commands:Array<robotkit.core.RobotCommand> = [];
     behavior.update(new WorldBehaviorContext(snapshot, events, commands));
     for (command in commands) robot.submit(command);
     return commands.length;
@@ -31,7 +31,7 @@ class WorldBehaviorRunner {
 
   public function reset():Void { hasObservation = false; lastObservationKey = ""; lastEventOrdinal = Int64.ofInt(0); }
 
-  static function observationKey(snapshot:robotkit.world.RobotSnapshot):String {
+  static function observationKey(snapshot:robotkit.core.RobotSnapshot):String {
     var key = '${snapshot.sourceClockId}:${Int64.toStr(snapshot.sourceSequence)}:'
       + '${Int64.toStr(snapshot.sourceTimestampNs)}:${snapshot.receivedClockId}:'
       + Int64.toStr(snapshot.receivedTimestampNs);

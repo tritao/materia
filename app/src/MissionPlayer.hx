@@ -15,8 +15,8 @@ import materia.project.SceneArtifact.SceneArtifactTorchPose;
 import materia.project.SceneArtifact.SceneArtifactWeld;
 import motionkit.robot.HandlingPlanRunner;
 import processkit.WeldingPlanRunner;
-import robotkit.skill.WeldPlan;
-import robotkit.skill.WeldSeam;
+import processkit.skill.WeldPlan;
+import processkit.skill.WeldSeam;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
 import robotkit.manipulation.Manipulator;
@@ -46,7 +46,7 @@ import robotkit.skill.GoTo;
 import robotkit.skill.Skill;
 import robotkit.skill.SkillRunner;
 import robotkit.skill.SkillStatus;
-import robotkit.world.RobotSnapshot;
+import robotkit.core.RobotSnapshot;
 
 /** A box held where it stands: centre, half extents and heading, in metres and radians. */
 typedef FloorObstacle = {

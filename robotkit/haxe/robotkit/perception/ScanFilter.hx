@@ -1,7 +1,7 @@
 package robotkit.perception;
 
 import robotkit.mobile.Pose2;
-import robotkit.world.SensorFrame;
+import robotkit.core.SensorFrame;
 
 /**
  * Rewrites a sensor frame before perception reads it, given where its sensor stands in the

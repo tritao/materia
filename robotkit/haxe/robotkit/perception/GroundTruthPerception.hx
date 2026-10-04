@@ -1,6 +1,6 @@
 package robotkit.perception;
 
-import robotkit.world.SensorFrame;
+import robotkit.core.SensorFrame;
 
 /** Supplies scene truth through the same API used by sensor-derived perception. */
 class GroundTruthPerception implements Perception {

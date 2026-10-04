@@ -54,6 +54,7 @@ if(MATERIA_ENABLE_MUJOCO)
     add_subdirectory("${MATERIA_SOURCE_ROOT}/simkit/sim_mujoco" sim_mujoco)
 endif()
 add_subdirectory("${MATERIA_SOURCE_ROOT}/robotkit" robotkit)
+add_subdirectory("${MATERIA_SOURCE_ROOT}/motionkit/native" motionkit)
 
 # CadKit is built by its own package (cadkit/haxeon.json), not by this aggregate.
 
@@ -68,7 +69,7 @@ set(BUILD_TESTING ${MATERIA_OWN_BUILD_TESTING})
 set(SK_BUILD_SHARED ON CACHE BOOL "Build StockKit core as a shared library" FORCE)
 
 set(MATERIA_RUNTIME_TARGETS nativekit nativekit_gpu nativekit_ui nativekit_scene
-    nativekit_scene_render nativekit_sim_core motionkit_core robotkit_runtime
+    nativekit_scene_render nativekit_sim_core trajectory_core motionkit_core robotkit_runtime
     animkit_core)
 if(MATERIA_ENABLE_MUJOCO)
     list(APPEND MATERIA_RUNTIME_TARGETS nativekit_sim_mujoco)

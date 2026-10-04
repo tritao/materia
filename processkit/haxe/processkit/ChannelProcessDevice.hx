@@ -2,8 +2,8 @@ package processkit;
 
 import haxe.Int64;
 import robotkit.tool.ChannelToolAdapter;
-import robotkit.world.FiredProcessEvent;
-import robotkit.world.ProcessEventValue;
+import robotkit.execution.FiredProcessEvent;
+import robotkit.execution.ProcessEventValue;
 
 /** Simulation process device driven by ChannelToolAdapter records. */
 class ChannelProcessDevice implements ProcessDevice {
