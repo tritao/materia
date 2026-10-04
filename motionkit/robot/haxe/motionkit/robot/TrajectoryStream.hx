@@ -63,6 +63,22 @@ class TrajectoryStream {
   static var nextProgramTag:Int64 = Int64.ofInt(1000000);
 
   public final robot:Robot;
+  public var planCheck:Null<PlanCheck> = null;
+  public final planChecks:PlanCheckSummary = new PlanCheckSummary();
+  var checkedTrajectory:Null<Trajectory> = null;
+
+  /** Check the whole direct move once, before any part reaches the robot. */
+  public function checkMotion(trajectory:Trajectory):Void {
+    if (checkedTrajectory == trajectory) return;
+    var check = planCheck;
+    if (check != null && check.checks()) {
+      var result = check.checkTrajectory(trajectory);
+      planChecks.add(result);
+      if (check.options.rejects && result.diagnostics.length > 0)
+        throw 'plan check: ${[for (diagnostic in result.diagnostics) diagnostic.describe()].join("; ")}';
+    }
+    checkedTrajectory = trajectory;
+  }
   public var elapsedSeconds(default, null):Float = 0.0;
   public var submitted(default, null):Bool = false;
   public var nextSegment(default, null):Int = 0;
@@ -86,6 +102,7 @@ class TrajectoryStream {
     beginSegments(new ArrayStreamSegments(segments), durationSeconds);
 
   public function beginSegments(segments:StreamSegments, durationSeconds:Float):Void {
+    checkedTrajectory = null;
     this.segments = segments;
     this.durationSeconds = durationSeconds;
     elapsedSeconds = 0.0;
@@ -205,6 +222,7 @@ class TrajectoryStream {
   public function motionSubmission(trajectory:Trajectory, first:Int, last:Int, tag:Int64,
       startNs:Int64, modelRevision:Int64, calibrationRevision:Int64,
       jerkUnchecked:Bool, jointTolerances:Array<Float>):ExecutionPlanSubmission {
+    checkMotion(trajectory);
     var startSeconds = Int64.toFloat(startNs) * 1e-9;
     var payload:Array<TrajectorySegment> = [];
     for (index in first...last)
@@ -342,6 +360,7 @@ class TrajectoryStream {
   public function submitSmoothReplacement(planned:Trajectory, state:TrajectoryState,
       observation:RobotSnapshot, anchorNs:Int64, modelRevision:Int64,
       calibrationRevision:Int64, jointTolerances:Array<Float>):Int64 {
+    checkMotion(planned);
     var tag = nextMotionTag;
     var payload = [for (segment in planned.segments())
       new TrajectorySegment(segment.timeFromStartNs, segment.durationNs,

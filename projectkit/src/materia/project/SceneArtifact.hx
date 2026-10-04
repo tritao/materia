@@ -67,6 +67,42 @@ typedef SceneArtifactData = {
 	@:optional var robotTools:Array<SceneArtifactRobotTool>;
 	/** The sensors on the assembly's robot; see SceneArtifactRobotSensor. */
 	@:optional var robotSensors:Array<SceneArtifactRobotSensor>;
+  /** Moving belts and an optional axis program supplied by the machine's generator. */
+  @:optional var machineMotion:SceneArtifactMachineMotion;
+}
+
+typedef SceneArtifactMachineMotion = {
+  var belts:Array<SceneArtifactBeltVisual>;
+  @:optional var program:SceneArtifactAxisProgram;
+  /** Execute the authored machine program on a streamed stepper board in the app. */
+  @:optional var virtualDevice:Bool;
+}
+
+typedef SceneArtifactBeltVisual = {
+  var occurrence:String;
+  var pitch:Float;
+  var width:Float;
+  var thickness:Float;
+  var driverJoint:String;
+  var driverWrap:Int;
+  var driverSign:Float;
+  var wraps:Array<SceneArtifactBeltWrap>;
+}
+
+typedef SceneArtifactBeltWrap = {
+  var occurrence:String;
+  var connector:String;
+  var radius:Float;
+  var side:Int;
+}
+
+/** Metre-valued independent-axis waypoints, run as exact-stop moves. */
+typedef SceneArtifactAxisProgram = {
+  var axes:Array<String>;
+  var waypoints:Array<Array<Float>>;
+  var loop:Bool;
+  /** Allowed measured endpoint error in axis SI units, including device step resolution. */
+  @:optional var positionTolerance:Float;
 }
 
 /**
@@ -360,8 +396,10 @@ class SceneArtifact {
 		if (robotTools.length > 100000) throw "Scene artifact robot tools are too large";
 		var robotSensors = data.robotSensors == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.robotSensors));
 		if (robotSensors.length > 100000) throw "Scene artifact robot sensors are too large";
+    var machineMotion = data.machineMotion == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.machineMotion));
+    if (machineMotion.length > 1000000) throw "Scene artifact machine motion is too large";
 		var length = 36 + unitText.length + assemblyDefinition.length + assemblyState.length + recipeDocument.length + recipeDiagnostics.length + 4
-			+ machining.length + 4 + mobileBase.length + 4 + mission.length + 4 + robotTools.length + 4 + robotSensors.length + 4;
+			+ machining.length + 4 + mobileBase.length + 4 + mission.length + 4 + robotTools.length + 4 + robotSensors.length + 4 + machineMotion.length + 4;
 		for (part in data.parts) {
 			validatePart(part, true);
 			var id = Bytes.ofString(part.id), name = Bytes.ofString(part.name);
@@ -457,9 +495,56 @@ class SceneArtifact {
 		result.blit(offset, robotTools, 0, robotTools.length); offset += robotTools.length;
 		offset = putInt(result, offset, robotSensors.length);
 		result.blit(offset, robotSensors, 0, robotSensors.length); offset += robotSensors.length;
+    offset = putInt(result, offset, machineMotion.length);
+    result.blit(offset, machineMotion, 0, machineMotion.length); offset += machineMotion.length;
 		if (offset != result.length) throw "Scene artifact size mismatch";
 		return result;
 	}
+
+  static function validateMachineMotion(motion:SceneArtifactMachineMotion, data:SceneArtifactData):Void {
+    if (data.assemblyDefinition == null || motion.belts == null || motion.belts.length > 128)
+      throw "Machine motion needs an assembly and a bounded belt list";
+    var definition = AssemblyDefinitionFlattener.flatten(cast data.assemblyDefinition);
+    var occurrences = [for (value in definition.occurrences) value.id];
+    var joints = [for (value in definition.joints) value.id];
+    for (belt in motion.belts) {
+      if (occurrences.indexOf(belt.occurrence) < 0 || joints.indexOf(belt.driverJoint) < 0 ||
+          belt.wraps == null || belt.wraps.length < 2 || belt.wraps.length > 128 ||
+          belt.driverWrap < 0 || belt.driverWrap >= belt.wraps.length ||
+          (belt.driverSign != 1.0 && belt.driverSign != -1.0))
+        throw "Invalid moving belt attachments";
+      for (value in [belt.pitch, belt.width, belt.thickness])
+        if (!Math.isFinite(value) || value <= 0.0) throw "Invalid moving belt dimensions";
+      for (wrap in belt.wraps) {
+        if (occurrences.indexOf(wrap.occurrence) < 0 || wrap.connector == null || wrap.connector.length == 0 ||
+            !Math.isFinite(wrap.radius) || wrap.radius <= 0.0 || (wrap.side != 1 && wrap.side != -1))
+          throw "Invalid moving belt wrap";
+        var occurrence = [for (value in definition.occurrences) if (value.id == wrap.occurrence) value][0];
+        var found = false;
+        for (component in definition.definitions) if (component.id == occurrence.definition)
+          for (connector in component.connectors) if (connector.name == wrap.connector) found = true;
+        if (!found) throw "Moving belt wrap connector is missing";
+      }
+    }
+    var program = motion.program;
+    if (motion.virtualDevice == true && program == null) throw "A virtual machine device needs an axis program";
+    if (program != null) {
+      if (program.positionTolerance != null && (!Math.isFinite(program.positionTolerance) || program.positionTolerance <= 0.0))
+        throw "Machine program position tolerance must be finite and positive";
+      if (program.axes == null || program.axes.length < 1 || program.axes.length > 64 ||
+          program.waypoints == null || program.waypoints.length < 1 || program.waypoints.length > 10000)
+        throw "Invalid machine axis program";
+      var seen = new Map<String, Bool>();
+      for (id in program.axes) {
+        if (joints.indexOf(id) < 0 || seen.exists(id)) throw "Machine program needs distinct known axes";
+        seen.set(id, true);
+      }
+      for (point in program.waypoints) {
+        if (point == null || point.length != program.axes.length) throw "Machine waypoint joint count mismatch";
+        for (value in point) if (!Math.isFinite(value)) throw "Machine waypoint must be finite";
+      }
+    }
+  }
 
 	public static function decode(source:Bytes):SceneArtifactData {
 		if (source == null || source.length > MAX_BYTES) throw "Scene artifact is missing or too large";
@@ -494,6 +579,7 @@ class SceneArtifact {
 		if (data.mobileBase != null) validateMobileBase(data.mobileBase, data.assemblyDefinition);
 		if (data.robotTools != null) validateRobotTools(data.robotTools, data);
 		if (data.robotSensors != null) validateRobotSensors(data.robotSensors, data);
+    if (data.machineMotion != null) validateMachineMotion(data.machineMotion, data);
 		if (data.mission != null) validateMission(data.mission, data);
 	}
 
@@ -603,6 +689,46 @@ class SceneArtifact {
 			sensor;
 		}];
 	}
+
+  /** Decode JSON into concrete records; native targets cannot cast dynamic objects to records. */
+  static function decodeMachineMotion(decoded:Dynamic):SceneArtifactMachineMotion {
+    function fail():Dynamic throw "Scene artifact machine motion is invalid";
+    function array(value:Dynamic):Array<Dynamic> return Std.isOfType(value, Array) ? cast value : fail();
+    function text(value:Dynamic, name:String):String {
+      var item:Dynamic = Reflect.field(value, name);
+      return Std.isOfType(item, String) ? item : fail();
+    }
+    function number(value:Dynamic):Float
+      return Std.isOfType(value, Float) || Std.isOfType(value, Int) ? (value:Float) : fail();
+    function field(value:Dynamic, name:String):Float return number(Reflect.field(value, name));
+    function integer(value:Dynamic, name:String):Int {
+      var result = field(value, name);
+      return result == Math.floor(result) ? Std.int(result) : fail();
+    }
+    var motion:SceneArtifactMachineMotion = {belts: [for (raw in array(Reflect.field(decoded, "belts"))) {
+      var belt:SceneArtifactBeltVisual = {occurrence: text(raw, "occurrence"), pitch: field(raw, "pitch"),
+        width: field(raw, "width"), thickness: field(raw, "thickness"), driverJoint: text(raw, "driverJoint"),
+        driverWrap: integer(raw, "driverWrap"), driverSign: field(raw, "driverSign"),
+        wraps: [for (wrap in array(Reflect.field(raw, "wraps"))) {
+          var item:SceneArtifactBeltWrap = {occurrence: text(wrap, "occurrence"), connector: text(wrap, "connector"),
+            radius: field(wrap, "radius"), side: integer(wrap, "side")};
+          item;
+        }]};
+      belt;
+    }]};
+    var virtual:Dynamic = Reflect.field(decoded, "virtualDevice");
+    if (virtual != null) motion.virtualDevice = Std.isOfType(virtual, Bool) ? (virtual:Bool) : fail();
+    var raw:Dynamic = Reflect.field(decoded, "program");
+    if (raw != null) {
+      var loop:Dynamic = Reflect.field(raw, "loop");
+      if (!Std.isOfType(loop, Bool)) fail();
+      motion.program = {axes: [for (axis in array(Reflect.field(raw, "axes"))) Std.isOfType(axis, String) ? (axis:String) : fail()],
+        waypoints: [for (waypoint in array(Reflect.field(raw, "waypoints"))) [for (q in array(waypoint)) number(q)]], loop: loop};
+      var tolerance:Dynamic = Reflect.field(raw, "positionTolerance");
+      if (tolerance != null) motion.program.positionTolerance = number(tolerance);
+    }
+    return motion;
+  }
 
 	/** Robot tools from their JSON section, typed field by field. */
 	static function decodeRobotTools(decoded:Dynamic):Array<SceneArtifactRobotTool> {
@@ -1191,12 +1317,17 @@ private class SceneArtifactReader {
 		if (sensorsLength < 0 || sensorsLength > 100000) throw "Scene artifact robot sensors are too large";
 		if (sensorsLength > 0)
 			robotSensors = @:privateAccess SceneArtifact.decodeRobotSensors(haxe.Json.parse(readBytes(sensorsLength).getString(0, sensorsLength)));
+    var machineMotion:Null<SceneArtifactMachineMotion> = null;
+    var machineLength = readInt();
+    if (machineLength < 0 || machineLength > 1000000) throw "Scene artifact machine motion is too large";
+    if (machineLength > 0)
+      machineMotion = @:privateAccess SceneArtifact.decodeMachineMotion(haxe.Json.parse(readBytes(machineLength).getString(0, machineLength)));
 		if (offset != source.length) throw "Scene artifact contains trailing data";
 		var result:SceneArtifactData = {metresPerUnit: metresPerUnit, lengthUnit: lengthUnit,
 			parts: parts,
 			assemblyDefinition: assemblyDefinition, assemblyState: assemblyState, recipeDocument: recipeDocument,
 			recipeDiagnostics: recipeDiagnostics, machining: machining, mobileBase: mobileBase, mission: mission,
-			robotTools: robotTools, robotSensors: robotSensors};
+			robotTools: robotTools, robotSensors: robotSensors, machineMotion: machineMotion};
 		@:privateAccess SceneArtifact.validateHeader(result);
 		return result;
 	}

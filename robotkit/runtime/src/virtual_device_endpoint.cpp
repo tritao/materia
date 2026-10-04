@@ -204,8 +204,9 @@ std::shared_ptr<VirtualDeviceEndpoint> VirtualDeviceEndpoint::create(
         config.seed ? config.seed : 1, config.target_error, config.clock_bound_ns,
         config.latency_ns, config.step_tick_hz, config.link_loss_timeout_ns, config.actuators);
     if (!inner) return {};
+    auto actuators = config.actuators;
     return std::shared_ptr<VirtualDeviceEndpoint>(new VirtualDeviceEndpoint(std::move(inner), link,
-        std::move(config.actuators), blueprint.joint_count, config.controller));
+        std::move(actuators), blueprint.joint_count, config.controller, blueprint, config));
 }
 
 rk_result VirtualDeviceEndpoint::apply(const rk_robot_command &command) {
@@ -226,6 +227,14 @@ rk_result VirtualDeviceEndpoint::submit_device_plan(const PlanRequest &plan,
     std::uint64_t committed_through_ns, const rk_robot_runtime_blueprint &blueprint) {
     return inner_->submit_device_plan(plan, base_time_ns, owner_now_ns,
         committed_through_ns, blueprint);
+}
+
+bool VirtualDeviceEndpoint::reset() {
+    auto fresh = create(*blueprint_, config_);
+    if (!fresh) return false;
+    inner_ = std::move(fresh->inner_);
+    link_ = fresh->link_;
+    return true;
 }
 
 void VirtualDeviceEndpoint::cut_link(bool cut) { link_->cut(cut); }

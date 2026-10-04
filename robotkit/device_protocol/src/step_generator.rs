@@ -11,7 +11,7 @@ pub struct SkewGroup {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum StepFault { DualDriveSkew }
+pub enum StepFault { DualDriveSkew, InvalidActuatorCount }
 
 pub struct StepGenerator<const A: usize> {
     steps_per_unit: [f64; A],
@@ -55,8 +55,14 @@ impl<const A: usize> StepGenerator<A> {
     }
 
     pub fn tick<B: Board>(&mut self, board: &mut B, targets: [f32; A]) -> Result<(), StepFault> {
+        self.tick_active(board, targets, A)
+    }
+
+    /// Only the negotiated outputs may emit pulses, including after a smaller session replaces a larger one.
+    pub fn tick_active<B: Board>(&mut self, board: &mut B, targets: [f32; A], count: usize) -> Result<(), StepFault> {
+        if count > A { return Err(StepFault::InvalidActuatorCount); }
         let now = board.now_ticks();
-        for a in 0..A {
+        for a in 0..count {
             let raw = targets[a] as f64 * self.steps_per_unit[a];
             let truncated = raw as i64;
             let desired = truncated.saturating_sub(i64::from(raw < truncated as f64));
@@ -76,6 +82,7 @@ impl<const A: usize> StepGenerator<A> {
             self.last_step[a] = Some(now);
         }
         for group in self.skew[..self.skew_count].iter().flatten() {
+            if group.first >= count || group.second >= count { continue; }
             let first = board.step_count(group.first) as f64 /
                 self.steps_per_unit[group.first] / group.first_ratio;
             let second = board.step_count(group.second) as f64 /

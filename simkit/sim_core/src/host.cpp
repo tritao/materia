@@ -123,11 +123,14 @@ public:
     }
 
     nksim_result pause() {
-        std::lock_guard lock(mutex);
+        std::unique_lock lock(mutex);
         if (!started || !running)
             return NKSIM_ERROR_INVALID_STATE;
         paused = true;
         condition.notify_all();
+        // A realtime step runs outside the mutex. Wait for its publication before
+        // returning, so a caller observing the paused clock sees a stable snapshot.
+        condition.wait(lock, [this] { return !stepping || !running; });
         return NKSIM_OK;
     }
 
@@ -345,7 +348,9 @@ private:
         {
             std::lock_guard lock(mutex);
             last_error = result;
+            stepping = false;
         }
+        condition.notify_all();
         if (request) {
             if (result != NKSIM_OK && step.scene_changes)
                 nkscene_change_set_destroy(step.scene_changes);
@@ -415,6 +420,7 @@ private:
                 } else if (mode == NKSIM_HOST_MODE_EXTERNAL || paused) {
                     continue;
                 }
+                stepping = true;
             }
 
             perform_step(request);
@@ -441,6 +447,7 @@ private:
     bool ready = false;
     bool running = false;
     bool paused = false;
+    bool stepping = false;
     bool stop_requested = false;
 };
 

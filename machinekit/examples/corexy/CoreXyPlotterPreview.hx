@@ -18,8 +18,14 @@ class CoreXyPlotterPreview {
 	public static inline var ASSEMBLY_ID:String = "corexy-plotter";
 
 	/** Geometry, joints and initial pose of the plotter (parts with equal designations share geometry). */
-	public static function plotter():Bytes
-		return SceneArtifact.encode(AssemblyPreview.scene(new CoreXyPlotter(), ASSEMBLY_ID));
+  public static function plotter():Bytes {
+    var scene = AssemblyPreview.scene(new CoreXyPlotter(), ASSEMBLY_ID);
+    var machine:materia.project.SceneArtifact.SceneArtifactMachineMotion = scene.machineMotion;
+    machine.virtualDevice = true;
+    machine.program = {positionTolerance: 2.5e-5, axes: ["x", "y"], loop: true,
+      waypoints: [[0.03, 0.0], [0.03, 0.03], [0.0, 0.03], [0.0, 0.0], [0.03, 0.03], [0.0, 0.0]]};
+    return SceneArtifact.encode(scene);
+  }
 }
 
 /** A pulley's coefficients on x and y: it turns `x * x + y * y` pitch radii per millimetre. */

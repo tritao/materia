@@ -11,14 +11,16 @@ base layer.
 `materia.project.SceneArtifact` is the shared writer and reader for generated
 viewport geometry. A project generator writes the artifact to a file; Materia
 loads and validates that file after the generator exits. The current `MTRG`
-version 15 contains a metres-per-coordinate scale and independent mesh parts.
+version 16 contains a metres-per-coordinate scale and independent mesh parts.
 Each part has a stable ID, display name, color, vertex and normal streams,
 triangle indices, CAD face ranges, and persistent edge identities. It can also
 carry rigid instance poses, named connector frames, and fixed, revolute,
 continuous, or prismatic joints. Readers reject unsupported versions, duplicate
 IDs, invalid units, malformed buffers, and out-of-range indices. Earlier
-versions are rejected. Version 15 can also carry a versioned assembly definition
-and a separate kinematic state alongside the pose record.
+versions are rejected. Version 16 can also carry a versioned assembly definition
+and a separate kinematic state alongside the pose record. Version 16 adds
+validated moving-belt routes and independent-axis playback metadata, including
+an optional streamed virtual-device deployment.
 
 The artifact is derived output. The project's source code and manifest remain
 authoritative. CadKit authors CAD occurrences and mates; ProjectKit stores their
@@ -35,7 +37,7 @@ joints, explicit unit axes, optional limits, and a `tree` or `closure` role.
 `AssemblyDefinitionCodec` validates and encodes this schema independently from
 the binary scene artifact version. `AssemblyStateRecord` stores joint
 coordinates and root placements separately from the definition. Scene artifact
-version 15 can carry both payloads; geometry part IDs identify component
+version 16 can carry both payloads; geometry part IDs identify component
 definitions so repeated occurrences can share one geometry payload.
 
 Schema version 2 adds a reusable `assemblies` table. An occurrence selects a
@@ -56,5 +58,5 @@ Run the direct ProjectKit suite with
 `./haxeon/scripts/haxeon run --project=projectkit/tests/haxeon.json` from the
 repository root. It exercises units, assembly codecs and frames, scene artifact
 versions, and materials without loading a downstream kit or any native library.
-The suite currently has 52 assertions; keep it passing when changing the
+The suite currently has 131 assertions; keep it passing when changing the
 portable assembly or scene records consumed by other kits.

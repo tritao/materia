@@ -782,13 +782,15 @@ bool Rkd6Endpoint::link_has_room(const DeviceSegment6 &segment) const noexcept {
 void Rkd6Endpoint::send_due_commit() {
     const auto margin_ticks = static_cast<std::uint64_t>(commit_margin_ns() *
         static_cast<double>(ack_.device_tick_hz) / 1e9);
-    if (next_commit_ >= sent_.size() ||
-        status_.path_clock_ticks + margin_ticks < committed_until_ticks_) return;
-    // Commit far enough ahead that the device keeps moving through a host stall (a
-    // collection, the scheduler), and no further, so the path beyond stays open to a
-    // replacement.
     const auto stall_ticks = static_cast<std::uint64_t>(kStallAllowanceNs *
         static_cast<double>(ack_.device_tick_hz) / 1e9);
+    // Keep the stall allowance ahead of the measured path. Waiting until only
+    // the wire margin remains makes a late host wakeup underflow even though
+    // the device already has the next segments buffered.
+    const auto replenish_ticks = std::max(margin_ticks, stall_ticks);
+    if (next_commit_ >= sent_.size() ||
+        status_.path_clock_ticks + replenish_ticks < committed_until_ticks_) return;
+    // Keep the committed horizon bounded, leaving later motion replaceable.
     const auto wanted = status_.path_clock_ticks + std::max(2 * margin_ticks, stall_ticks);
     auto chosen = next_commit_;
     while (chosen + 1 < sent_.size() &&

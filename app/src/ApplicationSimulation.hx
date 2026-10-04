@@ -54,6 +54,8 @@ class ApplicationSimulation {
   /** The simulated tools on the session's robots. */
   var tools:Null<SimulatedTools> = null;
   var cnc:Null<CncProgramPlayer> = null;
+  var beltVisuals:Null<BeltVisuals> = null;
+  var machineProgram:Null<MachineProgramPlayer> = null;
   /** The project's wheeled assembly's drive, when it has one. */
   var mobile:Null<robotkit.mobile.MobileBase> = null;
   /** The work the assembly robot does on its own, when its project ships a mission. */
@@ -120,6 +122,7 @@ class ApplicationSimulation {
     if (motions != null) members.push(motions);
     if (tools != null) members.push(tools);
     if (cnc != null) members.push(cnc);
+    if (machineProgram != null) members.push(machineProgram);
     if (mission != null) members.push(mission);
     if (beads != null) members.push(beads);
     if (workforce != null) members.push(workforce);
@@ -139,6 +142,8 @@ class ApplicationSimulation {
     var candidateAssemblyParts:Array<AssemblyPart> = [];
     var candidateWarnings:Array<String> = [];
     var candidateCnc:Null<CncProgramPlayer> = null;
+    var candidateBelts:Null<BeltVisuals> = null;
+    var candidateProgram:Null<MachineProgramPlayer> = null;
     var candidateMobile:Null<robotkit.mobile.MobileBase> = null;
     var candidateMission:Null<MissionPlayer> = null;
     var candidateBeads:Null<WeldBeads> = null;
@@ -191,6 +196,13 @@ class ApplicationSimulation {
         var job = session.cncJob;
         if (job != null)
           candidateCnc = new CncProgramPlayer(job, built, candidate, session, createdSpace.session);
+        var machine = session.machineMotion;
+        if (machine != null && machine.belts.length > 0)
+          candidateBelts = new BeltVisuals(session, built, candidate, machine.belts);
+        if (machine != null && machine.program != null) {
+          if (job != null) throw "A machine cannot run a CNC job and an axis program together";
+          candidateProgram = new MachineProgramPlayer(machine.program, built, createdSpace.session, machine.virtualDevice == true);
+        }
       }
       var resolvedMotions = RobotMotionPlayer.resolve(candidateMotions,
         [for (robot in candidateRobots) robot.id()], candidateRobotModels);
@@ -289,6 +301,10 @@ class ApplicationSimulation {
       tools = candidateTools;
       workforce = candidateWorkforce;
       if (cnc != null) cnc.dispose();
+      if (beltVisuals != null) beltVisuals.reset();
+      beltVisuals = candidateBelts;
+      if (machineProgram != null) machineProgram.beforeReset();
+      machineProgram = candidateProgram;
       cnc = candidateCnc;
       mobile = candidateMobile;
       mission = candidateMission;
@@ -368,6 +384,7 @@ class ApplicationSimulation {
     pumpStamp = -1.0;
     // The session's own reset has restored its objects and actors; what lives beside it follows.
     for (member in members) member.reset();
+    if (beltVisuals != null) beltVisuals.reset();
     presentMembers();
     presentationEpoch++; return true;
   }
@@ -380,6 +397,8 @@ class ApplicationSimulation {
 
   /** The project's CNC program player, or null when the project has no CNC job. */
   public function cncPlayer():Null<CncProgramPlayer> return cnc;
+  public function programPlayer():Null<MachineProgramPlayer> return machineProgram;
+  public function beltDisplayUpdates():Int return beltVisuals == null ? 0 : beltVisuals.updates;
   /** The drive of the project's wheeled assembly, for twist commands; null when it has none. */
   public function mobileBase():Null<robotkit.mobile.MobileBase> return mobile;
   /** The mission the assembly robot is running, or null when its project ships none. */
@@ -448,6 +467,7 @@ class ApplicationSimulation {
   public function simulatedRobotIds():Array<String> return simulatedIds.copy();
   /** Captures physics poses once, then combines the matching frame's world publications. */
   public function capturePresentationSnapshot():ApplicationPresentationSnapshot {
+    if (beltVisuals != null) beltVisuals.present();
     var active = space, robotsInSession = simulation;
     var frame = active == null ? null : active.session.capture();
     var physics = frame == null || robotsInSession == null ? null : robotsInSession.presentFrame(frame);
@@ -523,6 +543,10 @@ class ApplicationSimulation {
     workforce = null; motions = null; tools = null;
     if (cnc != null) cnc.dispose();
     if (beads != null) beads.dispose();
+    if (beltVisuals != null) beltVisuals.reset();
+    beltVisuals = null;
+    if (machineProgram != null) machineProgram.beforeReset();
+    machineProgram = null;
     cnc = null; mobile = null; mission = null; beads = null; refreshMembers();
     // A mission's programs are planned on worker threads that finish the plan they are on after they are cancelled; the
     // world they plan for goes now, so wait for them (see ProgramPlanner).

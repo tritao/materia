@@ -171,6 +171,22 @@ void realtime_host_can_pause_and_resume() {
     } while (std::chrono::steady_clock::now() < deadline);
     assert(clock.step_index > stable_clock.step_index);
 
+    // Exercise pause at different points in the worker's step/publication cycle.
+    for (int attempt = 0; attempt < 100; ++attempt) {
+        assert(nksim_host_pause(host) == NKSIM_OK);
+        assert(nksim_host_get_clock(host, &paused_clock) == NKSIM_OK);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        assert(nksim_host_get_clock(host, &stable_clock) == NKSIM_OK);
+        assert(stable_clock.step_index == paused_clock.step_index);
+        assert(nksim_host_resume(host) == NKSIM_OK);
+        const auto resume_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+        do {
+            assert(nksim_host_get_clock(host, &clock) == NKSIM_OK);
+            if (clock.step_index > stable_clock.step_index) break;
+            std::this_thread::yield();
+        } while (std::chrono::steady_clock::now() < resume_deadline);
+        assert(clock.step_index > stable_clock.step_index);
+    }
     assert(nksim_host_stop(host) == NKSIM_OK);
     nksim_host_destroy(host);
     nksim_world_destroy(world);
