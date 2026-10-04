@@ -1094,3 +1094,15 @@ readiness checks pass. The unchanged RKD6 CAD seam mission passes at **20.36 s**
 **4.99734 mm**, bead **180 mm**, no gap, and arc/wire off at completion. This is the first complete
 W6 RKD6 mission result. Modbus mission, mission shutdown cases and final app gates remain pending;
 W6 has not been fast-forwarded to main.
+
+The first full Modbus CAD mission exposes a separate owner-scheduling issue. The focused app compiles,
+but its fake server eventually reports `client=Modbus response timed out, requests=3` before a complete
+bead. Preparing CAD before opening TCP removes the long compiler gap, and initializing at supply
+attachment removes the early rebuild gap; neither makes the synchronous setup/planning thread a
+bounded transport owner. The harness now preserves the client fault in its error instead of masking it
+with the subsequent server receive failure. No Modbus mission result is claimed.
+
+Next choose an explicit ProcessKit transport owner that keeps Modbus I/O and watchdog refresh polling
+independent of synchronous CAD/mission planning, with synchronized setpoint and feedback exchange.
+Do not increase deadlines or suppress timeout faults to make the mission pass. Prove shutdown and
+link-loss behavior through that owner before running the remaining W6 gates and landing W6.
