@@ -2894,3 +2894,17 @@ Controlled homing stop must preserve device scope and host queue bookkeeping;
 fault/cancellation cleanup must discard inappropriate pending operations and
 resolve uncertain batches. Hardware controls/GPIO and Phase C verification also
 remain pending. G13 remains incomplete.
+
+### G13 — progress first-side holds during the slow approach
+
+The asynchronous adapter exposed a HomingCycle sequencing gap: queued holds
+were only polled once every switch had closed, so the first side could continue
+stepping while waiting for the second side. Approach now progresses control
+acknowledgments every update, including while a switch remains open. Seek and
+backoff stop transitions also require drained stationary observation and settled
+controls before issuing the next motion.
+
+No builds/tests ran. Delayed-ack first-side coverage remains queued for Phase C.
+Controlled device stop still needs host queue integration before router hookup;
+cancellation cleanup and hardware controls also remain unfinished. G13 is not
+complete.

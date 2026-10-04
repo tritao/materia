@@ -104,7 +104,7 @@ class HomingCycle {
         case Seek:
           if (anyActive(axis, observation)) enter(StopAfterSeek, observation);
         case StopAfterSeek:
-          if (stopped) enter(Backoff, observation);
+          if (stopped && observation.calibrationReady && controlsReady()) enter(Backoff, observation);
         case Backoff:
           if (anyActive(axis, observation)) releasePosition = null;
           else {
@@ -113,8 +113,13 @@ class HomingCycle {
               enter(StopAfterBackoff, observation);
           }
         case StopAfterBackoff:
-          if (stopped) { captures = [for (_ in axis.switches) null]; enter(Approach, observation); }
+          if (stopped && observation.calibrationReady && controlsReady()) {
+            captures = [for (_ in axis.switches) null]; enter(Approach, observation);
+          }
         case Approach:
+          // Progress the first side's asynchronous hold while the second side
+          // is still approaching its switch.
+          controlsReady();
           var all = true;
           for (i in 0...axis.switches.length) {
             var signal = signalFor(axis.switches[i].id, observation);
