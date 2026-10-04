@@ -234,6 +234,32 @@ Update every import across the repository in the same commit. No re-export shims
 
 ## R5 — Package boundaries
 
+Completed on 2026-10-04. Eight owning packages now have independent physical
+source roots: core, sim, remote, serial, recording, autonomy, inference and
+policy. The convenience package excludes ONNX addons. Core's exact dependency
+closure is core + NativeKit + TrajectoryKit. Only simulation directly imports
+SimKit; only autonomy directly declares VisionKit/KinematicsKit. Pure spatial
+values and immutable image/detection stream records remain in core. Serial
+adapters accept model/profile data without deployment/vision interpretation;
+SerialDeployment.openRobot owns that interpretation. Optional inference
+implementations register their factories explicitly in ONNX consumers.
+
+The dependency audit passed. An independent core consumer compiled 194 sources
+and created a runtime with simulation, vision, inference and policy disabled;
+its runtime's only project-library dependency is trajectory_core. The full
+52-target compile sweep and the additional core consumer's compile check passed
+(53 executable targets total). All workspace suites passed (4,950 RobotWorld,
+9,865 MotionKit assertions), including the core consumer run separately before
+adding it to the workspace manifest. All RobotKit/TCP suites, 16 native tests,
+device host/MCU, robotd, humanoid, welder, completed worker demo, 8 MotionKit
+Release and 3 CAD tests, four-platform ABI audits and exact fixtures passed.
+A native schema check initially retained the old source path; it was corrected
+and the complete RobotKit stage passed again. Editing the gate script while
+its workspace stage was running caused a shell read-offset error after all
+workspace tests had reported OK. The saved script passes bash syntax checks;
+all remaining stages passed separately from that version. R5 is merged before
+R6 begins.
+
 Started from the quiet point immediately after R4 main merge `183d90140`.
 Live branches with committed changes to affected files require rebase/path
 updates: drywall-scoped-d8 (8 files), machine-tending (17 files), mobile-welder (2 files), motion-loose-ends (1 files), sketching (1 files), uikit-extract (1 files), publish-facility (1 files), x7-transmissions (7 files).
