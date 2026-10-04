@@ -20,7 +20,7 @@ def main(port):
         with socket.create_connection(("127.0.0.1", port), timeout=5) as controller:
             controller.settimeout(5)
             lock = threading.Lock()
-            send_frame(controller, lock, 1, {1: PROTOCOL_VERSION, 2: "active-controller", 3: "", 4: "controller"})
+            send_frame(controller, lock, 1, {1: PROTOCOL_VERSION, 2: "active-controller", 3: "", 4: "controller", 5: []})
             kind, _, _, welcome, _ = read_frame(controller)
             assert kind == 2 and welcome[5] is True
             session, robot, lease = welcome[3], welcome[4], welcome[6]

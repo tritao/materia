@@ -25,13 +25,13 @@ def main(port):
 
     with socket.create_connection(("127.0.0.1", port), timeout=5) as good:
         good.settimeout(5)
-        send_frame(good, threading.Lock(), 1, {1: PROTOCOL_VERSION, 2: "good-hello", 3: "", 4: "observer"})
+        send_frame(good, threading.Lock(), 1, {1: PROTOCOL_VERSION, 2: "good-hello", 3: "", 4: "observer", 5: []})
         for _ in range(10):
             kind, _, _, _, _ = read_frame(good)
             if kind == 2:
-                print("robotd survived malformed Hello and accepted a legacy Hello")
+                print("robotd survived malformed Hello and accepted a current-version Hello")
                 return
-        raise AssertionError("robotd did not accept a legacy Hello after malformed input")
+        raise AssertionError("robotd did not accept a current-version Hello after malformed input")
 
 
 if __name__ == "__main__":
