@@ -1024,3 +1024,46 @@ cases and final welder/arm/mobile gates remain pending; no W6 cycle time or bead
 Main is not fast-forwarded to incomplete W6. The next authorized repair must establish the initial
 held device state once, retain commanded anchors after execution, and verify nonzero deployment
 origins and reset before retrying the same mission.
+
+
+### W6 initial-anchor repair: passed; short Cartesian segments block qualification
+
+The user authorized the generic held-origin repair. The first **validated** observation now seeds
+untouched joints' commanded anchors once, after construction or reset. A command or plan already
+owns its anchor, and later observation drift cannot move it. The focused native runtime suite passes,
+including nonzero -0.25 rad initialization, subsequent drift, reset to -0.4 rad and existing following-error
+and held-command checks. No changes to `RobotRuntime.hx` or `RobotArm.hx`.
+
+RKD6 then exposed missing startup integration: its plan clock needs two synchronization observations,
+so the app now waits on an explicit virtual-device readiness query before feeding the first mission.
+Readiness clears on rebuild/reset; once started the mission continues receiving failures. This is a
+native endpoint fact, not a fixed delay. Four-platform simulation ABI audit, native rebuild, focused
+host welding shutdown/readiness test and app compile pass. The host test still verifies stop, abort,
+emergency stop, link loss, grounding fault and synchronous stop, with arc/wire off, and reset.
+
+The virtual servo link defaults to configurable 3 Mbaud: the first six-axis polynomial chunk requires
+1,423,437 baud, above the stepper-oriented 921,600 default. A separate 2% acceleration planning reserve
+covers the clock fitter's up-to-0.5% rate adjustment and float polynomial conversion. Physical/native
+limits remain 2 rad/s²; ordinary simulation defaults remain unchanged. Without the reserve, conversion
+correctly rejects joint 0 acceleration 2.0005428791046143 against limit 2 and tolerance 0.000002.
+Device conversion errors now retain these values for diagnosis. The focused device-converter suite passes.
+
+With these changes the unchanged CAD seam mission executes the initial motion. At simulation 2.47 s,
+it fails submitting Cartesian plan chunk [0,199] of 672 (events=0, jerkUnchecked=true), with status -10:
+`Rkd6Endpoint: plan exceeds serial qualification: minimum_baud=18446744073709551615 minimum_queue_depth=4`.
+`minimum_baud` returns UINT64_MAX when the shortest converted segment is at most the configured
+2 ms per-segment processing allowance. Increasing baud cannot qualify this plan. Resolving that requires
+a generic trajectory-generation or buffered-queue qualification design; it is outside the authorized
+held-anchor repair. Stop here under the user's scope rule rather than bypass the native qualification.
+No full bead/cycle result is claimed. Modbus mission, mission shutdown coverage and final welder/arm/mobile
+gates remain pending. W6 is incomplete and not fast-forwarded to main, still
+`1484b924d9789334503781fce4ec1515021fdc6c`. The worktree uses main's recorded haxeon revision.
+
+Commits for this retry:
+
+- `5b99eb1bc7232a514d7c9162ff2e13a3048de4c8` RobotKit: establish held origins from initial device observations
+- `eae3c12bf0de5afcf62a1a8c591df2f04b358355` RobotKit: expose virtual device plan readiness
+- `70e6ab5dd7e704852a2c2110727ffcf0533c9b71` App: wait for virtual device clock qualification before welding
+- `2daa96c825b93c60cd4340582e236236b8c39fe9` RobotKit: report rejected device conversion limits
+- `fd82c53d704cba654963343e74e5dd00e3ad8cfc` RobotKit: configure virtual servo link and planning headroom
+- `28233766033c792226f513b8db14a646ae0db416` App: apply virtual servo acceleration headroom to weld planning
