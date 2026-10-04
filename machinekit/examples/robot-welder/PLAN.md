@@ -607,6 +607,17 @@ W5 design note while waiting for R3/R4 (2026-10-04; implementation has not start
   Earlier station geometry must participate in both grounded-work sensing and clearance before later passes ignite.
 
 W5 implementation notes (in progress, 2026-10-04):
+- Focused app quality checks now pass on both MuJoCo and the test backend. Woven 7 mm: 6.998 mm measured leg,
+  one strike, 27.03 s. Three-pass 10 mm: 9.999 mm leg, three strikes, 65.13 s. The later-pass strike checks verify
+  preceding bead deposition, a tip within 0.6 mm of that bead's surface, and available deposited clearance hulls.
+  The complete entry/weld/exit is checked clear, sampled every five simulation ticks; both beads cover the seam
+  without gaps and end with the arc off. These focused results precede the final W5 milestone gates.
+- `WeldPassPath` intersects adjacent offset lines at CAD chain corners rather than leaving gaps between shifted
+  segments. A closed chain includes its final join. Zero offsets preserve the exact original path object;
+  skew/parallel joins that cannot meet and offsets consuming more than 45% of an adjacent side are rejected.
+  Focused ProcessKit offset checks pass 19 assertions, including a lifted/expanded closed square and bounds.
+  Recipe serialization now shares the single-pass weaving policy too: `fillet(7).step` includes its weave and
+  face lift, and all multi-pass settings use the same unit conversion. Recipe checks pass 33 assertions.
 - Pass skills are now created lazily after cooling, allowing each runner to compile clearance against the metal
   deposited by preceding passes. `WeldBeads` supplies measured station prisms in world coordinates; `MissionPlayer`
   transforms them to the robot base link and includes them in `ArmClearance`. No RobotKit API changes are needed.

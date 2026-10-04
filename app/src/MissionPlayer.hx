@@ -490,11 +490,8 @@ class MissionPlayer implements SessionMember {
    */
   function weldPlan(weld:SceneArtifactWeld, pass:materia.project.SceneArtifact.SceneArtifactWeldPass):WeldPlan {
     var frame = referenceFrame(weld);
-    function pose(torch:SceneArtifactTorchPose, segment:materia.project.SceneArtifact.SceneArtifactWeldSegment):Transform3
-      return frame.compose(new Transform3(new Vec3(
-        torch.position[0] + segment.normals[0][0] * pass.offset[0] + segment.normals[1][0] * pass.offset[1],
-        torch.position[1] + segment.normals[0][1] * pass.offset[0] + segment.normals[1][1] * pass.offset[1],
-        torch.position[2] + segment.normals[0][2] * pass.offset[0] + segment.normals[1][2] * pass.offset[1]),
+    function pose(torch:SceneArtifactTorchPose):Transform3
+      return frame.compose(new Transform3(new Vec3(torch.position[0], torch.position[1], torch.position[2]),
         new Quat(torch.rotation[0], torch.rotation[1], torch.rotation[2], torch.rotation[3])));
     var process = pass.process;
     // The open side of a corner is the bisector of its two faces' outward normals.
@@ -515,7 +512,10 @@ class MissionPlayer implements SessionMember {
       parameters.weave = new motionkit.path.WeaveProfile(pattern, weave.amplitude, weave.cyclesPerMetre,
         process.travelSpeed, weave.edgeDwell);
     }
-    return new WeldPlan([for (segment in weld.path) new WeldSegment(pose(segment.start, segment), pose(segment.stop, segment), segment.seam, open(segment))], parameters);
+    var base = [for (segment in weld.path) new WeldSegment(pose(segment.start), pose(segment.stop), segment.seam, open(segment))];
+    var normals = [for (segment in weld.path) [for (normal in segment.normals)
+      frame.transformVector(new Vec3(normal[0], normal[1], normal[2]))]];
+    return new WeldPlan(processkit.WeldPassPath.offset(base, normals, pass.offset[0], pass.offset[1]), parameters);
   }
 
   /**
