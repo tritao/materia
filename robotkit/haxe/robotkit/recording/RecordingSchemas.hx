@@ -1,7 +1,5 @@
 package robotkit.recording;
 
-
-
 // Generated from the RKF1 schema lock. Do not edit by hand.
 class RecordingSchemas {
   public static function forChannel(name:String):String return switch name {
