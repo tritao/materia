@@ -112,6 +112,7 @@ class PlanExecutor {
       completed = true;
       plan = null;
       planArrays = null;
+      deferredRefill = false;
       if (ownsSession) session.completed();
       return !awaitingResume;
     }

@@ -4994,11 +4994,16 @@ class RobotWorldTests {
     simulationHarness.spawnBox([0.0, 0.0, 2.0], [0.2, 0.2, 0.2]);
     simulationHarness.step(Int64.ofInt(2));
     snapshot = robot.snapshot();
+    equal(value(snapshot, "sensor/stock-present"), 0.0,
+      "presence ignores a static prop directly in front of its face");
+    simulationHarness.spawnBox([0.5, 0.0, 2.0], [0.2, 0.2, 0.2], true, 1.0);
+    simulationHarness.step(Int64.ofInt(3));
+    snapshot = robot.snapshot();
     equal(value(snapshot, "sensor/stock-present"), 1.0,
-      "presence reports a free object inside the connector range");
+      "presence reports an offset free box inside the connector volume");
 
     runtime.submitPosition(0, 0.15, 1);
-    for (tick in 3...33) simulationHarness.step(Int64.ofInt(tick));
+    for (tick in 4...33) simulationHarness.step(Int64.ofInt(tick));
     snapshot = robot.snapshot();
     equal(value(snapshot, "sensor/door-closed"), 1.0,
       "joint switch closes inside its authored position window");
@@ -5011,18 +5016,25 @@ class RobotWorldTests {
     equal(value(robot.snapshot(), "sensor/door-closed"), 0.0,
       "joint switch opens after crossing its hysteresis boundary");
 
-    var spinSegment = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(100000000),
+    var spinSegment = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(400000000),
       [[0.27, 0.0], [0.0, 0.0]]);
     runtime.submitPlan(new ExecutionPlanSubmission(Int64.ofInt(1300), Int64.ofInt(blueprint.revision),
       Int64.ofInt(blueprint.calibrationRevision), RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE |
       RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_EVENTS, [0.27, 0.0], [0.0, 0.0], [0.0, 0.0],
       [spinSegment], null, null, null, null, null, true,
       [new ProcessTimedEvent(Int64.ofInt(0), "spindle.speed", ProcessEventValue.Analog(5.0)),
-       new ProcessTimedEvent(Int64.ofInt(0), "spindle.direction", ProcessEventValue.Analog(1.0))]), 4);
+       new ProcessTimedEvent(Int64.ofInt(0), "spindle.direction", ProcessEventValue.Analog(1.0)),
+       new ProcessTimedEvent(Int64.ofInt(200000000), "spindle.speed", ProcessEventValue.Analog(8.0))]), 4);
     for (tick in 94...104) simulationHarness.step(Int64.ofInt(tick));
-    check(Math.abs(robot.snapshot().velocities.get(1) - 5.0) < 1e-3 &&
-      value(robot.snapshot(), "sensor/spindle-at-speed") == 1.0,
-      "simulation drives the spindle from analog channels and its at-speed sensor reads motion");
+    var firstSpeed = robot.snapshot().velocities.get(1);
+    var firstAtSpeed = value(robot.snapshot(), "sensor/spindle-at-speed");
+    check(Math.abs(firstSpeed - 5.0) < 1e-3 && firstAtSpeed == 1.0,
+      'at-speed follows the lower commanded speed: velocity=$firstSpeed signal=$firstAtSpeed');
+    for (tick in 104...125) simulationHarness.step(Int64.ofInt(tick));
+    var secondSpeed = robot.snapshot().velocities.get(1);
+    var secondAtSpeed = value(robot.snapshot(), "sensor/spindle-at-speed");
+    check(Math.abs(secondSpeed - 8.0) < 1e-3 && secondAtSpeed == 1.0,
+      'at-speed follows an upward spindle command change: velocity=$secondSpeed signal=$secondAtSpeed');
     robot.close();
     simulationHarness.dispose();
   }

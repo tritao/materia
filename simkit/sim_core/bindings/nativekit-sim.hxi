@@ -181,6 +181,7 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 * is nearer.
 	 */
 	extern fn nksim_session_raycast(session: nksim_session, ray: ptr<const<nksim_ray>>, out_distance: ptr<f64> @out) -> nksim_result;
+	extern fn nksim_session_overlap_free_boxes(session: nksim_session, pose: ptr<const<nksim_pose>>, half_extents: ptr<const<f64>>, out_present: ptr<u32> @out) -> nksim_result;
 	/**
 	 * Releases a held object as DYNAMIC from the next tick, retaining the
 	 * carrier point's velocity. Releasing a free object is INVALID_STATE.

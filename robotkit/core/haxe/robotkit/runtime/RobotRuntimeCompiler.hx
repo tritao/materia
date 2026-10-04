@@ -52,8 +52,10 @@ class RobotRuntimeCompiler {
       var drive = actuator.drive;
       var pneumatic = drive == null ? null : drive.pneumatic();
       if (pneumatic != null) {
-        ensureDigitalChannel(result, pneumatic.channelA);
-        if (pneumatic.channelB != null) ensureDigitalChannel(result, pneumatic.channelB);
+        // A single-solenoid gripper needs its energized coil through an ordinary
+        // program stop. An emergency stop still de-energizes every channel.
+        ensureDigitalChannel(result, pneumatic.channelA, pneumatic.channelB == null);
+        if (pneumatic.channelB != null) ensureDigitalChannel(result, pneumatic.channelB, false);
       }
       var processVelocity = actuator.processVelocity;
       if (processVelocity != null) {
@@ -222,14 +224,17 @@ class RobotRuntimeCompiler {
     return Math.min(first, second);
   }
 
-  static function ensureDigitalChannel(blueprint:RobotRuntimeBlueprint, id:String):Void {
+  static function ensureDigitalChannel(blueprint:RobotRuntimeBlueprint, id:String,
+      keepOnStop:Bool):Void {
     for (channel in blueprint.channels) if (channel.id == id) {
       if (channel.safeValue != robotkit.execution.ProcessEventValue.Digital(false))
         throw 'Pneumatic valve channel "$id" must be digital and safe when de-energized';
+      if (channel.keepOnStop != keepOnStop)
+        throw 'Pneumatic valve channel "$id" has the wrong normal-stop policy';
       return;
     }
     blueprint.channels.push(new ProcessChannelDeclaration(id,
-      robotkit.execution.ProcessEventValue.Digital(false), false));
+      robotkit.execution.ProcessEventValue.Digital(false), keepOnStop));
   }
 
   static function ensureAnalogChannel(blueprint:RobotRuntimeBlueprint, id:String):Void {
@@ -625,7 +630,8 @@ class RobotRuntimeCompiler {
         if (!Math.isFinite(sensor.windowLower) || !Math.isFinite(sensor.windowUpper) ||
             !Math.isFinite(sensor.hysteresis) || sensor.hysteresis < 0.0 ||
             (sensor.kind == "joint_switch" && sensor.windowLower > sensor.windowUpper) ||
-            (sensor.kind == "at_speed" && sensor.windowLower <= 0.0))
+            (sensor.kind == "at_speed" && (sensor.windowLower <= 0.0 || sensor.windowLower >= 1.0 ||
+              sensor.hysteresis >= 1.0)))
           diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_WINDOW", path,
             "invalid joint sensor window or speed threshold"));
       }

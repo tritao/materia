@@ -1960,7 +1960,10 @@ private:
                         + joint.end_velocity) / (duration * duration);
                     reference += t * (joint.target_velocity + t * (c2 + t * c3));
                     velocity += t * (2.0 * c2 + 3.0 * t * c3);
-                    acceleration = 2.0 * c2 + 6.0 * t * c3;
+                    // Once the reference interval ends, the drive holds its end state.
+                    // The final polynomial acceleration must not keep producing torque.
+                    if (data->time - joint.reference_epoch < duration)
+                        acceleration = 2.0 * c2 + 6.0 * t * c3;
                 }
                 servo_gain[0] = servoing ? joint.target_stiffness : 0.0;
                 servo_bias[0] = servoing

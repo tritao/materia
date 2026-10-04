@@ -540,11 +540,16 @@ class MachineAssembly {
 			windowUpper: window.upper, hysteresis: hysteresis});
 	}
 
-	/** A digital spindle feedback sensor that turns on at the requested absolute joint speed. */
-	public function addAtSpeed(id:String, joint:String, minimumSpeed:Float):Void
-		addSensorRecord({id: id, kind: "at_speed", joint: joint, windowLower: minimumSpeed, hysteresis: 0.0});
+	/** Digital speed agreement with the current commanded joint speed, using relative error. */
+	public function addAtSpeed(id:String, joint:String, tolerance:Float = 0.02,
+			hysteresis:Float = 0.01):Void {
+		if (!(tolerance > 0 && tolerance < 1) || !(hysteresis >= 0 && hysteresis < 1) ||
+			!Math.isFinite(tolerance + hysteresis)) throw 'At-speed sensor "$id" needs fractional tolerance and hysteresis';
+		addSensorRecord({id: id, kind: "at_speed", joint: joint, windowLower: tolerance,
+			hysteresis: hysteresis});
+	}
 
-	/** A one-ray presence sensor normal to a connector face: an exposed connector's name, or `member/connector`. */
+	/** A volume presence sensor facing out from an assembly connector. */
 	public function addPresence(id:String, connector:String, range:Float):Void {
 		var target = presenceConnector(connector);
 		addSensorRecord({id: id, kind: "presence", occurrence: target.instanceId,

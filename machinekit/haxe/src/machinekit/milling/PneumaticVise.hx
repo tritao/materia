@@ -24,6 +24,9 @@ class PneumaticVise extends MachineAssembly {
 	public final cylinder:PneumaticCylinder;
 	public final datum:AssemblyFrame;
 	public final openGap:Float;
+	/** Jaw travel at first contact with the preset blank, measured from fully open. */
+	public var grippedPosition(get, never):Float;
+	function get_grippedPosition():Float return openGap - blankWidth;
 
 	public function new(blankWidth:Float = 40, blankLength:Float = 60, clearance:Float = 1.5) {
 		super();
@@ -44,7 +47,7 @@ class PneumaticVise extends MachineAssembly {
 		addComponent("movingJaw", movingJaw, jawPose);
 		addMemberConnector("body", "jawGuide", jawPose);
 		addMemberConnector("movingJaw", "guide", AssemblyFrames.identity());
-		var jawDefault = 2 * clearance;
+		var jawDefault = grippedPosition;
 		addMateOnAxis("jaw", "prismatic", "body", "jawGuide", "movingJaw", "guide", {x: 0, y: -1, z: 0},
 			jawDefault, {lower: 0, upper: stroke, velocity: null, effort: null,
 				overtravel: cylinder.endStopCompliance});

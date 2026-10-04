@@ -136,7 +136,7 @@ class BenchMill extends MachineAssembly {
 		zeroPoses.set("spindle", gaugeZero);
 		connect("head", "spindle");
 		addMateOnAxis("spindle-turn", "continuous", "head", "to-spindle", "spindle", "attach-spindle", {x: 0, y: 0, z: 1});
-		addAtSpeed("spindle-at-speed", "spindle-turn", 7600 * 2 * Math.PI / 60);
+		addAtSpeed("spindle-at-speed", "spindle-turn");
 		attach("holder", holder, gaugeZero, "spindle");
 		attach("tool", tool, AssemblyFrames.translation(0, spindleY, gaugeZero.z - tool.stickout), "spindle");
 		if (vise == null) {
@@ -162,8 +162,11 @@ class BenchMill extends MachineAssembly {
 			2 * (BallScrew.INPUT_JOURNAL_LENGTH + ScrewSupportUnit.bk12().length);
 		driveScrew(specs[0], "saddle", "table", [-xScrewLength / 2, saddleY, tableBottom - railSpec.blockHeight / 2],
 			[1.0, 0, 0], [0.0, 0, 1], xScrewLength, [tableX, saddleY, tableBottom - railSpec.blockHeight / 2]);
+		var yNut = new BallNut();
+		var yNutFace = yNut.bodyLength / 2 + yNut.flangeThickness;
 		driveScrew(specs[1], "base", "saddle", [0.0, yRailStart, saddleBottom + saddle.screwHeight],
-			[0.0, 1, 0], [0.0, 0, 1], yRailLength, [0.0, saddleY, saddleBottom + saddle.screwHeight]);
+			[0.0, 1, 0], [0.0, 0, 1], yRailLength,
+			[0.0, saddleY + saddle.depth / 2 - yNutFace, saddleBottom + saddle.screwHeight]);
 		var zScrewTop = columnPose.z + column.height + railSpec.railEndMargin;
 		var zScrewX = column.width / 2 + new BallNut().flangeDiameter / 2 + 2;
 		driveScrew(specs[2], "column", "head", [zScrewX, (headBack + columnFront) / 2, zScrewTop],
@@ -220,7 +223,8 @@ class BenchMill extends MachineAssembly {
 		attach(id + "Nut", nut, orient(nutCenter[0] - along[0] * nutOffset,
 			nutCenter[1] - along[1] * nutOffset, nutCenter[2] - along[2] * nutOffset, up, along), carriage);
 		var faceDistance = nut.bodyLength / 2 + nut.flangeThickness;
-		attach(id + "NutBracket", new MillNutBracket(nut, spec.id == "z"),
+		attach(id + "NutBracket", new MillNutBracket(nut, spec.id, spec.id == "x" ?
+			tableTop - table.height - nutCenter[2] : 0),
 			orient(nutCenter[0] + along[0] * faceDistance, nutCenter[1] + along[1] * faceDistance,
 				nutCenter[2] + along[2] * faceDistance, up, along), carriage);
 		var near = ScrewSupportUnit.bk12(), far = ScrewSupportUnit.bf12();
@@ -443,22 +447,31 @@ private class MillMotorPlate extends MachineComponent {
 	}
 }
 
-/** Nut flange adapter; the vertical-axis tongue reaches the head's side face. */
+/** Nut flange adapter; each axis has a machined bearing face on its carriage. */
 private class MillNutBracket extends MachineComponent {
 	final nut:BallNut;
-	final tongue:Bool;
-	public function new(nut:BallNut, tongue:Bool) {
-		super('MILL-NUT-BRACKET-${nut.designation}-$tongue', "Ball-nut flange adapter", "steel", true);
-		this.nut = nut; this.tongue = tongue;
+	final axis:String;
+	final mountRise:Float;
+	public function new(nut:BallNut, axis:String, mountRise:Float) {
+		super('MILL-NUT-BRACKET-${nut.designation}-$axis-$mountRise', "Ball-nut flange adapter", "steel", true);
+		this.nut = nut; this.axis = axis; this.mountRise = mountRise;
 	}
 	override public function hasGeometry():Bool return true;
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var radius = nut.flangeDiameter / 2 + 1;
+		var radius = nut.flangeDiameter / 2 + (axis == "y" ? 11 : 1);
 		var plate = Solids.named(Part.cylinderSpan(radius, 0, 8), "flange-seat");
-		if (tongue) plate = Solids.union([plate, Solids.named(Part.box(10, 10, 8)
+		if (axis == "z") plate = Solids.union([plate, Solids.named(Part.box(10, 10, 8)
 			.translated(new Vector(-radius + 6, -radius + 4, 0)), "head-seat")]);
+		if (axis == "x") for (side in [-1, 1]) plate = Solids.union([plate,
+			Solids.named(Part.box(16, mountRise, 8)
+				.translated(new Vector(side * (radius + 4), mountRise / 2, 0)),
+				side < 0 ? "table-seat-front" : "table-seat-back")]);
 		var tools = [Solids.named(Part.cylinderSpan(nut.screwDiameter / 2 + 1, -1, 9), "screw-bore")];
 		for (point in nut.boltPattern()) tools.push(Part.cylinderSpan(2.75, -1, 9, point.x, point.y));
+		if (axis == "y") for (side in [-1, 1])
+			tools.push(Part.cylinderSpan(3.3, -1, 9, side * (radius - 5), 0));
+		if (axis == "x") for (side in [-1, 1])
+			tools.push(Part.cylinderAlongY(3.3, -1, mountRise + 1, side * (radius + 4), 4));
 		return Solids.cut(plate, tools);
 	}
 }

@@ -444,9 +444,9 @@ class AssemblySimulationBridge {
         var windowLower = requiredFloat(sensor.windowLower,
           'Assembly sensor "${sensor.id}" has no lower window');
         added.joint = edge.id;
-        added.windowLower = (windowLower - initial) * factor;
+		added.windowLower = sensor.kind == "at_speed" ? windowLower : (windowLower - initial) * factor;
         added.windowUpper = sensor.windowUpper == null ? 0.0 : (sensor.windowUpper - initial) * factor;
-        added.hysteresis = sensor.hysteresis == null ? 0.0 : sensor.hysteresis * factor;
+		added.hysteresis = sensor.hysteresis == null ? 0.0 : sensor.hysteresis * (sensor.kind == "at_speed" ? 1.0 : factor);
       } else if (sensor.kind == "presence") {
         if (sensor.occurrence == null || sensor.connector == null)
           throw 'Assembly presence sensor "${sensor.id}" has no connector or range';

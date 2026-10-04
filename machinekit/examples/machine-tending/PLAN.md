@@ -224,8 +224,9 @@ Done. What was built and decided:
   10 mm T-slot mouths; head has a cartridge bore. Bodies and mounting holes carry semantic names.
 - ER20 cartridge and holder share the gauge-line frame; the generic 1.1 kW spindle motor is rated
   at 8000 rpm and capped at 10000 rpm, with assumed ratings and envelope.
-- MachineKit smoke passed on the current parts: computed casting masses are base 50.10 kg,
-  column 46.04 kg, saddle 28.41 kg, table 13.30 kg and head 30.67 kg. The 400/750 W servos
+- MachineKit smoke passed on the corrected castings: computed masses are base 58.64 kg,
+  column 49.54 kg, saddle 22.43 kg, table 11.71 kg and head 30.67 kg. The earlier values
+  predate the merged casting geometry and the saddle web correction. The 400/750 W servos
   derive rated torques 1.273/2.387 N m at 3000 rpm; maximum speed is 5000 rpm (assumed).
 - The first gate passed MachineKit and the application build, but its application run was interrupted
   (exit 130) during the router case. Following X7's documented workaround, run the replacement
@@ -251,7 +252,11 @@ Done. What was built and decided:
   cartridge mount and tool length; overtravel is measured from rail room.
 - Fitting the swept saddle and real bearing supports changed the designed base depth to 550 mm
   and saddle depth to 130 mm. The X nut needs matching clearance recesses in the saddle and
-  table; its flange adapter and the Y screw bore share dimensions with `BallNut`.
+  table; its flange adapter and the Y screw bore share dimensions with `BallNut`. Review found
+  the original 45 mm saddle severed by its 50 mm bore. The saddle is now 70 mm high with a
+  continuous lower web; the column is 650 mm high to preserve Z rail room. The X bracket has
+  two table bearing ears and the Y bracket mounts on the saddle's rear bore face. CAD checks
+  confirm finite bearing area and no bracket/casting overlap at all travel extremes.
 - SFU1605 now has assumed 12 mm machined journals (50 mm input, 25 mm output), so the BK12/BF12
   seats and coupling fit physical shaft surfaces. Screw speed still conservatively uses full length.
 - The single-tool exercise has a 22 mm seat 7 mm deep, two blind 10 mm fastening recesses 5 mm
@@ -406,9 +411,11 @@ Done. What was built and decided:
   locating faces, giving G54 [95, 55, -230] mm. Projection of that datum onto the table travel
   gives the load position [95, 150, 0] mm. The typed toolpath ends with retract-then-position
   `MachineMove` operations; export/recompile verifies their final G53 coordinates.
-- Static `TendingReach` chooses **Reach850 on a 550 mm riser**, with 15 poses (vise, two door
-  via-poses, twelve tray slots), 27.24693% minimum joint margin and minimum |sin(q5)| ≈ 1.
-  It checks the actual mill and open-door hulls with 5 mm clearance (1 mm for the tool at the
+- Static `TendingReach` chooses **Reach850 on a 600 mm riser**, with 15 poses (vise, two door
+  via-poses, twelve tray slots), 16.23993% minimum joint margin and minimum |sin(q5)| ≈ 1.
+  Review fixed the tray poses in the cell frame and added both tray decks to the clearance
+  scene; the earlier 550 mm riser collided with the outfeed tray at an infeed pose. It checks
+  the actual mill, open-door and tray hulls with 5 mm clearance (1 mm for the tool only at the
   vise); the grasped blank is the intended contact target. The future gripper is explicitly
   an assumed 80 × 50 × 150 mm body/finger envelope with 16 mm opening travel, not an MT8
   operational gripper. World TCP frames and solved joints are returned for the later cell.
@@ -416,10 +423,10 @@ Done. What was built and decided:
   tool length and wrist-module geometry. Numeric IK checks alternate elbow/wrist branches
   when its first solution hits a panel; the first outfeed solution otherwise crossed the
   right front frame. No clearance or joint-margin threshold was relaxed.
-- Clearance queries now skip nearest-point projection when a separating hull face already
-  proves the required distance. Close points keep the exact solver, including corner and
-  penetration checks. This preserves collision decisions and makes full mill-hull checks
-  practical; three RobotKit regressions cover the distance cutoff.
+- `ArmClearance` rejects distant pairs with bounding spheres, then uses
+  `ConvexDistance.between` with the required margin so a separating plane can
+  end the hull search early. Its three RobotKit cutoff checks now exercise
+  that production path; the unused point-to-solid shortcut was removed.
 - A diagnostic enclosed MuJoCo cut exposed the unactuated jaw drifting during table
   acceleration (fault at 35.86 s). MT4 therefore exports and verifies the seated job but
   leaves its physical cycle for MT5, instead of adding an artificial jaw lock or motor.
@@ -552,6 +559,44 @@ Done. What was built and decided:
 - The latest RobotKit world suite passes 4997 assertions, MotionKit 67533, and toolpath motion
   2952 scenario assertions; the other kit counts and MachineKit smoke remain as above. The
   full sequential gate is `mt-suite-main-sync-final.txt`.
+
+**Post-MT5 review fixes (MT5b).**
+- The vise's clamped reed window follows its preset seated-blank jaw position (3 mm), and
+  excludes the empty-vise end stop. The MuJoCo fixture now stops the jaw against a seated
+  blank surrogate and measures **0.08 s at 482.5486 N**; the earlier 0.18 s measurement
+  was the empty-vise full stroke. MT7 will replace that surrogate with a loose blank.
+- The spindle at-speed input compares actual joint speed to the current commanded speed
+  within 2% tolerance and 1% hysteresis. Its threshold no longer depends on starting
+  angle or a fixed 7600 rpm. Crossed A/B hoses swap the extend/retract coil meanings
+  of a double-solenoid valve; single-solenoid valves retain their spring-side logic.
+  A normal stop retains a single-solenoid coil; emergency stop de-energises it.
+- Saved machine assemblies preserve cylinders and sensors, nested spindle speed drives,
+  and their actual schema version. MachineKit v10-13 and ProjectKit v4-7 gate newly
+  saved features; ProjectKit v7 includes servo loop rate and command-relative at-speed.
+  A pneumatic actuator without its drive kind is rejected. MotionKit clears a deferred
+  refill when a plan finishes just after resume, allowing the program to advance.
+- Servo acceleration feedforward becomes zero after its reference interval. Presence
+  tests overlap the sensor's oriented volume with loose dynamic boxes, excluding fixed
+  fixtures, actors and carried boxes; an offset blank can therefore register.
+- The corrected saddle web and nut brackets reduce the derived Z rapid from 25 to
+  **22.8666 m/min**. The bare bearing-block cycle is **51.86 s**, 78 plans, with
+  0.077247/0.051552/0.043834 mm X/Y/Z peak tracking; the enclosed cycle is
+  **52.30 s** with the same removal volume. Door open/close stay **1.50/1.79 s**.
+- The reach study now fixes tray targets in the cell frame, includes both tray decks,
+  limits its 1 mm contact allowance to the vise, and asserts its result. It selects
+  **Reach850 on a 600 mm riser**, 15 poses and 16.23993% minimum joint margin.
+  Cobot mass checks use measured CAD masses rather than positivity alone. The unused
+  `ConvexSolid.distanceBelow` helper and its tests were removed; clearance tests now
+  exercise the production `ConvexDistance.between` path.
+- The sequential `mt-suite-mt5b-review.txt` gate passed: RobotKit world 4999,
+  MotionKit 67533, CadBridge 157, CncKit 317, CamKit 12311, ProjectKit 144,
+  ProcessKit 23 plus 19 weld-pass assertions, MachineKit smoke and the full app
+  project-source run. Direct SimKit session and MuJoCo native tests also passed.
+  The screw/belt router remain 232.2/215.2 s and 0.05/1.76 mm worst deviation;
+  CoreXY remains 649.6 mm/s and 71.549 m/s², arm and mobile mission times stay
+  unchanged, and the welder remains 20.6/21.1 s for the two seam cases and 106.5 s
+  for the ten-seam weldment. The geometry correction alone moves the bare mill from
+  51.19 to 51.86 s and the enclosed mill from 51.92 to 52.30 s.
 
 **MT6. Controllers, robots and signals.**
 - Controller parts:

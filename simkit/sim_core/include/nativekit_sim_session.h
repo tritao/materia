@@ -216,6 +216,15 @@ typedef struct nksim_ray {
 NKSIM_API nksim_result NKSIM_CALL nksim_session_raycast(
     nksim_session session, const nksim_ray *ray, double *out_distance NK_OUT);
 
+/**
+ * True when the oriented query box intersects a free dynamic box object in
+ * the latest physics state. Static fixtures, kinematic actors and carried
+ * objects are excluded. Query dimensions are positive half extents.
+ */
+NKSIM_API nksim_result NKSIM_CALL nksim_session_overlap_free_boxes(
+    nksim_session session, const nksim_pose *pose,
+    const double half_extents[3], uint32_t *out_present NK_OUT);
+
 /** Captures the clock and every body's state under one session lock. */
 NKSIM_API nksim_result NKSIM_CALL nksim_session_capture(
     nksim_session session, nksim_frame *out_frame NK_OUT NK_OWNED);

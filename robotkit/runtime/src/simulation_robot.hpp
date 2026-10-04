@@ -80,7 +80,7 @@ private:
                                      std::vector<nksim_joint_target> &targets);
     /** Resolves spindle setpoint channels and queues their velocity targets. */
     rk_result apply_velocity_drives(const RobotRuntime &runtime,
-                                    std::vector<nksim_joint_target> &targets) const;
+                                    std::vector<nksim_joint_target> &targets);
     /** Queues a zero-velocity hold for one actuated joint. */
     void queue_velocity_hold(std::size_t joint);
     /** Mutable copy of the committed joint commands for the apply in progress. */

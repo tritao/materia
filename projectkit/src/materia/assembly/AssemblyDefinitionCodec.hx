@@ -23,9 +23,11 @@ class AssemblyDefinitionCodec {
 	public static inline var SENSOR_VERSION:Int = 5;
 	/** Analog process-velocity bindings require v6; earlier assembly bytes remain stable. */
 	public static inline var VELOCITY_VERSION:Int = 6;
+	/** Servo loop metadata requires v7. */
+	public static inline var CONTROL_VERSION:Int = 7;
 
 	static function supportedVersion(version:Int):Bool
-		return version >= VERSION && version <= VELOCITY_VERSION;
+		return version >= VERSION && version <= CONTROL_VERSION;
 
 	public static function encode(definition:AssemblyDefinition):String {
 		validate(definition);
@@ -51,7 +53,7 @@ class AssemblyDefinitionCodec {
 
 	public static function validate(definition:AssemblyDefinition):Void {
 		if (definition != null && !supportedVersion(definition.schemaVersion))
-			throw 'schema v${definition.schemaVersion} is unsupported; supported v$VERSION through v$VELOCITY_VERSION';
+			throw 'schema v${definition.schemaVersion} is unsupported; supported v$VERSION through v$CONTROL_VERSION';
 		if (definition != null && definition.assemblies != null && definition.assemblies.length > 0) {
 			validateFlat(AssemblyDefinitionFlattener.flatten(definition));
 			return;
@@ -224,8 +226,10 @@ class AssemblyDefinitionCodec {
 			actuatorIds.set(actuator.id, true);
 			if (actuator.drive == "pneumatic" && definition.schemaVersion == VERSION)
 				throw "Pneumatic assembly drives require schema v$PROCESS_VERSION";
-			if (actuator.processVelocity != null && definition.schemaVersion != VELOCITY_VERSION)
+			if (actuator.processVelocity != null && definition.schemaVersion < VELOCITY_VERSION)
 				throw 'Process-velocity assembly drives require schema v$VELOCITY_VERSION';
+			if (actuator.positionLoopRate != null && definition.schemaVersion < CONTROL_VERSION)
+				throw 'Servo loop metadata requires schema v$CONTROL_VERSION';
 			if (actuator.processVelocity != null) {
 				var process = actuator.processVelocity;
 				var joint = movable.get(actuator.joint);
@@ -251,7 +255,8 @@ class AssemblyDefinitionCodec {
 					sensor.hysteresis == null || !Math.isFinite(sensor.hysteresis) || sensor.hysteresis < 0 ||
 					(sensor.kind == "joint_switch" && (sensor.windowUpper == null ||
 						!Math.isFinite(sensor.windowUpper) || sensor.windowLower > sensor.windowUpper)) ||
-					(sensor.kind == "at_speed" && (sensor.windowLower <= 0 || sensor.windowUpper != null)))
+					(sensor.kind == "at_speed" && (sensor.windowLower <= 0 || sensor.windowLower >= 1 ||
+						sensor.hysteresis >= 1 || sensor.windowUpper != null)))
 					throw 'Assembly sensor "${sensor.id}" has an invalid joint window';
 			} else {
 				var member = sensor.occurrence == null ? null : occurrences.get(sensor.occurrence);
@@ -264,6 +269,8 @@ class AssemblyDefinitionCodec {
 		}
 		if (sensors.length > 0 && definition.schemaVersion < SENSOR_VERSION)
 			throw "Native assembly sensors require schema v$SENSOR_VERSION";
+		if (definition.schemaVersion < CONTROL_VERSION) for (sensor in sensors)
+			if (sensor.kind == "at_speed") throw 'Command-relative at-speed sensors require schema v$CONTROL_VERSION';
 		var switches = definition.switches == null ? [] : definition.switches;
 		if (switches.length > 4000) throw "Assembly has too many switches";
 		var switchIds = new Map<String, Bool>();
@@ -470,7 +477,7 @@ class AssemblyDefinitionCodec {
 		if (actuator.fullStepsPerRevolution != null && actuator.fullStepsPerRevolution > 0
 			&& (actuator.microsteps == null || actuator.maxStepRate == null)) return false;
 		var kind = actuator.drive;
-		if (kind == null) return true;
+		if (kind == null) return actuator.pneumatic == null;
 		if (kind == "pneumatic") {
 			var p = actuator.pneumatic;
 			return p != null && p.bore > p.rod && p.rod > 0 && p.stroke > 0 && p.ratedSpeed > 0 &&

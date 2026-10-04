@@ -90,7 +90,8 @@ private class ClearanceBody {
  *
  * Margins: a pair must be at least `margin` apart. A tool body against fixed bodies in the contact zone (the caller says
  * so: the wire tip is working a seam) need only keep `contactMargin`, since the nozzle sits a few
- * millimetres from the faces it welds. The wire itself is no body (it is millimetres of metal that is consumed).
+ * millimetres from the faces it welds. A caller may name the fixed bodies that permit contact,
+ * so a vise grasp does not relax clearance at the enclosure or trays. The wire itself is no body.
  */
 class ArmClearance {
   /** The distance bodies must keep, in metres. */
@@ -102,6 +103,9 @@ class ArmClearance {
   public final arm:KinematicGroup;
   public final margin:Float;
   public final contactMargin:Float;
+  /** Null keeps the traditional contact policy; otherwise only named fixed bodies get it. */
+  final contactBodies:Null<Map<String, Bool>>;
+  final allowedContactBodyNames:Null<Array<String>>;
 
   final reference:Array<Float>;
   final bodies:Array<ClearanceBody> = [];
@@ -114,12 +118,20 @@ class ArmClearance {
    * touch there (a joint's housing against the next link) are not checked against one another.
    */
   public function new(arm:KinematicGroup, data:Array<ClearanceBodyData>, reference:Array<Float>, ?margin:Float = MARGIN,
-      ?contactMargin:Float = CONTACT_MARGIN) {
+      ?contactMargin:Float = CONTACT_MARGIN, ?allowedContactBodies:Array<String>) {
     if (arm == null || data == null || reference == null) throw "Arm clearance needs an arm, its bodies and a reference configuration";
     if (!(margin >= 0.0) || !(contactMargin >= 0.0) || contactMargin > margin) throw "Clearance margins must not be negative, the contact margin at most the margin";
     this.arm = arm;this.reference=reference.copy();
     this.margin = margin;
     this.contactMargin = contactMargin;
+    allowedContactBodyNames = allowedContactBodies == null ? null : allowedContactBodies.copy();
+    var permitted:Null<Map<String, Bool>> = null;
+    if (allowedContactBodies != null) {
+      var names = new Map<String, Bool>();
+      for (name in allowedContactBodies) names.set(name, true);
+      permitted = names;
+    }
+    contactBodies = permitted;
     var movingLinks = new Map<LinkId, Bool>();
     for (body in data) {
       if (body.vertices == null || body.vertices.length < 12) throw 'Clearance body "${body.name}" needs a hull';
@@ -172,7 +184,7 @@ class ArmClearance {
   /** Same collision geometry on a worker's independent compiled group. */
   public function withGroup(group:KinematicGroup):ArmClearance {
     return new ArmClearance(group,[for(body in bodies){name:body.name,link:body.link,
-      vertices:body.corners.copy(),tool:body.tool}],reference,margin,contactMargin);
+      vertices:body.corners.copy(),tool:body.tool}],reference,margin,contactMargin,allowedContactBodyNames);
   }
 
   public function pairCount():Int return pairs.length;
@@ -182,6 +194,11 @@ class ArmClearance {
 
   /** The names of the bodies that move with the arm. */
   public function movingNames():Array<String> return [for (body in bodies) if (body.moving) body.name];
+
+  function canContact(name:String):Bool {
+    var allowed = contactBodies;
+    return allowed == null || allowed.exists(name);
+  }
 
   /**
    * The first pair closer than it may be with the arm at `q`, or null. With `contact` the tool's bodies may come as close to
@@ -217,7 +234,9 @@ class ArmClearance {
     }
     for (pair in pairs) {
       var a = bodies[pair[0]], b = bodies[pair[1]];
-      var required = contact && (a.tool && !b.moving || b.tool && !a.moving) ? contactMargin : (wanted == null ? margin : Math.min(margin, wanted));
+      var workingFace = (a.tool && !b.moving && canContact(b.name)) ||
+        (b.tool && !a.moving && canContact(a.name));
+      var required = contact && workingFace ? contactMargin : (wanted == null ? margin : Math.min(margin, wanted));
       if(displacements!=null)required+=displacements[pair[0]]+displacements[pair[1]];
       // Whole bodies clear by more than the margin: bounding spheres.
       var gap = centres[pair[0]].sub(centres[pair[1]]).norm() - a.radius - b.radius;

@@ -80,8 +80,15 @@ class CobotArmChecks {
 			for (i in 0...6) if (Math.abs(torques[i]) > arm.modules[i].outputRatedTorque)
 				throw '${arm.reference.designation} joint ${i + 1} needs ${Math.abs(torques[i])} N m, exceeds ${arm.modules[i].outputRatedTorque} N m rated torque';
 			var mass = arm.armMass();
-			if (!(mass > 0) || !Math.isFinite(mass))
-				throw '${arm.reference.designation} assembled mass must be finite and positive';
+			var checkedMass = switch cls {
+				case Reach500: 13.616;
+				case Reach850: 19.484;
+				case Reach900: 35.342;
+				case Reach1300: 35.603;
+			};
+			if (!Math.isFinite(mass) || Math.abs(mass - checkedMass) > 0.02 ||
+				Math.abs(mass / arm.reference.mass - 1) > 0.25)
+				throw '${arm.reference.designation} assembled mass $mass kg differs from its checked design and published class';
 			if (definition.encoders == null || definition.encoders.length != 6) throw "Cobot needs six output encoders";
 			Sys.println('${arm.reference.designation}: $mass kg assembled (published reference ${arm.reference.mass} kg), DH-zero shoulder distance $reach mm, holding N m $torques, DH FK at five poses and full-turn limits passed');
 		}

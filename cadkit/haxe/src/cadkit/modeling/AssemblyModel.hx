@@ -195,8 +195,10 @@ class AssemblyModel {
 	public function actuateDrive(actuator:materia.assembly.AssemblyDefinition.AssemblyActuator):Void {
 		if (actuator.pneumatic != null && data.schemaVersion < AssemblyDefinitionCodec.PROCESS_VERSION)
 			data.schemaVersion = AssemblyDefinitionCodec.PROCESS_VERSION;
-		if (actuator.processVelocity != null)
+		if (actuator.processVelocity != null && data.schemaVersion < AssemblyDefinitionCodec.VELOCITY_VERSION)
 			data.schemaVersion = AssemblyDefinitionCodec.VELOCITY_VERSION;
+		if (actuator.positionLoopRate != null && data.schemaVersion < AssemblyDefinitionCodec.CONTROL_VERSION)
+			data.schemaVersion = AssemblyDefinitionCodec.CONTROL_VERSION;
 		if (data.actuators == null) data.actuators = [];
 		data.actuators.push(materia.assembly.AssemblyDefinitionFlattener.copyActuator(actuator, actuator.id, actuator.joint));
 	}
@@ -215,6 +217,8 @@ class AssemblyModel {
 	public function addSensor(sensor:materia.assembly.AssemblyDefinition.AssemblySensor):Void {
 		if (data.schemaVersion < AssemblyDefinitionCodec.SENSOR_VERSION)
 			data.schemaVersion = AssemblyDefinitionCodec.SENSOR_VERSION;
+		if (sensor.kind == "at_speed" && data.schemaVersion < AssemblyDefinitionCodec.CONTROL_VERSION)
+			data.schemaVersion = AssemblyDefinitionCodec.CONTROL_VERSION;
 		if (data.sensors == null) data.sensors = [];
 		data.sensors.push(materia.assembly.AssemblyDefinitionFlattener.copySensor(sensor, sensor.id, ""));
 	}

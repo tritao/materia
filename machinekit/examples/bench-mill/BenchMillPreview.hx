@@ -55,7 +55,7 @@ class BenchMillChecks {
 		var model = new AssemblyModel("mm");
 		mill.addTo(model, "");
 		var definition = model.definition(BenchMillPreview.ASSEMBLY_ID);
-		if (definition.schemaVersion != materia.assembly.AssemblyDefinitionCodec.VELOCITY_VERSION)
+		if (definition.schemaVersion != materia.assembly.AssemblyDefinitionCodec.CONTROL_VERSION)
 			throw "Bench mill did not select the process-velocity assembly schema";
 		var spindleBinding = false, atSpeedSensor = false;
 		if (definition.actuators != null) for (actuator in definition.actuators)
@@ -65,7 +65,8 @@ class BenchMillChecks {
 				spindleBinding = true;
 		if (definition.sensors != null) for (sensor in definition.sensors)
 			if (sensor.kind == "at_speed" && sensor.joint == "spindle-turn" && sensor.windowLower != null &&
-				Math.abs(sensor.windowLower - 7600 * 2 * Math.PI / 60) < 1e-9) atSpeedSensor = true;
+				Math.abs(sensor.windowLower - 0.02) < 1e-9 && sensor.hysteresis != null &&
+				Math.abs(sensor.hysteresis - 0.01) < 1e-9) atSpeedSensor = true;
 		if (!spindleBinding || !atSpeedSensor)
 			throw "Spindle process channels or at-speed feedback were not derived into the assembly";
 		var state = new AssemblyState(definition);
@@ -97,6 +98,14 @@ class BenchMillChecks {
 				if (Math.abs(state.joint(id + "-turn") - expected) > 1e-6) throw '$id ratio is wrong';
 			}
 		}
+		var saddleSolid = mill.saddle.geometry(), lowerWebProbe = Part.box(10, 10, 5);
+		var lowerWeb = saddleSolid.intersect(lowerWebProbe);
+		var lowerWebVolume = lowerWeb.volume();
+		lowerWeb.close(); lowerWebProbe.close(); saddleSolid.close();
+		if (lowerWebVolume < 200) throw "The Y screw bore severed the saddle's lower load web";
+		if (mountOverlap(mill, state, "screwXNutBracket", "table", 0, 0, 0.05) < 1 ||
+			mountOverlap(mill, state, "screwYNutBracket", "saddle", 0, -0.05, 0) < 1)
+			throw "The X/Y nut brackets lack finite bearing faces on their moving castings";
 		for (spec in mill.specs) {
 			if (!(mill.axisOvertravel(spec.id) > 0)) throw "Mill rail has no overtravel";
 			var suffix = spec.id.toUpperCase();
@@ -139,6 +148,14 @@ class BenchMillChecks {
 			local.close(); return part;
 		}
 		throw 'Mill has no part "$id"';
+	}
+	static function mountOverlap(mill:machinekit.assembly.MachineAssembly, state:AssemblyState,
+			bracket:String, carriage:String, dx:Float, dy:Float, dz:Float):Float {
+		var mounted = posed(mill, state, bracket), body = posed(mill, state, carriage);
+		var pressed = mounted.translated(new Vector(dx, dy, dz));
+		var common = pressed.intersect(body), volume = common.volume();
+		common.close(); pressed.close(); mounted.close(); body.close();
+		return volume;
 	}
 
 }
@@ -201,7 +218,7 @@ class EnclosedMillChecks {
 		var vise = cell.mill.vise;
 		if (vise == null) throw "Enclosed mill has no vise";
 		var processDefinition = state.definition;
-		if (processDefinition.schemaVersion != materia.assembly.AssemblyDefinitionCodec.VELOCITY_VERSION)
+		if (processDefinition.schemaVersion != materia.assembly.AssemblyDefinitionCodec.CONTROL_VERSION)
 			throw "Enclosed mill did not keep the process-velocity schema";
 		if (processDefinition.actuators == null || processDefinition.sensors == null)
 			throw "Enclosed mill did not export its typed actuator and sensor tables";
@@ -217,7 +234,12 @@ class EnclosedMillChecks {
 		for (sensor in processDefinition.sensors) {
 			if (sensor.id == "door-closed" && sensor.kind == "joint_switch") seenDoorClosed = true;
 			if (sensor.id == "door-open" && sensor.kind == "joint_switch") seenDoorOpen = true;
-			if (sensor.id == "vise-clamped" && sensor.kind == "joint_switch") seenViseClamp = true;
+			if (sensor.id == "vise-clamped" && sensor.kind == "joint_switch" &&
+				sensor.windowLower != null && sensor.windowUpper != null) {
+				var grip = vise.grippedPosition;
+				seenViseClamp = sensor.windowLower < grip && grip < sensor.windowUpper &&
+					sensor.windowUpper < vise.stroke;
+			}
 			if (sensor.id == "stock-present" && sensor.kind == "presence") seenStock = true;
 		}
 		if (!seenDoorClosed || !seenDoorOpen || !seenViseClamp || !seenStock)

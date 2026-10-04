@@ -127,6 +127,33 @@ void objects_follow_their_motion_type() {
     nksim_frame_destroy(frame);
 }
 
+void presence_counts_only_free_boxes_in_its_volume() {
+    Space space;
+    nksim_object_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.shape.type = NKSIM_SHAPE_BOX;
+    desc.shape.parameters[0] = desc.shape.parameters[1] = desc.shape.parameters[2] = 0.1;
+    desc.pose = pose_at(0.0, 0.0, 2.0);
+    desc.motion_type = NKSIM_MOTION_STATIC;
+    nksim_object fixture = 0;
+    assert(nksim_session_create_object(space.session, &desc, &fixture) == NKSIM_OK);
+    const double half_extents[3] = {0.5, 0.5, 0.5};
+    const auto query = pose_at(0.0, 0.0, 2.0);
+    uint32_t present = 1;
+    assert(nksim_session_overlap_free_boxes(space.session, &query, half_extents, &present) == NKSIM_OK);
+    assert(present == 0);
+    desc.motion_type = NKSIM_MOTION_DYNAMIC;
+    desc.mass = 1.0;
+    desc.pose = pose_at(0.4, 0.0, 2.0);
+    nksim_object blank = 0;
+    assert(nksim_session_create_object(space.session, &desc, &blank) == NKSIM_OK);
+    assert(nksim_session_overlap_free_boxes(space.session, &query, half_extents, &present) == NKSIM_OK);
+    assert(present == 1);
+    const auto far = pose_at(1.2, 0.0, 2.0);
+    assert(nksim_session_overlap_free_boxes(space.session, &far, half_extents, &present) == NKSIM_OK);
+    assert(present == 0);
+}
+
 void actors_follow_timed_keyframes() {
     Space space;
     nksim_actor_part parts[2]{};
@@ -480,6 +507,7 @@ int main() {
     }
     planes_and_cylinders_are_objects();
     objects_follow_their_motion_type();
+    presence_counts_only_free_boxes_in_its_volume();
     actors_follow_timed_keyframes();
     participants_share_every_tick();
     return 0;

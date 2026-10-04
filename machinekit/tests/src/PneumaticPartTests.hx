@@ -5,6 +5,9 @@ import materia.assembly.AssemblyFrames;
 import machinekit.pneumatic.PneumaticCylinder;
 import machinekit.pneumatic.AirSupply;
 import machinekit.pneumatic.SolenoidValve;
+import machinekit.document.MachineAssemblyDocuments;
+import cadkit.parametric.Document;
+import cadkit.parametric.DocumentCodec;
 
 /** Cylinder areas, valve state and air-service reconstruction before runtime integration. */
 class PneumaticPartTests {
@@ -92,6 +95,39 @@ class PneumaticPartTests {
 		close(drive.maxEffort, door.extendForce(600000), "bound cylinder effort");
 		close(drive.maxRate, 300, "bound cylinder speed");
 		MachineAssemblyDescriptionTests.roundTrip(bound, "bound cylinder", false);
+		bound.addSwitch("door-open", "door-guide", {lower: 450, upper: 460, velocity: null, effort: null});
+		var document = new Document();
+		var root = MachineAssemblyDocuments.defineAssembly(document, bound);
+		var reopened = DocumentCodec.decode(DocumentCodec.encode(document), false, false);
+		var restored = MachineAssemblyDocuments.rebuildAssembly(reopened.element(root.id));
+		var persisted = restored.describe().machine;
+		if (persisted.cylinders == null || persisted.cylinders.length != 1 ||
+			persisted.sensors == null || persisted.sensors.length != 1 ||
+			persisted.sensors[0].id != "door-open")
+			throw "Assembly document lost cylinder or switch bindings";
+		reopened.close();
+		document.close();
+
+		var crossed = new MachineAssembly();
+		crossed.addComponent("base", new MillPanel(100, 100, 20));
+		crossed.addComponent("carriage", new MillPanel(20, 20, 20));
+		crossed.addMemberConnector("base", "guide", AssemblyFrames.identity());
+		crossed.addMemberConnector("carriage", "guide", AssemblyFrames.identity());
+		crossed.addMateOnAxis("guide", "prismatic", "base", "guide", "carriage", "guide",
+			{x: 0, y: 0, z: 1}, 0, {lower: 0, upper: 460, velocity: null, effort: null});
+		crossed.addComponent("cylinder", door, AssemblyFrames.translation(0, 0, -door.bodyLength - door.stemLength));
+		crossed.addComponent("supply", new AirSupply());
+		crossed.addComponent("valve", new SolenoidValve(true, false));
+		crossed.connectPorts("source", "supply", "air", "valve", "P");
+		crossed.connectPorts("extend", "valve", "B", "cylinder", "A");
+		crossed.connectPorts("retract", "valve", "A", "cylinder", "B");
+		crossed.addCylinder("drive", "guide", "cylinder", "valve");
+		var crossedModel = new AssemblyModel("mm");
+		crossed.addTo(crossedModel, "");
+		var crossedDrive = crossedModel.definition("crossed").actuators[0].pneumatic;
+		if (crossedDrive == null || crossedDrive.channelA != "valve/coilB" ||
+			crossedDrive.channelB != "valve/coilA" || !crossedDrive.normallyToA)
+			throw "Crossed double-solenoid hoses must swap the extension and retraction coils";
 
 		var failed = false;
 		try new PneumaticCylinder("ISO6432", 32, 100, 300) catch (_:Dynamic) failed = true;

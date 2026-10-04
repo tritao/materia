@@ -149,6 +149,15 @@ class ClearanceTests {
     // The tool in the contact zone may come as close as the contact margin: 3 mm is clear for the forearm but not the upper arm.
     var contact = cell.clearance.violation([0.0, 0.0], true);
     check(contact != null && contact.a != "forearm" && contact.b != "forearm", 'only the arm itself, not the tool, is held to the margin there, got ${contact == null ? "" : contact.a + "," + contact.b}');
+    var selected = new ArmClearance(cell.arm, [
+      {name: "forearm", link: "link2", vertices: box(0.0, 0.3, -0.025, 0.025, -0.025, 0.025), tool: true},
+      {name: "table", link: "base", vertices: table.vertices, tool: false},
+      {name: "unrelated fixture", link: "base", vertices: table.vertices, tool: false}],
+      [0.0, 0.0], ArmClearance.MARGIN, ArmClearance.CONTACT_MARGIN, ["table"]);
+    var fixtureHit = selected.violation([0.0, 0.0], true);
+    check(fixtureHit != null && fixtureHit.b == "unrelated fixture" &&
+      fixtureHit.required == ArmClearance.MARGIN,
+      "contact allowance applies only to the selected fixed body");
     var lifted = rig([{name: "table", vertices: box(-0.2, 0.8, -0.5, 0.5, -0.2, -0.025 - 0.00025)}]);
     check(lifted.clearance.violation([0.0, 0.0], true) != null, "0.25 mm is closer than even the contact margin");
     var roomy = rig([{name: "table", vertices: box(-0.2, 0.8, -0.5, 0.5, -0.2, -0.025 - 0.02)}]);
@@ -229,16 +238,14 @@ class ClearanceTests {
   static function testSolidEdges():Void {
     var solid = new ConvexSolid(box(0.0, 0.1, 0.0, 0.2, 0.0, 0.3));
     check(solid.cornerPoints().length == 24, "a box has eight corners");
-    check(solid.distanceBelow(0.2, 0.3, 0.4, 0.005) >= 0.005,
-      "a separating face proves a distant point clear");
-    var corner = solid.distanceBelow(0.103, 0.203, 0.303, 0.005);
-    check(Math.abs(corner - Math.sqrt(3.0) * 0.003) < 1e-9,
-      "below-threshold face distances still solve the true corner distance");
-    check(Math.abs(solid.distanceBelow(0.05, 0.1, 0.15, 0.005) - solid.distance(0.05, 0.1, 0.15)) < 1e-12,
-      "clearance cutoff preserves penetration depth");
-
     // The distance between hulls: two boxes 0.05 apart face to face, and 0.05 apart edge to edge (a diagonal gap of 0.05 * sqrt(2)).
     var a = box(0.0, 1.0, 0.0, 1.0, 0.0, 1.0);
+    check(ConvexDistance.between(a, box(2.0, 3.0, 0.0, 1.0, 0.0, 1.0), 0.005) >= 0.005,
+      "the clearance solver proves a distant hull pair clear at the requested margin");
+    near(ConvexDistance.between(a, box(1.003, 2.0, 0.0, 1.0, 0.0, 1.0), 0.005),
+      0.003, 1e-9, "a below-margin pair keeps its exact distance");
+    check(ConvexDistance.between(a, box(0.5, 1.5, 0.5, 1.5, 0.5, 1.5), 0.005) == 0.0,
+      "the margin cutoff does not hide a penetration");
     near(ConvexDistance.between(a, box(1.05, 2.0, 0.0, 1.0, 0.0, 1.0), 1.0), 0.05, 1e-9, "boxes apart face to face");
     near(ConvexDistance.between(a, box(1.05, 2.0, 1.05, 2.0, 0.0, 1.0), 1.0), 0.05 * Math.sqrt(2), 1e-9, "boxes apart edge to edge");
     near(ConvexDistance.between(a, box(1.05, 2.0, 1.05, 2.0, 1.05, 2.0), 1.0), 0.05 * Math.sqrt(3), 1e-9, "boxes apart corner to corner");

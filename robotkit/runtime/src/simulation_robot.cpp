@@ -264,7 +264,7 @@ rk_result SimulationRobot::apply_pneumatic_valves(const RobotRuntime &runtime,
 }
 
 rk_result SimulationRobot::apply_velocity_drives(const RobotRuntime &runtime,
-                                                  std::vector<nksim_joint_target> &targets) const {
+                                                  std::vector<nksim_joint_target> &targets) {
     for (const auto &drive : velocity_drives_) {
         rk_event_value speed{};
         auto result = runtime.channel_value(drive.speed_channel.c_str(), speed);
@@ -284,6 +284,9 @@ rk_result SimulationRobot::apply_velocity_drives(const RobotRuntime &runtime,
         target.target = velocity;
         target.max_force = drive.max_effort;
         targets.push_back(target);
+        // Process velocity targets are resolved after take_pending_targets(). Keep
+        // the applied target for the at-speed sensor and the next stop command.
+        commanded_[drive.joint] = {target.mode, target.target};
     }
     return RK_OK;
 }
@@ -377,23 +380,33 @@ rk_result SimulationRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) 
                 sensor.values[0] = sensor.active ? 1.0 : 0.0;
             } else if (config.kind == RK_SENSOR_AT_SPEED) {
                 if (sensor.joint >= state.joint_count) return RK_ERROR_BACKEND;
+                const double target = std::abs(applied_velocity(sensor.joint));
+                const double error = std::abs(std::abs(state.velocity[sensor.joint]) - target);
+                // window_lower and hysteresis are fractions of the live command, not a fixed rpm.
+                const double tolerance = target * sensor.window_lower;
+                if (target <= 0.0) sensor.active = false;
+                else if (sensor.active) {
+                    if (error > target * (sensor.window_lower + sensor.hysteresis)) sensor.active = false;
+                } else if (error <= tolerance) sensor.active = true;
                 sample.value_count = 1;
-                sensor.values[0] = std::abs(state.velocity[sensor.joint]) >= sensor.window_lower
-                    ? 1.0 : 0.0;
+                sensor.values[0] = sensor.active ? 1.0 : 0.0;
             } else if (config.kind == RK_SENSOR_PRESENCE) {
                 sample.value_count = 1;
                 const double local[3] = {0.0, 0.0, 1.0};
                 double direction[3];
                 sensors::rotate(rotation, local, direction);
-                nksim_ray cast{};
-                cast.struct_size = sizeof(cast);
-                std::copy_n(origin, 3, cast.origin);
-                std::copy_n(direction, 3, cast.direction);
-                cast.max_distance = config.max_range;
-                double range = config.max_range;
-                if (nksim_session_raycast(simulation_.session_, &cast, &range) != NKSIM_OK)
+                nksim_pose volume{};
+                volume.struct_size = sizeof(volume);
+                for (int axis = 0; axis < 3; ++axis)
+                    volume.position[axis] = origin[axis] + direction[axis] * config.max_range * 0.5;
+                std::copy_n(rotation, 4, volume.rotation);
+                const double half_extents[3] = {config.max_range, config.max_range,
+                                                config.max_range * 0.5};
+                uint32_t present = 0;
+                if (nksim_session_overlap_free_boxes(simulation_.session_, &volume,
+                                                     half_extents, &present) != NKSIM_OK)
                     return RK_ERROR_BACKEND;
-                sensor.values[0] = range < config.max_range - 1e-9 ? 1.0 : 0.0;
+                sensor.values[0] = present ? 1.0 : 0.0;
             } else {
                 sample.value_count = config.ray_count;
                 const double field_of_view = config.field_of_view > 0.0

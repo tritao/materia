@@ -227,7 +227,9 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
                 !is_finite(blueprint->sensor_hysteresis[i]) || blueprint->sensor_hysteresis[i] < 0.0 ||
                 (sensor.kind == RK_SENSOR_JOINT_SWITCH &&
                     blueprint->sensor_window_lower[i] > blueprint->sensor_window_upper[i]) ||
-                (sensor.kind == RK_SENSOR_AT_SPEED && blueprint->sensor_window_lower[i] <= 0.0))
+                (sensor.kind == RK_SENSOR_AT_SPEED &&
+                    (blueprint->sensor_window_lower[i] <= 0.0 || blueprint->sensor_window_lower[i] >= 1.0 ||
+                     blueprint->sensor_hysteresis[i] >= 1.0)))
                 return RK_ERROR_INVALID_ARGUMENT;
         }
         pooled_values += sensor.kind == RK_SENSOR_LIDAR ? sensor.ray_count

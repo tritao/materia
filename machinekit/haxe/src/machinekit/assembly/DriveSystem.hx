@@ -468,10 +468,12 @@ class DriveSystem {
 			Math.pow(extension.z - slider.z, 2)) > 1e-5)
 			throw "Cylinder extension tip must meet the guided member at its default pose";
 		var hoseSign = a.portName == "A" ? 1.0 : -1.0;
+		var extendCoil = valve.isDoubleSolenoid() && hoseSign < 0 ? "coilB" : "coilA";
+		var retractCoil = valve.isDoubleSolenoid() && hoseSign < 0 ? "coilA" : "coilB";
 		return {id: record.actuator, joint: record.joint, maxEffort: cylinder.extendForce(pressure), maxRate: cylinder.ratedSpeedMmPerSecond(),
 			drive: "pneumatic", assumed: ["cylinder envelope", "flow-limited cylinder speed", "installed pneumatic fittings"],
 			pneumatic: {bore: cylinder.boreMm(), rod: cylinder.rodMm(), stroke: cylinder.strokeMm(), ratedSpeed: cylinder.ratedSpeedMmPerSecond(),
-				pressurePa: pressure, channelA: record.valve + "/coilA", channelB: valve.isDoubleSolenoid() ? record.valve + "/coilB" : null,
+				pressurePa: pressure, channelA: record.valve + "/" + extendCoil, channelB: valve.isDoubleSolenoid() ? record.valve + "/" + retractCoil : null,
 				normallyToA: hoseSign > 0 ? valve.defaultsToA() : !valve.defaultsToA(), extendSign: dot > 0 ? 1.0 : -1.0}};
 	}
 
@@ -529,10 +531,12 @@ class DriveSystem {
 						windowLower: lower, windowUpper: upper, hysteresis: hysteresis});
 				} else {
 					var threshold = record.windowLower;
-					if (threshold == null || !(threshold > 0) || !Math.isFinite(threshold))
-						throw 'At-speed sensor "${record.id}" needs a positive threshold';
+					if (threshold == null || !(threshold > 0 && threshold < 1) ||
+						record.hysteresis == null || !(record.hysteresis >= 0 && record.hysteresis < 1) ||
+						!Math.isFinite(threshold + record.hysteresis))
+						throw 'At-speed sensor "${record.id}" needs fractional tolerance and hysteresis';
 					result.push({id: record.id, kind: record.kind, joint: record.joint,
-						windowLower: threshold, hysteresis: 0.0});
+						windowLower: threshold, hysteresis: record.hysteresis});
 				}
 			} else {
 				var range = record.range, occurrence = record.occurrence, connector = record.connector;

@@ -163,7 +163,8 @@ class EnclosedBenchMill extends MachineAssembly {
 		addSwitch("door-closed", "door", {lower: 0, upper: 5, velocity: null, effort: null}, 2);
 		addSwitch("door-open", "door", {lower: doorStroke - 5, upper: doorStroke, velocity: null, effort: null}, 2);
 		addSwitch("vise-open", "mill/vise/jaw", {lower: 0, upper: 0.5, velocity: null, effort: null}, 0.25);
-		addSwitch("vise-clamped", "mill/vise/jaw", {lower: 5.5, upper: 6, velocity: null, effort: null}, 0.25);
+		addSwitch("vise-clamped", "mill/vise/jaw", {lower: vise.grippedPosition - 0.5,
+			upper: vise.grippedPosition + 0.5, velocity: null, effort: null}, 0.25);
 		addPresence("stock-present", "mill/vise/datum", 25);
 		loadPosition = nearestLoadPosition();
 	}

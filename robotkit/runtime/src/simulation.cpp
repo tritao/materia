@@ -706,6 +706,9 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             binding->actuated_joints_.push_back(source.type != RK_RUNTIME_JOINT_FIXED && !process_joint);
             joints_.push_back(joint);
         }
+        // A process drive may command its joint before any controller joint
+        // target has staged a command. Keep its applied state from the first tick.
+        binding->commanded_.resize(blueprint.joint_count);
         // Parallel powered drive shafts need independent targets for squaring.
         // An unpowered idler following the same axis is not a second drive. Keep
         // ordinary single-output transmissions physically constrained so their

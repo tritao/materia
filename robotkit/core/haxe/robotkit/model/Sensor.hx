@@ -11,10 +11,10 @@ class Sensor {
   public var maxRange:Float = 10.0;
   /** Joint read by a native switch or speed sensor. */
   public var joint:Null<String>;
-  /** Inclusive position window for a `joint_switch`, in joint SI units. */
+	/** Switch position window in SI units; for `at_speed`, lower is fractional speed tolerance. */
   public var windowLower:Float = 0.0;
   public var windowUpper:Float = 0.0;
-  /** Position hysteresis beyond the switch window, in joint SI units. */
+	/** Switch position hysteresis in SI units; for `at_speed`, fractional speed hysteresis. */
   public var hysteresis:Float = 0.0;
   /** Bearing of the first LiDAR ray in the sensor frame. */
   public var startAngleRadians:Float = 0.0;

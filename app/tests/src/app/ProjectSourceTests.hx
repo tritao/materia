@@ -2180,13 +2180,29 @@ class ProjectSourceTests {
     doorJoint.limitDampingRatio = 1.0;
     var viseJoint = fixture.addJoint(new Joint("vise jaw", JointType.Prismatic, base, viseLink, viseJointId));
     viseJoint.axis = [1.0, 0.0, 0.0];
+    // The preset blank stops the jaw before the cylinder's full empty stroke.
+    var gripTravel = new machinekit.milling.PneumaticVise().grippedPosition * 0.001;
     viseJoint.limits = viseDrive.extendSign > 0.0 ?
-      new JointLimits(0.0, viseDrive.stroke) : new JointLimits(-viseDrive.stroke, 0.0);
+      new JointLimits(0.0, gripTravel) : new JointLimits(-gripTravel, 0.0);
     viseJoint.limits.overtravel = viseCompliance;
     viseJoint.limitTimeConstant = viseDrive.limitTimeConstant(viseLink.mass, viseCompliance);
     viseJoint.limitDampingRatio = 1.0;
     fixture.addActuator(doorActuator);
     fixture.addActuator(viseActuator);
+    var clampSwitch = [for (sensor in model.sensors) if (sensor.id == "vise-clamped") sensor];
+    // The assembly bridge centres joint coordinates at the placed jaw (the
+    // seated blank). Its switch must be true there and false at empty closure.
+    var emptyTravel = viseDrive.stroke - gripTravel;
+    check(clampSwitch.length == 1 && clampSwitch[0].windowLower < 0.0 &&
+      0.0 < clampSwitch[0].windowUpper && clampSwitch[0].windowUpper < emptyTravel,
+      "clamped switch sees the seated blank and excludes the empty full stroke");
+    var fixtureSwitch = new robotkit.model.Sensor(clampSwitch[0].name,
+      clampSwitch[0].kind, clampSwitch[0].updateRate, clampSwitch[0].id);
+    fixtureSwitch.joint = clampSwitch[0].joint;
+    fixtureSwitch.windowLower = clampSwitch[0].windowLower + gripTravel;
+    fixtureSwitch.windowUpper = clampSwitch[0].windowUpper + gripTravel;
+    fixtureSwitch.hysteresis = clampSwitch[0].hysteresis;
+    fixture.addSensor(fixtureSwitch);
     var blueprint = RobotRuntimeCompiler.compile(fixture, new robotkit.profile.RobotProfile());
     var physical = new SimulationHarness(0.01, physicsSubsteps, SimulationSpace.MUJOCO);
     try {
@@ -2226,7 +2242,7 @@ class ProjectSourceTests {
         if (doorCloseStart >= 0 && doorCloseReached < 0 && doorPosition <= doorDrive.stroke * 0.02)
           doorCloseReached = tick;
         if (viseClampStart < 0 && viseA) viseClampStart = tick;
-        if (viseClampStart >= 0 && viseClampReached < 0 && visePosition >= viseDrive.stroke * 0.98) {
+        if (viseClampStart >= 0 && viseClampReached < 0 && visePosition >= gripTravel * 0.98) {
           viseClampReached = tick;
           viseClampEffort = Math.abs(snapshot.effort.get(1));
         }
@@ -2237,7 +2253,7 @@ class ProjectSourceTests {
       var expectedDoorSeconds = doorDrive.stroke * 0.98 / doorDrive.ratedSpeed;
       var expectedDoorCloseSeconds = expectedDoorSeconds *
         doorDrive.extensionForce() / doorDrive.retractionForce();
-      var expectedViseSeconds = viseDrive.stroke * 0.98 / viseDrive.ratedSpeed;
+      var expectedViseSeconds = gripTravel * 0.98 / viseDrive.ratedSpeed;
       check(doorOpenStart > 0 && doorOpenReached > doorOpenStart &&
         Math.abs(doorOpenSeconds / expectedDoorSeconds - 1.0) <= 0.1,
         'MuJoCo door extension takes stroke / rated speed within 10%, measured $doorOpenSeconds s; start=$doorOpenStart reached=$doorOpenReached position=$lastDoorPosition sign=${doorDrive.extendSign} drives=${blueprint.pneumaticDrives.length}, trajectory=${runtime.snapshot().trajectoryTimeNs}, active=${runtime.snapshot().trajectoryActive}, safety=${runtime.snapshot().safety}');
@@ -2245,12 +2261,16 @@ class ProjectSourceTests {
         Math.abs(doorCloseSeconds / expectedDoorCloseSeconds - 1.0) <= 0.1,
         'MuJoCo door retraction takes stroke / rated speed within 10%, measured $doorCloseSeconds s');
       check(viseClampStart > 0 && viseClampReached > viseClampStart &&
-        Math.abs(viseClampSeconds / expectedViseSeconds - 1.0) <= 0.1,
-        'MuJoCo vise clamp takes stroke / rated speed within 10%, measured $viseClampSeconds s');
+        Math.abs(viseClampSeconds - expectedViseSeconds) <= 0.03,
+        'MuJoCo seated-blank clamp takes grip travel / rated speed within three controller ticks, measured $viseClampSeconds s');
       check(Math.abs(viseClampEffort - viseDrive.extensionForce()) <= viseDrive.extensionForce() * 0.05,
         'MuJoCo vise joint reports clamp force within 5% of p·A, measured $viseClampEffort N');
+      var clampFrames = [for (frame in runtime.snapshot().sensors.toArray())
+        if (frame.sensorId == clampSwitch[0].id) frame];
+      check(clampFrames.length == 1 && clampFrames[0].values.get(0) == 1.0,
+        "clamped switch closes against the seated-blank stop");
       Sys.println('pneumatic mill: door open $doorOpenSeconds s, close $doorCloseSeconds s, ' +
-        'vise clamp $viseClampSeconds s at $viseClampEffort N');
+        'vise clamp against seated blank $viseClampSeconds s at $viseClampEffort N');
     } catch (error:Dynamic) {
       physical.dispose();
       throw error;

@@ -166,7 +166,7 @@ class RobotModelCodec {
         finite(sensor.hysteresis, "sensor hysteresis");
         if (sensor.kind == "joint_switch" && (sensor.windowLower > sensor.windowUpper || sensor.hysteresis < 0.0))
           throw 'Sensor ${sensor.id} has an invalid switch window';
-        if (sensor.kind == "at_speed" && sensor.windowLower <= 0.0)
+		if (sensor.kind == "at_speed" && (sensor.windowLower <= 0.0 || sensor.windowLower >= 1.0 || sensor.hysteresis >= 1.0))
           throw 'Sensor ${sensor.id} needs a positive at-speed threshold';
       }
       if (sensor.kind == "presence" && sensor.maxRange <= 0.0)

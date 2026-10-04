@@ -28,6 +28,54 @@ void rotate(const double q[4], const double v[3], double out[3], bool inverse = 
     out[2] = v[2] + w * t[2] + x * t[1] - y * t[0];
 }
 
+// Separating-axis test for two oriented boxes. The query uses an actual
+// volume, including objects offset from its centreline, without counting a
+// box whose AABB only crosses it after rotation.
+bool boxes_overlap(const nksim_pose &query, const double query_half[3],
+                   const nksim_body_state &object, const double object_half[3]) {
+    double a[3][3]{}, b[3][3]{}, r[3][3]{}, abs_r[3][3]{}, t[3]{};
+    for (int axis = 0; axis < 3; ++axis) {
+        double basis[3]{};
+        basis[axis] = 1.0;
+        rotate(query.rotation, basis, a[axis]);
+        rotate(object.rotation, basis, b[axis]);
+    }
+    const double delta[3] = {object.position[0] - query.position[0],
+                             object.position[1] - query.position[1],
+                             object.position[2] - query.position[2]};
+    for (int i = 0; i < 3; ++i) {
+        for (int k = 0; k < 3; ++k) t[i] += delta[k] * a[i][k];
+        for (int j = 0; j < 3; ++j) {
+            for (int k = 0; k < 3; ++k) r[i][j] += a[i][k] * b[j][k];
+            abs_r[i][j] = std::abs(r[i][j]) + 1e-12;
+        }
+    }
+    for (int i = 0; i < 3; ++i) {
+        double radius = query_half[i];
+        for (int j = 0; j < 3; ++j) radius += object_half[j] * abs_r[i][j];
+        if (std::abs(t[i]) > radius) return false;
+    }
+    for (int j = 0; j < 3; ++j) {
+        double centre = 0.0, radius = object_half[j];
+        for (int i = 0; i < 3; ++i) {
+            centre += t[i] * r[i][j];
+            radius += query_half[i] * abs_r[i][j];
+        }
+        if (std::abs(centre) > radius) return false;
+    }
+    for (int i = 0; i < 3; ++i) for (int j = 0; j < 3; ++j) {
+        const int i1 = (i + 1) % 3, i2 = (i + 2) % 3;
+        const int j1 = (j + 1) % 3, j2 = (j + 2) % 3;
+        const double centre = std::abs(t[i2] * r[i1][j] - t[i1] * r[i2][j]);
+        const double radius = query_half[i1] * abs_r[i2][j] +
+                              query_half[i2] * abs_r[i1][j] +
+                              object_half[j1] * abs_r[i][j2] +
+                              object_half[j2] * abs_r[i][j1];
+        if (centre > radius) return false;
+    }
+    return true;
+}
+
 void multiply(const double a[4], const double b[4], double out[4]) {
     out[0] = a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1];
     out[1] = a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0];
@@ -621,6 +669,25 @@ public:
             for (const auto &part : actor.parts)
                 if (const auto result = test(part); result != NKSIM_OK) return result;
         out = nearest;
+        return NKSIM_OK;
+    }
+
+    nksim_result overlap_free_boxes(const nksim_pose &pose, const double half_extents[3],
+                                    uint32_t &out) {
+        std::lock_guard lock(mutex);
+        out = 0;
+        for (const auto &[id, object] : objects_) {
+            if (object.motion_type != NKSIM_MOTION_DYNAMIC || object.carrier != 0 ||
+                object.part.shape_desc.type != NKSIM_SHAPE_BOX) continue;
+            nksim_body_state state{};
+            state.struct_size = sizeof(state);
+            if (const auto result = body_state(object.part.body, state); result != NKSIM_OK)
+                return result;
+            if (boxes_overlap(pose, half_extents, state, object.part.shape_desc.parameters)) {
+                out = 1;
+                break;
+            }
+        }
         return NKSIM_OK;
     }
 
@@ -1286,6 +1353,20 @@ nksim_result NKSIM_CALL nksim_session_raycast(nksim_session session, const nksim
         return NKSIM_ERROR_INVALID_ARGUMENT;
     NKSIM_SESSION_OR_FAIL(value);
     return value->raycast(ray->origin, ray->direction, ray->max_distance, *out_distance);
+}
+
+nksim_result NKSIM_CALL nksim_session_overlap_free_boxes(nksim_session session,
+                                                          const nksim_pose *pose,
+                                                          const double half_extents[3],
+                                                          uint32_t *out_present) {
+    if (!pose || !half_extents || !out_present ||
+        !nksim::valid_struct_size(pose->struct_size, sizeof(*pose)) || !nksim::valid_pose(*pose))
+        return NKSIM_ERROR_INVALID_ARGUMENT;
+    for (int axis = 0; axis < 3; ++axis)
+        if (!std::isfinite(half_extents[axis]) || half_extents[axis] <= 0.0)
+            return NKSIM_ERROR_INVALID_ARGUMENT;
+    NKSIM_SESSION_OR_FAIL(value);
+    return value->overlap_free_boxes(*pose, half_extents, *out_present);
 }
 
 nksim_result NKSIM_CALL nksim_session_capture(nksim_session session, nksim_frame *out_frame) {

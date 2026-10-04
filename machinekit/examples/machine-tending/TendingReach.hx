@@ -33,6 +33,8 @@ typedef TendingReachResult = {
 class TendingReach {
 	public static function run():Void {
 		var result = study(new EnclosedBenchMill());
+		if (result.cls != Reach850 || result.riser != 600 || result.names.length != 15)
+			throw 'Tending reach changed class, riser or pose coverage: ${result.cls}/${result.riser}/${result.names.length}';
 		trace('Tending reach: ${result.cls}, ${result.riser} mm riser, ${result.names.length} poses, ' +
 			'${result.jointMargin * 100}% joint margin, wrist |sin(q5)| ${result.wristSine}');
 	}
@@ -63,6 +65,21 @@ class TendingReach {
 			}
 			{name: occurrence.id, vertices: vertices};
 		}];
+		// Tray slots and decks are cell fixtures. Neither changes position when a
+		// different arm class or riser is tried.
+		var pitchX = tool.width + tool.openingTravel + 10;
+		var pitchY = tool.depth + 10;
+		var trayX = cell.opening.x + cell.openingWidth / 2 - tool.width - tool.fingerDepth;
+		var trayY = cell.opening.y - (tool.length + cell.mill.column.width / 3 + tool.depth + 20);
+		var trayOffset = cell.openingWidth / 2 + tool.fingerDepth + tool.fingerWidth;
+		var trayWidth = 3 * pitchX + 20, trayDepth = 2 * pitchY + 20;
+		var trayTop = grasp.z - BenchMill.STOCK_HEIGHT / 2;
+		for (side in [-1, 1]) {
+			var centre = trayX + side * trayOffset;
+			environment.push({name: side < 0 ? "tray:infeed" : "tray:outfeed",
+				vertices: boxVertices(centre - trayWidth / 2, centre + trayWidth / 2,
+					trayY - trayDepth / 2, trayY + trayDepth / 2, trayTop - 20, trayTop)});
+		}
 		for (cls in [Reach850, Reach1300]) {
 			var source = new CobotArm(cls, tool);
 			if (grasp.x - (tool.width + tool.openingTravel) / 2 < cell.opening.x - cell.openingWidth / 2 ||
@@ -82,9 +99,6 @@ class TendingReach {
 					tool: StringTools.startsWith(hull.part, "tool/")}], source.ready(), 0, 0);
 			var standOff = tool.length + source.baseFlange.flangeDiameter + tool.depth + 20;
 			var baseX = source.reference.d[3], baseY = cell.opening.y - standOff;
-			var pitchX = tool.width + tool.openingTravel + 10;
-			var pitchY = tool.depth + 10;
-			var trayOffset = source.baseFlange.flangeDiameter / 2 + 2 * pitchX;
 			// The doorway must pass the wrist as well as the tool. Keep its roll module
 			// below the header; the vise approach can rise after it is inside.
 			var wristPackage = tool.length + source.toolFlange.thickness + source.reference.d[5] + source.modules[5].length;
@@ -94,8 +108,8 @@ class TendingReach {
 				[grasp.x, cell.opening.y - tool.depth, viaZ], [grasp.x, cell.opening.y + tool.depth, viaZ]];
 			for (side in [-1, 1]) for (row in 0...2) for (column in 0...3) {
 				allNames.push((side < 0 ? "infeed" : "outfeed") + '-$row-$column');
-				allPoints.push([baseX + side * trayOffset + (column - 1) * pitchX,
-					baseY + (row - 0.5) * pitchY, grasp.z]);
+				allPoints.push([trayX + side * trayOffset + (column - 1) * pitchX,
+					trayY + (row - 0.5) * pitchY, grasp.z]);
 			}
 			var options = new IkOptions(0.00001, 0.0001, 250, 0.001).reaching();
 			for (level in 0...25) {
@@ -126,7 +140,10 @@ class TendingReach {
 						}
 						bodies.push({name: "machine:" + body.name, link: converted.model.links[0].id, vertices: vertices, tool: false});
 					}
-					var full = new ArmClearance(arm, bodies, source.ready());
+					var viseContact = [for (body in environment)
+						if (StringTools.startsWith(body.name, "mill/vise/")) "machine:" + body.name];
+					var full = new ArmClearance(arm, bodies, source.ready(),
+						ArmClearance.MARGIN, 0.001, viseContact);
 					for (i in 0...solved.length) {
 						var hit = full.violation(solved[i], i == 0);
 						if (hit == null) continue;
@@ -177,6 +194,13 @@ class TendingReach {
 	}
 	static function withinMargins(arm:Manipulator, q:Array<Float>):Bool
 		return jointMargin(arm, q) >= 0.1 && Math.abs(Math.sin(q[4])) >= 0.2;
+	static function boxVertices(x0:Float, x1:Float, y0:Float, y1:Float, z0:Float, z1:Float):Array<Float> {
+		var vertices:Array<Float> = [];
+		for (x in [x0, x1]) for (y in [y0, y1]) for (z in [z0, z1]) {
+			vertices.push(x / 1000); vertices.push(y / 1000); vertices.push(z / 1000);
+		}
+		return vertices;
+	}
 	static function toolDownFrame(point:Array<Float>):AssemblyFrame
 		return {x: point[0], y: point[1], z: point[2], qx: 1, qy: 0, qz: 0, qw: 0};
 	static function transform(frame:AssemblyFrame):Transform3 return new Transform3(
