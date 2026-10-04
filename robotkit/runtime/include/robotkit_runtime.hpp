@@ -369,6 +369,14 @@ private:
     mutable std::mutex state_mutex_;
     rk_robot_state state_{};
     mutable std::mutex queue_mutex_;
+    struct PendingDriveCalibration {
+        std::array<uint32_t, RK_MAX_JOINTS> joints{};
+        std::array<double, RK_MAX_JOINTS> zeros{};
+        std::array<double, RK_MAX_JOINTS> deltas{};
+        uint32_t count = 0;
+        bool acknowledged = false;
+    };
+    std::optional<PendingDriveCalibration> pending_drive_calibration_;
     std::array<double, RK_MAX_JOINTS> coordinate_offsets_{};
     std::array<bool, RK_MAX_JOINTS> reference_required_{};
     std::array<bool, RK_MAX_JOINTS> reference_latched_{};

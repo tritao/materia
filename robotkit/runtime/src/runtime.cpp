@@ -461,6 +461,8 @@ rk_result RobotRuntime::submit(const rk_robot_command &command) {
         return RK_ERROR_INVALID_ARGUMENT;
     try {
         std::lock_guard lock(queue_mutex_);
+        if (pending_drive_calibration_ && command.kind == RK_COMMAND_JOINT_TARGETS)
+            return RK_ERROR_INVALID_STATE;
         if (command.kind == RK_COMMAND_JOINT_TARGETS) {
             const auto referenced = references_locked();
             for (uint32_t index = 0; index < command.target_count; ++index) {
@@ -529,6 +531,7 @@ rk_result RobotRuntime::calibrate_coordinates(const double *offsets, uint32_t co
     std::lock_guard owner_lock(owner_mutex_);
     std::lock_guard queue_lock(queue_mutex_);
     std::lock_guard state_lock(state_mutex_);
+    if (pending_drive_calibration_) return RK_ERROR_INVALID_STATE;
     for (uint32_t i = 0; i < reference_count; ++i) {
         if (reference_joints[i] >= count || !reference_required_[reference_joints[i]])
             return RK_ERROR_INVALID_ARGUMENT;
@@ -585,7 +588,14 @@ rk_result RobotRuntime::calibrate_home_drives(const uint32_t *joints, const doub
     std::lock_guard owner_lock(owner_mutex_);
     std::lock_guard queue_lock(queue_mutex_);
     std::lock_guard state_lock(state_mutex_);
-    if (endpoint_->executes_trajectory_queue()) return RK_ERROR_UNSUPPORTED;
+    const bool queued_endpoint = endpoint_->executes_trajectory_queue();
+    if (pending_drive_calibration_) {
+        const auto &pending = *pending_drive_calibration_;
+        if (count != pending.count) return RK_ERROR_INVALID_STATE;
+        for (uint32_t i = 0; i < count; ++i)
+            if (joints[i] != pending.joints[i] || side_zeros[i] != pending.zeros[i])
+                return RK_ERROR_INVALID_STATE;
+    }
     if (state_.safety == RK_SAFETY_FAULT || state_.safety == RK_SAFETY_EMERGENCY_STOP)
         return RK_ERROR_SAFETY_STOPPED;
     if (!commands_.empty() || !trajectory_.empty() || control_.trajectory_active ||
@@ -608,10 +618,42 @@ rk_result RobotRuntime::calibrate_home_drives(const uint32_t *joints, const doub
             return RK_ERROR_INVALID_ARGUMENT;
     }
     if (blueprint_.calibration_revision == UINT64_MAX) return RK_ERROR_INVALID_STATE;
-    const auto result = endpoint_->rebase_counters(joints, deltas.data(), count);
-    if (result != RK_OK) return result;
-    // Logical plan targets retain their coupling contract; only measured counters change.
-    for (uint32_t i = 0; i < count; ++i) state_.position[joints[i]] -= deltas[i];
+    if (queued_endpoint && !pending_drive_calibration_) {
+        PendingDriveCalibration pending;
+        pending.count = count;
+        for (uint32_t i = 0; i < count; ++i) {
+            pending.joints[i] = joints[i]; pending.zeros[i] = side_zeros[i]; pending.deltas[i] = deltas[i];
+        }
+        pending_drive_calibration_ = pending;
+    }
+    if (!pending_drive_calibration_ || !pending_drive_calibration_->acknowledged) {
+        const auto result = endpoint_->rebase_counters(joints,
+            pending_drive_calibration_ ? pending_drive_calibration_->deltas.data() : deltas.data(), count);
+        if (result != RK_OK) {
+            if (result == RK_ERROR_INVALID_ARGUMENT || result == RK_ERROR_UNSUPPORTED ||
+                result == RK_ERROR_INVALID_STATE) pending_drive_calibration_.reset();
+            return result;
+        }
+        if (pending_drive_calibration_) pending_drive_calibration_->acknowledged = true;
+    }
+    if (queued_endpoint) {
+        // The device already rebased its counters. Refresh instead of subtracting
+        // deltas from a sample that may already contain the new origins.
+        auto fresh = state_;
+        const auto result = endpoint_->sample(last_owner_timestamp_ns_, fresh);
+        if (result != RK_OK) return result;
+        if (fresh.joint_count != blueprint_.joint_count) return RK_ERROR_BACKEND;
+        for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
+            state_.position[joint] = fresh.position[joint] + coordinate_offsets_[joint];
+            state_.velocity[joint] = fresh.velocity[joint];
+            state_.effort[joint] = fresh.effort[joint];
+        }
+        state_.source_timestamp_ns = fresh.source_timestamp_ns;
+        state_.received_timestamp_ns = fresh.received_timestamp_ns;
+    } else {
+        for (uint32_t i = 0; i < count; ++i) state_.position[joints[i]] -= deltas[i];
+    }
+    pending_drive_calibration_.reset();
     ++blueprint_.calibration_revision;
     state_backup_valid_ = false;
     return RK_OK;
@@ -640,6 +682,7 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
     try {
         std::lock_guard owner_lock(owner_mutex_);
         std::lock_guard queue_lock(queue_mutex_);
+        if (pending_drive_calibration_) return RK_ERROR_INVALID_STATE;
         if (plan.model_revision != blueprint_.revision ||
             plan.calibration_revision != blueprint_.calibration_revision)
             return RK_ERROR_MODEL_MISMATCH;

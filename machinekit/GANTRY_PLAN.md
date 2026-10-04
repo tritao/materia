@@ -2846,3 +2846,20 @@ must stage reference/revision/state changes without subtracting an already
 rebased fresh sample twice before enabling this endpoint contract. Device side
 adapter, controlled-stop integration, router/hardware support and Phase C gate
 remain pending; G13 is not complete.
+
+### G13 — staged runtime drive calibration commit
+
+RobotRuntime now retains queued-endpoint drive calibration inputs and original
+deltas while the endpoint awaits acknowledgment and fresh state. Motion targets,
+plans and coordinate calibration are rejected during that transaction. After
+acceptance it refreshes measured state from the endpoint instead of subtracting
+origin shifts twice, then increments calibration_revision exactly at commit. A
+failed refresh retains acknowledged staging without resubmitting the batch.
+Haxe tryCalibrateHomeDrives reports pending without publishing its candidate
+reference state; the synchronous wrapper remains available for existing callers.
+
+No builds/tests ran. Native/Haxe compilation and transaction regressions remain
+queued for Phase C. Queued coordinate-reference calibration, side adapter and
+controlled-stop integration still require implementation before router device
+homing works. Timeout recovery and cancellation interactions need the phase
+audit; G13 remains incomplete.

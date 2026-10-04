@@ -433,6 +433,11 @@ class RobotRuntime {
 
   /** Apply fresh side latches as one atomic endpoint counter-origin transaction. */
   public function calibrateHomeDrives(switchIds:Array<String>):Void {
+    if (!tryCalibrateHomeDrives(switchIds)) throw "Motor calibration is awaiting device acknowledgment";
+  }
+
+  /** Return false while an identical device batch awaits acknowledgment/fresh state. */
+  public function tryCalibrateHomeDrives(switchIds:Array<String>):Bool {
     ensureLive();
     if (switchIds == null || switchIds.length == 0) throw "Motor calibration requires home switch IDs";
     referenceMutex.acquire();
@@ -446,13 +451,19 @@ class RobotRuntime {
         joints.push(joint); zeros.push(candidate.homeDriveOffset(id));
       }
       candidate.markHomeDrivesCalibrated(switchIds);
-      check(endpoint.calibrateHomeDrives(joints, zeros), "runtime.calibrateHomeDrives");
+      var status = endpoint.calibrateHomeDrives(joints, zeros);
+      if (status == RobotKitRuntimeConstants.RK_ERROR_STALE_STATE) {
+        referenceMutex.release();
+        return false;
+      }
+      check(status, "runtime.calibrateHomeDrives");
       references = candidate;
     } catch (error:Dynamic) {
       referenceMutex.release();
       throw error;
     }
     referenceMutex.release();
+    return true;
   }
 
   /** Read the individual motor-side zero captured by a physical home switch. */
