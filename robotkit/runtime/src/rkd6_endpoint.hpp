@@ -79,6 +79,8 @@ public:
     rk_result device_homing_status(uint64_t sequence) const override { return homing_control_status(sequence); }
     rk_result request_homing_scope(std::uint64_t sequence, std::uint64_t scope,
         std::uint8_t action, std::uint8_t first, std::uint8_t second, double skew_bound);
+    rk_result request_homing_counter_batch(std::uint64_t sequence, std::uint64_t scope,
+        std::uint8_t first, std::uint8_t second, double first_delta, double second_delta);
     rk_result request_homing_side(std::uint64_t sequence, std::uint64_t scope,
         std::uint8_t actuator, bool hold);
     /** STALE_STATE means waiting for acknowledgment; OK means device acceptance. */
@@ -181,6 +183,10 @@ private:
     std::uint64_t control_sent_ns_ = 0;
     std::uint64_t control_timeout_ns_ = 500'000'000;
     std::optional<bool> control_accepted_;
+    std::optional<device_wire6::HomingCounterBatch6> counter_batch_;
+    std::array<double, 64> counter_origins_{};
+    std::uint64_t counter_state_sequence_ = 0;
+    bool counter_state_pending_ = false;
     bool has_state_ = false;
     std::array<device_wire6::Sensor6Header, RK_MAX_SENSORS> sensor_headers_{};
     std::array<std::array<float, RK_MAX_SENSOR_VALUES>, RK_MAX_SENSORS> sensor_values_{};

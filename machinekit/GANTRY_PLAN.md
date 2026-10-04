@@ -2777,3 +2777,22 @@ origin shifts for captured-position conversion and handle uncertain delivery
 without pretending calibration completed. Existing native calibrate_home_drives
 must integrate that asynchronous transaction before revision commit. Router and
 Nucleo controls/GPIO and Phase C verification remain pending; G13 is incomplete.
+
+### G13 — host counter-batch acknowledgment and state handoff
+
+Rkd6Endpoint can submit one atomic two-side counter batch. It retains its deltas
+until a matching acknowledgment, changes local origins only on acceptance and
+then waits for State6 with that control sequence before reporting completion.
+The virtual publisher now stamps accepted_sequence with its latest processed
+control sequence. Pending batches/state handoffs reject later controls and plan
+submission; switch observations are withheld while their origin conversion is
+unresolved. Captured positions subtract acknowledged actuator origins before
+transmission conversion. Stop no longer discards a pending counter-batch ack:
+physical origin changes cannot be assumed undone by cancellation.
+
+No builds/tests ran. An unacknowledged timed-out batch remains blocked pending
+session recovery; it must not be retried/committed blindly. Runtime calibration
+must still stage its revision/coordinate mutation around this request/status
+contract, and State6 freshness/uncertain-delivery regression coverage remains
+for Phase C. Queued device side adapter, homing stop bookkeeping, router test and
+Nucleo GPIO/control support remain unfinished.

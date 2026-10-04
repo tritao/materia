@@ -444,6 +444,7 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
     std::uint64_t base_time_ns, std::uint64_t owner_now_ns,
     std::uint64_t committed_through_ns, const rk_robot_runtime_blueprint &blueprint) {
     now_ns_ = std::max(now_ns_, owner_now_ns);
+    if (counter_batch_ || counter_state_pending_) return RK_ERROR_INVALID_STATE;
     if (!clock_.may_commit()) return RK_ERROR_INVALID_STATE;
     if (base_time_ns == 0 && plan.replace_after_plan_id == 0 &&
         status_.executing_plan_id == 0 &&
@@ -756,7 +757,7 @@ rk_result Rkd6Endpoint::apply(const rk_robot_command &command) {
         default: return RK_ERROR_UNSUPPORTED;
     }
     if (!send_record(kind, {})) return RK_ERROR_BACKEND;
-    if (kind >= 10 && kind <= 13 && control_sequence_) control_accepted_ = false;
+    if (kind >= 10 && kind <= 13 && control_sequence_ && !counter_batch_) control_accepted_ = false;
     return RK_OK;
 }
 
@@ -774,8 +775,18 @@ void Rkd6Endpoint::poll_frames(std::uint64_t owner_now_ns) {
         } else if (decoded.kind == 19) {
             device_wire6::HomingControlAck6 ack{};
             if (device_wire6::decode(decoded.payload, ack) && ack.session == ack_.session &&
-                ack.sequence == control_sequence_ && ack.scope == control_scope_ && !control_accepted_.has_value())
+                ack.sequence == control_sequence_ && ack.scope == control_scope_ && !control_accepted_.has_value()) {
                 control_accepted_ = ack.accepted != 0;
+                if (counter_batch_) {
+                    if (ack.accepted) {
+                        counter_origins_[counter_batch_->first] += counter_batch_->first_delta;
+                        counter_origins_[counter_batch_->second] += counter_batch_->second_delta;
+                        counter_state_sequence_ = ack.sequence;
+                        counter_state_pending_ = true;
+                    }
+                    counter_batch_.reset();
+                }
+            }
         } else if (decoded.kind == 14) {
             if (device_wire6::decode(decoded.payload, status_)) {
                 has_status_ = true;
@@ -821,6 +832,8 @@ void Rkd6Endpoint::poll_frames(std::uint64_t owner_now_ns) {
                 device_wire6::decode(decoded.payload.subspan(device_wire6::State6Header::SIZE +
                     state_header_.actuator_count * device_wire6::ActuatorState6::SIZE +
                     i * device_wire6::InputState6::SIZE, device_wire6::InputState6::SIZE), inputs_[i]);
+            if (counter_state_pending_ && state_header_.accepted_sequence >= counter_state_sequence_)
+                counter_state_pending_ = false;
             has_state_ = true;
         } else if (decoded.kind == 21) {
             device_wire6::Sensor6Header header{};
@@ -939,7 +952,7 @@ rk_result Rkd6Endpoint::sample(std::uint64_t timestamp_ns, rk_robot_state &state
     }
     poll_frames(timestamp_ns);
     pump_queue();
-    if (!has_state_) return RK_ERROR_STALE_STATE;
+    if (!has_state_ || counter_state_pending_) return RK_ERROR_STALE_STATE;
     state.struct_size = sizeof(state);
     state.joint_count = joint_count_;
     state.source_timestamp_ns = static_cast<std::uint64_t>(
@@ -1035,7 +1048,7 @@ std::uint64_t Rkd6Endpoint::device_ticks_at(std::uint64_t path_ns) const noexcep
 
 namespace robotkit {
 std::optional<DeviceInputObservation6> Rkd6Endpoint::input_observation(std::string_view switch_id) const {
-    if (!has_state_ || state_header_.input_count != input_layout_.size()) return std::nullopt;
+    if (!has_state_ || counter_batch_ || counter_state_pending_ || state_header_.input_count != input_layout_.size()) return std::nullopt;
     for (std::size_t i = 0; i < input_layout_.size(); ++i) {
         if (input_layout_[i].switch_id != switch_id) continue;
         const bool electrical_high = (state_header_.input_bits & (std::uint64_t{1} << i)) != 0;
@@ -1065,8 +1078,8 @@ rk_result Rkd6Endpoint::device_input(const char *switch_id, rk_device_input_obse
         out.opening_count = observed->capture.opening_count;
         out.captured_steps = observed->capture.captured_steps;
         out.captured_timestamp_ns = static_cast<std::uint64_t>(observed->capture.captured_ticks * (1e9 / ack_.device_tick_hz));
-        out.captured_position = static_cast<double>(out.captured_steps) / mapping.steps_per_unit /
-            mapping.ratio + mapping.offset;
+        out.captured_position = (static_cast<double>(out.captured_steps) / mapping.steps_per_unit -
+            counter_origins_[actuator]) / mapping.ratio + mapping.offset;
         return std::isfinite(out.captured_position) ? RK_OK : RK_ERROR_BACKEND;
     }
     return RK_ERROR_INVALID_ARGUMENT;
@@ -1076,7 +1089,10 @@ rk_result Rkd6Endpoint::device_input(const char *switch_id, rk_device_input_obse
 namespace robotkit {
 rk_result Rkd6Endpoint::homing_control_status(std::uint64_t sequence) const {
     if (!sequence || sequence != control_sequence_) return RK_ERROR_STALE_COMMAND;
-    if (control_accepted_) return *control_accepted_ ? RK_OK : RK_ERROR_INVALID_STATE;
+    if (control_accepted_) {
+        if (*control_accepted_ && counter_state_pending_) return RK_ERROR_STALE_STATE;
+        return *control_accepted_ ? RK_OK : RK_ERROR_INVALID_STATE;
+    }
     if (now_ns_ - std::min(now_ns_, control_sent_ns_) >= control_timeout_ns_) return RK_ERROR_BACKEND;
     return RK_ERROR_STALE_STATE;
 }
@@ -1087,7 +1103,7 @@ rk_result Rkd6Endpoint::request_homing_scope(std::uint64_t sequence, std::uint64
         !std::isfinite(skew_bound) || skew_bound <= 0 || skew_bound > std::numeric_limits<float>::max())
         return RK_ERROR_INVALID_ARGUMENT;
     if (sequence <= control_sequence_) return RK_ERROR_STALE_COMMAND;
-    if (control_sequence_ && !control_accepted_) return RK_ERROR_INVALID_STATE;
+    if ((control_sequence_ && !control_accepted_) || counter_state_pending_) return RK_ERROR_INVALID_STATE;
     device_wire6::HomingScope6 command{};
     command.session = ack_.session; command.sequence = sequence; command.scope = scope;
     command.action = action; command.first = first; command.second = second;
@@ -1102,7 +1118,7 @@ rk_result Rkd6Endpoint::request_homing_side(std::uint64_t sequence, std::uint64_
     std::uint8_t actuator, bool hold) {
     if (!sequence || !scope || actuator >= ack_.actuator_count) return RK_ERROR_INVALID_ARGUMENT;
     if (sequence <= control_sequence_) return RK_ERROR_STALE_COMMAND;
-    if (control_sequence_ && !control_accepted_) return RK_ERROR_INVALID_STATE;
+    if ((control_sequence_ && !control_accepted_) || counter_state_pending_) return RK_ERROR_INVALID_STATE;
     device_wire6::HomingSide6 command{};
     command.session = ack_.session; command.sequence = sequence; command.scope = scope;
     command.actuator = actuator; command.hold = hold;
@@ -1125,5 +1141,25 @@ rk_result Rkd6Endpoint::device_homing_control(const rk_device_homing_control &co
     }
     return request_homing_side(control.sequence, control.scope,
         static_cast<std::uint8_t>(control.first), control.action == 2);
+}
+}
+
+namespace robotkit {
+rk_result Rkd6Endpoint::request_homing_counter_batch(std::uint64_t sequence, std::uint64_t scope,
+    std::uint8_t first, std::uint8_t second, double first_delta, double second_delta) {
+    if (!sequence || !scope || first >= ack_.actuator_count || second >= ack_.actuator_count || first == second ||
+        !std::isfinite(first_delta) || !std::isfinite(second_delta) ||
+        !std::isfinite(counter_origins_[first] + first_delta) ||
+        !std::isfinite(counter_origins_[second] + second_delta)) return RK_ERROR_INVALID_ARGUMENT;
+    if (sequence <= control_sequence_) return RK_ERROR_STALE_COMMAND;
+    if ((control_sequence_ && !control_accepted_) || counter_state_pending_) return RK_ERROR_INVALID_STATE;
+    device_wire6::HomingCounterBatch6 command{};
+    command.session = ack_.session; command.sequence = sequence; command.scope = scope;
+    command.first = first; command.second = second; command.first_delta = first_delta; command.second_delta = second_delta;
+    std::array<std::uint8_t, device_wire6::HomingCounterBatch6::SIZE> bytes{};
+    if (!device_wire6::encode(command, bytes) || !send_record(20, bytes)) return RK_ERROR_BACKEND;
+    control_sequence_ = sequence; control_scope_ = scope; control_sent_ns_ = now_ns_; control_accepted_.reset();
+    counter_batch_ = command;
+    return RK_OK;
 }
 }

@@ -524,7 +524,7 @@ impl VirtualDevice {
         let header = State6Header {
             session: self.session,
             timestamp_ticks: self.board.now_ticks(),
-            accepted_sequence: 0,
+            accepted_sequence: self.control_sequence,
             safety: if fault != 0 { 3 } else { 0 },
             fault,
             actuator_count: self.active_count as u8,
