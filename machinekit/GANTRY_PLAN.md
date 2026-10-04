@@ -1702,3 +1702,21 @@ mapped moving follower: these need coordinated polynomial planning rather than
 one independent-axis profile. Existing unswitched planning stays unchanged.
 Router startup now has a reusable full-model mapping path, but application
 configuration and monitor resets still need wiring. No tests or builds ran.
+
+
+### G11 — home router machines before machining startup
+
+Follower expansion: `faa6304b1`. CncProgramPlayer now creates a full-machine
+homing MotionSystem when the runtime has home switches, using the existing
+axis placement and drive caps. Its latch callback invokes StepperSlip.reset
+and EncoderMonitor.reset with the calibrated observed joint positions.
+Feed waits for the first home sensor frames, starts the physical cycle, and
+advances it before any machining program is submitted. After completion,
+recompile the initial program from the homed machine pose. Homing errors stop
+startup and report a machine-homing failure. Reset recreates the home view and
+requires homing again.
+
+Expose homingSeconds separately from existing machining run/motion CPU timing.
+Picker mission startup remains pending. Homing after previously accumulated
+physical slip, nonzero power-up offsets, collision/clearance and cycle timing
+are unverified; no tests or builds ran. G11 is not complete.

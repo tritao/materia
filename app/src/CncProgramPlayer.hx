@@ -27,6 +27,7 @@ import motionkit.program.MotionProgram;
 import motionkit.robot.AxisKinematics;
 import motionkit.robot.ManipulatorMotion;
 import motionkit.robot.MotionSystemBlueprint;
+import motionkit.robot.MotionSystem;
 import motionkit.robot.PlanCheck;
 import motionkit.robot.PlanningLimits;
 import motionkit.robot.PlanCheck.PlanCheckOptions;
@@ -150,6 +151,12 @@ class CncProgramPlayer implements SessionMember {
 	 * machine has no encoders.
 	 */
 	public final encoders:EncoderMonitor;
+	/** Physical homing time, excluded from machining planning/execution timings. */
+	public var homingSeconds(default, null):Float = 0.0;
+	final newHoming:Void -> Null<MotionSystem>;
+	var homing:Null<MotionSystem> = null;
+	var homingStarted:Bool = false;
+	var homingComplete:Bool = false;
 	/** The G-code line the machine is executing; 0 between lines. */
 	public var currentLine(default, null):Int = 0;
 	/** Speed of every move, as a fraction of the program's. */
@@ -297,6 +304,20 @@ class CncProgramPlayer implements SessionMember {
 		encoders = new EncoderMonitor(robot.model, [for (_ in robot.model.joints) 0.0]);
 		slip = new StepperSlip(robot.robot.description().couplings, axisJoint,
 			(joint, offset) -> simulation.setJointSlip(robotIndex, joint, offset));
+		newHoming = () -> {
+			var hasHomes = false;
+			for (contact in robot.blueprint.switches) if (contact.role == "home") hasHomes = true;
+			if (!hasHomes) return null;
+			var view = new MotionSystem(robot.robot,
+				new MotionSystemBlueprint(machineModel, robot.blueprint, axes, session.fixedTimestep()));
+			view.configureRuntimeHoming(robot.runtime, () -> {
+				slip.reset();
+				encoders.reset(robot.runtime.snapshot().q.toArray());
+			});
+			return view;
+		};
+		homing = newHoming();
+		homingComplete = homing == null;
 		newMotion = () -> {
 			var made = new ManipulatorMotion(robot.robot, binding.compiler,
 				channel -> {
@@ -356,6 +377,31 @@ class CncProgramPlayer implements SessionMember {
 
 	public function feed():Void {
 		if (failure != null) return;
+		var homeView = homing;
+		if (!homingComplete && homeView != null) {
+			try {
+				if (!homingStarted) {
+					// feed runs before physics; wait for the first actual switch observations.
+					var seen = robot.robot.snapshot(), available = new Map<String, Bool>();
+					for (frame in seen.sensors.toArray()) available.set(frame.sensorId, true);
+					for (contact in robot.blueprint.switches)
+						if (contact.role == "home" && !available.exists(contact.id)) return;
+					homeView.home();
+					homingStarted = true;
+					return;
+				}
+				homingSeconds += session.fixedTimestep();
+				homeView.update(session.fixedTimestep());
+				if (homeView.homingStatus() != "Complete") return;
+				homingComplete = true;
+				var positions = robot.robot.snapshot().positions;
+				var pose = solver.forward([for (index in axisJoints) positions.get(index)]);
+				compileFrom(new Point3(pose.x, pose.y, pose.z));
+			} catch (error:Dynamic) {
+				failure = 'Machine homing: $error';
+				return;
+			}
+		}
 		var clock = Sys.time();
 		takeRestart();
 		if (started && motion.completed && !passCounted) {
@@ -505,6 +551,10 @@ class CncProgramPlayer implements SessionMember {
 		slip.reset();
 		encoders.reset([for (_ in robot.model.joints) 0.0]);
 		motion = newMotion();
+		homing = newHoming();
+		homingStarted = false;
+		homingComplete = homing == null;
+		homingSeconds = 0.0;
 		if (speedOverride != 1.0) motion.setSpeedOverride(speedOverride);
 		restartRequest = null;
 		pendingContinuation = null;
