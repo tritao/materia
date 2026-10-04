@@ -336,6 +336,19 @@ without changing their source observations. The runtime owns position bounds,
 velocity-rate bounds, and effort limits. This boundary intentionally contains
 joint targets rather than mobile-base or forklift-specific commands.
 
+`RobotCommand` has one buffered-motion abstraction: `ExecutionPlan`. Polynomial
+segments are its payload; there is no independent trajectory-chunk command.
+Lifecycle commands hold, resume or abort the runtime's plan session.
+`RobotCapabilities` names accepted control modes (including servo), execution
+limits and features, deadline/clock-mapping support, and available stream kinds.
+Execution guarantees use the shared `Proven`, `Sampled`, `Unchecked`, `Failed`
+vocabulary; analytic runtime validation covers declared position, velocity and
+acceleration limits, while jerk remains a separate plan claim. An adapter may
+restrict execution through a policy, but cannot advertise extra endpoint support.
+The RKF1 envelope and Hello/Welcome carry protocol version 2; older versions are
+rejected. Recording schema version 7 stores plans and lifecycle commands without
+a trajectory-chunk payload.
+
 ## Mobile kinematics
 
 `robotkit.mobile.MobileBase` composes a `Robot`, `DriveModel`, motion limits,
