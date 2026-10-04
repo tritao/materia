@@ -501,11 +501,108 @@ and torch reorientation. Approaches and retracts must clear the work: collision
 plan CL4 validation when it lands, until then a swept-volume clearance check. A
 seam the torch can't reach at its angles is reported, not skipped.
 
+W4 implementation notes (done, 2026-10-04):
+- Corner length comes from a rest-to-rest angular turn with half the wrist's speed and acceleration reserved
+  for reorientation. With `w = 0.5 * angularSpeed` and `a = 0.5 * angularAcceleration`, its time is
+  `2 * sqrt(angle / a)` below the speed limit, otherwise `angle / w + w / a`. Each side contributes
+  `travelSpeed * time / 2`, bounded to 4–25 mm and at most 45% of that segment; straight joins contribute zero.
+  The compiler still enforces the actual coupled joint limits, and process quantity follows any resulting slowdown.
+- ProcessKit owns welding preparation, ignition, interruption/re-strike, crater fill, burnback and retreat.
+  RobotKit's generic stop/fault policy cuts the tool outputs; neither the arm interface nor its spec table gains
+  welding policy. CAD capabilities provide the torch stickout, supply limits, wire and grounded-work connections.
+- The torch is three collision bodies: mount/handle, neck and nozzle/contact tip, rather than a single convex hull
+  filling the crook. The cell uses an 8 mm neck radius and 10 mm nozzle radius; posts are 60 mm tall with centres
+  80 mm from the beam centre. These CAD dimensions replace the initial draft's 80 mm height / 70 mm spacing and
+  the original 9 mm neck / 13 mm nozzle radii. Seam side lengths remain 40 mm and the requested legs remain 5 mm.
+  The full-cell planner checks 318,233 poses for the first post and 121,608 for the second; measured planning
+  costs are approximately 112–177 s per post and 1–14 s per plate seam on this machine, separate from cycle time.
+- ProcessKit checks the whole run before accepting an entry IK configuration. If the CAD tour's preferred corner
+  cannot start a closed perimeter, the planner tries its other corners, preserving every seam and its direction.
+  This is a reach/clearance decision; the CAD mission remains unchanged. The focused planning suite covers both
+  a later entry branch needed to finish a seam and a different entry corner needed to weld a closed run.
+- At corners, the roll search first tries the roll that continues the previous orientation by the wire's shortest
+  swing without additional twist. Numeric roll proximity alone ignores the next seam frame's change. The discrete
+  roll candidates remain alternatives for reach and clearance.
+- The planner samples at 2 mm and enforces the compiler's per-joint continuity bounds before accepting a run.
+  Individually reachable poses can otherwise hide a wrist branch jump until the arc is already up. A focused
+  regression rejects such a path.
+- Before ignition, each candidate's complete approach, weld, burnback lift and retreat is compiled using MotionKit's
+  existing API, then the resulting native joint trajectories are checked against the cell. Trajectory samples are
+  timed from the fastest joint's limit to bound travel between samples to 0.02 rad. Rejected candidates backtrack;
+  no plan is submitted and no arc output is issued during validation. IK position accuracy is 0.05 mm, leaving
+  headroom within the 0.5 mm compiled-path tolerance. Entry IK also uses the current arm configuration, since
+  broad grid sampling alone can miss a reachable branch. If the CAD tour's chosen direction has no feasible entry,
+  the planner tries reversed travel. It derives the reverse wire from the stored wire and seam tangent, reversing
+  the push component and preserving the face cross-section component. No seam angles are guessed or hard-coded.
+  Focused planning passes 44 assertions; full-cell execution passes on MuJoCo and the test backend.
+- The cell owns its ready configuration (`WeldingCell.readyPose`); the preview writes that configuration into the
+  scene's assembly state and uses it for CAD checks. The arm and its tool interface need no welding-specific method.
+- Pre-path weld decoding is removed: a weld without an explicit segment path is rejected. ProjectKit's rejection
+  check replaces its former migration check (131 assertions pass, commit `05f1b67f4`).
+- Initial draft validation: ProcessKit's welder tests pass 52 assertions, weld planning passes 28, and the remaining
+  process tests pass 23. The planning fixture chooses roll zero in free space (51 checked poses), then a quarter-turn
+  beside a wall (126 poses); a blocked seam reports the colliding bodies and pose. Full cell validation is pending.
+- Cell clearance uses 3 mm for arm and air motions and 0.5 mm for tool/work pairs in the working zone. The generic
+  RobotKit default stays 5 mm. CAD inspection of X8's drive installation gives a 4.5 mm intentional gap at j2:
+  the gearbox ends at 0.5 + 45 mm in the 90 mm housing, and the next tube extends back by its 40 mm radius.
+  Thus the generic 5 mm margin rejects every welding configuration of that assembly; 3 mm retains positive
+  clearance without excluding the gearhead or editing the arm. The runtime check uses the same configured margins
+  on actual joint snapshots. No colliding bodies are exempted to obtain a plan.
+- R3 and R4 landed before W4's final gate. They were merged from local main, and the remaining planner imports
+  were repaired separately (`4f7e9ccaf`). ProcessKit still passes 52 welder, 44 planning and 23 process assertions.
+- Full-cell execution reached all four runs, but the first post side measured a 6.98 mm leg: constant wire speed
+  was overfeeding a trajectory slowed by joint limits. The correction stays in ProcessKit: validate the program's
+  time law, then schedule wire rates as quantity per seam metre times each interval's actual progress speed.
+  Held rates conserve the requested quantity over each interval; the schedule is bounded per native section,
+  and the crater restores the recipe's wire speed. The motion and device execute the events together. Focused
+  timing tests cover a tenfold slowdown, section offsets, event-budget coalescing and invalid time maps (11 assertions).
+  The MuJoCo whole-cell check now passes: 106.5 s for four runs and ten seams, legs 4.9–5.1 mm,
+  bead lengths 40 mm on each of the eight post sides and 180 mm on each plate fillet, tip within 0.1 mm,
+  no clearance violation and no restart. The test backend also passes in 106.5 s with legs 4.9–5.1 mm,
+  full bead lengths and no clearance violation or restart. The complete welder app gate exits successfully.
+- Baseline timing changes are intentional consequences of W4's validated motion. The cell starts at shoulder
+  0.25 rad instead of the arm's generic 0.4 rad, keeping the torch above the table. Entry selection now checks
+  whole-path joint continuity and swept clearance instead of resolving an unchecked nearest pose target.
+  The single-seam cycle is 20.6 s (formerly 20.2), and one arc-loss recovery is 22.0 s on MuJoCo / 22.1 s on
+  the test backend (formerly 21.6). Both retain full 180 mm beads with no gaps; the undisturbed leg remains
+  5.0 mm (4.8–5.1). Recovery retains one restart and 11 mm overlap; reducing its hump belongs to W5.
+  The focused post cycle is 29.8 s (formerly 19.9), legs 4.9/5.0/5.0/5.1 mm, no restart. Its roll/entry
+  must now clear the cell, and its turn is derived from wrist limits rather than the old fixed 12 mm ramp;
+  MotionKit can slow the turn under those limits, with wire feed following the actual progress. The previous
+  reach-only timing is not retained by bypassing clearance or angular limits. The in-air seam still fails with
+  “the arc could not be held in 3 restarts”; crater dropout finishes with no restart and a whole bead;
+  displacement by 12.3 mm leaves the tip within 0.1 mm of the real seam and the leg at 5.0 mm.
+- Final W4 gates pass: ProcessKit 52 welder / 44 planning / 11 rate-schedule / 23 process assertions;
+  RobotKit 27 tool / 33 process / 152 weld / 33 clearance assertions; RobotKit world 4,950 assertions;
+  CAD bridge 157; ProjectKit 131. MachineKit smoke passes, including the complete mission and rejection checks.
+  The generated tour covers 680 mm, with 386 mm air travel and 176 degrees of turning versus 846 mm / 290 degrees
+  in discovery order. The app compiles against R5 and passes welder, arm and mobile. Arm remains 23.5 s;
+  the MuJoCo mobile mission completes in 61 s and its obstacle round in 65 s with one replan.
+  The whole-weldment test enforces 2 mm bead-length tolerance and 0.5 mm leg tolerance per seam.
+  R3/R4 landed early and their import repair is separate; R5's package move is merged with ConvexDistance in core.
+  W5 can start after this W4 sync, with the R0/R3/R4 prerequisites already present.
+
 **W5. Weaving and multi-pass.** A MotionKit path modifier lays a weave (sine,
 triangle or zigzag: amplitude, frequency, dwell at the edges) across the seam
 frame, keeping exact timing and events. The motion check covers the woven path,
 not just the centreline. Multi-pass seams get root, fill and cap passes offset
 in the seam frame, the bead from earlier passes counting as work.
+
+W5 design note while waiting for R3/R4 (2026-10-04; implementation has not started):
+- Wrap `PosePrimitive` and retain its length as seam progress, so `PosePath` events keep their original distances.
+  The lateral offset uses the CAD seam's material frame, independent of the torch roll chosen for clearance.
+  Its first and second derivatives include the material frame's derivatives; zero amplitude returns the base path.
+- Keep weave phase continuous across primitives. Convert a frequency in cycles per second to cycles per metre using
+  the recipe's nominal seam speed. An edge dwell holds the lateral offset while forward seam progress continues.
+  Piecewise patterns need explicit joins and one-sided derivatives; do not hide derivative discontinuities in a
+  numerical approximation. Taper the offset to zero at sharp seam joins to preserve a connected path.
+- Deposition follows actual seam progress per second, including kinematic slowdowns. The nominal wire/area ratio
+  is the recipe's policy; lateral tip speed during weaving must not increase the deposited area per seam metre.
+- Use one current saved weld representation: a non-empty pass list, each pass carrying its path, process, weave
+  and optional interpass dwell. Bump the then-current scene version and regenerate fixtures; reject older versions.
+- For the required 10 mm example, split its 50 mm² area into root/fill/cap fractions 1/4, 3/8 and 3/8
+  (12.5, 18.75 and 18.75 mm²). Derive offsets from the seam's face normals and previously deposited height.
+  Earlier station geometry must participate in both grounded-work sensing and clearance before later passes ignite.
 
 **W6. Real welder interface.** Map the channels to:
 - the retrofit I/O board: an optoMOS relay for the trigger, an isolated 0–10 V
@@ -578,6 +675,6 @@ Dependencies:
 | W1 | done | seams found from member faces (`WeldSeams`, `WeldSeam`, `Weldment`); workpiece with a tube frame; checks |
 | W2 | done | work clamp and derived grounded work; `torch` robot tool in the scene artifact; `SimulatedWelder` + `WeldArcModel`; `WelderProcessDevice`; tests |
 | W3 | done (+ hardening: paths, live workpiece frame, exit crash, safety tests) | `weld` mission step; `WeldSeam` skill and `WeldBead`; process engagement and `WeldingPlanRunner`; weld metal part and recipe; bead as runtime geometry; welds on MuJoCo and the test backend, restart with overlap |
-| W4 | | |
+| W4 | Done (2026-10-04) | Whole CAD weldment: 10 seams / 680 mm in 4 runs; swept clearance and derived corner turns; 106.5 s on both backends, legs 4.9–5.1 mm; affected gates pass. Timing changes recorded above. |
 | W5 | | |
 | W6 | | |

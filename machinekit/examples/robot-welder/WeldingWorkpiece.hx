@@ -46,9 +46,9 @@ class WeldingWorkpiece extends MachineAssembly {
 	public static inline var TUBE_WALL:Float = 3;
 	/** How much wider than the posts the beam is. */
 	public static inline var BEAM_EXTRA:Float = 20;
-	public static inline var POST_HEIGHT:Float = 80;
+	public static inline var POST_HEIGHT:Float = 60;
 	/** Distance from the beam's centre to each post's centre. */
-	public static inline var POST_SPACING:Float = 70;
+	public static inline var POST_SPACING:Float = 80;
 	public static inline var LEG_SIZE:Float = 5;
 
 	public final uprightLength:Float;

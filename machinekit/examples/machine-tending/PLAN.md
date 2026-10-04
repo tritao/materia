@@ -502,7 +502,7 @@ Done. What was built and decided:
   MachineKit smoke and app project-source passed. CoreXY, arm mission, mobile base and welder
   timing and geometry baselines stayed unchanged.
 
-**Post-MT5 integration with current main (RobotKit R0–R5 and transmission X9–X10).**
+**Post-MT5 integration with current main (RobotKit R0–R6, welder W4 and transmission X9–X10).**
 - Process-owned spindle and pneumatic actuators are excluded from `DriveLoads` planner budgets;
   their typed channel bindings and simulation forces remain active. The merged runtime uses the
   profile-aware compiler and main's nullable limit semantics. The current main submodule pins
@@ -514,13 +514,15 @@ Done. What was built and decided:
   transmission updates.
 - The arm mission remains at pick 5.8/place 12/pick 17.2/place 23.5 s. The mobile mission's
   final goTo moves from 57.6 to 61 s, and its obstacle round from 59 to 65 s, with main's
-  updated wheel/controller model. The welder stays at 20.2/21.6 s (one restart, 11 mm overlap)
-  and four-sided post 19.9 s. The mill remains 51.12 s bare and 51.73 s enclosed, with
+  updated wheel/controller model. Main's W4 weld planning and stop-policy changes move the
+  MuJoCo welder from 20.2/21.6 to 20.6/22.0 s (one restart, 11 mm overlap), and the
+  four-sided post from 19.9 to 29.8 s. The mill remains 51.12 s bare and 51.73 s enclosed, with
   0.075366/0.050317/0.029369 mm X/Y/Z tracking, 1.50/1.79 s door and 0.18 s vise at 482.55 N.
 - Main's removal of legacy saved-format tests changes ProjectKit's assertion count from 151
-  to 136. RobotKit world rises from 4947 to 4971 and MotionKit from 9762 to 9869 through
+  to 136. RobotKit world rises from 4947 to 4993 and MotionKit from 9762 to 9869 through
   main's new checks; CadBridge rises 156 to 157. CncKit remains 317, CamKit 12311,
-  ProcessKit 23 plus welder 52. The complete sequential gate is `mt-suite-integration-indexed.txt`.
+  ProcessKit 23 plus welder 52. Main's W4 far-plate welder case completes in 20.86 s
+  with a 4.9973 mm first leg. The final sequential gate is `mt-suite-final-r6.txt`.
 
 **MT6. Controllers, robots and signals.**
 - Controller parts:

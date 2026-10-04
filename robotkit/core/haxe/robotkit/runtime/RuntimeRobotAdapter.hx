@@ -35,6 +35,7 @@ class RuntimeRobotAdapter implements Robot {
   var observedReceipt:Int64 = Int64.ofInt(-1);
   var currentSensors:Array<SensorFrame> = [];
   final eventRing = new RobotEventRing();
+  final sensorStreams = new robotkit.streams.SensorStreams();
   var closed:Bool = false;
 
   public function new(id:RobotId, runtime:RobotRuntime, name:String,
@@ -100,7 +101,7 @@ class RuntimeRobotAdapter implements Robot {
       value.trajectoryTimeNs, value.trajectoryDurationNs,
       value.trajectoryTag, value.trajectoryTagTimeNs,
       value.sessionState, value.activePlanId,
-      value.committedUntilNs, value.queueEndTimeNs, value.setpoint.toArray());
+      value.committedUntilNs, value.queueEndTimeNs, value.setpoint.toArray(), sensorStreams.sequences());
   }
 
   public function fault():Null<RobotFault> {
@@ -118,8 +119,10 @@ class RuntimeRobotAdapter implements Robot {
   public function events(afterOrdinal:Int64, max:Int):Array<RobotEvent>
     return eventRing.events(afterOrdinal, max);
 
-  public function publishObservation(value:robotkit.streams.ImageDetectionObservation):RobotEvent
+  public function publishObservation(value:robotkit.streams.ImageDetectionObservation):RobotEvent {
+    sensorStreams.publish(robotkit.streams.SensorStreamSample.inference(value));
     return eventRing.publish(value);
+  }
 
   public function submit(command:RobotCommand):Void {
     ensureOpen();
@@ -172,7 +175,11 @@ class RuntimeRobotAdapter implements Robot {
     runtime.resetSafety(commandSequence);
   }
 
-  public function sensors():Array<SensorFrame> return currentSensors.copy();
+  public function streams():robotkit.streams.SensorStreams {
+    ensureOpen();
+    observe(runtime.snapshot());
+    return sensorStreams;
+  }
 
   public function setChangeListener(listener:Null < RobotId -> Void >):Void {
     changeListener = listener;
@@ -195,6 +202,7 @@ class RuntimeRobotAdapter implements Robot {
     observedSequence = value.sequence;
     observedReceipt = value.receivedTimestampNs;
     currentSensors = sensors;
+    sensorStreams.publishFrames(sensors);
     var listener = changeListener;
     if (listener != null) listener(logicalId);
   }

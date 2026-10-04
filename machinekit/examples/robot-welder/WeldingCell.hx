@@ -97,6 +97,12 @@ class WeldingCell extends MachineAssembly {
 		exposePort("control", "source", "control");
 	}
 
+	/** Lift the torch clear of the table before approaching the work. */
+	public function readyPose():Array<Float> {
+		var shoulder = 0.25, elbow = -1.4;
+		return [0.0, shoulder, elbow, 0.0, Math.PI - shoulder + elbow, 0.0];
+	}
+
 	/** The welded joints, for the members of `work` as they are named in the cell. */
 	public function weldment():Weldment return work.weldment().prefixed("work/");
 

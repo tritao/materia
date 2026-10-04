@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """A raw TCP controller that keeps its lease while pausing socket reads."""
 
+from contextlib import ExitStack
 import socket
 import re
 from pathlib import Path
@@ -112,18 +113,19 @@ def read_frame(sock):
     return kind, session, sequence, unpack(payload), sizes
 
 
-def send_frame(sock, lock, kind, payload, session=0):
+def send_frame(sock, lock, kind, payload, session=0, sequence=0):
     body = pack(payload)
-    frame = struct.pack(">4sHHIIIQQQ", b"RKF1", PROTOCOL_VERSION, kind, 0, len(body), 0, session, 0, 0) + body
+    frame = struct.pack(">4sHHIIIQQQ", b"RKF1", PROTOCOL_VERSION, kind, 0, len(body), 0, session, sequence, 0) + body
     with lock:
         sock.sendall(frame)
 
 
 def main(port):
-    with socket.create_connection(("127.0.0.1", port), timeout=5) as sock:
+    with ExitStack() as stack:
+        sock = stack.enter_context(socket.create_connection(("127.0.0.1", port), timeout=5))
         sock.settimeout(5)
         lock = threading.Lock()
-        send_frame(sock, lock, 1, {1: PROTOCOL_VERSION, 2: "stalled-bulk", 3: "", 4: "controller", 5: []})
+        send_frame(sock, lock, 1, {1: PROTOCOL_VERSION, 2: "stalled-bulk", 3: "", 4: "controller", 5: [], 6: "test-controller", 7: "robotkit-test-controller-token-0001"})
         kind, _, _, welcome, _ = read_frame(sock)
         assert kind == 2 and welcome[5] is True, "controller lease was not granted"
         session, robot, lease = welcome[3], welcome[4], welcome[6]
@@ -133,6 +135,13 @@ def main(port):
             if kind == 5:
                 assert value[10] != 2, "controller started in emergency stop"
                 initial_state_sequence = sequence
+        bulk = stack.enter_context(socket.create_connection(("127.0.0.1", port), timeout=5))
+        bulk.settimeout(5)
+        send_frame(bulk, threading.Lock(), 1, {1: PROTOCOL_VERSION, 2: "stalled-stream", 3: "", 4: "stream",
+            5: [{1: "camera", 2: 0.0}], 6: "test-observer", 7: "robotkit-test-observer-token-0001"})
+        kind, _, _, bulk_welcome, _ = read_frame(bulk)
+        assert kind == 2 and not bulk_welcome[5], "bulk connection incorrectly acquired control"
+        bulk_session = bulk_welcome[3]
         stop = threading.Event()
         heartbeat_error = []
 
@@ -156,7 +165,7 @@ def main(port):
             camera_ids = set()
             kinds = {}
             deadline = time.monotonic() + 6
-            while time.monotonic() < deadline and not (seen_state and seen_fault and len(camera_ids) >= 2):
+            while time.monotonic() < deadline and not (seen_state and seen_fault):
                 kind, frame_session, sequence, value, attachments = read_frame(sock)
                 kinds[kind] = kinds.get(kind, 0) + 1
                 assert frame_session == session
@@ -166,6 +175,11 @@ def main(port):
                 elif kind == 11 and value[2] == 404:
                     seen_fault = True
                 elif kind == 17:
+                    raise AssertionError("camera entered the control connection")
+            while time.monotonic() < deadline and len(camera_ids) < 2:
+                kind, frame_session, sequence, value, attachments = read_frame(bulk)
+                assert frame_session == bulk_session
+                if kind == 17:
                     key = (value[2], value[5])
                     assert key not in cameras, f"camera sequence repeated: {key}"
                     cameras.add(key)
@@ -175,7 +189,7 @@ def main(port):
             assert seen_state and seen_fault and len(camera_ids) >= 2, (
                 f"recovery missing state={seen_state} fault={seen_fault} cameras={camera_ids} kinds={kinds}"
             )
-            print(f"robotd stalled controller retained control; {len(cameras)} unique large camera frames received")
+            print(f"robotd stalled bulk connection retained separate control; {len(cameras)} unique large camera frames received")
         finally:
             stop.set()
             thread.join(timeout=1)

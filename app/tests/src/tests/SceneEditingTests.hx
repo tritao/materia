@@ -763,7 +763,7 @@ class SceneEditingTests {
     check(simulation.rebuild(sensors,scene),"replacement scene rebuild succeeds");
     simulation.step();
     var observation=simulation.snapshot().robot("materia/robot");
-    check(observation!=null&&observation.sensors.length>0,
+    check(observation!=null&&world.robot("materia/robot").streams().latestFrames().length>0,
       "applied sensor configuration produces simulated measurements");
     simulation.dispose();world.close();scene.dispose();sensors.dispose();
 
@@ -892,7 +892,7 @@ class SceneEditingTests {
     var firstRobot=observation.robot("materia/robot");
     if(firstRobot==null)throw "Shared simulation lost the first robot";
     var sawObstacle=false;
-    for(frame in firstRobot.sensors.toArray())if(frame.kind=="lidar")
+    for(frame in world.robot("materia/robot").streams().latestFrames())if(frame.kind=="lidar")
       for(value in frame.values.toArray())if(value<session.sensors.model.sensors[0].maxRange)sawObstacle=true;
     check(sawObstacle,"LiDAR observes geometry populated from the Materia scene");
     var visual=simulation.visualState();
@@ -906,13 +906,13 @@ class SceneEditingTests {
     check(presentation.revision>0&&presentation.robots.length==2&&presentation.environment.length>0&&
       publishedRobot.sensors.length==firstRobot.sensors.length,
       "one application presentation snapshot combines a physics revision with world publications");
-    check(publishedRobot.sensors.get(0).sourceTimestampNs==firstRobot.sensors.get(0).sourceTimestampNs,
+    check(publishedRobot.streamSequences[0].sequence==firstRobot.streamSequences[0].sequence,
       "presentation keeps each sensor's actual source timestamp");
     var writer = new McapRobotRecording(recordingPath);
     for(robotId in observation.robotIds()) {
       var robot=observation.robot(robotId);
       if(robot==null)throw "Shared simulation snapshot lost a robot";
-      for(frame in robot.sensors.toArray())writer.recordSensor(robotId,frame);
+      for(frame in world.robot(robotId).streams().latestFrames())writer.recordSensor(robotId,frame);
     }
     writer.close();
     var loaded = McapRecordingReader.load(recordingPath);
@@ -921,7 +921,7 @@ class SceneEditingTests {
     check(recordedRobots.exists("materia/robot")&&recordedRobots.exists("materia/robot-b"),
       "recording retains observations for both simulated robots");
     var replay = new ReplayRobot("materia/robot", loaded);
-    var replayed = replay.sensors();
+    var replayed = replay.streams().latestFrames();
     check(replayed.length > 0 && replayed[0].sensorId == session.sensors.model.sensors[0].id,
       "record/replay preserves configured sensor identity");
     check(replayed[0].mountPosition.get(0) == 0.25 && replayed[0].values.length > 0,
@@ -946,7 +946,7 @@ class SceneEditingTests {
     var initialObstacleZ=[for(object in initialObjects)if(object.id=="tower")object.position[2]][0];
     var mountedRobot=mujocoObservation.robot("materia/robot-b");
     if(mountedRobot==null)throw "MuJoCo world lost the articulated robot";
-    var mountedLidar=mountedRobot.sensors.get(0),initialHit=false;
+    var mountedLidar=mujocoWorld.robot("materia/robot-b").streams().latestFrames()[0],initialHit=false;
     for(value in mountedLidar.values.toArray())if(value<10.0)initialHit=true;
     check(mountedLidar.linkId=="arm"&&initialHit,
       "joint-mounted LiDAR observes the dynamic obstacle in MuJoCo");
@@ -957,7 +957,8 @@ class SceneEditingTests {
     mujocoObservation=mujocoSimulation.snapshot();
     var mujocoRobot=mujocoObservation.robot("materia/robot");
     if(mujocoRobot==null)throw "MuJoCo world lost the configured robot";
-    check(mujocoRobot.sensors.length>0&&mujocoSimulation.visualState().length==2,
+    var mujocoFrames = mujocoWorld.robot("materia/robot").streams().latestFrames();
+    check(mujocoWorld.robot("materia/robot").streams().latestFrames().length>0&&mujocoSimulation.visualState().length==2,
       "MuJoCo backend publishes the same observable multi-robot contract");
     var movedVisual=mujocoSimulation.visualState()[1];
     var movedArm=[for(link in movedVisual.links)if(link.id=="arm")link][0];
@@ -996,9 +997,9 @@ class SceneEditingTests {
         if(object.id=="tower")object.position[2]][0]-0.1)<0.00001,
         "MuJoCo reset restores the moving obstacle pose");
       var mujocoPath=recordingPath+".mujoco",mujocoWriter=new McapRobotRecording(mujocoPath);
-      for(frame in mujocoRobot.sensors.toArray())mujocoWriter.recordSensor("materia/robot",frame);
+      for(frame in mujocoFrames)mujocoWriter.recordSensor("materia/robot",frame);
       mujocoWriter.close();var mujocoReplay=new ReplayRobot("materia/robot",McapRecordingReader.load(mujocoPath));
-      check(mujocoReplay.sensors().length>0,"MuJoCo observations survive MCAP replay");
+      check(mujocoReplay.streams().latestFrames().length>0,"MuJoCo observations survive MCAP replay");
       mujocoReplay.close();FileSystem.deleteFile(mujocoPath);
       var mujocoStatus=mujocoPath+".incomplete.status";
       if(FileSystem.exists(mujocoStatus))FileSystem.deleteFile(mujocoStatus);

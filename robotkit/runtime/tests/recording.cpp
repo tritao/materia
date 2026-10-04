@@ -47,7 +47,7 @@ static void roundTrip(rk_recording_compression compression, const char* suffix) 
   rk_recording_message message{}; message.struct_size = sizeof(message);
   uint8_t output[256]{}; uint32_t size = sizeof(output);
   assert(rk_recording_reader_next(reader, &message, output, &size) == RK_OK);
-  assert(message.schema_version == 7 && message.ordinal == 9 &&
+  assert(message.schema_version == 8 && message.ordinal == 9 &&
       message.recording_timestamp_ns == 123456789 &&
       std::strcmp(message.topic, "robotkit/test") == 0 &&
       size == sizeof(payload) && std::memcmp(output, payload, size) == 0);
@@ -102,7 +102,7 @@ int main() {
     assert(mixed.open(mixedPath, options).ok());
     mcap::Metadata metadata;
     metadata.name = "robotkit";
-    metadata.metadata["robotkit.schema_version"] = "7";
+    metadata.metadata["robotkit.schema_version"] = "8";
     assert(mixed.write(metadata).ok());
     mcap::Schema schema("Foreign", "jsonschema", mcap::ByteArray{});
     mixed.addSchema(schema);

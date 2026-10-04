@@ -9,7 +9,10 @@ import machinekit.component.Solids;
 import materia.assembly.AssemblyFrames;
 
 /** Robot MIG torch: a breakaway mount, a straight handle, a swan neck bent 22 or 45 degrees, a gas
- * nozzle and a contact tip, 360 mm from mount to wire tip.
+ * nozzle and a contact tip, 360 mm from mount to wire tip. The component is the mount and the handle; the swan
+ * neck with its elbow is `WeldingTorchNeck`, mated to the `neck` connector at the bend, and the nozzle with the contact tip
+ * is `WeldingTorchNozzle` on the neck's end, so that each is a convex body of its own for collision (a hull around the whole
+ * bent torch would fill in the crook of the neck, and around the neck and nozzle together the step between their radii).
  *
  * CAD frame: the mount face at z=0 and the handle along +Z; the neck bends toward +X, so the
  * nozzle points along (sin bend, 0, cos bend). Connectors: `robot` (the mount face, mate it to the
@@ -33,9 +36,14 @@ class WeldingTorch extends MachineComponent {
 	public static inline var STICKOUT:Float = 15;
 	static inline var MOUNT_RADIUS:Float = 30;
 	static inline var HANDLE_RADIUS:Float = 14;
-	static inline var NECK_RADIUS:Float = 9;
-	static inline var NOZZLE_RADIUS:Float = 13;
+	static inline var NECK_RADIUS:Float = 8;
+	static inline var NOZZLE_RADIUS:Float = 10;
 	static inline var TIP_RADIUS:Float = 4;
+
+	/** The torch's mass, kg, and the neck's part of it. */
+	public static inline var MASS:Float = 1.6;
+	public static inline var NECK_MASS:Float = 0.45;
+	public static inline var NOZZLE_MASS:Float = 0.25;
 
 	/** Neck bend from the handle's axis, in degrees: 22 or 45. */
 	public final bendDegrees:Float;
@@ -47,6 +55,8 @@ class WeldingTorch extends MachineComponent {
 		this.bendDegrees = bendDegrees;
 		addConnector("robot", Mount, Solids.axial(0, 0, 0));
 		var bend = bendRadians(), reach = tipEnd() + STICKOUT;
+		// The neck's mount: at the bend, with the joint axis (+Y) along the nozzle, as a part's axial connector has it.
+		addConnector("neck", Mount, AssemblyFrames.alongY(0, 0, BEND_Z, Math.sin(bend), 0, Math.cos(bend)));
 		addConnector("tcp", Mount, AssemblyFrames.compose(
 			AssemblyFrames.translation(reach * Math.sin(bend), 0, BEND_Z + reach * Math.cos(bend)),
 			AssemblyFrames.turnY(bend)));
@@ -54,8 +64,8 @@ class WeldingTorch extends MachineComponent {
 		addPort({name: "gas", kind: Gas, role: Consumer, iface: WeldingInterfaces.gas(), required: true});
 		addPort({name: "wire", kind: Wire, role: Consumer, iface: WeldingInterfaces.wireLiner(), required: true});
 		addPort({name: "control", kind: Signal, role: Consumer, iface: WeldingInterfaces.control(), required: true});
-		addCapability(ArcTorch("tcp", "control"));
-		declareMass(1.6, new Vector(0.05 * Math.sin(bend) * reach, 0, 0.5 * BEND_Z));
+		addCapability(ArcTorch("tcp", "control", STICKOUT));
+		declareMass(MASS - NECK_MASS - NOZZLE_MASS, new Vector(0, 0, 0.5 * BEND_Z));
 	}
 
 	/** Distance from the bend to the contact tip's end, along the nozzle axis. */
@@ -69,16 +79,14 @@ class WeldingTorch extends MachineComponent {
 	override public function hasGeometry():Bool return true;
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var bend = new Vector(0, 0, BEND_Z), axis = wireDirection();
-		function along(distance:Float):Vector return bend.add(axis.scale(distance));
-		var parts = [
+		return Solids.union([
 			Solids.named(Part.cylinderSpan(MOUNT_RADIUS, 0, MOUNT_LENGTH), "breakaway"),
-			Solids.named(Part.cylinderSpan(HANDLE_RADIUS, MOUNT_LENGTH, BEND_Z), "handle"),
-			Solids.named(Part.sphere(NECK_RADIUS).translated(bend), "elbow"),
-			Solids.named(Part.cylinderAlong(NECK_RADIUS, bend, axis, NECK_LENGTH), "neck"),
-			Solids.named(Part.cylinderAlong(NOZZLE_RADIUS, along(NECK_LENGTH), axis, NOZZLE_LENGTH), "nozzle"),
-			Solids.named(Part.cylinderAlong(TIP_RADIUS, along(NECK_LENGTH + NOZZLE_LENGTH), axis, TIP_PROTRUSION), "tip")
-		];
-		return Solids.union(parts);
+			Solids.named(Part.cylinderSpan(HANDLE_RADIUS, MOUNT_LENGTH, BEND_Z), "handle")
+		]);
 	}
+
+	/** The radii of the neck's parts, for `WeldingTorchNeck`. */
+	public static inline var NECK_R:Float = NECK_RADIUS;
+	public static inline var NOZZLE_R:Float = NOZZLE_RADIUS;
+	public static inline var TIP_R:Float = TIP_RADIUS;
 }

@@ -39,7 +39,8 @@ class Main {
         if (port == null || port <= 0 || port > 65535)
           throw "worldd: --remote port is invalid";
         runtime = NativeKitRuntime.start();
-        var remote = host.addRemoteRobot("remote", false, new SerialDeployment(deploymentPath));
+        var remote = host.addRemoteRobot("remote", false, new SerialDeployment(deploymentPath),
+          new robotkit.auth.ClientCredentials(Sys.getEnv("ROBOTKIT_IDENTITY"), Sys.getEnv("ROBOTKIT_TOKEN")));
         remote.connect(remoteAddress.substr(0, separator), port, runtime.events);
       }
       var snapshot:Null<WorldSnapshot> = null;

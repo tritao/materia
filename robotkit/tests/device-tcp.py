@@ -92,14 +92,14 @@ def main():
             try:
                 # A deployment for another board is refused by the board, which says who it is.
                 rejected = subprocess.run(
-                    [str(HAXEON), "run", "--project", str(ROBOTD), "--", "--server",
+                    [str(HAXEON), "run", "--project", str(ROBOTD), "--", "--server", "--auth=" + str(ROOT / "robotkit/tests/fixtures/authorization.json"),
                      f"--deployment={wrong_path}"], cwd=ROOT, text=True,
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60)
                 if rejected.returncode == 0 or "is for controller 000102030405060708090a0b0c0d0e0f" \
                         not in rejected.stdout:
                     raise RuntimeError(f"robotd accepted another board's deployment:\n{rejected.stdout}")
                 server = subprocess.Popen(
-                    [str(HAXEON), "run", "--project", str(ROBOTD), "--", "--server",
+                    [str(HAXEON), "run", "--project", str(ROBOTD), "--", "--server", "--auth=" + str(ROOT / "robotkit/tests/fixtures/authorization.json"),
                      f"--deployment={deployment_path}", f"--port={port}",
                      "--listen=0.0.0.0"],
                     cwd=ROOT, stdout=server_log, stderr=subprocess.STDOUT,

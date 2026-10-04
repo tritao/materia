@@ -25,29 +25,60 @@ Run the current skeleton with:
 ../../haxeon/scripts/haxeon run --project haxeon.json
 
 # Start the authoritative robot process
-../../haxeon/scripts/haxeon run --project haxeon.json -- --server
+../../haxeon/scripts/haxeon run --project haxeon.json -- --server --auth=/etc/robotkit/authorization.json
 
 # Bind to a robot LAN interface when the network is isolated
 ../../haxeon/scripts/haxeon run --project haxeon.json -- \
-  --server --listen=192.168.10.20
+  --server --auth=/etc/robotkit/authorization.json --listen=192.168.10.20
 
 # Host a deployed robot through a serial device
 ../../haxeon/scripts/haxeon run --project haxeon.json -- \
-  --server --deployment=/etc/robotkit/deployment.json --listen=192.168.10.20
+  --server --auth=/etc/robotkit/authorization.json --deployment=/etc/robotkit/deployment.json --listen=192.168.10.20
 
 # Optionally host a Haxeon behavior inside robotd
 ../../haxeon/scripts/haxeon run --project haxeon.json -- \
-  --server --behavior=oscillate
+  --server --auth=/etc/robotkit/authorization.json --behavior=oscillate
 
 # Native-only runtime smoke test
 ../../haxeon/scripts/haxeon run --project haxeon.json -- --in-memory
 ```
 
 The TCP listener defaults to `127.0.0.1`. `--listen` accepts an explicit IPv4
-address, including `0.0.0.0` to bind all interfaces. The RobotKit TCP protocol
-does not authenticate clients; use an isolated robot network or SSH tunnel.
+address, including `0.0.0.0` to bind all interfaces. Every TCP host requires
+`--auth=FILE`; missing configuration stops the host before opening its listener.
+RKF1 version 3 authenticates each connection and returns its identity and grants
+in Welcome. There is no anonymous or loopback exception.
 
-Serial hosting requires a deployment JSON file (schema v5). It refers to the
+The authorization file uses schema version 1:
+
+```json
+{
+  "schemaVersion": 1,
+  "identities": [
+    {"id": "operator", "tokenSha256": "<64 lowercase hexadecimal SHA-256 digits>",
+     "permissions": ["observe", "command"]}
+  ],
+  "deployments": {"bench": "deployment.json"}
+}
+```
+
+Configure a distinct secret token of at least 16 characters per identity and
+store only its SHA-256 digest on the host. `observe`, `command`, and `deployment`
+are independent grants. Clients provide `ClientCredentials`; the editor CLI
+reads `ROBOTKIT_IDENTITY` and `ROBOTKIT_TOKEN`. Tokens travel over the TCP channel,
+so use a protected network or an encrypted tunnel when confidentiality is needed.
+Test identities in `tests/fixtures/authorization.json` are public test data.
+
+A controller receives small control state and numeric encoder/IMU frames.
+`RemoteRobot` opens a separately authenticated stream connection for LiDAR,
+camera, and inference subscriptions; bulk queues cannot occupy its control socket.
+An authenticated deployment client can call `requestDeployment(name)` only with
+the deployment grant. Names resolve through this file; clients cannot provide paths.
+The host requires no active local or remote controller, validates the selected
+record, closes the current host, and starts the new deployment. A successful
+change disconnects clients, which must reconnect and authenticate again.
+
+Serial hosting requires a deployment JSON file (schema v6). It refers to the
 canonical semantic robot model and gives the UART path, baud, `f32` target
 error budget, the `controller` id of the board it is for and a layout. The
 layout (schema v1) wires ordered RKD6 channels to model actuators: each channel

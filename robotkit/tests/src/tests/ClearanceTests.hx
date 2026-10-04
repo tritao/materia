@@ -7,6 +7,7 @@ import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.Link;
 import robotkit.model.RobotModel;
+import robotkit.tool.ConvexDistance;
 import robotkit.tool.ConvexSolid;
 
 /**
@@ -74,7 +75,7 @@ class ClearanceTests {
     check(hit != null, "the arm swung toward the post hits it");
     var names = hit == null ? "" : hit.a + "," + hit.b;
     check(names.indexOf("post") >= 0 && names.indexOf("upper") >= 0, 'the violation names the parts, got $names');
-    check(hit != null && hit.distance < 0.0, "the arm overlaps the post");
+    check(hit != null && hit.distance <= 0.0, "the arm overlaps the post");
     // A motion whose end poses are both clear but whose path goes through the post: the arm swings from along X to nearly along Y.
     check(cell.clearance.violation([1.4, 0.0]) == null, "the arm swung well past the post is clear");
     check(cell.clearance.sweep([0.0, 0.0], [1.4, 0.0]) != null, "the arm swinging round through the post is found along the way");
@@ -92,8 +93,8 @@ class ClearanceTests {
     // The tool in the contact zone may come as close as the contact margin: 3 mm is clear for the forearm but not the upper arm.
     var contact = cell.clearance.violation([0.0, 0.0], true);
     check(contact != null && contact.a != "forearm" && contact.b != "forearm", 'only the arm itself, not the tool, is held to the margin there, got ${contact == null ? "" : contact.a + "," + contact.b}');
-    var lifted = rig([{name: "table", vertices: box(-0.2, 0.8, -0.5, 0.5, -0.2, -0.025 - 0.0005)}]);
-    check(lifted.clearance.violation([0.0, 0.0], true) != null, "0.5 mm is closer than even the contact margin");
+    var lifted = rig([{name: "table", vertices: box(-0.2, 0.8, -0.5, 0.5, -0.2, -0.025 - 0.00025)}]);
+    check(lifted.clearance.violation([0.0, 0.0], true) != null, "0.25 mm is closer than even the contact margin");
     var roomy = rig([{name: "table", vertices: box(-0.2, 0.8, -0.5, 0.5, -0.2, -0.025 - 0.02)}]);
     check(roomy.clearance.violation([0.0, 0.0]) == null, "20 mm above the table is clear");
     // With a margin wider than the gap the violation reports the distance between the faces.
@@ -134,9 +135,40 @@ class ClearanceTests {
       "below-threshold face distances still solve the true corner distance");
     check(Math.abs(solid.distanceBelow(0.05, 0.1, 0.15, 0.005) - solid.distance(0.05, 0.1, 0.15)) < 1e-12,
       "clearance cutoff preserves penetration depth");
-    var points = solid.edgePoints(0.07);
-    // 8 corners, and along the four edges of 0.1 (1 more each), of 0.2 (2) and of 0.3 (4) at that spacing.
-    check(Std.int(points.length / 3) == 8 + 4 * (1 + 2 + 4), 'a box\'s edges are sampled, got ${Std.int(points.length / 3)} points');
+
+    // The distance between hulls: two boxes 0.05 apart face to face, and 0.05 apart edge to edge (a diagonal gap of 0.05 * sqrt(2)).
+    var a = box(0.0, 1.0, 0.0, 1.0, 0.0, 1.0);
+    near(ConvexDistance.between(a, box(1.05, 2.0, 0.0, 1.0, 0.0, 1.0), 1.0), 0.05, 1e-9, "boxes apart face to face");
+    near(ConvexDistance.between(a, box(1.05, 2.0, 1.05, 2.0, 0.0, 1.0), 1.0), 0.05 * Math.sqrt(2), 1e-9, "boxes apart edge to edge");
+    near(ConvexDistance.between(a, box(1.05, 2.0, 1.05, 2.0, 1.05, 2.0), 1.0), 0.05 * Math.sqrt(3), 1e-9, "boxes apart corner to corner");
+    check(ConvexDistance.between(a, box(0.5, 1.5, 0.5, 1.5, 0.5, 1.5), 1.0) == 0.0, "overlapping boxes are at no distance");
+    check(ConvexDistance.between(a, box(1.0, 2.0, 0.0, 1.0, 0.0, 1.0), 1.0) == 0.0, "touching boxes are at no distance");
+    // Two bars that cross, edges against faces, with no corner of either inside the other.
+    check(ConvexDistance.between(box(0.0, 1.0, 0.4, 0.6, -0.01, 0.01), box(0.4, 0.6, 0.0, 1.0, -0.02, 0.02), 1.0) == 0.0, "crossing bars overlap");
+    near(ConvexDistance.between(box(0.0, 1.0, 0.4, 0.6, -0.01, 0.01), box(0.4, 0.6, 0.0, 1.0, 0.03, 0.05), 1.0), 0.02, 1e-9, "crossing bars one above the other");
+    // A cylinder (a 24-sided prism, as hulls of round parts are) against a box face, upright and tilted 45 degrees: the nearest
+    // corner to the face is the distance. Prisms are symmetric and give flat simplices, which a naive search takes for overlap.
+    for (tilt in [0.0, Math.PI / 4, 1.0]) {
+      var prism:Array<Float> = [];
+      for (end in [0.0, 0.05]) for (side in 0...24) {
+        var angle = 2 * Math.PI * side / 24;
+        var x = 0.013 * Math.cos(angle), y = 0.013 * Math.sin(angle), z = end;
+        prism.push(x * Math.cos(tilt) + z * Math.sin(tilt) + 0.05);
+        prism.push(y);
+        prism.push(-x * Math.sin(tilt) + z * Math.cos(tilt) + 0.2);
+      }
+      var lowest = Math.POSITIVE_INFINITY;
+      for (i in 0...48) lowest = Math.min(lowest, prism[3 * i + 2]);
+      near(ConvexDistance.between(prism, box(-1.0, 1.0, -1.0, 1.0, lowest - 0.5, lowest - 0.003), 1.0), 0.003, 1e-9, 'a cylinder tilted $tilt rad over a face');
+    }
+    // Far apart: the search stops at a separating plane's gap, which is at least `enough`.
+    check(ConvexDistance.between(a, box(5.0, 6.0, 0.0, 1.0, 0.0, 1.0), 0.1) >= 0.1, "far boxes are reported farther than the margin asked");
+  }
+
+  static function near(actual:Float, expected:Float, tolerance:Float, message:String):Void {
+    assertions++;
+    if (!(Math.abs(actual - expected) <= tolerance)) throw 'Assertion failed: $message (expected $expected, got $actual)';
+
   }
 
   static function check(value:Bool, message:String):Void {

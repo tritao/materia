@@ -24,7 +24,7 @@ class WorldBehaviorRunner {
     hasObservation = true;
     lastObservationKey = key;
     var commands:Array<robotkit.core.RobotCommand> = [];
-    behavior.update(new WorldBehaviorContext(snapshot, events, commands));
+    behavior.update(new WorldBehaviorContext(snapshot, events, commands, robot.streams().latestFrames()));
     for (command in commands) robot.submit(command);
     return commands.length;
   }
@@ -38,6 +38,8 @@ class WorldBehaviorRunner {
     for (sensor in snapshot.sensors.toArray())
       key += '|${sensor.sensorId}:${sensor.sourceClockId}:${Int64.toStr(sensor.sequence)}:'
         + '${Int64.toStr(sensor.sourceTimestampNs)}:${Int64.toStr(sensor.receivedTimestampNs)}';
+    for (stream in snapshot.streamSequences)
+      key += '|${stream.streamId}:${stream.sourceClockId}:${Int64.toStr(stream.sequence)}';
     return key;
   }
 }

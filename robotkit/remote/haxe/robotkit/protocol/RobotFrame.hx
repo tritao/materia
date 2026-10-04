@@ -17,7 +17,7 @@ typedef RobotFrameHeader = {
 
 /** RobotKit's session envelope around one Haxeon Wire payload. */
 class RobotFrame {
-  public static inline final VERSION:Int = 2;
+  public static inline final VERSION:Int = 3;
   public static inline final HEADER_BYTES:Int = 44;
   public static inline final MAX_PAYLOAD:Int = 16 * 1024 * 1024;
   public static inline final MAX_ATTACHMENTS:Int = 64;

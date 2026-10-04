@@ -10,7 +10,7 @@ import robotkit.protocol.RobotMessageType;
 class RobotClientSmoke {
   public static function run(host:String, port:Int):Void {
     verifyFrameCodec();
-    var client = new RobotClient("materia-cli");
+    var client = new RobotClient("materia-cli", "controller", IntegrationCredentials.controller());
     var targetStateReceived = false;
     var targetSent = false;
     var stateCount = 0;

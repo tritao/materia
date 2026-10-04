@@ -14,7 +14,7 @@ interface Robot {
   function description():RobotDescription;
   function capabilities():RobotCapabilities;
   function snapshot():RobotSnapshot;
-  function sensors():Array<SensorFrame>;
+  function streams():robotkit.streams.SensorStreams;
   function events(afterOrdinal:haxe.Int64, max:Int):Array<RobotEvent>;
   function fault():Null<RobotFault>;
   function submit(command:RobotCommand):Void;

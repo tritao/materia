@@ -7,9 +7,9 @@ import NativeKitRuntime;
 class SubscriptionIntegration {
   public static function run(host:String, port:Int):Void {
     var runtime = NativeKitRuntime.start();
-    var numeric = new RobotClient("numeric-only", "observer");
+    var numeric = new RobotClient("numeric-only", "observer", IntegrationCredentials.observer());
     numeric.subscribeCamera = false;
-    var images = new RobotClient("camera-reader", "observer");
+    var images = new RobotClient("camera-reader", "observer", IntegrationCredentials.observer());
     images.subscribeCamera = true;
     var numericFrames = 0;
     var numericCameras = 0;
