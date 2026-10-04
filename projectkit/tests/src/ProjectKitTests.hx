@@ -326,7 +326,8 @@ class ProjectKitTests {
     check(weld.frame == "plate" && weld.path.length == 1 && weld.path[0].seam == "plate:f3|upright:f7" && weld.path[0].joint == "fillet" &&
       weld.path[0].kind == "line" && weld.metal == "plate" && weld.path[0].stop.position[0] == 0.18 &&
       weld.path[0].normals[1][1] == -1.0 && weld.legSize == 0.005 && weld.passes[0].process.wireSpeed == 8.0 && weld.passes[0].process.travelSpeed == 0.01 &&
-      weld.passes[0].process.burnback == 0.1, "weld mission round trip");
+      weld.passes[0].process.startDwell == 0.2 && weld.passes[0].process.craterDwell == 0.3 &&
+      weld.passes[0].process.burnback == 0.1, "weld mission round trip including both dwells");
     // A chained seam is one weld of several segments, each with its own faces.
     var chain = seam();
     chain.path = [line(), second()];
