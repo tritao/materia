@@ -1267,9 +1267,10 @@ excluded region, not of the raster's ordinary edge margin.
 ## CAD/BIM bridge (`robotkit/cadbridge`, separate project)
 
 `robotkit/cadbridge` is its own haxeon project (`robotkit/cadbridge/haxeon.json`),
-depending on `robotkit`, `cadkit`, and `bimkit`. It is the *only* place CAD/BIM
-concepts meet RobotKit; `robotkit/haxeon.json` itself still depends only on
-`nativekit`, per the plan's CAD-agnostic-core rule.
+depending on `robotkit`, `cadkit`, and `bimkit`. Generic assembly and frame
+conversion remain here. ProcessKit owns the CAD face and BIM wall bridges that
+produce work surfaces; the generic CAD bridge does not depend on ProcessKit.
+RobotKit's core model and runtime remain independent of CAD/BIM.
 
 `processkit.cadbridge.FaceBridge.toWorkSurface(face, id, frameId, ?provenance,
 ?surfaceFrameId, ?scale)` converts any CadKit planar `Face` into a design
