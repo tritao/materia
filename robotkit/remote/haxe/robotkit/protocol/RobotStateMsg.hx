@@ -23,6 +23,8 @@ class RobotStateMsg {
   @:id(19) public var committedUntilNs:haxe.Int64;
   @:id(20) public var queueEndTimeNs:haxe.Int64;
 
+  @:id(21) public var streamSequences:Array<StreamSequenceMsg>;
+
   public function new(?robotId:haxe.Int64 = null, ?sequence:haxe.Int64 = null,
       ?sourceTimestampNs:haxe.Int64 = null, ?q:Array<Float> = null,
       ?dq:Array<Float> = null, ?effort:Array<Float> = null, ?mode:Int = 0,
@@ -31,7 +33,8 @@ class RobotStateMsg {
       ?trajectoryTimeNs:haxe.Int64, ?trajectoryDurationNs:haxe.Int64,
       ?trajectoryTag:haxe.Int64, ?trajectoryTagTimeNs:haxe.Int64,
       ?sessionState:Int = 0, ?activePlanId:haxe.Int64,
-      ?committedUntilNs:haxe.Int64, ?queueEndTimeNs:haxe.Int64) {
+      ?committedUntilNs:haxe.Int64, ?queueEndTimeNs:haxe.Int64, ?streamSequences:Array<StreamSequenceMsg>) {
+    this.streamSequences = streamSequences == null ? [] : streamSequences.copy();
     this.robotId = robotId == null ? haxe.Int64.ofInt(0) : robotId;
     this.sequence = sequence == null ? haxe.Int64.ofInt(0) : sequence;
     this.sourceTimestampNs = sourceTimestampNs == null

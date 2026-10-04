@@ -345,8 +345,8 @@ Execution guarantees use the shared `Proven`, `Sampled`, `Unchecked`, `Failed`
 vocabulary; analytic runtime validation covers declared position, velocity and
 acceleration limits, while jerk remains a separate plan claim. An adapter may
 restrict execution through a policy, but cannot advertise extra endpoint support.
-The RKF1 envelope and Hello/Welcome carry protocol version 2; older versions are
-rejected. Recording schema version 7 stores plans and lifecycle commands without
+The RKF1 envelope and Hello/Welcome carry protocol version 3; older versions are
+rejected. Recording schema version 8 stores plans and lifecycle commands without
 a trajectory-chunk payload.
 
 ## Mobile kinematics
@@ -840,7 +840,7 @@ only metadata. `RobotRecordingEvent.Channel(...)` permits extensions without
 editing the core event enum. Typed core cases remain useful to behavior and
 replay code and are converted through the same channel registry.
 
-Recording format v7 defaults to LZ4 chunk compression and also supports no
+Recording format v8 defaults to LZ4 chunk compression and also supports no
 compression. MCAP log time stores the independent wall-clock recording time;
 publish time stores the full-width arrival ordinal used for deterministic
 replay. The incremental reader rejects older versions and can skip unknown

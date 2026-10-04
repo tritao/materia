@@ -39,6 +39,8 @@ import robotkit.transport.NativeTransport;
 class RobotClient {
   public final clientName:String;
   public final requestedRole:String;
+  final credentials:Null<robotkit.auth.ClientCredentials>;
+  public var subscribeSensors:Bool = true;
   public var welcome:Null<robotkit.protocol.Welcome> = null;
   public var description:Null<RobotDescription> = null;
   public var capabilities:Null<RobotCapabilities> = null;
@@ -72,9 +74,15 @@ class RobotClient {
   var failure:Null<String> = null;
   var closed:Bool = false;
 
-  public function new(?clientName:String = "materia", ?requestedRole:String = "controller") {
+  public function new(?clientName:String = "materia", ?requestedRole:String = "controller", ?credentials:robotkit.auth.ClientCredentials) {
+    this.credentials = credentials;
     this.clientName = clientName;
     this.requestedRole = requestedRole;
+  }
+
+  function requireCredentials():robotkit.auth.ClientCredentials {
+    if (credentials == null) throw "Robot connection requires explicit credentials";
+    return credentials;
   }
 
   public function subscriptionLocked():Bool
@@ -82,6 +90,7 @@ class RobotClient {
 
   /** Connects to robotd and starts the NativeKit event subscription. */
   public function connect(host:String, port:Int):Void {
+    requireCredentials();
     if (subscription != null || nativeRuntime != null || owned != null)
       throw "RobotKit client is already connected";
     closed = false;
@@ -127,6 +136,7 @@ class RobotClient {
    * authoritative while retaining the same typed client API.
    */
   public function connectWithEvents(host:String, port:Int, events:NativeKitEvents):Void {
+    requireCredentials();
     if (events == null)
       throw "RobotKit client requires a NativeKit event pump";
     if (subscription != null || nativeRuntime != null || owned != null)
@@ -203,6 +213,19 @@ class RobotClient {
     return isReady() && welcome != null && welcome.controlGranted;
 
   /** Sends one joint target through the batch command protocol. */
+  /** Requires the authenticated deployment grant; the host must have no active controller. */
+  public function requestDeployment(name:String):Void {
+    if (!isReady()) throw "RobotKit client is not ready";
+    var current = welcome;
+    if (current == null || current.permissions.indexOf("deployment") < 0)
+      throw "RobotKit identity cannot change deployment";
+    if (name == null || name.length == 0) throw "Deployment name is required";
+    raiseFailure();
+    send(new RobotFrame(RobotMessageType.DeploymentChange,
+      MessagePack.encode(new robotkit.protocol.DeploymentChange(name)), 0, null,
+      sessionId, nextCommandSequence()));
+  }
+
   public function sendJointTarget(joint:Int, mode:Int, target:Float,
       ?expiryNs:Int64):Int64 {
     var targetMode = switch mode {
@@ -314,14 +337,15 @@ class RobotClient {
             var statusChanged = statusListener;
             if (statusChanged != null)
               statusChanged();
-            var requested = [new StreamSubscription("essential"),
-              new StreamSubscription("sensor", sensorMaxRateHz)];
+            var requested = [new StreamSubscription("essential")];
+            if (subscribeSensors) requested.push(new StreamSubscription("sensor", sensorMaxRateHz));
             if (subscribeCamera == true || (subscribeCamera == null && cameraListener != null))
               requested.push(new StreamSubscription("camera", cameraMaxRateHz));
             if (subscribeObservations)
               requested.push(new StreamSubscription("observation"));
-            send(RobotProtocol.hello(new Hello(RobotFrame.VERSION, clientName, "robotkit-v2",
-              requestedRole, requested)));
+            var authenticated = requireCredentials();
+            send(RobotProtocol.hello(new Hello(RobotFrame.VERSION, clientName, "robotkit-v3",
+              requestedRole, requested, authenticated.identity, authenticated.token)));
           } else if (kind == EventKind.TransportData) {
             receive(currentTransport);
           } else if (kind == EventKind.TransportClosed || kind == EventKind.TransportFailed) {
@@ -376,6 +400,10 @@ class RobotClient {
         failure = "RobotKit Welcome session mismatch";
         return;
       }
+      if (value.identity != requireCredentials().identity) {
+        failure = "RobotKit Welcome identity mismatch";
+        return;
+      }
       welcome = value;
       sessionId = value.sessionId;
       resetLeaseRenewal();
@@ -407,7 +435,7 @@ class RobotClient {
       if (listener != null)
         listener(value);
     case RobotMessageType.Fault:
-      if (!validSession(frame))
+      if (welcome != null && !validSession(frame))
         return;
       var value = RobotProtocol.decodeFault(frame);
       lastFault = value;

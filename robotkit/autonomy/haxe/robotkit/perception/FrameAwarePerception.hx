@@ -71,13 +71,13 @@ class FrameAwarePerception implements Perception {
    * transforms that observation's sensors into the resulting reference frame.
    */
   public function observeRobotSnapshot(snapshot:RobotSnapshot, model:RobotModel,
-      blueprint:RobotRuntimeBlueprint, bodyLinkId:String):PerceptionSnapshot {
+      blueprint:RobotRuntimeBlueprint, bodyLinkId:String, sensorFrames:Array<SensorFrame>):PerceptionSnapshot {
     if (snapshot == null) throw "Frame-aware perception requires a robot snapshot";
     var currentFrames = RobotFrameTree2.fromSnapshot(model, blueprint, snapshot,
       bodyLinkId);
     localization.update(snapshot);
     frames = currentFrames;
-    return observe(snapshot.sensors.toArray());
+    return observe(sensorFrames);
   }
 
   function transformDetection(value:Detection,

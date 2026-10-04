@@ -23,11 +23,16 @@ class RecordingRobot implements Robot {
   var lastRecordedFaultCode:Int = 0;
   var lastRecordedEventOrdinal:haxe.Int64 = haxe.Int64.ofInt(0);
 
+  var streamRecording:robotkit.streams.SensorStreamSubscription;
+
   public function new(source:Robot, recording:RobotRecordingSink) {
     if (source == null || recording == null)
       throw "RecordingRobot requires a source robot and recording sink";
     this.source = source;
     this.recording = recording;
+    streamRecording = source.streams().subscribe("*", function(sample) {
+      if (sample.frame != null) record(function() recording.recordSensor(source.id(), sample.frame));
+    });
   }
 
   public function id():RobotId return source.id();
@@ -49,7 +54,7 @@ class RecordingRobot implements Robot {
     return observation;
   }
 
-  public function sensors():Array<SensorFrame> return source.sensors();
+  public function streams():robotkit.streams.SensorStreams return source.streams();
   public function events(afterOrdinal:haxe.Int64, max:Int):Array<RobotEvent> {
     captureEvents();
     return source.events(afterOrdinal, max);
@@ -79,6 +84,7 @@ class RecordingRobot implements Robot {
     source.setChangeListener(listener);
 
   public function close():Void {
+    streamRecording.cancel();
     source.setChangeListener(null);
     source.close();
   }

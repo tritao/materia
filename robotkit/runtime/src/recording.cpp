@@ -98,7 +98,7 @@ void writerMain(const std::shared_ptr<Writer>& writer) {
       mcap::Schema schema(def.schemaName, def.schemaEncoding, def.schemaData);
       output.addSchema(schema);
       mcap::Channel channel(def.topic, def.messageEncoding, schema.id);
-      channel.metadata["robotkit.schema_version"] = "7";
+      channel.metadata["robotkit.schema_version"] = "8";
       output.addChannel(channel);
       mcapChannels.push_back(channel.id);
     }
@@ -162,7 +162,7 @@ rk_result rk_recording_writer_create(const char* path, uint64_t capacity,
     if (!result.ok()) { std::filesystem::remove(marker); return RK_ERROR_BACKEND; }
     mcap::Metadata metadata;
     metadata.name = "robotkit";
-    metadata.metadata["robotkit.schema_version"] = "7";
+    metadata.metadata["robotkit.schema_version"] = "8";
     result = writer->output.write(metadata);
     if (!result.ok()) { writer->output.close(); std::filesystem::remove(marker); return RK_ERROR_BACKEND; }
     writer->thread = std::thread(writerMain, writer);
@@ -260,7 +260,7 @@ rk_result rk_recording_reader_open(const char* path,rk_recording_reader_handle* 
       mcap::Metadata metadata;
       if (!mcap::McapReader::ParseMetadata(record, &metadata).ok()) return RK_ERROR_BACKEND;
       auto version = metadata.metadata.find("robotkit.schema_version");
-      if (version != metadata.metadata.end() && version->second == "7") currentVersion = true;
+      if (version != metadata.metadata.end() && version->second == "8") currentVersion = true;
     }
     if (!currentVersion) return RK_ERROR_UNSUPPORTED;
     reader->messages.emplace(reader->mcap.readMessages([raw=reader.get()](const mcap::Status&){raw->damaged=true;}));
@@ -272,7 +272,7 @@ rk_result rk_recording_reader_next(rk_recording_reader_handle handle,rk_recordin
   auto reader=lookup(Readers,handle.id);if(!reader)return RK_ERROR_INVALID_HANDLE;
   if(!message||message->struct_size<sizeof(*message)||!size)return RK_ERROR_INVALID_ARGUMENT;
   if(!reader->current){auto status=validateAndCache(reader);if(status!=RK_OK)return status;}
-  auto& item=*reader->current;message->schema_version=7;
+  auto& item=*reader->current;message->schema_version=8;
   message->ordinal=item.ordinal;message->recording_timestamp_ns=item.timestamp;message->payload_size=item.data.size();
   std::memset(message->topic,0,sizeof(message->topic));
   std::memcpy(message->topic,reader->topic.data(),reader->topic.size());

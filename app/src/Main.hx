@@ -337,7 +337,7 @@ class Main {
       var robotHost = diagnostics.robotHost;
       if (robotHost != null) {
         world = new RobotWorld();
-        var remote = new RemoteRobot("warehouse/forklift-17");
+        var remote = new RemoteRobot("warehouse/forklift-17", new robotkit.auth.ClientCredentials(Sys.getEnv("ROBOTKIT_IDENTITY"),Sys.getEnv("ROBOTKIT_TOKEN")));
         world.attach(remote);
         remote.connect(robotHost, diagnostics.robotPort, context.events);
       }

@@ -27,5 +27,7 @@ class RecordingSnapshotMsg {
   @:id(22) public var committedUntilNs:haxe.Int64;
   @:id(23) public var queueEndTimeNs:haxe.Int64;
 
+  @:id(24) public var streamSequences:Array<StreamSequenceMsg> = [];
+
   public function new() {}
 }

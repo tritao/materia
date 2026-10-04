@@ -65,6 +65,10 @@ class RobotServer {
   final nativeRuntime:NativeKitRuntime;
   final listener:OwnedListenerHandle;
   final port:Int;
+  final authorization:robotkit.auth.RobotAuthorization;
+  final principals:Map<Int, robotkit.auth.AuthPrincipal> = [];
+  final deploymentSequences:Map<Int, Int64> = [];
+  public var nextDeployment(default, null):Null<String> = null;
   final listenAddress:String;
   final robotId:Int;
   final subscription:NativeKitEventSubscription;
@@ -80,6 +84,7 @@ class RobotServer {
   final perception:Null<PerceptionHost>;
   final perceptionConsumers:Map<String, Array<String>> = new Map<String, Array<String>>();
   final perceptionSequences:Map<String, Int64> = new Map<String, Int64>();
+  final inferenceSequences:Map<String, robotkit.protocol.StreamSequenceMsg> = [];
   final producedEvents = new RobotEventRing();
   final hostedRobot:RuntimeRobotAdapter;
   var stream:RobotFrameStream;
@@ -101,9 +106,11 @@ class RobotServer {
   var disposed:Bool = false;
 
   public function new(robot:RobotModel, blueprint:RobotRuntimeBlueprint, runtime:RobotRuntime,
-      simulation:Null<SimulationHarness>, port:Int, robotId:Int, ?behavior:RobotBehavior,
+      simulation:Null<SimulationHarness>, port:Int, robotId:Int, authorization:robotkit.auth.RobotAuthorization, ?behavior:RobotBehavior,
       ?listenAddress:String = "127.0.0.1", ?bulkBudgetBytes:Int = 0,
       ?fixtureTick:Void->Void, ?perceptionConfigs:Array<PerceptionPipelineConfig>) {
+    if (authorization == null) throw "RobotServer requires authorization configuration";
+    this.authorization = authorization;
     this.robot = robot;
     this.blueprint = blueprint;
     this.runtime = runtime;
@@ -159,6 +166,7 @@ class RobotServer {
           nativeRuntime.events.wait(0.01);
           checkControlLeaseTimeout();
         }
+        if (nextDeployment != null) stopped = true;
         if (onceMode && servedState && client == null && observers.length == 0)
           stopped = true;
       }
@@ -194,6 +202,8 @@ class RobotServer {
   function pollPerception():Void {
     if (perception == null) return;
     for (observation in perception.poll()) {
+      var streamId = "inference/" + observation.pipelineId;
+      inferenceSequences.set(streamId, new robotkit.protocol.StreamSequenceMsg(streamId, "inference", observation.sequence, observation.sourceClockId));
       var consumers = perceptionConsumers.get(observation.pipelineId);
       if (consumers == null) continue;
       var event = producedEvents.publish(observation);
@@ -240,6 +250,8 @@ class RobotServer {
     observerStreams.clear();
     observerSessions.clear();
     observerHello.clear();
+    principals.clear();
+    deploymentSequences.clear();
     outbound.clear();
     if (perception != null) perception.dispose();
     listener.close();
@@ -342,6 +354,8 @@ class RobotServer {
 
   function handleFrame(frame:RobotFrame):Void {
     switch frame.messageType {
+    case RobotMessageType.DeploymentChange:
+      if (client != null) handleDeploymentChange(client,sessionId,frame);
     case RobotMessageType.Hello:
       try handleHello(RobotProtocol.decodeHello(frame))
       catch (error:Dynamic) sendFault(400, 'invalid Hello payload: $error', false);
@@ -392,6 +406,10 @@ class RobotServer {
   function handleObserverFrame(transport:TransportHandle, frame:RobotFrame):Void {
     var observerSession = observerSessions.get(transport.rawValue());
     if (observerSession == null) return;
+    if (frame.messageType == RobotMessageType.DeploymentChange) {
+      handleDeploymentChange(transport, observerSession, frame);
+      return;
+    }
     if (frame.messageType != RobotMessageType.Hello) {
       sendTo(transport, observerSession,
         new RobotFrame(RobotMessageType.Fault,
@@ -409,6 +427,16 @@ class RobotServer {
       return;
     }
     if (value.protocolVersion != RobotFrame.VERSION) return;
+    if (observerHello.get(transport.rawValue()) == true) {
+      sendTo(transport, observerSession, new RobotFrame(RobotMessageType.Fault,
+        MessagePack.encode(new Fault(Int64.ofInt(robotId),409,"session already established",false)),0,null,observerSession));
+      return;
+    }
+    try authenticateHello(transport, value) catch (_:Dynamic) {
+      sendTo(transport, observerSession, new RobotFrame(RobotMessageType.Fault,
+        MessagePack.encode(new Fault(Int64.ofInt(robotId),401,"authentication or authorization denied",true)),0,null,observerSession));
+      return;
+    }
     try {
       outbound.get(transport.rawValue()).configure(value.subscriptions);
     } catch (_:Dynamic) {
@@ -420,7 +448,7 @@ class RobotServer {
     sendTo(transport, observerSession, RobotProtocol.welcome(
       new robotkit.protocol.Welcome(RobotFrame.VERSION, "robotd", observerSession,
         Int64.ofInt(robotId), false, Int64.ofInt(0), 0,
-        OutboundPolicy.capabilities()), observerSession));
+        OutboundPolicy.capabilities(), principalFor(transport).identity, grants(principals.get(transport.rawValue()))), observerSession));
     sendTo(transport, observerSession, RobotProtocol.description(new RobotDescription(
       Int64.ofInt(robotId), robot.name, [for (link in robot.links) link.name],
       [for (joint in robot.joints) joint.name]), observerSession));
@@ -428,6 +456,57 @@ class RobotServer {
     observerHello.set(transport.rawValue(), true);
     var latest = runtime.snapshot().withRobotId(Int64.ofInt(robotId));
     sendStateTo(transport, observerSession, latest);
+  }
+
+  function principalFor(transport:Null<TransportHandle>):robotkit.auth.AuthPrincipal {
+    if (transport == null) throw "No session transport";
+    var handle:TransportHandle = cast transport;
+    var value = principals.get(handle.rawValue());
+    if (value == null) throw "Session is not authenticated";
+    return value;
+  }
+
+  static function grants(principal:robotkit.auth.AuthPrincipal):Array<String> {
+    var result:Array<String> = [];
+    if (principal.mayObserve) result.push("observe");
+    if (principal.mayCommand) result.push("command");
+    if (principal.mayDeploy) result.push("deployment");
+    return result;
+  }
+  function authenticateHello(transport:Null<TransportHandle>, value:Hello):Void {
+    if (transport == null) throw "No client";
+    var authenticatedTransport:TransportHandle = cast transport;
+    var principal = authorization.authenticate(value.identity,value.token);
+    if (!principal.mayObserve) throw "Observation permission denied";
+    if (value.requestedRole != "controller" && value.requestedRole != "observer" &&
+        value.requestedRole != "stream" && value.requestedRole != "deployment") throw "Unknown role";
+    if (value.requestedRole == "controller" && !principal.mayCommand) throw "Command permission denied";
+    if (value.requestedRole == "deployment" && !principal.mayDeploy) throw "Deployment permission denied";
+    for (subscription in value.subscriptions)
+      if (value.requestedRole == "controller" && (subscription.family == "camera" || subscription.family == "observation"))
+        throw "Bulk streams require a separate stream connection";
+    principals.set(authenticatedTransport.rawValue(),principal);
+  }
+  function handleDeploymentChange(transport:TransportHandle, targetSession:Int64, frame:RobotFrame):Void {
+    var principal = principals.get(transport.rawValue());
+    try {
+      if (principal == null || !principal.mayDeploy || Int64.compare(frame.sessionId,targetSession) != 0)
+        throw "Deployment permission denied";
+      switch controlOwner { case None: case _: throw "Deployment change requires an idle controller"; }
+      var previous = deploymentSequences.get(transport.rawValue());
+      if (Int64.compare(frame.sequence, Int64.ofInt(0)) <= 0 ||
+          (previous != null && Int64.compare(frame.sequence, previous) <= 0))
+        throw "Stale deployment request";
+      deploymentSequences.set(transport.rawValue(), frame.sequence);
+      var request:robotkit.protocol.DeploymentChange = MessagePack.decode(frame.payload);
+      var path = authorization.deploymentPath(principal,request.name);
+      // Validate the complete configured deployment before relinquishing the current host.
+      new RobotDeployment(path);
+      nextDeployment = path;
+    } catch (error:Dynamic) {
+      sendTo(transport,targetSession,new RobotFrame(RobotMessageType.Fault,
+        MessagePack.encode(new Fault(Int64.ofInt(robotId),403,"deployment change denied",false)),0,null,targetSession));
+    }
   }
 
   function handleHello(value:Hello):Void {
@@ -439,6 +518,12 @@ class RobotServer {
       sendFault(426, "unsupported RobotKit protocol version", true);
       return;
     }
+    try {
+      authenticateHello(client,value);
+    } catch (_:Dynamic) {
+      sendFault(401,"authentication or authorization denied",true);
+      return;
+    }
     var scheduler = client == null ? null : outbound.get(client.rawValue());
     try {
       if (scheduler != null) scheduler.configure(value.subscriptions);
@@ -446,7 +531,7 @@ class RobotServer {
       sendFault(422, "invalid stream subscriptions", false);
       return;
     }
-    controllerGranted = value.requestedRole == "controller" &&
+    controllerGranted = value.requestedRole == "controller" && principalFor(client).mayCommand &&
       switch controlOwner { case None: true; case _: false; };
     if (controllerGranted) {
       controlOwner = RemoteController(sessionId);
@@ -456,7 +541,7 @@ class RobotServer {
       sessionId, Int64.ofInt(robotId), controllerGranted,
       controllerGranted ? sessionId : Int64.ofInt(0),
       controllerGranted ? CONTROL_LEASE_TIMEOUT_MS : 0,
-      OutboundPolicy.capabilities()), sessionId));
+      OutboundPolicy.capabilities(), principalFor(client).identity, grants(principalFor(client))), sessionId));
     send(RobotProtocol.description(new RobotDescription(Int64.ofInt(robotId),
       robot.name, [for (link in robot.links) link.name],
       [for (joint in robot.joints) joint.name]), sessionId));
@@ -647,7 +732,8 @@ class RobotServer {
   }
 
   function remoteOwnsControl():Bool return switch controlOwner {
-    case RemoteController(ownerSession): Int64.compare(ownerSession, sessionId) == 0;
+    case RemoteController(ownerSession): client != null && principals.exists(client.rawValue()) &&
+      principalFor(client).mayCommand && Int64.compare(ownerSession, sessionId) == 0;
     case _: false;
   }
 
@@ -742,12 +828,15 @@ class RobotServer {
       snapshot.trajectoryTimeNs, snapshot.trajectoryDurationNs,
       snapshot.trajectoryTag, snapshot.trajectoryTagTimeNs,
       snapshot.sessionState, snapshot.activePlanId,
-      snapshot.committedUntilNs, snapshot.queueEndTimeNs);
+      snapshot.committedUntilNs, snapshot.queueEndTimeNs,
+      [for (sensor in snapshot.sensors.toArray()) new robotkit.protocol.StreamSequenceMsg(sensor.sensorId,sensor.kind,sensor.sequence,sensor.sourceClockId)]);
+    for (sequence in inferenceSequences) message.streamSequences.push(sequence);
     sendTo(target, targetSession, RobotProtocol.state(message, targetSession, snapshot.sequence,
       snapshot.sourceTimestampNs));
     var scheduler = outbound.get(target.rawValue());
     if (scheduler == null) return;
     for (sensor in RobotSensorFrames.fromRuntimeSnapshot(snapshot)) {
+      if (target == client && !robotkit.streams.SensorStreamSample.smallControlFrame(sensor)) continue;
       var family = sensor.image == null ? OutboundFamily.Sensor : OutboundFamily.Camera;
       if (!scheduler.shouldOffer(family, sensor.sensorId, sensor.sequence,
           NativeKit.nk_time_now_ns())) continue;
@@ -841,6 +930,8 @@ class RobotServer {
       controllerGranted = false;
       lastLeaseRenewalNs = Int64.ofInt(0);
     }
+    principals.remove(currentClient.rawValue());
+    deploymentSequences.remove(currentClient.rawValue());
     outbound.remove(currentClient.rawValue());
     try { NativeTransport.close(currentClient); } catch (_:Dynamic) {}
   }
@@ -862,6 +953,8 @@ class RobotServer {
     observerStreams.remove(value.rawValue());
     observerSessions.remove(value.rawValue());
     observerHello.remove(value.rawValue());
+    principals.remove(value.rawValue());
+    deploymentSequences.remove(value.rawValue());
     outbound.remove(value.rawValue());
     try { NativeTransport.close(value); } catch (_:Dynamic) {}
   }

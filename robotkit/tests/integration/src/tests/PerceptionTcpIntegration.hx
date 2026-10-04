@@ -26,7 +26,7 @@ class PerceptionTcpIntegration {
   public static function run(host:String, port:Int):Void {
     var runtime = NativeKitRuntime.start();
     var worldHost = new WorldHost();
-    var remote = worldHost.addRemoteRobot("tcp-perception");
+    var remote = worldHost.addRemoteRobot("tcp-perception", false, null, IntegrationCredentials.controller());
     remote.enableCamera();
     remote.enableObservations();
     var failure:Dynamic = null;

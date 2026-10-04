@@ -43,8 +43,11 @@ fi
 if [[ "${ROBOTKIT_TEST_MALFORMED_HELLO:-0}" == "1" ]]; then
   server_mode="--server"
 fi
+if [[ "${ROBOTKIT_TEST_AUTHENTICATION:-0}" == "1" ]]; then
+  server_mode="--server"
+fi
 setsid stdbuf -oL -eL "$repo_dir/haxeon/scripts/haxeon" run --project "$server_project" -- \
-  $server_mode --multi-joint --robot-id=42 --port="$port" >"$server_log" 2>&1 &
+  $server_mode --auth="$repo_dir/robotkit/tests/fixtures/authorization.json" --multi-joint --robot-id=42 --port="$port" >"$server_log" 2>&1 &
 server_pid=$!
 cleanup() {
   if kill -0 "$server_pid" 2>/dev/null; then
@@ -87,7 +90,9 @@ if [[ "$ready" != "1" ]]; then
 fi
 # Let robotd process the probe disconnect before the real controller connects.
 sleep 0.1
-if [[ "${ROBOTKIT_TEST_MALFORMED_HELLO:-0}" == "1" ]]; then
+if [[ "${ROBOTKIT_TEST_AUTHENTICATION:-0}" == "1" ]]; then
+  python3 "$repo_dir/robotkit/tests/integration/authentication.py" "$port"
+elif [[ "${ROBOTKIT_TEST_MALFORMED_HELLO:-0}" == "1" ]]; then
   python3 "$repo_dir/robotkit/tests/integration/malformed_hello.py" "$port"
 elif [[ "${ROBOTKIT_TEST_PERCEPTION_STALL:-0}" == "1" ]]; then
   python3 "$repo_dir/robotkit/tests/integration/stalled_observer.py" "$port"
@@ -102,7 +107,7 @@ else
   "$repo_dir/haxeon/scripts/haxeon" run --project "$client_project" -- \
     --port="$port" $client_mode
 fi
-if [[ "${ROBOTKIT_TEST_SESSIONS:-0}" != "1" && "${ROBOTKIT_TEST_LOCAL_OWNER:-0}" != "1" \
+if [[ "${ROBOTKIT_TEST_AUTHENTICATION:-0}" != "1" && "${ROBOTKIT_TEST_SESSIONS:-0}" != "1" && "${ROBOTKIT_TEST_LOCAL_OWNER:-0}" != "1" \
     && "${ROBOTKIT_TEST_LEASE_TIMEOUT:-0}" != "1" && "${ROBOTKIT_TEST_BULK:-0}" != "1" \
     && "${ROBOTKIT_TEST_SUBSCRIPTIONS:-0}" != "1" \
     && "${ROBOTKIT_TEST_PERCEPTION:-0}" != "1" \

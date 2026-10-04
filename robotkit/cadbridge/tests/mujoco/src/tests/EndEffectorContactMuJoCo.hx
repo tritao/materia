@@ -166,8 +166,8 @@ class EndEffectorContactMuJoCo {
       throw "Losing cup contact must release simulated vacuum holding";
     recording.recordSnapshot(simulatedRobot.snapshot());
     var replay = new ReplayRobot("sensed-robot", recording);
-    if (sensorValue(replay.sensors(), authored.id) != 55 || !replay.advance() ||
-        sensorValue(replay.sensors(), authored.id) != 0)
+    if (sensorValue(replay.streams().latestFrames(), authored.id) != 55 || !replay.advance() ||
+        sensorValue(replay.streams().latestFrames(), authored.id) != 0)
       throw "Recorded pressure frames must replay in order";
     selection.select(null, simulation.sourceTimestampNs(), "robotkit.simulation");
     simulationHarness.step(Int64.ofInt(5));
