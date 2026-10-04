@@ -444,9 +444,9 @@ class RobotRuntime {
       case "gnss_pose":
         if (image != null || values.length != 3)
           throw 'GNSS "$sensorId" publication requires latitude, longitude, and yaw';
-      case "tool_contact":
+      case "tool_contact", "joint_switch":
         if (image != null || values.length != 1 || (values[0] != 0.0 && values[0] != 1.0))
-          throw 'Contact "$sensorId" publication requires one digital value';
+          throw 'Digital sensor "$sensorId" publication requires one zero-or-one value';
       case "tool_vacuum_kpa":
         if (image != null || values.length != 1 || values[0] < 0.0)
           throw 'Vacuum "$sensorId" publication requires one non-negative kPa value';

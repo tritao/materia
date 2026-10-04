@@ -135,6 +135,14 @@ class RobotModelCodec {
     }
     var cycle = JointCoupling.cycleThrough(model.couplings);
     if (cycle != null) throw 'Joint $cycle depends on itself through its couplings';
+    var switchIds = new Map<String, Bool>();
+    for (contact in model.switches) {
+      if (contact == null) throw "Robot switch is null";
+      if (switchIds.exists(contact.id)) throw 'Duplicate robot switch ${contact.id}';
+      switchIds.set(contact.id, true);
+      if (!joints.exists(contact.joint) || !frames.exists(contact.frameId))
+        throw 'Switch ${contact.id} references an unknown joint or frame';
+    }
     var sensors = new Map<String, Bool>();
     for (sensor in model.sensors) {
       requireText(sensor.id, "sensor id");
@@ -226,6 +234,12 @@ class RobotModelCodec {
     };
     // Written only when there are some, so models without encoders keep their bytes.
     if (model.encoders.length > 0) document.encoders = [for (encoder in model.encoders) encodeEncoder(encoder)];
+    // Additive metadata: models without switches retain their existing encoded shape.
+    if (model.switches.length > 0) document.switches = [for (contact in model.switches) {
+      id: contact.id, joint: contact.joint, frame: contact.frameId, role: contact.role,
+      side: contact.side, trip: contact.trip, hysteresis: contact.hysteresis,
+      repeatability: contact.repeatability, seed: contact.seed
+    }];
     if (model.elasticNetworks.length == 0) Reflect.deleteField(document, "elasticNetworks");
     return Bytes.ofString(Json.stringify(document));
   }
@@ -404,6 +418,23 @@ class RobotModelCodec {
       frame.rotation = vectorField(record, "rotation", 4);
       frame.flangeIncludePath = includeScope(record, "flangeIncludePath");
       frames.set(id, frame);
+    }
+
+    if (Reflect.hasField(root, "switches")) {
+      var switchIds = new Map<String, Bool>();
+      for (record in array(root, "switches")) {
+        var side = number(record, "side"), seed = number(record, "seed");
+        if ((side != -1 && side != 1) || seed != Math.floor(seed) || seed < -2147483648.0 || seed > 2147483647.0)
+          throw "Switch side/seed must be valid integers";
+        var contact = new JointSwitch(text(record, "id"), text(record, "joint"), text(record, "frame"),
+          text(record, "role"), Std.int(side), number(record, "trip"), number(record, "hysteresis"),
+          number(record, "repeatability"), Std.int(seed));
+        if (switchIds.exists(contact.id)) throw 'Duplicate robot switch ${contact.id}';
+        switchIds.set(contact.id, true);
+        if (!joints.exists(contact.joint) || !frames.exists(contact.frameId))
+          throw 'Switch ${contact.id} references an unknown joint or frame';
+        model.addSwitch(contact);
+      }
     }
 
     var sensors = new Map<String, Bool>();

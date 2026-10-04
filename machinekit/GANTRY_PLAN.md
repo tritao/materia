@@ -560,8 +560,8 @@ G0 → G1 → G2 → G3 ──────────────────�
 | G6 | implemented; build/runtime validation deferred at user request | `d11e4dacb` |
 | G7 | implemented; build/runtime validation deferred at user request | `11e9bc82b` |
 | G8 | implementation added; runtime and firmware verification deferred | `823de3191`, `6ac44c34e` |
-| G9 | implementation added; migration verification deferred | see progress notes |
-| G10 | planned | — |
+| G9 | implementation added; migration verification deferred | `cd7853a82` |
+| G10 | in progress; switch model and readings added | see progress notes |
 | G11 | planned | — |
 | G12 | planned | — |
 | G13 | planned | — |
@@ -1170,3 +1170,29 @@ Changed speed, acceleration, stall, cycle and trace numbers cannot be measured
 while testing is stopped. Compilation, MixedScene execution and all migrated
 fixture results remain deferred; source review does not prove those outcomes.
 No build or test was run for G9.
+
+
+### G10 — switch model and readings in progress
+
+Add immutable `JointSwitch` metadata to RobotModel with monitored joint,
+physical frame, home/limit role, increasing/decreasing trip side, SI trip
+coordinate, hysteresis, bounded repeatability and deterministic seed. The
+robot codec writes optional `switches` only when present and validates joint,
+frame, duplicate ID and integer references. Models without switches retain
+their existing encoded shape; no robot schema version bump is required for
+this optional metadata.
+
+`SwitchReading` uses a seeded closing-position variation per approach and a
+separate opening threshold. It changes the variation only after leaving the
+full uncertainty band, avoiding random stationary chatter. It records edge
+coordinates and closing-edge count for later homing. `joint_switch` is an
+external digital sensor kind, validated like tool contact. The simulation
+adapter implements the existing step observer contract and publishes each
+reading against its authored sensor mount using an explicit actual-position
+reader and clock. It has not yet been installed into application simulation.
+
+Remaining G10 work: physical roller/inductive switch parts and BOM/provenance,
+optional AssemblySwitch wire metadata with flatten/freeze/codec support,
+geometry-derived MachineAssembly.addSwitch, bridge lowering, physical Gantry
+home/limit placement and observer installation. No compilation or test runs
+have been made; this is preparatory implementation, not a completed G10.
