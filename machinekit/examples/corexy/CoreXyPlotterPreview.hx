@@ -1,3 +1,4 @@
+import machinekit.assembly.PosedParts;
 import machinekit.assembly.AssemblyPreview;
 import haxe.io.Bytes;
 import cadkit.modeling.AssemblyModel;
@@ -51,6 +52,18 @@ class CoreXyPlotterChecks {
 	];
 
 	public static function run():Void {
+		parts = new PosedParts();
+		try runChecks() catch (error:Dynamic) {
+			parts.close();
+			throw error;
+		}
+		parts.close();
+	}
+
+	/** The geometry of the members posed by this run, built once each; closed when the run ends. */
+	static var parts:PosedParts;
+
+	static function runChecks():Void {
 		var scene = SceneArtifact.decode(CoreXyPlotterPreview.plotter());
 		var definition = scene.assemblyDefinition;
 		var plotter = new CoreXyPlotter();
@@ -212,35 +225,42 @@ class CoreXyPlotterChecks {
 
 	/** No member of `moving` intersects a member of `others` at the pen's position `at`. */
 	static function checkClear(plotter:CoreXyPlotter, state:AssemblyState, at:Array<Float>, moving:Array<String>, others:Array<String>):Void {
-		for (a in moving) for (b in others) {
-			var volume = overlap(plotter, state, at, a, b);
-			if (volume > 1e-3) throw '$a collides with $b at ${at.join(", ")}: ${Math.round(volume)} mm³';
+		moveTo(state, at);
+		var first:Array<Part> = [], second:Array<Part> = [];
+		try {
+			for (id in moving) first.push(posed(plotter, state, id));
+			for (id in others) second.push(posed(plotter, state, id));
+			var firstBoxes = [for (part in first) PosedParts.boxOf(part)], secondBoxes = [for (part in second) PosedParts.boxOf(part)];
+			for (a in 0...first.length) for (b in 0...second.length) {
+				var volume = PosedParts.commonVolume(first[a], firstBoxes[a], second[b], secondBoxes[b]);
+				if (volume > 1e-3) throw '${moving[a]} collides with ${others[b]} at ${at.join(", ")}: ${Math.round(volume)} mm³';
+			}
+		} catch (error:Dynamic) {
+			PosedParts.closeAll(first);
+			PosedParts.closeAll(second);
+			throw error;
 		}
+		PosedParts.closeAll(first);
+		PosedParts.closeAll(second);
 	}
 
-	static function overlap(plotter:CoreXyPlotter, state:AssemblyState, at:Array<Float>, a:String, b:String):Float {
+	static function moveTo(state:AssemblyState, at:Array<Float>):Void {
 		state.setJoint("x", at[0]);
 		state.setJoint("y", at[1]);
 		state.forwardKinematics();
+	}
+
+	static function overlap(plotter:CoreXyPlotter, state:AssemblyState, at:Array<Float>, a:String, b:String):Float {
+		moveTo(state, at);
 		var first = posed(plotter, state, a), second = posed(plotter, state, b);
-		var common = first.intersect(second);
-		var volume = common.volume();
-		common.close();
+		var volume = PosedParts.commonVolume(first, PosedParts.boxOf(first), second, PosedParts.boxOf(second));
 		first.close();
 		second.close();
 		return volume;
 	}
 
 	static function posed(plotter:CoreXyPlotter, state:AssemblyState, id:String):Part {
-		for (entry in plotter.components()) if (entry.id == id) {
-			var pose = state.worldPose(id);
-			var x = AssemblyFrames.transformVector(pose, 1, 0, 0), z = AssemblyFrames.transformVector(pose, 0, 0, 1);
-			var local = entry.component.geometry(ComponentDetail.Preview);
-			var placed = local.placed(new Location(new Plane(new Vector(pose.x, pose.y, pose.z), new Vector(x.x, x.y, x.z),
-				new Vector(z.x, z.y, z.z))));
-			local.close();
-			return placed;
-		}
+		for (entry in plotter.components()) if (entry.id == id) return parts.posed(entry.component, state.worldPose(id));
 		throw 'CoreXY plotter has no member "$id"';
 	}
 }

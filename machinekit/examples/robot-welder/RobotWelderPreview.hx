@@ -1,3 +1,4 @@
+import machinekit.assembly.PosedParts;
 import machinekit.assembly.AssemblyPreview;
 import haxe.io.Bytes;
 import cadkit.modeling.AssemblyModel;
@@ -110,6 +111,18 @@ class RobotWelderChecks {
 	}
 
 	public static function run():Void {
+		parts = new PosedParts();
+		try runChecks() catch (error:Dynamic) {
+			parts.close();
+			throw error;
+		}
+		parts.close();
+	}
+
+	/** The geometry of the members posed by this run, built once each; closed when the run ends. */
+	static var parts:PosedParts;
+
+	static function runChecks():Void {
 		var scene = SceneArtifact.decode(RobotWelderPreview.cell());
 		var definition = scene.assemblyDefinition;
 		var cell = new WeldingCell();
@@ -386,9 +399,7 @@ class RobotWelderChecks {
 
 	static function checkApart(cell:WeldingCell, state:AssemblyState, a:String, b:String):Void {
 		var first = posed(cell, state, a), second = posed(cell, state, b);
-		var common = first.intersect(second);
-		var volume = common.volume();
-		common.close();
+		var volume = PosedParts.commonVolume(first, PosedParts.boxOf(first), second, PosedParts.boxOf(second));
 		first.close();
 		second.close();
 		if (volume > 1e-3) throw '$a hits $b: ${Math.round(volume)} mm³';
@@ -410,15 +421,7 @@ class RobotWelderChecks {
 	static function round2(value:Float):Float return Math.round(value * 100) / 100;
 
 	static function posed(cell:WeldingCell, state:AssemblyState, id:String):Part {
-		for (entry in cell.components()) if (entry.id == id) {
-			var frame:AssemblyFrame = state.worldPose(id);
-			var x = AssemblyFrames.transformVector(frame, 1, 0, 0), z = AssemblyFrames.transformVector(frame, 0, 0, 1);
-			var local = entry.component.geometry(ComponentDetail.Preview);
-			var placed = local.placed(new Location(new Plane(new Vector(frame.x, frame.y, frame.z), new Vector(x.x, x.y, x.z),
-				new Vector(z.x, z.y, z.z))));
-			local.close();
-			return placed;
-		}
+		for (entry in cell.components()) if (entry.id == id) return parts.posed(entry.component, state.worldPose(id));
 		throw 'Robot welder has no member "$id"';
 	}
 }

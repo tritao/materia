@@ -86,6 +86,11 @@ class MachineComponent {
 	 */
 	static final computedMass:Map<String, MassProperties> = [];
 
+	static var nextInstanceId = 0;
+
+	/** Tells this component from every other, including ones built from the same recipe. */
+	public final instanceId:Int;
+
 	var cachedMass:Null<MassProperties>;
 	var cachedMassMaterialId:Null<String>;
 	var declaredMass:Null<MassProperties>;
@@ -97,6 +102,7 @@ class MachineComponent {
 	final conversionList:Array<PortBridge> = [];
 
 	function new(designation:String, description:String, ?material:String, codeOnly:Bool = false) {
+		instanceId = nextInstanceId++;
 		if (designation == null || designation.length == 0) throw "Machine component needs a designation";
 		this.designation = designation;
 		materialId = MaterialLibrary.fromSpec(material);
@@ -137,6 +143,16 @@ class MachineComponent {
 
 	public function geometry(detail:ComponentDetail = Preview):Part
 		throw new NoGeometry(designation);
+
+	/**
+	 * Names the geometry `geometry(detail)` builds, for a cache of it: the same for every component made from the same recipe
+	 * inputs and material, which build the same shape, and for a component without a recipe (nothing says which components are
+	 * alike) its own.
+	 */
+	public function geometryKey(detail:ComponentDetail = Preview):String {
+		var recipe = type, suffix = materialId + "|" + Std.string(detail);
+		return recipe == null ? "instance|" + instanceId + "|" + suffix : recipe.id + "|" + recipe.key(values()) + "|" + suffix;
+	}
 
 	/** The preview shape supplies volume and centroid; its density is kg/m³. */
 	public function massProperties():MassProperties {
