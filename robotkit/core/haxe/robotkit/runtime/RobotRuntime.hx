@@ -429,6 +429,30 @@ class RobotRuntime {
     referenceMutex.release();
   }
 
+  /** Apply fresh side latches as one atomic endpoint counter-origin transaction. */
+  public function calibrateHomeDrives(switchIds:Array<String>):Void {
+    ensureLive();
+    if (switchIds == null || switchIds.length == 0) throw "Motor calibration requires home switch IDs";
+    referenceMutex.acquire();
+    try {
+      var candidate = references.copy();
+      var joints:Array<Int> = [], zeros:Array<Float> = [];
+      for (id in switchIds) {
+        var joint = candidate.homeDriveJoint(id);
+        if (joints.indexOf(joint) >= 0) throw "Motor calibration requires distinct side drives";
+        if (!candidate.isReferenced(candidate.homeJoint(id))) throw "Motor calibration requires all side latches";
+        joints.push(joint); zeros.push(candidate.homeDriveOffset(id));
+      }
+      candidate.markHomeDrivesCalibrated(switchIds);
+      check(endpoint.calibrateHomeDrives(joints, zeros), "runtime.calibrateHomeDrives");
+      references = candidate;
+    } catch (error:Dynamic) {
+      referenceMutex.release();
+      throw error;
+    }
+    referenceMutex.release();
+  }
+
   /** Read the individual motor-side zero captured by a physical home switch. */
   public function homeDriveOffset(switchId:String):Float {
     ensureLive();

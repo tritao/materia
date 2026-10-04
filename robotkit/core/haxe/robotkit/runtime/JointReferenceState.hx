@@ -8,6 +8,7 @@ class JointReferenceState {
   final homeJoints:Array<Int> = [];
   final homeDrives:Array<SwitchDriveBinding> = [];
   final latched:Array<Bool> = [];
+  final driveCalibrated:Array<Bool> = [];
   final latchOffsets:Array<Float> = [];
   final referenced:Array<Bool> = [];
   final offsets:Array<Float> = [];
@@ -20,6 +21,7 @@ class JointReferenceState {
       for (value in template.homeJoints) homeJoints.push(value);
       for (value in template.homeDrives) homeDrives.push(value);
       for (value in template.latched) latched.push(value);
+      for (value in template.driveCalibrated) driveCalibrated.push(value);
       for (value in template.latchOffsets) latchOffsets.push(value);
       for (value in template.referenced) referenced.push(value);
       for (value in template.offsets) offsets.push(value);
@@ -43,6 +45,7 @@ class JointReferenceState {
       if (joint < 0) throw 'Home switch "${contact.id}" monitors an unknown joint';
       homeJoints.push(joint); latched.push(false); latchOffsets.push(0.0);
       homeDrives.push(SwitchDriveBinding.resolve(blueprint, contact));
+      driveCalibrated.push(false);
     }
     refresh();
   }
@@ -90,6 +93,7 @@ class JointReferenceState {
     if (!Math.isFinite(homeDrives[index].ratio * zero)) throw "Home shaft coordinate zero must be finite";
     latchOffsets[index] = zero;
     latched[index] = true;
+    driveCalibrated[index] = false;
     refresh();
   }
 
@@ -114,16 +118,31 @@ class JointReferenceState {
     throw 'Unknown home switch "$switchId"';
   }
 
+  public function homeDriveJoint(switchId:String):Int {
+    for (i in 0...homes.length) if (homes[i].id == switchId) {
+      if (!latched[i] || driveCalibrated[i]) throw "Motor calibration requires a new home latch";
+      if (homes[i].driveJoint == null) throw "Motor calibration requires an explicit side drive";
+      return homeDrives[i].joint;
+    }
+    throw 'Unknown home switch "$switchId"';
+  }
+
+  /** Mark a successfully committed batch; only a new captured latch permits rebasing again. */
+  public function markHomeDrivesCalibrated(switchIds:Array<String>):Void {
+    for (id in switchIds) homeDriveJoint(id);
+    for (i in 0...homes.length) if (switchIds.indexOf(homes[i].id) >= 0) driveCalibrated[i] = true;
+  }
+
   /** A power cycle loses every switch-derived reference and calibrated zero. */
   public function invalidate():Void {
-    for (i in 0...latched.length) { latched[i] = false; latchOffsets[i] = 0.0; }
+    for (i in 0...latched.length) { latched[i] = false; latchOffsets[i] = 0.0; driveCalibrated[i] = false; }
     refresh();
   }
 
   public function invalidateJoint(joint:Int):Void {
     requireJoint(joint);
     for (i in 0...homeJoints.length) if (homeJoints[i] == joint) {
-      latched[i] = false; latchOffsets[i] = 0.0;
+      latched[i] = false; latchOffsets[i] = 0.0; driveCalibrated[i] = false;
     }
     refresh();
   }

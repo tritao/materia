@@ -30,6 +30,11 @@ class SimulatedHomingSides implements HomingSideControl {
     held.set(drive.joint, position);
   }
 
+  public function calibrate(switchIds:Array<String>):Void {
+    for (_ in held.keys()) throw "Release all shaft holds before motor calibration";
+    runtime.calibrateHomeDrives(switchIds);
+  }
+
   public function releaseAll():Void {
     var joints = [for (joint in held.keys()) joint];
     var failure:Null<String> = null;

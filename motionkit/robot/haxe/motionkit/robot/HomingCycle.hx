@@ -131,6 +131,7 @@ class HomingCycle {
               if (capture == null) throw "Homing has no captured latch position";
               driver.latch(axis.switches[i].id, capture);
             }
+            if (axis.switches.length > 1) sides.calibrate([for (contact in axis.switches) contact.id]);
             enter(Return, driver.observe(axis.joint));
           }
         case Return:

@@ -563,7 +563,7 @@ G0 → G1 → G2 → G3 ──────────────────�
 | G9 | implementation added; migration verification deferred | `cd7853a82` |
 | G10 | implementation added; mechanical/simulation verification deferred | see progress notes |
 | G11 | in progress; reference-state foundation added | see progress notes |
-| G12 | planned | — |
+| G12 | in progress; side holds and counter calibration wired; validation pending | see progress notes |
 | G13 | planned | — |
 | G14 | planned | — |
 | G15 | planned | — |
@@ -1983,3 +1983,27 @@ targets (source generation only); simulation imports the updated runtime
 declarations without a local generated diff. RobotRuntime switch-ID projection,
 once-per-latch tracking and HomingCycle invocation remain pending. No tests or
 project builds ran; compilation and behavior remain unverified.
+
+### G12 — apply each captured motor calibration once
+
+Public calibration API: `b0ecac1ea`. Track motor-calibration consumption per
+home latch in JointReferenceState, preserving it in transactional copies and
+clearing it on fresh latch or invalidation. RobotRuntime projects switch IDs
+to distinct drive indices and captured shaft zeros under its reference mutex,
+requires all leader-side latches and commits consumption only after successful
+atomic native calibration. HomingSideControl exposes calibration; the simulation
+adapter refuses it while any shaft hold remains. HomingCycle invokes it after
+releasing holds and latching all sides, before return motion.
+
+No tests or builds ran in this step. Explicit squaring-only skew handling,
+1 mm startup racking authoring/coverage and physical calibration behavior remain
+pending. Do not claim G12 complete.
+
+### Updated validation cadence — user instruction
+
+Finish G12 before proceeding to G13. Then stop implementation for a build pass:
+compile every kit and the app (use --compiler-only), build the native runtime
+and run ctest, then run G7 picker and homing tests once. Resolve failures before
+continuing. After that checkpoint, full test runs occur only at phase boundaries.
+This replaces the earlier stop-testing instruction; avoid starting the checkpoint
+until G12 implementation is ready.
