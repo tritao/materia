@@ -46,9 +46,9 @@ class Gantry extends AxisBuilder {
 		var beam = TSlotExtrusion.forProfile(spec.beamProfile);
 		var guide = LinearRailBlock.metric(spec.railProfile).spec;
 		railMargin = Math.max(80, guide.railEndMargin + guide.blockLength / 2 + 20);
-		var left = -railMargin, right = spec.travelX + railMargin;
+		var left = -railMargin - spec.sideExtension, right = spec.travelX + railMargin + spec.sideExtension;
 		var front = -railMargin - spec.frontExtension, back = spec.travelY + railMargin;
-		var frameZ = spec.travelZ + 350;
+		var frameZ = spec.travelZ + 350 + spec.frameLift;
 		var endAllowance = Math.max(frame.size / 2, NemaStepper.frame(spec.motorFrame).variant.shaftLength + 6);
 		var up = [0.0, 0, 1], alongX = [1.0, 0, 0], alongY = [0.0, 1, 0];
 		place("frameFront", new GantryExtrusion(frame, right - left - frame.size),

@@ -2416,3 +2416,17 @@ of Y travel. The picker explicitly uses a 200 mm extension to keep the
 crossbar beyond the tool's vertical sweep and homing overtravel; nominal travel
 and contact assertions are unchanged. MachineKit compiler and focused picker
 retries are running. No native/controller source changed in this correction.
+
+### G12 checkpoint — lateral and fixed-column work clearance
+
+The extended front frame compiled. Its picker retry exposed a left-side
+frame contact during home overtravel, at (-0.06031, -0.113, 0.830) metres.
+Added a separately authored sideExtension, default zero; the picker uses
+100 mm per side, moving the actual Y frames/guides and extending the beam.
+The next retry cleared that frame contact and identified a fixed X-body
+Z-column assembly contact with carton 1 near its 260 mm top. Added a
+separately authored frameLift, default zero; the picker raises the frame
+50 mm so the fixed column/idler mounting assembly clears the work while
+the moving Z slide retains its 500 mm stroke and reach. Both quantities
+are finite, non-negative design assumptions. Contact assertions remain
+strict. Final MachineKit compiler and picker retries are running.

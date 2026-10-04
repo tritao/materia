@@ -35,6 +35,10 @@ class GantrySpec {
 	public final tableMounted:Bool;
 	/** Extra frame length ahead of Y travel, clearing an overhanging tool's vertical sweep. */
 	public final frontExtension:Float;
+	/** Extra space on each X side between the tool travel and the Y frame guides. */
+	public final sideExtension:Float;
+	/** Extra frame elevation above the default work envelope, in millimetres. */
+	public final frameLift:Float;
 	public final head:GantryHead;
 	/** Allowed side-to-side displacement; a stated design assumption until measured. */
 	public final racking:Float;
@@ -49,11 +53,13 @@ class GantrySpec {
 			railProfile:String = "MGN12C", motorFrame:Int = 23,
 			frameProfile:String = "HFS5-4040", beamProfile:String = "HFS5-4040",
 			tableMounted:Bool = false, head:GantryHead = None, racking:Float = 0.5,
-			supplyVoltage:Float = 24, microsteps:Int = 16, frontExtension:Float = 0) {
+			supplyVoltage:Float = 24, microsteps:Int = 16, frontExtension:Float = 0, sideExtension:Float = 0, frameLift:Float = 0) {
 		for (value in [travelX, travelY, travelZ, racking, supplyVoltage])
 			if (!Math.isFinite(value) || value <= 0) throw "Gantry dimensions and electrical limits must be finite and positive";
 		if (microsteps <= 0) throw "Gantry microsteps must be positive";
 		if (!Math.isFinite(frontExtension) || frontExtension < 0) throw "Gantry front extension must be finite and non-negative";
+		if (!Math.isFinite(sideExtension) || sideExtension < 0) throw "Gantry side extension must be finite and non-negative";
+		if (!Math.isFinite(frameLift) || frameLift < 0) throw "Gantry frame lift must be finite and non-negative";
 		this.travelX = travelX; this.travelY = travelY; this.travelZ = travelZ;
 		this.driveX = driveX == null ? Belt(TimingBeltProfile.GT2, 20, 9) : driveX;
 		this.driveY = driveY == null ? Belt(TimingBeltProfile.GT2, 20, 9) : driveY;
@@ -63,10 +69,12 @@ class GantrySpec {
 		this.frameProfile = frameProfile; this.beamProfile = beamProfile;
 		this.tableMounted = tableMounted; this.head = head;
 		this.frontExtension = frontExtension;
+		this.sideExtension = sideExtension;
+		this.frameLift = frameLift;
 		this.racking = racking; rackingBasis = ValueBasis.Assumed;
 		this.supplyVoltage = supplyVoltage; this.microsteps = microsteps;
 		assumedFields = ["travelX", "travelY", "travelZ", "driveX", "driveY", "driveZ", "dualY",
 			"railProfile", "motorFrame", "frameProfile", "beamProfile", "tableMounted", "head",
-			"racking", "supplyVoltage", "microsteps", "frontExtension"];
+			"racking", "supplyVoltage", "microsteps", "frontExtension", "sideExtension", "frameLift"];
 	}
 }
