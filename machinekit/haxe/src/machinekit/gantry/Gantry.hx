@@ -131,8 +131,10 @@ class Gantry extends AxisBuilder {
 		// Belt endpoints fit the column's full length; the clamp remains on the
 		// carriage's upper edge. The screw nut and rack pinion sit 40 mm lower.
 		var zDriveDrop = switch spec.driveZ { case Belt(_, _, _): 0.0; case _: 40.0; };
+		// Leave the corner bracket's 12 mm arm outside the 80 mm carriage.
+		var zDriveX = 40 + Math.max((NemaStepper.frame(spec.motorFrame).spec.face + 12) / 2, 30) + 12 + 3;
 		buildDrive(axes[2], spec.driveZ, "Z", "zColumn", "zCarriage",
-			[70.0, zPlateY, xPlateZ - railMargin - zDriveDrop], [0.0, 0, -1]);
+			[zDriveX, zPlateY, xPlateZ - railMargin - zDriveDrop], [0.0, 0, -1]);
 		buildSwitches(axes[1], "YLeft", "frameLeft", "beamFootLeft", 0, 1, alongY);
 		if (spec.dualY) buildSwitches(axes[1], "YRight", "frameRight", "beamFootRight", 0, -1, alongY);
 		buildSwitches(axes[0], "X", "beam", "xCarriage", 1, -1, alongX);

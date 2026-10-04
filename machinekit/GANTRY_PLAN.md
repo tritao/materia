@@ -3449,3 +3449,16 @@ The full app phase gate is running independently; no complete gate is claimed.
 Compiler-only passed for the overtravel frame, mounting-row carriage placement
 and compact Z target (1044 sources). The expanded mechanical sweep is running.
 The independent full app gate has reached the welder execution checks.
+
+The expanded gate reached the positive Z travel corner: all drives still had a
+Z positive-limit support crossing the trigger, and the belt idler bracket crossed
+the carriage (1440 mm³). The Z drive offset now includes the motor/idler plate
+half-width, corner bracket arm and 3 mm carriage clearance instead of a fixed
+70 mm offset. This edit is pending compilation.
+
+The positive-limit support exposes an architectural issue with end-facing
+inductive sensors: their support runs through the trigger's axial sweep, and
+the target would overrun the sensor face before the guide end. The next fix must
+orient sensing sideways and route its bracket outside the swept target,
+retaining the derived trip points and full overtravel checks. Merely exempting
+the mount or dropping the overtravel gate would not complete G10/G13.
