@@ -200,6 +200,7 @@ class RobotWorldTests {
       Sys.println('RobotKit construction skills passed (${ConstructionSkillTests.run()} assertions)');
       return;
     }
+    assertions += RuntimeEndpointTests.run();
     testPolynomialTrajectoryChunk();
     testAttachDetachAndIdentity();
     testSequenceAndTopology();
@@ -4634,7 +4635,7 @@ class RobotWorldTests {
       "000102030405060708090a0b0c0d0e0f", layout, 1e-6, 115200,
       Int64.ofInt(1000000), Int64.ofInt(2000000))
     catch (error:Dynamic) timingMessage = Std.string(error);
-    check(timingMessage.indexOf("runtime.createSerial") >= 0,
+    check(timingMessage.indexOf("serialEndpoint.create") >= 0,
       "serial construction reports an unavailable device");
     var unwiredMessage = "";
     try new SerialRobot("unwired", model, '/dev/robotkit-missing-${Sys.getPid()}',

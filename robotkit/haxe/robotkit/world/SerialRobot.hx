@@ -32,8 +32,8 @@ class SerialRobot implements Robot {
     if (ownerPeriodNs != null) blueprint.ownerPeriodNs = ownerPeriodNs;
     if (processingAllowanceNs != null)
       blueprint.serialProcessingAllowanceNs = processingAllowanceNs;
-    var runtime = RobotRuntime.createSerial(blueprint, devicePath, controllerHex, binding,
-      maxTargetError, baud, linkLossTimeoutNs, clockSyncBoundNs);
+    var runtime = RobotRuntime.create(blueprint, robotkit.serial.SerialRuntimeEndpoint.create(blueprint, devicePath, controllerHex, binding,
+      maxTargetError, baud, linkLossTimeoutNs, clockSyncBoundNs));
     adapter = new RuntimeRobotAdapter(id, runtime, model.name,
       [for (link in model.links) link.id], [for (joint in model.joints) joint.id],
       true, true, "serial endpoint fault");
