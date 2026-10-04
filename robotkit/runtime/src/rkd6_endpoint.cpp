@@ -34,6 +34,43 @@ std::uint64_t device_wire6_config_digest(std::span<const std::uint8_t> payload) 
 
 } // namespace
 
+BufferedLinkQualification6::BufferedLinkQualification6(unsigned baud, std::uint8_t actuators,
+    std::uint16_t capacity, std::uint64_t processing_ns, std::uint64_t guard_ns, std::uint64_t owner_period_ns)
+    : capacity_(capacity), guard_ns_(guard_ns) {
+    const auto bytes = device_frame6::HEADER_SIZE + device_frame6::CRC_SIZE +
+        device_wire6::Segment6Header::SIZE + actuators * device_wire6::Segment6Coefficients::SIZE;
+    // The blueprint allowance is one-way latency, not a serialized CPU service
+    // rate. Successive packets can be in flight through that latency together.
+    latency_ns_ = processing_ns;
+    service_ns_ = baud && actuators ? std::ceil(10.0L * bytes * 1e9L / baud)
+        : std::numeric_limits<long double>::infinity();
+    if (owner_period_ns && std::isfinite(service_ns_)) {
+        const auto commit_ns = std::ceil(10.0L * (device_frame6::HEADER_SIZE +
+            device_frame6::CRC_SIZE + device_wire6::Commit6::SIZE) * 1e9L / baud);
+        // At zero clock uncertainty, the backlog budget is one owner period
+        // minus a commit frame. Reserve the loss from sending whole-frame batches.
+        const auto frames = std::floor(std::max(0.0L, owner_period_ns - commit_ns) / service_ns_);
+        service_ns_ = frames > 0 ? std::max(service_ns_, std::ceil(owner_period_ns / frames))
+            : std::numeric_limits<long double>::infinity();
+    }
+}
+
+bool BufferedLinkQualification6::append(std::uint64_t duration_ns) {
+    if (!capacity_ || !duration_ns || !std::isfinite(service_ns_)) return false;
+    auto delivery = delivered_ns_;
+    if (ends_.size() == capacity_) {
+        // The oldest row must finish before its slot can receive another row. The
+        // owner may see that release late; queued serial work and clock error add delay.
+        delivery = std::max(delivery, ends_.front() + guard_ns_ + latency_ns_) + service_ns_;
+        if (delivery > elapsed_ns_) return false;
+        ends_.pop_front();
+    }
+    delivered_ns_ = delivery;
+    elapsed_ns_ += duration_ns;
+    ends_.push_back(elapsed_ns_);
+    return true;
+}
+
 std::uint64_t Rkd6Endpoint::minimum_baud(std::uint8_t actuator_count,
     std::uint64_t minimum_segment_ns, std::uint64_t processing_allowance_ns) {
     if (actuator_count == 0 || minimum_segment_ns <= processing_allowance_ns) return UINT64_MAX;
@@ -406,20 +443,31 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
         sent_events_.clear();
         next_commit_ = 0;
         committed_until_ticks_ = 0;
+        qualification_prefix_.reset();
+        qualification_rows_.clear();
     }
     if (!epoch_set_) {
-        const auto frame_bytes = device_frame6::HEADER_SIZE + device_frame6::CRC_SIZE +
-            device_wire6::Segment6Header::SIZE +
-            ack_.actuator_count * device_wire6::Segment6Coefficients::SIZE;
-        const auto startup_bytes = 512u +
-            std::min<std::uint32_t>(static_cast<std::uint32_t>(plan.segments.segments.size()),
-                ack_.segment_capacity) * frame_bytes;
+        std::uint64_t prefill_count = 0;
+        for (const auto &segment : plan.segments.segments) {
+            const auto rows = ack_.profile == 2 ?
+                segment.duration_ns / owner_period_ns_ + (segment.duration_ns % owner_period_ns_ != 0) : 1;
+            prefill_count += std::min<std::uint64_t>(rows, ack_.segment_capacity - prefill_count);
+            if (prefill_count == ack_.segment_capacity) break;
+        }
+        const auto envelope = device_frame6::HEADER_SIZE + device_frame6::CRC_SIZE;
+        const auto startup_bytes = envelope + device_wire6::QueueBegin6::SIZE +
+            plan.events.size() * (envelope + device_wire6::Event6::SIZE) +
+            envelope + device_wire6::Commit6::SIZE;
         const auto startup_ns = static_cast<std::uint64_t>(std::ceil(
             10.0L * startup_bytes * 1e9L / transport_->baud()));
-        const auto delay = link_latency_ns_ + 2 * clock_.uncertainty_ns() +
-            (blueprint.owner_period_ns ? blueprint.owner_period_ns : 10'000'000ULL) +
-            startup_ns;
-        host_epoch_ns_ = owner_now_ns + delay;
+        const auto processing_ns = blueprint.serial_processing_allowance_ns
+            ? blueprint.serial_processing_allowance_ns : 2'000'000ULL;
+        const BufferedLinkQualification6 prefill(transport_->baud(), ack_.actuator_count,
+            ack_.segment_capacity, processing_ns, 0, owner_period_ns_);
+        const auto delay = static_cast<long double>(link_latency_ns_) + 2.0L * clock_.uncertainty_ns() +
+            prefill.prefill_ns(prefill_count) + owner_period_ns_ + startup_ns;
+        if (delay > UINT64_MAX - owner_now_ns) return RK_ERROR_LIMIT;
+        host_epoch_ns_ = owner_now_ns + static_cast<std::uint64_t>(std::ceil(delay));
         device_epoch_ticks_ = clock_.map_host_ns(host_epoch_ns_);
         epoch_set_ = true;
     }
@@ -508,24 +556,33 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
     const auto path_rate = static_cast<double>(compiled.segments.front().header.duration_ticks) /
         static_cast<double>(first_host_duration);
     if (!std::isfinite(path_rate) || path_rate <= 0) return RK_ERROR_LIMIT;
-    std::uint64_t shortest_ns = UINT64_MAX;
-    for (const auto &segment : compiled.segments) {
-        const auto duration_ns = static_cast<std::uint64_t>(std::ceil(
-            static_cast<long double>(segment.header.duration_ticks) * 1e9L /
-            ack_.device_tick_hz));
-        shortest_ns = std::min(shortest_ns, duration_ns);
-    }
     const auto allowance_ns = blueprint.serial_processing_allowance_ns
         ? blueprint.serial_processing_allowance_ns : 2'000'000ULL;
-    const auto required_baud = minimum_baud(ack_.actuator_count, shortest_ns, allowance_ns);
-    const auto required_depth = minimum_queue_depth(transport_->baud(), ack_.actuator_count,
-        shortest_ns, link_latency_ns_, clock_.uncertainty_ns());
-    if (transport_->baud() < required_baud || ack_.segment_capacity < required_depth) {
-        std::fprintf(stderr, "Rkd6Endpoint: plan exceeds serial qualification: "
-            "minimum_baud=%llu minimum_queue_depth=%u\n",
-            static_cast<unsigned long long>(required_baud), required_depth);
-        return RK_ERROR_LIMIT;
-    }
+    // Preserve the admitted prefix across chunks: a new chunk cannot borrow a new
+    // full queue. A replacement changes only the rows at its revision boundary.
+    auto rows = qualification_rows_;
+    if (plan.replace_after_plan_id)
+        while (!rows.empty() && rows.back().start_ticks >= revision_ticks) rows.pop_back();
+    const auto add_row = [&](const DeviceSegment6 &segment) {
+        const auto duration = std::floor(static_cast<long double>(segment.header.duration_ticks) *
+            1e9L / ack_.device_tick_hz);
+        if (duration < 1 || duration > UINT64_MAX) return false;
+        rows.push_back({segment.header.t0_ticks, segment.header.duration_ticks,
+            static_cast<std::uint64_t>(duration)});
+        return true;
+    };
+    if (head && !add_row(*head)) return RK_ERROR_LIMIT;
+    for (const auto &segment : compiled.segments) if (!add_row(segment)) return RK_ERROR_LIMIT;
+    auto qualification = qualification_prefix_.value_or(BufferedLinkQualification6(
+        transport_->baud(), ack_.actuator_count, ack_.segment_capacity, allowance_ns, 0, owner_period_ns_));
+    qualification.reserve_guard(commit_margin_ns() + segment_backlog_budget_ns());
+    for (const auto &row : rows)
+        if (!qualification.append(row.duration_ns)) {
+            std::fprintf(stderr, "Rkd6Endpoint: serial refill misses segment at tick %llu "
+                "(queue=%u, baud=%u)\n", static_cast<unsigned long long>(row.start_ticks),
+                ack_.segment_capacity, transport_->baud());
+            return RK_ERROR_LIMIT;
+        }
     // A queue begin opens a revision at a replacement boundary, or a fresh queue. An
     // append is more segments of the current revision: a new revision would make
     // the device drop segments still waiting to be sent under the old one.
@@ -635,6 +692,10 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
         }
     }
     const auto plan_start_ticks = compiled.segments.front().header.t0_ticks;
+    if (!qualification_prefix_) qualification_prefix_.emplace(
+        transport_->baud(), ack_.actuator_count, ack_.segment_capacity, allowance_ns, 0, owner_period_ns_);
+    qualification_prefix_->reserve_guard(commit_margin_ns() + segment_backlog_budget_ns());
+    qualification_rows_ = std::move(rows);
     const auto plan_end_ticks = compiled.segments.back().header.t0_ticks +
         compiled.segments.back().header.duration_ticks;
     for (auto &segment : compiled.segments) {
@@ -699,6 +760,12 @@ void Rkd6Endpoint::poll_frames(std::uint64_t owner_now_ns) {
             if (device_wire6::decode(decoded.payload, status_)) {
                 has_status_ = true;
                 status_at_ns_ = transport_->received_at_ns() ? transport_->received_at_ns() : owner_now_ns;
+                while (!qualification_rows_.empty() &&
+                    qualification_rows_.front().start_ticks + qualification_rows_.front().duration_ticks <
+                        status_.path_clock_ticks) {
+                    qualification_prefix_->append(qualification_rows_.front().duration_ns);
+                    qualification_rows_.pop_front();
+                }
                 queue_revision_mismatch_ = status_.queue_revision > revision_ ||
                     (revision_ != 0 && status_.queue_revision < revision_ &&
                      status_.path_clock_ticks >= revision_boundary_ticks_);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <limits>
+#include <algorithm>
 #include "robotkit_runtime.hpp"
 #include "device_wire6.hpp"
 #include "clock_estimator6.hpp"
@@ -15,6 +16,24 @@
 #include <vector>
 
 namespace robotkit {
+
+/** Conservative serial refill schedule, with a fully prefetched initial device queue. */
+class BufferedLinkQualification6 {
+public:
+    BufferedLinkQualification6(unsigned baud, std::uint8_t actuators, std::uint16_t capacity,
+        std::uint64_t processing_ns, std::uint64_t guard_ns, std::uint64_t owner_period_ns = 0);
+    bool append(std::uint64_t duration_ns);
+    long double prefill_ns(std::size_t count) const { return latency_ns_ + count * service_ns_; }
+    void reserve_guard(std::uint64_t guard_ns) { guard_ns_ = std::max(guard_ns_, guard_ns); }
+private:
+    std::uint16_t capacity_;
+    std::uint64_t guard_ns_;
+    std::uint64_t latency_ns_;
+    long double service_ns_;
+    long double elapsed_ns_ = 0;
+    long double delivered_ns_ = 0;
+    std::deque<long double> ends_;
+};
 
 /** Complete-frame transport. The virtual link and serial adapter implement this. */
 class RK_API Rkd6Transport {
@@ -169,6 +188,14 @@ private:
         std::uint64_t duration_ns;
     };
     std::vector<PlanTag> plan_tags_;
+    struct QualificationRow {
+        std::uint64_t start_ticks;
+        std::uint64_t duration_ticks;
+        std::uint64_t duration_ns;
+    };
+    /** Retired rows fold into a bounded scheduler state; appends retain their refill debt. */
+    std::optional<BufferedLinkQualification6> qualification_prefix_;
+    std::deque<QualificationRow> qualification_rows_;
     std::uint64_t path_time_ns(std::uint64_t device_ticks) const noexcept;
 };
 

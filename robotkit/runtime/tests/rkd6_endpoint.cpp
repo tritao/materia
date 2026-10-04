@@ -163,6 +163,46 @@ void unseen_backlog_holds_segments(const rk_robot_runtime_blueprint &blueprint) 
 }
 
 int main() {
+    {
+        // Same total time and mean rate, but only one ordering can refill a four-row queue.
+        BufferedLinkQualification6 smooth(921'600, 1, 4, 2'000'000, 2'000'000);
+        for (auto ns : {100'000'000ull, 100'000'000ull, 100'000ull, 100'000ull, 100'000ull})
+            assert(smooth.append(ns));
+        BufferedLinkQualification6 burst(921'600, 1, 4, 2'000'000, 2'000'000);
+        for (int i = 0; i < 4; ++i) assert(burst.append(i == 0 ? 100'000'000 : 100'000));
+        assert(!burst.append(100'000'000));
+        // A finite short program fitting the queue can be prefetched completely.
+        BufferedLinkQualification6 finite(921'600, 1, 4, 2'000'000, 2'000'000);
+        for (int i = 0; i < 4; ++i) assert(finite.append(100'000));
+        // Chunk boundaries must preserve the outstanding refill schedule.
+        auto continuation = finite;
+        assert(!continuation.append(100'000));
+        // Sustained excess traffic eventually exhausts even a larger prefill.
+        BufferedLinkQualification6 overload(921'600, 1, 16, 2'000'000, 2'000'000);
+        for (int i = 0; i < 16; ++i) assert(overload.append(100'000));
+        assert(!overload.append(100'000));
+        BufferedLinkQualification6 steady(921'600, 1, 4, 2'000'000, 2'000'000);
+        for (int i = 0; i < 1000; ++i) assert(steady.append(10'000'000));
+        // The 2 ms one-way latency is preserved while packets pipeline faster than that.
+        BufferedLinkQualification6 pipeline(921'600, 1, 4, 2'000'000, 1'000'000);
+        for (int i = 0; i < 1000; ++i) assert(pipeline.append(2'000'000));
+        // A line can carry this rate, but a host sending one whole frame per tick cannot.
+        BufferedLinkQualification6 wire(115'200, 1, 4, 0, 0);
+        BufferedLinkQualification6 paced(115'200, 1, 4, 0, 0, 10'000'000);
+        assert(paced.prefill_ns(4) > wire.prefill_ns(4));
+        bool paced_rejected = false;
+        for (int i = 0; i < 100; ++i) {
+            assert(wire.append(8'000'000));
+            if (!paced_rejected && !paced.append(8'000'000)) paced_rejected = true;
+        }
+        assert(paced_rejected);
+        BufferedLinkQualification6 stalled(921'600, 1, 4, 2'000'000, 100'000'000);
+        for (int i = 0; i < 4; ++i) assert(stalled.append(10'000'000));
+        assert(!stalled.append(10'000'000));
+        assert(!steady.append(0));
+        BufferedLinkQualification6 invalid(0, 1, 4, 0, 0);
+        assert(!invalid.append(10'000'000));
+    }
     assert(Rkd6Endpoint::minimum_baud(64, 10'000'000, 2'000'000) > 921'600);
     assert(Rkd6Endpoint::minimum_queue_depth(921'600, 1, 10'000'000,
         100'000, 500'000) <= 4);
@@ -321,9 +361,18 @@ int main() {
     segment.joint_count = 1;
     segment.coefficients[0].value[1] = 0.5;
     auto too_fast = plan;
-    too_fast.segments.segments[0].duration_ns = 1'000'000;
+    too_fast.segments.segments.resize(5);
+    for (std::size_t i = 0; i < 5; ++i) {
+        auto &row = too_fast.segments.segments[i];
+        row.time_from_start_ns = i * 1'000'000;
+        row.duration_ns = 1'000'000;
+        row.degree = 1;
+        row.joint_count = 1;
+        row.coefficients[0].value[1] = 0;
+    }
     assert(endpoint->submit_device_plan(too_fast, 0, 100'200'000, 20'000'000,
         blueprint) == RK_ERROR_LIMIT);
+    assert(observed->queue_begin_frames == 0 && observed->segment_frames == 0);
     assert(endpoint->submit_device_plan(plan, 0, 100'200'000, 20'000'000,
         blueprint) == RK_OK);
     assert(observed->queue_begin_frames == 1);
