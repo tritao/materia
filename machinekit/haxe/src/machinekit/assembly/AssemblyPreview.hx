@@ -28,6 +28,7 @@ class AssemblyPreview {
 		var model = new AssemblyModel("mm");
 		assembly.addTo(model, "");
 		var parts:Array<SceneArtifactPart> = [];
+    var machineMotion = movingBelts(assembly);
 		var definitionByOccurrence = new Map<String, String>();
 		var definitionByDesignation = new Map<String, String>();
 		for (entry in assembly.components()) {
@@ -35,8 +36,15 @@ class AssemblyPreview {
 			if (definitionId == null) {
 				definitionId = entry.id;
 				definitionByDesignation.set(entry.component.designation, definitionId);
-				parts.push(part(definitionId, entry.component.designation,
-					entry.component.geometry(ComponentDetail.Preview), entry.component.materialId));
+        var rendered = part(definitionId, entry.component.designation,
+          entry.component.geometry(ComponentDetail.Preview), entry.component.materialId);
+        if (Std.isOfType(entry.component, machinekit.transmission.TimingBelt)) {
+          var belt:machinekit.transmission.TimingBelt = cast entry.component;
+          var moving = [for (value in machineMotion.belts) if (value.occurrence == entry.id) value];
+          displayBelt(rendered, belt, moving.length == 0 ? belt.wraps()[0].side :
+            moving[0].wraps[moving[0].driverWrap].side);
+        }
+        parts.push(rendered);
 			}
 			definitionByOccurrence.set(entry.id, definitionId);
 		}
@@ -44,8 +52,45 @@ class AssemblyPreview {
 		var state = model.initialState(assemblyId).record();
 		shareDefinitions(definition, definitionByOccurrence);
 		return {lengthUnit: "mm", metresPerUnit: LengthUnit.metresPerUnit("mm"), parts: parts,
-			assemblyDefinition: definition, assemblyState: state};
+			assemblyDefinition: definition, assemblyState: state, machineMotion: machineMotion};
 	}
+
+  static function displayBelt(part:SceneArtifactPart, belt:machinekit.transmission.TimingBelt, side:Int):Void {
+    var mesh = machinekit.transmission.TimingBeltMesh.build(belt, 0.0, side);
+    var vertices = haxe.io.Bytes.alloc(mesh.positions.length * 8), normals = haxe.io.Bytes.alloc(mesh.normals.length * 8);
+    var indices = haxe.io.Bytes.alloc(mesh.indices.length * 4);
+    for (i in 0...mesh.positions.length) vertices.setDouble(i * 8, mesh.positions[i]);
+    for (i in 0...mesh.normals.length) normals.setDouble(i * 8, mesh.normals[i]);
+    for (i in 0...mesh.indices.length) indices.setInt32(i * 4, mesh.indices[i]);
+    part.vertexCount = Std.int(mesh.positions.length / 3); part.indexCount = mesh.indices.length;
+    part.vertices = vertices; part.normals = normals; part.indices = indices;
+    part.faceRanges = []; part.faceDescriptors = null; part.edgeSegments = null; part.edgeIds = null;
+  }
+
+  static function movingBelts(assembly:MachineAssembly):materia.project.SceneArtifact.SceneArtifactMachineMotion {
+    var description = assembly.describe();
+    var belts:Array<materia.project.SceneArtifact.SceneArtifactBeltVisual> = [];
+    var paths = description.machine.beltPaths, motors = description.machine.motors;
+    if (paths != null && motors != null) for (path in paths) {
+      var entries = [for (entry in assembly.components()) if (entry.id == path.belt) entry];
+      if (entries.length != 1 || !Std.isOfType(entries[0].component, machinekit.transmission.TimingBelt)) continue;
+      var belt:machinekit.transmission.TimingBelt = cast entries[0].component;
+      var wraps = belt.wraps(), driver = -1, driverJoint = "";
+      for (i in 0...path.wraps.length) for (motor in motors)
+        for (joint in description.mechanical.joints)
+          if (joint.id == motor.joint && joint.child == path.wraps[i].instanceId) { driver = i; driverJoint = motor.joint; }
+      if (driver < 0) continue;
+      belts.push({occurrence: path.belt, pitch: belt.pitch, width: belt.width, thickness: belt.thickness,
+        driverJoint: driverJoint, driverWrap: driver,
+        driverSign: machinekit.transmission.BeltStretch.axisSign(
+          machinekit.assembly.FrozenAssemblyDefinitions.thaw(description.mechanical),
+          new cadkit.modeling.AssemblyState(machinekit.assembly.FrozenAssemblyDefinitions.thaw(description.mechanical)),
+          path.belt, driverJoint, path.wraps[driver].instanceId),
+        wraps: [for (i in 0...path.wraps.length) {occurrence: path.wraps[i].instanceId,
+          connector: path.wraps[i].connectorName, radius: wraps[i].radius, side: wraps[i].side}]});
+    }
+    return {belts: belts};
+  }
 
 	/**
 	 * Points every occurrence at its shared definition (`definitionByOccurrence`; an occurrence missing

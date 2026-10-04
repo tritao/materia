@@ -61,9 +61,12 @@ public:
     rk_safety_state initial_safety_state() const noexcept override { return RK_SAFETY_READY; }
     bool executes_trajectory_queue() const noexcept override { return true; }
     int32_t diagnostic_code() const noexcept override;
+    const char *fault_reason() const noexcept { return inner_->fault_reason(); }
     rk_result submit_device_plan(const PlanRequest &, std::uint64_t base_time_ns,
         std::uint64_t owner_now_ns, std::uint64_t committed_through_ns,
         const rk_robot_runtime_blueprint &) override;
+    /** Recreate the board and UART queues when its simulation clock resets. */
+    bool reset();
     void cut_link(bool cut);
     bool miss_next_steps(std::uint32_t actuator, std::uint32_t count);
     std::array<std::uint8_t, 16> controller() const noexcept { return controller_; }
@@ -77,14 +80,18 @@ private:
     class Link;
     VirtualDeviceEndpoint(std::shared_ptr<Rkd6Endpoint> inner, Link *link,
         std::vector<DeviceActuator6> actuators, std::uint32_t joint_count,
-        std::array<std::uint8_t, 16> controller)
+        std::array<std::uint8_t, 16> controller, const rk_robot_runtime_blueprint &blueprint,
+        VirtualDeviceConfig6 config)
         : inner_(std::move(inner)), link_(link), actuators_(std::move(actuators)),
-          joint_count_(joint_count), controller_(controller) {}
+          joint_count_(joint_count), controller_(controller),
+          blueprint_(std::make_shared<rk_robot_runtime_blueprint>(blueprint)), config_(std::move(config)) {}
     std::shared_ptr<Rkd6Endpoint> inner_;
     Link *link_;
     std::vector<DeviceActuator6> actuators_;
     std::uint32_t joint_count_;
     std::array<std::uint8_t, 16> controller_;
+    std::shared_ptr<const rk_robot_runtime_blueprint> blueprint_;
+    VirtualDeviceConfig6 config_;
 };
 
 } // namespace robotkit

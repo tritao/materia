@@ -415,6 +415,25 @@ void host_stall_keeps_device_moving() {
         assert(endpoint->sample(now, state) == RK_OK);
     for (std::uint64_t now = 700'000'000; now <= 1'800'000'000; now += 10'000'000)
         assert(endpoint->sample(now, state) == RK_OK);
+    if (state.safety != RK_SAFETY_READY)
+        std::fprintf(stderr, "host stall fault: %s, position=%g, path=%llu, commit=%llu\n",
+            endpoint->fault_reason() ? endpoint->fault_reason() : "none", state.position[0],
+            static_cast<unsigned long long>(state.trajectory_time_ns),
+            static_cast<unsigned long long>(state.committed_until_ns));
+    assert(state.safety == RK_SAFETY_READY);
+    assert(std::abs(endpoint->actuator_positions()[0] - 0.5) <= 0.00101);
+
+    // A simulation reset rewinds host time while preserving the endpoint object
+    // held by Runtime. Recreate the board, stream and clock-sync state together.
+    assert(endpoint->reset());
+    assert(endpoint->actuator_positions()[0] == 0.0);
+    assert(endpoint->step_log().empty());
+    assert(endpoint->sample(0, state) == RK_ERROR_STALE_STATE);
+    for (std::uint64_t now = 2'000'000; now <= 120'000'000; now += 2'000'000)
+        endpoint->sample(now, state);
+    assert(endpoint->submit_device_plan(plan, 0, 120'000'000, 20'000'000, blueprint) == RK_OK);
+    for (std::uint64_t now = 130'000'000; now <= 1'400'000'000; now += 10'000'000)
+        assert(endpoint->sample(now, state) == RK_OK);
     assert(state.safety == RK_SAFETY_READY);
     assert(std::abs(endpoint->actuator_positions()[0] - 0.5) <= 0.00101);
 }

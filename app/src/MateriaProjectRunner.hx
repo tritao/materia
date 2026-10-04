@@ -420,7 +420,7 @@ class MateriaProjectRunner {
       metresPerUnit: scale, physical: {metresPerUnit: scale, parts: physicalParts},
       recipeDocument: artifact.recipeDocument, recipeDiagnostics: artifact.recipeDiagnostics,
       cncJob: machiningJob(artifact, records, scale), mobileBase: artifact.mobileBase, mission: artifact.mission,
-      robotTools: artifact.robotTools, robotSensors: artifact.robotSensors};
+      robotTools: artifact.robotTools, robotSensors: artifact.robotSensors, machineMotion: artifact.machineMotion};
   }
 
   /**
@@ -523,7 +523,7 @@ class MateriaProjectRunner {
       recipeDocument: generated.recipeDocument, recipeDiagnostics: generated.recipeDiagnostics,
       robotMotions: generated.robotMotions, cncJob: generated.cncJob,
       mobileBase: generated.mobileBase, mission: generated.mission, robotTools: generated.robotTools,
-      robotSensors: generated.robotSensors};
+      robotSensors: generated.robotSensors, machineMotion: generated.machineMotion};
   }
 
   static function addOccurrenceRecord(records:Array<SceneObjectData>, component:SceneArtifactPart,
@@ -654,4 +654,5 @@ typedef GeneratedAssemblyScene = {
   @:optional var robotTools:Array<materia.project.SceneArtifact.SceneArtifactRobotTool>;
   /** The sensors on the assembly's robot, as its parts declare them. */
   @:optional var robotSensors:Array<materia.project.SceneArtifact.SceneArtifactRobotSensor>;
+  @:optional var machineMotion:materia.project.SceneArtifact.SceneArtifactMachineMotion;
 }

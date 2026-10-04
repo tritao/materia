@@ -300,7 +300,7 @@ class CncProgramPlayer implements SessionMember {
 					return EventValue.Digital(true);
 				},
 				() -> robot.runtime.pollEvents(), planning.indices,
-        [for (_ in planning.indices) 1e-5]);
+					[for (_ in planning.indices) 1e-5]);
 			made.slip = slip;
 			return made;
 		};

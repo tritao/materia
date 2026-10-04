@@ -28,7 +28,9 @@ class MotorSpaceConstraints {
   }
 
   /** A planned subset of independent axes; shared followers are derived from their coupling terms. */
-  public static function of(model:RobotModel, jointIds:Array<String>):MotorSpaceConstraints {
+  public static function of(model:RobotModel, jointIds:Array<String>, ?rateScale:Float = 1.0):MotorSpaceConstraints {
+    if (!Math.isFinite(rateScale) || rateScale <= 0.0 || rateScale > 1.0)
+      throw "Motor rate scale must be in (0, 1]";
     function weights(id:String, depth:Int):Array<Float> {
       if (depth > model.joints.length) throw "Cyclic motor coupling";
       var result = [for (_ in jointIds) 0.0];
@@ -48,7 +50,7 @@ class MotorSpaceConstraints {
       var nonzero = 0;
       for (value in row) if (Math.abs(value) > 1e-12) nonzero++;
       if (nonzero < 2) return;
-      rows.push(row); rates.push(rate);
+      rows.push(row); rates.push(rate * rateScale);
     }
     for (joint in model.joints) {
       var mechanical = joint.mechanicalLimits == null ? joint.limits : joint.mechanicalLimits;

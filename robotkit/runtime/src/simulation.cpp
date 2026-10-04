@@ -723,6 +723,7 @@ rk_result Simulation::reset_robots() {
         if (set_robot_base_node_pose(static_cast<uint32_t>(index),
                                      robot_initial_poses_[index]) != RK_OK)
             return RK_ERROR_BACKEND;
+        if (virtual_devices_[index] && !virtual_devices_[index]->reset()) return RK_ERROR_BACKEND;
         if (auto binding = bindings_[index].lock()) binding->reset();
         runtimes_[index]->reset_state();
     }
@@ -761,6 +762,7 @@ rk_result Simulation::reset_robot(uint32_t robot_index) {
     std::fill(std::begin(drive.rates), std::end(drive.rates), 0.0);
     if (set_robot_base_node_pose(robot_index, robot_initial_poses_[robot_index]) != RK_OK)
         return RK_ERROR_BACKEND;
+    if (virtual_devices_[robot_index] && !virtual_devices_[robot_index]->reset()) return RK_ERROR_BACKEND;
     binding->reset();
     runtimes_[robot_index]->reset_state();
     return RK_OK;
