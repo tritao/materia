@@ -11,8 +11,4 @@ enum abstract WeldFault(Int) from Int to Int {
   var ArcLost = 2;
   /** The arc was switched off with the wire still feeding while it touched the work, so it froze in the pool. */
   var WireStuck = 3;
-  /** The supply reports an internal fault. */
-  var SupplyFault = 4;
-  /** The device connection or its feedback became unavailable. */
-  var ConnectionLost = 5;
 }

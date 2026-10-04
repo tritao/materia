@@ -780,8 +780,10 @@ W6 implementation notes (started after W5 main sync, 2026-10-04):
   vendor registers. Feedback must fit one 125-register read. The lease must exceed two bounded transactions plus
   100 ms owner allowance. The adapter test uses a 300 ms transaction bound and 1 s lease, rather than the generic
   client's 500 ms default (which is intentionally refused with that lease).
-  Supply fault (4) and connection loss (5) now have distinct `WeldFault` codes and messages; neither is mislabeled
-  as a stuck wire. Feedback is validated before publication. The fake safes and clears stored ignition on a supply
+  Supply faults and connection loss use the existing supply-drop/arc-loss code (2), preserving RobotKit's frozen
+  external sensor contract (codes 0–3). Adapter diagnostics expose the detailed cause separately; introducing codes
+  4 and 5 in the draft was incompatible with that contract and was removed. Feedback is validated before publication.
+  The fake safes and clears stored ignition on a supply
   fault, so clearing it cannot reignite. Tests pass: 78 focused assertions plus TCP safe initialization, ignition,
   scaled feedback, stop/restart, supply fault, explicit restart, link-loss fault and watchdog shutdown; affected
   tool regression suites pass 27 tool / 33 process / 152 weld / 33 clearance assertions.

@@ -88,7 +88,7 @@ class ModbusTcpTests {
       while (welder.reading().fault == 0 && Sys.time() < deadline) {
         runtime.events.poll(); fake.poll(Sys.time()); welder.poll(Sys.time()); runtime.events.wait(0.001);
       }
-      if (welder.reading().fault != processkit.tool.WeldFault.SupplyFault || fake.arc)
+      if (welder.reading().fault != processkit.tool.WeldFault.ArcLost || fake.arc)
         throw "Modbus supply fault did not safe the process interface";
       fake.supplyFault = false;
       deadline = Sys.time() + 3.0;

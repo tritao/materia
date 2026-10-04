@@ -43,6 +43,11 @@ class ModbusWelder implements WelderOutputs implements WelderFeedback {
       throw "Modbus device lease is too short for two bounded transactions and the owner tick";
   }
   public function reading():WeldReading return latest;
+  /** Adapter diagnostics supplement the device-neutral, frozen tool sensor fault codes. */
+  public function faultDetail():Null<String> {
+    if (faultMessage != null) return faultMessage;
+    return latest.fault != WeldFault.None ? "Modbus supply reports a fault" : null;
+  }
   public function setArc(on:Bool):Void {
     if (on && (faultMessage != null || !initialized || latest.fault != WeldFault.None)) throw "Faulted Modbus welder cannot ignite";
     if (!on) client.discardQueued();
@@ -64,13 +69,13 @@ class ModbusWelder implements WelderOutputs implements WelderFeedback {
   public function safe():Void { wire = 0.0; arc = false; dirty = true; client.discardQueued(); }
   public function disconnect():Void {
     safe(); client.close(); faultMessage = "Modbus welder disconnected";
-    latest = {arc:false, currentA:0.0, voltageV:0.0, touch:false, fault:WeldFault.ConnectionLost, powerW:0.0};
+    latest = {arc:false, currentA:0.0, voltageV:0.0, touch:false, fault:WeldFault.ArcLost, powerW:0.0};
   }
   public function poll(now:Float):Void {
     client.poll(now);
     if (client.fault != null) {
       faultMessage = client.fault;
-      latest = {arc:false, currentA:0.0, voltageV:0.0, touch:false, fault:WeldFault.ConnectionLost, powerW:0.0};
+      latest = {arc:false, currentA:0.0, voltageV:0.0, touch:false, fault:WeldFault.ArcLost, powerW:0.0};
       return;
     }
     if (faultMessage != null || !client.idle() || (!dirty && now < nextPoll)) return;
@@ -89,7 +94,7 @@ class ModbusWelder implements WelderOutputs implements WelderFeedback {
       var reading:WeldReading = {arc:(status & map.establishedMask) != 0,
         currentA:map.current.decode(registers[map.current.address - inputStart]),
         voltageV:map.measuredVoltage.decode(registers[map.measuredVoltage.address - inputStart]),
-        touch:(status & map.touchMask) != 0, fault:(status & map.faultMask) != 0 ? WeldFault.SupplyFault : WeldFault.None,
+        touch:(status & map.touchMask) != 0, fault:(status & map.faultMask) != 0 ? WeldFault.ArcLost : WeldFault.None,
         powerW:map.power.decode(registers[map.power.address - inputStart])};
       if (!WeldSensor.valid(WeldSensor.values(reading))) throw "Invalid Modbus welding feedback";
       latest = reading;
