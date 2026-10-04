@@ -1,0 +1,138 @@
+package robotkit.runtime;
+
+/** Reference and coordinate-zero state for the joints of one compiled machine.
+ * Only physical home-switch latches establish a reference. Power-up invalidates it. */
+class JointReferenceState {
+  final names:Array<String> = [];
+  final homes:Array<robotkit.model.JointSwitch>;
+  final homeJoints:Array<Int> = [];
+  final latched:Array<Bool> = [];
+  final latchOffsets:Array<Float> = [];
+  final referenced:Array<Bool> = [];
+  final offsets:Array<Float> = [];
+  final couplings:Array<RobotRuntimeJointCouplingBlueprint>;
+
+  public function new(blueprint:RobotRuntimeBlueprint) {
+    if (blueprint == null) throw "Reference state requires a runtime blueprint";
+    for (joint in 0...blueprint.jointCount) {
+      var id = blueprint.identity == null ? null : blueprint.identity.jointId(joint);
+      names.push(id == null ? 'joint[$joint]' : id);
+      referenced.push(true); offsets.push(0.0);
+    }
+    homes = [for (contact in blueprint.switches) if (contact.role == "home") contact];
+    couplings = blueprint.couplings.copy();
+    for (term in couplings) {
+      if (term == null) throw "Reference state has a null coupling";
+      requireJoint(term.leader); requireJoint(term.follower);
+      if (!Math.isFinite(term.ratio) || term.ratio == 0) throw "Reference coupling needs a finite nonzero ratio";
+    }
+    for (contact in homes) {
+      var joint = names.indexOf(contact.joint);
+      if (joint < 0) throw 'Home switch "${contact.id}" monitors an unknown joint';
+      homeJoints.push(joint); latched.push(false); latchOffsets.push(0.0);
+    }
+    refresh();
+  }
+
+  /** A joint without a home switch retains its existing reference convention. */
+  public function isReferenced(joint:Int):Bool {
+    requireJoint(joint);
+    return referenced[joint];
+  }
+
+  /** Refuse ordinary motion until every mapped coordinate is established. */
+  public function requireReferenced(joints:Array<Int>):Void {
+    if (joints == null) throw "Reference admission requires joint indices";
+    for (joint in joints) {
+      requireJoint(joint);
+      if (!referenced[joint])
+        throw 'RK_JOINT_UNREFERENCED: joint "${names[joint]}" requires homing';
+    }
+  }
+
+  /** All required home signals, including both Y sides, must latch before admission. */
+  public function latch(switchId:String, observedPosition:Float):Void {
+    if (!Math.isFinite(observedPosition)) throw "Home latch position must be finite";
+    var index = -1;
+    for (i in 0...homes.length) if (homes[i].id == switchId) index = i;
+    if (index < 0) throw 'Unknown home switch "$switchId"';
+    var zero = homes[index].trip - observedPosition;
+    if (!Math.isFinite(zero)) throw "Home coordinate zero must be finite";
+    latchOffsets[index] = zero;
+    latched[index] = true;
+    refresh();
+  }
+
+  /** Individual side zeros are retained for dual-drive squaring. */
+  public function homeOffset(switchId:String):Float {
+    for (i in 0...homes.length) if (homes[i].id == switchId) {
+      if (!latched[i]) throw 'Home switch "$switchId" has not latched';
+      return latchOffsets[i];
+    }
+    throw 'Unknown home switch "$switchId"';
+  }
+
+  /** A power cycle loses every switch-derived reference and calibrated zero. */
+  public function invalidate():Void {
+    for (i in 0...latched.length) { latched[i] = false; latchOffsets[i] = 0.0; }
+    refresh();
+  }
+
+  public function invalidateJoint(joint:Int):Void {
+    requireJoint(joint);
+    for (i in 0...homeJoints.length) if (homeJoints[i] == joint) {
+      latched[i] = false; latchOffsets[i] = 0.0;
+    }
+    refresh();
+  }
+
+  /** Calibrated logical position = observed counter coordinate + established zero. */
+  public function position(joint:Int, observed:Float):Float {
+    requireJoint(joint);
+    if (!Math.isFinite(observed)) throw "Observed position must be finite";
+    return observed + offsets[joint];
+  }
+
+  /** Convert a logical target back to its counter coordinate. */
+  public function target(joint:Int, logical:Float):Float {
+    requireJoint(joint);
+    if (!Math.isFinite(logical)) throw "Logical target must be finite";
+    return logical - offsets[joint];
+  }
+
+  public function offset(joint:Int):Float { requireJoint(joint); return offsets[joint]; }
+
+  function refresh():Void {
+    for (joint in 0...names.length) {
+      referenced[joint] = true; offsets[joint] = 0.0;
+      var first = true;
+      for (i in 0...homeJoints.length) if (homeJoints[i] == joint) {
+        if (!latched[i]) referenced[joint] = false;
+        // The first authored home is the leader's coordinate reference. Other
+        // side latches are required independently; their zeros are not averaged.
+        if (first) { offsets[joint] = latched[i] ? latchOffsets[i] : 0.0; first = false; }
+      }
+    }
+    // Fixed-point propagation handles chained and multiple-input followers.
+    for (_ in 0...names.length) {
+      for (joint in 0...names.length) {
+        var hasTerms = false, ready = true, sum = 0.0;
+        for (term in couplings) if (term.follower == joint) {
+          requireJoint(term.leader);
+          hasTerms = true;
+          ready = ready && referenced[term.leader];
+          sum += term.ratio * offsets[term.leader];
+        }
+        if (hasTerms) {
+          referenced[joint] = referenced[joint] && ready;
+          if (!Math.isFinite(sum)) throw "Coupled reference zero must be finite";
+          offsets[joint] = sum;
+        }
+      }
+    }
+  }
+
+  function requireJoint(joint:Int):Void {
+    if (joint < 0 || joint >= names.length) throw "Reference joint index is out of range";
+  }
+}

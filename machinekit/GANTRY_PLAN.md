@@ -562,7 +562,7 @@ G0 → G1 → G2 → G3 ──────────────────�
 | G8 | implementation added; runtime and firmware verification deferred | `823de3191`, `6ac44c34e` |
 | G9 | implementation added; migration verification deferred | `cd7853a82` |
 | G10 | implementation added; mechanical/simulation verification deferred | see progress notes |
-| G11 | planned | — |
+| G11 | in progress; reference-state foundation added | see progress notes |
 | G12 | planned | — |
 | G13 | planned | — |
 | G14 | planned | — |
@@ -1309,3 +1309,27 @@ lowering already filters external kinds, so this aligns compiler validation
 with the actual boundary. The dual-Y gantry's twelve switch frames can coexist
 with native defaults and tool feedback without changing the native ABI. This
 correction has not been compiled or tested.
+
+
+### G11 — joint reference state in progress
+
+Add JointReferenceState for a compiled runtime: home-switch joints start
+unreferenced, while joints without home switches retain their existing
+reference convention. Every home switch on a joint must latch; one Y side
+cannot establish the whole dual-drive reference. The first authored home
+is the leader zero reference, and other side offsets remain separate for
+G12 squaring rather than being averaged. A named RK_JOINT_UNREFERENCED error
+identifies an ordinary-motion admission failure.
+
+A physical latch records nominal trip minus observed counter coordinate.
+Logical position/target conversion uses this established zero. Reference
+status and coordinate offsets propagate through complete follower chains
+and multiple-input coupling sums. Power-cycle invalidation removes all
+home-derived references; individual-joint invalidation clears its home
+latches and dependent readiness.
+
+This is the state foundation only. Runtime/native admission, controlled
+jog/homing classification, limit-switch faults, calibration application,
+seek/backoff/slowlatch HomingCycle, simulation power-up offsets and automatic
+router/picker homing remain G11 work. No tests or builds were run and no
+reference enforcement or homing result is claimed yet.
