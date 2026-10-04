@@ -1,6 +1,6 @@
 package motionkit.trajectory;
 
-import MotionKitNative;
+import TrajectoryCore;
 
 /** The shared path derivative source for STOP and hold-lead calculations. */
 class PathDerivativeEstimate {

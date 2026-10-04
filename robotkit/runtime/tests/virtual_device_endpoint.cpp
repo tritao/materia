@@ -1,6 +1,7 @@
+#include "runtime_trajectory_fixtures.hpp"
 #include "virtual_device_endpoint.hpp"
 #include "robotkit_runtime.hpp"
-#include "motionkit.h"
+#include "trajectory_core.h"
 #include <cassert>
 #include <chrono>
 #include <cmath>
@@ -765,17 +766,8 @@ int main() {
     config.jitter_ns = 0;
     config.frame_drop_rate = 0;
 
-    mk_state_to_state_request request{};
-    request.struct_size = sizeof(request);
-    request.joint_count = 1;
-    request.synchronization = MK_SYNCHRONIZATION_TIME;
-    request.target_position[0] = 0.5;
-    request.max_velocity[0] = 1.0;
-    request.max_acceleration[0] = 2.0;
-    request.max_jerk[0] = 5.0;
     mk_trajectory_handle trajectory{};
-    int32_t generator_result = 0;
-    assert(mk_generate_state_to_state(&request, &trajectory, &generator_result) == MK_OK);
+    assert(runtime_fixtures::rest_one(&trajectory) == MK_OK);
     assert(trajectory.id != 0);
     std::uint32_t count = 0;
     std::int64_t duration_ns = 0;

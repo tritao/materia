@@ -6,6 +6,10 @@ if(NOT DEFINED RK_BUILD_SHARED)
     set(RK_BUILD_SHARED ON)
 endif()
 option(MK_BUILD_SHARED "Build MotionKit as a shared library" ${RK_BUILD_SHARED})
+if(NOT TARGET trajectory_core)
+    set(TC_BUILD_SHARED ${MK_BUILD_SHARED} CACHE BOOL "Build the shared trajectory core" FORCE)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../trajectorykit/native" trajectory)
+endif()
 
 # Only Ruckig's offline Community calculator is linked. Its upstream defaults
 # enable the networked cloud client, examples and tests, so override them here.
@@ -112,9 +116,9 @@ else()
         "${CMAKE_CURRENT_SOURCE_DIR}/vendor/shims/no_openmp")
 endif()
 
-add_library(motionkit_core ${MK_LIBRARY_TYPE} ../../trajectorykit/native/src/trajectory.cpp ../../trajectorykit/native/src/validation.cpp src/generator.cpp src/path.cpp src/opw.cpp src/configuration.cpp)
+add_library(motionkit_core ${MK_LIBRARY_TYPE} src/generator.cpp src/path.cpp src/opw.cpp src/configuration.cpp)
 target_compile_features(motionkit_core PUBLIC cxx_std_17)
-target_link_libraries(motionkit_core PRIVATE ruckig::ruckig toppra Eigen3::Eigen motionkit_descartes_core)
+target_link_libraries(motionkit_core PUBLIC trajectory_core PRIVATE ruckig::ruckig toppra Eigen3::Eigen motionkit_descartes_core)
 target_include_directories(motionkit_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>)
@@ -163,4 +167,19 @@ if(BUILD_TESTING)
             endif()
         endif()
     endforeach()
+endif()
+
+if(DEFINED HAXEON_NATIVE_OUTPUT_DIR)
+    set_target_properties(motionkit_core PROPERTIES
+        LIBRARY_OUTPUT_DIRECTORY "${HAXEON_NATIVE_OUTPUT_DIR}"
+        RUNTIME_OUTPUT_DIRECTORY "${HAXEON_NATIVE_OUTPUT_DIR}"
+        ARCHIVE_OUTPUT_DIRECTORY "${HAXEON_NATIVE_OUTPUT_DIR}")
+endif()
+
+add_executable(motionkit_runtime_fixtures EXCLUDE_FROM_ALL tools/generate-runtime-fixtures.cpp)
+target_link_libraries(motionkit_runtime_fixtures PRIVATE motionkit_core)
+if(MSVC)
+    target_compile_options(motionkit_runtime_fixtures PRIVATE /UNDEBUG)
+else()
+    target_compile_options(motionkit_runtime_fixtures PRIVATE -UNDEBUG)
 endif()

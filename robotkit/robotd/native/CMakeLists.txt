@@ -21,16 +21,14 @@ set(RK_BUILD_INFERENCE ON CACHE BOOL
 set(NK_BUILD_SHARED ON CACHE BOOL "Build SimKit dependencies as shared libraries" FORCE)
 set(NK_BUILD_TESTS OFF CACHE BOOL "Disable SimKit tests in robotd" FORCE)
 set(NK_BUILD_EXAMPLES OFF CACHE BOOL "Disable SimKit examples in robotd" FORCE)
-set(MK_BUILD_SHARED ${RK_BUILD_SHARED} CACHE BOOL "Build MotionKit as shared library" FORCE)
 option(NKSIM_BUILD_MUJOCO "Build the optional MuJoCo simulation backend" OFF)
 
-add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../../motionkit/native" motionkit)
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../../simkit" simkit)
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../.." robotkit)
 
 foreach(target_name
         nativekit nativekit_scene nativekit_scene_render nativekit_scene_interaction
-        nativekit_sim_core nativekit_sim_mujoco motionkit_core visionkit_core
+        nativekit_sim_core nativekit_sim_mujoco trajectory_core visionkit_core
         robotkit_runtime robotkit_policy robotkit_inference)
     if(TARGET "${target_name}")
         set_target_properties("${target_name}" PROPERTIES
@@ -51,7 +49,7 @@ if(TARGET robotkit_inference)
 endif()
 
 add_custom_target(robotd_native
-    DEPENDS motionkit_core robotkit_runtime ${ROBOTD_POLICY_TARGET}
+    DEPENDS trajectory_core robotkit_runtime ${ROBOTD_POLICY_TARGET}
         ${ROBOTD_VISIONKIT_TARGET} ${ROBOTD_INFERENCE_TARGET}
     COMMAND "${CMAKE_COMMAND}" -E touch "${HAXEON_NATIVE_OUTPUT_DIR}/robotd.hdll"
     BYPRODUCTS "${HAXEON_NATIVE_OUTPUT_DIR}/robotd.hdll"

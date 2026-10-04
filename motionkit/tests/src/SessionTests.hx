@@ -456,13 +456,13 @@ class SessionTests extends MotionKitTestSupport {
     check(cornerStops >= 3, "TOPP-RA square stops at every authored corner");
     var squareReport = squareMachine.lastPathValidationReport;
     if (squareReport == null) throw "TOPP-RA path did not record validation";
-    check(squareReport.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
-      MotionKitNativeConstants.MK_CHECK_PASSED &&
-      squareReport.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].method ==
-      MotionKitNativeConstants.MK_CHECK_METHOD_SAMPLED,
+    check(squareReport.checks[TrajectoryCoreConstants.MK_CHECK_TASK_SPACE].status ==
+      TrajectoryCoreConstants.MK_CHECK_PASSED &&
+      squareReport.checks[TrajectoryCoreConstants.MK_CHECK_TASK_SPACE].method ==
+      TrajectoryCoreConstants.MK_CHECK_METHOD_SAMPLED,
       "TOPP-RA task-space check reports sampled path tolerance");
-    check(squareReport.checks[MotionKitNativeConstants.MK_CHECK_JERK].status ==
-      MotionKitNativeConstants.MK_CHECK_UNCHECKED,
+    check(squareReport.checks[TrajectoryCoreConstants.MK_CHECK_JERK].status ==
+      TrajectoryCoreConstants.MK_CHECK_UNCHECKED,
       "TOPP-RA reports jerk as unchecked");
     var invalidPathRejected = false;
     try squareMachine.queuePath(null) catch (_:Dynamic) invalidPathRejected = true;

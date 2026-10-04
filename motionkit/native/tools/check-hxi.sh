@@ -15,6 +15,10 @@ output=${1:-"$module_dir/bindings/motionkit.hxi"}
     --library=motionkit_core \
     --interface=MotionKitNative \
     --include="$module_dir/include" \
+    --include="$materia_dir/trajectorykit/native/include" \
+    --depends=TrajectoryCore \
+    --dependency-hxi="$materia_dir/trajectorykit/native/bindings/trajectory-core.hxi" \
+    --exclude-header="$materia_dir/trajectorykit/native/include/trajectory_core.h" \
     --source-label=native/bindings/motionkit_import.h \
     --output="$output" \
     "$module_dir/bindings/motionkit_import.h"

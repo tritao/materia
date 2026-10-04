@@ -313,8 +313,8 @@ class ProgramTests extends MotionKitTestSupport {
     var line = compiler.compile(new MotionProgram([MotionOp.MoveL(endPose, "work", 0.1, Blend.ExactStop)]), start,
       Int64.ofInt(400));
     var plan = line.blocks[0].plans[0];
-    check(plan.report.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
-      MotionKitNativeConstants.MK_CHECK_PASSED, "the 7-axis line meets the Cartesian tolerance");
+    check(plan.report.checks[TrajectoryCoreConstants.MK_CHECK_TASK_SPACE].status ==
+      TrajectoryCoreConstants.MK_CHECK_PASSED, "the 7-axis line meets the Cartesian tolerance");
     var samples = 200;
     var angles:Array<Float> = [];
     var worstJump = 0.0, planTravel = 0.0;
@@ -390,8 +390,8 @@ class ProgramTests extends MotionKitTestSupport {
     var plans = [for (block in compiled.blocks) for (plan in block.plans) plan];
     check(plans.length == 32, 'the circle is planned side by side (${plans.length} plans)');
     for (plan in plans)
-      check(plan.report.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
-        MotionKitNativeConstants.MK_CHECK_PASSED, "the tool follows the circle on the turning workpiece");
+      check(plan.report.checks[TrajectoryCoreConstants.MK_CHECK_TASK_SPACE].status ==
+        TrajectoryCoreConstants.MK_CHECK_PASSED, "the tool follows the circle on the turning workpiece");
     var plan = plans[plans.length - 1];
     var turned = 0.0, railMoved = 0.0, armMoved = 0.0;
     var first = plans[0].evaluate(0.0).positions;
@@ -463,8 +463,8 @@ class ProgramTests extends MotionKitTestSupport {
     check(compiled.blocks.length == 1 && compiled.blocks[0].plans.length == 1,
       "program compiler lowers a joint move to one plan");
     check(compiled.blocks[0].plans[0].report.checks[
-      MotionKitNativeConstants.MK_CHECK_JERK].status ==
-      MotionKitNativeConstants.MK_CHECK_PASSED,
+      TrajectoryCoreConstants.MK_CHECK_JERK].status ==
+      TrajectoryCoreConstants.MK_CHECK_PASSED,
       "Ruckig MoveJ reports jerk checked");
     near(compiled.blocks[0].plans[0].evaluate(
       compiled.blocks[0].plans[0].durationSeconds).positions[0], goal[0],
@@ -501,8 +501,8 @@ class ProgramTests extends MotionKitTestSupport {
       "path event is placed inside the timed path");
     near(Int64.toFloat(pathPlan.events[1].timeNs) * 1e-9,
       pathPlan.durationSeconds, "SetOutput fires at the prior move end", 1e-9);
-    check(pathPlan.report.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
-      MotionKitNativeConstants.MK_CHECK_PASSED,
+    check(pathPlan.report.checks[TrajectoryCoreConstants.MK_CHECK_TASK_SPACE].status ==
+      TrajectoryCoreConstants.MK_CHECK_PASSED,
       "sampled task-space validation is recorded in the plan");
     check(switch pathPlan.guarantees().taskSpace {
       case Sampled(resolutionNs): Int64.compare(resolutionNs, Int64.ofInt(1000000)) <= 0;
@@ -513,8 +513,8 @@ class ProgramTests extends MotionKitTestSupport {
     var line = compiler.compile(new MotionProgram([MotionOp.MoveL(endPose,
       "work", 0.1, Blend.ExactStop)]), start, Int64.ofInt(300));
     check(line.blocks[0].plans[0].report.checks[
-      MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
-      MotionKitNativeConstants.MK_CHECK_PASSED,
+      TrajectoryCoreConstants.MK_CHECK_TASK_SPACE].status ==
+      TrajectoryCoreConstants.MK_CHECK_PASSED,
       "MoveL meets the sampled Cartesian tolerance");
     line.dispose();
     var poseMove = compiler.compile(new MotionProgram([MotionOp.MoveJ(
@@ -600,8 +600,8 @@ class ProgramTests extends MotionKitTestSupport {
       freePath, "work", 0.1, [])]), [0.0, 0.0, 0.0, 0.0, 0.1, 0.0],
       Int64.ofInt(502));
     check(freePlan.blocks[0].plans[0].report.checks[
-      MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
-      MotionKitNativeConstants.MK_CHECK_PASSED,
+      TrajectoryCoreConstants.MK_CHECK_TASK_SPACE].status ==
+      TrajectoryCoreConstants.MK_CHECK_PASSED,
       "FreeAboutTool accepts a free twist about the tool axis");
     freePlan.dispose();
 
@@ -617,13 +617,13 @@ class ProgramTests extends MotionKitTestSupport {
       blended.notes.length == 1 && blended.notes[0].indexOf("tolerance blended") >= 0,
       "planar MoveL corner uses C3 tolerance blending in one timed plan");
     var blendedPlan = blended.blocks[0].plans[0];
-    check(blendedPlan.report.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
-      MotionKitNativeConstants.MK_CHECK_PASSED,
+    check(blendedPlan.report.checks[TrajectoryCoreConstants.MK_CHECK_TASK_SPACE].status ==
+      TrajectoryCoreConstants.MK_CHECK_PASSED,
       "blended Cartesian plan passes authored-corner task-space validation");
-    check(blendedPlan.report.checks[MotionKitNativeConstants.MK_CHECK_JERK].status ==
-      MotionKitNativeConstants.MK_CHECK_UNCHECKED,
+    check(blendedPlan.report.checks[TrajectoryCoreConstants.MK_CHECK_JERK].status ==
+      TrajectoryCoreConstants.MK_CHECK_UNCHECKED,
       "TOPP-RA Cartesian plan reports jerk unchecked");
-    near(blendedPlan.report.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].limit,
+    near(blendedPlan.report.checks[TrajectoryCoreConstants.MK_CHECK_TASK_SPACE].limit,
       0.005, "blended task-space report uses the authored tolerance");
     blended.dispose();
     // A 150 degree authored corner stresses the fillet setback formula.
@@ -635,8 +635,8 @@ class ProgramTests extends MotionKitTestSupport {
           0.05 * Math.sin(turn)), "work", 0.1, Blend.ExactStop)
       ]), [for (_ in 0...6) 0.0], Int64.ofInt(504));
     var shallowCheck = shallow.blocks[0].plans[0].report.checks[
-      MotionKitNativeConstants.MK_CHECK_TASK_SPACE];
-    check(shallowCheck.status == MotionKitNativeConstants.MK_CHECK_PASSED &&
+      TrajectoryCoreConstants.MK_CHECK_TASK_SPACE];
+    check(shallowCheck.status == TrajectoryCoreConstants.MK_CHECK_PASSED &&
       shallowCheck.value <= 0.001 + 1e-9 && shallowCheck.limit == 0.001,
       "150 degree authored corner is checked against its tolerance");
     shallow.dispose();

@@ -1,6 +1,6 @@
 #include "device_compiler6.hpp"
 #include "coupling_terms.hpp"
-#include "motionkit.h"
+#include "trajectory_core.h"
 #include <algorithm>
 #include <bit>
 #include <cmath>

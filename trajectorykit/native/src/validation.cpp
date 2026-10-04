@@ -1,4 +1,4 @@
-#include "motionkit.hpp"
+#include "trajectory_core.hpp"
 
 #include <algorithm>
 #include <array>

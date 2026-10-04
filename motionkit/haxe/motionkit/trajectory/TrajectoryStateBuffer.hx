@@ -1,6 +1,6 @@
 package motionkit.trajectory;
 
-import MotionKitNative;
+import TrajectoryCore;
 #if (target.threaded && !eval)
 import sys.thread.Mutex;
 #end

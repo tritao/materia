@@ -11,7 +11,7 @@ import motionkit.planner.PathPlanningOptions;
 import motionkit.trajectory.Trajectory;
 import motionkit.trajectory.TrajectoryState;
 import motionkit.trajectory.ValidationReport;
-import MotionKitNative;
+import TrajectoryCore;
 import robotkit.world.Robot;
 import robotkit.world.RobotCommand;
 import robotkit.world.RobotSnapshot;
@@ -407,8 +407,8 @@ class MotionSystem {
     lastPathPlanningDiagnostics = result.diagnostics;
     if (result.report != null)
       pathJerkUnchecked.set(result.trajectory,
-        result.report.checks[MotionKitNativeConstants.MK_CHECK_JERK].status ==
-        MotionKitNativeConstants.MK_CHECK_UNCHECKED);
+        result.report.checks[TrajectoryCoreConstants.MK_CHECK_JERK].status ==
+        TrajectoryCoreConstants.MK_CHECK_UNCHECKED);
     return result.trajectory;
   }
 
