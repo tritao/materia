@@ -298,6 +298,7 @@ impl VirtualDevice {
                     if kind == 17 {
                         let command = HomingScope6::decode(payload).unwrap();
                         if command.action == 0 && self.homing_scope.is_none() &&
+                            self.core.as_ref().unwrap().remaining_capacity() == CAPACITY &&
                             self.core.as_ref().unwrap().velocities().iter().all(|v| v.abs() <= 1e-6) {
                             accepted = self.steps.begin_homing_pair(command.first as usize,
                                 command.second as usize, command.skew_bound as f64);
@@ -319,6 +320,7 @@ impl VirtualDevice {
                 let ack = HomingControlAck6 { session: self.session, sequence, scope, accepted: accepted as u8 };
                 let mut bytes = [0; HomingControlAck6::SIZE];
                 ack.encode(&mut bytes).unwrap(); self.emit(19, &bytes);
+                if accepted { self.publish_state(); }
                 true
             }
             3 => {

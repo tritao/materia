@@ -793,6 +793,9 @@ void Rkd6Endpoint::poll_frames(std::uint64_t owner_now_ns) {
                         pending_.clear(); sent_.clear(); sent_events_.clear();
                         chunk_timings_.clear(); plan_tags_.clear();
                         next_commit_ = 0; committed_until_ticks_ = 0; epoch_set_ = false;
+                        // Stop acceptance alone cannot prove stationary feedback.
+                        counter_state_sequence_ = ack.sequence;
+                        counter_state_pending_ = true;
                     }
                     homing_stop_pending_ = false;
                 }

@@ -3043,3 +3043,22 @@ it with an explicitly typed Actuator array and loop. App compilation restarted
 Native 18/18 CTest and Nucleo offline check remain green; no native code changed
 since those checks. App compile, router-device-home execution and remaining
 Phase C suites remain pending. G13 is not complete and G14 is not started.
+
+### Phase C — app compile green; scoped stop fresh-state handoff
+
+App project-source compiler-only build passed (1790 sources). The physical
+router device-homing fixture is running (session 12009, compiling the authored
+project entrypoint at this note). The full MotionKit suite stopped at
+PlanCheckTests.testEncoderSeesStepperSlip: gantryRun submits an ordinary program
+on the now home-equipped gantry before establishing references (status -14).
+That fixture must home before the program; do not weaken reference admission.
+
+Auditing stop readiness found acceptance could precede stationary feedback.
+Rkd6 scoped stop now waits for State6 carrying the accepted control sequence,
+and accepted virtual scope/side controls publish fresh state. Scope admission
+also requires an empty device queue. Native rebuild and focused endpoint,
+virtual endpoint and serial PTY tests passed (3/3). The earlier full 18/18 gate
+passed before this small stop-handshake change.
+
+Router execution and full Phase C suites remain incomplete; G13 is not complete
+and G14 has not started.
