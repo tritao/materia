@@ -3532,3 +3532,11 @@ RobotKit runner initially used the repository root; one existing process-channel
 fixture requires the tests directory. The scratch runner now starts RobotKit
 there, and its suite has reached the remaining scenario checks. The normalized
 MachineKit physical-model sweep is running. No phase completion is claimed.
+
+Full RobotKit passed (5004 assertions). The normalized MachineKit scene now
+passes geometry, physical-model validation, flange ownership and positive
+derived axis limits for screw, belt and rack. It then failed the BOM assertion:
+the fixture queried display designations instead of recipe BOM part numbers.
+The two quantity checks now use the component's actual BOM key, keeping the
+expected one flange and four motors. This final fixture correction awaits
+compilation. Native CTest remains 19/19; router screw rotation remains unresolved.

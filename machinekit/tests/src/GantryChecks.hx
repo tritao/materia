@@ -157,8 +157,8 @@ class GantryChecks {
 			check(limits.requireVelocity() > 0 && limits.requireAcceleration() > 0, "coupled limits are derived from actual motors and moving mass");
 			summaries.push(axis.id + " " + limits.requireVelocity() * 1000 + " mm/s, " + limits.requireAcceleration() + " m/s²");
 		}
-		check(gantry.billOfMaterials().quantity(gantry.component("flange").designation) == 1, "BOM includes the ISO-style tool flange");
-		check(gantry.billOfMaterials().quantity(gantry.component("motorYLeft").designation) == 4, "BOM includes all four motor occurrences");
+		check(gantry.billOfMaterials().quantity(gantry.component("flange").bom.partNumber) == 1, "BOM includes the ISO-style tool flange");
+		check(gantry.billOfMaterials().quantity(gantry.component("motorYLeft").bom.partNumber) == 4, "BOM includes all four motor occurrences");
 		Sys.println('gantry $drive: ${definition.definitions.length} definitions, ${definition.occurrences.length} occurrences; ' + summaries.join("; "));
 	}
 }
