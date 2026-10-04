@@ -1,5 +1,17 @@
 #include "cadkit.h"
 
+#include <BRepBuilderAPI_MakeSolid.hxx>
+#include <BRepBuilderAPI_Sewing.hxx>
+#include <BRepFill.hxx>
+#include <BRepLib.hxx>
+#include <BRepTools_WireExplorer.hxx>
+#include <ElSLib.hxx>
+#include <Geom2dConvert.hxx>
+#include <Geom2d_BSplineCurve.hxx>
+#include <Geom2d_TrimmedCurve.hxx>
+#include <ShapeFix_Shell.hxx>
+#include <TopoDS_Solid.hxx>
+#include <gp_Pln.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRepBuilderAPI_MakePolygon.hxx>
@@ -2134,6 +2146,101 @@ extern "C" CADKIT_API cad_result cad_shape_extrude_operation(
     return make_extrusion_operation(profile, gp_Vec(delta.x, delta.y, delta.z), out_operation);
 }
 
+extern "C" CADKIT_API cad_result cad_sheet_bend_region_operation(
+    cad_shape profile, double thickness, double angle, double allowance, double inner_radius,
+    cad_operation* out_operation) {
+    clear_error();
+    if (out_operation == nullptr) return fail(CAD_ERROR_INVALID_ARGUMENT, "out_operation must not be null");
+    *out_operation = 0;
+    if (!std::isfinite(thickness) || thickness <= 0 || !std::isfinite(angle) ||
+        std::abs(angle) <= 1e-15 || std::abs(angle) >= 2 * std::acos(-1.0) ||
+        !std::isfinite(allowance) || allowance <= 0 || !std::isfinite(inner_radius) || inner_radius <= 0)
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "mapped bend needs positive thickness, allowance and radius and a nonzero angle below a full turn");
+    TopoDS_Shape source;
+    const auto copied = copy_shape(profile, source);
+    if (copied != CAD_OK) return copied;
+    if (source.ShapeType() != TopAbs_FACE)
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "mapped bend profile must be one planar XY face");
+    try {
+        const auto face = TopoDS::Face(source);
+        const BRepAdaptor_Surface adaptor(face);
+        if (adaptor.GetType() != GeomAbs_Plane)
+            return fail(CAD_ERROR_INVALID_ARGUMENT, "mapped bend profile must be planar");
+        const auto plane = adaptor.Plane();
+        if (std::abs(plane.Axis().Direction().Z()) < 1 - 1e-12 || std::abs(plane.Location().Z()) > 1e-8)
+            return fail(CAD_ERROR_INVALID_ARGUMENT, "mapped bend profile must lie on global XY");
+        const bool up = angle > 0;
+        const gp_Ax3 axes(gp_Pnt(0, 0, up ? inner_radius : -thickness - inner_radius),
+                          gp_Dir(0, 1, 0), gp_Dir(0, 0, up ? -1 : 1));
+        const occ::handle<Geom_CylindricalSurface> surfaces[2] = {
+            new Geom_CylindricalSurface(axes, inner_radius),
+            new Geom_CylindricalSurface(axes, inner_radius + thickness)};
+        std::vector<TopoDS_Wire> wires[2];
+        OperationData data;
+        BRepBuilderAPI_Sewing sewing(1e-7);
+        const auto outer = BRepTools::OuterWire(face);
+        std::vector<TopoDS_Wire> source_wires{outer};
+        for (TopExp_Explorer explorer(face, TopAbs_WIRE); explorer.More(); explorer.Next())
+            if (!explorer.Current().IsSame(outer)) source_wires.push_back(TopoDS::Wire(explorer.Current()));
+        for (const auto& wire : source_wires) {
+            BRepBuilderAPI_MakeWire builders[2];
+            for (BRepTools_WireExplorer explorer(wire, face); explorer.More(); explorer.Next()) {
+                const auto edge = explorer.Current();
+                double first = 0, last = 0;
+                auto curve = BRep_Tool::CurveOnSurface(edge, face, first, last);
+                if (curve.IsNull()) return fail(CAD_ERROR_OPERATION_FAILED, "profile boundary has no planar pcurve");
+                auto mapped = Geom2dConvert::CurveToBSplineCurve(new Geom2d_TrimmedCurve(curve, first, last));
+                for (int pole = 1; pole <= mapped->NbPoles(); ++pole) {
+                    const auto uv = mapped->Pole(pole);
+                    const auto point = ElSLib::Value(uv.X(), uv.Y(), plane);
+                    mapped->SetPole(pole, gp_Pnt2d(-angle * point.X() / allowance, point.Y()));
+                }
+                TopoDS_Edge radial_edges[2];
+                for (int skin = 0; skin < 2; ++skin) {
+                    radial_edges[skin] = BRepBuilderAPI_MakeEdge(mapped, surfaces[skin]).Edge();
+                    if (!BRepLib::BuildCurves3d(radial_edges[skin], 1e-8))
+                        return fail(CAD_ERROR_OPERATION_FAILED, "mapped boundary 3D curve could not meet tolerance");
+                    auto oriented = radial_edges[skin]; oriented.Orientation(edge.Orientation());
+                    builders[skin].Add(oriented);
+                }
+                auto side = BRepFill::Face(radial_edges[0], radial_edges[1]);
+                sewing.Add(side); data.generated.push_back({edge, side});
+            }
+            for (int skin = 0; skin < 2; ++skin) {
+                auto mapped_wire = builders[skin].Wire();
+                if (up) mapped_wire.Reverse();
+                wires[skin].push_back(mapped_wire);
+            }
+        }
+        for (int skin = 0; skin < 2; ++skin) {
+            BRepBuilderAPI_MakeFace builder(surfaces[skin], wires[skin][0], true);
+            for (std::size_t hole = 1; hole < wires[skin].size(); ++hole) builder.Add(wires[skin][hole]);
+            auto skin_face = builder.Face();
+            if (skin == 0) skin_face.Reverse();
+            sewing.Add(skin_face); data.generated.push_back({face, skin_face});
+        }
+        sewing.Perform();
+        const auto sewed = sewing.SewedShape();
+        if (sewed.ShapeType() != TopAbs_SHELL)
+            return fail(CAD_ERROR_OPERATION_FAILED, "mapped bend did not sew into one shell");
+        ShapeFix_Shell fixer(TopoDS::Shell(sewed));
+        fixer.FixFaceOrientation(TopoDS::Shell(sewed));
+        auto solid = BRepBuilderAPI_MakeSolid(fixer.Shell()).Solid();
+        if (!BRepLib::OrientClosedSolid(solid) || !BRepCheck_Analyzer(solid).IsValid())
+            return fail(CAD_ERROR_OPERATION_FAILED, "mapped bend produced invalid solid topology");
+        data.result = solid;
+        for (auto& relation : data.generated)
+            if (sewing.IsModifiedSubShape(relation.target)) relation.target = sewing.ModifiedSubShape(relation.target);
+        return insert_operation(std::move(data), out_operation);
+    } catch (const Standard_Failure& error) {
+        return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (const std::bad_alloc& error) {
+        return fail(CAD_ERROR_OUT_OF_MEMORY, error);
+    } catch (const std::exception& error) {
+        return fail(CAD_ERROR_OPERATION_FAILED, error);
+    }
+}
+
 extern "C" CADKIT_API cad_result cad_shape_revolve_operation(
     cad_shape profile,
     cad_vec3 axis_origin,
@@ -2335,6 +2442,16 @@ extern "C" CADKIT_API cad_result cad_shape_volume(
     clear_error();
     return measure_shape(shape, out_volume, [](const TopoDS_Shape& source, GProp_GProps& properties) {
         BRepGProp::VolumeProperties(source, properties);
+    });
+}
+
+extern "C" CADKIT_API cad_result cad_shape_volume_with_tolerance(
+    cad_shape shape, double relative_tolerance, double* out_volume) {
+    clear_error();
+    if (!std::isfinite(relative_tolerance) || relative_tolerance < 1e-12 || relative_tolerance > 1e-3)
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "adaptive volume tolerance must be between 1e-12 and 1e-3");
+    return measure_shape(shape, out_volume, [relative_tolerance](const TopoDS_Shape& source, GProp_GProps& properties) {
+        BRepGProp::VolumeProperties(source, properties, relative_tolerance);
     });
 }
 

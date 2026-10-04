@@ -356,6 +356,16 @@ CADKIT_API cad_result cad_shape_extrude_operation(
     cad_vec3 delta,
     cad_operation* out_operation CADKIT_HXI_OUT CADKIT_HXI_OWNED);
 
+/* Map one exact planar XY developed bend region onto its radial thickness.
+ * Cylinder pcurves remain analytic; 3D edge curves use OCCT's 1e-8 tolerance. */
+CADKIT_API cad_result cad_sheet_bend_region_operation(
+    cad_shape profile,
+    double thickness,
+    double angle,
+    double allowance,
+    double inner_radius,
+    cad_operation* out_operation CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+
 CADKIT_API cad_result cad_shape_revolve_operation(
     cad_shape profile,
     cad_vec3 axis_origin,
@@ -427,6 +437,12 @@ CADKIT_API cad_result cad_shape_area(
 
 CADKIT_API cad_result cad_shape_volume(
     cad_shape shape,
+    double* out_volume CADKIT_HXI_OUT);
+
+/* Adaptive integration for curved trimmed faces; tolerance is relative, in [1e-12, 1e-3]. */
+CADKIT_API cad_result cad_shape_volume_with_tolerance(
+    cad_shape shape,
+    double relative_tolerance,
     double* out_volume CADKIT_HXI_OUT);
 
 /* Volumetric properties for solid shapes; coordinates and measures use kernel units. */

@@ -72,7 +72,8 @@ class Shape {
 		return CadKit.shapeAreaChecked(native.borrow());
 	}
 
-	public function volume():Float {
+	public function volume(?relativeTolerance:Float):Float {
+		if (relativeTolerance != null) return CadKit.shapeVolumeWithToleranceChecked(native.borrow(), relativeTolerance);
 		return CadKit.shapeVolumeChecked(native.borrow());
 	}
 

@@ -141,6 +141,8 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 	extern fn cad_shape_translate_operation(shape: cad_shape, delta: cad_vec3, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_shape_valid(shape: cad_shape, out_valid: ptr<u8> @out) -> cad_result;
 	extern fn cad_shape_volume(shape: cad_shape, out_volume: ptr<f64> @out) -> cad_result;
+	extern fn cad_shape_volume_with_tolerance(shape: cad_shape, relative_tolerance: f64, out_volume: ptr<f64> @out) -> cad_result;
+	extern fn cad_sheet_bend_region_operation(profile: cad_shape, thickness: f64, angle: f64, allowance: f64, inner_radius: f64, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_shell(solid: cad_shape, faces: ptr<const<cad_shape_ref>> @in_array("face_count"), face_count: u32, thickness: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_shell_operation(solid: cad_shape, faces: ptr<const<cad_shape_ref>> @in_array("face_count"), face_count: u32, thickness: f64, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_sphere(radius: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
