@@ -427,6 +427,7 @@ typedef RouterAxisSpec = {
 	var lower:Float;
 	var upper:Float;
 	var initial:Float;
+	@:optional var rackingTolerance:Null<Float>;
 }
 
 /**
@@ -493,7 +494,7 @@ class CncRouter extends AxisBuilder {
 	public final drill = new TwistDrill(5.5, 28, 40);
 	public final specs:Array<RouterAxisSpec> = [
 		{id: "x", lower: 0, upper: 300, initial: 150},
-		{id: "y", lower: 0, upper: 300, initial: 150},
+		{id: "y", lower: 0, upper: 300, initial: 150, rackingTolerance: 0.5},
 		{id: "z", lower: -80, upper: 0, initial: 0}
 	];
 	/** The stepper drivers' supply, as on most desktop routers. */

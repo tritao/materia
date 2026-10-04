@@ -559,7 +559,7 @@ G0 → G1 → G2 → G3 ──────────────────�
 | G5 | complete; full gate passed | `13e993340`; shared axis builder and physical rack regression |
 | G6 | implemented; build/runtime validation deferred at user request | `d11e4dacb` |
 | G7 | implemented; build/runtime validation deferred at user request | `11e9bc82b` |
-| G8 | in progress; leader mapping implemented, tolerance propagation pending | — |
+| G8 | implementation added; runtime and firmware verification deferred | see progress notes |
 | G9 | planned | — |
 | G10 | planned | — |
 | G11 | planned | — |
@@ -1104,13 +1104,37 @@ cycle time or passing clearance result is claimed.
 
 RKD6 already groups actuators by `actuator_joint`. Resolve one-leader chains
 on the host and send the independent leader with the fully composed signed
-ratio and offset, including the wiring direction. A multiple-input coupling
+ratio and joint-coordinate zero. Wiring direction changes the ratio only. A multiple-input coupling
 (such as a CoreXY shaft) keeps its original shaft coordinate, so the native
 compiler still evaluates the coupling sum and cannot form a false skew group.
 No protocol field or version change is required for this mapping decision.
 
 The existing step generator converts actual pulse counts through steps per
 actuator unit and the signed actuator ratio before comparing skew in leader
-units. G8 still needs stated racking tolerance propagation, explicit bound
-units, dual-Y and single-X regressions, and the native/firmware implementation
-review. All builds and test runs remain deferred at the user's request.
+units. Preserve that existing convention: a stated 0.5 mm racking tolerance
+is transmitted as 0.0005 m, rather than raw steps. The assembly stores this
+optional metadata at wire field 8 without changing existing field IDs; the
+bridge converts it to SI and the robot codec/coupled limits retain it. Automatic
+layouts apply the bound only to multiple single-leader drives. Multi-input
+transmissions cannot request RKD6 skew monitoring.
+
+Correct composition follows `actuator = ratio * (joint - offset)` and
+`follower = couplingRatio * leader + couplingOffset`: each chain step changes
+the zero to `(offset - couplingOffset) / couplingRatio`. RKD6's pulse comparison
+has no per-channel zero field, so guarded pairs with different composed zeros
+are rejected explicitly. G12/G13 must extend this when independent homing
+introduces distinct side references.
+
+Prepared Haxe checks cover signed dual-Y grouping, lone-axis bounds, codec
+retention and transmission zeros. A native router-shaped five-joint fixture
+includes both Y shafts and a separate X shaft, checks normal motion and X
+missed-pulse isolation, then injects 1000 missed Y pulses against the assumed
+0.5 mm bound (800 microsteps on a 2 mm lead at 16 microsteps). These checks have
+not been run. Native follower coefficients are authored consistently with
+the physical couplings, as required by the device compiler.
+
+Firmware review: Nucleo remains a stub board with no pulse counter/GPIO step
+implementation; its fault enum supports skew but the board does not yet run
+the step generator. Hardware integration belongs to G13. Firmware compile,
+runtime timing and hardware fault proof remain deferred; no build or test
+was run after the user's stop-testing instruction.

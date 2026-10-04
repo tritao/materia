@@ -3,7 +3,7 @@ package robotkit.device;
 import robotkit.model.Actuator;
 import robotkit.model.RobotModel;
 
-/** One actuator coordinate as a function of a single independent joint. */
+/** Actuator = ratio * (independent joint - offset), in SI coordinates. */
 typedef DeviceTransmissionMapping = {
   var jointIndex:Int;
   var ratio:Float;
@@ -36,7 +36,9 @@ class DeviceTransmission {
       // original shaft coordinate; the native compiler evaluates its coupling sum.
       if (terms.length != 1) return original;
       var term = terms[0];
-      offset += ratio * term.offset;
+      // follower = term.ratio * leader + term.offset; the transmission
+      // stores a joint-coordinate zero, rather than an actuator-coordinate sum.
+      offset = (offset - term.offset) / term.ratio;
       ratio *= term.ratio;
       if (!Math.isFinite(ratio) || ratio == 0 || !Math.isFinite(offset))
         throw 'Device transmission for "${actuator.id}" must be finite and nonzero';

@@ -85,6 +85,7 @@ class RobotModelCodec {
       if (joint.limits.maxAcceleration != null) finite(joint.limits.maxAcceleration, "joint limits.maxAcceleration");
       if (joint.limits.maxAcceleration != null && joint.limits.maxAcceleration < 0.0)
         throw "joint limits.maxAcceleration must be non-negative";
+      nonNegative(joint.limits.rackingTolerance, "joint limits.rackingTolerance");
       finite(joint.limits.overtravel, "joint limits.overtravel");
       if (joint.limits.overtravel < 0.0)
         throw "joint limits.overtravel must be non-negative";
@@ -297,6 +298,7 @@ class RobotModelCodec {
         var mechanical:Dynamic = required(record, "mechanicalLimits");
         joint.mechanicalLimits = new JointLimits(number(mechanical, "lower"), number(mechanical, "upper"),
           nullableNumber(mechanical, "velocity"), nullableNumber(mechanical, "effort"), nullableNumber(mechanical, "maxAcceleration"));
+        if (Reflect.hasField(mechanical, "rackingTolerance")) joint.mechanicalLimits.rackingTolerance = number(mechanical, "rackingTolerance");
         if (Reflect.hasField(mechanical, "overtravel")) joint.mechanicalLimits.overtravel = number(mechanical, "overtravel");
         if (Reflect.hasField(mechanical, "velocityLimiter")) joint.mechanicalLimits.velocityLimiter = text(mechanical, "velocityLimiter");
       }
@@ -304,6 +306,7 @@ class RobotModelCodec {
       if (joint.mechanicalLimits != null) joint.mechanicalLimits.assumptions = readAssumptions(Reflect.field(record, "mechanicalLimits"));
       if (Reflect.hasField(limits, "velocityLimiter")) joint.limits.velocityLimiter = text(limits, "velocityLimiter");
       // Written only when a joint has overtravel.
+      if (Reflect.hasField(limits, "rackingTolerance")) joint.limits.rackingTolerance = number(limits, "rackingTolerance");
       if (Reflect.hasField(limits, "overtravel")) joint.limits.overtravel = number(limits, "overtravel");
       joint.parentFramePosition = vectorField(record, "parentFramePosition", 3);
       joint.parentFrameRotation = vectorField(record, "parentFrameRotation", 4);
@@ -739,6 +742,7 @@ class RobotModelCodec {
       effort: limits.effort, maxAcceleration: limits.maxAcceleration};
     if (limits.assumptions.length > 0) Reflect.setField(result, "assumptions", limits.assumptions.copy());
     if (limits.velocityLimiter != "") Reflect.setField(result, "velocityLimiter", limits.velocityLimiter);
+    if (limits.rackingTolerance > 0.0) Reflect.setField(result, "rackingTolerance", limits.rackingTolerance);
     if (limits.overtravel > 0.0) Reflect.setField(result, "overtravel", limits.overtravel);
     return result;
   }

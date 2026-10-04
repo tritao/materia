@@ -182,6 +182,104 @@ void dual_drive_layout() {
     assert(missed->diagnostic_code() == RK_FAULT_DUAL_DRIVE_SKEW);
 }
 
+void router_leader_skew() {
+    rk_robot_runtime_blueprint blueprint{};
+    blueprint.struct_size = sizeof(blueprint);
+    blueprint.joint_count = 5;
+    // Y, X and three physical motor shaft followers (2 mm lead, 16 microsteps).
+    constexpr double ratio = 3141.592653589793;
+    constexpr double steps_per_radian = 3200.0 / 6.283185307179586;
+    blueprint.coupling_count = 3;
+    blueprint.couplings[0] = {0, 2, -ratio, 0};
+    blueprint.couplings[1] = {0, 3, ratio, 0};
+    blueprint.couplings[2] = {1, 4, ratio, 0};
+    for (std::size_t i = 1; i < 5; ++i) {
+        blueprint.joints[i].lower_limit = -100;
+        blueprint.joints[i].upper_limit = 100;
+        blueprint.joints[i].max_velocity = 100;
+        blueprint.joints[i].max_acceleration = 10000;
+        blueprint.joints[i].limit_flags = RK_LIMIT_VELOCITY | RK_LIMIT_ACCELERATION;
+    }
+    blueprint.owner_period_ns = 10'000'000;
+    blueprint.joints[0].lower_limit = -1;
+    blueprint.joints[0].upper_limit = 1;
+    blueprint.joints[0].max_velocity = (blueprint.joints[0].limit_flags |= RK_LIMIT_VELOCITY, 0.02);
+    blueprint.joints[0].max_acceleration = (blueprint.joints[0].limit_flags |= RK_LIMIT_ACCELERATION, 1);
+    VirtualDeviceConfig6 config;
+    config.controller.fill(7);
+    config.clock_bound_ns = 5'000'000;
+    config.actuators = {{0, -ratio, 0, steps_per_radian, 78, 2, 0.0005},
+                        {0, ratio, 0, steps_per_radian, 78, 2, 0.0005},
+                        {1, ratio, 0, steps_per_radian, 78, 2, 0}};
+    config.actuators[0].id = "gantry.left";
+    config.actuators[1].id = "gantry.right";
+    config.actuators[2].id = "gantry.x";
+    auto endpoint = VirtualDeviceEndpoint::create(blueprint, config);
+    assert(endpoint);
+    rk_robot_state state{};
+    endpoint->sample(0, state);
+    for (std::uint64_t now = 2'000'000; now <= 20'000'000; now += 2'000'000)
+        endpoint->sample(now, state);
+    for (std::uint64_t now = 100'000'000; now <= 120'000'000; now += 2'000'000)
+        endpoint->sample(now, state);
+    robotkit::PlanRequest plan{};
+    plan.plan_id = 50;
+    plan.sequence = 1;
+    plan.ends_at_rest = 1;
+    plan.segments.segments.resize(1);
+    auto &segment = plan.segments.segments[0];
+    segment.duration_ns = 1'000'000'000;
+    segment.degree = 1;
+    segment.joint_count = 5;
+    segment.coefficients[0].value[1] = 0.01;
+    segment.coefficients[1].value[1] = 0.005;
+    segment.coefficients[2].value[1] = -ratio * 0.01;
+    segment.coefficients[3].value[1] = ratio * 0.01;
+    segment.coefficients[4].value[1] = ratio * 0.005;
+    assert(endpoint->submit_device_plan(plan, 0, 120'000'000, 20'000'000,
+        blueprint) == RK_OK);
+    for (std::uint64_t now = 130'000'000; now <= 1'220'000'000; now += 10'000'000)
+        assert(endpoint->sample(now, state) == RK_OK);
+    assert(!state.trajectory_active);
+    assert(state.trajectory_tag == 50);
+    assert(state.trajectory_tag_time_ns >= 1'000'000'000);
+    auto positions = endpoint->actuator_positions();
+    assert(positions.size() == 3);
+    assert(std::abs(positions[0] + ratio * 0.01) <= 1 / steps_per_radian + 1e-4);
+    assert(std::abs(positions[1] - ratio * 0.01) <= 1 / steps_per_radian + 1e-4);
+    assert(std::abs(state.position[0] - 0.01) <= 1e-6);
+    assert(std::abs(state.position[1] - 0.005) <= 1e-6);
+
+    // Losing X pulses cannot trigger a dual-drive fault: it has no peer.
+    auto single = VirtualDeviceEndpoint::create(blueprint, config);
+    assert(single);
+    single->sample(0, state);
+    for (std::uint64_t now = 2'000'000; now <= 120'000'000; now += 2'000'000)
+        single->sample(now, state);
+    assert(single->submit_device_plan(plan, 0, 120'000'000, 20'000'000, blueprint) == RK_OK);
+    assert(single->miss_next_steps(2, 1000));
+    for (std::uint64_t now = 130'000'000; now <= 410'000'000; now += 10'000'000)
+        assert(single->sample(now, state) == RK_OK);
+    assert(state.safety == RK_SAFETY_READY);
+
+    auto missed = VirtualDeviceEndpoint::create(blueprint, config);
+    assert(missed);
+    missed->sample(0, state);
+    for (std::uint64_t now = 2'000'000; now <= 20'000'000; now += 2'000'000)
+        missed->sample(now, state);
+    for (std::uint64_t now = 100'000'000; now <= 120'000'000; now += 2'000'000)
+        missed->sample(now, state);
+    assert(missed->submit_device_plan(plan, 0, 120'000'000, 20'000'000,
+        blueprint) == RK_OK);
+    for (std::uint64_t now = 130'000'000; now <= 320'000'000; now += 10'000'000)
+        assert(missed->sample(now, state) == RK_OK);
+    assert(missed->miss_next_steps(1, 1000));
+    for (std::uint64_t now = 330'000'000; now <= 410'000'000; now += 10'000'000)
+        assert(missed->sample(now, state) == RK_OK);
+    assert(state.safety == RK_SAFETY_FAULT);
+    assert(missed->diagnostic_code() == RK_FAULT_DUAL_DRIVE_SKEW);
+}
+
 void motor_feedback_reconstructs_leaders() {
     rk_robot_runtime_blueprint blueprint{};
     blueprint.struct_size = sizeof(blueprint);
@@ -733,6 +831,7 @@ void runtime_hold_rest_resume_fires_final_event() {
 int main() {
     motor_feedback_reconstructs_leaders();
     dual_drive_layout();
+    router_leader_skew();
     lead_screw_carriage_coupling();
     minimal_midstream_replacement();
     const auto ordinary_events = run_event_pair(false, false);

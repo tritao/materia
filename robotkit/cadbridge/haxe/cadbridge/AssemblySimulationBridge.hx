@@ -295,6 +295,7 @@ class AssemblySimulationBridge {
       if (edge.limits.assumptions != null) joint.limits.assumptions = [for (value in edge.limits.assumptions)
         {quantity: value.quantity, label: value.label}];
       if (edge.limits.acceleration != null) joint.limits.maxAcceleration = edge.limits.acceleration * factor;
+      joint.limits.rackingTolerance = edge.limits.rackingTolerance == null ? 0.0 : edge.limits.rackingTolerance * factor;
       joint.limits.overtravel = edge.limits.overtravel != null ? edge.limits.overtravel * factor :
         edge.type == AssemblyJointType.Prismatic ? DEFAULT_PRISMATIC_OVERTRAVEL : DEFAULT_ROTARY_OVERTRAVEL;
     }

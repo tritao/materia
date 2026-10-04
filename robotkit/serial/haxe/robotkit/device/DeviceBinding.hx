@@ -80,6 +80,8 @@ class DeviceBinding {
       if (actuator.fullStepsPerRevolution <= 0.0)
         throw 'Actuator "$name" on channel $position is not a stepper: the model gives it no full steps per revolution';
       var mapping = DeviceTransmission.of(robot, actuator);
+      if (!mapping.singleLeader && channel.skewBound > 0)
+        throw "RKD6 cannot guard skew on a multiple-input transmission";
       var jointIndex = mapping.jointIndex;
       var ratio = mapping.ratio;
       var offset = mapping.offset;
@@ -91,7 +93,7 @@ class DeviceBinding {
       var ceiling = pulseRate / stepsPerUnit;
       var motorRate = actuator.planningRate();
       var rate = motorRate == null ? ceiling : Math.min(motorRate, ceiling);
-      bound.push(new BoundChannel(position, name, jointIndex, ratio * channel.direction, offset * channel.direction,
+      bound.push(new BoundChannel(position, name, jointIndex, ratio * channel.direction, offset,
         stepsPerUnit, rate, channel.directionSetupTicks, channel.skewBound));
       var capped = find(tightened, name);
       if (capped != null) {
@@ -103,6 +105,14 @@ class DeviceBinding {
     for (actuator in robot.actuators)
       if (actuator.fullStepsPerRevolution > 0.0 && !wired.exists(actuator.id))
         throw 'Stepper actuator "${actuator.id}" has no channel in the device layout';
+    // RKD6 skew comparison normalizes pulse counts by ratio, but carries no
+    // coordinate zeros. Equal zeros cancel; distinct zeros need a wire extension.
+    for (first in 0...bound.length) for (second in first + 1...bound.length) {
+      var a = bound[first], b = bound[second];
+      if (a.jointIndex == b.jointIndex && (a.skewBound > 0 || b.skewBound > 0) &&
+          Math.abs(a.offset - b.offset) > 1e-12)
+        throw "RKD6 skew groups require equal leader-coordinate offsets";
+    }
     tightened.materializeLimits();
     return new DeviceBinding(bound, tightened, stepTickHz);
   }

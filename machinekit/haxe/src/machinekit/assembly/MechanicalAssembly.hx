@@ -106,7 +106,7 @@ class MechanicalAssembly {
 			axis: {x: joint.axis.x, y: joint.axis.y, z: joint.axis.z},
 			limits: {lower: joint.limits.lower, upper: joint.limits.upper,
 				velocity: joint.limits.velocity, effort: joint.limits.effort, overtravel: joint.limits.overtravel,
-				acceleration: joint.limits.acceleration},
+				acceleration: joint.limits.acceleration, rackingTolerance: joint.limits.rackingTolerance},
 			defaultValue: joint.defaultValue};
 		if (joint.limits.assumptions != null && joint.limits.assumptions.length > 0)
 			copy.limits.assumptions = [for (value in joint.limits.assumptions)

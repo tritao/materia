@@ -390,6 +390,7 @@ class AssemblyDefinitionCodec {
 			if (limit != null && !Math.isFinite(limit)) return false;
 		if (limits.lower != null && limits.upper != null && limits.lower > limits.upper) return false;
 		if ((limits.velocity != null && limits.velocity < 0) || (limits.effort != null && limits.effort < 0)) return false;
+		if (limits.rackingTolerance != null && (!Math.isFinite(limits.rackingTolerance) || limits.rackingTolerance <= 0)) return false;
 		if (limits.overtravel != null && (!Math.isFinite(limits.overtravel) || limits.overtravel < 0)) return false;
 		if (limits.acceleration != null && (!Math.isFinite(limits.acceleration) || limits.acceleration < 0)) return false;
 		return withinLimits(limits, value);

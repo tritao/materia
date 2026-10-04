@@ -17,6 +17,8 @@ class JointLimits {
    * limit. Commands stay within the limits; the runtime faults only past this.
    */
   public var overtravel:Float = 0.0;
+  /** Permitted dual-drive disagreement in SI joint units; zero means unstated. */
+  public var rackingTolerance:Float = 0.0;
 
   public function new(?lower:Float = 0.0, ?upper:Float = 0.0,
       ?velocity:Float, ?effort:Float,
@@ -32,6 +34,7 @@ class JointLimits {
     var result = new JointLimits(lower, upper, velocity, effort, maxAcceleration);
     result.assumptions = [for (value in assumptions) {quantity: value.quantity, label: value.label}];
     result.overtravel = overtravel;
+    result.rackingTolerance = rackingTolerance;
     result.velocityLimiter = velocityLimiter;
     return result;
   }
@@ -61,6 +64,8 @@ class JointLimits {
     if (effort != null && (!Math.isFinite(effort) || effort < 0.0)) return "effort limit must be non-negative";
     if (maxAcceleration != null && (!Math.isFinite(maxAcceleration) || maxAcceleration < 0.0))
       return "maximum acceleration must be finite and non-negative";
+    if (!Math.isFinite(rackingTolerance) || rackingTolerance < 0.0)
+      return "racking tolerance must be finite and non-negative";
     if (!Math.isFinite(overtravel) || overtravel < 0.0)
       return "overtravel must be finite and non-negative";
     return null;

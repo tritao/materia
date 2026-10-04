@@ -17,10 +17,27 @@ class DeviceLayout {
 
   public static inline final VERSION:Int = 1;
 
-  /** One channel per model actuator, in order. Driver settings belong to the model. */
-  public static function forActuators(model:RobotModel, directionSetupTicks:Int = 0):DeviceLayout
-    return new DeviceLayout([for (index in 0...model.actuators.length)
-      new DeviceChannel(index, model.actuators[index].id, 1, directionSetupTicks)]);
+  /** One channel per actuator; dual drives inherit their leader's stated racking tolerance. */
+  public static function forActuators(model:RobotModel, directionSetupTicks:Int = 0):DeviceLayout {
+    if (model == null) throw "Device layout requires a model";
+    var mappings = [for (actuator in model.actuators) DeviceTransmission.of(model, actuator)];
+    var channels:Array<DeviceChannel> = [];
+    for (index in 0...model.actuators.length) {
+      var mapping = mappings[index];
+      var peers = 0;
+      if (mapping.singleLeader) for (candidate in mappings)
+        if (candidate.singleLeader && candidate.jointIndex == mapping.jointIndex) peers++;
+      var bound = 0.0;
+      if (peers > 1) {
+        var leader = model.joints[mapping.jointIndex];
+        var limits = leader.mechanicalLimits == null ? leader.limits : leader.mechanicalLimits;
+        bound = limits.rackingTolerance;
+        if (!Math.isFinite(bound) || bound < 0) throw "Device racking tolerance must be finite and non-negative";
+      }
+      channels.push(new DeviceChannel(index, model.actuators[index].id, 1, directionSetupTicks, bound));
+    }
+    return new DeviceLayout(channels);
+  }
 
   public static function encode(layout:DeviceLayout):Bytes {
     var bytes = Bytes.ofString(Json.stringify({schemaVersion: VERSION, channels: [for (channel in layout.channels)

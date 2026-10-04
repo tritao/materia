@@ -40,7 +40,7 @@ class Gantry extends AxisBuilder {
 		super();
 		this.spec = spec;
 		axes = [{id: "x", lower: 0.0, upper: spec.travelX, initial: 0.0},
-			{id: "y", lower: 0.0, upper: spec.travelY, initial: 0.0},
+			{id: "y", lower: 0.0, upper: spec.travelY, initial: 0.0, rackingTolerance: spec.dualY ? spec.racking : null},
 			{id: "z", lower: 0.0, upper: spec.travelZ, initial: 0.0}];
 		var frame = TSlotExtrusion.forProfile(spec.frameProfile);
 		var beam = TSlotExtrusion.forProfile(spec.beamProfile);

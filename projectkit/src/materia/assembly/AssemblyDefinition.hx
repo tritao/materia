@@ -68,6 +68,8 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(5) @:optional var overtravel:Null<Float>;
 	/** Largest acceleration the joint's drive can give, in the joint's units per second squared. */
 	@:id(6) @:optional var acceleration:Null<Float>;
+	/** Permitted dual-drive displacement disagreement, in the joint coordinate units. */
+	@:id(8) @:optional var rackingTolerance:Null<Float>;
 	@:id(7) @:optional var assumptions:Null<ReadOnlyArray<QuantityAssumption>>;
 }
 

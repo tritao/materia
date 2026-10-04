@@ -94,6 +94,7 @@ class RobotModel {
     var limits = new JointLimits(own.lower, own.upper, own.velocity, own.effort, own.maxAcceleration);
     limits.assumptions = [for (value in own.assumptions) {quantity: value.quantity, label: value.label}];
     limits.overtravel = own.overtravel;
+    limits.rackingTolerance = own.rackingTolerance;
     limits.velocityLimiter = own.velocityLimiter;
     function tighten(current:Null<Float>, bound:Null<Float>):Null<Float>
       return bound == null ? current : current == null ? bound : Math.min(current, bound);

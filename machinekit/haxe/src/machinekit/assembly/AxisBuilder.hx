@@ -17,7 +17,7 @@ import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 /** Travel and initial coordinate of a linear joint, in assembly units. */
-typedef AxisSpec = {id:String, lower:Float, upper:Float, initial:Float};
+typedef AxisSpec = {id:String, lower:Float, upper:Float, initial:Float, @:optional rackingTolerance:Null<Float>};
 
 /** One linear leader contributing to a belt pulley's shaft angle. */
 typedef BeltAxisMotion = {id:String, leader:String, initial:Float, rotation:Int, idler:Bool};
@@ -103,7 +103,8 @@ class AxisBuilder extends MachineAssembly {
 		zeroPoses.set(id, pose);
 		connect(parent, id);
 		addMateOnAxis(spec.id, "prismatic", parent, 'to-$id', id, 'attach-$id', axis, spec.initial,
-			{lower: spec.lower, upper: spec.upper, velocity: null, effort: null, overtravel: room});
+			{lower: spec.lower, upper: spec.upper, velocity: null, effort: null, overtravel: room, rackingTolerance: spec.rackingTolerance,
+				assumptions: spec.rackingTolerance == null ? null : [{quantity: "racking tolerance", label: "stated axis design assumption"}]});
 	}
 
 	/**
