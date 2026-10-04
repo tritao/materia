@@ -178,6 +178,13 @@ rk_result RK_CALL rk_robot_runtime_calibrate_coordinates(rk_robot_runtime runtim
     return value ? value->calibrate_coordinates(offsets, count) : RK_ERROR_INVALID_HANDLE;
 }
 
+rk_result RK_CALL rk_robot_runtime_calibrate_home(rk_robot_runtime runtime,
+    const double *offsets, uint32_t count, const uint32_t *reference_joints, uint32_t reference_count) {
+    const auto value = robotkit::internal::resolve_runtime(runtime);
+    return value ? value->calibrate_coordinates(offsets, count, reference_joints, reference_count)
+                 : RK_ERROR_INVALID_HANDLE;
+}
+
 rk_result RK_CALL rk_robot_runtime_limit_input(rk_robot_runtime runtime, uint32_t joint, uint32_t active) {
     if (active > 1) return RK_ERROR_INVALID_ARGUMENT;
     const auto value = robotkit::internal::resolve_runtime(runtime);

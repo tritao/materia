@@ -1581,3 +1581,19 @@ snapshots remain logical.
 Regenerate FFI bindings from the C header; no manual generated edits. The
 actual homing latch transaction, monitor reset and motion driver remain
 pending. No tests or project builds ran, and behavior is unverified.
+
+
+### G11 — atomic calibration and reference admission
+
+Calibration exposure: `2ed56edfa`. API 28 adds calibrate_home: install a full
+coupling-consistent coordinate-zero array and latch the explicitly completed
+home joints in the same native transaction. Reject unknown, duplicate or
+non-required reference indices before any coordinate mutation. Existing
+at-rest, mailbox, queue, safety and finite-value checks apply to the whole
+operation; failures leave both zeros and admission state unchanged. Empty
+reference lists permit intermediate side captures without prematurely admitting
+a multi-switch joint. RuntimeEndpoint exposes this operation for the driver.
+
+Regenerate bindings from the header. Haxe reference-state proposals and monitor
+reset still need to invoke it. Device queues remain unsupported until G13
+calibration transport. No tests or project builds ran.

@@ -522,11 +522,19 @@ rk_result RobotRuntime::submit_segments(const rk_robot_command &command, Segment
     }
 }
 
-rk_result RobotRuntime::calibrate_coordinates(const double *offsets, uint32_t count) {
-    if (!offsets || count != blueprint_.joint_count) return RK_ERROR_INVALID_ARGUMENT;
+rk_result RobotRuntime::calibrate_coordinates(const double *offsets, uint32_t count,
+                                             const uint32_t *reference_joints, uint32_t reference_count) {
+    if (!offsets || count != blueprint_.joint_count || reference_count > count ||
+        (reference_count != 0 && !reference_joints)) return RK_ERROR_INVALID_ARGUMENT;
     std::lock_guard owner_lock(owner_mutex_);
     std::lock_guard queue_lock(queue_mutex_);
     std::lock_guard state_lock(state_mutex_);
+    for (uint32_t i = 0; i < reference_count; ++i) {
+        if (reference_joints[i] >= count || !reference_required_[reference_joints[i]])
+            return RK_ERROR_INVALID_ARGUMENT;
+        for (uint32_t j = 0; j < i; ++j)
+            if (reference_joints[j] == reference_joints[i]) return RK_ERROR_INVALID_ARGUMENT;
+    }
     if (endpoint_->executes_trajectory_queue()) return RK_ERROR_UNSUPPORTED;
     if (state_.safety == RK_SAFETY_FAULT || state_.safety == RK_SAFETY_EMERGENCY_STOP)
         return RK_ERROR_SAFETY_STOPPED;
@@ -564,6 +572,8 @@ rk_result RobotRuntime::calibrate_coordinates(const double *offsets, uint32_t co
         if (control_.active[joint]) control_.targets[joint].target += delta;
         coordinate_offsets_[joint] = offsets[joint];
     }
+    for (uint32_t i = 0; i < reference_count; ++i)
+        reference_latched_[reference_joints[i]] = true;
     state_backup_valid_ = false;
     return RK_OK;
 }

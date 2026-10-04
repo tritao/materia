@@ -335,6 +335,10 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 */
 	extern fn rk_robot_runtime_calibrate_coordinates(runtime: rk_robot_runtime, offsets: ptr<const<f64>> @in_array("count"), count: u32) -> rk_result;
 	/**
+	 * Install coordinate zeros and admit completely homed joints in the same at-rest transaction.
+	 */
+	extern fn rk_robot_runtime_calibrate_home(runtime: rk_robot_runtime, offsets: ptr<const<f64>> @in_array("count"), count: u32, reference_joints: ptr<const<u32>> @in_array("reference_count"), reference_count: u32) -> rk_result;
+	/**
 	 * Copies the endpoint's static control capabilities.
 	 *
 	 * Capabilities describe what the endpoint can accept; they do not imply that

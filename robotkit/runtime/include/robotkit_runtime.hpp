@@ -212,7 +212,8 @@ public:
     rk_result require_reference(uint32_t joint, bool required);
     rk_result limit_input(uint32_t joint, bool active);
     /** Atomically establish logical = endpoint position + offset at rest. */
-    rk_result calibrate_coordinates(const double *offsets, uint32_t count);
+    rk_result calibrate_coordinates(const double *offsets, uint32_t count,
+        const uint32_t *reference_joints = nullptr, uint32_t reference_count = 0);
     rk_result latch_reference(uint32_t joint);
     rk_result reference_status(uint32_t joint, uint32_t &out_referenced) const;
     /** Copies the latest robot state without advancing endpoint time. */
