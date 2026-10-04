@@ -1631,3 +1631,24 @@ coordinates. Use separate mandatory position and edge translation callbacks.
 Applying the same translation to both would double-apply the zero to one source.
 No driver constructor calls existed to migrate. Homing motion, encoder/slip
 monitor resets and application startup remain pending. No tests or builds ran.
+
+
+### G11 — concrete runtime homing motion driver
+
+Reset/coordinate corrections: `9a0532072`. RuntimeHomingDriver implements
+HomingDriver with bounded, explicitly Homing-classified plans. Clone logical
+axis mappings with authored physical overtravel bounds for homed coordinates;
+retain follower scales/offsets. Seek/backoff/approach choose the endpoint in
+the requested direction and use drive-derived speed/acceleration. Generate
+coupling-consistent jerk-limited plans through AxisPlanner, anchor them on
+runtime held setpoints and submit immutable full polynomial payloads. Native
+controlled stop interrupts those paths at a switch observation. Return uses
+the authored home coordinate through the same homing admission category.
+
+Latch calls the atomic runtime operation, then a required caller-owned monitor
+reset callback. RuntimeHomingObserver supplies logical joint observations and
+physical captured edges without double translation. Reject missing physical
+mappings or primary coordinates not expressed directly in SI. HomingAxis now
+retains physical travel bounds. MotionSystem/home startup and actual monitor
+ownership must still connect this driver; simulation power-up offsets and G12
+independent side control remain pending. No tests or builds ran.

@@ -15,6 +15,8 @@ class HomingAxis {
   public final home:Float;
   public final positionTolerance:Float;
   public final timestep:Float;
+  public final lowerTravel:Float;
+  public final upperTravel:Float;
 
   public function new(id:String, joint:Int, switches:Array<JointSwitch>, velocity:Float,
       acceleration:Float, lower:Float, upper:Float, overtravel:Float, home:Float, timestep:Float) {
@@ -28,6 +30,7 @@ class HomingAxis {
     this.acceleration = acceleration; this.home = home;
     if (switches[0] == null) throw "Homing has a null home switch";
     this.timestep = timestep;
+    lowerTravel = lower - overtravel; upperTravel = upper + overtravel;
     var side = switches[0].side;
     var margin = overtravel, release = 0.0, precision = Math.POSITIVE_INFINITY;
     for (contact in switches) {

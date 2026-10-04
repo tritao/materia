@@ -58,4 +58,5 @@ class MotionAxis {
   }
 
   public function jointScale(index:Int):Float return jointScales[index];
+  public function jointOffset(index:Int):Float return jointOffsets[index];
 }
