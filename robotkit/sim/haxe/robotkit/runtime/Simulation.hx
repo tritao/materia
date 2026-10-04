@@ -29,6 +29,7 @@ private typedef StepObserverEntry = {id:Int, observer:SimulationStepObserver};
 class Simulation {
   final owner:Ownedrk_simulation;
   final robots:Array<RobotRuntime> = [];
+  final robotBlueprints:Array<RobotRuntimeBlueprint> = [];
   final stepObservers:Array<StepObserverEntry> = [];
   final switchObservers:Map<Int, SimulatedSwitchSensorAdapter> = new Map();
   final powerUpOffsets:Map<Int, Array<Float>> = new Map();
@@ -444,6 +445,7 @@ class Simulation {
     runtime = RobotRuntime.create(blueprint, endpoint,
       virtualDevice == null ? "robotkit.simulation" : "unspecified");
     robots.push(runtime);
+    robotBlueprints.push(blueprint);
     // Native simulation samples actual physics coordinates, including applied slip.
     // Virtual-device inputs are supplied by the device protocol rather than host synthesis.
     if (virtualDevice == null && blueprint.switches.length > 0) {
@@ -614,6 +616,13 @@ class Simulation {
     if (!Math.isFinite(position)) throw "Squaring hold requires a finite physical shaft position";
     check(RobotKitSimKit.rk_simulation_set_squaring_hold(owner.borrow(), robotIndex, joint,
       active ? 1 : 0, position), "simulation.setSquaringHold");
+  }
+
+  /** Create a side controller tied to the runtime owned at this robot index. */
+  public function homingSides(robotIndex:Int):HomingSideControl {
+    ensureLive();
+    if (robotIndex < 0 || robotIndex >= robots.length) throw "Unknown homing robot index";
+    return new SimulatedHomingSides(this, robotIndex, robots[robotIndex], robotBlueprints[robotIndex]);
   }
 
   /** Teleports one robot base while leaving the shared clock untouched. The
@@ -913,6 +922,7 @@ class Simulation {
     powerUpOffsets.clear();
     for (runtime in robots) runtime.dispose();
     robots.resize(0);
+    robotBlueprints.resize(0);
     owner.close();
     disposed = true;
   }

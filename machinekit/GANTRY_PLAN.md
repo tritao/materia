@@ -1872,3 +1872,17 @@ unchanged.
 No project build or test ran. Controller wiring, release on exit paths,
 independent calibration, squaring-only skew relaxation and physical coupling
 behavior remain pending/unverified.
+
+### G12 — simulation side-control adapter
+
+Hold API: `3b9397949`. Add method-only HomingSideControl and a simulation
+adapter resolving explicit home-switch drive bindings. Simulation.homingSides
+uses the blueprint and runtime retained at the same robot index, preventing
+caller-supplied identity mismatches. Hold a shaft at its current physical
+snapshot coordinate; repeated holds on the same shaft are idempotent. Release
+attempts every held shaft, retains failed releases for retry and reports the
+first failure. Successful releases preserve native follower displacement.
+
+HomingCycle and application owners still need to use this capability; reset
+reconciliation, independent motor calibration and skew relaxation remain.
+No tests or builds ran; the adapter is uncompiled and behavior unverified.
