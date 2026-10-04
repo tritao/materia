@@ -30,6 +30,7 @@ class Simulation {
   final owner:Ownedrk_simulation;
   final robots:Array<RobotRuntime> = [];
   final stepObservers:Array<StepObserverEntry> = [];
+  final switchObservers:Map<Int, SimulatedSwitchSensorAdapter> = new Map();
   var nextStepObserverId = 1;
   public final fixedTimestepSeconds:Float;
   /** The session this simulation joined. */
@@ -449,6 +450,7 @@ class Simulation {
       var switches = new SimulatedSwitchSensorAdapter(blueprint, observedRuntime,
         () -> observedRuntime.physicalPositions(), "robotkit.simulation");
       addStepObserver(switches);
+      switchObservers.set(robots.length - 1, switches);
     }
     return runtime;
   }
@@ -577,6 +579,8 @@ class Simulation {
     check(RobotKitSimKit.rk_simulation_reset_robot(owner.borrow(), robotIndex),
       "simulation.resetRobot");
     robots[robotIndex].afterNativeReset();
+    var switches = switchObservers.get(robotIndex);
+    if (switches != null) switches.reset();
   }
 
   /**
@@ -883,6 +887,7 @@ class Simulation {
     if (disposed) return;
     session.removeStepObserver(sessionObserverId);
     stepObservers.resize(0);
+    switchObservers.clear();
     for (runtime in robots) runtime.dispose();
     robots.resize(0);
     owner.close();

@@ -43,6 +43,12 @@ class SimulatedSwitchSensorAdapter implements SimulationStepObserver {
     return indices;
   }
 
+  /** Reset mechanical history and deterministic repeatability after a robot power cycle.
+   * Publication sequence stays monotonic for existing sensor stream consumers. */
+  public function reset():Void {
+    for (i in 0...readings.length) readings[i] = new SwitchReading(readings[i].source);
+  }
+
   public function reading(id:String):SwitchReading {
     for (value in readings) if (value.source.id == id) return value;
     throw 'Unknown simulated switch "$id"';

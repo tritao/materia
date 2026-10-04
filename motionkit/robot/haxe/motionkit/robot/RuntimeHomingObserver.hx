@@ -8,18 +8,20 @@ import motionkit.robot.HomingDriver.HomingSwitchObservation;
 import RobotKitRuntime;
 
 /** Reads homing observations from the same immutable snapshot as the robot's joint state.
- * The translation callback establishes counter coordinates before latch and logical
- * coordinates afterward. It must apply the same translation to source positions
- * and captured edges; velocities remain unchanged. */
+ * Position snapshots use runtime logical coordinates, while switch captures use
+ * physical endpoint coordinates. Explicit translations handle those two source
+ * domains separately; velocities remain unchanged. */
 class RuntimeHomingObserver {
   final robot:Robot;
   final axes:Map<Int, HomingAxis> = new Map();
-  final translate:Int -> Float -> Float;
+  final translatePosition:Int -> Float -> Float;
+  final translateEdge:Int -> Float -> Float;
 
-  public function new(robot:Robot, axes:Array<HomingAxis>, translate:Int -> Float -> Float) {
-    if (robot == null || axes == null || axes.length == 0 || translate == null)
+  public function new(robot:Robot, axes:Array<HomingAxis>, translatePosition:Int -> Float -> Float,
+      translateEdge:Int -> Float -> Float) {
+    if (robot == null || axes == null || axes.length == 0 || translatePosition == null || translateEdge == null)
       throw "Runtime homing observation requires robot, axes and coordinate translation";
-    this.robot = robot; this.translate = translate;
+    this.robot = robot; this.translatePosition = translatePosition; this.translateEdge = translateEdge;
     var ids = new Map<String, Bool>();
     for (axis in axes) {
       if (axis == null || this.axes.exists(axis.joint)) throw "Duplicate or null homing axis";
@@ -53,13 +55,13 @@ class RuntimeHomingObserver {
         throw 'Homing switch "${contact.id}" has no matching mounted frame';
       var reading = new JointSwitchFrame(frame);
       var edge = reading.closingEdgePosition;
-      var translatedEdge:Null<Float> = edge == null ? null : translate(joint, edge);
+      var translatedEdge:Null<Float> = edge == null ? null : translateEdge(joint, edge);
       // A digital-only source has no edge identity; it uses sampled-position budgets.
       var count:Null<Int> = frame.values.length == 4 ? reading.closingEdges : null;
       signals.push(new HomingSwitchObservation(contact.id, reading.active,
         frame.sequence, frame.sourceTimestampNs, frame.sourceClockId, translatedEdge, count));
     }
-    return new HomingObservation(translate(joint, snapshot.positions.get(joint)),
+    return new HomingObservation(translatePosition(joint, snapshot.positions.get(joint)),
       snapshot.velocities.get(joint), signals, snapshot.sourceTimestampNs, snapshot.sourceClockId);
   }
 }

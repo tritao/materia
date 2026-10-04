@@ -1614,3 +1614,20 @@ and clears old external frames, preventing reuse of pre-reset switch data or
 host-side references. Mechanical switch-reader reset/reseed and monitor reset
 at latch still need integration, as do homing commands and startup. No tests
 or project builds ran; latch behavior is unverified.
+
+
+### G11 — reset mechanical switch history and distinguish capture coordinates
+
+Haxe latch transaction: `c23a126da`. Simulation retains each installed switch
+observer by robot index and reseeds its SwitchReadings after robot reset.
+Closing/release history and captures restart from the authored deterministic
+seed; publication sequence remains monotonic for existing sensor consumers.
+Native reset also discards old limit-input state; the next physics sample
+republishes the restored physical state. Disposal clears observer ownership.
+
+Correct RuntimeHomingObserver's conversion contract: runtime positions are
+logical after calibration, while physical switch captures remain in endpoint
+coordinates. Use separate mandatory position and edge translation callbacks.
+Applying the same translation to both would double-apply the zero to one source.
+No driver constructor calls existed to migrate. Homing motion, encoder/slip
+monitor resets and application startup remain pending. No tests or builds ran.

@@ -2328,6 +2328,7 @@ void RobotRuntime::reset_state() noexcept {
     control_ = {};
     coordinate_offsets_.fill(0.0);
     reference_latched_.fill(false);
+    limit_inputs_.fill(false);
     // A robot reset to its start has every output at its safe value again.
     for (uint32_t i = 0; i < blueprint_.channel_count && i < RK_MAX_PROCESS_CHANNELS; ++i)
         channel_outputs_[i] = blueprint_.channels[i].safe_value;
