@@ -1,0 +1,17 @@
+{
+	"format": "materia.project",
+	"version": 1,
+	"name": "Robot welder, 10 mm three-pass seam",
+	"defaultEntrypoint": "cell",
+	"build": {
+		"system": "haxeon",
+		"manifest": "haxeon.json"
+	},
+	"entrypoints": {
+		"cell": {
+			"kind": "cad-preview",
+			"module": "RobotWelderPreview",
+			"function": "multipassCell"
+		}
+	}
+}

@@ -13,6 +13,19 @@ typedef RecipeWire = {
 	var maxSpeedMPerMin:Float;
 }
 
+/** A pass's settings and tip offset along the CAD face normals, in millimetres. */
+typedef WeldingPassRecipe = {
+	var name:String;
+	var recipe:WeldingRecipe;
+	var faceA:Float;
+	var faceB:Float;
+	var weaveAmplitude:Float;
+	/** Cycles per millimetre of seam progress. */
+	var weaveFrequency:Float;
+	var edgeDwell:Float;
+	var interpassDwell:Float;
+}
+
 /**
  * How a weld is run, derived from the seam and the wire: the settings of a MIG fillet in solid steel wire that lay a leg
  * of the size the weldment asks for. Nothing in it is a seam's geometry; that comes from the CAD (`WeldSeam`). The
@@ -62,7 +75,7 @@ class WeldingRecipe {
 
 	/** The recipe for a fillet of `leg` millimetres in `wire`. */
 	public static function fillet(leg:Float, wire:RecipeWire):WeldingRecipe {
-		if (!(leg >= 2 && leg <= 12)) throw 'A single-pass fillet recipe covers legs of 2 to 12 mm, not $leg';
+		if (!(leg >= 2 && leg <= 8)) throw 'A single-pass fillet recipe covers legs of 2 to 8 mm, not $leg';
 		if (wire == null || !(wire.diameterMm > 0) || !(wire.depositionEfficiency > 0 && wire.depositionEfficiency <= 1) || !(wire.maxSpeedMPerMin > 0))
 			throw "A recipe needs the wire: its diameter, deposition efficiency and the feeder's top speed";
 		var speed = Math.min(16.0, Math.max(3.0, 1.5 * leg + 0.5));
@@ -73,6 +86,62 @@ class WeldingRecipe {
 		var feed = speed * 1000.0 / 60.0;
 		var area = leg * leg / 2.0;
 		return new WeldingRecipe(speed, voltage, feed * wireArea * wire.depositionEfficiency / area, leg, 0.15, 0.15, 0.1, 40);
+	}
+
+	/** Equal-leg fillet area is conserved across root, fill and cap; offsets target the previous bead's surface. */
+	public static function passes(leg:Float, wire:RecipeWire, interpassDwell:Float = 0):Array<WeldingPassRecipe> {
+		if (!(leg >= 2 && leg <= 12)) throw 'A fillet recipe covers legs of 2 to 12 mm, not $leg';
+		if (!(interpassDwell >= 0 && interpassDwell <= 10)) throw "Interpass dwell must be between 0 and 10 seconds";
+		var fractions = leg <= 8 ? [1.0] : [0.25, 0.375, 0.375];
+		var result:Array<WeldingPassRecipe> = [];
+		var deposited = 0.0;
+		for (index in 0...fractions.length) {
+			var passLeg = leg * Math.sqrt(fractions[index]);
+			var recipe = fillet(passLeg, wire);
+			var pass = singlePass(recipe);
+			var previousLeg = leg * Math.sqrt(deposited);
+			// A fillet's exposed face joins the two leg endpoints. Shift toward alternate faces on fill and cap.
+			pass.name = fractions.length == 1 ? "single" : ["root", "fill", "cap"][index];
+			if (index > 0) {
+				pass.faceA = previousLeg * (index == 1 ? 0.65 : 0.35);
+				pass.faceB = previousLeg - pass.faceA;
+				pass.interpassDwell = interpassDwell;
+			}
+			result.push(pass);
+			deposited += fractions[index];
+		}
+		return result;
+	}
+
+	static function singlePass(recipe:WeldingRecipe):WeldingPassRecipe {
+		var leg = recipe.legSize;
+		var woven = leg > 6;
+		return {name: "single", recipe: recipe, faceA: woven ? leg * 0.25 : 0.0, faceB: woven ? leg * 0.25 : 0.0,
+			weaveAmplitude: woven ? leg * 0.2 : 0.0, weaveFrequency: woven ? 0.1 : 0.0,
+			edgeDwell: woven ? 0.05 : 0.0, interpassDwell: 0.0};
+	}
+
+	static function savedPass(pass:WeldingPassRecipe):materia.project.SceneArtifact.SceneArtifactWeldPass {
+		var recipe = pass.recipe;
+		var saved:materia.project.SceneArtifact.SceneArtifactWeldPass = {name: pass.name,
+			offset: [pass.faceA * 0.001, pass.faceB * 0.001], interpassDwell: pass.interpassDwell,
+			process: {wireSpeed: recipe.wireSpeed, voltage: recipe.voltage, travelSpeed: recipe.travelSpeed * 0.001,
+				approach: recipe.approach * 0.001, startDwell: recipe.startDwell, craterDwell: recipe.craterDwell, burnback: recipe.burnback}};
+		if (pass.weaveAmplitude > 0) saved.weave = {pattern: "sine", amplitude: pass.weaveAmplitude * 0.001,
+			cyclesPerMetre: pass.weaveFrequency * 1000, edgeDwell: pass.edgeDwell};
+		return saved;
+	}
+
+	/** Generate the shared CAD path once, then attach the area-conserving pass schedule. */
+	public static function passStep(leg:Float, wire:RecipeWire, seams:Array<WeldSeam>, frame:String, metal:String,
+			metresPerUnit:Float, interpassDwell:Float = 0):SceneArtifactMissionStep {
+		var schedule = passes(leg, wire, interpassDwell);
+		var step = schedule[0].recipe.step(seams, frame, metal, metresPerUnit);
+		var weld = step.weld;
+		if (weld == null) throw "A recipe produced no weld";
+		weld.legSize = leg * 0.001;
+		weld.passes = [for (pass in schedule) savedPass(pass)];
+		return step;
 	}
 
 	/**
@@ -100,7 +169,6 @@ class WeldingRecipe {
 				case Corner: "corner";
 			}, start: pose(seam.frameAtParameter(0.0)), stop: pose(seam.frameAtParameter(1.0)),
 			normals: [direction(seam.normalA), direction(seam.normalB)]}], legSize: legSize * millimetre,
-			process: {wireSpeed: wireSpeed, voltage: voltage, travelSpeed: travelSpeed * millimetre, approach: approach * millimetre,
-				startDwell: startDwell, craterDwell: craterDwell, burnback: burnback}}};
+			passes: [savedPass(singlePass(this))]}};
 	}
 }

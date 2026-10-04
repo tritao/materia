@@ -112,7 +112,10 @@ class ProcessRun {
       MotionOp.MoveL(continuation.waypointAt(0.0).pose, path.frameId,
         approach == null ? currentFeed : approach, Blend.ExactStop)
     ];
-    if (engagement != null) for (op in engagement.entry) ops.push(op);
+    if (engagement != null) {
+      var entry = state == ProcessRunState.Recovery ? engagement.recoveryEntry : engagement.entry;
+      for (op in entry) ops.push(op);
+    }
     followOp = ops.length;
     ops.push(MotionOp.FollowPath(continuation, path.frameId, currentFeed, events));
     if (engagement != null) for (op in engagement.exit) ops.push(op);

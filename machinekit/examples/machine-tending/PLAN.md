@@ -502,7 +502,7 @@ Done. What was built and decided:
   MachineKit smoke and app project-source passed. CoreXY, arm mission, mobile base and welder
   timing and geometry baselines stayed unchanged.
 
-**Post-MT5 integration with current main (RobotKit R0–R6, welder W4 and transmission X9–X10).**
+**Post-MT5 integration with main (RobotKit R0–R6, welder W4 and transmission X9–X10).**
 - Process-owned spindle and pneumatic actuators are excluded from `DriveLoads` planner budgets;
   their typed channel bindings and simulation forces remain active. The merged runtime uses the
   profile-aware compiler and main's nullable limit semantics. The current main submodule pins
@@ -522,7 +522,19 @@ Done. What was built and decided:
   to 136. RobotKit world rises from 4947 to 4993 and MotionKit from 9762 to 9869 through
   main's new checks; CadBridge rises 156 to 157. CncKit remains 317, CamKit 12311,
   ProcessKit 23 plus welder 52. Main's W4 far-plate welder case completes in 20.86 s
-  with a 4.9973 mm first leg. The final sequential gate is `mt-suite-final-r6.txt`.
+  with a 4.9973 mm first leg. The R6 sequential gate is `mt-suite-final-r6.txt`.
+
+**Post-MT5 integration with main's welder W5.**
+- W5's weld-pass planning and scene schema merge with the machine tending joint-motion mission
+  path. The ordinary MuJoCo seam remains 20.6 s; recovery improves from 22.0 to 21.1 s,
+  with one restart and overlap reduced from 11 to 3 mm. The four-sided post remains 29.8 s.
+  The 7 mm woven pass measures 6.998 mm in 27.17 s, and the three-pass 10 mm weld measures
+  9.999 mm in 65.55 s. Both backends complete the ten-seam weldment in 106.5 s.
+- The bare and enclosed mill remain 51.12/51.73 s, with the same axis tracking, door and vise
+  measurements above. Router, CoreXY, arm and mobile baselines also remain unchanged from the
+  R6 integration. W5 adds 19 weld-pass path assertions to ProcessKit's 23 and raises
+  ProjectKit from 136 to 143; RobotKit world remains 4993. The complete sequential gate is
+  `mt-suite-final-w5.txt`; all kits, MachineKit smoke, app build and project-source pass.
 
 **MT6. Controllers, robots and signals.**
 - Controller parts:

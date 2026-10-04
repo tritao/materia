@@ -164,6 +164,8 @@ class MissionPlayer implements SessionMember {
   /** What welds are planned clear of, and where the arm's joints are among the robot's. */
   var clearance:Null<ArmClearance> = null;
   var clearanceJoints:Array<Int> = [];
+  /** Runtime weld metal in world coordinates, read before each pass is planned. */
+  public var depositedWeldHulls:Void -> Array<{name:String, vertices:Array<Float>}> = () -> [];
   /** Where the tool's contact rides: its link and its frame there, in metres. */
   var toolLink:Int = -1;
   var toolTip:Null<AssemblyFrame> = null;
@@ -273,10 +275,11 @@ class MissionPlayer implements SessionMember {
       var channels = {arc: tool.channel, wireSpeed: torch.wireSpeedChannel, voltage: torch.voltageChannel};
       // Welds are planned clear of everything the simulation collides with except the weld metal, which is the bead.
       var metal = [for (step in mission.steps) if (step.kind == "weld") cast(step.weld, SceneArtifactWeld).metal];
-      var planned = weldClearance(arm, tool.contact.occurrence, metal);
-      clearance = planned;
-      newWelding = () -> WeldingPlanRunner.create(robot.robot, arm, () -> robot.runtime.pollEvents(), channels, ARM_ACCELERATION, 3,
-        planned);
+      newWelding = () -> {
+        var planned = weldClearance(arm, tool.contact.occurrence, metal);
+        clearance = planned;
+        return WeldingPlanRunner.create(robot.robot, arm, () -> robot.runtime.pollEvents(), channels, ARM_ACCELERATION, 3, planned);
+      };
       welding = newWelding();
     }
   }
@@ -293,6 +296,17 @@ class MissionPlayer implements SessionMember {
     var toolPrefix = torch.substr(0, torch.lastIndexOf("/") + 1);
     var bodies = [for (hull in robot.hulls) if (ignored.indexOf(hull.part) < 0)
       {name: hull.part, link: links[hull.link].id, vertices: hull.vertices, tool: StringTools.startsWith(hull.part, toolPrefix)}];
+    var base = simulation.linkPose(robotIndex, 0);
+    var baseInverse = new Transform3(new Vec3(base.position[0], base.position[1], base.position[2]),
+      new Quat(base.rotation[0], base.rotation[1], base.rotation[2], base.rotation[3])).inverse();
+    for (hull in depositedWeldHulls()) {
+      var vertices:Array<Float> = [];
+      for (index in 0...Std.int(hull.vertices.length / 3)) {
+        var point = baseInverse.transformPoint(new Vec3(hull.vertices[index * 3], hull.vertices[index * 3 + 1], hull.vertices[index * 3 + 2]));
+        vertices.push(point.x); vertices.push(point.y); vertices.push(point.z);
+      }
+      bodies.push({name: hull.name, link: links[0].id, vertices: vertices, tool: false});
+    }
     var positions = robot.robot.snapshot().positions;
     var indices = [for (target in arm.toJointTargets([for (_ in 0...arm.dofCount()) 0.0])) target.joint];
     clearanceJoints = indices;
@@ -461,7 +475,9 @@ class MissionPlayer implements SessionMember {
         return HandlePart.place(cast handling, localization, () -> placeContact(at), vacuumSensor);
       case "weld":
         var weld:SceneArtifactWeld = cast step.weld;
-        return new WeldSeam(cast welding, localization, () -> weldPlan(weld), cast weldSensor);
+        return new processkit.skill.WeldPasses([for (pass in weld.passes)
+          () -> weldPassSkill(weld, pass)],
+          [for (pass in weld.passes) pass.interpassDwell]);
       default:
         throw 'Mission step kind "${step.kind}" is not supported';
     }
@@ -523,6 +539,14 @@ class MissionPlayer implements SessionMember {
       MotionOp.MoveJ(MoveTarget.JointTarget(q), new MotionOptions(), Blend.ExactStop)]));
   }
 
+  /** Builds one weld pass using the shared welding runner. */
+  function weldPassSkill(weld:SceneArtifactWeld, pass:materia.project.SceneArtifact.SceneArtifactWeldPass):Skill {
+    var factory = newWelding;
+    if (factory == null) throw "Weld mission has no welding runner";
+    welding = factory();
+    return new WeldSeam(cast welding, localization, () -> weldPlan(weld, pass), cast weldSensor);
+  }
+
   /** The world pose of a weld's reference member now, or the world's own when the weld names none. */
   function referenceFrame(weld:SceneArtifactWeld):Transform3 {
     if (weld.frame == null || weld.frame == "") return Transform3.identity();
@@ -536,20 +560,34 @@ class MissionPlayer implements SessionMember {
    * workpiece's reference member, and that member is found where it stands when the step starts, as a pick finds its part,
    * so the weld follows a workpiece that is not where it was designed. A weld with no frame is in the assembly as designed.
    */
-  function weldPlan(weld:SceneArtifactWeld):WeldPlan {
+  function weldPlan(weld:SceneArtifactWeld, pass:materia.project.SceneArtifact.SceneArtifactWeldPass):WeldPlan {
     var frame = referenceFrame(weld);
     function pose(torch:SceneArtifactTorchPose):Transform3
       return frame.compose(new Transform3(new Vec3(torch.position[0], torch.position[1], torch.position[2]),
         new Quat(torch.rotation[0], torch.rotation[1], torch.rotation[2], torch.rotation[3])));
-    var process = weld.process;
+    var process = pass.process;
     // The open side of a corner is the bisector of its two faces' outward normals.
     function open(segment:materia.project.SceneArtifact.SceneArtifactWeldSegment):Vec3 {
       var a = segment.normals[0], b = segment.normals[1];
       return frame.rotation.rotate(new Vec3(a[0] + b[0], a[1] + b[1], a[2] + b[2]).normalized());
     }
-    return new WeldPlan([for (segment in weld.path) new WeldSegment(pose(segment.start), pose(segment.stop), segment.seam, open(segment))],
-      {wireSpeed: process.wireSpeed, voltage: process.voltage, travelSpeed: process.travelSpeed, approach: process.approach,
-        startDwell: process.startDwell, craterDwell: process.craterDwell, burnback: process.burnback});
+    var parameters:processkit.skill.WeldPlan.WeldParameters = {wireSpeed: process.wireSpeed, voltage: process.voltage, travelSpeed: process.travelSpeed, approach: process.approach,
+        startDwell: process.startDwell, craterDwell: process.craterDwell, burnback: process.burnback};
+    var weave = pass.weave;
+    if (weave != null) {
+      var pattern:motionkit.path.WeavePattern = switch weave.pattern {
+        case "sine": Sine;
+        case "triangle": Triangle;
+        case "zigzag": Zigzag;
+        default: throw 'Unknown weave pattern "${weave.pattern}"';
+      };
+      parameters.weave = new motionkit.path.WeaveProfile(pattern, weave.amplitude, weave.cyclesPerMetre,
+        process.travelSpeed, weave.edgeDwell);
+    }
+    var base = [for (segment in weld.path) new WeldSegment(pose(segment.start), pose(segment.stop), segment.seam, open(segment))];
+    var normals = [for (segment in weld.path) [for (normal in segment.normals)
+      frame.transformVector(new Vec3(normal[0], normal[1], normal[2]))]];
+    return new WeldPlan(processkit.WeldPassPath.offset(base, normals, pass.offset[0], pass.offset[1]), parameters);
   }
 
   /**

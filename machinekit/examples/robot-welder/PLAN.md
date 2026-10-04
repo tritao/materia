@@ -598,11 +598,118 @@ W5 design note while waiting for R3/R4 (2026-10-04; implementation has not start
   numerical approximation. Taper the offset to zero at sharp seam joins to preserve a connected path.
 - Deposition follows actual seam progress per second, including kinematic slowdowns. The nominal wire/area ratio
   is the recipe's policy; lateral tip speed during weaving must not increase the deposited area per seam metre.
-- Use one current saved weld representation: a non-empty pass list, each pass carrying its path, process, weave
-  and optional interpass dwell. Bump the then-current scene version and regenerate fixtures; reject older versions.
+- Use one current saved weld representation: a non-empty pass list over one CAD path. Each pass carries its process,
+  offsets along the path's face normals, weave and interpass dwell (zero when no cooling is requested). The common
+  path remains the deposition station reference, avoiding duplicated or independently drifting seam geometry.
+  Bump the then-current scene version and regenerate fixtures; reject older versions.
 - For the required 10 mm example, split its 50 mm² area into root/fill/cap fractions 1/4, 3/8 and 3/8
   (12.5, 18.75 and 18.75 mm²). Derive offsets from the seam's face normals and previously deposited height.
   Earlier station geometry must participate in both grounded-work sensing and clearance before later passes ignite.
+
+W5 implementation notes (completed, 2026-10-04):
+- The intermediate 20.5/20.9 s seam timings and 106.0 s whole-cell cycle came from duplicate skill updates in
+  `switch pass.update(...)`: the running pass's host clock advanced twice per snapshot. Native motion and deposited
+  interior area were correct, but each 0.15 s start/crater dwell lasted only seven observed ticks. The strengthened
+  saved-data check confirms both dwell values survive the codec. A focused sequencer regression fails with the
+  direct-switch implementation; storing the returned status in a local before switching fixes it. On both backends,
+  the focused app now observes fourteen ticks per dwell and restores ordinary/recovery times to 20.6/21.1 s,
+  preserving one restart, 3 mm overlap, a 5.4 mm peak and no gap. The corrected full W5 app gate passes on both
+  backends: all 10 seams in 106.5 s, legs 4.9–5.1 mm, exact bead lengths and no clearance violations. The in-air
+  failure, crater dropout, displaced workpiece and post-chain checks also pass with the W4 baseline behavior.
+- The full app quality checks pass on both MuJoCo and the test backend. Woven 7 mm: 6.998 mm measured leg,
+  one strike, 27.17 s. Three-pass 10 mm: 9.999 mm leg, three strikes, 65.55 s. The later-pass strike checks verify
+  preceding bead deposition, a tip within 0.6 mm of that bead's surface, and available deposited clearance hulls.
+  The complete entry/weld/exit is checked clear, sampled every five simulation ticks; both beads cover the seam
+  without gaps and end with the arc off. MachineKit smoke passes, including the CAD-derived 10-seam / 680 mm
+  mission in four runs. Shared app checks pass: arm 23.5 s; mobile 400 mm in 1 s on both backends, mission 61 s,
+  obstacle round 65 s with one replan and 416 mm closest clearance.
+  Focused suites pass: MotionKit weave 738 assertions; ProcessKit 55 welder, 44 planning, 16 rate, 106 weave,
+  13 pass-sequencer, 12 deposited-work, 19 offset and 23 process assertions; ProjectKit 138; CAD recipes 33.
+- `WeldPassPath` intersects adjacent offset lines at CAD chain corners rather than leaving gaps between shifted
+  segments. A closed chain includes its final join. Zero offsets preserve the exact original path object;
+  skew/parallel joins that cannot meet and offsets consuming more than 45% of an adjacent side are rejected.
+  Focused ProcessKit offset checks pass 19 assertions, including a lifted/expanded closed square and bounds.
+  Recipe serialization now shares the single-pass weaving policy too: `fillet(7).step` includes its weave and
+  face lift, and all multi-pass settings use the same unit conversion. Recipe checks pass 33 assertions.
+- Pass skills are now created lazily after cooling, allowing each runner to compile clearance against the metal
+  deposited by preceding passes. `WeldBeads` supplies measured station prisms in world coordinates; `MissionPlayer`
+  transforms them to the robot base link and includes them in `ArmClearance`. No RobotKit API changes are needed.
+  ProcessKit passes 12 sequencer assertions (including the fill factory observing the completed root), 12 bead-work,
+  55 welder, 44 planning, 16 rate, 106 weave and 23 process assertions. App compile for the clearance integration
+  passes 1,759 sources. New woven and multi-pass example entrypoints retain the CAD-derived seam and configure
+  its target leg to 7/10 mm. The new focused `welder-quality` checks are being compiled and have not yet run.
+
+- Runtime grounded work now accepts changing geometry providers. `WeldBeadWork` derives a convex triangular
+  prism per deposited station from its measured leg and CAD face directions; empty stations contribute no metal.
+  Queries use the live workpiece frame, cache unchanged prisms, and reject stations outside the query's seam
+  interval before expensive hull work. The same local vertices are exposed for subsequent clearance integration.
+  `WeldBeads` registers its deposited geometry with the simulated welder, so distance, ray and touch see earlier
+  metal without changing RobotKit. Focused ProcessKit bead-work checks pass 12 assertions, including a later
+  strike with only the root bead as grounded work, touch before ignition, moved/rotated frames, and reset clearing
+  cached metal. App compile passes 1,759 sources / 16,112 functions. Later-pass clearance integration and the
+  7 mm / 10 mm app gates remain open; this does not yet prove multi-pass execution quality.
+- Scene artifact version 16 replaces the weld's root process with a required non-empty `passes` list over its
+  shared CAD `path`. Pass offsets are two nonnegative distances in metres along the CAD face normals; spatial
+  weave frequency is cycles/metre. Validation checks pass bounds, process/feeder limits, patterns and edge dwells
+  that leave time to traverse the weave. Version 15 is rejected; the decoder also rejects a root `process`.
+  ProjectKit passes 138 assertions, including a two-pass weave round trip and malformed pass settings. Existing
+  fixtures are generated in tests; example previews now generate version 16 directly (no stored scene binaries).
+  `WeldingMission` attaches the recipe's complete pass schedule. `MissionPlayer` evaluates each pass against the
+  live workpiece frame when that pass starts, applies its face offsets and weave, and sequences it with `WeldPasses`.
+  Cooling begins after a pass has completed its burnback/retract and confirmed the arc off. Sequencer tests pass
+  11 assertions, including cancellation during travel/cooling and failure preventing later strikes. ProcessKit
+  remains 55 welder / 44 planning / 16 rate / 106 weave / 23 process assertions. App compile passes 1,758 sources,
+  16,100 functions against R6. Runtime earlier-bead grounding and offset joins at chain corners remain open,
+  together with the required woven 7 mm and three-pass 10 mm app quality gates. The focused `welder-seam`
+  check exits 0 on both backends: ordinary 20.5 s, leg 5.0 mm (4.8–5.1), 180 mm, no restart; recovery 20.9 s,
+  leg 5.0 mm (4.8–5.4), 180 mm, one restart and 3 mm overlap, no gap or stray. These are 0.1/0.2 s shorter
+  than the preceding focused build (20.6/21.1); this difference was subsequently diagnosed and fixed as duplicate pass updates (above).
+- CAD-side `WeldingRecipe.passes` now chooses one pass through 8 mm and root/fill/cap above it (through 12 mm).
+  Individual pass area determines wire speed, voltage and seam speed using the CAD wire's diameter, efficiency
+  and feeder limit. Single-pass recipes now reject legs above 8 mm. Weaving starts above a 6 mm pass leg:
+  amplitude is 20% of that leg, period 10 mm, and edge dwell 0.05 s. A woven first pass's centre opens toward
+  both faces by one quarter of its leg. Fill and cap target alternate sides of the preceding fillet's exposed
+  face (65/35 then 35/65 of its cumulative leg along the CAD face normals); optional cooling occurs only
+  between passes. These offsets are recipe targets; runtime grounding and clearance still need validation.
+  Focused `machinekit/tests/welding-recipe` passes 28 assertions: conserved area/volume, 7 mm weave settings,
+  10 mm three-pass split, prior-surface offsets, cooling, and feeder/single-pass limits. This recipe policy
+  is not yet connected to the saved pass schema or mission generation. R6 main `af673c4f4` merged cleanly.
+- MotionKit's `WeavePath` wraps pose primitives without changing seam-progress length, feed or event distances.
+  The lateral material frame supplies its axis and exact first/second derivatives separately from torch roll;
+  product-rule derivatives include the frame's motion. A quintic endpoint envelope starts and ends on the seam
+  with zero added velocity and acceleration. Phase continues across base primitives.
+- Sine uses cosine half-waves between edges. Triangle uses equal linear traverses; zigzag uses a 3:1 outward/return
+  traverse ratio. Edge holds consume forward distance at nominal seam speed within the requested cycle, so the
+  frequency remains unchanged; holds that consume the whole period are rejected. Frequency helpers accept
+  cycles/mm or cycles/s. Pattern joins become explicit primitive boundaries with one-sided derivatives.
+- Focused command: `haxeon/scripts/haxeon run --project motionkit/tests/weave/haxeon.json` with the standard
+  OCCT/library environment. It passes 738 assertions, including numeric first/second derivatives in a rotating
+  material frame, zero amplitude, endpoint taper, edge holds, frequency units and unchanged event coordinates.
+  Saved recipe integration, multi-pass schema and grounding, restart hump, and app quality gates remain open.
+- ProcessKit's weld parameters can carry the spatial profile. `WeldingPlanRunner.pathOf` applies it per CAD seam,
+  deriving the lateral axis from the travel tangent and open-face bisector; torch roll never supplies that axis.
+  Endpoint envelopes meet at the seam corners while phase continues across seams. The same generated path is used
+  for native preflight and execution, so preflight IK and swept clearance see the woven trajectory. The existing
+  bead projection deposits the woven tip into seam stations without a separate travel-length normalization.
+  Focused ProcessKit weave tests pass 106 assertions: a quarter-turn of torch roll leaves the weave unchanged,
+  authored seam length remains unchanged, and a simulated woven pass measures a 7 mm leg with no gaps or stray
+  metal and the prescribed total volume. This is a bead-model test; MuJoCo quality remains to be proven. Existing
+  ProcessKit welder/planning/rate/process checks still pass 52/44/11/23 assertions.
+
+- Recovery engagement now has its own sequence in ProcessKit, with the original engagement retained by default
+  for other processes. Welding re-strikes at `WeldArcModel.MIN_WIRE_SPEED`, waits for the arc, and omits the
+  initial pooling dwell over existing metal. The first strike and crater/burnback exit stay unchanged. The
+  ignition-watch operation index follows the shorter recovery sequence. ProcessKit passes 55 welder / 44 planning /
+  11 rate / 106 weave / 23 process assertions. Overlap-dose compensation and the measured restart peak were subsequently validated below.
+
+- Restart backoff is 2 mm, with maintenance wire feed over the already deposited prefix and normal validated
+  rates restored exactly at the interruption distance. The low-rate re-strike and omitted pooling dwell avoid
+  depositing another full section into the overlap. The original 10 mm / full-dose overlap is removed.
+  `PROJECT_SOURCE_ONLY=welder-seam` proves the result on MuJoCo and the test backend: 21.1 s with one restart,
+  3 mm measured overlap, a whole 180 mm bead with no gap or stray metal, mean leg 5.0 mm and peak 5.4 mm
+  (previously 9.4 mm). The undisturbed seam remains 20.6 s, leg 5.0 mm (4.8–5.1). The app asserts the
+  restart peak is at most target + 1 mm. Focused ProcessKit rate tests pass 16 assertions; other process checks
+  pass 55 welder / 44 planning / 106 weave / 23 process assertions. The app compiles 1,748 source files.
 
 **W6. Real welder interface.** Map the channels to:
 - the retrofit I/O board: an optoMOS relay for the trigger, an isolated 0–10 V
@@ -676,5 +783,5 @@ Dependencies:
 | W2 | done | work clamp and derived grounded work; `torch` robot tool in the scene artifact; `SimulatedWelder` + `WeldArcModel`; `WelderProcessDevice`; tests |
 | W3 | done (+ hardening: paths, live workpiece frame, exit crash, safety tests) | `weld` mission step; `WeldSeam` skill and `WeldBead`; process engagement and `WeldingPlanRunner`; weld metal part and recipe; bead as runtime geometry; welds on MuJoCo and the test backend, restart with overlap |
 | W4 | Done (2026-10-04) | Whole CAD weldment: 10 seams / 680 mm in 4 runs; swept clearance and derived corner turns; 106.5 s on both backends, legs 4.9–5.1 mm; affected gates pass. Timing changes recorded above. |
-| W5 | | |
+| W5 | Done (2026-10-04) | Seam-progress weave; CAD-derived pass recipes; deposited bead grounding and clearance; scene schema 16 rejects older versions; smaller restart hump. Woven 7 mm measures 6.998 mm, three-pass 10 mm measures 9.999 mm on both backends; all affected gates pass. |
 | W6 | | |

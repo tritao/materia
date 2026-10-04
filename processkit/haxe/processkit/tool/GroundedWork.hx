@@ -12,8 +12,16 @@ typedef WeldBodyPose = {position:Array<Float>, rotation:Array<Float>};
 class GroundedWork implements WeldWork {
   final solids:Array<ConvexSolid> = [];
   final poses:Array<Void -> WeldBodyPose> = [];
+  final additions:Array<WeldWork> = [];
 
   public function new() {}
+
+  /** Runtime metal, whose geometry changes as it is deposited. */
+  public function addWork(work:WeldWork):GroundedWork {
+    if (work == null || work == this) throw "Grounded work needs a distinct geometry provider";
+    additions.push(work);
+    return this;
+  }
 
   /** Adds a solid whose vertices are in the frame of the body `pose` reports. */
   public function add(solid:ConvexSolid, pose:Void -> WeldBodyPose):GroundedWork {
@@ -37,6 +45,7 @@ class GroundedWork implements WeldWork {
       var local = toLocal(poses[index](), x, y, z);
       result = Math.min(result, solids[index].distance(local[0], local[1], local[2]));
     }
+    for (work in additions) result = Math.min(result, work.distance(x, y, z));
     return result;
   }
 
@@ -48,6 +57,7 @@ class GroundedWork implements WeldWork {
       var direction = turnBack(pose.rotation, dx, dy, dz);
       result = Math.min(result, solids[index].ray(origin[0], origin[1], origin[2], direction[0], direction[1], direction[2], range));
     }
+    for (work in additions) result = Math.min(result, work.ray(ox, oy, oz, dx, dy, dz, range));
     return result;
   }
 

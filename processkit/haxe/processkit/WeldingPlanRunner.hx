@@ -9,6 +9,8 @@ import motionkit.path.OrientationPolicy;
 import motionkit.path.PoseLine;
 import motionkit.path.PosePath;
 import motionkit.path.PosePrimitive;
+import motionkit.path.WeavePath;
+import motionkit.path.FixedWeaveFrame;
 import robotkit.spatial.Quat;
 import motionkit.path.PoseWaypoint;
 import motionkit.program.Blend;
@@ -28,6 +30,7 @@ import processkit.skill.WeldPlan;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
 import processkit.tool.WeldFault;
+import processkit.tool.WeldArcModel;
 import processkit.tool.WeldSensor;
 import processkit.tool.WeldSensor.WeldReading;
 import robotkit.execution.FiredProcessEvent;
@@ -79,7 +82,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
   /** How long the program waits for the arc to establish, in seconds. */
   public static inline var IGNITION_TIMEOUT:Float = 2.0;
   /** How far before the stop a restart begins, in metres. */
-  public static inline var BACKOFF:Float = 0.010;
+  public static inline var BACKOFF:Float = 0.002;
   /** How far the torch lifts while the arc burns back, in metres. */
   public static inline var LIFT:Float = WeldPathPlanner.LIFT;
   /** Speed of the approach to the start and of the retract, in metres per second. */
@@ -218,6 +221,12 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
       MotionOp.WaitInput(ARC_ESTABLISHED, InputPredicate.Equals(EventValue.Digital(true)), IGNITION_TIMEOUT)
     ];
     if (parameters.startDwell > 0) entry.push(MotionOp.Dwell(parameters.startDwell));
+    // A re-strike is over an existing bead: light at the stable minimum and omit the pooling dwell.
+    var recoveryEntry:Array<MotionOp> = [
+      MotionOp.SetOutput(channels.wireSpeed, EventValue.Analog(WeldArcModel.MIN_WIRE_SPEED)),
+      MotionOp.SetOutput(channels.arc, EventValue.Digital(true)),
+      MotionOp.WaitInput(ARC_ESTABLISHED, InputPredicate.Equals(EventValue.Digital(true)), IGNITION_TIMEOUT)
+    ];
     // Crater fill with the arc up, then the wire stops; the torch lifts while the arc burns back, and the command ends.
     var exit:Array<MotionOp> = [];
     if (parameters.craterDwell > 0) exit.push(MotionOp.Dwell(parameters.craterDwell));
@@ -227,7 +236,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     }
     exit.push(MotionOp.SetOutput(channels.arc, EventValue.Digital(false)));
     var recipe = new ProcessRecipe(travel * 0.5, travel * 2.0, travel, 0.0, OrientationPolicy.Interpolated, 0.001,
-      parameters.wireSpeed / travel, 0.0, BACKOFF, FeedChangePolicy.Reject, new ProcessEngagement(entry, exit), APPROACH_SPEED,
+      parameters.wireSpeed / travel, 0.0, BACKOFF, FeedChangePolicy.Reject, new ProcessEngagement(entry, exit, recoveryEntry), APPROACH_SPEED,
       PREPARE_TIMEOUT);
     var device = new WelderProcessDevice(outputs, latest, channels, {voltage: parameters.voltage});
     var process = new ProcessRun(recipe, seam, device, channels.wireSpeed, motion.session);
@@ -322,7 +331,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     }
     followIndex = ops.length + process.followOp;
     // The entry is the two outputs, the wait for the arc, and perhaps a dwell, just before the path.
-    igniteIndex = followIndex - (cast(plan, WeldPlan).parameters.startDwell > 0 ? 2 : 1);
+    igniteIndex = followIndex - (first && cast(plan, WeldPlan).parameters.startDwell > 0 ? 2 : 1);
     ops = ops.concat(body.ops);
     programStart = process.lastProgramStart;
     reachedPath = false;
@@ -334,7 +343,8 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     var scheduled:MotionProgram;
     try {
       scheduled = ProcessRateSchedule.apply(program, timed, followIndex, channels.wireSpeed,
-        process.recipe.quantityPerDistance, cast(plan, WeldPlan).parameters.wireSpeed);
+        process.recipe.quantityPerDistance, cast(plan, WeldPlan).parameters.wireSpeed,
+        first ? 0.0 : Math.max(0.0, process.interruptedAt - process.lastProgramStart), WeldArcModel.MIN_WIRE_SPEED);
     } catch (error:Dynamic) {
       timed.dispose();
       throw error;
@@ -385,7 +395,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
    * where the torch would otherwise stand still to turn. How long the stretch is comes from the angle and the wrist's
    * limits (`WeldCorner`), and a corner takes at most `WeldCorner.SHARE` of a segment.
    */
-  static function pathOf(plan:WeldPlan, travel:Float, wrist:WristLimits, styles:Array<Int>):Array<PosePrimitive> {
+  public static function pathOf(plan:WeldPlan, travel:Float, wrist:WristLimits, styles:Array<Int>):Array<PosePrimitive> {
     var segments = plan.segments;
     var primitives:Array<PosePrimitive> = [];
     function waypoint(point:Vec3, rotation:Quat):PoseWaypoint
@@ -401,7 +411,9 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
           from.add(to.sub(from).scale(f1)), WeldCorner.orientationAt(r1, r2, s0 + (s1 - s0) * f1, travelA, travelB, style));
       }
     }
+    var progress = 0.0;
     for (index in 0...segments.length) {
+      var firstPrimitive = primitives.length;
       var segment = segments[index];
       var a = segment.start.translation, b = segment.stop.translation;
       var length = segment.length();
@@ -424,6 +436,16 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
       if (until.sub(from).norm() > 1e-6) line(from, startRotation, until, stopRotation);
       // The first half of the turn to the segment after.
       if (after) turn(until, b, stopRotation, segments[index + 1].start.rotation, 0.0, 0.5, afterAngle, direction, directionOf(segments[index + 1]), styles[index + 1]);
+      var weave = plan.parameters.weave;
+      if (weave != null && weave.amplitude > 0.0) {
+        var open = segment.open;
+        if (open == null) throw "A woven weld needs the CAD segment's material frame";
+        var lateral = direction.cross(open).normalized();
+        var base = new PosePath(FRAME, primitives.splice(firstPrimitive, primitives.length - firstPrimitive));
+        var woven = WeavePath.apply(base, weave, new FixedWeaveFrame([lateral.x, lateral.y, lateral.z]), progress);
+        for (primitive in woven.primitives) primitives.push(primitive);
+      }
+      progress += length;
     }
     return primitives;
   }

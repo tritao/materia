@@ -18,10 +18,13 @@ import motionkit.program.MotionOp;
 class ProcessEngagement {
   public final entry:Array<MotionOp>;
   public final exit:Array<MotionOp>;
+  /** Recovery may re-engage gently instead of repeating the initial dwell. */
+  public final recoveryEntry:Array<MotionOp>;
 
-  public function new(entry:Array<MotionOp>, exit:Array<MotionOp>) {
+  public function new(entry:Array<MotionOp>, exit:Array<MotionOp>, ?recoveryEntry:Array<MotionOp>) {
     if (entry == null || exit == null) throw "Process engagement needs entry and exit operations (either may be empty)";
     this.entry = entry.copy();
     this.exit = exit.copy();
+    this.recoveryEntry = recoveryEntry == null ? entry.copy() : recoveryEntry.copy();
   }
 }

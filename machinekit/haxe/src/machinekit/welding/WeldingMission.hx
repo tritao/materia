@@ -158,13 +158,10 @@ class WeldingMission {
 			left.splice(best, 1);
 			closedLeft.splice(best, 1);
 		}
-		var recipes = new Map<String, WeldingRecipe>();
 		var steps:Array<SceneArtifactMissionStep> = [];
 		for (run in runs) {
 			var leg = run.seams[0].legSize;
-			var key = Std.string(leg);
-			if (!recipes.exists(key)) recipes.set(key, WeldingRecipe.fillet(leg, wire));
-			steps.push(recipes.get(key).step(run.seams, weldment.reference, metal, metresPerUnit));
+			steps.push(WeldingRecipe.passStep(leg, wire, run.seams, weldment.reference, metal, metresPerUnit));
 		}
 		var totals = home == null ? {air: 0.0, turned: 0.0} : measure(runs, home);
 		return new WeldingMission(steps, runs, diagnostics, totals.air, totals.turned);

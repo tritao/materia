@@ -199,6 +199,11 @@ export CADKIT_OCCT_DIR=$OCCT
   Field reads are fine. Avoid the pattern by computing into a local that is never reassigned, or by using a helper
   function. Suspect this bug whenever a closure shows stale values.
 - When a compile error is unclear, read the haxeon compiler source to find the root cause before working around it.
+- **Verified interface-switch quirk (W5):** `switch pass.update(snapshot, dt)` calls the skill twice on the running
+  path. Bind its result first (`var outcome = pass.update(snapshot, dt); switch outcome { ... }`). A focused
+  sequencer regression reproduces the duplicate call; the direct switch reduced each 0.15 s weld dwell to seven
+  simulation ticks. The local-result form restores fourteen observed ticks and the 20.6/21.1 s seam timings.
+  Keep the workaround in ProcessKit; do not edit haxeon in this task.
 
 ## W4: weld the whole weldment (finish)
 

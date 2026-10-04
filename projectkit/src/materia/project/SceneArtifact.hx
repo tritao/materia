@@ -194,15 +194,15 @@ typedef SceneArtifactJointTarget = {
  * - `path` is the segments in order, each starting where the one before ends. The torch strikes the arc at the
  *   start of the first, keeps it up along the whole path and ends it at the end of the last. Where one segment's
  *   torch angles differ from the next one's, as at the corner of a tube, the torch turns from one to the other
- *   as it passes the joint. The joints of a path may differ, but the process is one, so they ask for one leg.
+ *   as it passes the joint. All passes share this CAD path and together deposit the requested leg.
  * - `frame` is the occurrence the path is relative to, the workpiece's reference member: every pose and normal in the
  *   path is in that occurrence's own frame (metres, with its normals turned with it). A player finds the occurrence where it
  *   stands when the step starts and places the path by it, so the weld follows a workpiece that is not where it was
  *   designed. Without a `frame` the path is in the assembly as designed (the form welds took before it existed).
  * - `metal` is the occurrence that carries the weld metal: the part the bead is shown on as the welder lays it.
  * - `legSize` is the leg the weldment asks for.
- * - `process` is how the weld is run (see SceneArtifactWeldProcess); the generator derived it from the leg,
- *   so the leg the weld reaches is a result that the declared one is checked against.
+ * - `passes` give ordered processes, face offsets, weaving and cooling over that path. The generator derives
+ *   their deposited areas from the target leg; the measured final leg is checked against that target.
  *
  */
 typedef SceneArtifactWeld = {
@@ -210,7 +210,24 @@ typedef SceneArtifactWeld = {
 	var metal:String;
 	var path:Array<SceneArtifactWeldSegment>;
 	var legSize:Float;
+	var passes:Array<SceneArtifactWeldPass>;
+}
+
+/** Ordered passes over the CAD path. Offsets are metres along its two outward face normals. */
+typedef SceneArtifactWeldPass = {
+	var name:String;
+	var offset:Array<Float>;
 	var process:SceneArtifactWeldProcess;
+	@:optional var weave:SceneArtifactWeldWeave;
+	var interpassDwell:Float;
+}
+
+/** Frequency is spatial, so timing changes never change the authored weave. */
+typedef SceneArtifactWeldWeave = {
+	var pattern:String;
+	var amplitude:Float;
+	var cyclesPerMetre:Float;
+	var edgeDwell:Float;
 }
 
 /**
@@ -319,7 +336,7 @@ typedef SceneArtifactTool = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 15;
+	public static inline var VERSION:Int = 16;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -691,8 +708,9 @@ class SceneArtifact {
 			var feeder = [for (tool in tools) if (tool.kind == "torch") tool][0].torch;
 			if (feeder != null) for (index in 0...mission.steps.length) {
 				var weld = mission.steps[index].weld;
-				if (weld != null && weld.process != null && weld.process.wireSpeed > feeder.maxWireSpeedMPerMin)
-					fail('step $index needs ${weld.process.wireSpeed} m/min of wire, past the feeder\'s top speed of ${feeder.maxWireSpeedMPerMin} m/min');
+				if (weld != null && weld.passes != null) for (pass in weld.passes)
+					if (pass.process.wireSpeed > feeder.maxWireSpeedMPerMin)
+						fail('step $index pass "${pass.name}" needs ${pass.process.wireSpeed} m/min of wire, past the feeder\'s top speed of ${feeder.maxWireSpeedMPerMin} m/min');
 			}
 		}
 		if (welds && handles) fail("picks and places and welds: the robot's arm carries one tool, a suction cup or a torch");
@@ -765,16 +783,35 @@ class SceneArtifact {
 			}
 		}
 		if (!(finite(weld.legSize) && weld.legSize > 0 && weld.legSize <= 0.05)) fail('step $index needs a leg size between 0 and 50 mm');
-		var process = weld.process;
-		if (process == null) { fail('step $index has no process'); return; }
-		if (!(finite(process.wireSpeed) && process.wireSpeed >= 1 && process.wireSpeed <= 30)) fail('step $index needs a wire speed between 1 and 30 m/min');
-		if (!(finite(process.voltage) && process.voltage > 0 && process.voltage <= 60)) fail('step $index needs a voltage between 0 and 60 V');
-		if (!(finite(process.travelSpeed) && process.travelSpeed > 0 && process.travelSpeed <= 0.05)) fail('step $index needs a travel speed between 0 and 50 mm/s');
-		if (!(finite(process.approach) && process.approach > 0 && process.approach <= 0.5)) fail('step $index needs an approach distance between 0 and 500 mm');
-		for (seconds in [process.startDwell, process.craterDwell])
-			if (!(finite(seconds) && seconds >= 0 && seconds <= 10)) fail('step $index needs dwell times between 0 and 10 s');
-		if (!(finite(process.burnback) && process.burnback >= 0.05 && process.burnback <= 10))
-			fail('step $index needs a burnback between 0.05 and 10 s: with none the wire sticks in the pool');
+		if (weld.passes == null || weld.passes.length == 0 || weld.passes.length > 16) {
+			fail('step $index needs between 1 and 16 weld passes'); return;
+		}
+		for (pass in weld.passes) {
+			if (pass == null) { fail('step $index has an empty pass'); return; }
+			if (pass.name == null || pass.name.length == 0) fail('step $index has an unnamed pass');
+			if (pass.offset == null || pass.offset.length != 2) { fail('step $index needs two face offsets'); return; }
+			for (offset in pass.offset) if (!(finite(offset) && offset >= 0 && offset <= 0.05)) fail('step $index needs face offsets between 0 and 50 mm');
+			if (!(finite(pass.interpassDwell) && pass.interpassDwell >= 0 && pass.interpassDwell <= 10)) fail('step $index needs interpass dwell between 0 and 10 s');
+			var weave = pass.weave;
+			if (weave != null) {
+				if (weave.pattern != "sine" && weave.pattern != "triangle" && weave.pattern != "zigzag") fail('step $index has an unknown weave pattern');
+				if (!(finite(weave.amplitude) && weave.amplitude > 0 && weave.amplitude <= 0.025)) fail('step $index needs weave amplitude between 0 and 25 mm');
+				if (!(finite(weave.cyclesPerMetre) && weave.cyclesPerMetre > 0 && weave.cyclesPerMetre <= 1000)) fail('step $index needs weave frequency between 0 and 1000 cycles/m');
+				if (!(finite(weave.edgeDwell) && weave.edgeDwell >= 0 && weave.edgeDwell <= 10)) fail('step $index needs edge dwell between 0 and 10 s');
+			}
+			var process = pass.process;
+			if (process == null) { fail('step $index has no process'); return; }
+			if (!(finite(process.wireSpeed) && process.wireSpeed >= 1 && process.wireSpeed <= 30)) fail('step $index needs a wire speed between 1 and 30 m/min');
+			if (!(finite(process.voltage) && process.voltage > 0 && process.voltage <= 60)) fail('step $index needs a voltage between 0 and 60 V');
+			if (!(finite(process.travelSpeed) && process.travelSpeed > 0 && process.travelSpeed <= 0.05)) fail('step $index needs a travel speed between 0 and 50 mm/s');
+			if (!(finite(process.approach) && process.approach > 0 && process.approach <= 0.5)) fail('step $index needs an approach distance between 0 and 500 mm');
+			for (seconds in [process.startDwell, process.craterDwell])
+				if (!(finite(seconds) && seconds >= 0 && seconds <= 10)) fail('step $index needs dwell times between 0 and 10 s');
+			if (!(finite(process.burnback) && process.burnback >= 0.05 && process.burnback <= 10))
+				fail('step $index needs a burnback between 0.05 and 10 s: with none the wire sticks in the pool');
+			if (weave != null && !(2 * process.travelSpeed * weave.edgeDwell * weave.cyclesPerMetre < 1))
+				fail('step $index has edge dwells that consume the entire weave period');
+		}
 	}
 
 	/** A weld from its JSON section, typed field by field. */
@@ -799,16 +836,29 @@ class SceneArtifact {
 			return {kind: kind, seam: seam, joint: joint, start: pose(Reflect.field(item, "start")), stop: pose(Reflect.field(item, "stop")),
 				normals: [for (normal in (cast normals:Array<Dynamic>)) numbers(normal, 3)]};
 		}
-		var metal:Dynamic = Reflect.field(raw, "metal"), process:Dynamic = Reflect.field(raw, "process"), path:Dynamic = Reflect.field(raw, "path");
-		if (!Std.isOfType(metal, String) || process == null) fail();
+		var metal:Dynamic = Reflect.field(raw, "metal"), path:Dynamic = Reflect.field(raw, "path"), passes:Dynamic = Reflect.field(raw, "passes");
+		if (!Std.isOfType(metal, String) || !Std.isOfType(passes, Array) || Reflect.hasField(raw, "process")) fail();
 		if (!Std.isOfType(path, Array)) fail();
 		var segments:Array<SceneArtifactWeldSegment> = [for (item in (cast path:Array<Dynamic>)) segment(item)];
 		var frame:Dynamic = Reflect.field(raw, "frame");
 		if (frame != null && !Std.isOfType(frame, String)) fail();
-		var weld:SceneArtifactWeld = {metal: metal, path: segments, legSize: number(raw, "legSize"),
-			process: {wireSpeed: number(process, "wireSpeed"), voltage: number(process, "voltage"),
-				travelSpeed: number(process, "travelSpeed"), approach: number(process, "approach"),
-				startDwell: number(process, "startDwell"), craterDwell: number(process, "craterDwell"), burnback: number(process, "burnback")}};
+		var decodedPasses:Array<SceneArtifactWeldPass> = [for (item in (cast passes:Array<Dynamic>)) {
+			var name:Dynamic = Reflect.field(item, "name"), process:Dynamic = Reflect.field(item, "process");
+			if (!Std.isOfType(name, String) || process == null) fail();
+			var pass:SceneArtifactWeldPass = {name: name, offset: numbers(Reflect.field(item, "offset"), 2),
+				interpassDwell: number(item, "interpassDwell"),
+				process: {wireSpeed: number(process, "wireSpeed"), voltage: number(process, "voltage"),
+					travelSpeed: number(process, "travelSpeed"), approach: number(process, "approach"),
+					startDwell: number(process, "startDwell"), craterDwell: number(process, "craterDwell"), burnback: number(process, "burnback")}};
+			var weave:Dynamic = Reflect.field(item, "weave");
+			if (weave != null) {
+				var pattern:Dynamic = Reflect.field(weave, "pattern");
+				if (!Std.isOfType(pattern, String)) fail();
+				pass.weave = {pattern: pattern, amplitude: number(weave, "amplitude"), cyclesPerMetre: number(weave, "cyclesPerMetre"), edgeDwell: number(weave, "edgeDwell")};
+			}
+			pass;
+		}];
+		var weld:SceneArtifactWeld = {metal: metal, path: segments, legSize: number(raw, "legSize"), passes: decodedPasses};
 		if (frame != null) weld.frame = frame;
 		return weld;
 	}

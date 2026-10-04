@@ -279,6 +279,21 @@ class WelderProcessTests {
     check(kinds(restart) == kinds(program), "and engages and disengages again");
     expectFailure(function() again.interruptNow(0.5, "off the path"), "an interruption has to be on the path");
 
+    // A process may use a different re-engagement, without repeating its initial pooling dwell.
+    var gentleRecipe = new ProcessRecipe(0.005, 0.03, 0.0115, 0.0, OrientationPolicy.Interpolated, 0.001,
+      8.0 / 0.0115, 0.0, 0.01, FeedChangePolicy.Reject,
+      new ProcessEngagement(entry, exit, [entry[0], entry[1]]), 0.08);
+    var gentle = new ProcessRun(gentleRecipe, seamPath(), device, channels.wireSpeed, session);
+    gentle.start();
+    gentle.update(0.0);
+    check(kinds(gentle.takeProgram(closing())) == kinds(program), "the first engagement retains its dwell");
+    gentle.interruptNow(0.09, "arc loss");
+    gentle.update(0.09);
+    var recovered = gentle.takeProgram(closing());
+    check(kinds(recovered) == "MoveL,SetOutput,WaitInput,FollowPath,Dwell,SetOutput,SetOutput,MoveL",
+      "recovery omits the start dwell but retains the arc wait and crater exit");
+    check(gentle.followOp == 3, "recovery path progress follows the shorter engagement");
+
     // Without an engagement the run ends at the path's end, as it always did.
     var plain = new ProcessRun(new ProcessRecipe(0.005, 0.03, 0.0115, 0.0, OrientationPolicy.Interpolated, 0.001, 8.0 / 0.0115, 0.0,
       0.01, FeedChangePolicy.Reject), seamPath(), device, channels.wireSpeed, new MotionSession());

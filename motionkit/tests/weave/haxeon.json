@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "motionkit-weave-tests"},
+  "entry": "WeaveTests",
+  "sourceRoots": ["src"],
+  "dependencies": {"motionkit": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "build"
+}
