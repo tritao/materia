@@ -35,7 +35,6 @@ import robotkit.device.DeviceChannel;
 import robotkit.device.DeviceLayout;
 import robotkit.world.RobotCapabilities;
 import robotkit.world.RobotCommand;
-import robotkit.world.TrajectoryChunk;
 import robotkit.world.TrajectorySegment;
 import robotkit.world.RobotDescription;
 import robotkit.world.RobotFault;
@@ -201,7 +200,7 @@ class RobotWorldTests {
       return;
     }
     assertions += RuntimeEndpointTests.run();
-    testPolynomialTrajectoryChunk();
+    testPolynomialExecutionPlan();
     testAttachDetachAndIdentity();
     testSequenceAndTopology();
     testCrossThreadEventQueue();
@@ -288,22 +287,36 @@ class RobotWorldTests {
       entry.recordingTimestampNs);
   }
 
-  static function testPolynomialTrajectoryChunk():Void {
+  static function testPolynomialExecutionPlan():Void {
     var segment = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(100000000),
       [[0.0, 1.0], [0.0, -1.0]]);
-    var chunk = TrajectoryChunk.fromSegments([segment], Int64.ofInt(7));
-    check(chunk.segments.length == 1,
-      "polynomial chunk uses segment payload");
-    check(chunk.copy().segments[0].coefficients[1][1] == -1.0,
-      "polynomial chunk copy keeps coefficients");
+    var plan = new robotkit.world.ExecutionPlanSubmission(Int64.ofInt(7),
+      Int64.ofInt(1), Int64.ofInt(1), 0, [0.0, 0.0], [0.0, 0.0],
+      [0.0, 0.0], [segment], null, null, null, null, null, false);
+    check(plan.segments.length == 1, "execution plan uses polynomial payload");
+    check(plan.copy().segments[0].coefficients[1][1] == -1.0,
+      "execution plan copy keeps coefficients");
+    var gapRejected = false;
+    try new robotkit.world.ExecutionPlanSubmission(Int64.ofInt(8), Int64.ofInt(1),
+      Int64.ofInt(1), 0, [0.0, 0.0], [0.0, 0.0], [0.0, 0.0],
+      [segment, new TrajectorySegment(Int64.ofInt(100000001), Int64.ofInt(100000000),
+        [[0.1, 1.0], [-0.1, -1.0]])]) catch (_:Dynamic) gapRejected = true;
+    check(gapRejected, "execution plan rejects a one-nanosecond segment gap");
+    var eventRejected = false;
+    try new robotkit.world.ExecutionPlanSubmission(Int64.ofInt(8), Int64.ofInt(1),
+      Int64.ofInt(1), 0, [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [segment],
+      null, null, null, null, null, false,
+      [new ProcessTimedEvent(Int64.ofInt(100000001), "test", ProcessEventValue.Digital(true))])
+      catch (_:Dynamic) eventRejected = true;
+    check(eventRejected, "execution plan rejects an event beyond its payload duration");
     var recording = new RobotRecording();
-    recording.recordCommand(RobotCommand.TrajectoryChunk(chunk));
+    recording.recordCommand(RobotCommand.ExecutionPlan(plan));
     var replayed = roundTripRecording(recording.entries[0]);
     switch replayed.event {
-      case Command(TrajectoryChunk(value)):
-        check(value.segments.length == 1 && value.segments[0].degree == 1,
-          "polynomial chunk survives recording round trip");
-      case _: throw "Expected recorded polynomial chunk";
+      case Command(ExecutionPlan(value)):
+        check(value.planId == Int64.ofInt(7) && value.segments[0].degree == 1,
+          "polynomial plan survives recording round trip");
+      case _: throw "Expected recorded polynomial plan";
     }
   }
 
@@ -3757,7 +3770,11 @@ class RobotWorldTests {
 
     var replayDescription = new RobotDescription("forklift", "recorded forklift",
       linkNames, jointNames);
-    var replayCapabilities = new RobotCapabilities("forklift", 5, true, true, true, false);
+    var replayCapabilities = new RobotCapabilities("forklift",
+      5,
+      [robotkit.world.JointTargetMode.Position, robotkit.world.JointTargetMode.Velocity, robotkit.world.JointTargetMode.Effort],
+      robotkit.world.ExecutionCapabilities.unavailable(),
+      new robotkit.world.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked));
 
     var goalReplay = new ReplayRobot("forklift", recording,
       replayDescription, replayCapabilities);
@@ -4098,8 +4115,8 @@ class RobotWorldTests {
       v5Path = Sys.getCwd() + "/fixtures/recording-v5.mcap";
     var v5Error = "";
     try McapRecordingReader.load(v5Path) catch (error:Dynamic) v5Error = Std.string(error);
-    check(v5Error.indexOf("schema version is not 6") >= 0,
-      "Haxe reader rejects a pre-v6 MCAP file");
+    check(v5Error.indexOf("schema version is not 7") >= 0,
+      "Haxe reader rejects a pre-v7 MCAP file");
     var fixtureRoot = v5Path.substr(0, v5Path.lastIndexOf("/") + 1);
     var mismatchPath = fixtureRoot + "recording-schema-mismatch.mcap";
     var mismatch = new McapRecordingReader(mismatchPath, null, true);
@@ -4115,7 +4132,7 @@ class RobotWorldTests {
     var foreignPath = fixtureRoot + "recording-foreign.mcap";
     var foreign = new McapRecordingReader(foreignPath);
     check(foreign.next() == null && foreign.skippedUnknown == 1,
-      "file-level v6 metadata permits a foreign MCAP channel");
+      "file-level v7 metadata permits a foreign MCAP channel");
     foreign.close();
     equal(loaded.entries.length, 7, "MCAP reload preserves every event type");
     equal(loaded.processEvents.length, 1, "MCAP reload preserves process records");
@@ -4152,7 +4169,7 @@ class RobotWorldTests {
     if (Sys.getEnv("ROBOTKIT_KEEP_MCAP") == null) sys.FileSystem.deleteFile(path);
     else Sys.println('RobotKit MCAP fixture: $path');
     for (compression in ["none", "lz4"]) {
-      var variantPath = '/tmp/robotkit-${Sys.getPid()}-$compression-v6.mcap';
+      var variantPath = '/tmp/robotkit-${Sys.getPid()}-$compression-v7.mcap';
       var channels = new RecordingChannels();
       channels.register(new TestRecordingChannel());
       var pixels = haxe.io.Bytes.alloc(512 * 1024 * 3);
@@ -5341,9 +5358,11 @@ class RobotWorldTests {
 
     var segmentSimulation = segmentSimulationHarness.simulation;
     var segmentRuntime = segmentSimulation.addRobot(blueprint);
-    segmentRuntime.submitTrajectory(TrajectoryChunk.fromSegments([
-      new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(200000000), [[0.0, 0.5]])
-    ]), 1);
+    segmentRuntime.submitPlan(new robotkit.world.ExecutionPlanSubmission(Int64.ofInt(1),
+      Int64.ofInt(blueprint.revision), Int64.ofInt(blueprint.calibrationRevision),
+      RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
+      [0.0], [0.0], [0.0],
+      [new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(200000000), [[0.0, 0.5]])]), 1);
     segmentSimulationHarness.step(Int64.ofInt(100));
     check(segmentRuntime.snapshot().trajectoryQueueDepth == 1,
       "Haxe segment submission reaches native knot queue");
@@ -5453,7 +5472,6 @@ class RobotWorldTests {
   static function commandSummary(command:RobotCommand):String return switch command {
     case JointTargets(targets, _): [for (target in targets)
       '${target.joint}:${Std.string(target.mode)}:${target.target}'].join(",");
-    case TrajectoryChunk(chunk): 'trajectory:${chunk.segments.length}';
     case ExecutionPlan(plan): 'plan:${Int64.toStr(plan.planId)}';
     case Hold: 'hold';
     case Resume: 'resume';
@@ -5502,14 +5520,11 @@ private class FakeRobot implements Robot {
   public function status():RobotStatus return Ready;
   public function description():RobotDescription return new RobotDescription(
     logicalId, logicalId, [], jointNames);
-  public function capabilities():RobotCapabilities return new RobotCapabilities(
-    logicalId,
-    positions.length,
-    true,
-    true,
-    true,
-    false
-  );
+  public function capabilities():RobotCapabilities return new RobotCapabilities(logicalId,
+      positions.length,
+      [robotkit.world.JointTargetMode.Position, robotkit.world.JointTargetMode.Velocity, robotkit.world.JointTargetMode.Effort],
+      robotkit.world.ExecutionCapabilities.unavailable(),
+      new robotkit.world.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked));
   public function snapshot():RobotSnapshot return new RobotSnapshot(
     logicalId,
     Int64.ofInt(1),

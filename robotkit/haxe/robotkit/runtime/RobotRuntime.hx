@@ -1,11 +1,12 @@
 package robotkit.runtime;
 
 import RobotKitRuntime;
+import TrajectoryCore;
+import trajectorykit.validation.ValidationGuarantee;
 import haxe.Int64;
 import nativekit.ffi.NativeKit;
 import robotkit.world.CameraImage;
 import robotkit.world.SensorFrame;
-import robotkit.world.TrajectoryChunk;
 import robotkit.world.ExecutionPlanSubmission;
 import robotkit.world.FiredProcessEvent;
 import robotkit.world.ProcessEventCodec;
@@ -100,23 +101,25 @@ class RobotRuntime {
     check(endpoint.stop(), "runtime.stop");
   }
 
-  /** Reports the endpoint's actual buffered-trajectory capability. */
-  public function supportsTrajectoryQueue():Bool {
+  /** Reads the endpoint's supported modes and bounded plan contracts. */
+  public function capabilities(id:robotkit.world.RobotId):robotkit.world.RobotCapabilities {
     ensureLive();
     var value = new rk_robot_capabilities();
     value.set_struct_size(rk_robot_capabilities.size());
-    check(endpoint.capabilities(value),
-      "runtime.capabilities");
-    return value.get_supports_trajectory_queue() != 0;
-  }
-
-  public function supportsExecutionPlans():Bool {
-    ensureLive();
-    var value = new rk_robot_capabilities();
-    value.set_struct_size(rk_robot_capabilities.size());
-    check(endpoint.capabilities(value),
-      "runtime.capabilities");
-    return value.get_supports_execution_plans() != 0;
+    check(endpoint.capabilities(value), "runtime.capabilities");
+    var modes:Array<robotkit.world.JointTargetMode> = [];
+    if (value.get_supports_position_targets() != 0) modes.push(Position);
+    if (value.get_supports_velocity_targets() != 0) modes.push(Velocity);
+    if (value.get_supports_effort_targets() != 0) modes.push(Effort);
+    if (value.get_supports_position_targets() != 0 && value.get_supports_effort_targets() != 0)
+      modes.push(Servo);
+    var execution = value.get_supports_execution_plans() != 0
+      ? new robotkit.world.ExecutionCapabilities(true, TrajectoryCoreConstants.MK_MAX_DEGREE,
+          RobotKitRuntimeConstants.RK_MAX_TRAJECTORY_JOINTS,
+          RobotKitRuntimeConstants.RK_MAX_TRAJECTORY_QUEUE_POINTS, true, true, true, Proven)
+      : robotkit.world.ExecutionCapabilities.unavailable();
+    return new robotkit.world.RobotCapabilities(id, value.get_joint_count(), modes,
+      execution, new robotkit.world.TimingCapabilities(true, true, Unchecked));
   }
 
   /**
@@ -168,28 +171,6 @@ class RobotRuntime {
     }
     check(endpoint.submit(command),
       "runtime.submitTargets");
-  }
-
-  /** Appends a bounded polynomial segment chunk to the native runtime queue. */
-  public function submitTrajectory(chunk:TrajectoryChunk, sequence:Int,
-      ?timestampNs:haxe.Int64):Void {
-    submitTrajectory64(chunk, haxe.Int64.ofInt(sequence), timestampNs);
-  }
-
-  public function submitTrajectory64(chunk:TrajectoryChunk, sequence:haxe.Int64,
-      ?timestampNs:haxe.Int64):Void {
-    ensureLive();
-    if (chunk == null) throw "Trajectory chunk is required";
-    var command = new rk_robot_command();
-    command.set_struct_size(rk_robot_command.size());
-    command.set_sequence(sequence);
-    command.set_timestamp_ns(timestampNs == null ? haxe.Int64.ofInt(0) : timestampNs);
-    command.set_kind(RobotKitRuntimeConstants.RK_COMMAND_TRAJECTORY_SEGMENTS);
-    command.set_target_count(0);
-    var arrays = SegmentValues.of(chunk.segments);
-    check(endpoint.submitSegments(command, chunk.tag,
-      arrays.starts, arrays.durations, arrays.degrees, arrays.coefficients),
-      "runtime.submitTrajectorySegments");
   }
 
   /**

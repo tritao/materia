@@ -92,7 +92,7 @@ class ServoSession {
     servo = new ManipulatorServo(manipulator, damping);
     indices = manipulator.jointIndices();
     commanded = [for (_ in indices) 0.0];
-    if (plans != null && !robot.capabilities().supportsExecutionPlans)
+    if (plans != null && !robot.capabilities().execution.plans)
       throw "Servo plans need a robot that executes plans";
     plan = plans == null ? null : new ServoPlan(plans, manipulator, robot.snapshot().positions.length);
   }

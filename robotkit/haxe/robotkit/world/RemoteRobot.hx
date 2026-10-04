@@ -1,5 +1,7 @@
 package robotkit.world;
 
+import trajectorykit.validation.ValidationGuarantee;
+
 import RobotKitRuntime;
 import nativekit.ffi.NativeKit;
 import NativeKitEvents;
@@ -89,16 +91,9 @@ class RemoteRobot implements Robot {
 
   public function capabilities():RobotCapabilities {
     var value = client.capabilities;
-    return value == null ? new RobotCapabilities(logicalId, 0, false, false, false, false) : new RobotCapabilities(
-      logicalId,
-      value.jointCount,
-      value.supportsPosition,
-      value.supportsVelocity,
-      value.supportsEffort,
-      value.supportsPrediction,
-      value.supportsTrajectoryQueue,
-      value.supportsExecutionPlans
-    );
+    return value == null ? new RobotCapabilities(logicalId, 0, [],
+      ExecutionCapabilities.unavailable(), new TimingCapabilities(false, false, Unchecked))
+      : robotkit.protocol.CapabilityCodec.decode(value, logicalId);
   }
 
   public function snapshot():RobotSnapshot return new RobotSnapshot(
@@ -165,8 +160,6 @@ class RemoteRobot implements Robot {
   public function submit(command:RobotCommand):Void switch command {
     case JointTargets(targets, expiryNs):
       client.sendJointTargets(targets, expiryNs);
-    case TrajectoryChunk(_):
-      throw "RemoteRobot does not support buffered trajectory chunks yet";
     case ExecutionPlan(plan): client.submitPlan(plan);
     case Hold: client.hold();
     case Resume: client.resume();

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Print RobotKit v6 MCAP messages as JSON lines using embedded RKF1 schemas.
+"""Print RobotKit v7 MCAP messages as JSON lines using embedded RKF1 schemas.
 
 Dependencies: mcap and msgpack (for example: uv run --with mcap --with msgpack).
 """
@@ -58,8 +58,8 @@ def main():
     args = parser.parse_args()
     with args.recording.open("rb") as stream:
         for schema, channel, message in make_reader(stream).iter_messages(log_time_order=False):
-            if channel.metadata.get("robotkit.schema_version") != "6":
-                parser.error("Recording schema version is not 6")
+            if channel.metadata.get("robotkit.schema_version") != "7":
+                parser.error("Recording schema version is not 7")
             if schema is None or schema.encoding != "robotkit-wire" or channel.message_encoding != "msgpack":
                 parser.error(f"Unsupported encoding on {channel.topic}")
             spec = json.loads(schema.data)

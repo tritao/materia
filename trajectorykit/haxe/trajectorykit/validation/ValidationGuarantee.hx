@@ -1,4 +1,4 @@
-package motionkit.trajectory;
+package trajectorykit.validation;
 
 import haxe.Int64;
 

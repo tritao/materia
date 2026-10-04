@@ -68,7 +68,7 @@ import motionkit.program.MoveTarget;
 import motionkit.trajectory.MotionLimits;
 import motionkit.trajectory.Trajectory;
 import motionkit.trajectory.ExecutionPlan;
-import motionkit.trajectory.ValidationGuarantee;
+import trajectorykit.validation.ValidationGuarantee;
 import motionkit.trajectory.PlanLimitError;
 import motionkit.trajectory.ValidationLimits;
 import robotkit.model.Joint;
@@ -239,7 +239,7 @@ class MotionKitTestSupport {
     var robot = new RuntimeRobotAdapter("limits", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name], false, false,
-      "simulated runtime fault", queueSupport);
+      "simulated runtime fault", queueSupport ? null : robotkit.world.ExecutionCapabilities.unavailable());
     var machine = MotionSystem.fromBlueprint(robot, blueprint);
     if (begin == null) machine.moveAxes([new AxisTarget("x", 0.15)], new MotionOptions(0.05, 0.4));
     else begin(machine);
@@ -330,7 +330,7 @@ class MotionKitTestSupport {
     var robot = new RuntimeRobotAdapter("rig", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name], false, false,
-      "simulated runtime fault", queueSupport);
+      "simulated runtime fault", queueSupport ? null : robotkit.world.ExecutionCapabilities.unavailable());
     return new TrialRig(MotionSystem.fromBlueprint(robot, blueprint), simulationHarness, robot);
   }
 
@@ -368,7 +368,7 @@ class MotionKitTestSupport {
     var robot = new RecordingRobot(new RuntimeRobotAdapter("dual-motor-geared", runtime,
       blueprint.model.name, [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name], false, false,
-      "simulated runtime fault", queueSupport), recording);
+      "simulated runtime fault", queueSupport ? null : robotkit.world.ExecutionCapabilities.unavailable()), recording);
     return new TrialRig(MotionSystem.fromBlueprint(robot, blueprint), simulationHarness, robot, recording);
   }
 

@@ -15,27 +15,21 @@ import robotkit.protocol.RecordingTimedEventMsg;
 import robotkit.protocol.RecordingWorldEventMsg;
 import robotkit.protocol.RecordingWorldMsg;
 
-/** Typed conversions between world values and v6 MessagePack payloads. */
+/** Typed conversions between world values and v7 MessagePack payloads. */
 class RobotRecordingCodec {
-  public static inline final VERSION:Int = 6;
+  public static inline final VERSION:Int = 7;
 
   public static function command(value:RobotCommand, robotId:RobotId):RecordingCommandMsg {
     var result = new RecordingCommandMsg();
     result.robotId = robotId;
     result.targets = [];
     result.expiryNs = Int64.ofInt(0);
-    result.tag = Int64.ofInt(0);
-    result.segments = [];
     result.plan = null;
     switch value {
       case JointTargets(targets, expiryNs):
         result.kind = 1;
         result.targets = [for (target in targets) jointTarget(target)];
         result.expiryNs = expiryNs == null ? Int64.ofInt(0) : expiryNs;
-      case TrajectoryChunk(chunk):
-        result.kind = 2;
-        result.tag = chunk.tag;
-        result.segments = [for (segment in chunk.segments) segmentMsg(segment)];
       case ExecutionPlan(plan): result.kind = 3; result.plan = planMsg(plan);
       case Hold: result.kind = 4;
       case Resume: result.kind = 5;
@@ -47,8 +41,6 @@ class RobotRecordingCodec {
   public static function readCommand(msg:RecordingCommandMsg):RobotCommand return switch msg.kind {
     case 1: JointTargets([for (target in msg.targets) readJointTarget(target)],
       Int64.compare(msg.expiryNs, Int64.ofInt(0)) == 0 ? null : msg.expiryNs);
-    case 2: TrajectoryChunk(TrajectoryChunk.fromSegments(
-      [for (segment in msg.segments) readSegment(segment)], msg.tag));
     case 3: ExecutionPlan(readPlan(msg.plan));
     case 4: Hold;
     case 5: Resume;

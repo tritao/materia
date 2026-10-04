@@ -440,17 +440,17 @@ runner.start(pick);
 ### Persistent recordings
 
 `McapRobotRecording` can preserve an in-memory `RobotRecording` while enqueueing
-versioned JSON payloads to a byte-bounded native writer thread. Pass
+version-7 MessagePack payloads to a byte-bounded native writer thread. Pass
 `retainInMemory = false` for file-only capture. Call `close()` to
 drain the queue and write the MCAP footer. Queue overflow, I/O failure, and a
 writer destroyed without a clean finish are explicit failures; `status()`
 exposes accepted, written, queued-event, queued-byte, and dropped counts.
 Terminal status is persisted beside the recording and can be inspected after
 restart with `McapRecordingReader.status(path)`. Files are currently
-uncompressed for straightforward inspection.
+LZ4-compressed by default, with an uncompressed option.
 
 `RecordingRobot` decorates any `Robot` with a `RobotRecordingSink`. It records
-each returned observation and each accepted `JointTargets` batch while
+each returned observation and each accepted command while
 delegating status, transport, and lifecycle to the wrapped adapter. Both the
 in-memory and MCAP writers implement the sink, so a control client can record a
 simulation or remote robot without changing its skill code. Logging failures
@@ -459,17 +459,15 @@ command or observation results.
 
 Every message carries a recording-wide 64-bit ordinal. It is the sole replay
 ordering key: robot and sensor source timestamps retain their clock-domain IDs
-and are never compared across domains. Wide sequences and timestamps are JSON
-decimal strings, avoiding precision loss in generic JSON tools. Payload schemas
-cover commands, robot snapshots, individual sensor frames, faults, world
-snapshots, and world lifecycle events. Schema v2 records complete joint target
-batches; readers also load v1 single-position commands as one-target batches.
+and are never compared across domains. MessagePack preserves their full-width
+integers. Payload schemas cover joint targets, execution plans and lifecycle
+commands, robot snapshots, individual sensor frames, faults, world snapshots,
+world lifecycle events and process events. Readers accept version 7 only.
 Recorded commands are history only; loading a file never forwards them to a
 live adapter.
 
 Recording timestamps are captured separately from event ordinals and stored in
-both MCAP time fields; the ordinal remains a full-width decimal string in the
-payload instead of masquerading as a timestamp. The reader validates
+MCAP log time; MCAP publish time stores the full-width ordinal for replay ordering. The reader validates
 the exact channel schema, channel/event type agreement, envelope ordinal and
 timestamp, and payload contract. `McapRecordingReader.next()` is an incremental
 cursor; the convenience `load()` method is the explicitly retaining variant.

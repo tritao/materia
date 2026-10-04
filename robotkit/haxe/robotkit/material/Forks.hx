@@ -106,7 +106,7 @@ class Forks {
     if (spread != null) targets.push(JointTarget.position(cast spreadIndex, spread));
     var capabilities = robot.capabilities();
     if (capabilities.jointCount > 0) {
-      if (!capabilities.supportsPosition)
+      if (!capabilities.accepts(robotkit.world.JointTargetMode.Position))
         throw "Robot does not support fork position targets";
       for (target in targets) if (target.joint >= capabilities.jointCount)
         throw 'Fork target joint ${target.joint} exceeds robot joint count ${capabilities.jointCount}';

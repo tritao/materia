@@ -159,16 +159,15 @@ class WorldTcpIntegration {
         Int64.ofInt(42)) != 0) throw 'expected protocol robot ID 42, got ${Std.string(protocolId)}';
       waitUntil(runtime, function() {
         var capabilities = remote.capabilities();
-        return capabilities.jointCount == 3 && capabilities.supportsPosition
-          && capabilities.supportsVelocity && capabilities.supportsEffort;
+        return capabilities.jointCount == 3 && capabilities.accepts(robotkit.world.JointTargetMode.Position)
+          && capabilities.accepts(robotkit.world.JointTargetMode.Velocity) && capabilities.accepts(robotkit.world.JointTargetMode.Effort);
       }, "robotd did not advertise all joint target modes");
 
       waitUntil(runtime, function() {
         var state = world.snapshot().robot(LOGICAL_ID);
         return state != null && state.positions.length > 0;
       }, "remote robot did not publish its initial state");
-      if (!remote.capabilities().supportsTrajectoryQueue ||
-          !remote.capabilities().supportsExecutionPlans)
+      if (!remote.capabilities().execution.plans)
         throw "robotd did not advertise its native plan queue";
       var initial = remote.snapshot().positions.toArray();
       var target = initial.copy();

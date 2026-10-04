@@ -32,8 +32,7 @@ class PlanExecutor {
 
   public function new(robot:Robot, ?jointIndices:Array<Int>,
       ?session:MotionSession) {
-    if (robot == null || !robot.capabilities().supportsExecutionPlans ||
-        !robot.capabilities().supportsTrajectoryQueue)
+    if (robot == null || !robot.capabilities().execution.plans)
       throw "PlanExecutor requires execution plan and trajectory queue support";
     this.robot = robot;
     ownsSession = session == null;

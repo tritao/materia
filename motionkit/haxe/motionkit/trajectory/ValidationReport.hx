@@ -1,5 +1,7 @@
 package motionkit.trajectory;
 
+import trajectorykit.validation.ValidationGuarantee;
+
 import TrajectoryCore;
 import haxe.Int64;
 

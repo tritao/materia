@@ -320,7 +320,7 @@ class RobotClient {
               requested.push(new StreamSubscription("camera", cameraMaxRateHz));
             if (subscribeObservations)
               requested.push(new StreamSubscription("observation"));
-            send(RobotProtocol.hello(new Hello(1, clientName, "robotkit-v1",
+            send(RobotProtocol.hello(new Hello(RobotFrame.VERSION, clientName, "robotkit-v2",
               requestedRole, requested)));
           } else if (kind == EventKind.TransportData) {
             receive(currentTransport);

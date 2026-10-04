@@ -8,7 +8,7 @@ class Hello {
   @:id(4) public var requestedRole:String;
   @:id(5) public var subscriptions:Array<StreamSubscription>;
 
-  public function new(?protocolVersion:Int = 1, ?clientName:String = "",
+  public function new(?protocolVersion:Int = RobotFrame.VERSION, ?clientName:String = "",
       ?schemaFingerprint:String = "", ?requestedRole:String = "controller",
       ?subscriptions:Array<StreamSubscription>) {
     this.protocolVersion = protocolVersion;

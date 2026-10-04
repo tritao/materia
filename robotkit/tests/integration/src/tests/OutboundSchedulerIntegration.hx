@@ -14,7 +14,6 @@ import robotkit.protocol.RobotMessageType;
 import robotkit.protocol.Hello;
 import robotkit.protocol.RobotProtocol;
 import robotkit.protocol.StreamSubscription;
-import haxeon.wire.MessagePackWriter;
 import robotkit.transport.NativeTransport;
 
 /** Exercises real NativeKit queue/transport behavior with a bounded dispatch step. */
@@ -42,18 +41,14 @@ class OutboundSchedulerIntegration {
       var server = accepted;
       if (server == null) throw "scheduler test TCP accept timed out";
       var scheduler = new OutboundScheduler(server, 256);
-      var legacyWriter = new MessagePackWriter();
-      legacyWriter.writeMapHeader(4);
-      legacyWriter.writeInt(1); legacyWriter.writeInt(1);
-      legacyWriter.writeInt(2); legacyWriter.writeString("legacy");
-      legacyWriter.writeInt(3); legacyWriter.writeString("robotkit-v1");
-      legacyWriter.writeInt(4); legacyWriter.writeString("observer");
-      var legacy = RobotProtocol.decodeHello(new RobotFrame(RobotMessageType.Hello,
-        legacyWriter.getBytes()));
-      if (legacy.subscriptions.length != 0) throw "missing Hello subscriptions did not decode empty";
-      scheduler.configure(legacy.subscriptions);
-      if (!scheduler.shouldOffer(OutboundFamily.Camera, "legacy", Int64.ofInt(1),
-          Int64.ofInt(0))) throw "legacy client lost camera family";
+      var oldVersion = new robotkit.protocol.Hello(1, "old-client", "robotkit-v1", "observer");
+      var unsupportedRejected = false;
+      try RobotProtocol.decodeHello(RobotProtocol.hello(oldVersion))
+        catch (_:Dynamic) unsupportedRejected = true;
+      if (!unsupportedRejected) throw "old protocol version was accepted";
+      scheduler.configure([]);
+      if (!scheduler.shouldOffer(OutboundFamily.Camera, "default", Int64.ofInt(1),
+          Int64.ofInt(0))) throw "default subscriptions lost camera family";
       scheduler.configure([new StreamSubscription("sensor", 2.0)]);
       scheduler.configure([new StreamSubscription("future_family", 1.0),
         new StreamSubscription("sensor", 2.0)]);

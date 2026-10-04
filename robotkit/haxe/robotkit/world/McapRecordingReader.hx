@@ -3,7 +3,7 @@ package robotkit.world;
 import RobotKitRuntime;
 import haxe.Int64;
 
-/** Incremental v6 MCAP cursor. Unknown channels can be skipped or rejected. */
+/** Incremental v7 MCAP cursor. Unknown channels can be skipped or rejected. */
 class McapRecordingReader {
   final owner:Ownedrk_recording_reader_handle;
   public final channels:RecordingChannels;
@@ -18,7 +18,7 @@ class McapRecordingReader {
     this.strict = strict;
     var opened = RobotKitRuntime.rk_recording_reader_open(path);
     if (opened.status == RobotKitRuntimeConstants.RK_ERROR_UNSUPPORTED)
-      throw "Recording schema version is not 6";
+      throw "Recording schema version is not 7";
     if (opened.status != RobotKitRuntimeConstants.RK_OK)
       throw 'Open recording failed with RobotKit status ${opened.status}';
     owner = opened.out_reader;
@@ -34,7 +34,7 @@ class McapRecordingReader {
       if (result.status != RobotKitRuntimeConstants.RK_OK)
         throw 'Read recording failed with RobotKit status ${result.status}';
       if (message.get_schema_version() != RobotRecordingEntry.VERSION)
-        throw "Recording schema version is not 6";
+        throw "Recording schema version is not 7";
       if (hasPrevious && Int64.compare(message.get_ordinal(), previous) <= 0)
         throw "Recording ordinals are not strictly increasing";
       previous = message.get_ordinal();

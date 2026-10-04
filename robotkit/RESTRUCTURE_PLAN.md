@@ -78,6 +78,25 @@ commits. R0 is merged to local main before R1 begins.
 
 ## R1 — One buffered execution abstraction, structured capabilities
 
+Completed on 2026-10-04, after R0's main merge `7db70f2cf`. The public command
+and runtime APIs now use execution plans exclusively; polynomial payloads remain
+as plan segments. Capabilities carry accepted modes, execution limits/features,
+timing and stream kinds, and shared validation guarantees. Adapter policies can
+reduce endpoint support and are enforced when accepting plans. Recording is
+version 7 and the remote envelope/handshake is version 2; previous versions are
+rejected. Recording fixtures and raw TCP clients are regenerated, with a
+reproducible fixture generator.
+
+All phase gate checks passed: full workspace (4,946 RobotWorld and 9,865 MotionKit
+assertions), all 52 compile targets, all RobotKit suites (16 native tests, device
+host/MCU, schemas, CAD bridge, MuJoCo and every managed TCP mode), robotd,
+humanoid, welder, completed worker demo, 8 MotionKit Release and 3 CAD tests,
+four-platform C ABI audits and exact runtime-fixture comparison. The full runner
+received SIGTERM while launching the welder after its preceding suites passed;
+the unchanged welder, worker and remaining native checks passed in separate runs.
+Mechanical guarantee-type movement remains a separate commit. R1 is merged to
+local main before R2 begins.
+
 - **Remove `TrajectoryChunk`.** `RobotCommand` keeps three kinds:
   - immediate control: `JointTargets`;
   - planned control: `ExecutionPlan` (`ExecutionPlanSubmission`);

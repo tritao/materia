@@ -235,8 +235,11 @@ class ConstructionSkillTests {
     // Replay the plan command stream and inspect its recorded process output.
     var replayDescription = new RobotDescription("construction-robot",
       "recorded construction robot", linkNames, jointNames);
-    var replayCapabilities = new RobotCapabilities("construction-robot", jointNames.length,
-      true, true, true, false, true, true);
+    var replayCapabilities = new RobotCapabilities("construction-robot",
+      jointNames.length,
+      [robotkit.world.JointTargetMode.Position, robotkit.world.JointTargetMode.Velocity, robotkit.world.JointTargetMode.Effort],
+      new robotkit.world.ExecutionCapabilities(true, 5, 64, 4096, true, true, true, trajectorykit.validation.ValidationGuarantee.Unchecked),
+      new robotkit.world.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked));
     var replay = new ReplayRobot("construction-robot", recording,
       replayDescription, replayCapabilities);
     for (command in recording.commands) {
