@@ -2256,3 +2256,16 @@ a structurally complete machining object; the simultaneous-mission rejection
 remains the assertion. Retried the failed picker, with the newly built native
 RobotKit runtime first on the library path. ProjectKit and RobotKit compiler
 checks passed. Remaining compiler checks and picker execution are pending.
+
+### G12 checkpoint — generated picker assembly corrections
+
+The focused picker reached actual assembly construction and exposed three
+errors hidden by compiler-only checks. The Z belt idler was 40 mm below the
+column end, leaving no common supporting plane; belt endpoints now span the
+column length, with their clamp on the upper part of the Z carriage. Switch
+registration now checks trigger connectors on the assembly member definition
+(including added member connectors), rather than only its component. Finally,
+the belt clamp connector names the lower belt face used by the planar path,
+while its jaw remains centred across the belt width. The picker is being
+retried against these corrections. Native runtime and homing tests remain
+unchanged. The compiler batch has passed StockKit, ToolpathKit and VisionKit.

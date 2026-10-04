@@ -118,8 +118,11 @@ class Gantry extends AxisBuilder {
 		if (spec.dualY) buildDrive(axes[1], spec.driveY, "YRight", "frameRight", "beamFootRight",
 			[right + 70, 0.0, feetZ + 6], alongY);
 		buildDrive(axes[0], spec.driveX, "X", "beam", "xCarriage", [0.0, 70, xPlateZ + 6], alongX);
+		// Belt endpoints fit the column's full length; the clamp remains on the
+		// carriage's upper edge. The screw nut and rack pinion sit 40 mm lower.
+		var zDriveDrop = switch spec.driveZ { case Belt(_, _, _): 0.0; case _: 40.0; };
 		buildDrive(axes[2], spec.driveZ, "Z", "zColumn", "zCarriage",
-			[70.0, zPlateY, xPlateZ - railMargin - 40], [0.0, 0, -1]);
+			[70.0, zPlateY, xPlateZ - railMargin - zDriveDrop], [0.0, 0, -1]);
 		buildSwitches(axes[1], "YLeft", "frameLeft", "beamFootLeft", 0, -1, alongY);
 		if (spec.dualY) buildSwitches(axes[1], "YRight", "frameRight", "beamFootRight", 0, 1, alongY);
 		buildSwitches(axes[0], "X", "beam", "xCarriage", 1, 1, alongX);

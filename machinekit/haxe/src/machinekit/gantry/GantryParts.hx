@@ -93,7 +93,8 @@ class GantryBeltClamp extends MachineComponent {
 			if (!Math.isFinite(value) || value <= 0) throw "Belt clamp dimensions must be positive";
 		super("GANTRY-BELT-CLAMP-W" + Dimension.format(beltWidth) + "-T" + Dimension.format(bandThickness), "Gantry belt clamp", "aluminium 6061", true);
 		this.beltWidth = beltWidth; this.bandThickness = bandThickness;
-		addConnector("belt", machinekit.component.ConnectorRole.Mount, AssemblyFrames.identity());
+		// The path is defined on the belt's lower face; the jaw is centred on its width.
+		addConnector("belt", machinekit.component.ConnectorRole.Mount, AssemblyFrames.translation(0, 0, -beltWidth / 2));
 	}
 	override public function hasGeometry():Bool return true;
 	override public function geometry(detail:ComponentDetail = Preview):Part {
