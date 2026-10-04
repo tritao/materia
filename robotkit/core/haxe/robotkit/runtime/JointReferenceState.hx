@@ -10,6 +10,7 @@ class JointReferenceState {
   final latched:Array<Bool> = [];
   final driveCalibrated:Array<Bool> = [];
   final latchOffsets:Array<Float> = [];
+  final leaderLatchOffsets:Array<Float> = [];
   final referenced:Array<Bool> = [];
   final offsets:Array<Float> = [];
   final couplings:Array<RobotRuntimeJointCouplingBlueprint>;
@@ -23,6 +24,7 @@ class JointReferenceState {
       for (value in template.latched) latched.push(value);
       for (value in template.driveCalibrated) driveCalibrated.push(value);
       for (value in template.latchOffsets) latchOffsets.push(value);
+      for (value in template.leaderLatchOffsets) leaderLatchOffsets.push(value);
       for (value in template.referenced) referenced.push(value);
       for (value in template.offsets) offsets.push(value);
       return;
@@ -44,6 +46,7 @@ class JointReferenceState {
       var joint = names.indexOf(contact.joint);
       if (joint < 0) throw 'Home switch "${contact.id}" monitors an unknown joint';
       homeJoints.push(joint); latched.push(false); latchOffsets.push(0.0);
+      leaderLatchOffsets.push(0.0);
       homeDrives.push(SwitchDriveBinding.resolve(blueprint, contact));
       driveCalibrated.push(false);
     }
@@ -83,7 +86,7 @@ class JointReferenceState {
   }
 
   /** All required home signals, including both Y sides, must latch before admission. */
-  public function latch(switchId:String, observedPosition:Float):Void {
+  public function latch(switchId:String, observedPosition:Float, ?leaderPosition:Float):Void {
     if (!Math.isFinite(observedPosition)) throw "Home latch position must be finite";
     var index = -1;
     for (i in 0...homes.length) if (homes[i].id == switchId) index = i;
@@ -91,7 +94,10 @@ class JointReferenceState {
     var zero = homes[index].trip - observedPosition;
     if (!Math.isFinite(zero)) throw "Home coordinate zero must be finite";
     if (!Math.isFinite(homeDrives[index].ratio * zero)) throw "Home shaft coordinate zero must be finite";
+    var leaderZero = homes[index].trip - (leaderPosition == null ? observedPosition : leaderPosition);
+    if (!Math.isFinite(leaderZero)) throw "Home leader coordinate zero must be finite";
     latchOffsets[index] = zero;
+    leaderLatchOffsets[index] = leaderZero;
     latched[index] = true;
     driveCalibrated[index] = false;
     refresh();
@@ -135,14 +141,14 @@ class JointReferenceState {
 
   /** A power cycle loses every switch-derived reference and calibrated zero. */
   public function invalidate():Void {
-    for (i in 0...latched.length) { latched[i] = false; latchOffsets[i] = 0.0; driveCalibrated[i] = false; }
+    for (i in 0...latched.length) { latched[i] = false; latchOffsets[i] = 0.0; leaderLatchOffsets[i] = 0.0; driveCalibrated[i] = false; }
     refresh();
   }
 
   public function invalidateJoint(joint:Int):Void {
     requireJoint(joint);
     for (i in 0...homeJoints.length) if (homeJoints[i] == joint) {
-      latched[i] = false; latchOffsets[i] = 0.0; driveCalibrated[i] = false;
+      latched[i] = false; latchOffsets[i] = 0.0; leaderLatchOffsets[i] = 0.0; driveCalibrated[i] = false;
     }
     refresh();
   }
@@ -171,7 +177,7 @@ class JointReferenceState {
         if (!latched[i]) referenced[joint] = false;
         // The first authored home is the leader's coordinate reference. Other
         // side latches are required independently; their zeros are not averaged.
-        if (first) { offsets[joint] = latched[i] ? latchOffsets[i] : 0.0; first = false; }
+        if (first) { offsets[joint] = latched[i] ? leaderLatchOffsets[i] : 0.0; first = false; }
       }
     }
     // Fixed-point propagation handles chained and multiple-input followers.

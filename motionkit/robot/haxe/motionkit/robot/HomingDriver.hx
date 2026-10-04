@@ -8,7 +8,7 @@ interface HomingDriver {
   function velocity(joint:Int, velocity:Float, acceleration:Float):Void;
   function stop(joint:Int, acceleration:Float):Void;
   /** Establish the runtime zero and reset encoder/slip monitors at the captured latch. */
-  function latch(switchId:String, counterPosition:Float):Void;
+  function latch(switchId:String, counterPosition:Float, ?leaderCounterPosition:Float):Void;
   function returnHome(joint:Int, position:Float, velocity:Float, acceleration:Float):Void;
 }
 

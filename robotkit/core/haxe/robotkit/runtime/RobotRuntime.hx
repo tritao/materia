@@ -412,12 +412,12 @@ class RobotRuntime {
   }
 
   /** Latch an actual home edge in endpoint/counter coordinates, never an ordinary move. */
-  public function latchHome(switchId:String, counterPosition:Float):Void {
+  public function latchHome(switchId:String, counterPosition:Float, ?leaderCounterPosition:Float):Void {
     ensureLive();
     referenceMutex.acquire();
     try {
       var candidate = references.copy();
-      candidate.latch(switchId, counterPosition);
+      candidate.latch(switchId, counterPosition, leaderCounterPosition);
       var joint = candidate.homeJoint(switchId);
       var ready:Array<Int> = candidate.isReferenced(joint) ? [joint] : [];
       check(endpoint.calibrateHome(candidate.coordinateOffsets(), ready), "runtime.latchHome");

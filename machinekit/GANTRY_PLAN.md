@@ -2074,3 +2074,23 @@ scope and independent counter zeros through the device protocol and call these
 operations on every lifecycle exit; simulation holds remain unsupported on
 virtual-device endpoints until that transport work. No builds or tests ran.
 Physical homing regression coverage and the post-G12 checkpoint remain pending.
+
+### G12 — compensate leader zero for first-side hold displacement
+
+Squaring scope: `d6eb92737`. Source tracing of the intended physical regression
+revealed that using the first held motor's original edge directly as the leader
+zero leaves the leader's subsequent travel unaccounted for. Retain two zeros:
+the individual motor zero from its original captured counter, and the leader
+zero from a compensated capture. At rest, convert current motor counter to
+axis coordinates and subtract its difference from the current leader counter
+from the original capture. This includes the displacement accumulated while
+the motor held. Runtime positions are reduced by their existing coordinate
+zeros before computing the counter difference.
+
+Pass the compensated leader capture through HomingDriver and RobotRuntime,
+retain/copy/invalidate it separately in JointReferenceState, and continue using
+the original side zero for the atomic motor calibration. For 1 mm subsequent
+leader travel, this corrects the missing 1 mm leader translation instead of
+leaving both aligned motors displaced from true zero on return. This is source
+reasoning, not runtime evidence. Physical regression and the requested build
+checkpoint remain pending; no builds or tests ran.

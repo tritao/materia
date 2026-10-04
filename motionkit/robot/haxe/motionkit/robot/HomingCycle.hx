@@ -130,7 +130,8 @@ class HomingCycle {
             for (i in 0...axis.switches.length) {
               var capture = captures[i];
               if (capture == null) throw "Homing has no captured latch position";
-              driver.latch(axis.switches[i].id, capture);
+              var leaderCapture:Null<Float> = axis.switches.length > 1 ? sides.leaderCapture(axis.switches[i].id, capture) : null;
+              driver.latch(axis.switches[i].id, capture, leaderCapture);
             }
             if (axis.switches.length > 1) {
               sides.calibrate([for (contact in axis.switches) contact.id]);

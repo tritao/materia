@@ -7,6 +7,7 @@ class SimulatedHomingSides implements HomingSideControl {
   final runtime:RobotRuntime;
   final drives:Map<String, SwitchDriveBinding> = new Map();
   final held:Map<Int, Float> = new Map();
+  final leaders:Map<String, Int> = new Map();
   var squaring:Array<String> = [];
 
   @:allow(robotkit.runtime.Simulation)
@@ -17,6 +18,8 @@ class SimulatedHomingSides implements HomingSideControl {
     for (contact in blueprint.switches) if (contact.role == "home" && contact.driveJoint != null) {
       if (drives.exists(contact.id)) throw "Duplicate side home switch";
       drives.set(contact.id, SwitchDriveBinding.resolve(blueprint, contact));
+      for (i in 0...blueprint.jointCount) if (blueprint.identity.jointId(i) == contact.joint)
+        leaders.set(contact.id, i);
     }
   }
 
@@ -47,6 +50,18 @@ class SimulatedHomingSides implements HomingSideControl {
     var position = positions[drive.joint];
     simulation.setSquaringHold(robotIndex, drive.joint, true, position);
     held.set(drive.joint, position);
+  }
+
+  public function leaderCapture(switchId:String, sideCapture:Float):Float {
+    if (squaring.indexOf(switchId) < 0 || !Math.isFinite(sideCapture)) throw "Leader capture requires active squaring";
+    var drive = drives.get(switchId), leader = leaders.get(switchId);
+    if (drive == null || leader == null) throw "Missing side-to-leader binding";
+    var q = runtime.snapshot().q.toArray();
+    var side = drive.position(q[drive.joint] - runtime.referenceOffset(drive.joint));
+    var axis = q[leader] - runtime.referenceOffset(leader);
+    var capture = sideCapture - (side - axis);
+    if (!Math.isFinite(capture)) throw "Invalid compensated leader capture";
+    return capture;
   }
 
   public function calibrate(switchIds:Array<String>):Void {
