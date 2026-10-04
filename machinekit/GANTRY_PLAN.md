@@ -3372,3 +3372,35 @@ passed for the final frame layout (1044 sources) and MotionKit bootstrap
 intersecting the left beam foot by 1344 mm³. Its rear edge now uses the nearer
 of the beam and beam-foot envelopes. Compiler-only passed after that correction;
 the next sweep is running. No complete Phase C pass is claimed.
+
+
+### Phase C — clear the Z trigger from the corner Y rail
+
+The final beam-foot correction compiled, and the next sweep found the Z trigger
+intersecting railYLeft by 1504 mm³ at the zero corner. The outboard Z tab is now
+26 mm wide and centred 10 mm beyond the carriage edge: it retains 3 mm of
+attachment and covers both sensor lanes without reaching the corner Y rails.
+This correction is pending the mechanical gate; G13 remains in progress.
+
+The 26 mm tab compiled and cleared railYLeft, then intersected frameLeft by
+8466 mm³. The tab now uses 20 mm width at 7 mm outboard, covering the 10 mm
+sensor spacing plus M8 diameter and retaining 3 mm attachment. The guide margin
+also accounts for half the frame profile width plus the tab envelope and
+clearance, so wider profiles retain the same space. Validation is pending.
+
+
+### Phase C — derive the minimum flange reach
+
+The final 20 mm Z tab compiled and passed the corner rail/frame contacts. The
+sweep then found flange/zColumn interference (4884.44 mm³) in the default zero
+toolReach layout. The physical flange outer diameter now sets a minimum reach
+that clears the column by 3 mm; larger requested reaches remain respected.
+The carriage depth and front-frame envelope use that same derived reach.
+This layout correction and the remainder of the mechanical gate are pending.
+
+Source geometry audit adds the rail height to that minimum reach: railZ extends
+forward of the column face, so clearance uses the guide block height minus
+rail height, plus the carriage spacing. Both players' latch hooks were also
+checked: they reset EncoderMonitor to calibrated q and clear StepperSlip loss
+history with rebaseAfterHoming, preserving the endpoint's calibrated offsets.
+Compiler-only passed before the rail-height adjustment; its retry is running.

@@ -45,11 +45,14 @@ class Gantry extends AxisBuilder {
 		var frame = TSlotExtrusion.forProfile(spec.frameProfile);
 		var beam = TSlotExtrusion.forProfile(spec.beamProfile);
 		var guide = LinearRailBlock.metric(spec.railProfile).spec;
-		railMargin = Math.max(80, guide.railEndMargin + guide.blockLength / 2 + 20);
+		var flange = new RobotFlange(50);
+		// The flange's rear rim must clear the column's projecting rail by 3 mm.
+		var toolReach = Math.max(spec.toolReach, flange.flangeDiameter / 2 + 3 - (guide.blockHeight - guide.railHeight + 4));
+		railMargin = Math.max(Math.max(80, frame.size / 2 + 60), guide.railEndMargin + guide.blockLength / 2 + 20);
 		var left = -railMargin - spec.sideExtension, right = spec.travelX + railMargin + spec.sideExtension;
 		// Keep the front crossmember ahead of the full vertical carriage sweep.
 		var columnY = -(beam.size / 2 + frame.height / 2 + 40);
-		var carriageFront = columnY - frame.height / 2 - guide.blockHeight - 8 - spec.toolReach;
+		var carriageFront = columnY - frame.height / 2 - guide.blockHeight - 8 - toolReach;
 		var front = Math.min(-railMargin, carriageFront - frame.size / 2 - 3) - spec.frontExtension;
 		var back = spec.travelY + railMargin;
 		var frameZ = spec.travelZ + 350 + spec.frameLift;
@@ -107,10 +110,9 @@ class Gantry extends AxisBuilder {
 			AxisBuilder.orient(0, railZFace, xPlateZ - railMargin, [0.0, -1, 0], [0.0, 0, -1]),
 			{x: 0.0, y: 0.0, z: -1.0});
 		var zPlateY = railZFace - (guide.blockHeight - guide.railHeight) - 4;
-		attach("zCarriage", new GantryPlate("Z carriage", 80, 8 + spec.toolReach, 100),
-			AssemblyFrames.translation(0, zPlateY - spec.toolReach / 2, xPlateZ - railMargin - 80), "blockZ");
-		var flange = new RobotFlange(50);
-		flangeZero = AxisBuilder.orient(0, zPlateY - spec.toolReach, xPlateZ - railMargin - 80 - flange.thickness,
+		attach("zCarriage", new GantryPlate("Z carriage", 80, 8 + toolReach, 100),
+			AssemblyFrames.translation(0, zPlateY - toolReach / 2, xPlateZ - railMargin - 80), "blockZ");
+		flangeZero = AxisBuilder.orient(0, zPlateY - toolReach, xPlateZ - railMargin - 80 - flange.thickness,
 			[0.0, 1, 0], [0.0, 0, -1]);
 		attach("flange", flange, flangeZero, "zCarriage");
 		exposeConnector("toolFlange", "flange", "face");
@@ -149,6 +151,10 @@ class Gantry extends AxisBuilder {
 		// Z workpieces rise in front of the column. Keep the fixed switches
 		// alongside it; the outboard trigger stays clear of the rear beam.
 		if (suffix == "Z") {
+			// A 20 mm tab covers both sensor lanes and overlaps the carriage
+			// by 3 mm without reaching the Y rails or frame at the X travel corners.
+			point[outboardAxis] = (sign < 0 ? bounds.min[outboardAxis] : bounds.max[outboardAxis]) + sign * 7;
+			dimensions[outboardAxis] = 20;
 			var column = mountBounds(component(fixed), zeroPose(fixed));
 			var rearBeam = mountBounds(component("beam"), zeroPose("beam"));
 			var rearFoot = mountBounds(component("beamFootLeft"), zeroPose("beamFootLeft"));

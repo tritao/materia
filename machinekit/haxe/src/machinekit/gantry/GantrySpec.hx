@@ -39,7 +39,7 @@ class GantrySpec {
 	public final sideExtension:Float;
 	/** Extra frame elevation above the default work envelope, in millimetres. */
 	public final frameLift:Float;
-	/** Forward flange reach from the Z guide, in millimetres. */
+	/** Requested forward flange reach, in millimetres; enlarged as needed to clear the Z column. */
 	public final toolReach:Float;
 	public final head:GantryHead;
 	/** Allowed side-to-side displacement; a stated design assumption until measured. */
