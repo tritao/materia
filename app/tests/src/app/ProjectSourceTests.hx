@@ -892,6 +892,25 @@ class ProjectSourceTests {
                 Math.abs(contact.position.z - seat.z) <= supportDepth) supported = true;
           }
           if (supported) continue;
+          if (contact.linkIndex != mission.toolLink) {
+            var body = mission.simulation.linkPose(0, contact.linkIndex);
+            for (hull in mission.robot.hulls) if (hull.link == contact.linkIndex) {
+              var lo = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
+              var hi = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
+              for (vertex in 0...Std.int(hull.vertices.length / 3)) {
+                var point = rotateVector(hull.vertices[vertex * 3], hull.vertices[vertex * 3 + 1],
+                  hull.vertices[vertex * 3 + 2], body.rotation);
+                for (axis in 0...3) {
+                  lo[axis] = Math.min(lo[axis], point[axis] + body.position[axis]);
+                  hi[axis] = Math.max(hi[axis], point[axis] + body.position[axis]);
+                }
+              }
+              var point = [contact.position.x, contact.position.y, contact.position.z];
+              var near = true;
+              for (axis in 0...3) if (point[axis] < lo[axis] - 0.002 || point[axis] > hi[axis] + 0.002) near = false;
+              if (near) Sys.println("picker contact candidate: " + hull.part + "; bounds=" + lo.join(",") + " / " + hi.join(","));
+            }
+          }
           // The compliant cup deliberately presses at most 3 mm into its intended grasp surface.
           check(contact.linkIndex == mission.toolLink && contact.otherKind == robotkit.runtime.RobotContactOtherKind.Object &&
             contact.distance >= -0.004, "picker has no unintended robot contact: link=" + contact.linkIndex +

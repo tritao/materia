@@ -39,6 +39,8 @@ class GantrySpec {
 	public final sideExtension:Float;
 	/** Extra frame elevation above the default work envelope, in millimetres. */
 	public final frameLift:Float;
+	/** Forward flange reach from the Z guide, in millimetres. */
+	public final toolReach:Float;
 	public final head:GantryHead;
 	/** Allowed side-to-side displacement; a stated design assumption until measured. */
 	public final racking:Float;
@@ -53,7 +55,7 @@ class GantrySpec {
 			railProfile:String = "MGN12C", motorFrame:Int = 23,
 			frameProfile:String = "HFS5-4040", beamProfile:String = "HFS5-4040",
 			tableMounted:Bool = false, head:GantryHead = None, racking:Float = 0.5,
-			supplyVoltage:Float = 24, microsteps:Int = 16, frontExtension:Float = 0, sideExtension:Float = 0, frameLift:Float = 0) {
+			supplyVoltage:Float = 24, microsteps:Int = 16, frontExtension:Float = 0, sideExtension:Float = 0, frameLift:Float = 0, toolReach:Float = 0) {
 		for (value in [travelX, travelY, travelZ, racking, supplyVoltage])
 			if (!Math.isFinite(value) || value <= 0) throw "Gantry dimensions and electrical limits must be finite and positive";
 		if (microsteps <= 0) throw "Gantry microsteps must be positive";
@@ -71,10 +73,12 @@ class GantrySpec {
 		this.frontExtension = frontExtension;
 		this.sideExtension = sideExtension;
 		this.frameLift = frameLift;
+		if (!Math.isFinite(toolReach) || toolReach < 0) throw "Gantry tool reach must be finite and non-negative";
+		this.toolReach = toolReach;
 		this.racking = racking; rackingBasis = ValueBasis.Assumed;
 		this.supplyVoltage = supplyVoltage; this.microsteps = microsteps;
 		assumedFields = ["travelX", "travelY", "travelZ", "driveX", "driveY", "driveZ", "dualY",
 			"railProfile", "motorFrame", "frameProfile", "beamProfile", "tableMounted", "head",
-			"racking", "supplyVoltage", "microsteps", "frontExtension", "sideExtension", "frameLift"];
+			"racking", "supplyVoltage", "microsteps", "frontExtension", "sideExtension", "frameLift", "toolReach"];
 	}
 }

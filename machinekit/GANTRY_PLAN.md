@@ -563,7 +563,7 @@ G0 → G1 → G2 → G3 ──────────────────�
 | G9 | implementation added; migration verification deferred | `cd7853a82` |
 | G10 | implementation added; mechanical/simulation verification deferred | see progress notes |
 | G11 | in progress; reference-state foundation added | see progress notes |
-| G12 | in progress; side holds and counter calibration wired; validation pending | see progress notes |
+| G12 | implemented; requested compiler/runtime/picker/homing checkpoint passed | see progress notes |
 | G13 | planned | — |
 | G14 | planned | — |
 | G15 | planned | — |
@@ -2441,3 +2441,29 @@ budget from the active handling runner's pressDepth plus a stated 2 mm contact
 settling allowance. Matching carton handle, own-pad footprint/height and
 vertical normal remain mandatory; other body and cup contact assertions remain
 unchanged. The app compiler is running for the failed-picker retry.
+
+
+### G12 checkpoint — clear the carton lift path and picker passed
+
+The final pad-budget retry exposed contact with `switchZpositiveLimitMount`,
+then the column itself as the first carton lifted. Contact diagnostics now
+identify candidate part bounds on the reported rigid-body link. Moving the Z
+switch line alongside the column, with an extended outboard trigger, clears
+the carton while avoiding the beam. A new nonnegative assumed `toolReach`
+(default zero) extends the physical Z carriage plate and moves its flange
+forward. The picker uses 60 mm reach; its frame lift remains 50 mm. Raising the
+frame another 10 mm only delayed the contact and was reverted.
+
+The focused G7 picker passed against the rebuilt native runtime: all six
+cartons placed within the existing 2 mm / 2 degree checks, 48 checked plans,
+no stalls, 180.38 seconds simulated time, and 78,005 bytes per execution tick.
+No collision assertions were disabled. Log:
+`/home/joao/dev/materia-cache/claude-scratch/gantries-g12-picker.log`.
+
+The complete compiler-only batch, separate CadKit/MotionKit compiles, native
+build and all 18 native tests, and focused homing test have passing results
+recorded above. Compiler-only checks for the final MachineKit geometry (1,036 sources) and app
+module (1,782 sources) also passed. The requested G12 checkpoint is complete. Unchanged green
+native and homing tests were not repeated. G13 remains unstarted at this checkpoint; subsequent full tests run at phase
+boundaries. Final compiler logs are `gantries-g12-machinekit-final.log` and
+`gantries-g12-app-final.log` in the same scratch directory.

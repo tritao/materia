@@ -104,10 +104,10 @@ class Gantry extends AxisBuilder {
 			AxisBuilder.orient(0, railZFace, xPlateZ - railMargin, [0.0, -1, 0], [0.0, 0, -1]),
 			{x: 0.0, y: 0.0, z: -1.0});
 		var zPlateY = railZFace - (guide.blockHeight - guide.railHeight) - 4;
-		attach("zCarriage", new GantryPlate("Z carriage", 80, 8, 100),
-			AssemblyFrames.translation(0, zPlateY, xPlateZ - railMargin - 80), "blockZ");
+		attach("zCarriage", new GantryPlate("Z carriage", 80, 8 + spec.toolReach, 100),
+			AssemblyFrames.translation(0, zPlateY - spec.toolReach / 2, xPlateZ - railMargin - 80), "blockZ");
 		var flange = new RobotFlange(50);
-		flangeZero = AxisBuilder.orient(0, zPlateY, xPlateZ - railMargin - 80 - flange.thickness,
+		flangeZero = AxisBuilder.orient(0, zPlateY - spec.toolReach, xPlateZ - railMargin - 80 - flange.thickness,
 			[0.0, 1, 0], [0.0, 0, -1]);
 		attach("flange", flange, flangeZero, "zCarriage");
 		exposeConnector("toolFlange", "flange", "face");
@@ -143,6 +143,13 @@ class Gantry extends AxisBuilder {
 		point[outboardAxis] = (sign < 0 ? bounds.min[outboardAxis] : bounds.max[outboardAxis]) + sign * 18;
 		var dimensions = [10.0, 10.0, 6.0];
 		dimensions[outboardAxis] = 40;
+		// Z workpieces rise in front of the column. Keep the fixed switches
+		// alongside it; the outboard trigger stays clear of the rear beam.
+		if (suffix == "Z") {
+			var column = mountBounds(component(fixed), zeroPose(fixed));
+			point[1] = column.max[1] - 10;
+			dimensions[1] = 2 * (point[1] - bounds.max[1] + 3);
+		}
 		for (i in 0...3) if (Math.abs(direction[i]) > 0.5)
 			dimensions[i] = bounds.max[i] - bounds.min[i] + 6;
 		var target = new GantryPlate("switch trigger", dimensions[0], dimensions[1], dimensions[2]);
