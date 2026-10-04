@@ -365,7 +365,7 @@ std::string import_model(const mjModel *m, const std::filesystem::path &out_dir,
             ", \"type\": " + json_string(type) + ", \"parentLink\": " +
             json_string(link_ids.at(m->body_parentid[body])) + ", \"childLink\": " + json_string(link_id) +
             ", \"limits\": {\"lower\": " + number(lower) + ", \"upper\": " + number(upper) +
-            ", \"velocity\": 0, \"effort\": " + number(effort) + ", \"maxAcceleration\": 0}" +
+            ", \"velocity\": null, \"effort\": " + (effort > 0 ? number(effort) : "null") + ", \"maxAcceleration\": null}" +
             ", \"parentFramePosition\": " + array(joint_pos) + ", \"parentFrameRotation\": " +
             array(parent_rot) + ", \"childFramePosition\": " + array(anchor) +
             ", \"childFrameRotation\": [0, 0, 0, 1], \"axis\": " + array(axis) +
@@ -405,7 +405,7 @@ std::string import_model(const mjModel *m, const std::filesystem::path &out_dir,
             else ++damping_ratio_actuators;
         }
         actuators.push_back("{\"id\": " + json_string("actuator/" + name) + ", \"maxEffort\": " +
-                            number(effort) + ", \"maxRate\": 0, \"servoStiffness\": " +
+                            (effort > 0 ? number(effort) : "null") + ", \"maxRate\": null, \"servoStiffness\": " +
                             number(stiffness) + ", \"servoDamping\": " + number(servo_damping) +
                             ", \"transmission\": " +
                             "{\"kind\": \"simple\", \"jointId\": " + json_string(joint_ids.at(joint)) +
