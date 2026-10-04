@@ -87,6 +87,22 @@ class ToolFreedom {
     return rows;
   }
 
+  /** Angular path rate that the hard task actually requires, in the path frame. */
+  public static function requiredAngular(actual:Pose3, angular:Array<Float>, policy:Null<OrientationPolicy>):Array<Float> {
+    if (isFull(policy)) return angular;
+    switch policy {
+      case Cone(_, _): return [0.0, 0.0, 0.0]; // Its axis is constant in the path frame.
+      default:
+    }
+    var required = [0.0, 0.0, 0.0];
+    for (row in twistRows(actual, policy)) {
+      var value = 0.0;
+      for (axis in 0...3) value += row[axis + 3]*angular[axis];
+      for (axis in 0...3) required[axis] += row[axis + 3]*value;
+    }
+    return required;
+  }
+
   public static function toolAxis(pose:Pose3):Array<Float>
     return [2.0*(pose.qx*pose.qz + pose.qw*pose.qy),
       2.0*(pose.qy*pose.qz - pose.qw*pose.qx),

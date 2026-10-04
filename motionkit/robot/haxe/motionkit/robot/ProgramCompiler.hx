@@ -566,10 +566,13 @@ class ProgramCompiler {
       if (arriving == null) secondBefore.push(second[k]);
       else {
         var before = arriving.primitive.derivativesAt(arriving.local);
+        var pose = solver.forward(q);
+        var beforeAngular = ToolFreedom.requiredAngular(pose, before.angular, arriving.primitive.orientationPolicy());
+        var leavingAngular = ToolFreedom.requiredAngular(pose, leaving.angular, sample.primitive.orientationPolicy());
         var turn = 0.0;
         for (axis in 0...3) turn = Math.max(turn, Math.max(
           Math.abs(before.linear[axis] - leaving.linear[axis]),
-          Math.abs(before.angular[axis] - leaving.angular[axis])));
+          Math.abs(beforeAngular[axis] - leavingAngular[axis])));
         if (turn > 1e-6)
           throw 'Motion program op $index turns a corner at path distance ${sample.distance}: blend it or stop there';
         secondBefore.push(jointCurvature(q, rate, before, redundancy, arriving.primitive.orientationPolicy()));
@@ -756,10 +759,12 @@ class ProgramCompiler {
       if (k > start) {
         var before = path.primitives[k - 1];
         var arriving = before.derivativesAt(before.length()), leaving = primitive.derivativesAt(0.0);
+        var beforeAngular = ToolFreedom.requiredAngular(before.endWaypoint().pose, arriving.angular, before.orientationPolicy());
+        var leavingAngular = ToolFreedom.requiredAngular(primitive.startWaypoint().pose, leaving.angular, primitive.orientationPolicy());
         var turn = 0.0;
         for (axis in 0...3) turn = Math.max(turn, Math.max(
           Math.abs(arriving.linear[axis] - leaving.linear[axis]),
-          Math.abs(arriving.angular[axis] - leaving.angular[axis])));
+          Math.abs(beforeAngular[axis] - leavingAngular[axis])));
         if (turn > 1e-6) {
           sections.push({path: new PosePath(path.frameId, path.primitives.slice(start, k)), offset: sectionOffset});
           start = k;

@@ -73,6 +73,31 @@ class ToolFreedomTests extends MotionKitTestSupport {
       OrientationPolicy.FreeAboutTool)]), seed, Int64.ofInt(21));
     check(line.blocks[0].plans.length == 1, "MoveL carries its explicit freedom into planning");
     line.dispose();
+    var middle = new PoseWaypoint(new Pose3(0.1, 0.05, 0.05, 0, 0, Math.sin(0.2), Math.cos(0.2)),
+      1e-4, 1e-4);
+    var segmented = new PosePath("work", [
+      new PoseLine(new PoseWaypoint(solver.forward(seed), 1e-4, 1e-4), middle,
+        OrientationPolicy.FreeAboutTool, 0.1, 0.1),
+      new PoseLine(middle, new PoseWaypoint(target, 1e-4, 1e-4),
+        OrientationPolicy.FreeAboutTool, 0.1, 0.1)
+    ]);
+    var joined = compiler.compile(new MotionProgram([MotionOp.FollowPath(segmented, "work", 0.1, [])]), seed,
+      Int64.ofInt(22));
+    check(joined.blocks[0].plans.length == 1, "Continuous path tolerates a change in the free spin rate at its junction");
+    joined.dispose();
+    var fullMiddle = new PoseWaypoint(new Pose3(0.1, 0.05, 0.05, 0, 0, Math.sin(0.01), Math.cos(0.01)),
+      1e-4, 1e-4);
+    var fullEnd = new PoseWaypoint(new Pose3(0.2, 0.1, 0.1, 0, 0, Math.sin(0.05), Math.cos(0.05)),
+      1e-4, 1e-4);
+    var hardSpin = new PosePath("work", [
+      new PoseLine(new PoseWaypoint(solver.forward(seed), 1e-4, 1e-4), fullMiddle,
+        OrientationPolicy.Interpolated, 0.1, 0.1),
+      new PoseLine(fullMiddle, fullEnd, OrientationPolicy.Interpolated, 0.1, 0.1)
+    ]);
+    var stopped = compiler.compile(new MotionProgram([MotionOp.FollowPath(hardSpin, "work", 0.1, [])]), seed,
+      Int64.ofInt(23));
+    check(stopped.blocks[0].plans.length == 2, "Hard spin rate discontinuity still creates an exact stop at its junction");
+    stopped.dispose();
   }
 
   public function testUnreachableTilt():Void {

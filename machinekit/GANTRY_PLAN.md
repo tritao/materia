@@ -553,7 +553,7 @@ G0 → G1 → G2 → G3 ──────────────────�
 |------|-------|---------|
 | G0 | done; full gate passed | `a8349cdea`, `29b9da11b` |
 | G1 | done | `e0b50b5ec` |
-| G2 | Core implementation verified; junction freedom check pending | G2 preparation commit |
+| G2 | Complete; full gate passed | `c73877872` preparation; this step commit |
 | G3 | planned | — |
 | G4 | R0/R1 source integration complete; full gate passed | `05271b08d`; source merges `7db70f2cf`, `bce647683` |
 | G5 | planned | — |
@@ -736,7 +736,7 @@ MotionKit remains at 13059 assertions, including G1 coverage. Submodule pins
 and the two unstaged vendor symlinks are unchanged.
 
 
-### G2 — tool freedom through IK and planning (2026-10-04, verification pending)
+### G2 — tool freedom through IK and planning complete (2026-10-04)
 
 `IkOptions` carries the position mask and `FrameOrientation` through ordinary
 and moving-base tool tasks. Its immutable orientation preference is a separate
@@ -789,3 +789,19 @@ arguments as required; concrete calls retain their flags. A fresh one-source
 project, with the compiler server disabled, reproduces E1008 for an omitted
 optional integer argument. No compiler
 source or dependency pin was changed.
+
+
+**G2 junction follow-up:** the core gate is committed as `c73877872`.
+A two-line path with continuous translation but differing free-spin rates
+exposed an unnecessary exact stop: corner splitting compared the raw angular
+rates and produced two plans. Both splitting and in-plan junction validation
+now use `ToolFreedom.requiredAngular`, projecting onto the hard task. Full
+policies return the original angular array, preserving their comparisons.
+The free-spin regression now produces one continuous plan; the full-orientation
+control still produces two plans for its genuine angular-rate discontinuity.
+Focused coverage passes 283 assertions. The `g2-junction-complete` full gate passed all fourteen suites, app build
+and full project-source tests (all exit 0). MotionKit passes 13342 assertions
+(+283 G2 coverage), RobotKit 4955 (+9 masked-task/preference coverage).
+All recorded G0 mechanical, drive, cutting and mission numbers hold. This
+follow-up completes G2. The next G4 boundary will take committed main through
+R6 and the whole-weldment W4 work before G3 adopts the package layout.
