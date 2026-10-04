@@ -2280,3 +2280,20 @@ contact indices, penetration and world position to the assertion (the pinned
 compiler's anonymous-object string only listed field types). The app compiler
 is being rerun for that diagnostic. CadBridge, MotionKit weave and the welding
 recipe compiler-only checks passed; app root compilation is underway.
+
+### G12 checkpoint — compiler pass complete, intended carton supports
+
+All 21 batch manifests completed: 15 top-level kit manifests, four nested
+manifest checks, and both app entries. The sole initial MachineKit failure
+passed its final retry after the attachment fixes. Separate MotionKit and
+CadKit compilers also passed, completing the requested per-kit/app compiler
+checkpoint. Native build/18-of-18 ctest and focused homing remain green.
+
+The picker diagnostic identified a fixed-root contact with carton body 1 at
+(0.185, 0.115, 0.20951) metres, penetration 0.981 mm: the carton settling on
+its authored infeed pad, rather than a moving gantry collision. Its assertion
+now allows shallow (at most 4 mm), vertical support only for each carton's
+own infeed/target pad footprint and height. Other fixed-root contacts, moving
+link contacts and deeper penetration still fail. Recompiling the app test
+entry for the justified picker retry. G12 is not verified and G13 is unstarted
+until the picker completes.

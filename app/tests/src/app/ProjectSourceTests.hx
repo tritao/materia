@@ -845,6 +845,16 @@ class ProjectSourceTests {
       var bytes = 0.0, measuredTicks = 0;
       var previousPlan:Null<motionkit.trajectory.ExecutionPlan> = null;
       var planned = 0;
+      var supports:Array<{object:Int, x:Float, y:Float, z:Float}> = [];
+      for (index in 0...6) {
+        var carton = simulation.environmentObject("project:box" + index);
+        if (carton == null) throw "picker has no carton body";
+        for (seatId in ["infeedSeat" + index, "slot" + index]) {
+          var seat = placement.worldConnector(seatId, "top");
+          supports.push({object: cast carton.handle, x: seat.x * generated.metresPerUnit,
+            y: seat.y * generated.metresPerUnit, z: seat.z * generated.metresPerUnit});
+        }
+      }
       while (!mission.finished && simulation.activeSession().simulationTime() < 600) {
         var before = hl.Gc.totalAllocated();
         var priorPlan = motion.executor.plan;
@@ -867,6 +877,17 @@ class ProjectSourceTests {
         }
         for (contact in mission.simulation.robotContacts(mission.robot.runtime)) {
           if (!contact.active || contact.distance >= -0.0005) continue;
+          // Tables and seats belong to the fixed root. Cartons settle on their
+          // own authored pads; allow only shallow, vertical support there.
+          var supported = false;
+          if (contact.linkIndex == 0 && contact.otherKind == robotkit.runtime.RobotContactOtherKind.Object &&
+              contact.distance >= -0.004 && Math.abs(contact.normal.z) >= 0.99) {
+            for (seat in supports) if (contact.otherObject == seat.object &&
+                Math.abs(contact.position.x - seat.x) <= 0.0451 &&
+                Math.abs(contact.position.y - seat.y) <= 0.0451 &&
+                Math.abs(contact.position.z - seat.z) <= 0.004) supported = true;
+          }
+          if (supported) continue;
           // The compliant cup deliberately presses at most 3 mm into its intended grasp surface.
           check(contact.linkIndex == mission.toolLink && contact.otherKind == robotkit.runtime.RobotContactOtherKind.Object &&
             contact.distance >= -0.004, "picker has no unintended robot contact: link=" + contact.linkIndex +
