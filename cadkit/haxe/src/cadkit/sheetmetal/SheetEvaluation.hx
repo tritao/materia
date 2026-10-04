@@ -8,11 +8,13 @@ class SheetEvaluation {
 	final frames:Map<Int, Location>;
 	final zones:Map<Int, BendZone>;
 	final walls:Array<Wall>;
+	final bends:Array<Bend>;
 	final thickness:Float;
-	public function new(frames:Map<Int, Location>, zones:Map<Int, BendZone>, walls:Array<Wall>, thickness:Float) {
+	public function new(frames:Map<Int, Location>, zones:Map<Int, BendZone>, walls:Array<Wall>, bends:Array<Bend>, thickness:Float) {
 		this.frames = frames;
 		this.zones = zones;
 		this.walls = walls.copy();
+		this.bends = bends.copy();
 		this.thickness = thickness;
 	}
 	public function wall(id:Int):Location {
@@ -28,7 +30,7 @@ class SheetEvaluation {
 		return result;
 	}
 
-	/** Exact extrema of the wall prisms and circular bend strips, including intermediate states. */
+	/** Analytic prism/strip extrema; trimmed mapped curves are enclosed within 1e-8 mm. */
 	public function bounds():SheetBounds {
 		var result = new SheetBounds();
 		for (w in walls) {
@@ -51,7 +53,9 @@ class SheetEvaluation {
 					}
 				}
 		}
-		for (zone in zones) {
+		for (record in bends) {
+			var zone = bend(record.id);
+			if (record.hasCuts()) { BendMaterialBounds.include(result, zone, record.materialRegions(zone.allowance)); continue; }
 			var fractions = [0.0, 1.0];
 			if (zone.angle != 0) {
 				var x = zone.frame.plane.xDirection;

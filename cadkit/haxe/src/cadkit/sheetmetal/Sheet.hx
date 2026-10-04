@@ -284,6 +284,6 @@ class Sheet {
 			zones.set(b.id, new BendZone(b.id, frameA.compose(local.frame), local.angle, local.allowance, local.width,
 				thickness(), local.allowance / Math.abs(b.angle) - b.radius));
 		}
-		return new SheetEvaluation(frames, zones, wallData, thickness());
+		return new SheetEvaluation(frames, zones, wallData, bendData, thickness());
 	}
 }

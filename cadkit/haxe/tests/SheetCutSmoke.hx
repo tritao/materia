@@ -13,7 +13,7 @@ import cadkit.sheetmetal.SheetCutFeature;
 import cadkit.sheetmetal.SheetDemoParts;
 import cadkit.sheetmetal.SheetDiagnosis;
 import cadkit.sheetmetal.SheetSide;
-import cadkit.sheetmetal.SheetWallCut;
+import cadkit.sheetmetal.SheetCutGeometry;
 import cadkit.sheetmetal.WallOutline;
 import cadkit.sheetmetal.Point2;
 import cadkit.sketch.ConstrainedSketch;
@@ -90,9 +90,8 @@ class SheetCutSmoke {
 		near(output.sheet().wall(1).outline.area(), 200 - Math.PI, "builder creates exact attached cut"); built.close();
 		var part = SheetDemoParts.p1(); var edge = part.wall(1).outline.segment(0, 1); var x = edge.start.x;
 		var tool = WallOutline.polygon([new Point2(x - 1, 40), new Point2(x + 1, 40), new Point2(x + 1, 42), new Point2(x - 1, 42)]);
-		var crosses = false; try { var unused = SheetWallCut.apply(part, 1, tool, "bend-cut"); }
-		catch (error:Dynamic) { var diagnosis = Std.downcast(error, SheetDiagnosis); if (diagnosis != null) crosses = diagnosis.code == "sheet.cut-bend-zone"; }
-		check(crosses, "wall-only builder diagnoses bend-zone crossing instead of leaving uncut bend material");
+		var crossed = SheetCutGeometry.apply(part, 1, tool, "bend-cut");
+		check(crossed.bends()[0].hasCuts(), "developed profile trims bend material as well as the wall");
 		var mismatch = new Document(); var mismatchedBaseProfile = mismatch.add(new ConstrainedSketchFeature(rectangle(Plane.XY())));
 		var mismatchedBase = mismatch.add(new SheetBaseFeature(mismatchedBaseProfile, SheetDemoParts.materialA())); mismatch.recompute();
 		var shifted = circle(); var shiftedPlane = new ConstrainedSketch(Plane.XY().offset(1));

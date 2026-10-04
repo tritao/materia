@@ -53,9 +53,12 @@ class SheetSolid {
 
 	/** One exact face; named input edges carry authored loop/segment identity through the native operation. */
 	static function profile(wall:Wall, sources:Map<String, String>):Sketch {
+		return regionProfile(wall.outline, "wall:" + wall.id + ":edge:", sources);
+	}
+	static function regionProfile(outline:WallOutline, prefix:String, sources:Map<String, String>):Sketch {
 		return Scope.run(function(scope:Scope) {
 			var wires:Array<Curve> = [];
-			var loops = wall.outline.loops();
+			var loops = outline.loops();
 			for (i in 0...loops.length) {
 				var curves:Array<Curve> = [];
 				for (j in 0...loops[i].length) {
@@ -68,7 +71,7 @@ class SheetSolid {
 						curve = Curve.circle(segment.radius, new Plane(vector(center), Vector.X(), Vector.Z()));
 					} else
 						curve = Curve.arc(vector(segment.start), vector(segment.point(0.5)), vector(segment.end));
-					var id = "wall:" + wall.id + ":edge:" + wall.outline.identity(i, j);
+					var id = prefix + outline.identity(i, j);
 					var named = scope.own(Curve.named(curve, id));
 					sources.set(named.shape.elementName(CadKit.ShapeKind.Edge, 0), id);
 					curves.push(named);
@@ -158,7 +161,7 @@ class SheetSolid {
 	}
 
 	static function bendSolid(bend:Bend, zone:BendZone):Shape {
-		if (bend.hasCuts()) throw new SheetDiagnosis("sheet.bend-region-builder", "Trimmed bend regions require the mapped native builder", ["bend:" + bend.id]);
+		if (bend.hasCuts()) return trimmedBendSolid(bend, zone);
 		if (zone.allowance <= 0)
 			throw new SheetDiagnosis("sheet.zero-bend-allowance", "The rule gives zero neutral length for a nonzero bend", ["bend:" + bend.id]);
 		var sketch:Sketch;
@@ -193,6 +196,64 @@ class SheetSolid {
 			if (part != null) part.close();
 			throw error;
 		}
+	}
+	/** Each disconnected strip patch remains connected to its neighbouring wall material. */
+	static function trimmedBendSolid(bend:Bend, zone:BendZone):Shape {
+		var regions = bend.materialRegions(zone.allowance); var pieces:Array<Shape> = []; var result:Null<Shape> = null;
+		try {
+			for (region in regions) pieces.push(bendRegionSolid(bend, zone, region, regions.length > 1));
+			result = pieces[0].cloneShape();
+			for (i in 1...pieces.length) { var combined = result.fuse(pieces[i]); result.close(); result = combined; }
+			for (piece in pieces) piece.close(); return result;
+		} catch (error:Dynamic) { if (result != null) result.close(); for (piece in pieces) piece.close(); throw error; }
+	}
+	static function bendRegionSolid(bend:Bend, zone:BendZone, region:WallOutline, multiple:Bool):Shape {
+		var prefix = "bend:" + bend.id; var sources:Map<String, String> = new Map();
+		var sketch = regionProfile(region, prefix + ":edge:", sources);
+		var operation:Null<Operation> = null; var raw:Null<Shape> = null;
+		try {
+			if (zone.angle == 0) operation = new Operation(CadKit.shapeExtrudeOperationChecked(sketch.shape.borrowHandle(), new Vector(0, 0, -zone.thickness).native()));
+			else {
+				if (zone.curvedInnerRadius() <= 0) throw new SheetDiagnosis("sheet.collapsed-bend-cut", "Trimmed zero-radius bend skins require collapsed-axis topology", [prefix]);
+				try { operation = new Operation(CadKit.sheetBendRegionOperationChecked(sketch.shape.borrowHandle(), zone.thickness, zone.angle, zone.allowance, zone.curvedInnerRadius())); }
+				catch (error:Dynamic) { throw new SheetDiagnosis("sheet.bend-cut-solid", "Mapped bend region failed: " + Std.string(error), [prefix]); }
+			}
+			raw = operation.resultShape();
+			var ids = [for (i in 0...raw.subshapeCount(CadKit.ShapeKind.Face)) ""];
+			var suffix = "";
+			if (multiple) { var identities = region.identities()[0]; identities.sort(Reflect.compare); suffix = ":patch:" + identities[0]; }
+			for (i in 0...ids.length) {
+				var face = raw.subshape(CadKit.ShapeKind.Face, i);
+				try {
+					var role:Null<String> = null;
+					if (zone.angle == 0 && face.surfaceKind() == CadKit.SurfaceKind.Plane) {
+						var normal = Vector.fromNative(face.faceNormal()); var center = Vector.fromNative(face.center());
+						if (Math.abs(normal.z) > 1 - 1e-9) {
+							if (Math.abs(center.z) < 1e-7) role = bend.angle > 0 ? "inner" : "outer";
+							else if (Math.abs(center.z + zone.thickness) < 1e-7) role = bend.angle > 0 ? "outer" : "inner";
+						}
+					} else if (zone.angle != 0 && face.surfaceKind() == CadKit.SurfaceKind.Cylinder) {
+						var radius = face.faceAxis().get_radius(); var inner = zone.curvedInnerRadius();
+						if (Math.abs(radius - inner) < 1e-7) role = "inner";
+						else if (Math.abs(radius - inner - zone.thickness) < 1e-7) role = "outer";
+					}
+					if (role != null) ids[i] = prefix + ":" + role + suffix;
+					face.close();
+				} catch (error:Dynamic) { face.close(); throw error; }
+			}
+			for (i in 0...operation.historyCount(CadKit.HistoryRelation.Generated)) {
+				var source = operation.historySourceAt(CadKit.HistoryRelation.Generated, i); var target = operation.historyTargetAt(CadKit.HistoryRelation.Generated, i);
+				try {
+					if (source.kind() == CadKit.ShapeKind.Edge && target.kind() == CadKit.ShapeKind.Face) {
+						var identity = sourceId(source, sketch.shape, sources);
+						if (identity == null) throw new SheetDiagnosis("sheet.solid-naming", "Mapped bend boundary lost its authored identity", [prefix]);
+						assignTarget(raw, target, ids, identity);
+					}
+					source.close(); target.close();
+				} catch (error:Dynamic) { source.close(); target.close(); throw error; }
+			}
+			var named = seeded(raw, ids, prefix); raw.close(); operation.close(); sketch.close(); return named;
+		} catch (error:Dynamic) { if (raw != null) raw.close(); if (operation != null) operation.close(); sketch.close(); throw error; }
 	}
 	static function bendRole(face:Shape, bend:Bend, zone:BendZone):String {
 		if (face.surfaceKind() == CadKit.SurfaceKind.Cylinder && zone.angle != 0) {

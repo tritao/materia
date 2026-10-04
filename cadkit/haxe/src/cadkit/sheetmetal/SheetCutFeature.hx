@@ -27,7 +27,7 @@ class SheetCutFeature extends SheetFeature {
 		if (Math.abs(geometry.plane.normal.dot(placement.normal)) < 1 - 1e-9
 			|| Math.abs(offset - (side == A ? 0 : -graph.thickness())) > 1e-7)
 			throw new SheetDiagnosis("sheet.cut-plane", "Cut sketch does not lie on the selected wall side", ["wall:" + wall]);
-		for (region in geometry.regions()) graph = SheetWallCut.apply(graph, wall, SheetProfile.region(region, geometry.plane, placement),
+		for (region in geometry.regions()) graph = SheetCutGeometry.apply(graph, wall, SheetProfile.region(region, geometry.plane, placement),
 			"feature:" + id.toInt() + ":region:" + region.id);
 		return graph;
 	}
