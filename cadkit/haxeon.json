@@ -13,6 +13,9 @@
     },
     "projectkit": {
       "path": "../projectkit"
+    },
+    "manufacturingkit": {
+      "path": "../manufacturingkit"
     }
   },
   "ffi": {

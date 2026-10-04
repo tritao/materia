@@ -383,3 +383,13 @@ writes JSON and STEP, exercises undo/redo, reloads the JSON, and exports the
 reloaded shape. The JSON stores the feature graph and current parameters,
 including the selection recipe; it does not store the undo/redo session stack.
 After reload, subsequent edits create a new undo/redo history.
+
+### Sheet manufacturing blanks
+
+`SheetBlank.requirement(FlatPattern.of(sheet), order)` derives material, thickness
+and rectangular stock dimensions from the current sheet. Supply a typed
+`SheetBlankOrder` with requirement and part ids, their positive revisions, quantity,
+and `SheetTolerance(minus, plus)` values in mm for thickness, width and height.
+The exported X axis follows authored grain; grained stock permits rotation 0,
+while ungrained stock permits 0/90 degrees. The result is ManufacturingKit
+`SheetPartRequirement`, ready for its current project codec and stock planning.

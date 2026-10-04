@@ -21,6 +21,7 @@ mkdir -p "$(dirname -- "$output")"
 	"--entry=$entry" \
 	"--root=$repo_root/haxe/src" \
 	"--root=$repo_root/../projectkit/src" \
+	"--root=$repo_root/../manufacturingkit/haxe/src" \
 	"--root=$repo_root/../kinematicskit/haxe" \
 	"--root=$repo_root/haxe/tests" \
 	"--root=$repo_root/examples/modeling" \
