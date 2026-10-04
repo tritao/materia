@@ -1,6 +1,7 @@
 package robotkit.skill;
 
 import robotkit.spatial.Transform3;
+import robotkit.spatial.Vec3;
 
 /**
  * How a weld is run: the arc (wire speed in metres per minute, voltage in volts), the travel speed along the path
@@ -21,17 +22,23 @@ typedef WeldParameters = {
 
 /**
  * One straight piece of a weld path: the poses of the wire tip at its two ends (+Z along the wire out of the torch, +X
- * along the direction of travel), in the plan's frame. The torch holds its orientation from `start` to `stop`.
+ * along the direction of travel), in the plan's frame. The torch holds its orientation from `start` to `stop`. `name` says
+ * which seam it lies along, for messages; `open`, when given, is the unit vector pointing out of the corner into the open
+ * side (the bisector of the two faces' outward normals), along which the torch can also come in and leave.
  */
 class WeldSegment {
   public final start:Transform3;
   public final stop:Transform3;
+  public final name:String;
+  public final open:Null<Vec3>;
 
-  public function new(start:Transform3, stop:Transform3) {
+  public function new(start:Transform3, stop:Transform3, ?name:String, ?open:Vec3) {
     if (start == null || stop == null) throw "A weld segment needs a start and a stop";
     if (!(stop.translation.sub(start.translation).norm() > 1e-6)) throw "A weld segment needs a length";
     this.start = start;
     this.stop = stop;
+    this.name = name == null ? "" : name;
+    this.open = open;
   }
 
   public function length():Float return stop.translation.sub(start.translation).norm();
@@ -85,6 +92,6 @@ class WeldPlan {
 
   /** The plan in the frame `frame_T_this` leads to: its poses become `frame_T_this * pose`. */
   public function transformed(frame_T_this:Transform3):WeldPlan
-    return new WeldPlan([for (segment in segments) new WeldSegment(frame_T_this.compose(segment.start), frame_T_this.compose(segment.stop))],
-      parameters);
+    return new WeldPlan([for (segment in segments) new WeldSegment(frame_T_this.compose(segment.start), frame_T_this.compose(segment.stop),
+      segment.name, segment.open == null ? null : frame_T_this.transformVector(segment.open))], parameters);
 }
