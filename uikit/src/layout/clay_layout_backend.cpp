@@ -122,8 +122,9 @@ struct LayoutEngine::Impl {
             state->clay_error = data.errorText.chars
                 ? std::string(data.errorText.chars, data.errorText.length) : "Clay error";
             if (data.errorType == CLAY_ERROR_TYPE_STATE_CAPACITY_EXCEEDED) {
-                state->clay_error += " table=" + std::string(data.arrayName.chars, data.arrayName.length) +
-                    " capacity=" + std::to_string(data.capacity) + " element=" + std::to_string(data.elementId);
+                const auto details = Clay_GetStateCapacityError();
+                state->clay_error += " table=" + std::string(details.arrayName.chars, details.arrayName.length) +
+                    " capacity=" + std::to_string(details.capacity) + " element=" + std::to_string(details.elementId);
             }
         };
         error_handler.userData = this;
