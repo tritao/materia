@@ -12,6 +12,7 @@ namespace robotkit {
 struct VirtualDeviceConfig6 {
     /** Optional board-defined peripheral profile; the host does not interpret its parameters. */
     std::uint32_t peripheral_kind = 0;
+    std::uint32_t external_sensor_mask = 0;
     std::vector<double> peripheral_parameters;
     std::uint8_t profile = 1; // 1 full, 2 minimal
     std::uint64_t device_tick_hz = 1'000'000;

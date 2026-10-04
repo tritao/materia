@@ -25,6 +25,7 @@ static void run(int stop) {
     }
     VirtualDeviceConfig6 config;
     config.peripheral_kind = 1;
+    config.external_sensor_mask = 1;
     config.peripheral_parameters = {0, 0, 1, 2, 0.002, 0.1, 0.9};
     config.clock_bound_ns = 5'000'000;
     auto endpoint = VirtualDeviceEndpoint::create(*blueprint, config);
@@ -51,6 +52,7 @@ static void run(int stop) {
     rk_sensor_sample sample{}; std::array<double, RK_MAX_SENSOR_VALUES> values{};
     assert(endpoint->sensor_sample(0, sample, values));
     assert(sample.sequence && sample.value_count == 6 && values[0] == 1 && values[1] == 240 && values[2] == 24);
+    assert(state->sensor_count == 0); // Authored external samples must not be mislabeled as native encoders.
     if (stop == -2) { assert(endpoint->stop_device());
         const auto safe = endpoint->channel_values(); assert(safe[0] == 0 && safe[1] == 0);
     }

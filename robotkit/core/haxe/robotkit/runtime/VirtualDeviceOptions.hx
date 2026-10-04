@@ -6,6 +6,8 @@ import haxe.Int64;
 class VirtualDeviceOptions {
   /** Board-defined profile data; process owners supply its meaning. */
   public var peripheralKind:Int = 0;
+  /** Numeric slots published through authored external sensors, excluded from the native sensor layout. */
+  public var externalSensorSlots:Array<Int> = [];
   public var peripheralParameters:Array<Float> = [];
   public var profile:Int = 1; // 1 full, 2 minimal
   public var tickHz:Int64 = Int64.ofInt(1000000);

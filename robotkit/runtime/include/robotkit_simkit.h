@@ -210,6 +210,7 @@ typedef struct rk_simulation_robot_desc {
     /** Optional board-defined peripheral profile; zero disables it. */
     uint32_t virtual_peripheral_kind;
     uint32_t virtual_peripheral_parameter_count;
+    uint32_t virtual_external_sensor_mask;
     double virtual_peripheral_parameters[16];
 } rk_simulation_robot_desc;
 

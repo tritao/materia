@@ -230,7 +230,15 @@ rk_result VirtualDeviceEndpoint::apply(const rk_robot_command &command) {
 
 rk_result VirtualDeviceEndpoint::sample(std::uint64_t timestamp_ns, rk_robot_state &state) {
     if (!link_->advance(timestamp_ns)) return RK_ERROR_BACKEND;
-    return inner_->sample(timestamp_ns, state);
+    const auto result = inner_->sample(timestamp_ns, state);
+    if (result == RK_OK && config_.external_sensor_mask) {
+        state.sensor_count = 0;
+        for (std::uint32_t slot = 0; slot < RK_MAX_SENSORS; ++slot) {
+            if (config_.external_sensor_mask & (1u << slot)) state.sensors[slot] = {};
+            if (state.sensors[slot].sequence) state.sensor_count = slot + 1;
+        }
+    }
+    return result;
 }
 
 int32_t VirtualDeviceEndpoint::diagnostic_code() const noexcept {

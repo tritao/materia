@@ -269,6 +269,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         if (robot_desc->struct_size >= sizeof(*robot_desc)) {
             if (robot_desc->virtual_peripheral_parameter_count > 16) return RK_ERROR_INVALID_ARGUMENT;
             config.peripheral_kind = robot_desc->virtual_peripheral_kind;
+            config.external_sensor_mask = robot_desc->virtual_external_sensor_mask;
             config.peripheral_parameters.assign(robot_desc->virtual_peripheral_parameters,
                 robot_desc->virtual_peripheral_parameters + robot_desc->virtual_peripheral_parameter_count);
         }
