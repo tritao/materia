@@ -557,8 +557,8 @@ G0 → G1 → G2 → G3 ──────────────────�
 | G3 | Complete; full gate passed | `d9d6de8f7` |
 | G4 | R0–R6/W4/W5 gates passed; X9e implemented, final gate stopped at user request | `05271b08d`, `bd2ccec83`, `0ec408c0d`; `c75e5d1a3`; source boundaries `bce647683`, `af673c4f4`, `757127cf0`, `b25366059` |
 | G5 | complete; full gate passed | `13e993340`; shared axis builder and physical rack regression |
-| G6 | implemented; build/runtime validation deferred at user request | see G6 implementation commit |
-| G7 | planned | — |
+| G6 | implemented; build/runtime validation deferred at user request | `d11e4dacb` |
+| G7 | implemented; build/runtime validation deferred at user request | see G7 implementation commit |
 | G8 | planned | — |
 | G9 | planned | — |
 | G10 | planned | — |
@@ -1072,3 +1072,30 @@ identity includes band thickness, so preview sharing cannot substitute a
 different bore or belt slot. Temporary OCCT allocations are owned through
 `Solids.building`, including failed mount-cutout creation. This source has not
 yet been compiled or exercised; the printed limit numbers remain pending.
+
+### G7 — Cartesian gantry picker implementation
+
+Add a 1500 × 1000 × 500 mm belt-driven picker with six 70 × 70 × 50 mm
+cartons, an infeed and a two-row pallet pattern. Both tables have a stated
+200 mm top height, chosen to leave the default gantry Z column above the
+cartons during horizontal travel. Table height, carton sizes, layout and
+materials are authored assumptions; their clearance has not been measured.
+The mission has six pick/place pairs, uses the existing handling runner and
+vacuum sensor, and ends after placing the sixth carton.
+
+Extract the existing arm suction assembly into library `SuctionTool`. The arm
+wrapper constructs the same parts and mates through this class; the picker
+shares the catalog parts without depending on another example's source.
+Register the project in the Start page, example build script, MachineKit source
+roots/smoke and the application project-source checks (`PROJECT_SOURCE_ONLY=gantry`).
+Scene artifact validation now rejects simultaneous machining and mission data.
+
+The prepared application check uses the real mission and MuJoCo, verifies
+three controllable coordinates, six final placements within 2 mm / 2°,
+coupled speed/acceleration ceilings, sampled plan speeds and PlanCheck stalls,
+robot contacts, and an assumed 200 KB budget per ordinary execution tick.
+Intended compliant cup contacts allow 4 mm penetration on object contacts;
+other contacts exceeding 0.5 mm fail. It prints the actual cycle time and
+allocation rate when run. These results, the low-rank IK path, and source
+compilation remain unverified because the user stopped testing. No measured
+cycle time or passing clearance result is claimed.

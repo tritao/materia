@@ -49,6 +49,8 @@ import haxe.io.Bytes;
 
 /** Save and reopen a generated project without persisting its mesh buffers. */
 @:access(app.MissionPlayer)
+@:access(motionkit.robot.ManipulatorMotion)
+@:access(motionkit.robot.PlanExecutor)
 class ProjectSourceTests {
   static function check(value:Bool, message:String):Void {
     if (!value) throw message;
@@ -807,6 +809,103 @@ class ProjectSourceTests {
       Sys.println('cobot $size: ${simulation.activeSession().simulationTime()} s, peak joint tracking ${worst * 1000} mrad, $ticks ticks');
       simulation.dispose(); session.dispose();
     }
+  }
+
+  /** Runs the actual Cartesian picker mission and measures its placement and drive budget. */
+  static function checkGantryPicker(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/gantry-picker/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var definition:AssemblyDefinition = cast generated.assemblyDefinition;
+    var placement = new AssemblyState(definition, generated.assemblyState);
+    var session = new ProjectDocumentSession(null, false);
+    var simulation = new ApplicationSimulation(new RobotWorld());
+    session.openGeneratedProject(generated, manifest);
+    simulation.setBackend(ApplicationSimulation.MUJOCO);
+    try {
+      check(simulation.rebuild(session.sensors, session.scene, session), "gantry picker builds: " + simulation.error);
+      var mission = simulation.missionPlayer();
+      if (mission == null || mission.handling == null) throw "gantry picker has no handling mission";
+      var motion = mission.handling.motion;
+      var model = mission.robot.model;
+      check(motion.compiler.solver.jointCount() == 3, "picker plans three controllable translational joints");
+      for (index in 0...motion.jointIndices.length) {
+        var joint = model.joints[motion.jointIndices[index]];
+        var coupled = model.coupledLimits(joint.id, new SteadyLoads());
+        check(motion.compiler.maxVelocity[index] <= coupled.requireVelocity() + 1e-9,
+          "picker planner respects coupled speed on " + joint.id);
+        check(motion.compiler.maxAcceleration[index] <= coupled.requireAcceleration() + 1e-9,
+          "picker planner respects coupled acceleration on " + joint.id);
+      }
+      function pose(id:String):app.ApplicationSimulation.SimulationPoseVisual {
+        var found = [for (entry in simulation.capturePresentationSnapshot().environment) if (entry.id == id) entry];
+        if (found.length != 1) throw "picker has no unique pose for " + id;
+        return found[0];
+      }
+      var lastDone = 0, placed = 0, ticks = 0;
+      var bytes = 0.0, measuredTicks = 0;
+      var previousPlan:Null<motionkit.trajectory.ExecutionPlan> = null;
+      var planned = 0;
+      while (!mission.finished && simulation.activeSession().simulationTime() < 600) {
+        var before = hl.Gc.totalAllocated();
+        var priorPlan = motion.executor.plan;
+        simulation.step();
+        var allocated = hl.Gc.totalAllocated() - before;
+        ticks++;
+        if (mission.failure != null) throw "gantry picker mission: " + mission.failure;
+        var plan = motion.executor.plan;
+        // Planning happens on a worker. Measure ordinary execution ticks separately from plan admission.
+        if (priorPlan != null && plan == priorPlan) { bytes += allocated; measuredTicks++; }
+        if (plan != null && plan != previousPlan) {
+          previousPlan = plan; planned++;
+          check(plan.checked != null, "every picker plan has a drive check");
+          for (sample in 0...101) {
+            var state = plan.evaluate(plan.durationSeconds * sample / 100);
+            for (axis in 0...state.velocities.length)
+              check(Math.abs(state.velocities[axis]) <= motion.compiler.maxVelocity[axis] * 1.000001 + 1e-9,
+                "picker planned speed remains within its coupled limit");
+          }
+        }
+        for (contact in mission.simulation.robotContacts(mission.robot.runtime)) {
+          if (!contact.active || contact.distance >= -0.0005) continue;
+          // The compliant cup deliberately presses at most 3 mm into its intended grasp surface.
+          check(contact.linkIndex == mission.toolLink && contact.otherKind == robotkit.runtime.RobotContactOtherKind.Object &&
+            contact.distance >= -0.004, "picker has no unintended robot contact");
+        }
+        var held = simulation.heldObjectIds();
+        check(held.length <= 1, "picker holds at most one carton");
+        if (mission.completed == lastDone) continue;
+        check(mission.completed == lastDone + 1, "picker completes each step individually");
+        var step = mission.mission.steps[lastDone];
+        if (step.kind == "pick") {
+          var at = step.at;
+          if (at == null) throw "picker pick has no carton";
+          check(held.join(",") == "project:" + at.occurrence, "picker picks the intended carton");
+        } else {
+          check(held.length == 0, "picker releases each carton");
+          for (_ in 0...50) simulation.step();
+          var at = step.at;
+          if (at == null) throw "picker place has no slot";
+          var seat = placement.worldConnector(at.occurrence, at.connector);
+          var box = pose("project:box" + placed);
+          var scale = generated.metresPerUnit;
+          var error = Math.sqrt(Math.pow(box.position[0] - seat.x * scale, 2) +
+            Math.pow(box.position[1] - seat.y * scale, 2) +
+            Math.pow(box.position[2] - (seat.z * scale + 0.025), 2));
+          check(error <= 0.002, "picker carton is within 2 mm of its slot: " + error);
+          var angle = 2 * Math.acos(Math.min(1, Math.abs(box.rotation[3])));
+          check(angle <= 2 * Math.PI / 180, "picker carton is within 2 degrees of its slot");
+          placed++;
+        }
+        lastDone = mission.completed;
+      }
+      check(mission.finished && mission.completed == 12 && placed == 6, "picker places all six cartons");
+      check(planned > 0 && motion.checks.plans > 0, "picker executes physically checked plans");
+      check(motion.checks.count(PlanDiagnosticKind.StepperStall) == 0, "picker drive checks report no stall");
+      check(measuredTicks > 0 && bytes / measuredTicks < 200000, "picker allocates below its assumed 200 KB execution-tick budget");
+      Sys.println("gantry picker mission: " + simulation.activeSession().simulationTime() + " s, six cartons; " +
+        Math.round(bytes / measuredTicks) + " bytes per execution tick; " + planned + " plans, no stalls");
+      simulation.clear(); session.dispose();
+    } catch (error:Dynamic) { simulation.clear(); session.dispose(); throw error; }
   }
 
   static function checkRobotArm(root:String):Void {
@@ -2258,6 +2357,10 @@ class ProjectSourceTests {
       checkCoreXyPlotter(root);
       return 0;
     }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "gantry") {
+      checkGantryPicker(root);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "arm") {
       checkRobotArm(root);
       return 0;
@@ -2579,6 +2682,7 @@ class ProjectSourceTests {
     if (FileSystem.exists(output)) FileSystem.deleteFile(output);
     checkRobotArm(root);
     checkCobotArms(root);
+    checkGantryPicker(root);
     checkRobotWelder(root);
     checkMates(root);
     checkBenchMill(root);

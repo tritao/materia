@@ -1,0 +1,25 @@
+{
+	"format": "materia.project",
+	"version": 1,
+	"name": "Gantry picker",
+	"defaultEntrypoint": "picker",
+	"build": {
+		"system": "haxeon",
+		"manifest": "haxeon.json"
+	},
+	"dynamicParts": [
+		"box0",
+		"box1",
+		"box2",
+		"box3",
+		"box4",
+		"box5"
+	],
+	"entrypoints": {
+		"picker": {
+			"kind": "cad-preview",
+			"module": "GantryPickerPreview",
+			"function": "picker"
+		}
+	}
+}

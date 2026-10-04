@@ -583,6 +583,8 @@ class SceneArtifact {
 			if (data.assemblyState != null)
 				AssemblyDefinitionCodec.validateState(assemblyDefinition, data.assemblyState);
 		}
+		if (data.machining != null && data.mission != null)
+			throw "Scene artifact cannot combine machining and a mission";
 		if (data.machining != null) validateMachining(data.machining, ids, data.assemblyDefinition);
 		if (data.mobileBase != null) validateMobileBase(data.mobileBase, data.assemblyDefinition);
 		if (data.robotTools != null) validateRobotTools(data.robotTools, data);
