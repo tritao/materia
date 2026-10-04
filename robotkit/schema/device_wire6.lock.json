@@ -6,7 +6,7 @@
     },
     "PROTOCOL_VERSION": {
       "type": "u8",
-      "value": 12
+      "value": 13
     }
   },
   "enums": {
@@ -23,6 +23,7 @@
         "reset_safety": 13,
         "resume": 9,
         "segment": 6,
+        "sensor6": 17,
         "session_ack6": 2,
         "session_begin6": 1,
         "state6": 15,
@@ -310,6 +311,48 @@
         }
       ],
       "size": 36
+    },
+    "Sensor6Header": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "session",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "timestamp_ticks",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "sequence",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "slot",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "value_count",
+          "type": "u16"
+        }
+      ],
+      "size": 27
+    },
+    "Sensor6Value": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "value",
+          "type": "f32"
+        }
+      ],
+      "size": 4
     },
     "SessionAck6": {
       "endian": "little",

@@ -33,7 +33,7 @@ struct Frame {
 inline bool decode(std::span<const std::uint8_t> bytes, Frame &frame) {
     if (bytes.size() < HEADER_SIZE + CRC_SIZE || bytes.size() > MAX_FRAME_SIZE ||
         bytes[0] != 'R' || bytes[1] != 'K' || bytes[2] != 'D' || bytes[3] != '6' ||
-        bytes[5] != 0 || bytes[4] == 0 || bytes[4] > 16) return false;
+        bytes[5] != 0 || bytes[4] == 0 || bytes[4] > 17) return false;
     const auto length = std::size_t(bytes[6]) | (std::size_t(bytes[7]) << 8);
     if (length > MAX_PAYLOAD_SIZE || bytes.size() != HEADER_SIZE + length + CRC_SIZE) return false;
     const auto expected = std::uint32_t(bytes[8 + length]) |
@@ -96,6 +96,19 @@ inline bool decode(std::span<const std::uint8_t> bytes, Frame &frame) {
             length != device_wire6::State6Header::SIZE +
                 header.actuator_count * device_wire6::ActuatorState6::SIZE) return false;
     }
+    if (bytes[4] == 17) {
+        device_wire6::Sensor6Header header{};
+        if (length < header.SIZE ||
+            !device_wire6::decode(bytes.subspan(HEADER_SIZE, header.SIZE), header) ||
+            header.session == 0 || header.sequence == 0 || header.slot >= 8 ||
+            header.value_count == 0 || header.value_count > 360 ||
+            length != header.SIZE + header.value_count * device_wire6::Sensor6Value::SIZE) return false;
+        for (std::size_t i = 0; i < header.value_count; ++i) {
+            device_wire6::Sensor6Value value{};
+            if (!device_wire6::decode(bytes.subspan(HEADER_SIZE + header.SIZE +
+                i * value.SIZE, value.SIZE), value) || !std::isfinite(value.value)) return false;
+        }
+    }
     if (bytes[4] == 16) {
         device_wire6::Event6 event{};
         if (!device_wire6::decode(bytes.subspan(HEADER_SIZE, event.SIZE), event) ||
@@ -110,7 +123,7 @@ inline bool decode(std::span<const std::uint8_t> bytes, Frame &frame) {
 
 inline bool encode(std::uint8_t kind, std::span<const std::uint8_t> payload,
                    std::vector<std::uint8_t> &out) {
-    if (kind == 0 || kind > 16 || payload.size() > MAX_PAYLOAD_SIZE) return false;
+    if (kind == 0 || kind > 17 || payload.size() > MAX_PAYLOAD_SIZE) return false;
     out.resize(HEADER_SIZE + payload.size() + CRC_SIZE);
     out[0] = 'R'; out[1] = 'K'; out[2] = 'D'; out[3] = '6';
     out[4] = kind; out[5] = 0;

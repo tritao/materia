@@ -736,6 +736,11 @@ W6 implementation notes (started after W5 main sync, 2026-10-04):
   Three model tests and three framed-device tests pass; the latter cover ignition, abort, commanded stop, emergency
   stop, link loss, no-arc and arc loss. Seven focused existing protocol stop tests also pass. Feedback still needs
   its wire transport and host sensor mapping; the unchanged shared mission has not yet been validated on this backend.
+- RKD6 keeps its frozen generation name and advances to wire revision 13 for generic `SENSOR6` feedback packets.
+  The protocol's pre-hardware policy requires a revision bump for wire changes; revision 12 is rejected, with no
+  compatibility path. Sensor packets carry a compiled slot, device ticks, sequence and finite numeric values;
+  welding semantics remain in ProcessKit. The schema lock/codecs/current shared vectors are regenerated. Nine Rust
+  wire tests and the C++ codec/vector test pass. Device publishing and runtime snapshot mapping remain to be connected.
 
 ## Phase 2: mobile welder
 

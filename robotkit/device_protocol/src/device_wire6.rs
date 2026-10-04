@@ -3,7 +3,7 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Error { ShortBuffer, WrongLength }
 
-pub const PROTOCOL_VERSION: u8 = 12;
+pub const PROTOCOL_VERSION: u8 = 13;
 pub const MAX_ACTUATORS: u8 = 64;
 
 #[repr(u8)]
@@ -25,6 +25,7 @@ pub enum MessageType6 {
     QueueStatus = 14,
     State6 = 15,
     Event = 16,
+    Sensor6 = 17,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -1029,5 +1030,89 @@ impl ActuatorState6 {
         offset += 8;
         let _ = offset;
         Ok(Self { position, velocity, effort, step_count })
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Sensor6Header {
+    pub session: u64,
+    pub timestamp_ticks: u64,
+    pub sequence: u64,
+    pub slot: u8,
+    pub value_count: u16,
+}
+
+impl Sensor6Header {
+    pub const SIZE: usize = 27;
+
+    pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {
+        if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }
+        let mut offset = 0usize;
+        out[offset..offset + 8].copy_from_slice(&self.session.to_le_bytes());
+        offset += 8;
+        out[offset..offset + 8].copy_from_slice(&self.timestamp_ticks.to_le_bytes());
+        offset += 8;
+        out[offset..offset + 8].copy_from_slice(&self.sequence.to_le_bytes());
+        offset += 8;
+        out[offset..offset + 1].copy_from_slice(&self.slot.to_le_bytes());
+        offset += 1;
+        out[offset..offset + 2].copy_from_slice(&self.value_count.to_le_bytes());
+        offset += 2;
+        Ok(offset)
+    }
+
+    pub fn decode(input: &[u8]) -> Result<Self, Error> {
+        if input.len() != Self::SIZE { return Err(Error::WrongLength); }
+        let mut offset = 0usize;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let session = u64::from_le_bytes(bytes);
+        offset += 8;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let timestamp_ticks = u64::from_le_bytes(bytes);
+        offset += 8;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let sequence = u64::from_le_bytes(bytes);
+        offset += 8;
+        let mut bytes = [0u8; 1];
+        bytes.copy_from_slice(&input[offset..offset + 1]);
+        let slot = u8::from_le_bytes(bytes);
+        offset += 1;
+        let mut bytes = [0u8; 2];
+        bytes.copy_from_slice(&input[offset..offset + 2]);
+        let value_count = u16::from_le_bytes(bytes);
+        offset += 2;
+        let _ = offset;
+        Ok(Self { session, timestamp_ticks, sequence, slot, value_count })
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Sensor6Value {
+    pub value: f32,
+}
+
+impl Sensor6Value {
+    pub const SIZE: usize = 4;
+
+    pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {
+        if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }
+        let mut offset = 0usize;
+        out[offset..offset + 4].copy_from_slice(&self.value.to_le_bytes());
+        offset += 4;
+        Ok(offset)
+    }
+
+    pub fn decode(input: &[u8]) -> Result<Self, Error> {
+        if input.len() != Self::SIZE { return Err(Error::WrongLength); }
+        let mut offset = 0usize;
+        let mut bytes = [0u8; 4];
+        bytes.copy_from_slice(&input[offset..offset + 4]);
+        let value = f32::from_le_bytes(bytes);
+        offset += 4;
+        let _ = offset;
+        Ok(Self { value })
     }
 }

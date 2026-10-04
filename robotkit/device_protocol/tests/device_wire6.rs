@@ -1,4 +1,4 @@
-use robotkit_device_protocol::device_wire6::{Event6, SessionBegin6, Segment6Header, TimeSyncRequest};
+use robotkit_device_protocol::device_wire6::{Event6, SessionBegin6, Segment6Header, TimeSyncRequest, Sensor6Header, Sensor6Value, PROTOCOL_VERSION};
 use robotkit_device_protocol::frame6::{decode_frame6, encode_frame6,
     slide_to_frame_marker, Frame6Error, MAX_FRAME_SIZE};
 
@@ -14,7 +14,7 @@ fn frame_sync_slides_across_a_bad_marker() {
 
 #[test]
 fn rkd6_records_round_trip() {
-    let begin = SessionBegin6 { session: 7, protocol_version: 12, expected_controller: [3; 16],
+    let begin = SessionBegin6 { session: 7, protocol_version: PROTOCOL_VERSION, expected_controller: [3; 16],
         actuator_count: 2, max_degree: 5, step_tick_hz: 40_000,
         max_acceleration: 4.0, actuator_max_acceleration: [4.0; 64], steps_per_unit: [400.0; 64], max_rate: [0.0; 64], direction_setup_ticks: [0; 64], actuator_joint: [0; 64], actuator_ratio: [1.0; 64], dual_drive_skew_bound: [0.0; 64], link_loss_timeout_ns: 500_000_000,
         channel_count: 0, channel_id: [0; 1536], channel_kind: [0; 32],
@@ -63,7 +63,7 @@ fn session_begin_carries_per_actuator_acceleration_limits() {
     let mut limits = [0.0; 64];
     limits[0] = 2.0;
     limits[1] = 4.0;
-    let begin = SessionBegin6 { session: 7, protocol_version: 12,
+    let begin = SessionBegin6 { session: 7, protocol_version: PROTOCOL_VERSION,
         expected_controller: [3; 16], actuator_count: 2, max_degree: 5,
         step_tick_hz: 40_000, max_acceleration: 4.0,
         actuator_max_acceleration: limits, steps_per_unit: [400.0; 64], max_rate: [0.0; 64], direction_setup_ticks: [0; 64], actuator_joint: [0; 64], actuator_ratio: [1.0; 64], dual_drive_skew_bound: [0.0; 64], link_loss_timeout_ns: 500_000_000,
@@ -107,7 +107,7 @@ fn shared_frame_vectors() {
             .collect();
         let (kind, payload) = decode_frame6(&bytes).unwrap();
         let expected = match name { "time_sync_request" => 3, "hold" => 8, "stop" => 11,
-            "session_begin6_v12" => 1, "digital_event" => 16,
+            "session_begin6_v13" => 1, "digital_event" => 16, "sensor6" => 17,
             _ => panic!("unknown vector") };
         assert_eq!(kind, expected);
         let mut encoded = [0; MAX_FRAME_SIZE];
@@ -136,7 +136,7 @@ fn config_digest_is_fnv1a_after_the_session_field() {
 #[test]
 fn config_digest_covers_the_channel_stop_policy() {
     use robotkit_device_protocol::config_digest::config_digest6;
-    let mut begin = SessionBegin6 { session: 7, protocol_version: 12, expected_controller: [3; 16],
+    let mut begin = SessionBegin6 { session: 7, protocol_version: PROTOCOL_VERSION, expected_controller: [3; 16],
         actuator_count: 0, max_degree: 5, step_tick_hz: 40_000,
         max_acceleration: 4.0, actuator_max_acceleration: [4.0; 64], steps_per_unit: [400.0; 64], max_rate: [0.0; 64], direction_setup_ticks: [0; 64], actuator_joint: [0; 64], actuator_ratio: [1.0; 64], dual_drive_skew_bound: [0.0; 64], link_loss_timeout_ns: 500_000_000,
         channel_count: 0, channel_id: [0; 1536], channel_kind: [0; 32],
@@ -148,4 +148,19 @@ fn config_digest_covers_the_channel_stop_policy() {
     let mut keep = [0; SessionBegin6::SIZE];
     begin.encode(&mut keep).unwrap();
     assert_ne!(config_digest6(&safe), config_digest6(&keep));
+}
+
+
+#[test]
+fn sensor_frame_rejects_invalid_samples() {
+    let header = Sensor6Header { session: 9, timestamp_ticks: 100, sequence: 1, slot: 0, value_count: 1 };
+    let mut body = vec![0; Sensor6Header::SIZE + Sensor6Value::SIZE];
+    header.encode(&mut body[..Sensor6Header::SIZE]).unwrap();
+    Sensor6Value { value: 240.0 }.encode(&mut body[Sensor6Header::SIZE..]).unwrap();
+    let mut frame = [0; MAX_FRAME_SIZE];
+    let n = encode_frame6(17, &body, &mut frame).unwrap();
+    assert_eq!(decode_frame6(&frame[..n]).unwrap().0, 17);
+    Sensor6Value { value: f32::NAN }.encode(&mut body[Sensor6Header::SIZE..]).unwrap();
+    assert_eq!(encode_frame6(17, &body, &mut frame), Err(Frame6Error::BadPayload));
+    assert!(encode_frame6(17, &body[..Sensor6Header::SIZE], &mut frame).is_err());
 }

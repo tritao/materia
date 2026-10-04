@@ -8,7 +8,7 @@
 
 namespace robotkit::device_wire6 {
 
-inline constexpr std::uint8_t PROTOCOL_VERSION = 12;
+inline constexpr std::uint8_t PROTOCOL_VERSION = 13;
 inline constexpr std::uint8_t MAX_ACTUATORS = 64;
 
 enum class MessageType6 : std::uint8_t {
@@ -28,6 +28,7 @@ enum class MessageType6 : std::uint8_t {
     queue_status = 14,
     state6 = 15,
     event = 16,
+    sensor6 = 17,
 };
 
 inline constexpr std::size_t SessionBegin6_SIZE = 4940;
@@ -1447,6 +1448,126 @@ inline bool decode(std::span<const std::uint8_t> input, ActuatorState6 &value) {
     bits_step_count |= static_cast<std::uint64_t>(input[offset++]) << 48;
     bits_step_count |= static_cast<std::uint64_t>(input[offset++]) << 56;
     value.step_count = std::bit_cast<std::int64_t>(bits_step_count);
+    return true;
+}
+
+inline constexpr std::size_t Sensor6Header_SIZE = 27;
+struct Sensor6Header {
+    static constexpr std::size_t SIZE = Sensor6Header_SIZE;
+    std::uint64_t session{};
+    std::uint64_t timestamp_ticks{};
+    std::uint64_t sequence{};
+    std::uint8_t slot{};
+    std::uint16_t value_count{};
+};
+
+inline bool encode(const Sensor6Header &value, std::span<std::uint8_t> out) {
+    if (out.size() < Sensor6Header_SIZE) return false;
+    std::size_t offset = 0;
+    const std::uint64_t bits_session = static_cast<std::uint64_t>(value.session);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 56);
+    const std::uint64_t bits_timestamp_ticks = static_cast<std::uint64_t>(value.timestamp_ticks);
+    out[offset++] = static_cast<std::uint8_t>(bits_timestamp_ticks >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_timestamp_ticks >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_timestamp_ticks >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_timestamp_ticks >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_timestamp_ticks >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_timestamp_ticks >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_timestamp_ticks >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_timestamp_ticks >> 56);
+    const std::uint64_t bits_sequence = static_cast<std::uint64_t>(value.sequence);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 56);
+    const std::uint8_t bits_slot = static_cast<std::uint8_t>(value.slot);
+    out[offset++] = static_cast<std::uint8_t>(bits_slot >> 0);
+    const std::uint16_t bits_value_count = static_cast<std::uint16_t>(value.value_count);
+    out[offset++] = static_cast<std::uint8_t>(bits_value_count >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_value_count >> 8);
+    return true;
+}
+
+inline bool decode(std::span<const std::uint8_t> input, Sensor6Header &value) {
+    if (input.size() != Sensor6Header_SIZE) return false;
+    std::size_t offset = 0;
+    std::uint64_t bits_session = 0;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.session = bits_session;
+    std::uint64_t bits_timestamp_ticks = 0;
+    bits_timestamp_ticks |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_timestamp_ticks |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_timestamp_ticks |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_timestamp_ticks |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_timestamp_ticks |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_timestamp_ticks |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_timestamp_ticks |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_timestamp_ticks |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.timestamp_ticks = bits_timestamp_ticks;
+    std::uint64_t bits_sequence = 0;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.sequence = bits_sequence;
+    std::uint8_t bits_slot = 0;
+    bits_slot |= static_cast<std::uint8_t>(input[offset++]) << 0;
+    value.slot = bits_slot;
+    std::uint16_t bits_value_count = 0;
+    bits_value_count |= static_cast<std::uint16_t>(input[offset++]) << 0;
+    bits_value_count |= static_cast<std::uint16_t>(input[offset++]) << 8;
+    value.value_count = bits_value_count;
+    return true;
+}
+
+inline constexpr std::size_t Sensor6Value_SIZE = 4;
+struct Sensor6Value {
+    static constexpr std::size_t SIZE = Sensor6Value_SIZE;
+    float value{};
+};
+
+inline bool encode(const Sensor6Value &value, std::span<std::uint8_t> out) {
+    if (out.size() < Sensor6Value_SIZE) return false;
+    std::size_t offset = 0;
+    const std::uint32_t bits_value = std::bit_cast<std::uint32_t>(value.value);
+    out[offset++] = static_cast<std::uint8_t>(bits_value >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_value >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_value >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_value >> 24);
+    return true;
+}
+
+inline bool decode(std::span<const std::uint8_t> input, Sensor6Value &value) {
+    if (input.size() != Sensor6Value_SIZE) return false;
+    std::size_t offset = 0;
+    std::uint32_t bits_value = 0;
+    bits_value |= static_cast<std::uint32_t>(input[offset++]) << 0;
+    bits_value |= static_cast<std::uint32_t>(input[offset++]) << 8;
+    bits_value |= static_cast<std::uint32_t>(input[offset++]) << 16;
+    bits_value |= static_cast<std::uint32_t>(input[offset++]) << 24;
+    value.value = std::bit_cast<float>(bits_value);
     return true;
 }
 

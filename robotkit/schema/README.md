@@ -1,6 +1,6 @@
-# RobotKit RKD generation 6 payload schema (wire revision 12)
+# RobotKit RKD generation 6 payload schema (wire revision 13)
 
-`RKD6` and the `6` suffix identify generation 6; `PROTOCOL_VERSION = 12` is the
+`RKD6` and the `6` suffix identify generation 6; `PROTOCOL_VERSION = 13` is the
 independent wire revision. Peers require that exact revision.
 
 `device_wire6.wire.idl` is the fixed-record source. `../wire6.json` generates

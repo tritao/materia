@@ -1,9 +1,9 @@
-# RobotKit scheduled device protocol (generation 6, wire revision 12)
+# RobotKit scheduled device protocol (generation 6, wire revision 13)
 
-The protocol name is **RKD generation 6, wire revision 12**. The four-byte sync
+The protocol name is **RKD generation 6, wire revision 13**. The four-byte sync
 marker `RKD6` identifies the scheduled-execution generation, not the wire revision.
 `PROTOCOL_VERSION` identifies the wire revision; peers must agree on its exact value
-(currently 12). A receiver never infers a revision from the marker or accepts an older
+(currently 13). A receiver never infers a revision from the marker or accepts an older
 revision. The `6` suffix in `device_wire6`, `device_frame6`, `Rkd6Endpoint`,
 `rkd6_endpoint`, `device_compiler6`, `robotkit_device_compiler6` and the serial C API
 likewise means generation 6. Keep these generation names when incrementing a wire
@@ -16,7 +16,7 @@ After hardware ships, a wire revision is immutable.
 The four-byte sync marker is `RKD6`. A frame is marker (4), message type (1), reserved zero
 (1), little-endian payload length (2), payload, then little-endian CRC-32/IEEE
 (4), calculated over every preceding byte. The largest current payload is the
-session record (4,908 bytes), so the frame maximum is 4,920 bytes.
+session record (4,940 bytes), so the frame maximum is 4,952 bytes.
 A receiver rejects unknown types, wrong lengths, a nonzero reserved byte,
 CRC mismatch, or malformed session, segment and event records.
 
@@ -30,6 +30,16 @@ frames carry the fixed records specified by the schema. The session ACK reports 
 the active actuator limits, each positive and no greater than the global cap.
 It also carries the link-loss timeout in nanoseconds. The device converts that
 timeout using its own clock after the session begins.
+
+Wire revision 13 adds `SENSOR6` (message 17). A `Sensor6Header` carries the session,
+device acquisition ticks, a nonzero sequence, the compiled sensor slot (0–7), and
+value count (1–360). Exactly that many `Sensor6Value` records follow; each is a
+finite `f32`. The host assigns semantic IDs to these deployment slots. A welding
+slot carries the six values specified by ProcessKit's `WeldContract`; the device
+transport does not interpret welding units or fault codes. Sequence zero means
+absent in host snapshots, and duplicate or older samples must not replace newer
+ones. Revision 12 is rejected rather than migrated. The current schema lock and
+shared Rust/C++ frame vectors were regenerated for revision 13.
 Protocol version 8 also carries steps per actuator unit, actuator rate limits,
 direction setup ticks, source joint indices, transmission ratios and dual-drive
 skew bounds, all derived by the host from the model and the deployment's

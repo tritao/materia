@@ -1,6 +1,6 @@
 # RKD generation 6 scheduled payload records; independent wire revision below.
 # Outer frame uses the generation marker RKD6, length and CRC32.
-const PROTOCOL_VERSION : u8 = 12;
+const PROTOCOL_VERSION : u8 = 13;
 const MAX_ACTUATORS : u8 = 64;
 
 enum MessageType6 : u8 {
@@ -20,6 +20,7 @@ enum MessageType6 : u8 {
     queue_status = 14
     state6 = 15
     event = 16
+    sensor6 = 17
 }
 
 packed SessionBegin6 endian little {
@@ -155,4 +156,18 @@ packed ActuatorState6 endian little {
     velocity : f32
     effort : f32
     step_count : i64
+}
+
+
+# Numeric feedback for a compiled sensor slot. Value records follow the header.
+packed Sensor6Header endian little {
+    session : u64
+    timestamp_ticks : u64
+    sequence : u64
+    slot : u8
+    value_count : u16
+}
+
+packed Sensor6Value endian little {
+    value : f32
 }

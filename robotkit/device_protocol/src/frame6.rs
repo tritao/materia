@@ -67,6 +67,7 @@ fn validate_payload(kind: u8, bytes: &[u8]) -> Result<(), Frame6Error> {
         8..=13 => Some(0), 14 => Some(QueueStatus6::SIZE),
         15 | 6 => None,
         16 => Some(Event6::SIZE),
+        17 => None,
         _ => return Err(Frame6Error::BadType),
     };
     if let Some(size) = exact {
@@ -118,6 +119,21 @@ fn validate_payload(kind: u8, bytes: &[u8]) -> Result<(), Frame6Error> {
         if head.actuator_count > MAX_ACTUATORS || head.reserved != 0 ||
            bytes.len() != State6Header::SIZE + head.actuator_count as usize * ActuatorState6::SIZE {
             return Err(Frame6Error::BadPayload);
+        }
+    }
+    if kind == 17 {
+        if bytes.len() < Sensor6Header::SIZE { return Err(Frame6Error::BadLength); }
+        let header = Sensor6Header::decode(&bytes[..Sensor6Header::SIZE])
+            .map_err(|_| Frame6Error::BadPayload)?;
+        if header.session == 0 || header.sequence == 0 || header.slot >= 8 ||
+            header.value_count == 0 || header.value_count > 360 ||
+            bytes.len() != Sensor6Header::SIZE + header.value_count as usize * Sensor6Value::SIZE {
+            return Err(Frame6Error::BadPayload);
+        }
+        for chunk in bytes[Sensor6Header::SIZE..].chunks_exact(Sensor6Value::SIZE) {
+            if !Sensor6Value::decode(chunk).map_err(|_| Frame6Error::BadPayload)?.value.is_finite() {
+                return Err(Frame6Error::BadPayload);
+            }
         }
     }
     if kind == 16 {
