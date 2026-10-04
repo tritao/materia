@@ -1,0 +1,1 @@
+{"version":1,"package":{"name":"welder-plan-control-regression"},"entry":"PlanControlRegression","sourceRoots":["."],"dependencies":{"processkit":{"path":"../.."}},"target":"host","outputDir":"build"}
