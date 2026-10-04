@@ -2269,3 +2269,14 @@ the belt clamp connector names the lower belt face used by the planar path,
 while its jaw remains centred across the belt width. The picker is being
 retried against these corrections. Native runtime and homing tests remain
 unchanged. The compiler batch has passed StockKit, ToolpathKit and VisionKit.
+
+### G12 checkpoint — picker reaches simulation, collision unresolved
+
+The corrected picker generates a 1,992,238-byte scene with 127 component
+records and enters MuJoCo simulation. Its strict contact check fails at
+0.01 seconds, before completing a mission step. This is unresolved and must
+not be treated as a successful picker or G12 checkpoint. Added explicit
+contact indices, penetration and world position to the assertion (the pinned
+compiler's anonymous-object string only listed field types). The app compiler
+is being rerun for that diagnostic. CadBridge, MotionKit weave and the welding
+recipe compiler-only checks passed; app root compilation is underway.

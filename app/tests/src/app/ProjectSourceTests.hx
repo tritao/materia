@@ -869,7 +869,11 @@ class ProjectSourceTests {
           if (!contact.active || contact.distance >= -0.0005) continue;
           // The compliant cup deliberately presses at most 3 mm into its intended grasp surface.
           check(contact.linkIndex == mission.toolLink && contact.otherKind == robotkit.runtime.RobotContactOtherKind.Object &&
-            contact.distance >= -0.004, "picker has no unintended robot contact");
+            contact.distance >= -0.004, "picker has no unintended robot contact: link=" + contact.linkIndex +
+              " (" + model.links[contact.linkIndex].id + "), otherKind=" + contact.otherKind +
+              ", otherLink=" + contact.otherLink + ", object=" + contact.otherObject +
+              ", distance=" + contact.distance + ", point=" + contact.position.x + "," + contact.position.y + "," + contact.position.z +
+              "; time=" + simulation.activeSession().simulationTime() + "; completed=" + mission.completed);
         }
         var held = simulation.heldObjectIds();
         check(held.length <= 1, "picker holds at most one carton");
