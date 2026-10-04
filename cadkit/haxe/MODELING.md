@@ -312,6 +312,13 @@ to the root wall frame. The flat pattern's `plane` aligns its X axis with that g
 grain it uses the root plane. Bounds and all contour coordinates refer to this exported plane.
 The document saves the material snapshot, including grain, with its current schema version.
 
+`cadkit.drawing.Drawing2D.of(flat)` supplies exact contours, bend markings, annotations and
+an optional grain arrow to both exporters. `Dxf.write(drawing)` returns R12 ASCII with only
+LINE, ARC, CIRCLE and TEXT entities; clockwise contours retain their winding through negative-Z
+object coordinates. `Svg.write(drawing)` returns a millimetre SVG with the same manufacturing
+layers. Both return text for the caller to save and perform no native operation. DXF annotations
+must be printable ASCII; SVG annotations escape XML text.
+
 ## Validation
 
 `ctest --test-dir build/debug --output-on-failure` exercises the C boundary,
