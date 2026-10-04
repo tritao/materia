@@ -2396,3 +2396,10 @@ once homing completes, before any mission work begins. Stale-plan rejection
 remains enforced. The picker test follows the renewed handling motion instance
 when collecting plan/allocation statistics. App and MotionKit compilers are
 running before the integration retry. G13 is unstarted.
+
+### G12 checkpoint — renewed runner nullability
+
+MotionKit compiled the captured-revision changes. App compilation required
+an explicit nullable local and guard when following the renewed handling
+runner inside the picker loop; added that guard and restarted only the failed
+app compiler. No native/controller source changed in this follow-up.

@@ -859,7 +859,9 @@ class ProjectSourceTests {
         var before = hl.Gc.totalAllocated();
         var priorPlan = motion.executor.plan;
         simulation.step();
-        motion = mission.handling.motion;
+        var currentHandling:Null<motionkit.robot.HandlingPlanRunner> = mission.handling;
+        if (currentHandling == null) throw "Picker handling runner disappeared";
+        motion = currentHandling.motion;
         var allocated = hl.Gc.totalAllocated() - before;
         ticks++;
         if (mission.failure != null) throw "gantry picker mission: " + mission.failure;
