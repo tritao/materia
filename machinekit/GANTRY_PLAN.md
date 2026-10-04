@@ -1886,3 +1886,17 @@ first failure. Successful releases preserve native follower displacement.
 HomingCycle and application owners still need to use this capability; reset
 reconciliation, independent motor calibration and skew relaxation remain.
 No tests or builds ran; the adapter is uncompiled and behavior unverified.
+
+### G12 — connect side holds to slow homing approach
+
+Side adapter: `8ecef17c0`. MotionSystem accepts a HomingSideControl and passes
+it into HomingCycle; router and mission players supply their simulation-owned
+adapter. Multi-switch axes require distinct explicit drive bindings and a side
+controller. Each new slow-approach capture holds its motor while uncaptured
+sides continue. Release all holds after the controlled stop before latching;
+start/update faults and cancellation attempt release even if stopping fails.
+
+Independent motor calibration and monitor-reset preservation of the resulting
+slip remain unresolved; this wiring alone does not prove squaring. Fast seek
+still stops the whole axis at its first switch. Skew relaxation and the 1 mm
+result remain pending. No tests or builds ran; source remains uncompiled.

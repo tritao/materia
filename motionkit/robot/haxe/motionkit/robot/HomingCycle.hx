@@ -11,6 +11,7 @@ private enum HomingPhase {
 class HomingCycle {
   final driver:HomingDriver;
   final axes:Array<HomingAxis>;
+  final sides:Null<robotkit.runtime.HomingSideControl>;
   var index:Int = 0;
   var phase:HomingPhase = Idle;
   var origin:Float = 0.0;
@@ -23,14 +24,24 @@ class HomingCycle {
   var observationClock:Null<String> = null;
   public var fault(default, null):Null<String> = null;
 
-  public function new(driver:HomingDriver, axes:Array<HomingAxis>) {
+  public function new(driver:HomingDriver, axes:Array<HomingAxis>, ?sides:robotkit.runtime.HomingSideControl) {
     if (driver == null || axes == null || axes.length == 0) throw "Homing requires a driver and physical axes";
     this.driver = driver; this.axes = axes.copy();
+    this.sides = sides;
     var ids = new Map<String, Bool>(), joints = new Map<Int, Bool>();
     for (axis in this.axes) {
       if (axis == null || ids.exists(axis.id) || joints.exists(axis.joint))
         throw "Homing requires distinct non-null axes and joints";
       ids.set(axis.id, true); joints.set(axis.joint, true);
+      if (axis.switches.length > 1) {
+        if (sides == null) throw "Multi-side homing requires independent motor holds";
+        var drives = new Map<String, Bool>();
+        for (contact in axis.switches) {
+          if (contact.driveJoint == null || drives.exists(contact.driveJoint))
+            throw "Multi-side homing requires distinct motor bindings";
+          drives.set(contact.driveJoint, true);
+        }
+      }
     }
     // Retract the downward slide before any horizontal carriage movement.
     this.axes.sort((a, b) -> {
@@ -50,6 +61,7 @@ class HomingCycle {
     try beginAxis() catch (error:Dynamic) {
       fault = Std.string(error); phase = Fault;
       try driver.stop(axes[index].joint, axes[index].acceleration) catch (_:Dynamic) {}
+      try releaseSides() catch (_:Dynamic) {}
       throw error;
     }
   }
@@ -106,12 +118,14 @@ class HomingCycle {
               if (signal.edgePosition == null && dt > axis.timestep * (1 + 1e-9))
                 throw "Homing sampling interval exceeds its repeatability budget";
               captures[i] = signal.edgePosition == null ? observation.position : signal.edgePosition;
+              if (axis.switches.length > 1) sides.hold(axis.switches[i].id);
             }
             if (captures[i] == null) all = false;
           }
           if (all) enter(StopAfterLatch, observation);
         case StopAfterLatch:
           if (stopped) {
+            releaseSides();
             for (i in 0...axis.switches.length) {
               var capture = captures[i];
               if (capture == null) throw "Homing has no captured latch position";
@@ -131,15 +145,21 @@ class HomingCycle {
     } catch (error:Dynamic) {
       fault = Std.string(error); phase = Fault;
       try driver.stop(axis.joint, axis.acceleration) catch (_:Dynamic) {}
+      try releaseSides() catch (_:Dynamic) {}
       throw error;
     }
   }
 
   public function cancel():Void {
     if (!isActive()) return;
-    driver.stop(axes[index].joint, axes[index].acceleration);
     fault = "Homing cancelled"; phase = Fault;
+    var failure:Null<String> = null;
+    try driver.stop(axes[index].joint, axes[index].acceleration) catch (error:Dynamic) failure = Std.string(error);
+    try releaseSides() catch (error:Dynamic) { if (failure == null) failure = Std.string(error); }
+    if (failure != null) throw failure;
   }
+
+  function releaseSides():Void { if (sides != null) sides.releaseAll(); }
 
   function enter(next:HomingPhase, observation:HomingObservation):Void {
     phase = next; origin = observation.position; elapsed = 0.0;

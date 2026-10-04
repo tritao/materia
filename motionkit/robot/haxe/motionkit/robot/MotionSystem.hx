@@ -43,6 +43,7 @@ class MotionSystem {
   final axisPlanner:AxisPlanner;
   final homingAxes:Array<HomingAxis> = [];
   var homingDriver:Null<HomingDriver> = null;
+  var homingSides:Null<robotkit.runtime.HomingSideControl> = null;
   var homingCycle:Null<HomingCycle> = null;
   final pathPlanner:PathPlanner;
   public final fixedTimestepSeconds:Float;
@@ -457,10 +458,11 @@ class MotionSystem {
 
   /** Bind the runtime owner and its encoder/slip reset before sensor homing. */
   public function configureRuntimeHoming(runtime:robotkit.runtime.RobotRuntime,
-      afterLatch:Void -> Void):Void {
+      afterLatch:Void -> Void, ?sides:robotkit.runtime.HomingSideControl):Void {
     if (isMoving()) throw "Cannot replace a homing driver during motion";
     if (homingAxes.length == 0) throw "Machine has no physical home switches";
     homingDriver = new RuntimeHomingDriver(robot, runtime, homingAxes, axes, afterLatch);
+    homingSides = sides;
   }
 
   public function homingStatus():String
@@ -472,7 +474,7 @@ class MotionSystem {
       if (isMoving() || queuedTrajectories.length > 0) throw "Homing requires an idle motion system";
       var driver = homingDriver;
       if (driver == null) throw "Physical homing requires a configured runtime driver and monitor reset";
-      homingCycle = new HomingCycle(driver, homingAxes);
+      homingCycle = new HomingCycle(driver, homingAxes, homingSides);
       homingCycle.start();
       return null;
     }

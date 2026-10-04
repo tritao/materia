@@ -314,7 +314,7 @@ class CncProgramPlayer implements SessionMember {
 			view.configureRuntimeHoming(robot.runtime, () -> {
 				slip.reset();
 				encoders.reset(robot.runtime.snapshot().q.toArray());
-			});
+			}, simulation.homingSides(robotIndex));
 			return view;
 		};
 		homing = newHoming();

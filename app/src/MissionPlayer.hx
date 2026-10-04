@@ -401,7 +401,7 @@ class MissionPlayer implements SessionMember {
     view.configureRuntimeHoming(robot.runtime, () -> {
       slip.reset();
       encoders.reset(robot.runtime.snapshot().q.toArray());
-    });
+    }, simulation.homingSides(robotIndex));
     homing = view; homingComplete = false;
   }
 
