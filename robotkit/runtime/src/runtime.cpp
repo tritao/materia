@@ -538,11 +538,13 @@ rk_result RobotRuntime::calibrate_coordinates(const double *offsets, uint32_t co
         for (uint32_t j = 0; j < i; ++j)
             if (reference_joints[j] == reference_joints[i]) return RK_ERROR_INVALID_ARGUMENT;
     }
-    if (endpoint_->executes_trajectory_queue()) return RK_ERROR_UNSUPPORTED;
+    if (blueprint_.calibration_revision == UINT64_MAX) return RK_ERROR_INVALID_STATE;
     if (state_.safety == RK_SAFETY_FAULT || state_.safety == RK_SAFETY_EMERGENCY_STOP)
         return RK_ERROR_SAFETY_STOPPED;
     if (!commands_.empty() || !trajectory_.empty() || control_.trajectory_active ||
-        control_.stop_ramp_active) return RK_ERROR_INVALID_STATE;
+        control_.stop_ramp_active || device_queue_active_ ||
+        (endpoint_->executes_trajectory_queue() && state_.trajectory_queue_depth != 0))
+        return RK_ERROR_INVALID_STATE;
     for (uint32_t joint = 0; joint < count; ++joint) {
         if (!std::isfinite(offsets[joint])) return RK_ERROR_INVALID_ARGUMENT;
         if (std::abs(state_.velocity[joint]) > 1e-6 ||
@@ -577,6 +579,7 @@ rk_result RobotRuntime::calibrate_coordinates(const double *offsets, uint32_t co
     }
     for (uint32_t i = 0; i < reference_count; ++i)
         reference_latched_[reference_joints[i]] = true;
+    ++blueprint_.calibration_revision;
     state_backup_valid_ = false;
     return RK_OK;
 }
@@ -933,8 +936,29 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
         if (checked != RK_OK) return checked;
         if (endpoint_->executes_trajectory_queue()) {
             const auto owner_now = externally_driven_ ? last_owner_timestamp_ns_ : monotonic_now_ns();
-            const auto submitted = endpoint_->submit_device_plan(plan, base_time, owner_now,
-                committed, blueprint_);
+            bool translated = false;
+            for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
+                translated |= coordinate_offsets_[joint] != 0.0;
+            rk_result submitted;
+            if (translated) {
+                // Host validation and queue anchors use referenced coordinates;
+                // device polynomials and deployment limits use endpoint coordinates.
+                auto device_plan = plan;
+                auto device_blueprint = blueprint_;
+                for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
+                    const auto offset = coordinate_offsets_[joint];
+                    device_plan.start_position[joint] -= offset;
+                    for (auto &segment : device_plan.segments.segments)
+                        segment.coefficients[joint].value[0] -= offset;
+                    device_blueprint.joints[joint].lower_limit -= offset;
+                    device_blueprint.joints[joint].upper_limit -= offset;
+                }
+                submitted = endpoint_->submit_device_plan(device_plan, base_time, owner_now,
+                    committed, device_blueprint);
+            } else {
+                submitted = endpoint_->submit_device_plan(plan, base_time, owner_now,
+                    committed, blueprint_);
+            }
             if (submitted != RK_OK) return submitted;
         }
         const bool was_idle = !control_.trajectory_active;

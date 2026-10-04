@@ -2863,3 +2863,18 @@ queued for Phase C. Queued coordinate-reference calibration, side adapter and
 controlled-stop integration still require implementation before router device
 homing works. Timeout recovery and cancellation interactions need the phase
 audit; G13 remains incomplete.
+
+### G13 — queued coordinate references and translated device plans
+
+Stationary, drained queued endpoints now accept coordinate-reference calibration.
+Runtime plans remain in referenced coordinates for validation/anchoring; device
+submission translates polynomial constants, expected start positions and native
+position bounds back to endpoint coordinates. Derivatives and coupling ratios
+remain unchanged. Coordinate calibration now increments calibration_revision,
+closing the earlier G11 stale-plan admission gap. Pending counter calibration
+still blocks coordinate changes. A queued regression checks old-revision rejection
+and transmitted start/constants/limit translation after a nonzero reference.
+
+No builds/tests ran; the new regression awaits Phase C. Homing side adapter,
+controlled-stop lifecycle, router fixture and hardware implementation remain
+unfinished, and G13 is not complete.
