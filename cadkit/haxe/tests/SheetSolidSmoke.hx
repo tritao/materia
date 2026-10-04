@@ -121,7 +121,7 @@ class SheetSolidSmoke {
 				var matches = 0;
 				for (b in sheet.bends()) {
 					var zone = evaluation.bend(b.id);
-					var radius:Float = cast zone.innerRadius;
+					var radius = zone.curvedInnerRadius();
 					var distance = origin.subtract(zone.axis()).cross(zone.frame.plane.yDirection).length();
 					if (distance < 1e-6 && Math.abs(Math.abs(direction.dot(zone.frame.plane.yDirection)) - 1) < 1e-6
 						&& (Math.abs(axis.get_radius() - radius) < 1e-6 || Math.abs(axis.get_radius() - radius - sheet.thickness()) < 1e-6)) matches++;

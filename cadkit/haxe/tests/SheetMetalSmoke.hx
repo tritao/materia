@@ -21,7 +21,7 @@ class SheetMetalSmoke {
 			action();
 		} catch (error:Dynamic) {
 			if (Std.isOfType(error, SheetDiagnosis)) {
-				var failure:SheetDiagnosis = cast error;
+				var failure = Std.downcast(error, SheetDiagnosis); if (failure == null) throw "unexpected error type";
 				if (failure.code == code)
 					return;
 			}
@@ -63,7 +63,7 @@ class SheetMetalSmoke {
 		near(BendDimensions.leg(10, LengthSpec.Leg, 2, 1.64, Math.PI), 10, "hem straight length");
 		var stock = new SheetMaterial("steel", 1.5, rule, {uts: 400, yield: 250, youngs: 205000});
 		near(stock.thickness, 1.5, "sheet stock thickness");
-		var mechanical:cadkit.sheetmetal.SheetMaterial.SheetMechanical = cast stock.mechanical;
+		var mechanical = stock.mechanical; if (mechanical == null) throw "missing test mechanical data";
 		near(mechanical.youngs, 205000, "modulus in MPa");
 		diagnosis("sheet.no-bend-rule", function() { var value = BendDimensions.allowance(2, 1, 1, null); });
 		diagnosis("sheet.sharp-length-angle", function() { var value = BendDimensions.leg(10, LengthSpec.InnerSharp, 2, 1, Math.PI); });
@@ -82,6 +82,7 @@ class SheetMetalSmoke {
 		assertions += SheetBaseSmoke.run();
 		assertions += SheetEdgeSmoke.run();
 		assertions += SheetFlangeGeometrySmoke.run();
+		assertions += SheetFlangeSmoke.run();
 		trace("Sheet metal smoke passed (" + assertions + " assertions)");
 	}
 }

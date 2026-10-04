@@ -228,8 +228,9 @@ table in `tools/README.md`.
   comes from the sketch workplane. For a side-B profile, the side-A frame is shifted +T along
   that same normal, preserving the sheet-wide material-toward-minus-Z convention.
   The thickness parameter owns T; a material snapshot owns its identity, explicit rule and
-  optional mechanical data. The new `sheet-base` record is additive to document version 11;
-  no existing record shape changes. Project material-library integration remains SM6.
+  optional mechanical data and explicit default/minimum radius ratios. Project material-library
+  integration remains SM6. SM3e changes the base record to a typed wire payload and bumps the
+  single supported document format to version 12; no version-11 sheet reader remains.
 - SM3d fixes flange-position semantics explicitly: `MaterialInside` keeps the virtual outside
   sharp corner at the picked boundary (parent tangent shifts inward by OSSB), `MaterialOutside`
   keeps the virtual inside sharp corner there (shift inward by R·tan(|angle|/2)), `BendOutside`
@@ -241,6 +242,18 @@ table in `tools/README.md`.
   identities; parallel neighbours, absent circle intersections and tied branches are diagnosed.
   `SheetFlange` edits an isolated graph. Wall edits remap existing bend attachments by authored
   identity and restore wall and bend records together if validation fails.
+- SM3e records sheet payloads with typed `@:wire` records and numbered enums. Geometry
+  accesses nullable arc centres and bend radii through guarded typed functions; sheet code
+  contains no unchecked casts. The generic document lookup boundary uses checked class narrowing.
+- Authored output wall/bend ids belong to each feature; a root-owned monotonic identity ledger
+  reserves them independently of rebuilt topology counts and saves its counters with the base.
+  A restored feature claims its saved ids, diagnosing duplicate ownership or invalid counters.
+  Upstream topology growth cannot renumber downstream walls, bends or native face names.
+- Material-default radius is an explicit ratio multiplied by current thickness; a missing
+  default diagnoses `sheet.no-default-radius`. Minimum radius is a separate optional property,
+  never substituted for the preferred radius. Gaps trim the attachment width; extensions add
+  child-wall material beyond it without widening the bend. Exact segment identities persist
+  through attachment subdivision.
 - Sheet features consume only the previous sheet feature's `Sheet`. A general solid feature
   (boolean, fillet...) after a sheet feature produces a plain solid: downstream code that needs
   a flat pattern must point at a sheet feature or convert (SM-D7). This keeps one owner per fact.
@@ -562,7 +575,8 @@ setbacks; these define new fixtures, with no existing baseline-number changes.
 - `BendProcess`, `AirBending`, `CalibrationTable` per SM-D8, in `cadkit.sheetmetal.process`
   (pure; tooling geometry enters as plain numbers so CadKit does not depend on MachineKit).
 - `MaterialDef` gains `mechanical {uts, yield, youngs}` (optional: not every material is
-  structural) and `sheet {kFactorTable, minRadiusRatio, grain}` (optional: only sheet materials)
+  structural) and `sheet {kFactorTable, defaultRadiusRatio, minRadiusRatio, grain}`
+  (optional: only sheet materials)
   in `projectkit`. Extend the current schema, bump its version if the codec requires it, and
   regenerate fixtures and example projects; no compatibility path (repo rule).
 - `BendRule.Process(tooling)`: flat pattern for a chosen punch/die.
@@ -766,7 +780,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM0 | done: clean branch on 38601ac61, pins verified, prerequisite documents read; quick gate `sm0-setup` passes (ProjectKit 138, ManufacturingKit 54) | c70c89745 |
 | SM1 | done: exact line/arc regions, permanent graph ids, edits/cuts/rips, bidirectional FK, neutral-length conservation, closure and P1–P5 bounds; quick gate `sm1-core` passes (2102 sheet assertions) | 0713c4e0c; 54b5cab15 |
 | SM2 | done: named wall extrusions and bend revolutions fused for flat/folded/partial states; P1–P5 validity, single bodies, volumes, axes and stable names; quick gate `sm2-solid` passes (3757 sheet assertions) | 7a3836d8c |
-| SM3 | in progress: SM3a atomic graph publication; SM3b exact sketch-backed base, side A/B, stock codec and named thickness builder; quick gates `sm3a-staging` (3773) and `sm3b-base` (3813 sheet assertions); SM3c authored segment names and exact face-to-graph picks; quick gate `sm3c-edges` (3843 sheet assertions); SM3d exact flange geometry and alignment; quick gate `sm3d-flange-geometry` (3880 sheet assertions); flange features/options, hem/cut/rip and P1–P5 document acceptance remain | 535ebc547; 08afd7a32; bb3405a64; 84a51f00d; geometry sub-step commit |
+| SM3 | in progress: SM3a atomic graph publication; SM3b exact sketch-backed base, side A/B, stock codec and named thickness builder; quick gates `sm3a-staging` (3773) and `sm3b-base` (3813 sheet assertions); SM3c authored segment names and exact face-to-graph picks; quick gate `sm3c-edges` (3843 sheet assertions); SM3d exact flange geometry and alignment; quick gate `sm3d-flange-geometry` (3880 sheet assertions); SM3e typed flange features, authored shared identities, gaps/extensions, stock radius defaults and P1–P5 document acceptance; quick gate `sm3e-flanges-typed` (4044 sheet assertions); relief options and hem/cut/rip remain | 535ebc547; 08afd7a32; bb3405a64; 84a51f00d; 3ed9b3971; flange sub-step commit |
 | SM4 | planned | |
 | SM4b | planned | |
 | SM5 | planned | |
@@ -817,3 +831,12 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
   successful recovery. No saved feature type or compatibility path is introduced by this
   foundation. Existing baseline counts and MachineKit summaries remain unchanged; no new
   haxeon issue was found. Concrete features and codec acceptance remain required for SM3.
+
+- SM3e: `sm3e-flanges-typed` checks production P1–P5 document chains, typed codec round trips,
+  malformed numeric wire payload rejection and version-11 rejection, shared parameter binding,
+  gap/extension native validity, thickness-derived default radius, undo/redo, conservative edge
+  resolution and stable output identities after upstream topology growth (4044 sheet assertions).
+  Root ledger counters and feature-owned ids are authored state, not reconstructed from wall counts.
+  Runtime fixtures generate the current format; no static version-11 sheet fixtures exist.
+  Sheet code and its tests have no unchecked casts. MachineKit's schema-version assertion
+  now expects version 12; its original geometry summaries are unchanged. No new haxeon issue was found.

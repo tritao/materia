@@ -75,7 +75,7 @@ class SheetFlangeGeometrySmoke {
 		try {
 			var removed = channel.updateWall(1, new WallOutline(before.loops()[0], [], [["new0", "new1", "new2", "new3"]]));
 		} catch (error:Dynamic) {
-			if (Std.isOfType(error, SheetDiagnosis)) { var diagnosis:SheetDiagnosis = cast error; failed = diagnosis.code == "sheet.bend-edge-removed"; }
+			if (Std.isOfType(error, SheetDiagnosis)) { var diagnosis = Std.downcast(error, SheetDiagnosis); if (diagnosis == null) throw "unexpected error type"; failed = diagnosis.code == "sheet.bend-edge-removed"; }
 		}
 		check(failed, "removing a consumed edge names the failed bend attachment");
 		check(channel.wall(1).outline == before && channel.bend(1) == first, "failed wall edits restore walls and bend attachments");

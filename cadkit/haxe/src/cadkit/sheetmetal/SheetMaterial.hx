@@ -6,8 +6,11 @@ class SheetMaterial {
 	public final thickness:Float;
 	public final bendRule:Null<BendRule>;
 	public final mechanical:Null<SheetMechanical>;
+	public final defaultRadiusRatio:Null<Float>;
+	public final minRadiusRatio:Null<Float>;
 
-	public function new(id:String, thickness:Float, ?bendRule:BendRule, ?mechanical:SheetMechanical) {
+	public function new(id:String, thickness:Float, ?bendRule:BendRule, ?mechanical:SheetMechanical,
+		?defaultRadiusRatio:Float, ?minRadiusRatio:Float) {
 		BendDimensions.validate(thickness, 0, 0);
 		if (id == null || id.length == 0)
 			throw new SheetDiagnosis("sheet.invalid-material", "A material needs an identity");
@@ -21,12 +24,23 @@ class SheetMaterial {
 		this.id = id;
 		this.thickness = thickness;
 		this.bendRule = bendRule;
+		if ((defaultRadiusRatio != null && (!Math.isFinite(defaultRadiusRatio) || defaultRadiusRatio < 0))
+			|| (minRadiusRatio != null && (!Math.isFinite(minRadiusRatio) || minRadiusRatio < 0))
+			|| (defaultRadiusRatio != null && minRadiusRatio != null && defaultRadiusRatio < minRadiusRatio))
+			throw new SheetDiagnosis("sheet.invalid-material-radius", "Radius ratios must be finite and nonnegative, with default no smaller than minimum");
+		this.defaultRadiusRatio = defaultRadiusRatio;
+		this.minRadiusRatio = minRadiusRatio;
+	}
+	public function defaultRadius():Float {
+		if (defaultRadiusRatio == null)
+			throw new SheetDiagnosis("sheet.no-default-radius", "Material has no default bend radius; choose a radius explicitly", [id]);
+		return thickness * defaultRadiusRatio;
 	}
 }
 
 /** Plain material properties, all in MPa. */
-typedef SheetMechanical = {
-	final uts:Float;
-	final yield:Float;
-	final youngs:Float;
+@:wire typedef SheetMechanical = {
+	@:id(1) final uts:Float;
+	@:id(2) final yield:Float;
+	@:id(3) final youngs:Float;
 }

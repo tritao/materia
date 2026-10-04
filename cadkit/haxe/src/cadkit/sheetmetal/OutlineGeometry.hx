@@ -39,7 +39,7 @@ class OutlineGeometry {
 					if (x > point.x) winding += s.end.y > s.start.y ? 1 : -1;
 				}
 			} else {
-				var center:Point2 = cast s.center;
+				var center = s.arcCenter();
 				var sine = (point.y - center.y) / s.radius;
 				if (Math.abs(sine) >= 1) continue;
 				var a = Math.asin(sine);
@@ -64,7 +64,7 @@ class OutlineGeometry {
 		return delta / Math.abs(s.sweep);
 	}
 	static function onArc(s:Segment, p:Point2):Bool {
-		var center:Point2 = cast s.center;
+		var center = s.arcCenter();
 		return arcFraction(s, Math.atan2(p.y - center.y, p.x - center.x)) <= 1 + 1e-10;
 	}
 	static function cross(x:Float, y:Float, u:Float, v:Float):Float { return x * v - y * u; }
@@ -98,8 +98,8 @@ class OutlineGeometry {
 				? [new Point2(a.start.x + t * dx, a.start.y + t * dy)] : [];
 		}
 		if (a.isLine() || b.isLine()) return lineArc(a.isLine() ? a : b, a.isLine() ? b : a);
-		var ca:Point2 = cast a.center;
-		var cb:Point2 = cast b.center;
+		var ca = a.arcCenter();
+		var cb = b.arcCenter();
 		var distance = ca.distance(cb);
 		if (distance < EPS && Math.abs(a.radius - b.radius) < EPS) {
 			var result:Array<Point2> = [];
@@ -120,7 +120,7 @@ class OutlineGeometry {
 		return result;
 	}
 	static function lineArc(line:Segment, arc:Segment):Array<Point2> {
-		var center:Point2 = cast arc.center;
+		var center = arc.arcCenter();
 		var dx = line.end.x - line.start.x;
 		var dy = line.end.y - line.start.y;
 		var px = line.start.x - center.x;

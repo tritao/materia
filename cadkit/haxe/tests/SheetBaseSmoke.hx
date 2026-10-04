@@ -59,12 +59,12 @@ class SheetBaseSmoke {
 			near(bounds.get_max().get_x(), side == SheetSide.A ? 7 : 8.5, "solid ends on the correct side of the profile");
 			var encoded = DocumentCodec.encode(document);
 			var loaded = DocumentCodec.decode(encoded);
-			var decoded:SheetBaseFeature = cast loaded.featureById(base.id.toInt());
+			var decoded = Std.downcast(loaded.featureById(base.id.toInt()), SheetBaseFeature); if (decoded == null) throw "unexpected loaded feature type";
 			check(decoded.side == side && decoded.materialId == "mild-steel", "base side and material identity round trip");
 			check(decoded.currentShape().elementNames(CadKit.ShapeKind.Face).join("\n")
 				== base.currentShape().elementNames(CadKit.ShapeKind.Face).join("\n"), "base names round trip");
 			near(decoded.sheet().wall(1).outline.area(), graph.wall(1).outline.area(), "exact outline round trip");
-			var mechanics:cadkit.sheetmetal.SheetMaterial.SheetMechanical = cast decoded.stock().mechanical;
+			var mechanics = decoded.stock().mechanical; if (mechanics == null) throw "missing test mechanical data";
 			near(mechanics.youngs, 205000, "material MPa round trip");
 			base.thickness.set(2);
 			document.recompute();
@@ -88,7 +88,7 @@ class SheetBaseSmoke {
 		near(base.sheet().thickness(), 2, "builder binds named thickness");
 		var loaded = DocumentCodec.decode(DocumentCodec.encode(document));
 		loaded.parameter("plate.thickness").set(3); loaded.recompute();
-		var restored:SheetBaseFeature = cast loaded.featureById(base.id.toInt());
+		var restored = Std.downcast(loaded.featureById(base.id.toInt()), SheetBaseFeature); if (restored == null) throw "unexpected loaded feature type";
 		near(restored.sheet().thickness(), 3, "loaded named thickness binding");
 		check(restored.stock().mechanical == null, "optional mechanical data stays absent");
 		loaded.close(); document.close();
@@ -116,9 +116,9 @@ class SheetBaseSmoke {
 		var diagnosed = false;
 		try { bad.recompute(); } catch (error:Dynamic) {
 			if (Std.isOfType(error, RecomputeError)) {
-				var failure:RecomputeError = cast error;
+				var failure = Std.downcast(error, RecomputeError); if (failure == null) throw "unexpected error type";
 				if (Std.isOfType(failure.cause, SheetDiagnosis)) {
-					var diagnosis:SheetDiagnosis = cast failure.cause;
+					var diagnosis = Std.downcast(failure.cause, SheetDiagnosis); if (diagnosis == null) throw "unexpected error type";
 					diagnosed = diagnosis.code == "sheet.base-region-count";
 				}
 			}

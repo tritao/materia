@@ -36,6 +36,17 @@ class BendZone {
 		}
 	}
 
+	public function curvedInnerRadius():Float {
+		var radius = innerRadius;
+		if (radius == null) throw new SheetDiagnosis("sheet.flat-bend-radius", "A flat strip has no finite inner radius", ["bend:" + id]);
+		return radius;
+	}
+	public function curvedNeutralRadius():Float {
+		var radius = neutralRadius;
+		if (radius == null) throw new SheetDiagnosis("sheet.flat-bend-radius", "A flat strip has no finite neutral radius", ["bend:" + id]);
+		return radius;
+	}
+
 	/** Strip point: fraction along the arc, distance along the bend edge, depth from side A. */
 	public function point(fraction:Float, along:Float = 0, depth:Float = 0):Vector {
 		if (!Math.isFinite(fraction) || fraction < 0 || fraction > 1 || !Math.isFinite(along)

@@ -35,7 +35,7 @@ class SheetCoreSmoke {
 		checks++;
 		try { action(); } catch (error:Dynamic) {
 			if (Std.isOfType(error, SheetDiagnosis)) {
-				var diagnosis:SheetDiagnosis = cast error;
+				var diagnosis = Std.downcast(error, SheetDiagnosis); if (diagnosis == null) throw "unexpected error type";
 				if (diagnosis.code == code) return;
 			}
 			throw "Expected " + code + ", got " + Std.string(error);
@@ -111,10 +111,10 @@ class SheetCoreSmoke {
 				var zone = evaluated.bend(b.id);
 				near(zone.allowance, sheet.bendAllowance(b), "fixed neutral length");
 				if (fraction > 0) {
-					var q:Float = cast zone.neutralRadius;
+					var q = zone.curvedNeutralRadius();
 					near(q * Math.abs(zone.angle), sheet.bendAllowance(b), "neutral arc length");
 					if (fraction == 1) {
-						var r:Float = cast zone.innerRadius;
+						var r = zone.curvedInnerRadius();
 						near(r, b.radius, "target inner radius");
 					}
 					if (fraction >= 0.25) {

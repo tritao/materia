@@ -9,13 +9,17 @@ class SheetFeature extends Feature {
 	var committedSheet:Null<Sheet>;
 	var stagedSheet:Null<Sheet>;
 	var stagedContext:Null<EvaluationContext>;
+	final rootIdentities:SheetIdentityLedger;
 
-	public function new() {
+	public function new(?identities:SheetIdentityLedger) {
 		super();
 		committedSheet = null;
 		stagedSheet = null;
 		stagedContext = null;
+		rootIdentities = identities == null ? new SheetIdentityLedger() : identities;
 	}
+	/** Concrete chained features delegate to their source; root features own the saved allocator. */
+	public function identityLedger():SheetIdentityLedger { return rootIdentities; }
 
 	/** An isolated copy of the last committed graph; edits cannot bypass document parameters. */
 	public function sheet():Sheet {

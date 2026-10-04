@@ -60,7 +60,7 @@ class ProfileGeometry {
 				if (curve.center == null)
 					part = Curve.line(plane.toWorld(curve.start), plane.toWorld(curve.end));
 				else {
-					var center:Vector = cast curve.center;
+					var center = curve.arcCenter();
 					if (Math.abs(curve.sweep) == 2 * Math.PI)
 						part = Curve.circle(curve.radius, new Plane(plane.toWorld(center), plane.xDirection, plane.normal));
 					else {

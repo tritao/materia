@@ -64,7 +64,7 @@ class SheetSolid {
 					if (segment.isLine())
 						curve = Curve.line(vector(segment.start), vector(segment.end));
 					else if (Math.abs(segment.sweep) >= 2 * Math.PI - 1e-12) {
-						var center:Point2 = cast segment.center;
+						var center = segment.arcCenter();
 						curve = Curve.circle(segment.radius, new Plane(vector(center), Vector.X(), Vector.Z()));
 					} else
 						curve = Curve.arc(vector(segment.start), vector(segment.point(0.5)), vector(segment.end));
@@ -102,7 +102,8 @@ class SheetSolid {
 					face.close();
 				} catch (error:Dynamic) { face.close(); throw error; }
 			}
-			var op:Operation = cast part.operation;
+			var op = part.operation;
+			if (op == null) throw new SheetDiagnosis("sheet.solid-history", "Wall extrusion did not produce operation history", ["wall:" + wall.id]);
 			for (i in 0...op.historyCount(CadKit.HistoryRelation.Generated)) {
 				var source = op.historySourceAt(CadKit.HistoryRelation.Generated, i);
 				var target = op.historyTargetAt(CadKit.HistoryRelation.Generated, i);
@@ -195,7 +196,7 @@ class SheetSolid {
 	static function bendRole(face:Shape, bend:Bend, zone:BendZone):String {
 		if (face.surfaceKind() == CadKit.SurfaceKind.Cylinder && zone.angle != 0) {
 			var radius = face.faceAxis().get_radius();
-			var inner:Float = cast zone.innerRadius;
+			var inner = zone.curvedInnerRadius();
 			if (Math.abs(radius - inner) < 1e-7) return "inner";
 			if (Math.abs(radius - inner - zone.thickness) < 1e-7) return "outer";
 		} else if (face.surfaceKind() == CadKit.SurfaceKind.Plane) {

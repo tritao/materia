@@ -6,7 +6,7 @@ class SheetDemoParts {
 	public static inline var RADIUS:Float = 1;
 	public static function materialA():SheetMaterial {
 		return new SheetMaterial("mild-steel", 1.5, BendRule.KFactor(new KFactorTable([0], [0.38])),
-			{uts: 400, yield: 250, youngs: 205000});
+			{uts: 400, yield: 250, youngs: 205000}, RADIUS / 1.5);
 	}
 
 	/** 100 along the bend, 60 outside base, 40 outside height. */

@@ -41,7 +41,7 @@ class WallOutlineEditor {
 			var along = (px * dy - py * dx) / determinant;
 			return new Point2(origin.x + along * tx, origin.y + along * ty);
 		}
-		var center:Point2 = cast neighbour.center;
+		var center = neighbour.arcCenter();
 		var projection = (center.x - origin.x) * tx + (center.y - origin.y) * ty;
 		var nearest = new Point2(origin.x + projection * tx, origin.y + projection * ty);
 		var separation = nearest.distance(center);
@@ -59,13 +59,13 @@ class WallOutlineEditor {
 	}
 	static function replaceStart(segment:Segment, point:Point2):Segment {
 		if (segment.isLine()) return Segment.line(point, segment.end);
-		var center:Point2 = cast segment.center;
+		var center = segment.arcCenter();
 		var start = Math.atan2(point.y - center.y, point.x - center.x);
 		return Segment.arc(center, segment.radius, start, directed(segment.startAngle + segment.sweep - start, segment.sweep));
 	}
 	static function replaceEnd(segment:Segment, point:Point2):Segment {
 		if (segment.isLine()) return Segment.line(segment.start, point);
-		var center:Point2 = cast segment.center;
+		var center = segment.arcCenter();
 		var end = Math.atan2(point.y - center.y, point.x - center.x);
 		return Segment.arc(center, segment.radius, segment.startAngle, directed(end - segment.startAngle, segment.sweep));
 	}

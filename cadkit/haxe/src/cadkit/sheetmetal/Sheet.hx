@@ -38,7 +38,16 @@ class Sheet {
 	public function bends():Array<Bend> { return bendData.copy(); }
 	public function rips():Array<Rip> { return ripData.copy(); }
 	public function addWall(outline:WallOutline):Wall {
-		var result = new Wall(nextWall++, outline);
+		return insertWall(nextWall, outline);
+	}
+	/** Restore a feature-owned identity while deriving a fresh graph; allocation belongs to the authoring ledger. */
+	public function insertWall(id:Int, outline:WallOutline):Wall {
+		if (id <= 0 || id == 2147483647)
+			throw new SheetDiagnosis("sheet.invalid-wall-identity", "Wall identity is outside the supported range");
+		for (wall in wallData) if (wall.id == id)
+			throw new SheetDiagnosis("sheet.duplicate-wall-identity", "Wall identity already belongs to this sheet", ["wall:" + id]);
+		var result = new Wall(id, outline);
+		if (id >= nextWall) nextWall = id + 1;
 		wallData.push(result);
 		return result;
 	}
@@ -55,12 +64,20 @@ class Sheet {
 		throw new SheetDiagnosis("sheet.missing-bend", "Bend does not belong to this sheet", ["bend:" + id]);
 	}
 	public function addBend(wallA:Int, edgeA:WallEdge, wallB:Int, edgeB:WallEdge, angle:Float, radius:Float):Bend {
-		var result = new Bend(nextBend, wallA, edgeA, wallB, edgeB, angle, radius);
+		return insertBend(nextBend, wallA, edgeA, wallB, edgeB, angle, radius);
+	}
+	/** Restore one feature-owned bend identity without deriving it from upstream output count. */
+	public function insertBend(id:Int, wallA:Int, edgeA:WallEdge, wallB:Int, edgeB:WallEdge, angle:Float, radius:Float):Bend {
+		if (id <= 0 || id == 2147483647)
+			throw new SheetDiagnosis("sheet.invalid-bend-identity", "Bend identity is outside the supported range");
+		for (bend in bendData) if (bend.id == id)
+			throw new SheetDiagnosis("sheet.duplicate-bend-identity", "Bend identity already belongs to this sheet", ["bend:" + id]);
+		var result = new Bend(id, wallA, edgeA, wallB, edgeB, angle, radius);
 		validateBend(result);
 		for (b in bendData)
 			if (uses(b, wallA, edgeA) || uses(b, wallB, edgeB))
 				throw new SheetDiagnosis("sheet.bend-edge-in-use", "A boundary segment can belong to only one bend", ["bend:" + b.id]);
-		nextBend++;
+		if (id >= nextBend) nextBend = id + 1;
 		bendData.push(result);
 		return result;
 	}
@@ -167,6 +184,11 @@ class Sheet {
 	function relative(b:Bend, angle:Float):Location {
 		return localZone(b, angle).endFrame().compose(edgeFrame(wall(b.wallB).outline, b.edgeB, true).inverse());
 	}
+	static function wallFrame(frames:Map<Int, Location>, id:Int):Location {
+		var result = frames.get(id);
+		if (result == null) throw new SheetDiagnosis("sheet.missing-wall", "Wall has no evaluated frame", ["wall:" + id]);
+		return result;
+	}
 
 	public function evaluate(state:SheetState, root:Int = 0, tolerance:Float = 1e-8):SheetEvaluation {
 		if (!Math.isFinite(tolerance) || tolerance <= 0)
@@ -192,7 +214,7 @@ class Sheet {
 		var cursor = 0;
 		while (cursor < queue.length) {
 			var id = queue[cursor++];
-			var parent:Location = cast frames.get(id);
+			var parent = wallFrame(frames, id);
 			for (b in bendData) {
 				if (isRipped(b.id) || (b.wallA != id && b.wallB != id))
 					continue;
@@ -210,8 +232,8 @@ class Sheet {
 				throw new SheetDiagnosis("sheet.disconnected", "Wall is not connected to the root after rips", ["wall:" + w.id]);
 		var zones:Map<Int, BendZone> = new Map();
 		for (b in bendData) {
-			var frameA:Location = cast frames.get(b.wallA);
-			var actual:Location = cast frames.get(b.wallB);
+			var frameA = wallFrame(frames, b.wallA);
+			var actual = wallFrame(frames, b.wallB);
 			var expected = frameA.compose(relative(b, state.angle(b.id)));
 			if (!isRipped(b.id) && !tree.exists(b.id)) {
 				var gap = expected.plane.origin.subtract(actual.plane.origin).length();

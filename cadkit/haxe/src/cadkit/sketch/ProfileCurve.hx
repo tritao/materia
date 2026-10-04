@@ -21,4 +21,9 @@ class ProfileCurve {
 		this.startAngle = startAngle;
 		this.sweep = sweep;
 	}
+	public function arcCenter():Vector {
+		var value = center;
+		if (value == null) throw new ProfileError("invalid", [entityId], "straight profile curve has no circle centre");
+		return value;
+	}
 }

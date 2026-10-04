@@ -33,6 +33,11 @@ class Segment {
 	public function isLine():Bool {
 		return center == null;
 	}
+	public function arcCenter():Point2 {
+		var value = center;
+		if (value == null) throw new SheetDiagnosis("sheet.not-an-arc", "A straight segment has no circle centre");
+		return value;
+	}
 	public function length():Float {
 		return isLine() ? start.distance(end) : radius * Math.abs(sweep);
 	}
@@ -40,7 +45,7 @@ class Segment {
 	public function area():Float {
 		if (center == null)
 			return (start.x * end.y - end.x * start.y) / 2;
-		var c:Point2 = cast center;
+		var c = arcCenter();
 		return (c.x * (end.y - start.y) - c.y * (end.x - start.x) + radius * radius * sweep) / 2;
 	}
 	public function point(fraction:Float):Point2 {
@@ -48,7 +53,7 @@ class Segment {
 			throw new SheetDiagnosis("sheet.invalid-outline", "Segment fraction must lie in [0, 1]");
 		if (center == null)
 			return new Point2(start.x + (end.x - start.x) * fraction, start.y + (end.y - start.y) * fraction);
-		var c:Point2 = cast center;
+		var c = arcCenter();
 		var a = startAngle + sweep * fraction;
 		return new Point2(c.x + radius * Math.cos(a), c.y + radius * Math.sin(a));
 	}
@@ -56,7 +61,7 @@ class Segment {
 	public function extrema():Array<Point2> {
 		var result = [start, end];
 		if (center != null) {
-			var c:Point2 = cast center;
+			var c = arcCenter();
 			for (i in 0...4) {
 				var angle = i * Math.PI / 2;
 				var distance = sweep > 0 ? positiveAngle(angle - startAngle) : positiveAngle(startAngle - angle);

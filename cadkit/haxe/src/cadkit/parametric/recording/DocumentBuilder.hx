@@ -35,6 +35,11 @@ import cadkit.parametric.features.CylinderFeature;
 import cadkit.parametric.features.PocketFeature;
 import cadkit.sketch.ConstrainedSketch;
 import cadkit.sheetmetal.SheetBaseFeature;
+import cadkit.sheetmetal.SheetFeature;
+import cadkit.sheetmetal.SheetEdgeFlangeFeature;
+import cadkit.sheetmetal.LengthSpec;
+import cadkit.sheetmetal.FlangePosition;
+import cadkit.Shape;
 import cadkit.sheetmetal.SheetMaterial;
 import cadkit.sheetmetal.SheetSide;
 
@@ -124,9 +129,21 @@ class DocumentBuilder {
 		side:SheetSide = A):SheetBaseFeature {
 		check();
 		var selectedStock = thickness == null ? stock
-			: new SheetMaterial(stock.id, thickness.value, stock.bendRule, stock.mechanical);
+			: new SheetMaterial(stock.id, thickness.value, stock.bendRule, stock.mechanical, stock.defaultRadiusRatio, stock.minRadiusRatio);
 		var feature = document.add(new SheetBaseFeature(source, selectedStock, side));
 		if (thickness != null) bind(thickness, feature, "sheet.thickness");
+		return feature;
+	}
+
+	/** Flange selected wall-side faces, with shared length/angle dimensions and an optional explicit radius. */
+	public function sheetEdgeFlange(source:SheetFeature, faces:Array<Shape>, length:NamedParameter, angle:NamedParameter,
+		?radius:NamedParameter, lengthSpec:LengthSpec = Leg, position:FlangePosition = BendOutside,
+		offset:Float = 0, gap1:Float = 0, gap2:Float = 0, extend1:Float = 0, extend2:Float = 0):SheetEdgeFlangeFeature {
+		check();
+		var feature = document.add(new SheetEdgeFlangeFeature(source, faces, length.value, angle.value,
+			radius == null ? null : radius.value, lengthSpec, position, offset, gap1, gap2, extend1, extend2));
+		bind(length, feature, "sheet.length"); bind(angle, feature, "sheet.angle");
+		if (radius != null) bind(radius, feature, "sheet.radius");
 		return feature;
 	}
 

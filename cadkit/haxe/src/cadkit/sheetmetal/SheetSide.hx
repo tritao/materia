@@ -1,7 +1,7 @@
 package cadkit.sheetmetal;
 
 /** Side A is the reference surface; sheet material grows toward local negative Z. */
-enum SheetSide {
-	A;
-	B;
+@:wire enum SheetSide {
+	@:id(1) A;
+	@:id(2) B;
 }
