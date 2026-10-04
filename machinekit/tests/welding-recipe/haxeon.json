@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-welding-recipe-tests"},
+  "entry": "WeldingRecipeTests",
+  "sourceRoots": ["src"],
+  "dependencies": {"machinekit": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "build"
+}

@@ -605,6 +605,16 @@ W5 design note while waiting for R3/R4 (2026-10-04; implementation has not start
   Earlier station geometry must participate in both grounded-work sensing and clearance before later passes ignite.
 
 W5 implementation notes (in progress, 2026-10-04):
+- CAD-side `WeldingRecipe.passes` now chooses one pass through 8 mm and root/fill/cap above it (through 12 mm).
+  Individual pass area determines wire speed, voltage and seam speed using the CAD wire's diameter, efficiency
+  and feeder limit. Single-pass recipes now reject legs above 8 mm. Weaving starts above a 6 mm pass leg:
+  amplitude is 20% of that leg, period 10 mm, and edge dwell 0.05 s. A woven first pass's centre opens toward
+  both faces by one quarter of its leg. Fill and cap target alternate sides of the preceding fillet's exposed
+  face (65/35 then 35/65 of its cumulative leg along the CAD face normals); optional cooling occurs only
+  between passes. These offsets are recipe targets; runtime grounding and clearance still need validation.
+  Focused `machinekit/tests/welding-recipe` passes 28 assertions: conserved area/volume, 7 mm weave settings,
+  10 mm three-pass split, prior-surface offsets, cooling, and feeder/single-pass limits. This recipe policy
+  is not yet connected to the saved pass schema or mission generation. R6 main `af673c4f4` merged cleanly.
 - MotionKit's `WeavePath` wraps pose primitives without changing seam-progress length, feed or event distances.
   The lateral material frame supplies its axis and exact first/second derivatives separately from torch roll;
   product-rule derivatives include the frame's motion. A quintic endpoint envelope starts and ends on the seam
