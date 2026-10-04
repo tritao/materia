@@ -2485,3 +2485,21 @@ It is queued for the Phase C test boundary, not run now. Protocol input state,
 edge step-count capture, deployment wiring, host observation, homing purpose,
 side holds/calibration and squaring-scope transport remain G13 work. No protocol
 version bump or hardware claim is made by this foundation commit.
+
+### G13 — device-clock edge capture foundation
+
+Added a fixed-capacity, allocation-free input capture bank to the step generator.
+Inputs bind to actuator indices and electrical polarity. Binding seeds the level
+without inventing a closure. Sampling before a tick observes external changes;
+sampling immediately after an associated pulse records physical step-count
+threshold changes before subsequent pulses. Closing and opening counters are
+independent, and the latest closure retains its actual step count and device
+timestamp through later motion and opening. Counter overflow returns a step
+fault instead of wrapping. This is polling at the step-clock boundary, not a
+claim of hardware interrupt capture or verified Nucleo GPIO.
+
+New regression fixtures cover active-low closure, retained capture after motion,
+repeated edges, invalid bindings and initially closed inputs. These are queued
+for the Phase C gate; no tests or builds ran in this step. Wire state/configuration,
+deployment mapping, virtual-device integration, host observations and homing
+control transport remain pending. G13 is not complete.

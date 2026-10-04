@@ -1,5 +1,5 @@
 //! Device-tick step and direction generation; no heap or host clock needed.
-use crate::Board;
+use crate::{Board, InputBinding, InputCapture, InputObservation};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SkewGroup {
@@ -11,9 +11,10 @@ pub struct SkewGroup {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum StepFault { DualDriveSkew, InvalidActuatorCount }
+pub enum StepFault { DualDriveSkew, InvalidActuatorCount, InputCounterOverflow }
 
 pub struct StepGenerator<const A: usize> {
+    inputs: InputCapture,
     steps_per_unit: [f64; A],
     setup_ticks: [u64; A],
     min_interval_ticks: [u64; A],
@@ -40,9 +41,19 @@ impl<const A: usize> StepGenerator<A> {
                     u64::from(interval > interval as u64 as f64);
             }
         }
-        Some(Self { steps_per_unit, setup_ticks, min_interval_ticks,
+        Some(Self { inputs: InputCapture::new(), steps_per_unit, setup_ticks, min_interval_ticks,
             direction: [None; A], direction_since: [0; A], last_step: [None; A],
             skew: [None; A], skew_count: 0, squaring_bound: [None; A] })
+    }
+
+    pub fn bind_input<B: Board>(&mut self, board: &B, channel: usize,
+        binding: InputBinding, actuator_count: usize) -> bool {
+        if actuator_count > A { return false; }
+        self.inputs.bind(board, channel, binding, actuator_count)
+    }
+
+    pub fn input_observation(&self, channel: usize) -> Option<InputObservation> {
+        self.inputs.observation(channel)
     }
 
     pub fn set_skew_group(&mut self, group: SkewGroup) -> bool {
@@ -83,6 +94,7 @@ impl<const A: usize> StepGenerator<A> {
     /// Only the negotiated outputs may emit pulses, including after a smaller session replaces a larger one.
     pub fn tick_active<B: Board>(&mut self, board: &mut B, targets: [f32; A], count: usize) -> Result<(), StepFault> {
         if count > A { return Err(StepFault::InvalidActuatorCount); }
+        if !self.inputs.sample(board, None) { return Err(StepFault::InputCounterOverflow); }
         let now = board.now_ticks();
         for a in 0..count {
             let raw = targets[a] as f64 * self.steps_per_unit[a];
@@ -101,6 +113,7 @@ impl<const A: usize> StepGenerator<A> {
                 if now.saturating_sub(last) < self.min_interval_ticks[a] { continue; }
             }
             board.step_pulse(a, forward);
+            if !self.inputs.sample(board, Some(a)) { return Err(StepFault::InputCounterOverflow); }
             self.last_step[a] = Some(now);
         }
         for (i, configured) in self.skew[..self.skew_count].iter().enumerate() {
