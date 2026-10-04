@@ -282,6 +282,7 @@ class MotionKitTestSupport {
       [for (joint in blueprint.model.joints) joint.name], false, false,
       "simulated runtime fault", queueSupport ? null : robotkit.core.ExecutionCapabilities.unavailable());
     var machine = MotionSystem.fromBlueprint(robot, blueprint);
+    if (queueSupport) homeGantryFixture(blueprint, runtime, simulationHarness, robot, machine);
     if (begin == null) machine.moveAxes([new AxisTarget("x", 0.15)], new MotionOptions(0.05, 0.4));
     else begin(machine);
     var positions:Array<Float> = [];
@@ -289,7 +290,8 @@ class MotionKitTestSupport {
     var stillTicks = 0;
     function step():Void {
       machine.update();
-      try simulationHarness.step(Int64.ofInt(tick++)) catch (error:Dynamic)
+      tick++;
+      try simulationHarness.step() catch (error:Dynamic)
         throw 'gantry trial (queue $queueSupport, event at $eventTick) failed at tick $tick: $error';
       var position = robot.snapshot().positions.get(0);
       stillTicks = positions.length > 0 &&
@@ -332,7 +334,8 @@ class MotionKitTestSupport {
     var stillTicks = 0;
     function step():Void {
       machine.update();
-      rig.harness.step(Int64.ofInt(tick++));
+      rig.harness.step();
+      tick++;
       var current = rig.robot.snapshot().positions.toArray();
       var still = positions.length > 0;
       if (still)

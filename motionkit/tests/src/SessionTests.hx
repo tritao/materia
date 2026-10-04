@@ -438,6 +438,7 @@ class SessionTests extends MotionKitTestSupport {
       squareBlueprint.model.name, [for (link in squareBlueprint.model.links) link.name],
       [for (joint in squareBlueprint.model.joints) joint.name]);
     var squareMachine = MotionSystem.fromBlueprint(squareRobot, squareBlueprint);
+    homeGantryFixture(squareBlueprint, squareRuntime, squareSimulationHarness, squareRobot, squareMachine);
     var squarePath = squareMachine.movePath(GeometricPath.lines([
       new PathPoint(0.0, 0.0, 0.0), new PathPoint(0.02, 0.0, 0.0),
       new PathPoint(0.02, 0.02, 0.0), new PathPoint(0.0, 0.02, 0.0),
@@ -473,7 +474,8 @@ class SessionTests extends MotionKitTestSupport {
     var reachedThirdLeg = false;
     while (squareMachine.isMoving()) {
       squareMachine.update();
-      squareSimulationHarness.step(Int64.ofInt(tick++));
+      squareSimulationHarness.step();
+      tick++;
       var position = squareRobot.snapshot().positions;
       if (position.get(1) > 0.019 && position.get(0) < 0.019) {
         reachedThirdLeg = true;
@@ -485,7 +487,8 @@ class SessionTests extends MotionKitTestSupport {
     squareMachine.hold();
     while (squareRuntime.snapshot().sessionState != RobotKitRuntimeConstants.RK_SESSION_HELD) {
       squareMachine.update();
-      squareSimulationHarness.step(Int64.ofInt(tick++));
+      squareSimulationHarness.step();
+      tick++;
       if (tick > 3400) throw "square third-leg stop did not settle";
     }
     var stopped = squareRobot.snapshot().positions;
@@ -493,7 +496,8 @@ class SessionTests extends MotionKitTestSupport {
     var previousX = stopped.get(0);
     while (squareMachine.isMoving()) {
       squareMachine.update();
-      squareSimulationHarness.step(Int64.ofInt(tick++));
+      squareSimulationHarness.step();
+      tick++;
       var position = squareRobot.snapshot().positions;
       if (previousX > 0.0001 && position.get(0) > 0.0001) {
         check(Math.abs(position.get(1) - 0.02) < 0.001,
@@ -535,6 +539,7 @@ class SessionTests extends MotionKitTestSupport {
         [for (link in blueprint.model.links) link.name],
         [for (joint in blueprint.model.joints) joint.name]);
       var machine = MotionSystem.fromBlueprint(robot, blueprint);
+      homeGantryFixture(blueprint, runtime, simulationHarness, robot, machine);
       var move = planned(machine.moveAxes([new AxisTarget("x", target)],
         new MotionOptions(0.05, limit)));
       if (moveTicks == 0) moveTicks = Math.ceil(move.durationSeconds() / 0.01);
@@ -542,13 +547,15 @@ class SessionTests extends MotionKitTestSupport {
       var positions:Array<Float> = [];
       for (_ in 0...holdTick) {
         machine.update();
-        simulationHarness.step(Int64.ofInt(tick++));
+        simulationHarness.step();
+        tick++;
         positions.push(robot.snapshot().positions.get(0));
       }
       machine.hold();
       for (_ in 0...40) {
         machine.update();
-        simulationHarness.step(Int64.ofInt(tick++));
+        simulationHarness.step();
+        tick++;
         positions.push(robot.snapshot().positions.get(0));
       }
       var peak = 0.0;
@@ -789,12 +796,14 @@ class SessionTests extends MotionKitTestSupport {
       [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name]));
     var machine = MotionSystem.fromBlueprint(robot, blueprint);
+    homeGantryFixture(blueprint, runtime, simulationHarness, robot, machine);
     var originalJog = planned(machine.jog("x", 0.04, 2.5));
     var positions:Array<Float> = [];
     var tick = 0;
     function step():Void {
       machine.update();
-      simulationHarness.step(Int64.ofInt(tick++));
+      simulationHarness.step();
+      tick++;
       positions.push(robot.snapshot().positions.get(0));
       if (tick > 2000) throw "late jog splice did not settle";
     }
@@ -809,7 +818,8 @@ class SessionTests extends MotionKitTestSupport {
     for (_ in 0...8) step();
     throws(() -> robot.release(), "late native replacement is rejected explicitly");
     for (_ in 0...250) {
-      simulationHarness.step(Int64.ofInt(tick++));
+      simulationHarness.step();
+      tick++;
       positions.push(robot.snapshot().positions.get(0));
     }
     check(peakSecondDifference(positions) <= 0.4 * 1.05,

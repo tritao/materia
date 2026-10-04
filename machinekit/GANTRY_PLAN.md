@@ -3331,3 +3331,18 @@ a pre-calibration accepted sequence, and a truncated channel layout; it keeps
 subsequent scope controls blocked until matching fresh feedback arrives.
 The regression failed before the change and passes afterward. Native rebuild
 and full CTest **19/19** pass with this fix.
+
+
+### Phase C — full MotionKit gate with actual gantry references
+
+Session fixtures now home the same runtime robot and MotionSystem before the
+hold-deceleration sweep, late jog replacement, and square path hold test. The
+shared gantry replacement trial also establishes actual switch references before
+submitting its first ordinary plan. Sampling continues on the automatic owner
+clock through setup; per-job event/deadline counters remain relative to motion.
+
+MotionKit compiler-only (1127 sources) and the complete suite passed:
+**13661 assertions**. The existing replacement, hold/resume, acceleration,
+late-arrival, exact-stop and Cartesian blend assertions are retained.
+This gate ran before the subsequent mechanical sensor relocation audit; a full
+Phase C result is not yet claimed.
