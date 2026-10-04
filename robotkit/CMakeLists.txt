@@ -81,7 +81,7 @@ if(RK_BUILD_TESTS)
     find_package(Python3 COMPONENTS Interpreter REQUIRED)
     add_test(NAME robotkit_rkf1_lock
         COMMAND ${Python3_EXECUTABLE} -m tools.wire.rkf1 check
-            --source ${CMAKE_CURRENT_SOURCE_DIR}/haxe/robotkit/protocol
+            --source ${CMAKE_CURRENT_SOURCE_DIR}/remote/haxe/robotkit/protocol
             --lock ${CMAKE_CURRENT_SOURCE_DIR}/schema/rkf1.lock.json)
     set_tests_properties(robotkit_rkf1_lock PROPERTIES
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/.. LABELS "robot;wire")
