@@ -319,6 +319,13 @@ object coordinates. `Svg.write(drawing)` returns a millimetre SVG with the same 
 layers. Both return text for the caller to save and perform no native operation. DXF annotations
 must be printable ASCII; SVG annotations escape XML text.
 
+`SheetChecks.of(sheet)` returns a developed snapshot plus named manufacturability findings.
+Each finding has a typed kind, measurement, assumption flag and exact geometry in the report's
+flat plane. Checks cover overlaps, minimum straight flange legs, cut/hole clearance, internal
+bend endings, explicit material radius minima and grain direction. The provisional `4T` tooling
+minimum and `2.5T + R` cut clearance are marked assumed. Relief boundaries carry an explicit
+purpose, so checks do not infer it from edge names.
+
 ## Validation
 
 `ctest --test-dir build/debug --output-on-failure` exercises the C boundary,

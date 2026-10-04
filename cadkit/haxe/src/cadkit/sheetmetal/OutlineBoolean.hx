@@ -24,8 +24,21 @@ class OutlineBoolean {
 	}
 	static function combine(source:WallOutline, tool:WallOutline, owner:String, mode:OutlineMode, origin:BoundaryOrigin):Array<WallOutline> {
 		var pieces:Array<OutlinePiece> = [];
-		collect(source, tool, false, owner, pieces, mode, origin);
-		collect(tool, source, true, owner, pieces, mode, origin);
+		collect(source, [tool], false, owner, pieces, mode, origin);
+		collect(tool, [source], true, owner, pieces, mode, origin);
+		return assemble(pieces);
+	}
+	/** Evaluate final union membership together, avoiding temporary point-contact contours. */
+	public static function unionMany(outlines:Array<WallOutline>):Array<WallOutline> {
+		var pieces:Array<OutlinePiece> = [];
+		for (i in 0...outlines.length) {
+			var others:Array<WallOutline> = [];
+			for (j in 0...outlines.length) if (i != j) others.push(outlines[j]);
+			collect(outlines[i], others, false, "", pieces, Union, BoundaryOrigin.Authored);
+		}
+		return assemble(pieces);
+	}
+	static function assemble(pieces:Array<OutlinePiece>):Array<WallOutline> {
 		var loops:Array<Array<Segment>> = [];
 		var ids:Array<Array<String>> = []; var roles:Array<Array<BoundaryOrigin>> = [];
 		while (pieces.length > 0) {
@@ -71,12 +84,12 @@ class OutlineBoolean {
 		return result;
 	}
 
-	static function collect(outline:WallOutline, other:WallOutline, reverse:Bool, owner:String, result:Array<OutlinePiece>, mode:OutlineMode, origin:BoundaryOrigin):Void {
+	static function collect(outline:WallOutline, others:Array<WallOutline>, reverse:Bool, owner:String, result:Array<OutlinePiece>, mode:OutlineMode, origin:BoundaryOrigin):Void {
 		var boundaries = outline.loops();
 		for (i in 0...boundaries.length) for (j in 0...boundaries[i].length) {
 			var segment = boundaries[i][j];
 			var parameters = [0.0, 1.0];
-			for (loop in other.loops()) for (edge in loop)
+			for (other in others) for (loop in other.loops()) for (edge in loop)
 				for (point in OutlineGeometry.intersections(segment, edge)) {
 					var value = segment.fractionAt(point);
 					if (value > 1e-10 && value < 1 - 1e-10) parameters.push(value);
@@ -93,10 +106,10 @@ class OutlineBoolean {
 				var distance = Math.min(1e-6, piece.length() * 1e-4);
 				var left = new Point2(midpoint.x - tangent.y * distance, midpoint.y + tangent.x * distance);
 				var right = new Point2(midpoint.x + tangent.y * distance, midpoint.y - tangent.x * distance);
-				var leftMaterial = mode == Union ? outline.contains(left) || other.contains(left) : mode == Intersection ? outline.contains(left) && other.contains(left) : reverse ? other.contains(left) && !outline.contains(left)
-					: outline.contains(left) && !other.contains(left);
-				var rightMaterial = mode == Union ? outline.contains(right) || other.contains(right) : mode == Intersection ? outline.contains(right) && other.contains(right) : reverse ? other.contains(right) && !outline.contains(right)
-					: outline.contains(right) && !other.contains(right);
+				var leftMaterial = mode == Union ? outline.contains(left) || containsAny(others, left) : mode == Intersection ? outline.contains(left) && containsAny(others, left) : reverse ? containsAny(others, left) && !outline.contains(left)
+					: outline.contains(left) && !containsAny(others, left);
+				var rightMaterial = mode == Union ? outline.contains(right) || containsAny(others, right) : mode == Intersection ? outline.contains(right) && containsAny(others, right) : reverse ? containsAny(others, right) && !outline.contains(right)
+					: outline.contains(right) && !containsAny(others, right);
 				if (leftMaterial == rightMaterial) continue;
 				append(retained, leftMaterial ? piece : reversed(piece));
 			}
@@ -104,17 +117,21 @@ class OutlineBoolean {
 			if (reverse && mode != Union) identity = "cut:" + owner.length + ":" + owner + ":" + identity;
 			for (k in 0...retained.length) {
 				var name = retained.length == 1 ? identity : "fragment:" + identity.length + ":" + identity + ":cut:"
-					+ endpointKey(segment, other, retained[k].start) + ":" + endpointKey(segment, other, retained[k].end);
+					+ endpointKey(segment, others, retained[k].start) + ":" + endpointKey(segment, others, retained[k].end);
 				var duplicate = false;
 				for (existing in result) if (same(existing.segment, retained[k])) duplicate = true;
 				if (!duplicate) result.push(new OutlinePiece(retained[k], name, reverse && mode != Union ? origin : outline.origin(i, j)));
 			}
 		}
 	}
-	static function endpointKey(segment:Segment, other:WallOutline, point:Point2):String {
+	static function containsAny(outlines:Array<WallOutline>, point:Point2):Bool {
+		for (outline in outlines) if (outline.contains(point)) return true; return false;
+	}
+	static function endpointKey(segment:Segment, others:Array<WallOutline>, point:Point2):String {
 		if (point.distance(segment.start) <= EPS) return "start";
 		if (point.distance(segment.end) <= EPS) return "end";
-		var keys:Array<String> = []; var loops = other.loops();
+		var keys:Array<String> = [];
+		for (other in others) { var loops = other.loops();
 		for (i in 0...loops.length) for (j in 0...loops[i].length) {
 			var edge = loops[i][j];
 			var touches = false;
@@ -123,6 +140,7 @@ class OutlineBoolean {
 				var identity = other.identity(i, j);
 				keys.push(identity.length + ":" + identity + ":" + branch(segment, edge, point));
 			}
+		}
 		}
 		if (keys.length == 0) throw new SheetDiagnosis("sheet.cut-boundary", "Cut fragment endpoint has no authored intersection");
 		keys.sort(function(a:String, b:String):Int { return Reflect.compare(a, b); });

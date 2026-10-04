@@ -340,6 +340,22 @@ table in `tools/README.md`.
 - DXF writer: ASCII R12 (AC1009) with `LINE`, `ARC`, `CIRCLE` and `TEXT` entities only
   (`LWPOLYLINE` is not R12), layers `OUTLINE`, `BEND_UP`, `BEND_DOWN`, `ETCH`, `TEXT`. SVG writer
   with the same layers. Both pure Haxe in `cadkit.drawing`.
+- SM4e evaluates the union of all material domains together, rather than constructing
+  temporary wall-only contours that can branch at point contacts before bend strips are added.
+  The same exact line/arc membership assembly retains authored boundary identities and origins.
+- `SheetChecks.of(sheet)` returns a `SheetCheckReport` with one flat snapshot and typed findings,
+  measured units and exact offending geometry. Positive domain intersections above 1e-8 mm²
+  diagnose flat overlap. The assumed `4T` minimum is a straight leg from the tangent attachment,
+  measured as the minimum first outer-profile exit over material-bearing seam intervals; holes
+  are covered by their separate clearance rule. Vertex/cardinal events split the exact contour
+  into monotone branches, including tapered legs and circular notches. A ripped strip has no
+  straight return: its detached wall cannot supply one. An unmeasurable seam is diagnosed,
+  never treated as infinite depth. SM6 replaces the placeholder when default tooling is available.
+  Hole and surviving cut-feature boundaries use exact minimum distance to the full developed
+  fold line and the assumed `2.5T + R` threshold; explicit relief origins are exempt. A fold-line
+  endpoint strictly inside the united blank, more than 1e-8 mm from its boundary, needs an opening.
+  Material radius minima are explicit; grain warnings include the 15-degree boundary. These
+  findings are separate from fatal graph validation and retain their measured geometry.
 - SM4d carries typed `BoundaryOrigin` values alongside segment identities: authored,
   cut(owner), or relief(owner). Booleans retain surviving source purposes and give newly
   introduced boundaries the operation's explicit purpose. Relief cuts supply `Relief`, and
@@ -874,7 +890,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM2 | done: named wall extrusions and bend revolutions fused for flat/folded/partial states; P1–P5 validity, single bodies, volumes, axes and stable names; quick gate `sm2-solid` passes (3757 sheet assertions) | 7a3836d8c |
 | SM3 | done (required feature chain); optional corner closure tracked separately as SM3o: SM3a atomic graph publication; SM3b exact sketch-backed base, side A/B, stock codec and named thickness builder; quick gates `sm3a-staging` (3773) and `sm3b-base` (3813 sheet assertions); SM3c authored segment names and exact face-to-graph picks; quick gate `sm3c-edges` (3843 sheet assertions); SM3d exact flange geometry and alignment; quick gate `sm3d-flange-geometry` (3880 sheet assertions); SM3e typed flange features, authored shared identities, gaps/extensions, stock radius defaults and P1–P5 document acceptance; quick gate `sm3e-flanges-typed` (4044 sheet assertions); SM3f exact planar subtraction foundation; quick gate `sm3f-outline-cuts` (4068 sheet assertions); SM3g typed rectangular/obround reliefs and sizing, exact gap/bend-width semantics, atomic edits and codec; quick gate `sm3g-reliefs` (4132 sheet assertions); SM3h closed/open/teardrop hems, shared edge selection, typed codec and builder; quick gate `sm3h-hems` (4303 sheet assertions); SM3i permanent bend-id rip feature, typed codec and builder; quick gate `sm3i-rips` (4315 sheet assertions); SM3j exact through-wall cuts on staged attached sketches, shared region mapping, typed codec and builder; quick gate `sm3j-wall-cuts` (4348 sheet assertions); SM3k nominal seam datums, exact bend material regions and seam validation; quick gate `sm3k-bend-regions` (4368 sheet assertions); SM3l native mapped positive-radius regions and adaptive volume integration; quick gate `sm3l-native-regions` (4368 sheet assertions); SM3m developed cuts across wall/bend/flange domains, named native patches, typed codec and edits, certified material bounds; quick gate `sm3m-cross-bend-cuts` (4633 sheet assertions); SM3n graph-derived collapsed-axis sectors, exact closed-hem cuts, material connectivity and production save/edit checks; quick gate `sm3n-closed-hem-cuts` (5200 sheet assertions) | 535ebc547; 08afd7a32; bb3405a64; 84a51f00d; 3ed9b3971; 31a696ed7; a02214101; f3ef57fa0; e5d66c947; 3d2d330dd; 6033a2f60; ee0d9e834; f83853060; db7e8be88; ab52986ef |
 | SM3o | planned: optional corner closure after SM6, before phase B; gap/overlap and round/square relief semantics remain | |
-| SM4 | in progress: SM4a exact developed blank regions, typed domain owners, sorted bend data and interrupted fold markings, authored grain frame and typed version-14 snapshot; quick gate `sm4a-flat-verified` (5259 sheet assertions); SM4c typed shared drawing data, exact R12 DXF/SVG, bend annotations and grain arrow; quick gate `sm4c-drawing-exports` (5888 sheet assertions); SM4d typed cut/relief boundary provenance and propagation; quick gate `sm4d-boundary-provenance` (5911 sheet assertions); design checks and blank requirement remain | a5508e566; 83a7a8c18; SM4d final sub-step commit |
+| SM4 | in progress: SM4a exact developed blank regions, typed domain owners, sorted bend data and interrupted fold markings, authored grain frame and typed version-14 snapshot; quick gate `sm4a-flat-verified` (5259 sheet assertions); SM4c typed shared drawing data, exact R12 DXF/SVG, bend annotations and grain arrow; quick gate `sm4c-drawing-exports` (5888 sheet assertions); SM4d typed cut/relief boundary provenance and propagation; quick gate `sm4d-boundary-provenance` (5911 sheet assertions); SM4e six typed manufacturability findings with exact geometry and minimum flange depth; quick gate `sm4e-checks-verified` (5944 sheet assertions); blank requirement remains | a5508e566; 83a7a8c18; 723b0bac4; SM4e final sub-step commit |
 | SM4b | planned | |
 | SM5 | planned | |
 | SM6 | planned | |
@@ -1079,3 +1095,14 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
   `sm4d-boundary-provenance`, with 5911 sheet assertions (23 new), ProjectKit 143,
   ManufacturingKit 54 and unchanged original MachineKit summaries. No schema or compiler change
   is introduced. Manufacturability findings and the blank requirement remain in SM4.
+
+- SM4e: every specified finding fires on a crafted bad sheet and stays silent on P1–P5.
+  Tests cover tapered/circular flange minima, ripped free strips, exact hole and outer-notch
+  clearance, explicit relief exemptions, internal crease endings, overlap, material minimum
+  equality and inclusive 15-degree grain limits. Typed measurements carry units and findings
+  keep exact geometry. A missing material interval has a named diagnosis, caught with a typed
+  catch. N-ary union resolves valid final material whose wall-only intermediate contours touch
+  at a point; curves are never polygonised. Quick gate `sm4e-checks-verified` passes all five
+  suites: 5944 sheet assertions (33 new), ProjectKit 143, ManufacturingKit 54 and unchanged
+  original MachineKit summaries. No unchecked cast, saved schema change or new haxeon issue.
+  The blank requirement remains before SM4 is complete.

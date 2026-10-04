@@ -51,16 +51,7 @@ class FlatPattern {
 			bends.push(new FlatBend(bend.id, bend.angle, bend.radius, zone.allowance, zone.width, sheet.isRipped(bend.id), lines));
 		}
 		bends.sort(function(a:FlatBend, b:FlatBend):Int { return a.id < b.id ? -1 : a.id > b.id ? 1 : 0; });
-		var regions:Array<WallOutline> = [];
-		for (domain in domains) {
-			var pending = domain.outline; var next:Array<WallOutline> = [];
-			for (region in regions) {
-				var union = OutlineBoolean.union(region, pending);
-				if (union.length == 1) { pending = union[0]; }
-				else next.push(region);
-			}
-			next.push(pending); regions = next;
-		}
+		var regions = OutlineBoolean.unionMany([for (domain in domains) domain.outline]);
 		return new FlatPattern(sheet.material, plane, domains, regions, bends);
 	}
 }
