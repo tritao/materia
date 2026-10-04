@@ -14,14 +14,21 @@ exposed ports. The work lead goes to a magnetic work clamp on the weldment's
 base plate, and the scene's `torch` robot tool is derived from that: the arc
 returns through the plate and everything welded to it, and nothing else.
 
-The scene's mission welds one seam: the plate's T-joint with the upright (`materia.post.project.json` is the same cell
-with a mission that welds the four sides of a tube post as one step, a path of four segments). The weld step is relative to
-the workpiece's reference member, so it follows the workpiece where it stands. When the
-simulation runs, the arm approaches the seam, strikes the arc and waits for it, travels
-the seam at the speed that deposits the leg the weldment asks for, fills the crater,
-stops the wire and retracts, and the weld metal grows along the seam as the simulated
-welder deposits it. The recipe (`machinekit.welding.WeldingRecipe`) derives the wire
-speed, voltage and travel speed from the seam's leg size.
+The scene's mission welds the whole weldment (`machinekit.welding.WeldingMission`): every seam the weldment's declared joints
+have, as one `weld` step per run of seams that meet end to end (the plate's two sides, and each tube post's four sides as one
+closed run), in an order that spares the torch air travel and turning, so adding a member adds its seams. If a declared joint
+has no seam, a seam is not a fillet, or the arm cannot reach or weld one clear of the cell, the check fails naming the seam:
+the cell's own CAD is ours to fix. `materia.seam.project.json` is the same cell with a mission of one seam (the plate's
+T-joint) and `materia.post.project.json` one that welds the four sides of a tube post as one step (a path of four
+segments). A weld step is relative to the workpiece's reference member, so it follows the workpiece where it stands. When the
+simulation runs, the arm plans each weld (the torch's roll, and how it comes in and leaves, reachable and clear of the work),
+strikes the arc and waits for it, travels the seam at the speed that deposits the leg the weldment asks for, fills the
+crater, stops the wire and retracts, and the weld metal grows along the seam as the simulated welder deposits it. The recipe
+(`machinekit.welding.WeldingRecipe`) derives the wire speed, voltage and travel speed from the seam's leg size.
+
+`PROJECT_SOURCE_ONLY=welder-plate` runs the far plate fillet alone, selected from the CAD-generated mission by its
+position. It checks approach reach, completion, bead length, leg and gaps while iterating on that seam.
+`PROJECT_SOURCE_ONLY=welder` runs the full weldment and the focused baselines for the milestone gate.
 
 - `ArmWeldingTool.hx` — the arm's welding end effector (an `ArmTool`): adapter
   plate and torch, with the `tcp` working frame at the wire tip.
@@ -30,9 +37,9 @@ speed, voltage and travel speed from the seam's leg size.
   `Weldment` that says which joints are welded. Its seams are not authored: they
   are found from the members' faces (`machinekit.welding.WeldSeams`).
 - `WeldSeamChecks.hx` — checks of the derived seams: names, frames, edits, gaps.
-- `RobotWelderPreview.hx` — the project entrypoint (which writes the weld mission) and `RobotWelderChecks`
+- `RobotWelderPreview.hx` — the project entrypoint (which generates the weld mission) and `RobotWelderChecks`
   (services supplied, torch pose, reach of the derived seam frames, torch and arm
-  clearances, bill of materials), run by the MachineKit smoke suite.
+  clearances, the whole-weldment mission and that every seam is weldable, bill of materials), run by the MachineKit smoke suite.
 - `PLAN.md` — where this example is going: seams from the CAD, a simulated
   welder, missions, then the mobile welder.
 
