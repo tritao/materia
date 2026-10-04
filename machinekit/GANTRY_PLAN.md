@@ -2661,3 +2661,19 @@ requirement and restoration of normal skew bounds. No tests/builds ran. This is
 step-generator support only: control messages, physical independent counter zeros,
 feedback correction and cancellation/reset/link-loss ownership still require
 integration before a virtual-router homing run can prove G13 complete.
+
+### G13 — acknowledged homing scope and side-control records
+
+Revision 13 now adds HomingScope6 (begin/end pair plus bounded skew), HomingSide6
+(hold/release actuator) and HomingControlAck6. Commands carry session, monotonic
+control sequence and scope ID. Rust/C++ framing validates lengths and fields.
+The virtual device requires the live session, rejects reused control sequences,
+checks pair scope and initial stationary velocity, applies scoped controls and
+acknowledges acceptance/rejection. Purpose-aware stepping retains scope while
+idle between homing segments; ordinary-purpose execution faults an active scope.
+Stops and step faults clear holds/scope and restore normal bounds in the tick
+loop. New session initialization clears scope/control sequence.
+
+No build/test ran. Host command/ack transport, immediate lifecycle cleanup audit,
+side counter-zero batches, physical feedback correction and Nucleo handlers remain
+pending. The revision is still under development and not proven by device homing.

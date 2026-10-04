@@ -20,7 +20,10 @@ enum MessageType6 : u8 {
     queue_status = 14
     state6 = 15
     event = 16
-    sensor6 = 17
+    sensor6 = 21
+    homing_scope = 17
+    homing_side = 18
+    homing_control_ack = 19
 }
 
 packed SessionBegin6 endian little {
@@ -184,4 +187,29 @@ packed InputState6 endian little {
     opening_count : u64
     captured_steps : i64
     captured_ticks : u64
+}
+
+packed HomingScope6 endian little {
+    session : u64
+    sequence : u64
+    scope : u64
+    # 0 begin, 1 end
+    action : u8
+    first : u8
+    second : u8
+    skew_bound : f32
+}
+packed HomingSide6 endian little {
+    session : u64
+    sequence : u64
+    scope : u64
+    actuator : u8
+    hold : u8
+}
+packed HomingControlAck6 endian little {
+    session : u64
+    sequence : u64
+    scope : u64
+    # 1 accepted, 0 rejected
+    accepted : u8
 }

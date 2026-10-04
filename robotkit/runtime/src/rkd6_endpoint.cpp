@@ -814,7 +814,7 @@ void Rkd6Endpoint::poll_frames(std::uint64_t owner_now_ns) {
                     state_header_.actuator_count * device_wire6::ActuatorState6::SIZE +
                     i * device_wire6::InputState6::SIZE, device_wire6::InputState6::SIZE), inputs_[i]);
             has_state_ = true;
-        } else if (decoded.kind == 17) {
+        } else if (decoded.kind == 21) {
             device_wire6::Sensor6Header header{};
             if (!device_wire6::decode(decoded.payload.first(header.SIZE), header) ||
                 header.session != ack_.session || header.slot >= RK_MAX_SENSORS ||

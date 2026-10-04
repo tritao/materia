@@ -29,6 +29,8 @@ pub struct VirtualDevice {
     session: u64,
     channel_kind: [u8; CHANNELS],
     input_count: usize,
+    homing_scope: Option<u64>,
+    control_sequence: u64,
     step_tick_hz: u32,
     profile: u8,
     host_ns: u64,
@@ -75,6 +77,8 @@ impl VirtualDevice {
             session: 0,
             channel_kind: [0; CHANNELS],
             input_count: 0,
+            homing_scope: None,
+            control_sequence: 0,
             step_tick_hz,
             profile,
             host_ns: 0,
@@ -234,6 +238,8 @@ impl VirtualDevice {
                     if let Some(welder) = self.welder.as_mut() { welder.reset(); }
                     self.weld_sequence = 0;
                     self.steps = generator;
+                    self.homing_scope = None;
+                    self.control_sequence = 0;
                     self.core = Some(core);
                     self.events = Some(DeviceEvents::new(&begin));
                     self.final_safe_applied = false;
@@ -250,6 +256,39 @@ impl VirtualDevice {
                 ack.encode(&mut bytes).unwrap();
                 self.emit(2, &bytes);
                 self.publish_state();
+                true
+            }
+            17 | 18 => {
+                let (session, sequence, scope) = if kind == 17 {
+                    let command = HomingScope6::decode(payload).unwrap();
+                    (command.session, command.sequence, command.scope)
+                } else {
+                    let command = HomingSide6::decode(payload).unwrap();
+                    (command.session, command.sequence, command.scope)
+                };
+                let mut accepted = false;
+                if session == self.session && sequence > self.control_sequence && self.profile == 1 {
+                    self.control_sequence = sequence;
+                    if kind == 17 {
+                        let command = HomingScope6::decode(payload).unwrap();
+                        if command.action == 0 && self.homing_scope.is_none() &&
+                            self.core.as_ref().unwrap().velocities().iter().all(|v| v.abs() <= 1e-6) {
+                            accepted = self.steps.begin_homing_pair(command.first as usize,
+                                command.second as usize, command.skew_bound as f64);
+                            if accepted { self.homing_scope = Some(scope); }
+                        } else if command.action == 1 && self.homing_scope == Some(scope) {
+                            self.steps.end_homing_pair(); self.homing_scope = None; accepted = true;
+                        }
+                    } else if self.homing_scope == Some(scope) {
+                        let command = HomingSide6::decode(payload).unwrap();
+                        accepted = if command.hold != 0 {
+                            self.steps.hold_homing_side(&self.board, command.actuator as usize)
+                        } else { self.steps.release_homing_side(command.actuator as usize) };
+                    }
+                }
+                let ack = HomingControlAck6 { session: self.session, sequence, scope, accepted: accepted as u8 };
+                let mut bytes = [0; HomingControlAck6::SIZE];
+                ack.encode(&mut bytes).unwrap(); self.emit(19, &bytes);
                 true
             }
             3 => {
@@ -396,8 +435,13 @@ impl VirtualDevice {
                 } else {
                     self.events.as_mut().unwrap().tick(core.path_clock(), &mut self.board);
                 }
+                if core.stop_reason().is_some() {
+                    self.steps.end_homing_pair(); self.homing_scope = None;
+                }
                 let targets = self.board.position_targets();
-                if self.profile == 1 && self.steps.tick_active(&mut self.board, targets, self.active_count).is_err() {
+                let purpose = core.executing_purpose().unwrap_or(if self.homing_scope.is_some() { 2 } else { 0 });
+                if self.profile == 1 && self.steps.tick_active_with_purpose(&mut self.board, targets, self.active_count, purpose).is_err() {
+                    self.steps.end_homing_pair(); self.homing_scope = None;
                     core.stop(StopReason::DualDriveSkew);
                 }
             }
@@ -493,7 +537,7 @@ impl VirtualDevice {
                 let start = Sensor6Header::SIZE + i * Sensor6Value::SIZE;
                 Sensor6Value { value: *value }.encode(&mut body[start..start + Sensor6Value::SIZE]).unwrap();
             }
-            self.emit(17, &body);
+            self.emit(21, &body);
         }
     }
 
@@ -1017,7 +1061,7 @@ mod tests {
     #[test]
     fn welding_feedback_travels_in_sensor_frames() {
         let mut d = welding_device(true); d.outbox.clear(); assert!(d.advance(10_000_000));
-        let frame = d.outbox.iter().find(|f| decode_frame6(f).unwrap().0 == 17).unwrap();
+        let frame = d.outbox.iter().find(|f| decode_frame6(f).unwrap().0 == 21).unwrap();
         let (_, body) = decode_frame6(frame).unwrap();
         let header = Sensor6Header::decode(&body[..Sensor6Header::SIZE]).unwrap();
         assert_eq!(header.session, 9); assert_eq!(header.slot, 0); assert_eq!(header.value_count, 6);

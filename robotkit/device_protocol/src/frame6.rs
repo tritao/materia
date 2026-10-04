@@ -67,7 +67,9 @@ fn validate_payload(kind: u8, bytes: &[u8]) -> Result<(), Frame6Error> {
         8..=13 => Some(0), 14 => Some(QueueStatus6::SIZE),
         15 | 6 => None,
         16 => Some(Event6::SIZE),
-        17 => None,
+        21 => None,
+        17 => Some(HomingScope6::SIZE), 18 => Some(HomingSide6::SIZE),
+        19 => Some(HomingControlAck6::SIZE),
         _ => return Err(Frame6Error::BadType),
     };
     if let Some(size) = exact {
@@ -124,7 +126,7 @@ fn validate_payload(kind: u8, bytes: &[u8]) -> Result<(), Frame6Error> {
             return Err(Frame6Error::BadPayload);
         }
     }
-    if kind == 17 {
+    if kind == 21 {
         if bytes.len() < Sensor6Header::SIZE { return Err(Frame6Error::BadLength); }
         let header = Sensor6Header::decode(&bytes[..Sensor6Header::SIZE])
             .map_err(|_| Frame6Error::BadPayload)?;
@@ -138,6 +140,22 @@ fn validate_payload(kind: u8, bytes: &[u8]) -> Result<(), Frame6Error> {
                 return Err(Frame6Error::BadPayload);
             }
         }
+    }
+    if kind == 17 {
+        let scope = HomingScope6::decode(bytes).map_err(|_| Frame6Error::BadPayload)?;
+        if scope.session == 0 || scope.sequence == 0 || scope.scope == 0 || scope.action > 1 ||
+            scope.first >= 64 || scope.second >= 64 || scope.first == scope.second ||
+            !scope.skew_bound.is_finite() || scope.skew_bound <= 0.0 { return Err(Frame6Error::BadPayload); }
+    }
+    if kind == 18 {
+        let side = HomingSide6::decode(bytes).map_err(|_| Frame6Error::BadPayload)?;
+        if side.session == 0 || side.sequence == 0 || side.scope == 0 || side.actuator >= 64 || side.hold > 1 {
+            return Err(Frame6Error::BadPayload);
+        }
+    }
+    if kind == 19 {
+        let ack = HomingControlAck6::decode(bytes).map_err(|_| Frame6Error::BadPayload)?;
+        if ack.session == 0 || ack.sequence == 0 || ack.scope == 0 || ack.accepted > 1 { return Err(Frame6Error::BadPayload); }
     }
     if kind == 16 {
         let event = Event6::decode(bytes).map_err(|_| Frame6Error::BadPayload)?;

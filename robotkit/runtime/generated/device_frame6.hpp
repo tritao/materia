@@ -48,7 +48,27 @@ inline bool decode(std::span<const std::uint8_t> bytes, Frame &frame) {
         (bytes[4] == 5 && length != device_wire6::QueueBegin6::SIZE) ||
         (bytes[4] == 7 && length != device_wire6::Commit6::SIZE) ||
         (bytes[4] == 14 && length != device_wire6::QueueStatus6::SIZE) ||
-        (bytes[4] == 16 && length != device_wire6::Event6::SIZE)) return false;
+        (bytes[4] == 16 && length != device_wire6::Event6::SIZE) ||
+        (bytes[4] == 17 && length != device_wire6::HomingScope6::SIZE) ||
+        (bytes[4] == 18 && length != device_wire6::HomingSide6::SIZE) ||
+        (bytes[4] == 19 && length != device_wire6::HomingControlAck6::SIZE)) return false;
+    if (bytes[4] == 17) {
+        device_wire6::HomingScope6 command{};
+        if (!device_wire6::decode(bytes.subspan(HEADER_SIZE, command.SIZE), command) ||
+            !command.session || !command.sequence || !command.scope || command.action > 1 ||
+            command.first >= 64 || command.second >= 64 || command.first == command.second ||
+            !std::isfinite(command.skew_bound) || command.skew_bound <= 0) return false;
+    }
+    if (bytes[4] == 18) {
+        device_wire6::HomingSide6 command{};
+        if (!device_wire6::decode(bytes.subspan(HEADER_SIZE, command.SIZE), command) ||
+            !command.session || !command.sequence || !command.scope || command.actuator >= 64 || command.hold > 1) return false;
+    }
+    if (bytes[4] == 19) {
+        device_wire6::HomingControlAck6 ack{};
+        if (!device_wire6::decode(bytes.subspan(HEADER_SIZE, ack.SIZE), ack) ||
+            !ack.session || !ack.sequence || !ack.scope || ack.accepted > 1) return false;
+    }
     if (bytes[4] == 6) {
         if (length < device_wire6::Segment6Header::SIZE) return false;
         device_wire6::Segment6Header header{};
