@@ -27,7 +27,7 @@ typedef SuctionContact = {member:String, connector:String};
  */
 typedef ArcTorchControl = {
 	member:String, channel:String, wireSpeedChannel:String, voltageChannel:String, sensor:String,
-	controlPort:String, tcpConnector:String
+	controlPort:String, tcpConnector:String, stickoutMm:Float
 };
 
 /**
@@ -113,12 +113,12 @@ class EndEffectorControls {
 					sensorId = '$name.$signalPort';
 				case Suction(_, _, _, contactConnector):
 					suctions.push({member: member.id, connector: contactConnector});
-				case ArcTorch(tcpConnector, controlPort):
+				case ArcTorch(tcpConnector, controlPort, stickoutMm):
 					requireInlet(configuration, member.id, controlPort, [PortKind.Signal]);
 					if (arcs.length > 0) throw "Ambiguous arc torch runtime ports";
 					controls.push(Arc('$name.arc', member.id, controlPort));
 					arcs.push({member: member.id, channel: '$name.arc', wireSpeedChannel: '$name.wire_speed',
-						voltageChannel: '$name.voltage', sensor: '$name.weld', controlPort: controlPort, tcpConnector: tcpConnector});
+						voltageChannel: '$name.voltage', sensor: '$name.weld', controlPort: controlPort, tcpConnector: tcpConnector, stickoutMm: stickoutMm});
 				case _:
 			}
 		}
