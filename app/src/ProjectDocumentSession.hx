@@ -92,6 +92,8 @@ class ProjectDocumentSession {
   /** The sensors on the project's robot, simulated where their parts mount them. */
   public var robotSensors(default, null):Array<SceneArtifactRobotSensor> = [];
   public var machineMotion(default, null):Null<materia.project.SceneArtifact.SceneArtifactMachineMotion> = null;
+  public var controllers(default, null):Array<materia.project.SceneArtifact.SceneArtifactCellController> = [];
+  public var signals(default, null):Array<materia.project.SceneArtifact.SceneArtifactCellSignal> = [];
   var assemblyRuntime:Null<AssemblyState> = null;
   /** Mates authored over the generated assembly, and the face connectors they name (see `ProjectAssemblyMates`). */
   public var assemblyMates(default, null):ProjectAssemblyMates = ProjectAssemblyMates.empty();
@@ -245,7 +247,7 @@ class ProjectDocumentSession {
       generated.localCentersByDefinition, generated.metresPerUnit,
       generated.physical, generated.recipeDocument, generated.robotMotions,
       generated.faceDescriptorsByDefinition, generated.cncJob, generated.mobileBase, generated.mission, generated.robotTools,
-      generated.robotSensors, generated.machineMotion);
+      generated.robotSensors, generated.machineMotion, generated.controllers, generated.signals);
 
   /** Open generated geometry while retaining its source manifest. */
   public function openGeneratedScene(data:Array<SceneObjectData>, ?manifestPath:String,
@@ -255,7 +257,9 @@ class ProjectDocumentSession {
       ?physical:AssemblyPhysicalData, ?recipeText:String, ?motions:Array<RobotMotionTrack>,
       ?faceDescriptors:Map<String, String>, ?cnc:CncJob,
       ?mobile:SceneArtifactMobileBase, ?work:SceneArtifactMission, ?tools:Array<SceneArtifactRobotTool>,
-      ?sensors:Array<SceneArtifactRobotSensor>, ?machine:materia.project.SceneArtifact.SceneArtifactMachineMotion):Void {
+      ?sensors:Array<SceneArtifactRobotSensor>, ?machine:materia.project.SceneArtifact.SceneArtifactMachineMotion,
+      ?cellControllers:Array<materia.project.SceneArtifact.SceneArtifactCellController>,
+      ?cellSignals:Array<materia.project.SceneArtifact.SceneArtifactCellSignal>):Void {
     if (data == null || data.length == 0)
       throw "Generated project preview contains no scene objects";
     var reference = manifestPath == null ? null : FileSystem.fullPath(manifestPath);
@@ -295,6 +299,8 @@ class ProjectDocumentSession {
     robotTools = tools == null ? [] : tools.copy();
     robotSensors = sensors == null ? [] : sensors.copy();
     machineMotion = machine;
+    controllers = cellControllers == null ? [] : cellControllers.copy();
+    signals = cellSignals == null ? [] : cellSignals.copy();
     if (reference != null) {
       projectReference = reference;
       projectBaseline = data;
@@ -383,6 +389,8 @@ class ProjectDocumentSession {
     robotTools = generated.robotTools == null ? [] : generated.robotTools.copy();
     robotSensors = generated.robotSensors == null ? [] : generated.robotSensors.copy();
     machineMotion = generated.machineMotion;
+    controllers = generated.controllers == null ? [] : generated.controllers.copy();
+    signals = generated.signals == null ? [] : generated.signals.copy();
   }
 
   function configureAssembly(target:EditorScene, definition:Null<AssemblyDefinition>):Void {
@@ -986,6 +994,8 @@ class ProjectDocumentSession {
     robotTools = [];
     robotSensors = [];
     machineMotion = null;
+    controllers = [];
+    signals = [];
     assemblyRuntime = null;
     assemblyLocalCentersByDefinition = null;
     assemblyMetresPerUnit = 1.0;

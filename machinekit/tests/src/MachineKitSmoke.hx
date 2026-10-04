@@ -2559,6 +2559,7 @@ class MachineKitSmoke {
 			{name: "BenchMillPreview.BenchMillChecks.run", run: () -> BenchMillPreview.BenchMillChecks.run(), weight: 1.0},
 			{name: "BenchMillPreview.EnclosedMillChecks.run", run: () -> BenchMillPreview.EnclosedMillChecks.run(), weight: 1.0},
 			{name: "TendingReach.run", run: () -> TendingReach.run(), weight: 1.0},
+			{name: "TendingControllers.TendingControllerChecks.run", run: () -> TendingControllers.TendingControllerChecks.run(), weight: 1.0},
 			{name: "CobotArmPreview.CobotArmChecks.run", run: () -> CobotArmPreview.CobotArmChecks.run(), weight: 1.0},
 			{name: "MobileWelderChecks.run", run: () -> MobileWelderChecks.run(false), weight: 1.0},
 			{name: "MillPartTests.run", run: () -> MillPartTests.run(), weight: 1.0},

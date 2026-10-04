@@ -46,7 +46,8 @@ class RobotRuntimeSensorBlueprint {
    */
   public static function isExternalKind(kind:String):Bool
     return kind == "camera" || kind == "gnss_pose" ||
-      kind == "trip_switch" || kind == "tool_contact" || kind == "tool_vacuum_kpa" || kind == "tool_weld";
+      kind == "trip_switch" || kind == "tool_contact" || kind == "tool_vacuum_kpa" || kind == "tool_weld" ||
+      kind == "digital_input";
 
   /** True for sensors the native runtime samples itself. */
   public static function isNativeKind(kind:String):Bool

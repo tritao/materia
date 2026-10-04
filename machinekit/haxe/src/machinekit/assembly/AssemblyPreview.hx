@@ -48,8 +48,14 @@ class AssemblyPreview {
 		var state = model.initialState(assemblyId).record();
 		preserveOwnership(definition, assembly.derived().definition);
 		shareDefinitions(definition, definitionByOccurrence);
-		return {lengthUnit: "mm", metresPerUnit: LengthUnit.metresPerUnit("mm"), parts: parts,
+		var cell = ControllerWiring.of(assembly, definition);
+		var result:SceneArtifactData = {lengthUnit: "mm", metresPerUnit: LengthUnit.metresPerUnit("mm"), parts: parts,
 			assemblyDefinition: definition, assemblyState: state, machineMotion: machineMotion};
+		if (cell != null) {
+			result.controllers = cell.controllers;
+			result.signals = cell.signals;
+		}
+		return result;
 	}
 
   static function displayBelt(part:SceneArtifactPart, belt:machinekit.transmission.TimingBelt, side:Int):Void {

@@ -73,6 +73,7 @@ typedef CncJob = {
 	@:optional var loadedTool:Int;
 	/** The controller the machine's steppers are nominally wired to; its step rate caps the axes. */
 	@:optional var controller:{stepTickHz:Int};
+	@:optional var controllerId:String;
 }
 
 /**
@@ -167,6 +168,7 @@ class CncProgramPlayer implements SessionMember {
 	final recipe:MachiningRecipe;
 	/** Sensor selected from the assembled machine; null on routers without at-speed feedback. */
 	final atSpeedSensorId:Null<String>;
+	final cellInput:Null<String->Null<EventValue>>;
 	/** The restart the operator asked for, until the machine can take it. */
 	var restartRequest:Null<{op:Int, distance:Float}> = null;
 	var pendingContinuation:Null<MachiningContinuation> = null;
@@ -179,12 +181,14 @@ class CncProgramPlayer implements SessionMember {
 	 * with that pose as its offset.
 	 */
 	public function new(job:CncJob, robot:AssemblyRobot, simulation:Simulation,
-			project:ProjectDocumentSession, session:SimSession, ?check:PlanCheckOptions) {
+			project:ProjectDocumentSession, session:SimSession, ?cellInput:String->Null<EventValue>,
+			?check:PlanCheckOptions) {
 		if (job.axes.length != 3) throw "A CNC job needs its X, Y and Z axes";
 		var definition = project.projectAssemblyDefinition, physical = project.projectPhysical;
 		if (definition == null || physical == null) throw "A CNC job needs the project's machine";
 		var metresPerUnit = physical.metresPerUnit, state = project.projectAssemblyState;
 		this.session = session;
+		this.cellInput = cellInput;
 		this.project = project;
 		this.loop = job.loop;
 		this.source = job.source;
@@ -324,7 +328,7 @@ class CncProgramPlayer implements SessionMember {
 			var made = new ManipulatorMotion(robot.robot, currentBinding.compiler,
 				channel -> {
 					if (channel == "spindle.at_speed") return spindleAtSpeed();
-					if (!StringTools.startsWith(channel, TOOL_CHANGE)) return null;
+					if (!StringTools.startsWith(channel, TOOL_CHANGE)) return cellInput == null ? null : cellInput(channel);
 					var number = Std.parseInt(channel.substr(TOOL_CHANGE.length));
 					if (number == null || !toolsByNumber.exists(number)) throw 'The machining program loads unknown tool $channel';
 					if (number != loadedTool) {

@@ -14,6 +14,7 @@ class MachineKitComponents {
 		machinekit.pneumatic.PneumaticComponents.register(registry);
 		machinekit.milling.MillingComponents.register(registry);
 		machinekit.assembly.AssemblyComponents.register(registry);
+		machinekit.control.ControlComponents.register(registry);
 		return registry;
 	}
 

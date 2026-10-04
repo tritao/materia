@@ -6,6 +6,7 @@
 	"entry": "TendingReach",
 	"sources": [
 		"TendingReach.hx",
+		"TendingControllers.hx",
 		"TendingToolEnvelope.hx",
 		"../bench-mill/EnclosedBenchMill.hx",
 		"../bench-mill/BenchMill.hx",

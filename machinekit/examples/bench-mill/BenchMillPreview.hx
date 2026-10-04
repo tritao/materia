@@ -43,7 +43,7 @@ class BenchMillPreview {
 			workOffset: [for (v in mill.workOffset()) v / 1000],
 			tools: [for (tool in mill.tools()) {number: tool.number, length: tool.length, profile: tool.profile().encode()}],
 			stock: "mill/stock", toolPart: "mill/tool", loadedTool: 1, target: TARGET_PART, loop: true,
-			controller: {stepTickHz: BenchMill.STEP_TICK_HZ}};
+			controller: {stepTickHz: BenchMill.STEP_TICK_HZ}, controllerId: "cncController"};
 		return SceneArtifact.encode(scene);
 	}
 

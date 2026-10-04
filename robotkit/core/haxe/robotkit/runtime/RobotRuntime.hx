@@ -614,7 +614,10 @@ class RobotRuntime {
           throw 'Switch "$sensorId" publication requires digital state and optional closing-edge capture';
       case "tool_contact":
         if (image != null || values.length != 1 || (values[0] != 0.0 && values[0] != 1.0))
-          throw 'Digital sensor "$sensorId" publication requires one zero-or-one value';
+          throw 'Contact "$sensorId" publication requires one digital value';
+      case "digital_input":
+        if (image != null || values.length != 1 || (values[0] != 0.0 && values[0] != 1.0))
+          throw 'Digital input "$sensorId" publication requires one digital value';
       case "tool_vacuum_kpa":
         if (image != null || values.length != 1 || values[0] < 0.0)
           throw 'Vacuum "$sensorId" publication requires one non-negative kPa value';

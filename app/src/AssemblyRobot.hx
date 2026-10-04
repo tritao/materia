@@ -7,6 +7,7 @@ import materia.assembly.AssemblyDefinitionFlattener;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.project.SceneArtifact.SceneArtifactPlace;
+import materia.project.SceneArtifact.SceneArtifactCellController;
 import materia.project.MaterialLibrary;
 import robotkit.mobile.MobileBase;
 import robotkit.model.CollisionApproximation;
@@ -18,6 +19,7 @@ import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationClosure;
 import robotkit.runtime.Simulation.SimulationLinkHull;
 import robotkit.execution.ProcessChannelDeclaration;
+import robotkit.execution.ProcessEventValue;
 import robotkit.simulation.SimulatedRobot;
 
 /**
@@ -121,7 +123,8 @@ class AssemblyRobot {
   }
 
   /** The id the assembly's robot takes in the world. */
-  public static function idFor(assembly:AssemblyDefinition):String return "assembly:" + assembly.id;
+  public static function idFor(assembly:AssemblyDefinition, ?controllerId:String):String
+    return "assembly:" + assembly.id + (controllerId == null ? "" : ":" + controllerId);
 
   /**
    * The occurrences that are not part of the assembly robot: parts flagged dynamic (a workpiece),
@@ -160,7 +163,7 @@ class AssemblyRobot {
    */
   public static function add(candidate:Simulation, scene:EditorScene, session:ProjectDocumentSession,
       assembly:AssemblyDefinition, supportsClosures:Bool, revision:Int, robotIndex:Int,
-      ?channels:Array<ProcessChannelDeclaration>, virtualWelder:Bool = false):AssemblyRobot {
+      ?channels:Array<ProcessChannelDeclaration>, virtualWelder:Bool = false, ?control:SceneArtifactCellController):AssemblyRobot {
     var warnings:Array<String> = [];
     var parts:Array<AssemblyPart> = [];
     var physical = session.projectPhysical;
@@ -196,8 +199,16 @@ class AssemblyRobot {
         throw 'Assembly occurrence "${occurrence.id}" has an invalid mass';
       masses.set(occurrence.id, chosenMass);
     }
+    var ownedJoints = control == null ? null : control.joints;
+    if (ownedJoints != null) {
+      var movable = [for (joint in AssemblyDefinitionFlattener.flatten(assembly).joints)
+        if (Std.string(joint.role) == "tree" && Std.string(joint.type) != "fixed") joint.id];
+      if (movable.length == ownedJoints.length) ownedJoints = null;
+    }
     var converted = AssemblySimulationBridge.toRobotModel(assembly, physical,
-      session.projectAssemblyState, [for (id in freeOccurrences(scene, assembly).keys()) id], id -> masses.get(id), session.mobileBase);
+      session.projectAssemblyState, [for (id in free.keys()) id], id -> masses.get(id),
+      control == null ? session.mobileBase : null,
+      ownedJoints, control == null || ownedJoints == null ? null : control.sensors);
     // Link collision geometry is installed with generated-part hulls in the
     // collision phase; the runtime's generic 10 cm robot box is not a part shape.
     converted.model.collisionApproximation = CollisionApproximation.None;
@@ -251,6 +262,7 @@ class AssemblyRobot {
     // Each tool reports on its sensor (a suction tool's vacuum, a torch's weld circuit), mounted at the tool's
     // contact on the link that carries it.
     for (tool in session.robotTools) {
+      if (control != null && converted.partLinks.get(tool.contact.occurrence) == null) continue;
       var sensorId = tool.sensor;
       if (sensorId == null) continue;
       var carrier = converted.partLinks.get(tool.contact.occurrence);
@@ -278,16 +290,22 @@ class AssemblyRobot {
     // Each tool's contact is a frame of the robot, where its arm's programs put the tool.
     var toolFrames = new Map<String, robotkit.model.Frame>();
     for (tool in session.robotTools)
-      toolFrames.set(tool.contact.occurrence, mountFrame(tool.contact.occurrence + " contact", tool.contact));
+      if (control == null || converted.partLinks.get(tool.contact.occurrence) != null)
+        toolFrames.set(tool.contact.occurrence, mountFrame(tool.contact.occurrence + " contact", tool.contact));
     // Each scanner scans from its mount connector.
     for (scanner in session.robotSensors) {
+      if (control != null && converted.partLinks.get(scanner.mount.occurrence) == null) continue;
       var sensor = converted.model.addSensor(new robotkit.model.Sensor(scanner.id, scanner.kind, scanner.updateRate, scanner.id));
       sensor.rayCount = scanner.rayCount;
       sensor.maxRange = scanner.maxRange;
       sensor.frame = mountFrame(scanner.id + " mount", scanner.mount);
     }
+    if (control != null) for (wire in session.signals)
+      if (wire.to.controller == control.id)
+        converted.model.addSensor(new robotkit.model.Sensor(wire.name, "digital_input", 0.0, wire.name));
     var missionFrames = new Map<String, robotkit.model.Frame>();
-    if (session.mission != null) for (step in session.mission.steps) if (step.kind == "moveJoints") {
+    if (session.mission != null && (control == null || session.mission.controllerId == control.id))
+      for (step in session.mission.steps) if (step.kind == "moveJoints") {
       var at:SceneArtifactPlace = cast step.at;
       var name = missionFrameName(at);
       if (!missionFrames.exists(name)) missionFrames.set(name, mountFrame(name, at));
@@ -312,6 +330,11 @@ class AssemblyRobot {
       }
     }
     var blueprint = RobotRuntimeCompiler.compile(converted.model, converted.profile, revision);
+    if (control != null) for (name in control.channels) {
+      var found = false;
+      for (entry in blueprint.channels) if (entry.id == name) found = true;
+      if (!found) blueprint.addChannel(new ProcessChannelDeclaration(name, ProcessEventValue.Digital(false)));
+    }
     // Process channels (a machine's spindle and coolant, a tool's vacuum) must be declared before the
     // robot is added.
     if (channels != null) for (channel in channels) blueprint.addChannel(channel);
@@ -319,6 +342,7 @@ class AssemblyRobot {
     // keeps holding through a commanded stop, as when its base arrives somewhere carrying a part; a torch's arc and wire
     // go off on any stop. A declaration made above that disagrees with the tool is refused.
     for (tool in session.robotTools) {
+      if (control != null && converted.partLinks.get(tool.contact.occurrence) == null) continue;
       var welder = tool.torch;
       blueprint.addTool(welder == null ? new robotkit.tool.SuctionChannels(tool.channel)
         : new processkit.tool.WeldChannels(tool.channel, welder.wireSpeedChannel, welder.voltageChannel));
@@ -361,7 +385,7 @@ class AssemblyRobot {
         candidate.setPowerUpSides(robotIndex, placement.offsets, placement.drives);
       } else candidate.setPowerUpOffsets(robotIndex, base);
     }
-    var robot = new SimulatedRobot(idFor(assembly), runtime, converted.model.name,
+    var robot = new SimulatedRobot(idFor(assembly, control == null ? null : control.id), runtime, converted.model.name,
       [for (link in converted.model.links) link.id],
       [for (joint in converted.model.joints) joint.id]);
     // A wheeled assembly's chassis rolls by the wheel rates the robot applies each tick, whoever commands them.
@@ -375,9 +399,10 @@ class AssemblyRobot {
     }
     for (occurrence in assembly.occurrences) {
       if (free.exists(occurrence.id)) continue;
+      var placed = converted.partLinks.get(occurrence.id);
+      if (control != null && placed == null) continue;
       var center = session.assemblyPreviewCenter(occurrence.definition);
       if (center == null) throw 'Assembly part "${occurrence.definition}" has no preview center';
-      var placed = converted.partLinks.get(occurrence.id);
       if (placed == null) throw 'Assembly occurrence "${occurrence.id}" has no simulated link';
       parts.push({id: "project:" + occurrence.id, robotIndex: robotIndex, linkIndex: placed.link,
         offset: placed.offset, center: [for (coordinate in center) coordinate * physical.metresPerUnit]});

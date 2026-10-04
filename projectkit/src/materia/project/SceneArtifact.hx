@@ -68,7 +68,27 @@ typedef SceneArtifactData = {
 	/** The sensors on the assembly's robot; see SceneArtifactRobotSensor. */
 	@:optional var robotSensors:Array<SceneArtifactRobotSensor>;
   /** Moving belts and an optional axis program supplied by the machine's generator. */
-  @:optional var machineMotion:SceneArtifactMachineMotion;
+	@:optional var machineMotion:SceneArtifactMachineMotion;
+	/** Independently clocked control domains derived from assembly signal wiring. */
+	@:optional var controllers:Array<SceneArtifactCellController>;
+	/** Digital wires between cabinet terminals. */
+	@:optional var signals:Array<SceneArtifactCellSignal>;
+}
+
+typedef SceneArtifactCellController = {
+	var id:String;
+	var kind:String;
+	var joints:Array<String>;
+	var sensors:Array<String>;
+	var channels:Array<String>;
+}
+
+typedef SceneArtifactSignalPort = {var controller:String; var port:String;}
+
+typedef SceneArtifactCellSignal = {
+	var name:String;
+	var from:SceneArtifactSignalPort;
+	var to:SceneArtifactSignalPort;
 }
 
 typedef SceneArtifactMachineMotion = {
@@ -210,6 +230,7 @@ typedef SceneArtifactMission = {
 	@:optional var loop:Bool;
 	@:optional var powerUpOffsets:Array<SceneArtifactPowerUpOffset>;
 	@:optional var powerUpSideOffsets:Array<SceneArtifactPowerUpSideOffset>;
+	@:optional var controllerId:String;
 }
 
 /** Generic geometric labels, with optional physical arm turn counts. */
@@ -384,6 +405,7 @@ typedef SceneArtifactMachining = {
 	@:optional var target:String;
 	@:optional var loop:Bool;
 	@:optional var controller:SceneArtifactController;
+	@:optional var controllerId:String;
 }
 
 /**
@@ -437,8 +459,12 @@ class SceneArtifact {
 		if (robotSensors.length > 100000) throw "Scene artifact robot sensors are too large";
     var machineMotion = data.machineMotion == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.machineMotion));
     if (machineMotion.length > 1000000) throw "Scene artifact machine motion is too large";
+		var controllers = data.controllers == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.controllers));
+		var signals = data.signals == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.signals));
+		if (controllers.length > 100000 || signals.length > 100000) throw "Scene artifact cell wiring is too large";
 		var length = 36 + unitText.length + assemblyDefinition.length + assemblyState.length + recipeDocument.length + recipeDiagnostics.length + 4
-			+ machining.length + 4 + mobileBase.length + 4 + mission.length + 4 + robotTools.length + 4 + robotSensors.length + 4 + machineMotion.length + 4;
+			+ machining.length + 4 + mobileBase.length + 4 + mission.length + 4 + robotTools.length + 4 + robotSensors.length + 4 + machineMotion.length + 4
+			+ controllers.length + 4 + signals.length + 4;
 		for (part in data.parts) {
 			validatePart(part, true);
 			var id = Bytes.ofString(part.id), name = Bytes.ofString(part.name);
@@ -536,6 +562,10 @@ class SceneArtifact {
 		result.blit(offset, robotSensors, 0, robotSensors.length); offset += robotSensors.length;
     offset = putInt(result, offset, machineMotion.length);
     result.blit(offset, machineMotion, 0, machineMotion.length); offset += machineMotion.length;
+		offset = putInt(result, offset, controllers.length);
+		result.blit(offset, controllers, 0, controllers.length); offset += controllers.length;
+		offset = putInt(result, offset, signals.length);
+		result.blit(offset, signals, 0, signals.length); offset += signals.length;
 		if (offset != result.length) throw "Scene artifact size mismatch";
 		return result;
 	}
@@ -621,7 +651,94 @@ class SceneArtifact {
 		if (data.robotTools != null) validateRobotTools(data.robotTools, data);
 		if (data.robotSensors != null) validateRobotSensors(data.robotSensors, data);
     if (data.machineMotion != null) validateMachineMotion(data.machineMotion, data);
+		if (data.controllers != null || data.signals != null) validateCell(data);
 		if (data.mission != null) validateMission(data.mission, data);
+	}
+
+	static function validateCell(data:SceneArtifactData):Void {
+		var controllers = data.controllers;
+		if (controllers == null || controllers.length == 0 || controllers.length > 32 || data.assemblyDefinition == null)
+			throw "Scene artifact cell needs controllers and an assembly";
+		var flat = AssemblyDefinitionFlattener.flatten(data.assemblyDefinition);
+		var validJoints = new Map<String, Bool>();
+		for (joint in flat.joints) if (Std.string(joint.role) == "tree" && Std.string(joint.type) != "fixed")
+			validJoints.set(joint.id, true);
+		var validSensors = new Map<String, Bool>();
+		if (flat.sensors != null) for (sensor in flat.sensors) validSensors.set(sensor.id, true);
+		var owners = new Map<String, String>();
+		var cabinetIds = new Map<String, Bool>();
+		var outputs = new Map<String, Array<String>>();
+		for (cabinet in controllers) {
+			if (cabinet == null || cabinet.id == null || cabinet.id.length == 0 || cabinetIds.exists(cabinet.id) ||
+				(cabinet.kind != "cnc" && cabinet.kind != "robot") || cabinet.joints == null ||
+				cabinet.sensors == null || cabinet.channels == null)
+				throw "Scene artifact cell has an invalid controller";
+			cabinetIds.set(cabinet.id, true);
+			var channelIds = new Map<String, Bool>();
+			for (channel in cabinet.channels) {
+				if (channel == null || channel.length == 0 || channelIds.exists(channel))
+					throw 'Scene artifact controller "${cabinet.id}" has a duplicate or empty channel';
+				channelIds.set(channel, true);
+			}
+			outputs.set(cabinet.id, cabinet.channels);
+			for (joint in cabinet.joints) {
+				if (!validJoints.exists(joint) || owners.exists(joint))
+					throw 'Scene artifact cell joint "$joint" has no unique owner';
+				owners.set(joint, cabinet.id);
+			}
+			for (sensor in cabinet.sensors) if (!validSensors.exists(sensor))
+				throw 'Scene artifact cell sensor "$sensor" is unknown';
+		}
+		for (joint in validJoints.keys()) if (!owners.exists(joint))
+			throw 'Scene artifact cell joint "$joint" has no controller';
+		var signalIds = new Map<String, Bool>(), destinations = new Map<String, Bool>();
+		if (data.signals != null) for (signal in data.signals) {
+			if (signal == null || signal.name == null || signal.name.length == 0 || signal.from == null || signal.to == null ||
+				!cabinetIds.exists(signal.from.controller) || !cabinetIds.exists(signal.to.controller) ||
+				signal.from.port == null || signal.to.port == null || signalIds.exists(signal.name) ||
+				destinations.exists(signal.to.controller + "/" + signal.to.port))
+				throw "Scene artifact cell has an invalid signal";
+			signalIds.set(signal.name, true);
+			destinations.set(signal.to.controller + "/" + signal.to.port, true);
+			var sourceChannels = outputs.get(signal.from.controller);
+			if (sourceChannels == null || sourceChannels.indexOf(signal.name) < 0)
+				throw 'Scene artifact signal "${signal.name}" has no source output channel';
+		}
+		if (data.machining != null && (data.machining.controllerId == null ||
+			[for (c in controllers) if (c.id == data.machining.controllerId && c.kind == "cnc") c].length != 1))
+			throw "Scene artifact machining job needs its CNC controller";
+		if (data.mission != null && (data.mission.controllerId == null ||
+			[for (c in controllers) if (c.id == data.mission.controllerId && c.kind == "robot") c].length != 1))
+			throw "Scene artifact mission needs its robot controller";
+	}
+
+	static function decodeControllers(raw:Dynamic):Array<SceneArtifactCellController> {
+		function fail():Dynamic throw "Scene artifact controllers are invalid";
+		function name(value:Dynamic):String return Std.isOfType(value, String) ? value : fail();
+		function names(value:Dynamic):Array<String> {
+			if (!Std.isOfType(value, Array)) fail();
+			return [for (item in (cast value:Array<Dynamic>)) name(item)];
+		}
+		if (!Std.isOfType(raw, Array)) fail();
+		return [for (item in (cast raw:Array<Dynamic>)) {
+			id: name(Reflect.field(item, "id")), kind: name(Reflect.field(item, "kind")),
+			joints: names(Reflect.field(item, "joints")), sensors: names(Reflect.field(item, "sensors")),
+			channels: names(Reflect.field(item, "channels"))
+		}];
+	}
+
+	static function decodeSignals(raw:Dynamic):Array<SceneArtifactCellSignal> {
+		function fail():Dynamic throw "Scene artifact signals are invalid";
+		function name(value:Dynamic):String return Std.isOfType(value, String) ? value : fail();
+		function port(value:Dynamic):SceneArtifactSignalPort {
+			if (value == null) fail();
+			return {controller: name(Reflect.field(value, "controller")), port: name(Reflect.field(value, "port"))};
+		}
+		if (!Std.isOfType(raw, Array)) fail();
+		return [for (item in (cast raw:Array<Dynamic>)) {
+			name: name(Reflect.field(item, "name")), from: port(Reflect.field(item, "from")),
+			to: port(Reflect.field(item, "to"))
+		}];
 	}
 
 	static function validateRobotTools(tools:Array<SceneArtifactRobotTool>, data:SceneArtifactData):Void {
@@ -1163,6 +1280,8 @@ class SceneArtifact {
 		if (offsets != null) mission.powerUpOffsets = decodePowerUpOffsets(offsets);
 		var sides:Dynamic = Reflect.field(decoded, "powerUpSideOffsets");
 		if (sides != null) mission.powerUpSideOffsets = decodePowerUpSideOffsets(sides);
+		var controllerId:Dynamic = Reflect.field(decoded, "controllerId");
+		if (controllerId != null) mission.controllerId = Std.isOfType(controllerId, String) ? controllerId : fail();
 		return mission;
 	}
 
@@ -1311,6 +1430,8 @@ class SceneArtifact {
 		if (offsets != null) machining.powerUpOffsets = decodePowerUpOffsets(offsets);
 		var sides:Dynamic = Reflect.field(decoded, "powerUpSideOffsets");
 		if (sides != null) machining.powerUpSideOffsets = decodePowerUpSideOffsets(sides);
+		var controllerId:Dynamic = Reflect.field(decoded, "controllerId");
+		if (controllerId != null) machining.controllerId = text(controllerId);
 		return machining;
 	}
 
@@ -1502,12 +1623,23 @@ private class SceneArtifactReader {
     if (machineLength < 0 || machineLength > 1000000) throw "Scene artifact machine motion is too large";
     if (machineLength > 0)
       machineMotion = @:privateAccess SceneArtifact.decodeMachineMotion(haxe.Json.parse(readBytes(machineLength).getString(0, machineLength)));
+		var controllers:Null<Array<SceneArtifactCellController>> = null;
+		var controllerLength = readInt();
+		if (controllerLength < 0 || controllerLength > 100000) throw "Scene artifact controllers are too large";
+		if (controllerLength > 0)
+			controllers = @:privateAccess SceneArtifact.decodeControllers(haxe.Json.parse(readBytes(controllerLength).getString(0, controllerLength)));
+		var signals:Null<Array<SceneArtifactCellSignal>> = null;
+		var signalLength = readInt();
+		if (signalLength < 0 || signalLength > 100000) throw "Scene artifact signals are too large";
+		if (signalLength > 0)
+			signals = @:privateAccess SceneArtifact.decodeSignals(haxe.Json.parse(readBytes(signalLength).getString(0, signalLength)));
 		if (offset != source.length) throw "Scene artifact contains trailing data";
 		var result:SceneArtifactData = {metresPerUnit: metresPerUnit, lengthUnit: lengthUnit,
 			parts: parts,
 			assemblyDefinition: assemblyDefinition, assemblyState: assemblyState, recipeDocument: recipeDocument,
 			recipeDiagnostics: recipeDiagnostics, machining: machining, mobileBase: mobileBase, mission: mission,
-			robotTools: robotTools, robotSensors: robotSensors, machineMotion: machineMotion};
+			robotTools: robotTools, robotSensors: robotSensors, machineMotion: machineMotion,
+			controllers: controllers, signals: signals};
 		@:privateAccess SceneArtifact.validateHeader(result);
 		return result;
 	}

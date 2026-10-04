@@ -20,6 +20,7 @@ import motionkit.robot.ManipulatorKinematics;
 import motionkit.robot.ProgramCompiler;
 import motionkit.robot.StartTolerances;
 import motionkit.robot.MotionProgramSkill;
+import motionkit.event.EventValue;
 import motionkit.trajectory.ValidationLimits;
 import motionkit.program.MotionProgram;
 import motionkit.program.MotionOp;
@@ -200,16 +201,18 @@ class MissionPlayer implements SessionMember {
   final wheels:Null<WheelOdometryLocalization>;
   var wheelsSeeded:Bool = false;
   final timestep:Float;
+  final cellInput:Null<String->Null<EventValue>>;
   final idle = new PerceptionSnapshot();
 
   public function new(mission:SceneArtifactMission, robot:AssemblyRobot, simulation:Simulation, robotIndex:Int,
-      timestep:Float, obstacles:Array<FloorObstacle>, objects:Array<GripObject>, project:ProjectDocumentSession, weldAcceleration:Float = ARM_ACCELERATION) {
+      timestep:Float, obstacles:Array<FloorObstacle>, objects:Array<GripObject>, project:ProjectDocumentSession, weldAcceleration:Float = ARM_ACCELERATION, ?cellInput:String->Null<EventValue>) {
     if (!Math.isFinite(weldAcceleration) || weldAcceleration <= 0.0 || weldAcceleration > ARM_ACCELERATION)
       throw "Invalid welding planning acceleration";
     if (mission.steps.length == 0) throw "A mission needs steps";
     this.mission = mission;
     this.robot = robot;
     this.timestep = timestep;
+    this.cellInput = cellInput;
     this.obstacles = standing(obstacles);
     this.simulation = simulation;
     this.weldAcceleration = weldAcceleration;
@@ -658,7 +661,8 @@ class MissionPlayer implements SessionMember {
       var compiler = new ProgramCompiler(new ManipulatorKinematics(arm, 1e-8), limits, FRAME,
         velocities, accelerations, [for (_ in 0...count) 20.0],
         StartTolerances.uniform(count, 0.005, ARM_ACCELERATION * 0.01, 0.2));
-      motion = new ManipulatorMotion(robot.robot, compiler, (_) -> null, () -> robot.runtime.pollEvents(), indices);
+      motion = new ManipulatorMotion(robot.robot, compiler,
+        channel -> cellInput == null ? null : cellInput(channel), () -> robot.runtime.pollEvents(), indices);
       jointMotions.set(name, motion);
     }
     // A different skill may have moved this chain since its last joint program completed.

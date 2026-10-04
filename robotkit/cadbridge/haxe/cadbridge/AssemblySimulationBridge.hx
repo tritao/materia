@@ -155,9 +155,14 @@ class AssemblySimulationBridge {
   public static function toRobotModel(definition:AssemblyDefinition,
       artifact:AssemblyPhysicalData, ?savedState:AssemblyStateRecord,
       ?freeOccurrences:Array<String>, ?massOf:String->Null<Float>,
-      ?mobileBase:SceneArtifactMobileBase):AssemblySimulationModel {
+      ?mobileBase:SceneArtifactMobileBase, ?ownedJoints:Array<String>,
+      ?ownedSensors:Array<String>):AssemblySimulationModel {
     var free = new Map<String, Bool>();
     if (freeOccurrences != null) for (id in freeOccurrences) free.set(id, true);
+		var selected = new Map<String, Bool>();
+		if (ownedJoints != null) for (id in ownedJoints) selected.set(id, true);
+		var selectedSensors = new Map<String, Bool>();
+		if (ownedSensors != null) for (id in ownedSensors) selectedSensors.set(id, true);
     AssemblyDefinitionCodec.validate(definition);
     var sourceDefinition = definition;
     definition = AssemblyDefinitionFlattener.flatten(definition);
@@ -191,6 +196,21 @@ class AssemblySimulationBridge {
     var linkHulls:Array<AssemblyLinkHull> = [];
     for (body in AssemblyBodies.of(definition)) {
       if (free.exists(body.id)) continue;
+      if (ownedJoints != null) {
+        if (body.joint != null && !selected.exists(body.joint)) continue;
+        if (body.joint == null) {
+          var occurrences = new Map<String, Bool>();
+          for (id in body.occurrences) occurrences.set(id, true);
+          var attached = 0, foreign = 0;
+          for (edge in definition.joints)
+            if (edge.role == AssemblyJointRole.Tree && edge.type != AssemblyJointType.Fixed &&
+                occurrences.exists(edge.parent)) {
+              if (selected.exists(edge.id)) attached++; else foreign++;
+            }
+          if (attached == 0) continue;
+          if (foreign > 0) throw 'Fixed body "${body.id}" bridges controllers; mount their machines on separate roots';
+        }
+      }
       var index = 0;
       var frame = rootFrame;
       if (body.joint != null) {
@@ -260,6 +280,11 @@ class AssemblySimulationBridge {
     var closureGeometry:Array<AssemblySimulationClosure> = [];
     for (edge in definition.joints) {
       if (edge.role == AssemblyJointRole.Closure) {
+				if (ownedJoints != null) {
+					var parentIncluded = linkIndexOfPart.exists(edge.parent), childIncluded = linkIndexOfPart.exists(edge.child);
+					if (!parentIncluded && !childIncluded) continue;
+					if (!parentIncluded || !childIncluded) throw 'Assembly closure "${edge.id}" crosses controllers';
+				}
         closures.push(edge.id);
         var frame = AssemblyFrames.compose(offsetOf(edge.parent),
           connector(definitions.get(occurrenceDefinition(definition, edge.parent)), edge.parentConnector));
@@ -272,6 +297,7 @@ class AssemblySimulationBridge {
       }
       // Fixed joints hold parts inside one body; they are not joints of the robot.
       if (edge.type == AssemblyJointType.Fixed) continue;
+			if (ownedJoints != null && !selected.exists(edge.id)) continue;
       var kind:JointType = switch (edge.type) {
         case AssemblyJointType.Revolute: JointType.Revolute;
         case AssemblyJointType.Continuous: JointType.Continuous;
@@ -304,6 +330,11 @@ class AssemblySimulationBridge {
     // A follower summing several couplings' terms has its placement taken off once, in its first.
     var offsetTargets = new Map<String, Bool>();
     if (definition.couplings != null) for (coupling in definition.couplings) {
+			if (ownedJoints != null) {
+				if (!selected.exists(coupling.source) && !selected.exists(coupling.target)) continue;
+				if (!selected.exists(coupling.source) || !selected.exists(coupling.target))
+					throw 'Assembly coupling "${coupling.id}" crosses controllers';
+			}
       var leader:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
       var follower:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
       for (edge in definition.joints) {
@@ -332,6 +363,13 @@ class AssemblySimulationBridge {
       if (coupling.assumed != null) added.assumed = [for (label in coupling.assumed) label];
     }
     if (definition.elasticNetworks != null) for (network in definition.elasticNetworks) {
+			if (ownedJoints != null) {
+				var inside = 0, outside = 0;
+				for (span in network.spans) for (term in span.terms)
+					if (selected.exists(term.joint)) inside++; else outside++;
+				if (inside == 0) continue;
+				if (outside > 0) throw 'Elastic network "${network.id}" crosses controllers';
+			}
       var spans:Array<robotkit.model.ElasticNetwork.ElasticSpan> = [];
       for (span in network.spans) {
         var terms:Array<robotkit.model.ElasticNetwork.ElasticTerm> = [];
@@ -357,6 +395,7 @@ class AssemblySimulationBridge {
     }
     // A motor on a joint: its effort and rate in robot units, and its rotor turning with the joint.
     if (definition.actuators != null) for (actuator in definition.actuators) {
+			if (ownedJoints != null && !selected.exists(actuator.joint)) continue;
       var driven:Null<Joint> = null;
       for (joint in model.joints) if (joint.id == actuator.joint) driven = joint;
       var edge:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
@@ -419,6 +458,7 @@ class AssemblySimulationBridge {
     model.materializeLimits();
     // Encoders: sensors on joints. Counts per millimetre on a sliding joint, per revolution on a turning one.
     if (definition.encoders != null) for (encoder in definition.encoders) {
+			if (ownedJoints != null && !selected.exists(encoder.joint)) continue;
       var edge:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
       for (candidate in definition.joints) if (candidate.id == encoder.joint) edge = candidate;
       var onJoint:Null<Joint> = null;
@@ -431,6 +471,7 @@ class AssemblySimulationBridge {
         : Encoder.perRevolution(encoder.id, onJoint.id, kind, encoder.counts, index));
     }
     if (definition.sensors != null) for (sensor in definition.sensors) {
+			if (ownedSensors != null && !selectedSensors.exists(sensor.id)) continue;
       var added = model.addSensor(new Sensor(sensor.id, sensor.kind, 0.0, sensor.id));
       if (sensor.kind == "joint_switch" || sensor.kind == "at_speed") {
         var edge:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;

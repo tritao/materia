@@ -4,6 +4,7 @@ import machinekit.pneumatic.PneumaticCylinder;
 import machinekit.pneumatic.AirSupply;
 import machinekit.pneumatic.PneumaticManifold;
 import machinekit.pneumatic.SolenoidValve;
+import machinekit.control.DigitalSensor;
 import machinekit.component.BomItem;
 import machinekit.component.MachineComponent;
 import cadkit.modeling.AssemblyModel;
@@ -126,6 +127,12 @@ class EnclosedBenchMill extends MachineAssembly {
 		panel("cabinetBack", 200, 2, 300, cabinetX, cabinetY + 100, cabinetZ, false);
 		panel("cabinetBottom", 200, 200, 2, cabinetX, cabinetY, cabinetZ, false);
 		panel("cabinetTop", 200, 200, 2, cabinetX, cabinetY, cabinetZ + 300, false);
+		fixed("cncController", new machinekit.control.CncController(4, 16, 16, 4),
+			AssemblyFrames.translation(cabinetX, cabinetY, cabinetZ + 10), "chipTray");
+		for (axis in ["X", "Y", "Z"])
+			connectPorts('cnc-$axis-drive', "cncController", 'axis${axis == "X" ? 1 : axis == "Y" ? 2 : 3}',
+				'mill/motor${axis}Driver', "bus");
+		connectPorts("cnc-spindle-drive", "cncController", "axis4", "mill/spindleMotorDriver", "bus");
 		addMemberConnector("chipTray", "doorOpening", AssemblyFrames.compose(AssemblyFrames.inverse(poses.get("chipTray")), opening));
 		exposeConnector("doorOpening", "chipTray", "doorOpening");
 		// The door cylinder uses the real guided-member connector as its piston endpoint.
@@ -158,6 +165,10 @@ class EnclosedBenchMill extends MachineAssembly {
 		var viseAirB = vise.port("airB", "mill/vise");
 		connectPorts("vise-extend-line", "viseValve", "A", viseAirA.instanceId, viseAirA.portName, hose);
 		connectPorts("vise-retract-line", "viseValve", "B", viseAirB.instanceId, viseAirB.portName, hose);
+		connectPorts("door-coil-a", "cncController", "valve1", "doorValve", "coilA");
+		connectPorts("door-coil-b", "cncController", "valve2", "doorValve", "coilB");
+		connectPorts("vise-coil-a", "cncController", "valve3", "viseValve", "coilA");
+		connectPorts("vise-coil-b", "cncController", "valve4", "viseValve", "coilB");
 		addCylinder("door-cylinder", "door", "doorCylinder", "doorValve");
 		addCylinder("vise-cylinder", "mill/vise/jaw", "mill/vise/cylinder", "viseValve");
 		addSwitch("door-closed", "door", {lower: 0, upper: 5, velocity: null, effort: null}, 2);
@@ -166,6 +177,20 @@ class EnclosedBenchMill extends MachineAssembly {
 		addSwitch("vise-clamped", "mill/vise/jaw", {lower: vise.grippedPosition - 0.5,
 			upper: vise.grippedPosition + 0.5, velocity: null, effort: null}, 0.25);
 		addPresence("stock-present", "mill/vise/datum", 25);
+		// The logical switch and its field head share an ID; each head has a real cabinet input wire.
+		var viseDatum = state().worldConnector("mill/vise/body", "datum");
+		var heads = [
+			{id: "door-closed", kind: "reed", x: -doorStroke / 2, y: railPose.y - 25, z: railPose.z + 18},
+			{id: "door-open", kind: "reed", x: doorStroke / 2, y: railPose.y - 25, z: railPose.z + 18},
+			{id: "vise-open", kind: "reed", x: viseDatum.x - 40, y: viseDatum.y, z: viseDatum.z + 30},
+			{id: "vise-clamped", kind: "reed", x: viseDatum.x - 25, y: viseDatum.y, z: viseDatum.z + 30},
+			{id: "stock-present", kind: "presence", x: viseDatum.x, y: viseDatum.y - 30, z: viseDatum.z + 30}
+		];
+		for (i in 0...heads.length) {
+			var head = heads[i];
+			fixed(head.id, new DigitalSensor(head.kind), AssemblyFrames.translation(head.x, head.y, head.z), "chipTray");
+			connectPorts('sensor-${head.id}', head.id, "signal", "cncController", 'input${i + 1}');
+		}
 		loadPosition = nearestLoadPosition();
 	}
 

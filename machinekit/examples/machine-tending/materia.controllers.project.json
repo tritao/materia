@@ -1,0 +1,17 @@
+{
+	"format": "materia.project",
+	"version": 1,
+	"name": "Machine tending controllers",
+	"defaultEntrypoint": "cell",
+	"build": {
+		"system": "haxeon",
+		"manifest": "haxeon.json"
+	},
+	"entrypoints": {
+		"cell": {
+			"kind": "cad-preview",
+			"module": "TendingControllers",
+			"function": "preview"
+		}
+	}
+}

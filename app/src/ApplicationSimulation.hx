@@ -64,6 +64,7 @@ class ApplicationSimulation {
   var mobile:Null<robotkit.mobile.MobileBase> = null;
   /** The work the assembly robot does on its own, when its project ships a mission. */
   var mission:Null<MissionPlayer> = null;
+  var cellSignals:Null<CellSignals> = null;
   /** The weld metal the mission's welds lay, when it welds. */
   var beads:Null<WeldBeads> = null;
   var workforce:Null<HumanWorkforce> = null;
@@ -123,6 +124,7 @@ class ApplicationSimulation {
   /** Rebuilds the list every tick walks, so the tick itself allocates nothing. */
   function refreshMembers():Void {
     members = [];
+    if (cellSignals != null) members.push(cellSignals);
     if (motions != null) members.push(motions);
     if (tools != null) members.push(tools);
     if (cnc != null) members.push(cnc);
@@ -150,9 +152,12 @@ class ApplicationSimulation {
     var candidateProgram:Null<MachineProgramPlayer> = null;
     var candidateMobile:Null<robotkit.mobile.MobileBase> = null;
     var candidateMission:Null<MissionPlayer> = null;
+    var candidateSignals:Null<CellSignals> = null;
     var candidateBeads:Null<WeldBeads> = null;
     var candidateAssembly:Null<AssemblyRobot> = null;
     var assemblyIndex = -1;
+		var candidateByController = new Map<String, AssemblyRobot>();
+		var indexByController = new Map<String, Int>();
     var heldBoxes:Array<MissionPlayer.FloorObstacle> = [];
     try {
       var models = configuration.robotModels();
@@ -170,6 +175,23 @@ class ApplicationSimulation {
       var createdSpace = SimulationSpace.create(backend, timestep);
       candidateSpace = createdSpace;
       candidate = Simulation.inSpace(createdSpace);
+      if (session != null && session.signals.length > 0) {
+        candidateSignals = new CellSignals(session.signals,
+          () -> createdSpace.session.simulationTime(),
+          (controller, channel) -> {
+            var source = candidateByController.get(controller);
+            if (source == null) throw 'Signal source controller "$controller" has no runtime';
+            return switch source.runtime.channelValue(channel) {
+              case Digital(on): on;
+              case _: throw 'Signal "$channel" is not a digital output';
+            };
+          },
+          (controller, channel, on, sequence, stamp) -> {
+            var target = candidateByController.get(controller);
+            if (target == null) throw 'Signal target controller "$controller" has no runtime';
+            target.runtime.publishSensorFrame(channel, [on ? 1.0 : 0.0], sequence, stamp, "cell.controller.tick");
+          });
+      }
       for (index in 0...models.length) {
         var editable=models[index];
         var blueprint = RobotRuntimeCompiler.compile(editable.model, editable.profile, appliedRevision + 1);
@@ -182,30 +204,43 @@ class ApplicationSimulation {
       }
       var candidateMotions = session == null ? [] : session.robotMotions;
       if (assembly != null && session != null) {
-        var id = AssemblyRobot.idFor(assembly);
-        if (world.robot(id) != null && simulatedIds.indexOf(id) < 0)
-          throw 'Robot "$id" is remote and read-only';
-        var robotIndex = candidateRobots.length;
-        assemblyIndex = robotIndex;
-        var built = AssemblyRobot.add(candidate, scene, session, assembly, backend == MUJOCO,
-          appliedRevision + 1, robotIndex, session.cncJob == null ? null : CncProgramPlayer.processChannels(), virtualWelder);
-        candidateRobots.push(built.robot);
-        candidateLinks.push([for (link in built.model.links) link.id]);
-        candidateRobotModels.push(built.model);
-        for (part in built.parts) candidateAssemblyParts.push(part);
-        for (warning in built.warnings) candidateWarnings.push(warning);
-        candidateMobile = built.mobile;
-        candidateAssembly = built;
-        // A bad program fails the rebuild here, before anything live changes.
-        var job = session.cncJob;
-        if (job != null)
-          candidateCnc = new CncProgramPlayer(job, built, candidate, session, createdSpace.session);
-        var machine = session.machineMotion;
-        if (machine != null && machine.belts.length > 0)
-          candidateBelts = new BeltVisuals(session, built, candidate, machine.belts);
-        if (machine != null && machine.program != null) {
-          if (job != null) throw "A machine cannot run a CNC job and an axis program together";
-          candidateProgram = new MachineProgramPlayer(machine.program, built, createdSpace.session, machine.virtualDevice == true);
+        var controls:Array<Null<materia.project.SceneArtifact.SceneArtifactCellController>> =
+          session.controllers.length == 0 ? [null] : [for (control in session.controllers) control];
+        for (control in controls) {
+          var id = AssemblyRobot.idFor(assembly, control == null ? null : control.id);
+          if (world.robot(id) != null && simulatedIds.indexOf(id) < 0)
+            throw 'Robot "$id" is remote and read-only';
+          var robotIndex = candidateRobots.length;
+          var job = session.cncJob;
+          var ownsJob = job != null && (control == null || job.controllerId == control.id);
+          var built = AssemblyRobot.add(candidate, scene, session, assembly, backend == MUJOCO,
+            appliedRevision + 1, robotIndex, ownsJob ? CncProgramPlayer.processChannels() : null, virtualWelder, control);
+          candidateRobots.push(built.robot);
+          candidateLinks.push([for (link in built.model.links) link.id]);
+          candidateRobotModels.push(built.model);
+          for (part in built.parts) candidateAssemblyParts.push(part);
+          for (warning in built.warnings) candidateWarnings.push(warning);
+          if (control != null) {
+            candidateByController.set(control.id, built);
+            indexByController.set(control.id, robotIndex);
+          }
+          if (built.mobile != null) candidateMobile = built.mobile;
+          if (candidateAssembly == null || control == null ||
+              (session.mission != null && session.mission.controllerId == control.id)) {
+            candidateAssembly = built;
+            assemblyIndex = robotIndex;
+          }
+          if (job != null && ownsJob) candidateCnc = new CncProgramPlayer(job, built, candidate, session,
+            createdSpace.session, candidateSignals == null || control == null ? null : candidateSignals.inputFor(control.id));
+          var machine = session.machineMotion;
+          if (machine != null && (control == null || ownsJob)) {
+            if (machine.belts.length > 0) candidateBelts = new BeltVisuals(session, built, candidate, machine.belts);
+            if (machine.program != null) {
+              if (job != null) throw "A machine cannot run a CNC job and an axis program together";
+              candidateProgram = new MachineProgramPlayer(machine.program, built, createdSpace.session,
+                machine.virtualDevice == true, candidateSignals == null || control == null ? null : candidateSignals.inputFor(control.id));
+            }
+          }
         }
       }
       var resolvedMotions = RobotMotionPlayer.resolve(candidateMotions,
@@ -213,11 +248,7 @@ class ApplicationSimulation {
       var environmentRecords = scene.records();
       environmentRecords.sort(function(a, b) return Reflect.compare(a.id, b.id));
       var assemblyOwned = new Map<String, Bool>();
-      if (assembly != null) {
-        var free = AssemblyRobot.unownedOccurrences(scene, session, assembly);
-        for (occurrence in assembly.occurrences)
-          if (!free.exists(occurrence.id)) assemblyOwned.set("project:" + occurrence.id, true);
-      }
+      for (part in candidateAssemblyParts) assemblyOwned.set(part.id, true);
       for (object in environmentRecords) if (object.collisionEnabled && !assemblyOwned.exists(object.id)) {
         var centerX=object.x,centerY=object.y,centerZ=object.z;
         var halfX=object.width/2.0,halfY=object.height/2.0,halfZ=object.depth/2.0;
@@ -243,17 +274,28 @@ class ApplicationSimulation {
       var candidateTools = new SimulatedTools([for (entry in candidateObjects) {id: entry.id, object: entry.object}]);
       var freeObjects = [for (entry in candidateObjects) entry.object];
       if (session != null && candidateAssembly != null) for (tool in session.robotTools) {
+        var toolRobot = candidateAssembly;
+        var toolIndex = assemblyIndex;
+        if (session.controllers.length > 0) for (control in session.controllers) {
+          var bound = candidateByController.get(control.id);
+          if (bound != null && bound.toolFrames.exists(tool.contact.occurrence)) {
+            toolRobot = bound;
+            var index = indexByController.get(control.id);
+            if (index == null) throw 'Controller "${control.id}" has no simulated robot';
+            toolIndex = index;
+          }
+        }
         if (tool.kind == "torch") {
-          var welder = candidateTools.welderFor(candidate, candidateAssembly, assemblyIndex, tool, session);
+          var welder = candidateTools.welderFor(candidate, toolRobot, toolIndex, tool, session);
           if (virtualWelder) welder.supply = new processkit.simulation.VirtualWelderSupply(candidate,
-            candidateAssembly.runtime, assemblyIndex, tool.sensor);
+            toolRobot.runtime, toolIndex, tool.sensor);
           else if (welderSupplyFactory != null) welder.supply = welderSupplyFactory(welder);
           candidate.addStepObserver(candidateTools.addWelder(welder));
           continue;
         }
-        var carrier = candidateAssembly.part("project:" + tool.contact.occurrence);
+        var carrier = toolRobot.part("project:" + tool.contact.occurrence);
         candidate.addStepObserver(candidateTools.add(new robotkit.runtime.SimulatedSuctionTool(candidate,
-          candidateAssembly.runtime, assemblyIndex, carrier.linkIndex, tool.channel, freeObjects, tool.sensor)));
+          toolRobot.runtime, toolIndex, carrier.linkIndex, tool.channel, freeObjects, tool.sensor)));
       }
       var work = session == null ? null : session.mission;
       if (work != null) {
@@ -261,7 +303,8 @@ class ApplicationSimulation {
         candidateMission = new MissionPlayer(work, candidateAssembly, candidate, assemblyIndex, timestep, heldBoxes,
           candidateTools.objectsByScene(), session, virtualWelder
             ? MissionPlayer.ARM_ACCELERATION * robotkit.runtime.VirtualServoOptions.ACCELERATION_SCALE
-            : MissionPlayer.ARM_ACCELERATION);
+            : MissionPlayer.ARM_ACCELERATION,
+          candidateSignals == null || work.controllerId == null ? null : candidateSignals.inputFor(work.controllerId));
         // A mission that welds lays the weld metal as the welder deposits it.
         var welds = [for (step in work.steps) if (step.kind == "weld") step].length > 0;
         if (welds) {
@@ -318,6 +361,7 @@ class ApplicationSimulation {
       cnc = candidateCnc;
       mobile = candidateMobile;
       mission = candidateMission;
+      cellSignals = candidateSignals;
       if (beads != null) beads.dispose();
       beads = candidateBeads;
       refreshMembers();
@@ -563,7 +607,7 @@ class ApplicationSimulation {
     beltVisuals = null;
     if (machineProgram != null) machineProgram.beforeReset();
     machineProgram = null;
-    cnc = null; mobile = null; mission = null; beads = null; refreshMembers();
+    cnc = null; mobile = null; mission = null; beads = null; cellSignals = null; refreshMembers();
     // A mission's programs are planned on worker threads that finish the plan they are on after they are cancelled; the
     // world they plan for goes now, so wait for them (see ProgramPlanner).
     motionkit.robot.ProgramPlanner.shutdown();

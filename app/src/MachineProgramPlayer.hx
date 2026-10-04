@@ -13,6 +13,7 @@ import motionkit.robot.MotorSpaceConstraints;
 import motionkit.robot.PlanCheck;
 import motionkit.robot.ManipulatorMotion;
 import motionkit.robot.StartTolerances;
+import motionkit.event.EventValue;
 import motionkit.trajectory.ValidationLimits;
 import nativekit.sim.SimSession;
 
@@ -20,6 +21,7 @@ import nativekit.sim.SimSession;
 class MachineProgramPlayer implements SessionMember {
   final robot:AssemblyRobot;
   final session:SimSession;
+  final cellInput:Null<String->Null<EventValue>>;
   final authored:SceneArtifactAxisProgram;
   final compiler:ProgramCompiler;
   final indices:Array<Int>;
@@ -33,8 +35,10 @@ class MachineProgramPlayer implements SessionMember {
   var started = false;
   var finished = false;
 
-  public function new(authored:SceneArtifactAxisProgram, robot:AssemblyRobot, session:SimSession, virtualDevice:Bool = false) {
+  public function new(authored:SceneArtifactAxisProgram, robot:AssemblyRobot, session:SimSession,
+      virtualDevice:Bool = false, ?cellInput:String->Null<EventValue>) {
     this.authored = authored; this.robot = robot; this.session = session;
+    this.cellInput = cellInput;
     tolerance = authored.positionTolerance == null ? 1e-5 : authored.positionTolerance;
     // Two deterministic time-sync replies establish the board's host clock mapping.
     synchronizationDelay = virtualDevice ? 0.15 : 0.0;
@@ -68,7 +72,8 @@ class MachineProgramPlayer implements SessionMember {
   }
 
   function newMotion():ManipulatorMotion
-    return new ManipulatorMotion(robot.robot, compiler, _ -> null, () -> robot.runtime.pollEvents(), indices,
+    return new ManipulatorMotion(robot.robot, compiler,
+      channel -> cellInput == null ? null : cellInput(channel), () -> robot.runtime.pollEvents(), indices,
       [for (_ in indices) tolerance]);
 
   public function feed():Void {

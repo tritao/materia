@@ -438,7 +438,8 @@ class MateriaProjectRunner {
       metresPerUnit: scale, physical: {metresPerUnit: scale, parts: physicalParts},
       recipeDocument: artifact.recipeDocument, recipeDiagnostics: artifact.recipeDiagnostics,
       cncJob: machiningJob(artifact, records, scale), mobileBase: artifact.mobileBase, mission: artifact.mission,
-      robotTools: artifact.robotTools, robotSensors: artifact.robotSensors, machineMotion: artifact.machineMotion};
+      robotTools: artifact.robotTools, robotSensors: artifact.robotSensors, machineMotion: artifact.machineMotion,
+      controllers: artifact.controllers, signals: artifact.signals};
   }
 
   /**
@@ -470,7 +471,8 @@ class MateriaProjectRunner {
       tools: [for (tool in machining.tools) Tool.shaped(tool.number, tool.length, CutterProfile.decode(tool.profile))],
       stock: stock, stockMesh: stockMesh, target: target == null ? null : partMesh(target),
       toolPart: machining.toolPart, loadedTool: machining.loadedTool, controller: machining.controller,
-      powerUpOffsets: machining.powerUpOffsets, powerUpSideOffsets: machining.powerUpSideOffsets};
+      controllerId: machining.controllerId, powerUpOffsets: machining.powerUpOffsets,
+      powerUpSideOffsets: machining.powerUpSideOffsets};
   }
 
   /** An artifact part's triangles, with vertices at the same place welded into one. */
@@ -542,7 +544,8 @@ class MateriaProjectRunner {
       recipeDocument: generated.recipeDocument, recipeDiagnostics: generated.recipeDiagnostics,
       robotMotions: generated.robotMotions, cncJob: generated.cncJob,
       mobileBase: generated.mobileBase, mission: generated.mission, robotTools: generated.robotTools,
-      robotSensors: generated.robotSensors, machineMotion: generated.machineMotion};
+      robotSensors: generated.robotSensors, machineMotion: generated.machineMotion,
+      controllers: generated.controllers, signals: generated.signals};
   }
 
   static function addOccurrenceRecord(records:Array<SceneObjectData>, component:SceneArtifactPart,
@@ -674,4 +677,6 @@ typedef GeneratedAssemblyScene = {
   /** The sensors on the assembly's robot, as its parts declare them. */
   @:optional var robotSensors:Array<materia.project.SceneArtifact.SceneArtifactRobotSensor>;
   @:optional var machineMotion:materia.project.SceneArtifact.SceneArtifactMachineMotion;
+  @:optional var controllers:Array<materia.project.SceneArtifact.SceneArtifactCellController>;
+  @:optional var signals:Array<materia.project.SceneArtifact.SceneArtifactCellSignal>;
 }

@@ -41,6 +41,7 @@ import robotkit.model.SteadyLoads;
 import robotkit.execution.TrajectorySegment;
 import robotkit.execution.ProcessTimedEvent;
 import robotkit.execution.ProcessEventValue;
+import motionkit.event.EventValue;
 import robotkit.execution.ExecutionPlanSubmission;
 import robotkit.device.DeviceBinding;
 import robotkit.device.DeviceLayout;
@@ -2035,7 +2036,9 @@ class ProjectSourceTests {
     session.openGeneratedScene(generated.objects, manifest,
       generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
       generated.localCentersByDefinition, generated.metresPerUnit, generated.physical,
-      generated.recipeDocument, generated.robotMotions, null, generated.cncJob);
+      generated.recipeDocument, generated.robotMotions, null, generated.cncJob,
+      generated.mobileBase, generated.mission, generated.robotTools, generated.robotSensors,
+      generated.machineMotion, generated.controllers, generated.signals);
     simulation.setBackend(ApplicationSimulation.MUJOCO);
     try {
       check(simulation.rebuild(session.sensors, session.scene, session), "mill builds: " + simulation.error);
@@ -2092,6 +2095,8 @@ class ProjectSourceTests {
   static function checkEnclosedMillProject(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/bench-mill/materia.enclosed.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
+    check(generated.controllers != null && generated.controllers.length == 1 &&
+      generated.controllers[0].id == "cncController", "enclosed mill exports its wired CNC controller");
     var definition = requiredAssemblyDefinition(generated.assemblyDefinition);
     var model = AssemblySimulationBridge.toRobotModel(definition, generated.physical).model;
     var doorActuator:Null<Actuator> = null;
@@ -2119,7 +2124,9 @@ class ProjectSourceTests {
     session.openGeneratedScene(generated.objects, manifest,
       generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
       generated.localCentersByDefinition, generated.metresPerUnit, generated.physical,
-      generated.recipeDocument, generated.robotMotions, null, generated.cncJob);
+      generated.recipeDocument, generated.robotMotions, null, generated.cncJob,
+      generated.mobileBase, generated.mission, generated.robotTools, generated.robotSensors,
+      generated.machineMotion, generated.controllers, generated.signals);
     simulation.setBackend(ApplicationSimulation.MUJOCO);
     try {
       check(simulation.rebuild(session.sensors, session.scene, session),
@@ -2146,6 +2153,78 @@ class ProjectSourceTests {
     simulation.dispose();
     session.dispose();
     Sys.println('enclosed mill project: ${generated.objects.length} objects, five mechanical slides');
+  }
+
+  /** One cell assembly produces independent CNC and cobot runtimes. */
+  static function checkTendingControllers(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/machine-tending/materia.controllers.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    check(generated.controllers != null && generated.controllers.length == 2 &&
+      generated.signals != null && generated.signals.length == 2,
+      "tending cell exports two wired controllers and two signal links");
+    var wires = generated.signals;
+    if (wires == null) throw "Tending cell lost its signal wires";
+    var first = wires[0], output = false, published = false, now = 0.0;
+    var bus = new CellSignals(wires, () -> now,
+      (controller, channel) -> channel == first.name && output,
+      (controller, channel, on, sequence, stamp) -> {
+        if (channel == first.name) published = on;
+      });
+    bus.feed();
+    var initial = bus.input(first.to.controller, first.name);
+    check(initial != null && switch initial {case Digital(on): !on; case _: false;},
+      "the receiving controller starts with the output low");
+    output = true;
+    var sameTick = bus.input(first.to.controller, first.name);
+    check(sameTick != null && switch sameTick {case Digital(on): !on; case _: false;},
+      "an output change is not visible in its own controller tick");
+    now = 0.01;
+    bus.feed();
+    var nextTick = bus.input(first.to.controller, first.name);
+    check(nextTick != null && switch nextTick {case Digital(on): on; case _: false;} && published,
+      "the wired digital output reaches the next controller tick and its sensor");
+    var session = new ProjectDocumentSession(null, false);
+    session.openGeneratedProject(generated, manifest);
+    var simulation = new ApplicationSimulation(new RobotWorld());
+    simulation.setBackend(ApplicationSimulation.MUJOCO);
+    try {
+      check(simulation.rebuild(session.sensors, session.scene, session),
+        "tending cell builds two runtimes: " + simulation.error);
+      var ids = simulation.simulatedRobotIds();
+      check(ids.length == 2, "tending cell has two simulated robots");
+      var joints = new Map<String, String>();
+      for (id in ids) {
+        var robot = simulation.world.robot(id);
+        if (robot == null) throw 'Missing simulated robot "$id"';
+        for (jointId in robot.description().joints) {
+          check(!joints.exists(jointId), 'Joint "$jointId" belongs to two runtimes');
+          joints.set(jointId, id);
+        }
+      }
+      check(joints.get("mill/mill/x") == "assembly:tending-controllers:mill/cncController" &&
+        joints.get("arm/j1") == "assembly:tending-controllers:robotController",
+        "CNC and arm joints follow their wired controllers");
+      simulation.step();
+      check(simulation.simulatedRobotIds().length == 2, "both robots advance one shared MuJoCo world");
+      check(simulation.environmentObject("project:floorMarker") != null &&
+        simulation.environmentObject("project:mill/mill/base") == null &&
+        simulation.environmentObject("project:arm/baseFlange") == null,
+        "uncontrolled parts are environment while both machine roots remain with their robots");
+      var target = simulation.world.robot("assembly:tending-controllers:" + first.to.controller);
+      if (target == null) throw "Tending signal has no target runtime";
+      var frames = target.snapshot().sensors;
+      var received = false;
+      for (index in 0...frames.length) {
+        var frame = frames.get(index);
+        if (frame.sensorId == first.name && frame.values.length == 1 && frame.values.get(0) == 0.0)
+          received = true;
+      }
+      check(received, "the other controller receives a digital sensor frame on the shared tick");
+      Sys.println('tending controllers: ${ids.length} robots, ${[for (_ in joints.keys()) _].length} disjoint joints');
+    } catch (error:Dynamic) {
+      simulation.dispose(); session.dispose(); throw error;
+    }
+    simulation.dispose(); session.dispose();
   }
 
   /** Run the assembled cylinders' real pressure and flow limits in MuJoCo. */
@@ -3035,6 +3114,10 @@ class ProjectSourceTests {
       checkEnclosedMillProject(root);
       return 0;
     }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "cell") {
+      checkTendingControllers(root);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "pneumatic") {
       checkEnclosedMillProject(root);
       return 0;
@@ -3391,6 +3474,7 @@ class ProjectSourceTests {
     checkBenchMill(root);
     checkEnclosedMillProject(root);
     checkVirtualRouterHoming(root);
+    checkTendingControllers(root);
     checkCncRouter(root);
     checkBeltRouter(root);
     checkCoreXyPlotter(root);
