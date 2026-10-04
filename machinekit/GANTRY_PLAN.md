@@ -1300,3 +1300,12 @@ G11/G12 work. G10 source implementation now includes parts, assembly records,
 geometry-derived trips, bridge lowering, Gantry placement and ordinary simulation
 publication. All compilation, geometry, codec round trips, end-stop checks and
 simulation outcomes remain unverified because tests/builds are stopped.
+
+
+G10 source review also found an existing native-slot limit applied to all
+RobotModel sensors. Count only native sensor kinds for RK_MAX_SENSORS: external
+switch/tool frames do not occupy that eight-slot native array. Blueprint native
+lowering already filters external kinds, so this aligns compiler validation
+with the actual boundary. The dual-Y gantry's twelve switch frames can coexist
+with native defaults and tool feedback without changing the native ABI. This
+correction has not been compiled or tested.

@@ -571,7 +571,10 @@ class RobotRuntimeCompiler {
       diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_VALUES", "sensors", "sensors report more values together than a state holds"));
     var sensorIds = new Map<String, Bool>();
     var sensorNames = new Map<String, Bool>();
-    if (robot.sensors.length > RobotKitRuntimeConstants.RK_MAX_SENSORS)
+    var nativeSensorCount = 0;
+    for (sensor in robot.sensors) if (sensor != null && RobotRuntimeSensorBlueprint.isNativeKind(sensor.kind))
+      nativeSensorCount++;
+    if (nativeSensorCount > RobotKitRuntimeConstants.RK_MAX_SENSORS)
       diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_LIMIT", "sensors", "too many sensors"));
     for (index in 0...robot.sensors.length) {
       var sensor = robot.sensors[index];
