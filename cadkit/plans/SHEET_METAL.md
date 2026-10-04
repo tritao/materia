@@ -230,6 +230,17 @@ table in `tools/README.md`.
   The thickness parameter owns T; a material snapshot owns its identity, explicit rule and
   optional mechanical data. The new `sheet-base` record is additive to document version 11;
   no existing record shape changes. Project material-library integration remains SM6.
+- SM3d fixes flange-position semantics explicitly: `MaterialInside` keeps the virtual outside
+  sharp corner at the picked boundary (parent tangent shifts inward by OSSB), `MaterialOutside`
+  keeps the virtual inside sharp corner there (shift inward by R·tan(|angle|/2)), `BendOutside`
+  keeps the parent tangent itself there, and `Offset` moves that tangent by an explicit signed
+  distance, positive outward. Sharp alignments are refused above 179 degrees. These are derived
+  from the two intersecting sheet surfaces, for either bend direction, rather than copied code;
+  see the [published flange-alignment vocabulary](https://cad.onshape.com/help/Content/PartStudio/sheet_metal_flange.htm).
+  `WallOutlineEditor` intersects neighbouring lines/circles analytically and retains segment
+  identities; parallel neighbours, absent circle intersections and tied branches are diagnosed.
+  `SheetFlange` edits an isolated graph. Wall edits remap existing bend attachments by authored
+  identity and restore wall and bend records together if validation fails.
 - Sheet features consume only the previous sheet feature's `Sheet`. A general solid feature
   (boolean, fillet...) after a sheet feature produces a plain solid: downstream code that needs
   a flat pattern must point at a sheet feature or convert (SM-D7). This keeps one owner per fact.
@@ -755,7 +766,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM0 | done: clean branch on 38601ac61, pins verified, prerequisite documents read; quick gate `sm0-setup` passes (ProjectKit 138, ManufacturingKit 54) | c70c89745 |
 | SM1 | done: exact line/arc regions, permanent graph ids, edits/cuts/rips, bidirectional FK, neutral-length conservation, closure and P1–P5 bounds; quick gate `sm1-core` passes (2102 sheet assertions) | 0713c4e0c; 54b5cab15 |
 | SM2 | done: named wall extrusions and bend revolutions fused for flat/folded/partial states; P1–P5 validity, single bodies, volumes, axes and stable names; quick gate `sm2-solid` passes (3757 sheet assertions) | 7a3836d8c |
-| SM3 | in progress: SM3a atomic graph publication; SM3b exact sketch-backed base, side A/B, stock codec and named thickness builder; quick gates `sm3a-staging` (3773) and `sm3b-base` (3813 sheet assertions); SM3c authored segment names and exact face-to-graph picks; quick gate `sm3c-edges` (3843 sheet assertions); flange/hem/cut/rip and P1–P5 document acceptance remain | 535ebc547; 08afd7a32; bb3405a64; edge identity sub-step commit |
+| SM3 | in progress: SM3a atomic graph publication; SM3b exact sketch-backed base, side A/B, stock codec and named thickness builder; quick gates `sm3a-staging` (3773) and `sm3b-base` (3813 sheet assertions); SM3c authored segment names and exact face-to-graph picks; quick gate `sm3c-edges` (3843 sheet assertions); SM3d exact flange geometry and alignment; quick gate `sm3d-flange-geometry` (3880 sheet assertions); flange features/options, hem/cut/rip and P1–P5 document acceptance remain | 535ebc547; 08afd7a32; bb3405a64; 84a51f00d; geometry sub-step commit |
 | SM4 | planned | |
 | SM4b | planned | |
 | SM5 | planned | |

@@ -81,15 +81,31 @@ class Sheet {
 		var result = new Wall(id, outline);
 		var index = wallData.indexOf(previous);
 		wallData[index] = result;
+		var previousBends = bendData.copy();
 		try {
-			for (b in bendData)
-				if (b.wallA == id || b.wallB == id)
-					validateBend(b);
+			for (i in 0...bendData.length) {
+				var b = bendData[i];
+				if (b.wallA != id && b.wallB != id) continue;
+				var a = b.wallA == id ? remappedEdge(previous.outline, outline, b.edgeA, b.id) : b.edgeA;
+				var c = b.wallB == id ? remappedEdge(previous.outline, outline, b.edgeB, b.id) : b.edgeB;
+				var replacement = new Bend(b.id, b.wallA, a, b.wallB, c, b.angle, b.radius);
+				validateBend(replacement);
+				bendData[i] = replacement;
+			}
 		} catch (error:Dynamic) {
 			wallData[index] = previous;
+			for (i in 0...previousBends.length) bendData[i] = previousBends[i];
 			throw error;
 		}
 		return result;
+	}
+	static function remappedEdge(previous:WallOutline, next:WallOutline, edge:WallEdge, bend:Int):WallEdge {
+		var identity = previous.identity(edge.loop, edge.segment);
+		var identities = next.identities();
+		for (i in 0...identities.length)
+			for (j in 0...identities[i].length)
+				if (identities[i][j] == identity) return new WallEdge(j, i);
+		throw new SheetDiagnosis("sheet.bend-edge-removed", "Wall edit removed an edge belonging to a bend", ["bend:" + bend, identity]);
 	}
 	public function updateBend(id:Int, angle:Float, radius:Float):Bend {
 		var previous = bend(id);
