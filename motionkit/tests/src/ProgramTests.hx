@@ -698,9 +698,12 @@ class ProgramTests extends MotionKitTestSupport {
     check(paced.isStopped() && delivered[0].isClosed() && delivered[1].isClosed(),
       "disposing a waiting planner stops its worker and disposes its plans");
 
-    // Shutting down cancels every planner and waits for its worker, so that none is planning when the process exits.
-    var running = new ProgramPlanner(compiler, program, start, Int64.ofInt(500), 0, 1.0, 1e9);
+    // Keep both workers waiting on bounded lookahead before checking their registration.
+    // An unbounded worker may finish before active() is observed.
+    var running = new ProgramPlanner(compiler, program, start, Int64.ofInt(500), 0, 1.0, 1e-6);
     var waiting = new ProgramPlanner(compiler, program, start, Int64.ofInt(600), 0, 1.0, 1e-6);
+    running.waitForMore();
+    waiting.waitForMore();
     check(ProgramPlanner.active() >= 2, "planners with a worker still going are counted");
     check(ProgramPlanner.shutdown() == 0 && ProgramPlanner.active() == 0 && running.isStopped() && waiting.isStopped(),
       "a shutdown stops every worker and waits for them");
