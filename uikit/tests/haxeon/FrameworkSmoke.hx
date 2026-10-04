@@ -594,6 +594,7 @@ class FrameworkSmoke {
 			return 30;
 		if (!commandHistoryValid(context))
 			return 230;
+		if (!scrollbarVisibilityValid(context)) throw "scrollbar visibility regression";
 		if (!smoothScrollValid(context)) throw "smooth scrolling motion or lifetime regression";
 		if (!sidebarValid(context)) throw "sidebar registry, persistence or lazy provider regression";
 		if (!dockWorkspaceValid(context))
@@ -4706,6 +4707,80 @@ class FrameworkSmoke {
 		return true;
 	}
 
+	static function scrollbarAlpha(root:RenderNode):Float {
+		var color = root.children[1].children[0].layout.style.background;
+		return color == null ? -1.0 : color.alpha;
+	}
+
+	static function scrollbarVisibilityValid(context:UiContext):Bool {
+		var clock = new AnimationScheduler();
+		var visibility = new nativekit.ui.widgets.scroll.ScrollbarVisibilityController();
+		visibility.attach(clock, function() {}); visibility.setAvailable(true);
+		if (visibility.opacity != 0) return false;
+		visibility.reveal(); clock.advance(0.49);
+		if (visibility.opacity != 1) return false;
+		clock.advance(0.11);
+		if (visibility.opacity < 0.49 || visibility.opacity > 0.51) return false;
+		visibility.setHovered(true); clock.advance(1);
+		if (visibility.opacity != 1 || clock.activeCount != 0) return false;
+		visibility.setDragging(true); visibility.setHovered(false); clock.advance(1);
+		if (visibility.opacity != 1 || clock.activeCount != 0) return false;
+		visibility.setDragging(false); clock.advance(0.71);
+		if (visibility.opacity != 0 || clock.activeCount != 0) return false;
+		visibility.configure(nativekit.ui.widgets.scroll.ScrollbarVisibility.Auto, true);
+		visibility.reveal(); clock.advance(0.49);
+		if (visibility.opacity != 1) return false;
+		clock.advance(0.02); if (visibility.opacity != 0) return false;
+		visibility.configure(nativekit.ui.widgets.scroll.ScrollbarVisibility.Always, false);
+		if (visibility.opacity != 1 || clock.activeCount != 0) return false;
+		visibility.configure(nativekit.ui.widgets.scroll.ScrollbarVisibility.Hidden, false);
+		visibility.setHovered(true); if (visibility.opacity != 0) return false;
+		visibility.setHovered(false);
+		visibility.configure(nativekit.ui.widgets.scroll.ScrollbarVisibility.Auto, false);
+		visibility.reveal(); visibility.dispose(); if (clock.activeCount != 0) return false;
+
+		var oldPolicy = context.buildContext.environment.scrollbarVisibility;
+		context.buildContext.environment.scrollbarVisibility = nativekit.ui.widgets.scroll.ScrollbarVisibility.Auto;
+		var style = new LayoutStyle(); style.width = LayoutAxis.fixed(180); style.height = LayoutAxis.fixed(80);
+		var content = new LayoutStyle(); content.width = LayoutAxis.fixed(180); content.height = LayoutAxis.fixed(600);
+		var frame = new LayoutFrame(180, 80); frame.deltaSeconds = 0;
+		var controller = new ScrollController();
+		var view = new ScrollView("visibility-regression", new Column("content", [], content), style, ScrollAxis.Vertical, controller);
+		var root = context.submit(view, frame);
+		var paintRevision = root.children[1].children[0].contentRevision;
+		if (scrollbarAlpha(root) != 0 || root.children[1].children[0].hitTestSelf) return false;
+		var track:ResolvedLayoutItem = cast root.children[1].resolved;
+		context.pointerMove(track.x + 5, track.y + 50);
+		root = context.submit(view, frame);
+		if (scrollbarAlpha(root) != 1 || controller.offsetY != 0 || controller.viewportWidth != 180
+			|| root.children[1].children[0].contentRevision <= paintRevision) return false;
+		paintRevision = root.children[1].children[0].contentRevision;
+		context.pointerMove(20, 20);
+		frame.deltaSeconds = 0.49; root = context.submit(view, frame);
+		if (scrollbarAlpha(root) != 1) return false;
+		frame.deltaSeconds = 0.11; root = context.submit(view, frame);
+		if (scrollbarAlpha(root) <= 0 || scrollbarAlpha(root) >= 1
+			|| root.children[1].children[0].contentRevision <= paintRevision) return false;
+		frame.deltaSeconds = 0.11; root = context.submit(view, frame);
+		if (scrollbarAlpha(root) != 0) return false;
+		frame.deltaSeconds = 0;
+		context.scroll(20, 20, 0, 40); root = context.submit(view, frame);
+		if (scrollbarAlpha(root) != 1 || controller.offsetY != 40) return false;
+		context.buildContext.environment.scrollbarVisibility = nativekit.ui.widgets.scroll.ScrollbarVisibility.Hidden;
+		root = context.submit(view, frame);
+		if (root.children.length != 1 || controller.offsetY != 40 || context.animations.activeCount != 0) return false;
+		context.buildContext.environment.scrollbarVisibility = nativekit.ui.widgets.scroll.ScrollbarVisibility.Always;
+		root = context.submit(view, frame); root = context.submit(view, frame);
+		if (scrollbarAlpha(root) != 1) return false;
+		context.buildContext.environment.scrollbarVisibility = nativekit.ui.widgets.scroll.ScrollbarVisibility.Auto;
+		context.pointerMove(track.x + 5, track.y + 50);
+		root = context.submit(view, frame);
+		context.pointerMove(20, 20);
+		context.submit(new Text("unmounted"), frame);
+		context.buildContext.environment.scrollbarVisibility = oldPolicy;
+		return context.animations.activeCount == 0;
+	}
+
 	static function smoothScrollValid(context:UiContext):Bool {
 		var motion = new ScrollController(); motion.configureAnimation(true);
 		motion.scrollBy(0, 100); motion.advance(1.0 / 60.0);
@@ -4732,7 +4807,7 @@ class FrameworkSmoke {
 		var mounted = new ScrollController(); mounted.configureAnimation(true);
 		context.submit(new ScrollView("smooth-lifetime", new Column("content", [], content), style, ScrollAxis.Vertical, mounted), frame);
 		context.scroll(20, 20, 0, 100);
-		if (mounted.offsetY != 0 || context.animations.activeCount != 1) return false;
+		if (mounted.offsetY != 0 || context.animations.activeCount != 2) return false;
 		frame.deltaSeconds = 1.0 / 60.0;
 		context.submit(new ScrollView("smooth-lifetime", new Column("content", [], content), style, ScrollAxis.Vertical, mounted), frame);
 		if (mounted.offsetY <= 40 || mounted.offsetY >= 100) return false;
@@ -4741,7 +4816,7 @@ class FrameworkSmoke {
 		context.submit(new ScrollView("smooth-lifetime", new Column("content", [], content), style, ScrollAxis.Vertical, replacement), frame);
 		if (context.animations.activeCount != 0) return false;
 		replacement.scrollBy(0, 100);
-		if (context.animations.activeCount != 1) return false;
+		if (context.animations.activeCount != 2) return false;
 		// Moving a supplied controller creates the new mount before retiring the old one.
 		context.submit(new ScrollView("smooth-moved", new Column("content", [], content), style, ScrollAxis.Vertical, replacement), frame);
 		if (context.animations.activeCount != 1) throw "old scroll mount detached replacement binding";

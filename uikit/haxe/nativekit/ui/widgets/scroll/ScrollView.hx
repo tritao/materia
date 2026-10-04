@@ -1,5 +1,6 @@
 package nativekit.ui.widgets.scroll;
 
+import Color;
 import LayoutAxis;
 import LayoutPositioning;
 import LayoutStyle;
@@ -31,6 +32,8 @@ class ScrollView implements View {
 	public var onScroll:UiEvent->Void;
 	/** Shows an interactive overlay scrollbar when vertical content overflows. */
 	public var showScrollbar:Bool;
+	/** Null inherits the application environment policy. */
+	public var scrollbarVisibility:Null<Int> = null;
 
 	public function new(key:String, child:View, ?style:LayoutStyle,
 			axis:Int = ScrollAxis.Vertical, ?controller:ScrollController) {
@@ -74,7 +77,14 @@ class ScrollView implements View {
 			// frame but not a rebuild: bumping the state revision here would invalidate every cached subtree around it.
 			var binding = context.resourceState(context.id("controller-binding"), function() return new ScrollBinding(),
 				function(value) value.dispose());
+			var visibility = context.resourceState(context.id("scrollbar-visibility"), function() return new ScrollbarVisibilityController(), function(value) value.dispose());
+			var visibilityChanged = function() { visibility.update(visibility.value); context.commands.refresh(); };
+			visibility.value.attach(context.animations, visibilityChanged);
+			visibility.value.bindSource(controller);
+			var policy:Int = scrollbarVisibility == null ? context.environment.scrollbarVisibility : scrollbarVisibility;
+			visibility.value.configure(showScrollbar ? policy : ScrollbarVisibility.Hidden, context.environment.reducedMotion);
 			binding.value.attach(controller, context.animations, function(_) {
+				visibility.value.reveal();
 				context.commands.refresh();
 			});
 
@@ -90,8 +100,8 @@ class ScrollView implements View {
 			});
 			translatedContent.add(content);
 			viewport.add(translatedContent);
-			var scrollbar = showScrollbar && axis != ScrollAxis.Horizontal
-				? addVerticalScrollbar(context, viewport) : null;
+			var scrollbar = showScrollbar && policy != ScrollbarVisibility.Hidden && axis != ScrollAxis.Horizontal
+				? addVerticalScrollbar(context, viewport, visibility.value, visibilityChanged) : null;
 
 			translatedContent.onResolved(function(geometry) {
 				var viewportGeometry:ResolvedLayoutItem = cast viewport.resolved;
@@ -110,6 +120,7 @@ class ScrollView implements View {
 					translatedContent.layout.style.transform = nextTransform;
 					context.requestLayoutFeedback();
 				}
+				visibility.value.setAvailable(scrollbar != null && controller.maxScrollY > 0 && controller.viewportHeight > 0);
 				if (scrollbar != null && updateVerticalScrollbar(scrollbar))
 					context.requestLayoutFeedback();
 			});
@@ -120,6 +131,7 @@ class ScrollView implements View {
 					return;
 				var dx = axis == ScrollAxis.Horizontal || axis == ScrollAxis.Both ? event.deltaX : 0.0;
 				var dy = axis == ScrollAxis.Vertical || axis == ScrollAxis.Both ? event.deltaY : 0.0;
+				if (dx != 0 || dy != 0) visibility.value.reveal();
 				if (controller.scrollBy(dx, dy))
 					event.stopPropagation();
 			});
@@ -154,7 +166,7 @@ class ScrollView implements View {
 		});
 	}
 
-	function addVerticalScrollbar(context:BuildContext, viewport:RenderNode):RenderNode {
+	function addVerticalScrollbar(context:BuildContext, viewport:RenderNode, visibility:ScrollbarVisibilityController, changed:Void->Void):RenderNode {
 		var trackWidth = 10.0;
 		var inset = 2.0;
 		var trackHeight = Math.max(0.0, controller.viewportHeight - inset * 2.0);
@@ -203,12 +215,29 @@ class ScrollView implements View {
 		semantics.numericValue = controller.offsetY;
 		semantics.orientation = AccessibilityOrientation.Vertical;
 		thumb.semantics = semantics;
+		var updatePaint = function() {
+			var opacity = visibility.opacity;
+			var trackColor = context.theme.controlUnselected, thumbColor = context.theme.accent;
+			track.layout.style.background = Color.rgba(trackColor.red, trackColor.green, trackColor.blue, trackColor.alpha * opacity);
+			thumb.layout.style.background = Color.rgba(thumbColor.red, thumbColor.green, thumbColor.blue, thumbColor.alpha * opacity);
+			// Only the narrow track receives pointer input while the thumb is hidden.
+			thumb.hitTestSelf = opacity > 0;
+		};
+		visibility.attach(context.animations, function() { thumb.hitTestSelf = visibility.opacity > 0; changed(); });
+		updatePaint();
+		track.on(UiEventKind.HoverEnter, function(event) { if (event.target.equals(track.id)) visibility.setHovered(true); });
+		track.on(UiEventKind.HoverLeave, function(event) { if (event.target.equals(track.id)) visibility.setHovered(false); });
+		thumb.on(UiEventKind.Focus, function(_) visibility.setFocused(true));
+		thumb.on(UiEventKind.Blur, function(_) visibility.setFocused(false));
+		thumb.on(UiEventKind.FocusLost, function(_) visibility.setFocused(false));
 		var dragState:State<ScrollbarDragState> = context.state(thumbId,
 			new ScrollbarDragState());
 		thumb.on(UiEventKind.PointerDown, function(event) {
 			if (event.button != 0)
 				return;
 			dragState.value.dragging = true;
+			visibility.setFocused(false);
+			visibility.setDragging(true);
 			dragState.value.pointerY = event.y;
 			dragState.value.offsetY = controller.offsetY;
 			dragState.update(dragState.value);
@@ -229,6 +258,7 @@ class ScrollView implements View {
 			if (!dragState.value.dragging)
 				return;
 			dragState.value.dragging = false;
+			visibility.setDragging(false);
 			dragState.update(dragState.value);
 			event.releasePointer();
 			event.preventDefault();
@@ -246,6 +276,7 @@ class ScrollView implements View {
 		track.on(UiEventKind.PointerDown, function(event) {
 			if (event.button != 0 || track.resolved == null)
 				return;
+			visibility.reveal();
 			var thumbHeight = thumb.layout.style.height.value;
 			var travel = Math.max(0.0, track.layout.style.height.value - thumbHeight);
 			var geometry:ResolvedLayoutItem = cast track.resolved;

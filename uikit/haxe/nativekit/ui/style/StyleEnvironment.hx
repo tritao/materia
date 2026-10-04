@@ -23,6 +23,8 @@ class StyleEnvironment {
 	public var textScale(get, set):Float;
 	var reducedMotionValue:Bool;
 	public var reducedMotion(get, set):Bool;
+	var scrollbarVisibilityValue:Int = nativekit.ui.widgets.scroll.ScrollbarVisibility.Auto;
+	public var scrollbarVisibility(get, set):Int;
 	var highContrastValue:Bool;
 	public var highContrast(get, set):Bool;
 	public var revision(default, null):Int;
@@ -116,6 +118,13 @@ class StyleEnvironment {
 			textScaleValue = value;
 			revision++;
 		}
+		return value;
+	}
+
+	function get_scrollbarVisibility():Int return scrollbarVisibilityValue;
+	function set_scrollbarVisibility(value:Int):Int {
+		if (value < 0 || value > 2) throw "Invalid scrollbar visibility";
+		if (scrollbarVisibilityValue != value) { scrollbarVisibilityValue = value; revision++; }
 		return value;
 	}
 
