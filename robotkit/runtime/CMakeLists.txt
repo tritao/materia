@@ -12,6 +12,7 @@ if(RK_BUILD_VIRTUAL_DEVICE)
             ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/boards/welder_retrofit.rs
             ${CMAKE_CURRENT_SOURCE_DIR}/../../processkit/schema/weld_contract.rs
             ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/src/scheduled_core.rs
+            ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/src/device_events.rs
             ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/src/virtual_board.rs
         VERBATIM)
     add_custom_target(robotkit_device_virtual_build DEPENDS ${RK_VIRTUAL_LIB})
