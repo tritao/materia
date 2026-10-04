@@ -38,6 +38,7 @@ class ApplicationSimulation {
   public final world:RobotWorld;
   /** Supply selection belongs to the cell, while its authored mission stays unchanged. */
   public var virtualWelder:Bool = false;
+  var virtualDevicePrepared:Bool = false;
   public var welderSupplyFactory:Null<processkit.simulation.SimulatedWelder -> processkit.simulation.SimulationWelderSupply> = null;
   public var appliedRevision(default, null):Int = 0;
   public var appliedDocumentRevision(default, null):Int = -1;
@@ -298,6 +299,7 @@ class ApplicationSimulation {
       for (participant in participants) participant.join(createdSpace.session);
       pumpStamp = -1.0;
       simulation = candidate;
+      virtualDevicePrepared = false;
       space = candidateSpace;
       simulatedIds = [for (robot in candidateRobots) robot.id()];
       simulatedLinks = candidateLinks;
@@ -387,7 +389,7 @@ class ApplicationSimulation {
     active.session.stop();
     // Members stop what they run while the robots' runtimes still answer; the session's reset starts them over.
     for (member in members) member.beforeReset();
-    active.session.reset(); running = false; presentAssemblyPhysics = false;
+    active.session.reset(); virtualDevicePrepared = false; running = false; presentAssemblyPhysics = false;
     pumpStamp = -1.0;
     // The session's own reset has restored its objects and actors; what lives beside it follows.
     for (member in members) member.reset();
@@ -455,7 +457,12 @@ class ApplicationSimulation {
   }
 
   function feedMembers():Void {
-    for (member in members) member.feed();
+    if (virtualWelder && !virtualDevicePrepared && simulation != null && tools != null && tools.welders.length > 0)
+      virtualDevicePrepared = simulation.virtualDeviceReady(tools.welders[0].robotIndex);
+    for (member in members) {
+      if (virtualWelder && !virtualDevicePrepared && member == mission) continue;
+      member.feed();
+    }
   }
 
   /** Publishes every member's current state to the scene, once per presented frame. */
