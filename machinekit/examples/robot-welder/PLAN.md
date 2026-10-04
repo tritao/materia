@@ -817,6 +817,59 @@ W6 implementation notes (started after W5 main sync, 2026-10-04):
   The Modbus CAD-mission harness, cross-backend stop/abort/fault/link-loss mission checks, final W6 app gate and main
   sync remain open. Local main remains `757127cf01605ef843a7e24c22b74a0ee13e6c61` (W5).
 
+### W6 resumed: host hooks implemented; latest-main regression blocks the mission gate
+
+The user explicitly authorized the endpoint/simulation extensions after the ownership stop above.
+Local main `38601ac61c60461548899007ef9db33d476a801a` was merged as `2c5bab9ac`.
+The conflict retained both welding safety validation and main's active-actuator subset support.
+
+- Generic virtual peripheral profile parameters, numeric inputs and cached sensor observations now cross the host
+  interface. ProcessKit owns the welding profile, derives grounding from the CAD including deposited metal, and
+  publishes on the authored external sensor. Explicit external-slot routing prevents welding values from being
+  mislabeled as native encoder data. Device epochs retain increasing host publication sequences and have distinct
+  clock identifiers. STOP6 is processed before a paused simulation clock freezes, with unsent UART work discarded.
+- The arm is a servo model, so physical stepper `DeviceBinding` correctly refuses it. A virtual-only servo adapter
+  derives its observation grid from the authored encoder, gearing and speed, capped at one count per board tick.
+  It exposes the resulting joint error budget (0.000100692 rad in this cell), without editing the CAD motor or
+  claiming a physical servo deployment is implemented. The native braking bound uses the existing mission policy,
+  2 rad/s², tightened by any lower authored bound; it is not an invented motor acceleration.
+- The Rust welding profiles now use sensor indices generated from the canonical ProcessKit channel contract.
+  The app can select virtual-device or supplied Modbus feedback; that same feedback drives bead deposition.
+  A focused harness loads the unchanged single-seam CAD mission. Modbus uses a real loopback socket, an independent
+  server watchdog clock, CAD grounding, and wall-clock pacing instead of advancing motion ahead of TCP responses.
+- **Passed:** native runtime build; simulation ABI audit on Linux, Windows, Intel macOS and ARM macOS; host RKD6
+  ignition, numeric sensor metadata, stop/abort/estop, link loss, arc loss, reset, shutdown with a frozen clock, and
+  exclusion of external slots from native encoders; 13 Rust virtual/profile tests; generated contract check;
+  78 Modbus assertions plus binding/TCP/watchdog checks; 27 tool / 33 process / 152 weld / 33 clearance assertions;
+  focused app compilation. These component results do not prove the unchanged mission gate.
+- **Failed, outside W6:** the CAD mission reaches plan submission and fails at 0.03 s with
+  `plan chunk [0,4] of 26 ... Array index out of bounds`. On latest main,
+  `robotkit/core/haxe/robotkit/execution/ExecutionPlanSubmission.hx:107–108` defaults and validates
+  `controlAcceleration` against the segment count. `RobotRuntime.hx:240` reads one entry per joint. The focused
+  reproduction proves a six-joint, four-segment plan has only four control accelerations and fails with
+  `Control-acceleration defaults are sized by segments instead of joints`.
+  Reproduce with the brief's kit environment and
+  `haxeon/scripts/haxeon run --project processkit/tests/device/haxeon.json`.
+  Both default sizing and length validation need to use the joint count. These unrelated main files were not edited.
+- **Stop required:** the user requires reporting an unrelated main regression instead of repairing it in this task.
+  W6 remains incomplete. The Modbus CAD mission, cross-backend mission shutdown checks, final welder gate and
+  arm/mobile checks (shared app code changed) remain open. No MachineKit code changed in this resumed work.
+  Main was not advanced to W6 and remains `38601ac61c60461548899007ef9db33d476a801a`.
+  The merged main records haxeon `8521d494e43233d6c0433e831e1219aa24caa88d`, which is absent from this submodule's
+  local objects. The clean submodule working copy remains at `4f1ac30fec7ec8a28e9ae84e1979027387753292`; checks used
+  that existing compiler. No pins were manually changed or fetched.
+
+Resumed W6 commits (branch only):
+
+- `2c5bab9ac499cd9ee531fdc20ef3846ff8267ea8` Merge main into mobile-welder for W6 host integration
+- `3dac0dc69d4d8508e312d0221749bc3972b4cc5f` RobotKit: expose virtual peripheral profiles and numeric device observations
+- `a084f1a1406f6a0a558e225535631d7db59a7c99` ProcessKit: generate the device welding sensor layout from its channel contract
+- `71eb2bff05174acec86c47bb466a52cd8b7e9594` ProcessKit: reproduce the main plan control array length regression
+- `1f898b2ea4c323379c62aecd73a20c67828c121f` RobotKit: route external device sensors outside the native sensor layout
+- `1809a3b098519856a80143e4efa26d3c8c15bab5` RobotKit: derive virtual servo command grids from model drive data
+- `68034eb23837750bbc6ff4d2367f267209455477` ProcessKit: connect CAD welding observations to external supply backends
+- `bde03e2e139eef80bc37050397050a93b3e4f620` App: exercise an unchanged CAD weld mission through RKD6 and Modbus
+
 ### Phase 1 commit ledger at the W6 ownership stop
 
 First-parent task history, including main sync merges; W6 is unfinished.
