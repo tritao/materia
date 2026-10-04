@@ -248,6 +248,11 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
         self.stopped = true;
     }
     pub fn tick<B: Board>(&mut self, board: &mut B) {
+        self.tick_with_process(board, false);
+    }
+
+    /// Process event policy may require the link lease while motion is at rest.
+    pub fn tick_with_process<B: Board>(&mut self, board: &mut B, process_requires_link: bool) {
         if self.stopped { return; }
         let now = board.now_ticks();
         if now < self.last_device_tick { self.stop(StopReason::LinkLost); }
@@ -259,7 +264,7 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
             let last = self.segments[committed_len - 1].unwrap();
             self.path_clock < last.end_ticks() || !last.ends_at_rest
         };
-        if self.stopping.is_none() && active_motion &&
+        if self.stopping.is_none() && (active_motion || process_requires_link) &&
            now.saturating_sub(self.last_frame_tick) > self.link_loss_ticks {
             self.stop(StopReason::LinkLost);
         }

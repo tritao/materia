@@ -30,6 +30,9 @@ frames carry the fixed records specified by the schema. The session ACK reports 
 the active actuator limits, each positive and no greater than the global cap.
 It also carries the link-loss timeout in nanoseconds. The device converts that
 timeout using its own clock after the session begins.
+The lease also covers safe-on-stop process outputs away from their safe values,
+including during rest and between motion chunks. Device event policy supplies
+this requirement to the scheduled core; a completed, safe program can remain idle.
 
 Wire revision 13 adds `SENSOR6` (message 17). A `Sensor6Header` carries the session,
 device acquisition ticks, a nonzero sequence, the compiled sensor slot (0–7), and

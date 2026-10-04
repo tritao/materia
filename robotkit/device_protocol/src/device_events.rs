@@ -84,6 +84,22 @@ impl<const CAP: usize> DeviceEvents<CAP> {
     }
 
     pub fn remaining_capacity(&self) -> usize { CAP - self.len }
+    /// A safe-on-stop output away from its safe value still needs a live owner,
+    /// even after the arm reaches rest. Held channels already made safe do not.
+    pub fn requires_link(&self) -> bool {
+        if self.stopped { return false; }
+        (0..self.channel_count).any(|i| {
+            if self.keep_on_stop[i] || !self.has_fired[i] ||
+                (self.held && self.fired_policy[i] != 0) { return false; }
+            let value = self.fired[i]; let safe = self.safe[i];
+            match value.kind {
+                1 => value.digital != safe.digital,
+                2 => value.analog != safe.analog,
+                3 => value.command != safe.command || value.argument != safe.argument,
+                _ => false,
+            }
+        })
+    }
     pub fn records(&self) -> &[Option<FiredEventRecord>] {
         &self.records[..self.record_count]
     }

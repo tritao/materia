@@ -377,7 +377,7 @@ impl VirtualDevice {
             self.host_ns += step_ns;
             self.board.advance_host_ns(self.host_ns);
             if let Some(core) = self.core.as_mut() {
-                core.tick(&mut self.board);
+                core.tick_with_process(&mut self.board, self.events.as_ref().unwrap().requires_link());
                 if let Some(reason) = core.stop_reason() {
                     self.events.as_mut().unwrap().stop(&mut self.board, reason);
                     if core.is_stopped() && !self.final_safe_applied {
@@ -886,6 +886,9 @@ mod tests {
         assert_ne!(changed.config_digest, ack.config_digest);
     }
     fn welding_device(grounded: bool) -> VirtualDevice {
+        welding_device_with_duration(grounded, 1_000_000)
+    }
+    fn welding_device_with_duration(grounded: bool, duration_ticks: u64) -> VirtualDevice {
         let mut d = VirtualDevice::new(1_000_000, 40_000, 0, 0, 1,
             [1_000.0; ACTUATORS], [7; 16], 1).unwrap();
         assert!(d.configure_welder(welder::WelderConfig { sensor_slot: 0, arc_channel: 0, wire_channel: 1,
@@ -903,7 +906,7 @@ mod tests {
         let mut q = [0; QueueBegin6::SIZE]; queue.encode(&mut q).unwrap();
         assert!(send::<QueueBegin6>(&mut d, 5, &q));
         let header = Segment6Header { queue_revision: 1, plan_id: 1, t0_ticks: 0,
-            duration_ticks: 1_000_000, degree: 0, actuator_count: 1, ends_at_rest: 1, reserved: 0 };
+            duration_ticks, degree: 0, actuator_count: 1, ends_at_rest: 1, reserved: 0 };
         let row = Segment6Coefficients { actuator: 0, c0: 0.0, c1: 0.0, c2: 0.0,
             c3: 0.0, c4: 0.0, c5: 0.0 };
         let mut segment = vec![0; Segment6Header::SIZE + Segment6Coefficients::SIZE];
@@ -917,7 +920,7 @@ mod tests {
             assert!(send::<Event6>(&mut d, 16, &body));
         }
         let mut body = [0; Commit6::SIZE];
-        Commit6 { through_ticks: 1_000_000 }.encode(&mut body).unwrap();
+        Commit6 { through_ticks: duration_ticks }.encode(&mut body).unwrap();
         assert!(send::<Commit6>(&mut d, 7, &body));
         d
     }
@@ -952,6 +955,16 @@ mod tests {
         let mut d = welding_device(true); assert!(d.advance(10_000_000));
         assert!(d.set_welder_grounded(false)); assert!(d.advance(11_000_000)); assert_weld_off(&d);
         assert_eq!(d.weld_values().unwrap()[4], 2.0);
+    }
+
+    #[test]
+    fn welding_at_rest_still_requires_the_device_link_lease() {
+        let mut d = welding_device_with_duration(true, 50_000);
+        assert!(d.advance(60_000_000));
+        assert_eq!(d.weld_values().unwrap()[0], 1.0);
+        assert_eq!(d.core.as_ref().unwrap().stop_reason(), None);
+        assert!(d.advance(150_000_000)); assert_weld_off(&d);
+        assert_eq!(d.core.as_ref().unwrap().stop_reason(), Some(StopReason::LinkLost));
     }
 
     #[test]

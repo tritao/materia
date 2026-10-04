@@ -33,21 +33,26 @@ fn event_pair_follows_path_clock_across_hold_and_stop() {
     board.advance_host_ns(99_000);
     events.tick(99, &mut board);
     assert_eq!(board.digital(0), Some(false));
+    assert!(!events.requires_link());
     board.advance_host_ns(100_000);
     events.tick(100, &mut board);
     assert_eq!(board.digital(0), Some(true));
+    assert!(events.requires_link());
     events.hold(&mut board);
     assert_eq!(board.digital(0), Some(false));
+    assert!(!events.requires_link());
     board.advance_host_ns(200_000);
     events.tick(100, &mut board);
     assert_eq!(board.digital(0), Some(false));
     events.resume(&mut board);
     assert_eq!(board.digital(0), Some(true));
+    assert!(events.requires_link());
     board.advance_host_ns(299_000);
     events.tick(299, &mut board);
     assert_eq!(board.digital(0), Some(true));
     board.advance_host_ns(300_000);
     events.tick(300, &mut board);
+    assert!(!events.requires_link());
     assert_eq!(board.digital(0), Some(false));
     let fired: Vec<_> = board.records().iter().filter(|r|
         matches!(r.output, Output::Digital(_, _))).collect();
@@ -88,6 +93,7 @@ fn a_kept_channel_holds_through_a_commanded_stop_but_not_an_emergency_stop() {
         events.commit(200);
         events.tick(100, &mut board);
         assert_eq!(board.digital(0), Some(true));
+        assert!(!events.requires_link());
         events.stop(&mut board, reason);
         assert_eq!(board.digital(0), Some(held), "{reason:?}");
     }

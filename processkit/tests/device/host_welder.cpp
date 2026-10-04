@@ -41,7 +41,8 @@ static void run(int stop) {
     plan.plan_id = 1; plan.sequence = 1; plan.ends_at_rest = 1;
     plan.segments.segments.resize(1);
     auto &segment = plan.segments.segments[0];
-    segment.duration_ns = 2'000'000'000; segment.degree = 1; segment.joint_count = 1;
+    // Link loss must also safe an arc whose ignition dwell has already ended at rest.
+    segment.duration_ns = stop == 0 ? 50'000'000 : 2'000'000'000; segment.degree = 1; segment.joint_count = 1;
     plan.events.resize(3);
     for (int i = 0; i < 3; ++i) {
         std::strcpy(plan.events[i].channel, names[i]);
@@ -65,7 +66,7 @@ static void run(int stop) {
     for (uint64_t now = 360'000'000; now <= 1'200'000'000; now += 10'000'000) endpoint->sample(now, *state);
     const auto outputs = endpoint->channel_values();
     assert(outputs[0] == 0 && outputs[1] == 0);
-    if (stop != 0) {
+    {
         assert(endpoint->sensor_sample(0, sample, values)); assert(values[0] == 0);
         if (stop == -1) assert(values[4] == 2);
     }

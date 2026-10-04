@@ -85,6 +85,31 @@ fn hold_resume_respects_acceleration() {
 }
 
 #[test]
+fn active_process_link_lease_expires_without_motion() {
+    let mut core = ScheduledCore::<1, 4>::new(1_000, [2.0], [-10.0], [10.0], 500);
+    let mut board = TestBoard::default();
+    core.note_host_frame(0);
+    board.tick = 500; core.tick_with_process(&mut board, true);
+    assert_eq!(core.stop_reason(), None);
+    board.tick = 501; core.tick_with_process(&mut board, true);
+    assert_eq!(core.stop_reason(), Some(StopReason::LinkLost));
+    assert!(board.stopped);
+}
+
+#[test]
+fn completed_rest_segment_does_not_disable_link_lease() {
+    let mut core = ScheduledCore::<1, 4>::new(1_000, [2.0], [-10.0], [10.0], 500);
+    let mut board = TestBoard::default();
+    core.queue_begin(1, 0).unwrap();
+    let dwell = ScheduledSegment::new(1, 0, 100, 0, [[0.0; 6]], true).unwrap();
+    core.push_segment(dwell).unwrap(); core.commit(100).unwrap();
+    board.tick = 100; core.tick_with_process(&mut board, true);
+    assert_eq!(core.stop_reason(), None);
+    board.tick = 501; core.tick_with_process(&mut board, true);
+    assert_eq!(core.stop_reason(), Some(StopReason::LinkLost));
+}
+
+#[test]
 fn continuation_underflows_but_declared_rest_does_not() {
     let mut board = TestBoard::default();
     let mut continuation = ScheduledCore::<1, 4>::new(1_000, [2.0], [-10.0], [10.0], 5_000);
