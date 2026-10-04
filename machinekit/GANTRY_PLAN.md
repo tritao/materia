@@ -1544,3 +1544,24 @@ its frame publications. Releasing inputs permits an explicit reset but does
 not automatically clear the latched fault. Device input reporting remains G13
 work. No tests or project builds ran; only FFI source generation was performed.
 Calibration, homing commands and application startup remain pending.
+
+
+### G11 — native coordinate translation at the endpoint boundary
+
+Limit fault enforcement: `fc03334aa`. Add native atomic coordinate calibration
+for owner-driven endpoints: logical position = endpoint position + per-joint
+zero. Require an empty mailbox/trajectory, no stop ramp, observed rest and
+positional held targets; reject safety faults, nonfinite rebases and zeros
+inconsistent with every coupling's linear terms. Rebase observed/commanded
+positions, held targets and controller references together under owner, queue
+and state locks. Plan coefficients and limits stay in logical coordinates.
+Before endpoint apply, translate positional outputs back into endpoint
+coordinates; translate sampled observations into logical coordinates before
+limit/following-error checks. Reset loses coordinate zeros and home latches.
+
+This C++ operation is not yet exposed through C/Haxe or invoked by the homing
+driver. Device-owned polynomial queues explicitly return unsupported pending
+G13 transport calibration. Simulation switch sensing must keep reading actual
+endpoint coordinates after calibration rather than calibrated logical values;
+that wiring remains pending alongside latch and startup integration. No tests
+or builds ran; coordinate behavior is unverified.

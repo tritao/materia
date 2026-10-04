@@ -522,6 +522,52 @@ rk_result RobotRuntime::submit_segments(const rk_robot_command &command, Segment
     }
 }
 
+rk_result RobotRuntime::calibrate_coordinates(const double *offsets, uint32_t count) {
+    if (!offsets || count != blueprint_.joint_count) return RK_ERROR_INVALID_ARGUMENT;
+    std::lock_guard owner_lock(owner_mutex_);
+    std::lock_guard queue_lock(queue_mutex_);
+    std::lock_guard state_lock(state_mutex_);
+    if (endpoint_->executes_trajectory_queue()) return RK_ERROR_UNSUPPORTED;
+    if (state_.safety == RK_SAFETY_FAULT || state_.safety == RK_SAFETY_EMERGENCY_STOP)
+        return RK_ERROR_SAFETY_STOPPED;
+    if (!commands_.empty() || !trajectory_.empty() || control_.trajectory_active ||
+        control_.stop_ramp_active) return RK_ERROR_INVALID_STATE;
+    for (uint32_t joint = 0; joint < count; ++joint) {
+        if (!std::isfinite(offsets[joint])) return RK_ERROR_INVALID_ARGUMENT;
+        if (std::abs(state_.velocity[joint]) > 1e-6 ||
+            (control_.active[joint] && control_.targets[joint].mode != RK_TARGET_POSITION &&
+             control_.targets[joint].mode != RK_TARGET_SERVO)) return RK_ERROR_INVALID_STATE;
+        const double delta = offsets[joint] - coordinate_offsets_[joint];
+        if (!std::isfinite(delta) || !std::isfinite(state_.position[joint] + delta) ||
+            !std::isfinite(commanded_position_[joint] + delta) ||
+            !std::isfinite(control_.position_reference[joint] + delta) ||
+            (control_.active[joint] && !std::isfinite(control_.targets[joint].target + delta)))
+            return RK_ERROR_INVALID_ARGUMENT;
+    }
+    // A coordinate translation has no affine coupling intercept: those are
+    // already carried in both endpoint and logical coordinates by the blueprint.
+    for (uint32_t i = 0; i < blueprint_.coupling_count; ++i) {
+        const auto &term = blueprint_.couplings[i];
+        if (!internal::first_term_of_follower(blueprint_.couplings, i)) continue;
+        double expected = 0.0;
+        for (uint32_t k = 0; k < blueprint_.coupling_count; ++k)
+            if (blueprint_.couplings[k].follower == term.follower)
+                expected += blueprint_.couplings[k].ratio * offsets[blueprint_.couplings[k].leader];
+        if (!std::isfinite(expected) || std::abs(offsets[term.follower] - expected) > 1e-6)
+            return RK_ERROR_INVALID_ARGUMENT;
+    }
+    for (uint32_t joint = 0; joint < count; ++joint) {
+        const double delta = offsets[joint] - coordinate_offsets_[joint];
+        state_.position[joint] += delta;
+        commanded_position_[joint] += delta;
+        control_.position_reference[joint] += delta;
+        if (control_.active[joint]) control_.targets[joint].target += delta;
+        coordinate_offsets_[joint] = offsets[joint];
+    }
+    state_backup_valid_ = false;
+    return RK_OK;
+}
+
 rk_result RobotRuntime::limit_input(uint32_t joint, bool active) {
     std::lock_guard owner_lock(owner_mutex_);
     std::lock_guard queue_lock(queue_mutex_);
@@ -1937,7 +1983,14 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
 
     output.sequence = ++endpoint_command_sequence_;
     const bool device_executes = device_plan_cycle && output.kind == RK_COMMAND_JOINT_TARGETS;
-    const auto result = device_executes ? RK_OK : endpoint_->apply(output);
+    auto endpoint_output = output;
+    if (endpoint_output.kind == RK_COMMAND_JOINT_TARGETS)
+        for (uint32_t index = 0; index < endpoint_output.target_count; ++index) {
+            auto &target = endpoint_output.targets[index];
+            if (target.mode == RK_TARGET_POSITION || target.mode == RK_TARGET_SERVO)
+                target.target -= coordinate_offsets_[target.joint];
+        }
+    const auto result = device_executes ? RK_OK : endpoint_->apply(endpoint_output);
     if (result != RK_OK) {
         latch_fault();
         return result;
@@ -2055,6 +2108,9 @@ rk_result RobotRuntime::publish_sample_impl(uint64_t timestamp_ns,
     next.received_timestamp_ns = 0;
     next.sensor_count = 0;
     const auto result = sample ? (next = *sample, sample_result) : endpoint_->sample(timestamp_ns, next);
+    if (result == RK_OK && next.joint_count == blueprint_.joint_count)
+        for (uint32_t joint = 0; joint < next.joint_count; ++joint)
+            next.position[joint] += coordinate_offsets_[joint];
     if (endpoint_->executes_trajectory_queue()) {
         control_.diagnostic_code = endpoint_->diagnostic_code();
         // The runtime's copy of the device's queue follows the device's path time, so it runs
@@ -2255,6 +2311,8 @@ void RobotRuntime::reset_state() noexcept {
     state_.mode = state_.safety == RK_SAFETY_EMERGENCY_STOP ||
         state_.safety == RK_SAFETY_FAULT ? RK_ROBOT_MODE_FAULT : RK_ROBOT_MODE_IDLE;
     control_ = {};
+    coordinate_offsets_.fill(0.0);
+    reference_latched_.fill(false);
     // A robot reset to its start has every output at its safe value again.
     for (uint32_t i = 0; i < blueprint_.channel_count && i < RK_MAX_PROCESS_CHANNELS; ++i)
         channel_outputs_[i] = blueprint_.channels[i].safe_value;

@@ -211,6 +211,8 @@ public:
     rk_result submit_plan(const PlanRequest &plan);
     rk_result require_reference(uint32_t joint, bool required);
     rk_result limit_input(uint32_t joint, bool active);
+    /** Atomically establish logical = endpoint position + offset at rest. */
+    rk_result calibrate_coordinates(const double *offsets, uint32_t count);
     rk_result latch_reference(uint32_t joint);
     rk_result reference_status(uint32_t joint, uint32_t &out_referenced) const;
     /** Copies the latest robot state without advancing endpoint time. */
@@ -348,6 +350,7 @@ private:
     mutable std::mutex state_mutex_;
     rk_robot_state state_{};
     mutable std::mutex queue_mutex_;
+    std::array<double, RK_MAX_JOINTS> coordinate_offsets_{};
     std::array<bool, RK_MAX_JOINTS> reference_required_{};
     std::array<bool, RK_MAX_JOINTS> reference_latched_{};
     std::array<bool, RK_MAX_JOINTS> references_locked() const;
