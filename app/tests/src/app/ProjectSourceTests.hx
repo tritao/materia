@@ -883,12 +883,13 @@ class ProjectSourceTests {
           // Tables and seats belong to the fixed root. Cartons settle on their
           // own authored pads; allow only shallow, vertical support there.
           var supported = false;
+          var supportDepth = currentHandling.pressDepth + 0.002;
           if (contact.linkIndex == 0 && contact.otherKind == robotkit.runtime.RobotContactOtherKind.Object &&
-              contact.distance >= -0.004 && Math.abs(contact.normal.z) >= 0.99) {
+              contact.distance >= -supportDepth && Math.abs(contact.normal.z) >= 0.99) {
             for (seat in supports) if (contact.otherObject == seat.object &&
                 Math.abs(contact.position.x - seat.x) <= 0.0451 &&
                 Math.abs(contact.position.y - seat.y) <= 0.0451 &&
-                Math.abs(contact.position.z - seat.z) <= 0.004) supported = true;
+                Math.abs(contact.position.z - seat.z) <= supportDepth) supported = true;
           }
           if (supported) continue;
           // The compliant cup deliberately presses at most 3 mm into its intended grasp surface.

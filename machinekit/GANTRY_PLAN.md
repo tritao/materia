@@ -2430,3 +2430,14 @@ separately authored frameLift, default zero; the picker raises the frame
 the moving Z slide retains its 500 mm stroke and reach. Both quantities
 are finite, non-negative design assumptions. Contact assertions remain
 strict. Final MachineKit compiler and picker retries are running.
+
+### G12 checkpoint — intended support compression during grasp
+
+MachineKit compiled the final frame-clearance fields. The picker now clears
+the frame and fixed-column collisions and reaches cup pressing. Its own-pad
+contact penetrated 4.0175 mm during the configured 3 mm suction press, just
+beyond the fixed 4 mm support budget. The pad-only assertion now derives its
+budget from the active handling runner's pressDepth plus a stated 2 mm contact
+settling allowance. Matching carton handle, own-pad footprint/height and
+vertical normal remain mandatory; other body and cup contact assertions remain
+unchanged. The app compiler is running for the failed-picker retry.
