@@ -32,3 +32,5 @@
 /robotkit/tools/humanoid/tests/build/
 
 /robotkit/tests/spike/build/
+
+/app/tests/fixtures/pin-plate/build/
