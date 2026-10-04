@@ -3274,3 +3274,9 @@ Audit stopped-anchor coupling projection and post-counter-calibration commanded
 anchors before changing tolerances. The restart/counter-origin alignment also
 needs a physical queued-handoff regression. Geometry/mass baselines and remaining
 Phase C gates are still pending. G13 is incomplete and G14 is not started.
+
+
+The latest buffered retry passed admission and hold/resume assertions, then hit
+its absolute tick deadline because setup homing had advanced that same clock.
+Count the unchanged 2000-tick job budget relative to job start, and start on the
+next tick after homing. Compilation/retry of this fixture correction is pending.

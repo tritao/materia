@@ -167,7 +167,8 @@ class StreamTests extends MotionKitTestSupport {
     var recording = new RobotRecording();
     var instrumented = new RecordingRobot(robot, recording);
     var machine = MotionSystem.fromBlueprint(instrumented, blueprint);
-    var tick = homeGantryFixture(blueprint, runtime, simulationHarness, instrumented, machine);
+    var tick = homeGantryFixture(blueprint, runtime, simulationHarness, instrumented, machine) + 1;
+    var jobStartTick = tick;
     // The assertions below count buffered job submissions after setup homing.
     recording.commands.resize(0);
     var options = new MotionOptions(0.05, 0.2);
@@ -247,7 +248,7 @@ class StreamTests extends MotionKitTestSupport {
     while (machine.isMoving()) {
       machine.update();
       simulationHarness.step(Int64.ofInt(tick++));
-      if (tick > 2000) throw "buffered MotionKit trajectory did not complete";
+      if (tick - jobStartTick > 2000) throw "buffered MotionKit trajectory did not complete";
     }
     near(robot.snapshot().positions.get(0), 0.04,
       "buffered trajectories execute in order", 1e-5);
