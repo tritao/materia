@@ -1,5 +1,7 @@
 package motionkit.trajectory;
 
+import trajectorykit.validation.ValidationGuarantee;
+
 /** Per-check validation claims; sampled checks are not continuous proofs. */
 class ValidationGuarantees {
   public final jointPosition:ValidationGuarantee;
