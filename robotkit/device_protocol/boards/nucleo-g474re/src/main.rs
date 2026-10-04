@@ -45,6 +45,7 @@ impl StubBoard {
     fn new() -> Self { Self { ticks: 0, position: [0.0; ACTUATORS], velocity: [0.0; ACTUATORS] } }
 }
 impl Board for StubBoard {
+    fn read_input(&self, _channel: usize) -> bool { false }
     fn now_ticks(&self) -> u64 { self.ticks }
     fn tick_hz(&self) -> u64 { TICK_HZ }
     fn position_target(&mut self, i: usize, value: f32) { self.position[i] = value; }

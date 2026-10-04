@@ -47,3 +47,39 @@ fn ten_seconds_of_output_uses_bounded_storage_and_active_actuators() {
         _ => true,
     }));
 }
+
+#[test]
+fn switch_inputs_follow_actual_steps_and_declared_polarity() {
+    use robotkit_device_protocol::{Board, VirtualBoard, VirtualSwitch};
+    let mut board = VirtualBoard::<2, 1>::new(1_000, 0, 0, [1000.0; 2]);
+    assert!(board.configure_switch(5, VirtualSwitch {
+        actuator: 1, threshold_steps: 2, active_above: true, active_high: true,
+    }));
+    assert!(board.configure_switch(6, VirtualSwitch {
+        actuator: 1, threshold_steps: 2, active_above: true, active_high: false,
+    }));
+    assert!(!board.read_input(5));
+    assert!(board.read_input(6));
+    board.step_pulse(0, true);
+    assert!(!board.read_input(5));
+    assert!(board.miss_next_steps(1, 1));
+    board.step_pulse(1, true);
+    assert_eq!(board.step_count(1), 0);
+    assert!(!board.read_input(5));
+    board.step_pulse(1, true);
+    assert!(!board.read_input(5));
+    board.step_pulse(1, true);
+    assert!(board.read_input(5));
+    assert!(!board.read_input(6));
+    board.step_pulse(1, false);
+    assert!(!board.read_input(5));
+    assert!(board.read_input(6));
+    assert!(!board.configure_switch(64, VirtualSwitch {
+        actuator: 0, threshold_steps: 0, active_above: true, active_high: true,
+    }));
+    assert!(!board.configure_switch(1, VirtualSwitch {
+        actuator: 2, threshold_steps: 0, active_above: true, active_high: true,
+    }));
+    assert!(board.set_input(5, true));
+    assert!(board.read_input(5));
+}

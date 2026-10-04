@@ -3,6 +3,7 @@ use robotkit_device_protocol::{Board, ScheduledCore, ScheduledSegment, QueueErro
 #[derive(Default)]
 struct TestBoard { tick: u64, position: f32, velocity: f32, stopped: bool }
 impl Board for TestBoard {
+    fn read_input(&self, _channel: usize) -> bool { false }
     fn now_ticks(&self) -> u64 { self.tick }
     fn tick_hz(&self) -> u64 { 1_000 }
     fn position_target(&mut self, _: usize, value: f32) { self.position = value; }

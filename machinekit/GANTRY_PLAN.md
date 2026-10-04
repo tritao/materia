@@ -564,7 +564,7 @@ G0 → G1 → G2 → G3 ──────────────────�
 | G10 | implementation added; mechanical/simulation verification deferred | see progress notes |
 | G11 | in progress; reference-state foundation added | see progress notes |
 | G12 | implemented; requested compiler/runtime/picker/homing checkpoint passed | see progress notes |
-| G13 | planned | — |
+| G13 | in progress; board input and physical virtual switches implemented | see progress notes |
 | G14 | planned | — |
 | G15 | planned | — |
 | G16 | planned | — |
@@ -2467,3 +2467,21 @@ module (1,782 sources) also passed. The requested G12 checkpoint is complete. Un
 native and homing tests were not repeated. G13 remains unstarted at this checkpoint; subsequent full tests run at phase
 boundaries. Final compiler logs are `gantries-g12-machinekit-final.log` and
 `gantries-g12-app-final.log` in the same scratch directory.
+
+
+### G13 — board input boundary and virtual physical switches
+
+`Board.read_input` is a required hardware-boundary method. The virtual board
+now has 64 input channels independent of process outputs, manual input levels,
+and switch mappings to actual actuator step counts with declared threshold,
+direction and electrical polarity. Missed steps therefore affect switch trips;
+commanded setpoints do not substitute for physical counts. Invalid channels or
+actuators are rejected. The test board and existing Nucleo stub implement the
+new method; the latter still returns low and is not hardware input support.
+
+A virtual-board regression covers independent actuators, missed pulses,
+threshold crossing in both directions, active-low wiring and invalid mappings.
+It is queued for the Phase C test boundary, not run now. Protocol input state,
+edge step-count capture, deployment wiring, host observation, homing purpose,
+side holds/calibration and squaring-scope transport remain G13 work. No protocol
+version bump or hardware claim is made by this foundation commit.

@@ -10,6 +10,17 @@ pub enum Output {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct OutputRecord { pub ticks: u64, pub output: Output }
 
+pub const MAX_INPUTS: usize = 64;
+
+/// A physical switch responds to actual emitted steps, including missed-step effects.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct VirtualSwitch {
+    pub actuator: usize,
+    pub threshold_steps: i64,
+    pub active_above: bool,
+    pub active_high: bool,
+}
+
 pub const MAX_OUTPUT_RECORDS: usize = 65_536;
 
 /// Deterministic board model; `advance_host_ns` is driven by the owner clock.
@@ -30,6 +41,8 @@ pub struct VirtualBoard<const ACTUATORS: usize, const CHANNELS: usize> {
     records: Vec<OutputRecord>,
     step_records: Vec<OutputRecord>,
     actuator_count: usize,
+    inputs: [bool; MAX_INPUTS],
+    switches: [Option<VirtualSwitch>; MAX_INPUTS],
 }
 
 impl<const A: usize, const C: usize> VirtualBoard<A, C> {
@@ -47,7 +60,8 @@ impl<const A: usize, const C: usize> VirtualBoard<A, C> {
             steps_per_unit, steps: [0; A], missed_steps: [0; A],
             targets: [0.0; A], velocities: [0.0; A],
             digital: [false; C], analog: [0.0; C], process_argument: [0.0; C],
-            records: Vec::new(), step_records: Vec::new(), actuator_count }
+            records: Vec::new(), step_records: Vec::new(), actuator_count,
+            inputs: [false; MAX_INPUTS], switches: [None; MAX_INPUTS] }
     }
     pub fn advance_host_ns(&mut self, host_ns: u64) {
         assert!(host_ns >= self.host_ns);
@@ -55,6 +69,18 @@ impl<const A: usize, const C: usize> VirtualBoard<A, C> {
         let scaled = u128::from(host_ns) * u128::from(self.tick_hz) *
             (1_000_000i64 + i64::from(self.drift_ppm)) as u128;
         self.ticks = self.offset_ticks.saturating_add((scaled / 1_000_000_000_000_000) as u64);
+    }
+    /// Configure deployment input wiring independently of process outputs.
+    pub fn configure_switch(&mut self, channel: usize, switch: VirtualSwitch) -> bool {
+        if channel >= MAX_INPUTS || switch.actuator >= self.actuator_count { return false; }
+        self.switches[channel] = Some(switch);
+        true
+    }
+    pub fn set_input(&mut self, channel: usize, level: bool) -> bool {
+        if channel >= MAX_INPUTS { return false; }
+        self.switches[channel] = None;
+        self.inputs[channel] = level;
+        true
     }
     pub fn step_counts(&self) -> [i64; A] { self.steps }
     pub fn miss_next_steps(&mut self, actuator: usize, count: u32) -> bool {
@@ -90,6 +116,18 @@ impl<const A: usize, const C: usize> VirtualBoard<A, C> {
 }
 
 impl<const A: usize, const C: usize> Board for VirtualBoard<A, C> {
+    fn read_input(&self, channel: usize) -> bool {
+        if channel >= MAX_INPUTS { return false; }
+        match self.switches[channel] {
+            None => self.inputs[channel],
+            Some(switch) => {
+                let steps = self.steps[switch.actuator];
+                let active = if switch.active_above { steps >= switch.threshold_steps }
+                    else { steps <= switch.threshold_steps };
+                active == switch.active_high
+            }
+        }
+    }
     fn now_ticks(&self) -> u64 { self.ticks }
     fn tick_hz(&self) -> u64 { self.tick_hz }
     fn position_target(&mut self, i: usize, value: f32) {
