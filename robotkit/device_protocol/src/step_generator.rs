@@ -18,6 +18,7 @@ pub struct StepGenerator<const A: usize> {
     homing_pair: Option<(usize, usize)>,
     held: [Option<i64>; A],
     alignment_steps: [f64; A],
+    counter_origin_steps: [f64; A],
     nominal_steps: [f64; A],
     steps_per_unit: [f64; A],
     setup_ticks: [u64; A],
@@ -46,7 +47,7 @@ impl<const A: usize> StepGenerator<A> {
             }
         }
         Some(Self { inputs: InputCapture::new(), homing_pair: None, held: [None; A],
-            alignment_steps: [0.0; A], nominal_steps: [0.0; A], steps_per_unit, setup_ticks, min_interval_ticks,
+            alignment_steps: [0.0; A], counter_origin_steps: [0.0; A], nominal_steps: [0.0; A], steps_per_unit, setup_ticks, min_interval_ticks,
             direction: [None; A], direction_since: [0; A], last_step: [None; A],
             skew: [None; A], skew_count: 0, squaring_bound: [None; A] })
     }
@@ -104,7 +105,7 @@ impl<const A: usize> StepGenerator<A> {
         if self.held[actuator].is_some() { return false; }
         let physical = board.step_count(actuator);
         self.held[actuator] = Some(physical);
-        self.alignment_steps[actuator] = physical as f64 - self.nominal_steps[actuator];
+        self.alignment_steps[actuator] = physical as f64 - self.nominal_steps[actuator] - self.counter_origin_steps[actuator];
         true
     }
 
@@ -113,6 +114,36 @@ impl<const A: usize> StepGenerator<A> {
         if (actuator != first && actuator != second) || self.held[actuator].is_none() { return false; }
         self.held[actuator] = None;
         true
+    }
+
+    /// Shift independent counter origins as one transaction. The device owner must
+    /// require drained, stationary motion before calling this method.
+    pub fn rebase_homing_counters(&mut self, deltas: &[(usize, f64)]) -> bool {
+        let Some((first, second)) = self.homing_pair else { return false; };
+        if deltas.len() != 2 || deltas[0].0 == deltas[1].0 || self.held.iter().any(Option::is_some) {
+            return false;
+        }
+        for &(actuator, delta) in deltas {
+            if actuator != first && actuator != second { return false; }
+            let shift = delta * self.steps_per_unit[actuator];
+            let origin = self.counter_origin_steps[actuator] + shift;
+            let alignment = self.alignment_steps[actuator] - shift;
+            if !shift.is_finite() || !origin.is_finite() || !alignment.is_finite() ||
+                origin.abs() > 9_007_199_254_740_991.0 || alignment.abs() > 9_007_199_254_740_991.0 {
+                return false;
+            }
+        }
+        for &(actuator, delta) in deltas {
+            let shift = delta * self.steps_per_unit[actuator];
+            self.counter_origin_steps[actuator] += shift;
+            self.alignment_steps[actuator] -= shift;
+        }
+        true
+    }
+
+    pub fn counter_position<B: Board>(&self, board: &B, actuator: usize) -> Option<f64> {
+        if actuator >= A { return None; }
+        Some((board.step_count(actuator) as f64 - self.counter_origin_steps[actuator]) / self.steps_per_unit[actuator])
     }
 
     /// Preserve the physical alignment while restoring normal skew bounds.
@@ -145,10 +176,10 @@ impl<const A: usize> StepGenerator<A> {
         for a in 0..count {
             self.nominal_steps[a] = targets[a] as f64 * self.steps_per_unit[a];
             if let Some(physical) = self.held[a] {
-                self.alignment_steps[a] = physical as f64 - self.nominal_steps[a];
+                self.alignment_steps[a] = physical as f64 - self.nominal_steps[a] - self.counter_origin_steps[a];
                 continue;
             }
-            let raw = self.nominal_steps[a] + self.alignment_steps[a];
+            let raw = self.nominal_steps[a] + self.counter_origin_steps[a] + self.alignment_steps[a];
             let truncated = raw as i64;
             let desired = truncated.saturating_sub(i64::from(raw < truncated as f64));
             let actual = board.step_count(a);
@@ -170,9 +201,9 @@ impl<const A: usize> StepGenerator<A> {
         for (i, configured) in self.skew[..self.skew_count].iter().enumerate() {
             let Some(group) = configured else { continue; };
             if group.first >= count || group.second >= count { continue; }
-            let first = board.step_count(group.first) as f64 /
+            let first = (board.step_count(group.first) as f64 - self.counter_origin_steps[group.first]) /
                 self.steps_per_unit[group.first] / group.first_ratio;
-            let second = board.step_count(group.second) as f64 /
+            let second = (board.step_count(group.second) as f64 - self.counter_origin_steps[group.second]) /
                 self.steps_per_unit[group.second] / group.second_ratio;
             let bound = self.squaring_bound[i].unwrap_or(group.bound);
             if (first - second).abs() > bound { self.end_homing_pair(); return Err(StepFault::DualDriveSkew); }

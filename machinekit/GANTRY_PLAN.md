@@ -2742,3 +2742,20 @@ trajectory bookkeeping and RuntimeHomingDriver still need to use the new stop
 path together; simply sending the device control is not yet a complete stop.
 Counter rebasing, queued side adapter, router gate and Nucleo input/control work
 remain pending. G13 is incomplete.
+
+### G13 — atomic independent device counter origins
+
+StepGenerator now separates physical emitted steps, logical counter origins and
+held-side alignment displacement. A homing pair can rebase exactly its two
+released actuators in one validated transaction. Duplicate/unrelated actuators,
+held sides, non-finite shifts and origins/alignment beyond exact integer precision
+are rejected before any mutation. Origin changes are compensated in alignment
+so physical targets and emitted step counts stay unchanged. Counter reads and
+skew comparison use the rebased origins.
+
+A queued regression checks held-side rejection, invalid second-side rollback,
+duplicate rejection, independent zeros, restored normal skew checks and unchanged
+physical steps after scope end. No builds/tests ran. The device owner must still
+verify drained stationary motion before invoking the primitive; acknowledged
+counter-batch wire transport and host feedback/target-zero composition remain
+pending. Do not infer completed physical homing from this foundation.
