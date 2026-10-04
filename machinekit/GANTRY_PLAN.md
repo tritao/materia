@@ -3346,3 +3346,29 @@ MotionKit compiler-only (1127 sources) and the complete suite passed:
 late-arrival, exact-stop and Cartesian blend assertions are retained.
 This gate ran before the subsequent mechanical sensor relocation audit; a full
 Phase C result is not yet claimed.
+
+
+### Phase C — sensor packing and full-suite homing coverage
+
+The limit-switch lever now ends at its roller axle instead of splitting the
+roller's side faces through its whole diameter. The unchanged naming audit
+passes; no naming allowlist was added.
+
+The mechanical gate exposed an X home sensor intersecting its screw coupling.
+X and Z switches now sit opposite their drive hardware. Home and negative-limit
+M8 tubes use lanes with 10 mm centres and matching named trigger connectors;
+trip positions along the guide remain unchanged. The clearance sweep now checks
+distinct sensor bodies even when they share a fixed structural body.
+The Z trigger's rear edge clears the beam and its feet by 3 mm while overlapping its carriage
+by 3 mm. The sweep also exposed the trigger crossing the front frame at Y zero;
+the front crossmember position is now derived from the full Z carriage envelope,
+including the guide profile and tool reach, before adding frontExtension.
+
+HomingTests now runs in the standard full MotionKit bootstrap as well as its
+focused selector, covering hold acknowledgement, compensated capture, stale
+edges and cancellation cleanup at future phase gates. Compiler-only builds
+passed for the final frame layout (1044 sources) and MotionKit bootstrap
+(1127 sources). The latest sweep cleared the front-frame collision, then found the Z trigger
+intersecting the left beam foot by 1344 mm³. Its rear edge now uses the nearer
+of the beam and beam-foot envelopes. Compiler-only passed after that correction;
+the next sweep is running. No complete Phase C pass is claimed.

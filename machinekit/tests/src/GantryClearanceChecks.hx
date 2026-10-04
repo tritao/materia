@@ -17,6 +17,7 @@ class GantryClearanceChecks {
 	final localParts = new Map<String, Part>();
 	final body = new Map<String, String>();
 	final interfaces = new Map<String, Bool>();
+	final sensors = new Map<String, Bool>();
 	final rackMeshes:Array<{pinion:String, rack:String}> = [];
 	final shaftSeatings:Array<{parent:String, child:String}> = [];
 
@@ -27,6 +28,7 @@ class GantryClearanceChecks {
 			allow(joint.parent, joint.child); shaftSeatings.push({parent: joint.parent, child: joint.child});
 		}
 		var description = gantry.describe().machine;
+		if (definition.switches != null) for (contact in definition.switches) sensors.set(contact.part, true);
 		var transmissions = description.transmissions;
 		if (transmissions != null) for (relation in transmissions) switch relation.source {
 			case LeadScrew(screw, nut): allow(screw, nut);
@@ -89,7 +91,10 @@ class GantryClearanceChecks {
 			}
 			for (i in 0...ids.length) for (j in i + 1...ids.length) {
 				var a = ids[i], b = ids[j];
-				if (body.get(a) == body.get(b) || interfaces.exists(a + "|" + b)) continue;
+				// Separate sensor bodies cannot occupy the same space even when
+				// both mounts belong to one fixed structural body.
+				var sensorPair = sensors.exists(a) && sensors.exists(b);
+				if ((!sensorPair && body.get(a) == body.get(b)) || interfaces.exists(a + "|" + b)) continue;
 				var boxA = boxes.get(a), boxB = boxes.get(b);
 				if (boxA == null || boxB == null) throw "Missing gantry bounds";
 				if (!boxesOverlap(boxA, boxB)) continue;

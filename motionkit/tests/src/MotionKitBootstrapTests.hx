@@ -102,6 +102,7 @@ class MotionKitBootstrapTests {
       Sys.println('C4 focused tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
     }
+    HomingTests.run();
     var freedomTests = new ToolFreedomTests();
     freedomTests.testFreeSpinPath();
     freedomTests.testUnreachableTilt();

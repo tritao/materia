@@ -79,8 +79,9 @@ class LimitSwitch extends MachineComponent implements SwitchPart {
         }
         body = Solids.cut(body, holes); parts.push(body);
       }
-      var leverBase = Part.box(spec.width, 3, 1.5); parts.push(leverBase);
-      var lever = Solids.named(leverBase.translated(new Vector(0, 0, spec.depth - 0.5)), "lever");
+      // The lever ends at the roller axle rather than crossing its full diameter.
+      var leverBase = Part.box(spec.width * 0.9, 3, 1.5); parts.push(leverBase);
+      var lever = Solids.named(leverBase.translated(new Vector(-spec.width * 0.05, 0, spec.depth - 0.5)), "lever");
       leverBase.close(); parts.push(lever);
       var roller = Solids.named(Part.cylinderAlongY(spec.rollerDiameter / 2, -3, 3,
         spec.width * 0.4, spec.depth + spec.rollerDiameter / 2), "roller");

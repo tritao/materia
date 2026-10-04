@@ -47,7 +47,11 @@ class Gantry extends AxisBuilder {
 		var guide = LinearRailBlock.metric(spec.railProfile).spec;
 		railMargin = Math.max(80, guide.railEndMargin + guide.blockLength / 2 + 20);
 		var left = -railMargin - spec.sideExtension, right = spec.travelX + railMargin + spec.sideExtension;
-		var front = -railMargin - spec.frontExtension, back = spec.travelY + railMargin;
+		// Keep the front crossmember ahead of the full vertical carriage sweep.
+		var columnY = -(beam.size / 2 + frame.height / 2 + 40);
+		var carriageFront = columnY - frame.height / 2 - guide.blockHeight - 8 - spec.toolReach;
+		var front = Math.min(-railMargin, carriageFront - frame.size / 2 - 3) - spec.frontExtension;
+		var back = spec.travelY + railMargin;
 		var frameZ = spec.travelZ + 350 + spec.frameLift;
 		var endAllowance = Math.max(frame.size / 2, NemaStepper.frame(spec.motorFrame).variant.shaftLength + 6);
 		var up = [0.0, 0, 1], alongX = [1.0, 0, 0], alongY = [0.0, 1, 0];
@@ -91,7 +95,6 @@ class Gantry extends AxisBuilder {
 			AxisBuilder.orient(0, 0, railXTop, up, alongX), {x: 1.0, y: 0.0, z: 0.0});
 		var xPlateZ = railXTop + guide.blockHeight - guide.railHeight;
 		// The Z column is in front of the beam, joined by the carriage's top plate.
-		var columnY = -(beam.size / 2 + frame.height / 2 + 40);
 		attach("xCarriage", new GantryPlate("X carriage", 80, -columnY + 80, 12),
 			AssemblyFrames.translation(0, columnY / 2, xPlateZ), "blockX");
 		var columnLength = spec.travelZ + 2 * railMargin;
@@ -125,8 +128,8 @@ class Gantry extends AxisBuilder {
 			[70.0, zPlateY, xPlateZ - railMargin - zDriveDrop], [0.0, 0, -1]);
 		buildSwitches(axes[1], "YLeft", "frameLeft", "beamFootLeft", 0, -1, alongY);
 		if (spec.dualY) buildSwitches(axes[1], "YRight", "frameRight", "beamFootRight", 0, 1, alongY);
-		buildSwitches(axes[0], "X", "beam", "xCarriage", 1, 1, alongX);
-		buildSwitches(axes[2], "Z", "zColumn", "zCarriage", 0, 1, [0.0, 0, -1]);
+		buildSwitches(axes[0], "X", "beam", "xCarriage", 1, -1, alongX);
+		buildSwitches(axes[2], "Z", "zColumn", "zCarriage", 0, -1, [0.0, 0, -1]);
 	}
 
 	/** Outboard steel trigger and switches carried by the actual guide's fixed structure. */
@@ -147,7 +150,12 @@ class Gantry extends AxisBuilder {
 		// alongside it; the outboard trigger stays clear of the rear beam.
 		if (suffix == "Z") {
 			var column = mountBounds(component(fixed), zeroPose(fixed));
-			point[1] = column.max[1] - 10;
+			var rearBeam = mountBounds(component("beam"), zeroPose("beam"));
+			var rearFoot = mountBounds(component("beamFootLeft"), zeroPose("beamFootLeft"));
+			var rearLimit = Math.min(rearBeam.min[1], rearFoot.min[1]);
+			// The trigger touches the carriage's rear by 3 mm and stops
+			// 3 mm short of the beam and its feet, throughout the Z stroke.
+			point[1] = Math.min(column.max[1] - 10, (rearLimit + bounds.max[1] - 6) / 2);
 			dimensions[1] = 2 * (point[1] - bounds.max[1] + 3);
 		}
 		for (i in 0...3) if (Math.abs(direction[i]) > 0.5)
@@ -158,12 +166,6 @@ class Gantry extends AxisBuilder {
 		attach(trigger, target, AssemblyFrames.translation(point[0], point[1], point[2] - dimensions[2] / 2), moving);
 		var half = 0.0;
 		for (i in 0...3) half += Math.abs(direction[i]) * dimensions[i] / 2;
-		for (side in [-1, 1]) {
-			var name = side < 0 ? "negative" : "positive";
-			var contact = [for (i in 0...3) point[i] + direction[i] * side * half];
-			addMemberConnector(trigger, name, AssemblyFrames.translation(
-				contact[0] - point[0], contact[1] - point[1], contact[2] - point[2] + dimensions[2] / 2));
-		}
 		var room = axisOvertravel(axis.id);
 		if (room <= 1) throw "Gantry switches need more than 1 mm of guide overtravel";
 		for (kind in ["home", "negativeLimit", "positiveLimit"]) {
@@ -173,6 +175,12 @@ class Gantry extends AxisBuilder {
 			var sensor = new machinekit.motion.ProximitySwitch();
 			var normal = [for (value in direction) -side * value];
 			var face = [for (i in 0...3) point[i] + direction[i] * (travel + side * half)];
+			// Home and negative-limit tubes share the end of travel but occupy
+			// separate lanes across the trigger face (M8 bodies, 10 mm centres).
+			face[outboardAxis] += (kind == "negativeLimit" ? -sign : sign) * 5;
+			var contact = [for (i in 0...3) face[i] - direction[i] * travel];
+			addMemberConnector(trigger, kind + suffix, AssemblyFrames.translation(
+				contact[0] - point[0], contact[1] - point[1], contact[2] - point[2] + dimensions[2] / 2));
 			var origin = [for (i in 0...3) face[i] - normal[i] * (sensor.spec.length + sensor.spec.sensingDistance)];
 			var transverse = outboardAxis == 0 ? [1.0, 0, 0] : [0.0, 1, 0];
 			var pose = AxisBuilder.orient(origin[0], origin[1], origin[2], transverse, normal);
@@ -194,7 +202,7 @@ class Gantry extends AxisBuilder {
 			attach(mount, new GantryPlate("switch mount", hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]),
 				AssemblyFrames.translation((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2]), fixed);
 			attach(id, sensor, pose, mount);
-			addSwitch(id, axis.id, id, {instanceId: trigger, connectorName: side < 0 ? "negative" : "positive"},
+			addSwitch(id, axis.id, id, {instanceId: trigger, connectorName: kind + suffix},
 				side, kind == "home" ? "home" : "limit", suffix == "YRight" ? 2 : 1, driveJoint);
 		}
 	}
