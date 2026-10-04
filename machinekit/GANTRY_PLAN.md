@@ -273,8 +273,8 @@ It moves and renames code this plan touches. Rules:
 ### Phase A — planning (no machinekit assembly changes; can start now)
 
 **G0. Baseline.**
-- Run the full suite on `aaa2b911a` in this worktree and record the numbers this plan must hold,
-  or must explain when they move:
+- Run the full suite on this branch's merged base `712019dbc` in this worktree. Record the numbers
+  this plan must hold, or must explain when they move:
   - router plate times (screw and belt) and belt deviation;
   - the CoreXY summary;
   - robot-arm pick/place mission time;
@@ -551,7 +551,7 @@ G0 → G1 → G2 → G3 ──────────────────�
 
 | Step | State | Commits |
 |------|-------|---------|
-| G0 | planned | — |
+| G0 | done; full gate passed | `a8349cdea` (test preparation), this baseline commit |
 | G1 | planned | — |
 | G2 | planned | — |
 | G3 | planned | — |
@@ -571,4 +571,84 @@ G0 → G1 → G2 → G3 ──────────────────�
 | G17 | planned | — |
 | G18 | planned | — |
 
-Baseline numbers (G0): to be filled in.
+### G0 — merged-base baseline (2026-10-04)
+
+**Gate:** `/home/joao/dev/materia-cache/claude-scratch/gantries-suite.sh g0-final`
+passed all twelve kit suites, CadKit, MachineKit, the app build and the full
+project-source suite. The summary is `gantries-suite-g0-final.txt`; logs are
+`g-s-*.log` beside it. The initial branch HEAD was `35a0fe879`, based on
+`712019dbc`; `a8349cdea` adds test-fixture reuse only, with no machine or planner
+behavior change. OCCT was prebuilt 8.0.1 from the specified cache directory.
+
+The G0 target was corrected from the old survey commit `aaa2b911a` to the
+merged base `712019dbc`, as required by the handoff. These are the numbers
+subsequent steps must preserve or explain when they move.
+
+| Suite | Baseline result |
+|-------|-----------------|
+| KinematicsKit | 210 assertions |
+| RobotKit | 4935 world assertions, including the excavator scenarios |
+| MotionKit | 9865 assertions, including redundancy and coordinated external axes |
+| ToolpathKit | 2921 scenario assertions |
+| CadBridge | 157 assertions |
+| CncKit | 317 assertions |
+| StockKit | 100673 assertions, 17494 reference rays |
+| CamKit | 12308 assertions |
+| ProcessKit | 52 welder assertions, 23 core assertions |
+| ProjectKit | 131 assertions |
+| HumanKit, AnimKit, CadKit, MachineKit | exit 0 |
+| App build and full project-source suite | exit 0 |
+
+**Router motor plate:** same controller, feeds and stock.
+
+| Figure | Screw | Belt |
+|--------|-------|------|
+| Machining time | 220.2 s | 201.6 s |
+| Planned Y/X/Z speed | 22.3 / 25 / 25 mm/s | 500 / 500 / 25 mm/s |
+| Planned Y/X/Z acceleration | 5.21 / 5.37 / 5.65 m/s² | 12.35 / 14.17 / 5.65 m/s² |
+| Free Y/X/Z speed | 22.3 / 34.6 / 43.7 mm/s | 873.1 / 873.1 / 43.7 mm/s |
+| Free Y/X/Z acceleration | 5.4 / 5.58 / 6.12 m/s² | 12.79 / 15.08 / 6.12 m/s² |
+| Checked / flagged plans | 126 / 0 | 126 / 57 |
+| Stepper stalls / accuracy findings | 0 / 0 | 0 / 64 |
+| Worst torque / predicted deviation | 56.7% / 0.05 mm | 56.5% / 1.76 mm |
+| Ticks of rapid-label cutting | 0 | 6 |
+
+Both removed 9914.9 mm³ from 9996.5 mm³ planned material, with 63.5 mm³
+leftover and 0.6 mm³ gouge. The old 1.89/1.90 mm belt-deviation figures in
+transmission milestone notes are not this merged branch's baseline. Screw
+router assembly: 33 definitions, 61 occurrences, 32 BOM lines and 36.9 kg.
+
+**CoreXY:** 17 definitions, 38 occurrences, 17 BOM lines, 4.6 kg, pulley radius
+6.366 mm; motors 204.1 rad/s, axes 649.6 mm/s, free accelerations 71.5 / 34 m/s²
+(the app reports X as 71.549 m/s²). MotionKit steady-load accelerations are
+57.409 / 27.415 m/s²; the square takes 79 ticks, with motors at most
+96.2 / 131.9 rad/s. Worst predicted belt deviation at planned limits: 0.133 mm.
+
+**Arm:** 32 definitions, 38 occurrences, 20.3 kg above the base flange and
+150.1 kg total. Suction contact (35, -524, 444) mm points down; ready-pose tool
+(35, -524, 563) mm. MuJoCo mission cumulative completions: pick 5.8 s, place
+12.0 s, pick 17.2 s, place 23.5 s.
+
+**Mobile:** both deterministic and MuJoCo base checks travel 400 mm in 1 s,
+turn 0.5 rad and report 400 mm odometry. MuJoCo mission cumulative completions:
+goTo 9.6 s, pick 15.1 s, goTo 25.2 s, place 30.6 s, pick 36.1 s, goTo 47.8 s,
+place 53.2 s, goTo 61.0 s. Obstacle round: cruise 0.4 m/s, slowest 0 m/s,
+closest approach 416 mm, one replan, completed at 65 s.
+
+**Other baselines:** Cartesian blend times: exact stop 2.523507353 s,
+0.5 mm 2.543744738 s, 2 mm 2.456784326 s. Robot welder: 36 definitions,
+42 occurrences, 41 BOM lines, 315.2 kg; normal seam run 20.2 s, restart run
+21.6 s on both backends. CNC controls held at line 6, restarted at line 30,
+and restarted at line 243 with tool 2.
+
+**Baseline preparation decision:** session hold/replacement/jog/path sweeps
+repeatedly compiled identical CAD gantries. Test support now lazily compiles
+one unchanging blueprint per test instance, while each trial still creates
+fresh runtime, simulation, endpoint and motion-system state. Both original
+and reused-fixture full MotionKit runs passed 9865 assertions with identical
+CoreXY and Cartesian blend figures. No sweep points or assertions were
+removed; commit `a8349cdea` keeps this preparation separate from features.
+An interrupted initial MotionKit run and a shell-driver parse error were
+superseded by the complete clean gate. Original logs are preserved in
+`gantries-g0-original-logs/`; temporary test-name logging was removed. No
+haxeon issue or pre-existing test failure was found.
