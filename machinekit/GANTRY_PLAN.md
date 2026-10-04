@@ -2829,3 +2829,20 @@ No builds/tests ran. FFI generation and native compilation remain queued for the
 Phase C boundary. Asynchronous runtime counter calibration, side adapter,
 controlled-stop bookkeeping, router homing and hardware support remain pending;
 G13 is still incomplete.
+
+### G13 — endpoint counter-rebase transaction retention
+
+Rkd6 now implements the two-shaft rebase_counters contract by resolving each
+physical joint to exactly one actuator and converting the requested joint delta
+through its original shaft ratio. It submits one acknowledged atomic batch and
+returns pending until the acknowledgment and fresh State6 handoff complete.
+Repeated polling must carry exactly the original joints/deltas; different batches
+and intervening controls are rejected. Timeouts and uncertain deliveries retain
+the transaction rather than resubmitting. VirtualDeviceEndpoint forwards the
+same contract. Explicit rejection or acknowledged completion resolves retention.
+
+No builds/tests ran. RobotRuntime still rejects queued-endpoint calibration: it
+must stage reference/revision/state changes without subtracting an already
+rebased fresh sample twice before enabling this endpoint contract. Device side
+adapter, controlled-stop integration, router/hardware support and Phase C gate
+remain pending; G13 is not complete.

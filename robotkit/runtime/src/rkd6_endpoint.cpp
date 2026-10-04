@@ -1108,7 +1108,8 @@ rk_result Rkd6Endpoint::request_homing_scope(std::uint64_t sequence, std::uint64
         !std::isfinite(skew_bound) || skew_bound <= 0 || skew_bound > std::numeric_limits<float>::max())
         return RK_ERROR_INVALID_ARGUMENT;
     if (sequence <= control_sequence_) return RK_ERROR_STALE_COMMAND;
-    if ((control_sequence_ && !control_accepted_) || counter_state_pending_) return RK_ERROR_INVALID_STATE;
+    if (pending_rebase_ || (control_sequence_ && !control_accepted_) || counter_state_pending_)
+        return RK_ERROR_INVALID_STATE;
     device_wire6::HomingScope6 command{};
     command.session = ack_.session; command.sequence = sequence; command.scope = scope;
     command.action = action; command.first = first; command.second = second;
@@ -1123,7 +1124,8 @@ rk_result Rkd6Endpoint::request_homing_side(std::uint64_t sequence, std::uint64_
     std::uint8_t actuator, bool hold) {
     if (!sequence || !scope || actuator >= ack_.actuator_count) return RK_ERROR_INVALID_ARGUMENT;
     if (sequence <= control_sequence_) return RK_ERROR_STALE_COMMAND;
-    if ((control_sequence_ && !control_accepted_) || counter_state_pending_) return RK_ERROR_INVALID_STATE;
+    if (pending_rebase_ || (control_sequence_ && !control_accepted_) || counter_state_pending_)
+        return RK_ERROR_INVALID_STATE;
     device_wire6::HomingSide6 command{};
     command.session = ack_.session; command.sequence = sequence; command.scope = scope;
     command.actuator = actuator; command.hold = hold;
@@ -1157,7 +1159,8 @@ rk_result Rkd6Endpoint::request_homing_counter_batch(std::uint64_t sequence, std
         !std::isfinite(counter_origins_[first] + first_delta) ||
         !std::isfinite(counter_origins_[second] + second_delta)) return RK_ERROR_INVALID_ARGUMENT;
     if (sequence <= control_sequence_) return RK_ERROR_STALE_COMMAND;
-    if ((control_sequence_ && !control_accepted_) || counter_state_pending_) return RK_ERROR_INVALID_STATE;
+    if (pending_rebase_ || (control_sequence_ && !control_accepted_) || counter_state_pending_)
+        return RK_ERROR_INVALID_STATE;
     device_wire6::HomingCounterBatch6 command{};
     command.session = ack_.session; command.sequence = sequence; command.scope = scope;
     command.first = first; command.second = second; command.first_delta = first_delta; command.second_delta = second_delta;
@@ -1166,5 +1169,44 @@ rk_result Rkd6Endpoint::request_homing_counter_batch(std::uint64_t sequence, std
     control_sequence_ = sequence; control_scope_ = scope; control_sent_ns_ = now_ns_; control_accepted_.reset();
     counter_batch_ = command;
     return RK_OK;
+}
+}
+
+namespace robotkit {
+rk_result Rkd6Endpoint::rebase_counters(const uint32_t *joints, const double *deltas, uint32_t count) {
+    if (!joints || !deltas || count != 2 || joints[0] == joints[1] ||
+        joints[0] >= joint_count_ || joints[1] >= joint_count_ ||
+        !std::isfinite(deltas[0]) || !std::isfinite(deltas[1])) return RK_ERROR_INVALID_ARGUMENT;
+    if (pending_rebase_) {
+        for (std::size_t i = 0; i < 2; ++i)
+            if (pending_rebase_->joints[i] != joints[i] || pending_rebase_->deltas[i] != deltas[i])
+                return RK_ERROR_INVALID_STATE;
+        const auto result = homing_control_status(pending_rebase_->sequence);
+        // Preserve uncertain deliveries and timeouts; only a device rejection or
+        // acknowledged, fresh state resolves this transaction.
+        if (result == RK_OK || result == RK_ERROR_INVALID_STATE) pending_rebase_.reset();
+        return result;
+    }
+    if (!control_scope_ || control_sequence_ == UINT64_MAX) return RK_ERROR_INVALID_STATE;
+    std::array<std::uint8_t, 2> channels{};
+    std::array<double, 2> actuator_deltas{};
+    for (std::size_t side = 0; side < 2; ++side) {
+        bool found = false;
+        for (std::size_t channel = 0; channel < ack_.actuator_count; ++channel) {
+            const auto mapping = layout_.empty() ? DeviceActuator6{static_cast<std::uint8_t>(channel)} : layout_[channel];
+            if (mapping.measured_joint() != joints[side]) continue;
+            if (found) return RK_ERROR_INVALID_ARGUMENT;
+            found = true;
+            channels[side] = static_cast<std::uint8_t>(channel);
+            actuator_deltas[side] = mapping.measured_ratio() * deltas[side];
+        }
+        if (!found || !std::isfinite(actuator_deltas[side])) return RK_ERROR_INVALID_ARGUMENT;
+    }
+    const auto sequence = control_sequence_ + 1;
+    const auto result = request_homing_counter_batch(sequence, control_scope_, channels[0], channels[1],
+        actuator_deltas[0], actuator_deltas[1]);
+    if (result != RK_OK) return result;
+    pending_rebase_ = PendingRebase{{joints[0], joints[1]}, {deltas[0], deltas[1]}, sequence};
+    return RK_ERROR_STALE_STATE;
 }
 }

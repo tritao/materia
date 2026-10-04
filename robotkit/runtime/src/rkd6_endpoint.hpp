@@ -76,6 +76,7 @@ public:
 
     rk_result device_input(const char *, rk_device_input_observation &) const override;
     rk_result device_homing_control(const rk_device_homing_control &) override;
+    rk_result rebase_counters(const uint32_t *, const double *, uint32_t) override;
     rk_result device_homing_status(uint64_t sequence) const override { return homing_control_status(sequence); }
     rk_result request_homing_scope(std::uint64_t sequence, std::uint64_t scope,
         std::uint8_t action, std::uint8_t first, std::uint8_t second, double skew_bound);
@@ -184,6 +185,12 @@ private:
     std::uint64_t control_timeout_ns_ = 500'000'000;
     std::optional<bool> control_accepted_;
     std::optional<device_wire6::HomingCounterBatch6> counter_batch_;
+    struct PendingRebase {
+        std::array<std::uint32_t, 2> joints;
+        std::array<double, 2> deltas;
+        std::uint64_t sequence;
+    };
+    std::optional<PendingRebase> pending_rebase_;
     std::array<double, 64> counter_origins_{};
     std::uint64_t counter_state_sequence_ = 0;
     bool counter_state_pending_ = false;

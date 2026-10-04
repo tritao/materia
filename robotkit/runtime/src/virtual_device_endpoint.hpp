@@ -75,6 +75,9 @@ public:
     rk_result device_input(const char *id, rk_device_input_observation &out) const override {
         return inner_->device_input(id, out);
     }
+    rk_result rebase_counters(const uint32_t *joints, const double *deltas, uint32_t count) override {
+        return inner_->rebase_counters(joints, deltas, count);
+    }
     bool reports_safety_state() const noexcept override { return true; }
     double observed_position_precision() const noexcept override {
         return inner_->observed_position_precision();
