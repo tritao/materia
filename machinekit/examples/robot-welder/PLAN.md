@@ -994,3 +994,33 @@ Dependencies:
 | W4 | Done (2026-10-04) | Whole CAD weldment: 10 seams / 680 mm in 4 runs; swept clearance and derived corner turns; 106.5 s on both backends, legs 4.9–5.1 mm; affected gates pass. Timing changes recorded above. |
 | W5 | Done (2026-10-04) | Seam-progress weave; CAD-derived pass recipes; deposited bead grounding and clearance; scene schema 16 rejects older versions; smaller restart hump. Woven 7 mm measures 6.998 mm, three-pass 10 mm measures 9.999 mm on both backends; all affected gates pass. |
 | W6 | | |
+
+
+### W6 latest-main retry: nonzero device start anchor blocks the mission
+
+User authorized the plan-control regression repair and continuing W6. Local main had advanced to
+`1484b924d9789334503781fce4ec1515021fdc6c` (machine tending MT5); it already contains the joint-count
+control-acceleration correction. Merge `95f6109ca` preserves both pneumatic/velocity simulation tails
+and appends virtual peripheral fields after them; regenerate the four-platform simulation HXI.
+Commit `aab794fa8` extends the focused control-array reproduction: six joints/four segments produce
+six defaults, accept six explicit accelerations and reject four. The test passes with main's recorded
+compiler `8521d494e43233d6c0433e831e1219aa24caa88d`, now checked out locally without changing the gitlink.
+Fetching that object succeeded; automatic recursion reported unavailable `vendor/hashlink`, but the
+existing local tools work and the focused app compiles (1810 files, compiler 21.953 s).
+The merged RobotKit native runtime builds successfully, using the prebuilt OCCT install.
+
+The unchanged RKD6 CAD seam mission still fails at 0.03 s before motion/ignition:
+`runtime.submitPlan failed with RobotKit status -2` (`RK_ERROR_INVALID_STATE`). Temporary native
+diagnostics identify the start-state guard in `RobotRuntime::submit_plan`: joint 1 has requested and
+polynomial start position -0.25 rad, but held commanded anchor 0 rad; all start derivatives are zero,
+with position/velocity/acceleration tolerances 0.005/0.02/0.2. The virtual endpoint derives this initial
+joint position from the CAD transmission offset. Generic runtime construction/reset initializes its
+commanded anchor to zero and does not establish it from the initial device observation. This needs
+an explicit generic initialization policy, not a welding tolerance increase or a fabricated CAD offset.
+Diagnostics are removed from source and the native runtime rebuilt cleanly.
+
+Per the user's stop rule for unrelated main errors, W6 pauses here. Modbus mission, mission shutdown
+cases and final welder/arm/mobile gates remain pending; no W6 cycle time or bead result is claimed.
+Main is not fast-forwarded to incomplete W6. The next authorized repair must establish the initial
+held device state once, retain commanded anchors after execution, and verify nonzero deployment
+origins and reset before retrying the same mission.
