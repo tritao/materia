@@ -1,27 +1,42 @@
 {
-	"version": 1,
-	"package": { "name": "robotkit" },
-	"sourceRoots": ["haxe"],
-	"scopeSourceRoots": false,
-	"dependencies": {
-		"kinematicskit": { "path": "../kinematicskit" },
-		"nativekit": { "path": "../nativekit" },
-		"simkit": { "path": "../simkit" },
-		"visionkit": { "path": "../visionkit" }
-	},
-	"ffi": {
-		"interfaces": [
-			"runtime/bindings/robotkit-runtime.hxi",
-			"runtime/bindings/robotkit-simkit.hxi",
-			"policy/bindings/robotkit-policy.hxi",
-			"inference/bindings/robotkit-inference.hxi"
-		],
-		"projections": [
-			"runtime/bindings/robotkit-runtime.hxmap",
-			"runtime/bindings/robotkit-simkit.hxmap",
-			"policy/bindings/robotkit-policy.hxmap",
-			"inference/bindings/robotkit-inference.hxmap"
-		]
-	},
-	"target": "host"
+  "version": 1,
+  "package": {
+    "name": "robotkit"
+  },
+  "sourceRoots": [
+    "haxe"
+  ],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "kinematicskit": {
+      "path": "../kinematicskit"
+    },
+    "nativekit": {
+      "path": "../nativekit"
+    },
+    "simkit": {
+      "path": "../simkit"
+    },
+    "visionkit": {
+      "path": "../visionkit"
+    },
+    "trajectorykit": {
+      "path": "../trajectorykit"
+    }
+  },
+  "ffi": {
+    "interfaces": [
+      "runtime/bindings/robotkit-runtime.hxi",
+      "runtime/bindings/robotkit-simkit.hxi",
+      "policy/bindings/robotkit-policy.hxi",
+      "inference/bindings/robotkit-inference.hxi"
+    ],
+    "projections": [
+      "runtime/bindings/robotkit-runtime.hxmap",
+      "runtime/bindings/robotkit-simkit.hxmap",
+      "policy/bindings/robotkit-policy.hxmap",
+      "inference/bindings/robotkit-inference.hxmap"
+    ]
+  },
+  "target": "host"
 }

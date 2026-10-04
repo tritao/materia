@@ -139,9 +139,9 @@ class RobotHost {
       var serverRuntime:Null<RobotRuntime> = null;
       try {
         if (serialPath != null)
-          serverRuntime = RobotRuntime.createSerial(blueprint, serialPath,
+          serverRuntime = RobotRuntime.create(blueprint, robotkit.serial.SerialRuntimeEndpoint.create(blueprint, serialPath,
             controller, binding, targetError, baud,
-            linkLossTimeoutNs, clockSyncBoundNs);
+            linkLossTimeoutNs, clockSyncBoundNs));
         else {
           var newServerSimulation = new SimulationHarness();
           serverSimulation = newServerSimulation;
@@ -205,8 +205,8 @@ class RobotHost {
     var simulation:Null<SimulationHarness> = null;
     var runtime:RobotRuntime;
     if (serialPath != null)
-      runtime = RobotRuntime.createSerial(blueprint, serialPath, controller, binding, targetError,
-        baud, linkLossTimeoutNs, clockSyncBoundNs);
+      runtime = RobotRuntime.create(blueprint, robotkit.serial.SerialRuntimeEndpoint.create(blueprint, serialPath, controller, binding, targetError,
+        baud, linkLossTimeoutNs, clockSyncBoundNs));
     else if (inMemory)
       runtime = RobotRuntime.create(blueprint);
     else {
@@ -238,7 +238,7 @@ class RobotHost {
     var baud = Std.parseInt(args[2]);
     if (baud == null || [115200, 230400, 460800, 921600].indexOf(baud) < 0)
       throw "robotd: identify baud must be one of 115200, 230400, 460800, 921600";
-    Sys.println(RobotRuntime.identifySerial(args[1], baud));
+    Sys.println(robotkit.serial.SerialRuntimeEndpoint.identify(args[1], baud));
   }
 
   function parsePort():Int {

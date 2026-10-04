@@ -1,5 +1,6 @@
 package motionkit.robot;
 
+import TrajectoryCore;
 import MotionKitNative;
 import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.KinematicsSolver;
@@ -129,7 +130,7 @@ class PathConfigurationSelector {
   /** The selected configurations, or the native diagnostic thrown. */
   public function readResult(status:Int,
       sequence:Array<mk_configuration_solution>):Array<Array<Float>> {
-    if (status != MotionKitNativeConstants.MK_OK) {
+    if (status != TrajectoryCoreConstants.MK_OK) {
       var message = "";
       if (sequence != null && sequence.length > 0) {
         var bytes = sequence[0];

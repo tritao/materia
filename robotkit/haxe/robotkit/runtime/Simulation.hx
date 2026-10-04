@@ -357,8 +357,12 @@ class Simulation {
     }
     var result = RobotKitSimKit.rk_simulation_add_robot(owner.borrow(), blueprint.nativeValue(), robotDesc);
     check(result.status, "simulation.addRobot");
-    var runtime = new RobotRuntime(result.out_runtime, blueprint);
-    runtime.simulation = this;
+    var runtime:RobotRuntime = null;
+    var capture = () -> robotContacts(runtime);
+    var endpoint = virtualDevice == null
+      ? SimulationEndpoints.simulation(result.out_runtime, capture)
+      : SimulationEndpoints.virtualDevice(result.out_runtime, capture);
+    runtime = RobotRuntime.create(blueprint, endpoint);
     robots.push(runtime);
     return runtime;
   }
@@ -371,10 +375,10 @@ class Simulation {
 
   public function robotContacts(runtime:RobotRuntime):Array<RobotContact> {
     ensureLive();
-    if (runtime == null || runtime.simulation != this)
+    if (runtime == null || robots.indexOf(runtime) < 0)
       throw "Runtime does not belong to this simulation";
     var capture = RobotKitSimKit.rk_simulation_capture_robot_contacts(
-      owner.borrow(), runtime.owner.borrow());
+      owner.borrow(), (cast runtime.endpoint:NativeRuntimeEndpoint).nativeHandle());
     check(capture.status, "simulation.robotContacts");
     var contacts:Array<RobotContact> = [];
     var list = capture.out_list;

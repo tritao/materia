@@ -1,6 +1,6 @@
 package motionkit.trajectory;
 
-import MotionKitNative;
+import TrajectoryCore;
 import haxe.Int64;
 import motionkit.event.TimedEvent;
 import motionkit.event.EventValue;
@@ -50,7 +50,7 @@ class ExecutionPlan implements NativeSpanOwner {
     storedAccelerationTolerances = aTol.copy();
     var info = new mk_plan_info();
     info.set_struct_size(mk_plan_info.size());
-    check(MotionKitNative.mk_plan_get_info(owner.borrow(), info), "plan.info");
+    check(TrajectoryCore.mk_plan_get_info(owner.borrow(), info), "plan.info");
     planId = info.get_plan_id();
     modelRevision = info.get_model_revision();
     calibrationRevision = info.get_calibration_revision();
@@ -62,23 +62,23 @@ class ExecutionPlan implements NativeSpanOwner {
     storedEvents = [];
     for (index in 0...info.get_event_count()) {
       var nativeEvent = new mk_timed_event();
-      check(MotionKitNative.mk_plan_get_event(owner.borrow(), index, nativeEvent),
+      check(TrajectoryCore.mk_plan_get_event(owner.borrow(), index, nativeEvent),
         "plan.event");
       var channel = new StringBuf();
-      for (i in 0...MotionKitNativeConstants.MK_EVENT_CHANNEL_BYTES) {
+      for (i in 0...TrajectoryCoreConstants.MK_EVENT_CHANNEL_BYTES) {
         var code = nativeEvent.get_channel(i);
         if (code == 0) break;
         channel.addChar(code);
       }
       var nativeValue = nativeEvent.get_value();
       var value = switch nativeValue.get_kind() {
-        case MotionKitNativeConstants.MK_EVENT_DIGITAL:
+        case TrajectoryCoreConstants.MK_EVENT_DIGITAL:
           EventValue.Digital(nativeValue.get_digital() != 0);
-        case MotionKitNativeConstants.MK_EVENT_ANALOG:
+        case TrajectoryCoreConstants.MK_EVENT_ANALOG:
           EventValue.Analog(nativeValue.get_analog());
-        case MotionKitNativeConstants.MK_EVENT_PROCESS:
+        case TrajectoryCoreConstants.MK_EVENT_PROCESS:
           var command = new StringBuf();
-          for (i in 0...MotionKitNativeConstants.MK_EVENT_COMMAND_BYTES) {
+          for (i in 0...TrajectoryCoreConstants.MK_EVENT_COMMAND_BYTES) {
             var code = nativeValue.get_command(i);
             if (code == 0) break;
             command.addChar(code);
@@ -87,8 +87,8 @@ class ExecutionPlan implements NativeSpanOwner {
         default: throw "Unknown native event value";
       };
       var hold = switch nativeEvent.get_hold_policy() {
-        case MotionKitNativeConstants.MK_EVENT_SAFE_WHILE_HELD: HoldPolicy.SafeWhileHeld;
-        case MotionKitNativeConstants.MK_EVENT_RESTORE_ON_RESUME: HoldPolicy.RestoreOnResume;
+        case TrajectoryCoreConstants.MK_EVENT_SAFE_WHILE_HELD: HoldPolicy.SafeWhileHeld;
+        case TrajectoryCoreConstants.MK_EVENT_RESTORE_ON_RESUME: HoldPolicy.RestoreOnResume;
         default: HoldPolicy.Keep;
       };
       storedEvents.push(new TimedEvent(nativeEvent.get_time_ns(), channel.toString(), value, hold));
@@ -98,26 +98,26 @@ class ExecutionPlan implements NativeSpanOwner {
   function get_events():Array<TimedEvent> return storedEvents.copy();
 
   /** Coefficients stored per joint and segment in `segmentCoefficients`: degree zero through five. */
-  public static inline final COEFFICIENT_STRIDE = MotionKitNativeConstants.MK_MAX_DEGREE + 1;
+  public static inline final COEFFICIENT_STRIDE = TrajectoryCoreConstants.MK_MAX_DEGREE + 1;
 
   public function isClosed():Bool return disposed;
 
   /** Each segment's start, in nanoseconds from the plan's start. */
   public function segmentStarts():NativeSpan<Int64>
-    return MotionKitNative.mk_plan_segment_starts(live()).ownedBy(this);
+    return TrajectoryCore.mk_plan_segment_starts(live()).ownedBy(this);
 
   public function segmentDurations():NativeSpan<Int64>
-    return MotionKitNative.mk_plan_segment_durations(live()).ownedBy(this);
+    return TrajectoryCore.mk_plan_segment_durations(live()).ownedBy(this);
 
   public function segmentDegrees():NativeSpan<Int>
-    return MotionKitNative.mk_plan_segment_degrees(live()).ownedBy(this);
+    return TrajectoryCore.mk_plan_segment_degrees(live()).ownedBy(this);
 
   /**
     Joint `j`'s coefficient of power `p` in segment `i` is at
     `(i * jointCount + j) * COEFFICIENT_STRIDE + p`, zero above the segment's degree.
   **/
   public function segmentCoefficients():NativeSpan<Float>
-    return MotionKitNative.mk_plan_segment_coefficients(live()).ownedBy(this);
+    return TrajectoryCore.mk_plan_segment_coefficients(live()).ownedBy(this);
 
   /** Copies the segments out of native memory. */
   public function segments():Array<{timeFromStartNs:Int64, durationNs:Int64,
@@ -170,13 +170,13 @@ class ExecutionPlan implements NativeSpanOwner {
     spec.set_plan_id(planId);
     spec.set_model_revision(limits.modelRevision);
     spec.set_calibration_revision(limits.calibrationRevision);
-    spec.set_required_capabilities(Int64.ofInt(MotionKitNativeConstants.MK_CAP_TIMED_TRAJECTORY));
+    spec.set_required_capabilities(Int64.ofInt(TrajectoryCoreConstants.MK_CAP_TIMED_TRAJECTORY));
     var authored = events == null ? [] : events;
-    if (authored.length > MotionKitNativeConstants.MK_MAX_PLAN_EVENTS)
+    if (authored.length > TrajectoryCoreConstants.MK_MAX_PLAN_EVENTS)
       throw "Too many timed events in plan";
     if (authored.length > 0)
       spec.set_required_capabilities(Int64.ofInt(
-        MotionKitNativeConstants.MK_CAP_TIMED_TRAJECTORY | MotionKitNativeConstants.MK_CAP_EVENTS));
+        TrajectoryCoreConstants.MK_CAP_TIMED_TRAJECTORY | TrajectoryCoreConstants.MK_CAP_EVENTS));
     spec.set_event_count(authored.length);
     var previous = Int64.ofInt(0);
     for (index in 0...authored.length) {
@@ -185,38 +185,38 @@ class ExecutionPlan implements NativeSpanOwner {
         throw "Timed events must be sorted";
       previous = event.timeNs;
       var nativeEvent = new mk_timed_event();
-      writeAscii(event.channel, MotionKitNativeConstants.MK_EVENT_CHANNEL_BYTES,
+      writeAscii(event.channel, TrajectoryCoreConstants.MK_EVENT_CHANNEL_BYTES,
         function(i, code) nativeEvent.set_channel(i, code));
       nativeEvent.set_time_ns(event.timeNs);
       nativeEvent.set_hold_policy(switch event.holdPolicy {
-        case Keep: MotionKitNativeConstants.MK_EVENT_KEEP;
-        case SafeWhileHeld: MotionKitNativeConstants.MK_EVENT_SAFE_WHILE_HELD;
-        case RestoreOnResume: MotionKitNativeConstants.MK_EVENT_RESTORE_ON_RESUME;
+        case Keep: TrajectoryCoreConstants.MK_EVENT_KEEP;
+        case SafeWhileHeld: TrajectoryCoreConstants.MK_EVENT_SAFE_WHILE_HELD;
+        case RestoreOnResume: TrajectoryCoreConstants.MK_EVENT_RESTORE_ON_RESUME;
       });
       var nativeValue = new mk_event_value();
       switch event.value {
         case Digital(enabled):
-          nativeValue.set_kind(MotionKitNativeConstants.MK_EVENT_DIGITAL);
+          nativeValue.set_kind(TrajectoryCoreConstants.MK_EVENT_DIGITAL);
           nativeValue.set_digital(enabled ? 1 : 0);
         case Analog(number):
-          nativeValue.set_kind(MotionKitNativeConstants.MK_EVENT_ANALOG);
+          nativeValue.set_kind(TrajectoryCoreConstants.MK_EVENT_ANALOG);
           nativeValue.set_analog(number);
         case Process(command, argument):
-          nativeValue.set_kind(MotionKitNativeConstants.MK_EVENT_PROCESS);
-          writeAscii(command, MotionKitNativeConstants.MK_EVENT_COMMAND_BYTES,
+          nativeValue.set_kind(TrajectoryCoreConstants.MK_EVENT_PROCESS);
+          writeAscii(command, TrajectoryCoreConstants.MK_EVENT_COMMAND_BYTES,
             function(i, code) nativeValue.set_command(i, code));
           nativeValue.set_argument(argument);
       }
       nativeEvent.set_value(nativeValue);
       spec.set_events(index, nativeEvent);
     }
-    spec.set_planning_authority(MotionKitNativeConstants.MK_AUTHORITY_MATERIA);
+    spec.set_planning_authority(TrajectoryCoreConstants.MK_AUTHORITY_MATERIA);
     spec.set_start_state(start);
     var nativeReport = new mk_validation_report();
     nativeReport.set_struct_size(mk_validation_report.size());
-    var created = MotionKitNative.mk_plan_create(trajectory.owner.borrow(), spec,
+    var created = TrajectoryCore.mk_plan_create(trajectory.owner.borrow(), spec,
       limits.nativeValue(), nativeReport);
-    if (created.status == MotionKitNativeConstants.MK_ERROR_LIMIT)
+    if (created.status == TrajectoryCoreConstants.MK_ERROR_LIMIT)
       throw new PlanLimitError(new ValidationReport(nativeReport));
     check(created.status, "plan.create");
     return new ExecutionPlan(created.out_plan, new ValidationReport(nativeReport),
@@ -228,7 +228,7 @@ class ExecutionPlan implements NativeSpanOwner {
     if (disposed) throw "Native plan has been disposed";
     var state = TrajectoryStateBuffer.acquire();
     try {
-      check(MotionKitNative.mk_plan_evaluate(owner.borrow(),
+      check(TrajectoryCore.mk_plan_evaluate(owner.borrow(),
         Trajectory.nanoseconds(timeSeconds), state), "plan.evaluate");
       var result = TrajectoryStateBuffer.copyOut();
       TrajectoryStateBuffer.release();
@@ -246,7 +246,7 @@ class ExecutionPlan implements NativeSpanOwner {
   }
 
   static function check(status:Int, operation:String):Void {
-    if (status != MotionKitNativeConstants.MK_OK)
+    if (status != TrajectoryCoreConstants.MK_OK)
       throw '$operation failed with MotionKit error $status';
   }
 

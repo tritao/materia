@@ -1,5 +1,6 @@
 package motionkit.path;
 
+import TrajectoryCore;
 import MotionKitNative;
 import motionkit.planner.JointPathSamples;
 import motionkit.planner.PathTimingLimits;
@@ -11,7 +12,7 @@ class NativeJointPath {
   var disposed:Bool = false;
 
   public function new(samples:JointPathSamples) {
-    if (samples.jointCount > MotionKitNativeConstants.MK_MAX_JOINTS)
+    if (samples.jointCount > TrajectoryCoreConstants.MK_MAX_JOINTS)
       throw "Native joint path exceeds the joint limit";
     var native:Array<mk_path_sample> = [];
     for (index in 0...samples.s.length) {
@@ -58,7 +59,7 @@ class NativeJointPath {
   }
 
   static function check(status:Int, operation:String):Void {
-    if (status != MotionKitNativeConstants.MK_OK)
+    if (status != TrajectoryCoreConstants.MK_OK)
       throw '$operation failed with MotionKit error $status';
   }
 }

@@ -17,7 +17,7 @@ import motionkit.planner.ToppraPathTiming;
 import motionkit.planner.PathPlanningOptions;
 import motionkit.trajectory.Trajectory;
 import motionkit.trajectory.ValidationLimits;
-import MotionKitNative;
+import TrajectoryCore;
 
 typedef PathPlanRequest = {
   var path:GeometricPath;
@@ -304,13 +304,13 @@ class PathPlanner {
     var tolerance = options.exactStop || options.blendTolerance == 0.0
       ? 1e-5 : options.blendTolerance;
     report.setTaskSpace(worstTaskDeviation <= tolerance
-      ? MotionKitNativeConstants.MK_CHECK_PASSED
-      : MotionKitNativeConstants.MK_CHECK_FAILED,
+      ? TrajectoryCoreConstants.MK_CHECK_PASSED
+      : TrajectoryCoreConstants.MK_CHECK_FAILED,
       worstTaskDeviation, worstTaskTime, tolerance, Int64.ofInt(1000000));
     if (report.hasFailure()) {
       for (index in 0...report.checks.length) {
         var check = report.checks[index];
-        if (check.status == MotionKitNativeConstants.MK_CHECK_FAILED)
+        if (check.status == TrajectoryCoreConstants.MK_CHECK_FAILED)
           throw 'Timed Cartesian path check $index failed: ${check.value} > ${check.limit} at ${check.timeSeconds}';
       }
     }

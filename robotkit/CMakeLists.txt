@@ -92,9 +92,9 @@ if(RK_BUILD_SHARED AND NOT EMSCRIPTEN)
     set(RK_LIBRARY_TYPE SHARED)
 endif()
 
-if(NOT TARGET motionkit_core)
-    set(MK_BUILD_SHARED ${RK_BUILD_SHARED} CACHE BOOL "Build MotionKit with RobotKit" FORCE)
-    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../motionkit/native" motionkit)
+if(NOT TARGET trajectory_core)
+    set(TC_BUILD_SHARED ${RK_BUILD_SHARED} CACHE BOOL "Build the shared trajectory core" FORCE)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../trajectorykit/native" trajectory)
 endif()
 
 if(RK_BUILD_VISIONKIT AND NOT TARGET visionkit_core)

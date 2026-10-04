@@ -1,6 +1,6 @@
 package motionkit.trajectory;
 
-import MotionKitNative;
+import TrajectoryCore;
 import haxe.Int64;
 
 /** Explicit claims about one native trajectory. Each derivative claim carries its presence separately from its value. */
@@ -11,7 +11,7 @@ class ValidationLimits {
   final native:mk_limits;
 
   public function new(jointCount:Int, modelRevision:Int64, calibrationRevision:Int64) {
-    if (jointCount < 1 || jointCount > MotionKitNativeConstants.MK_MAX_JOINTS)
+    if (jointCount < 1 || jointCount > TrajectoryCoreConstants.MK_MAX_JOINTS)
       throw "Invalid validation joint count";
     this.jointCount = jointCount;
     this.modelRevision = modelRevision;

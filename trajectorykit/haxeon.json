@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "package": {
+    "name": "trajectorykit"
+  },
+  "sourceRoots": ["haxe"],
+  "dependencies": {},
+  "ffi": {
+    "interfaces": [
+      "native/bindings/trajectory-core.hxi"
+    ]
+  },
+  "native": {
+    "cmake": {
+      "source": "native",
+      "target": "trajectory_core",
+      "library": "trajectory_core",
+      "inputs": [
+        "native/CMakeLists.txt",
+        "native/include/trajectory_core.h",
+        "native/include/trajectory_core.hpp",
+        "native/src/trajectory.cpp",
+        "native/src/validation.cpp"
+      ]
+    }
+  },
+  "target": "host"
+}

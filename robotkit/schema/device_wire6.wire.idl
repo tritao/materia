@@ -1,4 +1,5 @@
-# RKD6 scheduled device payload records. Outer frame uses RKD6, length and CRC32.
+# RKD generation 6 scheduled payload records; independent wire revision below.
+# Outer frame uses the generation marker RKD6, length and CRC32.
 const PROTOCOL_VERSION : u8 = 12;
 const MAX_ACTUATORS : u8 = 64;
 

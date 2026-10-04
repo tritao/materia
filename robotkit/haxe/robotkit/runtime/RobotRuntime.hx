@@ -3,7 +3,6 @@ package robotkit.runtime;
 import RobotKitRuntime;
 import haxe.Int64;
 import nativekit.ffi.NativeKit;
-import robotkit.device.DeviceBinding;
 import robotkit.world.CameraImage;
 import robotkit.world.SensorFrame;
 import robotkit.world.TrajectoryChunk;
@@ -29,8 +28,7 @@ import sys.thread.Mutex;
  * simulation so all robots observe one physics tick.
  */
 class RobotRuntime {
-  @:allow(robotkit.runtime.Simulation)
-  final owner:Ownedrk_robot_runtime;
+  public final endpoint:RuntimeEndpoint;
   final defaultMaxRates:Array<Null<Float>>;
   final defaultMaxEfforts:Array<Null<Float>>;
   final sensorLayout:Array<RobotRuntimeSensorBlueprint>;
@@ -54,12 +52,9 @@ class RobotRuntime {
   static final planHeaderScratch = new rk_plan_header();
   static final jointMapScratch = new Arena(256);
   var disposed:Bool = false;
-  @:allow(robotkit.runtime.Simulation)
-  var simulation:Null<Simulation>;
 
-  @:allow(robotkit.runtime.Simulation)
-  private function new(owner:Ownedrk_robot_runtime, blueprint:RobotRuntimeBlueprint) {
-    this.owner = owner;
+  private function new(endpoint:RuntimeEndpoint, blueprint:RobotRuntimeBlueprint) {
+    this.endpoint = endpoint;
     defaultMaxRates = [for (joint in blueprint.joints) joint.maxRate];
     defaultMaxEfforts = [for (joint in blueprint.joints) joint.maxEffort];
     sensorLayout = blueprint.nativeSensorLayout();
@@ -71,8 +66,8 @@ class RobotRuntime {
 
   /** Contacts from the latest simulation tick. Standalone runtimes have none. */
   public function contacts():Array<RobotContact> {
-    if (simulation == null) return [];
-    return simulation.robotContacts(this);
+    ensureLive();
+    return endpoint.contacts();
   }
 
   /** Inactive proximity contacts on attached tool pieces. */
@@ -85,80 +80,24 @@ class RobotRuntime {
     return false;
   }
 
-  /** Creates a standalone in-memory runtime with its own worker lifecycle. */
-  public static function create(blueprint:RobotRuntimeBlueprint):RobotRuntime {
-    var result = RobotKitRuntime.rk_robot_runtime_create(blueprint.nativeValue());
-    check(result.status, "runtime.create");
-    return new RobotRuntime(result.out_runtime, blueprint);
-  }
-
-  /**
-   * Creates a serial runtime for the board `controllerHex` (its 32-digit unique id) wired as
-   * `binding` says, within an SI-unit error budget. The blueprint should be compiled from the
-   * binding's model so its limits are the device's. The board must be that controller and agree
-   * with the configuration, or this throws with the device's reason on stderr.
-   */
-  public static function createSerial(blueprint:RobotRuntimeBlueprint,
-      devicePath:String, controllerHex:String, binding:DeviceBinding, maxTargetError:Float,
-      ?baud:Int = 115200, ?linkLossTimeoutNs:haxe.Int64, ?clockSyncBoundNs:haxe.Int64):RobotRuntime {
-    if (blueprint == null) throw "Serial runtime requires a compiled blueprint";
-    if (devicePath == null || StringTools.trim(devicePath).length == 0)
-      throw "Serial runtime requires a device path";
-    if (binding == null) throw "Serial runtime requires a device binding";
-    if (controllerHex == null || !~/^[0-9a-fA-F]{32}$/.match(controllerHex) ||
-        controllerHex.toLowerCase() == "00000000000000000000000000000000")
-      throw "Serial runtime requires a nonzero 32-digit controller id";
-    if (!Math.isFinite(maxTargetError) || maxTargetError < 0.0)
-      throw "Serial runtime requires a finite nonnegative target error budget";
-    if (linkLossTimeoutNs == null) linkLossTimeoutNs = haxe.Int64.ofInt(500000000);
-    if (clockSyncBoundNs == null) clockSyncBoundNs = haxe.Int64.ofInt(30000000);
-    var device = new rk_serial_device_desc();
-    device.set_struct_size(rk_serial_device_desc.size());
-    device.set_actuator_count(binding.channels.length);
-    for (i in 0...16)
-      device.set_controller(i, Std.parseInt("0x" + controllerHex.substr(i * 2, 2)));
-    for (i in 0...binding.channels.length) {
-      var channel = binding.channels[i];
-      device.set_actuator_joint(i, channel.jointIndex);
-      device.set_actuator_ratio(i, channel.ratio);
-      device.set_actuator_offset(i, channel.offset);
-      device.set_actuator_steps_per_unit(i, channel.stepsPerUnit);
-      device.set_actuator_max_rate(i, channel.maxRate);
-      device.set_actuator_direction_setup_ticks(i, channel.directionSetupTicks);
-      device.set_actuator_skew_bound(i, channel.skewBound);
-      if (channel.actuatorId.length > 63) throw "Serial actuator ID is longer than 63 characters";
-      for (byte in 0...channel.actuatorId.length)
-        device.set_actuator_ids(i * 64 + byte, channel.actuatorId.charCodeAt(byte));
-    }
-    var result = RobotKitRuntime.rk_robot_runtime_create_serial6(
-      blueprint.nativeValue(), devicePath, baud, device, maxTargetError,
-      binding.stepTickHz, linkLossTimeoutNs, clockSyncBoundNs, haxe.Int64.ofInt(100000));
-    check(result.status, "runtime.createSerial");
-    return new RobotRuntime(result.out_runtime, blueprint);
-  }
-
-  /** Reads the unique id (32 lowercase hex digits) of the board on a serial port. */
-  public static function identifySerial(devicePath:String, baud:Int):String {
-    if (devicePath == null || StringTools.trim(devicePath).length == 0)
-      throw "Identifying a serial device requires a device path";
-    var result = RobotKitRuntime.rk_serial_device_identify(devicePath, baud);
-    check(result.status, "runtime.identifySerial");
-    var text = "";
-    for (i in 0...16) text += StringTools.hex(result.out_controller.get_bytes(i), 2).toLowerCase();
-    return text;
+  /** Creates a runtime from a compiled model and an endpoint factory's result. */
+  public static function create(blueprint:RobotRuntimeBlueprint, ?endpoint:RuntimeEndpoint):RobotRuntime {
+    if (blueprint == null) throw "Runtime requires a compiled blueprint";
+    if (endpoint == null) endpoint = RuntimeEndpoints.inMemory(blueprint);
+    return new RobotRuntime(endpoint, blueprint);
   }
 
   /** Starts a standalone runtime worker; Simulation-owned runtimes reject this. */
   public function start():Void {
     ensureLive();
-    check(RobotKitRuntime.rk_robot_runtime_start(owner.borrow()), "runtime.start");
+    check(endpoint.start(), "runtime.start");
   }
 
   /** Stops a standalone worker; it never advances a shared Simulation. */
   public function stop():Void {
     if (disposed)
       return;
-    check(RobotKitRuntime.rk_robot_runtime_stop(owner.borrow()), "runtime.stop");
+    check(endpoint.stop(), "runtime.stop");
   }
 
   /** Reports the endpoint's actual buffered-trajectory capability. */
@@ -166,7 +105,7 @@ class RobotRuntime {
     ensureLive();
     var value = new rk_robot_capabilities();
     value.set_struct_size(rk_robot_capabilities.size());
-    check(RobotKitRuntime.rk_robot_runtime_capabilities(owner.borrow(), value).status,
+    check(endpoint.capabilities(value),
       "runtime.capabilities");
     return value.get_supports_trajectory_queue() != 0;
   }
@@ -175,7 +114,7 @@ class RobotRuntime {
     ensureLive();
     var value = new rk_robot_capabilities();
     value.set_struct_size(rk_robot_capabilities.size());
-    check(RobotKitRuntime.rk_robot_runtime_capabilities(owner.borrow(), value).status,
+    check(endpoint.capabilities(value),
       "runtime.capabilities");
     return value.get_supports_execution_plans() != 0;
   }
@@ -227,7 +166,7 @@ class RobotRuntime {
       if (effort != null) target.set_max_effort(effort);
       command.set_targets(index, target);
     }
-    check(RobotKitRuntime.rk_robot_runtime_submit(owner.borrow(), command),
+    check(endpoint.submit(command),
       "runtime.submitTargets");
   }
 
@@ -248,7 +187,7 @@ class RobotRuntime {
     command.set_kind(RobotKitRuntimeConstants.RK_COMMAND_TRAJECTORY_SEGMENTS);
     command.set_target_count(0);
     var arrays = SegmentValues.of(chunk.segments);
-    check(RobotKitRuntime.rk_robot_runtime_submit_segments(owner.borrow(), command, chunk.tag,
+    check(endpoint.submitSegments(command, chunk.tag,
       arrays.starts, arrays.durations, arrays.degrees, arrays.coefficients),
       "runtime.submitTrajectorySegments");
   }
@@ -273,12 +212,12 @@ class RobotRuntime {
         var map:RawPtr<Int> = jointMapScratch.alloc(arrays.jointMap.length);
         for (joint in 0...arrays.jointMap.length)
           map.offset(joint).store(arrays.jointMap[joint]);
-        RobotKitRuntime.rk_robot_runtime_submit_plan_span(owner.borrow(), header, arrays.starts,
+        endpoint.submitPlanSpan(header, arrays.starts,
           arrays.durations, arrays.degrees, arrays.coefficients,
           new NativeSpan<Int>(map, arrays.jointMap.length), events);
       } else {
         var values = SegmentValues.of(plan.segments);
-        RobotKitRuntime.rk_robot_runtime_submit_plan(owner.borrow(), header, values.starts,
+        endpoint.submitPlanArrays(header, values.starts,
           values.durations, values.degrees, values.coefficients,
           [for (joint in 0...plan.startPosition.length) joint], events);
       }
@@ -343,7 +282,7 @@ class RobotRuntime {
     scratchMutex.acquire();
     try {
       eventBatchScratch.set_struct_size(rk_event_record_batch.size());
-      check(RobotKitRuntime.rk_robot_runtime_poll_events(owner.borrow(), eventBatchScratch),
+      check(endpoint.pollEvents(eventBatchScratch),
         "runtime.pollEvents");
       for (index in 0...eventBatchScratch.get_count()) {
         var record = eventBatchScratch.get_records(index);
@@ -368,7 +307,7 @@ class RobotRuntime {
   public function channelValue(channel:String):ProcessEventValue {
     ensureLive();
     var value = new rk_event_value();
-    check(RobotKitRuntime.rk_robot_runtime_get_channel_value(owner.borrow(), channel, value),
+    check(endpoint.channelValue(channel, value),
       'runtime.channelValue("$channel")');
     return ProcessEventCodec.decode(value);
   }
@@ -409,7 +348,7 @@ class RobotRuntime {
       ? RobotKitRuntimeConstants.RK_COMMAND_EMERGENCY_STOP
       : RobotKitRuntimeConstants.RK_COMMAND_STOP);
     command.set_target_count(0);
-    check(RobotKitRuntime.rk_robot_runtime_submit(owner.borrow(), command),
+    check(endpoint.submit(command),
       "runtime.submitStop");
   }
 
@@ -429,7 +368,7 @@ class RobotRuntime {
     command.set_struct_size(rk_robot_command.size());
     command.set_sequence(haxe.Int64.ofInt(sequence));
     command.set_kind(kind);
-    check(RobotKitRuntime.rk_robot_runtime_submit(owner.borrow(), command),
+    check(endpoint.submit(command),
       "runtime.submitLifecycle");
   }
 
@@ -446,7 +385,7 @@ class RobotRuntime {
     command.set_timestamp_ns(haxe.Int64.ofInt(0));
     command.set_kind(RobotKitRuntimeConstants.RK_COMMAND_RESET_SAFETY);
     command.set_target_count(0);
-    check(RobotKitRuntime.rk_robot_runtime_submit(owner.borrow(), command),
+    check(endpoint.submit(command),
       "runtime.resetSafety");
   }
 
@@ -457,7 +396,7 @@ class RobotRuntime {
     scratchMutex.acquire();
     try {
       snapshotScratch.set_struct_size(rk_robot_snapshot.size());
-      check(RobotKitRuntime.rk_robot_runtime_snapshot_full(owner.borrow(), snapshotScratch).status,
+      check(endpoint.observe(snapshotScratch),
         "runtime.snapshot");
       native = RobotSnapshot.fromNative(snapshotScratch, sensorLayout);
     } catch (error:Dynamic) {
@@ -562,7 +501,7 @@ class RobotRuntime {
     externalMutex.acquire();
     externalFrames.clear();
     externalMutex.release();
-    owner.close();
+    endpoint.close();
     disposed = true;
   }
 
@@ -571,7 +510,7 @@ class RobotRuntime {
       throw "RobotKit runtime has been disposed";
   }
 
-  static function check(status:Int, operation:String):Void {
+  public static function check(status:Int, operation:String):Void {
     if (status != RobotKitRuntimeConstants.RK_OK)
       throw new RobotRuntimeError(status, operation);
   }

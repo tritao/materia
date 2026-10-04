@@ -1,4 +1,4 @@
-#include "motionkit.h"
+#include "trajectory_core.h"
 #include <cassert>
 #include <cmath>
 #include <cstdint>

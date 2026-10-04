@@ -1,4 +1,4 @@
-#include "motionkit.hpp"
+#include "trajectory_core.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -341,28 +341,6 @@ mk_result MK_CALL mk_trajectory_from_samples(uint32_t joint_count,
         return MK_ERROR_OUT_OF_MEMORY;
     } catch (...) {
         return MK_ERROR_INVALID_ARGUMENT;
-    }
-}
-
-mk_result MK_CALL mk_generate_state_to_state(const mk_state_to_state_request *request,
-    mk_trajectory_handle *out_trajectory, int32_t *out_ruckig_result) {
-    if (out_trajectory != nullptr) out_trajectory->id = 0;
-    if (out_ruckig_result != nullptr) *out_ruckig_result = -100; // Ruckig ErrorInvalidInput.
-    if (request == nullptr || out_trajectory == nullptr || out_ruckig_result == nullptr ||
-        request->struct_size < sizeof(mk_state_to_state_request) ||
-        request->joint_count == 0 || request->joint_count > MK_MAX_JOINTS)
-        return MK_ERROR_INVALID_ARGUMENT;
-    *out_ruckig_result = 0;
-    try {
-        auto generated = std::make_unique<motionkit::Trajectory>(request->joint_count);
-        const auto result = motionkit::generate(*request, *generated, *out_ruckig_result);
-        if (result != MK_OK) return result;
-        std::lock_guard lock(registry_mutex);
-        return register_trajectory(std::move(generated), out_trajectory);
-    } catch (const std::bad_alloc &) {
-        return MK_ERROR_OUT_OF_MEMORY;
-    } catch (...) {
-        return MK_ERROR_GENERATION;
     }
 }
 

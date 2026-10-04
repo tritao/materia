@@ -1,5 +1,6 @@
 package motionkit.path;
 
+import TrajectoryCore;
 import MotionKitNative;
 import haxe.Int64;
 import motionkit.planner.BindingConstraint;
@@ -46,21 +47,21 @@ class PathTimeLaw {
       native.push(value);
     }
     var created = MotionKitNative.mk_time_law_create(native);
-    if (created.status != MotionKitNativeConstants.MK_OK)
+    if (created.status != TrajectoryCoreConstants.MK_OK)
       throw 'timeLaw.create failed with MotionKit error ${created.status}';
     owner = created.out_law;
   }
 
   public function bindingConstraints():Array<BindingConstraint> {
     var result = MotionKitNative.mk_time_law_binding_count(borrow());
-    if (result.status != MotionKitNativeConstants.MK_OK)
+    if (result.status != TrajectoryCoreConstants.MK_OK)
       throw 'timeLaw.bindingCount failed with MotionKit error ${result.status}';
     var bindings:Array<BindingConstraint> = [];
     for (index in 0...result.out_count) {
       var native = new mk_timing_binding();
       native.set_struct_size(mk_timing_binding.size());
       var status = MotionKitNative.mk_time_law_get_binding(borrow(), index, native);
-      if (status != MotionKitNativeConstants.MK_OK)
+      if (status != TrajectoryCoreConstants.MK_OK)
         throw 'timeLaw.binding failed with MotionKit error $status';
       var kind = switch native.get_kind() {
         case MotionKitNativeConstants.MK_TIMING_BINDING_JOINT_VELOCITY:
@@ -78,7 +79,7 @@ class PathTimeLaw {
 
   public function distanceToTime(distance:Float):Float {
     var result = MotionKitNative.mk_path_distance_to_time(borrow(), distance);
-    if (result.status != MotionKitNativeConstants.MK_OK)
+    if (result.status != TrajectoryCoreConstants.MK_OK)
       throw 'timeLaw.distanceToTime failed with MotionKit error ${result.status}';
     return result.out_seconds;
   }
@@ -90,7 +91,7 @@ class PathTimeLaw {
   public function timesToDistances(seconds:Array<Float>):Array<Float> {
     if (seconds.length == 0) return [];
     var result = MotionKitNative.mk_path_times_to_distances(borrow(), seconds);
-    if (result.status != MotionKitNativeConstants.MK_OK)
+    if (result.status != TrajectoryCoreConstants.MK_OK)
       throw 'timeLaw.timesToDistances failed with MotionKit error ${result.status}';
     return result.out_distances;
   }
