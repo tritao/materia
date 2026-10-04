@@ -2968,3 +2968,17 @@ protocol-backed router variant.
 No builds/tests ran. The new regression is queued for Phase C alongside native
 transaction coverage. Router virtual-device execution and Nucleo/bench support
 remain pending; G13 is not complete.
+
+### G13 — physical router virtual-device homing fixture
+
+Added checkVirtualRouterHoming to the app project-source suite and a focused
+router-device-home selector. The fixture loads the authored screw router,
+requires its four home switches, explicitly binds each to its original motor
+shaft with active-low virtual inputs, and installs protocol-backed side controls.
+It runs MotionSystem homing through the virtual RKD6 endpoint, requires all
+linear axes referenced and checks return to each home within 50 micrometres.
+The fixture is included in the full project-source phase suite.
+
+No builds/tests ran. This new fixture is unverified and may expose integration
+issues at Phase C; it is not evidence that device router homing already passes.
+Nucleo input/control support and bench pin documentation remain pending.

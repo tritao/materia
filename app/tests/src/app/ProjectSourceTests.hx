@@ -1815,6 +1815,58 @@ class ProjectSourceTests {
     physical.dispose();
   }
 
+  /** Physical screw router homes using RKD6 switch captures, never host switch synthesis. */
+  static function checkVirtualRouterHoming(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/cnc-router/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var definition:AssemblyDefinition = cast generated.assemblyDefinition;
+    var model = AssemblySimulationBridge.toRobotModel(definition, generated.physical).model;
+    var homes = [for (contact in model.switches) if (contact.role == "home") contact];
+    check(homes.length == 4, "Physical router declares X, Z and two independent Y home switches");
+    var inputs:Array<robotkit.device.DeviceInput> = [];
+    for (contact in model.switches) {
+      var matches = [for (actuator in model.actuators) switch actuator.transmission {
+        case SimpleTransmission(shaft, _, _): if (shaft == contact.driveJoint) actuator;
+      }];
+      check(matches.length == 1, "Router switch has exactly one physical motor side: " + contact.id);
+      inputs.push(new robotkit.device.DeviceInput(inputs.length, contact.id, matches[0].id, false));
+    }
+    var channels = DeviceLayout.forActuators(model).channels;
+    var binding = DeviceBinding.bind(model, new DeviceLayout(channels, inputs), 40000);
+    var axes = [for (joint in binding.model.joints) if (joint.type == JointType.Prismatic) {
+      var limits = binding.model.coupledLimits(joint.id, new SteadyLoads());
+      new motionkit.axis.MotionAxisBlueprint(joint.id, [joint.id], joint.limits.lower,
+        joint.limits.upper, limits.requireVelocity(), limits.requireAcceleration());
+    }];
+    var blueprint = motionkit.robot.MotionSystemBlueprint.fromRobotModel(binding.model, axes);
+    var options = new robotkit.runtime.VirtualDeviceOptions();
+    options.actuators = binding.virtualActuators(); options.inputs = binding.virtualInputs();
+    var harness = new SimulationHarness(0.01);
+    try {
+      var runtime = harness.simulation.addRobot(blueprint.runtime, null, options);
+      for (_ in 0...30) harness.step();
+      var robot = new robotkit.runtime.SimulatedRobot("virtual-router", runtime, binding.model.name,
+        [for (link in binding.model.links) link.name], [for (joint in binding.model.joints) joint.name]);
+      var sides = robotkit.device.DeviceHomingSides.install(runtime, blueprint.runtime, binding, 0.01);
+      var motion = new motionkit.robot.MotionSystem(robot, blueprint);
+      motion.configureRuntimeHoming(runtime, () -> {}, sides);
+      motion.home();
+      var ticks = 0;
+      while (motion.homingStatus() != "Complete" && ticks++ < 60000) {
+        harness.step();
+        motion.update(0.01);
+      }
+      check(motion.homingStatus() == "Complete", "Router homes through virtual RKD6: " + motion.homingStatus());
+      var snapshot = runtime.snapshot();
+      for (index in 0...binding.model.joints.length) if (binding.model.joints[index].type == JointType.Prismatic) {
+        check(runtime.isReferenced(index), "Device-homed router axis is referenced");
+        check(Math.abs(snapshot.q.get(index) - binding.model.joints[index].limits.lower) < 0.00005,
+          "Device-homed router returns to its reference within 50 micrometres");
+      }
+      harness.dispose();
+    } catch (error:Dynamic) { harness.dispose(); throw error; }
+  }
+
   static function checkCncRouter(root:String, belts:Bool = false):Void {
     var kind = belts ? "belt router" : "screw router";
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/cnc-router/" + (belts ? "belts/" : "") + "materia.project.json");
@@ -2446,6 +2498,10 @@ class ProjectSourceTests {
       checkRobotWelderOn(root, ApplicationSimulation.DETERMINISTIC, "test backend");
       return 0;
     }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "router-device-home") {
+      checkVirtualRouterHoming(root);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "router") {
       checkCncRouter(root);
       checkBeltRouter(root);
@@ -2738,6 +2794,7 @@ class ProjectSourceTests {
     checkMates(root);
     checkBenchMill(root);
     checkEnclosedMillProject(root);
+    checkVirtualRouterHoming(root);
     checkCncRouter(root);
     checkBeltRouter(root);
     checkCoreXyPlotter(root);
