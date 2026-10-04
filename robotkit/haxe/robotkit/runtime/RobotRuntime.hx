@@ -450,7 +450,7 @@ class RobotRuntime {
         if (image != null || values.length != 1 || values[0] < 0.0)
           throw 'Vacuum "$sensorId" publication requires one non-negative kPa value';
       case "tool_weld":
-        if (image != null || !robotkit.tool.WeldSensor.valid(values))
+        if (image != null || !processkit.tool.WeldSensor.valid(values))
           throw 'Weld sensor "$sensorId" publication requires arc, current, voltage, touch, fault and power values';
       case _:
     }

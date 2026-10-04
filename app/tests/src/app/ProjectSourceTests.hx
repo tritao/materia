@@ -839,7 +839,7 @@ class ProjectSourceTests {
 
   /** A welder cell open in the simulation on MuJoCo, from one of the example's manifests. */
   static function openWelder(root:String, manifestName:String, ?adjust:app.MateriaProjectRunner.GeneratedAssemblyScene -> Void):{session:ProjectDocumentSession,
-      simulation:ApplicationSimulation, mission:MissionPlayer, welder:robotkit.runtime.SimulatedWelder, beads:WeldBeads} {
+      simulation:ApplicationSimulation, mission:MissionPlayer, welder:processkit.simulation.SimulatedWelder, beads:WeldBeads} {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-welder/" + manifestName);
     var generated = MateriaProjectRunner.loadProject(manifest);
     if (adjust != null) adjust(generated);

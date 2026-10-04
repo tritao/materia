@@ -21,7 +21,7 @@ import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.Frame;
 import robotkit.manipulation.Manipulator;
-import robotkit.manipulation.WorkPatchPlanner;
+import processkit.manipulation.WorkPatchPlanner;
 import cadbridge.FaceBridge;
 import cadbridge.WallBridge;
 import cadbridge.BimFrameBridge;
@@ -1003,7 +1003,7 @@ class CadBridgeTests {
     return result;
   }
 
-  static function reflexVertices(points:Array<robotkit.work.Point2>):Int {
+  static function reflexVertices(points:Array<processkit.work.Point2>):Int {
     var result = 0;
     for (i in 0...points.length) {
       var previous = points[(i + points.length - 1) % points.length];

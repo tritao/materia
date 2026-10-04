@@ -259,7 +259,7 @@ Done (see Progress). What was built and decided:
   The section is JSON, so there is no format version bump (M5 added `robotTools` inside version 13 the same way).
   `AssemblyPreview.robotTools(tool, prefix, ?equipment)` emits it; the cell's preview does, and the W0 check that
   asserted none now asserts the torch.
-- **Arc model** (`robotkit.tool.WeldArcModel`, pure and deterministic; documented in its header). With the
+- **Arc model** (`processkit.tool.WeldArcModel`, pure and deterministic; documented in its header). With the
   arc commanded, the supply ready and the wire fed (at least 1 m/min), the arc strikes when grounded work is
   within 5 mm ahead of the wire tip along the wire (the wire advances to scratch it), is established 80 ms
   later, and burns while the arc length (tip distance + 3 mm nominal) stays at most 12 mm. Current is the
@@ -373,7 +373,7 @@ Done (see Progress). What was built and decided:
   arc from the same reading the device reads.
 - **MotionKit needed nothing.** Its output events attach to a motion (a `SetOutput` after a barrier leads the next move,
   and a program may not end on one), which shaped the exit: the wire stop leads the lift, the arc command ends it.
-- **The bead** (`robotkit.tool.WeldBead`, pure) takes each tick the arc state, the wire speed and the wire tip, and
+- **The bead** (`processkit.tool.WeldBead`, pure) takes each tick the arc state, the wire speed and the wire tip, and
   keeps the metal at each 1 mm station of the seam: melted wire (`wire speed · A · dt`) times the deposit efficiency (0.95)
   goes to the station the tip is over, so a station's section is deposition over travel speed, and standing still piles
   metal into a crater. An equal-leg triangular fillet's leg is `sqrt(2·area)`. It is the result that is compared with the

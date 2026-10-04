@@ -6,11 +6,11 @@ import cadkit.Shape;
 import robotkit.spatial.Vec3;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
-import robotkit.work.Point2;
-import robotkit.work.Polygon2;
-import robotkit.work.Provenance;
-import robotkit.work.WorkSurface;
-import robotkit.work.WorkSurfaceId;
+import processkit.work.Point2;
+import processkit.work.Polygon2;
+import processkit.work.Provenance;
+import processkit.work.WorkSurface;
+import processkit.work.WorkSurfaceId;
 
 /**
  * Converts a CadKit planar Face into a design WorkSurface: its outer wire

@@ -5,10 +5,10 @@ import bimkit.BimDocument;
 import cadkit.Face;
 import cadkit.parametric.ElementId;
 import robotkit.spatial.Vec3;
-import robotkit.work.Provenance;
-import robotkit.work.SourceKind;
-import robotkit.work.WorkSurface;
-import robotkit.work.WorkSurfaceId;
+import processkit.work.Provenance;
+import processkit.work.SourceKind;
+import processkit.work.WorkSurface;
+import processkit.work.WorkSurfaceId;
 
 /**
  * Converts a BimKit wall's side face into a WorkSurface. Hosted

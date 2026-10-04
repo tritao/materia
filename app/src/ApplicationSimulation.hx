@@ -387,7 +387,7 @@ class ApplicationSimulation {
   /** The weld metal the mission has laid, or null when it does not weld. */
   public function weldBeads():Null<WeldBeads> return beads;
   /** The simulated welder on the assembly's torch, or null when it has none. */
-  public function welder():Null<robotkit.runtime.SimulatedWelder> return tools == null || tools.welders.length == 0 ? null : tools.welders[0];
+  public function welder():Null<processkit.simulation.SimulatedWelder> return tools == null || tools.welders.length == 0 ? null : tools.welders[0];
 
   /** The stock the project's CNC program is cutting, or null when it cuts none. */
   public function machiningStock():Null<MachiningStock> return cnc == null ? null : cnc.stock;

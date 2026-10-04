@@ -411,7 +411,7 @@ that builds on the repo instead:
 4. **Unify the two path systems.**
    - Arm toolpaths should go through timed chunks instead of per-tick
      `JointTargets` (`FinishSurface.hx:249`).
-   - `robotkit.process.Toolpath` becomes a facade over MotionKit paths with
+   - `processkit.path.Toolpath` becomes a facade over MotionKit paths with
      orientation.
    - `processOn` becomes an event keyed to path progress (§13).
 5. **RKD6 scheduled segments.** Clock mapping, queue revision, commit and

@@ -1,7 +1,7 @@
 package processkit;
 
-import robotkit.tool.WeldFault;
-import robotkit.tool.WeldSensor;
+import processkit.tool.WeldFault;
+import processkit.tool.WeldSensor;
 import robotkit.world.FiredProcessEvent;
 import robotkit.world.ProcessEventValue;
 
