@@ -837,6 +837,59 @@ class ProjectSourceTests {
     checkWeldCraterFault(root);
     checkWeldFollowsWorkpiece(root);
     checkWeldPost(root);
+    checkWeldQualities(root);
+  }
+
+  static function checkWeldQuality(root:String, legMm:Float, backend:Int, label:String):Void {
+    var cell = openWelder(root, legMm == 7 ? "materia.weave.project.json" : "materia.multipass.project.json", null, backend);
+    var mission = cell.mission, welder = cell.welder, simulation = cell.simulation;
+    var bead = cell.beads.beadOf(0).beads[0];
+    var strikes = 0, previousArc = false, tick = 0;
+    var limit = simulation.activeSession().simulationTime() + 300;
+    while (!mission.finished && simulation.activeSession().simulationTime() < limit) {
+      simulation.step();
+      if (mission.failure != null) throw '$legMm mm weld: ${mission.failure}';
+      var arc = welder.reading().arc;
+      if (arc && !previousArc) {
+        strikes++;
+        if (strikes > 1) {
+          var previousLeg = bead.meanLeg(0.3, 0.7);
+          check(previousLeg > (strikes == 2 ? 0.0045 : 0.0074), "later pass starts after preceding bead is deposited");
+          var deposited = new processkit.tool.WeldBeadWork(bead, () -> cell.beads.referenceOf(0));
+          var tip = welder.tip();
+          check(deposited.distance(tip[0], tip[1], tip[2]) < 0.0006, "later pass strikes on earlier bead metal");
+          check(mission.depositedWeldHulls().length > 0, "later pass has deposited clearance geometry");
+        }
+      }
+      previousArc = arc;
+      tick++;
+      if (tick % 5 == 0) {
+        var local = cell.beads.toFrame(0, welder.tip());
+        var along = 0.0;
+        for (axis in 0...3) along += (local[axis] - bead.start[axis]) * bead.tangent[axis];
+        var nearest = bead.pointAt(Math.max(0, Math.min(bead.length, along))), distance = 0.0;
+        for (axis in 0...3) distance += Math.pow(local[axis] - nearest[axis], 2);
+        var violation = mission.clearanceViolation(Math.sqrt(distance) <= processkit.WeldPathPlanner.CONTACT_ZONE);
+        check(violation == null, violation == null ? "weld remains clear" : '$legMm mm clearance: ${violation.a}/${violation.b}');
+      }
+    }
+    check(mission.finished && mission.completed == 1, "quality weld finishes");
+    check(strikes == (legMm == 7 ? 1 : 3), "recipe executes the requested pass count without restarts");
+    var achieved = bead.meanLeg(0.15, 0.85);
+    check(Math.abs(achieved - legMm * 0.001) <= 0.0005, '$legMm mm target: measured ${achieved * 1000} mm');
+    check(bead.gaps() == 0 && Math.abs(bead.extent() - bead.length) <= 0.002, "all passes cover the CAD seam");
+    check(!welder.reading().arc, "quality weld finishes with arc off");
+    Sys.println('robot welder ($label): $legMm mm target, ${strikes} strikes, leg ${achieved * 1000} mm, ' +
+      '${simulation.activeSession().simulationTime()} s, ' + mission.planReport());
+    simulation.clear();
+    cell.session.dispose();
+  }
+
+  static function checkWeldQualities(root:String):Void {
+    for (leg in [7.0, 10.0]) {
+      checkWeldQuality(root, leg, ApplicationSimulation.MUJOCO, "MuJoCo");
+      checkWeldQuality(root, leg, ApplicationSimulation.DETERMINISTIC, "test backend");
+    }
   }
 
   /** The plate fillet on the side away from the arm: its nearest endpoint can have no reachable approach. */
@@ -1838,6 +1891,10 @@ class ProjectSourceTests {
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "welder-plate") {
       checkFarPlateWeld(root);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "welder-quality") {
+      checkWeldQualities(root);
       return 0;
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "welder-seam") {

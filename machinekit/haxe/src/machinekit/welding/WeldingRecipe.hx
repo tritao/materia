@@ -98,18 +98,38 @@ class WeldingRecipe {
 		for (index in 0...fractions.length) {
 			var passLeg = leg * Math.sqrt(fractions[index]);
 			var recipe = fillet(passLeg, wire);
-			var woven = passLeg > 6;
+			var pass = singlePass(recipe);
 			var previousLeg = leg * Math.sqrt(deposited);
 			// A fillet's exposed face joins the two leg endpoints. Shift toward alternate faces on fill and cap.
-			var faceA = index == 0 ? (woven ? passLeg * 0.25 : 0.0) : previousLeg * (index == 1 ? 0.65 : 0.35);
-			var faceB = index == 0 ? faceA : previousLeg - faceA;
-			result.push({name: fractions.length == 1 ? "single" : ["root", "fill", "cap"][index], recipe: recipe,
-				faceA: faceA, faceB: faceB, weaveAmplitude: woven ? passLeg * 0.2 : 0.0,
-				weaveFrequency: woven ? 0.1 : 0.0, edgeDwell: woven ? 0.05 : 0.0,
-				interpassDwell: index == 0 ? 0.0 : interpassDwell});
+			pass.name = fractions.length == 1 ? "single" : ["root", "fill", "cap"][index];
+			if (index > 0) {
+				pass.faceA = previousLeg * (index == 1 ? 0.65 : 0.35);
+				pass.faceB = previousLeg - pass.faceA;
+				pass.interpassDwell = interpassDwell;
+			}
+			result.push(pass);
 			deposited += fractions[index];
 		}
 		return result;
+	}
+
+	static function singlePass(recipe:WeldingRecipe):WeldingPassRecipe {
+		var leg = recipe.legSize;
+		var woven = leg > 6;
+		return {name: "single", recipe: recipe, faceA: woven ? leg * 0.25 : 0.0, faceB: woven ? leg * 0.25 : 0.0,
+			weaveAmplitude: woven ? leg * 0.2 : 0.0, weaveFrequency: woven ? 0.1 : 0.0,
+			edgeDwell: woven ? 0.05 : 0.0, interpassDwell: 0.0};
+	}
+
+	static function savedPass(pass:WeldingPassRecipe):materia.project.SceneArtifact.SceneArtifactWeldPass {
+		var recipe = pass.recipe;
+		var saved:materia.project.SceneArtifact.SceneArtifactWeldPass = {name: pass.name,
+			offset: [pass.faceA * 0.001, pass.faceB * 0.001], interpassDwell: pass.interpassDwell,
+			process: {wireSpeed: recipe.wireSpeed, voltage: recipe.voltage, travelSpeed: recipe.travelSpeed * 0.001,
+				approach: recipe.approach * 0.001, startDwell: recipe.startDwell, craterDwell: recipe.craterDwell, burnback: recipe.burnback}};
+		if (pass.weaveAmplitude > 0) saved.weave = {pattern: "sine", amplitude: pass.weaveAmplitude * 0.001,
+			cyclesPerMetre: pass.weaveFrequency * 1000, edgeDwell: pass.edgeDwell};
+		return saved;
 	}
 
 	/** Generate the shared CAD path once, then attach the area-conserving pass schedule. */
@@ -120,16 +140,7 @@ class WeldingRecipe {
 		var weld = step.weld;
 		if (weld == null) throw "A recipe produced no weld";
 		weld.legSize = leg * 0.001;
-		weld.passes = [for (pass in schedule) {
-			var recipe = pass.recipe;
-			var saved:materia.project.SceneArtifact.SceneArtifactWeldPass = {name: pass.name,
-				offset: [pass.faceA * 0.001, pass.faceB * 0.001], interpassDwell: pass.interpassDwell,
-				process: {wireSpeed: recipe.wireSpeed, voltage: recipe.voltage, travelSpeed: recipe.travelSpeed * 0.001,
-					approach: recipe.approach * 0.001, startDwell: recipe.startDwell, craterDwell: recipe.craterDwell, burnback: recipe.burnback}};
-			if (pass.weaveAmplitude > 0) saved.weave = {pattern: "sine", amplitude: pass.weaveAmplitude * 0.001,
-				cyclesPerMetre: pass.weaveFrequency * 1000, edgeDwell: pass.edgeDwell};
-			saved;
-		}];
+		weld.passes = [for (pass in schedule) savedPass(pass)];
 		return step;
 	}
 
@@ -158,7 +169,6 @@ class WeldingRecipe {
 				case Corner: "corner";
 			}, start: pose(seam.frameAtParameter(0.0)), stop: pose(seam.frameAtParameter(1.0)),
 			normals: [direction(seam.normalA), direction(seam.normalB)]}], legSize: legSize * millimetre,
-			passes: [{name: "single", offset: [0.0, 0.0], interpassDwell: 0.0, process: {wireSpeed: wireSpeed, voltage: voltage, travelSpeed: travelSpeed * millimetre, approach: approach * millimetre,
-				startDwell: startDwell, craterDwell: craterDwell, burnback: burnback}}]}};
+			passes: [savedPass(singlePass(this))]}};
 	}
 }

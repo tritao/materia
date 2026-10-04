@@ -47,6 +47,10 @@ class RobotWelderPreview {
 	/** The cell with a mission of one weld, of the seam `WELD_SEAM`: for tests that look at one bead. */
 	public static function seamCell():Bytes return encode(new WeldingCell(), (cell, scene) -> [weldStep(cell, scene.metresPerUnit)]);
 
+	/** Process-quality examples over the same CAD-derived plate seam. */
+	public static function wovenCell():Bytes return encode(new WeldingCell(), (cell, scene) -> [weldStep(cell, scene.metresPerUnit, null, 7)]);
+	public static function multipassCell():Bytes return encode(new WeldingCell(), (cell, scene) -> [weldStep(cell, scene.metresPerUnit, null, 10)]);
+
 	/** The cell with a mission that welds the first post's perimeter only. */
 	public static function postCell():Bytes return encode(new WeldingCell(), (cell, scene) -> [postStep(cell, scene.metresPerUnit)]);
 
@@ -103,13 +107,13 @@ class RobotWelderPreview {
 	 * geometry and given relative to the workpiece's reference member, so a player finds it where the workpiece stands; it is
 	 * welded with the recipe for the leg the weldment asks for, in the wire the cell's feeder declares.
 	 */
-	public static function weldStep(cell:WeldingCell, metresPerUnit:Float, ?name:String):materia.project.SceneArtifact.SceneArtifactMissionStep {
+	public static function weldStep(cell:WeldingCell, metresPerUnit:Float, ?name:String, ?leg:Float):materia.project.SceneArtifact.SceneArtifactMissionStep {
 		var wanted = name == null ? WELD_SEAM : name;
 		var found = [for (item in seamsOf(cell).require()) if (item.name() == wanted) item];
 		if (found.length != 1) throw 'The cell has no seam "$wanted"';
 		var weldment = cell.weldment();
-		return WeldingRecipe.fillet(found[0].legSize, wireOf(cell)).step([found[0]], weldment.reference, WeldMetal.carrierOf(cell, weldment),
-			metresPerUnit);
+		var seam = leg == null ? found[0] : found[0].configured(leg);
+		return WeldingRecipe.passStep(seam.legSize, wireOf(cell), [seam], weldment.reference, WeldMetal.carrierOf(cell, weldment), metresPerUnit);
 	}
 
 	/**

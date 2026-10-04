@@ -46,6 +46,18 @@ class WeldingRecipeTests {
     rejected = false;
     try WeldingRecipe.passes(7, {diameterMm: 1.2, depositionEfficiency: 0.95, maxSpeedMPerMin: 3.0}) catch (_:Dynamic) rejected = true;
     check(rejected, "CAD feeder limit is enforced for each pass");
+    var seam = new machinekit.welding.WeldSeam({member: "plate", face: "top"}, {member: "wall", face: "front"},
+      machinekit.welding.WeldSeam.JointType.Fillet, new cadkit.modeling.Vector(0, 0, 0), new cadkit.modeling.Vector(180, 0, 0),
+      new cadkit.modeling.Vector(0, 0, 1), new cadkit.modeling.Vector(0, 1, 0), 7, 1, 0, 0);
+    var single = WeldingRecipe.fillet(7, wire).step([seam], "plate", "metal", 0.001).weld;
+    if (single == null) throw "single recipe lost its weld";
+    check(single.passes.length == 1 && single.passes[0].weave != null, "single-pass entrypoint saves its weave");
+    near(single.passes[0].offset[0], 0.00175, "saved offsets use metres");
+    var multi = WeldingRecipe.passStep(10, wire, [seam.configured(10)], "plate", "metal", 0.001, 0.5).weld;
+    if (multi == null) throw "multi-pass recipe lost its weld";
+    check(multi.path.length == 1 && multi.passes.length == 3, "all passes share one CAD path");
+    near(multi.legSize, 0.01, "saved target is the final leg");
+    near(multi.passes[1].interpassDwell, 0.5, "saved cooling dwell");
     Sys.println('Welding recipe tests passed: $checks assertions');
   }
 }
