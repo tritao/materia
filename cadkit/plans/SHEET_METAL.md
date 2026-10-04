@@ -199,6 +199,13 @@ table in `tools/README.md`.
 - Fusing many touching solids is acceptable to start. If it is slow or fragile, a native
   builder that assembles faces with known topology (planar and cylindrical faces sharing exact
   edges, then sewing) replaces it later, with the same names.
+- SM2 seeds the logical identifiers above; the core's existing naming grammar percent-escapes
+  colons in seed identifiers. They remain opaque in Haxe. Joining strip caps have logical roles
+  `bend:<id>:join:a|b` (normally consumed by the fuse). Extrusion side faces are matched by
+  native history and exact input-edge identity: history accessors return bare topology without
+  names, so `IsSame` on the still-owned named profile recovers the authored segment.
+- A rule that gives zero bend allowance for a nonzero bend cannot create a flat strip and
+  is refused by the solid builder with `sheet.zero-bend-allowance`; no artificial gap is added.
 
 **SM-D5. Sheet features form their own chain inside the document.**
 - `SheetFeature extends Feature` and exposes `sheet():Sheet` alongside the folded `shape`.
@@ -725,8 +732,8 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | Step | State | Commits |
 |---|---|---|
 | SM0 | done: clean branch on 38601ac61, pins verified, prerequisite documents read; quick gate `sm0-setup` passes (ProjectKit 138, ManufacturingKit 54) | c70c89745 |
-| SM1 | done: exact line/arc regions, permanent graph ids, edits/cuts/rips, bidirectional FK, neutral-length conservation, closure and P1–P5 bounds; quick gate `sm1-core` passes (2102 sheet assertions) | 0713c4e0c; final core commit |
-| SM2 | planned | |
+| SM1 | done: exact line/arc regions, permanent graph ids, edits/cuts/rips, bidirectional FK, neutral-length conservation, closure and P1–P5 bounds; quick gate `sm1-core` passes (2102 sheet assertions) | 0713c4e0c; 54b5cab15 |
+| SM2 | done: named wall extrusions and bend revolutions fused for flat/folded/partial states; P1–P5 validity, single bodies, volumes, axes and stable names; quick gate `sm2-solid` passes (3757 sheet assertions) | final solid commit |
 | SM3 | planned | |
 | SM4 | planned | |
 | SM4b | planned | |
@@ -765,3 +772,10 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
   P1–P5 cover both fold signs, 0/near-zero/partial/target angles, inverse traversal from another
   root, tangent contact on both sheet sides, restored edits and a changed closed-ring flange.
   No new haxeon issue or baseline-number change; existing MachineKit summaries match exactly.
+- SM2: `sm2-solid` passes all five quick suites, including 3757 sheet assertions. P1–P5
+  are valid single solids in flat/folded states, volumes match the separate graph formulas,
+  partial-state cylinders match evaluated axes/radii, and every face name is strong and unique.
+  Flat/folded name sets agree; angle, radius and flange-length edits preserve names. Circular
+  outlines/holes, partial arcs and K = 0.5 equal volumes are also checked. The native source-name
+  issue and logical seed encoding are recorded in SM-D4; no native or compiler patch was needed.
+  Existing MachineKit summaries and ProjectKit/ManufacturingKit counts remain unchanged.

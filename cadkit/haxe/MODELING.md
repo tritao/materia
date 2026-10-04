@@ -283,6 +283,24 @@ angles must lie strictly between zero and `π` radians. `CountersunkFlange.hx`
 patterns a face-attached countersink tool around a bolt circle and keeps the
 through cut valid when flange radius and thickness change.
 
+## Sheet metal
+
+`cadkit.sheetmetal.Sheet` owns an exact line/arc wall graph, permanent wall/bend ids,
+thickness through `SheetMaterial`, and an explicit bend rule. Angles are radians and lengths
+are millimetres. Side A is local z = 0; the material grows toward negative Z. A missing
+bend rule is diagnosed, never supplied implicitly.
+
+`evaluate(flat())` and `evaluate(folded())` derive wall placements and bend strips without
+native geometry. `SheetState` also supports partial angles, preserving the bend allowance's
+neutral length. Evaluations keep immutable wall snapshots. Rips cut connectivity at the
+child-side bend seam and retain the strip on the parent; closure failures name the measured gap.
+
+`SheetSolid.build(sheet, state)` returns an owning `Shape`: wall extrusions and bend-strip
+revolutions fused into one result. Face identities come from wall/loop/segment and bend roles,
+seeded before fusing. The native naming grammar escapes their logical identifiers. Close the
+returned shape when done. Native history is used within the extrusion to match side faces to
+their exact input edges; graph identity supplies persistence across rebuilds.
+
 ## Validation
 
 `ctest --test-dir build/debug --output-on-failure` exercises the C boundary,

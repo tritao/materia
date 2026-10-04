@@ -77,6 +77,7 @@ class SheetMetalSmoke {
 		diagnosis("sheet.invalid-radius-ratio", function() { var value = table.at(-1); });
 		diagnosis("sheet.invalid-mechanical-data", function() { var value = new SheetMaterial("bad", 1, rule, {uts: 200, yield: 300, youngs: 70000}); });
 		assertions += SheetCoreSmoke.run();
+		assertions += SheetSolidSmoke.run();
 		trace("Sheet metal smoke passed (" + assertions + " assertions)");
 	}
 }
