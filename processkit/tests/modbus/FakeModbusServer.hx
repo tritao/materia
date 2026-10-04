@@ -7,6 +7,8 @@ import processkit.modbus.ModbusWelderMap;
 
 /** In-process fake on a real TCP socket; watchdog clock advances even after the socket drops. */
 class FakeModbusServer {
+  /** Electrical contact supplied by the CAD harness; the server owns the arc and watchdog. */
+  public var grounded:Bool = true;
   public final map:ModbusWelderMap;
   final transport:TransportHandle;
   final stream = new ModbusFrameStream();
@@ -68,9 +70,10 @@ class FakeModbusServer {
     arc = expires > now && !supplyFault && (registers[map.arcAddress] & map.arcMask) != 0;
     wire = arc ? map.wire.decode(registers[map.wire.address]) : 0.0;
     if (modelEnabled) {
-      var current = arc ? wire * 30.0 : 0.0;
-      var voltage = arc ? map.voltage.decode(registers[map.voltage.address]) : 0.0;
-      registers[map.statusAddress] = (arc ? map.establishedMask : 0) | (supplyFault ? map.faultMask : 0);
+      var established = arc && grounded;
+      var current = established ? wire * 30.0 : 0.0;
+      var voltage = established ? map.voltage.decode(registers[map.voltage.address]) : 0.0;
+      registers[map.statusAddress] = (established ? map.establishedMask : 0) | (supplyFault ? map.faultMask : 0);
       registers[map.current.address] = map.current.encode(current);
       registers[map.measuredVoltage.address] = map.measuredVoltage.encode(voltage);
       registers[map.power.address] = map.power.encode(current * voltage / 0.9);

@@ -3,7 +3,7 @@
   "package": {
     "name": "app"
   },
-  "entry": "app.ProjectSourceTests",
+  "entry": "app.WelderDeviceTests",
   "sourceRoots": [
     "src",
     "tests/src",
@@ -109,5 +109,5 @@
     }
   },
   "target": "host",
-  "outputDir": "build"
+  "outputDir": "build/welder-device"
 }
