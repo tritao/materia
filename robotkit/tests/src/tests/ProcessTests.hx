@@ -2,9 +2,9 @@ package tests;
 
 import haxe.Int64;
 import motionkit.event.EventValue;
-import motionkit.robot.ToolpathPosePath;
-import robotkit.process.Toolpath;
-import robotkit.process.ToolpathPoint;
+import processkit.motion.ToolpathPosePath;
+import processkit.path.Toolpath;
+import processkit.path.ToolpathPoint;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;

@@ -507,3 +507,7 @@ latest expiring intent through `IntentBuffer`. `robotd` turns supported intents
 into bulk runtime commands; behaviors never access native handles or MuJoCo
 state directly. The initial `robotd --behavior=oscillate` behavior is an
 integration probe for this path, not a permanent controller API.
+
+Process work, finishing, welding and earthwork live in [ProcessKit](../processkit/README.md).
+Its skills use RobotKit's generic skill and tool interfaces; RobotKit does not
+import process planning or simulated weld behavior.

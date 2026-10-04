@@ -1,12 +1,25 @@
 {
   "version": 1,
-  "package": { "name": "robotkit-excavator-plan-tests" },
+  "package": {
+    "name": "robotkit-excavator-plan-tests"
+  },
   "entry": "tests.ExcavatorPlanRunner",
-  "sourceRoots": ["../src"],
+  "sourceRoots": [
+    "../src"
+  ],
   "dependencies": {
-    "nativekit": { "path": "../../../nativekit" },
-    "robotkit": { "path": "../.." },
-    "motionkit-robot": { "path": "../../../motionkit/robot" }
+    "nativekit": {
+      "path": "../../../nativekit"
+    },
+    "robotkit": {
+      "path": "../.."
+    },
+    "motionkit-robot": {
+      "path": "../../../motionkit/robot"
+    },
+    "processkit": {
+      "path": "../../../processkit"
+    }
   },
   "native": {
     "cmake": {

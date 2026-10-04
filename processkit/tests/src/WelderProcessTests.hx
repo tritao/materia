@@ -19,9 +19,9 @@ import processkit.ProcessRunState;
 import processkit.WelderFeedback;
 import processkit.WelderOutputs;
 import processkit.WelderProcessDevice;
-import robotkit.tool.WeldArcModel;
-import robotkit.tool.WeldFault;
-import robotkit.tool.WeldSensor.WeldReading;
+import processkit.tool.WeldArcModel;
+import processkit.tool.WeldFault;
+import processkit.tool.WeldSensor.WeldReading;
 import robotkit.world.FiredProcessEvent;
 import robotkit.world.ProcessEventValue;
 

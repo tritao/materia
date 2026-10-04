@@ -251,7 +251,7 @@ class AssemblyRobot {
       if (sensorId == null) continue;
       var carrier = converted.partLinks.get(tool.contact.occurrence);
       if (carrier == null) throw 'Robot tool "${tool.contact.occurrence}" is not part of the robot';
-      var kind = tool.kind == "torch" ? robotkit.tool.WeldSensor.KIND : "tool_vacuum_kpa";
+      var kind = tool.kind == "torch" ? processkit.tool.WeldSensor.KIND : "tool_vacuum_kpa";
       var sensor = converted.model.addSensor(new robotkit.model.Sensor(sensorId, kind, 0.0, sensorId));
       var mount = converted.model.addFrame(new robotkit.model.Frame(sensorId + " mount", converted.model.links[carrier.link]));
       mount.position = [carrier.offset.x, carrier.offset.y, carrier.offset.z];
@@ -292,7 +292,7 @@ class AssemblyRobot {
     for (tool in session.robotTools) {
       var welder = tool.torch;
       blueprint.addTool(welder == null ? new robotkit.tool.SuctionChannels(tool.channel)
-        : new robotkit.tool.WeldChannels(tool.channel, welder.wireSpeedChannel, welder.voltageChannel));
+        : new processkit.tool.WeldChannels(tool.channel, welder.wireSpeedChannel, welder.voltageChannel));
     }
     // A mobile robot stands at its origin on the floor; its root link is framed there.
     var origin = session.mobileBase == null ? null : session.mobileBase.origin;

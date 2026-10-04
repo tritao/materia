@@ -6,10 +6,10 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.project.SceneArtifact.SceneArtifactRobotTool;
 import nativekit.sim.SimObject;
 import robotkit.runtime.SimulatedSuctionTool;
-import robotkit.runtime.SimulatedWelder;
+import processkit.simulation.SimulatedWelder;
 import robotkit.runtime.Simulation;
 import robotkit.tool.ConvexSolid;
-import robotkit.tool.GroundedWork;
+import processkit.tool.GroundedWork;
 
 /** A scene object the simulation owns, by scene id. */
 typedef GripObject = {id:String, object:SimObject};

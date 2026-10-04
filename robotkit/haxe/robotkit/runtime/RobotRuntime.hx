@@ -450,7 +450,7 @@ class RobotRuntime {
         if (image != null || values.length != 1 || values[0] < 0.0)
           throw 'Vacuum "$sensorId" publication requires one non-negative kPa value';
       case "tool_weld":
-        if (image != null || !robotkit.tool.WeldSensor.valid(values))
+        if (image != null || !validExternalWeldFrame(values))
           throw 'Weld sensor "$sensorId" publication requires arc, current, voltage, touch, fault and power values';
       case _:
     }
@@ -495,6 +495,15 @@ class RobotRuntime {
     if (status != RobotKitRuntimeConstants.RK_OK)
       throw new RobotRuntimeError(status, operation);
   }
+  // Frozen external sensor frame contract; process behavior belongs to ProcessKit.
+  static function validExternalWeldFrame(values:Array<Float>):Bool {
+    if (values == null || values.length != 6) return false;
+    for (value in values) if (!Math.isFinite(value)) return false;
+    return (values[0] == 0.0 || values[0] == 1.0) && (values[3] == 0.0 || values[3] == 1.0) &&
+      values[1] >= 0.0 && values[5] >= 0.0 && values[4] == Std.int(values[4]) &&
+      values[4] >= 0.0 && values[4] <= 3.0;
+  }
+
 }
 
 /** Managed segments flattened into the runtime's segment arrays, over every joint they carry. */
@@ -518,4 +527,6 @@ private class SegmentValues {
     }
     return values;
   }
+
+
 }

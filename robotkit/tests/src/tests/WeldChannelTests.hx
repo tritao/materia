@@ -10,7 +10,7 @@ import robotkit.runtime.RobotRuntime;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.SimulationHarness;
 import robotkit.tool.SuctionChannels;
-import robotkit.tool.WeldChannels;
+import processkit.tool.WeldChannels;
 import robotkit.world.ExecutionPlanSubmission;
 import robotkit.world.ProcessEventValue;
 import robotkit.world.ProcessTimedEvent;

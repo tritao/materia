@@ -4,15 +4,15 @@ import haxe.Int64;
 import robotkit.spatial.Vec3;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
-import robotkit.work.WorkSurface;
-import robotkit.work.Polygon2;
-import robotkit.work.Point2;
-import robotkit.work.DeviationMap;
+import processkit.work.WorkSurface;
+import processkit.work.Polygon2;
+import processkit.work.Point2;
+import processkit.work.DeviationMap;
 import robotkit.perception.PlaneFit;
 import robotkit.perception.PlaneEstimate;
 import robotkit.perception.SeededRandom;
-import robotkit.perception.SimulatedSurfaceScanner;
-import robotkit.perception.SurfaceRegistration;
+import processkit.perception.SimulatedSurfaceScanner;
+import processkit.perception.SurfaceRegistration;
 
 /** M7 acceptance tests for robotkit.perception + robotkit.work: PlaneFit, SurfaceRegistration, DeviationMap. */
 class PerceptionTests {
@@ -50,7 +50,7 @@ class PerceptionTests {
       'Registration recovers the injected yaw within 0.05deg (got ${radToDeg(result.rotationCorrectionRadians)}deg)');
     check(result.registered != null, "An accepted registration returns a corrected work surface");
     var registered:WorkSurface = cast result.registered;
-    check(registered.provenance.sourceKind == robotkit.work.SourceKind.Work,
+    check(registered.provenance.sourceKind == processkit.work.SourceKind.Work,
       "The registered work surface's provenance is 'work'");
     check(registered.provenance.designElementId == design.provenance.designElementId,
       "The registered work surface retains the design element id");

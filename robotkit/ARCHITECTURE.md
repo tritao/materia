@@ -1267,11 +1267,12 @@ excluded region, not of the raster's ordinary edge margin.
 ## CAD/BIM bridge (`robotkit/cadbridge`, separate project)
 
 `robotkit/cadbridge` is its own haxeon project (`robotkit/cadbridge/haxeon.json`),
-depending on `robotkit`, `cadkit`, and `bimkit`. It is the *only* place CAD/BIM
-concepts meet RobotKit; `robotkit/haxeon.json` itself still depends only on
-`nativekit`, per the plan's CAD-agnostic-core rule.
+depending on `robotkit`, `cadkit`, and `bimkit`. Generic assembly and frame
+conversion remain here. ProcessKit owns the CAD face and BIM wall bridges that
+produce work surfaces; the generic CAD bridge does not depend on ProcessKit.
+RobotKit's core model and runtime remain independent of CAD/BIM.
 
-`cadbridge.FaceBridge.toWorkSurface(face, id, frameId, ?provenance,
+`processkit.cadbridge.FaceBridge.toWorkSurface(face, id, frameId, ?provenance,
 ?surfaceFrameId, ?scale)` converts any CadKit planar `Face` into a design
 `WorkSurface`: it walks each wire's edge endpoints to preserve the authored
 connected loop, normalizes the resulting loop to counter-clockwise, and picks
@@ -1290,7 +1291,7 @@ rotation's columns `(basisU, basisV, normal)` make the surface's local +Z
 exactly the face's outward normal. `scale` converts the shape's own linear
 units into meters; CadKit itself is unit-agnostic.
 
-`cadbridge.WallBridge.wallToWorkSurface(bim, wallId, id, frameId,
+`processkit.cadbridge.WallBridge.wallToWorkSurface(bim, wallId, id, frameId,
 ?sideNormal)` finds a `BimSchema.Wall` element's side face (the planar face
 whose normal is closest to `sideNormal`, default `+Y`) on its *cut* shape —
 `bimkit.BimDocument.rebuildWall` already boolean-cuts a wall's body with
@@ -1374,7 +1375,7 @@ shape is unaffected by an out-of-plane correction) at
 `design.frame_T_surface.compose(correction)`, with `provenance` retaining the
 design element id under `SourceKind.Work`.
 
-`robotkit.work.DeviationMap(surface, cellSize)` mirrors `CoverageMap`'s grid
+`processkit.work.DeviationMap(surface, cellSize)` mirrors `CoverageMap`'s grid
 (cells classified by the surface's boundary bounding box), but accumulates
 the *mean* signed deviation reported for each cell instead of a covered flag.
 A caller adds samples already expressed in the surface's own local plane
@@ -1589,7 +1590,7 @@ against a laid course, adhesive/mortar process state (a new capability
 interface alongside `SurfaceTool`/`Sander`/`Sprayer`), and force control
 during placement (seating a tile against a substrate without cracking it or
 leaving a proud edge) that this codebase has no capability interface or
-simulated contact-force model for yet. `robotkit.work.WorkPatchPlanner`'s
+simulated contact-force model for yet. `processkit.work.WorkPatchPlanner`'s
 axis-aligned patch geometry would also need a per-tile course/coursing-offset
 layer above the raster it already produces.
 
@@ -1653,7 +1654,7 @@ volume, together equal to one full column — which is what
 a tolerance.
 
 `EarthworkRegion` pairs an `existing` and `design` `HeightMap` (validated to
-share one grid) with exclusion polygons (`robotkit.work.Polygon2`, the same
+share one grid) with exclusion polygons (`processkit.work.Polygon2`, the same
 type `WorkSurface` uses for its own exclusions) and a `gradeTolerance`.
 `isAtGrade(col, row)` is true when a vertex's excluded, or its
 `|existing - design|` delta is within tolerance; `gradeFraction()` and

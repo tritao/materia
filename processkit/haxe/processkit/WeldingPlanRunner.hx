@@ -23,12 +23,12 @@ import motionkit.robot.StartTolerances;
 import motionkit.trajectory.ValidationLimits;
 import processkit.WelderProcessDevice.WelderChannels;
 import robotkit.manipulation.Manipulator;
-import robotkit.skill.WeldPlan;
+import processkit.skill.WeldPlan;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
-import robotkit.tool.WeldFault;
-import robotkit.tool.WeldSensor;
-import robotkit.tool.WeldSensor.WeldReading;
+import processkit.tool.WeldFault;
+import processkit.tool.WeldSensor;
+import processkit.tool.WeldSensor.WeldReading;
 import robotkit.world.FiredProcessEvent;
 import robotkit.world.Robot;
 
@@ -71,7 +71,7 @@ private class LatestReading implements WelderFeedback {
  * once the fault has cleared the run restarts `BACKOFF` metres before where it stopped, so the new bead overlaps the
  * old; at most `maxRestarts` times, after which the weld fails.
  */
-class WeldingPlanRunner implements robotkit.skill.WeldRunner {
+class WeldingPlanRunner implements processkit.skill.WeldRunner {
   public static inline var FRAME:String = "arm-base";
   /** The name the program's input wait reads the established arc under. */
   public static inline var ARC_ESTABLISHED:String = "weld.arc_established";
