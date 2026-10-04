@@ -31,7 +31,8 @@ class GantryPickerChecks {
 		if (axes.length != 3 || axes.indexOf("x") < 0 || axes.indexOf("y") < 0 || axes.indexOf("z") < 0)
 			throw "Gantry picker needs three physical translational leaders";
 		var rejected = false;
-		scene.machining = cast {};
+		scene.machining = {program: "M30", axes: ["x", "y", "z"], spindle: "tool",
+			workOffset: [0.0, 0.0, 0.0], tools: []};
 		try { var invalid = SceneArtifact.encode(scene); }
 		catch (error:Dynamic) rejected = Std.string(error) == "Scene artifact cannot combine machining and a mission";
 		if (!rejected) throw "A picker mission must reject simultaneous machining";

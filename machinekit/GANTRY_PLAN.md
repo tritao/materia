@@ -2244,3 +2244,15 @@ for the two optional startup-offset lists; added those declarations. Both
 failed compiles are being retried. These changes do not alter native code or
 homing sequencing, so the green native ctest and focused homing run stand.
 The picker and complete compiler checkpoint remain pending; G13 is unstarted.
+
+### G12 checkpoint — picker compilation follow-up
+
+The app project-source compiler passed after explicit offset-array typing.
+MachineKit's retry found a missing import for the secondary GantryPickerChecks
+type; imported it from GantryPickerPreview. The first focused picker attempt
+stopped during generated project compilation because its scene conflict check
+assigned an empty object to the machining schema. Replaced that fixture with
+a structurally complete machining object; the simultaneous-mission rejection
+remains the assertion. Retried the failed picker, with the newly built native
+RobotKit runtime first on the library path. ProjectKit and RobotKit compiler
+checks passed. Remaining compiler checks and picker execution are pending.

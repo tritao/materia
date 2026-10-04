@@ -10,6 +10,7 @@ import CncRouterPreview.CncRouterChecks;
 import MobileBasePreview.MobileBaseChecks;
 import RobotWelderPreview.RobotWelderChecks;
 import CoreXyPlotterPreview.CoreXyPlotterChecks;
+import GantryPickerPreview.GantryPickerChecks;
 import machinekit.assembly.AssemblyPreview;
 import machinekit.assembly.LinearAxis;
 import machinekit.assembly.MachineAssembly;
