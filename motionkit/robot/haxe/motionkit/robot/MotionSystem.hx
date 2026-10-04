@@ -550,6 +550,13 @@ class MotionSystem {
 
   /** Starts executing `trajectoryValue` as a fresh, un-retimed plan. */
   function setActive(trajectoryValue:Trajectory):Void {
+    // Pre-timed/sample trajectories still belong to this machine's motion session.
+    if (trajectoryValue.controlAcceleration == null) {
+      var caps = [for (_ in trajectoryValue.evaluate(0.0).positions) 0.0];
+      for (axis in axes) for (index in 0...axis.jointIndices.length)
+        caps[axis.jointIndices[index]] = axis.maxAcceleration * Math.abs(axis.jointScale(index));
+      trajectoryValue.controlAcceleration = caps;
+    }
     activeTrajectory = trajectoryValue;
     var segments = trajectoryValue.segments();
     activeStationary = stationarySegments(segments);

@@ -45,7 +45,15 @@ def main() -> int:
              "class RecordingSchemas {", "  public static function forChannel(name:String):String return switch name {"]
     for topic, root in ROOTS.items():
         lines.append(f'    case "{topic}": {json.dumps(schema(root, lock["declarations"]))};')
-    lines.extend(['    case _: throw "Unknown core recording schema";', "  };", "}", ""])
+    lines.extend(['    case _: throw "Unknown core recording schema";', "  };"])
+    # v6 recordings predating per-plan stop limits retain their exact schema.
+    legacy = json.loads(json.dumps(lock["declarations"]))
+    legacy["RecordingPlanMsg"]["fields"] = [field for field in legacy["RecordingPlanMsg"]["fields"]
+                                            if field["name"] != "controlAcceleration"]
+    lines.extend(["", "  /** Previous v6 command schema, before optional controlled-stop limits. */",
+                  "  public static function legacyCommand():String return " +
+                  json.dumps(schema("RecordingCommandMsg", legacy)) + ";", "}", ""])
+
     rendered = "\n".join(lines)
     if args.command == "check":
         if not args.output.exists() or args.output.read_text() != rendered:

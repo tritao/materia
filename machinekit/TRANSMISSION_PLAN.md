@@ -1377,6 +1377,30 @@ the 24 V → supply-derived wheel limits and the `RobotArm.hx` changes.
 Status: complete (2026-10-03). `x7-suite-x9e-final2.txt` reports 11/11 kit suites, CadKit,
 MachineKit, app build and project-source suite at exit 0. Focused app worker/scene tests,
 humanoid tests and mixed-scene command, and native RobotKit/SimKit MuJoCo tests also passed.
+Follow-up review: complete (2026-10-04). `x7-suite-x9e-review-final2.txt` reports all 11 kit
+suites, CadKit, MachineKit, app build and project-source suite at exit 0. The default app
+entry point and four-platform RobotKit HXI audit also passed. Belt rebuilds resolve only
+motors on the shaft network and catch electrical/curve/family faults as `transmission.parts`
+diagnostics. Partial scalar plans solve the complete shared-axis compliance before projection;
+validation builds the raw motor Jacobian without invoking an elastic solve. Recipe contracts
+again exercise every catalog designation and servo Choice option. General Choice parameters
+can require companion values and are not independently varied. Both belt-motion endpoints are
+probed, every loaded pulley receives tooth clearance, and tension uses usable actuator torque
+rather than holding/overload torque. URDF's zero-effort sentinel remains unspecified.
+
+Controlled stop/resume acceleration is plan metadata, capped by physical limits and preserved
+through streaming, replacement, wire plans and recordings. It does not alter mechanical limits
+or reject deliberate overload trajectories. Hold/jog/replace tests again enforce their requested
+0.4 m/s²; the third jog argument is duration, not an acceleration override. Remove the temporary
+`APP_X9E_ONLY` and `MOTIONKIT_HOLD_ONLY` entry-point branches.
+The native host executor consumes these per-plan limits; RKD6 firmware still uses its
+session-level limits and needs a separate device-protocol extension to consume them.
+
+Follow-up number change: folded-Z backlash 0.0505 → 0.0510 mm because the leader screw contact
+also contributes its tooth clearance; both contacts project through the same screw lead.
+The unequal-spring scalar CoreXY regression changes x-only compliance from 0.0002 to
+0.0003125 m/N: omitted y carries zero force and can deflect instead of being held rigidly.
+
 This review follows X9 on local main `4b952231f` (X9 merged with the robot welder).
 
 **Breaks (fix first):**
@@ -1388,7 +1412,8 @@ This review follows X9 on local main `4b952231f` (X9 merged with the robot welde
 - **Plan check uses the wrong axes for partial plans.** `PlanCheck.hx` (around line 205) builds
   forces only for the plan's axes, but `loads[0].elastic` is a `DriveCompliance` over every driven
   axis in the model, and `DriveCompliance.deflections` never checks the size.
-  - Build the compliance for the plan's axes: other axes are held by their own drives.
+  - Solve every connected elastic coordinate, then project onto the plan's axes; omitted axes
+    have zero applied force, not an extra rigid constraint.
   - Make `deflections` reject a size mismatch.
   - Test with a model that has a driven axis outside the plan, ordered before the plan's axes.
 - **Under-actuated coupled pairs throw everywhere.** `DriveLoads.of` always inverts the shared
@@ -1489,7 +1514,7 @@ same free-span spring calculation for carriage and shaft attachments, validate t
 and state assumed pretension and a working-tension bound. The folded-Z motor pilot and bolts have
 5 mm tensioning slots; its 6 mm GT2 belt uses an assumed 120 N pretension and 250 N working limit.
 The folded stage still asserts 43.653927/21.826964 mm/s, 6117.456/3263.410 mm/s²,
-486.867 MN/m, 0.05/0.0505 mm backlash, and 36.9/37.1 kg with the baseline router.
+486.867 MN/m, 0.05/0.0510 mm backlash, and 36.9/37.1 kg with the baseline router.
 `describe()` still poses a copy for each rebuild: pose context is shared across its belt paths,
 but the copy remains proportional to assembly size and is not cached across rebuilds.
 

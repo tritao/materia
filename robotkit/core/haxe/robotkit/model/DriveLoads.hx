@@ -134,22 +134,47 @@ class DriveLoads {
   }
 
   public static function of(model:RobotModel, ?steady:SteadyLoads, ?axisIds:Array<String>):Array<AxisLoad> {
+    var result = basic(model, steady);
+    if (result.length > 0) {
+      var elastic = new DriveCompliance(result, model);
+      if (axisIds != null) {
+        var selected = [for (load in result) if (axisIds.indexOf(load.axis) >= 0) load];
+        var projected = DriveCompliance.project(elastic, result, selected);
+        return selected;
+      }
+    }
+    return result;
+  }
+
+  /** Build force loads and their motor Jacobian without solving elasticity. */
+  public static function basic(model:RobotModel, ?steady:SteadyLoads):Array<AxisLoad> {
     var loads = steady == null ? new SteadyLoads() : steady;
     var followers = new Map<String, Bool>();
     for (coupling in model.couplings) followers.set(coupling.follower, true);
     var result:Array<AxisLoad> = [];
     for (joint in model.joints) {
-      if (followers.exists(joint.id) || (axisIds != null && axisIds.indexOf(joint.id) < 0)) continue;
+      if (followers.exists(joint.id)) continue;
       var load = axisLoad(model, joint, loads);
       if (load != null) result.push(load);
     }
-    // A partly wired coupled drive still has useful per-axis speed and force
-    // bounds. Its shared stiffness has no unique inverse until every degree
-    // of freedom has an independent motor constraint.
-    if (result.length > 0) {
-      var elastic = new DriveCompliance(result, model);
-    }
     return result;
+  }
+
+  /** Structural controllability needs ratios alone, never force ratings or an elastic inversion. */
+  public static function uncontrolledModelAxes(model:RobotModel):Array<String> {
+    var followers = new Map<String, Bool>();
+    for (coupling in model.couplings) followers.set(coupling.follower, true);
+    var axes:Array<AxisLoad> = [];
+    for (joint in model.joints) if (!followers.exists(joint.id)) {
+      var load = new AxisLoad(joint.id, joint.type == JointType.Prismatic, 0, 0, false, 0);
+      for (actuator in model.actuators) switch actuator.transmission {
+        case SimpleTransmission(target, transmissionRatio, _):
+          var ratio = transmissionRatio * derivative(model, target, joint.id);
+          if (ratio != 0.0) load.motors.push(new MotorLoad(actuator, target, ratio, 1, 0, 0));
+      }
+      if (load.motors.length > 0) axes.push(load);
+    }
+    return uncontrolledAxes(axes);
   }
 
   /** Axes whose motor-coordinate Jacobian has insufficient independent rows. */

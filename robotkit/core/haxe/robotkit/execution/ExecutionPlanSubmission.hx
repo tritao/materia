@@ -17,6 +17,8 @@ class ExecutionPlanSubmission {
   public final positionTolerances:ImmutableFloatArray;
   public final velocityTolerances:ImmutableFloatArray;
   public final accelerationTolerances:ImmutableFloatArray;
+  /** Requested acceleration for controlled stop/resume, zero for physical limits. */
+  public final controlAcceleration:ImmutableFloatArray;
   public final endsAtRest:Bool;
   public final jerkUnchecked:Bool;
   /** The payload, copied out of `arrays` on first use when the plan came as arrays. */
@@ -34,7 +36,7 @@ class ExecutionPlanSubmission {
       ?replaceAfterPlanId:Int64, ?replaceAfterTimeNs:Int64,
       ?positionTolerances:Array<Float>, ?velocityTolerances:Array<Float>,
       ?accelerationTolerances:Array<Float>, ?endsAtRest:Bool = true,
-      ?events:Array<ProcessTimedEvent>, ?jerkUnchecked:Bool = false, ?arrays:SegmentArrays) {
+      ?events:Array<ProcessTimedEvent>, ?jerkUnchecked:Bool = false, ?arrays:SegmentArrays, ?controlAcceleration:Array<Float>) {
     var payloadJoints = arrays != null ? arrays.robotJointCount() :
       segments == null || segments.length == 0 || segments[0] == null ? -1 : segments[0].jointCount;
     if (planId == null || Int64.compare(planId, Int64.ofInt(0)) <= 0 ||
@@ -102,6 +104,11 @@ class ExecutionPlanSubmission {
     this.positionTolerances = new ImmutableFloatArray(pTol);
     this.velocityTolerances = new ImmutableFloatArray(vTol);
     this.accelerationTolerances = new ImmutableFloatArray(aTol);
+    var control = controlAcceleration == null ? [for (_ in 0...count) 0.0] : controlAcceleration;
+    if (control.length != count) throw "Execution plan control acceleration count mismatch";
+    for (value in control) if (!Math.isFinite(value) || value < 0.0)
+      throw "Invalid execution plan control acceleration";
+    this.controlAcceleration = new ImmutableFloatArray(control);
     this.endsAtRest = endsAtRest;
     this.jerkUnchecked = jerkUnchecked;
     this.arrays = arrays;
@@ -134,10 +141,17 @@ class ExecutionPlanSubmission {
     return copied;
   }
 
+  /** Omit unset control limits from portable plans and existing recordings. */
+  public function statedControlAcceleration():Null<Array<Float>> {
+    var values = controlAcceleration.toArray();
+    for (value in values) if (value > 0.0) return values;
+    return null;
+  }
+
   public function copy():ExecutionPlanSubmission
     return new ExecutionPlanSubmission(planId, modelRevision, calibrationRevision,
       requiredCapabilities, startPosition.toArray(), startVelocity.toArray(),
       startAcceleration.toArray(), arrays == null ? segments : null, replaceAfterPlanId,
       replaceAfterTimeNs, positionTolerances.toArray(), velocityTolerances.toArray(),
-      accelerationTolerances.toArray(), endsAtRest, events, jerkUnchecked, arrays);
+      accelerationTolerances.toArray(), endsAtRest, events, jerkUnchecked, arrays, controlAcceleration.toArray());
 }

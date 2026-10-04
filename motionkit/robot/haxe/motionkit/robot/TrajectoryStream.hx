@@ -241,7 +241,7 @@ class TrajectoryStream {
     return new ExecutionPlanSubmission(tag, modelRevision, calibrationRevision, 1,
       state.positions, velocity, acceleration, payload, null, null,
       jointTolerances, jointTolerances,
-      accelerationTolerance, last == segments.count(), null, jerkUnchecked);
+      accelerationTolerance, last == segments.count(), null, jerkUnchecked, null, trajectory.controlAcceleration);
   }
 
   /**
@@ -349,7 +349,7 @@ class TrajectoryStream {
     robot.submit(RobotCommand.ExecutionPlan(new ExecutionPlanSubmission(tag,
       modelRevision, calibrationRevision, 1, state.positions, state.velocities,
       state.accelerations, payload, observation.activePlanId, anchorNs,
-      jointTolerances, jointTolerances, jointTolerances)));
+      jointTolerances, jointTolerances, jointTolerances, true, null, false, null, planned.controlAcceleration)));
     nextMotionTag = Int64.add(nextMotionTag, Int64.ofInt(1));
     return tag;
   }

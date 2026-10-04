@@ -382,12 +382,8 @@ class StreamTests extends MotionKitTestSupport {
       stopTicks += 1;
       if (stopTicks > 200) throw "near-boundary controlled hold did not settle";
     }
-    // Hold is a runtime safety action: it may brake harder than the requested
-    // planning acceleration, up to the physical cap from the drive.
-    var physicalCap = blueprint.runtime.joints[0].maxAcceleration;
-    if (physicalCap == null) throw "Buffered hold needs a physical acceleration ceiling";
-    check(peakAcceleration <= physicalCap * 1.05,
-      'hold near a streamed refill boundary exceeds its physical deceleration cap: $peakAcceleration versus $physicalCap m/s²');
+    check(peakAcceleration <= 0.4 * 1.05,
+      'hold near a streamed refill boundary exceeds requested 0.4 m/s²: $peakAcceleration');
     check(previousPosition > beforeHold,
       "hold near a streamed refill boundary continues along the path to rest");
     simulationHarness.dispose();
