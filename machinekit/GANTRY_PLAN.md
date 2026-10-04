@@ -2232,3 +2232,15 @@ exit 0; CadKit previously passed separately. Start app project-source compiler
 preflight to its dedicated output for the focused picker run while remaining
 kit compiles continue. The picker has not run and the full compile checkpoint
 is still incomplete. G13 remains unstarted.
+
+### G12 checkpoint — app startup-offset typing and clearance metadata
+
+The compiler-only batch passed HumanKit, KinematicsKit, ManufacturingKit and
+ProcessKit in addition to the earlier successes. MachineKit failed because
+GantryClearanceChecks read transmissions and belt paths directly from the
+assembly description rather than its machine metadata. Corrected that access.
+The app project-source compiler also required explicit nullable array types
+for the two optional startup-offset lists; added those declarations. Both
+failed compiles are being retried. These changes do not alter native code or
+homing sequencing, so the green native ctest and focused homing run stand.
+The picker and complete compiler checkpoint remain pending; G13 is unstarted.

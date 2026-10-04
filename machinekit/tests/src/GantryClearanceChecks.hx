@@ -26,7 +26,7 @@ class GantryClearanceChecks {
 		for (joint in definition.joints) if (joint.type == materia.assembly.AssemblyDefinition.AssemblyJointType.Continuous) {
 			allow(joint.parent, joint.child); shaftSeatings.push({parent: joint.parent, child: joint.child});
 		}
-		var description = gantry.describe();
+		var description = gantry.describe().machine;
 		var transmissions = description.transmissions;
 		if (transmissions != null) for (relation in transmissions) switch relation.source {
 			case LeadScrew(screw, nut): allow(screw, nut);

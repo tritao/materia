@@ -340,9 +340,9 @@ class AssemblyRobot {
     // them, such as an arm while its base drives.
     var runtime = candidate.addRobotAtPose(blueprint, position, rotation, device, null, null, closures, null, null, null, null,
       linkHulls, true);
-    var authored = session.cncJob != null ? session.cncJob.powerUpOffsets :
+    var authored:Null<Array<materia.project.SceneArtifact.SceneArtifactPowerUpOffset>> = session.cncJob != null ? session.cncJob.powerUpOffsets :
       session.mission == null ? null : session.mission.powerUpOffsets;
-    var sideOffsets = session.cncJob != null ? session.cncJob.powerUpSideOffsets :
+    var sideOffsets:Null<Array<materia.project.SceneArtifact.SceneArtifactPowerUpSideOffset>> = session.cncJob != null ? session.cncJob.powerUpSideOffsets :
       session.mission == null ? null : session.mission.powerUpSideOffsets;
     if ((authored != null && authored.length > 0) || (sideOffsets != null && sideOffsets.length > 0)) {
       var named = new Map<String, Float>();
