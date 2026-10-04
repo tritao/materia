@@ -263,6 +263,7 @@ class AssemblyDefinitionCodec {
 			if (contact == null) throw "Assembly has a null switch";
 			var part = occurrences.get(contact.part), trigger = occurrences.get(contact.trigger);
 			if (!validText(contact.id) || switchIds.exists(contact.id) || movable.get(contact.joint) == null ||
+				(contact.driveJoint != null && (!validText(contact.driveJoint) || movable.get(contact.driveJoint) == null)) ||
 				part == null || trigger == null || part.id == trigger.id ||
 				!hasConnector(definitions.get(part.definition), contact.connector) ||
 				!hasConnector(definitions.get(trigger.definition), contact.triggerConnector) ||

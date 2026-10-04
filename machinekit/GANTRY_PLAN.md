@@ -1827,3 +1827,19 @@ Gantry assembly authoring must still identify each side's motor, and the
 squaring controller must hold sides independently after their edges. This is
 side-observation support, not completed squaring. Skew relaxation, motor zeros
 and the 1 mm result remain pending/unverified. No tests or builds ran.
+
+### G12 — author drive bindings through assembly metadata
+
+Core drive observation: `8ab0616c3`. Add optional switch wire field 13
+driveJoint to mutable and frozen assembly records. Preserve and namespace it
+through copy, flattening, inclusion and export; validate that it names a movable
+joint. The simulation bridge forwards the binding to JointSwitch. Gantry home
+and limit switches now name their actual screw, driven pulley or pinion shaft,
+including distinct YLeft and YRight drives. Source inspection confirms these
+IDs match AxisBuilder's authored motor joints. Model encoding also checks the
+optional reference before writing it.
+
+This completes assembly wiring for side observation. Independent side holds,
+motor reference offsets and explicit squaring-only skew relaxation remain
+pending. No tests or builds ran; compilation and physical behavior are
+unverified.

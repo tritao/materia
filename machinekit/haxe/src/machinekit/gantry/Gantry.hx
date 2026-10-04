@@ -129,6 +129,12 @@ class Gantry extends AxisBuilder {
 	/** Outboard steel trigger and switches carried by the actual guide's fixed structure. */
 	function buildSwitches(axis:AxisSpec, suffix:String, fixed:String, moving:String,
 			outboardAxis:Int, sign:Int, direction:Array<Float>):Void {
+		var drive = suffix == "X" ? spec.driveX : suffix == "Z" ? spec.driveZ : spec.driveY;
+		var driveJoint = switch drive {
+			case Screw(_): "screw" + suffix + "-turn";
+			case Belt(_, _, _): "pulley" + suffix + "-turn";
+			case Rack(_, _, _): "pinion" + suffix + "-turn";
+		};
 		var bounds = mountBounds(component(moving), zeroPose(moving));
 		var point = [for (i in 0...3) (bounds.min[i] + bounds.max[i]) / 2];
 		point[outboardAxis] = (sign < 0 ? bounds.min[outboardAxis] : bounds.max[outboardAxis]) + sign * 18;
@@ -179,7 +185,7 @@ class Gantry extends AxisBuilder {
 				AssemblyFrames.translation((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2]), fixed);
 			attach(id, sensor, pose, mount);
 			addSwitch(id, axis.id, id, {instanceId: trigger, connectorName: side < 0 ? "negative" : "positive"},
-				side, kind == "home" ? "home" : "limit", suffix == "YRight" ? 2 : 1);
+				side, kind == "home" ? "home" : "limit", suffix == "YRight" ? 2 : 1, driveJoint);
 		}
 	}
 

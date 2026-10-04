@@ -140,7 +140,8 @@ class RobotModelCodec {
       if (contact == null) throw "Robot switch is null";
       if (switchIds.exists(contact.id)) throw 'Duplicate robot switch ${contact.id}';
       switchIds.set(contact.id, true);
-      if (!joints.exists(contact.joint) || !frames.exists(contact.frameId))
+      if (!joints.exists(contact.joint) || !frames.exists(contact.frameId) ||
+          (contact.driveJoint != null && !joints.exists(contact.driveJoint)))
         throw 'Switch ${contact.id} references an unknown joint or frame';
     }
     var sensors = new Map<String, Bool>();

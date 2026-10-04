@@ -267,6 +267,7 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(10) var hysteresis:Float;
 	@:id(11) var repeatability:Float;
 	@:id(12) var seed:Int;
+	@:id(13) @:optional var driveJoint:String;
 }
 
 /** A connector exported from a member of an assembly definition. */

@@ -173,7 +173,8 @@ class AssemblyDefinitionFlattener {
 		id: map(contact.id), joint: map(contact.joint), part: map(contact.part), connector: contact.connector,
 		trigger: map(contact.trigger), triggerConnector: contact.triggerConnector, role: contact.role,
 		side: contact.side, trip: contact.trip, hysteresis: contact.hysteresis,
-		repeatability: contact.repeatability, seed: contact.seed
+		repeatability: contact.repeatability, seed: contact.seed,
+		driveJoint: contact.driveJoint == null ? null : map(contact.driveJoint)
 	};
 
 	/** Keep every coordinate and motion-source reference in a network's namespace. */
@@ -301,7 +302,8 @@ class AssemblyDefinitionFlattener {
 				flat.switches.push({id: scoped(prefix, contact.id), joint: scoped(prefix, contact.joint),
 					part: part.occurrence, connector: part.connector, trigger: trigger.occurrence,
 					triggerConnector: trigger.connector, role: contact.role, side: contact.side,
-					trip: contact.trip, hysteresis: contact.hysteresis, repeatability: contact.repeatability, seed: contact.seed});
+					trip: contact.trip, hysteresis: contact.hysteresis, repeatability: contact.repeatability, seed: contact.seed,
+					driveJoint: contact.driveJoint == null ? null : scoped(prefix, contact.driveJoint)});
 			}
 		}
 		if (mates != null) for (mate in mates) {

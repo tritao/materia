@@ -477,7 +477,7 @@ class AssemblySimulationBridge {
       frame.rotation = [mount.qx, mount.qy, mount.qz, mount.qw];
       var added = new robotkit.model.JointSwitch(contact.id, contact.joint, frame.id, contact.role,
         contact.side, (contact.trip - placement.joint(contact.joint)) * scale,
-        contact.hysteresis * scale, contact.repeatability * scale, contact.seed);
+        contact.hysteresis * scale, contact.repeatability * scale, contact.seed, contact.driveJoint);
       model.addSwitch(added);
       var sensor = new robotkit.model.Sensor(contact.id, "joint_switch", 0.0, contact.id);
       sensor.frame = frame;
