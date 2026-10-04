@@ -29,6 +29,8 @@ crater, stops the wire and retracts, and the weld metal grows along the seam as 
 `PROJECT_SOURCE_ONLY=welder-plate` runs the far plate fillet alone, selected from the CAD-generated mission by its
 position. It checks approach reach, completion, bead length, leg and gaps while iterating on that seam.
 `PROJECT_SOURCE_ONLY=welder` runs the full weldment and the focused baselines for the milestone gate.
+`PROJECT_SOURCE_ONLY=welder-seam` runs the single seam and its arc-loss restart on both backends, including the
+restart peak-leg check, for focused recovery work.
 
 - `ArmWeldingTool.hx` — the arm's welding end effector (an `ArmTool`): adapter
   plate and torch, with the `tcp` working frame at the wire tip.

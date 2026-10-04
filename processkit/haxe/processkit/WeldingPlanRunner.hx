@@ -82,7 +82,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
   /** How long the program waits for the arc to establish, in seconds. */
   public static inline var IGNITION_TIMEOUT:Float = 2.0;
   /** How far before the stop a restart begins, in metres. */
-  public static inline var BACKOFF:Float = 0.010;
+  public static inline var BACKOFF:Float = 0.002;
   /** How far the torch lifts while the arc burns back, in metres. */
   public static inline var LIFT:Float = WeldPathPlanner.LIFT;
   /** Speed of the approach to the start and of the retract, in metres per second. */
@@ -343,7 +343,8 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     var scheduled:MotionProgram;
     try {
       scheduled = ProcessRateSchedule.apply(program, timed, followIndex, channels.wireSpeed,
-        process.recipe.quantityPerDistance, cast(plan, WeldPlan).parameters.wireSpeed);
+        process.recipe.quantityPerDistance, cast(plan, WeldPlan).parameters.wireSpeed,
+        first ? 0.0 : Math.max(0.0, process.interruptedAt - process.lastProgramStart), WeldArcModel.MIN_WIRE_SPEED);
     } catch (error:Dynamic) {
       timed.dispose();
       throw error;

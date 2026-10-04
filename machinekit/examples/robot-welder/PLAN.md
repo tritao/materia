@@ -631,7 +631,16 @@ W5 implementation notes (in progress, 2026-10-04):
   for other processes. Welding re-strikes at `WeldArcModel.MIN_WIRE_SPEED`, waits for the arc, and omits the
   initial pooling dwell over existing metal. The first strike and crater/burnback exit stay unchanged. The
   ignition-watch operation index follows the shorter recovery sequence. ProcessKit passes 55 welder / 44 planning /
-  11 rate / 106 weave / 23 process assertions. Overlap-dose compensation and the measured restart peak remain open.
+  11 rate / 106 weave / 23 process assertions. Overlap-dose compensation and the measured restart peak were subsequently validated below.
+
+- Restart backoff is 2 mm, with maintenance wire feed over the already deposited prefix and normal validated
+  rates restored exactly at the interruption distance. The low-rate re-strike and omitted pooling dwell avoid
+  depositing another full section into the overlap. The original 10 mm / full-dose overlap is removed.
+  `PROJECT_SOURCE_ONLY=welder-seam` proves the result on MuJoCo and the test backend: 21.1 s with one restart,
+  3 mm measured overlap, a whole 180 mm bead with no gap or stray metal, mean leg 5.0 mm and peak 5.4 mm
+  (previously 9.4 mm). The undisturbed seam remains 20.6 s, leg 5.0 mm (4.8–5.1). The app asserts the
+  restart peak is at most target + 1 mm. Focused ProcessKit rate tests pass 16 assertions; other process checks
+  pass 55 welder / 44 planning / 106 weave / 23 process assertions. The app compiles 1,748 source files.
 
 **W6. Real welder interface.** Map the channels to:
 - the retrofit I/O board: an optoMOS relay for the trigger, an isolated 0–10 V

@@ -1,4 +1,5 @@
 import motionkit.event.EventValue;
+import motionkit.event.PathEvent;
 import processkit.ProcessRateSchedule;
 
 class ProcessRateScheduleTests {
@@ -31,6 +32,22 @@ class ProcessRateScheduleTests {
     rejects([0.0, 0.01], [0.0, 0.0]);
     rejects([0.01, 0.0], [0.0, 1.0]);
     rejects([0.0, 0.01], [0.0]);
+    var normal = [new PathEvent(0.0, "wire", EventValue.Analog(8.0)),
+      new PathEvent(0.004, "wire", EventValue.Analog(6.0))];
+    var recovery = ProcessRateSchedule.overlap(normal, 0.002, 1.0);
+    check(recovery.length == 3 && recovery[1].distance == 0.002,
+      "the normal dose returns exactly where previous deposition ended");
+    switch recovery[0].value {
+      case Analog(rate): check(rate == 1.0, "already deposited material gets only maintenance feed");
+      case _: throw "Expected an analog rate";
+    }
+    switch recovery[1].value {
+      case Analog(rate): check(rate == 8.0, "fresh seam restores its validated rate");
+      case _: throw "Expected an analog rate";
+    }
+    check(recovery[2] == normal[1], "later joint-limit rate changes are preserved");
+    var exact = ProcessRateSchedule.overlap(normal, 0.004, 1.0);
+    check(exact.length == 2 && exact[1] == normal[1], "a boundary coinciding with a rate change is not duplicated");
     Sys.println('ProcessKit rate schedule tests passed ($assertions assertions)');
   }
 

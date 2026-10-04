@@ -40,7 +40,8 @@ class ProcessRateSchedule {
 
   /** Schedule a continuously active process; other channels and the engagement stay intact. */
   public static function apply(program:MotionProgram, compiled:CompiledProgram, op:Int,
-      channel:String, quantity:Float, endRate:Float):MotionProgram {
+      channel:String, quantity:Float, endRate:Float, ?coveredPrefix:Float = 0.0,
+      ?maintenanceRate:Float = 0.0):MotionProgram {
     var scheduled:Array<PathEvent> = [];
     for (block in compiled.blocks) for (i in 0...block.plans.length)
       if (block.opIndices[i] == op) scheduled = scheduled.concat(section(channel, quantity,
@@ -49,6 +50,8 @@ class ProcessRateSchedule {
     var ops = program.ops.copy();
     switch ops[op] {
       case FollowPath(path, frame, feed, events):
+        if (coveredPrefix > path.length()) throw "Covered process prefix lies beyond the path";
+        if (coveredPrefix > 0.0) scheduled = overlap(scheduled, coveredPrefix, maintenanceRate);
         for (event in events) {
           if (event.channel != channel) scheduled.push(event);
           else if (event.distance > 0.0 && event.distance < path.length())
@@ -60,5 +63,29 @@ class ProcessRateSchedule {
       case _: throw "A process rate schedule requires a FollowPath operation";
     }
     return new MotionProgram(ops);
+  }
+
+  /** Keep a process engaged over already deposited material, restoring the normal dose exactly at its end. */
+  public static function overlap(events:Array<PathEvent>, until:Float, maintenanceRate:Float):Array<PathEvent> {
+    if (events == null || events.length == 0 || !Math.isFinite(until) || until <= 0.0 ||
+        !Math.isFinite(maintenanceRate) || maintenanceRate <= 0.0)
+      throw "Process overlap needs scheduled events, a positive prefix and a maintenance rate";
+    var result:Array<PathEvent> = [];
+    var normal = events[0];
+    var restored = false;
+    for (event in events) {
+      if (event.distance < until) {
+        normal = event;
+        result.push(new PathEvent(event.distance, event.channel, EventValue.Analog(maintenanceRate),
+          event.leadSeconds, event.holdPolicy));
+      } else {
+        if (!restored && event.distance > until)
+          result.push(new PathEvent(until, normal.channel, normal.value, 0.0, normal.holdPolicy));
+        restored = true;
+        result.push(event);
+      }
+    }
+    if (!restored) result.push(new PathEvent(until, normal.channel, normal.value, 0.0, normal.holdPolicy));
+    return result;
   }
 }

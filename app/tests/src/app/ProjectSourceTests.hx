@@ -1233,7 +1233,8 @@ class ProjectSourceTests {
       if (run == 0) check(overlap == 0 && mission.weldRestarts() == 0, 'run 0: an undisturbed weld has no restart and no overlap');
       else {
         check(mission.weldRestarts() == 1, 'run 1: the weld restarted once (${mission.weldRestarts()})');
-        check(overlap >= 5 && overlap <= 25, 'run 1: the restart overlaps the bead by $overlap mm');
+        check(overlap >= 1 && overlap <= 5, 'run 1: the restart overlaps the bead by $overlap mm');
+        check(range.max <= target + 0.001, 'run 1: restart peak ${range.max * 1000} mm stays within 1 mm of the target');
       }
       log.push('run $run: ${Math.round(simulation.activeSession().simulationTime() * 10) / 10} s, leg ${Math.round(achieved * 10000) / 10} mm ' +
         '(${Math.round(range.min * 10000) / 10}..${Math.round(range.max * 10000) / 10}), bead ${Math.round(bead.extent() * 1000)} mm, ' +
@@ -1837,6 +1838,11 @@ class ProjectSourceTests {
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "welder-plate") {
       checkFarPlateWeld(root);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "welder-seam") {
+      checkRobotWelderOn(root, ApplicationSimulation.MUJOCO, "MuJoCo");
+      checkRobotWelderOn(root, ApplicationSimulation.DETERMINISTIC, "test backend");
       return 0;
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "router") {
