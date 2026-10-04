@@ -199,10 +199,17 @@ typedef SceneArtifactPowerUpOffset = {
 	var offset:Float;
 }
 
+/** Startup racking in axis SI units, identified by the physical side home switch. */
+typedef SceneArtifactPowerUpSideOffset = {
+	var homeSwitch:String;
+	var offset:Float;
+}
+
 typedef SceneArtifactMission = {
 	var steps:Array<SceneArtifactMissionStep>;
 	@:optional var loop:Bool;
 	@:optional var powerUpOffsets:Array<SceneArtifactPowerUpOffset>;
+	@:optional var powerUpSideOffsets:Array<SceneArtifactPowerUpSideOffset>;
 }
 
 /**
@@ -349,6 +356,7 @@ typedef SceneArtifactFloorPose = {
  */
 typedef SceneArtifactMachining = {
 	@:optional var powerUpOffsets:Array<SceneArtifactPowerUpOffset>;
+	@:optional var powerUpSideOffsets:Array<SceneArtifactPowerUpSideOffset>;
 	var program:String;
 	var axes:Array<String>;
 	var spindle:String;
@@ -787,6 +795,7 @@ class SceneArtifact {
 	static function validateMission(mission:SceneArtifactMission, data:SceneArtifactData):Void {
 		function fail(detail:String):Void throw 'Scene artifact mission $detail';
 		validatePowerUpOffsets(mission.powerUpOffsets, data.assemblyDefinition);
+		validatePowerUpSideOffsets(mission.powerUpSideOffsets, data.assemblyDefinition);
 		if (mission.steps == null || mission.steps.length == 0) fail("has no steps");
 		var definition = data.assemblyDefinition;
 		var flat = definition == null ? null : AssemblyDefinitionFlattener.flatten(definition);
@@ -1014,6 +1023,37 @@ class SceneArtifact {
 		}];
 	}
 
+	static function decodePowerUpSideOffsets(decoded:Dynamic):Array<SceneArtifactPowerUpSideOffset> {
+		if (!Std.isOfType(decoded, Array)) throw "Power-up side offsets require an array";
+		return [for (raw in (cast decoded:Array<Dynamic>)) {
+			if (raw == null) throw "Power-up side offset is null";
+			for (field in Reflect.fields(raw)) if (field != "homeSwitch" && field != "offset")
+				throw 'Unknown power-up side offset field "$field"';
+			var id:Dynamic = Reflect.field(raw, "homeSwitch"), offset:Dynamic = Reflect.field(raw, "offset");
+			if (!Std.isOfType(id, String) || (!Std.isOfType(offset, Float) && !Std.isOfType(offset, Int)))
+				throw "Power-up side offset requires a switch ID and SI number";
+			{homeSwitch: (id:String), offset: (offset:Float)};
+		}];
+	}
+
+	static function validatePowerUpSideOffsets(offsets:Null<Array<SceneArtifactPowerUpSideOffset>>,
+			definition:Null<AssemblyDefinition>):Void {
+		if (offsets == null) return;
+		if (definition == null || offsets.length > 512) throw "Power-up sides require a bounded machine layout";
+		var flat = AssemblyDefinitionFlattener.flatten(definition), seen = new Map<String, Bool>();
+		for (entry in offsets) {
+			if (entry == null || entry.homeSwitch == null || !finite(entry.offset)) throw "Invalid power-up side offset";
+			var drive:Null<String> = null;
+			if (flat.switches != null) for (contact in flat.switches)
+				if (contact.id == entry.homeSwitch && contact.role == "home" && contact.driveJoint != contact.joint) {
+					for (joint in flat.joints) if (joint.id == contact.joint && Std.string(joint.type) == "prismatic")
+						drive = contact.driveJoint;
+				}
+			if (drive == null || seen.exists(drive)) throw "Power-up sides require distinct home motor drives";
+			seen.set(drive, true);
+		}
+	}
+
 	static function validatePowerUpOffsets(offsets:Null<Array<SceneArtifactPowerUpOffset>>,
 			definition:Null<AssemblyDefinition>):Void {
 		if (offsets == null) return;
@@ -1069,6 +1109,8 @@ class SceneArtifact {
 		if (loop != null) mission.loop = Std.isOfType(loop, Bool) ? (loop:Bool) : fail();
 		var offsets:Dynamic = Reflect.field(decoded, "powerUpOffsets");
 		if (offsets != null) mission.powerUpOffsets = decodePowerUpOffsets(offsets);
+		var sides:Dynamic = Reflect.field(decoded, "powerUpSideOffsets");
+		if (sides != null) mission.powerUpSideOffsets = decodePowerUpSideOffsets(sides);
 		return mission;
 	}
 
@@ -1133,6 +1175,7 @@ class SceneArtifact {
 			definition:Null<AssemblyDefinition>):Void {
 		function fail(detail:String):Void throw 'Scene artifact machining job $detail';
 		validatePowerUpOffsets(machining.powerUpOffsets, definition);
+		validatePowerUpSideOffsets(machining.powerUpSideOffsets, definition);
 		if (machining.program == null) fail("has no program");
 		if (definition == null) throw "Scene artifact machining job needs the machine's assembly definition";
 		var occurrences = new Map<String, Bool>(), joints = new Map<String, Bool>();
@@ -1214,6 +1257,8 @@ class SceneArtifact {
 		}
 		var offsets:Dynamic = Reflect.field(decoded, "powerUpOffsets");
 		if (offsets != null) machining.powerUpOffsets = decodePowerUpOffsets(offsets);
+		var sides:Dynamic = Reflect.field(decoded, "powerUpSideOffsets");
+		if (sides != null) machining.powerUpSideOffsets = decodePowerUpSideOffsets(sides);
 		return machining;
 	}
 

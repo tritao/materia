@@ -2040,3 +2040,19 @@ same side-placement API on robot reset, and clears caches on disposal.
 Regenerate simulation FFI declarations for four portable ABI targets (source
 generation only). Scene authoring, 1 mm coverage and skew scope remain pending.
 No project builds or tests ran; physical placement remains unverified.
+
+### G12 — author and apply startup racking in scenes
+
+Native side placement: `b746b422f`. Add typed optional powerUpSideOffsets
+entries {homeSwitch, offset} to mission and machining data. Decode fields
+strictly and validate finite SI displacement, bounded arrays, physical home
+switches on prismatic axes and distinct explicit motor drives. Preserve data
+through CncJob projection. AssemblyRobot combines ordinary propagated offsets
+with resolved side offsets, then performs one cold placement before samples.
+Absent fields preserve default startup.
+
+The picker scene now authors a +0.001 m right-Y startup side offset using
+switchYRighthome, exercising the requested 1 mm racking case when played.
+This is input authoring, not proof of successful physical squaring. Explicit
+skew scope and homing coverage still remain before the post-G12 compile/runtime
+checkpoint. No builds or tests ran; all new behavior remains unverified.

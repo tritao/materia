@@ -51,6 +51,7 @@ import toolpathkit.path.Point3;
  * spindle axis. Each tool hangs its length below it.
  */
 typedef CncJob = {
+	@:optional var powerUpSideOffsets:Array<materia.project.SceneArtifact.SceneArtifactPowerUpSideOffset>;
 	@:optional var powerUpOffsets:Array<materia.project.SceneArtifact.SceneArtifactPowerUpOffset>;
 	var source:String;
 	var axes:Array<String>;

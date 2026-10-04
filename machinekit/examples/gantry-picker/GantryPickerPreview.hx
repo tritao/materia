@@ -13,7 +13,8 @@ class GantryPickerPreview {
 			steps.push({kind: "pick", at: {occurrence: "box" + index, connector: "top"}});
 			steps.push({kind: "place", at: {occurrence: "slot" + index, connector: "top"}});
 		}
-		scene.mission = {loop: false, steps: steps};
+		scene.mission = {loop: false, steps: steps,
+			powerUpSideOffsets: [{homeSwitch: "switchYRighthome", offset: 0.001}]};
 		return SceneArtifact.encode(scene);
 	}
 }
