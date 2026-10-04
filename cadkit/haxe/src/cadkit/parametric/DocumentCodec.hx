@@ -21,6 +21,8 @@ import cadkit.sheetmetal.SheetFeature;
 import cadkit.sheetmetal.SheetEdgeFlangeFeature;
 import cadkit.sheetmetal.SheetEdgeFeature;
 import cadkit.sheetmetal.SheetHemFeature;
+import cadkit.sheetmetal.SheetRipFeature;
+import cadkit.sheetmetal.SheetFeatureRecord.SheetRipRecord;
 import cadkit.sheetmetal.SheetFeatureRecord.SheetHemRecord;
 import cadkit.sheetmetal.SheetIdentityLedger;
 import cadkit.sheetmetal.SheetFeatureRecord.SheetBaseRecord;
@@ -296,6 +298,11 @@ class DocumentCodec {
 					if (source == null) throw new ParametricError("hem source must be a sheet feature");
 					feature = document.add(new SheetHemFeature(source, null, data.spec, data.length, data.side,
 						[for (face in data.faces) decodeSheetFace(face)], data.walls, data.bends));
+				} else if (featureType == "sheet-rip") {
+					var data:SheetRipRecord = JsonWire.decode(Json.stringify(requiredField(record, "sheet")));
+					var source = Std.downcast(requiredFeature(document, data.source), SheetFeature);
+					if (source == null) throw new ParametricError("rip source must be a sheet feature");
+					feature = document.add(new SheetRipFeature(source, data.bend));
 				} else if (featureType == "datum-sketch") {
 					feature = document.add(new DatumSketchFeature(stringField(record, "profile"), numberField(record, "width"), numberField(record, "height"),
 						decodeElementReferenceInDocument(requiredField(record, "datum")), numberField(record, "offset")));
@@ -584,6 +591,12 @@ class DocumentCodec {
 			if (hem == null) throw new ParametricError("sheet-hem has the wrong feature class");
 			var data:SheetHemRecord = {source: hem.source.id.toInt(), length: hem.length.value, spec: hem.authoredSpec(), side: hem.side,
 				walls: hem.wallIds(), bends: hem.bendIds(), faces: [for (reference in hem.faceReferences()) encodeSheetFace(reference.fingerprintData())]};
+			return {id: feature.id.toInt(), type: featureType, sheet: Json.parse(JsonWire.encode(data)), references: references};
+		}
+		if (featureType == "sheet-rip") {
+			var rip = Std.downcast(feature, SheetRipFeature);
+			if (rip == null) throw new ParametricError("sheet-rip has the wrong feature class");
+			var data:SheetRipRecord = {source: rip.source.id.toInt(), bend: rip.bend};
 			return {id: feature.id.toInt(), type: featureType, sheet: Json.parse(JsonWire.encode(data)), references: references};
 		}
 		if (featureType == "datum-sketch") {

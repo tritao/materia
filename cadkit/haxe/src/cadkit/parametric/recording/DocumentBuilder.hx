@@ -38,6 +38,7 @@ import cadkit.sheetmetal.SheetBaseFeature;
 import cadkit.sheetmetal.SheetFeature;
 import cadkit.sheetmetal.SheetEdgeFlangeFeature;
 import cadkit.sheetmetal.SheetHemFeature;
+import cadkit.sheetmetal.SheetRipFeature;
 import cadkit.sheetmetal.HemSpec;
 import cadkit.sheetmetal.LengthSpec;
 import cadkit.sheetmetal.FlangePosition;
@@ -137,6 +138,11 @@ class DocumentBuilder {
 		var feature = document.add(new SheetBaseFeature(source, selectedStock, side));
 		if (thickness != null) bind(thickness, feature, "sheet.thickness");
 		return feature;
+	}
+
+	/** Cut the child-side seam of one permanent bend without deleting its allowance strip. */
+	public function sheetRip(source:SheetFeature, bend:Int):SheetRipFeature {
+		check(); return document.add(new SheetRipFeature(source, bend));
 	}
 
 	/** Return hem on selected wall-side faces, with one shared straight-return dimension. */

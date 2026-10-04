@@ -73,3 +73,8 @@ import cadkit.sheetmetal.SheetMaterial.SheetMechanical;
 	@:id(6) var bends:Array<Int>;
 	@:id(7) var faces:Array<SheetFaceRecord>;
 }
+
+@:wire typedef SheetRipRecord = {
+	@:id(1) var source:Int;
+	@:id(2) var bend:Int;
+}

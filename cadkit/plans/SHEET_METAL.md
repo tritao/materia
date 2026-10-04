@@ -281,6 +281,13 @@ table in `tools/README.md`.
   reservations for both flanges and hems. `HemSpec` saves only each kind's authored values:
   closed has no gap/radius parameter, open owns a gap, and teardrop owns a gap and optional
   explicit radius. The new hem feature record is additive to document version 13.
+- SM3i rip selection is an authored permanent bend id, independent of contour order or native
+  face names. The feature consumes the staged source graph, cuts that bend's child-side seam,
+  retains its allowance strip and delegates identity ownership to the same sheet root. Missing,
+  already-ripped and disconnected selections retain the core's precise diagnoses. The new
+  typed rip record is additive to document version 13. A zero-gap seam changes graph
+  connectivity; a coincident folded seam need not create a positive-width void in the native
+  volumetric union. Flattening uses the cut graph rather than that union's face adjacency.
 - Sheet features consume only the previous sheet feature's `Sheet`. A general solid feature
   (boolean, fillet...) after a sheet feature produces a plain solid: downstream code that needs
   a flat pattern must point at a sheet feature or convert (SM-D7). This keeps one owner per fact.
@@ -807,7 +814,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM0 | done: clean branch on 38601ac61, pins verified, prerequisite documents read; quick gate `sm0-setup` passes (ProjectKit 138, ManufacturingKit 54) | c70c89745 |
 | SM1 | done: exact line/arc regions, permanent graph ids, edits/cuts/rips, bidirectional FK, neutral-length conservation, closure and P1–P5 bounds; quick gate `sm1-core` passes (2102 sheet assertions) | 0713c4e0c; 54b5cab15 |
 | SM2 | done: named wall extrusions and bend revolutions fused for flat/folded/partial states; P1–P5 validity, single bodies, volumes, axes and stable names; quick gate `sm2-solid` passes (3757 sheet assertions) | 7a3836d8c |
-| SM3 | in progress: SM3a atomic graph publication; SM3b exact sketch-backed base, side A/B, stock codec and named thickness builder; quick gates `sm3a-staging` (3773) and `sm3b-base` (3813 sheet assertions); SM3c authored segment names and exact face-to-graph picks; quick gate `sm3c-edges` (3843 sheet assertions); SM3d exact flange geometry and alignment; quick gate `sm3d-flange-geometry` (3880 sheet assertions); SM3e typed flange features, authored shared identities, gaps/extensions, stock radius defaults and P1–P5 document acceptance; quick gate `sm3e-flanges-typed` (4044 sheet assertions); SM3f exact planar subtraction foundation; quick gate `sm3f-outline-cuts` (4068 sheet assertions); SM3g typed rectangular/obround reliefs and sizing, exact gap/bend-width semantics, atomic edits and codec; quick gate `sm3g-reliefs` (4132 sheet assertions); SM3h closed/open/teardrop hems, shared edge selection, typed codec and builder; quick gate `sm3h-hems` (4303 sheet assertions); cut/rip features remain | 535ebc547; 08afd7a32; bb3405a64; 84a51f00d; 3ed9b3971; 31a696ed7; a02214101; f3ef57fa0; hem sub-step commit |
+| SM3 | in progress: SM3a atomic graph publication; SM3b exact sketch-backed base, side A/B, stock codec and named thickness builder; quick gates `sm3a-staging` (3773) and `sm3b-base` (3813 sheet assertions); SM3c authored segment names and exact face-to-graph picks; quick gate `sm3c-edges` (3843 sheet assertions); SM3d exact flange geometry and alignment; quick gate `sm3d-flange-geometry` (3880 sheet assertions); SM3e typed flange features, authored shared identities, gaps/extensions, stock radius defaults and P1–P5 document acceptance; quick gate `sm3e-flanges-typed` (4044 sheet assertions); SM3f exact planar subtraction foundation; quick gate `sm3f-outline-cuts` (4068 sheet assertions); SM3g typed rectangular/obround reliefs and sizing, exact gap/bend-width semantics, atomic edits and codec; quick gate `sm3g-reliefs` (4132 sheet assertions); SM3h closed/open/teardrop hems, shared edge selection, typed codec and builder; quick gate `sm3h-hems` (4303 sheet assertions); SM3i permanent bend-id rip feature, typed codec and builder; quick gate `sm3i-rips` (4315 sheet assertions); cut features remain | 535ebc547; 08afd7a32; bb3405a64; 84a51f00d; 3ed9b3971; 31a696ed7; a02214101; f3ef57fa0; e5d66c947; rip sub-step commit |
 | SM4 | planned | |
 | SM4b | planned | |
 | SM5 | planned | |
@@ -893,3 +900,12 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
   The shared edge-feature layer also reruns every flange and relief check. No native or compiler
   change is needed, and no unchecked casts are introduced. Existing suite counts and original
   MachineKit summaries remain unchanged. Cut and rip features remain in SM3.
+
+- SM3i: `sm3i-rips` checks a production rip on a closed four-wall ring, source isolation,
+  flattening into one plane, retained bend allowance and native validity. A second seam that
+  disconnects walls is diagnosed and leaves the committed graph unchanged. Codec/builder
+  checks preserve source and bend ids in an inactive tree-seam record; active ring-source
+  codec coverage will use the convert feature in SM5 (the ring builder is test-only, not a
+  saved feature). There are 12 new assertions, 4315 total. Existing suite counts and original
+  MachineKit summaries remain unchanged. No compiler issue or unchecked cast was introduced.
+  Wall cuts and exact cuts across bend zones remain in SM3.
