@@ -3435,3 +3435,17 @@ report. The latest mechanical changes await compilation and the next sweep.
 Compiler-only passed after the rack support, mirrored motor and shortened Z-tab
 changes (1044 sources). The batched mechanical gate is now running on that
 compiled layout. No full Phase C pass is claimed.
+
+The next sweep cleared every rack-specific clash and the Y sensor tube contact.
+It still found the long Z tab crossing the Y mounts' vertical support stems
+(1560 mm³ each). The Z target is now a 6 mm plate near the carriage's lower edge,
+and Z sensors sit in the gap between the actual Y home/limit support envelopes.
+The carriage's upper edge is derived from the guide block mounting-row spacing
+with a 3 mm web. Frame front and side clearance also include the guide's full
+homing overtravel. The existing FK/shaft/volume gate now checks both ordinary
+and overtravel corners. These mechanical changes are pending validation.
+The full app phase gate is running independently; no complete gate is claimed.
+
+Compiler-only passed for the overtravel frame, mounting-row carriage placement
+and compact Z target (1044 sources). The expanded mechanical sweep is running.
+The independent full app gate has reached the welder execution checks.

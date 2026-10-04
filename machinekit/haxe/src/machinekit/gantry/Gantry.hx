@@ -49,11 +49,13 @@ class Gantry extends AxisBuilder {
 		// The flange's rear rim must clear the column's projecting rail by 3 mm.
 		var toolReach = Math.max(spec.toolReach, flange.flangeDiameter / 2 + 3 - (guide.blockHeight - guide.railHeight + 4));
 		railMargin = Math.max(Math.max(80, frame.size / 2 + 60), guide.railEndMargin + guide.blockLength / 2 + 20);
-		var left = -railMargin - spec.sideExtension, right = spec.travelX + railMargin + spec.sideExtension;
+		var guideOvertravel = railMargin - guide.railEndMargin - guide.blockLength / 2;
+		var left = -railMargin - spec.sideExtension - guideOvertravel;
+		var right = spec.travelX + railMargin + spec.sideExtension + guideOvertravel;
 		// Keep the front crossmember ahead of the full vertical carriage sweep.
 		var columnY = -(beam.size / 2 + frame.height / 2 + 40);
 		var carriageFront = columnY - frame.height / 2 - guide.blockHeight - 8 - toolReach;
-		var front = Math.min(-railMargin, carriageFront - frame.size / 2 - 3) - spec.frontExtension;
+		var front = Math.min(-railMargin, carriageFront - frame.size / 2 - 3 - guideOvertravel) - spec.frontExtension;
 		var back = spec.travelY + railMargin;
 		var frameZ = spec.travelZ + 350 + spec.frameLift;
 		var endAllowance = Math.max(frame.size / 2, NemaStepper.frame(spec.motorFrame).variant.shaftLength + 6);
@@ -110,9 +112,12 @@ class Gantry extends AxisBuilder {
 			AxisBuilder.orient(0, railZFace, xPlateZ - railMargin, [0.0, -1, 0], [0.0, 0, -1]),
 			{x: 0.0, y: 0.0, z: -1.0});
 		var zPlateY = railZFace - (guide.blockHeight - guide.railHeight) - 4;
-		attach("zCarriage", new GantryPlate("Z carriage", 80, 8 + toolReach, 100),
-			AssemblyFrames.translation(0, zPlateY - toolReach / 2, xPlateZ - railMargin - 80), "blockZ");
-		flangeZero = AxisBuilder.orient(0, zPlateY - toolReach, xPlateZ - railMargin - 80 - flange.thickness,
+		var carriageHeight = 100.0;
+		// Retain 3 mm of plate above the upper guide-block mounting row.
+		var carriageDrop = carriageHeight - guide.blockHolePitchC / 2 - 3;
+		attach("zCarriage", new GantryPlate("Z carriage", 80, 8 + toolReach, carriageHeight),
+			AssemblyFrames.translation(0, zPlateY - toolReach / 2, xPlateZ - railMargin - carriageDrop), "blockZ");
+		flangeZero = AxisBuilder.orient(0, zPlateY - toolReach, xPlateZ - railMargin - carriageDrop - flange.thickness,
 			[0.0, 1, 0], [0.0, 0, -1]);
 		attach("flange", flange, flangeZero, "zCarriage");
 		exposeConnector("toolFlange", "flange", "face");
@@ -162,9 +167,7 @@ class Gantry extends AxisBuilder {
 			var rearFoot = mountBounds(component("beamFootLeft"), zeroPose("beamFootLeft"));
 			var rearLimit = Math.min(rearBeam.min[1], rearFoot.min[1]);
 			// End the tab below the foot and its Y sensor mounts at the zero corner.
-			var bottom = bounds.min[2] - 3;
-			var top = Math.min(bounds.max[2] + 3, rearFoot.min[2] - 3);
-			point[2] = (bottom + top) / 2; dimensions[2] = top - bottom;
+			point[2] = bounds.min[2] + 6; dimensions[2] = 6;
 			// The trigger touches the carriage's rear by 3 mm and stops
 			// 3 mm short of the beam and its feet, throughout the Z stroke.
 			point[1] = Math.min(column.max[1] - 10, (rearLimit + bounds.max[1] - 6) / 2);
@@ -189,6 +192,11 @@ class Gantry extends AxisBuilder {
 			// Home and negative-limit tubes share the end of travel but occupy
 			// separate lanes across the trigger face (M8 bodies, 10 mm centres).
 			face[outboardAxis] += (kind == "negativeLimit" ? -sign : sign) * 5;
+			if (suffix == "Z") {
+				var homeMount = mountBounds(component("switchYLefthomeMount"), zeroPose("switchYLefthomeMount"));
+				var limitMount = mountBounds(component("switchYLeftnegativeLimitMount"), zeroPose("switchYLeftnegativeLimitMount"));
+				face[1] = (limitMount.max[1] + homeMount.min[1]) / 2;
+			}
 			var contact = [for (i in 0...3) face[i] - direction[i] * travel];
 			addMemberConnector(trigger, kind + suffix, AssemblyFrames.translation(
 				contact[0] - point[0], contact[1] - point[1], contact[2] - point[2] + dimensions[2] / 2));

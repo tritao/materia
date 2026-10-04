@@ -90,7 +90,11 @@ class GantryChecks {
 		var expectedFace = AssemblyFrames.compose(gantry.flangeZero, gantry.component("flange").connector("face").frame);
 		var expectedRotation = AssemblyFrames.toRotationMatrix(expectedFace);
 		try {
-		for (x in [0.0, gantry.spec.travelX]) for (y in [0.0, gantry.spec.travelY]) for (z in [0.0, gantry.spec.travelZ]) {
+		for (includeOvertravel in [false, true]) {
+		var roomX = includeOvertravel ? gantry.axisOvertravel("x") : 0.0;
+		var roomY = includeOvertravel ? gantry.axisOvertravel("y") : 0.0;
+		var roomZ = includeOvertravel ? gantry.axisOvertravel("z") : 0.0;
+		for (x in [-roomX, gantry.spec.travelX + roomX]) for (y in [-roomY, gantry.spec.travelY + roomY]) for (z in [-roomZ, gantry.spec.travelZ + roomZ]) {
 			state.setJoint("x", x); state.setJoint("y", y); state.setJoint("z", z);
 			state.forwardKinematics();
 			var flange = state.worldConnector("flange", "face");
@@ -106,6 +110,7 @@ class GantryChecks {
 			near(state.worldPose("blockYRight").y, y, "right guide follows the single Y leader");
 			clearance.check(state);
 			checkShaftTips(gantry, definition, state);
+		}
 		}
 		} catch (error:Dynamic) { clearance.close(); throw error; }
 		clearance.close();
