@@ -57,6 +57,17 @@ class Segment {
 		var a = startAngle + sweep * fraction;
 		return new Point2(c.x + radius * Math.cos(a), c.y + radius * Math.sin(a));
 	}
+	/** Parameter of a point already known to lie on this curve; full-circle endpoints use zero. */
+	public function fractionAt(point:Point2):Float {
+		if (isLine()) {
+			var dx = end.x - start.x; var dy = end.y - start.y;
+			return ((point.x - start.x) * dx + (point.y - start.y) * dy) / (dx * dx + dy * dy);
+		}
+		var c = arcCenter(); var angle = Math.atan2(point.y - c.y, point.x - c.x);
+		var delta = positiveAngle(sweep > 0 ? angle - startAngle : startAngle - angle);
+		if (delta > 2 * Math.PI - 1e-10) delta = 0;
+		return delta / Math.abs(sweep);
+	}
 	/** Endpoints and cardinal extrema, sufficient for exact projected bounds of this arc. */
 	public function extrema():Array<Point2> {
 		var result = [start, end];

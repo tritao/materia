@@ -33,7 +33,7 @@ class SheetSolidSmoke {
 			var flatVolume = walls;
 			var foldedVolume = walls;
 			for (b in sheet.bends()) {
-				var length = sheet.wall(b.wallA).outline.segment(b.edgeA.loop, b.edgeA.segment).length();
+				var length = b.edgeA.span.length();
 				flatVolume += sheet.bendAllowance(b) * length * sheet.thickness();
 				foldedVolume += Math.abs(b.angle) * length * sheet.thickness() * (b.radius + sheet.thickness() / 2);
 			}

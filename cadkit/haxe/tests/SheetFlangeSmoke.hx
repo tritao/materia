@@ -156,7 +156,7 @@ class SheetFlangeSmoke {
 				FlangePosition.BendOutside, 0, ends[0], ends[1], ends[2], ends[3]);
 			near(graph.wall(2).outline.area(), 40 * (100 - ends[0] - ends[1] + ends[2] + ends[3]), "gap and extension wall area");
 			var bend = graph.bend(1);
-			near(graph.wall(1).outline.segment(bend.edgeA.loop, bend.edgeA.segment).length(), 100 - ends[0] - ends[1], "end gaps own bend width");
+			near(bend.edgeA.span.length(), 100 - ends[0] - ends[1], "end gaps own bend width");
 			var shape = SheetSolid.build(graph, graph.folded());
 			check(CadKit.shapeValidChecked(shape.borrowHandle()) != 0, "gap and extension folded solid valid"); shape.close();
 			var flat = SheetSolid.build(graph, graph.flat());

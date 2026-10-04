@@ -158,6 +158,7 @@ class SheetSolid {
 	}
 
 	static function bendSolid(bend:Bend, zone:BendZone):Shape {
+		if (bend.hasCuts()) throw new SheetDiagnosis("sheet.bend-region-builder", "Trimmed bend regions require the mapped native builder", ["bend:" + bend.id]);
 		if (zone.allowance <= 0)
 			throw new SheetDiagnosis("sheet.zero-bend-allowance", "The rule gives zero neutral length for a nonzero bend", ["bend:" + bend.id]);
 		var sketch:Sketch;

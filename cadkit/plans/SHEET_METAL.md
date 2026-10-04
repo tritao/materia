@@ -145,6 +145,13 @@ table in `tools/README.md`.
 - A wall's 2D outline is exact on both sides (walls are prisms), so it is valid in the flat and
   the folded state. Only bend zones differ: a flat rectangle `BA × width` flat, a cylindrical
   shell of inner radius `R` and outer `R + T` folded.
+- SM3k separates each bend's nominal straight attachment datum from the material contour.
+  A cut can interrupt a seam without moving its fold axis. Authored developed-region tools
+  derive bend patches from the current allowance on every rebuild; exact line/arc subtraction
+  permits multiple patches joined through the walls. Analytic seam intervals must agree on
+  both domains; missing attachment material and mismatched intervals are diagnosed.
+  Cuts are developed blank profiles in the selected wall frame, then folded with the graph.
+  This defines cross-bend cut semantics consistently with the manufactured flat pattern.
 - Features edit the graph; nothing edits the solid. This is the Onshape-style design, not the
   FreeCAD one (features build B-rep, a separate tool recognises it). Reasons: exact flat pattern,
   permanent bend identity, and every partly folded state is cheap (SM-D2), which bend planning,
@@ -501,8 +508,9 @@ setbacks; these define new fixtures, with no existing baseline-number changes.
   has it, never `--shared`). Write guarded paths in destructive commands (`"${WT:?}"/...`).
 - CadKit native: `cadkit/core` is unchanged between origin/main 3fd620e4 and 38601ac61, so use
   `CADKIT_BUILD_ROOT=/home/joao/dev/materia-worktrees/topological-naming/cadkit/build/debug`
-  until SM5 changes the native core. The shared checkout's build lacks `cad_shape_stamp_names`.
-- When SM5 needs a native build: configure CadKit in the worktree with
+  until native work is needed. SM3k prepares the local prebuilt-OCCT build for trimmed bend
+  regions before SM5; the shared checkout's build lacks `cad_shape_stamp_names`.
+- When native work needs a build (SM3 mapped bend regions, then SM5): configure CadKit in the worktree with
   `CADKIT_OCCT_DIR=/home/joao/dev/materia-cache/occt-f1dc4efb-release` set **before** the first
   configure (`-DCADKIT_BUILD_OCCT=OFF`). Never build OCCT.
 - Tests: `cadkit/scripts/test-haxeon` with `CADKIT_SMOKE_ENTRY=<entry>`. Add a
@@ -823,7 +831,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM0 | done: clean branch on 38601ac61, pins verified, prerequisite documents read; quick gate `sm0-setup` passes (ProjectKit 138, ManufacturingKit 54) | c70c89745 |
 | SM1 | done: exact line/arc regions, permanent graph ids, edits/cuts/rips, bidirectional FK, neutral-length conservation, closure and P1–P5 bounds; quick gate `sm1-core` passes (2102 sheet assertions) | 0713c4e0c; 54b5cab15 |
 | SM2 | done: named wall extrusions and bend revolutions fused for flat/folded/partial states; P1–P5 validity, single bodies, volumes, axes and stable names; quick gate `sm2-solid` passes (3757 sheet assertions) | 7a3836d8c |
-| SM3 | in progress: SM3a atomic graph publication; SM3b exact sketch-backed base, side A/B, stock codec and named thickness builder; quick gates `sm3a-staging` (3773) and `sm3b-base` (3813 sheet assertions); SM3c authored segment names and exact face-to-graph picks; quick gate `sm3c-edges` (3843 sheet assertions); SM3d exact flange geometry and alignment; quick gate `sm3d-flange-geometry` (3880 sheet assertions); SM3e typed flange features, authored shared identities, gaps/extensions, stock radius defaults and P1–P5 document acceptance; quick gate `sm3e-flanges-typed` (4044 sheet assertions); SM3f exact planar subtraction foundation; quick gate `sm3f-outline-cuts` (4068 sheet assertions); SM3g typed rectangular/obround reliefs and sizing, exact gap/bend-width semantics, atomic edits and codec; quick gate `sm3g-reliefs` (4132 sheet assertions); SM3h closed/open/teardrop hems, shared edge selection, typed codec and builder; quick gate `sm3h-hems` (4303 sheet assertions); SM3i permanent bend-id rip feature, typed codec and builder; quick gate `sm3i-rips` (4315 sheet assertions); SM3j exact through-wall cuts on staged attached sketches, shared region mapping, typed codec and builder; quick gate `sm3j-wall-cuts` (4348 sheet assertions); exact cuts across bend zones remain | 535ebc547; 08afd7a32; bb3405a64; 84a51f00d; 3ed9b3971; 31a696ed7; a02214101; f3ef57fa0; e5d66c947; 3d2d330dd; wall-cut sub-step commit |
+| SM3 | in progress: SM3a atomic graph publication; SM3b exact sketch-backed base, side A/B, stock codec and named thickness builder; quick gates `sm3a-staging` (3773) and `sm3b-base` (3813 sheet assertions); SM3c authored segment names and exact face-to-graph picks; quick gate `sm3c-edges` (3843 sheet assertions); SM3d exact flange geometry and alignment; quick gate `sm3d-flange-geometry` (3880 sheet assertions); SM3e typed flange features, authored shared identities, gaps/extensions, stock radius defaults and P1–P5 document acceptance; quick gate `sm3e-flanges-typed` (4044 sheet assertions); SM3f exact planar subtraction foundation; quick gate `sm3f-outline-cuts` (4068 sheet assertions); SM3g typed rectangular/obround reliefs and sizing, exact gap/bend-width semantics, atomic edits and codec; quick gate `sm3g-reliefs` (4132 sheet assertions); SM3h closed/open/teardrop hems, shared edge selection, typed codec and builder; quick gate `sm3h-hems` (4303 sheet assertions); SM3i permanent bend-id rip feature, typed codec and builder; quick gate `sm3i-rips` (4315 sheet assertions); SM3j exact through-wall cuts on staged attached sketches, shared region mapping, typed codec and builder; quick gate `sm3j-wall-cuts` (4348 sheet assertions); SM3k nominal seam datums, exact bend material regions and seam validation; quick gate `sm3k-bend-regions` (4368 sheet assertions); native mapped regions and cross-bend feature mapping remain | 535ebc547; 08afd7a32; bb3405a64; 84a51f00d; 3ed9b3971; 31a696ed7; a02214101; f3ef57fa0; e5d66c947; 3d2d330dd; 6033a2f60; bend-region sub-step commit |
 | SM4 | planned | |
 | SM4b | planned | |
 | SM5 | planned | |
@@ -928,3 +936,24 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
   describe both flanges and hems. Existing suite counts and original MachineKit summaries are
   unchanged; no new compiler issue or unchecked cast was introduced. Exact cuts across bend
   zones remain required before SM3 completes; this guard is temporary, not a compatibility path.
+
+- SM3k: `sm3k-bend-regions` checks circular developed bend holes, split strip patches,
+  interrupted wall seams, fixed fold transforms, copy isolation and precise disconnected/mismatch
+  diagnoses (20 new assertions, 4368 total). Nominal attachments are typed immutable records,
+  independent of contour indices. The native builder explicitly refuses trimmed bend regions
+  until its mapped-region operation lands; SM3 remains in progress. A local CadKit build was
+  configured early because this native work is needed before SM5. Its configure log explicitly
+  says “CadKit uses prebuilt OCCT”; both OCCT build options are OFF, and all three native
+  baseline tests pass. Existing suite numbers and original MachineKit summaries are unchanged.
+  No new compiler issue or unchecked cast was introduced.
+
+  Haxeon note (SM3k): a secondary typedef used inside its own module needs an explicit
+  `import cadkit.sheetmetal.BendSeam.SeamInterval`. Without it, dependency scanning records
+  `cadkit.sheetmetal.SeamInterval` and E2001 rejects a nonexistent module. The cause is
+  `haxeon/src/compiler/semantic/ModuleAnalyzer.hx` dependency qualification (the class-name
+  removal handles classes only, then unresolved names fall back to the package at lines 183–189)
+  despite `indexDeclarations` registering the alias owner; `sourceModuleForDependency` at
+  lines 473–484 probes source paths without consulting that owner map.
+  `modules/ModuleReachability.hx:63` reports it. The local explicit import preserves typed
+  data; haxeon is unchanged. The first quick gate exposed this after the import was removed;
+  it was restored before the passing gate.

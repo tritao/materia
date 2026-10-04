@@ -4,6 +4,8 @@ import cadkit.sheetmetal.BendRule;
 import cadkit.sheetmetal.KFactorTable;
 import cadkit.sheetmetal.Point2;
 import cadkit.sheetmetal.OutlineGeometry;
+import cadkit.sheetmetal.OutlineDifference;
+import cadkit.sheetmetal.BendSeam;
 import cadkit.sheetmetal.Segment;
 import cadkit.sheetmetal.Sheet;
 import cadkit.sheetmetal.SheetDemoParts;
@@ -57,6 +59,7 @@ class SheetCoreSmoke {
 			near(bounds.maxZ - bounds.minZ, heights[i], "P" + (i + 1) + " height");
 			invariants(sheet);
 		}
+		materialSeams();
 		closure();
 		diagnoses();
 		return checks;
@@ -129,7 +132,7 @@ class SheetCoreSmoke {
 					}
 				}
 				// Far strip surface meets the child's attachment at both endpoints, with no hidden gap.
-				var childEdge = sheet.wall(b.wallB).outline.segment(b.edgeB.loop, b.edgeB.segment);
+				var childEdge = b.edgeB.span;
 				var child = evaluated.wall(b.wallB);
 				vector(zone.point(1), child.plane.toWorld(new Vector(childEdge.end.x, childEdge.end.y, 0)), "child far edge end");
 				vector(zone.point(1, zone.width), child.plane.toWorld(new Vector(childEdge.start.x, childEdge.start.y, 0)), "child far edge start");
@@ -152,6 +155,40 @@ class SheetCoreSmoke {
 		var restored = sheet.updateBend(b.id, b.angle, b.radius);
 		var again = sheet.evaluate(sheet.folded());
 		for (w in sheet.walls()) frame(again.wall(w.id), folded.wall(w.id), "restored edit frame");
+	}
+	static function materialSeams():Void {
+		var sheet = SheetDemoParts.p1(); var bend = sheet.bends()[0];
+		var allowance = sheet.bendAllowance(bend);
+		var hole = new WallOutline([Segment.arc(new Point2(allowance / 2, 50), allowance / 4, 0, 2 * Math.PI)]);
+		var cut = sheet.cutBend(bend.id, hole, "interior-hole");
+		near(cut.materialRegions(allowance)[0].area(), allowance * 100 - Math.PI * allowance * allowance / 16, "developed circular bend hole area");
+		var evaluated = sheet.evaluate(sheet.folded());
+		near(evaluated.bend(bend.id).allowance, allowance, "cut keeps neutral length");
+		var tools = cut.cutTools(); tools.pop();
+		near(cut.cutTools().length, 1, "bend owns cut array");
+		var split = SheetDemoParts.p1(); var original = split.bends()[0];
+		var slot = WallOutline.polygon([new Point2(-1, 40), new Point2(allowance + 1, 40),
+			new Point2(allowance + 1, 60), new Point2(-1, 60)]);
+		var trimmed = split.cutBend(original.id, slot, "cross-slot");
+		var regions = trimmed.materialRegions(allowance);
+		near(regions.length, 2, "bend material may have connected patches joined by walls");
+		near(regions[0].area() + regions[1].area(), allowance * 80, "split strip exact area");
+		failure("sheet.cut-seam-mismatch", function() { var value = split.evaluate(split.flat()); });
+		for (wallId in [original.wallA, original.wallB]) {
+			var wall = split.wall(wallId); var span = wallId == original.wallA ? original.edgeA.span : original.edgeB.span;
+			var x = span.start.x;
+			var tool = WallOutline.polygon([new Point2(x - 1, 40), new Point2(x + 1, 40),
+				new Point2(x + 1, 60), new Point2(x - 1, 60)]);
+			var outline = OutlineDifference.subtract(wall.outline, tool, "cross-slot");
+			var changed = split.updateWallMaterial(wallId, outline);
+			near(BendSeam.intervals(outline, span, true).length, 2, "interrupted nominal seam intervals");
+		}
+		var flat = split.evaluate(split.flat());
+		near(split.bend(original.id).edgeA.span.length(), 100, "material cut retains bend datum");
+		frame(flat.wall(original.wallB), SheetDemoParts.p1().evaluate(SheetDemoParts.p1().flat()).wall(original.wallB), "material cuts keep child transform");
+		var copy = split.copy(); var removed = copy.cutBend(original.id, WallOutline.rectangle(allowance, 100), "remove-strip");
+		failure("sheet.cut-seam-disconnected", function() { var value = copy.evaluate(copy.flat()); });
+		near(split.bend(original.id).cutTools().length, 1, "copy isolates bend edits");
 	}
 	static function closure():Void {
 		var sheet = new Sheet(SheetDemoParts.materialA());

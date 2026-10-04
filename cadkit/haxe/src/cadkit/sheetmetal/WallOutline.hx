@@ -69,6 +69,12 @@ class WallOutline {
 	public function identities():Array<Array<String>> {
 		return [for (ids in segmentIds) ids.copy()];
 	}
+	/** Material membership away from the boundary, accounting for every authored hole. */
+	public function contains(point:Point2):Bool {
+		if (!OutlineGeometry.contains(boundaries[0], point)) return false;
+		for (i in 1...boundaries.length) if (OutlineGeometry.contains(boundaries[i], point)) return false;
+		return true;
+	}
 	public function area():Float {
 		var result = 0.0;
 		for (loop in boundaries)

@@ -3,6 +3,7 @@ package cadkit.sheetmetal;
 import cadkit.modeling.Location;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
+import cadkit.sheetmetal.BendSeam.SeamInterval;
 
 /** One sheet graph owns identities and dimensions; solids and flat patterns are derived from it. */
 class Sheet {
@@ -72,26 +73,47 @@ class Sheet {
 			throw new SheetDiagnosis("sheet.invalid-bend-identity", "Bend identity is outside the supported range");
 		for (bend in bendData) if (bend.id == id)
 			throw new SheetDiagnosis("sheet.duplicate-bend-identity", "Bend identity already belongs to this sheet", ["bend:" + id]);
-		var result = new Bend(id, wallA, edgeA, wallB, edgeB, angle, radius);
+		var result = new Bend(id, wallA, BendAttachment.fromOutline(wall(wallA).outline, edgeA),
+			wallB, BendAttachment.fromOutline(wall(wallB).outline, edgeB), angle, radius);
 		validateBend(result);
 		for (b in bendData)
-			if (uses(b, wallA, edgeA) || uses(b, wallB, edgeB))
+			if (uses(b, wallA, result.edgeA.identity) || uses(b, wallB, result.edgeB.identity))
 				throw new SheetDiagnosis("sheet.bend-edge-in-use", "A boundary segment can belong to only one bend", ["bend:" + b.id]);
 		if (id >= nextBend) nextBend = id + 1;
 		bendData.push(result);
 		return result;
 	}
-	static function uses(b:Bend, wall:Int, edge:WallEdge):Bool {
-		return (b.wallA == wall && b.edgeA.key() == edge.key()) || (b.wallB == wall && b.edgeB.key() == edge.key());
+	static function uses(b:Bend, wall:Int, identity:String):Bool {
+		return (b.wallA == wall && b.edgeA.identity == identity) || (b.wallB == wall && b.edgeB.identity == identity);
 	}
 	function validateBend(b:Bend):Void {
 		BendDimensions.validate(thickness(), b.radius, b.angle);
 		if (b.wallA == b.wallB || b.angle == 0)
 			throw new SheetDiagnosis("sheet.bend-edge-mismatch", "A bend needs different walls and a nonzero target angle", ["bend:" + b.id]);
-		var a = wall(b.wallA).outline.segment(b.edgeA.loop, b.edgeA.segment);
-		var c = wall(b.wallB).outline.segment(b.edgeB.loop, b.edgeB.segment);
+		var ownerA = wall(b.wallA); var ownerB = wall(b.wallB);
+		var a = b.edgeA.span;
+		var c = b.edgeB.span;
 		if (!a.isLine() || !c.isLine() || Math.abs(a.length() - c.length()) > 1e-8)
 			throw new SheetDiagnosis("sheet.bend-edge-mismatch", "Bend edges must be straight and of equal length", ["bend:" + b.id]);
+	}
+	function validateMaterial(b:Bend):Void {
+		var a = BendSeam.intervals(wall(b.wallA).outline, b.edgeA.span, true);
+		var c = BendSeam.intervals(wall(b.wallB).outline, b.edgeB.span, true);
+		var regionA:Array<SeamInterval> = [{first: 0, last: 1}]; var regionB:Array<SeamInterval> = [{first: 0, last: 1}];
+		if (b.hasCuts()) {
+			regionA = []; regionB = []; var allowance = bendAllowance(b); var width = b.edgeA.span.length();
+			var seamA = Segment.line(new Point2(0, 0), new Point2(0, width));
+			var seamB = Segment.line(new Point2(allowance, width), new Point2(allowance, 0));
+			for (region in b.materialRegions(allowance)) {
+				for (interval in BendSeam.intervals(region, seamA, false)) regionA.push(interval);
+				for (interval in BendSeam.intervals(region, seamB, false)) regionB.push(interval);
+			}
+			regionA = BendSeam.union(regionA); regionB = BendSeam.union(regionB);
+		}
+		if (a.length == 0 || regionA.length == 0 || (!isRipped(b.id) && (c.length == 0 || regionB.length == 0)))
+			throw new SheetDiagnosis("sheet.cut-seam-disconnected", "Bend material has no connection at its nominal seam", ["bend:" + b.id]);
+		if (!BendSeam.matches(a, regionA) || (!isRipped(b.id) && !BendSeam.matches(c, regionB)))
+			throw new SheetDiagnosis("sheet.cut-seam-mismatch", "Wall and bend material intervals differ at their shared seam", ["bend:" + b.id]);
 	}
 	public function updateWall(id:Int, outline:WallOutline):Wall {
 		var previous = wall(id);
@@ -105,7 +127,7 @@ class Sheet {
 				if (b.wallA != id && b.wallB != id) continue;
 				var a = b.wallA == id ? remappedEdge(previous.outline, outline, b.edgeA, b.id) : b.edgeA;
 				var c = b.wallB == id ? remappedEdge(previous.outline, outline, b.edgeB, b.id) : b.edgeB;
-				var replacement = new Bend(b.id, b.wallA, a, b.wallB, c, b.angle, b.radius);
+				var replacement = new Bend(b.id, b.wallA, a, b.wallB, c, b.angle, b.radius, b.cutTools());
 				validateBend(replacement);
 				bendData[i] = replacement;
 			}
@@ -116,20 +138,35 @@ class Sheet {
 		}
 		return result;
 	}
-	static function remappedEdge(previous:WallOutline, next:WallOutline, edge:WallEdge, bend:Int):WallEdge {
-		var identity = previous.identity(edge.loop, edge.segment);
+	static function remappedEdge(previous:WallOutline, next:WallOutline, attachment:BendAttachment, bend:Int):BendAttachment {
+		var before = previous.identities(); var intact = false;
+		for (i in 0...before.length) for (j in 0...before[i].length) if (before[i][j] == attachment.identity) {
+			var segment = previous.segment(i, j);
+			intact = segment.isLine() && segment.start.distance(attachment.span.start) < 1e-8 && segment.end.distance(attachment.span.end) < 1e-8;
+		}
+		// An interrupted seam is a nominal datum; a material-contour edit cannot redefine it.
+		if (!intact) return attachment;
 		var identities = next.identities();
-		for (i in 0...identities.length)
-			for (j in 0...identities[i].length)
-				if (identities[i][j] == identity) return new WallEdge(j, i);
-		throw new SheetDiagnosis("sheet.bend-edge-removed", "Wall edit removed an edge belonging to a bend", ["bend:" + bend, identity]);
+		for (i in 0...identities.length) for (j in 0...identities[i].length)
+			if (identities[i][j] == attachment.identity) return new BendAttachment(attachment.identity, next.segment(i, j));
+		throw new SheetDiagnosis("sheet.bend-edge-removed", "Wall edit removed an edge belonging to a bend", ["bend:" + bend, attachment.identity]);
+	}
+	/** Change only material contours; attachment datums remain owned by their bends. */
+	public function updateWallMaterial(id:Int, outline:WallOutline):Wall {
+		var previous = wall(id); var result = new Wall(id, outline); wallData[wallData.indexOf(previous)] = result; return result;
 	}
 	public function updateBend(id:Int, angle:Float, radius:Float):Bend {
 		var previous = bend(id);
-		var result = new Bend(id, previous.wallA, previous.edgeA, previous.wallB, previous.edgeB, angle, radius);
+		var result = new Bend(id, previous.wallA, previous.edgeA, previous.wallB, previous.edgeB, angle, radius, previous.cutTools());
 		validateBend(result);
 		bendData[bendData.indexOf(previous)] = result;
 		return result;
+	}
+	/** Add an exact developed-region cut; the strip's nominal seam datums remain fixed. */
+	public function cutBend(id:Int, region:WallOutline, owner:String):Bend {
+		var previous = bend(id); var cuts = previous.cutTools(); cuts.push(new BendCut(region, owner));
+		var result = new Bend(id, previous.wallA, previous.edgeA, previous.wallB, previous.edgeB, previous.angle, previous.radius, cuts);
+		bendData[bendData.indexOf(previous)] = result; return result;
 	}
 	public function rip(id:Int):Rip {
 		var b = bend(id);
@@ -166,8 +203,7 @@ class Sheet {
 	}
 
 	/** Outward X, edge tangent Y, side-A normal Z. Child attachment uses the opposite tangent. */
-	public static function edgeFrame(outline:WallOutline, edge:WallEdge, child:Bool = false):Location {
-		var s = outline.segment(edge.loop, edge.segment);
+	public static function edgeFrame(s:Segment, child:Bool = false):Location {
 		if (!s.isLine())
 			throw new SheetDiagnosis("sheet.bend-edge-mismatch", "An arc cannot be a bend edge");
 		var tangent = new Vector(s.end.x - s.start.x, s.end.y - s.start.y, 0).normalized();
@@ -178,11 +214,11 @@ class Sheet {
 	function localZone(b:Bend, angle:Float):BendZone {
 		var allowance = bendAllowance(b);
 		var neutralOffset = allowance / Math.abs(b.angle) - b.radius;
-		var edge = wall(b.wallA).outline.segment(b.edgeA.loop, b.edgeA.segment);
-		return new BendZone(b.id, edgeFrame(wall(b.wallA).outline, b.edgeA), angle, allowance, edge.length(), thickness(), neutralOffset);
+		var edge = b.edgeA.span;
+		return new BendZone(b.id, edgeFrame(edge), angle, allowance, edge.length(), thickness(), neutralOffset);
 	}
 	function relative(b:Bend, angle:Float):Location {
-		return localZone(b, angle).endFrame().compose(edgeFrame(wall(b.wallB).outline, b.edgeB, true).inverse());
+		return localZone(b, angle).endFrame().compose(edgeFrame(b.edgeB.span, true).inverse());
 	}
 	static function wallFrame(frames:Map<Int, Location>, id:Int):Location {
 		var result = frames.get(id);
@@ -203,6 +239,7 @@ class Sheet {
 		for (id in state.ids()) { var known = bend(id); }
 		for (b in bendData) {
 			validateBend(b);
+			validateMaterial(b);
 			var a = state.angle(b.id);
 			if (a * b.angle < 0 || Math.abs(a) > Math.abs(b.angle))
 				throw new SheetDiagnosis("sheet.invalid-state", "State angle must lie between zero and its target", ["bend:" + b.id]);

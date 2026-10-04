@@ -66,7 +66,7 @@ class SheetFlangeGeometrySmoke {
 		var ids = previous.identities()[0];
 		var changed = channel.updateWall(1, new WallOutline([loop[2], loop[3], loop[0], loop[1]], [],
 			[[ids[2], ids[3], ids[0], ids[1]]]));
-		check(channel.bend(1).edgeA.segment == 3 && channel.bend(2).edgeA.segment == 1,
+		check(channel.bend(1).edgeA.identity == ids[1] && channel.bend(2).edgeA.identity == ids[3],
 			"existing bend attachments follow authored identities after contour rotation");
 		near(channel.evaluate(channel.folded()).bounds().maxZ, bounds.maxZ, "remapped attachments preserve folded geometry");
 		var failed = false;

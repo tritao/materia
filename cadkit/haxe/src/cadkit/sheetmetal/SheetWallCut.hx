@@ -5,9 +5,9 @@ class SheetWallCut {
 	public static function apply(source:Sheet, wall:Int, tool:WallOutline, owner:String):Sheet {
 		var outline = source.wall(wall).outline;
 		for (bend in source.bends()) {
-			var attachment:Null<WallEdge> = bend.wallA == wall ? bend.edgeA : bend.wallB == wall ? bend.edgeB : null;
+			var attachment:Null<BendAttachment> = bend.wallA == wall ? bend.edgeA : bend.wallB == wall ? bend.edgeB : null;
 			if (attachment == null) continue;
-			var edge = outline.segment(attachment.loop, attachment.segment); var length = source.bendAllowance(bend);
+			var edge = attachment.span; var length = source.bendAllowance(bend);
 			if (length <= 0) continue;
 			var dx = (edge.end.y - edge.start.y) / edge.length() * length;
 			var dy = (edge.start.x - edge.end.x) / edge.length() * length;

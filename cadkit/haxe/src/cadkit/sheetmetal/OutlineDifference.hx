@@ -1,9 +1,16 @@
 package cadkit.sheetmetal;
 
-/** Analytic subtraction of exact planar regions; disconnected walls are diagnosed rather than joined. */
+/** Analytic subtraction of exact planar regions; wall callers require one connected result. */
 class OutlineDifference {
 	static inline var EPS:Float = 1e-8;
 	public static function subtract(source:WallOutline, tool:WallOutline, owner:String):WallOutline {
+		var result = regions(source, tool, owner);
+		if (result.length == 0) throw new SheetDiagnosis("sheet.cut-empty", "Cut removes the entire wall");
+		if (result.length != 1) throw new SheetDiagnosis("sheet.cut-disconnected", "Cut splits the wall into separate regions");
+		return result[0];
+	}
+	/** Bend strips may have separate patches joined through their neighbouring walls. */
+	public static function regions(source:WallOutline, tool:WallOutline, owner:String):Array<WallOutline> {
 		var pieces:Array<OutlinePiece> = [];
 		collect(source, tool, false, owner, pieces);
 		collect(tool, source, true, owner, pieces);
@@ -26,19 +33,26 @@ class OutlineDifference {
 			}
 			loops.push(loop); ids.push(names);
 		}
-		var outer = -1;
+		var outers:Array<Int> = []; var holes:Array<Int> = [];
 		for (i in 0...loops.length) {
 			var area = 0.0; for (segment in loops[i]) area += segment.area();
-			if (area > 1e-12) {
-				if (outer >= 0) throw new SheetDiagnosis("sheet.cut-disconnected", "Cut splits the wall into separate regions");
-				outer = i;
-			}
+			if (area > 1e-12) outers.push(i);
+			else if (area < -1e-12) holes.push(i);
+			else throw new SheetDiagnosis("sheet.cut-boundary", "Cut boundary encloses zero area");
 		}
-		if (outer < 0) throw new SheetDiagnosis("sheet.cut-empty", "Cut removes the entire wall");
-		var boundary = loops[outer]; var boundaryIds = ids[outer];
-		loops.splice(outer, 1); ids.splice(outer, 1); ids.unshift(boundaryIds);
-		return new WallOutline(boundary, loops, ids);
+		var result:Array<WallOutline> = []; var assigned:Map<Int, Bool> = new Map();
+		for (outer in outers) {
+			var nested:Array<Array<Segment>> = []; var names = [ids[outer]];
+			for (hole in holes) if (OutlineGeometry.contains(loops[outer], loops[hole][0].start)) {
+				if (assigned.exists(hole)) throw new SheetDiagnosis("sheet.cut-boundary", "Cut hole belongs to multiple outer regions");
+				assigned.set(hole, true); nested.push(loops[hole]); names.push(ids[hole]);
+			}
+			result.push(new WallOutline(loops[outer], nested, names));
+		}
+		for (hole in holes) if (!assigned.exists(hole)) throw new SheetDiagnosis("sheet.cut-boundary", "Cut hole has no outer region");
+		return result;
 	}
+
 	static function collect(outline:WallOutline, other:WallOutline, reverse:Bool, owner:String, result:Array<OutlinePiece>):Void {
 		var boundaries = outline.loops();
 		for (i in 0...boundaries.length) for (j in 0...boundaries[i].length) {
@@ -46,7 +60,7 @@ class OutlineDifference {
 			var parameters = [0.0, 1.0];
 			for (loop in other.loops()) for (edge in loop)
 				for (point in OutlineGeometry.intersections(segment, edge)) {
-					var value = fraction(segment, point);
+					var value = segment.fractionAt(point);
 					if (value > 1e-10 && value < 1 - 1e-10) parameters.push(value);
 				}
 			parameters.sort(function(a:Float, b:Float):Int { return a < b ? -1 : a > b ? 1 : 0; });
@@ -61,10 +75,10 @@ class OutlineDifference {
 				var distance = Math.min(1e-6, piece.length() * 1e-4);
 				var left = new Point2(midpoint.x - tangent.y * distance, midpoint.y + tangent.x * distance);
 				var right = new Point2(midpoint.x + tangent.y * distance, midpoint.y - tangent.x * distance);
-				var leftMaterial = reverse ? contains(other, left) && !contains(outline, left)
-					: contains(outline, left) && !contains(other, left);
-				var rightMaterial = reverse ? contains(other, right) && !contains(outline, right)
-					: contains(outline, right) && !contains(other, right);
+				var leftMaterial = reverse ? other.contains(left) && !outline.contains(left)
+					: outline.contains(left) && !other.contains(left);
+				var rightMaterial = reverse ? other.contains(right) && !outline.contains(right)
+					: outline.contains(right) && !other.contains(right);
 				if (leftMaterial == rightMaterial) continue;
 				append(retained, leftMaterial ? piece : reversed(piece));
 			}
@@ -123,28 +137,10 @@ class OutlineDifference {
 	static function same(a:Segment, b:Segment):Bool {
 		return a.start.distance(b.start) <= EPS && a.end.distance(b.end) <= EPS && a.point(0.5).distance(b.point(0.5)) <= EPS;
 	}
-	static function contains(outline:WallOutline, point:Point2):Bool {
-		var loops = outline.loops();
-		if (!OutlineGeometry.contains(loops[0], point)) return false;
-		for (i in 1...loops.length) if (OutlineGeometry.contains(loops[i], point)) return false;
-		return true;
-	}
 	static function direction(segment:Segment):Point2 {
 		if (segment.isLine()) return new Point2((segment.end.x - segment.start.x) / segment.length(), (segment.end.y - segment.start.y) / segment.length());
 		var angle = segment.startAngle + segment.sweep / 2; var sign = segment.sweep > 0 ? 1 : -1;
 		return new Point2(-Math.sin(angle) * sign, Math.cos(angle) * sign);
-	}
-	static function fraction(segment:Segment, point:Point2):Float {
-		if (segment.isLine()) {
-			var dx = segment.end.x - segment.start.x; var dy = segment.end.y - segment.start.y;
-			return ((point.x - segment.start.x) * dx + (point.y - segment.start.y) * dy) / (dx * dx + dy * dy);
-		}
-		var center = segment.arcCenter();
-		var angle = Math.atan2(point.y - center.y, point.x - center.x);
-		var delta = (segment.sweep > 0 ? angle - segment.startAngle : segment.startAngle - angle) % (2 * Math.PI);
-		if (delta < 0) delta += 2 * Math.PI;
-		if (delta > 2 * Math.PI - 1e-10) delta = 0;
-		return delta / Math.abs(segment.sweep);
 	}
 	static function slice(segment:Segment, start:Float, end:Float):Segment {
 		return segment.isLine() ? Segment.line(segment.point(start), segment.point(end))
