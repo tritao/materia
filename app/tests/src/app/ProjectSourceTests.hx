@@ -2005,7 +2005,10 @@ class ProjectSourceTests {
     // The pass ends with the drill; the next pass, started as this one is counted, loads the end mill again.
     var changes = tools.join(",");
     check(changes == "1,2" || changes == "1,2,1", 'the router starts with the end mill and changes to the drill, got $tools');
-    var seconds = simulation.activeSession().simulationTime();
+    var totalSeconds = simulation.activeSession().simulationTime();
+    var homingSeconds = player.homingSeconds;
+    var seconds = totalSeconds - homingSeconds;
+    check(homingSeconds > 0 && seconds > 0, 'the $kind reports homing separately from machining');
     check(player.passes == 1, 'the router finishes one pass of its program, at $seconds s');
     // What the plan checks found over the pass: stepper stalls and the drives' stretch against the tolerance.
     var checks = player.planChecks();
@@ -2044,7 +2047,7 @@ class ProjectSourceTests {
       check(simulation.cncFailure() == null, 'the looping program starts its next pass: ${simulation.cncFailure()}');
     }
     session.dispose();
-    Sys.println('cnc $kind milled the motor plate in ${Math.round(seconds * 10) / 10} s of machining: removed ' +
+    Sys.println('cnc $kind milled the motor plate in ${Math.round(seconds * 10) / 10} s of machining (homing ${Math.round(homingSeconds * 10) / 10} s, total ${Math.round(totalSeconds * 10) / 10} s): removed ' +
       '${Math.round(stock.removed * 1e10) / 10} mm³ of ${Math.round(recesses * 1e10) / 10}, leftover ' +
       '${Math.round(deviation.leftover * 1e10) / 10} mm³, gouge ${Math.round(deviation.gouge * 1e10) / 10} mm³; ' +
       '${Math.round(stepping / steps * 1e5) / 100} ms per simulated tick; ${stock.rapidContacts} ticks of rapid label cut');

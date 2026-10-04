@@ -89,6 +89,7 @@ class GantryClearanceChecks {
 					new Vector(x.x, x.y, x.z), new Vector(z.x, z.y, z.z))));
 				placed.set(id, world); boxes.set(id, bounds(world)); ids.push(id);
 			}
+			var clashes:Array<String> = [];
 			for (i in 0...ids.length) for (j in i + 1...ids.length) {
 				var a = ids[i], b = ids[j];
 				// Separate sensor bodies cannot occupy the same space even when
@@ -99,9 +100,10 @@ class GantryClearanceChecks {
 				if (boxA == null || boxB == null) throw "Missing gantry bounds";
 				if (!boxesOverlap(boxA, boxB)) continue;
 				var volume = overlap(a, b);
-				if (volume > 1e-3) throw 'Gantry interference $a / $b: $volume mm³ at ' +
-					[state.joint("x"), state.joint("y"), state.joint("z")].join(", ");
+				if (volume > 1e-3) clashes.push('$a / $b: $volume mm³');
 			}
+			if (clashes.length > 0) throw "Gantry interference at " +
+				[state.joint("x"), state.joint("y"), state.joint("z")].join(", ") + ":\n" + clashes.join("\n");
 			for (pair in shaftSeatings) {
 				var volume = overlap(pair.parent, pair.child);
 				if (volume > 1e-3) throw 'Shaft does not fit ${pair.child}: $volume mm³';

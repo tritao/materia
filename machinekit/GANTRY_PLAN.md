@@ -3404,3 +3404,34 @@ rail height, plus the carriage spacing. Both players' latch hooks were also
 checked: they reset EncoderMonitor to calibrated q and clear StepperSlip loss
 history with rebaseAfterHoming, preserving the endpoint's calibrated offsets.
 Compiler-only passed before the rail-height adjustment; its retry is running.
+
+
+### Phase C — report router homing outside machining time
+
+The app plate-program gate used total simulation time as its machining cycle
+time. It now subtracts the player's measured homing duration, requires both
+phases to have run, and reports machining, homing and total time separately.
+The screw/belt comparison uses machining duration; loop scheduling continues
+to use the full simulation clock. This reporting change awaits the full app
+phase gate. The final flange/rail reach compiler-only build passed (1044 sources);
+the mechanical sweep is running.
+
+The next mechanical sweep cleared the flange contacts, then found the Y-left
+trigger intersecting its screw (1480.91 mm³). Y switches and triggers now use the
+inboard side of their feet, opposite the outboard drive. Existing corner checks
+retain all tolerances and exclusions but collect pair clashes and exercise each
+drive before reporting failures, avoiding a rebuild cycle per first clash.
+The updated mechanical gate is pending.
+
+The batched sweep found the same three Z-tab/Y-sensor contacts in screw and belt
+layouts, plus rack pinion/support and right motor/frame/rail contacts. The Z tab
+now ends below the beam foot and its Y mounts. Rack supports use clearance
+bores sized from the pinion outside diameter plus 2 mm, preserving material
+around the gear rather than exempting its collision. The right rack motor and
+rack plane are mirrored together to keep the motor body outboard.
+App compiler-only passed (1790 sources), including the separate homing timing
+report. The latest mechanical changes await compilation and the next sweep.
+
+Compiler-only passed after the rack support, mirrored motor and shortened Z-tab
+changes (1044 sources). The batched mechanical gate is now running on that
+compiled layout. No full Phase C pass is claimed.

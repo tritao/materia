@@ -142,10 +142,15 @@ class GantryNutMount extends MachineComponent {
 class GantryMotorSupport extends GantryPlate {
 	public final mountedMotor:NemaStepper;
 	public final shaftFace:AssemblyFrame;
+	public final clearanceDiameter:Float;
 	public final sections:Array<Array<Float>>;
 	public function new(name:String, width:Float, depth:Float, height:Float, motor:NemaStepper,
-			shaftFace:AssemblyFrame, ?sections:Array<Array<Float>>) {
-		super(name, width, depth, height);
+			shaftFace:AssemblyFrame, ?sections:Array<Array<Float>>, ?clearanceDiameter:Float) {
+		var bore = clearanceDiameter == null ? motor.variant.shaftDiameter + 0.5 : clearanceDiameter;
+		if (!Math.isFinite(bore) || bore < motor.variant.shaftDiameter + 0.5)
+			throw "Motor support clearance must cover its shaft";
+		super(name + "-BORE" + Dimension.format(bore), width, depth, height);
+		this.clearanceDiameter = bore;
 		mountedMotor = motor; this.shaftFace = shaftFace;
 		this.sections = sections == null ? [[-width / 2, -depth / 2, 0.0, width / 2, depth / 2, height]] : [for (section in sections) section.copy()];
 		if (this.sections.length == 0) throw "Motor support needs a solid section";
@@ -167,7 +172,7 @@ class GantryMotorSupport extends GantryPlate {
 			var body = parts.length == 1 ? parts[0] : Solids.union(parts);
 			if (parts.length != 1) owned.push(body);
 			var extent = width + depth + height + mountedMotor.variant.shaftLength;
-			var bore = Part.cylinderSpan((mountedMotor.variant.shaftDiameter + 0.5) / 2, -extent, extent);
+			var bore = Part.cylinderSpan(clearanceDiameter / 2, -extent, extent);
 			owned.push(bore);
 			var x = AssemblyFrames.transformVector(shaftFace, 1, 0, 0), z = AssemblyFrames.transformVector(shaftFace, 0, 0, 1);
 			var tool = bore.placed(new Location(new Plane(new Vector(shaftFace.x, shaftFace.y, shaftFace.z),

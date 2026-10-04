@@ -128,13 +128,13 @@ class Gantry extends AxisBuilder {
 		var zDriveDrop = switch spec.driveZ { case Belt(_, _, _): 0.0; case _: 40.0; };
 		buildDrive(axes[2], spec.driveZ, "Z", "zColumn", "zCarriage",
 			[70.0, zPlateY, xPlateZ - railMargin - zDriveDrop], [0.0, 0, -1]);
-		buildSwitches(axes[1], "YLeft", "frameLeft", "beamFootLeft", 0, -1, alongY);
-		if (spec.dualY) buildSwitches(axes[1], "YRight", "frameRight", "beamFootRight", 0, 1, alongY);
+		buildSwitches(axes[1], "YLeft", "frameLeft", "beamFootLeft", 0, 1, alongY);
+		if (spec.dualY) buildSwitches(axes[1], "YRight", "frameRight", "beamFootRight", 0, -1, alongY);
 		buildSwitches(axes[0], "X", "beam", "xCarriage", 1, -1, alongX);
 		buildSwitches(axes[2], "Z", "zColumn", "zCarriage", 0, -1, [0.0, 0, -1]);
 	}
 
-	/** Outboard steel trigger and switches carried by the actual guide's fixed structure. */
+	/** Side-mounted steel trigger and switches carried by the actual guide's fixed structure. */
 	function buildSwitches(axis:AxisSpec, suffix:String, fixed:String, moving:String,
 			outboardAxis:Int, sign:Int, direction:Array<Float>):Void {
 		var drive = suffix == "X" ? spec.driveX : suffix == "Z" ? spec.driveZ : spec.driveY;
@@ -148,6 +148,8 @@ class Gantry extends AxisBuilder {
 		point[outboardAxis] = (sign < 0 ? bounds.min[outboardAxis] : bounds.max[outboardAxis]) + sign * 18;
 		var dimensions = [10.0, 10.0, 6.0];
 		dimensions[outboardAxis] = 40;
+		for (i in 0...3) if (Math.abs(direction[i]) > 0.5)
+			dimensions[i] = bounds.max[i] - bounds.min[i] + 6;
 		// Z workpieces rise in front of the column. Keep the fixed switches
 		// alongside it; the outboard trigger stays clear of the rear beam.
 		if (suffix == "Z") {
@@ -159,13 +161,16 @@ class Gantry extends AxisBuilder {
 			var rearBeam = mountBounds(component("beam"), zeroPose("beam"));
 			var rearFoot = mountBounds(component("beamFootLeft"), zeroPose("beamFootLeft"));
 			var rearLimit = Math.min(rearBeam.min[1], rearFoot.min[1]);
+			// End the tab below the foot and its Y sensor mounts at the zero corner.
+			var bottom = bounds.min[2] - 3;
+			var top = Math.min(bounds.max[2] + 3, rearFoot.min[2] - 3);
+			point[2] = (bottom + top) / 2; dimensions[2] = top - bottom;
 			// The trigger touches the carriage's rear by 3 mm and stops
 			// 3 mm short of the beam and its feet, throughout the Z stroke.
 			point[1] = Math.min(column.max[1] - 10, (rearLimit + bounds.max[1] - 6) / 2);
 			dimensions[1] = 2 * (point[1] - bounds.max[1] + 3);
 		}
-		for (i in 0...3) if (Math.abs(direction[i]) > 0.5)
-			dimensions[i] = bounds.max[i] - bounds.min[i] + 6;
+
 		var target = new GantryPlate("switch trigger", dimensions[0], dimensions[1], dimensions[2]);
 		target.setMaterial("steel");
 		var trigger = "switchTrigger" + suffix;
@@ -226,10 +231,10 @@ class Gantry extends AxisBuilder {
 		return id;
 	}
 
-	function mountMotor(id:String, parent:String, face:AssemblyFrame):NemaStepper {
+	function mountMotor(id:String, parent:String, face:AssemblyFrame, ?clearanceDiameter:Float):NemaStepper {
 		var motor = NemaStepper.frame(spec.motorFrame);
 		var plate = new GantryPlate("motor mount", motor.spec.face + 12, motor.spec.face + 12, 6, motor, AssemblyFrames.identity());
-		var support = supportMotor(id + "Support", parent, plate, face, motor);
+		var support = supportMotor(id + "Support", parent, plate, face, motor, clearanceDiameter);
 		attach(id + "Plate", plate, face, support);
 		attach(id, motor, face, id + "Plate");
 		return motor;
@@ -255,12 +260,12 @@ class Gantry extends AxisBuilder {
 		return {min: lo, max: hi};
 	}
 
-	function supportMotor(id:String, parent:String, plate:GantryPlate, face:AssemblyFrame, motor:NemaStepper):String {
+	function supportMotor(id:String, parent:String, plate:GantryPlate, face:AssemblyFrame, motor:NemaStepper, ?clearanceDiameter:Float):String {
 		var host = mountBounds(component(parent), zeroPose(parent)), target = mountBounds(plate, face);
 		var gaps:Array<Int> = [];
 		for (axis in 0...3) if (target.min[axis] > host.max[axis] + 1e-7 || host.min[axis] > target.max[axis] + 1e-7) gaps.push(axis);
 		if (gaps.length == 0) return parent;
-		if (gaps.length == 2) return supportMotorCorner(id, parent, host, target, face, motor, gaps);
+		if (gaps.length == 2) return supportMotorCorner(id, parent, host, target, face, motor, gaps, clearanceDiameter);
 		if (gaps.length > 2) throw "A gantry motor bracket needs a common supporting plane";
 		var gapAxis = gaps[0];
 		var min:Array<Float> = [], max:Array<Float> = [];
@@ -274,13 +279,13 @@ class Gantry extends AxisBuilder {
 		}
 		var pose = AssemblyFrames.translation((min[0] + max[0]) / 2, (min[1] + max[1]) / 2, min[2]);
 		attach(id, new GantryMotorSupport(id, max[0] - min[0], max[1] - min[1], max[2] - min[2], motor,
-			AssemblyFrames.compose(AssemblyFrames.inverse(pose), face)), pose, parent);
+			AssemblyFrames.compose(AssemblyFrames.inverse(pose), face), null, clearanceDiameter), pose, parent);
 		return id;
 	}
 
 	/** Two intersecting arms support a motor beside a frame corner without passing through its body. */
 	function supportMotorCorner(id:String, parent:String, host:GantryBox, target:GantryBox,
-			face:AssemblyFrame, motor:NemaStepper, gaps:Array<Int>):String {
+			face:AssemblyFrame, motor:NemaStepper, gaps:Array<Int>, ?clearanceDiameter:Float):String {
 		var a = gaps[0], b = gaps[1], c = 3 - a - b;
 		var signA = target.min[a] > host.max[a] ? 1.0 : -1.0;
 		var signB = target.min[b] > host.max[b] ? 1.0 : -1.0;
@@ -306,7 +311,7 @@ class Gantry extends AxisBuilder {
 			sections.push([pair.lo[0] - pose.x, pair.lo[1] - pose.y, pair.lo[2] - pose.z,
 				pair.hi[0] - pose.x, pair.hi[1] - pose.y, pair.hi[2] - pose.z]);
 		attach(id, new GantryMotorSupport(id, max[0] - min[0], max[1] - min[1], max[2] - min[2], motor,
-			AssemblyFrames.compose(AssemblyFrames.inverse(pose), face), sections), pose, parent);
+			AssemblyFrames.compose(AssemblyFrames.inverse(pose), face), sections, clearanceDiameter), pose, parent);
 		return id;
 	}
 
@@ -348,6 +353,9 @@ class Gantry extends AxisBuilder {
 	function buildDrive(axis:AxisSpec, drive:GantryDrive, suffix:String, fixed:String, moving:String,
 			origin:Array<Float>, direction:Array<Float>):Void {
 		var transverse:Array<Float> = direction[2] == 0 ? [0.0, 0, 1] : [1.0, 0, 0];
+		// Mirror the right rack's motor and rack plane to keep its body outboard.
+		var mirroredRack = suffix == "YRight" && (switch drive { case Rack(_, _, _): true; case _: false; });
+		if (mirroredRack) transverse = [for (value in transverse) -value];
 		var normal = [direction[1] * transverse[2] - direction[2] * transverse[1],
 			direction[2] * transverse[0] - direction[0] * transverse[2],
 			direction[0] * transverse[1] - direction[1] * transverse[0]];
@@ -416,8 +424,8 @@ class Gantry extends AxisBuilder {
 						{instanceId: idlerId, connectorName: "attach-" + idlerId}]});
 			case Rack(moduleSize, teeth, width):
 				var face = [origin[0] - normal[0] * (shaft - width), origin[1] - normal[1] * (shaft - width), origin[2] - normal[2] * (shaft - width)];
-				mountMotor(motorId, moving, AxisBuilder.orient(face[0], face[1], face[2], transverse, normal));
 				var pinion = new SpurGear(moduleSize, teeth, width, SpurGear.STANDARD_PRESSURE_ANGLE, 0, 0, selectedMotor.variant.shaftDiameter);
+				mountMotor(motorId, moving, AxisBuilder.orient(face[0], face[1], face[2], transverse, normal), pinion.outsideDiameter + 2);
 				// At coordinate zero a pinion tooth meets a rack gap. Round the end margin
 				// to full rack pitches to retain this phase for every module and travel.
 				var rackPitch = Math.PI * moduleSize;

@@ -29,7 +29,10 @@ class GantryChecks {
 		checkGearBore();
 		var thread = new LeadScrewThread(MetricTrapezoidal, 12, 3);
 		var drives:Array<GantryDrive> = [Screw(thread), Belt(TimingBeltProfile.GT2, 20, 9), Rack(1, 20, 8)];
-		for (drive in drives) runDrive(drive);
+		var failures:Array<String> = [];
+		for (drive in drives) try runDrive(drive)
+		catch (error:Dynamic) failures.push(Std.string(drive) + ": " + Std.string(error));
+		if (failures.length > 0) throw failures.join("\n");
 		var table = new Gantry(new GantrySpec(200, 150, 100, drives[1], drives[1], drives[0], false,
 			"MGN12C", 17, "HFS5-4040", "HFS5-4040", true));
 		for (member in table.components()) check(!StringTools.startsWith(member.id, "post"), "table-mounted variant omits posts");
