@@ -340,6 +340,16 @@ class AssemblyRobot {
     // them, such as an arm while its base drives.
     var runtime = candidate.addRobotAtPose(blueprint, position, rotation, device, null, null, closures, null, null, null, null,
       linkHulls, true);
+    var authored = session.cncJob != null ? session.cncJob.powerUpOffsets :
+      session.mission == null ? null : session.mission.powerUpOffsets;
+    if (authored != null && authored.length > 0) {
+      var named = new Map<String, Float>();
+      for (entry in authored) {
+        if (entry == null || named.exists(entry.joint)) throw "Duplicate or null scene power-up offset";
+        named.set(entry.joint, entry.offset);
+      }
+      candidate.setPowerUpOffsets(robotIndex, robotkit.runtime.PowerUpOffsets.resolve(blueprint, named));
+    }
     var robot = new SimulatedRobot(idFor(assembly), runtime, converted.model.name,
       [for (link in converted.model.links) link.id],
       [for (joint in converted.model.joints) joint.id]);

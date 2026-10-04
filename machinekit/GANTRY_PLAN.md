@@ -1790,3 +1790,22 @@ change; absent fields remain absent and retain zero startup offsets.
 Application projection into full coupling-consistent vectors and stopped-world
 configuration/reset reapplication remain pending. No tests or builds ran;
 serialization and semantic validation are source-reviewed only.
+
+
+### G11 — apply authored power-up offsets and retain them across reset
+
+Typed scene data: `43f1a1dc5`. Preserve machining powerUpOffsets through CncJob
+projection. AssemblyRobot selects its machining/mission offsets while creating
+the runtime, resolves names through compiled identity and applies the complete
+vector before the first sample. PowerUpOffsets resolves independent home axes
+and propagates displacements through every coupling term, including chains and
+same-/multi-input sums. Do not add affine intercepts to a displacement. Reject
+unknown/dependent named axes, missing homes, nonfinite values and unresolved
+graphs. Native stopped-world placement performs physical travel checks.
+
+Simulation copies the successful vector and reapplies it after robot reset,
+then invalidates host references and resets sensor history. Default absent
+scene offsets stay zero. Nonzero startup poses, homing repeatability, reset
+geometry and follower placement remain unverified; no tests or builds ran.
+G11 source now covers startup offset authoring through application creation,
+but full G11/G12 behavior is not proven complete.

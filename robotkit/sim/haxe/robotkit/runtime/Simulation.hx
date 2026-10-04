@@ -31,6 +31,7 @@ class Simulation {
   final robots:Array<RobotRuntime> = [];
   final stepObservers:Array<StepObserverEntry> = [];
   final switchObservers:Map<Int, SimulatedSwitchSensorAdapter> = new Map();
+  final powerUpOffsets:Map<Int, Array<Float>> = new Map();
   var nextStepObserverId = 1;
   public final fixedTimestepSeconds:Float;
   /** The session this simulation joined. */
@@ -578,6 +579,8 @@ class Simulation {
     ensureLive();
     check(RobotKitSimKit.rk_simulation_reset_robot(owner.borrow(), robotIndex),
       "simulation.resetRobot");
+    var offsets = powerUpOffsets.get(robotIndex);
+    if (offsets != null) setPowerUpOffsets(robotIndex, offsets);
     robots[robotIndex].afterNativeReset();
     var switches = switchObservers.get(robotIndex);
     if (switches != null) switches.reset();
@@ -595,6 +598,7 @@ class Simulation {
     if (offsets == null) throw "Power-up offsets require a full joint vector";
     check(RobotKitSimKit.rk_simulation_set_power_up_offsets(owner.borrow(), robotIndex, offsets),
       "simulation.setPowerUpOffsets");
+    powerUpOffsets.set(robotIndex, offsets.copy());
   }
 
   public function setJointSlip(robotIndex:Int, joint:Int, offset:Float):Void {
@@ -897,6 +901,7 @@ class Simulation {
     session.removeStepObserver(sessionObserverId);
     stepObservers.resize(0);
     switchObservers.clear();
+    powerUpOffsets.clear();
     for (runtime in robots) runtime.dispose();
     robots.resize(0);
     owner.close();
