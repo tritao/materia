@@ -2094,3 +2094,20 @@ leader travel, this corrects the missing 1 mm leader translation instead of
 leaving both aligned motors displaced from true zero on return. This is source
 reasoning, not runtime evidence. Physical regression and the requested build
 checkpoint remain pending; no builds or tests ran.
+
+### G12 — native physical one-millimetre regression
+
+Leader capture correction: `8e98924bb`. Add a native simulation regression
+with one prismatic leader and two 1000 rad/m motor followers. Place a 1 mm
+right-side startup offset, advance to the first edge, hold the left motor,
+continue the leader by 1 mm until both motors align, release and install the
+compensated leader and original motor zeros. Check that duplicate motor batches
+are rejected, calibration preserves all physical positions, and return targets
+put both shafts at true zero within 20 micrometres, including relative skew.
+The fixture uses actual simulation stepping and physical snapshots; it does
+not emulate or cover Haxe sensor freshness and cycle sequencing. Register it
+in the existing native simkit test executable.
+
+The regression has not run. Add cycle sequencing coverage, then execute the
+requested post-G12 kit/app compiler-only and native build/ctest checkpoint, plus
+picker and homing runs once. G13 remains unstarted.

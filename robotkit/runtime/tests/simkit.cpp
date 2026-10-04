@@ -1268,7 +1268,82 @@ void shape_descriptor_without_pose_keeps_default_placement() {
     assert(std::abs(pose.position[0] - 1.0) < 1e-9);
 }
 
+// Exercise the physical endpoint path, including displacement accumulated after
+// the first motor holds. The Haxe homing-cycle test must cover sensor sequencing separately.
+void dual_home_removes_one_millimetre_startup_racking() {
+    SessionFixture fixture(0.01);
+    auto model = blueprint(912);
+    model.joint_count = 3;
+    model.link_count = 4;
+    model.links[2] = model.links[1];
+    model.links[3] = model.links[1];
+    model.joints[0].type = RK_RUNTIME_JOINT_PRISMATIC;
+    model.joints[0].lower_limit = -0.1;
+    model.joints[0].upper_limit = 0.1;
+    for (uint32_t i = 1; i < 3; ++i) {
+        model.joints[i] = model.joints[0];
+        model.joints[i].joint = i;
+        model.joints[i].type = RK_RUNTIME_JOINT_REVOLUTE;
+        model.joints[i].child_link = i + 1;
+        model.joints[i].lower_limit = -100.0;
+        model.joints[i].upper_limit = 100.0;
+    }
+    model.coupling_count = 2;
+    model.couplings[0] = {0, 1, 1000.0, 0.0};
+    model.couplings[1] = {0, 2, 1000.0, 0.0};
+    assert(rk_robot_runtime_blueprint_validate(&model) == RK_OK);
+    rk_robot_runtime robot = RK_INVALID_ROBOT_RUNTIME;
+    assert(rk_simulation_add_robot(fixture.simulation, &model, nullptr, &robot) == RK_OK);
+    const double startup[] = {0.0, 0.0, 1.0}; // Right shaft: 1 rad / 1000 rad/m = 1 mm.
+    const uint32_t right[] = {2};
+    assert(rk_simulation_set_power_up_offsets(fixture.simulation, 0, startup, 3) == RK_ERROR_INVALID_ARGUMENT);
+    assert(rk_simulation_set_power_up_sides(fixture.simulation, 0, startup, 3, right, 1) == RK_OK);
+    uint64_t time = 0;
+    auto advance = [&]() {
+        for (int i = 0; i < 3; ++i) assert(step(fixture.session, time += 10'000'000) == RK_OK);
+    };
+    auto move = [&](double position, uint64_t sequence) {
+        const auto command = target(position, sequence);
+        assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
+        advance();
+    };
+    auto physical = [&]() {
+        rk_robot_snapshot value{};
+        value.struct_size = sizeof(value);
+        assert(rk_robot_runtime_snapshot_endpoint(robot, &value) == RK_OK);
+        return value;
+    };
+    move(-0.005, 1);
+    auto seen = physical();
+    assert(std::abs(seen.position[1] + 5.0) < 1e-8);
+    assert(std::abs(seen.position[2] + 4.0) < 1e-8);
+    assert(rk_simulation_set_squaring_hold(fixture.simulation, 0, 1, 1, seen.position[1]) == RK_OK);
+    move(-0.006, 2);
+    seen = physical();
+    assert(std::abs(seen.position[1] + 5.0) < 1e-8);
+    assert(std::abs(seen.position[2] + 5.0) < 1e-8);
+    assert(rk_simulation_set_squaring_hold(fixture.simulation, 0, 1, 0, 0.0) == RK_OK);
+    assert(rk_robot_runtime_require_reference(robot, 0, 1) == RK_OK);
+    // First edge was at -5 mm; the leader continued to -6 mm while that side held.
+    const double zeros[] = {0.001, 1.0, 1.0};
+    const uint32_t leader[] = {0};
+    assert(rk_robot_runtime_calibrate_home(robot, zeros, 3, leader, 1) == RK_OK);
+    const uint32_t motors[] = {1, 2};
+    const double side_zeros[] = {0.0, 1.0};
+    const uint32_t duplicate[] = {1, 1};
+    assert(rk_robot_runtime_calibrate_home_drives(robot, duplicate, side_zeros, 2) == RK_ERROR_INVALID_ARGUMENT);
+    assert(rk_robot_runtime_calibrate_home_drives(robot, motors, side_zeros, 2) == RK_OK);
+    auto after = physical();
+    for (uint32_t i = 0; i < 3; ++i) assert(std::abs(after.position[i] - seen.position[i]) < 1e-8);
+    move(0.0, 3);
+    after = physical();
+    assert(std::abs(after.position[1] / 1000.0) < 0.00002);
+    assert(std::abs(after.position[2] / 1000.0) < 0.00002);
+    assert(std::abs((after.position[1] - after.position[2]) / 1000.0) < 0.00002);
+}
+
 int main() {
+    dual_home_removes_one_millimetre_startup_racking();
     shape_descriptor_without_pose_keeps_default_placement();
     convex_link_and_box_link_build();
     shared_world_steps_once();
