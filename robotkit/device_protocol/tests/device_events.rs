@@ -98,3 +98,16 @@ fn a_kept_channel_holds_through_a_commanded_stop_but_not_an_emergency_stop() {
         assert_eq!(board.digital(0), Some(held), "{reason:?}");
     }
 }
+
+#[test]
+fn a_channel_not_restored_after_hold_no_longer_requires_the_link() {
+    let mut board = VirtualBoard::<1, 32>::new(1_000_000, 0, 0, [1.0]);
+    let mut events = DeviceEvents::<4>::new(&session());
+    events.queue_begin(1, 0, 0).unwrap();
+    let mut event = digital_event(1, 100, true); event.hold_policy = 1;
+    events.push(event).unwrap(); events.commit(200); events.tick(100, &mut board);
+    assert!(events.requires_link());
+    events.hold(&mut board); events.resume(&mut board);
+    assert_eq!(board.digital(0), Some(false));
+    assert!(!events.requires_link());
+}

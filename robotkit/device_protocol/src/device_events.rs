@@ -52,6 +52,7 @@ pub struct DeviceEvents<const CAP: usize> {
     channel_count: usize,
     channel_kind: [u8; CHANNELS],
     safe: [Value; CHANNELS],
+    live: [Value; CHANNELS],
     /// Channels that keep their output through a commanded stop, as a gripper holding a part must.
     keep_on_stop: [bool; CHANNELS],
     fired: [Value; CHANNELS],
@@ -78,7 +79,7 @@ impl<const CAP: usize> DeviceEvents<CAP> {
         Self { events: [None; CAP], len: 0, next: 0, revision: 0,
             replace_after: 0, committed_until: 0, held: false, stopped: false,
             channel_count: session.channel_count as usize,
-            channel_kind: session.channel_kind, safe, keep_on_stop, fired: [Value::ZERO; CHANNELS],
+            channel_kind: session.channel_kind, safe, live: safe, keep_on_stop, fired: [Value::ZERO; CHANNELS],
             fired_policy: [0; CHANNELS], has_fired: [false; CHANNELS],
             records: [None; CAP], record_count: 0 }
     }
@@ -89,9 +90,8 @@ impl<const CAP: usize> DeviceEvents<CAP> {
     pub fn requires_link(&self) -> bool {
         if self.stopped { return false; }
         (0..self.channel_count).any(|i| {
-            if self.keep_on_stop[i] || !self.has_fired[i] ||
-                (self.held && self.fired_policy[i] != 0) { return false; }
-            let value = self.fired[i]; let safe = self.safe[i];
+            if self.keep_on_stop[i] { return false; }
+            let value = self.live[i]; let safe = self.safe[i];
             match value.kind {
                 1 => value.digital != safe.digital,
                 2 => value.analog != safe.analog,
@@ -155,6 +155,7 @@ impl<const CAP: usize> DeviceEvents<CAP> {
             let value = Value { kind: event.kind, digital: event.digital,
                 analog: event.analog, argument: event.argument, command: event.command };
             value.apply(channel, board);
+            self.live[channel] = value;
             if self.record_count == CAP {
                 self.records.copy_within(1..CAP, 0);
                 self.record_count -= 1;
@@ -181,6 +182,7 @@ impl<const CAP: usize> DeviceEvents<CAP> {
         for i in 0..self.channel_count {
             if self.has_fired[i] && self.fired_policy[i] != 0 {
                 self.safe[i].apply(i, board);
+                self.live[i] = self.safe[i];
             }
         }
     }
@@ -189,6 +191,7 @@ impl<const CAP: usize> DeviceEvents<CAP> {
         for i in 0..self.channel_count {
             if self.has_fired[i] && self.fired_policy[i] == 2 {
                 self.fired[i].apply(i, board);
+                self.live[i] = self.fired[i];
             }
         }
         self.held = false;
