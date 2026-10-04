@@ -3,14 +3,12 @@ package processkit.motion;
 import motionkit.robot.*;
 
 import robotkit.manipulation.IkOptions;
-import haxe.Int64;
 import motionkit.MotionOptions;
 import motionkit.kinematics.IkTolerance;
 import motionkit.program.Blend;
 import motionkit.program.MotionOp;
 import motionkit.program.MotionProgram;
 import motionkit.program.MoveTarget;
-import motionkit.trajectory.ValidationLimits;
 import robotkit.manipulation.Manipulator;
 import processkit.path.Toolpath;
 import robotkit.core.Robot;
@@ -28,28 +26,20 @@ class ToolpathPlanRunner implements processkit.skill.ToolpathPlanRunner {
   var processSpans:Array<Bool> = [];
 
   public static function create(robot:Robot, manipulator:Manipulator, frameId:String,
-      maxAcceleration:Float, maxJointJump:Float, positionTolerance:Float,
+      planning:PlanningLimits, maxJointJump:Float, positionTolerance:Float,
       orientationTolerance:Float, ikMaxIterations:Int, ikDamping:Float):ToolpathPlanRunner {
     var count = manipulator.group.count();
-    var limits = new ValidationLimits(count, Int64.ofInt(1), Int64.ofInt(0));
-    for (joint in 0...count) {
-      var bound = manipulator.group.limitsOf(joint);
-      if (bound.lower < bound.upper) limits.position(joint, bound.lower, bound.upper);
-      limits.velocity(joint, bound.velocity != null ? bound.velocity : 10.0);
-      limits.acceleration(joint, maxAcceleration);
-      limits.jerk(joint, 20.0);
-    }
+    planning.requireGroup(manipulator);
+    var limits = planning.validation();
     var solver = new ManipulatorKinematics(manipulator, 1e-8);
     var compiler = new ProgramCompiler(solver, limits, frameId,
-      [for (joint in 0...count) {
-        var speed = manipulator.group.limitsOf(joint).velocity;
-        speed != null ? speed : 10.0;
-      }], [for (_ in 0...count) maxAcceleration], [for (_ in 0...count) 20.0],
-      StartTolerances.uniform(count, positionTolerance,
-        maxAcceleration * 0.01, 20.0 * 0.01),
+      planning.velocity, planning.acceleration, planning.jerk,
+      planning.startTolerances(positionTolerance),
       null, 0.01, maxJointJump, positionTolerance,
       orientationTolerance, new IkTolerance(positionTolerance,
         orientationTolerance, ikMaxIterations, ikDamping));
+    compiler.planningAssumptions = planning.assumptions.copy();
+    compiler.planCheck = planning.check();
     var indices = [for (target in manipulator.toJointTargets(
       [for (_ in 0...count) 0.0])) target.joint];
     var motion = new ManipulatorMotion(robot, compiler, function(_) return null,

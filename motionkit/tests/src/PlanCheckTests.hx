@@ -1,3 +1,11 @@
+import motionkit.robot.PlanningLimits;
+import motionkit.robot.HandlingPlanRunner;
+import robotkit.manipulation.Manipulator;
+import robotkit.model.Frame;
+import robotkit.runtime.RobotRuntimeCompiler;
+import robotkit.world.ProcessChannelDeclaration;
+import robotkit.world.ProcessEventValue;
+import robotkit.spatial.Vec3;
 import haxe.Int64;
 import machinekit.assembly.LinearAxis;
 import motionkit.MotionOptions;
@@ -170,6 +178,106 @@ class PlanCheckTests extends MotionKitTestSupport {
     check(rejected && session.planChecks.flagged == 1, "a live servo chunk rejects a predicted overload");
     check(recording.commands.length == 0, "an overloaded servo chunk never reaches the runtime");
     session.dispose();
+    harness.dispose();
+  }
+
+  public function testPlanningLimits():Void {
+    var model = machine([1.0, 0.0, 0.0], false);
+    var armLink = model.addLink(new Link("arm-link"));
+    var arm = model.addJoint(new Joint("arm", JointType.Revolute, model.links[0], armLink));
+    arm.limits = new JointLimits(-1.0, 1.0, 0.7);
+    var steady = new SteadyLoads();
+    var limits = PlanningLimits.of(model, ["slide", "arm"], steady, 1.5, [3.0, 7.0]);
+    near(limits.velocity[0], model.coupledLimits("slide", steady).requireVelocity(),
+      "planning uses the screw's coupled speed");
+    near(limits.acceleration[0], model.coupledLimits("slide", steady).requireAcceleration(),
+      "planning derives slide acceleration after steady loads");
+    near(limits.acceleration[1], 1.5, "missing arm acceleration uses the named default");
+    check(arm.limits.maxAcceleration == null, "planning defaults do not rewrite the physical model");
+    check(limits.jerk[0] == 3.0 && limits.jerk[1] == 7.0, "jerk limits are per joint");
+    check(limits.assumptions.length == 1 && limits.assumptions[0].indexOf("arm") >= 0,
+      "the acceleration fallback is reported against its joint");
+    arm.limits.maxAcceleration = 0.4;
+    var authored = PlanningLimits.of(model, ["arm"]);
+    near(authored.acceleration[0], 0.4, "an authored acceleration wins over the fallback");
+    check(authored.assumptions.length == 1 && authored.assumptions[0].indexOf("jerk") >= 0,
+      "an unstated jerk cap is reported as assumed");
+    arm.limits.velocity = null;
+    var message = "";
+    try PlanningLimits.of(model, ["arm"]) catch (error:Dynamic) message = Std.string(error);
+    check(message.indexOf("arm") >= 0 && message.indexOf("velocity") >= 0,
+      "an unknown speed is rejected by joint name rather than invented");
+  }
+
+  /** Missions on an XYZ screw machine use drive caps and submit accepted runtime segments. */
+  public function testHandlingUsesCoupledLimits():Void {
+    var model = new RobotModel("handling-screw-xyz");
+    var base = model.addLink(new Link("base"));
+    var parent = base;
+    var ids = ["x", "y", "z"];
+    var axes = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+    var rates = [2.5, 1.25, 2.0];
+    for (index in 0...3) {
+      var id = ids[index];
+      var carriage = model.addLink(new Link(id + "-carriage"));
+      carriage.mass = 2.0;
+      var slide = model.addJoint(new Joint(id, JointType.Prismatic, parent, carriage));
+      slide.axis = axes[index];
+      slide.limits = new JointLimits(-0.15, 0.15);
+      var rotor = model.addLink(new Link(id + "-rotor"));
+      rotor.mass = 0.1;
+      rotor.inertiaTensor = [1e-5, 0.0, 0.0, 0.0, 1e-5, 0.0, 0.0, 0.0, 1e-5];
+      var shaft = model.addJoint(new Joint(id + "-turn", JointType.Continuous, base, rotor));
+      shaft.limits = new JointLimits(-1e9, 1e9);
+      shaft.axis = axes[index];
+      shaft.armature = 3e-5;
+      var coupling = new JointCoupling(id + "-screw", id, shaft.id, 100.0, 0.0);
+      coupling.efficiency = 0.4;
+      model.addCoupling(coupling);
+      var actuator = new Actuator(id + "-motor", 0.63, rates[index],
+        Transmission.SimpleTransmission(shaft.id, 1.0, 0.0));
+      actuator.microsteps = 16;
+      actuator.maxStepRate = 200000;
+      actuator.drive = new StepperDrive(200.0, 3e-5, 1.26,
+        new TorqueSpeedCurve([0.0, 100.0], [1.26, 1.26]));
+      model.addActuator(actuator);
+      parent = carriage;
+    }
+    model.materializeLimits();
+    var flange = model.addFrame(new Frame("flange", parent));
+    var group = new Manipulator(model, base.id, flange.id);
+    var planning = PlanningLimits.ofGroup(group, null, 2.0, [2.0, 4.0, 6.0]);
+    var blueprint = RobotRuntimeCompiler.compile(model);
+    blueprint.channels.push(new ProcessChannelDeclaration("tool.hold", ProcessEventValue.Digital(false), false));
+    var harness = new SimulationHarness(0.01);
+    var runtime = harness.simulation.addRobot(blueprint);
+    var robot = new SimulatedRobot("handling", runtime, model.name,
+      [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
+    var runner = HandlingPlanRunner.create(robot, group, () -> runtime.pollEvents(), "tool.hold", planning,
+      0.02, 0.08, 0.02, 0.02, 0.001);
+    for (index in 0...3) {
+      near(runner.motion.compiler.maxVelocity[index], rates[index] / 100.0,
+        'handling joint ${ids[index]} plans at its coupled speed');
+      check(runner.motion.compiler.maxAcceleration[index] == planning.acceleration[index] &&
+        runner.motion.compiler.maxJerk[index] == planning.jerk[index],
+        "handling preserves each joint's acceleration and jerk");
+    }
+    runner.run(new Vec3(0.04, 0.03, 0.06), true);
+    var tick = 0;
+    while (!runner.completed() && runner.failure() == null && tick < 8000) {
+      runner.update(0.01);
+      harness.step(Int64.ofInt(++tick));
+      var snapshot = robot.snapshot();
+      for (index in 0...3) {
+        var joint = [for (slot in 0...model.joints.length) if (model.joints[slot].id == ids[index]) slot][0];
+        check(Math.abs(snapshot.velocities.get(joint)) <= planning.velocity[index] + 1e-6,
+          "every handling segment stays within the drive-derived speed");
+      }
+    }
+    check(runner.completed() && runner.failure() == null,
+      'the runtime accepts the entire handling program (${runner.failure()})');
+    check(runner.motion.checks.plans > 0 && runner.motion.checks.count(PlanDiagnosticKind.StepperStall) == 0,
+      "every handling plan is checked and no screw motor stalls");
     harness.dispose();
   }
 

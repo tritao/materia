@@ -28,6 +28,7 @@ import motionkit.robot.AxisKinematics;
 import motionkit.robot.ManipulatorMotion;
 import motionkit.robot.MotionSystemBlueprint;
 import motionkit.robot.PlanCheck;
+import motionkit.robot.PlanningLimits;
 import motionkit.robot.PlanCheck.PlanCheckOptions;
 import motionkit.robot.PlanCheckSummary;
 import motionkit.robot.StepperSlip;
@@ -563,7 +564,9 @@ class CncProgramPlayer implements SessionMember {
 		var planning = new RobotModel(model.name + ".axes");
 		var parent = planning.addLink(new Link("machine.base"));
 		var indices:Array<Int> = [];
-		for (id in axes) {
+		var limits = PlanningLimits.of(model, axes, steady);
+		for (slot in 0...axes.length) {
+			var id = axes[slot];
 			var index = -1;
 			for (candidate in 0...model.joints.length) if (Std.string(model.joints[candidate].id) == id) index = candidate;
 			if (index < 0) throw 'CNC axis "$id" is not a joint of the machine';
@@ -571,7 +574,7 @@ class CncProgramPlayer implements SessionMember {
 			var child = planning.addLink(new Link(id + ".carriage"));
 			var joint = planning.addJoint(new Joint(id, source.type, parent, child, source.id));
 			joint.axis = source.axis.copy();
-			joint.limits = model.coupledLimits(source.id, steady);
+			joint.limits = limits.bounds[slot].copy();
 			indices.push(index);
 			parent = child;
 		}

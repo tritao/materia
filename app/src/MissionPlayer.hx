@@ -25,6 +25,7 @@ import motionkit.program.MotionOp;
 import motionkit.program.MoveTarget;
 import motionkit.program.Blend;
 import motionkit.MotionOptions;
+import motionkit.robot.PlanningLimits;
 import processkit.WeldingPlanRunner;
 import processkit.skill.WeldPlan;
 import processkit.skill.WeldSeam;
@@ -34,6 +35,7 @@ import robotkit.manipulation.ArmClearance;
 import robotkit.manipulation.ArmClearance.ClearanceViolation;
 import robotkit.manipulation.Manipulator;
 import robotkit.model.Frame;
+import robotkit.model.SteadyLoads;
 import robotkit.skill.HandlePart;
 import robotkit.spatial.Vec3;
 import robotkit.localization.SimulationTruthLocalization;
@@ -110,7 +112,7 @@ class MissionPlayer implements SessionMember {
   /** How close a `goTo` stands to its pose, in metres and radians. */
   public static inline var POSITION_TOLERANCE:Float = 0.05;
   public static inline var HEADING_TOLERANCE:Float = 0.05;
-  /** Joint acceleration the arm programs plan with, rad/s². */
+  /** Assumed acceleration only for arm joints whose drive model supplies no cap, rad/s². */
   public static inline var ARM_ACCELERATION:Float = 2.0;
   /** A lidar return this close (m) to a mapped cell belongs to the map: it is the room, not an obstacle. */
   public static inline var MAP_TOLERANCE:Float = 0.1;
@@ -258,7 +260,7 @@ class MissionPlayer implements SessionMember {
       vacuumSensor = tool.sensor;
       var arm = toolArm(tool);
       newHandling = () -> HandlingPlanRunner.create(robot.robot, arm, () -> robot.runtime.pollEvents(), tool.channel,
-        ARM_ACCELERATION);
+        PlanningLimits.ofGroup(arm, new SteadyLoads(), ARM_ACCELERATION));
       handling = newHandling();
     }
     if (!welds) {
@@ -278,7 +280,7 @@ class MissionPlayer implements SessionMember {
       newWelding = () -> {
         var planned = weldClearance(arm, tool.contact.occurrence, metal);
         clearance = planned;
-        return WeldingPlanRunner.create(robot.robot, arm, () -> robot.runtime.pollEvents(), channels, weldAcceleration, 3, planned);
+        return WeldingPlanRunner.create(robot.robot, arm, () -> robot.runtime.pollEvents(), channels, PlanningLimits.ofGroup(arm, new SteadyLoads(), weldAcceleration), 3, planned);
       };
       welding = newWelding();
     }

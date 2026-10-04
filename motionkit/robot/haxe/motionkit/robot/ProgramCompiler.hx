@@ -55,6 +55,8 @@ class ProgramCompiler {
   public final maxVelocity:Array<Float>;
   public final maxAcceleration:Array<Float>;
   public final maxJerk:Array<Float>;
+  /** Planning defaults exposed to callers alongside the drive check's physical assumptions. */
+  public var planningAssumptions:Array<String> = [];
   public final startTolerances:StartTolerances;
   public final cartesianResolution:Float;
   /** The speed scale of the program being compiled. */
@@ -93,6 +95,7 @@ class ProgramCompiler {
       configurationSelector == null ? null : configurationSelector.withSolver(forked),
       perJointMaxJump, jointIds, couplings, controllerPeriodSeconds);
     // The worker plans one program in order, so it remembers which way each axis last moved.
+    worker.planningAssumptions = planningAssumptions.copy();
     if (planCheck != null) worker.planCheck = planCheck.fork();
     worker.motorSpace = motorSpace;
     return worker;

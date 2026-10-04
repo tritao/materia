@@ -1,6 +1,5 @@
 package motionkit.robot;
 
-import haxe.Int64;
 import motionkit.MotionOptions;
 import motionkit.event.EventValue;
 import motionkit.kinematics.IkTolerance;
@@ -9,7 +8,6 @@ import motionkit.program.Blend;
 import motionkit.program.MotionOp;
 import motionkit.program.MotionProgram;
 import motionkit.program.MoveTarget;
-import motionkit.trajectory.ValidationLimits;
 import robotkit.manipulation.Manipulator;
 import robotkit.spatial.Vec3;
 import robotkit.execution.FiredProcessEvent;
@@ -40,25 +38,18 @@ class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
 
   public static function create(robot:Robot, manipulator:Manipulator,
       eventSource:Void -> {events:Array<FiredProcessEvent>, overflow:Bool}, channel:String,
-      maxAcceleration:Float, ?approachHeight:Float = 0.12, ?travelSpeed:Float = 0.3, ?contactSpeed:Float = 0.08,
+      planning:PlanningLimits, ?approachHeight:Float = 0.12, ?travelSpeed:Float = 0.3, ?contactSpeed:Float = 0.08,
       ?dwell:Float = 0.4, ?pressDepth:Float = 0.003):HandlingPlanRunner {
     var count = manipulator.group.count();
-    var limits = new ValidationLimits(count, Int64.ofInt(1), Int64.ofInt(0));
-    for (joint in 0...count) {
-      var bound = manipulator.group.limitsOf(joint);
-      if (bound.lower < bound.upper) limits.position(joint, bound.lower, bound.upper);
-      limits.velocity(joint, bound.velocity != null ? bound.velocity : 2.0);
-      limits.acceleration(joint, maxAcceleration);
-      limits.jerk(joint, 20.0);
-    }
+    planning.requireGroup(manipulator);
+    var limits = planning.validation();
     var solver = new ManipulatorKinematics(manipulator, 1e-8);
     var compiler = new ProgramCompiler(solver, limits, FRAME,
-      [for (joint in 0...count) {
-        var speed = manipulator.group.limitsOf(joint).velocity;
-        speed != null ? speed : 2.0;
-      }], [for (_ in 0...count) maxAcceleration], [for (_ in 0...count) 20.0],
-      StartTolerances.uniform(count, 0.005, maxAcceleration * 0.01, 20.0 * 0.01),
+      planning.velocity, planning.acceleration, planning.jerk,
+      planning.startTolerances(0.005),
       null, 0.0075, 0.2, 0.002, 0.02, new IkTolerance(2e-3, 5e-3, 300, 0.03));
+    compiler.planningAssumptions = planning.assumptions.copy();
+    compiler.planCheck = planning.check();
     var indices = [for (target in manipulator.toJointTargets([for (_ in 0...count) 0.0])) target.joint];
     var motion = new ManipulatorMotion(robot, compiler, function(_) return null, eventSource, indices);
     // Joint values are relative to the robot's starting pose, so home is all zeros.

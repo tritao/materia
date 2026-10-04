@@ -551,8 +551,8 @@ G0 → G1 → G2 → G3 ──────────────────�
 
 | Step | State | Commits |
 |------|-------|---------|
-| G0 | done; full gate passed | `a8349cdea` (test preparation), this baseline commit |
-| G1 | planned | — |
+| G0 | done; full gate passed | `a8349cdea`, `29b9da11b` |
+| G1 | done | this commit |
 | G2 | planned | — |
 | G3 | planned | — |
 | G4 | planned | — |
@@ -652,3 +652,44 @@ An interrupted initial MotionKit run and a shell-driver parse error were
 superseded by the complete clean gate. Original logs are preserved in
 `gantries-g0-original-logs/`; temporary test-name logging was removed. No
 haxeon issue or pre-existing test failure was found.
+
+### G1 — drive-derived planning limits (2026-10-04)
+
+**Gate:** `gantries-suite.sh g1-complete` passes all twelve kit suites, CadKit,
+MachineKit, the app build and the full project-source suite. Focused PlanCheck
+tests pass 3261 assertions; full MotionKit passes 13059, an increase of 3194
+regression assertions over G0. RobotKit remains at 4935 assertions.
+
+`PlanningLimits` snapshots coupled speed and acceleration in group order with
+shared steady-load assumptions, per-joint jerk, validation limits and a physical
+`PlanCheck`. Handling, surface, toolpath and welding runners use it; mission
+factories and the CNC planning model share the helper. Missing speed is an error
+naming the joint. Missing acceleration uses a reported assumed default without
+rewriting the physical model; unstated jerk is likewise reported as assumed.
+The compiler retains these assumptions when forked for a worker.
+
+The three-screw XYZ handling regression plans at 25/12.5/20 mm/s with per-joint
+jerk caps of 2/4/6, accepts every segment in the native runtime, observes no
+speed beyond its drive cap and reports no stepper stalls. Its model materializes
+coupled limits before runtime compilation, matching the assembly bridge.
+
+**Numbers:** all G0 machine, CNC, CoreXY, arm, mobile and welder results hold.
+In particular, arm mission completions remain 5.8/12.0/17.2/23.5 s; welder
+normal/restart runs remain 20.2/21.6 s on both backends; CNC screw/belt machining
+remains 220.2/201.6 s and predicted deviation 0.05/1.76 mm. No machine or mission
+baseline number changed intentionally.
+
+**Fixture decisions and interrupted gates:** the synthetic wall-finishing arm
+had no velocity, so its former implicit 2 rad/s runner assumption is now explicit
+in the fixture. The synthetic excavator likewise states its former 10 rad/s
+assumption. These are test assumptions, not new physical drive ratings. The new
+screw fixture also supplies unbounded shaft travel rather than the default
+zero-width bounds. The first gate's app and the second gate's MachineKit run
+ended on SIGTERM (143), without a source exception. Their logs are preserved in
+`gantries-g1-first-gate-logs/` and `gantries-g1-second-gate-logs/`; the journal did
+not identify the sender. The complete gate ran with signal tracing, passed in
+full and received no SIGTERM. No haxeon issue was found.
+
+The pre-R0 MotionKit native libraries and G0 reference binary are preserved in
+scratch for G2 comparisons. Local main now contains restructuring R0; G4 takes
+that committed work at the next boundary.

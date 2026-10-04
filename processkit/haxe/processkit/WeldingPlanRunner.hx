@@ -1,6 +1,5 @@
 package processkit;
 
-import haxe.Int64;
 import motionkit.MotionOptions;
 import motionkit.event.EventValue;
 import motionkit.kinematics.IkTolerance;
@@ -21,8 +20,7 @@ import motionkit.program.MoveTarget;
 import motionkit.robot.ManipulatorKinematics;
 import motionkit.robot.ManipulatorMotion;
 import motionkit.robot.ProgramCompiler;
-import motionkit.robot.StartTolerances;
-import motionkit.trajectory.ValidationLimits;
+import motionkit.robot.PlanningLimits;
 import processkit.WelderProcessDevice.WelderChannels;
 import robotkit.manipulation.ArmClearance;
 import robotkit.manipulation.Manipulator;
@@ -153,30 +151,27 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
 
   /** The same complete-motion planner used by execution, without a robot or channel owner. */
   public static function planning(manipulator:Manipulator, maxAcceleration:Float, ?clearance:ArmClearance):WeldPlanning {
+    return planningWithLimits(manipulator, PlanningLimits.ofGroup(manipulator, new robotkit.model.SteadyLoads(), maxAcceleration), clearance);
+  }
+
+  static function planningWithLimits(manipulator:Manipulator, planning:PlanningLimits, ?clearance:ArmClearance):WeldPlanning {
     var count = manipulator.group.count();
-    var limits = new ValidationLimits(count, Int64.ofInt(1), Int64.ofInt(0));
-    for (joint in 0...count) {
-      var bound = manipulator.group.limitsOf(joint);
-      if (bound.lower < bound.upper) limits.position(joint, bound.lower, bound.upper);
-      limits.velocity(joint, bound.velocity != null ? bound.velocity : 2.0);
-      limits.acceleration(joint, maxAcceleration);
-      limits.jerk(joint, 20.0);
-    }
+    planning.requireGroup(manipulator);
+    var limits = planning.validation();
     var solver = new ManipulatorKinematics(manipulator, 1e-8);
     var compiler = new ProgramCompiler(solver, limits, FRAME,
-      [for (joint in 0...count) {
-        var speed = manipulator.group.limitsOf(joint).velocity;
-        speed != null ? speed : 2.0;
-      }], [for (_ in 0...count) maxAcceleration], [for (_ in 0...count) 20.0],
-      StartTolerances.uniform(count, 0.005, maxAcceleration * 0.01, 20.0 * 0.01),
+      planning.velocity, planning.acceleration, planning.jerk,
+      planning.startTolerances(0.005),
       null, 0.002, 0.2, PATH_TOLERANCE, 0.02, new IkTolerance(5e-5, 1e-3, 300, 0.03));
+    compiler.planningAssumptions = planning.assumptions.copy();
+    compiler.planCheck = planning.check();
     // The torch turns at corners as the wrist allows: the slowest of its last three joints, and the programs' acceleration.
     var wristSpeed = Math.POSITIVE_INFINITY;
     for (joint in Std.int(Math.max(0, count - 3))...count) {
       var speed = manipulator.group.limitsOf(joint).velocity;
       wristSpeed = Math.min(wristSpeed, speed != null && speed > 0.0 ? speed : 2.0);
     }
-    var wrist:WristLimits = {angularSpeed: wristSpeed, angularAcceleration: maxAcceleration};
+    var wrist:WristLimits = {angularSpeed: wristSpeed, angularAcceleration: planning.acceleration[count - 1]};
     var planner = new WeldPathPlanner(compiler.solver, compiler.ikTolerance, compiler.maxVelocity, wrist, clearance, compiler.perJointMaxJump,
       function(planned, start) return compileWeld(compiler, wrist, planned, start));
     return new WeldPlanning(compiler, wrist, planner);
@@ -187,9 +182,9 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
    * `clearance`, when given, is what the welds are planned to be clear of the work with (`WeldPathPlanner`).
    */
   public static function create(robot:Robot, manipulator:Manipulator,
-      eventSource:Void -> {events:Array<FiredProcessEvent>, overflow:Bool}, channels:WelderChannels, maxAcceleration:Float,
+      eventSource:Void -> {events:Array<FiredProcessEvent>, overflow:Bool}, channels:WelderChannels, limits:PlanningLimits,
       ?maxRestarts:Int = 3, ?clearance:ArmClearance):WeldingPlanRunner {
-    var checked = planning(manipulator, maxAcceleration, clearance);
+    var checked = planningWithLimits(manipulator, limits, clearance);
     var count = manipulator.group.count();
     var compiler = checked.compiler;
     var indices = [for (target in manipulator.toJointTargets([for (_ in 0...count) 0.0])) target.joint];

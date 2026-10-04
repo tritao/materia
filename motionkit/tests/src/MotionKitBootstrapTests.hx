@@ -50,6 +50,8 @@ class MotionKitBootstrapTests {
       return;
     }
     if (Sys.getEnv("MOTIONKIT_PLANCHECK_ONLY") == "1") {
+      new PlanCheckTests().testPlanningLimits();
+      new PlanCheckTests().testHandlingUsesCoupledLimits();
       new PlanCheckTests().testPlanCheck();
       new PlanCheckTests().testStepperSlip();
       new PlanCheckTests().testEncoderSeesStepperSlip();
@@ -90,6 +92,8 @@ class MotionKitBootstrapTests {
       Sys.println('C4 focused tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
     }
+    new PlanCheckTests().testPlanningLimits();
+    new PlanCheckTests().testHandlingUsesCoupledLimits();
     new PlanCheckTests().testPlanCheck();
     new PlanCheckTests().testStepperSlip();
     new PlanCheckTests().testEncoderSeesStepperSlip();
