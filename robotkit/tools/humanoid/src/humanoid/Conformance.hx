@@ -5,7 +5,7 @@ import robotkit.model.RobotModelCodec;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.SimulationHarness;
 import robotkit.runtime.SimulationSpace;
-import robotkit.world.JointTarget;
+import robotkit.core.JointTarget;
 
 /**
  * Sim-to-sim conformance (robotkit/plans/HUMANOID.md, HU-D5). Replays the

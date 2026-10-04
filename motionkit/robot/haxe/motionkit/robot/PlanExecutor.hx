@@ -3,14 +3,14 @@ package motionkit.robot;
 import haxe.Int64;
 import motionkit.event.TimedEvent;
 import motionkit.trajectory.ExecutionPlan;
-import robotkit.world.ExecutionPlanSubmission;
-import robotkit.world.ProcessEventValue;
-import robotkit.world.ProcessHoldPolicy;
-import robotkit.world.ProcessTimedEvent;
-import robotkit.world.Robot;
-import robotkit.world.RobotCommand;
-import robotkit.world.RobotSnapshot;
-import robotkit.world.SegmentArrays;
+import robotkit.execution.ExecutionPlanSubmission;
+import robotkit.execution.ProcessEventValue;
+import robotkit.execution.ProcessHoldPolicy;
+import robotkit.execution.ProcessTimedEvent;
+import robotkit.core.Robot;
+import robotkit.core.RobotCommand;
+import robotkit.core.RobotSnapshot;
+import robotkit.execution.SegmentArrays;
 
 /** Submits a validated plan in bounded chunks and tracks its owner-clock progress. */
 class PlanExecutor {

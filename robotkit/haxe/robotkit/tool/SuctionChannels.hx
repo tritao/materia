@@ -1,7 +1,7 @@
 package robotkit.tool;
 
-import robotkit.world.ProcessChannelDeclaration;
-import robotkit.world.ProcessEventValue;
+import robotkit.execution.ProcessChannelDeclaration;
+import robotkit.execution.ProcessEventValue;
 
 /**
  * The channel a suction tool is worked by, with its safe value and stop policy. It keeps its output through a commanded

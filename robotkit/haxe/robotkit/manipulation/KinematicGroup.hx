@@ -28,7 +28,7 @@ import robotkit.model.LinkId;
 import robotkit.model.RobotModel;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
-import robotkit.world.JointTarget;
+import robotkit.core.JointTarget;
 import sys.thread.Tls;
 
 /**

@@ -29,8 +29,8 @@ import robotkit.spatial.Vec3;
 import processkit.tool.WeldFault;
 import processkit.tool.WeldSensor;
 import processkit.tool.WeldSensor.WeldReading;
-import robotkit.world.FiredProcessEvent;
-import robotkit.world.Robot;
+import robotkit.execution.FiredProcessEvent;
+import robotkit.core.Robot;
 
 private enum WeldingPhase {
   Idle;

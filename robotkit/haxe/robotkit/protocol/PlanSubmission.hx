@@ -3,8 +3,8 @@ package robotkit.protocol;
 import RobotKitRuntime;
 
 import haxe.Int64;
-import robotkit.world.ExecutionPlanSubmission;
-import robotkit.world.TrajectorySegment;
+import robotkit.execution.ExecutionPlanSubmission;
+import robotkit.execution.TrajectorySegment;
 
 /** Versioned wire shape of an execution plan, including replacement metadata. */
 @:wire

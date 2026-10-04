@@ -6,7 +6,7 @@ import robotkit.localization.Localization;
 import robotkit.spatial.Transform3;
 import processkit.tool.WeldFault;
 import processkit.tool.WeldSensor;
-import robotkit.world.RobotSnapshot;
+import robotkit.core.RobotSnapshot;
 
 /**
  * Welds one seam with the robot's torch. `seam` gives the plan in the map frame, read when the skill starts so it

@@ -5,11 +5,11 @@ import NativeKitRuntime;
 import robotkit.behavior.WorldBehavior;
 import robotkit.behavior.WorldBehaviorContext;
 import robotkit.behavior.WorldBehaviorRunner;
-import robotkit.world.RecordingRobot;
-import robotkit.world.ReplayRobot;
-import robotkit.world.RobotEvent;
-import robotkit.world.RobotEventRing;
-import robotkit.world.RobotRecording;
+import robotkit.recording.RecordingRobot;
+import robotkit.recording.ReplayRobot;
+import robotkit.core.RobotEvent;
+import robotkit.core.RobotEventRing;
+import robotkit.recording.RobotRecording;
 import robotkit.worldd.WorldHost;
 
 private class DetectionBehavior implements WorldBehavior {

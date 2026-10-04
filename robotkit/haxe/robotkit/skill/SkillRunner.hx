@@ -1,6 +1,6 @@
 package robotkit.skill;
 
-import robotkit.world.RobotSnapshot;
+import robotkit.core.RobotSnapshot;
 
 /** Advances at most one robot-local skill from the application's control loop. */
 class SkillRunner {

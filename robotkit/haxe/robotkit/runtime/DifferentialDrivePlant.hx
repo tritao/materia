@@ -3,7 +3,7 @@ package robotkit.runtime;
 import haxe.Int64;
 import robotkit.mobile.MobileBase;
 import robotkit.mobile.Pose2;
-import robotkit.world.RobotSnapshot;
+import robotkit.core.RobotSnapshot;
 
 /**
  * Ideal rolling-kinematics plant for a differential-drive robot in SimKit.

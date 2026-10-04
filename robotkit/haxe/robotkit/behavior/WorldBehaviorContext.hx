@@ -1,10 +1,10 @@
 package robotkit.behavior;
 
 import haxe.Int64;
-import robotkit.world.RobotCommand;
-import robotkit.world.RobotSnapshot;
-import robotkit.world.SensorFrame;
-import robotkit.world.RobotEvent;
+import robotkit.core.RobotCommand;
+import robotkit.core.RobotSnapshot;
+import robotkit.core.SensorFrame;
+import robotkit.core.RobotEvent;
 
 /** Read-only application input plus bounded command output for one robot. */
 class WorldBehaviorContext {
@@ -26,7 +26,7 @@ class WorldBehaviorContext {
     // epoch. A concrete adapter assigns its local default deadline; callers
     // may still provide an explicit endpoint-clock deadline.
     commands.push(RobotCommand.JointTargets([
-      robotkit.world.JointTarget.position(joint, target)
+      robotkit.core.JointTarget.position(joint, target)
     ], expiryNs));
   }
 }

@@ -297,7 +297,7 @@ external controller backend.
 
 ## 8. Backends and capabilities (§17, §18)
 
-- `rk_robot_capabilities` / `robotkit.world.RobotCapabilities` has five
+- `rk_robot_capabilities` / `robotkit.core.RobotCapabilities` has five
   booleans: position, velocity, effort, prediction and trajectory queue.
   - Position, velocity and effort are hardcoded to 1 in
     `runtime/src/runtime_c_api.cpp`.

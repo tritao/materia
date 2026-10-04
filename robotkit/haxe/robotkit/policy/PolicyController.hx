@@ -7,8 +7,8 @@ import robotkit.model.RobotModel;
 import robotkit.model.Sensor;
 import robotkit.policy.ObservationBuilder.Observed;
 import robotkit.policy.VelocityReference.VelocityCommand;
-import robotkit.world.JointTarget;
-import robotkit.world.SensorFrame;
+import robotkit.core.JointTarget;
+import robotkit.core.SensorFrame;
 
 /** Privileged simulator state, for debugging only; see PolicyController.debugTruth. */
 typedef DebugTruth = {down:Array<Float>, angularVelocity:Array<Float>};

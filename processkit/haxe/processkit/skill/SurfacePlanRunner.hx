@@ -4,7 +4,7 @@ import robotkit.skill.*;
 
 import processkit.manipulation.WorkPatch;
 import robotkit.spatial.Transform3;
-import robotkit.world.FiredProcessEvent;
+import robotkit.execution.FiredProcessEvent;
 
 /** Plan execution boundary used by finishing skills without a MotionKit dependency. */
 interface SurfacePlanRunner {

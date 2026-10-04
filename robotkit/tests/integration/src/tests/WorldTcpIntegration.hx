@@ -4,8 +4,8 @@ import RobotKitRuntime;
 import NativeKitRuntime;
 import haxe.Int64;
 import motionkit.trajectory.Trajectory;
-import robotkit.world.ExecutionPlanSubmission;
-import robotkit.world.TrajectorySegment;
+import robotkit.execution.ExecutionPlanSubmission;
+import robotkit.execution.TrajectorySegment;
 import materia.automation.facility.Facility;
 import materia.automation.facility.FacilityRouter;
 import materia.automation.facility.Lane;
@@ -21,14 +21,14 @@ import materia.automation.task.Task;
 import materia.automation.task.TaskKind;
 import materia.automation.task.Transport;
 import robotkit.material.Payload;
-import robotkit.world.RemoteRobot;
-import robotkit.world.RobotStatus;
+import robotkit.remote.RemoteRobot;
+import robotkit.core.RobotStatus;
 import robotkit.world.RobotWorld;
 import robotkit.behavior.HoldJointBehavior;
 import robotkit.behavior.WorldBehaviorRunner;
-import robotkit.world.McapRobotRecording;
-import robotkit.world.McapRecordingReader;
-import robotkit.world.ReplayRobot;
+import robotkit.recording.McapRobotRecording;
+import robotkit.recording.McapRecordingReader;
+import robotkit.recording.ReplayRobot;
 import robotkit.mobile.MobileBase;
 import robotkit.mobile.Pose2;
 import robotkit.localization.WheelOdometryLocalization;
@@ -70,8 +70,8 @@ class WorldTcpIntegration {
       waitUntil(runtime, function() return remote.snapshot().safety ==
           RobotKitRuntimeConstants.RK_SAFETY_READY,
         "restarted serial session did not accept an explicit safety reset");
-      remote.submit(robotkit.world.RobotCommand.JointTargets([
-        robotkit.world.JointTarget.position(0, 0.5)
+      remote.submit(robotkit.core.RobotCommand.JointTargets([
+        robotkit.core.JointTarget.position(0, 0.5)
       ], null));
       waitUntil(runtime, function() {
         var state = remote.snapshot();
@@ -136,13 +136,13 @@ class WorldTcpIntegration {
       }
       var localRuntime = simulation.addRobot(
         robotkit.runtime.RobotRuntimeCompiler.compile(model, profile));
-      var local = new robotkit.world.SimulatedRobot("local", localRuntime, model.name,
+      var local = new robotkit.simulation.SimulatedRobot("local", localRuntime, model.name,
         [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
       if (cameraFixture) {
         var pixels = haxe.io.Bytes.alloc(6);
         for (index in 0...6) pixels.set(index, index + 1);
         localRuntime.publishCameraFrame("demo/camera",
-          new robotkit.world.CameraImage(2, 1, "rgb8", pixels),
+          new robotkit.streams.CameraImage(2, 1, "rgb8", pixels),
           Int64.ofInt(1), Int64.ofInt(1), "camera.fixture");
       }
       world.attach(local);
@@ -160,8 +160,8 @@ class WorldTcpIntegration {
         Int64.ofInt(42)) != 0) throw 'expected protocol robot ID 42, got ${Std.string(protocolId)}';
       waitUntil(runtime, function() {
         var capabilities = remote.capabilities();
-        return capabilities.jointCount == 3 && capabilities.accepts(robotkit.world.JointTargetMode.Position)
-          && capabilities.accepts(robotkit.world.JointTargetMode.Velocity) && capabilities.accepts(robotkit.world.JointTargetMode.Effort);
+        return capabilities.jointCount == 3 && capabilities.accepts(robotkit.core.JointTargetMode.Position)
+          && capabilities.accepts(robotkit.core.JointTargetMode.Velocity) && capabilities.accepts(robotkit.core.JointTargetMode.Effort);
       }, "robotd did not advertise all joint target modes");
 
       waitUntil(runtime, function() {
@@ -180,22 +180,22 @@ class WorldTcpIntegration {
         new TrajectorySegment(segment.timeFromStartNs, segment.durationNs,
           segment.coefficients)];
       generated.dispose();
-      remote.submit(robotkit.world.RobotCommand.ExecutionPlan(
+      remote.submit(robotkit.core.RobotCommand.ExecutionPlan(
         new ExecutionPlanSubmission(Int64.ofInt(1001), Int64.ofInt(1),
           Int64.ofInt(0), 0, initial, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0],
           planSegments)));
       waitUntil(runtime, function() return Int64.compare(
         remote.snapshot().activePlanId, Int64.ofInt(1001)) == 0,
         'remote Ruckig plan was not accepted: fault=${remote.fault()} state=${remote.snapshot().sessionState} id=${remote.snapshot().activePlanId} depth=${remote.snapshot().trajectoryQueueDepth} q=${remote.snapshot().positions.get(0)} safety=${remote.snapshot().safety} code=${remote.snapshot().faultCode} seq=${remote.snapshot().sourceSequence} status=${remote.status()}');
-      remote.submit(robotkit.world.RobotCommand.Hold);
+      remote.submit(robotkit.core.RobotCommand.Hold);
       waitUntil(runtime, function() return remote.snapshot().sessionState ==
         RobotKitRuntimeConstants.RK_SESSION_HELD,
         'remote HOLD did not pause the native plan: state=${remote.snapshot().sessionState} q=${remote.snapshot().positions.get(0)} fault=${remote.fault()}');
-      remote.submit(robotkit.world.RobotCommand.Resume);
+      remote.submit(robotkit.core.RobotCommand.Resume);
       waitUntil(runtime, function() return Math.abs(remote.snapshot().positions.get(0) -
         target[0]) < 1e-4 && !remote.snapshot().trajectoryActive,
         "remote Ruckig plan did not resume and complete");
-      remote.stop(robotkit.world.StopMode.Emergency);
+      remote.stop(robotkit.core.StopMode.Emergency);
       waitUntil(runtime, function() return remote.snapshot().safety ==
           RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP,
         "simulated robot did not latch an explicit remote emergency stop");
@@ -204,8 +204,8 @@ class WorldTcpIntegration {
           RobotKitRuntimeConstants.RK_SAFETY_READY,
         "explicit safety reset did not release the new serial session");
       var deadlineRejected = false;
-      try remote.submit(robotkit.world.RobotCommand.JointTargets([
-        robotkit.world.JointTarget.position(0, 0.9)
+      try remote.submit(robotkit.core.RobotCommand.JointTargets([
+        robotkit.core.JointTarget.position(0, 0.9)
       ], Int64.ofInt(123)))
       catch (_:Dynamic) deadlineRejected = true;
       if (!deadlineRejected) throw "remote adapter forwarded an unmapped absolute deadline";
@@ -248,8 +248,8 @@ class WorldTcpIntegration {
         var remoteRunner = new WorldBehaviorRunner(shared);
         if (localRunner.update(local) != 1 || remoteRunner.update(remote) != 1)
           throw "shared behavior did not emit one command on each adapter";
-        recording.recordCommand(robotkit.world.RobotCommand.JointTargets([
-          robotkit.world.JointTarget.position(0, target)
+        recording.recordCommand(robotkit.core.RobotCommand.JointTargets([
+          robotkit.core.JointTarget.position(0, target)
         ], null), LOGICAL_ID);
         if (localRunner.update(local) != 0 || remoteRunner.update(remote) != 0)
           throw "runner emitted duplicate commands for an unchanged snapshot";
@@ -302,10 +302,10 @@ class WorldTcpIntegration {
           throw "replayed observation changed behavior output";
       }
       replay.close(); sys.FileSystem.deleteFile(recordingPath);
-      remote.submit(robotkit.world.RobotCommand.JointTargets([
-        robotkit.world.JointTarget.position(0, 0.25),
-        robotkit.world.JointTarget.velocity(1, 0.5),
-        robotkit.world.JointTarget.effort(2, 2.0)
+      remote.submit(robotkit.core.RobotCommand.JointTargets([
+        robotkit.core.JointTarget.position(0, 0.25),
+        robotkit.core.JointTarget.velocity(1, 0.5),
+        robotkit.core.JointTarget.effort(2, 2.0)
       ], null));
       waitUntil(runtime, function() {
         var state = remote.snapshot();
@@ -408,7 +408,7 @@ private class SerialTransportSkillFactory implements materia.automation.mission.
     this.model = model; this.profile = profile;
   }
 
-  public function create(task:Task, robot:robotkit.world.Robot,
+  public function create(task:Task, robot:robotkit.core.Robot,
       facility:Facility):robotkit.skill.Skill {
     return switch task.kind {
       case TaskKind.Transport:

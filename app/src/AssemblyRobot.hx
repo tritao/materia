@@ -17,8 +17,8 @@ import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationClosure;
 import robotkit.runtime.Simulation.SimulationLinkHull;
-import robotkit.world.ProcessChannelDeclaration;
-import robotkit.world.SimulatedRobot;
+import robotkit.execution.ProcessChannelDeclaration;
+import robotkit.simulation.SimulatedRobot;
 
 /**
  * A simulated part: it rides link `linkIndex` of robot `robotIndex` at `offset` (metres, in the

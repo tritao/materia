@@ -9,7 +9,7 @@ import processkit.tool.WeldArcModel;
 import processkit.tool.WeldSensor.WeldReading;
 import processkit.tool.WeldSensor;
 import processkit.tool.WeldWork;
-import robotkit.world.ProcessEventValue;
+import robotkit.execution.ProcessEventValue;
 
 /**
  * A MIG/MAG welder on one link of a simulated robot, worked by its channels as a real supply is: the arc

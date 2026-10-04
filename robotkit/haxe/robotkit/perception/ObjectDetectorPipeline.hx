@@ -4,7 +4,7 @@ import haxe.Int64;
 import haxe.io.Bytes;
 import robotkit.inference.InferenceSession;
 import robotkit.inference.InferenceSession.InferenceResult;
-import robotkit.world.SensorFrame;
+import robotkit.core.SensorFrame;
 import visionkit.CameraModel;
 import visionkit.ImageView;
 import visionkit.UndistortMap;

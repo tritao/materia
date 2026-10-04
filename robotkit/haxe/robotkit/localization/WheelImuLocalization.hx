@@ -5,8 +5,8 @@ import robotkit.mobile.DifferentialOdometry;
 import robotkit.mobile.MobileBase;
 import robotkit.mobile.Pose2;
 import robotkit.model.RobotModel;
-import robotkit.world.RobotSnapshot;
-import robotkit.world.SensorFrame;
+import robotkit.core.RobotSnapshot;
+import robotkit.core.SensorFrame;
 
 /** Wheel displacement with heading increments corrected by the IMU gyro z rate. */
 class WheelImuLocalization implements Localization {

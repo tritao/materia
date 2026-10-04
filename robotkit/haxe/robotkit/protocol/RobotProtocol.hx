@@ -3,7 +3,7 @@ package robotkit.protocol;
 import haxe.io.Bytes;
 import haxeon.wire.MessagePack;
 import haxeon.wire.MessagePackError;
-import robotkit.world.CameraImage;
+import robotkit.streams.CameraImage;
 
 /** Typed RobotKit message helpers; the frame envelope remains independent. */
 class RobotProtocol {

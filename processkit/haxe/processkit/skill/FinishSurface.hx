@@ -16,8 +16,8 @@ import robotkit.tool.ChannelToolAdapter;
 import processkit.work.CoverageMap;
 import processkit.work.Point2;
 import processkit.work.WorkSurface;
-import robotkit.world.Robot;
-import robotkit.world.RobotSnapshot;
+import robotkit.core.Robot;
+import robotkit.core.RobotSnapshot;
 
 /**
  * Process parameters for one `FinishSurface` run: raster geometry

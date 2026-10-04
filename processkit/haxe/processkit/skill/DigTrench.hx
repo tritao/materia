@@ -10,8 +10,8 @@ import processkit.work.DigCyclePlanner;
 import processkit.work.HeightMap;
 import processkit.work.Polygon2;
 import processkit.work.Point2;
-import robotkit.world.Robot;
-import robotkit.world.RobotSnapshot;
+import robotkit.core.Robot;
+import robotkit.core.RobotSnapshot;
 
 /**
  * Tunable per-cycle parameters for `DigTrench`/`GradeRegion`; a pure-data

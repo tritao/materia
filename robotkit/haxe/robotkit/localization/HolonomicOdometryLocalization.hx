@@ -2,7 +2,7 @@ package robotkit.localization;
 
 import robotkit.mobile.HolonomicOdometry;
 import robotkit.mobile.Pose2;
-import robotkit.world.RobotSnapshot;
+import robotkit.core.RobotSnapshot;
 
 /**
  * Wheel odometry for a three-wheel omni/kiwi base exposed as an `odom` to

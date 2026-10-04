@@ -3,7 +3,7 @@ package robotkit.localization;
 import robotkit.mobile.PlanarMath;
 import robotkit.mobile.Pose2;
 import robotkit.runtime.Simulation;
-import robotkit.world.RobotSnapshot;
+import robotkit.core.RobotSnapshot;
 
 /** Projects an owned Simulation robot base pose into a map-frame estimate. */
 class SimulationTruthLocalization implements Localization {

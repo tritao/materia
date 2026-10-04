@@ -139,8 +139,8 @@ contact. Set `blueprint.selfCollision = false` for a model whose simple box
 collision approximation is too coarse; it keeps environment collision while
 disabling contacts between that robot's own links.
 
-`robotkit.world.SimulatedRobot` adapts one simulation-owned runtime to the same
-`Robot` interface used by `RemoteRobot`. `robotkit.world.SerialRobot` compiles
+`robotkit.simulation.SimulatedRobot` adapts one simulation-owned runtime to the same
+`Robot` interface used by `RemoteRobot`. `robotkit.serial.SerialRobot` compiles
 an authored `RobotModel` with its `RobotProfile`, opens a POSIX serial device, and owns its standalone
 runtime. Both can be attached to `RobotWorld` and used through the same command
 and snapshot interfaces. The serial endpoint executes RKD6 scheduled plans. It receives queue status and

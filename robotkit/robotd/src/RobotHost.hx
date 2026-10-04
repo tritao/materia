@@ -159,9 +159,9 @@ class RobotHost {
           var pixels = haxe.io.Bytes.alloc(fixtureWidth * fixtureHeight * 3);
           for (index in 0...pixels.length) pixels.set(index,
             perceptionFixtureModel == null ? index % 251 : 51);
-          var image = new robotkit.world.CameraImage(fixtureWidth, fixtureHeight, "rgb8", pixels);
+          var image = new robotkit.streams.CameraImage(fixtureWidth, fixtureHeight, "rgb8", pixels);
           var oversizeImage = perceptionFixtureModel == null
-            ? new robotkit.world.CameraImage(1920, 1080, "rgb8", haxe.io.Bytes.alloc(1920 * 1080 * 3))
+            ? new robotkit.streams.CameraImage(1920, 1080, "rgb8", haxe.io.Bytes.alloc(1920 * 1080 * 3))
             : null;
           var fixtureSequence = haxe.Int64.ofInt(0);
           var nextFixtureNs = haxe.Int64.ofInt(0);
@@ -182,7 +182,7 @@ class RobotHost {
           var pixels = haxe.io.Bytes.alloc(6);
           for (index in 0...6) pixels.set(index, index + 1);
           hostedRuntime.publishCameraFrame("demo/camera",
-            new robotkit.world.CameraImage(2, 1, "rgb8", pixels),
+            new robotkit.streams.CameraImage(2, 1, "rgb8", pixels),
             haxe.Int64.ofInt(1), haxe.Int64.ofInt(1), "camera.fixture");
         }
         var server = new RobotServer(robot, blueprint, hostedRuntime, serverSimulation,

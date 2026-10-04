@@ -2,10 +2,10 @@ package robotkit.mobile;
 
 import kinematicskit.UnicycleEnvelope;
 
-import robotkit.world.JointTarget;
-import robotkit.world.Robot;
-import robotkit.world.RobotCommand;
-import robotkit.world.StopMode;
+import robotkit.core.JointTarget;
+import robotkit.core.Robot;
+import robotkit.core.RobotCommand;
+import robotkit.core.StopMode;
 import robotkit.model.RobotModel;
 import robotkit.runtime.RobotRuntimeBlueprint;
 import robotkit.runtime.RobotRuntimeCompiler;

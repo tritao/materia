@@ -8,8 +8,8 @@ import robotkit.device.DeviceBinding;
 import robotkit.device.DeviceLayout;
 import robotkit.model.RobotModel;
 import robotkit.model.RobotModelCodec;
-import robotkit.world.ProcessChannelDeclaration;
-import robotkit.world.ProcessEventValue;
+import robotkit.execution.ProcessChannelDeclaration;
+import robotkit.execution.ProcessEventValue;
 import robotkit.inference.InferenceSession;
 import robotkit.perception.PerceptionPipelineRegistry;
 

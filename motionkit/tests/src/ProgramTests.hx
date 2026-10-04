@@ -90,25 +90,25 @@ import robotkit.runtime.VirtualActuatorOptions;
 import robotkit.runtime.RobotRuntimeError;
 import robotkit.runtime.RobotRuntimeCompiler;
 import RobotKitRuntime;
-import robotkit.world.RecordingRobot;
-import robotkit.world.ReplayRobot;
-import robotkit.world.RobotRecording;
-import robotkit.world.SimulatedRobot;
-import robotkit.world.RobotCommand;
-import robotkit.world.Robot;
-import robotkit.world.RobotCapabilities;
-import robotkit.world.RobotDescription;
-import robotkit.world.RobotFault;
-import robotkit.world.RobotId;
-import robotkit.world.RobotSnapshot;
-import robotkit.world.RobotStatus;
-import robotkit.world.RuntimeRobotAdapter;
-import robotkit.world.SensorFrame;
-import robotkit.world.StopMode;
-import robotkit.world.ExecutionPlanSubmission;
-import robotkit.world.ProcessChannelDeclaration;
-import robotkit.world.ProcessEventValue;
-import robotkit.world.TrajectorySegment;
+import robotkit.recording.RecordingRobot;
+import robotkit.recording.ReplayRobot;
+import robotkit.recording.RobotRecording;
+import robotkit.simulation.SimulatedRobot;
+import robotkit.core.RobotCommand;
+import robotkit.core.Robot;
+import robotkit.core.RobotCapabilities;
+import robotkit.core.RobotDescription;
+import robotkit.core.RobotFault;
+import robotkit.core.RobotId;
+import robotkit.core.RobotSnapshot;
+import robotkit.core.RobotStatus;
+import robotkit.runtime.RuntimeRobotAdapter;
+import robotkit.core.SensorFrame;
+import robotkit.core.StopMode;
+import robotkit.execution.ExecutionPlanSubmission;
+import robotkit.execution.ProcessChannelDeclaration;
+import robotkit.execution.ProcessEventValue;
+import robotkit.execution.TrajectorySegment;
 
 import MotionKitTestSupport.WristBranchSolver;
 import MotionKitTestSupport.PlanarSolver;
@@ -411,7 +411,7 @@ class ProgramTests extends MotionKitTestSupport {
     var runtime = harness.simulation.addRobot(blueprint);
     var robot = new SimulatedRobot("workcell", runtime, fixture.model.name, [for (link in fixture.model.links) link.name],
       [for (joint in fixture.model.joints) joint.name]);
-    robot.submit(RobotCommand.JointTargets([for (j in 0...8) robotkit.world.JointTarget.position(j, entry[j])], null));
+    robot.submit(RobotCommand.JointTargets([for (j in 0...8) robotkit.core.JointTarget.position(j, entry[j])], null));
     var tick = 0;
     for (_ in 0...300) harness.step(Int64.ofInt(++tick));
     // Executed through the program runner, which streams the long plan to the runtime in chunks.
@@ -698,9 +698,12 @@ class ProgramTests extends MotionKitTestSupport {
     check(paced.isStopped() && delivered[0].isClosed() && delivered[1].isClosed(),
       "disposing a waiting planner stops its worker and disposes its plans");
 
-    // Shutting down cancels every planner and waits for its worker, so that none is planning when the process exits.
-    var running = new ProgramPlanner(compiler, program, start, Int64.ofInt(500), 0, 1.0, 1e9);
+    // Keep both workers waiting on bounded lookahead before checking their registration.
+    // An unbounded worker may finish before active() is observed.
+    var running = new ProgramPlanner(compiler, program, start, Int64.ofInt(500), 0, 1.0, 1e-6);
     var waiting = new ProgramPlanner(compiler, program, start, Int64.ofInt(600), 0, 1.0, 1e-6);
+    running.waitForMore();
+    waiting.waitForMore();
     check(ProgramPlanner.active() >= 2, "planners with a worker still going are counted");
     check(ProgramPlanner.shutdown() == 0 && ProgramPlanner.active() == 0 && running.isStopped() && waiting.isStopped(),
       "a shutdown stops every worker and waits for them");
@@ -728,7 +731,7 @@ class ProgramTests extends MotionKitTestSupport {
     var unsupported = new RuntimeRobotAdapter("unsupported-arm", runtime,
       fixture.model.name, [for (link in fixture.model.links) link.name],
       [for (joint in fixture.model.joints) joint.name], false, false,
-      "simulated runtime fault", robotkit.world.ExecutionCapabilities.unavailable());
+      "simulated runtime fault", robotkit.core.ExecutionCapabilities.unavailable());
     throws(function() new ManipulatorMotion(unsupported, compiler,
       function(_) return null, function() return runtime.pollEvents()),
       "manipulator requires plan support at construction");

@@ -1,6 +1,6 @@
 package motionkit.robot;
 
-import robotkit.world.RobotSnapshot;
+import robotkit.core.RobotSnapshot;
 
 /**
  * Motion lifecycle. The runtime owns physical rest; only update() may complete

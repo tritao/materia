@@ -9,11 +9,11 @@ import robotkit.perception.ImageDetectionObservation;
 import robotkit.perception.ObjectDetectorPipeline;
 import robotkit.perception.PerceptionHost;
 import robotkit.perception.PerceptionPipelineRegistry;
-import robotkit.world.CameraImage;
-import robotkit.world.ReplayRobot;
-import robotkit.world.RobotRecording;
-import robotkit.world.RobotSnapshot;
-import robotkit.world.SensorFrame;
+import robotkit.streams.CameraImage;
+import robotkit.recording.ReplayRobot;
+import robotkit.recording.RobotRecording;
+import robotkit.core.RobotSnapshot;
+import robotkit.core.SensorFrame;
 
 class PerceptionInferenceTests {
   static var assertions = 0;

@@ -53,23 +53,23 @@ import robotkit.skill.FollowPath;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationHarness;
-import robotkit.world.Robot;
-import robotkit.world.RobotCapabilities;
-import robotkit.world.RobotCommand;
-import robotkit.world.RobotDescription;
-import robotkit.world.RobotFault;
-import robotkit.world.RobotId;
-import robotkit.world.McapRecordingReader;
-import robotkit.world.McapRobotRecording;
-import robotkit.world.RecordingRobot;
-import robotkit.world.RobotSnapshot;
-import robotkit.world.RobotRecording;
-import robotkit.world.ReplayRobot;
-import robotkit.world.SimulatedRobot;
-import robotkit.world.RobotStatus;
+import robotkit.core.Robot;
+import robotkit.core.RobotCapabilities;
+import robotkit.core.RobotCommand;
+import robotkit.core.RobotDescription;
+import robotkit.core.RobotFault;
+import robotkit.core.RobotId;
+import robotkit.recording.McapRecordingReader;
+import robotkit.recording.McapRobotRecording;
+import robotkit.recording.RecordingRobot;
+import robotkit.core.RobotSnapshot;
+import robotkit.recording.RobotRecording;
+import robotkit.recording.ReplayRobot;
+import robotkit.simulation.SimulatedRobot;
+import robotkit.core.RobotStatus;
 import robotkit.world.RobotWorld;
-import robotkit.world.SensorFrame;
-import robotkit.world.StopMode;
+import robotkit.core.SensorFrame;
+import robotkit.core.StopMode;
 import robotkit.skill.Skill;
 import robotkit.skill.SkillResult;
 import robotkit.skill.SkillStatus;
@@ -515,9 +515,9 @@ class AutomationTests {
         new RobotDescription(liveRobot.id(), "recorded mission forklift", linkNames, jointNames),
         new RobotCapabilities(liveRobot.id(),
       jointNames.length,
-      [robotkit.world.JointTargetMode.Position, robotkit.world.JointTargetMode.Velocity, robotkit.world.JointTargetMode.Effort],
-      robotkit.world.ExecutionCapabilities.unavailable(),
-      new robotkit.world.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked)));
+      [robotkit.core.JointTargetMode.Position, robotkit.core.JointTargetMode.Velocity, robotkit.core.JointTargetMode.Effort],
+      robotkit.core.ExecutionCapabilities.unavailable(),
+      new robotkit.core.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked)));
       replayWorld = new RobotWorld();
       replayWorld.attach(replay);
       var replayFleet = new Fleet("replay-fleet", replayWorld);
@@ -612,9 +612,9 @@ private class AutomationFakeRobot implements Robot {
     descriptionValue = new RobotDescription(logicalId, model.name, links, joints);
     capabilitiesValue = new RobotCapabilities(logicalId,
       joints.length,
-      [robotkit.world.JointTargetMode.Position, robotkit.world.JointTargetMode.Velocity, robotkit.world.JointTargetMode.Effort],
-      robotkit.world.ExecutionCapabilities.unavailable(),
-      new robotkit.world.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked));
+      [robotkit.core.JointTargetMode.Position, robotkit.core.JointTargetMode.Velocity, robotkit.core.JointTargetMode.Effort],
+      robotkit.core.ExecutionCapabilities.unavailable(),
+      new robotkit.core.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked));
     snapshotValue = new RobotSnapshot(logicalId, Int64.ofInt(0), Int64.ofInt(0),
       [for (_ in joints) 0.0], [for (_ in joints) 0.0], [for (_ in joints) 0.0], 0, 0);
   }
@@ -624,7 +624,7 @@ private class AutomationFakeRobot implements Robot {
   public function capabilities():RobotCapabilities return capabilitiesValue;
   public function snapshot():RobotSnapshot return snapshotValue;
   public function sensors():Array<SensorFrame> return [];
-  public function events(afterOrdinal:Int64, max:Int):Array<robotkit.world.RobotEvent> return [];
+  public function events(afterOrdinal:Int64, max:Int):Array<robotkit.core.RobotEvent> return [];
   public function fault():Null<RobotFault> return null;
   public function submit(command:RobotCommand):Void {}
   public function stop(mode:StopMode):Void {}

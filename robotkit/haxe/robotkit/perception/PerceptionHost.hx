@@ -1,6 +1,6 @@
 package robotkit.perception;
 
-import robotkit.world.SensorFrame;
+import robotkit.core.SensorFrame;
 
 /** Routes camera frames to configured pipelines; submit does not wait for inference. */
 class PerceptionHost {

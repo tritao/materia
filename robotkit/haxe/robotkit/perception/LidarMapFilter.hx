@@ -3,7 +3,7 @@ package robotkit.perception;
 import robotkit.mobile.Pose2;
 import robotkit.navigation.OccupancyGrid2;
 import robotkit.runtime.RobotRuntimeSensorBlueprint;
-import robotkit.world.SensorFrame;
+import robotkit.core.SensorFrame;
 
 /**
  * Drops the planar LiDAR returns that a known map already explains, so what perception reports is

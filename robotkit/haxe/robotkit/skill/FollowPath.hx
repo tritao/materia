@@ -5,7 +5,7 @@ import robotkit.navigation.NavigationGoal;
 import robotkit.navigation.NavigationStatus;
 import robotkit.navigation.Path;
 import robotkit.navigation.PathSpeedLimit;
-import robotkit.world.RobotSnapshot;
+import robotkit.core.RobotSnapshot;
 
 /** Tracks a caller-supplied path without planning or replanning it. */
 class FollowPath implements Skill {

@@ -12,10 +12,10 @@ import motionkit.trajectory.Trajectory;
 import motionkit.trajectory.TrajectoryState;
 import motionkit.trajectory.ValidationReport;
 import TrajectoryCore;
-import robotkit.world.Robot;
-import robotkit.world.RobotCommand;
-import robotkit.world.RobotSnapshot;
-import robotkit.world.StopMode;
+import robotkit.core.Robot;
+import robotkit.core.RobotCommand;
+import robotkit.core.RobotSnapshot;
+import robotkit.core.StopMode;
 import robotkit.runtime.RobotRuntimeError;
 import RobotKitRuntime;
 

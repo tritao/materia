@@ -2,9 +2,9 @@ package robotkit.runtime;
 
 import RobotKitRuntime;
 import robotkit.tool.ToolChannels;
-import robotkit.world.ProcessChannelDeclaration;
-import robotkit.world.ProcessEventCodec;
-import robotkit.world.ProcessEventValue;
+import robotkit.execution.ProcessChannelDeclaration;
+import robotkit.execution.ProcessEventCodec;
+import robotkit.execution.ProcessEventValue;
 
 /**
  * Immutable-at-execution compiled robot description consumed by RobotRuntime.

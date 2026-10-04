@@ -5,7 +5,7 @@ import nativekit.sim.MotionType;
 import nativekit.sim.SimObject;
 import nativekit.sim.SimPose;
 import robotkit.spatial.Vec3;
-import robotkit.world.ProcessEventValue;
+import robotkit.execution.ProcessEventValue;
 
 /**
  * A suction tool on one link of a simulated robot, worked by its control channel as the valve of a

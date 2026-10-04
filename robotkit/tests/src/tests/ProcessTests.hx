@@ -16,10 +16,10 @@ import robotkit.tool.Tool;
 import robotkit.tool.ToolRuntime;
 import robotkit.tool.ToolRuntimeSelection;
 import robotkit.tool.SimulatedToolSensorAdapter;
-import robotkit.world.FiredProcessEvent;
-import robotkit.world.ProcessEventValue;
-import robotkit.world.RobotSnapshot;
-import robotkit.world.SensorFrame;
+import robotkit.execution.FiredProcessEvent;
+import robotkit.execution.ProcessEventValue;
+import robotkit.core.RobotSnapshot;
+import robotkit.core.SensorFrame;
 
 /** Toolpath authoring and B1 process-path conversion acceptance. */
 class ProcessTests {

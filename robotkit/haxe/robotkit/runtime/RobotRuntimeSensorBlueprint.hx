@@ -1,7 +1,7 @@
 package robotkit.runtime;
 
 import RobotKitRuntime;
-import robotkit.world.ImmutableFloatArray;
+import robotkit.core.ImmutableFloatArray;
 
 /** Immutable lowering of one sensor and its semantic mount. */
 class RobotRuntimeSensorBlueprint {

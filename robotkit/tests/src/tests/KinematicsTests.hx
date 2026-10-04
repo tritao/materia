@@ -23,8 +23,8 @@ import robotkit.manipulation.IKResult;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationHarness;
-import robotkit.world.SimulatedRobot;
-import robotkit.world.RobotCommand;
+import robotkit.simulation.SimulatedRobot;
+import robotkit.core.RobotCommand;
 
 /** M2 acceptance tests for robotkit.manipulation: Manipulator, Jacobian, IK, Manipulator. */
 class KinematicsTests {

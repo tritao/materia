@@ -24,10 +24,10 @@ class RobotSessionIntegration {
           Int64.ofInt(1200000000)) < 0) {
         if (!first.poll()) first.wait(0.01);
       }
-      first.submitPlan(new robotkit.world.ExecutionPlanSubmission(
+      first.submitPlan(new robotkit.execution.ExecutionPlanSubmission(
         Int64.ofInt(901), Int64.ofInt(1), Int64.ofInt(0), 0,
         [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0],
-        [new robotkit.world.TrajectorySegment(Int64.ofInt(0), Int64.ofInt(1000000000),
+        [new robotkit.execution.TrajectorySegment(Int64.ofInt(0), Int64.ofInt(1000000000),
           [[0.0, 0.1], [0.0, 0.0], [0.0, 0.0]])], null, null,
         [0.01, 0.01, 0.01], null, null, true));
       waitFor(first, function() return first.latestState != null &&
@@ -102,7 +102,7 @@ class RobotSessionIntegration {
       var anchor = settled.q.copy();
       var anchorSequence = settled.sequence;
       controller.sendJointTargets([for (joint in 0...anchor.length)
-        robotkit.world.JointTarget.position(joint, anchor[joint])]);
+        robotkit.core.JointTarget.position(joint, anchor[joint])]);
       waitFor(controller, function() {
         var state = controller.latestState;
         return state != null &&
@@ -111,10 +111,10 @@ class RobotSessionIntegration {
           Math.abs(state.q[0] - anchor[0]) < 1e-6;
       },
         "lease test did not establish a commanded position anchor");
-      controller.submitPlan(new robotkit.world.ExecutionPlanSubmission(
+      controller.submitPlan(new robotkit.execution.ExecutionPlanSubmission(
         Int64.ofInt(801), Int64.ofInt(1), Int64.ofInt(0), 0,
         anchor, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0],
-        [for (index in 0...4) new robotkit.world.TrajectorySegment(
+        [for (index in 0...4) new robotkit.execution.TrajectorySegment(
           Int64.fromFloat(index * 2000000000.0), Int64.ofInt(2000000000),
           [[anchor[0] + index * 0.02, 0.01], [anchor[1], 0.0],
             [anchor[2], 0.0]])], null, null, null, null, null, false));
@@ -236,10 +236,10 @@ class RobotSessionIntegration {
       if (!observerCommandRejected)
         throw "observer command was not rejected by the client lease boundary";
       var observerPlanRejected = false;
-      try observer.submitPlan(new robotkit.world.ExecutionPlanSubmission(
+      try observer.submitPlan(new robotkit.execution.ExecutionPlanSubmission(
         Int64.ofInt(800), Int64.ofInt(1), Int64.ofInt(0), 0,
         [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0],
-        [new robotkit.world.TrajectorySegment(Int64.ofInt(0),
+        [new robotkit.execution.TrajectorySegment(Int64.ofInt(0),
           Int64.ofInt(100000000), [[0.0, 0.0], [0.0, 0.0], [0.0, 0.0]])]))
       catch (_:Dynamic) observerPlanRejected = true;
       if (!observerPlanRejected)
@@ -252,10 +252,10 @@ class RobotSessionIntegration {
         "controller command did not reach the runtime");
       waitFor(observer, function() return observerState,
         "observer did not receive read-only state fanout");
-      controller.submitPlan(new robotkit.world.ExecutionPlanSubmission(
+      controller.submitPlan(new robotkit.execution.ExecutionPlanSubmission(
         Int64.ofInt(802), Int64.ofInt(1), Int64.ofInt(0), 0,
         [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0],
-        [new robotkit.world.TrajectorySegment(Int64.ofInt(0),
+        [new robotkit.execution.TrajectorySegment(Int64.ofInt(0),
           Int64.ofInt(100000000), [[0.0, 0.0], [0.0, 0.0], [0.0, 0.0]])]));
       waitFor(controller, function() return controller.lastFault != null,
         "rejected plan did not return a fault");

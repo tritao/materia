@@ -2,9 +2,9 @@ package robotkit.runtime;
 
 import RobotKitRuntime;
 import haxe.Int64;
-import robotkit.world.ImmutableFloatArray;
-import robotkit.world.ImmutableSensorArray;
-import robotkit.world.SensorFrame;
+import robotkit.core.ImmutableFloatArray;
+import robotkit.core.ImmutableSensorArray;
+import robotkit.core.SensorFrame;
 
 /**
  * Immutable-by-ownership copy of one robot runtime observation.

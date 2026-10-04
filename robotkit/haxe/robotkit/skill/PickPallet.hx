@@ -8,7 +8,7 @@ import robotkit.navigation.NavigationGoal;
 import robotkit.navigation.Navigator;
 import robotkit.perception.Pallet;
 import robotkit.perception.PerceptionSnapshot;
-import robotkit.world.RobotSnapshot;
+import robotkit.core.RobotSnapshot;
 
 private enum PickStage {
   Approach;
@@ -101,7 +101,7 @@ class PickPallet implements Skill {
     if (!lifecycle.isRunning()) return;
     var value:Null<GoTo> = approach;
     if (value != null) value.cancel();
-    try forks.robot.stop(robotkit.world.StopMode.Normal) catch (_:Dynamic) {}
+    try forks.robot.stop(robotkit.core.StopMode.Normal) catch (_:Dynamic) {}
     lifecycle.cancel();
   }
 

@@ -1,6 +1,6 @@
 package robotkit.mobile;
 
-import robotkit.world.JointTarget;
+import robotkit.core.JointTarget;
 
 /**
  * Omnidirectional ("kiwi") drive: three wheels mounted at 120-degree

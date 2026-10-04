@@ -1,6 +1,6 @@
 package robotkit.perception;
 
-import robotkit.world.SensorFrame;
+import robotkit.core.SensorFrame;
 
 interface PerceptionPipeline {
   function id():String;

@@ -1,6 +1,6 @@
 package robotkit.mobile;
 
-import robotkit.world.JointTarget;
+import robotkit.core.JointTarget;
 
 /** Kinematic mapping from a planar body twist to one atomic joint target batch. */
 interface DriveModel {
