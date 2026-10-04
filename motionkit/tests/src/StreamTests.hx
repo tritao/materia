@@ -167,6 +167,9 @@ class StreamTests extends MotionKitTestSupport {
     var recording = new RobotRecording();
     var instrumented = new RecordingRobot(robot, recording);
     var machine = MotionSystem.fromBlueprint(instrumented, blueprint);
+    var tick = homeGantryFixture(blueprint, runtime, simulationHarness, instrumented, machine);
+    // The assertions below count buffered job submissions after setup homing.
+    recording.commands.resize(0);
     var options = new MotionOptions(0.05, 0.2);
     check(machine.robot.capabilities().execution.plans,
       "simulation runtime advertises trajectory queue support");
@@ -189,7 +192,6 @@ class StreamTests extends MotionKitTestSupport {
         throw "buffer submitted a lifecycle command before motion started";
     }
 
-    var tick = 0;
     for (iteration in 0...5) {
       check(machine.update(), "buffer remains active while its first move is running");
       simulationHarness.step(Int64.ofInt(tick++));

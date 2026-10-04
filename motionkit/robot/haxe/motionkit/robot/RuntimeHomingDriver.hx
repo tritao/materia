@@ -96,9 +96,13 @@ class RuntimeHomingDriver implements HomingDriver {
 
   function move(axis:HomingAxis, position:Float, velocity:Float, acceleration:Float):Void {
     var snapshot = robot.snapshot();
+    // Homing polls once per owner period. Keep acceleration ramps observable
+    // for two periods, including the slow latch pass, rather than producing
+    // sub-period segments that a serial device cannot qualify or stream.
+    var boundedAcceleration = Math.min(acceleration, velocity / (2 * axis.timestep));
     // Native plans anchor on held commanded coordinates, including measured following error.
     var trajectory = planner.plan(snapshot.setpointPositions.toArray(),
-      {targets: [new AxisTarget(axis.id, position - mappings.get(axis.joint).jointOffset(0))], options: new MotionOptions(velocity, acceleration)}).trajectory;
+      {targets: [new AxisTarget(axis.id, position - mappings.get(axis.joint).jointOffset(0))], options: new MotionOptions(velocity, boundedAcceleration)}).trajectory;
     try {
       var stream = new TrajectoryStream(robot);
       var segments = trajectory.segments();
@@ -112,7 +116,7 @@ class RuntimeHomingDriver implements HomingDriver {
       robot.submit(RobotCommand.ExecutionPlan(plan));
     } catch (error:Dynamic) {
       trajectory.dispose();
-      throw error;
+      throw 'Homing move ${axis.id} to $position failed: $error; session=${snapshot.sessionState} active=${snapshot.trajectoryActive} queue=${snapshot.trajectoryQueueDepth} observed=${snapshot.positions.toArray()} held=${snapshot.setpointPositions.toArray()}';
     }
     trajectory.dispose();
   }

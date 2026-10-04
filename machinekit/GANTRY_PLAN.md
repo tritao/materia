@@ -3242,3 +3242,35 @@ The router reaches Y backoff through these controls. A previous run then rejecte
 its restart because its held anchor predated the paired stop. The fresh-rest
 barrier is implemented; the router retry is running, so no successful router
 homing or complete Phase C gate is claimed here. G13 remains in progress.
+
+
+### Phase C — keep paired-stop readiness behind fresh feedback
+
+The homing status API now returns pending after Stop acceptance until fresh
+stationary feedback has refreshed the anchor. This prevents the caller acting on
+its snapshot from before acknowledgment in the same update. A native regression
+covers acceptance, subsequent moving feedback, and final stationary readiness.
+Native rebuild and the focused runtime regression pass; the preceding full
+native gate passed 18/18 with this readiness behavior before adding the regression.
+
+Physical assembly compilation now preserves flange/include ownership using the
+same helper as the scene path. The full MotionKit run passes the XYZ flange,
+physical homing and Cartesian motion checks. Its virtual lead-screw fixture now
+checks both normalized leader commands and retained physical shaft feedback, and
+keeps its clock monotonic; that test also passes. The next full-run failure was
+an unreferenced buffered gantry fixture. It now homes the same instrumented robot
+and MotionSystem before counting job submissions, retaining the setup clock.
+The latest full MotionKit retry is running; no full-suite pass is claimed.
+
+Homing ramps are bounded to two owner periods even at slow latch speed so serial
+qualification can represent them. App (1790 sources) and MotionKit (1127 sources)
+compiler-only checks pass. Failed homing submissions now include the axis, target,
+observed coordinates, held anchors and queue state.
+
+The latest router retry passes Y backoff and latch/calibration, then rejects its
+Y return plan with INVALID_STATE. Its held motor sides differ by 0.01570797 rad
+(5 micrometres), while the axis planner reconstructs a common coupled position.
+Audit stopped-anchor coupling projection and post-counter-calibration commanded
+anchors before changing tolerances. The restart/counter-origin alignment also
+needs a physical queued-handoff regression. Geometry/mass baselines and remaining
+Phase C gates are still pending. G13 is incomplete and G14 is not started.

@@ -71,6 +71,25 @@ public:
     }
 };
 
+class HomingStopEndpoint final : public robotkit::RobotEndpoint {
+public:
+    double velocity = 0.0;
+    bool executes_trajectory_queue() const noexcept override { return true; }
+    rk_result apply(const rk_robot_command &) override { return RK_OK; }
+    rk_result device_homing_control(const rk_device_homing_control &) override { return RK_OK; }
+    rk_result device_homing_status(uint64_t) const override { return RK_OK; }
+    rk_result sample(uint64_t timestamp, rk_robot_state &state) override {
+        state.struct_size = sizeof(state);
+        state.joint_count = 2;
+        state.source_timestamp_ns = state.received_timestamp_ns = timestamp;
+        state.position[0] = 0.25; state.position[1] = -0.25;
+        state.velocity[0] = velocity;
+        state.trajectory_active = 0; state.trajectory_queue_depth = 0;
+        state.session_state = RK_SESSION_IDLE;
+        return RK_OK;
+    }
+};
+
 class EchoEndpoint final : public robotkit::RobotEndpoint {
 public:
     explicit EchoEndpoint(uint32_t joint_count, bool queue_support = true)
@@ -2621,5 +2640,23 @@ int main() {
     assert(sample_failure_endpoint->emergency_stop_count == 1);
     assert(sample_failure.snapshot(state) == RK_OK);
     assert(state.safety == RK_SAFETY_FAULT);
+    {
+        auto stop_endpoint = std::make_shared<HomingStopEndpoint>();
+        robotkit::RobotRuntime stopped(blueprint, stop_endpoint);
+        assert(stopped.publish_sample(100'000'000) == RK_OK);
+        rk_device_homing_control stop{};
+        stop.struct_size = sizeof(stop); stop.action = 4;
+        stop.sequence = 1; stop.scope = 1; stop.first = 0; stop.second = 1;
+        stop.skew_bound = 0.01;
+        assert(stopped.device_homing_control(stop) == RK_OK);
+        // Acceptance must not let the caller use the snapshot from before ACK.
+        assert(stopped.device_homing_status(1) == RK_ERROR_STALE_STATE);
+        stop_endpoint->velocity = 0.01;
+        assert(stopped.publish_sample(200'000'000) == RK_OK);
+        assert(stopped.device_homing_status(1) == RK_ERROR_STALE_STATE);
+        stop_endpoint->velocity = 0.0;
+        assert(stopped.publish_sample(300'000'000) == RK_OK);
+        assert(stopped.device_homing_status(1) == RK_OK);
+    }
     return 0;
 }

@@ -2555,6 +2555,9 @@ rk_result RobotRuntime::device_homing_status(uint64_t sequence) {
             pending_homing_stop_.reset();
         } else if (result == RK_ERROR_INVALID_STATE) pending_homing_stop_.reset();
     }
+    // The caller must not act on its pre-ack snapshot in this same tick.
+    // Report readiness only after the rest barrier has refreshed the anchor.
+    if (result == RK_OK && pending_device_stop_source_) return RK_ERROR_STALE_STATE;
     return result;
 }
 }

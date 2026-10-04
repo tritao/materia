@@ -364,8 +364,7 @@ class ProcessTests extends MotionKitTestSupport {
     check(machine.axis("x") != null && machine.axis("y") != null && machine.axis("z") != null,
       "XYZ gantry exposes all logical axes");
 
-    machine.home();
-    runMotion(machine, simulationHarness);
+    homeGantryFixture(blueprint, runtime, simulationHarness, robot, machine);
     var home = robot.snapshot();
     near(home.positions.get(0), 0.0, "XYZ gantry homes X");
     near(home.positions.get(1), 0.0, "XYZ gantry homes Y");
@@ -465,9 +464,12 @@ class ProcessTests extends MotionKitTestSupport {
       new DeviceLayout([for (index in 0...blueprint.model.actuators.length)
         new robotkit.device.DeviceChannel(index, blueprint.model.actuators[index].id, 1, 2)]), options.stepTickHz);
     near(blueprint.model.couplings[0].ratio, ratio, "the physical coupling takes its ratio from the screw");
-    near(binding.channels[0].ratio, 1.0, "the binding drives the explicit motor shaft in radians");
-    check(blueprint.model.joints[binding.channels[0].jointIndex].id == blueprint.axes[0].jointIds[1],
-      "the virtual channel addresses the physical motor shaft");
+    near(binding.channels[0].ratio, ratio, "device commands normalize the shaft to its screw leader");
+    check(blueprint.model.joints[binding.channels[0].jointIndex].id == blueprint.axes[0].jointIds[0],
+      "the virtual channel commands the independent carriage coordinate");
+    near(binding.channels[0].feedbackRatio, 1.0, "physical feedback measures the motor shaft in radians");
+    check(blueprint.model.joints[binding.channels[0].feedbackJointIndex].id == blueprint.axes[0].jointIds[1],
+      "the virtual channel retains the physical motor feedback joint");
     options.actuators = binding.virtualActuators();
     var simulationHarness = new SimulationHarness(0.01);
     var simulation = simulationHarness.simulation;
@@ -484,7 +486,7 @@ class ProcessTests extends MotionKitTestSupport {
     var before = simulation.linkPose(0, carriage);
     machine.moveAxes([new AxisTarget("x", 0.02)], new MotionOptions(0.01, 0.04));
     runMotion(machine, simulationHarness);
-    for (tick in 0...20) simulationHarness.step(Int64.ofInt(tick));
+    for (_ in 0...20) simulationHarness.step();
     var finalJoint = robot.snapshot().positions.get(0);
     check(Math.abs(finalJoint - 0.02) <= 1.0 / 400000.0 + 1e-6,
       "MachineKit lead screw follows the virtual RKD6 step position");
