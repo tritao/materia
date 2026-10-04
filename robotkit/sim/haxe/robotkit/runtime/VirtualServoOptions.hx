@@ -5,10 +5,15 @@ import robotkit.model.ActuatorDrive.ServoDrive;
 
 /** Servo emulation on the virtual board's pulse grid; physical stepper wiring stays in DeviceBinding. */
 class VirtualServoOptions {
-  public static function fromModel(model:RobotModel, tickHz:Int = 40000):VirtualDeviceOptions {
-    if (model == null || tickHz <= 0 || model.actuators.length == 0) throw "Virtual servos need a model and tick rate";
+  /** Reserve 2% of acceleration for clock fitting (up to 0.5% rate error) and float polynomial conversion. */
+  public static inline var ACCELERATION_SCALE:Float = 0.98;
+  public static function fromModel(model:RobotModel, tickHz:Int = 40000, baud:Int = 3000000):VirtualDeviceOptions {
+    if (model == null || tickHz <= 0 || baud <= 0 || model.actuators.length == 0) throw "Virtual servos need a model and tick rate";
     var options = new VirtualDeviceOptions();
     options.stepTickHz = tickHz;
+    // Full servo polynomials carry more coefficients than the stepper defaults;
+    // the endpoint still qualifies every submitted plan against this link rate.
+    options.baud = baud;
     options.targetError = 0.0;
     for (actuator in model.actuators) {
       var drive = actuator.drive;
