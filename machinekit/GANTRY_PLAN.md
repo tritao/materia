@@ -2359,3 +2359,15 @@ following error outside a boundary becoming the planned seed. Snapshot's
 existing measured fallback remains available for adapters without setpoints.
 MotionKit and app compiler retries are running before the justified focused
 homing/picker reruns. No native source changed after its passing results.
+
+### G12 checkpoint — return handoff verified, picker duration unresolved
+
+Both compilers passed the return-drain/commanded-anchor change. The focused
+homing test passed with delayed return completion covered. The picker now
+passes homing and enters its mission without the prior limit/start rejection,
+but reaches the 600-second simulation cap without satisfying all-six-carton
+completion. No mission or contact fault was reported. Added completed-step,
+placement, plan-count, homing-duration and endpoint-state details to the
+completion assertion to distinguish slow execution from planning wait. The
+app test compiler is running before a diagnostic picker retry. G12 checkpoint
+remains incomplete, and G13 is unstarted.

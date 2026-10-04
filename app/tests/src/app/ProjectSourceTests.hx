@@ -923,7 +923,10 @@ class ProjectSourceTests {
         }
         lastDone = mission.completed;
       }
-      check(mission.finished && mission.completed == 12 && placed == 6, "picker places all six cartons");
+      check(mission.finished && mission.completed == 12 && placed == 6, "picker places all six cartons: completed=" +
+        mission.completed + ", placed=" + placed + ", plans=" + planned + ", homing=" + mission.homingSeconds +
+        ", time=" + simulation.activeSession().simulationTime() + ", motion=" + motion.sessionState() +
+        ", q=" + mission.robot.runtime.snapshot().q.toArray().join(","));
       check(planned > 0 && motion.checks.plans > 0, "picker executes physically checked plans");
       check(motion.checks.count(PlanDiagnosticKind.StepperStall) == 0, "picker drive checks report no stall");
       check(measuredTicks > 0 && bytes / measuredTicks < 200000, "picker allocates below its assumed 200 KB execution-tick budget");
