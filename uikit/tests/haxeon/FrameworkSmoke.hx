@@ -584,6 +584,7 @@ class FrameworkSmoke {
 			return 30;
 		if (!commandHistoryValid(context))
 			return 230;
+		if (!sidebarValid(context)) throw "sidebar registry, persistence or lazy provider regression";
 		if (!dockWorkspaceValid(context))
 			return 231;
 		var emptyEditor = new TextEditorState(fonts, "");
@@ -4691,6 +4692,61 @@ class FrameworkSmoke {
 		uiContext.key(UiEventKind.KeyDown, UiKey.Enter);
 		if (disabledRuns != 0)
 			return false;
+		return true;
+	}
+
+	static function sidebarValid(context:UiContext):Bool {
+		var model = new nativekit.ui.widgets.sidebar.SidebarModel();
+		var files = 0, search = 0;
+		model.register("search", function() { search++; return new Text("Search content"); },
+			new nativekit.ui.widgets.sidebar.SidebarModeOptions("Search", 10, true, 320));
+		model.register("files", function() { files++; return new Text("Files content"); },
+			new nativekit.ui.widgets.sidebar.SidebarModeOptions("Files", 0, true, 240));
+		model.select("files");
+		if (files != 0 || search != 0 || model.modes[0].id != "files") return false;
+		var view = new nativekit.ui.widgets.sidebar.SidebarHost("sidebar-regression", model, function(id) { model.select(id); });
+		context.submit(view, new LayoutFrame(240, 240));
+		if (files != 1 || search != 0) return false;
+		model.select("search");
+		context.submit(view, new LayoutFrame(320, 240));
+		var filesMode = model.find("files");
+		if (filesMode == null || files != 1 || search != 1 || filesMode.width != 240) return false;
+		model.setVisible(false);
+		context.submit(view, new LayoutFrame(320, 240));
+		if (files != 1 || search != 1) return false;
+		var state = model.encode(), restored = new nativekit.ui.widgets.sidebar.SidebarModel();
+		if (!restored.restore(state)) return false;
+		restored.register("files", function() return new Text("Files"), new nativekit.ui.widgets.sidebar.SidebarModeOptions("Files"));
+		restored.register("search", function() return new Text("Search"), new nativekit.ui.widgets.sidebar.SidebarModeOptions("Search"));
+		var searchMode = restored.find("search");
+		if (searchMode == null || restored.activeId != "search" || restored.visible || searchMode.width != 320) return false;
+		var before = restored.encode();
+		for (invalid in ["2|search|1|", "1|search|1|search,NaN,1", "1|search|1|search,320oops,1", "1|search|1|search,320,1;search,240,1"])
+			if (restored.restore(invalid) || restored.encode() != before) return false;
+		if (!restored.setModeVisible("search", false)) return false;
+		var selected = restored.selected();
+		if (selected == null || selected.id != "files") return false;
+		var dock = new DockWorkspaceModel();
+		dock.register(new DockPanelDescriptor("sidebar", "Sidebar"));
+		dock.register(new DockPanelDescriptor("editor", "Editor"));
+		dock.setDefaultLayout(DockNode.Split(DockSplitAxis.Horizontal, 0.25, DockNode.Panel("sidebar"), DockNode.Panel("editor")));
+		if (!dock.setPanelWidth("sidebar", 320, 1000)) return false;
+		switch dock.root { case Split(_, ratio, _, _): if (ratio != 0.32) return false; case _: return false; }
+		if (!dock.setPanelWidth("editor", 500, 1000, 8)) return false;
+		switch dock.root { case Split(_, ratio, _, _): if (Math.abs(ratio - 0.492) > 0.0001) return false; case _: return false; }
+		dock.register(new DockPanelDescriptor("outer", "Outer"));
+		dock.setDefaultLayout(DockNode.Split(DockSplitAxis.Horizontal, 0.6,
+			DockNode.Split(DockSplitAxis.Horizontal, 0.2, DockNode.Panel("sidebar"), DockNode.Panel("editor")), DockNode.Panel("outer")));
+		if (!dock.setPanelWidth("sidebar", 240, 1000, 8)) return false;
+		switch dock.root { case Split(_, outerRatio, Split(_, innerRatio, _, _), _):
+			if (outerRatio != 0.6 || Math.abs(innerRatio - 0.4) > 0.0001) return false;
+			case _: return false;
+		}
+		if (!restored.unregister("search") || !restored.restore("1|future|1|future,360,1")) return false;
+		restored.register("future", function() return new Text("Future"), new nativekit.ui.widgets.sidebar.SidebarModeOptions("Future"));
+		var future = restored.selected();
+		if (future == null || future.id != "future" || future.width != 360) return false;
+		trace("PASS: sidebar lazy providers, mode widths, deferred registration and atomic persistence");
 		return true;
 	}
 

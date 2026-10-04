@@ -182,6 +182,35 @@ class DockWorkspaceModel {
 		return true;
 	}
 
+	/** Resize the nearest horizontal split; supply the mounted layout's divider and minimum extents. */
+	public function setPanelWidth(panelId:String, width:Float, workspaceWidth:Float, dividerExtent:Float = 0.0, minimumExtent:Float = 0.0):Bool {
+		if (width <= 0 || workspaceWidth <= 0 || width - width != 0 || workspaceWidth - workspaceWidth != 0 ||
+			dividerExtent < 0 || minimumExtent < 0 || dividerExtent - dividerExtent != 0 || minimumExtent - minimumExtent != 0)
+			return false;
+		return resizePanelWidth(root, panelId, width, workspaceWidth, dividerExtent, minimumExtent, []);
+	}
+	function resizePanelWidth(node:DockNode, id:String, width:Float, extent:Float, divider:Float, minimum:Float, path:Array<Int>):Bool {
+		return switch node {
+			case Split(axis, ratio, first, second):
+				var inFirst = DockNodeTools.contains(first, id), inSecond = DockNodeTools.contains(second, id);
+				if (!inFirst && !inSecond) false;
+				else {
+					var branch = inFirst ? 0 : 1;
+					path.push(branch);
+					var firstExtent = Math.max(minimum, Math.min(ratio * extent, Math.max(minimum, extent - minimum - divider)));
+					var childExtent = axis == DockSplitAxis.Horizontal ? (inFirst ? firstExtent : Math.max(0.0, extent - firstExtent - divider)) : extent;
+					var found = resizePanelWidth(inFirst ? first : second, id, width, childExtent, divider, minimum, path);
+					path.pop();
+					if (found) true;
+					else if (axis == DockSplitAxis.Horizontal) {
+						setSplitRatio(path, inFirst ? width / extent : (extent - width - divider) / extent);
+						true;
+					} else false;
+				}
+			case _: false;
+		};
+	}
+
 	public function snapshot():DockWorkspaceSnapshot
 		return new DockWorkspaceSnapshot(root, activePanelId);
 

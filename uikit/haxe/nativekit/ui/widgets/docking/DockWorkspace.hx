@@ -41,6 +41,8 @@ import nativekit.ui.style.StyleState;
 
 /** Renders a DockWorkspaceModel using split panes, tab groups, and lazy panels. */
 class DockWorkspace implements View {
+	public static inline final DividerExtent = 8.0;
+	public static inline final MinimumHorizontalExtent = 190.0;
 	public final key:String;
 	public final model:DockWorkspaceModel;
 	public var interaction(default, null):DockWorkspaceInteraction;
@@ -227,8 +229,8 @@ class DockWorkspace implements View {
 		var available = horizontal ? availableWidth : availableHeight;
 		if (available <= 0.0)
 			available = 1000.0;
-		var minimum = horizontal ? 190.0 : 120.0;
-		var divider = 8.0;
+		var minimum = horizontal ? MinimumHorizontalExtent : 120.0;
+		var divider = DividerExtent;
 		var maximum = available - minimum - divider;
 		if (maximum < minimum)
 			maximum = minimum;
