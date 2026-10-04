@@ -78,6 +78,11 @@ class SheetCoreSmoke {
 		failure("sheet.invalid-outline", function() { var value = region.withHole([Segment.arc(new Point2(6.5, 5), 1, 0, -2 * Math.PI)]); });
 		failure("sheet.invalid-outline", function() { var value = cut.withHole([Segment.arc(new Point2(4.5, 5), 1, 0, -2 * Math.PI)]); });
 		failure("sheet.invalid-outline", function() { var value = cut.withHole([Segment.arc(new Point2(4, 5), 0.5, 0, -2 * Math.PI)]); });
+		var tangent = Segment.line(new Point2(-1, 49.7), new Point2(3, 49.7));
+		var smallCircle = Segment.arc(new Point2(1, 50), 0.3, 0, 2 * Math.PI);
+		var contacts = OutlineGeometry.intersections(tangent, smallCircle);
+		near(contacts.length, 1, "translated small circle has one tangent contact");
+		near(contacts[0].x, 1, "tangent projection retains exact centre coordinate");
 		var straight = WallOutline.rectangle(10, 10);
 		var straightCut = straight.withHole([Segment.arc(new Point2(5, 5), 2, 0, -2 * Math.PI)]);
 		near(straightCut.area(), 100 - 4 * Math.PI, "line/arc region");

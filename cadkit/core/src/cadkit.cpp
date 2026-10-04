@@ -6,6 +6,10 @@
 #include <BRepLib.hxx>
 #include <BRepTools_WireExplorer.hxx>
 #include <ElSLib.hxx>
+#include <GeomConvert.hxx>
+#include <Geom_BSplineCurve.hxx>
+#include <Geom_TrimmedCurve.hxx>
+#include <NCollection_Array2.hxx>
 #include <Geom2dConvert.hxx>
 #include <Geom2d_BSplineCurve.hxx>
 #include <Geom2d_TrimmedCurve.hxx>
@@ -2154,8 +2158,8 @@ extern "C" CADKIT_API cad_result cad_sheet_bend_region_operation(
     *out_operation = 0;
     if (!std::isfinite(thickness) || thickness <= 0 || !std::isfinite(angle) ||
         std::abs(angle) <= 1e-15 || std::abs(angle) >= 2 * std::acos(-1.0) ||
-        !std::isfinite(allowance) || allowance <= 0 || !std::isfinite(inner_radius) || inner_radius <= 0)
-        return fail(CAD_ERROR_INVALID_ARGUMENT, "mapped bend needs positive thickness, allowance and radius and a nonzero angle below a full turn");
+        !std::isfinite(allowance) || allowance <= 0 || !std::isfinite(inner_radius) || inner_radius < 0)
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "mapped bend needs positive thickness and allowance, nonnegative radius and a nonzero angle below a full turn");
     TopoDS_Shape source;
     const auto copied = copy_shape(profile, source);
     if (copied != CAD_OK) return copied;
@@ -2182,6 +2186,8 @@ extern "C" CADKIT_API cad_result cad_sheet_bend_region_operation(
         std::vector<TopoDS_Wire> source_wires{outer};
         for (TopExp_Explorer explorer(face, TopAbs_WIRE); explorer.More(); explorer.Next())
             if (!explorer.Current().IsSame(outer)) source_wires.push_back(TopoDS::Wire(explorer.Current()));
+        if (inner_radius == 0 && source_wires.size() != 1)
+            return fail(CAD_ERROR_INVALID_ARGUMENT, "collapsed-axis radial regions must be decomposed into hole-free sectors");
         for (const auto& wire : source_wires) {
             BRepBuilderAPI_MakeWire builders[2];
             for (BRepTools_WireExplorer explorer(wire, face); explorer.More(); explorer.Next()) {
@@ -2196,23 +2202,44 @@ extern "C" CADKIT_API cad_result cad_sheet_bend_region_operation(
                     mapped->SetPole(pole, gp_Pnt2d(-angle * point.X() / allowance, point.Y()));
                 }
                 TopoDS_Edge radial_edges[2];
-                for (int skin = 0; skin < 2; ++skin) {
+                for (int skin = inner_radius == 0 ? 1 : 0; skin < 2; ++skin) {
                     radial_edges[skin] = BRepBuilderAPI_MakeEdge(mapped, surfaces[skin]).Edge();
                     if (!BRepLib::BuildCurves3d(radial_edges[skin], 1e-8))
                         return fail(CAD_ERROR_OPERATION_FAILED, "mapped boundary 3D curve could not meet tolerance");
                     auto oriented = radial_edges[skin]; oriented.Orientation(edge.Orientation());
                     builders[skin].Add(oriented);
                 }
-                auto side = BRepFill::Face(radial_edges[0], radial_edges[1]);
+                TopoDS_Face side;
+                if (inner_radius > 0) side = BRepFill::Face(radial_edges[0], radial_edges[1]);
+                else {
+                    // A ruled surface reaches the axis directly. Its constant-y cap is a
+                    // valid degenerate surface edge, rather than a zero-radius cylinder.
+                    double curve_first = 0, curve_last = 0;
+                    auto outer_curve = BRep_Tool::Curve(radial_edges[1], curve_first, curve_last);
+                    auto spline = GeomConvert::CurveToBSplineCurve(new Geom_TrimmedCurve(outer_curve, curve_first, curve_last));
+                    NCollection_Array2<gp_Pnt> poles(1, spline->NbPoles(), 1, 2);
+                    NCollection_Array2<double> weights(1, spline->NbPoles(), 1, 2);
+                    for (int pole = 1; pole <= spline->NbPoles(); ++pole) {
+                        const auto point = spline->Pole(pole);
+                        poles(pole, 1) = gp_Pnt(0, point.Y(), axes.Location().Z());
+                        poles(pole, 2) = point;
+                        weights(pole, 1) = weights(pole, 2) = spline->Weight(pole);
+                    }
+                    NCollection_Array1<double> radial_knots(1, 2); radial_knots(1) = 0; radial_knots(2) = 1;
+                    NCollection_Array1<int> radial_mults(1, 2); radial_mults(1) = radial_mults(2) = 2;
+                    occ::handle<Geom_BSplineSurface> ruled = new Geom_BSplineSurface(
+                        poles, weights, spline->Knots(), radial_knots, spline->Multiplicities(), radial_mults, spline->Degree(), 1);
+                    side = BRepBuilderAPI_MakeFace(ruled, spline->FirstParameter(), spline->LastParameter(), 0, 1, 1e-8).Face();
+                }
                 sewing.Add(side); data.generated.push_back({edge, side});
             }
-            for (int skin = 0; skin < 2; ++skin) {
+            for (int skin = inner_radius == 0 ? 1 : 0; skin < 2; ++skin) {
                 auto mapped_wire = builders[skin].Wire();
                 if (up) mapped_wire.Reverse();
                 wires[skin].push_back(mapped_wire);
             }
         }
-        for (int skin = 0; skin < 2; ++skin) {
+        for (int skin = inner_radius == 0 ? 1 : 0; skin < 2; ++skin) {
             BRepBuilderAPI_MakeFace builder(surfaces[skin], wires[skin][0], true);
             for (std::size_t hole = 1; hole < wires[skin].size(); ++hole) builder.Add(wires[skin][hole]);
             auto skin_face = builder.Face();
@@ -2238,6 +2265,8 @@ extern "C" CADKIT_API cad_result cad_sheet_bend_region_operation(
         return fail(CAD_ERROR_OUT_OF_MEMORY, error);
     } catch (const std::exception& error) {
         return fail(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (...) {
+        return fail(CAD_ERROR_OPERATION_FAILED, "unknown mapped bend exception");
     }
 }
 

@@ -1,6 +1,6 @@
 package cadkit.sheetmetal;
 
-/** Analytic subtraction of exact planar regions; wall callers require one connected result. */
+/** Analytic planar difference and intersection; wall callers require one connected result. */
 class OutlineDifference {
 	static inline var EPS:Float = 1e-8;
 	public static function subtract(source:WallOutline, tool:WallOutline, owner:String):WallOutline {
@@ -11,9 +11,15 @@ class OutlineDifference {
 	}
 	/** Bend strips may have separate patches joined through their neighbouring walls. */
 	public static function regions(source:WallOutline, tool:WallOutline, owner:String):Array<WallOutline> {
+		return combine(source, tool, owner, false);
+	}
+	public static function intersection(source:WallOutline, tool:WallOutline, owner:String):Array<WallOutline> {
+		return combine(source, tool, owner, true);
+	}
+	static function combine(source:WallOutline, tool:WallOutline, owner:String, intersection:Bool):Array<WallOutline> {
 		var pieces:Array<OutlinePiece> = [];
-		collect(source, tool, false, owner, pieces);
-		collect(tool, source, true, owner, pieces);
+		collect(source, tool, false, owner, pieces, intersection);
+		collect(tool, source, true, owner, pieces, intersection);
 		var loops:Array<Array<Segment>> = [];
 		var ids:Array<Array<String>> = [];
 		while (pieces.length > 0) {
@@ -53,7 +59,7 @@ class OutlineDifference {
 		return result;
 	}
 
-	static function collect(outline:WallOutline, other:WallOutline, reverse:Bool, owner:String, result:Array<OutlinePiece>):Void {
+	static function collect(outline:WallOutline, other:WallOutline, reverse:Bool, owner:String, result:Array<OutlinePiece>, intersection:Bool):Void {
 		var boundaries = outline.loops();
 		for (i in 0...boundaries.length) for (j in 0...boundaries[i].length) {
 			var segment = boundaries[i][j];
@@ -75,9 +81,9 @@ class OutlineDifference {
 				var distance = Math.min(1e-6, piece.length() * 1e-4);
 				var left = new Point2(midpoint.x - tangent.y * distance, midpoint.y + tangent.x * distance);
 				var right = new Point2(midpoint.x + tangent.y * distance, midpoint.y - tangent.x * distance);
-				var leftMaterial = reverse ? other.contains(left) && !outline.contains(left)
+				var leftMaterial = intersection ? outline.contains(left) && other.contains(left) : reverse ? other.contains(left) && !outline.contains(left)
 					: outline.contains(left) && !other.contains(left);
-				var rightMaterial = reverse ? other.contains(right) && !outline.contains(right)
+				var rightMaterial = intersection ? outline.contains(right) && other.contains(right) : reverse ? other.contains(right) && !outline.contains(right)
 					: outline.contains(right) && !other.contains(right);
 				if (leftMaterial == rightMaterial) continue;
 				append(retained, leftMaterial ? piece : reversed(piece));

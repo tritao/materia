@@ -17,6 +17,7 @@ class SheetSolid {
 	public static function build(sheet:Sheet, state:SheetState):Shape {
 		var evaluation = sheet.evaluate(state);
 		var pieces:Array<Shape> = [];
+		var radialCuts:Array<Shape> = [];
 		var result:Null<Shape> = null;
 		try {
 			for (wall in sheet.walls()) {
@@ -28,11 +29,17 @@ class SheetSolid {
 			}
 			for (bend in sheet.bends()) {
 				var zone = evaluation.bend(bend.id);
-				var local = bendSolid(bend, zone);
+				var collapsed = bend.hasCuts() && zone.angle != 0 && zone.curvedInnerRadius() == 0;
+				var local = bendSolid(bend, zone, collapsed);
 				try {
 					pieces.push(zone.frame.apply(local));
 					local.close();
 				} catch (error:Dynamic) { local.close(); throw error; }
+				if (collapsed) for (region in BendRadialCuts.regions(bend, zone.allowance)) {
+					var cutter = bendRegionSolid(bend, zone, region, true);
+					try { radialCuts.push(zone.frame.apply(cutter)); cutter.close(); }
+					catch (error:Dynamic) { cutter.close(); throw error; }
+				}
 			}
 			result = pieces[0].cloneShape();
 			for (i in 1...pieces.length) {
@@ -40,13 +47,18 @@ class SheetSolid {
 				result.close();
 				result = combined;
 			}
+			// Axis contact is interior only after the hem and walls are united. Cut sectors
+			// derive from graph material; no feature edits or reuses a predecessor solid.
+			for (cutter in radialCuts) { var trimmed = result.cut(cutter); result.close(); result = trimmed; }
 			if (CadKit.shapeValidChecked(result.borrowHandle()) == 0)
 				throw new SheetDiagnosis("sheet.invalid-solid", "Fusing the evaluated wall and bend solids produced an invalid shape");
 			for (piece in pieces) piece.close();
+			for (cutter in radialCuts) cutter.close();
 			return result;
 		} catch (error:Dynamic) {
 			if (result != null) result.close();
 			for (piece in pieces) piece.close();
+			for (cutter in radialCuts) cutter.close();
 			throw error;
 		}
 	}
@@ -160,8 +172,8 @@ class SheetSolid {
 		throw new SheetDiagnosis("sheet.solid-naming", "A generated face is missing from the extrusion", [id]);
 	}
 
-	static function bendSolid(bend:Bend, zone:BendZone):Shape {
-		if (bend.hasCuts()) return trimmedBendSolid(bend, zone);
+	static function bendSolid(bend:Bend, zone:BendZone, fullStrip:Bool = false):Shape {
+		if (bend.hasCuts() && !fullStrip) return trimmedBendSolid(bend, zone);
 		if (zone.allowance <= 0)
 			throw new SheetDiagnosis("sheet.zero-bend-allowance", "The rule gives zero neutral length for a nonzero bend", ["bend:" + bend.id]);
 		var sketch:Sketch;
@@ -214,7 +226,6 @@ class SheetSolid {
 		try {
 			if (zone.angle == 0) operation = new Operation(CadKit.shapeExtrudeOperationChecked(sketch.shape.borrowHandle(), new Vector(0, 0, -zone.thickness).native()));
 			else {
-				if (zone.curvedInnerRadius() <= 0) throw new SheetDiagnosis("sheet.collapsed-bend-cut", "Trimmed zero-radius bend skins require collapsed-axis topology", [prefix]);
 				try { operation = new Operation(CadKit.sheetBendRegionOperationChecked(sketch.shape.borrowHandle(), zone.thickness, zone.angle, zone.allowance, zone.curvedInnerRadius())); }
 				catch (error:Dynamic) { throw new SheetDiagnosis("sheet.bend-cut-solid", "Mapped bend region failed: " + Std.string(error), [prefix]); }
 			}

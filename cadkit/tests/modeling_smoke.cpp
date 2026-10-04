@@ -222,6 +222,13 @@ int main() {
         }
         cad_operation_destroy(mapped);
     }
+    cad_shape radial_profile=0; ok(cad_planar_face(strip_wire,nullptr,0,&radial_profile)); keep(radial_profile);
+    for (double bend_angle : {std::acos(-1.0), -std::acos(-1.0)}) {
+        cad_operation radial=0; ok(cad_sheet_bend_region_operation(radial_profile,1.5,bend_angle,4,0,&radial));
+        cad_shape sector=0; ok(cad_operation_result_shape(radial,&sector)); keep(sector); valid(sector);
+        double sector_volume=0; ok(cad_shape_volume_with_tolerance(sector,1e-10,&sector_volume));
+        near(sector_volume,20*std::abs(bend_angle)*1.5*1.5/2,1e-6); cad_operation_destroy(radial);
+    }
     cad_operation invalid_mapped=99;
     check(cad_sheet_bend_region_operation(strip_face,1.5,0,4,1,&invalid_mapped)==CAD_ERROR_INVALID_ARGUMENT && invalid_mapped==0);
     for(auto shape:owned) cad_shape_destroy(shape);

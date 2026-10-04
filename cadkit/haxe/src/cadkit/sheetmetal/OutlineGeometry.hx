@@ -126,13 +126,18 @@ class OutlineGeometry {
 		var px = line.start.x - center.x;
 		var py = line.start.y - center.y;
 		var aa = dx * dx + dy * dy;
-		var bb = 2 * (dx * px + dy * py);
-		var cc = px * px + py * py - arc.radius * arc.radius;
-		var discriminant = bb * bb - 4 * aa * cc;
-		if (discriminant < -EPS) return [];
-		var root = Math.sqrt(Math.max(0, discriminant));
+		// Project onto the infinite line first; the quadratic discriminant loses
+		// tangency to cancellation for translated small circles.
+		var projection = -(dx * px + dy * py) / aa;
+		var closestX = px + projection * dx; var closestY = py + projection * dy;
+		var distanceSquared = closestX * closestX + closestY * closestY;
+		var gap = arc.radius * arc.radius - distanceSquared;
+		var roundoff = 1e-12 * Math.max(arc.radius * arc.radius, distanceSquared);
+		if (gap < -roundoff) return [];
+		if (Math.abs(gap) <= roundoff) gap = 0;
+		var root = Math.sqrt(Math.max(0, gap) / aa);
 		var result:Array<Point2> = [];
-		for (t in [(-bb - root) / (2 * aa), (-bb + root) / (2 * aa)])
+		for (t in (root == 0 ? [projection] : [projection - root, projection + root]))
 			if (t >= -1e-10 && t <= 1 + 1e-10) {
 				var p = new Point2(line.start.x + t * dx, line.start.y + t * dy);
 				if (onArc(arc, p)) result.push(p);

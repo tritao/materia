@@ -99,19 +99,25 @@ class Sheet {
 	function validateMaterial(b:Bend):Void {
 		var a = BendSeam.intervals(wall(b.wallA).outline, b.edgeA.span, true);
 		var c = BendSeam.intervals(wall(b.wallB).outline, b.edgeB.span, true);
+		var bridge = true;
 		var regionA:Array<SeamInterval> = [{first: 0, last: 1}]; var regionB:Array<SeamInterval> = [{first: 0, last: 1}];
 		if (b.hasCuts()) {
-			regionA = []; regionB = []; var allowance = bendAllowance(b); var width = b.edgeA.span.length();
+			bridge = false; regionA = []; regionB = []; var allowance = bendAllowance(b); var width = b.edgeA.span.length();
 			var seamA = Segment.line(new Point2(0, 0), new Point2(0, width));
 			var seamB = Segment.line(new Point2(allowance, width), new Point2(allowance, 0));
 			for (region in b.materialRegions(allowance)) {
-				for (interval in BendSeam.intervals(region, seamA, false)) regionA.push(interval);
-				for (interval in BendSeam.intervals(region, seamB, false)) regionB.push(interval);
+				var partA = BendSeam.intervals(region, seamA, false); var partB = BendSeam.intervals(region, seamB, false);
+				if (partA.length == 0 && (isRipped(b.id) || partB.length == 0))
+					throw new SheetDiagnosis("sheet.cut-isolated-bend-patch", "Cut leaves bend material detached from its walls", ["bend:" + b.id, region.identity(0, 0)]);
+				if (partA.length > 0 && partB.length > 0) bridge = true;
+				for (interval in partA) regionA.push(interval); for (interval in partB) regionB.push(interval);
 			}
 			regionA = BendSeam.union(regionA); regionB = BendSeam.union(regionB);
 		}
 		if (a.length == 0 || regionA.length == 0 || (!isRipped(b.id) && (c.length == 0 || regionB.length == 0)))
 			throw new SheetDiagnosis("sheet.cut-seam-disconnected", "Bend material has no connection at its nominal seam", ["bend:" + b.id]);
+		if (!isRipped(b.id) && !bridge)
+			throw new SheetDiagnosis("sheet.cut-bend-disconnected", "Cut removes every material bridge across an active bend", ["bend:" + b.id]);
 		if (!BendSeam.matches(a, regionA) || (!isRipped(b.id) && !BendSeam.matches(c, regionB)))
 			throw new SheetDiagnosis("sheet.cut-seam-mismatch", "Wall and bend material intervals differ at their shared seam", ["bend:" + b.id]);
 	}

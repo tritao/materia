@@ -357,7 +357,8 @@ CADKIT_API cad_result cad_shape_extrude_operation(
     cad_operation* out_operation CADKIT_HXI_OUT CADKIT_HXI_OWNED);
 
 /* Map one exact planar XY developed bend region onto its radial thickness.
- * Cylinder pcurves remain analytic; 3D edge curves use OCCT's 1e-8 tolerance. */
+ * Cylinder pcurves remain analytic; 3D edge curves use OCCT's 1e-8 tolerance.
+ * At zero inner radius, the input is a hole-free Y-monotone radial sector. */
 CADKIT_API cad_result cad_sheet_bend_region_operation(
     cad_shape profile,
     double thickness,
