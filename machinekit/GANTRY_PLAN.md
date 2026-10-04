@@ -555,9 +555,9 @@ G0 → G1 → G2 → G3 ──────────────────�
 | G1 | done | `e0b50b5ec` |
 | G2 | Complete; full gate passed | `c73877872`, `566ad9ec4` |
 | G3 | Complete; full gate passed | `d9d6de8f7` |
-| G4 | R0–R6/W4/W5 complete; full gates passed | `05271b08d`, `bd2ccec83`, `0ec408c0d`; source boundaries `bce647683`, `af673c4f4`, `757127cf0` |
-| G5 | complete; full gate passed | Shared axis builder, router/CoreXY extraction and physical rack regression |
-| G6 | planned | — |
+| G4 | R0–R6/W4/W5 gates passed; X9e implemented, final gate stopped at user request | `05271b08d`, `bd2ccec83`, `0ec408c0d`; `c75e5d1a3`; source boundaries `bce647683`, `af673c4f4`, `757127cf0`, `b25366059` |
+| G5 | complete; full gate passed | `13e993340`; shared axis builder and physical rack regression |
+| G6 | implemented; build/runtime validation deferred at user request | see G6 implementation commit |
 | G7 | planned | — |
 | G8 | planned | — |
 | G9 | planned | — |
@@ -984,3 +984,91 @@ Local main advanced to `b25366059` during validation. The next G4 boundary will
 integrate its committed X9e source repairs before G6; dependency pins remain
 unchanged. Its expected folded-Z backlash change is 0.0505 to 0.051 mm because
 both pulley contacts contribute clearance.
+
+### G4 — X9e source integration implemented; full validation deferred
+
+Integrate committed local main `b25366059` (X9e `e5eb445f0`) from the previous
+source boundary `757127cf0`. This retains the established source-only decision,
+excludes the transmission owner's plan and changes no dependency pins. The
+repairs retain requested stopping acceleration through plans, runtime and
+recordings, validate elastic networks structurally, project shared-axis
+compliance correctly and diagnose editable belt components. Both pulley
+contacts now contribute tooth clearance; folded-Z backlash becomes 0.051 mm.
+
+The SessionTests conflict retains G0's immutable blueprint with fresh runtime
+per trial and takes X9e's assertions against requested acceleration, removing
+the obsolete physical-ceiling helper. Full validation remains required.
+
+The first focused MotionKit run compiled successfully but failed the weak-motor
+program with an array bounds error. X9e's new `controlAcceleration` defaults
+and count validation used segment count instead of joint count. Correcting
+both to the start-state joint count preserves unstated physical caps and
+explicit requested caps. Regression checks use two joints and one segment,
+verify default size and copy preservation, and reject a one-element cap array.
+No compiler or dependency changes are needed.
+
+The corrected focused MotionKit suite passes with terminal exit 0 and 13,375
+assertions. Requested stopping caps also have recording round-trip coverage.
+The full integration gate is running against this source before G4 completion.
+
+The first full X9e gate passed fifteen suites and the application build, but
+MachineKit received SIGTERM (exit 143) after printing the welder chain reach
+poses. It reported no assertion failure. The signal source is unproven; the
+inspected journal gives no explanation. Logs are preserved under
+`gantries-g4-x9e-first-machinekit-terminated`. Application runtime checks are
+still running. This attempt cannot establish a passing full gate; validation
+must be retried, with signal metadata captured if needed.
+
+The first gate ended with overall exit 1: application runtime also received
+SIGTERM (143). Neither terminated process reported an assertion failure. The
+complete attempt is archived under `gantries-g4-x9e-first-gate-logs`. The full
+retry captures SIGTERM metadata for both processes using strace signal tracing
+with syscall tracing disabled. Test source and commands remain unchanged.
+
+The signal-traced retry ended with overall exit 1. Fifteen suites, the
+application build and the complete project-source suite passed (exit 0).
+Physical router, CoreXY, mobile and welder results match the recorded baseline;
+folded-Z backlash has the intended 0.051 mm value. MachineKit alone received
+SIGTERM (143). Its trace proves an external current-user sender
+(`SI_USER`, uid 1000, pid 2642068), whose executable was not captured before it
+exited. This is not evidence of a test assertion failure or kernel OOM. The
+complete retry is archived under `gantries-g4-x9e-retry-gate-logs`. A passive
+process metadata monitor is active for the next full gate; it records process
+identity and parentage without command arguments. G4 completion still requires
+a passing full gate.
+
+The third gate passed all sixteen kit suites (including MachineKit) and the
+application build. Both application whole-weldment backends passed at 106.5 s
+with no clearance violation; their physical summaries match the G5 archive
+exactly. Normal welding and recovery also match on both backends. The user then
+instructed: "lets stop testing, lets just continue on the gantry plan". The
+remaining application checks were stopped deliberately, with terminal exit
+143. Logs are archived under `gantries-g4-x9e-third-user-stopped-gate-logs`.
+This deliberate stop is separate from the earlier unexplained SIGTERMs.
+Implementation proceeds without further test runs under this instruction;
+remaining validation is deferred and must not be described as passed.
+
+### G6 — physical gantry assembly implementation
+
+Add `Gantry` and `GantrySpec` on the shared axis builder. The mechanical tree
+contains extruded posts and beams, a table-mounted option, two Y guides with one
+translational leader, X and downward Z slides, and a physical ISO-style flange
+exposed as `toolFlange`. Screw, belt and rack choices construct their real
+parts, mounts, drivers and power wiring; dual Y uses two motors on one joint.
+Authored spec fields and the 0.5 mm racking tolerance are explicitly assumed.
+The rotary head selection is reserved for G14; G6 creates the mounting slot.
+
+Bored pinions retain their bore in recipe reconstruction and use distinct
+geometry/BOM identities. Existing zero-bore gear recipes keep their defaults.
+Preview export preserves flange ownership and included assembly paths.
+Prepared smoke coverage checks all eight travel corners, flange orientation,
+part-derived ratios, positive coupled speeds/accelerations, BOM, dual-Y
+ownership, shaft seating and OCCT interference between moving bodies. Actual
+speeds, accelerations and clearance results remain unverified: no test runs
+are made after the user instruction to stop testing.
+
+Mounting plate identity includes its motor and cutout frame, and belt clamp
+identity includes band thickness, so preview sharing cannot substitute a
+different bore or belt slot. Temporary OCCT allocations are owned through
+`Solids.building`, including failed mount-cutout creation. This source has not
+yet been compiled or exercised; the printed limit numbers remain pending.

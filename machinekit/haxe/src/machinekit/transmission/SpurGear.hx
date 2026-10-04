@@ -41,6 +41,8 @@ class SpurGear extends MachineComponent {
 	public final profileShift:Float;
 	/** Tangential backlash allowance at the pitch circle, in millimetres. */
 	public final backlash:Float;
+	/** Shaft bore diameter; zero leaves the original solid gear blank. */
+	public final boreDiameter:Float;
 
 	public final pitchDiameter:Float;
 	public final baseDiameter:Float;
@@ -49,7 +51,7 @@ class SpurGear extends MachineComponent {
 	public final tipToothThickness:Float;
 
 	public function new(moduleSize:Float, teeth:Int, faceWidth:Float, pressureAngle:Float = STANDARD_PRESSURE_ANGLE,
-			profileShift:Float = 0, backlash:Float = 0) {
+			profileShift:Float = 0, backlash:Float = 0, boreDiameter:Float = 0) {
 		if (!(moduleSize > 0)) throw "Spur gear needs a positive module";
 		if (teeth < 6) throw "Spur gear needs at least 6 teeth";
 		if (!(faceWidth > 0)) throw "Spur gear needs a positive face width";
@@ -67,6 +69,8 @@ class SpurGear extends MachineComponent {
 		if (!(rootDiameter > 0)) throw "Spur gear root diameter must be positive; use a larger module or more teeth";
 		var toothThickness = Math.PI * moduleSize / 2 + 2 * moduleSize * profileShift * Math.tan(pressureAngle) - backlash;
 		if (!(toothThickness > 0)) throw "Spur gear backlash leaves no tooth thickness";
+		if (!Math.isFinite(boreDiameter) || boreDiameter < 0 || boreDiameter >= rootDiameter)
+			throw "Spur gear bore must be non-negative and leave material inside the tooth roots";
 		var tipToothThickness = outsideDiameter * (toothThickness / pitchDiameter
 			+ involuteRollAngle(pitchDiameter / 2, baseDiameter / 2)
 			- involuteRollAngle(outsideDiameter / 2, baseDiameter / 2));
@@ -75,7 +79,8 @@ class SpurGear extends MachineComponent {
 		var moduleText = Dimension.format(moduleSize);
 		var shiftSuffix = profileShift == 0 ? "" : '-X${Dimension.format(profileShift)}';
 		var backlashSuffix = backlash == 0 ? "" : '-B${Dimension.format(backlash)}';
-		var designation = 'SPUR-M$moduleText-${teeth}T$shiftSuffix$backlashSuffix';
+		var boreSuffix = boreDiameter == 0 ? "" : "-D" + Dimension.format(boreDiameter);
+		var designation = 'SPUR-M$moduleText-${teeth}T$shiftSuffix$backlashSuffix$boreSuffix';
 		var description = 'Spur gear module $moduleText, ${teeth} teeth${profileShift == 0 ? "" : ", profile shift ${Dimension.format(profileShift)}"}${backlash == 0 ? "" : ", backlash ${Dimension.format(backlash)} mm"}';
 		super(designation, description, "steel");
 		this.moduleSize = moduleSize;
@@ -84,6 +89,7 @@ class SpurGear extends MachineComponent {
 		this.faceWidth = faceWidth;
 		this.profileShift = profileShift;
 		this.backlash = backlash;
+		this.boreDiameter = boreDiameter;
 		this.pitchDiameter = pitchDiameter;
 		this.baseDiameter = baseDiameter;
 		this.outsideDiameter = outsideDiameter;
@@ -154,8 +160,15 @@ class SpurGear extends MachineComponent {
 
 	override public function hasGeometry():Bool return true;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Part.prism(profile(), 0, faceWidth);
+	override public function geometry(detail:ComponentDetail = Preview):Part {
+		var body = Part.prism(profile(), 0, faceWidth);
+		if (boreDiameter == 0) return body;
+		return Solids.building([body], owned -> {
+			var bore = Solids.named(Part.cylinderSpan(boreDiameter / 2, -0.1, faceWidth + 0.1), "bore");
+			owned.push(bore);
+			return Solids.cut(body, [bore]);
+		});
+	}
 
 	private static var recipeTypeCache:Null<ComponentType>;
 
@@ -167,9 +180,9 @@ class SpurGear extends MachineComponent {
 				new ComponentParameter("pressureAngle", Angle, Number(STANDARD_PRESSURE_ANGLE), "rad",
 					MIN_PRESSURE_ANGLE, MAX_PRESSURE_ANGLE),
 				ComponentRecipeSupport.scalar("profileShift", 0, -0.999, 1.249),
-				ComponentRecipeSupport.length("backlash", 0)
+				ComponentRecipeSupport.length("backlash", 0), ComponentRecipeSupport.length("boreDiameter", 0)
 			], v -> new SpurGear(v.number("moduleSize"), v.integer("teeth"), v.number("faceWidth"),
-				v.number("pressureAngle"), v.number("profileShift"), v.number("backlash")), true);
+				v.number("pressureAngle"), v.number("profileShift"), v.number("backlash"), v.number("boreDiameter")), true);
 		return recipeTypeCache;
 	}
 
@@ -178,7 +191,7 @@ class SpurGear extends MachineComponent {
 	override public function values():ComponentValues return new ComponentValues()
 		.setNumber("moduleSize", moduleSize).setInteger("teeth", teeth).setNumber("faceWidth", faceWidth)
 		.setNumber("pressureAngle", pressureAngle).setNumber("profileShift", profileShift)
-		.setNumber("backlash", backlash).setToken("material", materialSpec());
+		.setNumber("backlash", backlash).setNumber("boreDiameter", boreDiameter).setToken("material", materialSpec());
 
 	/** Full-gear outline as one closed loop, one tooth centred on each multiple of 2*pi/teeth. */
 	function profile():Array<Vector> {
