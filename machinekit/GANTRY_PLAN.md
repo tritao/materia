@@ -2940,3 +2940,18 @@ No builds/tests ran. Transport-failure recovery and uncertain-batch/session
 recovery require Phase C coverage. Cancellation requires normal safety recovery
 before new homing; router fixture and Nucleo controls/GPIO remain unfinished.
 G13 is still incomplete.
+
+### G13 — generic scoped-stop hookup and virtual sensor installation
+
+MotionSystem.configureRuntimeHoming now discovers the optional core
+HomingStopControl interface on its side controller and passes that callback to
+RuntimeHomingDriver. DeviceHomingSides implements the interface and provides
+an install factory that attaches protocol-backed switch polling and side controls
+to either serial or virtual native runtimes. Virtual simulation runtimes now
+name their source clock robotkit.device, matching physical device observations.
+The hookup keeps core/motion/simulation free of a dependency on serial classes;
+the deployment fixture explicitly installs its device bindings.
+
+No builds/tests ran. The router virtual-device fixture still needs to invoke this
+factory with explicit wiring and skew budget. Hardware controls/GPIO, uncertain
+transaction recovery and Phase C validation remain pending; G13 is incomplete.

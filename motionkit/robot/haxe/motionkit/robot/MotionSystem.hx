@@ -461,7 +461,12 @@ class MotionSystem {
       afterLatch:Void -> Void, ?sides:robotkit.runtime.HomingSideControl):Void {
     if (isMoving()) throw "Cannot replace a homing driver during motion";
     if (homingAxes.length == 0) throw "Machine has no physical home switches";
-    homingDriver = new RuntimeHomingDriver(robot, runtime, homingAxes, axes, afterLatch);
+    var scopedStop:Null<Void -> Bool> = null;
+    if (sides != null && Std.isOfType(sides, robotkit.runtime.HomingStopControl)) {
+      var stopControl:robotkit.runtime.HomingStopControl = cast sides;
+      scopedStop = () -> stopControl.controlledStop();
+    }
+    homingDriver = new RuntimeHomingDriver(robot, runtime, homingAxes, axes, afterLatch, scopedStop);
     homingSides = sides;
   }
 

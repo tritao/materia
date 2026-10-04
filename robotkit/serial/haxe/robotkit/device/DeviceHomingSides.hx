@@ -5,13 +5,14 @@ import RobotKitRuntime;
 import robotkit.runtime.HomingSideControl;
 import robotkit.runtime.HomingControlReadiness;
 import robotkit.runtime.HomingCancellation;
+import robotkit.runtime.HomingStopControl;
 import robotkit.runtime.NativeRuntimeEndpoint;
 import robotkit.runtime.RobotRuntime;
 import robotkit.runtime.RobotRuntimeBlueprint;
 import robotkit.runtime.SwitchDriveBinding;
 
 /** One owner serializes acknowledged physical side controls for a wired device. */
-class DeviceHomingSides implements HomingSideControl implements HomingControlReadiness implements HomingCancellation {
+class DeviceHomingSides implements HomingSideControl implements HomingControlReadiness implements HomingCancellation implements HomingStopControl {
   final runtime:RobotRuntime;
   final endpoint:NativeRuntimeEndpoint;
   final channels:Map<String, Int> = new Map();
@@ -41,6 +42,18 @@ class DeviceHomingSides implements HomingSideControl implements HomingControlRea
       for (input in binding.inputs) if (input.wiring.switchId == contact.id)
         channels.set(contact.id, input.actuatorChannel);
     }
+  }
+
+  /** Bind protocol-backed input sensors and side control to a serial or virtual runtime. */
+  public static function install(runtime:RobotRuntime, blueprint:RobotRuntimeBlueprint,
+      binding:DeviceBinding, skewBound:Float):DeviceHomingSides {
+    if (!Std.isOfType(runtime.endpoint, NativeRuntimeEndpoint))
+      throw "Device homing requires a native device runtime";
+    var endpoint:NativeRuntimeEndpoint = cast runtime.endpoint;
+    var sides = new DeviceHomingSides(runtime, endpoint, blueprint, binding, skewBound);
+    var switches = new DeviceSwitchSensorAdapter(blueprint, runtime, binding);
+    runtime.installSensorPoller(snapshot -> switches.poll(snapshot));
+    return sides;
   }
 
   function enqueue(action:Int, first:Int, second:Int):Void {
