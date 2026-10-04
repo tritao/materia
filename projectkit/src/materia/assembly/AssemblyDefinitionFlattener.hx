@@ -167,6 +167,14 @@ class AssemblyDefinitionFlattener {
 		if (sensor.range != null) copy.range = sensor.range;
 		return copy;
 	}
+	/** Copy physical switch references into a containing namespace. */
+	public static function copySwitch(contact:materia.assembly.AssemblyDefinition.AssemblySwitch,
+			map:String->String):materia.assembly.AssemblyDefinition.AssemblySwitch return {
+		id: map(contact.id), joint: map(contact.joint), part: map(contact.part), connector: contact.connector,
+		trigger: map(contact.trigger), triggerConnector: contact.triggerConnector, role: contact.role,
+		side: contact.side, trip: contact.trip, hysteresis: contact.hysteresis,
+		repeatability: contact.repeatability, seed: contact.seed
+	};
 
 	/** Keep every coordinate and motion-source reference in a network's namespace. */
 	public static function copyElasticNetwork(network:materia.assembly.AssemblyDefinition.AssemblyElasticNetwork,
@@ -288,8 +296,8 @@ class AssemblyDefinitionFlattener {
 		if (switches != null) {
 			if (flat.switches == null) flat.switches = [];
 			for (contact in switches) {
-				var part = endpoint(members, contact.part, contact.connector, prefix);
-				var trigger = endpoint(members, contact.trigger, contact.triggerConnector, prefix);
+				var part = switchEndpoint(members, flat, contact.part, contact.connector, prefix);
+				var trigger = switchEndpoint(members, flat, contact.trigger, contact.triggerConnector, prefix);
 				flat.switches.push({id: scoped(prefix, contact.id), joint: scoped(prefix, contact.joint),
 					part: part.occurrence, connector: part.connector, trigger: trigger.occurrence,
 					triggerConnector: trigger.connector, role: contact.role, side: contact.side,
@@ -316,6 +324,18 @@ class AssemblyDefinitionFlattener {
 			result.set(item.name, endpoint(members, item.occurrence, item.connector, path));
 		}
 		return result;
+	}
+
+	/** Builder side records can name concrete paths below a nested occurrence. */
+	static function switchEndpoint(members:Map<String, FlatMember>, flat:AssemblyDefinition,
+			occurrence:String, connector:String, prefix:String):FlatEndpoint {
+		if (members.exists(occurrence)) return endpoint(members, occurrence, connector, prefix);
+		var path = scoped(prefix, occurrence);
+		for (item in flat.occurrences) if (item.id == path)
+			for (definition in flat.definitions) if (definition.id == item.definition)
+				for (mount in definition.connectors) if (mount.name == connector)
+					return {occurrence: path, connector: connector};
+		throw 'Assembly "$prefix" has a missing switch connector "$occurrence.$connector"';
 	}
 
 	static function endpoint(members:Map<String, FlatMember>, occurrence:String, connector:String, path:String):FlatEndpoint {

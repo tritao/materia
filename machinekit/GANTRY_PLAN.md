@@ -1224,3 +1224,28 @@ These are preparatory changes. MachineAssembly geometry-derived addSwitch,
 its include/rebuild/export paths, Gantry placement and application observer
 installation remain pending. No builds or tests were run; recipe geometry,
 wire compatibility and bridge lowering remain unverified at runtime.
+
+
+### G10 — geometry-derived MachineAssembly switch bindings
+
+Implement `MachineAssembly.addSwitch(id, joint, part, trigger, side)` with
+optional role and deterministic seed. Registration requires a SwitchPart,
+a fixed switch relative to the monitored prismatic joint, and a trigger
+carried by that joint. Project connector separation onto the normalized
+world joint direction to derive trip travel. Reject a trigger path that
+misses the trip connector; reject a trip/repeatability band touching either
+the soft limit or physical end stop. The part supplies hysteresis and
+repeatability rather than independent copied constants.
+
+Refresh these values when describing/exporting the current assembly so
+part or connector edits change the derived trip. Copy, include, saved
+rebuild, included-module reconstruction and export retain switch records
+and scope their IDs and member references. Canonical sorting includes
+switches. The flattener also resolves concrete member paths in builder side
+records below reusable nested definitions, while retaining exposed-connector
+resolution for ordinary nested endpoints. `check()` reports switch geometry
+errors with the `assembly.switch-geometry` diagnostic.
+
+Gantry switch mounting/trigger parts, placement and simulation observer
+installation remain pending. No builds or tests ran; the geometry projection,
+round-trip paths and end-stop checks are unverified at runtime.
