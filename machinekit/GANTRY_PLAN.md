@@ -1426,3 +1426,20 @@ until real homing establishes references. No synthetic startup latch is added.
 The runtime latch/calibration and HomingDriver connection still need work, so
 router/picker startup remains incomplete. No tests or builds ran; this source
 change and its effects on application startup are unverified.
+
+
+### G11 — validate homing polynomials through authored overtravel
+
+Reference configuration: `e7a3e94fa`. The native polynomial admission check
+widens position bounds by each joint's authored overtravel only for plans
+explicitly flagged RK_PLAN_HOMING. Jog, ordinary plans and legacy segment
+batches keep soft-limit bounds. Velocity/acceleration claims and continuity
+checks retain their existing limits; observed stop/fault bounds are unchanged.
+Missing versioned overtravel means zero, and nonfinite widened endpoints are
+rejected before admission.
+
+This is one part of homing execution. Straight velocity-target homing and its
+stop ramp still use the existing soft-limit handling, and must be integrated
+with purpose-aware control before the homing driver can use them. Coordinate
+calibration and application home startup remain pending. No tests or builds
+ran; no homing travel or stopping behavior is claimed as verified.

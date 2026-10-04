@@ -139,7 +139,7 @@ void evaluate_knot(const RobotRuntime::RuntimeTrajectoryPoint &knot, uint64_t ti
 rk_result validate_appended_path(
     const std::deque<RobotRuntime::RuntimeTrajectoryPoint> &queued,
     const std::vector<RobotRuntime::RuntimeTrajectoryPoint> &added,
-    const rk_robot_runtime_blueprint &blueprint) {
+    const rk_robot_runtime_blueprint &blueprint, bool homing = false) {
     mk_trajectory_handle handle{};
     if (mk_trajectory_create(blueprint.joint_count, &handle) != MK_OK)
         return RK_ERROR_OUT_OF_MEMORY;
@@ -179,8 +179,16 @@ rk_result validate_appended_path(
         limits.position_claimed[joint] = blueprint.struct_size >=
             offsetof(rk_robot_runtime_blueprint, sensor_joint) &&
             blueprint.process_joint[joint] ? 0 : 1;
-        limits.position_lower[joint] = source.lower_limit;
-        limits.position_upper[joint] = source.upper_limit;
+        const bool has_overtravel = blueprint.struct_size >=
+            offsetof(rk_robot_runtime_blueprint, joint_overtravel) + sizeof(blueprint.joint_overtravel);
+        const double travel = homing && has_overtravel ? blueprint.joint_overtravel[joint] : 0.0;
+        limits.position_lower[joint] = source.lower_limit - travel;
+        limits.position_upper[joint] = source.upper_limit + travel;
+        if (!std::isfinite(limits.position_lower[joint]) ||
+            !std::isfinite(limits.position_upper[joint])) {
+            mk_trajectory_destroy(handle);
+            return RK_ERROR_LIMIT;
+        }
         limits.max_velocity[joint] = source.max_velocity;
         limits.max_acceleration[joint] = source.max_acceleration;
         limits.derivative_claimed[joint] = ((source.limit_flags & RK_LIMIT_VELOCITY) ? 1u : 0u) |
@@ -759,7 +767,8 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
         added.push_back(std::move(end));
         if (knots_after_append(kept, added) > RK_MAX_TRAJECTORY_QUEUE_POINTS)
             return RK_ERROR_QUEUE_FULL;
-        const auto checked = validate_appended_path(kept, added, blueprint_);
+        const auto checked = validate_appended_path(kept, added, blueprint_,
+            (plan.flags & RK_PLAN_HOMING) != 0);
         if (checked != RK_OK) return checked;
         if (endpoint_->executes_trajectory_queue()) {
             const auto owner_now = externally_driven_ ? last_owner_timestamp_ns_ : monotonic_now_ns();
