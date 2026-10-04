@@ -1082,15 +1082,15 @@ rk_result Rkd6Endpoint::homing_control_status(std::uint64_t sequence) const {
 }
 
 rk_result Rkd6Endpoint::request_homing_scope(std::uint64_t sequence, std::uint64_t scope,
-    bool begin, std::uint8_t first, std::uint8_t second, double skew_bound) {
-    if (!sequence || !scope || first >= ack_.actuator_count || second >= ack_.actuator_count || first == second ||
+    std::uint8_t action, std::uint8_t first, std::uint8_t second, double skew_bound) {
+    if (!sequence || !scope || action > 2 || first >= ack_.actuator_count || second >= ack_.actuator_count || first == second ||
         !std::isfinite(skew_bound) || skew_bound <= 0 || skew_bound > std::numeric_limits<float>::max())
         return RK_ERROR_INVALID_ARGUMENT;
     if (sequence <= control_sequence_) return RK_ERROR_STALE_COMMAND;
     if (control_sequence_ && !control_accepted_) return RK_ERROR_INVALID_STATE;
     device_wire6::HomingScope6 command{};
     command.session = ack_.session; command.sequence = sequence; command.scope = scope;
-    command.action = begin ? 0 : 1; command.first = first; command.second = second;
+    command.action = action; command.first = first; command.second = second;
     command.skew_bound = static_cast<float>(skew_bound);
     std::array<std::uint8_t, device_wire6::HomingScope6::SIZE> bytes{};
     if (!device_wire6::encode(command, bytes) || !send_record(17, bytes)) return RK_ERROR_BACKEND;
@@ -1115,12 +1115,12 @@ rk_result Rkd6Endpoint::request_homing_side(std::uint64_t sequence, std::uint64_
 
 namespace robotkit {
 rk_result Rkd6Endpoint::device_homing_control(const rk_device_homing_control &control) {
-    if (control.struct_size < sizeof(control) || control.action > 3 ||
+    if (control.struct_size < sizeof(control) || control.action > 4 ||
         !control.sequence || !control.scope || control.first >= ack_.actuator_count)
         return RK_ERROR_INVALID_ARGUMENT;
-    if (control.action <= 1) {
+    if (control.action <= 1 || control.action == 4) {
         if (control.second >= ack_.actuator_count) return RK_ERROR_INVALID_ARGUMENT;
-        return request_homing_scope(control.sequence, control.scope, control.action == 0,
+        return request_homing_scope(control.sequence, control.scope, control.action == 4 ? 2 : static_cast<std::uint8_t>(control.action),
             static_cast<std::uint8_t>(control.first), static_cast<std::uint8_t>(control.second), control.skew_bound);
     }
     return request_homing_side(control.sequence, control.scope,

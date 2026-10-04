@@ -2724,3 +2724,21 @@ Important pending integration: an intentional controlled latch stop must preserv
 the homing scope, while cancellation/ordinary stop must clear it. The current
 device stop cleanup does not yet distinguish those purposes. Counter batches,
 router integration, board GPIO and full Phase C verification remain unfinished.
+
+### G13 — distinguish controlled homing stop from cancellation
+
+Added acknowledged scope action 2 (runtime control action 4): stop the device
+queue while preserving the matching homing scope and independent side holds.
+The virtual device marks that intentional stop so tick cleanup does not destroy
+its scope; ordinary abort/stop/emergency commands still clear it immediately.
+End-scope and faults clear the marker. A commanded normal Stop is reported as
+ready, rather than a device fault, permitting the stationary latch/calibration
+handoff and later Return. Host acknowledgment semantics remain explicit.
+
+Also corrected the earlier virtual input publisher edit: input count/bits had
+been inserted into QueueStatus6 initialization instead of State6Header. They
+now appear only in State6 as specified. No builds/tests ran. The host runtime's
+trajectory bookkeeping and RuntimeHomingDriver still need to use the new stop
+path together; simply sending the device control is not yet a complete stop.
+Counter rebasing, queued side adapter, router gate and Nucleo input/control work
+remain pending. G13 is incomplete.

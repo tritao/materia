@@ -31,6 +31,7 @@ pub struct VirtualDevice {
     input_count: usize,
     homing_scope: Option<u64>,
     control_sequence: u64,
+    homing_stop: bool,
     step_tick_hz: u32,
     profile: u8,
     host_ns: u64,
@@ -79,6 +80,7 @@ impl VirtualDevice {
             input_count: 0,
             homing_scope: None,
             control_sequence: 0,
+            homing_stop: false,
             step_tick_hz,
             profile,
             host_ns: 0,
@@ -240,6 +242,7 @@ impl VirtualDevice {
                     self.steps = generator;
                     self.homing_scope = None;
                     self.control_sequence = 0;
+                    self.homing_stop = false;
                     self.core = Some(core);
                     self.events = Some(DeviceEvents::new(&begin));
                     self.final_safe_applied = false;
@@ -276,8 +279,12 @@ impl VirtualDevice {
                             accepted = self.steps.begin_homing_pair(command.first as usize,
                                 command.second as usize, command.skew_bound as f64);
                             if accepted { self.homing_scope = Some(scope); }
+                        } else if command.action == 2 && self.homing_scope == Some(scope) {
+                            self.core.as_mut().unwrap().stop(StopReason::Stop);
+                            self.events.as_mut().unwrap().stop(&mut self.board, StopReason::Stop);
+                            self.homing_stop = true; accepted = true;
                         } else if command.action == 1 && self.homing_scope == Some(scope) {
-                            self.steps.end_homing_pair(); self.homing_scope = None; accepted = true;
+                            self.steps.end_homing_pair(); self.homing_scope = None; self.homing_stop = false; accepted = true;
                         }
                     } else if self.homing_scope == Some(scope) {
                         let command = HomingSide6::decode(payload).unwrap();
@@ -384,7 +391,7 @@ impl VirtualDevice {
                 true
             }
             10 => {
-                self.steps.end_homing_pair(); self.homing_scope = None;
+                self.steps.end_homing_pair(); self.homing_scope = None; self.homing_stop = false;
                 self.core.as_mut().unwrap().abort();
                 if let Some(reason) = self.core.as_ref().unwrap().stop_reason() {
                     self.events.as_mut().unwrap().stop(&mut self.board, reason);
@@ -393,14 +400,14 @@ impl VirtualDevice {
                 true
             }
             11 => {
-                self.steps.end_homing_pair(); self.homing_scope = None;
+                self.steps.end_homing_pair(); self.homing_scope = None; self.homing_stop = false;
                 self.core.as_mut().unwrap().stop(StopReason::Stop);
                 self.events.as_mut().unwrap().stop(&mut self.board, StopReason::Stop);
                 self.update_welder(0.0);
                 true
             }
             12 => {
-                self.steps.end_homing_pair(); self.homing_scope = None;
+                self.steps.end_homing_pair(); self.homing_scope = None; self.homing_stop = false;
                 self.core.as_mut().unwrap().emergency_stop(&mut self.board);
                 self.events.as_mut().unwrap().stop(&mut self.board, StopReason::EmergencyStop);
                 self.final_safe_applied = true;
@@ -438,13 +445,13 @@ impl VirtualDevice {
                 } else {
                     self.events.as_mut().unwrap().tick(core.path_clock(), &mut self.board);
                 }
-                if core.stop_reason().is_some() {
-                    self.steps.end_homing_pair(); self.homing_scope = None;
+                if core.stop_reason().is_some() && !(self.homing_stop && core.stop_reason() == Some(StopReason::Stop)) {
+                    self.steps.end_homing_pair(); self.homing_scope = None; self.homing_stop = false;
                 }
                 let targets = self.board.position_targets();
                 let purpose = core.executing_purpose().unwrap_or(if self.homing_scope.is_some() { 2 } else { 0 });
                 if self.profile == 1 && self.steps.tick_active_with_purpose(&mut self.board, targets, self.active_count, purpose).is_err() {
-                    self.steps.end_homing_pair(); self.homing_scope = None;
+                    self.steps.end_homing_pair(); self.homing_scope = None; self.homing_stop = false;
                     core.stop(StopReason::DualDriveSkew);
                 }
             }
@@ -464,6 +471,7 @@ impl VirtualDevice {
         };
         let fault = match core.stop_reason() {
             None => 0,
+            Some(StopReason::Stop) => 0,
             Some(StopReason::Underflow) => 2,
             Some(StopReason::LinkLost) => 3,
             Some(StopReason::DualDriveSkew) => 4,
@@ -475,9 +483,6 @@ impl VirtualDevice {
             executing_plan_id: core.executing_plan_id(),
             executing_segment: core.executing_segment(),
             path_clock_ticks: core.path_clock(),
-            input_count: self.input_count as u8,
-            input_bits: (0..self.input_count).fold(0u64, |bits, channel|
-                bits | (u64::from(self.board.read_input(channel)) << channel)),
             rate: core.rate(),
             remaining_segments: if self.profile == 2 {
                 core.remaining_capacity().saturating_sub(CAPACITY - MINIMAL_CAPACITY) as u16
@@ -497,11 +502,14 @@ impl VirtualDevice {
             session: self.session,
             timestamp_ticks: self.board.now_ticks(),
             accepted_sequence: 0,
-            safety: if core.stop_reason().is_some() { 3 } else { 0 },
+            safety: if fault != 0 { 3 } else { 0 },
             fault,
             actuator_count: self.active_count as u8,
             reserved: 0,
             path_clock_ticks: core.path_clock(),
+            input_count: self.input_count as u8,
+            input_bits: (0..self.input_count).fold(0u64, |bits, channel|
+                bits | (u64::from(self.board.read_input(channel)) << channel)),
         };
         let positions = self.board.actuator_positions();
         let targets = self.board.position_targets();

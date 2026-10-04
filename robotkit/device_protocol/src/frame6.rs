@@ -143,7 +143,7 @@ fn validate_payload(kind: u8, bytes: &[u8]) -> Result<(), Frame6Error> {
     }
     if kind == 17 {
         let scope = HomingScope6::decode(bytes).map_err(|_| Frame6Error::BadPayload)?;
-        if scope.session == 0 || scope.sequence == 0 || scope.scope == 0 || scope.action > 1 ||
+        if scope.session == 0 || scope.sequence == 0 || scope.scope == 0 || scope.action > 2 ||
             scope.first >= 64 || scope.second >= 64 || scope.first == scope.second ||
             !scope.skew_bound.is_finite() || scope.skew_bound <= 0.0 { return Err(Frame6Error::BadPayload); }
     }

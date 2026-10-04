@@ -55,7 +55,7 @@ inline bool decode(std::span<const std::uint8_t> bytes, Frame &frame) {
     if (bytes[4] == 17) {
         device_wire6::HomingScope6 command{};
         if (!device_wire6::decode(bytes.subspan(HEADER_SIZE, command.SIZE), command) ||
-            !command.session || !command.sequence || !command.scope || command.action > 1 ||
+            !command.session || !command.sequence || !command.scope || command.action > 2 ||
             command.first >= 64 || command.second >= 64 || command.first == command.second ||
             !std::isfinite(command.skew_bound) || command.skew_bound <= 0) return false;
     }
