@@ -1509,3 +1509,20 @@ is explicitly configured; no device clock conversion is inferred.
 This fixes the source-clock mismatch needed by the homing freshness checks.
 The concrete observation/motion driver and calibration remain pending. No
 tests or builds ran; the source integration remains unverified at runtime.
+
+
+### G11 — concrete runtime homing observations
+
+Source-clock propagation: `4b92c3784`. RuntimeHomingObserver reads joint state
+and switches from one Robot snapshot. It resolves each authored home sensor by
+ID and mounted frame, decodes digital/captured payloads, and forwards sequence,
+timestamp, clock and edge-count metadata to HomingCycle. Reject unknown joints,
+missing/wrong mounts, duplicate/null frames, malformed payloads and runtime
+safety faults. Legacy digital frames explicitly carry no captured-edge count.
+
+An explicit coordinate-translation callback converts both observed positions
+and captured edges; velocity is unchanged because this boundary supports only
+coordinate translation. The eventual calibration driver must supply counter
+coordinates before latch and logical coordinates after it. This observer is a
+concrete read path; command execution, native calibration and MotionSystem
+startup wiring are still pending. No tests or builds ran.
