@@ -2523,3 +2523,20 @@ stub currently rejects nonzero input configurations rather than pretending to
 support them. Virtual switch configuration through deployment, real board GPIO,
 homing purpose/holds/calibration/squaring transport and verification still remain.
 No build or test ran; Phase C gate is pending.
+
+### G13 — deployment switch wiring model
+
+DeviceLayout accepts optional input wiring records (index, switch ID, actuator
+ID, electrical polarity, optional pin label) and preserves them on JSON round
+trip. Input indices are ordered and bounded, switch IDs and nonempty pins must
+be unique, and polarity is explicit. Thresholds remain model data. Layouts with
+no inputs remain valid for machines with no switches.
+
+DeviceBinding joins each input to its wired actuator channel. It rejects unknown
+switches, unwired actuators, different leader axes and the wrong shaft for an
+explicit physical switch side. Every model switch requires deployment input
+wiring; nothing infers a controller pin. New regression assertions cover the
+join, polarity, pin round trip and missing/unknown switch wiring. No tests or
+builds ran; verification waits for the Phase C boundary. Native ABI population,
+virtual input options, host switch-frame publication and device homing control
+remain pending, so these Haxe bindings do not yet enable device homing.

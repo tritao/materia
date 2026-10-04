@@ -152,6 +152,19 @@ class DeviceBindingTests {
     dual.actuators[1].transmission = Transmission.SimpleTransmission("right turn", 1, 1);
     fails(function() DeviceBinding.bind(dual, dualLayout, 40000), "equal leader-coordinate offsets",
       "RKD6 refuses guarded drives with different zeros");
+    var switched = axisModel();
+    switched.addSwitch(new robotkit.model.JointSwitch("home", "axis", "home-frame", "home", -1, -0.01, 0.0, 0.0));
+    var inputLayout = DeviceLayout.decode(Bytes.ofString('{"schemaVersion":1,"channels":[{"index":0,"actuator":"motor"}],"inputs":[{"index":0,"switch_id":"home","actuator":"motor","active_high":false,"pin":"PA0"}]}'));
+    var inputBinding = DeviceBinding.bind(switched, inputLayout, 20000);
+    check(inputBinding.inputs.length == 1 && inputBinding.inputs[0].actuatorChannel == 0 &&
+      !inputBinding.inputs[0].wiring.activeHigh, "switch wiring resolves to the physical actuator and polarity");
+    var restoredInputs = DeviceLayout.decode(DeviceLayout.encode(inputLayout));
+    check(restoredInputs.inputs[0].switchId == "home" && restoredInputs.inputs[0].pin == "PA0",
+      "deployment input wiring round trips");
+    fails(function() DeviceBinding.bind(switched, layout, 20000), "no deployment input",
+      "a machine switch cannot silently lose its input wiring");
+    fails(function() DeviceBinding.bind(model, inputLayout, 20000), "one model switch",
+      "unknown model switch input is rejected");
     return assertions;
   }
 

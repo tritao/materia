@@ -34,6 +34,15 @@ class BoundChannel {
   }
 }
 
+/** An input channel joined to the physical actuator whose step count it captures. */
+class BoundInput {
+  public final wiring:DeviceInput;
+  public final actuatorChannel:Int;
+  public function new(wiring:DeviceInput, actuatorChannel:Int) {
+    this.wiring = wiring; this.actuatorChannel = actuatorChannel;
+  }
+}
+
 /**
  * The join of a machine model and a deployment's wiring into the device's actuator layout. The
  * model owns the motor's full steps and the transmission; the layout owns which channel drives
@@ -43,6 +52,7 @@ class BoundChannel {
  */
 class DeviceBinding {
   public final channels:Array<BoundChannel>;
+  public final inputs:Array<BoundInput>;
   /**
    * A copy of the model whose stepper actuators are no faster than the step tick can drive them,
    * so the limits planning reads from it (RobotModel.coupledLimits) are the device's real ceiling.
@@ -50,8 +60,9 @@ class DeviceBinding {
   public final model:RobotModel;
   public final stepTickHz:Int;
 
-  function new(channels:Array<BoundChannel>, model:RobotModel, stepTickHz:Int) {
+  function new(channels:Array<BoundChannel>, model:RobotModel, stepTickHz:Int, inputs:Array<BoundInput>) {
     this.channels = channels;
+    this.inputs = inputs;
     this.model = model;
     this.stepTickHz = stepTickHz;
   }
@@ -113,8 +124,31 @@ class DeviceBinding {
           Math.abs(a.offset - b.offset) > 1e-12)
         throw "RKD6 skew groups require equal leader-coordinate offsets";
     }
+    var inputs:Array<BoundInput> = [];
+    var seen = new Map<String, Bool>();
+    if (layout.inputs.length > 64) throw "Device layout supports at most 64 inputs";
+    for (input in layout.inputs) {
+      if (input.index != inputs.length || seen.exists(input.switchId)) throw "Device input indices or switch IDs are duplicated";
+      seen.set(input.switchId, true);
+      var matching = [for (contact in robot.switches) if (contact.id == input.switchId) contact];
+      if (matching.length != 1) throw "Device input must name one model switch";
+      var actuatorChannel = wired.get(input.actuator);
+      if (actuatorChannel == null) throw "Device input names an unwired actuator";
+      var channel = bound[actuatorChannel];
+      var contact = matching[0];
+      if (robot.joints[channel.jointIndex].id != contact.joint)
+        throw "Device input actuator does not drive its switch axis";
+      var actuator = find(robot, input.actuator);
+      if (actuator == null) throw "Device input actuator is missing";
+      var shaft = switch actuator.transmission { case SimpleTransmission(joint, _, _): joint; };
+      if (contact.driveJoint != null && shaft != contact.driveJoint)
+        throw "Device input actuator does not match its physical switch side";
+      inputs.push(new BoundInput(input, actuatorChannel));
+    }
+    for (contact in robot.switches) if (!seen.exists(contact.id))
+      throw "Model switch has no deployment input: " + contact.id;
     tightened.materializeLimits();
-    return new DeviceBinding(bound, tightened, stepTickHz);
+    return new DeviceBinding(bound, tightened, stepTickHz, inputs);
   }
 
   /** The channels as an in-process virtual device's actuators. */
