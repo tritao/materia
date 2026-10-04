@@ -1720,3 +1720,20 @@ Expose homingSeconds separately from existing machining run/motion CPU timing.
 Picker mission startup remains pending. Homing after previously accumulated
 physical slip, nonzero power-up offsets, collision/clearance and cycle timing
 are unverified; no tests or builds ran. G11 is not complete.
+
+
+### G11 — home switched machines before mission startup
+
+Router startup: `a539f37f2`. MissionPlayer builds a full-machine homing view
+from home-monitored independent joints and compiled physical limits. Native
+origin zero is the saved assembly pose; clamp the return coordinate to its
+soft travel. Configure coupled follower expansion and caller-owned EncoderMonitor
+and StepperSlip resets at latch. Feed waits for actual home frames and finishes
+the cycle before starting any mission skill, including picker handling.
+Report homing failure and duration separately. Reset recreates the homing state;
+beforeReset cancels active homing through its controlled-stop path.
+
+Machines without home switches keep their existing mission startup. Power-up
+nonzero offsets, previously accumulated slip, independent Y squaring and all
+physical/mission timing checks remain pending or unverified. No tests or
+builds ran, so G11 is not proven complete.

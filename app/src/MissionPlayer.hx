@@ -25,6 +25,11 @@ import motionkit.program.MotionOp;
 import motionkit.program.MoveTarget;
 import motionkit.program.Blend;
 import motionkit.MotionOptions;
+import motionkit.robot.MotionSystem;
+import motionkit.robot.MotionSystemBlueprint;
+import motionkit.axis.MotionAxisBlueprint;
+import motionkit.robot.StepperSlip;
+import robotkit.runtime.EncoderMonitor;
 import motionkit.robot.PlanningLimits;
 import processkit.WeldingPlanRunner;
 import processkit.skill.WeldPlan;
@@ -145,6 +150,12 @@ class MissionPlayer implements SessionMember {
   public var finished(default, null):Bool = false;
 
   final robot:AssemblyRobot;
+  var homing:Null<MotionSystem> = null;
+  var homingStarted:Bool = false;
+  var homingComplete:Bool = false;
+  public var homingSeconds(default, null):Float = 0.0;
+  var homingEncoders:Null<EncoderMonitor> = null;
+  var homingSlip:Null<StepperSlip> = null;
   var runner = new SkillRunner();
   var jointMotions = new Map<String, ManipulatorMotion>();
   /** The arm and its suction tool's vacuum sensor, when the mission picks and places. */
@@ -284,6 +295,7 @@ class MissionPlayer implements SessionMember {
       };
       welding = newWelding();
     }
+    configureHoming();
   }
 
   /**
@@ -363,8 +375,58 @@ class MissionPlayer implements SessionMember {
   public static function floorPlan(obstacles:Array<FloorObstacle>, poses:Array<Pose2>, margin:Float = MARGIN):OccupancyGrid2
     return robotkit.navigation.FloorMap.rasterize(obstacles, poses, RESOLUTION, margin, CLEARANCE, FRAME);
 
+  function configureHoming():Void {
+    var axes:Array<MotionAxisBlueprint> = [], axisJoints = new Map<String, Int>();
+    var names = robot.robot.description().joints;
+    for (joint in 0...robot.blueprint.jointCount) {
+      var required = false;
+      for (contact in robot.blueprint.switches)
+        if (contact.role == "home" && contact.joint == names[joint]) required = true;
+      if (!required) continue;
+      var physical = robot.blueprint.joints[joint];
+      if (physical.maxRate == null || physical.maxAcceleration == null)
+        throw "Mission home axis requires physical drive limits";
+      axes.push(new MotionAxisBlueprint(names[joint], [names[joint]],
+        physical.lowerLimit, physical.upperLimit, physical.maxRate, physical.maxAcceleration,
+        Math.max(physical.lowerLimit, Math.min(physical.upperLimit, 0.0)), [1.0], [0.0]));
+      axisJoints.set(names[joint], joint);
+    }
+    homingStarted = false; homingSeconds = 0.0;
+    if (axes.length == 0) { homing = null; homingComplete = true; return; }
+    var encoders = new EncoderMonitor(robot.model, robot.runtime.snapshot().q.toArray());
+    var slip = new StepperSlip(robot.robot.description().couplings, axisJoints,
+      (joint, offset) -> simulation.setJointSlip(robotIndex, joint, offset));
+    homingEncoders = encoders; homingSlip = slip;
+    var view = new MotionSystem(robot.robot, new MotionSystemBlueprint(robot.model, robot.blueprint, axes, timestep));
+    view.configureRuntimeHoming(robot.runtime, () -> {
+      slip.reset();
+      encoders.reset(robot.runtime.snapshot().q.toArray());
+    });
+    homing = view; homingComplete = false;
+  }
+
   public function feed():Void {
     if (failure != null || finished) return;
+    var homeView = homing;
+    if (!homingComplete && homeView != null) {
+      try {
+        if (!homingStarted) {
+          var available = new Map<String, Bool>();
+          for (frame in robot.robot.snapshot().sensors.toArray()) available.set(frame.sensorId, true);
+          for (contact in robot.blueprint.switches)
+            if (contact.role == "home" && !available.exists(contact.id)) return;
+          homeView.home(); homingStarted = true;
+          return;
+        }
+        homingSeconds += timestep;
+        homeView.update(timestep);
+        if (homeView.homingStatus() != "Complete") return;
+        homingComplete = true;
+      } catch (error:Dynamic) {
+        failure = 'Mission homing: $error';
+        return;
+      }
+    }
     var snapshot = robot.robot.snapshot();
     localization.update(snapshot);
     trackWheels(snapshot);
@@ -381,7 +443,10 @@ class MissionPlayer implements SessionMember {
   }
 
   /** The step that was running stops through the robot's runtime, which still answers until the session resets. */
-  public function beforeReset():Void runner.cancel();
+  public function beforeReset():Void {
+    runner.cancel();
+    if (homing != null && homing.isMoving()) homing.abort();
+  }
 
   /** Back to the first step; the next tick starts it from wherever the reset put the robot. */
   public function reset():Void {
@@ -395,6 +460,7 @@ class MissionPlayer implements SessionMember {
     wheelsSeeded = false;
     scanned = null;
     sensed = new PerceptionSnapshot();
+    configureHoming();
     var make = newHandling;
     if (make != null) handling = make();
     var makeWelding = newWelding;
