@@ -7,6 +7,7 @@ use robotkit_device_protocol::{
     StepGenerator, StopReason, VirtualBoard,
 };
 use std::collections::VecDeque;
+pub mod welder;
 
 const ACTUATORS: usize = 64;
 const CHANNELS: usize = 32;
