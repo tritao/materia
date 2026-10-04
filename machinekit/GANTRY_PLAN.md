@@ -1443,3 +1443,18 @@ stop ramp still use the existing soft-limit handling, and must be integrated
 with purpose-aware control before the homing driver can use them. Coordinate
 calibration and application home startup remain pending. No tests or builds
 ran; no homing travel or stopping behavior is claimed as verified.
+
+
+### G11 — preserve homing bounds when a queued path stops
+
+Homing polynomial admission: `a2724349e`. Native trajectory knots now retain
+plan flags, including end markers. When a path stop falls back to a straight
+ramp, it captures the interrupted chunk's homing purpose before clearing the
+queue. Braking room and emitted ramp targets then use the same authored
+overtravel bounds as that homing plan. Ordinary interrupted chunks retain
+soft limits, even when a later queued chunk has another purpose. Existing
+acceleration-duration and limit-hit fault handling remain in place.
+
+Direct velocity targets have no homing-purpose transport yet and retain soft
+bounds. Native coordinate calibration, latch, driver and startup integration
+remain pending. No tests or builds ran; stopping behavior is unverified.

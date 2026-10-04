@@ -255,6 +255,7 @@ public:
         uint64_t chunk_base_time_ns = 0;
         uint64_t tag = 0;
         uint64_t plan_id = 0;
+        uint32_t plan_flags = 0;
         bool ends_at_rest = true;
         double control_acceleration[RK_MAX_TRAJECTORY_JOINTS]{};
     };
@@ -323,6 +324,8 @@ private:
         int32_t diagnostic_code = 0;
         /** Set when the unclamped straight ramp reaches a joint travel limit. */
         bool stop_ramp_hits_limit = false;
+        /** Preserve the interrupted homing bounds after its queue is cleared. */
+        bool stop_ramp_homing = false;
     };
 
     struct QueuedCommand {

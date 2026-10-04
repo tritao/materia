@@ -749,6 +749,7 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
             knot.chunk_base_time_ns = base_time;
             knot.tag = plan.segments.tag;
             knot.plan_id = plan.plan_id;
+            knot.plan_flags = plan.flags;
             knot.ends_at_rest = ends_at_rest;
             std::copy_n(plan.control_acceleration, RK_MAX_TRAJECTORY_JOINTS, knot.control_acceleration);
             added.push_back(std::move(knot));
@@ -762,6 +763,7 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
         end.chunk_base_time_ns = base_time;
         end.tag = plan.segments.tag;
         end.plan_id = plan.plan_id;
+        end.plan_flags = plan.flags;
         end.ends_at_rest = ends_at_rest;
         std::copy_n(plan.control_acceleration, RK_MAX_TRAJECTORY_JOINTS, end.control_acceleration);
         added.push_back(std::move(end));
@@ -1194,6 +1196,19 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
     // limit instead of running into it; if that means braking harder than a
     // joint allows, the fault is latched once the ramp reaches rest.
     auto stop_ramp_bounds = [&](const double *positions, const double *velocities) {
+        // Select the interrupted chunk, never a later appended chunk's purpose.
+        const RuntimeTrajectoryPoint *interrupted = nullptr;
+        for (const auto &knot : trajectory_) {
+            if (knot.point.time_from_start_ns > control_.trajectory_time_ns) break;
+            interrupted = &knot;
+        }
+        control_.stop_ramp_homing = interrupted != nullptr &&
+            (interrupted->plan_flags & RK_PLAN_HOMING) != 0;
+        const bool has_overtravel = blueprint_.struct_size >=
+            offsetof(rk_robot_runtime_blueprint, joint_overtravel) + sizeof(blueprint_.joint_overtravel);
+        const auto ramp_overtravel = [&](uint32_t joint) {
+            return control_.stop_ramp_homing && has_overtravel ? blueprint_.joint_overtravel[joint] : 0.0;
+        };
         const auto period_count = period_.count();
         const auto period_ns = period_count > 0 ? static_cast<uint64_t>(period_count) : 1;
         double duration_seconds = 2.0 * static_cast<double>(period_ns) / 1'000'000'000.0;
@@ -1213,7 +1228,8 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                 continue;
             const auto &limits = blueprint_.joints[joint];
             const double room = std::max(0.0, velocities[joint] > 0.0
-                ? limits.upper_limit - positions[joint] : positions[joint] - limits.lower_limit);
+                ? limits.upper_limit + ramp_overtravel(joint) - positions[joint]
+                : positions[joint] - (limits.lower_limit - ramp_overtravel(joint)));
             if (0.5 * speed * unconstrained_duration >= room - 1e-12)
                 ramp_hits_limit = true;
             duration_seconds = std::min(duration_seconds, 2.0 * room / speed);
@@ -1629,16 +1645,20 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
             target.joint = joint;
             target.mode = RK_TARGET_POSITION;
             const auto &limits = blueprint_.joints[joint];
+            const bool has_overtravel = blueprint_.struct_size >=
+                offsetof(rk_robot_runtime_blueprint, joint_overtravel) + sizeof(blueprint_.joint_overtravel);
+            const double travel = control_.stop_ramp_homing && has_overtravel
+                ? blueprint_.joint_overtravel[joint] : 0.0;
             target.target = std::clamp(
                 control_.stop_ramp_positions[joint] +
                     control_.stop_ramp_velocities[joint] * blend,
-                limits.lower_limit, limits.upper_limit);
+                limits.lower_limit - travel, limits.upper_limit + travel);
             if (joint < RK_MAX_SERVO_JOINTS && duration > 0.0 && t < duration) {
                 const double end_t = std::min(duration, t + value.reference_duration);
                 value.servos[target_count].velocity = control_.stop_ramp_velocities[joint] * (1.0 - t / duration);
                 value.reference_end_position[target_count] = std::clamp(control_.stop_ramp_positions[joint] +
                     control_.stop_ramp_velocities[joint] * (end_t - 0.5 * end_t * end_t / duration),
-                    limits.lower_limit, limits.upper_limit);
+                    limits.lower_limit - travel, limits.upper_limit + travel);
                 value.reference_end_velocity[target_count] = control_.stop_ramp_velocities[joint] * (1.0 - end_t / duration);
             }
             target.max_rate = 0.0;
