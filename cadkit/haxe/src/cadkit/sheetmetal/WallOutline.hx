@@ -3,12 +3,28 @@ package cadkit.sheetmetal;
 /** Exact loops with authored segment order: outer CCW, holes CW. No implicit reversal renames edges. */
 class WallOutline {
 	final boundaries:Array<Array<Segment>>;
+	final segmentIds:Array<Array<String>>;
 
-	public function new(outer:Array<Segment>, ?holes:Array<Array<Segment>>) {
+	public function new(outer:Array<Segment>, ?holes:Array<Array<Segment>>, ?identities:Array<Array<String>>) {
 		boundaries = [outer.copy()];
 		if (holes != null)
 			for (hole in holes)
 				boundaries.push(hole.copy());
+		if (identities != null && identities.length != boundaries.length)
+			throw new SheetDiagnosis("sheet.invalid-outline-identity", "Segment identities must cover every loop");
+		segmentIds = [];
+		var seen:Map<String, Bool> = new Map();
+		for (i in 0...boundaries.length) {
+			var ids = identities == null ? [for (j in 0...boundaries[i].length) i + ":" + j] : identities[i].copy();
+			if (ids.length != boundaries[i].length)
+				throw new SheetDiagnosis("sheet.invalid-outline-identity", "Segment identities must cover every segment");
+			for (id in ids) {
+				if (id == null || id.length == 0 || seen.exists(id))
+					throw new SheetDiagnosis("sheet.invalid-outline-identity", "Segment identities must be nonempty and unique", [id]);
+				seen.set(id, true);
+			}
+			segmentIds.push(ids);
+		}
 		for (i in 0...boundaries.length) {
 			var loop = boundaries[i];
 			if (loop.length == 0)
@@ -45,6 +61,14 @@ class WallOutline {
 			throw new SheetDiagnosis("sheet.bend-edge-mismatch", "The referenced wall segment does not exist");
 		return boundaries[loop][index];
 	}
+	/** Authored identity for naming; it need not equal the segment's current contour index. */
+	public function identity(loop:Int, index:Int):String {
+		var checked = segment(loop, index);
+		return segmentIds[loop][index];
+	}
+	public function identities():Array<Array<String>> {
+		return [for (ids in segmentIds) ids.copy()];
+	}
 	public function area():Float {
 		var result = 0.0;
 		for (loop in boundaries)
@@ -55,6 +79,8 @@ class WallOutline {
 	public function withHole(hole:Array<Segment>):WallOutline {
 		var holes = [for (i in 1...boundaries.length) boundaries[i]];
 		holes.push(hole);
-		return new WallOutline(boundaries[0], holes);
+		var ids = identities();
+		ids.push([for (j in 0...hole.length) boundaries.length + ":" + j]);
+		return new WallOutline(boundaries[0], holes, ids);
 	}
 }

@@ -196,6 +196,14 @@ table in `tools/README.md`.
   `wall:<id>:a`, `wall:<id>:b`, `wall:<id>:edge:<loop>:<segment>`, `bend:<id>:inner`,
   `bend:<id>:outer`, `bend:<id>:end:0|1`. Wall and bend ids are permanent (created once, never
   renumbered), so names survive parameter edits by construction.
+- SM3c distinguishes a segment's authored identity from its current loop/index. Pure graph
+  outlines default to the numeric loop/index roles above; sketch-backed bases use
+  `wall:<id>:edge:sketch:<entity-id>`. Contour rotation and insertion therefore cannot reuse a
+  surviving edge's name for another face. Exact line/arc records and their identities reverse
+  together when normalising winding. Native names stay opaque: after `TopologyResolver`
+  resolves a persistent face, `SheetEdgeSelection` matches its geometry against analytically
+  derived straight wall-side faces, refusing zero or multiple matches. Renamed surviving
+  entities use the existing conservative geometric fallback; disappeared edges stay unresolved.
 - Fusing many touching solids is acceptable to start. If it is slow or fragile, a native
   builder that assembles faces with known topology (planar and cylindrical faces sharing exact
   edges, then sewing) replaces it later, with the same names.
@@ -747,7 +755,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM0 | done: clean branch on 38601ac61, pins verified, prerequisite documents read; quick gate `sm0-setup` passes (ProjectKit 138, ManufacturingKit 54) | c70c89745 |
 | SM1 | done: exact line/arc regions, permanent graph ids, edits/cuts/rips, bidirectional FK, neutral-length conservation, closure and P1–P5 bounds; quick gate `sm1-core` passes (2102 sheet assertions) | 0713c4e0c; 54b5cab15 |
 | SM2 | done: named wall extrusions and bend revolutions fused for flat/folded/partial states; P1–P5 validity, single bodies, volumes, axes and stable names; quick gate `sm2-solid` passes (3757 sheet assertions) | 7a3836d8c |
-| SM3 | in progress: SM3a atomic graph publication; SM3b exact sketch-backed base, side A/B, stock codec and named thickness builder; quick gates `sm3a-staging` (3773) and `sm3b-base` (3813 sheet assertions); flange/hem/cut/rip, persistent picks and P1–P5 document acceptance remain | 535ebc547; base sub-step commit |
+| SM3 | in progress: SM3a atomic graph publication; SM3b exact sketch-backed base, side A/B, stock codec and named thickness builder; quick gates `sm3a-staging` (3773) and `sm3b-base` (3813 sheet assertions); SM3c authored segment names and exact face-to-graph picks; quick gate `sm3c-edges` (3843 sheet assertions); flange/hem/cut/rip and P1–P5 document acceptance remain | 535ebc547; 08afd7a32; bb3405a64; edge identity sub-step commit |
 | SM4 | planned | |
 | SM4b | planned | |
 | SM5 | planned | |

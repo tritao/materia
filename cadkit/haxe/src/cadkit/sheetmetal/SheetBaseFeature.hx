@@ -42,11 +42,14 @@ class SheetBaseFeature extends SheetFeature {
 		var holes = [for (curves in regions[0].holes()) loop(curves, true)];
 		var plane = side == SheetSide.A ? geometry.plane : geometry.plane.offset(thickness.value);
 		var graph = new Sheet(stock(), plane.location());
-		var wall = graph.addWall(new WallOutline(outer, holes));
+		var identities = [outer.identities];
+		for (hole in holes) identities.push(hole.identities);
+		var wall = graph.addWall(new WallOutline(outer.segments, [for (hole in holes) hole.segments], identities));
 		return graph;
 	}
-	static function loop(curves:Array<ProfileCurve>, clockwise:Bool):Array<Segment> {
+	static function loop(curves:Array<ProfileCurve>, clockwise:Bool):{segments:Array<Segment>, identities:Array<String>} {
 		var result:Array<Segment> = [];
+		var identities:Array<String> = [];
 		var area = 0.0;
 		for (curve in curves) {
 			var segment:Segment;
@@ -57,6 +60,7 @@ class SheetBaseFeature extends SheetFeature {
 				segment = Segment.arc(new Point2(center.x, center.y), curve.radius, curve.startAngle, curve.sweep);
 			}
 			result.push(segment);
+			identities.push("sketch:" + curve.entityId);
 			area += segment.area();
 		}
 		if ((area < 0) != clockwise) {
@@ -70,8 +74,9 @@ class SheetBaseFeature extends SheetFeature {
 					reversed.push(Segment.arc(center, segment.radius, segment.startAngle + segment.sweep, -segment.sweep));
 				}
 			}
-			return reversed;
+			identities.reverse();
+			return {segments: reversed, identities: identities};
 		}
-		return result;
+		return {segments: result, identities: identities};
 	}
 }

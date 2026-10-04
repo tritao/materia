@@ -68,7 +68,7 @@ class SheetSolid {
 						curve = Curve.circle(segment.radius, new Plane(vector(center), Vector.X(), Vector.Z()));
 					} else
 						curve = Curve.arc(vector(segment.start), vector(segment.point(0.5)), vector(segment.end));
-					var id = "wall:" + wall.id + ":edge:" + i + ":" + j;
+					var id = "wall:" + wall.id + ":edge:" + wall.outline.identity(i, j);
 					var named = scope.own(Curve.named(curve, id));
 					sources.set(named.shape.elementName(CadKit.ShapeKind.Edge, 0), id);
 					curves.push(named);
