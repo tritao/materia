@@ -10,6 +10,7 @@ import cadkit.parametric.ParameterKind;
 import cadkit.sketch.ConstrainedSketch;
 import cadkit.sketch.SketchConstraint;
 import cadkit.sketch.SketchProfile;
+import cadkit.sketch.ProfileGeometry;
 import cadkit.sketch.SolveDiagnostic;
 import cadkit.sketch.SolvedSketch;
 import cadkit.sketch.SketchSolveError;
@@ -39,6 +40,9 @@ class ConstrainedSketchFeature extends Feature {
 	public var lastProfileBuildSeconds(default,null):Float;
 	private var committedSolution:Null<SolvedSketch>;
 	private var pendingSolution:Null<SolvedSketch>;
+	private var committedProfile:Null<ProfileGeometry>;
+	private var pendingProfile:Null<ProfileGeometry>;
+	private var pendingProfileContext:Null<EvaluationContext>;
 	public final support:Null<Feature>;
 	public final supportSelection:Null<SelectionRecipe>;
 	public final supportXDirection:Null<Vector>;
@@ -63,6 +67,9 @@ class ConstrainedSketchFeature extends Feature {
 		lastProfileBuildSeconds = 0;
 		committedSolution = null;
 		pendingSolution = null;
+		committedProfile = null;
+		pendingProfile = null;
+		pendingProfileContext = null;
 		this.support = support;
 		this.supportSelection = supportSelection;
 		this.supportXDirection = supportXDirection;
@@ -91,6 +98,18 @@ class ConstrainedSketchFeature extends Feature {
 
 	public function sketch():ConstrainedSketch {
 		return authored.copy();
+	}
+
+	/** Exact regions matching this context's profile, including staged parameter and support edits. */
+	public function profileForEvaluation(context:EvaluationContext):ProfileGeometry {
+		if (context.owner() != document)
+			throw new ParametricError("sketch profile belongs to another document");
+		var shape = context.shape(this);
+		if (pendingProfileContext == context && pendingProfile != null)
+			return pendingProfile;
+		if (committedProfile == null)
+			throw new ParametricError("sketch profile has not been evaluated");
+		return committedProfile;
 	}
 
 	/** Resolve the world workplane currently used to evaluate this sketch. */
@@ -463,8 +482,10 @@ class ConstrainedSketchFeature extends Feature {
 		context.checkCancelled();
 		var profileStarted = Sys.time();
 		var profile:cadkit.modeling.Sketch;
+		var geometry:ProfileGeometry;
 		try {
-			profile = SketchProfile.build(candidate, solved);
+			geometry = SketchProfile.geometry(candidate, solved);
+			profile = geometry.build();
 		} catch (error:Dynamic) {
 			lastProfileBuildSeconds = Sys.time() - profileStarted;
 			context.recordSketchProfile(lastProfileBuildSeconds);
@@ -477,6 +498,8 @@ class ConstrainedSketchFeature extends Feature {
 			var result = EvaluationResult.fromShape(profile.shape.cloneShape());
 			profile.close();
 			pendingSolution = solved;
+			pendingProfile = geometry;
+			pendingProfileContext = context;
 			return result;
 		} catch (error:Dynamic) {
 			profile.close();
@@ -488,13 +511,18 @@ class ConstrainedSketchFeature extends Feature {
 		if (pendingSolution == null)
 			return;
 		committedSolution = pendingSolution;
+		committedProfile = pendingProfile;
 		lastDiagnostic = pendingSolution.diagnostic;
 		lastAttemptDiagnostic = null;
 		pendingSolution = null;
+		pendingProfile = null;
+		pendingProfileContext = null;
 	}
 
 	override public function discardEvaluation():Void {
 		pendingSolution = null;
+		pendingProfile = null;
+		pendingProfileContext = null;
 	}
 
 	private static function isDimensional(kind:String):Bool {

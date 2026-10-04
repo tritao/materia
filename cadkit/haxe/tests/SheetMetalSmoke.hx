@@ -79,6 +79,7 @@ class SheetMetalSmoke {
 		assertions += SheetCoreSmoke.run();
 		assertions += SheetSolidSmoke.run();
 		assertions += SheetFeatureStagingSmoke.run();
+		assertions += SheetBaseSmoke.run();
 		trace("Sheet metal smoke passed (" + assertions + " assertions)");
 	}
 }

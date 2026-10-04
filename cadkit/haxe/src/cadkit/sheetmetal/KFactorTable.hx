@@ -33,4 +33,9 @@ class KFactorTable {
 			}
 		return factors[factors.length - 1];
 	}
+
+	/** Canonical ANSI rows for saved stock specifications; callers cannot mutate the table. */
+	public function rows():Array<{ratio:Float, k:Float}> {
+		return [for (i in 0...ratios.length) {ratio: ratios[i], k: factors[i]}];
+	}
 }

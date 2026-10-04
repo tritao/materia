@@ -214,6 +214,14 @@ table in `tools/README.md`.
   `sheet()` returns an isolated editable copy, sharing immutable records only. Downstream
   features use `sheetForEvaluation(context)` to consume the graph corresponding to the staged
   solid, rather than the previous committed graph. The context must belong to the same document.
+- SM3b bases consume the constrained sketch's staged exact `ProfileGeometry`, shared with
+  its native face builder: validation, nesting and unit conversion have one implementation.
+  A base requires one connected region; holes and exact arcs are retained. Its root placement
+  comes from the sketch workplane. For a side-B profile, the side-A frame is shifted +T along
+  that same normal, preserving the sheet-wide material-toward-minus-Z convention.
+  The thickness parameter owns T; a material snapshot owns its identity, explicit rule and
+  optional mechanical data. The new `sheet-base` record is additive to document version 11;
+  no existing record shape changes. Project material-library integration remains SM6.
 - Sheet features consume only the previous sheet feature's `Sheet`. A general solid feature
   (boolean, fillet...) after a sheet feature produces a plain solid: downstream code that needs
   a flat pattern must point at a sheet feature or convert (SM-D7). This keeps one owner per fact.
@@ -739,7 +747,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM0 | done: clean branch on 38601ac61, pins verified, prerequisite documents read; quick gate `sm0-setup` passes (ProjectKit 138, ManufacturingKit 54) | c70c89745 |
 | SM1 | done: exact line/arc regions, permanent graph ids, edits/cuts/rips, bidirectional FK, neutral-length conservation, closure and P1–P5 bounds; quick gate `sm1-core` passes (2102 sheet assertions) | 0713c4e0c; 54b5cab15 |
 | SM2 | done: named wall extrusions and bend revolutions fused for flat/folded/partial states; P1–P5 validity, single bodies, volumes, axes and stable names; quick gate `sm2-solid` passes (3757 sheet assertions) | 7a3836d8c |
-| SM3 | in progress: SM3a isolated graph copies and atomic sheet-feature publication; quick gate `sm3a-staging` passes (3773 sheet assertions); base/flange/hem/cut/rip features, persistent picks, codecs/builders and acceptance tests remain | staging sub-step commit |
+| SM3 | in progress: SM3a atomic graph publication; SM3b exact sketch-backed base, side A/B, stock codec and named thickness builder; quick gates `sm3a-staging` (3773) and `sm3b-base` (3813 sheet assertions); flange/hem/cut/rip, persistent picks and P1–P5 document acceptance remain | 535ebc547; base sub-step commit |
 | SM4 | planned | |
 | SM4b | planned | |
 | SM5 | planned | |

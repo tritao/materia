@@ -7,14 +7,16 @@ import cadkit.modeling.Vector;
 /** One sheet graph owns identities and dimensions; solids and flat patterns are derived from it. */
 class Sheet {
 	public final material:SheetMaterial;
+	public final placement:Location;
 	final wallData:Array<Wall>;
 	final bendData:Array<Bend>;
 	final ripData:Array<Rip>;
 	var nextWall:Int = 1;
 	var nextBend:Int = 1;
 
-	public function new(material:SheetMaterial) {
+	public function new(material:SheetMaterial, ?placement:Location) {
 		this.material = material;
+		this.placement = placement == null ? Location.identity() : placement;
 		wallData = [];
 		bendData = [];
 		ripData = [];
@@ -24,7 +26,7 @@ class Sheet {
 	}
 	/** Isolated editable graph, sharing only immutable material, outlines and connection records. */
 	public function copy():Sheet {
-		var result = new Sheet(material);
+		var result = new Sheet(material, placement);
 		for (wall in wallData) result.wallData.push(wall);
 		for (bend in bendData) result.bendData.push(bend);
 		for (rip in ripData) result.ripData.push(rip);
@@ -169,7 +171,7 @@ class Sheet {
 		}
 		var frames:Map<Int, Location> = new Map();
 		var tree:Map<Int, Bool> = new Map();
-		frames.set(root, Location.identity());
+		frames.set(root, placement);
 		var queue = [root];
 		var cursor = 0;
 		while (cursor < queue.length) {

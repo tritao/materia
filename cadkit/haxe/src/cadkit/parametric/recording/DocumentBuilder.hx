@@ -34,6 +34,9 @@ import cadkit.parametric.features.ConstrainedSketchFeature;
 import cadkit.parametric.features.CylinderFeature;
 import cadkit.parametric.features.PocketFeature;
 import cadkit.sketch.ConstrainedSketch;
+import cadkit.sheetmetal.SheetBaseFeature;
+import cadkit.sheetmetal.SheetMaterial;
+import cadkit.sheetmetal.SheetSide;
 
 /** Explicit recorder for the serializable document feature set.
  * Methods borrow features and dimensions and return document-owned features.
@@ -113,6 +116,17 @@ class DocumentBuilder {
 		var feature = document.add(new SketchFeature("slot", length.value, width.value, plane));
 		bind(length, feature, "sketch.width");
 		bind(width, feature, "sketch.height");
+		return feature;
+	}
+
+	/** Base stock from one closed constrained-sketch region, with an optional shared thickness dimension. */
+	public function sheetBase(source:ConstrainedSketchFeature, stock:SheetMaterial, ?thickness:NamedParameter,
+		side:SheetSide = A):SheetBaseFeature {
+		check();
+		var selectedStock = thickness == null ? stock
+			: new SheetMaterial(stock.id, thickness.value, stock.bendRule, stock.mechanical);
+		var feature = document.add(new SheetBaseFeature(source, selectedStock, side));
+		if (thickness != null) bind(thickness, feature, "sheet.thickness");
 		return feature;
 	}
 

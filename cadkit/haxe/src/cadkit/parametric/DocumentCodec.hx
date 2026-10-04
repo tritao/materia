@@ -16,6 +16,12 @@ import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import cadkit.parametric.features.SketchFeature;
 import cadkit.parametric.features.ConstrainedSketchFeature;
+import cadkit.sheetmetal.SheetBaseFeature;
+import cadkit.sheetmetal.SheetMaterial;
+import cadkit.sheetmetal.SheetMaterial.SheetMechanical;
+import cadkit.sheetmetal.SheetSide;
+import cadkit.sheetmetal.BendRule;
+import cadkit.sheetmetal.KFactorTable;
 import cadkit.sketch.ConstrainedSketch;
 import cadkit.sketch.SketchPoint;
 import cadkit.sketch.SketchEntity;
@@ -260,6 +266,15 @@ class DocumentCodec {
 					feature = document.add(modeling);
 				} else if (featureType == "constrained-sketch") {
 					feature = document.add(decodeConstrainedSketch(record, document));
+				} else if (featureType == "sheet-base") {
+					var source = requiredFeature(document, intField(record, "source"));
+					if (!Std.isOfType(source, ConstrainedSketchFeature))
+						throw new ParametricError("sheet base source must be a constrained sketch");
+					var side = stringField(record, "side");
+					if (side != "a" && side != "b") throw new ParametricError("invalid sheet base side: " + side);
+					feature = document.add(new SheetBaseFeature(cast source,
+						decodeSheetStock(requiredField(record, "material"), numberField(record, "thickness")),
+						side == "a" ? SheetSide.A : SheetSide.B));
 				} else if (featureType == "datum-sketch") {
 					feature = document.add(new DatumSketchFeature(stringField(record, "profile"), numberField(record, "width"), numberField(record, "height"),
 						decodeElementReferenceInDocument(requiredField(record, "datum")), numberField(record, "offset")));
@@ -520,6 +535,12 @@ class DocumentCodec {
 		var modeling = encodeModelingFeature(feature, references);
 		if (modeling != null)
 			return modeling;
+		if (featureType == "sheet-base") {
+			var base:SheetBaseFeature = cast feature;
+			return {id: feature.id.toInt(), type: featureType, source: base.source.id.toInt(),
+				thickness: base.thickness.value, side: base.side == SheetSide.A ? "a" : "b",
+				material: encodeSheetStock(base.stock()), references: references};
+		}
 		if (featureType == "datum-sketch") {
 			var sketch:DatumSketchFeature = cast feature;
 			return {
@@ -759,6 +780,42 @@ class DocumentCodec {
 	private static function decodePlacement(value:Dynamic):Placement
 		return new Placement(new Plane(decodeVector(requiredField(value, "origin")), decodeVector(requiredField(value, "xDirection")),
 			decodeVector(requiredField(value, "normal"))));
+
+	private static function encodeSheetStock(stock:SheetMaterial):Dynamic {
+		var rule:Dynamic = null;
+		if (stock.bendRule != null)
+			switch (stock.bendRule) {
+				case KFactor(table): rule = {kind: "k-factor", rows: table.rows()};
+			}
+		var mechanical:Dynamic = null;
+		if (stock.mechanical != null) {
+			var data:SheetMechanical = cast stock.mechanical;
+			mechanical = {uts: data.uts, yield: data.yield, youngs: data.youngs};
+		}
+		return {id: stock.id, rule: rule, mechanical: mechanical};
+	}
+	private static function decodeSheetStock(record:Dynamic, thickness:Float):SheetMaterial {
+		var rule:Null<BendRule> = null;
+		if (!Reflect.hasField(record, "rule") || !Reflect.hasField(record, "mechanical"))
+			throw new ParametricError("sheet stock must specify its bend rule and mechanical data (null is allowed)");
+		var savedRule:Dynamic = Reflect.field(record, "rule");
+		if (savedRule != null) {
+			if (stringField(savedRule, "kind") != "k-factor") throw new ParametricError("unsupported sheet bend rule");
+			var rawRows = requiredField(savedRule, "rows");
+			if (!Std.isOfType(rawRows, Array)) throw new ParametricError("sheet K-factor rows must be an array");
+			var rows:Array<Dynamic> = cast rawRows;
+			var ratios:Array<Float> = [];
+			var factors:Array<Float> = [];
+			for (row in rows) { ratios.push(numberField(row, "ratio")); factors.push(numberField(row, "k")); }
+			rule = BendRule.KFactor(new KFactorTable(ratios, factors));
+		}
+		var mechanical:Null<SheetMechanical> = null;
+		var savedMechanical:Dynamic = Reflect.field(record, "mechanical");
+		if (savedMechanical != null)
+			mechanical = {uts: numberField(savedMechanical, "uts"), yield: numberField(savedMechanical, "yield"),
+				youngs: numberField(savedMechanical, "youngs")};
+		return new SheetMaterial(stringField(record, "id"), thickness, rule, mechanical);
+	}
 
 	private static function encodeProperties(values:Array<TypedProperty>):Array<Dynamic> {
 		var result:Array<Dynamic> = [];
