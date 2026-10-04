@@ -1,5 +1,9 @@
 package processkit.testing;
 
+import sys.thread.Mutex;
+import sys.thread.Lock;
+import sys.thread.Thread;
+
 import haxe.io.Bytes;
 import nativekit.ffi.NativeKitTypes;
 import robotkit.transport.NativeTransport;
@@ -80,5 +84,34 @@ class FakeModbusServer {
       registers[map.measuredVoltage.address] = map.measuredVoltage.encode(voltage);
       registers[map.power.address] = map.power.encode(current * voltage / 0.9);
     }
+  }
+}
+
+/** Independent fake hardware clock, including while its host is compiling or planning. */
+class FakeModbusOwner {
+  final server:FakeModbusServer;
+  final clock:Void->Float;
+  final mutex = new Mutex();
+  final ended = new Lock();
+  var closing = false;
+  var failure:Null<String> = null;
+  public function new(server:FakeModbusServer, clock:Void->Float) {
+    this.server = server; this.clock = clock; Thread.create(run);
+  }
+  public function grounded(value:Bool):Void { mutex.acquire(); server.grounded = value; mutex.release(); }
+  public function supplyFault(value:Bool):Void { mutex.acquire(); server.supplyFault = value; mutex.release(); }
+  public function drop():Void { mutex.acquire(); server.drop(); mutex.release(); }
+  public function arc():Bool { mutex.acquire(); var value = server.arc; mutex.release(); return value; }
+  public function wire():Float { mutex.acquire(); var value = server.wire; mutex.release(); return value; }
+  public function fault():Null<String> { mutex.acquire(); var value = failure; mutex.release(); return value; }
+  public function close():Void { mutex.acquire(); closing = true; mutex.release(); ended.wait(); }
+  function run():Void {
+    while (true) {
+      mutex.acquire();
+      if (closing) { server.drop(); mutex.release(); break; }
+      try server.poll(clock()) catch (error:Dynamic) { failure = Std.string(error); server.drop(); }
+      mutex.release(); Sys.sleep(0.002);
+    }
+    ended.release();
   }
 }

@@ -7,7 +7,7 @@ import processkit.tool.WeldSensor;
 import processkit.tool.WeldFault;
 
 /** Async supply adapter. The process owner polls it even while awaiting engagement or stopping. */
-class ModbusWelder implements WelderOutputs implements WelderFeedback {
+class ModbusWelder implements WelderOutputs implements WelderFeedback implements processkit.PolledWelderDevice {
   public final client:ModbusTcpClient;
   public final map:ModbusWelderMap;
   public var faultMessage(default, null):Null<String> = null;
@@ -21,6 +21,7 @@ class ModbusWelder implements WelderOutputs implements WelderFeedback {
   var voltage = 0.0;
   var job = 0;
   var dirty = true;
+  var offAcknowledged = false;
   var nextPoll = 0.0;
   var latest:WeldReading = {arc:false, currentA:0.0, voltageV:0.0, touch:false, fault:0, powerW:0.0};
 
@@ -43,6 +44,11 @@ class ModbusWelder implements WelderOutputs implements WelderFeedback {
       throw "Modbus device lease is too short for two bounded transactions and the owner tick";
   }
   public function reading():WeldReading return latest;
+  public function outputs():WelderOutputs return this;
+  public function feedback():WelderFeedback return this;
+  public function ready():Bool return initialized && faultMessage == null && client.fault == null;
+  public function safeAcknowledged():Bool return offAcknowledged && !latest.arc;
+  public function close():Void client.close();
   /** Adapter diagnostics supplement the device-neutral, frozen tool sensor fault codes. */
   public function faultDetail():Null<String> {
     if (faultMessage != null) return faultMessage;
@@ -51,7 +57,7 @@ class ModbusWelder implements WelderOutputs implements WelderFeedback {
   public function setArc(on:Bool):Void {
     if (on && (faultMessage != null || !initialized || latest.fault != WeldFault.None)) throw "Faulted Modbus welder cannot ignite";
     if (!on) client.discardQueued();
-    arc = on; dirty = true;
+    arc = on; dirty = true; offAcknowledged = false;
   }
   public function setWireSpeed(value:Float):Void {
     map.wire.encode(value); if (value < 0.0) throw "Negative welding wire speed";
@@ -66,7 +72,7 @@ class ModbusWelder implements WelderOutputs implements WelderFeedback {
     if (register == null || value < 0) throw "Modbus job is unsupported or negative";
     register.encode(value); job = value; dirty = true;
   }
-  public function safe():Void { wire = 0.0; arc = false; dirty = true; client.discardQueued(); }
+  public function safe():Void { wire = 0.0; arc = false; dirty = true; offAcknowledged = false; client.discardQueued(); }
   public function disconnect():Void {
     safe(); client.close(); faultMessage = "Modbus welder disconnected";
     latest = {arc:false, currentA:0.0, voltageV:0.0, touch:false, fault:WeldFault.ArcLost, powerW:0.0};
@@ -88,7 +94,8 @@ class ModbusWelder implements WelderOutputs implements WelderFeedback {
     values[map.leaseAddress - outputStart] = arc ? map.leaseMs : 0;
     var jobRegister = map.job;
     if (jobRegister != null) values[jobRegister.address - outputStart] = jobRegister.encode(job);
-    client.writeMultiple(outputStart, values, function() {});
+    var sendingSafe = !arc && wire == 0.0;
+    client.writeMultiple(outputStart, values, function() { offAcknowledged = sendingSafe; });
     client.read(inputStart, inputCount, function(registers:Array<Int>) {
       var status = registers[map.statusAddress - inputStart];
       var reading:WeldReading = {arc:(status & map.establishedMask) != 0,

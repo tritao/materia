@@ -58,5 +58,6 @@ class ModbusTests {
     trace('Modbus tests passed ($count assertions)');
     WelderBindingTests.run();
     ModbusTcpTests.run();
+    WelderOwnerTests.run();
   }
 }
