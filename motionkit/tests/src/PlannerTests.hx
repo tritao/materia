@@ -474,6 +474,7 @@ class PlannerTests extends MotionKitTestSupport {
       blueprint.model.name, [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name]);
     var machine = MotionSystem.fromBlueprint(robot, blueprint);
+    homeGantryFixture(blueprint, runtime, simulationHarness, robot, machine);
     var options = new MotionOptions(0.2, 2.0);
     var gentle = planned(machine.moveLinear(Pose.xyz(0.02, 0.0, 0.0),
       Feed.metresPerSecond(0.2), new MotionOptions(0.2, 0.4)));

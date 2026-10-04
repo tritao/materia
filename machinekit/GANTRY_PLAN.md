@@ -3170,3 +3170,21 @@ MotionKit compiler-only passed (1127 sources; 28027), app compiler-only passed
 fault code and joint. Native 18/18 remains green with no implementation change
 since that gate. Router homing, geometry/baseline audits and the full Phase C gate
 remain pending. G13 is not complete; G14 is not started.
+
+### Phase C — first router queue revision remains unaccepted
+
+Router retry 61562 reported safety fault 6 on joint 6. Added one diagnostic at
+the onset of RKD6 queue revision mismatch, preserving the admission/fault rule.
+Native rebuild and focused endpoint/virtual/PTY checks passed 3/3. The diagnostic
+router retry 26965 showed expected revision 1, observed 0, path tick 370000 past
+boundary 367543, no executing plan and all 128 queue slots free. This occurs on
+the first home plan, not a later stop-to-next-plan handoff. Investigate why the
+virtual device rejects or fails to receive QueueBegin before that boundary;
+do not suppress revision mismatch or assume successful motion.
+
+Full MotionKit retry 28245 passed the circular-path fixtures after the calibration
+refresh fix, then found testMoveLinearUsesPlannerLimits also submitting an
+ordinary gantry plan before home (status -14). Added its actual sensor homing
+setup on the same adapter/MotionSystem. Compiler-only passed (1127 sources;
+33733). Full-suite retry has been started; its result remains pending.
+G13/Phase C remain incomplete; G14 is not started.

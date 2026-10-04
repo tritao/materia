@@ -819,9 +819,18 @@ void Rkd6Endpoint::poll_frames(std::uint64_t owner_now_ns) {
                     qualification_prefix_->append(qualification_rows_.front().duration_ns);
                     qualification_rows_.pop_front();
                 }
-                queue_revision_mismatch_ = status_.queue_revision > revision_ ||
+                const bool mismatch = status_.queue_revision > revision_ ||
                     (revision_ != 0 && status_.queue_revision < revision_ &&
                      status_.path_clock_ticks >= revision_boundary_ticks_);
+                if (mismatch && !queue_revision_mismatch_)
+                    std::fprintf(stderr, "Rkd6Endpoint: queue revision mismatch: expected=%llu observed=%llu path_ticks=%llu boundary_ticks=%llu plan=%llu remaining=%u\n",
+                        static_cast<unsigned long long>(revision_),
+                        static_cast<unsigned long long>(status_.queue_revision),
+                        static_cast<unsigned long long>(status_.path_clock_ticks),
+                        static_cast<unsigned long long>(revision_boundary_ticks_),
+                        static_cast<unsigned long long>(status_.executing_plan_id),
+                        status_.remaining_segments);
+                queue_revision_mismatch_ = mismatch;
                 std::size_t retired = 0;
                 while (retired < sent_.size() &&
                        sent_[retired].header.t0_ticks +
