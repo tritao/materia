@@ -26,7 +26,7 @@ class WeldPassesTests {
   public static function run():Void {
     var snapshot = new RobotSnapshot("weld", haxe.Int64.ofInt(0), haxe.Int64.ofInt(0), [], [], [], 0, 0);
     var root = new PassFixture(), fill = new PassFixture(), cap = new PassFixture();
-    var weld = new WeldPasses([root, fill, cap], [0.0, 0.5, 0.2]);
+    var weld = new WeldPasses([() -> root, () -> { check(root.updates > 0, "fill factory reads the completed root"); return fill; }, () -> cap], [0.0, 0.5, 0.2]);
     weld.start();
     check(root.starts == 1 && fill.starts == 0, "only root starts immediately");
     check(running(weld.update(snapshot, 0.1)), "root completion keeps sequence running");
@@ -50,7 +50,7 @@ class WeldPassesTests {
     check(root.cancels == 1, "cancel during cooling has no active pass");
     var failing = new PassFixture(), later = new PassFixture();
     failing.outcome = Failed("arc fault");
-    var failed = new WeldPasses([failing, later], [0.0, 0.0]);
+    var failed = new WeldPasses([() -> failing, () -> later], [0.0, 0.0]);
     failed.start();
     check(switch failed.update(snapshot, 0.1) { case Failed(message): message == "pass 1: arc fault"; case _: false; }, "failure identifies pass");
     check(later.starts == 0, "failed pass prevents later strikes");

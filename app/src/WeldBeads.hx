@@ -90,6 +90,7 @@ class WeldBeads implements SessionMember {
     this.simulation = simulation;
     this.scene = scene;
     this.timestep = timestep;
+    mission.depositedWeldHulls = () -> clearanceHulls();
     for (index in 0...mission.mission.steps.length) {
       var step = mission.mission.steps[index];
       var weld = step.weld;
@@ -124,6 +125,29 @@ class WeldBeads implements SessionMember {
         beads.push(seam);
       }
     }
+  }
+
+  /** Prior deposited station prisms, transformed once before a pass's clearance is compiled. */
+  function clearanceHulls():Array<{name:String, vertices:Array<Float>}> {
+    var result:Array<{name:String, vertices:Array<Float>}> = [];
+    for (entry in paths) {
+      var frame = frameOf(entry);
+      for (number in 0...entry.path.beads.length) {
+        var bead = entry.path.beads[number];
+        var work = new processkit.tool.WeldBeadWork(bead, () -> frame);
+        for (station in 0...bead.count) {
+          var points = work.vertices(station);
+          if (points.length == 0) continue;
+          var world:Array<Float> = [];
+          for (index in 0...Std.int(points.length / 3)) {
+            var point = AssemblyRobot.rotate(frame.rotation, [points[3 * index], points[3 * index + 1], points[3 * index + 2]]);
+            for (axis in 0...3) world.push(point[axis] + frame.position[axis]);
+          }
+          result.push({name: 'weld bead step ${entry.step} seam $number station $station', vertices: world});
+        }
+      }
+    }
+    return result;
   }
 
   /** The metal laid along the path of weld step `step`. */

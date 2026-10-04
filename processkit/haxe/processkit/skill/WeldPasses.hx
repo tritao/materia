@@ -5,14 +5,15 @@ import robotkit.skill.*;
 
 /** Run each pass to completion, with cooling between passes and the arc off during that cooling. */
 class WeldPasses implements Skill {
-  final passes:Array<Skill>;
+  final passes:Array<Void -> Skill>;
   final dwells:Array<Float>;
   final lifecycle = new SkillLifecycle();
   var index:Int = 0;
+  var active:Null<Skill> = null;
   var waiting:Bool = false;
   var remaining:Float = 0;
 
-  public function new(passes:Array<Skill>, dwells:Array<Float>) {
+  public function new(passes:Array<Void -> Skill>, dwells:Array<Float>) {
     if (passes == null || passes.length == 0 || dwells == null || dwells.length != passes.length)
       throw "WeldPasses needs passes and their interpass dwells";
     for (pass in passes) if (pass == null) throw "WeldPasses has an empty pass";
@@ -26,11 +27,21 @@ class WeldPasses implements Skill {
     index = 0;
     waiting = false;
     remaining = 0;
+    active = null;
     beginPass();
   }
 
   function beginPass():Void {
-    try passes[index].start() catch (error:Dynamic) lifecycle.fail(Std.string(error));
+    try {
+      var pass = passes[index]();
+      if (pass == null) throw "Pass factory produced no skill";
+      active = pass;
+      pass.start();
+    } catch (error:Dynamic) {
+      var pass = active;
+      if (pass != null) try pass.cancel() catch (_:Dynamic) {}
+      lifecycle.fail(Std.string(error));
+    }
   }
 
   public function update(snapshot:RobotSnapshot, durationSeconds:Float):SkillStatus {
@@ -43,8 +54,11 @@ class WeldPasses implements Skill {
       return lifecycle.status();
     }
     try {
-      switch passes[index].update(snapshot, durationSeconds) {
+      var pass = active;
+      if (pass == null) throw "No active weld pass";
+      switch pass.update(snapshot, durationSeconds) {
         case Succeeded:
+          active = null;
           index++;
           if (index == passes.length) lifecycle.succeed('welded ${passes.length} passes');
           else {
@@ -56,7 +70,8 @@ class WeldPasses implements Skill {
         case _: {}
       }
     } catch (error:Dynamic) {
-      try passes[index].cancel() catch (_:Dynamic) {}
+      var pass = active;
+      if (pass != null) try pass.cancel() catch (_:Dynamic) {}
       lifecycle.fail(Std.string(error));
     }
     return lifecycle.status();
@@ -64,7 +79,8 @@ class WeldPasses implements Skill {
 
   public function cancel():Void {
     if (!lifecycle.isRunning()) return;
-    if (!waiting) passes[index].cancel();
+    var pass = active;
+    if (pass != null) pass.cancel();
     lifecycle.cancel();
   }
   public function status():SkillStatus return lifecycle.status();

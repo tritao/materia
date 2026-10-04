@@ -607,6 +607,14 @@ W5 design note while waiting for R3/R4 (2026-10-04; implementation has not start
   Earlier station geometry must participate in both grounded-work sensing and clearance before later passes ignite.
 
 W5 implementation notes (in progress, 2026-10-04):
+- Pass skills are now created lazily after cooling, allowing each runner to compile clearance against the metal
+  deposited by preceding passes. `WeldBeads` supplies measured station prisms in world coordinates; `MissionPlayer`
+  transforms them to the robot base link and includes them in `ArmClearance`. No RobotKit API changes are needed.
+  ProcessKit passes 12 sequencer assertions (including the fill factory observing the completed root), 12 bead-work,
+  55 welder, 44 planning, 16 rate, 106 weave and 23 process assertions. App compile for the clearance integration
+  passes 1,759 sources. New woven and multi-pass example entrypoints retain the CAD-derived seam and configure
+  its target leg to 7/10 mm. The new focused `welder-quality` checks are being compiled and have not yet run.
+
 - Runtime grounded work now accepts changing geometry providers. `WeldBeadWork` derives a convex triangular
   prism per deposited station from its measured leg and CAD face directions; empty stations contribute no metal.
   Queries use the live workpiece frame, cache unchanged prisms, and reject stations outside the query's seam
