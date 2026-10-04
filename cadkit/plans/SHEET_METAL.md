@@ -164,6 +164,15 @@ table in `tools/README.md`.
   non-tree bend must close within tolerance in the evaluated state, or the sheet reports
   `sheet.closure-gap` with the measured gap. Rips are how designs break loops. Never guess.
 - Wall and bend frames are `cadkit.modeling.Location`s. No dependency on KinematicsKit.
+- SM1 clarification: at intermediate angle `a`, the neutral radius is `BA / |a|`,
+  and the inner radius is `BA / |a| - n`, where `n = BA / |target| - R`.
+  The side-A radius is that inner radius for up bends and inner radius + T for down bends.
+  At the target this recovers R; at zero the strip is a rectangle of length BA.
+  This replaces a fixed intermediate radius, which cannot conserve neutral length while
+  changing angle. `BendZone` supplies both the strip geometry and child attachment frame.
+- A rip cuts the child-side seam of its bend strip. It removes the spanning-tree/closure
+  connection, while retaining the strip attached to wall A: a zero-gap cut must not delete
+  the bend allowance's material. Rips that disconnect a wall from the root are diagnosed.
 
 **SM-D3. Bend allowance comes from a bend rule; there is no silent default.**
 - `BendRule` is one of `KFactor(table)` or `Process(tooling)` (SM-D8). `KFactorTable` maps
@@ -374,6 +383,13 @@ Demo parts (all in material A unless noted):
 - **P5** Tray 150 × 100 × 25, four flanges with corner reliefs (segmented punch with gaps; box
   bending).
 - **P6** P2 in material B (springback and calibration contrast).
+
+SM1 fixes the unspecified demo details in `SheetDemoParts`: reference R = 1 mm and ANSI
+K = 0.38 are assumed until process-selected tooling in SM6. P3 is 120 long with a 60 outside
+web and opposed 40 outside legs (78.5 overall height). P4 is 120 long with a 60 outside crown,
+40 height and 20 outside lips (97 overall width, accounting for shared thickness). P5 has
+2 mm square corner reliefs. All straight leg lengths derive from the drawing dimensions and
+setbacks; these define new fixtures, with no existing baseline-number changes.
 
 ## Steps
 
@@ -709,7 +725,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | Step | State | Commits |
 |---|---|---|
 | SM0 | done: clean branch on 38601ac61, pins verified, prerequisite documents read; quick gate `sm0-setup` passes (ProjectKit 138, ManufacturingKit 54) | c70c89745 |
-| SM1 | in progress: SM1a bend dimensions, ANSI/DIN tables, explicit stock/rules and named diagnoses; quick gate `sm1a-dimensions` passes; graph, FK, closure and P1–P5 tests remain | SM1a dimension sub-step commit |
+| SM1 | done: exact line/arc regions, permanent graph ids, edits/cuts/rips, bidirectional FK, neutral-length conservation, closure and P1–P5 bounds; quick gate `sm1-core` passes (2102 sheet assertions) | 0713c4e0c; final core commit |
 | SM2 | planned | |
 | SM3 | planned | |
 | SM4 | planned | |
@@ -743,3 +759,9 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
   compiler policy, not a compiler patch or an unresolved blocker.
   Quick gate `sm1a-dimensions` passes all five suites; existing MachineKit summaries and
   ProjectKit/ManufacturingKit assertion counts are unchanged.
+- SM1: `sm1-core` passes all five quick suites, including 2102 sheet assertions. Outline
+  validation uses analytic intersections and winding (including circular holes); evaluations
+  retain immutable wall snapshots, so later graph edits cannot corrupt derived bounds.
+  P1–P5 cover both fold signs, 0/near-zero/partial/target angles, inverse traversal from another
+  root, tangent contact on both sheet sides, restored edits and a changed closed-ring flange.
+  No new haxeon issue or baseline-number change; existing MachineKit summaries match exactly.
