@@ -413,6 +413,9 @@ void host_stall_keeps_device_moving() {
     assert(endpoint->submit_device_plan(plan, 0, 120'000'000, 20'000'000, blueprint) == RK_OK);
     for (std::uint64_t now = 130'000'000; now <= 400'000'000; now += 10'000'000)
         assert(endpoint->sample(now, state) == RK_OK);
+    // A 300 ms owner stall must fit inside the remaining committed horizon,
+    // even when it begins halfway between old replenishment boundaries.
+    assert(state.committed_until_ns >= state.trajectory_time_ns + 400'000'000);
     for (std::uint64_t now = 700'000'000; now <= 1'800'000'000; now += 10'000'000)
         assert(endpoint->sample(now, state) == RK_OK);
     if (state.safety != RK_SAFETY_READY)
