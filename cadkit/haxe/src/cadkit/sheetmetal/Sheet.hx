@@ -22,6 +22,16 @@ class Sheet {
 	public function thickness():Float {
 		return material.thickness;
 	}
+	/** Isolated editable graph, sharing only immutable material, outlines and connection records. */
+	public function copy():Sheet {
+		var result = new Sheet(material);
+		for (wall in wallData) result.wallData.push(wall);
+		for (bend in bendData) result.bendData.push(bend);
+		for (rip in ripData) result.ripData.push(rip);
+		result.nextWall = nextWall;
+		result.nextBend = nextBend;
+		return result;
+	}
 	public function walls():Array<Wall> { return wallData.copy(); }
 	public function bends():Array<Bend> { return bendData.copy(); }
 	public function rips():Array<Rip> { return ripData.copy(); }
