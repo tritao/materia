@@ -10,8 +10,8 @@ import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.Link;
 import robotkit.model.RobotModel;
-import robotkit.skill.WeldPlan;
-import robotkit.skill.WeldPlan.WeldParameters;
+import processkit.skill.WeldPlan;
+import processkit.skill.WeldPlan.WeldParameters;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
@@ -189,7 +189,7 @@ class WeldPlanningTests {
   static function testClosedRunChoosesAReachableCorner():Void {
     var rotation = seam().start().rotation;
     var points = [new Vec3(0.35, 0.2, 0.15), new Vec3(0.45, 0.2, 0.15), new Vec3(0.45, 0.3, 0.15), new Vec3(0.35, 0.3, 0.15)];
-    var segments = [for (i in 0...4) new robotkit.skill.WeldPlan.WeldSegment(new Transform3(points[i], rotation),
+    var segments = [for (i in 0...4) new processkit.skill.WeldPlan.WeldSegment(new Transform3(points[i], rotation),
       new Transform3(points[(i + 1) % 4], rotation), 'side$i')];
     var requested = new WeldPlan(segments, PARAMETERS);
     var planner = new WeldPathPlanner(new EntryCornerFixture(), new IkTolerance(2e-4, 1e-3, 300, 0.03), [3.0], WRIST);
