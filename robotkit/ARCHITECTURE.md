@@ -1025,7 +1025,7 @@ land in should seed close to their last known configuration.
 `toJointTargets(q)` looks up each arm DOF's driving joint in
 `RobotModel.joints`, which is the same index `RobotRuntimeCompiler` assigns
 as the runtime joint index, and emits one
-`robotkit.world.JointTarget.position(...)` per degree of freedom — the
+`robotkit.core.JointTarget.position(...)` per degree of freedom — the
 existing typed joint-command boundary, unchanged.
 
 ## Tools and TCP

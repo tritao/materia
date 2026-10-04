@@ -1,7 +1,7 @@
 package robotkit.tool;
 
-import robotkit.world.FiredProcessEvent;
-import robotkit.world.ProcessEventValue;
+import robotkit.execution.FiredProcessEvent;
+import robotkit.execution.ProcessEventValue;
 
 /** Applies runtime output records to simulation tools at scheduled path time. */
 class ChannelToolAdapter {

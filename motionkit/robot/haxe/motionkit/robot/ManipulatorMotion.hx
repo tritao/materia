@@ -5,8 +5,8 @@ import motionkit.event.EventValue;
 import motionkit.program.InputPredicate;
 import motionkit.program.MotionProgram;
 import motionkit.trajectory.ExecutionPlan;
-import robotkit.world.FiredProcessEvent;
-import robotkit.world.Robot;
+import robotkit.execution.FiredProcessEvent;
+import robotkit.core.Robot;
 import motionkit.robot.SessionState;
 
 /**

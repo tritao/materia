@@ -5,7 +5,7 @@ import robotkit.localization.FrameTransform2;
 import robotkit.mobile.Pose2;
 import robotkit.mobile.Pose3;
 import robotkit.model.RobotModel;
-import robotkit.world.SensorFrame;
+import robotkit.core.SensorFrame;
 
 /** Maps camera detector fiducials to configured pallet and dock targets. */
 class FiducialPerception implements Perception {

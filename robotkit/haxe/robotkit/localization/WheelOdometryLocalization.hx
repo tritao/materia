@@ -3,7 +3,7 @@ package robotkit.localization;
 import robotkit.mobile.DifferentialOdometry;
 import robotkit.mobile.MobileBase;
 import robotkit.mobile.Pose2;
-import robotkit.world.RobotSnapshot;
+import robotkit.core.RobotSnapshot;
 
 /** Differential wheel odometry exposed as an `odom` to `base` localization service. */
 class WheelOdometryLocalization implements Localization {

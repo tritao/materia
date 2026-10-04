@@ -5,16 +5,16 @@ import TrajectoryCore;
 import trajectorykit.validation.ValidationGuarantee;
 import haxe.Int64;
 import nativekit.ffi.NativeKit;
-import robotkit.world.CameraImage;
-import robotkit.world.SensorFrame;
-import robotkit.world.ExecutionPlanSubmission;
-import robotkit.world.FiredProcessEvent;
-import robotkit.world.ProcessEventCodec;
-import robotkit.world.ProcessEventValue;
-import robotkit.world.ProcessHoldPolicy;
-import robotkit.world.ProcessChannelDeclaration;
-import robotkit.world.ProcessTimedEvent;
-import robotkit.world.TrajectorySegment;
+import robotkit.streams.CameraImage;
+import robotkit.core.SensorFrame;
+import robotkit.execution.ExecutionPlanSubmission;
+import robotkit.execution.FiredProcessEvent;
+import robotkit.execution.ProcessEventCodec;
+import robotkit.execution.ProcessEventValue;
+import robotkit.execution.ProcessHoldPolicy;
+import robotkit.execution.ProcessChannelDeclaration;
+import robotkit.execution.ProcessTimedEvent;
+import robotkit.execution.TrajectorySegment;
 import runtime.memory.Arena;
 import runtime.memory.NativeSpan;
 import runtime.memory.RawPtr;
@@ -35,7 +35,7 @@ class RobotRuntime {
   final sensorLayout:Array<RobotRuntimeSensorBlueprint>;
   public final channels:Array<ProcessChannelDeclaration>;
   /** The blueprint's joint couplings: a joint a plan leaves out follows its leader. */
-  public final couplings:Array<robotkit.world.CoupledJoint>;
+  public final couplings:Array<robotkit.core.CoupledJoint>;
   final externalSensorLayout:Array<RobotRuntimeSensorBlueprint>;
   final externalMutex = new Mutex();
   final externalFrames:Map<String, SensorFrame> = new Map();
@@ -61,7 +61,7 @@ class RobotRuntime {
     sensorLayout = blueprint.nativeSensorLayout();
     channels = blueprint.channels.copy();
     couplings = [for (coupling in blueprint.couplings)
-      new robotkit.world.CoupledJoint(coupling.follower, coupling.leader, coupling.ratio, coupling.offset)];
+      new robotkit.core.CoupledJoint(coupling.follower, coupling.leader, coupling.ratio, coupling.offset)];
     externalSensorLayout = blueprint.externalSensorLayout();
   }
 
@@ -102,24 +102,24 @@ class RobotRuntime {
   }
 
   /** Reads the endpoint's supported modes and bounded plan contracts. */
-  public function capabilities(id:robotkit.world.RobotId):robotkit.world.RobotCapabilities {
+  public function capabilities(id:robotkit.core.RobotId):robotkit.core.RobotCapabilities {
     ensureLive();
     var value = new rk_robot_capabilities();
     value.set_struct_size(rk_robot_capabilities.size());
     check(endpoint.capabilities(value), "runtime.capabilities");
-    var modes:Array<robotkit.world.JointTargetMode> = [];
+    var modes:Array<robotkit.core.JointTargetMode> = [];
     if (value.get_supports_position_targets() != 0) modes.push(Position);
     if (value.get_supports_velocity_targets() != 0) modes.push(Velocity);
     if (value.get_supports_effort_targets() != 0) modes.push(Effort);
     if (value.get_supports_position_targets() != 0 && value.get_supports_effort_targets() != 0)
       modes.push(Servo);
     var execution = value.get_supports_execution_plans() != 0
-      ? new robotkit.world.ExecutionCapabilities(true, TrajectoryCoreConstants.MK_MAX_DEGREE,
+      ? new robotkit.core.ExecutionCapabilities(true, TrajectoryCoreConstants.MK_MAX_DEGREE,
           RobotKitRuntimeConstants.RK_MAX_TRAJECTORY_JOINTS,
           RobotKitRuntimeConstants.RK_MAX_TRAJECTORY_QUEUE_POINTS, true, true, true, Proven)
-      : robotkit.world.ExecutionCapabilities.unavailable();
-    return new robotkit.world.RobotCapabilities(id, value.get_joint_count(), modes,
-      execution, new robotkit.world.TimingCapabilities(true, true, Unchecked));
+      : robotkit.core.ExecutionCapabilities.unavailable();
+    return new robotkit.core.RobotCapabilities(id, value.get_joint_count(), modes,
+      execution, new robotkit.core.TimingCapabilities(true, true, Unchecked));
   }
 
   /**
@@ -127,15 +127,15 @@ class RobotRuntime {
    * `expiresAtNs` (robot source clock, as in snapshots) makes the batch's
    * velocity targets lapse then: the runtime brakes those joints to zero.
    */
-  public function submitTargets(targets:Array<robotkit.world.JointTarget>, sequence:Int,
+  public function submitTargets(targets:Array<robotkit.core.JointTarget>, sequence:Int,
       ?timestampNs:haxe.Int64, ?expiresAtNs:haxe.Int64):Void {
     submitTargets64(targets, haxe.Int64.ofInt(sequence), timestampNs, expiresAtNs);
   }
 
-  public function submitTargets64(targets:Array<robotkit.world.JointTarget>, sequence:haxe.Int64,
+  public function submitTargets64(targets:Array<robotkit.core.JointTarget>, sequence:haxe.Int64,
       ?timestampNs:haxe.Int64, ?expiresAtNs:haxe.Int64):Void {
     ensureLive();
-    var batch = robotkit.world.JointTarget.copyBatch(targets);
+    var batch = robotkit.core.JointTarget.copyBatch(targets);
     var command = new rk_robot_command();
     command.set_struct_size(rk_robot_command.size());
     command.set_sequence(sequence);
@@ -148,12 +148,12 @@ class RobotRuntime {
       var target = new rk_joint_target();
       target.set_joint(targetValue.joint);
       target.set_mode(switch targetValue.mode {
-        case robotkit.world.JointTargetMode.Position: RobotKitRuntimeConstants.RK_TARGET_POSITION;
-        case robotkit.world.JointTargetMode.Velocity: RobotKitRuntimeConstants.RK_TARGET_VELOCITY;
-        case robotkit.world.JointTargetMode.Effort: RobotKitRuntimeConstants.RK_TARGET_EFFORT;
-        case robotkit.world.JointTargetMode.Servo: RobotKitRuntimeConstants.RK_TARGET_SERVO;
+        case robotkit.core.JointTargetMode.Position: RobotKitRuntimeConstants.RK_TARGET_POSITION;
+        case robotkit.core.JointTargetMode.Velocity: RobotKitRuntimeConstants.RK_TARGET_VELOCITY;
+        case robotkit.core.JointTargetMode.Effort: RobotKitRuntimeConstants.RK_TARGET_EFFORT;
+        case robotkit.core.JointTargetMode.Servo: RobotKitRuntimeConstants.RK_TARGET_SERVO;
       });
-      if (targetValue.mode == robotkit.world.JointTargetMode.Servo) {
+      if (targetValue.mode == robotkit.core.JointTargetMode.Servo) {
         var servo = new rk_joint_servo();
         servo.set_velocity(targetValue.servoVelocity);
         servo.set_stiffness(targetValue.stiffness);
@@ -301,16 +301,16 @@ class RobotRuntime {
 
   public function submitPositions64(positions:Array<Float>, sequence:haxe.Int64,
       ?timestampNs:haxe.Int64):Void {
-    var targets:Array<robotkit.world.JointTarget> = [];
+    var targets:Array<robotkit.core.JointTarget> = [];
     for (index in 0...positions.length)
-      targets.push(robotkit.world.JointTarget.position(index, positions[index]));
+      targets.push(robotkit.core.JointTarget.position(index, positions[index]));
     submitTargets64(targets, sequence, timestampNs);
   }
 
   /** Submits one position target without implying ownership of a simulation tick. */
   public function submitPosition(joint:Int, targetValue:Float, sequence:Int,
       ?timestampNs:haxe.Int64):Void {
-    submitTargets([robotkit.world.JointTarget.position(joint, targetValue)], sequence,
+    submitTargets([robotkit.core.JointTarget.position(joint, targetValue)], sequence,
       timestampNs);
   }
 

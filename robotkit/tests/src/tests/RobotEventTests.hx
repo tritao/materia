@@ -10,15 +10,15 @@ import robotkit.perception.ImageDetectionObservation;
 import robotkit.protocol.ImageDetectionObservationMsg;
 import robotkit.protocol.RobotMessageType;
 import robotkit.protocol.RobotProtocol;
-import robotkit.world.RecordingChannels;
-import robotkit.world.RecordingRobot;
-import robotkit.world.McapRobotRecording;
-import robotkit.world.McapRecordingReader;
-import robotkit.world.RemoteRobot;
-import robotkit.world.ReplayRobot;
-import robotkit.world.RobotEvent;
-import robotkit.world.RobotEventRing;
-import robotkit.world.RobotRecording;
+import robotkit.recording.RecordingChannels;
+import robotkit.recording.RecordingRobot;
+import robotkit.recording.McapRobotRecording;
+import robotkit.recording.McapRecordingReader;
+import robotkit.remote.RemoteRobot;
+import robotkit.recording.ReplayRobot;
+import robotkit.core.RobotEvent;
+import robotkit.core.RobotEventRing;
+import robotkit.recording.RobotRecording;
 
 private class EventBehavior implements WorldBehavior {
   public var seen:Int = 0;

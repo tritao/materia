@@ -2,7 +2,7 @@ package robotkit.behavior;
 
 import haxe.Int64;
 import robotkit.runtime.RobotSnapshot;
-import robotkit.world.RobotEvent;
+import robotkit.core.RobotEvent;
 
 /** Read-only snapshot plus bounded intent output exposed to a behavior. */
 class RobotContext {

@@ -7,7 +7,7 @@ import robotkit.model.RobotModel;
 import robotkit.mobile.Pose2;
 import robotkit.runtime.RobotRuntimeBlueprint;
 import robotkit.runtime.RobotRuntimeIdentity;
-import robotkit.world.RobotSnapshot;
+import robotkit.core.RobotSnapshot;
 
 /** Builds a current planar frame tree from authored robot kinematics and joint state. */
 class RobotFrameTree2 {

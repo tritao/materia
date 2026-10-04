@@ -32,9 +32,9 @@ import processkit.work.Point2;
 import processkit.work.BucketSweep;
 import processkit.path.Toolpath;
 import processkit.path.ToolpathPoint;
-import robotkit.world.SimulatedRobot;
-import robotkit.world.RobotCommand;
-import robotkit.world.RobotSnapshot;
+import robotkit.simulation.SimulatedRobot;
+import robotkit.core.RobotCommand;
+import robotkit.core.RobotSnapshot;
 
 /**
  * M12 acceptance tests for the simulated excavator: the 4-DOF

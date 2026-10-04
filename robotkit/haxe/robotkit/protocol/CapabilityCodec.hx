@@ -3,7 +3,7 @@ import haxe.Int64;
 import trajectorykit.validation.ValidationGuarantee;
 /** One conversion for local and remote capability records; unknown modes are rejected. */
 class CapabilityCodec {
-  public static function encode(value:robotkit.world.RobotCapabilities, robotId:Int64):RobotCapabilities {
+  public static function encode(value:robotkit.core.RobotCapabilities, robotId:Int64):RobotCapabilities {
     var result = new RobotCapabilities();
     result.robotId = robotId;
     result.jointCount = value.jointCount;
@@ -31,20 +31,20 @@ class CapabilityCodec {
     result.timing = timing;
     return result;
   }
-  public static function decode(value:RobotCapabilities, id:robotkit.world.RobotId):robotkit.world.RobotCapabilities {
+  public static function decode(value:RobotCapabilities, id:robotkit.core.RobotId):robotkit.core.RobotCapabilities {
     if (value == null || value.controlModes == null || value.execution == null ||
         value.timing == null || value.streams == null) throw "Invalid robot capabilities";
-    var modes:Array<robotkit.world.JointTargetMode> = [for (mode in value.controlModes) switch mode {
+    var modes:Array<robotkit.core.JointTargetMode> = [for (mode in value.controlModes) switch mode {
       case "position": Position; case "velocity": Velocity; case "effort": Effort; case "servo": Servo;
       case _: throw "Invalid robot capabilities";
     }];
     var e = value.execution;
     var t = value.timing;
-    return new robotkit.world.RobotCapabilities(id, value.jointCount, modes,
-      new robotkit.world.ExecutionCapabilities(e.plans, e.maximumPolynomialDegree, e.maximumJoints,
+    return new robotkit.core.RobotCapabilities(id, value.jointCount, modes,
+      new robotkit.core.ExecutionCapabilities(e.plans, e.maximumPolynomialDegree, e.maximumJoints,
         e.maximumSegments, e.timedEvents, e.replacementBoundaries, e.holdResume,
         guarantee(e.polynomialLimits, e.samplingResolutionNs)),
-      new robotkit.world.TimingCapabilities(t.deadlines, t.clockMapping,
+      new robotkit.core.TimingCapabilities(t.deadlines, t.clockMapping,
         guarantee(t.prediction, t.samplingResolutionNs)), value.streams);
   }
   static function label(value:ValidationGuarantee):String return switch value {

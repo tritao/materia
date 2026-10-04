@@ -3,9 +3,9 @@ package robotkit.policy;
 import haxe.Int64;
 import robotkit.policy.VelocityReference.CommandRejection;
 import robotkit.policy.VelocityReference.VelocityCommand;
-import robotkit.world.JointTarget;
-import robotkit.world.Robot;
-import robotkit.world.RobotCommand;
+import robotkit.core.JointTarget;
+import robotkit.core.Robot;
+import robotkit.core.RobotCommand;
 
 /**
  * The execution session of a policy-driven robot. It closes the loop every

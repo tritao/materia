@@ -6,14 +6,14 @@ import motionkit.trajectory.Trajectory;
 import motionkit.trajectory.TrajectoryState;
 import robotkit.runtime.RobotRuntimeError;
 import RobotKitRuntime;
-import robotkit.world.ExecutionPlanSubmission;
-import robotkit.world.Robot;
-import robotkit.world.RobotCommand;
-import robotkit.world.RobotSnapshot;
-import robotkit.world.StopMode;
-import robotkit.world.ProcessTimedEvent;
-import robotkit.world.SegmentArrays;
-import robotkit.world.TrajectorySegment;
+import robotkit.execution.ExecutionPlanSubmission;
+import robotkit.core.Robot;
+import robotkit.core.RobotCommand;
+import robotkit.core.RobotSnapshot;
+import robotkit.core.StopMode;
+import robotkit.execution.ProcessTimedEvent;
+import robotkit.execution.SegmentArrays;
+import robotkit.execution.TrajectorySegment;
 
 private typedef StreamSegment = {timeFromStartNs:Int64, durationNs:Int64,
   coefficients:Array<Array<Float>>};

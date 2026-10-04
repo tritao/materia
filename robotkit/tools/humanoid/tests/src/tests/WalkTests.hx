@@ -4,10 +4,10 @@ import haxe.Int64;
 import humanoid.WalkRun;
 import humanoid.WalkRun.WalkResult;
 import humanoid.WalkRun.WalkScenario;
-import robotkit.world.McapRecordingReader;
-import robotkit.world.RobotCommand;
-import robotkit.world.JointTarget;
-import robotkit.world.JointTargetMode;
+import robotkit.recording.McapRecordingReader;
+import robotkit.core.RobotCommand;
+import robotkit.core.JointTarget;
+import robotkit.core.JointTargetMode;
 
 /**
  * H4 acceptance: Unitree's pretrained G1 policy, run through the ordinary

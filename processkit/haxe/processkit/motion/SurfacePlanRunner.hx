@@ -20,8 +20,8 @@ import processkit.path.Toolpath;
 import processkit.path.ToolpathPoint;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
-import robotkit.world.FiredProcessEvent;
-import robotkit.world.Robot;
+import robotkit.execution.FiredProcessEvent;
+import robotkit.core.Robot;
 
 /** Lowers one raster patch into approach, process and retract plans. */
 class SurfacePlanRunner implements processkit.skill.SurfacePlanRunner {

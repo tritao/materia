@@ -13,13 +13,13 @@ import robotkit.runtime.RobotRuntime;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationHarness;
 import robotkit.runtime.SimulationSpace;
-import robotkit.world.McapRobotRecording;
-import robotkit.world.RobotCommand;
-import robotkit.world.RobotRecording;
-import robotkit.world.RobotRecordingEvent;
-import robotkit.world.RecordingRobot;
-import robotkit.world.Robot;
-import robotkit.world.SimulatedRobot;
+import robotkit.recording.McapRobotRecording;
+import robotkit.core.RobotCommand;
+import robotkit.recording.RobotRecording;
+import robotkit.recording.RobotRecordingEvent;
+import robotkit.recording.RecordingRobot;
+import robotkit.core.Robot;
+import robotkit.simulation.SimulatedRobot;
 
 /** A velocity command from `from` seconds on, until the next segment. */
 typedef CommandSegment = {from:Float, vx:Float, vy:Float, wz:Float};

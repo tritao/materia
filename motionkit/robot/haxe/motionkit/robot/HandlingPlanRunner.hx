@@ -12,8 +12,8 @@ import motionkit.program.MoveTarget;
 import motionkit.trajectory.ValidationLimits;
 import robotkit.manipulation.Manipulator;
 import robotkit.spatial.Vec3;
-import robotkit.world.FiredProcessEvent;
-import robotkit.world.Robot;
+import robotkit.execution.FiredProcessEvent;
+import robotkit.core.Robot;
 
 /**
  * Picks and places with an arm: a motion program that comes down onto the contact point from above

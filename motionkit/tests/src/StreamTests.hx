@@ -88,25 +88,25 @@ import robotkit.runtime.VirtualActuatorOptions;
 import robotkit.runtime.RobotRuntimeError;
 import robotkit.runtime.RobotRuntimeCompiler;
 import RobotKitRuntime;
-import robotkit.world.RecordingRobot;
-import robotkit.world.ReplayRobot;
-import robotkit.world.RobotRecording;
-import robotkit.world.SimulatedRobot;
-import robotkit.world.RobotCommand;
-import robotkit.world.Robot;
-import robotkit.world.RobotCapabilities;
-import robotkit.world.RobotDescription;
-import robotkit.world.RobotFault;
-import robotkit.world.RobotId;
-import robotkit.world.RobotSnapshot;
-import robotkit.world.RobotStatus;
-import robotkit.world.RuntimeRobotAdapter;
-import robotkit.world.SensorFrame;
-import robotkit.world.StopMode;
-import robotkit.world.ExecutionPlanSubmission;
-import robotkit.world.ProcessChannelDeclaration;
-import robotkit.world.ProcessEventValue;
-import robotkit.world.TrajectorySegment;
+import robotkit.recording.RecordingRobot;
+import robotkit.recording.ReplayRobot;
+import robotkit.recording.RobotRecording;
+import robotkit.simulation.SimulatedRobot;
+import robotkit.core.RobotCommand;
+import robotkit.core.Robot;
+import robotkit.core.RobotCapabilities;
+import robotkit.core.RobotDescription;
+import robotkit.core.RobotFault;
+import robotkit.core.RobotId;
+import robotkit.core.RobotSnapshot;
+import robotkit.core.RobotStatus;
+import robotkit.runtime.RuntimeRobotAdapter;
+import robotkit.core.SensorFrame;
+import robotkit.core.StopMode;
+import robotkit.execution.ExecutionPlanSubmission;
+import robotkit.execution.ProcessChannelDeclaration;
+import robotkit.execution.ProcessEventValue;
+import robotkit.execution.TrajectorySegment;
 
 import MotionKitTestSupport.WristBranchSolver;
 import MotionKitTestSupport.PlanarSolver;
@@ -132,9 +132,9 @@ class StreamTests extends MotionKitTestSupport {
       [for (joint in blueprint.model.joints) joint.name]);
     var capabilities = new RobotCapabilities("plan-replay",
       blueprint.model.joints.length,
-      [robotkit.world.JointTargetMode.Position],
-      new robotkit.world.ExecutionCapabilities(true, 5, 64, 4096, true, true, true, trajectorykit.validation.ValidationGuarantee.Unchecked),
-      new robotkit.world.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked));
+      [robotkit.core.JointTargetMode.Position],
+      new robotkit.core.ExecutionCapabilities(true, 5, 64, 4096, true, true, true, trajectorykit.validation.ValidationGuarantee.Unchecked),
+      new robotkit.core.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked));
     var unsupported = new ReplayRobot("plan-replay", source, description);
     throws(function() MotionSystem.fromBlueprint(unsupported, blueprint),
       "MotionSystem rejects a robot without queue and plan capabilities");

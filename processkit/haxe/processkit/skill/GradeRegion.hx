@@ -9,8 +9,8 @@ import processkit.work.DigCyclePlan;
 import processkit.work.DigCyclePlanner;
 import processkit.work.EarthworkRegion;
 import processkit.work.Point2;
-import robotkit.world.Robot;
-import robotkit.world.RobotSnapshot;
+import robotkit.core.Robot;
+import robotkit.core.RobotSnapshot;
 
 /**
  * Tunable per-cycle parameters for `GradeRegion`; a pure-data anonymous

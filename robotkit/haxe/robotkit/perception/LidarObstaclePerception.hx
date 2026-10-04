@@ -3,7 +3,7 @@ package robotkit.perception;
 import robotkit.mobile.Pose2;
 import robotkit.runtime.RobotRuntimeBlueprint;
 import robotkit.runtime.RobotRuntimeSensorBlueprint;
-import robotkit.world.SensorFrame;
+import robotkit.core.SensorFrame;
 
 /** Groups adjacent planar LiDAR returns into circular obstacle observations. */
 class LidarObstaclePerception implements Perception {

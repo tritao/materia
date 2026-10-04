@@ -1,5 +1,8 @@
 package robotkit.world;
 
+import robotkit.core.RobotId;
+import robotkit.core.RobotSnapshot;
+
 import haxe.Int64;
 
 /** Immutable-by-ownership view of all observable world state. */

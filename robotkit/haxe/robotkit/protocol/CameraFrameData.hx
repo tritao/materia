@@ -1,7 +1,7 @@
 package robotkit.protocol;
 
 import haxe.io.Bytes;
-import robotkit.world.CameraImage;
+import robotkit.streams.CameraImage;
 
 /** Decoded CameraFrame metadata paired with owned bytes resolved from its attachment. */
 class CameraFrameData {

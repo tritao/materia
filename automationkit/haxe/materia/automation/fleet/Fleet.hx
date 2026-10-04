@@ -1,7 +1,7 @@
 package materia.automation.fleet;
 
 import materia.automation.mission.Mission;
-import robotkit.world.RobotStatus;
+import robotkit.core.RobotStatus;
 import robotkit.world.RobotWorld;
 
 /** Fleet roster and mission reservations composed over a live RobotWorld. */

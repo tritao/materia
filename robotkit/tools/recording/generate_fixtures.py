@@ -8,7 +8,7 @@ import re
 from mcap.writer import CompressionType, Writer
 
 ROOT = Path(__file__).resolve().parents[3]
-source = (ROOT / 'robotkit/haxe/robotkit/world/RobotRecordingEntry.hx').read_text()
+source = (ROOT / 'robotkit/haxe/robotkit/recording/RobotRecordingEntry.hx').read_text()
 version = re.search(r'VERSION:Int = (\d+)', source).group(1)
 fixtures = ROOT / 'robotkit/tests/fixtures'
 for filename, name, encoding, topic, message_encoding, payload in [

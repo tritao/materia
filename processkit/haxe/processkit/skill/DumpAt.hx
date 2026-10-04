@@ -6,8 +6,8 @@ import robotkit.manipulation.Manipulator;
 import processkit.path.Toolpath;
 import processkit.path.ToolpathPoint;
 import robotkit.spatial.Transform3;
-import robotkit.world.Robot;
-import robotkit.world.RobotSnapshot;
+import robotkit.core.Robot;
+import robotkit.core.RobotSnapshot;
 
 /**
  * Moves the bucket to a target TCP `pose` (chain-base frame) and holds it

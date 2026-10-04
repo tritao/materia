@@ -5,7 +5,7 @@ import robotkit.model.RobotModelCodec;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.SimulationHarness;
 import robotkit.runtime.SimulationSpace;
-import robotkit.world.JointTarget;
+import robotkit.core.JointTarget;
 
 /**
  * Starts an imported humanoid in a pose on a floor and holds that pose with

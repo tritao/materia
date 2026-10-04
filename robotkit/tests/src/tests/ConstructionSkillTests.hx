@@ -49,16 +49,16 @@ import robotkit.tool.ToolCollisionShape;
 import processkit.work.WorkSurface;
 import processkit.work.Polygon2;
 import processkit.work.Point2;
-import robotkit.world.SimulatedRobot;
-import robotkit.world.RecordingRobot;
-import robotkit.world.ReplayRobot;
-import robotkit.world.McapRobotRecording;
-import robotkit.world.McapRecordingReader;
-import robotkit.world.RobotDescription;
-import robotkit.world.RobotCapabilities;
-import robotkit.world.RobotSnapshot;
-import robotkit.world.ProcessChannelDeclaration;
-import robotkit.world.ProcessEventValue;
+import robotkit.simulation.SimulatedRobot;
+import robotkit.recording.RecordingRobot;
+import robotkit.recording.ReplayRobot;
+import robotkit.recording.McapRobotRecording;
+import robotkit.recording.McapRecordingReader;
+import robotkit.core.RobotDescription;
+import robotkit.core.RobotCapabilities;
+import robotkit.core.RobotSnapshot;
+import robotkit.execution.ProcessChannelDeclaration;
+import robotkit.execution.ProcessEventValue;
 
 /**
  * M10 acceptance tests: `ScanSurface`, `RegisterSurface`, `Paint`, and
@@ -168,7 +168,7 @@ class ConstructionSkillTests {
 
     // -- Paint --
     var sprayer = new SimulatedSprayer();
-    function eventSource():{events:Array<robotkit.world.FiredProcessEvent>, overflow:Bool} {
+    function eventSource():{events:Array<robotkit.execution.FiredProcessEvent>, overflow:Bool} {
       var batch = runtime.pollEvents();
       for (event in batch.events) writer.recordProcessEvent(robot.id(), event);
       return batch;
@@ -237,9 +237,9 @@ class ConstructionSkillTests {
       "recorded construction robot", linkNames, jointNames);
     var replayCapabilities = new RobotCapabilities("construction-robot",
       jointNames.length,
-      [robotkit.world.JointTargetMode.Position, robotkit.world.JointTargetMode.Velocity, robotkit.world.JointTargetMode.Effort],
-      new robotkit.world.ExecutionCapabilities(true, 5, 64, 4096, true, true, true, trajectorykit.validation.ValidationGuarantee.Unchecked),
-      new robotkit.world.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked));
+      [robotkit.core.JointTargetMode.Position, robotkit.core.JointTargetMode.Velocity, robotkit.core.JointTargetMode.Effort],
+      new robotkit.core.ExecutionCapabilities(true, 5, 64, 4096, true, true, true, trajectorykit.validation.ValidationGuarantee.Unchecked),
+      new robotkit.core.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked));
     var replay = new ReplayRobot("construction-robot", recording,
       replayDescription, replayCapabilities);
     for (command in recording.commands) {

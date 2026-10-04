@@ -1,6 +1,6 @@
 package robotkit.tool;
 
-import robotkit.world.ProcessChannelDeclaration;
+import robotkit.execution.ProcessChannelDeclaration;
 
 /**
  * The process channels a robot's tool is worked by, with the safe value and stop policy the tool itself needs: what a

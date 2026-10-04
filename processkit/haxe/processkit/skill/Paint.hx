@@ -12,8 +12,8 @@ import robotkit.tool.Sprayer;
 import robotkit.tool.ChannelToolAdapter;
 import processkit.work.CoverageMap;
 import processkit.work.WorkSurface;
-import robotkit.world.Robot;
-import robotkit.world.RobotSnapshot;
+import robotkit.core.Robot;
+import robotkit.core.RobotSnapshot;
 
 /**
  * `FinishSurface` bound to a `Sprayer`: `setProcessOn` commands the

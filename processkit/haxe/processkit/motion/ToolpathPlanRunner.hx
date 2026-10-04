@@ -13,7 +13,7 @@ import motionkit.program.MoveTarget;
 import motionkit.trajectory.ValidationLimits;
 import robotkit.manipulation.Manipulator;
 import processkit.path.Toolpath;
-import robotkit.world.Robot;
+import robotkit.core.Robot;
 
 /** Plans joint moves through the authored poses of a toolpath. */
 class ToolpathPlanRunner implements processkit.skill.ToolpathPlanRunner {

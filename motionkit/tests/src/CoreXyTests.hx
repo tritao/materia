@@ -26,7 +26,7 @@ import robotkit.model.RobotModel;
 import robotkit.model.SteadyLoads;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.SimulationHarness;
-import robotkit.world.SimulatedRobot;
+import robotkit.simulation.SimulatedRobot;
 
 /** The two axes of a Cartesian machine as a two-joint chain: the pose is where the joints are. */
 class CartesianSolver implements KinematicsSolver {

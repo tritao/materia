@@ -1,7 +1,7 @@
 package robotkit.localization;
 
 import robotkit.mobile.Pose2;
-import robotkit.world.RobotSnapshot;
+import robotkit.core.RobotSnapshot;
 
 /** Service that derives a framed pose estimate from robot observations. */
 interface Localization {

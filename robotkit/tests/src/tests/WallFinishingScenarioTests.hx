@@ -5,8 +5,8 @@ import processkit.motion.SurfacePlanRunner;
 import motionkit.robot.ProgramCompiler;
 import motionkit.planner.SimplePathTiming;
 import robotkit.tool.ChannelToolAdapter;
-import robotkit.world.ProcessChannelDeclaration;
-import robotkit.world.ProcessEventValue;
+import robotkit.execution.ProcessChannelDeclaration;
+import robotkit.execution.ProcessEventValue;
 import robotkit.model.RobotModel;
 import robotkit.model.Link;
 import robotkit.model.Joint;
@@ -50,15 +50,15 @@ import robotkit.perception.PerceptionSnapshot;
 import robotkit.skill.SkillRunner;
 import robotkit.skill.GoTo;
 import robotkit.skill.SkillStatus;
-import robotkit.world.SimulatedRobot;
-import robotkit.world.RecordingRobot;
-import robotkit.world.ReplayRobot;
-import robotkit.world.McapRobotRecording;
-import robotkit.world.McapRecordingReader;
-import robotkit.world.RobotDescription;
-import robotkit.world.RobotCapabilities;
-import robotkit.world.RobotCommand;
-import robotkit.world.RobotSnapshot;
+import robotkit.simulation.SimulatedRobot;
+import robotkit.recording.RecordingRobot;
+import robotkit.recording.ReplayRobot;
+import robotkit.recording.McapRobotRecording;
+import robotkit.recording.McapRecordingReader;
+import robotkit.core.RobotDescription;
+import robotkit.core.RobotCapabilities;
+import robotkit.core.RobotCommand;
+import robotkit.core.RobotSnapshot;
 
 /**
  * M9 acceptance test: a simulated wall-finishing robot (omni base + UR-class
@@ -430,9 +430,9 @@ class WallFinishingScenarioTests {
       linkNames, jointNames);
     var replayCapabilities = new RobotCapabilities("wall-finishing-robot",
       jointNames.length,
-      [robotkit.world.JointTargetMode.Position, robotkit.world.JointTargetMode.Velocity, robotkit.world.JointTargetMode.Effort],
-      robotkit.world.ExecutionCapabilities.unavailable(),
-      new robotkit.world.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked));
+      [robotkit.core.JointTargetMode.Position, robotkit.core.JointTargetMode.Velocity, robotkit.core.JointTargetMode.Effort],
+      robotkit.core.ExecutionCapabilities.unavailable(),
+      new robotkit.core.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked));
     var replay = new ReplayRobot("wall-finishing-robot", recording, replayDescription, replayCapabilities);
     var replayed = 0;
     for (command in recording.commands) {

@@ -2,7 +2,7 @@ package processkit.skill;
 
 import robotkit.skill.*;
 
-import robotkit.world.RobotSnapshot;
+import robotkit.core.RobotSnapshot;
 import processkit.work.WorkSurface;
 import robotkit.perception.PointCloud;
 import processkit.perception.SurfaceRegistration;

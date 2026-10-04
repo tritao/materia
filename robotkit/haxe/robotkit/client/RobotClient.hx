@@ -206,34 +206,34 @@ class RobotClient {
   public function sendJointTarget(joint:Int, mode:Int, target:Float,
       ?expiryNs:Int64):Int64 {
     var targetMode = switch mode {
-      case 1: robotkit.world.JointTargetMode.Position;
-      case 2: robotkit.world.JointTargetMode.Velocity;
-      case 3: robotkit.world.JointTargetMode.Effort;
+      case 1: robotkit.core.JointTargetMode.Position;
+      case 2: robotkit.core.JointTargetMode.Velocity;
+      case 3: robotkit.core.JointTargetMode.Effort;
       case _: throw 'Unsupported joint target mode $mode';
     };
-    return sendJointTargets([new robotkit.world.JointTarget(joint, targetMode, target)],
+    return sendJointTargets([new robotkit.core.JointTarget(joint, targetMode, target)],
       expiryNs);
   }
 
   /** Sends a complete position/velocity/effort batch as one protocol frame. */
-  public function sendJointTargets(targets:Array<robotkit.world.JointTarget>,
+  public function sendJointTargets(targets:Array<robotkit.core.JointTarget>,
       ?expiryNs:Int64):Int64 {
     ensureReady();
     // Monotonic clocks on different hosts have no shared epoch.
     if (expiryNs != null && Int64.compare(expiryNs, Int64.ofInt(0)) != 0)
       throw "Remote absolute deadlines require clock synchronization";
-    var batch = robotkit.world.JointTarget.copyBatch(targets);
+    var batch = robotkit.core.JointTarget.copyBatch(targets);
     for (target in batch)
-      if (target.mode == robotkit.world.JointTargetMode.Servo)
+      if (target.mode == robotkit.core.JointTargetMode.Servo)
         throw "Servo joint targets are not carried by the robotd protocol yet";
     var sequence = nextCommandSequence();
     var wireTargets:Array<JointTargetValue> = [];
     for (target in batch) wireTargets.push(new JointTargetValue(target.joint,
       switch target.mode {
-        case robotkit.world.JointTargetMode.Position: 1;
-        case robotkit.world.JointTargetMode.Velocity: 2;
-        case robotkit.world.JointTargetMode.Effort: 3;
-        case robotkit.world.JointTargetMode.Servo: throw "unreachable";
+        case robotkit.core.JointTargetMode.Position: 1;
+        case robotkit.core.JointTargetMode.Velocity: 2;
+        case robotkit.core.JointTargetMode.Effort: 3;
+        case robotkit.core.JointTargetMode.Servo: throw "unreachable";
       }, target.target));
     var value = new JointTargets(robotId(), wireTargets, sequence,
       expiryNs == null ? Int64.ofInt(0) : expiryNs);
@@ -251,7 +251,7 @@ class RobotClient {
     return sequence;
   }
 
-  public function submitPlan(plan:robotkit.world.ExecutionPlanSubmission):Int64 {
+  public function submitPlan(plan:robotkit.execution.ExecutionPlanSubmission):Int64 {
     ensureReady();
     var sequence = nextCommandSequence();
     send(RobotProtocol.planSubmission(PlanSubmission.fromWorld(robotId(), plan),

@@ -4,7 +4,7 @@ import robotkit.navigation.NavigationGoal;
 import robotkit.navigation.Navigator;
 import robotkit.perception.DockingTarget;
 import robotkit.perception.PerceptionSnapshot;
-import robotkit.world.RobotSnapshot;
+import robotkit.core.RobotSnapshot;
 
 /** Plans and navigates to the approach pose of a detected docking target. */
 class Dock implements Skill {

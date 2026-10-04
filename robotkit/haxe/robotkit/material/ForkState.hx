@@ -1,7 +1,7 @@
 package robotkit.material;
 
 import haxe.Int64;
-import robotkit.world.RobotId;
+import robotkit.core.RobotId;
 
 /** Immutable fork observation derived from one RobotSnapshot. */
 class ForkState {

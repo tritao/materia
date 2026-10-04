@@ -33,25 +33,25 @@ import robotkit.model.RobotModelCodec;
 import robotkit.model.CollisionShape;
 import robotkit.device.DeviceChannel;
 import robotkit.device.DeviceLayout;
-import robotkit.world.RobotCapabilities;
-import robotkit.world.RobotCommand;
-import robotkit.world.TrajectorySegment;
-import robotkit.world.RobotDescription;
-import robotkit.world.RobotFault;
-import robotkit.world.RobotId;
-import robotkit.world.Robot;
-import robotkit.world.RobotSnapshot;
-import robotkit.world.RobotStatus;
-import robotkit.world.RemoteRobot;
-import robotkit.world.SerialRobot;
+import robotkit.core.RobotCapabilities;
+import robotkit.core.RobotCommand;
+import robotkit.execution.TrajectorySegment;
+import robotkit.core.RobotDescription;
+import robotkit.core.RobotFault;
+import robotkit.core.RobotId;
+import robotkit.core.Robot;
+import robotkit.core.RobotSnapshot;
+import robotkit.core.RobotStatus;
+import robotkit.remote.RemoteRobot;
+import robotkit.serial.SerialRobot;
 import robotkit.deployment.SerialDeployment;
-import robotkit.world.SimulatedRobot;
-import robotkit.world.RecordingRobot;
-import robotkit.world.StopMode;
+import robotkit.simulation.SimulatedRobot;
+import robotkit.recording.RecordingRobot;
+import robotkit.core.StopMode;
 import robotkit.world.RobotWorld;
 import robotkit.world.RobotWorldEvent;
-import robotkit.world.SensorFrame;
-import robotkit.world.CameraImage;
+import robotkit.core.SensorFrame;
+import robotkit.streams.CameraImage;
 import robotkit.protocol.BufferRef;
 import robotkit.protocol.CameraFrame;
 import robotkit.protocol.PixelFormat;
@@ -59,20 +59,20 @@ import robotkit.protocol.RobotFrame;
 import robotkit.protocol.RobotMessageType;
 import robotkit.protocol.RobotProtocol;
 import haxeon.wire.MessagePack;
-import robotkit.world.ReplayRobot;
-import robotkit.world.RobotRecording;
-import robotkit.world.RobotRecordingEvent;
-import robotkit.world.McapRobotRecording;
-import robotkit.world.McapRecordingReader;
-import robotkit.world.McapRecordingStatus;
-import robotkit.world.RecordingChannels;
-import robotkit.world.RobotRecordingEntry;
-import robotkit.world.FiredProcessEvent;
-import robotkit.world.ProcessEventValue;
-import robotkit.world.ProcessChannelDeclaration;
-import robotkit.world.ProcessTimedEvent;
-import robotkit.world.ExecutionPlanSubmission;
-import robotkit.world.ProcessHoldPolicy;
+import robotkit.recording.ReplayRobot;
+import robotkit.recording.RobotRecording;
+import robotkit.recording.RobotRecordingEvent;
+import robotkit.recording.McapRobotRecording;
+import robotkit.recording.McapRecordingReader;
+import robotkit.recording.McapRecordingStatus;
+import robotkit.recording.RecordingChannels;
+import robotkit.recording.RobotRecordingEntry;
+import robotkit.execution.FiredProcessEvent;
+import robotkit.execution.ProcessEventValue;
+import robotkit.execution.ProcessChannelDeclaration;
+import robotkit.execution.ProcessTimedEvent;
+import robotkit.execution.ExecutionPlanSubmission;
+import robotkit.execution.ProcessHoldPolicy;
 import robotkit.tool.ChannelToolAdapter;
 import robotkit.tool.SimulatedSprayer;
 import robotkit.deployment.SerialDeployment;
@@ -294,20 +294,20 @@ class RobotWorldTests {
   static function testPolynomialExecutionPlan():Void {
     var segment = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(100000000),
       [[0.0, 1.0], [0.0, -1.0]]);
-    var plan = new robotkit.world.ExecutionPlanSubmission(Int64.ofInt(7),
+    var plan = new robotkit.execution.ExecutionPlanSubmission(Int64.ofInt(7),
       Int64.ofInt(1), Int64.ofInt(1), 0, [0.0, 0.0], [0.0, 0.0],
       [0.0, 0.0], [segment], null, null, null, null, null, false);
     check(plan.segments.length == 1, "execution plan uses polynomial payload");
     check(plan.copy().segments[0].coefficients[1][1] == -1.0,
       "execution plan copy keeps coefficients");
     var gapRejected = false;
-    try new robotkit.world.ExecutionPlanSubmission(Int64.ofInt(8), Int64.ofInt(1),
+    try new robotkit.execution.ExecutionPlanSubmission(Int64.ofInt(8), Int64.ofInt(1),
       Int64.ofInt(1), 0, [0.0, 0.0], [0.0, 0.0], [0.0, 0.0],
       [segment, new TrajectorySegment(Int64.ofInt(100000001), Int64.ofInt(100000000),
         [[0.1, 1.0], [-0.1, -1.0]])]) catch (_:Dynamic) gapRejected = true;
     check(gapRejected, "execution plan rejects a one-nanosecond segment gap");
     var eventRejected = false;
-    try new robotkit.world.ExecutionPlanSubmission(Int64.ofInt(8), Int64.ofInt(1),
+    try new robotkit.execution.ExecutionPlanSubmission(Int64.ofInt(8), Int64.ofInt(1),
       Int64.ofInt(1), 0, [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [segment],
       null, null, null, null, null, false,
       [new ProcessTimedEvent(Int64.ofInt(100000001), "test", ProcessEventValue.Digital(true))])
@@ -367,7 +367,7 @@ class RobotWorldTests {
   static function testReplayCorrectness():Void {
     var recording = new RobotRecording();
     recording.recordCommand(RobotCommand.JointTargets([
-      robotkit.world.JointTarget.position(0, 99.0)
+      robotkit.core.JointTarget.position(0, 99.0)
     ], null), "robot-a");
     recording.recordSnapshot(new RobotSnapshot("robot-a", Int64.ofInt(7), Int64.ofInt(100),
       [1.0], [], [], 1, 0, Int64.ofInt(200), [], "robot-a.boot-1", "host"));
@@ -410,22 +410,22 @@ class RobotWorldTests {
 
   static function testJointTargetBatches():Void {
     var source = [
-      robotkit.world.JointTarget.position(0, 0.4),
-      robotkit.world.JointTarget.velocity(1, -0.25),
-      robotkit.world.JointTarget.effort(2, 3.5)
+      robotkit.core.JointTarget.position(0, 0.4),
+      robotkit.core.JointTarget.velocity(1, -0.25),
+      robotkit.core.JointTarget.effort(2, 3.5)
     ];
     var recording = new RobotRecording();
     recording.recordCommand(RobotCommand.JointTargets(source, null), "batch-robot");
-    source[0] = robotkit.world.JointTarget.position(0, 9.0);
+    source[0] = robotkit.core.JointTarget.position(0, 9.0);
     source.pop();
     var recorded = recording.commands[0];
     switch recorded {
       case JointTargets(targets, _):
         equal(targets.length, 3, "recording owns the full command batch");
         equal(targets[0].target, 0.4, "recording copies immutable target values");
-        equal(Std.string(targets[1].mode), Std.string(robotkit.world.JointTargetMode.Velocity),
+        equal(Std.string(targets[1].mode), Std.string(robotkit.core.JointTargetMode.Velocity),
           "recording preserves velocity interpretation");
-        equal(Std.string(targets[2].mode), Std.string(robotkit.world.JointTargetMode.Effort),
+        equal(Std.string(targets[2].mode), Std.string(robotkit.core.JointTargetMode.Effort),
           "recording preserves effort interpretation");
       case _:
         check(false, "recording retains a joint target batch");
@@ -435,7 +435,7 @@ class RobotWorldTests {
     switch decoded.event {
       case Command(JointTargets(targets, _)):
         equal(targets.length, 3, "recording codec round-trips every target in a batch");
-        equal(Std.string(targets[0].mode), Std.string(robotkit.world.JointTargetMode.Position),
+        equal(Std.string(targets[0].mode), Std.string(robotkit.core.JointTargetMode.Position),
           "recording codec preserves position mode");
         equal(targets[1].target, -0.25, "recording codec preserves velocity values");
         equal(targets[2].target, 3.5, "recording codec preserves effort values");
@@ -445,21 +445,21 @@ class RobotWorldTests {
 
     var replay = new ReplayRobot("batch-robot", recording);
     replay.submit(RobotCommand.JointTargets([
-      robotkit.world.JointTarget.position(0, -0.1),
-      robotkit.world.JointTarget.velocity(1, 0.5)
+      robotkit.core.JointTarget.position(0, -0.1),
+      robotkit.core.JointTarget.velocity(1, 0.5)
     ], null));
     switch replay.generatedCommands.commands[0] {
       case JointTargets(targets, _):
         equal(targets.length, 2, "replay captures generated commands as one batch");
-        equal(Std.string(targets[1].mode), Std.string(robotkit.world.JointTargetMode.Velocity),
+        equal(Std.string(targets[1].mode), Std.string(robotkit.core.JointTargetMode.Velocity),
           "replay preserves generated target modes");
       case _:
         check(false, "replay generated command keeps batch form");
     }
     replay.close();
-    throws(function() robotkit.world.JointTarget.copyBatch([
-      robotkit.world.JointTarget.position(0, 0.0),
-      robotkit.world.JointTarget.effort(0, 1.0)
+    throws(function() robotkit.core.JointTarget.copyBatch([
+      robotkit.core.JointTarget.position(0, 0.0),
+      robotkit.core.JointTarget.effort(0, 1.0)
     ]), "duplicate joints rejected within one atomic batch");
   }
 
@@ -506,8 +506,8 @@ class RobotWorldTests {
     check(switch differentialRobot.lastCommand {
       case JointTargets(targets, _):
         targets.length == 2 && targets[0].joint == 0 && targets[1].joint == 1 &&
-          targets[0].mode == robotkit.world.JointTargetMode.Velocity &&
-          targets[1].mode == robotkit.world.JointTargetMode.Velocity &&
+          targets[0].mode == robotkit.core.JointTargetMode.Velocity &&
+          targets[1].mode == robotkit.core.JointTargetMode.Velocity &&
           Math.abs(targets[0].target - 1.0) < 1e-9 &&
           Math.abs(targets[1].target - 4.0) < 1e-9;
       case _: false;
@@ -554,8 +554,8 @@ class RobotWorldTests {
       "Ackermann drive limits yaw rate to the configured steering angle");
     check(switch ackermannRobot.lastCommand {
       case JointTargets(targets, _):
-        targets.length == 2 && targets[0].mode == robotkit.world.JointTargetMode.Position &&
-          targets[1].mode == robotkit.world.JointTargetMode.Velocity &&
+        targets.length == 2 && targets[0].mode == robotkit.core.JointTargetMode.Position &&
+          targets[1].mode == robotkit.core.JointTargetMode.Velocity &&
           Math.abs(targets[0].target) <= 0.5 && targets[1].target > 0.0;
       case _: false;
     }, "Ackermann drive submits steering position and wheel velocity together");
@@ -581,9 +581,9 @@ class RobotWorldTests {
     check(switch holonomicRobot.lastCommand {
       case JointTargets(targets, _):
         targets.length == 3 && targets[0].joint == 0 && targets[1].joint == 1 && targets[2].joint == 2 &&
-          targets[0].mode == robotkit.world.JointTargetMode.Velocity &&
-          targets[1].mode == robotkit.world.JointTargetMode.Velocity &&
-          targets[2].mode == robotkit.world.JointTargetMode.Velocity;
+          targets[0].mode == robotkit.core.JointTargetMode.Velocity &&
+          targets[1].mode == robotkit.core.JointTargetMode.Velocity &&
+          targets[2].mode == robotkit.core.JointTargetMode.Velocity;
       case _: false;
     }, "holonomic drive submits all three wheel velocities as one atomic command");
     var straightTargets = new robotkit.mobile.HolonomicDrive([0, 1, 2], 0.05, 0.3).targets(new Twist2(1.0, 0.0));
@@ -784,8 +784,8 @@ class RobotWorldTests {
     ackermann.command(new Twist2(0.5, 0.2));
     check(switch robot.lastCommand {
       case JointTargets(targets, _): targets.length == 2 &&
-        targets[0].joint == 3 && targets[0].mode == robotkit.world.JointTargetMode.Position &&
-        targets[1].joint == 0 && targets[1].mode == robotkit.world.JointTargetMode.Velocity;
+        targets[0].joint == 3 && targets[0].mode == robotkit.core.JointTargetMode.Position &&
+        targets[1].joint == 0 && targets[1].mode == robotkit.core.JointTargetMode.Velocity;
       case _: false;
     }, "model-driven Ackermann roles preserve the steering and wheel target modes");
     profile.forkMechanism = savedForkConfig;
@@ -1104,15 +1104,15 @@ class RobotWorldTests {
       "compiler rejects a contact pair naming a missing shape");
     throws(function() RobotModelCodec.encode(paired), "codec rejects a contact pair naming a missing shape");
 
-    var servo = robotkit.world.JointTarget.servo(1, 0.3, 0.1, 100.0, 5.0, -2.0);
+    var servo = robotkit.core.JointTarget.servo(1, 0.3, 0.1, 100.0, 5.0, -2.0);
     var servoCopy = servo.copy();
-    check(servoCopy.mode == robotkit.world.JointTargetMode.Servo && servoCopy.stiffness == 100.0 &&
+    check(servoCopy.mode == robotkit.core.JointTargetMode.Servo && servoCopy.stiffness == 100.0 &&
       servoCopy.servoVelocity == 0.1 && servoCopy.feedforward == -2.0, "servo targets copy their terms");
-    throws(function() robotkit.world.JointTarget.servo(0, 0.0, 0.0, -1.0, 0.0, 0.0),
+    throws(function() robotkit.core.JointTarget.servo(0, 0.0, 0.0, -1.0, 0.0, 0.0),
       "servo targets reject negative stiffness");
     var servoHarness = new SimulationHarness(0.02);
     var servoRuntime = servoHarness.simulation.addRobot(RobotRuntimeCompiler.compile(restored, restoredProfile));
-    servoRuntime.submitTargets([robotkit.world.JointTarget.servo(2, 0.4, 0.0, 100.0, 5.0, 0.0)], 1);
+    servoRuntime.submitTargets([robotkit.core.JointTarget.servo(2, 0.4, 0.0, 100.0, 5.0, 0.0)], 1);
     servoHarness.step(Int64.ofInt(0));
     check(Math.abs(servoRuntime.snapshot().q.get(2) - 0.4) < 1e-9,
       "a servo target reaches the deterministic backend's joint");
@@ -1121,7 +1121,7 @@ class RobotWorldTests {
     servoRecording.recordCommand(RobotCommand.JointTargets([servo], null));
     switch roundTripRecording(servoRecording.entries[0]).event {
       case Command(JointTargets(targets, _)):
-        check(targets[0].mode == robotkit.world.JointTargetMode.Servo &&
+        check(targets[0].mode == robotkit.core.JointTargetMode.Servo &&
           targets[0].stiffness == 100.0 && targets[0].feedforward == -2.0,
           "a recorded servo target replays with its terms");
       case _: throw "Expected recorded servo targets";
@@ -1888,8 +1888,8 @@ class RobotWorldTests {
     }, "Navigation starts and updates a path-following request");
     check(switch robot.lastCommand {
       case JointTargets(targets, _):
-        targets.length == 2 && targets[0].mode == robotkit.world.JointTargetMode.Velocity &&
-          targets[1].mode == robotkit.world.JointTargetMode.Velocity &&
+        targets.length == 2 && targets[0].mode == robotkit.core.JointTargetMode.Velocity &&
+          targets[1].mode == robotkit.core.JointTargetMode.Velocity &&
           Math.abs(targets[0].target - targets[1].target) < 1e-9;
       case _: false;
     }, "path follower commands both differential wheels through MobileBase");
@@ -2896,8 +2896,8 @@ class RobotWorldTests {
     plant.step(Int64.ofInt(tick++));
     var directStart = plant.pose;
     robot.submit(RobotCommand.JointTargets([
-      robotkit.world.JointTarget.velocity(0, 3.0),
-      robotkit.world.JointTarget.velocity(1, 3.0)
+      robotkit.core.JointTarget.velocity(0, 3.0),
+      robotkit.core.JointTarget.velocity(1, 3.0)
     ], null));
     plant.step(Int64.ofInt(tick++));
     var directExpected = directStart.integrateDisplacement(3.0 * 0.1 * 0.02, 0.0);
@@ -3049,7 +3049,7 @@ class RobotWorldTests {
     var wheelStart = plant.pose;
     var strafe = [for (i in 0...3) {
       var angle = Math.PI * 0.5 + i * Math.PI * 2.0 / 3.0;
-      robotkit.world.JointTarget.velocity(i, Math.cos(angle) * 0.3 / wheelRadius);
+      robotkit.core.JointTarget.velocity(i, Math.cos(angle) * 0.3 / wheelRadius);
     }];
     robot.submit(RobotCommand.JointTargets(strafe, null));
     for (_ in 0...10) plant.step(Int64.ofInt(tick++));
@@ -3108,9 +3108,9 @@ class RobotWorldTests {
         targets.length == 3 && targets[0].joint == 0 && targets[1].joint == 1 &&
           targets[2].joint == 2 && targets[0].target == 1.5 &&
           targets[1].target == 0.2 && targets[2].target == 0.4 &&
-          targets[0].mode == robotkit.world.JointTargetMode.Position &&
-          targets[1].mode == robotkit.world.JointTargetMode.Position &&
-          targets[2].mode == robotkit.world.JointTargetMode.Position;
+          targets[0].mode == robotkit.core.JointTargetMode.Position &&
+          targets[1].mode == robotkit.core.JointTargetMode.Position &&
+          targets[2].mode == robotkit.core.JointTargetMode.Position;
       case _: false;
     }, "Forks sends lift, tilt, and spread targets as one atomic batch");
 
@@ -3821,9 +3821,9 @@ class RobotWorldTests {
       linkNames, jointNames);
     var replayCapabilities = new RobotCapabilities("forklift",
       5,
-      [robotkit.world.JointTargetMode.Position, robotkit.world.JointTargetMode.Velocity, robotkit.world.JointTargetMode.Effort],
-      robotkit.world.ExecutionCapabilities.unavailable(),
-      new robotkit.world.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked));
+      [robotkit.core.JointTargetMode.Position, robotkit.core.JointTargetMode.Velocity, robotkit.core.JointTargetMode.Effort],
+      robotkit.core.ExecutionCapabilities.unavailable(),
+      new robotkit.core.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked));
 
     var goalReplay = new ReplayRobot("forklift", recording,
       replayDescription, replayCapabilities);
@@ -4116,17 +4116,17 @@ class RobotWorldTests {
       Int64.ofInt(9), Int64.ofInt(150), [], Int64.ofInt(160), "link/base",
       [0.2, 0.0, 0.8], [0.0, 0.0, 0.0, 1.0], "robot-a.reset-2",
       "host.monotonic", new CameraImage(2, 1, "rgb8", cameraBytes));
-    var corruptSensor = robotkit.world.RobotRecordingCodec.sensor(camera, "robot-a");
+    var corruptSensor = robotkit.recording.RobotRecordingCodec.sensor(camera, "robot-a");
     corruptSensor.mountPosition = [0.0, 0.0];
     var decodeError = "";
-    try robotkit.world.RobotRecordingCodec.readSensor(corruptSensor)
+    try robotkit.recording.RobotRecordingCodec.readSensor(corruptSensor)
     catch (error:Dynamic) decodeError = Std.string(error);
     check(decodeError.indexOf("mount dimensions") >= 0,
       "recorded sensor mount position requires three finite values");
     corruptSensor.mountPosition = [0.0, 0.0, 0.0];
     corruptSensor.mountRotation = [0.0, 0.0, 0.0, 2.0];
     decodeError = "";
-    try robotkit.world.RobotRecordingCodec.readSensor(corruptSensor)
+    try robotkit.recording.RobotRecordingCodec.readSensor(corruptSensor)
     catch (error:Dynamic) decodeError = Std.string(error);
     check(decodeError.indexOf("unit quaternion") >= 0,
       "recorded sensor mount rotation requires unit length");
@@ -4134,19 +4134,19 @@ class RobotWorldTests {
       Int64.parseString("9223372036854775000"), [0.5], [0.25], [0.125], 1, 0,
       Int64.parseString("9223372036854775002"), [sensor, camera], "robot-a.reset-2", "host.monotonic",
       RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP);
-    var corruptSnapshot = robotkit.world.RobotRecordingCodec.snapshot(first);
+    var corruptSnapshot = robotkit.recording.RobotRecordingCodec.snapshot(first);
     corruptSnapshot.positions = [Math.sqrt(-1.0)];
     decodeError = "";
-    try robotkit.world.RobotRecordingCodec.readSnapshot(corruptSnapshot)
+    try robotkit.recording.RobotRecordingCodec.readSnapshot(corruptSnapshot)
     catch (error:Dynamic) decodeError = Std.string(error);
     check(decodeError.indexOf("not finite") >= 0,
       "recorded snapshot rejects non-finite joint values");
     var second = new RobotSnapshot("robot-b", Int64.ofInt(3), Int64.ofInt(10),
       [0.75], [], [], 1, 0, Int64.ofInt(20), [], "robot-b.boot-1", "host.monotonic");
     writer.recordCommand(RobotCommand.JointTargets([
-      robotkit.world.JointTarget.position(0, 0.75),
-      robotkit.world.JointTarget.velocity(1, -0.25),
-      robotkit.world.JointTarget.effort(2, 3.5)
+      robotkit.core.JointTarget.position(0, 0.75),
+      robotkit.core.JointTarget.velocity(1, -0.25),
+      robotkit.core.JointTarget.effort(2, 3.5)
     ], Int64.parseString("9223372036854775003")), "robot-a");
     writer.recordSnapshot(first);
     writer.recordSensor("robot-a", sensor);
@@ -4191,7 +4191,7 @@ class RobotWorldTests {
     switch loaded.commands[0] {
       case JointTargets(targets, expiry):
         equal(targets.length, 3, "MCAP preserves batched target count");
-        equal(Std.string(targets[1].mode), Std.string(robotkit.world.JointTargetMode.Velocity),
+        equal(Std.string(targets[1].mode), Std.string(robotkit.core.JointTargetMode.Velocity),
           "MCAP preserves velocity mode");
         equal(targets[2].target, 3.5, "MCAP preserves effort target value");
         equal(expiry, Int64.parseString("9223372036854775003"),
@@ -4862,7 +4862,7 @@ class RobotWorldTests {
     equal(robot.snapshot().sensors.length, 3, "second sample publishes measured IMU");
     var rejected = false;
     try robot.submit(RobotCommand.JointTargets([
-      robotkit.world.JointTarget.position(0, 0.0)
+      robotkit.core.JointTarget.position(0, 0.0)
     ], Int64.ofInt(100)))
     catch (_:Dynamic) rejected = true;
     check(rejected, "simulation never silently ignores an unsupported deadline");
@@ -4909,7 +4909,7 @@ class RobotWorldTests {
     input[5] = -1.0;
     equal(snapshot.sensors.get(1).values.get(5), 9.81, "runtime sensor payload owns a copy");
     var copy = snapshot.withRobotId(Int64.ofInt(5));
-    var frames = robotkit.world.RobotSensorFrames.fromRuntimeSnapshot(copy);
+    var frames = robotkit.core.RobotSensorFrames.fromRuntimeSnapshot(copy);
     equal(frames.length, 3, "runtime projection preserves valid measurements");
     var mutable = frames[1].values.toArray();
     mutable[5] = 0.0;
@@ -4918,7 +4918,7 @@ class RobotWorldTests {
     var absent = new robotkit.runtime.RobotSnapshot(Int64.ofInt(1), Int64.ofInt(0),
       Int64.ofInt(999), 0, 0, 1, 0, [], [], []);
     equal(absent.receivedTimestampNs, Int64.ofInt(0), "unknown receipt is not source time");
-    equal(robotkit.world.RobotSensorFrames.fromRuntimeSnapshot(absent).length, 0,
+    equal(robotkit.core.RobotSensorFrames.fromRuntimeSnapshot(absent).length, 0,
       "endpoints without sensors do not fabricate IMU or LiDAR");
     var intents = new robotkit.behavior.IntentBuffer();
     intents.publish(new robotkit.behavior.JointTargetIntent(0, 1, 0.5, Int64.ofInt(100)));
@@ -5074,7 +5074,7 @@ class RobotWorldTests {
     for (index in 0...500) {
       host.step(Int64.ofInt(4000 + index));
       for (event in remote.events(Int64.ofInt(0), 8)) switch event {
-        case robotkit.world.RobotEvent.Observation(_, value):
+        case robotkit.core.RobotEvent.Observation(_, value):
           if (value.sensorId == "front_camera" && value.sourceFrameId == "frame/front")
             worldObservation = true;
         case _:
@@ -5193,7 +5193,7 @@ class RobotWorldTests {
     var robot = new FakeRobot("arm");
     world.attach(robot);
     var command = RobotCommand.JointTargets([
-      robotkit.world.JointTarget.position(3, 1.25)
+      robotkit.core.JointTarget.position(3, 1.25)
     ], Int64.ofInt(99));
     world.submit("arm", command);
     equal(Std.string(robot.lastCommand), Std.string(command), "command forwarded to selected robot");
@@ -5232,7 +5232,7 @@ class RobotWorldTests {
     var snapshot = world.snapshot().robot("recorded-arm");
     check(snapshot != null, "recording test has a robot snapshot");
     recording.recordCommand(RobotCommand.JointTargets([
-      robotkit.world.JointTarget.position(0, 0.5)
+      robotkit.core.JointTarget.position(0, 0.5)
     ], null));
     recording.recordSnapshot(cast snapshot);
     recording.recordFault(new RobotFault("fault-1", 7, "test fault", false));
@@ -5293,16 +5293,16 @@ class RobotWorldTests {
 
     var duplicateRejected = false;
     try world.submit("sim-a", RobotCommand.JointTargets([
-      robotkit.world.JointTarget.position(0, 0.1),
-      robotkit.world.JointTarget.effort(0, 2.0)
+      robotkit.core.JointTarget.position(0, 0.1),
+      robotkit.core.JointTarget.effort(0, 2.0)
     ], null)) catch (_:Dynamic) duplicateRejected = true;
     check(duplicateRejected, "simulated adapter rejects an ambiguous atomic batch");
     world.submit("sim-a", RobotCommand.JointTargets([
-      robotkit.world.JointTarget.position(0, 0.4),
-      robotkit.world.JointTarget.position(1, -0.2)
+      robotkit.core.JointTarget.position(0, 0.4),
+      robotkit.core.JointTarget.position(1, -0.2)
     ], null));
     world.submit("sim-b", RobotCommand.JointTargets([
-      robotkit.world.JointTarget.position(0, -0.3)
+      robotkit.core.JointTarget.position(0, -0.3)
     ], null));
     simulationHarness.step(Int64.ofInt(1000));
 
@@ -5408,7 +5408,7 @@ class RobotWorldTests {
 
     var segmentSimulation = segmentSimulationHarness.simulation;
     var segmentRuntime = segmentSimulation.addRobot(blueprint);
-    segmentRuntime.submitPlan(new robotkit.world.ExecutionPlanSubmission(Int64.ofInt(1),
+    segmentRuntime.submitPlan(new robotkit.execution.ExecutionPlanSubmission(Int64.ofInt(1),
       Int64.ofInt(blueprint.revision), Int64.ofInt(blueprint.calibrationRevision),
       RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
       [0.0], [0.0], [0.0],
@@ -5430,7 +5430,7 @@ class RobotWorldTests {
     var writer = new McapRobotRecording(planPath, 1024 * 1024);
     var recorded = new RecordingRobot(new SimulatedRobot("plan-session", planRuntime,
       model.name, ["base", "tool"], ["shoulder"]), writer);
-    var plan = new robotkit.world.ExecutionPlanSubmission(Int64.ofInt(77),
+    var plan = new robotkit.execution.ExecutionPlanSubmission(Int64.ofInt(77),
       Int64.ofInt(blueprint.revision), Int64.ofInt(blueprint.calibrationRevision),
       RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
       [0.0], [0.0], [0.0],
@@ -5572,9 +5572,9 @@ private class FakeRobot implements Robot {
     logicalId, logicalId, [], jointNames);
   public function capabilities():RobotCapabilities return new RobotCapabilities(logicalId,
       positions.length,
-      [robotkit.world.JointTargetMode.Position, robotkit.world.JointTargetMode.Velocity, robotkit.world.JointTargetMode.Effort],
-      robotkit.world.ExecutionCapabilities.unavailable(),
-      new robotkit.world.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked));
+      [robotkit.core.JointTargetMode.Position, robotkit.core.JointTargetMode.Velocity, robotkit.core.JointTargetMode.Effort],
+      robotkit.core.ExecutionCapabilities.unavailable(),
+      new robotkit.core.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked));
   public function snapshot():RobotSnapshot return new RobotSnapshot(
     logicalId,
     Int64.ofInt(1),
@@ -5586,7 +5586,7 @@ private class FakeRobot implements Robot {
     0
   );
   public function sensors():Array<SensorFrame> return [];
-  public function events(afterOrdinal:haxe.Int64, max:Int):Array<robotkit.world.RobotEvent> return [];
+  public function events(afterOrdinal:haxe.Int64, max:Int):Array<robotkit.core.RobotEvent> return [];
   public function fault():Null < RobotFault > return null;
   public function submit(command:RobotCommand):Void lastCommand = command;
   public function stop(mode:StopMode):Void lastStop = mode;

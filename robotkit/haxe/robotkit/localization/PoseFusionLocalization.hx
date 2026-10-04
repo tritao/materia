@@ -3,7 +3,7 @@ package robotkit.localization;
 import haxe.Int64;
 import robotkit.localization.LocalizationQuality;
 import robotkit.mobile.Pose2;
-import robotkit.world.RobotSnapshot;
+import robotkit.core.RobotSnapshot;
 
 /** Fuses wheel odometry with covariance-weighted external planar pose observations. */
 class PoseFusionLocalization implements Localization {

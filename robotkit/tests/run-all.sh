@@ -47,7 +47,7 @@ ensure_mujoco() {
 say "Haxe world tests"
 run python3 "$robotkit_dir/tools/recording/generate_schemas.py" check \
   --lock "$robotkit_dir/schema/rkf1.lock.json" \
-  --output "$robotkit_dir/haxe/robotkit/world/RecordingSchemas.hx"
+  --output "$robotkit_dir/haxe/robotkit/recording/RecordingSchemas.hx"
 run "$haxeon" run --project "$robotkit_dir/tests/haxeon.json"
 
 if [[ "${ROBOTKIT_TEST_SENSORKIT_SPIKE:-0}" == "1" ]]; then

@@ -189,6 +189,11 @@ Other worktrees and their uncommitted work remain untouched.
 
 ## R4 — Split `robotkit.world`
 
+Started from the quiet point immediately after R3 main merge `d1a42c128`.
+Live branches with world imports must update them when rebasing: drywall-scoped-d8,
+gantries, machine-tending, machinekit-restructure, mobile-welder,
+motion-loose-ends and x7-transmissions. Other worktrees remain untouched.
+
 `robotkit.world` has 54 files and really means "miscellaneous public types". In one mechanical
 commit, move them to:
 

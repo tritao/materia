@@ -3,7 +3,7 @@ package robotkit.skill;
 import robotkit.localization.Localization;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
-import robotkit.world.RobotSnapshot;
+import robotkit.core.RobotSnapshot;
 
 /**
  * Picks a part up with a vacuum tool, or sets the held part down. `contact` gives, in the map frame,

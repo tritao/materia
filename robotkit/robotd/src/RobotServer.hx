@@ -39,10 +39,10 @@ import robotkit.protocol.PathControl;
 import robotkit.runtime.RobotRuntimeError;
 import robotkit.protocol.SensorFrameMsg;
 import robotkit.transport.NativeTransport;
-import robotkit.world.RobotSensorFrames;
-import robotkit.world.RuntimeRobotAdapter;
-import robotkit.world.RobotEvent;
-import robotkit.world.RobotEventRing;
+import robotkit.core.RobotSensorFrames;
+import robotkit.runtime.RuntimeRobotAdapter;
+import robotkit.core.RobotEvent;
+import robotkit.core.RobotEventRing;
 import robotkit.perception.PerceptionHost;
 import robotkit.perception.PerceptionPipelineRegistry;
 import robotkit.deployment.PerceptionPipelineConfig;
@@ -517,7 +517,7 @@ class RobotServer {
       return;
     }
     try {
-      var targets:Array<robotkit.world.JointTarget> = [];
+      var targets:Array<robotkit.core.JointTarget> = [];
       var seen = new Map<Int, Bool>();
       for (target in value.targets) {
         if (target == null || target.joint < 0 || target.joint >= blueprint.jointCount
@@ -527,16 +527,16 @@ class RobotServer {
         }
         seen.set(target.joint, true);
         var mode = switch target.mode {
-          case 1: robotkit.world.JointTargetMode.Position;
-          case 2: robotkit.world.JointTargetMode.Velocity;
-          case 3: robotkit.world.JointTargetMode.Effort;
+          case 1: robotkit.core.JointTargetMode.Position;
+          case 2: robotkit.core.JointTargetMode.Velocity;
+          case 3: robotkit.core.JointTargetMode.Effort;
           case _: null;
         };
         if (mode == null) {
           sendFault(422, "joint target batch contains an unsupported mode", false);
           return;
         }
-        targets.push(new robotkit.world.JointTarget(target.joint, mode, target.target));
+        targets.push(new robotkit.core.JointTarget(target.joint, mode, target.target));
       }
       runtime.submitTargets64(targets, nextRuntimeSequence());
       lastRequestSequence = value.sequence;

@@ -3,8 +3,8 @@ package robotkit.localization;
 import haxe.Int64;
 import robotkit.model.RobotModel;
 import robotkit.mobile.Pose2;
-import robotkit.world.RobotSnapshot;
-import robotkit.world.SensorFrame;
+import robotkit.core.RobotSnapshot;
+import robotkit.core.SensorFrame;
 
 /**
  * Converts a dual-antenna GNSS pose fix into a local ENU frame.

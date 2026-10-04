@@ -22,8 +22,8 @@ import processkit.WelderProcessDevice;
 import processkit.tool.WeldArcModel;
 import processkit.tool.WeldFault;
 import processkit.tool.WeldSensor.WeldReading;
-import robotkit.world.FiredProcessEvent;
-import robotkit.world.ProcessEventValue;
+import robotkit.execution.FiredProcessEvent;
+import robotkit.execution.ProcessEventValue;
 
 /**
  * A welder behind the outputs and feedback a process device speaks: RobotKit's arc model stands in for the supply,

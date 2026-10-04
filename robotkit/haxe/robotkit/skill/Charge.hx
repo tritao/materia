@@ -4,7 +4,7 @@ import robotkit.navigation.Navigator;
 import robotkit.perception.DockingTarget;
 import robotkit.perception.PerceptionSnapshot;
 import robotkit.power.Power;
-import robotkit.world.RobotSnapshot;
+import robotkit.core.RobotSnapshot;
 
 private enum ChargeStage {
   Docking;
