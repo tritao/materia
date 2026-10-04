@@ -9,6 +9,13 @@ class Sensor {
   public var frame:Null<Frame>;
   public var rayCount:Int = 8;
   public var maxRange:Float = 10.0;
+  /** Joint read by a native switch or speed sensor. */
+  public var joint:Null<String>;
+  /** Inclusive position window for a `joint_switch`, in joint SI units. */
+  public var windowLower:Float = 0.0;
+  public var windowUpper:Float = 0.0;
+  /** Position hysteresis beyond the switch window, in joint SI units. */
+  public var hysteresis:Float = 0.0;
   /** Bearing of the first LiDAR ray in the sensor frame. */
   public var startAngleRadians:Float = 0.0;
   /** Angular coverage. The default is one full revolution. */

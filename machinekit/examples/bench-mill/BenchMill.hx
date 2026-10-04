@@ -131,11 +131,12 @@ class BenchMill extends MachineAssembly {
 		attach("head", head, AssemblyFrames.translation(0, headY, headZ), "blockZLeft");
 		attach("blockZRight", LinearRailBlock.metric(RAIL),
 			orient(column.railSpacing / 2, columnFront - railSpec.railHeight, zBlock, [0.0, -1, 0], [0.0, 0, 1]), "head");
-		// MT2 keeps the cartridge at zero speed; MT5 binds its continuous joint to spindle.speed.
+		// The at-speed switch returns real feedback to the CNC program.
 		addComponent("spindle", spindle);
 		zeroPoses.set("spindle", gaugeZero);
 		connect("head", "spindle");
 		addMateOnAxis("spindle-turn", "continuous", "head", "to-spindle", "spindle", "attach-spindle", {x: 0, y: 0, z: 1});
+		addAtSpeed("spindle-at-speed", "spindle-turn", 7600 * 2 * Math.PI / 60);
 		attach("holder", holder, gaugeZero, "spindle");
 		attach("tool", tool, AssemblyFrames.translation(0, spindleY, gaugeZero.z - tool.stickout), "spindle");
 		if (vise == null) {
@@ -185,6 +186,13 @@ class BenchMill extends MachineAssembly {
 			AssemblyFrames.translation(head.width / 2, spindleY + 5, headZ + head.height), "head");
 		attach("spindleMotorPulley", motorPulley, AssemblyFrames.translation(150, spindleY, beltZ), "spindleMotor");
 		attach("spindleBelt", belt, AssemblyFrames.translation(0, spindleY, beltZ), "head");
+		var spindleDriver = "spindleMotorDriver";
+		attach(spindleDriver, new MotorDriver("GENERIC-SERVO-AMP", 10),
+			AssemblyFrames.translation(-190, base.depth / 2 - 30, 0), "base");
+		connectPorts("spindle-power", "powerSupply", "power4", spindleDriver, "power");
+		addMotor("spindleMotor", "spindle-turn", "spindleMotor", spindleDriver, 0.5, null,
+			{speedChannel: "spindle.speed", directionChannel: "spindle.direction",
+				radiansPerSpeedUnit: 2 * Math.PI / 60});
 	}
 
 	/** Each drive reads its lead and bearing boundary from its screw, nut and support parts. */

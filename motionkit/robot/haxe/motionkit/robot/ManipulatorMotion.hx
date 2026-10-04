@@ -124,7 +124,9 @@ class ManipulatorMotion {
         session.reject();
         throw 'Robot fault ${fault.code}: ${fault.message}';
       }
-      executor.update();
+      // A Resume submitted this tick has not reached the runtime owner yet. Starting the next
+      // program block now would make its plan race the pending safety command.
+      if (!executor.update()) return;
       if (session.isStopping()) return;
       if (session.state == Idle) {
         release();

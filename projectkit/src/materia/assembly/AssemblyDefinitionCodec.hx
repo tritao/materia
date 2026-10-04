@@ -17,6 +17,12 @@ import materia.units.LengthUnit;
 /** Versioned transport and validation for reusable assembly definitions and states. */
 class AssemblyDefinitionCodec {
 	public static inline var VERSION:Int = 2;
+	/** Pneumatic process drives require v3; assemblies without them retain v2 bytes. */
+	public static inline var PROCESS_VERSION:Int = 3;
+	/** Optional native sensor bindings require v4; older assemblies retain their bytes. */
+	public static inline var SENSOR_VERSION:Int = 4;
+	/** Analog process-velocity bindings require v5; earlier assembly bytes remain stable. */
+	public static inline var VELOCITY_VERSION:Int = 5;
 
 	public static function encode(definition:AssemblyDefinition):String {
 		validate(definition);
@@ -53,7 +59,8 @@ class AssemblyDefinitionCodec {
 	}
 
 	static function validateFlat(definition:AssemblyDefinition):Void {
-		if (definition == null || definition.schemaVersion != VERSION || !validText(definition.id) ||
+		if (definition == null || (definition.schemaVersion != VERSION && definition.schemaVersion != PROCESS_VERSION &&
+			definition.schemaVersion != SENSOR_VERSION && definition.schemaVersion != VELOCITY_VERSION) || !validText(definition.id) ||
 			definition.definitions == null || definition.definitions.length == 0 ||
 			definition.definitions.length > 1000 || definition.occurrences == null ||
 			definition.occurrences.length == 0 || definition.occurrences.length > 1000 ||
@@ -178,7 +185,48 @@ class AssemblyDefinitionCodec {
 				!validDrive(actuator))
 				throw 'Assembly has an invalid actuator "${actuator == null ? "" : actuator.id}"';
 			actuatorIds.set(actuator.id, true);
+			if (actuator.drive == "pneumatic" && definition.schemaVersion == VERSION)
+				throw "Pneumatic assembly drives require schema v$PROCESS_VERSION";
+			if (actuator.processVelocity != null && definition.schemaVersion != VELOCITY_VERSION)
+				throw 'Process-velocity assembly drives require schema v$VELOCITY_VERSION';
+			if (actuator.processVelocity != null) {
+				var process = actuator.processVelocity;
+				var joint = movable.get(actuator.joint);
+				if (actuator.drive != "servo" || actuator.pneumatic != null || joint == null ||
+					joint.type != AssemblyJointType.Continuous || !validText(process.speedChannel) ||
+					!validText(process.directionChannel) || process.speedChannel == process.directionChannel ||
+					!(process.radiansPerSpeedUnit > 0) || !Math.isFinite(process.radiansPerSpeedUnit))
+					throw 'Assembly actuator "${actuator.id}" has an invalid process-velocity binding';
+			}
 		}
+		var sensorIds = new Map<String, Bool>();
+		var sensors = definition.sensors == null ? [] : definition.sensors;
+		if (sensors.length > 4000) throw "Assembly has too many sensors";
+		for (sensor in sensors) {
+			if (sensor == null || !validText(sensor.id) || sensorIds.exists(sensor.id) ||
+				(sensor.kind != "joint_switch" && sensor.kind != "at_speed" && sensor.kind != "presence"))
+				throw "Assembly has an invalid or duplicate native sensor";
+			sensorIds.set(sensor.id, true);
+			if (sensor.kind == "joint_switch" || sensor.kind == "at_speed") {
+				var joint = sensor.joint == null ? null : movable.get(sensor.joint);
+				if (joint == null || sensor.occurrence != null || sensor.connector != null ||
+					sensor.windowLower == null || !Math.isFinite(sensor.windowLower) ||
+					sensor.hysteresis == null || !Math.isFinite(sensor.hysteresis) || sensor.hysteresis < 0 ||
+					(sensor.kind == "joint_switch" && (sensor.windowUpper == null ||
+						!Math.isFinite(sensor.windowUpper) || sensor.windowLower > sensor.windowUpper)) ||
+					(sensor.kind == "at_speed" && (sensor.windowLower <= 0 || sensor.windowUpper != null)))
+					throw 'Assembly sensor "${sensor.id}" has an invalid joint window';
+			} else {
+				var member = sensor.occurrence == null ? null : occurrences.get(sensor.occurrence);
+				if (sensor.joint != null || sensor.windowLower != null || sensor.windowUpper != null ||
+					sensor.hysteresis != null || member == null || !validText(sensor.connector) ||
+					!hasConnector(definitions.get(member.definition), sensor.connector) || sensor.range == null ||
+					!(sensor.range > 0) || !Math.isFinite(sensor.range))
+					throw 'Assembly sensor "${sensor.id}" has an invalid presence connector or range';
+			}
+		}
+		if (sensors.length > 0 && definition.schemaVersion < SENSOR_VERSION)
+			throw "Native assembly sensors require schema v$SENSOR_VERSION";
 		var encoders = definition.encoders == null ? [] : definition.encoders;
 		if (encoders.length > 4000) throw "Assembly has too many encoders";
 		var encoderIds = new Map<String, Bool>();
@@ -210,7 +258,8 @@ class AssemblyDefinitionCodec {
 		validate(definition);
 		state = AssemblyDefinitionFlattener.flattenState(definition, state);
 		definition = AssemblyDefinitionFlattener.flatten(definition);
-		if (state == null || state.schemaVersion != VERSION || state.definition != definition.id ||
+		if (state == null || (state.schemaVersion != VERSION && state.schemaVersion != PROCESS_VERSION &&
+			state.schemaVersion != SENSOR_VERSION && state.schemaVersion != VELOCITY_VERSION) || state.definition != definition.id ||
 			state.jointCoordinates == null || state.rootPoses == null ||
 			state.jointCoordinates.length > definition.joints.length ||
 			state.rootPoses.length > definition.occurrences.length)
@@ -341,6 +390,13 @@ class AssemblyDefinitionCodec {
 		}
 		var kind = actuator.drive;
 		if (kind == null) return true;
+		if (kind == "pneumatic") {
+			var p = actuator.pneumatic;
+			return p != null && p.bore > p.rod && p.rod > 0 && p.stroke > 0 && p.ratedSpeed > 0 &&
+				p.pressurePa >= 0 && Math.isFinite(p.bore + p.rod + p.stroke + p.ratedSpeed + p.pressurePa) &&
+				validText(p.channelA) && (p.channelB == null || validText(p.channelB)) && Math.abs(p.extendSign) == 1;
+		}
+		if (actuator.pneumatic != null) return false;
 		if (kind == "stepper") return actuator.fullStepsPerRevolution != null && actuator.holdingTorque != null && curve != null;
 		if (kind == "servo")
 			return actuator.ratedTorque != null && actuator.peakTorque != null && actuator.ratedSpeed != null &&

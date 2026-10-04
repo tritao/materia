@@ -262,7 +262,10 @@ class MachineAssemblyDescriptionTests {
 			var oldVersion:machinekit.assembly.MachineAssemblyDescription.DescriptionVersion = {schemaVersion: version};
 			var oldText = haxeon.wire.JsonWire.encode(oldVersion);
 			try MachineAssembly.decode(oldText) catch (error:Dynamic)
-				oldRejected = Std.string(error).indexOf('expected v${MachineAssembly.SCHEMA_VERSION} typed gearbox members') >= 0;
+				oldRejected = Std.string(error).indexOf('Machine assembly schema v$version is unsupported') >= 0 &&
+					Std.string(error).indexOf('supported schema versions are v${MachineAssembly.SCHEMA_VERSION}, ' +
+						'v${MachineAssembly.PROCESS_SCHEMA_VERSION}, v${MachineAssembly.SENSOR_SCHEMA_VERSION} and ' +
+						'v${MachineAssembly.PROCESS_VELOCITY_SCHEMA_VERSION}') >= 0;
 			if (!oldRejected) throw 'The v$version machine schema needs a clear rejection';
 		}
 		var sources:Array<Transmission> = [Transmission.LeadScrew("screw", "nut"),

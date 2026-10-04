@@ -152,6 +152,63 @@ std::vector<nksim_joint_target> SimulationRobot::take_pending_targets() {
     return result;
 }
 
+rk_result SimulationRobot::apply_pneumatic_valves(const RobotRuntime &runtime,
+                                                   std::vector<nksim_joint_target> &targets) {
+    for (auto &drive : pneumatic_drives_) {
+        rk_event_value channel_a{};
+        auto result = runtime.channel_value(drive.channel_a.c_str(), channel_a);
+        if (result != RK_OK || channel_a.kind != RK_EVENT_DIGITAL) return RK_ERROR_INVALID_STATE;
+        const bool coil_a = channel_a.digital != 0;
+        bool to_a = drive.to_a;
+        if (!drive.has_channel_b) {
+            to_a = coil_a ? !drive.normally_to_a : drive.normally_to_a;
+        } else {
+            rk_event_value channel_b{};
+            result = runtime.channel_value(drive.channel_b.c_str(), channel_b);
+            if (result != RK_OK || channel_b.kind != RK_EVENT_DIGITAL) return RK_ERROR_INVALID_STATE;
+            const bool coil_b = channel_b.digital != 0;
+            // A double-solenoid valve holds its last spool position when both coils
+            // are off (including an emergency stop), or when both are energized.
+            if (coil_a != coil_b) to_a = coil_a;
+        }
+        drive.to_a = to_a;
+        nksim_joint_target target{};
+        target.struct_size = sizeof(target);
+        target.joint = joints_[drive.joint];
+        target.mode = NKSIM_JOINT_TARGET_EFFORT;
+        target.target = to_a ? drive.extension_force * drive.extend_sign
+            : -drive.retraction_force * drive.extend_sign;
+        target.max_force = std::max(drive.extension_force, drive.retraction_force);
+        targets.push_back(target);
+    }
+    return RK_OK;
+}
+
+rk_result SimulationRobot::apply_velocity_drives(const RobotRuntime &runtime,
+                                                  std::vector<nksim_joint_target> &targets) const {
+    for (const auto &drive : velocity_drives_) {
+        rk_event_value speed{};
+        auto result = runtime.channel_value(drive.speed_channel.c_str(), speed);
+        if (result != RK_OK || speed.kind != RK_EVENT_ANALOG) return RK_ERROR_INVALID_STATE;
+        rk_event_value direction{};
+        result = runtime.channel_value(drive.direction_channel.c_str(), direction);
+        if (result != RK_OK || direction.kind != RK_EVENT_ANALOG) return RK_ERROR_INVALID_STATE;
+        if (!std::isfinite(speed.analog) || !std::isfinite(direction.analog))
+            return RK_ERROR_INVALID_STATE;
+        const auto signed_direction = std::clamp(direction.analog, -1.0, 1.0);
+        const auto velocity = std::clamp(speed.analog * signed_direction *
+            drive.radians_per_speed_unit, -drive.max_rate, drive.max_rate);
+        nksim_joint_target target{};
+        target.struct_size = sizeof(target);
+        target.joint = joints_[drive.joint];
+        target.mode = NKSIM_JOINT_TARGET_VELOCITY;
+        target.target = velocity;
+        target.max_force = drive.max_effort;
+        targets.push_back(target);
+    }
+    return RK_OK;
+}
+
 rk_result SimulationRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) {
     const auto snapshot = nksim_session_latest_snapshot(simulation_.session_);
     nksim_session_status status{};
@@ -227,6 +284,37 @@ rk_result SimulationRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) 
             } else if (config.kind == RK_SENSOR_IMU) {
                 sample.value_count = 6;
                 sensors::imu(rotation, base->angular_velocity, acceleration, simulation_.gravity_, sensor.values);
+            } else if (config.kind == RK_SENSOR_JOINT_SWITCH) {
+                if (sensor.joint >= state.joint_count) return RK_ERROR_BACKEND;
+                const double position = state.position[sensor.joint];
+                if (sensor.active) {
+                    if (position < sensor.window_lower - sensor.hysteresis ||
+                        position > sensor.window_upper + sensor.hysteresis)
+                        sensor.active = false;
+                } else if (position >= sensor.window_lower && position <= sensor.window_upper) {
+                    sensor.active = true;
+                }
+                sample.value_count = 1;
+                sensor.values[0] = sensor.active ? 1.0 : 0.0;
+            } else if (config.kind == RK_SENSOR_AT_SPEED) {
+                if (sensor.joint >= state.joint_count) return RK_ERROR_BACKEND;
+                sample.value_count = 1;
+                sensor.values[0] = std::abs(state.velocity[sensor.joint]) >= sensor.window_lower
+                    ? 1.0 : 0.0;
+            } else if (config.kind == RK_SENSOR_PRESENCE) {
+                sample.value_count = 1;
+                const double local[3] = {0.0, 0.0, 1.0};
+                double direction[3];
+                sensors::rotate(rotation, local, direction);
+                nksim_ray cast{};
+                cast.struct_size = sizeof(cast);
+                std::copy_n(origin, 3, cast.origin);
+                std::copy_n(direction, 3, cast.direction);
+                cast.max_distance = config.max_range;
+                double range = config.max_range;
+                if (nksim_session_raycast(simulation_.session_, &cast, &range) != NKSIM_OK)
+                    return RK_ERROR_BACKEND;
+                sensor.values[0] = range < config.max_range - 1e-9 ? 1.0 : 0.0;
             } else {
                 sample.value_count = config.ray_count;
                 const double field_of_view = config.field_of_view > 0.0
@@ -262,7 +350,8 @@ rk_result SimulationRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) 
                 }
             }
             for (uint32_t i = 0; i < sample.value_count; ++i) {
-                if (config.noise_stddev > 0.0)
+                if (config.noise_stddev > 0.0 && config.kind != RK_SENSOR_JOINT_SWITCH &&
+                    config.kind != RK_SENSOR_AT_SPEED && config.kind != RK_SENSOR_PRESENCE)
                     sensor.values[i] += config.noise_stddev * sensors::gaussian(sensor.random);
                 if (config.kind == RK_SENSOR_LIDAR)
                     sensor.values[i] = std::clamp(sensor.values[i], 0.0, config.max_range);

@@ -1,4 +1,7 @@
 import machinekit.assembly.MachineAssembly;
+import machinekit.milling.MillPanel;
+import cadkit.modeling.AssemblyModel;
+import materia.assembly.AssemblyFrames;
 import machinekit.pneumatic.PneumaticCylinder;
 import machinekit.pneumatic.AirSupply;
 import machinekit.pneumatic.SolenoidValve;
@@ -24,7 +27,10 @@ class PneumaticPartTests {
 				if (Math.abs(cylinder.extendForce(600000) - advance[i]) > 0.6 ||
 					Math.abs(cylinder.retractForce(600000) - retract[i]) > 0.6)
 					throw '$family bore ${bores[i]} disagrees with reference force table';
-				var rebuilt:PneumaticCylinder = cast cylinder.componentType().create(cylinder.values());
+				var recipe = cylinder.componentType();
+				if (recipe == null) throw "Cylinder recipe is missing";
+				var rebuilt = recipe.create(cylinder.values()).pneumaticCylinderSpec();
+				if (rebuilt == null) throw "Cylinder recipe did not rebuild its typed pneumatic specification";
 				close(rebuilt.retractForce(600000), cylinder.retractForce(600000), "reconstructed annular force");
 			}
 		}
@@ -54,6 +60,39 @@ class PneumaticPartTests {
 		for (line in lines) if (line.partNumber == hose.partNumber) quantity += line.quantity;
 		close(quantity, 4, "connected hoses enter BOM");
 		MachineAssemblyDescriptionTests.roundTrip(assembly, "pneumatic service", false);
+
+		// A cylinder binds to a real guide coordinate. Its tip at home lies on the carriage's
+		// guide connector and its axis follows the joint, so no actuator-only travel is invented.
+		var bound = new MachineAssembly();
+		bound.addComponent("base", new MillPanel(100, 100, 20));
+		bound.addComponent("carriage", new MillPanel(20, 20, 20));
+		bound.addMemberConnector("base", "guide", AssemblyFrames.identity());
+		bound.addMemberConnector("carriage", "guide", AssemblyFrames.identity());
+		bound.addMateOnAxis("door-guide", "prismatic", "base", "guide", "carriage", "guide",
+			{x: 0, y: 0, z: 1}, 0, {lower: 0, upper: 460, velocity: null, effort: null, overtravel: 0});
+		bound.addComponent("cylinder", door, AssemblyFrames.translation(0, 0, -door.bodyLength - door.stemLength));
+		bound.addComponent("supply", new AirSupply());
+		bound.addComponent("manifold", new machinekit.pneumatic.PneumaticManifold(1));
+		bound.addComponent("valve", valve);
+		bound.connectPorts("source-line", "supply", "air", "manifold", "input");
+		bound.connectPorts("valve-line", "manifold", "out1", "valve", "P");
+		bound.connectPorts("A-line", "valve", "A", "cylinder", "A");
+		bound.connectPorts("B-line", "valve", "B", "cylinder", "B");
+		bound.addCylinder("door-drive", "door-guide", "cylinder", "valve");
+		var model = new AssemblyModel("mm");
+		bound.addTo(model, "");
+		var definition = model.definition("pneumatic-fixture");
+		if (definition.schemaVersion != materia.assembly.AssemblyDefinitionCodec.PROCESS_VERSION ||
+			definition.actuators == null || definition.actuators.length != 1)
+			throw "Process actuator did not produce the process-format drive";
+		var drive = definition.actuators[0];
+		if (drive.drive != "pneumatic" || drive.pneumatic == null || drive.pneumatic.channelA != "valve/coilA" ||
+			drive.pneumatic.channelB != null || drive.pneumatic.normallyToA || drive.pneumatic.extendSign != 1)
+			throw "Derived cylinder process binding has wrong valve channels or direction";
+		close(drive.maxEffort, door.extendForce(600000), "bound cylinder effort");
+		close(drive.maxRate, 300, "bound cylinder speed");
+		MachineAssemblyDescriptionTests.roundTrip(bound, "bound cylinder", false);
+
 		var failed = false;
 		try new PneumaticCylinder("ISO6432", 32, 100, 300) catch (_:Dynamic) failed = true;
 		if (!failed) throw "Cylinder accepted bore outside its family";

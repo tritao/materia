@@ -173,7 +173,11 @@ rk_result validate_appended_path(
     limits.max_continuity_jump[0] = 1e-9;
     for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
         const auto &source = blueprint.joints[joint];
-        limits.position_claimed[joint] = 1;
+        // A process drive may be compressing its end cushion while the motion
+        // planner carries a constant observation of that joint.
+        limits.position_claimed[joint] = blueprint.struct_size >=
+            offsetof(rk_robot_runtime_blueprint, sensor_joint) &&
+            blueprint.process_joint[joint] ? 0 : 1;
         limits.position_lower[joint] = source.lower_limit;
         limits.position_upper[joint] = source.upper_limit;
         limits.max_velocity[joint] = source.max_velocity;
@@ -196,8 +200,10 @@ rk_result validate_appended_path(
   leaders', so this bounds nothing new, but every stop and check that budgets joint by joint then
   has a limit to work with. A follower waits until every leader has the limit.
 **/
-rk_robot_runtime_blueprint with_coupled_limits(rk_robot_runtime_blueprint blueprint) {
-    if (blueprint.struct_size < sizeof(blueprint)) return blueprint;
+rk_robot_runtime_blueprint with_coupled_limits(const rk_robot_runtime_blueprint &source) {
+    rk_robot_runtime_blueprint blueprint{};
+    std::memcpy(&blueprint, &source, std::min<std::size_t>(source.struct_size, sizeof(blueprint)));
+    if (blueprint.struct_size < offsetof(rk_robot_runtime_blueprint, process_joint)) return blueprint;
     const auto count = std::min(blueprint.coupling_count,
         static_cast<uint32_t>(RK_MAX_JOINT_COUPLINGS));
     // Each pass settles at least one more link of every chain.
@@ -485,6 +491,11 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
             // A drained path or completed stop holds its last commanded
             // setpoint. Endpoint samples are observations, not plan anchors.
             for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
+                if (blueprint_.struct_size >= offsetof(rk_robot_runtime_blueprint, sensor_joint) &&
+                    blueprint_.process_joint[joint]) {
+                    anchor_position[joint] = state_.position[joint];
+                    continue;
+                }
                 if (control_.active[joint] &&
                     control_.targets[joint].mode != RK_TARGET_POSITION &&
                     control_.targets[joint].mode != RK_TARGET_SERVO)
@@ -533,6 +544,10 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
         if (replace && first.degree < 2)
             return RK_ERROR_INVALID_STATE;
         for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
+            // A process drive owns its joint independently of planned motion. Its observed
+            // position can change while a program waits for a process input.
+            if (blueprint_.struct_size >= offsetof(rk_robot_runtime_blueprint, sensor_joint) &&
+                blueprint_.process_joint[joint]) continue;
             const double position_tolerance = plan.position_tolerance[joint] > 0.0
                 ? plan.position_tolerance[joint] : default_tolerance;
             const double velocity_tolerance = plan.velocity_tolerance[joint] > 0.0
@@ -1475,7 +1490,6 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
     bool stop_ramp_finished = false;
     auto write_stop_ramp_targets = [&](rk_robot_command &value) {
         value.kind = RK_COMMAND_JOINT_TARGETS;
-        value.target_count = blueprint_.joint_count;
         const double duration = static_cast<double>(control_.stop_ramp_duration_ns) /
             1'000'000'000.0;
         const double elapsed = static_cast<double>(control_.stop_ramp_time_ns) /
@@ -1484,25 +1498,31 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         const double blend = duration <= 0.0 ? 0.0 : t - 0.5 * t * t / duration;
         value.reference_duration = std::min(std::chrono::duration<double>(period_).count(),
             std::max(0.0, duration - t));
+        uint32_t target_count = 0;
         for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
-            value.targets[joint].joint = joint;
-            value.targets[joint].mode = RK_TARGET_POSITION;
+            if (blueprint_.struct_size >= offsetof(rk_robot_runtime_blueprint, sensor_joint) &&
+                blueprint_.process_joint[joint]) continue;
+            auto &target = value.targets[target_count];
+            target.joint = joint;
+            target.mode = RK_TARGET_POSITION;
             const auto &limits = blueprint_.joints[joint];
-            value.targets[joint].target = std::clamp(
+            target.target = std::clamp(
                 control_.stop_ramp_positions[joint] +
                     control_.stop_ramp_velocities[joint] * blend,
                 limits.lower_limit, limits.upper_limit);
             if (joint < RK_MAX_SERVO_JOINTS && duration > 0.0 && t < duration) {
                 const double end_t = std::min(duration, t + value.reference_duration);
-                value.servos[joint].velocity = control_.stop_ramp_velocities[joint] * (1.0 - t / duration);
-                value.reference_end_position[joint] = std::clamp(control_.stop_ramp_positions[joint] +
+                value.servos[target_count].velocity = control_.stop_ramp_velocities[joint] * (1.0 - t / duration);
+                value.reference_end_position[target_count] = std::clamp(control_.stop_ramp_positions[joint] +
                     control_.stop_ramp_velocities[joint] * (end_t - 0.5 * end_t * end_t / duration),
                     limits.lower_limit, limits.upper_limit);
-                value.reference_end_velocity[joint] = control_.stop_ramp_velocities[joint] * (1.0 - end_t / duration);
+                value.reference_end_velocity[target_count] = control_.stop_ramp_velocities[joint] * (1.0 - end_t / duration);
             }
-            value.targets[joint].max_rate = 0.0;
-            value.targets[joint].max_effort = 0.0;
+            target.max_rate = 0.0;
+            target.max_effort = 0.0;
+            ++target_count;
         }
+        value.target_count = target_count;
         if (control_.stop_ramp_time_ns >= control_.stop_ramp_duration_ns) {
             control_.stop_ramp_active = false;
             stop_ramp_finished = true;
@@ -1594,19 +1614,22 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         stop_after_crossing_seconds = saved_after_crossing;
         trajectory_stop_completed = saved_completed;
         output.kind = RK_COMMAND_JOINT_TARGETS;
-        output.target_count = front.point.joint_count;
+        output.target_count = 0;
         for (uint32_t joint = 0; joint < front.point.joint_count; ++joint) {
-            output.targets[joint].joint = joint;
-            output.targets[joint].mode = RK_TARGET_POSITION;
-            output.targets[joint].target = point_positions[joint];
-            if (joint < RK_MAX_SERVO_JOINTS) {
+            if (blueprint_.struct_size >= offsetof(rk_robot_runtime_blueprint, sensor_joint) &&
+                blueprint_.process_joint[joint]) continue;
+            const auto target_index = output.target_count++;
+            output.targets[target_index].joint = joint;
+            output.targets[target_index].mode = RK_TARGET_POSITION;
+            output.targets[target_index].target = point_positions[joint];
+            if (target_index < RK_MAX_SERVO_JOINTS) {
                 const double rate = control_.trajectory_rate;
-                output.servos[joint].velocity = point_velocities[joint] * rate;
-                output.reference_end_position[joint] = end_positions[joint];
-                output.reference_end_velocity[joint] = end_velocities[joint] * end_rate;
+                output.servos[target_index].velocity = point_velocities[joint] * rate;
+                output.reference_end_position[target_index] = end_positions[joint];
+                output.reference_end_velocity[target_index] = end_velocities[joint] * end_rate;
             }
-            output.targets[joint].max_rate = 0.0;
-            output.targets[joint].max_effort = 0.0;
+            output.targets[target_index].max_rate = 0.0;
+            output.targets[target_index].max_effort = 0.0;
         }
         const bool queue_exhausted =
             control_.trajectory_time_ns >= trajectory_.back().point.time_from_start_ns;
@@ -1901,7 +1924,7 @@ rk_result RobotRuntime::publish_sample_impl(uint64_t timestamp_ns,
     if (result != RK_OK || sample_validation != RK_OK ||
         next.joint_count != blueprint_.joint_count ||
         next.sensor_count > configured_sensor_count ||
-        (next.sensor_count != 0 && next.sensor_count != configured_sensor_count)) {
+            (next.sensor_count != 0 && next.sensor_count != configured_sensor_count)) {
         latch_fault();
         return result != RK_OK ? result : RK_ERROR_BACKEND;
     }

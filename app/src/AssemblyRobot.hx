@@ -295,7 +295,7 @@ class AssemblyRobot {
     var blueprint = RobotRuntimeCompiler.compile(converted.model, revision);
     // Process channels (a machine's spindle and coolant, a tool's vacuum) must be declared before the
     // robot is added.
-    if (channels != null) for (channel in channels) blueprint.channels.push(channel);
+    if (channels != null) for (channel in channels) blueprint.addChannel(channel);
     // Each robot tool brings its own channels with the stop policy it needs (RobotKit's `ToolChannels`): a suction tool
     // keeps holding through a commanded stop, as when its base arrives somewhere carrying a part; a torch's arc and wire
     // go off on any stop. A declaration made above that disagrees with the tool is refused.

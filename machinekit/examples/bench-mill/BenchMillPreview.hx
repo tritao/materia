@@ -28,9 +28,8 @@ class BenchMillPreview {
 			controller: {stepTickHz: BenchMill.STEP_TICK_HZ}};
 		return SceneArtifact.encode(scene);
 	}
-	/** Mechanical preview until MT5 supplies the jaw's real clamping force. */
-	public static function enclosure():Bytes
-		return SceneArtifact.encode(AssemblyPreview.scene(new EnclosedBenchMill(), ASSEMBLY_ID));
+	/** Enclosed mill with its pressure-clamped vise and bearing-block job. */
+	public static function enclosure():Bytes return enclosed();
 
 	/** Enclosed vise job; final G53 moves bring its datum to the doorway. */
 	public static function enclosed():Bytes {
@@ -55,7 +54,21 @@ class BenchMillChecks {
 		var mill = new BenchMill();
 		var model = new AssemblyModel("mm");
 		mill.addTo(model, "");
-		var state = new AssemblyState(model.definition(BenchMillPreview.ASSEMBLY_ID));
+		var definition = model.definition(BenchMillPreview.ASSEMBLY_ID);
+		if (definition.schemaVersion != materia.assembly.AssemblyDefinitionCodec.VELOCITY_VERSION)
+			throw "Bench mill did not select the process-velocity assembly schema";
+		var spindleBinding = false, atSpeedSensor = false;
+		if (definition.actuators != null) for (actuator in definition.actuators)
+			if (actuator.processVelocity != null && actuator.processVelocity.speedChannel == "spindle.speed" &&
+				actuator.processVelocity.directionChannel == "spindle.direction" &&
+				Math.abs(actuator.processVelocity.radiansPerSpeedUnit - 2 * Math.PI / 60) < 1e-12)
+				spindleBinding = true;
+		if (definition.sensors != null) for (sensor in definition.sensors)
+			if (sensor.kind == "at_speed" && sensor.joint == "spindle-turn" && sensor.windowLower != null &&
+				Math.abs(sensor.windowLower - 7600 * 2 * Math.PI / 60) < 1e-9) atSpeedSensor = true;
+		if (!spindleBinding || !atSpeedSensor)
+			throw "Spindle process channels or at-speed feedback were not derived into the assembly";
+		var state = new AssemblyState(definition);
 		for (x in [0.0, 250]) for (y in [0.0, 150]) for (z in [-250.0, 0]) {
 			state.setJoint("x", x); state.setJoint("y", y); state.setJoint("z", z);
 			state.forwardKinematics();
@@ -166,6 +179,46 @@ class EnclosedMillChecks {
 		if (head.z < cell.opening.z + cell.openingHeight) throw "Retracted head crosses the doorway";
 		var vise = cell.mill.vise;
 		if (vise == null) throw "Enclosed mill has no vise";
+		var processDefinition = state.definition;
+		if (processDefinition.schemaVersion != materia.assembly.AssemblyDefinitionCodec.VELOCITY_VERSION)
+			throw "Enclosed mill did not keep the process-velocity schema";
+		if (processDefinition.actuators == null || processDefinition.sensors == null)
+			throw "Enclosed mill did not export its typed actuator and sensor tables";
+		var doorForce:Null<Float> = null, viseForce:Null<Float> = null;
+		for (actuator in processDefinition.actuators) {
+			if (actuator.id == "door-cylinder") doorForce = actuator.maxEffort;
+			if (actuator.id == "vise-cylinder") viseForce = actuator.maxEffort;
+		}
+		if (doorForce == null || viseForce == null || Math.abs(doorForce - 294.524311274) > 0.01 ||
+			Math.abs(viseForce - 482.54863159) > 0.01)
+			throw 'Enclosed cylinder models do not retain their newton ratings: $doorForce/$viseForce N';
+		var seenDoorClosed = false, seenDoorOpen = false, seenViseClamp = false, seenStock = false;
+		for (sensor in processDefinition.sensors) {
+			if (sensor.id == "door-closed" && sensor.kind == "joint_switch") seenDoorClosed = true;
+			if (sensor.id == "door-open" && sensor.kind == "joint_switch") seenDoorOpen = true;
+			if (sensor.id == "vise-clamped" && sensor.kind == "joint_switch") seenViseClamp = true;
+			if (sensor.id == "stock-present" && sensor.kind == "presence") seenStock = true;
+		}
+		if (!seenDoorClosed || !seenDoorOpen || !seenViseClamp || !seenStock)
+			throw "Enclosed mill did not preserve its door, vise and part sensors";
+		var occurrences = state.definition.occurrences;
+		var viseCylinder = [for (occurrence in occurrences) if (occurrence.id == "mill/vise/cylinder") occurrence];
+		var viseRod = [for (occurrence in occurrences) if (occurrence.id == "mill/vise/clampRod") occurrence];
+		var duplicateViseCylinder = [for (occurrence in occurrences)
+			if (StringTools.endsWith(occurrence.id, "viseCylinder") || occurrence.id == "viseCylinder") occurrence];
+		if (viseCylinder.length != 1 || viseRod.length != 1 || duplicateViseCylinder.length != 0)
+			throw "The vise must own the only clamp cylinder body and rod";
+		var connections = cell.describe().machine.portConnections;
+		var viseAirA = false, viseAirB = false;
+		var visePortA = vise.port("airA", "mill/vise");
+		var visePortB = vise.port("airB", "mill/vise");
+		for (connection in connections) {
+			if (connection.toInstance == visePortA.instanceId && connection.toPort == visePortA.portName &&
+				connection.fromInstance == "viseValve" && connection.fromPort == "A") viseAirA = true;
+			if (connection.toInstance == visePortB.instanceId && connection.toPort == visePortB.portName &&
+				connection.fromInstance == "viseValve" && connection.fromPort == "B") viseAirB = true;
+		}
+		if (!viseAirA || !viseAirB) throw "The enclosure valve must connect to the vise's exposed A/B air ports";
 		state.setJoint("mill/vise/jaw", 0);
 		var fixedFace = state.worldPose("mill/vise/fixedJaw").y + vise.fixedJaw.depth / 2;
 		var movingFace = state.worldPose("mill/vise/movingJaw").y - vise.movingJaw.depth / 2;
@@ -205,7 +258,8 @@ class EnclosedMillChecks {
 		if (end == null || Math.abs(end.x - cell.loadPosition[0] / 1000) > 1e-9 ||
 			Math.abs(end.y - cell.loadPosition[1] / 1000) > 1e-9 || Math.abs(end.z - cell.loadPosition[2] / 1000) > 1e-9)
 			throw "Final G53 does not command the geometry-derived load position";
-		var definition:materia.assembly.AssemblyDefinition = cast scene.assemblyDefinition;
+		var definition = scene.assemblyDefinition;
+		if (definition == null) throw "Enclosed CNC preview has no typed assembly definition";
 		for (id in cell.panelIds.concat(cell.doorIds)) {
 			var occurrence = [for (o in definition.occurrences) if (o.id == id) o][0];
 			var part = [for (p in scene.parts) if (p.id == occurrence.definition) p][0];

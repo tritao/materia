@@ -12,7 +12,7 @@ import machinekit.component.Solids;
  * A single coil reverses the spring-return state. Double coils select and latch A/B.
  * Installed 6 mm fittings and the valve envelope are assumed.
  */
-class SolenoidValve extends MachineComponent {
+class SolenoidValve extends MachineComponent implements PneumaticValveSpec {
 	public final doubleSolenoid:Bool;
 	public final normallyToA:Bool;
 	static var recipe:Null<ComponentType>;
@@ -31,6 +31,9 @@ class SolenoidValve extends MachineComponent {
 	/** Pure spool transition. Retain the previous state when double coils agree. */
 	public function routesToA(coilA:Bool, coilB:Bool, previousToA:Bool):Bool
 		return doubleSolenoid ? (coilA == coilB ? previousToA : coilA) : (coilA ? !normallyToA : normallyToA);
+	public function isDoubleSolenoid():Bool return doubleSolenoid;
+	public function defaultsToA():Bool return normallyToA;
+	override public function pneumaticValveSpec():Null<PneumaticValveSpec> return this;
 	override public function hasGeometry():Bool return true;
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Solids.named(Part.box(doubleSolenoid ? 100 : 80, 25, 30), "valve");

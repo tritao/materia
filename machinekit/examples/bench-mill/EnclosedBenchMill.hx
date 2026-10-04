@@ -1,5 +1,11 @@
 import machinekit.assembly.MachineAssembly;
 import machinekit.milling.MillPanel;
+import machinekit.pneumatic.PneumaticCylinder;
+import machinekit.pneumatic.AirSupply;
+import machinekit.pneumatic.PneumaticManifold;
+import machinekit.pneumatic.SolenoidValve;
+import machinekit.component.BomItem;
+import machinekit.component.MachineComponent;
 import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.AssemblyState;
 import materia.assembly.AssemblyFrames;
@@ -72,8 +78,10 @@ class EnclosedBenchMill extends MachineAssembly {
 		poses.set("doorSlider", sliderPose);
 		addMemberConnector("doorRail", "slide", AssemblyFrames.compose(AssemblyFrames.inverse(railPose), sliderPose));
 		addMemberConnector("doorSlider", "slide", AssemblyFrames.identity());
+		var doorCylinder = new PneumaticCylinder("ISO6432", 25, doorStroke, 300);
 		addMateOnAxis("door", "prismatic", "doorRail", "slide", "doorSlider", "slide", {x: 1, y: 0, z: 0}, 0,
-			{lower: 0, upper: doorStroke, velocity: null, effort: null, overtravel: 0});
+			{lower: 0, upper: doorStroke, velocity: null, effort: null,
+				overtravel: doorCylinder.endStopCompliance});
 		var frameWidth = 25.0, leafY = front - 10;
 		doorPanel("doorLeft", frameWidth, 4, openingHeight, -(openingWidth - frameWidth) / 2, leafY, opening.z);
 		doorPanel("doorRight", frameWidth, 4, openingHeight, (openingWidth - frameWidth) / 2, leafY, opening.z);
@@ -91,6 +99,43 @@ class EnclosedBenchMill extends MachineAssembly {
 		panel("cabinetTop", 200, 200, 2, cabinetX, cabinetY, cabinetZ + 300, false);
 		addMemberConnector("chipTray", "doorOpening", AssemblyFrames.compose(AssemblyFrames.inverse(poses.get("chipTray")), opening));
 		exposeConnector("doorOpening", "chipTray", "doorOpening");
+		// The door cylinder uses the real guided-member connector as its piston endpoint.
+		// The vise owns its cylinder, body and rod; this enclosure only routes air to it.
+		var mountState = state();
+		var doorTip = mountState.worldConnector("doorSlider", "slide");
+		var quarter = Math.sqrt(0.5);
+		var doorAxis:AssemblyFrame = {x: 0, y: 0, z: 0, qx: 0, qy: quarter, qz: 0, qw: quarter};
+		var doorPose:AssemblyFrame = {x: doorTip.x - doorCylinder.bodyLength - doorCylinder.stemLength,
+			y: doorTip.y, z: doorTip.z, qx: doorAxis.qx, qy: doorAxis.qy, qz: doorAxis.qz, qw: doorAxis.qw};
+		addComponent("doorCylinder", doorCylinder, doorPose);
+		fixed("doorCylinderRod", doorCylinder.movingRod(), {x: doorTip.x, y: doorTip.y, z: doorTip.z,
+			qx: doorAxis.qx, qy: doorAxis.qy, qz: doorAxis.qz, qw: doorAxis.qw}, "doorSlider");
+		var vise = mill.vise;
+		if (vise == null) throw "Enclosed bench mill needs a pneumatic vise";
+		// One FRL and the existing two-outlet manifold supply both double-solenoid valves.
+		var serviceX = cabinetX, serviceY = cabinetY;
+		addComponent("airSupply", new AirSupply(600000), AssemblyFrames.translation(serviceX, serviceY, cabinetZ + 12));
+		addComponent("airManifold", new PneumaticManifold(2), AssemblyFrames.translation(serviceX, serviceY, cabinetZ + 125));
+		addComponent("doorValve", new SolenoidValve(true, false), AssemblyFrames.translation(serviceX - 48, serviceY, cabinetZ + 180));
+		addComponent("viseValve", new SolenoidValve(true, true), AssemblyFrames.translation(serviceX + 48, serviceY, cabinetZ + 180));
+		var hose:BomItem = {partNumber: "REF-PNEU-HOSE-6MM", description: "Assumed 6 mm polyurethane air hose",
+			quantity: 1, material: "polyurethane PU"};
+		connectPorts("supply-to-manifold", "airSupply", "air", "airManifold", "input", hose);
+		connectPorts("manifold-to-door-valve", "airManifold", "out1", "doorValve", "P", hose);
+		connectPorts("manifold-to-vise-valve", "airManifold", "out2", "viseValve", "P", hose);
+		connectPorts("door-extend-line", "doorValve", "A", "doorCylinder", "A", hose);
+		connectPorts("door-retract-line", "doorValve", "B", "doorCylinder", "B", hose);
+		var viseAirA = vise.port("airA", "mill/vise");
+		var viseAirB = vise.port("airB", "mill/vise");
+		connectPorts("vise-extend-line", "viseValve", "A", viseAirA.instanceId, viseAirA.portName, hose);
+		connectPorts("vise-retract-line", "viseValve", "B", viseAirB.instanceId, viseAirB.portName, hose);
+		addCylinder("door-cylinder", "door", "doorCylinder", "doorValve");
+		addCylinder("vise-cylinder", "mill/vise/jaw", "mill/vise/cylinder", "viseValve");
+		addSwitch("door-closed", "door", {lower: 0, upper: 5, velocity: null, effort: null}, 2);
+		addSwitch("door-open", "door", {lower: doorStroke - 5, upper: doorStroke, velocity: null, effort: null}, 2);
+		addSwitch("vise-open", "mill/vise/jaw", {lower: 0, upper: 0.5, velocity: null, effort: null}, 0.25);
+		addSwitch("vise-clamped", "mill/vise/jaw", {lower: 5.5, upper: 6, velocity: null, effort: null}, 0.25);
+		addPresence("stock-present", "mill/vise/datum", 25);
 		loadPosition = nearestLoadPosition();
 	}
 
@@ -104,7 +149,7 @@ class EnclosedBenchMill extends MachineAssembly {
 		fixed(id, new MillPanel(w, d, h, material), AssemblyFrames.translation(x, y, z), "doorSlider");
 		doorIds.push(id);
 	}
-	function fixed(id:String, part:MillPanel, pose:AssemblyFrame, parent:String):Void {
+	function fixed(id:String, part:MachineComponent, pose:AssemblyFrame, parent:String):Void {
 		addComponent(id, part, pose); poses.set(id, pose);
 		addMemberConnector(parent, '$id-seat', AssemblyFrames.compose(AssemblyFrames.inverse(poses.get(parent)), pose));
 		addMemberConnector(id, "seat", AssemblyFrames.identity());

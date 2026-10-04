@@ -87,7 +87,7 @@ enum {
     RK_PROCESS_CHANNEL_ID_BYTES = 48,
     RK_PROCESS_COMMAND_BYTES = 48,
     RK_MAX_JOINT_COUPLINGS = 512,
-    RK_API_VERSION = 25 /**< Servo drive endpoint references and physical coupling stiffness. */
+    RK_API_VERSION = 29 /**< Discrete sensors, simulation process drives and typed velocity outputs. */
 };
 
 /** Result returned by RobotKit C ABI functions. */
@@ -311,7 +311,8 @@ typedef struct rk_robot_runtime_link {
     double inertia_tensor[9]; /**< Row-major, symmetric kg m² tensor. */
 } rk_robot_runtime_link;
 
-enum { RK_SENSOR_ENCODER = 1, RK_SENSOR_IMU = 2, RK_SENSOR_LIDAR = 3 };
+enum { RK_SENSOR_ENCODER = 1, RK_SENSOR_IMU = 2, RK_SENSOR_LIDAR = 3,
+    RK_SENSOR_JOINT_SWITCH = 4, RK_SENSOR_AT_SPEED = 5, RK_SENSOR_PRESENCE = 6 };
 
 /** Compiled sensor slot. Semantic IDs live in the immutable host mapping. */
 typedef struct rk_sensor_config {
@@ -479,6 +480,13 @@ typedef struct rk_robot_runtime_blueprint {
     double servo_reflected_inertia[RK_MAX_JOINTS];
     /** Coupling stiffness in follower-coordinate effort per unit of follower travel. */
     double coupling_stiffness[RK_MAX_JOINT_COUPLINGS];
+    /** Versioned command ownership: process joints accept no host or trajectory targets. */
+    uint32_t process_joint[RK_MAX_JOINTS];
+    /** Versioned metadata for joint switches and speed sensors; ordinary sensor slots use UINT32_MAX. */
+    uint32_t sensor_joint[RK_MAX_SENSORS];
+    double sensor_window_lower[RK_MAX_SENSORS];
+    double sensor_window_upper[RK_MAX_SENSORS];
+    double sensor_hysteresis[RK_MAX_SENSORS];
 } rk_robot_runtime_blueprint;
 
 /* ------------------------------------------------------------------------- */

@@ -19,13 +19,22 @@ class ActuatorDrive {
     this.curve = curve;
   }
 
-  /** The name saved with the drive: "stepper" or "servo". */
+  /** The name saved with the drive. */
   public function kind():String throw "ActuatorDrive is abstract";
 
   /** The largest torque the drive can give at any speed. */
   public function peakTorque():Float return curve.peakTorque();
 
   public function maxSpeed():Float return curve.maxSpeed();
+
+  /** Stepper fields when this drive has steps; null for other drives. */
+  public function stepper():Null<StepperDrive> return null;
+
+  /** Pneumatic fields when this drive is a cylinder; null for electric drives. */
+  public function pneumatic():Null<PneumaticDrive> return null;
+
+  /** Servo fields when this drive has a position loop; null for other drives. */
+  public function servo():Null<ServoDrive> return null;
 }
 
 /**
@@ -55,6 +64,7 @@ class StepperDrive extends ActuatorDrive {
   public function hasTorqueData():Bool return holdingTorque > 0.0;
 
   override public function kind():String return "stepper";
+  override public function stepper():Null<StepperDrive> return this;
 }
 
 /**
@@ -105,4 +115,45 @@ class ServoDrive extends ActuatorDrive {
   override public function kind():String return "servo";
   override public function peakTorque():Float return peakTorqueValue;
   override public function maxSpeed():Float return maxSpeedValue;
+  override public function servo():Null<ServoDrive> return this;
+}
+
+/** Double-acting cylinder whose effort is selected by process valve channels, not a motion plan. */
+class PneumaticDrive extends ActuatorDrive {
+  public final bore:Float;
+  public final rod:Float;
+  public final stroke:Float;
+  public final ratedSpeed:Float;
+  public final pressurePa:Float;
+  public final channelA:String;
+  public final channelB:Null<String>;
+  public final normallyToA:Bool;
+  public final extendSign:Float;
+
+  public function new(bore:Float, rod:Float, stroke:Float, ratedSpeed:Float, pressurePa:Float,
+      channelA:String, channelB:Null<String>, normallyToA:Bool, extendSign:Float) {
+    super(0.0, TorqueSpeedCurve.flat(0.0, ratedSpeed));
+    if (!(bore > rod && rod > 0 && stroke > 0 && ratedSpeed > 0 && pressurePa >= 0) ||
+        !Math.isFinite(bore + rod + stroke + ratedSpeed + pressurePa) ||
+        channelA == null || channelA.length == 0 || (channelB != null && channelB.length == 0) ||
+        (extendSign != 1.0 && extendSign != -1.0))
+      throw "Invalid pneumatic drive";
+    this.bore = bore; this.rod = rod; this.stroke = stroke; this.ratedSpeed = ratedSpeed;
+    this.pressurePa = pressurePa; this.channelA = channelA; this.channelB = channelB;
+    this.normallyToA = normallyToA; this.extendSign = extendSign;
+  }
+
+  public function extensionForce():Float return pressurePa * Math.PI * bore * bore / 4.0;
+  public function retractionForce():Float return pressurePa * Math.PI * (bore * bore - rod * rod) / 4.0;
+  /** A critically damped end stop: static deflection uses one quarter of the cushion's allowance. */
+  public function limitTimeConstant(movingMass:Float, cushionCompression:Float):Float {
+    if (!(movingMass > 0.0) || !(cushionCompression > 0.0) || !(extensionForce() > 0.0) ||
+        !Math.isFinite(movingMass + cushionCompression))
+      throw "Pneumatic limit needs positive mass and cushion compression";
+    return Math.sqrt(movingMass * cushionCompression / extensionForce()) / 2.0;
+  }
+  override public function pneumatic():Null<PneumaticDrive> return this;
+  override public function kind():String return "pneumatic";
+  override public function peakTorque():Float return extensionForce();
+  override public function maxSpeed():Float return ratedSpeed;
 }

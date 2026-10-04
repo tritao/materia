@@ -70,6 +70,7 @@ class ProgramCompiler {
   public final configurationSelector:Null<PathConfigurationSelector>;
   final jointIds:Null<Array<String>>;
   final couplings:Null<Array<JointCoupling>>;
+  final controllerPeriodSeconds:Float;
   /**
    * The plan check every plan this compiler makes goes through, or null for none. Every planner of
    * MotionKit makes its plans here (this is the one place that creates an `ExecutionPlan`), so
@@ -89,7 +90,7 @@ class ProgramCompiler {
       startTolerances, timing, cartesianResolution, maxJointJump, positionTolerance,
       orientationTolerance, ikTolerance,
       configurationSelector == null ? null : configurationSelector.withSolver(forked),
-      perJointMaxJump, jointIds, couplings);
+      perJointMaxJump, jointIds, couplings, controllerPeriodSeconds);
     // The worker plans one program in order, so it remembers which way each axis last moved.
     if (planCheck != null) worker.planCheck = planCheck.fork();
     return worker;
@@ -102,11 +103,14 @@ class ProgramCompiler {
       ?positionTolerance:Float = 0.005, ?orientationTolerance:Float = 0.02,
       ?ikTolerance:IkTolerance, ?configurationSelector:PathConfigurationSelector,
       ?perJointMaxJump:Array<Float>, ?jointIds:Array<String>,
-      ?couplings:Array<JointCoupling>) {
+      ?couplings:Array<JointCoupling>, ?controllerPeriodSeconds:Float = 0.01) {
     if (solver == null || limits == null || solver.jointCount() != limits.jointCount)
       throw "Program compiler needs matching kinematics and validation limits";
     if (frameId == null || StringTools.trim(frameId).length == 0)
       throw "Program compiler needs a frame ID";
+    if (!Math.isFinite(controllerPeriodSeconds) || controllerPeriodSeconds <= 0.0)
+      throw "Program compiler controller period must be finite and positive";
+    this.controllerPeriodSeconds = controllerPeriodSeconds;
     var count = limits.jointCount;
     if (startTolerances == null) throw "Program compiler start tolerances are required";
     startTolerances.validate(count);
@@ -217,6 +221,18 @@ class ProgramCompiler {
   /** Ends the current block at a barrier. */
   function barrier(c:ProgramCompilation, barrier:ProgramBarrier):Void {
     retire(c);
+    if (c.leadingOutputs.length > 0) {
+      // An output before a wait must run before the wait can observe its input.
+      var trajectory = Trajectory.fromSegments([{
+        timeFromStartNs: Int64.ofInt(0),
+        durationNs: Trajectory.nanoseconds(controllerPeriodSeconds),
+        coefficients: [for (position in c.q) [position, 0.0]]
+      }]);
+      var pending = new PendingMotion(c.currentIndex, c.q, c.q, trajectory, [], null, null);
+      attachLeadingOutputs(pending, c.leadingOutputs);
+      c.pending = pending;
+      retire(c);
+    }
     c.sink.barrier(barrier);
   }
 

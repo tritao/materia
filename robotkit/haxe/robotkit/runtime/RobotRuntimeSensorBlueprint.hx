@@ -19,17 +19,24 @@ class RobotRuntimeSensorBlueprint {
   public final fieldOfViewRadians:Float;
   public final noiseStddev:Float;
   public final noiseSeed:Int;
+  public final joint:Int;
+  public final windowLower:Float;
+  public final windowUpper:Float;
+  public final hysteresis:Float;
 
   public function new(id:String, kind:String, frameId:String, linkId:String, link:Int,
       position:Array<Float>, rotation:Array<Float>, updateRate:Float = 0.0,
       rayCount:Int = 8, maxRange:Float = 10.0, noiseStddev:Float = 0.0, noiseSeed:Int = 1,
-      startAngleRadians:Float = 0.0, fieldOfViewRadians:Float = Math.PI * 2.0) {
+      startAngleRadians:Float = 0.0, fieldOfViewRadians:Float = Math.PI * 2.0,
+      joint:Int = -1, windowLower:Float = 0.0, windowUpper:Float = 0.0, hysteresis:Float = 0.0) {
     this.id = id; this.kind = kind; this.frameId = frameId; this.linkId = linkId; this.link = link;
     this.position = new ImmutableFloatArray(position);
     this.rotation = new ImmutableFloatArray(rotation);
     this.updateRate = updateRate; this.rayCount = rayCount; this.maxRange = maxRange;
     this.startAngleRadians = startAngleRadians; this.fieldOfViewRadians = fieldOfViewRadians;
     this.noiseStddev = noiseStddev; this.noiseSeed = noiseSeed;
+    this.joint = joint; this.windowLower = windowLower; this.windowUpper = windowUpper;
+    this.hysteresis = hysteresis;
   }
 
   /**
@@ -43,7 +50,8 @@ class RobotRuntimeSensorBlueprint {
 
   /** True for sensors the native runtime samples itself. */
   public static function isNativeKind(kind:String):Bool
-    return kind == "joint_encoder" || kind == "imu" || kind == "lidar";
+    return kind == "joint_encoder" || kind == "imu" || kind == "lidar" ||
+      kind == "joint_switch" || kind == "at_speed" || kind == "presence";
 
   public var external(get, never):Bool;
 
@@ -51,7 +59,8 @@ class RobotRuntimeSensorBlueprint {
 
   public function nativeValue():rk_sensor_config {
     var value = new rk_sensor_config();
-    value.set_kind(switch kind { case "joint_encoder": 1; case "imu": 2; case "lidar": 3; default: throw "Unsupported sensor kind"; });
+    value.set_kind(switch kind { case "joint_encoder": 1; case "imu": 2; case "lidar": 3;
+      case "joint_switch": 4; case "at_speed": 5; case "presence": 6; default: throw "Unsupported sensor kind"; });
     value.set_link(link);
     for (i in 0...3) value.set_position(i, position.get(i));
     for (i in 0...4) value.set_rotation(i, rotation.get(i));

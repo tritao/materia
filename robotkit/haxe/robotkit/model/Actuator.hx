@@ -30,6 +30,8 @@ class Actuator {
    * and the drive carries the rest: the torque-speed curve the plan check compares against.
    */
   public var drive:Null<ActuatorDrive> = null;
+  /** Process velocity binding for a CNC spindle; setpoints come from analog channels, not trajectories. */
+  public var processVelocity:Null<ProcessVelocityDrive> = null;
   /**
    * The id of the `Encoder` that reads this motor, or empty for none. A servo's feedback comes from it
    * (the servo drive's own `encoderCounts` is what models saved before encoders were sensors recorded).
@@ -73,6 +75,8 @@ class Actuator {
    */
   public function planningEffort():Float {
     var current = drive;
+    if (processVelocity != null) return 0.0;
+    if (current != null && Std.isOfType(current, PneumaticDrive)) return 0.0;
     if (current == null || !Std.isOfType(current, ServoDrive)) return maxEffort;
     return maxEffort > 0.0 ? Math.min(maxEffort, current.peakTorque()) : current.peakTorque();
   }
@@ -80,6 +84,8 @@ class Actuator {
   /** The speed a planner may rely on, in actuator units: a servo falls back to its maximum speed. */
   public function planningRate():Float {
     var current = drive;
+    if (processVelocity != null) return 0.0;
+    if (current != null && Std.isOfType(current, PneumaticDrive)) return 0.0;
     if (current == null || !Std.isOfType(current, ServoDrive)) return maxRate;
     return maxRate > 0.0 ? Math.min(maxRate, current.maxSpeed()) : current.maxSpeed();
   }

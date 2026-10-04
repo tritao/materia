@@ -100,7 +100,8 @@ class ToolpathMotionBinding {
       velocity, acceleration, jerk, startTolerances, null, 0.002, 0.1,
       machine.positionTolerance, machine.orientationTolerance,
       null, null, jump,
-      [for (joint in blueprint.model.joints) joint.id], blueprint.model.couplings);
+      [for (joint in blueprint.model.joints) joint.id], blueprint.model.couplings,
+      blueprint.fixedTimestepSeconds);
   }
 
   public function compile(program:ToolpathProgram, initialJoints:Array<Float>,

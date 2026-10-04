@@ -152,6 +152,13 @@ rk_result from_sim(nksim_result result) {
     }
 }
 
+constexpr std::size_t pneumatic_desc_size =
+    offsetof(rk_simulation_robot_desc, pneumatic_drives) +
+    sizeof(rk_simulation_robot_desc::pneumatic_drives);
+constexpr std::size_t velocity_desc_size =
+    offsetof(rk_simulation_robot_desc, velocity_drives) +
+    sizeof(rk_simulation_robot_desc::velocity_drives);
+
 } // namespace
 
 Simulation::Simulation(nksim_session session) : session_(session) {
@@ -235,6 +242,55 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         return RK_ERROR_INVALID_STATE;
     if (rk_robot_runtime_blueprint_validate(&blueprint) != RK_OK || blueprint.link_count == 0)
         return RK_ERROR_INVALID_ARGUMENT;
+    const bool has_pneumatic_desc = robot_desc && robot_desc->struct_size >= pneumatic_desc_size;
+    const auto pneumatic_count = has_pneumatic_desc ? robot_desc->pneumatic_drive_count : 0;
+    if (pneumatic_count > RK_MAX_JOINTS) return RK_ERROR_INVALID_ARGUMENT;
+    for (uint32_t index = 0; index < pneumatic_count; ++index) {
+        const auto &drive = robot_desc->pneumatic_drives[index];
+        if (drive.joint >= blueprint.joint_count ||
+            blueprint.joints[drive.joint].type != RK_RUNTIME_JOINT_PRISMATIC ||
+            blueprint.struct_size < offsetof(rk_robot_runtime_blueprint, sensor_joint) ||
+            !blueprint.process_joint[drive.joint] ||
+            drive.channel_a >= blueprint.channel_count ||
+            (drive.channel_b != UINT32_MAX && drive.channel_b >= blueprint.channel_count) ||
+            drive.channel_a == drive.channel_b || drive.normally_to_a > 1 ||
+            !std::isfinite(drive.extension_force) || drive.extension_force < 0.0 ||
+            !std::isfinite(drive.retraction_force) || drive.retraction_force < 0.0 ||
+            !std::isfinite(drive.extend_sign) ||
+            (drive.extend_sign != 1.0 && drive.extend_sign != -1.0) ||
+            !std::isfinite(drive.rated_speed) || drive.rated_speed <= 0.0 ||
+            blueprint.channels[drive.channel_a].kind != RK_EVENT_DIGITAL ||
+            (drive.channel_b != UINT32_MAX &&
+             blueprint.channels[drive.channel_b].kind != RK_EVENT_DIGITAL))
+            return RK_ERROR_INVALID_ARGUMENT;
+        for (uint32_t earlier = 0; earlier < index; ++earlier)
+            if (robot_desc->pneumatic_drives[earlier].joint == drive.joint)
+                return RK_ERROR_INVALID_ARGUMENT;
+    }
+    const bool has_velocity_desc = robot_desc && robot_desc->struct_size >= velocity_desc_size;
+    const auto velocity_count = has_velocity_desc ? robot_desc->velocity_drive_count : 0;
+    if (velocity_count > RK_MAX_JOINTS) return RK_ERROR_INVALID_ARGUMENT;
+    for (uint32_t index = 0; index < velocity_count; ++index) {
+        const auto &drive = robot_desc->velocity_drives[index];
+        if (drive.joint >= blueprint.joint_count ||
+            blueprint.struct_size < offsetof(rk_robot_runtime_blueprint, sensor_joint) ||
+            !blueprint.process_joint[drive.joint] ||
+            drive.speed_channel >= blueprint.channel_count ||
+            drive.direction_channel >= blueprint.channel_count ||
+            drive.speed_channel == drive.direction_channel ||
+            !std::isfinite(drive.radians_per_speed_unit) || drive.radians_per_speed_unit <= 0.0 ||
+            !std::isfinite(drive.max_effort) || drive.max_effort < 0.0 ||
+            !std::isfinite(drive.max_rate) || drive.max_rate <= 0.0 ||
+            blueprint.channels[drive.speed_channel].kind != RK_EVENT_ANALOG ||
+            blueprint.channels[drive.direction_channel].kind != RK_EVENT_ANALOG)
+            return RK_ERROR_INVALID_ARGUMENT;
+        for (uint32_t earlier = 0; earlier < index; ++earlier)
+            if (robot_desc->velocity_drives[earlier].joint == drive.joint)
+                return RK_ERROR_INVALID_ARGUMENT;
+        for (uint32_t pneumatic = 0; pneumatic < pneumatic_count; ++pneumatic)
+            if (robot_desc->pneumatic_drives[pneumatic].joint == drive.joint)
+                return RK_ERROR_INVALID_ARGUMENT;
+    }
     if (initial_pose && (initial_pose->struct_size < sizeof(*initial_pose) ||
                          !valid_pose(initial_pose->position, initial_pose->rotation)))
         return RK_ERROR_INVALID_ARGUMENT;
@@ -296,6 +352,31 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
     }
     try {
         auto binding = std::shared_ptr<SimulationRobot>(new SimulationRobot(*this));
+        for (uint32_t index = 0; index < pneumatic_count; ++index) {
+            const auto &source = robot_desc->pneumatic_drives[index];
+            SimulationRobot::PneumaticDriveState drive;
+            drive.joint = source.joint;
+            drive.channel_a = blueprint.channels[source.channel_a].id;
+            drive.has_channel_b = source.channel_b != UINT32_MAX;
+            if (drive.has_channel_b) drive.channel_b = blueprint.channels[source.channel_b].id;
+            drive.normally_to_a = source.normally_to_a != 0;
+            drive.to_a = drive.normally_to_a;
+            drive.extension_force = source.extension_force;
+            drive.retraction_force = source.retraction_force;
+            drive.extend_sign = source.extend_sign;
+            binding->pneumatic_drives_.push_back(std::move(drive));
+        }
+        for (uint32_t index = 0; index < velocity_count; ++index) {
+            const auto &source = robot_desc->velocity_drives[index];
+            SimulationRobot::VelocityDriveState drive;
+            drive.joint = source.joint;
+            drive.speed_channel = blueprint.channels[source.speed_channel].id;
+            drive.direction_channel = blueprint.channels[source.direction_channel].id;
+            drive.radians_per_speed_unit = source.radians_per_speed_unit;
+            drive.max_effort = source.max_effort;
+            drive.max_rate = source.max_rate;
+            binding->velocity_drives_.push_back(std::move(drive));
+        }
         const auto robot_index = static_cast<uint32_t>(bindings_.size());
         uint32_t root = 0;
         for (uint32_t candidate = 0; candidate < blueprint.link_count; ++candidate) {
@@ -554,9 +635,12 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             desc.axis_a[2] = a[2] + q[3]*t[2] + q[0]*t[1] - q[1]*t[0];
             std::copy_n(source.parent_frame_rotation, 4, desc.rotation_a);
             std::copy_n(source.child_frame_rotation, 4, desc.rotation_b);
-            // The end stops sit beyond the limits by the joint's overtravel.
+            // A pneumatic cylinder's overtravel is its compressible end cushion: keep
+            // the physics stop at the stroke boundary while the runtime tolerates
+            // that small penetration in the observed joint position.
             const double overtravel = blueprint.struct_size >=
                 offsetof(rk_robot_runtime_blueprint, joint_overtravel) + sizeof(blueprint.joint_overtravel)
+                && !blueprint.process_joint[index]
                 ? blueprint.joint_overtravel[index] : 0.0;
             desc.lower_limit = source.lower_limit - overtravel;
             desc.upper_limit = source.upper_limit + overtravel;
@@ -571,10 +655,20 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 desc.limit_damping_ratio = dynamics.limit_damping_ratio;
                 std::copy_n(dynamics.limit_impedance, 5, desc.limit_impedance);
             }
+            for (uint32_t drive_index = 0; drive_index < pneumatic_count; ++drive_index) {
+                const auto &drive = robot_desc->pneumatic_drives[drive_index];
+                if (drive.joint != index) continue;
+                desc.max_force = std::max(desc.max_force,
+                    std::max(drive.extension_force, drive.retraction_force));
+                desc.damping += std::max(drive.extension_force, drive.retraction_force) /
+                    drive.rated_speed;
+            }
             nksim_joint joint = 0;
             require_sim(nksim_joint_create(world, &desc, &joint), "nksim_joint_create");
             binding->joints_.push_back(joint);
-            binding->actuated_joints_.push_back(source.type != RK_RUNTIME_JOINT_FIXED);
+            const bool process_joint = blueprint.struct_size >=
+                offsetof(rk_robot_runtime_blueprint, sensor_joint) && blueprint.process_joint[index];
+            binding->actuated_joints_.push_back(source.type != RK_RUNTIME_JOINT_FIXED && !process_joint);
             joints_.push_back(joint);
         }
         for (uint32_t index = 0; index < blueprint.coupling_count; ++index) {
@@ -585,7 +679,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             coupling.follower = binding->joints_[source.follower];
             coupling.ratio = source.ratio;
             coupling.offset = source.offset;
-            if (blueprint.struct_size >= sizeof(blueprint))
+            if (blueprint.struct_size >= offsetof(rk_robot_runtime_blueprint, process_joint))
                 coupling.stiffness = blueprint.coupling_stiffness[index];
             require_sim(nksim_joint_couple(world, &coupling), "nksim_joint_couple");
         }
@@ -627,7 +721,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         binding->slip_.assign(blueprint.joint_count, 0.0);
         binding->servo_.assign(blueprint.joint_count, rk_robot_joint_servo{});
         binding->reflected_inertia_.assign(blueprint.joint_count, 0.0);
-        if (blueprint.struct_size >= sizeof(blueprint))
+        if (blueprint.struct_size >= offsetof(rk_robot_runtime_blueprint, process_joint))
             std::copy_n(blueprint.servo_reflected_inertia, blueprint.joint_count,
                 binding->reflected_inertia_.begin());
         binding->passive_.assign(blueprint.joint_count, 0);
@@ -665,6 +759,9 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 if (binding->servo_[index].stiffness > 0.0) held[index] = binding->actuated_joints_[index];
                 if (binding->passive_[index]) held[index] = 0;
             }
+            if (blueprint.struct_size >= offsetof(rk_robot_runtime_blueprint, sensor_joint))
+                for (uint32_t index = 0; index < blueprint.joint_count; ++index)
+                    if (blueprint.process_joint[index]) held[index] = 0;
             binding->hold_at_rest(std::move(held));
         }
         bindings_.push_back(binding);
@@ -686,6 +783,12 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 sensor.config.rotation[3] = 1.0;
                 sensor.config.ray_count = 8;
                 sensor.config.max_range = 10.0;
+            }
+            if (blueprint.struct_size >= sizeof(blueprint)) {
+                sensor.joint = blueprint.sensor_joint[i];
+                sensor.window_lower = blueprint.sensor_window_lower[i];
+                sensor.window_upper = blueprint.sensor_window_upper[i];
+                sensor.hysteresis = blueprint.sensor_hysteresis[i];
             }
             binding->sensors_.push_back(sensor);
         }
@@ -1458,6 +1561,11 @@ rk_result Simulation::submit(const nksim_tick &tick) {
             continue;
         }
         auto targets = binding->take_pending_targets();
+        if (binding_index >= runtimes_.size()) return RK_ERROR_BACKEND;
+        const auto process_result = binding->apply_pneumatic_valves(*runtimes_[binding_index], targets);
+        if (process_result != RK_OK) return process_result;
+        const auto velocity_result = binding->apply_velocity_drives(*runtimes_[binding_index], targets);
+        if (velocity_result != RK_OK) return velocity_result;
         if (virtual_devices_[binding_index]) {
             rk_robot_state state{};
             const auto result = virtual_devices_[binding_index]->sample(simulation_ns, state);

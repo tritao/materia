@@ -2,10 +2,12 @@
 #define ROBOTKIT_SIMULATION_ROBOT_HPP
 
 #include "robotkit_runtime.hpp"
+#include "robotkit_simkit.h"
 #include "nativekit_sim.h"
 
 #include <algorithm>
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace robotkit {
@@ -30,6 +32,7 @@ public:
         staged_stopped_ = false;
         std::fill(commanded_.begin(), commanded_.end(), JointCommand{});
         stopped_ = false;
+        for (auto &drive : pneumatic_drives_) drive.to_a = drive.normally_to_a;
         reset_sensors();
         queue_rest_holds();
     }
@@ -44,6 +47,7 @@ public:
             sensor.previous_time = -1.0;
             sensor.next_due = 0.0;
             sensor.random = sensor.config.noise_seed ? sensor.config.noise_seed : 1;
+            sensor.active = false;
         }
     }
 
@@ -64,6 +68,12 @@ private:
     explicit SimulationRobot(Simulation &simulation) : simulation_(simulation) {}
     /** Hands this tick's targets to the backend and commits what they command. */
     std::vector<nksim_joint_target> take_pending_targets();
+    /** Resolves valve coils and queues simulation-owned cylinder effort for this physics tick. */
+    rk_result apply_pneumatic_valves(const RobotRuntime &runtime,
+                                     std::vector<nksim_joint_target> &targets);
+    /** Resolves spindle setpoint channels and queues their velocity targets. */
+    rk_result apply_velocity_drives(const RobotRuntime &runtime,
+                                    std::vector<nksim_joint_target> &targets) const;
     /** Queues a zero-velocity hold for one actuated joint. */
     void queue_velocity_hold(std::size_t joint);
     /** Mutable copy of the committed joint commands for the apply in progress. */
@@ -111,8 +121,34 @@ private:
         double previous_velocity[3]{};
         double next_due = 0.0;
         uint32_t random = 1;
+        uint32_t joint = UINT32_MAX;
+        double window_lower = 0.0;
+        double window_upper = 0.0;
+        double hysteresis = 0.0;
+        bool active = false;
     };
     std::vector<SensorState> sensors_;
+    struct PneumaticDriveState {
+        uint32_t joint = 0;
+        std::string channel_a;
+        std::string channel_b;
+        bool has_channel_b = false;
+        bool normally_to_a = true;
+        bool to_a = true;
+        double extension_force = 0.0;
+        double retraction_force = 0.0;
+        double extend_sign = 1.0;
+    };
+    std::vector<PneumaticDriveState> pneumatic_drives_;
+    struct VelocityDriveState {
+        uint32_t joint = 0;
+        std::string speed_channel;
+        std::string direction_channel;
+        double radians_per_speed_unit = 0.0;
+        double max_effort = 0.0;
+        double max_rate = 0.0;
+    };
+    std::vector<VelocityDriveState> velocity_drives_;
 };
 
 } // namespace robotkit

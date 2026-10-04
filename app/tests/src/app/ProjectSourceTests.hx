@@ -1,5 +1,6 @@
 package app;
 
+import RobotKitRuntime;
 import FontCollection;
 import LayoutFrame;
 import nativekit.ui.core.RenderNode;
@@ -24,14 +25,21 @@ import haxe.Json;
 import haxe.Int64;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationHarness;
+import robotkit.runtime.SimulationSpace;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.model.RobotModel;
+import robotkit.model.Actuator;
+import robotkit.model.Transmission;
 import robotkit.model.Link;
 import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.JointLimits;
 import robotkit.model.JointCoupling;
 import robotkit.model.SteadyLoads;
+import robotkit.world.TrajectorySegment;
+import robotkit.world.ProcessTimedEvent;
+import robotkit.world.ProcessEventValue;
+import robotkit.world.ExecutionPlanSubmission;
 import robotkit.device.DeviceBinding;
 import robotkit.device.DeviceLayout;
 import motionkit.trajectory.PlanDiagnostic;
@@ -463,7 +471,7 @@ class ProjectSourceTests {
     var section:materia.project.SceneArtifact.SceneArtifactMobileBase = cast generated.mobileBase;
     var work:materia.project.SceneArtifact.SceneArtifactMission = cast generated.mission;
     var steps = work.steps;
-    var definition:AssemblyDefinition = cast generated.assemblyDefinition;
+    var definition = requiredAssemblyDefinition(generated.assemblyDefinition);
     var placement = new AssemblyState(definition, generated.assemblyState);
     var halfLength:Float = cast section.footprintLength, halfWidth:Float = cast section.footprintWidth;
     halfLength /= 2; halfWidth /= 2;
@@ -1272,20 +1280,172 @@ class ProjectSourceTests {
     }
   }
 
-  /** The mechanical enclosure stays a preview until the pneumatic clamp is available. */
+  /** The enclosure's pressure-clamped vise holds the bearing-block job. */
   static function checkEnclosedMillProject(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/bench-mill/materia.enclosed.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
-    var definition:AssemblyDefinition = cast generated.assemblyDefinition;
+    var definition = requiredAssemblyDefinition(generated.assemblyDefinition);
     var model = AssemblySimulationBridge.toRobotModel(definition, generated.physical).model;
+    var doorActuator:Null<Actuator> = null;
+    for (actuator in model.actuators) if (actuator.id == "door-cylinder") doorActuator = actuator;
+    check(doorActuator != null && Math.abs(doorActuator.maxEffort - 294.524311274) < 0.01,
+      'assembly bridge keeps the 25 mm door cylinder force in newtons, got ${doorActuator == null ? "missing" : doorActuator.maxEffort}');
+    var viseActuator:Null<Actuator> = null;
+    for (actuator in model.actuators) if (actuator.id == "vise-cylinder") viseActuator = actuator;
+    check(viseActuator != null && Math.abs(viseActuator.maxEffort - 482.54863159) < 0.01,
+      'assembly bridge keeps the 32 mm vise cylinder force in newtons, got ${viseActuator == null ? "missing" : viseActuator.maxEffort}');
     check([for (joint in model.joints) if (joint.type == JointType.Prismatic) joint].length == 5,
       "enclosed project retains three mill axes, door and jaw");
-    check(generated.cncJob == null, "mechanical preview waits for the pneumatic clamp before cutting");
+    check(generated.cncJob != null, "enclosed mill exports its clamped bearing-block job");
     var state = new AssemblyState(definition);
     var opening = state.worldConnector("chipTray", "doorOpening");
     var datum = state.worldConnector("mill/vise/body", "datum");
     check(opening.y < datum.y && opening.z < datum.z, "door opening and vise datum survive project generation");
+    if (doorActuator == null || viseActuator == null) throw "Enclosed mill lost its pneumatic drives";
+    var enclosedRate = RobotRuntimeCompiler.compile(model).fastestPositionLoopRate();
+    checkPneumaticDynamics(model, doorActuator, viseActuator, Math.ceil(enclosedRate * 0.01));
+    var session = new ProjectDocumentSession(null, false);
+    var simulation = new ApplicationSimulation(new RobotWorld());
+    session.openGeneratedScene(generated.objects, manifest, generated.assembly,
+      generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
+      generated.localCentersByDefinition, generated.metresPerUnit, generated.physical,
+      generated.recipeDocument, generated.robotMotions, null, generated.cncJob);
+    simulation.setBackend(ApplicationSimulation.MUJOCO);
+    try {
+      check(simulation.rebuild(session.sensors, session.scene, session),
+        "enclosed mill builds: " + simulation.error);
+      var player = simulation.cncPlayer();
+      if (player == null) throw "Enclosed mill lost its CNC player";
+      var ticks = 0;
+      while (player.passes == 0 && simulation.activeSession().simulationTime() < 600 && ticks++ < 1000000) {
+        simulation.step();
+        var failure = simulation.cncFailure();
+        if (failure != null) throw 'Enclosed mill CNC fault at ${simulation.activeSession().simulationTime()} s: $failure';
+      }
+      check(player.passes == 1, "enclosed mill completes one bearing-block pass");
+      var stock = simulation.machiningStock();
+      if (stock == null) throw "Enclosed mill lost its machining stock";
+      check(stock.removed > 3.6e-6 && stock.rapidContacts == 0 && stock.collisions == 0,
+        "enclosed mill cuts the bearing block without rapid or holder contact");
+      Sys.println('enclosed mill bearing block: ${simulation.activeSession().simulationTime()} s, ${stock.removed * 1e9} mm³ removed');
+    } catch (error:Dynamic) {
+      simulation.dispose();
+      session.dispose();
+      throw error;
+    }
+    simulation.dispose();
+    session.dispose();
     Sys.println('enclosed mill project: ${generated.objects.length} objects, five mechanical slides');
+  }
+
+  /** Run the assembled cylinders' real pressure and flow limits in MuJoCo. */
+  static function checkPneumaticDynamics(model:RobotModel, doorActuator:Actuator, viseActuator:Actuator,
+      physicsSubsteps:Int):Void {
+    var doorMotor = doorActuator.drive, viseMotor = viseActuator.drive;
+    var doorDrive = doorMotor == null ? null : doorMotor.pneumatic();
+    var viseDrive = viseMotor == null ? null : viseMotor.pneumatic();
+    if (doorDrive == null || viseDrive == null)
+      throw "Enclosed mill needs typed double-solenoid door and vise cylinder drives";
+    var doorChannelB = doorDrive.channelB;
+    if (doorChannelB == null) throw "Enclosed mill door needs a second valve coil";
+    var fixture = new RobotModel("enclosed mill pneumatic stroke");
+    var base = fixture.addLink(new Link("base"));
+    var doorLink = fixture.addLink(new Link("door"));
+    var viseLink = fixture.addLink(new Link("vise jaw"));
+    var doorJointId = switch doorActuator.transmission {case SimpleTransmission(id, _, _): id;};
+    var viseJointId = switch viseActuator.transmission {case SimpleTransmission(id, _, _): id;};
+    var doorCompliance = 0.0, viseCompliance = 0.0;
+    for (joint in model.joints) {
+      if (joint.id == doorJointId) doorCompliance = joint.limits.overtravel;
+      if (joint.id == viseJointId) viseCompliance = joint.limits.overtravel;
+    }
+    check(doorCompliance > 0.0 && viseCompliance > 0.0,
+      "pneumatic end cushion compression comes from cylinder parts");
+    var doorJoint = fixture.addJoint(new Joint("door", JointType.Prismatic, base, doorLink, doorJointId));
+    doorJoint.axis = [0.0, 1.0, 0.0];
+    doorJoint.limits = doorDrive.extendSign > 0.0 ?
+      new JointLimits(0.0, doorDrive.stroke) : new JointLimits(-doorDrive.stroke, 0.0);
+    doorJoint.limits.overtravel = doorCompliance;
+    doorJoint.limitTimeConstant = doorDrive.limitTimeConstant(doorLink.mass, doorCompliance);
+    doorJoint.limitDampingRatio = 1.0;
+    var viseJoint = fixture.addJoint(new Joint("vise jaw", JointType.Prismatic, base, viseLink, viseJointId));
+    viseJoint.axis = [1.0, 0.0, 0.0];
+    viseJoint.limits = viseDrive.extendSign > 0.0 ?
+      new JointLimits(0.0, viseDrive.stroke) : new JointLimits(-viseDrive.stroke, 0.0);
+    viseJoint.limits.overtravel = viseCompliance;
+    viseJoint.limitTimeConstant = viseDrive.limitTimeConstant(viseLink.mass, viseCompliance);
+    viseJoint.limitDampingRatio = 1.0;
+    fixture.addActuator(doorActuator);
+    fixture.addActuator(viseActuator);
+    var blueprint = RobotRuntimeCompiler.compile(fixture);
+    var physical = new SimulationHarness(0.01, physicsSubsteps, SimulationSpace.MUJOCO);
+    try {
+      var runtime = physical.simulation.addRobot(blueprint);
+      var stroke = new TrajectorySegment(Int64.ofInt(0), Int64.parseString("3500000000"),
+        [[0.0, 0.0], [0.0, 0.0]]);
+      var events = [
+        new ProcessTimedEvent(Int64.ofInt(10000000), doorDrive.channelA, ProcessEventValue.Digital(true)),
+        new ProcessTimedEvent(Int64.ofInt(10000000), viseDrive.channelA, ProcessEventValue.Digital(true)),
+        new ProcessTimedEvent(Int64.ofInt(1600000000), doorDrive.channelA, ProcessEventValue.Digital(false)),
+        new ProcessTimedEvent(Int64.ofInt(1600000000), doorChannelB, ProcessEventValue.Digital(true))
+      ];
+      runtime.submitPlan(new ExecutionPlanSubmission(Int64.ofInt(1202), Int64.ofInt(blueprint.revision),
+        Int64.ofInt(blueprint.calibrationRevision), RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
+        [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [stroke], null, null, null, null, null, true, events), 1);
+      var doorOpenStart = -1, doorOpenReached = -1;
+      var doorCloseStart = -1, doorCloseReached = -1;
+      var viseClampStart = -1, viseClampReached = -1;
+      var viseClampEffort = 0.0;
+      var lastDoorPosition = 0.0;
+      for (tick in 1...351) {
+        physical.step(Int64.fromFloat(tick * 10000000.0));
+        var snapshot = runtime.snapshot();
+        if (snapshot.safety != RobotKitRuntimeConstants.RK_SAFETY_READY &&
+            snapshot.safety != RobotKitRuntimeConstants.RK_SAFETY_STOPPING)
+          throw 'Pneumatic runtime fault at tick $tick: safety=${snapshot.safety}, fault=${snapshot.faultCode}, q=${snapshot.q.get(0)},${snapshot.q.get(1)}, effort=${snapshot.effort.get(0)},${snapshot.effort.get(1)}';
+        var doorPosition = snapshot.q.get(0) * doorDrive.extendSign;
+        var visePosition = snapshot.q.get(1) * viseDrive.extendSign;
+        lastDoorPosition = doorPosition;
+        var doorA = switch runtime.channelValue(doorDrive.channelA) {case Digital(value): value; case _: false;};
+        var doorB = switch runtime.channelValue(doorChannelB) {case Digital(value): value; case _: false;};
+        var viseA = switch runtime.channelValue(viseDrive.channelA) {case Digital(value): value; case _: false;};
+        if (doorOpenStart < 0 && doorA) doorOpenStart = tick;
+        if (doorOpenStart >= 0 && doorOpenReached < 0 && doorPosition >= doorDrive.stroke * 0.98)
+          doorOpenReached = tick;
+        if (doorCloseStart < 0 && doorB) doorCloseStart = tick;
+        if (doorCloseStart >= 0 && doorCloseReached < 0 && doorPosition <= doorDrive.stroke * 0.02)
+          doorCloseReached = tick;
+        if (viseClampStart < 0 && viseA) viseClampStart = tick;
+        if (viseClampStart >= 0 && viseClampReached < 0 && visePosition >= viseDrive.stroke * 0.98) {
+          viseClampReached = tick;
+          viseClampEffort = Math.abs(snapshot.effort.get(1));
+        }
+      }
+      var doorOpenSeconds = (doorOpenReached - doorOpenStart) * 0.01;
+      var doorCloseSeconds = (doorCloseReached - doorCloseStart) * 0.01;
+      var viseClampSeconds = (viseClampReached - viseClampStart) * 0.01;
+      var expectedDoorSeconds = doorDrive.stroke * 0.98 / doorDrive.ratedSpeed;
+      var expectedDoorCloseSeconds = expectedDoorSeconds *
+        doorDrive.extensionForce() / doorDrive.retractionForce();
+      var expectedViseSeconds = viseDrive.stroke * 0.98 / viseDrive.ratedSpeed;
+      check(doorOpenStart > 0 && doorOpenReached > doorOpenStart &&
+        Math.abs(doorOpenSeconds / expectedDoorSeconds - 1.0) <= 0.1,
+        'MuJoCo door extension takes stroke / rated speed within 10%, measured $doorOpenSeconds s; start=$doorOpenStart reached=$doorOpenReached position=$lastDoorPosition sign=${doorDrive.extendSign} drives=${blueprint.pneumaticDrives.length}, trajectory=${runtime.snapshot().trajectoryTimeNs}, active=${runtime.snapshot().trajectoryActive}, safety=${runtime.snapshot().safety}');
+      check(doorCloseStart > 0 && doorCloseReached > doorCloseStart &&
+        Math.abs(doorCloseSeconds / expectedDoorCloseSeconds - 1.0) <= 0.1,
+        'MuJoCo door retraction takes stroke / rated speed within 10%, measured $doorCloseSeconds s');
+      check(viseClampStart > 0 && viseClampReached > viseClampStart &&
+        Math.abs(viseClampSeconds / expectedViseSeconds - 1.0) <= 0.1,
+        'MuJoCo vise clamp takes stroke / rated speed within 10%, measured $viseClampSeconds s');
+      check(Math.abs(viseClampEffort - viseDrive.extensionForce()) <= viseDrive.extensionForce() * 0.05,
+        'MuJoCo vise joint reports clamp force within 5% of p·A, measured $viseClampEffort N');
+      Sys.println('pneumatic mill: door open $doorOpenSeconds s, close $doorCloseSeconds s, ' +
+        'vise clamp $viseClampSeconds s at $viseClampEffort N');
+    } catch (error:Dynamic) {
+      physical.dispose();
+      throw error;
+    }
+    physical.dispose();
   }
 
   static function checkCncRouter(root:String, belts:Bool = false):Void {
@@ -1478,6 +1638,11 @@ class ProjectSourceTests {
     }
   }
 
+  static function requiredAssemblyDefinition(value:Null<AssemblyDefinition>):AssemblyDefinition {
+    if (value == null) throw "Generated machine project has no assembly definition";
+    return value;
+  }
+
   /**
    * The belt-driven router machines the same plate: its X and Y limits come from their pulleys (a
    * 20-tooth GT2 pulley has a 6.366 mm pitch radius, so a belt axis moves 20 times as fast as a screw
@@ -1566,7 +1731,7 @@ class ProjectSourceTests {
     check(picked > heldLine, 'clicking a line picks it to restart at, line $picked');
     press(find(submit(), "cnc-restart"), "its restart button");
     check(run(30.0, () -> player.currentLine >= picked),
-      'the panel restarts the program at the picked line, now line ${player.currentLine}');
+      'the panel restarts the program at the picked line, now line ${player.currentLine}, held=${player.held()}, failure=${player.failure}, sim=${simulation.cncFailure()}');
     // Restart where the drill starts work: the first motion after the drill is loaded.
     var drillChange = -1;
     for (index in 0...lines.length) if (lines[index].indexOf("T2 M6") >= 0) drillChange = index + 1;
@@ -1874,6 +2039,10 @@ class ProjectSourceTests {
       checkEnclosedMillProject(root);
       return 0;
     }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "pneumatic") {
+      checkEnclosedMillProject(root);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "router") {
       checkCncRouter(root);
       checkBeltRouter(root);
@@ -1881,6 +2050,10 @@ class ProjectSourceTests {
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "belts") {
       checkBeltRouter(root);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "controls") {
+      checkCncControls(root);
       return 0;
     }
     var manifest = FileSystem.fullPath(root + "/cadkit/examples/modeling/materia.project.json");

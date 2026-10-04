@@ -3,12 +3,15 @@ package robotkit.model;
 import haxe.Json;
 import haxe.io.Bytes;
 import robotkit.model.ActuatorDrive;
+import robotkit.model.ProcessVelocityDrive;
 import robotkit.model.CollisionShape;
 import robotkit.model.Transmission;
 
 /** Canonical, versioned JSON artifact for an editable RobotModel. */
 class RobotModelCodec {
   public static inline final VERSION:Int = RobotModel.CURRENT_VERSION;
+  static inline final LEGACY_VERSION:Int = VERSION - 2;
+  static inline final PREVIOUS_VERSION:Int = VERSION - 1;
 
   public static function encode(model:RobotModel):Bytes {
     if (model == null) throw "RobotModel is required";
@@ -129,13 +132,45 @@ class RobotModelCodec {
       finite(sensor.startAngleRadians, "sensor startAngleRadians");
       finite(sensor.fieldOfViewRadians, "sensor fieldOfViewRadians");
       finite(sensor.noiseStddev, "sensor noiseStddev");
+      if (sensor.kind == "joint_switch" || sensor.kind == "at_speed") {
+        requireText(sensor.joint, 'sensor ${sensor.id} joint');
+        if (!joints.exists(sensor.joint)) throw 'Sensor ${sensor.id} references unknown joint ${sensor.joint}';
+        finite(sensor.windowLower, "sensor windowLower");
+        finite(sensor.windowUpper, "sensor windowUpper");
+        finite(sensor.hysteresis, "sensor hysteresis");
+        if (sensor.kind == "joint_switch" && (sensor.windowLower > sensor.windowUpper || sensor.hysteresis < 0.0))
+          throw 'Sensor ${sensor.id} has an invalid switch window';
+        if (sensor.kind == "at_speed" && sensor.windowLower <= 0.0)
+          throw 'Sensor ${sensor.id} needs a positive at-speed threshold';
+      }
+      if (sensor.kind == "presence" && sensor.maxRange <= 0.0)
+        throw 'Sensor ${sensor.id} needs a positive presence range';
     }
     if (model.mobileBase != null) validateMobile(model.mobileBase, joints);
     if (model.forkMechanism != null) validateFork(model.forkMechanism, joints);
     var mobile = model.mobileBase == null ? null : encodeMobile(model.mobileBase);
     var fork = model.forkMechanism == null ? null : encodeFork(model.forkMechanism);
+    var encodedSensors:Array<Dynamic> = [for (sensor in model.sensors) {
+      id: sensor.id, name: sensor.name, kind: sensor.kind,
+      updateRate: sensor.updateRate,
+      frame: sensor.frame == null ? null : sensor.frame.id,
+      rayCount: sensor.rayCount, maxRange: sensor.maxRange,
+      startAngleRadians: sensor.startAngleRadians,
+      fieldOfViewRadians: sensor.fieldOfViewRadians,
+      noiseStddev: sensor.noiseStddev, noiseSeed: sensor.noiseSeed
+    }];
+    for (index in 0...model.sensors.length) {
+      var sensor = model.sensors[index], record:Dynamic = encodedSensors[index];
+      if (sensor.kind == "joint_switch" || sensor.kind == "at_speed") {
+        Reflect.setField(record, "joint", sensor.joint);
+        Reflect.setField(record, "windowLower", sensor.windowLower);
+        Reflect.setField(record, "windowUpper", sensor.windowUpper);
+        if (sensor.kind == "joint_switch") Reflect.setField(record, "hysteresis", sensor.hysteresis);
+      }
+    }
     var document:Dynamic = {
-      schemaVersion: VERSION,
+      schemaVersion: hasProcessVelocityDrive(model) ? VERSION :
+        hasPneumaticDrive(model) ? PREVIOUS_VERSION : LEGACY_VERSION,
       name: model.name,
       collisionApproximation: collisionName(model.collisionApproximation),
       floatingBase: model.floatingBase,
@@ -164,15 +199,7 @@ class RobotModelCodec {
         id: frame.id, name: frame.name, link: frame.link.id,
         position: frame.position, rotation: frame.rotation
       }],
-      sensors: [for (sensor in model.sensors) {
-        id: sensor.id, name: sensor.name, kind: sensor.kind,
-        updateRate: sensor.updateRate,
-        frame: sensor.frame == null ? null : sensor.frame.id,
-        rayCount: sensor.rayCount, maxRange: sensor.maxRange,
-        startAngleRadians: sensor.startAngleRadians,
-        fieldOfViewRadians: sensor.fieldOfViewRadians,
-        noiseStddev: sensor.noiseStddev, noiseSeed: sensor.noiseSeed
-      }],
+      sensors: encodedSensors,
       mobileBase: mobile,
       forkMechanism: fork,
       contactPairs: [for (pair in model.contactPairs) {
@@ -205,7 +232,8 @@ class RobotModelCodec {
     try root = Json.parse(bytes.toString()) catch (_:Dynamic)
       throw "Malformed RobotModel artifact";
     var version = fieldInt(root, "schemaVersion");
-    if (version != VERSION) throw 'Unsupported RobotModel schema version $version; expected $VERSION';
+    if (version != VERSION && version != PREVIOUS_VERSION && version != LEGACY_VERSION)
+      throw 'Unsupported RobotModel schema version $version; expected $VERSION';
 
     var model = new RobotModel(text(root, "name"));
     model.collisionApproximation = readCollision(text(root, "collisionApproximation"));
@@ -344,6 +372,10 @@ class RobotModelCodec {
       sensor.fieldOfViewRadians = number(record, "fieldOfViewRadians");
       sensor.noiseStddev = number(record, "noiseStddev");
       sensor.noiseSeed = fieldInt(record, "noiseSeed");
+      if (Reflect.hasField(record, "joint")) sensor.joint = text(record, "joint");
+      sensor.windowLower = fieldNumberDefault(record, "windowLower", 0.0);
+      sensor.windowUpper = fieldNumberDefault(record, "windowUpper", 0.0);
+      sensor.hysteresis = fieldNumberDefault(record, "hysteresis", 0.0);
     }
 
     var mobile:Dynamic = required(root, "mobileBase");
@@ -363,6 +395,17 @@ class RobotModelCodec {
     var fork:Dynamic = required(root, "forkMechanism");
     if (fork != null) model.forkMechanism = readFork(fork);
     return model;
+  }
+
+  static function hasPneumaticDrive(model:RobotModel):Bool {
+    for (actuator in model.actuators)
+      if (actuator.drive != null && Std.isOfType(actuator.drive, PneumaticDrive)) return true;
+    return false;
+  }
+
+  static function hasProcessVelocityDrive(model:RobotModel):Bool {
+    for (actuator in model.actuators) if (actuator.processVelocity != null) return true;
+    return false;
   }
 
   public static function encodeCollisionShape(shape:CollisionShape):Dynamic {
@@ -451,24 +494,40 @@ class RobotModelCodec {
     if (value.microsteps != null) record.microsteps = value.microsteps;
     if (value.maxStepRate != null) record.maxStepRate = value.maxStepRate;
     if (value.efficiency != 1.0) record.efficiency = value.efficiency;
+    if (value.processVelocity != null) {
+      var process = value.processVelocity;
+      record.processVelocity = {speedChannel: process.speedChannel,
+        directionChannel: process.directionChannel,
+        radiansPerSpeedUnit: process.radiansPerSpeedUnit};
+    }
     // A bare stepper is its steps alone, as before drive kinds; anything with ratings gets a drive.
     var drive = value.drive;
     if (drive != null) {
-      if (Std.isOfType(drive, StepperDrive)) {
-        var stepper:StepperDrive = cast drive;
+      var stepper = drive.stepper();
+      var servo = drive.servo();
+      var pneumatic = drive.pneumatic();
+      if (stepper != null) {
         if (stepper.hasTorqueData()) record.drive = {kind: "stepper", fullStepsPerRevolution: stepper.fullStepsPerRevolution,
           rotorInertia: stepper.rotorInertia, holdingTorque: stepper.holdingTorque, curve: stepper.curve.flatten()};
-      } else if (Std.isOfType(drive, ServoDrive)) {
-        var servo:ServoDrive = cast drive;
+      } else if (servo != null) {
         record.drive = {kind: "servo", ratedTorque: servo.ratedTorque, peakTorque: servo.peakTorqueValue,
           ratedSpeed: servo.ratedSpeed, maxSpeed: servo.maxSpeedValue, rotorInertia: servo.rotorInertia,
           encoderCounts: servo.encoderCounts, curve: servo.curve.flatten()};
+      } else if (pneumatic != null) {
+        record.drive = {kind: "pneumatic", bore: pneumatic.bore, rod: pneumatic.rod,
+          stroke: pneumatic.stroke, ratedSpeed: pneumatic.ratedSpeed, pressurePa: pneumatic.pressurePa,
+          channelA: pneumatic.channelA, channelB: pneumatic.channelB,
+          normallyToA: pneumatic.normallyToA, extendSign: pneumatic.extendSign};
       } else throw 'Actuator ${value.id} has an unsupported drive';
     }
     return record;
   }
 
   static function readActuatorDrive(record:Dynamic):ActuatorDrive {
+    if (text(record, "kind") == "pneumatic")
+      return new PneumaticDrive(number(record, "bore"), number(record, "rod"), number(record, "stroke"),
+        number(record, "ratedSpeed"), number(record, "pressurePa"), text(record, "channelA"),
+        optionalText(record, "channelB"), bool(record, "normallyToA"), number(record, "extendSign"));
     var curveValues:Dynamic = required(record, "curve");
     if (!Std.isOfType(curveValues, Array)) throw "Invalid RobotModel field curve";
     var curve = TorqueSpeedCurve.unflatten([for (entry in (cast curveValues : Array<Dynamic>)) {
@@ -495,7 +554,8 @@ class RobotModelCodec {
       throw "Actuator microsteps must be an integer from 1 to 1024";
     if (value.maxStepRate != null && (!(value.maxStepRate > 0) || !Math.isFinite(value.maxStepRate)))
       throw "Actuator maxStepRate must be finite and positive";
-    if (value.drive != null && !Std.isOfType(value.drive, StepperDrive) && !Std.isOfType(value.drive, ServoDrive))
+    if (value.drive != null && !Std.isOfType(value.drive, StepperDrive) && !Std.isOfType(value.drive, ServoDrive) &&
+        !Std.isOfType(value.drive, PneumaticDrive))
       throw 'Actuator ${value.id} has an unsupported drive';
     requireText(value.id, "actuator ID");
     finite(value.maxEffort, "actuator maxEffort");
@@ -570,6 +630,11 @@ class RobotModelCodec {
     // Models saved before drive kinds have no `drive`; a stepper's steps stand alone.
     if (Reflect.hasField(value, "drive") && Reflect.field(value, "drive") != null)
       actuator.drive = readActuatorDrive(Reflect.field(value, "drive"));
+    if (Reflect.hasField(value, "processVelocity") && Reflect.field(value, "processVelocity") != null) {
+      var process:Dynamic = Reflect.field(value, "processVelocity");
+      actuator.processVelocity = new ProcessVelocityDrive(text(process, "speedChannel"),
+        text(process, "directionChannel"), number(process, "radiansPerSpeedUnit"));
+    }
     if (Reflect.hasField(value, "encoder") && Reflect.field(value, "encoder") != null)
       actuator.encoder = text(value, "encoder");
     if (Reflect.hasField(value, "efficiency") && Reflect.field(value, "efficiency") != null) {
@@ -701,6 +766,9 @@ class RobotModelCodec {
       throw 'Invalid RobotModel field $name';
     return finite(result, name);
   }
+
+  static function fieldNumberDefault(value:Dynamic, name:String, fallback:Float):Float
+    return Reflect.hasField(value, name) ? number(value, name) : fallback;
 
   static function optionalNumber(value:Dynamic, name:String):Null<Float> {
     var result:Dynamic = required(value, name);

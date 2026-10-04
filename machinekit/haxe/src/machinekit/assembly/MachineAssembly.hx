@@ -30,6 +30,7 @@ import materia.assembly.AssemblyDefinition.AssemblySubdefinition;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyDefinition.AssemblyJointType;
 import materia.assembly.AssemblyDefinition.AssemblyJointRole;
+import materia.assembly.AssemblyDefinition.AssemblySensor;
 import materia.assembly.AssemblyDefinition.KinematicJoint;
 import materia.assembly.AssemblyDefinition.AssemblyJointLimits;
 import materia.assembly.AssemblyDefinition.AssemblyVector;
@@ -42,6 +43,7 @@ typedef UpstreamResult = { var port:PortRef; var external:Bool; }
 private typedef MotorCompilation = {
 	var actuators:Array<materia.assembly.AssemblyDefinition.AssemblyActuator>;
 	var encoders:Array<materia.assembly.AssemblyDefinition.AssemblyEncoder>;
+	var sensors:Array<materia.assembly.AssemblyDefinition.AssemblySensor>;
 }
 private typedef ServiceTrace = { var port:PortRef; var external:Bool; var supplied:Bool; var chain:Array<String>; }
 typedef MachineSubassembly = { var id:String; var assembly:MachineAssembly; var pose:Null<AssemblyFrame>; }
@@ -69,6 +71,9 @@ private typedef MutableIncludedRecord = {var id:String; var pose:AssemblyFrame; 
 /** Reusable, prefixable assembly made from MachineComponents and named connector references. */
 class MachineAssembly {
 	public static inline var SCHEMA_VERSION:Int = 5;
+	public static inline var PROCESS_SCHEMA_VERSION:Int = 6;
+	public static inline var SENSOR_SCHEMA_VERSION:Int = 7;
+	public static inline var PROCESS_VELOCITY_SCHEMA_VERSION:Int = 8;
 	final members:Array<AssemblyMember> = [];
 	final mechanical:AssemblyDefinition = {schemaVersion: AssemblyDefinitionCodec.VERSION,
 		id: "assembly", lengthUnit: "mm", definitions: [], occurrences: [], joints: [], couplings: []};
@@ -88,6 +93,8 @@ class MachineAssembly {
 	final motors:Array<machinekit.assembly.MachineAssemblyDescription.MotorRecord> = [];
 	/** Encoders reading joints, by encoder id. */
 	final encoders:Array<machinekit.assembly.MachineAssemblyDescription.EncoderRecord> = [];
+	final cylinders:Array<machinekit.assembly.MachineAssemblyDescription.CylinderRecord> = [];
+	final sensors:Array<AssemblySensor> = [];
 	final massByDefinition:Map<String, machinekit.component.MassProperties> = [];
 
 	public function new() {}
@@ -158,7 +165,9 @@ class MachineAssembly {
 			fromInstance: connection.fromInstance, fromPort: connection.fromPort,
 			toInstance: connection.toInstance, toPort: connection.toPort}];
 		savedConnections.sort((a, b) -> Reflect.compare(a.id, b.id));
-		return {schemaVersion: SCHEMA_VERSION, mechanical: FrozenAssemblyDefinitions.freeze(mechanical), machine: {
+		var schemaVersion = motorsWithProcessVelocity() ? PROCESS_VELOCITY_SCHEMA_VERSION :
+			sensors.length > 0 ? SENSOR_SCHEMA_VERSION : cylinders.length == 0 ? SCHEMA_VERSION : PROCESS_SCHEMA_VERSION;
+		return {schemaVersion: schemaVersion, mechanical: FrozenAssemblyDefinitions.freeze(mechanical), machine: {
 			members: sources,
 			ports: savedPorts,
 			included: [for (entry in nestedEntries) {id: entry.id, pose: copyFrame(entry.pose),
@@ -187,6 +196,8 @@ class MachineAssembly {
 				saved.sort((a, b) -> Reflect.compare(a.encoder, b.encoder));
 				saved.length == 0 ? null : saved;
 			},
+			cylinders: cylinders.length == 0 ? null : [for (c in cylinders) copyCylinder(c, "")],
+			sensors: sensors.length == 0 ? null : [for (sensor in sensors) copySensorRecord(sensor, "")],
 			bomExtras: [for (entry in bomItems) {item: copyBomItem(entry.item), quantity: entry.quantity,
 				mass: switch entry.mass {
 					case Unknown: machinekit.assembly.MachineAssemblyDescription.SavedBomMass.Unknown;
@@ -246,7 +257,9 @@ class MachineAssembly {
 	}
 
 	static function checkDescriptionVersion(version:Null<Int>):Void {
-		if (version != SCHEMA_VERSION) throw 'Machine assembly schema v$version is unsupported; expected v$SCHEMA_VERSION typed gearbox members';
+		if (version != SCHEMA_VERSION && version != PROCESS_SCHEMA_VERSION && version != SENSOR_SCHEMA_VERSION &&
+			version != PROCESS_VELOCITY_SCHEMA_VERSION)
+			throw 'Machine assembly schema v$version is unsupported; supported schema versions are v$SCHEMA_VERSION, v$PROCESS_SCHEMA_VERSION, v$SENSOR_SCHEMA_VERSION and v$PROCESS_VELOCITY_SCHEMA_VERSION';
 	}
 
 	/** Rebuild through registered recipes; no component object is stored in the description. */
@@ -307,6 +320,10 @@ class MachineAssembly {
 		// Motors too: their actuators follow the motor parts as they are now.
 		if (description.machine.motors != null) for (motor in description.machine.motors)
 			result.addMotorRecord(copyMotor(motor, ""));
+		if (description.machine.cylinders != null) for (c in description.machine.cylinders)
+			result.addCylinder(c.actuator, c.joint, c.cylinder, c.valve);
+		if (description.machine.sensors != null) for (sensor in description.machine.sensors)
+			result.addSensorRecord(copySensorRecord(sensor, ""));
 		// Encoders after the motors they read, whose actuators they point at.
 		if (description.machine.encoders != null) for (encoder in description.machine.encoders)
 			result.addEncoderRecord(copyEncoder(encoder, ""));
@@ -355,6 +372,11 @@ class MachineAssembly {
 				child.addCoupling(coupling.id.substr(prefix.length), coupling.source.substr(prefix.length),
 					coupling.target.substr(prefix.length), coupling.ratio, coupling.offset, coupling.efficiency,
 					coupling.stiffness, coupling.backlash, coupling.drag, coupling.assumed);
+		for (c in cylinders) if (StringTools.startsWith(c.actuator, prefix))
+			child.addCylinder(c.actuator.substr(prefix.length), c.joint.substr(prefix.length),
+				c.cylinder.substr(prefix.length), c.valve.substr(prefix.length));
+		for (sensor in sensors) if (StringTools.startsWith(sensor.id, prefix))
+			child.addSensorRecord(stripSensorRecord(sensor, prefix));
 		for (motor in motors) if (StringTools.startsWith(motor.actuator, prefix))
 			child.addMotorRecord({actuator: motor.actuator.substr(prefix.length), joint: motor.joint.substr(prefix.length),
 				motor: motor.motor.substr(prefix.length), driver: motor.driver.substr(prefix.length), margin: motor.margin,
@@ -387,6 +409,9 @@ class MachineAssembly {
 			StringTools.startsWith(connector.instanceId, prefix))
 			child.exposeConnector(connector.name.substr(prefix.length),
 				connector.instanceId.substr(prefix.length), connector.connectorName);
+		for (port in externalPorts) if (StringTools.startsWith(port.name, prefix) &&
+			StringTools.startsWith(port.instanceId, prefix))
+			child.exposePort(port.name.substr(prefix.length), port.instanceId.substr(prefix.length), port.portName);
 		return child;
 	}
 
@@ -400,6 +425,8 @@ class MachineAssembly {
 		target.mechanical.joints = copy.joints;
 		target.mechanical.couplings = copy.couplings;
 		for (transmission in transmissions) target.transmissions.push(copyTransmission(transmission, ""));
+		for (c in cylinders) target.cylinders.push(copyCylinder(c, ""));
+		for (sensor in sensors) target.sensors.push(copySensorRecord(sensor, ""));
 		for (motor in motors) target.motors.push(copyMotor(motor, ""));
 		for (encoder in encoders) target.encoders.push(copyEncoder(encoder, ""));
 		for (entry in included) target.included.push({id: entry.id,
@@ -638,6 +665,11 @@ class MachineAssembly {
 			applyTransmission(record);
 			transmissions.push(record);
 		}
+		for (c in assembly.cylinders) {
+			var mapped = copyCylinder(c, id);
+			addCylinder(mapped.actuator, mapped.joint, mapped.cylinder, mapped.valve);
+		}
+		for (sensor in assembly.sensors) addSensorRecord(copySensorRecord(sensor, id));
 		for (motor in assembly.motors) addMotorRecord(copyMotor(motor, id));
 		for (encoder in assembly.encoders) addEncoderRecord(copyEncoder(encoder, id));
 		for (connection in assembly.portConnections)
@@ -784,9 +816,10 @@ class MachineAssembly {
 	 * speed up to where pull-out torque falls to that, for a servo its peak torque and maximum speed.
 	 * Rebuilding the assembly works them out again from the motor and driver settings.
 	 */
-	public function addMotor(id:String, joint:String, motor:String, driver:String, margin:Float = 0.5, ?gearbox:String):Void
+	public function addMotor(id:String, joint:String, motor:String, driver:String, margin:Float = 0.5,
+			?gearbox:String, ?processVelocity:materia.assembly.AssemblyDefinition.AssemblyProcessVelocityDrive):Void
 		addMotorRecord({actuator: id, joint: joint, motor: motor, driver: driver, margin: margin,
-			gearbox: gearbox});
+			gearbox: gearbox, processVelocity: processVelocity});
 
 	function motorDriver(record:machinekit.assembly.MachineAssemblyDescription.MotorRecord):machinekit.motion.MotorDriver {
 		var member = requireMember(record.motor);
@@ -820,6 +853,7 @@ class MachineAssembly {
 		if (voltage == null) throw 'Motor "${record.actuator}" needs a wired supply or a stated driver voltage';
 		var motor:machinekit.motion.MotorDrive = cast requireMember(record.motor);
 		var added = motor.actuator(record.actuator, record.joint, voltage, record.margin, driver.current);
+		if (record.processVelocity != null) added.processVelocity = record.processVelocity;
 		if (driver.rating.positionLoopRate > 0) added.positionLoopRate = driver.rating.positionLoopRate;
 		var stepper = driver.rating.family == machinekit.motion.MotorDriver.MotorDriverFamily.Stepper;
 		if ((stepper && added.drive != "stepper") || (!stepper && added.drive != "servo"))
@@ -853,8 +887,22 @@ class MachineAssembly {
 	}
 
 	function addMotorRecord(record:machinekit.assembly.MachineAssemblyDescription.MotorRecord):Void {
+		if (record.processVelocity != null) {
+			var process = record.processVelocity;
+			if (process.speedChannel == null || process.speedChannel.length == 0 ||
+				process.directionChannel == null || process.directionChannel.length == 0 ||
+				process.speedChannel == process.directionChannel || !(process.radiansPerSpeedUnit > 0) ||
+				!Math.isFinite(process.radiansPerSpeedUnit))
+				throw 'Motor "${record.actuator}" has an invalid process velocity binding';
+			var continuous = false;
+			for (joint in mechanical.joints) if (joint.id == record.joint && joint.type == AssemblyJointType.Continuous)
+				continuous = true;
+			if (!continuous) throw 'Process velocity motor "${record.actuator}" needs a continuous joint';
+		}
 		for (motor in motors) if (motor.actuator == record.actuator)
 			throw 'Duplicate assembly actuator "${record.actuator}"';
+		for (c in cylinders) if (c.actuator == record.actuator || c.joint == record.joint)
+			throw 'Joint "${record.joint}" already has a pneumatic drive';
 		var driver = motorDriver(record);
 		// An incomplete module may be wired by its containing assembly. Validate known ratings now,
 		// and resolve the complete power graph when exporting the assembly's model.
@@ -862,6 +910,63 @@ class MachineAssembly {
 			var checked = resolveMotor(record, false);
 		}
 		motors.push(copyMotor(record, ""));
+	}
+
+	/** Bind a cylinder to the existing guide joint; pressure and direction are rebuilt from parts. */
+	public function addCylinder(id:String, joint:String, cylinderMember:String, valveMember:String):Void {
+		requireOperationId(id);
+		var cylinder = requireMember(cylinderMember).pneumaticCylinderSpec();
+		var valve = requireMember(valveMember).pneumaticValveSpec();
+		if (cylinder == null || valve == null) throw "Cylinder binding needs cylinder and valve parts";
+		for (c in cylinders) if (c.actuator == id || c.joint == joint) throw "Duplicate cylinder actuator or joint";
+		for (motor in motors) if (motor.actuator == id || motor.joint == joint) throw "Joint already has a motor";
+		for (encoder in encoders) if (encoder.encoder == id) throw 'Duplicate assembly actuator "$id"';
+		var found = false;
+		for (j in mechanical.joints) if (j.id == joint && j.type == AssemblyJointType.Prismatic && j.role == AssemblyJointRole.Tree) found = true;
+		if (!found) throw 'Cylinder "$id" needs a prismatic tree joint';
+		cylinders.push({actuator: id, joint: joint, cylinder: cylinderMember, valve: valveMember});
+	}
+
+	static function copyCylinder(c:machinekit.assembly.MachineAssemblyDescription.CylinderRecord, prefix:String)
+		:machinekit.assembly.MachineAssemblyDescription.CylinderRecord
+		return {actuator: join(prefix, c.actuator), joint: join(prefix, c.joint), cylinder: join(prefix, c.cylinder), valve: join(prefix, c.valve)};
+
+	function compileCylinder(c:machinekit.assembly.MachineAssemblyDescription.CylinderRecord):materia.assembly.AssemblyDefinition.AssemblyActuator {
+		var cylinder = requireMember(c.cylinder).pneumaticCylinderSpec();
+		var valve = requireMember(c.valve).pneumaticValveSpec();
+		if (cylinder == null || valve == null) throw "Cylinder binding lost its typed cylinder or valve part";
+		var pressure = airPressure(c.valve, "P");
+		var a = directUpstream(c.cylinder, "A"), b = directUpstream(c.cylinder, "B");
+		if (a.instanceId != c.valve || b.instanceId != c.valve || a.portName == b.portName ||
+			(a.portName != "A" && a.portName != "B") || (b.portName != "A" && b.portName != "B")) throw "Cylinder hoses must connect to the bound valve's A/B outlets";
+		var state = new AssemblyState(cloneDefinition(mechanical));
+		var extension = state.worldConnector(c.cylinder, "extension");
+		var direction = AssemblyFrames.transformVector(extension, 0, 1, 0);
+		var slider:Null<AssemblyFrame> = null;
+		var axis:{x:Float, y:Float, z:Float} = null;
+		for (j in mechanical.joints) if (j.id == c.joint) {
+			slider = state.worldConnector(j.child, j.childConnector);
+			axis = AssemblyFrames.transformVector(state.worldConnector(j.parent, j.parentConnector), j.axis.x, j.axis.y, j.axis.z);
+			if (j.limits.lower == null || j.limits.upper == null || Math.abs(j.limits.upper - j.limits.lower - cylinder.strokeMm()) > 1e-6)
+				throw "Cylinder stroke must match the guide's geometric travel";
+		}
+		var dot = direction.x * axis.x + direction.y * axis.y + direction.z * axis.z;
+		if (Math.abs(dot) < 0.999999) throw "Cylinder extension must align with its guide axis";
+		if (slider == null || Math.sqrt(Math.pow(extension.x - slider.x, 2) + Math.pow(extension.y - slider.y, 2) +
+			Math.pow(extension.z - slider.z, 2)) > 1e-5)
+			throw "Cylinder extension tip must meet the guided member at its default pose";
+		var hoseSign = a.portName == "A" ? 1.0 : -1.0;
+		return {id: c.actuator, joint: c.joint, maxEffort: cylinder.extendForce(pressure), maxRate: cylinder.ratedSpeedMmPerSecond(),
+			drive: "pneumatic", assumed: ["cylinder envelope", "flow-limited cylinder speed", "installed pneumatic fittings"],
+			pneumatic: {bore: cylinder.boreMm(), rod: cylinder.rodMm(), stroke: cylinder.strokeMm(), ratedSpeed: cylinder.ratedSpeedMmPerSecond(),
+				pressurePa: pressure, channelA: c.valve + "/coilA", channelB: valve.isDoubleSolenoid() ? c.valve + "/coilB" : null,
+				normallyToA: hoseSign > 0 ? valve.defaultsToA() : !valve.defaultsToA(), extendSign: dot > 0 ? 1.0 : -1.0}};
+	}
+
+	function directUpstream(instanceId:String, portName:String):PortRef {
+		for (connection in portConnections) if (connection.toInstance == instanceId && connection.toPort == portName)
+			return {instanceId: connection.fromInstance, portName: connection.fromPort};
+		throw 'Unwired cylinder port "$instanceId/$portName"';
 	}
 
 	/** Gauge pressure at a pneumatic consumer, resolved from its current service wiring. */
@@ -884,7 +989,9 @@ class MachineAssembly {
 	/** Compile every binding anew; connecting a supply after binding must not leave an old curve. */
 	function compileMotors():MotorCompilation {
 		var actuators = [for (record in motors) resolveMotor(record, true)];
+		for (c in cylinders) actuators.push(compileCylinder(c));
 		var sensors:Array<materia.assembly.AssemblyDefinition.AssemblyEncoder> = [];
+		var nativeSensors = compileSensors();
 		var sensorIds:Map<String, Bool> = [];
 		for (record in encoders) {
 			var part:machinekit.motion.EncoderPart = cast requireMember(record.part);
@@ -908,7 +1015,108 @@ class MachineAssembly {
 				actuator.encoderCounts = null;
 			}
 		}
-		return {actuators: actuators, encoders: sensors};
+		return {actuators: actuators, encoders: sensors, sensors: nativeSensors};
+	}
+
+	/** A reed or limit switch with an inclusive coordinate window and release hysteresis. */
+	public function addSwitch(id:String, joint:String, window:AssemblyJointLimits, hysteresis:Float = 0):Void {
+		if (window == null || window.lower == null || window.upper == null)
+			throw 'Switch "$id" needs a closed coordinate window';
+		addSensorRecord({id: id, kind: "joint_switch", joint: joint, windowLower: window.lower,
+			windowUpper: window.upper, hysteresis: hysteresis});
+	}
+
+	/** A digital spindle feedback sensor that turns on at the requested absolute joint speed. */
+	public function addAtSpeed(id:String, joint:String, minimumSpeed:Float):Void
+		addSensorRecord({id: id, kind: "at_speed", joint: joint, windowLower: minimumSpeed,
+			hysteresis: 0.0});
+
+	/** A one-ray presence sensor mounted normal to an assembly connector face. */
+	public function addPresence(id:String, connector:String, range:Float):Void {
+		var ref = presenceConnector(connector);
+		addSensorRecord({id: id, kind: "presence", occurrence: ref.instanceId,
+			connector: ref.connectorName, range: range});
+	}
+
+	function presenceConnector(name:String):MachineAssemblyConnector {
+		for (entry in externalConnectors) if (entry.name == name)
+			return {instanceId: entry.instanceId, connectorName: entry.connectorName};
+		if (name == null) throw "Presence sensor needs an exposed or member connector";
+		var at = name.lastIndexOf("/");
+		if (at <= 0 || at == name.length - 1) throw 'Presence sensor connector "$name" must name occurrence/connector';
+		var instance = name.substr(0, at), connector = name.substr(at + 1);
+		requireConnector(ref(instance, connector));
+		return {instanceId: instance, connectorName: connector};
+	}
+
+	function addSensorRecord(record:AssemblySensor):Void {
+		requireOperationId(record.id);
+		for (sensor in sensors) if (sensor.id == record.id) throw 'Duplicate assembly sensor "${record.id}"';
+		for (encoder in encoders) if (encoder.encoder == record.id) throw 'Duplicate assembly sensor "${record.id}"';
+		sensors.push(copySensorRecord(record, ""));
+	}
+
+	function compileSensors():Array<materia.assembly.AssemblyDefinition.AssemblySensor> {
+		var result:Array<materia.assembly.AssemblyDefinition.AssemblySensor> = [];
+		for (record in sensors) {
+			if (record.kind == "joint_switch" || record.kind == "at_speed") {
+				var edge:Null<KinematicJoint> = null;
+				for (joint in mechanical.joints) if (joint.id == record.joint) edge = joint;
+				if (edge == null || edge.role != AssemblyJointRole.Tree ||
+					(edge.type != AssemblyJointType.Prismatic && edge.type != AssemblyJointType.Revolute &&
+						edge.type != AssemblyJointType.Continuous))
+					throw 'Native sensor "${record.id}" needs a moving tree joint';
+				if (record.kind == "joint_switch") {
+					if (record.windowLower == null || record.windowUpper == null ||
+						!Math.isFinite(record.windowLower) || !Math.isFinite(record.windowUpper) ||
+						record.windowLower > record.windowUpper || record.hysteresis == null ||
+						!Math.isFinite(record.hysteresis) || record.hysteresis < 0)
+						throw 'Joint switch "${record.id}" has an invalid window or hysteresis';
+					if ((edge.limits.lower != null && record.windowLower < edge.limits.lower) ||
+						(edge.limits.upper != null && record.windowUpper > edge.limits.upper))
+						throw 'Joint switch "${record.id}" lies outside joint travel';
+					result.push({id: record.id, kind: record.kind, joint: record.joint,
+						windowLower: record.windowLower, windowUpper: record.windowUpper,
+						hysteresis: record.hysteresis});
+				} else {
+					if (record.windowLower == null || !(record.windowLower > 0) ||
+						!Math.isFinite(record.windowLower)) throw 'At-speed sensor "${record.id}" needs a positive threshold';
+					result.push({id: record.id, kind: record.kind, joint: record.joint,
+						windowLower: record.windowLower, hysteresis: 0.0});
+				}
+			} else {
+				if (record.occurrence == null || record.connector == null || record.range == null ||
+					!(record.range > 0) || !Math.isFinite(record.range))
+					throw 'Presence sensor "${record.id}" needs a connector and positive range';
+				requireConnector(ref(record.occurrence, record.connector));
+				result.push({id: record.id, kind: record.kind, occurrence: record.occurrence,
+					connector: record.connector, range: record.range});
+			}
+		}
+		return result;
+	}
+
+	static function copySensorRecord(sensor:AssemblySensor, prefix:String):AssemblySensor {
+			function mapped(value:Null<String>):Null<String> {
+				if (value == null) return null;
+				return join(prefix, value);
+			}
+			return {id: mapped(sensor.id), kind: sensor.kind, joint: mapped(sensor.joint),
+				occurrence: mapped(sensor.occurrence), connector: sensor.connector,
+				windowLower: sensor.windowLower, windowUpper: sensor.windowUpper,
+				hysteresis: sensor.hysteresis, range: sensor.range};
+	}
+
+	static function stripSensorRecord(sensor:AssemblySensor, prefix:String):AssemblySensor {
+			function stripped(value:Null<String>):Null<String> {
+				if (value == null) return null;
+				if (!StringTools.startsWith(value, prefix)) throw 'Sensor reference "$value" is outside "$prefix"';
+				return value.substr(prefix.length);
+			}
+			return {id: stripped(sensor.id), kind: sensor.kind, joint: stripped(sensor.joint),
+				occurrence: stripped(sensor.occurrence), connector: sensor.connector,
+				windowLower: sensor.windowLower, windowUpper: sensor.windowUpper,
+				hysteresis: sensor.hysteresis, range: sensor.range};
 	}
 
 	/**
@@ -945,10 +1153,24 @@ class MachineAssembly {
 			actuator: encoder.actuator == null ? null : join(prefix, encoder.actuator)};
 
 	static function copyMotor(motor:machinekit.assembly.MachineAssemblyDescription.MotorRecord,
-			prefix:String):machinekit.assembly.MachineAssemblyDescription.MotorRecord
-		return {actuator: join(prefix, motor.actuator), joint: join(prefix, motor.joint),
+			prefix:String):machinekit.assembly.MachineAssemblyDescription.MotorRecord {
+		var copy:machinekit.assembly.MachineAssemblyDescription.MotorRecord = {
+			actuator: join(prefix, motor.actuator), joint: join(prefix, motor.joint),
 			motor: join(prefix, motor.motor), driver: join(prefix, motor.driver), margin: motor.margin,
 			gearbox: motor.gearbox == null ? null : join(prefix, motor.gearbox)};
+		if (motor.processVelocity != null) {
+			var process = motor.processVelocity;
+			copy.processVelocity = {speedChannel: process.speedChannel,
+				directionChannel: process.directionChannel,
+				radiansPerSpeedUnit: process.radiansPerSpeedUnit};
+		}
+		return copy;
+	}
+
+	function motorsWithProcessVelocity():Bool {
+		for (motor in motors) if (motor.processVelocity != null) return true;
+		return false;
+	}
 
 	static function copyActuator(actuator:materia.assembly.AssemblyDefinition.AssemblyActuator,
 			prefix:String):materia.assembly.AssemblyDefinition.AssemblyActuator {
@@ -991,7 +1213,7 @@ class MachineAssembly {
 	public function connectPorts(id:String, fromInstance:String, fromPort:String,
 			toInstance:String, toPort:String, ?line:BomItem,
 			lineMass:AssemblyBomMass = Unknown):Void {
-		var from = portRef(fromInstance, fromPort), to = portRef(toInstance, toPort);
+		var from = resolvePortRef(fromInstance, fromPort), to = resolvePortRef(toInstance, toPort);
 		var first = requirePort(from), second = requirePort(to);
 		if ((first.role == Consumer && second.role != Consumer) ||
 			(first.role == Passive && second.role == Supply)) {
@@ -1185,6 +1407,8 @@ class MachineAssembly {
 		for (encoder in compiled.encoders)
 			model.addEncoder(materia.assembly.AssemblyDefinitionFlattener.copyEncoder(encoder, join(prefix, encoder.id),
 				join(prefix, encoder.joint)));
+		for (sensor in compiled.sensors)
+			model.addSensor(materia.assembly.AssemblyDefinitionFlattener.copySensor(sensor, sensor.id, prefix));
 	}
 
 	public function components():Array<MachineAssemblyComponent>
@@ -1490,6 +1714,13 @@ class MachineAssembly {
 
 	static function portRef(instanceId:String, portName:String):PortRef
 		return {instanceId: instanceId, portName: portName};
+
+	function resolvePortRef(instanceId:String, portName:String):PortRef {
+		var exposed = join(instanceId, portName);
+		for (entry in externalPorts) if (entry.name == exposed)
+			return portRef(entry.instanceId, entry.portName);
+		return portRef(instanceId, portName);
+	}
 
 	static function ref(instanceId:String, connectorName:String):MachineAssemblyConnector
 		return {instanceId: instanceId, connectorName: connectorName};

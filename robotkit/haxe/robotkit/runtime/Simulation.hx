@@ -114,7 +114,8 @@ class Simulation {
     ensureLive();
     if (space != null) space.requireDrives(blueprint);
     var robotDesc:Null<rk_simulation_robot_desc> = null;
-    if (initialPose != null || virtualDevice != null) {
+    if (initialPose != null || virtualDevice != null || blueprint.pneumaticDrives.length > 0 ||
+        blueprint.velocityDrives.length > 0) {
       robotDesc = new rk_simulation_robot_desc();
       robotDesc.set_struct_size(rk_simulation_robot_desc.size());
       robotDesc.set_initial_pose(initialPose == null ?
@@ -164,6 +165,58 @@ class Simulation {
             robotDesc.set_virtual_device_actuator_ids(i * 64 + byte,
               actuator.id.charCodeAt(byte));
         }
+      }
+    }
+    if (blueprint.pneumaticDrives.length > 0) {
+      var desc = requireRobotDescription(robotDesc);
+      desc.set_pneumatic_drive_count(blueprint.pneumaticDrives.length);
+      for (index in 0...blueprint.pneumaticDrives.length) {
+        var drive = blueprint.pneumaticDrives[index];
+        var channelA = -1, channelB = -1;
+        for (channelIndex in 0...blueprint.channels.length) {
+          var channel = blueprint.channels[channelIndex];
+          var isDigital = switch channel.safeValue {case Digital(_): true; case _: false;};
+          if (!isDigital) continue;
+          if (channel.id == drive.channelA) channelA = channelIndex;
+          if (drive.channelB != null && channel.id == drive.channelB) channelB = channelIndex;
+        }
+        if (channelA < 0 || (drive.channelB != null && channelB < 0))
+          throw 'Pneumatic drive on joint ${drive.joint} references an undeclared digital coil';
+        var native = new rk_simulation_pneumatic_drive();
+        native.set_joint(drive.joint);
+        native.set_channel_a(channelA);
+        native.set_channel_b(drive.channelB == null ? -1 : channelB);
+        native.set_normally_to_a(drive.normallyToA ? 1 : 0);
+        native.set_extension_force(drive.extensionForce);
+        native.set_retraction_force(drive.retractionForce);
+        native.set_extend_sign(drive.extendSign);
+        native.set_rated_speed(drive.ratedSpeed);
+        desc.set_pneumatic_drives(index, native);
+      }
+    }
+    if (blueprint.velocityDrives.length > 0) {
+      var desc = requireRobotDescription(robotDesc);
+      desc.set_velocity_drive_count(blueprint.velocityDrives.length);
+      for (index in 0...blueprint.velocityDrives.length) {
+        var drive = blueprint.velocityDrives[index];
+        var speedChannel = -1, directionChannel = -1;
+        for (channelIndex in 0...blueprint.channels.length) {
+          var channel = blueprint.channels[channelIndex];
+          var isAnalog = switch channel.safeValue {case Analog(_): true; case _: false;};
+          if (!isAnalog) continue;
+          if (channel.id == drive.speedChannel) speedChannel = channelIndex;
+          if (channel.id == drive.directionChannel) directionChannel = channelIndex;
+        }
+        if (speedChannel < 0 || directionChannel < 0)
+          throw 'Velocity drive on joint ${drive.joint} references undeclared analog channels';
+        var native = new rk_simulation_velocity_drive();
+        native.set_joint(drive.joint);
+        native.set_speed_channel(speedChannel);
+        native.set_direction_channel(directionChannel);
+        native.set_radians_per_speed_unit(drive.radiansPerSpeedUnit);
+        native.set_max_effort(drive.maxEffort);
+        native.set_max_rate(drive.maxRate);
+        desc.set_velocity_drives(index, native);
       }
     }
     if (linkCollisionBoxes != null) {
@@ -362,7 +415,7 @@ class Simulation {
         robotDesc = new rk_simulation_robot_desc();
         robotDesc.set_struct_size(rk_simulation_robot_desc.size());
       }
-      var desc:rk_simulation_robot_desc = cast robotDesc;
+      var desc = requireRobotDescription(robotDesc);
       desc.set_flags(desc.get_flags() | RobotKitSimKitConstants.RK_SIMULATION_ROBOT_HOLD_AT_REST);
     }
     var result = RobotKitSimKit.rk_simulation_add_robot(owner.borrow(), blueprint.nativeValue(), robotDesc);
@@ -752,6 +805,11 @@ class Simulation {
   static function poseValue(pose:rk_simulation_pose):{position:Array<Float>,rotation:Array<Float>}
     return {position:[for(index in 0...3) pose.get_position(index)],
       rotation:[for(index in 0...4) pose.get_rotation(index)]};
+
+  static function requireRobotDescription(value:Null<rk_simulation_robot_desc>):rk_simulation_robot_desc {
+    if (value == null) throw "Simulation robot description was not allocated";
+    return value;
+  }
 
   public function stepIndex():Int64 {
     var value = readClock();

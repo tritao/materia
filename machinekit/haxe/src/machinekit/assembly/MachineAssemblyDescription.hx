@@ -277,6 +277,8 @@ import machinekit.component.PortInterface;
 	/** A gearbox between the motor and the joint (see `Gearbox`); absent for a direct drive. */
 	// Retired numeric reduction ids 6 and 7.
 	@:id(9) @:optional var gearbox:Null<String>;
+	/** A process speed/direction pair for a CNC spindle; both channels are analog. */
+	@:id(10) @:optional var processVelocity:Null<materia.assembly.AssemblyDefinition.AssemblyProcessVelocityDrive>;
 }
 
 /**
@@ -305,6 +307,8 @@ import machinekit.component.PortInterface;
 	@:id(12) @:optional var transmissions:ReadOnlyArray<TransmissionRecord>;
 	@:id(13) @:optional var motors:ReadOnlyArray<MotorRecord>;
 	@:id(14) @:optional var encoders:ReadOnlyArray<EncoderRecord>;
+	@:id(15) @:optional var cylinders:ReadOnlyArray<CylinderRecord>;
+	@:id(16) @:optional var sensors:ReadOnlyArray<materia.assembly.AssemblyDefinition.AssemblySensor>;
 }
 
 /** Mechanical definition plus the MachineKit facts keyed by occurrence ID. */
@@ -312,4 +316,12 @@ import machinekit.component.PortInterface;
 	@:id(1) var mechanical:FrozenAssemblyDefinition;
 	@:id(2) var machine:AssemblySideRecord;
 	@:id(3) @:optional var schemaVersion:Int;
+}
+
+/** Keep part references, rather than a cached pressure or area. */
+@:wire typedef CylinderRecord = {
+	@:id(1) var actuator:String;
+	@:id(2) var joint:String;
+	@:id(3) var cylinder:String;
+	@:id(4) var valve:String;
 }

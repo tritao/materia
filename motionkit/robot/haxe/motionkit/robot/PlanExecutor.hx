@@ -69,15 +69,20 @@ class PlanExecutor {
     fill();
   }
 
-  public function update():Void {
+  /** False while a hold or resume command still needs an owner tick before another plan can start. */
+  public function update():Bool {
+    var awaitingResume = deferredRefill;
     var observation = sync();
     stream.observe(session, observation);
     if (session.isStopping()) {
       if (TrajectoryStream.atRest(observation)) {
         session.rest();
         clear();
+        // The caller must observe Idle in this update to launch a replacement
+        // program; there will be no later update while the session is idle.
+        return true;
       }
-      return;
+      return false;
     }
     if (session.state == Holding) {
       if (TrajectoryStream.atRest(observation)) {
@@ -89,20 +94,25 @@ class PlanExecutor {
           deferredRefill = false;
         }
       }
-      return;
+      return false;
     }
-    if (session.state == Held) return;
+    if (session.state == Held) return false;
     var active = plan;
-    if (active == null) return;
+    if (active == null) return !awaitingResume;
     if (stream.finishedProgram(observation)) {
       stream.markCompleted();
       completed = true;
       plan = null;
       planArrays = null;
       if (ownsSession) session.completed();
-      return;
+      return !awaitingResume;
     }
-    if (deferredRefill) deferredRefill = false; else fill();
+    if (deferredRefill) {
+      deferredRefill = false;
+      return false;
+    }
+    fill();
+    return true;
   }
 
   public function hold():Void {
@@ -110,8 +120,19 @@ class PlanExecutor {
   }
   public function resume():Void {
     if (session.resume() && plan != null) {
-      stream.submit(session, RobotCommand.Resume);
-      deferredRefill = true;
+      var observation = robot.snapshot();
+      if (stream.finishedProgram(observation)) {
+        // A hold can settle exactly at the plan's end. There is no path left for
+        // the runtime to resume; retire it so the next program block can start.
+        stream.markCompleted();
+        completed = true;
+        plan = null;
+        planArrays = null;
+        if (ownsSession) session.completed();
+      } else {
+        stream.submit(session, RobotCommand.Resume);
+        deferredRefill = true;
+      }
     }
   }
   public function abort():Void {

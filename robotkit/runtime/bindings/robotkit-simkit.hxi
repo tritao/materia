@@ -440,6 +440,22 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		wheel_rates: array<f64, 3> @offset(40);
 		reserved: array<u64, 2> @offset(64);
 	}
+	/**
+	 * A simulation-owned cylinder and valve latch acting on one process joint.
+	 */
+	struct rk_simulation_pneumatic_drive @layout(48, 8) {
+		joint: u32 @offset(0);
+		channel_a: u32 @offset(4);
+		/**
+		 * < UINT32_MAX for a single-coil, spring-return valve.
+		 */
+		channel_b: u32 @offset(8);
+		normally_to_a: u32 @offset(12);
+		extension_force: f64 @offset(16);
+		retraction_force: f64 @offset(24);
+		extend_sign: f64 @offset(32);
+		rated_speed: f64 @offset(40);
+	}
 	struct rk_simulation_pose @layout(64, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		reserved0: u32 @offset(4);
@@ -462,7 +478,7 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		position: array<f64, 3> @offset(32);
 		rotation: array<f64, 4> @offset(56);
 	}
-	struct rk_simulation_robot_desc @layout(2470416, 8) {
+	struct rk_simulation_robot_desc @layout(2515488, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		flags: u32 @offset(4);
 		initial_pose: rk_simulation_pose @offset(8);
@@ -538,6 +554,16 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		 */
 		link_hull_count: u32 @offset(1679880);
 		link_hulls: array<rk_simulation_link_hull, 512> @offset(1679888);
+		/**
+		 * Appended v28 tail: physical cylinders are simulation models, not runtime targets.
+		 */
+		pneumatic_drive_count: u32 @offset(2470416);
+		pneumatic_drives: array<rk_simulation_pneumatic_drive, 512> @offset(2470424);
+		/**
+		 * Appended v29 tail: spindle speed is a typed analog process drive.
+		 */
+		velocity_drive_count: u32 @offset(2495000);
+		velocity_drives: array<rk_simulation_velocity_drive, 512> @offset(2495008);
 	}
 	/**
 	 * World-frame twist of one body: metres per second and radians per second.
@@ -547,6 +573,18 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		reserved0: u32 @offset(4);
 		linear: array<f64, 3> @offset(8);
 		angular: array<f64, 3> @offset(32);
+	}
+	/**
+	 * A simulation-owned continuous joint whose speed is set by analog process channels.
+	 */
+	struct rk_simulation_velocity_drive @layout(40, 8) {
+		joint: u32 @offset(0);
+		speed_channel: u32 @offset(4);
+		direction_channel: u32 @offset(8);
+		reserved0: u32 @offset(12);
+		radians_per_speed_unit: f64 @offset(16);
+		max_effort: f64 @offset(24);
+		max_rate: f64 @offset(32);
 	}
 	/**
 	 * A force (N) and torque (N m), world frame, at a body's centre of mass.
