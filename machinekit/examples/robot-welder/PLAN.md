@@ -786,6 +786,14 @@ W6 implementation notes (started after W5 main sync, 2026-10-04):
   scaled feedback, stop/restart, supply fault, explicit restart, link-loss fault and watchdog shutdown; affected
   tool regression suites pass 27 tool / 33 process / 152 weld / 33 clearance assertions.
   These are adapter-level checks; running the unchanged welding process/mission on all three backends remains open.
+- `WelderChannelBinding` forwards executed channel transitions through the device-neutral outputs/feedback boundary
+  and polls the supply continuously. It does not consume the runtime's event queue or rewrite the authored program;
+  the runner retains its existing channel commands and tool-sensor waits. Repeated off samples do not discard queued
+  feedback reads. Stop inhibits ignition until the robot's arc channel has actually reported off, preventing stale
+  on samples from reigniting a stopped source. Invalid channels/feedback and reported faults safe the outputs.
+  Focused binding checks pass for unchanged values, channel transitions, continuous polling, stop inhibition and
+  invalid setpoints; the 78 Modbus assertions and TCP adapter tests remain green. Runtime sensor publication and
+  complete CAD-mission execution through this binding are still to be connected and verified.
 
 ## Phase 2: mobile welder
 

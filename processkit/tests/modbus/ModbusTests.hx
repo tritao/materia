@@ -56,6 +56,7 @@ class ModbusTests {
     check(processkit.tool.WeldSensor.faultMessage(4) == "weld: supply fault");
     check(processkit.tool.WeldSensor.faultMessage(5) == "weld: device connection lost");
     trace('Modbus tests passed ($count assertions)');
+    WelderBindingTests.run();
     ModbusTcpTests.run();
   }
 }
