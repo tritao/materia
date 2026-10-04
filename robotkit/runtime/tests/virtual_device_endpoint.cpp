@@ -839,7 +839,75 @@ void runtime_hold_rest_resume_fires_final_event() {
     assert(endpoint->channel_values()[0] == 0.0f);
 }
 
+void runtime_boot_anchor_uses_device_counter_origin() {
+    rk_robot_runtime_blueprint blueprint{};
+    blueprint.struct_size = sizeof(blueprint);
+    blueprint.revision = 1;
+    blueprint.joint_count = 1;
+    blueprint.link_count = 2;
+    for (std::uint32_t i = 0; i < blueprint.link_count; ++i) {
+        blueprint.links[i].mass = 1.0;
+        blueprint.links[i].inertia_tensor[0] = blueprint.links[i].inertia_tensor[4] =
+            blueprint.links[i].inertia_tensor[8] = 1.0;
+    }
+    blueprint.joints[0].type = RK_RUNTIME_JOINT_PRISMATIC;
+    blueprint.joints[0].child_link = 1;
+    blueprint.joints[0].parent_frame_rotation[3] = blueprint.joints[0].child_frame_rotation[3] = 1.0;
+    blueprint.joints[0].axis[0] = 1.0;
+    blueprint.owner_period_ns = 10'000'000;
+    blueprint.joints[0].lower_limit = -2.0;
+    blueprint.joints[0].upper_limit = 2.0;
+    blueprint.joints[0].max_velocity = 1.0;
+    blueprint.joints[0].max_acceleration = 2.0;
+    blueprint.joints[0].limit_flags = RK_LIMIT_VELOCITY | RK_LIMIT_ACCELERATION;
+    assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_OK);
+    VirtualDeviceConfig6 config;
+    config.controller.fill(12);
+    config.clock_bound_ns = 5'000'000;
+    config.actuators = {{0, 2.0, 1.0, 1'000.0, 40'000.0}};
+    config.actuators[0].id = "offset-motor";
+    auto endpoint = VirtualDeviceEndpoint::create(blueprint, config);
+    assert(endpoint);
+    RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(10));
+    runtime.set_externally_driven(true);
+    std::uint64_t now = 0;
+    auto cycle = [&] {
+        now += 10'000'000;
+        assert(runtime.apply_pending_commands(now) == RK_OK);
+        assert(runtime.publish_sample(now) == RK_OK);
+    };
+    for (int i = 0; i < 30; ++i) cycle();
+    rk_robot_snapshot snapshot{};
+    assert(runtime.snapshot_full(snapshot) == RK_OK);
+    assert(std::abs(snapshot.position[0] - 1.0) < 1e-12);
+    assert(std::abs(snapshot.setpoint_position[0] - 1.0) < 1e-12);
+    PlanRequest plan{};
+    plan.sequence = 1;
+    plan.plan_id = 91;
+    plan.model_revision = 1;
+    plan.required_capabilities = RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE;
+    plan.ends_at_rest = 1;
+    plan.start_position[0] = 1.0;
+    plan.position_tolerance[0] = 1e-6;
+    plan.segments.tag = 91;
+    plan.segments.segments.resize(1);
+    auto &segment = plan.segments.segments[0];
+    segment.duration_ns = 1'000'000'000;
+    segment.degree = 1;
+    segment.joint_count = 1;
+    segment.coefficients[0].value[0] = 1.0;
+    const auto submitted = runtime.submit_plan(plan);
+    if (submitted != RK_OK) std::fprintf(stderr, "boot anchor submit=%d safety=%d fault=%d\n", submitted, snapshot.safety, snapshot.fault_code);
+    assert(submitted == RK_OK);
+    for (int i = 0; i < 150; ++i) cycle();
+    assert(runtime.snapshot_full(snapshot) == RK_OK);
+    assert(snapshot.fault_code == 0 && snapshot.safety == RK_SAFETY_READY);
+    assert(std::abs(snapshot.setpoint_position[0] - 1.0) < 1e-12);
+    assert(std::abs(endpoint->actuator_positions()[0]) < 1e-12);
+}
+
 int main() {
+    runtime_boot_anchor_uses_device_counter_origin();
     motor_feedback_reconstructs_leaders();
     dual_drive_layout();
     router_leader_skew();

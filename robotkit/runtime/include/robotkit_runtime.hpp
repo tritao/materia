@@ -465,6 +465,8 @@ private:
     void reset_control();
     /** Last position sent to the endpoint, retained after a trajectory drains. */
     double commanded_position_[RK_MAX_JOINTS]{};
+    /** A queued device's counters establish its first held anchor, before any plan. */
+    bool device_anchor_initialized_ = false;
     double commanded_position_backup_[RK_MAX_JOINTS]{};
     bool velocity_anchor_pending_[RK_MAX_JOINTS]{};
     bool velocity_anchor_pending_backup_[RK_MAX_JOINTS]{};

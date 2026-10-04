@@ -217,15 +217,19 @@ class MotionKitTestSupport {
 
   public function runMotion(machine:MotionSystem, harness:SimulationHarness):Void {
     var tick = 0;
+    var homeStatus = machine.homingStatus();
+    var maximumTicks = homeStatus != "Idle" && homeStatus != "Complete" && homeStatus != "Fault"
+      ? 60000 : 2000;
     while (machine.isMoving()) {
+      harness.step();
       machine.update();
-      harness.step(Int64.ofInt(tick++));
-      if (tick > 2000) {
+      tick++;
+      if (tick > maximumTicks) {
         var snapshot = machine.robot.snapshot();
         throw 'MotionKit trajectory did not complete: safety=${snapshot.safety} fault=${snapshot.faultCode} session=${snapshot.sessionState} active=${snapshot.trajectoryActive} queue=${snapshot.trajectoryQueueDepth} time=${snapshot.trajectoryTimeNs} duration=${snapshot.trajectoryDurationNs} committed=${snapshot.committedUntilNs}';
       }
     }
-    for (_ in 0...4) harness.step(Int64.ofInt(tick++));
+    for (_ in 0...4) harness.step();
   }
 
   var gantryBlueprint_:Null<MotionSystemBlueprint> = null;

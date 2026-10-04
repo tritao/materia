@@ -2321,6 +2321,15 @@ rk_result RobotRuntime::publish_sample_impl(uint64_t timestamp_ns,
         }
         next.struct_size = sizeof(next);
         state_ = next;
+        if (endpoint_->executes_trajectory_queue() && !device_anchor_initialized_ &&
+            next.source_timestamp_ns != 0 && result == RK_OK &&
+            !control_.trajectory_active && trajectory_.empty() && !control_.stop_ramp_active) {
+            // A device boots with its own counter origin. Model placement is
+            // not evidence of the held motor coordinates; seed only once.
+            for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
+                if (!control_.active[joint]) commanded_position_[joint] = next.position[joint];
+            device_anchor_initialized_ = true;
+        }
         // After velocity control stops, use its observed resting position as
         // the next plan anchor. Position-controlled and untouched joints keep
         // their commanded anchor despite small observation offsets.
@@ -2451,6 +2460,7 @@ void RobotRuntime::reset_state() noexcept {
         channel_outputs_[i] = blueprint_.channels[i].safe_value;
     latched_fault_code_ = 1;
     std::fill_n(commanded_position_, RK_MAX_JOINTS, 0.0);
+    device_anchor_initialized_ = false;
     std::fill_n(commanded_position_backup_, RK_MAX_JOINTS, 0.0);
     std::fill_n(velocity_anchor_pending_, RK_MAX_JOINTS, false);
     std::fill_n(velocity_anchor_pending_backup_, RK_MAX_JOINTS, false);

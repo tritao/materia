@@ -353,7 +353,15 @@ impl VirtualDevice {
                         begin.expected_position,
                         begin.expected_velocity,
                     );
-                if result.is_err() { return false; }
+                if let Err(error) = result {
+                    eprintln!("Virtual RKD6 rejected QueueBegin: {:?}, revision={}, boundary={}",
+                        error, begin.queue_revision, begin.replace_after_ticks);
+                    let core = self.core.as_ref().unwrap();
+                    eprintln!("  expected positions={:?} velocities={:?}; actual positions={:?} velocities={:?}",
+                        &begin.expected_position[..self.count], &begin.expected_velocity[..self.count],
+                        &core.positions()[..self.count], &core.velocities()[..self.count]);
+                    return false;
+                }
                 self.events.as_mut().unwrap().queue_begin(begin.queue_revision,
                     begin.replace_after_ticks, self.core.as_ref().unwrap().committed_until()).is_ok()
             }

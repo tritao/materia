@@ -3188,3 +3188,29 @@ ordinary gantry plan before home (status -14). Added its actual sensor homing
 setup on the same adapter/MotionSystem. Compiler-only passed (1127 sources;
 33733). Full-suite retry has been started; its result remains pending.
 G13/Phase C remain incomplete; G14 is not started.
+
+### Phase C — boot queued-device anchors from actual counter feedback
+
+Virtual QueueBegin diagnostics identified BadExpectedState on revision 1:
+X/Y targets expected 471.2389 radians from centred model placement, but actual
+boot motor counters were zero. Runtime now initializes queued-device held
+anchors once from its first fresh valid counter feedback, retaining the usual
+commanded-anchor semantics thereafter. A nonzero transmission-offset regression
+checks the logical observed/held start, successful first plan and unchanged
+physical motor counter. Native rebuild and full CTest passed 18/18 (10002).
+
+Router retry 62867 now starts revision 1. Revision 2 fails after Z stop:
+host expects 0.5834607 radians, device holds 1.5707964. Inspecting runtime stop
+handling found a host-generated stop ramp suppresses endpoint output when the
+device executes queued plans, so the device keeps its original path. This needs
+a proper device-owned stop and fresh stationary-feedback anchor handoff; do not
+relax QueueBegin's expected-state check. Router homing remains incomplete.
+
+MotionKit runMotion now advances the session clock before polling homing and
+uses the automatic fixed-step timestamp across repeated calls. Actual homing
+uses its existing 60000-tick budget; ordinary trajectory budget stays 2000.
+Compiler-only passed (1127 sources; 17614). Full retry 32623 passed the linear
+planner fixture and reached testCompiledXYZGantryRunsThroughSimulation, which
+indexes an empty flangeIncludePath frame selection (ProcessTests line 341).
+Audit physical gantry flange metadata and update that fixture correctly.
+G13/Phase C remain incomplete; G14 is not started.
