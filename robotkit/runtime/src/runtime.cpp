@@ -215,55 +215,6 @@ rk_result validate_appended_path(
     return RK_OK;
 }
 
-/**
-  The blueprint with each coupled joint that has no velocity or acceleration limit of its own
-  given its leaders', scaled by the ratios and summed: a lead screw turns as fast as its axis
-  moves it, and a CoreXY motor as fast as both axes together can turn it. Its motion is its
-  leaders', so this bounds nothing new, but every stop and check that budgets joint by joint then
-  has a limit to work with. A follower waits until every leader has the limit.
-**/
-rk_robot_runtime_blueprint with_coupled_limits(const rk_robot_runtime_blueprint &source) {
-    rk_robot_runtime_blueprint blueprint{};
-    std::memcpy(&blueprint, &source, std::min<std::size_t>(source.struct_size, sizeof(blueprint)));
-    if (blueprint.struct_size < offsetof(rk_robot_runtime_blueprint, process_joint)) return blueprint;
-    const auto count = std::min(blueprint.coupling_count,
-        static_cast<uint32_t>(RK_MAX_JOINT_COUPLINGS));
-    // Each pass settles at least one more link of every chain.
-    for (uint32_t pass = 0; pass < count; ++pass) {
-        bool changed = false;
-        for (uint32_t i = 0; i < count; ++i) {
-            const auto &coupling = blueprint.couplings[i];
-            if (coupling.leader >= blueprint.joint_count || coupling.follower >= blueprint.joint_count ||
-                !robotkit::internal::first_term_of_follower(blueprint.couplings, i))
-                continue;
-            auto &follower = blueprint.joints[coupling.follower];
-            double velocity = 0.0, acceleration = 0.0;
-            bool has_velocity = true, has_acceleration = true;
-            for (uint32_t k = 0; k < count; ++k) {
-                const auto &term = blueprint.couplings[k];
-                if (term.follower != coupling.follower) continue;
-                if (term.leader >= blueprint.joint_count) { has_velocity = has_acceleration = false; break; }
-                const auto &leader = blueprint.joints[term.leader];
-                const double scale = std::abs(term.ratio);
-                if (leader.max_velocity > 0.0) velocity += scale * leader.max_velocity;
-                else has_velocity = false;
-                if (leader.max_acceleration > 0.0) acceleration += scale * leader.max_acceleration;
-                else has_acceleration = false;
-            }
-            if (!(follower.max_velocity > 0.0) && has_velocity) {
-                follower.max_velocity = velocity;
-                changed = true;
-            }
-            if (!(follower.max_acceleration > 0.0) && has_acceleration) {
-                follower.max_acceleration = acceleration;
-                changed = true;
-            }
-        }
-        if (!changed) break;
-    }
-    return blueprint;
-}
-
 /** Missing acceleration has no numeric sentinel: presence is carried in the blueprint. */
 double acceleration_limit(const rk_robot_runtime_joint &joint) {
     return (joint.limit_flags & RK_LIMIT_ACCELERATION) ? joint.max_acceleration
@@ -754,8 +705,7 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
             // A drained path or completed stop holds its last commanded
             // setpoint. Endpoint samples are observations, not plan anchors.
             for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
-                if (blueprint_.struct_size >= offsetof(rk_robot_runtime_blueprint, sensor_joint) &&
-                    blueprint_.process_joint[joint]) {
+                if (    blueprint_.process_joint[joint]) {
                     anchor_position[joint] = state_.position[joint];
                     continue;
                 }
@@ -809,8 +759,7 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
         for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
             // A process drive owns its joint independently of planned motion. Its observed
             // position can change while a program waits for a process input.
-            if (blueprint_.struct_size >= offsetof(rk_robot_runtime_blueprint, sensor_joint) &&
-                blueprint_.process_joint[joint]) continue;
+            if (blueprint_.process_joint[joint]) continue;
             const double position_tolerance = plan.position_tolerance[joint] > 0.0
                 ? plan.position_tolerance[joint] : default_tolerance;
             const double velocity_tolerance = plan.velocity_tolerance[joint] > 0.0
@@ -862,8 +811,7 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
             double rest_scale[RK_MAX_JOINTS];
             std::fill_n(rest_scale, blueprint_.joint_count, 1.0);
             uint32_t followers[RK_MAX_JOINTS], follower_count = 0;
-            if (blueprint_.struct_size >= sizeof(blueprint_) &&
-                internal::order_followers(blueprint_.couplings, blueprint_.coupling_count,
+            if (internal::order_followers(blueprint_.couplings, blueprint_.coupling_count,
                     blueprint_.joint_count, nullptr, followers, follower_count))
                 for (uint32_t index = 0; index < follower_count; ++index) {
                     double sum = 0.0;
@@ -1861,8 +1809,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
             std::max(0.0, duration - t));
         uint32_t target_count = 0;
         for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
-            if (blueprint_.struct_size >= offsetof(rk_robot_runtime_blueprint, sensor_joint) &&
-                blueprint_.process_joint[joint]) continue;
+            if (blueprint_.process_joint[joint]) continue;
             auto &target = value.targets[target_count];
             target.joint = joint;
             target.mode = RK_TARGET_POSITION;
@@ -1981,8 +1928,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         output.kind = RK_COMMAND_JOINT_TARGETS;
         output.target_count = 0;
         for (uint32_t joint = 0; joint < front.point.joint_count; ++joint) {
-            if (blueprint_.struct_size >= offsetof(rk_robot_runtime_blueprint, sensor_joint) &&
-                blueprint_.process_joint[joint]) continue;
+            if (blueprint_.process_joint[joint]) continue;
             const auto target_index = output.target_count++;
             output.targets[target_index].joint = joint;
             output.targets[target_index].mode = RK_TARGET_POSITION;
@@ -2312,16 +2258,11 @@ rk_result RobotRuntime::publish_sample_impl(uint64_t timestamp_ns,
         latch_fault();
         return result != RK_OK ? result : RK_ERROR_BACKEND;
     }
-    const double tolerance = blueprint_.struct_size >=
-        offsetof(rk_robot_runtime_blueprint, observed_limit_tolerance) +
-            sizeof(blueprint_.observed_limit_tolerance)
-        ? blueprint_.observed_limit_tolerance : 0.0;
+    const double tolerance = blueprint_.observed_limit_tolerance;
     const double precision = endpoint_->observed_position_precision();
-    const bool has_overtravel = blueprint_.struct_size >=
-        offsetof(rk_robot_runtime_blueprint, joint_overtravel) + sizeof(blueprint_.joint_overtravel);
     for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
         const auto &limits = blueprint_.joints[joint];
-        const double margin = tolerance + (has_overtravel ? blueprint_.joint_overtravel[joint] : 0.0);
+        const double margin = tolerance + blueprint_.joint_overtravel[joint];
         if (next.position[joint] < limits.lower_limit - margin -
                 precision * std::max(1.0, std::abs(limits.lower_limit)) ||
             next.position[joint] > limits.upper_limit + margin +

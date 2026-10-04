@@ -296,8 +296,7 @@ rk_result copy_segments(const int64_t *starts_ns, const int64_t *durations_ns,
     // derived from it.
     uint32_t followed[RK_MAX_JOINTS];
     uint32_t follow_count = 0;
-    if (blueprint && blueprint->struct_size >= sizeof(*blueprint) &&
-        source_joint_count < robot_joint_count &&
+    if (blueprint && source_joint_count < robot_joint_count &&
         !robotkit::internal::order_followers(blueprint->couplings, blueprint->coupling_count,
             robot_joint_count, driven, followed, follow_count))
         return RK_ERROR_INVALID_ARGUMENT;
@@ -421,19 +420,10 @@ rk_result RK_CALL rk_robot_runtime_snapshot(rk_robot_runtime runtime, rk_robot_s
 
 rk_result RK_CALL rk_robot_runtime_snapshot_full(rk_robot_runtime runtime,
                                            rk_robot_snapshot *out_snapshot) {
-    if (!out_snapshot ||
-        out_snapshot->struct_size < offsetof(rk_robot_snapshot, calibration_revision))
+    if (!out_snapshot || out_snapshot->struct_size != sizeof(*out_snapshot))
         return RK_ERROR_INVALID_ARGUMENT;
     const auto value = robotkit::internal::resolve_runtime(runtime);
-    if (!value) return RK_ERROR_INVALID_HANDLE;
-    const auto caller_size = out_snapshot->struct_size;
-    rk_robot_snapshot complete{};
-    const auto result = value->snapshot_full(complete);
-    if (result != RK_OK) return result;
-    std::memcpy(out_snapshot, &complete,
-        std::min<std::size_t>(caller_size, sizeof(complete)));
-    out_snapshot->struct_size = caller_size;
-    return RK_OK;
+    return value ? value->snapshot_full(*out_snapshot) : RK_ERROR_INVALID_HANDLE;
 }
 
 rk_result RK_CALL rk_robot_runtime_snapshot_endpoint(rk_robot_runtime runtime,

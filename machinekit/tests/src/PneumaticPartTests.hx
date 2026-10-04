@@ -85,7 +85,7 @@ class PneumaticPartTests {
 		var model = new AssemblyModel("mm");
 		bound.addTo(model, "");
 		var definition = model.definition("pneumatic-fixture");
-		if (definition.schemaVersion != materia.assembly.AssemblyDefinitionCodec.PROCESS_VERSION ||
+		if (definition.schemaVersion != materia.assembly.AssemblyDefinitionCodec.VERSION ||
 			definition.actuators == null || definition.actuators.length != 1)
 			throw "Process actuator did not produce the process-format drive";
 		var drive = definition.actuators[0];

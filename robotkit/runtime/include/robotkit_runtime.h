@@ -9,7 +9,9 @@
  * physical, replay, and test endpoints. A RobotRuntime owns one command
  * mailbox and publishes immutable observations; it does not expose native
  * backend handles. All extensible structs begin with struct_size so callers
- * and libraries can validate ABI compatibility before reading fields.
+ * and libraries can validate their layout before reading fields. Blueprints
+ * and snapshots require exactly the current complete layout; older prefixes
+ * are rejected.
  */
 
 /* ------------------------------------------------------------------------- */
@@ -452,16 +454,16 @@ typedef struct rk_robot_runtime_blueprint {
     uint64_t calibration_revision; /**< Optional compiled calibration identity; zero is unspecified. */
     uint64_t commit_lead_ns; /**< Zero selects two owner periods. */
     double following_error_bound[RK_MAX_TRAJECTORY_JOINTS]; /**< Per-joint SI-unit bound; zero disables this check. */
-    uint64_t owner_period_ns; /**< Zero selects the 10 ms default; versioned by struct_size. */
+    uint64_t owner_period_ns; /**< Zero selects the 10 ms default. */
     uint64_t serial_processing_allowance_ns; /**< Zero selects 2 ms; one-way target-streaming budget. */
-    uint32_t channel_count; /**< Versioned: absent means no process channels. */
+    uint32_t channel_count; /**< Number of declared process channels. */
     rk_channel_declaration channels[RK_MAX_PROCESS_CHANNELS];
     uint32_t coupling_count; /**< Joint relations compiled from RobotModel v5. */
     rk_robot_joint_coupling couplings[RK_MAX_JOINT_COUPLINGS];
-    /** Versioned: absent means no passive dynamics. Indexed by joint. */
+    /** Passive dynamics, indexed by joint; zero disables each contribution. */
     rk_robot_joint_dynamics joint_dynamics[RK_MAX_JOINTS];
     /**
-     * Versioned: how far, in joint units, an observed position may pass a
+     * How far, in joint units, an observed position may pass a
      * joint limit before the runtime faults. Zero keeps limits exact. A robot
      * that rests on its mechanical stops, such as a legged robot on its knee
      * stops, needs room for a simulator's or joint's compliant stops.
@@ -469,7 +471,7 @@ typedef struct rk_robot_runtime_blueprint {
      */
     double observed_limit_tolerance;
     /**
-     * Versioned: per-joint overtravel in joint units, indexed by joint: how
+     * Per-joint overtravel in joint units, indexed by joint: how
      * far a joint can travel past its position limits before it meets its end
      * stop, as a machine's limit switch sits beyond its soft limit. Commands
      * must still lie within the limits; the runtime faults only when an
@@ -478,15 +480,15 @@ typedef struct rk_robot_runtime_blueprint {
      * stops at the limits widened by it. Zero puts the stops at the limits.
      */
     double joint_overtravel[RK_MAX_JOINTS];
-    /** Versioned: absent means no servo motor joints. Indexed by joint. */
+    /** Servo gains, indexed by joint; zero disables position-loop interpolation. */
     rk_robot_joint_servo joint_servo[RK_MAX_JOINTS];
     /** Joint-coordinate inertia known to the servo drive, for acceleration feedforward. */
     double servo_reflected_inertia[RK_MAX_JOINTS];
     /** Coupling stiffness in follower-coordinate effort per unit of follower travel. */
     double coupling_stiffness[RK_MAX_JOINT_COUPLINGS];
-    /** Versioned command ownership: process joints accept no host or trajectory targets. */
+    /** Command ownership: process joints accept no host or trajectory targets. */
     uint32_t process_joint[RK_MAX_JOINTS];
-    /** Versioned metadata for joint switches and speed sensors; ordinary sensor slots use UINT32_MAX. */
+    /** Metadata for joint switches and speed sensors; ordinary sensor slots use UINT32_MAX. */
     uint32_t sensor_joint[RK_MAX_SENSORS];
     double sensor_window_lower[RK_MAX_SENSORS];
     double sensor_window_upper[RK_MAX_SENSORS];

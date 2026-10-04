@@ -16,18 +16,10 @@ import materia.units.LengthUnit;
 
 /** Versioned transport and validation for reusable assembly definitions and states. */
 class AssemblyDefinitionCodec {
-	public static inline var VERSION:Int = 3;
-	/** Pneumatic process drives require v4; assemblies without them retain v3 bytes. */
-	public static inline var PROCESS_VERSION:Int = 4;
-	/** Optional native sensor bindings require v5; older assemblies retain their bytes. */
-	public static inline var SENSOR_VERSION:Int = 5;
-	/** Analog process-velocity bindings require v6; earlier assembly bytes remain stable. */
-	public static inline var VELOCITY_VERSION:Int = 6;
-	/** Servo loop metadata requires v7. */
-	public static inline var CONTROL_VERSION:Int = 7;
+	/** Current assembly definition and state format. Older formats must be migrated before loading. */
+	public static inline var VERSION:Int = 7;
 
-	static function supportedVersion(version:Int):Bool
-		return version >= VERSION && version <= CONTROL_VERSION;
+	static function supportedVersion(version:Int):Bool return version == VERSION;
 
 	public static function encode(definition:AssemblyDefinition):String {
 		validate(definition);
@@ -53,7 +45,7 @@ class AssemblyDefinitionCodec {
 
 	public static function validate(definition:AssemblyDefinition):Void {
 		if (definition != null && !supportedVersion(definition.schemaVersion))
-			throw 'schema v${definition.schemaVersion} is unsupported; supported v$VERSION through v$CONTROL_VERSION';
+			throw 'schema v${definition.schemaVersion} is unsupported; expected v$VERSION';
 		if (definition != null && definition.assemblies != null && definition.assemblies.length > 0) {
 			validateFlat(AssemblyDefinitionFlattener.flatten(definition));
 			return;
@@ -224,12 +216,6 @@ class AssemblyDefinitionCodec {
 				!validDrive(actuator))
 				throw 'Assembly has an invalid actuator "${actuator == null ? "" : actuator.id}"';
 			actuatorIds.set(actuator.id, true);
-			if (actuator.drive == "pneumatic" && definition.schemaVersion == VERSION)
-				throw "Pneumatic assembly drives require schema v$PROCESS_VERSION";
-			if (actuator.processVelocity != null && definition.schemaVersion < VELOCITY_VERSION)
-				throw 'Process-velocity assembly drives require schema v$VELOCITY_VERSION';
-			if (actuator.positionLoopRate != null && definition.schemaVersion < CONTROL_VERSION)
-				throw 'Servo loop metadata requires schema v$CONTROL_VERSION';
 			if (actuator.processVelocity != null) {
 				var process = actuator.processVelocity;
 				var joint = movable.get(actuator.joint);

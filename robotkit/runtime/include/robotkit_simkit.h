@@ -170,8 +170,7 @@ typedef struct rk_simulation_robot_desc {
     uint32_t flags;
     rk_simulation_pose initial_pose;
     uint64_t reserved[2];
-    /* Optional when struct_size includes this tail. 0 keeps the direct
-       simulation endpoint; 1 runs RKD6 through the virtual device. */
+    /* 0 keeps the direct simulation endpoint; 1 runs RKD6 through the virtual device. */
     uint32_t virtual_device_enabled;
     uint32_t virtual_device_step_tick_hz;
     uint64_t virtual_device_tick_hz;

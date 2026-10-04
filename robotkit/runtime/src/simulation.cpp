@@ -153,13 +153,6 @@ rk_result from_sim(nksim_result result) {
     }
 }
 
-constexpr std::size_t pneumatic_desc_size =
-    offsetof(rk_simulation_robot_desc, pneumatic_drives) +
-    sizeof(rk_simulation_robot_desc::pneumatic_drives);
-constexpr std::size_t velocity_desc_size =
-    offsetof(rk_simulation_robot_desc, velocity_drives) +
-    sizeof(rk_simulation_robot_desc::velocity_drives);
-
 } // namespace
 
 Simulation::Simulation(nksim_session session) : session_(session) {
@@ -228,6 +221,8 @@ Simulation::~Simulation() {
 rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                                 rk_robot_runtime &out_runtime,
                                 const rk_simulation_robot_desc *robot_desc) {
+    if (robot_desc && robot_desc->struct_size != sizeof(*robot_desc))
+        return RK_ERROR_INVALID_ARGUMENT;
     // A zero-sized initial pose keeps the default placement, so a descriptor
     // can carry collision or device settings without choosing a pose.
     const auto *initial_pose = robot_desc && robot_desc->initial_pose.struct_size != 0
@@ -243,14 +238,13 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         return RK_ERROR_INVALID_STATE;
     if (rk_robot_runtime_blueprint_validate(&blueprint) != RK_OK || blueprint.link_count == 0)
         return RK_ERROR_INVALID_ARGUMENT;
-    const bool has_pneumatic_desc = robot_desc && robot_desc->struct_size >= pneumatic_desc_size;
+    const bool has_pneumatic_desc = robot_desc != nullptr;
     const auto pneumatic_count = has_pneumatic_desc ? robot_desc->pneumatic_drive_count : 0;
     if (pneumatic_count > RK_MAX_JOINTS) return RK_ERROR_INVALID_ARGUMENT;
     for (uint32_t index = 0; index < pneumatic_count; ++index) {
         const auto &drive = robot_desc->pneumatic_drives[index];
         if (drive.joint >= blueprint.joint_count ||
             blueprint.joints[drive.joint].type != RK_RUNTIME_JOINT_PRISMATIC ||
-            blueprint.struct_size < offsetof(rk_robot_runtime_blueprint, sensor_joint) ||
             !blueprint.process_joint[drive.joint] ||
             drive.channel_a >= blueprint.channel_count ||
             (drive.channel_b != UINT32_MAX && drive.channel_b >= blueprint.channel_count) ||
@@ -268,13 +262,12 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             if (robot_desc->pneumatic_drives[earlier].joint == drive.joint)
                 return RK_ERROR_INVALID_ARGUMENT;
     }
-    const bool has_velocity_desc = robot_desc && robot_desc->struct_size >= velocity_desc_size;
+    const bool has_velocity_desc = robot_desc != nullptr;
     const auto velocity_count = has_velocity_desc ? robot_desc->velocity_drive_count : 0;
     if (velocity_count > RK_MAX_JOINTS) return RK_ERROR_INVALID_ARGUMENT;
     for (uint32_t index = 0; index < velocity_count; ++index) {
         const auto &drive = robot_desc->velocity_drives[index];
         if (drive.joint >= blueprint.joint_count ||
-            blueprint.struct_size < offsetof(rk_robot_runtime_blueprint, sensor_joint) ||
             !blueprint.process_joint[drive.joint] ||
             drive.speed_channel >= blueprint.channel_count ||
             drive.direction_channel >= blueprint.channel_count ||
@@ -296,8 +289,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                          !valid_pose(initial_pose->position, initial_pose->rotation)))
         return RK_ERROR_INVALID_ARGUMENT;
     std::shared_ptr<VirtualDeviceEndpoint> virtual_endpoint;
-    if (robot_desc && robot_desc->struct_size >=
-        offsetof(rk_simulation_robot_desc, virtual_device_actuator_count) &&
+    if (robot_desc &&
         robot_desc->virtual_device_enabled) {
 #if !defined(RK_HAS_VIRTUAL_DEVICE)
         // Built without the simulated board (RK_BUILD_VIRTUAL_DEVICE).
@@ -323,7 +315,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         config.target_error = robot_desc->virtual_device_target_error;
         config.clock_bound_ns = robot_desc->virtual_device_clock_bound_ns;
         config.link_loss_timeout_ns = robot_desc->virtual_device_link_loss_timeout_ns;
-        if (robot_desc->struct_size >= sizeof(*robot_desc)) {
+        {
             if (robot_desc->virtual_peripheral_parameter_count > 16) return RK_ERROR_INVALID_ARGUMENT;
             config.peripheral_kind = robot_desc->virtual_peripheral_kind;
             config.external_sensor_mask = robot_desc->virtual_external_sensor_mask;
@@ -332,9 +324,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         }
         if (robot_desc->struct_size >= offsetof(rk_simulation_robot_desc, virtual_device_profile) + sizeof(robot_desc->virtual_device_profile) && robot_desc->virtual_device_profile)
             config.profile = robot_desc->virtual_device_profile;
-        if (robot_desc->struct_size >=
-            offsetof(rk_simulation_robot_desc, collision_half_extents) &&
-            robot_desc->virtual_device_actuator_count > 0) {
+        if (robot_desc->virtual_device_actuator_count > 0) {
             if (robot_desc->virtual_device_actuator_count > 64) return RK_ERROR_INVALID_ARGUMENT;
             for (std::uint32_t i = 0; i < robot_desc->virtual_device_actuator_count; ++i) {
                 DeviceActuator6 actuator;
@@ -456,22 +446,19 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         require_sim(nksim_world_begin_topology_update(world),
                     "nksim_world_begin_topology_update");
         topology_update = true;
-        const bool has_tool = robot_desc && robot_desc->struct_size >=
-            offsetof(rk_simulation_robot_desc, tool_gap) + sizeof(double) &&
+        const bool has_tool = robot_desc &&
             robot_desc->tool_piece_count > 0;
         if (has_tool && (robot_desc->tool_link_index >= blueprint.link_count ||
                          robot_desc->tool_piece_count > 16))
             throw std::invalid_argument("invalid tool attachment link or piece count");
-        const auto link_shape_count = robot_desc && robot_desc->struct_size >=
-            offsetof(rk_simulation_robot_desc, link_shapes) + sizeof(robot_desc->link_shapes)
+        const auto link_shape_count = robot_desc
             ? robot_desc->link_shape_count : 0;
         if (link_shape_count > RK_MAX_LINK_SHAPES)
             throw std::invalid_argument("too many link collision shapes");
         for (uint32_t index = 0; index < link_shape_count; ++index)
             if (!valid_link_shape(robot_desc->link_shapes[index], blueprint.link_count))
                 throw std::invalid_argument("invalid link collision shape");
-        const auto contact_pair_count = robot_desc && robot_desc->struct_size >=
-            offsetof(rk_simulation_robot_desc, contact_pairs) + sizeof(robot_desc->contact_pairs)
+        const auto contact_pair_count = robot_desc
             ? robot_desc->contact_pair_count : 0;
         if (contact_pair_count > RK_MAX_CONTACT_PAIRS)
             throw std::invalid_argument("too many contact pairs");
@@ -481,8 +468,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 robot_desc->link_shapes[pair.shape_a].link == robot_desc->link_shapes[pair.shape_b].link)
                 throw std::invalid_argument("invalid contact pair");
         }
-        const auto link_hull_count = robot_desc && robot_desc->struct_size >=
-            offsetof(rk_simulation_robot_desc, link_hulls) + sizeof(robot_desc->link_hulls)
+        const auto link_hull_count = robot_desc
             ? robot_desc->link_hull_count : 0;
         if (link_hull_count > RK_MAX_LINK_HULLS)
             throw std::invalid_argument("too many link hulls");
@@ -507,10 +493,8 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             std::copy_n(blueprint.links[index].center_of_mass, 3, desc.center_of_mass);
             std::copy_n(blueprint.links[index].inertia_tensor, 9, desc.inertia_tensor);
             desc.shape = shape_;
-            bool has_link_shape = robot_desc && robot_desc->struct_size >=
-                offsetof(rk_simulation_robot_desc, collision_hull_count);
-            const auto hull_count = robot_desc && robot_desc->struct_size >=
-                offsetof(rk_simulation_robot_desc, closure_count)
+            bool has_link_shape = robot_desc;
+            const auto hull_count = robot_desc
                 ? robot_desc->collision_hull_count[index] : 0;
             if (hull_count != 0 && (hull_count < 4 || hull_count > 64))
                 throw std::invalid_argument("invalid link collision hull vertex count");
@@ -670,18 +654,14 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             // A pneumatic cylinder's overtravel is its compressible end cushion: keep
             // the physics stop at the stroke boundary while the runtime tolerates
             // that small penetration in the observed joint position.
-            const double overtravel = blueprint.struct_size >=
-                offsetof(rk_robot_runtime_blueprint, joint_overtravel) + sizeof(blueprint.joint_overtravel)
-                && !blueprint.process_joint[index]
-                ? blueprint.joint_overtravel[index] : 0.0;
+            const double overtravel = blueprint.process_joint[index] ? 0.0 : blueprint.joint_overtravel[index];
             desc.lower_limit = source.lower_limit - overtravel;
             desc.upper_limit = source.upper_limit + overtravel;
             // SimKit uses zero for an unspecified force ceiling. A negative
             // sentinel preserves an explicit zero-effort RobotKit limit.
             desc.max_force = (source.limit_flags & RK_LIMIT_EFFORT) && source.max_effort == 0.0
                 ? -1.0 : source.max_effort;
-            if (blueprint.struct_size >= offsetof(rk_robot_runtime_blueprint, joint_dynamics) +
-                    sizeof(blueprint.joint_dynamics)) {
+            {
                 const auto &dynamics = blueprint.joint_dynamics[index];
                 desc.armature = dynamics.armature;
                 desc.damping = dynamics.damping;
@@ -701,8 +681,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             nksim_joint joint = 0;
             require_sim(nksim_joint_create(world, &desc, &joint), "nksim_joint_create");
             binding->joints_.push_back(joint);
-            const bool process_joint = blueprint.struct_size >=
-                offsetof(rk_robot_runtime_blueprint, sensor_joint) && blueprint.process_joint[index];
+            const bool process_joint = blueprint.process_joint[index] != 0;
             binding->actuated_joints_.push_back(source.type != RK_RUNTIME_JOINT_FIXED && !process_joint);
             joints_.push_back(joint);
         }
@@ -769,8 +748,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             coupling.follower = binding->joints_[source.follower];
             coupling.ratio = source.ratio;
             coupling.offset = source.offset;
-            if (blueprint.struct_size >= offsetof(rk_robot_runtime_blueprint, process_joint))
-                coupling.stiffness = blueprint.coupling_stiffness[index];
+            coupling.stiffness = blueprint.coupling_stiffness[index];
             require_sim(nksim_joint_couple(world, &coupling), "nksim_joint_couple");
         }
         for (uint32_t index = 0; index < contact_pair_count; ++index) {
@@ -788,8 +766,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             pair.surface.contact_damping_ratio = source.contact_damping_ratio;
             require_sim(nksim_contact_pair_create(world, &pair), "nksim_contact_pair_create");
         }
-        const auto closure_count = robot_desc && robot_desc->struct_size >=
-            offsetof(rk_simulation_robot_desc, virtual_device_profile)
+        const auto closure_count = robot_desc
             ? robot_desc->closure_count : 0;
         if (closure_count > 64) throw std::invalid_argument("too many assembly closures");
         for (uint32_t index = 0; index < closure_count; ++index) {
@@ -815,13 +792,11 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         binding->squaring_position_.assign(blueprint.joint_count, 0.0);
         binding->servo_.assign(blueprint.joint_count, rk_robot_joint_servo{});
         binding->reflected_inertia_.assign(blueprint.joint_count, 0.0);
-        if (blueprint.struct_size >= offsetof(rk_robot_runtime_blueprint, process_joint))
-            std::copy_n(blueprint.servo_reflected_inertia, blueprint.joint_count,
+        std::copy_n(blueprint.servo_reflected_inertia, blueprint.joint_count,
                 binding->reflected_inertia_.begin());
         binding->passive_.assign(blueprint.joint_count, 0);
         binding->step_ = fixed_timestep_;
-        if (blueprint.struct_size >= offsetof(rk_robot_runtime_blueprint, joint_servo) +
-                sizeof(blueprint.joint_servo)) {
+        {
             std::copy_n(blueprint.joint_servo, blueprint.joint_count, binding->servo_.begin());
             std::vector<uint32_t> group(blueprint.joint_count);
             for (uint32_t index = 0; index < blueprint.joint_count; ++index) group[index] = index;
@@ -853,8 +828,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 if (binding->servo_[index].stiffness > 0.0) held[index] = binding->actuated_joints_[index];
                 if (binding->passive_[index]) held[index] = 0;
             }
-            if (blueprint.struct_size >= offsetof(rk_robot_runtime_blueprint, sensor_joint))
-                for (uint32_t index = 0; index < blueprint.joint_count; ++index)
+            for (uint32_t index = 0; index < blueprint.joint_count; ++index)
                     if (blueprint.process_joint[index]) held[index] = 0;
             binding->hold_at_rest(std::move(held));
         }
@@ -878,7 +852,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 sensor.config.ray_count = 8;
                 sensor.config.max_range = 10.0;
             }
-            if (blueprint.struct_size >= sizeof(blueprint)) {
+            {
                 sensor.joint = blueprint.sensor_joint[i];
                 sensor.window_lower = blueprint.sensor_window_lower[i];
                 sensor.window_upper = blueprint.sensor_window_upper[i];

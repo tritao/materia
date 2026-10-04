@@ -313,7 +313,7 @@ class MachineAssemblyDescriptionTests {
 
 	/** A coupling's ratio comes from the parts that drive it, so editing a part changes it. */
 	static function transmissionsFollowTheirParts():Void {
-		for (version in [2, 9, 12]) {
+		for (version in [2, 3, 4, 9, 10, 11, 12]) {
 			var oldRejected = false;
 			var oldVersion:machinekit.assembly.MachineAssemblyDescription.DescriptionVersion = {schemaVersion: version};
 			var oldText = haxeon.wire.JsonWire.encode(oldVersion);

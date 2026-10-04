@@ -35,20 +35,15 @@ int main(void) {
     full_snapshot.struct_size = sizeof(full_snapshot);
     assert(rk_robot_runtime_snapshot_full(runtime, &full_snapshot) == RK_OK);
     assert(full_snapshot.calibration_revision == 0);
+    /* Old prefixes must be migrated, never silently defaulted. */
     full_snapshot.struct_size = offsetof(rk_robot_snapshot, calibration_revision);
-    full_snapshot.calibration_revision = 0x1234;
-    assert(rk_robot_runtime_snapshot_full(runtime, &full_snapshot) == RK_OK);
-    assert(full_snapshot.calibration_revision == 0x1234);
-
+    assert(rk_robot_runtime_snapshot_full(runtime, &full_snapshot) == RK_ERROR_INVALID_ARGUMENT);
+    full_snapshot.struct_size = sizeof(full_snapshot);
     rk_robot_runtime_blueprint old_blueprint = blueprint;
     old_blueprint.struct_size = offsetof(rk_robot_runtime_blueprint, calibration_revision);
-    old_blueprint.calibration_revision = 77;
     rk_robot_runtime old_runtime = RK_INVALID_ROBOT_RUNTIME;
-    assert(rk_robot_runtime_create(&old_blueprint, &old_runtime) == RK_OK);
-    full_snapshot.struct_size = sizeof(full_snapshot);
-    assert(rk_robot_runtime_snapshot_full(old_runtime, &full_snapshot) == RK_OK);
-    assert(full_snapshot.calibration_revision == 0);
-    rk_robot_runtime_destroy(old_runtime);
+    assert(rk_robot_runtime_create(&old_blueprint, &old_runtime) == RK_ERROR_INVALID_ARGUMENT);
+    assert(old_runtime == RK_INVALID_ROBOT_RUNTIME);
 
     rk_robot_runtime segment_runtime = RK_INVALID_ROBOT_RUNTIME;
     assert(rk_robot_runtime_create(&blueprint, &segment_runtime) == RK_OK);

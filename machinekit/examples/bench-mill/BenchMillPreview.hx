@@ -55,7 +55,7 @@ class BenchMillChecks {
 		var model = new AssemblyModel("mm");
 		mill.addTo(model, "");
 		var definition = model.definition(BenchMillPreview.ASSEMBLY_ID);
-		if (definition.schemaVersion != materia.assembly.AssemblyDefinitionCodec.CONTROL_VERSION)
+		if (definition.schemaVersion != materia.assembly.AssemblyDefinitionCodec.VERSION)
 			throw "Bench mill did not select the process-velocity assembly schema";
 		var spindleBinding = false, atSpeedSensor = false;
 		if (definition.actuators != null) for (actuator in definition.actuators)
@@ -218,7 +218,7 @@ class EnclosedMillChecks {
 		var vise = cell.mill.vise;
 		if (vise == null) throw "Enclosed mill has no vise";
 		var processDefinition = state.definition;
-		if (processDefinition.schemaVersion != materia.assembly.AssemblyDefinitionCodec.CONTROL_VERSION)
+		if (processDefinition.schemaVersion != materia.assembly.AssemblyDefinitionCodec.VERSION)
 			throw "Enclosed mill did not keep the process-velocity schema";
 		if (processDefinition.actuators == null || processDefinition.sensors == null)
 			throw "Enclosed mill did not export its typed actuator and sensor tables";

@@ -75,7 +75,7 @@ class ProjectKitTests {
     model = definition(); model.joints[0].limits.lower = 2;
     rejects(function() AssemblyDefinitionCodec.encode(model), "inverted joint limits");
     model = definition();
-    model.schemaVersion = AssemblyDefinitionCodec.PROCESS_VERSION;
+    model.schemaVersion = AssemblyDefinitionCodec.VERSION;
     model.joints[0].type = AssemblyJointType.Prismatic;
     model.actuators = [{id: "air", joint: "hinge", maxEffort: 100.0, maxRate: 0.1,
       pneumatic: {bore: 25.0, rod: 10.0, stroke: 20.0, ratedSpeed: 100.0,
