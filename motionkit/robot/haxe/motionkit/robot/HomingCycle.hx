@@ -108,11 +108,12 @@ class HomingCycle {
           var all = true;
           for (i in 0...axis.switches.length) {
             var signal = signalFor(axis.switches[i].id, observation);
-            if (signal.closingEdges != null && approachEdges[i] != null &&
-                signal.closingEdges < approachEdges[i]) throw "Homing edge counter reset during approach";
+            var baseline:Int = approachEdges[i] == null ? -1 : approachEdges[i];
+            var count:Int = signal.closingEdges == null ? -1 : signal.closingEdges;
+            if (count >= 0 && baseline >= 0 && count < baseline)
+              throw "Homing edge counter reset during approach";
             if (signal.active && captures[i] == null) {
-              if (signal.edgePosition != null && (approachEdges[i] == null ||
-                  signal.closingEdges <= approachEdges[i]))
+              if (signal.edgePosition != null && (baseline < 0 || count <= baseline))
                 throw "Homing closing-edge capture predates the slow approach";
               if (signal.edgePosition == null && axis.switches[i].repeatability == 0)
                 throw "Zero-repeatability homing requires captured switch edges";

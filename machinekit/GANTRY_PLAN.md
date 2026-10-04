@@ -2133,3 +2133,18 @@ its local PlotterAxisSpec omitted the optional rackingTolerance now present in
 the shared AxisSpec. Replace the local shape with the shared AxisSpec alias.
 Restart the compiler-only pass after that source fix; no runtime tests have
 run yet. This is a compilation checkpoint, not evidence of completed G12.
+
+### G12 checkpoint — native build and first ctest results
+
+Enable ROBOTD_BUILD_TESTS in the existing RobotKit native build configuration.
+Native runtime and all enabled test targets built successfully. ctest ran all
+18 tests: 17 passed; robotkit_simkit failed at the new 1 mm startup assertion
+for the right shaft before holding. Physical coupling/origin behavior needs
+investigation; do not weaken the assertion. The other native results do not
+prove G12 squaring.
+
+MotionKit compile retries exposed SwitchPart narrowing hiding the component
+connector method, then nullable edge-count numeric comparison. Use a fresh
+component lookup for connector validation and explicit integer sentinels for
+optional counts, preserving capture freshness checks. A new compiler-only retry
+is started. Other kits, app, picker and Haxe homing execution remain pending.
