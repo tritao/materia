@@ -22,6 +22,9 @@
     },
     "cadbridge": {
       "path": "../../robotkit/cadbridge"
+    },
+    "robotkit-policy": {
+      "path": "../../robotkit/policy"
     }
   },
   "target": "host"

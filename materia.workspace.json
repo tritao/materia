@@ -14,6 +14,7 @@
 		{ "path": "motionkit/tests/haxeon.json", "name": "motionkit" },
 		{ "path": "processkit/tests/haxeon.json", "name": "processkit" },
 		{ "path": "projectkit/tests/haxeon.json", "name": "projectkit" },
+		{ "path": "robotkit/core/tests/haxeon.json", "name": "robotkit-core" },
 		{ "path": "robotkit/tests/haxeon.json", "name": "robotkit" },
 		{ "path": "robotkit/tests/integration/haxeon.json", "name": "robotkit-integration", "tags": ["peer"] },
 		{ "path": "robotkit/tests/excavator/haxeon.json", "name": "robotkit-excavator" },

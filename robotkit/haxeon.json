@@ -8,35 +8,24 @@
   ],
   "scopeSourceRoots": false,
   "dependencies": {
-    "kinematicskit": {
-      "path": "../kinematicskit"
+    "robotkit-core": {
+      "path": "core"
     },
-    "nativekit": {
-      "path": "../nativekit"
+    "robotkit-sim": {
+      "path": "sim"
     },
-    "simkit": {
-      "path": "../simkit"
+    "robotkit-remote": {
+      "path": "remote"
     },
-    "visionkit": {
-      "path": "../visionkit"
+    "robotkit-serial": {
+      "path": "serial"
     },
-    "trajectorykit": {
-      "path": "../trajectorykit"
+    "robotkit-recording": {
+      "path": "recording"
+    },
+    "robotkit-autonomy": {
+      "path": "autonomy"
     }
-  },
-  "ffi": {
-    "interfaces": [
-      "runtime/bindings/robotkit-runtime.hxi",
-      "runtime/bindings/robotkit-simkit.hxi",
-      "policy/bindings/robotkit-policy.hxi",
-      "inference/bindings/robotkit-inference.hxi"
-    ],
-    "projections": [
-      "runtime/bindings/robotkit-runtime.hxmap",
-      "runtime/bindings/robotkit-simkit.hxmap",
-      "policy/bindings/robotkit-policy.hxmap",
-      "inference/bindings/robotkit-inference.hxmap"
-    ]
   },
   "target": "host"
 }

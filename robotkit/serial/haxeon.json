@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "package": {
+    "name": "robotkit-serial"
+  },
+  "sourceRoots": [
+    "haxe"
+  ],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "robotkit-core": {
+      "path": "../core"
+    }
+  },
+  "target": "host"
+}

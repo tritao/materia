@@ -4,19 +4,36 @@ RobotKit is the complete robotics layer for Materia. It owns robot models,
 commands, control, runtime ownership, endpoint adapters, world orchestration,
 and the protocol shared by `robotd` and editor clients.
 
-The current increment contains deliberately small boundaries:
+RobotKit is split at dependency boundaries. Select `robotkit-core` for model
+and runtime use; the convenience `robotkit` package includes the standard
+adapters and autonomy but excludes optional ONNX implementations.
 
-- `runtime`: engine-neutral values and validation, an owner-thread runtime,
-  command mailbox, immutable snapshots, and the first framed serial endpoint;
-- `haxe/robotkit/protocol`: versioned framing independent of any particular transport;
-- `haxe`: Haxeon façades, protocol clients, and `RobotWorld` orchestration;
-- `robotd`: one independently deployable logical robot host;
-- `Simulation`: one shared SimKit-backed universe and clock for any number of
-  simulated robots.
+| Package | Owns | Additional dependencies |
+| --- | --- | --- |
+| `robotkit-core` | Model, profile, compiler, control/execution contracts, clocks, safety, streams and world composition | NativeKit, TrajectoryKit |
+| `robotkit-sim` | Simulation, drive plants, presentation, simulated adapters/tools | SimKit, autonomy |
+| `robotkit-remote` | Client, transport and wire protocol | Core |
+| `robotkit-serial` | Device layout/binding and serial endpoint | Core |
+| `robotkit-recording` | Recording and replay | Core, remote protocol |
+| `robotkit-autonomy` | Navigation, localization, manipulation, perception and deployment interpretation | Core/adapters, VisionKit, KinematicsKit |
+| `robotkit-inference` | ONNX image inference, detector implementation and perception host integration | Core/autonomy/simulation |
+| `robotkit-policy` | ONNX control policies | Core |
 
-The semantic robot model and native-runtime compiler are reusable Haxe APIs
-under `haxe/robotkit`; `robotd` supplies only process hosting and deployment
-policy.
+Each package's public modules live under its own `haxe/robotkit` source root.
+Pure planar/spatial values and immutable image/detection records stay in core;
+interpreting them belongs to autonomy. Simulation is the only RobotKit package
+that directly depends on SimKit. The model/runtime dependency closure is
+exactly core, NativeKit and TrajectoryKit.
+
+Perception hosts explicitly call `ObjectDetectorPipeline.install()` after opting
+into `robotkit-inference`. Deployment records validate model digests without
+loading ONNX. `SerialDeployment.openRobot(id)` owns deployment interpretation;
+the serial adapter itself accepts a model/profile pair and no vision dependency.
+
+Run `python3 tools/check-robotkit-packages.py` to audit the declarations.
+`robotkit/core/tests` builds and runs a standalone model/runtime consumer with
+simulation, vision and ONNX explicitly disabled.
+
 RobotKit receives only compiled runtime blueprints and bulk data at execution
 boundaries. A standalone `RobotRuntime` can use the in-memory endpoint for
 host bring-up, while `Simulation` owns the shared SimKit backend for live
@@ -48,8 +65,7 @@ available.
 The canonical native CMake target is `RobotKit::runtime`.
 
 `robotd/native` enables the SimKit simulation and builds the native dependency
-graph consumed by the Haxeon host. The Haxe façade and wire protocol are under
-`haxe/robotkit`;
+graph consumed by the Haxeon host. The Haxe façade and wire protocol live in the owning package source roots;
 its bindings deliberately submit one command batch and retrieve one snapshot
 per tick.
 

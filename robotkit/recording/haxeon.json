@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "package": {
+    "name": "robotkit-recording"
+  },
+  "sourceRoots": [
+    "haxe"
+  ],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "robotkit-core": {
+      "path": "../core"
+    },
+    "robotkit-remote": {
+      "path": "../remote"
+    }
+  },
+  "target": "host"
+}

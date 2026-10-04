@@ -17,6 +17,9 @@
     },
     "processkit": {
       "path": "../../../processkit"
+    },
+    "robotkit-inference": {
+      "path": "../../inference"
     }
   },
   "target": "host",
