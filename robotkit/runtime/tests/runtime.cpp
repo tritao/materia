@@ -121,6 +121,7 @@ private:
 class OffsetEndpoint final : public robotkit::RobotEndpoint {
 public:
     explicit OffsetEndpoint(double offset) : offset_(offset) {}
+    void set_offset(double offset) { offset_ = offset; }
     rk_result apply(const rk_robot_command &command) override {
         for (uint32_t index = 0; index < command.target_count; ++index)
             if (command.targets[index].mode == RK_TARGET_POSITION)
@@ -1049,11 +1050,13 @@ void idle_plan_uses_commanded_anchor_and_following_error(
     // runtimes on the heap, as the C API does.
     auto blueprint = source;
     blueprint.following_error_bound[0] = 0.0002;
-    auto accepted_endpoint = std::make_shared<OffsetEndpoint>(0.0001);
+    auto accepted_endpoint = std::make_shared<OffsetEndpoint>(0.0);
     auto accepted_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, accepted_endpoint,
         std::chrono::milliseconds(10));
     auto &accepted = *accepted_owner;
     assert(accepted.publish_sample(1) == RK_OK);
+    accepted_endpoint->set_offset(0.0001);
+    assert(accepted.publish_sample(2) == RK_OK);
     robotkit::PlanRequest plan{};
     plan.sequence = 1;
     plan.plan_id = 91;
@@ -1085,23 +1088,60 @@ void idle_plan_uses_commanded_anchor_and_following_error(
     plan.segments.segments[0].coefficients[1].value[3] = -0.2;
     assert(held.submit_plan(plan) == RK_OK);
 
-    auto rejected_endpoint = std::make_shared<OffsetEndpoint>(0.0003);
+    auto rejected_endpoint = std::make_shared<OffsetEndpoint>(0.0);
     auto rejected_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, rejected_endpoint,
         std::chrono::milliseconds(10));
     auto &rejected = *rejected_owner;
     assert(rejected.publish_sample(1) == RK_OK);
+    rejected_endpoint->set_offset(0.0003);
+    assert(rejected.publish_sample(2) == RK_OK);
     assert(rejected.submit_plan(plan) == RK_ERROR_FOLLOWING_ERROR);
     rk_robot_snapshot snapshot{};
     assert(rejected.snapshot_full(snapshot) == RK_OK);
     assert(snapshot.trajectory_queue_depth == 0);
 
     auto unchecked_blueprint = source;
-    auto unchecked_endpoint = std::make_shared<OffsetEndpoint>(0.0003);
+    auto unchecked_endpoint = std::make_shared<OffsetEndpoint>(0.0);
     auto unchecked_owner = std::make_unique<robotkit::RobotRuntime>(unchecked_blueprint, unchecked_endpoint,
         std::chrono::milliseconds(10));
     auto &unchecked = *unchecked_owner;
     assert(unchecked.publish_sample(1) == RK_OK);
+    unchecked_endpoint->set_offset(0.0003);
+    assert(unchecked.publish_sample(2) == RK_OK);
     assert(unchecked.submit_plan(initial_plan) == RK_OK);
+}
+
+void initial_device_origin_is_held_once_and_reset(const rk_robot_runtime_blueprint &blueprint) {
+    auto endpoint = std::make_shared<OffsetEndpoint>(-0.25);
+    auto runtime = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(10));
+    assert(runtime->publish_sample(1) == RK_OK);
+    rk_robot_snapshot snapshot{};
+    assert(runtime->snapshot_full(snapshot) == RK_OK);
+    assert(snapshot.setpoint_position[0] == -0.25);
+    endpoint->set_offset(-0.3);
+    assert(runtime->publish_sample(2) == RK_OK);
+    assert(runtime->snapshot_full(snapshot) == RK_OK);
+    assert(snapshot.position[0] == -0.3 && snapshot.setpoint_position[0] == -0.25);
+    robotkit::PlanRequest plan{};
+    plan.sequence = 1;
+    plan.plan_id = 93;
+    plan.model_revision = blueprint.revision;
+    plan.calibration_revision = blueprint.calibration_revision;
+    plan.start_position[0] = -0.25;
+    robotkit::TrajectorySegment segment{};
+    segment.joint_count = 2;
+    segment.duration_ns = 100'000'000;
+    segment.coefficients[0].value[0] = -0.25;
+    plan.segments.segments.push_back(segment);
+    assert(runtime->submit_plan(plan) == RK_OK);
+    runtime->reset_state();
+    endpoint->set_offset(-0.4);
+    assert(runtime->publish_sample(3) == RK_OK);
+    assert(runtime->snapshot_full(snapshot) == RK_OK);
+    assert(snapshot.setpoint_position[0] == -0.4);
+    plan.start_position[0] = -0.4;
+    plan.segments.segments[0].coefficients[0].value[0] = -0.4;
+    assert(runtime->submit_plan(plan) == RK_OK);
 }
 
 void submitted_start_tolerances_control_acceptance(
@@ -2280,6 +2320,7 @@ int main() {
     accepted_plan_keeps_committed_region_identical(blueprint);
     moving_degree_one_plan_cannot_retarget(blueprint);
     idle_plan_uses_commanded_anchor_and_following_error(blueprint);
+    initial_device_origin_is_held_once_and_reset(blueprint);
     submitted_start_tolerances_control_acceptance(blueprint);
     degree_one_append_checks_chord_velocity(blueprint);
     ruckig_segments_match_motionkit_evaluation(blueprint);

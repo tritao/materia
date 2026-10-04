@@ -2000,6 +2000,12 @@ rk_result RobotRuntime::publish_sample_impl(uint64_t timestamp_ns,
     }
     {
         std::lock_guard state_lock(state_mutex_);
+        // The first accepted observation establishes the held origin for untouched joints.
+        // Explicit commands and plans already own their anchors, even before that observation.
+        if (state_.sequence == 0 && !control_.trajectory_active && trajectory_.empty() &&
+            !control_.stop_ramp_active)
+            for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
+                if (!control_.active[joint]) commanded_position_[joint] = next.position[joint];
         next.sequence = state_.sequence + 1;
         // Source epoch zero is valid. Receipt is always the local monotonic
         // acceptance clock, never the caller's simulation/source tick.
