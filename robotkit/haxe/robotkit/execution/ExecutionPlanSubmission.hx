@@ -3,6 +3,7 @@ package robotkit.execution;
 import robotkit.core.ImmutableFloatArray;
 
 import haxe.Int64;
+import RobotKitRuntime;
 
 /** Immutable plan metadata and bounded polynomial payload for a runtime session. */
 class ExecutionPlanSubmission {
