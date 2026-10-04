@@ -171,6 +171,19 @@ class WeldPathPlanner {
       }
     }
     if (found == null) {
+      var reversed = reverse(requested);
+      budget = BUDGET;
+      found = search(reversed, start, 0, [], [], [], null, 0.0, null);
+      if (found == null && reversed.segments.length > 1 && reversed.stop().translation.sub(reversed.start().translation).norm() <= WeldPlan.JOIN) {
+        for (corner in 1...reversed.segments.length) {
+          var rotated = new WeldPlan(reversed.segments.slice(corner).concat(reversed.segments.slice(0, corner)), reversed.parameters);
+          budget = BUDGET;
+          found = search(rotated, start, 0, [], [], [], null, 0.0, null);
+          if (found != null) break;
+        }
+      }
+    }
+    if (found == null) {
       var names:Array<String> = [];
       for (segment in requested.segments) if (segment.name != "" && names.indexOf(segment.name) < 0) names.push(segment.name);
       var label = names.length == 0 ? "the weld" : 'the weld of ${names.join(", ")}';
@@ -187,6 +200,23 @@ class WeldPathPlanner {
         (reasons.length > shown.length ? '; and ${reasons.length - shown.length} more' : "");
     }
     return found;
+  }
+
+  /** Reverse travel and its push angle while keeping the wire's component in the faces' cross-section. */
+  static function reverse(plan:WeldPlan):WeldPlan {
+    var segments:Array<WeldSegment> = [];
+    for (index in 0...plan.segments.length) {
+      var segment = plan.segments[plan.segments.length - index - 1];
+      var travel = segment.stop.translation.sub(segment.start.translation).normalized();
+      function reversed(rotation:Quat):Quat {
+        var wire = rotation.rotate(new Vec3(0.0, 0.0, 1.0));
+        var crossSection = wire.sub(travel.scale(wire.dot(travel))).normalized();
+        return Quat.fromAxisAngle(crossSection, Math.PI).multiply(rotation);
+      }
+      segments.push(new WeldSegment(new Transform3(segment.stop.translation, reversed(segment.stop.rotation)),
+        new Transform3(segment.start.translation, reversed(segment.start.rotation)), segment.name, segment.open));
+    }
+    return new WeldPlan(segments, plan.parameters);
   }
 
   /** The search over segment `index` and the ones after: null when no choice of rolls gets through them. */

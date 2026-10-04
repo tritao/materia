@@ -36,6 +36,7 @@ class WeldPlanningTests {
     testBranchJumpIsRefused();
     testCompiledMotionRejectsAnEntry();
     testEntryUsesTheCurrentConfiguration();
+    testReverseTravelPreservesThePushAngle();
     testCollidingWeldIsRefused();
     Sys.println('ProcessKit weld planning tests passed ($assertions assertions)');
     return assertions;
@@ -223,6 +224,20 @@ class WeldPlanningTests {
     var planner = new WeldPathPlanner(new CurrentEntryFixture(), new IkTolerance(2e-4, 1e-3, 300, 0.03), [3.0], WRIST);
     var planned = planner.plan(seam(), [0.3]);
     near(planned.entry.joints[0], 0.3, 1e-9, "the current arm configuration can reach an entry missed by broad IK sampling");
+  }
+
+  static function testReverseTravelPreservesThePushAngle():Void {
+    var down = seam().start().rotation;
+    var tilted = Quat.fromAxisAngle(new Vec3(0.0, 1.0, 0.0), -0.17453292519943295).multiply(down);
+    var requested = WeldPlan.straight(new Transform3(seam().start().translation, tilted), new Transform3(seam().stop().translation, tilted), PARAMETERS);
+    var planner = new WeldPathPlanner(new EntryCornerFixture(), new IkTolerance(2e-4, 1e-3, 300, 0.03), [3.0], WRIST);
+    var planned = planner.plan(requested, [0.0]);
+    near(planned.plan.start().translation.x, requested.stop().translation.x, 1e-9, "a seam may enter from its other reachable endpoint");
+    near(planned.plan.stop().translation.x, requested.start().translation.x, 1e-9, "reversed travel deposits the whole seam");
+    var before = tilted.rotate(new Vec3(0.0, 0.0, 1.0));
+    var after = planned.plan.start().rotation.rotate(new Vec3(0.0, 0.0, 1.0));
+    near(after.x, -before.x, 1e-9, "reversing travel reverses the push component of the wire");
+    near(after.z, before.z, 1e-9, "and preserves the wire's work angle in the face cross-section");
   }
 
   static function near(actual:Float, expected:Float, tolerance:Float, message:String):Void {
