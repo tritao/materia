@@ -31,6 +31,7 @@ public:
     void reset() noexcept {
         std::fill(slip_.begin(), slip_.end(), 0.0);
         std::fill(counter_origin_.begin(), counter_origin_.end(), 0.0);
+        std::fill(squaring_hold_.begin(), squaring_hold_.end(), 0);
         pending_targets_.clear();
         staged_valid_ = false;
         staged_stopped_ = false;
@@ -98,6 +99,9 @@ private:
      */
     std::vector<double> slip_;
     std::vector<double> counter_origin_;
+    /** Physical shaft holds during dual-drive squaring; accumulated displacement stays in slip_. */
+    std::vector<uint8_t> squaring_hold_;
+    std::vector<double> squaring_position_;
     /** Servo gains per joint: a joint with stiffness runs as a servo on its position targets. */
     std::vector<rk_robot_joint_servo> servo_;
     std::vector<double> reflected_inertia_;

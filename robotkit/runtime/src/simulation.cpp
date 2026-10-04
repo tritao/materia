@@ -731,6 +731,8 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         // take no commands of their own.
         binding->slip_.assign(blueprint.joint_count, 0.0);
         binding->counter_origin_.assign(blueprint.joint_count, 0.0);
+        binding->squaring_hold_.assign(blueprint.joint_count, 0);
+        binding->squaring_position_.assign(blueprint.joint_count, 0.0);
         binding->servo_.assign(blueprint.joint_count, rk_robot_joint_servo{});
         binding->reflected_inertia_.assign(blueprint.joint_count, 0.0);
         if (blueprint.struct_size >= offsetof(rk_robot_runtime_blueprint, process_joint))
@@ -916,6 +918,21 @@ rk_result Simulation::set_joint_slip(uint32_t robot_index, uint32_t joint, doubl
     if (joint >= binding->slip_.size())
         return RK_ERROR_INVALID_ARGUMENT;
     binding->slip_[joint] = offset;
+    return RK_OK;
+}
+
+rk_result Simulation::set_squaring_hold(uint32_t robot_index, uint32_t joint, bool active,
+                                       double position) {
+    Lock lock(session_);
+    if (robot_index >= bindings_.size() || !std::isfinite(position))
+        return RK_ERROR_INVALID_ARGUMENT;
+    auto binding = bindings_[robot_index].lock();
+    if (!binding) return RK_ERROR_INVALID_HANDLE;
+    if (joint >= binding->squaring_hold_.size() || !binding->actuated_joints_[joint] ||
+        binding->passive_[joint]) return RK_ERROR_INVALID_ARGUMENT;
+    binding->squaring_position_[joint] = position;
+    binding->squaring_hold_[joint] = active ? 1 : 0;
+    // Releasing preserves the accumulated shaft displacement in slip_.
     return RK_OK;
 }
 

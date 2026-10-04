@@ -1843,3 +1843,18 @@ This completes assembly wiring for side observation. Independent side holds,
 motor reference offsets and explicit squaring-only skew relaxation remain
 pending. No tests or builds ran; compilation and physical behavior are
 unverified.
+
+### G12 — simulation shaft-hold foundation
+
+Assembly side-drive wiring: `504c84dd2`. Add an internal simulation operation
+to hold an actuated, nonpassive shaft at an explicit physical position. While
+the leader's positional targets continue, update that follower's slip to keep
+the shaft target fixed. Held servo velocity is zero. Releasing retains the
+accumulated follower displacement; reset clears all hold flags and slip.
+Reject nonpositional commands on held shafts before staging any targets.
+
+This operation is not yet exposed through the C/Haxe boundary or connected to
+the homing cycle. The controller must supply a fresh physical shaft position,
+release holds on all exit paths, establish independent motor reference offsets
+and manage squaring-only skew relaxation. Mechanical coupling behavior remains
+unverified. No tests or builds ran.

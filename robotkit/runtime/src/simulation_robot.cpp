@@ -95,6 +95,11 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
     for (uint32_t index = 0; index < command.target_count; ++index)
         if (command.targets[index].joint >= joints_.size())
             return RK_ERROR_INVALID_ARGUMENT;
+    for (uint32_t index = 0; index < command.target_count; ++index) {
+        const auto &source = command.targets[index];
+        if (squaring_hold_[source.joint] && source.mode != RK_TARGET_POSITION &&
+            source.mode != RK_TARGET_SERVO) return RK_ERROR_INVALID_STATE;
+    }
     auto &staged = staged_commands();
     for (uint32_t index = 0; index < command.target_count; ++index) {
         const auto &source = command.targets[index];
@@ -112,6 +117,9 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
         target.mode = source.mode;
         target.target = source.target;
         target.max_force = source.max_effort;
+        if (positional && squaring_hold_[source.joint])
+            slip_[source.joint] = squaring_position_[source.joint] - source.target -
+                counter_origin_[source.joint];
         if (positional && source.joint < slip_.size())
             target.target += slip_[source.joint] + counter_origin_[source.joint];
         if (source.mode == RK_TARGET_POSITION && source.joint < servo_.size() &&
@@ -135,6 +143,10 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
             target.stiffness = servo.stiffness;
             target.damping = servo.damping;
             target.feedforward = servo.feedforward;
+        }
+        if (squaring_hold_[source.joint]) {
+            target.target = squaring_position_[source.joint];
+            target.velocity = 0.0;
         }
         pending_targets_.push_back(target);
         staged[source.joint] = {target.mode, target.target};
