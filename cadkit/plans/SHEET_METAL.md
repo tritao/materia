@@ -254,6 +254,12 @@ table in `tools/README.md`.
   never substituted for the preferred radius. Gaps trim the attachment width; extensions add
   child-wall material beyond it without widening the bend. Exact segment identities persist
   through attachment subdivision.
+- SM3f subtracts exact planar regions by analytic line/circle intersections, split intervals,
+  material-side classification and directed boundary assembly. It retains line and arc curves,
+  handles existing holes and coincident boundaries, and diagnoses empty or disconnected walls.
+  Untouched segment identities survive; multiple surviving fragments use authored intersection
+  roles and infinite-curve branches, never contour indices or coordinates. This is shared
+  geometry for reliefs and wall cuts; cuts through bend zones still require exact mapped trims.
 - Sheet features consume only the previous sheet feature's `Sheet`. A general solid feature
   (boolean, fillet...) after a sheet feature produces a plain solid: downstream code that needs
   a flat pattern must point at a sheet feature or convert (SM-D7). This keeps one owner per fact.
@@ -780,7 +786,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM0 | done: clean branch on 38601ac61, pins verified, prerequisite documents read; quick gate `sm0-setup` passes (ProjectKit 138, ManufacturingKit 54) | c70c89745 |
 | SM1 | done: exact line/arc regions, permanent graph ids, edits/cuts/rips, bidirectional FK, neutral-length conservation, closure and P1–P5 bounds; quick gate `sm1-core` passes (2102 sheet assertions) | 0713c4e0c; 54b5cab15 |
 | SM2 | done: named wall extrusions and bend revolutions fused for flat/folded/partial states; P1–P5 validity, single bodies, volumes, axes and stable names; quick gate `sm2-solid` passes (3757 sheet assertions) | 7a3836d8c |
-| SM3 | in progress: SM3a atomic graph publication; SM3b exact sketch-backed base, side A/B, stock codec and named thickness builder; quick gates `sm3a-staging` (3773) and `sm3b-base` (3813 sheet assertions); SM3c authored segment names and exact face-to-graph picks; quick gate `sm3c-edges` (3843 sheet assertions); SM3d exact flange geometry and alignment; quick gate `sm3d-flange-geometry` (3880 sheet assertions); SM3e typed flange features, authored shared identities, gaps/extensions, stock radius defaults and P1–P5 document acceptance; quick gate `sm3e-flanges-typed` (4044 sheet assertions); relief options and hem/cut/rip remain | 535ebc547; 08afd7a32; bb3405a64; 84a51f00d; 3ed9b3971; flange sub-step commit |
+| SM3 | in progress: SM3a atomic graph publication; SM3b exact sketch-backed base, side A/B, stock codec and named thickness builder; quick gates `sm3a-staging` (3773) and `sm3b-base` (3813 sheet assertions); SM3c authored segment names and exact face-to-graph picks; quick gate `sm3c-edges` (3843 sheet assertions); SM3d exact flange geometry and alignment; quick gate `sm3d-flange-geometry` (3880 sheet assertions); SM3e typed flange features, authored shared identities, gaps/extensions, stock radius defaults and P1–P5 document acceptance; quick gate `sm3e-flanges-typed` (4044 sheet assertions); SM3f exact planar subtraction foundation; quick gate `sm3f-outline-cuts` (4068 sheet assertions); relief options and hem/cut/rip features remain | 535ebc547; 08afd7a32; bb3405a64; 84a51f00d; 3ed9b3971; 31a696ed7; planar subtraction sub-step commit |
 | SM4 | planned | |
 | SM4b | planned | |
 | SM5 | planned | |
@@ -840,3 +846,10 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
   Runtime fixtures generate the current format; no static version-11 sheet fixtures exist.
   Sheet code and its tests have no unchecked casts. MachineKit's schema-version assertion
   now expects version 12; its original geometry summaries are unchanged. No new haxeon issue was found.
+
+- SM3f: `sm3f-outline-cuts` includes 24 planar subtraction assertions, raising sheet checks
+  to 4068. Rectangular holes, open/circular notches, circle-circle lens area, overlapping voids,
+  coincident boundaries and stable fragment identities are checked. Curved and holed results
+  build valid named native walls whose volumes match exact areas. Empty/disconnected cuts have
+  named diagnoses. This foundation introduces no saved feature record or schema change; relief,
+  hem, cut and rip features remain in SM3. No new compiler issue was found.
