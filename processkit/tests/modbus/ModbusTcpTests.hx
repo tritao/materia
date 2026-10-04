@@ -1,3 +1,4 @@
+import processkit.testing.FakeModbusServer;
 import nativekit.ffi.NativeKitTypes;
 import NativeKitRuntime;
 import NativeKitEventValue;

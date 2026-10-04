@@ -14,7 +14,7 @@ import processkit.modbus.ModbusWelder;
 import processkit.modbus.ModbusWelderMap;
 import processkit.modbus.ModbusRegister;
 import processkit.simulation.ModbusWelderSupply;
-import FakeModbusServer;
+import processkit.testing.FakeModbusServer;
 
 /** Focused integration gate: an unchanged CAD weld mission with device feedback driving its bead. */
 class WelderDeviceTests {
