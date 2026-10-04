@@ -41,6 +41,9 @@ class MotionSystem {
   function get_planChecks():PlanCheckSummary return stream.planChecks;
   public final axes:Array<MotionAxis>;
   final axisPlanner:AxisPlanner;
+  final homingAxes:Array<HomingAxis> = [];
+  var homingDriver:Null<HomingDriver> = null;
+  var homingCycle:Null<HomingCycle> = null;
   final pathPlanner:PathPlanner;
   public final fixedTimestepSeconds:Float;
   public final replacementMarginOwnerPeriods:Int;
@@ -110,6 +113,24 @@ class MotionSystem {
       axis.writeLogicalDelta(tolerance, 1e-6);
       for (joint in axis.jointIndices) jointTolerances[joint] = Math.abs(tolerance[joint]);
     }
+    for (axis in this.axes) {
+      var joint = axis.jointIndices[0];
+      var homes = [for (contact in blueprint.runtime.switches)
+        if (contact.role == "home" && contact.joint == description.joints[joint]) contact];
+      if (homes.length > 0) {
+        var physical = blueprint.runtime.joints[joint];
+        if (physical.maxRate == null || physical.maxAcceleration == null)
+          throw 'Homing axis "${axis.id}" needs physical drive limits';
+        homingAxes.push(new HomingAxis(axis.id, joint, homes, physical.maxRate,
+          physical.maxAcceleration, physical.lowerLimit, physical.upperLimit,
+          physical.overtravel, axis.homePosition, fixedTimestepSeconds));
+      }
+    }
+    for (contact in blueprint.runtime.switches) if (contact.role == "home") {
+      var mapped = false;
+      for (home in homingAxes) for (signal in home.switches) if (signal.id == contact.id) mapped = true;
+      if (!mapped) throw 'Home switch "${contact.id}" has no independent motion axis';
+    }
     axisPlanner = new AxisPlanner(this.axes, fixedTimestepSeconds);
     pathPlanner = new PathPlanner(this.axes, fixedTimestepSeconds,
       modelRevision, calibrationRevision);
@@ -122,7 +143,8 @@ class MotionSystem {
 
   /** True while a trajectory is active, held, or waiting to start after a stop. */
   public function isMoving():Bool
-    return activeTrajectory != null || session.isStopping() || session.hasPending();
+    return (homingCycle != null && homingCycle.isActive()) ||
+      activeTrajectory != null || session.isStopping() || session.hasPending();
 
   public function sessionState():SessionState return session.state;
 
@@ -284,6 +306,12 @@ class MotionSystem {
    * path before discarding it; an emergency stop acts immediately.
    */
   public function abort(?mode:StopMode = StopMode.Normal):Void {
+    if (homingCycle != null && homingCycle.isActive()) {
+      homingCycle.cancel();
+      if (mode == StopMode.Emergency) robot.stop(mode);
+      session.stop(Discard, []);
+      return;
+    }
     checkSnapshot();
     if (mode == StopMode.Normal && isMotionInProgress() && elapsedSeconds > 1e-9) {
       submitCommand(RobotCommand.Abort);
@@ -306,6 +334,7 @@ class MotionSystem {
    * the current path and plans the captured request from where it came to rest.
    */
   function replaceMotion(planned:Trajectory, request:MotionRequest):Null<Trajectory> {
+    if (homingCycle != null && homingCycle.isActive()) throw "Ordinary motion cannot interrupt homing";
     if (!isMotionInProgress()) {
       clearBufferedMotion();
       beginImmediate(planned);
@@ -421,8 +450,27 @@ class MotionSystem {
     return result.trajectory;
   }
 
-  /** Software homing for the bootstrap: move to each authored home coordinate. */
+  /** Bind the runtime owner and its encoder/slip reset before sensor homing. */
+  public function configureRuntimeHoming(runtime:robotkit.runtime.RobotRuntime,
+      afterLatch:Void -> Void):Void {
+    if (isMoving()) throw "Cannot replace a homing driver during motion";
+    if (homingAxes.length == 0) throw "Machine has no physical home switches";
+    homingDriver = new RuntimeHomingDriver(robot, runtime, homingAxes, axes, afterLatch);
+  }
+
+  public function homingStatus():String
+    return homingCycle == null ? "Idle" : homingCycle.status();
+
+  /** Sensor homing when authored switches exist; coordinate move for unswitched robots. */
   public function home(?options:MotionOptions):Null<Trajectory> {
+    if (homingAxes.length > 0) {
+      if (isMoving() || queuedTrajectories.length > 0) throw "Homing requires an idle motion system";
+      var driver = homingDriver;
+      if (driver == null) throw "Physical homing requires a configured runtime driver and monitor reset";
+      homingCycle = new HomingCycle(driver, homingAxes);
+      homingCycle.start();
+      return null;
+    }
     return moveAxes([for (axisValue in axes) new AxisTarget(axisValue.id, axisValue.homePosition)], options);
   }
 
@@ -526,6 +574,8 @@ class MotionSystem {
     var dt = dtSeconds < 0.0 ? fixedTimestepSeconds : dtSeconds;
     if (!Math.isFinite(dt) || dt <= 0.0) throw "Motion-system update duration must be finite and positive";
     updateCount++;
+    var homing = homingCycle;
+    if (homing != null && homing.isActive()) return homing.update(dt);
     checkSnapshot();
     if (session.isHolding() || session.isStopping()) {
       // No refills while stopping: beginStop() already queued enough path for
@@ -596,6 +646,7 @@ class MotionSystem {
   }
 
   function enqueueTrajectory(trajectoryValue:Trajectory):Void {
+    if (homingCycle != null && homingCycle.isActive()) throw "Ordinary motion cannot queue during homing";
     if (activeTrajectory == null && queuedTrajectories.length == 0) {
       bufferedTotalSeconds = 0.0;
       bufferedCompletedSeconds = 0.0;

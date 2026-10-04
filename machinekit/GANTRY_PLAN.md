@@ -1652,3 +1652,21 @@ mappings or primary coordinates not expressed directly in SI. HomingAxis now
 retains physical travel bounds. MotionSystem/home startup and actual monitor
 ownership must still connect this driver; simulation power-up offsets and G12
 independent side control remain pending. No tests or builds ran.
+
+
+### G11 — MotionSystem sensor-home lifecycle
+
+Runtime driver: `84de3e407`. MotionSystem derives physical HomingAxes from
+compiled home-switch metadata and independent logical-axis mappings, requiring
+physical velocity/acceleration and an authored overtravel window. Reject home
+switches without a mapped independent axis. configureRuntimeHoming binds the
+runtime and a required monitor-reset callback. With home switches, home()
+starts HomingCycle and update() advances it; isMoving reports active homing.
+Abort cancels via controlled stop (emergency requests remain available).
+Reject ordinary immediate/queued motion while the cycle is active. Expose
+homingStatus for startup progress. Unswitched robots retain coordinate home.
+
+Application owners still need to configure their monitor callback and home
+before program/mission startup; this wiring is not yet present. Hold/resume
+semantics during homing, simulation power-up offsets, monitor/slip physical
+reset effects and G12 side control remain pending. No tests or builds ran.
