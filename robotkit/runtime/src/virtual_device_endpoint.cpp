@@ -241,6 +241,10 @@ rk_result VirtualDeviceEndpoint::sample(std::uint64_t timestamp_ns, rk_robot_sta
     return result;
 }
 
+bool VirtualDeviceEndpoint::ready_for_plans() const noexcept {
+    return inner_->has_state_ && inner_->clock_.may_commit();
+}
+
 int32_t VirtualDeviceEndpoint::diagnostic_code() const noexcept {
     return inner_->diagnostic_code();
 }

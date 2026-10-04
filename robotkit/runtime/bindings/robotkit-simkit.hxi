@@ -271,6 +271,10 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * This does not change the pose restored by reset or resetRobot.
 	 */
 	extern fn rk_simulation_teleport_robot(simulation: rk_simulation, robot_index: u32, pose: ptr<const<rk_simulation_pose>>) -> rk_result;
+	/**
+	 * Whether the virtual device has an observation and a qualified plan clock.
+	 */
+	extern fn rk_simulation_virtual_device_ready(simulation: rk_simulation, robot_index: u32, out_ready: ptr<u32> @out) -> rk_result;
 	struct rk_robot_contact @layout(96, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		link_index: u32 @offset(4);

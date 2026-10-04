@@ -30,11 +30,13 @@ static void run(int stop) {
     config.clock_bound_ns = 5'000'000;
     auto endpoint = VirtualDeviceEndpoint::create(*blueprint, config);
     assert(endpoint);
+    assert(!endpoint->ready_for_plans());
     assert(!endpoint->set_peripheral_input(1, 1));
     assert(!endpoint->set_peripheral_input(0, 0.5));
     assert(endpoint->set_peripheral_input(0, 1));
     auto state = std::make_unique<rk_robot_state>();
     for (uint64_t now = 0; now <= 120'000'000; now += 2'000'000) endpoint->sample(now, *state);
+    assert(endpoint->ready_for_plans());
     PlanRequest plan{};
     plan.plan_id = 1; plan.sequence = 1; plan.ends_at_rest = 1;
     plan.segments.segments.resize(1);
@@ -68,6 +70,7 @@ static void run(int stop) {
         if (stop == -1) assert(values[4] == 2);
     }
     assert(endpoint->reset());
+    assert(!endpoint->ready_for_plans());
     assert(endpoint->set_peripheral_input(0, 1));
 }
 int main() {

@@ -58,6 +58,7 @@ public:
         const rk_robot_runtime_blueprint &blueprint, VirtualDeviceConfig6 config);
     rk_result apply(const rk_robot_command &command) override;
     rk_result sample(std::uint64_t timestamp_ns, rk_robot_state &state) override;
+    bool ready_for_plans() const noexcept;
     bool reports_safety_state() const noexcept override { return true; }
     double observed_position_precision() const noexcept override {
         return inner_->observed_position_precision();

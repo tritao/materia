@@ -179,6 +179,12 @@ rk_result RK_CALL rk_simulation_add_robot(rk_simulation simulation,
     }
 }
 
+rk_result RK_CALL rk_simulation_virtual_device_ready(rk_simulation simulation, uint32_t robot_index, uint32_t *out_ready) {
+    if (!out_ready) return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = resolve(simulation);
+    return value ? value->virtual_device_ready(robot_index, *out_ready) : RK_ERROR_INVALID_HANDLE;
+}
+
 rk_result RK_CALL rk_simulation_stop_virtual_device(rk_simulation simulation, uint32_t robot_index) {
     const auto value = resolve(simulation);
     return value ? value->stop_virtual_device(robot_index) : RK_ERROR_INVALID_HANDLE;

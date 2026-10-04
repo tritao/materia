@@ -519,6 +519,14 @@ class Simulation {
     }
   }
 
+  /** A virtual link is ready only after its device observation and clock qualification. */
+  public function virtualDeviceReady(robotIndex:Int):Bool {
+    ensureLive();
+    var call = RobotKitSimKit.rk_simulation_virtual_device_ready(owner.borrow(), robotIndex);
+    check(call.status, "simulation.virtualDeviceReady");
+    return call.out_ready != 0;
+  }
+
   /** Deliver device stop before the simulation clock is frozen. */
   public function stopVirtualDevice(robotIndex:Int):Void {
     ensureLive();

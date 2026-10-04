@@ -249,6 +249,10 @@ typedef struct rk_simulation_device_sensor {
     double values[RK_MAX_SENSOR_VALUES];
 } rk_simulation_device_sensor;
 
+/** Whether the virtual device has an observation and a qualified plan clock. */
+RK_API rk_result RK_CALL rk_simulation_virtual_device_ready(
+    rk_simulation simulation, uint32_t robot_index, uint32_t *out_ready RK_OUT);
+
 /** Deliver STOP6 before freezing the simulated board's clock. */
 RK_API rk_result RK_CALL rk_simulation_stop_virtual_device(rk_simulation simulation, uint32_t robot_index);
 RK_API rk_result RK_CALL rk_simulation_set_virtual_device_input(

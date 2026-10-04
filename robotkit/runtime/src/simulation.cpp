@@ -1529,6 +1529,13 @@ rk_result Simulation::present_frame(nksim_frame frame, rk_simulation_presentatio
     return RK_OK;
 }
 
+rk_result Simulation::virtual_device_ready(uint32_t robot_index, uint32_t &ready) {
+    Lock lock(session_);
+    if (robot_index >= virtual_devices_.size() || !virtual_devices_[robot_index]) return RK_ERROR_INVALID_ARGUMENT;
+    ready = virtual_devices_[robot_index]->ready_for_plans() ? 1 : 0;
+    return RK_OK;
+}
+
 rk_result Simulation::stop_virtual_device(uint32_t robot_index) {
     Lock lock(session_);
     if (robot_index >= virtual_devices_.size() || !virtual_devices_[robot_index]) return RK_ERROR_INVALID_ARGUMENT;
