@@ -210,6 +210,7 @@ public:
     rk_result submit_segments(const rk_robot_command &command, SegmentBatch batch);
     rk_result submit_plan(const PlanRequest &plan);
     rk_result require_reference(uint32_t joint, bool required);
+    rk_result limit_input(uint32_t joint, bool active);
     rk_result latch_reference(uint32_t joint);
     rk_result reference_status(uint32_t joint, uint32_t &out_referenced) const;
     /** Copies the latest robot state without advancing endpoint time. */
@@ -336,6 +337,7 @@ private:
     void run();
     rk_result step_owner(uint64_t timestamp_ns);
     void latch_fault(bool clear_control = true, int32_t fault_code = 1);
+    std::array<bool, RK_MAX_JOINTS> limit_inputs_{};
 
     rk_robot_runtime_blueprint blueprint_{};
     std::shared_ptr<RobotEndpoint> endpoint_;

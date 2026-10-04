@@ -42,6 +42,7 @@ class RobotRuntime {
   final externalSensorLayout:Array<RobotRuntimeSensorBlueprint>;
   final externalMutex = new Mutex();
   final externalFrames:Map<String, SensorFrame> = new Map();
+  final limitJoints:Map<String, Int> = new Map();
 
   /**
    * Native output buffers reused across calls. `rk_robot_snapshot` is 17 KB and `rk_event_record_batch` 10 KB
@@ -68,6 +69,13 @@ class RobotRuntime {
       new robotkit.core.CoupledJoint(coupling.follower, coupling.leader, coupling.ratio, coupling.offset)];
     externalSensorLayout = blueprint.externalSensorLayout();
     references = new JointReferenceState(blueprint);
+    for (contact in blueprint.switches) if (contact.role == "limit") {
+      var index = -1;
+      for (joint in 0...blueprint.jointCount)
+        if (blueprint.identity != null && blueprint.identity.jointId(joint) == contact.joint) index = joint;
+      if (index < 0) throw 'Limit switch "${contact.id}" monitors an unknown joint';
+      limitJoints.set(contact.id, index);
+    }
     // Configure before any worker or shared simulation tick can admit motion.
     for (joint in 0...blueprint.jointCount)
       if (references.requiresHome(joint))
@@ -489,6 +497,20 @@ class RobotRuntime {
       throw 'Sensor "$sensorId" received a stale sequence';
     }
     externalFrames.set(sensorId, frame);
+    var limitJoint = limitJoints.get(sensorId);
+    if (limitJoint != null) {
+      var active = false;
+      for (id in limitJoints.keys()) if (limitJoints.get(id) == limitJoint) {
+        var signal = externalFrames.get(id);
+        if (signal != null && signal.values.get(0) == 1.0) active = true;
+      }
+      // Serialize frame changes and native aggregation so concurrent publishers
+      // cannot release one input over another's active update.
+      try check(endpoint.limitInput(limitJoint, active), "runtime.limitInput") catch (error:Dynamic) {
+        externalMutex.release();
+        throw error;
+      }
+    }
     externalMutex.release();
     return frame;
   }

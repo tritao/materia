@@ -12,6 +12,7 @@ interface RuntimeEndpoint {
   public function capabilities(value:rk_robot_capabilities):Int;
   /** Configure the authoritative admission gate before motion starts. */
   public function requireReference(joint:Int, required:Bool):Int;
+  public function limitInput(joint:Int, active:Bool):Int;
   public function submitPlanArrays(header:rk_plan_header, starts:Array<Int64>, durations:Array<Int64>,
     degrees:Array<Int>, coefficients:Array<Float>, joints:Array<Int>, events:Array<rk_timed_event>):Int;
   public function submitPlanSpan(header:rk_plan_header, starts:NativeSpan<Int64>, durations:NativeSpan<Int64>,

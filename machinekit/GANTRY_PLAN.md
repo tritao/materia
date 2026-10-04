@@ -1526,3 +1526,21 @@ coordinate translation. The eventual calibration driver must supply counter
 coordinates before latch and logical coordinates after it. This observer is a
 concrete read path; command execution, native calibration and MotionSystem
 startup wiring are still pending. No tests or builds ran.
+
+
+### G11 — native limit-switch fault enforcement
+
+Runtime observation path: `cd8995640`. Add native limit-input reporting per
+joint, RK_FAULT_LIMIT_SWITCH and API 26 generated bindings. An active input
+clears pending commands and invokes the same native fault/stop path used by
+observed overtravel. Safety reset is rejected while any reported input remains
+active. Runtime external switch publication aggregates all authored limit
+signals on the same joint under its publication mutex before reporting native
+state, so releasing one switch cannot clear another active input. Home signals
+do not use this path. RuntimeRobotAdapter exposes the named limit_switch fault.
+
+The existing simulation switch observer now reaches this native path through
+its frame publications. Releasing inputs permits an explicit reset but does
+not automatically clear the latched fault. Device input reporting remains G13
+work. No tests or project builds ran; only FFI source generation was performed.
+Calibration, homing commands and application startup remain pending.

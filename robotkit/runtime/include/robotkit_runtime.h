@@ -560,7 +560,7 @@ enum { RK_FAULT_TRAJECTORY_UNDERFLOW = 2, RK_FAULT_RAMP_LIMIT = 3,
     RK_FAULT_CLOCK_SYNC_LOST = 4, RK_FAULT_DUAL_DRIVE_SKEW = 5,
     RK_FAULT_QUEUE_REVISION_MISMATCH = 6,
     /** A velocity target outlived its command's expires_at_ns; the joint brakes to zero. */
-    RK_FAULT_COMMAND_EXPIRED = 7 };
+    RK_FAULT_COMMAND_EXPIRED = 7, RK_FAULT_LIMIT_SWITCH = 8 };
 
 typedef uint32_t rk_session_state;
 enum {
@@ -793,6 +793,9 @@ RK_API rk_result RK_CALL rk_robot_runtime_stop(rk_robot_runtime runtime);
 RK_API rk_result RK_CALL rk_robot_runtime_require_reference(rk_robot_runtime runtime, uint32_t joint, uint32_t required);
 /** Mark a stationary joint referenced after the homing controller establishes its coordinate zero. */
 RK_API rk_result RK_CALL rk_robot_runtime_latch_reference(rk_robot_runtime runtime, uint32_t joint);
+/** Report aggregated physical limit inputs for a joint. An active input latches a fault and prevents safety reset. */
+RK_API rk_result RK_CALL rk_robot_runtime_limit_input(rk_robot_runtime runtime, uint32_t joint, uint32_t active);
+
 /** Read reference readiness, including all leader dependencies of a coupled follower. */
 RK_API rk_result RK_CALL rk_robot_runtime_reference_status(rk_robot_runtime runtime, uint32_t joint, uint32_t *out_referenced);
 

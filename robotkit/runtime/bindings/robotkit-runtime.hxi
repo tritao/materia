@@ -134,6 +134,10 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 */
 	const RK_FAULT_COMMAND_EXPIRED = 7;
 	const RK_FAULT_DUAL_DRIVE_SKEW = 5;
+	/**
+	 * A velocity target outlived its command's expires_at_ns; the joint brakes to zero.
+	 */
+	const RK_FAULT_LIMIT_SWITCH = 8;
 	const RK_FAULT_QUEUE_REVISION_MISMATCH = 6;
 	const RK_FAULT_RAMP_LIMIT = 3;
 	const RK_FAULT_TRAJECTORY_UNDERFLOW = 2;
@@ -373,6 +377,10 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 * Mark a stationary joint referenced after the homing controller establishes its coordinate zero.
 	 */
 	extern fn rk_robot_runtime_latch_reference(runtime: rk_robot_runtime, joint: u32) -> rk_result;
+	/**
+	 * Report aggregated physical limit inputs for a joint. An active input latches a fault and prevents safety reset.
+	 */
+	extern fn rk_robot_runtime_limit_input(runtime: rk_robot_runtime, joint: u32, active: u32) -> rk_result;
 	/**
 	 * Drains process-output changes. An overflow flag means earlier records were lost.
 	 */

@@ -172,6 +172,12 @@ rk_result RK_CALL rk_robot_runtime_stop(rk_robot_runtime runtime) {
     return value ? value->stop() : RK_ERROR_INVALID_HANDLE;
 }
 
+rk_result RK_CALL rk_robot_runtime_limit_input(rk_robot_runtime runtime, uint32_t joint, uint32_t active) {
+    if (active > 1) return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = robotkit::internal::resolve_runtime(runtime);
+    return value ? value->limit_input(joint, active != 0) : RK_ERROR_INVALID_HANDLE;
+}
+
 rk_result RK_CALL rk_robot_runtime_require_reference(rk_robot_runtime runtime, uint32_t joint, uint32_t required) {
     if (required > 1) return RK_ERROR_INVALID_ARGUMENT;
     const auto value = robotkit::internal::resolve_runtime(runtime);

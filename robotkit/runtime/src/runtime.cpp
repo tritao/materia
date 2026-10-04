@@ -522,6 +522,18 @@ rk_result RobotRuntime::submit_segments(const rk_robot_command &command, Segment
     }
 }
 
+rk_result RobotRuntime::limit_input(uint32_t joint, bool active) {
+    std::lock_guard owner_lock(owner_mutex_);
+    std::lock_guard queue_lock(queue_mutex_);
+    if (joint >= blueprint_.joint_count) return RK_ERROR_INVALID_ARGUMENT;
+    limit_inputs_[joint] = active;
+    if (active) {
+        commands_.clear();
+        latch_fault(true, RK_FAULT_LIMIT_SWITCH);
+    }
+    return RK_OK;
+}
+
 rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
     if (validate_plan_for_blueprint(plan, blueprint_) != RK_OK)
         return RK_ERROR_INVALID_ARGUMENT;
@@ -1358,6 +1370,8 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
             final_kind = value.kind;
 
             if (value.kind == RK_COMMAND_RESET_SAFETY) {
+                for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
+                    if (limit_inputs_[joint]) return RK_ERROR_SAFETY_STOPPED;
                 reset_control();
                 latched_fault_code_ = 1;
                 controlled_stop = false;
