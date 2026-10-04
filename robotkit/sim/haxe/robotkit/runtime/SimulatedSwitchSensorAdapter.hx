@@ -1,7 +1,6 @@
 package robotkit.runtime;
 
 import haxe.Int64;
-import robotkit.model.RobotModel;
 import robotkit.model.SwitchReading;
 
 /** Publish mechanical switch observations after each simulation tick.
@@ -15,22 +14,33 @@ class SimulatedSwitchSensorAdapter implements SimulationStepObserver {
   final jointCount:Int;
   var sequence:Int64 = Int64.ofInt(0);
 
-  public function new(model:RobotModel, runtime:RobotRuntime, readPositions:Void->Array<Float>, clockId:String) {
-    if (model == null || runtime == null || readPositions == null || clockId == null || clockId.length == 0)
+  public function new(blueprint:RobotRuntimeBlueprint, runtime:RobotRuntime, readPositions:Void->Array<Float>, clockId:String) {
+    if (blueprint == null || blueprint.identity == null || runtime == null || readPositions == null || clockId == null || clockId.length == 0)
       throw "Switch sensor adapter needs a model, runtime, actual-position reader and clock";
     this.runtime = runtime; this.readPositions = readPositions; this.clockId = clockId;
-    jointCount = model.joints.length;
-    for (contact in model.switches) {
+    jointCount = blueprint.jointCount;
+    var indices = bindingIndices(blueprint);
+    for (index in indices) joints.push(index);
+    for (contact in blueprint.switches) readings.push(new SwitchReading(contact));
+  }
+
+  /** Validate before creating a native robot, so bad mounts cannot leave a partial addition. */
+  public static function bindingIndices(blueprint:RobotRuntimeBlueprint):Array<Int> {
+    if (blueprint == null || blueprint.identity == null) throw "Switches require a semantic runtime identity";
+    var indices:Array<Int> = [], ids = new Map<String, Bool>();
+    for (contact in blueprint.switches) {
+      if (contact == null || ids.exists(contact.id)) throw "Switch layout has a null or duplicate switch";
+      ids.set(contact.id, true);
       var index = -1;
-      for (i in 0...model.joints.length) if (model.joints[i].id == contact.joint) index = i;
+      for (i in 0...blueprint.jointCount) if (blueprint.identity.jointId(i) == contact.joint) index = i;
       if (index < 0) throw 'Switch ${contact.id} has no monitored joint';
       var mounted = false;
-      for (sensor in model.sensors) if (sensor.id == contact.id && sensor.kind == "joint_switch" &&
-          sensor.frame != null && sensor.frame.id == contact.frameId) mounted = true;
+      for (sensor in blueprint.sensors) if (sensor.id == contact.id && sensor.kind == "joint_switch" &&
+          sensor.frameId == contact.frameId) mounted = true;
       if (!mounted) throw 'Switch ${contact.id} has no matching external sensor mount';
-      joints.push(index);
-      readings.push(new SwitchReading(contact));
+      indices.push(index);
     }
+    return indices;
   }
 
   public function reading(id:String):SwitchReading {

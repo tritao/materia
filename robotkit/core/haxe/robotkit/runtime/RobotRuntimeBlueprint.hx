@@ -36,6 +36,8 @@ class RobotRuntimeBlueprint {
   }
   public final couplings:Array<RobotRuntimeJointCouplingBlueprint> = [];
   public final sensors:Array<RobotRuntimeSensorBlueprint> = [];
+  /** Immutable switch definitions sampled by simulation or supplied by device inputs. */
+  public final switches:Array<robotkit.model.JointSwitch> = [];
   public final channels:Array<ProcessChannelDeclaration> = [];
   /** Pneumatic process drives are bound to channels, never to trajectory axes. */
   public final pneumaticDrives:Array<RobotRuntimePneumaticDriveBlueprint> = [];

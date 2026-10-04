@@ -561,7 +561,7 @@ G0 → G1 → G2 → G3 ──────────────────�
 | G7 | implemented; build/runtime validation deferred at user request | `11e9bc82b` |
 | G8 | implementation added; runtime and firmware verification deferred | `823de3191`, `6ac44c34e` |
 | G9 | implementation added; migration verification deferred | `cd7853a82` |
-| G10 | in progress; switch model and readings added | see progress notes |
+| G10 | implementation added; mechanical/simulation verification deferred | see progress notes |
 | G11 | planned | — |
 | G12 | planned | — |
 | G13 | planned | — |
@@ -1274,3 +1274,29 @@ No GPIO assignments or verified electrical operation are claimed. Mounted
 sensor retention, actual corner clearances, sensor trip outcomes and geometry
 compilation remain unverified. Simulation observer installation and G10 checks
 remain pending; no build or test was run.
+
+
+### G10 — simulation switch observations installed
+
+Carry detached immutable JointSwitch definitions in the runtime blueprint.
+Compiler diagnostics require a unique switch ID, known monitored joint/frame
+and the matching mounted external `joint_switch` sensor. The simulation adapter
+now binds against compiled identity and sensor mounts rather than a mutable
+RobotModel. Simulation validates these bindings before creating its native
+robot and installs the adapter as a tick observer for ordinary simulation.
+Observers are removed with Simulation disposal.
+
+The source reader takes `runtime.snapshot().q` after each physics tick.
+Native `SimulationRobot.sample` reads `source.position` from the SimKit latest
+joint snapshot; `SimulationRobot.apply` adds configured joint slip to positional
+targets. Thus the adapter observes resulting physics positions instead of
+reconstructing requested coordinates. It publishes fresh zero-or-one digital
+frames with the simulation source clock and each authored sensor mount.
+
+Virtual-device simulations do not synthesize host switch inputs from device
+feedback: G13 must supply input reads and edge capture from its device/board
+path. Switch referencing, fault enforcement, power-up offsets and homing remain
+G11/G12 work. G10 source implementation now includes parts, assembly records,
+geometry-derived trips, bridge lowering, Gantry placement and ordinary simulation
+publication. All compilation, geometry, codec round trips, end-stop checks and
+simulation outcomes remain unverified because tests/builds are stopped.

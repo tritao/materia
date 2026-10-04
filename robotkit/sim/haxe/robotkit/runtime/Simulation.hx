@@ -112,6 +112,9 @@ class Simulation {
       ?toolLink:Int, ?toolMargin:Float, ?toolGap:Float, ?linkHulls:Array<SimulationLinkHull>,
       holdAtRest:Bool = false):RobotRuntime {
     ensureLive();
+    if (blueprint == null) throw "Simulation requires a robot blueprint";
+    if (virtualDevice == null && blueprint.switches.length > 0)
+      SimulatedSwitchSensorAdapter.bindingIndices(blueprint);
     if (space != null) space.requireDrives(blueprint);
     var robotDesc:Null<rk_simulation_robot_desc> = null;
     if (initialPose != null || virtualDevice != null || blueprint.pneumaticDrives.length > 0 ||
@@ -438,6 +441,14 @@ class Simulation {
       : SimulationEndpoints.virtualDevice(result.out_runtime, capture);
     runtime = RobotRuntime.create(blueprint, endpoint);
     robots.push(runtime);
+    // Native simulation samples actual physics coordinates, including applied slip.
+    // Virtual-device inputs are supplied by the device protocol rather than host synthesis.
+    if (virtualDevice == null && blueprint.switches.length > 0) {
+      var observedRuntime:RobotRuntime = runtime;
+      var switches = new SimulatedSwitchSensorAdapter(blueprint, observedRuntime,
+        () -> observedRuntime.snapshot().q.toArray(), "robotkit.simulation");
+      addStepObserver(switches);
+    }
     return runtime;
   }
 
