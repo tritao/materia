@@ -6,4 +6,6 @@ enum OrientationPolicy {
   Interpolated;
   Cone(axis:Array<Float>, halfAngle:Float);
   FreeAboutTool;
+  /** Position only; every orientation is acceptable. */
+  Free;
 }

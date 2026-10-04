@@ -1,5 +1,7 @@
 package motionkit.kinematics;
 
+import motionkit.path.OrientationPolicy;
+
 /** Transport-neutral forward, inverse, differential and path kinematics contract. */
 interface KinematicsSolver {
   function jointCount():Int;
@@ -11,16 +13,16 @@ interface KinematicsSolver {
   function fork():KinematicsSolver;
   function forward(q:Array<Float>):Pose3;
   function solvePose(target:Pose3, seed:Array<Float>,
-    tolerance:IkTolerance):Null<Array<Float>>;
+    tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>>;
   function sampleCandidates(target:Pose3, maxCount:Int,
-    tolerance:IkTolerance):Array<Array<Float>>;
+    tolerance:IkTolerance, ?freedom:OrientationPolicy):Array<Array<Float>>;
   /**
    * Joint rates producing `twist` at `q`. A redundant solver has a family of them; given
    * `redundancyRate` (d/ds of its redundancy values, e.g. `PathSolution.redundancyRates` at the sample)
    * it returns the one moving its redundancy (a swivel, external axes) at exactly that rate; without
    * one, the smallest. Solvers with no redundancy ignore it.
    */
-  function solveDifferential(q:Array<Float>, twist:Twist6, ?redundancyRate:Array<Float>):Null<Array<Float>>;
+  function solveDifferential(q:Array<Float>, twist:Twist6, ?redundancyRate:Array<Float>, ?freedom:OrientationPolicy):Null<Array<Float>>;
   /**
    * One configuration per sample of a path (see `PathRequest`): each solver
    * searches the way that suits it (an analytic arm across its branches, a

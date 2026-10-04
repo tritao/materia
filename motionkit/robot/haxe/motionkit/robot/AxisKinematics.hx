@@ -1,5 +1,7 @@
 package motionkit.robot;
 
+import motionkit.path.OrientationPolicy;
+
 import motionkit.axis.MotionAxis;
 import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.KinematicsSolver;
@@ -46,10 +48,10 @@ class AxisKinematics implements KinematicsSolver {
   }
 
   public function solvePose(target:Pose3, seed:Array<Float>,
-      tolerance:IkTolerance):Null<Array<Float>> {
+      tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>> {
     if (target == null || tolerance == null) throw "Axis IK needs a pose and tolerance";
     requireJoints(seed);
-    if (2.0 * Math.acos(Math.min(1.0, Math.abs(target.qw))) > tolerance.orientation)
+    if (ToolFreedom.orientationError(new Pose3(0, 0, 0), target, freedom == null ? OrientationPolicy.Interpolated : freedom) > tolerance.orientation)
       return null;
     var logical = [target.x, target.y, target.z];
     var axes = [x, y, z];
@@ -89,21 +91,29 @@ class AxisKinematics implements KinematicsSolver {
   public function solvePath(request:PathRequest):Array<Null<Array<Float>>> return request.followPointByPoint(this);
 
   public function sampleCandidates(target:Pose3, maxCount:Int,
-      tolerance:IkTolerance):Array<Array<Float>> {
+      tolerance:IkTolerance, ?freedom:OrientationPolicy):Array<Array<Float>> {
     if (maxCount < 0) throw "Axis IK candidate count must be non-negative";
     if (maxCount == 0) return [];
-    var solution = solvePose(target, home, tolerance);
+    var solution = solvePose(target, home, tolerance, freedom);
     return solution == null ? [] : [solution];
   }
 
   /** Nothing here changes once built. */
   public function fork():KinematicsSolver return this;
 
-  public function solveDifferential(q:Array<Float>, twist:Twist6, ?redundancyRate:Array<Float>):Null<Array<Float>> {
+  public function solveDifferential(q:Array<Float>, twist:Twist6, ?redundancyRate:Array<Float>, ?freedom:OrientationPolicy):Null<Array<Float>> {
     requireJoints(q);
     if (twist == null) throw "Axis differential IK needs a tool twist";
-    if (Math.abs(twist.angularX) > 1e-12 || Math.abs(twist.angularY) > 1e-12 ||
-        Math.abs(twist.angularZ) > 1e-12) return null;
+    var asked = twist.toArray();
+    switch freedom {
+      case Cone(_, _): for (i in 3...6) asked[i] = 0.0;
+      default:
+    }
+    for (row in ToolFreedom.twistRows(forward(q), freedom)) {
+      var angular = 0.0;
+      for (axis in 3...6) angular += row[axis]*asked[axis];
+      if (Math.abs(angular) > 1e-12) return null;
+    }
     var result = [for (_ in 0...jointCount()) 0.0];
     x.writeLogicalDelta(result, twist.linearX);
     y.writeLogicalDelta(result, twist.linearY);

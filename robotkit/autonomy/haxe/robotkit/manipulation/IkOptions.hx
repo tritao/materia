@@ -1,6 +1,8 @@
 package robotkit.manipulation;
 
 import robotkit.spatial.Transform3;
+import robotkit.spatial.Quat;
+import kinematicskit.FrameOrientation;
 
 /** How `KinematicGroup.solve` runs. */
 enum abstract IkMethod(String) to String {
@@ -21,6 +23,13 @@ enum abstract IkMethod(String) to String {
  * tool-centre-point target from a nearby seed.
  */
 class IkOptions {
+  /** Position axes in the target frame; 7 selects X, Y and Z. */
+  public var positionAxes:Int = 7;
+  /** Hard orientation rows; an axis leaves spin about that local axis free. */
+  public var orientation:FrameOrientation = Full;
+  /** Soft tool orientation, optimized only after the selected hard rows. */
+  public var orientationPreference:Null<Quat> = null;
+  public var orientationPreferenceWeight:Float = 0.05;
   public var positionTolerance:Float;
   public var orientationTolerance:Float;
   public var maxIterations:Int;
@@ -61,6 +70,24 @@ class IkOptions {
     this.orientationTolerance = orientationTolerance;
     this.maxIterations = maxIterations;
     this.damping = damping;
+  }
+
+  /** Selects the hard tool task. Returns this. */
+  public function freedom(orientation:FrameOrientation, ?positionAxes:Int = 7):IkOptions {
+    if (orientation == null) throw "IK task requires an orientation policy";
+    if (positionAxes < 0 || positionAxes > 7) throw "IK position axes must be a mask of X, Y and Z";
+    this.positionAxes = positionAxes;
+    this.orientation = orientation;
+    return this;
+  }
+
+  /** Prefers an orientation without adding any hard orientation rows. */
+  public function preferringOrientation(rotation:Quat, ?weight:Float = 0.05):IkOptions {
+    if (rotation == null || !Math.isFinite(weight) || weight <= 0)
+      throw "IK orientation preference needs a rotation and positive finite weight";
+    orientationPreference = rotation;
+    orientationPreferenceWeight = weight;
+    return this;
   }
 
   /** Targets the flange instead of the tool centre point. Returns this. */
@@ -108,6 +135,10 @@ class IkOptions {
 
   public function copy():IkOptions {
     var result = new IkOptions(positionTolerance, orientationTolerance, maxIterations, damping);
+    result.positionAxes = positionAxes;
+    result.orientation = orientation;
+    result.orientationPreference = orientationPreference;
+    result.orientationPreferenceWeight = orientationPreferenceWeight;
     result.method = method;
     result.atFlange = atFlange;
     result.swivel = swivel;

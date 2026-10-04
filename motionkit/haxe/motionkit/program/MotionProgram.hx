@@ -33,12 +33,12 @@ class MotionProgram {
         if (targetError != null) targetError;
         else if (limits == null) 'Motion program op $index needs motion limits';
         else validateBlend(blend, index, ops);
-      case MoveL(pose, frameId, feed, blend):
+      case MoveL(pose, frameId, feed, blend, _):
         if (pose == null) 'Motion program op $index needs a line endpoint pose';
         else if (!hasId(frameId)) 'Motion program op $index needs a frame ID';
         else if (!validPositive(feed)) 'Motion program op $index feed must be finite and positive';
         else validateBlend(blend, index, ops);
-      case MoveC(via, end, frameId, feed, blend):
+      case MoveC(via, end, frameId, feed, blend, _):
         if (via == null || end == null) 'Motion program op $index needs circular via and end poses';
         else if (!hasId(frameId)) 'Motion program op $index needs a frame ID';
         else if (!validPositive(feed)) 'Motion program op $index feed must be finite and positive';

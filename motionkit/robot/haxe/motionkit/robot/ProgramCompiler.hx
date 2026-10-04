@@ -280,9 +280,10 @@ class ProgramCompiler {
           c.pending = pending;
           attachLeadingOutputs(pending, c.leadingOutputs);
           c.q = goal;
-        case MoveL(pose, requestedFrame, feed, blend):
+        case MoveL(pose, requestedFrame, feed, blend, freedom):
           retire(c);
           requireFrame(requestedFrame, index);
+          requireFixedOrientation(solver.forward(q), [pose], freedom, index);
           var blended:Null<PosePath> = null;
           var blendTolerance = 0.0;
           var blendNextPose:Null<Pose3> = null;
@@ -290,8 +291,8 @@ class ProgramCompiler {
             case ToleranceBlend(metres):
               blendTolerance = metres;
               if (index + 1 < program.ops.length) switch program.ops[index + 1] {
-                case MoveL(nextPose, nextFrame, nextFeed, ExactStop):
-                  if (nextFrame == frameId) {
+                case MoveL(nextPose, nextFrame, nextFeed, ExactStop, nextFreedom):
+                  if (nextFrame == frameId && ToolFreedom.isFull(freedom) && ToolFreedom.isFull(nextFreedom)) {
                     blended = blendLinear(solver.forward(q), pose, nextPose,
                       metres, feed, nextFeed);
                     blendNextPose = nextPose;
@@ -303,7 +304,7 @@ class ProgramCompiler {
           var pending:PendingMotion;
           if (blended != null) {
             var nextFeed = switch program.ops[index + 1] {
-              case MoveL(_, _, speed, _): speed;
+              case MoveL(_, _, speed, _, _): speed;
               case _: feed;
             };
             pending = lowerPath(speedScale, blended, q, Math.max(feed, nextFeed), [], index,
@@ -316,20 +317,21 @@ class ProgramCompiler {
               orientationTolerance);
             var end = new PoseWaypoint(pose, positionTolerance, orientationTolerance);
             pending = lowerPath(speedScale, new PosePath(frameId, [new PoseLine(start, end,
-              OrientationPolicy.Interpolated, 0.1, feed)]), q, feed, [], index);
+              freedom == null ? OrientationPolicy.Interpolated : freedom, 0.1, feed)]), q, feed, [], index);
           }
           c.pending = pending;
           c.q = pending.endQ.copy();
           attachLeadingOutputs(pending, c.leadingOutputs);
-        case MoveC(via, endPose, requestedFrame, feed, blend):
+        case MoveC(via, endPose, requestedFrame, feed, blend, freedom):
           retire(c);
           noteBlend(blend, index, c.sink);
           requireFrame(requestedFrame, index);
+          requireFixedOrientation(solver.forward(q), [via, endPose], freedom, index);
           var pending = lowerPath(speedScale, new PosePath(frameId, [new PoseArc(
             new PoseWaypoint(solver.forward(q), positionTolerance, orientationTolerance),
             new PoseWaypoint(via, positionTolerance, orientationTolerance),
             new PoseWaypoint(endPose, positionTolerance, orientationTolerance),
-            OrientationPolicy.Interpolated, feed)]), q, feed, [], index);
+            freedom == null ? OrientationPolicy.Interpolated : freedom, feed)]), q, feed, [], index);
           c.pending = pending;
           c.q = pending.endQ.copy();
           attachLeadingOutputs(pending, c.leadingOutputs);
@@ -448,7 +450,7 @@ class ProgramCompiler {
         joints.copy();
       case PoseTarget(pose, requestedFrame, _):
         requireFrame(requestedFrame, index);
-        var candidates = solver.sampleCandidates(pose, 32, ikTolerance);
+        var candidates = solver.sampleCandidates(pose, 32, ikTolerance, null);
         if (candidates.length == 0) throw 'Motion program op $index unreachable pose';
         var best:Null<Array<Float>> = null;
         var bestCost = Math.POSITIVE_INFINITY;
@@ -514,12 +516,15 @@ class ProgramCompiler {
     var caps:Array<Float> = [];
     var previous = startQ.copy();
     var pathPoses = [for (sample in samples) sample.primitive.waypointAt(sample.local).pose];
+    var freedoms = [for (sample in samples) sample.primitive.orientationPolicy()];
+    var fullOrientation = true;
+    for (freedom in freedoms) if (!ToolFreedom.isFull(freedom)) fullOrientation = false;
     var selected:Array<Null<Array<Float>>> = [];
     var redundancyRates:Null<Array<Array<Float>>> = null;
-    if (configurationSelector != null)
+    if (configurationSelector != null && fullOrientation)
       for (q in configurationSelector.selectPoses(distances, pathPoses, startQ, ikTolerance)) selected.push(q);
     else {
-      var request = new PathRequest(distances, pathPoses, startQ, ikTolerance, perJointMaxJump, maxVelocity, 48);
+      var request = new PathRequest(distances, pathPoses, startQ, ikTolerance, perJointMaxJump, maxVelocity, 48, freedoms);
       // A redundant solver also reports how its redundancy changes along the path it chose, exactly.
       if (Std.isOfType(solver, RedundantPathSolver)) {
         var redundant:RedundantPathSolver = cast solver;
@@ -532,7 +537,7 @@ class ProgramCompiler {
       var distance = distances[sample];
       var solved = selected[sample];
       if (solved == null || solved.length != startQ.length)
-        throw 'Motion program op $index unreachable pose at path distance $distance';
+        throw 'Motion program op $index unreachable pose at path distance $distance${solverFailure()}';
       checkJointPosition(solved, index, distance);
       if (sample > 0) {
         for (joint in 0...startQ.length)
@@ -553,10 +558,10 @@ class ProgramCompiler {
       var sample = samples[k], q = positions[k];
       var leaving = sample.primitive.derivativesAt(sample.local);
       var redundancy = redundancyRates == null ? null : redundancyRates[k];
-      var rate = jointRate(q, leaving.linear, leaving.angular, redundancy);
-      if (rate == null) throw 'Motion program op $index has no joint velocity along the path at distance ${sample.distance}';
+      var rate = jointRate(q, leaving.linear, leaving.angular, redundancy, freedoms[k]);
+      if (rate == null) throw 'Motion program op $index has no joint velocity along the path at distance ${sample.distance}${solverFailure()}';
       first.push(rate);
-      second.push(jointCurvature(q, rate, leaving, redundancy));
+      second.push(jointCurvature(q, rate, leaving, redundancy, freedoms[k]));
       var arriving = sample.arriving;
       if (arriving == null) secondBefore.push(second[k]);
       else {
@@ -567,7 +572,7 @@ class ProgramCompiler {
           Math.abs(before.angular[axis] - leaving.angular[axis])));
         if (turn > 1e-6)
           throw 'Motion program op $index turns a corner at path distance ${sample.distance}: blend it or stop there';
-        secondBefore.push(jointCurvature(q, rate, before, redundancy));
+        secondBefore.push(jointCurvature(q, rate, before, redundancy, arriving.primitive.orientationPolicy()));
       }
     }
     var jointPath = new JointPathSamples(distances, positions, first, second, secondBefore);
@@ -809,11 +814,31 @@ class ProgramCompiler {
     return samples;
   }
 
+  function requireFixedOrientation(start:Pose3, targets:Array<Pose3>, freedom:Null<OrientationPolicy>, index:Int):Void {
+    switch freedom {
+      case Fixed:
+        for (target in targets) {
+          var residual = PoseMath.angle(start, target);
+          if (residual > orientationTolerance)
+            throw 'Motion program op $index fixed orientation differs from its start: position residual 0 m; orientation residual $residual rad';
+        }
+      default:
+    }
+  }
+
+  function solverFailure():String {
+    if (Std.isOfType(solver, ManipulatorKinematics)) {
+      var numeric:ManipulatorKinematics = cast solver;
+      return numeric.lastFailure == null ? "" : ': ${numeric.lastFailure}';
+    }
+    return "";
+  }
+
   /** dq/ds for a pose moving at `linear` and `angular` per metre of path, or null at a singularity. */
   function jointRate(q:Array<Float>, linear:Array<Float>, angular:Array<Float>,
-      ?redundancyRate:Array<Float>):Null<Array<Float>>
+      ?redundancyRate:Array<Float>, ?freedom:OrientationPolicy):Null<Array<Float>>
     return solver.solveDifferential(q, new Twist6(linear[0], linear[1], linear[2],
-      angular[0], angular[1], angular[2]), redundancyRate);
+      angular[0], angular[1], angular[2]), redundancyRate, freedom);
 
   /**
     d²q/ds²: how dq/ds changes along the path, from the pose's second
@@ -821,12 +846,12 @@ class ProgramCompiler {
     Exact for a Cartesian machine, whose kinematics do not change.
   **/
   function jointCurvature(q:Array<Float>, rate:Array<Float>, pose:PoseDerivatives,
-      ?redundancyRate:Array<Float>):Array<Float> {
+      ?redundancyRate:Array<Float>, ?freedom:OrientationPolicy):Array<Float> {
     var step = 1e-6;
     function at(sign:Float):Null<Array<Float>>
       return jointRate([for (joint in 0...q.length) q[joint] + sign * step * rate[joint]],
         [for (axis in 0...3) pose.linear[axis] + sign * step * pose.linearSecond[axis]],
-        [for (axis in 0...3) pose.angular[axis] + sign * step * pose.angularSecond[axis]], redundancyRate);
+        [for (axis in 0...3) pose.angular[axis] + sign * step * pose.angularSecond[axis]], redundancyRate, freedom);
     var ahead = at(1.0), behind = at(-1.0);
     if (ahead == null || behind == null) return [for (_ in q) 0.0];
     return [for (joint in 0...q.length) (ahead[joint] - behind[joint]) / (2.0 * step)];
@@ -842,27 +867,7 @@ class ProgramCompiler {
   }
   static function orientationError(actual:Pose3, desired:Pose3,
       policy:OrientationPolicy):Float {
-    return switch policy {
-      case Fixed | Interpolated: PoseMath.angle(actual, desired);
-      case FreeAboutTool:
-        axisAngle(toolAxis(actual), toolAxis(desired));
-      case Cone(axis, halfAngle):
-        if (axis == null || axis.length != 3)
-          throw "Invalid orientation cone axis";
-        var norm = Math.sqrt(axis[0]*axis[0] + axis[1]*axis[1] + axis[2]*axis[2]);
-        if (!Math.isFinite(norm) || norm <= 0.0)
-          throw "Invalid orientation cone axis";
-        Math.max(0.0, axisAngle(toolAxis(actual),
-          [axis[0]/norm, axis[1]/norm, axis[2]/norm]) - halfAngle);
-    };
-  }
-  static function toolAxis(pose:Pose3):Array<Float>
-    return [2.0*(pose.qx*pose.qz + pose.qw*pose.qy),
-      2.0*(pose.qy*pose.qz - pose.qw*pose.qx),
-      1.0 - 2.0*(pose.qx*pose.qx + pose.qy*pose.qy)];
-  static function axisAngle(a:Array<Float>, b:Array<Float>):Float {
-    var dot = a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
-    return Math.acos(Math.max(-1.0, Math.min(1.0, dot)));
+    return ToolFreedom.orientationError(actual, desired, policy);
   }
   function zeros():Array<Float> return [for (_ in 0...solver.jointCount()) 0.0];
   static function effective(machine:Array<Float>, requested:Float):Array<Float>

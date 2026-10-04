@@ -211,8 +211,8 @@ class WelderProcessTests {
   static function kinds(program:MotionProgram):String
     return [for (op in program.ops) switch op {
       case MoveJ(_, _, _): "MoveJ";
-      case MoveL(_, _, _, _): "MoveL";
-      case MoveC(_, _, _, _, _): "MoveC";
+      case MoveL(_, _, _, _, _): "MoveL";
+      case MoveC(_, _, _, _, _, _): "MoveC";
       case FollowPath(_, _, _, _): "FollowPath";
       case Dwell(_): "Dwell";
       case SetOutput(_, _): "SetOutput";
@@ -246,7 +246,7 @@ class WelderProcessTests {
       "the approach, then the entry, the path and the exit: " + kinds(program));
     check(run.followOp == 4, "the path is the fifth operation");
     switch program.ops[0] {
-      case MoveL(_, _, feed, _): near(feed, 0.08, "the approach moves at the recipe's approach speed");
+      case MoveL(_, _, feed, _, _): near(feed, 0.08, "the approach moves at the recipe's approach speed");
       case _: check(false, "the program begins with a straight move");
     }
     switch program.ops[4] {

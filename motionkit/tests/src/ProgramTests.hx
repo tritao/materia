@@ -232,7 +232,7 @@ class ProgramTests extends MotionKitTestSupport {
     // A joint rate for a tool twist moves the swivel exactly at the asked rate.
     var askedSwivelRate = 0.7;
     var twist = new motionkit.kinematics.Twist6(0.05, 0.0, -0.02, 0.0, 0.1, 0.0);
-    var rate = solver.solveDifferential(start, twist, [askedSwivelRate]);
+    var rate = solver.solveDifferential(start, twist, [askedSwivelRate], null);
     check(rate != null, "a 7-axis arm has a joint rate for a tool twist");
     var tool = arm.tcpJacobian(start), wanted = twist.toArray();
     for (row in 0...6) {
@@ -254,7 +254,7 @@ class ProgramTests extends MotionKitTestSupport {
     for (i in 1...21) {
       var target = new Pose3(startPose.x, startPose.y + 0.01 * i, startPose.z, startPose.qx, startPose.qy,
         startPose.qz, startPose.qw);
-      var solved = solver.solvePose(target, q, tolerance);
+      var solved = solver.solvePose(target, q, tolerance, null);
       check(solved != null, 'point IK reaches step $i');
       q = solved;
       drift = Math.max(drift, Math.abs(arm.swivelAngle(q) - swivel));
@@ -271,7 +271,7 @@ class ProgramTests extends MotionKitTestSupport {
         var f = i / 35.0;
         var target = new Pose3(startPose.x - 0.1 * f, startPose.y + 0.3 * f, startPose.z - 0.15 * f, startPose.qx,
           startPose.qy, startPose.qz, startPose.qw);
-        var solved = solver.solvePose(target, chain, tolerance);
+        var solved = solver.solvePose(target, chain, tolerance, null);
         check(solved != null, 'the line solves point by point at $f');
         for (j in 0...7) pointTravel += Math.abs(solved[j] - chain[j]);
         chain = solved;
@@ -372,7 +372,7 @@ class ProgramTests extends MotionKitTestSupport {
     }
     var points = [for (k in 0...33) onCircle(2.0 * Math.PI * k / 32)];
     // Enter the circle in the configuration that leaves the turntable nearest home.
-    var options = solver.sampleCandidates(points[0], 8, tolerance);
+    var options = solver.sampleCandidates(points[0], 8, tolerance, null);
     check(options.length > 0, "the circle's first point is reachable");
     var entry = options[0];
     for (option in options) if (Math.abs(option[7]) < Math.abs(entry[7])) entry = option;
@@ -979,7 +979,7 @@ class ProgramTests extends MotionKitTestSupport {
     check(run.lastProgramStart < run.interruptedAt,
       "recovery overlaps the interrupted pass");
     var approachMatches = switch continuation.ops[0] {
-      case MoveL(pose, _, _, _):
+      case MoveL(pose, _, _, _, _):
         motionkit.path.PoseMath.distance(pose,
           path.waypointAt(restart).pose) < 1e-6;
       case _: false;

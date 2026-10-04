@@ -1,3 +1,4 @@
+import motionkit.path.OrientationPolicy;
 import cadbridge.AssemblyPhysicalPartView;
 import cadbridge.AssemblySimulationBridge;
 import haxe.Int64;
@@ -34,12 +35,12 @@ class CartesianSolver implements KinematicsSolver {
   public function fork():KinematicsSolver return this;
   public function jointCount():Int return 2;
   public function forward(q:Array<Float>):Pose3 return new Pose3(q[0], q[1]);
-  public function solvePose(target:Pose3, seed:Array<Float>, tolerance:IkTolerance):Null<Array<Float>> return [target.x, target.y];
-  public function sampleCandidates(target:Pose3, maxCount:Int, tolerance:IkTolerance):Array<Array<Float>>
+  public function solvePose(target:Pose3, seed:Array<Float>, tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>> return [target.x, target.y];
+  public function sampleCandidates(target:Pose3, maxCount:Int, tolerance:IkTolerance, ?freedom:OrientationPolicy):Array<Array<Float>>
     return [[target.x, target.y]];
   public function solvePath(request:motionkit.kinematics.PathRequest):Array<Null<Array<Float>>>
     return request.followPointByPoint(this);
-  public function solveDifferential(q:Array<Float>, twist:Twist6, ?preferredRate:Array<Float>):Null<Array<Float>>
+  public function solveDifferential(q:Array<Float>, twist:Twist6, ?preferredRate:Array<Float>, ?freedom:OrientationPolicy):Null<Array<Float>>
     return [twist.linearX, twist.linearY];
 }
 

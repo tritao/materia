@@ -5,6 +5,7 @@ import motionkit.event.EventValue;
 import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.Pose3;
 import motionkit.program.Blend;
+import motionkit.path.OrientationPolicy;
 import motionkit.program.MotionOp;
 import motionkit.program.MotionProgram;
 import motionkit.program.MoveTarget;
@@ -19,7 +20,7 @@ import robotkit.core.Robot;
  * and returns to the arm's home joints, run by `ManipulatorMotion` like every other arm program. To
  * pick, it presses `pressDepth` past the contact, as a compliant suction cup is pressed onto a part,
  * so the cup meets the part within the motion's position tolerance.
- * The tool keeps its home orientation throughout. The arm's other joints, such as a mobile base's
+ * The tool keeps its home Z direction, with home orientation preferred and spin free. The arm's other joints, such as a mobile base's
  * wheels, hold still while the program runs.
  */
 class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
@@ -44,6 +45,8 @@ class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
     planning.requireGroup(manipulator);
     var limits = planning.validation();
     var solver = new ManipulatorKinematics(manipulator, 1e-8);
+    var home = [for (_ in 0...count) 0.0];
+    solver.preferredOrientation = solver.forward(home);
     var compiler = new ProgramCompiler(solver, limits, FRAME,
       planning.velocity, planning.acceleration, planning.jerk,
       planning.startTolerances(0.005),
@@ -53,7 +56,6 @@ class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
     var indices = [for (target in manipulator.toJointTargets([for (_ in 0...count) 0.0])) target.joint];
     var motion = new ManipulatorMotion(robot, compiler, function(_) return null, eventSource, indices);
     // Joint values are relative to the robot's starting pose, so home is all zeros.
-    var home = [for (_ in 0...count) 0.0];
     return new HandlingPlanRunner(motion, channel, home, solver.forward(home), approachHeight, travelSpeed,
       contactSpeed, dwell, pressDepth);
   }
@@ -83,11 +85,11 @@ class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
     var above = new Pose3(contact.x, contact.y, contact.z + approachHeight, q.qx, q.qy, q.qz, q.qw);
     var at = new Pose3(contact.x, contact.y, contact.z - (hold ? pressDepth : 0.0), q.qx, q.qy, q.qz, q.qw);
     return new MotionProgram([
-      MotionOp.MoveL(above, FRAME, travelSpeed, Blend.ExactStop),
-      MotionOp.MoveL(at, FRAME, contactSpeed, Blend.ExactStop),
+      MotionOp.MoveL(above, FRAME, travelSpeed, Blend.ExactStop, OrientationPolicy.FreeAboutTool),
+      MotionOp.MoveL(at, FRAME, contactSpeed, Blend.ExactStop, OrientationPolicy.FreeAboutTool),
       MotionOp.SetOutput(channel, EventValue.Digital(hold)),
       MotionOp.Dwell(dwell),
-      MotionOp.MoveL(above, FRAME, contactSpeed, Blend.ExactStop),
+      MotionOp.MoveL(above, FRAME, contactSpeed, Blend.ExactStop, OrientationPolicy.FreeAboutTool),
       MotionOp.MoveJ(MoveTarget.JointTarget(home), new MotionOptions(), Blend.ExactStop)
     ]);
   }

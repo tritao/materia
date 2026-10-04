@@ -7,6 +7,15 @@ class MotionKitBootstrapTests {
     var kinematicsTests:KinematicsTests = new KinematicsTests();
     var processTests:ProcessTests = new ProcessTests();
 
+    if (Sys.getEnv("MOTIONKIT_FREEDOM_ONLY") == "1") {
+      var tests = new ToolFreedomTests();
+      tests.testFreeSpinPath();
+      tests.testUnreachableTilt();
+      tests.testConeAndRedundancy();
+      tests.testFullOrientationIdentity();
+      Sys.println('Tool freedom tests passed (${MotionKitTestSupport.assertions} assertions)');
+      return;
+    }
     if (Sys.getEnv("MOTIONKIT_ARM_SESSION_ONLY") == "1") {
       programTests.testManipulatorSessionTransitions();
       Sys.println('Arm session tests passed (${MotionKitTestSupport.assertions} assertions)');
@@ -92,6 +101,11 @@ class MotionKitBootstrapTests {
       Sys.println('C4 focused tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
     }
+    var freedomTests = new ToolFreedomTests();
+    freedomTests.testFreeSpinPath();
+    freedomTests.testUnreachableTilt();
+    freedomTests.testConeAndRedundancy();
+    freedomTests.testFullOrientationIdentity();
     new PlanCheckTests().testPlanningLimits();
     new PlanCheckTests().testHandlingUsesCoupledLimits();
     new PlanCheckTests().testPlanCheck();

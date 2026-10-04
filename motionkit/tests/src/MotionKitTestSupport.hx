@@ -1,3 +1,4 @@
+import motionkit.path.OrientationPolicy;
 import haxe.Int64;
 import haxe.io.Bytes;
 import machinekit.assembly.LinearAxis;
@@ -431,18 +432,18 @@ class WristBranchSolver implements KinematicsSolver {
   public function jointCount():Int return 6;
   public function forward(q:Array<Float>):Pose3 return new Pose3(q[0]);
   public function solvePose(target:Pose3, seed:Array<Float>,
-      tolerance:IkTolerance):Null<Array<Float>> {
+      tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>> {
     var q = seed.copy();
     q[0] = target.x;
     q[4] = !jump || target.x < 0.5 ? 0.1 : -2.0;
     return q;
   }
   public function sampleCandidates(target:Pose3, maxCount:Int,
-      tolerance:IkTolerance):Array<Array<Float>>
+      tolerance:IkTolerance, ?freedom:OrientationPolicy):Array<Array<Float>>
     return [solvePose(target, [for (_ in 0...6) 0.0], tolerance)];
   public function solvePath(request:motionkit.kinematics.PathRequest):Array<Null<Array<Float>>>
     return request.followPointByPoint(this);
-  public function solveDifferential(q:Array<Float>, twist:Twist6, ?redundancyRate:Array<Float>):Null<Array<Float>>
+  public function solveDifferential(q:Array<Float>, twist:Twist6, ?redundancyRate:Array<Float>, ?freedom:OrientationPolicy):Null<Array<Float>>
     return [twist.linearX, 0.0, 0.0, 0.0, 0.0, 0.0];
 }
 
@@ -453,17 +454,17 @@ class PlanarSolver implements KinematicsSolver {
   public function jointCount():Int return 6;
   public function forward(q:Array<Float>):Pose3 return new Pose3(q[0], q[1]);
   public function solvePose(target:Pose3, seed:Array<Float>,
-      tolerance:IkTolerance):Null<Array<Float>> {
+      tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>> {
     var q = seed.copy();
     q[0] = target.x; q[1] = target.y;
     return q;
   }
   public function sampleCandidates(target:Pose3, maxCount:Int,
-      tolerance:IkTolerance):Array<Array<Float>>
+      tolerance:IkTolerance, ?freedom:OrientationPolicy):Array<Array<Float>>
     return [solvePose(target, [for (_ in 0...6) 0.0], tolerance)];
   public function solvePath(request:motionkit.kinematics.PathRequest):Array<Null<Array<Float>>>
     return request.followPointByPoint(this);
-  public function solveDifferential(q:Array<Float>, twist:Twist6, ?redundancyRate:Array<Float>):Null<Array<Float>>
+  public function solveDifferential(q:Array<Float>, twist:Twist6, ?redundancyRate:Array<Float>, ?freedom:OrientationPolicy):Null<Array<Float>>
     return [twist.linearX, twist.linearY, 0.0, 0.0, 0.0, 0.0];
 }
 

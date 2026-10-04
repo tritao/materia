@@ -374,6 +374,10 @@ class KinematicGroup {
     if (hasExternal()) problem.add(new DofDampingTask(model, damping));
     if (o.swivel != null) problem.add(swivelTask(o.swivel, o.swivelTolerance, !o.swivelExact));
     var method = o.method;
+    if (o.orientationPreference != null) {
+      problem.add(orientationPreferenceTask(target, o, d));
+      method = IkMethod.Prioritized;
+    }
     if (o.posture != null) {
       var posture:Array<Float> = o.posture;
       if (posture.length != n) throw 'Preferred posture needs $n values';
@@ -447,7 +451,8 @@ class KinematicGroup {
     var problem = limitedProblem();
     // The tool task first, so the result reports it.
     problem.add(FrameTask.atFrame(model, flangeFrameIndex, RobotKinematics.toTransform(target), o.positionTolerance,
-      o.orientationTolerance, o.atFlange ? null : RobotKinematics.toTransform(flangeTTcp)));
+      o.orientationTolerance, o.atFlange ? null : RobotKinematics.toTransform(flangeTTcp),
+      o.positionAxes, o.orientation));
     if (hasExternal()) problem.add(new DofDampingTask(model, damping));
     var motion = baseMotion();
     if (motion != RootMotion.Fixed) {
@@ -458,7 +463,10 @@ class KinematicGroup {
     for (i in 0...dofs.length) seedState.q[dofs[i]] = start[i];
     seedState.setRootPose(root, RobotKinematics.toTransform(o.rootPose));
     problem.clamp(seedState.q);
-    var solution = LevenbergMarquardt.solve(problem, seedState, o.maxIterations, 1e-3, 1e-8, 1.0, d.workspace);
+    if (o.orientationPreference != null) problem.add(orientationPreferenceTask(target, o, d, true));
+    var solution = o.orientationPreference == null
+      ? LevenbergMarquardt.solve(problem, seedState, o.maxIterations, 1e-3, 1e-8, 1.0, d.workspace)
+      : PrioritizedSolver.solve(problem, seedState, o.maxIterations, o.damping > 0 ? o.damping : 0.02, 1e-8, d.workspace);
     var tip = solution.tasks[0];
     return new IKResult(solution.status == KinematicStatus.Converged, [for (dof in dofs) solution.state.q[dof]],
       tip.positionError, tip.orientationError, solution.iterations, solution.status,
@@ -474,9 +482,21 @@ class KinematicGroup {
     var offset = o.atFlange ? null : RobotKinematics.toTransform(flangeTTcp);
     if (workFrame == null)
       return FrameTask.atFrame(model, flangeFrameIndex, referencePose(d).compose(target), o.positionTolerance,
-        o.orientationTolerance, offset);
-    return FrameTask.atFrame(model, flangeFrameIndex, target, o.positionTolerance, o.orientationTolerance, offset)
+        o.orientationTolerance, offset, o.positionAxes, o.orientation);
+    return FrameTask.atFrame(model, flangeFrameIndex, target, o.positionTolerance, o.orientationTolerance, offset,
+      o.positionAxes, o.orientation)
       .relativeTo(model, referenceBody, referenceOffset);
+  }
+
+  function orientationPreferenceTask(target:Transform3, o:IkOptions, d:KinematicGroupData,
+      ?world:Bool = false):FrameTask {
+    var preferred = new Transform3(target.translation, o.orientationPreference);
+    var soft = o.copy().freedom(kinematicskit.FrameOrientation.Full, 0);
+    var task = world ? FrameTask.atFrame(model, flangeFrameIndex, RobotKinematics.toTransform(preferred),
+      o.positionTolerance, o.orientationTolerance, o.atFlange ? null : RobotKinematics.toTransform(flangeTTcp),
+      0, kinematicskit.FrameOrientation.Full) : toolTask(RobotKinematics.toTransform(preferred), soft, d);
+    task.orientationWeight = o.orientationPreferenceWeight;
+    return task.asPreference();
   }
 
   function hasExternal():Bool {

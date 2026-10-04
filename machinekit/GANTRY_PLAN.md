@@ -552,10 +552,10 @@ G0 → G1 → G2 → G3 ──────────────────�
 | Step | State | Commits |
 |------|-------|---------|
 | G0 | done; full gate passed | `a8349cdea`, `29b9da11b` |
-| G1 | done | this commit |
-| G2 | planned | — |
+| G1 | done | `e0b50b5ec` |
+| G2 | Core implementation verified; junction freedom check pending | G2 preparation commit |
 | G3 | planned | — |
-| G4 | planned | — |
+| G4 | R0/R1 source integration complete; full gate passed | `05271b08d`; source merges `7db70f2cf`, `bce647683` |
 | G5 | planned | — |
 | G6 | planned | — |
 | G7 | planned | — |
@@ -693,3 +693,99 @@ full and received no SIGTERM. No haxeon issue was found.
 The pre-R0 MotionKit native libraries and G0 reference binary are preserved in
 scratch for G2 comparisons. Local main now contains restructuring R0; G4 takes
 that committed work at the next boundary.
+
+### G4 — R0/R1 source integration complete (2026-10-04)
+
+Take the committed R0/R1 changes from local main's merge commits `7db70f2cf`
+and `bce647683`, using their first-parent source diffs. R0 extracts planner-free
+trajectory core, separates protocol naming/versioning and injects runtime
+endpoints; R1 publishes bounded endpoint capabilities and execution-plan
+contracts. The surface-patch reaching-IK fix is included. G0 fixture reuse and
+G1 shared limits are preserved.
+
+**Integration decision:** a whole-main merge also brought unrelated UI changes
+that require newer Skribidi APIs, and four dependency pin updates. Retaining the
+pins made the app build fail on missing Skribidi functions. To honor the
+handoff's explicit prohibition on pin changes and preserve future merge behavior,
+G4 integrates the R0/R1 source commits from main without taking unrelated UI
+changes or adding main ancestry. The existing UI and submodule revisions remain
+unchanged; no other sessions' uncommitted files or feature branches were used.
+This is a deliberate adjustment to G4's whole-main merge workflow.
+
+The app runtime target list adds `trajectory_core` while retaining the existing
+CadKit target required by the pinned build layout. NativeTransport retains its
+explicit byte-count arguments required by the pinned NativeKit FFI.
+
+A clean RobotKit rebuild exposed a pinned-haxeon enum membership issue:
+`Array<JointTargetMode>.contains(Servo)` and `Type.enumEq` returned false for
+`Position,Velocity,Effort,Servo`, before mutation of a defensive copy. Native
+capability values were correct. `RobotCapabilities.accepts` uses an explicit
+loop with statically typed enum equality; the original capability regression
+passes, with richer failure values. No haxeon source was changed. Focused
+RobotKit passes 4946 assertions, 11 more than G0/G1 from R0/R1's new endpoint
+and contract tests.
+
+All fourteen suites passed the whole-main integration attempt, but its app
+build failed; its stale app run was stopped and is not validation evidence.
+The source-only app build passed, followed by the clean `g4-source-complete`
+full gate: all fourteen suites, app build and project-source suite exited 0.
+The traced gate received no SIGTERM. The configured CadKit uses prebuilt
+OCCT 8.0.1. G0 mechanical, planning, cutting and mission numbers remain
+unchanged; RobotKit alone adds the eleven R0/R1 assertions noted above.
+MotionKit remains at 13059 assertions, including G1 coverage. Submodule pins
+and the two unstaged vendor symlinks are unchanged.
+
+
+### G2 — tool freedom through IK and planning (2026-10-04, verification pending)
+
+`IkOptions` carries the position mask and `FrameOrientation` through ordinary
+and moving-base tool tasks. Its immutable orientation preference is a separate
+soft task, optimized with the prioritized solver after the hard rows. A frame
+task can be marked as a preference without changing its residuals or Jacobian.
+
+`ToolFreedom` is the shared mapping in MotionKit's RobotKit adapter layer;
+MotionKit core still has no native kinematics dependency. Free spin holds local
+tool Z, `Free` drops orientation, and cones align tool Z with their path-frame
+axis and use the aperture as the orientation tolerance. Pose IK, candidate
+sampling, differential row projection, redundant lattice/refinement and the
+path check use this mapping. `PathRequest` carries aligned sample policies;
+`MoveL`/`MoveC` have an optional policy, defaulting to the existing interpolated
+full orientation. The existing planar full-orientation blender remains exact;
+reduced-task MoveL blends currently follow the existing exact-stop fallback.
+
+Handling moves request tool Z with spin free, preferring home orientation. If
+that orientation is feasible, its zero-error solution preserves the original
+full solve. Otherwise the prioritized solver improves the soft orientation
+within joint bounds without compromising hard rows. Worker solvers retain the
+immutable preference. Reduced differential IK checks its hard residuals;
+underactuated full tasks no longer silently accept an impossible twist. Failed
+numeric IK reports separate position and orientation residuals to the compiler.
+
+Focused tool-freedom coverage passes 281 assertions: a limited-C XYZ machine
+follows an otherwise unreachable spinning path, a soft orientation reaches C's
+nearest limit, fixed XYZ tilt and angular velocity fail with named residuals,
+cones use a path-frame axis, and external-axis lattice/refinement propagates
+per-sample freedom. Full 6R and swivel-preserving solves are compared bit for
+bit with the pre-G2 algorithms. Redundant searches also retain the soft
+orientation preference. A `Fixed` MoveL/MoveC rejects inconsistent endpoint
+orientations instead of silently discarding them. The saved G0 executable and current code both
+pass the same 193-assertion redundancy suite. RobotKit passes 4955 assertions, including moving-base and copied-preference
+checks. The first gate was deliberately stopped after RobotKit to extend soft
+orientation preference through redundant lattice/refinement; the new regression
+then passed. The `g2-final` core gate passed all fourteen suites, app build and the full
+project-source suite (all exit 0): MotionKit 13340, RobotKit 4955. All recorded
+G0 physical and mission numbers hold, including the 6R mission at
+5.8/12/17.2/23.5 seconds. Review found that path-junction angular comparison
+still includes free spin; a regression and projection fix remain before the
+final G2 commit. This checkpoint is preparation, not step completion.
+
+Pinned-haxeon workaround: an omitted optional argument on an interface call
+produced E1008 (`KinematicsSolver.sampleCandidates` expected four arguments,
+got three). Calls through that contract pass an explicit null for the default
+full policy. `ModuleCanonicalizer.canonicalInterface` reconstructs method arguments with
+name, type and span but drops their optional/default metadata.
+`CallResolver.typeDeclaredCallArguments` consequently treats all interface
+arguments as required; concrete calls retain their flags. A fresh one-source
+project, with the compiler server disabled, reproduces E1008 for an omitted
+optional integer argument. No compiler
+source or dependency pin was changed.

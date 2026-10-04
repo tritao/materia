@@ -17,7 +17,7 @@ class ToolpathAccuracyTests {
     var binding = ToolpathTestSupport.cncBinding(cnc, blueprint);
     // The joints where the interpreter's start position is.
     var start = binding.solver.solvePose(new motionkit.kinematics.Pose3(0.02, 0.02, 0.0),
-      [for (_ in blueprint.model.joints) 0.0], new motionkit.kinematics.IkTolerance());
+      [for (_ in blueprint.model.joints) 0.0], new motionkit.kinematics.IkTolerance(), null);
     if (start == null) throw "the gantry reaches its start";
     var assertions = 0;
 
