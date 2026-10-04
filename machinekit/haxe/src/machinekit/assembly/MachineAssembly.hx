@@ -678,8 +678,12 @@ class MachineAssembly {
 		return result;
 	}
 
-	/** The flattened view with every transmission worked out from its parts. */
+	/**
+	 * The flattened view with every transmission and belt worked out from its parts as they are now.
+	 * Parts can change in place (a driver's rating, say), so this always derives afresh.
+	 */
 	function derived():FlatAssembly {
+		changed();
 		var result = flat();
 		DriveSystem.derive(result);
 		return result;

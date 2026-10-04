@@ -1112,8 +1112,8 @@ class MachineAssemblyDescriptionTests {
 		var unrelatedMaximum = unrelated.rating.maximumVoltage;
 		unrelated.rating.maximumVoltage = 20;
 		var unrelatedCheck = assembly.check();
-		var unrelatedSaved = assembly.describe();
-		if (unrelatedSaved.mechanical.elasticNetworks == null || unrelatedSaved.mechanical.elasticNetworks.length != 1)
+		var unrelatedNetworks = assembly.definition().elasticNetworks;
+		if (unrelatedNetworks == null || unrelatedNetworks.length != 1)
 			throw "An unrelated faulty motor must leave the belt network available";
 		unrelated.rating.maximumVoltage = unrelatedMaximum;
 
