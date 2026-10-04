@@ -1,6 +1,7 @@
 package app;
 
 import sys.FileSystem;
+import app.MateriaProjectRunner.GeneratedAssemblyScene;
 import robotkit.world.RobotWorld;
 import nativekit.ffi.NativeKit;
 import nativekit.ffi.NativeKitTypes;
@@ -27,6 +28,10 @@ class WelderDeviceTests {
   static function clock():Float return haxe.Int64.toFloat(NativeKit.nk_time_now_ns()) * 1.0e-9;
 
   static function runModbus(root:String):Void {
+    // CAD compilation can take longer than the device's response deadline.
+    // Establish the live connection only after the static artifact is available.
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-welder/materia.seam.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
     var native = NativeKitRuntime.start();
     var listener = NativeTransport.listen(36278);
     var accepted:Array<TransportHandle> = [];
@@ -46,15 +51,20 @@ class WelderDeviceTests {
       200, 1, 2, 4, new ModbusRegister(201, 0.1), new ModbusRegister(202, 0.01), new ModbusRegister(203), 103, 1000);
     var server = new FakeModbusServer(map, accepted[0]); server.modelEnabled = true;
     var supply = new ModbusWelder(client, map);
-    while (!supply.initialized && clock() < deadline) {
-      native.events.poll(); server.poll(clock()); supply.poll(clock()); native.events.wait(0.001);
-    }
-    if (!supply.initialized) throw "CAD mission Modbus source did not initialize";
     runMission(root, false, function(welder:processkit.simulation.SimulatedWelder):processkit.simulation.SimulationWelderSupply {
+      var readyUntil = clock() + 3.0;
+      while (!supply.initialized && clock() < readyUntil) {
+        native.events.poll(); server.poll(clock()); supply.poll(clock()); native.events.wait(0.001);
+      }
+      if (!supply.initialized) throw 'CAD mission Modbus source did not initialize: ${client.fault}';
       return new ModbusWelderSupply(supply, welder.runtime,
         {arc:welder.arcChannel, wireSpeed:welder.wireSpeedChannel, voltage:welder.voltageChannel}, welder.sensorId,
-        clock, function(grounded:Bool) { server.grounded = grounded; native.events.poll(); server.poll(clock()); });
-    });
+        clock, function(grounded:Bool) {
+          server.grounded = grounded; native.events.poll();
+          try server.poll(clock()) catch (error:Dynamic)
+            throw 'CAD mission Modbus server failed: client=${client.fault}, requests=${server.requests}, error=$error';
+        });
+    }, generated);
     deadline = clock() + 2.0;
     while ((server.arc || !client.idle()) && clock() < deadline) {
       native.events.poll(); server.poll(clock()); supply.poll(clock()); native.events.wait(0.001);
@@ -64,9 +74,10 @@ class WelderDeviceTests {
   }
 
   static function runMission(root:String, virtualDevice:Bool,
-      factory:Null<processkit.simulation.SimulatedWelder -> processkit.simulation.SimulationWelderSupply>):Void {
+      factory:Null<processkit.simulation.SimulatedWelder -> processkit.simulation.SimulationWelderSupply>,
+      ?prepared:GeneratedAssemblyScene):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-welder/materia.seam.project.json");
-    var generated = MateriaProjectRunner.loadProject(manifest);
+    var generated = prepared == null ? MateriaProjectRunner.loadProject(manifest) : prepared;
     var session = new ProjectDocumentSession(null, false);
     session.openGeneratedProject(generated, manifest);
     var simulation = new ApplicationSimulation(new RobotWorld());
