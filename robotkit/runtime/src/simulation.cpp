@@ -930,6 +930,8 @@ rk_result Simulation::set_squaring_hold(uint32_t robot_index, uint32_t joint, bo
         return RK_ERROR_INVALID_ARGUMENT;
     auto binding = bindings_[robot_index].lock();
     if (!binding) return RK_ERROR_INVALID_HANDLE;
+    if (std::find(virtual_bindings_.begin(), virtual_bindings_.end(), binding) != virtual_bindings_.end())
+        return RK_ERROR_UNSUPPORTED;
     if (joint >= binding->squaring_hold_.size() || !binding->actuated_joints_[joint] ||
         binding->passive_[joint]) return RK_ERROR_INVALID_ARGUMENT;
     binding->squaring_position_[joint] = position;

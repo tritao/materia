@@ -6,6 +6,7 @@ class JointReferenceState {
   final names:Array<String> = [];
   final homes:Array<robotkit.model.JointSwitch>;
   final homeJoints:Array<Int> = [];
+  final homeDrives:Array<SwitchDriveBinding> = [];
   final latched:Array<Bool> = [];
   final latchOffsets:Array<Float> = [];
   final referenced:Array<Bool> = [];
@@ -17,6 +18,7 @@ class JointReferenceState {
       homes = template.homes.copy(); couplings = template.couplings.copy();
       for (value in template.names) names.push(value);
       for (value in template.homeJoints) homeJoints.push(value);
+      for (value in template.homeDrives) homeDrives.push(value);
       for (value in template.latched) latched.push(value);
       for (value in template.latchOffsets) latchOffsets.push(value);
       for (value in template.referenced) referenced.push(value);
@@ -40,6 +42,7 @@ class JointReferenceState {
       var joint = names.indexOf(contact.joint);
       if (joint < 0) throw 'Home switch "${contact.id}" monitors an unknown joint';
       homeJoints.push(joint); latched.push(false); latchOffsets.push(0.0);
+      homeDrives.push(SwitchDriveBinding.resolve(blueprint, contact));
     }
     refresh();
   }
@@ -84,6 +87,7 @@ class JointReferenceState {
     if (index < 0) throw 'Unknown home switch "$switchId"';
     var zero = homes[index].trip - observedPosition;
     if (!Math.isFinite(zero)) throw "Home coordinate zero must be finite";
+    if (!Math.isFinite(homeDrives[index].ratio * zero)) throw "Home shaft coordinate zero must be finite";
     latchOffsets[index] = zero;
     latched[index] = true;
     refresh();
@@ -94,6 +98,18 @@ class JointReferenceState {
     for (i in 0...homes.length) if (homes[i].id == switchId) {
       if (!latched[i]) throw 'Home switch "$switchId" has not latched';
       return latchOffsets[i];
+    }
+    throw 'Unknown home switch "$switchId"';
+  }
+
+  /** Individual shaft-coordinate translation from its own captured home edge.
+   * This is retained side calibration, not the shared leader's propagated zero. */
+  public function homeDriveOffset(switchId:String):Float {
+    for (i in 0...homes.length) if (homes[i].id == switchId) {
+      if (!latched[i]) throw 'Home switch "$switchId" has not latched';
+      var zero = homeDrives[i].ratio * latchOffsets[i];
+      if (!Math.isFinite(zero)) throw "Home shaft coordinate zero must be finite";
+      return zero;
     }
     throw 'Unknown home switch "$switchId"';
   }

@@ -546,7 +546,9 @@ class CncProgramPlayer implements SessionMember {
 	}
 
 	/** The session is back at its start, and the robot with it: run the program again on fresh stock. */
-	public function beforeReset():Void {}
+	public function beforeReset():Void {
+		if (homing != null && homing.isMoving()) homing.abort();
+	}
 
 	public function reset():Void {
 		slip.reset();

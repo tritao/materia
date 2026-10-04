@@ -1920,3 +1920,18 @@ monitor history.
 Independent motor coordinate calibration, skew relaxation and the physical
 1 mm squaring result remain pending. No tests or builds ran; all source and
 behavior remain unverified.
+
+### G12 — retain independent shaft zeros and bound simulation ownership
+
+Alignment preservation: `a0f8ee79c`. JointReferenceState resolves each home
+switch drive and retains that mapping across transactional copies. Expose the
+individual shaft translation as ratio times captured axis-coordinate zero;
+affine coupling intercepts do not enter translations. Validate finite shaft
+zeros before accepting a latch, and expose a mutex-protected runtime accessor.
+These zeros are not yet installed in native motor coordinates: native
+calibration currently requires coupling-consistent propagated zeros, so that
+contract needs an explicit independent-side extension.
+
+Reject simulation shaft holds on virtual-device bindings. Router beforeReset
+now aborts active homing so side-release cleanup runs before native reset, as
+in mission playback. No tests or builds ran; behavior remains unverified.

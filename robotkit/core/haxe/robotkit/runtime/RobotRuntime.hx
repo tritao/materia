@@ -429,6 +429,20 @@ class RobotRuntime {
     referenceMutex.release();
   }
 
+  /** Read the individual motor-side zero captured by a physical home switch. */
+  public function homeDriveOffset(switchId:String):Float {
+    ensureLive();
+    referenceMutex.acquire();
+    try {
+      var zero = references.homeDriveOffset(switchId);
+      referenceMutex.release();
+      return zero;
+    } catch (error:Dynamic) {
+      referenceMutex.release();
+      throw error;
+    }
+  }
+
   public function isReferenced(joint:Int):Bool {
     ensureLive();
     referenceMutex.acquire();
