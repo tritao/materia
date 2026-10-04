@@ -10,8 +10,6 @@ interface RuntimeEndpoint {
   public function observe(snapshot:rk_robot_snapshot):Int;
   public function stop():Int;
   public function capabilities(value:rk_robot_capabilities):Int;
-  public function submitSegments(command:rk_robot_command, tag:Int64, starts:Array<Int64>,
-    durations:Array<Int64>, degrees:Array<Int>, coefficients:Array<Float>):Int;
   public function submitPlanArrays(header:rk_plan_header, starts:Array<Int64>, durations:Array<Int64>,
     degrees:Array<Int>, coefficients:Array<Float>, joints:Array<Int>, events:Array<rk_timed_event>):Int;
   public function submitPlanSpan(header:rk_plan_header, starts:NativeSpan<Int64>, durations:NativeSpan<Int64>,

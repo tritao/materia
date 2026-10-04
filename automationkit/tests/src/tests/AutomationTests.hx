@@ -511,7 +511,11 @@ class AutomationTests {
         "RecordingRobot captures the mission's observation stream in MCAP");
       var replay = new ReplayRobot(liveRobot.id(), recording,
         new RobotDescription(liveRobot.id(), "recorded mission forklift", linkNames, jointNames),
-        new RobotCapabilities(liveRobot.id(), jointNames.length, true, true, true, false));
+        new RobotCapabilities(liveRobot.id(),
+      jointNames.length,
+      [robotkit.world.JointTargetMode.Position, robotkit.world.JointTargetMode.Velocity, robotkit.world.JointTargetMode.Effort],
+      robotkit.world.ExecutionCapabilities.unavailable(),
+      new robotkit.world.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked)));
       replayWorld = new RobotWorld();
       replayWorld.attach(replay);
       var replayFleet = new Fleet("replay-fleet", replayWorld);
@@ -604,8 +608,11 @@ private class AutomationFakeRobot implements Robot {
     var links = [for (link in model.links) link.name];
     var joints = [for (joint in model.joints) joint.name];
     descriptionValue = new RobotDescription(logicalId, model.name, links, joints);
-    capabilitiesValue = new RobotCapabilities(logicalId, joints.length,
-      true, true, true, false);
+    capabilitiesValue = new RobotCapabilities(logicalId,
+      joints.length,
+      [robotkit.world.JointTargetMode.Position, robotkit.world.JointTargetMode.Velocity, robotkit.world.JointTargetMode.Effort],
+      robotkit.world.ExecutionCapabilities.unavailable(),
+      new robotkit.world.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked));
     snapshotValue = new RobotSnapshot(logicalId, Int64.ofInt(0), Int64.ofInt(0),
       [for (_ in joints) 0.0], [for (_ in joints) 0.0], [for (_ in joints) 0.0], 0, 0);
   }

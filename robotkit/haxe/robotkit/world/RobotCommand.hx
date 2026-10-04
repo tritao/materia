@@ -13,8 +13,6 @@ enum RobotCommand {
    * it until host and robot clocks are mapped.
    */
   JointTargets(targets:Array<JointTarget>, expiryNs:Null<Int64>);
-  /** Append bounded polynomial segments to a runtime-owned queue. */
-  TrajectoryChunk(chunk:robotkit.world.TrajectoryChunk);
   /** Submit or replace a revision-bound execution plan. */
   ExecutionPlan(plan:robotkit.world.ExecutionPlanSubmission);
   /** Pause the native path clock while retaining its queue. */

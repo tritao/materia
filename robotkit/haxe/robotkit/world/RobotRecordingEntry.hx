@@ -4,7 +4,7 @@ import haxe.Int64;
 
 /** Versioned payload envelope with a recording-wide deterministic ordinal. */
 class RobotRecordingEntry {
-  public static inline final VERSION:Int = 6;
+  public static inline final VERSION:Int = 7;
   public final ordinal:Int64;
   public final robotId:RobotId;
   public final event:RobotRecordingEvent;

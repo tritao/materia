@@ -67,8 +67,7 @@ class MotionSystem {
 
   public function new(robot:Robot, blueprint:MotionSystemBlueprint) {
     if (robot == null || blueprint == null) throw "Motion system needs a robot and blueprint";
-    if (!robot.capabilities().supportsTrajectoryQueue ||
-        !robot.capabilities().supportsExecutionPlans)
+    if (!robot.capabilities().execution.plans)
       throw "MotionSystem requires a robot with trajectory queue and execution plan support";
     var description = robot.description();
     if (description == null || description.joints.length != blueprint.model.joints.length)

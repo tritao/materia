@@ -399,7 +399,7 @@ class SessionTests extends MotionKitTestSupport {
     queuedMachine.queueAxes([new AxisTarget("x", 0.02)], options);
     queuedMachine.queueAxes([new AxisTarget("x", 0.05)], options);
     var firstTag = switch (recording.commands[0]) {
-      case RobotCommand.TrajectoryChunk(chunk): chunk.tag;
+      case RobotCommand.ExecutionPlan(plan): plan.planId;
       case _: Int64.ofInt(0);
     };
     tick = 0;
@@ -606,8 +606,6 @@ class SessionTests extends MotionKitTestSupport {
         check(true, "immediate replacement submits the new plan");
       case JointTargets(_, _):
         throw "immediate replacement did not submit a plan";
-      case TrajectoryChunk(_):
-        throw "immediate replacement submitted a legacy point chunk";
       case Hold | Resume | Abort:
         throw "immediate replacement unexpectedly submitted a lifecycle command";
     }
@@ -933,7 +931,7 @@ class SessionTests extends MotionKitTestSupport {
           if (recording != null)
             for (command in recording.commands)
               switch command {
-                case JointTargets(_, _) | TrajectoryChunk(_):
+                case JointTargets(_, _):
                   throw "MotionSystem submitted a non-plan motion command";
                 case ExecutionPlan(plan):
                   worstSkew = Math.max(worstSkew,

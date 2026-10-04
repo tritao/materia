@@ -6,7 +6,7 @@ package robotkit.world;
  * ReplayRobot observes commands but does not execute them. Its default
  * capabilities intentionally do not claim queue or plan support. A caller
  * replaying a plan-based controller must pass capabilities with both
- * supportsTrajectoryQueue and supportsExecutionPlans enabled.
+ * execution.plans enabled.
  */
 class ReplayRobot implements Robot {
   public final logicalId:RobotId;
@@ -31,8 +31,11 @@ class ReplayRobot implements Robot {
     if (source.length > 0) for (event in source[0].events) eventRing.restore(event);
     descriptionValue = description == null ? new RobotDescription(id, id, [], []) : description;
     capabilitiesValue = capabilities == null
-      ? new RobotCapabilities(id, source.length == 0 ? 0 : source[0].snapshot.positions.length,
-          true, false, false, false) : capabilities;
+      ? new RobotCapabilities(id,
+      source.length == 0 ? 0 : source[0].snapshot.positions.length,
+      [robotkit.world.JointTargetMode.Position],
+      robotkit.world.ExecutionCapabilities.unavailable(),
+      new robotkit.world.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked)) : capabilities;
   }
 
   public function id():RobotId return logicalId;

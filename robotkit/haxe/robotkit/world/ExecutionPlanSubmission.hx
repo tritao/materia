@@ -34,7 +34,7 @@ class ExecutionPlanSubmission {
       ?accelerationTolerances:Array<Float>, ?endsAtRest:Bool = true,
       ?events:Array<ProcessTimedEvent>, ?jerkUnchecked:Bool = false, ?arrays:SegmentArrays) {
     var payloadJoints = arrays != null ? arrays.robotJointCount() :
-      segments == null || segments.length == 0 ? -1 : segments[0].jointCount;
+      segments == null || segments.length == 0 || segments[0] == null ? -1 : segments[0].jointCount;
     if (planId == null || Int64.compare(planId, Int64.ofInt(0)) <= 0 ||
         startPosition == null || startVelocity == null || startAcceleration == null ||
         (arrays == null) == (segments == null) ||
@@ -42,14 +42,43 @@ class ExecutionPlanSubmission {
         startPosition.length != startAcceleration.length ||
         payloadJoints != startPosition.length)
       throw "Invalid execution plan submission";
+    for (state in [startPosition, startVelocity, startAcceleration])
+      for (value in state) if (!Math.isFinite(value)) throw "Invalid execution plan start state";
+    var count = arrays != null ? arrays.count() : segments == null ? 0 : segments.length;
+    if (count < 1 || count > RobotKitRuntimeConstants.RK_MAX_TRAJECTORY_QUEUE_POINTS)
+      throw "Invalid execution plan segment count";
+    var expected = Int64.ofInt(0);
+    if (arrays != null) {
+      var origin = arrays.starts.get(0);
+      for (index in 0...count) {
+        var duration = arrays.durations.get(index);
+        if (Int64.compare(Int64.sub(arrays.starts.get(index), origin), expected) != 0 ||
+            Int64.compare(duration, Int64.ofInt(0)) <= 0 ||
+            arrays.degrees.get(index) < 0 || arrays.degrees.get(index) > SegmentArrays.STRIDE - 1)
+          throw "Execution plan segments must be contiguous";
+        var end = Int64.add(expected, duration);
+        if (Int64.compare(end, expected) <= 0) throw "Invalid execution plan duration";
+        expected = end;
+      }
+    } else {
+      for (segment in segments) {
+        if (segment == null || segment.jointCount != payloadJoints ||
+            Int64.compare(segment.timeFromStartNs, expected) != 0)
+          throw "Execution plan segments must be contiguous with one joint count";
+        var end = Int64.add(expected, segment.durationNs);
+        if (Int64.compare(end, expected) <= 0) throw "Invalid execution plan duration";
+        expected = end;
+      }
+    }
     this.planId = planId;
     this.modelRevision = modelRevision;
     this.calibrationRevision = calibrationRevision;
     this.events = events == null ? [] : events.copy();
     var previous = Int64.ofInt(0);
     for (event in this.events) {
-      if (event == null || Int64.compare(event.timeNs, previous) < 0)
-        throw "Plan events must be sorted by path time";
+      if (event == null || Int64.compare(event.timeNs, previous) < 0 ||
+          Int64.compare(event.timeNs, expected) > 0)
+        throw "Plan events must be sorted and within the plan duration";
       previous = event.timeNs;
     }
     this.requiredCapabilities = requiredCapabilities |
@@ -57,13 +86,13 @@ class ExecutionPlanSubmission {
     this.startPosition = new ImmutableFloatArray(startPosition);
     this.startVelocity = new ImmutableFloatArray(startVelocity);
     this.startAcceleration = new ImmutableFloatArray(startAcceleration);
-    var count = startPosition.length;
-    var pTol = positionTolerances == null ? [for (_ in 0...count) 0.0] : positionTolerances;
-    var vTol = velocityTolerances == null ? [for (_ in 0...count) 0.0] : velocityTolerances;
-    var aTol = accelerationTolerances == null ? [for (_ in 0...count) 0.0] : accelerationTolerances;
-    if (pTol.length != count || vTol.length != count || aTol.length != count)
+    var joints = startPosition.length;
+    var pTol = positionTolerances == null ? [for (_ in 0...joints) 0.0] : positionTolerances;
+    var vTol = velocityTolerances == null ? [for (_ in 0...joints) 0.0] : velocityTolerances;
+    var aTol = accelerationTolerances == null ? [for (_ in 0...joints) 0.0] : accelerationTolerances;
+    if (pTol.length != joints || vTol.length != joints || aTol.length != joints)
       throw "Execution plan tolerance count mismatch";
-    for (joint in 0...count)
+    for (joint in 0...joints)
       if (!Math.isFinite(pTol[joint]) || pTol[joint] < 0.0 ||
           !Math.isFinite(vTol[joint]) || vTol[joint] < 0.0 ||
           !Math.isFinite(aTol[joint]) || aTol[joint] < 0.0)

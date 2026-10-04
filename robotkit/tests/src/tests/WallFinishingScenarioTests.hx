@@ -428,7 +428,11 @@ class WallFinishingScenarioTests {
     // -- replay: re-run the same command stream against a ReplayRobot --
     var replayDescription = new RobotDescription("wall-finishing-robot", "recorded wall-finishing robot",
       linkNames, jointNames);
-    var replayCapabilities = new RobotCapabilities("wall-finishing-robot", jointNames.length, true, true, true, false);
+    var replayCapabilities = new RobotCapabilities("wall-finishing-robot",
+      jointNames.length,
+      [robotkit.world.JointTargetMode.Position, robotkit.world.JointTargetMode.Velocity, robotkit.world.JointTargetMode.Effort],
+      robotkit.world.ExecutionCapabilities.unavailable(),
+      new robotkit.world.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked));
     var replay = new ReplayRobot("wall-finishing-robot", recording, replayDescription, replayCapabilities);
     var replayed = 0;
     for (command in recording.commands) {

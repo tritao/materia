@@ -13,8 +13,6 @@ class RuntimeRobotAdapter implements Robot {
   final robotCapabilities:RobotCapabilities;
   final ownsRuntime:Bool;
   final faultMessage:String;
-  final supportsTrajectoryQueue:Bool;
-  final supportsExecutionPlans:Bool;
   var changeListener:Null < RobotId -> Void > = null;
   var commandSequence:Int = 0;
   var observedSequence:Int64 = Int64.ofInt(-1);
@@ -25,8 +23,7 @@ class RuntimeRobotAdapter implements Robot {
 
   public function new(id:RobotId, runtime:RobotRuntime, name:String,
       links:Array<String>, joints:Array<String>, ?ownsRuntime:Bool = false,
-      ?startRuntime:Bool = false, ?faultMessage:String = "robot runtime fault",
-      ?supportsTrajectoryQueue:Null<Bool> = null) {
+      ?startRuntime:Bool = false, ?faultMessage:String = "robot runtime fault") {
     if (id == null || id.length == 0)
       throw "RuntimeRobotAdapter requires a non-empty logical ID";
     if (runtime == null)
@@ -35,17 +32,8 @@ class RuntimeRobotAdapter implements Robot {
     this.runtime = runtime;
     this.ownsRuntime = ownsRuntime;
     this.faultMessage = faultMessage;
-    var runtimeSupportsTrajectoryQueue = runtime.supportsTrajectoryQueue();
-    var configuredSupportsTrajectoryQueue = supportsTrajectoryQueue == null
-      ? runtimeSupportsTrajectoryQueue : supportsTrajectoryQueue == true;
-    this.supportsTrajectoryQueue = runtimeSupportsTrajectoryQueue &&
-      configuredSupportsTrajectoryQueue;
-    this.supportsExecutionPlans = runtime.supportsExecutionPlans() &&
-      configuredSupportsTrajectoryQueue;
     robotDescription = new RobotDescription(id, name, links, joints, runtime.channels, runtime.couplings);
-    robotCapabilities = new RobotCapabilities(
-      id, joints == null ? 0 : joints.length, true, true, true, false,
-      this.supportsTrajectoryQueue, this.supportsExecutionPlans);
+    robotCapabilities = runtime.capabilities(id);
     if (startRuntime) {
       try runtime.start() catch (error:Dynamic) {
         if (ownsRuntime) runtime.dispose();
@@ -107,13 +95,8 @@ class RuntimeRobotAdapter implements Robot {
         commandSequence++;
         runtime.submitTargets(targets, commandSequence, null,
           expiryNs == null || Int64.compare(expiryNs, Int64.ofInt(0)) == 0 ? null : expiryNs);
-      case TrajectoryChunk(chunk):
-        if (!supportsTrajectoryQueue)
-          throw "Runtime endpoint does not support buffered trajectories";
-        commandSequence++;
-        runtime.submitTrajectory(chunk, commandSequence);
       case ExecutionPlan(plan):
-        if (!supportsExecutionPlans)
+        if (!robotCapabilities.execution.plans)
           throw "Runtime endpoint does not support execution plans";
         commandSequence++;
         runtime.submitPlan(plan, commandSequence);

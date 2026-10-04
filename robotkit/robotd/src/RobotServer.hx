@@ -407,7 +407,7 @@ class RobotServer {
           'invalid Hello payload: $error', false)), 0, null, observerSession));
       return;
     }
-    if (value.protocolVersion != 1) return;
+    if (value.protocolVersion != RobotFrame.VERSION) return;
     try {
       outbound.get(transport.rawValue()).configure(value.subscriptions);
     } catch (_:Dynamic) {
@@ -417,15 +417,13 @@ class RobotServer {
       return;
     }
     sendTo(transport, observerSession, RobotProtocol.welcome(
-      new robotkit.protocol.Welcome(1, "robotd", observerSession,
+      new robotkit.protocol.Welcome(RobotFrame.VERSION, "robotd", observerSession,
         Int64.ofInt(robotId), false, Int64.ofInt(0), 0,
         OutboundPolicy.capabilities()), observerSession));
     sendTo(transport, observerSession, RobotProtocol.description(new RobotDescription(
       Int64.ofInt(robotId), robot.name, [for (link in robot.links) link.name],
       [for (joint in robot.joints) joint.name]), observerSession));
-    sendTo(transport, observerSession, RobotProtocol.capabilities(new RobotCapabilities(
-      Int64.ofInt(robotId), blueprint.jointCount, true, true, true, false,
-      runtime.supportsTrajectoryQueue(), runtime.supportsExecutionPlans()), observerSession));
+    sendTo(transport, observerSession, RobotProtocol.capabilities(robotkit.protocol.CapabilityCodec.encode(runtime.capabilities("robotd"), Int64.ofInt(robotId)), observerSession));
     observerHello.set(transport.rawValue(), true);
     var latest = runtime.snapshot().withRobotId(Int64.ofInt(robotId));
     sendStateTo(transport, observerSession, latest);
@@ -436,7 +434,7 @@ class RobotServer {
       sendFault(409, "session already established", false);
       return;
     }
-    if (value.protocolVersion != 1) {
+    if (value.protocolVersion != RobotFrame.VERSION) {
       sendFault(426, "unsupported RobotKit protocol version", true);
       return;
     }
@@ -453,7 +451,7 @@ class RobotServer {
       controlOwner = RemoteController(sessionId);
       lastLeaseRenewalNs = NativeKit.nk_time_now_ns();
     }
-    send(RobotProtocol.welcome(new robotkit.protocol.Welcome(1, "robotd",
+    send(RobotProtocol.welcome(new robotkit.protocol.Welcome(RobotFrame.VERSION, "robotd",
       sessionId, Int64.ofInt(robotId), controllerGranted,
       controllerGranted ? sessionId : Int64.ofInt(0),
       controllerGranted ? CONTROL_LEASE_TIMEOUT_MS : 0,
@@ -461,9 +459,7 @@ class RobotServer {
     send(RobotProtocol.description(new RobotDescription(Int64.ofInt(robotId),
       robot.name, [for (link in robot.links) link.name],
       [for (joint in robot.joints) joint.name]), sessionId));
-    send(RobotProtocol.capabilities(new RobotCapabilities(Int64.ofInt(robotId),
-      blueprint.jointCount, true, true, true, false,
-      runtime.supportsTrajectoryQueue(), runtime.supportsExecutionPlans()), sessionId));
+    send(RobotProtocol.capabilities(robotkit.protocol.CapabilityCodec.encode(runtime.capabilities("robotd"), Int64.ofInt(robotId)), sessionId));
     helloComplete = true;
     publishSnapshot(true);
     if (!controllerGranted)
@@ -569,7 +565,7 @@ class RobotServer {
       sendFault(400, "invalid plan session, robot, or sequence", false);
       return;
     }
-    if (!runtime.supportsExecutionPlans()) {
+    if (!runtime.capabilities("robotd").execution.plans) {
       sendFault(422, "runtime does not support execution plans", false);
       return;
     }

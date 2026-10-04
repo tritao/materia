@@ -827,7 +827,7 @@ only metadata. `RobotRecordingEvent.Channel(...)` permits extensions without
 editing the core event enum. Typed core cases remain useful to behavior and
 replay code and are converted through the same channel registry.
 
-Recording format v6 defaults to LZ4 chunk compression and also supports no
+Recording format v7 defaults to LZ4 chunk compression and also supports no
 compression. MCAP log time stores the independent wall-clock recording time;
 publish time stores the full-width arrival ordinal used for deterministic
 replay. The incremental reader rejects older versions and can skip unknown

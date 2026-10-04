@@ -130,8 +130,11 @@ class StreamTests extends MotionKitTestSupport {
     var description = new RobotDescription("plan-replay", blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name]);
-    var capabilities = new RobotCapabilities("plan-replay", blueprint.model.joints.length,
-      true, false, false, false, true, true);
+    var capabilities = new RobotCapabilities("plan-replay",
+      blueprint.model.joints.length,
+      [robotkit.world.JointTargetMode.Position],
+      new robotkit.world.ExecutionCapabilities(true, 5, 64, 4096, true, true, true, trajectorykit.validation.ValidationGuarantee.Unchecked),
+      new robotkit.world.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked));
     var unsupported = new ReplayRobot("plan-replay", source, description);
     throws(function() MotionSystem.fromBlueprint(unsupported, blueprint),
       "MotionSystem rejects a robot without queue and plan capabilities");
@@ -166,7 +169,7 @@ class StreamTests extends MotionKitTestSupport {
     var instrumented = new RecordingRobot(robot, recording);
     var machine = MotionSystem.fromBlueprint(instrumented, blueprint);
     var options = new MotionOptions(0.05, 0.2);
-    check(machine.robot.capabilities().supportsTrajectoryQueue,
+    check(machine.robot.capabilities().execution.plans,
       "simulation runtime advertises trajectory queue support");
 
     var first = planned(machine.queueAxes([new AxisTarget("x", 0.02)], options));
@@ -179,8 +182,6 @@ class StreamTests extends MotionKitTestSupport {
     near(machine.progress(), 0.0, "buffer starts with zero progress");
     check(recording.commands.length == 1, "buffer submits the first move as one plan");
     switch recording.commands[0] {
-      case TrajectoryChunk(chunk):
-        throw "buffer submitted a legacy point chunk";
       case JointTargets(_, _):
         throw "buffer unexpectedly fell back to sample-by-sample targets";
       case ExecutionPlan(plan):
@@ -317,8 +318,6 @@ class StreamTests extends MotionKitTestSupport {
     check(recording.commands.length >= 3,
       "long trajectory refills native chunks before the queue drains");
     for (command in recording.commands) switch command {
-      case RobotCommand.TrajectoryChunk(chunk):
-        throw "long trajectory submitted a legacy point chunk";
       case RobotCommand.JointTargets(_, _):
         throw "long trajectory unexpectedly fell back to sample-by-sample targets";
       case RobotCommand.ExecutionPlan(plan):

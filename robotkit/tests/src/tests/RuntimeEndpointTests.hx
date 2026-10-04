@@ -25,13 +25,34 @@ class RuntimeEndpointTests {
       throw "RobotRuntime did not use its supplied endpoint for start, submit, observe and stop";
     if (endpoint.sequence != 7 || runtime.contacts().length != 0)
       throw "Endpoint changed command identity or fabricated contacts";
+    var capabilities = runtime.capabilities("test/endpoint");
+    var modes = capabilities.controlModes;
+    modes.resize(0);
+    if (!capabilities.accepts(robotkit.world.JointTargetMode.Servo) ||
+        capabilities.jointCount != 1 || !capabilities.execution.plans ||
+        capabilities.execution.maximumPolynomialDegree != 5 ||
+        capabilities.execution.maximumJoints != 64 || !capabilities.timing.deadlines)
+      throw "Endpoint capabilities lost modes or bounded execution contracts";
+    var encoded = robotkit.protocol.CapabilityCodec.encode(capabilities, haxe.Int64.ofInt(42));
+    var wire:robotkit.protocol.RobotCapabilities = haxeon.wire.MessagePack.decode(
+      haxeon.wire.MessagePack.encode(encoded));
+    var decoded = robotkit.protocol.CapabilityCodec.decode(wire, "test/remote");
+    if (decoded.execution.maximumSegments != 4096 || !decoded.execution.holdResume ||
+        !decoded.execution.timedEvents || !decoded.execution.replacementBoundaries ||
+        !decoded.accepts(robotkit.world.JointTargetMode.Servo))
+      throw "Remote capability round trip lost limits or contracts";
+    encoded.controlModes.push("unknown");
+    var invalidModeRejected = false;
+    try robotkit.protocol.CapabilityCodec.decode(encoded, "test/remote")
+      catch (_:Dynamic) invalidModeRejected = true;
+    if (!invalidModeRejected) throw "Unknown remote control mode was accepted";
     runtime.dispose();
     runtime.dispose();
     if (endpoint.closes != 1) throw "Runtime did not release its endpoint exactly once";
     var rejected = false;
     try runtime.start() catch (_:Dynamic) rejected = true;
     if (!rejected) throw "Disposed runtime accepted a start";
-    return 4;
+    return 7;
   }
 }
 

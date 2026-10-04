@@ -149,12 +149,18 @@ class RobotProtocol {
 
   static function decodeHelloPayload(frame:RobotFrame):Hello {
     expect(frame, RobotMessageType.Hello);
-    return MessagePack.decode(frame.payload);
+    var value:Hello = MessagePack.decode(frame.payload);
+    if (value.protocolVersion != RobotFrame.VERSION)
+      throw new MessagePackError("Unsupported RobotKit protocol version");
+    return value;
   }
 
   static function decodeWelcomePayload(frame:RobotFrame):Welcome {
     expect(frame, RobotMessageType.Welcome);
-    return MessagePack.decode(frame.payload);
+    var value:Welcome = MessagePack.decode(frame.payload);
+    if (value.protocolVersion != RobotFrame.VERSION)
+      throw new MessagePackError("Unsupported RobotKit protocol version");
+    return value;
   }
 
   static function decodeJointTargetPayload(frame:RobotFrame):JointTarget {

@@ -154,14 +154,7 @@ class MobileBase {
       for (target in targets) {
         if (target.joint >= capabilities.jointCount)
           throw 'Drive model targets joint ${target.joint}, but robot has ${capabilities.jointCount} joints';
-        var supported = switch target.mode {
-          case robotkit.world.JointTargetMode.Position: capabilities.supportsPosition;
-          case robotkit.world.JointTargetMode.Velocity: capabilities.supportsVelocity;
-          case robotkit.world.JointTargetMode.Effort: capabilities.supportsEffort;
-          // A servo commands a position and an effort at once.
-          case robotkit.world.JointTargetMode.Servo:
-            capabilities.supportsPosition && capabilities.supportsEffort;
-        };
+        var supported = capabilities.accepts(target.mode);
         if (!supported)
           throw 'Robot does not support ${Std.string(target.mode)} joint targets';
       }
