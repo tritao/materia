@@ -354,6 +354,23 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 config.actuators.push_back(actuator);
             }
         }
+        if (robot_desc->struct_size >= sizeof(*robot_desc)) {
+            if (robot_desc->virtual_device_input_count > 64) return RK_ERROR_INVALID_ARGUMENT;
+            for (std::uint32_t i = 0; i < robot_desc->virtual_device_input_count; ++i) {
+                const auto *id = robot_desc->virtual_device_input_switch_ids + i * 64;
+                const auto *end = std::find(id, id + 64, 0);
+                if (end == id || end == id + 64 ||
+                    robot_desc->virtual_device_input_active_high[i] > 1 ||
+                    robot_desc->virtual_device_input_active_above[i] > 1) return RK_ERROR_INVALID_ARGUMENT;
+                VirtualInputSwitch6 input;
+                input.wiring.actuator = robot_desc->virtual_device_input_actuator[i];
+                input.wiring.active_high = robot_desc->virtual_device_input_active_high[i] != 0;
+                input.wiring.switch_id.assign(reinterpret_cast<const char *>(id), reinterpret_cast<const char *>(end));
+                input.active_above = robot_desc->virtual_device_input_active_above[i] != 0;
+                input.threshold_steps = robot_desc->virtual_device_input_threshold_steps[i];
+                config.inputs.push_back(std::move(input));
+            }
+        }
         virtual_endpoint = VirtualDeviceEndpoint::create(blueprint, config);
         if (!virtual_endpoint) return RK_ERROR_INVALID_ARGUMENT;
 #endif

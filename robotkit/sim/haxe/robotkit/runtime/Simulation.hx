@@ -166,6 +166,23 @@ class Simulation {
         robotDesc.set_virtual_device_target_error(virtualDevice.targetError);
         robotDesc.set_virtual_device_clock_bound_ns(virtualDevice.clockBoundNs);
         robotDesc.set_virtual_device_link_loss_timeout_ns(virtualDevice.linkLossTimeoutNs);
+        if (virtualDevice.inputs.length > 64 || (virtualDevice.inputs.length > 0 && virtualDevice.profile != 1))
+          throw "Physical virtual switches require the full device profile and at most 64 inputs";
+        robotDesc.set_virtual_device_input_count(virtualDevice.inputs.length);
+        var inputIds = new Map<String, Bool>();
+        for (i in 0...virtualDevice.inputs.length) {
+          var input = virtualDevice.inputs[i];
+          if (input.actuator < 0 || input.actuator >= virtualDevice.actuators.length ||
+              input.switchId.length == 0 || input.switchId.length > 63 || inputIds.exists(input.switchId))
+            throw "Virtual input requires a unique switch ID and a wired actuator";
+          inputIds.set(input.switchId, true);
+          robotDesc.set_virtual_device_input_actuator(i, input.actuator);
+          robotDesc.set_virtual_device_input_active_high(i, input.activeHigh ? 1 : 0);
+          robotDesc.set_virtual_device_input_active_above(i, input.activeAbove ? 1 : 0);
+          robotDesc.set_virtual_device_input_threshold_steps(i, input.thresholdSteps);
+          for (byte in 0...input.switchId.length)
+            robotDesc.set_virtual_device_input_switch_ids(i * 64 + byte, input.switchId.charCodeAt(byte));
+        }
         robotDesc.set_virtual_device_actuator_count(virtualDevice.actuators.length);
         for (i in 0...virtualDevice.actuators.length) {
           var actuator = virtualDevice.actuators[i];

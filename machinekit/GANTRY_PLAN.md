@@ -2609,3 +2609,20 @@ and verifies that the final physical position moved beyond the captured edge.
 It is queued for the Phase C gate; no build/test ran here. Haxe simulation input
 options and model-to-threshold mapping remain pending, as do homing-purpose,
 side holds, counter rebasing and squaring transport. G13 is not complete.
+
+### G13 — Haxe virtual input options and model thresholds
+
+VirtualDeviceOptions now carries physical switch inputs. Simulation.addRobot
+passes bounded, unique IDs, actuator channels, polarity, threshold direction and
+64-bit actual-step thresholds through an optional descriptor tail to the native
+virtual endpoint. DeviceBinding.virtualInputs derives each ideal switch threshold
+from its model trip, composed transmission/zero, driver direction and steps per
+unit. It rounds upward for increasing-count closure and downward for decreasing
+closure, never tripping before the declared threshold, and rejects values outside
+exact floating-point integer precision. These ideal virtual switches currently
+have no hysteresis/repeatability model; hardware claims remain absent.
+
+No builds/tests ran. Wiring these options and the device switch adapter into the
+router fixture remains pending, as do homing segment purpose, side holds, counter
+rebasing, bounded squaring control and real board input reads. The simulation
+ABI descriptor and new FFI setters must be verified at the Phase C gate.

@@ -151,6 +151,25 @@ class DeviceBinding {
     return new DeviceBinding(bound, tightened, stepTickHz, inputs);
   }
 
+  /** Ideal physical switches, quantized conservatively to an emitted step boundary. */
+  public function virtualInputs():Array<robotkit.runtime.VirtualInputOptions> {
+    var result:Array<robotkit.runtime.VirtualInputOptions> = [];
+    for (input in inputs) {
+      var matched = [for (contact in model.switches) if (contact.id == input.wiring.switchId) contact];
+      if (matched.length != 1) throw "Virtual input has no unique model switch";
+      var contact = matched[0];
+      var channel = channels[input.actuatorChannel];
+      var raw = channel.ratio * (contact.trip - channel.offset) * channel.stepsPerUnit;
+      if (!Math.isFinite(raw) || Math.abs(raw) > 9007199254740991.0)
+        throw "Virtual switch step threshold exceeds exact integer precision";
+      var above = contact.side * channel.ratio > 0;
+      var quantized = above ? Math.fceil(raw) : Math.ffloor(raw);
+      result.push(new robotkit.runtime.VirtualInputOptions(contact.id, input.actuatorChannel,
+        haxe.Int64.fromFloat(quantized), above, input.wiring.activeHigh));
+    }
+    return result;
+  }
+
   /** The channels as an in-process virtual device's actuators. */
   public function virtualActuators():Array<VirtualActuatorOptions>
     return [for (channel in channels) new VirtualActuatorOptions(channel.actuatorId,

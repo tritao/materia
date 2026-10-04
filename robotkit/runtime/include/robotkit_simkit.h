@@ -241,6 +241,13 @@ typedef struct rk_simulation_robot_desc {
     uint32_t virtual_peripheral_parameter_count;
     uint32_t virtual_external_sensor_mask;
     double virtual_peripheral_parameters[16];
+    /** Optional physical virtual-device switch wiring and step thresholds. */
+    uint32_t virtual_device_input_count;
+    uint8_t virtual_device_input_actuator[64];
+    uint8_t virtual_device_input_active_high[64];
+    uint8_t virtual_device_input_active_above[64];
+    int64_t virtual_device_input_threshold_steps[64];
+    uint8_t virtual_device_input_switch_ids[4096];
 } rk_simulation_robot_desc;
 
 /** Latest numeric device observation, independent of the authored sensor layout. */
