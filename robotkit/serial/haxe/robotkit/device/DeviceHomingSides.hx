@@ -4,13 +4,14 @@ import haxe.Int64;
 import RobotKitRuntime;
 import robotkit.runtime.HomingSideControl;
 import robotkit.runtime.HomingControlReadiness;
+import robotkit.runtime.HomingCancellation;
 import robotkit.runtime.NativeRuntimeEndpoint;
 import robotkit.runtime.RobotRuntime;
 import robotkit.runtime.RobotRuntimeBlueprint;
 import robotkit.runtime.SwitchDriveBinding;
 
 /** One owner serializes acknowledged physical side controls for a wired device. */
-class DeviceHomingSides implements HomingSideControl implements HomingControlReadiness {
+class DeviceHomingSides implements HomingSideControl implements HomingControlReadiness implements HomingCancellation {
   final runtime:RobotRuntime;
   final endpoint:NativeRuntimeEndpoint;
   final channels:Map<String, Int> = new Map();
@@ -93,6 +94,19 @@ class DeviceHomingSides implements HomingSideControl implements HomingControlRea
     if (squaring.length == 0 || ending) return false;
     enqueue(4, channel(squaring[0]), channel(squaring[1]));
     return true;
+  }
+
+  public function cancelSquaring():Void {
+    pending.resize(0);
+    calibrating = null;
+    outstanding = Int64.ofInt(0);
+    ending = false;
+    var group = squaring.copy();
+    squaring = [];
+    held.clear();
+    if (group.length == 0) return;
+    RobotRuntime.check(endpoint.deviceHomingControl(5, sequence, scope,
+      channel(group[0]), channel(group[1]), skewBound), "cancel device homing");
   }
 
   public function endSquaring():Void {

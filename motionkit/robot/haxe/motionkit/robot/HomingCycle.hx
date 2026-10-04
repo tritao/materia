@@ -204,7 +204,13 @@ class HomingCycle {
     else enter(Return, observation);
   }
 
-  function releaseSides():Void { if (sides != null) sides.endSquaring(); }
+  function releaseSides():Void {
+    if (sides == null) return;
+    if (Std.isOfType(sides, robotkit.runtime.HomingCancellation)) {
+      var cancellation:robotkit.runtime.HomingCancellation = cast sides;
+      cancellation.cancelSquaring();
+    } else sides.endSquaring();
+  }
 
   function enter(next:HomingPhase, observation:HomingObservation):Void {
     phase = next; origin = observation.position; elapsed = 0.0;

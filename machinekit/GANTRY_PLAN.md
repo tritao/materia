@@ -2924,3 +2924,19 @@ is nonzero. Ordinary stops remain the fallback outside a pair scope.
 No builds/tests ran. Cancellation/fault cleanup, stop rejection/timeout behavior
 and fresh stationary handoff need phase regression/audit. Router fixture wiring
 and Nucleo support remain pending; G13 is incomplete.
+
+### G13 — immediate terminal homing cancellation
+
+Added optional HomingCancellation so fault/cancel cleanup does not depend on
+further cycle polling. DeviceHomingSides discards unsent side commands and uses
+control action 5 to send the existing immediate emergency-stop frame through the
+native owner. Runtime clears motion/control bookkeeping and pending scoped-stop
+state, records safe process outputs and enters emergency-stop safety. Ordinary
+stop/abort/reset also discard endpoint queued segment/event/timing metadata so
+stopped motion is not pumped again. Pending counter-origin transactions are
+retained because their physical application cannot be assumed undone.
+
+No builds/tests ran. Transport-failure recovery and uncertain-batch/session
+recovery require Phase C coverage. Cancellation requires normal safety recovery
+before new homing; router fixture and Nucleo controls/GPIO remain unfinished.
+G13 is still incomplete.

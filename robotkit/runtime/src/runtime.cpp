@@ -2471,10 +2471,20 @@ rk_result RobotRuntime::device_input(const char *switch_id, rk_device_input_obse
 
 namespace robotkit {
 rk_result RobotRuntime::device_homing_control(const rk_device_homing_control &control) {
-    if (control.struct_size < sizeof(control) || control.action > 4 || !control.sequence || !control.scope)
+    if (control.struct_size < sizeof(control) || control.action > 5 || !control.sequence || !control.scope)
         return RK_ERROR_INVALID_ARGUMENT;
     std::lock_guard owner_lock(owner_mutex_);
     std::lock_guard queue_lock(queue_mutex_);
+    if (control.action == 5) {
+        const auto result = endpoint_ ? endpoint_->device_homing_control(control) : RK_ERROR_BACKEND;
+        std::lock_guard state_lock(state_mutex_);
+        safe_channels(current_owner_time_ns_, RK_EVENT_STOP_SAFE);
+        commands_.clear(); reset_control(); pending_homing_stop_.reset();
+        state_.mode = RK_ROBOT_MODE_FAULT; state_.safety = RK_SAFETY_EMERGENCY_STOP;
+        state_backup_valid_ = false;
+        // A counter batch may already have applied: retain uncertain calibration.
+        return result;
+    }
     if (pending_homing_stop_ || pending_drive_calibration_) return RK_ERROR_INVALID_STATE;
     const auto result = endpoint_ ? endpoint_->device_homing_control(control) : RK_ERROR_BACKEND;
     if (result == RK_OK && control.action == 4) pending_homing_stop_ = control.sequence;

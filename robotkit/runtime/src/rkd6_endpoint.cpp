@@ -762,7 +762,13 @@ rk_result Rkd6Endpoint::apply(const rk_robot_command &command) {
         default: return RK_ERROR_UNSUPPORTED;
     }
     if (!send_record(kind, {})) return RK_ERROR_BACKEND;
-    if (kind >= 10 && kind <= 13 && control_sequence_ && !counter_batch_) control_accepted_ = false;
+    if (kind >= 10 && kind <= 13) {
+        if (control_sequence_ && !counter_batch_) control_accepted_ = false;
+        homing_stop_pending_ = false;
+        pending_.clear(); sent_.clear(); sent_events_.clear();
+        chunk_timings_.clear(); plan_tags_.clear();
+        next_commit_ = 0; committed_until_ticks_ = 0; epoch_set_ = false;
+    }
     return RK_OK;
 }
 
@@ -1147,9 +1153,14 @@ rk_result Rkd6Endpoint::request_homing_side(std::uint64_t sequence, std::uint64_
 
 namespace robotkit {
 rk_result Rkd6Endpoint::device_homing_control(const rk_device_homing_control &control) {
-    if (control.struct_size < sizeof(control) || control.action > 4 ||
+    if (control.struct_size < sizeof(control) || control.action > 5 ||
         !control.sequence || !control.scope || control.first >= ack_.actuator_count)
         return RK_ERROR_INVALID_ARGUMENT;
+    if (control.action == 5) {
+        rk_robot_command stop{};
+        stop.struct_size = sizeof(stop); stop.kind = RK_COMMAND_EMERGENCY_STOP;
+        return apply(stop);
+    }
     if (control.action <= 1 || control.action == 4) {
         if (control.second >= ack_.actuator_count) return RK_ERROR_INVALID_ARGUMENT;
         return request_homing_scope(control.sequence, control.scope, control.action == 4 ? 2 : static_cast<std::uint8_t>(control.action),

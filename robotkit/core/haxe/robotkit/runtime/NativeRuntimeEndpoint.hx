@@ -29,7 +29,7 @@ class NativeRuntimeEndpoint implements RuntimeEndpoint {
   }
   public function deviceHomingControl(action:Int, sequence:Int64, scope:Int64,
       first:Int, second:Int, skewBound:Float):Int {
-    if (action < 0 || action > 4 || first < 0 || first >= 64 || second < 0 || second >= 64)
+    if (action < 0 || action > 5 || first < 0 || first >= 64 || second < 0 || second >= 64)
       throw "Invalid device homing control";
     var control = new rk_device_homing_control();
     control.set_struct_size(rk_device_homing_control.size());

@@ -765,7 +765,7 @@ typedef struct rk_serial_device_desc {
 /** Asynchronous device homing control; acceptance is queried separately. */
 typedef struct rk_device_homing_control {
     uint32_t struct_size RK_STRUCT_SIZE;
-    uint32_t action; /**< 0 begin pair, 1 end scope, 2 hold side, 3 release side, 4 controlled homing stop. */
+    uint32_t action; /**< 0 begin pair, 1 end scope, 2 hold side, 3 release side, 4 controlled homing stop, 5 cancel homing immediately. */
     uint64_t sequence;
     uint64_t scope;
     uint32_t first; /**< Physical actuator index, or the selected side for hold/release. */
