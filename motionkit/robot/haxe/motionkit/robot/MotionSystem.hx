@@ -47,6 +47,7 @@ class MotionSystem {
   public final replacementOwnerPeriodSeconds:Float;
   /** Joint and sampled Cartesian checks for the last planned path. */
   public var lastPathValidationReport(default, null):Null<ValidationReport> = null;
+  var jogTrajectories:haxe.ds.ObjectMap<Trajectory, Bool> = new haxe.ds.ObjectMap();
   var pathJerkUnchecked:haxe.ds.ObjectMap<Trajectory, Bool> = new haxe.ds.ObjectMap();
   public var lastPathPlanningDiagnostics(default, null):Array<String> = [];
   /** Native trajectory currently submitted to the runtime queue. */
@@ -377,8 +378,10 @@ class MotionSystem {
         clearBufferedMotion();
         var axisValue = axis(axisId);
         if (axisValue == null) throw 'Unknown motion axis "$axisId"';
-        beginImmediate(axisPlanner.planJog(robot.snapshot().positions.toArray(),
-          axisValue, velocity, durationSeconds, acceleration).trajectory);
+        var plannedJog = axisPlanner.planJog(robot.snapshot().positions.toArray(),
+          axisValue, velocity, durationSeconds, acceleration).trajectory;
+        jogTrajectories.set(plannedJog, true);
+        beginImmediate(plannedJog);
         session.jogAxis = axisId;
       case Queued(command):
         switch command {
@@ -447,8 +450,10 @@ class MotionSystem {
     if (continued != null) return continued;
     function planJog():Trajectory {
       var start = robot.snapshot().positions.toArray();
-      return axisPlanner.planJog(start, axisValue, velocity,
+      var plannedJog = axisPlanner.planJog(start, axisValue, velocity,
         durationSeconds, acceleration).trajectory;
+      jogTrajectories.set(plannedJog, true);
+      return plannedJog;
     }
     return replaceMotion(planJog(), MotionRequestCapture.jog(axisValue.id,
       velocity, durationSeconds, acceleration));
@@ -501,7 +506,9 @@ class MotionSystem {
   function submitSmoothReplacement(planned:Trajectory, state:TrajectoryState,
       observation:RobotSnapshot, anchorNs:Int64, jogAxis:Null<String>):Trajectory {
     var tag = stream.submitSmoothReplacement(planned, state, observation,
-      anchorNs, modelRevision, calibrationRevision, jointTolerances);
+      anchorNs, modelRevision, calibrationRevision, jointTolerances,
+      jogAxis == null ? robotkit.execution.ExecutionPlanPurpose.Program : robotkit.execution.ExecutionPlanPurpose.Jog);
+    if (jogAxis != null) jogTrajectories.set(planned, true);
     setActive(planned);
     session.jogAxis = jogAxis;
     bufferedTotalSeconds = planned.durationSeconds();
@@ -631,7 +638,8 @@ class MotionSystem {
       stream.fill(session,
         (first, last, tag, startNs, _) -> stream.motionSubmission(
           trajectoryValue, first, last, tag, startNs, modelRevision,
-          calibrationRevision, jerkUnchecked, jointTolerances),
+          calibrationRevision, jerkUnchecked, jointTolerances,
+          jogTrajectories.exists(trajectoryValue) ? robotkit.execution.ExecutionPlanPurpose.Jog : robotkit.execution.ExecutionPlanPurpose.Program),
         (first, last, error) ->
           'plan chunk [$first,$last] of ${trajectoryValue.segments().length}: $error');
     } catch (error:Dynamic) {
@@ -652,6 +660,7 @@ class MotionSystem {
     if (activeTrajectory == null) return;
     bufferedCompletedSeconds += activeTrajectory.durationSeconds();
     pathJerkUnchecked.remove(activeTrajectory);
+    jogTrajectories.remove(activeTrajectory);
     activeTrajectory = null;
     activeStationary = false;
     stream.clear();
@@ -681,6 +690,7 @@ class MotionSystem {
 
   function discardNativeTrajectory(value:Trajectory):Void {
     pathJerkUnchecked.remove(value);
+    jogTrajectories.remove(value);
     value.dispose();
   }
 

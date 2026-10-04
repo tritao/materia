@@ -111,6 +111,10 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 */
 	const RK_ERROR_STALE_STATE = -11;
 	/**
+	 * < Ordinary motion requires an established joint reference.
+	 */
+	const RK_ERROR_UNREFERENCED = -14;
+	/**
 	 * < The endpoint or backend does not support the request.
 	 */
 	const RK_ERROR_UNSUPPORTED = -4;
@@ -171,7 +175,9 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 */
 	const RK_PLAN_CAPABILITY_EVENTS = 2;
 	const RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE = 1;
+	const RK_PLAN_HOMING = 4;
 	const RK_PLAN_JERK_UNCHECKED = 1;
+	const RK_PLAN_JOG = 2;
 	const RK_PROCESS_CHANNEL_ID_BYTES = 48;
 	const RK_PROCESS_COMMAND_BYTES = 48;
 	const RK_RECORDING_CLOSED = 3;
@@ -364,9 +370,21 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 */
 	extern fn rk_robot_runtime_get_channel_value(runtime: rk_robot_runtime, channel: utf8, out_value: ptr<rk_event_value>) -> rk_result;
 	/**
+	 * Mark a stationary joint referenced after the homing controller establishes its coordinate zero.
+	 */
+	extern fn rk_robot_runtime_latch_reference(runtime: rk_robot_runtime, joint: u32) -> rk_result;
+	/**
 	 * Drains process-output changes. An overflow flag means earlier records were lost.
 	 */
 	extern fn rk_robot_runtime_poll_events(runtime: rk_robot_runtime, out_batch: ptr<rk_event_record_batch>) -> rk_result;
+	/**
+	 * Read reference readiness, including all leader dependencies of a coupled follower.
+	 */
+	extern fn rk_robot_runtime_reference_status(runtime: rk_robot_runtime, joint: u32, out_referenced: ptr<u32>) -> rk_result;
+	/**
+	 * Configure whether a stationary joint needs homing; requiring it invalidates its latch.
+	 */
+	extern fn rk_robot_runtime_require_reference(runtime: rk_robot_runtime, joint: u32, required: u32) -> rk_result;
 	/**
 	 * Copies the latest state into the caller-provided value.
 	 *
@@ -544,7 +562,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		 */
 		tag: u64 @offset(56);
 		/**
-		 * < RK_PLAN_JERK_UNCHECKED when jerk validation is unchecked.
+		 * < RK_PLAN_JERK_UNCHECKED and optional exclusive RK_PLAN_JOG/RK_PLAN_HOMING purpose.
 		 */
 		flags: u32 @offset(64);
 		/**

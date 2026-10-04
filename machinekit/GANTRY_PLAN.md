@@ -1391,3 +1391,20 @@ Homing travel into overtravel, native coordinate-zero application and
 limit-switch fault enforcement also remain pending. Thus existing application
 machines do not yet configure this native gate automatically. No build/test
 ran; native admission behavior is unverified at runtime.
+
+
+### G11 — execution purposes and generated bindings
+
+Native admission foundation: `0fb59f54d`. Regenerate runtime FFI bindings from
+its API 25 header using the existing portable ABI source generator. Add
+immutable Program/Jog/Homing purpose metadata to ExecutionPlanSubmission,
+preserve it in copies and array factories, and reject process events on jog
+or homing submissions. RobotRuntime maps purpose to the native plan flags.
+MotionSystem tags initial, deferred and smoothly replaced jog trajectories;
+TrajectoryStream carries the tag through every submitted chunk. Ordinary
+programs retain Program as the default. Purpose belongs to each trajectory,
+so a later ordinary move cannot inherit the jog admission category.
+
+This is source integration only. No tests or project builds ran. Runtime
+reference configuration, calibration, homing-driver execution, overtravel and
+limit enforcement remain pending; G11 remains in progress.

@@ -7,6 +7,7 @@ import motionkit.trajectory.TrajectoryState;
 import robotkit.runtime.RobotRuntimeError;
 import RobotKitRuntime;
 import robotkit.execution.ExecutionPlanSubmission;
+import robotkit.execution.ExecutionPlanPurpose;
 import robotkit.core.Robot;
 import robotkit.core.RobotCommand;
 import robotkit.core.RobotSnapshot;
@@ -221,7 +222,8 @@ class TrajectoryStream {
 
   public function motionSubmission(trajectory:Trajectory, first:Int, last:Int, tag:Int64,
       startNs:Int64, modelRevision:Int64, calibrationRevision:Int64,
-      jerkUnchecked:Bool, jointTolerances:Array<Float>):ExecutionPlanSubmission {
+      jerkUnchecked:Bool, jointTolerances:Array<Float>,
+      ?purpose:ExecutionPlanPurpose = Program):ExecutionPlanSubmission {
     checkMotion(trajectory);
     var startSeconds = Int64.toFloat(startNs) * 1e-9;
     var payload:Array<TrajectorySegment> = [];
@@ -259,7 +261,7 @@ class TrajectoryStream {
     return new ExecutionPlanSubmission(tag, modelRevision, calibrationRevision, 1,
       state.positions, velocity, acceleration, payload, null, null,
       jointTolerances, jointTolerances,
-      accelerationTolerance, last == segments.count(), null, jerkUnchecked, null, trajectory.controlAcceleration);
+      accelerationTolerance, last == segments.count(), null, jerkUnchecked, null, trajectory.controlAcceleration, purpose);
   }
 
   /**
@@ -359,7 +361,8 @@ class TrajectoryStream {
 
   public function submitSmoothReplacement(planned:Trajectory, state:TrajectoryState,
       observation:RobotSnapshot, anchorNs:Int64, modelRevision:Int64,
-      calibrationRevision:Int64, jointTolerances:Array<Float>):Int64 {
+      calibrationRevision:Int64, jointTolerances:Array<Float>,
+      ?purpose:ExecutionPlanPurpose = Program):Int64 {
     checkMotion(planned);
     var tag = nextMotionTag;
     var payload = [for (segment in planned.segments())
@@ -368,7 +371,7 @@ class TrajectoryStream {
     robot.submit(RobotCommand.ExecutionPlan(new ExecutionPlanSubmission(tag,
       modelRevision, calibrationRevision, 1, state.positions, state.velocities,
       state.accelerations, payload, observation.activePlanId, anchorNs,
-      jointTolerances, jointTolerances, jointTolerances, true, null, false, null, planned.controlAcceleration)));
+      jointTolerances, jointTolerances, jointTolerances, true, null, false, null, planned.controlAcceleration, purpose)));
     nextMotionTag = Int64.add(nextMotionTag, Int64.ofInt(1));
     return tag;
   }

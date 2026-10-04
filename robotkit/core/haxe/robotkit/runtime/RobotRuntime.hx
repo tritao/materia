@@ -221,7 +221,13 @@ class RobotRuntime {
     header.set_calibration_revision(plan.calibrationRevision);
     header.set_required_capabilities(plan.requiredCapabilities);
     header.set_ends_at_rest(plan.endsAtRest ? 1 : 0);
-    header.set_flags(plan.jerkUnchecked ? RobotKitRuntimeConstants.RK_PLAN_JERK_UNCHECKED : 0);
+    var flags = plan.jerkUnchecked ? RobotKitRuntimeConstants.RK_PLAN_JERK_UNCHECKED : 0;
+    flags |= switch plan.purpose {
+      case Program: 0;
+      case Jog: RobotKitRuntimeConstants.RK_PLAN_JOG;
+      case Homing: RobotKitRuntimeConstants.RK_PLAN_HOMING;
+    };
+    header.set_flags(flags);
     header.set_replace_after_plan_id(plan.replaceAfterPlanId);
     header.set_replace_after_time_ns(plan.replaceAfterTimeNs);
     var positions = plan.startPosition.toArray(), velocities = plan.startVelocity.toArray(),
