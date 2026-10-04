@@ -607,6 +607,15 @@ W5 design note while waiting for R3/R4 (2026-10-04; implementation has not start
   Earlier station geometry must participate in both grounded-work sensing and clearance before later passes ignite.
 
 W5 implementation notes (in progress, 2026-10-04):
+- Runtime grounded work now accepts changing geometry providers. `WeldBeadWork` derives a convex triangular
+  prism per deposited station from its measured leg and CAD face directions; empty stations contribute no metal.
+  Queries use the live workpiece frame, cache unchanged prisms, and reject stations outside the query's seam
+  interval before expensive hull work. The same local vertices are exposed for subsequent clearance integration.
+  `WeldBeads` registers its deposited geometry with the simulated welder, so distance, ray and touch see earlier
+  metal without changing RobotKit. Focused ProcessKit bead-work checks pass 12 assertions, including a later
+  strike with only the root bead as grounded work, touch before ignition, moved/rotated frames, and reset clearing
+  cached metal. App compile passes 1,759 sources / 16,112 functions. Later-pass clearance integration and the
+  7 mm / 10 mm app gates remain open; this does not yet prove multi-pass execution quality.
 - Scene artifact version 16 replaces the weld's root process with a required non-empty `passes` list over its
   shared CAD `path`. Pass offsets are two nonnegative distances in metres along the CAD face normals; spatial
   weave frequency is cycles/metre. Validation checks pass bounds, process/feeder limits, patterns and edge dwells

@@ -30,6 +30,7 @@ class ProcessKitTests {
     ProcessRateScheduleTests.run();
     WeldWeaveTests.run();
     WeldPassesTests.run();
+    WeldBeadWorkTests.run();
     Sys.println('ProcessKit tests passed ($assertions assertions)');
   }
 

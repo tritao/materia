@@ -43,7 +43,7 @@ class SimulatedWelder implements SimulationStepObserver {
   /** The supply is on and healthy; clear it to model a dropout of the mains or the gas. */
   public var supplyReady:Bool = true;
 
-  final work:WeldWork;
+  final work:processkit.tool.GroundedWork;
   final tipPosition:Array<Float>;
   final wireDirection:Array<Float>;
   var sequence:Int = 0;
@@ -63,7 +63,7 @@ class SimulatedWelder implements SimulationStepObserver {
     this.runtime = runtime;
     this.robotIndex = robotIndex;
     this.linkIndex = linkIndex;
-    this.work = work;
+    this.work = new processkit.tool.GroundedWork().addWork(work);
     this.tipPosition = tipPosition.copy();
     this.wireDirection = [for (axis in wireDirection) axis / length];
     this.arcChannel = arcChannel;
@@ -75,6 +75,9 @@ class SimulatedWelder implements SimulationStepObserver {
 
   /** The latest reading. */
   public function reading():WeldReading return model.reading;
+
+  /** Metal deposited on a grounded workpiece extends its electrical contact geometry. */
+  public function addWork(work:WeldWork):Void this.work.addWork(work);
 
   /** Where the wire tip is now, in the world frame, in metres. */
   public function tip():Array<Float> {

@@ -111,7 +111,10 @@ class WeldBeads implements SessionMember {
         if (named.length != 1) throw 'The weld frame "${weld.frame}" is not part of the simulated assembly';
         frame = named[0];
       }
-      paths.push({step: index, path: path, frame: frame});
+      var entry = {step: index, path: path, frame: frame};
+      paths.push(entry);
+      for (bead in path.beads)
+        welder.addWork(new processkit.tool.WeldBeadWork(bead, () -> frameOf(entry)));
       for (number in 0...path.beads.length) {
         var bead = path.beads[number];
         var chunks = Std.int(Math.ceil(bead.count / CHUNK));
