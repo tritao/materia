@@ -613,13 +613,14 @@ W5 implementation notes (in progress, 2026-10-04):
   saved-data check confirms both dwell values survive the codec. A focused sequencer regression fails with the
   direct-switch implementation; storing the returned status in a local before switching fixes it. On both backends,
   the focused app now observes fourteen ticks per dwell and restores ordinary/recovery times to 20.6/21.1 s,
-  preserving one restart, 3 mm overlap, a 5.4 mm peak and no gap. The initial full W5 gate passed all geometry,
-  grounding and fault checks; the corrected dispatcher requires the affected milestone gate to run again.
-- Focused app quality checks now pass on both MuJoCo and the test backend. Woven 7 mm: 6.998 mm measured leg,
-  one strike, 27.03 s. Three-pass 10 mm: 9.999 mm leg, three strikes, 65.13 s. The later-pass strike checks verify
+  preserving one restart, 3 mm overlap, a 5.4 mm peak and no gap. The corrected full W5 app gate passes on both
+  backends: all 10 seams in 106.5 s, legs 4.9–5.1 mm, exact bead lengths and no clearance violations. The in-air
+  failure, crater dropout, displaced workpiece and post-chain checks also pass with the W4 baseline behavior.
+- The full app quality checks pass on both MuJoCo and the test backend. Woven 7 mm: 6.998 mm measured leg,
+  one strike, 27.17 s. Three-pass 10 mm: 9.999 mm leg, three strikes, 65.55 s. The later-pass strike checks verify
   preceding bead deposition, a tip within 0.6 mm of that bead's surface, and available deposited clearance hulls.
   The complete entry/weld/exit is checked clear, sampled every five simulation ticks; both beads cover the seam
-  without gaps and end with the arc off. These focused results precede the final W5 milestone gates.
+  without gaps and end with the arc off. MachineKit smoke and the shared arm/mobile app gates remain pending.
 - `WeldPassPath` intersects adjacent offset lines at CAD chain corners rather than leaving gaps between shifted
   segments. A closed chain includes its final join. Zero offsets preserve the exact original path object;
   skew/parallel joins that cannot meet and offsets consuming more than 45% of an adjacent side are rejected.
