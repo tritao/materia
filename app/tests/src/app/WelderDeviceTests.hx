@@ -23,7 +23,14 @@ class WelderDeviceTests {
   public static function main():Void run(FileSystem.fullPath("."));
   public static function run(root:String):Void {
     var selected = Sys.getEnv("WELDER_DEVICE_ONLY");
-    if (selected != "modbus") runMission(root, true, null);
+    var onlyShutdown = Sys.getEnv("WELDER_DEVICE_SHUTDOWN_ONLY");
+    if (selected != "modbus") {
+      var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-welder/materia.seam.project.json");
+      var generated = MateriaProjectRunner.loadProject(manifest);
+      if (onlyShutdown == null) runMission(root, true, null, generated);
+      for (mode in ["stop", "abort", "estop", "pause", "fault", "link"])
+        if (onlyShutdown == null || onlyShutdown == mode) runMission(root, true, null, generated, mode);
+    }
     if (selected != "rkd6") runModbus(root);
 
   }
@@ -55,20 +62,27 @@ class WelderDeviceTests {
     var supply = new ModbusWelder(client, map);
     var hardware = new FakeModbusOwner(server, clock);
     var owner = new WelderDeviceOwner(supply, clock);
+    var failure:Null<String> = null;
+    try {
     var readyUntil = clock() + 3.0;
     while (!owner.ready() && clock() < readyUntil) Sys.sleep(0.001);
     if (!owner.ready()) throw 'CAD mission Modbus source did not initialize: ${owner.faultDetail()}';
     owner.reset();
-    var failure:Null<String> = null;
-    try {
-    runMission(root, false, function(welder:processkit.simulation.SimulatedWelder):processkit.simulation.SimulationWelderSupply {
+    var factory = function(welder:processkit.simulation.SimulatedWelder):processkit.simulation.SimulationWelderSupply {
       return new ModbusWelderSupply(owner, welder.runtime,
         {arc:welder.arcChannel, wireSpeed:welder.wireSpeedChannel, voltage:welder.voltageChannel}, welder.sensorId,
         clock, hardware.grounded);
-    }, generated);
+    };
+    runMission(root, false, factory, generated);
     deadline = clock() + 2.0;
     while (hardware.arc() && clock() < deadline) Sys.sleep(0.001);
     if (hardware.arc() || hardware.wire() != 0.0) throw "Finished CAD mission left the Modbus source on";
+    for (mode in ["stop", "abort", "estop", "pause", "fault", "link"]) {
+      owner.reset();
+      runMission(root, false, factory, generated, mode, hardware);
+      hardware.supplyFault(false);
+      Sys.sleep(0.2);
+    }
     } catch (error:Dynamic) failure = Std.string(error);
     owner.close(); hardware.close(); subscription.dispose(); listener.close(); native.dispose();
     if (failure != null) throw failure;
@@ -76,7 +90,7 @@ class WelderDeviceTests {
 
   static function runMission(root:String, virtualDevice:Bool,
       factory:Null<processkit.simulation.SimulatedWelder -> processkit.simulation.SimulationWelderSupply>,
-      ?prepared:GeneratedAssemblyScene):Void {
+      ?prepared:GeneratedAssemblyScene, ?shutdown:String, ?hardware:FakeModbusOwner):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-welder/materia.seam.project.json");
     var generated = prepared == null ? MateriaProjectRunner.loadProject(manifest) : prepared;
     var session = new ProjectDocumentSession(null, false);
@@ -85,6 +99,8 @@ class WelderDeviceTests {
     simulation.virtualWelder = virtualDevice;
     simulation.welderSupplyFactory = factory;
     simulation.setBackend(ApplicationSimulation.MUJOCO);
+    var failure:Null<String> = null;
+    try {
     if (!simulation.rebuild(session.sensors, session.scene, session)) throw "Virtual welding cell failed: " + simulation.error;
     var mission = simulation.missionPlayer(), welder = simulation.welder(), beads = simulation.weldBeads();
     if (mission == null || welder == null || beads == null) throw "Missing virtual welding mission";
@@ -97,7 +113,37 @@ class WelderDeviceTests {
         while (clock() < until) Sys.sleep(0.001);
       }
       simulation.step();
-      if (mission.failure != null) throw 'RKD6 mission failed at ${active.simulationTime()}: ${mission.failure}';
+      if (shutdown != null && welder.reading().arc) {
+        switch shutdown {
+          case "stop": welder.runtime.submitStop(1000000000, false);
+          case "abort": mission.beforeReset();
+          case "estop": welder.runtime.submitStop(1000000000, true);
+          case "pause": simulation.stop();
+          case "fault":
+            if (hardware == null) welder.supplyReady = false; else hardware.supplyFault(true);
+          case "link":
+            if (hardware == null) welder.simulation.cutVirtualDeviceLink(welder.robotIndex, true); else hardware.drop();
+          case _: throw "Unknown shutdown test";
+        }
+        // Observe shutdown without feeding another mission command or permitting a restart.
+        for (_ in 0...200) {
+          if (!virtualDevice) Sys.sleep(simulation.timestep);
+          active.step();
+        }
+        var reading = welder.reading();
+        if (reading.arc || (hardware != null && (hardware.arc() || hardware.wire() != 0.0)))
+          throw 'Welding $shutdown left source feedback on: arc=${reading.arc}, current=${reading.currentA}, fault=${reading.fault}, runtimeFault=${welder.runtime.snapshot().faultCode}';
+        if (virtualDevice) {
+          var sensor = welder.simulation.virtualDeviceSensor(welder.robotIndex, 0);
+          if (sensor.get_values(0) != 0 || sensor.get_values(1) != 0)
+            throw 'RKD6 $shutdown left device welding feedback on';
+        }
+        if ((shutdown == "fault" || shutdown == "link") && reading.fault == 0 && welder.runtime.snapshot().faultCode == 0)
+          throw 'Welding $shutdown did not report a process fault';
+        Sys.println('${virtualDevice ? "RKD6" : "Modbus"} CAD mission $shutdown: arc and wire off');
+        simulation.clear(); session.dispose(); return;
+      }
+      if (mission.failure != null) throw '${virtualDevice ? "RKD6" : "Modbus"} mission failed at ${active.simulationTime()}: ${mission.failure}';
     }
     if (!mission.finished) throw "RKD6 welding mission timed out";
     var bead = beads.beadOf(0).beads[0];
@@ -107,6 +153,8 @@ class WelderDeviceTests {
     // The program turns its channels off; TCP feedback can still be awaiting its acknowledged off write.
     if (welder.wireSpeed() != 0.0 || (virtualDevice && welder.reading().arc)) throw "Mission left welding outputs on";
     Sys.println('${virtualDevice ? "RKD6" : "Modbus"} CAD mission passed: ${active.simulationTime()} s, leg ${leg * 1000} mm, bead ${bead.extent() * 1000} mm, no gap');
+    } catch (error:Dynamic) failure = Std.string(error);
     simulation.clear(); session.dispose();
+    if (failure != null) throw failure;
   }
 }
