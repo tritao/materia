@@ -14,8 +14,9 @@ enum ComponentCapability {
 	VacuumPressureSensor(vacuumPort:String, signalPort:String);
 	ChangerLock(inletPort:String);
 	/** An arc torch: `tcpConnector` is the wire tip at nominal stickout with +Z along the wire out of
-	 * the torch, and `controlPort` is the signal inlet that starts and stops the arc. */
-	ArcTorch(tcpConnector:String, controlPort:String);
+	 * the torch, and `controlPort` is the signal inlet that starts and stops the arc. `stickoutMm` is that
+	 * stickout: the wire's extension past the contact tip, which the arc model needs. */
+	ArcTorch(tcpConnector:String, controlPort:String, stickoutMm:Float);
 	/** A welding power source: the processes it runs, its rated current in amperes, how a
 	 * controller drives it, and its efficiency (the fraction of the mains power it delivers to the arc). */
 	WeldingSupply(processes:Array<WeldingProcess>, maxCurrentA:Float, controlInterface:WeldingControlInterface,

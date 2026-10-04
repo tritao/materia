@@ -196,8 +196,6 @@ typedef SceneArtifactMissionStep = {
  * - `process` is how the weld is run (see SceneArtifactWeldProcess); the generator derived it from the leg,
  *   so the leg the weld reaches is a result that the declared one is checked against.
  *
- * A step written before paths existed has `seam`, `joint`, `start`, `stop` and `normals` on the weld itself, for
- * one straight seam; reading it makes that the single segment of a path.
  */
 typedef SceneArtifactWeld = {
 	@:optional var frame:String;
@@ -775,11 +773,8 @@ class SceneArtifact {
 		}
 		var metal:Dynamic = Reflect.field(raw, "metal"), process:Dynamic = Reflect.field(raw, "process"), path:Dynamic = Reflect.field(raw, "path");
 		if (!Std.isOfType(metal, String) || process == null) fail();
-		// A weld written before paths existed carried its one straight seam on itself.
-		var segments:Array<SceneArtifactWeldSegment> = path == null
-			? [segment({kind: "line", seam: Reflect.field(raw, "seam"), joint: Reflect.field(raw, "joint"), start: Reflect.field(raw, "start"),
-				stop: Reflect.field(raw, "stop"), normals: Reflect.field(raw, "normals")})]
-			: Std.isOfType(path, Array) ? [for (item in (cast path:Array<Dynamic>)) segment(item)] : fail();
+		if (!Std.isOfType(path, Array)) fail();
+		var segments:Array<SceneArtifactWeldSegment> = [for (item in (cast path:Array<Dynamic>)) segment(item)];
 		var frame:Dynamic = Reflect.field(raw, "frame");
 		if (frame != null && !Std.isOfType(frame, String)) fail();
 		var weld:SceneArtifactWeld = {metal: metal, path: segments, legSize: number(raw, "legSize"),

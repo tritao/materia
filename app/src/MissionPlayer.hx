@@ -19,6 +19,8 @@ import processkit.skill.WeldPlan;
 import processkit.skill.WeldSeam;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
+import robotkit.manipulation.ArmClearance;
+import robotkit.manipulation.ArmClearance.ClearanceViolation;
 import robotkit.manipulation.Manipulator;
 import robotkit.model.Frame;
 import robotkit.skill.HandlePart;
@@ -147,6 +149,9 @@ class MissionPlayer implements SessionMember {
   var welding:Null<WeldingPlanRunner>;
   final newWelding:Null<Void->WeldingPlanRunner>;
   final weldSensor:Null<String>;
+  /** What welds are planned clear of, and where the arm's joints are among the robot's. */
+  var clearance:Null<ArmClearance> = null;
+  var clearanceJoints:Array<Int> = [];
   /** Where the tool's contact rides: its link and its frame there, in metres. */
   var toolLink:Int = -1;
   var toolTip:Null<AssemblyFrame> = null;
@@ -254,9 +259,43 @@ class MissionPlayer implements SessionMember {
       weldSensor = tool.sensor;
       var arm = toolArm(tool);
       var channels = {arc: tool.channel, wireSpeed: torch.wireSpeedChannel, voltage: torch.voltageChannel};
-      newWelding = () -> WeldingPlanRunner.create(robot.robot, arm, () -> robot.runtime.pollEvents(), channels, ARM_ACCELERATION);
+      // Welds are planned clear of everything the simulation collides with except the weld metal, which is the bead.
+      var metal = [for (step in mission.steps) if (step.kind == "weld") cast(step.weld, SceneArtifactWeld).metal];
+      var planned = weldClearance(arm, tool.contact.occurrence, metal);
+      clearance = planned;
+      newWelding = () -> WeldingPlanRunner.create(robot.robot, arm, () -> robot.runtime.pollEvents(), channels, ARM_ACCELERATION, 3,
+        planned);
       welding = newWelding();
     }
+  }
+
+  /**
+   * The clearance a weld is planned with: the collision hulls the simulation uses, each on its link, the torch's marked as
+   * the tool, and the arm's pose now as the one where neighbouring links touch by design. Welding keeps 3 mm between bodies in air
+   * and 0.5 mm between tool and work at the seam; the arm's installed gearheads have 4.5 mm designed clearance to the next tube. `ignored` are occurrences that
+   * are no obstacle (the weld metal).
+   */
+  function weldClearance(arm:Manipulator, torch:String, ignored:Array<String>):ArmClearance {
+    var links = robot.model.links;
+    // The tool is everything the torch's assembly holds (the plate on the flange, the torch and its neck).
+    var toolPrefix = torch.substr(0, torch.lastIndexOf("/") + 1);
+    var bodies = [for (hull in robot.hulls) if (ignored.indexOf(hull.part) < 0)
+      {name: hull.part, link: links[hull.link].id, vertices: hull.vertices, tool: StringTools.startsWith(hull.part, toolPrefix)}];
+    var positions = robot.robot.snapshot().positions;
+    var indices = [for (target in arm.toJointTargets([for (_ in 0...arm.dofCount()) 0.0])) target.joint];
+    clearanceJoints = indices;
+    return new ArmClearance(arm, bodies, [for (index in indices) positions.get(index)], processkit.WeldPathPlanner.AIR_MARGIN);
+  }
+
+  /**
+   * The first pair of bodies closer than a weld is planned to keep them with the arm where it is now, or null (also when
+   * the mission does not weld). With `contact` the torch is where it works, and may come as close as the contact margin.
+   */
+  public function clearanceViolation(contact:Bool):Null<ClearanceViolation> {
+    var checked = clearance;
+    if (checked == null) return null;
+    var positions = robot.robot.snapshot().positions;
+    return checked.violation([for (index in clearanceJoints) positions.get(index)], contact);
   }
 
   /** The arm that works the tool: its tool frame is the tool's contact connector, on the link that carries it. */
@@ -362,6 +401,15 @@ class MissionPlayer implements SessionMember {
     return stepIndex;
   }
 
+  /** The last weld planned: how long it took, and how the torch comes in. */
+  public function planReport():String {
+    if (welding == null) return "";
+    var active = cast(welding, WeldingPlanRunner);
+    var plan = active.lastPlan();
+    if (plan == null) return "";
+    return '${Math.round(active.planningSeconds * 100) / 100} s, ${plan.checked} poses, rolls ${[for (roll in plan.rolls) Math.round(roll * 180 / Math.PI)].join("/")} deg, in ${plan.entry.name}, out ${plan.exitName}';
+  }
+
   /** How many times the arc was lost and the weld restarted, in the weld running or last run. */
   public function weldRestarts():Int {
     var active = welding;
@@ -423,7 +471,12 @@ class MissionPlayer implements SessionMember {
       return frame.compose(new Transform3(new Vec3(torch.position[0], torch.position[1], torch.position[2]),
         new Quat(torch.rotation[0], torch.rotation[1], torch.rotation[2], torch.rotation[3])));
     var process = weld.process;
-    return new WeldPlan([for (segment in weld.path) new WeldSegment(pose(segment.start), pose(segment.stop))],
+    // The open side of a corner is the bisector of its two faces' outward normals.
+    function open(segment:materia.project.SceneArtifact.SceneArtifactWeldSegment):Vec3 {
+      var a = segment.normals[0], b = segment.normals[1];
+      return frame.rotation.rotate(new Vec3(a[0] + b[0], a[1] + b[1], a[2] + b[2]).normalized());
+    }
+    return new WeldPlan([for (segment in weld.path) new WeldSegment(pose(segment.start), pose(segment.stop), segment.seam, open(segment))],
       {wireSpeed: process.wireSpeed, voltage: process.voltage, travelSpeed: process.travelSpeed, approach: process.approach,
         startDwell: process.startDwell, craterDwell: process.craterDwell, burnback: process.burnback});
   }

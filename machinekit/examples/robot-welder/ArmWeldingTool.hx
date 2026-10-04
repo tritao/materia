@@ -3,6 +3,8 @@ import machinekit.robotics.EndEffector;
 import machinekit.robotics.EndEffectorPlate;
 import machinekit.robotics.RobotFlange;
 import machinekit.welding.WeldingTorch;
+import machinekit.welding.WeldingTorchNeck;
+import machinekit.welding.WeldingTorchNozzle;
 
 /** Welding tool for the arm's ISO 9409-1 style tool flange: an adapter plate and a MIG torch
  * with a breakaway mount. Its `tcp` working frame is the wire tip at nominal stickout, +Z along
@@ -26,8 +28,12 @@ class ArmWeldingTool implements ArmTool {
 		var result = new EndEffector();
 		result.addComponent("plate", new EndEffectorPlate(flange));
 		result.addComponent("torch", new WeldingTorch(bendDegrees));
+		result.addComponent("neck", new WeldingTorchNeck(bendDegrees));
+		result.addComponent("nozzle", new WeldingTorchNozzle(bendDegrees));
 		result.mount("plate", "robot");
 		result.addMate("torch-mate", "fixed", "plate", "tool", "torch", "robot");
+		result.addMate("neck-mate", "fixed", "torch", "neck", "neck", "base");
+		result.addMate("nozzle-mate", "fixed", "neck", "nozzle", "nozzle", "base");
 		for (inlet in INLETS) result.exposePort(inlet.tool, "torch", inlet.tool);
 		result.workingFrame("tcp", "torch", "tcp", true);
 		return result;

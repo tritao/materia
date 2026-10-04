@@ -13,7 +13,6 @@ import materia.project.SceneArtifact.SceneArtifactRobotTool;
 import machinekit.robotics.EndEffector;
 import machinekit.robotics.EndEffectorControls;
 import machinekit.welding.WeldingEquipment.WeldingEquipmentData;
-import machinekit.welding.WeldingTorch;
 import materia.units.LengthUnit;
 
 /**
@@ -85,7 +84,7 @@ class AssemblyPreview {
 			sensor: arc.sensor,
 			torch: {wireSpeedChannel: arc.wireSpeedChannel, voltageChannel: arc.voltageChannel,
 				groundedWork: welding.groundedWork.copy(), maxCurrentA: welding.maxCurrentA, efficiency: welding.efficiency,
-				wireDiameterMm: welding.wireDiameterMm, stickoutMm: WeldingTorch.STICKOUT,
+				wireDiameterMm: welding.wireDiameterMm, stickoutMm: arc.stickoutMm,
 				maxWireSpeedMPerMin: welding.maxWireSpeedMPerMin, depositionEfficiency: welding.depositionEfficiency}
 		}];
 	}

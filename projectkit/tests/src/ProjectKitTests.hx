@@ -336,14 +336,12 @@ class ProjectKitTests {
     var chained:materia.project.SceneArtifact.SceneArtifactWeld = cast chainBack.steps[0].weld;
     check(chained.path.length == 2 && chained.path[1].normals[1][0] == -1.0 && chained.path[1].stop.position[1] == 0.06,
       "a chained weld keeps its segments");
-    // A weld written before paths existed carries its one seam on itself, in the assembly frame: it reads as one segment.
+    // A weld without a path is rejected.
     var legacy = haxe.Json.parse('{"seam":"plate:f3|upright:f7","joint":"fillet","metal":"plate","start":{"position":[0,0,0.01],"rotation":[0.96593,0,0,-0.25882]},' +
       '"stop":{"position":[0.18,0,0.01],"rotation":[0.96593,0,0,-0.25882]},"normals":[[0,0,1],[0,-1,0]],"legSize":0.005,' +
       '"process":{"wireSpeed":8,"voltage":24,"travelSpeed":0.01,"approach":0.05,"startDwell":0.2,"craterDwell":0.3,"burnback":0.1}}');
-    var migrated:materia.project.SceneArtifact.SceneArtifactMission = @:privateAccess SceneArtifact.decodeMission({steps: [{kind: "weld", weld: legacy}]});
-    var old:materia.project.SceneArtifact.SceneArtifactWeld = cast migrated.steps[0].weld;
-    check(old.path.length == 1 && old.path[0].seam == "plate:f3|upright:f7" && old.path[0].stop.position[0] == 0.18 && old.frame == null,
-      "an older weld step becomes a path of one segment in the assembly frame");
+    rejects(function() { @:privateAccess SceneArtifact.decodeMission({steps: [{kind: "weld", weld: legacy}]}); },
+      "a weld without a path");
     function first(w:materia.project.SceneArtifact.SceneArtifactWeld):materia.project.SceneArtifact.SceneArtifactWeldSegment return w.path[0];
     function bad(change:materia.project.SceneArtifact.SceneArtifactWeld -> Void, message:String):Void {
       var weld = seam();
