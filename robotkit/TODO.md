@@ -5,10 +5,9 @@
 - Add `robotkit/tools/recording/foxglove-export` when Foxglove export is needed; the user explicitly said "you can ignore the foxstudio toolf or nwo" during Phase 3 of this session.
 - Support ONNX exports with dynamically sized output tensors.
 - Add a TCP observer test that measures subscription delivery rate under frame timing jitter.
-- Separate inference and policy native dependencies from consumers that do not use them.
 - Expand detector unit coverage for decode, NMS, exact drop accounting, and non-default
   camera aspect ratios through the Haxe entry point.
-- Consider a second TCP connection for bulk data; UDP, QUIC, and HTTP model distribution, health, and recording download remain outside RKF1.
+- UDP, QUIC, and HTTP model distribution, health, and recording download remain outside RKF1.
 - Estimate cross-process clock offsets when a bounded mapping can be measured.
 - Export a nanosecond-valued RKD6 mapping snapshot; test skew uncertainty and
   expiry policies against measured device drift.
@@ -41,8 +40,6 @@
   through it (finding 6 of the H4 log in the plan).
 - ONNX Runtime pins for linux-aarch64, macOS arm64 and Windows x64 are
   unverified; add CI or a machine that builds them.
-- `RuntimeRobotAdapter.sensors()` returns the frames of the last `snapshot()`.
-  Either document it on `Robot.sensors()` or refresh it.
 
 ## Grippers
 

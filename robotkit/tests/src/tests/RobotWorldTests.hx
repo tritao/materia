@@ -190,6 +190,8 @@ class RobotWorldTests {
 
 
   public static function main():Void {
+    assertions += SensorStreamTests.run();
+    assertions += RobotAuthorizationTests.run();
     if (Sys.getEnv("ROBOTKIT_REGENERATE_FIXTURES") == "1") {
       var root = Sys.getCwd();
       if (!sys.FileSystem.exists(root + "/robotkit/tests/fixtures")) root += "/../..";
@@ -393,10 +395,9 @@ class RobotWorldTests {
     equal(recording.commands.length, originalCommandCount, "replay leaves historical commands unchanged");
     equal(replay.generatedCommands.commands.length, 1, "replay captures generated commands separately");
 
-    check(replay.advance(), "replay advances to selected sensor event");
-    equal(replay.sensors().length, 1, "replay applies selected sensor event");
-    equal(replay.sensors()[0].sensorId, "imu", "replay excludes another robot sensor");
-    check(replay.advance(), "replay advances to selected fault event");
+    check(replay.advance(), "replay advances to the next control event with intervening stream samples");
+    equal(replay.streams().latestFrames().length, 1, "replay applies selected sensor event");
+    equal(replay.streams().latestFrames()[0].sensorId, "imu", "replay excludes another robot sensor");
     var replayFault:RobotFault = cast replay.fault();
     equal(replayFault.code, 12, "replay applies selected fault event");
     equal(replay.snapshot().faultCode, 12, "fault event updates replay observation");
@@ -2105,7 +2106,7 @@ class RobotWorldTests {
     function observe(tick:Int):PerceptionSnapshot {
       simulationHarness.step(Int64.ofInt(tick));
       var snapshot = robot.snapshot();
-      return framedPerception.observe(snapshot.sensors.toArray());
+      return framedPerception.observe(robot.streams().latestFrames());
     }
     var clear = observe(1);
     equal(clear.obstacles().length, 0, "simulated LiDAR reports a clear path initially");
@@ -2563,7 +2564,7 @@ class RobotWorldTests {
       return plant.step(Int64.ofInt(tick));
     function perceive(snapshot:RobotSnapshot):PerceptionSnapshot {
       lastPerception = framedPerception.observeRobotSnapshot(snapshot, model,
-        blueprint, baseLink.id);
+        blueprint, baseLink.id, robot.streams().latestFrames());
       return lastPerception;
     }
     function observe(tick:Int):PerceptionSnapshot return perceive(robotObservation(tick));
@@ -3207,7 +3208,7 @@ class RobotWorldTests {
     var framedLidar = framed.observeRobotSnapshot(new RobotSnapshot("framed-lidar",
       Int64.ofInt(9), Int64.ofInt(140), [0.75], [0.0], [0.0], 1, 0,
       Int64.ofInt(150), [framedSensor], "robot-boot", "host-clock"),
-      perceptionModel, articulatedBlueprint, "base");
+      perceptionModel, articulatedBlueprint, "base", [framedSensor]);
     var framedObstacle = framedLidar.obstacles()[0];
     check(framedObstacle.detection.frameId == "map" &&
       Math.abs(framedObstacle.detection.pose.x - 4.0) < 1e-9 &&
@@ -3230,11 +3231,11 @@ class RobotWorldTests {
     var mappedSnapshot = new RobotSnapshot("framed-lidar", Int64.ofInt(10), Int64.ofInt(140), [0.75], [0.0], [0.0],
       1, 0, Int64.ofInt(150), [mappedFrame], "robot-boot", "host-clock");
     var unmapped = new FrameAwarePerception(perception, new FixedLocalization(mapEstimate)).observeRobotSnapshot(
-      mappedSnapshot, perceptionModel, articulatedBlueprint, "base");
+      mappedSnapshot, perceptionModel, articulatedBlueprint, "base", [mappedFrame]);
     equal(unmapped.obstacles().length, 2, "without a map both returns are obstacles");
     var mappedPerception = new FrameAwarePerception(perception, new FixedLocalization(mapEstimate), null,
       new LidarMapFilter(knownMap, 0.1, 10.0));
-    var leftOver = mappedPerception.observeRobotSnapshot(mappedSnapshot, perceptionModel, articulatedBlueprint, "base")
+    var leftOver = mappedPerception.observeRobotSnapshot(mappedSnapshot, perceptionModel, articulatedBlueprint, "base", [mappedFrame])
       .obstacles();
     check(leftOver.length == 1 && Math.abs(leftOver[0].detection.pose.x - 7.0) < 1e-9 &&
       Math.abs(leftOver[0].detection.pose.y - 2.2) < 1e-9,
@@ -3635,7 +3636,7 @@ class RobotWorldTests {
     };
     var forks = Forks.fromRobot(simulatedRobot, model, modelProfile);
     simulationHarness.step(Int64.ofInt(1));
-    var configuredScan = sourceRobot.snapshot().sensors;
+    var configuredScan = new robotkit.core.ImmutableSensorArray(sourceRobot.streams().latestFrames());
     check(configuredScan.length == 1 &&
       configuredScan.get(0).sensorId == "sensor/front-lidar" &&
       configuredScan.get(0).frameId == "frame/front-lidar" &&
@@ -4150,6 +4151,7 @@ class RobotWorldTests {
     ], Int64.parseString("9223372036854775003")), "robot-a");
     writer.recordSnapshot(first);
     writer.recordSensor("robot-a", sensor);
+    writer.recordSensor("robot-a", camera);
     writer.recordFault(new RobotFault("robot-b", 42, "recorded fault", false));
     var robots = new Map<RobotId,RobotSnapshot>(); robots.set(first.id,first); robots.set(second.id,second);
     writer.recordWorld(new robotkit.world.WorldSnapshot(7,2,Int64.ofInt(0),robots,Int64.ofInt(50)));
@@ -4165,7 +4167,7 @@ class RobotWorldTests {
       v5Path = Sys.getCwd() + "/fixtures/recording-v5.mcap";
     var v5Error = "";
     try McapRecordingReader.load(v5Path) catch (error:Dynamic) v5Error = Std.string(error);
-    check(v5Error.indexOf("schema version is not 7") >= 0,
+    check(v5Error.indexOf("schema version is not 8") >= 0,
       "Haxe reader rejects a pre-v7 MCAP file");
     var fixtureRoot = v5Path.substr(0, v5Path.lastIndexOf("/") + 1);
     var mismatchPath = fixtureRoot + "recording-schema-mismatch.mcap";
@@ -4184,7 +4186,7 @@ class RobotWorldTests {
     check(foreign.next() == null && foreign.skippedUnknown == 1,
       "file-level v7 metadata permits a foreign MCAP channel");
     foreign.close();
-    equal(loaded.entries.length, 7, "MCAP reload preserves every event type");
+    equal(loaded.entries.length, 8, "MCAP reload preserves every event type");
     equal(loaded.processEvents.length, 1, "MCAP reload preserves process records");
     equal(loaded.processEvents[0].scheduledTimeNs, Int64.ofInt(300),
       "MCAP preserves scheduled trajectory time");
@@ -4199,13 +4201,18 @@ class RobotWorldTests {
       case _:
         check(false, "MCAP preserves command batch variant");
     }
+    var recordedFrames:Array<SensorFrame> = [];
+    for (event in loaded.events) switch event {
+      case Sensor(_, frame): recordedFrames.push(frame);
+      case _:
+    }
     equal(loaded.snapshots[0].sourceTimestampNs, first.sourceTimestampNs, "MCAP preserves exact 64-bit timestamps");
     equal(loaded.snapshots[0].sourceSequence, first.sourceSequence, "MCAP preserves exact 64-bit sequences");
     equal(loaded.snapshots[0].sourceClockId, "robot-a.reset-2", "MCAP preserves reset clock identity");
     equal(loaded.snapshots[0].safety, first.safety, "MCAP preserves robot safety state");
-    equal(loaded.snapshots[0].sensors.get(0).frameId, "frame/front", "MCAP preserves sensor frame identity");
-    equal(loaded.snapshots[0].sensors.get(0).mountPosition.get(2), 0.3, "MCAP preserves sensor mount");
-    var recordedCamera:CameraImage = cast loaded.snapshots[0].sensors.get(1).image;
+    equal(recordedFrames[0].frameId, "frame/front", "MCAP preserves sensor frame identity");
+    equal(recordedFrames[0].mountPosition.get(2), 0.3, "MCAP preserves sensor mount");
+    var recordedCamera:CameraImage = cast recordedFrames[1].image;
     check(recordedCamera != null && recordedCamera.width == 2 &&
       recordedCamera.encoding == "rgb8" && recordedCamera.bytes().get(0) == 1 &&
       recordedCamera.bytes().get(5) == 6,
@@ -4295,7 +4302,7 @@ class RobotWorldTests {
     var robot = new SimulatedRobot("external-sensors", runtime, model.name, [base.name], []);
     simulationHarness.step(Int64.ofInt(1));
     simulationHarness.step(Int64.ofInt(2));
-    var nativeCount = robot.snapshot().sensors.length;
+    var nativeCount = robot.streams().latestFrames().length;
     var pixels = haxe.io.Bytes.alloc(6);
     for (index in 0...pixels.length) pixels.set(index, index + 31);
     runtime.publishCameraFrame("sensor/front-camera", new CameraImage(2, 1, "rgb8", pixels),
@@ -4304,11 +4311,11 @@ class RobotWorldTests {
     runtime.publishSensorFrame("sensor/gnss", [48.1, 11.5, 0.3], Int64.ofInt(1),
       Int64.ofInt(100), "gnss.receiver");
     var snapshot = robot.snapshot();
-    equal(snapshot.sensors.length, nativeCount + 2,
+    equal(robot.streams().latestFrames().length, nativeCount + 2,
       "external frames merge with native sensors without a physics step");
     var cameraFrame:Null<SensorFrame> = null;
     var gnssFrame:Null<SensorFrame> = null;
-    for (sensor in snapshot.sensors.toArray()) {
+    for (sensor in robot.streams().latestFrames()) {
       if (sensor.sensorId == "sensor/front-camera") cameraFrame = sensor;
       if (sensor.sensorId == "sensor/gnss") gnssFrame = sensor;
     }
@@ -4342,7 +4349,7 @@ class RobotWorldTests {
       new CameraImage(1, 1, "jpeg", haxe.io.Bytes.ofString("y")), Int64.ofInt(2),
       Int64.ofInt(102), "camera.boot-3");
     var updated = 0;
-    for (sensor in robot.snapshot().sensors.toArray())
+    for (sensor in robot.streams().latestFrames())
       if (sensor.sensorId == "sensor/front-camera") updated = Int64.toInt(sensor.sequence);
     equal(updated, 2, "the simulated robot observes an image update without a physics step");
     robot.close();
@@ -4439,7 +4446,7 @@ class RobotWorldTests {
       "decoded camera pixels own a copy independent of the frame attachment");
     var remote = new RemoteRobot("camera-remote");
     remote.onCamera(decoded);
-    var remoteSensors = remote.sensors();
+    var remoteSensors = remote.streams().latestFrames();
     equal(remoteSensors.length, 1, "remote robot publishes received camera as a sensor frame");
     equal(remoteSensors[0].sensorId, "camera/front", "remote camera keeps sensor identity");
     equal(remoteSensors[0].values.length, 0, "remote camera does not invent scalar readings");
@@ -4493,6 +4500,15 @@ class RobotWorldTests {
    * A full 360-ray scan reaches Haxe intact beside an IMU's values, each at its own place in the state's
    * value pool, and a snapshot is no larger than it was when sensors could report 64 values each.
    */
+  static function streamFrame(frames:Array<SensorFrame>, id:String):SensorFrame {
+    for (frame in frames) if (frame.sensorId == id) return frame;
+    throw 'Missing sensor stream $id';
+  }
+  static function streamKind(frames:Array<SensorFrame>, kind:String):SensorFrame {
+    for (frame in frames) if (frame.kind == kind) return frame;
+    throw 'Missing sensor stream kind $kind';
+  }
+
   static function testFullScan():Void {
     var model = new RobotModel("full-scan");
     var base = model.addLink(new Link("base", "link/base"));
@@ -4507,7 +4523,7 @@ class RobotWorldTests {
     simulationHarness.spawnBox([2.0, 0.0, 0.0], [0.25, 0.25, 0.25]);
     simulationHarness.step(Int64.ofInt(1));
     simulationHarness.step(Int64.ofInt(2));
-    var frames = robot.snapshot().sensors;
+    var frames = new robotkit.core.ImmutableSensorArray(robot.streams().latestFrames());
     var found:Null<SensorFrame> = null, motion:Null<SensorFrame> = null;
     for (frame in frames.toArray()) {
       if (frame.sensorId == "sensor/scan") found = frame;
@@ -4567,7 +4583,8 @@ class RobotWorldTests {
     simulationHarness.spawnBox([0.5, 2.0, 0.0], [0.25, 0.25, 0.25]);
     simulationHarness.step(Int64.ofInt(1));
     var first = robot.snapshot();
-    var firstScan = first.sensors.get(0);
+    var firstFrames = robot.streams().latestFrames();
+    var firstScan = streamFrame(firstFrames, "sensor/scan");
     equal(firstScan.sensorId, "sensor/scan", "compiled sensor identity survives model rename and reorder");
     equal(firstScan.frameId, "frame/stable", "configured frame identity reaches measurement");
     equal(firstScan.linkId, "link/stable", "mount link identity reaches measurement");
@@ -4577,7 +4594,7 @@ class RobotWorldTests {
     equal(firstScan.values.get(8), 3.0, "configured maximum range reaches native scanner");
     // The IMU has no sample on the first tick because it needs a velocity
     // derivative, so the partial scan is the third published frame here.
-    var partialScan = first.sensors.get(2);
+    var partialScan = streamFrame(firstFrames, "sensor/partial");
     equal(partialScan.values.length, 3, "partial field of view keeps configured ray count");
     equal(partialScan.values.get(0), 3.0, "partial scan starts at configured bearing");
     check(Math.abs(partialScan.values.get(1) - 1.75) < 0.000001,
@@ -4592,24 +4609,26 @@ class RobotWorldTests {
     equal(observations.obstacles().length, 1, "compiled LiDAR settings construct matching perception");
     check(Math.abs(observations.obstacles()[0].detection.pose.x - 1.75) < 0.000001,
       "perception ray angles match simulated scan angles");
-    var noisyValue = first.sensors.get(1).values.get(0);
+    var noisyValue = streamFrame(firstFrames, "sensor/noisy").values.get(0);
     check(noisyValue != firstScan.values.get(0), "configured noise changes measurement");
     simulationHarness.step(Int64.ofInt(2));
     var second = robot.snapshot();
-    equal(second.sensors.get(0).sequence, firstScan.sequence, "slow sensor sequence held between acquisitions");
-    equal(second.sensors.get(0).receivedTimestampNs, firstScan.receivedTimestampNs, "cached sensor receipt does not become fresh");
-    equal(second.sensors.get(0).sourceTimestampNs, firstScan.sourceTimestampNs, "cached sensor source time preserved");
-    equal(second.sensors.get(2).values.get(5), 9.81, "configured mounted IMU is measured");
+    var secondFrames = robot.streams().latestFrames();
+    equal(streamFrame(secondFrames, "sensor/scan").sequence, firstScan.sequence, "slow sensor sequence held between acquisitions");
+    equal(streamFrame(secondFrames, "sensor/scan").receivedTimestampNs, firstScan.receivedTimestampNs, "cached sensor receipt does not become fresh");
+    equal(streamFrame(secondFrames, "sensor/scan").sourceTimestampNs, firstScan.sourceTimestampNs, "cached sensor source time preserved");
+    equal(streamFrame(secondFrames, "sensor/imu").values.get(5), 9.81, "configured mounted IMU is measured");
     for (_ in 0...8) simulationHarness.step(Int64.ofInt(3));
-    equal(robot.snapshot().sensors.get(0).sequence, Int64.ofInt(2), "10 Hz scan updates on source-clock schedule");
+    equal(streamFrame(robot.streams().latestFrames(), "sensor/scan").sequence, Int64.ofInt(2), "10 Hz scan updates on source-clock schedule");
     var recording = new RobotRecording();
     recording.recordSnapshot(second);
+    for (frame in secondFrames) recording.recordSensor("configured", frame);
     var replay = new ReplayRobot("configured", recording);
-    equal(replay.snapshot().sensors.get(0).frameId, "frame/stable", "recording retains frame identity");
-    equal(replay.snapshot().sensors.get(0).mountPosition.get(0), 0.5, "recording retains mount metadata");
+    equal(streamFrame(replay.streams().latestFrames(), "sensor/scan").frameId, "frame/stable", "recording retains frame identity");
+    equal(streamFrame(replay.streams().latestFrames(), "sensor/scan").mountPosition.get(0), 0.5, "recording retains mount metadata");
     simulationHarness.reset();
     simulationHarness.step(Int64.ofInt(1));
-    equal(robot.snapshot().sensors.get(1).values.get(0), noisyValue, "reset repeats seeded noise deterministically");
+    equal(streamFrame(robot.streams().latestFrames(), "sensor/noisy").values.get(0), noisyValue, "reset repeats seeded noise deterministically");
     robot.close(); simulationHarness.dispose(); replay.close();
     scan.rayCount = 361;
     mount.rotation = [0.0, 0.0, 0.0, 0.0];
@@ -4849,17 +4868,18 @@ class RobotWorldTests {
     simulationHarness.spawnBox([2.0, 0.0, 0.0], [0.25, 0.25, 0.25]);
     simulationHarness.step(Int64.ofInt(100));
     var before = robot.snapshot();
-    equal(before.sensors.get(1).values.get(0), 1.75, "adapter exposes scene ray distance");
+    var beforeScan = streamKind(robot.streams().latestFrames(), "lidar");
+    equal(beforeScan.values.get(0), 1.75, "adapter exposes scene ray distance");
     simulationHarness.reset();
     simulationHarness.teleportRobot(0, [1.0, 0.0, 0.0]);
     simulationHarness.step(Int64.ofInt(100));
     var after = robot.snapshot();
     equal(after.sourceSequence, before.sourceSequence, "reset repeats source sequence");
-    equal(after.sensors.get(1).values.get(0), 0.75,
+    equal(streamKind(robot.streams().latestFrames(), "lidar").values.get(0), 0.75,
       "adapter refreshes sensors even when reset repeats sequence");
-    equal(before.sensors.get(1).values.get(0), 1.75, "old sensor snapshot survives reset");
+    equal(beforeScan.values.get(0), 1.75, "old sensor snapshot survives reset");
     simulationHarness.step(Int64.ofInt(200));
-    equal(robot.snapshot().sensors.length, 3, "second sample publishes measured IMU");
+    equal(robot.streams().latestFrames().length, 3, "second sample publishes measured IMU");
     var rejected = false;
     try robot.submit(RobotCommand.JointTargets([
       robotkit.core.JointTarget.position(0, 0.0)
@@ -5329,11 +5349,11 @@ class RobotWorldTests {
     check(Int64.compare(value.receivedTimestampNs, secondValue.receivedTimestampNs) >= 0,
       "world stamps its own publication after runtime acceptance");
     equal(value.sourceTimestampNs, Int64.ofInt(0), "mixed source clocks are not aggregated");
-    equal(firstValue.sensors.length, 2,
+    equal(firstValue.sensors.length, 1,
       "first sample primes IMU derivative and publishes encoders plus LiDAR");
     equal(firstValue.sensors.get(0).sourceTimestampNs, Int64.ofInt(10000000),
       "sensor source clock matches robot source clock");
-    equal(firstValue.sensors.get(1).frameId, "base_link",
+    equal(firstValue.streamSequences.length, 2,
       "sensor frame identity is explicit");
     var recording = new RobotRecording();
     recording.recordSnapshot(firstValue);
@@ -5350,7 +5370,7 @@ class RobotWorldTests {
     check(replay.advance(), "replay advances through the same snapshot boundary");
     var replayNext = replayWorld.snapshot().robot("sim-a");
     var replayNextValue:RobotSnapshot = cast replayNext;
-    check(replayNextValue != null && replayNextValue.sensors.length == 2,
+    check(replayNextValue != null && replayNextValue.sensors.length == 1,
       "replay preserves sensor frames");
     var behavior = new WorldBehaviorRunner(new HoldJointBehavior(0, 0.25));
     equal(behavior.update(first), 1, "world behavior emits a transport-neutral command");
@@ -5585,7 +5605,7 @@ private class FakeRobot implements Robot {
     1,
     0
   );
-  public function sensors():Array<SensorFrame> return [];
+  public function streams():robotkit.streams.SensorStreams return new robotkit.streams.SensorStreams();
   public function events(afterOrdinal:haxe.Int64, max:Int):Array<robotkit.core.RobotEvent> return [];
   public function fault():Null < RobotFault > return null;
   public function submit(command:RobotCommand):Void lastCommand = command;

@@ -35,5 +35,5 @@ uses DWT monotonic ticks and publishes state every 25 ms. No motor pins are
 driven.
 
 Copy the bench deployment directory to the Linux board, edit `device.path`
-for the UART node, and run `robotd --server --deployment=...`. Before physical
+for the UART node, and run `robotd --server --auth=... --deployment=...`. Before physical
 actuators are attached, measure UART timing and stop behavior on the bench.

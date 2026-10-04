@@ -284,6 +284,47 @@ need the simulation or vision stack.
 
 ## R6 — Snapshots vs sensor streams, robotd authentication
 
+Completed on 2026-10-04. RobotSnapshot now keeps coherent joint/runtime/safety/
+execution state, small numeric measurements, and immutable stream sequence
+headers. Camera, depth, point-cloud, LiDAR, and inference samples use timestamped
+SensorStreams with cancellable subscriptions and retained latest samples.
+Robot.sensors() is removed. Runtime, remote, serial, recording, replay, perception,
+world behaviors, and application presentation use the new boundary. WorldSnapshot
+copies all execution fields and stream headers. Recording retains stream events
+separately without inserting sensor delivery into the control replay cadence.
+
+RKF1 is version 3 and recording schema is version 8. Wire locks, generated
+recording schemas, fixtures, raw clients, and consumers use only the current
+formats. RemoteRobot authenticates separate control and bulk TCP connections;
+stalled camera/inference queues cannot occupy its control socket.
+
+Every robotd TCP host now requires a strict authorization file before opening
+its listener. Hello authenticates an explicit identity/token against configured
+SHA-256 digests; Welcome carries the authenticated identity and its independent
+observe/command/deployment grants. Neither anonymous clients nor loopback clients
+receive a bypass. Commands still require the authenticated control lease.
+Deployment requests require the deployment grant, a current session and a fresh
+sequence, an idle controller, and an operator-configured name. The complete
+deployment is validated before the old host closes and restarts. Clients cannot
+submit deployment paths. Editor and worldd clients require explicit credentials;
+the CLI reads ROBOTKIT_IDENTITY and ROBOTKIT_TOKEN.
+
+Local main advanced with the whole-weldment W4 work during this phase. The final
+gate runs on the combined tree after syncing main `1245b8c99` in `a6f6addeb`.
+Superseded preliminary gates were stopped and rerun after that sync. Other
+worktrees and their uncommitted changes remain untouched.
+
+The saved workspace gate completed successfully in 894 seconds.
+
+Final validation: all 53 executable compile targets; all 22 workspace projects
+(including 4,972 RobotWorld and 9,865 MotionKit assertions and the independent
+core-only consumer); all RobotKit suites and authenticated TCP modes; 16 native
+RobotKit tests; Rust device host/MCU checks; authenticated RKD6 virtual-device
+TCP integration; the complete application suite; robotd in-memory, humanoid,
+whole-weldment robot welder, and completed worker demo; 8 MotionKit Release and
+3 CAD tests; four-platform ABI audits and exact trajectory fixtures. Robotd
+without --auth was also verified to stop before opening its listener.
+
 - **Snapshot vs streams.** Today there are three ways to say two things: `robot.snapshot()`,
   `robot.sensors()` (which returns the previous snapshot's frames, per `TODO.md`), and sensors
   inside `RobotSnapshot`.

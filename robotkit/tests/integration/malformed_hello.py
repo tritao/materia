@@ -25,7 +25,7 @@ def main(port):
 
     with socket.create_connection(("127.0.0.1", port), timeout=5) as good:
         good.settimeout(5)
-        send_frame(good, threading.Lock(), 1, {1: PROTOCOL_VERSION, 2: "good-hello", 3: "", 4: "observer", 5: []})
+        send_frame(good, threading.Lock(), 1, {1: PROTOCOL_VERSION, 2: "good-hello", 3: "", 4: "observer", 5: [], 6: "test-observer", 7: "robotkit-test-observer-token-0001"})
         for _ in range(10):
             kind, _, _, _, _ = read_frame(good)
             if kind == 2:

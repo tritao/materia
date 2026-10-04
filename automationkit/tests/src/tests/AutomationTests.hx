@@ -623,7 +623,7 @@ private class AutomationFakeRobot implements Robot {
   public function description():RobotDescription return descriptionValue;
   public function capabilities():RobotCapabilities return capabilitiesValue;
   public function snapshot():RobotSnapshot return snapshotValue;
-  public function sensors():Array<SensorFrame> return [];
+  public function streams():robotkit.streams.SensorStreams return new robotkit.streams.SensorStreams();
   public function events(afterOrdinal:Int64, max:Int):Array<robotkit.core.RobotEvent> return [];
   public function fault():Null<RobotFault> return null;
   public function submit(command:RobotCommand):Void {}

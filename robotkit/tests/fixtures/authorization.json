@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "identities": [
+    {
+      "id": "test-controller",
+      "tokenSha256": "d2df3ebd5b4e9f31a278b479f0836bae7c5d6ae1db00e761fbe7a47e5c8091f7",
+      "permissions": [
+        "observe",
+        "command"
+      ]
+    },
+    {
+      "id": "test-observer",
+      "tokenSha256": "8934f31c90041ffc4f7809e3b252106a3c0576be4e634a8f563ce3bf000e8135",
+      "permissions": [
+        "observe"
+      ]
+    },
+    {
+      "id": "test-deployer",
+      "tokenSha256": "e85b3b0174f4543b49ffe16f6578e197792e22e1c076b0b2ba2380b5e44fb0e3",
+      "permissions": [
+        "observe",
+        "deployment"
+      ]
+    }
+  ],
+  "deployments": {
+    "bench": "device-deployment/deployment.json"
+  }
+}

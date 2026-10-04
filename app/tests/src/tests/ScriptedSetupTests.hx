@@ -214,10 +214,10 @@ class ScriptedSetupTests {
     var observed = simulation.snapshot();
     for (robotId in ["materia/robot", "materia/robot-b"]) {
       var robot = observed.robot(robotId);
-      check(robot != null && robot.sensors.length == 3, "scripted robots publish all configured sensors");
+      check(robot != null && world.robot(robotId).streams().latestFrames().length == 3, "scripted robots publish all configured sensors");
       if (robot != null) {
         writer.recordSnapshot(robot);
-        for (frame in robot.sensors.toArray()) writer.recordSensor(robotId, frame);
+        for (frame in world.robot(robotId).streams().latestFrames()) writer.recordSensor(robotId, frame);
       }
     }
     writer.close();
@@ -228,8 +228,8 @@ class ScriptedSetupTests {
       check(original != null && replay.snapshot().id == robotId,
         "MCAP replay selects the scripted robot by stable ID");
       if (original != null) {
-        var expected = original.sensors.toArray();
-        var actual = replay.sensors();
+        var expected = world.robot(robotId).streams().latestFrames();
+        var actual = replay.streams().latestFrames();
         check(actual.length == expected.length, "MCAP replay preserves the scripted sensor count");
         for (index in 0...expected.length) check(actual[index].sensorId == expected[index].sensorId
           && actual[index].linkId == expected[index].linkId

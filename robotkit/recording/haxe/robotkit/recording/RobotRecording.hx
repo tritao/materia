@@ -128,7 +128,7 @@ class RobotRecording implements RobotRecordingSink {
       value.trajectoryTimeNs, value.trajectoryDurationNs,
       value.trajectoryTag, value.trajectoryTagTimeNs,
       value.sessionState, value.activePlanId,
-      value.committedUntilNs, value.queueEndTimeNs, value.setpointPositions.toArray());
+      value.committedUntilNs, value.queueEndTimeNs, value.setpointPositions.toArray(), value.streamSequences);
 
   function pushWorldEvent(event:RobotWorldEvent, robotId:RobotId):Void {
     events.push(RobotRecordingEvent.WorldEvent(event));

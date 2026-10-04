@@ -54,7 +54,7 @@ class WorldTcpIntegration {
   public static function runRestartCheck(host:String, port:Int):Void {
     var runtime = NativeKitRuntime.start();
     var world = new RobotWorld();
-    var remote = new RemoteRobot(LOGICAL_ID);
+    var remote = new RemoteRobot(LOGICAL_ID, IntegrationCredentials.controller());
     world.attach(remote);
     var failure:Dynamic = null;
     try {
@@ -87,7 +87,7 @@ class WorldTcpIntegration {
   public static function run(host:String, port:Int, ?cameraFixture:Bool = false):Void {
     var runtime = NativeKitRuntime.start();
     var world = new RobotWorld();
-    var remote = new RemoteRobot(LOGICAL_ID);
+    var remote = new RemoteRobot(LOGICAL_ID, IntegrationCredentials.controller());
     if (cameraFixture) remote.enableCamera();
     world.attach(remote);
     var simulationHarness = new robotkit.runtime.SimulationHarness();
@@ -219,9 +219,10 @@ class WorldTcpIntegration {
 
       var state = world.snapshot().robot(LOGICAL_ID);
       var position = state == null ? 0.0 : state.positions.get(0);
-      if (state == null || state.sensors.length != (cameraFixture ? 4 : 3))
+      waitUntil(runtime, function() return remote.streams().latestFrames().length == (cameraFixture ? 4 : 3), "bulk sensor connection did not publish all frames");
+      if (state == null || state.sensors.length != 2)
         throw "robotd did not transport simulated encoder, IMU, and LiDAR frames";
-      for (sensor in state.sensors.toArray()) {
+      for (sensor in remote.streams().latestFrames()) {
         if (sensor.sensorId != 'demo/${sensor.kind}' || sensor.frameId != "demo/sensor-mount"
             || sensor.linkId != "base" || sensor.mountPosition.get(0) != 0.2)
           throw "transport lost configured sensor identity or mount";

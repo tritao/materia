@@ -49,7 +49,9 @@ class WorldSnapshot {
           value.trajectoryTimeNs,
           value.trajectoryDurationNs,
           value.trajectoryTag,
-          value.trajectoryTagTimeNs
+          value.trajectoryTagTimeNs,
+          value.sessionState, value.activePlanId, value.committedUntilNs,
+          value.queueEndTimeNs, value.setpointPositions.toArray(), value.streamSequences
         )
       );
     }

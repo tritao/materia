@@ -175,6 +175,16 @@
       ],
       "kind": "class"
     },
+    "DeploymentChange": {
+      "fields": [
+        {
+          "id": 1,
+          "name": "name",
+          "type": "String"
+        }
+      ],
+      "kind": "class"
+    },
     "ExecutionCapabilitiesMsg": {
       "fields": [
         {
@@ -306,6 +316,16 @@
           "id": 5,
           "name": "subscriptions",
           "type": "Array<StreamSubscription>"
+        },
+        {
+          "id": 6,
+          "name": "identity",
+          "type": "String"
+        },
+        {
+          "id": 7,
+          "name": "token",
+          "type": "String"
         }
       ],
       "kind": "class"
@@ -1153,6 +1173,11 @@
           "id": 23,
           "name": "queueEndTimeNs",
           "type": "Int64"
+        },
+        {
+          "id": 24,
+          "name": "streamSequences",
+          "type": "Array<StreamSequenceMsg>"
         }
       ],
       "kind": "class"
@@ -1388,6 +1413,11 @@
           "id": 20,
           "name": "queueEndTimeNs",
           "type": "Int64"
+        },
+        {
+          "id": 21,
+          "name": "streamSequences",
+          "type": "Array<StreamSequenceMsg>"
         }
       ],
       "kind": "class"
@@ -1487,6 +1517,31 @@
       ],
       "kind": "class"
     },
+    "StreamSequenceMsg": {
+      "fields": [
+        {
+          "id": 1,
+          "name": "streamId",
+          "type": "String"
+        },
+        {
+          "id": 2,
+          "name": "kind",
+          "type": "String"
+        },
+        {
+          "id": 3,
+          "name": "sequence",
+          "type": "Int64"
+        },
+        {
+          "id": 4,
+          "name": "sourceClockId",
+          "type": "String"
+        }
+      ],
+      "kind": "class"
+    },
     "StreamSubscription": {
       "fields": [
         {
@@ -1568,6 +1623,16 @@
           "id": 8,
           "name": "capabilities",
           "type": "Array<String>"
+        },
+        {
+          "id": 9,
+          "name": "identity",
+          "type": "String"
+        },
+        {
+          "id": 10,
+          "name": "permissions",
+          "type": "Array<String>"
         }
       ],
       "kind": "class"
@@ -1578,6 +1643,7 @@
     "CameraFrame": 17,
     "ControlHeartbeat": 16,
     "ControllerStatus": 10,
+    "DeploymentChange": 20,
     "Fault": 11,
     "FrameTarget": 7,
     "Hello": 1,
