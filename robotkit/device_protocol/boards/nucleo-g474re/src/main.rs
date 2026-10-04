@@ -84,7 +84,7 @@ fn publish<T: Write<u8>>(tx: &mut T, core: &ScheduledCore<ACTUATORS, CAPACITY>,
     let header = State6Header {
         session, timestamp_ticks: board.ticks, accepted_sequence: 0,
         safety: if fault == 0 { 0 } else { 3 }, fault, actuator_count: active_count as u8,
-        reserved: 0, path_clock_ticks: core.path_clock(),
+        reserved: 0, path_clock_ticks: core.path_clock(), input_count: 0, input_bits: 0,
     };
     header.encode(&mut body[..State6Header::SIZE]).ok();
     for i in 0..active_count {
@@ -108,7 +108,7 @@ fn handle<T: Write<u8>>(input: &[u8], board: &mut StubBoard,
             let own = controller_id();
             let accepted = controller_matches(&begin.expected_controller, &own) &&
                 begin.actuator_count > 0 && begin.actuator_count as usize <= JOINTS && begin.session != 0 &&
-                begin.step_tick_hz == 40_000 && begin.channel_count == 0 &&
+                begin.step_tick_hz == 40_000 && begin.channel_count == 0 && begin.input_count == 0 &&
                 begin.actuator_max_acceleration[..begin.actuator_count as usize].iter().all(|v| v.is_finite() && *v > 0.0);
             let mut ack = SessionAck6 {
                 session: begin.session, protocol_version: PROTOCOL_VERSION,

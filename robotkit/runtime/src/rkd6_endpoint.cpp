@@ -797,6 +797,10 @@ void Rkd6Endpoint::poll_frames(std::uint64_t owner_now_ns) {
                 device_wire6::decode(decoded.payload.subspan(device_wire6::State6Header::SIZE +
                     i * device_wire6::ActuatorState6::SIZE,
                     device_wire6::ActuatorState6::SIZE), actuators_[i]);
+            for (std::size_t i = 0; i < state_header_.input_count; ++i)
+                device_wire6::decode(decoded.payload.subspan(device_wire6::State6Header::SIZE +
+                    state_header_.actuator_count * device_wire6::ActuatorState6::SIZE +
+                    i * device_wire6::InputState6::SIZE, device_wire6::InputState6::SIZE), inputs_[i]);
             has_state_ = true;
         } else if (decoded.kind == 17) {
             device_wire6::Sensor6Header header{};

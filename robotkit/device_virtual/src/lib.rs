@@ -3,7 +3,7 @@ use robotkit_device_protocol::config_digest::{config_digest6, controller_matches
 use robotkit_device_protocol::device_wire6::*;
 use robotkit_device_protocol::frame6::{decode_frame6, encode_frame6, MAX_FRAME_SIZE};
 use robotkit_device_protocol::{
-    Board, DeviceEvents, Output, ScheduledCore, ScheduledSegment, SkewGroup,
+    Board, DeviceEvents, InputBinding, Output, ScheduledCore, ScheduledSegment, SkewGroup,
     StepGenerator, StopReason, VirtualBoard,
 };
 use std::collections::VecDeque;
@@ -28,6 +28,7 @@ pub struct VirtualDevice {
     active_count: usize,
     session: u64,
     channel_kind: [u8; CHANNELS],
+    input_count: usize,
     step_tick_hz: u32,
     profile: u8,
     host_ns: u64,
@@ -73,6 +74,7 @@ impl VirtualDevice {
             active_count: 0,
             session: 0,
             channel_kind: [0; CHANNELS],
+            input_count: 0,
             step_tick_hz,
             profile,
             host_ns: 0,
@@ -212,6 +214,12 @@ impl VirtualDevice {
                             }
                         }
                     }
+                    for channel in 0..begin.input_count as usize {
+                        if !generator.bind_input(&self.board, channel, InputBinding {
+                            actuator: begin.input_actuator[channel] as usize,
+                            active_high: begin.input_active_high & (1u64 << channel) != 0,
+                        }, self.count) { return false; }
+                    }
                     let link_loss_ticks = ((begin.link_loss_timeout_ns as u128
                         * self.board.tick_hz() as u128)
                         / 1_000_000_000) as u64;
@@ -234,6 +242,7 @@ impl VirtualDevice {
                     // The count starts after the frame that begins the session, as the host's does.
                     self.received_bytes = 0;
                     self.channel_kind = begin.channel_kind;
+                    self.input_count = begin.input_count as usize;
                     ack.status = 1;
                     ack.actuator_count = begin.actuator_count;
                 }
@@ -419,6 +428,9 @@ impl VirtualDevice {
             executing_plan_id: core.executing_plan_id(),
             executing_segment: core.executing_segment(),
             path_clock_ticks: core.path_clock(),
+            input_count: self.input_count as u8,
+            input_bits: (0..self.input_count).fold(0u64, |bits, channel|
+                bits | (u64::from(self.board.read_input(channel)) << channel)),
             rate: core.rate(),
             remaining_segments: if self.profile == 2 {
                 core.remaining_capacity().saturating_sub(CAPACITY - MINIMAL_CAPACITY) as u16
@@ -448,7 +460,7 @@ impl VirtualDevice {
         let targets = self.board.position_targets();
         let velocity = core.velocities();
         let counts = self.board.step_counts();
-        let mut body = vec![0; State6Header::SIZE + self.active_count * ActuatorState6::SIZE];
+        let mut body = vec![0; State6Header::SIZE + self.active_count * ActuatorState6::SIZE + self.input_count * InputState6::SIZE];
         header.encode(&mut body[..State6Header::SIZE]).unwrap();
         for i in 0..self.active_count {
             let row = ActuatorState6 {
@@ -460,6 +472,14 @@ impl VirtualDevice {
             let start = State6Header::SIZE + i * ActuatorState6::SIZE;
             row.encode(&mut body[start..start + ActuatorState6::SIZE])
                 .unwrap();
+        }
+        for channel in 0..self.input_count {
+            let observed = self.steps.input_observation(channel).unwrap();
+            let row = InputState6 { closing_count: observed.closing_count,
+                opening_count: observed.opening_count, captured_steps: observed.captured_steps,
+                captured_ticks: observed.captured_ticks };
+            let start = State6Header::SIZE + self.active_count * ActuatorState6::SIZE + channel * InputState6::SIZE;
+            row.encode(&mut body[start..start + InputState6::SIZE]).unwrap();
         }
         self.emit(15, &body);
         if let Some(welder) = self.welder.as_ref() {
@@ -763,6 +783,7 @@ mod tests {
             direction_setup_ticks: [0; 64], actuator_joint: [0; 64],
             actuator_ratio: [1.0; 64], dual_drive_skew_bound: [0.0; 64],
             link_loss_timeout_ns: 2_000_000_000,
+            input_count: 0, input_actuator: [0; 64], input_active_high: 0,
             channel_count: 0, channel_id: [0; 1536], channel_kind: [0; 32],
             safe_digital: [0; 32], safe_analog: [0.0; 32],
             safe_argument: [0.0; 32], safe_command: [0; 1536], channel_stop_policy: [0; 32],
@@ -840,6 +861,7 @@ mod tests {
             direction_setup_ticks: [0; 64], actuator_joint: [0; 64],
             actuator_ratio: [1.0; 64], dual_drive_skew_bound: [0.0; 64],
             link_loss_timeout_ns: 2_000_000_000,
+            input_count: 0, input_actuator: [0; 64], input_active_high: 0,
             channel_count: 0, channel_id: [0; 1536], channel_kind: [0; 32],
             safe_digital: [0; 32], safe_analog: [0.0; 32],
             safe_argument: [0.0; 32], safe_command: [0; 1536], channel_stop_policy: [0; 32],

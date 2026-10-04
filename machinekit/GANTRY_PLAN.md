@@ -2503,3 +2503,23 @@ repeated edges, invalid bindings and initially closed inputs. These are queued
 for the Phase C gate; no tests or builds ran in this step. Wire state/configuration,
 deployment mapping, virtual-device integration, host observations and homing
 control transport remain pending. G13 is not complete.
+
+### G13 — revision 13 input state transport
+
+Bumped RKD6 wire revision 12 to 13 and regenerated the packed C++ and Rust
+records with the specified wire command. The generator's compatibility lock
+rejects changed constants/records; the previous lock was preserved externally
+as `gantries-rkd6-v12.lock.json`, then the lock was regenerated for the explicit
+planned incompatible revision. No generator/compiler code changed.
+
+Session configuration now declares input count, actuator bindings and electrical
+polarity. State carries raw input bits and one closure/opening/captured-step/
+captured-timestamp row per configured input after the actuator rows. Both frame
+validators bound counts, validate actuator bindings and require exact state
+length. The virtual device binds inputs when accepting a session and publishes
+captured observations. The host endpoint decodes and retains input rows; wiring
+configuration and publication to homing observers remain pending. The Nucleo
+stub currently rejects nonzero input configurations rather than pretending to
+support them. Virtual switch configuration through deployment, real board GPIO,
+homing purpose/holds/calibration/squaring transport and verification still remain.
+No build or test ran; Phase C gate is pending.

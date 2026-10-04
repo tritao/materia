@@ -48,6 +48,9 @@ packed SessionBegin6 endian little {
     safe_argument : f32[32]
     safe_command : u8[1536]
     channel_stop_policy : u8[32]
+    input_count : u8
+    input_actuator : u8[64]
+    input_active_high : u64
 }
 
 packed Event6 endian little {
@@ -149,6 +152,8 @@ packed State6Header endian little {
     actuator_count : u8
     reserved : u8
     path_clock_ticks : u64
+    input_count : u8
+    input_bits : u64
 }
 
 packed ActuatorState6 endian little {
@@ -170,4 +175,12 @@ packed Sensor6Header endian little {
 
 packed Sensor6Value endian little {
     value : f32
+}
+
+# State6 appends one input row after actuator rows, in deployment channel order.
+packed InputState6 endian little {
+    closing_count : u64
+    opening_count : u64
+    captured_steps : i64
+    captured_ticks : u64
 }

@@ -79,7 +79,7 @@ fn validate_payload(kind: u8, bytes: &[u8]) -> Result<(), Frame6Error> {
         if head.protocol_version != PROTOCOL_VERSION || head.actuator_count == 0 ||
            head.actuator_count > MAX_ACTUATORS || !head.max_acceleration.is_finite() ||
            head.max_acceleration <= 0.0 || head.link_loss_timeout_ns == 0 ||
-           head.channel_count > 32 {
+           head.channel_count > 32 || head.input_count > 64 {
             return Err(Frame6Error::BadPayload);
         }
         for (a, &limit) in head.actuator_max_acceleration[..head.actuator_count as usize].iter().enumerate() {
@@ -91,6 +91,9 @@ fn validate_payload(kind: u8, bytes: &[u8]) -> Result<(), Frame6Error> {
                !head.dual_drive_skew_bound[a].is_finite() || head.dual_drive_skew_bound[a] < 0.0 {
                 return Err(Frame6Error::BadPayload);
             }
+        }
+        for channel in 0..head.input_count as usize {
+            if head.input_actuator[channel] >= head.actuator_count { return Err(Frame6Error::BadPayload); }
         }
         for channel in 0..head.channel_count as usize {
             let kind = head.channel_kind[channel];
@@ -116,8 +119,8 @@ fn validate_payload(kind: u8, bytes: &[u8]) -> Result<(), Frame6Error> {
         if bytes.len() < State6Header::SIZE { return Err(Frame6Error::BadLength); }
         let head = State6Header::decode(&bytes[..State6Header::SIZE])
             .map_err(|_| Frame6Error::BadPayload)?;
-        if head.actuator_count > MAX_ACTUATORS || head.reserved != 0 ||
-           bytes.len() != State6Header::SIZE + head.actuator_count as usize * ActuatorState6::SIZE {
+        if head.actuator_count > MAX_ACTUATORS || head.input_count > 64 || head.reserved != 0 ||
+           bytes.len() != State6Header::SIZE + head.actuator_count as usize * ActuatorState6::SIZE + head.input_count as usize * InputState6::SIZE {
             return Err(Frame6Error::BadPayload);
         }
     }

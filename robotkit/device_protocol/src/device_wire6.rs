@@ -53,10 +53,13 @@ pub struct SessionBegin6 {
     pub safe_argument: [f32; 32],
     pub safe_command: [u8; 1536],
     pub channel_stop_policy: [u8; 32],
+    pub input_count: u8,
+    pub input_actuator: [u8; 64],
+    pub input_active_high: u64,
 }
 
 impl SessionBegin6 {
-    pub const SIZE: usize = 4940;
+    pub const SIZE: usize = 5013;
 
     pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {
         if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }
@@ -137,6 +140,14 @@ impl SessionBegin6 {
             out[offset..offset + 1].copy_from_slice(&value.to_le_bytes());
             offset += 1;
         }
+        out[offset..offset + 1].copy_from_slice(&self.input_count.to_le_bytes());
+        offset += 1;
+        for value in self.input_actuator {
+            out[offset..offset + 1].copy_from_slice(&value.to_le_bytes());
+            offset += 1;
+        }
+        out[offset..offset + 8].copy_from_slice(&self.input_active_high.to_le_bytes());
+        offset += 8;
         Ok(offset)
     }
 
@@ -280,8 +291,23 @@ impl SessionBegin6 {
             *item = u8::from_le_bytes(bytes);
             offset += 1;
         }
+        let mut bytes = [0u8; 1];
+        bytes.copy_from_slice(&input[offset..offset + 1]);
+        let input_count = u8::from_le_bytes(bytes);
+        offset += 1;
+        let mut input_actuator = [0 as u8; 64];
+        for item in &mut input_actuator {
+            let mut bytes = [0u8; 1];
+            bytes.copy_from_slice(&input[offset..offset + 1]);
+            *item = u8::from_le_bytes(bytes);
+            offset += 1;
+        }
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let input_active_high = u64::from_le_bytes(bytes);
+        offset += 8;
         let _ = offset;
-        Ok(Self { session, protocol_version, expected_controller, actuator_count, max_degree, step_tick_hz, max_acceleration, actuator_max_acceleration, steps_per_unit, max_rate, direction_setup_ticks, actuator_joint, actuator_ratio, dual_drive_skew_bound, link_loss_timeout_ns, channel_count, channel_id, channel_kind, safe_digital, safe_analog, safe_argument, safe_command, channel_stop_policy })
+        Ok(Self { session, protocol_version, expected_controller, actuator_count, max_degree, step_tick_hz, max_acceleration, actuator_max_acceleration, steps_per_unit, max_rate, direction_setup_ticks, actuator_joint, actuator_ratio, dual_drive_skew_bound, link_loss_timeout_ns, channel_count, channel_id, channel_kind, safe_digital, safe_analog, safe_argument, safe_command, channel_stop_policy, input_count, input_actuator, input_active_high })
     }
 }
 
@@ -917,10 +943,12 @@ pub struct State6Header {
     pub actuator_count: u8,
     pub reserved: u8,
     pub path_clock_ticks: u64,
+    pub input_count: u8,
+    pub input_bits: u64,
 }
 
 impl State6Header {
-    pub const SIZE: usize = 36;
+    pub const SIZE: usize = 45;
 
     pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {
         if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }
@@ -940,6 +968,10 @@ impl State6Header {
         out[offset..offset + 1].copy_from_slice(&self.reserved.to_le_bytes());
         offset += 1;
         out[offset..offset + 8].copy_from_slice(&self.path_clock_ticks.to_le_bytes());
+        offset += 8;
+        out[offset..offset + 1].copy_from_slice(&self.input_count.to_le_bytes());
+        offset += 1;
+        out[offset..offset + 8].copy_from_slice(&self.input_bits.to_le_bytes());
         offset += 8;
         Ok(offset)
     }
@@ -979,8 +1011,16 @@ impl State6Header {
         bytes.copy_from_slice(&input[offset..offset + 8]);
         let path_clock_ticks = u64::from_le_bytes(bytes);
         offset += 8;
+        let mut bytes = [0u8; 1];
+        bytes.copy_from_slice(&input[offset..offset + 1]);
+        let input_count = u8::from_le_bytes(bytes);
+        offset += 1;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let input_bits = u64::from_le_bytes(bytes);
+        offset += 8;
         let _ = offset;
-        Ok(Self { session, timestamp_ticks, accepted_sequence, safety, fault, actuator_count, reserved, path_clock_ticks })
+        Ok(Self { session, timestamp_ticks, accepted_sequence, safety, fault, actuator_count, reserved, path_clock_ticks, input_count, input_bits })
     }
 }
 
@@ -1114,5 +1154,54 @@ impl Sensor6Value {
         offset += 4;
         let _ = offset;
         Ok(Self { value })
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct InputState6 {
+    pub closing_count: u64,
+    pub opening_count: u64,
+    pub captured_steps: i64,
+    pub captured_ticks: u64,
+}
+
+impl InputState6 {
+    pub const SIZE: usize = 32;
+
+    pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {
+        if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }
+        let mut offset = 0usize;
+        out[offset..offset + 8].copy_from_slice(&self.closing_count.to_le_bytes());
+        offset += 8;
+        out[offset..offset + 8].copy_from_slice(&self.opening_count.to_le_bytes());
+        offset += 8;
+        out[offset..offset + 8].copy_from_slice(&self.captured_steps.to_le_bytes());
+        offset += 8;
+        out[offset..offset + 8].copy_from_slice(&self.captured_ticks.to_le_bytes());
+        offset += 8;
+        Ok(offset)
+    }
+
+    pub fn decode(input: &[u8]) -> Result<Self, Error> {
+        if input.len() != Self::SIZE { return Err(Error::WrongLength); }
+        let mut offset = 0usize;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let closing_count = u64::from_le_bytes(bytes);
+        offset += 8;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let opening_count = u64::from_le_bytes(bytes);
+        offset += 8;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let captured_steps = i64::from_le_bytes(bytes);
+        offset += 8;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let captured_ticks = u64::from_le_bytes(bytes);
+        offset += 8;
+        let _ = offset;
+        Ok(Self { closing_count, opening_count, captured_steps, captured_ticks })
     }
 }

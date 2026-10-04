@@ -156,6 +156,7 @@ private:
     device_wire6::QueueStatus6 status_{};
     device_wire6::State6Header state_header_{};
     std::array<device_wire6::ActuatorState6, device_wire6::MAX_ACTUATORS> actuators_{};
+    std::array<device_wire6::InputState6, 64> inputs_{};
     bool has_state_ = false;
     std::array<device_wire6::Sensor6Header, RK_MAX_SENSORS> sensor_headers_{};
     std::array<std::array<float, RK_MAX_SENSOR_VALUES>, RK_MAX_SENSORS> sensor_values_{};

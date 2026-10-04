@@ -66,7 +66,7 @@ inline bool decode(std::span<const std::uint8_t> bytes, Frame &frame) {
             header.protocol_version != device_wire6::PROTOCOL_VERSION || header.actuator_count == 0 ||
             header.actuator_count > device_wire6::MAX_ACTUATORS ||
             !std::isfinite(header.max_acceleration) || header.max_acceleration <= 0 ||
-            header.link_loss_timeout_ns == 0 || header.channel_count > 32)
+            header.link_loss_timeout_ns == 0 || header.channel_count > 32 || header.input_count > 64)
             return false;
         for (std::size_t i = 0; i < header.actuator_count; ++i) {
             const auto limit = header.actuator_max_acceleration[i];
@@ -79,6 +79,8 @@ inline bool decode(std::span<const std::uint8_t> bytes, Frame &frame) {
                 !std::isfinite(header.dual_drive_skew_bound[i]) ||
                 header.dual_drive_skew_bound[i] < 0) return false;
         }
+        for (std::size_t i = 0; i < header.input_count; ++i)
+            if (header.input_actuator[i] >= header.actuator_count) return false;
         for (std::size_t i = 0; i < header.channel_count; ++i) {
             const auto *id = header.channel_id.data() + i * 48;
             if (header.channel_kind[i] < 1 || header.channel_kind[i] > 3 || id[0] == 0 ||
@@ -92,9 +94,10 @@ inline bool decode(std::span<const std::uint8_t> bytes, Frame &frame) {
         if (length < device_wire6::State6Header::SIZE) return false;
         device_wire6::State6Header header{};
         if (!device_wire6::decode(bytes.subspan(HEADER_SIZE, device_wire6::State6Header::SIZE), header) ||
-            header.actuator_count > device_wire6::MAX_ACTUATORS || header.reserved != 0 ||
+            header.actuator_count > device_wire6::MAX_ACTUATORS || header.input_count > 64 || header.reserved != 0 ||
             length != device_wire6::State6Header::SIZE +
-                header.actuator_count * device_wire6::ActuatorState6::SIZE) return false;
+                header.actuator_count * device_wire6::ActuatorState6::SIZE +
+                header.input_count * device_wire6::InputState6::SIZE) return false;
     }
     if (bytes[4] == 17) {
         device_wire6::Sensor6Header header{};

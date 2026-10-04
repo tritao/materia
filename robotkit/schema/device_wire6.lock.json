@@ -128,6 +128,32 @@
       ],
       "size": 84
     },
+    "InputState6": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "closing_count",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "opening_count",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "captured_steps",
+          "type": "i64"
+        },
+        {
+          "length": 1,
+          "name": "captured_ticks",
+          "type": "u64"
+        }
+      ],
+      "size": 32
+    },
     "QueueBegin6": {
       "endian": "little",
       "fields": [
@@ -537,9 +563,24 @@
           "length": 32,
           "name": "channel_stop_policy",
           "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "input_count",
+          "type": "u8"
+        },
+        {
+          "length": 64,
+          "name": "input_actuator",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "input_active_high",
+          "type": "u64"
         }
       ],
-      "size": 4940
+      "size": 5013
     },
     "State6Header": {
       "endian": "little",
@@ -583,9 +624,19 @@
           "length": 1,
           "name": "path_clock_ticks",
           "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "input_count",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "input_bits",
+          "type": "u64"
         }
       ],
-      "size": 36
+      "size": 45
     },
     "TimeSyncReply": {
       "endian": "little",

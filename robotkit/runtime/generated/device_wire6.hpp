@@ -31,7 +31,7 @@ enum class MessageType6 : std::uint8_t {
     sensor6 = 17,
 };
 
-inline constexpr std::size_t SessionBegin6_SIZE = 4940;
+inline constexpr std::size_t SessionBegin6_SIZE = 5013;
 struct SessionBegin6 {
     static constexpr std::size_t SIZE = SessionBegin6_SIZE;
     std::uint64_t session{};
@@ -57,6 +57,9 @@ struct SessionBegin6 {
     std::array<float, 32> safe_argument{};
     std::array<std::uint8_t, 1536> safe_command{};
     std::array<std::uint8_t, 32> channel_stop_policy{};
+    std::uint8_t input_count{};
+    std::array<std::uint8_t, 64> input_actuator{};
+    std::uint64_t input_active_high{};
 };
 
 inline bool encode(const SessionBegin6 &value, std::span<std::uint8_t> out) {
@@ -180,6 +183,21 @@ inline bool encode(const SessionBegin6 &value, std::span<std::uint8_t> out) {
         const std::uint8_t bits_channel_stop_policy = static_cast<std::uint8_t>(value.channel_stop_policy[i]);
         out[offset++] = static_cast<std::uint8_t>(bits_channel_stop_policy >> 0);
     }
+    const std::uint8_t bits_input_count = static_cast<std::uint8_t>(value.input_count);
+    out[offset++] = static_cast<std::uint8_t>(bits_input_count >> 0);
+    for (std::size_t i = 0; i < 64; ++i) {
+        const std::uint8_t bits_input_actuator = static_cast<std::uint8_t>(value.input_actuator[i]);
+        out[offset++] = static_cast<std::uint8_t>(bits_input_actuator >> 0);
+    }
+    const std::uint64_t bits_input_active_high = static_cast<std::uint64_t>(value.input_active_high);
+    out[offset++] = static_cast<std::uint8_t>(bits_input_active_high >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_input_active_high >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_input_active_high >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_input_active_high >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_input_active_high >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_input_active_high >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_input_active_high >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_input_active_high >> 56);
     return true;
 }
 
@@ -327,6 +345,24 @@ inline bool decode(std::span<const std::uint8_t> input, SessionBegin6 &value) {
         bits_channel_stop_policy |= static_cast<std::uint8_t>(input[offset++]) << 0;
         value.channel_stop_policy[i] = bits_channel_stop_policy;
     }
+    std::uint8_t bits_input_count = 0;
+    bits_input_count |= static_cast<std::uint8_t>(input[offset++]) << 0;
+    value.input_count = bits_input_count;
+    for (std::size_t i = 0; i < 64; ++i) {
+        std::uint8_t bits_input_actuator = 0;
+        bits_input_actuator |= static_cast<std::uint8_t>(input[offset++]) << 0;
+        value.input_actuator[i] = bits_input_actuator;
+    }
+    std::uint64_t bits_input_active_high = 0;
+    bits_input_active_high |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_input_active_high |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_input_active_high |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_input_active_high |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_input_active_high |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_input_active_high |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_input_active_high |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_input_active_high |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.input_active_high = bits_input_active_high;
     return true;
 }
 
@@ -1257,7 +1293,7 @@ inline bool decode(std::span<const std::uint8_t> input, QueueStatus6 &value) {
     return true;
 }
 
-inline constexpr std::size_t State6Header_SIZE = 36;
+inline constexpr std::size_t State6Header_SIZE = 45;
 struct State6Header {
     static constexpr std::size_t SIZE = State6Header_SIZE;
     std::uint64_t session{};
@@ -1268,6 +1304,8 @@ struct State6Header {
     std::uint8_t actuator_count{};
     std::uint8_t reserved{};
     std::uint64_t path_clock_ticks{};
+    std::uint8_t input_count{};
+    std::uint64_t input_bits{};
 };
 
 inline bool encode(const State6Header &value, std::span<std::uint8_t> out) {
@@ -1317,6 +1355,17 @@ inline bool encode(const State6Header &value, std::span<std::uint8_t> out) {
     out[offset++] = static_cast<std::uint8_t>(bits_path_clock_ticks >> 40);
     out[offset++] = static_cast<std::uint8_t>(bits_path_clock_ticks >> 48);
     out[offset++] = static_cast<std::uint8_t>(bits_path_clock_ticks >> 56);
+    const std::uint8_t bits_input_count = static_cast<std::uint8_t>(value.input_count);
+    out[offset++] = static_cast<std::uint8_t>(bits_input_count >> 0);
+    const std::uint64_t bits_input_bits = static_cast<std::uint64_t>(value.input_bits);
+    out[offset++] = static_cast<std::uint8_t>(bits_input_bits >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_input_bits >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_input_bits >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_input_bits >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_input_bits >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_input_bits >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_input_bits >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_input_bits >> 56);
     return true;
 }
 
@@ -1375,6 +1424,19 @@ inline bool decode(std::span<const std::uint8_t> input, State6Header &value) {
     bits_path_clock_ticks |= static_cast<std::uint64_t>(input[offset++]) << 48;
     bits_path_clock_ticks |= static_cast<std::uint64_t>(input[offset++]) << 56;
     value.path_clock_ticks = bits_path_clock_ticks;
+    std::uint8_t bits_input_count = 0;
+    bits_input_count |= static_cast<std::uint8_t>(input[offset++]) << 0;
+    value.input_count = bits_input_count;
+    std::uint64_t bits_input_bits = 0;
+    bits_input_bits |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_input_bits |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_input_bits |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_input_bits |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_input_bits |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_input_bits |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_input_bits |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_input_bits |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.input_bits = bits_input_bits;
     return true;
 }
 
@@ -1568,6 +1630,103 @@ inline bool decode(std::span<const std::uint8_t> input, Sensor6Value &value) {
     bits_value |= static_cast<std::uint32_t>(input[offset++]) << 16;
     bits_value |= static_cast<std::uint32_t>(input[offset++]) << 24;
     value.value = std::bit_cast<float>(bits_value);
+    return true;
+}
+
+inline constexpr std::size_t InputState6_SIZE = 32;
+struct InputState6 {
+    static constexpr std::size_t SIZE = InputState6_SIZE;
+    std::uint64_t closing_count{};
+    std::uint64_t opening_count{};
+    std::int64_t captured_steps{};
+    std::uint64_t captured_ticks{};
+};
+
+inline bool encode(const InputState6 &value, std::span<std::uint8_t> out) {
+    if (out.size() < InputState6_SIZE) return false;
+    std::size_t offset = 0;
+    const std::uint64_t bits_closing_count = static_cast<std::uint64_t>(value.closing_count);
+    out[offset++] = static_cast<std::uint8_t>(bits_closing_count >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_closing_count >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_closing_count >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_closing_count >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_closing_count >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_closing_count >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_closing_count >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_closing_count >> 56);
+    const std::uint64_t bits_opening_count = static_cast<std::uint64_t>(value.opening_count);
+    out[offset++] = static_cast<std::uint8_t>(bits_opening_count >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_opening_count >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_opening_count >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_opening_count >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_opening_count >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_opening_count >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_opening_count >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_opening_count >> 56);
+    const std::uint64_t bits_captured_steps = std::bit_cast<std::uint64_t>(value.captured_steps);
+    out[offset++] = static_cast<std::uint8_t>(bits_captured_steps >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_captured_steps >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_captured_steps >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_captured_steps >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_captured_steps >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_captured_steps >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_captured_steps >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_captured_steps >> 56);
+    const std::uint64_t bits_captured_ticks = static_cast<std::uint64_t>(value.captured_ticks);
+    out[offset++] = static_cast<std::uint8_t>(bits_captured_ticks >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_captured_ticks >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_captured_ticks >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_captured_ticks >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_captured_ticks >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_captured_ticks >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_captured_ticks >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_captured_ticks >> 56);
+    return true;
+}
+
+inline bool decode(std::span<const std::uint8_t> input, InputState6 &value) {
+    if (input.size() != InputState6_SIZE) return false;
+    std::size_t offset = 0;
+    std::uint64_t bits_closing_count = 0;
+    bits_closing_count |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_closing_count |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_closing_count |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_closing_count |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_closing_count |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_closing_count |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_closing_count |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_closing_count |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.closing_count = bits_closing_count;
+    std::uint64_t bits_opening_count = 0;
+    bits_opening_count |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_opening_count |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_opening_count |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_opening_count |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_opening_count |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_opening_count |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_opening_count |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_opening_count |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.opening_count = bits_opening_count;
+    std::uint64_t bits_captured_steps = 0;
+    bits_captured_steps |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_captured_steps |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_captured_steps |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_captured_steps |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_captured_steps |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_captured_steps |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_captured_steps |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_captured_steps |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.captured_steps = std::bit_cast<std::int64_t>(bits_captured_steps);
+    std::uint64_t bits_captured_ticks = 0;
+    bits_captured_ticks |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_captured_ticks |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_captured_ticks |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_captured_ticks |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_captured_ticks |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_captured_ticks |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_captured_ticks |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_captured_ticks |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.captured_ticks = bits_captured_ticks;
     return true;
 }
 
