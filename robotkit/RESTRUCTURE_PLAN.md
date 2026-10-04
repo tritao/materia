@@ -152,6 +152,21 @@ separate run. R2 is merged to local main before R3 begins.
 
 ## R3 — Process and work semantics out of RobotKit
 
+Completed on 2026-10-04. ProcessKit now owns work geometry, process paths,
+finishing/scanning/welding/earthwork skills, simulated weld tools and arc
+models. Surface registration, work-patch planning and process MotionKit
+lowering moved with their domain dependencies. CAD face and wall work-surface
+bridges moved too, preventing a CAD bridge / MotionKit / ProcessKit cycle.
+RobotKit retains generic robot, skill and tool mechanisms and the frozen
+external sensor frame validation contract. Mechanical moves are separate
+from boundary fixes and documentation; no old import aliases remain.
+
+All required gate stages passed: workspace (4,950 RobotWorld and 9,865 MotionKit
+assertions), all 52 compile targets, all RobotKit suites and managed TCP modes,
+16 native tests, device host/MCU, robotd, humanoid, welder, completed worker demo,
+8 MotionKit Release and 3 CAD tests, four-platform ABI audits and exact planner
+fixture comparison. R3 is merged to local main before R4 begins.
+
 Started from the quiet point immediately after R2 main merge `8be94384e`.
 Live branches with committed changes to moved modules require rebase/import
 updates: drywall-scoped-d8 (1 modules), gantries (2 modules), machine-tending (13 modules), mobile-welder (1 modules), motion-loose-ends (1 modules).
