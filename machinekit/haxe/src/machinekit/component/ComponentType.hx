@@ -13,6 +13,12 @@ class ComponentType {
 	final defaultMaterial:String;
 	final bomExcludedInputs:Array<String>;
 
+	/** Most mass properties kept per recipe; past it the memo is emptied and each is computed again on its next use. */
+	static inline final MASS_MEMO_LIMIT = 1024;
+
+	final massMemo:Map<String, MassProperties> = [];
+	var massMemoCount = 0;
+
 	public function new(id:String, inputs:Array<ComponentParameter>, build:ComponentValues->MachineComponent,
 			keepDesignation:Bool = false, materialInDesignation:Bool = false,
 			?bomExcludedInputs:Array<String>) {
@@ -81,6 +87,23 @@ class ComponentType {
 	}
 
 	public function key(values:ComponentValues):String return keyFor(values, false);
+
+	/**
+	 * Mass properties already computed for a component of this type, by its `MachineComponent.geometryKey(Preview)`. They come
+	 * from cutting and integrating real solids, and each machine compile builds new component instances, so a per-instance
+	 * cache never hit across compiles. `MassProperties` never changes, so one value can be shared by every such component.
+	 */
+	public function knownMass(key:String):Null<MassProperties>
+		return massMemo.get(key);
+
+	public function rememberMass(key:String, mass:MassProperties):Void {
+		if (massMemoCount >= MASS_MEMO_LIMIT) {
+			massMemo.clear();
+			massMemoCount = 0;
+		}
+		massMemo.set(key, mass);
+		massMemoCount++;
+	}
 
 	/** BOM identity omits recipe inputs that only place or route a physical part. */
 	public function bomKey(values:ComponentValues):String return keyFor(values, true);
