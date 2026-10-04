@@ -152,6 +152,11 @@ separate run. R2 is merged to local main before R3 begins.
 
 ## R3 — Process and work semantics out of RobotKit
 
+Started from the quiet point immediately after R2 main merge `8be94384e`.
+Live branches with committed changes to moved modules require rebase/import
+updates: drywall-scoped-d8 (1 modules), gantries (2 modules), machine-tending (13 modules), mobile-welder (1 modules), motion-loose-ends (1 modules).
+Other worktrees and their uncommitted work remain untouched.
+
 - Move `robotkit.work` (16 files: `BucketSweep`, `DigCyclePlanner`, `EarthworkRegion`, `HeightMap`,
   `CoverageMap`, `RasterToolpathGenerator`, `WorkSurface`, …) and `robotkit.process` (`Toolpath`,
   `ToolpathPoint`) into ProcessKit (or a `workkit` beside it, if earthwork turns out to be its own

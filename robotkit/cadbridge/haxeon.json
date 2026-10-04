@@ -25,9 +25,6 @@
     },
     "bimkit": {
       "path": "../../bimkit"
-    },
-    "processkit": {
-      "path": "../../processkit"
     }
   },
   "target": "host"

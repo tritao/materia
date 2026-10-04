@@ -1271,7 +1271,7 @@ depending on `robotkit`, `cadkit`, and `bimkit`. It is the *only* place CAD/BIM
 concepts meet RobotKit; `robotkit/haxeon.json` itself still depends only on
 `nativekit`, per the plan's CAD-agnostic-core rule.
 
-`cadbridge.FaceBridge.toWorkSurface(face, id, frameId, ?provenance,
+`processkit.cadbridge.FaceBridge.toWorkSurface(face, id, frameId, ?provenance,
 ?surfaceFrameId, ?scale)` converts any CadKit planar `Face` into a design
 `WorkSurface`: it walks each wire's edge endpoints to preserve the authored
 connected loop, normalizes the resulting loop to counter-clockwise, and picks
@@ -1290,7 +1290,7 @@ rotation's columns `(basisU, basisV, normal)` make the surface's local +Z
 exactly the face's outward normal. `scale` converts the shape's own linear
 units into meters; CadKit itself is unit-agnostic.
 
-`cadbridge.WallBridge.wallToWorkSurface(bim, wallId, id, frameId,
+`processkit.cadbridge.WallBridge.wallToWorkSurface(bim, wallId, id, frameId,
 ?sideNormal)` finds a `BimSchema.Wall` element's side face (the planar face
 whose normal is closest to `sideNormal`, default `+Y`) on its *cut* shape —
 `bimkit.BimDocument.rebuildWall` already boolean-cuts a wall's body with

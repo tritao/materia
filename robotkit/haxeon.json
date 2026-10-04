@@ -22,9 +22,6 @@
     },
     "trajectorykit": {
       "path": "../trajectorykit"
-    },
-    "processkit": {
-      "path": "../processkit"
     }
   },
   "ffi": {

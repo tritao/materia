@@ -1,4 +1,6 @@
-package cadbridge;
+package processkit.cadbridge;
+
+import cadbridge.*;
 
 import CadKit;
 import cadkit.Face;
