@@ -112,6 +112,27 @@ class WeldingRecipe {
 		return result;
 	}
 
+	/** Generate the shared CAD path once, then attach the area-conserving pass schedule. */
+	public static function passStep(leg:Float, wire:RecipeWire, seams:Array<WeldSeam>, frame:String, metal:String,
+			metresPerUnit:Float, interpassDwell:Float = 0):SceneArtifactMissionStep {
+		var schedule = passes(leg, wire, interpassDwell);
+		var step = schedule[0].recipe.step(seams, frame, metal, metresPerUnit);
+		var weld = step.weld;
+		if (weld == null) throw "A recipe produced no weld";
+		weld.legSize = leg * 0.001;
+		weld.passes = [for (pass in schedule) {
+			var recipe = pass.recipe;
+			var saved:materia.project.SceneArtifact.SceneArtifactWeldPass = {name: pass.name,
+				offset: [pass.faceA * 0.001, pass.faceB * 0.001], interpassDwell: pass.interpassDwell,
+				process: {wireSpeed: recipe.wireSpeed, voltage: recipe.voltage, travelSpeed: recipe.travelSpeed * 0.001,
+					approach: recipe.approach * 0.001, startDwell: recipe.startDwell, craterDwell: recipe.craterDwell, burnback: recipe.burnback}};
+			if (pass.weaveAmplitude > 0) saved.weave = {pattern: "sine", amplitude: pass.weaveAmplitude * 0.001,
+				cyclesPerMetre: pass.weaveFrequency * 1000, edgeDwell: pass.edgeDwell};
+			saved;
+		}];
+		return step;
+	}
+
 	/**
 	 * The mission step that welds `seams` as one weld, run in order, each starting where the one before ends (a straight
 	 * seam is one, a chain of the sides of a tube several; see `WeldSeams.chains`). The seams are in the millimetre frame of
@@ -137,7 +158,7 @@ class WeldingRecipe {
 				case Corner: "corner";
 			}, start: pose(seam.frameAtParameter(0.0)), stop: pose(seam.frameAtParameter(1.0)),
 			normals: [direction(seam.normalA), direction(seam.normalB)]}], legSize: legSize * millimetre,
-			process: {wireSpeed: wireSpeed, voltage: voltage, travelSpeed: travelSpeed * millimetre, approach: approach * millimetre,
-				startDwell: startDwell, craterDwell: craterDwell, burnback: burnback}}};
+			passes: [{name: "single", offset: [0.0, 0.0], interpassDwell: 0.0, process: {wireSpeed: wireSpeed, voltage: voltage, travelSpeed: travelSpeed * millimetre, approach: approach * millimetre,
+				startDwell: startDwell, craterDwell: craterDwell, burnback: burnback}}]}};
 	}
 }

@@ -598,13 +598,31 @@ W5 design note while waiting for R3/R4 (2026-10-04; implementation has not start
   numerical approximation. Taper the offset to zero at sharp seam joins to preserve a connected path.
 - Deposition follows actual seam progress per second, including kinematic slowdowns. The nominal wire/area ratio
   is the recipe's policy; lateral tip speed during weaving must not increase the deposited area per seam metre.
-- Use one current saved weld representation: a non-empty pass list, each pass carrying its path, process, weave
-  and optional interpass dwell. Bump the then-current scene version and regenerate fixtures; reject older versions.
+- Use one current saved weld representation: a non-empty pass list over one CAD path. Each pass carries its process,
+  offsets along the path's face normals, weave and interpass dwell (zero when no cooling is requested). The common
+  path remains the deposition station reference, avoiding duplicated or independently drifting seam geometry.
+  Bump the then-current scene version and regenerate fixtures; reject older versions.
 - For the required 10 mm example, split its 50 mm² area into root/fill/cap fractions 1/4, 3/8 and 3/8
   (12.5, 18.75 and 18.75 mm²). Derive offsets from the seam's face normals and previously deposited height.
   Earlier station geometry must participate in both grounded-work sensing and clearance before later passes ignite.
 
 W5 implementation notes (in progress, 2026-10-04):
+- Scene artifact version 16 replaces the weld's root process with a required non-empty `passes` list over its
+  shared CAD `path`. Pass offsets are two nonnegative distances in metres along the CAD face normals; spatial
+  weave frequency is cycles/metre. Validation checks pass bounds, process/feeder limits, patterns and edge dwells
+  that leave time to traverse the weave. Version 15 is rejected; the decoder also rejects a root `process`.
+  ProjectKit passes 138 assertions, including a two-pass weave round trip and malformed pass settings. Existing
+  fixtures are generated in tests; example previews now generate version 16 directly (no stored scene binaries).
+  `WeldingMission` attaches the recipe's complete pass schedule. `MissionPlayer` evaluates each pass against the
+  live workpiece frame when that pass starts, applies its face offsets and weave, and sequences it with `WeldPasses`.
+  Cooling begins after a pass has completed its burnback/retract and confirmed the arc off. Sequencer tests pass
+  11 assertions, including cancellation during travel/cooling and failure preventing later strikes. ProcessKit
+  remains 55 welder / 44 planning / 16 rate / 106 weave / 23 process assertions. App compile passes 1,758 sources,
+  16,100 functions against R6. Runtime earlier-bead grounding and offset joins at chain corners remain open,
+  together with the required woven 7 mm and three-pass 10 mm app quality gates. The focused `welder-seam`
+  check exits 0 on both backends: ordinary 20.5 s, leg 5.0 mm (4.8–5.1), 180 mm, no restart; recovery 20.9 s,
+  leg 5.0 mm (4.8–5.4), 180 mm, one restart and 3 mm overlap, no gap or stray. These are 0.1/0.2 s shorter
+  than the preceding focused build (20.6/21.1); the timing difference still needs diagnosis before the W5 gate.
 - CAD-side `WeldingRecipe.passes` now chooses one pass through 8 mm and root/fill/cap above it (through 12 mm).
   Individual pass area determines wire speed, voltage and seam speed using the CAD wire's diameter, efficiency
   and feeder limit. Single-pass recipes now reject legs above 8 mm. Weaving starts above a 6 mm pass leg:

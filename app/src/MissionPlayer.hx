@@ -446,7 +446,9 @@ class MissionPlayer implements SessionMember {
         return HandlePart.place(cast handling, localization, () -> placeContact(at), vacuumSensor);
       case "weld":
         var weld:SceneArtifactWeld = cast step.weld;
-        return new WeldSeam(cast welding, localization, () -> weldPlan(weld), cast weldSensor);
+        return new processkit.skill.WeldPasses([for (pass in weld.passes)
+          new WeldSeam(cast welding, localization, () -> weldPlan(weld, pass), cast weldSensor)],
+          [for (pass in weld.passes) pass.interpassDwell]);
       default:
         throw 'Mission step kind "${step.kind}" is not supported';
     }
@@ -465,20 +467,34 @@ class MissionPlayer implements SessionMember {
    * workpiece's reference member, and that member is found where it stands when the step starts, as a pick finds its part,
    * so the weld follows a workpiece that is not where it was designed. A weld with no frame is in the assembly as designed.
    */
-  function weldPlan(weld:SceneArtifactWeld):WeldPlan {
+  function weldPlan(weld:SceneArtifactWeld, pass:materia.project.SceneArtifact.SceneArtifactWeldPass):WeldPlan {
     var frame = referenceFrame(weld);
-    function pose(torch:SceneArtifactTorchPose):Transform3
-      return frame.compose(new Transform3(new Vec3(torch.position[0], torch.position[1], torch.position[2]),
+    function pose(torch:SceneArtifactTorchPose, segment:materia.project.SceneArtifact.SceneArtifactWeldSegment):Transform3
+      return frame.compose(new Transform3(new Vec3(
+        torch.position[0] + segment.normals[0][0] * pass.offset[0] + segment.normals[1][0] * pass.offset[1],
+        torch.position[1] + segment.normals[0][1] * pass.offset[0] + segment.normals[1][1] * pass.offset[1],
+        torch.position[2] + segment.normals[0][2] * pass.offset[0] + segment.normals[1][2] * pass.offset[1]),
         new Quat(torch.rotation[0], torch.rotation[1], torch.rotation[2], torch.rotation[3])));
-    var process = weld.process;
+    var process = pass.process;
     // The open side of a corner is the bisector of its two faces' outward normals.
     function open(segment:materia.project.SceneArtifact.SceneArtifactWeldSegment):Vec3 {
       var a = segment.normals[0], b = segment.normals[1];
       return frame.rotation.rotate(new Vec3(a[0] + b[0], a[1] + b[1], a[2] + b[2]).normalized());
     }
-    return new WeldPlan([for (segment in weld.path) new WeldSegment(pose(segment.start), pose(segment.stop), segment.seam, open(segment))],
-      {wireSpeed: process.wireSpeed, voltage: process.voltage, travelSpeed: process.travelSpeed, approach: process.approach,
-        startDwell: process.startDwell, craterDwell: process.craterDwell, burnback: process.burnback});
+    var parameters:processkit.skill.WeldPlan.WeldParameters = {wireSpeed: process.wireSpeed, voltage: process.voltage, travelSpeed: process.travelSpeed, approach: process.approach,
+        startDwell: process.startDwell, craterDwell: process.craterDwell, burnback: process.burnback};
+    var weave = pass.weave;
+    if (weave != null) {
+      var pattern:motionkit.path.WeavePattern = switch weave.pattern {
+        case "sine": Sine;
+        case "triangle": Triangle;
+        case "zigzag": Zigzag;
+        default: throw 'Unknown weave pattern "${weave.pattern}"';
+      };
+      parameters.weave = new motionkit.path.WeaveProfile(pattern, weave.amplitude, weave.cyclesPerMetre,
+        process.travelSpeed, weave.edgeDwell);
+    }
+    return new WeldPlan([for (segment in weld.path) new WeldSegment(pose(segment.start, segment), pose(segment.stop, segment), segment.seam, open(segment))], parameters);
   }
 
   /**

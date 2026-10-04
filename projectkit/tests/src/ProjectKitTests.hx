@@ -117,8 +117,8 @@ class ProjectKitTests {
     truncated.blit(0, encoded, 0, 10);
     rejects(function() SceneArtifact.decode(truncated), "truncated scene");
     var badVersion = Bytes.alloc(encoded.length); badVersion.blit(0, encoded, 0, encoded.length);
-    badVersion.setInt32(4, 100);
-    rejects(function() SceneArtifact.decode(badVersion), "unsupported scene version");
+    badVersion.setInt32(4, 15);
+    rejects(function() SceneArtifact.decode(badVersion), "previous scene version is rejected");
     var invalidScale = Bytes.alloc(encoded.length);
     invalidScale.blit(0, encoded, 0, encoded.length);
     invalidScale.setDouble(8, -1);
@@ -315,7 +315,7 @@ class ProjectKitTests {
       return segment("plate:f3|plate:f9", [0.18, 0.0, 0.01], [0.18, 0.06, 0.01], [[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0]], intoX);
     function seam():materia.project.SceneArtifact.SceneArtifactWeld
       return {frame: "plate", metal: "plate", path: [line()], legSize: 0.005,
-        process: {wireSpeed: 8.0, voltage: 24.0, travelSpeed: 0.01, approach: 0.05, startDwell: 0.2, craterDwell: 0.3, burnback: 0.1}};
+        passes: [{name: "single", offset: [0.0, 0.0], interpassDwell: 0.0, process: {wireSpeed: 8.0, voltage: 24.0, travelSpeed: 0.01, approach: 0.05, startDwell: 0.2, craterDwell: 0.3, burnback: 0.1}}]};
     function mission(weld:materia.project.SceneArtifact.SceneArtifactWeld):materia.project.SceneArtifact.SceneArtifactMission
       return {steps: [{kind: "weld", weld: weld}]};
     data.robotTools = [torch()];
@@ -325,8 +325,8 @@ class ProjectKitTests {
     var weld:materia.project.SceneArtifact.SceneArtifactWeld = cast back.steps[0].weld;
     check(weld.frame == "plate" && weld.path.length == 1 && weld.path[0].seam == "plate:f3|upright:f7" && weld.path[0].joint == "fillet" &&
       weld.path[0].kind == "line" && weld.metal == "plate" && weld.path[0].stop.position[0] == 0.18 &&
-      weld.path[0].normals[1][1] == -1.0 && weld.legSize == 0.005 && weld.process.wireSpeed == 8.0 && weld.process.travelSpeed == 0.01 &&
-      weld.process.burnback == 0.1, "weld mission round trip");
+      weld.path[0].normals[1][1] == -1.0 && weld.legSize == 0.005 && weld.passes[0].process.wireSpeed == 8.0 && weld.passes[0].process.travelSpeed == 0.01 &&
+      weld.passes[0].process.burnback == 0.1, "weld mission round trip");
     // A chained seam is one weld of several segments, each with its own faces.
     var chain = seam();
     chain.path = [line(), second()];
@@ -366,12 +366,29 @@ class ProjectKitTests {
     bad(w -> w.path = [line(), segment("plate:f3|plate:f9", [0.5, 0.0, 0.01], [0.5, 0.06, 0.01], [[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0]], intoX)],
       "a path whose segments do not join");
     bad(w -> w.legSize = 0.0, "weld with no leg");
-    bad(w -> w.process.wireSpeed = 0.0, "weld with no wire speed");
-    bad(w -> w.process.wireSpeed = 25.0, "weld that asks the feeder for more wire than it can feed");
-    bad(w -> w.process.travelSpeed = Math.NaN, "weld that travels at no number");
-    bad(w -> w.process.approach = 0.0, "weld with no approach");
-    bad(w -> w.process.craterDwell = -1.0, "weld with a negative crater dwell");
-    bad(w -> w.process.burnback = 0.0, "weld with no burnback");
+    bad(w -> w.passes = [], "weld with no passes");
+    bad(function(w) { var pass = w.passes[0]; pass.offset = [0.0]; }, "pass with one face offset");
+    bad(function(w) { var pass = w.passes[0]; pass.offset = [-0.001, 0.0]; }, "pass inside a face");
+    bad(function(w) { var pass = w.passes[0]; pass.interpassDwell = Math.NaN; }, "nonfinite interpass dwell");
+    bad(function(w) { var pass = w.passes[0]; pass.weave = {pattern: "unknown", amplitude: 0.001, cyclesPerMetre: 100, edgeDwell: 0.05}; }, "unknown weave pattern");
+    bad(function(w) { var pass = w.passes[0]; pass.weave = {pattern: "sine", amplitude: 0.001, cyclesPerMetre: 100, edgeDwell: 1.0}; }, "edge dwells consume the weave period");
+    var multipass = seam();
+    multipass.passes.push({name: "cap", offset: [0.002, 0.003], interpassDwell: 0.5,
+      process: multipass.passes[0].process, weave: {pattern: "triangle", amplitude: 0.001, cyclesPerMetre: 100, edgeDwell: 0.05}});
+    data.mission = mission(multipass);
+    var passesBack = SceneArtifact.decode(SceneArtifact.encode(data)).mission;
+    if (passesBack == null || passesBack.steps[0].weld == null) throw "multi-pass weld lost";
+    var restored:materia.project.SceneArtifact.SceneArtifactWeld = cast passesBack.steps[0].weld;
+    var cap = restored.passes[1];
+    check(restored.passes.length == 2 && cap.name == "cap" && cap.offset[1] == 0.003 && cap.interpassDwell == 0.5 &&
+      cap.weave != null && cap.weave.pattern == "triangle" && cap.weave.cyclesPerMetre == 100, "pass schedule round trip");
+
+    bad(function(w) { var process = w.passes[0].process; process.wireSpeed = 0.0; }, "weld with no wire speed");
+    bad(function(w) { var process = w.passes[0].process; process.wireSpeed = 25.0; }, "weld that asks the feeder for more wire than it can feed");
+    bad(function(w) { var process = w.passes[0].process; process.travelSpeed = Math.NaN; }, "weld that travels at no number");
+    bad(function(w) { var process = w.passes[0].process; process.approach = 0.0; }, "weld with no approach");
+    bad(function(w) { var process = w.passes[0].process; process.craterDwell = -1.0; }, "weld with a negative crater dwell");
+    bad(function(w) { var process = w.passes[0].process; process.burnback = 0.0; }, "weld with no burnback");
     data.mission = mission(seam());
     // The robot's arm carries one tool: a mission cannot both pick and weld.
     data.mission = {steps: [{kind: "weld", weld: seam()}, {kind: "pick", at: {occurrence: "plate", connector: "tcp"}}]};

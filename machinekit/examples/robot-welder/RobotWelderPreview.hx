@@ -283,7 +283,7 @@ class RobotWelderChecks {
 		var length = Math.sqrt(Math.pow(segment.stop.position[0] - segment.start.position[0], 2) + Math.pow(segment.stop.position[1] - segment.start.position[1], 2) +
 			Math.pow(segment.stop.position[2] - segment.start.position[2], 2));
 		near(length, WeldingWorkpiece.PLATE_LENGTH * 0.001, "the seam's length", 1e-6);
-		var process = weld.process;
+		var process = weld.passes[0].process;
 		// Wire speed times wire area times efficiency over travel speed is the section of an equal-leg fillet of that leg.
 		var cellFeeder = new WeldingCell().feeder;
 		var area = process.wireSpeed * 1000 / 60 * Math.PI * cellFeeder.wireDiameterMm * cellFeeder.wireDiameterMm / 4 * cellFeeder.depositionEfficiency / (process.travelSpeed * 1000);
