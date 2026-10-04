@@ -542,6 +542,12 @@ class TextField implements View {
 			var handleKey = function(event:UiEvent) {
 				if (!enabled)
 					return;
+				// Ctrl+Alt arrows belong to application navigation, including its
+				// Shift variant. Leave them unconsumed for the command route.
+				if ((event.modifiers & (UiModifier.Control | UiModifier.Alt)) ==
+					(UiModifier.Control | UiModifier.Alt) &&
+					(event.key == UiKey.Left || event.key == UiKey.Right ||
+					 event.key == UiKey.Up || event.key == UiKey.Down)) return;
 				var extend = (event.modifiers & UiModifier.Shift) != 0;
 				var command = (event.modifiers & (UiModifier.Control | UiModifier.Super)) != 0;
 				var macWordNavigation = #if (mac || ios)

@@ -717,6 +717,20 @@ class FrameworkSmoke {
 			fieldDiagnostics.selectionStart != 5 || fieldDiagnostics.selectionEnd != 5 ||
 			fieldDiagnostics.caretOffset != 5 || fieldDiagnostics.caretRect == null)
 			return 209;
+		var applicationArrows = 0;
+		for (key in [UiKey.Left, UiKey.Right, UiKey.Up, UiKey.Down]) {
+			for (extend in [false, true]) {
+				var modifiers = UiModifier.Control | UiModifier.Alt | (extend ? UiModifier.Shift : 0);
+				var id = "test.application-arrow-" + key + "-" + modifiers;
+				context.commands.register(new Command(id, "Application navigation", function() applicationArrows++,
+					new Shortcut(key, modifiers)));
+				context.key(UiEventKind.KeyDown, key, modifiers);
+				context.commands.unregister(id);
+				if (fieldEditor.selectionStart != 5 || fieldEditor.selectionEnd != 5)
+					throw "application arrow chord changed text selection";
+			}
+		}
+		if (applicationArrows != 8) throw "text field swallowed application arrow shortcuts";
 		var sharedDocument = new TextDocument("start");
 		var sharedEdit:Null<EditTransaction> = null;
 		var sharedField = TextField.withDocument("shared-document-field", sharedDocument,
