@@ -2007,3 +2007,20 @@ and run ctest, then run G7 picker and homing tests once. Resolve failures before
 continuing. After that checkpoint, full test runs occur only at phase boundaries.
 This replaces the earlier stop-testing instruction; avoid starting the checkpoint
 until G12 implementation is ready.
+
+### G12 — resolve explicit startup side displacement
+
+Homing calibration wiring: `edc64c50a`. PowerUpSideOffsets resolves a named
+home switch to its explicit motor follower. Input displacement is in the
+monitored axis SI units: a 1 mm side offset is 0.001, converted through that
+side's composed ratio, without an affine intercept. Add it to a copied full
+base offset vector and return the explicitly affected drive indices. Reject
+unknown/nonhome switches, absent bindings, leader bindings, duplicate shafts
+and nonfinite/overflowing offsets.
+
+Native cold placement currently requires coupling-consistent offsets. It must
+accept the returned explicit side-drive list through a separate checked
+placement API, preserve reset behavior, and reject nonactuated/passive shafts.
+Scene authoring and the 1 mm regression must then use that API. This resolver
+alone does not place or square the machine. No tests or builds ran; the post-G12
+checkpoint is still pending G12 implementation.
