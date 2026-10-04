@@ -53,6 +53,8 @@ class TreeView implements View {
 	public var onItemActivated:Null<String->Void>;
 	/** Primary row clicks, including repeated clicks on the selected item. */
 	public var onItemClicked:Null<String->Int->Void>;
+	/** Explorer-style branch labels toggle on the first click of a sequence. */
+	public var expandOnSingleClick:Bool = false;
 	public var onItemContextMenu:Null<String->UiEvent->Void>;
 	public var onItemRename:Null<String->Void>;
 	public var onExpandedChanged:Null<String->Bool->Void>;
@@ -254,7 +256,9 @@ class TreeView implements View {
 						function(event) {
 							var count = clicks.value.register(nodeKey, event);
 							if (onItemClicked != null) onItemClicked(nodeKey, count);
-							if (count == 2) { if (entry.hasChildren) toggleExpanded(nodeKey); else if (onItemActivated != null) onItemActivated(nodeKey); }
+							if (entry.hasChildren) {
+								if (count == (expandOnSingleClick ? 1 : 2)) toggleExpanded(nodeKey);
+							} else if (count == 2 && onItemActivated != null) onItemActivated(nodeKey);
 						},
 						function(event) { handleNodeKey(context, entry, event); },
 						function(id) { itemIds.set(nodeKey, id); },
