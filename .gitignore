@@ -30,3 +30,5 @@
 /build/
 /uikit/build-web/
 /robotkit/tools/humanoid/tests/build/
+
+/robotkit/tests/spike/build/
