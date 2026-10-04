@@ -30,6 +30,7 @@ import processkit.skill.WeldPlan;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
 import processkit.tool.WeldFault;
+import processkit.tool.WeldArcModel;
 import processkit.tool.WeldSensor;
 import processkit.tool.WeldSensor.WeldReading;
 import robotkit.execution.FiredProcessEvent;
@@ -220,6 +221,12 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
       MotionOp.WaitInput(ARC_ESTABLISHED, InputPredicate.Equals(EventValue.Digital(true)), IGNITION_TIMEOUT)
     ];
     if (parameters.startDwell > 0) entry.push(MotionOp.Dwell(parameters.startDwell));
+    // A re-strike is over an existing bead: light at the stable minimum and omit the pooling dwell.
+    var recoveryEntry:Array<MotionOp> = [
+      MotionOp.SetOutput(channels.wireSpeed, EventValue.Analog(WeldArcModel.MIN_WIRE_SPEED)),
+      MotionOp.SetOutput(channels.arc, EventValue.Digital(true)),
+      MotionOp.WaitInput(ARC_ESTABLISHED, InputPredicate.Equals(EventValue.Digital(true)), IGNITION_TIMEOUT)
+    ];
     // Crater fill with the arc up, then the wire stops; the torch lifts while the arc burns back, and the command ends.
     var exit:Array<MotionOp> = [];
     if (parameters.craterDwell > 0) exit.push(MotionOp.Dwell(parameters.craterDwell));
@@ -229,7 +236,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     }
     exit.push(MotionOp.SetOutput(channels.arc, EventValue.Digital(false)));
     var recipe = new ProcessRecipe(travel * 0.5, travel * 2.0, travel, 0.0, OrientationPolicy.Interpolated, 0.001,
-      parameters.wireSpeed / travel, 0.0, BACKOFF, FeedChangePolicy.Reject, new ProcessEngagement(entry, exit), APPROACH_SPEED,
+      parameters.wireSpeed / travel, 0.0, BACKOFF, FeedChangePolicy.Reject, new ProcessEngagement(entry, exit, recoveryEntry), APPROACH_SPEED,
       PREPARE_TIMEOUT);
     var device = new WelderProcessDevice(outputs, latest, channels, {voltage: parameters.voltage});
     var process = new ProcessRun(recipe, seam, device, channels.wireSpeed, motion.session);
@@ -324,7 +331,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     }
     followIndex = ops.length + process.followOp;
     // The entry is the two outputs, the wait for the arc, and perhaps a dwell, just before the path.
-    igniteIndex = followIndex - (cast(plan, WeldPlan).parameters.startDwell > 0 ? 2 : 1);
+    igniteIndex = followIndex - (first && cast(plan, WeldPlan).parameters.startDwell > 0 ? 2 : 1);
     ops = ops.concat(body.ops);
     programStart = process.lastProgramStart;
     reachedPath = false;

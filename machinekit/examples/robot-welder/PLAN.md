@@ -627,6 +627,12 @@ W5 implementation notes (in progress, 2026-10-04):
   metal and the prescribed total volume. This is a bead-model test; MuJoCo quality remains to be proven. Existing
   ProcessKit welder/planning/rate/process checks still pass 52/44/11/23 assertions.
 
+- Recovery engagement now has its own sequence in ProcessKit, with the original engagement retained by default
+  for other processes. Welding re-strikes at `WeldArcModel.MIN_WIRE_SPEED`, waits for the arc, and omits the
+  initial pooling dwell over existing metal. The first strike and crater/burnback exit stay unchanged. The
+  ignition-watch operation index follows the shorter recovery sequence. ProcessKit passes 55 welder / 44 planning /
+  11 rate / 106 weave / 23 process assertions. Overlap-dose compensation and the measured restart peak remain open.
+
 **W6. Real welder interface.** Map the channels to:
 - the retrofit I/O board: an optoMOS relay for the trigger, an isolated 0–10 V
   output for wire speed and voltage, a Hall-effect current sensor, an isolated
