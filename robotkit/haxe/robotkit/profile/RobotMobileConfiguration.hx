@@ -1,4 +1,4 @@
-package robotkit.model;
+package robotkit.profile;
 
 /** Mobile-base roles, command limits, and optional rectangular footprint. */
 class RobotMobileConfiguration {

@@ -1,5 +1,9 @@
 package robotkit.model;
 
+import robotkit.profile.RobotDriveConfiguration;
+import robotkit.profile.RobotMobileConfiguration;
+import robotkit.profile.RobotForkConfiguration;
+
 import haxe.Json;
 import haxe.io.Bytes;
 import robotkit.model.ActuatorDrive;

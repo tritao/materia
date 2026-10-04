@@ -1,5 +1,8 @@
 package robotkit.model;
 
+import robotkit.profile.RobotMobileConfiguration;
+import robotkit.profile.RobotForkConfiguration;
+
 import robotkit.model.Transmission;
 
 /** Editable static definition of a robot's links, joints, and sensors. */

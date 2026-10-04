@@ -117,10 +117,10 @@ class WorldTcpIntegration {
       liftJoint.limits.upper = 1.0;
       liftJoint.limits.velocity = 2.0;
       liftJoint.limits.effort = 100.0;
-      model.mobileBase = new robotkit.model.RobotMobileConfiguration(
-        robotkit.model.RobotDriveConfiguration.Differential("joint/left-wheel",
+      model.mobileBase = new robotkit.profile.RobotMobileConfiguration(
+        robotkit.profile.RobotDriveConfiguration.Differential("joint/left-wheel",
           "joint/right-wheel", 0.1, 0.5), 0.5, 1.0, 1.0, 1.0);
-      model.forkMechanism = new robotkit.model.RobotForkConfiguration("joint/lift",
+      model.forkMechanism = new robotkit.profile.RobotForkConfiguration("joint/lift",
         1000.0, 600.0, 1.0);
       var mount = model.addFrame(new robotkit.model.Frame("sensor mount", base, "demo/sensor-mount"));
       mount.position = [0.2, 0.0, 0.0];

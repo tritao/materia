@@ -19,9 +19,9 @@ import robotkit.model.Link;
 import robotkit.model.RobotModel;
 import robotkit.model.RobotModelCodec;
 import robotkit.model.Sensor;
-import robotkit.model.RobotDriveConfiguration;
-import robotkit.model.RobotMobileConfiguration;
-import robotkit.model.RobotForkConfiguration;
+import robotkit.profile.RobotDriveConfiguration;
+import robotkit.profile.RobotMobileConfiguration;
+import robotkit.profile.RobotForkConfiguration;
 import robotkit.runtime.RobotRuntimeCompiler;
 
 /** Editable RobotKit sensor model used by Materia's sensor panel. */

@@ -21,8 +21,8 @@ import robotkit.model.ActuatorDrive;
 import robotkit.model.Encoder;
 import robotkit.model.EncoderKind;
 import robotkit.model.TorqueSpeedCurve;
-import robotkit.model.RobotDriveConfiguration;
-import robotkit.model.RobotMobileConfiguration;
+import robotkit.profile.RobotDriveConfiguration;
+import robotkit.profile.RobotMobileConfiguration;
 import materia.project.SceneArtifact.SceneArtifactMobileBase;
 import cadkit.modeling.AssemblyState;
 
