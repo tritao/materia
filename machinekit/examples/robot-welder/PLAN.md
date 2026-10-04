@@ -797,6 +797,26 @@ W6 implementation notes (started after W5 main sync, 2026-10-04):
   invalid setpoints; the 78 Modbus assertions and TCP adapter tests remain green. Runtime sensor publication and
   complete CAD-mission execution through this binding are still to be connected and verified.
 
+- `WelderRuntimeBinding` now publishes supply feedback through RobotKit's existing external-sensor API, preserving
+  authored sensor identity, mount, source timestamp and explicit clock domain. Transport polling time is supplied
+  separately from the observation timestamp. Publication errors safe arc/wire, and sequence advances only after
+  successful publication. Focused checks use a real in-memory runtime: six-value frame/mount/clock preservation,
+  fault code 2 publication, safe outputs and backward source-clock rejection. The 78 Modbus assertions and real TCP
+  adapter/watchdog tests pass; the fault-contract change also passes 27 tool / 33 process / 152 weld / 33 clearance.
+- **W6 stopped at the ownership boundary; not complete or landed.** The full unchanged CAD mission has not run on
+  the RKD6 virtual welder or Modbus fake. The virtual board's C ABI can configure the welder only before its session,
+  but `robotkit/runtime/src/virtual_device_endpoint.{hpp,cpp}` creates and privately owns that board without an
+  initialization or tool access hook. `VirtualDeviceOptions`, `Simulation`, `robotkit_simkit.h` and the simulation
+  native adapter likewise expose no configuration, grounding-input or tool-feedback access. RKD6 numeric packets
+  reach native snapshots, but the Haxe snapshot layout accepts only encoder/IMU/lidar native sensors; `tool_weld`
+  remains an authored external sensor. A clean completion needs generic endpoint/device initialization and numeric
+  sensor access, with welding configuration, CAD grounding and external-sensor publication owned by ProcessKit.
+  These generic host endpoint/simulation files belong to the restructuring session under the handoff. The goal
+  explicitly requires stopping when finishing needs those files beyond post-merge compile fixes; no such edits
+  were made. Resume after that session supplies the hooks or the ownership restriction is explicitly revised.
+  The Modbus CAD-mission harness, cross-backend stop/abort/fault/link-loss mission checks, final W6 app gate and main
+  sync remain open. Local main remains `757127cf01605ef843a7e24c22b74a0ee13e6c61` (W5).
+
 ## Phase 2: mobile welder
 
 These are the hardware choices made on 2026-10-02: a 48 V LFP pack (16s,
