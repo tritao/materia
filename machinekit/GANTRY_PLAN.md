@@ -1475,3 +1475,21 @@ metadata, not proof of firmware input capture (G13 remains pending).
 
 Homing observation freshness and edge-count advancement must still be enforced
 by the runtime driver. No tests or builds ran; runtime behavior is unverified.
+
+
+### G11 — enforce homing observation freshness and edge identity
+
+Switch capture transport: `90e7c8e72`. Homing observations now require source
+timestamps/clocks, and each home signal carries its sequence plus optional
+closing-edge count. Reject missing/duplicate signals, nonpositive sequences,
+invalid capture identity and clock changes. HomingCycle requires position and
+switch observations to advance on each control update; switch timestamps must
+share the position clock, never lie in its future, and stay within one authored
+sampling period. Freshness rejection requests the existing controlled stop.
+
+At slow-approach entry, record closing-edge counts. A captured latch must have
+a larger count; a count reset or an old seek capture faults. Digital-only
+sources retain the existing sampled-position repeatability budget. Post-latch
+coordinate rereads may share the same physics sample and are not a new control
+update. Actual driver construction and counter transformations remain pending.
+No tests or builds ran; no freshness or homing behavior is runtime-verified.

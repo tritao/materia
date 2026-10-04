@@ -1,6 +1,7 @@
 package motionkit.robot;
 
 import motionkit.robot.HomingDriver.HomingObservation;
+import haxe.Int64;
 
 private enum HomingPhase {
   Idle; Seek; StopAfterSeek; Backoff; StopAfterBackoff; Approach; StopAfterLatch; Return; Complete; Fault;
@@ -16,6 +17,10 @@ class HomingCycle {
   var elapsed:Float = 0.0;
   var releasePosition:Null<Float> = null;
   var captures:Array<Null<Float>> = [];
+  var approachEdges:Array<Null<Int>> = [];
+  var sequences:Map<String, Int64> = new Map();
+  var lastTimestamp:Null<Int64> = null;
+  var observationClock:Null<String> = null;
   public var fault(default, null):Null<String> = null;
 
   public function new(driver:HomingDriver, axes:Array<HomingAxis>) {
@@ -51,6 +56,8 @@ class HomingCycle {
 
   function beginAxis():Void {
     var axis = axes[index], observation = driver.observe(axis.joint);
+    lastTimestamp = null; observationClock = null;
+    validateFresh(axis, observation);
     if (Math.abs(observation.velocity) > axis.latchSpeed * 0.01)
       throw "Homing must start with the axis at rest";
     captures = [for (_ in axis.switches) null]; releasePosition = null;
@@ -64,6 +71,7 @@ class HomingCycle {
     var axis = axes[index];
     try {
       var observation = driver.observe(axis.joint);
+      validateFresh(axis, observation);
       elapsed += dt;
       var timeout = axis.maximumTravel / axis.latchSpeed + 10 * axis.seekSpeed / axis.acceleration;
       if (elapsed > timeout || Math.abs(observation.position - origin) > axis.maximumTravel)
@@ -87,7 +95,12 @@ class HomingCycle {
           var all = true;
           for (i in 0...axis.switches.length) {
             var signal = signalFor(axis.switches[i].id, observation);
+            if (signal.closingEdges != null && approachEdges[i] != null &&
+                signal.closingEdges < approachEdges[i]) throw "Homing edge counter reset during approach";
             if (signal.active && captures[i] == null) {
+              if (signal.edgePosition != null && (approachEdges[i] == null ||
+                  signal.closingEdges <= approachEdges[i]))
+                throw "Homing closing-edge capture predates the slow approach";
               if (signal.edgePosition == null && axis.switches[i].repeatability == 0)
                 throw "Zero-repeatability homing requires captured switch edges";
               if (signal.edgePosition == null && dt > axis.timestep * (1 + 1e-9))
@@ -134,11 +147,36 @@ class HomingCycle {
     switch next {
       case Seek: driver.velocity(axis.joint, side * axis.seekSpeed, axis.acceleration);
       case Backoff: driver.velocity(axis.joint, -side * axis.seekSpeed, axis.acceleration);
-      case Approach: driver.velocity(axis.joint, side * axis.latchSpeed, axis.acceleration);
+      case Approach:
+        approachEdges = [for (contact in axis.switches) signalFor(contact.id, observation).closingEdges];
+        driver.velocity(axis.joint, side * axis.latchSpeed, axis.acceleration);
       case StopAfterSeek, StopAfterBackoff, StopAfterLatch: driver.stop(axis.joint, axis.acceleration);
       case Return: driver.returnHome(axis.joint, axis.home, axis.seekSpeed, axis.acceleration);
       case _:
     }
+  }
+
+  function validateFresh(axis:HomingAxis, observation:HomingObservation):Void {
+    if (observation == null) throw "Homing has no position observation";
+    if (observationClock != null && observation.clockId != observationClock)
+      throw "Homing observation source clock changed";
+    if (lastTimestamp != null && Int64.compare(observation.timestampNs, lastTimestamp) <= 0)
+      throw "Homing position observation did not advance";
+    for (contact in axis.switches) {
+      var signal = signalFor(contact.id, observation);
+      var previous = sequences.get(signal.id);
+      if (signal.clockId != observation.clockId ||
+          Int64.compare(signal.timestampNs, observation.timestampNs) > 0 ||
+          Int64.toFloat(Int64.sub(observation.timestampNs, signal.timestampNs)) > axis.timestep * 1e9 * (1 + 1e-9) ||
+          (previous != null && Int64.compare(signal.sequence, previous) <= 0))
+        throw 'Homing switch "${signal.id}" has a stale or incompatible source observation';
+    }
+    for (contact in axis.switches) {
+      var signal = signalFor(contact.id, observation);
+      sequences.set(signal.id, signal.sequence);
+    }
+    lastTimestamp = observation.timestampNs;
+    observationClock = observation.clockId;
   }
 
   function anyActive(axis:HomingAxis, observation:HomingObservation):Bool {
