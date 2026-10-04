@@ -194,6 +194,7 @@ private:
     std::array<double, 64> counter_origins_{};
     std::uint64_t counter_state_sequence_ = 0;
     bool counter_state_pending_ = false;
+    bool homing_stop_pending_ = false;
     bool has_state_ = false;
     std::array<device_wire6::Sensor6Header, RK_MAX_SENSORS> sensor_headers_{};
     std::array<std::array<float, RK_MAX_SENSOR_VALUES>, RK_MAX_SENSORS> sensor_values_{};

@@ -88,6 +88,13 @@ class DeviceHomingSides implements HomingSideControl implements HomingControlRea
     }
   }
 
+  /** Return false when ordinary stopping applies outside a physical pair scope. */
+  public function controlledStop():Bool {
+    if (squaring.length == 0 || ending) return false;
+    enqueue(4, channel(squaring[0]), channel(squaring[1]));
+    return true;
+  }
+
   public function endSquaring():Void {
     if (squaring.length == 0 || ending) return;
     releaseAll();

@@ -2908,3 +2908,19 @@ No builds/tests ran. Delayed-ack first-side coverage remains queued for Phase C.
 Controlled device stop still needs host queue integration before router hookup;
 cancellation cleanup and hardware controls also remain unfinished. G13 is not
 complete.
+
+### G13 — acknowledged scoped stop and host queue cleanup
+
+Scoped homing stop now suspends native segment pumping while its acknowledgment
+is pending. Acceptance clears endpoint segment/event/timing bookkeeping without
+issuing the ordinary scope-clearing stop. Runtime retains the stop sequence,
+blocks new motion and, on accepted status, clears its queue/control state and
+records safe process outputs. Unknown delivery remains pending.
+RuntimeHomingDriver accepts an optional scoped device-stop callback, and
+DeviceHomingSides exposes that operation for active pairs. HomingCycle polls
+controls on every update, so stop commands progress even while observed velocity
+is nonzero. Ordinary stops remain the fallback outside a pair scope.
+
+No builds/tests ran. Cancellation/fault cleanup, stop rejection/timeout behavior
+and fresh stationary handoff need phase regression/audit. Router fixture wiring
+and Nucleo support remain pending; G13 is incomplete.

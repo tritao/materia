@@ -23,13 +23,15 @@ class RuntimeHomingDriver implements HomingDriver {
   final axes:Map<Int, HomingAxis> = new Map();
   final mappings:Map<Int, MotionAxis> = new Map();
   final afterLatch:Void -> Void;
+  final deviceStop:Null<Void -> Bool>;
 
   /** afterLatch resets the caller-owned encoder and stepper-slip monitors. */
   public function new(robot:Robot, runtime:RobotRuntime, homes:Array<HomingAxis>,
-      motionAxes:Array<MotionAxis>, afterLatch:Void -> Void) {
+      motionAxes:Array<MotionAxis>, afterLatch:Void -> Void, ?deviceStop:Void -> Bool) {
     if (robot == null || runtime == null || homes == null || homes.length == 0 ||
         motionAxes == null || afterLatch == null) throw "Homing driver requires runtime, axes and latch monitor reset";
     this.robot = robot; this.runtime = runtime; this.afterLatch = afterLatch;
+    this.deviceStop = deviceStop;
     var expanded:Array<MotionAxis> = [];
     var names = robot.description().joints;
     if (homes[0] == null) throw "Homing driver has a null home axis";
@@ -73,6 +75,8 @@ class RuntimeHomingDriver implements HomingDriver {
 
   public function stop(joint:Int, acceleration:Float):Void {
     requireAxis(joint);
+    var stopDevice = deviceStop;
+    if (stopDevice != null && stopDevice()) return;
     robot.stop(StopMode.Normal);
   }
 

@@ -461,7 +461,7 @@ rk_result RobotRuntime::submit(const rk_robot_command &command) {
         return RK_ERROR_INVALID_ARGUMENT;
     try {
         std::lock_guard lock(queue_mutex_);
-        if (pending_drive_calibration_ && command.kind == RK_COMMAND_JOINT_TARGETS)
+        if ((pending_drive_calibration_ || pending_homing_stop_) && command.kind == RK_COMMAND_JOINT_TARGETS)
             return RK_ERROR_INVALID_STATE;
         if (command.kind == RK_COMMAND_JOINT_TARGETS) {
             const auto referenced = references_locked();
@@ -685,7 +685,7 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
     try {
         std::lock_guard owner_lock(owner_mutex_);
         std::lock_guard queue_lock(queue_mutex_);
-        if (pending_drive_calibration_) return RK_ERROR_INVALID_STATE;
+        if (pending_drive_calibration_ || pending_homing_stop_) return RK_ERROR_INVALID_STATE;
         if (plan.model_revision != blueprint_.revision ||
             plan.calibration_revision != blueprint_.calibration_revision)
             return RK_ERROR_MODEL_MISMATCH;
@@ -2474,11 +2474,32 @@ rk_result RobotRuntime::device_homing_control(const rk_device_homing_control &co
     if (control.struct_size < sizeof(control) || control.action > 4 || !control.sequence || !control.scope)
         return RK_ERROR_INVALID_ARGUMENT;
     std::lock_guard owner_lock(owner_mutex_);
-    return endpoint_ ? endpoint_->device_homing_control(control) : RK_ERROR_BACKEND;
+    std::lock_guard queue_lock(queue_mutex_);
+    if (pending_homing_stop_ || pending_drive_calibration_) return RK_ERROR_INVALID_STATE;
+    const auto result = endpoint_ ? endpoint_->device_homing_control(control) : RK_ERROR_BACKEND;
+    if (result == RK_OK && control.action == 4) pending_homing_stop_ = control.sequence;
+    return result;
 }
-rk_result RobotRuntime::device_homing_status(uint64_t sequence) const {
+rk_result RobotRuntime::device_homing_status(uint64_t sequence) {
     if (!sequence) return RK_ERROR_INVALID_ARGUMENT;
     std::lock_guard owner_lock(owner_mutex_);
-    return endpoint_ ? endpoint_->device_homing_status(sequence) : RK_ERROR_BACKEND;
+    const auto result = endpoint_ ? endpoint_->device_homing_status(sequence) : RK_ERROR_BACKEND;
+    std::lock_guard queue_lock(queue_mutex_);
+    if (pending_homing_stop_ && *pending_homing_stop_ == sequence) {
+        if (result == RK_OK) {
+            std::lock_guard state_lock(state_mutex_);
+            safe_channels(current_owner_time_ns_, RK_EVENT_STOP_SAFE, false, true);
+            commands_.clear();
+            reset_control();
+            device_queue_active_ = false;
+            state_.trajectory_active = 0; state_.trajectory_queue_depth = 0;
+            state_.active_plan_id = 0; state_.committed_until_ns = 0;
+            state_.queue_end_time_ns = 0;
+            state_.mode = RK_ROBOT_MODE_STOPPING; state_.safety = RK_SAFETY_STOPPING;
+            state_backup_valid_ = false;
+            pending_homing_stop_.reset();
+        } else if (result == RK_ERROR_INVALID_STATE) pending_homing_stop_.reset();
+    }
+    return result;
 }
 }

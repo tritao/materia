@@ -227,7 +227,7 @@ public:
     rk_result limit_input(uint32_t joint, bool active);
     rk_result device_input(const char *switch_id, rk_device_input_observation &out) const;
     rk_result device_homing_control(const rk_device_homing_control &control);
-    rk_result device_homing_status(uint64_t sequence) const;
+    rk_result device_homing_status(uint64_t sequence);
     /** Atomically establish logical = endpoint position + offset at rest. */
     rk_result calibrate_coordinates(const double *offsets, uint32_t count,
                                    const uint32_t *reference_joints = nullptr, uint32_t reference_count = 0);
@@ -377,6 +377,7 @@ private:
         bool acknowledged = false;
     };
     std::optional<PendingDriveCalibration> pending_drive_calibration_;
+    std::optional<uint64_t> pending_homing_stop_;
     std::array<double, RK_MAX_JOINTS> coordinate_offsets_{};
     std::array<bool, RK_MAX_JOINTS> reference_required_{};
     std::array<bool, RK_MAX_JOINTS> reference_latched_{};

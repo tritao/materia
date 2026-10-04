@@ -85,6 +85,8 @@ class HomingCycle {
     try {
       var observation = driver.observe(axis.joint);
       validateFresh(axis, observation);
+      // Asynchronous stop/hold commands must progress even while still moving.
+      controlsReady();
       elapsed += dt;
       var timeout = axis.maximumTravel / axis.latchSpeed + 10 * axis.seekSpeed / axis.acceleration;
       if (elapsed > timeout || Math.abs(observation.position - origin) > axis.maximumTravel)

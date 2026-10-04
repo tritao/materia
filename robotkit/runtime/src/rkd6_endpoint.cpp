@@ -782,6 +782,14 @@ void Rkd6Endpoint::poll_frames(std::uint64_t owner_now_ns) {
             if (device_wire6::decode(decoded.payload, ack) && ack.session == ack_.session &&
                 ack.sequence == control_sequence_ && ack.scope == control_scope_ && !control_accepted_.has_value()) {
                 control_accepted_ = ack.accepted != 0;
+                if (homing_stop_pending_) {
+                    if (ack.accepted) {
+                        pending_.clear(); sent_.clear(); sent_events_.clear();
+                        chunk_timings_.clear(); plan_tags_.clear();
+                        next_commit_ = 0; committed_until_ticks_ = 0; epoch_set_ = false;
+                    }
+                    homing_stop_pending_ = false;
+                }
                 if (counter_batch_) {
                     if (ack.accepted) {
                         counter_origins_[counter_batch_->first] += counter_batch_->first_delta;
@@ -931,7 +939,7 @@ void Rkd6Endpoint::send_due_commit() {
 }
 
 void Rkd6Endpoint::pump_queue() {
-    if (!clock_.may_commit()) return;
+    if (homing_stop_pending_ || !clock_.may_commit()) return;
     const auto occupied = std::count_if(sent_.begin(), sent_.end(), [&](const auto &row) {
         return row.header.t0_ticks + row.header.duration_ticks >= status_.path_clock_ticks;
     });
@@ -1117,6 +1125,7 @@ rk_result Rkd6Endpoint::request_homing_scope(std::uint64_t sequence, std::uint64
     std::array<std::uint8_t, device_wire6::HomingScope6::SIZE> bytes{};
     if (!device_wire6::encode(command, bytes) || !send_record(17, bytes)) return RK_ERROR_BACKEND;
     control_sequence_ = sequence; control_scope_ = scope; control_sent_ns_ = now_ns_; control_accepted_.reset();
+    homing_stop_pending_ = action == 2;
     return RK_OK;
 }
 
