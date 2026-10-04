@@ -112,8 +112,8 @@ class PlanCheckTests extends MotionKitTestSupport {
     var runtime = harness.simulation.addRobot(blueprint.runtime);
     var robot = new SimulatedRobot("checked-direct", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name], [for (joint in blueprint.model.joints) joint.name]);
-    var recording = new robotkit.world.RobotRecording();
-    var machine = new motionkit.robot.MotionSystem(new robotkit.world.RecordingRobot(robot, recording), blueprint);
+    var recording = new robotkit.recording.RobotRecording();
+    var machine = new motionkit.robot.MotionSystem(new robotkit.recording.RecordingRobot(robot, recording), blueprint);
     var directCheck:PlanCheck = machine.planCheck;
     directCheck.options.rejects = true;
     var rejected = false;
@@ -156,8 +156,8 @@ class PlanCheckTests extends MotionKitTestSupport {
     var runtime = harness.simulation.addRobot(blueprint);
     var robot = new SimulatedRobot("checked-servo", runtime, fixture.model.name,
       [for (link in fixture.model.links) link.name], [for (joint in fixture.model.joints) joint.name]);
-    var recording = new robotkit.world.RobotRecording();
-    var session = new motionkit.robot.ServoSession(new robotkit.world.RecordingRobot(robot, recording), fixture.arm,
+    var recording = new robotkit.recording.RobotRecording();
+    var session = new motionkit.robot.ServoSession(new robotkit.recording.RecordingRobot(robot, recording), fixture.arm,
       0.01, 1e-3, 1e-4, new motionkit.robot.ServoPlan.ServoPlanOptions(
         Int64.ofInt(blueprint.revision), Int64.ofInt(blueprint.calibrationRevision)));
     var servoCheck:PlanCheck = session.planCheck;

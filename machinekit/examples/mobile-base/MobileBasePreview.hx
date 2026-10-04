@@ -1,3 +1,4 @@
+import machinekit.assembly.PosedParts;
 import machinekit.assembly.AssemblyPreview;
 import haxe.io.Bytes;
 import cadkit.modeling.AssemblyModel;
@@ -72,6 +73,18 @@ class MobileBaseChecks {
 	}
 
 	public static function run():Void {
+		parts = new PosedParts();
+		try runChecks() catch (error:Dynamic) {
+			parts.close();
+			throw error;
+		}
+		parts.close();
+	}
+
+	/** The geometry of the members posed by this run, built once each; closed when the run ends. */
+	static var parts:PosedParts;
+
+	static function runChecks():Void {
 		var scene = SceneArtifact.decode(MobileBasePreview.base());
 		var definition = scene.assemblyDefinition;
 		var robot = new MobileBase();
@@ -163,10 +176,9 @@ class MobileBaseChecks {
 			state.setJoint("wheel_r", -angle);
 			state.forwardKinematics();
 			var solids = [for (id in ids) posed(robot, state, id)];
+			var boxes = [for (solid in solids) PosedParts.boxOf(solid)];
 			for (i in 0...ids.length) for (j in i + 1...ids.length) {
-				var common = solids[i].intersect(solids[j]);
-				var volume = common.volume();
-				common.close();
+				var volume = PosedParts.commonVolume(solids[i], boxes[i], solids[j], boxes[j]);
 				if (volume > 1e-3) throw '${ids[i]} collides with ${ids[j]} at wheel angle $angle: ${Math.round(volume)} mm³';
 			}
 			for (solid in solids) solid.close();
@@ -198,13 +210,21 @@ class MobileBaseChecks {
 		near(plate.y, MobileBaseCell.ORIGIN.y, "the robot stands at its origin, y", 1e-9);
 		var blocks = [for (entry in cell.components()) if (!StringTools.startsWith(entry.id, "robot/")) entry];
 		var robotIds = [for (entry in cell.components()) if (StringTools.startsWith(entry.id, "robot/")) entry.id];
-		for (block in blocks) for (id in robotIds) {
-			var a = posed(cell, state, block.id), b = posed(cell, state, id);
-			var common = a.intersect(b);
-			var volume = common.volume();
-			common.close(); a.close(); b.close();
-			if (volume > 1e-3) throw 'At its origin the robot\'s ${id} hits ${block.id}';
+		var robotSolids = [for (id in robotIds) posed(cell, state, id)];
+		var robotBoxes = [for (solid in robotSolids) PosedParts.boxOf(solid)];
+		for (block in blocks) {
+			var a = posed(cell, state, block.id), boxA = PosedParts.boxOf(a);
+			for (index in 0...robotIds.length) {
+				var volume = PosedParts.commonVolume(a, boxA, robotSolids[index], robotBoxes[index]);
+				if (volume > 1e-3) {
+					a.close();
+					PosedParts.closeAll(robotSolids);
+					throw 'At its origin the robot\'s ${robotIds[index]} hits ${block.id}';
+				}
+			}
+			a.close();
 		}
+		PosedParts.closeAll(robotSolids);
 		// The chassis' corner radius plus the planner's half-cell margin.
 		var radius = Math.sqrt(Math.pow(MobileBase.LENGTH / 2, 2) + Math.pow(MobileBase.WIDTH / 2, 2)) + 40;
 		for (goal in MobileBaseCell.GOALS) for (block in blocks) {
@@ -246,27 +266,24 @@ class MobileBaseChecks {
 		near(floor.z, MobileBase.DECK_Z + MobileBase.DECK_THICKNESS, "the arm stands on the deck", 1e-9);
 		var armIds = [for (entry in robot.components()) if (StringTools.startsWith(entry.id, "arm/")) entry.id];
 		var baseIds = [for (entry in robot.components()) if (!StringTools.startsWith(entry.id, "arm/")) entry.id];
-		for (a in armIds) for (b in baseIds) {
-			if (a == "arm/pedestal" && b == "deck") continue;
-			var first = posed(robot, state, a), second = posed(robot, state, b);
-			var common = first.intersect(second);
-			var volume = common.volume();
-			common.close(); first.close(); second.close();
-			if (volume > 1e-3) throw '$a collides with $b on the mobile manipulator: ${Math.round(volume)} mm³';
+		var armSolids = [for (id in armIds) posed(robot, state, id)], baseSolids = [for (id in baseIds) posed(robot, state, id)];
+		var armBoxes = [for (solid in armSolids) PosedParts.boxOf(solid)], baseBoxes = [for (solid in baseSolids) PosedParts.boxOf(solid)];
+		for (a in 0...armIds.length) for (b in 0...baseIds.length) {
+			if (armIds[a] == "arm/pedestal" && baseIds[b] == "deck") continue;
+			var volume = PosedParts.commonVolume(armSolids[a], armBoxes[a], baseSolids[b], baseBoxes[b]);
+			if (volume > 1e-3) {
+				PosedParts.closeAll(armSolids);
+				PosedParts.closeAll(baseSolids);
+				throw '${armIds[a]} collides with ${baseIds[b]} on the mobile manipulator: ${Math.round(volume)} mm³';
+			}
 		}
+		PosedParts.closeAll(armSolids);
+		PosedParts.closeAll(baseSolids);
 		Sys.println('mobile manipulator: cup ahead at ${Math.round(cup.x)}, ${Math.round(cup.y)}, ${Math.round(cup.z)} mm');
 	}
 
 	static function posed(robot:MachineAssembly, state:AssemblyState, id:String):Part {
-		for (entry in robot.components()) if (entry.id == id) {
-			var pose = state.worldPose(id);
-			var x = AssemblyFrames.transformVector(pose, 1, 0, 0), z = AssemblyFrames.transformVector(pose, 0, 0, 1);
-			var local = entry.component.geometry(ComponentDetail.Preview);
-			var placed = local.placed(new Location(new Plane(new Vector(pose.x, pose.y, pose.z), new Vector(x.x, x.y, x.z),
-				new Vector(z.x, z.y, z.z))));
-			local.close();
-			return placed;
-		}
+		for (entry in robot.components()) if (entry.id == id) return parts.posed(entry.component, state.worldPose(id));
 		throw 'Mobile base has no member "$id"';
 	}
 }
