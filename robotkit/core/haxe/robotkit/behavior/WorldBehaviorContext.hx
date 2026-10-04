@@ -14,9 +14,9 @@ class WorldBehaviorContext {
   final commands:Array<RobotCommand>;
 
   @:allow(robotkit.behavior.WorldBehaviorRunner)
-  function new(snapshot:RobotSnapshot, events:Array<RobotEvent>, commands:Array<RobotCommand>) {
+  function new(snapshot:RobotSnapshot, events:Array<RobotEvent>, commands:Array<RobotCommand>, sensorFrames:Array<SensorFrame>) {
     this.snapshot = snapshot;
-    this.sensors = snapshot.sensors.toArray();
+    this.sensors = sensorFrames.copy();
     this.events = events.copy();
     this.commands = commands;
   }

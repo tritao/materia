@@ -30,9 +30,9 @@ import robotkit.protocol.RecordingTimedEventMsg;
 import robotkit.protocol.RecordingWorldEventMsg;
 import robotkit.protocol.RecordingWorldMsg;
 
-/** Typed conversions between world values and v7 MessagePack payloads. */
+/** Typed conversions between world values and v8 MessagePack payloads. */
 class RobotRecordingCodec {
-  public static inline final VERSION:Int = 7;
+  public static inline final VERSION:Int = 8;
 
   public static function command(value:RobotCommand, robotId:RobotId):RecordingCommandMsg {
     var result = new RecordingCommandMsg();
@@ -218,6 +218,7 @@ class RobotRecordingCodec {
     msg.positions = value.positions.toArray();
     msg.velocities = value.velocities.toArray();
     msg.efforts = value.efforts.toArray();
+    msg.streamSequences = [for (stream in value.streamSequences) new robotkit.protocol.StreamSequenceMsg(stream.streamId,stream.kind,stream.sequence,stream.sourceClockId)];
     msg.sensors = [for (sensor in value.sensors.toArray()) RobotRecordingCodec.sensor(sensor, value.id)];
     msg.mode = value.mode;
     msg.faultCode = value.faultCode;
@@ -244,7 +245,7 @@ class RobotRecordingCodec {
       msg.sourceClockId, msg.receivedClockId, msg.safety, msg.trajectoryQueueDepth,
       msg.trajectoryActive, msg.trajectoryTimeNs, msg.trajectoryDurationNs,
       msg.trajectoryTag, msg.trajectoryTagTimeNs, msg.sessionState, msg.activePlanId,
-      msg.committedUntilNs, msg.queueEndTimeNs);
+      msg.committedUntilNs, msg.queueEndTimeNs, null, robotkit.protocol.StreamSequenceMsg.values(msg.streamSequences));
   }
 
   static function finiteArray(values:Array<Float>, label:String):Void {

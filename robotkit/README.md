@@ -160,7 +160,7 @@ disabling contacts between that robot's own links.
 an authored `RobotModel` with its `RobotProfile`, opens a POSIX serial device, and owns its standalone
 runtime. Both can be attached to `RobotWorld` and used through the same command
 and snapshot interfaces. The serial endpoint executes RKD6 scheduled plans. It receives queue status and
-actuator state from the device. `robotd --server --deployment=FILE` hosts that
+actuator state from the device. `robotd --server --auth=FILE --deployment=FILE` hosts that
 endpoint behind the existing remote protocol; see
 [the device protocol](runtime/DEVICE_PROTOCOL.md).
 
@@ -325,7 +325,7 @@ for hard stops.
 
 ```haxe
 var guard = new MotionGuard(navigation, base.footprint);
-guard.update(perception.observe(robot.snapshot().sensors.toArray()), 0.02);
+guard.update(perception.observe(robot.streams().latestFrames()), 0.02);
 ```
 
 `robotkit.material.Forks` maps configured lift, tilt, and spread joint names to
@@ -479,7 +479,7 @@ ordering key: robot and sensor source timestamps retain their clock-domain IDs
 and are never compared across domains. MessagePack preserves their full-width
 integers. Payload schemas cover joint targets, execution plans and lifecycle
 commands, robot snapshots, individual sensor frames, faults, world snapshots,
-world lifecycle events and process events. Readers accept version 7 only.
+world lifecycle events and process events. Readers accept version 8 only.
 Recorded commands are history only; loading a file never forwards them to a
 live adapter.
 
@@ -527,3 +527,27 @@ integration probe for this path, not a permanent controller API.
 Process work, finishing, welding and earthwork live in [ProcessKit](../processkit/README.md).
 Its skills use RobotKit's generic skill and tool interfaces; RobotKit does not
 import process planning or simulated weld behavior.
+
+## Control snapshots and sensor streams
+
+`robot.snapshot()` is the coherent control observation: joint state, runtime,
+safety, execution progress, and `streamSequences`. It retains only small numeric
+sensor frames; camera, depth, point cloud, LiDAR, and inference payloads belong to
+`robot.streams()`. The removed `Robot.sensors()` API has no compatibility alias.
+
+```haxe
+var subscription = robot.streams().subscribe("sensor/front-lidar", function(sample) {
+  if (sample.frame != null) perception.observe([sample.frame]);
+});
+var latest = robot.streams().latestFrames();
+subscription.cancel();
+```
+
+Subscriptions replay the latest retained sample by default and then deliver new
+sequence numbers within each source clock. Samples preserve source and receipt
+timestamps and clock identities. `"*"` subscribes to all streams; inference samples
+use `"inference/" + pipelineId` and expose `sample.detection`. Cancel subscriptions
+when their owner closes. Recording stores streams separately from control
+snapshots (schema 8), and replay retains stream data without adding control ticks.
+Remote adapters authenticate a second TCP connection for bulk streams; see
+[robotd authorization](robotd/README.md).

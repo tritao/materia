@@ -437,13 +437,13 @@ class MissionPlayer implements SessionMember {
     var name = scanner;
     if (reading == null || name == null) return idle;
     var sequence:Null<Int64> = null;
-    for (frame in snapshot.sensors.toArray()) if (frame.sensorId == name) sequence = frame.sequence;
+    for (frame in snapshot.streamSequences) if (frame.streamId == name) sequence = frame.sequence;
     if (sequence == null) return idle;
     var latest:Int64 = cast sequence;
     var before = scanned;
     if (before != null && Int64.compare(before, latest) == 0) return sensed;
     scanned = latest;
-    sensed = reading.observeRobotSnapshot(snapshot, robot.model, robot.blueprint, robot.rootLink);
+    sensed = reading.observeRobotSnapshot(snapshot, robot.model, robot.blueprint, robot.rootLink, robot.robot.streams().latestFrames());
     return sensed;
   }
 

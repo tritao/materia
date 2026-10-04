@@ -16,11 +16,12 @@ def main(port):
         send_frame(observer, threading.Lock(), 1, {
             1: PROTOCOL_VERSION, 2: "stalled-observer", 3: "", 4: "observer",
             5: [{1: "camera", 2: 0.0}, {1: "observation", 2: 0.0}],
+            6: "test-observer", 7: "robotkit-test-observer-token-0001",
         })
         with socket.create_connection(("127.0.0.1", port), timeout=5) as controller:
             controller.settimeout(5)
             lock = threading.Lock()
-            send_frame(controller, lock, 1, {1: PROTOCOL_VERSION, 2: "active-controller", 3: "", 4: "controller", 5: []})
+            send_frame(controller, lock, 1, {1: PROTOCOL_VERSION, 2: "active-controller", 3: "", 4: "controller", 5: [], 6: "test-controller", 7: "robotkit-test-controller-token-0001"})
             kind, _, _, welcome, _ = read_frame(controller)
             assert kind == 2 and welcome[5] is True
             session, robot, lease = welcome[3], welcome[4], welcome[6]

@@ -10,8 +10,8 @@ import robotkit.client.RobotClient;
 class RobotSessionIntegration {
   public static function runDevice(host:String, port:Int):Void {
     var runtime = NativeKitRuntime.start();
-    var first = new RobotClient("device-controller", "controller");
-    var second = new RobotClient("device-reconnect", "controller");
+    var first = new RobotClient("device-controller", "controller", IntegrationCredentials.controller());
+    var second = new RobotClient("device-reconnect", "controller", IntegrationCredentials.controller());
     var failure:Dynamic = null;
     try {
       first.connectWithEvents(host, port, runtime.events);
@@ -52,8 +52,8 @@ class RobotSessionIntegration {
 
   public static function runLeaseTimeout(host:String, port:Int):Void {
     var runtime = NativeKitRuntime.start();
-    var controller = new RobotClient("silent-controller", "controller");
-    var replacement = new RobotClient("replacement-controller", "controller");
+    var controller = new RobotClient("silent-controller", "controller", IntegrationCredentials.controller());
+    var replacement = new RobotClient("replacement-controller", "controller", IntegrationCredentials.controller());
     var failure:Dynamic = null;
     try {
       controller.connectWithEvents(host, port, runtime.events);
@@ -171,8 +171,8 @@ class RobotSessionIntegration {
   }
 
   public static function runLocalOwner(host:String, port:Int):Void {
-    var first = new RobotClient("denied-controller", "controller");
-    var observer = new RobotClient("local-observer", "observer");
+    var first = new RobotClient("denied-controller", "controller", IntegrationCredentials.controller());
+    var observer = new RobotClient("local-observer", "observer", IntegrationCredentials.observer());
     var runtime = NativeKitRuntime.start();
     var failure:Dynamic = null;
     try {
@@ -201,8 +201,8 @@ class RobotSessionIntegration {
   }
 
   public static function run(host:String, port:Int):Void {
-    var observer = new RobotClient("observer", "observer");
-    var controller = new RobotClient("controller", "controller");
+    var observer = new RobotClient("observer", "observer", IntegrationCredentials.observer());
+    var controller = new RobotClient("controller", "controller", IntegrationCredentials.controller());
     var runtime = NativeKitRuntime.start();
     var observerState = false;
     observer.stateListener = function(_) observerState = true;
@@ -269,7 +269,7 @@ class RobotSessionIntegration {
       waitFor(observer, function() return observer.latestState != null &&
         observer.latestState.safety == RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP,
         "controller disconnect did not latch emergency stop");
-      var reconnect = new RobotClient("reconnected", "controller");
+      var reconnect = new RobotClient("reconnected", "controller", IntegrationCredentials.controller());
       try {
         stage = "reconnect connect";
         reconnect.connectWithEvents(host, port, runtime.events);

@@ -16,6 +16,8 @@ class RobotSnapshot {
   public final velocities:ImmutableFloatArray;
   public final efforts:ImmutableFloatArray;
   public final sensors:ImmutableSensorArray;
+  final sequences:Array<robotkit.streams.StreamSequence>;
+  public var streamSequences(get, never):Array<robotkit.streams.StreamSequence>;
   public final mode:Int;
   public final faultCode:Int;
   /** Current runtime safety state: ready, stopping, emergency-stop, or fault. */
@@ -71,7 +73,8 @@ class RobotSnapshot {
     ?activePlanId:Int64,
     ?committedUntilNs:Int64,
     ?queueEndTimeNs:Int64,
-    ?setpointPositions:Array<Float>
+    ?setpointPositions:Array<Float>,
+    ?streamSequences:Array<robotkit.streams.StreamSequence>
   ) {
     this.id = id;
     this.sourceSequence = sourceSequence;
@@ -84,7 +87,11 @@ class RobotSnapshot {
     this.positions = new ImmutableFloatArray(positions);
     this.velocities = new ImmutableFloatArray(velocities);
     this.efforts = new ImmutableFloatArray(efforts);
-    this.sensors = new ImmutableSensorArray(sensors);
+    var frames = sensors == null ? [] : sensors;
+    this.sensors = new ImmutableSensorArray([for (frame in frames) if (robotkit.streams.SensorStreamSample.smallControlFrame(frame)) frame]);
+    sequences = streamSequences == null
+      ? [for (frame in frames) new robotkit.streams.StreamSequence(frame.sensorId, frame.kind, frame.sequence, frame.sourceClockId)]
+      : streamSequences.copy();
     this.mode = mode;
     this.faultCode = faultCode;
     this.safety = safety;
@@ -102,6 +109,8 @@ class RobotSnapshot {
     this.queueEndTimeNs = queueEndTimeNs == null ? Int64.ofInt(0) : queueEndTimeNs;
     this.setpointPositions = new ImmutableFloatArray(setpointPositions == null ? positions : setpointPositions);
   }
+
+  function get_streamSequences():Array<robotkit.streams.StreamSequence> return sequences.copy();
 
   inline function get_timestampNs():Int64 return sourceTimestampNs;
 }

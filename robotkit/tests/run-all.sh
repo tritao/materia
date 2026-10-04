@@ -91,6 +91,7 @@ say "World TCP integration"
 run python3 -m tools.wire.rkf1 check --source "$robotkit_dir/remote/haxe/robotkit/protocol" --lock "$robotkit_dir/schema/rkf1.lock.json"
 run python3 -m unittest tools.wire.tests.test_rkf1
 run "$haxeon" run --project "$robotkit_dir/tests/integration/haxeon.json" -- --outbound-scheduler
+run env ROBOTKIT_TEST_AUTHENTICATION=1 "$robotkit_dir/tests/world-tcp.sh"
 run "$robotkit_dir/tests/world-tcp.sh"
 run env ROBOTKIT_TEST_SUBSCRIPTIONS=1 "$robotkit_dir/tests/world-tcp.sh"
 run env ROBOTKIT_TEST_SESSIONS=1 "$robotkit_dir/tests/world-tcp.sh"

@@ -144,6 +144,7 @@ class PerceptionInferenceTests {
     var recording = new RobotRecording();
     for (sequence in 7...10) {
       var recordedFrame = frame(sequence);
+      recording.recordSensor("robot-a", recordedFrame);
       recording.recordSnapshot(new RobotSnapshot("robot-a", Int64.ofInt(sequence),
         Int64.ofInt(100 + sequence), [], [], [], 1, 0,
         Int64.ofInt(200 + sequence), [recordedFrame], "robot.clock", "host.monotonic"));
@@ -153,7 +154,7 @@ class PerceptionInferenceTests {
     var directReplay = new PerceptionHost([PerceptionPipelineRegistry.create(config, "robotd/front_objects")]);
     for (sequence in 7...10) {
       if (sequence > 7) check(replay.advance(), "replay advances to the next recorded frame");
-      var replayFrame = replay.sensors()[0];
+      var replayFrame = replay.streams().latestFrames()[0];
       replayHost.submit(replayFrame);
       directReplay.submit(frame(sequence));
       var replayed = wait(replayHost);

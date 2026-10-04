@@ -462,7 +462,7 @@ class ApplicationSimulation {
       var id = simulatedIds[index];
       var robot = publication.robot(id);
       robots.push({id:id,position:[0.0,0.0,0.0],rotation:[0.0,0.0,0.0,1.0],
-        sensors:robot==null?[]:robot.sensors.toArray(),links:[for (linkId in simulatedLinks[index])
+        sensors:world.robot(id)==null?[]:world.robot(id).streams().latestFrames(),links:[for (linkId in simulatedLinks[index])
           {id:linkId,position:[0.0,0.0,0.0],rotation:[0.0,0.0,0.0,1.0]}]});
     }
     if (physics != null) for (pose in physics.poses) switch pose.kind {

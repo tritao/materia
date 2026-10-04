@@ -31,40 +31,49 @@ class RemoteRobot implements Robot {
   public final logicalId:RobotId;
 
   final client:RobotClient;
+  final bulkClient:RobotClient;
+  var connectionHost:String;
+  var connectionPort:Int;
+  var connectionEvents:Null<NativeKitEvents>;
+  var bulkStarted:Bool = false;
   var currentSnapshot:RobotSnapshot;
   var currentFault:Null<RobotFault> = null;
   var currentSensors:Array<SensorFrame> = [];
   final eventRing = new RobotEventRing();
+  final sensorStreams = new robotkit.streams.SensorStreams();
   var lastWireObservationOrdinal:Int64 = Int64.ofInt(0);
   final sensorSourceReceipts:Map<String, Int64> = [];
   var changeListener:Null < RobotId -> Void > = null;
 
-  public function new(id:RobotId) {
+  public function new(id:RobotId, ?credentials:robotkit.auth.ClientCredentials) {
     if (id == null || id.length == 0) throw "RemoteRobot requires a non-empty logical ID";
     logicalId = id;
-    client = new RobotClient("materia-world-" + id);
+    client = new RobotClient("materia-world-" + id, "controller", credentials);
+    bulkClient = new RobotClient("materia-streams-" + id, "stream", credentials);
     currentSnapshot = new RobotSnapshot(id, Int64.ofInt(0), Int64.ofInt(0), [], [], [], 0, 0);
     client.stateListener = onState;
     client.faultListener = onFault;
     client.statusListener = onStatus;
     client.sensorListener = onSensor;
-    client.cameraListener = onCamera;
+    bulkClient.sensorListener = onSensor;
+    bulkClient.cameraListener = onCamera;
     client.subscribeCamera = false;
-    client.imageDetectionListener = onImageDetection;
+    bulkClient.subscribeCamera = false;
+    bulkClient.imageDetectionListener = onImageDetection;
     client.subscribeObservations = false;
   }
 
   /** Request image frames before connecting. */
   public function enableCamera(?maxRateHz:Float = 0.0):Void {
     if (client.subscriptionLocked()) throw "Camera subscription must be set before connect";
-    client.subscribeCamera = true;
-    client.cameraMaxRateHz = maxRateHz;
+    bulkClient.subscribeCamera = true;
+    bulkClient.cameraMaxRateHz = maxRateHz;
   }
 
   /** Request robotd-produced observations before connecting. */
   public function enableObservations():Void {
     if (client.subscriptionLocked()) throw "Observation subscription must be set before connect";
-    client.subscribeObservations = true;
+    bulkClient.subscribeObservations = true;
   }
 
   public function streamCapabilities():Array<String> {
@@ -81,11 +90,16 @@ class RemoteRobot implements Robot {
   }
 
   /** Connects this adapter using the host's event pump. */
-  public function connect(host:String, port:Int, events:NativeKitEvents):Void client.connectWithEvents(
-    host,
-    port,
-    events
-  );
+  public function connect(host:String, port:Int, events:NativeKitEvents):Void {
+    connectionHost = host; connectionPort = port; connectionEvents = events;
+    client.connectWithEvents(host,port,events);
+  }
+  function connectBulk():Void {
+    if (!bulkStarted && client.isReady() && connectionEvents != null) {
+      bulkStarted = true;
+      bulkClient.connectWithEvents(connectionHost,connectionPort,connectionEvents);
+    }
+  }
 
   public function status():RobotStatus {
     if (currentFault != null && currentFault.fatal) return Fault;
@@ -129,15 +143,10 @@ class RemoteRobot implements Robot {
     currentSnapshot.trajectoryTimeNs, currentSnapshot.trajectoryDurationNs,
     currentSnapshot.trajectoryTag, currentSnapshot.trajectoryTagTimeNs,
     currentSnapshot.sessionState, currentSnapshot.activePlanId,
-    currentSnapshot.committedUntilNs, currentSnapshot.queueEndTimeNs
+    currentSnapshot.committedUntilNs, currentSnapshot.queueEndTimeNs, null, currentSnapshot.streamSequences
   );
 
-  public function sensors():Array<SensorFrame> {
-    var result:Array<SensorFrame> = [];
-    for (frame in currentSensors)
-      result.push(frame.copy());
-    return result;
-  }
+  public function streams():robotkit.streams.SensorStreams return sensorStreams;
 
   public function fault():Null < RobotFault > return currentFault;
 
@@ -145,6 +154,7 @@ class RemoteRobot implements Robot {
     return eventRing.events(afterOrdinal, max);
 
   public function publishObservation(value:robotkit.streams.ImageDetectionObservation):RobotEvent {
+    sensorStreams.publish(robotkit.streams.SensorStreamSample.inference(value));
     var event = eventRing.publish(value);
     notifyChanged();
     return event;
@@ -191,9 +201,10 @@ class RemoteRobot implements Robot {
     changeListener = listener;
   }
 
-  public function close():Void client.close();
+  public function close():Void { bulkClient.close(); client.close(); sensorStreams.clear(); }
 
   function onState(value:RobotStateMsg):Void {
+    connectBulk();
     currentSnapshot = new RobotSnapshot(
       logicalId,
       value.sequence,
@@ -212,7 +223,7 @@ class RemoteRobot implements Robot {
       value.trajectoryTimeNs, value.trajectoryDurationNs,
       value.trajectoryTag, value.trajectoryTagTimeNs,
       value.sessionState, value.activePlanId,
-      value.committedUntilNs, value.queueEndTimeNs
+      value.committedUntilNs, value.queueEndTimeNs, null, robotkit.protocol.StreamSequenceMsg.values(value.streamSequences)
     );
     notifyChanged();
   }
@@ -259,11 +270,13 @@ class RemoteRobot implements Robot {
       }
     }
     if (!replaced) currentSensors.push(frame);
+    sensorStreams.publish(robotkit.streams.SensorStreamSample.sensor(frame));
     sensorSourceReceipts.set(frame.sensorId, sourceReceipt);
     notifyChanged();
   }
 
   function onStatus():Void {
+    connectBulk();
     if (client.lastFault == null) currentFault = null;
     notifyChanged();
   }

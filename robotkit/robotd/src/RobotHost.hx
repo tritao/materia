@@ -22,18 +22,29 @@ class RobotHost {
   }
 
   public function run():Void {
+    var current = args.copy();
+    while (true) {
+      var next = new RobotHost(current).runCycle();
+      if (next == null) return;
+      current = next;
+    }
+  }
+
+  function runCycle():Null<Array<String>> {
     if (args.length > 0 && args[0] == "identify") {
       identify();
-      return;
+      return null;
     }
     if (args.indexOf("--help") >= 0) {
       Sys.println("Usage: robotd [--server [--once]] [--port=N] [--listen=IPv4] "
         + "[--robot-id=N] [--multi-joint] [--behavior=oscillate] [--in-memory] "
-        + "[--deployment=FILE] [--camera-fixture] [--camera-fixture-stream] "
+        + "[--deployment=FILE] [--auth=FILE] [--camera-fixture] [--camera-fixture-stream] "
         + "[--bulk-budget-bytes=N] [--help]");
       Sys.println("       robotd identify DEVICE_PATH BAUD   print the connected board's controller id");
-      return;
+      return null;
     }
+    var authorization = args.indexOf("--server") >= 0 ? new robotkit.auth.RobotAuthorization(optionValue("--auth=")) : null;
+    var requestedDeployment:Null<String> = null;
     var port = parsePort();
     var listenAddress = parseListenAddress();
     var robotId = parseRobotId();
@@ -186,13 +197,14 @@ class RobotHost {
             haxe.Int64.ofInt(1), haxe.Int64.ofInt(1), "camera.fixture");
         }
         var server = new RobotServer(robot, blueprint, hostedRuntime, serverSimulation,
-          port, robotId, behavior, listenAddress, bulkBudgetBytes, fixtureTick,
+          port, robotId, authorization, behavior, listenAddress, bulkBudgetBytes, fixtureTick,
           deployment != null ? deployment.perception : perceptionFixtureModel == null ? [] :
             [new robotkit.deployment.PerceptionPipelineConfig("front_objects", "demo/camera",
               "object_detector", perceptionFixtureModel,
               robotkit.inference.InferenceSession.modelDigest(perceptionFixtureModel),
               "robotd", ["local", "worldd"], 0.4, 0.0, 0.5)]);
         server.run(args.indexOf("--once") >= 0);
+        requestedDeployment = server.nextDeployment;
       } catch (error:Dynamic) {
         if (serverSimulation != null) serverSimulation.dispose();
         else if (serverRuntime != null) serverRuntime.dispose();
@@ -200,7 +212,14 @@ class RobotHost {
       }
       if (serverRuntime != null) serverRuntime.dispose();
       if (serverSimulation != null) serverSimulation.dispose();
-      return;
+      if (requestedDeployment != null) {
+        var restartArgs = [for (arg in args) if (!StringTools.startsWith(arg,"--deployment=") &&
+          arg != "--multi-joint" && arg != "--in-memory" && !StringTools.startsWith(arg,"--camera-fixture") &&
+          !StringTools.startsWith(arg,"--perception-fixture")) arg];
+        restartArgs.push("--deployment=" + requestedDeployment);
+        return restartArgs;
+      }
+      return null;
     }
     var inMemory = args.indexOf("--in-memory") >= 0;
     var simulation:Null<SimulationHarness> = null;
@@ -231,6 +250,7 @@ class RobotHost {
     runtime.dispose();
     if (simulation != null)
       simulation.dispose();
+    return null;
   }
 
   /** `robotd identify DEVICE_PATH BAUD`: prints the unique id of the board on a serial port. */

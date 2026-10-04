@@ -6,7 +6,7 @@ import haxe.Int64;
 
 /** Versioned payload envelope with a recording-wide deterministic ordinal. */
 class RobotRecordingEntry {
-  public static inline final VERSION:Int = 7;
+  public static inline final VERSION:Int = 8;
   public final ordinal:Int64;
   public final robotId:RobotId;
   public final event:RobotRecordingEvent;
@@ -19,7 +19,7 @@ class RobotRecordingEntry {
 
   public function new(ordinal:Int64, robotId:RobotId, event:RobotRecordingEvent,
       ?sourceSequence:Int64, ?sourceTimestampNs:Int64, ?sourceClockId:String = "unspecified",
-      ?recordingTimestampNs:Int64, ?schemaVersion:Int = 6) {
+      ?recordingTimestampNs:Int64, ?schemaVersion:Int = VERSION) {
     this.ordinal = ordinal;
     this.robotId = robotId;
     this.event = event;

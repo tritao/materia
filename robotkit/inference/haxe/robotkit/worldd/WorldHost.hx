@@ -38,9 +38,9 @@ class WorldHost {
   }
 
   public function addRemoteRobot(id:String, ?camera:Bool = false,
-      ?deployment:SerialDeployment):RemoteRobot {
+      ?deployment:SerialDeployment, ?credentials:robotkit.auth.ClientCredentials):RemoteRobot {
     ensureOpen();
-    var robot = new RemoteRobot(id);
+    var robot = new RemoteRobot(id, credentials);
     if (camera) robot.enableCamera();
     world.attach(robot);
     remoteRobots.set(id, robot);
@@ -78,7 +78,7 @@ class WorldHost {
       if (host == null) continue;
       var robot = remoteRobots.get(id);
       if (robot == null) continue;
-      for (sensor in robot.sensors()) if (sensor.image != null) {
+      for (sensor in robot.streams().latestFrames()) if (sensor.image != null) {
         var key = id + ":" + sensor.sensorId;
         var last = perceptionSequences.get(key);
         // A remote camera may restart its sequence after the device reconnects.

@@ -58,7 +58,7 @@ class SerialRobot implements Robot {
   public function description():RobotDescription return adapter.description();
   public function capabilities():RobotCapabilities return adapter.capabilities();
   public function snapshot():RobotSnapshot return adapter.snapshot();
-  public function sensors():Array<SensorFrame> return adapter.sensors();
+  public function streams():robotkit.streams.SensorStreams return adapter.streams();
   public function events(afterOrdinal:haxe.Int64, max:Int):Array<RobotEvent>
     return adapter.events(afterOrdinal, max);
   public function fault():Null<RobotFault> return adapter.fault();

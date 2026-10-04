@@ -481,7 +481,7 @@ class SessionTransitionRobot implements Robot {
       value.sessionState, value.activePlanId, value.committedUntilNs,
       value.queueEndTimeNs, value.setpointPositions.toArray());
   }
-  public function sensors():Array<SensorFrame> return inner.sensors();
+  public function streams():robotkit.streams.SensorStreams return inner.streams();
   public function events(afterOrdinal:Int64, max:Int):Array<robotkit.core.RobotEvent>
     return inner.events(afterOrdinal, max);
   public function fault():Null<RobotFault> return inner.fault();
@@ -591,7 +591,7 @@ class LaggingRobot implements Robot {
   public function description():RobotDescription return inner.description();
   public function capabilities():RobotCapabilities return inner.capabilities();
   public function snapshot():RobotSnapshot return inner.snapshot();
-  public function sensors():Array<SensorFrame> return inner.sensors();
+  public function streams():robotkit.streams.SensorStreams return inner.streams();
   public function events(afterOrdinal:Int64, max:Int):Array<robotkit.core.RobotEvent>
     return inner.events(afterOrdinal, max);
   public function fault():Null<RobotFault> return inner.fault();
