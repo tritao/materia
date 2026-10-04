@@ -234,6 +234,11 @@ Update every import across the repository in the same commit. No re-export shims
 
 ## R5 — Package boundaries
 
+Started from the quiet point immediately after R4 main merge `183d90140`.
+Live branches with committed changes to affected files require rebase/path
+updates: drywall-scoped-d8 (8 files), machine-tending (17 files), mobile-welder (2 files), motion-loose-ends (1 files), sketching (1 files), uikit-extract (1 files), publish-facility (1 files), x7-transmissions (7 files).
+Other worktrees and their uncommitted work remain untouched.
+
 The goal is the dependency direction: someone who wants only the robot model and runtime must not
 need the simulation or vision stack.
 
