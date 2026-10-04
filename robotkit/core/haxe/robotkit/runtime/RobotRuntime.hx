@@ -412,7 +412,7 @@ class RobotRuntime {
   }
 
   /** Latch an actual home edge in endpoint/counter coordinates, never an ordinary move. */
-  public function latchHome(switchId:String, counterPosition:Float, ?leaderCounterPosition:Float):Void {
+  public function latchHome(switchId:String, counterPosition:Float, leaderCounterPosition:Null<Float> = null):Void {
     ensureLive();
     referenceMutex.acquire();
     try {

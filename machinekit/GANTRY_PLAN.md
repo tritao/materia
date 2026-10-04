@@ -2185,3 +2185,19 @@ both variants, device protocol Rust, virtual endpoints and serial PTY tests.
 This establishes the native checkpoint for this source state. MotionKit
 compiler-only retry remains running; other kits/app and focused picker/Haxe
 homing execution remain pending before G13.
+
+### G12 checkpoint — nullable latch interface and compile batch
+
+Sparse native projection: `5acc78e6a`, native ctest remains 18/18 green.
+MotionKit compile failed at HomingDriver.latch argument 3: an optional Float
+parameter did not accept Null<Float> under the pinned compiler. Declare the
+driver interface/implementations with an explicit required Null<Float> argument
+(all call sites pass it), and retain explicit nullable defaults on standalone
+RobotRuntime and JointReferenceState methods. Retry MotionKit compiler-only.
+
+Start a serial compiler-only batch for the available top-level kit test
+entrypoints, additional established nested kit entrypoints, app and app
+project-source. Record individual logs/statuses in external scratch. This batch
+does not run tests; focused picker and homing execution remains pending. CadKit
+uses its separate compiler entrypoint and still needs a compiler-only invocation.
+G13 remains unstarted until the checkpoint succeeds.

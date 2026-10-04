@@ -86,7 +86,7 @@ class JointReferenceState {
   }
 
   /** All required home signals, including both Y sides, must latch before admission. */
-  public function latch(switchId:String, observedPosition:Float, ?leaderPosition:Float):Void {
+  public function latch(switchId:String, observedPosition:Float, leaderPosition:Null<Float> = null):Void {
     if (!Math.isFinite(observedPosition)) throw "Home latch position must be finite";
     var index = -1;
     for (i in 0...homes.length) if (homes[i].id == switchId) index = i;

@@ -77,7 +77,7 @@ class HomingFixture implements HomingDriver implements HomingSideControl {
   }
   public function velocity(joint:Int, velocity:Float, acceleration:Float):Void events.push("velocity");
   public function stop(joint:Int, acceleration:Float):Void { events.push("stop"); if (failStop) throw "stop failed"; }
-  public function latch(id:String, position:Float, ?leaderCounterPosition:Float):Void {
+  public function latch(id:String, position:Float, leaderCounterPosition:Null<Float>):Void {
     events.push("latch:" + id);
     if (id == "left" && leaderCounterPosition != null) leaderCaptureSeen = leaderCounterPosition;
   }

@@ -76,7 +76,7 @@ class RuntimeHomingDriver implements HomingDriver {
     robot.stop(StopMode.Normal);
   }
 
-  public function latch(switchId:String, counterPosition:Float, ?leaderCounterPosition:Float):Void {
+  public function latch(switchId:String, counterPosition:Float, leaderCounterPosition:Null<Float>):Void {
     runtime.latchHome(switchId, counterPosition, leaderCounterPosition);
     afterLatch();
   }
