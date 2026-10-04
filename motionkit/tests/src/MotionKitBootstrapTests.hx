@@ -1,5 +1,6 @@
 class MotionKitBootstrapTests {
   public static function main():Void {
+    if (Sys.getEnv("MOTIONKIT_HOMING_ONLY") == "1") { HomingTests.run(); return; }
     var plannerTests:PlannerTests = new PlannerTests();
     var streamTests:StreamTests = new StreamTests();
     var sessionTests:SessionTests = new SessionTests();

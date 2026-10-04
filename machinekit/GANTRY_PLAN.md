@@ -2111,3 +2111,17 @@ in the existing native simkit test executable.
 The regression has not run. Add cycle sequencing coverage, then execute the
 requested post-G12 kit/app compiler-only and native build/ctest checkpoint, plus
 picker and homing runs once. G13 remains unstarted.
+
+### G12 — cycle sequencing coverage and checkpoint start
+
+Native physical regression: `d4a61a7c5`. Add standalone HomingTests and
+MOTIONKIT_HOMING_ONLY selection in the existing MotionKit test entrypoint.
+Cover release/backoff/slow-approach ordering, first-side holds, stop/release/all
+latches/calibration/scope close before return, compensated leader capture,
+stale closing-edge rejection and cancellation cleanup when stopping throws.
+The fixture covers controller sequencing; native simkit covers physical
+placement/calibration separately. Both remain unrun at this commit.
+
+Begin the requested post-G12 compiler-only checkpoint. G13 is unstarted.
+Do not mark G12 verified until native ctest, picker and homing runs establish
+the required physical and controller behavior.
