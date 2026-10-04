@@ -88,7 +88,13 @@ class SurfacePlanRunner implements robotkit.skill.SurfacePlanRunner {
     var start = points[0].work_T_tcp;
     var end = points[points.length - 1].work_T_tcp;
     var ik = manipulator.solve(start, seed, new IkOptions(2e-3, 5e-3, 300, 0.03));
-    if (!ik.converged) throw "Surface patch approach pose is unreachable";
+    // An approach can be far from the seed; DLS tracking may stall in a local
+    // basin after a small change in the achieved base pose. Retry with the
+    // reaching solver before declaring the target unreachable.
+    if (!ik.converged)
+      ik = manipulator.solve(start, seed, new IkOptions(2e-3, 5e-3, 300, 0.03).reaching());
+    if (!ik.converged)
+      throw 'Surface patch approach pose is unreachable (position error ${ik.positionError}, orientation error ${ik.orientationError})';
     var localEnd = patch.toolpath.points[patch.toolpath.points.length - 1].work_T_tcp;
     var retractLocal = new Transform3(
       localEnd.translation.add(new Vec3(0.0, 0.0, 0.03)), localEnd.rotation);
