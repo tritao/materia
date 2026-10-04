@@ -1,5 +1,6 @@
 /** Focused folded router fixture without the rest of MachineKit smoke. */
 import CncRouterPreview.CncRouterChecks;
+import machinekit.assembly.PosedParts;
 import machinekit.assembly.Transmission;
 import machinekit.transmission.TimingBelt;
 import cadbridge.AssemblyPhysicalPartView;
@@ -83,11 +84,13 @@ class FoldedZRouterCheck {
 			CncRouterChecks.near(state.joint("screwZ-turn"), Math.PI * position[2], "folded Z screw follows its lead", 1e-6);
 			CncRouterChecks.near(state.joint("motorZ-turn"), -2 * Math.PI * position[2], "folded Z motor keeps the belt's world direction", 1e-6);
 		}
-		for (position in [[150.0, 150, 0], [0.0, 0, -80], [300.0, 300, -80]]) {
-			CncRouterChecks.checkClear(folded, state, position, ["motorZ"], ["xPlate", "zPlate", "spindle", "uprightRight", "beamUpper", "beamLower"]);
-			CncRouterChecks.checkClear(folded, state, position, ["beltZ"], ["zPlate", "spindle", "uprightRight", "beamUpper"]);
-			CncRouterChecks.checkClear(folded, state, position, ["foldedMotorPlateZ"], ["screwZ", "spindle", "uprightRight", "beamUpper"]);
-		}
+		PosedParts.scope(parts -> {
+			for (position in [[150.0, 150, 0], [0.0, 0, -80], [300.0, 300, -80]]) {
+				CncRouterChecks.checkClearWith(parts, folded, state, position, ["motorZ"], ["xPlate", "zPlate", "spindle", "uprightRight", "beamUpper", "beamLower"]);
+				CncRouterChecks.checkClearWith(parts, folded, state, position, ["beltZ"], ["zPlate", "spindle", "uprightRight", "beamUpper"]);
+				CncRouterChecks.checkClearWith(parts, folded, state, position, ["foldedMotorPlateZ"], ["screwZ", "spindle", "uprightRight", "beamUpper"]);
+			}
+		});
 		Sys.println('folded Z: ${belt.teeth} teeth; direct/folded speed ${directZ.requireVelocity() * 1000}/${foldedZ.requireVelocity() * 1000} mm/s, acceleration ${directZ.requireAcceleration() * 1000}/${foldedZ.requireAcceleration() * 1000} mm/s², stiffness rigid/${foldedLoad.stiffness} N/m, backlash ${directLoad.backlash * 1000}/${foldedLoad.backlash * 1000} mm, mass ${Math.round(new CncRouter().massProperties().mass * 10) / 10}/${Math.round(folded.massProperties().mass * 10) / 10} kg');
 	}
 

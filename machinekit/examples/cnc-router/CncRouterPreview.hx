@@ -305,10 +305,18 @@ class CncRouterChecks {
 	}
 
 	/** No member of `moving` intersects a member of `others` at machine position `at`. */
-	public static function checkClear(router:CncRouter, state:AssemblyState, at:Array<Float>, moving:Array<String>,
+	/** `checkClearWith` for this run's members; only for use while `run` is in progress. */
+	static function checkClear(router:CncRouter, state:AssemblyState, at:Array<Float>, moving:Array<String>, others:Array<String>):Void
+		checkClearWith(clearance, router, state, at, moving, others);
+
+	/**
+	 * Throws unless no member of `moving` intersects a member of `others` at machine position `at`. The members are posed
+	 * through `parts`, which the caller owns (see `PosedParts.scope`) and may reuse across calls.
+	 */
+	public static function checkClearWith(parts:PosedParts, router:CncRouter, state:AssemblyState, at:Array<Float>, moving:Array<String>,
 			others:Array<String>):Void {
 		moveTo(state, at);
-		clearance.checkClear(router, state, "CNC router", moving, others,
+		parts.checkClear(router, state, "CNC router", moving, others,
 			(a, b, volume) -> '$a collides with $b at machine ${at.join(", ")}: ${Math.round(volume)} mm³');
 	}
 
