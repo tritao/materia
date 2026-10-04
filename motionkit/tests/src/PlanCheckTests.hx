@@ -487,9 +487,22 @@ class PlanCheckTests extends MotionKitTestSupport {
     model.addEncoder(Encoder.perRevolution("x.encoder", blueprint.axes[0].jointIds[1], EncoderKind.Incremental, 2000.0));
     model.addEncoder(Encoder.perMillimetre("x.scale", "x", EncoderKind.Incremental, 200.0));
     var ids = [for (joint in model.joints) joint.id];
+    var harness = new SimulationHarness(0.01);
+    var runtime = harness.simulation.addRobot(blueprint.runtime);
+    var robot = new SimulatedRobot("gantry", runtime, model.name, [for (link in model.links) link.name],
+      [for (joint in model.joints) joint.name]);
+    var homing = new motionkit.robot.MotionSystem(robot, blueprint);
+    homing.configureRuntimeHoming(runtime, () -> {}, harness.simulation.homingSides(0));
+    homing.home();
+    var tick = 0;
+    while (homing.homingStatus() != "Complete" && tick < 60000) {
+      harness.step(Int64.ofInt(++tick));
+      homing.update(0.01);
+    }
+    check(homing.homingStatus() == "Complete", "Slip fixture establishes physical home references");
     var solver = new AxisKinematics(blueprint);
     var limits = new ValidationLimits(ids.length, Int64.ofInt(blueprint.runtime.revision),
-      Int64.ofInt(blueprint.runtime.calibrationRevision));
+      runtime.snapshot().calibrationRevision);
     var scales = [for (_ in ids) 0.0];
     for (axis in blueprint.axes) for (slot in 0...axis.jointIds.length)
       scales[ids.indexOf(axis.jointIds[slot])] = Math.abs(axis.jointScales[slot]);
@@ -511,17 +524,13 @@ class PlanCheckTests extends MotionKitTestSupport {
     for (slot in 0...blueprint.axes[0].jointIds.length)
       goal[ids.indexOf(blueprint.axes[0].jointIds[slot])] = blueprint.axes[0].jointScales[slot] * 0.05;
     var moving = new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(goal), new MotionOptions(), Blend.ExactStop)]);
-    var harness = new SimulationHarness(0.01);
-    var runtime = harness.simulation.addRobot(blueprint.runtime);
-    var robot = new SimulatedRobot("gantry", runtime, model.name, [for (link in model.links) link.name],
-      [for (joint in model.joints) joint.name]);
     var motion = new ManipulatorMotion(robot, compiler, function(_) return null, function() return {events: [], overflow: false}, [for (joint in 0...ids.length) joint]);
     var slip = new StepperSlip([for (coupling in model.couplings) new CoupledJoint(ids.indexOf(coupling.follower),
       ids.indexOf(coupling.leader), coupling.ratio, coupling.offset)], [for (joint in 0...ids.length) ids[joint] => joint], (joint, offset) -> harness.simulation.setJointSlip(0, joint, offset));
     motion.slip = slip;
     var monitor = new EncoderMonitor(model, [for (_ in ids) 0.0]);
     motion.run(moving);
-    var tick = 0, guard = 0;
+    var guard = 0;
     var snapshot = robot.snapshot();
     while (!motion.completed && motion.failure == null && guard++ < 3000) {
       motion.update(0.01);

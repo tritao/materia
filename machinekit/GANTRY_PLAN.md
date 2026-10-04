@@ -3062,3 +3062,21 @@ passed before this small stop-handshake change.
 
 Router execution and full Phase C suites remain incomplete; G13 is not complete
 and G14 has not started.
+
+### Phase C — router fixture exposes missing authored home switches
+
+The app compiler-only build passed, then router-device-home loaded the actual
+61-component screw router and failed its four-home-switch assertion. The authored
+router exports no home switch declarations; the earlier assumption that G12 had
+already supplied those was incorrect. Add physical switch/trigger assembly
+members and declarations to CncRouter before claiming G13 router homing. Keep
+the fixture assertion; do not substitute the generic gantry for the router.
+
+The full MotionKit slip fixture now performs physical sensor homing with its
+simulation side controller before constructing ordinary program validation
+limits. It uses the committed post-home calibration revision and keeps the
+simulation clock advancing across home/program execution. This preserves
+reference admission rather than bypassing it. MotionKit compilation restarted
+(session 41414, live at this note); the updated fixture has not executed yet.
+
+G13 and Phase C remain incomplete; G14 is not started.
