@@ -32,9 +32,14 @@ bool FrameResources::bind_image(ResourceId id, const PreparedTexture &image,
 }
 
 bool FrameResources::bind_text(ResourceId id, const PreparedGlyphs &glyphs,
-                               uint64_t content_generation) {
+                               uint64_t content_generation, ResourceId source_identity) {
     if (!is_resource_id(id, ResourceKind::TextLayout))
         return false;
+    if (source_identity.value &&
+        (!is_resource_id(source_identity, ResourceKind::TextLayout) ||
+         (source_identity.value != id.value && !content_generation)))
+        return false;
+    source_identities_[id.value] = source_identity.value ? source_identity : id;
     texts_[id.value] = &glyphs;
     content_generations_[id.value] = content_generation;
     return true;
@@ -88,6 +93,11 @@ uint64_t FrameResources::content_generation(ResourceId id) const {
     return found == content_generations_.end() ? 0 : found->second;
 }
 
+ResourceId FrameResources::source_identity(ResourceId id) const {
+    const auto found = source_identities_.find(id.value);
+    return found == source_identities_.end() ? id : found->second;
+}
+
 void FrameResources::reset() {
     paths_.clear();
     images_.clear();
@@ -95,6 +105,7 @@ void FrameResources::reset() {
     surfaces_.clear();
     graphics_images_.clear();
     content_generations_.clear();
+    source_identities_.clear();
 }
 
 bool OwnedFrameResources::bind_path(ResourceId id, std::shared_ptr<const PreparedPath> path,
@@ -114,8 +125,8 @@ bool OwnedFrameResources::bind_image(ResourceId id, std::shared_ptr<const Prepar
 }
 
 bool OwnedFrameResources::bind_text(ResourceId id, std::shared_ptr<const PreparedGlyphs> glyphs,
-                                    uint64_t content_generation) {
-    if (!glyphs || !FrameResources::bind_text(id, *glyphs, content_generation))
+                                    uint64_t content_generation, ResourceId source_identity) {
+    if (!glyphs || !FrameResources::bind_text(id, *glyphs, content_generation, source_identity))
         return false;
     owners_.push_back(std::move(glyphs));
     return true;

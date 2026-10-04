@@ -25,7 +25,20 @@ class DocCheck {
   }
   check(doc.sliceCodepoints(0,doc.codepointCount)==expected,"full slice at "+step);
  }
+ static function asciiGraphemes():Void {
+  // HashLink text strings exclude NUL; exercise every representable ASCII pair.
+  for (previous in 1...128) for (current in 1...128) {
+   var map=new TextOffsetMap(String.fromCharCode(previous)+String.fromCharCode(current));
+   check(map.isGraphemeBoundary(1)==(previous!=13||current!=10), "ASCII grapheme pair "+previous+":"+current);
+  }
+  var map=new TextOffsetMap("a\u0301b");
+  check(!map.isGraphemeBoundary(1)&&map.isGraphemeBoundary(2),"ASCII next to combining mark");
+  map=new TextOffsetMap("a\rX");
+  map.replaceCodepointsIncremental(2,3,"\n");
+  check(!map.isGraphemeBoundary(2),"edited CR/LF grapheme");
+ }
  static function main():Void {
+  asciiGraphemes();
   var content=new StringBuf();
   for (i in 0...260) content.add(StringTools.lpad(Std.string(i),"0",4)+" Café e\u0301 🙂 🧑‍💻 漢字 שלום\n");
   var expected=content.toString(); var doc=new TextDocument(expected);

@@ -138,6 +138,9 @@ class DockWorkspace implements View {
 					visiblePanels.push(descriptor);
 			}
 		var selectedId = activePanelId == null && visiblePanels.length > 0 ? visiblePanels[0].id : activePanelId;
+		if (visiblePanels.length == 1 &&
+			visiblePanels[0].headerMode == nativekit.ui.docking.DockPanelHeaderMode.Content)
+			return panelView(visiblePanels[0].id, availableWidth, panelCache);
 		var allWidth = Math.max(0, visiblePanels.length - 1) * 4.0;
 		var selectedWidth = allWidth;
 		for (descriptor in visiblePanels) {
@@ -277,7 +280,7 @@ class DockWorkspace implements View {
 		for (panelId in panelIds) {
 			var descriptor = model.get(panelId);
 			if (descriptor != null)
-				text += "|" + panelId + ":" + descriptor.title + ":" + Std.string(descriptor.icon) + ":" + descriptor.enabled;
+				text += "|" + panelId + ":" + descriptor.title + ":" + Std.string(descriptor.icon) + ":" + descriptor.enabled + ":" + Std.string(descriptor.headerMode);
 		}
 		return text + "|content=" + contentKey();
 	}

@@ -540,7 +540,7 @@ int main() {
          * and verify that capacity pressure evicts entries without allowing
          * unbounded GPU memory growth. */
         if (!result) {
-            constexpr int pressure_frames = 20;
+            constexpr int pressure_frames = 160;
             for (int pressure = 0; pressure < pressure_frames && !result; ++pressure) {
                 const auto pressure_commands =
                     make_custom_commands(20.0f + static_cast<float>(pressure), 20.0f);
@@ -558,7 +558,7 @@ int main() {
                      custom_cache_scaled.raster_cache_misses + pressure_frames ||
                  custom_cache_pressure.custom_paint_nodes <
                      custom_cache_scaled.custom_paint_nodes + pressure_frames ||
-                 custom_cache_pressure.raster_cache_entries > 16 ||
+                 custom_cache_pressure.raster_cache_entries > 128 ||
                  custom_cache_pressure.raster_cache_bytes > 64u * 1024u * 1024u)) {
                 std::fprintf(stderr,
                              "raster cache pressure exceeded its bounds: misses=%llu entries=%llu "
@@ -575,15 +575,17 @@ int main() {
         /*
          * A custom-paint node that draws a retained TextLayout (the path
          * TextField/TextArea use for their editable content) must paint the
-         * layout's current color, not the shaping engine's untinted glyphs.
+         * layout's foreground override and base color, including retained snapshots.
          * Regression coverage for the layout-session owned/sealed glyph
          * snapshot silently defaulting to opaque white.
          */
         nkui_resource text_layout{};
         nkui_display_list text_list{};
+        const nkui_text_color_range first_letter{0, 1, {0.0f, 0.85f, 0.0f, 1.0f}};
         if (!result) {
             if (nkui_text_layout_create(fonts, "Hg", 140.0f, 40.0f, &text_layout) != NKUI_OK ||
-                nkui_text_layout_set_color(text_layout, {0.0f, 0.85f, 0.0f, 1.0f}) != NKUI_OK ||
+                nkui_text_layout_set_color_ranges(text_layout, &first_letter, 1) != NKUI_OK ||
+                nkui_text_layout_set_color(text_layout, {0.0f, 0.0f, 0.85f, 1.0f}) != NKUI_OK ||
                 nkui_display_list_create(&text_list) != NKUI_OK)
                 result = 37;
         }
@@ -623,9 +625,12 @@ int main() {
             std::array<uint8_t, 160 * 64 * 4> block{};
             glReadPixels(12, 108, 160, 64, GL_RGBA, GL_UNSIGNED_BYTE, block.data());
             int best_green = -1;
+            int blue_pixels = 0;
             uint8_t best_rgba[4] = {0, 0, 0, 0};
             for (std::size_t pixel = 0; pixel < 160 * 64; ++pixel) {
                 const uint8_t *rgba = block.data() + pixel * 4;
+                if (rgba[2] > 150 && rgba[0] < 80 && rgba[1] < 80)
+                    ++blue_pixels;
                 if (rgba[1] > best_green) {
                     best_green = rgba[1];
                     std::memcpy(best_rgba, rgba, 4);
@@ -633,7 +638,7 @@ int main() {
             }
             // Opaque white glyphs (the untinted-snapshot bug) leave red and blue as high
             // as green; a correctly tinted green layout keeps them low.
-            if (best_green < 150 || best_rgba[0] > 80 || best_rgba[2] > 80) {
+            if (best_green < 150 || best_rgba[0] > 80 || best_rgba[2] > 80 || blue_pixels == 0) {
                 std::fprintf(stderr,
                              "custom-paint text layout did not render its set color: "
                              "peak rgba = %d,%d,%d,%d\n",
@@ -650,15 +655,18 @@ int main() {
             std::array<uint8_t, 160 * 64 * 4> block{};
             glReadPixels(12, 108, 160, 64, GL_RGBA, GL_UNSIGNED_BYTE, block.data());
             int best_green = -1;
+            int blue_pixels = 0;
             uint8_t best_rgba[4] = {0, 0, 0, 0};
             for (std::size_t pixel = 0; pixel < 160 * 64; ++pixel) {
                 const uint8_t *rgba = block.data() + pixel * 4;
+                if (rgba[2] > 150 && rgba[0] < 80 && rgba[1] < 80)
+                    ++blue_pixels;
                 if (rgba[1] > best_green) {
                     best_green = rgba[1];
                     std::memcpy(best_rgba, rgba, 4);
                 }
             }
-            if (best_green < 150 || best_rgba[0] > 80 || best_rgba[2] > 80) {
+            if (best_green < 150 || best_rgba[0] > 80 || best_rgba[2] > 80 || blue_pixels == 0) {
                 std::fprintf(stderr,
                              "custom-paint text layout lost its set color on a cached repaint: "
                              "peak rgba = %d,%d,%d,%d\n",
@@ -666,6 +674,168 @@ int main() {
                 result = 42;
             }
         }
+        // Recolor a retained layout after the node has a live raster cache.
+        const nkui_text_color_range recolored_letter{0, 1, {0.85f, 0.0f, 0.0f, 1.0f}};
+        if (!result && (nkui_text_layout_set_color_ranges(text_layout, &recolored_letter, 1) != NKUI_OK ||
+            nkui_layout_session_render_frame(renderer, session, surface, &frame_info, 0) != NKUI_OK))
+            result = 43;
+        if (!result) {
+            std::array<uint8_t, 160 * 64 * 4> block{};
+            glReadPixels(12, 108, 160, 64, GL_RGBA, GL_UNSIGNED_BYTE, block.data());
+            int red_pixels = 0;
+            int green_pixels = 0;
+            for (std::size_t pixel = 0; pixel < 160 * 64; ++pixel) {
+                const uint8_t *rgba = block.data() + pixel * 4;
+                if (rgba[0] > 150 && rgba[1] < 80 && rgba[2] < 80)
+                    ++red_pixels;
+                if (rgba[1] > 150 && rgba[0] < 80 && rgba[2] < 80)
+                    ++green_pixels;
+            }
+            if (!red_pixels || green_pixels) {
+                std::fprintf(stderr, "cached text recolor: red=%d green=%d\n", red_pixels, green_pixels);
+                result = 44;
+            }
+        }
+        if (!result && (nkui_text_layout_set_text(text_layout, "Hg") != NKUI_OK ||
+            nkui_layout_session_render_frame(renderer, session, surface, &frame_info, 0) != NKUI_OK))
+            result = 45;
+        if (!result) {
+            std::array<uint8_t, 160 * 64 * 4> block{};
+            glReadPixels(12, 108, 160, 64, GL_RGBA, GL_UNSIGNED_BYTE, block.data());
+            int blue_pixels = 0;
+            int stale_pixels = 0;
+            for (std::size_t pixel = 0; pixel < 160 * 64; ++pixel) {
+                const uint8_t *rgba = block.data() + pixel * 4;
+                if (rgba[2] > 150 && rgba[0] < 80 && rgba[1] < 80)
+                    ++blue_pixels;
+                if (rgba[0] > 150 || rgba[1] > 150)
+                    ++stale_pixels;
+            }
+            if (!blue_pixels || stale_pixels)
+                result = 46;
+        }
+        // A wrapped custom-paint layout must cache each visible text row. An
+        // edit in its first row should miss that row while other rows hit.
+        nkui_resource wrapped_rows{};
+        if (!result) {
+            const std::string word(512, 'a');
+            nkui_text_style row_style{sizeof(row_style), NKUI_FONT_FAMILY_DEFAULT, 18.0f, 0.0f};
+            nkui_paragraph_style row_paragraph{sizeof(row_paragraph), 24.0f,
+                NKUI_TEXT_WRAP_WORD_CHARACTER, NKUI_TEXT_ALIGN_START, NKUI_TEXT_DIRECTION_AUTO};
+            if (nkui_text_layout_create_styled(fonts, word.c_str(), 140.0f, &row_style,
+                                               &row_paragraph, &wrapped_rows) != NKUI_OK)
+                result = 47;
+        }
+        if (!result) {
+            std::vector<uint8_t> row_commands;
+            append_bytes(row_commands,
+                nkui_transform_command{{NKUI_COMMAND_SET_TRANSFORM, NKUI_COMMAND_VERSION,
+                                        sizeof(nkui_transform_command)},
+                                       {1.0f, 0.0f, 0.0f, 1.0f, 8.0f, 4.0f}});
+            append_bytes(row_commands,
+                nkui_draw_rect_command{{NKUI_COMMAND_DRAW_TEXT_LAYOUT, NKUI_COMMAND_VERSION,
+                                        sizeof(nkui_draw_rect_command)},
+                                       wrapped_rows, 0.0f, 0.0f, 0.0f, 0.0f});
+            nkui_renderer_stats before_rows{}, first_rows{}, repeated_rows{}, edited_rows{};
+            if (nkui_display_list_submit(text_list, row_commands.data(),
+                                         static_cast<uint32_t>(row_commands.size())) != NKUI_OK ||
+                nkui_renderer_get_stats(renderer, &before_rows) != NKUI_OK ||
+                nkui_layout_session_render_frame(renderer, session, surface, &frame_info, 0) != NKUI_OK ||
+                nkui_renderer_get_stats(renderer, &first_rows) != NKUI_OK ||
+                nkui_layout_session_render_frame(renderer, session, surface, &frame_info, 0) != NKUI_OK ||
+                nkui_renderer_get_stats(renderer, &repeated_rows) != NKUI_OK ||
+                nkui_text_layout_edit(wrapped_rows, 4, 5, "e") != NKUI_OK ||
+                nkui_layout_session_render_frame(renderer, session, surface, &frame_info, 0) != NKUI_OK ||
+                nkui_renderer_get_stats(renderer, &edited_rows) != NKUI_OK) {
+                result = 48;
+            } else {
+                std::printf("wrapped row raster cache: first misses=%llu, repeat hits=%llu, edited hits=%llu misses=%llu\n",
+                    static_cast<unsigned long long>(first_rows.raster_cache_misses - before_rows.raster_cache_misses),
+                    static_cast<unsigned long long>(repeated_rows.raster_cache_hits - first_rows.raster_cache_hits),
+                    static_cast<unsigned long long>(edited_rows.raster_cache_hits - repeated_rows.raster_cache_hits),
+                    static_cast<unsigned long long>(edited_rows.raster_cache_misses - repeated_rows.raster_cache_misses));
+                std::printf("wrapped row draws: first=%llu repeat=%llu edited=%llu\n",
+                    static_cast<unsigned long long>(first_rows.gpu_draw_calls - before_rows.gpu_draw_calls),
+                    static_cast<unsigned long long>(repeated_rows.gpu_draw_calls - first_rows.gpu_draw_calls),
+                    static_cast<unsigned long long>(edited_rows.gpu_draw_calls - repeated_rows.gpu_draw_calls));
+                if (edited_rows.gpu_draw_calls - repeated_rows.gpu_draw_calls >=
+                        first_rows.gpu_draw_calls - before_rows.gpu_draw_calls ||
+                    edited_rows.gpu_draw_calls - repeated_rows.gpu_draw_calls <=
+                        repeated_rows.gpu_draw_calls - first_rows.gpu_draw_calls)
+                    result = 49;
+                if (first_rows.raster_cache_misses < before_rows.raster_cache_misses + 2 ||
+                    repeated_rows.raster_cache_hits < first_rows.raster_cache_hits + 2 ||
+                    edited_rows.raster_cache_hits < repeated_rows.raster_cache_hits + 2 ||
+                    edited_rows.raster_cache_misses != repeated_rows.raster_cache_misses + 2)
+                    result = 48;
+            }
+            // Unicode forces a fresh native layout but unchanged rows must
+            // retain their raster identity after glyph equivalence is checked.
+            nkui_renderer_stats unicode_rows{};
+            if (!result && (nkui_text_layout_edit(wrapped_rows, 4, 5, "é") != NKUI_OK ||
+                nkui_layout_session_render_frame(renderer, session, surface, &frame_info, 0) != NKUI_OK ||
+                nkui_renderer_get_stats(renderer, &unicode_rows) != NKUI_OK))
+                result = 50;
+            if (!result && (unicode_rows.raster_cache_hits < edited_rows.raster_cache_hits + 2 ||
+                unicode_rows.raster_cache_misses != edited_rows.raster_cache_misses + 2)) {
+                std::fprintf(stderr, "Unicode row edit rebuilt unchanged rasters\n");
+                result = 51;
+            }
+            std::vector<uint8_t> original_pixels(framebuffer_width * framebuffer_height * 4);
+            if (!result)
+                glReadPixels(0, 0, framebuffer_width, framebuffer_height, GL_RGBA,
+                             GL_UNSIGNED_BYTE, original_pixels.data());
+            nkui_renderer_stats moved_rows{}, restored_rows{};
+            if (!result && (nkui_text_layout_edit(wrapped_rows, 0, 0, "\n") != NKUI_OK ||
+                nkui_layout_session_render_frame(renderer, session, surface, &frame_info, 0) != NKUI_OK ||
+                nkui_renderer_get_stats(renderer, &moved_rows) != NKUI_OK))
+                result = 52;
+            if (!result && (moved_rows.raster_cache_hits < unicode_rows.raster_cache_hits + 2 ||
+                moved_rows.raster_cache_misses != unicode_rows.raster_cache_misses + 2)) {
+                std::fprintf(stderr, "Newline insertion discarded moved row rasters\n");
+                result = 53;
+            }
+            if (!result) {
+                std::vector<uint8_t> moved_pixels(original_pixels.size());
+                glReadPixels(0, 0, framebuffer_width, framebuffer_height, GL_RGBA,
+                             GL_UNSIGNED_BYTE, moved_pixels.data());
+                // The second original row moves down by the explicit line height.
+                for (int y = 28; y < 52; ++y)
+                    for (int x = 8; x < 148; ++x)
+                        for (int channel = 0; channel < 4; ++channel) {
+                            const auto old_pixel = ((framebuffer_height - y - 1) *
+                                                    framebuffer_width + x) * 4 + channel;
+                            const auto new_pixel = ((framebuffer_height - y - 25) *
+                                                    framebuffer_width + x) * 4 + channel;
+                            if (original_pixels[old_pixel] != moved_pixels[new_pixel])
+                                result = 57;
+                        }
+            }
+            if (!result && (nkui_text_layout_edit(wrapped_rows, 0, 1, "") != NKUI_OK ||
+                nkui_layout_session_render_frame(renderer, session, surface, &frame_info, 0) != NKUI_OK ||
+                nkui_renderer_get_stats(renderer, &restored_rows) != NKUI_OK))
+                result = 54;
+            if (!result && (restored_rows.raster_cache_hits < moved_rows.raster_cache_hits + 2 ||
+                restored_rows.raster_cache_misses != moved_rows.raster_cache_misses + 2))
+                result = 55;
+            if (!result) {
+                std::vector<uint8_t> restored_pixels(original_pixels.size());
+                glReadPixels(0, 0, framebuffer_width, framebuffer_height, GL_RGBA,
+                             GL_UNSIGNED_BYTE, restored_pixels.data());
+                if (restored_pixels != original_pixels)
+                    result = 56;
+            }
+            if (!result)
+                std::printf("moved row raster cache: inserted hits=%llu misses=%llu; deleted hits=%llu misses=%llu\n",
+                    static_cast<unsigned long long>(moved_rows.raster_cache_hits - unicode_rows.raster_cache_hits),
+                    static_cast<unsigned long long>(moved_rows.raster_cache_misses - unicode_rows.raster_cache_misses),
+                    static_cast<unsigned long long>(restored_rows.raster_cache_hits - moved_rows.raster_cache_hits),
+                    static_cast<unsigned long long>(restored_rows.raster_cache_misses - moved_rows.raster_cache_misses));
+
+
+        }
+        if (wrapped_rows.id)
+            nkui_resource_destroy(wrapped_rows);
         nkui_layout_session_clear_custom_paints(session);
         nkui_display_list_destroy(text_list);
         nkui_resource_destroy(text_layout);

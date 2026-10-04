@@ -49,12 +49,12 @@ class NativeTransport {
   public static function send(transport:TransportHandle, bytes:Bytes):Void {
     if (bytes == null)
       throw "RobotKit TCP cannot send null bytes";
-    NativeKit.nk_transport_send_checked(transport, bytes, bytes.length);
+    NativeKit.nk_transport_send_checked(transport, bytes);
   }
 
   public static function sendStatus(transport:TransportHandle, bytes:Bytes):Int {
     if (bytes == null) throw "RobotKit TCP cannot send null bytes";
-    return NativeKit.nk_transport_send(transport, bytes, bytes.length);
+    return NativeKit.nk_transport_send(transport, bytes);
   }
 
   public static function sendQueue(transport:TransportHandle):TransportSendQueue {

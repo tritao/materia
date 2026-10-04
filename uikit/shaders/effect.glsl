@@ -107,14 +107,25 @@ layout(binding=0) uniform texture2D tex;
 layout(binding=0) uniform sampler smp;
 layout(location=0) in vec2 uv;
 layout(location=0) out vec4 frag_color;
+
+// Pixels outside the source are transparent. Clamp-to-edge sampling would
+// smear content touching the target edge into the shadow, which happens when
+// the offset is at least the blur extent and leaves no margin on that side.
+float source_alpha(vec2 point) {
+    vec2 inside = step(vec2(0.0), point) * step(point, vec2(1.0));
+    return texture(sampler2D(tex, smp), point).a * inside.x * inside.y;
+}
+
 void main() {
     vec4 parameters = value[0];
     vec4 color = value[1];
     vec2 texel = value[2].xy;
     vec2 center = uv;
+    // Effect passes sample with v running bottom-up (v = 1 at the target's top
+    // edge), so a positive screen-space Y offset reads from a higher v.
     if (parameters.y > 0.5)
-        center -= vec2(parameters.z * texel.x, parameters.w * texel.y);
-    float alpha = texture(sampler2D(tex, smp), center).a;
+        center -= vec2(parameters.z * texel.x, -parameters.w * texel.y);
+    float alpha = source_alpha(center);
     float weight_sum = 1.0;
     if (parameters.x > 0.0001) {
         float sample_step = max(1.0, parameters.x * 0.5);
@@ -124,8 +135,7 @@ void main() {
             float normalized = offset_in_texels / parameters.x;
             float weight = exp(-0.5 * normalized * normalized);
             vec2 offset = direction * offset_in_texels;
-            alpha += (texture(sampler2D(tex, smp), center + offset).a +
-                      texture(sampler2D(tex, smp), center - offset).a) * weight;
+            alpha += (source_alpha(center + offset) + source_alpha(center - offset)) * weight;
             weight_sum += 2.0 * weight;
         }
     }
@@ -160,37 +170,82 @@ layout(binding=1) uniform box_shadow_fs_params {
 layout(location=0) in vec2 uv;
 layout(location=0) out vec4 frag_color;
 
-float rounded_rect_distance(vec2 point, vec4 rect, vec4 radii) {
-    vec2 center = rect.xy + rect.zw * 0.5;
-    vec2 local = point - center;
-    float radius = local.x < 0.0
-                       ? (local.y < 0.0 ? radii.x : radii.w)
-                       : (local.y < 0.0 ? radii.y : radii.z);
-    radius = max(0.0, min(radius, min(rect.z, rect.w) * 0.5));
-    vec2 half_extent = rect.zw * 0.5;
+// Closed-form Gaussian-blurred rounded rectangle: exact erf integral across X,
+// a short Gaussian-weighted quadrature across Y. Matches CSS box-shadow falloff
+// (half intensity at the shape edge) without rendering an offscreen mask.
+vec2 erf_approx(vec2 x) {
+    vec2 s = sign(x);
+    vec2 a = abs(x);
+    x = 1.0 + (0.278393 + (0.230389 + 0.078108 * (a * a)) * a) * a;
+    x *= x;
+    return s - s / (x * x);
+}
+
+float gaussian(float x, float sigma) {
+    return exp(-(x * x) / (2.0 * sigma * sigma)) / (2.50662827463 * sigma);
+}
+
+float shadow_row(float x, float y, float sigma, float corner, vec2 half_extent) {
+    float delta = min(half_extent.y - corner - abs(y), 0.0);
+    float curved = half_extent.x - corner + sqrt(max(0.0, corner * corner - delta * delta));
+    vec2 integral = 0.5 + 0.5 * erf_approx((x + vec2(-curved, curved)) * (0.70710678 / sigma));
+    return integral.y - integral.x;
+}
+
+float rounded_rect_distance(vec2 local, vec2 half_extent, float radius) {
     vec2 q = abs(local) - (half_extent - vec2(radius));
     return length(max(q, vec2(0.0))) + min(max(q.x, q.y), 0.0) - radius;
+}
+
+// CSS spread adjustment: sharp corners stay sharp, small radii grow smoothly.
+vec4 spread_radii(vec4 radii, float spread) {
+    if (spread <= 0.0)
+        return max(radii + vec4(spread), vec4(0.0));
+    vec4 ratio = radii / spread - vec4(1.0);
+    vec4 small = radii + vec4(spread) * (vec4(1.0) + ratio * ratio * ratio);
+    vec4 grown = mix(small, radii + vec4(spread), step(vec4(spread), radii));
+    return mix(vec4(0.0), grown, step(vec4(0.0001), radii));
 }
 
 void main() {
     vec4 base = value[0];
     vec4 params = value[1];
-    vec4 radii = value[2];
     vec4 color = value[3];
-    vec4 shape = vec4(base.x + params.x - params.w,
-                      base.y + params.y - params.w,
-                      base.z + 2.0 * params.w,
-                      base.w + 2.0 * params.w);
-    float distance = rounded_rect_distance(uv, shape, radii + vec4(params.w));
-    float alpha = 1.0;
-    if (distance > 0.0) {
-        if (params.z <= 0.0001)
-            alpha = 0.0;
-        else {
-            float normalized = distance / params.z;
-            alpha = exp(-0.5 * normalized * normalized);
+    vec2 size = base.zw + vec2(2.0 * params.w);
+    vec2 half_extent = size * 0.5;
+    vec2 center = base.xy + vec2(params.x, params.y) + base.zw * 0.5;
+    vec2 local = uv - center;
+    vec4 radii = spread_radii(value[2], params.w);
+    float corner = local.x < 0.0 ? (local.y < 0.0 ? radii.x : radii.w)
+                                 : (local.y < 0.0 ? radii.y : radii.z);
+    corner = max(0.0, min(corner, min(half_extent.x, half_extent.y)));
+    float sigma = params.z;
+    float alpha;
+    if (sigma <= 0.0001) {
+        alpha = clamp(0.5 - rounded_rect_distance(local, half_extent, corner), 0.0, 1.0);
+    } else {
+        float low = local.y - half_extent.y;
+        float high = local.y + half_extent.y;
+        float start = clamp(-3.0 * sigma, low, high);
+        float finish = clamp(3.0 * sigma, low, high);
+        float step_size = (finish - start) / 4.0;
+        float y = start + step_size * 0.5;
+        alpha = 0.0;
+        for (int index = 0; index < 4; index++) {
+            alpha += shadow_row(local.x, local.y - y, sigma, corner, half_extent) *
+                     gaussian(y, sigma) * step_size;
+            y += step_size;
         }
     }
+    // Outer shadows are clipped to outside the casting box, like CSS, so they
+    // never show through translucent surfaces or where a surface is missing.
+    vec2 box_half = base.zw * 0.5;
+    vec2 box_local = uv - (base.xy + box_half);
+    vec4 box_radii = value[2];
+    float box_corner = box_local.x < 0.0 ? (box_local.y < 0.0 ? box_radii.x : box_radii.w)
+                                         : (box_local.y < 0.0 ? box_radii.y : box_radii.z);
+    box_corner = max(0.0, min(box_corner, min(box_half.x, box_half.y)));
+    alpha *= clamp(rounded_rect_distance(box_local, box_half, box_corner) + 0.5, 0.0, 1.0);
     frag_color = vec4(color.rgb * color.a * alpha, color.a * alpha);
 }
 @end

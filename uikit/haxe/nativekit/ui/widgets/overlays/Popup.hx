@@ -26,6 +26,8 @@ class Popup implements View {
 	public final x:Float;
 	public final y:Float;
 	public final style:LayoutStyle;
+	/** Optional live anchor in logical screen coordinates; placement uses measured panel size. */
+	public var anchorRectProvider:Null<Void->Null<Rect>>;
 	public var label:Null<String>;
 	public var modal:Bool;
 	public var dimBackdrop:Bool;
@@ -36,6 +38,12 @@ class Popup implements View {
 	public var layerZIndex:Int;
 	/** Paint a square menu surface and its shadow beneath the popup content. */
 	public var menuSurface:Bool;
+	/**
+	 * Open to the left of the anchor when the popup does not fit to its right
+	 * but fits to its left, as native context menus do. Otherwise the popup is
+	 * shifted to stay inside the layer.
+	 */
+	public var flipHorizontally:Bool;
 	public var onDismiss:Void->Void;
 	public var hasDismissHandler(default, null):Bool;
 	public function new(key:String, child:View, x:Float = 0.0, y:Float = 0.0,
@@ -48,6 +56,7 @@ class Popup implements View {
 		this.y = y;
 		this.style = style == null ? new LayoutStyle() : style.copy();
 		label = null;
+		anchorRectProvider = null;
 		modal = true;
 		dimBackdrop = true;
 		dismissOnOutside = true;
@@ -55,6 +64,7 @@ class Popup implements View {
 		backdropColor = null;
 		layerZIndex = 0;
 		menuSurface = false;
+		flipHorizontally = false;
 		hasDismissHandler = onDismiss != null;
 		this.onDismiss = onDismiss == null ? function() {} : onDismiss;
 	}
@@ -161,17 +171,47 @@ class Popup implements View {
 					LayoutVisualKind.Custom, shadowStyle);
 				shadowLayer.hitTestSelf = false;
 				var shadow = context.theme.tokens.selectionPopupShadow;
+				// A soft key shadow lifts the menu; a tight contact shadow at half
+				// strength defines its edge against similarly coloured content.
+				var contactShadow = Color.rgba(shadow.red, shadow.green, shadow.blue,
+					shadow.alpha * 0.5);
 				shadowLayer.onPaint(function(canvas, geometry) {
 					var bounds = panel.resolved;
 					if (bounds == null) return;
-					canvas.drawBoxShadow(new Rect(bounds.x - geometry.x, bounds.y - geometry.y,
-						bounds.width, bounds.height), 0.0, 3.0, 9.0, 0.0,
-						[0.0, 0.0, 0.0, 0.0], shadow);
+					var rect = new Rect(bounds.x - geometry.x, bounds.y - geometry.y,
+						bounds.width, bounds.height);
+					var square = [0.0, 0.0, 0.0, 0.0];
+					canvas.drawBoxShadow(rect, 0.0, 6.0, 20.0, 0.0, square, shadow);
+					canvas.drawBoxShadow(rect, 0.0, 1.0, 3.0, 0.0, square, contactShadow);
 				});
 				root.add(shadowLayer);
 			}
 			var content = context.withStyleParent(panelComputed, function() return
 				context.withScope(new Key("content"), function() return child.build(context)));
+			if (anchorRectProvider != null)
+				panel.onResolved(function(geometry) {
+					var bounds = root.resolved;
+					var provider = anchorRectProvider;
+					if (provider == null) return;
+					var anchor = provider();
+					if (bounds == null || anchor == null) return;
+					var left = anchor.x - bounds.x;
+					var top = anchor.y + anchor.height - bounds.y;
+					if (flipHorizontally && left + geometry.width > bounds.width) {
+						var flipped = anchor.x + anchor.width - bounds.x - geometry.width;
+						if (flipped >= 0.0) left = flipped;
+					}
+					if (top + geometry.height > bounds.height)
+						top = anchor.y - bounds.y - geometry.height;
+					left = Math.max(0.0, Math.min(left, bounds.width - geometry.width));
+					top = Math.max(0.0, Math.min(top, bounds.height - geometry.height));
+					if (Math.abs(panel.layout.style.positionX - left) > 0.01 ||
+						Math.abs(panel.layout.style.positionY - top) > 0.01) {
+						panel.layout.style.positionX = left;
+						panel.layout.style.positionY = top;
+						context.requestLayoutFeedback();
+					}
+				});
 			panel.add(content);
 			root.add(panel);
 			root.on(UiEventKind.KeyDown, function(event) {

@@ -27,14 +27,23 @@ struct FontCollection::State {
     uint32_t font_load_count = 0;
 };
 
+static std::shared_ptr<const skb_layout_t> own_native_layout(
+    skb_layout_t *layout, const std::shared_ptr<FontCollection> &fonts) {
+    if (!layout)
+        return {};
+    // The mutable constructor transfers ownership once; every retained reader
+    // thereafter sees a const generation. Fonts outlive its native destruction.
+    return std::shared_ptr<skb_layout_t>(layout, [fonts](skb_layout_t *value) {
+        skb_layout_destroy(value);
+        (void)fonts;
+    });
+}
+
 struct TextEngine::State {
     struct RetainedLayout {
-        ~RetainedLayout() {
-            if (layout)
-                skb_layout_destroy(layout);
-        }
-
-        skb_layout_t *layout = nullptr;
+        // Read-only generations can be retained by indexed pieces without
+        // later edits mutating or freeing their native data.
+        std::shared_ptr<const skb_layout_t> layout;
         std::string text;
         float width = 0.0f;
         TextLayoutOptions options{};
@@ -42,6 +51,9 @@ struct TextEngine::State {
         uint64_t last_used = 0;
         TextLayoutResult result{};
         std::vector<skb_range_t> line_ranges;
+        std::vector<uint64_t> line_revisions;
+        std::vector<float> prefix_bottoms;
+        std::vector<float> suffix_tops;
     };
 
     std::shared_ptr<FontCollection> font_collection;
@@ -53,6 +65,7 @@ struct TextEngine::State {
     TextLayoutId next_layout_id = 1;
     TextLayoutId active_layout_id = 0;
     uint64_t layout_use_sequence = 0;
+    uint64_t line_revision_sequence = 0;
     std::unordered_map<TextLayoutId, std::unique_ptr<RetainedLayout>> layouts;
     // Intrinsic (unwrapped) measurements by text and style. Layout asks for every text node on every frame, and shaping
     // a paragraph to answer is most of the cost of a layout in which nothing changed. Invalidated with the fonts.
@@ -62,6 +75,8 @@ struct TextEngine::State {
     uint64_t prepared_batch_count = 0;
     uint64_t layout_cache_hits = 0;
     uint64_t layout_cache_misses = 0;
+    uint64_t incremental_ascii_edits = 0;
+    uint64_t edit_layout_fallbacks = 0;
     uint32_t last_scale_key = 0;
     uint32_t scale_generation = 0;
     std::unordered_map<uint64_t, std::weak_ptr<const PreparedGlyphs>> published_glyphs;
@@ -174,6 +189,44 @@ std::vector<std::size_t> utf8_codepoint_offsets(const char *text) {
     return offsets;
 }
 
+bool utf8_byte_range(const std::string &text, int32_t start, int32_t end,
+                     std::size_t &byte_start, std::size_t &byte_end) {
+    if (start < 0 || end < start)
+        return false;
+    const auto continuation = [](unsigned char value) { return (value & 0xC0u) == 0x80u; };
+    std::size_t index = 0;
+    int32_t offset = 0;
+    while (offset <= end) {
+        if (offset == start)
+            byte_start = index;
+        if (offset == end) {
+            byte_end = index;
+            return true;
+        }
+        if (index >= text.size())
+            return false;
+        const unsigned char first = static_cast<unsigned char>(text[index]);
+        std::size_t sequence_length = 1;
+        if (first >= 0xC2u && first <= 0xDFu)
+            sequence_length = 2;
+        else if (first >= 0xE0u && first <= 0xEFu)
+            sequence_length = 3;
+        else if (first >= 0xF0u && first <= 0xF4u)
+            sequence_length = 4;
+        if (sequence_length > 1 &&
+            (index + sequence_length > text.size() ||
+             !std::all_of(text.data() + index + 1,
+                          text.data() + index + sequence_length,
+                          [&](char value) {
+                              return continuation(static_cast<unsigned char>(value));
+                          })))
+            sequence_length = 1;
+        index += sequence_length;
+        ++offset;
+    }
+    return false;
+}
+
 AtlasTextureFormat atlas_format(skb_image_atlas_texture_format_t format) {
     switch (format) {
     case SKB_IMAGE_ATLAS_FORMAT_R8_SDF:
@@ -210,7 +263,7 @@ void append_quad(const skb_quad_t &quad, const skb_image_t &atlas, PreparedGlyph
 struct RenderGlyphContext {
     TextEngine::State *state = nullptr;
     skb_font_collection_t *font_collection = nullptr;
-    skb_layout_t *layout = nullptr;
+    const skb_layout_t *layout = nullptr;
     float origin_x = 0.0f;
     float origin_y = 0.0f;
     float pixel_scale = 1.0f;
@@ -227,14 +280,16 @@ bool append_render_glyph(const skb_layout_render_glyph_t *glyph, void *context) 
         return true;
     if (std::getenv("NKUI_DEBUG_GLYPHS")) {
         const uint32_t script = skb_script_to_iso15924_tag(glyph->script);
-        const uint32_t *text = skb_layout_get_text(render.layout);
         std::fprintf(
             stderr, "glyph %c%c%c%c size=%.1f font=%u gid=%u range=%d..%d cp=%x offset=%.1f,%.1f\n",
             static_cast<char>(script >> 24), static_cast<char>(script >> 16),
             static_cast<char>(script >> 8), static_cast<char>(script), glyph->font_size,
             static_cast<unsigned>(glyph->font_handle), static_cast<unsigned>(glyph->glyph_id),
             glyph->text_range.start, glyph->text_range.end,
-            text ? text[glyph->text_range.start] : 0u, glyph->offset_x, glyph->offset_y);
+            glyph->text_range.start >= 0 &&
+                    glyph->text_range.start < skb_layout_get_text_count(render.layout)
+                ? skb_layout_get_text_at(render.layout, glyph->text_range.start) : 0u,
+            glyph->offset_x, glyph->offset_y);
     }
     const skb_quad_t quad = skb_image_atlas_get_glyph_quad(
         render.state->atlas, render.origin_x + glyph->offset_x, render.origin_y + glyph->offset_y,
@@ -259,6 +314,9 @@ bool append_render_glyph(const skb_layout_render_glyph_t *glyph, void *context) 
     const skb_image_t *atlas = skb_image_atlas_get_texture(render.state->atlas, quad.texture_idx);
     if (!atlas)
         return false;
+    render.output->source_ranges.push_back({
+        static_cast<uint32_t>(render.output->vertices.size()), 4,
+        glyph->text_range.start, glyph->text_range.end});
     append_quad(quad, *atlas, *render.output);
     auto &batch = render.output->batches.back();
     batch.vertex_count += 4;
@@ -274,6 +332,40 @@ void atlas_texture_created(skb_image_atlas_t *atlas, uint8_t texture_index, void
 }
 
 } // namespace
+
+bool valid_glyph_color_ranges(const std::vector<GlyphColorRange> &ranges) {
+    int32_t previous_end = 0;
+    for (const auto &range : ranges) {
+        if (range.start < previous_end || range.end <= range.start)
+            return false;
+        previous_end = range.end;
+    }
+    return true;
+}
+
+void apply_glyph_colors(PreparedGlyphs &glyphs, GlyphTint base,
+                        const std::vector<GlyphColorRange> &ranges) {
+    const auto paint = [](GlyphVertex &vertex, GlyphTint tint) {
+        vertex.red = tint.red;
+        vertex.green = tint.green;
+        vertex.blue = tint.blue;
+        vertex.alpha = tint.alpha;
+    };
+    for (auto &vertex : glyphs.vertices)
+        paint(vertex, base);
+    for (const auto &source : glyphs.source_ranges) {
+        auto range = std::upper_bound(ranges.begin(), ranges.end(), source.start,
+            [](int32_t offset, const GlyphColorRange &candidate) { return offset < candidate.start; });
+        if (range == ranges.begin())
+            continue;
+        --range;
+        if (source.start >= range->end)
+            continue;
+        for (uint32_t index = source.first_vertex;
+             index < source.first_vertex + source.vertex_count; ++index)
+            paint(glyphs.vertices[index], range->tint);
+    }
+}
 
 FontCollection::FontCollection() : state_(new State) {
     state_->fonts = skb_font_collection_create();
@@ -438,9 +530,9 @@ bool TextEngine::measure_intrinsic_utf8(const char *text, const TextLayoutOption
                         SKB_ATTRIBUTE_SET_FROM_STATIC_ARRAY(attributes));
     const skb_rect2_t bounds = skb_layout_get_bounds(layout);
     const int32_t line_count = skb_layout_get_lines_count(layout);
-    const skb_layout_line_t *lines = skb_layout_get_lines(layout);
-    const bool has_baseline = line_count > 0 && lines && std::isfinite(lines[0].baseline);
-    const float baseline = has_baseline ? lines[0].baseline - bounds.y : 0.0f;
+    const float native_baseline = line_count > 0 ? skb_layout_get_line_at(layout, 0).baseline : 0.0f;
+    const bool has_baseline = line_count > 0 && std::isfinite(native_baseline);
+    const float baseline = has_baseline ? native_baseline - bounds.y : 0.0f;
     skb_layout_destroy(layout);
     const TextIntrinsicMetrics metrics{{bounds.x, bounds.y, bounds.width, bounds.height}, baseline,
                                        has_baseline};
@@ -515,11 +607,12 @@ bool TextEngine::layout_utf8(const char *text, float width, const TextLayoutOpti
                                         .layout_attributes =
                                             SKB_ATTRIBUTE_SET_FROM_STATIC_ARRAY(layout_attributes)};
     auto retained = std::make_unique<State::RetainedLayout>();
-    retained->layout = skb_layout_create(&params);
+    retained->layout = own_native_layout(
+        skb_layout_create_utf8(state_->temporary, &params, text, -1,
+                               SKB_ATTRIBUTE_SET_FROM_STATIC_ARRAY(attributes)),
+        state_->font_collection);
     if (!retained->layout)
         return false;
-    skb_layout_set_utf8(retained->layout, state_->temporary, &params, text, -1,
-                        SKB_ATTRIBUTE_SET_FROM_STATIC_ARRAY(attributes));
     retained->text = text;
     retained->width = width;
     retained->options = options;
@@ -530,19 +623,16 @@ bool TextEngine::layout_utf8(const char *text, float width, const TextLayoutOpti
     if (!layout_result.id)
         layout_result.id = state_->next_layout_id++;
     const TextLayoutId layout_id = layout_result.id;
-    const skb_rect2_t layout_bounds = skb_layout_get_bounds(retained->layout);
+    const skb_rect2_t layout_bounds = skb_layout_get_bounds(retained->layout.get());
     layout_result.bounds = {layout_bounds.x, layout_bounds.y, layout_bounds.width,
                             layout_bounds.height};
     const auto offsets = utf8_codepoint_offsets(text);
-    const int32_t lines_count = skb_layout_get_lines_count(retained->layout);
-    const skb_layout_line_t *lines = skb_layout_get_lines(retained->layout);
-    if (lines_count > 0 && !lines)
-        return false;
+    const int32_t lines_count = skb_layout_get_lines_count(retained->layout.get());
     layout_result.lines.reserve(static_cast<std::size_t>(std::max(lines_count, 0)));
     retained->line_ranges.reserve(static_cast<std::size_t>(std::max(lines_count, 0)));
-    const int32_t text_count = skb_layout_get_text_count(retained->layout);
+    const int32_t text_count = skb_layout_get_text_count(retained->layout.get());
     for (int32_t index = 0; index < lines_count; ++index) {
-        const skb_layout_line_t &line = lines[index];
+        const auto line = skb_layout_get_line_at(retained->layout.get(), index);
         if (line.text_range.start < 0 || line.text_range.end < line.text_range.start ||
             line.text_range.end > text_count ||
             static_cast<std::size_t>(line.text_range.end) >= offsets.size())
@@ -550,17 +640,201 @@ bool TextEngine::layout_utf8(const char *text, float width, const TextLayoutOpti
         const std::size_t start = offsets[static_cast<std::size_t>(line.text_range.start)];
         const std::size_t end = offsets[static_cast<std::size_t>(line.text_range.end)];
         retained->line_ranges.push_back(line.text_range);
+        retained->line_revisions.push_back(++state_->line_revision_sequence);
+        const float top = std::min(line.bounds.y, line.culling_bounds.y);
+        const float bottom = std::max(line.bounds.y + line.bounds.height,
+                                       line.culling_bounds.y + line.culling_bounds.height);
+        retained->prefix_bottoms.push_back(index == 0 ? bottom
+            : std::max(bottom, retained->prefix_bottoms.back()));
+        retained->suffix_tops.push_back(top);
         layout_result.lines.push_back(
             {start,
              end - start,
              {line.bounds.x, line.bounds.y, line.bounds.width, line.bounds.height}});
     }
+    for (int32_t i = lines_count - 2; i >= 0; --i)
+        retained->suffix_tops[i] = std::min(retained->suffix_tops[i], retained->suffix_tops[i + 1]);
     retained->result = std::move(layout_result);
     state_->active_layout_id = layout_id;
     if (result)
         *result = retained->result;
     state_->layouts.emplace(layout_id, std::move(retained));
     ++state_->layout_builds;
+    return true;
+}
+
+static bool same_rendered_line(const skb_layout_t *previous, const skb_layout_t *next,
+                               int32_t old_index, int32_t new_index) {
+    const auto a = skb_layout_get_line_at(previous, old_index);
+    const auto b = skb_layout_get_line_at(next, new_index);
+    const auto same_bounds = [](skb_rect2_t x, skb_rect2_t y) {
+        return x.x == y.x && x.y == y.y && x.width == y.width && x.height == y.height;
+    };
+    // Require exact row-local geometry. Fractional origin subtraction can
+    // differ after movement; those rows conservatively receive new revisions.
+    const int32_t count = a.text_range.end - a.text_range.start;
+    if (count != b.text_range.end - b.text_range.start ||
+        a.bounds.width != b.bounds.width || a.bounds.height != b.bounds.height ||
+        a.baseline - a.bounds.y != b.baseline - b.bounds.y ||
+        a.layout_run_range.end - a.layout_run_range.start !=
+            b.layout_run_range.end - b.layout_run_range.start)
+        return false;
+    for (int32_t i = 0; i < count; ++i) {
+        if (skb_layout_get_text_at(previous, a.text_range.start + i) !=
+            skb_layout_get_text_at(next, b.text_range.start + i))
+            return false;
+    }
+    for (int32_t run = 0; run < a.layout_run_range.end - a.layout_run_range.start; ++run) {
+        const auto x = skb_layout_get_layout_run_at(previous, a.layout_run_range.start + run);
+        const auto y = skb_layout_get_layout_run_at(next, b.layout_run_range.start + run);
+        auto old_bounds = x.bounds;
+        auto new_bounds = y.bounds;
+        old_bounds.x -= a.bounds.x;
+        old_bounds.y -= a.bounds.y;
+        new_bounds.x -= b.bounds.x;
+        new_bounds.y -= b.bounds.y;
+        if ((x.type != SKB_CONTENT_RUN_UTF8 && x.type != SKB_CONTENT_RUN_UTF32) ||
+            x.type != y.type || x.direction != y.direction || x.script != y.script ||
+            x.bidi_level != y.bidi_level || x.font_handle != y.font_handle ||
+            x.font_size != y.font_size || x.flags != y.flags ||
+            x.ref_baseline - a.bounds.y != y.ref_baseline - b.bounds.y ||
+            !same_bounds(old_bounds, new_bounds) ||
+            x.glyph_range.end - x.glyph_range.start != y.glyph_range.end - y.glyph_range.start)
+            return false;
+        for (int32_t glyph = 0; glyph < x.glyph_range.end - x.glyph_range.start; ++glyph) {
+            const auto p = skb_layout_get_glyph_at(previous, x.glyph_range.start + glyph);
+            const auto q = skb_layout_get_glyph_at(next, y.glyph_range.start + glyph);
+            if (p.gid != q.gid || p.advance_x != q.advance_x ||
+                p.offset_x - a.bounds.x != q.offset_x - b.bounds.x ||
+                p.offset_y - a.bounds.y != q.offset_y - b.bounds.y ||
+                p.cluster_idx < 0 || q.cluster_idx < 0 ||
+                p.cluster_idx >= skb_layout_get_clusters_count(previous) ||
+                q.cluster_idx >= skb_layout_get_clusters_count(next))
+                return false;
+            const auto pc = skb_layout_get_cluster_at(previous, p.cluster_idx);
+            const auto qc = skb_layout_get_cluster_at(next, q.cluster_idx);
+            if (pc.text_offset - a.text_range.start != qc.text_offset - b.text_range.start ||
+                pc.text_count != qc.text_count || pc.glyphs_count != qc.glyphs_count)
+                return false;
+        }
+    }
+    return true;
+}
+
+bool TextEngine::edit_utf8(int32_t start, int32_t end, const char *replacement,
+                           TextLayoutResult *result) {
+    auto *current = active_layout(*state_);
+    if (!current || start < 0 || end < start || !replacement)
+        return false;
+    std::size_t byte_start = 0;
+    std::size_t byte_end = 0;
+    if (!utf8_byte_range(current->text, start, end, byte_start, byte_end))
+        return false;
+    std::string edited;
+    edited.reserve(current->text.size() + std::strlen(replacement));
+    edited.append(current->text, 0, byte_start);
+    edited.append(replacement);
+    edited.append(current->text, byte_end, std::string::npos);
+    auto edited_layout = own_native_layout(
+        skb_layout_create_ascii_edit(current->layout.get(), state_->temporary,
+                                     start, end, replacement, -1), state_->font_collection);
+    if (edited_layout) {
+        current->layout = std::move(edited_layout);
+        std::string previous_text = std::move(current->text);
+        current->text = std::move(edited);
+        current->last_used = ++state_->layout_use_sequence;
+        auto &layout_result = current->result;
+        const skb_rect2_t bounds = skb_layout_get_bounds(current->layout.get());
+        layout_result.bounds = {bounds.x, bounds.y, bounds.width, bounds.height};
+        const int32_t line_count = skb_layout_get_lines_count(current->layout.get());
+        std::vector<uint64_t> next_line_revisions;
+        next_line_revisions.reserve(static_cast<std::size_t>(line_count));
+        for (int32_t index = 0; index < line_count; ++index) {
+            const auto line = skb_layout_get_line_at(current->layout.get(), index);
+            const auto &old_range = index < static_cast<int32_t>(current->line_ranges.size())
+                ? current->line_ranges[index] : line.text_range;
+            const bool unchanged_text = line.text_range.start >= 0 &&
+                line.text_range.end >= line.text_range.start &&
+                old_range.start >= 0 && old_range.end >= old_range.start &&
+                line.text_range.end - line.text_range.start == old_range.end - old_range.start &&
+                static_cast<std::size_t>(old_range.end) <= previous_text.size() &&
+                static_cast<std::size_t>(line.text_range.end) <= current->text.size() &&
+                std::memcmp(previous_text.data() + old_range.start,
+                            current->text.data() + line.text_range.start,
+                            static_cast<std::size_t>(line.text_range.end - line.text_range.start)) == 0;
+            const bool reusable = index < static_cast<int32_t>(current->line_ranges.size()) &&
+                index < static_cast<int32_t>(current->line_revisions.size()) &&
+                index < static_cast<int32_t>(layout_result.lines.size()) &&
+                unchanged_text &&
+                line.bounds.x == layout_result.lines[index].bounds.x &&
+                line.bounds.y == layout_result.lines[index].bounds.y &&
+                line.bounds.width == layout_result.lines[index].bounds.width &&
+                line.bounds.height == layout_result.lines[index].bounds.height;
+            next_line_revisions.push_back(reusable ? current->line_revisions[index]
+                : ++state_->line_revision_sequence);
+        }
+        current->line_revisions = std::move(next_line_revisions);
+        layout_result.lines.clear();
+        current->line_ranges.clear();
+        current->prefix_bottoms.clear();
+        current->suffix_tops.clear();
+        layout_result.lines.reserve(static_cast<std::size_t>(line_count));
+        current->line_ranges.reserve(static_cast<std::size_t>(line_count));
+        for (int32_t index = 0; index < line_count; ++index) {
+            const auto line = skb_layout_get_line_at(current->layout.get(), index);
+            current->line_ranges.push_back(line.text_range);
+            const float top = std::min(line.bounds.y, line.culling_bounds.y);
+            const float bottom = std::max(line.bounds.y + line.bounds.height,
+                                           line.culling_bounds.y + line.culling_bounds.height);
+            current->prefix_bottoms.push_back(index == 0 ? bottom
+                : std::max(bottom, current->prefix_bottoms.back()));
+            current->suffix_tops.push_back(top);
+            // The guarded native path accepts only one-byte lowercase ASCII.
+            layout_result.lines.push_back({static_cast<std::size_t>(line.text_range.start),
+                static_cast<std::size_t>(line.text_range.end - line.text_range.start),
+                {line.bounds.x, line.bounds.y, line.bounds.width, line.bounds.height}});
+        }
+        for (int32_t index = line_count - 2; index >= 0; --index)
+            current->suffix_tops[index] = std::min(current->suffix_tops[index],
+                                                    current->suffix_tops[index + 1]);
+        ++state_->incremental_ascii_edits;
+        ++state_->layout_builds;
+        if (std::getenv("NKUI_TRACE_ASCII_EDIT"))
+            std::fprintf(stderr, "nkui edit: reused ASCII shaping, %d codepoints, %d rows\n",
+                         skb_layout_get_text_count(current->layout.get()), line_count);
+        if (result)
+            *result = layout_result;
+        return true;
+    }
+    ++state_->edit_layout_fallbacks;
+    if (std::getenv("NKUI_TRACE_ASCII_EDIT"))
+        std::fprintf(stderr, "nkui edit: full-layout fallback\n");
+    if (!layout_utf8(edited.c_str(), current->width, current->options, result))
+        return false;
+    auto *rebuilt = active_layout(*state_);
+    if (rebuilt && rebuilt->font_generation == current->font_generation) {
+        const int32_t delta = skb_layout_get_text_count(rebuilt->layout.get()) -
+                              skb_layout_get_text_count(current->layout.get());
+        for (std::size_t row = 0; row < rebuilt->line_ranges.size(); ++row) {
+            const auto range = rebuilt->line_ranges[row];
+            const bool prefix = range.end <= start;
+            const bool suffix = range.start >= end + delta;
+            if (!prefix && !suffix)
+                continue;
+            const int32_t shift = prefix ? 0 : delta;
+            const int32_t old_start = range.start - shift;
+            const auto found = std::lower_bound(current->line_ranges.begin(),
+                current->line_ranges.end(), old_start,
+                [](skb_range_t line, int32_t offset) { return line.start < offset; });
+            if (found == current->line_ranges.end() || found->start != old_start ||
+                found->end != range.end - shift)
+                continue;
+            const auto old_row = static_cast<std::size_t>(found - current->line_ranges.begin());
+            if (same_rendered_line(current->layout.get(), rebuilt->layout.get(),
+                                   static_cast<int32_t>(old_row), static_cast<int32_t>(row)))
+                rebuilt->line_revisions[row] = current->line_revisions[old_row];
+        }
+    }
     return true;
 }
 
@@ -602,6 +876,63 @@ bool TextEngine::prepare_glyphs(float origin_x, float origin_y, float pixel_scal
                                    output, -1, -1, 0.0f, 0.0f);
 }
 
+std::pair<uint32_t, uint32_t> TextEngine::visible_lines(float min_y, float max_y) const {
+    const auto *layout = active_layout(*state_);
+    if (!layout || max_y <= min_y)
+        return {0, 0};
+    const auto first = std::upper_bound(layout->prefix_bottoms.begin(),
+                                         layout->prefix_bottoms.end(), min_y);
+    const auto end = std::lower_bound(layout->suffix_tops.begin(),
+                                       layout->suffix_tops.end(), max_y);
+    const auto begin_index = static_cast<uint32_t>(first - layout->prefix_bottoms.begin());
+    return {begin_index, std::max(begin_index,
+        static_cast<uint32_t>(end - layout->suffix_tops.begin()))};
+}
+
+std::vector<TextRect> TextEngine::line_rects(int32_t start, int32_t end, float min_y,
+                                             float max_y) const {
+    std::vector<TextRect> rectangles;
+    const auto *layout = active_layout(*state_);
+    if (!layout || start >= end || max_y <= min_y)
+        return rectangles;
+    const auto [first, last] = visible_lines(min_y, max_y);
+    rectangles.reserve(last - first);
+    for (uint32_t index = first; index < last; ++index) {
+        const auto range = layout->line_ranges[index];
+        if (range.end <= start || range.start >= end)
+            continue;
+        rectangles.push_back(layout->result.lines[index].bounds);
+    }
+    return rectangles;
+}
+
+TextRect TextEngine::line_bounds(uint32_t index) const {
+    const auto *layout = active_layout(*state_);
+    return layout && index < layout->result.lines.size()
+        ? layout->result.lines[index].bounds : TextRect{};
+}
+
+bool TextEngine::prepare_glyphs_for_lines(uint32_t first, uint32_t end, float origin_x,
+                                          float origin_y, float pixel_scale, GlyphMode mode,
+                                          PreparedGlyphs &output) {
+    const auto *layout = active_layout(*state_);
+    if (!layout || first > end || end > layout->result.lines.size())
+        return false;
+    return prepare_glyphs_internal(state_->active_layout_id, origin_x, origin_y, pixel_scale,
+                                    mode, output, -1, -1, 0, 0,
+                                    static_cast<int32_t>(first), static_cast<int32_t>(end));
+}
+
+std::shared_ptr<const PreparedGlyphs> TextEngine::published_glyphs_for_lines(
+    TextLayoutId id, uint32_t first, uint32_t end, float origin_x, float origin_y,
+    float pixel_scale, GlyphMode mode, GlyphTint tint, const std::vector<GlyphColorRange> &ranges) {
+    const auto *layout = find_layout(*state_, id);
+    if (!layout || first > end || end > layout->result.lines.size())
+        return {};
+    return publish_glyphs(id, static_cast<int32_t>(first), origin_x, origin_y,
+                          pixel_scale, mode, tint, ranges, static_cast<int32_t>(end));
+}
+
 bool TextEngine::prepare_glyphs_for_line(uint32_t line_index, float origin_x, float origin_y,
                                          float pixel_scale, GlyphMode mode,
                                          PreparedGlyphs &output) {
@@ -619,78 +950,128 @@ bool TextEngine::prepare_glyphs_for_line(TextLayoutId id, uint32_t line_index, f
     const auto &line = layout->result.lines[line_index];
     const auto range = layout->line_ranges[line_index];
     return prepare_glyphs_internal(id, origin_x, origin_y, pixel_scale, mode, output, range.start,
-                                   range.end, line.bounds.x, line.bounds.y);
+                                   range.end, line.bounds.x, line.bounds.y, static_cast<int32_t>(line_index));
 }
 
 std::shared_ptr<const PreparedGlyphs> TextEngine::published_glyphs(TextLayoutId id, float origin_x,
                                                                    float origin_y,
                                                                    float pixel_scale,
-                                                                   GlyphMode mode, GlyphTint tint) {
-    return publish_glyphs(id, -1, origin_x, origin_y, pixel_scale, mode, tint);
+                                                                   GlyphMode mode, GlyphTint tint,
+                                                                   const std::vector<GlyphColorRange> &ranges) {
+    return publish_glyphs(id, -1, origin_x, origin_y, pixel_scale, mode, tint, ranges);
 }
 
 std::shared_ptr<const PreparedGlyphs>
 TextEngine::published_glyphs_for_line(TextLayoutId id, uint32_t line_index, float origin_x,
                                       float origin_y, float pixel_scale, GlyphMode mode,
-                                      GlyphTint tint) {
+                                      GlyphTint tint, const std::vector<GlyphColorRange> &ranges) {
     return publish_glyphs(id, static_cast<int32_t>(line_index), origin_x, origin_y, pixel_scale,
-                          mode, tint);
+                          mode, tint, ranges);
 }
 
 std::shared_ptr<const PreparedGlyphs> TextEngine::publish_glyphs(TextLayoutId id,
                                                                  int32_t line_index, float origin_x,
                                                                  float origin_y, float pixel_scale,
-                                                                 GlyphMode mode, GlyphTint tint) {
+                                                                 GlyphMode mode, GlyphTint tint,
+                                                                   const std::vector<GlyphColorRange> &ranges, int32_t end_line) {
     const auto *layout = find_layout(*state_, id);
-    if (!layout || pixel_scale <= 0.0f)
+    if (!layout || pixel_scale <= 0.0f || !valid_glyph_color_ranges(ranges))
         return {};
-    if (line_index >= 0 && static_cast<std::size_t>(line_index) >= layout->result.lines.size())
+    if (line_index >= 0 && end_line < 0 && static_cast<std::size_t>(line_index) >= layout->result.lines.size())
         return {};
 
     const uint32_t scale_key =
         static_cast<uint32_t>(std::max(1.0, std::round(static_cast<double>(pixel_scale) * 1024.0)));
-    auto key = static_cast<uint64_t>(id);
+    const bool single_line = line_index >= 0 && end_line < 0 &&
+        static_cast<std::size_t>(line_index) < layout->line_revisions.size();
+    // Row revisions are unique within this engine and may survive a fresh
+    // Unicode layout. Keep their paint identity independent of layout IDs.
+    auto key = single_line ? uint64_t{0} : static_cast<uint64_t>(id);
     const auto mix = [&key](uint64_t value) {
         key ^= value + 0x9e3779b97f4a7c15ull + (key << 6) + (key >> 2);
     };
-    mix(skb_layout_get_generation(layout->layout));
+    mix(single_line ? 1u : 0u);
+    mix(single_line ? layout->line_revisions[line_index]
+                    : skb_layout_get_generation(layout->layout.get()));
     mix(font_collection_generation());
     mix(scale_key);
     mix(static_cast<uint64_t>(mode));
-    mix(static_cast<uint64_t>(line_index + 1));
+    if (!single_line) {
+        mix(static_cast<uint64_t>(line_index + 1));
+        mix(static_cast<uint64_t>(end_line + 1));
+    }
     mix(static_cast<uint64_t>(std::llround(static_cast<double>(origin_x) * 64.0)));
     mix(static_cast<uint64_t>(std::llround(static_cast<double>(origin_y) * 64.0)));
     mix(static_cast<uint64_t>(tint.red) << 24 | static_cast<uint64_t>(tint.green) << 16 |
         static_cast<uint64_t>(tint.blue) << 8 | static_cast<uint64_t>(tint.alpha));
 
+    std::vector<GlyphColorRange> relevant_ranges;
+    for (auto range : ranges) {
+        if (line_index >= 0) {
+            if (end_line == line_index)
+                continue;
+            const skb_range_t line = end_line < 0 ? layout->line_ranges[line_index]
+                : skb_range_t{layout->line_ranges[line_index].start,
+                              layout->line_ranges[end_line - 1].end};
+            range.start = std::max(range.start, line.start);
+            range.end = std::min(range.end, line.end);
+            if (range.start >= range.end)
+                continue;
+        }
+        relevant_ranges.push_back(range);
+        const int32_t color_origin = single_line ? layout->line_ranges[line_index].start : 0;
+        mix(static_cast<uint64_t>(range.start - color_origin));
+        mix(static_cast<uint64_t>(range.end - color_origin));
+        mix(static_cast<uint64_t>(range.tint.red) << 24 |
+            static_cast<uint64_t>(range.tint.green) << 16 |
+            static_cast<uint64_t>(range.tint.blue) << 8 | range.tint.alpha);
+    }
+
     if (const auto found = state_->published_glyphs.find(key);
         found != state_->published_glyphs.end()) {
-        if (auto cached = found->second.lock())
-            return cached;
+        if (auto cached = found->second.lock()) {
+            if (single_line && cached->source_start >= 0 &&
+                (cached->layout_id != id ||
+                 cached->first_line != line_index ||
+                 cached->source_start != layout->line_ranges[line_index].start) &&
+                cached->line_revision == layout->line_revisions[line_index]) {
+                const int32_t delta = layout->line_ranges[line_index].start - cached->source_start;
+                auto rebased = std::make_shared<PreparedGlyphs>(*cached);
+                rebased->layout_id = id;
+                rebased->layout_generation = skb_layout_get_generation(layout->layout.get());
+                rebased->first_line = line_index;
+                rebased->end_line = line_index + 1;
+                rebased->source_start += delta;
+                for (auto &source : rebased->source_ranges) {
+                    source.start += delta;
+                    source.end += delta;
+                }
+                if (prepared_glyphs_current(*rebased)) {
+                    state_->published_glyphs[key] = rebased;
+                    return rebased;
+                }
+            }
+            if (prepared_glyphs_current(*cached))
+                return cached;
+        }
     }
 
     auto snapshot = std::make_shared<PreparedGlyphs>();
     if (!snapshot)
         return {};
     const bool prepared =
-        line_index < 0 ? prepare_glyphs_internal(id, origin_x, origin_y, pixel_scale, mode,
+        end_line >= 0 ? prepare_glyphs_internal(id, origin_x, origin_y, pixel_scale, mode,
+                                                *snapshot, -1, -1, 0, 0, line_index, end_line)
+        : line_index < 0 ? prepare_glyphs_internal(id, origin_x, origin_y, pixel_scale, mode,
                                                  *snapshot, -1, -1, 0.0f, 0.0f)
                        : prepare_glyphs_for_line(id, static_cast<uint32_t>(line_index), origin_x,
                                                  origin_y, pixel_scale, mode, *snapshot);
     if (!prepared)
         return {};
 
-    /* Tint only the snapshot we just built, before it is shared or cached. */
-    const bool tinted =
-        tint.red != 255 || tint.green != 255 || tint.blue != 255 || tint.alpha != 255;
-    if (tinted) {
-        for (auto &vertex : snapshot->vertices) {
-            vertex.red = tint.red;
-            vertex.green = tint.green;
-            vertex.blue = tint.blue;
-            vertex.alpha = tint.alpha;
-        }
-    }
+    /* Color only the newly built snapshot, before publishing it. */
+    apply_glyph_colors(*snapshot, tint, relevant_ranges);
+    snapshot->publication_key = key;
 
     /* Weak entries keep live snapshots shared and let the rest expire. */
     if (state_->published_glyphs.size() >= 256) {
@@ -709,7 +1090,7 @@ std::shared_ptr<const PreparedGlyphs> TextEngine::publish_glyphs(TextLayoutId id
 bool TextEngine::prepare_glyphs_internal(TextLayoutId id, float origin_x, float origin_y,
                                          float pixel_scale, GlyphMode mode, PreparedGlyphs &output,
                                          int32_t line_start, int32_t line_end, float line_x,
-                                         float line_y) {
+                                         float line_y, int32_t line_index, int32_t end_line) {
     const auto *retained = find_layout(*state_, id);
     if (!retained || pixel_scale <= 0.0f)
         return false;
@@ -727,21 +1108,31 @@ bool TextEngine::prepare_glyphs_internal(TextLayoutId id, float origin_x, float 
     output.pixel_scale = pixel_scale;
     output.mode = mode;
     output.layout_id = id;
-    output.layout_generation = skb_layout_get_generation(retained->layout);
+    output.first_line = line_index;
+    output.end_line = end_line < 0 ? line_index + 1 : end_line;
+    output.layout_generation = skb_layout_get_generation(retained->layout.get());
+    output.line_revision = line_index >= 0 && end_line < 0 &&
+        static_cast<std::size_t>(line_index) < retained->line_revisions.size()
+        ? retained->line_revisions[line_index] : 0;
+    if (output.line_revision)
+        output.source_start = retained->line_ranges[line_index].start;
     if (!state_->font_collection || !state_->font_collection->state_ ||
         !state_->font_collection->state_->fonts)
         return false;
-    if (!skb_layout_prepare_glyphs(retained->layout, state_->atlas, state_->temporary,
-                                   state_->rasterizer, pixel_scale, raster_mode(mode)))
+    const skb_range_t lines = line_index < 0
+        ? skb_range_t{0, skb_layout_get_lines_count(retained->layout.get())}
+        : skb_range_t{line_index, end_line < 0 ? line_index + 1 : end_line};
+    if (!skb_layout_prepare_glyphs_range(retained->layout.get(), lines, state_->atlas, state_->temporary,
+                                         state_->rasterizer, pixel_scale, raster_mode(mode)))
         return false;
     if (std::getenv("NKUI_DEBUG_GLYPHS") && retained->options.font_size == 18.0f) {
-        const uint32_t *text = skb_layout_get_text(retained->layout);
-        const skb_text_property_t *properties = skb_layout_get_text_properties(retained->layout);
-        const int32_t count = skb_layout_get_text_count(retained->layout);
+        const int32_t count = skb_layout_get_text_count(retained->layout.get());
         std::fprintf(stderr, "text properties:");
         for (int32_t i = 0; i < count; ++i) {
-            const uint32_t script = skb_script_to_iso15924_tag(properties[i].script);
-            std::fprintf(stderr, " %x/%c%c%c%c", text[i], static_cast<char>(script >> 24),
+            const uint32_t script = skb_script_to_iso15924_tag(
+                skb_layout_get_text_property_at(retained->layout.get(), i).script);
+            std::fprintf(stderr, " %x/%c%c%c%c", skb_layout_get_text_at(retained->layout.get(), i),
+                         static_cast<char>(script >> 24),
                          static_cast<char>(script >> 16), static_cast<char>(script >> 8),
                          static_cast<char>(script));
         }
@@ -749,7 +1140,7 @@ bool TextEngine::prepare_glyphs_internal(TextLayoutId id, float origin_x, float 
     }
     RenderGlyphContext render{state_,
                               state_->font_collection->state_->fonts,
-                              retained->layout,
+                              retained->layout.get(),
                               origin_x - line_x,
                               origin_y - line_y,
                               pixel_scale,
@@ -757,7 +1148,7 @@ bool TextEngine::prepare_glyphs_internal(TextLayoutId id, float origin_x, float 
                               &output,
                               line_start,
                               line_end};
-    if (!skb_layout_iterate_render_glyphs(retained->layout, append_render_glyph, &render))
+    if (!skb_layout_iterate_render_glyphs_range(retained->layout.get(), lines, append_render_glyph, &render))
         return false;
     state_->prepared_batch_count += output.batches.size();
     return true;
@@ -765,8 +1156,15 @@ bool TextEngine::prepare_glyphs_internal(TextLayoutId id, float origin_x, float 
 
 bool TextEngine::prepared_glyphs_current(const PreparedGlyphs &glyphs) const {
     const auto *layout = find_layout(*state_, glyphs.layout_id);
-    if (!state_->atlas || !layout ||
-        glyphs.layout_generation != skb_layout_get_generation(layout->layout))
+    if (!state_->atlas || !layout)
+        return false;
+    if (glyphs.line_revision != 0) {
+        if (glyphs.first_line < 0 || glyphs.end_line != glyphs.first_line + 1 ||
+            static_cast<std::size_t>(glyphs.first_line) >= layout->line_revisions.size() ||
+            glyphs.line_revision != layout->line_revisions[glyphs.first_line] ||
+            glyphs.source_start != layout->line_ranges[glyphs.first_line].start)
+            return false;
+    } else if (glyphs.layout_generation != skb_layout_get_generation(layout->layout.get()))
         return false;
     const int count = skb_image_atlas_get_texture_count(state_->atlas);
     for (const auto &batch : glyphs.batches) {
@@ -786,11 +1184,16 @@ bool TextEngine::prepared_glyphs_current(const PreparedGlyphs &glyphs) const {
     return true;
 }
 
+int32_t TextEngine::text_count() const {
+    const auto *layout = find_layout(*state_, active_layout_id());
+    return layout ? skb_layout_get_text_count(layout->layout.get()) : 0;
+}
+
 TextRect TextEngine::bounds() const {
     const auto *layout = active_layout(*state_);
     if (!layout)
         return {};
-    const skb_rect2_t value = skb_layout_get_bounds(layout->layout);
+    const skb_rect2_t value = skb_layout_get_bounds(layout->layout.get());
     return {value.x, value.y, value.width, value.height};
 }
 
@@ -798,7 +1201,7 @@ TextPosition TextEngine::hit_test(float x, float y) const {
     const auto *layout = active_layout(*state_);
     if (!layout)
         return {};
-    const skb_text_position_t value = skb_layout_hit_test(layout->layout, SKB_MOVEMENT_CARET, x, y);
+    const skb_text_position_t value = skb_layout_hit_test(layout->layout.get(), SKB_MOVEMENT_CARET, x, y);
     return {value.offset, static_cast<uint8_t>(value.affinity)};
 }
 
@@ -808,7 +1211,7 @@ int32_t TextEngine::offset_from_position(TextPosition position) const {
         return 0;
     const skb_text_position_t value = {position.offset,
                                        static_cast<skb_caret_affinity_t>(position.affinity)};
-    return skb_layout_get_offset_from_text_position(layout->layout, value);
+    return skb_layout_get_offset_from_text_position(layout->layout.get(), value);
 }
 
 TextCaret TextEngine::caret(TextPosition position) const {
@@ -817,7 +1220,7 @@ TextCaret TextEngine::caret(TextPosition position) const {
         return {};
     const skb_text_position_t value = {position.offset,
                                        static_cast<skb_caret_affinity_t>(position.affinity)};
-    const skb_caret_info_t result = skb_layout_get_caret_info_at(layout->layout, value);
+    const skb_caret_info_t result = skb_layout_get_caret_info_at(layout->layout.get(), value);
     return {result.x, result.y, result.ascender, result.descender, result.slope, result.direction};
 }
 
@@ -827,7 +1230,7 @@ TextPosition TextEngine::word_start(TextPosition position) const {
         return {};
     const skb_text_position_t input = {position.offset,
                                        static_cast<skb_caret_affinity_t>(position.affinity)};
-    const skb_text_position_t result = skb_layout_get_word_start_at(layout->layout, input);
+    const skb_text_position_t result = skb_layout_get_word_start_at(layout->layout.get(), input);
     return {result.offset, static_cast<uint8_t>(result.affinity)};
 }
 
@@ -837,30 +1240,30 @@ TextPosition TextEngine::word_end(TextPosition position) const {
         return {};
     const skb_text_position_t input = {position.offset,
                                        static_cast<skb_caret_affinity_t>(position.affinity)};
-    const skb_text_position_t result = skb_layout_get_word_end_at(layout->layout, input);
+    const skb_text_position_t result = skb_layout_get_word_end_at(layout->layout.get(), input);
     return {result.offset, static_cast<uint8_t>(result.affinity)};
 }
 
 int32_t TextEngine::next_grapheme(int32_t offset) const {
     const auto *layout = active_layout(*state_);
-    return layout ? skb_layout_get_next_grapheme_offset(layout->layout, offset) : 0;
+    return layout ? skb_layout_get_next_grapheme_offset(layout->layout.get(), offset) : 0;
 }
 
 int32_t TextEngine::previous_grapheme(int32_t offset) const {
     const auto *layout = active_layout(*state_);
-    return layout ? skb_layout_get_prev_grapheme_offset(layout->layout, offset) : 0;
+    return layout ? skb_layout_get_prev_grapheme_offset(layout->layout.get(), offset) : 0;
 }
 
 int32_t TextEngine::align_grapheme(int32_t offset) const {
     const auto *layout = active_layout(*state_);
-    return layout ? skb_layout_align_grapheme_offset(layout->layout, offset) : 0;
+    return layout ? skb_layout_align_grapheme_offset(layout->layout.get(), offset) : 0;
 }
 
 TextRange TextEngine::word_range_at(int32_t offset) const {
     const auto *retained = active_layout(*state_);
     if (!retained)
         return {};
-    const skb_layout_t *layout = retained->layout;
+    const skb_layout_t *layout = retained->layout.get();
     const int32_t text_count = skb_layout_get_text_count(layout);
     if (text_count <= 0)
         return {};
@@ -879,7 +1282,7 @@ TextRange TextEngine::line_range_at(int32_t offset) const {
     const auto *retained = active_layout(*state_);
     if (!retained)
         return {};
-    const skb_layout_t *layout = retained->layout;
+    const skb_layout_t *layout = retained->layout.get();
     const int32_t text_count = skb_layout_get_text_count(layout);
     if (text_count <= 0)
         return {};
@@ -899,14 +1302,10 @@ int32_t TextEngine::move_word(int32_t offset, int32_t direction, bool mac_style)
     if (!retained || direction == 0)
         return offset;
 
-    const skb_layout_t *layout = retained->layout;
+    const skb_layout_t *layout = retained->layout.get();
     const int32_t text_count = skb_layout_get_text_count(layout);
     if (text_count <= 0)
         return 0;
-
-    const skb_text_property_t *properties = skb_layout_get_text_properties(layout);
-    if (!properties)
-        return std::clamp(offset, 0, text_count);
 
     int32_t next = std::clamp(offset, 0, text_count);
     const auto next_grapheme = [layout](int32_t value) {
@@ -921,10 +1320,11 @@ int32_t TextEngine::move_word(int32_t offset, int32_t direction, bool mac_style)
 
     if (direction > 0) {
         if (mac_style) {
-            while (next < text_count && (properties[next].flags & (whitespace | punctuation)) != 0)
+            while (next < text_count &&
+                   (skb_layout_get_text_property_at(layout, next).flags & (whitespace | punctuation)) != 0)
                 next++;
             while (next < text_count) {
-                if ((properties[next].flags & word_break) != 0) {
+                if ((skb_layout_get_text_property_at(layout, next).flags & word_break) != 0) {
                     next = next_grapheme(next);
                     break;
                 }
@@ -932,10 +1332,10 @@ int32_t TextEngine::move_word(int32_t offset, int32_t direction, bool mac_style)
             }
         } else {
             while (next < text_count) {
-                if ((properties[next].flags & word_break) != 0) {
+                if ((skb_layout_get_text_property_at(layout, next).flags & word_break) != 0) {
                     const int32_t after_boundary = next_grapheme(next);
                     if (after_boundary >= text_count ||
-                        (properties[after_boundary].flags & whitespace) == 0) {
+                        (skb_layout_get_text_property_at(layout, after_boundary).flags & whitespace) == 0) {
                         next = after_boundary;
                         break;
                     }
@@ -945,16 +1345,17 @@ int32_t TextEngine::move_word(int32_t offset, int32_t direction, bool mac_style)
         }
     } else {
         if (mac_style) {
-            while (next > 0 && (properties[next - 1].flags & (whitespace | punctuation)) != 0)
+            while (next > 0 &&
+                   (skb_layout_get_text_property_at(layout, next - 1).flags & (whitespace | punctuation)) != 0)
                 next--;
         }
         if (next > 0)
             next = previous_grapheme(next);
         while (next > 0) {
-            if ((properties[next - 1].flags & word_break) != 0) {
+            if ((skb_layout_get_text_property_at(layout, next - 1).flags & word_break) != 0) {
                 const int32_t after_boundary = next_grapheme(next - 1);
                 if (mac_style || after_boundary >= text_count ||
-                    (properties[after_boundary].flags & whitespace) == 0) {
+                    (skb_layout_get_text_property_at(layout, after_boundary).flags & whitespace) == 0) {
                     next = after_boundary;
                     break;
                 }
@@ -971,24 +1372,20 @@ int32_t TextEngine::move_paragraph(int32_t offset, int32_t direction, bool mac_s
     if (!retained || direction == 0)
         return offset;
 
-    const skb_layout_t *layout = retained->layout;
+    const skb_layout_t *layout = retained->layout.get();
     const int32_t text_count = skb_layout_get_text_count(layout);
     if (text_count <= 0)
         return 0;
-    const skb_text_property_t *properties = skb_layout_get_text_properties(layout);
-    if (!properties)
-        return std::clamp(offset, 0, text_count);
-
     const int32_t current = std::clamp(offset, 0, text_count);
     int32_t paragraph_start = 0;
     for (int32_t index = 0; index < current; ++index) {
-        if ((properties[index].flags & SKB_TEXT_PROP_MUST_LINE_BREAK) != 0)
+        if ((skb_layout_get_text_property_at(layout, index).flags & SKB_TEXT_PROP_MUST_LINE_BREAK) != 0)
             paragraph_start = index + 1;
     }
 
     int32_t paragraph_end = text_count;
     for (int32_t index = current; index < text_count; ++index) {
-        if ((properties[index].flags & SKB_TEXT_PROP_MUST_LINE_BREAK) != 0) {
+        if ((skb_layout_get_text_property_at(layout, index).flags & SKB_TEXT_PROP_MUST_LINE_BREAK) != 0) {
             paragraph_end = index;
             break;
         }
@@ -1001,7 +1398,7 @@ int32_t TextEngine::move_paragraph(int32_t offset, int32_t direction, bool mac_s
 
     int32_t previous_start = 0;
     for (int32_t index = 0; index + 1 < paragraph_start; ++index) {
-        if ((properties[index].flags & SKB_TEXT_PROP_MUST_LINE_BREAK) != 0)
+        if ((skb_layout_get_text_property_at(layout, index).flags & SKB_TEXT_PROP_MUST_LINE_BREAK) != 0)
             previous_start = index + 1;
     }
     return previous_start;
@@ -1019,7 +1416,7 @@ std::vector<TextRect> TextEngine::selection_rects(TextPosition start, TextPositi
         static_cast<std::vector<TextRect> *>(context)->push_back(
             {rect.x, rect.y, rect.width, rect.height});
     };
-    skb_layout_iterate_text_range_bounds(layout->layout, range, collect, &rectangles);
+    skb_layout_iterate_text_range_bounds(layout->layout.get(), range, collect, &rectangles);
 
     // Visual runs in mixed-direction text may produce touching or overlapping
     // bounds on the same line. Returning those independently causes translucent
@@ -1057,7 +1454,7 @@ uint64_t TextEngine::font_collection_generation() const {
 
 uint64_t TextEngine::layout_generation() const {
     const auto *layout = active_layout(*state_);
-    return layout ? skb_layout_get_generation(layout->layout) : 0;
+    return layout ? skb_layout_get_generation(layout->layout.get()) : 0;
 }
 
 TextLayoutId TextEngine::active_layout_id() const {
@@ -1087,6 +1484,8 @@ TextEngineStats TextEngine::stats() const {
     result.prepared_batch_count = state_->prepared_batch_count;
     result.text_layout_cache_hits = state_->layout_cache_hits;
     result.text_layout_cache_misses = state_->layout_cache_misses;
+    result.incremental_ascii_edits = state_->incremental_ascii_edits;
+    result.edit_layout_fallbacks = state_->edit_layout_fallbacks;
     result.atlas_pages = atlas_texture_count();
     result.scale_generation = state_->scale_generation;
     for (const auto &upload : atlas_uploads(true))

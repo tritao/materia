@@ -5,6 +5,7 @@ import Canvas;
 import DisplayList;
 import CompositeMode;
 import FontCollection;
+import FontFamily;
 import GradientStop;
 import Image;
 import ImageFormat;
@@ -31,6 +32,9 @@ import Transform2D;
 import TextLayout;
 import TextDirection;
 import TextStyle;
+import TextColorRange;
+import nativekit.ui.widgets.text.TextDecoration;
+import nativekit.ui.widgets.text.TextDecorationKind;
 import TextWrap;
 import NativeKitEventValue;
 import NativeKitEventValue.NativeKitTextEdit;
@@ -142,6 +146,7 @@ import nativekit.ui.widgets.text.TextEditorHistoryKind;
 import nativekit.ui.widgets.text.TextEditorDiagnostics;
 import nativekit.ui.widgets.text.TextArea;
 import nativekit.ui.widgets.text.TextField;
+import nativekit.ui.widgets.text.TextSelection;
 import nativekit.ui.widgets.text.EditTransaction;
 import nativekit.editorkit.TextDocument;
 import nativekit.ui.widgets.layout.Spacer;
@@ -240,6 +245,231 @@ import nativekit.ui.host.UiApplication;
 import nativekit.ui.host.UiHostPendingResources;
 
 class FrameworkSmoke {
+	static function newlineChunksValid(fonts:FontCollection):Bool {
+		var value = new StringBuf();
+		for (line in 0...220)
+			value.add("é🙂 x " + line + "\n");
+		var editor = new TextEditorState(fonts, value.toString());
+		editor.paragraphStyle.lineHeight = 24.0;
+		editor.updateLayout(400.0);
+		var paintedRanges:Array<Int> = [];
+		editor.layout.colorRangeProvider = function(start, end) {
+			paintedRanges.push(start);
+			paintedRanges.push(end);
+			return [];
+		};
+		var canvas = new Canvas();
+		editor.layout.paint(canvas, new Color(1.0, 1.0, 1.0), 0.0, editor.layout.measure().height);
+		var originalRanges = paintedRanges;
+		canvas.reset();
+		for (step in 0...7) {
+			var beforeRanges = paintedRanges;
+			var offsets = new nativekit.editorkit.TextDocument(editor.text);
+			var start = step == 0 ? 0 : offsets.paragraphRangeAtIndex(step >= 3 ? 190 : 63).start;
+			var end = step == 2 ? offsets.paragraphRangeAtIndex(67).start : start;
+			if (step == 5) {
+				var many = new StringBuf();
+				for (_ in 0...140) many.add("overflow α🙂\n");
+				// Exercise local splitting above the hard 128-paragraph bound.
+				if (!editor.replace(start, start, many.toString()))
+					throw "chunk overflow insertion was ignored";
+				offsets = new nativekit.editorkit.TextDocument(editor.text);
+				start = offsets.paragraphRangeAtIndex(190).start;
+				end = start;
+			}
+			var inserted = step == 0 ? "\n" : (step == 2 ? "α🙂 joined\n" :
+				(step == 4 ? "ordinary é🙂" : "α\nβ\n"));
+			if (step == 6) {
+				start = 0;
+				end = offsets.codepointCount;
+				inserted = "";
+			}
+			if (!editor.replace(start, end, inserted))
+				throw "newline chunk replacement was ignored";
+			var expected = new TextEditorState(fonts, editor.text);
+			expected.paragraphStyle.lineHeight = 24.0;
+			expected.updateLayout(400.0);
+			var actualSize = editor.layout.measure();
+			var expectedSize = expected.layout.measure();
+			if (Math.abs(actualSize.height - expectedSize.height) > 0.001 ||
+				Math.abs(actualSize.width - expectedSize.width) > 0.001)
+				throw "newline chunk metrics differ from fresh layout";
+			var current = new nativekit.editorkit.TextDocument(editor.text);
+			paintedRanges = [];
+			editor.layout.paint(canvas, new Color(1.0, 1.0, 1.0), 0.0, actualSize.height);
+			canvas.reset();
+			if (step == 0) {
+				if (paintedRanges.length != originalRanges.length)
+					throw "one newline repartitioned unrelated chunks";
+				for (index in 0...paintedRanges.length)
+					if (paintedRanges[index] != originalRanges[index] + (index == 0 ? 0 : 1))
+						throw "one newline moved an unrelated chunk boundary";
+			}
+			if (step == 4) {
+				if (paintedRanges.length != beforeRanges.length)
+					throw "ordinary typing repartitioned stable chunks";
+				var delta = current.codepointCount - offsets.codepointCount;
+				for (index in 0...paintedRanges.length) {
+					var shifted = index % 2 == 0 ? beforeRanges[index] > start : beforeRanges[index] >= start;
+					if (paintedRanges[index] != beforeRanges[index] + (shifted ? delta : 0))
+						throw "ordinary typing changed an unrelated chunk boundary";
+				}
+			}
+			var rangeIndex = 0;
+			while (rangeIndex < paintedRanges.length) {
+				if (current.paragraphIndexAtOffset(paintedRanges[rangeIndex + 1]) -
+					current.paragraphIndexAtOffset(paintedRanges[rangeIndex]) + 1 > 128)
+					throw "edited chunk exceeded the paragraph bound";
+				rangeIndex += 2;
+			}
+			for (offset in 0...current.codepointCount + 1) {
+				var actual = editor.layout.caret(new TextPosition(offset, 0));
+				var fresh = expected.layout.caret(new TextPosition(offset, 0));
+				if (Math.abs(actual.x - fresh.x) > 0.001 || Math.abs(actual.y - fresh.y) > 0.001)
+					throw "newline chunk caret differs at step " + step + " offset " + offset;
+			}
+			for (paragraph in 0...current.paragraphCount()) {
+				var start = current.paragraphRangeAtIndex(paragraph).start;
+				var actual = editor.layout.paragraphCaret(paragraph);
+				var fresh = expected.layout.caret(new TextPosition(start, 0));
+				if (Math.abs(actual.y - fresh.y) > 0.001 || Math.abs(actual.x - fresh.x) > 0.001 ||
+					editor.layout.paragraphIndexAtY(actual.y) != paragraph)
+					throw "logical paragraph geometry differs after newline edit";
+			}
+			expected.dispose();
+		}
+		editor.dispose();
+		return true;
+	}
+
+	static function foregroundRangesValid(fonts:FontCollection):Bool {
+		var value = new StringBuf();
+		for (_ in 0...150)
+			value.add("é🙂x\n");
+		var editor = new TextEditorState(fonts, value.toString());
+		editor.updateLayout(200.0);
+		var measured = editor.layout.measure();
+		var calls = 0;
+		var requestedEnd = 0;
+		var tint = new Color(1.0, 0.0, 0.0);
+		editor.layout.colorRangeProvider = function(start, end) {
+			calls++;
+			requestedEnd = end;
+			return [new TextColorRange(0, 600, tint)];
+		};
+		var canvas = new Canvas();
+		editor.layout.paint(canvas, new Color(1.0, 1.0, 1.0), 0.0, 20.0);
+		if (calls != 1 || requestedEnd <= 0 || requestedEnd >= 600)
+			return false;
+		tint = new Color(0.0, 1.0, 0.0);
+		editor.layout.paint(canvas, new Color(1.0, 1.0, 1.0), 0.0, 20.0);
+		var afterColors = editor.layout.measure();
+		if (calls != 2 || measured.width != afterColors.width || measured.height != afterColors.height)
+			return false;
+		editor.layout.colorRangeProvider = function(start, end) {
+			return [new TextColorRange(0, 3, tint), new TextColorRange(2, 4, tint)];
+		};
+		var rejected = false;
+		try {
+			editor.layout.paint(canvas, new Color(1.0, 1.0, 1.0), 0.0, 20.0);
+		} catch (_:String) {
+			rejected = true;
+		}
+		editor.layout.colorRangeProvider = null;
+		editor.layout.paint(canvas, new Color(1.0, 1.0, 1.0), 0.0, 20.0);
+		editor.dispose();
+		return rejected;
+	}
+
+	static function decorationRangesValid(fonts:FontCollection):Bool {
+		var emojiPath = Sys.getEnv("NKUI_TEST_EMOJI_FONT_PATH");
+		var textPath = Sys.getEnv("NKUI_TEST_FONT_PATH");
+		if (emojiPath == null || textPath == null)
+			throw "Decoration tests require text and emoji fonts";
+		var decorationFonts = FontCollection.create();
+		decorationFonts.add(textPath);
+		decorationFonts.add(emojiPath, FontFamily.Emoji);
+		var editor = new TextEditorState(decorationFonts, "abc🙂def\nxyz");
+		editor.updateLayout(200.0);
+		var before = editor.layout.measure();
+		var color = new Color(0.85, 0.2, 0.2);
+		var background = new TextDecoration(1, 5, color, Background);
+		var rects = background.rectangles(editor.layout, 0.0, 100.0);
+		if (rects.length == 0 || rects[0].x <= 0.0 || rects[0].width <= 0.0)
+			throw "decoration range geometry: count=" + rects.length + (rects.length == 0 ? "" : " x=" + rects[0].x + " width=" + rects[0].width);
+		var line = new TextDecoration(0, 0, color, WholeLineBackground);
+		var lineRects = line.rectangles(editor.layout, 0.0, 100.0);
+		if (lineRects.length != 1 || lineRects[0].x != 0.0 || lineRects[0].width != 200.0)
+			throw "whole-line geometry";
+		var rangedLine = new TextDecoration(0, 8, color, WholeLineBackground);
+		var rangedRects = rangedLine.rectangles(editor.layout, 0.0, 100.0);
+		if (rangedRects.length != 1 || rangedRects[0].width != 200.0 ||
+			rangedLine.rectangles(editor.layout, rangedRects[0].y + rangedRects[0].height,
+				100.0).length != 0)
+			throw "visible whole-line range geometry";
+		var underline = new TextDecoration(1, 5, color, Underline);
+		var wavy = new TextDecoration(1, 5, color, WavyUnderline);
+		var canvas = new Canvas();
+		background.paint(canvas, rects, 0.0, 20.0);
+		line.paint(canvas, lineRects, 0.0, 20.0);
+		underline.paint(canvas, rects, 0.0, 20.0);
+		wavy.paint(canvas, rects, 0.0, 20.0);
+		var list = DisplayList.create();
+		canvas.update(list);
+		if (list.info().commandCount <= 0 || editor.layout.measure().height != before.height)
+			throw "decoration transaction measurement";
+		list.dispose();
+		canvas.reset();
+		var paintCalls = 0;
+		var provider = function(start:Int, end:Int):Array<TextDecoration> {
+			paintCalls++;
+			return [wavy];
+		};
+		var measurementVersion = editor.renderContent.getVersion();
+		editor.configurePresentation(null, provider, 1);
+		var geometry = new ResolvedLayoutItem(1, 1, 0.0, 0.0, 200.0, 100.0,
+			new Rect(0.0, 0.0, 200.0, 100.0), new Rect(0.0, 0.0, 200.0, 100.0), Transform2D.identity(), 0.0);
+		var painted = editor.renderContent.paint(geometry);
+		var decoratedCommands = painted.info().commandCount;
+		editor.renderContent.paint(geometry);
+		if (paintCalls != 1) throw "unchanged presentation did not retain its display list";
+		editor.configurePresentation(null, provider, 2);
+		editor.renderContent.paint(geometry);
+		if (paintCalls != 2 || editor.renderContent.getVersion() != measurementVersion)
+			throw "presentation revision did not repaint independently of measurement";
+		editor.configurePresentation(null, provider, 2);
+		editor.renderContent.paint(geometry);
+		if (paintCalls != 2) throw "unchanged presentation revision repainted";
+		editor.configurePresentation(null, null, 3);
+		if (editor.renderContent.paint(geometry).info().commandCount >= decoratedCommands ||
+			editor.renderContent.getVersion() != measurementVersion || editor.layout.measure().height != before.height)
+			throw "cleared presentation retained decoration commands or changed measurement";
+		if (!editor.replace(0, 0, "zz"))
+			throw "decoration edit application";
+		var moved = new TextDecoration(3, 7, color, Underline).rectangles(editor.layout, 0.0, 100.0);
+		if (moved.length == 0 || moved[0].x <= rects[0].x)
+			throw "decoration geometry after edit";
+		editor.dispose();
+		var value = new StringBuf();
+		for (_ in 0...150)
+			value.add("abc\n");
+		var layered = new TextEditorState(decorationFonts, value.toString());
+		layered.updateLayout(200.0);
+		var calls = 0;
+		layered.layout.decorationProvider = function(start, end) {
+			calls++;
+			layered.layout.decorationProvider = null;
+			return [new TextDecoration(start, start, color, WholeLineBackground)];
+		};
+		layered.layout.paintDecorations(canvas, true, 0.0, layered.layout.measure().height,
+			0.0, 200.0);
+		canvas.reset();
+		layered.dispose();
+		decorationFonts.dispose();
+		if (calls != 3) throw "provider snapshot calls: " + calls;
+		return true;
+	}
+
 	static function main():Int {
 		if (!hostFrameLifecycleValid())
 			return 270;
@@ -263,6 +493,57 @@ class FrameworkSmoke {
 			return 2;
 		var fonts = FontCollection.create();
 		fonts.add(fontPath);
+		// Visual affinity positions name a glyph; range tags name logical insertion offsets.
+		var affinityLayout = TextLayout.create(fonts, "abc", 100.0);
+		var affinityStart = new TextPosition(0, 2), affinityEnd = new TextPosition(2, 2);
+		if (affinityLayout.offsetFromPosition(affinityStart) != 1 ||
+			affinityLayout.offsetFromPosition(affinityEnd) != 3) return 1021;
+		var affinityRects = affinityLayout.selectionRangeRects(affinityStart, affinityEnd);
+		var reversedAffinityRects = affinityLayout.selectionRangeRects(affinityEnd, affinityStart);
+		if (affinityRects.length != 2 || reversedAffinityRects.length != 2) return 1022;
+		var affinityCaret = affinityLayout.caret(affinityStart);
+		if (Math.abs(affinityRects[0].x - affinityCaret.x) > 0.1) return 1023;
+		for (index in 0...affinityRects.length) {
+			var rect = affinityRects[index], reverse = reversedAffinityRects[index];
+			if (rect.start != index + 1 || rect.end != index + 2 ||
+				reverse.start != rect.start || reverse.end != rect.end ||
+				Math.abs(reverse.x - rect.x) > 0.1 || Math.abs(reverse.width - rect.width) > 0.1)
+				return 1024;
+		}
+		affinityLayout.dispose();
+		var affinityEditor = new TextEditorState(fonts, "abc\nabc");
+		affinityEditor.updateLayout(100.0);
+		affinityEditor.placeCaretAt(new TextPosition(0, 2), false);
+		affinityEditor.placeCaretAt(new TextPosition(6, 2), true);
+		for (pass in 0...2) {
+			var rects = affinityEditor.layout.selectionRangeRects(affinityEditor.anchorPosition(),
+				affinityEditor.focusPosition());
+			if (rects.length == 0) return 1025;
+			for (rect in rects) if (rect.start < affinityEditor.selectionStart ||
+				rect.end > affinityEditor.selectionEnd) return 1026;
+		}
+		affinityEditor.dispose();
+		var boundaryText = "";
+		for (_ in 0...128) boundaryText += "abc\n";
+		var boundaryEditor = new TextEditorState(fonts, boundaryText + "abc");
+		boundaryEditor.updateLayout(100.0);
+		boundaryEditor.placeCaretAt(new TextPosition(255, 2), false);
+		boundaryEditor.placeCaretAt(new TextPosition(258, 2), true);
+		var boundaryRects = boundaryEditor.layout.selectionRangeRects(boundaryEditor.anchorPosition(),
+			boundaryEditor.focusPosition());
+		// The model retains the preceding newline; only the three visible letters have rectangles.
+		if (boundaryRects.length != 3 || boundaryEditor.selectionStart != 255 ||
+			boundaryEditor.selectionEnd != 259) return 1027;
+		for (rect in boundaryRects) if (rect.start < 256 || rect.end > 259) return 1028;
+		boundaryEditor.dispose();
+
+		Sys.println("PASS: logical affinity range tags, reversed endpoints and chunked cache");
+		if (!newlineChunksValid(fonts))
+			return 310;
+		if (!foregroundRangesValid(fonts))
+			return 308;
+		if (!decorationRangesValid(fonts))
+			return 309;
 		if (!hostRuntimeLifecycleValid(fonts))
 			return 272;
 		var rtlLayout = TextLayout.create(fonts, "א", 80.0, null,
@@ -343,6 +624,15 @@ class FrameworkSmoke {
 			return 274;
 		nativeDeleteEditor.dispose();
 		editor.dispose();
+		var provisionalEditor = new TextEditorState(fonts, "abcdefghijklmnopqrstuv");
+		var unconstrained = provisionalEditor.layout.measure();
+		if (unconstrained.width < 100.0 || unconstrained.height > 50.0)
+			return 501;
+		provisionalEditor.updateLayout(25.0);
+		if (provisionalEditor.layout.measure().height < unconstrained.height * 3.0 ||
+			provisionalEditor.selectionFocus != 22)
+			return 502;
+		provisionalEditor.dispose();
 		var blinkEditor = new TextEditorState(fonts, "caret");
 		blinkEditor.focused = true;
 		blinkEditor.resetCaretBlink(10.0);
@@ -472,6 +762,50 @@ class FrameworkSmoke {
 		if (sharedEditor.text != "external update" || sharedEditor.selectionEnd >
 			sharedDocument.codepointCount)
 			return 295;
+		var controlledDocument = new TextDocument("a🙂bc");
+		var controlledSelection = new TextSelection(4, 1);
+		var editDelivered = false;
+		var callbackOrdered = true;
+		var controlledField = TextField.withDocument("controlled-selection", controlledDocument,
+			function(_) { editDelivered = true; });
+		controlledField.selectionProvider = function() return controlledSelection;
+		controlledField.onSelectionChange = function(next) {
+			if (controlledDocument.text == "ax" && !editDelivered) callbackOrdered = false;
+			controlledSelection = next;
+		};
+		var controlledRoot = context.submit(controlledField, new LayoutFrame(256.0, 192.0));
+		var controlledState:State<TextEditorState> = context.buildContext.existingState(controlledRoot.id);
+		var controlledEditor:TextEditorState = cast controlledState.value;
+		if (controlledEditor.selectionAnchor != 4 || controlledEditor.selectionFocus != 1)
+			return 340;
+		context.focusWidget(controlledRoot.id);
+		context.text(UiEventKind.TextInput, "x");
+		if (controlledDocument.text != "ax" || !callbackOrdered || !editDelivered ||
+			controlledSelection.anchor != 2 || controlledSelection.focus != 2)
+			return 341;
+		context.submit(controlledField, new LayoutFrame(256.0, 192.0));
+		if (controlledEditor.selectionFocus != 2) return 342;
+		controlledSelection = new TextSelection(0, 0);
+		context.submit(controlledField, new LayoutFrame(256.0, 192.0));
+		context.key(UiEventKind.KeyDown, UiKey.Right, UiModifier.Shift);
+		if (controlledSelection.anchor != 0 || controlledSelection.focus != 1) return 343;
+		editDelivered = false;
+		controlledField.onEditIntent = function(intent) {
+			switch intent {
+				case Insert(text):
+					controlledDocument.replace(0, controlledDocument.codepointCount, text + "!");
+					controlledSelection = new TextSelection(controlledDocument.codepointCount, controlledDocument.codepointCount);
+					return true;
+				case _: return false;
+			}
+		};
+		context.submit(controlledField, new LayoutFrame(256.0, 192.0));
+		context.text(UiEventKind.TextInput, "🙂");
+		if (controlledDocument.text != "🙂!" || editDelivered || controlledEditor.selectionFocus != 2)
+			return 344;
+		context.key(UiEventKind.KeyDown, UiKey.Backspace);
+		if (controlledDocument.text != "🙂" || !editDelivered || controlledSelection.focus != 1)
+			return 345;
 		var sharedArea = TextArea.withDocument("shared-document-area",
 			new TextDocument("multiline"));
 		if (!sharedArea.multiline)
@@ -1221,7 +1555,8 @@ class FrameworkSmoke {
 			editSeen = event.data != null && event.text == "compose";
 		});
 		var source = new Handle(17);
-		var input = new NativeInputAdapter(context, source);
+		var surface = new Handle(19);
+		var input = new NativeInputAdapter(context, source, surface);
 		var eventRuntime = NativeKitRuntime.start();
 		var eventPump = eventRuntime.events;
 		var pumpEvents = 0;
@@ -1283,7 +1618,9 @@ class FrameworkSmoke {
 			return 16;
 		var edit = new NativeKitTextEdit(TextEditAction.Compose, "compose", 0, 0,
 			0, 0, 0, 7);
-		if (!input.consume(TextEdit(source, edit)) || !editSeen)
+		if (input.consume(TextEdit(source, edit)) || editSeen ||
+			input.consume(TextEdit(new Handle(20), edit)) || editSeen ||
+			!input.consume(TextEdit(surface, edit)) || !editSeen)
 			return 17;
 		if (!input.consume(PointerEnter(source, false)) || hoverLeaves == 0)
 			return 18;
@@ -1468,6 +1805,16 @@ class FrameworkSmoke {
 		var shortTrack:ResolvedLayoutItem = cast shortRoot.children[1].resolved;
 		if (shortScroll.controller.maxScrollY != 0.0 || shortTrack.visible)
 			return 269;
+		var ownedFirst = new ScrollController(0.0, 40.0);
+		var ownedFirstView = new ScrollView("owned-scroll", new Column("owned-content", [], longContentStyle),
+			viewportStyle, ScrollAxis.Vertical, ownedFirst);
+		context.submit(ownedFirstView, scrollFrame);
+		var ownedReplacement = new ScrollController(0.0, 90.0);
+		var ownedReplacementView = new ScrollView("owned-scroll", new Column("owned-content", [], longContentStyle),
+			viewportStyle, ScrollAxis.Vertical, ownedReplacement);
+		context.submit(ownedReplacementView, scrollFrame);
+		if (ownedFirstView.controller != ownedFirst || ownedReplacementView.controller != ownedReplacement ||
+			ownedFirst.offsetY != 40.0 || ownedReplacement.offsetY != 90.0) return 1101;
 		var emptyViewport = new VirtualViewport(0, 32.0, 350.0, 0.0);
 		var topViewport = new VirtualViewport(100000, 32.0, 350.0, 0.0);
 		var middleViewport = new VirtualViewport(100000, 32.0, 350.0, 414.0 * 32.0);
@@ -1880,13 +2227,73 @@ class FrameworkSmoke {
 		var menuGeometry:ResolvedLayoutItem = cast menuRoot.children[2].resolved;
 		if (context.focus.focusedId == null ||
 			menuRoot.children[0].layout.style.background.alpha != 0.0 ||
-			menuGeometry.x != 32.0 || menuGeometry.y != 24.0 ||
+			Math.abs(menuGeometry.x - Math.min(32.0, dialogFrame.width - menuGeometry.width)) > 0.1 ||
+			menuGeometry.y != 24.0 ||
 			menuRoot.children[2].layout.style.radiusTopLeft != 0.0)
 			return 74;
 		context.key(UiEventKind.KeyDown, UiKey.Enter);
-		if (selectedMenuItem != "open" || menuDismissals != 1 ||
-			menuRoot.children[2].children[1].children[1].enabled)
+		var disabledMenuPresent = false;
+		menuRoot.walk(function(node) {
+			if (node.semantics != null && node.semantics.role == AccessibilityRole.MenuItem &&
+				node.semantics.label == "Unavailable" && !node.enabled) disabledMenuPresent = true;
+		});
+		if (selectedMenuItem != "open" || menuDismissals != 1 || !disabledMenuPresent)
 			return 75;
+
+		var unavailableMenuDismissals = 0;
+		var unavailableMenu = new Menu("unavailable-menu-smoke", [
+			new MenuItem("disabled-only", "Unavailable", null, false)
+		], 4.0, 4.0, function() { unavailableMenuDismissals++; });
+		var unavailableMenuRoot = context.submit(unavailableMenu, dialogFrame);
+		if (context.focus.focusedId == null) return 1016;
+		// A menu that fits to the right of its anchor opens there.
+		var unavailableMenuBounds = unavailableMenuRoot.children[2].resolved;
+		if (unavailableMenuBounds == null || Math.abs(unavailableMenuBounds.x - 4.0) > 0.1 ||
+			Math.abs(unavailableMenuBounds.y - 4.0) > 0.1) return 1019;
+		context.key(UiEventKind.KeyDown, UiKey.Escape);
+		if (unavailableMenuDismissals != 1) return 1017;
+
+		var overflowChoice = -1;
+		var overflowMenuItems:Array<MenuItem> = [];
+		for (index in 0...18) {
+			var choice = index;
+			overflowMenuItems.push(new MenuItem("choice-" + index, "Choice " + index,
+				function() { overflowChoice = choice; }));
+		}
+		var overflowMenu = new Menu("overflow-menu-smoke", overflowMenuItems, 250.0, 115.0);
+		var overflowMenuFrame = new LayoutFrame(256.0, 120.0);
+		var overflowMenuRoot = context.submit(overflowMenu, overflowMenuFrame);
+		var overflowMenuBounds = overflowMenuRoot.children[2].resolved;
+		if (overflowMenuBounds == null || overflowMenuBounds.x < 0 || overflowMenuBounds.y < 0 ||
+			overflowMenuBounds.x + overflowMenuBounds.width > 256.1 ||
+			overflowMenuBounds.y + overflowMenuBounds.height > 120.1) return 1008;
+		// Without room to the right, the menu opens to the left of its anchor.
+		if (Math.abs(overflowMenuBounds.x + overflowMenuBounds.width - 250.0) > 0.1) return 1020;
+		// The menu surface must follow the panel after edge placement moves it.
+		var overflowSurfaceBounds = overflowMenuRoot.children[2].children[0].resolved;
+		if (overflowSurfaceBounds == null ||
+			Math.abs(overflowSurfaceBounds.x - overflowMenuBounds.x) > 0.1 ||
+			Math.abs(overflowSurfaceBounds.y - overflowMenuBounds.y) > 0.1) return 1018;
+		for (overflowIndex in 0...17) {
+			context.key(UiEventKind.KeyDown, UiKey.Down);
+			overflowMenuRoot = context.submit(overflowMenu, overflowMenuFrame);
+			var stepFocus = context.focus.focusedId;
+			if (stepFocus == null) return 1013;
+			var stepItem = overflowMenuRoot.find(stepFocus);
+			if (stepItem == null || stepItem.semantics == null ||
+				stepItem.semantics.label != "Choice " + (overflowIndex + 1)) return 1014;
+		}
+		var focusedOverflowItem = context.focus.focusedId;
+		if (focusedOverflowItem == null) return 1009;
+		var lastOverflowItem = overflowMenuRoot.find(focusedOverflowItem);
+		if (lastOverflowItem == null || lastOverflowItem.semantics == null ||
+			lastOverflowItem.semantics.label != "Choice 17") return 1010;
+		var lastOverflowGeometry = lastOverflowItem.resolved;
+		if (lastOverflowGeometry == null || !lastOverflowGeometry.visible) return 1011;
+		var lastOverflowBounds = lastOverflowGeometry.viewportBounds();
+		if (lastOverflowBounds.y < 0 || lastOverflowBounds.y + lastOverflowBounds.height > 120.1) return 1015;
+		context.key(UiEventKind.KeyDown, UiKey.Enter);
+		if (overflowChoice != 17) return 1012;
 
 		var tooltip = new Tooltip("tooltip-smoke", new Button("Anchor"), new Text("Hint"));
 		var tooltipFrame = new LayoutFrame(256.0, 192.0);
@@ -1980,6 +2387,29 @@ class FrameworkSmoke {
 		if (tabs.selectedKey != "first" || context.focus.focusedId == null ||
 			!context.focus.focusedId.equals(tabsRoot.children[0].children[0].children[0].id))
 			return 98;
+
+		var tabMenus = 0;
+		var menuTab = "";
+		tabs.onTabContextMenu = function(key, event) { tabMenus++; menuTab = key; };
+		tabsRoot = context.submit(tabs, tabsFrame);
+		var tabContextGeometry = tabsRoot.children[0].children[1].children[0].resolved;
+		if (tabContextGeometry == null) return 1001;
+		context.pointerDown(tabContextGeometry.x + 2.0, tabContextGeometry.y + 2.0, 1);
+		context.pointerUp(tabContextGeometry.x + 2.0, tabContextGeometry.y + 2.0, 1);
+		if (tabMenus != 1 || menuTab != "second" || tabs.selectedKey != "first" || tabChanges != 2)
+			return 1002;
+		if (!context.focusWidget(tabsRoot.children[0].children[0].children[0].id)) return 1003;
+		context.key(UiEventKind.KeyDown, UiKey.F10);
+		if (tabMenus != 1) return 1004;
+		context.key(UiEventKind.KeyDown, UiKey.F10, UiModifier.Shift);
+		if (tabMenus != 2 || menuTab != "first" || tabs.selectedKey != "first") return 1005;
+		context.key(UiEventKind.KeyDown, UiKey.Menu);
+		if (tabMenus != 3 || menuTab != "first") return 1018;
+		var lockedTabContextGeometry = tabsRoot.children[0].children[2].children[0].resolved;
+		if (lockedTabContextGeometry == null) return 1006;
+		context.pointerDown(lockedTabContextGeometry.x + 2.0, lockedTabContextGeometry.y + 2.0, 1);
+		context.pointerUp(lockedTabContextGeometry.x + 2.0, lockedTabContextGeometry.y + 2.0, 1);
+		if (tabMenus != 3 || tabs.selectedKey != "first") return 1007;
 
 		var theme = new Theme();
 		if (theme.tokens.textPrimary != theme.text || theme.tokens.textSecondary != theme.mutedText ||
@@ -4299,6 +4729,60 @@ class FrameworkSmoke {
 			default: return false;
 		}
 		var singletonDock = new DockWorkspaceModel();
+		var groupedDock = new DockWorkspaceModel();
+		groupedDock.register(new DockPanelDescriptor("surface", "Surface", false, true, null,
+			nativekit.ui.docking.DockPanelHeaderMode.Content,
+			new nativekit.ui.docking.DockPanelGrouping("surfaces", false)));
+		groupedDock.register(new DockPanelDescriptor("tool-a", "Tool A", true, true, null,
+			nativekit.ui.docking.DockPanelHeaderMode.Dock,
+			new nativekit.ui.docking.DockPanelGrouping("tools")));
+		groupedDock.register(new DockPanelDescriptor("tool-b", "Tool B", true, true, null,
+			nativekit.ui.docking.DockPanelHeaderMode.Dock,
+			new nativekit.ui.docking.DockPanelGrouping("tools")));
+		groupedDock.setDefaultLayout(DockNode.Panel("surface"));
+		if (groupedDock.canDock("tool-a", "surface", DockDropZone.Center) ||
+			groupedDock.dock("tool-a", "surface", DockDropZone.TabBefore) ||
+			!groupedDock.open("tool-a", "surface") || !groupedDock.open("tool-b", "surface")) return false;
+		var groupedSnapshot = new nativekit.ui.docking.DockWorkspaceSnapshot(DockNode.Tabs(["surface", "tool-a", "tool-b"], "tool-b"), "tool-b");
+		if (!groupedDock.restorePersisted(groupedSnapshot) || groupedDock.activePanelId != "tool-b") return false;
+		switch groupedDock.root {
+			case Split(Vertical, _, Panel("surface"), Tabs(ids, selected)):
+				if (ids.length != 2 || ids[0] != "tool-a" || ids[1] != "tool-b" || selected != "tool-b") return false;
+			default: return false;
+		}
+		var groupedJson = groupedDock.snapshotJson();
+		if (!groupedDock.restoreJson(groupedJson) || groupedDock.snapshotJson() != groupedJson) return false;
+		if (!groupedDock.canDock("tool-a", "surface", DockDropZone.Right) ||
+			!groupedDock.dock("tool-a", "surface", DockDropZone.Right)) return false;
+		var contentHeaderDock = new DockWorkspaceModel();
+		contentHeaderDock.register(new DockPanelDescriptor("content-header", "Content header", false,
+			true, null, nativekit.ui.docking.DockPanelHeaderMode.Content));
+		contentHeaderDock.register(new DockPanelDescriptor("tool-header", "Tool header"));
+		contentHeaderDock.setDefaultLayout(DockNode.Panel("content-header"));
+		var contentHeaderWorkspace = new DockWorkspace("content-header-workspace", contentHeaderDock);
+		var contentHeaderRoot = uiContext.submit(contentHeaderWorkspace, new LayoutFrame(640.0, 480.0));
+		var contentHeaderTabs = 0;
+		if (contentHeaderRoot == null) return false;
+		contentHeaderRoot.walk(function(node) {
+			if (node.semantics != null && node.semantics.role == AccessibilityRole.Tab) contentHeaderTabs++;
+		});
+		if (contentHeaderTabs != 0) return false;
+		if (!contentHeaderDock.dock("tool-header", "content-header", DockDropZone.Center)) return false;
+		contentHeaderRoot = uiContext.submit(contentHeaderWorkspace, new LayoutFrame(640.0, 480.0));
+		contentHeaderTabs = 0;
+		if (contentHeaderRoot == null) return false;
+		contentHeaderRoot.walk(function(node) {
+			if (node.semantics != null && node.semantics.role == AccessibilityRole.Tab) contentHeaderTabs++;
+		});
+		if (contentHeaderTabs != 2) return false;
+		if (!contentHeaderDock.close("tool-header")) return false;
+		contentHeaderRoot = uiContext.submit(contentHeaderWorkspace, new LayoutFrame(640.0, 480.0));
+		contentHeaderTabs = 0;
+		if (contentHeaderRoot == null) return false;
+		contentHeaderRoot.walk(function(node) {
+			if (node.semantics != null && node.semantics.role == AccessibilityRole.Tab) contentHeaderTabs++;
+		});
+		if (contentHeaderTabs != 0) return false;
 		for (panelId in ["single-source", "single-target"])
 			singletonDock.register(new DockPanelDescriptor(panelId, panelId));
 		singletonDock.setDefaultLayout(DockNode.Split(DockSplitAxis.Horizontal, 0.5,

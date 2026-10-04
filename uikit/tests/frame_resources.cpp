@@ -44,6 +44,25 @@ int main() {
         resources.text(text) != &glyphs || resources.surface(surface) != &producer ||
         resources.content_generation(path) != 42)
         return 2;
+    const auto temporary = make_resource_id(ResourceKind::TextLayout, 4093, 8);
+    if (resources.bind_text(temporary, glyphs, 0, text) ||
+        resources.bind_text(temporary, glyphs, 19, path) ||
+        !resources.bind_text(temporary, glyphs, 19, text) ||
+        resources.source_identity(temporary).value != text.value ||
+        resources.content_generation(temporary) != 19 ||
+        resources.source_identity(path).value != path.value)
+        return 4;
+    OwnedFrameResources owned;
+    auto snapshot = std::make_shared<PreparedGlyphs>();
+    if (!owned.bind_text(temporary, snapshot, 19, text) ||
+        owned.source_identity(temporary).value != text.value)
+        return 5;
+    snapshot.reset();
+    if (!owned.text(temporary))
+        return 6;
+    owned.reset();
+    if (owned.text(temporary) || owned.source_identity(temporary).value != temporary.value)
+        return 7;
     resources.reset();
     return !resources.path(path) && !resources.text(text) && !resources.surface(surface) ? 0 : 3;
 }
