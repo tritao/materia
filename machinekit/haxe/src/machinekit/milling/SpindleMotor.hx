@@ -10,11 +10,12 @@ import machinekit.component.ComponentValues;
 class SpindleMotor extends ServoMotor {
 	public static inline var POWER:Float = 1100;
 	public function new() {
-		var speed = SpindleCartridge.MAX_RPM * 2 * Math.PI / 60;
+		var speed = 10000 * 2 * Math.PI / 60; // Independent assumed motor winding limit.
 		var torque = POWER / (speed * 0.8);
 		super({designation: "GENERIC-SPINDLE-1100W", ratedTorque: torque, peakTorque: 2 * torque,
 			ratedSpeed: speed * 0.8, maxSpeed: speed, rotorInertia: 0.001, encoderCounts: 4096,
-			bodyDiameter: 90, bodyLength: 160}, Assumed);
+			bodyDiameter: 90, bodyLength: 160, shaftDiameter: 20, shaftLength: 30, electrical: {torqueConstant: 0.1 * Math.sqrt(3.0), backEmfConstant: 0.1,
+				phaseResistance: 0.4, mechanicalEfficiency: 0.95}}, Assumed);
 	}
 	static var spindleMotorRecipe:Null<ComponentType>;
 	public static function recipeType():ComponentType {

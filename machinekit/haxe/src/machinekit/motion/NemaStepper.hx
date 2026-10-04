@@ -144,6 +144,9 @@ class NemaStepper extends MachineComponent implements MotorDrive {
 		for (point in boltPattern()) addConnector('bolt${i++}', Mount, Solids.axial(point.x, point.y, 0));
 	}
 
+	override public function motorDrive():Null<MotorDrive> return this;
+	public function electricalRating():Null<ServoElectricalRating> return null;
+
 	/** The motor's ratings, or null for a variant without them, such as a generic length. */
 	public function rating():Null<StepperMotorRating>
 		return ratingCatalog().exists(variant.designation) ? ratingCatalog().get(variant.designation) : null;

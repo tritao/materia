@@ -135,7 +135,8 @@ class BenchMill extends MachineAssembly {
 		addComponent("spindle", spindle);
 		zeroPoses.set("spindle", gaugeZero);
 		connect("head", "spindle");
-		addMateOnAxis("spindle-turn", "continuous", "head", "to-spindle", "spindle", "attach-spindle", {x: 0, y: 0, z: 1});
+		addMateOnAxis("spindle-turn", "continuous", "head", "to-spindle", "spindle", "attach-spindle", {x: 0, y: 0, z: 1}, 0,
+			{lower: null, upper: null, velocity: SpindleCartridge.MAX_RPM * 2 * Math.PI / 60, effort: null});
 		addAtSpeed("spindle-at-speed", "spindle-turn");
 		attach("holder", holder, gaugeZero, "spindle");
 		attach("tool", tool, AssemblyFrames.translation(0, spindleY, gaugeZero.z - tool.stickout), "spindle");
@@ -157,7 +158,7 @@ class BenchMill extends MachineAssembly {
 
 		exposeConnector("gaugeLine", "spindle", "gaugeLine");
 		exposeConnector("toolTip", "tool", "tip");
-		attach("powerSupply", new PowerSupply(48, 40, 4), AssemblyFrames.translation(-190, columnPose.y, 0), "base");
+		attach("powerSupply", new PowerSupply(310, 32, 4, 240, 120, 100, 8000), AssemblyFrames.translation(-190, columnPose.y, 0), "base");
 		var xScrewLength = table.width + specs[0].upper - specs[0].lower +
 			2 * (BallScrew.INPUT_JOURNAL_LENGTH + ScrewSupportUnit.bk12().length);
 		driveScrew(specs[0], "saddle", "table", [-xScrewLength / 2, saddleY, tableBottom - railSpec.blockHeight / 2],
@@ -174,28 +175,36 @@ class BenchMill extends MachineAssembly {
 			[zScrewX, (headBack + columnFront) / 2, headZ + head.height / 2]);
 		var pulley = new TimingPulley(HTD5M, 20, 20, 15);
 		var motorPulley = new TimingPulley(HTD5M, 20, 20, 15);
-		var belt = TimingBelt.twoPulley(HTD5M, 20, 20, 150, 15);
+		var belt = TimingBelt.twoPulley(HTD5M, 20, 20, 150, 15, 5000); // Assumed glass-cord EA per mm width, pending vendor data.
 		var beltZ = gaugeZero.z + spindle.connector("pulley").frame.z;
 		attach("spindlePulley", pulley, AssemblyFrames.translation(0, spindleY, beltZ), "spindle");
 		var spindleDrive = new SpindleMotor();
 		var motorFaceZ = beltZ + motorPulley.thickness;
 		attach("spindleMotor", spindleDrive, orient(150, spindleY, motorFaceZ, [0.0, 1, 0], [0.0, 0, -1]), "head");
-		attach("spindleMotorShaft", new MillDriveShaft(20, motorPulley.thickness),
-			orient(150, spindleY, motorFaceZ, [0.0, 1, 0], [0.0, 0, -1]), "spindleMotor");
 		var shelfBottom = motorFaceZ - 8;
 		attach("spindleMotorShelf", new MillMotorPlate(spindleDrive.rating.bodyDiameter + 20, 8, motorPulley.outsideDiameter + 2),
 			AssemblyFrames.translation(150, spindleY, shelfBottom), "head");
 		attach("spindleMotorRiser", new MillDriveBox(20, 100, shelfBottom - headZ - head.height),
 			AssemblyFrames.translation(head.width / 2, spindleY + 5, headZ + head.height), "head");
-		attach("spindleMotorPulley", motorPulley, AssemblyFrames.translation(150, spindleY, beltZ), "spindleMotor");
-		attach("spindleBelt", belt, AssemblyFrames.translation(0, spindleY, beltZ), "head");
+		addComponent("spindleMotorPulley", motorPulley);
+		zeroPoses.set("spindleMotorPulley", AssemblyFrames.translation(150, spindleY, beltZ));
+		connect("spindleMotor", "spindleMotorPulley");
+		addMateOnAxis("spindle-motor-turn", "continuous", "spindleMotor", "to-spindleMotorPulley",
+			"spindleMotorPulley", "attach-spindleMotorPulley", {x: 0, y: 0, z: 1});
+		attach("spindleMotorShaft", spindleDrive.shaft(),
+			orient(150, spindleY, motorFaceZ, [0.0, 1, 0], [0.0, 0, -1]), "spindleMotorPulley");
+		attach("spindleBelt", belt, AssemblyFrames.translation(0, spindleY, beltZ + pulley.thickness / 2), "head");
+		addBeltPath({belt: "spindleBelt", wraps: [{instanceId: "spindlePulley", connectorName: "axis"},
+			{instanceId: "spindleMotorPulley", connectorName: "axis"}]});
+		var motorRatio = addTransmission("spindle-belt", "spindle-turn", "spindle-motor-turn",
+			Transmission.BeltReduction("spindleBelt", "spindlePulley", "spindleMotorPulley"), machinekit.assembly.Sense.Same);
 		var spindleDriver = "spindleMotorDriver";
-		attach(spindleDriver, new MotorDriver("GENERIC-SERVO-AMP", 10),
+		attach(spindleDriver, new MotorDriver("GENERIC-AC-SERVO-AMP", 20),
 			AssemblyFrames.translation(-190, base.depth / 2 - 30, 0), "base");
 		connectPorts("spindle-power", "powerSupply", "power4", spindleDriver, "power");
-		addMotor("spindleMotor", "spindle-turn", "spindleMotor", spindleDriver, 0.5, null,
+		addMotor("spindleMotor", "spindle-motor-turn", "spindleMotor", spindleDriver, 0.5, null,
 			{speedChannel: "spindle.speed", directionChannel: "spindle.direction",
-				radiansPerSpeedUnit: 2 * Math.PI / 60});
+				radiansPerSpeedUnit: motorRatio * 2 * Math.PI / 60});
 	}
 
 	/** Each drive reads its lead and bearing boundary from its screw, nut and support parts. */
@@ -205,9 +214,11 @@ class BenchMill extends MachineAssembly {
 		var motorId = "motor" + spec.id.toUpperCase();
 		var motor = ServoMotor.model(spec.id == "z" ? "GENERIC-SERVO-750W" : "GENERIC-SERVO-400W");
 		var screw = new BallScrew(length), nut = new BallNut();
-		var coupling = new ShaftCoupling(12, BallScrew.JOURNAL_DIAMETER, 26, 36);
-		var shaftLength = 15.0; // Generic servo shaft extension, assumed.
-		var motorOffset = coupling.length / 2 + shaftLength;
+		var coupling = new ShaftCoupling(motor.rating.shaftDiameter, BallScrew.JOURNAL_DIAMETER);
+		var shaftLength = motor.rating.shaftLength;
+		// The shaft seats through side A to the sleeve midpoint; side B seats on the screw.
+		if (shaftLength < coupling.length / 2) throw "Motor shaft is too short for its coupling";
+		var motorOffset = shaftLength;
 		var motorPose = orient(start[0] - along[0] * motorOffset, start[1] - along[1] * motorOffset,
 			start[2] - along[2] * motorOffset, up, along);
 		var couplingPose = orient(start[0] - along[0] * coupling.length / 2, start[1] - along[1] * coupling.length / 2,
@@ -218,7 +229,7 @@ class BenchMill extends MachineAssembly {
 		connect(motorId, id);
 
 		attach(id + "Coupling", coupling, couplingPose, id);
-		attach(motorId + "Shaft", new MillDriveShaft(12, shaftLength), motorPose, id);
+		attach(motorId + "Shaft", motor.shaft(), motorPose, id);
 		var nutOffset = nut.bodyLength / 2;
 		attach(id + "Nut", nut, orient(nutCenter[0] - along[0] * nutOffset,
 			nutCenter[1] - along[1] * nutOffset, nutCenter[2] - along[2] * nutOffset, up, along), carriage);
@@ -235,7 +246,10 @@ class BenchMill extends MachineAssembly {
 				orient(start[0] + along[0] * offset, start[1] + along[1] * offset,
 					start[2] + along[2] * offset, up, along), parent);
 		}
-		var motorPlate = new MillMotorPlate(motor.rating.bodyDiameter + 20, 8, 12);
+		var plateThickness = 8.0;
+		var couplingStart = shaftLength - coupling.length / 2;
+		var plateBore = couplingStart < plateThickness ? coupling.outerDiameter : motor.rating.shaftDiameter;
+		var motorPlate = new MillMotorPlate(motor.rating.bodyDiameter + 20, plateThickness, plateBore);
 		if (spec.id == "y") {
 			var footZ = start[2] + near.connector("mount").frame.y;
 			for (end in 0...2) {
@@ -278,7 +292,7 @@ class BenchMill extends MachineAssembly {
 		supportScrew(id + "-lead", near.support, far.support);
 		var driver = motorId + "Driver";
 		var index = spec.id == "x" ? 1 : spec.id == "y" ? 2 : 3;
-		attach(driver, new MotorDriver("GENERIC-SERVO-AMP", 10),
+		attach(driver, new MotorDriver("GENERIC-AC-SERVO-AMP", 20),
 			AssemblyFrames.translation(-190 + index * 65, base.depth / 2 - 30, 0), "base");
 		connectPorts(driver + "-power", "powerSupply", 'power$index', driver, "power");
 		addMotor(motorId, id + "-turn", motorId, driver);
@@ -398,19 +412,6 @@ class BenchMill extends MachineAssembly {
 		if (pose == null) throw 'Bench mill has no member "$id" yet';
 		return pose;
 	}
-}
-
-/** Assumed exposed servo shaft; its body remains in the reusable servo part. */
-private class MillDriveShaft extends MachineComponent {
-	final diameter:Float;
-	final length:Float;
-	public function new(diameter:Float, length:Float) {
-		super('MILL-SHAFT-$diameter-$length', "Assumed servo shaft extension", "steel", true);
-		this.diameter = diameter; this.length = length;
-	}
-	override public function hasGeometry():Bool return true;
-	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Solids.named(Part.cylinderSpan(diameter / 2, 0, length), "shaft");
 }
 
 /** Designed flat bracket bodies; source placement derives from the supported shaft and casting. */

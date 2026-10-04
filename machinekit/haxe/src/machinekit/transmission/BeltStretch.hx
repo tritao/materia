@@ -28,7 +28,7 @@ class BeltStretch {
 		relation.ratio = Math.abs(relation.ratio) * contact * driverSign * drivenSign;
 		var paths = posed.freePaths(first, second);
 		var radius = posed.wraps()[first].radius;
-		return energy(TimingBelt.cordStiffnessPerMm(belt.beltProfile) * belt.width,
+		return energy(belt.cordRigidityPerWidth() * belt.width,
 			paths, radius, -radius) / 1000;
 	}
 
@@ -156,7 +156,7 @@ class BeltStretch {
 					if (balanced > lead.lower && balanced < lead.upper) positions.push(balanced);
 				}
 				weakest = Math.min(weakest,
-					energy(TimingBelt.cordStiffnessPerMm(belt.beltProfile) * belt.width, current, da, db));
+					energy(belt.cordRigidityPerWidth() * belt.width, current, da, db));
 			}
 		}
 		if (!(weakest > 0) || !Math.isFinite(weakest))
@@ -177,7 +177,7 @@ class BeltStretch {
 			if (Math.abs(point.z) > 1e-5) throw new TransmissionDesignError("Belt wrap leaves its plane; align its pulley attachment");
 			wraps.push(new BeltWrap(point.x, point.y, original[index].radius, original[index].side));
 		}
-		try return new TimingBelt(belt.beltProfile, belt.width, wraps) catch (error:Dynamic)
+		try return new TimingBelt(belt.beltProfile, belt.width, wraps, null, belt.statedCordRigidity) catch (error:Dynamic)
 			throw new TransmissionDesignError('Belt "${path.belt}" wrap geometry is incompatible; update its pulley attachments: $error');
 	}
 

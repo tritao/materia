@@ -87,7 +87,9 @@ class PowerSupplyTests {
 		servo.addComponent("base", new RobotFlange(50));
 		servo.addComponent("motor", new machinekit.robotics.ArmJoint(80, 80, null,
 			machinekit.motion.ServoMotor.model("GENERIC-SERVO-50W")));
-		servo.addComponent("driver", new MotorDriver("GENERIC-SERVO-AMP", 5, 1, 24));
+		servo.addComponent("driver", new MotorDriver("GENERIC-AC-SERVO-AMP", 5));
+		servo.addComponent("servo-supply", new machinekit.motion.PowerSupply(310, 5, 1, 120, 60, 30, 1000));
+		servo.connectPorts("servo-power", "servo-supply", "power1", "driver", "power");
 		servo.addMateOnAxis("turn", "continuous", "base", "face", "motor", "stator", {x: 0, y: 0, z: 1});
 		servo.addMate("driver-mount", "fixed", "base", "face", "driver", "mount");
 		servo.addMotor("drive", "turn", "motor", "driver");

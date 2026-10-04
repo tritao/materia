@@ -11,7 +11,7 @@ class BallNut extends LeadScrewNut {
 	public final preloaded:Bool;
 
 	public function new(preloaded:Bool = true) {
-		super(new LeadScrewThread(Ball, 16, 5), 6, true, preloaded ? PreloadedBallNut : BallNut,
+		super(BallScrew.race(), 6, true, preloaded ? PreloadedBallNut : BallNut,
 			{bodyDiameter: 28, bodyLength: 35, flangeDiameter: 48, flangeThickness: 10,
 				boltCircleDiameter: 38, mountScrew: "M5"});
 		this.preloaded = preloaded;

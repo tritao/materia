@@ -63,7 +63,7 @@ class BeltElasticity {
 		if (indexes.length < 2) throw new TransmissionDesignError("A shaft belt needs at least two loaded rotary attachments");
 		if (stated != null && indexes.length != 2)
 			throw new TransmissionDesignError("Pairwise stiffness overrides cannot replace a shared multi-output belt; clear the override");
-		var ea = TimingBelt.cordStiffnessPerMm(belt.beltProfile) * belt.width;
+		var ea = belt.cordRigidityPerWidth() * belt.width;
 		var spans:Array<AssemblyElasticSpan> = [];
 		for (at in 0...indexes.length) {
 			var next = (at + 1) % indexes.length;

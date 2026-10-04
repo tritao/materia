@@ -16,10 +16,10 @@ class MotorDriverTests {
 		for (name in MotorDriver.catalog().designations()) {
 			check(MotorDriver.catalog().metadata(name).conformance == GenericApproximation,
 				"Generic drivers must declare assumed catalog provenance");
-			var driver = new MotorDriver(name, 1.68, 1, 24);
+			var driver = new MotorDriver(name, 1.68, 1);
 			var rebuilt:MotorDriver = cast driver.componentType().create(driver.values());
 			check(rebuilt.current == driver.current && rebuilt.microsteps == driver.microsteps &&
-				rebuilt.statedVoltage == driver.statedVoltage, "Driver settings must survive recipes");
+				rebuilt.statedVoltage == driver.statedVoltage && rebuilt.port("power").required, "Driver settings and wired source requirement must survive recipes");
 			check(rebuilt.bom.partNumber == driver.bom.partNumber && rebuilt.ports().length == 3,
 				"Driver recipe must preserve its BOM and service ports");
 		}

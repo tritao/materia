@@ -137,6 +137,8 @@ private:
         double next_due = 0.0;
         uint32_t random = 1;
         uint32_t joint = UINT32_MAX;
+        uint32_t speed_reference_joint = UINT32_MAX;
+        double speed_reference_scale = 1.0;
         double window_lower = 0.0;
         double window_upper = 0.0;
         double hysteresis = 0.0;

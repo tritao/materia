@@ -9,11 +9,14 @@ import machinekit.component.ComponentRecipeSupport;
  */
 class BallScrew extends LeadScrew {
 	/** Assumed machined bearing journals, shared by support and coupling placement. */
+	/** Assumed SFU1605 race root; not a formula for other nominal sizes. */
+	public static inline var RACE_ROOT_DIAMETER:Float = 13;
+	public static function race():LeadScrewThread return new LeadScrewThread(Ball, 16, 5, 1, RightHand, RACE_ROOT_DIAMETER);
 	public static inline var JOURNAL_DIAMETER:Float = 12;
 	public static inline var JOURNAL_LENGTH:Float = 25;
 	public static inline var INPUT_JOURNAL_LENGTH:Float = 50;
 	public function new(length:Float) {
-		super(new LeadScrewThread(Ball, 16, 5), length);
+		super(race(), length);
 		if (length <= INPUT_JOURNAL_LENGTH + JOURNAL_LENGTH) throw "Ball screw needs a race between its journals";
 	}
 

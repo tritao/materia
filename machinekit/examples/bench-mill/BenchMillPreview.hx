@@ -116,6 +116,16 @@ class BenchMillChecks {
 				if (entry.id == "motor" + suffix) motor = cast entry.component;
 			}
 			if (screw == null || motor == null) throw "Mill axis has no screw or servo";
+			var couplingId = "screw" + suffix + "Coupling", shaftId = "motor" + suffix + "Shaft";
+			var sleeve = state.worldPose(couplingId);
+			var axis = AssemblyFrames.transformVector(sleeve, 0, 0, 1);
+			var face = state.worldConnector(couplingId, "sideA"), midpoint = state.worldConnector(couplingId, "axis");
+			var shaftEnd = state.worldConnector(shaftId, "output"), shaftStart = state.worldConnector(shaftId, "input");
+			var depth = (shaftEnd.x - face.x) * axis.x + (shaftEnd.y - face.y) * axis.y + (shaftEnd.z - face.z) * axis.z;
+			var start = (shaftStart.x - face.x) * axis.x + (shaftStart.y - face.y) * axis.y + (shaftStart.z - face.z) * axis.z;
+			var dx = shaftEnd.x - midpoint.x, dy = shaftEnd.y - midpoint.y, dz = shaftEnd.z - midpoint.z;
+			if (start > 1e-6 || depth <= 5 || dx * dx + dy * dy + dz * dz > 1e-12)
+				throw '${spec.id} motor shaft does not seat into its coupling';
 			var rapid = Math.min(screw.criticalSpeed(Fixed, Simple), motor.rating.maxSpeed) * 5 / (2 * Math.PI);
 			if (rapid < 8000.0 / 60) throw '${spec.id} rapid is below 8 m/min';
 			trace('Mill ${spec.id}: ${rapid * 60 / 1000} m/min source-derived rapid, ${mill.axisOvertravel(spec.id)} mm overtravel');

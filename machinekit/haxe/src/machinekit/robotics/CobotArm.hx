@@ -56,10 +56,10 @@ class CobotArm extends MachineAssembly {
 			addComponent(gearboxId, modules[i].gearbox);
 			addMate('$gearboxId-mount', "fixed", moduleId, "gearheadSeat", gearboxId, "input");
 		}
-		addComponent("powerSupply", new PowerSupply(48, 60, 6), AssemblyFrames.translation(600, -180, 0));
+		addComponent("powerSupply", new PowerSupply(48, 300, 6, 240, 120, 100, 12000), AssemblyFrames.translation(600, -180, 0));
 		for (i in 0...6) {
 			var driverId = 'driver${i + 1}', moduleId = 'joint${i + 1}', jointId = 'j${i + 1}';
-			addComponent(driverId, new MotorDriver("GENERIC-SERVO-AMP", 10),
+			addComponent(driverId, new MotorDriver("GENERIC-LV-SERVO-AMP", 150),
 				AssemblyFrames.translation(600, i * 80, 0));
 			connectPorts('$driverId-power', "powerSupply", 'power${i + 1}', driverId, "power");
 			addMotor('drive_$jointId', jointId, moduleId, driverId, 0.5, 'gearbox${i + 1}');

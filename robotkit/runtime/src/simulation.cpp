@@ -858,6 +858,38 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 sensor.window_upper = blueprint.sensor_window_upper[i];
                 sensor.hysteresis = blueprint.sensor_hysteresis[i];
             }
+            if (sensor.config.kind == RK_SENSOR_AT_SPEED) {
+                // Resolve the drive's live setpoint into the measured shaft coordinate once.
+                // A sum coupling cannot be inverted from one drive's command.
+                struct Reference { uint32_t joint; double scale; };
+                std::vector<Reference> pending{{sensor.joint, 1.0}};
+                std::vector<bool> visited(blueprint.joint_count, false);
+                for (std::size_t next = 0; next < pending.size(); ++next) {
+                    const auto reference = pending[next];
+                    if (reference.joint >= visited.size() || visited[reference.joint]) continue;
+                    visited[reference.joint] = true;
+                    for (const auto &drive : binding->velocity_drives_)
+                        if (drive.joint == reference.joint) {
+                            if (sensor.speed_reference_joint != UINT32_MAX)
+                                throw std::invalid_argument("At-speed sensor has multiple drive references");
+                            sensor.speed_reference_joint = reference.joint;
+                            sensor.speed_reference_scale = reference.scale;
+                        }
+                    for (uint32_t coupling = 0; coupling < blueprint.coupling_count; ++coupling) {
+                        const auto &relation = blueprint.couplings[coupling];
+                        uint32_t terms = 0;
+                        for (uint32_t term = 0; term < blueprint.coupling_count; ++term)
+                            if (blueprint.couplings[term].follower == relation.follower) ++terms;
+                        if (terms != 1 || relation.ratio == 0.0) continue;
+                        if (relation.leader == reference.joint)
+                            pending.push_back({relation.follower, reference.scale / relation.ratio});
+                        else if (relation.follower == reference.joint)
+                            pending.push_back({relation.leader, reference.scale * relation.ratio});
+                    }
+                }
+                // Direct velocity commands also supply a live reference without a process drive.
+                if (sensor.speed_reference_joint == UINT32_MAX) sensor.speed_reference_joint = sensor.joint;
+            }
             binding->sensors_.push_back(sensor);
         }
         binding->reset_sensors();

@@ -17,15 +17,18 @@ class ComponentRecipeSupport {
 	public static function threadParameters():Array<ComponentParameter> return [
 		choice("family", ["MetricTrapezoidal", "Acme", "Ball"], "MetricTrapezoidal"),
 		length("screwDiameter", 8), length("pitch", 2), count("starts", 1),
-		choice("hand", ["RightHand", "LeftHand"], "RightHand")];
+		choice("hand", ["RightHand", "LeftHand"], "RightHand"),
+		length("raceRootDiameter", 0)];
 
 	public static function thread(v:ComponentValues):LeadScrewThread return new LeadScrewThread(
 		family(v.token("family")), v.number("screwDiameter"),
-		v.number("pitch"), v.integer("starts"), hand(v.token("hand")));
+		v.number("pitch"), v.integer("starts"), hand(v.token("hand")),
+		v.token("family") == "Ball" ? v.number("raceRootDiameter") : null);
 
 	public static function threadValues(t:LeadScrewThread):ComponentValues return new ComponentValues()
 		.setToken("family", Std.string(t.family)).setNumber("screwDiameter", t.screwDiameter)
-		.setNumber("pitch", t.pitch).setInteger("starts", t.starts).setToken("hand", Std.string(t.hand));
+		.setNumber("pitch", t.pitch).setInteger("starts", t.starts).setToken("hand", Std.string(t.hand))
+		.setNumber("raceRootDiameter", t.raceRootDiameter == null ? 0 : t.raceRootDiameter);
 
 	public static function fit(value:String):BearingHousingFit return switch value {
 		case "Slip": Slip;

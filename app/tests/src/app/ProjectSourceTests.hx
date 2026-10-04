@@ -2020,6 +2020,11 @@ class ProjectSourceTests {
     check([for (joint in axes) Std.string(joint.id)].join(",") == "y,x,z", "mill has three mechanical axes");
     var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     check(blueprint.fastestPositionLoopRate() == 4000, "mill driver loop rate survives project generation");
+    var processOwned = blueprint.processJoints();
+    var processNames = [for (index in 0...model.joints.length) if (processOwned[index]) Std.string(model.joints[index].id)];
+    processNames.sort(Reflect.compare);
+    check(processNames.join(",") == "spindle-motor-turn,spindle-turn",
+      "the spindle motor and belt-coupled cartridge both reject controller position targets");
     check(blueprint.servoStabilityInterval() > 0 && Math.isFinite(blueprint.servoStabilityInterval()),
       "mill servo stability bound comes from its reflected inertia");
     var limits:Array<String> = [];
@@ -2056,7 +2061,10 @@ class ProjectSourceTests {
         }
       }
       var bytes = (hl.Gc.totalAllocated() - allocated) / ticks;
-      check(player.passes == 1, "mill completes one pass");
+      var finishedState = simulation.snapshot().robots()[0];
+      check(player.passes == 1, 'mill completes one pass at ${simulation.activeSession().simulationTime()} s; velocities ' +
+        [for (i in 0...model.joints.length) '${model.joints[i].id}=${finishedState.velocities.get(i)}'].join(", ") +
+        "; sensors " + [for (sensor in finishedState.sensors.toArray()) '${sensor.sensorId}=${sensor.values.toArray()}'].join(", "));
       var stock = simulation.machiningStock();
       if (stock == null) throw "Mill has no stock";
       var removal = (Math.PI * (121 * 7 + 2 * 25 * 5) + (96 - (4 - Math.PI) * 12.25) * 3) / 1e9;

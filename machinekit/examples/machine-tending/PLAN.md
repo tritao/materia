@@ -598,6 +598,35 @@ Done. What was built and decided:
   for the ten-seam weldment. The geometry correction alone moves the bare mill from
   51.19 to 51.86 s and the enclosed mill from 51.92 to 52.30 s.
 
+**Remaining review fixes, R1–R2 (MT5b).**
+
+Done. What was built and decided:
+
+- Require one current MachineKit schema (v14 after hardware recipe changes), ProjectKit v7,
+  and the complete native runtime layouts. In-repo producers and tests migrate together;
+  the earlier v10–13/v4–7 feature gates are superseded, with no compatibility fallback.
+- Separate spindle motor and cartridge rotation with the actual assumed 1:1 HTD5M pulley
+  transmission. The belt explicitly states assumed cord rigidity of 5,000 N/mm width;
+  readiness follows the commanded motor speed through the relation. Both coupled joints
+  belong to the process drive and cannot receive motion-plan targets.
+- Derive exposed shaft and coupling dimensions from assumed motor rows (400 W: 14×30 mm;
+  750 W: 19×35 mm; spindle: 20×30 mm). Geometry checks verify actual shaft engagement.
+  The Z motor is 750 W to meet vertical-axis load, superseding the original 400 W proposal.
+- Check servo phase RMS current, back EMF, winding losses, amplifier efficiency, combined
+  source draw and regeneration. Assumed mill reference hardware uses a 310 V/32 A source
+  with an 8 kW shunt and 20 A AC amplifiers. Arm and cobot sources are sized independently.
+  Larger offboard arm hardware changes assembly mass from 150.1 to 155.9 kg (welder:
+  315.2 to 321 kg), without changing moving-arm mass.
+- State the SFU1605 race root explicitly at an assumed 13 mm; every other ball race must
+  supply its own root diameter. Nuts share the same race specification.
+- Bare/enclosed bearing-block cycles now measure **51.77/52.49 s**, still 78 plans.
+  Actual X/Y/Z peak tracking errors are **0.077237/0.051505/0.053502 mm**, at the 10 ms
+  controller period. Rapids remain **15.0955/25/22.8666 m/min**; X/Y/Z acceleration limits
+  are **29.87/28.97/26.93 m/s²**. Revised rotating shafts/couplings and the separate spindle
+  transmission change inertia, acceleration and cycle time. Door open/close remain
+  **1.50/1.79 s**, seated-blank clamp **0.08 s**, clamp force **482.55 N**.
+- Focused and complete gate results are recorded in `REVIEW_FIXES.md` as each group closes.
+
 **MT6. Controllers, robots and signals.**
 - Controller parts:
   - `CncController` cabinet: digital I/O ports, axis driver outputs, valve outputs;

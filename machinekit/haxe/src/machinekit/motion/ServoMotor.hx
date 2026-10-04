@@ -21,6 +21,10 @@ typedef ServoRating = {
 	/** Round body, mm. */
 	var bodyDiameter:Float;
 	var bodyLength:Float;
+	/** Exposed steel shaft dimensions, mm, measured from the mounting face. */
+	var shaftDiameter:Float;
+	var shaftLength:Float;
+	var electrical:ServoElectricalRating;
 }
 
 /**
@@ -35,6 +39,12 @@ typedef ServoRating = {
  * CAD frame: mounting face at z=0, body toward -Z, shaft along +Z. Connectors: `mountFace`, `shaftAxis`.
  */
 class ServoMotor extends MachineComponent implements MotorDrive {
+	/** Reference low-voltage winding; each catalogue row keeps this assumption explicitly. */
+	public static function lowVoltageWinding():ServoElectricalRating return {torqueConstant: 0.03 * Math.sqrt(3.0),
+		backEmfConstant: 0.03, phaseResistance: 0.02, mechanicalEfficiency: 0.95};
+	/** Reference 200 V class AC winding; these values are assumed, like the mechanical rows. */
+	public static function acWinding():ServoElectricalRating return {torqueConstant: 0.3 * Math.sqrt(3.0),
+		backEmfConstant: 0.3, phaseResistance: 1.5, mechanicalEfficiency: 0.95};
 	static var table:Null<Array<ServoRating>>;
 
 	public final rating:ServoRating;
@@ -43,17 +53,17 @@ class ServoMotor extends MachineComponent implements MotorDrive {
 	public static function ratings():Array<ServoRating> {
 		if (table == null) {
 			var rpm = 2.0 * Math.PI / 60.0;
-			function generic(name:String, watts:Float, inertia:Float, face:Float, length:Float):ServoRating {
+			function generic(name:String, watts:Float, inertia:Float, face:Float, length:Float, shaftDiameter:Float, shaftLength:Float):ServoRating {
 				var rated = watts / (3000.0 * rpm);
 				return {designation: name, ratedTorque: rated, peakTorque: 3.0 * rated, ratedSpeed: 3000.0 * rpm, maxSpeed: 5000.0 * rpm,
-					rotorInertia: inertia, encoderCounts: 131072, bodyDiameter: face, bodyLength: length};
+					rotorInertia: inertia, encoderCounts: 131072, bodyDiameter: face, bodyLength: length, shaftDiameter: shaftDiameter, shaftLength: shaftLength, electrical: acWinding()};
 			}
 			table = [
-				generic("GENERIC-SERVO-50W", 50, 3.0e-6, 40, 70),
-				generic("GENERIC-SERVO-100W", 100, 5.0e-6, 40, 85),
-				generic("GENERIC-SERVO-200W", 200, 2.5e-5, 60, 100),
-				generic("GENERIC-SERVO-400W", 400, 5.0e-5, 60, 130),
-				generic("GENERIC-SERVO-750W", 750, 1.2e-4, 80, 145)
+				generic("GENERIC-SERVO-50W", 50, 3.0e-6, 40, 70, 8, 20),
+				generic("GENERIC-SERVO-100W", 100, 5.0e-6, 40, 85, 8, 20),
+				generic("GENERIC-SERVO-200W", 200, 2.5e-5, 60, 100, 14, 30),
+				generic("GENERIC-SERVO-400W", 400, 5.0e-5, 60, 130, 14, 30),
+				generic("GENERIC-SERVO-750W", 750, 1.2e-4, 80, 145, 19, 35)
 			];
 		}
 		return table;
@@ -92,12 +102,23 @@ class ServoMotor extends MachineComponent implements MotorDrive {
 		if (!(rating.ratedTorque > 0) || !(rating.peakTorque >= rating.ratedTorque) || !(rating.ratedSpeed > 0) ||
 			!(rating.maxSpeed >= rating.ratedSpeed) || !(rating.rotorInertia >= 0) || !(rating.encoderCounts >= 0))
 			throw "A servo needs 0 < rated torque <= peak torque, 0 < rated speed <= maximum speed and finite ratings";
+		for (dimension in [rating.bodyDiameter, rating.bodyLength, rating.shaftDiameter, rating.shaftLength])
+			if (!(dimension > 0) || !Math.isFinite(dimension)) throw "A servo needs finite positive body and shaft dimensions";
+		var electrical = rating.electrical;
+		for (value in [electrical.torqueConstant, electrical.backEmfConstant, electrical.phaseResistance, electrical.mechanicalEfficiency])
+			if (!(value > 0) || !Math.isFinite(value)) throw "A servo needs finite positive winding ratings";
+		if (electrical.mechanicalEfficiency > 1) throw "Motor efficiency exceeds one";
 		super(rating.designation, 'Servo motor, ${Dimension.format(rating.peakTorque)} N m peak', "aluminium 6061", true);
 		this.rating = rating;
 		this.ratingsBasis = ratingsBasis;
 		addConnector("mountFace", Mount, Solids.axial(0, 0, 0));
 		addConnector("shaftAxis", Axis, Solids.axial(0, 0, 0));
+		addConnector("shaftEnd", Axis, Solids.axial(0, 0, rating.shaftLength));
 	}
+
+	override public function motorDrive():Null<MotorDrive> return this;
+	public function electricalRating():Null<ServoElectricalRating> return rating.electrical;
+	public function ratedPhaseCurrent():Float return rating.ratedTorque / rating.electrical.torqueConstant;
 
 	/** The actuator: a servo drive with its peak torque and maximum speed as the limits a planner may rely on. */
 	public function actuator(id:String, joint:String, volts:Float, margin:Float, ?current:Float):AssemblyActuator
@@ -108,6 +129,9 @@ class ServoMotor extends MachineComponent implements MotorDrive {
 			assumed: ratingsBasis == Assumed ? ["servo ratings"] : null,
 			assumptions: ratingsBasis == Assumed ? [{quantity: "motor curve", label: "servo ratings"},
 				{quantity: "inertia", label: "servo ratings"}, {quantity: "speed limit", label: "servo ratings"}] : null};
+
+	/** The exposed rotating shaft is a separate part attached to the driven joint. */
+	public function shaft():SteppedShaft return new SteppedShaft([{diameter: rating.shaftDiameter, length: rating.shaftLength}]);
 
 	override public function hasGeometry():Bool return true;
 

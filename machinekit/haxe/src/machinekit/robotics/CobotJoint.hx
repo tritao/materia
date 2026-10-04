@@ -38,7 +38,7 @@ class CobotJoint extends GearedArmJoint implements machinekit.motion.EncoderPart
 		var servo = new ServoMotor({designation: 'COBOT-SERVO-$size-${speedDegrees}-P${inputPilotDepth}',
 			ratedTorque: torque, peakTorque: 2 * torque, ratedSpeed: 0.8 * rate, maxSpeed: rate,
 			rotorInertia: (size + 1) * 1e-5, encoderCounts: 131072,
-			bodyDiameter: pockets[size] - 2, bodyLength: pocketLengths[size] - 2}, Assumed);
+			bodyDiameter: pockets[size] - 2, bodyLength: pocketLengths[size] - 2, shaftDiameter: 8, shaftLength: 10, electrical: ServoMotor.lowVoltageWinding()}, Assumed);
 		super(diameters[size], lengths[size], pockets[size], pocketLengths[size], null, servo);
 		setMaterial(size == 2 || size == 4 ? "steel" : "aluminium 6061");
 		this.size = size;

@@ -44,6 +44,32 @@ class RobotRuntimeBlueprint {
   /** Velocity process drives are bound to analog channels, never to trajectory axes. */
   public final velocityDrives:Array<RobotRuntimeVelocityDriveBlueprint> = [];
   public final links:Array<RobotRuntimeLinkBlueprint> = [];
+  /** Process ownership covers the whole mechanically coupled set, not just its motor shaft. */
+  public function processJoints():Array<Bool> {
+    var owned = [for (_ in joints) false];
+    for (drive in pneumaticDrives) {
+      if (drive.joint < 0 || drive.joint >= joints.length) throw "Pneumatic drive joint is outside the blueprint";
+      owned[drive.joint] = true;
+    }
+    for (drive in velocityDrives) {
+      if (drive.joint < 0 || drive.joint >= joints.length) throw "Velocity drive joint is outside the blueprint";
+      owned[drive.joint] = true;
+    }
+    for (coupling in couplings)
+      if (coupling.leader < 0 || coupling.leader >= joints.length || coupling.follower < 0 || coupling.follower >= joints.length)
+        throw "Coupling joint is outside the blueprint";
+    var changed = true;
+    while (changed) {
+      changed = false;
+      for (coupling in couplings) if (owned[coupling.leader] || owned[coupling.follower]) {
+        if (!owned[coupling.leader] || !owned[coupling.follower]) changed = true;
+        owned[coupling.leader] = true;
+        owned[coupling.follower] = true;
+      }
+    }
+    return owned;
+  }
+
   /**
    * Sets a tool's channels up with the safe values and stop policy the tool owns (`ToolChannels`). A channel the robot's
    * setup declared already must say the same, or the tool is refused: a torch's arc cannot be left to keep its output
@@ -209,7 +235,6 @@ class RobotRuntimeBlueprint {
       }
       if (!channelA || !channelB)
         throw 'Pneumatic drive on joint ${drive.joint} needs declared digital coil channels';
-      value.set_process_joint(drive.joint, 1);
     }
     if (velocityDrives.length > RobotKitRuntimeConstants.RK_MAX_JOINTS)
       throw "Too many process-driven joints";
@@ -230,7 +255,6 @@ class RobotRuntimeBlueprint {
       }
       if (!speedChannel || !directionChannel)
         throw 'Velocity drive on joint ${drive.joint} needs declared analog speed and direction channels';
-      value.set_process_joint(drive.joint, 1);
     }
     for (joint in 0...jointCount) {
       var bound = followingErrorBounds[joint];
@@ -295,6 +319,8 @@ class RobotRuntimeBlueprint {
       value.set_joint_servo(index, servo);
       value.set_servo_reflected_inertia(index, joint.reflectedInertia);
     }
+    var processOwned = processJoints();
+    for (index in 0...processOwned.length) value.set_process_joint(index, processOwned[index] ? 1 : 0);
     if (links.length != linkCount) throw "RobotKit runtime blueprint is missing link physical properties";
     for (index in 0...links.length) value.set_links(index, links[index].nativeValue());
     return value;

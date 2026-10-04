@@ -274,11 +274,11 @@ class DriveSystem {
 
 	public static function motorDriver(flat:FlatAssembly, record:MotorRecord):machinekit.motion.MotorDriver {
 		var member = flat.member(record.motor);
-		if (!Std.isOfType(member, machinekit.motion.MotorDrive)) throw 'Motor "${record.actuator}": "${record.motor}" is not a motor part';
-		var driver = flat.member(record.driver);
-		if (!Std.isOfType(driver, machinekit.motion.MotorDriver))
+		if (member.motorDrive() == null) throw 'Motor "${record.actuator}": "${record.motor}" is not a motor part';
+		var driver = flat.member(record.driver).motorDriver();
+		if (driver == null)
 			throw 'Motor "${record.actuator}": "${record.driver}" is not a driver part';
-		return cast driver;
+		return driver;
 	}
 
 	/** A modelled supply wins over the explicit fallback; an exposed boundary has no voltage of its own. */
@@ -297,9 +297,9 @@ class DriveSystem {
 				checked.throwIfErrors();
 			}
 			var part = flat.member(source.instanceId);
-			if (!Std.isOfType(part, machinekit.motion.ElectricalSource))
+			if (part.electricalSource() == null)
 				throw 'Power source "${source.instanceId}/${source.portName}" does not state an output voltage';
-			var supply:machinekit.motion.ElectricalSource = cast part;
+			var supply = part.electricalSource();
 			voltage = supply.outputVoltage(source.portName);
 		} else if (!trace.supplied && trace.chain.length > 1) throw ServiceNetwork.unsuppliedMessage(trace.chain);
 		if (voltage != null) machinekit.motion.MotorDriver.validateVoltage(driver.rating, voltage);
@@ -310,13 +310,20 @@ class DriveSystem {
 		var driver = motorDriver(flat, record);
 		var voltage = driverVoltage(flat, record.driver, driver, complete);
 		if (voltage == null) throw 'Motor "${record.actuator}" needs a wired supply or a stated driver voltage';
-		var motor:machinekit.motion.MotorDrive = cast flat.member(record.motor);
+		var motor = flat.member(record.motor).motorDrive();
+		if (motor == null) throw 'Motor "${record.motor}" has no typed drive';
 		var added = motor.actuator(record.actuator, record.joint, voltage, record.margin, driver.current);
 		if (record.processVelocity != null) added.processVelocity = record.processVelocity;
 		if (driver.rating.positionLoopRate > 0) added.positionLoopRate = driver.rating.positionLoopRate;
 		var stepper = driver.rating.family == machinekit.motion.MotorDriver.MotorDriverFamily.Stepper;
 		if ((stepper && added.drive != "stepper") || (!stepper && added.drive != "servo"))
 			throw 'Motor "${record.actuator}" and driver "${record.driver}" have different drive families';
+		if (!stepper) {
+			var winding = motor.electricalRating();
+			if (winding == null) throw 'Servo "${record.motor}" needs winding ratings';
+			var load = new machinekit.motion.ServoElectricalLoad(added, winding, driver);
+			load.check(driver, voltage, record.actuator);
+		}
 		if (stepper) {
 			added.microsteps = driver.microsteps;
 			added.maxStepRate = driver.rating.maximumStepRate;
@@ -394,7 +401,43 @@ class DriveSystem {
 	}
 
 	/** Compile every binding anew; connecting a supply after binding must not leave an old curve. */
+	/** Check the whole wired source, including simultaneous peak loads and regeneration. */
+	public static function checkElectricalSources(flat:FlatAssembly):Void {
+		var demands:Map<String, {rating:machinekit.motion.ElectricalSupplyRating, peak:Float, regeneration:Float}> = [];
+		for (record in flat.motors) {
+			var motor = flat.member(record.motor).motorDrive();
+			if (motor == null) throw 'Motor "${record.motor}" has no typed drive';
+			var winding = motor.electricalRating();
+			if (winding == null) continue; // Steppers retain their explicit current/pull-out model.
+			var driver = motorDriver(flat, record);
+			var trace = ServiceNetwork.trace(flat, ServiceNetwork.portRef(record.driver, "power"));
+			if (!trace.supplied || trace.external)
+				throw 'Servo "${record.actuator}" needs a wired source with current and regenerative ratings';
+			var port = ServiceNetwork.trace(flat, ServiceNetwork.portRef(record.driver, "power"),
+				(part, port) -> part.electricalSource() != null).port;
+			var source = flat.member(port.instanceId).electricalSource();
+			if (source == null) throw 'Source "${port.instanceId}" has no electrical ratings';
+			var rating = source.outputRating(port.portName);
+			var actuator = motor.actuator(record.actuator, record.joint, rating.voltage, record.margin, driver.current);
+			var load = new machinekit.motion.ServoElectricalLoad(actuator, winding, driver);
+			load.check(driver, rating.voltage, record.actuator);
+			var demand = demands.get(port.instanceId);
+			if (demand == null) {demand = {rating: rating, peak: 0, regeneration: 0}; demands.set(port.instanceId, demand);}
+			demand.peak += load.peakPower;
+			demand.regeneration += load.regenerativePower;
+		}
+		for (id in demands.keys()) {
+			var demand = demands.get(id), rating = demand.rating;
+			if (demand.peak > rating.voltage * rating.current + 1e-9)
+				throw 'Source "$id" supplies ${rating.voltage * rating.current} W DC; simultaneous servo demand is ${demand.peak} W';
+			if (demand.regeneration > rating.regenerativePower + 1e-9)
+				throw 'Source "$id" absorbs ${rating.regenerativePower} W; servo regeneration needs ${demand.regeneration} W';
+		}
+	}
+
+
 	public static function compileMotors(flat:FlatAssembly):MotorCompilation {
+		checkElectricalSources(flat);
 		var actuators = [for (record in flat.motors) resolveMotor(flat, record, true)];
 		for (cylinder in flat.cylinders) actuators.push(compileCylinder(flat, cylinder));
 		var sensors:Array<AssemblyEncoder> = [];

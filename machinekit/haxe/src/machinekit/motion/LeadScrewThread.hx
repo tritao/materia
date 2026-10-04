@@ -28,14 +28,19 @@ class LeadScrewThread {
 	/** Positive axial distance per revolution, independent of handedness. */
 	public final lead:Float;
 	public final designation:String;
+	/** Explicit catalogue or assumed race root, mm; required for ball screws. */
+	public final raceRootDiameter:Null<Float>;
 
 	public function new(family:LeadScrewThreadFamily, screwDiameter:Float, pitch:Float,
-			starts:Int = 1, hand:LeadScrewHand = RightHand) {
+			starts:Int = 1, hand:LeadScrewHand = RightHand, ?raceRootDiameter:Float) {
 		if (family == null) throw "Lead screw thread needs a family";
 		if (!(screwDiameter > 0) || !Math.isFinite(screwDiameter))
 			throw "Lead screw thread needs a positive screw diameter";
 		if (!(pitch > 0) || !Math.isFinite(pitch)) throw "Lead screw thread needs a positive pitch";
-		if (family == Ball && screwDiameter <= 3) throw "Ball race needs a positive root diameter";
+		if (family == Ball && (raceRootDiameter == null || !Math.isFinite(raceRootDiameter) ||
+			!(raceRootDiameter > 0 && raceRootDiameter < screwDiameter)))
+			throw "Ball race needs an explicit positive root smaller than its nominal diameter";
+		if (family != Ball && raceRootDiameter != null) throw "Only a ball race has a stated race root";
 		if (starts < 1) throw "Lead screw thread needs at least one start";
 		if (hand == null) throw "Lead screw thread needs a hand";
 		var calculatedLead = pitch * starts;
@@ -45,6 +50,7 @@ class LeadScrewThread {
 		this.pitch = pitch;
 		this.starts = starts;
 		this.hand = hand;
+		this.raceRootDiameter = raceRootDiameter;
 		lead = calculatedLead;
 		var familyCode = family == MetricTrapezoidal ? "TR" : family == Acme ? "ACME" : "BALL";
 		var handCode = hand == RightHand ? "RH" : "LH";
@@ -79,8 +85,11 @@ class LeadScrewThread {
 	 * pitch, which is close for a 29 degree thread with its crest clearance.
 	 */
 	public function rootDiameter():Float {
-		// Assumed race root for the generic SFU envelope; not a vendor tolerance.
-		if (family == Ball) return screwDiameter - 3;
+		if (family == Ball) {
+			var root = raceRootDiameter;
+			if (root == null) throw "Ball race root is missing";
+			return root;
+		}
 		if (family == Acme) return screwDiameter - pitch;
 		var clearance = pitch <= 5 ? 0.25 : pitch <= 12 ? 0.5 : 1.0;
 		return screwDiameter - pitch - 2 * clearance;

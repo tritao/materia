@@ -19,6 +19,11 @@ class MachineComponent {
 
 	public function coupling():Null<CouplingFacet> return CouplingFacet.of(this);
 
+	/** Typed electrical endpoints, absent on unrelated components. */
+	public function motorDrive():Null<machinekit.motion.MotorDrive> return null;
+	public function motorDriver():Null<machinekit.motion.MotorDriver> return null;
+	public function electricalSource():Null<machinekit.motion.ElectricalSource> return null;
+
 	/** Typed pneumatic model when this component is a cylinder. */
 	public function pneumaticCylinderSpec():Null<machinekit.pneumatic.PneumaticCylinderSpec> return null;
 

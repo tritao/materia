@@ -380,7 +380,7 @@ rk_result SimulationRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) 
                 sensor.values[0] = sensor.active ? 1.0 : 0.0;
             } else if (config.kind == RK_SENSOR_AT_SPEED) {
                 if (sensor.joint >= state.joint_count) return RK_ERROR_BACKEND;
-                const double target = std::abs(applied_velocity(sensor.joint));
+                const double target = std::abs(applied_velocity(sensor.speed_reference_joint) * sensor.speed_reference_scale);
                 const double error = std::abs(std::abs(state.velocity[sensor.joint]) - target);
                 // window_lower and hysteresis are fractions of the live command, not a fixed rpm.
                 const double tolerance = target * sensor.window_lower;

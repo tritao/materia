@@ -75,6 +75,9 @@ class ArmJoint extends MachineComponent implements MotorDrive {
 			.setToken("servoBasis", servo == null ? "assumed" : servo.basisToken())
 			.setToken("material", materialSpec());
 
+	override public function motorDrive():Null<MotorDrive> return servo == null ? null : this;
+	public function electricalRating():Null<machinekit.motion.ServoElectricalRating> return servo == null ? null : servo.electricalRating();
+
 	/** The servo inside the module as an actuator on joint `joint`; a module with no servo is not a motor. */
 	public function actuator(id:String, joint:String, volts:Float, margin:Float, ?current:Float):AssemblyActuator {
 		var motor = servo;

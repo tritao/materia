@@ -169,6 +169,8 @@ class MachineAssemblyDescriptionTests {
 		beltReductions();
 		BeltElasticityTests.run();
 		motorsDriveJoints();
+		electricalSizing();
+		nestedProcessDriveRoundTrip();
 		transmissionsCarryAllowances();
 		changerDocumentRoundTrip();
 		fullEoatDocumentRoundTrip();
@@ -227,6 +229,77 @@ class MachineAssemblyDescriptionTests {
 		var exported = model.definition().switches;
 		if (exported == null || exported[0].joint != "machine/axis/slide")
 			throw "Trip switch export must map the containing model prefix";
+	}
+
+	static function electricalSizing():Void {
+		function definition(assembly:MachineAssembly):materia.assembly.AssemblyDefinition {
+			var model = new cadkit.modeling.AssemblyModel("mm");
+			assembly.addTo(model, "");
+			return model.definition("electrical-bank");
+		}
+		function bank(current:Float, regeneration:Float):MachineAssembly {
+			var assembly = new MachineAssembly();
+			assembly.addComponent("base", new RobotFlange(50));
+			assembly.addComponent("supply", new machinekit.motion.PowerSupply(310, current, 2, 120, 60, 30, regeneration));
+			for (i in 0...2) {
+				var id = 'motor$i', driver = 'driver$i';
+				assembly.addComponent(id, machinekit.motion.ServoMotor.model("GENERIC-SERVO-400W"));
+				assembly.addComponent(driver, new MotorDriver("GENERIC-AC-SERVO-AMP", 10));
+				assembly.connectPorts('power$i', "supply", 'power${i + 1}', driver, "power");
+				assembly.addMateOnAxis('turn$i', "continuous", "base", "face", id, "shaftAxis", {x: 0, y: 1, z: 0});
+				assembly.addMotor(id, 'turn$i', id, driver);
+			}
+			return assembly;
+		}
+		for (bad in [{current: 6.0, regeneration: 3000.0}, {current: 12.0, regeneration: 0.0}]) {
+			var rejected = false;
+			try {var invalid = definition(bank(bad.current, bad.regeneration));} catch (e:Dynamic) {rejected = true;}
+			if (!rejected) throw "A shared supply accepted excessive servo power or regeneration";
+		}
+		var good = definition(bank(12, 3000));
+		if (good.actuators == null || good.actuators.length != 2) throw "A correctly sized servo bank lost a drive";
+		var motor = machinekit.motion.ServoMotor.model("GENERIC-SERVO-750W");
+		var driver = new MotorDriver("GENERIC-AC-SERVO-AMP", 10);
+		var load = new machinekit.motion.ServoElectricalLoad(motor.actuator("z", "z", 310, 0.5), motor.rating.electrical, driver);
+		var undercurrent = false, undervoltage = false;
+		try {load.check(driver, 310, "z");} catch (e:Dynamic) {undercurrent = true;}
+		try {load.check(new MotorDriver("GENERIC-AC-SERVO-AMP", 20), 48, "z");} catch (e:Dynamic) {undervoltage = true;}
+		if (!undercurrent || !undervoltage) throw "Servo winding current and back-EMF constraints were not enforced";
+		var noRoot = false;
+		try {var invalid = new machinekit.motion.LeadScrewThread(Ball, 16, 5);} catch (e:Dynamic) {noRoot = true;}
+		if (!noRoot) throw "An unspecified ball race root was silently guessed";
+		var small = new machinekit.motion.LeadScrewThread(Ball, 12, 4, 1, RightHand, 9.2);
+		if (Math.abs(small.rootDiameter() - 9.2) > 1e-12) throw "Ball race ignored its stated root";
+	}
+
+	static function nestedProcessDriveRoundTrip():Void {
+		var spindle = new MachineAssembly();
+		spindle.addComponent("base", new RobotFlange(50));
+		spindle.addComponent("servo", machinekit.motion.ServoMotor.model("GENERIC-SERVO-400W"));
+		spindle.addComponent("driver", new MotorDriver("GENERIC-AC-SERVO-AMP", 10));
+		spindle.addComponent("supply", new machinekit.motion.PowerSupply(310, 10, 1, 120, 60, 30, 2000));
+		spindle.connectPorts("servo-power", "supply", "power1", "driver", "power");
+		spindle.addMateOnAxis("turn", "continuous", "base", "face", "servo", "shaftAxis",
+			{x: 0, y: 1, z: 0});
+		spindle.addMotor("spindle", "turn", "servo", "driver", 0.5, null,
+			{speedChannel: "spindle.speed", directionChannel: "spindle.direction", radiansPerSpeedUnit: 1.0});
+		var outer = new MachineAssembly();
+		outer.include("mill", spindle);
+		var restored = MachineAssembly.decode(outer.encode());
+		var motors = restored.describe().machine.motors;
+		if (motors == null || motors.length != 1 || motors[0].actuator != "mill/spindle")
+			throw "A nested rebuild dropped its spindle motor";
+		var binding = motors[0].processVelocity;
+		if (binding == null || binding.speedChannel != "spindle.speed")
+			throw "A nested rebuild dropped its spindle velocity drive";
+		var document = new Document();
+		var root = MachineAssemblyDocuments.defineAssembly(document, outer);
+		var reopened = DocumentCodec.decode(DocumentCodec.encode(document), false, false);
+		var fromDocument = MachineAssemblyDocuments.rebuildAssembly(reopened.element(root.id));
+		var savedMotors = fromDocument.describe().machine.motors;
+		if (savedMotors == null || savedMotors.length != 1 || savedMotors[0].processVelocity == null)
+			throw "A saved nested assembly dropped its spindle velocity drive";
+		reopened.close(); document.close();
 	}
 
 	static function includedConnectorRuntime():Void {
@@ -313,7 +386,7 @@ class MachineAssemblyDescriptionTests {
 
 	/** A coupling's ratio comes from the parts that drive it, so editing a part changes it. */
 	static function transmissionsFollowTheirParts():Void {
-		for (version in [2, 3, 4, 9, 10, 11, 12]) {
+		for (version in [2, 3, 4, 9, 10, 11, 12, 13]) {
 			var oldRejected = false;
 			var oldVersion:machinekit.assembly.MachineAssemblyDescription.DescriptionVersion = {schemaVersion: version};
 			var oldText = haxeon.wire.JsonWire.encode(oldVersion);
@@ -734,7 +807,9 @@ class MachineAssemblyDescriptionTests {
 		servoMachine.addComponent("base", new RobotFlange(50));
 		servoMachine.addComponent("servo", new TestServo());
 		servoMachine.addMateOnAxis("turn", "continuous", "base", "face", "servo", "shaft", {x: 0, y: 1, z: 0});
-		servoMachine.addComponent("driver", new MotorDriver("GENERIC-SERVO-AMP", 5, 1, 48));
+		servoMachine.addComponent("driver", new MotorDriver("GENERIC-LV-SERVO-AMP", 40));
+		servoMachine.addComponent("supply", new machinekit.motion.PowerSupply(48, 40, 1, 120, 60, 30, 1000));
+		servoMachine.connectPorts("servo-power", "supply", "power1", "driver", "power");
 		servoMachine.addMotor("servo-drive", "turn", "servo", "driver");
 		var servoActuator = actuatorsOf(definition(servoMachine))[0];
 		if (servoActuator.drive != "servo") throw "A servo part's actuator is a servo drive";
@@ -1204,6 +1279,8 @@ private class TestServo extends machinekit.component.MachineComponent implements
 		addConnector("shaft", machinekit.component.ConnectorRole.Axis, machinekit.component.Solids.axial(0, 0, 0));
 	}
 
+	override public function motorDrive():Null<machinekit.motion.MotorDrive> return this;
+	public function electricalRating():Null<machinekit.motion.ServoElectricalRating> return machinekit.motion.ServoMotor.lowVoltageWinding();
 	public function actuator(id:String, joint:String, volts:Float, margin:Float, ?current:Float):materia.assembly.AssemblyDefinition.AssemblyActuator
 		return {id: id, joint: joint, maxEffort: 1.9, maxRate: 500, rotorInertia: 2e-5, drive: "servo",
 			ratedTorque: 0.64, peakTorque: 1.9, ratedSpeed: 314, maxSpeed: 500, encoderCounts: 4096,

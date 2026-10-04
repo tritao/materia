@@ -29,6 +29,7 @@ typedef MotorDriverRating = {
 	var minimumVoltage:Float;
 	var maximumVoltage:Float;
 	var maximumCurrent:Float;
+	var efficiency:Float;
 	var maximumMicrosteps:Int;
 	var maximumStepRate:Float;
 	/** Assumed drive position-loop frequency in Hz; zero for stepper drivers. */
@@ -53,13 +54,19 @@ class MotorDriver extends MachineComponent {
 		if (table == null) table = new Catalog("motor driver", row -> row.designation, [
 			{designation: "GENERIC-TMC2209", family: Stepper, control: StepDir,
 				minimumVoltage: 5.0, maximumVoltage: 29.0, maximumCurrent: 2.0,
-				maximumMicrosteps: 256, maximumStepRate: 250000.0, positionLoopRate: 0.0, width: 20.0, height: 16.0, depth: 12.0},
+				efficiency: 0.95, maximumMicrosteps: 256, maximumStepRate: 250000.0, positionLoopRate: 0.0, width: 20.0, height: 16.0, depth: 12.0},
 			{designation: "GENERIC-DM542", family: Stepper, control: StepDir,
 				minimumVoltage: 18.0, maximumVoltage: 50.0, maximumCurrent: 3.0,
-				maximumMicrosteps: 128, maximumStepRate: 200000.0, positionLoopRate: 0.0, width: 118.0, height: 75.0, depth: 34.0},
+				efficiency: 0.95, maximumMicrosteps: 128, maximumStepRate: 200000.0, positionLoopRate: 0.0, width: 118.0, height: 75.0, depth: 34.0},
 			{designation: "GENERIC-SERVO-AMP", family: Servo, control: Bus,
 				minimumVoltage: 12.0, maximumVoltage: 60.0, maximumCurrent: 10.0,
-				maximumMicrosteps: 1, maximumStepRate: 0.0, positionLoopRate: 4000.0, width: 100.0, height: 60.0, depth: 30.0}
+				efficiency: 0.95, maximumMicrosteps: 1, maximumStepRate: 0.0, positionLoopRate: 4000.0, width: 100.0, height: 60.0, depth: 30.0},
+			{designation: "GENERIC-AC-SERVO-AMP", family: Servo, control: Bus,
+				minimumVoltage: 200.0, maximumVoltage: 400.0, maximumCurrent: 20.0, efficiency: 0.95,
+				maximumMicrosteps: 1, maximumStepRate: 0.0, positionLoopRate: 4000.0, width: 120.0, height: 80.0, depth: 45.0},
+			{designation: "GENERIC-LV-SERVO-AMP", family: Servo, control: Bus,
+				minimumVoltage: 24.0, maximumVoltage: 60.0, maximumCurrent: 150.0, efficiency: 0.95,
+				maximumMicrosteps: 1, maximumStepRate: 0.0, positionLoopRate: 4000.0, width: 120.0, height: 70.0, depth: 45.0}
 		], row -> ({source: "Assumed generic driver class; ratings and envelope are unverified",
 			standard: null, standardEdition: null, dimensionKind: Unverified, conformance: GenericApproximation}));
 		return table;
@@ -88,6 +95,8 @@ class MotorDriver extends MachineComponent {
 			iface: Unspecified, required: false});
 	}
 
+	override public function motorDriver():Null<MotorDriver> return this;
+
 	public static function validateVoltage(row:MotorDriverRating, voltage:Float):Void {
 		if (!Math.isFinite(voltage) || voltage < row.minimumVoltage || voltage > row.maximumVoltage)
 			throw 'Driver "${row.designation}" supply is outside ${row.minimumVoltage}–${row.maximumVoltage} V';
@@ -98,7 +107,7 @@ class MotorDriver extends MachineComponent {
 		ComponentRecipeSupport.catalog("designation", catalog(), "GENERIC-TMC2209"),
 		ComponentRecipeSupport.scalar("current", 1.68, 0.001),
 		ComponentRecipeSupport.count("microsteps", 1),
-		ComponentRecipeSupport.flag("wiredSupply", false),
+		ComponentRecipeSupport.flag("wiredSupply", true),
 		ComponentRecipeSupport.scalar("voltage", 24, 0.001)
 	], v -> new MotorDriver(v.token("designation"), v.number("current"), v.integer("microsteps"),
 		v.boolean("wiredSupply") ? null : v.number("voltage")));

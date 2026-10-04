@@ -197,13 +197,13 @@ class RobotArm extends MachineAssembly {
 		}
 		addComponent("toolFlange", toolFlange);
 		revolute(specs[5], "joint6", "tool", "toolFlange", "face");
-		addComponent("powerSupply", new PowerSupply(48, 30, 6));
+		addComponent("powerSupply", new PowerSupply(310, 10, 6, 180, 80, 60, 2500));
 		addMemberConnector("pedestal", "powerSupply", Solids.axial(-300, 0, 0));
 		addMate("powerSupply-mount", "fixed", "pedestal", "powerSupply", "powerSupply", "mount");
 		// Each joint's servo, through its gearbox, drives it: the limits above are what the drives deliver.
 		for (index in 0...6) {
 			var driver = 'driver${index + 1}';
-			addComponent(driver, new MotorDriver("GENERIC-SERVO-AMP", 5));
+			addComponent(driver, new MotorDriver("GENERIC-AC-SERVO-AMP", 5));
 			addMemberConnector("pedestal", driver, Solids.axial(300, (index - 2.5) * 70, 0));
 			addMate('$driver-mount', "fixed", "pedestal", driver, driver, "mount");
 			connectPorts('$driver-power', "powerSupply", 'power${index + 1}', driver, "power");
