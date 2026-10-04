@@ -927,8 +927,10 @@ rk_result RobotRuntime::snapshot_full(rk_robot_snapshot &out_snapshot, bool endp
     std::copy_n(commanded_position_, state_.joint_count, out_snapshot.setpoint_position);
     if (endpoint_coordinates)
         for (uint32_t joint = 0; joint < state_.joint_count; ++joint) {
-            out_snapshot.position[joint] -= coordinate_offsets_[joint];
-            out_snapshot.setpoint_position[joint] -= coordinate_offsets_[joint];
+            out_snapshot.position[joint] = endpoint_->physical_position(joint,
+                out_snapshot.position[joint] - coordinate_offsets_[joint]);
+            out_snapshot.setpoint_position[joint] = endpoint_->physical_position(joint,
+                out_snapshot.setpoint_position[joint] - coordinate_offsets_[joint]);
         }
     return RK_OK;
 }

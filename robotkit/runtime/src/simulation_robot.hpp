@@ -19,6 +19,9 @@ class SimulationRobot final : public RobotEndpoint {
 public:
     rk_result apply(const rk_robot_command &command) override;
     rk_result sample(uint64_t timestamp_ns, rk_robot_state &state) override;
+    double physical_position(uint32_t joint, double counter_position) const noexcept override {
+        return counter_position + (joint < counter_origin_.size() ? counter_origin_[joint] : 0.0);
+    }
     void discard_pending() noexcept override {
         pending_targets_.clear();
         if (staged_valid_)
@@ -27,6 +30,7 @@ public:
     }
     void reset() noexcept {
         std::fill(slip_.begin(), slip_.end(), 0.0);
+        std::fill(counter_origin_.begin(), counter_origin_.end(), 0.0);
         pending_targets_.clear();
         staged_valid_ = false;
         staged_stopped_ = false;
@@ -93,6 +97,7 @@ private:
      * lost steps is: added to every position or servo target. Zero is none; reset clears it.
      */
     std::vector<double> slip_;
+    std::vector<double> counter_origin_;
     /** Servo gains per joint: a joint with stiffness runs as a servo on its position targets. */
     std::vector<rk_robot_joint_servo> servo_;
     std::vector<double> reflected_inertia_;

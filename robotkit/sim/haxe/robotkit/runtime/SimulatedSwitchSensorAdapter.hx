@@ -58,11 +58,15 @@ class SimulatedSwitchSensorAdapter implements SimulationStepObserver {
     var positions = readPositions();
     if (positions == null || positions.length != jointCount)
       throw "Switch actual-position reader returned the wrong joint count";
+    var counters = runtime.snapshot().q.toArray();
     sequence = Int64.add(sequence, Int64.ofInt(1));
     for (i in 0...readings.length) {
       var value = readings[i];
       var active = value.sample(positions[joints[i]]);
-      var edge = value.closingEdgePosition;
+      var physicalEdge = value.closingEdgePosition;
+      var joint = joints[i];
+      var edge:Null<Float> = physicalEdge == null ? null : physicalEdge +
+        counters[joint] - runtime.referenceOffset(joint) - positions[joint];
       runtime.publishSensorFrame(value.source.id,
         [active ? 1.0 : 0.0, edge == null ? 0.0 : 1.0, edge == null ? 0.0 : edge, value.closingEdges], sequence,
         sourceTimestampNs, clockId, null);

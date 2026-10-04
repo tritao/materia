@@ -729,6 +729,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         // Servo motor joints (see rk_robot_joint_servo) carry the joints coupled to them, which then
         // take no commands of their own.
         binding->slip_.assign(blueprint.joint_count, 0.0);
+        binding->counter_origin_.assign(blueprint.joint_count, 0.0);
         binding->servo_.assign(blueprint.joint_count, rk_robot_joint_servo{});
         binding->reflected_inertia_.assign(blueprint.joint_count, 0.0);
         if (blueprint.struct_size >= offsetof(rk_robot_runtime_blueprint, process_joint))

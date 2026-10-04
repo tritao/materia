@@ -113,7 +113,7 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
         target.target = source.target;
         target.max_force = source.max_effort;
         if (positional && source.joint < slip_.size())
-            target.target += slip_[source.joint];
+            target.target += slip_[source.joint] + counter_origin_[source.joint];
         if (source.mode == RK_TARGET_POSITION && source.joint < servo_.size() &&
             servo_[source.joint].stiffness > 0.0) {
             // The drive interpolates the analytic trajectory reference within this cycle.
@@ -230,7 +230,7 @@ rk_result SimulationRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) 
             return RK_ERROR_BACKEND;
         for (uint32_t target = 0; target < state.joint_count; ++target) {
             if (source.joint == joints_[target]) {
-                state.position[target] = source.position;
+                state.position[target] = source.position - counter_origin_[target];
                 state.velocity[target] = source.velocity;
                 state.effort[target] = source.effort;
                 break;

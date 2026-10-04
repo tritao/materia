@@ -124,6 +124,10 @@ public:
 
     /** Returns true when sample() supplies the endpoint's observed safety state. */
     virtual bool reports_safety_state() const noexcept { return false; }
+    /** Physical coordinate for sensor synthesis, distinct from a power-up counter origin. */
+    virtual double physical_position(uint32_t, double counter_position) const noexcept {
+        return counter_position;
+    }
 
     /**
      * Relative precision of the positions sample() reports: 0 for full double

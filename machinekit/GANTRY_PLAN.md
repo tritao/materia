@@ -1737,3 +1737,21 @@ Machines without home switches keep their existing mission startup. Power-up
 nonzero offsets, previously accumulated slip, independent Y squaring and all
 physical/mission timing checks remain pending or unverified. No tests or
 builds ran, so G11 is not proven complete.
+
+
+### G11 — separate simulated counter origin from lost-step slip
+
+Mission startup: `86da82a74`. Simulation endpoints now keep a distinct
+power-up counter-origin vector, initialized/reset to zero. Positional commands
+convert counter targets to physical coordinates through that origin; sampled
+counter positions subtract it. Existing lost-step slip remains a separate
+command effect, so observing counters still detects newly lost steps.
+Physical sensor snapshots convert counters back through the endpoint's
+physical_position contract. Simulation switch readers sense physical trips
+but publish closing-edge captures converted into counter coordinates.
+
+No nonzero origins are configured yet: the scene/API setter and startup pose
+handling remain pending. This separation enables proper calibration rather
+than latching a physical edge as if it were an unknown counter. Native/Haxe
+concurrent reset/calibration and nonzero-offset behavior remain unverified.
+No tests or builds ran.
