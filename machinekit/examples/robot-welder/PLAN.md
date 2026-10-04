@@ -763,6 +763,16 @@ W6 implementation notes (started after W5 main sync, 2026-10-04):
   watchdog needs an external safety interlock before this adapter can satisfy link-loss safety.
   The focused Modbus suite passes 37 assertions, including malformed frames, setpoint overflow and invalid maps.
   This proves the codec/map foundations only; TCP transactions, the in-process fake and mission integration remain open.
+- The nonblocking Modbus TCP client now executes bounded, acknowledged transactions through NativeKit. Its stream
+  decoder handles fragmented and coalesced MBAP records; responses must match transaction, unit and function.
+  An in-process fake uses a real loopback socket and an independent device watchdog clock. The focused suite passes
+  74 framing/map/stream assertions plus real TCP setpoint writes, feedback-bit reads, connection-fault detection and
+  arc/wire shutdown after the connection drops without a final write.
+  NativeKit's transport worker can wait 100 ms before noticing outgoing data; a 50 ms request timeout was therefore
+  invalid. The client uses a bounded 500 ms default; the TCP test uses a 1 s device lease. The adapter must budget
+  lease renewal against transport delay instead of assuming a write is applied synchronously. Focused TCP tests need
+  the existing app native directory on `LD_LIBRARY_PATH` for `libnativekit.so`.
+  The `WelderOutputs`/`WelderFeedback` adapter and unchanged process mission are still pending.
 
 ## Phase 2: mobile welder
 

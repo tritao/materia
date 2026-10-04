@@ -1,4 +1,5 @@
 import processkit.modbus.ModbusFrame;
+import processkit.modbus.ModbusFrameStream;
 import processkit.modbus.ModbusRegister;
 import processkit.modbus.ModbusWelderMap;
 import haxe.io.Bytes;
@@ -35,6 +36,22 @@ class ModbusTests {
       200, 1, 1, 4, map.current, map.measuredVoltage, map.power, 103, 200));
     rejects(function() new ModbusWelderMap(1, 100, 1, map.wire, map.voltage,
       200, 1, 2, 4, map.current, map.measuredVoltage, map.power, 103, 5000));
+    var encoded = new ModbusFrame(42, 1, ModbusFrame.writeHolding(100, 1)).encode();
+    for (split in 1...encoded.length) {
+      var stream = new ModbusFrameStream();
+      stream.feed(Bytes.view(encoded, 0, split)); check(stream.next() == null);
+      stream.feed(Bytes.view(encoded, split, encoded.length - split));
+      var packet = stream.next(); check(packet != null && packet.transaction == 42);
+      check(stream.next() == null);
+    }
+    var coalesced = Bytes.alloc(encoded.length * 2);
+    coalesced.blit(0, encoded, 0, encoded.length); coalesced.blit(encoded.length, encoded, 0, encoded.length);
+    var stream = new ModbusFrameStream(); stream.feed(coalesced);
+    check(stream.next() != null); check(stream.next() != null); check(stream.next() == null);
+    var bad = Bytes.alloc(7); bad.set(5, 255);
+    var invalidStream = new ModbusFrameStream(); invalidStream.feed(bad);
+    rejects(function() invalidStream.next());
     trace('Modbus tests passed ($count assertions)');
+    ModbusTcpTests.run();
   }
 }
