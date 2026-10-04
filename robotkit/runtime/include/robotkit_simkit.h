@@ -207,7 +207,25 @@ typedef struct rk_simulation_robot_desc {
      */
     uint32_t link_hull_count;
     rk_simulation_link_hull link_hulls[RK_MAX_LINK_HULLS];
+    /** Optional board-defined peripheral profile; zero disables it. */
+    uint32_t virtual_peripheral_kind;
+    uint32_t virtual_peripheral_parameter_count;
+    double virtual_peripheral_parameters[16];
 } rk_simulation_robot_desc;
+
+/** Latest numeric device observation, independent of the authored sensor layout. */
+typedef struct rk_simulation_device_sensor {
+    rk_sensor_sample sample;
+    double values[RK_MAX_SENSOR_VALUES];
+} rk_simulation_device_sensor;
+
+/** Deliver STOP6 before freezing the simulated board's clock. */
+RK_API rk_result RK_CALL rk_simulation_stop_virtual_device(rk_simulation simulation, uint32_t robot_index);
+RK_API rk_result RK_CALL rk_simulation_set_virtual_device_input(
+    rk_simulation simulation, uint32_t robot_index, uint32_t input, double value);
+RK_API rk_result RK_CALL rk_simulation_get_virtual_device_sensor(
+    rk_simulation simulation, uint32_t robot_index, uint32_t slot,
+    rk_simulation_device_sensor *out_sensor RK_INOUT);
 
 /** rk_simulation_differential_drive_desc.reversed_wheels bits. */
 enum { RK_DRIVE_REVERSED_LEFT = 1, RK_DRIVE_REVERSED_RIGHT = 2 };

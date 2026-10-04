@@ -514,6 +514,26 @@ pub unsafe extern "C" fn rkd_virtual_create(
     .map_or(std::ptr::null_mut(), |v| Box::into_raw(Box::new(v)))
 }
 
+// Profile 1 is the board's welding simulator. Host transport treats its parameters as opaque data.
+#[no_mangle]
+pub unsafe extern "C" fn rkd_virtual_configure_peripheral(
+    device: *mut VirtualDevice, kind: u32, parameters: *const f64, count: usize,
+) -> i32 {
+    if parameters.is_null() || kind != 1 || count != 7 { return 0; }
+    let p = std::slice::from_raw_parts(parameters, count);
+    if p.iter().any(|v| !v.is_finite()) || p[..4].iter().any(|v| *v < 0.0 || v.fract() != 0.0)
+        || p[0] >= 8.0 || p[1..4].iter().any(|v| *v >= 32.0) { return 0; }
+    rkd_virtual_configure_welder(device, p[0] as u8, p[1] as u32, p[2] as u32,
+        p[3] as u32, p[4], p[5], p[6] as f32)
+}
+#[no_mangle]
+pub unsafe extern "C" fn rkd_virtual_set_peripheral_input(
+    device: *mut VirtualDevice, input: u32, value: f64,
+) -> i32 {
+    if input != 0 || (value != 0.0 && value != 1.0) { return 0; }
+    rkd_virtual_set_welder_grounded(device, value as u8)
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn rkd_virtual_configure_welder(
     device: *mut VirtualDevice, sensor_slot: u8, arc_channel: u32, wire_channel: u32,

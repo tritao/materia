@@ -10,6 +10,9 @@ namespace robotkit {
 
 /** Deterministic in-process RKD6 link and board configuration. */
 struct VirtualDeviceConfig6 {
+    /** Optional board-defined peripheral profile; the host does not interpret its parameters. */
+    std::uint32_t peripheral_kind = 0;
+    std::vector<double> peripheral_parameters;
     std::uint8_t profile = 1; // 1 full, 2 minimal
     std::uint64_t device_tick_hz = 1'000'000;
     std::uint32_t step_tick_hz = 40'000;
@@ -67,6 +70,9 @@ public:
         const rk_robot_runtime_blueprint &) override;
     /** Recreate the board and UART queues when its simulation clock resets. */
     bool reset();
+    bool stop_device();
+    bool set_peripheral_input(std::uint32_t input, double value);
+    bool sensor_sample(std::uint32_t slot, rk_sensor_sample &sample, std::span<double> values) const;
     void cut_link(bool cut);
     bool miss_next_steps(std::uint32_t actuator, std::uint32_t count);
     std::array<std::uint8_t, 16> controller() const noexcept { return controller_; }

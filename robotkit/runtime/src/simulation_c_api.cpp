@@ -179,6 +179,22 @@ rk_result RK_CALL rk_simulation_add_robot(rk_simulation simulation,
     }
 }
 
+rk_result RK_CALL rk_simulation_stop_virtual_device(rk_simulation simulation, uint32_t robot_index) {
+    const auto value = resolve(simulation);
+    return value ? value->stop_virtual_device(robot_index) : RK_ERROR_INVALID_HANDLE;
+}
+rk_result RK_CALL rk_simulation_set_virtual_device_input(
+    rk_simulation simulation, uint32_t robot_index, uint32_t input, double input_value) {
+    const auto value = resolve(simulation);
+    return value ? value->set_virtual_device_input(robot_index, input, input_value) : RK_ERROR_INVALID_HANDLE;
+}
+rk_result RK_CALL rk_simulation_get_virtual_device_sensor(
+    rk_simulation simulation, uint32_t robot_index, uint32_t slot, rk_simulation_device_sensor *out_sensor) {
+    if (!out_sensor) return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = resolve(simulation);
+    return value ? value->get_virtual_device_sensor(robot_index, slot, *out_sensor) : RK_ERROR_INVALID_HANDLE;
+}
+
 rk_result RK_CALL rk_simulation_cut_virtual_device_link(
     rk_simulation simulation, uint32_t robot_index, uint32_t cut) {
     if (cut > 1) return RK_ERROR_INVALID_ARGUMENT;

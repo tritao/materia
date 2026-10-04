@@ -30,6 +30,10 @@ typedef struct rkd_virtual_event_record {
 rkd_virtual_device *rkd_virtual_create(uint64_t tick_hz, uint32_t step_tick_hz,
     uint64_t offset_ticks, int32_t drift_ppm, uint32_t actuator_count,
     const double *steps_per_unit, const uint8_t *controller, uint8_t profile);
+/* Board-owned peripheral profile data, supplied before opening the session. */
+int32_t rkd_virtual_configure_peripheral(rkd_virtual_device *device, uint32_t kind,
+    const double *parameters, size_t count);
+int32_t rkd_virtual_set_peripheral_input(rkd_virtual_device *device, uint32_t input, double value);
 /* Configure before opening the session. Feedback is published through SENSOR6. */
 int32_t rkd_virtual_configure_welder(rkd_virtual_device *device, uint8_t sensor_slot,
     uint32_t arc_channel, uint32_t wire_channel, uint32_t voltage_channel,

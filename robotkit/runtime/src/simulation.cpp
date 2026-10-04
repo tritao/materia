@@ -266,6 +266,12 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         config.target_error = robot_desc->virtual_device_target_error;
         config.clock_bound_ns = robot_desc->virtual_device_clock_bound_ns;
         config.link_loss_timeout_ns = robot_desc->virtual_device_link_loss_timeout_ns;
+        if (robot_desc->struct_size >= sizeof(*robot_desc)) {
+            if (robot_desc->virtual_peripheral_parameter_count > 16) return RK_ERROR_INVALID_ARGUMENT;
+            config.peripheral_kind = robot_desc->virtual_peripheral_kind;
+            config.peripheral_parameters.assign(robot_desc->virtual_peripheral_parameters,
+                robot_desc->virtual_peripheral_parameters + robot_desc->virtual_peripheral_parameter_count);
+        }
         if (robot_desc->struct_size >= sizeof(*robot_desc) && robot_desc->virtual_device_profile)
             config.profile = robot_desc->virtual_device_profile;
         if (robot_desc->struct_size >=
@@ -1411,6 +1417,22 @@ rk_result Simulation::present_frame(nksim_frame frame, rk_simulation_presentatio
     out_info.simulation_time = clock.time;
     out_info.pose_count = static_cast<uint32_t>(out_poses.size());
     return RK_OK;
+}
+
+rk_result Simulation::stop_virtual_device(uint32_t robot_index) {
+    Lock lock(session_);
+    if (robot_index >= virtual_devices_.size() || !virtual_devices_[robot_index]) return RK_ERROR_INVALID_ARGUMENT;
+    return virtual_devices_[robot_index]->stop_device() ? RK_OK : RK_ERROR_BACKEND;
+}
+rk_result Simulation::set_virtual_device_input(uint32_t robot_index, uint32_t input, double value) {
+    Lock lock(session_);
+    if (robot_index >= virtual_devices_.size() || !virtual_devices_[robot_index]) return RK_ERROR_INVALID_ARGUMENT;
+    return virtual_devices_[robot_index]->set_peripheral_input(input, value) ? RK_OK : RK_ERROR_INVALID_ARGUMENT;
+}
+rk_result Simulation::get_virtual_device_sensor(uint32_t robot_index, uint32_t slot, rk_simulation_device_sensor &sensor) {
+    Lock lock(session_);
+    if (robot_index >= virtual_devices_.size() || !virtual_devices_[robot_index]) return RK_ERROR_INVALID_ARGUMENT;
+    return virtual_devices_[robot_index]->sensor_sample(slot, sensor.sample, sensor.values) ? RK_OK : RK_ERROR_INVALID_ARGUMENT;
 }
 
 rk_result Simulation::cut_virtual_device_link(uint32_t robot_index, bool cut) {

@@ -39,6 +39,9 @@ public:
     /** Adds one simulation-owned runtime before the topology is sealed. */
     rk_result add_robot(const rk_robot_runtime_blueprint &blueprint, rk_robot_runtime &out_runtime,
                         const rk_simulation_robot_desc *robot_desc = nullptr);
+    rk_result stop_virtual_device(uint32_t robot_index);
+    rk_result set_virtual_device_input(uint32_t robot_index, uint32_t input, double value);
+    rk_result get_virtual_device_sensor(uint32_t robot_index, uint32_t slot, rk_simulation_device_sensor &sensor);
     rk_result cut_virtual_device_link(uint32_t robot_index, bool cut);
     rk_result reset_robot(uint32_t robot_index);
     /**

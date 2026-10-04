@@ -116,6 +116,11 @@ class Simulation {
             (virtualDevice.stepsPerUnit.length != 0 &&
              virtualDevice.stepsPerUnit.length != blueprint.jointCount))
           throw "Simulation virtual device configuration is invalid";
+        if (virtualDevice.peripheralParameters.length > 16) throw "Too many virtual peripheral parameters";
+        robotDesc.set_virtual_peripheral_kind(virtualDevice.peripheralKind);
+        robotDesc.set_virtual_peripheral_parameter_count(virtualDevice.peripheralParameters.length);
+        for (i in 0...virtualDevice.peripheralParameters.length)
+          robotDesc.set_virtual_peripheral_parameters(i, virtualDevice.peripheralParameters[i]);
         robotDesc.set_virtual_device_enabled(1);
         robotDesc.set_virtual_device_profile(virtualDevice.profile);
         robotDesc.set_virtual_device_tick_hz(virtualDevice.tickHz);
@@ -443,6 +448,28 @@ class Simulation {
       for (current in stepObservers) if (current.id == entry.id) registered = true;
       if (registered) entry.observer.afterSimulationStep(sourceTimeNs);
     }
+  }
+
+  /** Deliver device stop before the simulation clock is frozen. */
+  public function stopVirtualDevice(robotIndex:Int):Void {
+    ensureLive();
+    check(RobotKitSimKit.rk_simulation_stop_virtual_device(owner.borrow(), robotIndex), "simulation.stopVirtualDevice");
+  }
+
+  /** Supplies a board-defined numeric input; meaning belongs to its peripheral profile. */
+  public function setVirtualDeviceInput(robotIndex:Int, input:Int, value:Float):Void {
+    ensureLive();
+    check(RobotKitSimKit.rk_simulation_set_virtual_device_input(owner.borrow(), robotIndex, input, value),
+      "simulation.setVirtualDeviceInput");
+  }
+
+  /** Latest device sample; sequence zero means no observation has arrived yet. */
+  public function virtualDeviceSensor(robotIndex:Int, slot:Int):rk_simulation_device_sensor {
+    ensureLive();
+    var value = new rk_simulation_device_sensor();
+    check(RobotKitSimKit.rk_simulation_get_virtual_device_sensor(owner.borrow(), robotIndex, slot, value).status,
+      "simulation.virtualDeviceSensor");
+    return value;
   }
 
   /** Injects a virtual RKD6 link loss or reconnects the link. */

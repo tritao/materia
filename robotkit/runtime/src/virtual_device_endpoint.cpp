@@ -22,11 +22,26 @@ public:
         device_ = rkd_virtual_create(config.device_tick_hz, config.step_tick_hz,
             config.offset_ticks, config.drift_ppm, count, scale.data(),
             config.controller.data(), config.profile);
+        if (device_ && config.peripheral_kind && !rkd_virtual_configure_peripheral(device_,
+                config.peripheral_kind, config.peripheral_parameters.data(), config.peripheral_parameters.size())) {
+            rkd_virtual_destroy(device_); device_ = nullptr;
+        }
     }
     ~Link() override { rkd_virtual_destroy(device_); }
     bool valid() const noexcept { return device_ != nullptr; }
     bool miss_next_steps(std::uint32_t actuator, std::uint32_t count) {
         return rkd_virtual_miss_next_steps(device_, actuator, count) != 0;
+    }
+    bool stop_device() {
+        // A paused simulation has no future clock tick to deliver an ordinary queued UART stop.
+        // Process the same STOP6 frame now and discard unsent host work before the clock freezes.
+        pending_host_.clear();
+        std::vector<std::uint8_t> frame;
+        if (!device_frame6::encode(11, {}, frame)) return false;
+        return rkd_virtual_link_host_to_device(device_, frame.data(), frame.size()) != 0;
+    }
+    bool set_input(std::uint32_t input, double value) {
+        return rkd_virtual_set_peripheral_input(device_, input, value) != 0;
     }
     unsigned baud() const noexcept override { return config_.baud; }
     std::uint64_t received_at_ns() const noexcept override { return received_at_ns_; }
@@ -234,6 +249,24 @@ bool VirtualDeviceEndpoint::reset() {
     if (!fresh) return false;
     inner_ = std::move(fresh->inner_);
     link_ = fresh->link_;
+    return true;
+}
+
+bool VirtualDeviceEndpoint::stop_device() { return link_->stop_device(); }
+bool VirtualDeviceEndpoint::set_peripheral_input(std::uint32_t input, double value) {
+    return link_->set_input(input, value);
+}
+bool VirtualDeviceEndpoint::sensor_sample(std::uint32_t slot, rk_sensor_sample &sample, std::span<double> values) const {
+    if (slot >= RK_MAX_SENSORS) return false;
+    const auto &header = inner_->sensor_headers_[slot];
+    if (values.size() < header.value_count) return false;
+    sample = {};
+    sample.sequence = header.sequence;
+    sample.source_timestamp_ns = static_cast<std::uint64_t>(
+        static_cast<long double>(header.timestamp_ticks) * 1e9L / inner_->ack_.device_tick_hz);
+    sample.received_timestamp_ns = inner_->sensor_received_ns_[slot];
+    sample.value_count = header.value_count;
+    std::copy_n(inner_->sensor_values_[slot].begin(), header.value_count, values.begin());
     return true;
 }
 

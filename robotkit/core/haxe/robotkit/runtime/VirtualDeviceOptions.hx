@@ -4,6 +4,9 @@ import haxe.Int64;
 
 /** Optional in-process RKD6 device and simulated UART for Simulation.addRobot. */
 class VirtualDeviceOptions {
+  /** Board-defined profile data; process owners supply its meaning. */
+  public var peripheralKind:Int = 0;
+  public var peripheralParameters:Array<Float> = [];
   public var profile:Int = 1; // 1 full, 2 minimal
   public var tickHz:Int64 = Int64.ofInt(1000000);
   public var stepTickHz:Int = 40000;
