@@ -52,16 +52,14 @@ class CoreXyPlotterChecks {
 	];
 
 	public static function run():Void {
-		parts = new PosedParts();
-		try runChecks() catch (error:Dynamic) {
-			parts.close();
-			throw error;
-		}
-		parts.close();
+		PosedParts.scope(posed -> {
+			clearance = posed;
+			runChecks();
+		});
 	}
 
-	/** The geometry of the members posed by this run, built once each; closed when the run ends. */
-	static var parts:PosedParts;
+	/** The members posed by this run, with their geometry built once each; closed when the run ends. */
+	static var clearance:PosedParts;
 
 	static function runChecks():Void {
 		var scene = SceneArtifact.decode(CoreXyPlotterPreview.plotter());
@@ -226,22 +224,8 @@ class CoreXyPlotterChecks {
 	/** No member of `moving` intersects a member of `others` at the pen's position `at`. */
 	static function checkClear(plotter:CoreXyPlotter, state:AssemblyState, at:Array<Float>, moving:Array<String>, others:Array<String>):Void {
 		moveTo(state, at);
-		var first:Array<Part> = [], second:Array<Part> = [];
-		try {
-			for (id in moving) first.push(posed(plotter, state, id));
-			for (id in others) second.push(posed(plotter, state, id));
-			var firstBoxes = [for (part in first) PosedParts.boxOf(part)], secondBoxes = [for (part in second) PosedParts.boxOf(part)];
-			for (a in 0...first.length) for (b in 0...second.length) {
-				var volume = PosedParts.commonVolume(first[a], firstBoxes[a], second[b], secondBoxes[b]);
-				if (volume > 1e-3) throw '${moving[a]} collides with ${others[b]} at ${at.join(", ")}: ${Math.round(volume)} mm³';
-			}
-		} catch (error:Dynamic) {
-			PosedParts.closeAll(first);
-			PosedParts.closeAll(second);
-			throw error;
-		}
-		PosedParts.closeAll(first);
-		PosedParts.closeAll(second);
+		clearance.checkClear(plotter, state, "CoreXY plotter", moving, others,
+			(a, b, volume) -> '$a collides with $b at ${at.join(", ")}: ${Math.round(volume)} mm³');
 	}
 
 	static function moveTo(state:AssemblyState, at:Array<Float>):Void {
@@ -252,16 +236,7 @@ class CoreXyPlotterChecks {
 
 	static function overlap(plotter:CoreXyPlotter, state:AssemblyState, at:Array<Float>, a:String, b:String):Float {
 		moveTo(state, at);
-		var first = posed(plotter, state, a), second = posed(plotter, state, b);
-		var volume = PosedParts.commonVolume(first, PosedParts.boxOf(first), second, PosedParts.boxOf(second));
-		first.close();
-		second.close();
-		return volume;
-	}
-
-	static function posed(plotter:CoreXyPlotter, state:AssemblyState, id:String):Part {
-		for (entry in plotter.components()) if (entry.id == id) return parts.posed(entry.component, state.worldPose(id));
-		throw 'CoreXY plotter has no member "$id"';
+		return clearance.volume(plotter, state, "CoreXY plotter", a, b);
 	}
 }
 
