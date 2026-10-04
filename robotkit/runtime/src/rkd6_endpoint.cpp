@@ -852,9 +852,12 @@ void Rkd6Endpoint::poll_frames(std::uint64_t owner_now_ns) {
                     plan_tags_.erase(plan_tags_.begin());
             }
         } else if (decoded.kind == 15) {
+            device_wire6::State6Header header{};
             if (decoded.payload.size() < device_wire6::State6Header::SIZE ||
-                !device_wire6::decode(decoded.payload.first(device_wire6::State6Header::SIZE),
-                    state_header_)) continue;
+                !device_wire6::decode(decoded.payload.first(device_wire6::State6Header::SIZE), header) ||
+                header.session != ack_.session || header.actuator_count != ack_.actuator_count ||
+                header.input_count != input_layout_.size()) continue;
+            state_header_ = header;
             for (std::size_t i = 0; i < state_header_.actuator_count; ++i)
                 device_wire6::decode(decoded.payload.subspan(device_wire6::State6Header::SIZE +
                     i * device_wire6::ActuatorState6::SIZE,

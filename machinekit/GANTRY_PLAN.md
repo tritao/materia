@@ -3319,3 +3319,15 @@ MachineKit compilation passed, but its naming audit found ambiguous split roller
 faces in the new limit switch. A geometry ownership fix is being checked.
 Geometry/mass/acceleration audits and the remaining full Phase C gate still
 remain. G13 is in progress; G14 has not started.
+
+
+### Phase C — validate the counter-calibration feedback session
+
+A native regression reproduced a counter-calibration acknowledgment barrier
+being released by State6 feedback from another session. The endpoint now checks
+session, actuator count, and configured input count before installing a state
+header or releasing the barrier. The regression rejects wrong-session feedback,
+a pre-calibration accepted sequence, and a truncated channel layout; it keeps
+subsequent scope controls blocked until matching fresh feedback arrives.
+The regression failed before the change and passes afterward. Native rebuild
+and full CTest **19/19** pass with this fix.

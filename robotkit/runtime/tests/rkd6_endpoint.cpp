@@ -219,6 +219,51 @@ int main() {
     blueprint.joints[0].max_acceleration = (blueprint.joints[0].limit_flags |= RK_LIMIT_ACCELERATION, 10);
     unseen_backlog_holds_segments(blueprint);
     {
+        auto paired = blueprint;
+        paired.joint_count = 2; paired.joints[1] = paired.joints[0];
+        auto link = std::make_unique<MockLink>();
+        auto *wire = link.get(); wire->controller.fill(7);
+        auto homing = Rkd6Endpoint::attach(std::move(link), paired,
+            wire->controller, 91, 1e-6, 500'000, 100'000);
+        assert(homing);
+        rk_robot_state measured{};
+        assert(homing->sample(0, measured) == RK_OK);
+        assert(homing->request_homing_scope(1, 1, 0, 0, 1, 0.01) == RK_OK);
+        wire->push(19, device_wire6::HomingControlAck6{91, 1, 1, 1});
+        assert(homing->sample(100'000, measured) == RK_OK);
+        assert(homing->homing_control_status(1) == RK_OK);
+        assert(homing->request_homing_counter_batch(2, 1, 0, 1, 0.01, -0.01) == RK_OK);
+        wire->push(19, device_wire6::HomingControlAck6{91, 2, 1, 1});
+        assert(homing->sample(200'000, measured) == RK_ERROR_STALE_STATE);
+        assert(homing->homing_control_status(2) == RK_ERROR_STALE_STATE);
+        auto feedback = [&](uint64_t session, uint64_t sequence, uint8_t count) {
+            device_wire6::State6Header header{};
+            header.session = session; header.accepted_sequence = sequence;
+            header.actuator_count = count; header.timestamp_ticks = 300;
+            std::vector<uint8_t> body(header.SIZE + count * device_wire6::ActuatorState6::SIZE);
+            assert(device_wire6::encode(header, std::span(body).first(header.SIZE)));
+            for (uint8_t i = 0; i < count; ++i) {
+                device_wire6::ActuatorState6 motor{}; motor.position = 0.3f;
+                assert(device_wire6::encode(motor, std::span(body).subspan(
+                    header.SIZE + i * motor.SIZE, motor.SIZE)));
+            }
+            std::vector<uint8_t> frame;
+            assert(device_frame6::encode(15, body, frame));
+            wire->incoming.push_back(std::move(frame));
+        };
+        feedback(90, 2, 2);
+        assert(homing->sample(300'000, measured) == RK_ERROR_STALE_STATE);
+        feedback(91, 1, 2);
+        assert(homing->sample(400'000, measured) == RK_ERROR_STALE_STATE);
+        feedback(91, 2, 1);
+        assert(homing->sample(500'000, measured) == RK_ERROR_STALE_STATE);
+        assert(homing->request_homing_scope(3, 1, 1, 0, 1, 0.01) == RK_ERROR_INVALID_STATE);
+        feedback(91, 2, 2);
+        assert(homing->sample(600'000, measured) == RK_OK);
+        assert(homing->homing_control_status(2) == RK_OK);
+        assert(std::abs(measured.position[1] - 0.3) < 1e-6);
+    }
+    {
         auto wrong = std::make_unique<MockLink>();
         wrong->controller.fill(4);
         rk_result reason = RK_OK;
