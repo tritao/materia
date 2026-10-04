@@ -73,6 +73,7 @@ class HomingCycle {
     if (Math.abs(observation.velocity) > axis.latchSpeed * 0.01)
       throw "Homing must start with the axis at rest";
     captures = [for (_ in axis.switches) null]; releasePosition = null;
+    if (axis.switches.length > 1) sides.beginSquaring([for (contact in axis.switches) contact.id]);
     if (anyActive(axis, observation)) enter(Backoff, observation);
     else enter(Seek, observation);
   }
@@ -125,13 +126,16 @@ class HomingCycle {
           if (all) enter(StopAfterLatch, observation);
         case StopAfterLatch:
           if (stopped) {
-            releaseSides();
+            if (sides != null) sides.releaseAll();
             for (i in 0...axis.switches.length) {
               var capture = captures[i];
               if (capture == null) throw "Homing has no captured latch position";
               driver.latch(axis.switches[i].id, capture);
             }
-            if (axis.switches.length > 1) sides.calibrate([for (contact in axis.switches) contact.id]);
+            if (axis.switches.length > 1) {
+              sides.calibrate([for (contact in axis.switches) contact.id]);
+              sides.endSquaring();
+            }
             enter(Return, driver.observe(axis.joint));
           }
         case Return:
@@ -160,7 +164,7 @@ class HomingCycle {
     if (failure != null) throw failure;
   }
 
-  function releaseSides():Void { if (sides != null) sides.releaseAll(); }
+  function releaseSides():Void { if (sides != null) sides.endSquaring(); }
 
   function enter(next:HomingPhase, observation:HomingObservation):Void {
     phase = next; origin = observation.position; elapsed = 0.0;

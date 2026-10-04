@@ -7,6 +7,7 @@ class SimulatedHomingSides implements HomingSideControl {
   final runtime:RobotRuntime;
   final drives:Map<String, SwitchDriveBinding> = new Map();
   final held:Map<Int, Float> = new Map();
+  var squaring:Array<String> = [];
 
   @:allow(robotkit.runtime.Simulation)
   private function new(simulation:Simulation, robotIndex:Int, runtime:RobotRuntime,
@@ -19,7 +20,25 @@ class SimulatedHomingSides implements HomingSideControl {
     }
   }
 
+  public function beginSquaring(switchIds:Array<String>):Void {
+    if (squaring.length > 0 || switchIds == null || switchIds.length < 2)
+      throw "Squaring requires an idle controller and multiple sides";
+    var shafts:Array<Int> = [];
+    for (id in switchIds) {
+      var drive = drives.get(id);
+      if (drive == null || shafts.indexOf(drive.joint) >= 0) throw "Squaring requires distinct known side shafts";
+      shafts.push(drive.joint);
+    }
+    squaring = switchIds.copy();
+  }
+
+  public function endSquaring():Void {
+    releaseAll();
+    squaring = [];
+  }
+
   public function hold(switchId:String):Void {
+    if (squaring.indexOf(switchId) < 0) throw "Side holds require an explicit squaring move";
     var drive = drives.get(switchId);
     if (drive == null) throw 'Home switch "$switchId" has no motor-side binding';
     if (held.exists(drive.joint)) return;
@@ -31,6 +50,13 @@ class SimulatedHomingSides implements HomingSideControl {
   }
 
   public function calibrate(switchIds:Array<String>):Void {
+    if (switchIds == null || switchIds.length != squaring.length || squaring.length == 0)
+      throw "Calibrate the complete active squaring group";
+    var seen = new Map<String, Bool>();
+    for (id in switchIds) {
+      if (squaring.indexOf(id) < 0 || seen.exists(id)) throw "Calibration does not match the squaring group";
+      seen.set(id, true);
+    }
     for (_ in held.keys()) throw "Release all shaft holds before motor calibration";
     runtime.calibrateHomeDrives(switchIds);
   }

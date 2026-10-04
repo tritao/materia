@@ -22,6 +22,7 @@ pub struct StepGenerator<const A: usize> {
     last_step: [Option<u64>; A],
     skew: [Option<SkewGroup>; A],
     skew_count: usize,
+    squaring_bound: [Option<f64>; A],
 }
 
 impl<const A: usize> StepGenerator<A> {
@@ -41,7 +42,7 @@ impl<const A: usize> StepGenerator<A> {
         }
         Some(Self { steps_per_unit, setup_ticks, min_interval_ticks,
             direction: [None; A], direction_since: [0; A], last_step: [None; A],
-            skew: [None; A], skew_count: 0 })
+            skew: [None; A], skew_count: 0, squaring_bound: [None; A] })
     }
 
     pub fn set_skew_group(&mut self, group: SkewGroup) -> bool {
@@ -53,6 +54,27 @@ impl<const A: usize> StepGenerator<A> {
         self.skew_count += 1;
         true
     }
+
+    /// Explicitly relax one configured pair for a bounded squaring move.
+    /// The homing owner must call end_squaring on completion, cancellation and faults.
+    pub fn begin_squaring(&mut self, first: usize, second: usize, bound: f64) -> bool {
+        if !bound.is_finite() { return false; }
+        let mut selected = None;
+        for i in 0..self.skew_count {
+            if let Some(group) = self.skew[i] {
+                if (group.first == first && group.second == second) ||
+                    (group.first == second && group.second == first) {
+                    if selected.is_some() || bound < group.bound || self.squaring_bound[i].is_some() {
+                        return false;
+                    }
+                    selected = Some(i);
+                }
+            }
+        }
+        if let Some(i) = selected { self.squaring_bound[i] = Some(bound); true } else { false }
+    }
+
+    pub fn end_squaring(&mut self) { self.squaring_bound.fill(None); }
 
     pub fn tick<B: Board>(&mut self, board: &mut B, targets: [f32; A]) -> Result<(), StepFault> {
         self.tick_active(board, targets, A)
@@ -81,13 +103,15 @@ impl<const A: usize> StepGenerator<A> {
             board.step_pulse(a, forward);
             self.last_step[a] = Some(now);
         }
-        for group in self.skew[..self.skew_count].iter().flatten() {
+        for (i, configured) in self.skew[..self.skew_count].iter().enumerate() {
+            let Some(group) = configured else { continue; };
             if group.first >= count || group.second >= count { continue; }
             let first = board.step_count(group.first) as f64 /
                 self.steps_per_unit[group.first] / group.first_ratio;
             let second = board.step_count(group.second) as f64 /
                 self.steps_per_unit[group.second] / group.second_ratio;
-            if (first - second).abs() > group.bound { return Err(StepFault::DualDriveSkew); }
+            let bound = self.squaring_bound[i].unwrap_or(group.bound);
+            if (first - second).abs() > bound { return Err(StepFault::DualDriveSkew); }
         }
         Ok(())
     }

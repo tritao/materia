@@ -2056,3 +2056,21 @@ switchYRighthome, exercising the requested 1 mm racking case when played.
 This is input authoring, not proof of successful physical squaring. Explicit
 skew scope and homing coverage still remain before the post-G12 compile/runtime
 checkpoint. No builds or tests ran; all new behavior remains unverified.
+
+### G12 — explicit squaring scope and bounded device skew override
+
+Startup scene wiring: `623de1e3f`. HomingSideControl now opens/closes an
+explicit squaring group. The simulation adapter validates distinct known drives,
+refuses holds outside that group and requires calibration of its complete
+identity set. HomingCycle opens the group for a multi-side homing move, releases
+holds for latching, calibrates, then closes before return. Fault/cancel cleanup
+closes the scope; failed releases retain it for retry.
+
+StepGenerator gains an explicit finite bounded override for one configured
+skew pair. Reject unknown/ambiguous pairs, repeated activation and bounds below
+the normal bound. Other pairs retain their limits, and end_squaring restores
+all normal bounds. This does not disable skew checks. G13 must carry homing
+scope and independent counter zeros through the device protocol and call these
+operations on every lifecycle exit; simulation holds remain unsupported on
+virtual-device endpoints until that transport work. No builds or tests ran.
+Physical homing regression coverage and the post-G12 checkpoint remain pending.
