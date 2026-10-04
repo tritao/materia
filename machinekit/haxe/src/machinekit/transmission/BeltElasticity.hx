@@ -96,13 +96,6 @@ class BeltElasticity {
 			for (span in spans) span.stiffness *= stated / derived;
 		}
 		var clearances:Array<materia.assembly.AssemblyDefinition.AssemblyElasticClearance> = [];
-		var drivers:Array<String> = [];
-		for (record in records) switch record.source {
-			case BeltReduction(id, driver, _) if (id == path.belt):
-				var driverJoint = rotaryJoint(definition, driver);
-				if (driverJoint != null && drivers.indexOf(driverJoint) < 0) drivers.push(driverJoint);
-			case _:
-		}
 		for (record in records) switch record.source {
 			case BeltReduction(id, driver, driven) if (id == path.belt):
 				var drivenJoint = rotaryJoint(definition, driven), driverJoint = rotaryJoint(definition, driver);
@@ -120,20 +113,19 @@ class BeltElasticity {
 		}
 		// A screw linked to the carriage by a lead-screw relation can still be a
 		// loaded contact even when no extra belt motion record names that pulley.
-		for (at in 0...joints.length) if (drivers.indexOf(joints[at]) < 0) {
+		for (at in 0...joints.length) {
 			var found = false;
 			for (entry in clearances) if (entry.joint == joints[at]) found = true;
 			if (!found) clearances.push({joint: joints[at],
 				allowance: TimingBelt.toothClearance(belt.beltProfile) / Math.abs(radii[at])});
 		}
 
+		// Use the actuator's usable design torque, not the stepper's holding or overload torque.
 		var peakDifference = 0.0;
 		for (actuator in actuators) {
 			var at = joints.indexOf(actuator.joint);
 			if (at < 0) continue;
 			var torque = actuator.maxEffort;
-			if (actuator.holdingTorque != null) torque = Math.max(torque, actuator.holdingTorque);
-			if (actuator.peakTorque != null) torque = Math.max(torque, actuator.peakTorque);
 			if (actuator.gearRatio != null) torque *= actuator.gearRatio;
 			if (actuator.gearEfficiency != null) torque *= actuator.gearEfficiency;
 			peakDifference += torque * 1000 / Math.abs(radii[at]);
@@ -147,7 +139,7 @@ class BeltElasticity {
 	}
 
 	/** Follow rigid attachments to the rotary shaft carrying this pulley. */
-	static function rotaryJoint(definition:AssemblyDefinition, pulley:String):Null<String> {
+	public static function rotaryJoint(definition:AssemblyDefinition, pulley:String):Null<String> {
 		var child = pulley;
 		for (_ in 0...definition.joints.length) {
 			var found:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;

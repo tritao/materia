@@ -64,7 +64,12 @@ public:
         std::uint64_t owner_now_ns, std::uint64_t committed_through_ns,
         const rk_robot_runtime_blueprint &blueprint) override;
     const char *fault_reason() const noexcept {
-        return queue_revision_mismatch_ ? "queue_revision_mismatch" : clock_.fault_reason();
+        return queue_revision_mismatch_ ? "queue_revision_mismatch" :
+            clock_.clock_sync_lost() ? clock_.fault_reason() :
+            status_.fault == 2 ? "trajectory_underflow" :
+            status_.fault == 3 ? "device_link_lost" :
+            status_.fault == 4 ? "dual_drive_skew" :
+            status_.fault != 0 ? "device_stopped" : nullptr;
     }
     std::uint64_t committed_until_ticks() const noexcept { return committed_until_ticks_; }
     std::pair<std::size_t, std::size_t> bookkeeping_counts() const noexcept {

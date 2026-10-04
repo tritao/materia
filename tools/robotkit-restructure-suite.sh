@@ -47,6 +47,8 @@ if [[ "$stage" == all || "$stage" == consumers ]]; then
 haxeon/scripts/haxeon run --project robotkit/robotd/haxeon.json -- --in-memory
 haxeon/scripts/haxeon run --project robotkit/tools/humanoid/tests/haxeon.json
 haxeon/scripts/haxeon run --project machinekit/examples/robot-welder/haxeon.json
+# VisionKit's RobotKit perception tests are in no workspace project.
+haxeon/scripts/haxeon run --project visionkit/tests/haxeon-robotkit.json
 haxeon/scripts/haxeon build --project app/haxeon.json
 app/run-built.sh --snapshot --worker-demo=rack-to-table --worker-demo-step=1000 \
     > "$build_root/worker-demo.log"

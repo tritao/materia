@@ -109,11 +109,15 @@ class BeltStretch {
 			for (candidate in mechanical.joints) if (candidate.id == joint.id) source = candidate;
 			var lower = source == null ? null : source.limits.lower;
 			var upper = source == null ? null : source.limits.upper;
-			context.reset();
-			state.setJoint(joint.id, upper == null ? joint.defaultValue + 1 : upper);
-			var moved = lengths(posedBelt(belt, path, state), path, state, anchor, heldPhase);
-			if (joint.id == leader || Math.abs(moved[0] - baseline[0]) > 1e-5 ||
-					Math.abs(moved[1] - baseline[1]) > 1e-5) {
+			var moves = joint.id == leader;
+			for (position in [lower == null ? joint.defaultValue - 1 : lower,
+					upper == null ? joint.defaultValue + 1 : upper]) {
+				context.reset();
+				state.setJoint(joint.id, position);
+				var moved = lengths(posedBelt(belt, path, state), path, state, anchor, heldPhase);
+				if (Math.abs(moved[0] - baseline[0]) > 1e-5 || Math.abs(moved[1] - baseline[1]) > 1e-5) moves = true;
+			}
+			if (moves) {
 				if (lower == null || upper == null)
 					throw new TransmissionDesignError('Belt "${path.belt}" has no known weakest stiffness without limits for joint "${joint.id}"');
 				sampled.push({id: joint.id, lower: lower, upper: upper, zero: joint.defaultValue});

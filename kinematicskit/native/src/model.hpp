@@ -11,8 +11,8 @@ struct Model {
     uint32_t body_count = 0, joint_count = 0, dof_count = 0, frame_count = 0;
     std::vector<int32_t> body_parent_joint, body_order;
     std::vector<int32_t> joint_kind, joint_parent, joint_child, joint_dof, joint_source;
-    std::vector<int32_t> joint_order, joint_value_order, frame_body;
-    std::vector<double> root_pose, parent_t_joint, joint_t_child, axis, ratio, offset, scale, frame_offset;
+    std::vector<int32_t> joint_order, joint_value_order, frame_body, term_start, term_dof;
+    std::vector<double> root_pose, parent_t_joint, joint_t_child, axis, ratio, offset, scale, frame_offset, joint_constant, term_scale;
     std::vector<std::vector<int32_t>> body_chain;
 
     // Evaluation state, reused across calls.

@@ -417,7 +417,8 @@ rk_result validate_plan_for_blueprint(const PlanRequest &plan,
             !is_finite(plan.acceleration_tolerance[joint]) ||
             plan.position_tolerance[joint] < 0.0 ||
             plan.velocity_tolerance[joint] < 0.0 ||
-            plan.acceleration_tolerance[joint] < 0.0)
+            plan.acceleration_tolerance[joint] < 0.0 ||
+            !is_finite(plan.control_acceleration[joint]) || plan.control_acceleration[joint] < 0.0)
             return RK_ERROR_INVALID_ARGUMENT;
     if (!coupled_values(&blueprint, plan.start_position, 1e-6, true) ||
         !coupled_values(&blueprint, plan.start_velocity, 1e-6, false) ||

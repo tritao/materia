@@ -3,6 +3,9 @@ package motionkit.robot;
 import haxe.Int64;
 import motionkit.trajectory.ExecutionPlan;
 import motionkit.trajectory.PlanDiagnostic;
+import motionkit.robot.TrajectoryStream.StreamSegments;
+import motionkit.robot.TrajectoryStream.ArrayStreamSegments;
+import motionkit.trajectory.Trajectory;
 import robotkit.model.ActuatorDrive.ServoDrive;
 import robotkit.model.ActuatorDrive.StepperDrive;
 import robotkit.model.Actuator;
@@ -49,7 +52,7 @@ class PlanCheckOptions {
 }
 
 /**
- * Checks a plan against the drives of the machine it is for, once, when the compiler has made it:
+ * Checks polynomial motion against the drives of the machine it is for:
  * the torque each motor would need along the plan against what its drive can give (a stepper's
  * pull-out curve, a servo's peak and rated torque), and how far the axes' drives stretch or lag
  * under the plan's forces. It reads the plan's polynomial segments, so the same check serves a
@@ -111,10 +114,17 @@ class PlanCheck {
 
   /** Checks `plan`, made from op `opIndex` at programmed speed `feed` (m/s, 0 when not a path move). */
   public function check(plan:ExecutionPlan, opIndex:Int, feed:Float):PlanCheckResult {
-    var starts = plan.segmentStarts(), durations = plan.segmentDurations();
-    var degrees = plan.segmentDegrees(), coefficients = plan.segmentCoefficients();
-    var count = starts.length();
-    var stride = ExecutionPlan.COEFFICIENT_STRIDE, jointCount = plan.jointCount;
+    return checkSegments(new CheckedPlanSegments(plan), opIndex, feed);
+  }
+
+  /** Direct moves and live servo chunks use the same drive and accuracy checks as programs. */
+  public function checkTrajectory(trajectory:Trajectory, ?opIndex:Int = -1, ?feed:Float = 0.0):PlanCheckResult
+    return checkSegments(new ArrayStreamSegments(trajectory.segments()), opIndex, feed);
+
+  public function checkSegments(segments:StreamSegments, ?opIndex:Int = -1, ?feed:Float = 0.0):PlanCheckResult {
+    if (segments.jointCount() != jointIds.length) throw "Plan check joint count mismatch";
+    var count = segments.count();
+    var stride = ExecutionPlan.COEFFICIENT_STRIDE;
     var cutting = options.cuttingFeedLimit > 0.0 && feed > 0.0 && feed <= options.cuttingFeedLimit;
     // Per motor (an actuator, however many axes it serves): worst ratio and where, samples over, and
     // the sum of squares for a servo's RMS.
@@ -145,15 +155,15 @@ class PlanCheck {
     var velocities = [for (_ in loads) 0.0];
     var accelerations = [for (_ in loads) 0.0];
     for (segment in 0...count) {
-      var length = Int64.toFloat(durations.get(segment)) * 1e-9;
-      var begin = Int64.toFloat(starts.get(segment)) * 1e-9;
-      var degree = degrees.get(segment);
+      var length = Int64.toFloat(segments.durationNs(segment)) * 1e-9;
+      var begin = Int64.toFloat(segments.startNs(segment)) * 1e-9;
+      var degree = segments.degree(segment);
       var steps = Std.int(Math.max(1.0, Math.ceil(length / options.sampleStep)));
       var step = length / steps;
       duration += length;
       for (axis in 0...loads.length) {
-        var base = (segment * jointCount + planJoint[axis]) * stride;
-        for (power in 0...degree + 1) c[axis][power] = coefficients.get(base + power);
+        for (power in 0...degree + 1)
+          c[axis][power] = segments.coefficient(segment, planJoint[axis], power);
       }
       for (sample in 0...steps + 1) {
         var tau = step * sample;
@@ -311,4 +321,29 @@ class PlanCheck {
     }
     return result;
   }
+}
+
+/** Read the native program arrays without copying their coefficients. */
+private class CheckedPlanSegments implements StreamSegments {
+  final plan:ExecutionPlan;
+  final starts:runtime.memory.NativeSpan<Int64>;
+  final durations:runtime.memory.NativeSpan<Int64>;
+  final degrees:runtime.memory.NativeSpan<Int>;
+  final coefficients:runtime.memory.NativeSpan<Float>;
+
+  public function new(plan:ExecutionPlan) {
+    this.plan = plan;
+    starts = plan.segmentStarts();
+    durations = plan.segmentDurations();
+    degrees = plan.segmentDegrees();
+    coefficients = plan.segmentCoefficients();
+  }
+
+  public function count():Int return starts.length();
+  public function jointCount():Int return plan.jointCount;
+  public function startNs(index:Int):Int64 return starts.get(index);
+  public function durationNs(index:Int):Int64 return durations.get(index);
+  public function degree(index:Int):Int return degrees.get(index);
+  public function coefficient(index:Int, joint:Int, power:Int):Float
+    return coefficients.get((index * plan.jointCount + joint) * ExecutionPlan.COEFFICIENT_STRIDE + power);
 }

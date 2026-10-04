@@ -15,20 +15,20 @@ bool finite(const double *values, size_t count) {
 } // namespace
 
 bool Model::build(const int32_t *ints, uint32_t int_count, const double *reals, uint32_t real_count) {
-    if (!ints || !reals || int_count < 5 || ints[0] != 1) return false;
-    const int64_t bodies = ints[1], joints = ints[2], dofs = ints[3], frames = ints[4];
-    if (bodies < 0 || joints < 0 || dofs < 0 || frames < 0 || bodies > 1000000 || joints > 1000000 ||
+    if (!ints || !reals || int_count < 6 || ints[0] != 2) return false;
+    const int64_t bodies = ints[1], joints = ints[2], dofs = ints[3], frames = ints[4], terms = ints[5];
+    if (bodies < 0 || joints < 0 || dofs < 0 || frames < 0 || terms < 0 || terms > 10000000 || bodies > 1000000 || joints > 1000000 ||
         frames > 1000000 || dofs > joints)
         return false;
-    const uint64_t expected_ints = 5 + 2 * uint64_t(bodies) + 7 * uint64_t(joints) + uint64_t(frames);
-    const uint64_t expected_reals = 7 * uint64_t(bodies) + 20 * uint64_t(joints) + 7 * uint64_t(frames);
+    const uint64_t expected_ints = 7 + 2 * uint64_t(bodies) + 8 * uint64_t(joints) + uint64_t(frames) + uint64_t(terms);
+    const uint64_t expected_reals = 7 * uint64_t(bodies) + 21 * uint64_t(joints) + 7 * uint64_t(frames) + uint64_t(terms);
     if (int_count != expected_ints || real_count != expected_reals || !finite(reals, real_count)) return false;
     body_count = uint32_t(bodies);
     joint_count = uint32_t(joints);
     dof_count = uint32_t(dofs);
     frame_count = uint32_t(frames);
 
-    size_t i = 5;
+    size_t i = 6;
     auto body_ok = [&](int32_t b) { return b >= 0 && b < bodies; };
     auto joint_ok = [&](int32_t j) { return j >= 0 && j < joints; };
     body_parent_joint.assign(ints + i, ints + i + bodies); i += bodies;
@@ -43,14 +43,21 @@ bool Model::build(const int32_t *ints, uint32_t int_count, const double *reals, 
     joint_value_order.assign(ints + i, ints + i + joints); i += joints;
     frame_body.assign(ints + i, ints + i + frames); i += frames;
 
+    term_start.assign(ints + i, ints + i + joints + 1); i += joints + 1;
+    term_dof.assign(ints + i, ints + i + terms);
+    if (term_start.front() != 0 || term_start.back() != terms) return false;
+    for (int64_t j = 0; j < joints; ++j)
+        if (term_start[j] < 0 || term_start[j + 1] < term_start[j] || term_start[j + 1] > terms) return false;
+    for (int32_t dof : term_dof) if (dof < 0 || dof >= dofs) return false;
+
     for (int64_t b = 0; b < bodies; ++b) {
         if (body_parent_joint[b] != -1 && !joint_ok(body_parent_joint[b])) return false;
         if (!body_ok(body_order[b])) return false;
     }
     for (int64_t j = 0; j < joints; ++j) {
         if (joint_kind[j] < 0 || joint_kind[j] > 2 || !body_ok(joint_parent[j]) || !body_ok(joint_child[j]) ||
-            joint_dof[j] < -1 || joint_dof[j] >= dofs || (joint_kind[j] != 0 && joint_dof[j] < 0) ||
-            (joint_source[j] != -1 && !joint_ok(joint_source[j])) || !joint_ok(joint_order[j]) ||
+            joint_dof[j] < -1 || joint_dof[j] >= dofs || (joint_kind[j] != 0 && joint_dof[j] < 0 && joint_source[j] != -2) ||
+            (joint_source[j] < -2 || (joint_source[j] >= 0 && !joint_ok(joint_source[j]))) || !joint_ok(joint_order[j]) ||
             !joint_ok(joint_value_order[j]))
             return false;
     }
@@ -66,7 +73,9 @@ bool Model::build(const int32_t *ints, uint32_t int_count, const double *reals, 
         for (int k = 0; k < 3; ++k) axis[3 * j + k] = reals[r++];
         ratio[j] = reals[r++]; offset[j] = reals[r++]; scale[j] = reals[r++];
     }
-    frame_offset.assign(reals + r, reals + r + 7 * frames);
+    frame_offset.assign(reals + r, reals + r + 7 * frames); r += 7 * frames;
+    joint_constant.assign(reals + r, reals + r + joints); r += joints;
+    term_scale.assign(reals + r, reals + r + terms);
 
     // Movable joints from each body's root to the body, root first (bodies are in parent-first order).
     body_chain.assign(bodies, {});
@@ -87,6 +96,12 @@ void Model::evaluate(const double *q, const double *roots) {
     for (int32_t joint : joint_value_order) {
         const int32_t source = joint_source[joint];
         if (source >= 0) values[joint] = values[source] * ratio[joint] + offset[joint];
+        else if (source == -2) {
+            double sum = joint_constant[joint];
+            for (int32_t term = term_start[joint]; term < term_start[joint + 1]; ++term)
+                sum += term_scale[term] * q[term_dof[term]];
+            values[joint] = sum;
+        }
         else values[joint] = joint_dof[joint] < 0 ? 0.0 : q[joint_dof[joint]];
     }
     for (int32_t body : body_order) if (body_parent_joint[body] < 0) {
@@ -122,22 +137,24 @@ void Model::point_jacobian(uint32_t body, double px, double py, double pz, const
                            uint32_t width, double *out) const {
     for (uint32_t i = 0; i < 6 * width; ++i) out[i] = 0.0;
     for (int32_t joint : body_chain[body]) {
-        const int32_t column = column_of_dof[joint_dof[joint]];
-        if (column < 0) continue;
-        const double s = scale[joint];
-        const double ax = axes[3 * joint], ay = axes[3 * joint + 1], az = axes[3 * joint + 2];
-        if (joint_kind[joint] == 2) {
-            out[column] += s * ax;
-            out[width + column] += s * ay;
-            out[2 * width + column] += s * az;
-        } else {
-            const double rx = px - origins[3 * joint], ry = py - origins[3 * joint + 1], rz = pz - origins[3 * joint + 2];
-            out[column] += s * (ay * rz - az * ry);
-            out[width + column] += s * (az * rx - ax * rz);
-            out[2 * width + column] += s * (ax * ry - ay * rx);
-            out[3 * width + column] += s * ax;
-            out[4 * width + column] += s * ay;
-            out[5 * width + column] += s * az;
+        for (int32_t term = term_start[joint]; term < term_start[joint + 1]; ++term) {
+            const int32_t column = column_of_dof[term_dof[term]];
+            if (column < 0) continue;
+            const double s = term_scale[term];
+            const double ax = axes[3 * joint], ay = axes[3 * joint + 1], az = axes[3 * joint + 2];
+            if (joint_kind[joint] == 2) {
+                out[column] += s * ax;
+                out[width + column] += s * ay;
+                out[2 * width + column] += s * az;
+            } else {
+                const double rx = px - origins[3 * joint], ry = py - origins[3 * joint + 1], rz = pz - origins[3 * joint + 2];
+                out[column] += s * (ay * rz - az * ry);
+                out[width + column] += s * (az * rx - ax * rz);
+                out[2 * width + column] += s * (ax * ry - ay * rx);
+                out[3 * width + column] += s * ax;
+                out[4 * width + column] += s * ay;
+                out[5 * width + column] += s * az;
+            }
         }
     }
 }

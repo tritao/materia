@@ -1084,6 +1084,40 @@ class MachineAssemblyDescriptionTests {
 		if (definition.elasticNetworks == null || definition.elasticNetworks.length != 1 ||
 				definition.elasticNetworks[0].couplings.length != 1 || definition.elasticNetworks[0].spans.length != 2)
 			throw "A shaft belt must compile to one two-span network";
+		var contacts:Array<materia.assembly.AssemblyDefinition.AssemblyElasticClearance> = cast definition.elasticNetworks[0].clearances;
+		if (contacts.length != 2) throw "Both leader and follower belt contacts need tooth clearance";
+		assembly.addComponent("motor", NemaStepper.frame(23));
+		var driver = new machinekit.motion.MotorDriver("GENERIC-DM542", 2.8, 16, 24);
+		assembly.addComponent("amplifier", driver);
+		assembly.addMotor("motor-drive", "input", "motor", "amplifier");
+		if (assembly.check().hasErrors()) throw "Normal NEMA 23 usable torque must fit a 20-tooth GT2-6 belt";
+		var maximum = driver.rating.maximumVoltage;
+		driver.rating.maximumVoltage = 20;
+		var faults = assembly.check();
+		if (!faults.hasErrors()) throw "An overvoltage belt motor must report a design error";
+		var savedFault = assembly.describe();
+		driver.rating.maximumVoltage = maximum;
+		if (assembly.check().hasErrors()) throw "A repaired belt motor must clear its design error";
+		var family = driver.rating.family;
+		driver.rating.family = machinekit.motion.MotorDriver.MotorDriverFamily.Servo;
+		if (!assembly.check().hasErrors()) throw "A mismatched belt motor and driver must report a design error";
+		var mismatchedSaved = assembly.describe();
+		driver.rating.family = family;
+		assembly.addComponent("unrelatedMotor", NemaStepper.frame(17));
+		var unrelated = new machinekit.motion.MotorDriver("GENERIC-TMC2209", 1.0, 16, 24);
+		assembly.addComponent("unrelatedDriver", unrelated);
+		// An electrical fault outside this belt must not invalidate its elastic network.
+		assembly.addMemberConnector("base", "other", AssemblyFrames.translation(0, 100, 0));
+		assembly.addMateOnAxis("unrelated-turn", "continuous", "base", "other", "unrelatedMotor", "shaftAxis", {x: 0, y: 0, z: 1});
+		assembly.addMotor("unrelated-drive", "unrelated-turn", "unrelatedMotor", "unrelatedDriver");
+		var unrelatedMaximum = unrelated.rating.maximumVoltage;
+		unrelated.rating.maximumVoltage = 20;
+		var unrelatedCheck = assembly.check();
+		var unrelatedSaved = assembly.describe();
+		if (unrelatedSaved.mechanical.elasticNetworks == null || unrelatedSaved.mechanical.elasticNetworks.length != 1)
+			throw "An unrelated faulty motor must leave the belt network available";
+		unrelated.rating.maximumVoltage = unrelatedMaximum;
+
 		var paths = belt.freePaths(0, 1), radius = belt.wraps()[0].radius;
 		if (spring == null) throw "Belt reduction did not resolve its spring";
 		close(spring, 15000 * (1 / paths[0] + 1 / paths[1]) * radius * radius / 1000,
@@ -1106,6 +1140,12 @@ class MachineAssemblyDescriptionTests {
 		try TimingBelt.reduction(belt, new TimingPulley(HTD5M, 20, 8, 6), new TimingPulley(GT2, 40, 8, 6), 1)
 		catch (error:Dynamic) wrong = true;
 		if (!wrong) throw "Belt reduction accepted different tooth profiles";
+		assembly.addComponent("disconnected-terminal", new TestPowerPass());
+		assembly.connectPorts("disconnected-feed", "disconnected-terminal", "output", "amplifier", "power");
+		var missingSupply = [for (item in assembly.check().items)
+			if (item.code == "transmission.parts" && item.message.indexOf("not supplied") >= 0) item];
+		if (missingSupply.length != 1) throw "A disconnected belt supply must be a transmission design diagnostic";
+		var disconnectedSaved = assembly.describe();
 	}
 
 }
@@ -1122,4 +1162,16 @@ private class TestServo extends machinekit.component.MachineComponent implements
 			ratedTorque: 0.64, peakTorque: 1.9, ratedSpeed: 314, maxSpeed: 500, encoderCounts: 4096,
 			torqueSpeed: [0, 1.9, 314, 1.9, 500, 0.64]};
 
+}
+
+/** A disconnected feed-through models an electrical edit without inventing a supply voltage. */
+private class TestPowerPass extends machinekit.component.MachineComponent {
+	public function new() {
+		super("TEST-POWER-PASS", "electrical feed-through");
+		addPort({name: "input", kind: machinekit.component.PortKind.ElectricalPower,
+			role: machinekit.component.PortRole.Consumer, iface: Unspecified, required: true});
+		addPort({name: "output", kind: machinekit.component.PortKind.ElectricalPower,
+			role: machinekit.component.PortRole.Supply, iface: Unspecified, required: false});
+		addBridge("input", "output");
+	}
 }

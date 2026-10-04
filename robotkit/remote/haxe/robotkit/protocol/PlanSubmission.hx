@@ -26,6 +26,8 @@ class PlanSubmission {
   @:id(15) public var replaceAfterTimeNs:Int64;
   @:id(16) public var jerkUnchecked:Bool;
 
+  @:optional @:id(17) public var controlAcceleration:Null<Array<Float>>;
+
   public function new(?robotId:Int64, ?planId:Int64, ?modelRevision:Int64,
       ?calibrationRevision:Int64, ?requiredCapabilities:Int = 0,
       ?startPosition:Array<Float>, ?startVelocity:Array<Float>,
@@ -33,7 +35,7 @@ class PlanSubmission {
       ?velocityTolerances:Array<Float>, ?accelerationTolerances:Array<Float>,
       ?endsAtRest:Bool = true, ?segments:Array<PlanSegment>,
       ?replaceAfterPlanId:Int64, ?replaceAfterTimeNs:Int64,
-      ?jerkUnchecked:Bool = false) {
+      ?jerkUnchecked:Bool = false, ?controlAcceleration:Array<Float>) {
     this.robotId = robotId == null ? Int64.ofInt(0) : robotId;
     this.planId = planId == null ? Int64.ofInt(0) : planId;
     this.modelRevision = modelRevision == null ? Int64.ofInt(0) : modelRevision;
@@ -47,6 +49,7 @@ class PlanSubmission {
     this.accelerationTolerances = accelerationTolerances == null ? [] : accelerationTolerances;
     this.endsAtRest = endsAtRest;
     this.jerkUnchecked = jerkUnchecked;
+    this.controlAcceleration = controlAcceleration;
     this.segments = segments == null ? [] : segments;
     this.replaceAfterPlanId = replaceAfterPlanId == null ? Int64.ofInt(0) : replaceAfterPlanId;
     this.replaceAfterTimeNs = replaceAfterTimeNs == null ? Int64.ofInt(0) : replaceAfterTimeNs;
@@ -64,7 +67,7 @@ class PlanSubmission {
       plan.startAcceleration.toArray(), plan.positionTolerances.toArray(),
       plan.velocityTolerances.toArray(), plan.accelerationTolerances.toArray(),
       plan.endsAtRest, segments, plan.replaceAfterPlanId, plan.replaceAfterTimeNs,
-      plan.jerkUnchecked);
+      plan.jerkUnchecked, plan.statedControlAcceleration());
   }
 
   public function toWorld():ExecutionPlanSubmission {
@@ -91,6 +94,6 @@ class PlanSubmission {
       requiredCapabilities, startPosition, startVelocity, startAcceleration,
       converted, replaceAfterPlanId, replaceAfterTimeNs,
       positionTolerances, velocityTolerances, accelerationTolerances, endsAtRest,
-      null, jerkUnchecked);
+      null, jerkUnchecked, null, controlAcceleration);
   }
 }

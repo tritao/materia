@@ -33,6 +33,12 @@ import RobotKitRuntime;
  */
 class MotionSystem {
   public final robot:Robot;
+  /** Drive-check settings shared by immediate, queued, path and replacement motion. */
+  public var planCheck(get, set):Null<PlanCheck>;
+  public var planChecks(get, never):PlanCheckSummary;
+  function get_planCheck():Null<PlanCheck> return stream.planCheck;
+  function set_planCheck(value:Null<PlanCheck>):Null<PlanCheck> return stream.planCheck = value;
+  function get_planChecks():PlanCheckSummary return stream.planChecks;
   public final axes:Array<MotionAxis>;
   final axisPlanner:AxisPlanner;
   final pathPlanner:PathPlanner;
@@ -80,6 +86,7 @@ class MotionSystem {
     }
     this.robot = robot;
     stream = new TrajectoryStream(robot);
+    stream.planCheck = new PlanCheck(blueprint.model, [for (joint in blueprint.model.joints) joint.id]);
     this.modelRevision = Int64.ofInt(blueprint.runtime.revision);
     this.calibrationRevision = Int64.ofInt(blueprint.runtime.calibrationRevision);
     this.fixedTimestepSeconds = blueprint.fixedTimestepSeconds;
@@ -550,6 +557,13 @@ class MotionSystem {
 
   /** Starts executing `trajectoryValue` as a fresh, un-retimed plan. */
   function setActive(trajectoryValue:Trajectory):Void {
+    // Pre-timed/sample trajectories still belong to this machine's motion session.
+    if (trajectoryValue.controlAcceleration == null) {
+      var caps = [for (_ in trajectoryValue.evaluate(0.0).positions) 0.0];
+      for (axis in axes) for (index in 0...axis.jointIndices.length)
+        caps[axis.jointIndices[index]] = axis.maxAcceleration * Math.abs(axis.jointScale(index));
+      trajectoryValue.controlAcceleration = caps;
+    }
     activeTrajectory = trajectoryValue;
     var segments = trajectoryValue.segments();
     activeStationary = stationarySegments(segments);

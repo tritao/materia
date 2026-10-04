@@ -53,21 +53,22 @@ extern "C" {
  * the same model. Handles are process-local, generation-checked and never
  * zero.
  *
- * Packed model, format 1.
- *   ints:  [1, bodies, joints, dofs, frames,
+ * Packed model, format 2.
+ *   ints:  [2, bodies, joints, dofs, frames, terms,
  *           per body:  parent joint (-1 for a root),
  *           body order (bodies entries),
  *           per joint: kind (0 fixed, 1 revolute, 2 prismatic), parent body,
- *                      child body, DOF (-1 fixed), coupling source (-1 none),
+ *                      child body, DOF (-1 fixed), coupling source (-1 none, -2 sum),
  *           joint order (joints entries), joint value order (joints entries),
- *           per frame: body]
+ *           per frame: body,
+ *           CSR joint term starts (joints + 1), term DOFs (terms)]
  *   reals: [per body: root pose (7),
  *           per joint: parent_T_joint (7), joint_T_child (7), unit axis (3),
  *                      coupling ratio, coupling offset, Jacobian scale,
- *           per frame: body_T_frame (7)]
+ *           per frame: body_T_frame (7), joint constants (joints), term scales (terms)]
  */
 
-enum { KK_API_VERSION = 1, KK_MODEL_FORMAT = 1 };
+enum { KK_API_VERSION = 1, KK_MODEL_FORMAT = 2 };
 
 typedef int32_t kk_result;
 enum {

@@ -54,6 +54,63 @@ class CoreXyTests extends MotionKitTestSupport {
     return found;
   }
 
+  public function testBeltDisplay():Void {
+    var belt = machinekit.transmission.TimingBelt.twoPulley(machinekit.transmission.TimingBeltProfile.GT2, 20, 20, 100, 6);
+    var a = machinekit.transmission.TimingBeltMesh.build(belt, 0.0);
+    var b = machinekit.transmission.TimingBeltMesh.build(belt, belt.pitch * 0.25);
+    check(a.positions.length > 1000 && a.indices.length > 1000, "the display belt has a tooth mesh");
+    var different = a.positions.length != b.positions.length;
+    for (i in 0...Std.int(Math.min(a.positions.length, b.positions.length)))
+      if (Math.abs(a.positions[i] - b.positions[i]) > 1e-8) different = true;
+    check(different, "the driving pulley's material phase moves the tooth mesh");
+    var cycle = machinekit.transmission.TimingBeltMesh.build(belt, belt.pitch);
+    check(cycle.positions.length == a.positions.length, "one tooth pitch preserves mesh topology");
+    for (i in 0...a.positions.length) near(cycle.positions[i], a.positions[i], "one tooth pitch repeats the tooth profile", 1e-7);
+    for (value in a.normals) check(Math.isFinite(value), "belt display normals remain finite");
+    var scene = SceneArtifact.decode(CoreXyPlotterPreview.plotter());
+    var machine:materia.project.SceneArtifact.SceneArtifactMachineMotion = scene.machineMotion;
+    check(machine.belts.length == 2 && machine.belts[0].driverJoint == "pulleyA-turn",
+      "the artifact retains the physical wrap attachments and driving joint of both belts");
+    check(machine.program != null && machine.program.axes.join(",") == "x,y", "the plotter ships its independent-axis program");
+    var beltParts = [for (part in scene.parts) if (part.id == "beltA" || part.id == "beltB") part];
+    check(beltParts.length == 2 && beltParts[0].vertexCount > 1000, "the static preview draws belt teeth too");
+    machine.belts[0].wraps[0].connector = "missing-connector";
+    throws(() -> SceneArtifact.encode(scene), "moving belts reject a missing physical connector");
+  }
+
+  public function testMotorSpaceTiming():Void {
+    var motors = new motionkit.robot.MotorSpaceConstraints([[1.0, 1.0], [1.0, -1.0]], [1.0, 1.0]);
+    function move(goal:Array<Float>):Trajectory
+      return motors.move([0.0, 0.0], goal, [1.0, 1.0], [100.0, 100.0], [10000.0, 10000.0]);
+    var single = move([1.0, 0.0]), diagonal = move([1.0, 1.0]), opposite = move([1.0, -1.0]);
+    motors.validate(single); motors.validate(diagonal); motors.validate(opposite);
+    check(single.durationSeconds() < diagonal.durationSeconds() * 0.6,
+      "a single-axis move uses both motors' full speed rather than their diagonal box");
+    near(diagonal.durationSeconds(), opposite.durationSeconds(), "both diagonals obey the motor that carries their sum", 1e-8);
+    var peak = single.evaluate(single.durationSeconds() / 2.0).velocities[0];
+    near(peak, 1.0, "single-axis cruise reaches the full motor speed", 1e-8);
+    near(diagonal.evaluate(diagonal.durationSeconds() / 2.0).velocities[0], 0.5,
+      "diagonal cruise divides the moving motor's speed between the two axes", 1e-8);
+    function time(goal:Array<Float>):motionkit.planner.TimedPath {
+      var zero = [0.0, 0.0];
+      var path = new motionkit.planner.JointPathSamples([0.0, 1.0], [zero, goal], [goal, goal], [zero, zero]);
+      return motors.time(new motionkit.planner.ToppraPathTiming(), path,
+        new motionkit.planner.PathTimingLimits([1.0, 1.0], [100.0, 100.0]));
+    }
+    var timedSingle = time([1.0, 0.0]), timedDiagonal = time([1.0, 1.0]);
+    motors.validate(timedSingle.trajectory); motors.validate(timedDiagonal.trajectory);
+    check(timedSingle.trajectory.jointCount() == 2, "motor timing returns only the authored axes");
+    check(timedSingle.trajectory.durationSeconds() < timedDiagonal.trajectory.durationSeconds() * 0.6,
+      "Cartesian path timing also uses direction-dependent motor speed limits");
+    near(timedSingle.distanceToTime(1.0), timedSingle.trajectory.durationSeconds(), "motor timing preserves its distance map", 1e-8);
+    var tooFast = Trajectory.fromPositionSamples([0.0, 1.0], [[0.0, 0.0], [1.0, 1.0]]);
+    var rejected = false;
+    try motors.validate(tooFast) catch (_:Dynamic) rejected = true;
+    check(rejected, "a lowered path exceeding a motor's sum is rejected");
+    for (trajectory in [single, diagonal, opposite, tooFast, timedSingle.trajectory, timedDiagonal.trajectory]) trajectory.dispose();
+    timedSingle.releaseDistanceMap(); timedDiagonal.releaseDistanceMap();
+  }
+
   public function testTwoBeltCompliance():Void {
     var model = new RobotModel("two-belts");
     var base = model.addLink(new Link("base"));
@@ -96,10 +153,23 @@ class CoreXyTests extends MotionKitTestSupport {
   }
 
   public function testPlotterDrawsASquare():Void {
+    plotterTrial(false);
+    plotterTrial(true);
+  }
+
+  function plotterTrial(virtual:Bool):Void {
     var scene = SceneArtifact.decode(CoreXyPlotterPreview.plotter());
     var model = AssemblySimulationBridge.toRobotModel(scene.assemblyDefinition, AssemblyPhysicalPartView.fromSceneArtifact(scene),
       scene.assemblyState).model;
     var steady = new PlanCheckOptions().steady;
+    var device:Null<robotkit.runtime.VirtualDeviceOptions> = null;
+    if (virtual) {
+      var binding = robotkit.device.DeviceBinding.bind(model, robotkit.device.DeviceLayout.forActuators(model), 40000);
+      model = binding.model;
+      device = new robotkit.runtime.VirtualDeviceOptions();
+      device.actuators = binding.virtualActuators();
+    }
+    model.materializeLimits(true);
     var runtimeBlueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile(), 1);
     var index = new Map<String, Int>();
     for (joint in 0...model.joints.length) index.set(model.joints[joint].id, joint);
@@ -114,7 +184,7 @@ class CoreXyTests extends MotionKitTestSupport {
       var source = model.joints[slot(index, id)];
       var joint = planning.addJoint(new Joint(id, source.type, parent, child, source.id));
       joint.axis = source.axis.copy();
-      joint.limits = model.coupledLimits(id, steady);
+      joint.limits = model.coupledLimits(id, steady, true);
       driven.push(slot(index, id));
       parent = child;
     }
@@ -134,18 +204,20 @@ class CoreXyTests extends MotionKitTestSupport {
     }
     var ids = ["x", "y"];
     var compiler = new ProgramCompiler(new CartesianSolver(), limits, "work", [for (limit in velocities) limit * 0.95], [for (limit in accelerations) limit * 0.95],
-      [for (limit in accelerations) limit * 20.0], StartTolerances.uniform(2, 1e-5, 0.02, 0.02));
+      [for (limit in accelerations) limit * 20.0], StartTolerances.uniform(2, virtual ? 2.5e-5 : 1e-5, 0.02, 0.02));
     var options = new PlanCheckOptions();
     options.steady = steady;
     compiler.planCheck = new PlanCheck(model, ids, options);
+    compiler.motorSpace = motionkit.robot.MotorSpaceConstraints.of(model, ids, 0.95);
     // A 30 mm square, then its diagonal both ways.
     var corners = [[0.03, 0.0], [0.03, 0.03], [0.0, 0.03], [0.0, 0.0], [0.03, 0.03], [0.0, 0.0]];
     var program = new MotionProgram([for (corner in corners)
       MotionOp.MoveJ(MoveTarget.JointTarget(corner), new MotionOptions(), Blend.ExactStop)]);
     var harness = new SimulationHarness(0.01);
-    var runtime = harness.simulation.addRobot(runtimeBlueprint);
+    var runtime = harness.simulation.addRobot(runtimeBlueprint, null, device);
+    if (virtual) for (tick in 0...100) harness.step(Int64.ofInt(tick));
     var robot = new SimulatedRobot("plotter", runtime, model.name, [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
-    var motion = new ManipulatorMotion(robot, compiler, function(_) return null, function() return {events: [], overflow: false}, driven);
+    var motion = new ManipulatorMotion(robot, compiler, function(_) return null, function() return {events: [], overflow: false}, driven, virtual ? [2.5e-5, 2.5e-5] : null);
     motion.run(program);
     var tick = 0, guard = 0;
     var peak = 0.0, worstSum = 0.0, worstDiagonal = 0.0;
@@ -173,19 +245,19 @@ class CoreXyTests extends MotionKitTestSupport {
       var da = a - previous[0], db = b - previous[1], dx = x - previous[2], dy = y - previous[3];
       motorSpeed[0] = Math.max(motorSpeed[0], Math.abs(da) / 0.01);
       motorSpeed[1] = Math.max(motorSpeed[1], Math.abs(db) / 0.01);
-      if (Math.abs(dy) < 1e-9 && Math.abs(dx) > 1e-5 && Math.abs(da - db) < 1e-6) alike++;
-      if (Math.abs(dx) < 1e-9 && Math.abs(dy) > 1e-5 && Math.abs(da + db) < 1e-6) opposite++;
+      if (Math.abs(dy) < (virtual ? 2.5e-5 : 1e-9) && Math.abs(dx) > 1e-5 && Math.abs(da - db) < (virtual ? 0.004 : 1e-6)) alike++;
+      if (Math.abs(dx) < (virtual ? 2.5e-5 : 1e-9) && Math.abs(dy) > 1e-5 && Math.abs(da + db) < (virtual ? 0.004 : 1e-6)) opposite++;
       previous = [a, b, x, y];
     }
     var finished = robot.snapshot();
     var endX = finished.positions.get(slot(index, "x")), endY = finished.positions.get(slot(index, "y"));
-    check(motion.completed, 'the program completes (${motion.failure})');
+    check(motion.completed, 'the program completes (${motion.failure}, safety=${finished.safety}, active=${finished.trajectoryActive}, queue=${finished.trajectoryQueueDepth}, end=$endX,$endY, tick=$tick)');
     check([for (finding in motion.checks.diagnostics) if (finding.kind != motionkit.trajectory.PlanDiagnostic.PlanDiagnosticKind.Accuracy) finding].length == 0, 'a program at 95% of the axes\' limits asks no motor for more than it gives: ${[for (d in motion.checks.diagnostics) d.toString()]}');
-    near(endX, 0.0, "the square ends where it began, x", 1e-6);
-    near(endY, 0.0, "the square ends where it began, y", 1e-6);
+    near(endX, 0.0, "the square ends where it began, x", virtual ? 2.5e-5 : 1e-6);
+    near(endY, 0.0, "the square ends where it began, y", virtual ? 2.5e-5 : 1e-6);
     check(worstSum < 1e-9, 'every pulley is the sum of its couplings\' terms all along: $worstSum');
     check(worstDiagonal < 1e-9, 'and the motors are (x - y) / R and (x + y) / R: $worstDiagonal');
-    near(peak, 0.06 / radius, "the motors turn furthest at the far corner, both axes at 30 mm: 60 mm of belt", 1e-6);
+    near(peak, 0.06 / radius, "the motors turn furthest at the far corner, both axes at 30 mm: 60 mm of belt", virtual ? 0.004 : 1e-6);
     check(alike > 10 && opposite > 10, 'x alone turns both motors alike ($alike ticks) and y alone against each other ($opposite)');
     // The axes' speed limit is the motors': both turning at their top speed along an axis.
     check(motorSpeed[0] < 204.0 && motorSpeed[1] < 204.0, 'motors stay under their 204 rad/s: ${motorSpeed}');

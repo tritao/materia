@@ -25,6 +25,7 @@ pub struct VirtualDevice {
     steps: StepGenerator<ACTUATORS>,
     controller: [u8; 16],
     count: usize,
+    active_count: usize,
     session: u64,
     channel_kind: [u8; CHANNELS],
     step_tick_hz: u32,
@@ -69,6 +70,7 @@ impl VirtualDevice {
             final_safe_applied: false,
             controller,
             count,
+            active_count: 0,
             session: 0,
             channel_kind: [0; CHANNELS],
             step_tick_hz,
@@ -170,22 +172,23 @@ impl VirtualDevice {
                 };
                 if self.valid_weld_channels(&begin)
                     && controller_matches(&begin.expected_controller, &self.controller)
-                    && begin.actuator_count as usize == self.count
+                    && begin.actuator_count > 0
+                    && begin.actuator_count as usize <= self.count
                     && begin.step_tick_hz == self.step_tick_hz
                     && begin.session != 0
-                    && (0..self.count).all(|i| {
+                    && (0..begin.actuator_count as usize).all(|i| {
                         let physical = self.board.steps_per_unit()[i];
                         ((begin.steps_per_unit[i] as f64 - physical) / physical).abs() < 1e-6
                     })
                 {
                     let mut limits = [1.0f32; ACTUATORS];
-                    for (i, limit) in limits.iter_mut().enumerate().take(self.count) {
+                    for (i, limit) in limits.iter_mut().enumerate().take(begin.actuator_count as usize) {
                         *limit = begin.actuator_max_acceleration[i];
                     }
                     let mut steps_per_unit = [1.0; ACTUATORS];
                     let mut max_rate = [0.0; ACTUATORS];
                     let mut setup = [0; ACTUATORS];
-                    for i in 0..self.count {
+                    for i in 0..begin.actuator_count as usize {
                         steps_per_unit[i] = begin.steps_per_unit[i] as f64;
                         max_rate[i] = begin.max_rate[i] as f64;
                         setup[i] = begin.direction_setup_ticks[i] as u64;
@@ -194,8 +197,8 @@ impl VirtualDevice {
                         steps_per_unit, setup, max_rate, self.board.tick_hz()) else {
                         return false;
                     };
-                    for i in 0..self.count {
-                        for j in i + 1..self.count {
+                    for i in 0..begin.actuator_count as usize {
+                        for j in i + 1..begin.actuator_count as usize {
                             if begin.actuator_joint[i] == begin.actuator_joint[j] {
                                 let bound = begin.dual_drive_skew_bound[i]
                                     .max(begin.dual_drive_skew_bound[j]) as f64;
@@ -226,11 +229,13 @@ impl VirtualDevice {
                     self.core = Some(core);
                     self.events = Some(DeviceEvents::new(&begin));
                     self.final_safe_applied = false;
+                    self.active_count = begin.actuator_count as usize;
                     self.session = begin.session;
                     // The count starts after the frame that begins the session, as the host's does.
                     self.received_bytes = 0;
                     self.channel_kind = begin.channel_kind;
                     ack.status = 1;
+                    ack.actuator_count = begin.actuator_count;
                 }
                 let mut bytes = [0; SessionAck6::SIZE];
                 ack.encode(&mut bytes).unwrap();
@@ -256,7 +261,7 @@ impl VirtualDevice {
                 let Ok(begin) = QueueBegin6::decode(payload) else {
                     return false;
                 };
-                if begin.actuator_count as usize != self.count {
+                if begin.actuator_count as usize != self.active_count {
                     return false;
                 }
                 let result = self.core
@@ -276,14 +281,14 @@ impl VirtualDevice {
                 let Ok(header) = Segment6Header::decode(&payload[..Segment6Header::SIZE]) else {
                     return false;
                 };
-                if header.actuator_count as usize != self.count
+                if header.actuator_count as usize != self.active_count
                     || (self.profile == 2 && (header.degree > 1 ||
                         self.core.as_ref().unwrap().remaining_capacity() <= CAPACITY - MINIMAL_CAPACITY))
                 {
                     return false;
                 }
                 let mut coefficients = [[0.0f32; 6]; ACTUATORS];
-                for (i, slot) in coefficients.iter_mut().enumerate().take(self.count) {
+                for (i, slot) in coefficients.iter_mut().enumerate().take(self.active_count) {
                     let start = Segment6Header::SIZE + i * Segment6Coefficients::SIZE;
                     let Ok(row) = Segment6Coefficients::decode(
                         &payload[start..start + Segment6Coefficients::SIZE],
@@ -383,7 +388,7 @@ impl VirtualDevice {
                     self.events.as_mut().unwrap().tick(core.path_clock(), &mut self.board);
                 }
                 let targets = self.board.position_targets();
-                if self.profile == 1 && self.steps.tick(&mut self.board, targets).is_err() {
+                if self.profile == 1 && self.steps.tick_active(&mut self.board, targets, self.active_count).is_err() {
                     core.stop(StopReason::DualDriveSkew);
                 }
             }
@@ -435,7 +440,7 @@ impl VirtualDevice {
             accepted_sequence: 0,
             safety: if core.stop_reason().is_some() { 3 } else { 0 },
             fault,
-            actuator_count: self.count as u8,
+            actuator_count: self.active_count as u8,
             reserved: 0,
             path_clock_ticks: core.path_clock(),
         };
@@ -443,9 +448,9 @@ impl VirtualDevice {
         let targets = self.board.position_targets();
         let velocity = core.velocities();
         let counts = self.board.step_counts();
-        let mut body = vec![0; State6Header::SIZE + self.count * ActuatorState6::SIZE];
+        let mut body = vec![0; State6Header::SIZE + self.active_count * ActuatorState6::SIZE];
         header.encode(&mut body[..State6Header::SIZE]).unwrap();
-        for i in 0..self.count {
+        for i in 0..self.active_count {
             let row = ActuatorState6 {
                 position: if self.profile == 2 { targets[i] } else { positions[i] as f32 },
                 velocity: velocity[i],
@@ -723,7 +728,8 @@ mod tests {
         let mut scale = [1.0; ACTUATORS];
         scale[0] = 1_000.0;
         let mut device =
-            VirtualDevice::new(1_000_000, 40_000, 50_000, 0, 1, scale, controller, 1).unwrap();
+            VirtualDevice::new(1_000_000, 40_000, 50_000, 0, 3, scale, controller, 1).unwrap();
+        device.board.step_pulse(1, true); // An unused output need not already be at zero.
         let begin = SessionBegin6 {
             session: 9,
             protocol_version: PROTOCOL_VERSION,
@@ -744,7 +750,11 @@ mod tests {
         let mut session = vec![0; SessionBegin6::SIZE];
         begin.encode(&mut session).unwrap();
         assert!(send::<SessionBegin6>(&mut device, 1, &session));
-        assert_eq!(decode_frame6(device.outbox.front().unwrap()).unwrap().0, 2);
+        let (_, payload) = decode_frame6(device.outbox.front().unwrap()).unwrap();
+        let ack = SessionAck6::decode(payload).unwrap();
+        assert_eq!(ack.status, 1);
+        assert_eq!(ack.actuator_count, 1);
+        assert_eq!(device.active_count, 1);
         let queue = QueueBegin6 {
             queue_revision: 1,
             replace_after_ticks: 50_000,
@@ -793,6 +803,7 @@ mod tests {
             device.core.as_ref().unwrap().path_clock()
         );
         assert!(!device.core.as_ref().unwrap().underflow());
+        assert_eq!(device.board.step_counts()[1..3], [1, 0]);
     }
 
     fn begin_for(expected: [u8; 16]) -> SessionBegin6 {
@@ -946,6 +957,18 @@ mod tests {
             let start = Sensor6Header::SIZE + i * Sensor6Value::SIZE;
             assert_eq!(Sensor6Value::decode(&body[start..start + Sensor6Value::SIZE]).unwrap().value, *expected);
         }
+    }
+
+    #[test]
+    fn rejects_more_actuators_than_the_board_has() {
+        let controller = [7; 16];
+        let mut device = VirtualDevice::new(1_000_000, 40_000, 0, 0, 2,
+            [1_000.0; ACTUATORS], controller, 1).unwrap();
+        let mut begin = begin_for(controller);
+        begin.actuator_count = 3;
+        assert_eq!(ack_to(&mut device, &begin).0.status, 0);
+        assert_eq!(device.active_count, 0);
+        assert!(device.core.is_none());
     }
 
 }
