@@ -558,8 +558,8 @@ G0 → G1 → G2 → G3 ──────────────────�
 | G4 | R0–R6/W4/W5 gates passed; X9e implemented, final gate stopped at user request | `05271b08d`, `bd2ccec83`, `0ec408c0d`; `c75e5d1a3`; source boundaries `bce647683`, `af673c4f4`, `757127cf0`, `b25366059` |
 | G5 | complete; full gate passed | `13e993340`; shared axis builder and physical rack regression |
 | G6 | implemented; build/runtime validation deferred at user request | `d11e4dacb` |
-| G7 | implemented; build/runtime validation deferred at user request | see G7 implementation commit |
-| G8 | planned | — |
+| G7 | implemented; build/runtime validation deferred at user request | `11e9bc82b` |
+| G8 | in progress; leader mapping implemented, tolerance propagation pending | — |
 | G9 | planned | — |
 | G10 | planned | — |
 | G11 | planned | — |
@@ -1099,3 +1099,18 @@ other contacts exceeding 0.5 mm fail. It prints the actual cycle time and
 allocation rate when run. These results, the low-rank IK path, and source
 compilation remain unverified because the user stopped testing. No measured
 cycle time or passing clearance result is claimed.
+
+### G8 — leader-based device grouping in progress
+
+RKD6 already groups actuators by `actuator_joint`. Resolve one-leader chains
+on the host and send the independent leader with the fully composed signed
+ratio and offset, including the wiring direction. A multiple-input coupling
+(such as a CoreXY shaft) keeps its original shaft coordinate, so the native
+compiler still evaluates the coupling sum and cannot form a false skew group.
+No protocol field or version change is required for this mapping decision.
+
+The existing step generator converts actual pulse counts through steps per
+actuator unit and the signed actuator ratio before comparing skew in leader
+units. G8 still needs stated racking tolerance propagation, explicit bound
+units, dual-Y and single-X regressions, and the native/firmware implementation
+review. All builds and test runs remain deferred at the user's request.

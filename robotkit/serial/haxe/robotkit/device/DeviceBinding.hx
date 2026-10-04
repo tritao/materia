@@ -79,18 +79,10 @@ class DeviceBinding {
         throw 'Device layout channel $position names actuator "$name", which the model does not have';
       if (actuator.fullStepsPerRevolution <= 0.0)
         throw 'Actuator "$name" on channel $position is not a stepper: the model gives it no full steps per revolution';
-      var jointId:String;
-      var ratio:Float;
-      var offset:Float;
-      switch actuator.transmission {
-        case SimpleTransmission(target, transmissionRatio, transmissionOffset):
-          jointId = target;
-          ratio = transmissionRatio;
-          offset = transmissionOffset;
-      }
-      var jointIndex = -1;
-      for (index in 0...robot.joints.length) if (robot.joints[index].id == jointId) jointIndex = index;
-      if (jointIndex < 0) throw 'Actuator "$name" drives joint "$jointId", which the model does not have';
+      var mapping = DeviceTransmission.of(robot, actuator);
+      var jointIndex = mapping.jointIndex;
+      var ratio = mapping.ratio;
+      var offset = mapping.offset;
       var setting = actuator.microsteps, driverRate = actuator.maxStepRate;
       if (setting == null || driverRate == null)
         throw 'Stepper actuator "$name" requires microsteps and a driver step-rate ceiling';
@@ -99,7 +91,7 @@ class DeviceBinding {
       var ceiling = pulseRate / stepsPerUnit;
       var motorRate = actuator.planningRate();
       var rate = motorRate == null ? ceiling : Math.min(motorRate, ceiling);
-      bound.push(new BoundChannel(position, name, jointIndex, ratio * channel.direction, offset,
+      bound.push(new BoundChannel(position, name, jointIndex, ratio * channel.direction, offset * channel.direction,
         stepsPerUnit, rate, channel.directionSetupTicks, channel.skewBound));
       var capped = find(tightened, name);
       if (capped != null) {
