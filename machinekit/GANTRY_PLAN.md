@@ -1249,3 +1249,28 @@ errors with the `assembly.switch-geometry` diagnostic.
 Gantry switch mounting/trigger parts, placement and simulation observer
 installation remain pending. No builds or tests ran; the geometry projection,
 round-trip paths and end-stop checks are unverified at runtime.
+
+
+### G10 — gantry home and limit switch placement
+
+Place generic M8 inductive home switches on X/Z and independently on each
+Y side when dual Y is selected. Each track also has negative/positive limit
+switches. Steel trigger plates attach to the moving carriage/beam foot and
+extend 3 mm beyond its longitudinal edges; their transverse extension carries
+the sensing track outboard of the carriage. Fixed mounting blocks connect
+each sensor's rear mount to the actual supporting beam/frame/column. Supports
+at frame ends stop at the frame face rather than extending into carriage
+travel. All these mounts and triggers are stated geometric design assumptions.
+
+Home sensing planes sit one quarter of the derived guide overtravel beyond
+the negative soft limit; limit sensing planes sit three quarters beyond each
+soft limit. These are placement fractions, not copied trip coordinates:
+MachineAssembly derives each trip again from the sensor gap connector and
+trigger edge. Registration checks the repeatability band fits before the end
+stop. Opposite Y home switches have distinct IDs and deterministic seeds.
+Single Y omits the right-side track.
+
+No GPIO assignments or verified electrical operation are claimed. Mounted
+sensor retention, actual corner clearances, sensor trip outcomes and geometry
+compilation remain unverified. Simulation observer installation and G10 checks
+remain pending; no build or test was run.

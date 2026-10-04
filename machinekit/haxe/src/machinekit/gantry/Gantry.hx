@@ -120,6 +120,67 @@ class Gantry extends AxisBuilder {
 		buildDrive(axes[0], spec.driveX, "X", "beam", "xCarriage", [0.0, 70, xPlateZ + 6], alongX);
 		buildDrive(axes[2], spec.driveZ, "Z", "zColumn", "zCarriage",
 			[70.0, zPlateY, xPlateZ - railMargin - 40], [0.0, 0, -1]);
+		buildSwitches(axes[1], "YLeft", "frameLeft", "beamFootLeft", 0, -1, alongY);
+		if (spec.dualY) buildSwitches(axes[1], "YRight", "frameRight", "beamFootRight", 0, 1, alongY);
+		buildSwitches(axes[0], "X", "beam", "xCarriage", 1, 1, alongX);
+		buildSwitches(axes[2], "Z", "zColumn", "zCarriage", 0, 1, [0.0, 0, -1]);
+	}
+
+	/** Outboard steel trigger and switches carried by the actual guide's fixed structure. */
+	function buildSwitches(axis:AxisSpec, suffix:String, fixed:String, moving:String,
+			outboardAxis:Int, sign:Int, direction:Array<Float>):Void {
+		var bounds = mountBounds(component(moving), zeroPose(moving));
+		var point = [for (i in 0...3) (bounds.min[i] + bounds.max[i]) / 2];
+		point[outboardAxis] = (sign < 0 ? bounds.min[outboardAxis] : bounds.max[outboardAxis]) + sign * 18;
+		var dimensions = [10.0, 10.0, 6.0];
+		dimensions[outboardAxis] = 40;
+		for (i in 0...3) if (Math.abs(direction[i]) > 0.5)
+			dimensions[i] = bounds.max[i] - bounds.min[i] + 6;
+		var target = new GantryPlate("switch trigger", dimensions[0], dimensions[1], dimensions[2]);
+		target.setMaterial("steel");
+		var trigger = "switchTrigger" + suffix;
+		attach(trigger, target, AssemblyFrames.translation(point[0], point[1], point[2] - dimensions[2] / 2), moving);
+		var half = 0.0;
+		for (i in 0...3) half += Math.abs(direction[i]) * dimensions[i] / 2;
+		for (side in [-1, 1]) {
+			var name = side < 0 ? "negative" : "positive";
+			var contact = [for (i in 0...3) point[i] + direction[i] * side * half];
+			addMemberConnector(trigger, name, AssemblyFrames.translation(
+				contact[0] - point[0], contact[1] - point[1], contact[2] - point[2] + dimensions[2] / 2));
+		}
+		var room = axisOvertravel(axis.id);
+		if (room <= 1) throw "Gantry switches need more than 1 mm of guide overtravel";
+		for (kind in ["home", "negativeLimit", "positiveLimit"]) {
+			var side = kind == "positiveLimit" ? 1 : -1;
+			var travel = (side < 0 ? axis.lower : axis.upper) + side * room * (kind == "home" ? 0.25 : 0.75);
+			var id = "switch" + suffix + kind;
+			var sensor = new machinekit.motion.ProximitySwitch();
+			var normal = [for (value in direction) -side * value];
+			var face = [for (i in 0...3) point[i] + direction[i] * (travel + side * half)];
+			var origin = [for (i in 0...3) face[i] - normal[i] * (sensor.spec.length + sensor.spec.sensingDistance)];
+			var transverse = outboardAxis == 0 ? [1.0, 0, 0] : [0.0, 1, 0];
+			var pose = AxisBuilder.orient(origin[0], origin[1], origin[2], transverse, normal);
+			// A supported mounting block extends from the fixed member to the sensor's rear mount.
+			var host = mountBounds(component(fixed), zeroPose(fixed));
+			var lo:Array<Float> = [], hi:Array<Float> = [];
+			for (i in 0...3) {
+				var anchor = Math.max(host.min[i], Math.min(host.max[i], origin[i]));
+				var lower = Math.min(anchor, origin[i]) - 3, upper = Math.max(anchor, origin[i]) + 3;
+				// At a frame end, stop the support at its face rather than projecting
+				// material into the carriage's end-of-travel envelope.
+				if (Math.abs(direction[i]) > 0.5) {
+					if (origin[i] < host.min[i]) upper = host.min[i];
+					if (origin[i] > host.max[i]) lower = host.max[i];
+				}
+				lo.push(lower); hi.push(upper);
+			}
+			var mount = id + "Mount";
+			attach(mount, new GantryPlate("switch mount", hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]),
+				AssemblyFrames.translation((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2]), fixed);
+			attach(id, sensor, pose, mount);
+			addSwitch(id, axis.id, id, {instanceId: trigger, connectorName: side < 0 ? "negative" : "positive"},
+				side, kind == "home" ? "home" : "limit", suffix == "YRight" ? 2 : 1);
+		}
 	}
 
 	function addDriver(motorId:String):String {
