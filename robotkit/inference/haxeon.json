@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "package": {
+    "name": "robotkit-inference"
+  },
+  "sourceRoots": [
+    "haxe"
+  ],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "robotkit-core": {
+      "path": "../core"
+    },
+    "robotkit-autonomy": {
+      "path": "../autonomy"
+    },
+    "robotkit-sim": {
+      "path": "../sim"
+    },
+    "robotkit-remote": {
+      "path": "../remote"
+    }
+  },
+  "target": "host",
+  "ffi": {
+    "interfaces": [
+      "bindings/robotkit-inference.hxi"
+    ],
+    "projections": [
+      "bindings/robotkit-inference.hxmap"
+    ]
+  }
+}

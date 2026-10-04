@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.21)
+project(robotkit_core_package_consumer LANGUAGES C CXX)
+set(RK_BUILD_SIMKIT OFF CACHE BOOL "Core consumer has no simulation" FORCE)
+set(RK_BUILD_POLICY OFF CACHE BOOL "Core consumer has no policy runtime" FORCE)
+set(RK_BUILD_INFERENCE OFF CACHE BOOL "Core consumer has no image inference" FORCE)
+set(RK_BUILD_VISIONKIT OFF CACHE BOOL "Core consumer has no vision stack" FORCE)
+set(RK_BUILD_TESTS OFF CACHE BOOL "Build only this consumer" FORCE)
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../.." robotkit)

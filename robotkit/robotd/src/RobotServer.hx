@@ -115,6 +115,7 @@ class RobotServer {
     this.robotId = robotId;
     this.bulkBudgetBytes = bulkBudgetBytes;
     this.fixtureTick = fixtureTick;
+    robotkit.inference.ObjectDetectorPipeline.install();
     var pipelines:Array<robotkit.perception.PerceptionPipeline> = [];
     if (perceptionConfigs != null) for (config in perceptionConfigs) if (config.host == "robotd") {
       pipelines.push(PerceptionPipelineRegistry.create(config, "robotd/" + config.id));

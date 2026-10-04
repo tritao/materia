@@ -9,7 +9,7 @@ import robotkit.model.Frame;
 import robotkit.model.Link;
 import robotkit.model.RobotModel;
 import robotkit.model.Sensor;
-import robotkit.perception.ObjectDetectorPipeline;
+import robotkit.inference.ObjectDetectorPipeline;
 import robotkit.perception.PerceptionHost;
 import sys.io.File;
 

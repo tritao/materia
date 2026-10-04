@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "package": {
+    "name": "robotkit-autonomy"
+  },
+  "sourceRoots": [
+    "haxe"
+  ],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "robotkit-core": {
+      "path": "../core"
+    },
+    "robotkit-serial": {
+      "path": "../serial"
+    },
+    "robotkit-remote": {
+      "path": "../remote"
+    },
+    "kinematicskit": {
+      "path": "../../kinematicskit"
+    },
+    "visionkit": {
+      "path": "../../visionkit"
+    }
+  },
+  "target": "host"
+}

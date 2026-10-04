@@ -19,6 +19,9 @@
     },
     "processkit": {
       "path": "../../../processkit"
+    },
+    "robotkit-inference": {
+      "path": "../../inference"
     }
   },
   "native": {

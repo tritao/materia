@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "package": {
+    "name": "robotkit-core-tests"
+  },
+  "entry": "CorePackageTests",
+  "sourceRoots": [
+    "src"
+  ],
+  "dependencies": {
+    "robotkit-core": {
+      "path": ".."
+    }
+  },
+  "native": {
+    "cmake": {
+      "source": "native",
+      "target": "robotkit_runtime",
+      "library": "robotkit_runtime",
+      "inputs": [
+        "../../CMakeLists.txt",
+        "../../runtime/CMakeLists.txt",
+        "../../runtime/include/robotkit_runtime.h",
+        "native/CMakeLists.txt"
+      ]
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
+}
