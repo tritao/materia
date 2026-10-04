@@ -39,6 +39,10 @@ int32_t rkd_virtual_configure_welder(rkd_virtual_device *device, uint8_t sensor_
     uint32_t arc_channel, uint32_t wire_channel, uint32_t voltage_channel,
     double ignition_seconds, double no_arc_seconds, float efficiency);
 int32_t rkd_virtual_set_welder_grounded(rkd_virtual_device *device, uint8_t grounded);
+/** Configure a physical switch before session setup; returns zero for invalid/minimal devices. */
+int32_t rkd_virtual_configure_switch(rkd_virtual_device *device, uint32_t channel,
+    uint32_t actuator, int64_t threshold_steps, uint8_t active_above, uint8_t active_high);
+
 void rkd_virtual_destroy(rkd_virtual_device *device);
 int32_t rkd_virtual_step(rkd_virtual_device *device, uint64_t host_ns);
 int32_t rkd_virtual_link_host_to_device(rkd_virtual_device *device,

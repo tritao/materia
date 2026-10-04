@@ -8,6 +8,12 @@
 
 namespace robotkit {
 
+struct VirtualInputSwitch6 {
+    DeviceInput6 wiring;
+    std::int64_t threshold_steps = 0;
+    bool active_above = false;
+};
+
 /** Deterministic in-process RKD6 link and board configuration. */
 struct VirtualDeviceConfig6 {
     /** Optional board-defined peripheral profile; the host does not interpret its parameters. */
@@ -30,6 +36,7 @@ struct VirtualDeviceConfig6 {
         'D', 'e', 'v', 'i', 'c', 'e', '-', '1'};
     std::vector<double> steps_per_unit;
     std::vector<DeviceActuator6> actuators;
+    std::vector<VirtualInputSwitch6> inputs;
     double target_error = 1e-5;
     std::uint64_t clock_bound_ns = 500'000;
     std::uint64_t link_loss_timeout_ns = 500'000'000;
@@ -59,6 +66,9 @@ public:
     rk_result apply(const rk_robot_command &command) override;
     rk_result sample(std::uint64_t timestamp_ns, rk_robot_state &state) override;
     bool ready_for_plans() const noexcept;
+    rk_result device_input(const char *id, rk_device_input_observation &out) const override {
+        return inner_->device_input(id, out);
+    }
     bool reports_safety_state() const noexcept override { return true; }
     double observed_position_precision() const noexcept override {
         return inner_->observed_position_precision();

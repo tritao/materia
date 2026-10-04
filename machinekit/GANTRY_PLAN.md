@@ -2593,3 +2593,19 @@ No builds/tests ran; the Phase C gate must verify FFI calls and pinned-compiler
 compatibility. Virtual-device wrapping/configuration, physical side hold/counter
 rebasing, homing-purpose transport, GPIO and the virtual-router homing fixture
 remain G13 work. Device homing is not yet complete.
+
+### G13 — configure physical switches on the virtual endpoint
+
+The virtual-device C ABI can install switch thresholds and polarity before a
+session opens, rejecting invalid indices/booleans, reconfiguration after setup,
+and the minimal profile (which produces no physical steps). VirtualDeviceConfig6
+now carries input wiring and actual-step thresholds. Its link configures those
+switches before handshake, passes the wiring into the RKD6 session and forwards
+copied runtime input observations through the virtual endpoint wrapper.
+
+A native virtual-endpoint regression now runs a moving axis through an active-low
+switch, checks closure count, retained captured steps and converted SI position,
+and verifies that the final physical position moved beyond the captured edge.
+It is queued for the Phase C gate; no build/test ran here. Haxe simulation input
+options and model-to-threshold mapping remain pending, as do homing-purpose,
+side holds, counter rebasing and squaring transport. G13 is not complete.

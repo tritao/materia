@@ -103,6 +103,17 @@ RunResult run(VirtualDeviceConfig6 config, bool cut = false, bool replace = fals
     const auto positions = endpoint->actuator_positions();
     assert(positions.size() == 1);
     assert(std::abs(state.position[0] - positions[0]) <= 1e-6);
+    for (const auto &input : config.inputs) {
+        rk_device_input_observation observed{};
+        observed.struct_size = sizeof(observed);
+        assert(endpoint->device_input(input.wiring.switch_id.c_str(), observed) == RK_OK);
+        assert(observed.active == 1);
+        assert(observed.closing_count == 1 && observed.opening_count == 0);
+        assert(observed.captured_steps == input.threshold_steps);
+        assert(observed.captured_timestamp_ns <= observed.source_timestamp_ns);
+        assert(std::abs(observed.captured_position - input.threshold_steps / 1000.0) < 1e-12);
+        assert(positions[0] > observed.captured_position);
+    }
     return {positions[0], state, endpoint->step_log()};
 }
 
@@ -847,6 +858,10 @@ int main() {
     config.controller.fill(7);
     config.steps_per_unit = {1'000};
     config.clock_bound_ns = 5'000'000;
+    auto switched = config;
+    switched.inputs.push_back({DeviceInput6{0, false, "axis.home"}, 200, true});
+    const auto captured_run = run(switched);
+    assert(captured_run.state.safety == RK_SAFETY_READY);
     const auto baseline = run(config);
     assert(std::abs(baseline.position - 0.5) <= 0.00101);
     assert(baseline.state.safety == RK_SAFETY_READY);

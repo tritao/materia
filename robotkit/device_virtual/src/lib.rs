@@ -4,7 +4,7 @@ use robotkit_device_protocol::device_wire6::*;
 use robotkit_device_protocol::frame6::{decode_frame6, encode_frame6, MAX_FRAME_SIZE};
 use robotkit_device_protocol::{
     Board, DeviceEvents, InputBinding, Output, ScheduledCore, ScheduledSegment, SkewGroup,
-    StepGenerator, StopReason, VirtualBoard,
+    StepGenerator, StopReason, VirtualBoard, VirtualSwitch,
 };
 use std::collections::VecDeque;
 pub mod welder;
@@ -570,6 +570,20 @@ pub unsafe extern "C" fn rkd_virtual_set_welder_grounded(device: *mut VirtualDev
     let Some(device) = device.as_mut() else { return 0; };
     if grounded > 1 { return 0; }
     device.set_welder_grounded(grounded != 0) as i32
+}
+
+/// Install physical switch geometry before opening the deployment session.
+#[no_mangle]
+pub unsafe extern "C" fn rkd_virtual_configure_switch(
+    device: *mut VirtualDevice, channel: u32, actuator: u32,
+    threshold_steps: i64, active_above: u8, active_high: u8,
+) -> i32 {
+    let Some(device) = device.as_mut() else { return 0; };
+    if device.core.is_some() || device.profile != 1 || active_above > 1 || active_high > 1 { return 0; }
+    device.board.configure_switch(channel as usize, VirtualSwitch {
+        actuator: actuator as usize, threshold_steps,
+        active_above: active_above != 0, active_high: active_high != 0,
+    }) as i32
 }
 
 #[no_mangle]
