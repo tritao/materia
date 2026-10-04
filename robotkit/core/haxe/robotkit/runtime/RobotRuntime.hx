@@ -399,6 +399,22 @@ class RobotRuntime {
       "runtime.resetSafety");
   }
 
+  /** Actual endpoint coordinates for physical switch synthesis, unaffected by coordinate zeros. */
+  public function physicalPositions():Array<Float> {
+    ensureLive();
+    scratchMutex.acquire();
+    try {
+      snapshotScratch.set_struct_size(rk_robot_snapshot.size());
+      check(endpoint.observeEndpoint(snapshotScratch), "runtime.physicalPositions");
+      var positions = RobotSnapshot.fromNative(snapshotScratch, sensorLayout).q.toArray();
+      scratchMutex.release();
+      return positions;
+    } catch (error:Dynamic) {
+      scratchMutex.release();
+      throw error;
+    }
+  }
+
   /** Reads the latest published native state without advancing time. */
   public function snapshot():RobotSnapshot {
     ensureLive();

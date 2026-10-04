@@ -789,6 +789,12 @@ RK_API rk_result RK_CALL rk_robot_runtime_start(rk_robot_runtime runtime);
 /** Stops a standalone runtime's owner worker, if it is running. */
 RK_API rk_result RK_CALL rk_robot_runtime_stop(rk_robot_runtime runtime);
 
+/** Atomically establish logical = endpoint position + offsets at rest. Device queues require transport support. */
+RK_API rk_result RK_CALL rk_robot_runtime_calibrate_coordinates(rk_robot_runtime runtime,
+    const double *offsets RK_IN_ARRAY(count), uint32_t count);
+/** Read the snapshot positions and setpoints in endpoint coordinates for physical sensor synthesis. */
+RK_API rk_result RK_CALL rk_robot_runtime_snapshot_endpoint(rk_robot_runtime runtime, rk_robot_snapshot *out_snapshot);
+
 /** Configure whether a stationary joint needs homing; requiring it invalidates its latch. */
 RK_API rk_result RK_CALL rk_robot_runtime_require_reference(rk_robot_runtime runtime, uint32_t joint, uint32_t required);
 /** Mark a stationary joint referenced after the homing controller establishes its coordinate zero. */

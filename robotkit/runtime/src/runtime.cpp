@@ -877,7 +877,7 @@ rk_result RobotRuntime::snapshot(rk_robot_state &out_state) const {
     return RK_OK;
 }
 
-rk_result RobotRuntime::snapshot_full(rk_robot_snapshot &out_snapshot) const {
+rk_result RobotRuntime::snapshot_full(rk_robot_snapshot &out_snapshot, bool endpoint_coordinates) const {
     // The diagnostic lives with owner-controlled execution state. Serialize
     // with the owner before reading it alongside the published sample.
     std::lock_guard owner_lock(owner_mutex_);
@@ -915,6 +915,11 @@ rk_result RobotRuntime::snapshot_full(rk_robot_snapshot &out_snapshot) const {
     std::copy_n(state_.sensors, state_.sensor_count, out_snapshot.sensors);
     std::copy_n(state_.sensor_values, RK_SENSOR_VALUE_POOL, out_snapshot.sensor_values);
     std::copy_n(commanded_position_, state_.joint_count, out_snapshot.setpoint_position);
+    if (endpoint_coordinates)
+        for (uint32_t joint = 0; joint < state_.joint_count; ++joint) {
+            out_snapshot.position[joint] -= coordinate_offsets_[joint];
+            out_snapshot.setpoint_position[joint] -= coordinate_offsets_[joint];
+        }
     return RK_OK;
 }
 

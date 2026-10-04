@@ -172,6 +172,12 @@ rk_result RK_CALL rk_robot_runtime_stop(rk_robot_runtime runtime) {
     return value ? value->stop() : RK_ERROR_INVALID_HANDLE;
 }
 
+rk_result RK_CALL rk_robot_runtime_calibrate_coordinates(rk_robot_runtime runtime,
+                                                        const double *offsets, uint32_t count) {
+    const auto value = robotkit::internal::resolve_runtime(runtime);
+    return value ? value->calibrate_coordinates(offsets, count) : RK_ERROR_INVALID_HANDLE;
+}
+
 rk_result RK_CALL rk_robot_runtime_limit_input(rk_robot_runtime runtime, uint32_t joint, uint32_t active) {
     if (active > 1) return RK_ERROR_INVALID_ARGUMENT;
     const auto value = robotkit::internal::resolve_runtime(runtime);
@@ -375,6 +381,14 @@ rk_result RK_CALL rk_robot_runtime_snapshot_full(rk_robot_runtime runtime,
         std::min<std::size_t>(caller_size, sizeof(complete)));
     out_snapshot->struct_size = caller_size;
     return RK_OK;
+}
+
+rk_result RK_CALL rk_robot_runtime_snapshot_endpoint(rk_robot_runtime runtime,
+                                                      rk_robot_snapshot *out_snapshot) {
+    if (!out_snapshot || out_snapshot->struct_size < sizeof(*out_snapshot))
+        return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = robotkit::internal::resolve_runtime(runtime);
+    return value ? value->snapshot_full(*out_snapshot, true) : RK_ERROR_INVALID_HANDLE;
 }
 
 rk_result RK_CALL rk_robot_runtime_capabilities(rk_robot_runtime runtime,

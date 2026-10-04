@@ -218,7 +218,7 @@ public:
     /** Copies the latest robot state without advancing endpoint time. */
     rk_result snapshot(rk_robot_state &out_state) const;
     /** Copies the latest state plus revision, endpoint, and fault metadata. */
-    rk_result snapshot_full(rk_robot_snapshot &out_snapshot) const;
+    rk_result snapshot_full(rk_robot_snapshot &out_snapshot, bool endpoint_coordinates = false) const;
     rk_result poll_events(rk_event_record_batch &out_batch);
     /** The current output value of a declared process channel. */
     rk_result channel_value(const char *channel, rk_event_value &out_value) const;

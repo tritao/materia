@@ -331,6 +331,10 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 */
 	extern fn rk_robot_runtime_blueprint_validate(blueprint: ptr<const<rk_robot_runtime_blueprint>>) -> rk_result;
 	/**
+	 * Atomically establish logical = endpoint position + offsets at rest. Device queues require transport support.
+	 */
+	extern fn rk_robot_runtime_calibrate_coordinates(runtime: rk_robot_runtime, offsets: ptr<const<f64>> @in_array("count"), count: u32) -> rk_result;
+	/**
 	 * Copies the endpoint's static control capabilities.
 	 *
 	 * Capabilities describe what the endpoint can accept; they do not imply that
@@ -400,6 +404,10 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 * The caller must initialize out_state->struct_size before calling.
 	 */
 	extern fn rk_robot_runtime_snapshot(runtime: rk_robot_runtime, out_state: ptr<rk_robot_state> @inout) -> rk_result;
+	/**
+	 * Read the snapshot positions and setpoints in endpoint coordinates for physical sensor synthesis.
+	 */
+	extern fn rk_robot_runtime_snapshot_endpoint(runtime: rk_robot_runtime, out_snapshot: ptr<rk_robot_snapshot>) -> rk_result;
 	/**
 	 * Copies the latest published snapshot, including revision, endpoint, and
 	 * fault metadata. This operation never advances time.

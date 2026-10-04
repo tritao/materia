@@ -447,7 +447,7 @@ class Simulation {
     if (virtualDevice == null && blueprint.switches.length > 0) {
       var observedRuntime:RobotRuntime = runtime;
       var switches = new SimulatedSwitchSensorAdapter(blueprint, observedRuntime,
-        () -> observedRuntime.snapshot().q.toArray(), "robotkit.simulation");
+        () -> observedRuntime.physicalPositions(), "robotkit.simulation");
       addStepObserver(switches);
     }
     return runtime;

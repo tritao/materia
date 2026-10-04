@@ -1565,3 +1565,19 @@ G13 transport calibration. Simulation switch sensing must keep reading actual
 endpoint coordinates after calibration rather than calibrated logical values;
 that wiring remains pending alongside latch and startup integration. No tests
 or builds ran; coordinate behavior is unverified.
+
+
+### G11 — expose calibration and preserve physical switch coordinates
+
+Native translation: `1f3834340`. API 27 adds borrowed-array coordinate
+calibration and a snapshot in endpoint coordinates. The latter converts both
+positions and held setpoints under the native owner/state locks, keeping a
+single coherent coordinate zero. RuntimeEndpoint exposes calibration and
+endpoint observation. RobotRuntime.physicalPositions() reads that snapshot;
+the simulation switch observer now uses it, so logical calibration cannot
+shift physical trip locations or their captured edges. Ordinary robot
+snapshots remain logical.
+
+Regenerate FFI bindings from the C header; no manual generated edits. The
+actual homing latch transaction, monitor reset and motion driver remain
+pending. No tests or project builds ran, and behavior is unverified.

@@ -8,6 +8,8 @@ interface RuntimeEndpoint {
   public function start():Int;
   public function submit(command:rk_robot_command):Int;
   public function observe(snapshot:rk_robot_snapshot):Int;
+  public function observeEndpoint(snapshot:rk_robot_snapshot):Int;
+  public function calibrateCoordinates(offsets:Array<Float>):Int;
   public function stop():Int;
   public function capabilities(value:rk_robot_capabilities):Int;
   /** Configure the authoritative admission gate before motion starts. */
