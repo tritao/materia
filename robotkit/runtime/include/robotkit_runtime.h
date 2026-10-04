@@ -757,6 +757,22 @@ typedef struct rk_serial_device_desc {
     uint8_t input_switch_ids[64 * 64]; /**< NUL-terminated model switch IDs. */
 } rk_serial_device_desc;
 
+/** Asynchronous device homing control; acceptance is queried separately. */
+typedef struct rk_device_homing_control {
+    uint32_t struct_size RK_STRUCT_SIZE;
+    uint32_t action; /**< 0 begin pair, 1 end scope, 2 hold side, 3 release side. */
+    uint64_t sequence;
+    uint64_t scope;
+    uint32_t first; /**< Physical actuator index, or the selected side for hold/release. */
+    uint32_t second;
+    double skew_bound;
+} rk_device_homing_control;
+
+RK_API rk_result RK_CALL rk_robot_runtime_device_homing_control(rk_robot_runtime runtime,
+    const rk_device_homing_control *control);
+/** STALE_STATE is pending; OK is accepted; INVALID_STATE is rejected. */
+RK_API rk_result RK_CALL rk_robot_runtime_device_homing_status(rk_robot_runtime runtime, uint64_t sequence);
+
 /** Copy of a physical switch observation in the endpoint's source clock. */
 typedef struct rk_device_input_observation {
     uint32_t struct_size RK_STRUCT_SIZE;

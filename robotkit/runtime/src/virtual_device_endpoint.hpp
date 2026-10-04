@@ -66,6 +66,12 @@ public:
     rk_result apply(const rk_robot_command &command) override;
     rk_result sample(std::uint64_t timestamp_ns, rk_robot_state &state) override;
     bool ready_for_plans() const noexcept;
+    rk_result device_homing_control(const rk_device_homing_control &control) override {
+        return inner_->device_homing_control(control);
+    }
+    rk_result device_homing_status(uint64_t sequence) const override {
+        return inner_->device_homing_status(sequence);
+    }
     rk_result device_input(const char *id, rk_device_input_observation &out) const override {
         return inner_->device_input(id, out);
     }

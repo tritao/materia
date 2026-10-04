@@ -1112,3 +1112,18 @@ rk_result Rkd6Endpoint::request_homing_side(std::uint64_t sequence, std::uint64_
     return RK_OK;
 }
 }
+
+namespace robotkit {
+rk_result Rkd6Endpoint::device_homing_control(const rk_device_homing_control &control) {
+    if (control.struct_size < sizeof(control) || control.action > 3 ||
+        !control.sequence || !control.scope || control.first >= ack_.actuator_count)
+        return RK_ERROR_INVALID_ARGUMENT;
+    if (control.action <= 1) {
+        if (control.second >= ack_.actuator_count) return RK_ERROR_INVALID_ARGUMENT;
+        return request_homing_scope(control.sequence, control.scope, control.action == 0,
+            static_cast<std::uint8_t>(control.first), static_cast<std::uint8_t>(control.second), control.skew_bound);
+    }
+    return request_homing_side(control.sequence, control.scope,
+        static_cast<std::uint8_t>(control.first), control.action == 2);
+}
+}

@@ -2401,3 +2401,17 @@ rk_result RobotRuntime::device_input(const char *switch_id, rk_device_input_obse
     return endpoint_ ? endpoint_->device_input(switch_id, out) : RK_ERROR_BACKEND;
 }
 }
+
+namespace robotkit {
+rk_result RobotRuntime::device_homing_control(const rk_device_homing_control &control) {
+    if (control.struct_size < sizeof(control) || control.action > 3 || !control.sequence || !control.scope)
+        return RK_ERROR_INVALID_ARGUMENT;
+    std::lock_guard owner_lock(owner_mutex_);
+    return endpoint_ ? endpoint_->device_homing_control(control) : RK_ERROR_BACKEND;
+}
+rk_result RobotRuntime::device_homing_status(uint64_t sequence) const {
+    if (!sequence) return RK_ERROR_INVALID_ARGUMENT;
+    std::lock_guard owner_lock(owner_mutex_);
+    return endpoint_ ? endpoint_->device_homing_status(sequence) : RK_ERROR_BACKEND;
+}
+}

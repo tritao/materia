@@ -75,6 +75,8 @@ public:
     std::optional<DeviceInputObservation6> input_observation(std::string_view switch_id) const;
 
     rk_result device_input(const char *, rk_device_input_observation &) const override;
+    rk_result device_homing_control(const rk_device_homing_control &) override;
+    rk_result device_homing_status(uint64_t sequence) const override { return homing_control_status(sequence); }
     rk_result request_homing_scope(std::uint64_t sequence, std::uint64_t scope,
         bool begin, std::uint8_t first, std::uint8_t second, double skew_bound);
     rk_result request_homing_side(std::uint64_t sequence, std::uint64_t scope,

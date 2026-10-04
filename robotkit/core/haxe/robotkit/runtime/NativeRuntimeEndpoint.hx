@@ -27,6 +27,19 @@ class NativeRuntimeEndpoint implements RuntimeEndpoint {
       input.get_closing_count(), input.get_opening_count(), input.get_captured_steps(),
       input.get_captured_timestamp_ns(), input.get_captured_position());
   }
+  public function deviceHomingControl(action:Int, sequence:Int64, scope:Int64,
+      first:Int, second:Int, skewBound:Float):Int {
+    if (action < 0 || action > 3 || first < 0 || first >= 64 || second < 0 || second >= 64)
+      throw "Invalid device homing control";
+    var control = new rk_device_homing_control();
+    control.set_struct_size(rk_device_homing_control.size());
+    control.set_action(action); control.set_sequence(sequence); control.set_scope(scope);
+    control.set_first(first); control.set_second(second); control.set_skew_bound(skewBound);
+    return RobotKitRuntime.rk_robot_runtime_device_homing_control(nativeHandle(), control);
+  }
+  public function deviceHomingStatus(sequence:Int64):Int
+    return RobotKitRuntime.rk_robot_runtime_device_homing_status(nativeHandle(), sequence);
+
   public function start():Int return RobotKitRuntime.rk_robot_runtime_start(nativeHandle());
   public function submit(command:rk_robot_command):Int
     return RobotKitRuntime.rk_robot_runtime_submit(nativeHandle(), command);

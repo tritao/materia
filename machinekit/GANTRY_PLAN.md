@@ -2692,3 +2692,18 @@ No tests/builds ran. Runtime ABI exposure, asynchronous HomingCycle readiness,
 virtual wrapper forwarding, counter-zero batches and Nucleo controls still remain.
 A timed-out control requires stop/recovery before issuing another; this is not a
 claim that control lifecycle is fully integrated or that G13 passes its gate.
+
+### G13 — expose acknowledged controls through runtime endpoints
+
+Added a typed device-homing control descriptor and C API request/status entry
+points. The runtime serializes them under its owner mutex; unsupported endpoints
+reject them. RKD6 translates scope begin/end and side hold/release actions into
+the acknowledged wire requests, and VirtualDeviceEndpoint forwards the same
+contract. NativeRuntimeEndpoint exposes request and status calls without blocking
+or equating send success to device acceptance.
+
+No builds/tests ran. HomingCycle and its side-control adapter still need explicit
+pending acknowledgment readiness before advancing. Counter-zero batches and
+feedback offsets, virtual-router integration, Nucleo handlers and Phase C tests
+remain incomplete. These additive API calls stay within the under-development
+API 30/RKD6 revision 13 change, awaiting generated-binding/compiler verification.

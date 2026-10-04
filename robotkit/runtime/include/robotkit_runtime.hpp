@@ -123,6 +123,8 @@ public:
     virtual rk_result sample(uint64_t timestamp_ns, rk_robot_state &state) = 0;
 
     /** Returns true when sample() supplies the endpoint's observed safety state. */
+    virtual rk_result device_homing_control(const rk_device_homing_control &) { return RK_ERROR_UNSUPPORTED; }
+    virtual rk_result device_homing_status(uint64_t) const { return RK_ERROR_UNSUPPORTED; }
     virtual rk_result device_input(const char *, rk_device_input_observation &) const {
         return RK_ERROR_UNSUPPORTED;
     }
@@ -224,6 +226,8 @@ public:
     rk_result require_reference(uint32_t joint, bool required);
     rk_result limit_input(uint32_t joint, bool active);
     rk_result device_input(const char *switch_id, rk_device_input_observation &out) const;
+    rk_result device_homing_control(const rk_device_homing_control &control);
+    rk_result device_homing_status(uint64_t sequence) const;
     /** Atomically establish logical = endpoint position + offset at rest. */
     rk_result calibrate_coordinates(const double *offsets, uint32_t count,
                                    const uint32_t *reference_joints = nullptr, uint32_t reference_count = 0);
