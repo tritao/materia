@@ -32,6 +32,7 @@ pub struct VirtualDevice {
     outbox: VecDeque<Vec<u8>>,
     /// Bytes received since the session began, as the status reports them.
     received_bytes: u64,
+    welder: Option<welder::VirtualWelder>,
 }
 
 impl VirtualDevice {
@@ -73,7 +74,54 @@ impl VirtualDevice {
             last_publish_ns: 0,
             outbox: VecDeque::new(),
             received_bytes: 0,
+            welder: None,
         })
+    }
+
+    /// The process profile is configured before opening its deployment session.
+    pub fn configure_welder(&mut self, config: welder::WelderConfig) -> bool {
+        if self.core.is_some() { return false; }
+        self.welder = welder::VirtualWelder::new(config);
+        self.welder.is_some()
+    }
+
+    pub fn set_welder_grounded(&mut self, grounded: bool) -> bool {
+        let Some(welder) = self.welder.as_mut() else { return false; };
+        welder.grounded = grounded;
+        true
+    }
+
+    pub fn weld_values(&self) -> Option<[f32; 6]> { self.welder.as_ref().map(|w| w.values()) }
+
+    fn valid_weld_channels(&self, begin: &SessionBegin6) -> bool {
+        let Some(welder) = self.welder.as_ref() else { return true; };
+        let c = welder.config;
+        [c.arc_channel, c.wire_channel, c.voltage_channel].iter()
+            .all(|&i| i < begin.channel_count as usize)
+            && begin.channel_kind[c.arc_channel] == 1
+            && begin.channel_kind[c.wire_channel] == 2
+            && begin.channel_kind[c.voltage_channel] == 2
+            && begin.safe_digital[c.arc_channel] == 0
+            && begin.safe_analog[c.wire_channel] == 0.0
+            && begin.channel_stop_policy[c.arc_channel] == 0
+            && begin.channel_stop_policy[c.wire_channel] == 0
+    }
+
+    fn update_welder(&mut self, dt: f64) {
+        let Some(welder) = self.welder.as_mut() else { return; };
+        let c = welder.config;
+        welder.tick(dt, self.board.digital(c.arc_channel).unwrap_or(false),
+            self.board.analog(c.wire_channel).unwrap_or(0.0),
+            self.board.analog(c.voltage_channel).unwrap_or(0.0));
+        if welder.faulted() {
+            if let Some(core) = self.core.as_mut() {
+                if core.stop_reason().is_none() { core.stop(StopReason::ProcessFault); }
+                self.events.as_mut().unwrap().stop(&mut self.board, StopReason::ProcessFault);
+                self.events.as_ref().unwrap().apply_safe(&mut self.board, StopReason::ProcessFault);
+                welder.tick(0.0, false, 0.0, 0.0);
+                self.final_safe_applied = true;
+            }
+        }
     }
 
     fn emit(&mut self, kind: u8, payload: &[u8]) {
@@ -116,7 +164,8 @@ impl VirtualDevice {
                     actuator_count: self.count as u8,
                     profile: self.profile,
                 };
-                if controller_matches(&begin.expected_controller, &self.controller)
+                if self.valid_weld_channels(&begin)
+                    && controller_matches(&begin.expected_controller, &self.controller)
                     && begin.actuator_count as usize == self.count
                     && begin.step_tick_hz == self.step_tick_hz
                     && begin.session != 0
@@ -167,6 +216,7 @@ impl VirtualDevice {
                         link_loss_ticks.max(1),
                     );
                     core.initialize_clock(self.board.now_ticks());
+                    if let Some(welder) = self.welder.as_mut() { welder.reset(); }
                     self.steps = generator;
                     self.core = Some(core);
                     self.events = Some(DeviceEvents::new(&begin));
@@ -280,17 +330,20 @@ impl VirtualDevice {
                 if let Some(reason) = self.core.as_ref().unwrap().stop_reason() {
                     self.events.as_mut().unwrap().stop(&mut self.board, reason);
                 }
+                self.update_welder(0.0);
                 true
             }
             11 => {
                 self.core.as_mut().unwrap().stop(StopReason::Stop);
                 self.events.as_mut().unwrap().stop(&mut self.board, StopReason::Stop);
+                self.update_welder(0.0);
                 true
             }
             12 => {
                 self.core.as_mut().unwrap().emergency_stop(&mut self.board);
                 self.events.as_mut().unwrap().stop(&mut self.board, StopReason::EmergencyStop);
                 self.final_safe_applied = true;
+                self.update_welder(0.0);
                 true
             }
             13 => false,
@@ -329,7 +382,9 @@ impl VirtualDevice {
                     core.stop(StopReason::DualDriveSkew);
                 }
             }
+            self.update_welder(step_ns as f64 / 1_000_000_000.0);
         }
+        self.update_welder(0.0);
         if host_ns.saturating_sub(self.last_publish_ns) >= 10_000_000 {
             self.publish_state();
             self.last_publish_ns = host_ns;
@@ -763,4 +818,84 @@ mod tests {
         let (changed, _) = ack_to(&mut device, &other);
         assert_ne!(changed.config_digest, ack.config_digest);
     }
+    fn welding_device(grounded: bool) -> VirtualDevice {
+        let mut d = VirtualDevice::new(1_000_000, 40_000, 0, 0, 1,
+            [1_000.0; ACTUATORS], [7; 16], 1).unwrap();
+        assert!(d.configure_welder(welder::WelderConfig { arc_channel: 0, wire_channel: 1,
+            voltage_channel: 2, ignition_seconds: 0.002, no_arc_seconds: 0.02, efficiency: 0.9 }));
+        assert!(d.set_welder_grounded(grounded));
+        let mut begin = begin_for([7; 16]);
+        begin.channel_count = 3; begin.channel_kind[0] = 1; begin.channel_kind[1] = 2; begin.channel_kind[2] = 2;
+        for (i, name) in [b"arc".as_slice(), b"wire".as_slice(), b"voltage".as_slice()].iter().enumerate() {
+            begin.channel_id[i * 48..i * 48 + name.len()].copy_from_slice(name);
+        }
+        begin.channel_stop_policy[2] = 1; begin.link_loss_timeout_ns = 100_000_000;
+        assert_eq!(ack_to(&mut d, &begin).0.status, 1);
+        let queue = QueueBegin6 { queue_revision: 1, replace_after_ticks: 0,
+            expected_position: [0.0; 64], expected_velocity: [0.0; 64], actuator_count: 1 };
+        let mut q = [0; QueueBegin6::SIZE]; queue.encode(&mut q).unwrap();
+        assert!(send::<QueueBegin6>(&mut d, 5, &q));
+        let header = Segment6Header { queue_revision: 1, plan_id: 1, t0_ticks: 0,
+            duration_ticks: 1_000_000, degree: 0, actuator_count: 1, ends_at_rest: 1, reserved: 0 };
+        let row = Segment6Coefficients { actuator: 0, c0: 0.0, c1: 0.0, c2: 0.0,
+            c3: 0.0, c4: 0.0, c5: 0.0 };
+        let mut segment = vec![0; Segment6Header::SIZE + Segment6Coefficients::SIZE];
+        header.encode(&mut segment[..Segment6Header::SIZE]).unwrap();
+        row.encode(&mut segment[Segment6Header::SIZE..]).unwrap();
+        assert!(send::<Segment6Header>(&mut d, 6, &segment));
+        for (channel, kind, digital, analog) in [(2, 2, 0, 24.0), (1, 2, 0, 8.0), (0, 1, 1, 0.0)] {
+            let event = Event6 { queue_revision: 1, plan_id: 1, path_ticks: 0, channel,
+                kind, hold_policy: 1, digital, analog, argument: 0.0, command: [0; 48] };
+            let mut body = [0; Event6::SIZE]; event.encode(&mut body).unwrap();
+            assert!(send::<Event6>(&mut d, 16, &body));
+        }
+        let mut body = [0; Commit6::SIZE];
+        Commit6 { through_ticks: 1_000_000 }.encode(&mut body).unwrap();
+        assert!(send::<Commit6>(&mut d, 7, &body));
+        d
+    }
+
+    fn assert_weld_off(d: &VirtualDevice) {
+        assert_eq!(d.board.digital(0), Some(false));
+        assert_eq!(d.board.analog(1), Some(0.0));
+        assert_eq!(d.weld_values().unwrap()[0], 0.0);
+        assert_eq!(d.weld_values().unwrap()[5], 0.0);
+    }
+
+    #[test]
+    fn welding_stop_paths_safe_device_outputs() {
+        for kind in [10, 11, 12] {
+            let mut d = welding_device(true); assert!(d.advance(10_000_000));
+            assert_eq!(d.weld_values().unwrap()[0], 1.0);
+            assert_eq!(d.weld_values().unwrap()[1], 240.0);
+            assert!(send::<SessionBegin6>(&mut d, kind, &[]));
+            assert!(d.advance(11_000_000)); assert_weld_off(&d);
+        }
+        let mut d = welding_device(true); assert!(d.advance(10_000_000));
+        assert_eq!(d.weld_values().unwrap()[0], 1.0);
+        assert!(d.advance(150_000_000)); assert_weld_off(&d);
+        assert_eq!(d.core.as_ref().unwrap().stop_reason(), Some(StopReason::LinkLost));
+    }
+
+    #[test]
+    fn welding_fault_safes_channels_on_device() {
+        let mut d = welding_device(false); assert!(d.advance(30_000_000)); assert_weld_off(&d);
+        assert_eq!(d.weld_values().unwrap()[4], 1.0);
+        assert_eq!(d.core.as_ref().unwrap().stop_reason(), Some(StopReason::ProcessFault));
+        let mut d = welding_device(true); assert!(d.advance(10_000_000));
+        assert!(d.set_welder_grounded(false)); assert!(d.advance(11_000_000)); assert_weld_off(&d);
+        assert_eq!(d.weld_values().unwrap()[4], 2.0);
+    }
+
+    #[test]
+    fn welding_rejects_unsafe_channel_policy() {
+        let mut d = welding_device(true);
+        let mut begin = begin_for([7; 16]); begin.channel_count = 3;
+        begin.channel_kind[0] = 1; begin.channel_kind[1] = 2; begin.channel_kind[2] = 2; begin.channel_stop_policy[0] = 1;
+        for (i, name) in [b"arc".as_slice(), b"wire".as_slice(), b"voltage".as_slice()].iter().enumerate() {
+            begin.channel_id[i * 48..i * 48 + name.len()].copy_from_slice(name);
+        }
+        assert_eq!(ack_to(&mut d, &begin).0.status, 0);
+    }
+
 }

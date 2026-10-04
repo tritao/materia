@@ -730,6 +730,12 @@ W6 implementation notes (started after W5 main sync, 2026-10-04):
   A Modbus connection failure cannot rely on a final network write to stop the physical source: the register map
   must express a device watchdog/lease, and the fake server must enforce its expiry independently of the host.
   The same process mission must run through each backend rather than replacing it with backend-specific scripts.
+- The virtual device now observes scheduler-controlled arc/wire/voltage channels through its configured welding
+  profile. Deployment refuses unsafe arc/wire stop policies. Its ignition/current/power model latches no-arc and
+  arc-loss faults; a generic `ProcessFault` stop safes every channel on the device before another host frame is needed.
+  Three model tests and three framed-device tests pass; the latter cover ignition, abort, commanded stop, emergency
+  stop, link loss, no-arc and arc loss. Seven focused existing protocol stop tests also pass. Feedback still needs
+  its wire transport and host sensor mapping; the unchanged shared mission has not yet been validated on this backend.
 
 ## Phase 2: mobile welder
 

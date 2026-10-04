@@ -4,7 +4,7 @@ use crate::Board;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum QueueError { StaleRevision, Committed, BadBoundary, BadExpectedState, Full, InvalidSegment, InvalidCommit }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum StopReason { Underflow, LinkLost, Abort, Stop, EmergencyStop, DualDriveSkew }
+pub enum StopReason { Underflow, LinkLost, Abort, Stop, EmergencyStop, DualDriveSkew, ProcessFault }
 
 #[derive(Clone, Copy, Debug)]
 pub struct ScheduledSegment<const A: usize> {
