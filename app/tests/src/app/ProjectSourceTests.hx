@@ -1837,7 +1837,8 @@ class ProjectSourceTests {
     var axes = [for (joint in binding.model.joints) if (joint.type == JointType.Prismatic) {
       var limits = binding.model.coupledLimits(joint.id, new SteadyLoads());
       new motionkit.axis.MotionAxisBlueprint(joint.id, [joint.id], joint.limits.lower,
-        joint.limits.upper, limits.requireVelocity(), limits.requireAcceleration());
+        joint.limits.upper, limits.requireVelocity(), limits.requireAcceleration(),
+        joint.id == "z" ? joint.limits.upper : joint.limits.lower);
     }];
     var blueprint = motionkit.robot.MotionSystemBlueprint.fromRobotModel(binding.model, axes);
     var options = new robotkit.runtime.VirtualDeviceOptions();
@@ -1861,7 +1862,8 @@ class ProjectSourceTests {
       var snapshot = runtime.snapshot();
       for (index in 0...binding.model.joints.length) if (binding.model.joints[index].type == JointType.Prismatic) {
         check(runtime.isReferenced(index), "Device-homed router axis is referenced");
-        check(Math.abs(snapshot.q.get(index) - binding.model.joints[index].limits.lower) < 0.00005,
+        check(Math.abs(snapshot.q.get(index) - (binding.model.joints[index].id == "z"
+          ? binding.model.joints[index].limits.upper : binding.model.joints[index].limits.lower)) < 0.00005,
           "Device-homed router returns to its reference within 50 micrometres");
       }
       harness.dispose();

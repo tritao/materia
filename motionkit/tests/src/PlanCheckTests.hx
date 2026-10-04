@@ -493,8 +493,9 @@ class PlanCheckTests extends MotionKitTestSupport {
       [for (joint in model.joints) joint.name]);
     var homing = new motionkit.robot.MotionSystem(robot, blueprint);
     homing.configureRuntimeHoming(runtime, () -> {}, harness.simulation.homingSides(0));
+    var tick = 1;
+    harness.step(Int64.ofInt(tick));
     homing.home();
-    var tick = 0;
     while (homing.homingStatus() != "Complete" && tick < 60000) {
       harness.step(Int64.ofInt(++tick));
       homing.update(0.01);

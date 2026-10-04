@@ -658,8 +658,67 @@ class CncRouter extends AxisBuilder {
 			attachBeltPath("beltX", "beltBracketX", "pulleyX", "idlerX");
 			for (name in ["Left", "Right"]) attachBeltPath("beltY" + name, "beltBracketY" + name, "pulleyY" + name, "idlerY" + name);
 		}
+		// Independent Y contacts support squaring; Z homes upward before lateral travel.
+		buildHome(specs[1], "YLeft", "sideLeft", "uprightLeft", [-SIDE_X - 18.0, yb, 70.0],
+			[40.0, 6.0, 6.0], [0.0, 1, 0], -1, (belts ? "pulley" : "screw") + "YLeft-turn");
+		buildHome(specs[1], "YRight", "sideRight", "uprightRight", [SIDE_X + 18.0, yb, 70.0],
+			[40.0, 6.0, 6.0], [0.0, 1, 0], -1, (belts ? "pulley" : "screw") + "YRight-turn");
+		buildHome(specs[0], "X", "beamUpper", "xPlate", [xc, blockFace - 30.0, 250.0],
+			[6.0, 40.0, 6.0], [1.0, 0, 0], -1, (belts ? "pulleyX-turn" : "screwX-turn"));
+		buildHome(specs[2], "Z", "xPlate", "zPlate", [xc + 75.0, zBlockFace, zPlateBottom + 35.0],
+			[40.0, 6.0, 6.0], [0.0, 0, 1], 1, foldedZ ? "motorZ-turn" : "screwZ-turn");
 		exposeConnector("nose", "spindle", "nose");
 		exposeConnector("toolTip", "tool", "tip");
+	}
+
+	/** Physical outboard steel target and supported proximity sensor at a guide's home end. */
+	function buildHome(axis:RouterAxisSpec, suffix:String, fixed:String, moving:String,
+			point:Array<Float>, dimensions:Array<Float>, direction:Array<Float>, side:Int, shaft:String):Void {
+		var room = axisOvertravel(axis.id);
+		if (room <= 1) throw "Router home requires physical guide overtravel";
+		var trigger = "homeTrigger" + suffix;
+		attach(trigger, new RouterPlate(dimensions[0], dimensions[1], dimensions[2], "steel", "Home trigger"),
+			AssemblyFrames.translation(point[0], point[1], point[2] - dimensions[2] / 2), moving);
+		var half = 0.0;
+		for (i in 0...3) half += Math.abs(direction[i]) * dimensions[i] / 2;
+		addMemberConnector(trigger, "trip", AssemblyFrames.translation(direction[0] * side * half,
+			direction[1] * side * half, dimensions[2] / 2 + direction[2] * side * half));
+		var travel = (side < 0 ? axis.lower : axis.upper) + side * room * 0.25;
+		var sensor = new machinekit.motion.ProximitySwitch();
+		var normal = [for (value in direction) -side * value];
+		var face = [for (i in 0...3) point[i] + direction[i] * (travel - axis.initial + side * half)];
+		var origin = [for (i in 0...3) face[i] - normal[i] * (sensor.spec.length + sensor.spec.sensingDistance)];
+		var transverse = suffix == "X" ? [0.0, 1, 0] : [1.0, 0, 0];
+		var pose = AxisBuilder.orient(origin[0], origin[1], origin[2], transverse, normal);
+		var host = switchMountBounds(fixed);
+		var anchor = [for (i in 0...3) Math.max(host.min[i], Math.min(host.max[i], origin[i]))];
+		var lo = [for (i in 0...3) Math.min(anchor[i], origin[i]) - 3];
+		var hi = [for (i in 0...3) Math.max(anchor[i], origin[i]) + 3];
+		var id = "home" + suffix, mount = id + "Mount";
+		attach(mount, new RouterPlate(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2], "aluminium 6061", "Home switch mount"),
+			AssemblyFrames.translation((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2]), fixed);
+		attach(id, sensor, pose, mount);
+		addSwitch(id, axis.id, id, {instanceId: trigger, connectorName: "trip"}, side, "home",
+			suffix == "YRight" ? 2 : 1, shaft);
+	}
+
+	function switchMountBounds(id:String):{min:Array<Float>, max:Array<Float>} {
+		var member = component(id), min:Array<Float>, max:Array<Float>;
+		if (Std.isOfType(member, ExtrusionMember)) {
+			var frame:ExtrusionMember = cast member;
+			min = [-frame.profile.size / 2, -frame.profile.height / 2, 0.0];
+			max = [frame.profile.size / 2, frame.profile.height / 2, frame.length];
+		} else if (Std.isOfType(member, RouterPlate)) {
+			var plate:RouterPlate = cast member;
+			min = [-plate.width / 2, -plate.depth / 2, 0.0]; max = [plate.width / 2, plate.depth / 2, plate.height];
+		} else throw "Router switch mount requires a frame or plate";
+		var lo = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
+		var hi = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
+		for (x in [min[0], max[0]]) for (y in [min[1], max[1]]) for (z in [min[2], max[2]]) {
+			var point = AssemblyFrames.transformPoint(zeroPose(id), x, y, z), values = [point.x, point.y, point.z];
+			for (i in 0...3) { lo[i] = Math.min(lo[i], values[i]); hi[i] = Math.max(hi[i], values[i]); }
+		}
+		return {min: lo, max: hi};
 	}
 
 	/** The Z screw and motor are two distinct shafts joined by one pretensioned belt loop. */

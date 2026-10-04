@@ -3080,3 +3080,19 @@ reference admission rather than bypassing it. MotionKit compilation restarted
 (session 41414, live at this note); the updated fixture has not executed yet.
 
 G13 and Phase C remain incomplete; G14 is not started.
+
+### G13 — authored router home contacts and physical targets
+
+CncRouter now builds steel home triggers, proximity sensors and fixed supported
+mounts for X, Z and both Y sides. Contacts name their original screw/pulley shafts
+(including folded Z's motor shaft), and trip geometry is derived from guide
+overtravel and initial axis positions. Z closes at the upward end; the virtual
+fixture returns Z to its upper home and X/Y to their lower homes. Router example
+compiler-only build is running (32171); app fixture rebuild is running (55203).
+These new members intentionally change router assembly mass/counts; physical
+clearances and baseline assertions must be audited at Phase C.
+
+The updated slip fixture compiled, but its full-suite retry reached homing before
+the first simulated switch frames existed. Added one initial simulation tick
+before home; recompile/retry remains pending. No successful router homing or
+full MotionKit pass is claimed. G13/Phase C remain incomplete.
