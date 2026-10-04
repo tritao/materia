@@ -52,7 +52,8 @@ public:
     rk_result set_joint_slip(uint32_t robot_index, uint32_t joint, double offset);
     /** Hold one actuated shaft at a physical position while its coupled leader continues. */
     rk_result set_squaring_hold(uint32_t robot_index, uint32_t joint, bool active, double position);
-    rk_result set_power_up_offsets(uint32_t robot_index, const double *offsets, uint32_t count);
+    rk_result set_power_up_offsets(uint32_t robot_index, const double *offsets, uint32_t count,
+                                  const uint32_t *side_drives = nullptr, uint32_t side_count = 0);
     rk_result teleport_robot(uint32_t robot_index, const rk_simulation_pose &pose);
     rk_result set_joint_positions(uint32_t robot_index, const double *positions, uint32_t count);
     /**

@@ -2024,3 +2024,19 @@ placement API, preserve reset behavior, and reject nonactuated/passive shafts.
 Scene authoring and the 1 mm regression must then use that API. This resolver
 alone does not place or square the machine. No tests or builds ran; the post-G12
 checkpoint is still pending G12 implementation.
+
+### G12 — place independent startup motor sides
+
+Startup resolver: `968c74ecd`. Add rk_simulation_set_power_up_sides and the
+Haxe setPowerUpSides wrapper. Cold placement accepts a full offset vector plus
+an explicit side-drive list; validate unique known actuated nonpassive shafts
+with exactly one incoming coupling. Only those followers may deviate from
+shared-axis displacement propagation. Existing finite/travel checks, cold
+state requirements, virtual-device rejection and backend rollback remain.
+The original power-up API retains its coupling-consistent contract.
+
+Haxe retains copied offsets and side identities, reapplies them through the
+same side-placement API on robot reset, and clears caches on disposal.
+Regenerate simulation FFI declarations for four portable ABI targets (source
+generation only). Scene authoring, 1 mm coverage and skew scope remain pending.
+No project builds or tests ran; physical placement remains unverified.

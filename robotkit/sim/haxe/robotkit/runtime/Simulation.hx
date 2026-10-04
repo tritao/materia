@@ -33,6 +33,7 @@ class Simulation {
   final stepObservers:Array<StepObserverEntry> = [];
   final switchObservers:Map<Int, SimulatedSwitchSensorAdapter> = new Map();
   final powerUpOffsets:Map<Int, Array<Float>> = new Map();
+  final powerUpSideDrives:Map<Int, Array<Int>> = new Map();
   var nextStepObserverId = 1;
   public final fixedTimestepSeconds:Float;
   /** The session this simulation joined. */
@@ -582,7 +583,11 @@ class Simulation {
     check(RobotKitSimKit.rk_simulation_reset_robot(owner.borrow(), robotIndex),
       "simulation.resetRobot");
     var offsets = powerUpOffsets.get(robotIndex);
-    if (offsets != null) setPowerUpOffsets(robotIndex, offsets);
+    if (offsets != null) {
+      var drives = powerUpSideDrives.get(robotIndex);
+      if (drives == null) setPowerUpOffsets(robotIndex, offsets);
+      else setPowerUpSides(robotIndex, offsets, drives);
+    }
     robots[robotIndex].afterNativeReset();
     var switches = switchObservers.get(robotIndex);
     if (switches != null) switches.reset();
@@ -601,6 +606,18 @@ class Simulation {
     check(RobotKitSimKit.rk_simulation_set_power_up_offsets(owner.borrow(), robotIndex, offsets),
       "simulation.setPowerUpOffsets");
     powerUpOffsets.set(robotIndex, offsets.copy());
+    powerUpSideDrives.remove(robotIndex);
+  }
+
+  /** Cold placement including explicit motor-side racking; retain it across robot reset. */
+  public function setPowerUpSides(robotIndex:Int, offsets:Array<Float>, drives:Array<Int>):Void {
+    ensureLive();
+    if (offsets == null || drives == null || drives.length == 0)
+      throw "Side startup placement requires offsets and explicit motor followers";
+    check(RobotKitSimKit.rk_simulation_set_power_up_sides(owner.borrow(), robotIndex, offsets, drives),
+      "simulation.setPowerUpSides");
+    powerUpOffsets.set(robotIndex, offsets.copy());
+    powerUpSideDrives.set(robotIndex, drives.copy());
   }
 
   public function setJointSlip(robotIndex:Int, joint:Int, offset:Float):Void {
@@ -920,6 +937,7 @@ class Simulation {
     stepObservers.resize(0);
     switchObservers.clear();
     powerUpOffsets.clear();
+    powerUpSideDrives.clear();
     for (runtime in robots) runtime.dispose();
     robots.resize(0);
     robotBlueprints.resize(0);

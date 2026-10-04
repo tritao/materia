@@ -446,6 +446,11 @@ RK_API rk_result RK_CALL rk_simulation_set_squaring_hold(
  * Full joint vector in SI units; accepted only in a stopped world before the first runtime sample. */
 RK_API rk_result RK_CALL rk_simulation_set_power_up_offsets(rk_simulation simulation,
     uint32_t robot_index, const double *offsets RK_IN_ARRAY(count), uint32_t count);
+/** Cold startup placement with explicit independently displaced motor followers.
+ * All other joints must retain coupling-consistent displacement. Reset clears the placement. */
+RK_API rk_result RK_CALL rk_simulation_set_power_up_sides(rk_simulation simulation,
+    uint32_t robot_index, const double *offsets RK_IN_ARRAY(count), uint32_t count,
+    const uint32_t *side_drives RK_IN_ARRAY(side_count), uint32_t side_count);
 /** Teleports one attached robot's base while the simulation is stopped.
  * This does not change the pose restored by reset or resetRobot. */
 RK_API rk_result RK_CALL rk_simulation_teleport_robot(

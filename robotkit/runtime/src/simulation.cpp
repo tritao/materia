@@ -851,7 +851,8 @@ rk_result Simulation::reset_robots() {
     return RK_OK;
 }
 
-rk_result Simulation::set_power_up_offsets(uint32_t robot_index, const double *offsets, uint32_t count) {
+rk_result Simulation::set_power_up_offsets(uint32_t robot_index, const double *offsets, uint32_t count,
+                                         const uint32_t *side_drives, uint32_t side_count) {
     Lock lock(session_);
     const auto world = stopped_world();
     if (!world || !offsets || robot_index >= bindings_.size()) return RK_ERROR_INVALID_ARGUMENT;
@@ -861,6 +862,18 @@ rk_result Simulation::set_power_up_offsets(uint32_t robot_index, const double *o
         return RK_ERROR_UNSUPPORTED;
     const auto &blueprint = runtimes_[robot_index]->blueprint();
     if (count != blueprint.joint_count) return RK_ERROR_INVALID_ARGUMENT;
+    if (side_count > count || (side_count != 0 && !side_drives)) return RK_ERROR_INVALID_ARGUMENT;
+    std::array<bool, RK_MAX_JOINTS> independent_sides{};
+    for (uint32_t i = 0; i < side_count; ++i) {
+        const auto joint = side_drives[i];
+        if (joint >= count || independent_sides[joint] || !binding->actuated_joints_[joint] ||
+            binding->passive_[joint]) return RK_ERROR_INVALID_ARGUMENT;
+        uint32_t terms = 0;
+        for (uint32_t k = 0; k < blueprint.coupling_count; ++k)
+            if (blueprint.couplings[k].follower == joint) ++terms;
+        if (terms != 1) return RK_ERROR_INVALID_ARGUMENT;
+        independent_sides[joint] = true;
+    }
     rk_robot_state observed{};
     runtimes_[robot_index]->snapshot(observed);
     if (observed.sequence != 0) return RK_ERROR_INVALID_STATE;
@@ -888,7 +901,8 @@ rk_result Simulation::set_power_up_offsets(uint32_t robot_index, const double *o
                 coupled = true;
                 expected += blueprint.couplings[k].ratio * offsets[blueprint.couplings[k].leader];
             }
-        if (coupled && (!std::isfinite(expected) || std::abs(expected - offsets[joint]) > 1e-6))
+        if (coupled && !independent_sides[joint] &&
+            (!std::isfinite(expected) || std::abs(expected - offsets[joint]) > 1e-6))
             return RK_ERROR_INVALID_ARGUMENT;
     }
     for (uint32_t joint = 0; joint < count; ++joint) {
