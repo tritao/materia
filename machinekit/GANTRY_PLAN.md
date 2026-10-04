@@ -3014,3 +3014,18 @@ router fixture; corrected to robotkit.simulation and restarted compilation
 (session 59317, live at this note). Rust tests need rerun after their missing
 PROTOCOL_VERSION import was corrected; serial PTY identification is unresolved.
 Phase C gate is not green, router homing has not run, and G13 is incomplete.
+
+### Phase C — native gate green and homing FFI regenerated
+
+All 18 native CTest targets passed after repairing the PTY fixture's obsolete
+5000-byte payload cap: revision 13's session record exceeded it. The fixture now
+uses the protocol MAX_FRAME_SIZE. Rust protocol tests run with std enabled, so
+virtual-board input/hold regressions are included. Native rebuild passed; the
+earlier Nucleo cargo check --offline remains green.
+
+App compilation exposed stale generated FFI interfaces. Regenerated runtime and
+simulation HXI from their native headers using the repository audit scripts;
+both passed portable-abi64 audits across Linux, Windows and both macOS targets.
+The app compiler-only pass has been restarted with these bindings. App/Haxe
+homing execution, router-device-home and the remaining Phase C suites are still
+pending. G13 is not complete; G14 has not started.
