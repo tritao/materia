@@ -1333,3 +1333,34 @@ jog/homing classification, limit-switch faults, calibration application,
 seek/backoff/slowlatch HomingCycle, simulation power-up offsets and automatic
 router/picker homing remain G11 work. No tests or builds were run and no
 reference enforcement or homing result is claimed yet.
+
+
+### G11 — sensor-driven HomingCycle foundation
+
+Add HomingAxis, HomingDriver and HomingCycle. HomingAxis takes real drive
+velocity/acceleration, coordinate travel/overtravel, authored home switches
+and fixed sampling interval. Seek speed is capped by one quarter of drive
+speed and half the braking-distance speed before the end stop. Latch speed
+is capped by seek speed and a quarter of repeatability per tick; release
+travel clears hysteresis and both sides of the repeatability band. With
+zero authored repeatability, latch requires an edge capture; the numerical
+return-position tolerance uses an explicit 1 µm floor when no positive
+repeatability is available.
+
+The cycle orders Z before X/Y (including qualified axis IDs), starts only
+at rest, seeks to the first switch, stops under acceleration control, backs
+off until every switch is released with margin, stops, approaches slowly,
+captures every home edge, stops, establishes references, then returns to
+the authored home. Initially active switches start with backoff. Stops
+must finish before reversing or applying coordinate zeros. Return uses
+an observation after calibration, so the raw-to-logical coordinate change
+cannot be mistaken for excessive travel. Missing signals, excessive
+travel/time, late sampling without edge capture and invalid observations
+fault and request a controlled stop. Cancellation stops the current axis.
+
+HomingDriver is the explicit execution boundary: observation, homing-classified
+velocity/stop/return commands, and latch that establishes runtime zeros and
+resets encoder/slip monitors. Its runtime implementation is still pending.
+The state machine is not yet connected to MotionSystem.home(), runtime
+admission or application startup. No homing result is claimed and no tests
+or builds have been run.

@@ -1,0 +1,154 @@
+package motionkit.robot;
+
+import motionkit.robot.HomingDriver.HomingObservation;
+
+private enum HomingPhase {
+  Idle; Seek; StopAfterSeek; Backoff; StopAfterBackoff; Approach; StopAfterLatch; Return; Complete; Fault;
+}
+
+/** Sensor-driven homing with controlled stops between every change of direction. */
+class HomingCycle {
+  final driver:HomingDriver;
+  final axes:Array<HomingAxis>;
+  var index:Int = 0;
+  var phase:HomingPhase = Idle;
+  var origin:Float = 0.0;
+  var elapsed:Float = 0.0;
+  var releasePosition:Null<Float> = null;
+  var captures:Array<Null<Float>> = [];
+  public var fault(default, null):Null<String> = null;
+
+  public function new(driver:HomingDriver, axes:Array<HomingAxis>) {
+    if (driver == null || axes == null || axes.length == 0) throw "Homing requires a driver and physical axes";
+    this.driver = driver; this.axes = axes.copy();
+    var ids = new Map<String, Bool>(), joints = new Map<Int, Bool>();
+    for (axis in this.axes) {
+      if (axis == null || ids.exists(axis.id) || joints.exists(axis.joint))
+        throw "Homing requires distinct non-null axes and joints";
+      ids.set(axis.id, true); joints.set(axis.joint, true);
+    }
+    // Retract the downward slide before any horizontal carriage movement.
+    this.axes.sort((a, b) -> {
+      var nameA = a.id.split("/").pop(), nameB = b.id.split("/").pop();
+      var first = nameA == "z" ? 0 : nameA == "x" ? 1 : nameA == "y" ? 2 : 3;
+      var second = nameB == "z" ? 0 : nameB == "x" ? 1 : nameB == "y" ? 2 : 3;
+      return first == second ? Reflect.compare(a.id, b.id) : first - second;
+    });
+  }
+
+  public function status():String return Std.string(phase);
+  public function isComplete():Bool return phase == Complete;
+  public function isActive():Bool return phase != Idle && phase != Complete && phase != Fault;
+
+  public function start():Void {
+    if (phase != Idle) throw "Homing cycle has already started";
+    try beginAxis() catch (error:Dynamic) {
+      fault = Std.string(error); phase = Fault;
+      try driver.stop(axes[index].joint, axes[index].acceleration) catch (_:Dynamic) {}
+      throw error;
+    }
+  }
+
+  function beginAxis():Void {
+    var axis = axes[index], observation = driver.observe(axis.joint);
+    if (Math.abs(observation.velocity) > axis.latchSpeed * 0.01)
+      throw "Homing must start with the axis at rest";
+    captures = [for (_ in axis.switches) null]; releasePosition = null;
+    if (anyActive(axis, observation)) enter(Backoff, observation);
+    else enter(Seek, observation);
+  }
+
+  public function update(dt:Float):Bool {
+    if (!Math.isFinite(dt) || dt <= 0) throw "Homing update requires a finite positive interval";
+    if (!isActive()) return false;
+    var axis = axes[index];
+    try {
+      var observation = driver.observe(axis.joint);
+      elapsed += dt;
+      var timeout = axis.maximumTravel / axis.latchSpeed + 10 * axis.seekSpeed / axis.acceleration;
+      if (elapsed > timeout || Math.abs(observation.position - origin) > axis.maximumTravel)
+        throw 'Homing axis "${axis.id}" did not reach its switch within physical travel';
+      var stopped = Math.abs(observation.velocity) <= axis.latchSpeed * 0.01;
+      switch phase {
+        case Seek:
+          if (anyActive(axis, observation)) enter(StopAfterSeek, observation);
+        case StopAfterSeek:
+          if (stopped) enter(Backoff, observation);
+        case Backoff:
+          if (anyActive(axis, observation)) releasePosition = null;
+          else {
+            if (releasePosition == null) releasePosition = observation.position;
+            if (Math.abs(observation.position - releasePosition) >= axis.releaseDistance)
+              enter(StopAfterBackoff, observation);
+          }
+        case StopAfterBackoff:
+          if (stopped) { captures = [for (_ in axis.switches) null]; enter(Approach, observation); }
+        case Approach:
+          var all = true;
+          for (i in 0...axis.switches.length) {
+            var signal = signalFor(axis.switches[i].id, observation);
+            if (signal.active && captures[i] == null) {
+              if (signal.edgePosition == null && axis.switches[i].repeatability == 0)
+                throw "Zero-repeatability homing requires captured switch edges";
+              if (signal.edgePosition == null && dt > axis.timestep * (1 + 1e-9))
+                throw "Homing sampling interval exceeds its repeatability budget";
+              captures[i] = signal.edgePosition == null ? observation.position : signal.edgePosition;
+            }
+            if (captures[i] == null) all = false;
+          }
+          if (all) enter(StopAfterLatch, observation);
+        case StopAfterLatch:
+          if (stopped) {
+            for (i in 0...axis.switches.length) {
+              var capture = captures[i];
+              if (capture == null) throw "Homing has no captured latch position";
+              driver.latch(axis.switches[i].id, capture);
+            }
+            enter(Return, driver.observe(axis.joint));
+          }
+        case Return:
+          if (stopped && Math.abs(observation.position - axis.home) <= axis.positionTolerance) {
+            index++;
+            if (index == axes.length) phase = Complete;
+            else beginAxis();
+          }
+        case _:
+      }
+      return isActive();
+    } catch (error:Dynamic) {
+      fault = Std.string(error); phase = Fault;
+      try driver.stop(axis.joint, axis.acceleration) catch (_:Dynamic) {}
+      throw error;
+    }
+  }
+
+  public function cancel():Void {
+    if (!isActive()) return;
+    driver.stop(axes[index].joint, axes[index].acceleration);
+    fault = "Homing cancelled"; phase = Fault;
+  }
+
+  function enter(next:HomingPhase, observation:HomingObservation):Void {
+    phase = next; origin = observation.position; elapsed = 0.0;
+    var axis = axes[index], side = axis.switches[0].side;
+    switch next {
+      case Seek: driver.velocity(axis.joint, side * axis.seekSpeed, axis.acceleration);
+      case Backoff: driver.velocity(axis.joint, -side * axis.seekSpeed, axis.acceleration);
+      case Approach: driver.velocity(axis.joint, side * axis.latchSpeed, axis.acceleration);
+      case StopAfterSeek, StopAfterBackoff, StopAfterLatch: driver.stop(axis.joint, axis.acceleration);
+      case Return: driver.returnHome(axis.joint, axis.home, axis.seekSpeed, axis.acceleration);
+      case _:
+    }
+  }
+
+  function anyActive(axis:HomingAxis, observation:HomingObservation):Bool {
+    var active = false;
+    for (contact in axis.switches) if (signalFor(contact.id, observation).active) active = true;
+    return active;
+  }
+
+  function signalFor(id:String, observation:HomingObservation):motionkit.robot.HomingDriver.HomingSwitchObservation {
+    for (signal in observation.switches) if (signal != null && signal.id == id) return signal;
+    throw 'Homing switch "$id" has no fresh observation';
+  }
+}
