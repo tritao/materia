@@ -588,6 +588,15 @@ class Simulation {
    * on, as a stepper that lost steps is, until reset. A joint's coupled joints need the matching
    * offsets. Accepted while the simulation runs.
    */
+  /** Configure a stopped cold/reset robot's physical power-up pose and unknown counter origin.
+   * Full coupling-consistent joint vector in SI units; later lost steps use setJointSlip. */
+  public function setPowerUpOffsets(robotIndex:Int, offsets:Array<Float>):Void {
+    ensureLive();
+    if (offsets == null) throw "Power-up offsets require a full joint vector";
+    check(RobotKitSimKit.rk_simulation_set_power_up_offsets(owner.borrow(), robotIndex, offsets),
+      "simulation.setPowerUpOffsets");
+  }
+
   public function setJointSlip(robotIndex:Int, joint:Int, offset:Float):Void {
     ensureLive();
     check(RobotKitSimKit.rk_simulation_set_joint_slip(owner.borrow(), robotIndex, joint, offset),

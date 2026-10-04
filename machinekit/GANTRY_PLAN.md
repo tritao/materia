@@ -1755,3 +1755,22 @@ handling remain pending. This separation enables proper calibration rather
 than latching a physical edge as if it were an unknown counter. Native/Haxe
 concurrent reset/calibration and nonzero-offset behavior remain unverified.
 No tests or builds ran.
+
+
+### G11 — stopped-world power-up offset API
+
+Counter-origin separation: `75b6b6540`. Add Simulation.setPowerUpOffsets and
+its native borrowed-array API. Validate a full finite coupling-consistent SI
+vector, unchanged cold/reset origins, no existing lost-step slip, and physical
+poses within soft travel before changing the world. Require runtime sequence
+zero and a stopped world; virtual-device endpoints return unsupported until
+G13. Place one-DOF joints with SimKit's initial-state API and retain those offsets
+as counter origins. Replace startup holds with holds at the physical offset
+pose, so counters retain their initial readings while the actual machine is
+shifted. Attempt to restore prior joint states if a backend placement fails.
+
+Regenerate SimKit FFI sources. Typed scene authoring, coupling propagation from
+named axes and reset reapplication remain pending. Existing setJointSlip stays
+available for later lost steps; combining unknown startup counter origin with
+that later physical fault would hide monitor errors. This refines the plan's
+original setJointSlip-only sketch. No tests or builds ran.

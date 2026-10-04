@@ -267,6 +267,11 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 */
 	extern fn rk_simulation_stop_virtual_device(simulation: rk_simulation, robot_index: u32) -> rk_result;
 	/**
+	 * Place a cold/reset robot at a coupling-consistent physical offset while keeping its counter origin.
+	 * Full joint vector in SI units; accepted only in a stopped world before the first runtime sample.
+	 */
+	extern fn rk_simulation_set_power_up_offsets(simulation: rk_simulation, robot_index: u32, offsets: ptr<const<f64>> @in_array("count"), count: u32) -> rk_result;
+	/**
 	 * Teleports one attached robot's base while the simulation is stopped.
 	 * This does not change the pose restored by reset or resetRobot.
 	 */

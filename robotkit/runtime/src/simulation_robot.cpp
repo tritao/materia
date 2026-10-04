@@ -24,7 +24,7 @@ void SimulationRobot::queue_rest_holds() noexcept {
         target.struct_size = sizeof(target);
         target.joint = joints_[joint];
         target.mode = NKSIM_JOINT_TARGET_POSITION;
-        target.target = 0.0;
+        target.target = joint < counter_origin_.size() ? counter_origin_[joint] : 0.0;
         if (joint < servo_.size() && servo_[joint].stiffness > 0.0) {
             target.mode = NKSIM_JOINT_TARGET_SERVO;
             target.stiffness = servo_[joint].stiffness;

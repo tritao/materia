@@ -5,6 +5,7 @@
 #include "sensor_math.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <limits>
 #include <stdexcept>
@@ -844,6 +845,63 @@ rk_result Simulation::reset_robots() {
         if (auto binding = bindings_[index].lock()) binding->reset();
         runtimes_[index]->reset_state();
     }
+    return RK_OK;
+}
+
+rk_result Simulation::set_power_up_offsets(uint32_t robot_index, const double *offsets, uint32_t count) {
+    Lock lock(session_);
+    const auto world = stopped_world();
+    if (!world || !offsets || robot_index >= bindings_.size()) return RK_ERROR_INVALID_ARGUMENT;
+    auto binding = bindings_[robot_index].lock();
+    if (!binding) return RK_ERROR_INVALID_HANDLE;
+    if (std::find(virtual_bindings_.begin(), virtual_bindings_.end(), binding) != virtual_bindings_.end())
+        return RK_ERROR_UNSUPPORTED;
+    const auto &blueprint = runtimes_[robot_index]->blueprint();
+    if (count != blueprint.joint_count) return RK_ERROR_INVALID_ARGUMENT;
+    rk_robot_state observed{};
+    runtimes_[robot_index]->snapshot(observed);
+    if (observed.sequence != 0) return RK_ERROR_INVALID_STATE;
+    std::array<nksim_joint_state, RK_MAX_JOINTS> before{};
+    for (uint32_t joint = 0; joint < count; ++joint) {
+        if (!std::isfinite(offsets[joint]) || binding->counter_origin_[joint] != 0.0 ||
+            binding->slip_[joint] != 0.0) return RK_ERROR_INVALID_ARGUMENT;
+        if (blueprint.joints[joint].type == RK_RUNTIME_JOINT_FIXED) {
+            if (offsets[joint] != 0.0) return RK_ERROR_INVALID_ARGUMENT;
+            continue;
+        }
+        before[joint].struct_size = sizeof(before[joint]);
+        if (nksim_joint_get_state(world, binding->joints_[joint], &before[joint]) != NKSIM_OK)
+            return RK_ERROR_BACKEND;
+        const double position = before[joint].position + offsets[joint];
+        const auto &limits = blueprint.joints[joint];
+        if (!std::isfinite(position) || position < limits.lower_limit || position > limits.upper_limit)
+            return RK_ERROR_LIMIT;
+    }
+    for (uint32_t joint = 0; joint < count; ++joint) {
+        bool coupled = false; double expected = 0.0;
+        for (uint32_t k = 0; k < blueprint.coupling_count; ++k)
+            if (blueprint.couplings[k].follower == joint) {
+                coupled = true;
+                expected += blueprint.couplings[k].ratio * offsets[blueprint.couplings[k].leader];
+            }
+        if (coupled && (!std::isfinite(expected) || std::abs(expected - offsets[joint]) > 1e-6))
+            return RK_ERROR_INVALID_ARGUMENT;
+    }
+    for (uint32_t joint = 0; joint < count; ++joint) {
+        if (blueprint.joints[joint].type == RK_RUNTIME_JOINT_FIXED) continue;
+        if (nksim_joint_set_state(world, binding->joints_[joint],
+                before[joint].position + offsets[joint], 0.0) != NKSIM_OK) {
+            for (uint32_t restore = 0; restore <= joint; ++restore)
+                if (blueprint.joints[restore].type != RK_RUNTIME_JOINT_FIXED)
+                    nksim_joint_set_state(world, binding->joints_[restore],
+                        before[restore].position, before[restore].velocity);
+            return RK_ERROR_BACKEND;
+        }
+    }
+    std::copy_n(offsets, count, binding->counter_origin_.begin());
+    // Replace initial holds with physical holds at the offset pose.
+    binding->pending_targets_.clear();
+    binding->queue_rest_holds();
     return RK_OK;
 }
 

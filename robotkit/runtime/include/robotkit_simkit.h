@@ -437,6 +437,10 @@ RK_API rk_result RK_CALL rk_simulation_reset_robot(rk_simulation simulation,
  */
 RK_API rk_result RK_CALL rk_simulation_set_joint_slip(
     rk_simulation simulation, uint32_t robot_index, uint32_t joint, double offset);
+/** Place a cold/reset robot at a coupling-consistent physical offset while keeping its counter origin.
+ * Full joint vector in SI units; accepted only in a stopped world before the first runtime sample. */
+RK_API rk_result RK_CALL rk_simulation_set_power_up_offsets(rk_simulation simulation,
+    uint32_t robot_index, const double *offsets RK_IN_ARRAY(count), uint32_t count);
 /** Teleports one attached robot's base while the simulation is stopped.
  * This does not change the pose restored by reset or resetRobot. */
 RK_API rk_result RK_CALL rk_simulation_teleport_robot(
