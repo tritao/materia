@@ -501,7 +501,7 @@ and torch reorientation. Approaches and retracts must clear the work: collision
 plan CL4 validation when it lands, until then a swept-volume clearance check. A
 seam the torch can't reach at its angles is reported, not skipped.
 
-W4 implementation notes (in progress, 2026-10-04):
+W4 implementation notes (done, 2026-10-04):
 - Corner length comes from a rest-to-rest angular turn with half the wrist's speed and acceleration reserved
   for reorientation. With `w = 0.5 * angularSpeed` and `a = 0.5 * angularAcceleration`, its time is
   `2 * sqrt(angle / a)` below the speed limit, otherwise `angle / w + w / a`. Each side contributes
@@ -534,8 +534,7 @@ W4 implementation notes (in progress, 2026-10-04):
   broad grid sampling alone can miss a reachable branch. If the CAD tour's chosen direction has no feasible entry,
   the planner tries reversed travel. It derives the reverse wire from the stored wire and seam tangent, reversing
   the push component and preserving the face cross-section component. No seam angles are guessed or hard-coded.
-  Focused planning passes 44 assertions; full-cell execution
-  remains under validation.
+  Focused planning passes 44 assertions; full-cell execution passes on MuJoCo and the test backend.
 - The cell owns its ready configuration (`WeldingCell.readyPose`); the preview writes that configuration into the
   scene's assembly state and uses it for CAD checks. The arm and its tool interface need no welding-specific method.
 - Pre-path weld decoding is removed: a weld without an explicit segment path is rejected. ProjectKit's rejection
@@ -573,8 +572,15 @@ W4 implementation notes (in progress, 2026-10-04):
   reach-only timing is not retained by bypassing clearance or angular limits. The in-air seam still fails with
   “the arc could not be held in 3 restarts”; crater dropout finishes with no restart and a whole bead;
   displacement by 12.3 mm leaves the tip within 0.1 mm of the real seam and the leg at 5.0 mm.
-- The whole-weldment test enforces the requested 2 mm bead-length tolerance per seam; W4 remains incomplete until
-  the full MuJoCo mission, the focused baselines and all affected suites pass.
+- Final W4 gates pass: ProcessKit 52 welder / 44 planning / 11 rate-schedule / 23 process assertions;
+  RobotKit 27 tool / 33 process / 152 weld / 33 clearance assertions; RobotKit world 4,950 assertions;
+  CAD bridge 157; ProjectKit 131. MachineKit smoke passes, including the complete mission and rejection checks.
+  The generated tour covers 680 mm, with 386 mm air travel and 176 degrees of turning versus 846 mm / 290 degrees
+  in discovery order. The app compiles against R5 and passes welder, arm and mobile. Arm remains 23.5 s;
+  the MuJoCo mobile mission completes in 61 s and its obstacle round in 65 s with one replan.
+  The whole-weldment test enforces 2 mm bead-length tolerance and 0.5 mm leg tolerance per seam.
+  R3/R4 landed early and their import repair is separate; R5's package move is merged with ConvexDistance in core.
+  W5 can start after this W4 sync, with the R0/R3/R4 prerequisites already present.
 
 **W5. Weaving and multi-pass.** A MotionKit path modifier lays a weave (sine,
 triangle or zigzag: amplitude, frequency, dwell at the edges) across the seam
@@ -669,6 +675,6 @@ Dependencies:
 | W1 | done | seams found from member faces (`WeldSeams`, `WeldSeam`, `Weldment`); workpiece with a tube frame; checks |
 | W2 | done | work clamp and derived grounded work; `torch` robot tool in the scene artifact; `SimulatedWelder` + `WeldArcModel`; `WelderProcessDevice`; tests |
 | W3 | done (+ hardening: paths, live workpiece frame, exit crash, safety tests) | `weld` mission step; `WeldSeam` skill and `WeldBead`; process engagement and `WeldingPlanRunner`; weld metal part and recipe; bead as runtime geometry; welds on MuJoCo and the test backend, restart with overlap |
-| W4 | | |
+| W4 | Done (2026-10-04) | Whole CAD weldment: 10 seams / 680 mm in 4 runs; swept clearance and derived corner turns; 106.5 s on both backends, legs 4.9–5.1 mm; affected gates pass. Timing changes recorded above. |
 | W5 | | |
 | W6 | | |
