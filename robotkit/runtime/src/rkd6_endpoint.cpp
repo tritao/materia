@@ -466,7 +466,10 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
         plan.ends_at_rest != 0, host_epoch_ns_ + base_time_ns, clock_, blueprint,
         ack_.device_tick_hz, ack_.step_tick_hz, ack_.max_degree, target_error_, layout_,
         anchor_ticks);
-    if (!compiled.ok) return RK_ERROR_LIMIT;
+    if (!compiled.ok) {
+        std::fprintf(stderr, "Rkd6Endpoint: device plan conversion failed: %s\n", compiled.error.c_str());
+        return RK_ERROR_LIMIT;
+    }
     const auto event_count = static_cast<std::uint32_t>(plan.events.size());
     if (event_count > ack_.event_capacity)
         return RK_ERROR_LIMIT;

@@ -2,6 +2,7 @@
 #include "coupling_terms.hpp"
 #include "trajectory_core.h"
 #include <algorithm>
+#include <cstdio>
 #include <bit>
 #include <cmath>
 #include <limits>
@@ -273,8 +274,13 @@ CompiledDevicePlan6 compile_device_segments6(
     mk_trajectory_destroy(validation);
     if (validated != MK_OK) return failure("mk_validate rejected converted trajectory");
     for (const auto &check : report.checks)
-        if (check.status == MK_CHECK_FAILED)
-            return failure("converted trajectory violates deployment limits");
+        if (check.status == MK_CHECK_FAILED) {
+            char detail[256];
+            std::snprintf(detail, sizeof(detail),
+                "converted trajectory violates deployment limits: joint=%u derivative=%u value=%.17g limit=%.17g tolerance=%.17g",
+                check.joint, check.derivative_order, check.value, check.limit, check.tolerance);
+            return failure(detail);
+        }
     result.ok = true;
     return result;
 }
