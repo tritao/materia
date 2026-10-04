@@ -11,10 +11,14 @@ pub struct SkewGroup {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum StepFault { DualDriveSkew, InvalidActuatorCount, InputCounterOverflow }
+pub enum StepFault { DualDriveSkew, InvalidActuatorCount, InputCounterOverflow, InvalidHomingPurpose }
 
 pub struct StepGenerator<const A: usize> {
     inputs: InputCapture,
+    homing_pair: Option<(usize, usize)>,
+    held: [Option<i64>; A],
+    alignment_steps: [f64; A],
+    nominal_steps: [f64; A],
     steps_per_unit: [f64; A],
     setup_ticks: [u64; A],
     min_interval_ticks: [u64; A],
@@ -41,7 +45,8 @@ impl<const A: usize> StepGenerator<A> {
                     u64::from(interval > interval as u64 as f64);
             }
         }
-        Some(Self { inputs: InputCapture::new(), steps_per_unit, setup_ticks, min_interval_ticks,
+        Some(Self { inputs: InputCapture::new(), homing_pair: None, held: [None; A],
+            alignment_steps: [0.0; A], nominal_steps: [0.0; A], steps_per_unit, setup_ticks, min_interval_ticks,
             direction: [None; A], direction_since: [0; A], last_step: [None; A],
             skew: [None; A], skew_count: 0, squaring_bound: [None; A] })
     }
@@ -87,17 +92,63 @@ impl<const A: usize> StepGenerator<A> {
 
     pub fn end_squaring(&mut self) { self.squaring_bound.fill(None); }
 
-    pub fn tick<B: Board>(&mut self, board: &mut B, targets: [f32; A]) -> Result<(), StepFault> {
-        self.tick_active(board, targets, A)
+    pub fn begin_homing_pair(&mut self, first: usize, second: usize, bound: f64) -> bool {
+        if self.homing_pair.is_some() || !self.begin_squaring(first, second, bound) { return false; }
+        self.homing_pair = Some((first, second));
+        true
     }
 
-    /// Only the negotiated outputs may emit pulses, including after a smaller session replaces a larger one.
+    pub fn hold_homing_side<B: Board>(&mut self, board: &B, actuator: usize) -> bool {
+        let Some((first, second)) = self.homing_pair else { return false; };
+        if actuator != first && actuator != second { return false; }
+        if self.held[actuator].is_some() { return false; }
+        let physical = board.step_count(actuator);
+        self.held[actuator] = Some(physical);
+        self.alignment_steps[actuator] = physical as f64 - self.nominal_steps[actuator];
+        true
+    }
+
+    pub fn release_homing_side(&mut self, actuator: usize) -> bool {
+        let Some((first, second)) = self.homing_pair else { return false; };
+        if (actuator != first && actuator != second) || self.held[actuator].is_none() { return false; }
+        self.held[actuator] = None;
+        true
+    }
+
+    /// Preserve the physical alignment while restoring normal skew bounds.
+    pub fn end_homing_pair(&mut self) {
+        self.held.fill(None);
+        self.homing_pair = None;
+        self.end_squaring();
+    }
+
+    pub fn tick<B: Board>(&mut self, board: &mut B, targets: [f32; A]) -> Result<(), StepFault> {
+        self.tick_active_with_purpose(board, targets, A, 0)
+    }
+
+    pub fn tick_with_purpose<B: Board>(&mut self, board: &mut B, targets: [f32; A], purpose: u8) -> Result<(), StepFault> {
+        self.tick_active_with_purpose(board, targets, A, purpose)
+    }
+
     pub fn tick_active<B: Board>(&mut self, board: &mut B, targets: [f32; A], count: usize) -> Result<(), StepFault> {
+        self.tick_active_with_purpose(board, targets, count, 0)
+    }
+
+    pub fn tick_active_with_purpose<B: Board>(&mut self, board: &mut B, targets: [f32; A], count: usize, purpose: u8) -> Result<(), StepFault> {
         if count > A { return Err(StepFault::InvalidActuatorCount); }
-        if !self.inputs.sample(board, None) { return Err(StepFault::InputCounterOverflow); }
+        if self.homing_pair.is_some() && purpose != 2 {
+            self.end_homing_pair();
+            return Err(StepFault::InvalidHomingPurpose);
+        }
+        if !self.inputs.sample(board, None) { self.end_homing_pair(); return Err(StepFault::InputCounterOverflow); }
         let now = board.now_ticks();
         for a in 0..count {
-            let raw = targets[a] as f64 * self.steps_per_unit[a];
+            self.nominal_steps[a] = targets[a] as f64 * self.steps_per_unit[a];
+            if let Some(physical) = self.held[a] {
+                self.alignment_steps[a] = physical as f64 - self.nominal_steps[a];
+                continue;
+            }
+            let raw = self.nominal_steps[a] + self.alignment_steps[a];
             let truncated = raw as i64;
             let desired = truncated.saturating_sub(i64::from(raw < truncated as f64));
             let actual = board.step_count(a);
@@ -113,7 +164,7 @@ impl<const A: usize> StepGenerator<A> {
                 if now.saturating_sub(last) < self.min_interval_ticks[a] { continue; }
             }
             board.step_pulse(a, forward);
-            if !self.inputs.sample(board, Some(a)) { return Err(StepFault::InputCounterOverflow); }
+            if !self.inputs.sample(board, Some(a)) { self.end_homing_pair(); return Err(StepFault::InputCounterOverflow); }
             self.last_step[a] = Some(now);
         }
         for (i, configured) in self.skew[..self.skew_count].iter().enumerate() {
@@ -124,7 +175,7 @@ impl<const A: usize> StepGenerator<A> {
             let second = board.step_count(group.second) as f64 /
                 self.steps_per_unit[group.second] / group.second_ratio;
             let bound = self.squaring_bound[i].unwrap_or(group.bound);
-            if (first - second).abs() > bound { return Err(StepFault::DualDriveSkew); }
+            if (first - second).abs() > bound { self.end_homing_pair(); return Err(StepFault::DualDriveSkew); }
         }
         Ok(())
     }

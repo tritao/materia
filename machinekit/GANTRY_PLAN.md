@@ -2643,3 +2643,21 @@ revision 13; preserved its earlier input-only lock in scratch. A purpose retenti
 and invalid-purpose regression is queued for the Phase C gate. No tests/builds
 ran. Scope begin/end, side holds/zeros, hardware inputs and virtual-router homing
 verification remain pending; G13 is not complete.
+
+### G13 — scoped device-side independent holds
+
+StepGenerator can begin one explicit configured homing pair with a finite
+bounded skew override, hold only its two actuator channels and release them
+without snapping to the shared target. While held, each side retains its actual
+step count and updates an alignment displacement relative to the nominal target;
+release preserves that displacement. Purpose-aware stepping rejects an active
+scope on ordinary/jog segments. Purpose mismatch, input counter overflow and
+skew faults clear holds/scope and restore normal bounds. Explicit scope end also
+preserves physical alignment. Legacy unscoped stepping remains program-purpose.
+
+A queued regression verifies first-side hold, second-side continuation, no jump
+on release, rejection of an unrelated actuator and duplicate scope, homing-purpose
+requirement and restoration of normal skew bounds. No tests/builds ran. This is
+step-generator support only: control messages, physical independent counter zeros,
+feedback correction and cancellation/reset/link-loss ownership still require
+integration before a virtual-router homing run can prove G13 complete.

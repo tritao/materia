@@ -49,3 +49,31 @@ fn lead_screw_crosses_400_steps_per_mm() {
         assert!((board.step_count(0) - expected).abs() <= 1);
     }
 }
+
+#[test]
+fn homing_side_hold_preserves_alignment_and_requires_homing_purpose() {
+    let mut board = VirtualBoard::<3, 1>::new(1000, 0, 0, [1000.0; 3]);
+    let mut generator = StepGenerator::new([1000.0; 3], [0; 3], [0.0; 3], 1000).unwrap();
+    assert!(generator.set_skew_group(SkewGroup {
+        first: 0, second: 1, first_ratio: 1.0, second_ratio: 1.0, bound: 0.001,
+    }));
+    assert!(!generator.hold_homing_side(&board, 0));
+    assert!(generator.begin_homing_pair(0, 1, 0.02));
+    assert!(!generator.begin_homing_pair(0, 1, 0.02));
+    assert!(!generator.hold_homing_side(&board, 2));
+    assert!(generator.hold_homing_side(&board, 0));
+    for tick in 1..=3 {
+        board.advance_host_ns(tick * 1_000_000);
+        generator.tick_with_purpose(&mut board, [0.003, 0.003, 0.0], 2).unwrap();
+    }
+    assert_eq!(board.step_count(0), 0);
+    assert_eq!(board.step_count(1), 3);
+    assert!(generator.release_homing_side(0));
+    board.advance_host_ns(4_000_000);
+    generator.tick_with_purpose(&mut board, [0.003, 0.003, 0.0], 2).unwrap();
+    assert_eq!(board.step_count(0), 0);
+    assert_eq!(generator.tick(&mut board, [0.003, 0.003, 0.0]), Err(StepFault::InvalidHomingPurpose));
+    assert!(!generator.hold_homing_side(&board, 0));
+    // Invalid-purpose cleanup restored the normal skew bound.
+    assert_eq!(generator.tick(&mut board, [0.003, 0.003, 0.0]), Err(StepFault::DualDriveSkew));
+}
