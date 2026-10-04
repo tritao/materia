@@ -2878,3 +2878,19 @@ and transmitted start/constants/limit translation after a nonzero reference.
 No builds/tests ran; the new regression awaits Phase C. Homing side adapter,
 controlled-stop lifecycle, router fixture and hardware implementation remain
 unfinished, and G13 is not complete.
+
+### G13 — acknowledged device homing side adapter
+
+Added DeviceHomingSides implementing HomingSideControl and its asynchronous
+readiness contract. It resolves deployed switch inputs to distinct physical
+shafts on one leader, requires an explicit finite squaring skew budget at least
+the normal bound, serializes begin/hold/release/end commands and waits for each
+acknowledgment. Leader capture compensation uses independent measured shaft
+feedback. Complete released pairs poll staged runtime calibration before
+reporting readiness; the adapter accounts for its native batch sequence.
+
+No builds/tests ran. This adapter is not connected to router execution yet.
+Controlled homing stop must preserve device scope and host queue bookkeeping;
+fault/cancellation cleanup must discard inappropriate pending operations and
+resolve uncertain batches. Hardware controls/GPIO and Phase C verification also
+remain pending. G13 remains incomplete.
