@@ -33,7 +33,7 @@ class Bend {
 		var regions = [developedRegion(allowance)];
 		for (cut in cuts) {
 			var next:Array<WallOutline> = [];
-			for (region in regions) for (part in OutlineDifference.regions(region, cut.region, cut.owner)) next.push(part);
+			for (region in regions) for (part in OutlineBoolean.regions(region, cut.region, cut.owner)) next.push(part);
 			regions = next;
 		}
 		return regions;

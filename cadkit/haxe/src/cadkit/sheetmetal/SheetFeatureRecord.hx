@@ -23,6 +23,7 @@ import cadkit.sheetmetal.SheetMaterial.SheetMechanical;
 	@:id(3) var mechanical:Null<SheetMechanical>;
 	@:id(4) var defaultRadiusRatio:Null<Float>;
 	@:id(5) var minRadiusRatio:Null<Float>;
+	@:id(6) var grainAngle:Null<Float>;
 }
 
 @:wire enum SheetSavedBendRule {

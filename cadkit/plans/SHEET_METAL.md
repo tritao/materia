@@ -325,6 +325,18 @@ table in `tools/README.md`.
 - `FlatPattern`: outer and inner loops (lines and arcs, splines refused), bend lines with id,
   direction, angle, inner radius and allowance, form markers, grain direction, part bounding
   box.
+- SM4a derives exact unions of mapped wall/bend material domains with `OutlineBoolean`
+  (the renamed generalisation of `OutlineDifference`, without an alias). Boundary subdivisions
+  retain authored identities; acceptance compares material geometry with an independent outline,
+  rather than counting collinear subdivisions. Domain owners remain typed graph identities.
+  Fold lines mark only material-covered intervals; effective bend length is their total length,
+  while nominal attachment width is separately available. Bend records are sorted by permanent id.
+- Grain is an authored undirected angle in the root wall frame, normalised modulo pi. It is
+  introduced on `SheetMaterial` in SM4a because flat checks need it before SM6's library work.
+  The exported plane's X axis follows grain, so an arbitrary rolling angle can map exactly to
+  ManufacturingKit's width-aligned rectangular-stock constraint. Ungrained parts retain the
+  root plane. Document version 14 saves the typed grain snapshot; version 13 is rejected,
+  runtime fixtures use current code, and the named-thickness builder preserves grain.
 - DXF writer: ASCII R12 (AC1009) with `LINE`, `ARC`, `CIRCLE` and `TEXT` entities only
   (`LWPOLYLINE` is not R12), layers `OUTLINE`, `BEND_UP`, `BEND_DOWN`, `ETCH`, `TEXT`. SVG writer
   with the same layers. Both pure Haxe in `cadkit.drawing`.
@@ -842,9 +854,9 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM0 | done: clean branch on 38601ac61, pins verified, prerequisite documents read; quick gate `sm0-setup` passes (ProjectKit 138, ManufacturingKit 54) | c70c89745 |
 | SM1 | done: exact line/arc regions, permanent graph ids, edits/cuts/rips, bidirectional FK, neutral-length conservation, closure and P1–P5 bounds; quick gate `sm1-core` passes (2102 sheet assertions) | 0713c4e0c; 54b5cab15 |
 | SM2 | done: named wall extrusions and bend revolutions fused for flat/folded/partial states; P1–P5 validity, single bodies, volumes, axes and stable names; quick gate `sm2-solid` passes (3757 sheet assertions) | 7a3836d8c |
-| SM3 | done (required feature chain); optional corner closure tracked separately as SM3o: SM3a atomic graph publication; SM3b exact sketch-backed base, side A/B, stock codec and named thickness builder; quick gates `sm3a-staging` (3773) and `sm3b-base` (3813 sheet assertions); SM3c authored segment names and exact face-to-graph picks; quick gate `sm3c-edges` (3843 sheet assertions); SM3d exact flange geometry and alignment; quick gate `sm3d-flange-geometry` (3880 sheet assertions); SM3e typed flange features, authored shared identities, gaps/extensions, stock radius defaults and P1–P5 document acceptance; quick gate `sm3e-flanges-typed` (4044 sheet assertions); SM3f exact planar subtraction foundation; quick gate `sm3f-outline-cuts` (4068 sheet assertions); SM3g typed rectangular/obround reliefs and sizing, exact gap/bend-width semantics, atomic edits and codec; quick gate `sm3g-reliefs` (4132 sheet assertions); SM3h closed/open/teardrop hems, shared edge selection, typed codec and builder; quick gate `sm3h-hems` (4303 sheet assertions); SM3i permanent bend-id rip feature, typed codec and builder; quick gate `sm3i-rips` (4315 sheet assertions); SM3j exact through-wall cuts on staged attached sketches, shared region mapping, typed codec and builder; quick gate `sm3j-wall-cuts` (4348 sheet assertions); SM3k nominal seam datums, exact bend material regions and seam validation; quick gate `sm3k-bend-regions` (4368 sheet assertions); SM3l native mapped positive-radius regions and adaptive volume integration; quick gate `sm3l-native-regions` (4368 sheet assertions); SM3m developed cuts across wall/bend/flange domains, named native patches, typed codec and edits, certified material bounds; quick gate `sm3m-cross-bend-cuts` (4633 sheet assertions); SM3n graph-derived collapsed-axis sectors, exact closed-hem cuts, material connectivity and production save/edit checks; quick gate `sm3n-closed-hem-cuts` (5200 sheet assertions) | 535ebc547; 08afd7a32; bb3405a64; 84a51f00d; 3ed9b3971; 31a696ed7; a02214101; f3ef57fa0; e5d66c947; 3d2d330dd; 6033a2f60; ee0d9e834; f83853060; db7e8be88; SM3 final sub-step commit |
+| SM3 | done (required feature chain); optional corner closure tracked separately as SM3o: SM3a atomic graph publication; SM3b exact sketch-backed base, side A/B, stock codec and named thickness builder; quick gates `sm3a-staging` (3773) and `sm3b-base` (3813 sheet assertions); SM3c authored segment names and exact face-to-graph picks; quick gate `sm3c-edges` (3843 sheet assertions); SM3d exact flange geometry and alignment; quick gate `sm3d-flange-geometry` (3880 sheet assertions); SM3e typed flange features, authored shared identities, gaps/extensions, stock radius defaults and P1–P5 document acceptance; quick gate `sm3e-flanges-typed` (4044 sheet assertions); SM3f exact planar subtraction foundation; quick gate `sm3f-outline-cuts` (4068 sheet assertions); SM3g typed rectangular/obround reliefs and sizing, exact gap/bend-width semantics, atomic edits and codec; quick gate `sm3g-reliefs` (4132 sheet assertions); SM3h closed/open/teardrop hems, shared edge selection, typed codec and builder; quick gate `sm3h-hems` (4303 sheet assertions); SM3i permanent bend-id rip feature, typed codec and builder; quick gate `sm3i-rips` (4315 sheet assertions); SM3j exact through-wall cuts on staged attached sketches, shared region mapping, typed codec and builder; quick gate `sm3j-wall-cuts` (4348 sheet assertions); SM3k nominal seam datums, exact bend material regions and seam validation; quick gate `sm3k-bend-regions` (4368 sheet assertions); SM3l native mapped positive-radius regions and adaptive volume integration; quick gate `sm3l-native-regions` (4368 sheet assertions); SM3m developed cuts across wall/bend/flange domains, named native patches, typed codec and edits, certified material bounds; quick gate `sm3m-cross-bend-cuts` (4633 sheet assertions); SM3n graph-derived collapsed-axis sectors, exact closed-hem cuts, material connectivity and production save/edit checks; quick gate `sm3n-closed-hem-cuts` (5200 sheet assertions) | 535ebc547; 08afd7a32; bb3405a64; 84a51f00d; 3ed9b3971; 31a696ed7; a02214101; f3ef57fa0; e5d66c947; 3d2d330dd; 6033a2f60; ee0d9e834; f83853060; db7e8be88; ab52986ef |
 | SM3o | planned: optional corner closure after SM6, before phase B; gap/overlap and round/square relief semantics remain | |
-| SM4 | planned | |
+| SM4 | in progress: SM4a exact developed blank regions, typed domain owners, sorted bend data and interrupted fold markings, authored grain frame and typed version-14 snapshot; quick gate `sm4a-flat-verified` (5259 sheet assertions); DXF/SVG, design checks and blank requirement remain | SM4a final sub-step commit |
 | SM4b | planned | |
 | SM5 | planned | |
 | SM6 | planned | |
@@ -1017,3 +1029,15 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
   ProjectKit 143, ManufacturingKit 54 and unchanged original MachineKit summaries.
   No new haxeon issue was found. SM3's required features are complete; optional corner closure
   is explicitly SM3o after SM6, before phase B, as permitted by the SM3 step text.
+
+- SM4a: exact mapped material domains produce connected P1–P5 blanks and preserve circular
+  holes across wall/bend seams. P5 matches an independently constructed twelve-corner polygon
+  by empty differences in both directions, exact area and extrema; authored contour subdivisions
+  are preserved rather than coalesced away. Bend lines stop at removed material and the table
+  retains nominal width separately from effective fold length. Nested disconnected rings retain
+  the nearest containing hole owner. Grain normalisation, diagonal/right-angle stock bounds,
+  isolated returned arrays, typed codec and named-thickness material copying are covered.
+  The `sm4a-flat-verified` quick gate passes 5259 sheet assertions (59 new), ProjectKit 143,
+  ManufacturingKit 54 and unchanged original MachineKit summaries. Schema version 14 replaces
+  version 13; runtime fixtures use current code, with no compatibility reader or unchecked cast.
+  No new haxeon issue was found. Exports, design checks and the blank requirement remain SM4.

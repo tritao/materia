@@ -135,7 +135,7 @@ class DocumentBuilder {
 		side:SheetSide = A):SheetBaseFeature {
 		check();
 		var selectedStock = thickness == null ? stock
-			: new SheetMaterial(stock.id, thickness.value, stock.bendRule, stock.mechanical, stock.defaultRadiusRatio, stock.minRadiusRatio);
+			: new SheetMaterial(stock.id, thickness.value, stock.bendRule, stock.mechanical, stock.defaultRadiusRatio, stock.minRadiusRatio, stock.grainAngle);
 		var feature = document.add(new SheetBaseFeature(source, selectedStock, side));
 		if (thickness != null) bind(thickness, feature, "sheet.thickness");
 		return feature;

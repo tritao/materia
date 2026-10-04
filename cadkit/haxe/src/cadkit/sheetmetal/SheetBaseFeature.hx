@@ -18,6 +18,7 @@ class SheetBaseFeature extends SheetFeature {
 	public final mechanical:Null<SheetMechanical>;
 	public final defaultRadiusRatio:Null<Float>;
 	public final minRadiusRatio:Null<Float>;
+	public final grainAngle:Null<Float>;
 	public function new(source:ConstrainedSketchFeature, stock:SheetMaterial, side:SheetSide = A, ?identities:SheetIdentityLedger) {
 		super(identities);
 		this.source = source;
@@ -27,10 +28,11 @@ class SheetBaseFeature extends SheetFeature {
 		mechanical = stock.mechanical;
 		defaultRadiusRatio = stock.defaultRadiusRatio;
 		minRadiusRatio = stock.minRadiusRatio;
+		grainAngle = stock.grainAngle;
 		thickness = new Parameter(this, "sheet.thickness", stock.thickness, 0, false, 1e300, ParameterKind.Length);
 	}
 	public function stock():SheetMaterial {
-		return new SheetMaterial(materialId, thickness.value, bendRule, mechanical, defaultRadiusRatio, minRadiusRatio);
+		return new SheetMaterial(materialId, thickness.value, bendRule, mechanical, defaultRadiusRatio, minRadiusRatio, grainAngle);
 	}
 	override public function serializationType():String { return "sheet-base"; }
 	override public function dependencies():Array<FeatureId> { return [source.id]; }

@@ -7,7 +7,7 @@ class SheetCutGeometry {
 		var result = source.copy();
 		for (target in source.walls()) {
 			var local = SheetProfile.transform(tool, plane, developed.wall(target.id).plane);
-			var regions = OutlineDifference.regions(target.outline, local, owner);
+			var regions = OutlineBoolean.regions(target.outline, local, owner);
 			if (regions.length == 0) throw new SheetDiagnosis("sheet.cut-empty", "Cut removes an entire wall", ["wall:" + target.id]);
 			if (regions.length != 1) throw new SheetDiagnosis("sheet.cut-disconnected", "Cut splits a wall into separate regions", ["wall:" + target.id]);
 			if (regions[0].area() < target.outline.area() - 1e-9) { var changed = result.updateWallMaterial(target.id, regions[0]); }
@@ -16,7 +16,7 @@ class SheetCutGeometry {
 			var zone = developed.bend(bend.id); var local = SheetProfile.transform(tool, plane, zone.frame.plane);
 			var before = bend.materialRegions(zone.allowance); var area = 0.0; var remaining = 0.0;
 			for (region in before) {
-				area += region.area(); for (part in OutlineDifference.regions(region, local, owner)) remaining += part.area();
+				area += region.area(); for (part in OutlineBoolean.regions(region, local, owner)) remaining += part.area();
 			}
 			if (remaining < area - 1e-9) { var changed = result.cutBend(bend.id, local, owner); }
 		}

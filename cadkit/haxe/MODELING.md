@@ -301,6 +301,17 @@ seeded before fusing. The native naming grammar escapes their logical identifier
 returned shape when done. Native history is used within the extrusion to match side faces to
 their exact input edges; graph identity supplies persistence across rebuilds.
 
+`FlatPattern.of(sheet)` derives an exact developed blank without native geometry. `regions()`
+returns its outer contours and holes; `domains()` retains typed wall/bend ownership for checks.
+`bends()` returns a table sorted by permanent bend id, including signed angle, inner radius,
+allowance and the material-covered fold-line intervals. `length()` sums those intervals;
+`nominalWidth` preserves the attachment width before cuts. Returned arrays are isolated copies.
+
+When `SheetMaterial.grainAngle` is authored, it is an undirected rolling angle in radians relative
+to the root wall frame. The flat pattern's `plane` aligns its X axis with that grain; without
+grain it uses the root plane. Bounds and all contour coordinates refer to this exported plane.
+The document saves the material snapshot, including grain, with its current schema version.
+
 ## Validation
 
 `ctest --test-dir build/debug --output-on-failure` exercises the C boundary,

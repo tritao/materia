@@ -82,10 +82,12 @@ class SheetBaseSmoke {
 		var thickness = builder.length("plate.thickness", 2);
 		var source = builder.constrainedSketch(rectangle(Plane.XY()), new Map());
 		var base = builder.sheetBase(source, new SheetMaterial("unspecified-strength", 1,
-			BendRule.KFactor(new KFactorTable([0], [0.4]))), thickness);
+			BendRule.KFactor(new KFactorTable([0], [0.4])), null, null, null, Math.PI / 3), thickness);
 		builder.output(base);
 		var document = builder.finish();
 		near(base.sheet().thickness(), 2, "builder binds named thickness");
+		var grain = base.stock().grainAngle; if (grain == null) throw "builder lost grain";
+		near(grain, Math.PI / 3, "named thickness preserves authored grain");
 		var loaded = DocumentCodec.decode(DocumentCodec.encode(document));
 		loaded.parameter("plate.thickness").set(3); loaded.recompute();
 		var restored = Std.downcast(loaded.featureById(base.id.toInt()), SheetBaseFeature); if (restored == null) throw "unexpected loaded feature type";

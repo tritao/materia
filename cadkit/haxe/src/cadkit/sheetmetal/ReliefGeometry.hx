@@ -13,7 +13,7 @@ class ReliefGeometry {
 			var dx = (boundary.end.x - boundary.start.x) / boundary.length();
 			var dy = (boundary.end.y - boundary.start.y) / boundary.length();
 			var tool = slot(type, width, depth, origin, dx, dy);
-			result = OutlineDifference.subtract(result, tool, owner + ":relief:" + end);
+			result = OutlineBoolean.subtract(result, tool, owner + ":relief:" + end);
 		}
 		return result;
 	}

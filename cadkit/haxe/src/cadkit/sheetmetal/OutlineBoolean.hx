@@ -1,7 +1,9 @@
 package cadkit.sheetmetal;
 
-/** Analytic planar difference and intersection; wall callers require one connected result. */
-class OutlineDifference {
+import cadkit.sheetmetal.OutlineBoolean.OutlineMode;
+
+/** Analytic line/arc region booleans; callers choose whether disconnected components are valid. */
+class OutlineBoolean {
 	static inline var EPS:Float = 1e-8;
 	public static function subtract(source:WallOutline, tool:WallOutline, owner:String):WallOutline {
 		var result = regions(source, tool, owner);
@@ -11,15 +13,18 @@ class OutlineDifference {
 	}
 	/** Bend strips may have separate patches joined through their neighbouring walls. */
 	public static function regions(source:WallOutline, tool:WallOutline, owner:String):Array<WallOutline> {
-		return combine(source, tool, owner, false);
+		return combine(source, tool, owner, Difference);
 	}
 	public static function intersection(source:WallOutline, tool:WallOutline, owner:String):Array<WallOutline> {
-		return combine(source, tool, owner, true);
+		return combine(source, tool, owner, Intersection);
 	}
-	static function combine(source:WallOutline, tool:WallOutline, owner:String, intersection:Bool):Array<WallOutline> {
+	public static function union(source:WallOutline, tool:WallOutline):Array<WallOutline> {
+		return combine(source, tool, "", Union);
+	}
+	static function combine(source:WallOutline, tool:WallOutline, owner:String, mode:OutlineMode):Array<WallOutline> {
 		var pieces:Array<OutlinePiece> = [];
-		collect(source, tool, false, owner, pieces, intersection);
-		collect(tool, source, true, owner, pieces, intersection);
+		collect(source, tool, false, owner, pieces, mode);
+		collect(tool, source, true, owner, pieces, mode);
 		var loops:Array<Array<Segment>> = [];
 		var ids:Array<Array<String>> = [];
 		while (pieces.length > 0) {
@@ -46,20 +51,26 @@ class OutlineDifference {
 			else if (area < -1e-12) holes.push(i);
 			else throw new SheetDiagnosis("sheet.cut-boundary", "Cut boundary encloses zero area");
 		}
-		var result:Array<WallOutline> = []; var assigned:Map<Int, Bool> = new Map();
+		var owners:Map<Int, Int> = [];
+		for (hole in holes) {
+			var selected = -1; var selectedArea = Math.POSITIVE_INFINITY;
+			for (outer in outers) if (OutlineGeometry.contains(loops[outer], loops[hole][0].start)) {
+				var area = 0.0; for (segment in loops[outer]) area += segment.area();
+				if (area < selectedArea) { selected = outer; selectedArea = area; }
+			}
+			if (selected < 0) throw new SheetDiagnosis("sheet.cut-boundary", "Boolean hole has no containing outer region");
+			owners.set(hole, selected);
+		}
+		var result:Array<WallOutline> = [];
 		for (outer in outers) {
 			var nested:Array<Array<Segment>> = []; var names = [ids[outer]];
-			for (hole in holes) if (OutlineGeometry.contains(loops[outer], loops[hole][0].start)) {
-				if (assigned.exists(hole)) throw new SheetDiagnosis("sheet.cut-boundary", "Cut hole belongs to multiple outer regions");
-				assigned.set(hole, true); nested.push(loops[hole]); names.push(ids[hole]);
-			}
+			for (hole in holes) if (owners.get(hole) == outer) { nested.push(loops[hole]); names.push(ids[hole]); }
 			result.push(new WallOutline(loops[outer], nested, names));
 		}
-		for (hole in holes) if (!assigned.exists(hole)) throw new SheetDiagnosis("sheet.cut-boundary", "Cut hole has no outer region");
 		return result;
 	}
 
-	static function collect(outline:WallOutline, other:WallOutline, reverse:Bool, owner:String, result:Array<OutlinePiece>, intersection:Bool):Void {
+	static function collect(outline:WallOutline, other:WallOutline, reverse:Bool, owner:String, result:Array<OutlinePiece>, mode:OutlineMode):Void {
 		var boundaries = outline.loops();
 		for (i in 0...boundaries.length) for (j in 0...boundaries[i].length) {
 			var segment = boundaries[i][j];
@@ -81,15 +92,15 @@ class OutlineDifference {
 				var distance = Math.min(1e-6, piece.length() * 1e-4);
 				var left = new Point2(midpoint.x - tangent.y * distance, midpoint.y + tangent.x * distance);
 				var right = new Point2(midpoint.x + tangent.y * distance, midpoint.y - tangent.x * distance);
-				var leftMaterial = intersection ? outline.contains(left) && other.contains(left) : reverse ? other.contains(left) && !outline.contains(left)
+				var leftMaterial = mode == Union ? outline.contains(left) || other.contains(left) : mode == Intersection ? outline.contains(left) && other.contains(left) : reverse ? other.contains(left) && !outline.contains(left)
 					: outline.contains(left) && !other.contains(left);
-				var rightMaterial = intersection ? outline.contains(right) && other.contains(right) : reverse ? other.contains(right) && !outline.contains(right)
+				var rightMaterial = mode == Union ? outline.contains(right) || other.contains(right) : mode == Intersection ? outline.contains(right) && other.contains(right) : reverse ? other.contains(right) && !outline.contains(right)
 					: outline.contains(right) && !other.contains(right);
 				if (leftMaterial == rightMaterial) continue;
 				append(retained, leftMaterial ? piece : reversed(piece));
 			}
 			var identity = outline.identity(i, j);
-			if (reverse) identity = "cut:" + owner.length + ":" + owner + ":" + identity;
+			if (reverse && mode != Union) identity = "cut:" + owner.length + ":" + owner + ":" + identity;
 			for (k in 0...retained.length) {
 				var name = retained.length == 1 ? identity : "fragment:" + identity.length + ":" + identity + ":cut:"
 					+ endpointKey(segment, other, retained[k].start) + ":" + endpointKey(segment, other, retained[k].end);
@@ -163,3 +174,6 @@ private class OutlinePiece {
 	public final identity:String;
 	public function new(segment:Segment, identity:String) { this.segment = segment; this.identity = identity; }
 }
+
+/** Operation choice is transient geometry policy, never saved feature state. */
+private enum OutlineMode { Difference; Intersection; Union; }

@@ -4,7 +4,7 @@ import cadkit.sheetmetal.BendRule;
 import cadkit.sheetmetal.KFactorTable;
 import cadkit.sheetmetal.Point2;
 import cadkit.sheetmetal.OutlineGeometry;
-import cadkit.sheetmetal.OutlineDifference;
+import cadkit.sheetmetal.OutlineBoolean;
 import cadkit.sheetmetal.BendSeam;
 import cadkit.sheetmetal.Segment;
 import cadkit.sheetmetal.Sheet;
@@ -184,7 +184,7 @@ class SheetCoreSmoke {
 			var x = span.start.x;
 			var tool = WallOutline.polygon([new Point2(x - 1, 40), new Point2(x + 1, 40),
 				new Point2(x + 1, 60), new Point2(x - 1, 60)]);
-			var outline = OutlineDifference.subtract(wall.outline, tool, "cross-slot");
+			var outline = OutlineBoolean.subtract(wall.outline, tool, "cross-slot");
 			var changed = split.updateWallMaterial(wallId, outline);
 			near(BendSeam.intervals(outline, span, true).length, 2, "interrupted nominal seam intervals");
 		}

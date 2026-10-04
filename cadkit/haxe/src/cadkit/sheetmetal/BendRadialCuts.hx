@@ -53,7 +53,7 @@ class BendRadialCuts {
 	}
 	public static function regions(bend:Bend, allowance:Float):Array<WallOutline> {
 		var result:Array<WallOutline> = []; var strip = bend.developedRegion(allowance);
-		for (cut in bend.cutTools()) for (region in OutlineDifference.intersection(cut.region, strip, cut.owner)) {
+		for (cut in bend.cutTools()) for (region in OutlineBoolean.intersection(cut.region, strip, cut.owner)) {
 			// Both coordinates partition at authored vertices and arc extrema. A tangency
 			// then lands on a cell corner, avoiding a pinched intermediate planar region.
 			var xs = events(region, 0); var ys = events(region, 1);
@@ -62,7 +62,7 @@ class BendRadialCuts {
 				var cell = new WallOutline(WallOutline.polygon([new Point2(left.value, lower.value), new Point2(right.value, lower.value),
 					new Point2(right.value, upper.value), new Point2(left.value, upper.value)]).loops()[0], [],
 					[["partition:y:" + lower.identity, "partition:x:" + right.identity, "partition:y:" + upper.identity, "partition:x:" + left.identity]]);
-				for (part in OutlineDifference.intersection(region, cell, cut.owner)) {
+				for (part in OutlineBoolean.intersection(region, cell, cut.owner)) {
 					if (part.loops().length != 1) throw new SheetDiagnosis("sheet.radial-cut-partition", "Radial sector retained a hole after analytic partition", ["bend:" + bend.id]);
 					result.push(splitExtrema(part));
 				}

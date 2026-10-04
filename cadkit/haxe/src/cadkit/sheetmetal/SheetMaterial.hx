@@ -8,9 +8,11 @@ class SheetMaterial {
 	public final mechanical:Null<SheetMechanical>;
 	public final defaultRadiusRatio:Null<Float>;
 	public final minRadiusRatio:Null<Float>;
+	/** Undirected rolling axis in the root wall frame, radians modulo pi. */
+	public final grainAngle:Null<Float>;
 
 	public function new(id:String, thickness:Float, ?bendRule:BendRule, ?mechanical:SheetMechanical,
-		?defaultRadiusRatio:Float, ?minRadiusRatio:Float) {
+		?defaultRadiusRatio:Float, ?minRadiusRatio:Float, ?grainAngle:Float) {
 		BendDimensions.validate(thickness, 0, 0);
 		if (id == null || id.length == 0)
 			throw new SheetDiagnosis("sheet.invalid-material", "A material needs an identity");
@@ -30,6 +32,11 @@ class SheetMaterial {
 			throw new SheetDiagnosis("sheet.invalid-material-radius", "Radius ratios must be finite and nonnegative, with default no smaller than minimum");
 		this.defaultRadiusRatio = defaultRadiusRatio;
 		this.minRadiusRatio = minRadiusRatio;
+		if (grainAngle == null) this.grainAngle = null;
+		else {
+			if (!Math.isFinite(grainAngle)) throw new SheetDiagnosis("sheet.invalid-grain", "Grain angle must be finite radians", [id]);
+			var angle = grainAngle % Math.PI; this.grainAngle = angle < 0 ? angle + Math.PI : angle;
+		}
 	}
 	public function defaultRadius():Float {
 		if (defaultRadiusRatio == null)

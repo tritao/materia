@@ -76,6 +76,7 @@ class SheetMetalSmoke {
 		diagnosis("sheet.invalid-k-table", function() { var value = new KFactorTable([], []); });
 		diagnosis("sheet.invalid-radius-ratio", function() { var value = table.at(-1); });
 		diagnosis("sheet.invalid-mechanical-data", function() { var value = new SheetMaterial("bad", 1, rule, {uts: 200, yield: 300, youngs: 70000}); });
+		diagnosis("sheet.invalid-grain", function() { var value = new SheetMaterial("bad-grain", 1, rule, null, null, null, Math.NaN); });
 		assertions += SheetCoreSmoke.run();
 		assertions += SheetSolidSmoke.run();
 		assertions += SheetFeatureStagingSmoke.run();
@@ -83,12 +84,13 @@ class SheetMetalSmoke {
 		assertions += SheetEdgeSmoke.run();
 		assertions += SheetFlangeGeometrySmoke.run();
 		assertions += SheetFlangeSmoke.run();
-		assertions += SheetOutlineDifferenceSmoke.run();
+		assertions += SheetOutlineBooleanSmoke.run();
 		assertions += SheetReliefSmoke.run();
 		assertions += SheetHemSmoke.run();
 		assertions += SheetRipSmoke.run();
 		assertions += SheetCutSmoke.run();
 		assertions += SheetBendCutSmoke.run();
+		assertions += SheetFlatPatternSmoke.run();
 		trace("Sheet metal smoke passed (" + assertions + " assertions)");
 	}
 }

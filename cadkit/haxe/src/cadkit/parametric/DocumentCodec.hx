@@ -80,7 +80,7 @@ import cadkit.parametric.RelationshipId;
 /** Versioned JSON persistence for the Haxeon parametric document layer. */
 class DocumentCodec {
 	public static inline var FORMAT:String = "cadkit.document";
-	public static inline var VERSION:Int = 13;
+	public static inline var VERSION:Int = 14;
 	public static function encode(document:Document):String {
 		var encodedFeatures:Array<Dynamic> = [];
 		for (index in 0...document.featureCount()) {
@@ -873,7 +873,7 @@ class DocumentCodec {
 				case KFactor(table): rule = SheetSavedBendRule.KFactor(table.rows());
 			}
 		return {id: stock.id, rule: rule, mechanical: stock.mechanical,
-			defaultRadiusRatio: stock.defaultRadiusRatio, minRadiusRatio: stock.minRadiusRatio};
+			defaultRadiusRatio: stock.defaultRadiusRatio, minRadiusRatio: stock.minRadiusRatio, grainAngle: stock.grainAngle};
 	}
 	private static function decodeSheetStock(record:SheetStockRecord, thickness:Float):SheetMaterial {
 		var rule:Null<BendRule> = null;
@@ -881,7 +881,7 @@ class DocumentCodec {
 			switch (record.rule) {
 				case KFactor(rows): rule = BendRule.KFactor(new KFactorTable([for (row in rows) row.ratio], [for (row in rows) row.k]));
 			}
-		return new SheetMaterial(record.id, thickness, rule, record.mechanical, record.defaultRadiusRatio, record.minRadiusRatio);
+		return new SheetMaterial(record.id, thickness, rule, record.mechanical, record.defaultRadiusRatio, record.minRadiusRatio, record.grainAngle);
 	}
 
 	private static function encodeProperties(values:Array<TypedProperty>):Array<Dynamic> {
