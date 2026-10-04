@@ -817,6 +817,65 @@ W6 implementation notes (started after W5 main sync, 2026-10-04):
   The Modbus CAD-mission harness, cross-backend stop/abort/fault/link-loss mission checks, final W6 app gate and main
   sync remain open. Local main remains `757127cf01605ef843a7e24c22b74a0ee13e6c61` (W5).
 
+### Phase 1 commit ledger at the W6 ownership stop
+
+First-parent task history, including main sync merges; W6 is unfinished.
+
+W4:
+
+- `3106781d543edc7173253da37a03d1b57118bd82` Robot welder handoff: synced with main 712019dbc, RobotKit restructuring R0/R3 constraints
+- `c67506284f7d7851b59cdd967f7b1ee94b9928cd` Robot welder handoff: coordination with the RobotKit restructuring (sync points A and B)
+- `05f1b67f44e0871f247032e7063382ad6f269dfb` ProjectKit: reject weld steps without a path
+- `e8eb7795a90490a3eef968ec4a1ce2862c497555` Merge branch 'main' into mobile-welder
+- `6d8c9a1199d018bb13d53ab008b559de4a528109` RobotKit: check swept arm clearance between convex hulls
+- `0f8c82e9530aa4ebfc382d16dc82e526e8010bbc` ProcessKit: plan weld paths with reach and clearance
+- `cceb415023a424b45efd0b327c28805962a49d56` ProcessKit: reverse weld runs when their entry is unreachable
+- `0badaeae682900bf090b32d2b2c24c87ade6e567` Merge branch 'main' into mobile-welder
+- `4f7e9ccafa81c2b83410c9e3a6ea6a376dcfb653` ProcessKit: follow the extracted weld plan namespace
+- `0c248c7e153b12460bf31c2d74631145db424054` ProcessKit: schedule wire feed from validated seam progress
+- `362e0a64fca10cf9a5d00c72e77e48da26cf205e` MachineKit: derive torch stickout and split its collision bodies
+- `8d9a034e5e37920025663ea14163ef73c6f01ca1` MachineKit: generate the welder mission from every declared seam
+- `e7879f9057b4fea563cb278b2acae522814e5607` App: check complete welder missions against swept clearance
+- `44604b5a4fba60ee841d4617d51175d7d452d377` Merge branch 'main' into mobile-welder
+- `b6f588d3e920d3cde79146b7b052ec4169e1cbe5` MachineKit: record W4 clearance and process timing decisions
+- `1245b8c9923212228e33fd1bded5cabfe520d148` MachineKit: complete the whole-weldment W4 validation gate
+
+W5:
+
+- `ced4a77e3322bfb851e29ce2ee9ecf0442cf568a` MotionKit: weave pose paths in authored seam progress
+- `3dbedfd1b6a50fa82c718dd70ee176cf2ec7ceca` MotionKit: ignore generated weave test builds
+- `30ef670b637ce7e9330775db09e55ce7456d36d4` ProcessKit: validate and execute woven weld paths in the CAD frame
+- `c6e936c4300c97555171fd59c627741ac5e646c3` ProcessKit: separate re-strike engagement from the initial dwell
+- `761543995199f60db9b9a73856ab64d58fb593be` ProcessKit: limit restart deposition over the existing bead
+- `e3ee4ea8fdec697e4cec20fa50ba970b96496a83` Merge branch 'main' into mobile-welder
+- `aa31a409c01c0ef626f41846c76ce7e0e2fd73b6` MachineKit: derive fillet pass recipes from deposited area
+- `401da9d020795c99fef491b052ad5c79dc2bf4a2` ProcessKit: sequence weld passes with interpass cooling
+- `2b1e24b489f1f12a89e3c553e7b9f79aaa407c91` ProjectKit: represent welds as passes over a shared CAD path
+- `0ec3f5b545bb2345e663eb17b63296edff2fd1be` ProcessKit: ground welds on deposited bead geometry
+- `c8f451a340ee54153669cf59fdf6ec7a8e8b49a4` ProcessKit: plan later passes against deposited weld metal
+- `9832c564ba0b41a78d765591c49d807193b8adad` ProcessKit: join offset pass paths at CAD chain corners
+- `a5a0b4e94689602089660d42f904095298318c19` MachineKit: generate and verify woven and multi-pass weld examples
+- `23c5b95933e09a22970881eea121aae277a7e059` ProjectKit: verify weld pass dwell round trips
+- `e3267f30916242474f6061f4c75af009ff70d201` ProcessKit: update each running weld pass once per snapshot
+- `4d1734becd08035a1db5c33b3ad0e887cf70e6a7` ProcessKit: record corrected W5 app validation
+- `757127cf01605ef843a7e24c22b74a0ee13e6c61` ProcessKit: complete W5 validation record
+
+W6 (partial, branch only):
+
+- `b8d552a6f9e37f25132c5af2792dadad6ae07933` ProcessKit: centralize the welder channel contract
+- `9bda6e6b6fd2023a6abce247e72749594949b9c3` RobotKit: model a welder in the virtual device
+- `b67f12ba60f2cd9a9bb037017ea97249a2df890a` RobotKit: safe the virtual welder through device stop policies
+- `71f5fb745d0f879e9e5004077ce7b77779722d79` RobotKit: carry numeric sensor samples in RKD6 revision 13
+- `113affcec3bff12bbf1eb403658f01f4039160b5` RobotKit: publish virtual welder feedback into runtime sensor snapshots
+- `e17f2cd9415069d9a311f81b8ca1396f7f230465` RobotKit: define and check the retrofit welding I/O profile
+- `994cb63c5e3d64571f2cdcb0bc344688fb210716` ProcessKit: ignore generated Modbus test builds
+- `2e34f4f8e3e6264b65cd7c47a5779f23eacd3b91` ProcessKit: define Modbus welding register maps and TCP frames
+- `e5bc4e5654bd393a97a1b5e7ba60289103da0ac7` ProcessKit: execute Modbus TCP transactions against a watchdog fake
+- `a1a81fdb0ac14b798ffab719fc7f76c2289d4481` ProcessKit: adapt Modbus supplies to the welder process interfaces
+- `51da75921e7ee75fa8301973ff574c2e7c10dbf3` ProcessKit: bind executed welding channels to device-neutral supplies
+- `abcc33df689f435072e3a262e04e20dc4f2726d2` ProcessKit: preserve the external welding sensor fault contract
+- `d3178440cbfbadcb24d9fa7a827497a379ba6b51` ProcessKit: publish supply feedback through authored welding sensors
+
 ## Phase 2: mobile welder
 
 These are the hardware choices made on 2026-10-02: a 48 V LFP pack (16s,
