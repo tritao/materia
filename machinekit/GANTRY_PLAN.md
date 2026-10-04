@@ -2371,3 +2371,14 @@ placement, plan-count, homing-duration and endpoint-state details to the
 completion assertion to distinguish slow execution from planning wait. The
 app test compiler is running before a diagnostic picker retry. G12 checkpoint
 remains incomplete, and G13 is unstarted.
+
+### G12 checkpoint — use execution session readiness
+
+The diagnostic picker retry reported zero mission plans/steps and about
+600 seconds in homing, with the Z return already at zero. The new readiness
+check had used the legacy robot mode, which remains Tracking after a drained
+trajectory. Native execution sessionState is derived from current activity
+and does become Idle. RuntimeHomingObserver now uses RK_SESSION_IDLE with
+the unchanged empty-trajectory and all-joint stationary checks. This corrects
+the readiness condition rather than extending the picker time bound. App
+and MotionKit compiler retries are running; G13 is unstarted.
