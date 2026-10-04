@@ -2217,3 +2217,18 @@ passed (exit 0); no CadKit test execution. AnimKit and AutomationKit batch
 compiler checks passed. Remaining kit/app batch is live. Focused picker is
 PROJECT_SOURCE_ONLY=gantry in app.ProjectSourceTests; Haxe homing selector is
 MOTIONKIT_HOMING_ONLY=1. Neither focused test has run yet.
+
+### G12 checkpoint — MotionKit compile and focused homing passed
+
+Snapshot annotation: `149af187e`. MotionKit compiler-only retry finished
+exit 0, compiling 1119 sources. Execute the resulting module directly with
+MOTIONKIT_HOMING_ONLY=1 and native library paths prioritizing the newly built
+RobotKit runtime: exit 0. Reported checks cover side hold order, compensated
+capture, stale closing-edge rejection and cancellation cleanup; no full
+MotionKit suite ran. Native physical homing remains covered by 18/18 ctest.
+
+The serial batch now records AnimKit, AutomationKit, CamKit and CncKit compile
+exit 0; CadKit previously passed separately. Start app project-source compiler
+preflight to its dedicated output for the focused picker run while remaining
+kit compiles continue. The picker has not run and the full compile checkpoint
+is still incomplete. G13 remains unstarted.
