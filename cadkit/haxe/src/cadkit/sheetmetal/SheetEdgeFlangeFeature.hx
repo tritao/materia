@@ -25,6 +25,10 @@ class SheetEdgeFlangeFeature extends SheetFeature {
 	public final lengthSpec:LengthSpec;
 	public final position:FlangePosition;
 	public final useMaterialRadius:Bool;
+	public final reliefType:ReliefType;
+	public final reliefSizing:ReliefSizing;
+	public final reliefWidth:Parameter;
+	public final reliefDepth:Parameter;
 	final references:Array<TopologyReference>;
 	var pendingFaces:Null<Array<Shape>>;
 	var pendingFingerprints:Null<Array<TopologyFingerprint>>;
@@ -35,7 +39,8 @@ class SheetEdgeFlangeFeature extends SheetFeature {
 	public function new(source:SheetFeature, selectedFaces:Null<Array<Shape>>, lengthValue:Float, angleValue:Float,
 		?radiusValue:Float, lengthSpec:LengthSpec = Leg, position:FlangePosition = BendOutside, offsetValue:Float = 0,
 		gap1Value:Float = 0, gap2Value:Float = 0, extend1Value:Float = 0, extend2Value:Float = 0,
-		?savedFingerprints:Array<TopologyFingerprint>, ?savedWallIds:Array<Int>, ?savedBendIds:Array<Int>) {
+		?savedFingerprints:Array<TopologyFingerprint>, ?savedWallIds:Array<Int>, ?savedBendIds:Array<Int>,
+		reliefType:ReliefType = None, reliefSizing:ReliefSizing = Absolute, reliefWidthValue:Float = 0, reliefDepthValue:Float = 0) {
 		super();
 		if ((selectedFaces == null) == (savedFingerprints == null))
 			throw new ParametricError("flange requires either live side faces or saved face fingerprints");
@@ -57,6 +62,11 @@ class SheetEdgeFlangeFeature extends SheetFeature {
 		this.source = source;
 		this.lengthSpec = lengthSpec;
 		this.position = position;
+		this.reliefType = reliefType;
+		this.reliefSizing = reliefSizing;
+		var reliefKind = reliefSizing == Absolute ? ParameterKind.Length : ParameterKind.Scalar;
+		reliefWidth = new Parameter(this, "sheet.relief.width", reliefWidthValue, -1e300, false, 1e300, reliefKind);
+		reliefDepth = new Parameter(this, "sheet.relief.depth", reliefDepthValue, -1e300, false, 1e300, reliefKind);
 		useMaterialRadius = radiusValue == null;
 		angle = new Parameter(this, "sheet.angle", angleValue, -1e300, false, 1e300, ParameterKind.Angle);
 		length = new Parameter(this, "sheet.length", lengthValue, 0, false, 1e300, ParameterKind.Length);
@@ -123,6 +133,7 @@ class SheetEdgeFlangeFeature extends SheetFeature {
 			} catch (error:Dynamic) { face.close(); throw error; }
 		}
 		var bendRadius = useMaterialRadius ? graph.material.defaultRadius() : radius.value;
+		var scale = reliefSizing == ThicknessRatio ? graph.thickness() : 1.0;
 		for (slot in 0...selected.length) {
 			var selection = selected[slot];
 			var identities = graph.wall(selection.wall).outline.identities();
@@ -134,7 +145,7 @@ class SheetEdgeFlangeFeature extends SheetFeature {
 				throw new SheetDiagnosis("sheet.flange-edge-selection", "An earlier flange removed the selected edge", [selection.identity]);
 			graph = SheetFlange.add(graph, selection.wall, attachment, length.value, angle.value, bendRadius,
 				lengthSpec, position, offset.value, gap1.value, gap2.value, extend1.value, extend2.value,
-				outputWallIds[slot], outputBendIds[slot]);
+				outputWallIds[slot], outputBendIds[slot], reliefType, reliefWidth.value * scale, reliefDepth.value * scale);
 		}
 		return graph;
 	}

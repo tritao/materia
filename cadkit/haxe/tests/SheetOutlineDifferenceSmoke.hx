@@ -18,6 +18,8 @@ class SheetOutlineDifferenceSmoke {
 	}
 	public static function run():Int {
 		assertions = 0;
+		var tiny = OutlineDifference.subtract(WallOutline.rectangle(2e-5, 2e-5), box(1, 1, 1, 1), "tiny");
+		check(Math.abs(tiny.area() / 4e-10 - 1) < 1e-9, "boundary assembly uses the wall's area tolerance rather than a length tolerance");
 		var source = WallOutline.rectangle(20, 10);
 		var hole = OutlineDifference.subtract(source, box(5, 3, 4, 2), "hole");
 		near(hole.area(), 192, "rectangular hole subtracts exact area"); check(hole.loops().length == 2, "interior cut creates a hole");

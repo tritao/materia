@@ -29,7 +29,7 @@ class OutlineDifference {
 		var outer = -1;
 		for (i in 0...loops.length) {
 			var area = 0.0; for (segment in loops[i]) area += segment.area();
-			if (area > EPS) {
+			if (area > 1e-12) {
 				if (outer >= 0) throw new SheetDiagnosis("sheet.cut-disconnected", "Cut splits the wall into separate regions");
 				outer = i;
 			}

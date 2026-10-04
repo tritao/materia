@@ -39,6 +39,8 @@ import cadkit.sheetmetal.SheetFeature;
 import cadkit.sheetmetal.SheetEdgeFlangeFeature;
 import cadkit.sheetmetal.LengthSpec;
 import cadkit.sheetmetal.FlangePosition;
+import cadkit.sheetmetal.ReliefType;
+import cadkit.sheetmetal.ReliefSizing;
 import cadkit.Shape;
 import cadkit.sheetmetal.SheetMaterial;
 import cadkit.sheetmetal.SheetSide;
@@ -138,10 +140,12 @@ class DocumentBuilder {
 	/** Flange selected wall-side faces, with shared length/angle dimensions and an optional explicit radius. */
 	public function sheetEdgeFlange(source:SheetFeature, faces:Array<Shape>, length:NamedParameter, angle:NamedParameter,
 		?radius:NamedParameter, lengthSpec:LengthSpec = Leg, position:FlangePosition = BendOutside,
-		offset:Float = 0, gap1:Float = 0, gap2:Float = 0, extend1:Float = 0, extend2:Float = 0):SheetEdgeFlangeFeature {
+		offset:Float = 0, gap1:Float = 0, gap2:Float = 0, extend1:Float = 0, extend2:Float = 0,
+		reliefType:ReliefType = None, reliefSizing:ReliefSizing = Absolute, reliefWidth:Float = 0, reliefDepth:Float = 0):SheetEdgeFlangeFeature {
 		check();
 		var feature = document.add(new SheetEdgeFlangeFeature(source, faces, length.value, angle.value,
-			radius == null ? null : radius.value, lengthSpec, position, offset, gap1, gap2, extend1, extend2));
+			radius == null ? null : radius.value, lengthSpec, position, offset, gap1, gap2, extend1, extend2,
+			null, null, null, reliefType, reliefSizing, reliefWidth, reliefDepth));
 		bind(length, feature, "sheet.length"); bind(angle, feature, "sheet.angle");
 		if (radius != null) bind(radius, feature, "sheet.radius");
 		return feature;

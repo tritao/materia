@@ -73,7 +73,7 @@ import cadkit.parametric.RelationshipId;
 /** Versioned JSON persistence for the Haxeon parametric document layer. */
 class DocumentCodec {
 	public static inline var FORMAT:String = "cadkit.document";
-	public static inline var VERSION:Int = 12;
+	public static inline var VERSION:Int = 13;
 	public static function encode(document:Document):String {
 		var encodedFeatures:Array<Dynamic> = [];
 		for (index in 0...document.featureCount()) {
@@ -285,7 +285,8 @@ class DocumentCodec {
 					if (source == null) throw new ParametricError("flange source must be a sheet feature");
 					feature = document.add(new SheetEdgeFlangeFeature(source, null, data.length, data.angle, data.radius,
 						data.lengthSpec, data.position, data.offset, data.gap1, data.gap2, data.extend1, data.extend2,
-						[for (face in data.faces) decodeSheetFace(face)], data.walls, data.bends));
+						[for (face in data.faces) decodeSheetFace(face)], data.walls, data.bends,
+						data.reliefType, data.reliefSizing, data.reliefWidth, data.reliefDepth));
 				} else if (featureType == "datum-sketch") {
 					feature = document.add(new DatumSketchFeature(stringField(record, "profile"), numberField(record, "width"), numberField(record, "height"),
 						decodeElementReferenceInDocument(requiredField(record, "datum")), numberField(record, "offset")));
@@ -565,7 +566,8 @@ class DocumentCodec {
 				radius: flange.useMaterialRadius ? null : flange.radius.value, lengthSpec: flange.lengthSpec, position: flange.position,
 				offset: flange.offset.value, gap1: flange.gap1.value, gap2: flange.gap2.value,
 				extend1: flange.extend1.value, extend2: flange.extend2.value, walls: flange.wallIds(), bends: flange.bendIds(),
-				faces: [for (reference in flange.faceReferences()) encodeSheetFace(reference.fingerprintData())]};
+				faces: [for (reference in flange.faceReferences()) encodeSheetFace(reference.fingerprintData())],
+				reliefType: flange.reliefType, reliefSizing: flange.reliefSizing, reliefWidth: flange.reliefWidth.value, reliefDepth: flange.reliefDepth.value};
 			return {id: feature.id.toInt(), type: featureType, sheet: Json.parse(JsonWire.encode(data)), references: references};
 		}
 		if (featureType == "datum-sketch") {

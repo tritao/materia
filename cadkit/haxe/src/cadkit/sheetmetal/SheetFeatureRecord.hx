@@ -44,6 +44,10 @@ import cadkit.sheetmetal.SheetMaterial.SheetMechanical;
 	@:id(12) var walls:Array<Int>;
 	@:id(13) var bends:Array<Int>;
 	@:id(14) var faces:Array<SheetFaceRecord>;
+	@:id(15) var reliefType:ReliefType;
+	@:id(16) var reliefSizing:ReliefSizing;
+	@:id(17) var reliefWidth:Float;
+	@:id(18) var reliefDepth:Float;
 }
 
 @:wire typedef SheetFaceRecord = {

@@ -230,7 +230,8 @@ table in `tools/README.md`.
   The thickness parameter owns T; a material snapshot owns its identity, explicit rule and
   optional mechanical data and explicit default/minimum radius ratios. Project material-library
   integration remains SM6. SM3e changes the base record to a typed wire payload and bumps the
-  single supported document format to version 12; no version-11 sheet reader remains.
+  document format to version 12. SM3g adds typed relief sizing and dimensions, advancing the
+  single supported format to version 13; no older sheet reader remains.
 - SM3d fixes flange-position semantics explicitly: `MaterialInside` keeps the virtual outside
   sharp corner at the picked boundary (parent tangent shifts inward by OSSB), `MaterialOutside`
   keeps the virtual inside sharp corner there (shift inward by R·tan(|angle|/2)), `BendOutside`
@@ -260,6 +261,13 @@ table in `tools/README.md`.
   Untouched segment identities survive; multiple surviving fragments use authored intersection
   roles and infinite-curve branches, never contour indices or coordinates. This is shared
   geometry for reliefs and wall cuts; cuts through bend zones still require exact mapped trims.
+- SM3g specifies bend-end relief placement: each slot occupies `width` along the attachment
+  after the explicit end gap and cuts `depth` inward into the parent. The bend attachment is
+  shortened by that width at each end; the child extends by the same width to preserve the
+  requested flange width. Rectangular slots have square ends; obround slots have semicircular
+  inward caps of radius width/2 and require depth >= width/2. Dimensions are either explicit
+  millimetres or explicit thickness ratios, derived on every rebuild. Existing bend attachments
+  still validate after parent edits; a relief cannot silently remove another bend's edge.
 - Sheet features consume only the previous sheet feature's `Sheet`. A general solid feature
   (boolean, fillet...) after a sheet feature produces a plain solid: downstream code that needs
   a flat pattern must point at a sheet feature or convert (SM-D7). This keeps one owner per fact.
@@ -786,7 +794,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM0 | done: clean branch on 38601ac61, pins verified, prerequisite documents read; quick gate `sm0-setup` passes (ProjectKit 138, ManufacturingKit 54) | c70c89745 |
 | SM1 | done: exact line/arc regions, permanent graph ids, edits/cuts/rips, bidirectional FK, neutral-length conservation, closure and P1–P5 bounds; quick gate `sm1-core` passes (2102 sheet assertions) | 0713c4e0c; 54b5cab15 |
 | SM2 | done: named wall extrusions and bend revolutions fused for flat/folded/partial states; P1–P5 validity, single bodies, volumes, axes and stable names; quick gate `sm2-solid` passes (3757 sheet assertions) | 7a3836d8c |
-| SM3 | in progress: SM3a atomic graph publication; SM3b exact sketch-backed base, side A/B, stock codec and named thickness builder; quick gates `sm3a-staging` (3773) and `sm3b-base` (3813 sheet assertions); SM3c authored segment names and exact face-to-graph picks; quick gate `sm3c-edges` (3843 sheet assertions); SM3d exact flange geometry and alignment; quick gate `sm3d-flange-geometry` (3880 sheet assertions); SM3e typed flange features, authored shared identities, gaps/extensions, stock radius defaults and P1–P5 document acceptance; quick gate `sm3e-flanges-typed` (4044 sheet assertions); SM3f exact planar subtraction foundation; quick gate `sm3f-outline-cuts` (4068 sheet assertions); relief options and hem/cut/rip features remain | 535ebc547; 08afd7a32; bb3405a64; 84a51f00d; 3ed9b3971; 31a696ed7; planar subtraction sub-step commit |
+| SM3 | in progress: SM3a atomic graph publication; SM3b exact sketch-backed base, side A/B, stock codec and named thickness builder; quick gates `sm3a-staging` (3773) and `sm3b-base` (3813 sheet assertions); SM3c authored segment names and exact face-to-graph picks; quick gate `sm3c-edges` (3843 sheet assertions); SM3d exact flange geometry and alignment; quick gate `sm3d-flange-geometry` (3880 sheet assertions); SM3e typed flange features, authored shared identities, gaps/extensions, stock radius defaults and P1–P5 document acceptance; quick gate `sm3e-flanges-typed` (4044 sheet assertions); SM3f exact planar subtraction foundation; quick gate `sm3f-outline-cuts` (4068 sheet assertions); SM3g typed rectangular/obround reliefs and sizing, exact gap/bend-width semantics, atomic edits and codec; quick gate `sm3g-reliefs` (4132 sheet assertions); hem/cut/rip features remain | 535ebc547; 08afd7a32; bb3405a64; 84a51f00d; 3ed9b3971; 31a696ed7; a02214101; relief sub-step commit |
 | SM4 | planned | |
 | SM4b | planned | |
 | SM5 | planned | |
@@ -853,3 +861,13 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
   build valid named native walls whose volumes match exact areas. Empty/disconnected cuts have
   named diagnoses. This foundation introduces no saved feature record or schema change; relief,
   hem, cut and rip features remain in SM3. No new compiler issue was found.
+
+- SM3g: `sm3g-reliefs` checks both relief types with absolute dimensions and thickness ratios,
+  exact removed areas and explicit bend widths, valid flat/folded solids, builder arguments,
+  typed codec round trips, persistent face names after thickness edits, failed-edit atomicity and
+  undo recovery (63 relief assertions; 4132 sheet assertions total). Boundary assembly now uses
+  the wall's area tolerance rather than the length tolerance, with a small-region regression check.
+  The flange record changes shape, so document version 13 replaces version 12 and MachineKit's
+  version check follows it. Runtime fixtures use current code; no compatibility reader is added.
+  Existing ProjectKit/ManufacturingKit counts and MachineKit summaries remain unchanged.
+  No new haxeon issue was found. Hem, cut and rip features remain.

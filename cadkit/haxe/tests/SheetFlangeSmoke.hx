@@ -121,7 +121,7 @@ class SheetFlangeSmoke {
 				var rejected = false;
 				try { var invalid = DocumentCodec.decode(malformed); invalid.close(); } catch (error:Dynamic) { rejected = true; }
 				check(rejected, "typed wire validation refuses a string in a numeric flange field");
-				var previous = StringTools.replace(encoded, '"version":' + DocumentCodec.VERSION, '"version":11');
+				var previous = StringTools.replace(encoded, '"version":' + DocumentCodec.VERSION, '"version":' + (DocumentCodec.VERSION - 1));
 				var oldRejected = false;
 				try { var invalid = DocumentCodec.decode(previous); invalid.close(); } catch (error:Dynamic) { oldRejected = true; }
 				check(oldRejected, "document format has one supported version and no older sheet reader");
