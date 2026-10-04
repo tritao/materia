@@ -993,7 +993,7 @@ Dependencies:
 | W3 | done (+ hardening: paths, live workpiece frame, exit crash, safety tests) | `weld` mission step; `WeldSeam` skill and `WeldBead`; process engagement and `WeldingPlanRunner`; weld metal part and recipe; bead as runtime geometry; welds on MuJoCo and the test backend, restart with overlap |
 | W4 | Done (2026-10-04) | Whole CAD weldment: 10 seams / 680 mm in 4 runs; swept clearance and derived corner turns; 106.5 s on both backends, legs 4.9–5.1 mm; affected gates pass. Timing changes recorded above. |
 | W5 | Done (2026-10-04) | Seam-progress weave; CAD-derived pass recipes; deposited bead grounding and clearance; scene schema 16 rejects older versions; smaller restart hump. Woven 7 mm measures 6.998 mm, three-pass 10 mm measures 9.999 mm on both backends; all affected gates pass. |
-| W6 | | |
+| W6 | Implemented; final mobile gate blocked (2026-10-04), branch only | RKD6 numeric feedback and virtual welder; checked retrofit profile; Modbus map/adapter with independent ProcessKit owner; unchanged seam and all six shutdown cases pass. Full welder and arm gates pass; mobile baseline fails before final sync. |
 
 
 ### W6 latest-main retry: nonzero device start anchor blocks the mission
@@ -1106,3 +1106,145 @@ Next choose an explicit ProcessKit transport owner that keeps Modbus I/O and wat
 independent of synchronous CAD/mission planning, with synchronized setpoint and feedback exchange.
 Do not increase deadlines or suppress timeout faults to make the mission pass. Prove shutdown and
 link-loss behavior through that owner before running the remaining W6 gates and landing W6.
+
+### W6 independent device owner: Modbus mission passes
+
+The user authorized the independent-owner architecture. `PolledWelderDevice` separates a nonblocking
+supply from its host scheduler; `WelderDeviceOwner` owns all adapter calls on one thread. Planning
+publishes only desired arc/wire/voltage to a mutex-protected latest-state mailbox, and reads copied
+feedback snapshots. There is no growing command queue. Stops clear ignition and wire under the same
+lock used to apply setpoints; fault inhibition is latched, healthy feedback alone cannot re-ignite,
+and explicit reset clears the latch without replaying old commands. Close services an off request
+until acknowledgement or a bounded 2 s attempt, then closes the connection; hardware retains its
+independent watchdog. The Modbus adapter and vendor register map remain transport-specific, while
+the owner is ProcessKit device policy. The fake hardware has its own clock/thread too.
+
+The focused Modbus gate passes: 78 map/frame assertions, channel-binding checks, real TCP adapter/
+watchdog cases, and new owner cases covering a 1.5 s caller stall (longer than response timeout and
+lease), isolated snapshots, stop priority, explicit reset, supply faults and dropped connections.
+The unchanged Modbus CAD seam now passes at **21.10 s**, mean leg **4.99734 mm**, bead **180 mm**, no
+gap, with the fake's arc/wire off. TCP round trips extend ignition-feedback waiting relative to RKD6;
+CAD geometry, trajectory and weld deposition values are unchanged.
+
+Mission shutdown coverage exposed a device watchdog gap at rest: an ignition dwell could finish
+before the lost-link timeout, disabling the motion-only watchdog while the arc remained on. Device
+event policy now supplies a generic `requires_link` fact when a safe-on-stop channel differs from
+its safe value. The scheduled core checks the lease during such process activity as well as motion;
+completed safe programs retain their existing idle behavior. Focused scheduled-core tests (16),
+event tests (3), Rust virtual-device tests (14), native rebuild, host shutdown/numeric-feedback tests
+and Nucleo `cargo check --offline` pass. The host link-loss test now ends its dwell before cutting
+the link and requires numeric arc-off feedback, rather than checking only physical channel outputs.
+
+Commits for this repair:
+
+- `f4d5abcdf8b925cf4f060ebb559dda1c7d4e9ca9` ProcessKit: move the shared Modbus fake into its test package directory
+- `f5c2d1bd207df6ff27611f67dfe32e03f73b5d25` ProcessKit: resolve the shared Modbus fixture by its explicit package
+- `2a9977f51556ed4596c95d46ebca9f602cbe1244` ProcessKit: service welding devices independently of planning
+- `c7eeb86ef31da49666c69224555fcb2efb2160e3` App: run the Modbus weld mission through its independent device owner
+- `d7a5e443e85828050df83443df3a35842b1e9854` RobotKit: enforce link leases for active process outputs at rest
+
+All six active CAD mission shutdown cases pass on RKD6 and Modbus: stop, abort, emergency stop,
+simulation pause, supply fault and link loss leave arc and wire off. RKD6 link loss is rechecked after
+the lease repair, with a generic runtime fault even if the welding sensor itself reports a clean off.
+The Modbus repeat is **20.92 s**, with the same leg and bead; actual TCP scheduling introduces small
+ignition-feedback timing variation. `52316f89b6d75952b25000e2c9f03344071af371` records those mission tests.
+
+`ed6409f803b9b10dd94d9a12fb5a4e72344691ce` refines device event policy to track applied output values,
+including safe-on-hold values that are not restored on resume. Four event-policy tests and five focused
+Rust welding cases pass. The final app compile passes (1835 files, compiler 26.974 s).
+Final app gates are still being checked; W6 is not yet landed.
+
+
+### W6 final gate record: owner repair complete; mobile baseline blocks landing
+
+The independent-owner repair and mission shutdown coverage are committed and validated. The final
+`PROJECT_SOURCE_ONLY=welder` gate passes once, including both complete weldments and all standard
+seam/recovery/quality cases. Its main results match W4/W5:
+
+- Whole weldment, both backends: **106.5 s**, 10 seams / 680 mm, legs **4.9–5.1 mm**, no clearance violation.
+- Single seam, both: **20.6 s**, mean leg **5 mm** (4.8–5.1), bead **180 mm**, no gap.
+- Arc loss, both: **21.1 s**, one restart, 3 mm overlap, peak **5.4 mm**, no gap.
+- Air seam: expected failure after **7.4 s**, `the arc could not be held in 3 restarts`.
+- Crater dropout: **20.6 s**, no restart; displaced workpiece: **12.3 mm**, tip within **0.1 mm**, leg **5 mm**.
+- Post chain: **29.8 s**, legs **4.9/5/5/5.1 mm**, tip within **0.1 mm**.
+- Weave, both: **6.998213 mm**, **27.17 s**, one strike.
+- Three passes: **9.999356 / 9.999193 mm**, **65.55 s**, three strikes, both backends.
+- `PROJECT_SOURCE_ONLY=arm`: pass, pick/place cycle **23.5 s**.
+
+The final native rebuild and focused host welding shutdown test pass. The Nucleo profile passes
+`cargo check --offline` after the applied-output policy refinement. The generated welding contract
+matches its checked-in Rust output. Commit `15fa95fdba7c8313d3484da83d7708d6c3a511d7` adds the missing CMake dependency on
+`device_events.rs`, so changing event policy rebuilds the embedded virtual-device library.
+
+**Failed gate:** `PROJECT_SOURCE_ONLY=mobile` exits 1 at
+`app/tests/src/app/ProjectSourceTests.hx:461`:
+
+```
+deterministic: the wheels spin at v / r, the right one negative (0, 0)
+```
+
+The preceding chassis displacement check passed. This assertion reads literal joint slots 0 and 1;
+its actual CAD-resolved wheel indices and the root cause have not been isolated. The W6 application
+paths are disabled for this test (`virtualWelder=false`, no welding factory); the new process lease
+runs only on device endpoints, and the native held-origin repair leaves zero-origin untouched joints
+at zero. No mobile code or assertion was repaired under the welder task. Per the user's instruction
+to stop on unrelated breakage, stop here and report the exact mobile error rather than landing W6
+with a failed required gate. MachineKit smoke and final sync remain pending.
+
+Local main remains **a5d1e7e4008a8970fb7f627e124881aa4d4e7659**. W6 is branch-only. Hardware bench
+calibration, vendor-specific maps and flashing the checked retrofit profile remain hardware follow-up;
+phase 1's device tests use simulated hardware. The next step is to inspect the mobile drive's authored
+joint mapping and observations, repair the cause in its owning layer, and rerun only that failed gate
+before the pending smoke and guarded main sync. Passed welder/arm suites need no repeat unless that
+repair affects them.
+
+### W6 complete branch commit ledger before the mobile stop
+
+First-parent commits since the W5 landing, in order (including local-main merges):
+
+- `b8d552a6f9e37f25132c5af2792dadad6ae07933` ProcessKit: centralize the welder channel contract
+- `9bda6e6b6fd2023a6abce247e72749594949b9c3` RobotKit: model a welder in the virtual device
+- `b67f12ba60f2cd9a9bb037017ea97249a2df890a` RobotKit: safe the virtual welder through device stop policies
+- `71f5fb745d0f879e9e5004077ce7b77779722d79` RobotKit: carry numeric sensor samples in RKD6 revision 13
+- `113affcec3bff12bbf1eb403658f01f4039160b5` RobotKit: publish virtual welder feedback into runtime sensor snapshots
+- `e17f2cd9415069d9a311f81b8ca1396f7f230465` RobotKit: define and check the retrofit welding I/O profile
+- `994cb63c5e3d64571f2cdcb0bc344688fb210716` ProcessKit: ignore generated Modbus test builds
+- `2e34f4f8e3e6264b65cd7c47a5779f23eacd3b91` ProcessKit: define Modbus welding register maps and TCP frames
+- `e5bc4e5654bd393a97a1b5e7ba60289103da0ac7` ProcessKit: execute Modbus TCP transactions against a watchdog fake
+- `a1a81fdb0ac14b798ffab719fc7f76c2289d4481` ProcessKit: adapt Modbus supplies to the welder process interfaces
+- `51da75921e7ee75fa8301973ff574c2e7c10dbf3` ProcessKit: bind executed welding channels to device-neutral supplies
+- `abcc33df689f435072e3a262e04e20dc4f2726d2` ProcessKit: preserve the external welding sensor fault contract
+- `d3178440cbfbadcb24d9fa7a827497a379ba6b51` ProcessKit: publish supply feedback through authored welding sensors
+- `46788d2e4def64d541736dfa4ca5cab59c8a83fb` MachineKit: record phase-one commits at the W6 ownership stop
+- `2c5bab9ac499cd9ee531fdc20ef3846ff8267ea8` Merge main into mobile-welder for W6 host integration
+- `3dac0dc69d4d8508e312d0221749bc3972b4cc5f` RobotKit: expose virtual peripheral profiles and numeric device observations
+- `a084f1a1406f6a0a558e225535631d7db59a7c99` ProcessKit: generate the device welding sensor layout from its channel contract
+- `71eb2bff05174acec86c47bb466a52cd8b7e9594` ProcessKit: reproduce the main plan control array length regression
+- `1f898b2ea4c323379c62aecd73a20c67828c121f` RobotKit: route external device sensors outside the native sensor layout
+- `1809a3b098519856a80143e4efa26d3c8c15bab5` RobotKit: derive virtual servo command grids from model drive data
+- `68034eb23837750bbc6ff4d2367f267209455477` ProcessKit: connect CAD welding observations to external supply backends
+- `bde03e2e139eef80bc37050397050a93b3e4f620` App: exercise an unchanged CAD weld mission through RKD6 and Modbus
+- `b5453e8e60c8a0ed6fbe1c023ae650de00225eed` MachineKit: record resumed W6 integration and the main plan regression
+- `95f6109caf9d1c6d1d593c875e29be0ebc175f4e` Merge main into mobile-welder for the W6 mission gate
+- `aab794fa8742ae394634dc86e20a6d2a337ff67f` ProcessKit: verify plan control arrays use joint count
+- `c188fd90893c9baaeb97795f273280e0abccf2d1` MachineKit: record the W6 nonzero device anchor blocker
+- `5b99eb1bc7232a514d7c9162ff2e13a3048de4c8` RobotKit: establish held origins from initial device observations
+- `eae3c12bf0de5afcf62a1a8c591df2f04b358355` RobotKit: expose virtual device plan readiness
+- `70e6ab5dd7e704852a2c2110727ffcf0533c9b71` App: wait for virtual device clock qualification before welding
+- `2daa96c825b93c60cd4340582e236236b8c39fe9` RobotKit: report rejected device conversion limits
+- `fd82c53d704cba654963343e74e5dd00e3ad8cfc` RobotKit: configure virtual servo link and planning headroom
+- `28233766033c792226f513b8db14a646ae0db416` App: apply virtual servo acceleration headroom to weld planning
+- `00eda3131102fa27b7b0cd1636a3111ee770f852` MachineKit: record the W6 anchor repair and serial qualification blocker
+- `083aa07211212a4d0eab21089998f703019fdf4e` Merge branch 'main' into mobile-welder
+- `5c20666415cf1d306899c9ace13b42bc8a5e2c52` RobotKit: qualify buffered device streams by refill deadlines
+- `cb8a30de92c1eb1c748fdf4f9c80daca954c32cd` MachineKit: record buffered-link qualification and RKD6 mission result
+- `b4bf08d1948face07ff5a82b4e0a2ea9d1e32ad4` App: prepare CAD before opening the welding test connection
+- `bc35cc79aa69a947aa92eaf6afcbcb0b54d38db5` MachineKit: record the Modbus mission owner scheduling failure
+- `f4d5abcdf8b925cf4f060ebb559dda1c7d4e9ca9` ProcessKit: move the shared Modbus fake into its test package directory
+- `f5c2d1bd207df6ff27611f67dfe32e03f73b5d25` ProcessKit: resolve the shared Modbus fixture by its explicit package
+- `2a9977f51556ed4596c95d46ebca9f602cbe1244` ProcessKit: service welding devices independently of planning
+- `c7eeb86ef31da49666c69224555fcb2efb2160e3` App: run the Modbus weld mission through its independent device owner
+- `d7a5e443e85828050df83443df3a35842b1e9854` RobotKit: enforce link leases for active process outputs at rest
+- `52316f89b6d75952b25000e2c9f03344071af371` App: verify device shutdown during active CAD weld missions
+- `ed6409f803b9b10dd94d9a12fb5a4e72344691ce` RobotKit: derive process link requirements from applied channel values
+- `15fa95fdba7c8313d3484da83d7708d6c3a511d7` RobotKit: rebuild the virtual device when event policy changes
