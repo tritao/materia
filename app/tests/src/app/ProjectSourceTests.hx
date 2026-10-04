@@ -1845,7 +1845,7 @@ class ProjectSourceTests {
     try {
       var runtime = harness.simulation.addRobot(blueprint.runtime, null, options);
       for (_ in 0...30) harness.step();
-      var robot = new robotkit.runtime.SimulatedRobot("virtual-router", runtime, binding.model.name,
+      var robot = new robotkit.simulation.SimulatedRobot("virtual-router", runtime, binding.model.name,
         [for (link in binding.model.links) link.name], [for (joint in binding.model.joints) joint.name]);
       var sides = robotkit.device.DeviceHomingSides.install(runtime, blueprint.runtime, binding, 0.01);
       var motion = new motionkit.robot.MotionSystem(robot, blueprint);

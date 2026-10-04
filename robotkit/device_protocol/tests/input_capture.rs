@@ -1,3 +1,4 @@
+#![cfg(feature = "std")]
 use robotkit_device_protocol::{Board, InputBinding, StepGenerator, VirtualBoard, VirtualSwitch};
 
 #[test]

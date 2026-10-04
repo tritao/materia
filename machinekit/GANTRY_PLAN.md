@@ -2997,3 +2997,20 @@ No builds/tests ran. Nucleo cargo check --offline is queued for Phase C. The
 board retains its honest minimal profile: no physical motor outputs, captured
 step counts zero, no scoped motor holds/calibration. Router homing verification
 uses the full virtual device fixture and remains unverified. G13 is incomplete.
+
+### Phase C — first G13 build/test integration pass
+
+Native runtime build passed and Nucleo cargo check --offline passed. Initial
+ctest: 14/18 passed; failures were Rust protocol test compilation, stale v12 wire
+vector, new runtime translation fixture and serial PTY identification. Updated
+Rust session fixtures for input fields/version, enabled std tests in CTest so
+physical virtual-board regressions actually run, and updated the wire vector to
+v13 with fresh framing CRC. Corrected the translation fixture's shifted limit
+and heap-allocated the translated blueprint to avoid a 291 KB owner stack frame.
+Wire-vector and runtime tests passed on focused rerun.
+
+The app compiler-only pass failed on a wrong SimulatedRobot package in the new
+router fixture; corrected to robotkit.simulation and restarted compilation
+(session 59317, live at this note). Rust tests need rerun after their missing
+PROTOCOL_VERSION import was corrected; serial PTY identification is unresolved.
+Phase C gate is not green, router homing has not run, and G13 is incomplete.

@@ -2309,7 +2309,7 @@ void trajectory_drive_endpoints_join_at_queue_exhaustion(
 void queued_coordinate_calibration_translates_device_plan(const rk_robot_runtime_blueprint &blueprint) {
     auto endpoint = std::make_shared<QueueExecutingEndpoint>();
     robotkit::RobotRuntime runtime(blueprint, endpoint);
-    const double offsets[] = {0.1, 0.0};
+    const double offsets[] = {-0.1, 0.0};
     assert(runtime.calibrate_coordinates(offsets, 2, nullptr, 0) == RK_OK);
     rk_robot_snapshot snapshot{};
     assert(runtime.snapshot_full(snapshot) == RK_OK);
@@ -2318,15 +2318,15 @@ void queued_coordinate_calibration_translates_device_plan(const rk_robot_runtime
     plan.sequence = 1; plan.plan_id = 11; plan.model_revision = blueprint.revision;
     plan.calibration_revision = blueprint.calibration_revision;
     plan.segments = cubic_plan_chunk(11);
-    plan.start_position[0] = 0.1;
-    for (auto &segment : plan.segments.segments) segment.coefficients[0].value[0] += 0.1;
+    plan.start_position[0] = -0.1;
+    for (auto &segment : plan.segments.segments) segment.coefficients[0].value[0] -= 0.1;
     assert(runtime.submit_plan(plan) == RK_ERROR_MODEL_MISMATCH);
     plan.calibration_revision = snapshot.calibration_revision;
     assert(runtime.submit_plan(plan) == RK_OK);
     assert(std::abs(endpoint->received_plan.start_position[0]) < 1e-12);
     assert(std::abs(endpoint->received_plan.segments.segments[0].coefficients[0].value[0]) < 1e-12);
     assert(std::abs(endpoint->received_blueprint.joints[0].lower_limit -
-        (blueprint.joints[0].lower_limit - 0.1)) < 1e-12);
+        (blueprint.joints[0].lower_limit + 0.1)) < 1e-12);
 }
 
 int main() {

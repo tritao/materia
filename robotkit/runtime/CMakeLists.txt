@@ -79,7 +79,7 @@ if(RK_BUILD_TESTS)
     find_program(RK_CARGO_EXECUTABLE cargo)
     if(RK_CARGO_EXECUTABLE)
         add_test(NAME robotkit_device_protocol_rust
-            COMMAND ${RK_CARGO_EXECUTABLE} test
+            COMMAND ${RK_CARGO_EXECUTABLE} test --offline --features std
                 --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/Cargo.toml
                 --target-dir ${CMAKE_CURRENT_BINARY_DIR}/cargo-target)
         set_tests_properties(robotkit_device_protocol_rust PROPERTIES

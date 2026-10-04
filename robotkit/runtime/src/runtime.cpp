@@ -944,17 +944,17 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
                 // Host validation and queue anchors use referenced coordinates;
                 // device polynomials and deployment limits use endpoint coordinates.
                 auto device_plan = plan;
-                auto device_blueprint = blueprint_;
+                auto device_blueprint = std::make_unique<rk_robot_runtime_blueprint>(blueprint_);
                 for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
                     const auto offset = coordinate_offsets_[joint];
                     device_plan.start_position[joint] -= offset;
                     for (auto &segment : device_plan.segments.segments)
                         segment.coefficients[joint].value[0] -= offset;
-                    device_blueprint.joints[joint].lower_limit -= offset;
-                    device_blueprint.joints[joint].upper_limit -= offset;
+                    device_blueprint->joints[joint].lower_limit -= offset;
+                    device_blueprint->joints[joint].upper_limit -= offset;
                 }
                 submitted = endpoint_->submit_device_plan(device_plan, base_time, owner_now,
-                    committed, device_blueprint);
+                    committed, *device_blueprint);
             } else {
                 submitted = endpoint_->submit_device_plan(plan, base_time, owner_now,
                     committed, blueprint_);
