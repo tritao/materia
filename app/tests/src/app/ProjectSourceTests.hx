@@ -431,7 +431,7 @@ class ProjectSourceTests {
       var base = simulation.mobileBase();
       if (base == null) throw 'mobile base has no drive on the $label backend';
       var id = "assembly:" + (cast generated.assemblyDefinition:AssemblyDefinition).id;
-      var odometry = base.driveModel.createOdometry();
+      var odometry:robotkit.mobile.DifferentialOdometry = base.driveModel.createOdometry();
       function step(seconds:Float):Void {
         var until = simulation.activeSession().simulationTime() + seconds - 1e-9;
         while (simulation.activeSession().simulationTime() < until) {
@@ -458,9 +458,14 @@ class ProjectSourceTests {
       var observed = world.snapshot().robot(id);
       if (observed == null) throw "mobile base is missing from the world snapshot";
       var wheelRate = 0.4 / wheelRadius;
-      check(Math.abs(observed.velocities.get(0) - wheelRate) < 0.05 * wheelRate &&
-        Math.abs(observed.velocities.get(1) + wheelRate) < 0.05 * wheelRate,
-        '$label: the wheels spin at v / r, the right one negative (${observed.velocities.get(0)}, ${observed.velocities.get(1)})');
+      var leftRate = observed.velocities.get(odometry.leftWheelJoint);
+      var rightRate = observed.velocities.get(odometry.rightWheelJoint);
+      check(odometry.leftDirection == 1 && odometry.rightDirection == -1,
+        '$label: the authored wheel shafts point outward');
+      check(Math.abs(leftRate - wheelRate) < 0.05 * wheelRate &&
+        Math.abs(rightRate + wheelRate) < 0.05 * wheelRate,
+        '$label: the wheels spin at v / r, the right one negative (${leftRate}, ${rightRate}; ' +
+          'CAD joint indices ${odometry.leftWheelJoint}, ${odometry.rightWheelJoint})');
       // Half a second turning in place at 1 rad/s.
       var startYaw = yaw(plate.rotation);
       base.command(new robotkit.mobile.Twist2(0.0, 1.0));
