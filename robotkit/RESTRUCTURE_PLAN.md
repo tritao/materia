@@ -1,7 +1,9 @@
 # RobotKit restructuring plan
 
-Status: planned (2026-10-03), after an outside architecture review of `main`. Start after
-transmissions X9e has landed on local main.
+Status: in progress (2026-10-04), in `robotkit-restructure`, based on local main
+`712019dbc` after transmissions X9e, then synchronized with `575c06898`
+(the concurrent exosuit-followon merge). Each phase is validated, committed and merged
+to local main before the next phase begins. Mechanical moves remain separate commits.
 
 The review's verdict, which this plan accepts: the core execution design is right. The problem is
 scope and taxonomy. RobotKit has become "everything robotics": `robotkit/haxeon.json` makes
@@ -30,7 +32,7 @@ boundaries and removes duplicates. It does not change the execution architecture
   deprecated aliases.
 - **Moves and renames are mechanical commits** with no behaviour change, separate from commits that
   change behaviour, so they are easy to review and to merge other branches across.
-- **Gate:** each phase's final commit passes the full suite (`x7-suite.sh` or its successor), plus the
+- **Gate:** each phase's final commit passes the full suite (`tools/robotkit-restructure-suite.sh`, the maintained successor to `x7-suite.sh`), plus the
   RobotKit native tests, robotd, the device compiler tests, the humanoid tools, the worker demo and
   the robot welder checks.
 - **Coordinate:** phases R3–R5 touch files that other live branches edit (robot welder, humanoid,
@@ -38,6 +40,20 @@ boundaries and removes duplicates. It does not change the execution architecture
   in this file which branches must rebase.
 
 ## R0 — Before hardware ships (cheap now, expensive later)
+
+Completed on 2026-10-04. Generation-6 naming is frozen independently of wire
+revision 12; MotionKit and RobotKit share the planner-free `trajectory_core`;
+RobotRuntime takes an endpoint, with serial construction in its factory.
+
+The maintained phase gate passed against synchronized main `575c06898`: full
+workspace tests (including 4,939 RobotWorld and 9,865 MotionKit assertions), all
+52 compile targets, all RobotKit suites (16 native tests, device host/MCU,
+recording/wire checks, CAD bridge, MuJoCo and managed TCP scenarios), robotd,
+humanoid tools, welder and completed worker demo. Both C interfaces passed the
+four-platform ABI audit; all 8 MotionKit Release and 3 CAD native tests passed.
+Generated runtime fixtures match the checked-in curves exactly. Source moves,
+protocol documentation, endpoint changes and validation fixes are separate
+commits. R0 is merged to local main before R1 begins.
 
 - **Device protocol naming.** The sync marker is `RKD6` and the wire version is 12, which invites
   "why is RKD6 version 12?". `DEVICE_PROTOCOL.md` says no hardware has shipped and in-place changes
