@@ -1067,3 +1067,30 @@ Commits for this retry:
 - `2daa96c825b93c60cd4340582e236236b8c39fe9` RobotKit: report rejected device conversion limits
 - `fd82c53d704cba654963343e74e5dd00e3ad8cfc` RobotKit: configure virtual servo link and planning headroom
 - `28233766033c792226f513b8db14a646ae0db416` App: apply virtual servo acceleration headroom to weld planning
+
+### W6 buffered-link repair: unchanged RKD6 CAD mission passes
+
+The user authorized buffer-aware serial qualification. Main's MachineKit restructure is merged as
+`083aa07211212a4d0eab21089998f703019fdf4e`, from main
+`a5d1e7e4008a8970fb7f627e124881aa4d4e7659`; the focused app compiles with its new hierarchy/facets.
+
+Choose qualification in the native device-link layer, preserving CAD polynomials and process events.
+Commit `5c20666415cf1d306899c9ace13b42bc8a5e2c52` qualifies actual converted row durations against
+finite FIFO refill deadlines. A prefetched initial queue permits bounded short bursts; retained
+refill debt prevents later chunks from borrowing a new full queue. Revisions replace only their
+future rows, and retired rows fold into bounded scheduler state. Admission accounts for exact
+serial frame sizes, owner-tick whole-frame batching, queue-release guards and clock uncertainty.
+Startup reserves the prefill and actual queue/event/commit serialization before playback.
+
+The configured 2 ms processing allowance is documented as one-way target-streaming latency,
+so it stays a pipelined latency guard rather than being charged as serialized CPU service for
+every row. Baud determines serial service time. Sustained overload and unbufferable bursts still
+fail admission before any queue or segment write; CAD trajectories are not coalesced or stretched.
+
+Focused endpoint tests pass, including equal-average streams with different burst order, finite
+prefill, continuation debt, sustained overload, pipelined latency, owner-cadence throughput and
+existing replacement/clock/backlog checks. Native runtime rebuild and host welding shutdown/
+readiness checks pass. The unchanged RKD6 CAD seam mission passes at **20.36 s**, mean leg
+**4.99734 mm**, bead **180 mm**, no gap, and arc/wire off at completion. This is the first complete
+W6 RKD6 mission result. Modbus mission, mission shutdown cases and final app gates remain pending;
+W6 has not been fast-forwarded to main.
