@@ -21,9 +21,9 @@ class Forks {
   final tiltIndex:Null<Int>;
   final spreadIndex:Null<Int>;
 
-  /** Builds the fork view from roles and limits authored on a RobotModel. */
-  public static function fromRobot(robot:Robot, model:RobotModel):Forks
-    return fromBlueprint(robot, RobotRuntimeCompiler.compile(model));
+  /** Builds the fork view from roles and limits authored on a RobotProfile, resolved against a RobotModel. */
+  public static function fromRobot(robot:Robot, model:RobotModel, profile:robotkit.profile.RobotProfile):Forks
+    return fromBlueprint(robot, RobotRuntimeCompiler.compile(model, profile));
 
   /** Builds the fork view from a previously compiled robot blueprint. */
   public static function fromBlueprint(robot:Robot,

@@ -17,12 +17,12 @@ class Manipulator extends KinematicGroup {
   public final baseLink:LinkId;
 
   public function new(robot:RobotModel, baseLink:LinkId, flangeFrame:FrameId, ?flangeTTcp:Transform3,
-      ?compiled:KinematicModel, ?swivel:ArmSwivel) {
-    super(robot, baseLink, flangeFrame, null, flangeTTcp, swivel, null, 0.3, compiled);
+      ?compiled:KinematicModel, ?swivel:ArmSwivel, ?profile:robotkit.profile.RobotProfile) {
+    super(robot, baseLink, flangeFrame, null, flangeTTcp, swivel, null, 0.3, compiled, profile);
     this.baseLink = baseLink;
   }
 
   /** The same arm carrying a different tool; shares the compiled model. */
   public function withTool(flangeTTcp:Transform3):Manipulator
-    return new Manipulator(robot, baseLink, flangeFrame, flangeTTcp, model, swivel);
+    return new Manipulator(robot, baseLink, flangeFrame, flangeTTcp, model, swivel, profile);
 }

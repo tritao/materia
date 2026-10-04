@@ -125,7 +125,7 @@ class WallFinishingScenarioTests {
     var manipulator = fixture.arm.withTool(fixture.flangeTTcp);
     var linkNames = [for (link in model.links) link.name];
     var jointNames = [for (joint in model.joints) joint.name];
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    var blueprint = RobotRuntimeCompiler.compile(model, fixture.profile);
     // This synthetic DH arm has no authored collision meshes. The default
     // per-link bounds boxes overlap while the elbow folds during approach,
     // creating a false self-contact that blocks the planned MoveJ near 2.8 rad.
@@ -482,7 +482,8 @@ class WallFinishingScenarioTests {
    * fixture, attached directly to the base link) + sprayer flange offset +
    * a base-mounted lidar-kind "scanner" sensor.
    */
-  static function buildWallFinishingRobotModel():{model:RobotModel, arm:Manipulator, flangeTTcp:Transform3, linkTFlange:Transform3} {
+  static function buildWallFinishingRobotModel():{model:RobotModel, profile:robotkit.profile.RobotProfile, arm:Manipulator, flangeTTcp:Transform3, linkTFlange:Transform3} {
+    var profile = new robotkit.profile.RobotProfile();
     var model = new RobotModel("wall-finishing-robot");
     var base = model.addLink(new Link("base", "link/base"));
 
@@ -499,7 +500,7 @@ class WallFinishingScenarioTests {
       model.addJoint(joint);
       wheelIds.push(joint.id);
     }
-    model.mobileBase = new RobotMobileConfiguration(
+    profile.mobileBase = new RobotMobileConfiguration(
       RobotDriveConfiguration.Holonomic(wheelIds, wheelRadius, baseRadius),
       0.4, 0.6, 0.5, 1.0, 0.5, 0.5);
 
@@ -535,7 +536,7 @@ class WallFinishingScenarioTests {
     var flangeOffset = new Vec3(0.0, d6, 0.0);
     var flange = model.addFrame(new Frame("flange", links[6], "frame/flange"));
     flange.position = flangeOffset.toArray();
-    var arm = new Manipulator(model, base.id, flange.id);
+    var arm = new Manipulator(model, base.id, flange.id, null, null, null, profile);
 
     var scannerFrame = model.addFrame(new Frame("scanner mount", base, "frame/scanner"));
     scannerFrame.position = [0.3, 0.0, 0.1];
@@ -546,7 +547,7 @@ class WallFinishingScenarioTests {
 
     var flangeTTcp = new Transform3(new Vec3(0.0, 0.0, 0.08), robotkit.spatial.Quat.identity());
     var linkTFlange = new Transform3(flangeOffset, robotkit.spatial.Quat.identity());
-    return { model: model, arm: arm, flangeTTcp: flangeTTcp, linkTFlange: linkTFlange };
+    return { model: model, profile: profile, arm: arm, flangeTTcp: flangeTTcp, linkTFlange: linkTFlange };
   }
 
   static function check(value:Bool, message:String):Void {

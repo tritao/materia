@@ -66,6 +66,7 @@ class RobotHost {
     if (cameraFixture && deployment != null)
       throw "robotd: --camera-fixture requires the demo robot";
     // A deployment plans on its binding's model, whose actuator rates are what the step tick can drive.
+    var profile = deployment == null ? new robotkit.profile.RobotProfile() : deployment.profile;
     var robot = deployment == null ? new RobotModel(multiJoint ? "demo-forklift" : "demo-arm") : deployment.binding.model;
     if (deployment == null) {
     var base = robot.addLink(new Link("base"));
@@ -94,10 +95,10 @@ class RobotHost {
       liftJoint.limits.velocity = 2.0;
       liftJoint.limits.effort = 100.0;
       liftJoint.limits.maxAcceleration = 1.0;
-      robot.mobileBase = new RobotMobileConfiguration(
+      profile.mobileBase = new RobotMobileConfiguration(
         RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel",
           0.1, 0.5), 0.5, 1.0, 1.0, 1.0);
-      robot.forkMechanism = new RobotForkConfiguration("joint/lift", 1000.0,
+      profile.forkMechanism = new RobotForkConfiguration("joint/lift", 1000.0,
         600.0, 1.0);
     } else {
       var tool = robot.addLink(new Link("tool"));
@@ -128,7 +129,7 @@ class RobotHost {
       }
     }
     }
-    var blueprint = RobotRuntimeCompiler.compile(robot);
+    var blueprint = RobotRuntimeCompiler.compile(robot, profile);
     if (deployment != null) {
       blueprint.ownerPeriodNs = deployment.ownerPeriodNs;
       blueprint.serialProcessingAllowanceNs = deployment.processingAllowanceNs;

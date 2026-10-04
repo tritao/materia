@@ -117,7 +117,7 @@ class MotionSystemBlueprint {
         axis.lowerLimit, axis.upperLimit, axis.maxVelocity,
         axis.maxAcceleration, axis.homePosition, scales, jointOffsets));
     }
-    return new MotionSystemBlueprint(model, RobotRuntimeCompiler.compile(model, revision),
+    return new MotionSystemBlueprint(model, RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile(), revision),
       mapped, fixedTimestepSeconds);
   }
 }

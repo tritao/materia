@@ -31,7 +31,7 @@ class StandCheck {
       lineSearchIterations: Std.parseInt(args[8])
     });
     var simulation = harness.simulation;
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     blueprint.observedLimitTolerance = 0.05;
     var runtime = simulation.addRobotAtPose(blueprint, pose.rootPosition, pose.rootRotation);
     harness.spawnPlane();

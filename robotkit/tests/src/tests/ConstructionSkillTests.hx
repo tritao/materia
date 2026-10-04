@@ -85,7 +85,7 @@ class ConstructionSkillTests {
     var manipulator = fixture.arm;
     var linkNames = [for (link in model.links) link.name];
     var jointNames = [for (joint in model.joints) joint.name];
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    var blueprint = RobotRuntimeCompiler.compile(model, fixture.profile);
     blueprint.channels.push(new ProcessChannelDeclaration("surface.process",
       ProcessEventValue.Digital(false)));
 
@@ -257,7 +257,8 @@ class ConstructionSkillTests {
       sys.FileSystem.deleteFile(recordingPath + ".incomplete.status");
   }
 
-  static function buildFixture():{model:RobotModel, arm:Manipulator, wheelRadius:Float, baseRadius:Float} {
+  static function buildFixture():{model:RobotModel, profile:robotkit.profile.RobotProfile, arm:Manipulator, wheelRadius:Float, baseRadius:Float} {
+    var profile = new robotkit.profile.RobotProfile();
     var model = new RobotModel("construction-skill-robot");
     var base = model.addLink(new Link("base", "link/base"));
 
@@ -278,7 +279,7 @@ class ConstructionSkillTests {
       model.addJoint(joint);
       wheelIds.push(joint.id);
     }
-    model.mobileBase = new RobotMobileConfiguration(
+    profile.mobileBase = new RobotMobileConfiguration(
       RobotDriveConfiguration.Holonomic(wheelIds, wheelRadius, baseRadius),
       0.4, 0.6, 0.5, 1.0, 0.5, 0.5);
 
@@ -314,8 +315,8 @@ class ConstructionSkillTests {
     }
     var flange = model.addFrame(new Frame("flange", links[6], "frame/flange"));
     flange.position = [0.0, d6, 0.0];
-    var arm = new Manipulator(model, base.id, flange.id);
-    return { model: model, arm: arm, wheelRadius: wheelRadius, baseRadius: baseRadius };
+    var arm = new Manipulator(model, base.id, flange.id, null, null, null, profile);
+    return { model: model, profile: profile, arm: arm, wheelRadius: wheelRadius, baseRadius: baseRadius };
   }
 
   static function check(value:Bool, message:String):Void {

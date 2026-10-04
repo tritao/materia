@@ -189,7 +189,7 @@ the configuration it receives is checked by digest (see the device protocol).
 
 ### Transmissions (model contract and RKD6 implementation)
 
-RobotModel v6 owns actuators independently of joints. Each actuator has a
+RobotModel v9 owns actuators independently of joints. Each actuator has a
 stable ID, effort/rate limits in actuator units, and a `SimpleTransmission`
 with `jointId`, `ratio`, and `offset`. Coordinates are SI and obey
 `joint = offset + actuator / ratio`: for a motor driving a linear joint,
@@ -199,9 +199,9 @@ logical coordinate and derives the other joint scales and offsets by equating
 actuator coordinates, using the first actuator authored for each joint as its
 mapping reference. Additional actuators on that joint do not change the
 logical-axis mapping. Explicit authored axis maps remain a deprecated override.
-`RobotModelCodec` accepts v6 only; older schemas are rejected, not migrated.
+`RobotModelCodec` accepts v9 only; older schemas are rejected, not migrated.
 
-RobotModel v6 adds `floatingBase`. When true, the root link is a free six-DOF
+RobotModel v9 adds `floatingBase`. When true, the root link is a free six-DOF
 body, as for a legged or humanoid robot, instead of a base fixed to or driven
 over the world. It is a model property rather than a joint, so runtime joints
 stay one-DOF and joint indices, targets, and plans are unchanged;
@@ -209,10 +209,10 @@ stay one-DOF and joint indices, targets, and plans are unchanged;
 as `floating_base`. `Simulation` then creates the root as a dynamic body
 (a MuJoCo free joint), reports its twist through
 `rk_simulation_get_robot_base_velocity()`, and refuses kinematic base drives
-and wheel couplings for it. A floating base cannot also have a `mobileBase`.
+and wheel couplings for it. A floating base cannot bind a mobile-base profile. `RobotProfile` schema v1 stores mobile and fork roles separately from the mechanical model; `RobotRuntimeCompiler.compile(model, profile)` validates their stable joint IDs.
 See `robotkit/plans/HUMANOID.md`.
 
-RobotModel v6 links also carry `collisionShapes`: boxes, spheres, capsules and
+RobotModel v9 links also carry `collisionShapes`: boxes, spheres, capsules and
 cylinders, each posed in the link frame, with capsule and cylinder lengths
 given as half-lengths along local Z (MuJoCo's convention). The compiler copies
 them onto the blueprint, and `Simulation` sends them in the robot
@@ -856,11 +856,11 @@ source timestamps are never silently reused as receive or command time.
 
 ## Perception
 
-`SerialDeployment` schema v5 may declare perception pipelines separately from
+`SerialDeployment` schema v6 may declare perception pipelines separately from
 the device layout. Each entry names a camera sensor, a model path and SHA-256,
 a pipeline implementation, an execution `host`, and its `consumers`.
 The section is strict and remains outside the device configuration. Deployments
-are schema v5. A `worldd` host cannot serve a
+are schema v6. A `worldd` host cannot serve a
 `local` consumer without a network round trip.
 
 `PerceptionHost` routes camera `SensorFrame`s by sensor ID to code-defined

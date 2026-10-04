@@ -1,6 +1,7 @@
 package robotkit.runtime;
 
 import robotkit.model.RobotModel;
+import robotkit.profile.RobotProfile;
 import robotkit.model.Joint;
 import robotkit.model.JointCoupling;
 import robotkit.model.JointType;
@@ -22,9 +23,9 @@ class RobotRuntimeCompiler {
    * This is the domain-typing boundary: it checks topology and backend
    * support before assigning deterministic runtime indices.
    */
-  public static function compile(robot:RobotModel, ?revision:Int = 1,
+  public static function compile(robot:RobotModel, profile:RobotProfile, ?revision:Int = 1,
       ?calibrationRevision:Int = 0):RobotRuntimeBlueprint {
-    var diagnostics = validate(robot, revision, calibrationRevision);
+    var diagnostics = validate(robot, profile, revision, calibrationRevision);
     if (diagnostics.length > 0)
       throw new RobotCompileException(robot == null ? "<null>" : robot.name, diagnostics);
     // A robot whose authored sensors are all external still gets the native
@@ -44,7 +45,7 @@ class RobotRuntimeCompiler {
         [for (frame in robot.frames) frame.link.id],
         [for (link in robot.links) link.visualGeometry],
         [for (link in robot.links) link.collisionGeometry], robot.collisionApproximation),
-      compileConfiguration(robot), calibrationRevision);
+      compileConfiguration(robot, profile), calibrationRevision);
     result.floatingBase = robot.floatingBase;
     result.collisionApproximation = switch (robot.collisionApproximation) {
       case CollisionApproximation.None: RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_NONE;
@@ -147,12 +148,16 @@ class RobotRuntimeCompiler {
   }
 
   /** Returns all semantic diagnostics without attempting native lowering. */
-  public static function validate(robot:RobotModel, ?revision:Int = 1,
+  public static function validate(robot:RobotModel, profile:RobotProfile, ?revision:Int = 1,
       ?calibrationRevision:Int = 0):Array<RobotCompileDiagnostic> {
     var diagnostics:Array<RobotCompileDiagnostic> = [];
     if (robot == null) {
       diagnostics.push(new RobotCompileDiagnostic("RK_MODEL_NULL", "robot",
         "robot model is null"));
+      return diagnostics;
+    }
+    if (profile == null) {
+      diagnostics.push(new RobotCompileDiagnostic("RK_PROFILE_NULL", "profile", "robot profile is null"));
       return diagnostics;
     }
     if (revision < 0)
@@ -476,7 +481,7 @@ class RobotRuntimeCompiler {
           "sensor update rate must be non-negative"));
     }
 
-    validateUserConfiguration(robot, diagnostics);
+    validateUserConfiguration(robot, profile, diagnostics);
 
     var roots:Array<Int> = [];
     for (index in 0...indegree.length)
@@ -525,7 +530,7 @@ class RobotRuntimeCompiler {
     return diagnostics;
   }
 
-  static function validateUserConfiguration(robot:RobotModel,
+  static function validateUserConfiguration(robot:RobotModel, profile:RobotProfile,
       diagnostics:Array<RobotCompileDiagnostic>):Void {
     var roleOwners = new Map<String, String>();
     function resolveRole(id:Null<String>, path:String,
@@ -563,7 +568,7 @@ class RobotRuntimeCompiler {
           "value must be finite and positive"));
     }
 
-    var mobile = robot.mobileBase;
+    var mobile = profile.mobileBase;
     if (mobile != null && robot.floatingBase)
       diagnostics.push(new RobotCompileDiagnostic("RK_FLOATING_MOBILE", "mobileBase",
         "a floating base moves under physics and cannot also be a wheeled mobile base"));
@@ -611,7 +616,7 @@ class RobotRuntimeCompiler {
       }
     }
 
-    var forks:Null<RobotForkConfiguration> = robot.forkMechanism;
+    var forks:Null<RobotForkConfiguration> = profile.forkMechanism;
     if (forks != null) {
       var linear = [JointType.Prismatic];
       resolveRole(forks.liftJointId, "forkMechanism.liftJointId", linear);
@@ -625,14 +630,14 @@ class RobotRuntimeCompiler {
     }
   }
 
-  static function compileConfiguration(robot:RobotModel):RobotRuntimeConfiguration {
+  static function compileConfiguration(robot:RobotModel, profile:RobotProfile):RobotRuntimeConfiguration {
     function jointIndex(id:String):Int {
       for (index in 0...robot.joints.length)
         if (robot.joints[index].id == id) return index;
       throw 'Validated robot configuration references missing joint "$id"';
     }
     var mobileConfig:Null<RobotRuntimeMobileConfiguration> = null;
-    var mobile = robot.mobileBase;
+    var mobile = profile.mobileBase;
     if (mobile != null) {
       var drive:RobotRuntimeDriveConfiguration = switch mobile.drive {
         case Differential(leftId, rightId, radius, trackWidth):
@@ -656,7 +661,7 @@ class RobotRuntimeCompiler {
         mobile.footprintLength, mobile.footprintWidth);
     }
     var forkConfig:Null<RobotRuntimeForkConfiguration> = null;
-    var forks = robot.forkMechanism;
+    var forks = profile.forkMechanism;
     if (forks != null) {
       function axis(id:String):RobotRuntimeForkAxisConfiguration {
         var index = jointIndex(id), joint = robot.joints[index];

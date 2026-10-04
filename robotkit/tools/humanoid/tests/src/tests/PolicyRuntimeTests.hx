@@ -177,7 +177,7 @@ class PolicyRuntimeTests {
     var controller = new PolicyController(spec, policy, model);
     var stand = controller.standTargets();
     if (stand.length != 12 || stand[3].stiffness != 150.0 || stand[3].target != 0.3) throw "stand targets are not the default pose";
-    RobotRuntimeCompiler.compile(model); // the prepared model compiles
+    RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()); // the prepared model compiles
     // A spec naming a joint the model lacks, and a network that does not fit.
     var text = sys.io.File.getContent(specPath());
     var wrongJoint = PolicySpec.parse(StringTools.replace(text, "joint/left_knee_joint", "joint/no_such_joint"));

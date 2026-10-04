@@ -55,7 +55,7 @@ class MixedScene {
       joint.limits.velocity = null;
       joint.limits.maxAcceleration = 0.3;
     }
-    return RobotRuntimeCompiler.compile(model);
+    return RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
   }
 
   static function gantry():RobotRuntimeBlueprint {
@@ -118,7 +118,7 @@ class MixedScene {
     if (humanoid != null) {
       // The compiler's default of no observed-limit tolerance: a G1 pressed onto
       // a joint stop faults, as it does in an application scene.
-      var blueprint = RobotRuntimeCompiler.compile(humanoid);
+      var blueprint = RobotRuntimeCompiler.compile(humanoid, new robotkit.profile.RobotProfile());
       // Dropped tilted 0.6 rad forward, so that it topples and faults.
       g1 = simulation.addRobotAtPose(blueprint, [10.0, 0.0, 0.8], [0.0, Math.sin(0.3), 0.0, Math.cos(0.3)]);
       g1Zero = [for (_ in humanoid.joints) 0.0];
@@ -158,7 +158,7 @@ class MixedScene {
       index == 0 ? [0.4, 0.4, 0.05] : null];
     // The bed or base link is centred on the robot's origin, 0.5 m up: top at 0.55.
     machine = simulation.addRobotAtPose(blueprint, [3.0, 0.0, 0.5], [0.0, 0.0, 0.0, 1.0], null, boxes);
-    var g1Blueprint = RobotRuntimeCompiler.compile(humanoid);
+    var g1Blueprint = RobotRuntimeCompiler.compile(humanoid, new robotkit.profile.RobotProfile());
     g1Blueprint.observedLimitTolerance = 0.05;
     // G1's authored base height puts its feet on the floor: 0.793 m up.
     var g1 = simulation.addRobotAtPose(g1Blueprint, [3.0, 0.0, surfaceTop + 0.793 + 0.02],

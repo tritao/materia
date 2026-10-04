@@ -163,7 +163,7 @@ class ApplicationSimulation {
       candidate = Simulation.inSession(createdSpace.session);
       for (index in 0...models.length) {
         var editable=models[index];
-        var blueprint = RobotRuntimeCompiler.compile(editable.model, appliedRevision + 1);
+        var blueprint = RobotRuntimeCompiler.compile(editable.model, editable.profile, appliedRevision + 1);
         var runtime = candidate.addRobotAtPose(blueprint, editable.position, editable.rotation);
         var id = editable.id;
         candidateRobots.push(new SimulatedRobot(id, runtime, editable.model.name,

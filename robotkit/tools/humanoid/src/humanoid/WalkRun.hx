@@ -90,7 +90,7 @@ class WalkRun {
     var specDirectory = haxe.io.Path.directory(scenario.spec);
     var policy = OnnxPolicy.load(haxe.io.Path.join([specDirectory, spec.model]));
     PolicyController.prepareModel(model, spec);
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     // A compliant stop always gives a little; the policy leans on its stops.
     blueprint.observedLimitTolerance = 0.05;
 

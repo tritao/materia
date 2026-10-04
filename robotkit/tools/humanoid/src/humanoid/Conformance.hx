@@ -58,7 +58,7 @@ class Conformance {
       {integrator: integrator, solverIterations: solverIterations,
         lineSearchIterations: lineSearchIterations});
     var simulation = harness.simulation;
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     // A leg pressed onto its compliant knee stop passes it slightly.
     blueprint.observedLimitTolerance = 0.05;
     var runtime = simulation.addRobotAtPose(blueprint,

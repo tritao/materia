@@ -32,6 +32,7 @@ import cadkit.modeling.AssemblyState;
  */
 typedef AssemblySimulationModel = {
   var model:RobotModel;
+  var profile:robotkit.profile.RobotProfile;
   /** Each part's convex hull, in its link's frame, for Simulation.addRobotAtPose. */
   var linkHulls:Array<AssemblyLinkHull>;
   /** Each simulated part's link and its frame within that link. */
@@ -129,6 +130,7 @@ class AssemblySimulationBridge {
       {x: mobileBase.origin.x / scale, y: mobileBase.origin.y / scale, z: 0.0, qx: 0.0, qy: 0.0,
         qz: Math.sin(mobileBase.origin.yaw / 2), qw: Math.cos(mobileBase.origin.yaw / 2)};
     var model = new RobotModel(definition.id);
+    var profile = new robotkit.profile.RobotProfile();
     var root = model.addLink(new Link("assembly-root"));
     var links = [root];
     // Mass, centre of mass (link frame, metres) and inertia (about that centre, link axes) of each
@@ -361,14 +363,14 @@ class AssemblySimulationBridge {
       for (wheel in [mobileBase.leftWheel, mobileBase.rightWheel])
         if ([for (joint in model.joints) if (joint.id == wheel) joint].length != 1)
           throw 'Mobile base wheel "$wheel" is not a moving joint of the assembly';
-      model.mobileBase = new RobotMobileConfiguration(
+      profile.mobileBase = new RobotMobileConfiguration(
         RobotDriveConfiguration.Differential(mobileBase.leftWheel, mobileBase.rightWheel,
           mobileBase.wheelRadius, mobileBase.trackWidth),
         mobileBase.maxLinearSpeed, mobileBase.maxAngularSpeed,
         mobileBase.maxLinearAcceleration, mobileBase.maxAngularAcceleration,
         mobileBase.footprintLength, mobileBase.footprintWidth);
     }
-    return {model: model, linkHulls: linkHulls, partLinks: partLinks,
+    return {model: model, profile: profile, linkHulls: linkHulls, partLinks: partLinks,
       closureIds: closures, closures: closureGeometry};
   }
 

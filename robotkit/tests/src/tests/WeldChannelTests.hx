@@ -48,7 +48,7 @@ class WeldChannelTests {
     var joint = model.addJoint(new Joint("axis", JointType.Revolute, base, tool));
     joint.limits.lower = -1.0;
     joint.limits.upper = 1.0;
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     // The robot is set up with its tools and nothing else: the stop policy comes with each tool.
     blueprint.addTool(new WeldChannels(ARC, WIRE, VOLTAGE));
     blueprint.addTool(new SuctionChannels(SUCTION));
@@ -133,7 +133,7 @@ class WeldChannelTests {
       var joint = model.addJoint(new Joint("axis", JointType.Revolute, base, tool));
       joint.limits.lower = -1.0;
       joint.limits.upper = 1.0;
-      return RobotRuntimeCompiler.compile(model);
+      return RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     }
     var wrong = blueprint();
     wrong.channels.push(new robotkit.world.ProcessChannelDeclaration(ARC, ProcessEventValue.Digital(false), true));
