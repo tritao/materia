@@ -224,6 +224,19 @@ class MotionKitTestSupport {
     for (_ in 0...4) harness.step(Int64.ofInt(tick++));
   }
 
+  var gantryBlueprint_:Null<MotionSystemBlueprint> = null;
+
+  /** Reuse the unchanging CAD fixture; every trial still owns fresh runtime and simulation state. */
+  public function gantryBlueprint():MotionSystemBlueprint {
+    var compiled = gantryBlueprint_;
+    if (compiled == null) {
+      compiled = MachineKitRobotCompiler.compileXYZGantry(new LinearAxis(23, 10, 200),
+        new LinearAxis(23, 10, 60), new LinearAxis(23, 10, 40), 0.1, 0.4);
+      gantryBlueprint_ = compiled;
+    }
+    return compiled;
+  }
+
   /**
    * Starts a streamed x move, injects an event at eventTick, optionally
    * resumes once the machine has come to rest, and runs until everything has
@@ -231,8 +244,7 @@ class MotionKitTestSupport {
    */
   public function gantryTrial(queueSupport:Bool, eventTick:Int, event:MotionSystem -> Void,
       resumeAfterStop:Bool, ?begin:MotionSystem -> Void):Array<Float> {
-    var blueprint = MachineKitRobotCompiler.compileXYZGantry(new LinearAxis(23, 10, 200),
-      new LinearAxis(23, 10, 60), new LinearAxis(23, 10, 40), 0.1, 0.4);
+    var blueprint = gantryBlueprint();
     var simulationHarness = new SimulationHarness(0.01);
     var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
@@ -323,8 +335,7 @@ class MotionKitTestSupport {
   }
 
   public function gantryRig(queueSupport:Bool):TrialRig {
-    var blueprint = MachineKitRobotCompiler.compileXYZGantry(new LinearAxis(23, 10, 200),
-      new LinearAxis(23, 10, 60), new LinearAxis(23, 10, 40), 0.1, 0.4);
+    var blueprint = gantryBlueprint();
     var simulationHarness = new SimulationHarness(0.01);
     var runtime = simulationHarness.simulation.addRobot(blueprint.runtime);
     var robot = new RuntimeRobotAdapter("rig", runtime, blueprint.model.name,

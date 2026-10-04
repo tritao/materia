@@ -781,8 +781,7 @@ class SessionTests extends MotionKitTestSupport {
    * explicitly; the original jog remains safe and completes normally.
    */
   public function testLateJogReplacementRejectsLateArrival():Void {
-    var blueprint = MachineKitRobotCompiler.compileXYZGantry(new LinearAxis(23, 10, 200),
-      new LinearAxis(23, 10, 60), new LinearAxis(23, 10, 40), 0.1, 0.4);
+    var blueprint = gantryBlueprint();
     var simulationHarness = new SimulationHarness(0.01);
     var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
