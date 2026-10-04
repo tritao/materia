@@ -1,6 +1,8 @@
 package robotkit.inference;
 
 import robotkit.perception.*;
+import robotkit.streams.ImageDetection;
+import robotkit.streams.ImageDetectionObservation;
 
 import haxe.Int64;
 import haxe.io.Bytes;
@@ -25,6 +27,14 @@ private class FrameMeta {
  * uses UndistortMap.rectified intrinsics; otherwise the original K is retained.
  */
 class ObjectDetectorPipeline implements PerceptionPipeline {
+  public static function install():Void {
+    PerceptionPipelineRegistry.register("object_detector", function(config, producerId)
+      return new ObjectDetectorPipeline(producerId, config.id, config.input,
+        config.id, config.modelPath, config.modelSha256, config.scoreThreshold,
+        config.iouThreshold, config.maxRateHz, config.threads,
+        config.dynamicWidth, config.dynamicHeight));
+  }
+
   final pipelineId:String;
   final inputSensorId:String;
   final producerId:String;

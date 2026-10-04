@@ -10,7 +10,6 @@ import robotkit.model.RobotModel;
 import robotkit.model.RobotModelCodec;
 import robotkit.execution.ProcessChannelDeclaration;
 import robotkit.execution.ProcessEventValue;
-import robotkit.inference.InferenceSession;
 import robotkit.perception.PerceptionPipelineRegistry;
 
 /**
@@ -37,6 +36,11 @@ class SerialDeployment {
   public final channels:Array<ProcessChannelDeclaration>;
   public final cameras:Map<String, CameraCalibration>;
   public final perception:Array<PerceptionPipelineConfig>;
+
+  public function openRobot(id:robotkit.core.RobotId):robotkit.serial.SerialRobot
+    return new robotkit.serial.SerialRobot(id, robot, profile, serialPath, controller,
+      layout, targetError, baud, ownerPeriodNs, processingAllowanceNs, channels,
+      stepTickHz, linkLossTimeoutNs, clockSyncBoundNs);
 
   public function new(path:String) {
     var directory = Path.directory(path);
@@ -105,7 +109,7 @@ class SerialDeployment {
           throw 'robotd: unknown perception pipeline $pipeline';
         var modelFile = Path.join([directory, requiredString(entry, "model")]);
         var digest = requiredString(entry, "modelSha256").toLowerCase();
-        if (!~/^[0-9a-f]{64}$/.match(digest) || InferenceSession.modelDigest(modelFile) != digest)
+        if (!~/^[0-9a-f]{64}$/.match(digest) || sha256Hex(sys.io.File.getBytes(modelFile)) != digest)
           throw 'robotd: perception model SHA-256 mismatch for $id';
         var host = requiredString(entry, "host");
         if (host != "robotd" && host != "worldd") throw 'robotd: unsupported perception host $host';

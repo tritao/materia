@@ -52,6 +52,7 @@ class WorldHost {
   public function configurePerception(robot:RemoteRobot, configs:Array<PerceptionPipelineConfig>):Void {
     ensureOpen();
     if (remoteRobots.get(robot.id()) != robot) throw "WorldHost does not own this remote robot";
+    robotkit.inference.ObjectDetectorPipeline.install();
     var pipelines:Array<robotkit.perception.PerceptionPipeline> = [];
     for (config in configs) if (config.host == "worldd") {
       robot.enableCamera();

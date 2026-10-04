@@ -3,7 +3,9 @@
   "package": {
     "name": "robotkit"
   },
-  "sourceRoots": [],
+  "sourceRoots": [
+    "haxe"
+  ],
   "scopeSourceRoots": false,
   "dependencies": {
     "robotkit-core": {

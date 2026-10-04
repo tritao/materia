@@ -1,20 +1,19 @@
 package robotkit.perception;
 
-
-
 import robotkit.deployment.PerceptionPipelineConfig;
 
-/** The only place deployment names are bound to pipeline code. */
+/** Deployment metadata is independent of optional pipeline implementations. */
 class PerceptionPipelineRegistry {
-  public static function supports(name:String):Bool return name == "object_detector";
-
+  static final factories:Map<String, PerceptionPipelineConfig->String->PerceptionPipeline> = [];
+  public static function supports(name:String):Bool
+    return name == "object_detector" || factories.exists(name);
+  public static function register(name:String, factory:PerceptionPipelineConfig->String->PerceptionPipeline):Void {
+    if (name == null || name.length == 0 || factory == null) throw "Pipeline registration requires a name and factory";
+    factories.set(name, factory);
+  }
   public static function create(config:PerceptionPipelineConfig, producerId:String):PerceptionPipeline {
-    return switch config.pipeline {
-      case "object_detector": new ObjectDetectorPipeline(producerId, config.id, config.input,
-        config.id, config.modelPath, config.modelSha256, config.scoreThreshold,
-        config.iouThreshold, config.maxRateHz, config.threads,
-        config.dynamicWidth, config.dynamicHeight);
-      case _: throw 'Unknown perception pipeline ${config.pipeline}';
-    };
+    var factory = factories.get(config.pipeline);
+    if (factory == null) throw 'Perception pipeline ${config.pipeline} requires its optional implementation package';
+    return factory(config, producerId);
   }
 }

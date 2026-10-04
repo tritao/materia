@@ -21,7 +21,6 @@ import robotkit.model.RobotModel;
 import robotkit.runtime.RobotRuntime;
 import robotkit.runtime.RobotRuntimeBlueprint;
 import robotkit.runtime.RobotRuntimeCompiler;
-import robotkit.deployment.SerialDeployment;
 
 /**
  * RobotWorld adapter that owns and starts a serial runtime for one board, wired to the model's
@@ -52,15 +51,6 @@ class SerialRobot implements Robot {
     adapter = new RuntimeRobotAdapter(id, runtime, model.name,
       [for (link in model.links) link.id], [for (joint in model.joints) joint.id],
       true, true, "serial endpoint fault");
-  }
-
-  /** Opens a serial robot from the same versioned deployment as robotd. */
-  public static function fromDeployment(id:RobotId, path:String):SerialRobot {
-    var deployment = new SerialDeployment(path);
-    return new SerialRobot(id, deployment.robot, deployment.profile, deployment.serialPath,
-      deployment.controller, deployment.layout, deployment.targetError, deployment.baud,
-      deployment.ownerPeriodNs, deployment.processingAllowanceNs, deployment.channels,
-      deployment.stepTickHz, deployment.linkLossTimeoutNs, deployment.clockSyncBoundNs);
   }
 
   public function id():RobotId return adapter.id();

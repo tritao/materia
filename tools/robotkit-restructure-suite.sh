@@ -22,6 +22,7 @@ cmake --build "$build_root/cad"
 export LD_LIBRARY_PATH="$build_root/cad/core:$CADKIT_OCCT_DIR/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
 if [[ "$stage" == all || "$stage" == workspace ]]; then
+python3 tools/check-robotkit-packages.py
 trajectorykit/native/tools/check-hxi.sh "$build_root/trajectory-core.hxi"
 cmake -E compare_files "$build_root/trajectory-core.hxi" trajectorykit/native/bindings/trajectory-core.hxi
 motionkit/native/tools/check-hxi.sh "$build_root/motionkit.hxi"

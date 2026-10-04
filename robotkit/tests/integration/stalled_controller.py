@@ -11,7 +11,7 @@ import time
 
 
 PROTOCOL_VERSION = int(re.search(r"VERSION:Int = (\d+)",
-    (Path(__file__).resolve().parents[2] / "haxe/robotkit/protocol/RobotFrame.hx").read_text()).group(1))
+    (Path(__file__).resolve().parents[2] / "remote/haxe/robotkit/protocol/RobotFrame.hx").read_text()).group(1))
 
 
 def pack(value):
