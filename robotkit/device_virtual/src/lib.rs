@@ -309,13 +309,13 @@ impl VirtualDevice {
                     }
                     *slot = [row.c0, row.c1, row.c2, row.c3, row.c4, row.c5];
                 }
-                let Ok(segment) = ScheduledSegment::new(
+                let Ok(segment) = ScheduledSegment::new_with_purpose(
                     header.plan_id,
                     header.t0_ticks,
                     header.duration_ticks,
                     header.degree,
                     coefficients,
-                    header.ends_at_rest != 0,
+                    header.ends_at_rest != 0, header.purpose,
                 ) else {
                     return false;
                 };
@@ -828,7 +828,7 @@ mod tests {
             degree: 1,
             actuator_count: 1,
             ends_at_rest: 1,
-            reserved: 0,
+            purpose: 0,
         };
         let row = Segment6Coefficients {
             actuator: 0,

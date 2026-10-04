@@ -161,8 +161,8 @@ fn handle<T: Write<u8>>(input: &[u8], board: &mut StubBoard,
                 if row.actuator as usize != i { return; }
                 *slot = [row.c0, row.c1, 0.0, 0.0, 0.0, 0.0];
             }
-            let Ok(segment) = ScheduledSegment::new(header.plan_id, header.t0_ticks,
-                header.duration_ticks, header.degree, coefficients, header.ends_at_rest != 0) else { return; };
+            let Ok(segment) = ScheduledSegment::new_with_purpose(header.plan_id, header.t0_ticks,
+                header.duration_ticks, header.degree, coefficients, header.ends_at_rest != 0, header.purpose) else { return; };
             if let Some(core) = core.as_mut() {
                 core.push_segment_for_revision(header.queue_revision, segment).ok();
             }

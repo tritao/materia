@@ -271,3 +271,21 @@ fn completed_rest_plan_does_not_fault_when_link_goes_idle() {
     core.tick(&mut board);
     assert_eq!(core.stop_reason(), None);
 }
+
+#[test]
+fn segment_purpose_is_retained_and_invalid_purpose_is_rejected() {
+    let mut core = ScheduledCore::<1, 4>::new(1000, [10.0], [-10.0], [10.0], 500);
+    core.queue_begin(1, 0).unwrap();
+    let home = ScheduledSegment::new_with_purpose(9, 0, 100, 1,
+        [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]], true, 2).unwrap();
+    core.push_segment(home).unwrap();
+    core.commit(100).unwrap();
+    assert_eq!(core.executing_purpose(), Some(2));
+    let mut invalid = home;
+    invalid.purpose = 3;
+    assert_eq!(core.push_segment(invalid), Err(QueueError::InvalidSegment));
+    assert!(ScheduledSegment::<1>::new_with_purpose(9, 0, 100, 1,
+        [[0.0; 6]], true, 3).is_err());
+    let program = ScheduledSegment::<1>::new(10, 100, 100, 1, [[0.0; 6]], true).unwrap();
+    assert_eq!(program.purpose, 0);
+}

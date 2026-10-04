@@ -865,7 +865,7 @@ struct Segment6Header {
     std::uint8_t degree{};
     std::uint8_t actuator_count{};
     std::uint8_t ends_at_rest{};
-    std::uint8_t reserved{};
+    std::uint8_t purpose{};
 };
 
 inline bool encode(const Segment6Header &value, std::span<std::uint8_t> out) {
@@ -913,8 +913,8 @@ inline bool encode(const Segment6Header &value, std::span<std::uint8_t> out) {
     out[offset++] = static_cast<std::uint8_t>(bits_actuator_count >> 0);
     const std::uint8_t bits_ends_at_rest = static_cast<std::uint8_t>(value.ends_at_rest);
     out[offset++] = static_cast<std::uint8_t>(bits_ends_at_rest >> 0);
-    const std::uint8_t bits_reserved = static_cast<std::uint8_t>(value.reserved);
-    out[offset++] = static_cast<std::uint8_t>(bits_reserved >> 0);
+    const std::uint8_t bits_purpose = static_cast<std::uint8_t>(value.purpose);
+    out[offset++] = static_cast<std::uint8_t>(bits_purpose >> 0);
     return true;
 }
 
@@ -970,9 +970,9 @@ inline bool decode(std::span<const std::uint8_t> input, Segment6Header &value) {
     std::uint8_t bits_ends_at_rest = 0;
     bits_ends_at_rest |= static_cast<std::uint8_t>(input[offset++]) << 0;
     value.ends_at_rest = bits_ends_at_rest;
-    std::uint8_t bits_reserved = 0;
-    bits_reserved |= static_cast<std::uint8_t>(input[offset++]) << 0;
-    value.reserved = bits_reserved;
+    std::uint8_t bits_purpose = 0;
+    bits_purpose |= static_cast<std::uint8_t>(input[offset++]) << 0;
+    value.purpose = bits_purpose;
     return true;
 }
 

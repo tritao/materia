@@ -14,6 +14,7 @@ pub struct ScheduledSegment<const A: usize> {
     pub degree: u8,
     pub coefficients: [[f32; 6]; A],
     pub ends_at_rest: bool,
+    pub purpose: u8,
 }
 
 impl<const A: usize> ScheduledSegment<A> {
@@ -24,7 +25,14 @@ impl<const A: usize> ScheduledSegment<A> {
             return Err(QueueError::InvalidSegment);
         }
         t0_ticks.checked_add(duration_ticks).ok_or(QueueError::InvalidSegment)?;
-        Ok(Self { plan_id, t0_ticks, duration_ticks, degree, coefficients, ends_at_rest })
+        Ok(Self { plan_id, t0_ticks, duration_ticks, degree, coefficients, ends_at_rest, purpose: 0 })
+    }
+    pub fn new_with_purpose(plan_id: u64, t0_ticks: u64, duration_ticks: u64, degree: u8,
+        coefficients: [[f32; 6]; A], ends_at_rest: bool, purpose: u8) -> Result<Self, QueueError> {
+        if purpose > 2 { return Err(QueueError::InvalidSegment); }
+        let mut segment = Self::new(plan_id, t0_ticks, duration_ticks, degree, coefficients, ends_at_rest)?;
+        segment.purpose = purpose;
+        Ok(segment)
     }
     pub fn end_ticks(&self) -> u64 { self.t0_ticks + self.duration_ticks }
     pub fn evaluate(&self, path_ticks: u64, tick_hz: u64) -> ([f32; A], [f32; A]) {
@@ -115,6 +123,15 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
     pub fn remaining_capacity(&self) -> usize { CAP - self.len }
     pub fn positions(&self) -> [f32; A] { self.position }
     pub fn velocities(&self) -> [f32; A] { self.velocity }
+    pub fn executing_purpose(&self) -> Option<u8> {
+        if self.stopped { return None; }
+        for segment in self.segments[..self.committed_len()].iter().flatten() {
+            if self.path_clock >= segment.t0_ticks && self.path_clock <= segment.end_ticks() {
+                return Some(segment.purpose);
+            }
+        }
+        None
+    }
     pub fn executing_plan_id(&self) -> u64 {
         for segment in self.segments[..self.committed_len()].iter().flatten() {
             if self.path_clock >= segment.t0_ticks && self.path_clock <= segment.end_ticks() {
@@ -181,6 +198,7 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
         self.queue_begin(revision, replace_after)
     }
     pub fn push_segment(&mut self, segment: ScheduledSegment<A>) -> Result<(), QueueError> {
+        if segment.purpose > 2 { return Err(QueueError::InvalidSegment); }
         if self.len == CAP { return Err(QueueError::Full); }
         if self.len == 0 {
             if segment.t0_ticks != self.replace_after || segment.t0_ticks < self.path_clock {

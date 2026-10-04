@@ -55,7 +55,7 @@ inline bool decode(std::span<const std::uint8_t> bytes, Frame &frame) {
         if (!device_wire6::decode(bytes.subspan(HEADER_SIZE, device_wire6::Segment6Header::SIZE), header) ||
             header.degree > 5 || header.actuator_count == 0 ||
             header.actuator_count > device_wire6::MAX_ACTUATORS || header.ends_at_rest > 1 ||
-            header.reserved != 0 || header.duration_ticks == 0 ||
+            header.purpose > 2 || header.duration_ticks == 0 ||
             length != device_wire6::Segment6Header::SIZE +
                 header.actuator_count * device_wire6::Segment6Coefficients::SIZE) return false;
     }

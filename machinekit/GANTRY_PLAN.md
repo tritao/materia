@@ -2626,3 +2626,20 @@ No builds/tests ran. Wiring these options and the device switch adapter into the
 router fixture remains pending, as do homing segment purpose, side holds, counter
 rebasing, bounded squaring control and real board input reads. The simulation
 ABI descriptor and new FFI setters must be verified at the Phase C gate.
+
+### G13 — choose homing segment purpose on RKD6
+
+Chosen transport: immutable segment purpose, rather than a separate home-motion
+command. Revision 13 Segment6Header's formerly reserved byte is now purpose:
+0 program, 1 jog, 2 homing. Host compilation copies the accepted plan flags to
+every transmitted segment; both wire validators reject other values. Device
+scheduled segments preserve purpose, expose the currently executing purpose,
+and validate it again at queue admission. Virtual and Nucleo receivers carry
+it into their scheduled cores. This flag does not itself relax travel/skew or
+enable holds; those controls still need explicit scope and lifecycle transport.
+
+Regenerated the schema lock and artifacts as part of the still-in-development
+revision 13; preserved its earlier input-only lock in scratch. A purpose retention
+and invalid-purpose regression is queued for the Phase C gate. No tests/builds
+ran. Scope begin/end, side holds/zeros, hardware inputs and virtual-router homing
+verification remain pending; G13 is not complete.

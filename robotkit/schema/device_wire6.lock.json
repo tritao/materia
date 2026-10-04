@@ -332,7 +332,7 @@
         },
         {
           "length": 1,
-          "name": "reserved",
+          "name": "purpose",
           "type": "u8"
         }
       ],

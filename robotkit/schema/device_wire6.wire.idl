@@ -109,7 +109,8 @@ packed Segment6Header endian little {
     degree : u8
     actuator_count : u8
     ends_at_rest : u8
-    reserved : u8
+    # 0 program, 1 jog, 2 homing; immutable for the segment.
+    purpose : u8
 }
 
 packed Segment6Coefficients endian little {

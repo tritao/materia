@@ -662,7 +662,7 @@ pub struct Segment6Header {
     pub degree: u8,
     pub actuator_count: u8,
     pub ends_at_rest: u8,
-    pub reserved: u8,
+    pub purpose: u8,
 }
 
 impl Segment6Header {
@@ -685,7 +685,7 @@ impl Segment6Header {
         offset += 1;
         out[offset..offset + 1].copy_from_slice(&self.ends_at_rest.to_le_bytes());
         offset += 1;
-        out[offset..offset + 1].copy_from_slice(&self.reserved.to_le_bytes());
+        out[offset..offset + 1].copy_from_slice(&self.purpose.to_le_bytes());
         offset += 1;
         Ok(offset)
     }
@@ -723,10 +723,10 @@ impl Segment6Header {
         offset += 1;
         let mut bytes = [0u8; 1];
         bytes.copy_from_slice(&input[offset..offset + 1]);
-        let reserved = u8::from_le_bytes(bytes);
+        let purpose = u8::from_le_bytes(bytes);
         offset += 1;
         let _ = offset;
-        Ok(Self { queue_revision, plan_id, t0_ticks, duration_ticks, degree, actuator_count, ends_at_rest, reserved })
+        Ok(Self { queue_revision, plan_id, t0_ticks, duration_ticks, degree, actuator_count, ends_at_rest, purpose })
     }
 }
 

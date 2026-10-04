@@ -111,7 +111,7 @@ fn validate_payload(kind: u8, bytes: &[u8]) -> Result<(), Frame6Error> {
         let head = Segment6Header::decode(&bytes[..Segment6Header::SIZE])
             .map_err(|_| Frame6Error::BadPayload)?;
         if head.degree > 5 || head.actuator_count == 0 || head.actuator_count > MAX_ACTUATORS ||
-           head.ends_at_rest > 1 || head.reserved != 0 || head.duration_ticks == 0 ||
+           head.ends_at_rest > 1 || head.purpose > 2 || head.duration_ticks == 0 ||
            bytes.len() != Segment6Header::SIZE + head.actuator_count as usize * Segment6Coefficients::SIZE {
             return Err(Frame6Error::BadPayload);
         }

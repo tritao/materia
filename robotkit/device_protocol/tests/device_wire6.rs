@@ -29,7 +29,7 @@ fn rkd6_records_round_trip() {
     assert_eq!(TimeSyncRequest::decode(&bytes).unwrap(), sync);
     let segment = Segment6Header { queue_revision: 3, plan_id: 2,
         t0_ticks: 12_000, duration_ticks: 8_000, degree: 5,
-        actuator_count: 2, ends_at_rest: 1, reserved: 0 };
+        actuator_count: 2, ends_at_rest: 1, purpose: 0 };
     let mut bytes = [0; Segment6Header::SIZE];
     segment.encode(&mut bytes).unwrap();
     assert_eq!(Segment6Header::decode(&bytes).unwrap(), segment);
