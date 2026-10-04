@@ -1,3 +1,7 @@
+file(GLOB_RECURSE RK_DEVICE_RUST_SOURCES CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/src/*.rs
+    ${CMAKE_CURRENT_SOURCE_DIR}/../device_virtual/src/*.rs)
+
 if(RK_BUILD_VIRTUAL_DEVICE)
     find_program(RK_VIRTUAL_CARGO_EXECUTABLE cargo REQUIRED)
     set(RK_VIRTUAL_LIB ${CMAKE_CURRENT_BINARY_DIR}/cargo-virtual/debug/librobotkit_device_virtual.a)
@@ -14,6 +18,8 @@ if(RK_BUILD_VIRTUAL_DEVICE)
             ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/src/scheduled_core.rs
             ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/src/device_events.rs
             ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/src/virtual_board.rs
+            ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/Cargo.toml
+            ${RK_DEVICE_RUST_SOURCES}
         VERBATIM)
     add_custom_target(robotkit_device_virtual_build DEPENDS ${RK_VIRTUAL_LIB})
     add_library(robotkit_device_virtual STATIC IMPORTED GLOBAL)
@@ -167,9 +173,8 @@ if(RK_BUILD_TESTS)
                 --bin pty_device
             DEPENDS
                 ${CMAKE_CURRENT_SOURCE_DIR}/../device_virtual/Cargo.toml
-                ${CMAKE_CURRENT_SOURCE_DIR}/../device_virtual/src/lib.rs
-                ${CMAKE_CURRENT_SOURCE_DIR}/../device_virtual/src/bin/pty_device.rs
-                ${CMAKE_CURRENT_SOURCE_DIR}/../device_virtual/src/bin/shared/mod.rs
+                ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/Cargo.toml
+                ${RK_DEVICE_RUST_SOURCES}
             VERBATIM)
         add_custom_target(robotkit_pty_device DEPENDS
             ${CMAKE_CURRENT_BINARY_DIR}/cargo-target/debug/pty_device)

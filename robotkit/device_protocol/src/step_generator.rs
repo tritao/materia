@@ -180,6 +180,12 @@ impl<const A: usize> StepGenerator<A> {
                 continue;
             }
             let raw = self.nominal_steps[a] + self.counter_origin_steps[a] + self.alignment_steps[a];
+            // A captured integer counter converted to f32 can fall just below
+            // its own step boundary. Preserve that boundary when the excess
+            // is only representation error, without rounding ordinary targets.
+            let nearest = (raw + if raw >= 0.0 { 0.5 } else { -0.5 }) as i64 as f64;
+            let boundary_error = (f32::EPSILON as f64 * raw.abs().max(1.0)).min(1e-4);
+            let raw = if (raw - nearest).abs() <= boundary_error { nearest } else { raw };
             let truncated = raw as i64;
             let desired = truncated.saturating_sub(i64::from(raw < truncated as f64));
             let actual = board.step_count(a);

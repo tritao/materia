@@ -2,7 +2,7 @@
 use crate::Board;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum QueueError { StaleRevision, Committed, BadBoundary, BadExpectedState, Full, InvalidSegment, InvalidCommit }
+pub enum QueueError { StaleRevision, Committed, BadBoundary, BadExpectedState, Full, InvalidSegment, InvalidCommit, Stopped }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StopReason { Underflow, LinkLost, Abort, Stop, EmergencyStop, DualDriveSkew, ProcessFault }
 
@@ -159,6 +159,10 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
         self.path_clock = now_ticks;
     }
     pub fn queue_begin(&mut self, revision: u64, replace_after: u64) -> Result<(), QueueError> {
+        if self.stopping.is_some() &&
+            !(self.stopped && self.stopping == Some(StopReason::Stop)) {
+            return Err(QueueError::Stopped);
+        }
         if revision <= self.revision { return Err(QueueError::StaleRevision); }
         if replace_after < self.committed_until { return Err(QueueError::Committed); }
         if replace_after < self.path_clock { return Err(QueueError::BadBoundary); }
@@ -175,6 +179,27 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
         self.len = keep;
         self.revision = revision;
         self.replace_after = replace_after;
+        if self.stopping == Some(StopReason::Stop) {
+            self.stopping = None;
+            self.stopped = false;
+            self.rate = 1.0;
+            self.target_rate = 1.0;
+        }
+        Ok(())
+    }
+    /// After a normal Stop, a new queue starts at the held physical counters.
+    /// Rebase time so the first tick excludes the interval spent stopped.
+    pub fn prepare_stopped_queue(&mut self, now_ticks: u64, positions: [f32; A])
+        -> Result<(), QueueError> {
+        if !self.stopped || self.stopping != Some(StopReason::Stop) || self.len != 0 ||
+            self.velocity.iter().any(|v| v.abs() > 1e-6) {
+            return Err(QueueError::Stopped);
+        }
+        if !positions.iter().all(|v| v.is_finite()) {
+            return Err(QueueError::BadExpectedState);
+        }
+        self.position = positions;
+        self.initialize_clock(now_ticks);
         Ok(())
     }
     pub fn queue_begin_with_state(&mut self, revision: u64, replace_after: u64,
@@ -257,6 +282,7 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
         self.target_rate = 0.0;
         self.abort_at_end = false;
         self.len = 0;
+        self.committed_until = 0;
         self.segments.fill(None);
     }
     pub fn emergency_stop<B: Board>(&mut self, board: &mut B) {

@@ -17,6 +17,37 @@ impl Board for TestBoard {
 fn line(t0: u64, duration: u64, at_rest: bool) -> ScheduledSegment<1> {
     ScheduledSegment::new(1, t0, duration, 1, [[t0 as f32 / 1_000.0, 1.0, 0.0, 0.0, 0.0, 0.0]], at_rest).unwrap()
 }
+
+#[test]
+fn normal_stop_restarts_from_counter_anchor_and_current_clock() {
+    let mut core = ScheduledCore::<1, 4>::new(1_000, [10.0], [-10.0], [10.0], 5_000);
+    let mut board = TestBoard::default();
+    core.queue_begin(1, 0).unwrap();
+    core.push_segment(line(0, 3_000, true)).unwrap();
+    core.commit(3_000).unwrap();
+    board.tick = 250;
+    core.tick(&mut board);
+    core.stop(StopReason::Stop);
+    assert_eq!(core.prepare_stopped_queue(250, [0.3]), Err(QueueError::Stopped));
+    for tick in 251..=400 { board.tick = tick; core.tick(&mut board); }
+    assert!(core.is_stopped());
+    assert_eq!(core.committed_until(), 0);
+    // A long stopped interval and a quantized held counter must not carry
+    // the old path horizon or continuous target into the next revision.
+    board.tick = 2_000;
+    core.prepare_stopped_queue(board.tick, [0.3]).unwrap();
+    core.queue_begin_with_state(2, 2_100, [0.3], [0.0]).unwrap();
+    let next = ScheduledSegment::new(2, 2_100, 1_000, 1,
+        [[0.3, 0.1, 0.0, 0.0, 0.0, 0.0]], true).unwrap();
+    core.push_segment(next).unwrap();
+    core.commit(3_100).unwrap();
+    board.tick = 2_100; core.tick(&mut board);
+    board.tick = 2_200; core.tick(&mut board);
+    assert!((core.positions()[0] - 0.31).abs() < 1e-6);
+    assert_eq!(core.stop_reason(), None);
+    core.emergency_stop(&mut board);
+    assert_eq!(core.queue_begin(3, 4_000), Err(QueueError::Stopped));
+}
 #[test]
 fn replace_respects_committed_horizon() {
     let mut core = ScheduledCore::<1, 4>::new(1_000, [10.0], [-10.0], [10.0], 500);

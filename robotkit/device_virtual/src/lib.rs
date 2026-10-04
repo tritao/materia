@@ -344,6 +344,18 @@ impl VirtualDevice {
                 if begin.actuator_count as usize != self.active_count {
                     return false;
                 }
+                if self.core.as_ref().unwrap().is_stopped() &&
+                    self.core.as_ref().unwrap().stop_reason() == Some(StopReason::Stop) {
+                    let mut positions = self.core.as_ref().unwrap().positions();
+                    if self.profile == 1 {
+                        for (i, position) in positions.iter_mut().enumerate().take(self.count) {
+                            *position = self.steps.counter_position(&self.board, i).unwrap() as f32;
+                        }
+                    }
+                    if self.core.as_mut().unwrap().prepare_stopped_queue(now, positions).is_err() {
+                        return false;
+                    }
+                }
                 let result = self.core
                     .as_mut()
                     .unwrap()

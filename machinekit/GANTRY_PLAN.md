@@ -3214,3 +3214,31 @@ planner fixture and reached testCompiledXYZGantryRunsThroughSimulation, which
 indexes an empty flangeIncludePath frame selection (ProcessTests line 341).
 Audit physical gantry flange metadata and update that fixture correctly.
 G13/Phase C remain incomplete; G14 is not started.
+
+
+### Phase C — stop queued motion on its device owner
+
+Queued endpoints now receive the normal Stop record instead of an unsent host
+position ramp. Admissions remain blocked until fresh stationary device feedback
+supplies the held anchor; acknowledged paired homing stops use that same rest
+barrier. A normal stopped queue may restart at its physical counters and a fresh
+clock, while emergency/fault stops remain rejected. Restart clears the discarded
+commit horizon and stopped event state. Step generation preserves an integer
+capture boundary through f32 conversion without rounding ordinary half-step
+commands.
+
+The native regression moves, stops, rejects immediate restart, and then accepts a
+stationary queue without changing held physical counters. Rust checks cover the
+stopped interval, emergency rejection, and captured-counter precision. CMake now
+tracks all Rust protocol and virtual-device sources for its Cargo artifacts.
+Native build and full CTest passed **18/18** after these changes.
+Nucleo `cargo check --offline` passed with the stopped-queue preparation and the
+no_std-safe boundary calculation; physical pins remain unverified.
+
+The C++ frame encoder and decoder still capped RKD6 records at type 16 despite
+existing validators for homing types 17–20. Their cap now includes type 20, with
+round-trip tests for scope, side, acknowledgment, and counter-batch frames.
+The router reaches Y backoff through these controls. A previous run then rejected
+its restart because its held anchor predated the paired stop. The fresh-rest
+barrier is implemented; the router retry is running, so no successful router
+homing or complete Phase C gate is claimed here. G13 remains in progress.

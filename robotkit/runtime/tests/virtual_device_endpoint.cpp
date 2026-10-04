@@ -904,6 +904,45 @@ void runtime_boot_anchor_uses_device_counter_origin() {
     assert(snapshot.fault_code == 0 && snapshot.safety == RK_SAFETY_READY);
     assert(std::abs(snapshot.setpoint_position[0] - 1.0) < 1e-12);
     assert(std::abs(endpoint->actuator_positions()[0]) < 1e-12);
+    // Stop a device-owned path while it is moving, then start a fresh queue
+    // from its physical held counter rather than a host-predicted stop ramp.
+    auto moving = plan;
+    moving.sequence = 2;
+    moving.plan_id = 92;
+    moving.segments.tag = 92;
+    moving.segments.segments[0].duration_ns = 5'000'000'000;
+    moving.segments.segments[0].degree = 5;
+    moving.segments.segments[0].coefficients[0].value[3] = 0.04;
+    moving.segments.segments[0].coefficients[0].value[4] = -0.012;
+    moving.segments.segments[0].coefficients[0].value[5] = 0.00096;
+    assert(runtime.submit_plan(moving) == RK_OK);
+    for (int i = 0; i < 150; ++i) cycle();
+    rk_robot_command stop{};
+    stop.struct_size = sizeof(stop);
+    stop.kind = RK_COMMAND_STOP;
+    stop.sequence = 3;
+    assert(runtime.submit(stop) == RK_OK);
+    cycle();
+    auto restart = plan;
+    restart.sequence = 4;
+    restart.plan_id = 93;
+    assert(runtime.submit_plan(restart) == RK_ERROR_INVALID_STATE);
+    for (int i = 0; i < 30; ++i) cycle();
+    assert(runtime.snapshot_full(snapshot) == RK_OK);
+    assert(snapshot.fault_code == 0 && !snapshot.trajectory_active);
+    const auto held = snapshot.setpoint_position[0];
+    assert(held > 1.02 && held < 1.2);
+    assert(std::abs(held - snapshot.position[0]) < 1e-9);
+    restart.start_position[0] = held;
+    restart.segments.segments[0].coefficients[0].value[0] = held;
+    assert(runtime.submit_plan(restart) == RK_OK);
+    for (int i = 0; i < 150; ++i) cycle();
+    assert(runtime.snapshot_full(snapshot) == RK_OK);
+    assert(snapshot.fault_code == 0 && snapshot.safety == RK_SAFETY_READY);
+    if (std::abs(snapshot.position[0] - held) >= 1e-9)
+        std::fprintf(stderr, "restart held=%.17g measured=%.17g setpoint=%.17g motor=%.17g\n",
+            held, snapshot.position[0], snapshot.setpoint_position[0], endpoint->actuator_positions()[0]);
+    assert(std::abs(snapshot.position[0] - held) < 1e-9);
 }
 
 int main() {

@@ -378,6 +378,8 @@ private:
     };
     std::optional<PendingDriveCalibration> pending_drive_calibration_;
     std::optional<uint64_t> pending_homing_stop_;
+    /** Last source timestamp before a queued-device Stop; wait for fresh rest feedback. */
+    std::optional<uint64_t> pending_device_stop_source_;
     std::array<double, RK_MAX_JOINTS> coordinate_offsets_{};
     std::array<bool, RK_MAX_JOINTS> reference_required_{};
     std::array<bool, RK_MAX_JOINTS> reference_latched_{};

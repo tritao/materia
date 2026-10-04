@@ -180,6 +180,10 @@ fn handle<T: Write<u8>>(input: &[u8], board: &mut StubBoard,
             let Ok(begin) = QueueBegin6::decode(payload) else { return; };
             if begin.actuator_count as usize != *active_count { return; }
             if let Some(core) = core.as_mut() {
+                if core.is_stopped() && core.stop_reason() == Some(StopReason::Stop) {
+                    let positions = core.positions();
+                    core.prepare_stopped_queue(board.now_ticks(), positions).ok();
+                }
                 core.queue_begin_with_state(begin.queue_revision, begin.replace_after_ticks,
                     begin.expected_position, begin.expected_velocity).ok();
             }

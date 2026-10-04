@@ -461,8 +461,12 @@ rk_result RobotRuntime::submit(const rk_robot_command &command) {
         return RK_ERROR_INVALID_ARGUMENT;
     try {
         std::lock_guard lock(queue_mutex_);
-        if ((pending_drive_calibration_ || pending_homing_stop_) && command.kind == RK_COMMAND_JOINT_TARGETS)
+        if ((pending_drive_calibration_ || pending_homing_stop_ || pending_device_stop_source_) && command.kind == RK_COMMAND_JOINT_TARGETS)
             return RK_ERROR_INVALID_STATE;
+        if (endpoint_->executes_trajectory_queue() && command.kind == RK_COMMAND_JOINT_TARGETS &&
+            std::any_of(commands_.begin(), commands_.end(), [](const QueuedCommand &queued) {
+                return queued.command.kind == RK_COMMAND_STOP;
+            })) return RK_ERROR_INVALID_STATE;
         if (command.kind == RK_COMMAND_JOINT_TARGETS) {
             const auto referenced = references_locked();
             for (uint32_t index = 0; index < command.target_count; ++index) {
@@ -531,7 +535,7 @@ rk_result RobotRuntime::calibrate_coordinates(const double *offsets, uint32_t co
     std::lock_guard owner_lock(owner_mutex_);
     std::lock_guard queue_lock(queue_mutex_);
     std::lock_guard state_lock(state_mutex_);
-    if (pending_drive_calibration_) return RK_ERROR_INVALID_STATE;
+    if (pending_drive_calibration_ || pending_device_stop_source_) return RK_ERROR_INVALID_STATE;
     for (uint32_t i = 0; i < reference_count; ++i) {
         if (reference_joints[i] >= count || !reference_required_[reference_joints[i]])
             return RK_ERROR_INVALID_ARGUMENT;
@@ -592,6 +596,7 @@ rk_result RobotRuntime::calibrate_home_drives(const uint32_t *joints, const doub
     std::lock_guard queue_lock(queue_mutex_);
     std::lock_guard state_lock(state_mutex_);
     const bool queued_endpoint = endpoint_->executes_trajectory_queue();
+    if (pending_device_stop_source_) return RK_ERROR_INVALID_STATE;
     if (pending_drive_calibration_) {
         const auto &pending = *pending_drive_calibration_;
         if (count != pending.count) return RK_ERROR_INVALID_STATE;
@@ -685,7 +690,7 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
     try {
         std::lock_guard owner_lock(owner_mutex_);
         std::lock_guard queue_lock(queue_mutex_);
-        if (pending_drive_calibration_ || pending_homing_stop_) return RK_ERROR_INVALID_STATE;
+        if (pending_drive_calibration_ || pending_homing_stop_ || pending_device_stop_source_) return RK_ERROR_INVALID_STATE;
         if (plan.model_revision != blueprint_.revision ||
             plan.calibration_revision != blueprint_.calibration_revision)
             return RK_ERROR_MODEL_MISMATCH;
@@ -1564,7 +1569,16 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
 
             if (value.kind == RK_COMMAND_STOP) {
                 safe_channels(owner_time_ns, RK_EVENT_STOP_SAFE, false, true);
-                controlled_stop = begin_controlled_stop();
+                if (endpoint_->executes_trajectory_queue()) {
+                    // The device owns its queued path and deceleration. A host
+                    // ramp is never sent to a queue-executing endpoint.
+                    reset_control();
+                    if (!pending_device_stop_source_) {
+                        std::lock_guard state_lock(state_mutex_);
+                        pending_device_stop_source_ = state_.source_timestamp_ns;
+                    }
+                    controlled_stop = false;
+                } else controlled_stop = begin_controlled_stop();
                 safety = RK_SAFETY_READY;
                 if (has_later_effective_command) {
                     const auto result = apply_intermediate_lifecycle(value);
@@ -2300,6 +2314,7 @@ rk_result RobotRuntime::publish_sample_impl(uint64_t timestamp_ns,
         }
     }
     {
+        std::lock_guard queue_lock(queue_mutex_);
         std::lock_guard state_lock(state_mutex_);
         // The first accepted observation establishes the held origin for untouched joints.
         // Explicit commands and plans already own their anchors, even before that observation.
@@ -2320,6 +2335,21 @@ rk_result RobotRuntime::publish_sample_impl(uint64_t timestamp_ns,
                 ? old.received_timestamp_ns : next.received_timestamp_ns;
         }
         next.struct_size = sizeof(next);
+        if (pending_device_stop_source_ &&
+            next.source_timestamp_ns > *pending_device_stop_source_ &&
+            next.trajectory_active == 0 && next.trajectory_queue_depth == 0 &&
+            next.safety != RK_SAFETY_FAULT && next.safety != RK_SAFETY_EMERGENCY_STOP &&
+            std::all_of(next.velocity, next.velocity + blueprint_.joint_count,
+                [](double velocity) { return std::abs(velocity) <= 1e-6; })) {
+            std::copy_n(next.position, blueprint_.joint_count, commanded_position_);
+            pending_device_stop_source_.reset();
+        }
+        if (pending_device_stop_source_ && next.safety != RK_SAFETY_FAULT &&
+            next.safety != RK_SAFETY_EMERGENCY_STOP) {
+            next.mode = RK_ROBOT_MODE_STOPPING;
+            next.session_state = RK_SESSION_STOPPING;
+            next.trajectory_active = 1;
+        }
         state_ = next;
         if (endpoint_->executes_trajectory_queue() && !device_anchor_initialized_ &&
             next.source_timestamp_ns != 0 && result == RK_OK &&
@@ -2461,6 +2491,7 @@ void RobotRuntime::reset_state() noexcept {
     latched_fault_code_ = 1;
     std::fill_n(commanded_position_, RK_MAX_JOINTS, 0.0);
     device_anchor_initialized_ = false;
+    pending_device_stop_source_.reset();
     std::fill_n(commanded_position_backup_, RK_MAX_JOINTS, 0.0);
     std::fill_n(velocity_anchor_pending_, RK_MAX_JOINTS, false);
     std::fill_n(velocity_anchor_pending_backup_, RK_MAX_JOINTS, false);
@@ -2495,7 +2526,7 @@ rk_result RobotRuntime::device_homing_control(const rk_device_homing_control &co
         // A counter batch may already have applied: retain uncertain calibration.
         return result;
     }
-    if (pending_homing_stop_ || pending_drive_calibration_) return RK_ERROR_INVALID_STATE;
+    if (pending_homing_stop_ || pending_drive_calibration_ || pending_device_stop_source_) return RK_ERROR_INVALID_STATE;
     const auto result = endpoint_ ? endpoint_->device_homing_control(control) : RK_ERROR_BACKEND;
     if (result == RK_OK && control.action == 4) pending_homing_stop_ = control.sequence;
     return result;
@@ -2516,6 +2547,10 @@ rk_result RobotRuntime::device_homing_status(uint64_t sequence) {
             state_.active_plan_id = 0; state_.committed_until_ns = 0;
             state_.queue_end_time_ns = 0;
             state_.mode = RK_ROBOT_MODE_STOPPING; state_.safety = RK_SAFETY_STOPPING;
+            // The acknowledgment precedes completion of device deceleration.
+            // Hold admissions until fresh stationary feedback supplies the
+            // actual anchor, including independently held squaring sides.
+            pending_device_stop_source_ = state_.source_timestamp_ns;
             state_backup_valid_ = false;
             pending_homing_stop_.reset();
         } else if (result == RK_ERROR_INVALID_STATE) pending_homing_stop_.reset();

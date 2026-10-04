@@ -2,6 +2,21 @@
 use robotkit_device_protocol::{Board, Output, SkewGroup, StepFault, StepGenerator, VirtualBoard};
 
 #[test]
+fn captured_integer_counter_does_not_retract_after_f32_conversion() {
+    let mut board = VirtualBoard::<1, 1>::new(1_000_000, 0, 0, [1000.0]);
+    let mut generator = StepGenerator::new([1000.0], [0], [0.0], 1_000_000).unwrap();
+    for _ in 0..166 { board.step_pulse(0, true); }
+    board.advance_host_ns(1_000_000);
+    let held = generator.counter_position(&board, 0).unwrap() as f32;
+    assert!((held as f64 * 1000.0) < 166.0);
+    generator.tick(&mut board, [held]).unwrap();
+    assert_eq!(board.step_count(0), 166);
+    board.advance_host_ns(2_000_000);
+    generator.tick(&mut board, [0.1655]).unwrap();
+    assert_eq!(board.step_count(0), 165);
+}
+
+#[test]
 fn crossing_setup_and_rate_limit() {
     let mut board = VirtualBoard::<1, 1>::new(1_000_000, 0, 0, [400.0]);
     let mut generator = StepGenerator::new([400.0], [50], [10.0], 1_000_000).unwrap();

@@ -41,6 +41,20 @@ int main(int argc, char **argv) {
     assert(robotkit::device_frame6::encode(1, session, session_frame));
     robotkit::device_frame6::Frame decoded_session{};
     assert(robotkit::device_frame6::decode(session_frame, decoded_session));
+    // Physical homing controls and acknowledgments cross the same frame gate
+    // as ordinary queue records, including the highest assigned message kind.
+    auto check_homing_frame = [](std::uint8_t kind, const auto &record) {
+        std::vector<std::uint8_t> body(record.SIZE), bytes;
+        assert(encode(record, body));
+        assert(robotkit::device_frame6::encode(kind, body, bytes));
+        robotkit::device_frame6::Frame frame{};
+        assert(robotkit::device_frame6::decode(bytes, frame));
+        assert(frame.kind == kind && frame.payload.size() == record.SIZE);
+    };
+    check_homing_frame(17, HomingScope6{7, 1, 1, 0, 0, 1, 0.01f});
+    check_homing_frame(18, HomingSide6{7, 2, 1, 0, 1});
+    check_homing_frame(19, HomingControlAck6{7, 2, 1, 1});
+    check_homing_frame(20, HomingCounterBatch6{7, 3, 1, 0, 1, 0.1, -0.1});
     std::ifstream input(argv[1]);
     assert(input.good());
     std::string line;
