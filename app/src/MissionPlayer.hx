@@ -399,7 +399,7 @@ class MissionPlayer implements SessionMember {
     homingEncoders = encoders; homingSlip = slip;
     var view = new MotionSystem(robot.robot, new MotionSystemBlueprint(robot.model, robot.blueprint, axes, timestep));
     view.configureRuntimeHoming(robot.runtime, () -> {
-      slip.reset();
+      slip.rebaseAfterHoming();
       encoders.reset(robot.runtime.snapshot().q.toArray());
     }, simulation.homingSides(robotIndex));
     homing = view; homingComplete = false;

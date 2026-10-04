@@ -1900,3 +1900,23 @@ Independent motor calibration and monitor-reset preservation of the resulting
 slip remain unresolved; this wiring alone does not prove squaring. Fast seek
 still stops the whole axis at its first switch. Skew relaxation and the 1 mm
 result remain pending. No tests or builds ran; source remains uncompiled.
+
+### G12 — preserve side alignment and physical slip during monitor rebase
+
+Controller wiring: `4a4026210`. Refine simulation offset storage: alignment
+created by a side hold is its own additive squaring_offset, alongside lost-step
+slip and the power-up counter origin. Stage alignment transactionally and retain
+it on release; reset clears it. Hold compensation subtracts current lost-step
+slip, so existing losses do not change the held physical target. Cold power-up
+placement refuses an existing alignment offset.
+
+StepperSlip.rebaseAfterHoming clears loss history without writing endpoint
+offsets. Retain previously applied offsets as a baseline, then add subsequent
+plan losses on top after coupling propagation. Router and mission latch
+callbacks use this rebase instead of reset; session reset still clears physical
+slip. This also avoids moving an already slipped machine merely to clear its
+monitor history.
+
+Independent motor coordinate calibration, skew relaxation and the physical
+1 mm squaring result remain pending. No tests or builds ran; all source and
+behavior remain unverified.

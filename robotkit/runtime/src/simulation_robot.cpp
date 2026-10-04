@@ -11,7 +11,7 @@ std::vector<SimulationRobot::JointCommand> &SimulationRobot::staged_commands() {
     if (!staged_valid_) {
         commanded_.resize(joints_.size());
         staged_ = commanded_;
-        staged_slip_ = slip_;
+        staged_squaring_offset_ = squaring_offset_;
         staged_stopped_ = stopped_;
         staged_valid_ = true;
     }
@@ -119,10 +119,11 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
         target.target = source.target;
         target.max_force = source.max_effort;
         if (positional && squaring_hold_[source.joint])
-            staged_slip_[source.joint] = squaring_position_[source.joint] - source.target -
-                counter_origin_[source.joint];
+            staged_squaring_offset_[source.joint] = squaring_position_[source.joint] - source.target -
+                counter_origin_[source.joint] - slip_[source.joint];
         if (positional && source.joint < slip_.size())
-            target.target += staged_slip_[source.joint] + counter_origin_[source.joint];
+            target.target += slip_[source.joint] + staged_squaring_offset_[source.joint] +
+                counter_origin_[source.joint];
         if (source.mode == RK_TARGET_POSITION && source.joint < servo_.size() &&
             servo_[source.joint].stiffness > 0.0) {
             // The drive interpolates the analytic trajectory reference within this cycle.
@@ -160,7 +161,7 @@ std::vector<nksim_joint_target> SimulationRobot::take_pending_targets() {
     pending_targets_.clear();
     if (staged_valid_) {
         commanded_ = staged_;
-        slip_ = staged_slip_;
+        squaring_offset_ = staged_squaring_offset_;
         staged_valid_ = false;
     }
     return result;

@@ -312,7 +312,7 @@ class CncProgramPlayer implements SessionMember {
 			var view = new MotionSystem(robot.robot,
 				new MotionSystemBlueprint(machineModel, robot.blueprint, axes, session.fixedTimestep()));
 			view.configureRuntimeHoming(robot.runtime, () -> {
-				slip.reset();
+				slip.rebaseAfterHoming();
 				encoders.reset(robot.runtime.snapshot().q.toArray());
 			}, simulation.homingSides(robotIndex));
 			return view;

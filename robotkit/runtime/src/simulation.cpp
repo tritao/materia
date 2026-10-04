@@ -730,6 +730,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         // Servo motor joints (see rk_robot_joint_servo) carry the joints coupled to them, which then
         // take no commands of their own.
         binding->slip_.assign(blueprint.joint_count, 0.0);
+        binding->squaring_offset_.assign(blueprint.joint_count, 0.0);
         binding->counter_origin_.assign(blueprint.joint_count, 0.0);
         binding->squaring_hold_.assign(blueprint.joint_count, 0);
         binding->squaring_position_.assign(blueprint.joint_count, 0.0);
@@ -866,7 +867,8 @@ rk_result Simulation::set_power_up_offsets(uint32_t robot_index, const double *o
     std::array<nksim_joint_state, RK_MAX_JOINTS> before{};
     for (uint32_t joint = 0; joint < count; ++joint) {
         if (!std::isfinite(offsets[joint]) || binding->counter_origin_[joint] != 0.0 ||
-            binding->slip_[joint] != 0.0) return RK_ERROR_INVALID_ARGUMENT;
+            binding->slip_[joint] != 0.0 || binding->squaring_offset_[joint] != 0.0)
+            return RK_ERROR_INVALID_ARGUMENT;
         if (blueprint.joints[joint].type == RK_RUNTIME_JOINT_FIXED) {
             if (offsets[joint] != 0.0) return RK_ERROR_INVALID_ARGUMENT;
             continue;
@@ -932,7 +934,7 @@ rk_result Simulation::set_squaring_hold(uint32_t robot_index, uint32_t joint, bo
         binding->passive_[joint]) return RK_ERROR_INVALID_ARGUMENT;
     binding->squaring_position_[joint] = position;
     binding->squaring_hold_[joint] = active ? 1 : 0;
-    // Releasing preserves the accumulated shaft displacement in slip_.
+    // Releasing preserves alignment separately from subsequent lost-step slip.
     return RK_OK;
 }
 
