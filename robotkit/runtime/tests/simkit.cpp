@@ -1270,7 +1270,7 @@ void shape_descriptor_without_pose_keeps_default_placement() {
 
 // Exercise the physical endpoint path, including displacement accumulated after
 // the first motor holds. The Haxe homing-cycle test must cover sensor sequencing separately.
-void dual_home_removes_one_millimetre_startup_racking() {
+void dual_home_removes_one_millimetre_startup_racking(bool full_targets) {
     SessionFixture fixture(0.01);
     auto model = blueprint(912);
     model.joint_count = 3;
@@ -1304,9 +1304,11 @@ void dual_home_removes_one_millimetre_startup_racking() {
     };
     auto move = [&](double position, uint64_t sequence) {
         auto command = target(position, sequence);
-        command.target_count = 3;
-        command.targets[1] = {1, RK_TARGET_POSITION, position * 1000.0, 0.0, 0.0};
-        command.targets[2] = {2, RK_TARGET_POSITION, position * 1000.0, 0.0, 0.0};
+        if (full_targets) {
+            command.target_count = 3;
+            command.targets[1] = {1, RK_TARGET_POSITION, position * 1000.0, 0.0, 0.0};
+            command.targets[2] = {2, RK_TARGET_POSITION, position * 1000.0, 0.0, 0.0};
+        }
         assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
         advance();
     };
@@ -1346,7 +1348,8 @@ void dual_home_removes_one_millimetre_startup_racking() {
 }
 
 int main() {
-    dual_home_removes_one_millimetre_startup_racking();
+    dual_home_removes_one_millimetre_startup_racking(true);
+    dual_home_removes_one_millimetre_startup_racking(false);
     shape_descriptor_without_pose_keeps_default_placement();
     convex_link_and_box_link_build();
     shared_world_steps_once();

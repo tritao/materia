@@ -91,6 +91,7 @@ private:
     std::vector<JointCommand> &staged_commands();
 
     Simulation &simulation_;
+    std::vector<rk_robot_joint_coupling> kinematic_couplings_;
     std::vector<nkscene_node_id> nodes_;
     std::vector<nksim_body> bodies_;
     std::vector<nksim_joint> joints_;

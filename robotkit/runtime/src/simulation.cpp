@@ -690,6 +690,11 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 sizeof(blueprint.joint_servo))
             for (uint32_t i = 0; i < blueprint.joint_count; ++i)
                 physical_coupling[i] = blueprint.joint_servo[i].stiffness > 0.0;
+        // Multiple-input mechanisms keep their physical summed constraint.
+        for (uint32_t i = 0; i < blueprint.coupling_count; ++i)
+            for (uint32_t k = 0; k < i; ++k)
+                if (blueprint.couplings[i].follower == blueprint.couplings[k].follower)
+                    physical_coupling[blueprint.couplings[i].follower] = 1;
         for (uint32_t pass = 0; pass < blueprint.joint_count; ++pass) {
             bool changed = false;
             for (uint32_t i = 0; i < blueprint.coupling_count; ++i) {
@@ -703,7 +708,10 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         }
         for (uint32_t index = 0; index < blueprint.coupling_count; ++index) {
             const auto &source = blueprint.couplings[index];
-            if (!physical_coupling[source.follower]) continue;
+            if (!physical_coupling[source.follower]) {
+                binding->kinematic_couplings_.push_back(source);
+                continue;
+            }
             nksim_joint_coupling_desc coupling{};
             coupling.struct_size = sizeof(coupling);
             coupling.leader = binding->joints_[source.leader];

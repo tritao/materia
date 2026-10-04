@@ -4,6 +4,7 @@
 #include "sensor_math.hpp"
 #include <algorithm>
 #include <cmath>
+#include <memory>
 
 namespace robotkit {
 
@@ -116,6 +117,46 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
         return RK_OK;
     if (command.kind != RK_COMMAND_JOINT_TARGETS)
         return RK_ERROR_UNSUPPORTED;
+    // Full plans already name followers. Sparse direct commands still need the
+    // old coupling propagation, now applied before per-shaft physical offsets.
+    bool needs_projection = false;
+    for (const auto &term : kinematic_couplings_) {
+        bool leader = false, follower = false;
+        for (uint32_t i = 0; i < command.target_count; ++i) {
+            leader |= command.targets[i].joint == term.leader;
+            follower |= command.targets[i].joint == term.follower;
+        }
+        needs_projection |= leader && !follower;
+    }
+    if (needs_projection) {
+        auto expanded = std::make_unique<rk_robot_command>(command);
+        bool added = false;
+        for (std::size_t pass = 0; pass < joints_.size(); ++pass) {
+            bool changed = false;
+            for (const auto &term : kinematic_couplings_) {
+                const rk_joint_target *leader = nullptr;
+                bool follower = false;
+                for (uint32_t i = 0; i < expanded->target_count; ++i) {
+                    if (expanded->targets[i].joint == term.leader) leader = &expanded->targets[i];
+                    if (expanded->targets[i].joint == term.follower) follower = true;
+                }
+                if (!leader || follower) continue;
+                if (expanded->target_count >= RK_MAX_JOINTS) return RK_ERROR_INVALID_ARGUMENT;
+                rk_joint_target target = *leader;
+                target.joint = term.follower;
+                if (target.mode == RK_TARGET_POSITION || target.mode == RK_TARGET_SERVO) {
+                    target.mode = RK_TARGET_POSITION;
+                    target.target = term.ratio * leader->target + term.offset;
+                } else if (target.mode == RK_TARGET_VELOCITY) target.target *= term.ratio;
+                else return RK_ERROR_UNSUPPORTED;
+                if (!std::isfinite(target.target)) return RK_ERROR_INVALID_ARGUMENT;
+                expanded->targets[expanded->target_count++] = target;
+                changed = added = true;
+            }
+            if (!changed) break;
+        }
+        if (added) return apply(*expanded);
+    }
     for (uint32_t index = 0; index < command.target_count; ++index)
         if (command.targets[index].joint >= joints_.size())
             return RK_ERROR_INVALID_ARGUMENT;

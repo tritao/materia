@@ -2168,3 +2168,20 @@ explicit target projection before considering the native change complete.
 MotionKit compile found conditional nullable count typing; replace ternaries
 with guarded casts to the known integer type. The compiler pass still needs
 retry, other kits/app and focused picker/Haxe homing runs remain pending.
+
+### G12 checkpoint — sparse targets preserved, native ctest green
+
+Kinematic follower fix: `5a9636faf`. Retain skipped single-input kinematic
+coupling terms on the simulation endpoint. When a direct command omits a
+follower, project its position/velocity through those terms, including chains,
+before applying follower slip/origin/alignment. Explicit follower targets remain
+authoritative. Full payloads avoid the expansion allocation. Reject unsupported
+effort projection and nonfinite results. Multi-input coupling groups retain
+physical constraints along with servo-connected groups.
+
+Extend the physical 1 mm regression to run full and sparse target variants.
+Native rebuild passed. Full enabled ctest rerun passed 18/18 in 9.13 s, including
+both variants, device protocol Rust, virtual endpoints and serial PTY tests.
+This establishes the native checkpoint for this source state. MotionKit
+compiler-only retry remains running; other kits/app and focused picker/Haxe
+homing execution remain pending before G13.
