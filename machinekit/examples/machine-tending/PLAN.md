@@ -604,7 +604,7 @@ Done. What was built and decided:
   - `RobotController` cabinet.
   - Axis servos, valves and switches are wired to them (X8 driver/controller wiring).
 - A controller owns the joints its actuators are wired to (MT-D1). Joints with no controller are an error; parts with no controller are environment.
-- Scene v15:
+- Scene v17 (v16 already carried the pneumatic/process scene fields):
   - `controllers: [{id, kind:"cnc"|"robot", joints, sensors, channels}]`;
   - `machining` and `mission` name their controller;
   - `signals: [{name, from:{controller, output}, to:{controller, input}}]`, derived from the `Signal` wiring.
@@ -618,6 +618,14 @@ Done. What was built and decided:
   - signals arrive after exactly one tick;
   - `checkBenchMill` unchanged;
   - router, arm and welder project tests unchanged, since a project with no controllers keeps one robot.
+
+Done. What was built and decided:
+- CNC and robot cabinet parts own joints through motor-driver and valve-coil signal wires. Five mill field heads share their logical sensor IDs and each has its own cabinet input wire; spindle at-speed comes from its drive. Saved parts and port connections reconstruct those ownerships on every rebuild.
+- One cell assembly builds two runtimes in one MuJoCo world: 15 disjoint moving joints and 148 component records, including an unowned floor marker. Both machine roots stay with their robots.
+- Two cabinet-to-cabinet wires carry `cnc.ready` and `robot.clear` through the `CellSignals` bus. A changed output becomes visible to the other controller on the next 10 ms tick, including a digital input sensor frame.
+- The bare mill remains at 51.86 s and the enclosed mill at 52.30 s for the bearing-block job after the cabinet and sensor heads were added. The enclosed mill still opens its door in 1.50 s, closes it in 1.79 s, and clamps a seated blank in 0.08 s at 482.55 N.
+- The sequential `mt-suite-mt6-final.txt` gate passed every kit, MachineKit smoke, the app build and the full app project-source suite. Counts remain RobotKit 4999, MotionKit 67533, CadBridge 157, CncKit 317, CamKit 12311, ProjectKit 144 and ProcessKit 23 plus 19 weld-pass assertions.
+- No MT6 baseline moved: screw/belt router 232.2/215.2 s with 0.05/1.76 mm worst deviation; CoreXY 649.6 mm/s and 71.549 m/s²; arm mission 5.8/12/17.2/23.5 s; mobile final goTo 61 s and obstacle round 65 s; welder seam runs 20.6/21.1 s and whole weldment 106.5 s. These are the MT5b values, including the earlier recorded main-merge and review-fix changes.
 
 **MT7. The mill's robot interface.**
 - `cnckit.controller.RobotInterface` is a pure state machine with:
@@ -744,8 +752,9 @@ MT0 ─┬─ MT1 ── MT2 ─┬─ MT4 (reach study) ─┐
 | MT2 | done | 06c9bf5fd, 73a14c58e |
 | MT3 | done | 4d58cd5d3, 8a44aeb53 |
 | MT4 | done | c945a0dc8, f518b0dff |
-| MT5 | done | 453d890ad, 5f06c32e5, a397b187a, a6230c46e |
-| MT6 | planned | |
+| MT5 | done | 453d890ad, 5f06c32e5, a397b187a, a6230c46e, 1484b924d |
+| MT5b | done: review regressions | 04d3d092d |
+| MT6 | done | 4c9e6ebec |
 | MT7 | planned | |
 | MT8 | planned | |
 | MT9 | planned | |
