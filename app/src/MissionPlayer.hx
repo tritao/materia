@@ -193,7 +193,9 @@ class MissionPlayer implements SessionMember {
   final idle = new PerceptionSnapshot();
 
   public function new(mission:SceneArtifactMission, robot:AssemblyRobot, simulation:Simulation, robotIndex:Int,
-      timestep:Float, obstacles:Array<FloorObstacle>, objects:Array<GripObject>, project:ProjectDocumentSession) {
+      timestep:Float, obstacles:Array<FloorObstacle>, objects:Array<GripObject>, project:ProjectDocumentSession, weldAcceleration:Float = ARM_ACCELERATION) {
+    if (!Math.isFinite(weldAcceleration) || weldAcceleration <= 0.0 || weldAcceleration > ARM_ACCELERATION)
+      throw "Invalid welding planning acceleration";
     if (mission.steps.length == 0) throw "A mission needs steps";
     this.mission = mission;
     this.robot = robot;
@@ -278,7 +280,7 @@ class MissionPlayer implements SessionMember {
       newWelding = () -> {
         var planned = weldClearance(arm, tool.contact.occurrence, metal);
         clearance = planned;
-        return WeldingPlanRunner.create(robot.robot, arm, () -> robot.runtime.pollEvents(), channels, ARM_ACCELERATION, 3, planned);
+        return WeldingPlanRunner.create(robot.robot, arm, () -> robot.runtime.pollEvents(), channels, weldAcceleration, 3, planned);
       };
       welding = newWelding();
     }

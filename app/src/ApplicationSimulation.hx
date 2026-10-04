@@ -259,7 +259,9 @@ class ApplicationSimulation {
       if (work != null) {
         if (candidateAssembly == null) throw "A mission needs the project's assembly";
         candidateMission = new MissionPlayer(work, candidateAssembly, candidate, assemblyIndex, timestep, heldBoxes,
-          candidateTools.objectsByScene(), session);
+          candidateTools.objectsByScene(), session, virtualWelder
+            ? MissionPlayer.ARM_ACCELERATION * robotkit.runtime.VirtualServoOptions.ACCELERATION_SCALE
+            : MissionPlayer.ARM_ACCELERATION);
         // A mission that welds lays the weld metal as the welder deposits it.
         var welds = [for (step in work.steps) if (step.kind == "weld") step].length > 0;
         if (welds) {
