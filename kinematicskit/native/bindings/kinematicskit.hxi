@@ -6,7 +6,7 @@ interface KinematicsKitNative @target("portable-abi64") @library("kinematicskit_
 	const KK_ERROR_INVALID_HANDLE = -2;
 	const KK_ERROR_OUT_OF_MEMORY = -3;
 	const KK_ERROR_SOLVER = -4;
-	const KK_MODEL_FORMAT = 1;
+	const KK_MODEL_FORMAT = 2;
 	const KK_OK = 0;
 	/**
 	 * The bounds admit no step (e.g. a lower bound above its upper bound).
