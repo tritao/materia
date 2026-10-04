@@ -1,3 +1,4 @@
+import haxeon.test.Shards;
 import CadKit;
 import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.Location;
@@ -2549,52 +2550,55 @@ class MachineKitSmoke {
 			'give connector "shared" different frames');
 	}
 
+	/** The groups of this suite, each independent of the others, so that the workspace can run them as parallel shards. */
 	static function main():Void {
-		namedStepperFaces();
-		MachineKitNamingAudit.run();
-		MachineAssemblyDescriptionTests.run();
-		EndEffectorTests.run();
-		EndEffectorSetTests.run();
-		EndEffectorComponentTests.run();
-		EndEffectorExampleChecks.run();
-		RobotArmChecks.run();
-		CncRouterChecks.run();
-		FoldedZRouterCheck.main();
-		MobileBaseChecks.run();
-		RobotWelderChecks.run();
-		CoreXyPlotterChecks.run();
-		CoreXyDriveTests.run();
-		assemblyPreviewSharing();
-		RecipeContractTests.run();
-		MotorDriverTests.run();
-		PowerSupplyTests.run();
-		GearboxTests.run();
-		componentRecipes();
-		documentRecipes();
-		documentPreview();
-		MachineKitReferenceTests.run();
-		massProperties();
-		dimensions();
-		catalogMetadata();
-		bearings();
-		screws();
-		motors();
-		fasteners();
-		shafts();
-		shaftHardware();
-		structural();
-		gears();
-		flangeBearingAssembly();
-		pillowBlock();
-		wheels();
-		linearAxis();
-		linearRailGuide();
-		pickingFrames();
-		catalogExtras();
-		robotics();
-		armParts();
-		assembly();
-		ports();
-		trace("MachineKit smoke passed");
+		var everything = Shards.run([
+			{name: "namedStepperFaces", run: namedStepperFaces, weight: 0.1},
+			{name: "MachineKitNamingAudit.run", run: MachineKitNamingAudit.run, weight: 0.4},
+			{name: "MachineAssemblyDescriptionTests.run", run: MachineAssemblyDescriptionTests.run, weight: 10.5},
+			{name: "EndEffectorTests.run", run: EndEffectorTests.run, weight: 0.05},
+			{name: "EndEffectorSetTests.run", run: EndEffectorSetTests.run, weight: 0.05},
+			{name: "EndEffectorComponentTests.run", run: EndEffectorComponentTests.run, weight: 0.05},
+			{name: "EndEffectorExampleChecks.run", run: EndEffectorExampleChecks.run, weight: 0.1},
+			{name: "RobotArmChecks.run", run: RobotArmChecks.run, weight: 0.6},
+			{name: "CncRouterChecks.run", run: CncRouterChecks.run, weight: 4},
+			{name: "FoldedZRouterCheck.main", run: FoldedZRouterCheck.main, weight: 5.1},
+			{name: "MobileBaseChecks.run", run: MobileBaseChecks.run, weight: 2},
+			{name: "RobotWelderChecks.run", run: RobotWelderChecks.run, weight: 11.3},
+			{name: "CoreXyPlotterChecks.run", run: CoreXyPlotterChecks.run, weight: 2.7},
+			{name: "CoreXyDriveTests.run", run: CoreXyDriveTests.run, weight: 0.5},
+			{name: "assemblyPreviewSharing", run: assemblyPreviewSharing, weight: 0.05},
+			{name: "RecipeContractTests.run", run: RecipeContractTests.run, weight: 7.1},
+			{name: "MotorDriverTests.run", run: MotorDriverTests.run, weight: 0.05},
+			{name: "PowerSupplyTests.run", run: PowerSupplyTests.run, weight: 0.05},
+			{name: "GearboxTests.run", run: GearboxTests.run, weight: 0.05},
+			{name: "componentRecipes", run: componentRecipes, weight: 5.5},
+			{name: "documentRecipes", run: documentRecipes, weight: 0.2},
+			{name: "documentPreview", run: documentPreview, weight: 0.4},
+			{name: "MachineKitReferenceTests.run", run: MachineKitReferenceTests.run, weight: 0.05},
+			{name: "massProperties", run: massProperties, weight: 0.05},
+			{name: "dimensions", run: dimensions, weight: 0.05},
+			{name: "catalogMetadata", run: catalogMetadata, weight: 0.05},
+			{name: "bearings", run: bearings, weight: 0.05},
+			{name: "screws", run: screws, weight: 0.05},
+			{name: "motors", run: motors, weight: 0.1},
+			{name: "fasteners", run: fasteners, weight: 0.05},
+			{name: "shafts", run: shafts, weight: 0.05},
+			{name: "shaftHardware", run: shaftHardware, weight: 0.05},
+			{name: "structural", run: structural, weight: 0.3},
+			{name: "gears", run: gears, weight: 3.7},
+			{name: "flangeBearingAssembly", run: flangeBearingAssembly, weight: 0.1},
+			{name: "pillowBlock", run: pillowBlock, weight: 0.1},
+			{name: "wheels", run: wheels, weight: 0.05},
+			{name: "linearAxis", run: linearAxis, weight: 0.2},
+			{name: "linearRailGuide", run: linearRailGuide, weight: 0.05},
+			{name: "pickingFrames", run: pickingFrames, weight: 0.5},
+			{name: "catalogExtras", run: catalogExtras, weight: 0.2},
+			{name: "robotics", run: robotics, weight: 0.3},
+			{name: "armParts", run: armParts, weight: 0.05},
+			{name: "assembly", run: assembly, weight: 0.05},
+			{name: "ports", run: ports, weight: 0.05}
+		]);
+		if (everything) trace("MachineKit smoke passed");
 	}
 }
