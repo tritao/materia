@@ -3096,3 +3096,19 @@ The updated slip fixture compiled, but its full-suite retry reached homing befor
 the first simulated switch frames existed. Added one initial simulation tick
 before home; recompile/retry remains pending. No successful router homing or
 full MotionKit pass is claimed. G13/Phase C remain incomplete.
+
+### Phase C — router trip geometry correction and explicit test wiring
+
+Router example compiler-only build passed. Its standalone execution rejected
+homeYLeft trip placement: switch construction subtracted axis.initial even
+though AxisBuilder.zeroPoses already denotes coordinate zero. Removed that
+subtraction so physical trips use the same coordinates as guide limits. Router
+example recompilation is running (61641). Existing app router checks now share
+an explicit test deployment helper for their new switch inputs instead of using
+motor-only DeviceLayout.forActuators directly.
+
+App and MotionKit recompiles passed. Full MotionKit retry (83787) progressed
+past the earlier slip-fixture failure into CoreXY checks; still running. The
+router-device-home retry (72026) is compiling the updated project entrypoint.
+No successful router homing or full phase pass is claimed yet. G13 remains
+incomplete and G14 is not started.

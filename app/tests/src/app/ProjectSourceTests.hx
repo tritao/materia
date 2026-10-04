@@ -1815,14 +1815,8 @@ class ProjectSourceTests {
     physical.dispose();
   }
 
-  /** Physical screw router homes using RKD6 switch captures, never host switch synthesis. */
-  static function checkVirtualRouterHoming(root:String):Void {
-    var manifest = FileSystem.fullPath(root + "/machinekit/examples/cnc-router/materia.project.json");
-    var generated = MateriaProjectRunner.loadProject(manifest);
-    var definition:AssemblyDefinition = cast generated.assemblyDefinition;
-    var model = AssemblySimulationBridge.toRobotModel(definition, generated.physical).model;
-    var homes = [for (contact in model.switches) if (contact.role == "home") contact];
-    check(homes.length == 4, "Physical router declares X, Z and two independent Y home switches");
+  /** Test deployment wiring is explicit; no physical bench pins are inferred here. */
+  static function routerDeviceBinding(model:RobotModel, stepTickHz:Int):DeviceBinding {
     var inputs:Array<robotkit.device.DeviceInput> = [];
     for (contact in model.switches) {
       var matches:Array<robotkit.model.Actuator> = [];
@@ -1833,7 +1827,18 @@ class ProjectSourceTests {
       inputs.push(new robotkit.device.DeviceInput(inputs.length, contact.id, matches[0].id, false));
     }
     var channels = DeviceLayout.forActuators(model).channels;
-    var binding = DeviceBinding.bind(model, new DeviceLayout(channels, inputs), 40000);
+    return DeviceBinding.bind(model, new DeviceLayout(channels, inputs), stepTickHz);
+  }
+
+  /** Physical screw router homes using RKD6 switch captures, never host switch synthesis. */
+  static function checkVirtualRouterHoming(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/cnc-router/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var definition:AssemblyDefinition = cast generated.assemblyDefinition;
+    var model = AssemblySimulationBridge.toRobotModel(definition, generated.physical).model;
+    var homes = [for (contact in model.switches) if (contact.role == "home") contact];
+    check(homes.length == 4, "Physical router declares X, Z and two independent Y home switches");
+    var binding = routerDeviceBinding(model, 40000);
     var axes = [for (joint in binding.model.joints) if (joint.type == JointType.Prismatic) {
       var limits = binding.model.coupledLimits(joint.id, new SteadyLoads());
       new motionkit.axis.MotionAxisBlueprint(joint.id, [joint.id], joint.limits.lower,
@@ -1905,7 +1910,7 @@ class ProjectSourceTests {
     // generate at its microstepping (40 kHz over 3200 steps a turn: 78.5 rad/s), and the screw's
     // critical speed, all through the axis's ratio to the motor.
     var motorSpeed = 2 * 24 / (50 * 2.5e-3 * 2.8);
-    var binding = DeviceBinding.bind(model, DeviceLayout.forActuators(model), controller.stepTickHz);
+    var binding = routerDeviceBinding(model, controller.stepTickHz);
     var stepSpeed = controller.stepTickHz / binding.channels[0].stepsPerUnit;
     var wired = binding.model;
     var steady = new SteadyLoads();

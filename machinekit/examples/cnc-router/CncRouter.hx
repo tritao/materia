@@ -686,7 +686,7 @@ class CncRouter extends AxisBuilder {
 		var travel = (side < 0 ? axis.lower : axis.upper) + side * room * 0.25;
 		var sensor = new machinekit.motion.ProximitySwitch();
 		var normal = [for (value in direction) -side * value];
-		var face = [for (i in 0...3) point[i] + direction[i] * (travel - axis.initial + side * half)];
+		var face = [for (i in 0...3) point[i] + direction[i] * (travel + side * half)];
 		var origin = [for (i in 0...3) face[i] - normal[i] * (sensor.spec.length + sensor.spec.sensingDistance)];
 		var transverse = suffix == "X" ? [0.0, 1, 0] : [1.0, 0, 0];
 		var pose = AxisBuilder.orient(origin[0], origin[1], origin[2], transverse, normal);
