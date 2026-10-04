@@ -2,6 +2,11 @@
 # network and spend half a minute cloning. They are submodules under simkit/vendor/mujoco-deps instead, and FetchContent is
 # pointed at them. Each must be at the commit the MuJoCo checkout declares (MUJOCO_DEP_VERSION_*), so updating MuJoCo's
 # pins is only complete once the submodule is moved too, and a configure says so rather than building the wrong source.
+#
+# The pins are read from the MuJoCo checkout's own CMake files, so this module has no copy of them to keep in step; if that
+# layout changes the configure stops with "Could not read MuJoCo's pinned version" rather than skipping the check. Only what
+# the backend builds is vendored. MuJoCo's tests and benchmarks need gtest, abseil and benchmark: turning them on fails the
+# configure (FetchContent is disconnected below) until those are added as submodules here too.
 
 set(_mujoco_deps_dir "${CMAKE_CURRENT_LIST_DIR}/../vendor/mujoco-deps")
 file(READ "${NK_MUJOCO_SOURCE_DIR}/cmake/MujocoDependencies.cmake" _mujoco_pins)
