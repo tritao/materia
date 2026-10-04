@@ -1670,3 +1670,19 @@ Application owners still need to configure their monitor callback and home
 before program/mission startup; this wiring is not yet present. Hold/resume
 semantics during homing, simulation power-up offsets, monitor/slip physical
 reset effects and G12 side control remain pending. No tests or builds ran.
+
+
+### G11 — preserve authored axis placement during homing
+
+MotionSystem integration: `1ec505a7e`. Router MotionAxis mappings use a placement
+intercept (native joint position = authored position minus initial placement).
+Convert authored home to native joint coordinates when building HomingAxis.
+RuntimeHomingDriver retains that intercept: express expanded physical bounds
+and every requested physical seek/return coordinate in the mapped axis's
+logical coordinates before planning. Continue requiring unit SI scale for the
+independent homing joint, while retaining all follower mappings. This avoids
+rejecting the router's existing placement convention or returning it to the
+wrong native home coordinate.
+
+Router/picker startup and monitor ownership still need wiring. No tests or
+builds ran; coordinate mapping and homing remain runtime-unverified.

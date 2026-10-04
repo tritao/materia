@@ -21,6 +21,7 @@ class RuntimeHomingDriver implements HomingDriver {
   final observer:RuntimeHomingObserver;
   final planner:AxisPlanner;
   final axes:Map<Int, HomingAxis> = new Map();
+  final mappings:Map<Int, MotionAxis> = new Map();
   final afterLatch:Void -> Void;
 
   /** afterLatch resets the caller-owned encoder and stepper-slip monitors. */
@@ -41,11 +42,12 @@ class RuntimeHomingDriver implements HomingDriver {
     for (axis in motionAxes) {
       if (axis == null) throw "Homing driver has a null motion axis";
       var home = axes.get(axis.jointIndices[0]);
-      if (home != null && (axis.id != home.id || axis.jointScale(0) != 1.0 || axis.jointOffset(0) != 0.0))
+      if (home != null && (axis.id != home.id || axis.jointScale(0) != 1.0))
         throw "Homing requires the independent joint in SI coordinates";
+      if (home != null) mappings.set(home.joint, axis);
       expanded.push(new MotionAxis(new MotionAxisBlueprint(axis.id, axis.jointIds,
-        home == null ? axis.lowerLimit : home.lowerTravel,
-        home == null ? axis.upperLimit : home.upperTravel,
+        home == null ? axis.lowerLimit : home.lowerTravel - axis.jointOffset(0),
+        home == null ? axis.upperLimit : home.upperTravel - axis.jointOffset(0),
         axis.maxVelocity, axis.maxAcceleration, axis.homePosition,
         [for (i in 0...axis.jointIndices.length) axis.jointScale(i)],
         [for (i in 0...axis.jointIndices.length) axis.jointOffset(i)]), names));
@@ -92,7 +94,7 @@ class RuntimeHomingDriver implements HomingDriver {
     var snapshot = robot.snapshot();
     // Native plans anchor on held commanded coordinates, including measured following error.
     var trajectory = planner.plan(snapshot.setpointPositions.toArray(),
-      {targets: [new AxisTarget(axis.id, position)], options: new MotionOptions(velocity, acceleration)}).trajectory;
+      {targets: [new AxisTarget(axis.id, position - mappings.get(axis.joint).jointOffset(0))], options: new MotionOptions(velocity, acceleration)}).trajectory;
     try {
       var stream = new TrajectoryStream(robot);
       var segments = trajectory.segments();

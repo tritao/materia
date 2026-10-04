@@ -123,7 +123,8 @@ class MotionSystem {
           throw 'Homing axis "${axis.id}" needs physical drive limits';
         homingAxes.push(new HomingAxis(axis.id, joint, homes, physical.maxRate,
           physical.maxAcceleration, physical.lowerLimit, physical.upperLimit,
-          physical.overtravel, axis.homePosition, fixedTimestepSeconds));
+          physical.overtravel, axis.jointOffset(0) + axis.jointScale(0) * axis.homePosition,
+          fixedTimestepSeconds));
       }
     }
     for (contact in blueprint.runtime.switches) if (contact.role == "home") {
