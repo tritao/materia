@@ -594,6 +594,7 @@ class FrameworkSmoke {
 			return 30;
 		if (!commandHistoryValid(context))
 			return 230;
+		if (!externalScrollbarValid(context)) throw "external scrollbar placement or input regression";
 		if (!scrollbarVisibilityValid(context)) throw "scrollbar visibility regression";
 		if (!smoothScrollValid(context)) throw "smooth scrolling motion or lifetime regression";
 		if (!sidebarValid(context)) throw "sidebar registry, persistence or lazy provider regression";
@@ -4707,6 +4708,36 @@ class FrameworkSmoke {
 		return true;
 	}
 
+	static function externalScrollbarValid(context:UiContext):Bool {
+		var controller = new ScrollController();
+		var view = new ExternalScrollbarSmoke(controller);
+		var frame = new LayoutFrame(240, 80); frame.deltaSeconds = 0;
+		var root = context.submit(view, frame);
+		var track = root.children[0], viewport = root.children[1], fixed = root.children[2];
+		var bounds = track.globalBounds(), side = fixed.globalBounds();
+		if (viewport.children.length != 1 || Math.abs(bounds.x + bounds.width - 238) > 0.01
+			|| bounds.x < side.x || Math.abs(controller.viewportWidth - 160) > 0.01) return false;
+		context.pointerMove(bounds.x + 5, bounds.y + 40);
+		context.scroll(bounds.x + 5, bounds.y + 40, 0, 20);
+		if (controller.offsetY != 20) return false;
+		root = context.submit(view, frame); track = root.children[0];
+		var thumb = track.children[0];
+		if (!context.focusWidget(thumb.id)) return false;
+		context.key(UiEventKind.KeyDown, UiKey.PageDown);
+		if (controller.offsetY <= 20) return false;
+		root = context.submit(view, frame); track = root.children[0]; thumb = track.children[0];
+		var thumbBounds = thumb.globalBounds(), before = controller.offsetY;
+		context.pointerDown(thumbBounds.x + 4, thumbBounds.y + thumbBounds.height / 2, 0);
+		context.pointerMove(-20, thumbBounds.y + thumbBounds.height / 2 + 15);
+		if (controller.offsetY <= before) return false;
+		context.pointerUp(-20, thumbBounds.y + thumbBounds.height / 2 + 15, 0);
+		frame.deltaSeconds = 0.8; root = context.submit(view, frame);
+		var color = root.children[0].children[0].layout.style.background;
+		if (color == null || color.alpha != 0) return false;
+		frame.deltaSeconds = 0; context.submit(new Text("external-unmounted"), frame);
+		return context.animations.activeCount == 0;
+	}
+
 	static function scrollbarAlpha(root:RenderNode):Float {
 		var color = root.children[1].children[0].layout.style.background;
 		return color == null ? -1.0 : color.alpha;
@@ -5638,5 +5669,26 @@ private class SmokeHostApplication implements UiApplication {
 	public function dispose():Void {
 		disposeCalls++;
 		if (throwOnDispose) throw "application dispose failure";
+	}
+}
+
+/** Fixed sibling content shares the pane overlay, without becoming scroll content. */
+private class ExternalScrollbarSmoke implements View {
+	final controller:ScrollController;
+	public function new(controller:ScrollController) this.controller = controller;
+	public function build(context:BuildContext):RenderNode {
+		return context.withScope(new nativekit.ui.core.Key("external-scrollbar-smoke"), function() {
+			var style = new LayoutStyle(); style.width = LayoutAxis.fixed(240); style.height = LayoutAxis.fixed(80);
+			style.direction = LayoutDirection.LeftToRight;
+			var host = new RenderNode(context.id("host"), LayoutVisualKind.Box, style);
+			var viewportStyle = new LayoutStyle(); viewportStyle.width = LayoutAxis.grow(); viewportStyle.height = LayoutAxis.grow();
+			var contentStyle = new LayoutStyle(); contentStyle.width = LayoutAxis.stretch(); contentStyle.height = LayoutAxis.fixed(600);
+			var viewport = new ScrollView("external-viewport", new Column("content", [], contentStyle), viewportStyle, ScrollAxis.Vertical, controller);
+			viewport.scrollbarOverlayHost = host;
+			host.add(viewport.build(context));
+			var sideStyle = new LayoutStyle(); sideStyle.width = LayoutAxis.fixed(80); sideStyle.height = LayoutAxis.grow();
+			host.add(new RenderNode(context.id("fixed-side"), LayoutVisualKind.Box, sideStyle));
+			return host;
+		});
 	}
 }

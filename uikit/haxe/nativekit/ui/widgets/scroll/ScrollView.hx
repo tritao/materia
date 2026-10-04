@@ -34,6 +34,8 @@ class ScrollView implements View {
 	public var showScrollbar:Bool;
 	/** Null inherits the application environment policy. */
 	public var scrollbarVisibility:Null<Int> = null;
+	/** Optional non-scrolling ancestor with the same vertical extent. */
+	public var scrollbarOverlayHost:Null<RenderNode> = null;
 
 	public function new(key:String, child:View, ?style:LayoutStyle,
 			axis:Int = ScrollAxis.Vertical, ?controller:ScrollController) {
@@ -100,8 +102,9 @@ class ScrollView implements View {
 			});
 			translatedContent.add(content);
 			viewport.add(translatedContent);
+			var overlayHost = scrollbarOverlayHost == null ? viewport : scrollbarOverlayHost;
 			var scrollbar = showScrollbar && policy != ScrollbarVisibility.Hidden && axis != ScrollAxis.Horizontal
-				? addVerticalScrollbar(context, viewport, visibility.value, visibilityChanged) : null;
+				? addVerticalScrollbar(context, overlayHost, visibility.value, visibilityChanged) : null;
 
 			translatedContent.onResolved(function(geometry) {
 				var viewportGeometry:ResolvedLayoutItem = cast viewport.resolved;
@@ -121,7 +124,7 @@ class ScrollView implements View {
 					context.requestLayoutFeedback();
 				}
 				visibility.value.setAvailable(scrollbar != null && controller.maxScrollY > 0 && controller.viewportHeight > 0);
-				if (scrollbar != null && updateVerticalScrollbar(scrollbar))
+				if (scrollbar != null && updateVerticalScrollbar(scrollbar, overlayHost.resolved == null ? controller.viewportWidth : overlayHost.resolved.width))
 					context.requestLayoutFeedback();
 			});
 			viewport.on(UiEventKind.Scroll, function(event) {
@@ -162,6 +165,14 @@ class ScrollView implements View {
 			};
 			viewport.on(UiEventKind.KeyDown, handleKey);
 			viewport.on(UiEventKind.KeyRepeat, handleKey);
+			if (scrollbar != null && overlayHost != viewport) {
+				scrollbar.on(UiEventKind.KeyDown, handleKey);
+				scrollbar.on(UiEventKind.KeyRepeat, handleKey);
+				scrollbar.on(UiEventKind.Scroll, function(event) {
+					visibility.value.reveal();
+					if (controller.scrollBy(0, event.deltaY)) event.stopPropagation();
+				});
+			}
 			return viewport;
 		});
 	}
@@ -293,7 +304,7 @@ class ScrollView implements View {
 		return track;
 	}
 
-	function updateVerticalScrollbar(track:RenderNode):Bool {
+	function updateVerticalScrollbar(track:RenderNode, width:Float):Bool {
 		var thumb = track.children[0];
 		var trackStyle = track.layout.style;
 		var thumbStyle = thumb.layout.style;
@@ -306,7 +317,7 @@ class ScrollView implements View {
 		var thumbY = controller.maxScrollY <= 0.0 ? 0.0 :
 			controller.offsetY / controller.maxScrollY * travel;
 		var visible = controller.maxScrollY > 0.0 && controller.viewportHeight > 0.0;
-		var trackX = Math.max(0.0, controller.viewportWidth - 12.0);
+		var trackX = Math.max(0.0, width - 12.0);
 		var changed = trackStyle.positionX != trackX ||
 			trackStyle.height.value != trackHeight || thumbStyle.height.value != thumbHeight ||
 			thumbStyle.positionY != thumbY || trackStyle.visible != visible;
