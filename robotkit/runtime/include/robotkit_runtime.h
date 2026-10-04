@@ -106,7 +106,8 @@ enum {
     RK_ERROR_LIMIT = -10, /**< Command violates a compiled joint or actuator limit. */
     RK_ERROR_STALE_STATE = -11, /**< The endpoint only supplied an old observation. */
     RK_ERROR_MODEL_MISMATCH = -12, /**< The device is not the deployment's controller or disagrees with its configuration. */
-    RK_ERROR_FOLLOWING_ERROR = -13 /**< Measured state exceeds the configured distance from the commanded setpoint. */
+    RK_ERROR_FOLLOWING_ERROR = -13, /**< Measured state exceeds the configured distance from the commanded setpoint. */
+    RK_ERROR_UNREFERENCED = -14 /**< Ordinary motion requires an established joint reference. */
 };
 
 /* ------------------------------------------------------------------------- */
@@ -524,7 +525,7 @@ enum {
 };
 
 /** Validation property carried from MotionKit's plan report. */
-enum { RK_PLAN_JERK_UNCHECKED = 1u };
+enum { RK_PLAN_JERK_UNCHECKED = 1u, RK_PLAN_JOG = 2u, RK_PLAN_HOMING = 4u };
 
 /**
  * A plan's identity and start state, submitted with its segments and events by
@@ -540,7 +541,7 @@ typedef struct rk_plan_header {
     uint64_t replace_after_plan_id; /**< Zero means append/start, not replace. */
     uint64_t replace_after_time_ns;
     uint64_t tag; /**< Reported as the trajectory tag while the plan runs. */
-    uint32_t flags; /**< RK_PLAN_JERK_UNCHECKED when jerk validation is unchecked. */
+    uint32_t flags; /**< RK_PLAN_JERK_UNCHECKED and optional exclusive RK_PLAN_JOG/RK_PLAN_HOMING purpose. */
     uint32_t ends_at_rest; /**< One for a final plan, zero if more motion is expected. */
     double start_position[RK_MAX_TRAJECTORY_JOINTS];
     double start_velocity[RK_MAX_TRAJECTORY_JOINTS];
@@ -787,6 +788,13 @@ RK_API void RK_CALL rk_robot_runtime_destroy(rk_robot_runtime runtime);
 RK_API rk_result RK_CALL rk_robot_runtime_start(rk_robot_runtime runtime);
 /** Stops a standalone runtime's owner worker, if it is running. */
 RK_API rk_result RK_CALL rk_robot_runtime_stop(rk_robot_runtime runtime);
+
+/** Configure whether a stationary joint needs homing; requiring it invalidates its latch. */
+RK_API rk_result RK_CALL rk_robot_runtime_require_reference(rk_robot_runtime runtime, uint32_t joint, uint32_t required);
+/** Mark a stationary joint referenced after the homing controller establishes its coordinate zero. */
+RK_API rk_result RK_CALL rk_robot_runtime_latch_reference(rk_robot_runtime runtime, uint32_t joint);
+/** Read reference readiness, including all leader dependencies of a coupled follower. */
+RK_API rk_result RK_CALL rk_robot_runtime_reference_status(rk_robot_runtime runtime, uint32_t joint, uint32_t *out_referenced);
 
 /**
  * Submits one complete command batch to the runtime mailbox.

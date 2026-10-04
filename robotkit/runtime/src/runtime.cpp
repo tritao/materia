@@ -392,6 +392,60 @@ rk_result RobotRuntime::stop() {
     return RK_OK;
 }
 
+std::array<bool, RK_MAX_JOINTS> RobotRuntime::references_locked() const {
+    std::array<bool, RK_MAX_JOINTS> ready;
+    ready.fill(true);
+    for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
+        ready[joint] = !reference_required_[joint] || reference_latched_[joint];
+    for (uint32_t pass = 0; pass < blueprint_.joint_count; ++pass) {
+        bool changed = false;
+        for (uint32_t term = 0; term < blueprint_.coupling_count; ++term) {
+            const auto &coupling = blueprint_.couplings[term];
+            if (ready[coupling.follower] && !ready[coupling.leader]) {
+                ready[coupling.follower] = false;
+                changed = true;
+            }
+        }
+        if (!changed) break;
+    }
+    return ready;
+}
+
+rk_result RobotRuntime::require_reference(uint32_t joint, bool required) {
+    if (joint >= blueprint_.joint_count) return RK_ERROR_INVALID_ARGUMENT;
+    std::lock_guard owner_lock(owner_mutex_);
+    std::lock_guard queue_lock(queue_mutex_);
+    std::lock_guard state_lock(state_mutex_);
+    if (!commands_.empty() || control_.trajectory_active || control_.stop_ramp_active ||
+        std::abs(state_.velocity[joint]) > 1e-6 ||
+        (control_.active[joint] && control_.targets[joint].mode == RK_TARGET_VELOCITY &&
+         std::abs(control_.targets[joint].target) > 1e-6)) return RK_ERROR_INVALID_STATE;
+    reference_required_[joint] = required;
+    reference_latched_[joint] = false;
+    return RK_OK;
+}
+
+rk_result RobotRuntime::latch_reference(uint32_t joint) {
+    if (joint >= blueprint_.joint_count) return RK_ERROR_INVALID_ARGUMENT;
+    std::lock_guard owner_lock(owner_mutex_);
+    std::lock_guard queue_lock(queue_mutex_);
+    std::lock_guard state_lock(state_mutex_);
+    if (!reference_required_[joint] || !commands_.empty() || control_.trajectory_active ||
+        control_.stop_ramp_active || std::abs(state_.velocity[joint]) > 1e-6 ||
+        (control_.active[joint] && control_.targets[joint].mode == RK_TARGET_VELOCITY &&
+         std::abs(control_.targets[joint].target) > 1e-6))
+        return RK_ERROR_INVALID_STATE;
+    reference_latched_[joint] = true;
+    return RK_OK;
+}
+
+rk_result RobotRuntime::reference_status(uint32_t joint, uint32_t &out_referenced) const {
+    if (joint >= blueprint_.joint_count) return RK_ERROR_INVALID_ARGUMENT;
+    std::lock_guard queue_lock(queue_mutex_);
+    out_referenced = references_locked()[joint] ? 1u : 0u;
+    return RK_OK;
+}
+
 rk_result RobotRuntime::submit(const rk_robot_command &command) {
     if (command.kind == RK_COMMAND_TRAJECTORY_SEGMENTS)
         return RK_ERROR_INVALID_ARGUMENT;
@@ -399,6 +453,14 @@ rk_result RobotRuntime::submit(const rk_robot_command &command) {
         return RK_ERROR_INVALID_ARGUMENT;
     try {
         std::lock_guard lock(queue_mutex_);
+        if (command.kind == RK_COMMAND_JOINT_TARGETS) {
+            const auto referenced = references_locked();
+            for (uint32_t index = 0; index < command.target_count; ++index) {
+                const auto &target = command.targets[index];
+                if (!referenced[target.joint] && target.mode != RK_TARGET_VELOCITY)
+                    return RK_ERROR_UNREFERENCED;
+            }
+        }
         if (command.sequence == 0 || command.sequence <= last_command_sequence_)
             return RK_ERROR_STALE_COMMAND;
         if (commands_.size() >= 128)
@@ -427,6 +489,9 @@ rk_result RobotRuntime::submit_segments(const rk_robot_command &command, Segment
     }
     try {
         std::lock_guard lock(queue_mutex_);
+        const auto referenced = references_locked();
+        for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
+            if (!referenced[joint]) return RK_ERROR_UNREFERENCED;
         if (command.sequence == 0 || command.sequence <= last_command_sequence_)
             return RK_ERROR_STALE_COMMAND;
         if (commands_.size() >= 128) return RK_ERROR_QUEUE_FULL;
@@ -463,6 +528,11 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
     try {
         std::lock_guard owner_lock(owner_mutex_);
         std::lock_guard queue_lock(queue_mutex_);
+        if ((plan.flags & (RK_PLAN_JOG | RK_PLAN_HOMING)) == 0) {
+            const auto referenced = references_locked();
+            for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
+                if (!referenced[joint]) return RK_ERROR_UNREFERENCED;
+        }
         if (plan.sequence <= last_command_sequence_) return RK_ERROR_STALE_COMMAND;
         // A pending command could change the anchor before the owner applies
         // it. Reject rather than accepting a plan against stale state.

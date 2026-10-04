@@ -1364,3 +1364,30 @@ resets encoder/slip monitors. Its runtime implementation is still pending.
 The state machine is not yet connected to MotionSystem.home(), runtime
 admission or application startup. No homing result is claimed and no tests
 or builds have been run.
+
+
+### G11 — native reference admission foundation
+
+Add native per-joint reference requirements/latches and C APIs to configure,
+latch and query them. Readiness propagates through every coupling leader,
+including chains and multi-input followers. Configuration/latch changes require
+an empty mailbox, no trajectory/stop ramp, observed rest and no nonzero active
+velocity target. Joints without a configured requirement retain existing
+behavior. Native ordinary position/servo/effort targets, unclassified segment
+batches and ordinary plans reject unreferenced coordinates with
+RK_ERROR_UNREFERENCED; velocity targets remain available for controlled jog.
+
+Add exclusive RK_PLAN_JOG/RK_PLAN_HOMING purpose flags. They may coexist with
+jerk-unchecked metadata but cannot coexist with each other or carry timed
+process events. They retain existing polynomial, coupling and drive-limit
+validation. Plan submission performs the reference admission check under the
+queue lock before any sequence or queue mutation. Runtime API version becomes
+25; there is no native struct-layout change in this stage.
+
+This remains foundational: generated FFI bindings must be regenerated for API
+25 and the new functions/constants; Haxe runtime must configure requirements
+from compiled homes, apply latch/calibration and identify jog/homing plans.
+Homing travel into overtravel, native coordinate-zero application and
+limit-switch fault enforcement also remain pending. Thus existing application
+machines do not yet configure this native gate automatically. No build/test
+ran; native admission behavior is unverified at runtime.

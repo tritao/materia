@@ -4,6 +4,7 @@
 #include "robotkit_runtime.h"
 #include "trajectory_core.hpp"
 
+#include <array>
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
@@ -208,6 +209,9 @@ public:
     /** Queues segments; the command's kind is RK_COMMAND_TRAJECTORY_SEGMENTS. */
     rk_result submit_segments(const rk_robot_command &command, SegmentBatch batch);
     rk_result submit_plan(const PlanRequest &plan);
+    rk_result require_reference(uint32_t joint, bool required);
+    rk_result latch_reference(uint32_t joint);
+    rk_result reference_status(uint32_t joint, uint32_t &out_referenced) const;
     /** Copies the latest robot state without advancing endpoint time. */
     rk_result snapshot(rk_robot_state &out_state) const;
     /** Copies the latest state plus revision, endpoint, and fault metadata. */
@@ -339,6 +343,9 @@ private:
     mutable std::mutex state_mutex_;
     rk_robot_state state_{};
     mutable std::mutex queue_mutex_;
+    std::array<bool, RK_MAX_JOINTS> reference_required_{};
+    std::array<bool, RK_MAX_JOINTS> reference_latched_{};
+    std::array<bool, RK_MAX_JOINTS> references_locked() const;
     /** Serializes plan submission with owner queue/clock mutations. */
     mutable std::mutex owner_mutex_;
     /**
