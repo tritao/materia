@@ -268,6 +268,19 @@ table in `tools/README.md`.
   inward caps of radius width/2 and require depth >= width/2. Dimensions are either explicit
   millimetres or explicit thickness ratios, derived on every rebuild. Existing bend attachments
   still validate after parent edits; a relief cannot silently remove another bend's edge.
+- SM3h specifies hem dimensions as a straight return length and fold side. Closed hems
+  derive R = 0 and a half turn; open hems derive R = gap/2 and a half turn. Teardrops
+  use an explicit bulb radius or the material default, and solve
+  `R*(1-cos(theta)) + length*sin(theta) = gap` for the return above 180 degrees.
+  The gap is measured between the concave sheet surfaces at the return tip; a return tip
+  whose other surface penetrates the parent is diagnosed. No clearance gap or minimum
+  radius is invented. Bend validation now accepts finite magnitudes below one full turn;
+  the 179-degree sharp-dimension limit remains. Native closed contact can consume faces
+  where layers touch, so only surviving faces retain their names across that contact event.
+  `SheetEdgeFeature` owns shared persistent picks, graph attachment matching and output-id
+  reservations for both flanges and hems. `HemSpec` saves only each kind's authored values:
+  closed has no gap/radius parameter, open owns a gap, and teardrop owns a gap and optional
+  explicit radius. The new hem feature record is additive to document version 13.
 - Sheet features consume only the previous sheet feature's `Sheet`. A general solid feature
   (boolean, fillet...) after a sheet feature produces a plain solid: downstream code that needs
   a flat pattern must point at a sheet feature or convert (SM-D7). This keeps one owner per fact.
@@ -794,7 +807,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM0 | done: clean branch on 38601ac61, pins verified, prerequisite documents read; quick gate `sm0-setup` passes (ProjectKit 138, ManufacturingKit 54) | c70c89745 |
 | SM1 | done: exact line/arc regions, permanent graph ids, edits/cuts/rips, bidirectional FK, neutral-length conservation, closure and P1–P5 bounds; quick gate `sm1-core` passes (2102 sheet assertions) | 0713c4e0c; 54b5cab15 |
 | SM2 | done: named wall extrusions and bend revolutions fused for flat/folded/partial states; P1–P5 validity, single bodies, volumes, axes and stable names; quick gate `sm2-solid` passes (3757 sheet assertions) | 7a3836d8c |
-| SM3 | in progress: SM3a atomic graph publication; SM3b exact sketch-backed base, side A/B, stock codec and named thickness builder; quick gates `sm3a-staging` (3773) and `sm3b-base` (3813 sheet assertions); SM3c authored segment names and exact face-to-graph picks; quick gate `sm3c-edges` (3843 sheet assertions); SM3d exact flange geometry and alignment; quick gate `sm3d-flange-geometry` (3880 sheet assertions); SM3e typed flange features, authored shared identities, gaps/extensions, stock radius defaults and P1–P5 document acceptance; quick gate `sm3e-flanges-typed` (4044 sheet assertions); SM3f exact planar subtraction foundation; quick gate `sm3f-outline-cuts` (4068 sheet assertions); SM3g typed rectangular/obround reliefs and sizing, exact gap/bend-width semantics, atomic edits and codec; quick gate `sm3g-reliefs` (4132 sheet assertions); hem/cut/rip features remain | 535ebc547; 08afd7a32; bb3405a64; 84a51f00d; 3ed9b3971; 31a696ed7; a02214101; relief sub-step commit |
+| SM3 | in progress: SM3a atomic graph publication; SM3b exact sketch-backed base, side A/B, stock codec and named thickness builder; quick gates `sm3a-staging` (3773) and `sm3b-base` (3813 sheet assertions); SM3c authored segment names and exact face-to-graph picks; quick gate `sm3c-edges` (3843 sheet assertions); SM3d exact flange geometry and alignment; quick gate `sm3d-flange-geometry` (3880 sheet assertions); SM3e typed flange features, authored shared identities, gaps/extensions, stock radius defaults and P1–P5 document acceptance; quick gate `sm3e-flanges-typed` (4044 sheet assertions); SM3f exact planar subtraction foundation; quick gate `sm3f-outline-cuts` (4068 sheet assertions); SM3g typed rectangular/obround reliefs and sizing, exact gap/bend-width semantics, atomic edits and codec; quick gate `sm3g-reliefs` (4132 sheet assertions); SM3h closed/open/teardrop hems, shared edge selection, typed codec and builder; quick gate `sm3h-hems` (4303 sheet assertions); cut/rip features remain | 535ebc547; 08afd7a32; bb3405a64; 84a51f00d; 3ed9b3971; 31a696ed7; a02214101; f3ef57fa0; hem sub-step commit |
 | SM4 | planned | |
 | SM4b | planned | |
 | SM5 | planned | |
@@ -871,3 +884,12 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
   version check follows it. Runtime fixtures use current code; no compatibility reader is added.
   Existing ProjectKit/ManufacturingKit counts and MachineKit summaries remain unchanged.
   No new haxeon issue was found. Hem, cut and rip features remain.
+
+- SM3h: `sm3h-hems` checks closed, open and teardrop hems on either sheet side, including
+  exact contact, explicit tip gaps, valid single flat/partial/folded solids, volumes from an
+  independent neutral-length integral, partial-state conservation and named invalid geometry
+  diagnoses. Production document tests cover codec identities and names, shared builder length,
+  edit/undo/redo and thickness-derived default bulb radii (171 hem assertions; 4303 total).
+  The shared edge-feature layer also reruns every flange and relief check. No native or compiler
+  change is needed, and no unchecked casts are introduced. Existing suite counts and original
+  MachineKit summaries remain unchanged. Cut and rip features remain in SM3.

@@ -63,3 +63,13 @@ import cadkit.sheetmetal.SheetMaterial.SheetMechanical;
 	@:id(10) var name:Null<String>;
 	@:id(11) var naming:Null<Int>;
 }
+
+@:wire typedef SheetHemRecord = {
+	@:id(1) var source:Int;
+	@:id(2) var length:Float;
+	@:id(3) var spec:HemSpec;
+	@:id(4) var side:SheetSide;
+	@:id(5) var walls:Array<Int>;
+	@:id(6) var bends:Array<Int>;
+	@:id(7) var faces:Array<SheetFaceRecord>;
+}

@@ -37,6 +37,8 @@ import cadkit.sketch.ConstrainedSketch;
 import cadkit.sheetmetal.SheetBaseFeature;
 import cadkit.sheetmetal.SheetFeature;
 import cadkit.sheetmetal.SheetEdgeFlangeFeature;
+import cadkit.sheetmetal.SheetHemFeature;
+import cadkit.sheetmetal.HemSpec;
 import cadkit.sheetmetal.LengthSpec;
 import cadkit.sheetmetal.FlangePosition;
 import cadkit.sheetmetal.ReliefType;
@@ -134,6 +136,15 @@ class DocumentBuilder {
 			: new SheetMaterial(stock.id, thickness.value, stock.bendRule, stock.mechanical, stock.defaultRadiusRatio, stock.minRadiusRatio);
 		var feature = document.add(new SheetBaseFeature(source, selectedStock, side));
 		if (thickness != null) bind(thickness, feature, "sheet.thickness");
+		return feature;
+	}
+
+	/** Return hem on selected wall-side faces, with one shared straight-return dimension. */
+	public function sheetHem(source:SheetFeature, faces:Array<Shape>, spec:HemSpec, length:NamedParameter,
+		side:SheetSide = A):SheetHemFeature {
+		check();
+		var feature = document.add(new SheetHemFeature(source, faces, spec, length.value, side));
+		bind(length, feature, "sheet.hem.length");
 		return feature;
 	}
 

@@ -19,6 +19,9 @@ import cadkit.parametric.features.ConstrainedSketchFeature;
 import cadkit.sheetmetal.SheetBaseFeature;
 import cadkit.sheetmetal.SheetFeature;
 import cadkit.sheetmetal.SheetEdgeFlangeFeature;
+import cadkit.sheetmetal.SheetEdgeFeature;
+import cadkit.sheetmetal.SheetHemFeature;
+import cadkit.sheetmetal.SheetFeatureRecord.SheetHemRecord;
 import cadkit.sheetmetal.SheetIdentityLedger;
 import cadkit.sheetmetal.SheetFeatureRecord.SheetBaseRecord;
 import cadkit.sheetmetal.SheetFeatureRecord.SheetFlangeRecord;
@@ -287,6 +290,12 @@ class DocumentCodec {
 						data.lengthSpec, data.position, data.offset, data.gap1, data.gap2, data.extend1, data.extend2,
 						[for (face in data.faces) decodeSheetFace(face)], data.walls, data.bends,
 						data.reliefType, data.reliefSizing, data.reliefWidth, data.reliefDepth));
+				} else if (featureType == "sheet-hem") {
+					var data:SheetHemRecord = JsonWire.decode(Json.stringify(requiredField(record, "sheet")));
+					var source = Std.downcast(requiredFeature(document, data.source), SheetFeature);
+					if (source == null) throw new ParametricError("hem source must be a sheet feature");
+					feature = document.add(new SheetHemFeature(source, null, data.spec, data.length, data.side,
+						[for (face in data.faces) decodeSheetFace(face)], data.walls, data.bends));
 				} else if (featureType == "datum-sketch") {
 					feature = document.add(new DatumSketchFeature(stringField(record, "profile"), numberField(record, "width"), numberField(record, "height"),
 						decodeElementReferenceInDocument(requiredField(record, "datum")), numberField(record, "offset")));
@@ -531,9 +540,9 @@ class DocumentCodec {
 		} else if (featureType == "chamfer") {
 			var selectedChamfer:ChamferFeature = cast feature;
 			excluded = selectedChamfer.edgeReferences;
-		} else if (featureType == "sheet-edge-flange") {
-			var selectedFlange = Std.downcast(feature, SheetEdgeFlangeFeature);
-			if (selectedFlange == null) throw new ParametricError("sheet-edge-flange has the wrong feature class");
+		} else if (featureType == "sheet-edge-flange" || featureType == "sheet-hem") {
+			var selectedFlange = Std.downcast(feature, SheetEdgeFeature);
+			if (selectedFlange == null) throw new ParametricError("sheet edge feature has the wrong feature class");
 			excluded = selectedFlange.faceReferences();
 		} else if (featureType == "constrained-sketch") {
 			var selectedSketch:ConstrainedSketchFeature = cast feature;
@@ -568,6 +577,13 @@ class DocumentCodec {
 				extend1: flange.extend1.value, extend2: flange.extend2.value, walls: flange.wallIds(), bends: flange.bendIds(),
 				faces: [for (reference in flange.faceReferences()) encodeSheetFace(reference.fingerprintData())],
 				reliefType: flange.reliefType, reliefSizing: flange.reliefSizing, reliefWidth: flange.reliefWidth.value, reliefDepth: flange.reliefDepth.value};
+			return {id: feature.id.toInt(), type: featureType, sheet: Json.parse(JsonWire.encode(data)), references: references};
+		}
+		if (featureType == "sheet-hem") {
+			var hem = Std.downcast(feature, SheetHemFeature);
+			if (hem == null) throw new ParametricError("sheet-hem has the wrong feature class");
+			var data:SheetHemRecord = {source: hem.source.id.toInt(), length: hem.length.value, spec: hem.authoredSpec(), side: hem.side,
+				walls: hem.wallIds(), bends: hem.bendIds(), faces: [for (reference in hem.faceReferences()) encodeSheetFace(reference.fingerprintData())]};
 			return {id: feature.id.toInt(), type: featureType, sheet: Json.parse(JsonWire.encode(data)), references: references};
 		}
 		if (featureType == "datum-sketch") {

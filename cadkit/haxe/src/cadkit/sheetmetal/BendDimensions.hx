@@ -7,8 +7,8 @@ class BendDimensions {
 			throw new SheetDiagnosis("sheet.invalid-thickness", "Thickness must be finite and positive");
 		if (!Math.isFinite(radius) || radius < 0)
 			throw new SheetDiagnosis("sheet.invalid-radius", "Inner radius must be finite and nonnegative");
-		if (!Math.isFinite(angle) || Math.abs(angle) > Math.PI)
-			throw new SheetDiagnosis("sheet.invalid-angle", "Bend angle must be finite and within a half turn");
+		if (!Math.isFinite(angle) || Math.abs(angle) >= 2 * Math.PI)
+			throw new SheetDiagnosis("sheet.invalid-angle", "Bend angle must be finite and below one full turn");
 	}
 
 	public static function allowance(thickness:Float, radius:Float, angle:Float, rule:Null<BendRule>):Float {
