@@ -773,6 +773,19 @@ W6 implementation notes (started after W5 main sync, 2026-10-04):
   lease renewal against transport delay instead of assuming a write is applied synchronously. Focused TCP tests need
   the existing app native directory on `LD_LIBRARY_PATH` for `libnativekit.so`.
   The `WelderOutputs`/`WelderFeedback` adapter and unchanged process mission are still pending.
+- `ModbusWelder` now implements both existing welder interfaces. Its owner polls acknowledged atomic setpoint/lease
+  writes and a coherent feedback block; initialization begins with the source off. Stop discards unsent ignition
+  commands and sends arc/wire off; a lost connection faults feedback while the independent device lease expires.
+  Output registers, including the lease and optional job, must be contiguous, preventing writes into unmapped
+  vendor registers. Feedback must fit one 125-register read. The lease must exceed two bounded transactions plus
+  100 ms owner allowance. The adapter test uses a 300 ms transaction bound and 1 s lease, rather than the generic
+  client's 500 ms default (which is intentionally refused with that lease).
+  Supply fault (4) and connection loss (5) now have distinct `WeldFault` codes and messages; neither is mislabeled
+  as a stuck wire. Feedback is validated before publication. The fake safes and clears stored ignition on a supply
+  fault, so clearing it cannot reignite. Tests pass: 78 focused assertions plus TCP safe initialization, ignition,
+  scaled feedback, stop/restart, supply fault, explicit restart, link-loss fault and watchdog shutdown; affected
+  tool regression suites pass 27 tool / 33 process / 152 weld / 33 clearance assertions.
+  These are adapter-level checks; running the unchanged welding process/mission on all three backends remains open.
 
 ## Phase 2: mobile welder
 

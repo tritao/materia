@@ -37,4 +37,13 @@ class ModbusFrame {
   public static function writeHolding(address:Int, value:Int):Bytes {
     var pdu = Bytes.alloc(5); pdu.set(0, 6); putWord(pdu, 1, address); putWord(pdu, 3, value); return pdu;
   }
+  public static function writeMultiple(address:Int, values:Array<Int>):Bytes {
+    if (values == null || values.length < 1 || values.length > 123 || address < 0 || address + values.length > 65536)
+      throw "Invalid Modbus write range";
+    var pdu = Bytes.alloc(6 + values.length * 2); pdu.set(0, 16);
+    putWord(pdu, 1, address); putWord(pdu, 3, values.length); pdu.set(5, values.length * 2);
+    for (i in 0...values.length) putWord(pdu, 6 + i * 2, values[i]);
+    return pdu;
+  }
+
 }

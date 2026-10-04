@@ -43,6 +43,8 @@ class WeldSensor {
       case 1: "weld: the arc did not ignite";
       case 2: "weld: the arc was lost";
       case 3: "weld: the wire is stuck to the work";
+      case 4: "weld: supply fault";
+      case 5: "weld: device connection lost";
       default: 'weld: unknown fault $code';
     }
   }
@@ -59,6 +61,6 @@ class WeldSensor {
     for (value in values) if (!Math.isFinite(value)) return false;
     return (values[ARC] == 0.0 || values[ARC] == 1.0) && (values[TOUCH] == 0.0 || values[TOUCH] == 1.0) &&
       values[CURRENT] >= 0.0 && values[POWER] >= 0.0 && values[FAULT] == Std.int(values[FAULT]) &&
-      values[FAULT] >= 0.0 && values[FAULT] <= 3.0;
+      values[FAULT] >= 0.0 && values[FAULT] <= 5.0;
   }
 }

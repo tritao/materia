@@ -44,6 +44,14 @@ class ModbusTcpClient {
       complete();
     });
   }
+  public function writeMultiple(address:Int, values:Array<Int>, complete:Void->Void):Void {
+    var pdu = ModbusFrame.writeMultiple(address, values);
+    enqueue(pdu, function(reply:Bytes) {
+      if (reply.length != 5 || ModbusFrame.word(reply, 1) != address || ModbusFrame.word(reply, 3) != values.length)
+        throw "Malformed Modbus multiple-write acknowledgement";
+      complete();
+    });
+  }
   public function read(address:Int, count:Int, complete:Array<Int>->Void):Void {
     enqueue(ModbusFrame.readHolding(address, count), function(reply:Bytes) {
       if (reply.length != 2 + count * 2 || reply.get(1) != count * 2) throw "Malformed Modbus read response";

@@ -51,6 +51,10 @@ class ModbusTests {
     var bad = Bytes.alloc(7); bad.set(5, 255);
     var invalidStream = new ModbusFrameStream(); invalidStream.feed(bad);
     rejects(function() invalidStream.next());
+    check(processkit.tool.WeldSensor.valid([0, 0, 0, 0, 4, 0]));
+    check(processkit.tool.WeldSensor.valid([0, 0, 0, 0, 5, 0]));
+    check(processkit.tool.WeldSensor.faultMessage(4) == "weld: supply fault");
+    check(processkit.tool.WeldSensor.faultMessage(5) == "weld: device connection lost");
     trace('Modbus tests passed ($count assertions)');
     ModbusTcpTests.run();
   }
