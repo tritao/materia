@@ -175,6 +175,10 @@ table in `tools/README.md`.
 - `OSSB = (R + T)·tan(θ/2)`, `BD = 2·OSSB − BA`.
 - A sheet without a bend rule fails with `sheet.no-bend-rule` (FreeCAD's "engineering mode",
   always on). Material library entries carry a default rule, so picking a material is enough.
+- SM1a validation: input R/T rows must be nonnegative and strictly increasing, and ANSI K
+  must be in [0, 0.5] (DIN [0, 1]); malformed tables are refused rather than reordered or
+  repaired. Table inputs are copied. Sheet lengths use mm, angles radians and mechanical
+  strengths/modulus MPa, so SM6 will not carry implicit unit conversions.
 
 **SM-D4. Solids are generated from the graph and named by it.**
 - Each wall is its outline extruded by `T` along −Z of its frame. Each bend is the rectangle
@@ -704,8 +708,8 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 
 | Step | State | Commits |
 |---|---|---|
-| SM0 | done: clean branch on 38601ac61, pins verified, prerequisite documents read; quick gate `sm0-setup` passes (ProjectKit 138, ManufacturingKit 54) | setup commit |
-| SM1 | planned | |
+| SM0 | done: clean branch on 38601ac61, pins verified, prerequisite documents read; quick gate `sm0-setup` passes (ProjectKit 138, ManufacturingKit 54) | c70c89745 |
+| SM1 | in progress: SM1a bend dimensions, ANSI/DIN tables, explicit stock/rules and named diagnoses; quick gate `sm1a-dimensions` passes; graph, FK, closure and P1–P5 tests remain | SM1a dimension sub-step commit |
 | SM2 | planned | |
 | SM3 | planned | |
 | SM4 | planned | |
@@ -725,3 +729,17 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM16 | planned | |
 | SM17 | later | |
 | SM18 | later | |
+
+### Implementation notes
+
+- SM0: `sm0-setup` passed; MachineKit's robot-arm and CNC-router printed summaries exactly
+  match `sm-s-machinekit-baseline.log`. No baseline numbers changed.
+- SM1a: SheetMetalSmoke covers table validation/ownership, ANSI/DIN conversion, published
+  flange and mould-line dimensions, BA/OSSB/BD at 30°/90°/135° for either bend sign,
+  length conventions, stock units and named invalid-input diagnoses (41 assertions).
+  Haxeon rejects direct field access on `Null<SheetMechanical>` (`E1005`):
+  `haxeon/src/compiler/types/typing/BodyTyper.hx`, `typedMember`, explicitly rejects
+  `TNullable`. The test uses a typed nonnullable local for its known-present data; this is
+  compiler policy, not a compiler patch or an unresolved blocker.
+  Quick gate `sm1a-dimensions` passes all five suites; existing MachineKit summaries and
+  ProjectKit/ManufacturingKit assertion counts are unchanged.
