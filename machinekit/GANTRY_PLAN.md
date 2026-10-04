@@ -1774,3 +1774,19 @@ named axes and reset reapplication remain pending. Existing setJointSlip stays
 available for later lost steps; combining unknown startup counter origin with
 that later physical fault would hide monitor errors. This refines the plan's
 original setJointSlip-only sketch. No tests or builds ran.
+
+
+### G11 — typed scene power-up offsets
+
+Stopped-world simulation API: `726449a72`. Add optional powerUpOffsets to
+machining and mission JSON sections, with typed entries {joint, offset} in SI
+units relative to the saved physical pose. Decode field by field; reject
+unknown entry fields, nonnumbers, null entries, duplicate names, nonfinite
+values and layouts beyond the runtime joint bound. Validate joint references
+against the flattened assembly and require home-monitored prismatic axes.
+The existing JSON sections carry the optional data without a binary layout
+change; absent fields remain absent and retain zero startup offsets.
+
+Application projection into full coupling-consistent vectors and stopped-world
+configuration/reset reapplication remain pending. No tests or builds ran;
+serialization and semantic validation are source-reviewed only.
