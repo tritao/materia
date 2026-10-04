@@ -756,6 +756,13 @@ W6 implementation notes (started after W5 main sync, 2026-10-04):
   with HAL traits checking analog pin capabilities. Three virtual I/O tests pass for scaling, feedback, no-arc,
   short persistence, reset and invalid command safety. The bench firmware remains a virtual-output UART image;
   the pin profile is defined and checked, but no physical welding firmware is enabled or flashed.
+- Modbus foundations are in ProcessKit: MBAP framing with big-endian words, holding-register reads/writes,
+  engineering-unit scale/offset data, swappable output/feedback addresses and bit masks, and an optional job register.
+  The current register encoding is unsigned 16-bit; unsupported wider or vendor-specific encodings are not silently
+  reinterpreted. Every map requires an independently enforced device lease of 20–1000 ms; a source without that
+  watchdog needs an external safety interlock before this adapter can satisfy link-loss safety.
+  The focused Modbus suite passes 37 assertions, including malformed frames, setpoint overflow and invalid maps.
+  This proves the codec/map foundations only; TCP transactions, the in-process fake and mission integration remain open.
 
 ## Phase 2: mobile welder
 

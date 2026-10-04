@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": { "name": "processkit-modbus-tests" },
+  "entry": "ModbusTests",
+  "sourceRoots": ["."],
+  "dependencies": { "processkit": { "path": "../.." } },
+  "target": "host",
+  "outputDir": "build"
+}
