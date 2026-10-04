@@ -470,7 +470,17 @@ class FrameworkSmoke {
 		return true;
 	}
 
+	static function clickEvent(time:Float, x:Float = 10.0, button:Int = 0):nativekit.ui.core.UiEvent
+		return new nativekit.ui.core.UiEvent(UiEventKind.Click, new WidgetId(90502), x, 10.0, 0.0, 0.0, button, 0, 0, null, null, 0, 0, time);
+
 	static function main():Int {
+		var clickSequence = new nativekit.ui.core.PointerClickSequence();
+		if (clickSequence.register("a", clickEvent(1.0)) != 1 || clickSequence.register("a", clickEvent(1.1)) != 2
+			|| clickSequence.register("a", clickEvent(1.2)) != 1 || clickSequence.register("b", clickEvent(1.3)) != 1
+			|| clickSequence.register("b", clickEvent(2.0)) != 1 || clickSequence.register("b", clickEvent(2.1, 30.0)) != 1
+			|| clickSequence.register("b", clickEvent(2.2, 30.0, 1)) != 1 || clickSequence.register("b", clickEvent(2.3, 30.0)) != 1)
+			throw "pointer double-click boundaries failed";
+
 		if (!hostFrameLifecycleValid())
 			return 270;
 		if (!hostSessionLifecycleValid())

@@ -18,6 +18,7 @@ import nativekit.ui.core.Key;
 import nativekit.ui.core.RenderNode;
 import nativekit.ui.core.State;
 import nativekit.ui.core.UiEvent;
+import nativekit.ui.core.PointerClickSequence;
 import nativekit.ui.core.UiEventKind;
 import nativekit.ui.core.UiKey;
 import nativekit.ui.core.View;
@@ -50,6 +51,8 @@ class TreeView implements View {
 	public var selectedKey(default, null):Null<String>;
 	public var onSelectionChanged:Null<String->Void>;
 	public var onItemActivated:Null<String->Void>;
+	/** Primary row clicks, including repeated clicks on the selected item. */
+	public var onItemClicked:Null<String->Int->Void>;
 	public var onItemContextMenu:Null<String->UiEvent->Void>;
 	public var onItemRename:Null<String->Void>;
 	public var onExpandedChanged:Null<String->Bool->Void>;
@@ -90,6 +93,7 @@ class TreeView implements View {
 		this.selectedKey = selectedKey;
 		this.onSelectionChanged = onSelectionChanged;
 		this.onItemActivated = onItemActivated;
+		onItemClicked = null;
 		onItemContextMenu = null;
 		onItemRename = null;
 		this.onExpandedChanged = onExpandedChanged;
@@ -201,6 +205,7 @@ class TreeView implements View {
 
 	public function build(context:BuildContext):RenderNode {
 		return context.withScope(new Key(key), function() {
+			var clicks:State<PointerClickSequence> = context.state(context.id("click-sequence"), new PointerClickSequence());
 			var expansion:State<Map<String, Bool>> = context.state(
 				context.id("expanded-state"), expandedKeys);
 			expandedState = expansion;
@@ -244,8 +249,13 @@ class TreeView implements View {
 						throw 'TreeView model returned null for key $nodeKey';
 					var row = new TreeViewRow("row", nodeKey, item, entry, selectedKey == nodeKey,
 						function() { select(nodeKey); },
-						function() { if (onItemActivated != null) onItemActivated(nodeKey); },
+						function() { if (entry.hasChildren) toggleExpanded(nodeKey); else if (onItemActivated != null) onItemActivated(nodeKey); },
 						function() { toggleExpanded(nodeKey); },
+						function(event) {
+							var count = clicks.value.register(nodeKey, event);
+							if (onItemClicked != null) onItemClicked(nodeKey, count);
+							if (count == 2) { if (entry.hasChildren) toggleExpanded(nodeKey); else if (onItemActivated != null) onItemActivated(nodeKey); }
+						},
 						function(event) { handleNodeKey(context, entry, event); },
 						function(id) { itemIds.set(nodeKey, id); },
 						function(event) {
@@ -668,13 +678,14 @@ private class TreeViewRow implements View {
 	final onSelect:Void->Void;
 	final onActivate:Void->Void;
 	final onToggle:Void->Void;
+	final onClick:UiEvent->Void;
 	final onKey:UiEvent->Void;
 	final onBuilt:WidgetId->Void;
 	final onContextMenu:UiEvent->Void;
 
 	public function new(key:String, itemKey:String, child:View, entry:TreeEntry, selected:Bool,
 			onSelect:Void->Void, onActivate:Void->Void, onToggle:Void->Void,
-			onKey:UiEvent->Void, onBuilt:WidgetId->Void, onContextMenu:UiEvent->Void) {
+			onClick:UiEvent->Void, onKey:UiEvent->Void, onBuilt:WidgetId->Void, onContextMenu:UiEvent->Void) {
 		this.key = key;
 		this.itemKey = itemKey;
 		this.child = child;
@@ -683,6 +694,7 @@ private class TreeViewRow implements View {
 		this.onSelect = onSelect;
 		this.onActivate = onActivate;
 		this.onToggle = onToggle;
+		this.onClick = onClick;
 		this.onKey = onKey;
 		this.onBuilt = onBuilt;
 		this.onContextMenu = onContextMenu;
@@ -706,6 +718,7 @@ private class TreeViewRow implements View {
 			node.states = flags;
 			node.focusable = true;
 			var semantics = new Semantics(AccessibilityRole.TreeItem);
+			semantics.label = itemKey;
 			semantics.actions = AccessibilityAction.Activate | AccessibilityAction.Select;
 			if (entry.hasChildren)
 				semantics.actions |= entry.expanded ? AccessibilityAction.Collapse :
@@ -718,7 +731,7 @@ private class TreeViewRow implements View {
 			semantics.positionInSet = entry.depth + 1;
 			semantics.hierarchyLevel = entry.depth + 1;
 			node.semantics = semantics;
-			node.on(UiEventKind.Click, function(_) { onSelect(); });
+			node.on(UiEventKind.Click, function(event) { if (event.button == 0) { onSelect(); onClick(event); } });
 			node.on(UiEventKind.Activate, function(_) { onSelect(); onActivate(); });
 			node.on(UiEventKind.KeyDown, onKey);
 			node.on(UiEventKind.KeyRepeat, onKey);
