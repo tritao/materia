@@ -270,8 +270,11 @@ class MissionPlayer implements SessionMember {
       var tool = suctions[0];
       vacuumSensor = tool.sensor;
       var arm = toolArm(tool);
-      newHandling = () -> HandlingPlanRunner.create(robot.robot, arm, () -> robot.runtime.pollEvents(), tool.channel,
-        PlanningLimits.ofGroup(arm, new SteadyLoads(), ARM_ACCELERATION));
+      newHandling = () -> {
+        var state = robot.runtime.snapshot();
+        return HandlingPlanRunner.create(robot.robot, arm, () -> robot.runtime.pollEvents(), tool.channel,
+          PlanningLimits.ofGroup(arm, new SteadyLoads(), ARM_ACCELERATION, null, state.modelRevision, state.calibrationRevision));
+      };
       handling = newHandling();
     }
     if (!welds) {
@@ -289,9 +292,11 @@ class MissionPlayer implements SessionMember {
       // Welds are planned clear of everything the simulation collides with except the weld metal, which is the bead.
       var metal = [for (step in mission.steps) if (step.kind == "weld") cast(step.weld, SceneArtifactWeld).metal];
       newWelding = () -> {
+        var state = robot.runtime.snapshot();
         var planned = weldClearance(arm, tool.contact.occurrence, metal);
         clearance = planned;
-        return WeldingPlanRunner.create(robot.robot, arm, () -> robot.runtime.pollEvents(), channels, PlanningLimits.ofGroup(arm, new SteadyLoads(), weldAcceleration), 3, planned);
+        return WeldingPlanRunner.create(robot.robot, arm, () -> robot.runtime.pollEvents(), channels,
+          PlanningLimits.ofGroup(arm, new SteadyLoads(), weldAcceleration, null, state.modelRevision, state.calibrationRevision), 3, planned);
       };
       welding = newWelding();
     }
@@ -422,6 +427,10 @@ class MissionPlayer implements SessionMember {
         homeView.update(timestep);
         if (homeView.homingStatus() != "Complete") return;
         homingComplete = true;
+        var make = newHandling;
+        if (make != null) handling = make();
+        var makeWelding = newWelding;
+        if (makeWelding != null) welding = makeWelding();
       } catch (error:Dynamic) {
         failure = 'Mission homing: $error';
         return;

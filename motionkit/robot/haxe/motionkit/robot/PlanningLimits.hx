@@ -17,31 +17,38 @@ class PlanningLimits {
   public final jerk:Array<Float>;
   /** Defaults used where the model does not supply a quantity; never hardware ratings. */
   public final assumptions:Array<String>;
+  public final modelRevision:Int64;
+  public final calibrationRevision:Int64;
   final model:RobotModel;
   final steady:SteadyLoads;
 
   public static function of(model:RobotModel, jointIds:Array<String>, ?steady:SteadyLoads,
-      ?defaultAcceleration:Float = 2.0, ?jointJerk:Array<Float>):PlanningLimits {
+      ?defaultAcceleration:Float = 2.0, ?jointJerk:Array<Float>,
+      ?modelRevision:Int64, ?calibrationRevision:Int64):PlanningLimits {
     return new PlanningLimits(model, jointIds, steady == null ? new SteadyLoads() : steady,
-      defaultAcceleration, jointJerk);
+      defaultAcceleration, jointJerk, modelRevision, calibrationRevision);
   }
 
   /** The same helper over a group's driving joints, preserving its solver order. */
   public static function ofGroup(group:KinematicGroup, ?steady:SteadyLoads,
-      ?defaultAcceleration:Float = 2.0, ?jointJerk:Array<Float>):PlanningLimits {
+      ?defaultAcceleration:Float = 2.0, ?jointJerk:Array<Float>,
+      ?modelRevision:Int64, ?calibrationRevision:Int64):PlanningLimits {
     if (group == null) throw "Planning limits need a kinematic group";
     return of(group.robot, [for (id in group.jointIds()) Std.string(id)], steady,
-      defaultAcceleration, jointJerk);
+      defaultAcceleration, jointJerk, modelRevision, calibrationRevision);
   }
 
   function new(model:RobotModel, jointIds:Array<String>, steady:SteadyLoads,
-      defaultAcceleration:Float, jointJerk:Null<Array<Float>>) {
+      defaultAcceleration:Float, jointJerk:Null<Array<Float>>,
+      modelRevision:Null<Int64>, calibrationRevision:Null<Int64>) {
     if (model == null || jointIds == null || jointIds.length == 0)
       throw "Planning limits need a model and joints in planner order";
     positive(defaultAcceleration, "default acceleration");
     if (jointJerk != null && jointJerk.length != jointIds.length)
       throw "Planning jerk limits need one value per joint";
     this.model = model;
+    this.modelRevision = modelRevision == null ? Int64.ofInt(1) : modelRevision;
+    this.calibrationRevision = calibrationRevision == null ? Int64.ofInt(0) : calibrationRevision;
     this.jointIds = jointIds.copy();
     this.steady = steady.copy();
     bounds = []; velocity = []; acceleration = []; jerk = []; assumptions = [];
@@ -78,8 +85,8 @@ class PlanningLimits {
 
   public function validation(?modelRevision:Int64, ?calibrationRevision:Int64):ValidationLimits {
     var result = new ValidationLimits(jointIds.length,
-      modelRevision == null ? Int64.ofInt(1) : modelRevision,
-      calibrationRevision == null ? Int64.ofInt(0) : calibrationRevision);
+      modelRevision == null ? this.modelRevision : modelRevision,
+      calibrationRevision == null ? this.calibrationRevision : calibrationRevision);
     for (index in 0...jointIds.length) {
       var bound = bounds[index];
       if (bound.lower < bound.upper) result.position(index, bound.lower, bound.upper);

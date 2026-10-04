@@ -859,6 +859,7 @@ class ProjectSourceTests {
         var before = hl.Gc.totalAllocated();
         var priorPlan = motion.executor.plan;
         simulation.step();
+        motion = mission.handling.motion;
         var allocated = hl.Gc.totalAllocated() - before;
         ticks++;
         if (mission.failure != null) throw "gantry picker mission: " + mission.failure;

@@ -2382,3 +2382,17 @@ and does become Idle. RuntimeHomingObserver now uses RK_SESSION_IDLE with
 the unchanged empty-trajectory and all-joint stationary checks. This corrects
 the readiness condition rather than extending the picker time bound. App
 and MotionKit compiler retries are running; G13 is unstarted.
+
+### G12 checkpoint — refresh mission planners after calibration
+
+Both compilers passed the execution-session readiness fix. The picker now
+finishes homing and submits its first checked mission plan, rejected with
+RK_ERROR_MODEL_MISMATCH (-12): dual-drive calibration increments the native
+calibration revision while the mission planner retained its pre-home revision.
+PlanningLimits now carries optional captured model/calibration revisions through
+validation instead of always defaulting to 1/0. Mission planner factories
+capture the live runtime revisions, and handling/welding planners are renewed
+once homing completes, before any mission work begins. Stale-plan rejection
+remains enforced. The picker test follows the renewed handling motion instance
+when collecting plan/allocation statistics. App and MotionKit compilers are
+running before the integration retry. G13 is unstarted.
