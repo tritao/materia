@@ -64,7 +64,7 @@ class RobotRuntimeCompiler {
 
     for (contact in robot.switches) result.switches.push(new robotkit.model.JointSwitch(
       contact.id, contact.joint, contact.frameId, contact.role, contact.side, contact.trip,
-      contact.hysteresis, contact.repeatability, contact.seed));
+      contact.hysteresis, contact.repeatability, contact.seed, contact.driveJoint));
     result.floatingBase = robot.floatingBase;
     result.collisionApproximation = switch (robot.collisionApproximation) {
       case CollisionApproximation.None: RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_NONE;
@@ -263,12 +263,13 @@ class RobotRuntimeCompiler {
         diagnostics.push(new RobotCompileDiagnostic("RK_SWITCH_BINDING", path, "switch is null"));
         continue;
       }
-      var jointFound = false, frameFound = false, sensorFound = false;
+      var jointFound = false, frameFound = false, sensorFound = false, driveFound = contact.driveJoint == null;
+      for (joint in robot.joints) if (joint != null && joint.id == contact.driveJoint) driveFound = true;
       for (joint in robot.joints) if (joint != null && joint.id == contact.joint) jointFound = true;
       for (frame in robot.frames) if (frame != null && frame.id == contact.frameId) frameFound = true;
       for (sensor in robot.sensors) if (sensor != null && sensor.id == contact.id && sensor.kind == "joint_switch" &&
           sensor.frame != null && sensor.frame.id == contact.frameId) sensorFound = true;
-      if (switchIds.exists(contact.id) || !jointFound || !frameFound || !sensorFound)
+      if (switchIds.exists(contact.id) || !jointFound || !frameFound || !sensorFound || !driveFound)
         diagnostics.push(new RobotCompileDiagnostic("RK_SWITCH_BINDING", path,
           "switch needs a unique ID, monitored joint and matching mounted external digital sensor"));
       switchIds.set(contact.id, true);

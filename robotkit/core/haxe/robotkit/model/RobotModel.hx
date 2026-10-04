@@ -331,6 +331,11 @@ class RobotModel {
       for (frame in frames) if (frame.id == contact.frameId) mounted = true;
       if (!onJoint) errors.push('switch ${contact.id} references unknown joint ${contact.joint}');
       if (!mounted) errors.push('switch ${contact.id} references unknown frame ${contact.frameId}');
+      if (contact.driveJoint != null) {
+        var drive = false;
+        for (joint in joints) if (joint.id == contact.driveJoint) drive = true;
+        if (!drive) errors.push('switch ${contact.id} references unknown drive joint ${contact.driveJoint}');
+      }
     }
     var encoderIds = new Map<String, Bool>();
     for (encoder in encoders) {

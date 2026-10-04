@@ -236,9 +236,11 @@ class RobotModelCodec {
     if (model.encoders.length > 0) document.encoders = [for (encoder in model.encoders) encodeEncoder(encoder)];
     // Additive metadata: models without switches retain their existing encoded shape.
     if (model.switches.length > 0) document.switches = [for (contact in model.switches) {
-      id: contact.id, joint: contact.joint, frame: contact.frameId, role: contact.role,
+      var encoded:Dynamic = {id: contact.id, joint: contact.joint, frame: contact.frameId, role: contact.role,
       side: contact.side, trip: contact.trip, hysteresis: contact.hysteresis,
-      repeatability: contact.repeatability, seed: contact.seed
+      repeatability: contact.repeatability, seed: contact.seed};
+      if (contact.driveJoint != null) encoded.driveJoint = contact.driveJoint;
+      encoded;
     }];
     if (model.elasticNetworks.length == 0) Reflect.deleteField(document, "elasticNetworks");
     return Bytes.ofString(Json.stringify(document));
@@ -428,10 +430,12 @@ class RobotModelCodec {
           throw "Switch side/seed must be valid integers";
         var contact = new JointSwitch(text(record, "id"), text(record, "joint"), text(record, "frame"),
           text(record, "role"), Std.int(side), number(record, "trip"), number(record, "hysteresis"),
-          number(record, "repeatability"), Std.int(seed));
+          number(record, "repeatability"), Std.int(seed),
+          Reflect.hasField(record, "driveJoint") ? text(record, "driveJoint") : null);
         if (switchIds.exists(contact.id)) throw 'Duplicate robot switch ${contact.id}';
         switchIds.set(contact.id, true);
-        if (!joints.exists(contact.joint) || !frames.exists(contact.frameId))
+        if (!joints.exists(contact.joint) || !frames.exists(contact.frameId) ||
+            (contact.driveJoint != null && !joints.exists(contact.driveJoint)))
           throw 'Switch ${contact.id} references an unknown joint or frame';
         model.addSwitch(contact);
       }

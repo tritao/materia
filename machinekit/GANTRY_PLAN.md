@@ -1809,3 +1809,21 @@ scene offsets stay zero. Nonzero startup poses, homing repeatability, reset
 geometry and follower placement remain unverified; no tests or builds ran.
 G11 source now covers startup offset authoring through application creation,
 but full G11/G12 behavior is not proven complete.
+
+
+### G12 — explicit switch-side drive observation
+
+G11 startup-offset wiring: `e45258fe8`. JointSwitch gains optional driveJoint,
+retained by model codec and runtime copies with known-joint validation. Absent
+bindings preserve leader observation. SwitchDriveBinding resolves a specified
+motor shaft through its single-input coupling chain to the monitored axis,
+composing ratios and affine zeros; reject unrelated, cyclic or multi-input
+side mappings. Simulation switch preflight resolves the binding before robot
+creation. Observe that physical drive and convert shaft position into the
+axis SI coordinate before applying the switch trip model. Captured edges are
+converted into the same axis's counter coordinate.
+
+Gantry assembly authoring must still identify each side's motor, and the
+squaring controller must hold sides independently after their edges. This is
+side-observation support, not completed squaring. Skew relaxation, motor zeros
+and the 1 mm result remain pending/unverified. No tests or builds ran.
