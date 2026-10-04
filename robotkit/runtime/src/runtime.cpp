@@ -806,13 +806,22 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
                                 rest_scale[blueprint_.couplings[k].leader];
                     rest_scale[followers[index]] = std::max(1.0, sum);
                 }
-            for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
+            for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
+                const auto &limits = blueprint_.joints[joint];
+                const double acceleration_scale = (limits.limit_flags & RK_LIMIT_ACCELERATION)
+                    ? limits.max_acceleration : rest_scale[joint];
+                const double terminal_jerk = endpoint.jerk[joint];
+                const double quantized_acceleration = std::min(
+                    0.5e-9 * std::abs(terminal_jerk),
+                    1e-6 * std::max(1.0, acceleration_scale));
                 // TOPP-RA can stop with nonzero endpoint acceleration. A
                 // checked-jerk plan must also join the held state smoothly.
                 if (std::abs(endpoint.velocity[joint]) > 1e-6 * rest_scale[joint] ||
                     ((plan.flags & RK_PLAN_JERK_UNCHECKED) == 0 &&
-                     std::abs(endpoint.acceleration[joint]) > 1e-6 * rest_scale[joint]))
+                     std::abs(endpoint.acceleration[joint]) >
+                        std::max(1e-6 * rest_scale[joint], quantized_acceleration)))
                     return RK_ERROR_INVALID_ARGUMENT;
+            }
         }
         // A replacement keeps the queue only up to its anchor, so it works on a copy.
         std::deque<RuntimeTrajectoryPoint> replaced;

@@ -2322,3 +2322,24 @@ StopAfterLatch waits for it before releasing holds and calibrating. The focused
 homing fixture now checks that both holds remain while readiness is false.
 App and MotionKit compiler retries are running. A focused homing rerun is
 justified by this controller change; the unchanged native tests need no repeat.
+
+### G12 checkpoint — bounded terminal clock rounding
+
+MotionKit and app compilers passed the endpoint-readiness change; the focused
+homing regression passed again with the new wait-before-release assertion.
+The picker then reached Z's return plan, rejected with status -1. Native
+debugging confirmed all start states and polynomial coupling coefficients
+were consistent. Its terminal acceleration was 2.420116e-6 m/s² after
+nanosecond phase rounding (and 0.000380151 rad/s² on belt followers), exceeding
+the unscaled/scaled 1e-6 rest threshold despite essentially zero terminal speed.
+
+Native terminal admission now accepts at most half a nanosecond of terminal
+jerk as acceleration rounding, capped by 1e-6 of the physical acceleration
+scale, alongside the existing rest tolerance. Terminal speed remains strict.
+The new runtime regression accepts a 4e-6 acceleration gap for 10,000-unit
+jerk and rejects 1e-4. Its first fixture accidentally failed start-anchor
+validation (-2); the fixture now explicitly budgets its initial acceleration
+to isolate the terminal check. Final native build passed. The full ctest run
+passed the other 17 tests; the corrected runtime test passed its targeted retry
+(1/1), restoring green results for all 18 without repeating the unchanged
+17 tests. The picker is being retried against this runtime. G13 is unstarted.

@@ -2085,6 +2085,41 @@ void quantized_motor_seams_keep_the_c2_bound(const rk_robot_runtime_blueprint &s
     }
 }
 
+void quantized_terminal_acceleration_is_bounded(const rk_robot_runtime_blueprint &source) {
+    auto blueprint = source;
+    for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
+        blueprint.joints[joint].limit_flags |= RK_LIMIT_ACCELERATION;
+        blueprint.joints[joint].max_acceleration = 100.0;
+    }
+    for (double gap : {4e-6, 1e-4}) {
+        auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
+        robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(10));
+        robotkit::PlanRequest plan{};
+        plan.sequence = 1; plan.plan_id = 403;
+        plan.model_revision = blueprint.revision;
+        plan.calibration_revision = blueprint.calibration_revision;
+        plan.ends_at_rest = true;
+        plan.segments = linear_segment_chunk(0.0, 0.0, 1000, 403);
+        auto &segment = plan.segments.segments[0];
+        segment.degree = 3;
+        // A 10,000-unit jerk permits at most 5e-6 acceleration error from
+        // rounding the terminal time by half a nanosecond, never 1e-4.
+        for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
+            auto &c = segment.coefficients[joint].value;
+            c[1] = 5000.0 * 1e-12 - gap * 1e-6;
+            c[2] = (gap - 0.01) / 2.0;
+            c[3] = 10000.0 / 6.0;
+            plan.start_velocity[joint] = c[1];
+            plan.start_acceleration[joint] = 2.0 * c[2];
+            // This fixture isolates terminal readiness from the start-anchor check.
+            plan.acceleration_tolerance[joint] = 0.02;
+        }
+        const auto result = runtime.submit_plan(plan);
+        if (gap < 5e-6) assert(result == RK_OK);
+        else assert(result == RK_ERROR_INVALID_ARGUMENT);
+    }
+}
+
 void expired_velocity_targets_brake_within_limits(const rk_robot_runtime_blueprint &blueprint) {
     // Joint 0 brakes at 2 rad/s^2; joint 1 has no acceleration limit.
     auto limited = blueprint;
@@ -2305,6 +2340,7 @@ int main() {
     stop_ramp_stays_within_travel(blueprint);
     stated_zero_speed_stops_position_commands(blueprint);
     quantized_motor_seams_keep_the_c2_bound(blueprint);
+    quantized_terminal_acceleration_is_bounded(blueprint);
     expired_velocity_targets_brake_within_limits(blueprint);
     plan_end_does_not_restore_earlier_targets(blueprint);
     single_precision_reading_at_a_limit_is_not_a_fault(blueprint);
