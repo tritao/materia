@@ -801,7 +801,7 @@ RK_API rk_result RK_CALL rk_robot_runtime_calibrate_home(rk_robot_runtime runtim
 RK_API rk_result RK_CALL rk_robot_runtime_calibrate_home_drives(rk_robot_runtime runtime,
     const uint32_t *joints RK_IN_ARRAY(count), const double *side_zeros RK_IN_ARRAY(count), uint32_t count);
 /** Read the snapshot positions and setpoints in endpoint coordinates for physical sensor synthesis. */
-RK_API rk_result RK_CALL rk_robot_runtime_snapshot_endpoint(rk_robot_runtime runtime, rk_robot_snapshot *out_snapshot);
+RK_API rk_result RK_CALL rk_robot_runtime_snapshot_endpoint(rk_robot_runtime runtime, rk_robot_snapshot *out_snapshot RK_INOUT);
 
 /** Configure whether a stationary joint needs homing; requiring it invalidates its latch. */
 RK_API rk_result RK_CALL rk_robot_runtime_require_reference(rk_robot_runtime runtime, uint32_t joint, uint32_t required);

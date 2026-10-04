@@ -416,7 +416,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	/**
 	 * Read the snapshot positions and setpoints in endpoint coordinates for physical sensor synthesis.
 	 */
-	extern fn rk_robot_runtime_snapshot_endpoint(runtime: rk_robot_runtime, out_snapshot: ptr<rk_robot_snapshot>) -> rk_result;
+	extern fn rk_robot_runtime_snapshot_endpoint(runtime: rk_robot_runtime, out_snapshot: ptr<rk_robot_snapshot> @inout) -> rk_result;
 	/**
 	 * Copies the latest published snapshot, including revision, endpoint, and
 	 * fault metadata. This operation never advances time.

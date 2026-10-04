@@ -2201,3 +2201,19 @@ project-source. Record individual logs/statuses in external scratch. This batch
 does not run tests; focused picker and homing execution remains pending. CadKit
 uses its separate compiler entrypoint and still needs a compiler-only invocation.
 G13 remains unstarted until the checkpoint succeeds.
+
+### G12 checkpoint — endpoint snapshot FFI direction and CadKit compile
+
+Nullable latch correction: `b283c8bd8`. MotionKit compile reached
+NativeRuntimeEndpoint.observeEndpoint and failed because snapshot_endpoint
+lacked the INOUT annotation used by snapshot_full. Annotate its borrowed
+snapshot correctly and regenerate runtime and simulation canonical FFI sources
+for four portable ABI targets. Native ABI layout/signature is unchanged; the
+Haxe projection now includes the intended status/result shape. Retry MotionKit
+compiler-only with the corrected declaration.
+
+CadKit HaxeonSmoke compilation through the compiler-only portion of its script
+passed (exit 0); no CadKit test execution. AnimKit and AutomationKit batch
+compiler checks passed. Remaining kit/app batch is live. Focused picker is
+PROJECT_SOURCE_ONLY=gantry in app.ProjectSourceTests; Haxe homing selector is
+MOTIONKIT_HOMING_ONLY=1. Neither focused test has run yet.
