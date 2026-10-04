@@ -38,3 +38,5 @@
 /robotkit/tests/integration/__pycache__/
 
 /robotkit/core/tests/build/
+
+/processkit/tests/modbus/build/
