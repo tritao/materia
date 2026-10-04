@@ -1,135 +1,11 @@
 package machinekit.assembly;
 
+import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
-import haxe.ds.ReadOnlyArray;
-import machinekit.component.PortKind;
-import machinekit.component.PortRole;
-import machinekit.component.PortInterface;
-
-/** Wire-compatible read-only view of the mechanical schema. */
-@:wire typedef FrozenFrame = {
-	@:id(1) final x:Float;
-	@:id(2) final y:Float;
-	@:id(3) final z:Float;
-	@:id(4) final qx:Float;
-	@:id(5) final qy:Float;
-	@:id(6) final qz:Float;
-	@:id(7) final qw:Float;
-}
-
-@:wire typedef FrozenConnector = {
-	@:id(1) final name:String;
-	@:id(2) final frame:FrozenFrame;
-}
-
-@:wire typedef FrozenComponentDefinition = {
-	@:id(1) final id:String;
-	@:id(2) final connectors:ReadOnlyArray<FrozenConnector>;
-}
-
-@:wire typedef FrozenOccurrence = {
-	@:id(1) final id:String;
-	@:id(2) final definition:String;
-	@:id(3) final initialPose:FrozenFrame;
-	@:id(4) @:optional final assembly:String;
-}
-
-@:wire typedef FrozenVector = {
-	@:id(1) final x:Float;
-	@:id(2) final y:Float;
-	@:id(3) final z:Float;
-}
-
-@:wire typedef FrozenJointLimits = {
-	@:id(1) final lower:Null<Float>;
-	@:id(2) final upper:Null<Float>;
-	@:id(3) final velocity:Null<Float>;
-	@:id(4) final effort:Null<Float>;
-	@:id(5) @:optional final overtravel:Null<Float>;
-	@:id(6) @:optional final acceleration:Null<Float>;
-	@:id(7) @:optional final assumptions:Null<ReadOnlyArray<materia.assembly.AssemblyDefinition.QuantityAssumption>>;
-}
-
-@:wire typedef FrozenJoint = {
-	@:id(1) final id:String;
-	@:id(2) final type:materia.assembly.AssemblyDefinition.AssemblyJointType;
-	@:id(3) final role:materia.assembly.AssemblyDefinition.AssemblyJointRole;
-	@:id(4) final parent:String;
-	@:id(5) final parentConnector:String;
-	@:id(6) final child:String;
-	@:id(7) final childConnector:String;
-	@:id(8) final axis:FrozenVector;
-	@:id(9) final limits:FrozenJointLimits;
-	@:id(10) final defaultValue:Float;
-	@:id(11) @:optional final closureTolerance:Float;
-}
-
-@:wire typedef FrozenCoupling = {
-	@:id(1) final id:String;
-	@:id(2) final source:String;
-	@:id(3) final target:String;
-	@:id(4) final ratio:Float;
-	@:id(5) final offset:Float;
-	@:id(6) @:optional final efficiency:Null<Float>;
-	@:id(7) @:optional final stiffness:Null<Float>;
-	@:id(8) @:optional final backlash:Null<Float>;
-	@:id(9) @:optional final drag:Null<Float>;
-	@:id(10) @:optional final assumed:Null<ReadOnlyArray<String>>;
-	@:id(11) @:optional final assumptions:Null<ReadOnlyArray<materia.assembly.AssemblyDefinition.QuantityAssumption>>;
-}
-
-@:wire typedef FrozenExposedConnector = {
-	@:id(1) final name:String;
-	@:id(2) final occurrence:String;
-	@:id(3) final connector:String;
-}
-
-@:wire typedef FrozenAssemblySubdefinition = {
-	@:id(1) final id:String;
-	@:id(2) final definitions:ReadOnlyArray<FrozenComponentDefinition>;
-	@:id(3) final occurrences:ReadOnlyArray<FrozenOccurrence>;
-	@:id(4) final joints:ReadOnlyArray<FrozenJoint>;
-	@:id(5) @:optional final couplings:ReadOnlyArray<FrozenCoupling>;
-	@:id(6) @:optional final exposedConnectors:ReadOnlyArray<FrozenExposedConnector>;
-	@:id(10) @:optional final elasticNetworks:ReadOnlyArray<FrozenElasticNetwork>;
-}
-
-@:wire typedef FrozenElasticTerm = {
-	@:id(1) final joint:String;
-	@:id(2) final coefficient:Float;
-}
-@:wire typedef FrozenElasticSpan = {
-	@:id(1) final stiffness:Float;
-	@:id(2) final terms:ReadOnlyArray<FrozenElasticTerm>;
-}
-@:wire typedef FrozenElasticClearance = {
-	@:id(1) final joint:String;
-	@:id(2) final allowance:Float;
-}
-@:wire typedef FrozenElasticNetwork = {
-	@:id(1) final id:String;
-	@:id(2) final couplings:ReadOnlyArray<String>;
-	@:id(3) final spans:ReadOnlyArray<FrozenElasticSpan>;
-	@:id(4) @:optional final assumptions:ReadOnlyArray<materia.assembly.AssemblyDefinition.QuantityAssumption>;
-	@:id(5) @:optional final clearances:ReadOnlyArray<FrozenElasticClearance>;
-}
-
-@:wire typedef FrozenAssemblyDefinition = {
-	@:id(1) final schemaVersion:Int;
-	@:id(2) final id:String;
-	@:id(3) @:optional final lengthUnit:String;
-	@:id(4) final definitions:ReadOnlyArray<FrozenComponentDefinition>;
-	@:id(5) final occurrences:ReadOnlyArray<FrozenOccurrence>;
-	@:id(6) final joints:ReadOnlyArray<FrozenJoint>;
-	@:id(7) @:optional final couplings:ReadOnlyArray<FrozenCoupling>;
-	@:id(8) @:optional final assemblies:ReadOnlyArray<FrozenAssemblySubdefinition>;
-	@:id(9) @:optional final exposedConnectors:ReadOnlyArray<FrozenExposedConnector>;
-	@:id(13) @:optional final elasticNetworks:ReadOnlyArray<FrozenElasticNetwork>;
-}
 
 /** Serializable recipe inputs. The constructor IDs are part of the wire schema. */
 @:wire enum MemberSource {
-	@:id(1) Typed(typeId:String, values:ReadOnlyArray<NamedValue>);
+	@:id(1) Typed(typeId:String, values:Array<NamedValue>);
 	@:id(2) Code(designation:String);
 }
 
@@ -146,6 +22,7 @@ import machinekit.component.PortInterface;
 	@:id(2) var value:SavedValue;
 }
 
+/** A member of one level, by its local name. */
 @:wire typedef MemberRecord = {
 	@:id(1) var occurrence:String;
 	@:id(2) var source:MemberSource;
@@ -158,22 +35,6 @@ import machinekit.component.PortInterface;
 	@:id(3) var fromPort:String;
 	@:id(4) var toInstance:String;
 	@:id(5) var toPort:String;
-}
-
-@:wire typedef PortRecord = {
-	@:id(1) var occurrence:String;
-	@:id(2) var name:String;
-	@:id(3) var kind:PortKind;
-	@:id(4) var role:PortRole;
-	@:id(5) var iface:PortInterface;
-	@:id(6) var required:Bool;
-	@:id(7) @:optional var connector:String;
-}
-
-@:wire typedef ServiceLinkRecord = {
-	@:id(1) var occurrence:String;
-	@:id(2) var fromPort:String;
-	@:id(3) var toPort:String;
 }
 
 @:wire typedef PortExposureRecord = {
@@ -197,54 +58,6 @@ import machinekit.component.PortInterface;
 @:wire typedef ConnectorReference = {
 	@:id(1) var instanceId:String;
 	@:id(2) var connectorName:String;
-}
-
-@:wire typedef EndEffectorRecord = {
-	@:id(1) var mount:Null<ConnectorReference>;
-	@:id(2) var frames:ReadOnlyArray<ConnectorExposureRecord>;
-	@:id(3) var primaryFrame:Null<String>;
-	@:id(4) var collisionExclusions:ReadOnlyArray<String>;
-}
-
-@:wire typedef ChangerPortRecord = {
-	@:id(1) var robot:String;
-	@:id(2) var tool:String;
-}
-
-@:wire typedef ChangerRecord = {
-	@:id(1) var name:String;
-	@:id(2) var instanceId:String;
-	@:id(3) var connectorName:String;
-	@:id(4) var ports:ReadOnlyArray<ChangerPortRecord>;
-}
-
-@:wire typedef ToolRecord = {
-	@:id(1) var id:String;
-	@:id(2) var mechanical:FrozenAssemblyDefinition;
-	@:id(3) var machine:ToolSideRecord;
-}
-
-@:wire typedef IncludedRecord = {
-	@:id(1) var id:String;
-	@:id(2) var pose:AssemblyFrame;
-	@:id(3) var mechanical:FrozenAssemblyDefinition;
-}
-
-/** A tool has its own EOAT data, with no recursive changer table. */
-@:wire typedef ToolSideRecord = {
-	@:id(1) var members:ReadOnlyArray<MemberRecord>;
-	@:id(2) var portConnections:ReadOnlyArray<PortConnectionRecord>;
-	@:id(3) var portExposures:ReadOnlyArray<PortExposureRecord>;
-	@:id(4) var bomExtras:ReadOnlyArray<BomExtraRecord>;
-	@:id(5) var connectorExposures:ReadOnlyArray<ConnectorExposureRecord>;
-	@:id(6) var memberConnectors:ReadOnlyArray<MemberConnectorRecord>;
-	@:id(7) var endEffector:EndEffectorRecord;
-	@:id(8) var ports:ReadOnlyArray<PortRecord>;
-	@:id(9) var included:ReadOnlyArray<IncludedRecord>;
-	@:id(10) @:optional var transmissions:ReadOnlyArray<TransmissionRecord>;
-	@:id(11) @:optional var motors:ReadOnlyArray<MotorRecord>;
-	@:id(12) @:optional var encoders:ReadOnlyArray<EncoderRecord>;
-	@:id(13) @:optional var beltPaths:ReadOnlyArray<BeltPathRecord>;
 }
 
 @:wire typedef BomExtraRecord = {
@@ -271,23 +84,19 @@ import machinekit.component.PortInterface;
 /** Source of a derived coupling; the follower is zero at `leaderZero`. */
 @:wire typedef TransmissionRecord = {
 	@:id(1) var coupling:String;
-	@:id(12) var source:Transmission;
-	@:id(13) var sense:Sense;
-	@:id(5) var leaderZero:Float;
+	@:id(2) var source:Transmission;
+	@:id(3) var sense:Sense;
+	@:id(4) var leaderZero:Float;
 	/** Stated stiffness at the leader, N per leader unit. */
-	@:id(6) @:optional var stiffness:Null<Float>;
+	@:id(5) @:optional var stiffness:Null<Float>;
 	/** Stated lost motion on reversal, in leader units. */
-	@:id(7) @:optional var backlash:Null<Float>;
+	@:id(6) @:optional var backlash:Null<Float>;
 	/** Stated drag torque at the follower, N m. */
-	@:id(8) @:optional var drag:Null<Float>;
-	@:id(9) @:optional var near:Null<machinekit.motion.ScrewSupport>;
-	@:id(10) @:optional var far:Null<machinekit.motion.ScrewSupport>;
+	@:id(7) @:optional var drag:Null<Float>;
+	@:id(8) @:optional var near:Null<machinekit.motion.ScrewSupport>;
+	@:id(9) @:optional var far:Null<machinekit.motion.ScrewSupport>;
 	/** Longest unsupported stretch in mm; absent means the whole screw. */
-	@:id(11) @:optional var unsupported:Null<Float>;
-}
-
-@:wire typedef DescriptionVersion = {
-	@:id(3) @:optional var schemaVersion:Int;
+	@:id(10) @:optional var unsupported:Null<Float>;
 }
 
 /**
@@ -298,13 +107,23 @@ import machinekit.component.PortInterface;
 	@:id(1) var actuator:String;
 	@:id(2) var joint:String;
 	@:id(3) var motor:String;
-	@:id(8) var driver:String;
+	@:id(4) var driver:String;
 	@:id(5) var margin:Float;
 	/** A gearbox between the motor and the joint (see `Gearbox`); absent for a direct drive. */
-	// Retired numeric reduction ids 6 and 7.
-	@:id(9) @:optional var gearbox:Null<String>;
+	@:id(6) @:optional var gearbox:Null<String>;
 	/** A process speed/direction pair for a CNC spindle; both channels are analog. */
-	@:id(10) @:optional var processVelocity:Null<materia.assembly.AssemblyDefinition.AssemblyProcessVelocityDrive>;
+	@:id(7) @:optional var processVelocity:Null<materia.assembly.AssemblyDefinition.AssemblyProcessVelocityDrive>;
+}
+
+/**
+ * A pneumatic cylinder driving a prismatic joint through a directional valve. Only the parts are
+ * kept; pressure, force and direction are worked out from them and the air wiring.
+ */
+@:wire typedef CylinderRecord = {
+	@:id(1) var actuator:String;
+	@:id(2) var joint:String;
+	@:id(3) var cylinder:String;
+	@:id(4) var valve:String;
 }
 
 /**
@@ -318,44 +137,51 @@ import machinekit.component.PortInterface;
 	@:id(4) @:optional var actuator:Null<String>;
 }
 
-@:wire typedef AssemblySideRecord = {
-	@:id(1) var members:ReadOnlyArray<MemberRecord>;
-	@:id(2) var portConnections:ReadOnlyArray<PortConnectionRecord>;
-	@:id(3) var portExposures:ReadOnlyArray<PortExposureRecord>;
-	@:id(4) var bomExtras:ReadOnlyArray<BomExtraRecord>;
-	@:id(5) var connectorExposures:ReadOnlyArray<ConnectorExposureRecord>;
-	@:id(6) var memberConnectors:ReadOnlyArray<MemberConnectorRecord>;
-	@:id(7) @:optional var endEffector:EndEffectorRecord;
-	@:id(8) @:optional var changer:ChangerRecord;
-	@:id(9) @:optional var tools:ReadOnlyArray<ToolRecord>;
-	@:id(10) var ports:ReadOnlyArray<PortRecord>;
-	@:id(11) var included:ReadOnlyArray<IncludedRecord>;
-	@:id(12) @:optional var transmissions:ReadOnlyArray<TransmissionRecord>;
-	@:id(13) @:optional var motors:ReadOnlyArray<MotorRecord>;
-	@:id(14) @:optional var encoders:ReadOnlyArray<EncoderRecord>;
-	@:id(15) @:optional var beltPaths:ReadOnlyArray<BeltPathRecord>;
-	@:id(16) @:optional var cylinders:ReadOnlyArray<CylinderRecord>;
-	@:id(17) @:optional var sensors:ReadOnlyArray<materia.assembly.AssemblyDefinition.AssemblySensor>;
-}
-
-/** Mechanical definition plus the MachineKit facts keyed by occurrence ID. */
-@:wire typedef MachineAssemblyDescription = {
-	@:id(1) var mechanical:FrozenAssemblyDefinition;
-	@:id(2) var machine:AssemblySideRecord;
-	@:id(3) @:optional var schemaVersion:Int;
-}
-
-/** Keep part references, rather than a cached pressure or area. */
-@:wire typedef CylinderRecord = {
-	@:id(1) var actuator:String;
-	@:id(2) var joint:String;
-	@:id(3) var cylinder:String;
-	@:id(4) var valve:String;
-}
-
 /** Physical clamp and pulley centres, in belt path order. The clamp span follows its geometry. */
 @:wire typedef BeltPathRecord = {
 	@:id(1) var belt:String;
 	@:id(2) @:optional var clamp:Null<ConnectorReference>;
-	@:id(4) var wraps:ReadOnlyArray<ConnectorReference>;
+	@:id(3) var wraps:Array<ConnectorReference>;
+}
+
+/**
+ * The MachineKit facts of one assembly level. Every member reference is a path below that level, so
+ * a record may name a member of a subassembly (`arm/link1`).
+ */
+@:wire typedef MachineLevelRecord = {
+	@:id(1) var members:Array<MemberRecord>;
+	@:id(2) var memberConnectors:Array<MemberConnectorRecord>;
+	@:id(3) var connectorExposures:Array<ConnectorExposureRecord>;
+	@:id(4) var portConnections:Array<PortConnectionRecord>;
+	@:id(5) var portExposures:Array<PortExposureRecord>;
+	@:id(6) var transmissions:Array<TransmissionRecord>;
+	@:id(7) var beltPaths:Array<BeltPathRecord>;
+	@:id(8) var motors:Array<MotorRecord>;
+	@:id(9) var encoders:Array<EncoderRecord>;
+	@:id(10) var bomExtras:Array<BomExtraRecord>;
+	@:id(11) var cylinders:Array<CylinderRecord>;
+	/** Switches, at-speed and presence sensors. */
+	@:id(12) var sensors:Array<materia.assembly.AssemblyDefinition.AssemblySensor>;
+}
+
+/** One subassembly: its path from the root, its entry in the mechanical table, and its facts. */
+@:wire typedef SubassemblyRecord = {
+	@:id(1) var path:String;
+	@:id(2) var definition:String;
+	@:id(3) var machine:MachineLevelRecord;
+}
+
+/**
+ * A machine assembly as portable data: the nested ProjectKit definition, with each subassembly a
+ * table entry, and the MachineKit facts of the root and of each subassembly.
+ */
+@:wire typedef MachineAssemblyDescription = {
+	@:id(1) var schemaVersion:Int;
+	@:id(2) var mechanical:AssemblyDefinition;
+	@:id(3) var machine:MachineLevelRecord;
+	@:id(4) var subassemblies:Array<SubassemblyRecord>;
+}
+
+@:wire typedef DescriptionVersion = {
+	@:id(1) @:optional var schemaVersion:Int;
 }

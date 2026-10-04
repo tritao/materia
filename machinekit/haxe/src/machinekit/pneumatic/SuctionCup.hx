@@ -8,6 +8,8 @@ import machinekit.component.PortInterface;
 import machinekit.component.PortKind;
 import machinekit.component.PortRole;
 import machinekit.component.Solids;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ComponentType;
 
 /** Generic suction cup with a vacuum input and contact frame. */
 class SuctionCup extends MachineComponent {
@@ -54,14 +56,25 @@ class SuctionCup extends MachineComponent {
 		addConnector("contact", Face, Solids.axial(0, 0, height));
 		addPort({name: "vacuum", kind: Vacuum, role: Consumer,
 			iface: vacuumInterface == null ? PushIn(6) : vacuumInterface, required: true});
-		addCapability(Suction(effectiveAreaMm2, ratedMomentNm, "vacuum", "contact"));
+		addFacet(new SuctionFacet(effectiveAreaMm2, ratedMomentNm, "vacuum", "contact"));
 	}
 
-	public static function recipeType():machinekit.component.ComponentType
-		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.pneumatic.suction-cup");
+	static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.pneumatic.suction-cup", [ComponentRecipeSupport.length("diameter", 40), ComponentRecipeSupport.length("height", 18),
+			ComponentRecipeSupport.optionalScalar("effectiveAreaMm2"), ComponentRecipeSupport.optionalScalar("ratedMomentNm"),
+			ComponentRecipeSupport.optionalText("catalogDesignation"), ComponentRecipeSupport.optionalText("catalogDescription")]
+			.concat(ComponentRecipeSupport.interfaceParameters("vacuumInterface")),
+			v -> new SuctionCup(v.number("diameter"), v.number("height"),
+				v.optionalNumber("effectiveAreaMm2"), v.optionalNumber("ratedMomentNm"),
+				v.optionalToken("catalogDesignation"), ComponentRecipeSupport.interfaceFrom(v, "vacuumInterface"),
+				v.optionalToken("catalogDescription")), true);
+		return recipeTypeCache;
+	}
 
 	/** Subclasses must declare their own recipe and saved values. */
-	override public function componentType():Null<machinekit.component.ComponentType>
+	override public function componentType():Null<ComponentType>
 		return Std.isExactType(this, SuctionCup) ? recipeType() : null;
 
 	override public function values():machinekit.component.ComponentValues {
@@ -70,7 +83,7 @@ class SuctionCup extends MachineComponent {
 			.set("ratedMomentNm", ratedMomentNm == null ? machinekit.component.ComponentValue.Unset : machinekit.component.ComponentValue.Number(ratedMomentNm))
 			.set("catalogDesignation", codeOnly ? machinekit.component.ComponentValue.Unset : machinekit.component.ComponentValue.Token(designation))
 			.set("catalogDescription", codeOnly ? machinekit.component.ComponentValue.Unset : machinekit.component.ComponentValue.Token(description));
-		machinekit.component.MachineKitAdditionalRecipes.interfaceValues(values, "vacuumInterface", port("vacuum").iface);
+		ComponentRecipeSupport.interfaceValues(values, "vacuumInterface", port("vacuum").iface);
 		return values.setToken("material", materialSpec());
 	}
 

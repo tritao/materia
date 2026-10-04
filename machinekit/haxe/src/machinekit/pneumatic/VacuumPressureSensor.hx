@@ -7,6 +7,8 @@ import machinekit.component.PortInterface;
 import machinekit.component.PortKind;
 import machinekit.component.PortRole;
 import machinekit.component.Solids;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ComponentType;
 
 /** Generic inline vacuum sensor with a pressure feedback signal. */
 class VacuumPressureSensor extends MachineComponent {
@@ -24,14 +26,19 @@ class VacuumPressureSensor extends MachineComponent {
 		addBridge("vacuumIn", "vacuumOut");
 		addPort({name: "pressureSignal", kind: Signal, role: Supply,
 			iface: Plug("analog-vacuum-kpa", 3), required: false});
-		addCapability(VacuumPressureSensor("vacuumIn", "pressureSignal"));
+		addFacet(new VacuumPressureSensorFacet("vacuumIn", "pressureSignal"));
 	}
 
-	public static function recipeType():machinekit.component.ComponentType
-		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.pneumatic.vacuum-pressure-sensor");
+	static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.pneumatic.vacuum-pressure-sensor", [ComponentRecipeSupport.length("tubeOdMm", 4)],
+			v -> new VacuumPressureSensor(v.number("tubeOdMm")), true);
+		return recipeTypeCache;
+	}
 
 	/** Subclasses must declare their own recipe and saved values. */
-	override public function componentType():Null<machinekit.component.ComponentType>
+	override public function componentType():Null<ComponentType>
 		return Std.isExactType(this, VacuumPressureSensor) ? recipeType() : null;
 
 	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues().setNumber("tubeOdMm", switch port("vacuumIn").iface { case PushIn(d): d; case _: 0; }).setToken("material", materialSpec());

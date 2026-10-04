@@ -64,7 +64,7 @@ class WeldingTorch extends MachineComponent {
 		addPort({name: "gas", kind: Gas, role: Consumer, iface: WeldingInterfaces.gas(), required: true});
 		addPort({name: "wire", kind: Wire, role: Consumer, iface: WeldingInterfaces.wireLiner(), required: true});
 		addPort({name: "control", kind: Signal, role: Consumer, iface: WeldingInterfaces.control(), required: true});
-		addCapability(ArcTorch("tcp", "control", STICKOUT));
+		addFacet(new ArcTorchFacet("tcp", "control", STICKOUT));
 		declareMass(MASS - NECK_MASS - NOZZLE_MASS, new Vector(0, 0, 0.5 * BEND_Z));
 	}
 

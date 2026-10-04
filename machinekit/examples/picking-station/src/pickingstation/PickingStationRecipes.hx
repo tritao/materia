@@ -34,7 +34,7 @@ class PickingStationRecipes {
 				new ComponentType("pickingstation.adjustable-foot", [length("diameter", 35), length("height", 25)],
 					v -> new AdjustableFoot(v.number("diameter"), v.number("height")), true)
 			];
-			for (type in types) MachineKitComponents.register(type);
+			for (type in types) MachineKitComponents.defaultRegistry().register(type);
 		}
 		return types.copy();
 	}

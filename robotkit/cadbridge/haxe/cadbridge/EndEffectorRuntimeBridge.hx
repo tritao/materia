@@ -3,7 +3,7 @@ package cadbridge;
 import cadkit.modeling.AssemblyState;
 import machinekit.component.PortKind;
 import machinekit.component.PortRole;
-import machinekit.component.ComponentCapability;
+import machinekit.pneumatic.VacuumPressureSensorFacet;
 import machinekit.robotics.EndEffector;
 import machinekit.robotics.EndEffectorSet;
 import machinekit.robotics.EndEffectorFrames;
@@ -75,7 +75,7 @@ class EndEffectorRuntimeBridge {
   public static function deriveBindings(set:EndEffectorSet,
       configurationId:String):EndEffectorRuntimeBindings {
     if (set == null) throw "End effector set is required";
-    var derived = machinekit.robotics.EndEffectorControls.derive(set.configuration(configurationId), configurationId);
+    var derived = machinekit.robot.EndEffectorControls.derive(set.configuration(configurationId), configurationId);
     var controls:Array<EndEffectorControlBinding> = [for (control in derived.controls) switch control {
       case Gripper(channel, member, openPort, closePort): EndEffectorControlBinding.Gripper(channel, member, openPort, closePort);
       case Vacuum(channel, member, inletPort): EndEffectorControlBinding.Vacuum(channel, member, inletPort);
@@ -108,10 +108,10 @@ class EndEffectorRuntimeBridge {
       throw 'Robot blueprint already has sensor "$sensorId"';
     var configuration = set.configuration(configurationId);
     var solved = configuration.solve(state);
-    for (member in configuration.components())
-      for (intent in member.component.capabilities()) switch intent {
-        case VacuumPressureSensor(_, signalPort):
-          var port = member.component.port(signalPort);
+    for (member in configuration.components()) {
+      var pressure = VacuumPressureSensorFacet.of(member.component);
+      if (pressure != null) {
+          var port = member.component.port(pressure.signalPort);
           var connector = port.connector == null ? "mount" : port.connector;
           var pose = solved.poses.get(member.id);
           if (pose == null) throw 'Missing pressure sensor pose for "${member.id}"';
@@ -134,8 +134,8 @@ class EndEffectorRuntimeBridge {
               frame.quaternion.w]);
           blueprint.sensors.push(sensor);
           return sensor;
-        case _:
       }
+    }
     throw "End effector pressure sensor intent did not resolve";
   }
 

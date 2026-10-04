@@ -28,6 +28,8 @@ import machinekit.standard.ClearanceFit;
 import machinekit.structural.FrameAssembly;
 import machinekit.structural.RectTube;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ComponentType;
 
 /** Block riding the lead screw. CAD frame: bore centred, spanning z=0..length. */
 class Carriage extends MachineComponent {
@@ -64,15 +66,28 @@ class Carriage extends MachineComponent {
 			addConnector("railMount", Mount, Solids.axial(0, this.railMountY, length / 2));
 	}
 
-	public static function recipeType():machinekit.component.ComponentType
-		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.assembly.carriage");
+	static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.assembly.carriage", [ComponentRecipeSupport.length("boreDiameter", 8), ComponentRecipeSupport.length("width", 70),
+			ComponentRecipeSupport.length("length", 50), ComponentRecipeSupport.length("guideSpacing", 25), ComponentRecipeSupport.length("guideSeatDiameter", 12),
+			ComponentRecipeSupport.choice("guideSeatFit", ["Slip", "Transition", "Interference"], "Slip"),
+			ComponentRecipeSupport.flag("hasRailMount", false), ComponentRecipeSupport.scalar("railMountY", 0),
+			ComponentRecipeSupport.count("nutBoltCount", 4)].concat(ComponentRecipeSupport.threadParameters()),
+			v -> new Carriage(v.number("boreDiameter"), v.number("width"), v.number("length"),
+				v.number("guideSpacing"), v.number("guideSeatDiameter"),
+				new machinekit.motion.LeadScrewNut(ComponentRecipeSupport.thread(v), v.integer("nutBoltCount")),
+				ComponentRecipeSupport.fit(v.token("guideSeatFit")),
+				v.boolean("hasRailMount") ? v.number("railMountY") : null), true);
+		return recipeTypeCache;
+	}
 
 	/** Subclasses must declare their own recipe and saved values. */
-	override public function componentType():Null<machinekit.component.ComponentType>
+	override public function componentType():Null<ComponentType>
 		return Std.isExactType(this, Carriage) ? recipeType() : null;
 
 	override public function values():machinekit.component.ComponentValues {
-		var values = machinekit.component.ComponentRecipeSupport.threadValues(nut.thread);
+		var values = ComponentRecipeSupport.threadValues(nut.thread);
 		values.setNumber("boreDiameter", boreDiameter).setNumber("width", width)
 			.setNumber("length", length).setNumber("guideSpacing", guideSpacing)
 			.setNumber("guideSeatDiameter", guideSeatDiameter)

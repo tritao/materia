@@ -53,7 +53,7 @@ class WireFeeder extends MachineComponent {
 		addBridge("power", "torchPower");
 		addBridge("gas", "torchGas");
 		addBridge("control", "torchControl");
-		addCapability(WireFeed(wireDiameterMm, maxSpeedMPerMin, depositionEfficiency));
+		addFacet(new WireFeedFacet(wireDiameterMm, maxSpeedMPerMin, depositionEfficiency));
 		declareMass(14, new Vector(0, 0, height / 2));
 	}
 

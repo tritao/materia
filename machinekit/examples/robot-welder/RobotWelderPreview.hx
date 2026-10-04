@@ -8,7 +8,7 @@ import cadkit.modeling.Part;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import machinekit.component.ComponentDetail;
-import machinekit.robotics.EndEffectorControls;
+import machinekit.robot.EndEffectorControls;
 import machinekit.welding.WeldMetal;
 import machinekit.welding.WeldSeam;
 import machinekit.welding.WeldSeams;
@@ -25,6 +25,7 @@ import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.project.SceneArtifact;
 import materia.project.SceneArtifact.SceneArtifactData;
+import machinekit.robot.RobotScene;
 
 /** Materia project entrypoint for the robot welding cell. */
 class RobotWelderPreview {
@@ -58,7 +59,7 @@ class RobotWelderPreview {
 	static function encode(cell:WeldingCell, steps:(WeldingCell, SceneArtifactData) -> Array<materia.project.SceneArtifact.SceneArtifactMissionStep>):Bytes {
 		var scene = AssemblyPreview.scene(cell, ASSEMBLY_ID);
 		scene.assemblyState = readyState(cell).record();
-		scene.robotTools = AssemblyPreview.robotTools(cell.arm.tool, TOOL_PREFIX, cell.equipment());
+		scene.robotTools = RobotScene.robotTools(cell.arm.tool, TOOL_PREFIX, cell.equipment());
 		scene.mission = {steps: steps(cell, scene)};
 		return SceneArtifact.encode(scene);
 	}

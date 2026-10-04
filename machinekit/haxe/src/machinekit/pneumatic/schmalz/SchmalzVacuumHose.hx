@@ -6,6 +6,8 @@ import machinekit.catalog.CatalogMetadata.DimensionKind;
 import machinekit.catalog.CatalogMetadata.Conformance;
 import machinekit.component.Dimension;
 import machinekit.pneumatic.RoutedHose;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ComponentType;
 
 typedef SchmalzHoseSpec = {
 	var designation:String;
@@ -33,14 +35,20 @@ class SchmalzVacuumHose extends RoutedHose {
 		return table;
 	}
 
-	public static function recipeType():machinekit.component.ComponentType
-		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.pneumatic.schmalz-vacuum-hose");
+	static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.pneumatic.schmalz-vacuum-hose",
+			[ComponentRecipeSupport.catalog("stock", SchmalzVacuumHose.catalog(), "10.07.09.00001"), ComponentRecipeSupport.text("route", ComponentRecipeSupport.defaultRoute())],
+			v -> new SchmalzVacuumHose(v.token("stock"), ComponentRecipeSupport.route(v.token("route"))), true, false, ["route"]);
+		return recipeTypeCache;
+	}
 
 	/** Subclasses must declare their own recipe and saved values. */
-	override public function componentType():Null<machinekit.component.ComponentType>
+	override public function componentType():Null<ComponentType>
 		return Std.isExactType(this, SchmalzVacuumHose) ? recipeType() : null;
 
-	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues().setToken("stock", stock.designation).setToken("route", machinekit.component.MachineKitAdditionalRecipes.routeText(route)).setToken("material", materialSpec());
+	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues().setToken("stock", stock.designation).setToken("route", ComponentRecipeSupport.routeText(route)).setToken("material", materialSpec());
 
 	public function new(stockDesignation:String, route:Array<Vector>) {
 		var row = catalog().get(stockDesignation);

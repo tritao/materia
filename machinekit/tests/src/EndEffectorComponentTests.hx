@@ -34,16 +34,14 @@ class EndEffectorComponentTests {
 			throw "Catalog cup sizes must have distinct mass and rated area";
 		var sxtMaster = new SchmalzSxtMaster("10.07.13.00013");
 		var sxtTool = new SchmalzSxtTool("10.07.13.00018");
-		if ((cast sxtMaster.coupling() : {key:String, connector:String}).key !=
-			(cast sxtTool.coupling() : {key:String, connector:String}).key ||
+		var masterHalf = sxtMaster.coupling(), toolHalf = sxtTool.coupling();
+		if (masterHalf == null || toolHalf == null || masterHalf.key != toolHalf.key ||
 			!PortInterfaces.compatible(sxtMaster.port("airOut2").iface,
 				sxtTool.port("airIn2").iface) ||
 			PortInterfaces.compatible(sxtMaster.port("airOut2").iface,
 				sxtTool.port("airIn3").iface) ||
 			Math.abs(sxtMaster.massProperties().mass - 1.7) > 1e-9 ||
-			Math.abs(sxtTool.massProperties().mass - 0.55) > 1e-9 ||
-			sxtMaster.runtimePortIntents().length != 0 ||
-			sxtTool.runtimePortIntents().length != 0)
+			Math.abs(sxtTool.massProperties().mass - 0.55) > 1e-9)
 			throw "Schmalz SXT pair has incorrect fit, channels or mass";
 		var hose = new SchmalzVacuumHose("10.07.09.00001", [new Vector(0, 0, 0),
 			new Vector(0, 0, 100), new Vector(100, 0, 100)]);

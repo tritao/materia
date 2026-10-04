@@ -610,7 +610,7 @@ class CadBridgeTests {
           "the arc control is the torch's trigger channel on its signal inlet");
       case _: check(false, "a torch derives an arc binding");
     }
-    var derived = machinekit.robotics.EndEffectorControls.derive(set.configuration("weld"), "weld");
+    var derived = machinekit.robot.EndEffectorControls.derive(set.configuration("weld"), "weld");
     check(derived.arcs.length == 1 && derived.arcs[0].wireSpeedChannel == "weld/tool/torch.wire_speed" &&
       derived.arcs[0].voltageChannel == "weld/tool/torch.voltage" && derived.arcs[0].sensor == "weld/tool/torch.weld" &&
       derived.arcs[0].tcpConnector == "tcp", "the torch's analogue channels and weld sensor are named after its member");

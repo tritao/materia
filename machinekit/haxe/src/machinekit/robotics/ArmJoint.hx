@@ -2,7 +2,7 @@ package machinekit.robotics;
 
 import cadkit.modeling.Part;
 import machinekit.component.ComponentDetail;
-import machinekit.component.ComponentType;
+import ComponentType;
 import machinekit.component.ComponentValues;
 import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
@@ -10,6 +10,8 @@ import machinekit.component.Solids;
 import machinekit.motion.MotorDrive;
 import machinekit.motion.ServoMotor;
 import materia.assembly.AssemblyDefinition.AssemblyActuator;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ComponentType;
 
 /** Joint module of a serial arm: a cylindrical housing along local +Z with a fixed `stator` face at
  * z=0 and the rotating output `rotor` face at z=length. The housing belongs to the link before the
@@ -50,8 +52,17 @@ class ArmJoint extends MachineComponent implements MotorDrive {
 		}
 	}
 
-	public static function recipeType():ComponentType
-		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.robotics.arm-joint");
+	static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.robotics.arm-joint", [ComponentRecipeSupport.length("diameter", 100), ComponentRecipeSupport.length("length", 70), ComponentRecipeSupport.length("flangePitchCircle", 0),
+			ComponentRecipeSupport.choice("servo", ["none"].concat([for (rating in machinekit.motion.ServoMotor.ratings()) rating.designation]), "none"),
+			ComponentRecipeSupport.choice("servoBasis", ["derived", "catalog", "stated", "assumed"], "assumed")],
+			v -> new ArmJoint(v.number("diameter"), v.number("length"),
+				v.number("flangePitchCircle") > 0 ? new machinekit.robotics.RobotFlange(v.number("flangePitchCircle")) : null,
+				v.token("servo") == "none" ? null : machinekit.motion.ServoMotor.model(v.token("servo"), machinekit.motion.ServoMotor.basisFromToken(v.token("servoBasis")))), true);
+		return recipeTypeCache;
+	}
 
 	/** Subclasses must declare their own recipe and saved values. */
 	override public function componentType():Null<ComponentType>

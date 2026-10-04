@@ -36,20 +36,24 @@ class WeldingEquipment {
 		var supply:Null<String> = null, maxCurrent = 0.0, efficiency = 1.0;
 		var feeder:Null<String> = null, wire = 0.0, wireSpeed = 0.0, deposited = 1.0;
 		var clamps:Array<{id:String, lead:String}> = [];
-		for (member in assembly.components()) for (capability in member.component.capabilities()) switch capability {
-			case WeldingSupply(_, current, _, deliveredFraction):
+		for (member in assembly.components()) {
+			var source = WeldingSupplyFacet.of(member.component);
+			if (source != null) {
 				if (supply != null) throw 'The assembly has two welding power sources, "$supply" and "${member.id}"';
 				supply = member.id;
-				maxCurrent = current;
-				efficiency = deliveredFraction;
-			case WireFeed(diameter, speed, depositionEfficiency):
+				maxCurrent = source.maxCurrentA;
+				efficiency = source.efficiency;
+			}
+			var feed = WireFeedFacet.of(member.component);
+			if (feed != null) {
 				if (feeder != null) throw 'The assembly has two wire feeders, "$feeder" and "${member.id}"';
 				feeder = member.id;
-				wire = diameter;
-				wireSpeed = speed;
-				deposited = depositionEfficiency;
-			case WorkReturn(leadPort, _): clamps.push({id: member.id, lead: leadPort});
-			case _:
+				wire = feed.wireDiameterMm;
+				wireSpeed = feed.maxSpeedMPerMin;
+				deposited = feed.depositionEfficiency;
+			}
+			var clamp = WorkReturnFacet.of(member.component);
+			if (clamp != null) clamps.push({id: member.id, lead: clamp.leadPort});
 		}
 		if (supply == null) throw "The assembly has no welding power source";
 		if (feeder == null) throw "The assembly has no wire feeder";

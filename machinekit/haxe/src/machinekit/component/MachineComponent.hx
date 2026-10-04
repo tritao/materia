@@ -12,32 +12,12 @@ import materia.project.MaterialLibrary;
  * `geometry()` returns a new owned Part in the component's CAD frame; the caller closes it.
  */
 class MachineComponent {
-	final capabilityList:Array<ComponentCapability> = [];
+	final facetList:Array<ComponentFacet> = [];
 
-	public function capabilities():Array<ComponentCapability> return capabilityList.copy();
+	/** The typed facts this part states about itself; look one kind up with its class's `of`. */
+	public function facets():Array<ComponentFacet> return facetList.copy();
 
-	public function coupling():Null<{key:String, connector:String}> {
-		for (capability in capabilityList) switch capability {
-			case Coupling(key, connector): return {key: key, connector: connector};
-			case _:
-		}
-		return null;
-	}
-
-	/** Compatibility view for existing runtime clients. */
-	public function runtimePortIntents():Array<RuntimePortIntent> {
-		var result:Array<RuntimePortIntent> = [];
-		for (capability in capabilityList) switch capability {
-			case Grip(_, _, openPort, closePort): result.push(RuntimePortIntent.Gripper(openPort, closePort));
-			case VacuumActuator(port): result.push(RuntimePortIntent.VacuumActuator(port));
-			case VacuumValve(port): result.push(RuntimePortIntent.VacuumValve(port));
-			case VacuumPressureSensor(vacuumPort, signalPort):
-				result.push(RuntimePortIntent.VacuumPressureSensor(vacuumPort, signalPort));
-			case ChangerLock(port): result.push(RuntimePortIntent.ChangerLock(port));
-			case _:
-		}
-		return result;
-	}
+	public function coupling():Null<CouplingFacet> return CouplingFacet.of(this);
 
 	/** Typed pneumatic model when this component is a cylinder. */
 	public function pneumaticCylinderSpec():Null<machinekit.pneumatic.PneumaticCylinderSpec> return null;
@@ -45,40 +25,11 @@ class MachineComponent {
 	/** Typed pneumatic model when this component is a directional valve. */
 	public function pneumaticValveSpec():Null<machinekit.pneumatic.PneumaticValveSpec> return null;
 
-	function addCapability(capability:ComponentCapability):Void {
-		if (capability == null) throw 'Null capability on "$designation"';
-		switch capability {
-			case Coupling(key, connector):
-				if (key == null || key.length == 0) throw 'Coupling on "$designation" needs a key';
-				this.connector(connector);
-				if (coupling() != null) throw 'Duplicate coupling capability on "$designation"';
-			case Suction(_, _, vacuumPort, contactConnector):
-				port(vacuumPort); connector(contactConnector);
-			case Grip(_, _, openPort, closePort): port(openPort); port(closePort);
-			case VacuumSource(_, outputPort): port(outputPort);
-			case VacuumActuator(inletPort) | VacuumValve(inletPort) | ChangerLock(inletPort): port(inletPort);
-			case VacuumPressureSensor(vacuumPort, signalPort): port(vacuumPort); port(signalPort);
-			case ArcTorch(tcpConnector, controlPort, stickoutMm):
-				if (!(stickoutMm > 0)) throw 'Arc torch on "$designation" needs a positive stickout';
-				connector(tcpConnector);
-				port(controlPort);
-			case WeldingSupply(processes, maxCurrentA, _, efficiency):
-				if (processes == null || processes.length == 0 || !(maxCurrentA > 0))
-					throw 'Welding supply on "$designation" needs a process and a positive rated current';
-				if (!(efficiency > 0 && efficiency <= 1))
-					throw 'Welding supply on "$designation" needs an efficiency in (0, 1]';
-			case WireFeed(wireDiameterMm, maxSpeedMPerMin, depositionEfficiency):
-				if (!(wireDiameterMm > 0) || !(maxSpeedMPerMin > 0))
-					throw 'Wire feed on "$designation" needs a positive wire diameter and speed';
-				if (!(depositionEfficiency > 0 && depositionEfficiency <= 1))
-					throw 'Wire feed on "$designation" needs a deposition efficiency in (0, 1]';
-			case WorkReturn(leadPort, contactConnector): port(leadPort); connector(contactConnector);
-			case PlanarScanner(scanConnector, rayCount, maxRangeMeters, rateHz):
-				connector(scanConnector);
-				if (rayCount < 2 || !(maxRangeMeters > 0) || !(rateHz > 0))
-					throw 'Planar scanner on "$designation" needs rays, a range and a rate';
-		}
-		capabilityList.push(capability);
+	function addFacet(facet:ComponentFacet):Void {
+		if (facet == null) throw 'Null facet on "$designation"';
+		facet.check(this);
+		if (Std.isOfType(facet, CouplingFacet) && coupling() != null) throw 'Duplicate coupling capability on "$designation"';
+		facetList.push(facet);
 	}
 
 	public final designation:String;

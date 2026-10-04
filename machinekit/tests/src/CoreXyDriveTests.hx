@@ -22,7 +22,7 @@ class CoreXyDriveTests {
 			scene.assemblyState).model;
 		var plotter = new CoreXyPlotter();
 		var beltDescription = plotter.describe();
-		var atUpper = machinekit.assembly.FrozenAssemblyDefinitions.thaw(beltDescription.mechanical);
+		var atUpper = plotter.definition();
 		for (joint in atUpper.joints) if (joint.id == "y") {
 			joint.limits.lower = null; joint.limits.upper = joint.defaultValue;
 		}

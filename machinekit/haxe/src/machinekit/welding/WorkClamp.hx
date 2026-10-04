@@ -36,7 +36,7 @@ class WorkClamp extends MachineComponent {
 		this.height = height;
 		addConnector("contact", Mount, Solids.axial(0, 0, 0));
 		addPort({name: "lead", kind: ElectricalPower, role: Consumer, iface: WeldingInterfaces.weldCable(), required: true});
-		addCapability(WorkReturn("lead", "contact"));
+		addFacet(new WorkReturnFacet("lead", "contact"));
 		declareMass(2.4, new Vector(0, 0, 0.4 * height));
 	}
 

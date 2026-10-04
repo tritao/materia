@@ -12,6 +12,8 @@ import machinekit.component.PortInterface;
 import machinekit.component.PortKind;
 import machinekit.component.PortRole;
 import machinekit.component.Solids;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ComponentType;
 
 typedef SchmalzSxtToolSpec = {
 	var designation:String;
@@ -59,18 +61,24 @@ class SchmalzSxtTool extends MachineComponent {
 				iface: Thread(row.outsideThread), required: false});
 			addBridge('airIn$i', 'airOut$i');
 		}
-		addCapability(Coupling('schmalz:sxt:${spec.nominalPipeDiameterMm}:${spec.channels}', "master"));
+		addFacet(new machinekit.component.CouplingFacet('schmalz:sxt:${spec.nominalPipeDiameterMm}:${spec.channels}', "master"));
 		var r = row.envelopeDiameterMm / 2, z = row.lengthMm, m = row.massKg;
 		var transverse = m * (3 * r * r + z * z) / 12;
 		declareMass(m, new Vector(0, 0, z / 2),
 			new InertiaTensor(transverse, 0, 0, transverse, 0, m * r * r / 2));
 	}
 
-	public static function recipeType():machinekit.component.ComponentType
-		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.robotics.schmalz-sxt-tool");
+	static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.robotics.schmalz-sxt-tool",
+			[ComponentRecipeSupport.catalog("designation", SchmalzSxtTool.catalog(), "10.07.13.00018")],
+			v -> new SchmalzSxtTool(v.token("designation")), true);
+		return recipeTypeCache;
+	}
 
 	/** Subclasses must declare their own recipe and saved values. */
-	override public function componentType():Null<machinekit.component.ComponentType>
+	override public function componentType():Null<ComponentType>
 		return Std.isExactType(this, SchmalzSxtTool) ? recipeType() : null;
 
 	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues().setToken("designation", spec.designation).setToken("material", materialSpec());

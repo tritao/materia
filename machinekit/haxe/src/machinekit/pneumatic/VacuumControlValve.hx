@@ -7,6 +7,8 @@ import machinekit.component.PortInterface;
 import machinekit.component.PortKind;
 import machinekit.component.PortRole;
 import machinekit.component.Solids;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ComponentType;
 
 /** Generic normally closed valve in a vacuum line, commanded by a signal. */
 class VacuumControlValve extends MachineComponent {
@@ -24,14 +26,19 @@ class VacuumControlValve extends MachineComponent {
 		addBridge("vacuumIn", "vacuumOut");
 		addPort({name: "control", kind: Signal, role: Consumer,
 			iface: Plug("digital-valve", 2), required: true});
-		addCapability(VacuumValve("control"));
+		addFacet(new VacuumValveFacet("control"));
 	}
 
-	public static function recipeType():machinekit.component.ComponentType
-		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.pneumatic.vacuum-control-valve");
+	static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.pneumatic.vacuum-control-valve", [ComponentRecipeSupport.length("tubeOdMm", 4)],
+			v -> new VacuumControlValve(v.number("tubeOdMm")), true);
+		return recipeTypeCache;
+	}
 
 	/** Subclasses must declare their own recipe and saved values. */
-	override public function componentType():Null<machinekit.component.ComponentType>
+	override public function componentType():Null<ComponentType>
 		return Std.isExactType(this, VacuumControlValve) ? recipeType() : null;
 
 	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues().setNumber("tubeOdMm", switch port("vacuumIn").iface { case PushIn(d): d; case _: 0; }).setToken("material", materialSpec());

@@ -4,7 +4,10 @@ import cadkit.modeling.AssemblyState;
 import cadkit.modeling.Vector;
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.Diagnostics;
-import machinekit.assembly.MachineAssemblyDescription;
+import haxeon.wire.JsonWire;
+import machinekit.assembly.MachineAssemblyCodec;
+import machinekit.component.ComponentRegistry;
+import machinekit.robotics.EndEffectorDescription;
 import machinekit.assembly.MachineAssembly.MachineAssemblyMassProperties;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
@@ -29,27 +32,36 @@ class EndEffector extends MachineAssembly {
 
 	public function new() super();
 
-	override public function describe():MachineAssemblyDescription {
-		var description = super.describe();
-		description.machine.endEffector = {mount: mountRef == null ? null :
+	public function describeEndEffector():EndEffectorDescription
+		return {assembly: describe(), endEffector: {mount: mountRef == null ? null :
 			{instanceId: mountRef.instanceId, connectorName: mountRef.connectorName},
 			frames: [for (frame in frames) {name: frame.name, instanceId: frame.instanceId,
 				connectorName: frame.connectorName}], primaryFrame: primaryFrame,
-			collisionExclusions: [for (member in components()) if (collisionExclusions.exists(member.id)) member.id]};
-		return description;
+			collisionExclusions: [for (member in components()) if (collisionExclusions.exists(member.id)) member.id]}};
+
+	override public function encode():String {
+		var description = describeEndEffector();
+		MachineAssemblyCodec.encode(description.assembly);
+		return JsonWire.encode(description);
 	}
 
-	public static function fromDescription(description:MachineAssemblyDescription):EndEffector {
-		var saved = description.machine.endEffector;
-		if (saved == null) throw "Description has no end-effector data";
-		var base = MachineAssembly.fromDescription(description);
+	public static function decode(text:String, ?registry:ComponentRegistry):EndEffector {
+		var description:EndEffectorDescription = JsonWire.decode(text);
+		return fromDescription(description, registry);
+	}
+
+	public static function fromDescription(description:EndEffectorDescription, ?registry:ComponentRegistry):EndEffector {
 		var result = new EndEffector();
-		base.copyInto(result);
-		if (saved.mount != null) result.mount(saved.mount.instanceId, saved.mount.connectorName);
-		for (frame in saved.frames) result.workingFrame(frame.name, frame.instanceId,
-			frame.connectorName, frame.name == saved.primaryFrame);
-		for (id in saved.collisionExclusions) result.excludeFromCollision(id);
+		MachineAssembly.fromDescription(description.assembly, registry).copyInto(result);
+		result.readEndEffector(description.endEffector);
 		return result;
+	}
+
+	function readEndEffector(saved:EndEffectorRecord):Void {
+		if (saved.mount != null) mount(saved.mount.instanceId, saved.mount.connectorName);
+		for (frame in saved.frames) workingFrame(frame.name, frame.instanceId,
+			frame.connectorName, frame.name == saved.primaryFrame);
+		for (id in saved.collisionExclusions) excludeFromCollision(id);
 	}
 
 	/** Own a stable builder snapshot when a changer accepts this tool. */

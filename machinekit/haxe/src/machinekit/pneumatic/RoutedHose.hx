@@ -7,6 +7,8 @@ import machinekit.component.ComponentDetail;
 import machinekit.component.MachineComponent;
 import machinekit.component.PortKind;
 import machinekit.component.Solids;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ComponentType;
 
 /** One cut hose with an authored centreline in its member frame (millimetres).
  * The solid envelope follows the route; mass follows centreline length. */
@@ -87,15 +89,25 @@ class RoutedHose extends MachineComponent {
 		declareMass(mass, new Vector(weightedX, weightedY, weightedZ), tensor);
 	}
 
-	public static function recipeType():machinekit.component.ComponentType
-		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.pneumatic.routed-hose");
+	static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.pneumatic.routed-hose", [ComponentRecipeSupport.text("designation", "HOSE"), ComponentRecipeSupport.text("route", ComponentRecipeSupport.defaultRoute()),
+			ComponentRecipeSupport.length("outerDiameterMm", 4), ComponentRecipeSupport.length("innerDiameterMm", 2), ComponentRecipeSupport.scalar("massPerMetreKg", 0.01),
+			ComponentRecipeSupport.choice("service", ["Vacuum", "Pneumatic"], "Vacuum")],
+			v -> new RoutedHose(v.token("designation"), ComponentRecipeSupport.route(v.token("route")),
+				v.number("outerDiameterMm"), v.number("innerDiameterMm"), v.number("massPerMetreKg"),
+				v.token("service") == "Vacuum" ? machinekit.component.PortKind.Vacuum : machinekit.component.PortKind.Pneumatic,
+				"polyurethane PU", false), true, false, ["route"]);
+		return recipeTypeCache;
+	}
 
 	/** Subclasses must declare their own recipe and saved values. */
-	override public function componentType():Null<machinekit.component.ComponentType>
+	override public function componentType():Null<ComponentType>
 		return Std.isExactType(this, RoutedHose) ? recipeType() : null;
 
 	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues().setToken("designation", designation)
-			.setToken("route", machinekit.component.MachineKitAdditionalRecipes.routeText(route))
+			.setToken("route", ComponentRecipeSupport.routeText(route))
 			.setNumber("outerDiameterMm", outerDiameterMm).setNumber("innerDiameterMm", innerDiameterMm)
 			.setNumber("massPerMetreKg", massPerMetreKg).setToken("service", Std.string(serviceKind)).setToken("material", materialSpec());
 

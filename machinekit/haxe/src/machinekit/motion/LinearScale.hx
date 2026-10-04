@@ -8,6 +8,8 @@ import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 import materia.assembly.AssemblyDefinition.AssemblyEncoder;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ComponentType;
 
 /**
  * A linear scale laid along a rail, read by a head on the carriage: `countsPerMillimetre` counts a
@@ -38,10 +40,17 @@ class LinearScale extends MachineComponent implements EncoderPart {
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
   }
 
-  public static function recipeType():machinekit.component.ComponentType
-    return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.motion.linear-scale");
+  static var recipeTypeCache:Null<ComponentType>;
 
-  override public function componentType():Null<machinekit.component.ComponentType>
+  public static function recipeType():ComponentType {
+    if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.motion.linear-scale", [ComponentRecipeSupport.length("length", 300), ComponentRecipeSupport.scalar("countsPerMillimetre", 200),
+      ComponentRecipeSupport.flag("absolute", false), ComponentRecipeSupport.flag("index", true)],
+      v -> new LinearScale(v.number("length"), v.number("countsPerMillimetre"), v.boolean("absolute"),
+      	v.boolean("index")), true);
+    return recipeTypeCache;
+  }
+
+  override public function componentType():Null<ComponentType>
     return Std.isExactType(this, LinearScale) ? recipeType() : null;
 
   override public function values():machinekit.component.ComponentValues

@@ -1,7 +1,8 @@
 package cadbridge;
 
 import cadkit.modeling.AssemblyState;
-import machinekit.component.ComponentCapability;
+import machinekit.pneumatic.SuctionFacet;
+import machinekit.pneumatic.VacuumSourceFacet;
 import machinekit.robotics.EndEffector;
 import machinekit.robotics.EndEffectorFrames;
 import materia.assembly.AssemblyFrames;
@@ -26,30 +27,28 @@ class SuctionCapacityBridge {
     var contactConnector = "contact";
     for (member in effector.components()) if (member.id == cupInstanceId) {
       found = true;
-      for (capability in member.component.capabilities()) switch capability {
-        case Suction(area, moment, port, contact):
-          suction = true;
-          effectiveArea = area;
-          ratedMoment = moment;
-          vacuumPort = port;
-          contactConnector = contact;
-        case _:
+      var cup = SuctionFacet.of(member.component);
+      if (cup != null) {
+        suction = true;
+        effectiveArea = cup.effectiveAreaMm2;
+        ratedMoment = cup.ratedMomentNm;
+        vacuumPort = cup.vacuumPort;
+        contactConnector = cup.contactConnector;
       }
     }
     if (!found) throw 'Unknown suction cup "$cupInstanceId"';
     if (!suction) throw 'Member "$cupInstanceId" is not a suction cup';
     if (effectiveArea == null) throw 'Suction cup "$cupInstanceId" has no effective sealed area';
     var chain = effector.upstreamChain(cupInstanceId, vacuumPort);
-    for (member in effector.components()) for (capability in member.component.capabilities())
-      switch capability {
-        case VacuumSource(rating, outputPort):
-          if (chain.indexOf('${member.id}/$outputPort') >= 0) {
-            if (rating == null) throw 'Vacuum generator "${member.id}" has no pressure rating';
-            if (minimumCupVacuumKpa > rating + 1e-9)
-              throw 'Cup vacuum exceeds generator "${member.id}" rating';
-          }
-        case _:
+    for (member in effector.components()) {
+      var source = VacuumSourceFacet.of(member.component);
+      if (source != null && chain.indexOf('${member.id}/${source.outputPort}') >= 0) {
+        var rating = source.ratedVacuumKpa;
+        if (rating == null) throw 'Vacuum generator "${member.id}" has no pressure rating';
+        if (minimumCupVacuumKpa > rating + 1e-9)
+          throw 'Cup vacuum exceeds generator "${member.id}" rating';
       }
+    }
     var solved = effector.solve(state);
     var memberPose = solved.poses.get(cupInstanceId);
     if (memberPose == null) throw 'Missing solved pose for "$cupInstanceId"';

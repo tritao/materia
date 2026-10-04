@@ -1,7 +1,10 @@
-package machinekit.robotics;
+package machinekit.robot;
 
 import machinekit.component.PortKind;
 import machinekit.component.PortRole;
+import machinekit.robotics.ChangerLockFacet;
+import machinekit.robotics.EndEffector;
+import machinekit.robotics.GripFacet;
 
 /** One digital control of an end effector: the channel that works it and the inlet it drives. */
 enum EndEffectorControl {
@@ -31,7 +34,7 @@ typedef ArcTorchControl = {
 };
 
 /**
- * What it takes to run an end effector, read from the capabilities its parts declare: the digital
+ * What it takes to run an end effector, read from the facets its parts declare: the digital
  * controls that work its gripper, vacuum and changer lock, each on a channel named
  * `<prefix>/<member>.<action>`; the vacuum pressure sensor, if it has one, as
  * `<prefix>/<member>.<signal port>`; where its suction cups touch; and its arc torches, each with
@@ -74,52 +77,55 @@ class EndEffectorControls {
 		var sensorId:Null<String> = null;
 		var hasGripper = false, hasVacuum = false, hasLock = false;
 		var hasExplicitVacuumValve = false;
-		for (member in configuration.components()) for (intent in member.component.capabilities())
-			switch intent {
-				case VacuumValve(_): hasExplicitVacuumValve = true;
-				case _:
-			}
-		for (member in configuration.components()) for (intent in member.component.capabilities()) {
+		for (member in configuration.components()) if (machinekit.pneumatic.VacuumValveFacet.of(member.component) != null)
+			hasExplicitVacuumValve = true;
+		for (member in configuration.components()) for (facet in member.component.facets()) {
 			var name = '$prefix/${member.id}';
-			switch intent {
-				case Grip(_, _, openPort, closePort):
-					if (hasGripper || openPort == closePort) throw "Ambiguous gripper runtime ports";
-					requireInlet(configuration, member.id, openPort, [PortKind.Pneumatic, PortKind.Signal]);
-					requireInlet(configuration, member.id, closePort, [PortKind.Pneumatic, PortKind.Signal]);
-					controls.push(Gripper('$name.close', member.id, openPort, closePort));
-					hasGripper = true;
-				case VacuumActuator(inletPort):
-					if (hasExplicitVacuumValve) continue;
-					if (hasVacuum) throw "Ambiguous vacuum runtime ports";
-					requireInlet(configuration, member.id, inletPort, [PortKind.Pneumatic, PortKind.Signal]);
-					controls.push(Vacuum('$name.enable', member.id, inletPort));
-					hasVacuum = true;
-				case VacuumValve(controlPort):
-					if (hasVacuum) throw "Ambiguous vacuum runtime ports";
-					requireInlet(configuration, member.id, controlPort, [PortKind.Signal]);
-					controls.push(Vacuum('$name.enable', member.id, controlPort));
-					hasVacuum = true;
-				case ChangerLock(inletPort):
-					if (hasLock) throw "Ambiguous changer-lock runtime ports";
-					requireInlet(configuration, member.id, inletPort, [PortKind.Pneumatic]);
-					controls.push(Lock('$name.lock', member.id, inletPort));
-					hasLock = true;
-				case VacuumPressureSensor(vacuumPort, signalPort):
-					if (sensorId != null) throw "Ambiguous vacuum pressure sensors";
-					requireInlet(configuration, member.id, vacuumPort, [PortKind.Vacuum]);
-					var signal = member.component.port(signalPort);
-					if (signal.role != PortRole.Supply || signal.kind != PortKind.Signal)
-						throw 'Pressure sensor "$name" needs a signal supply';
-					sensorId = '$name.$signalPort';
-				case Suction(_, _, _, contactConnector):
-					suctions.push({member: member.id, connector: contactConnector});
-				case ArcTorch(tcpConnector, controlPort, stickoutMm):
-					requireInlet(configuration, member.id, controlPort, [PortKind.Signal]);
-					if (arcs.length > 0) throw "Ambiguous arc torch runtime ports";
-					controls.push(Arc('$name.arc', member.id, controlPort));
-					arcs.push({member: member.id, channel: '$name.arc', wireSpeedChannel: '$name.wire_speed',
-						voltageChannel: '$name.voltage', sensor: '$name.weld', controlPort: controlPort, tcpConnector: tcpConnector, stickoutMm: stickoutMm});
-				case _:
+			if (Std.isOfType(facet, GripFacet)) {
+				var grip:GripFacet = cast facet;
+				if (hasGripper || grip.openPort == grip.closePort) throw "Ambiguous gripper runtime ports";
+				requireInlet(configuration, member.id, grip.openPort, [PortKind.Pneumatic, PortKind.Signal]);
+				requireInlet(configuration, member.id, grip.closePort, [PortKind.Pneumatic, PortKind.Signal]);
+				controls.push(Gripper('$name.close', member.id, grip.openPort, grip.closePort));
+				hasGripper = true;
+			} else if (Std.isOfType(facet, machinekit.pneumatic.VacuumActuatorFacet)) {
+				var actuator:machinekit.pneumatic.VacuumActuatorFacet = cast facet;
+				if (hasExplicitVacuumValve) continue;
+				if (hasVacuum) throw "Ambiguous vacuum runtime ports";
+				requireInlet(configuration, member.id, actuator.inletPort, [PortKind.Pneumatic, PortKind.Signal]);
+				controls.push(Vacuum('$name.enable', member.id, actuator.inletPort));
+				hasVacuum = true;
+			} else if (Std.isOfType(facet, machinekit.pneumatic.VacuumValveFacet)) {
+				var valve:machinekit.pneumatic.VacuumValveFacet = cast facet;
+				if (hasVacuum) throw "Ambiguous vacuum runtime ports";
+				requireInlet(configuration, member.id, valve.controlPort, [PortKind.Signal]);
+				controls.push(Vacuum('$name.enable', member.id, valve.controlPort));
+				hasVacuum = true;
+			} else if (Std.isOfType(facet, ChangerLockFacet)) {
+				var lock:ChangerLockFacet = cast facet;
+				if (hasLock) throw "Ambiguous changer-lock runtime ports";
+				requireInlet(configuration, member.id, lock.inletPort, [PortKind.Pneumatic]);
+				controls.push(Lock('$name.lock', member.id, lock.inletPort));
+				hasLock = true;
+			} else if (Std.isOfType(facet, machinekit.pneumatic.VacuumPressureSensorFacet)) {
+				var sensor:machinekit.pneumatic.VacuumPressureSensorFacet = cast facet;
+				if (sensorId != null) throw "Ambiguous vacuum pressure sensors";
+				requireInlet(configuration, member.id, sensor.vacuumPort, [PortKind.Vacuum]);
+				var signal = member.component.port(sensor.signalPort);
+				if (signal.role != PortRole.Supply || signal.kind != PortKind.Signal)
+					throw 'Pressure sensor "$name" needs a signal supply';
+				sensorId = '$name.${sensor.signalPort}';
+			} else if (Std.isOfType(facet, machinekit.pneumatic.SuctionFacet)) {
+				var suction:machinekit.pneumatic.SuctionFacet = cast facet;
+				suctions.push({member: member.id, connector: suction.contactConnector});
+			} else if (Std.isOfType(facet, machinekit.welding.ArcTorchFacet)) {
+				var torch:machinekit.welding.ArcTorchFacet = cast facet;
+				requireInlet(configuration, member.id, torch.controlPort, [PortKind.Signal]);
+				if (arcs.length > 0) throw "Ambiguous arc torch runtime ports";
+				controls.push(Arc('$name.arc', member.id, torch.controlPort));
+				arcs.push({member: member.id, channel: '$name.arc', wireSpeedChannel: '$name.wire_speed',
+					voltageChannel: '$name.voltage', sensor: '$name.weld', controlPort: torch.controlPort,
+					tcpConnector: torch.tcpConnector, stickoutMm: torch.stickoutMm});
 			}
 		}
 		if (sensorId != null && !hasVacuum) throw "Vacuum pressure sensor has no bound vacuum actuator";

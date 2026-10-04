@@ -56,7 +56,7 @@ Schmalz ejector, SAF 40 cup, push-in fitting and hose, with an inline
 `tool/...` and mates its plate to the flange's pilot boss. The assembly exposes
 the cup's `toolContact` connector and the ejector's `compressedAir` inlet.
 
-The tool's capabilities say how it is worked: `AssemblyPreview.robotTools` derives the scene's
+The tool's facets say how it is worked: `RobotScene.robotTools` (in `machinekit/robot`) derives the scene's
 `robotTools` from them (the cup's contact, the ejector's vacuum channel, the sensor's pressure
 signal), so the simulation, the skills and a real controller name the same channels.
 
