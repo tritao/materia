@@ -74,6 +74,7 @@ public:
 
     std::optional<DeviceInputObservation6> input_observation(std::string_view switch_id) const;
 
+    rk_result device_input(const char *, rk_device_input_observation &) const override;
     rk_result apply(const rk_robot_command &command) override;
     rk_result sample(std::uint64_t timestamp_ns, rk_robot_state &state) override;
     bool reports_safety_state() const noexcept override { return true; }

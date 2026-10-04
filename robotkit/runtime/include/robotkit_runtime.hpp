@@ -123,6 +123,9 @@ public:
     virtual rk_result sample(uint64_t timestamp_ns, rk_robot_state &state) = 0;
 
     /** Returns true when sample() supplies the endpoint's observed safety state. */
+    virtual rk_result device_input(const char *, rk_device_input_observation &) const {
+        return RK_ERROR_UNSUPPORTED;
+    }
     virtual bool reports_safety_state() const noexcept { return false; }
     /** Atomically shift motor counter origins without changing physical targets or poses.
      * Implementations must validate the complete batch before modifying any motor. */
@@ -220,6 +223,7 @@ public:
     rk_result submit_plan(const PlanRequest &plan);
     rk_result require_reference(uint32_t joint, bool required);
     rk_result limit_input(uint32_t joint, bool active);
+    rk_result device_input(const char *switch_id, rk_device_input_observation &out) const;
     /** Atomically establish logical = endpoint position + offset at rest. */
     rk_result calibrate_coordinates(const double *offsets, uint32_t count,
                                    const uint32_t *reference_joints = nullptr, uint32_t reference_count = 0);

@@ -16,6 +16,17 @@ class NativeRuntimeEndpoint implements RuntimeEndpoint {
     if (closed) throw "Runtime endpoint is closed";
     return owner.borrow();
   }
+  /** Read a copied input observation; no fabricated edge is returned without device state. */
+  public function deviceInput(switchId:String):Null<DeviceInputReading> {
+    if (switchId == null || switchId.length == 0) throw "Device input requires a switch ID";
+    var result = RobotKitRuntime.rk_robot_runtime_device_input(nativeHandle(), switchId);
+    if (result.status == RobotKitRuntime.RK_ERROR_STALE_STATE) return null;
+    RobotRuntime.check(result.status, "deviceInput");
+    var input = result.out_observation;
+    return new DeviceInputReading(input.get_active() != 0, input.get_source_timestamp_ns(),
+      input.get_closing_count(), input.get_opening_count(), input.get_captured_steps(),
+      input.get_captured_timestamp_ns(), input.get_captured_position());
+  }
   public function start():Int return RobotKitRuntime.rk_robot_runtime_start(nativeHandle());
   public function submit(command:rk_robot_command):Int
     return RobotKitRuntime.rk_robot_runtime_submit(nativeHandle(), command);

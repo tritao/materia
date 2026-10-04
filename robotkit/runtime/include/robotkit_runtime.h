@@ -757,6 +757,21 @@ typedef struct rk_serial_device_desc {
     uint8_t input_switch_ids[64 * 64]; /**< NUL-terminated model switch IDs. */
 } rk_serial_device_desc;
 
+/** Copy of a physical switch observation in the endpoint's source clock. */
+typedef struct rk_device_input_observation {
+    uint32_t struct_size RK_STRUCT_SIZE;
+    uint32_t active;
+    uint64_t source_timestamp_ns;
+    uint64_t closing_count;
+    uint64_t opening_count;
+    int64_t captured_steps;
+    uint64_t captured_timestamp_ns;
+    double captured_position; /**< Captured steps converted to the monitored leader SI coordinate. */
+} rk_device_input_observation;
+
+RK_API rk_result RK_CALL rk_robot_runtime_device_input(rk_robot_runtime runtime,
+    const char *switch_id RK_UTF8, rk_device_input_observation *out_observation RK_OUT);
+
 /** The unique id of a controller board. */
 typedef struct rk_controller_id {
     uint8_t bytes[16];

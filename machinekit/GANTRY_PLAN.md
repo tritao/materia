@@ -2557,3 +2557,20 @@ No native/Haxe build or test ran; generated FFI bindings are refreshed through
 the normal package build at the Phase C gate. Virtual-device input configuration,
 runtime switch publication, homing segment purpose and physical side hold/zero/
 squaring control remain pending. This is not evidence of device homing completion.
+
+### G13 — runtime-owned device input query
+
+Added a copied device-input observation ABI and endpoint query under the runtime
+owner mutex, avoiding races with serial state ingestion. RKD6 observations carry
+active level, closure/opening counters, raw captured steps and source/capture
+timestamps in the same endpoint clock used by joint snapshots. Captured steps
+are also converted through the declared actuator steps-per-unit and transmission
+into leader SI coordinates; future captures are rejected. NativeRuntimeEndpoint
+exposes the copied reading to Haxe without inventing an observation when state
+is missing. Generic endpoints return unsupported.
+
+No builds/tests ran. FFI generation and compilation remain for the Phase C gate.
+This query is a publication prerequisite, not publication itself: a device switch
+sensor adapter must still retain sequence/freshness and account for reference
+rebasing before publishing JointSwitchFrame. Virtual wrapper forwarding/config,
+device homing controls and hardware GPIO remain pending.

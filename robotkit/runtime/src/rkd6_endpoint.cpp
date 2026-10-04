@@ -1035,3 +1035,30 @@ std::optional<DeviceInputObservation6> Rkd6Endpoint::input_observation(std::stri
     return std::nullopt;
 }
 } // namespace robotkit
+
+namespace robotkit {
+rk_result Rkd6Endpoint::device_input(const char *switch_id, rk_device_input_observation &out) const {
+    if (!switch_id || !*switch_id) return RK_ERROR_INVALID_ARGUMENT;
+    const auto observed = input_observation(switch_id);
+    if (!observed) return RK_ERROR_STALE_STATE;
+    if (observed->capture.captured_ticks > observed->timestamp_ticks) return RK_ERROR_STALE_STATE;
+    for (const auto &input : input_layout_) {
+        if (input.switch_id != switch_id) continue;
+        const auto actuator = input.actuator;
+        const auto mapping = layout_.empty() ? DeviceActuator6{actuator} : layout_[actuator];
+        out = {};
+        out.struct_size = sizeof(out);
+        out.active = observed->active;
+        // Match sample()'s endpoint source clock, rather than substituting receive time.
+        out.source_timestamp_ns = static_cast<std::uint64_t>(observed->timestamp_ticks * (1e9 / ack_.device_tick_hz));
+        out.closing_count = observed->capture.closing_count;
+        out.opening_count = observed->capture.opening_count;
+        out.captured_steps = observed->capture.captured_steps;
+        out.captured_timestamp_ns = static_cast<std::uint64_t>(observed->capture.captured_ticks * (1e9 / ack_.device_tick_hz));
+        out.captured_position = static_cast<double>(out.captured_steps) / mapping.steps_per_unit /
+            mapping.ratio + mapping.offset;
+        return std::isfinite(out.captured_position) ? RK_OK : RK_ERROR_BACKEND;
+    }
+    return RK_ERROR_INVALID_ARGUMENT;
+}
+}

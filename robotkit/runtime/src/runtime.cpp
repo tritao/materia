@@ -2393,3 +2393,11 @@ void RobotRuntime::reset_state() noexcept {
 }
 
 } // namespace robotkit
+
+namespace robotkit {
+rk_result RobotRuntime::device_input(const char *switch_id, rk_device_input_observation &out) const {
+    if (!switch_id || !*switch_id) return RK_ERROR_INVALID_ARGUMENT;
+    std::lock_guard owner_lock(owner_mutex_);
+    return endpoint_ ? endpoint_->device_input(switch_id, out) : RK_ERROR_BACKEND;
+}
+}
