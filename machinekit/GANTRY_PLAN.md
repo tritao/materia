@@ -1458,3 +1458,20 @@ acceleration-duration and limit-hit fault handling remain in place.
 Direct velocity targets have no homing-purpose transport yet and retain soft
 bounds. Native coordinate calibration, latch, driver and startup integration
 remain pending. No tests or builds ran; stopping behavior is unverified.
+
+
+### G11 — carry closing-edge captures in switch sensor frames
+
+Purpose-aware queued stop ramps: `950cfb8a6`. SwitchReading now retains its
+latest closing edge separately from the latest edge, which may be a release.
+Simulation publishes digital state, capture-valid bit, closing-edge position
+and closing-edge count in immutable joint_switch SensorFrames. Their existing
+sequence/timestamp/source-clock metadata remains available to the homing
+observation driver. JointSwitchFrame validates and decodes that payload;
+legacy one-value digital frames remain supported without an edge capture.
+Capture positions use the source joint coordinate and require the eventual
+counter/calibration transformation in the driver. This is simulated capture
+metadata, not proof of firmware input capture (G13 remains pending).
+
+Homing observation freshness and edge-count advancement must still be enforced
+by the runtime driver. No tests or builds ran; runtime behavior is unverified.

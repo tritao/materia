@@ -8,6 +8,8 @@ class SwitchReading {
   /** Exact mechanical edge coordinate; null until an edge is observed. */
   public var edgePosition(default, null):Null<Float> = null;
   public var closingEdges(default, null):Int = 0;
+  /** Latest closing edge, retained separately from the release edge. */
+  public var closingEdgePosition(default, null):Null<Float> = null;
   var state:Int;
   var variation:Float;
   var rearm:Bool = false;
@@ -33,6 +35,7 @@ class SwitchReading {
     if (!active && distance >= variation) {
       active = true; changed = true; closingEdges++;
       edgePosition = source.trip + source.side * variation;
+      closingEdgePosition = edgePosition;
     } else if (active && distance < variation - source.hysteresis) {
       active = false; changed = true; rearm = true;
       edgePosition = source.trip + source.side * (variation - source.hysteresis);

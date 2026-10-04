@@ -459,7 +459,10 @@ class RobotRuntime {
       case "gnss_pose":
         if (image != null || values.length != 3)
           throw 'GNSS "$sensorId" publication requires latitude, longitude, and yaw';
-      case "tool_contact", "joint_switch":
+      case "joint_switch":
+        if (image != null || !JointSwitchFrame.valid(values))
+          throw 'Switch "$sensorId" publication requires digital state and optional closing-edge capture';
+      case "tool_contact":
         if (image != null || values.length != 1 || (values[0] != 0.0 && values[0] != 1.0))
           throw 'Digital sensor "$sensorId" publication requires one zero-or-one value';
       case "tool_vacuum_kpa":

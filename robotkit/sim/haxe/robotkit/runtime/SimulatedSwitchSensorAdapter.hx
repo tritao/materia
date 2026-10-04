@@ -56,7 +56,9 @@ class SimulatedSwitchSensorAdapter implements SimulationStepObserver {
     for (i in 0...readings.length) {
       var value = readings[i];
       var active = value.sample(positions[joints[i]]);
-      runtime.publishSensorFrame(value.source.id, [active ? 1.0 : 0.0], sequence,
+      var edge = value.closingEdgePosition;
+      runtime.publishSensorFrame(value.source.id,
+        [active ? 1.0 : 0.0, edge == null ? 0.0 : 1.0, edge == null ? 0.0 : edge, value.closingEdges], sequence,
         sourceTimestampNs, clockId, null);
     }
   }
