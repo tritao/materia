@@ -3480,3 +3480,55 @@ normal/overtravel clearance gate. The independent app gate remains active.
 Compiler-only passed for the sideways sensors and bored bracket routes (1044
 sources). The normal/overtravel geometry gate is running on the redesigned
 layout. App fault-recovery fixtures remain in progress.
+
+The sideways-layout sweep reached the positive X corner. Screw/belt X fixtures
+cleared the carriage but crossed the taller Z motor; their route now includes
+the actual Z motor and mounting-plate envelope. Rack passed the ordinary corners
+then hit CAD state's soft-limit guard. The geometry fixture now deep-copies the
+definition and expands only its bounds by declared overtravel, so FK can reach
+those guide ends without altering exported/runtime soft limits. Compilation and
+the next sweep are pending.
+
+
+### Phase C — consume the full physical moving and controller envelopes
+
+The private CAD fixture compiled and reached guide-overtravel corners. It found
+flange/front-frame contact, right belt motor/beam-foot contacts, and X fixtures
+crossing belt clamps or rack motor plates. Frame clearance now includes the
+flange rim. Right belt planes mirror with their motors, keeping local travel
+direction unchanged. X fixture routing uses all carried descendants (including
+Z guide allowance) and fixed X motor/plate bounds, rather than a hand-picked
+carriage subset. Compilation and the next mechanical sweep are pending.
+
+The full app gate completed its welder fixtures and device router home, then
+failed the ordinary MuJoCo router rebuild: controller rate planning called full
+DeviceBinding without deployment inputs. Controller planning now uses the same
+actuator-rate binding core but returns a model copy without claiming GPIO wiring.
+Full device binding still requires every switch input explicitly. The CNC player
+retains the model's switches for host-simulated homing. This fix awaits app and
+RobotKit compilation and the remaining phase gate.
+
+The latest geometry compiled (1044 sources). All three drives reached the
+physical-model check after their ordinary and declared-overtravel corner sweeps
+without interference. Side frame spacing now includes the outboard Z drive,
+belt idler spacing includes the clamp jaw, and X fixture anchors pass below
+the rack motor plate. The physical-model fixture had passed an unresolved
+preview directly to the bridge; it now uses the normal scene artifact encode/
+decode boundary to resolve material density and inertia. This fixture update
+awaits compilation and the remaining gate.
+
+RobotKit (1150 sources) and app (1790 sources) compiled. The router now passes
+controller planning and enters machining, but its screw/axis rotation assertion
+still fails. Restore physical simulation constraints for single-output
+transmissions while retaining independent parallel-drive targets for squaring;
+native rebuild and CTest passed 19/19, including the independent calibration
+regressions. RobotKit then passed the earlier slip assertion and exposed a
+switch fixture with no declared frame. That frame is now explicit; its corrected
+suite is running. Phase C/G13 remains incomplete, with router rotation and the
+remaining physical-model, mass/limits, and phase checks outstanding.
+
+The scene round-trip fixture and corrected switch fixture compiled. The direct
+RobotKit runner initially used the repository root; one existing process-channel
+fixture requires the tests directory. The scratch runner now starts RobotKit
+there, and its suite has reached the remaining scenario checks. The normalized
+MachineKit physical-model sweep is running. No phase completion is claimed.

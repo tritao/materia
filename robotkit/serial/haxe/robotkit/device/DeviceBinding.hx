@@ -75,7 +75,15 @@ class DeviceBinding {
     this.stepTickHz = stepTickHz;
   }
 
-  public static function bind(robot:RobotModel, layout:DeviceLayout, stepTickHz:Int):DeviceBinding {
+  /** Controller rate ceilings for host planning; GPIO deployment is not implied. */
+  public static function planningModel(robot:RobotModel, stepTickHz:Int):RobotModel {
+    var rates = bindActuators(robot, DeviceLayout.forActuators(robot), stepTickHz);
+    rates.model.materializeLimits();
+    return rates.model;
+  }
+
+  static function bindActuators(robot:RobotModel, layout:DeviceLayout, stepTickHz:Int):{
+      model:RobotModel, channels:Array<BoundChannel>, wired:Map<String, Int>} {
     if (robot == null || layout == null) throw "Device binding requires a model and a layout";
     if (stepTickHz <= 0) throw "Device binding requires a positive step tick rate";
     if (layout.channels.length == 0 || layout.channels.length > 64)
@@ -142,6 +150,12 @@ class DeviceBinding {
           Math.abs(a.offset - b.offset) > 1e-12)
         throw "RKD6 skew groups require equal leader-coordinate offsets";
     }
+    return {model: tightened, channels: bound, wired: wired};
+  }
+
+  public static function bind(robot:RobotModel, layout:DeviceLayout, stepTickHz:Int):DeviceBinding {
+    var rates = bindActuators(robot, layout, stepTickHz);
+    var tightened = rates.model, bound = rates.channels, wired = rates.wired;
     var inputs:Array<BoundInput> = [];
     var seen = new Map<String, Bool>();
     if (layout.inputs.length > 64) throw "Device layout supports at most 64 inputs";

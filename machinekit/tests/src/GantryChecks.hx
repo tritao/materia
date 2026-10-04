@@ -10,6 +10,7 @@ import machinekit.transmission.ValueBasis;
 import machinekit.transmission.SpurGear;
 import machinekit.component.ComponentValues;
 import materia.assembly.AssemblyDefinition;
+import materia.assembly.AssemblyDefinitionCodec;
 import materia.assembly.AssemblyFrames;
 import machinekit.motion.NemaStepper;
 import cadkit.modeling.AssemblyState;
@@ -82,7 +83,8 @@ class GantryChecks {
 			"the default racking tolerance has assumption provenance");
 		var exported = gantry.connector("toolFlange");
 		check(exported.instanceId == "flange" && exported.connectorName == "face", "the standard tool flange is exposed");
-		var scene = AssemblyPreview.scene(gantry, "gantry-check");
+		var scene = materia.project.SceneArtifact.decode(materia.project.SceneArtifact.encode(
+			AssemblyPreview.scene(gantry, "gantry-check")));
 		var definition = scene.assemblyDefinition;
 		if (definition == null) throw "Gantry scene has no assembly definition";
 		var state = new AssemblyState(definition);
@@ -91,6 +93,16 @@ class GantryChecks {
 		var expectedRotation = AssemblyFrames.toRotationMatrix(expectedFace);
 		try {
 		for (includeOvertravel in [false, true]) {
+		if (includeOvertravel) {
+			// CAD state enforces soft bounds; consume only the declared guide allowance
+			// in this private geometry fixture. The exported machine is unchanged.
+			var extended = AssemblyDefinitionCodec.decode(AssemblyDefinitionCodec.encode(definition));
+			for (joint in extended.joints) if (joint.limits.overtravel != null) {
+				if (joint.limits.lower != null) joint.limits.lower -= joint.limits.overtravel;
+				if (joint.limits.upper != null) joint.limits.upper += joint.limits.overtravel;
+			}
+			state = new AssemblyState(extended);
+		}
 		var roomX = includeOvertravel ? gantry.axisOvertravel("x") : 0.0;
 		var roomY = includeOvertravel ? gantry.axisOvertravel("y") : 0.0;
 		var roomZ = includeOvertravel ? gantry.axisOvertravel("z") : 0.0;

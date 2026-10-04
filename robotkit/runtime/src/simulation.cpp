@@ -706,14 +706,33 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             binding->actuated_joints_.push_back(source.type != RK_RUNTIME_JOINT_FIXED && !process_joint);
             joints_.push_back(joint);
         }
-        // Kinematic followers receive runtime-projected targets, including slip
-        // and independent home origins. A hard backend coupling would erase
-        // those physical offsets. Servo-driven groups need physical constraints.
+        // Parallel drive shafts need independent targets for squaring. Keep
+        // ordinary single-output transmissions physically constrained so their
+        // load and shaft cannot drift apart while tracking a moving target.
+        std::vector<uint8_t> independent_coupling(blueprint.joint_count, 0);
+        for (uint32_t i = 0; i < blueprint.coupling_count; ++i)
+            for (uint32_t k = 0; k < i; ++k)
+                if (blueprint.couplings[i].leader == blueprint.couplings[k].leader &&
+                    blueprint.couplings[i].follower != blueprint.couplings[k].follower)
+                    independent_coupling[blueprint.couplings[i].leader] = 1;
+        for (uint32_t pass = 0; pass < blueprint.joint_count; ++pass) {
+            bool changed = false;
+            for (uint32_t i = 0; i < blueprint.coupling_count; ++i) {
+                const auto &term = blueprint.couplings[i];
+                if (independent_coupling[term.leader] || independent_coupling[term.follower]) {
+                    changed |= !independent_coupling[term.leader] || !independent_coupling[term.follower];
+                    independent_coupling[term.leader] = independent_coupling[term.follower] = 1;
+                }
+            }
+            if (!changed) break;
+        }
         std::vector<uint8_t> physical_coupling(blueprint.joint_count, 0);
+        for (uint32_t i = 0; i < blueprint.joint_count; ++i)
+            physical_coupling[i] = !independent_coupling[i];
         if (blueprint.struct_size >= offsetof(rk_robot_runtime_blueprint, joint_servo) +
                 sizeof(blueprint.joint_servo))
             for (uint32_t i = 0; i < blueprint.joint_count; ++i)
-                physical_coupling[i] = blueprint.joint_servo[i].stiffness > 0.0;
+                physical_coupling[i] |= blueprint.joint_servo[i].stiffness > 0.0;
         // Multiple-input mechanisms keep their physical summed constraint.
         for (uint32_t i = 0; i < blueprint.coupling_count; ++i)
             for (uint32_t k = 0; k < i; ++k)

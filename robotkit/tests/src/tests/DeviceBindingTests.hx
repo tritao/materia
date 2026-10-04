@@ -155,6 +155,7 @@ class DeviceBindingTests {
     fails(function() DeviceBinding.bind(dual, dualLayout, 40000), "equal leader-coordinate offsets",
       "RKD6 refuses guarded drives with different zeros");
     var switched = axisModel();
+    switched.addFrame(new robotkit.model.Frame("home-frame", switched.links[0]));
     switched.addSwitch(new robotkit.model.JointSwitch("home", "axis", "home-frame", "home", -1, -0.01, 0.0, 0.0));
     var inputLayout = DeviceLayout.decode(Bytes.ofString('{"schemaVersion":1,"channels":[{"index":0,"actuator":"motor"}],"inputs":[{"index":0,"switch_id":"home","actuator":"motor","active_high":false,"pin":"PA0"}]}'));
     var inputBinding = DeviceBinding.bind(switched, inputLayout, 20000);

@@ -51,14 +51,17 @@ class Gantry extends AxisBuilder {
 		var toolReach = Math.max(spec.toolReach, flange.flangeDiameter / 2 + 3 - (guide.blockHeight - guide.railHeight + 4));
 		railMargin = Math.max(Math.max(80, Math.max(frame.size / 2 + 66, 89)), guide.railEndMargin + guide.blockLength / 2 + 20);
 		var guideOvertravel = railMargin - guide.railEndMargin - guide.blockLength / 2;
-		var left = -railMargin - spec.sideExtension - guideOvertravel;
-		var right = spec.travelX + railMargin + spec.sideExtension + guideOvertravel;
+		var zDriveX = 40 + Math.max((NemaStepper.frame(spec.motorFrame).spec.face + 12) / 2, 30) + 12 + 3;
+		var sideRoom = Math.max(railMargin, zDriveX + Math.max((NemaStepper.frame(spec.motorFrame).spec.face + 12) / 2, 30) + frame.size / 2 + 3);
+		var left = -sideRoom - spec.sideExtension - guideOvertravel;
+		var right = spec.travelX + sideRoom + spec.sideExtension + guideOvertravel;
 		// Keep the front crossmember ahead of the full vertical carriage sweep.
 		var columnY = -(beam.size / 2 + frame.height / 2 + 40);
 		var carriageFront = columnY - frame.height / 2 - guide.blockHeight - 8 - toolReach;
 		var switchSpec = machinekit.motion.ProximitySwitch.catalog().get("GENERIC-INDUCTIVE-M8");
 		var sensorFront = columnY - frame.height / 2 - guide.blockHeight - 3 - switchSpec.length - switchSpec.sensingDistance - 6;
-		var front = Math.min(-railMargin, Math.min(carriageFront, sensorFront) - frame.size / 2 - 3 - guideOvertravel) - spec.frontExtension;
+		var flangeFront = columnY - frame.height / 2 - guide.blockHeight - 4 - toolReach - flange.flangeDiameter / 2;
+		var front = Math.min(-railMargin, Math.min(flangeFront, Math.min(carriageFront, sensorFront)) - frame.size / 2 - 3 - guideOvertravel) - spec.frontExtension;
 		var back = spec.travelY + railMargin;
 		var frameZ = spec.travelZ + 350 + spec.frameLift;
 		var endAllowance = Math.max(frame.size / 2, NemaStepper.frame(spec.motorFrame).variant.shaftLength + 6);
@@ -135,7 +138,6 @@ class Gantry extends AxisBuilder {
 		// carriage's upper edge. The screw nut and rack pinion sit 40 mm lower.
 		var zDriveDrop = switch spec.driveZ { case Belt(_, _, _): 0.0; case _: 40.0; };
 		// Leave the corner bracket's 12 mm arm outside the 80 mm carriage.
-		var zDriveX = 40 + Math.max((NemaStepper.frame(spec.motorFrame).spec.face + 12) / 2, 30) + 12 + 3;
 		buildDrive(axes[2], spec.driveZ, "Z", "zColumn", "zCarriage",
 			[zDriveX, zPlateY, xPlateZ - railMargin - zDriveDrop], [0.0, 0, -1]);
 		buildSwitches(axes[1], "YLeft", "frameLeft", "beamFootLeft", 0, -1, alongY);
@@ -222,18 +224,15 @@ class Gantry extends AxisBuilder {
 		var half = 6.0, clearance = 3.0;
 		var path:Array<Array<Float>>;
 		if (suffix == "X") {
-			var rear = carriage.max[1], top = carriage.max[2];
-			switch spec.driveX {
-				case Rack(_, _, _):
-					var motor:NemaStepper = cast component("motorX");
-					var motorPose = zeroPose("motorX");
-					var plate = mountBounds(component("motorXPlate"), zeroPose("motorXPlate"));
-					rear = Math.max(rear, Math.max(plate.max[1], motorPose.y + motor.bodyLength));
-					top = Math.max(top, Math.max(plate.max[2], motorPose.z + motor.variant.bodyFace / 2));
-				case _:
+			var carried = movingBounds(moving);
+			var rear = carried.max[1], top = carried.max[2];
+			// Also clear the fixed X drive where a field bracket passes its motor.
+			for (member in ["motorX", "motorXPlate"]) {
+				var envelope = mountBounds(component(member), zeroPose(member));
+				rear = Math.max(rear, envelope.max[1]); top = Math.max(top, envelope.max[2]);
 			}
 			var rearPost = rear + half + clearance, overhead = top + half + clearance;
-			var baseZ = (host.min[2] + host.max[2]) / 2;
+			var baseZ = host.min[2] + half;
 			path = [[origin[0], host.max[1] - half, baseZ], [origin[0], rearPost, baseZ],
 				[origin[0], rearPost, overhead], [origin[0], origin[1], overhead], origin];
 		} else if (suffix == "Z") {
@@ -263,6 +262,30 @@ class Gantry extends AxisBuilder {
 		}
 		attach(id, new GantryBoredBracket(id, hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2],
 			AssemblyFrames.compose(AssemblyFrames.inverse(pose), sensorPose), diameter + 0.5, sections), pose, fixed);
+	}
+
+	/** All descendants carried by X, including the Z carriage and its guide allowance. */
+	function movingBounds(moving:String):GantryBox {
+		var definition = machinekit.assembly.FrozenAssemblyDefinitions.thaw(describe().mechanical);
+		var lo = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
+		var hi = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
+		for (member in components()) {
+			var cursor = member.id, carried = false, movesZ = false;
+			for (_ in 0...definition.joints.length + 1) {
+				if (cursor == moving) { carried = true; break; }
+				var parent:Null<String> = null;
+				for (joint in definition.joints) if (joint.child == cursor && joint.role == materia.assembly.AssemblyDefinition.AssemblyJointRole.Tree) {
+					parent = joint.parent; if (joint.id == "z") movesZ = true;
+				}
+				if (parent == null) break;
+				cursor = parent;
+			}
+			if (!carried || !member.component.hasGeometry()) continue;
+			var box = mountBounds(member.component, zeroPose(member.id));
+			if (movesZ) { box.max[2] += axisOvertravel("z"); box.min[2] -= spec.travelZ + axisOvertravel("z"); }
+			for (i in 0...3) { lo[i] = Math.min(lo[i], box.min[i]); hi[i] = Math.max(hi[i], box.max[i]); }
+		}
+		return {min: lo, max: hi};
 	}
 
 	function addDriver(motorId:String):String {
@@ -297,7 +320,18 @@ class Gantry extends AxisBuilder {
 		} else if (Std.isOfType(member, GantryPlate)) {
 			var plate:GantryPlate = cast member;
 			min = [-plate.width / 2, -plate.depth / 2, 0.0]; max = [plate.width / 2, plate.depth / 2, plate.height];
-		} else throw "Gantry motor mount must be supported by a frame or carriage plate";
+		} else if (Std.isOfType(member, NemaStepper)) {
+			var motor:NemaStepper = cast member;
+			min = [-motor.variant.bodyFace / 2, -motor.variant.bodyFace / 2, -motor.bodyLength];
+			max = [motor.variant.bodyFace / 2, motor.variant.bodyFace / 2, motor.variant.shaftLength];
+		} else {
+			var part = member.geometry(machinekit.component.ComponentDetail.Envelope);
+			try {
+				var box = part.shape.bounds(), lower = box.get_min(), upper = box.get_max();
+				min = [lower.get_x(), lower.get_y(), lower.get_z()];
+				max = [upper.get_x(), upper.get_y(), upper.get_z()]; part.close();
+			} catch (error:Dynamic) { part.close(); throw error; }
+		}
 		var lo = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
 		var hi = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
 		for (x in [min[0], max[0]]) for (y in [min[1], max[1]]) for (z in [min[2], max[2]]) {
@@ -400,9 +434,9 @@ class Gantry extends AxisBuilder {
 	function buildDrive(axis:AxisSpec, drive:GantryDrive, suffix:String, fixed:String, moving:String,
 			origin:Array<Float>, direction:Array<Float>):Void {
 		var transverse:Array<Float> = direction[2] == 0 ? [0.0, 0, 1] : [1.0, 0, 0];
-		// Mirror the right rack's motor and rack plane to keep its body outboard.
-		var mirroredRack = suffix == "YRight" && (switch drive { case Rack(_, _, _): true; case _: false; });
-		if (mirroredRack) transverse = [for (value in transverse) -value];
+		// Mirror right-side transverse drives to keep the motor body outboard.
+		var mirroredDrive = suffix == "YRight" && (switch drive { case Rack(_, _, _) | Belt(_, _, _): true; case _: false; });
+		if (mirroredDrive) transverse = [for (value in transverse) -value];
 		var normal = [direction[1] * transverse[2] - direction[2] * transverse[1],
 			direction[2] * transverse[0] - direction[0] * transverse[2],
 			direction[0] * transverse[1] - direction[1] * transverse[0]];
@@ -437,11 +471,13 @@ class Gantry extends AxisBuilder {
 				attach(screwId + "NutMount", mount, mountPose, parent);
 				mountNut(screwId, screwId + "NutMount", mountPose);
 			case Belt(profile, teeth, width):
-				var start = point(-railMargin), end = point(axis.upper + railMargin);
+				// The clamp's 20 mm jaw must stop before the idler's 60 mm plate.
+				var endRoom = Math.max(0, 30 + 10 + 3 - (railMargin - axisOvertravel(axis.id)));
+				var start = point(-railMargin), end = point(axis.upper + railMargin + endRoom);
 				var face = [start[0] - normal[0] * (shaft - width), start[1] - normal[1] * (shaft - width), start[2] - normal[2] * (shaft - width)];
 				var motor = mountMotor(motorId, fixed, AxisBuilder.orient(face[0], face[1], face[2], transverse, normal));
 				var beltId = "belt" + suffix;
-				var belt = TimingBelt.twoPulley(profile, teeth, teeth, axis.upper + 2 * railMargin, width);
+				var belt = TimingBelt.twoPulley(profile, teeth, teeth, axis.upper + 2 * railMargin + endRoom, width);
 				var plane = AxisBuilder.orient(start[0], start[1], start[2], transverse, normal);
 				var pulleyId = "pulley" + suffix, idlerId = "idler" + suffix;
 				twoPulleyAxis({axis: axis, beltId: beltId, belt: belt, beltPose: plane, beltParent: fixed,
