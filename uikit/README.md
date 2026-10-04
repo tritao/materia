@@ -26,6 +26,14 @@ so custom drawing shares the same transforms, clipping, and sibling order as
 boxes, text, and images. Clay remains pinned as a private dependency; this
 branch carries only small layout-kernel fixes intended to be upstreamable.
 
+UIKit disables Clay's persistent native scroll tracking: clipping remains active,
+while Haxe `ScrollController` owns offsets and input. Clipped labels therefore
+consume no Clay scroll records. Standalone Clay users retain native scrolling by
+default. Scroll/transition state capacities scale with the declared element
+capacity, including overlap between consecutive layouts. State exhaustion reports
+the table, capacity and element ID and rejects the frame without writing into a
+fallback record. Stale scroll records retire before scroll-target selection.
+
 The C layout bridge uses a versioned transaction with fixed node records of
 `NKUI_LAYOUT_NODE_RECORD_BYTES` bytes and a 16 MiB transaction bound. Node
 capacity grows with submitted data rather than imposing a small framework node

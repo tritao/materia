@@ -240,6 +240,17 @@ if(NK_BUILD_TESTS)
         "${NK_VENDOR_DIR}/clay")
     add_test(NAME nativekit_ui_clay_floating_order
         COMMAND nativekit_ui_clay_floating_order_test)
+    # Clay's public single-header interface must also remain valid C.
+    add_library(nativekit_ui_clay_c_compile OBJECT
+        "${NK_VENDOR_DIR}/clay/tests/c_compile.c")
+    target_compile_features(nativekit_ui_clay_c_compile PRIVATE c_std_11)
+    target_include_directories(nativekit_ui_clay_c_compile PRIVATE "${NK_VENDOR_DIR}/clay")
+    add_executable(nativekit_ui_clay_state_capacity_test
+        "${NK_VENDOR_DIR}/clay/tests/state_capacity.cpp")
+    target_compile_features(nativekit_ui_clay_state_capacity_test PRIVATE cxx_std_20)
+    target_include_directories(nativekit_ui_clay_state_capacity_test PRIVATE
+        "${NK_VENDOR_DIR}/clay")
+    add_test(NAME nativekit_ui_clay_state_capacity COMMAND nativekit_ui_clay_state_capacity_test)
     add_executable(nativekit_ui_clay_layout_benchmark
         "${NK_VENDOR_DIR}/clay/tests/layout_benchmark.cpp")
     target_compile_features(nativekit_ui_clay_layout_benchmark PRIVATE cxx_std_20)
@@ -373,6 +384,7 @@ if(NK_BUILD_TESTS)
     endforeach()
     if(NK_ENABLE_SANITIZERS AND CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
         foreach(target IN ITEMS
+            nativekit_ui_clay_state_capacity_test
             nativekit_ui_layout_engine_test
             nativekit_ui_layout_invariants_test
             nativekit_ui_layout_session_test)
