@@ -40,8 +40,17 @@ def main(port):
             token = "robotkit-test-" + ("observer" if role == "observer" else "deployer") + "-token-0001"
             kind, session, value = hello(sock, identity, token, role)
             assert kind == 2 and value[9] == identity and value[10] == permissions and not value[5], value
+            send_frame(sock, threading.Lock(), 7, {}, session, sequence=1)
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                kind, _, _, reply, _ = read_frame(sock)
+                if kind == 11:
+                    assert reply[2] == 403, reply
+                    break
+            else:
+                raise AssertionError("Observe/deploy identity accepted a command")
             # An observer cannot change deployment, and even a deployer cannot supply a path.
-            send_frame(sock, threading.Lock(), 20, {1: "../../unauthorized.json"}, session, sequence=1)
+            send_frame(sock, threading.Lock(), 20, {1: "../../unauthorized.json"}, session, sequence=2)
             deadline = time.monotonic() + 5
             while time.monotonic() < deadline:
                 kind, _, _, value, _ = read_frame(sock)
