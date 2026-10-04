@@ -2125,3 +2125,11 @@ placement/calibration separately. Both remain unrun at this commit.
 Begin the requested post-G12 compiler-only checkpoint. G13 is unstarted.
 Do not mark G12 verified until native ctest, picker and homing runs establish
 the required physical and controller behavior.
+
+### G12 checkpoint — first compiler error
+
+MotionKit test compilation terminated with E1009 at CoreXyPlotter slide:
+its local PlotterAxisSpec omitted the optional rackingTolerance now present in
+the shared AxisSpec. Replace the local shape with the shared AxisSpec alias.
+Restart the compiler-only pass after that source fix; no runtime tests have
+run yet. This is a compilation checkpoint, not evidence of completed G12.

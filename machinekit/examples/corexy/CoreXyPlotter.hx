@@ -59,7 +59,7 @@ class PlotterPin extends MachineComponent {
 }
 
 /** One axis's range of travel, in millimetres, and where it starts. */
-typedef PlotterAxisSpec = {id:String, lower:Float, upper:Float, initial:Float};
+typedef PlotterAxisSpec = machinekit.assembly.AxisBuilder.AxisSpec;
 
 /**
  * A small CoreXY pen plotter: the head moves along X on a gantry that moves along Y, and both
