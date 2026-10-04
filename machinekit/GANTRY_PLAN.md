@@ -2540,3 +2540,20 @@ join, polarity, pin round trip and missing/unknown switch wiring. No tests or
 builds ran; verification waits for the Phase C boundary. Native ABI population,
 virtual input options, host switch-frame publication and device homing control
 remain pending, so these Haxe bindings do not yet enable device homing.
+
+### G13 — serial native input wiring hookup
+
+Extended the serial-device descriptor with input count, physical actuator indices,
+electrical polarity and switch IDs; API version is now 30 for this descriptor
+change. SerialRuntimeEndpoint fills the descriptor from DeviceBinding. The C API
+validates bounds/polarity/terminated IDs, and the serial transport forwards input
+mappings into the RKD6 session with duplicate-switch validation. The endpoint
+retains the mapping and exposes a switch-ID query returning active state, current
+device timestamp and captured edge data. A query without matching configured
+state returns no observation. Capture timestamps remain device ticks here;
+conversion/publication into runtime switch frames still needs implementation.
+
+No native/Haxe build or test ran; generated FFI bindings are refreshed through
+the normal package build at the Phase C gate. Virtual-device input configuration,
+runtime switch publication, homing segment purpose and physical side hold/zero/
+squaring control remain pending. This is not evidence of device homing completion.

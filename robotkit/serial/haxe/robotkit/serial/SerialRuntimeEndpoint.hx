@@ -45,6 +45,15 @@ class SerialRuntimeEndpoint {
       for (byte in 0...channel.actuatorId.length)
         device.set_actuator_ids(i * 64 + byte, channel.actuatorId.charCodeAt(byte));
     }
+    device.set_input_count(binding.inputs.length);
+    for (i in 0...binding.inputs.length) {
+      var input = binding.inputs[i];
+      device.set_input_actuator(i, input.actuatorChannel);
+      device.set_input_active_high(i, input.wiring.activeHigh ? 1 : 0);
+      var id = input.wiring.switchId;
+      if (id.length > 63) throw "Serial switch ID is longer than 63 characters";
+      for (byte in 0...id.length) device.set_input_switch_ids(i * 64 + byte, id.charCodeAt(byte));
+    }
     var result = RobotKitRuntime.rk_robot_runtime_create_serial6(
       blueprint.nativeValue(), devicePath, baud, device, maxTargetError,
       binding.stepTickHz, linkLossTimeoutNs, clockSyncBoundNs, haxe.Int64.ofInt(100000));

@@ -95,7 +95,7 @@ rk_result RK_CALL rk_robot_runtime_create_serial6(const rk_robot_runtime_bluepri
     if (!out_runtime || !blueprint || rk_robot_runtime_blueprint_validate(blueprint) != RK_OK ||
         !device_path || !*device_path || blueprint->joint_count > RK_MAX_SERIAL_JOINTS ||
         !device || device->struct_size < sizeof(*device) || device->actuator_count == 0 ||
-        device->actuator_count > RK_MAX_SERIAL_JOINTS ||
+        device->actuator_count > RK_MAX_SERIAL_JOINTS || device->input_count > 64 ||
         !std::isfinite(max_target_error) || max_target_error < 0.0 ||
         step_tick_hz == 0 || link_loss_timeout_ns == 0 || clock_bound_ns == 0)
         return RK_ERROR_INVALID_ARGUMENT;
@@ -117,6 +117,16 @@ rk_result RK_CALL rk_robot_runtime_create_serial6(const rk_robot_runtime_bluepri
         actuator.id.assign(reinterpret_cast<const char *>(id), reinterpret_cast<const char *>(end));
         layout.push_back(std::move(actuator));
     }
+    std::vector<robotkit::DeviceInput6> inputs;
+    for (std::uint32_t i = 0; i < device->input_count; ++i) {
+        if (device->input_actuator[i] >= device->actuator_count || device->input_active_high[i] > 1)
+            return RK_ERROR_INVALID_ARGUMENT;
+        const auto *id = device->input_switch_ids + i * 64;
+        const auto *end = std::find(id, id + 64, 0);
+        if (end == id || end == id + 64) return RK_ERROR_INVALID_ARGUMENT;
+        inputs.push_back({device->input_actuator[i], device->input_active_high[i] != 0,
+            std::string(reinterpret_cast<const char *>(id), reinterpret_cast<const char *>(end))});
+    }
     *out_runtime = RK_INVALID_ROBOT_RUNTIME;
 #if !defined(RK_HAS_SERIAL_DEVICE)
     // Built without serial ports (RK_BUILD_SERIAL_DEVICE).
@@ -129,7 +139,7 @@ rk_result RK_CALL rk_robot_runtime_create_serial6(const rk_robot_runtime_bluepri
         rk_result endpoint_error = RK_ERROR_BACKEND;
         auto endpoint = robotkit::DeviceSerialEndpoint::open(device_path, baud, *copied,
             controller, max_target_error, step_tick_hz, link_loss_timeout_ns,
-            clock_bound_ns, link_latency_ns, layout, &endpoint_error);
+            clock_bound_ns, link_latency_ns, layout, &endpoint_error, inputs);
         if (!endpoint) return endpoint_error;
         auto runtime = std::make_shared<robotkit::RobotRuntime>(
             *copied, std::static_pointer_cast<robotkit::RobotEndpoint>(endpoint), period);

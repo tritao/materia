@@ -107,7 +107,7 @@ std::shared_ptr<Rkd6Endpoint> Rkd6Endpoint::attach(std::unique_ptr<Rkd6Transport
     std::uint64_t session, double target_error, std::uint64_t clock_bound_ns,
     std::uint64_t link_latency_ns, std::uint32_t step_tick_hz,
     std::uint64_t link_loss_timeout_ns, std::span<const DeviceActuator6> layout,
-    rk_result *error) {
+    rk_result *error, std::span<const DeviceInput6> inputs) {
     if (error) *error = RK_ERROR_BACKEND;
     const auto actuator_count = layout.empty() ? blueprint.joint_count : layout.size();
     if (!transport || session == 0 || blueprint.joint_count == 0 ||
@@ -163,6 +163,15 @@ std::shared_ptr<Rkd6Endpoint> Rkd6Endpoint::attach(std::unique_ptr<Rkd6Transport
         begin.dual_drive_skew_bound[i] = static_cast<float>(mapping.dual_drive_skew_bound);
         begin.max_acceleration = std::max(begin.max_acceleration,
             begin.actuator_max_acceleration[i]);
+    }
+    if (inputs.size() > 64) return {};
+    begin.input_count = static_cast<std::uint8_t>(inputs.size());
+    for (std::size_t i = 0; i < inputs.size(); ++i) {
+        if (inputs[i].actuator >= actuator_count || inputs[i].switch_id.empty()) return {};
+        for (std::size_t j = 0; j < i; ++j)
+            if (inputs[j].switch_id == inputs[i].switch_id) return {};
+        begin.input_actuator[i] = inputs[i].actuator;
+        if (inputs[i].active_high) begin.input_active_high |= std::uint64_t{1} << i;
     }
     if (begin.max_acceleration <= 0 || !std::isfinite(begin.max_acceleration)) return {};
     std::vector<std::uint8_t> payload(begin.SIZE);
@@ -255,6 +264,7 @@ std::shared_ptr<Rkd6Endpoint> Rkd6Endpoint::attach(std::unique_ptr<Rkd6Transport
     auto endpoint = std::shared_ptr<Rkd6Endpoint>(new Rkd6Endpoint(
         std::move(transport), ack, target_error, clock_bound_ns, link_latency_ns,
         std::vector<DeviceActuator6>(layout.begin(), layout.end()), blueprint.joint_count));
+    endpoint->input_layout_.assign(inputs.begin(), inputs.end());
     if (!endpoint->configure_feedback(blueprint)) {
         if (error) *error = RK_ERROR_MODEL_MISMATCH;
         return {};
@@ -1011,4 +1021,17 @@ std::uint64_t Rkd6Endpoint::device_ticks_at(std::uint64_t path_ns) const noexcep
     return 0;
 }
 
+} // namespace robotkit
+
+namespace robotkit {
+std::optional<DeviceInputObservation6> Rkd6Endpoint::input_observation(std::string_view switch_id) const {
+    if (!has_state_ || state_header_.input_count != input_layout_.size()) return std::nullopt;
+    for (std::size_t i = 0; i < input_layout_.size(); ++i) {
+        if (input_layout_[i].switch_id != switch_id) continue;
+        const bool electrical_high = (state_header_.input_bits & (std::uint64_t{1} << i)) != 0;
+        return DeviceInputObservation6{electrical_high == input_layout_[i].active_high,
+            state_header_.timestamp_ticks, inputs_[i]};
+    }
+    return std::nullopt;
+}
 } // namespace robotkit

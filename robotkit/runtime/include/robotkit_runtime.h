@@ -87,7 +87,7 @@ enum {
     RK_PROCESS_CHANNEL_ID_BYTES = 48,
     RK_PROCESS_COMMAND_BYTES = 48,
     RK_MAX_JOINT_COUPLINGS = 512,
-    RK_API_VERSION = 29 /**< Discrete sensors, simulation process drives and typed velocity outputs. */
+    RK_API_VERSION = 30 /**< Serial deployment input wiring and device switch captures. */
 };
 
 /** Result returned by RobotKit C ABI functions. */
@@ -751,6 +751,10 @@ typedef struct rk_serial_device_desc {
     uint16_t actuator_direction_setup_ticks[RK_MAX_SERIAL_JOINTS];
     double actuator_skew_bound[RK_MAX_SERIAL_JOINTS];
     uint8_t actuator_ids[RK_MAX_SERIAL_JOINTS * 64]; /**< 64 NUL-terminated ASCII IDs, 64 bytes each. */
+    uint32_t input_count; /**< Wired switch inputs, zero to 64. */
+    uint8_t input_actuator[64]; /**< Captured physical actuator channel per input. */
+    uint8_t input_active_high[64]; /**< Electrical polarity: zero or one. */
+    uint8_t input_switch_ids[64 * 64]; /**< NUL-terminated model switch IDs. */
 } rk_serial_device_desc;
 
 /** The unique id of a controller board. */

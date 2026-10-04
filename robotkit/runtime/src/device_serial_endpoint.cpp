@@ -128,12 +128,12 @@ std::shared_ptr<Rkd6Endpoint> DeviceSerialEndpoint::open(const char *path, unsig
     const rk_robot_runtime_blueprint &blueprint, std::array<std::uint8_t, 16> controller,
     double target_error, std::uint32_t step_tick_hz,
     std::uint64_t link_loss_timeout_ns, std::uint64_t clock_bound_ns,
-    std::uint64_t link_latency_ns, std::span<const DeviceActuator6> layout, rk_result *error) {
+    std::uint64_t link_latency_ns, std::span<const DeviceActuator6> layout, rk_result *error, std::span<const DeviceInput6> inputs) {
     const auto fd = open_port(path, baud, error);
     if (fd < 0) return {};
     return Rkd6Endpoint::attach(std::make_unique<PosixRkd6Transport>(fd, baud), blueprint,
         controller, random_session(), target_error, clock_bound_ns, link_latency_ns,
-        step_tick_hz, link_loss_timeout_ns, layout, error);
+        step_tick_hz, link_loss_timeout_ns, layout, error, inputs);
 }
 
 rk_result DeviceSerialEndpoint::identify(const char *path, unsigned baud,

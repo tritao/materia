@@ -12,6 +12,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -47,6 +48,12 @@ public:
     virtual std::optional<std::size_t> queued_output_bytes() const noexcept { return std::nullopt; }
 };
 
+struct DeviceInputObservation6 {
+    bool active = false;
+    std::uint64_t timestamp_ticks = 0;
+    device_wire6::InputState6 capture{};
+};
+
 class RK_API Rkd6Endpoint final : public RobotEndpoint {
 public:
     static std::uint64_t minimum_baud(std::uint8_t actuator_count,
@@ -59,11 +66,13 @@ public:
         std::uint64_t session, double target_error, std::uint64_t clock_bound_ns,
         std::uint64_t link_latency_ns, std::uint32_t step_tick_hz = 40'000,
         std::uint64_t link_loss_timeout_ns = 500'000'000,
-        std::span<const DeviceActuator6> layout = {}, rk_result *error = nullptr);
+        std::span<const DeviceActuator6> layout = {}, rk_result *error = nullptr, std::span<const DeviceInput6> inputs = {});
 
     /** Reads a board's own controller id by opening a session no board accepts. */
     static rk_result identify(std::unique_ptr<Rkd6Transport> transport, std::uint64_t session,
         std::array<std::uint8_t, 16> &controller);
+
+    std::optional<DeviceInputObservation6> input_observation(std::string_view switch_id) const;
 
     rk_result apply(const rk_robot_command &command) override;
     rk_result sample(std::uint64_t timestamp_ns, rk_robot_state &state) override;
@@ -157,6 +166,7 @@ private:
     device_wire6::State6Header state_header_{};
     std::array<device_wire6::ActuatorState6, device_wire6::MAX_ACTUATORS> actuators_{};
     std::array<device_wire6::InputState6, 64> inputs_{};
+    std::vector<DeviceInput6> input_layout_;
     bool has_state_ = false;
     std::array<device_wire6::Sensor6Header, RK_MAX_SENSORS> sensor_headers_{};
     std::array<std::array<float, RK_MAX_SENSOR_VALUES>, RK_MAX_SENSORS> sensor_values_{};

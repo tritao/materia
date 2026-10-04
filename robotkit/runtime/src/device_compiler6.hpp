@@ -23,6 +23,12 @@ struct DeviceActuator6 {
     std::string id;
 };
 
+struct DeviceInput6 {
+    std::uint8_t actuator = 0;
+    bool active_high = false;
+    std::string switch_id;
+};
+
 struct DeviceSegment6 {
     device_wire6::Segment6Header header{};
     std::vector<device_wire6::Segment6Coefficients> coefficients;
