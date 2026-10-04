@@ -4,11 +4,13 @@ import cadkit.modeling.Align;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.component.ComponentDetail;
-import machinekit.component.ComponentType;
+import ComponentType;
 import machinekit.component.ComponentValues;
 import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ComponentType;
 
 /** Plate-mounted swivel caster: a square top plate, a swivel boss, a fork and a wheel on its axle.
  * It is one rigid part; the swivel is not a joint. CAD frame: the top of the plate is at z=0 with
@@ -55,8 +57,15 @@ class CasterWheel extends MachineComponent {
 
 	function get_axleHeight():Float return wheelDiameter / 2;
 
-	public static function recipeType():ComponentType
-		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.motion.caster-wheel");
+	static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.motion.caster-wheel", [ComponentRecipeSupport.length("wheelDiameter", 75), ComponentRecipeSupport.length("wheelWidth", 25), ComponentRecipeSupport.length("height", 110),
+			ComponentRecipeSupport.length("trail", 30), ComponentRecipeSupport.length("plateSize", 60)],
+			v -> new CasterWheel(v.number("wheelDiameter"), v.number("wheelWidth"), v.number("height"), v.number("trail"),
+				v.number("plateSize")), true);
+		return recipeTypeCache;
+	}
 
 	override public function componentType():Null<ComponentType>
 		return Std.isExactType(this, CasterWheel) ? recipeType() : null;

@@ -8,6 +8,8 @@ import machinekit.component.PortInterface;
 import machinekit.component.PortKind;
 import machinekit.component.PortRole;
 import machinekit.component.Solids;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ComponentType;
 
 /** Generic ejector converting compressed air to vacuum. */
 class VacuumGenerator extends MachineComponent {
@@ -32,15 +34,24 @@ class VacuumGenerator extends MachineComponent {
 		addPort({name: "vacuum", kind: Vacuum, role: Supply,
 			iface: vacuumInterface == null ? PushIn(6) : vacuumInterface, required: false});
 		addConversion("air", "vacuum");
-		addCapability(VacuumActuator("air"));
-		addCapability(VacuumSource(ratedVacuumKpa, "vacuum"));
+		addFacet(new VacuumActuatorFacet("air"));
+		addFacet(new VacuumSourceFacet(ratedVacuumKpa, "vacuum"));
 	}
 
-	public static function recipeType():machinekit.component.ComponentType
-		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.pneumatic.vacuum-generator");
+	static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.pneumatic.vacuum-generator", [ComponentRecipeSupport.optionalScalar("ratedVacuumKpa"),
+			ComponentRecipeSupport.optionalText("catalogDesignation"), ComponentRecipeSupport.optionalText("catalogDescription")]
+			.concat(ComponentRecipeSupport.interfaceParameters("airInterface")).concat(ComponentRecipeSupport.interfaceParameters("vacuumInterface")),
+			v -> new VacuumGenerator(v.optionalNumber("ratedVacuumKpa"),
+				v.optionalToken("catalogDesignation"), ComponentRecipeSupport.interfaceFrom(v, "airInterface"),
+				ComponentRecipeSupport.interfaceFrom(v, "vacuumInterface"), v.optionalToken("catalogDescription")), true);
+		return recipeTypeCache;
+	}
 
 	/** Subclasses must declare their own recipe and saved values. */
-	override public function componentType():Null<machinekit.component.ComponentType>
+	override public function componentType():Null<ComponentType>
 		return Std.isExactType(this, VacuumGenerator) ? recipeType() : null;
 
 	override public function values():machinekit.component.ComponentValues {
@@ -48,8 +59,8 @@ class VacuumGenerator extends MachineComponent {
 			.set("ratedVacuumKpa", ratedVacuumKpa == null ? machinekit.component.ComponentValue.Unset : machinekit.component.ComponentValue.Number(ratedVacuumKpa))
 			.set("catalogDesignation", codeOnly ? machinekit.component.ComponentValue.Unset : machinekit.component.ComponentValue.Token(designation))
 			.set("catalogDescription", codeOnly ? machinekit.component.ComponentValue.Unset : machinekit.component.ComponentValue.Token(description));
-		machinekit.component.MachineKitAdditionalRecipes.interfaceValues(values, "airInterface", port("air").iface);
-		machinekit.component.MachineKitAdditionalRecipes.interfaceValues(values, "vacuumInterface", port("vacuum").iface);
+		ComponentRecipeSupport.interfaceValues(values, "airInterface", port("air").iface);
+		ComponentRecipeSupport.interfaceValues(values, "vacuumInterface", port("vacuum").iface);
 		return values.setToken("material", materialSpec());
 	}
 

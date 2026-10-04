@@ -12,6 +12,8 @@ import machinekit.component.PortInterface;
 import machinekit.component.PortKind;
 import machinekit.component.PortRole;
 import machinekit.component.Solids;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ComponentType;
 
 typedef SchmalzSxtMasterSpec = {
 	var designation:String;
@@ -60,18 +62,24 @@ class SchmalzSxtMaster extends MachineComponent {
 				iface: Coupling('schmalz:sxt:${spec.nominalPipeDiameterMm}:${spec.channels}', i), required: false});
 			addBridge('airIn$i', 'airOut$i');
 		}
-		addCapability(Coupling('schmalz:sxt:${spec.nominalPipeDiameterMm}:${spec.channels}', "tool"));
+		addFacet(new machinekit.component.CouplingFacet('schmalz:sxt:${spec.nominalPipeDiameterMm}:${spec.channels}', "tool"));
 		var x = row.widthMm, y = row.depthMm, z = row.lengthMm, m = row.massKg;
 		declareMass(m, new Vector(0, 0, z / 2),
 			new InertiaTensor(m * (y * y + z * z) / 12, 0, 0,
 				m * (x * x + z * z) / 12, 0, m * (x * x + y * y) / 12));
 	}
 
-	public static function recipeType():machinekit.component.ComponentType
-		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.robotics.schmalz-sxt-master");
+	static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.robotics.schmalz-sxt-master",
+			[ComponentRecipeSupport.catalog("designation", SchmalzSxtMaster.catalog(), "10.07.13.00013")],
+			v -> new SchmalzSxtMaster(v.token("designation")), true);
+		return recipeTypeCache;
+	}
 
 	/** Subclasses must declare their own recipe and saved values. */
-	override public function componentType():Null<machinekit.component.ComponentType>
+	override public function componentType():Null<ComponentType>
 		return Std.isExactType(this, SchmalzSxtMaster) ? recipeType() : null;
 
 	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues().setToken("designation", spec.designation).setToken("material", materialSpec());

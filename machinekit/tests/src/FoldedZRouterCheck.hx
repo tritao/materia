@@ -12,8 +12,8 @@ class FoldedZRouterCheck {
 	public static function main():Void {
 		runFoldedZ();
 		var combined = new CncRouter(true, true);
-		var geometry = combined.describe();
-		if (geometry.mechanical.elasticNetworks == null || geometry.mechanical.elasticNetworks.length != 1 ||
+		var networks = combined.definition().elasticNetworks;
+		if (networks == null || networks.length != 1 ||
 			combined.check().hasErrors()) throw "The folded Z stage must combine with the router's X/Y carriage belts";
 		var combinedScene = SceneArtifact.decode(CncRouterPreview.router(true, true));
 		var combinedModel = AssemblySimulationBridge.toRobotModel(combinedScene.assemblyDefinition,

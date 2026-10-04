@@ -2,11 +2,13 @@ package machinekit.motion;
 
 import cadkit.modeling.Part;
 import machinekit.component.ComponentDetail;
-import machinekit.component.ComponentType;
+import ComponentType;
 import machinekit.component.ComponentValues;
 import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ComponentType;
 
 /** Drive wheel of a wheeled base: a tread disc on a hub boss, bored to sit straight on a motor or
  * gearbox shaft. CAD frame: the axle runs along +Z, the hub's inner end is at z=0 and the tread
@@ -48,8 +50,15 @@ class DriveWheel extends MachineComponent {
 
 	function get_radius():Float return diameter / 2;
 
-	public static function recipeType():ComponentType
-		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.motion.drive-wheel");
+	static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.motion.drive-wheel", [ComponentRecipeSupport.length("diameter", 150), ComponentRecipeSupport.length("width", 40), ComponentRecipeSupport.length("boreDiameter", 8),
+			ComponentRecipeSupport.length("hubDiameter", 40), ComponentRecipeSupport.length("hubLength", 10)],
+			v -> new DriveWheel(v.number("diameter"), v.number("width"), v.number("boreDiameter"), v.number("hubDiameter"),
+				v.number("hubLength")), true);
+		return recipeTypeCache;
+	}
 
 	override public function componentType():Null<ComponentType>
 		return Std.isExactType(this, DriveWheel) ? recipeType() : null;

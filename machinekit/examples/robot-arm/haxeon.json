@@ -7,7 +7,8 @@
 	"dependencies": {
 		"projectkit": { "path": "../../../projectkit" },
 		"cadkit": { "path": "../../../cadkit" },
-		"machinekit": { "path": "../../" }
+		"machinekit": { "path": "../../" },
+		"machinekit-robot": { "path": "../../robot" }
 	},
 	"target": "host",
 	"outputDir": "build"

@@ -3,12 +3,14 @@ package machinekit.robotics;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.component.ComponentDetail;
-import machinekit.component.ComponentType;
+import ComponentType;
 import machinekit.component.ComponentValues;
 import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 import materia.assembly.AssemblyFrames;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ComponentType;
 
 /** Direction of a joint axis, in the frame of the link that carries the joint. */
 enum ArmAxis {
@@ -81,8 +83,17 @@ class ArmLink extends MachineComponent {
 			default: throw 'Unknown arm axis "$token"';
 		};
 
-	public static function recipeType():ComponentType
-		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.robotics.arm-link");
+	static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.robotics.arm-link", [ComponentRecipeSupport.length("length", 300), ComponentRecipeSupport.length("diameter", 80), ComponentRecipeSupport.length("wall", 5),
+			ComponentRecipeSupport.length("collarDiameter", 100), ComponentRecipeSupport.choice("startAxis", ["+X", "-X", "+Z"], "+Z"), ComponentRecipeSupport.choice("endAxis", ["+X", "-X", "+Z"], "+Z"),
+			ComponentRecipeSupport.length("endJointLength", 0)],
+			v -> new ArmLink(v.number("length"), v.number("diameter"), v.number("wall"), v.number("collarDiameter"),
+				ArmLink.axisFromToken(v.token("startAxis")), ArmLink.axisFromToken(v.token("endAxis")),
+				v.number("endJointLength")), true);
+		return recipeTypeCache;
+	}
 
 	/** Subclasses must declare their own recipe and saved values. */
 	override public function componentType():Null<ComponentType>

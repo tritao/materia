@@ -7,6 +7,8 @@ import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 import materia.assembly.AssemblyDefinition.AssemblyEncoder;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ComponentType;
 
 /**
  * A rotary encoder that rides a shaft end, such as a stepper's back shaft: the housing a standard
@@ -40,10 +42,17 @@ class ShaftEncoder extends MachineComponent implements EncoderPart {
     addConnector("axis", Axis, Solids.axial(0, 0, 0));
   }
 
-  public static function recipeType():machinekit.component.ComponentType
-    return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.motion.shaft-encoder");
+  static var recipeTypeCache:Null<ComponentType>;
 
-  override public function componentType():Null<machinekit.component.ComponentType>
+  public static function recipeType():ComponentType {
+    if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.motion.shaft-encoder", [ComponentRecipeSupport.scalar("countsPerRevolution", 4096), ComponentRecipeSupport.flag("absolute", false),
+      ComponentRecipeSupport.flag("index", true), ComponentRecipeSupport.length("bodyDiameter", 38), ComponentRecipeSupport.length("bodyLength", 22)],
+      v -> new ShaftEncoder(v.number("countsPerRevolution"), v.boolean("absolute"), v.boolean("index"),
+      	v.number("bodyDiameter"), v.number("bodyLength")), true);
+    return recipeTypeCache;
+  }
+
+  override public function componentType():Null<ComponentType>
     return Std.isExactType(this, ShaftEncoder) ? recipeType() : null;
 
   override public function values():machinekit.component.ComponentValues

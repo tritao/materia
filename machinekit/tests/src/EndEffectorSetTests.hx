@@ -37,8 +37,8 @@ private class CoupledMaster extends MachineComponent {
 		addConnector("mount", Mount, AssemblyFrames.identity());
 		addConnector("couple", Mount, AssemblyFrames.translation(0, 10, 0));
 		addPort({name: "airOut", kind: Pneumatic, role: Supply, iface: Unspecified, required: false});
-		addCapability(Coupling("test:master", "couple"));
-		if (duplicate) addCapability(Coupling("test:master", "couple"));
+		addFacet(new machinekit.component.CouplingFacet("test:master", "couple"));
+		if (duplicate) addFacet(new machinekit.component.CouplingFacet("test:master", "couple"));
 		declareMass(5, new Vector(), InertiaTensor.zero());
 	}
 	override public function hasGeometry():Bool return true;
@@ -51,7 +51,7 @@ private class CoupledPlate extends MachineComponent {
 		super("COUPLED-PLATE", "Coupled plate", "steel", true);
 		addConnector("mount", Mount, AssemblyFrames.identity());
 		addPort({name: "airIn", kind: Pneumatic, role: Consumer, iface: Unspecified, required: false});
-		addCapability(Coupling("test:tool", "mount"));
+		addFacet(new machinekit.component.CouplingFacet("test:tool", "mount"));
 		declareMass(1, new Vector(), InertiaTensor.zero());
 	}
 	override public function hasGeometry():Bool return true;
@@ -152,7 +152,7 @@ class EndEffectorSetTests {
 		sxtTool.exposePort("air", "half", "airIn1");
 		sxtSet.addTool("manual", sxtTool);
 		var savedSxt = sxtSet.encode();
-		var rebuiltSxt = EndEffectorSet.fromDescription(JsonWire.decode(savedSxt));
+		var rebuiltSxt = EndEffectorSet.decode(savedSxt);
 		if (!Equality.equals(sxtSet.describe(), rebuiltSxt.describe()))
 			throw "SXT changer description changed after wire round trip";
 		sxtTool.addComponent("late", new SchmalzSxtTool("10.07.13.00018"));

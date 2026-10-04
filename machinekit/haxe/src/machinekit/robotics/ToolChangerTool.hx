@@ -8,6 +8,8 @@ import machinekit.component.PortInterface;
 import machinekit.component.PortKind;
 import machinekit.component.PortRole;
 import machinekit.component.Solids;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ComponentType;
 
 /** Generic tool-side changer half with bridged air and signal channels. */
 class ToolChangerTool extends MachineComponent {
@@ -35,14 +37,20 @@ class ToolChangerTool extends MachineComponent {
 		addPort({name: "signalIn", kind: Signal, role: Consumer, iface: Plug("generic", 4), required: true});
 		addPort({name: "signalOut", kind: Signal, role: Supply, iface: Plug("generic", 4), required: false});
 		addBridge("signalIn", "signalOut");
-		addCapability(Coupling('generic:$airChannels:${Dimension.format(diameter)}', "master"));
+		addFacet(new machinekit.component.CouplingFacet('generic:$airChannels:${Dimension.format(diameter)}', "master"));
 	}
 
-	public static function recipeType():machinekit.component.ComponentType
-		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.robotics.tool-changer-tool");
+	static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.robotics.tool-changer-tool", [ComponentRecipeSupport.count("airChannels", 2),
+			ComponentRecipeSupport.length("diameter", 60), ComponentRecipeSupport.length("thickness", 12)],
+			v -> new ToolChangerTool(v.integer("airChannels"), v.number("diameter"), v.number("thickness")), true);
+		return recipeTypeCache;
+	}
 
 	/** Subclasses must declare their own recipe and saved values. */
-	override public function componentType():Null<machinekit.component.ComponentType>
+	override public function componentType():Null<ComponentType>
 		return Std.isExactType(this, ToolChangerTool) ? recipeType() : null;
 
 	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues().setInteger("airChannels", airChannels).setNumber("diameter", diameter).setNumber("thickness", thickness).setToken("material", materialSpec());

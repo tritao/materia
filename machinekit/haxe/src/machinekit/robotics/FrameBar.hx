@@ -5,6 +5,8 @@ import machinekit.component.ComponentDetail;
 import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ComponentType;
 
 /** Simple rectangular robot tooling bar along local +Z. */
 class FrameBar extends MachineComponent {
@@ -25,11 +27,16 @@ class FrameBar extends MachineComponent {
 		addConnector("end", Mount, Solids.axial(0, 0, length));
 	}
 
-	public static function recipeType():machinekit.component.ComponentType
-		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.robotics.frame-bar");
+	static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.robotics.frame-bar", [ComponentRecipeSupport.length("width", 20), ComponentRecipeSupport.length("depth", 20), ComponentRecipeSupport.length("length", 100)],
+			v -> new FrameBar(v.number("width"), v.number("depth"), v.number("length")), true);
+		return recipeTypeCache;
+	}
 
 	/** Subclasses must declare their own recipe and saved values. */
-	override public function componentType():Null<machinekit.component.ComponentType>
+	override public function componentType():Null<ComponentType>
 		return Std.isExactType(this, FrameBar) ? recipeType() : null;
 
 	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues().setNumber("width", width).setNumber("depth", depth).setNumber("length", length).setToken("material", materialSpec());

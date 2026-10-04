@@ -16,6 +16,8 @@ import machinekit.component.Solids;
 import machinekit.standard.ParallelKey;
 import machinekit.standard.BearingFit;
 import machinekit.standard.BearingFit.BearingShaftFit;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ComponentType;
 
 private typedef RecipeKey = {
 	var size:String;
@@ -351,11 +353,18 @@ class SteppedShaft extends MachineComponent {
 		return new SteppedShaft(sections, faces, rebuilt, grooves, detail);
 	}
 
-	public static function recipeType():machinekit.component.ComponentType
-		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.motion.stepped-shaft");
+	static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.motion.stepped-shaft",
+			[ComponentRecipeSupport.text("sections", '[{"diameter":10,"length":100}]'), ComponentRecipeSupport.text("faces", "[]"),
+				ComponentRecipeSupport.text("keyways", "[]"), ComponentRecipeSupport.text("grooves", "[]"), ComponentRecipeSupport.text("shaftDetail", "{}")],
+			v -> SteppedShaft.fromRecipe(v), true);
+		return recipeTypeCache;
+	}
 
 	/** Subclasses must declare their own recipe and saved values. */
-	override public function componentType():Null<machinekit.component.ComponentType>
+	override public function componentType():Null<ComponentType>
 		return Std.isExactType(this, SteppedShaft) ? recipeType() : null;
 
 	override public function values():machinekit.component.ComponentValues return recipeValues().setToken("material", materialSpec());

@@ -1,5 +1,7 @@
 package machinekit.component;
 
+import haxe.Json;
+import cadkit.modeling.Vector;
 import machinekit.catalog.CatalogIndex;
 import machinekit.component.ComponentParameterType.*;
 import machinekit.component.ComponentValue.*;
@@ -82,4 +84,45 @@ class ComponentRecipeSupport {
 
 	public static function catalog(name:String, index:CatalogIndex, value:String):ComponentParameter
 		return new ComponentParameter(name, CatalogDesignation(index), Token(value));
+
+	public static function optionalScalar(name:String):ComponentParameter
+		return new ComponentParameter(name, Optional(Scalar), Unset);
+
+	public static function optionalText(name:String):ComponentParameter
+		return new ComponentParameter(name, Optional(Text), Unset);
+
+	/** Inputs describing a port's mating interface, under one name prefix. */
+	public static function interfaceParameters(prefix:String):Array<ComponentParameter> return [
+		choice(prefix + "Kind", ["PushIn", "Thread", "Plug", "Coupling", "Unspecified"], "PushIn"),
+		length(prefix + "Size", 6), text(prefix + "Name", ""), count(prefix + "Channel", 0)
+	];
+
+	public static function interfaceFrom(values:ComponentValues, prefix:String):PortInterface
+		return switch values.token(prefix + "Kind") {
+			case "PushIn": PortInterface.PushIn(values.number(prefix + "Size"));
+			case "Thread": PortInterface.Thread(values.token(prefix + "Name"));
+			case "Plug": PortInterface.Plug(values.token(prefix + "Name"), values.integer(prefix + "Channel"));
+			case "Coupling": PortInterface.Coupling(values.token(prefix + "Name"), values.integer(prefix + "Channel"));
+			case _: PortInterface.Unspecified;
+		};
+
+	public static function interfaceValues(values:ComponentValues, prefix:String, iface:PortInterface):Void
+		switch iface {
+			case PushIn(size): values.setToken(prefix + "Kind", "PushIn").setNumber(prefix + "Size", size);
+			case Thread(name): values.setToken(prefix + "Kind", "Thread").setToken(prefix + "Name", name);
+			case Plug(name, pins): values.setToken(prefix + "Kind", "Plug").setToken(prefix + "Name", name).setInteger(prefix + "Channel", pins);
+			case Coupling(key, channel): values.setToken(prefix + "Kind", "Coupling").setToken(prefix + "Name", key).setInteger(prefix + "Channel", channel);
+			case Unspecified: values.setToken(prefix + "Kind", "Unspecified");
+		}
+
+	public static function route(text:String):Array<Vector> {
+		var points:Array<Dynamic> = Json.parse(text);
+		return [for (p in points) new Vector(cast Reflect.field(p, "x"),
+			cast Reflect.field(p, "y"), cast Reflect.field(p, "z"))];
+	}
+
+	public static function routeText(points:Array<Vector>):String
+		return Json.stringify([for (p in points) {x: p.x, y: p.y, z: p.z}]);
+
+	public static function defaultRoute():String return '[{"x":0,"y":0,"z":0},{"x":0,"y":0,"z":100}]';
 }

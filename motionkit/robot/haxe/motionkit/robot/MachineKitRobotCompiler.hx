@@ -180,8 +180,7 @@ class MachineKitRobotCompiler {
     // LinearAxis's grounded preview parts belong to its motor body when it is a moving stage.
     for (index in 0...ids.length) {
       var id = ids[index];
-      var flat = materia.assembly.AssemblyDefinitionFlattener.flatten(
-        machinekit.assembly.FrozenAssemblyDefinitions.thaw(axes[index].describe().mechanical));
+      var flat = axes[index].definition();
       var motorPose = [for (entry in flat.occurrences) if (entry.id == "motor") entry.initialPose][0];
       var children = [for (joint in flat.joints) if (joint.role == materia.assembly.AssemblyDefinition.AssemblyJointRole.Tree) joint.child];
       for (entry in flat.occurrences) if (entry.id != "motor" && children.indexOf(entry.id) < 0) {
@@ -233,7 +232,7 @@ class MachineKitRobotCompiler {
 
   /** Read the axis's resolved coupling, then convert its mm leader to SI. */
   static function assemblyScrewRatio(axis:LinearAxis):Float {
-    var couplings = axis.describe().mechanical.couplings;
+    var couplings = axis.definition().couplings;
     if (couplings != null) for (coupling in couplings)
       if (coupling.id == "lead-screw") return coupling.ratio / MILLIMETRES_TO_METRES;
     throw "Linear axis has no resolved lead-screw coupling";

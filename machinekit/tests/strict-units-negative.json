@@ -1,9 +1,0 @@
-{
-  "version": 1,
-  "package": {"name": "machinekit-strict-units-negative"},
-  "entry": "StrictUnitsMismatch",
-  "sourceRoots": ["fixtures"],
-  "dependencies": {"machinekit": {"path": ".."}},
-  "target": "host",
-  "outputDir": "build/strict-units-negative"
-}

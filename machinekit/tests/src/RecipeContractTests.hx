@@ -40,7 +40,7 @@ class RecipeContractTests {
 		check(cupBom.lines().length == 2, "Different cup fittings must have different BOM identities");
 		checkRebuild(new SuctionCup(40, 18, 900, 0.2, "CUP-CUSTOM", Thread("G1/8"), "Custom cup"));
 		checkRebuild(new VacuumGenerator(80, "GEN-CUSTOM", PushIn(4), Thread("G1/4"), "Custom generator"));
-		for (type in MachineKitComponents.all()) {
+		for (type in MachineKitComponents.defaultRegistry().all()) {
 			for (parameter in type.parameters()) switch parameter.type {
 				case CatalogDesignation(index):
 					for (designation in index.designations()) {
@@ -71,8 +71,8 @@ class RecipeContractTests {
 					'${type.id}: connectors changed after rebuild');
 				check(Equality.equals(component.ports(), rebuilt.ports()),
 					'${type.id}: ports changed after rebuild');
-				check(Equality.equals(component.capabilities(), rebuilt.capabilities()),
-					'${type.id}: capabilities changed after rebuild');
+				check(Equality.equals(facetWords(component), facetWords(rebuilt)),
+					'${type.id}: facets changed after rebuild');
 
 				var partNumber = component.bom.partNumber;
 				var prior = partNumbers.get(partNumber);
@@ -125,9 +125,12 @@ class RecipeContractTests {
 			'${component.designation}: custom connectors changed');
 		check(Equality.equals(component.ports(), rebuilt.ports()),
 			'${component.designation}: custom ports changed');
-		check(Equality.equals(component.capabilities(), rebuilt.capabilities()),
-			'${component.designation}: custom capabilities changed');
+		check(Equality.equals(facetWords(component), facetWords(rebuilt)),
+			'${component.designation}: custom facets changed');
 	}
+
+	static function facetWords(component:machinekit.component.MachineComponent):Array<String>
+		return [for (facet in component.facets()) facet.describe()];
 
 	static function cases(type:machinekit.component.ComponentType):Array<ComponentValues> {
 		var result = [type.defaults()];

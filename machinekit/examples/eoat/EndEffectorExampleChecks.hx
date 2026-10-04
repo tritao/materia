@@ -31,7 +31,7 @@ class EndEffectorExampleChecks {
 
 	public static function run():Void {
 		var set = EndEffectorExample.build();
-		var rebuiltSet = EndEffectorSet.fromDescription(JsonWire.decode(set.encode()));
+		var rebuiltSet = EndEffectorSet.decode(set.encode());
 		check(Equality.equals(set.describe(), rebuiltSet.describe()),
 			"EOAT changer description changed after save and rebuild");
 		var short = set.configuration("short");
@@ -52,7 +52,7 @@ class EndEffectorExampleChecks {
 		check(Math.abs(Math.sqrt(dx * dx + dy * dy + dz * dz) - 50) < 1e-6,
 			"Tool contact should move with bar length");
 		for (configuration in [short, long]) {
-			var rebuilt = EndEffector.fromDescription(JsonWire.decode(configuration.encode()));
+			var rebuilt = EndEffector.decode(configuration.encode());
 			check(Equality.equals(configuration.describe(), rebuilt.describe()),
 				"EOAT configuration description changed after save and rebuild");
 			// A saved description lists members by sorted id, so a rebuild adds them in that order

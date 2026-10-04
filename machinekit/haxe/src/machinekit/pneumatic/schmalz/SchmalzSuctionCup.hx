@@ -9,6 +9,8 @@ import machinekit.catalog.CatalogMetadata.Conformance;
 import machinekit.component.ComponentDetail;
 import machinekit.component.PortInterface;
 import machinekit.pneumatic.SuctionCup;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ComponentType;
 
 typedef SchmalzCupSpec = {
 	var designation:String;
@@ -69,11 +71,17 @@ class SchmalzSuctionCup extends SuctionCup {
 			new InertiaTensor(transverse, 0, 0, transverse, 0, axial));
 	}
 
-	public static function recipeType():machinekit.component.ComponentType
-		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.pneumatic.schmalz-suction-cup");
+	static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.pneumatic.schmalz-suction-cup",
+			[ComponentRecipeSupport.catalog("designation", SchmalzSuctionCup.catalog(), "10.01.01.11400")],
+			v -> new SchmalzSuctionCup(v.token("designation")), true);
+		return recipeTypeCache;
+	}
 
 	/** Subclasses must declare their own recipe and saved values. */
-	override public function componentType():Null<machinekit.component.ComponentType>
+	override public function componentType():Null<ComponentType>
 		return Std.isExactType(this, SchmalzSuctionCup) ? recipeType() : null;
 
 	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues().setToken("designation", spec.designation).setToken("material", materialSpec());

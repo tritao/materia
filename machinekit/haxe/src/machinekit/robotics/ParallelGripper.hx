@@ -8,6 +8,8 @@ import machinekit.component.PortInterface;
 import machinekit.component.PortKind;
 import machinekit.component.PortRole;
 import machinekit.component.Solids;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ComponentType;
 
 /** Generic two-jaw pneumatic gripper envelope; stroke is the total jaw travel. */
 class ParallelGripper extends MachineComponent {
@@ -30,14 +32,20 @@ class ParallelGripper extends MachineComponent {
 		addConnector("tcp", Face, Solids.axial(0, 0, length));
 		addPort({name: "open", kind: Pneumatic, role: Consumer, iface: PushIn(6), required: true});
 		addPort({name: "close", kind: Pneumatic, role: Consumer, iface: PushIn(6), required: true});
-		addCapability(Grip(stroke, null, "open", "close"));
+		addFacet(new GripFacet(stroke, null, "open", "close"));
 	}
 
-	public static function recipeType():machinekit.component.ComponentType
-		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.robotics.parallel-gripper");
+	static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.robotics.parallel-gripper", [ComponentRecipeSupport.length("width", 40), ComponentRecipeSupport.length("depth", 20),
+			ComponentRecipeSupport.length("length", 60), ComponentRecipeSupport.length("stroke", 30)],
+			v -> new ParallelGripper(v.number("width"), v.number("depth"), v.number("length"), v.number("stroke")), true);
+		return recipeTypeCache;
+	}
 
 	/** Subclasses must declare their own recipe and saved values. */
-	override public function componentType():Null<machinekit.component.ComponentType>
+	override public function componentType():Null<ComponentType>
 		return Std.isExactType(this, ParallelGripper) ? recipeType() : null;
 
 	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues().setNumber("width", width).setNumber("depth", depth).setNumber("length", length).setNumber("stroke", stroke).setToken("material", materialSpec());

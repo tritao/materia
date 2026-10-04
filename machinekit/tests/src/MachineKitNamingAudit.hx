@@ -19,7 +19,7 @@ class MachineKitNamingAudit {
 	public static function run():Void {
 		var failures:Array<String> = [];
 		var report = Sys.getEnv("MACHINEKIT_NAMING_AUDIT") == "print";
-		for (type in MachineKitComponents.all()) {
+		for (type in MachineKitComponents.defaultRegistry().all()) {
 			var bad = weakFaces(type.id);
 			if (bad == null)
 				continue;
@@ -37,7 +37,7 @@ class MachineKitNamingAudit {
 
 	/** The weak or repeated face names of `id`'s default geometry, or null when it has none. */
 	static function weakFaces(id:String):Null<Array<String>> {
-		var component = MachineKitComponents.byId(id).create();
+		var component = MachineKitComponents.defaultRegistry().byId(id).create();
 		if (!component.hasGeometry())
 			return null;
 		var part = component.geometry();

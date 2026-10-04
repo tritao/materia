@@ -12,6 +12,8 @@ import machinekit.component.PortInterface;
 import machinekit.component.PortKind;
 import machinekit.component.PortRole;
 import machinekit.component.Solids;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ComponentType;
 
 typedef SchmalzFittingSpec = {
 	var designation:String;
@@ -58,11 +60,17 @@ class SchmalzPushInFitting extends MachineComponent {
 			new InertiaTensor(transverse, 0, 0, transverse, 0, m * r * r / 2));
 	}
 
-	public static function recipeType():machinekit.component.ComponentType
-		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.pneumatic.schmalz-push-in-fitting");
+	static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.pneumatic.schmalz-push-in-fitting",
+			[ComponentRecipeSupport.catalog("designation", SchmalzPushInFitting.catalog(), "10.08.02.00203")],
+			v -> new SchmalzPushInFitting(v.token("designation")), true);
+		return recipeTypeCache;
+	}
 
 	/** Subclasses must declare their own recipe and saved values. */
-	override public function componentType():Null<machinekit.component.ComponentType>
+	override public function componentType():Null<ComponentType>
 		return Std.isExactType(this, SchmalzPushInFitting) ? recipeType() : null;
 
 	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues().setToken("designation", spec.designation).setToken("material", materialSpec());

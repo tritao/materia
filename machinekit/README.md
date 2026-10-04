@@ -192,6 +192,19 @@ can be given in either order. Components declare service passages with
 `addBridge` and changes of service kind with `addConversion`; `upstream()`
 follows only those declared routes.
 
+`include(id, assembly, ?pose)` keeps a snapshot of the included assembly as a
+subassembly; records on the including level name its members by path
+(`arm/link1`). Each level is four parts: `MechanicalAssembly` (members,
+subassemblies, connectors, joints, couplings), `ServiceNetwork` (port
+connections and exposures), `DriveSystem` (transmissions, belt paths, motors,
+encoders) and `AssemblyInventory` (BOM extras). Checks, mass, `addTo` and
+`definition()` work on one flattened view of all levels, built on demand.
+`describe()` saves the nested ProjectKit definition with each level's MachineKit
+facts beside it; `decode(text, ?registry)` rebuilds members through a
+`ComponentRegistry` (`MachineKitComponents.defaultRegistry()` unless given).
+Parts state what they are for through typed facets (`SuctionFacet`,
+`GripFacet`, `WeldingSupplyFacet`, ...), each looked up with its class's `of`.
+
 `machinekit.assembly` composes standalone `MachineComponent`s into small
 machines, the same way `examples/MotorShaftBearings.hx` does, but as reusable
 library classes rather than one-off scripts:

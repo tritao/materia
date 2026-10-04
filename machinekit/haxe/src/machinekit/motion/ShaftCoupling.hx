@@ -1,5 +1,6 @@
 package machinekit.motion;
 
+import haxe.Json;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import materia.assembly.AssemblyFrames;
@@ -10,6 +11,8 @@ import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 import machinekit.standard.SocketHeadCapScrew;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ComponentType;
 
 /** One radial tapped set-screw hole in a shaft coupling. `z` is the axial location and `angle`
  * is measured in radians from local +X toward +Y. The thread flanks are not modelled. */
@@ -66,11 +69,18 @@ class ShaftCoupling extends MachineComponent {
 		}
 	}
 
-	public static function recipeType():machinekit.component.ComponentType
-		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.motion.shaft-coupling");
+	static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.motion.shaft-coupling", [ComponentRecipeSupport.length("boreA", 8), ComponentRecipeSupport.length("boreB", 8),
+			ComponentRecipeSupport.length("outerDiameter", 20), ComponentRecipeSupport.length("length", 30), ComponentRecipeSupport.text("setScrews", '[{"z":7.5,"angle":0},{"z":22.5,"angle":0}]')],
+			v -> new ShaftCoupling(v.number("boreA"), v.number("boreB"), v.number("outerDiameter"),
+				v.number("length"), ShaftCoupling.setScrewsFromText(v.token("setScrews"))), true);
+		return recipeTypeCache;
+	}
 
 	/** Subclasses must declare their own recipe and saved values. */
-	override public function componentType():Null<machinekit.component.ComponentType>
+	override public function componentType():Null<ComponentType>
 		return Std.isExactType(this, ShaftCoupling) ? recipeType() : null;
 
 	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues().setNumber("boreA", boreA).setNumber("boreB", boreB).setNumber("outerDiameter", outerDiameter).setNumber("length", length).setToken("setScrews", haxe.Json.stringify(setScrews)).setToken("material", materialSpec());
@@ -118,5 +128,10 @@ class ShaftCoupling extends MachineComponent {
 				if (Math.abs(holes[j].z - hole.z) < 1e-6 && Math.abs(holes[j].angle - hole.angle) < 1e-6)
 					throw "Shaft coupling set screw locations must be unique";
 		}
+	}
+
+	public static function setScrewsFromText(text:String):Array<ShaftCouplingSetScrew> {
+		var rows:Array<Dynamic> = Json.parse(text);
+		return [for (row in rows) {z: cast Reflect.field(row, "z"), angle: cast Reflect.field(row, "angle")}];
 	}
 }

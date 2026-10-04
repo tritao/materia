@@ -23,6 +23,9 @@
     "machinekit": {
       "path": "../../machinekit"
     },
+    "machinekit-robot": {
+      "path": "../../machinekit/robot"
+    },
     "bimkit": {
       "path": "../../bimkit"
     }

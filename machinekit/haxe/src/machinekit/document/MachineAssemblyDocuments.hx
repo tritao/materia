@@ -8,19 +8,35 @@ import cadkit.parametric.PersistentReference;
 import cadkit.parametric.TypedProperty;
 import haxeon.wire.JsonWire;
 import machinekit.assembly.MachineAssembly;
+import machinekit.assembly.MachineAssemblyCodec;
 import machinekit.assembly.MachineAssemblyDescription;
-import machinekit.assembly.MachineAssemblyDescription.AssemblySideRecord;
-import machinekit.assembly.MachineAssemblyDescription.PortConnectionRecord;
-import machinekit.assembly.MachineAssemblyDescription.MemberSource;
-import machinekit.assembly.MachineAssemblyDescription.SavedValue;
-import machinekit.component.ComponentValues;
-import machinekit.component.ComponentValue;
+import machinekit.component.ComponentRegistry;
 import machinekit.component.MachineKitComponents;
 import machinekit.robotics.EndEffector;
+import machinekit.robotics.EndEffectorDescription;
 import machinekit.robotics.EndEffectorSet;
 import cadkit.parametric.Definition;
 import cadkit.parametric.InstanceElement;
 import materia.assembly.AssemblyDefinitionFlattener;
+
+/** What kind of MachineKit assembly a document holds, with the data its kind adds. */
+@:wire enum MachineDocumentKind {
+	@:id(1) Assembly;
+	@:id(2) Effector(endEffector:EndEffectorRecord);
+	@:id(3) EffectorSet(endEffector:EndEffectorRecord, changer:ChangerRecord, tools:Array<ChangerToolRecord>);
+}
+
+/**
+ * The MachineKit side of an assembly document. Members and port connections are left out of the
+ * stored copy: the document's instances and relationships hold them, so editing those edits the assembly.
+ */
+@:wire typedef MachineDocumentRecord = {
+	@:id(1) var assembly:MachineAssemblyDescription;
+	@:id(2) var kind:MachineDocumentKind;
+}
+
+/** One level of a description: its path from the root and its facts. */
+private typedef DocumentLevel = {var path:String; var machine:MachineLevelRecord;}
 
 /** Stores mechanical data through CadKit and MachineKit facts beside it. */
 class MachineAssemblyDocuments {
@@ -40,99 +56,154 @@ class MachineAssemblyDocuments {
 		}
 	}
 
+	public static function describeDocument(assembly:MachineAssembly):MachineDocumentRecord {
+		if (Std.isOfType(assembly, EndEffectorSet)) {
+			var set:EndEffectorSet = cast assembly;
+			var description = set.describeSet();
+			return {assembly: description.base.assembly,
+				kind: MachineDocumentKind.EffectorSet(description.base.endEffector, description.changer, description.tools)};
+		}
+		if (Std.isOfType(assembly, EndEffector)) {
+			var effector:EndEffector = cast assembly;
+			var description = effector.describeEndEffector();
+			return {assembly: description.assembly, kind: MachineDocumentKind.Effector(description.endEffector)};
+		}
+		return {assembly: assembly.describe(), kind: MachineDocumentKind.Assembly};
+	}
+
 	static function writeAssembly(document:Document, assembly:MachineAssembly):Element {
 		// The generated codec checks all members, including tools, before creating document objects.
-		var description:MachineAssemblyDescription = JsonWire.decode(assembly.encode());
-		MachineAssembly.fromDescription(description);
+		var record:MachineDocumentRecord = JsonWire.decode(JsonWire.encode(describeDocument(assembly)));
+		var description = record.assembly;
+		MachineAssemblyCodec.encode(description);
+		var tools = toolsOf(record.kind);
+		for (tool in tools) MachineAssemblyCodec.encode(tool.tool.assembly);
+		rebuild(record);
 		for (existing in document.allElements())
 			if (propertyText(existing, "cadkit.assembly.kind") == "root" &&
 				propertyText(existing, "cadkit.assembly.id") == description.mechanical.id)
 				removeToolInstances(document, existing);
+		var members = membersByPath(description);
 		var recipes:Map<String, Definition> = [];
-		var root = AssemblyDocuments.fromDefinition(document, machinekit.assembly.FrozenAssemblyDefinitions.thaw(description.mechanical),
+		var root = AssemblyDocuments.fromDefinition(document, description.mechanical,
 			(scope, occurrence, component) -> {
 				if (component == null) return null;
-				var member = sourceFor(description.machine.members, scope, occurrence.id);
+				var member = members.get(scope + occurrence.id);
 				if (member == null) return null;
 				return recipeDefinition(document, member, recipes);
 			});
-		var side = description.machine;
-		var noConnections:Array<PortConnectionRecord> = [];
-		var noMembers:Array<machinekit.assembly.MachineAssemblyDescription.MemberRecord> = [];
-		var saved:AssemblySideRecord = {
-			members: noMembers, ports: side.ports, included: side.included,
-			portConnections: noConnections, portExposures: side.portExposures,
-			bomExtras: side.bomExtras, connectorExposures: side.connectorExposures,
-			memberConnectors: side.memberConnectors, endEffector: side.endEffector,
-			changer: side.changer, tools: side.tools, transmissions: side.transmissions, beltPaths: side.beltPaths, motors: side.motors, encoders: side.encoders
-		};
-		var toolRecords:Array<machinekit.assembly.MachineAssemblyDescription.ToolRecord> = [];
-		if (side.tools != null) for (tool in side.tools) {
-			var emptyToolConnections:Array<PortConnectionRecord> = [];
-			toolRecords.push({id: tool.id, mechanical: tool.mechanical,
-				machine: {members: tool.machine.members, ports: tool.machine.ports,
-					included: tool.machine.included, portConnections: emptyToolConnections,
-					portExposures: tool.machine.portExposures, bomExtras: tool.machine.bomExtras,
-					connectorExposures: tool.machine.connectorExposures,
-					memberConnectors: tool.machine.memberConnectors,
-					endEffector: tool.machine.endEffector, transmissions: tool.machine.transmissions, beltPaths: tool.machine.beltPaths,
-					motors: tool.machine.motors, encoders: tool.machine.encoders}});
-		}
-		saved.tools = toolRecords;
+		var stored:MachineDocumentRecord = {assembly: stripped(description),
+			kind: switch record.kind {
+				case EffectorSet(effector, changer, tools):
+					MachineDocumentKind.EffectorSet(effector, changer, [for (tool in tools)
+						{id: tool.id, tool: {assembly: stripped(tool.tool.assembly), endEffector: tool.tool.endEffector}}]);
+				case kind: kind;
+			}};
 		root.setProperty(TypedProperty.text(PREFIX + "schemaVersion", Std.string(MachineAssembly.SCHEMA_VERSION)));
-		root.setProperty(TypedProperty.text(PREFIX + "side", JsonWire.encode(saved)));
+		root.setProperty(TypedProperty.text(PREFIX + "side", JsonWire.encode(stored)));
 		var endpoints = new Map<String, Element>();
 		for (element in document.allElements()) if (element.kind == "instance" && belongsToCadKit(element, root)) {
 			var path = propertyText(element, "cadkit.assembly.path");
-			var member = sourceFor(side.members, "", path);
-			if (member != null) {
-				element.setProperty(TypedProperty.text(PREFIX + "occurrence", member.occurrence));
-				element.setProperty(TypedProperty.text("machinekit.occurrence", member.occurrence));
-				endpoints.set(member.occurrence, element);
+			if (path != null && members.exists(path)) {
+				element.setProperty(TypedProperty.text(PREFIX + "occurrence", path));
+				element.setProperty(TypedProperty.text("machinekit.occurrence", path));
+				endpoints.set(path, element);
 			}
 		}
-		for (connection in side.portConnections) {
-			var source = endpoints.get(connection.fromInstance);
-			var target = endpoints.get(connection.toInstance);
-			if (source == null || target == null)
-				throw 'Port connection "${connection.id}" references a missing member';
-			var relationship = document.createRelationship(PORT_CONNECTION,
-				new ElementReference(document.id, source.id), new ElementReference(document.id, target.id));
-			put(relationship, "id", connection.id);
-			put(relationship, "fromPort", connection.fromPort);
-			put(relationship, "toPort", connection.toPort);
-		}
-		if (side.tools != null) for (tool in side.tools) {
+		for (level in levels(description)) for (connection in level.machine.portConnections)
+			writeConnection(document, connection, level.path, null, endpoints);
+		for (tool in tools) {
 			var toolEndpoints:Map<String, Element> = [];
-			var flatTool = AssemblyDefinitionFlattener.flatten(machinekit.assembly.FrozenAssemblyDefinitions.thaw(tool.mechanical));
-			for (member in tool.machine.members) {
+			var flatTool = AssemblyDefinitionFlattener.flatten(tool.tool.assembly.mechanical);
+			var toolMembers = membersByPath(tool.tool.assembly);
+			for (path in toolMembers.keys()) {
+				var member = toolMembers.get(path);
 				var definition = recipeDefinition(document, member, recipes);
-				if (definition == null) throw 'Tool member "${tool.id}/${member.occurrence}" has no recipe';
-				var instance = document.createInstance(tool.id + "/" + member.occurrence, definition);
-				for (occurrence in flatTool.occurrences) if (occurrence.id == member.occurrence)
+				if (definition == null) throw 'Tool member "${tool.id}/$path" has no recipe';
+				var instance = document.createInstance(tool.id + "/" + path, definition);
+				for (occurrence in flatTool.occurrences) if (occurrence.id == path)
 					instance.setPlacement(cadkit.parametric.PlacementFrames.fromAssemblyFrame(occurrence.initialPose));
 				instance.setProperty(TypedProperty.elementReference(PREFIX + "owner",
 					new ElementReference(document.id, root.id)));
 				instance.setProperty(TypedProperty.text(PREFIX + "tool", tool.id));
-				instance.setProperty(TypedProperty.text(PREFIX + "occurrence", member.occurrence));
-				instance.setProperty(TypedProperty.text("machinekit.occurrence", tool.id + "/" + member.occurrence));
-				toolEndpoints.set(member.occurrence, instance);
+				instance.setProperty(TypedProperty.text(PREFIX + "occurrence", path));
+				instance.setProperty(TypedProperty.text("machinekit.occurrence", tool.id + "/" + path));
+				toolEndpoints.set(path, instance);
 			}
-			for (connection in tool.machine.portConnections) {
-				var source = toolEndpoints.get(connection.fromInstance);
-				var target = toolEndpoints.get(connection.toInstance);
-				if (source == null || target == null)
-					throw 'Tool port connection "${tool.id}/${connection.id}" references a missing member';
-				var relationship = document.createRelationship(PORT_CONNECTION,
-					new ElementReference(document.id, source.id), new ElementReference(document.id, target.id));
-				put(relationship, "tool", tool.id);
-				put(relationship, "id", connection.id);
-				put(relationship, "fromPort", connection.fromPort);
-				put(relationship, "toPort", connection.toPort);
-			}
+			for (level in levels(tool.tool.assembly)) for (connection in level.machine.portConnections)
+				writeConnection(document, connection, level.path, tool.id, toolEndpoints);
 		}
 		return root;
 	}
+
+	static function writeConnection(document:Document, connection:PortConnectionRecord, level:String,
+			tool:Null<String>, endpoints:Map<String, Element>):Void {
+		var source = endpoints.get(join(level, connection.fromInstance));
+		var target = endpoints.get(join(level, connection.toInstance));
+		var scope = tool == null ? "" : '$tool/';
+		if (source == null || target == null)
+			throw 'Port connection "$scope${join(level, connection.id)}" references a missing member';
+		var relationship = document.createRelationship(PORT_CONNECTION,
+			new ElementReference(document.id, source.id), new ElementReference(document.id, target.id));
+		if (tool != null) put(relationship, "tool", tool);
+		if (level.length > 0) put(relationship, "level", level);
+		put(relationship, "id", connection.id);
+		put(relationship, "fromPort", connection.fromPort);
+		put(relationship, "toPort", connection.toPort);
+	}
+
+	static function toolsOf(kind:MachineDocumentKind):Array<ChangerToolRecord> return switch kind {
+		case EffectorSet(_, _, tools): tools;
+		case _: [];
+	};
+
+	/** A copy with no members or port connections; the document holds those. */
+	static function stripped(description:MachineAssemblyDescription):MachineAssemblyDescription {
+		var copy:MachineAssemblyDescription = JsonWire.decode(JsonWire.encode(description));
+		for (level in levels(copy)) {
+			level.machine.members = [];
+			level.machine.portConnections = [];
+		}
+		return copy;
+	}
+
+	static function levels(description:MachineAssemblyDescription):Array<DocumentLevel> {
+		var result:Array<DocumentLevel> = [{path: "", machine: description.machine}];
+		for (record in description.subassemblies) result.push({path: record.path, machine: record.machine});
+		return result;
+	}
+
+	static function membersByPath(description:MachineAssemblyDescription):Map<String, MemberRecord> {
+		var result = new Map<String, MemberRecord>();
+		for (level in levels(description)) for (member in level.machine.members)
+			result.set(join(level.path, member.occurrence), member);
+		return result;
+	}
+
+	/** Each member path of the nested definition, with the level that owns it and its local name. */
+	static function memberLevels(description:MachineAssemblyDescription):Map<String, {level:String, local:String}> {
+		var result = new Map<String, {level:String, local:String}>();
+		var table = new Map<String, materia.assembly.AssemblyDefinition.AssemblySubdefinition>();
+		var mechanical = description.mechanical;
+		if (mechanical.assemblies != null) for (entry in mechanical.assemblies) table.set(entry.id, entry);
+		walkMembers(mechanical.occurrences, "", table, result);
+		return result;
+	}
+
+	static function walkMembers(occurrences:Array<materia.assembly.AssemblyDefinition.AssemblyComponentOccurrence>, level:String,
+			table:Map<String, materia.assembly.AssemblyDefinition.AssemblySubdefinition>,
+			result:Map<String, {level:String, local:String}>):Void
+		for (occurrence in occurrences) {
+			var path = join(level, occurrence.id);
+			if (occurrence.assembly == null) result.set(path, {level: level, local: occurrence.id});
+			else {
+				var entry = table.get(occurrence.assembly);
+				if (entry == null) throw 'Unknown nested assembly "${occurrence.assembly}"';
+				walkMembers(entry.occurrences, path, table, result);
+			}
+		}
+
+	static function join(level:String, id:String):String return level.length == 0 ? id : level + "/" + id;
 
 	static function removeToolInstances(document:Document, root:Element):Void {
 		var owned = [for (element in document.allElements())
@@ -145,32 +216,17 @@ class MachineAssemblyDocuments {
 		for (element in owned) document.removeElement(element.id);
 	}
 
-	static function sourceFor(members:haxe.ds.ReadOnlyArray<machinekit.assembly.MachineAssemblyDescription.MemberRecord>,
-			scope:String, local:String):Null<machinekit.assembly.MachineAssemblyDescription.MemberRecord> {
-		var path = scope + local;
-		for (member in members) if (member.occurrence == path) return member;
-		return null;
-	}
-
-	static function recipeDefinition(document:Document,
-			member:machinekit.assembly.MachineAssemblyDescription.MemberRecord,
-			cache:Map<String, Definition>):Null<Definition> {
+	static function recipeDefinition(document:Document, member:MemberRecord, cache:Map<String, Definition>):Null<Definition> {
 		var typeId:String;
-		var values = new ComponentValues();
+		var values = new machinekit.component.ComponentValues();
 		switch member.source {
 			case Code(_): return null;
 			case Typed(id, saved):
 				typeId = id;
-				for (entry in saved) values.set(entry.name, switch entry.value {
-					case SavedValue.Number(value): ComponentValue.Number(value);
-					case SavedValue.Integer(value): ComponentValue.Integer(value);
-					case SavedValue.Boolean(value): ComponentValue.Boolean(value);
-					case SavedValue.Token(value): ComponentValue.Token(value);
-					case SavedValue.Unset: ComponentValue.Unset;
-				});
+				for (entry in saved) values.set(entry.name, MachineAssemblyCodec.componentValue(entry.value));
 		}
 		values.setToken("material", member.material);
-		var type = MachineKitComponents.byId(typeId);
+		var type = MachineKitComponents.defaultRegistry().byId(typeId);
 		var key = type.key(values);
 		var definition = cache.get(key);
 		if (definition == null) {
@@ -199,127 +255,116 @@ class MachineAssemblyDocuments {
 		return reference.documentId == root.document.id.value && reference.targetId == root.id.value;
 	}
 
-	public static function describeAssembly(root:Element):MachineAssemblyDescription {
+	static function memberRecord(element:InstanceElement, local:String):MemberRecord {
+		var component = MachineKitRecipes.component(element);
+		if (component.componentType() == null) throw 'Saved member "$local" has no recipe';
+		return {occurrence: local, material: component.materialSpec(), source: MachineAssemblyCodec.memberSource(component)};
+	}
+
+	/** The document's assembly as data, with members and port connections read from the document. */
+	public static function describeAssembly(root:Element):MachineDocumentRecord {
 		var version = propertyText(root, PREFIX + "schemaVersion");
 		if (version != Std.string(MachineAssembly.SCHEMA_VERSION))
 			throw 'schema v$version is unsupported; expected v${MachineAssembly.SCHEMA_VERSION}';
 		var property = root.property(PREFIX + "side");
 		if (property == null) throw "Assembly document has no MachineKit side record";
 		var savedText:String = cast property.value;
-		var side:AssemblySideRecord = JsonWire.decode(savedText);
+		var record:MachineDocumentRecord = JsonWire.decode(savedText);
+		var description = record.assembly;
+		description.mechanical = AssemblyDocuments.toDefinition(root);
+		var owners = memberLevels(description);
+		var levelByPath = new Map<String, MachineLevelRecord>();
+		for (level in levels(description)) levelByPath.set(level.path, level.machine);
+		var tools = new Map<String, MachineAssemblyDescription>();
+		for (tool in toolsOf(record.kind)) tools.set(tool.id, tool.tool.assembly);
+		var toolOwners = new Map<String, Map<String, {level:String, local:String}>>();
+		var toolLevels = new Map<String, Map<String, MachineLevelRecord>>();
+		for (id in tools.keys()) {
+			var tool = tools.get(id);
+			toolOwners.set(id, memberLevels(tool));
+			var byPath = new Map<String, MachineLevelRecord>();
+			for (level in levels(tool)) byPath.set(level.path, level.machine);
+			toolLevels.set(id, byPath);
+		}
 		var endpoints = new Map<String, String>();
 		var toolEndpoints:Map<String, {tool:String, occurrence:String}> = [];
-		var toolElements:Map<String, Array<InstanceElement>> = [];
-		var rebuiltMembers:Array<machinekit.assembly.MachineAssemblyDescription.MemberRecord> = [];
-		var rebuiltPorts:Array<machinekit.assembly.MachineAssemblyDescription.PortRecord> = [];
 		for (element in root.document.allElements()) {
-			var path = element.property(PREFIX + "occurrence");
+			var path = propertyText(element, PREFIX + "occurrence");
 			if (path == null) continue;
 			var toolId = propertyText(element, PREFIX + "tool");
 			if (toolId != null && belongsToMachineKit(element, root)) {
-				toolEndpoints.set(element.id.value, {tool: toolId, occurrence: cast path.value});
-				var instances = toolElements.get(toolId);
-				if (instances == null) {instances = []; toolElements.set(toolId, instances);}
-				instances.push(cast element);
+				var ownersOfTool = toolOwners.get(toolId), levelsOfTool = toolLevels.get(toolId);
+				var owner = ownersOfTool == null ? null : ownersOfTool.get(path);
+				if (owner == null || levelsOfTool == null) throw 'Tool instance "$toolId/$path" is not a tool member';
+				toolEndpoints.set(element.id.value, {tool: toolId, occurrence: path});
+				requireLevel(levelsOfTool, owner.level).members.push(memberRecord(cast element, owner.local));
 				continue;
 			}
 			if (!belongsToCadKit(element, root)) continue;
-			var occurrence:String = cast path.value;
-			endpoints.set(element.id.value, occurrence);
-			var component = MachineKitRecipes.component(cast element);
-			var recipe = component.componentType();
-			if (recipe == null) throw 'Saved member "$occurrence" has no recipe';
-			var values = component.values(), names = values.names();
-			names.sort(Reflect.compare);
-			rebuiltMembers.push({occurrence: occurrence, material: component.materialSpec(),
-				source: MemberSource.Typed(recipe.id, [for (name in names) {name: name,
-					value: switch values.get(name) {
-						case ComponentValue.Number(value): SavedValue.Number(value);
-						case ComponentValue.Integer(value): SavedValue.Integer(value);
-						case ComponentValue.Boolean(value): SavedValue.Boolean(value);
-						case ComponentValue.Token(value): SavedValue.Token(value);
-						case ComponentValue.Unset: SavedValue.Unset;
-						case null: throw 'Missing value "$name"';
-					}}])});
-			for (port in component.ports()) rebuiltPorts.push({occurrence: occurrence,
-				name: port.name, kind: port.kind, role: port.role, iface: port.iface,
-				required: port.required, connector: port.connector});
+			var owner = owners.get(path);
+			if (owner == null) throw 'Instance "$path" is not an assembly member';
+			endpoints.set(element.id.value, path);
+			requireLevel(levelByPath, owner.level).members.push(memberRecord(cast element, owner.local));
 		}
-		rebuiltMembers.sort((a, b) -> Reflect.compare(a.occurrence, b.occurrence));
-		rebuiltPorts.sort((a, b) -> Reflect.compare(a.occurrence + "/" + a.name, b.occurrence + "/" + b.name));
-		side.members = rebuiltMembers;
-		side.ports = rebuiltPorts;
-		var connections:Array<PortConnectionRecord> = [];
-		var toolConnections:Map<String, Array<PortConnectionRecord>> = [];
 		for (relationship in root.document.allRelationships()) if (relationship.typeName == PORT_CONNECTION) {
+			var level = propertyTextRelationship(relationship, "level");
+			if (level == null) level = "";
 			var toolId = propertyTextRelationship(relationship, "tool");
+			var from:Null<String>, to:Null<String>, target:Null<MachineLevelRecord>;
 			if (toolId != null) {
 				var fromTool = toolEndpoints.get(relationship.source.elementId.value);
 				var toTool = toolEndpoints.get(relationship.target.elementId.value);
 				if (fromTool == null || toTool == null) continue;
 				if (fromTool.tool != toolId || toTool.tool != toolId)
 					throw 'Tool port connection crosses tool scopes: "$toolId"';
-				var rows = toolConnections.get(toolId);
-				if (rows == null) {rows = []; toolConnections.set(toolId, rows);}
-				rows.push({id: read(relationship, "id"), fromInstance: fromTool.occurrence,
-					fromPort: read(relationship, "fromPort"), toInstance: toTool.occurrence,
-					toPort: read(relationship, "toPort")});
-				continue;
+				from = fromTool.occurrence;
+				to = toTool.occurrence;
+				var levelsOfTool = toolLevels.get(toolId);
+				target = levelsOfTool == null ? null : levelsOfTool.get(level);
+			} else {
+				from = endpoints.get(relationship.source.elementId.value);
+				to = endpoints.get(relationship.target.elementId.value);
+				if (from == null && to == null) continue;
+				if (from == null || to == null) throw "Port connection crosses assembly documents";
+				target = levelByPath.get(level);
 			}
-			var from = endpoints.get(relationship.source.elementId.value);
-			var to = endpoints.get(relationship.target.elementId.value);
-			if (from == null && to == null) continue;
-			if (from == null || to == null) throw "Port connection crosses assembly documents";
-			connections.push({id: read(relationship, "id"), fromInstance: from,
-				fromPort: read(relationship, "fromPort"), toInstance: to,
+			if (target == null) throw 'Port connection names unknown level "$level"';
+			var prefix = level.length == 0 ? "" : level + "/";
+			if (!StringTools.startsWith(from, prefix) || !StringTools.startsWith(to, prefix))
+				throw 'Port connection leaves its level "$level"';
+			target.portConnections.push({id: read(relationship, "id"), fromInstance: from.substr(prefix.length),
+				fromPort: read(relationship, "fromPort"), toInstance: to.substr(prefix.length),
 				toPort: read(relationship, "toPort")});
 		}
-		connections.sort((a, b) -> Reflect.compare(a.id, b.id));
-		side.portConnections = connections;
-		if (side.tools != null) for (tool in side.tools) {
-			var rebuiltToolMembers:Array<machinekit.assembly.MachineAssemblyDescription.MemberRecord> = [];
-			var rebuiltToolPorts:Array<machinekit.assembly.MachineAssemblyDescription.PortRecord> = [];
-			var instances = toolElements.get(tool.id);
-			if (instances != null) for (instance in instances) {
-				var occurrence = propertyText(instance, PREFIX + "occurrence");
-				if (occurrence == null) throw "Tool instance is missing its occurrence id";
-				var component = MachineKitRecipes.component(instance);
-				var recipe = component.componentType();
-				if (recipe == null) throw 'Saved tool member "$occurrence" has no recipe';
-				var values = component.values(), names = values.names();
-				names.sort(Reflect.compare);
-				rebuiltToolMembers.push({occurrence: occurrence, material: component.materialSpec(),
-					source: MemberSource.Typed(recipe.id, [for (name in names) {name: name,
-						value: switch values.get(name) {
-							case ComponentValue.Number(value): SavedValue.Number(value);
-							case ComponentValue.Integer(value): SavedValue.Integer(value);
-							case ComponentValue.Boolean(value): SavedValue.Boolean(value);
-							case ComponentValue.Token(value): SavedValue.Token(value);
-							case ComponentValue.Unset: SavedValue.Unset;
-							case null: throw 'Missing value "$name"';
-						}}])});
-				for (port in component.ports()) rebuiltToolPorts.push({occurrence: occurrence,
-					name: port.name, kind: port.kind, role: port.role, iface: port.iface,
-					required: port.required, connector: port.connector});
-			}
-			rebuiltToolMembers.sort((a, b) -> Reflect.compare(a.occurrence, b.occurrence));
-			rebuiltToolPorts.sort((a, b) -> Reflect.compare(a.occurrence + "/" + a.name, b.occurrence + "/" + b.name));
-			tool.machine.members = rebuiltToolMembers;
-			tool.machine.ports = rebuiltToolPorts;
-			var rows = toolConnections.get(tool.id);
-			if (rows == null) rows = [];
-			rows.sort((a, b) -> Reflect.compare(a.id, b.id));
-			tool.machine.portConnections = rows;
-		}
-		return {schemaVersion: MachineAssembly.SCHEMA_VERSION, mechanical: machinekit.assembly.FrozenAssemblyDefinitions.freeze(AssemblyDocuments.toDefinition(root)), machine: side};
+		for (tool in tools) sortLevels(tool);
+		sortLevels(description);
+		return record;
 	}
 
-	public static function rebuildAssembly(root:Element):MachineAssembly {
-		var description = describeAssembly(root);
-		if (description.machine.changer != null) return EndEffectorSet.fromDescription(description);
-		if (description.machine.endEffector != null) return EndEffector.fromDescription(description);
-		return MachineAssembly.fromDescription(description);
+	static function requireLevel(levels:Map<String, MachineLevelRecord>, path:String):MachineLevelRecord {
+		var level = levels.get(path);
+		if (level == null) throw 'Unknown assembly level "$path"';
+		return level;
 	}
+
+	static function sortLevels(description:MachineAssemblyDescription):Void
+		for (level in levels(description)) {
+			level.machine.members.sort((a, b) -> Reflect.compare(a.occurrence, b.occurrence));
+			level.machine.portConnections.sort((a, b) -> Reflect.compare(a.id, b.id));
+		}
+
+	public static function rebuildAssembly(root:Element, ?registry:ComponentRegistry):MachineAssembly
+		return rebuild(describeAssembly(root), registry);
+
+	static function rebuild(record:MachineDocumentRecord, ?registry:ComponentRegistry):MachineAssembly
+		return switch record.kind {
+			case Assembly: MachineAssembly.fromDescription(record.assembly, registry);
+			case Effector(effector):
+				machinekit.robotics.EndEffector.fromDescription({assembly: record.assembly, endEffector: effector}, registry);
+			case EffectorSet(effector, changer, tools):
+				machinekit.robotics.EndEffectorSet.fromDescription({base: {assembly: record.assembly, endEffector: effector},
+					changer: changer, tools: tools}, registry);
+		};
 
 	static function put(relationship:cadkit.parametric.Relationship, name:String, value:String):Void
 		relationship.setProperty(TypedProperty.text(PREFIX + name, value));

@@ -2,7 +2,10 @@ package machinekit.robotics;
 
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.Diagnostics;
-import machinekit.assembly.MachineAssemblyDescription;
+import haxeon.wire.JsonWire;
+import machinekit.assembly.MachineAssemblyCodec;
+import machinekit.component.ComponentRegistry;
+import machinekit.robotics.EndEffectorDescription;
 
 typedef ChangerPortMap = {robot:String, tool:String};
 
@@ -20,58 +23,43 @@ class EndEffectorSet extends EndEffector {
 
 	public function new() super();
 
-	override public function describe():MachineAssemblyDescription {
-		var description = super.describe();
-		if (changerRef != null) description.machine.changer = {name: changerRef.name,
-			instanceId: changerRef.instanceId, connectorName: changerRef.connectorName,
-			ports: [for (entry in changerRef.ports) {robot: entry.robot, tool: entry.tool}]};
+	public function describeSet():EndEffectorSetDescription {
+		var changer = changerRef;
+		if (changer == null) throw "End effector set needs a changer";
 		var ids = toolIds();
 		ids.sort(Reflect.compare);
-		var toolRecords:Array<machinekit.assembly.MachineAssemblyDescription.ToolRecord> = [];
-		for (id in ids) {
-			var tool = tools.get(id).describe();
-			if (tool.machine.endEffector == null) throw 'Tool "$id" has no end-effector data';
-			toolRecords.push({id: id, mechanical: tool.mechanical, machine: {
-				members: tool.machine.members, ports: tool.machine.ports,
-				included: tool.machine.included,
-				portConnections: tool.machine.portConnections,
-				portExposures: tool.machine.portExposures, bomExtras: tool.machine.bomExtras,
-				connectorExposures: tool.machine.connectorExposures,
-				memberConnectors: tool.machine.memberConnectors,
-				endEffector: tool.machine.endEffector, transmissions: tool.machine.transmissions, beltPaths: tool.machine.beltPaths,
-				motors: tool.machine.motors, encoders: tool.machine.encoders}});
-		}
-		description.machine.tools = toolRecords;
-		return description;
+		return {base: describeEndEffector(), changer: {name: changer.name,
+			instanceId: changer.instanceId, connectorName: changer.connectorName,
+			ports: [for (entry in changer.ports) {robot: entry.robot, tool: entry.tool}]},
+			tools: [for (id in ids) {id: id, tool: requireTool(id).describeEndEffector()}]};
 	}
 
-	public static function fromDescription(description:MachineAssemblyDescription):EndEffectorSet {
-		var changer = description.machine.changer;
-		if (changer == null) throw "Description has no changer data";
-		var base = EndEffector.fromDescription(description);
+	function requireTool(id:String):EndEffector {
+		var tool = tools.get(id);
+		if (tool == null) throw 'Unknown changer tool "$id"';
+		return tool;
+	}
+
+	override public function encode():String {
+		var description = describeSet();
+		MachineAssemblyCodec.encode(description.base.assembly);
+		for (entry in description.tools) MachineAssemblyCodec.encode(entry.tool.assembly);
+		return JsonWire.encode(description);
+	}
+
+	public static function decode(text:String, ?registry:ComponentRegistry):EndEffectorSet {
+		var description:EndEffectorSetDescription = JsonWire.decode(text);
+		return fromDescription(description, registry);
+	}
+
+	public static function fromDescription(description:EndEffectorSetDescription, ?registry:ComponentRegistry):EndEffectorSet {
 		var result = new EndEffectorSet();
-		base.copyInto(result);
-		// Rebuild EOAT metadata through the public API.
-		var eoat = description.machine.endEffector;
-		if (eoat == null) throw "Description has no end-effector data";
-		if (eoat.mount != null) result.mount(eoat.mount.instanceId, eoat.mount.connectorName);
-		for (frame in eoat.frames) result.workingFrame(frame.name, frame.instanceId,
-			frame.connectorName, frame.name == eoat.primaryFrame);
-		for (id in eoat.collisionExclusions) result.excludeFromCollision(id);
-		result.changer(changer.name, changer.instanceId, changer.connectorName, changer.ports.copy());
-		if (description.machine.tools != null) for (entry in description.machine.tools) {
-			var machine:machinekit.assembly.MachineAssemblyDescription.AssemblySideRecord = {
-				members: entry.machine.members, ports: entry.machine.ports,
-				included: entry.machine.included,
-				portConnections: entry.machine.portConnections,
-				portExposures: entry.machine.portExposures, bomExtras: entry.machine.bomExtras,
-				connectorExposures: entry.machine.connectorExposures,
-				memberConnectors: entry.machine.memberConnectors, transmissions: entry.machine.transmissions, beltPaths: entry.machine.beltPaths,
-			motors: entry.machine.motors, encoders: entry.machine.encoders};
-			machine.endEffector = entry.machine.endEffector;
-			var tool:MachineAssemblyDescription = {schemaVersion: MachineAssembly.SCHEMA_VERSION, mechanical: entry.mechanical, machine: machine};
-			result.addTool(entry.id, EndEffector.fromDescription(tool));
-		}
+		MachineAssembly.fromDescription(description.base.assembly, registry).copyInto(result);
+		result.readEndEffector(description.base.endEffector);
+		var changer = description.changer;
+		result.changer(changer.name, changer.instanceId, changer.connectorName,
+			[for (entry in changer.ports) {robot: entry.robot, tool: entry.tool}]);
+		for (entry in description.tools) result.addTool(entry.id, EndEffector.fromDescription(entry.tool, registry));
 		return result;
 	}
 
@@ -123,8 +111,8 @@ class EndEffectorSet extends EndEffector {
 		if (masterCoupled != toolCoupled)
 			throw 'Changer tool "$id" needs a matching coupling interface';
 		if (masterCoupled) {
-			var robotHalf:{key:String, connector:String} = cast masterCoupling;
-			var toolHalf:{key:String, connector:String} = cast toolCoupling;
+			var robotHalf:machinekit.component.CouplingFacet = cast masterCoupling;
+			var toolHalf:machinekit.component.CouplingFacet = cast toolCoupling;
 			if (changer.connectorName != robotHalf.connector ||
 				mount.connectorName != toolHalf.connector ||
 				robotHalf.key != toolHalf.key)
@@ -161,9 +149,9 @@ class EndEffectorSet extends EndEffector {
 	}
 
 	/** Evaluate a configuration from portable data without modifying the source description. */
-	public static function configurationFromDescription(description:MachineAssemblyDescription,
-			toolId:String):EndEffector
-		return EndEffectorSet.fromDescription(description).buildConfiguration(toolId);
+	public static function configurationFromDescription(description:EndEffectorSetDescription,
+			toolId:String, ?registry:ComponentRegistry):EndEffector
+		return EndEffectorSet.fromDescription(description, registry).buildConfiguration(toolId);
 
 	function buildConfiguration(toolId:String):EndEffector {
 		if (changerRef == null) throw "End effector set needs a changer";

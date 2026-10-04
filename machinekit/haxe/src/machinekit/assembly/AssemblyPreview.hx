@@ -8,11 +8,6 @@ import materia.assembly.AssemblyDefinition.AssemblyComponentDefinition;
 import materia.project.MaterialLibrary;
 import materia.project.SceneArtifact.SceneArtifactData;
 import materia.project.SceneArtifact.SceneArtifactPart;
-import materia.project.SceneArtifact.SceneArtifactRobotSensor;
-import materia.project.SceneArtifact.SceneArtifactRobotTool;
-import machinekit.robotics.EndEffector;
-import machinekit.robotics.EndEffectorControls;
-import machinekit.welding.WeldingEquipment.WeldingEquipmentData;
 import materia.units.LengthUnit;
 
 /**
@@ -66,30 +61,26 @@ class AssemblyPreview {
     part.faceRanges = []; part.faceDescriptors = null; part.edgeSegments = null; part.edgeIds = null;
   }
 
-  static function movingBelts(assembly:MachineAssembly):materia.project.SceneArtifact.SceneArtifactMachineMotion {
-    var description = assembly.describe();
-    var belts:Array<materia.project.SceneArtifact.SceneArtifactBeltVisual> = [];
-    var paths = description.machine.beltPaths, motors = description.machine.motors;
-    if (paths != null && motors != null) for (path in paths) {
-      var entries = [for (entry in assembly.components()) if (entry.id == path.belt) entry];
-      if (entries.length != 1 || !Std.isOfType(entries[0].component, machinekit.transmission.TimingBelt)) continue;
-      var belt:machinekit.transmission.TimingBelt = cast entries[0].component;
-      var wraps = belt.wraps(), driver = -1, driverJoint = "";
-      for (i in 0...path.wraps.length) for (motor in motors)
-        for (joint in description.mechanical.joints)
-          if (joint.id == motor.joint && joint.child == path.wraps[i].instanceId) { driver = i; driverJoint = motor.joint; }
-      if (driver < 0) continue;
-      belts.push({occurrence: path.belt, pitch: belt.pitch, width: belt.width, thickness: belt.thickness,
-        driverJoint: driverJoint, driverWrap: driver,
-        driverSign: machinekit.transmission.BeltStretch.axisSign(
-          machinekit.assembly.FrozenAssemblyDefinitions.thaw(description.mechanical),
-          new cadkit.modeling.AssemblyState(machinekit.assembly.FrozenAssemblyDefinitions.thaw(description.mechanical)),
-          path.belt, driverJoint, path.wraps[driver].instanceId),
-        wraps: [for (i in 0...path.wraps.length) {occurrence: path.wraps[i].instanceId,
-          connector: path.wraps[i].connectorName, radius: wraps[i].radius, side: wraps[i].side}]});
-    }
-    return {belts: belts};
-  }
+	static function movingBelts(assembly:MachineAssembly):materia.project.SceneArtifact.SceneArtifactMachineMotion {
+		var flat = assembly.derived();
+		var belts:Array<materia.project.SceneArtifact.SceneArtifactBeltVisual> = [];
+		for (path in flat.beltPaths) {
+			if (!flat.hasMember(path.belt) || !Std.isOfType(flat.member(path.belt), machinekit.transmission.TimingBelt)) continue;
+			var belt:machinekit.transmission.TimingBelt = cast flat.member(path.belt);
+			var wraps = belt.wraps(), driver = -1, driverJoint = "";
+			for (i in 0...path.wraps.length) for (motor in flat.motors)
+				for (joint in flat.definition.joints)
+					if (joint.id == motor.joint && joint.child == path.wraps[i].instanceId) { driver = i; driverJoint = motor.joint; }
+			if (driver < 0) continue;
+			belts.push({occurrence: path.belt, pitch: belt.pitch, width: belt.width, thickness: belt.thickness,
+				driverJoint: driverJoint, driverWrap: driver,
+				driverSign: machinekit.transmission.BeltStretch.axisSign(assembly.definition(),
+					new cadkit.modeling.AssemblyState(assembly.definition()), path.belt, driverJoint, path.wraps[driver].instanceId),
+				wraps: [for (i in 0...path.wraps.length) {occurrence: path.wraps[i].instanceId,
+					connector: path.wraps[i].connectorName, radius: wraps[i].radius, side: wraps[i].side}]});
+		}
+		return {belts: belts};
+	}
 
 	/**
 	 * Points every occurrence at its shared definition (`definitionByOccurrence`; an occurrence missing
@@ -97,58 +88,6 @@ class AssemblyPreview {
 	 * takes the connectors of every occurrence that shares it; two occurrences may name the same
 	 * connector only with the same frame, since the scene holds one frame per name.
 	 */
-	/**
-	 * A robot's tools as its end effector `tool` declares them, its members' occurrences under
-	 * `prefix`: each suction cup's contact, worked by the effector's vacuum control channel and
-	 * reporting on its pressure sensor when it has one.
-	 */
-	public static function robotTools(tool:EndEffector, prefix:String, ?welding:WeldingEquipmentData):Array<SceneArtifactRobotTool> {
-		var controls = EndEffectorControls.derive(tool, prefix);
-		if (controls.arcs.length > 0) return torchTools(controls, prefix, welding);
-		var channel = controls.vacuumChannel();
-		if (channel == null) throw "The suction tool has no vacuum control";
-		return [for (suction in controls.suctions) {
-			var entry:SceneArtifactRobotTool = {kind: "suction",
-				contact: {occurrence: prefix + "/" + suction.member, connector: suction.connector}, channel: channel};
-			if (controls.vacuumSensor != null) entry.sensor = controls.vacuumSensor;
-			entry;
-		}];
-	}
-
-	/**
-	 * Each arc torch as a `torch` tool: its wire tip as the contact, its three channels and weld sensor, and the
-	 * welder behind it (`welding`: the supply's limits, the wire, and the work the circuit returns through, found by
-	 * `WeldingEquipment.of`).
-	 */
-	static function torchTools(controls:EndEffectorControls, prefix:String, welding:Null<WeldingEquipmentData>):Array<SceneArtifactRobotTool> {
-		if (welding == null) throw "A torch needs the welding equipment of its cell: pass WeldingEquipment.of(...)";
-		return [for (arc in controls.arcs) {
-			kind: "torch",
-			contact: {occurrence: prefix + "/" + arc.member, connector: arc.tcpConnector},
-			channel: arc.channel,
-			sensor: arc.sensor,
-			torch: {wireSpeedChannel: arc.wireSpeedChannel, voltageChannel: arc.voltageChannel,
-				groundedWork: welding.groundedWork.copy(), maxCurrentA: welding.maxCurrentA, efficiency: welding.efficiency,
-				wireDiameterMm: welding.wireDiameterMm, stickoutMm: arc.stickoutMm,
-				maxWireSpeedMPerMin: welding.maxWireSpeedMPerMin, depositionEfficiency: welding.depositionEfficiency}
-		}];
-	}
-
-	/**
-	 * The sensors `robot` declares, its members' occurrences under `prefix`: each planar scanner,
-	 * mounted at its scan connector and named after its occurrence.
-	 */
-	public static function robotSensors(robot:MachineAssembly, prefix:String):Array<SceneArtifactRobotSensor> {
-		var result:Array<SceneArtifactRobotSensor> = [];
-		for (entry in robot.components()) for (capability in entry.component.capabilities()) switch capability {
-			case PlanarScanner(scanConnector, rayCount, maxRangeMeters, rateHz):
-				result.push({kind: "lidar", id: prefix + entry.id, mount: {occurrence: prefix + entry.id, connector: scanConnector},
-					rayCount: rayCount, maxRange: maxRangeMeters, updateRate: rateHz});
-			case _:
-		}
-		return result;
-	}
-
 	public static function shareDefinitions(definition:AssemblyDefinition, definitionByOccurrence:Map<String, String>):Void {
 		function sharedId(id:String):String {
 			var shared = definitionByOccurrence.get(id);

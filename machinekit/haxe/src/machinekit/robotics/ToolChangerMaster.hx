@@ -8,6 +8,8 @@ import machinekit.component.PortInterface;
 import machinekit.component.PortKind;
 import machinekit.component.PortRole;
 import machinekit.component.Solids;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ComponentType;
 
 /** Generic robot-side changer half with bridged air and signal channels. */
 class ToolChangerMaster extends MachineComponent {
@@ -36,15 +38,21 @@ class ToolChangerMaster extends MachineComponent {
 		addPort({name: "signalOut", kind: Signal, role: Supply, iface: Plug("generic", 4), required: false});
 		addBridge("signalIn", "signalOut");
 		addPort({name: "lock", kind: Pneumatic, role: Consumer, iface: PushIn(6), required: true});
-		addCapability(ChangerLock("lock"));
-		addCapability(Coupling('generic:$airChannels:${Dimension.format(diameter)}', "tool"));
+		addFacet(new ChangerLockFacet("lock"));
+		addFacet(new machinekit.component.CouplingFacet('generic:$airChannels:${Dimension.format(diameter)}', "tool"));
 	}
 
-	public static function recipeType():machinekit.component.ComponentType
-		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.robotics.tool-changer-master");
+	static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.robotics.tool-changer-master", [ComponentRecipeSupport.count("airChannels", 2),
+			ComponentRecipeSupport.length("diameter", 60), ComponentRecipeSupport.length("thickness", 15)],
+			v -> new ToolChangerMaster(v.integer("airChannels"), v.number("diameter"), v.number("thickness")), true);
+		return recipeTypeCache;
+	}
 
 	/** Subclasses must declare their own recipe and saved values. */
-	override public function componentType():Null<machinekit.component.ComponentType>
+	override public function componentType():Null<ComponentType>
 		return Std.isExactType(this, ToolChangerMaster) ? recipeType() : null;
 
 	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues().setInteger("airChannels", airChannels).setNumber("diameter", diameter).setNumber("thickness", thickness).setToken("material", materialSpec());

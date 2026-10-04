@@ -49,7 +49,7 @@ class WeldingPowerSource extends MachineComponent {
 		addPort({name: "feederControl", kind: Signal, role: Supply, iface: WeldingInterfaces.control(), required: false});
 		addBridge("gas", "gasOut");
 		addBridge("control", "feederControl");
-		addCapability(WeldingSupply([Mig, Mag], maxCurrentA, AnalogIo, efficiency));
+		addFacet(new WeldingSupplyFacet([Mig, Mag], maxCurrentA, AnalogIo, efficiency));
 		declareMass(55, new Vector(0, 0, 0.4 * height));
 	}
 

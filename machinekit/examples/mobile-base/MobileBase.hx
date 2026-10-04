@@ -190,7 +190,7 @@ class LidarPuck extends MachineComponent {
 		super("LIDAR-D76-H70", "Planar scanning lidar", "plastic", true);
 		addConnector("base", Mount, Solids.axial(0, 0, 0));
 		addConnector("scan", Mount, AssemblyFrames.translation(0, 0, SCAN_HEIGHT));
-		addCapability(PlanarScanner("scan", RAYS, RANGE, RATE));
+		addFacet(new machinekit.sensing.PlanarScannerFacet("scan", RAYS, RANGE, RATE));
 	}
 
 	override public function hasGeometry():Bool return true;

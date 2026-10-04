@@ -15,8 +15,6 @@ import machinekit.assembly.LinearAxis;
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.InstancePath;
 import machinekit.component.PortInterfaces;
-import machinekit.units.Millimetres;
-import machinekit.units.KgMm2;
 import machinekit.assembly.MachineAssembly.AssemblyBomMass;
 import machinekit.assembly.FlangeBearingAssembly;
 import machinekit.catalog.Catalog;
@@ -282,9 +280,6 @@ class MachineKitSmoke {
 			!PortInterfaces.compatible(Plug("M12", 4), Plug("M12", 5)) &&
 			PortInterfaces.compatible(Thread("G1/8-M"), Thread("G1/8-F")),
 			"port interfaces compare by value with thread mating rules");
-		check(Math.abs((new Millimetres(250)).metres().raw() - 0.25) < 1e-12 &&
-			Math.abs((new KgMm2(1000000)).kgM2() - 1) < 1e-12,
-			"unit conversions at bridge boundaries");
 
 		var changer = new PortTestComponent("CHANGER");
 		changer.defineConnector("airFace");
@@ -476,7 +471,7 @@ class MachineKitSmoke {
 	}
 
 	static function componentRecipes():Void {
-		for (recipe in MachineKitComponents.all()) {
+		for (recipe in MachineKitComponents.defaultRegistry().all()) {
 			var original = recipe.create();
 			check(original.type == recipe, 'recipe type mismatch ${recipe.id}');
 			var values = original.values();
@@ -500,10 +495,10 @@ class MachineKitSmoke {
 			first.close();
 			second.close();
 		}
-		var bearing = MachineKitComponents.byId("machinekit.standard.deep-groove-bearing");
+		var bearing = MachineKitComponents.defaultRegistry().byId("machinekit.standard.deep-groove-bearing");
 		throws(() -> bearing.create(new ComponentValues().setToken("designation", "NO-BEARING")),
 			"Unknown catalog designation");
-		var pulley = MachineKitComponents.byId("machinekit.transmission.timing-pulley");
+		var pulley = MachineKitComponents.defaultRegistry().byId("machinekit.transmission.timing-pulley");
 		throws(() -> pulley.create(new ComponentValues().setToken("profile", "UNKNOWN")), "Invalid choice");
 		var angleType = new ComponentType("test.angle",
 			[new ComponentParameter("angle", ComponentParameterType.Angle, ComponentValue.Number(3))],
@@ -515,7 +510,7 @@ class MachineKitSmoke {
 			function(_:ComponentValues) return DeepGrooveBearing.metric("608"));
 		check(scalarType.key(null).indexOf("scalar:1:3") >= 0,
 			"scalar keys round above the signed 32-bit integer range");
-		var screwRecipe = MachineKitComponents.byId("machinekit.standard.socket-head-cap-screw");
+		var screwRecipe = MachineKitComponents.defaultRegistry().byId("machinekit.standard.socket-head-cap-screw");
 		var steelScrew = screwRecipe.create(new ComponentValues().setToken("material", "steel C45"));
 		check(steelScrew.bom.material == "steel C45", "non-default screw material reaches the BOM");
 		check(steelScrew.designation == "ISO4762-M5x20-steel-C45" &&
@@ -567,7 +562,7 @@ class MachineKitSmoke {
 		MachineKitRecipes.register();
 		MachineKitRecipes.register();
 		var registryDocument = new Document();
-		for (registered in MachineKitComponents.all()) {
+		for (registered in MachineKitComponents.defaultRegistry().all()) {
 			check(DefinitionEvaluatorRegistry.isRegistered(registered.id), "MachineKit evaluator registration");
 			var recipeDefinition = MachineKitDocuments.define(registryDocument, registered);
 			var defaultComponent = registered.create();
@@ -583,7 +578,7 @@ class MachineKitSmoke {
 		}
 		registryDocument.close();
 		var routeDocument = new Document();
-		var routeType = MachineKitComponents.byId("machinekit.pneumatic.routed-hose");
+		var routeType = MachineKitComponents.defaultRegistry().byId("machinekit.pneumatic.routed-hose");
 		var routeDefinition = MachineKitDocuments.define(routeDocument, routeType,
 			routeType.defaults().setToken("route", '[{"x":0,"y":0,"z":0},{"x":0,"y":0,"z":80},{"x":30,"y":0,"z":80}]'));
 		var routeInstance = routeDocument.createInstance("Hose", routeDefinition);
@@ -596,7 +591,7 @@ class MachineKitSmoke {
 		reloadedRoute.close();
 		routeDocument.close();
 		var document = new Document();
-		var type = MachineKitComponents.byId("machinekit.standard.deep-groove-bearing");
+		var type = MachineKitComponents.defaultRegistry().byId("machinekit.standard.deep-groove-bearing");
 		var definition = MachineKitDocuments.define(document, type);
 		check(definition.property("machinekit.type") != null && definition.properties().length == 1,
 			"only recipe identity is stored");
@@ -662,7 +657,7 @@ class MachineKitSmoke {
 		document.close();
 
 		var tools = new Document();
-		var screwType = MachineKitComponents.byId("machinekit.standard.socket-head-cap-screw");
+		var screwType = MachineKitComponents.defaultRegistry().byId("machinekit.standard.socket-head-cap-screw");
 		var screw = tools.createInstance("Screw", MachineKitDocuments.define(tools, screwType));
 		for (name in ["clearanceHole", "tapHole", "counterboreHole"])
 			check(tools.definitionOutput(screw, name).volume() > 0, "screw tool output " + name);
@@ -675,7 +670,7 @@ class MachineKitSmoke {
 		for (tool in screwComponent.toolSpecs()) if (tool.name == "counterboreHole") counterbore = tool;
 		check(counterbore != null && counterbore.defaults().number("depth") > screwComponent.spec.counterboreDepth,
 			"counterbore default depth covers the screw head");
-		var nutType = MachineKitComponents.byId("machinekit.standard.hex-nut");
+		var nutType = MachineKitComponents.defaultRegistry().byId("machinekit.standard.hex-nut");
 		var nut = tools.createInstance("Nut", MachineKitDocuments.define(tools, nutType));
 		check(tools.definitionOutput(nut, "pocket").volume() > 0,
 			"HexNut exposes a valid pocket tool output");
@@ -684,10 +679,10 @@ class MachineKitSmoke {
 		check(slipHousing.tool("bearingSeat", new ComponentValues()).volume() !=
 			interferenceHousing.tool("bearingSeat", new ComponentValues()).volume(),
 			"flange bearing housing tool uses its selected fit");
-		var motorType = MachineKitComponents.byId("machinekit.motion.nema-stepper");
+		var motorType = MachineKitComponents.defaultRegistry().byId("machinekit.motion.nema-stepper");
 		var motor = tools.createInstance("Motor", MachineKitDocuments.define(tools, motorType));
 		check(tools.definitionOutput(motor, "mountingCutout").volume() > 0, "motor cutout output");
-		var flangeType = MachineKitComponents.byId("machinekit.robotics.robot-flange");
+		var flangeType = MachineKitComponents.defaultRegistry().byId("machinekit.robotics.robot-flange");
 		var flange = tools.createInstance("Flange", MachineKitDocuments.define(tools, flangeType));
 		check(flange.connectorNames().indexOf("bolt4") >= 0 && flange.connectorNames().indexOf("bolt5") < 0,
 			"flange starts with four bolt connectors");
@@ -697,7 +692,7 @@ class MachineKitSmoke {
 		flange.setTypedOverride("boltCount", 3);
 		check(flange.connectorNames().indexOf("bolt3") >= 0 && flange.connectorNames().indexOf("bolt4") < 0,
 			"flange shrinks its connector set");
-		var railType = MachineKitComponents.byId("machinekit.motion.linear-rail");
+		var railType = MachineKitComponents.defaultRegistry().byId("machinekit.motion.linear-rail");
 		var rail = tools.createInstance("Rail", MachineKitDocuments.define(tools, railType));
 		var shortMounts = rail.connectorNames().length;
 		rail.setOverride("length", 200);
@@ -2112,8 +2107,8 @@ class MachineKitSmoke {
 		var beltBox = bounds(beltPart);
 		near(beltBox.maxX, 100 + 2 * 20 / (2 * Math.PI) + 1.38 / 2, "timing belt band reaches past the pitch line by half its thickness", 0.01);
 		beltPart.close();
-		check(MachineKitComponents.byId("machinekit.transmission.timing-belt").create(
-			MachineKitComponents.byId("machinekit.transmission.timing-belt").defaults()) != null, "timing belt recipe builds");
+		check(MachineKitComponents.defaultRegistry().byId("machinekit.transmission.timing-belt").create(
+			MachineKitComponents.defaultRegistry().byId("machinekit.transmission.timing-belt").defaults()) != null, "timing belt recipe builds");
 		check(belt.componentType() != null && belt.componentType().create(belt.values()).designation == belt.designation, "belt rebuilds from its recipe");
 
 		var thread = new LeadScrewThread(MetricTrapezoidal, 8, 2);

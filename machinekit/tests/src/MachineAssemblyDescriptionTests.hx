@@ -54,7 +54,7 @@ class MachineAssemblyDescriptionTests {
 
 	public static function roundTrip(assembly:MachineAssembly, label:String, massAvailable:Bool = true):Void {
 		var rebuilt:MachineAssembly = Std.isOfType(assembly, EndEffector)
-			? EndEffector.fromDescription(haxeon.wire.JsonWire.decode(assembly.encode()))
+			? EndEffector.decode(assembly.encode())
 			: MachineAssembly.decode(assembly.encode());
 		if (!Equality.equals(assembly.describe(), rebuilt.describe())) {
 			var before = assembly.encode(), after = rebuilt.encode(), offset = 0;
@@ -143,7 +143,7 @@ class MachineAssemblyDescriptionTests {
 		if (assembly.describe().mechanical.definitions.length != 1)
 			throw "Identical recipe parts should share a mechanical definition";
 		var detached = assembly.describe();
-		var editableCopy = machinekit.assembly.FrozenAssemblyDefinitions.thaw(detached.mechanical);
+		var editableCopy = detached.mechanical;
 		editableCopy.occurrences[0].initialPose.x = 42;
 		if (assembly.describe().mechanical.occurrences[0].initialPose.x == 42)
 			throw "Description retained a mutable connector or pose from the builder";
@@ -228,7 +228,7 @@ class MachineAssemblyDescriptionTests {
 			throw "Included assemblies were not preserved as nested definitions";
 		if (description.mechanical.occurrences.length != 2)
 			throw "Included members were not grouped into an assembly occurrence";
-		var flat = AssemblyDefinitionFlattener.flatten(machinekit.assembly.FrozenAssemblyDefinitions.thaw(description.mechanical));
+		var flat = AssemblyDefinitionFlattener.flatten(description.mechanical);
 		if (flat.occurrences.length != outer.components().length || flat.joints.length != 3)
 			throw "Nested assembly did not flatten to the original members and joints";
 		var expected = ["base", "unit/pair/first", "unit/pair/second"];
@@ -265,15 +265,12 @@ class MachineAssemblyDescriptionTests {
 
 	/** A coupling's ratio comes from the parts that drive it, so editing a part changes it. */
 	static function transmissionsFollowTheirParts():Void {
-		for (version in [2, 3, 4]) {
+		for (version in [2, 9, 12]) {
 			var oldRejected = false;
 			var oldVersion:machinekit.assembly.MachineAssemblyDescription.DescriptionVersion = {schemaVersion: version};
 			var oldText = haxeon.wire.JsonWire.encode(oldVersion);
 			try MachineAssembly.decode(oldText) catch (error:Dynamic)
-				oldRejected = Std.string(error).indexOf('Machine assembly schema v$version is unsupported') >= 0 &&
-					Std.string(error).indexOf('supported schema versions are v${MachineAssembly.SCHEMA_VERSION}, ' +
-						'v${MachineAssembly.PROCESS_SCHEMA_VERSION}, v${MachineAssembly.SENSOR_SCHEMA_VERSION} and ' +
-						'v${MachineAssembly.PROCESS_VELOCITY_SCHEMA_VERSION}') >= 0;
+				oldRejected = Std.string(error).indexOf('expected v${MachineAssembly.SCHEMA_VERSION}') >= 0;
 			if (!oldRejected) throw 'The v$version machine schema needs a clear rejection';
 		}
 		var sources:Array<Transmission> = [Transmission.LeadScrew("screw", "nut"),
@@ -450,7 +447,7 @@ class MachineAssemblyDescriptionTests {
 		assembly.addComponent("belt-part", belt, {x: 0, y: 0, z: 0, qx: 0, qy: -Math.sqrt(0.5), qz: 0, qw: Math.sqrt(0.5)});
 		assembly.addMateOnAxis("pulley-turn", "continuous", "base", "face", "pulley", "axis", {x: 0, y: 1, z: 0});
 		assembly.addComponent("belt-idler", new TimingPulley(GT2, 20, 8, 6), materia.assembly.AssemblyFrames.translation(0, 0, 444));
-		var beltState = new cadkit.modeling.AssemblyState(machinekit.assembly.FrozenAssemblyDefinitions.thaw(assembly.describe().mechanical));
+		var beltState = new cadkit.modeling.AssemblyState(assembly.definition());
 		assembly.addMemberConnector("pulley", "beltWrap", materia.assembly.AssemblyFrames.inverse(beltState.worldPose("pulley")));
 		assembly.addMemberConnector("slider", "beltClamp", materia.assembly.AssemblyFrames.compose(
 			materia.assembly.AssemblyFrames.inverse(beltState.worldPose("slider")), materia.assembly.AssemblyFrames.translation(0, -belt.wraps()[0].radius, 222)));
@@ -846,7 +843,7 @@ class MachineAssemblyDescriptionTests {
 		}
 		if (!edited) throw "Joint was not saved as a relationship";
 		var description = MachineAssemblyDocuments.describeAssembly(document.element(root.id));
-		var upper = description.mechanical.joints[0].limits.upper;
+		var upper = description.assembly.mechanical.joints[0].limits.upper;
 		if (upper == null || upper != 12.0)
 			throw "Typed joint limit edit was lost";
 		var victim:InstanceElement = null;
@@ -917,9 +914,8 @@ class MachineAssemblyDescriptionTests {
 		for (relationship in reopened.allRelationships()) if (relationship.typeName == MachineAssemblyDocuments.PORT_CONNECTION &&
 			relationship.property("machinekit.assembly.tool") != null) toolConnections++;
 		if (toolConnections != 1) throw "Tool port connection was not saved as a scoped relationship";
-		var restored = EndEffectorSet.fromDescription(
-			MachineAssemblyDocuments.describeAssembly(reopened.element(root.id)));
-		if (!Equality.equals(set.describe(), restored.describe())) {
+		var restored:EndEffectorSet = cast MachineAssemblyDocuments.rebuildAssembly(reopened.element(root.id));
+		if (!Equality.equals(set.describeSet(), restored.describeSet())) {
 			var before = set.encode(), after = restored.encode(), offset = 0;
 			while (offset < before.length && offset < after.length && before.charAt(offset) == after.charAt(offset)) offset++;
 			throw "EOAT set changed after document round trip at " + offset + ": " +
@@ -975,7 +971,7 @@ class MachineAssemblyDescriptionTests {
 			throw "Builder did not retain authored mechanical records";
 		var model = new AssemblyModel();
 		assembly.addTo(model, "");
-		var modelState = model.initialState(), savedState = new AssemblyState(machinekit.assembly.FrozenAssemblyDefinitions.thaw(definition));
+		var modelState = model.initialState(), savedState = new AssemblyState(definition);
 		modelState.setJoint("first", 5);
 		savedState.setJoint("first", 5);
 		for (id in ["a", "b", "c"])
@@ -1074,7 +1070,7 @@ class MachineAssemblyDescriptionTests {
 		try machinekit.transmission.BeltStretch.reduction(belt,
 			{belt: "belt", wraps: [{instanceId: "driver", connectorName: "front"},
 				{instanceId: "driven", connectorName: "front"}]}, "input", "output", "driver", "driven",
-			machinekit.assembly.FrozenAssemblyDefinitions.thaw(assembly.describe().mechanical),
+			assembly.definition(),
 			TimingBelt.reduction(belt, new TimingPulley(GT2, 20, 8, 6), new TimingPulley(GT2, 40, 8, 6), -1))
 		catch (error:machinekit.transmission.TransmissionDesignError) wrongSense = true;
 		if (!wrongSense) throw "Opposite Sense on a plain loop must be rejected";
@@ -1082,7 +1078,7 @@ class MachineAssemblyDescriptionTests {
 			new BeltWrap(100, 0, 10, -1), new BeltWrap(50, 60, 10, 1)]);
 		if (machinekit.transmission.BeltStretch.contactDirection(serpentine, 0, 1) != -1)
 			throw "Back-side serpentine contact must reverse pulley direction";
-		var definition = machinekit.assembly.FrozenAssemblyDefinitions.thaw(assembly.describe().mechanical);
+		var definition = assembly.definition();
 		var relation = definition.couplings[0], spring = relation.stiffness;
 		if (definition.elasticNetworks == null || definition.elasticNetworks.length != 1 ||
 				definition.elasticNetworks[0].couplings.length != 1 || definition.elasticNetworks[0].spans.length != 2)
@@ -1130,12 +1126,12 @@ class MachineAssemblyDescriptionTests {
 			throw "Belt reduction lost its source or attachments in a round trip";
 		var included = new MachineAssembly(); included.include("stage", assembly);
 		if (included.check().hasErrors()) throw "Included belt reduction did not prefix its pulley attachments";
-		var prefixed = machinekit.assembly.FrozenAssemblyDefinitions.thaw(included.describe().mechanical).elasticNetworks;
+		var prefixed = included.definition().elasticNetworks;
 		if (prefixed == null || prefixed.length != 1 || prefixed[0].id != "stage/belt" ||
 				prefixed[0].couplings[0] != "stage/reduction" || prefixed[0].spans[0].terms[0].joint != "stage/input")
 			throw "Included belt network did not namespace every physical and joint reference";
 		assembly.setTransmissionOverrides("reduction", State(12), State(0.002), State(0.003));
-		var stated = machinekit.assembly.FrozenAssemblyDefinitions.thaw(assembly.describe().mechanical).couplings[0];
+		var stated = assembly.definition().couplings[0];
 		var statedSpring = stated.stiffness;
 		if (statedSpring == null) throw "Stated reduction spring disappeared";
 		close(statedSpring, 12, "reduction honors stated stiffness");

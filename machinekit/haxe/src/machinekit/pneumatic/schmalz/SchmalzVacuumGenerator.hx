@@ -9,6 +9,8 @@ import machinekit.catalog.CatalogMetadata.Conformance;
 import machinekit.component.ComponentDetail;
 import machinekit.component.PortInterface;
 import machinekit.pneumatic.VacuumGenerator;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ComponentType;
 
 typedef SchmalzEjectorSpec = {
 	var designation:String;
@@ -59,11 +61,17 @@ class SchmalzVacuumGenerator extends VacuumGenerator {
 				m * (x * x + z * z) / 12, 0, m * (x * x + y * y) / 12));
 	}
 
-	public static function recipeType():machinekit.component.ComponentType
-		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.pneumatic.schmalz-vacuum-generator");
+	static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.pneumatic.schmalz-vacuum-generator",
+			[ComponentRecipeSupport.catalog("designation", SchmalzVacuumGenerator.catalog(), "10.02.01.00563")],
+			v -> new SchmalzVacuumGenerator(v.token("designation")), true);
+		return recipeTypeCache;
+	}
 
 	/** Subclasses must declare their own recipe and saved values. */
-	override public function componentType():Null<machinekit.component.ComponentType>
+	override public function componentType():Null<ComponentType>
 		return Std.isExactType(this, SchmalzVacuumGenerator) ? recipeType() : null;
 
 	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues().setToken("designation", spec.designation).setToken("material", materialSpec());

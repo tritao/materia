@@ -12,6 +12,7 @@ import machinekit.component.ComponentDetail;
 import materia.assembly.AssemblyFrames;
 import materia.project.SceneArtifact;
 import materia.project.SceneArtifact.SceneArtifactMobileBase;
+import machinekit.robot.RobotScene;
 
 /** Materia project entrypoint for the differential-drive mobile base. */
 class MobileBasePreview {
@@ -26,7 +27,7 @@ class MobileBasePreview {
 		var robot = new MobileBase();
 		var scene = AssemblyPreview.scene(robot, ASSEMBLY_ID);
 		scene.mobileBase = drive(robot, "");
-		scene.robotSensors = AssemblyPreview.robotSensors(robot, "");
+		scene.robotSensors = RobotScene.robotSensors(robot, "");
 		return SceneArtifact.encode(scene);
 	}
 
@@ -39,7 +40,7 @@ class MobileBasePreview {
 		section.origin = metres(MobileBaseCell.ORIGIN);
 		scene.mobileBase = section;
 		scene.robotTools = robotTools(cell.robot, "robot/");
-		scene.robotSensors = AssemblyPreview.robotSensors(cell.robot, "robot/");
+		scene.robotSensors = RobotScene.robotSensors(cell.robot, "robot/");
 		scene.mission = {loop: true,
 			steps: [for (step in MobileBaseCell.ROUND) switch step {
 				case GoTo(pose): {kind: "goTo", pose: metres(pose)};
@@ -51,7 +52,7 @@ class MobileBasePreview {
 
 	/** The tools of the arm the base carries, if any. */
 	static function robotTools(robot:MobileBase, prefix:String):Array<materia.project.SceneArtifact.SceneArtifactRobotTool>
-		return robot.arm == null ? [] : AssemblyPreview.robotTools(robot.arm.tool, prefix + "arm/tool");
+		return robot.arm == null ? [] : RobotScene.robotTools(robot.arm.tool, prefix + "arm/tool");
 
 	/** The drive of `robot`, whose joints carry `prefix`: wheel radius and track measured from its assembly. */
 	static function drive(robot:MobileBase, prefix:String):SceneArtifactMobileBase

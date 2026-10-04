@@ -28,7 +28,7 @@ class MachineKitRecipes {
 	static var watchedDocuments:Map<String, Bool> = [];
 
 	public static function register():Void {
-		for (type in MachineKitComponents.all()) {
+		for (type in MachineKitComponents.defaultRegistry().all()) {
 			var evaluator = evaluators.get(type.id);
 			if (evaluator == null) {
 				evaluator = new MachineKitRecipeEvaluator(type);
@@ -39,7 +39,7 @@ class MachineKitRecipes {
 	}
 
 	public static function typeOrNull(id:String):Null<ComponentType> {
-		for (type in MachineKitComponents.all()) if (type.id == id) return type;
+		for (type in MachineKitComponents.defaultRegistry().all()) if (type.id == id) return type;
 		return null;
 	}
 
