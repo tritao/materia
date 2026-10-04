@@ -530,7 +530,7 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
         std::span(plan.segments.segments), plan.plan_id,
         plan.ends_at_rest != 0, host_epoch_ns_ + base_time_ns, clock_, blueprint,
         ack_.device_tick_hz, ack_.step_tick_hz, ack_.max_degree, target_error_, layout_,
-        anchor_ticks);
+        anchor_ticks, (plan.flags & RK_PLAN_HOMING) != 0);
     if (!compiled.ok) {
         std::fprintf(stderr, "Rkd6Endpoint: device plan conversion failed: %s\n", compiled.error.c_str());
         return RK_ERROR_LIMIT;

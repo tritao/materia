@@ -38,7 +38,7 @@ CompiledDevicePlan6 compile_device_segments6(
     const ClockEstimator6 &clock, const rk_robot_runtime_blueprint &blueprint,
     std::uint64_t device_tick_hz, std::uint64_t step_tick_hz,
     std::uint8_t max_degree, double target_error,
-    std::span<const DeviceActuator6> layout, std::uint64_t anchor_ticks) {
+    std::span<const DeviceActuator6> layout, std::uint64_t anchor_ticks, bool homing) {
     if (!clock.may_commit()) return failure("clock_sync_lost");
     if (segments.empty() || plan_id == 0 || blueprint.joint_count == 0 ||
         blueprint.joint_count > device_wire6::MAX_ACTUATORS ||
@@ -261,8 +261,11 @@ CompiledDevicePlan6 compile_device_segments6(
     for (std::uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
         const auto &source = blueprint.joints[joint];
         limits.position_claimed[joint] = 1;
-        limits.position_lower[joint] = source.lower_limit;
-        limits.position_upper[joint] = source.upper_limit;
+        const bool has_overtravel = blueprint.struct_size >=
+            offsetof(rk_robot_runtime_blueprint, joint_overtravel) + sizeof(blueprint.joint_overtravel);
+        const auto travel = homing && has_overtravel ? blueprint.joint_overtravel[joint] : 0.0;
+        limits.position_lower[joint] = source.lower_limit - travel;
+        limits.position_upper[joint] = source.upper_limit + travel;
         limits.max_velocity[joint] = source.max_velocity;
         limits.max_acceleration[joint] = source.max_acceleration;
         limits.derivative_claimed[joint] = ((source.limit_flags & RK_LIMIT_VELOCITY) ? 1u : 0u) |

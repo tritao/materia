@@ -1847,6 +1847,9 @@ class ProjectSourceTests {
     }];
     var blueprint = motionkit.robot.MotionSystemBlueprint.fromRobotModel(binding.model, axes);
     var options = new robotkit.runtime.VirtualDeviceOptions();
+    // Four motors' short home ramps require more than the default 921600-baud link.
+    // This is the virtual deployment's rate, not a verified bench UART assignment.
+    options.baud = 2000000;
     options.actuators = binding.virtualActuators(); options.inputs = binding.virtualInputs();
     var harness = new SimulationHarness(0.01);
     try {

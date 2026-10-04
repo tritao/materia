@@ -40,6 +40,25 @@ int main() {
         std::span(&segment, 1), 7, true, 1'000'000'000ULL,
         clock, blueprint, 1'000'000, 40'000, 5, 0.0);
     assert(!rejected.ok);
+    // The switch is inside physical guide room beyond the normal soft limit.
+    auto home_segment = segment;
+    home_segment.coefficients[0].value[0] = 10.05;
+    home_segment.coefficients[0].value[1] = 0.0;
+    blueprint.joint_overtravel[0] = 0.1;
+    auto ordinary_overtravel = robotkit::compile_device_segments6(
+        std::span(&home_segment, 1), 8, true, 1'000'000'000ULL,
+        clock, blueprint, 1'000'000, 40'000, 5, 1e-6);
+    assert(!ordinary_overtravel.ok);
+    auto home_overtravel = robotkit::compile_device_segments6(
+        std::span(&home_segment, 1), 8, true, 1'000'000'000ULL,
+        clock, blueprint, 1'000'000, 40'000, 5, 1e-6, {}, 0, true);
+    assert(home_overtravel.ok);
+    home_segment.coefficients[0].value[0] = 10.15;
+    auto beyond_stop = robotkit::compile_device_segments6(
+        std::span(&home_segment, 1), 8, true, 1'000'000'000ULL,
+        clock, blueprint, 1'000'000, 40'000, 5, 1e-6, {}, 0, true);
+    assert(!beyond_stop.ok);
+    blueprint.joint_overtravel[0] = 0.0;
     segment.degree = 6;
     auto degree = robotkit::compile_device_segments6(
         std::span(&segment, 1), 7, true, 1'000'000'000ULL,

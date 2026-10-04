@@ -3128,3 +3128,28 @@ sensor homing setup to MotionKitTestSupport and used it before building this
 test's compiler/validation limits, stamped with the post-home revision. Its
 start-position mismatch assertion remains unchanged. MotionKit recompilation is
 running (23979); no full-suite pass is claimed. G13/Phase C remain incomplete.
+
+### Phase C — device compiler honors physical homing overtravel
+
+Router assembly generation now succeeds with 73 components after distinct home
+trigger definitions preserve their axis-specific trip connector frames. The
+virtual-device run then exposed device compiler validation against ordinary soft
+limits even for homing plans. RKD6 now passes immutable plan purpose to converted
+trajectory validation, allowing only declared overtravel for homing. Added
+regressions for ordinary-plan rejection, home acceptance inside guide room, and
+home rejection past the physical stop. Native rebuild and full CTest passed
+18/18; focused device compiler/endpoint/virtual/PTY checks also passed 4/4.
+
+The next router retry qualified its short four-motor ramps at about 1.12 Mbaud,
+above the default 921600 baud. The test deployment now explicitly uses 2 Mbaud,
+with no bench UART claim. App compiler-only passed (1790 sources). Execution
+advanced into homing but reached a runtime safety fault; the fault diagnosis and
+successful router home are still pending.
+
+MotionKit start-tolerance validation passed after preserving its adapter command
+sequence across home. The full suite next reached an unreferenced circular-path
+fixture. Its queued gantry rig now homes with the same adapter and MotionSystem.
+That exposed MotionSystem retaining its pre-home calibration revision; a fix to
+refresh revision/path planning at latches and final dual-side calibration is in
+progress. Full MotionKit and remaining Phase C suites are not green. G13 remains
+incomplete and G14 has not started.

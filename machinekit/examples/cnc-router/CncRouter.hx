@@ -679,7 +679,8 @@ class CncRouter extends AxisBuilder {
 		if (!Math.isFinite(room) || room <= 4 * sensor.switchRepeatability())
 			throw "Router home uncertainty does not fit its physical guide overtravel";
 		var trigger = "homeTrigger" + suffix;
-		attach(trigger, new RouterPlate(dimensions[0], dimensions[1], dimensions[2], "steel", "Home trigger"),
+		// Each target's trip connector follows its axis; distinct definitions retain those frames.
+		attach(trigger, new RouterPlate(dimensions[0], dimensions[1], dimensions[2], "steel", "Home trigger " + suffix),
 			AssemblyFrames.translation(point[0], point[1], point[2] - dimensions[2] / 2), moving);
 		var half = 0.0;
 		for (i in 0...3) half += Math.abs(direction[i]) * dimensions[i] / 2;
