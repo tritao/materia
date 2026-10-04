@@ -109,7 +109,10 @@ Surveyed 2026-10-03 on local main 1048bf768, plus the `mobile-welder` and `x7-tr
 - A cylinder part (bore, rod, stroke) plus `addCylinder(joint, cylinder, valve)` becomes an `AssemblyActuator` of kind Pneumatic.
 - Force is supply pressure × piston area: the full bore extending, the bore minus the rod retracting.
 - A flow restriction limits speed, as a damping term sized from the rated piston speed.
-- The valve's channel picks the direction. The runtime drives the joint with EFFORT and leaves it out of motion planning ("process-driven joints").
+- The cylinder's assumed 2 mm end cushion sets each process joint's tolerated stop compression;
+  its critically damped stop rate is derived from moving mass and piston force. The physics
+  stop remains at the stroke boundary, while the runtime tolerates that compression.
+- The valve's digital coil channels pick the direction. The simulation reads them, owns the valve latch state and applies the cylinder effort every physics substep. The runtime owns only those outputs and leaves the cylinder joint out of motion planning ("process-driven joints").
 - Solenoid valves are parts wired to controller outputs; their channel names are derived, not chosen.
 
 **MT-D5. Grip and clamp by contact.**
@@ -432,42 +435,64 @@ Done. What was built and decided:
   - Hoses from valve to cylinder use `connectPorts`, and the BOM picks them up.
 - Assembly: `addCylinder(id, joint, cylinderMember, valveMember)` produces `AssemblyActuator` kind `Pneumatic{bore, rod, stroke, ratedSpeed}`. Pressure is traced through the ports to the supply. This needs a projectkit format bump.
 - Bridge → RobotKit `PneumaticDrive` → runtime blueprint:
-  - The joint is process-driven: it gets an EFFORT target each tick from the valve channel (± force, damping sized for the rated speed).
-  - It is never part of a submitted trajectory.
+  - The joint is process-driven: the simulation reads the digital valve coils and applies an EFFORT target each tick (± force, damping sized for the rated speed).
+  - A trajectory may carry its constant observed coordinate for full-robot indexing, but cannot move it; the runtime emits no position target for it.
   - Planning models leave it out, just as CNC planning models already keep only their axes.
 - Sensors:
   - `addSwitch(id, joint, window, hysteresis)` produces a digital `joint_switch` sensor kind: reed switches, the door safety switch and the clamped/open switches.
   - `addPresence(id, connector, range)` produces a digital `presence` sensor that is true when a free object's box lies within range of the connector's face: the vise air gauge, tray slot sensors and the gripper's part sensor if used.
   - Both publish sensor frames, and the switch quantity uses hysteresis.
 - The spindle's continuous joint becomes velocity-driven from `spindle.speed`, and a process `at_speed` reading replaces the instant answer.
+- Emergency stop de-energises both door and vise valve coils. Both use double-solenoid valves, so their spools hold the last selected outlet and the trapped supply force remains; the FRL stays pressurised because this cell has no dump valve. This is a simulation decision, not a safety-rated machine design.
 - Tests, pure and MuJoCo:
-  - door open/close times within 10 % of stroke ÷ rated speed;
+  - door extension within 10 % of stroke ÷ rated speed; retraction uses the annular-to-bore force ratio with the shared flow damping;
   - vise clamp force = p·A within 5 % (measured from the joint constraint force);
   - switches flip at their windows;
-  - a blocked door times out with the switch never reached;
   - the trajectory runtime rejects a plan that touches a process-driven joint.
 
+The blocked-door request timeout is tested in MT7 with `RobotInterface`, which owns requests,
+switch interpretation and alarms; MT5 supplies the physical switch and cylinder only.
 
-Parts checkpoint (MT5 remains in progress):
-- Added reconstructible ISO 6432 / ISO 15552 cylinder recipes, a separate moving rod,
-  single/double-solenoid 5/2 valve and regulated air supply. Bore/rod pairs are reference
-  values; body envelopes, installed fittings, material and flow-limited speeds are assumed.
-- Pressure is resolved from the current service graph through valves and the reused manifold,
-  using `PressureSource.outputPressure`. Connected hose BOM entries survive reconstruction.
-- Checked all 13 bore/rod pairs against the rounded theoretical 6 bar force tables in
-  [Festo DSNU (2012), p. 13](https://ftp.festo.com/Public/PNEUMATIC/SOFTWARE_SERVICE/Documentation/2012/EN/DSNU-ISO_EN.PDF)
+Done. What was built and decided:
+- Reconstructible ISO 6432/15552 cylinders, moving rods, 5/2 valves and regulated supply;
+  pressure follows A/B hoses through the manifold. All 13 bore/rod reference rows agree with
+  the rounded theoretical 6 bar force tables in [Festo DSNU (2012), p. 13](https://ftp.festo.com/Public/PNEUMATIC/SOFTWARE_SERVICE/Documentation/2012/EN/DSNU-ISO_EN.PDF)
   and [Festo DSBC (2024), p. 14](https://www.festo.com/media/pim/132/D15000100122132.pdf).
-  Rod sizes agree with the annular areas implied by these tables; this is a reference model,
-  not a vendor geometry or flow model.
-- At 6 bar: 25/10 mm door cylinder gives 294.5243 N advancing and 247.4004 N retracting;
-  32/12 mm vise cylinder gives 482.5486 N advancing and 414.6902 N retracting. These are
-  calculated theoretical forces, not measured joint constraint forces.
-- Validation: the full MachineKit smoke entry passed after the naming fix, including all
-  13 force-table rows, valve state transitions, manifold pressure tracing, hose BOM and
-  saved-assembly reconstruction. The full multi-kit/app gate awaits the completed step.
-- Still to build: saved actuator/sensor bindings and the format extension; RobotKit process
-  drives and native sensors; physical door, vise and spindle integration; timing, constraint
-  force, blocked-door and trajectory-rejection tests; the full MT5 baseline gate.
+  Envelopes, fittings, flow-limited speed and end-cushion compression are assumed.
+- The vise owns one cylinder body and rod and exports its air ports. The enclosure owns the
+  valves, FRL and hoses. Saved assemblies keep actuator, switch, presence and process-velocity
+  bindings through flattening and codec round trips.
+- The runtime owns only process output channels. The simulation owns valve latch state, piston
+  force and spindle velocity. An emergency stop drops both coils; double-solenoid spools hold
+  their last outlet and the FRL stays pressurised without a dump valve. The runtime rejects
+  planned motion on process joints and omits them from endpoint position commands.
+- The 25/10 mm door cylinder delivers 294.5243 N advancing and 247.4004 N retracting;
+  the 32/12 mm vise delivers 482.5486 N advancing and 414.6902 N retracting. MuJoCo measured
+  door open 1.50 s, close 1.79 s, and vise clamp 0.18 s at 482.5486 N. Retraction is slower
+  because its annular area produces less force against the same flow damping.
+- The bare mill takes 51.12 s with a physical spindle at-speed wait, 78 plans and the same
+  0.075366/0.050317/0.029369 mm X/Y/Z tracking peaks and 3716.5811 mm³ removed. Its
+  earlier 49.98 s cycle moves by 1.14 s for spindle spin-up; the vise rod is only in the
+  enclosed assembly and does not change the bare mill mass or tracking.
+- The enclosed Start-page project now runs its pressure-clamped bearing-block job. With the
+  vise spool initially latched to clamp, MuJoCo completes one pass in 51.73 s and removes
+  3716.5718 mm³, with no rapid or holder contact.
+- MachineKit smoke passed with cylinder force, valve, pressure, hose, saved-format, switch
+  and vise checks. RobotKit checks cover coil emergency stop and trajectory rejection;
+  the app's MuJoCo check covers physical timing and force. The CNC panel's hold, resume and
+  restart check exposed a one-tick race at a completed plan boundary; MotionKit now waits for
+  the runtime owner to apply Resume before starting another plan, and retires a held plan
+  already at its endpoint without sending a stale Resume.
+- The output-before-input barrier now has a one-controller-cycle stationary plan so spindle
+  outputs reach the physical spindle before its at-speed wait. This changes both router jobs
+  from 126 to 128 plans. The screw router remains 220.2 s with 0.05 mm worst deviation;
+  the belt router takes 201.7 s (was 201.6 s), has 56 flagged plans (was 57) and 62 over
+  tolerance (was 64), with the same 1.89 mm worst deviation. The changed plan boundaries,
+  rather than a change to belt or screw mechanics, account for these numbers.
+- The `mt5-typed-final` full gate passed: RobotKit world 4947, MotionKit 9762, CadBridge 156,
+  CncKit 317, CamKit 12311, ProjectKit 151, and ProcessKit 23 plus welder 52 assertions;
+  MachineKit smoke and app project-source passed. CoreXY, arm mission, mobile base and welder
+  timing and geometry baselines stayed unchanged.
 
 **MT6. Controllers, robots and signals.**
 - Controller parts:
@@ -503,6 +528,7 @@ Parts checkpoint (MT5 remains in progress):
 - `CncProgramPlayer` idles until cycle start, runs one pass, then raises cycle complete. The program ends with `G53` to the load position (MT-D6). `CamJob`/`CncWriter` gain an end position. Tool-change requests are alarms (MT-D8).
 - Tests:
   - pure tests: every interlock refusal and timeout;
+  - a blocked door request times out when its physical open switch never arrives;
   - a scripted-signal sim test with no robot: open door, place the blank by script, clamp, close, start, wait for complete, open, unclamp. Volume as in MT2.
 
 **MT8. The parallel gripper, for real.**
@@ -614,7 +640,7 @@ MT0 ─┬─ MT1 ── MT2 ─┬─ MT4 (reach study) ─┐
 | MT2 | done | 06c9bf5fd, 73a14c58e |
 | MT3 | done | 4d58cd5d3, 8a44aeb53 |
 | MT4 | done | c945a0dc8 |
-| MT5 | in progress: pneumatic parts and service wiring | 453d890ad |
+| MT5 | done | 453d890ad, 5f06c32e5, a397b187a |
 | MT6 | planned | |
 | MT7 | planned | |
 | MT8 | planned | |
