@@ -3,7 +3,7 @@ interface NativeKitUI @target("portable-abi64") @library("nativekit_ui") @depend
 	/**
 	 * Current UI ABI version.
 	 */
-	const NKUI_API_VERSION = 7;
+	const NKUI_API_VERSION = 8;
 	const NKUI_COMMAND_VERSION = 1;
 	const NKUI_CUSTOM_EFFECT_PARAMETER_COMPONENTS = 20;
 	const NKUI_EFFECT_PROGRAM_MAX_OPS = 8;
@@ -866,6 +866,18 @@ interface NativeKitUI @target("portable-abi64") @library("nativekit_ui") @depend
 	 */
 	extern fn nkui_text_layout_create_styled(fonts: nkui_resource, text: nullable<utf8>, width: f32, text_style: ptr<const<nkui_text_style>>, paragraph_style: ptr<const<nkui_paragraph_style>>, out_layout: ptr<nkui_resource> @out) -> nkui_result;
 	/**
+	 * Replaces a half-open codepoint range using the layout's current width and style.
+	 * The replacement is UTF-8; null represents an empty string. Invalid ranges leave
+	 * the layout unchanged. Rendering and geometry use the resulting layout together.
+	 */
+	extern fn nkui_text_layout_edit(layout: nkui_resource, start: i32, end: i32, replacement: nullable<utf8>) -> nkui_result;
+	/**
+	 * Returns logical visual-line rectangles intersecting both ranges. Text offsets
+	 * count codepoints; vertical bounds use layout-local coordinates. The buffer
+	 * contains packed nkui_text_rect records, as in selection_rects.
+	 */
+	extern fn nkui_text_layout_get_line_rects(layout: nkui_resource, start: i32, end: i32, min_y: f32, max_y: f32, out_buffer: nullable<ptr<u8>> @out_buffer("inout_bytes"), inout_bytes: ptr<u32> @inout) -> nkui_result;
+	/**
 	 * Returns the visual rectangles covered by a code-point selection.
 	 *
 	 * Query the required buffer size by passing NULL. On NKUI_OK, `inout_bytes` is
@@ -914,6 +926,15 @@ interface NativeKitUI @target("portable-abi64") @library("nativekit_ui") @depend
 	 * Sets the color used when this retained text layout is drawn.
 	 */
 	extern fn nkui_text_layout_set_color(layout: nkui_resource, color: nkui_color) -> nkui_result;
+	/**
+	 * Replaces copied foreground ranges without reshaping or rasterizing text.
+	 * Ranges must be sorted, disjoint, nonempty and within the current text; colors
+	 * must contain finite components in [0,1]. A shaped cluster uses the color at
+	 * its first codepoint. Zero count clears overrides; null is valid only then.
+	 * Invalid input leaves the previous ranges unchanged. Updating text or layout
+	 * clears ranges; changing the base color preserves overrides.
+	 */
+	extern fn nkui_text_layout_set_color_ranges(layout: nkui_resource, ranges: ptr<const<nkui_text_color_range>> @in_array("count"), count: u32) -> nkui_result;
 	/**
 	 * Re-shapes an existing layout with new UTF-8 text while retaining its handle and style; null text
 	 * is empty.
@@ -1836,6 +1857,14 @@ interface NativeKitUI @target("portable-abi64") @library("nativekit_ui") @depend
 		 * Text-direction code at the caret; preserve it when selecting a visual direction.
 		 */
 		direction: nkui_text_direction @offset(24);
+	}
+	/**
+	 * A half-open logical codepoint range with an overriding foreground color.
+	 */
+	struct nkui_text_color_range @layout(24, 4) {
+		start: i32 @offset(0);
+		end: i32 @offset(4);
+		color: nkui_color @offset(8);
 	}
 	/**
 	 * Bounding rectangle returned for a text layout.

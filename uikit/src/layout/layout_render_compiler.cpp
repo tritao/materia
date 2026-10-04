@@ -98,19 +98,6 @@ uint8_t color_byte(float value) {
     return static_cast<uint8_t>(std::lround(value * 255.0f));
 }
 
-void tint_glyphs(PreparedGlyphs &glyphs, const LayoutColor &color) {
-    const uint8_t red = color_byte(color.red);
-    const uint8_t green = color_byte(color.green);
-    const uint8_t blue = color_byte(color.blue);
-    const uint8_t alpha = color_byte(color.alpha);
-    for (auto &vertex : glyphs.vertices) {
-        vertex.red = red;
-        vertex.green = green;
-        vertex.blue = blue;
-        vertex.alpha = alpha;
-    }
-}
-
 void set_scissor(RenderCommand &command, const LayoutRect &clip, float pixel_scale) {
     command.has_scissor = true;
     command.scissor_x = clip.x * pixel_scale;
@@ -154,7 +141,9 @@ uint64_t primitive_content_generation(const LayoutPrimitive &primitive,
     uint64_t hash = kContentHashOffset;
     hash_u32(hash, static_cast<uint32_t>(primitive.kind));
     hash_u32(hash, primitive.node_id);
-    hash_u32(hash, primitive.content_revision);
+    if (!(primitive.kind == LayoutPrimitiveKind::Text && primitive.text_layout_id &&
+          glyph_generation))
+        hash_u32(hash, primitive.content_revision);
     for (const float value :
          {primitive.bounds.x, primitive.bounds.y, primitive.bounds.width, primitive.bounds.height,
           primitive.transform.a, primitive.transform.b, primitive.transform.c,
@@ -176,7 +165,8 @@ uint64_t primitive_content_generation(const LayoutPrimitive &primitive,
     hash_u32(hash, primitive.text_line_index);
     if (text) {
         hash_u64(hash, text->font_collection_generation());
-        hash_u64(hash, text->layout_generation());
+        if (!glyph_generation)
+            hash_u64(hash, text->layout_generation());
     }
     hash_u64(hash, glyph_generation);
     return hash ? hash : 1;
@@ -299,7 +289,6 @@ void LayoutRenderFrame::reset() {
     sealable_ = true;
     plan_ = {};
     paths_.clear();
-    glyphs_.clear();
     text_engine_source_ = nullptr;
 }
 
@@ -647,23 +636,29 @@ bool LayoutRenderCompiler::compile(const LayoutSnapshot &snapshot, ResourceId ma
                 scene_item ? scene_item->content_revision : primitive.content_revision;
             const bool has_composite =
                 custom_composites && custom_composites->contains(primitive.node_id);
+            // Floating custom layers may be emitted outside ancestor scissor
+            // commands. Resolved geometry still carries their inherited clip.
+            const bool has_node_clip = scene_item || !clips.empty();
+            LayoutRect node_clip = scene_item ? scene_item->clip_bounds : LayoutRect{};
+            if (!clips.empty())
+                node_clip = scene_item ? intersect(node_clip, clips.back()) : clips.back();
             if (active_raster_root != no_raster_root) {
                 const auto &root = raster_roots[active_raster_root];
                 const auto node_local_to_world = custom_local_to_world(primitive);
                 const auto destination_transform =
                     compose_transform(root.world_to_cache, node_local_to_world);
                 const LayoutRect local_clip =
-                    clips.empty()
+                    !has_node_clip
                         ? LayoutRect{}
-                        : transform_bounds(clips.back(), transform_layout(root.world_to_cache));
+                        : transform_bounds(node_clip, transform_layout(root.world_to_cache));
                 if (has_composite)
                     return append_custom_with_composite(
                         *found->second, primitive.node_id, primitive_index, active_raster_target,
                         current_main_pass, false, &destination_transform,
-                        clips.empty() ? nullptr : &local_clip);
+                        has_node_clip ? &local_clip : nullptr);
                 return append_custom_plan(*found->second, primitive_index, active_raster_target,
                                           current_main_pass, &destination_transform,
-                                          clips.empty() ? nullptr : &local_clip,
+                                          has_node_clip ? &local_clip : nullptr,
                                           content_revision);
             }
             const auto node_local_to_world = custom_local_to_world(primitive);
@@ -672,10 +667,12 @@ bool LayoutRenderCompiler::compile(const LayoutSnapshot &snapshot, ResourceId ma
             if (has_composite)
                 return append_custom_with_composite(*found->second, primitive.node_id,
                                                     primitive_index, main_target, current_main_pass,
-                                                    raster, &node_local_to_world);
+                                                    raster, &node_local_to_world,
+                                                    has_node_clip ? &node_clip : nullptr);
             if (!raster)
                 return append_custom_plan(*found->second, primitive_index, main_target,
-                                          current_main_pass, &node_local_to_world, nullptr,
+                                          current_main_pass, &node_local_to_world,
+                                          has_node_clip ? &node_clip : nullptr,
                                           content_revision);
             if (transient_target_slot > std::numeric_limits<uint16_t>::max())
                 return fail(error, primitive_index, "raster cache target limit exceeded");
@@ -687,7 +684,8 @@ bool LayoutRenderCompiler::compile(const LayoutSnapshot &snapshot, ResourceId ma
             out.plan_.passes.push_back(std::move(raster_pass));
             const std::size_t raster_pass_index = out.plan_.passes.size() - 1;
             if (!append_custom_plan(*found->second, primitive_index, raster_target,
-                                    raster_pass_index, &node_local_to_world, nullptr,
+                                    raster_pass_index, &node_local_to_world,
+                                    has_node_clip ? &node_clip : nullptr,
                                     content_revision))
                 return false;
             out.plan_.dependencies.push_back({raster_target, main_target});
@@ -871,26 +869,6 @@ bool LayoutRenderCompiler::compile(const LayoutSnapshot &snapshot, ResourceId ma
                     if (!text->layout_utf8(primitive.text.c_str(), width, options))
                         return fail(error, index, "layout text shaping failed");
                 }
-                auto glyphs = std::make_unique<PreparedGlyphs>();
-                const bool prepared =
-                    text_layout
-                        ? text->prepare_glyphs_for_line(text_layout->id, primitive.text_line_index,
-                                                        0.0f, 0.0f, pixel_scale, GlyphMode::Alpha,
-                                                        *glyphs)
-                        : text->prepare_glyphs(0.0f, 0.0f, pixel_scale, GlyphMode::Alpha, *glyphs);
-                if (!prepared)
-                    return fail(error, index, "layout glyph preparation failed");
-                tint_glyphs(*glyphs, primitive.color);
-                const ResourceId id =
-                    make_resource_id(ResourceKind::TextLayout, kTransientGeneration,
-                                     static_cast<uint16_t>(transient_slot++));
-                const LayoutTransform draw_transform = draw_transform_for(primitive);
-                auto generation_primitive = primitive;
-                generation_primitive.transform = draw_transform;
-                const uint64_t content_generation = primitive_content_generation(
-                    generation_primitive, text, glyphs->layout_generation);
-                if (!out.resources_.bind_text(id, *glyphs, content_generation))
-                    return fail(error, index, "layout text resource binding failed");
                 const GlyphTint tint{
                     color_byte(primitive.color.red), color_byte(primitive.color.green),
                     color_byte(primitive.color.blue), color_byte(primitive.color.alpha)};
@@ -900,8 +878,20 @@ bool LayoutRenderCompiler::compile(const LayoutSnapshot &snapshot, ResourceId ma
                                           pixel_scale, GlyphMode::Alpha, tint)
                                     : text->published_glyphs(text->active_layout_id(), 0.0f, 0.0f,
                                                              pixel_scale, GlyphMode::Alpha, tint);
-                if (!snapshot ||
-                    !out.owned_resources_.bind_text(id, std::move(snapshot), content_generation))
+                if (!snapshot)
+                    return fail(error, index, "layout glyph preparation failed");
+                const ResourceId id =
+                    make_resource_id(ResourceKind::TextLayout, kTransientGeneration,
+                                     static_cast<uint16_t>(transient_slot++));
+                const LayoutTransform draw_transform = draw_transform_for(primitive);
+                auto generation_primitive = primitive;
+                generation_primitive.transform = draw_transform;
+                const uint64_t content_generation = primitive_content_generation(
+                    generation_primitive, text,
+                    snapshot->publication_key);
+                if (!out.resources_.bind_text(id, *snapshot, content_generation))
+                    return fail(error, index, "layout text resource binding failed");
+                if (!out.owned_resources_.bind_text(id, std::move(snapshot), content_generation))
                     out.sealable_ = false;
                 RenderCommand command{RenderCommandKind::GlyphBatch,
                                       id,
@@ -914,7 +904,6 @@ bool LayoutRenderCompiler::compile(const LayoutSnapshot &snapshot, ResourceId ma
                 if (!clips.empty())
                     set_scissor(command, clip_for(clips.back()), pixel_scale);
                 out.plan_.passes[current_main_pass].commands.push_back(std::move(command));
-                out.glyphs_.push_back(std::move(glyphs));
                 if (!append_custom_for_primitive(index))
                     return false;
                 close_raster_if_last(index);

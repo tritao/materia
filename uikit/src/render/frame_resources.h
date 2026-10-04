@@ -97,7 +97,10 @@ class FrameResources {
     bool bind_path(ResourceId id, const PreparedPath &path, uint32_t operation_index,
                    uint64_t content_generation = 0);
     bool bind_image(ResourceId id, const PreparedTexture &image, uint64_t content_generation = 0);
-    bool bind_text(ResourceId id, const PreparedGlyphs &glyphs, uint64_t content_generation = 0);
+    // source_identity names the persistent source when id is a temporary frame slot.
+    // Its generation must describe the complete bound paint; zero uses id itself.
+    bool bind_text(ResourceId id, const PreparedGlyphs &glyphs, uint64_t content_generation = 0,
+                   ResourceId source_identity = {});
     bool bind_surface(ResourceId id, SurfaceProducer &producer, uint64_t content_generation = 0);
     bool bind_graphics_image(ResourceId id, nk_graphics_image image,
                              uint64_t content_generation = 0);
@@ -107,6 +110,7 @@ class FrameResources {
     SurfaceProducer *surface(ResourceId id) const;
     const nk_graphics_image *graphics_image(ResourceId id) const;
     uint64_t content_generation(ResourceId id) const;
+    ResourceId source_identity(ResourceId id) const;
     void reset();
 
   private:
@@ -116,6 +120,7 @@ class FrameResources {
     std::unordered_map<uint32_t, SurfaceProducer *> surfaces_;
     std::unordered_map<uint32_t, nk_graphics_image> graphics_images_;
     std::unordered_map<uint32_t, uint64_t> content_generations_;
+    std::unordered_map<uint32_t, ResourceId> source_identities_;
 };
 
 /**
@@ -133,7 +138,7 @@ class OwnedFrameResources final : public FrameResources {
     bool bind_image(ResourceId id, std::shared_ptr<const PreparedTexture> image,
                     uint64_t content_generation = 0);
     bool bind_text(ResourceId id, std::shared_ptr<const PreparedGlyphs> glyphs,
-                   uint64_t content_generation = 0);
+                   uint64_t content_generation = 0, ResourceId source_identity = {});
     /** Binds a graphics image and retains it until this set is destroyed. */
     bool bind_graphics_image(ResourceId id, nk_graphics_image image,
                              uint64_t content_generation = 0);
@@ -142,7 +147,7 @@ class OwnedFrameResources final : public FrameResources {
     bool bind_path(ResourceId, const PreparedPathData &, uint32_t, uint64_t) = delete;
     bool bind_path(ResourceId, const PreparedPath &, uint32_t, uint64_t) = delete;
     bool bind_image(ResourceId, const PreparedTexture &, uint64_t) = delete;
-    bool bind_text(ResourceId, const PreparedGlyphs &, uint64_t) = delete;
+    bool bind_text(ResourceId, const PreparedGlyphs &, uint64_t, ResourceId = {}) = delete;
     bool bind_surface(ResourceId, SurfaceProducer &, uint64_t) = delete;
 
     void reset();

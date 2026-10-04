@@ -25,6 +25,7 @@ class ScrollView implements View {
 	final key:Key;
 	final child:View;
 	final axis:Int;
+	final suppliedController:Bool;
 	public final style:LayoutStyle;
 	public var controller(default, null):ScrollController;
 	public var onScroll:UiEvent->Void;
@@ -40,6 +41,7 @@ class ScrollView implements View {
 		this.child = child;
 		this.axis = axis;
 		this.style = style == null ? new LayoutStyle() : style.copy();
+		suppliedController = controller != null;
 		this.controller = controller == null ? new ScrollController() : controller;
 		onScroll = null;
 		showScrollbar = true;
@@ -64,8 +66,10 @@ class ScrollView implements View {
 				axis == ScrollAxis.Horizontal || axis == ScrollAxis.Both;
 			viewport.layout.style.clipVertical = viewport.layout.style.clipVertical ||
 				axis == ScrollAxis.Vertical || axis == ScrollAxis.Both;
-			var stored:State<ScrollController> = context.state(viewport.id, controller);
-			controller = stored.value;
+			if (!suppliedController) {
+				var stored:State<ScrollController> = context.state(viewport.id, controller);
+				controller = stored.value;
+			}
 			// The offset is applied to the content in place after layout (see onResolved below), so a scroll needs a new
 			// frame but not a rebuild: bumping the state revision here would invalidate every cached subtree around it.
 			controller.bind(function(_) {
@@ -85,7 +89,7 @@ class ScrollView implements View {
 			translatedContent.add(content);
 			viewport.add(translatedContent);
 			var scrollbar = showScrollbar && axis != ScrollAxis.Horizontal
-				? addVerticalScrollbar(context, viewport, stored) : null;
+				? addVerticalScrollbar(context, viewport) : null;
 
 			translatedContent.onResolved(function(geometry) {
 				var viewportGeometry:ResolvedLayoutItem = cast viewport.resolved;
@@ -148,8 +152,7 @@ class ScrollView implements View {
 		});
 	}
 
-	function addVerticalScrollbar(context:BuildContext, viewport:RenderNode,
-			stored:State<ScrollController>):RenderNode {
+	function addVerticalScrollbar(context:BuildContext, viewport:RenderNode):RenderNode {
 		var trackWidth = 10.0;
 		var inset = 2.0;
 		var trackHeight = Math.max(0.0, controller.viewportHeight - inset * 2.0);

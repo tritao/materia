@@ -23,5 +23,19 @@
       "haxe/abi/CadKit.hxmap"
     ]
   },
+  "native": {
+    "cmake": {
+      "source": "native",
+      "target": "cadkit-core",
+      "library": "cadkit-core",
+      "inputs": [
+        "native/CMakeLists.txt",
+        "CMakeLists.txt",
+        "core/CMakeLists.txt",
+        "core/include/cadkit.h",
+        "core/src/cadkit.cpp"
+      ]
+    }
+  },
   "target": "host"
 }

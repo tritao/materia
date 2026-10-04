@@ -42,6 +42,7 @@ class BuildContext {
 	/** Bumped when the theme or application sheet is replaced, so swaps never reuse a fingerprint. */
 	var styleEpoch:Int = 0;
 	var focusRequester:WidgetId->Bool;
+	var deferredFocusRequester:WidgetId->Void;
 	final claimed:IdSet;
 	final idsByPath:Map<String, WidgetId>;
 	var cachedIdCount:Int;
@@ -80,6 +81,7 @@ class BuildContext {
 		viewportWidth = 0.0;
 		viewportHeight = 0.0;
 		focusRequester = function(_) { return false; };
+		deferredFocusRequester = function(_) {};
 		claimed = new IdSet();
 		idsByPath = new Map();
 		cachedIdCount = 0;
@@ -159,6 +161,17 @@ class BuildContext {
 
 	public function requestFocus(id:WidgetId):Bool
 		return id != null && focusRequester(id);
+
+	/** Installs the focus route for targets revealed by the next layout. */
+	public function setDeferredFocusRequester(requester:WidgetId->Void):Void {
+		if (requester == null) throw "Build context requires a deferred focus route";
+		deferredFocusRequester = requester;
+	}
+
+	/** Focus a newly built or scrolled-into-view widget after geometry is resolved. */
+	public function requestFocusAfterLayout(id:WidgetId):Void {
+		if (id != null) deferredFocusRequester(id);
+	}
 
 	/** Provides the font collection used by text-layout-backed widgets. */
 	public function setFonts(fonts:FontCollection):Void {

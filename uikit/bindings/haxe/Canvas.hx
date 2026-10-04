@@ -266,8 +266,8 @@ class Canvas {
 
 	/**
 	 * Paints a rounded-rectangle shadow directly with the native geometry renderer.
-	 * `blurRadius` is the UI-facing visible blur radius; the backend converts it to
-	 * the Gaussian sigma used by the shader so the radius remains stable across backends.
+	 * `blurRadius` follows CSS box-shadow semantics and is encoded as Gaussian
+	 * sigma = blurRadius / 2 so the falloff matches across backends.
 	 */
 	public function drawBoxShadow(rect:Rect, offsetX:Float, offsetY:Float, blurRadius:Float,
 		spread:Float, radii:Array<Float>, color:Color):Void {
@@ -279,7 +279,7 @@ class Canvas {
 			if (!Math.isFinite(radius) || radius < 0.0)
 				throw "Box shadow radii must be finite and non-negative";
 		commands.drawBoxShadow(rect.x, rect.y, rect.width, rect.height, offsetX, offsetY,
-			blurRadius / 3.0, spread, radii, color);
+			blurRadius / 2.0, spread, radii, color);
 	}
 
 	public function drawText(layout:TextLayout, x:Float, y:Float):Void

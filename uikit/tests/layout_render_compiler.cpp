@@ -427,6 +427,49 @@ int main() {
         custom_position->scissor_width != 4.5f || custom_position->scissor_height != 6.0f)
         return 22;
 
+    // Floating painters can appear outside the ancestor's scissor commands,
+    // but must retain the resolved inherited clip (selection overlays do this).
+    LayoutSnapshot floating_snapshot = ordered_snapshot;
+    floating_snapshot.primitives.erase(
+        std::remove_if(floating_snapshot.primitives.begin(), floating_snapshot.primitives.end(),
+                       [](const LayoutPrimitive &primitive) {
+                           return primitive.kind == LayoutPrimitiveKind::ClipBegin ||
+                                  primitive.kind == LayoutPrimitiveKind::ClipEnd;
+                       }),
+        floating_snapshot.primitives.end());
+    for (auto &item : floating_snapshot.items)
+        if (item.id == 2)
+            item.clip_bounds = {52.0f, 36.0f, 1.0f, 2.0f};
+    LayoutRenderFrame floating_frame;
+    if (!compiler.compile(floating_snapshot, main_target, 1.5f, floating_frame, &compile_error,
+                          false, engine.text_engine(), &custom_paints))
+        return 290;
+    const auto &floating_commands = floating_frame.plan().passes.front().commands;
+    const auto floating_paint = std::find_if(
+        floating_commands.begin(), floating_commands.end(),
+        [](const RenderCommand &command) { return command.custom_payload; });
+    if (floating_paint == floating_commands.end() || !floating_paint->has_scissor ||
+        floating_paint->scissor_x != 78.0f || floating_paint->scissor_y != 54.0f ||
+        floating_paint->scissor_width != 1.5f || floating_paint->scissor_height != 3.0f)
+        return 291;
+    LayoutRenderCompiler::RasterPaintNodes floating_raster_nodes{2};
+    LayoutRenderFrame floating_raster_frame;
+    if (!compiler.compile(floating_snapshot, main_target, 1.5f, floating_raster_frame,
+                          &compile_error, false, engine.text_engine(), &custom_paints,
+                          &floating_raster_nodes))
+        return 292;
+    bool clipped_raster_paint = false;
+    for (const auto &pass : floating_raster_frame.plan().passes)
+        for (const auto &command : pass.commands) {
+            // The raster subtree uses cache-local coordinates.
+            if (command.custom_payload && command.has_scissor &&
+                command.scissor_x == 39.0f && command.scissor_y == 27.0f &&
+                command.scissor_width == 1.5f && command.scissor_height == 3.0f)
+                clipped_raster_paint = true;
+        }
+    if (!clipped_raster_paint)
+        return 293;
+
     // Framework-owned layer metadata wraps retained custom pixels in a
     // separate target. The draw plan remains free of the outer layer, so a
     // composite-only revision can reuse its content target.
