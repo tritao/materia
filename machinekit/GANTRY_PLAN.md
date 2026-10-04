@@ -2148,3 +2148,23 @@ connector method, then nullable edge-count numeric comparison. Use a fresh
 component lookup for connector validation and explicit integer sentinels for
 optional counts, preserving capture freshness checks. A new compiler-only retry
 is started. Other kits, app, picker and Haxe homing execution remain pending.
+
+### G12 checkpoint — physical coupling conflict confirmed
+
+Measured startup after the first move: leader -0.005 m, left -5 rad, right
+-5 rad instead of -4 rad. The backend unconditionally overwrote follower
+positions with physical coupling equations. Install hard constraints only for
+coupling groups connected to a servo; commanded kinematic followers must retain
+the independent slip/origin targets. Servo-connected groups are identified by
+fixed-point propagation through the coupling graph.
+
+Make the physical homing regression submit full joint targets, matching actual
+homing plan payloads. Rebuilt native simkit and reran its ctest: passed, including
+1 mm placement, first-side hold, calibration and true-zero return within 20 um.
+Removing backend kinematic constraints also exposes the old reliance of sparse
+direct leader commands on physical propagation; preserve that behavior through
+explicit target projection before considering the native change complete.
+
+MotionKit compile found conditional nullable count typing; replace ternaries
+with guarded casts to the known integer type. The compiler pass still needs
+retry, other kits/app and focused picker/Haxe homing runs remain pending.

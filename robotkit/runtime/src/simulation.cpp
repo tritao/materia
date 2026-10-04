@@ -682,8 +682,28 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             binding->actuated_joints_.push_back(source.type != RK_RUNTIME_JOINT_FIXED && !process_joint);
             joints_.push_back(joint);
         }
+        // Kinematic followers receive runtime-projected targets, including slip
+        // and independent home origins. A hard backend coupling would erase
+        // those physical offsets. Servo-driven groups need physical constraints.
+        std::vector<uint8_t> physical_coupling(blueprint.joint_count, 0);
+        if (blueprint.struct_size >= offsetof(rk_robot_runtime_blueprint, joint_servo) +
+                sizeof(blueprint.joint_servo))
+            for (uint32_t i = 0; i < blueprint.joint_count; ++i)
+                physical_coupling[i] = blueprint.joint_servo[i].stiffness > 0.0;
+        for (uint32_t pass = 0; pass < blueprint.joint_count; ++pass) {
+            bool changed = false;
+            for (uint32_t i = 0; i < blueprint.coupling_count; ++i) {
+                const auto &term = blueprint.couplings[i];
+                if (physical_coupling[term.leader] || physical_coupling[term.follower]) {
+                    changed |= !physical_coupling[term.leader] || !physical_coupling[term.follower];
+                    physical_coupling[term.leader] = physical_coupling[term.follower] = 1;
+                }
+            }
+            if (!changed) break;
+        }
         for (uint32_t index = 0; index < blueprint.coupling_count; ++index) {
             const auto &source = blueprint.couplings[index];
+            if (!physical_coupling[source.follower]) continue;
             nksim_joint_coupling_desc coupling{};
             coupling.struct_size = sizeof(coupling);
             coupling.leader = binding->joints_[source.leader];

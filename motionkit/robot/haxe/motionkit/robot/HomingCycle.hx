@@ -108,8 +108,9 @@ class HomingCycle {
           var all = true;
           for (i in 0...axis.switches.length) {
             var signal = signalFor(axis.switches[i].id, observation);
-            var baseline:Int = approachEdges[i] == null ? -1 : approachEdges[i];
-            var count:Int = signal.closingEdges == null ? -1 : signal.closingEdges;
+            var baseline:Int = -1, count:Int = -1;
+            if (approachEdges[i] != null) baseline = cast approachEdges[i];
+            if (signal.closingEdges != null) count = cast signal.closingEdges;
             if (count >= 0 && baseline >= 0 && count < baseline)
               throw "Homing edge counter reset during approach";
             if (signal.active && captures[i] == null) {

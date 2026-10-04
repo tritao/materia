@@ -1303,7 +1303,10 @@ void dual_home_removes_one_millimetre_startup_racking() {
         for (int i = 0; i < 3; ++i) assert(step(fixture.session, time += 10'000'000) == RK_OK);
     };
     auto move = [&](double position, uint64_t sequence) {
-        const auto command = target(position, sequence);
+        auto command = target(position, sequence);
+        command.target_count = 3;
+        command.targets[1] = {1, RK_TARGET_POSITION, position * 1000.0, 0.0, 0.0};
+        command.targets[2] = {2, RK_TARGET_POSITION, position * 1000.0, 0.0, 0.0};
         assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
         advance();
     };
