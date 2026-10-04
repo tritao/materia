@@ -42,7 +42,7 @@ class RuntimeHomingObserver {
       throw "Homing runtime returned an invalid joint observation";
     if (snapshot.faultCode != 0 || snapshot.safety == RobotKitRuntimeConstants.RK_SAFETY_FAULT ||
         snapshot.safety == RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP)
-      throw "Homing runtime has a safety fault";
+      throw 'Homing runtime has a safety fault ${snapshot.faultCode} on joint $joint';
     var frames = new Map<String, SensorFrame>();
     for (frame in snapshot.sensors.toArray()) {
       if (frame == null || frames.exists(frame.sensorId)) throw "Homing snapshot has duplicate or null sensor frames";

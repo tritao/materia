@@ -45,7 +45,8 @@ class MotionSystem {
   var homingDriver:Null<HomingDriver> = null;
   var homingSides:Null<robotkit.runtime.HomingSideControl> = null;
   var homingCycle:Null<HomingCycle> = null;
-  final pathPlanner:PathPlanner;
+  var refreshHomeRevision:Null<Void -> Void> = null;
+  var pathPlanner:PathPlanner;
   public final fixedTimestepSeconds:Float;
   public final replacementMarginOwnerPeriods:Int;
   public final replacementOwnerPeriodSeconds:Float;
@@ -71,7 +72,7 @@ class MotionSystem {
   var bufferedCompletedSeconds:Float = 0.0;
   var plannedEndPositions:Null<Array<Float>> = null;
   final modelRevision:Int64;
-  final calibrationRevision:Int64;
+  var calibrationRevision:Int64;
 
   public static function fromBlueprint(robot:Robot, blueprint:MotionSystemBlueprint):MotionSystem
     return new MotionSystem(robot, blueprint);
@@ -459,6 +460,7 @@ class MotionSystem {
   /** Bind the runtime owner and its encoder/slip reset before sensor homing. */
   public function configureRuntimeHoming(runtime:robotkit.runtime.RobotRuntime,
       afterLatch:Void -> Void, ?sides:robotkit.runtime.HomingSideControl):Void {
+    if (runtime == null || afterLatch == null) throw "Homing requires a runtime and latch monitor reset";
     if (isMoving()) throw "Cannot replace a homing driver during motion";
     if (homingAxes.length == 0) throw "Machine has no physical home switches";
     var scopedStop:Null<Void -> Bool> = null;
@@ -466,6 +468,12 @@ class MotionSystem {
       var stopControl:robotkit.runtime.HomingStopControl = cast sides;
       scopedStop = () -> stopControl.controlledStop();
     }
+    function refreshRevision():Void {
+      calibrationRevision = runtime.snapshot().calibrationRevision;
+      pathPlanner = new PathPlanner(axes, fixedTimestepSeconds, modelRevision, calibrationRevision);
+    }
+    refreshRevision();
+    refreshHomeRevision = refreshRevision;
     homingDriver = new RuntimeHomingDriver(robot, runtime, homingAxes, axes, afterLatch, scopedStop);
     homingSides = sides;
   }
@@ -587,7 +595,13 @@ class MotionSystem {
     if (!Math.isFinite(dt) || dt <= 0.0) throw "Motion-system update duration must be finite and positive";
     updateCount++;
     var homing = homingCycle;
-    if (homing != null && homing.isActive()) return homing.update(dt);
+    if (homing != null && homing.isActive()) {
+      var active = homing.update(dt);
+      var refresh = refreshHomeRevision;
+      // Dual-side counter calibration commits after individual switch latches.
+      if (!active && homing.status() == "Complete" && refresh != null) refresh();
+      return active;
+    }
     checkSnapshot();
     if (session.isHolding() || session.isStopping()) {
       // No refills while stopping: beginStop() already queued enough path for

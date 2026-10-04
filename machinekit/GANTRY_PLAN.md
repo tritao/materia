@@ -3153,3 +3153,20 @@ That exposed MotionSystem retaining its pre-home calibration revision; a fix to
 refresh revision/path planning at latches and final dual-side calibration is in
 progress. Full MotionKit and remaining Phase C suites are not green. G13 remains
 incomplete and G14 has not started.
+
+### Phase C — preserve plan identity after complete sensor homing
+
+MotionSystem now refreshes its calibration revision and recreates its path
+planner when runtime homing is bound and when the complete cycle finishes. This
+includes the final dual-side counter transaction, which commits after individual
+switch latches. Monitor reset callbacks still run at each latch. Queued gantry
+fixtures retain the same adapter and MotionSystem through home/program execution;
+the program start-tolerance fixture also keeps its adapter command sequence and
+rethrows unrelated errors rather than hiding them behind a tolerance assertion.
+
+MotionKit compiler-only passed (1127 sources; 28027), app compiler-only passed
+(1790 sources; 68964). Full MotionKit retry 28245 and router-device-home retry
+61562 are running at this note. Runtime homing errors now identify their safety
+fault code and joint. Native 18/18 remains green with no implementation change
+since that gate. Router homing, geometry/baseline audits and the full Phase C gate
+remain pending. G13 is not complete; G14 is not started.

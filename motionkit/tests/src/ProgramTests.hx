@@ -136,7 +136,9 @@ class ProgramTests extends MotionKitTestSupport {
     var ids = [for (joint in model.joints) joint.id];
     var simulationHarness = new SimulationHarness(0.01);
     var runtime = simulationHarness.simulation.addRobot(blueprint.runtime);
-    homeGantryFixture(blueprint, runtime, simulationHarness);
+    var fixtureRobot = new robotkit.simulation.SimulatedRobot("start-tolerances", runtime,
+      model.name, [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
+    homeGantryFixture(blueprint, runtime, simulationHarness, fixtureRobot);
     var count = ids.length;
     var scales = [for (_ in ids) 0.0];
     for (axis in blueprint.axes) for (slot in 0...axis.jointIds.length)
@@ -196,11 +198,12 @@ class ProgramTests extends MotionKitTestSupport {
       plan.copyPositionTolerances(), plan.copyVelocityTolerances(),
       plan.copyAccelerationTolerances());
     var rejectedAtRuntime = false;
-    try runtime.submitPlan(submission, 1) catch (error:Dynamic) {
+    try fixtureRobot.submit(robotkit.core.RobotCommand.ExecutionPlan(submission)) catch (error:Dynamic) {
       if (Std.isOfType(error, RobotRuntimeError)) {
         var nativeError:RobotRuntimeError = cast error;
         rejectedAtRuntime = nativeError.status ==
           RobotKitRuntimeConstants.RK_ERROR_INVALID_STATE;
+        if (!rejectedAtRuntime) throw error;
       }
     }
     check(rejectedAtRuntime,

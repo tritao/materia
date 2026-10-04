@@ -244,11 +244,12 @@ class MotionKitTestSupport {
 
   /** Establish actual switch references before fixtures submit ordinary gantry plans. */
   public function homeGantryFixture(blueprint:MotionSystemBlueprint,
-      runtime:robotkit.runtime.RobotRuntime, harness:SimulationHarness):Int {
+      runtime:robotkit.runtime.RobotRuntime, harness:SimulationHarness, ?fixtureRobot:Robot,
+      ?fixtureMotion:MotionSystem):Int {
     var model = blueprint.model;
-    var robot = new SimulatedRobot("homing-fixture", runtime, model.name,
-      [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
-    var homing = new MotionSystem(robot, blueprint);
+    var robot:Robot = fixtureRobot == null ? new SimulatedRobot("homing-fixture", runtime, model.name,
+      [for (link in model.links) link.name], [for (joint in model.joints) joint.name]) : fixtureRobot;
+    var homing = fixtureMotion == null ? new MotionSystem(robot, blueprint) : fixtureMotion;
     homing.configureRuntimeHoming(runtime, () -> {}, harness.simulation.homingSides(0));
     var tick = 1;
     harness.step(Int64.ofInt(tick));
@@ -366,7 +367,9 @@ class MotionKitTestSupport {
       [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name], false, false,
       "simulated runtime fault", queueSupport ? null : robotkit.core.ExecutionCapabilities.unavailable());
-    return new TrialRig(MotionSystem.fromBlueprint(robot, blueprint), simulationHarness, robot);
+    var machine = MotionSystem.fromBlueprint(robot, blueprint);
+    if (queueSupport) homeGantryFixture(blueprint, runtime, simulationHarness, robot, machine);
+    return new TrialRig(machine, simulationHarness, robot);
   }
 
   public function segmentDistance(x:Float, y:Float, ax:Float, ay:Float, bx:Float, by:Float):Float {
