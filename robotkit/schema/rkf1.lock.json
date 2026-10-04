@@ -613,6 +613,11 @@
           "id": 16,
           "name": "jerkUnchecked",
           "type": "Bool"
+        },
+        {
+          "id": 17,
+          "name": "controlAcceleration",
+          "type": "Null<Array<Float>>"
         }
       ],
       "kind": "class"
@@ -828,6 +833,11 @@
           "id": 16,
           "name": "replaceAfterTimeNs",
           "type": "haxe.Int64"
+        },
+        {
+          "id": 17,
+          "name": "controlAcceleration",
+          "type": "Null<Array<Float>>"
         }
       ],
       "kind": "class"

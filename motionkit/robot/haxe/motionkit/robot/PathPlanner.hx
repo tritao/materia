@@ -314,6 +314,7 @@ class PathPlanner {
           throw 'Timed Cartesian path check $index failed: ${check.value} > ${check.limit} at ${check.timeSeconds}';
       }
     }
+    result.controlAcceleration = maxAcceleration.copy();
     return {trajectory: result, report: report, diagnostics: diagnostics};
   }
 

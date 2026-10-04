@@ -9,6 +9,8 @@ import haxe.Int64;
 class Trajectory {
   final owner:Ownedmk_trajectory_handle;
   var disposed:Bool = false;
+  /** Requested joint acceleration for controlled stops; independent of physical ratings. */
+  public var controlAcceleration:Null<Array<Float>> = null;
 
   private function new(owner:Ownedmk_trajectory_handle) {
     this.owner = owner;

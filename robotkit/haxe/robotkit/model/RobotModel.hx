@@ -343,10 +343,24 @@ class RobotModel {
       if (!hasLeader || !hasFollower)
         errors.push('joint coupling ${coupling.id} references an unknown joint');
     }
+    var networkIds = new Map<String, Bool>();
+    var networkOwners = new Map<String, String>();
+    for (network in elasticNetworks) {
+      if (network == null) { errors.push("robot has a null elastic network"); continue; }
+      if (networkIds.exists(network.id)) errors.push('duplicate elastic network ID ${network.id}');
+      networkIds.set(network.id, true);
+      try {
+        network.validate(joints, couplings);
+        for (owner in network.couplings) {
+          if (networkOwners.exists(owner)) errors.push('coupling $owner belongs to more than one elastic network');
+          networkOwners.set(owner, network.id);
+        }
+      } catch (error:Dynamic) errors.push(Std.string(error));
+    }
     var cycle = JointCoupling.cycleThrough(couplings);
     if (cycle != null) errors.push('joint $cycle depends on itself through its couplings');
     if (errors.length == 0) {
-      var uncontrolled = DriveLoads.uncontrolledAxes(DriveLoads.of(this));
+      var uncontrolled = DriveLoads.uncontrolledModelAxes(this);
       if (uncontrolled.length > 0)
         errors.push('under-actuated coupled axes: ${uncontrolled.join(", ")}; bind independent motors before solving shared stiffness');
     }

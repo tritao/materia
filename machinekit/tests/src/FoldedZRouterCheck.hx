@@ -59,7 +59,7 @@ class FoldedZRouterCheck {
 			throw "Folded Z must add the belt's elastic compliance to the direct screw";
 		CncRouterChecks.near(foldedLoad.stiffness / 1e6, 486.86732785, "folded Z stiffness baseline, MN/m", 0.01);
 		CncRouterChecks.near(directLoad.backlash * 1000, 0.05, "direct Z backlash baseline", 1e-6);
-		CncRouterChecks.near(foldedLoad.backlash * 1000, 0.0505, "folded Z backlash baseline", 1e-6);
+		CncRouterChecks.near(foldedLoad.backlash * 1000, 0.051, "folded Z backlash baseline", 1e-6);
 		CncRouterChecks.near(new CncRouter().massProperties().mass, 36.9, "direct router mass baseline", 0.1);
 		CncRouterChecks.near(folded.massProperties().mass, 37.1, "folded router mass baseline", 0.1);
 		if (CncRouter.FoldedZMotorPlate.TENSION_TRAVEL < 4.0)

@@ -609,6 +609,7 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
             knot.tag = plan.segments.tag;
             knot.plan_id = plan.plan_id;
             knot.ends_at_rest = ends_at_rest;
+            std::copy_n(plan.control_acceleration, RK_MAX_TRAJECTORY_JOINTS, knot.control_acceleration);
             added.push_back(std::move(knot));
         }
         RuntimeTrajectoryPoint end{};
@@ -621,6 +622,7 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
         end.tag = plan.segments.tag;
         end.plan_id = plan.plan_id;
         end.ends_at_rest = ends_at_rest;
+        std::copy_n(plan.control_acceleration, RK_MAX_TRAJECTORY_JOINTS, end.control_acceleration);
         added.push_back(std::move(end));
         if (knots_after_append(kept, added) > RK_MAX_TRAJECTORY_QUEUE_POINTS)
             return RK_ERROR_QUEUE_FULL;
@@ -803,6 +805,22 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
     double stop_crossing_rate = 0.0;
     double stop_after_crossing_seconds = 0.0;
     double stop_path_velocities[RK_MAX_TRAJECTORY_JOINTS]{};
+    // Planning limits belong to the active queued segment, never the mechanical blueprint.
+    if (control_.trajectory_active && !trajectory_.empty()) {
+        const auto *selected = &trajectory_.front();
+        for (const auto &point : trajectory_) {
+            if (point.point.time_from_start_ns > control_.trajectory_time_ns) break;
+            selected = &point;
+        }
+        std::copy_n(selected->control_acceleration, RK_MAX_TRAJECTORY_JOINTS, control_.control_acceleration);
+    }
+    auto control_acceleration = [&](uint32_t joint) {
+        const auto physical = acceleration_limit(blueprint_.joints[joint]);
+        const auto requested = joint < RK_MAX_TRAJECTORY_JOINTS &&
+            (control_.trajectory_active || control_.stop_ramp_active)
+            ? control_.control_acceleration[joint] : 0.0;
+        return requested > 0.0 ? std::min(physical, requested) : physical;
+    };
     if (control_.trajectory_active && !trajectory_.empty()) {
         const auto period_count = period_.count();
         const auto period_ns = period_count > 0 ? static_cast<uint64_t>(period_count) : 0;
@@ -871,7 +889,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                     const double braking = std::max(0.0, std::max(
                         -direction * accelerations[joint], -direction * recent[joint]));
                     max_decrease = std::min(max_decrease,
-                        (acceleration_limit(blueprint_.joints[joint]) - rate * braking) / speed);
+                        (control_acceleration(joint) - rate * braking) / speed);
                 }
                 // No joint moving: the trajectory is at rest and can stop now.
                 // A non-positive bound means the trajectory already brakes at
@@ -938,7 +956,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                     const double path_acceleration = std::max(std::abs(estimate.acceleration[joint]),
                         std::abs(estimate.recent_acceleration[joint]));
                     max_increase = std::min(max_increase,
-                        std::max(0.0, acceleration_limit(blueprint_.joints[joint]) -
+                        std::max(0.0, control_acceleration(joint) -
                             rate * path_acceleration) / speed);
                 }
                 const double next_rate = !std::isfinite(max_increase) ? 1.0 :
@@ -1032,7 +1050,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         double duration_seconds = 2.0 * static_cast<double>(period_ns) / 1'000'000'000.0;
         double limited_duration = 0.0;
         for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
-            const auto acceleration = acceleration_limit(blueprint_.joints[joint]);
+            const auto acceleration = control_acceleration(joint);
             if (std::isfinite(acceleration) && acceleration > 0.0)
                 limited_duration = std::max(limited_duration,
                     std::abs(velocities[joint]) / acceleration);
@@ -1079,7 +1097,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         refresh_trajectory_progress();
         bool has_acceleration_limits = true;
         for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
-            const auto acceleration = acceleration_limit(blueprint_.joints[joint]);
+            const auto acceleration = control_acceleration(joint);
             if (!std::isfinite(acceleration) || acceleration <= 0.0) {
                 has_acceleration_limits = false;
                 break;
@@ -1219,7 +1237,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                         trajectory_.back().ends_at_rest) {
                         double ramp_duration = 2.0 * std::chrono::duration<double>(period_).count();
                         for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
-                            const double acceleration = acceleration_limit(blueprint_.joints[joint]);
+                            const double acceleration = control_acceleration(joint);
                             if (std::isfinite(acceleration) && acceleration > 0.0)
                                 ramp_duration = std::max(ramp_duration,
                                     std::abs(velocities[joint]) / acceleration);
@@ -1259,7 +1277,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                     control_.stop_ramp_active)
                     return RK_ERROR_INVALID_STATE;
                 for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
-                    if (acceleration_limit(blueprint_.joints[joint]) <= 0.0)
+                    if (control_acceleration(joint) <= 0.0)
                         return RK_ERROR_UNSUPPORTED;
                 if (endpoint_->executes_trajectory_queue()) {
                     const auto result = apply_intermediate_lifecycle(value);

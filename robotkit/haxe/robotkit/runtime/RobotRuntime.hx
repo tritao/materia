@@ -317,6 +317,7 @@ class RobotRuntime {
       header.set_position_tolerance(joint, used ? positionTolerances[joint] : 0.0);
       header.set_velocity_tolerance(joint, used ? velocityTolerances[joint] : 0.0);
       header.set_acceleration_tolerance(joint, used ? accelerationTolerances[joint] : 0.0);
+      header.set_control_acceleration(joint, used ? plan.controlAcceleration.get(joint) : 0.0);
     }
     return header;
   }

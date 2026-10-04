@@ -525,13 +525,9 @@ class SessionTests extends MotionKitTestSupport {
     var holdTick = 2;
     var worstAcceleration = 0.0;
     var worstTick = -1;
-    var physicalCap = 0.0;
     while (moveTicks == 0 || holdTick < moveTicks) {
       var blueprint = MachineKitRobotCompiler.compileXYZGantry(new LinearAxis(23, 10, 200),
         new LinearAxis(23, 10, 60), new LinearAxis(23, 10, 40), 0.1, limit);
-      var compiledCap = blueprint.runtime.joints[0].maxAcceleration;
-      if (compiledCap == null) throw "Hold sweep needs a physical acceleration ceiling";
-      physicalCap = compiledCap;
       var simulationHarness = new SimulationHarness(0.01);
       var simulation = simulationHarness.simulation;
       var runtime = simulation.addRobot(blueprint.runtime);
@@ -579,8 +575,8 @@ class SessionTests extends MotionKitTestSupport {
       simulationHarness.dispose();
       holdTick += 2;
     }
-    check(worstAcceleration <= physicalCap * 1.05,
-      'every hold stays within the physical acceleration limit (worst ${worstAcceleration} at tick $worstTick, cap $physicalCap)');
+    check(worstAcceleration <= limit * 1.05,
+      'every hold stays within the requested acceleration limit (worst ${worstAcceleration} at tick $worstTick, cap $limit)');
   }
 
   public function testImmediateMotionReplacesNativeQueue():Void {
@@ -692,19 +688,10 @@ class SessionTests extends MotionKitTestSupport {
 
   /**
    * Replacing motion while moving and resuming after a hold must stay
-   * within the physical joint acceleration limit on the execution path.
+   * within the requested joint acceleration limit on the execution path.
    */
-  function gantryPhysicalAcceleration(?joint:Int = 0):Float {
-    var blueprint = MachineKitRobotCompiler.compileXYZGantry(new LinearAxis(23, 10, 200),
-      new LinearAxis(23, 10, 60), new LinearAxis(23, 10, 40), 0.1, 0.4);
-    var cap = blueprint.runtime.joints[joint].maxAcceleration;
-    if (cap == null) throw "Gantry test needs a physical acceleration ceiling";
-    return cap;
-  }
-
   public function testMotionChangesStayWithinLimits():Void {
     var limit = 0.4;
-    var physicalCap = gantryPhysicalAcceleration();
     for (queueSupport in [true]) {
       var label = "buffered";
       var worstReplace = 0.0;
@@ -748,21 +735,21 @@ class SessionTests extends MotionKitTestSupport {
           '$label move held and resumed at tick $eventTick reaches its target', 1e-5);
         eventTick += 8;
       }
-      check(worstReplace <= physicalCap * 1.05,
+      check(worstReplace <= limit * 1.05,
         '$label move replaced while moving stays within the limit (worst $worstReplace at tick $worstReplaceTick)');
-      check(worstJog <= physicalCap * 1.05,
+      check(worstJog <= limit * 1.05,
         '$label jog while moving stays within the limit (worst $worstJog at tick $worstJogTick)');
-      check(worstResume <= physicalCap * 1.05,
+      check(worstResume <= limit * 1.05,
         '$label resume stays within the limit (worst $worstResume at tick $worstResumeTick)');
     }
   }
 
   /**
    * A jog issued while the same axis is jogging changes speed or direction
-   * without stopping first, within the physical acceleration limit, on the plan path.
+   * without stopping first, within the requested acceleration limit, on the plan path.
    */
   public function testContinuousJog():Void {
-    var physicalCap = gantryPhysicalAcceleration();
+    var limit = 0.4;
     for (queueSupport in [true]) {
       var label = "buffered";
       for (secondVelocity in [0.043, 0.02, -0.04]) {
@@ -774,7 +761,7 @@ class SessionTests extends MotionKitTestSupport {
           }, false, machine -> machine.jog("x", 0.04, 2.0));
           var context = '$label jog changed to $secondVelocity at tick $eventTick';
           check(continued, '$context continues without stopping first');
-          check(peakSecondDifference(positions) <= physicalCap * 1.05,
+          check(peakSecondDifference(positions) <= limit * 1.05,
             '$context stays within the limit (peak ${peakSecondDifference(positions)})');
           // Count ticks at rest before the motion finally settles.
           var settled = positions.length - 1;
@@ -828,7 +815,7 @@ class SessionTests extends MotionKitTestSupport {
       simulationHarness.step(Int64.ofInt(tick++));
       positions.push(robot.snapshot().positions.get(0));
     }
-    check(peakSecondDifference(positions) <= gantryPhysicalAcceleration() * 1.05,
+    check(peakSecondDifference(positions) <= 0.4 * 1.05,
       'original jog stays within the limit (peak ${peakSecondDifference(positions)})');
     near(positions[positions.length - 1], 0.1,
       "rejected replacement leaves the original jog to complete", 1e-5);
@@ -875,7 +862,7 @@ class SessionTests extends MotionKitTestSupport {
         // Time-warping changes which 10 ms sample straddles a blended corner;
         // keep a small absolute allowance on this discrete second difference.
         var allowed = [for (joint in 0...2)
-          Math.max(gantryPhysicalAcceleration(joint), jointPeak(baseline, joint)) * 1.05 + 0.01];
+          Math.max(0.4, jointPeak(baseline, joint)) * 1.05 + 0.01];
         var eventTicks = baseline.length;
         var eventTick = 3;
         while (eventTick < eventTicks) {

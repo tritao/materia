@@ -1253,6 +1253,10 @@ class RobotWorldTests {
       "a loaded URDF round-trips through the RobotModel codec");
     equal(RobotRuntimeCompiler.compile(model).linkCollisionShapes.length, 3,
       "a loaded URDF compiles");
+    var zeroEffort = robotkit.model.urdf.UrdfLoader.load(
+      "<robot name='zero'><link name='a'/><link name='b'/><joint name='j' type='revolute'><parent link='a'/><child link='b'/><limit lower='-1' upper='1' effort='0' velocity='1'/></joint></robot>").model;
+    check(zeroEffort.joints[0].limits.effort == null,
+      "URDF zero effort remains an unspecified rating, not an unpowered drive");
     throws(function() robotkit.model.urdf.UrdfLoader.load("<robot name='x'><link name='a'/>"),
       "malformed URDF XML is rejected");
     throws(function() robotkit.model.urdf.UrdfLoader.load(
@@ -5365,7 +5369,12 @@ class RobotWorldTests {
       RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
       [0.0], [0.0], [0.0],
       [new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(200000000), [[0.0, 0.5]])],
-      null, null, [0.0001], [0.0002], [0.0003]);
+      null, null, [0.0001], [0.0002], [0.0003], true, null, false, null, [0.4]);
+    var portable = robotkit.protocol.PlanSubmission.fromWorld(Int64.ofInt(1), plan);
+    var decodedPortable:robotkit.protocol.PlanSubmission = MessagePack.decode(MessagePack.encode(portable));
+    equal(decodedPortable.toWorld().controlAcceleration.get(0), 0.4,
+      "wire plans preserve controlled stop acceleration independently of physical ratings");
+    equal(plan.copy().controlAcceleration.get(0), 0.4, "copied plans preserve stopping limits");
     recorded.submit(RobotCommand.ExecutionPlan(plan));
     var progress:Array<String> = [];
     for (time in [100, 200, 300]) {
@@ -5384,6 +5393,7 @@ class RobotWorldTests {
         equal(replayedPlan.positionTolerances.toArray()[0], 0.0001,
           "MCAP preserves plan start tolerances");
         check(replayedPlan.endsAtRest, "MCAP preserves declared plan completion");
+        equal(replayedPlan.controlAcceleration.get(0), 0.4, "MCAP preserves controlled stop acceleration");
       case _:
         check(false, "MCAP decodes the plan command variant");
     }
