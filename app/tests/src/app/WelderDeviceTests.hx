@@ -15,6 +15,8 @@ import processkit.modbus.ModbusWelderMap;
 import processkit.modbus.ModbusRegister;
 import processkit.simulation.ModbusWelderSupply;
 import processkit.testing.FakeModbusServer;
+import processkit.testing.FakeModbusServer.FakeModbusOwner;
+import processkit.WelderDeviceOwner;
 
 /** Focused integration gate: an unchanged CAD weld mission with device feedback driving its bead. */
 class WelderDeviceTests {
@@ -51,26 +53,25 @@ class WelderDeviceTests {
       200, 1, 2, 4, new ModbusRegister(201, 0.1), new ModbusRegister(202, 0.01), new ModbusRegister(203), 103, 1000);
     var server = new FakeModbusServer(map, accepted[0]); server.modelEnabled = true;
     var supply = new ModbusWelder(client, map);
+    var hardware = new FakeModbusOwner(server, clock);
+    var owner = new WelderDeviceOwner(supply, clock);
+    var readyUntil = clock() + 3.0;
+    while (!owner.ready() && clock() < readyUntil) Sys.sleep(0.001);
+    if (!owner.ready()) throw 'CAD mission Modbus source did not initialize: ${owner.faultDetail()}';
+    owner.reset();
+    var failure:Null<String> = null;
+    try {
     runMission(root, false, function(welder:processkit.simulation.SimulatedWelder):processkit.simulation.SimulationWelderSupply {
-      var readyUntil = clock() + 3.0;
-      while (!supply.initialized && clock() < readyUntil) {
-        native.events.poll(); server.poll(clock()); supply.poll(clock()); native.events.wait(0.001);
-      }
-      if (!supply.initialized) throw 'CAD mission Modbus source did not initialize: ${client.fault}';
-      return new ModbusWelderSupply(supply, welder.runtime,
+      return new ModbusWelderSupply(owner, welder.runtime,
         {arc:welder.arcChannel, wireSpeed:welder.wireSpeedChannel, voltage:welder.voltageChannel}, welder.sensorId,
-        clock, function(grounded:Bool) {
-          server.grounded = grounded; native.events.poll();
-          try server.poll(clock()) catch (error:Dynamic)
-            throw 'CAD mission Modbus server failed: client=${client.fault}, requests=${server.requests}, error=$error';
-        });
+        clock, hardware.grounded);
     }, generated);
     deadline = clock() + 2.0;
-    while ((server.arc || !client.idle()) && clock() < deadline) {
-      native.events.poll(); server.poll(clock()); supply.poll(clock()); native.events.wait(0.001);
-    }
-    if (server.arc || server.wire != 0.0) throw "Finished CAD mission left the Modbus source on";
-    client.close(); server.drop(); subscription.dispose(); listener.close(); native.dispose();
+    while (hardware.arc() && clock() < deadline) Sys.sleep(0.001);
+    if (hardware.arc() || hardware.wire() != 0.0) throw "Finished CAD mission left the Modbus source on";
+    } catch (error:Dynamic) failure = Std.string(error);
+    owner.close(); hardware.close(); subscription.dispose(); listener.close(); native.dispose();
+    if (failure != null) throw failure;
   }
 
   static function runMission(root:String, virtualDevice:Bool,
