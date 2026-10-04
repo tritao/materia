@@ -437,6 +437,11 @@ RK_API rk_result RK_CALL rk_simulation_reset_robot(rk_simulation simulation,
  */
 RK_API rk_result RK_CALL rk_simulation_set_joint_slip(
     rk_simulation simulation, uint32_t robot_index, uint32_t joint, double offset);
+/** Hold an actuated, nonpassive shaft at a physical SI position during squaring.
+ * active must be 0 or 1. Release preserves accumulated follower slip; reset clears it.
+ * The caller owns homing authorization and must release holds on cancellation or fault. */
+RK_API rk_result RK_CALL rk_simulation_set_squaring_hold(
+    rk_simulation simulation, uint32_t robot_index, uint32_t joint, uint32_t active, double position);
 /** Place a cold/reset robot at a coupling-consistent physical offset while keeping its counter origin.
  * Full joint vector in SI units; accepted only in a stopped world before the first runtime sample. */
 RK_API rk_result RK_CALL rk_simulation_set_power_up_offsets(rk_simulation simulation,

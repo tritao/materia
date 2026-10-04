@@ -607,6 +607,15 @@ class Simulation {
       "simulation.setJointSlip");
   }
 
+  /** Hold one motor-side shaft at a physical SI position while its leader continues.
+   * Release retains follower slip. The homing owner must release on every exit path. */
+  public function setSquaringHold(robotIndex:Int, joint:Int, active:Bool, position:Float):Void {
+    ensureLive();
+    if (!Math.isFinite(position)) throw "Squaring hold requires a finite physical shaft position";
+    check(RobotKitSimKit.rk_simulation_set_squaring_hold(owner.borrow(), robotIndex, joint,
+      active ? 1 : 0, position), "simulation.setSquaringHold");
+  }
+
   /** Teleports one robot base while leaving the shared clock untouched. The
    * session must be stopped. */
   public function teleportRobot(robotIndex:Int, position:Array<Float>,

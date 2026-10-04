@@ -1858,3 +1858,17 @@ the homing cycle. The controller must supply a fresh physical shaft position,
 release holds on all exit paths, establish independent motor reference offsets
 and manage squaring-only skew relaxation. Mechanical coupling behavior remains
 unverified. No tests or builds ran.
+
+### G12 — expose simulation holds and stage follower displacement
+
+Native hold foundation: `6b771a626`. Expose set_squaring_hold through the C
+API and Simulation.setSquaringHold through Haxe. The C boundary accepts only
+active values 0/1; Haxe rejects nonfinite positions. Regenerate canonical FFI
+declarations from the header for the four portable ABI targets (source
+generation only). Stage hold-induced slip with positional targets and commit
+it with accepted pending commands, so discarded staging leaves retained slip
+unchanged.
+
+No project build or test ran. Controller wiring, release on exit paths,
+independent calibration, squaring-only skew relaxation and physical coupling
+behavior remain pending/unverified.

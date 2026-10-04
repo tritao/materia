@@ -98,6 +98,7 @@ private:
      * lost steps is: added to every position or servo target. Zero is none; reset clears it.
      */
     std::vector<double> slip_;
+    std::vector<double> staged_slip_;
     std::vector<double> counter_origin_;
     /** Physical shaft holds during dual-drive squaring; accumulated displacement stays in slip_. */
     std::vector<uint8_t> squaring_hold_;

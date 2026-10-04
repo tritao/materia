@@ -272,6 +272,12 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 */
 	extern fn rk_simulation_set_power_up_offsets(simulation: rk_simulation, robot_index: u32, offsets: ptr<const<f64>> @in_array("count"), count: u32) -> rk_result;
 	/**
+	 * Hold an actuated, nonpassive shaft at a physical SI position during squaring.
+	 * active must be 0 or 1. Release preserves accumulated follower slip; reset clears it.
+	 * The caller owns homing authorization and must release holds on cancellation or fault.
+	 */
+	extern fn rk_simulation_set_squaring_hold(simulation: rk_simulation, robot_index: u32, joint: u32, active: u32, position: f64) -> rk_result;
+	/**
 	 * Teleports one attached robot's base while the simulation is stopped.
 	 * This does not change the pose restored by reset or resetRobot.
 	 */
