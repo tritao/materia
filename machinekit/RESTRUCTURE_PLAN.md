@@ -128,6 +128,24 @@ This plan simplifies the implementation around them.
   parts). Whichever lands second rebases; MK5 must add facets for its new capabilities.
 - MK7 and MK8 go with RobotKit R3 (ProcessKit). MK9 waits until no branch has open MachineKit edits.
 
+## Porting a branch onto the restructure
+
+| Before | After |
+|---|---|
+| `component.capabilities()` + `switch` | `XFacet.of(component)` (e.g. `SuctionFacet.of`), or `component.facets()` with `Std.isOfType` |
+| `addCapability(Suction(...))` | `addFacet(new SuctionFacet(...))`; a new kind is a new class implementing `ComponentFacet` in its domain's package |
+| `component.coupling()` as `{key, connector}` | `component.coupling()` returns `CouplingFacet` |
+| `FrozenAssemblyDefinitions.thaw(a.describe().mechanical)` | `a.definition()` for the flat, derived definition; `a.describe().mechanical` is the nested one |
+| `describe().mechanical.elasticNetworks` / derived couplings | `definition()` (the saved form holds no derived data) |
+| `describe().machine.tools/changer/endEffector` | `EndEffector.describeEndEffector()`, `EndEffectorSet.describeSet()` |
+| `description.machine.<records>` of included members | `description.subassemblies[i].machine` (per level, local paths) |
+| `MachineKitComponents.byId/all/register` | `MachineKitComponents.defaultRegistry().byId/all/register` |
+| `MachineKitAdditionalRecipes` | the part class's own `recipeType()`, registered in its package's `*Components` |
+| `AssemblyPreview.robotTools/robotSensors` | `machinekit.robot.RobotScene.*` (package `machinekit-robot`, add it to haxeon.json) |
+| `machinekit.robotics.EndEffectorControls` | `machinekit.robot.EndEffectorControls` |
+| `machinekit.units.*` | plain `Float` with unit-suffixed names |
+| editing `MachineAssembly` internals | the level parts: `MechanicalAssembly`, `ServiceNetwork`, `DriveSystem`, `AssemblyInventory`; derived data in `DriveSystem.derive` |
+
 ## Gate (each phase)
 
 The MachineKit suite (`machinekit/scripts/test-haxeon`, which builds every example), the CadKit
