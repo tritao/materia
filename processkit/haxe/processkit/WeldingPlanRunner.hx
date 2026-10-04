@@ -327,7 +327,20 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     programStart = process.lastProgramStart;
     reachedPath = false;
     waiting = 0.0;
-    motion.run(new MotionProgram(ops));
+    var program = new MotionProgram(ops);
+    // Joint limits can slow a corner below the requested feed. Schedule wire quantity against that
+    // validated clock before submitting the program, so the device applies it with the motion.
+    var timed = motion.compiler.compile(program, startPositions(), haxe.Int64.ofInt(1));
+    var scheduled:MotionProgram;
+    try {
+      scheduled = ProcessRateSchedule.apply(program, timed, followIndex, channels.wireSpeed,
+        process.recipe.quantityPerDistance, cast(plan, WeldPlan).parameters.wireSpeed);
+    } catch (error:Dynamic) {
+      timed.dispose();
+      throw error;
+    }
+    timed.dispose();
+    motion.run(scheduled);
     phase = Welding;
   }
 

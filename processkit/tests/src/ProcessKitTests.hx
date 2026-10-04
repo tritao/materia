@@ -27,6 +27,7 @@ class ProcessKitTests {
     pauseOverride();
     WelderProcessTests.run();
     WeldPlanningTests.run();
+    ProcessRateScheduleTests.run();
     Sys.println('ProcessKit tests passed ($assertions assertions)');
   }
 
