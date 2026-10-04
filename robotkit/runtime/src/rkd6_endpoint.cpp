@@ -728,6 +728,23 @@ void Rkd6Endpoint::poll_frames(std::uint64_t owner_now_ns) {
                     i * device_wire6::ActuatorState6::SIZE,
                     device_wire6::ActuatorState6::SIZE), actuators_[i]);
             has_state_ = true;
+        } else if (decoded.kind == 17) {
+            device_wire6::Sensor6Header header{};
+            if (!device_wire6::decode(decoded.payload.first(header.SIZE), header) ||
+                header.session != ack_.session || header.slot >= RK_MAX_SENSORS ||
+                header.sequence <= sensor_headers_[header.slot].sequence ||
+                header.timestamp_ticks < sensor_headers_[header.slot].timestamp_ticks) continue;
+            std::size_t count = header.value_count;
+            for (std::size_t slot = 0; slot < RK_MAX_SENSORS; ++slot)
+                if (slot != header.slot) count += sensor_headers_[slot].value_count;
+            if (count > RK_SENSOR_VALUE_POOL) continue;
+            for (std::size_t i = 0; i < header.value_count; ++i) {
+                device_wire6::Sensor6Value value{};
+                device_wire6::decode(decoded.payload.subspan(header.SIZE + i * value.SIZE, value.SIZE), value);
+                sensor_values_[header.slot][i] = value.value;
+            }
+            sensor_headers_[header.slot] = header;
+            sensor_received_ns_[header.slot] = transport_->received_at_ns() ? transport_->received_at_ns() : owner_now_ns;
         }
     }
 }
@@ -840,6 +857,23 @@ rk_result Rkd6Endpoint::sample(std::uint64_t timestamp_ns, rk_robot_state &state
         state.position[mapping.joint] = actuators_[i].position / mapping.ratio + mapping.offset;
         state.velocity[mapping.joint] = actuators_[i].velocity / mapping.ratio;
         state.effort[mapping.joint] += actuators_[i].effort * mapping.ratio;
+    }
+    state.sensor_count = 0;
+    std::size_t value_cursor = 0;
+    for (std::size_t slot = 0; slot < RK_MAX_SENSORS; ++slot) {
+        const auto &header = sensor_headers_[slot];
+        state.sensors[slot] = {};
+        if (header.sequence == 0) continue;
+        state.sensor_count = static_cast<std::uint32_t>(slot + 1);
+        auto &sample = state.sensors[slot];
+        sample.sequence = header.sequence;
+        sample.source_timestamp_ns = static_cast<std::uint64_t>(
+            static_cast<long double>(header.timestamp_ticks) * 1e9L / ack_.device_tick_hz);
+        sample.received_timestamp_ns = sensor_received_ns_[slot];
+        sample.value_count = header.value_count;
+        sample.value_offset = static_cast<std::uint32_t>(value_cursor);
+        std::copy_n(sensor_values_[slot].begin(), header.value_count, state.sensor_values + value_cursor);
+        value_cursor += header.value_count;
     }
     reconstruct_feedback(state);
     state.trajectory_queue_depth = ack_.segment_capacity - status_.remaining_segments;

@@ -1,6 +1,7 @@
 //! Device-side arc simulation. The scheduler owns output safety; this model observes its outputs.
 #[derive(Clone, Copy, Debug)]
 pub struct WelderConfig {
+    pub sensor_slot: u8,
     pub arc_channel: usize,
     pub wire_channel: usize,
     pub voltage_channel: usize,
@@ -10,7 +11,7 @@ pub struct WelderConfig {
 }
 impl WelderConfig {
     pub fn valid(&self) -> bool {
-        self.arc_channel < 32 && self.wire_channel < 32 && self.voltage_channel < 32
+        self.sensor_slot < 8 && self.arc_channel < 32 && self.wire_channel < 32 && self.voltage_channel < 32
             && self.arc_channel != self.wire_channel && self.arc_channel != self.voltage_channel
             && self.wire_channel != self.voltage_channel
             && self.ignition_seconds.is_finite() && self.ignition_seconds >= 0.0
@@ -64,7 +65,7 @@ impl VirtualWelder {
 mod tests {
     use super::*;
     fn welder() -> VirtualWelder {
-        VirtualWelder::new(WelderConfig { arc_channel: 0, wire_channel: 1, voltage_channel: 2,
+        VirtualWelder::new(WelderConfig { sensor_slot: 0, arc_channel: 0, wire_channel: 1, voltage_channel: 2,
             ignition_seconds: 0.02, no_arc_seconds: 0.2, efficiency: 0.9 }).unwrap()
     }
     #[test]

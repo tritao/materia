@@ -279,6 +279,33 @@ int main() {
     rk_robot_state state{};
     assert(endpoint->sample(0, state) == RK_OK);
     assert(state.effort[0] == 2.0);
+    auto sensor_packet = [&](std::uint64_t session, std::uint64_t sequence, std::uint64_t ticks, float current) {
+        device_wire6::Sensor6Header header{session, ticks, sequence, 0, 6};
+        std::vector<std::uint8_t> body(header.SIZE + 6 * device_wire6::Sensor6Value::SIZE);
+        assert(device_wire6::encode(header, std::span(body).first(header.SIZE)));
+        const float values[] = {1, current, 24, 0, 0, 6400};
+        for (std::size_t i = 0; i < 6; ++i) {
+            device_wire6::Sensor6Value value{values[i]};
+            assert(device_wire6::encode(value, std::span(body).subspan(header.SIZE + i * value.SIZE, value.SIZE)));
+        }
+        std::vector<std::uint8_t> frame;
+        assert(device_frame6::encode(17, body, frame)); observed->incoming.push_back(std::move(frame));
+    };
+    sensor_packet(77, 2, 100, 240);
+    assert(endpoint->sample(100'000, state) == RK_OK);
+    assert(state.sensor_count == 1 && state.sensors[0].value_count == 6);
+    assert(state.sensors[0].sequence == 2 && state.sensors[0].source_timestamp_ns == 100'000);
+    assert(state.sensors[0].received_timestamp_ns == 100'000);
+    assert(RK_SENSOR_VALUE(state, 0, 0) == 1 && RK_SENSOR_VALUE(state, 0, 1) == 240);
+    sensor_packet(76, 3, 101, 10); // Wrong deployment session.
+    sensor_packet(77, 1, 101, 20); // Older acquisition sequence.
+    sensor_packet(77, 3, 99, 30); // Device acquisition time moved backwards.
+    assert(endpoint->sample(110'000, state) == RK_OK);
+    assert(state.sensors[0].sequence == 2 && RK_SENSOR_VALUE(state, 0, 1) == 240);
+    sensor_packet(77, 3, 102, 250);
+    assert(endpoint->sample(120'000, state) == RK_OK);
+    assert(state.sensors[0].sequence == 3 && RK_SENSOR_VALUE(state, 0, 1) == 250);
+
     assert(endpoint->sample(200'000, state) == RK_OK);
     assert(state.effort[0] == 2.0);
     assert(endpoint->sample(100'000'000, state) == RK_OK);

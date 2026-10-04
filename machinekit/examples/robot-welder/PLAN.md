@@ -741,6 +741,13 @@ W6 implementation notes (started after W5 main sync, 2026-10-04):
   compatibility path. Sensor packets carry a compiled slot, device ticks, sequence and finite numeric values;
   welding semantics remain in ProcessKit. The schema lock/codecs/current shared vectors are regenerated. Nine Rust
   wire tests and the C++ codec/vector test pass. Device publishing and runtime snapshot mapping remain to be connected.
+- The virtual welder publishes all six feedback values in `SENSOR6`, with a configured sensor slot and device
+  acquisition clock. Its C interface exposes profile configuration before deployment and grounding changes for
+  host tests. The RKD6 endpoint packs samples into the existing runtime sensor pool, retaining source/reception
+  times and sequences. Wrong-session, stale-sequence, backwards-time and aggregate pool-overflow packets are ignored.
+  Four framed virtual-device tests and the native endpoint suite pass, including sensor metadata, values and stale
+  packet handling. The host's native endpoint test uses a mock transport; the unchanged welding mission still needs
+  to exercise the complete virtual-device link and the Modbus backend.
 
 ## Phase 2: mobile welder
 

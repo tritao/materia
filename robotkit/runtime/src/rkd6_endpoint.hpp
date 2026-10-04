@@ -133,6 +133,9 @@ private:
     device_wire6::State6Header state_header_{};
     std::array<device_wire6::ActuatorState6, device_wire6::MAX_ACTUATORS> actuators_{};
     bool has_state_ = false;
+    std::array<device_wire6::Sensor6Header, RK_MAX_SENSORS> sensor_headers_{};
+    std::array<std::array<float, RK_MAX_SENSOR_VALUES>, RK_MAX_SENSORS> sensor_values_{};
+    std::array<std::uint64_t, RK_MAX_SENSORS> sensor_received_ns_{};
     std::deque<DeviceSegment6> pending_;
     std::vector<DeviceSegment6> sent_;
     std::size_t next_commit_ = 0;

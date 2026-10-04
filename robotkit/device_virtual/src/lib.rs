@@ -33,6 +33,7 @@ pub struct VirtualDevice {
     /// Bytes received since the session began, as the status reports them.
     received_bytes: u64,
     welder: Option<welder::VirtualWelder>,
+    weld_sequence: u64,
 }
 
 impl VirtualDevice {
@@ -75,6 +76,7 @@ impl VirtualDevice {
             outbox: VecDeque::new(),
             received_bytes: 0,
             welder: None,
+            weld_sequence: 0,
         })
     }
 
@@ -217,6 +219,7 @@ impl VirtualDevice {
                     );
                     core.initialize_clock(self.board.now_ticks());
                     if let Some(welder) = self.welder.as_mut() { welder.reset(); }
+                    self.weld_sequence = 0;
                     self.steps = generator;
                     self.core = Some(core);
                     self.events = Some(DeviceEvents::new(&begin));
@@ -452,6 +455,19 @@ impl VirtualDevice {
                 .unwrap();
         }
         self.emit(15, &body);
+        if let Some(welder) = self.welder.as_ref() {
+            self.weld_sequence += 1;
+            let header = Sensor6Header { session: self.session, timestamp_ticks: self.board.now_ticks(),
+                sequence: self.weld_sequence, slot: welder.config.sensor_slot, value_count: 6 };
+            let values = welder.values();
+            let mut body = [0; Sensor6Header::SIZE + 6 * Sensor6Value::SIZE];
+            header.encode(&mut body[..Sensor6Header::SIZE]).unwrap();
+            for (i, value) in values.iter().enumerate() {
+                let start = Sensor6Header::SIZE + i * Sensor6Value::SIZE;
+                Sensor6Value { value: *value }.encode(&mut body[start..start + Sensor6Value::SIZE]).unwrap();
+            }
+            self.emit(17, &body);
+        }
     }
 
     pub fn take_frame(&mut self) -> Option<Vec<u8>> { self.outbox.pop_front() }
@@ -489,6 +505,24 @@ pub unsafe extern "C" fn rkd_virtual_create(
         profile,
     )
     .map_or(std::ptr::null_mut(), |v| Box::into_raw(Box::new(v)))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn rkd_virtual_configure_welder(
+    device: *mut VirtualDevice, sensor_slot: u8, arc_channel: u32, wire_channel: u32,
+    voltage_channel: u32, ignition_seconds: f64, no_arc_seconds: f64, efficiency: f32,
+) -> i32 {
+    let Some(device) = device.as_mut() else { return 0; };
+    device.configure_welder(welder::WelderConfig { sensor_slot, arc_channel: arc_channel as usize,
+        wire_channel: wire_channel as usize, voltage_channel: voltage_channel as usize,
+        ignition_seconds, no_arc_seconds, efficiency }) as i32
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn rkd_virtual_set_welder_grounded(device: *mut VirtualDevice, grounded: u8) -> i32 {
+    let Some(device) = device.as_mut() else { return 0; };
+    if grounded > 1 { return 0; }
+    device.set_welder_grounded(grounded != 0) as i32
 }
 
 #[no_mangle]
@@ -821,7 +855,7 @@ mod tests {
     fn welding_device(grounded: bool) -> VirtualDevice {
         let mut d = VirtualDevice::new(1_000_000, 40_000, 0, 0, 1,
             [1_000.0; ACTUATORS], [7; 16], 1).unwrap();
-        assert!(d.configure_welder(welder::WelderConfig { arc_channel: 0, wire_channel: 1,
+        assert!(d.configure_welder(welder::WelderConfig { sensor_slot: 0, arc_channel: 0, wire_channel: 1,
             voltage_channel: 2, ignition_seconds: 0.002, no_arc_seconds: 0.02, efficiency: 0.9 }));
         assert!(d.set_welder_grounded(grounded));
         let mut begin = begin_for([7; 16]);
@@ -896,6 +930,20 @@ mod tests {
             begin.channel_id[i * 48..i * 48 + name.len()].copy_from_slice(name);
         }
         assert_eq!(ack_to(&mut d, &begin).0.status, 0);
+    }
+
+    #[test]
+    fn welding_feedback_travels_in_sensor_frames() {
+        let mut d = welding_device(true); d.outbox.clear(); assert!(d.advance(10_000_000));
+        let frame = d.outbox.iter().find(|f| decode_frame6(f).unwrap().0 == 17).unwrap();
+        let (_, body) = decode_frame6(frame).unwrap();
+        let header = Sensor6Header::decode(&body[..Sensor6Header::SIZE]).unwrap();
+        assert_eq!(header.session, 9); assert_eq!(header.slot, 0); assert_eq!(header.value_count, 6);
+        assert_eq!(header.timestamp_ticks, 10_000); assert!(header.sequence > 1);
+        for (i, expected) in d.weld_values().unwrap().iter().enumerate() {
+            let start = Sensor6Header::SIZE + i * Sensor6Value::SIZE;
+            assert_eq!(Sensor6Value::decode(&body[start..start + Sensor6Value::SIZE]).unwrap().value, *expected);
+        }
     }
 
 }
