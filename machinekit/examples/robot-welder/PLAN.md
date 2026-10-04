@@ -993,7 +993,7 @@ Dependencies:
 | W3 | done (+ hardening: paths, live workpiece frame, exit crash, safety tests) | `weld` mission step; `WeldSeam` skill and `WeldBead`; process engagement and `WeldingPlanRunner`; weld metal part and recipe; bead as runtime geometry; welds on MuJoCo and the test backend, restart with overlap |
 | W4 | Done (2026-10-04) | Whole CAD weldment: 10 seams / 680 mm in 4 runs; swept clearance and derived corner turns; 106.5 s on both backends, legs 4.9–5.1 mm; affected gates pass. Timing changes recorded above. |
 | W5 | Done (2026-10-04) | Seam-progress weave; CAD-derived pass recipes; deposited bead grounding and clearance; scene schema 16 rejects older versions; smaller restart hump. Woven 7 mm measures 6.998 mm, three-pass 10 mm measures 9.999 mm on both backends; all affected gates pass. |
-| W6 | Implemented; final mobile gate blocked (2026-10-04), branch only | RKD6 numeric feedback and virtual welder; checked retrofit profile; Modbus map/adapter with independent ProcessKit owner; unchanged seam and all six shutdown cases pass. Full welder and arm gates pass; mobile baseline fails before final sync. |
+| W6 | Done (2026-10-04) | RKD6 numeric feedback and virtual welder; checked retrofit profile; Modbus map/adapter with independent ProcessKit owner; unchanged seam and all six shutdown cases pass. Full welder, arm, mobile and MachineKit smoke gates pass; phase one lands on local main. |
 
 
 ### W6 latest-main retry: nonzero device start anchor blocks the mission
@@ -1248,3 +1248,39 @@ First-parent commits since the W5 landing, in order (including local-main merges
 - `52316f89b6d75952b25000e2c9f03344071af371` App: verify device shutdown during active CAD weld missions
 - `ed6409f803b9b10dd94d9a12fb5a4e72344691ce` RobotKit: derive process link requirements from applied channel values
 - `15fa95fdba7c8313d3484da83d7708d6c3a511d7` RobotKit: rebuild the virtual device when event policy changes
+
+
+### W6 final mobile gate repair and phase-one landing
+
+The user authorized repairing the remaining mobile gate. The error came from the test reading
+robot joint slots 0 and 1 as wheels. The restructured CAD assembly does not promise that ordering;
+the drive already resolves the authored wheel joint names into the robot blueprint and supplies
+those indices to its odometry. The long-term choice is to measure through that existing mapping,
+without changing production joint ordering or introducing compatibility rules. The test still
+checks the independently authored wheel radius, opposite shaft directions, chassis travel, turn
+and wheel odometry. An explicit local odometry type also avoids haxeon's captured-local field
+inference failure.
+
+- `7143da2cab31aa89cec154f84699d269c6b169b5` MachineKit: record the completed device owner repair and final gate results
+- `b1155a8b3fe2c5c523c802d6baf37b3200203cbf` App: check mobile wheel rates through the CAD joint mapping
+
+Incremental app compilation passes (1,835 sources). The complete
+`PROJECT_SOURCE_ONLY=mobile` gate now passes: deterministic and MuJoCo both travel 400 mm in 1 s,
+turn 0.5 rad, and estimate 400 mm through wheel odometry. The MuJoCo mission retains 61 s;
+obstacle recovery retains 65 s, one replan and 416 mm closest clearance. The production mobile
+code is unchanged, so passed welder and arm gates were not repeated.
+
+The full W6 validation includes the earlier passed welder gate (whole weldment 106.5 s,
+680 mm, legs 4.9–5.1 mm on both backends), arm gate (23.5 s), RKD6 seam (20.36 s),
+Modbus seam (20.92 s), all six shutdown cases on both device routes, 78 Modbus assertions,
+16 scheduled-core checks, four applied-output policy checks, virtual/native device checks,
+and the offline Nucleo profile check. Earlier baseline timing changes remain explained above.
+MachineKit smoke passes (exit 0, `MachineKit smoke passed`), run once with the prebuilt OCCT
+and read-only shared CadKit build. No OCCT rebuild or shared-build write was needed.
+
+Local main has remained `a5d1e7e4008a8970fb7f627e124881aa4d4e7659` and is already an ancestor
+through the W6 merge. All required gates pass. The completion-record commit is the landing commit; its full SHA
+is reported after the guarded `git update-ref` fast-forward from that exact old main SHA.
+Hardware bench/flashing and a verified vendor register map remain follow-ups: phase one proves
+the unchanged CAD mission against simulated devices, including the independent supply owner and
+arc-off shutdown behavior.
