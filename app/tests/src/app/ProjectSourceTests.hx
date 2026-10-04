@@ -1294,9 +1294,9 @@ class ProjectSourceTests {
       4 * 0.00275 * 0.00275 * (0.020 - 0.0054));
     check(Math.abs(stock.removed - recesses) < recesses * 0.02,
       'the stock loses the plate\'s recesses, ${stock.removed} m³ removed against $recesses');
-    // A belt router's rapids are fast enough for the simulated carriage to lag its command by millimetres,
-    // so a rapid's label can reach a few ticks into a cut: those are counted and reported, not forbidden.
-    check((belts || stock.rapidContacts == 0) && stock.collisions == 0,
+    // Both routers settle their measured axes before advancing an exact-stop move, so a rapid
+    // may not remove stock even when a belt carriage lags during its preceding move.
+    check(stock.rapidContacts == 0 && stock.collisions == 0,
       'no rapid runs through the stock and the holder never touches it (${stock.rapidContacts}, ${stock.collisions})');
     var deviation = stock.deviation();
     check(deviation.gouge < 1e-9, 'nothing is cut from the finished plate, gouge ${deviation.gouge} m³');

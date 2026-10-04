@@ -20,6 +20,8 @@ class PlanExecutor {
   public var completed(default, null):Bool = false;
   public final session:MotionSession;
   final ownsSession:Bool;
+  /** Optional measured endpoint allowance before advancing an exact-stop program. */
+  final completionPositionTolerance:Null<Array<Float>>;
   var plan:Null<ExecutionPlan>;
   /** The active plan's segments, read in place over the robot's joints. */
   var planArrays:Null<SegmentArrays> = null;
@@ -31,7 +33,7 @@ class PlanExecutor {
   var deferredRefill:Bool = false;
 
   public function new(robot:Robot, ?jointIndices:Array<Int>,
-      ?session:MotionSession) {
+      ?session:MotionSession, ?completionPositionTolerance:Array<Float>) {
     if (robot == null || !robot.capabilities().supportsExecutionPlans ||
         !robot.capabilities().supportsTrajectoryQueue)
       throw "PlanExecutor requires execution plan and trajectory queue support";
@@ -41,6 +43,13 @@ class PlanExecutor {
     stream = new TrajectoryStream(robot, true);
     this.jointIndices = jointIndices == null ?
       [for (i in 0...robot.description().joints.length) i] : jointIndices.copy();
+    if (completionPositionTolerance != null) {
+      if (completionPositionTolerance.length != this.jointIndices.length)
+        throw "Plan completion tolerances must match the planned joints";
+      for (value in completionPositionTolerance)
+        if (!Math.isFinite(value) || value <= 0.0) throw "Plan completion tolerances must be finite and positive";
+    }
+    this.completionPositionTolerance = completionPositionTolerance == null ? null : completionPositionTolerance.copy();
   }
 
   public function start(plan:ExecutionPlan, ?endsAtRest:Bool = true):Void {
@@ -94,7 +103,7 @@ class PlanExecutor {
     if (session.state == Held) return;
     var active = plan;
     if (active == null) return;
-    if (stream.finishedProgram(observation)) {
+    if (stream.finishedProgram(observation) && settled(active, observation)) {
       stream.markCompleted();
       completed = true;
       plan = null;
@@ -103,6 +112,15 @@ class PlanExecutor {
       return;
     }
     if (deferredRefill) deferredRefill = false; else fill();
+  }
+
+  function settled(active:ExecutionPlan, observation:RobotSnapshot):Bool {
+    var tolerance = completionPositionTolerance;
+    if (!endsAtRest || tolerance == null) return true;
+    var target = active.evaluate(active.durationSeconds).positions;
+    for (joint in 0...jointIndices.length)
+      if (Math.abs(observation.positions.get(jointIndices[joint]) - target[joint]) > tolerance[joint]) return false;
+    return true;
   }
 
   public function hold():Void {

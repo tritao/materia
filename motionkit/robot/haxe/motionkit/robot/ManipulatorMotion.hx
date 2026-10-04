@@ -56,7 +56,7 @@ class ManipulatorMotion {
   public function new(robot:Robot, compiler:ProgramCompiler,
       input:String -> Null<EventValue>,
       eventSource:Void -> {events:Array<FiredProcessEvent>, overflow:Bool},
-      ?jointIndices:Array<Int>) {
+      ?jointIndices:Array<Int>, ?completionPositionTolerance:Array<Float>) {
     if (robot == null || compiler == null || input == null || eventSource == null)
       throw "ManipulatorMotion needs a robot, compiler, input and event source";
     this.robot = robot; this.compiler = compiler;
@@ -72,7 +72,7 @@ class ManipulatorMotion {
         throw "ManipulatorMotion needs distinct robot joint indices";
       seen.set(index, true);
     }
-    executor = new PlanExecutor(robot, this.jointIndices, session);
+    executor = new PlanExecutor(robot, this.jointIndices, session, completionPositionTolerance);
   }
 
   function get_running():Bool return session.isActive();
