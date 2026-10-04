@@ -33,11 +33,29 @@ class PlacementTests {
     testObstacleForcesADifferentBasePose();
     testConvexToolClearancePreservesEmptyCorner();
     testToolClearanceChecksJointMotion();
+    testApproachPoseFarFromTheSeedIsReachable();
     testFirstPointDoesNotCheckSeedApproach();
     testFiveMillimetreObstacleBetweenPoints();
     testWorkPatchPlannerUsesToolObstacles();
     Sys.println('RobotKit placement tests passed ($assertions assertions)');
     return assertions;
+  }
+
+  /**
+   * The pose a path starts from can be far from the seed posture: tracking IK, which steps from a nearby seed, does not reach
+   * this one from it in 100 iterations. The planner's reachability check and a plan runner both solve that pose with
+   * `solveApproach`, so a path the planner calls reachable is one the runner can start.
+   */
+  static function testApproachPoseFarFromTheSeedIsReachable():Void {
+    var fixture = buildUR5Fixture();
+    var manipulator = fixture.arm;
+    var seed = [0.3, -0.9, 1.2, -0.3, 0.5, 0.0];
+    var target = manipulator.tcpPose([3.0, -1.0, 1.0, 2.0, 1.0, -2.0]);
+    var approach = ReachabilityChecker.solveApproach(manipulator, target, seed);
+    check(approach.converged, 'The approach solve reaches a pose far from the seed (${approach.status} after ${approach.iterations} iterations)');
+    var toolpath = new Toolpath("base", [new ToolpathPoint(target, 0.05, true)]);
+    var result = ReachabilityChecker.check(manipulator, toolpath, Transform3.identity(), seed);
+    check(result.fullyReachable(), "The reachability check solves the first point of a path the way the runner does");
   }
 
   static function testReachabilityCheckerReportsFractionAndFirstFailure():Void {

@@ -1,7 +1,6 @@
 package motionkit.robot;
 
-import robotkit.manipulation.IkOptions;
-import robotkit.manipulation.IkOptions.IkMethod;
+import robotkit.manipulation.ReachabilityChecker;
 import motionkit.MotionOptions;
 import haxe.Int64;
 import motionkit.event.HoldPolicy;
@@ -88,12 +87,7 @@ class SurfacePlanRunner implements robotkit.skill.SurfacePlanRunner {
       event.channel, event.value, event.leadSeconds, HoldPolicy.RestoreOnResume)];
     var start = points[0].work_T_tcp;
     var end = points[points.length - 1].work_T_tcp;
-    // The approach pose is far from the seed (the arm unfolds from its rest posture to the wall), which is what the reaching
-    // method is for: tracking steps from a nearby seed, and from here stalls at a joint limit or winds a joint a full turn
-    // to reach the same pose, depending on millimetres of base error.
-    var approach = new IkOptions(2e-3, 5e-3, 300, 0.03);
-    approach.method = IkMethod.Reaching;
-    var ik = manipulator.solve(start, seed, approach);
+    var ik = ReachabilityChecker.solveApproach(manipulator, start, seed, 2e-3, 5e-3, 300, 0.03);
     if (!ik.converged) throw "Surface patch approach pose is unreachable";
     var localEnd = patch.toolpath.points[patch.toolpath.points.length - 1].work_T_tcp;
     var retractLocal = new Transform3(

@@ -1,5 +1,6 @@
 package robotkit.manipulation;
 
+import robotkit.manipulation.IkOptions.IkMethod;
 import robotkit.spatial.Transform3;
 import robotkit.process.Toolpath;
 
@@ -32,6 +33,20 @@ class ReachabilityResult {
  * at the first failure.
  */
 class ReachabilityChecker {
+  /**
+   * Solves the pose a tool starts a path from, with the arm at `seed`. That pose is far from the seed (the arm unfolds from its
+   * rest posture to the work), which is what the reaching method is for: tracking steps from a nearby seed, and from here it
+   * can stall at a joint limit or wind a joint a full turn to the same pose, depending on millimetres of base error. Planning
+   * (`check`) and running a plan (`SurfacePlanRunner`) both solve it here, so the one that calls a pose reachable is the one
+   * that reaches it.
+   */
+  public static function solveApproach(manipulator:Manipulator, target:Transform3, seed:Array<Float>, ?positionTolerance:Float = 1e-4,
+      ?orientationTolerance:Float = 1e-3, ?maxIterations:Int = 100, ?damping:Float = 0.02):IKResult {
+    var options = new IkOptions(positionTolerance, orientationTolerance, maxIterations, damping);
+    options.method = IkMethod.Reaching;
+    return manipulator.solve(target, seed, options);
+  }
+
   public static function check(manipulator:Manipulator, toolpath:Toolpath, base_T_work:Transform3,
       seed:Array<Float>, ?positionTolerance:Float = 1e-4, ?orientationTolerance:Float = 1e-3,
       ?maxIterations:Int = 100, ?damping:Float = 0.02,
@@ -52,8 +67,9 @@ class ReachabilityChecker {
     for (index in 0...toolpath.points.length) {
       var point = toolpath.points[index];
       var target = base_T_work.compose(point.work_T_tcp);
-      var ik = manipulator.solve(target, seedQ, new IkOptions(positionTolerance, orientationTolerance,
-        maxIterations, damping));
+      // The first point is the approach from the seed posture; the following ones continue from the previous solution.
+      var ik = index == 0 ? solveApproach(manipulator, target, seedQ, positionTolerance, orientationTolerance, maxIterations, damping) : manipulator.solve(target,
+        seedQ, new IkOptions(positionTolerance, orientationTolerance, maxIterations, damping));
       lastQ = ik.q;
       var clear = ik.converged && (toolClearance == null || (reachableCount == 0 && !checkApproach
         ? toolClearance.isClear(manipulator.forwardKinematics(ik.q))
