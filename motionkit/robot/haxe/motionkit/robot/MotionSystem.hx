@@ -104,7 +104,11 @@ class MotionSystem {
     this.axes = [];
     jointTolerances = [for (_ in description.joints) 1e-6];
     var axisIds = new Map<String, Bool>();
-    for (axisBlueprint in blueprint.axes) {
+    var hasHomes = false;
+    for (contact in blueprint.runtime.switches) if (contact.role == "home") hasHomes = true;
+    var resolvedAxes = hasHomes
+      ? MotionAxisCouplings.expand(blueprint.axes, blueprint.runtime, description.joints) : blueprint.axes;
+    for (axisBlueprint in resolvedAxes) {
       var axis = new MotionAxis(axisBlueprint, description.joints);
       if (axisIds.exists(axis.id)) throw 'Duplicate motion axis "${axis.id}"';
       axisIds.set(axis.id, true);

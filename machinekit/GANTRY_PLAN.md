@@ -1686,3 +1686,19 @@ wrong native home coordinate.
 
 Router/picker startup and monitor ownership still need wiring. No tests or
 builds ran; coordinate mapping and homing remain runtime-unverified.
+
+
+### G11 — expand switched motion axes through physical followers
+
+Placement mapping correction: `a91b86795`. MotionAxisCouplings expands task
+axes through the compiled coupling graph, composing scales and affine offsets
+across chains and same-axis multiple terms. Retain authored order/primary
+joints; append physical followers and reject contradictory existing mappings
+or joint sharing. MotionSystem applies this expansion when home switches exist,
+so homing plans include motor followers as well as carriage coordinates.
+
+Reject followers with terms from several independent task axes, or a partially
+mapped moving follower: these need coordinated polynomial planning rather than
+one independent-axis profile. Existing unswitched planning stays unchanged.
+Router startup now has a reusable full-model mapping path, but application
+configuration and monitor resets still need wiring. No tests or builds ran.
