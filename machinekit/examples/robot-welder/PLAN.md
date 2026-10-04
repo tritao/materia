@@ -607,6 +607,14 @@ W5 design note while waiting for R3/R4 (2026-10-04; implementation has not start
   Earlier station geometry must participate in both grounded-work sensing and clearance before later passes ignite.
 
 W5 implementation notes (in progress, 2026-10-04):
+- The intermediate 20.5/20.9 s seam timings and 106.0 s whole-cell cycle came from duplicate skill updates in
+  `switch pass.update(...)`: the running pass's host clock advanced twice per snapshot. Native motion and deposited
+  interior area were correct, but each 0.15 s start/crater dwell lasted only seven observed ticks. The strengthened
+  saved-data check confirms both dwell values survive the codec. A focused sequencer regression fails with the
+  direct-switch implementation; storing the returned status in a local before switching fixes it. On both backends,
+  the focused app now observes fourteen ticks per dwell and restores ordinary/recovery times to 20.6/21.1 s,
+  preserving one restart, 3 mm overlap, a 5.4 mm peak and no gap. The initial full W5 gate passed all geometry,
+  grounding and fault checks; the corrected dispatcher requires the affected milestone gate to run again.
 - Focused app quality checks now pass on both MuJoCo and the test backend. Woven 7 mm: 6.998 mm measured leg,
   one strike, 27.03 s. Three-pass 10 mm: 9.999 mm leg, three strikes, 65.13 s. The later-pass strike checks verify
   preceding bead deposition, a tip within 0.6 mm of that bead's surface, and available deposited clearance hulls.
@@ -650,7 +658,7 @@ W5 implementation notes (in progress, 2026-10-04):
   together with the required woven 7 mm and three-pass 10 mm app quality gates. The focused `welder-seam`
   check exits 0 on both backends: ordinary 20.5 s, leg 5.0 mm (4.8–5.1), 180 mm, no restart; recovery 20.9 s,
   leg 5.0 mm (4.8–5.4), 180 mm, one restart and 3 mm overlap, no gap or stray. These are 0.1/0.2 s shorter
-  than the preceding focused build (20.6/21.1); the timing difference still needs diagnosis before the W5 gate.
+  than the preceding focused build (20.6/21.1); this difference was subsequently diagnosed and fixed as duplicate pass updates (above).
 - CAD-side `WeldingRecipe.passes` now chooses one pass through 8 mm and root/fill/cap above it (through 12 mm).
   Individual pass area determines wire speed, voltage and seam speed using the CAD wire's diameter, efficiency
   and feeder limit. Single-pass recipes now reject legs above 8 mm. Weaving starts above a 6 mm pass leg:

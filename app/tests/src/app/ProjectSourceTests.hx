@@ -1236,12 +1236,29 @@ class ProjectSourceTests {
         simulation.step();
       }
       var lost = false, established = 0, current = 0.0, peak = 0.0, lowest = 1e9, previousArc = false, ignited = 0.0, strayed = 0.0;
+      var startDwellTicks = 0, craterDwellTicks = 0;
       var limit = simulation.activeSession().simulationTime() + 90;
       while (mission.completed < 1 && simulation.activeSession().simulationTime() < limit) {
         simulation.step();
         var failure = mission.failure;
         if (failure != null) throw 'run $run: the weld failed after ${simulation.activeSession().simulationTime()} s: $failure';
         var reading = welder.reading();
+        // Observe the actual host barriers, after their native plans finish, rather than inferring dwell from cycle time.
+        var active = @:privateAccess mission.welding;
+        if (active != null) {
+          var planning = @:privateAccess active.motion.planner;
+          var progress = active.motion.progress();
+          if (planning != null && progress.block >= 0 && progress.block < planning.blocks.blocks.length) {
+            var block = planning.blocks.blocks[progress.block];
+            var index = @:privateAccess active.motion.planIndex;
+            if (index >= block.plans.length && block.barrier != null) switch block.barrier {
+              case Dwell(seconds):
+                check(Math.abs(seconds - 0.15) < 1e-8, "executed weld dwell preserves recipe duration");
+                if (bead.extent() < bead.length / 2) startDwellTicks++; else craterDwellTicks++;
+              case _: {}
+            }
+          }
+        }
         if (reading.arc) {
           // How far the wire tip strays from the seam line while the arc burns.
           var tip = beads.toFrame(0, welder.tip());
@@ -1289,10 +1306,12 @@ class ProjectSourceTests {
         check(overlap >= 1 && overlap <= 5, 'run 1: the restart overlaps the bead by $overlap mm');
         check(range.max <= target + 0.001, 'run 1: restart peak ${range.max * 1000} mm stays within 1 mm of the target');
       }
+      if (run == 0) check(startDwellTicks >= 14 && craterDwellTicks >= 14,
+        'both 0.15 s dwells execute: start $startDwellTicks ticks, crater $craterDwellTicks ticks');
       log.push('run $run: ${Math.round(simulation.activeSession().simulationTime() * 10) / 10} s, leg ${Math.round(achieved * 10000) / 10} mm ' +
         '(${Math.round(range.min * 10000) / 10}..${Math.round(range.max * 10000) / 10}), bead ${Math.round(bead.extent() * 1000)} mm, ' +
         '${established} ticks of arc up to ${Math.round(peak)} A, tip within ${Math.round(strayed * 10000) / 10} mm of the seam, ${overlap} mm overlap, ${mission.weldRestarts()} restarts, stray ' +
-        '${Math.round(100 * path.stray / path.deposited)}%');
+        '${Math.round(100 * path.stray / path.deposited)}%, dwells $startDwellTicks/$craterDwellTicks ticks');
     }
     simulation.clear();
     session.dispose();

@@ -56,7 +56,8 @@ class WeldPasses implements Skill {
     try {
       var pass = active;
       if (pass == null) throw "No active weld pass";
-      switch pass.update(snapshot, durationSeconds) {
+      var outcome = pass.update(snapshot, durationSeconds);
+      switch outcome {
         case Succeeded:
           active = null;
           index++;

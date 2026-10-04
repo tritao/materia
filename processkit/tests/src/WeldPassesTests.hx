@@ -41,6 +41,9 @@ class WeldPassesTests {
     check(root.starts == 1 && fill.starts == 1 && cap.starts == 1, "each pass starts once");
     weld.start();
     root.outcome = Running;
+    var before = root.updates;
+    weld.update(snapshot, 0.01);
+    check(root.updates == before + 1, "running pass updates once per snapshot");
     weld.cancel();
     check(root.cancels == 1 && fill.cancels == 0, "cancel stops the active pass");
     root.outcome = Succeeded;
