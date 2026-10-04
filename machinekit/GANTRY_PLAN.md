@@ -3029,3 +3029,17 @@ both passed portable-abi64 audits across Linux, Windows and both macOS targets.
 The app compiler-only pass has been restarted with these bindings. App/Haxe
 homing execution, router-device-home and the remaining Phase C suites are still
 pending. G13 is not complete; G14 has not started.
+
+### Phase C — MotionKit compile and focused homing regressions green
+
+MotionKit compiler-only build passed (1127 sources). The focused
+MOTIONKIT_HOMING_ONLY run passed, including the new delayed-first-side
+acknowledgment fixture, hold ordering, compensated capture, stale-edge rejection
+and cancellation cleanup. App compilation progressed past regenerated FFI but
+found an untyped switch-expression comprehension in the router fixture; replaced
+it with an explicitly typed Actuator array and loop. App compilation restarted
+(session 37554, live at this note).
+
+Native 18/18 CTest and Nucleo offline check remain green; no native code changed
+since those checks. App compile, router-device-home execution and remaining
+Phase C suites remain pending. G13 is not complete and G14 is not started.

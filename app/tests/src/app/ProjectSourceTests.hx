@@ -1825,9 +1825,10 @@ class ProjectSourceTests {
     check(homes.length == 4, "Physical router declares X, Z and two independent Y home switches");
     var inputs:Array<robotkit.device.DeviceInput> = [];
     for (contact in model.switches) {
-      var matches = [for (actuator in model.actuators) switch actuator.transmission {
-        case SimpleTransmission(shaft, _, _): if (shaft == contact.driveJoint) actuator;
-      }];
+      var matches:Array<robotkit.model.Actuator> = [];
+      for (actuator in model.actuators) switch actuator.transmission {
+        case SimpleTransmission(shaft, _, _): if (shaft == contact.driveJoint) matches.push(actuator);
+      }
       check(matches.length == 1, "Router switch has exactly one physical motor side: " + contact.id);
       inputs.push(new robotkit.device.DeviceInput(inputs.length, contact.id, matches[0].id, false));
     }
