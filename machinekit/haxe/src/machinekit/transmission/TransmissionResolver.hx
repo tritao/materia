@@ -17,14 +17,14 @@ class TransmissionResolver {
 		var alignment = SenseTools.sign(record.sense);
 		function gear(id:String):SpurGear {
 			var part = member(id);
-			if (!Std.isOfType(part, SpurGear)) throw 'Transmission "${record.coupling}": "$id" is not a spur gear';
+			if (!Std.isOfType(part, SpurGear)) throw new TransmissionDesignError('Transmission "${record.coupling}": "$id" is not a spur gear');
 			return cast part;
 		}
 		var relation = switch record.source {
 			case LeadScrew(screwId, nutId):
 				var screw = member(screwId);
-				if (!Std.isOfType(screw, machinekit.motion.LeadScrew)) throw "Transmission needs a lead screw";
-				if (!Std.isOfType(member(nutId), machinekit.motion.LeadScrewNut)) throw "Transmission needs a lead screw nut";
+				if (!Std.isOfType(screw, machinekit.motion.LeadScrew)) throw new TransmissionDesignError("Transmission needs a lead screw");
+				if (!Std.isOfType(member(nutId), machinekit.motion.LeadScrewNut)) throw new TransmissionDesignError("Transmission needs a lead screw nut");
 				var result = machinekit.motion.LeadScrew.relation(cast screw, cast member(nutId), alignment);
 				if (record.near != null && record.far != null)
 					result.followerSpeedCap = (cast(screw, machinekit.motion.LeadScrew)).criticalSpeed(record.near,
@@ -33,20 +33,34 @@ class TransmissionResolver {
 				result;
 			case GearMesh(driver, driven): GearPair.relation(gear(driver), gear(driven), alignment);
 			case RackAndPinion(pinion, rack):
-				if (rack != null && !Std.isOfType(member(rack), Rack)) throw "Transmission needs a rack";
+				if (rack != null && !Std.isOfType(member(rack), Rack)) throw new TransmissionDesignError("Transmission needs a rack");
 				Rack.relation(gear(pinion), rack == null ? null : cast member(rack), alignment);
-			case TimingBelt(beltId, pulleyId, strand):
+			case TimingBelt(beltId, pulleyId) | BeltIdler(beltId, pulleyId):
 				var belt = member(beltId), pulley = member(pulleyId);
-				if (!Std.isOfType(belt, TimingBelt)) throw "Transmission needs a timing belt";
-				if (!Std.isOfType(pulley, TimingPulley)) throw "Transmission needs a timing pulley";
+				if (!Std.isOfType(belt, TimingBelt)) throw new TransmissionDesignError("Transmission needs a timing belt");
+				if (!Std.isOfType(pulley, TimingPulley)) throw new TransmissionDesignError("Transmission needs a timing pulley");
 				var loop:TimingBelt = cast belt;
-				if (strand < 0 || strand >= loop.strands().length) throw "Transmission belt strand is out of range";
-				TimingBelt.relation(loop, cast pulley, strand, alignment);
+				TimingBelt.relation(loop, cast pulley, alignment, switch record.source { case BeltIdler(_, _): true; case _: false; });
+			case BeltReduction(beltId, driverId, drivenId):
+				var belt = member(beltId), driver = member(driverId), driven = member(drivenId);
+				if (!Std.isOfType(belt, TimingBelt) || !Std.isOfType(driver, TimingPulley) || !Std.isOfType(driven, TimingPulley))
+					throw new TransmissionDesignError("Belt reduction needs a timing belt and two timing pulleys");
+				TimingBelt.reduction(cast belt, cast driver, cast driven, alignment);
 			case RollerChain(chain, sprocketId):
-				if (chain != null) member(chain);
 				var sprocket = member(sprocketId);
-				if (!Std.isOfType(sprocket, Sprocket)) throw "Transmission needs a sprocket";
-				Sprocket.relation(cast sprocket, alignment);
+				if (!Std.isOfType(sprocket, Sprocket)) throw new TransmissionDesignError("Transmission needs a sprocket");
+				var wheel:Sprocket = cast sprocket;
+				if (chain != null) {
+					var part = member(chain);
+					if (!Std.isOfType(part, RollerChainSource))
+						throw new TransmissionDesignError('Transmission "${record.coupling}": "$chain" is not a roller chain; use a chain matching the sprocket');
+					var source:RollerChainSource = cast part;
+					var spec = source.chainSpec();
+					if (spec.pitch != wheel.pitch || spec.rollerDiameter != wheel.rollerDiameter ||
+							(wheel.chain != null && spec.designation != wheel.chain))
+						throw new TransmissionDesignError('Transmission "${record.coupling}": chain and sprocket differ; update the chain to match the sprocket');
+				}
+				Sprocket.relation(wheel, alignment);
 		};
 		if (record.stiffness != null) {
 			relation.stiffness = record.stiffness;
@@ -68,7 +82,9 @@ class TransmissionResolver {
 		case LeadScrew(screw, nut): LeadScrew(map(screw), map(nut));
 		case GearMesh(driver, driven): GearMesh(map(driver), map(driven));
 		case RackAndPinion(pinion, rack): RackAndPinion(map(pinion), rack == null ? null : map(rack));
-		case TimingBelt(belt, pulley, strand): TimingBelt(map(belt), map(pulley), strand);
+		case TimingBelt(belt, pulley): TimingBelt(map(belt), map(pulley));
+		case BeltReduction(belt, driver, driven): BeltReduction(map(belt), map(driver), map(driven));
+		case BeltIdler(belt, pulley): BeltIdler(map(belt), map(pulley));
 		case RollerChain(chain, sprocket): RollerChain(chain == null ? null : map(chain), map(sprocket));
 	};
 }

@@ -5,7 +5,7 @@ import robotkit.skill.Skill;
 import robotkit.skill.SkillLifecycle;
 import robotkit.skill.SkillResult;
 import robotkit.skill.SkillStatus;
-import robotkit.world.RobotSnapshot;
+import robotkit.core.RobotSnapshot;
 
 /** Runs a planned arm program through the same lifecycle as the other robot skills. */
 class MotionProgramSkill implements Skill {

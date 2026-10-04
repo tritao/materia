@@ -236,13 +236,14 @@ std::vector<double> VirtualDeviceEndpoint::actuator_positions() const { return l
 std::vector<double> VirtualDeviceEndpoint::joint_positions() const {
     auto positions = link_->positions();
     if (actuators_.empty()) return positions;
-    std::vector<double> joints(joint_count_);
+    rk_robot_state state{};
     for (std::size_t i = 0; i < positions.size(); ++i) {
         const auto &mapping = actuators_[i];
-        if (mapping.joint < joints.size())
-            joints[mapping.joint] = positions[i] / mapping.ratio + mapping.offset;
+        if (mapping.joint < joint_count_)
+            state.position[mapping.joint] = positions[i] / mapping.ratio + mapping.offset;
     }
-    return joints;
+    inner_->reconstruct_feedback(state);
+    return std::vector<double>(state.position, state.position + joint_count_);
 }
 std::vector<float> VirtualDeviceEndpoint::channel_values() const { return link_->channels(); }
 std::vector<VirtualStepRecord6> VirtualDeviceEndpoint::step_log() const { return link_->steps(); }

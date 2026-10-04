@@ -151,8 +151,8 @@ Named dimensions can bind several scalar feature slots. Editing the dimension,
 or any bound feature parameter, changes every binding as one undoable edit.
 The codec saves dimension names, current values, bindings, and the selected
 document output. Reloaded documents preserve those relationships. JSON from
-older documents remains readable; without an explicit output it uses the last
-feature, matching the earlier behavior. Persistence saves current model state,
+older documents is rejected; current v11 documents without an explicit output
+use the last feature. Persistence saves current model state,
 not the undo/redo stacks.
 
 Named parameters may be declared as `length`, `angle`, `count`, `area`, or

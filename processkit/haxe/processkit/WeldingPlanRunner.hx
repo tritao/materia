@@ -23,14 +23,14 @@ import motionkit.robot.StartTolerances;
 import motionkit.trajectory.ValidationLimits;
 import processkit.WelderProcessDevice.WelderChannels;
 import robotkit.manipulation.Manipulator;
-import robotkit.skill.WeldPlan;
+import processkit.skill.WeldPlan;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
-import robotkit.tool.WeldFault;
-import robotkit.tool.WeldSensor;
-import robotkit.tool.WeldSensor.WeldReading;
-import robotkit.world.FiredProcessEvent;
-import robotkit.world.Robot;
+import processkit.tool.WeldFault;
+import processkit.tool.WeldSensor;
+import processkit.tool.WeldSensor.WeldReading;
+import robotkit.execution.FiredProcessEvent;
+import robotkit.core.Robot;
 
 private enum WeldingPhase {
   Idle;
@@ -71,7 +71,7 @@ private class LatestReading implements WelderFeedback {
  * once the fault has cleared the run restarts `BACKOFF` metres before where it stopped, so the new bead overlaps the
  * old; at most `maxRestarts` times, after which the weld fails.
  */
-class WeldingPlanRunner implements robotkit.skill.WeldRunner {
+class WeldingPlanRunner implements processkit.skill.WeldRunner {
   public static inline var FRAME:String = "arm-base";
   /** The name the program's input wait reads the established arc under. */
   public static inline var ARC_ESTABLISHED:String = "weld.arc_established";
@@ -130,7 +130,7 @@ class WeldingPlanRunner implements robotkit.skill.WeldRunner {
     for (joint in 0...count) {
       var bound = manipulator.group.limitsOf(joint);
       if (bound.lower < bound.upper) limits.position(joint, bound.lower, bound.upper);
-      limits.velocity(joint, bound.velocity > 0.0 ? bound.velocity : 2.0);
+      limits.velocity(joint, bound.velocity != null ? bound.velocity : 2.0);
       limits.acceleration(joint, maxAcceleration);
       limits.jerk(joint, 20.0);
     }
@@ -138,7 +138,7 @@ class WeldingPlanRunner implements robotkit.skill.WeldRunner {
     var compiler = new ProgramCompiler(solver, limits, FRAME,
       [for (joint in 0...count) {
         var speed = manipulator.group.limitsOf(joint).velocity;
-        speed > 0.0 ? speed : 2.0;
+        speed != null ? speed : 2.0;
       }], [for (_ in 0...count) maxAcceleration], [for (_ in 0...count) 20.0],
       StartTolerances.uniform(count, 0.005, maxAcceleration * 0.01, 20.0 * 0.01),
       null, 0.002, 0.2, PATH_TOLERANCE, 0.02, new IkTolerance(2e-4, 1e-3, 300, 0.03));

@@ -43,7 +43,7 @@ else()
 endif()
 
 target_compile_features(robotkit_runtime PUBLIC cxx_std_20)
-target_link_libraries(robotkit_runtime PUBLIC motionkit_core
+target_link_libraries(robotkit_runtime PUBLIC trajectory_core
     PRIVATE robotkit_mcap_headers robotkit_lz4)
 target_include_directories(robotkit_runtime PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../device_virtual/include)
@@ -98,7 +98,7 @@ if(RK_BUILD_TESTS)
 
     add_executable(robotkit_segment_vectors_tests tests/segment_vectors.cpp)
     target_compile_features(robotkit_segment_vectors_tests PRIVATE cxx_std_20)
-    target_link_libraries(robotkit_segment_vectors_tests PRIVATE motionkit_core)
+    target_link_libraries(robotkit_segment_vectors_tests PRIVATE trajectory_core)
     add_test(NAME robotkit_segment_vectors COMMAND robotkit_segment_vectors_tests
         ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/tests/segment_vectors.tsv)
     set_tests_properties(robotkit_segment_vectors PROPERTIES LABELS "robot;wire;motion" TIMEOUT 30)
@@ -107,7 +107,7 @@ if(RK_BUILD_TESTS)
         src/device_compiler6.cpp src/clock_estimator6.cpp)
     target_compile_features(robotkit_device_compiler6_tests PRIVATE cxx_std_20)
     target_include_directories(robotkit_device_compiler6_tests PRIVATE src include generated)
-    target_link_libraries(robotkit_device_compiler6_tests PRIVATE motionkit_core)
+    target_link_libraries(robotkit_device_compiler6_tests PRIVATE trajectory_core)
     add_test(NAME robotkit_device_compiler6 COMMAND robotkit_device_compiler6_tests)
     set_tests_properties(robotkit_device_compiler6 PROPERTIES LABELS "robot;runtime;wire" TIMEOUT 30)
 
@@ -115,7 +115,7 @@ if(RK_BUILD_TESTS)
         src/rkd6_endpoint.cpp src/device_compiler6.cpp src/clock_estimator6.cpp)
     target_compile_features(robotkit_rkd6_endpoint_tests PRIVATE cxx_std_20)
     target_include_directories(robotkit_rkd6_endpoint_tests PRIVATE src include generated)
-    target_link_libraries(robotkit_rkd6_endpoint_tests PRIVATE motionkit_core)
+    target_link_libraries(robotkit_rkd6_endpoint_tests PRIVATE trajectory_core)
     add_test(NAME robotkit_rkd6_endpoint COMMAND robotkit_rkd6_endpoint_tests)
     set_tests_properties(robotkit_rkd6_endpoint PROPERTIES LABELS "robot;runtime;wire" TIMEOUT 30)
 
@@ -150,7 +150,7 @@ if(RK_BUILD_TESTS)
 
     add_executable(robotkit_recording_tests tests/recording.cpp)
     target_compile_features(robotkit_recording_tests PRIVATE cxx_std_20)
-    target_link_libraries(robotkit_recording_tests PRIVATE RobotKit::runtime robotkit_mcap_headers)
+    target_link_libraries(robotkit_recording_tests PRIVATE RobotKit::runtime robotkit_mcap_headers robotkit_lz4)
     add_test(NAME robotkit_recording COMMAND robotkit_recording_tests)
     set_tests_properties(robotkit_recording PROPERTIES LABELS "robot;recording;mcap" TIMEOUT 30)
 

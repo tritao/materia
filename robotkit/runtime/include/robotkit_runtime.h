@@ -258,6 +258,8 @@ enum {
 /* RobotRuntime descriptions                                                 */
 /* ------------------------------------------------------------------------- */
 
+enum { RK_LIMIT_EFFORT = 1, RK_LIMIT_VELOCITY = 2, RK_LIMIT_ACCELERATION = 4 };
+
 /** One compiled joint and its limits in a RobotRuntimeBlueprint. */
 typedef struct rk_robot_runtime_joint {
     rk_joint_id joint; /**< Stable index of this joint within the blueprint. */
@@ -272,8 +274,9 @@ typedef struct rk_robot_runtime_joint {
     double child_frame_position[3];
     double child_frame_rotation[4]; /**< Unit quaternion xyzw. */
     double axis[3]; /**< Unit vector in the parent joint frame. */
-    double max_acceleration; /**< Maximum joint acceleration, or zero when unspecified. */
-    double max_velocity; /**< Maximum joint speed, or zero when unspecified. */
+    double max_acceleration; /**< Maximum joint acceleration when RK_LIMIT_ACCELERATION is claimed. */
+    double max_velocity; /**< Maximum joint speed when RK_LIMIT_VELOCITY is claimed. */
+    uint32_t limit_flags; /**< RK_LIMIT_* presence bits; a claimed zero limit prohibits motion. */
 } rk_robot_runtime_joint;
 
 enum { RK_COLLISION_APPROXIMATION_NONE = 0, RK_COLLISION_APPROXIMATION_BOUNDS_BOX = 1 };

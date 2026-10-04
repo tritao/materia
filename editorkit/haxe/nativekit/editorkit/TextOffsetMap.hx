@@ -560,6 +560,10 @@ class TextOffsetMap {
 	}
 
 	function graphemeBreak(previous:Int, current:Int, regionalRun:Int):Bool {
+		// ASCII has no combining, spacing, Hangul, Indic or emoji properties.
+		// Its only joined pair is CR/LF; skip the Unicode range tables here.
+		if (previous >= 0 && previous < 0x80 && current < 0x80)
+			return previous != 0x0d || current != 0x0a;
 		if (previous == 0x0d && current == 0x0a)
 			return false;
 		if (isControl(previous) || isControl(current))

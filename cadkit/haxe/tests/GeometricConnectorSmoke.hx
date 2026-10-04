@@ -157,8 +157,7 @@ class GeometricConnectorSmoke {
 	}
 
 	/**
-		Edge fingerprints are anchored at the edge's midpoint (document version 10); records from older
-		documents, anchored at the first vertex, still resolve to the same edge.
+		Edge fingerprints save their midpoint anchor and resolve to the same edge.
 	*/
 	static function checkEdgeAnchors():Void {
 		var box = Shape.box(30, 20, 10);
@@ -172,14 +171,7 @@ class GeometricConnectorSmoke {
 			var saved = DocumentCodec.decodeFingerprint(haxe.Json.parse(haxe.Json.stringify(DocumentCodec.encodeFingerprint(fingerprint))),
 				CadKit.ShapeKind.Edge);
 			check(saved.midpoint, 'edge $index keeps its anchor through a save');
-			var legacyRecord:Dynamic = haxe.Json.parse(haxe.Json.stringify(DocumentCodec.encodeFingerprint(fingerprint)));
-			Reflect.deleteField(legacyRecord, "anchor");
-			Reflect.setField(legacyRecord, "x", first.get_x());
-			Reflect.setField(legacyRecord, "y", first.get_y());
-			Reflect.setField(legacyRecord, "z", first.get_z());
-			var legacy = DocumentCodec.decodeFingerprint(legacyRecord, CadKit.ShapeKind.Edge);
-			check(!legacy.midpoint, 'a record without an anchor is a first-vertex one');
-			for (candidate in [saved, legacy]) {
+			for (candidate in [saved]) {
 				var resolution = cadkit.parametric.TopologyResolver.resolve(box, candidate, CadKit.ShapeKind.Edge);
 				check(resolution.index == index, 'edge $index resolves (${candidate.midpoint ? "midpoint" : "first vertex"}): ${resolution.index}');
 			}

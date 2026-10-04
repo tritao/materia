@@ -933,8 +933,8 @@ plan, and nothing in this milestone's acceptance needs it); `LayTile` is
 explicitly out of scope, with a note on what it would need
 (inventory/course-adhesive/force-control capability this codebase doesn't
 have yet) added to `ARCHITECTURE.md`'s "Construction skills (M10)" section
-rather than repeated here. `robotkit.manipulation.WorkPatch`/
-`WorkPatchPlanResult` and `robotkit.perception.SurfaceRegistrationResult`
+rather than repeated here. `processkit.manipulation.WorkPatch`/
+`WorkPatchPlanResult` and `processkit.perception.SurfaceRegistrationResult`
 moved out of `WorkPatchPlanner.hx`/`SurfaceRegistration.hx` into their own
 files (mechanical moves, no behavior change) — the same "haxeon requires an
 explicitly-imported class to be its file's own module" constraint M8's log

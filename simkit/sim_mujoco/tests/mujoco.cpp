@@ -589,7 +589,7 @@ void effort_target_respects_max_force_clamp() {
         joint_desc.body_a = base;
         joint_desc.body_b = wheel;
         joint_desc.axis_a[2] = 1.0;
-        joint_desc.max_force = 1000.0; // Unclamped at the joint description itself.
+        joint_desc.max_force = max_force < 0.0 ? max_force : 1000.0;
         nksim_joint joint = 0;
         assert(nksim_joint_create(world, &joint_desc, &joint) == NKSIM_OK);
         nksim_joint_target target{};
@@ -615,6 +615,7 @@ void effort_target_respects_max_force_clamp() {
     const auto at_limit = run(10.0, 10.0);
     assert(std::abs(clamped - at_limit) < 1e-9);
     assert(std::abs(clamped) > 1e-6); // The clamp still lets it move.
+    assert(std::abs(run(500.0, -1.0)) < 1e-12); // RobotKit's explicit zero-effort limit disables force.
 }
 
 void kinematic_root_child_velocity_matches_joint_across_substeps() {

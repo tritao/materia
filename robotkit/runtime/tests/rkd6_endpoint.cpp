@@ -175,8 +175,8 @@ int main() {
     blueprint.owner_period_ns = 10'000'000;
     blueprint.joints[0].lower_limit = -10;
     blueprint.joints[0].upper_limit = 10;
-    blueprint.joints[0].max_velocity = 10;
-    blueprint.joints[0].max_acceleration = 10;
+    blueprint.joints[0].max_velocity = (blueprint.joints[0].limit_flags |= RK_LIMIT_VELOCITY, 10);
+    blueprint.joints[0].max_acceleration = (blueprint.joints[0].limit_flags |= RK_LIMIT_ACCELERATION, 10);
     unseen_backlog_holds_segments(blueprint);
     {
         auto wrong = std::make_unique<MockLink>();

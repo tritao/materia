@@ -47,9 +47,9 @@ import motionkit.path.PoseLine;
 import motionkit.path.PoseArc;
 import motionkit.path.PoseWaypoint;
 import motionkit.path.OrientationPolicy;
-import motionkit.robot.ToolpathPosePath;
-import robotkit.process.Toolpath;
-import robotkit.process.ToolpathPoint;
+import processkit.motion.ToolpathPosePath;
+import processkit.path.Toolpath;
+import processkit.path.ToolpathPoint;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
 import robotkit.spatial.Quat;
@@ -68,7 +68,7 @@ import motionkit.program.MoveTarget;
 import motionkit.trajectory.MotionLimits;
 import motionkit.trajectory.Trajectory;
 import motionkit.trajectory.ExecutionPlan;
-import motionkit.trajectory.ValidationGuarantee;
+import trajectorykit.validation.ValidationGuarantee;
 import motionkit.trajectory.PlanLimitError;
 import motionkit.trajectory.ValidationLimits;
 import robotkit.model.Joint;
@@ -87,25 +87,25 @@ import robotkit.runtime.VirtualActuatorOptions;
 import robotkit.runtime.RobotRuntimeError;
 import robotkit.runtime.RobotRuntimeCompiler;
 import RobotKitRuntime;
-import robotkit.world.RecordingRobot;
-import robotkit.world.ReplayRobot;
-import robotkit.world.RobotRecording;
-import robotkit.world.SimulatedRobot;
-import robotkit.world.RobotCommand;
-import robotkit.world.Robot;
-import robotkit.world.RobotCapabilities;
-import robotkit.world.RobotDescription;
-import robotkit.world.RobotFault;
-import robotkit.world.RobotId;
-import robotkit.world.RobotSnapshot;
-import robotkit.world.RobotStatus;
-import robotkit.world.RuntimeRobotAdapter;
-import robotkit.world.SensorFrame;
-import robotkit.world.StopMode;
-import robotkit.world.ExecutionPlanSubmission;
-import robotkit.world.ProcessChannelDeclaration;
-import robotkit.world.ProcessEventValue;
-import robotkit.world.TrajectorySegment;
+import robotkit.recording.RecordingRobot;
+import robotkit.recording.ReplayRobot;
+import robotkit.recording.RobotRecording;
+import robotkit.simulation.SimulatedRobot;
+import robotkit.core.RobotCommand;
+import robotkit.core.Robot;
+import robotkit.core.RobotCapabilities;
+import robotkit.core.RobotDescription;
+import robotkit.core.RobotFault;
+import robotkit.core.RobotId;
+import robotkit.core.RobotSnapshot;
+import robotkit.core.RobotStatus;
+import robotkit.runtime.RuntimeRobotAdapter;
+import robotkit.core.SensorFrame;
+import robotkit.core.StopMode;
+import robotkit.execution.ExecutionPlanSubmission;
+import robotkit.execution.ProcessChannelDeclaration;
+import robotkit.execution.ProcessEventValue;
+import robotkit.execution.TrajectorySegment;
 
 import MotionKitTestSupport.WristBranchSolver;
 import MotionKitTestSupport.PlanarSolver;
@@ -119,6 +119,13 @@ class SessionTests extends MotionKitTestSupport {
   public function testNormalAbortWaitsForRest():Void {
     var axis = new LinearAxis(23, 10, 80);
     var blueprint = MachineKitRobotCompiler.compileLinearAxis(axis, "x", 0.05, 0.2);
+    var slower = MachineKitRobotCompiler.compileLinearAxis(axis, "x", 0.01, 0.05);
+    var standardLimit = blueprint.model.joints[0].mechanicalLimits;
+    var slowerLimit = slower.model.joints[0].mechanicalLimits;
+    if (blueprint.model.actuators[0].maxRate != slower.model.actuators[0].maxRate ||
+        standardLimit == null || slowerLimit == null || standardLimit.velocity != slowerLimit.velocity ||
+        !(slower.axes[0].maxVelocity < blueprint.axes[0].maxVelocity))
+      throw "Requested planning limits must not rewrite motor or mechanical ceilings";
     var simulationHarness = new SimulationHarness(0.01);
     var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
@@ -261,7 +268,7 @@ class SessionTests extends MotionKitTestSupport {
     heldRig.dispose();
 
     var jogRig = new SessionTransitionRig("session-jog");
-    jogRig.machine.jog("x", 0.05, 2.0);
+    jogRig.machine.jog("x", 0.04, 2.0);
     jogRig.advance(10);
     var beforeReplacement = jogRig.robot.planCount();
     expect(jogRig, "running + jog replacement", Running, 1, () -> {
@@ -392,7 +399,7 @@ class SessionTests extends MotionKitTestSupport {
     queuedMachine.queueAxes([new AxisTarget("x", 0.02)], options);
     queuedMachine.queueAxes([new AxisTarget("x", 0.05)], options);
     var firstTag = switch (recording.commands[0]) {
-      case RobotCommand.TrajectoryChunk(chunk): chunk.tag;
+      case RobotCommand.ExecutionPlan(plan): plan.planId;
       case _: Int64.ofInt(0);
     };
     tick = 0;
@@ -449,13 +456,13 @@ class SessionTests extends MotionKitTestSupport {
     check(cornerStops >= 3, "TOPP-RA square stops at every authored corner");
     var squareReport = squareMachine.lastPathValidationReport;
     if (squareReport == null) throw "TOPP-RA path did not record validation";
-    check(squareReport.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
-      MotionKitNativeConstants.MK_CHECK_PASSED &&
-      squareReport.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].method ==
-      MotionKitNativeConstants.MK_CHECK_METHOD_SAMPLED,
+    check(squareReport.checks[TrajectoryCoreConstants.MK_CHECK_TASK_SPACE].status ==
+      TrajectoryCoreConstants.MK_CHECK_PASSED &&
+      squareReport.checks[TrajectoryCoreConstants.MK_CHECK_TASK_SPACE].method ==
+      TrajectoryCoreConstants.MK_CHECK_METHOD_SAMPLED,
       "TOPP-RA task-space check reports sampled path tolerance");
-    check(squareReport.checks[MotionKitNativeConstants.MK_CHECK_JERK].status ==
-      MotionKitNativeConstants.MK_CHECK_UNCHECKED,
+    check(squareReport.checks[TrajectoryCoreConstants.MK_CHECK_JERK].status ==
+      TrajectoryCoreConstants.MK_CHECK_UNCHECKED,
       "TOPP-RA reports jerk as unchecked");
     var invalidPathRejected = false;
     try squareMachine.queuePath(null) catch (_:Dynamic) invalidPathRejected = true;
@@ -506,7 +513,7 @@ class SessionTests extends MotionKitTestSupport {
 
   /**
    * Holds at every other tick of one streamed move and checks each stop. The
-   * move accelerates and brakes at the joint limit itself, so holds during
+   * move accelerates and brakes at the requested planning limit, so holds during
    * those phases catch a stop that adds its own deceleration on top, and
    * holds around the streaming refill points catch a stop that runs out of
    * queued path.
@@ -518,9 +525,13 @@ class SessionTests extends MotionKitTestSupport {
     var holdTick = 2;
     var worstAcceleration = 0.0;
     var worstTick = -1;
+    var physicalCap = 0.0;
     while (moveTicks == 0 || holdTick < moveTicks) {
       var blueprint = MachineKitRobotCompiler.compileXYZGantry(new LinearAxis(23, 10, 200),
         new LinearAxis(23, 10, 60), new LinearAxis(23, 10, 40), 0.1, limit);
+      var compiledCap = blueprint.runtime.joints[0].maxAcceleration;
+      if (compiledCap == null) throw "Hold sweep needs a physical acceleration ceiling";
+      physicalCap = compiledCap;
       var simulationHarness = new SimulationHarness(0.01);
       var simulation = simulationHarness.simulation;
       var runtime = simulation.addRobot(blueprint.runtime);
@@ -568,8 +579,8 @@ class SessionTests extends MotionKitTestSupport {
       simulationHarness.dispose();
       holdTick += 2;
     }
-    check(worstAcceleration <= limit * 1.05,
-      'every hold stays within the joint acceleration limit (worst ${worstAcceleration} at tick $worstTick)');
+    check(worstAcceleration <= physicalCap * 1.05,
+      'every hold stays within the physical acceleration limit (worst ${worstAcceleration} at tick $worstTick, cap $physicalCap)');
   }
 
   public function testImmediateMotionReplacesNativeQueue():Void {
@@ -595,8 +606,6 @@ class SessionTests extends MotionKitTestSupport {
         check(true, "immediate replacement submits the new plan");
       case JointTargets(_, _):
         throw "immediate replacement did not submit a plan";
-      case TrajectoryChunk(_):
-        throw "immediate replacement submitted a legacy point chunk";
       case Hold | Resume | Abort:
         throw "immediate replacement unexpectedly submitted a lifecycle command";
     }
@@ -669,7 +678,7 @@ class SessionTests extends MotionKitTestSupport {
       check(result != null || machine.isMoving(),
         "free-running jog applies a replacement or defers behind a stop");
       var observation = robot.snapshot();
-      check(Math.abs(observation.velocities.get(0)) <= 0.08 + 1e-5,
+      check(Math.abs(observation.velocities.get(0)) <= blueprint.axes[0].maxVelocity + 1e-5,
         "free-running replacement stays within velocity limit");
       check(observation.positions.get(0) >= -1e-6 &&
         observation.positions.get(0) <= 0.08 + 1e-6,
@@ -680,11 +689,20 @@ class SessionTests extends MotionKitTestSupport {
   }
 
   /**
-   * Replacing motion while moving and resuming after a hold must both stay
-   * within the joint acceleration limit on the plan execution path.
+   * Replacing motion while moving and resuming after a hold must stay
+   * within the physical joint acceleration limit on the execution path.
    */
+  function gantryPhysicalAcceleration(?joint:Int = 0):Float {
+    var blueprint = MachineKitRobotCompiler.compileXYZGantry(new LinearAxis(23, 10, 200),
+      new LinearAxis(23, 10, 60), new LinearAxis(23, 10, 40), 0.1, 0.4);
+    var cap = blueprint.runtime.joints[joint].maxAcceleration;
+    if (cap == null) throw "Gantry test needs a physical acceleration ceiling";
+    return cap;
+  }
+
   public function testMotionChangesStayWithinLimits():Void {
     var limit = 0.4;
+    var physicalCap = gantryPhysicalAcceleration();
     for (queueSupport in [true]) {
       var label = "buffered";
       var worstReplace = 0.0;
@@ -711,7 +729,7 @@ class SessionTests extends MotionKitTestSupport {
           '$label move replaced at tick $eventTick stays within the first move');
 
         var jogged = gantryTrial(queueSupport, eventTick,
-          machine -> machine.jog("x", -0.05, 0.5), false);
+          machine -> machine.jog("x", -0.04, 0.5), false);
         var jogPeak = peakSecondDifference(jogged);
         if (jogPeak > worstJog) {
           worstJog = jogPeak;
@@ -728,33 +746,33 @@ class SessionTests extends MotionKitTestSupport {
           '$label move held and resumed at tick $eventTick reaches its target', 1e-5);
         eventTick += 8;
       }
-      check(worstReplace <= limit * 1.05,
+      check(worstReplace <= physicalCap * 1.05,
         '$label move replaced while moving stays within the limit (worst $worstReplace at tick $worstReplaceTick)');
-      check(worstJog <= limit * 1.05,
+      check(worstJog <= physicalCap * 1.05,
         '$label jog while moving stays within the limit (worst $worstJog at tick $worstJogTick)');
-      check(worstResume <= limit * 1.05,
+      check(worstResume <= physicalCap * 1.05,
         '$label resume stays within the limit (worst $worstResume at tick $worstResumeTick)');
     }
   }
 
   /**
    * A jog issued while the same axis is jogging changes speed or direction
-   * without stopping first, within the acceleration limit, on the plan path.
+   * without stopping first, within the physical acceleration limit, on the plan path.
    */
   public function testContinuousJog():Void {
-    var limit = 0.4;
+    var physicalCap = gantryPhysicalAcceleration();
     for (queueSupport in [true]) {
       var label = "buffered";
-      for (secondVelocity in [0.08, 0.02, -0.05]) {
+      for (secondVelocity in [0.043, 0.02, -0.04]) {
         var eventTick = 10;
         while (eventTick <= 150) {
           var continued = false;
           var positions = gantryTrial(queueSupport, eventTick, machine -> {
             continued = machine.jog("x", secondVelocity, 1.0) != null;
-          }, false, machine -> machine.jog("x", 0.05, 2.0));
+          }, false, machine -> machine.jog("x", 0.04, 2.0));
           var context = '$label jog changed to $secondVelocity at tick $eventTick';
           check(continued, '$context continues without stopping first');
-          check(peakSecondDifference(positions) <= limit * 1.05,
+          check(peakSecondDifference(positions) <= physicalCap * 1.05,
             '$context stays within the limit (peak ${peakSecondDifference(positions)})');
           // Count ticks at rest before the motion finally settles.
           var settled = positions.length - 1;
@@ -785,7 +803,7 @@ class SessionTests extends MotionKitTestSupport {
       [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name]));
     var machine = MotionSystem.fromBlueprint(robot, blueprint);
-    machine.jog("x", 0.05, 2.0);
+    var originalJog = planned(machine.jog("x", 0.04, 2.5));
     var positions:Array<Float> = [];
     var tick = 0;
     function step():Void {
@@ -794,7 +812,12 @@ class SessionTests extends MotionKitTestSupport {
       positions.push(robot.snapshot().positions.get(0));
       if (tick > 2000) throw "late jog splice did not settle";
     }
-    for (_ in 0...40) step();
+    // The slower physical axis needs a longer jog. Let the bounded stream
+    // queue its final deceleration before deliberately delaying a replacement.
+    for (_ in 0...80) step();
+    check(Int64.compare(robot.snapshot().trajectoryDurationNs,
+      Trajectory.nanoseconds(originalJog.durationSeconds())) >= 0,
+      "late replacement starts after the entire original jog is queued");
     robot.lagging = true;
     check(machine.jog("x", 0.02, 1.0) != null, "jog change is planned as a continuation");
     for (_ in 0...8) step();
@@ -803,7 +826,7 @@ class SessionTests extends MotionKitTestSupport {
       simulationHarness.step(Int64.ofInt(tick++));
       positions.push(robot.snapshot().positions.get(0));
     }
-    check(peakSecondDifference(positions) <= 0.4 * 1.05,
+    check(peakSecondDifference(positions) <= gantryPhysicalAcceleration() * 1.05,
       'original jog stays within the limit (peak ${peakSecondDifference(positions)})');
     near(positions[positions.length - 1], 0.1,
       "rejected replacement leaves the original jog to complete", 1e-5);
@@ -850,7 +873,7 @@ class SessionTests extends MotionKitTestSupport {
         // Time-warping changes which 10 ms sample straddles a blended corner;
         // keep a small absolute allowance on this discrete second difference.
         var allowed = [for (joint in 0...2)
-          Math.max(limit, jointPeak(baseline, joint)) * 1.05 + 0.01];
+          Math.max(gantryPhysicalAcceleration(joint), jointPeak(baseline, joint)) * 1.05 + 0.01];
         var eventTicks = baseline.length;
         var eventTick = 3;
         while (eventTick < eventTicks) {
@@ -908,7 +931,7 @@ class SessionTests extends MotionKitTestSupport {
           if (recording != null)
             for (command in recording.commands)
               switch command {
-                case JointTargets(_, _) | TrajectoryChunk(_):
+                case JointTargets(_, _):
                   throw "MotionSystem submitted a non-plan motion command";
                 case ExecutionPlan(plan):
                   worstSkew = Math.max(worstSkew,

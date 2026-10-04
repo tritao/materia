@@ -2,9 +2,9 @@ package tests;
 
 import haxe.Int64;
 import motionkit.event.EventValue;
-import motionkit.robot.ToolpathPosePath;
-import robotkit.process.Toolpath;
-import robotkit.process.ToolpathPoint;
+import processkit.motion.ToolpathPosePath;
+import processkit.path.Toolpath;
+import processkit.path.ToolpathPoint;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
@@ -16,10 +16,10 @@ import robotkit.tool.Tool;
 import robotkit.tool.ToolRuntime;
 import robotkit.tool.ToolRuntimeSelection;
 import robotkit.tool.SimulatedToolSensorAdapter;
-import robotkit.world.FiredProcessEvent;
-import robotkit.world.ProcessEventValue;
-import robotkit.world.RobotSnapshot;
-import robotkit.world.SensorFrame;
+import robotkit.execution.FiredProcessEvent;
+import robotkit.execution.ProcessEventValue;
+import robotkit.core.RobotSnapshot;
+import robotkit.core.SensorFrame;
 
 /** Toolpath authoring and B1 process-path conversion acceptance. */
 class ProcessTests {

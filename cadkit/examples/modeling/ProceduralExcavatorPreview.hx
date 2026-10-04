@@ -31,7 +31,6 @@ class ProceduralExcavatorPreview {
 			}
 			var result = SceneArtifact.encode({lengthUnit: "mm",
 				metresPerUnit: LengthUnit.metresPerUnit("mm"), parts: parts,
-				assembly: ProceduralExcavatorAssembly.build(),
 				assemblyDefinition: ProceduralExcavatorAssembly.buildDefinition(),
 				assemblyState: ProceduralExcavatorAssembly.buildState()});
 			for (component in components) component.close();

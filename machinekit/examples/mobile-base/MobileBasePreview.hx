@@ -110,15 +110,17 @@ class MobileBaseChecks {
 				throw 'Mobile base motor ${motor.id} should drive a wheel through a gearhead';
 			var ratio:Float = ratioValue, efficiency:Float = efficiencyValue;
 			near(ratio, MobileBase.WHEEL_GEARBOX.ratio, "wheel gearhead ratio");
-			near(motor.maxRate / ratio, MobileBase.WHEEL_SPEED, "wheel speed is the stepper's over the gearhead ratio", 1e-9);
-			near(motor.maxEffort * ratio * efficiency, MobileBase.WHEEL_TORQUE, "wheel torque is the stepper's through the gearhead", 1e-9);
+			near(motor.maxRate / ratio, robot.wheelSpeed(), "wheel speed is the stepper's over the gearhead ratio", 1e-9);
+			near(motor.maxEffort * ratio * efficiency, robot.wheelTorque(), "wheel torque is the stepper's through the gearhead", 1e-9);
 		}
-		near(MobileBase.WHEEL_SPEED, 13.71, "the wheels turn at most about 13.7 rad/s", 0.01);
-		near(MobileBase.WHEEL_SPEED * drive.wheelRadius, 1.03, "which is about 1 m/s on the ground", 0.01);
-		// The wheels' top speed covers the drive's: straight, and turning in place.
-		if (!(MobileBase.MAX_LINEAR_SPEED / drive.wheelRadius <= MobileBase.WHEEL_SPEED &&
-				MobileBase.MAX_ANGULAR_SPEED * drive.trackWidth / 2 / drive.wheelRadius <= MobileBase.WHEEL_SPEED))
-			throw "Mobile base speed limits ask more of the wheels than their joints allow";
+		near(robot.wheelSpeed(), 13.71, "the wheels turn at most about 13.7 rad/s", 0.01);
+		near(robot.wheelSpeed() * drive.wheelRadius, 1.03, "which is about 1 m/s on the ground", 0.01);
+		var envelope = new kinematicskit.UnicycleEnvelope(robot.wheelSpeed() * drive.wheelRadius, drive.trackWidth);
+		var bounded = envelope.constrain(MobileBase.MAX_LINEAR_SPEED, MobileBase.MAX_ANGULAR_SPEED);
+		if (Math.abs(bounded.linear) + Math.abs(bounded.angular) * drive.trackWidth / 2 > robot.wheelSpeed() * drive.wheelRadius + 1e-12)
+			throw "Combined base motion exceeds its wheel limits";
+		var higherVoltage = new MobileBase(null, 48);
+		if (!(higherVoltage.wheelSpeed() > robot.wheelSpeed())) throw "A 48 V battery must raise the resolved wheel speed";
 		var scan = state.worldConnector("lidar", "scan");
 		near(scan.z, MobileBase.DECK_Z + MobileBase.DECK_THICKNESS + LidarPuck.SCAN_HEIGHT, "lidar scan height", 1e-9);
 		near(scan.x, MobileBase.LIDAR_X, "lidar position along the robot", 1e-9);

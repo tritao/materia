@@ -5,6 +5,11 @@ import app.MachineKitRecipeProjectTests;
 /** Default app regression entry point. */
 class AppTests {
 	static function main():Int {
+		if (Sys.getEnv("APP_X9E_ONLY") == "1") {
+			if (SceneEditingTests.main() != 0) return 1;
+			if (WorkerDemoTests.main() != 0) return 1;
+			return WorkerGalleryTests.main();
+		}
 		if (AppPreferencesTests.main() != 0) return 1;
 		if (EditorSettingsDialogTests.main() != 0) return 1;
 		if (SceneAtomicityTests.main() != 0) return 1;

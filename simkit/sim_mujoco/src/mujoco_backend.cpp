@@ -1943,7 +1943,9 @@ private:
             // Outside servo mode every term is zero, so it exerts nothing.
             const auto servo = model_actuator_id(joint, "servo");
             if (servo >= 0) {
-                const bool servoing = joint.target_mode == NKSIM_JOINT_TARGET_SERVO;
+                const auto limit = joint.target_max_force != 0.0
+                    ? joint.target_max_force : joint.desc.max_force;
+                const bool servoing = joint.target_mode == NKSIM_JOINT_TARGET_SERVO && limit >= 0.0;
                 auto *servo_gain = model->actuator_gainprm + mjNGAIN * servo;
                 auto *servo_bias = model->actuator_biasprm + mjNBIAS * servo;
                 double reference = joint.target, velocity = joint.target_velocity, acceleration = 0.0;
@@ -1970,8 +1972,6 @@ private:
                 // Every mode clamps to this same bound, so a joint-level clamp
                 // changes nothing for the motor's already-clamped torque.
                 const auto joint_model = model_joint_id(joint);
-                const auto limit = joint.target_max_force > 0.0
-                    ? joint.target_max_force : joint.desc.max_force;
                 // MuJoCo's implicit derivative recognises actuator force saturation. A
                 // joint-only clamp leaves the full damping derivative active after saturation.
                 model->actuator_forcelimited[servo] = limit > 0.0 ? 1 : 0;
@@ -2012,9 +2012,10 @@ private:
                 break;
             }
 
-            const auto max_force = joint.target_max_force > 0.0
+            const auto max_force = joint.target_max_force != 0.0
                 ? joint.target_max_force : joint.desc.max_force;
-            if (max_force > 0.0) {
+            if (max_force < 0.0) torque = 0.0;
+            else if (max_force > 0.0) {
                 if (torque > max_force) torque = max_force;
                 if (torque < -max_force) torque = -max_force;
             }

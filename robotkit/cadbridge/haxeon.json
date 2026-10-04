@@ -1,15 +1,31 @@
 {
-	"version": 1,
-	"package": { "name": "cadbridge" },
-	"sourceRoots": ["haxe"],
-	"scopeSourceRoots": false,
-	"dependencies": {
-		"nativekit": { "path": "../../nativekit" },
-		"projectkit": { "path": "../../projectkit" },
-		"robotkit": { "path": ".." },
-		"cadkit": { "path": "../../cadkit" },
-		"machinekit": { "path": "../../machinekit" },
-		"bimkit": { "path": "../../bimkit" }
-	},
-	"target": "host"
+  "version": 1,
+  "package": {
+    "name": "cadbridge"
+  },
+  "sourceRoots": [
+    "haxe"
+  ],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "nativekit": {
+      "path": "../../nativekit"
+    },
+    "projectkit": {
+      "path": "../../projectkit"
+    },
+    "robotkit": {
+      "path": ".."
+    },
+    "cadkit": {
+      "path": "../../cadkit"
+    },
+    "machinekit": {
+      "path": "../../machinekit"
+    },
+    "bimkit": {
+      "path": "../../bimkit"
+    }
+  },
+  "target": "host"
 }

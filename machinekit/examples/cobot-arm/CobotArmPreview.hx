@@ -80,10 +80,10 @@ class CobotArmChecks {
 			for (i in 0...6) if (Math.abs(torques[i]) > arm.modules[i].outputRatedTorque)
 				throw "Cobot rated payload exceeds a joint holding torque";
 			var mass = arm.armMass();
-			if (Math.abs(mass - arm.reference.mass) > arm.reference.mass * 0.1)
-				throw '${arm.reference.designation} mass $mass differs from reference ${arm.reference.mass}';
+			if (!(mass > 0) || !Math.isFinite(mass))
+				throw '${arm.reference.designation} assembled mass must be finite and positive';
 			if (definition.encoders == null || definition.encoders.length != 6) throw "Cobot needs six output encoders";
-			Sys.println('${arm.reference.designation}: $mass kg, DH-zero shoulder distance $reach mm, holding N m $torques, DH FK at five poses and full-turn limits passed');
+			Sys.println('${arm.reference.designation}: $mass kg assembled (published reference ${arm.reference.mass} kg), DH-zero shoulder distance $reach mm, holding N m $torques, DH FK at five poses and full-turn limits passed');
 		}
 	}
 

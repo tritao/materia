@@ -331,7 +331,7 @@ class ScriptOwnership {
     sensors.dispose();
   }
   static function validateSensors(sensors:SensorConfiguration):Void for (robot in sensors.robotModels()) {
-    var issues = RobotRuntimeCompiler.validate(robot.model);
+    var issues = RobotRuntimeCompiler.validate(robot.model, robot.profile);
     if (issues.length > 0) throw issues[0].code + ": " + issues[0].message;
   }
   function cloneObjects():Array<SceneObjectData> {

@@ -189,7 +189,7 @@ the configuration it receives is checked by digest (see the device protocol).
 
 ### Transmissions (model contract and RKD6 implementation)
 
-RobotModel v6 owns actuators independently of joints. Each actuator has a
+RobotModel v9 owns actuators independently of joints. Each actuator has a
 stable ID, effort/rate limits in actuator units, and a `SimpleTransmission`
 with `jointId`, `ratio`, and `offset`. Coordinates are SI and obey
 `joint = offset + actuator / ratio`: for a motor driving a linear joint,
@@ -199,9 +199,9 @@ logical coordinate and derives the other joint scales and offsets by equating
 actuator coordinates, using the first actuator authored for each joint as its
 mapping reference. Additional actuators on that joint do not change the
 logical-axis mapping. Explicit authored axis maps remain a deprecated override.
-`RobotModelCodec` accepts v6 only; older schemas are rejected, not migrated.
+`RobotModelCodec` accepts v9 only; older schemas are rejected, not migrated.
 
-RobotModel v6 adds `floatingBase`. When true, the root link is a free six-DOF
+RobotModel v9 adds `floatingBase`. When true, the root link is a free six-DOF
 body, as for a legged or humanoid robot, instead of a base fixed to or driven
 over the world. It is a model property rather than a joint, so runtime joints
 stay one-DOF and joint indices, targets, and plans are unchanged;
@@ -209,10 +209,10 @@ stay one-DOF and joint indices, targets, and plans are unchanged;
 as `floating_base`. `Simulation` then creates the root as a dynamic body
 (a MuJoCo free joint), reports its twist through
 `rk_simulation_get_robot_base_velocity()`, and refuses kinematic base drives
-and wheel couplings for it. A floating base cannot also have a `mobileBase`.
+and wheel couplings for it. A floating base cannot bind a mobile-base profile. `RobotProfile` schema v1 stores mobile and fork roles separately from the mechanical model; `RobotRuntimeCompiler.compile(model, profile)` validates their stable joint IDs.
 See `robotkit/plans/HUMANOID.md`.
 
-RobotModel v6 links also carry `collisionShapes`: boxes, spheres, capsules and
+RobotModel v9 links also carry `collisionShapes`: boxes, spheres, capsules and
 cylinders, each posed in the link frame, with capsule and cylinder lengths
 given as half-lengths along local Z (MuJoCo's convention). The compiler copies
 them onto the blueprint, and `Simulation` sends them in the robot
@@ -335,6 +335,19 @@ use that same mailbox batch directly; replay records newly generated batches
 without changing their source observations. The runtime owns position bounds,
 velocity-rate bounds, and effort limits. This boundary intentionally contains
 joint targets rather than mobile-base or forklift-specific commands.
+
+`RobotCommand` has one buffered-motion abstraction: `ExecutionPlan`. Polynomial
+segments are its payload; there is no independent trajectory-chunk command.
+Lifecycle commands hold, resume or abort the runtime's plan session.
+`RobotCapabilities` names accepted control modes (including servo), execution
+limits and features, deadline/clock-mapping support, and available stream kinds.
+Execution guarantees use the shared `Proven`, `Sampled`, `Unchecked`, `Failed`
+vocabulary; analytic runtime validation covers declared position, velocity and
+acceleration limits, while jerk remains a separate plan claim. An adapter may
+restrict execution through a policy, but cannot advertise extra endpoint support.
+The RKF1 envelope and Hello/Welcome carry protocol version 2; older versions are
+rejected. Recording schema version 7 stores plans and lifecycle commands without
+a trajectory-chunk payload.
 
 ## Mobile kinematics
 
@@ -827,7 +840,7 @@ only metadata. `RobotRecordingEvent.Channel(...)` permits extensions without
 editing the core event enum. Typed core cases remain useful to behavior and
 replay code and are converted through the same channel registry.
 
-Recording format v6 defaults to LZ4 chunk compression and also supports no
+Recording format v7 defaults to LZ4 chunk compression and also supports no
 compression. MCAP log time stores the independent wall-clock recording time;
 publish time stores the full-width arrival ordinal used for deterministic
 replay. The incremental reader rejects older versions and can skip unknown
@@ -843,11 +856,11 @@ source timestamps are never silently reused as receive or command time.
 
 ## Perception
 
-`SerialDeployment` schema v5 may declare perception pipelines separately from
+`SerialDeployment` schema v6 may declare perception pipelines separately from
 the device layout. Each entry names a camera sensor, a model path and SHA-256,
 a pipeline implementation, an execution `host`, and its `consumers`.
 The section is strict and remains outside the device configuration. Deployments
-are schema v5. A `worldd` host cannot serve a
+are schema v6. A `worldd` host cannot serve a
 `local` consumer without a network round trip.
 
 `PerceptionHost` routes camera `SensorFrame`s by sensor ID to code-defined
@@ -1012,7 +1025,7 @@ land in should seed close to their last known configuration.
 `toJointTargets(q)` looks up each arm DOF's driving joint in
 `RobotModel.joints`, which is the same index `RobotRuntimeCompiler` assigns
 as the runtime joint index, and emits one
-`robotkit.world.JointTarget.position(...)` per degree of freedom — the
+`robotkit.core.JointTarget.position(...)` per degree of freedom — the
 existing typed joint-command boundary, unchanged.
 
 ## Tools and TCP
@@ -1254,11 +1267,12 @@ excluded region, not of the raster's ordinary edge margin.
 ## CAD/BIM bridge (`robotkit/cadbridge`, separate project)
 
 `robotkit/cadbridge` is its own haxeon project (`robotkit/cadbridge/haxeon.json`),
-depending on `robotkit`, `cadkit`, and `bimkit`. It is the *only* place CAD/BIM
-concepts meet RobotKit; `robotkit/haxeon.json` itself still depends only on
-`nativekit`, per the plan's CAD-agnostic-core rule.
+depending on `robotkit`, `cadkit`, and `bimkit`. Generic assembly and frame
+conversion remain here. ProcessKit owns the CAD face and BIM wall bridges that
+produce work surfaces; the generic CAD bridge does not depend on ProcessKit.
+RobotKit's core model and runtime remain independent of CAD/BIM.
 
-`cadbridge.FaceBridge.toWorkSurface(face, id, frameId, ?provenance,
+`processkit.cadbridge.FaceBridge.toWorkSurface(face, id, frameId, ?provenance,
 ?surfaceFrameId, ?scale)` converts any CadKit planar `Face` into a design
 `WorkSurface`: it walks each wire's edge endpoints to preserve the authored
 connected loop, normalizes the resulting loop to counter-clockwise, and picks
@@ -1277,7 +1291,7 @@ rotation's columns `(basisU, basisV, normal)` make the surface's local +Z
 exactly the face's outward normal. `scale` converts the shape's own linear
 units into meters; CadKit itself is unit-agnostic.
 
-`cadbridge.WallBridge.wallToWorkSurface(bim, wallId, id, frameId,
+`processkit.cadbridge.WallBridge.wallToWorkSurface(bim, wallId, id, frameId,
 ?sideNormal)` finds a `BimSchema.Wall` element's side face (the planar face
 whose normal is closest to `sideNormal`, default `+Y`) on its *cut* shape —
 `bimkit.BimDocument.rebuildWall` already boolean-cuts a wall's body with
@@ -1361,7 +1375,7 @@ shape is unaffected by an out-of-plane correction) at
 `design.frame_T_surface.compose(correction)`, with `provenance` retaining the
 design element id under `SourceKind.Work`.
 
-`robotkit.work.DeviationMap(surface, cellSize)` mirrors `CoverageMap`'s grid
+`processkit.work.DeviationMap(surface, cellSize)` mirrors `CoverageMap`'s grid
 (cells classified by the surface's boundary bounding box), but accumulates
 the *mean* signed deviation reported for each cell instead of a covered flag.
 A caller adds samples already expressed in the surface's own local plane
@@ -1576,7 +1590,7 @@ against a laid course, adhesive/mortar process state (a new capability
 interface alongside `SurfaceTool`/`Sander`/`Sprayer`), and force control
 during placement (seating a tile against a substrate without cracking it or
 leaving a proud edge) that this codebase has no capability interface or
-simulated contact-force model for yet. `robotkit.work.WorkPatchPlanner`'s
+simulated contact-force model for yet. `processkit.work.WorkPatchPlanner`'s
 axis-aligned patch geometry would also need a per-tile course/coursing-offset
 layer above the raster it already produces.
 
@@ -1640,7 +1654,7 @@ volume, together equal to one full column — which is what
 a tolerance.
 
 `EarthworkRegion` pairs an `existing` and `design` `HeightMap` (validated to
-share one grid) with exclusion polygons (`robotkit.work.Polygon2`, the same
+share one grid) with exclusion polygons (`processkit.work.Polygon2`, the same
 type `WorkSurface` uses for its own exclusions) and a `gradeTolerance`.
 `isAtGrade(col, row)` is true when a vertex's excluded, or its
 `|existing - design|` delta is within tolerance; `gradeFraction()` and

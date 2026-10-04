@@ -49,6 +49,25 @@ class TextLayout extends NativeKitUIResource {
 			"textLayout.setColor");
 	}
 
+	/** Replaces sorted, disjoint foreground ranges without changing measured geometry.
+	 * Offsets are codepoints; shaped clusters use their first codepoint's color.
+	 * An empty array clears overrides. Updating text/layout also clears them.
+	 */
+	public function setColorRanges(ranges:Array<TextColorRange>):Void {
+		if (ranges == null)
+			throw "Text color ranges cannot be null";
+		var nativeRanges:Array<nkui_text_color_range> = [];
+		var previousEnd = 0;
+		for (range in ranges) {
+			if (range == null || range.start < previousEnd)
+				throw "Text color ranges must be sorted and disjoint";
+			nativeRanges.push(range.nativeValue());
+			previousEnd = range.end;
+		}
+		UiResult.check(NativeKitUI.nkui_text_layout_set_color_ranges(nativeHandle(), nativeRanges),
+			"textLayout.setColorRanges");
+	}
+
 	/** Re-shapes this retained layout with new content, width, or semantic styles. */
 	public function update(value:String, newWidth:Float, style:TextStyle,
 			paragraph:ParagraphStyle):Void {
@@ -68,6 +87,15 @@ class TextLayout extends NativeKitUIResource {
 		paragraphStyle.alignment = ownedParagraphStyle.alignment;
 		paragraphStyle.lineHeight = ownedParagraphStyle.lineHeight;
 		paragraphStyle.direction = ownedParagraphStyle.direction;
+	}
+
+	/** Applies a codepoint replacement to the retained layout. */
+	public function edit(start:Int, end:Int, replacement:String, nextText:String):Void {
+		if (start < 0 || end < start || replacement == null || nextText == null)
+			throw "Text layout edit arguments are invalid";
+		UiResult.check(NativeKitUI.nkui_text_layout_edit(nativeHandle(), start, end, replacement),
+			"textLayout.edit");
+		text = nextText;
 	}
 
 	static function copyTextStyle(style:TextStyle):TextStyle
@@ -169,17 +197,41 @@ class TextLayout extends NativeKitUIResource {
 		return rectangles;
 	}
 
+	/** Logical rectangles for visual rows intersecting a text and vertical range. */
+	public function lineRects(start:Int, end:Int, minY:Float, maxY:Float):Array<Rect> {
+		if (start < 0 || end < start || !Math.isFinite(minY) || !Math.isFinite(maxY) || maxY < minY)
+			throw "Text line rectangle arguments are invalid";
+		var result = NativeKitUI.nkui_text_layout_get_line_rects(nativeHandle(), start, end,
+			minY, maxY);
+		UiResult.check(result.status, "textLayout.lineRects");
+		var bytes:haxe.io.Bytes = result.out_buffer;
+		var recordBytes = 20;
+		if (bytes.length % recordBytes != 0)
+			throw "Text line geometry contains a truncated rectangle";
+		var rectangles:Array<Rect> = [];
+		for (index in 0...Std.int(bytes.length / recordBytes)) {
+			var offset = index * recordBytes;
+			if (bytes.getInt32(offset) != recordBytes)
+				throw "Text line geometry returned an unsupported record size";
+			rectangles.push(new Rect(readFloat(bytes, offset + 4), readFloat(bytes, offset + 8),
+				readFloat(bytes, offset + 12), readFloat(bytes, offset + 16)));
+		}
+		return rectangles;
+	}
+
 	/** Returns range-aware rectangles for each grapheme covered by a selection. */
 	public function selectionRangeRects(start:TextPosition, end:TextPosition):Array<TextRangeRect> {
 		if (start == null || end == null)
 			throw "Text selection endpoints cannot be null";
-		var forward = start.offset <= end.offset;
-		var first = forward ? start.offset : end.offset;
-		var last = forward ? end.offset : start.offset;
+		// Affinity identifies a visual glyph edge; tags must use logical insertion offsets.
+		var startOffset = offsetFromPosition(start), endOffset = offsetFromPosition(end);
+		var forward = startOffset <= endOffset;
+		var first = forward ? startOffset : endOffset;
+		var last = forward ? endOffset : startOffset;
 		if (first == last)
 			return [];
-		var firstAffinity = forward ? start.affinity : end.affinity;
-		var lastAffinity = forward ? end.affinity : start.affinity;
+		var firstPosition = forward ? start : end;
+		var lastPosition = forward ? end : start;
 		var result:Array<TextRangeRect> = [];
 		var cursor = first;
 		while (cursor < last) {
@@ -188,8 +240,8 @@ class TextLayout extends NativeKitUIResource {
 				next = cursor + 1;
 			if (next > last)
 				next = last;
-			var startCaret = caret(new TextPosition(cursor, cursor == first ? firstAffinity : 0));
-			var endCaret = caret(new TextPosition(next, next == last ? lastAffinity : 0));
+			var startCaret = caret(cursor == first ? firstPosition : new TextPosition(cursor, 0));
+			var endCaret = caret(next == last ? lastPosition : new TextPosition(next, 0));
 			var startTopX = startCaret.x + startCaret.ascender * startCaret.slope;
 			var startBottomX = startCaret.x + startCaret.descender * startCaret.slope;
 			var endTopX = endCaret.x + endCaret.ascender * endCaret.slope;

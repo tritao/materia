@@ -7,11 +7,11 @@ import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationSpace;
 import robotkit.runtime.SimulationPresentationSnapshot;
-import robotkit.world.Robot;
+import robotkit.core.Robot;
 import robotkit.world.RobotWorld;
-import robotkit.world.SimulatedRobot;
+import robotkit.simulation.SimulatedRobot;
 import robotkit.world.WorldSnapshot;
-import robotkit.world.SensorFrame;
+import robotkit.core.SensorFrame;
 import nativekit.sim.MotionType;
 import nativekit.sim.SimObject;
 import nativekit.sim.SimPose;
@@ -163,7 +163,7 @@ class ApplicationSimulation {
       candidate = Simulation.inSpace(createdSpace);
       for (index in 0...models.length) {
         var editable=models[index];
-        var blueprint = RobotRuntimeCompiler.compile(editable.model, appliedRevision + 1);
+        var blueprint = RobotRuntimeCompiler.compile(editable.model, editable.profile, appliedRevision + 1);
         var runtime = candidate.addRobotAtPose(blueprint, editable.position, editable.rotation);
         var id = editable.id;
         candidateRobots.push(new SimulatedRobot(id, runtime, editable.model.name,
@@ -387,7 +387,7 @@ class ApplicationSimulation {
   /** The weld metal the mission has laid, or null when it does not weld. */
   public function weldBeads():Null<WeldBeads> return beads;
   /** The simulated welder on the assembly's torch, or null when it has none. */
-  public function welder():Null<robotkit.runtime.SimulatedWelder> return tools == null || tools.welders.length == 0 ? null : tools.welders[0];
+  public function welder():Null<processkit.simulation.SimulatedWelder> return tools == null || tools.welders.length == 0 ? null : tools.welders[0];
 
   /** The stock the project's CNC program is cutting, or null when it cuts none. */
   public function machiningStock():Null<MachiningStock> return cnc == null ? null : cnc.stock;

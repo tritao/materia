@@ -21,9 +21,9 @@ import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.Frame;
 import robotkit.manipulation.Manipulator;
-import robotkit.manipulation.WorkPatchPlanner;
-import cadbridge.FaceBridge;
-import cadbridge.WallBridge;
+import processkit.manipulation.WorkPatchPlanner;
+import processkit.cadbridge.FaceBridge;
+import processkit.cadbridge.WallBridge;
 import cadbridge.BimFrameBridge;
 import cadbridge.AssemblySimulationBridge;
 import cadbridge.AssemblyPhysicalPartView;
@@ -32,7 +32,7 @@ import materia.project.SceneArtifact;
 import robotkit.mobile.Twist2;
 import robotkit.runtime.DifferentialDrivePlant;
 import robotkit.runtime.SimulationHarness;
-import robotkit.world.SimulatedRobot;
+import robotkit.simulation.SimulatedRobot;
 import cadbridge.MachineAssemblyMassBridge;
 import cadbridge.EndEffectorBridge;
 import cadbridge.EndEffectorCollision;
@@ -69,9 +69,9 @@ import robotkit.tool.SuctionMotionSample;
 import robotkit.tool.WorkpieceLoad;
 import robotkit.tool.MassProperties;
 import robotkit.spatial.Inertia3;
-import robotkit.world.FiredProcessEvent;
-import robotkit.world.ProcessEventValue;
-import robotkit.world.SensorFrame;
+import robotkit.execution.FiredProcessEvent;
+import robotkit.execution.ProcessEventValue;
+import robotkit.core.SensorFrame;
 import haxe.Int64;
 import robotkit.material.LoadLimits;
 import robotkit.runtime.RobotRuntimeCompiler;
@@ -627,7 +627,8 @@ class CadBridgeTests {
     assembly.connector("slider", "mount", AssemblyFrames.identity());
     assembly.mateOnAxis("slide", "prismatic", "base", "mount", "slider", "mount",
       {x: 0, y: 1, z: 0}, 0, {lower: 0, upper: 100, velocity: 20, effort: 50});
-    assembly.actuate("drive", "slide", 10, 5, null, 200);
+    assembly.actuateDrive({id: "drive", joint: "slide", maxEffort: 10, maxRate: 5,
+      fullStepsPerRevolution: 200, microsteps: 16, maxStepRate: 200000});
     var vertices = Bytes.alloc(4 * 24);
     var points = [0.0, 0.0, 0.0, 10.0, 0.0, 0.0,
       0.0, 10.0, 0.0, 0.0, 0.0, 10.0];
@@ -649,7 +650,7 @@ class CadBridgeTests {
     check(Math.abs(slide.limits.upper - 0.1) < 1e-9 && slide.axis[1] == 1 &&
       Math.abs(translated.model.links[1].mass - 7.85) < 1e-9,
       "assembly limits and material mass convert to SI units");
-    check(RobotRuntimeCompiler.validate(translated.model).length == 0,
+    check(RobotRuntimeCompiler.validate(translated.model, new robotkit.profile.RobotProfile()).length == 0,
       "translated assembly is a valid RobotKit runtime model");
     check(translated.model.actuators.length == 1 && translated.model.actuators[0].fullStepsPerRevolution == 200,
       "a stepper's full steps reach the robot actuator");
@@ -662,16 +663,16 @@ class CadBridgeTests {
     driven.mateOnAxis("slide", "prismatic", "base", "mount", "slider", "mount",
       {x: 0, y: 1, z: 0}, 0, {lower: 0, upper: 100, velocity: 20, effort: 50});
     driven.actuateDrive({id: "stepper", joint: "slide", maxEffort: 0.6, maxRate: 100, rotorInertia: 3e-5,
-      fullStepsPerRevolution: 200, drive: "stepper", holdingTorque: 1.2, torqueSpeed: [0, 1.2, 100, 1.2, 400, 0.3]});
-    driven.actuateDrive({id: "servo", joint: "slide", maxEffort: 0, maxRate: 0, drive: "servo", ratedTorque: 0.6,
+      fullStepsPerRevolution: 200, microsteps: 16, maxStepRate: 200000, drive: "stepper", holdingTorque: 1.2, torqueSpeed: [0, 1.2, 100, 1.2, 400, 0.3]});
+    driven.actuateDrive({id: "servo", joint: "slide", maxEffort: 1.8, maxRate: 500, drive: "servo", ratedTorque: 0.6,
       peakTorque: 1.8, ratedSpeed: 300, maxSpeed: 500, encoderCounts: 4096, servoStiffness: 12});
     var drives = AssemblySimulationBridge.toRobotModel(driven.definition("drive-test"), parts).model.actuators;
     var stepperDrive = drives[0].drive, servoDrive = drives[1].drive;
     check(stepperDrive != null && stepperDrive.kind() == "stepper" && stepperDrive.curve.torqueAt(250) == 0.75 &&
       drives[0].fullStepsPerRevolution == 200 && stepperDrive.rotorInertia == 3e-5,
       "a stepper's drive and pull-out curve reach the robot actuator");
-    check(servoDrive != null && servoDrive.kind() == "servo" && drives[1].planningEffort() == 1.8 &&
-      drives[1].planningRate() == 500 && drives[1].servoStiffness == 12 && servoDrive.curve.torqueAt(400) < 1.8,
+    check(servoDrive != null && servoDrive.kind() == "servo" && drives[1].requireEffort() == 1.8 &&
+      drives[1].requireRate() == 500 && drives[1].servoStiffness == 12 && servoDrive.curve.torqueAt(400) < 1.8,
       "a servo's drive, peak torque and maximum speed reach the robot actuator");
     // A gearbox between a servo and a turning joint: the actuator turns `gearRatio` times for one turn of the joint, the joint
     // is limited to the servo's speed over the ratio and its torque through the ratio at the efficiency, and the rotor's
@@ -690,8 +691,10 @@ class CadBridgeTests {
     var gearing = switch gearedMotor.transmission { case SimpleTransmission(_, ratio, _): ratio; };
     check(gearing == 100.0 && gearedMotor.efficiency == 0.8, "a gearbox's ratio and efficiency reach the robot actuator");
     check(Math.abs(gearedModel.joints[0].armature - 2e-5 * 100.0 * 100.0) < 1e-12, "the rotor's inertia is seen through the ratio squared");
-    var gearedJoint = RobotRuntimeCompiler.compile(gearedModel).joints[0];
-    check(Math.abs(gearedJoint.maxRate - 5.0) < 1e-12 && Math.abs(gearedJoint.maxEffort - 160.0) < 1e-9,
+    check(gearedModel.joints[0].limits.velocity == 5.0 && gearedModel.joints[0].limits.effort == 160.0,
+      "the compiled model carries effective limits before runtime lowering");
+    var gearedJoint = RobotRuntimeCompiler.compile(gearedModel, new robotkit.profile.RobotProfile()).joints[0];
+    check(Math.abs(gearedJoint.requireRate() - 5.0) < 1e-12 && Math.abs(gearedJoint.requireEffort() - 160.0) < 1e-9,
       'the joint is limited to its drive: ${gearedJoint.maxRate} rad/s and ${gearedJoint.maxEffort} N m');
     // Encoders are sensors on joints: counts per millimetre on a sliding joint become per metre, per revolution on a
     // turning one per radian, and a servo that names its encoder holds no count of its own.
@@ -702,7 +705,7 @@ class CadBridgeTests {
     sensed.connector("slider", "mount", AssemblyFrames.identity());
     sensed.mateOnAxis("slide", "prismatic", "base", "mount", "slider", "mount",
       {x: 0, y: 1, z: 0}, 0, {lower: 0, upper: 100, velocity: 20, effort: 50});
-    sensed.actuateDrive({id: "servo", joint: "slide", maxEffort: 0, maxRate: 0, drive: "servo", ratedTorque: 0.6,
+    sensed.actuateDrive({id: "servo", joint: "slide", maxEffort: 1.8, maxRate: 500, drive: "servo", ratedTorque: 0.6,
       peakTorque: 1.8, ratedSpeed: 300, maxSpeed: 500, encoder: "scale"});
     sensed.addEncoder({id: "scale", joint: "slide", kind: "absolute", counts: 200, index: true});
     var sensedModel = AssemblySimulationBridge.toRobotModel(sensed.definition("encoder-test"), parts).model;
@@ -710,7 +713,7 @@ class CadBridgeTests {
       sensedModel.encoders[0].kind == robotkit.model.EncoderKind.Absolute && sensedModel.encoders[0].index &&
       sensedModel.encoders[0].joint == sensedModel.joints[0].id, "an encoder's counts per millimetre reach the robot in counts per metre");
     check(sensedModel.actuators[0].encoder == "scale" && sensedModel.encoderFor(sensedModel.actuators[0]) == sensedModel.encoders[0] &&
-      RobotRuntimeCompiler.validate(sensedModel).length == 0, "the servo's encoder is the sensor it names");
+      RobotRuntimeCompiler.validate(sensedModel, new robotkit.profile.RobotProfile()).length == 0, "the servo's encoder is the sensor it names");
     // A coupling's stiffness, backlash and drag reach the robot coupling in SI units: a 100 N/mm drive on a
     // millimetre axis is 100000 N/m, 0.05 mm of backlash 5e-5 m, and a turning follower's drag is as given.
     var screwed = new AssemblyModel();
@@ -821,8 +824,8 @@ class CadBridgeTests {
     var model = converted.model;
     check(model.links.length == 3 && [for (joint in model.joints) joint.id].join(",") == "wheel_l,wheel_r",
       "the mobile base is its chassis and two wheel links on the wheel joints");
-    check(model.mobileBase != null, "the bridge configures the mobile base");
-    var blueprint = robotkit.runtime.RobotRuntimeCompiler.compile(model);
+    check(converted.profile.mobileBase != null, "the bridge configures the mobile base");
+    var blueprint = robotkit.runtime.RobotRuntimeCompiler.compile(model, converted.profile);
     var configuration:robotkit.runtime.RobotRuntimeConfiguration = cast blueprint.configuration;
     var mobile:robotkit.runtime.RobotRuntimeMobileConfiguration = cast configuration.mobileBase;
     check(switch mobile.drive {
@@ -936,7 +939,7 @@ class CadBridgeTests {
       joint.axis = axes[i];
       joint.limits.lower = -2.0 * Math.PI;
       joint.limits.upper = 2.0 * Math.PI;
-      joint.limits.velocity = 0.0;
+      joint.limits.velocity = null;
     }
     var flangeOffset = new Vec3(0.0, d6, 0.0);
     var flange = model.addFrame(new Frame("flange", links[6]));
@@ -1000,7 +1003,7 @@ class CadBridgeTests {
     return result;
   }
 
-  static function reflexVertices(points:Array<robotkit.work.Point2>):Int {
+  static function reflexVertices(points:Array<processkit.work.Point2>):Int {
     var result = 0;
     for (i in 0...points.length) {
       var previous = points[(i + points.length - 1) % points.length];

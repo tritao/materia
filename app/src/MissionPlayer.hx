@@ -26,8 +26,8 @@ import motionkit.program.MoveTarget;
 import motionkit.program.Blend;
 import motionkit.MotionOptions;
 import processkit.WeldingPlanRunner;
-import robotkit.skill.WeldPlan;
-import robotkit.skill.WeldSeam;
+import processkit.skill.WeldPlan;
+import processkit.skill.WeldSeam;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
 import robotkit.manipulation.Manipulator;
@@ -57,7 +57,7 @@ import robotkit.skill.GoTo;
 import robotkit.skill.Skill;
 import robotkit.skill.SkillRunner;
 import robotkit.skill.SkillStatus;
-import robotkit.world.RobotSnapshot;
+import robotkit.core.RobotSnapshot;
 
 /** A box held where it stands: centre, half extents and heading, in metres and radians. */
 typedef FloorObstacle = {
@@ -436,10 +436,12 @@ class MissionPlayer implements SessionMember {
       for (i in 0...count) {
         var bound = arm.group.limitsOf(i);
         if (bound.lower < bound.upper) limits.position(i, bound.lower, bound.upper);
-        var speed = bound.velocity > 0 ? bound.velocity : 2.0;
+        var speedLimit:Float = bound.velocity == null ? 0.0 : bound.velocity;
+        var speed = speedLimit > 0 ? speedLimit : 2.0;
         velocities.push(speed);
         limits.velocity(i, speed);
-        var acceleration = bound.maxAcceleration > 0 ? Math.min(ARM_ACCELERATION, bound.maxAcceleration) : ARM_ACCELERATION;
+        var accelerationLimit:Float = bound.maxAcceleration == null ? 0.0 : bound.maxAcceleration;
+        var acceleration = accelerationLimit > 0 ? Math.min(ARM_ACCELERATION, accelerationLimit) : ARM_ACCELERATION;
         accelerations.push(acceleration);
         limits.acceleration(i, acceleration);
         limits.jerk(i, 20.0);

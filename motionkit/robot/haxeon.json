@@ -1,13 +1,31 @@
 {
   "version": 1,
-  "package": { "name": "motionkit-robot" },
-  "sourceRoots": ["haxe"],
+  "package": {
+    "name": "motionkit-robot"
+  },
+  "sourceRoots": [
+    "haxe"
+  ],
   "scopeSourceRoots": false,
   "dependencies": {
-    "motionkit": { "path": ".." },
-    "robotkit": { "path": "../../robotkit" },
-    "machinekit": { "path": "../../machinekit" },
-    "kinematicskit-native": { "path": "../../kinematicskit/native" }
+    "motionkit": {
+      "path": ".."
+    },
+    "robotkit": {
+      "path": "../../robotkit"
+    },
+    "machinekit": {
+      "path": "../../machinekit"
+    },
+    "kinematicskit-native": {
+      "path": "../../kinematicskit/native"
+    },
+    "cadbridge": {
+      "path": "../../robotkit/cadbridge"
+    },
+    "robotkit-policy": {
+      "path": "../../robotkit/policy"
+    }
   },
   "target": "host"
 }

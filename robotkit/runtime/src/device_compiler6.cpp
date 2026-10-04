@@ -1,6 +1,6 @@
 #include "device_compiler6.hpp"
 #include "coupling_terms.hpp"
-#include "motionkit.h"
+#include "trajectory_core.h"
 #include <algorithm>
 #include <bit>
 #include <cmath>
@@ -250,7 +250,9 @@ CompiledDevicePlan6 compile_device_segments6(
     limits.struct_size = sizeof(limits);
     limits.joint_count = blueprint.joint_count;
     limits.executor_time_resolution_ns = resolution_ns;
-    limits.max_continuity_jump[0] = 1e-6;
+    // Both neighbouring float segments approximate the same authored seam within
+    // target_error, so their positions may differ by twice that declared error.
+    limits.max_continuity_jump[0] = 2.0 * target_error;
     for (std::uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
         const auto &source = blueprint.joints[joint];
         limits.position_claimed[joint] = 1;
@@ -258,6 +260,8 @@ CompiledDevicePlan6 compile_device_segments6(
         limits.position_upper[joint] = source.upper_limit;
         limits.max_velocity[joint] = source.max_velocity;
         limits.max_acceleration[joint] = source.max_acceleration;
+        limits.derivative_claimed[joint] = ((source.limit_flags & RK_LIMIT_VELOCITY) ? 1u : 0u) |
+            ((source.limit_flags & RK_LIMIT_ACCELERATION) ? 2u : 0u);
     }
     mk_validation_report report{};
     report.struct_size = sizeof(report);

@@ -19,14 +19,18 @@ import robotkit.model.Link;
 import robotkit.model.RobotModel;
 import robotkit.model.RobotModelCodec;
 import robotkit.model.Sensor;
-import robotkit.model.RobotDriveConfiguration;
-import robotkit.model.RobotMobileConfiguration;
-import robotkit.model.RobotForkConfiguration;
+import robotkit.profile.RobotDriveConfiguration;
+import robotkit.profile.RobotMobileConfiguration;
+import robotkit.profile.RobotForkConfiguration;
 import robotkit.runtime.RobotRuntimeCompiler;
 
 /** Editable RobotKit sensor model used by Materia's sensor panel. */
 class SensorConfiguration {
-  public var model(default, null):RobotModel;
+  var active:robotkit.model.RobotDefinition;
+  public var model(get, never):RobotModel;
+  public var profile(get, never):robotkit.profile.RobotProfile;
+  function get_model():RobotModel return active.model;
+  function get_profile():robotkit.profile.RobotProfile return active.profile;
   public final document:EditorDocument;
   public var selectedIndex(default,null):Int = 0;
   public var robotId(default, null):String = "materia/robot";
@@ -38,7 +42,7 @@ class SensorConfiguration {
   var observedConfigurationRevision:Int = -1;
   var observedPhysicsState:Null<String> = null;
   final configurations:Map<String, Dynamic> = new Map();
-  final liveModels:Map<String, RobotModel> = new Map();
+  final liveModels:Map<String, robotkit.model.RobotDefinition> = new Map();
   final selections:Map<String, Int> = new Map();
   final nextIds:Map<String, Int> = new Map();
   final positions:Map<String, Array<Float>> = new Map();
@@ -47,7 +51,7 @@ class SensorConfiguration {
 
   public function new(?data:Dynamic, ?sharedDocument:EditorDocument, empty:Bool = false) {
     document = sharedDocument == null ? new EditorDocument("sensors") : sharedDocument;
-    model=new RobotModel("Materia robot");
+    active=new robotkit.model.RobotDefinition(new RobotModel("Materia robot"), new robotkit.profile.RobotProfile());
     var base=model.addLink(new Link("Base","base"));
     model.addFrame(new Frame("Base sensor mount",base,"base/sensors"));
     if (data == null && empty) {
@@ -74,7 +78,7 @@ class SensorConfiguration {
     }
     if (!this.empty) {
       configurations.set(robotId, singleRecord());
-      liveModels.set(robotId, model); selections.set(robotId, selectedIndex);
+      liveModels.set(robotId, active); selections.set(robotId, selectedIndex);
     }
     if (sharedDocument == null) document.markSaved();
   }
@@ -90,13 +94,13 @@ class SensorConfiguration {
     if (readOnlyRobots.exists(id) && !configurations.exists(id) && !liveModels.exists(id)) return false;
     if (empty) {
       var previousId = robotId;
-      var previousModel = model, previousSelection = selectedIndex;
+      var previousDefinition = active, previousSelection = selectedIndex;
       document.apply(new EditOperation("Add robot configuration", function() {
         empty = false; createDefault(id); configurationRevision++;
       }, function() {
         configurations.remove(id); liveModels.remove(id); selections.remove(id);
         nextIds.remove(id); positions.remove(id); rotations.remove(id);
-        robotId = previousId; model = previousModel; selectedIndex = previousSelection;
+        robotId = previousId; active = previousDefinition; selectedIndex = previousSelection;
         empty = true; configurationRevision++;
       }));
       return true;
@@ -192,13 +196,14 @@ class SensorConfiguration {
   public function add(kind:String):Sensor {
     ensureEditable();
     var owner = model;
+    var ownerDefinition = active;
     var ownerId = robotId;
     var sensor = createSensor(kind);
     var previous = selectedIndex;
     document.apply(new EditOperation("Add " + kind + " sensor", function() {
       if (empty) {
         empty = false;
-        configurations.set(ownerId, singleRecord()); liveModels.set(ownerId, owner);
+        configurations.set(ownerId, singleRecord()); liveModels.set(ownerId, ownerDefinition);
       }
       if (owner.sensors.indexOf(sensor) < 0) owner.addSensor(sensor);
       if (robotId == ownerId) selectedIndex = owner.sensors.indexOf(sensor);
@@ -253,103 +258,42 @@ class SensorConfiguration {
     for(id in liveModels.keys())configurations.set(id,singleRecordFor(id,liveModels.get(id)));
     return [for(id in configuredRobotIds()) configurations.get(id)];
   }
-  public function robotModels():Array<{id:String,model:RobotModel,position:Array<Float>,rotation:Array<Float>}> {
+  public function robotModels():Array<{id:String,model:RobotModel,profile:robotkit.profile.RobotProfile,position:Array<Float>,rotation:Array<Float>}> {
     if (empty) return [];
     captureCurrent(); var selected=robotId;
-    var result:Array<{id:String,model:RobotModel,position:Array<Float>,rotation:Array<Float>}> = [];
+    var result:Array<{id:String,model:RobotModel,profile:robotkit.profile.RobotProfile,position:Array<Float>,rotation:Array<Float>}> = [];
     for(id in configuredRobotIds()) {
       if(!liveModels.exists(id))loadRobot(configurations.get(id));
       var live = liveModels.get(id);
       if (live == null) throw 'Robot "$id" has no editable model';
-      result.push({id:id,model:live,position:robotPosition(id),rotation:robotRotation(id)});
+      result.push({id:id,model:live.model,profile:live.profile,position:robotPosition(id),rotation:robotRotation(id)});
     }
     activate(selected,configurations.get(selected));
     return result;
   }
-  function singleRecord():Dynamic return singleRecordFor(robotId,model);
-  function singleRecordFor(id:String,value:RobotModel):Dynamic return {
-    robotId: id,
-    name: value.name,
-    modelVersion: RobotModel.CURRENT_VERSION,
-    collisionApproximation: value.collisionApproximation,
-    pose: {position:robotPosition(id), rotation:robotRotation(id)},
-    links: [for (link in value.links) {id:link.id, name:link.name, mass:link.mass,
-      centerOfMass:link.centerOfMass.copy(), inertiaTensor:link.inertiaTensor.copy(),
-      visualGeometry:link.visualGeometry, collisionGeometry:link.collisionGeometry,
-      collisionShapes:[for (shape in link.collisionShapes) RobotModelCodec.encodeCollisionShape(shape)]}],
-    joints: [for (joint in value.joints) {id:joint.id, name:joint.name, type:joint.type,
-      parentId:joint.parent.id, childId:joint.child.id,
-      parentFramePosition:joint.parentFramePosition.copy(),
-      parentFrameRotation:joint.parentFrameRotation.copy(),
-      childFramePosition:joint.childFramePosition.copy(),
-      childFrameRotation:joint.childFrameRotation.copy(), axis:joint.axis.copy(),
-      limits:{lower:joint.limits.lower,upper:joint.limits.upper,
-        velocity:joint.limits.velocity,effort:joint.limits.effort}}],
-    frames: [for (frame in value.frames) {id:frame.id, name:frame.name, linkId:frame.link.id,
-      position:frame.position.copy(), rotation:frame.rotation.copy()}],
-    mobileBase: mobileRecord(value.mobileBase),
-    forkMechanism: forkRecord(value.forkMechanism),
-    sensors: [for (sensor in value.sensors) {id:sensor.id, name:sensor.name, kind:sensor.kind,
-      updateRate:sensor.updateRate, frameId:sensor.frame == null ? null : sensor.frame.id,
-      rayCount:sensor.rayCount, maxRange:sensor.maxRange, noiseStddev:sensor.noiseStddev,
-      noiseSeed:sensor.noiseSeed, startAngleRadians:sensor.startAngleRadians,
-      fieldOfViewRadians:sensor.fieldOfViewRadians}]
-  };
-
-  static function mobileRecord(value:Null<RobotMobileConfiguration>):Dynamic {
-    if (value == null) return null;
-    return {
-      drive: driveRecord(value.drive),
-      maxLinearSpeed: value.maxLinearSpeed,
-      maxAngularSpeed: value.maxAngularSpeed,
-      maxLinearAcceleration: value.maxLinearAcceleration,
-      maxAngularAcceleration: value.maxAngularAcceleration,
-      footprintLength: value.footprintLength,
-      footprintWidth: value.footprintWidth
-    };
-  }
-
-  static function forkRecord(value:Null<RobotForkConfiguration>):Dynamic {
-    if (value == null) return null;
-    return {
-      liftJointId: value.liftJointId,
-      tiltJointId: value.tiltJointId,
-      spreadJointId: value.spreadJointId,
-      maxMassKg: value.maxMassKg,
-      maxLoadMomentKgMeters: value.maxLoadMomentKgMeters,
-      maxLiftHeightMeters: value.maxLiftHeightMeters
-    };
-  }
-
-  static function driveRecord(value:RobotDriveConfiguration):Dynamic return switch value {
-    case Differential(leftId, rightId, wheelRadius, trackWidth): {
-      kind:"differential", leftWheelJointId:leftId, rightWheelJointId:rightId,
-      wheelRadius:wheelRadius, trackWidth:trackWidth
-    };
-    case Ackermann(steeringId, driveId, wheelBase, wheelRadius, maxSteeringAngle): {
-      kind:"ackermann", steeringJointId:steeringId, driveWheelJointId:driveId,
-      wheelBase:wheelBase, wheelRadius:wheelRadius, maxSteeringAngle:maxSteeringAngle
-    };
-    case Holonomic(wheelJointIds, wheelRadius, baseRadius): {
-      kind:"holonomic", wheelJointIds:wheelJointIds.copy(),
-      wheelRadius:wheelRadius, baseRadius:baseRadius
-    };
+  function singleRecord():Dynamic return singleRecordFor(robotId, active);
+  function singleRecordFor(id:String, value:robotkit.model.RobotDefinition):Dynamic return {
+    schemaVersion:1,
+    robotId:id,
+    model:haxe.Json.parse(RobotModelCodec.encode(value.model).toString()),
+    profile:robotkit.profile.RobotProfileCodec.toRecord(value.profile),
+    pose:{position:robotPosition(id), rotation:robotRotation(id)}
   };
 
   function captureCurrent():Void {
     if (empty) return;
-    configurations.set(robotId, singleRecord()); liveModels.set(robotId,model);
+    configurations.set(robotId, singleRecord()); liveModels.set(robotId,active);
     selections.set(robotId,selectedIndex);nextIds.set(robotId,nextId);
   }
   function activate(id:String,record:Dynamic):Void {
     var live=liveModels.get(id);
     if(live==null)loadRobot(record); else {
-      robotId=id;model=live;var selected=selections.get(id);selectedIndex=selected==null?0:selected;
+      robotId=id;active=live;var selected=selections.get(id);selectedIndex=selected==null?0:selected;
       var savedNextId=nextIds.get(id);nextId=savedNextId==null?1:savedNextId;
     }
   }
   function createDefault(id:String):Void {
-    robotId=id; model=new RobotModel("Materia robot");
+    robotId=id; active=new robotkit.model.RobotDefinition(new RobotModel("Materia robot"), new robotkit.profile.RobotProfile());
     var base=model.addLink(new Link("Base","base"));
     model.addFrame(new Frame("Base sensor mount",base,"base/sensors"));
     nextId=1; addDirect("lidar"); captureCurrent();
@@ -376,147 +320,18 @@ class SensorConfiguration {
 
   function loadRobot(data:Dynamic):Void {
     robotId = requiredString(data, "robotId");
-    var rawVersion:Dynamic = Reflect.field(data, "modelVersion");
-    var modelVersion = rawVersion == null ? 1 : requiredInteger(data, "modelVersion");
-    if (modelVersion < 1 || modelVersion > RobotModel.CURRENT_VERSION)
-      throw 'Unsupported RobotModel version $modelVersion';
-    var modelName:Dynamic=Reflect.field(data,"name");
-    model = new RobotModel(Std.isOfType(modelName,String)&&StringTools.trim(cast modelName).length>0
-      ? cast modelName : "Materia robot");
-    if (modelVersion >= 2) {
-      var approximation = requiredString(data, "collisionApproximation");
-      if (approximation != CollisionApproximation.BoundsBox && approximation != CollisionApproximation.None)
-        throw "Unsupported collision approximation policy";
-      model.collisionApproximation = cast approximation;
-    }
-    var pose:Dynamic=Reflect.field(data,"pose");
-    var loadedPosition=pose==null?[0.0,0.0,0.0]:vector(pose,"position",3);
-    var loadedRotation=pose==null?[0.0,0.0,0.0,1.0]:vector(pose,"rotation",4);
-    positions.set(robotId,loadedPosition);rotations.set(robotId,loadedRotation);
-    var poseNorm=0.0;for(value in loadedRotation)poseNorm+=value*value;
-    if(Math.abs(poseNorm-1.0)>0.000001)throw "Robot pose rotation must be a unit quaternion";
-    var links = new Map<String, Link>();
-    for (value in requiredArray(data, "links")) {
-      var link = model.addLink(new Link(requiredString(value, "name"), requiredString(value, "id")));
-      if (modelVersion >= 2) {
-        link.mass = finite(value, "mass");
-        link.centerOfMass = vector(value, "centerOfMass", 3);
-        link.inertiaTensor = vector(value, "inertiaTensor", 9);
-        link.visualGeometry = optionalString(value, "visualGeometry");
-        link.collisionGeometry = optionalString(value, "collisionGeometry");
-        if (Reflect.hasField(value, "collisionShapes")) {
-          for (record in requiredArray(value, "collisionShapes")) {
-            var shape = RobotModelCodec.readCollisionShape(record);
-            var reason = shape.validate();
-            if (reason != null) throw 'Invalid sensor link collision shape: $reason';
-            link.collisionShapes.push(shape);
-          }
-        }
-      }
-      if (links.exists(link.id)) throw "Duplicate sensor document link ID";
-      links.set(link.id, link);
-    }
-    if (model.links.length == 0) throw "Sensor document requires a robot link";
-    var jointValues:Dynamic=Reflect.field(data,"joints");
-    if(jointValues!=null)for(value in requiredArray(data,"joints")) {
-      var parent=links.get(requiredString(value,"parentId"));
-      var child=links.get(requiredString(value,"childId"));
-      if(parent==null||child==null)throw "Sensor joint references an unknown link";
-      var kind:String=requiredString(value,"type");
-      var joint=new Joint(requiredString(value,"name"),cast kind,parent,child,requiredString(value,"id"));
-      if (modelVersion >= 2) {
-        joint.parentFramePosition = vector(value, "parentFramePosition", 3);
-        joint.parentFrameRotation = vector(value, "parentFrameRotation", 4);
-        joint.childFramePosition = vector(value, "childFramePosition", 3);
-        joint.childFrameRotation = vector(value, "childFrameRotation", 4);
-        joint.axis = vector(value, "axis", 3);
-      }
-      var limits:Dynamic=Reflect.field(value,"limits");
-      if(limits==null)throw "Sensor joint requires limits";
-      joint.limits=new JointLimits(finite(limits,"lower"),finite(limits,"upper"),
-        finite(limits,"velocity"),finite(limits,"effort"));
-      model.addJoint(joint);
-    }
-    var mobileData:Dynamic = Reflect.field(data, "mobileBase");
-    if (mobileData != null) {
-      var driveData:Dynamic = Reflect.field(mobileData, "drive");
-      if (driveData == null) throw "Mobile-base configuration requires a drive";
-      var drive:RobotDriveConfiguration = switch requiredString(driveData, "kind") {
-        case "differential": RobotDriveConfiguration.Differential(
-          requiredString(driveData, "leftWheelJointId"),
-          requiredString(driveData, "rightWheelJointId"),
-          finite(driveData, "wheelRadius"), finite(driveData, "trackWidth"));
-        case "ackermann": RobotDriveConfiguration.Ackermann(
-          requiredString(driveData, "steeringJointId"),
-          requiredString(driveData, "driveWheelJointId"),
-          finite(driveData, "wheelBase"), finite(driveData, "wheelRadius"),
-          finite(driveData, "maxSteeringAngle"));
-        case "holonomic":
-          var ids:Dynamic = Reflect.field(driveData, "wheelJointIds");
-          if (!Std.isOfType(ids, Array))
-            throw "Holonomic drive requires three wheel joint IDs";
-          var idsArray:Array<Dynamic> = cast ids;
-          if (idsArray.length != 3)
-            throw "Holonomic drive requires three wheel joint IDs";
-          RobotDriveConfiguration.Holonomic(
-            [for (id in idsArray) {
-              if (!Std.isOfType(id, String) || id.length == 0)
-                throw "Holonomic wheel joint ID must be a non-empty string";
-              Std.string(id);
-            }], finite(driveData, "wheelRadius"), finite(driveData, "baseRadius"));
-        default: throw "Unsupported mobile-base drive configuration";
-      };
-      // Documents before version 2 store no joint axes; their wheels always meant a positive rate
-      // rolls forward, which is a turn about the base's +Y.
-      if (modelVersion < 2) switch drive {
-        case Differential(leftId, rightId, _, _):
-          for (joint in model.joints) if (joint.id == leftId || joint.id == rightId) joint.axis = [0.0, 1.0, 0.0];
-        case _:
-      }
-      model.mobileBase = new RobotMobileConfiguration(drive,
-        finite(mobileData, "maxLinearSpeed"), finite(mobileData, "maxAngularSpeed"),
-        finite(mobileData, "maxLinearAcceleration"), finite(mobileData, "maxAngularAcceleration"),
-        optionalFinite(mobileData, "footprintLength"), optionalFinite(mobileData, "footprintWidth"));
-    }
-    var forkData:Dynamic = Reflect.field(data, "forkMechanism");
-    if (forkData != null) {
-      model.forkMechanism = new RobotForkConfiguration(requiredString(forkData, "liftJointId"),
-        finite(forkData, "maxMassKg"), finite(forkData, "maxLoadMomentKgMeters"),
-        finite(forkData, "maxLiftHeightMeters"), optionalString(forkData, "tiltJointId"),
-        optionalString(forkData, "spreadJointId"));
-    }
-    var frames = new Map<String, Frame>();
-    for (value in requiredArray(data, "frames")) {
-      var link = links.get(requiredString(value, "linkId"));
-      if (link == null) throw "Sensor frame references an unknown link";
-      var frame = new Frame(requiredString(value, "name"), link, requiredString(value, "id"));
-      frame.position = vector(value, "position", 3);
-      frame.rotation = vector(value, "rotation", 4);
-      var norm = 0.0; for (item in frame.rotation) norm += item * item;
-      if (Math.abs(norm - 1.0) > 0.000001) throw "Sensor frame rotation must be a unit quaternion";
-      model.addFrame(frame); frames.set(frame.id, frame);
-    }
-    for (value in requiredArray(data, "sensors")) {
-      var id = requiredString(value, "id");
-      var sensor = new Sensor(requiredString(value, "name"), requiredString(value, "kind"),
-        finite(value, "updateRate"), id);
-      var frameId:Dynamic = Reflect.field(value, "frameId");
-      if (frameId != null) {
-        if (!Std.isOfType(frameId, String) || !frames.exists(cast frameId))
-          throw "Sensor references an unknown frame";
-        sensor.frame = frames.get(cast frameId);
-      }
-      sensor.rayCount = requiredInteger(value, "rayCount"); sensor.maxRange = finite(value, "maxRange");
-      sensor.noiseStddev = finite(value, "noiseStddev"); sensor.noiseSeed = requiredInteger(value, "noiseSeed");
-      var startAngle = optionalFinite(value, "startAngleRadians");
-      var fieldOfView = optionalFinite(value, "fieldOfViewRadians");
-      if (startAngle != null) sensor.startAngleRadians = startAngle;
-      if (fieldOfView != null) sensor.fieldOfViewRadians = fieldOfView;
-      model.addSensor(sensor);
-      var slash = id.lastIndexOf("/");
-      var suffix = Std.parseInt(slash < 0 ? id : id.substr(slash + 1));
-      if (suffix != null && suffix >= nextId) nextId = suffix + 1;
-    }
+    if (Reflect.field(data, "schemaVersion") != 1)
+      throw "Unsupported robot authoring schema version";
+    active = new robotkit.model.RobotDefinition(
+      RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(Reflect.field(data, "model")))),
+      robotkit.profile.RobotProfileCodec.fromRecord(Reflect.field(data, "profile")));
+    var pose:Dynamic = Reflect.field(data, "pose");
+    var loadedPosition = vector(pose, "position", 3);
+    var loadedRotation = vector(pose, "rotation", 4);
+    var poseNorm = 0.0;
+    for (value in loadedRotation) poseNorm += value * value;
+    if (Math.abs(poseNorm - 1.0) > 0.000001) throw "Robot pose rotation must be a unit quaternion";
+    positions.set(robotId, loadedPosition); rotations.set(robotId, loadedRotation);
     selectedIndex = model.sensors.length == 0 ? -1 : 0;
     nextId = 1;
     for (sensor in model.sensors) {
@@ -524,7 +339,7 @@ class SensorConfiguration {
       if (suffix != null && suffix >= nextId) nextId=suffix+1;
     }
     if (diagnostics().length > 0) throw diagnostics()[0].message;
-    liveModels.set(robotId,model); selections.set(robotId,selectedIndex);nextIds.set(robotId,nextId);
+    liveModels.set(robotId,active); selections.set(robotId,selectedIndex);nextIds.set(robotId,nextId);
   }
 
   static function requiredArray(value:Dynamic, name:String):Array<Dynamic> {
@@ -532,29 +347,6 @@ class SensorConfiguration {
   }
   static function requiredString(value:Dynamic, name:String):String {
     var field = Reflect.field(value, name); if (!Std.isOfType(field, String) || StringTools.trim(field).length == 0) throw 'Invalid sensor document field $name'; return cast field;
-  }
-  static function optionalString(value:Dynamic, name:String):Null<String> {
-    var field = Reflect.field(value, name);
-    if (field == null) return null;
-    if (!Std.isOfType(field, String) || StringTools.trim(field).length == 0 || SceneCodec.containsNul(cast field))
-      throw 'Invalid sensor document field $name';
-    return cast field;
-  }
-  static function finite(value:Dynamic, name:String):Float {
-    var field = Reflect.field(value, name); if (!Std.isOfType(field, Float) && !Std.isOfType(field, Int)) throw 'Invalid sensor document field $name';
-    var result:Float = cast field; if (!Math.isFinite(result)) throw 'Non-finite sensor document field $name'; return result;
-  }
-  static function requiredInteger(value:Dynamic, name:String):Int {
-    var field = Reflect.field(value, name); if (!Std.isOfType(field, Int)) throw 'Invalid sensor document field $name'; return cast field;
-  }
-  static function optionalFinite(value:Dynamic, name:String):Null<Float> {
-    var field = Reflect.field(value, name);
-    if (field == null) return null;
-    if (!Std.isOfType(field, Float) && !Std.isOfType(field, Int))
-      throw 'Invalid sensor document field $name';
-    var result:Float = cast field;
-    if (!Math.isFinite(result)) throw 'Non-finite sensor document field $name';
-    return result;
   }
   static function vector(value:Dynamic, name:String, count:Int):Array<Float> {
     var items = requiredArray(value, name); if (items.length != count) throw 'Invalid sensor document vector $name';
@@ -584,7 +376,7 @@ class SensorConfiguration {
       "sensor-panel", null, "sensor-editor");
   }
   public function diagnostics():Array<robotkit.runtime.RobotCompileDiagnostic>
-    return RobotRuntimeCompiler.validate(model);
+    return RobotRuntimeCompiler.validate(model, profile);
 
   public function properties():Array<PropertyDescriptor> {
     if (!isEditable()) return [];

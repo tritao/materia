@@ -1,5 +1,6 @@
 package motionkit.trajectory;
 
+import TrajectoryCore;
 import MotionKitNative;
 import haxe.Int64;
 
@@ -20,7 +21,7 @@ class Trajectory {
     if (segments == null || segments.length == 0 || segments[0].coefficients == null)
       throw "Native trajectory needs segments";
     var count = segments[0].coefficients.length;
-    var created = MotionKitNative.mk_trajectory_create(count);
+    var created = TrajectoryCore.mk_trajectory_create(count);
     check(created.status, "trajectory.create");
     var result = new Trajectory(created.out_trajectory);
     try {
@@ -28,7 +29,7 @@ class Trajectory {
         if (segment.coefficients == null || segment.coefficients.length != count)
           throw "Native trajectory joint count changed";
         var degree = segment.coefficients[0].length - 1;
-        if (degree < 0 || degree > MotionKitNativeConstants.MK_MAX_DEGREE)
+        if (degree < 0 || degree > TrajectoryCoreConstants.MK_MAX_DEGREE)
           throw "Native trajectory degree is out of range";
         var value = new mk_segment();
         value.set_struct_size(mk_segment.size());
@@ -44,7 +45,7 @@ class Trajectory {
             coefficients.set_value(index, segment.coefficients[joint][index]);
           value.set_coefficients(joint, coefficients);
         }
-        check(MotionKitNative.mk_trajectory_append_segment(result.owner.borrow(), value),
+        check(TrajectoryCore.mk_trajectory_append_segment(result.owner.borrow(), value),
           "trajectory.appendSegment");
       }
       return result;
@@ -60,7 +61,7 @@ class Trajectory {
         times.length != positions.length || positions[0] == null)
       throw "Native trajectory needs at least two position samples";
     var count = positions[0].length;
-    if (count < 1 || count > MotionKitNativeConstants.MK_MAX_JOINTS)
+    if (count < 1 || count > TrajectoryCoreConstants.MK_MAX_JOINTS)
       throw "Native trajectory exceeds the joint limit";
     var samples:Array<mk_sample> = [];
     var previous = Int64.ofInt(-1);
@@ -88,7 +89,7 @@ class Trajectory {
       previous = time;
     }
     if (samples.length < 2) throw "Native trajectory needs two distinct sample times";
-    var created = MotionKitNative.mk_trajectory_from_samples(count, samples);
+    var created = TrajectoryCore.mk_trajectory_from_samples(count, samples);
     check(created.status, "trajectory.fromSamples");
     return new Trajectory(created.out_trajectory);
   }
@@ -99,7 +100,7 @@ class Trajectory {
       maximumVelocity:Array<Float>, maximumAcceleration:Array<Float>,
       maximumJerk:Array<Float>):Trajectory {
     if (currentPosition == null || currentPosition.length < 1 ||
-        currentPosition.length > MotionKitNativeConstants.MK_MAX_JOINTS)
+        currentPosition.length > TrajectoryCoreConstants.MK_MAX_JOINTS)
       throw "Invalid generated trajectory joint count";
     var count = currentPosition.length;
     for (values in [currentVelocity, currentAcceleration, targetPosition,
@@ -131,13 +132,13 @@ class Trajectory {
   public function segments():Array<{timeFromStartNs:Int64, durationNs:Int64,
       coefficients:Array<Array<Float>>}> {
     ensureLive();
-    var count = MotionKitNative.mk_trajectory_segment_count(owner.borrow());
+    var count = TrajectoryCore.mk_trajectory_segment_count(owner.borrow());
     check(count.status, "trajectory.segmentCount");
     var result = [];
     for (index in 0...count.out_segment_count) {
       var native = new mk_segment();
       native.set_struct_size(mk_segment.size());
-      check(MotionKitNative.mk_trajectory_get_segment(owner.borrow(), index, native),
+      check(TrajectoryCore.mk_trajectory_get_segment(owner.borrow(), index, native),
         "trajectory.segment");
       var coefficients:Array<Array<Float>> = [];
       for (joint in 0...native.get_joint_count()) {
@@ -155,7 +156,7 @@ class Trajectory {
     ensureLive();
     var state = TrajectoryStateBuffer.acquire();
     try {
-      check(MotionKitNative.mk_trajectory_evaluate(owner.borrow(), nanoseconds(timeSeconds), state),
+      check(TrajectoryCore.mk_trajectory_evaluate(owner.borrow(), nanoseconds(timeSeconds), state),
         "trajectory.evaluate");
       var result = TrajectoryStateBuffer.copyOut();
       TrajectoryStateBuffer.release();
@@ -172,7 +173,7 @@ class Trajectory {
     ensureLive();
     var estimate = new mk_path_derivative_estimate();
     estimate.set_struct_size(mk_path_derivative_estimate.size());
-    check(MotionKitNative.mk_trajectory_estimate_path_derivatives(owner.borrow(),
+    check(TrajectoryCore.mk_trajectory_estimate_path_derivatives(owner.borrow(),
       nanoseconds(timeSeconds), nanoseconds(windowSeconds), estimate),
       "trajectory.estimatePathDerivatives");
     return new PathDerivativeEstimate(estimate);
@@ -180,14 +181,14 @@ class Trajectory {
 
   public function durationSeconds():Float {
     ensureLive();
-    var result = MotionKitNative.mk_trajectory_duration_ns(owner.borrow());
+    var result = TrajectoryCore.mk_trajectory_duration_ns(owner.borrow());
     check(result.status, "trajectory.duration");
     return Int64.toFloat(result.out_duration_ns) * 1e-9;
   }
 
   public function jointCount():Int {
     ensureLive();
-    var result = MotionKitNative.mk_trajectory_joint_count(owner.borrow());
+    var result = TrajectoryCore.mk_trajectory_joint_count(owner.borrow());
     check(result.status, "trajectory.jointCount");
     return result.out_joint_count;
   }
@@ -197,7 +198,7 @@ class Trajectory {
     if (limits.jointCount != jointCount()) throw "Validation joint count mismatch";
     var report = new mk_validation_report();
     report.set_struct_size(mk_validation_report.size());
-    check(MotionKitNative.mk_validate(owner.borrow(), limits.nativeValue(), report),
+    check(TrajectoryCore.mk_validate(owner.borrow(), limits.nativeValue(), report),
       "trajectory.validate");
     return new ValidationReport(report);
   }
@@ -226,7 +227,7 @@ class Trajectory {
   }
 
   static function check(status:Int, operation:String):Void {
-    if (status != MotionKitNativeConstants.MK_OK)
+    if (status != TrajectoryCoreConstants.MK_OK)
       throw '$operation failed with MotionKit error $status';
   }
 

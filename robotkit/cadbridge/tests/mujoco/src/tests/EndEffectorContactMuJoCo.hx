@@ -21,16 +21,16 @@ import robotkit.runtime.RobotRuntimeBlueprint;
 import robotkit.runtime.RobotRuntime;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationHarness;
-import robotkit.world.SimulatedRobot;
-import robotkit.world.RobotRecording;
-import robotkit.world.ReplayRobot;
-import robotkit.world.SensorFrame;
+import robotkit.simulation.SimulatedRobot;
+import robotkit.recording.RobotRecording;
+import robotkit.recording.ReplayRobot;
+import robotkit.core.SensorFrame;
 import robotkit.tool.ToolCollisionShape;
 import robotkit.tool.ToolCollisionShapes;
 import robotkit.tool.ToolRuntimeSelection;
 import robotkit.tool.SimulatedVacuum;
-import robotkit.world.FiredProcessEvent;
-import robotkit.world.ProcessEventValue;
+import robotkit.execution.FiredProcessEvent;
+import robotkit.execution.ProcessEventValue;
 
 private class AirSource extends MachineComponent {
   public function new() {

@@ -80,7 +80,6 @@ class NamingRobustnessSmoke {
 		"sketch-made side face | move line" => CORRECT,
 		"sketch-made side face | redraw line" => CORRECT,
 		"sketch-made side face | split line" => REPORTED,
-		"legacy v10 box fillet | load" => CORRECT
 	];
 
 	static var outcomes:Array<NamingOutcome> = [];
@@ -101,7 +100,6 @@ class NamingRobustnessSmoke {
 			connectorCase(edit);
 		for (edit in ["control", "move line", "redraw line", "split line"])
 			sketchCase(edit);
-		legacyCase();
 		report();
 	}
 
@@ -293,18 +291,6 @@ class NamingRobustnessSmoke {
 	}
 
 	// 8. A document saved before names (version 10, fingerprint-only references) loads and resolves.
-	static function legacyCase():Void {
-		var row = 'legacy v10 box fillet | load';
-		var document = DocumentCodec.decode(NamingLegacyFixtures.BOX_FILLET_V10);
-		var fillet:FilletFeature = cast document.featureAt(1);
-		judgeReference(row, document, fillet.edgeReferences[0], s -> lineAt(s, 10, 10, 30, 0, 1, 0));
-		// Resolved by geometry, the reference takes its element's name, and a save writes it (version 11).
-		var name = fillet.edgeReferences[0].fingerprintData().name;
-		var saved = DocumentCodec.encode(document);
-		if (name != "E(f1:box.+x|f1:box.+z)" || saved.indexOf('"name":"E(f1:box.+x|f1:box.+z)"') < 0 || saved.indexOf('"version":11') < 0)
-			throw 'NamingRobustnessSmoke: a legacy reference was not upgraded to its name (got $name)';
-		document.close();
-	}
 
 	/** Recompute after the edit and class what `reference` resolved to. */
 	static function judgeReference(row:String, document:Document, reference:TopologyReference, oracle:Shape->Bool):Void {

@@ -2,7 +2,7 @@ package tests;
 
 import robotkit.manipulation.IkOptions;
 import haxe.Int64;
-import motionkit.robot.ToolpathPlanRunner;
+import processkit.motion.ToolpathPlanRunner;
 import robotkit.model.RobotModel;
 import robotkit.model.Link;
 import robotkit.model.Joint;
@@ -21,20 +21,20 @@ import robotkit.runtime.SimulationHarness;
 import robotkit.skill.Skill;
 import robotkit.skill.SkillRunner;
 import robotkit.skill.SkillStatus;
-import robotkit.skill.DigTrench;
-import robotkit.skill.GradeRegion;
-import robotkit.skill.DumpAt;
-import robotkit.work.HeightMap;
-import robotkit.work.EarthworkRegion;
-import robotkit.work.DigCyclePlanner;
-import robotkit.work.DigCyclePlan;
-import robotkit.work.Point2;
-import robotkit.work.BucketSweep;
-import robotkit.process.Toolpath;
-import robotkit.process.ToolpathPoint;
-import robotkit.world.SimulatedRobot;
-import robotkit.world.RobotCommand;
-import robotkit.world.RobotSnapshot;
+import processkit.skill.DigTrench;
+import processkit.skill.GradeRegion;
+import processkit.skill.DumpAt;
+import processkit.work.HeightMap;
+import processkit.work.EarthworkRegion;
+import processkit.work.DigCyclePlanner;
+import processkit.work.DigCyclePlan;
+import processkit.work.Point2;
+import processkit.work.BucketSweep;
+import processkit.path.Toolpath;
+import processkit.path.ToolpathPoint;
+import robotkit.simulation.SimulatedRobot;
+import robotkit.core.RobotCommand;
+import robotkit.core.RobotSnapshot;
 
 /**
  * M12 acceptance tests for the simulated excavator: the 4-DOF
@@ -66,7 +66,7 @@ class ExcavatorTests {
 
     var simulation = simulationHarness.simulation;
     var robot = new SimulatedRobot("two-pass-toolpath",
-      simulation.addRobot(RobotRuntimeCompiler.compile(fixture.model)),
+      simulation.addRobot(RobotRuntimeCompiler.compile(fixture.model, new robotkit.profile.RobotProfile())),
       fixture.model.name, [for (link in fixture.model.links) link.name],
       [for (joint in fixture.model.joints) joint.name]);
     var seed = [0.0, 0.0, 0.0, 0.0];
@@ -193,7 +193,7 @@ class ExcavatorTests {
 
   static function testDigTrenchScenario():Void {
     var fixture = buildExcavatorFixture();
-    var blueprint = RobotRuntimeCompiler.compile(fixture.model);
+    var blueprint = RobotRuntimeCompiler.compile(fixture.model, new robotkit.profile.RobotProfile());
     var simulationHarness = new SimulationHarness(0.02);
 
     var simulation = simulationHarness.simulation;
@@ -272,7 +272,7 @@ class ExcavatorTests {
 
   static function testGradeRegionScenario():Void {
     var fixture = buildExcavatorFixture();
-    var blueprint = RobotRuntimeCompiler.compile(fixture.model);
+    var blueprint = RobotRuntimeCompiler.compile(fixture.model, new robotkit.profile.RobotProfile());
     var simulationHarness = new SimulationHarness(0.02);
 
     var simulation = simulationHarness.simulation;
@@ -326,7 +326,7 @@ class ExcavatorTests {
 
   static function testDumpAtMovesToTarget():Void {
     var fixture = buildExcavatorFixture();
-    var blueprint = RobotRuntimeCompiler.compile(fixture.model);
+    var blueprint = RobotRuntimeCompiler.compile(fixture.model, new robotkit.profile.RobotProfile());
     var simulationHarness = new SimulationHarness(0.02);
 
     var simulation = simulationHarness.simulation;

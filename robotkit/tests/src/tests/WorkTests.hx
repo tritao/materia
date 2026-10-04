@@ -2,13 +2,13 @@ package tests;
 
 import robotkit.spatial.Transform3;
 import robotkit.spatial.FrameTree3;
-import robotkit.work.Point2;
-import robotkit.work.Polygon2;
-import robotkit.work.WorkSurface;
-import robotkit.work.RasterToolpathGenerator;
-import robotkit.work.CoverageMap;
+import processkit.work.Point2;
+import processkit.work.Polygon2;
+import processkit.work.WorkSurface;
+import processkit.work.RasterToolpathGenerator;
+import processkit.work.CoverageMap;
 import motionkit.event.EventValue;
-import motionkit.robot.ToolpathPosePath;
+import processkit.motion.ToolpathPosePath;
 
 /** M5 acceptance tests for robotkit.work: WorkSurface, RasterToolpathGenerator, CoverageMap. */
 class WorkTests {
@@ -135,7 +135,7 @@ class WorkTests {
 
   // -- helpers -----------------------------------------------------------
 
-  static function sweepProcessMoves(coverage:CoverageMap, toolpath:robotkit.process.Toolpath, radius:Float, stepSize:Float):Void {
+  static function sweepProcessMoves(coverage:CoverageMap, toolpath:processkit.path.Toolpath, radius:Float, stepSize:Float):Void {
     for (i in 0...(toolpath.points.length - 1)) if (toolpath.points[i].processOn) {
       var from = toolpath.points[i].work_T_tcp.translation;
       var to = toolpath.points[i + 1].work_T_tcp.translation;

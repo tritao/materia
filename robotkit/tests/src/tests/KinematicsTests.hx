@@ -8,8 +8,8 @@ import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.Frame;
 import robotkit.model.JointCoupling;
-import robotkit.model.RobotMobileConfiguration;
-import robotkit.model.RobotDriveConfiguration;
+import robotkit.profile.RobotMobileConfiguration;
+import robotkit.profile.RobotDriveConfiguration;
 import kinematicskit.RootMotion;
 import robotkit.spatial.Vec3;
 import robotkit.spatial.Quat;
@@ -23,8 +23,8 @@ import robotkit.manipulation.IKResult;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationHarness;
-import robotkit.world.SimulatedRobot;
-import robotkit.world.RobotCommand;
+import robotkit.simulation.SimulatedRobot;
+import robotkit.core.RobotCommand;
 
 /** M2 acceptance tests for robotkit.manipulation: Manipulator, Jacobian, IK, Manipulator. */
 class KinematicsTests {
@@ -135,7 +135,7 @@ class KinematicsTests {
   static function testToJointTargetsThroughSimulatedRobot():Void {
     var fixture = buildUR5Fixture();
     var manipulator = fixture.arm;
-    var blueprint = RobotRuntimeCompiler.compile(fixture.model);
+    var blueprint = RobotRuntimeCompiler.compile(fixture.model, new robotkit.profile.RobotProfile());
     var simulationHarness = new SimulationHarness(0.02);
 
     var simulation = simulationHarness.simulation;
@@ -253,7 +253,7 @@ class KinematicsTests {
     check(!fixed.converged && fixedBase != null && (cast fixedBase:Transform3).translation.norm() == 0.0,
       "from a fixed base the far target is out of reach and the base stays put");
 
-    fixture.model.mobileBase = new RobotMobileConfiguration(RobotDriveConfiguration.Differential("left", "right", 0.1, 0.5),
+    arm.profile.mobileBase = new RobotMobileConfiguration(RobotDriveConfiguration.Differential("left", "right", 0.1, 0.5),
       1.0, 1.0);
     check(arm.baseMotion() == RootMotion.Planar, "a mobile-base robot moves on the floor");
     var driven = arm.solve(target, seed, new IkOptions(1e-4, 1e-3, 200).movingBase(Transform3.identity()));
@@ -265,7 +265,7 @@ class KinematicsTests {
     check(tool.translation.sub(target.translation).norm() < 1e-4 && tool.rotation.angularDistance(target.rotation) < 1e-3,
       "base pose and joints together put the tool on the target");
 
-    fixture.model.mobileBase = null;
+    arm.profile.mobileBase = null;
     fixture.model.floatingBase = true;
     check(arm.baseMotion() == RootMotion.Floating, "a floating-base robot moves freely");
     var floating = arm.solve(target, seed, new IkOptions(1e-4, 1e-3, 200).movingBase(Transform3.identity()));
@@ -321,7 +321,7 @@ class KinematicsTests {
       joint.axis = axes[i];
       joint.limits.lower = -2.0 * Math.PI;
       joint.limits.upper = 2.0 * Math.PI;
-      joint.limits.velocity = 0.0;
+      joint.limits.velocity = null;
     }
     var flangeOffset = new Vec3(0.0, d6, 0.0);
     var flange = model.addFrame(new Frame("flange", links[6]));

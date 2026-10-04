@@ -47,6 +47,7 @@ import machinekit.component.PortInterface;
 	@:id(4) final effort:Null<Float>;
 	@:id(5) @:optional final overtravel:Null<Float>;
 	@:id(6) @:optional final acceleration:Null<Float>;
+	@:id(7) @:optional final assumptions:Null<ReadOnlyArray<materia.assembly.AssemblyDefinition.QuantityAssumption>>;
 }
 
 @:wire typedef FrozenJoint = {
@@ -74,6 +75,7 @@ import machinekit.component.PortInterface;
 	@:id(8) @:optional final backlash:Null<Float>;
 	@:id(9) @:optional final drag:Null<Float>;
 	@:id(10) @:optional final assumed:Null<ReadOnlyArray<String>>;
+	@:id(11) @:optional final assumptions:Null<ReadOnlyArray<materia.assembly.AssemblyDefinition.QuantityAssumption>>;
 }
 
 @:wire typedef FrozenExposedConnector = {
@@ -89,6 +91,27 @@ import machinekit.component.PortInterface;
 	@:id(4) final joints:ReadOnlyArray<FrozenJoint>;
 	@:id(5) @:optional final couplings:ReadOnlyArray<FrozenCoupling>;
 	@:id(6) @:optional final exposedConnectors:ReadOnlyArray<FrozenExposedConnector>;
+	@:id(10) @:optional final elasticNetworks:ReadOnlyArray<FrozenElasticNetwork>;
+}
+
+@:wire typedef FrozenElasticTerm = {
+	@:id(1) final joint:String;
+	@:id(2) final coefficient:Float;
+}
+@:wire typedef FrozenElasticSpan = {
+	@:id(1) final stiffness:Float;
+	@:id(2) final terms:ReadOnlyArray<FrozenElasticTerm>;
+}
+@:wire typedef FrozenElasticClearance = {
+	@:id(1) final joint:String;
+	@:id(2) final allowance:Float;
+}
+@:wire typedef FrozenElasticNetwork = {
+	@:id(1) final id:String;
+	@:id(2) final couplings:ReadOnlyArray<String>;
+	@:id(3) final spans:ReadOnlyArray<FrozenElasticSpan>;
+	@:id(4) @:optional final assumptions:ReadOnlyArray<materia.assembly.AssemblyDefinition.QuantityAssumption>;
+	@:id(5) @:optional final clearances:ReadOnlyArray<FrozenElasticClearance>;
 }
 
 @:wire typedef FrozenAssemblyDefinition = {
@@ -101,6 +124,7 @@ import machinekit.component.PortInterface;
 	@:id(7) @:optional final couplings:ReadOnlyArray<FrozenCoupling>;
 	@:id(8) @:optional final assemblies:ReadOnlyArray<FrozenAssemblySubdefinition>;
 	@:id(9) @:optional final exposedConnectors:ReadOnlyArray<FrozenExposedConnector>;
+	@:id(13) @:optional final elasticNetworks:ReadOnlyArray<FrozenElasticNetwork>;
 }
 
 /** Serializable recipe inputs. The constructor IDs are part of the wire schema. */
@@ -217,6 +241,10 @@ import machinekit.component.PortInterface;
 	@:id(7) var endEffector:EndEffectorRecord;
 	@:id(8) var ports:ReadOnlyArray<PortRecord>;
 	@:id(9) var included:ReadOnlyArray<IncludedRecord>;
+	@:id(10) @:optional var transmissions:ReadOnlyArray<TransmissionRecord>;
+	@:id(11) @:optional var motors:ReadOnlyArray<MotorRecord>;
+	@:id(12) @:optional var encoders:ReadOnlyArray<EncoderRecord>;
+	@:id(13) @:optional var beltPaths:ReadOnlyArray<BeltPathRecord>;
 }
 
 @:wire typedef BomExtraRecord = {
@@ -243,7 +271,6 @@ import machinekit.component.PortInterface;
 /** Source of a derived coupling; the follower is zero at `leaderZero`. */
 @:wire typedef TransmissionRecord = {
 	@:id(1) var coupling:String;
-	// IDs 2–4 belonged to the v2 string form and are retired.
 	@:id(12) var source:Transmission;
 	@:id(13) var sense:Sense;
 	@:id(5) var leaderZero:Float;
@@ -271,7 +298,6 @@ import machinekit.component.PortInterface;
 	@:id(1) var actuator:String;
 	@:id(2) var joint:String;
 	@:id(3) var motor:String;
-	/** id 4 retired: supply voltage now belongs to the driver. */
 	@:id(8) var driver:String;
 	@:id(5) var margin:Float;
 	/** A gearbox between the motor and the joint (see `Gearbox`); absent for a direct drive. */
@@ -307,8 +333,9 @@ import machinekit.component.PortInterface;
 	@:id(12) @:optional var transmissions:ReadOnlyArray<TransmissionRecord>;
 	@:id(13) @:optional var motors:ReadOnlyArray<MotorRecord>;
 	@:id(14) @:optional var encoders:ReadOnlyArray<EncoderRecord>;
-	@:id(15) @:optional var cylinders:ReadOnlyArray<CylinderRecord>;
-	@:id(16) @:optional var sensors:ReadOnlyArray<materia.assembly.AssemblyDefinition.AssemblySensor>;
+	@:id(15) @:optional var beltPaths:ReadOnlyArray<BeltPathRecord>;
+	@:id(16) @:optional var cylinders:ReadOnlyArray<CylinderRecord>;
+	@:id(17) @:optional var sensors:ReadOnlyArray<materia.assembly.AssemblyDefinition.AssemblySensor>;
 }
 
 /** Mechanical definition plus the MachineKit facts keyed by occurrence ID. */
@@ -324,4 +351,11 @@ import machinekit.component.PortInterface;
 	@:id(2) var joint:String;
 	@:id(3) var cylinder:String;
 	@:id(4) var valve:String;
+}
+
+/** Physical clamp and pulley centres, in belt path order. The clamp span follows its geometry. */
+@:wire typedef BeltPathRecord = {
+	@:id(1) var belt:String;
+	@:id(2) @:optional var clamp:Null<ConnectorReference>;
+	@:id(4) var wraps:ReadOnlyArray<ConnectorReference>;
 }

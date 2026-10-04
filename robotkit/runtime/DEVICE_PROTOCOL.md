@@ -1,4 +1,17 @@
-# RobotKit scheduled device protocol (RKD6)
+# RobotKit scheduled device protocol (generation 6, wire revision 12)
+
+The protocol name is **RKD generation 6, wire revision 12**. The four-byte sync
+marker `RKD6` identifies the scheduled-execution generation, not the wire revision.
+`PROTOCOL_VERSION` identifies the wire revision; peers must agree on its exact value
+(currently 12). A receiver never infers a revision from the marker or accepts an older
+revision. The `6` suffix in `device_wire6`, `device_frame6`, `Rkd6Endpoint`,
+`rkd6_endpoint`, `device_compiler6`, `robotkit_device_compiler6` and the serial C API
+likewise means generation 6. Keep these generation names when incrementing a wire
+revision. A new generation requires a new marker and a new set of identifiers.
+
+This naming scheme is fixed for the first hardware release. No hardware has shipped;
+wire layout changes still require a revision bump and regenerated current fixtures.
+After hardware ships, a wire revision is immutable.
 
 The four-byte sync marker is `RKD6`. A frame is marker (4), message type (1), reserved zero
 (1), little-endian payload length (2), payload, then little-endian CRC-32/IEEE
@@ -173,7 +186,8 @@ Deployment schema v5 implies RKD6 and omits `protocol`. Its `device.controller`
 is the 32-hex-digit unique id of the board; the layout wires channels to the
 model's actuators (see `robotkit.device.DeviceBinding`). The motor's full steps
 and driver microstepping come from the machine model. The layout states direction
-and confirms the driver's microsteps (legacy models may state them only in the layout).
+and uses the driver's microsteps from the model. Layout schema v1 rejects
+driver settings on channels.
 The step tick comes from `device.step_tick_hz`; the binding derives each channel's
 steps per radian, ratio, rate ceiling and direction setup, and refuses a
 stepper without a channel or a channel without a stepper. Pulse frequency is bounded

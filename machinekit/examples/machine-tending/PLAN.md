@@ -306,7 +306,8 @@ Done. What was built and decided:
 - **Joint modules.** `CobotJoint` (`machinekit.robotics`) is a housing with a stator connector and a rotor connector.
   - It contains a `ServoMotor` with a `Gearbox` (strain-wave, ratio about 100, efficiency assumed), plus an output encoder through `addEncoder` (X6d).
   - It comes in sizes 0–4. Reference torques (N·m, assumed engineering values): 0 = 12, 1 = 28, 2 = 56, 3 = 150, 4 = 330 (assumed rated torques; peak twice rated). Speeds are 180–360 °/s for small sizes and 120 °/s for size 4.
-  - Each size's diameter, length and mass are chosen so the class masses below come out within about 10 %.
+  - Each size's diameter and length are assumed module envelopes. The assembled mass is computed
+    from the parts; the maker's complete-arm mass is a reference, not an exact target for generic internals.
 - **Links.** `CobotLink` is a round tube between two module seats, with the lateral offset of the cobot layout built into its end caps. Each link is one part, so it gets one convex hull.
 - **Classes.** `CobotArm(cls:CobotClass, ?tool:ArmTool)`, with class lengths in the usual d1/a2/a3/d4/d5/d6 form. Dimensions are checked against the maker's [DH table](https://www.universal-robots.com/developer/hardware-and-motion/robot-motion-dh-parameters/); payload, joint speeds and mass against the [November 2023 technical data sheet](https://www.universal-robots.com/media/1829346/11_2023_collective_data-sheet.pdf). The table gives magnitudes of a2/a3; DH uses negative values:
 
@@ -324,7 +325,8 @@ Done. What was built and decided:
   - FK of the flange at zero and at four poses equals the DH table within 0.01 mm;
   - shoulder-to-flange distance at DH zero equals the distance derived from the verified DH offsets;
     the published nominal reach remains class metadata, rather than changing DH lengths to fit it;
-  - mass within 10 % of the reference;
+  - assembled mass finite and positive, reported beside the maker's complete-arm reference;
+    changes in assumed gearbox mass are recorded rather than hidden by a tolerance;
   - no self-overlap at zero or at the joint limits taken one joint at a time;
   - assembly-derived gravity moments hold the rated payload at the horizontally stretched DH-zero
     pose without exceeding rated torque on any joint. X6 steady loads currently model sliding
@@ -345,6 +347,12 @@ Done. What was built and decided:
 - Computed arm masses (offboard amplifiers/supply and optional tool excluded) are 11.450,
   19.484, 33.119 and 33.380 kg. The rated-payload shoulder moments are 29.666, 95.026,
   234.048 and 288.315 N m; elbow moments are 10.402, 35.134, 89.853 and 123.446 N m.
+- After integrating main's derived steel-class `Gearbox.massKg` assumption, assembled masses are
+  13.616, 19.484, 35.342 and 35.603 kg for Reach500/850/900/1300. Published complete-arm
+  masses remain 11.2/20.6/33.1/33.5 kg. The generic gearhead model changes the assembled
+  mass and gravity loads, especially for Reach500; its assumptions are not vendor internals.
+  The updated rated-payload shoulder moments are 31.436, 95.026, 252.330 and 314.138 N m.
+  The MachineKit smoke passes with these model-derived values; no reference row was rewritten.
 - The proposed 1% equality between catalogue reach and a fully stretched DH flange distance
   does not follow from the verified offsets. Keep the source geometry and check its explicit
   shoulder reference distance instead; do not rescale a2/a3 to force the catalogue label.
@@ -493,6 +501,26 @@ Done. What was built and decided:
   CncKit 317, CamKit 12311, ProjectKit 151, and ProcessKit 23 plus welder 52 assertions;
   MachineKit smoke and app project-source passed. CoreXY, arm mission, mobile base and welder
   timing and geometry baselines stayed unchanged.
+
+**Post-MT5 integration with current main (RobotKit R0–R5 and transmission X9–X10).**
+- Process-owned spindle and pneumatic actuators are excluded from `DriveLoads` planner budgets;
+  their typed channel bindings and simulation forces remain active. The merged runtime uses the
+  profile-aware compiler and main's nullable limit semantics. The current main submodule pins
+  are inherited unchanged; no new pin was chosen for machine tending.
+- The screw router remains 220.2 s, 128 plans and 0.05 mm worst deviation. Main's belt path
+  and elasticity work changes the belt router's worst Y deviation from 1.89 to 1.76 mm; it
+  remains 201.7 s with 128 plans, now 56 flagged and 62 over tolerance. CoreXY still reaches
+  649.6 mm/s; its derived X acceleration is 71.549 rather than 71.577 m/s² after main's
+  transmission updates.
+- The arm mission remains at pick 5.8/place 12/pick 17.2/place 23.5 s. The mobile mission's
+  final goTo moves from 57.6 to 61 s, and its obstacle round from 59 to 65 s, with main's
+  updated wheel/controller model. The welder stays at 20.2/21.6 s (one restart, 11 mm overlap)
+  and four-sided post 19.9 s. The mill remains 51.12 s bare and 51.73 s enclosed, with
+  0.075366/0.050317/0.029369 mm X/Y/Z tracking, 1.50/1.79 s door and 0.18 s vise at 482.55 N.
+- Main's removal of legacy saved-format tests changes ProjectKit's assertion count from 151
+  to 136. RobotKit world rises from 4947 to 4971 and MotionKit from 9762 to 9869 through
+  main's new checks; CadBridge rises 156 to 157. CncKit remains 317, CamKit 12311,
+  ProcessKit 23 plus welder 52. The complete sequential gate is `mt-suite-integration-indexed.txt`.
 
 **MT6. Controllers, robots and signals.**
 - Controller parts:

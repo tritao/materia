@@ -406,6 +406,7 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		axis_a: array<f64, 3> @offset(64);
 		lower_limit: f64 @offset(88);
 		upper_limit: f64 @offset(96);
+		/** 0 unspecified; negative explicitly unpowered; positive force ceiling. */
 		max_force: f64 @offset(104);
 		/**
 		 * Joint-frame orientation relative to body_a/body_b (x, y, z, w),
@@ -438,6 +439,7 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		joint: nksim_joint @offset(4);
 		mode: u32 @offset(8);
 		target: f64 @offset(16);
+		/** 0 inherits joint ceiling; negative disables force; positive overrides it. */
 		max_force: f64 @offset(24);
 		velocity: f64 @offset(32);
 		stiffness: f64 @offset(40);

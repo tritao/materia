@@ -644,7 +644,10 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 ? blueprint.joint_overtravel[index] : 0.0;
             desc.lower_limit = source.lower_limit - overtravel;
             desc.upper_limit = source.upper_limit + overtravel;
-            desc.max_force = source.max_effort;
+            // SimKit uses zero for an unspecified force ceiling. A negative
+            // sentinel preserves an explicit zero-effort RobotKit limit.
+            desc.max_force = (source.limit_flags & RK_LIMIT_EFFORT) && source.max_effort == 0.0
+                ? -1.0 : source.max_effort;
             if (blueprint.struct_size >= offsetof(rk_robot_runtime_blueprint, joint_dynamics) +
                     sizeof(blueprint.joint_dynamics)) {
                 const auto &dynamics = blueprint.joint_dynamics[index];

@@ -11,15 +11,14 @@ base layer.
 `materia.project.SceneArtifact` is the shared writer and reader for generated
 viewport geometry. A project generator writes the artifact to a file; Materia
 loads and validates that file after the generator exits. The current `MTRG`
-version 10 contains a metres-per-coordinate scale and independent mesh parts.
+version 15 contains a metres-per-coordinate scale and independent mesh parts.
 Each part has a stable ID, display name, color, vertex and normal streams,
 triangle indices, CAD face ranges, and persistent edge identities. It can also
-carry legacy rigid instance poses, named connector frames, and fixed, revolute,
+carry rigid instance poses, named connector frames, and fixed, revolute,
 continuous, or prismatic joints. Readers reject unsupported versions, duplicate
-IDs, invalid units, malformed buffers, and out-of-range indices. Versions 2–9
-remain readable. Version 10 can also carry a versioned assembly definition
-and a separate kinematic state while retaining the legacy pose record for older
-scene consumers.
+IDs, invalid units, malformed buffers, and out-of-range indices. Earlier
+versions are rejected. Version 15 can also carry a versioned assembly definition
+and a separate kinematic state alongside the pose record.
 
 The artifact is derived output. The project's source code and manifest remain
 authoritative. CadKit authors CAD occurrences and mates; ProjectKit stores their
@@ -36,7 +35,7 @@ joints, explicit unit axes, optional limits, and a `tree` or `closure` role.
 `AssemblyDefinitionCodec` validates and encodes this schema independently from
 the binary scene artifact version. `AssemblyStateRecord` stores joint
 coordinates and root placements separately from the definition. Scene artifact
-version 10 can carry both payloads; geometry part IDs identify component
+version 15 can carry both payloads; geometry part IDs identify component
 definitions so repeated occurrences can share one geometry payload.
 
 Schema version 2 adds a reusable `assemblies` table. An occurrence selects a

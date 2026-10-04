@@ -36,6 +36,8 @@ class Tabs implements View {
 	public var onTabDragMove:Null<String->UiEvent->Void>;
 	public var onTabDragEnd:Null<String->UiEvent->Void>;
 	public var onTabDragCancel:Null<String->UiEvent->Void>;
+	/** Requests a menu for an enabled tab without changing the selected page. */
+	public var onTabContextMenu:Null<String->UiEvent->Void>;
 	/** Called after each header is built so dock hosts can register geometry. */
 	public var onTabHeaderBuilt:Null<String->RenderNode->Void>;
 
@@ -59,6 +61,7 @@ class Tabs implements View {
 		this.onTabDragEnd = onTabDragEnd;
 		this.onTabDragCancel = onTabDragCancel;
 		this.onTabHeaderBuilt = onTabHeaderBuilt;
+		this.onTabContextMenu = null;
 		var keys:Map<String, Bool> = new Map();
 		for (item in this.items) {
 			if (item == null || keys.exists(item.key))
@@ -71,9 +74,11 @@ class Tabs implements View {
 	public static function withOptions(key:String, items:Array<TabItem>, selectedKey:String,
 			onChange:Null<String->Void>, options:TabsOptions):Tabs {
 		var configured = options == null ? new TabsOptions() : options;
-		return new Tabs(key, items, selectedKey, onChange, configured.style,
+		var tabs = new Tabs(key, items, selectedKey, onChange, configured.style,
 			configured.onTabDragStart, configured.onTabDragMove, configured.onTabDragEnd,
 			configured.onTabDragCancel, configured.selectionMode, configured.onTabHeaderBuilt);
+		tabs.onTabContextMenu = configured.onTabContextMenu;
+		return tabs;
 	}
 
 	public function build(context:BuildContext):RenderNode {
@@ -153,6 +158,22 @@ class Tabs implements View {
 				if (onTabHeaderBuilt != null)
 					onTabHeaderBuilt(item.key, buttonNode);
 				installTabDragHandlers(buttonNode, item.key, tabDragState);
+				if (item.enabled && onTabContextMenu != null) {
+					var requestMenu = function(event:UiEvent) {
+						var handler = onTabContextMenu;
+						if (handler == null) return;
+						handler(item.key, event);
+						event.preventDefault();
+						event.stopPropagation();
+					};
+					buttonNode.on(UiEventKind.PointerDown, function(event) {
+						if (event.button == 1) requestMenu(event);
+					});
+					buttonNode.on(UiEventKind.KeyDown, function(event) {
+						if (UiKey.isContextMenuRequest(event.key, event.modifiers))
+							requestMenu(event);
+					});
+				}
 			}
 			for (index in 0...buttonNodes.length) {
 				var tabIndex = index;

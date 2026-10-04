@@ -54,17 +54,9 @@ if(MATERIA_ENABLE_MUJOCO)
     add_subdirectory("${MATERIA_SOURCE_ROOT}/simkit/sim_mujoco" sim_mujoco)
 endif()
 add_subdirectory("${MATERIA_SOURCE_ROOT}/robotkit" robotkit)
+add_subdirectory("${MATERIA_SOURCE_ROOT}/motionkit/native" motionkit)
 
-# CadKit owns millimetre-based parametric geometry. Keep its pinned OCCT
-# toolkits shared, matching OCCT's supported LGPL distribution model.
-set(CADKIT_BUILD_TESTS OFF CACHE BOOL "Disable CadKit dependency tests" FORCE)
-set(CADKIT_BUILD_OCCT ON CACHE BOOL "Build CadKit's pinned OCCT" FORCE)
-set(CADKIT_BUILD_SHARED ON CACHE BOOL "Build the CadKit application library" FORCE)
-set(BUILD_LIBRARY_TYPE Shared CACHE STRING "Build OCCT as shared libraries" FORCE)
-add_subdirectory("${MATERIA_SOURCE_ROOT}/cadkit" cadkit)
-if(UNIX AND NOT APPLE)
-    target_link_options(cadkit-core PRIVATE "LINKER:-z,defs")
-endif()
+# CadKit is built by its own package (cadkit/haxeon.json), not by this aggregate.
 
 # AnimKit imports glTF characters and poses them with ozz-animation.
 set(AK_BUILD_SHARED ON CACHE BOOL "Build AnimKit as a shared library" FORCE)
@@ -77,7 +69,7 @@ set(BUILD_TESTING ${MATERIA_OWN_BUILD_TESTING})
 set(SK_BUILD_SHARED ON CACHE BOOL "Build StockKit core as a shared library" FORCE)
 
 set(MATERIA_RUNTIME_TARGETS nativekit nativekit_gpu nativekit_ui nativekit_scene
-    nativekit_scene_render nativekit_sim_core motionkit_core robotkit_runtime cadkit-core
+    nativekit_scene_render nativekit_sim_core trajectory_core motionkit_core robotkit_runtime
     animkit_core)
 if(MATERIA_ENABLE_MUJOCO)
     list(APPEND MATERIA_RUNTIME_TARGETS nativekit_sim_mujoco)

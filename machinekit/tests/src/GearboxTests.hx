@@ -29,6 +29,11 @@ class GearboxTests {
 		return machine;
 	}
 	public static function run():Void {
+		var standard = new Gearbox(10, 0.9, 60, 40, 8, true);
+		var compact = new Gearbox(10, 0.9, 30, 20, 8, true);
+		check(Math.abs(standard.inputInertia - 0.000005) < 1e-12 &&
+			Math.abs(compact.inputInertia - 0.000000625) < 1e-12 && compact.massKg < standard.massKg,
+			"Assumed gearbox inertia and mass follow its authored size");
 		var machine = fixture("gearbox");
 		var before = definition(machine);
 		check(before.actuators != null && before.encoders != null, "A geared servo compiles its actuator and intrinsic sensor");

@@ -859,11 +859,9 @@ Profiled 20 drag steps (width +0.01 each, seeded) at 1000 points:
 7. **Edge fingerprints are anchored at the midpoint** (document version 10).
    - A first-vertex anchor depends on the edge's orientation and, for a
      closed edge, on where its seam vertex lies.
-   - Fingerprint records carry `anchor`; edge records from older documents
-     (no anchor) keep matching by their first vertex.
-   - MachineKit's recovery of pre-v9 defaults compared against
-     `DocumentCodec.VERSION`, so any version bump would have misfired. It
-     now compares against a pinned constant, 9.
+   - Fingerprint records carry `anchor`. The older first-vertex reader and
+     MachineKit's pre-v9 default recovery were removed by X9b when document
+     versions 1–10 stopped loading. This historical design note predates X9b.
 
 ### C4.5 — Editor: mates (2026-10-01, in progress)
 

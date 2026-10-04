@@ -29,33 +29,32 @@ import robotkit.model.Link;
 import robotkit.model.RobotModel;
 import robotkit.model.Frame;
 import robotkit.model.Sensor;
-import robotkit.model.RobotDriveConfiguration;
-import robotkit.model.RobotMobileConfiguration;
-import robotkit.model.RobotForkConfiguration;
+import robotkit.profile.RobotDriveConfiguration;
+import robotkit.profile.RobotMobileConfiguration;
+import robotkit.profile.RobotForkConfiguration;
 import robotkit.model.RobotModelCodec;
 import robotkit.model.CollisionShape;
 import robotkit.device.DeviceChannel;
 import robotkit.device.DeviceLayout;
-import robotkit.world.RobotCapabilities;
-import robotkit.world.RobotCommand;
-import robotkit.world.TrajectoryChunk;
-import robotkit.world.TrajectorySegment;
-import robotkit.world.RobotDescription;
-import robotkit.world.RobotFault;
-import robotkit.world.RobotId;
-import robotkit.world.Robot;
-import robotkit.world.RobotSnapshot;
-import robotkit.world.RobotStatus;
-import robotkit.world.RemoteRobot;
-import robotkit.world.SerialRobot;
+import robotkit.core.RobotCapabilities;
+import robotkit.core.RobotCommand;
+import robotkit.execution.TrajectorySegment;
+import robotkit.core.RobotDescription;
+import robotkit.core.RobotFault;
+import robotkit.core.RobotId;
+import robotkit.core.Robot;
+import robotkit.core.RobotSnapshot;
+import robotkit.core.RobotStatus;
+import robotkit.remote.RemoteRobot;
+import robotkit.serial.SerialRobot;
 import robotkit.deployment.SerialDeployment;
-import robotkit.world.SimulatedRobot;
-import robotkit.world.RecordingRobot;
-import robotkit.world.StopMode;
+import robotkit.simulation.SimulatedRobot;
+import robotkit.recording.RecordingRobot;
+import robotkit.core.StopMode;
 import robotkit.world.RobotWorld;
 import robotkit.world.RobotWorldEvent;
-import robotkit.world.SensorFrame;
-import robotkit.world.CameraImage;
+import robotkit.core.SensorFrame;
+import robotkit.streams.CameraImage;
 import robotkit.protocol.BufferRef;
 import robotkit.protocol.CameraFrame;
 import robotkit.protocol.PixelFormat;
@@ -63,20 +62,20 @@ import robotkit.protocol.RobotFrame;
 import robotkit.protocol.RobotMessageType;
 import robotkit.protocol.RobotProtocol;
 import haxeon.wire.MessagePack;
-import robotkit.world.ReplayRobot;
-import robotkit.world.RobotRecording;
-import robotkit.world.RobotRecordingEvent;
-import robotkit.world.McapRobotRecording;
-import robotkit.world.McapRecordingReader;
-import robotkit.world.McapRecordingStatus;
-import robotkit.world.RecordingChannels;
-import robotkit.world.RobotRecordingEntry;
-import robotkit.world.FiredProcessEvent;
-import robotkit.world.ProcessEventValue;
-import robotkit.world.ProcessChannelDeclaration;
-import robotkit.world.ProcessTimedEvent;
-import robotkit.world.ExecutionPlanSubmission;
-import robotkit.world.ProcessHoldPolicy;
+import robotkit.recording.ReplayRobot;
+import robotkit.recording.RobotRecording;
+import robotkit.recording.RobotRecordingEvent;
+import robotkit.recording.McapRobotRecording;
+import robotkit.recording.McapRecordingReader;
+import robotkit.recording.McapRecordingStatus;
+import robotkit.recording.RecordingChannels;
+import robotkit.recording.RobotRecordingEntry;
+import robotkit.execution.FiredProcessEvent;
+import robotkit.execution.ProcessEventValue;
+import robotkit.execution.ProcessChannelDeclaration;
+import robotkit.execution.ProcessTimedEvent;
+import robotkit.execution.ExecutionPlanSubmission;
+import robotkit.execution.ProcessHoldPolicy;
 import robotkit.tool.ChannelToolAdapter;
 import robotkit.tool.SimulatedSprayer;
 import robotkit.deployment.SerialDeployment;
@@ -170,13 +169,45 @@ import robotkit.skill.SkillRunner;
 class RobotWorldTests {
   static var assertions = 0;
 
+  /** Rewrite authored current models/layouts through their codecs; unsupported versions stay rejection fixtures. */
+  static function regenerateFixtures(directory:String):Void {
+    for (name in sys.FileSystem.readDirectory(directory)) {
+      var path = directory + "/" + name;
+      if (sys.FileSystem.isDirectory(path)) regenerateFixtures(path);
+      else if (StringTools.endsWith(name, ".json")) {
+        var value:Dynamic = haxe.Json.parse(sys.io.File.getContent(path));
+        if (Reflect.field(value, "schemaVersion") == RobotModel.CURRENT_VERSION && Reflect.hasField(value, "links")) {
+          var model = RobotModelCodec.decode(sys.io.File.getBytes(path));
+          sys.io.File.saveBytes(path, RobotModelCodec.encode(model));
+        } else if (Reflect.field(value, "schemaVersion") == 6 && Reflect.hasField(value, "device")) {
+          var profile = robotkit.profile.RobotProfileCodec.fromRecord(Reflect.field(value, "profile"));
+          Reflect.setField(value, "profile", robotkit.profile.RobotProfileCodec.toRecord(profile));
+          sys.io.File.saveContent(path, haxe.Json.stringify(value));
+        } else if (Reflect.field(value, "schemaVersion") == DeviceLayout.VERSION && Reflect.hasField(value, "channels") && !Reflect.hasField(value, "device") && !Reflect.hasField(value, "model")) {
+          var layout = DeviceLayout.decode(sys.io.File.getBytes(path));
+          sys.io.File.saveBytes(path, DeviceLayout.encode(layout));
+        }
+      }
+    }
+  }
+
+
   public static function main():Void {
+    if (Sys.getEnv("ROBOTKIT_REGENERATE_FIXTURES") == "1") {
+      var root = Sys.getCwd();
+      if (!sys.FileSystem.exists(root + "/robotkit/tests/fixtures")) root += "/../..";
+      regenerateFixtures(root + "/robotkit/tests/fixtures");
+      regenerateFixtures(root + "/robotkit/deployment/bench-nucleo-g474re");
+      Sys.println("Current RobotKit fixtures regenerated");
+      return;
+    }
     // ROBOTKIT_ONLY=construction runs just the construction skills (they plan arm motions through MotionKit).
     if (Sys.getEnv("ROBOTKIT_ONLY") == "construction") {
       Sys.println('RobotKit construction skills passed (${ConstructionSkillTests.run()} assertions)');
       return;
     }
-    testPolynomialTrajectoryChunk();
+    assertions += RuntimeEndpointTests.run();
+    testPolynomialExecutionPlan();
     testAttachDetachAndIdentity();
     testSequenceAndTopology();
     testCrossThreadEventQueue();
@@ -265,22 +296,36 @@ class RobotWorldTests {
       entry.recordingTimestampNs);
   }
 
-  static function testPolynomialTrajectoryChunk():Void {
+  static function testPolynomialExecutionPlan():Void {
     var segment = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(100000000),
       [[0.0, 1.0], [0.0, -1.0]]);
-    var chunk = TrajectoryChunk.fromSegments([segment], Int64.ofInt(7));
-    check(chunk.segments.length == 1,
-      "polynomial chunk uses segment payload");
-    check(chunk.copy().segments[0].coefficients[1][1] == -1.0,
-      "polynomial chunk copy keeps coefficients");
+    var plan = new robotkit.execution.ExecutionPlanSubmission(Int64.ofInt(7),
+      Int64.ofInt(1), Int64.ofInt(1), 0, [0.0, 0.0], [0.0, 0.0],
+      [0.0, 0.0], [segment], null, null, null, null, null, false);
+    check(plan.segments.length == 1, "execution plan uses polynomial payload");
+    check(plan.copy().segments[0].coefficients[1][1] == -1.0,
+      "execution plan copy keeps coefficients");
+    var gapRejected = false;
+    try new robotkit.execution.ExecutionPlanSubmission(Int64.ofInt(8), Int64.ofInt(1),
+      Int64.ofInt(1), 0, [0.0, 0.0], [0.0, 0.0], [0.0, 0.0],
+      [segment, new TrajectorySegment(Int64.ofInt(100000001), Int64.ofInt(100000000),
+        [[0.1, 1.0], [-0.1, -1.0]])]) catch (_:Dynamic) gapRejected = true;
+    check(gapRejected, "execution plan rejects a one-nanosecond segment gap");
+    var eventRejected = false;
+    try new robotkit.execution.ExecutionPlanSubmission(Int64.ofInt(8), Int64.ofInt(1),
+      Int64.ofInt(1), 0, [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [segment],
+      null, null, null, null, null, false,
+      [new ProcessTimedEvent(Int64.ofInt(100000001), "test", ProcessEventValue.Digital(true))])
+      catch (_:Dynamic) eventRejected = true;
+    check(eventRejected, "execution plan rejects an event beyond its payload duration");
     var recording = new RobotRecording();
-    recording.recordCommand(RobotCommand.TrajectoryChunk(chunk));
+    recording.recordCommand(RobotCommand.ExecutionPlan(plan));
     var replayed = roundTripRecording(recording.entries[0]);
     switch replayed.event {
-      case Command(TrajectoryChunk(value)):
-        check(value.segments.length == 1 && value.segments[0].degree == 1,
-          "polynomial chunk survives recording round trip");
-      case _: throw "Expected recorded polynomial chunk";
+      case Command(ExecutionPlan(value)):
+        check(value.planId == Int64.ofInt(7) && value.segments[0].degree == 1,
+          "polynomial plan survives recording round trip");
+      case _: throw "Expected recorded polynomial plan";
     }
   }
 
@@ -327,7 +372,7 @@ class RobotWorldTests {
   static function testReplayCorrectness():Void {
     var recording = new RobotRecording();
     recording.recordCommand(RobotCommand.JointTargets([
-      robotkit.world.JointTarget.position(0, 99.0)
+      robotkit.core.JointTarget.position(0, 99.0)
     ], null), "robot-a");
     recording.recordSnapshot(new RobotSnapshot("robot-a", Int64.ofInt(7), Int64.ofInt(100),
       [1.0], [], [], 1, 0, Int64.ofInt(200), [], "robot-a.boot-1", "host"));
@@ -370,22 +415,22 @@ class RobotWorldTests {
 
   static function testJointTargetBatches():Void {
     var source = [
-      robotkit.world.JointTarget.position(0, 0.4),
-      robotkit.world.JointTarget.velocity(1, -0.25),
-      robotkit.world.JointTarget.effort(2, 3.5)
+      robotkit.core.JointTarget.position(0, 0.4),
+      robotkit.core.JointTarget.velocity(1, -0.25),
+      robotkit.core.JointTarget.effort(2, 3.5)
     ];
     var recording = new RobotRecording();
     recording.recordCommand(RobotCommand.JointTargets(source, null), "batch-robot");
-    source[0] = robotkit.world.JointTarget.position(0, 9.0);
+    source[0] = robotkit.core.JointTarget.position(0, 9.0);
     source.pop();
     var recorded = recording.commands[0];
     switch recorded {
       case JointTargets(targets, _):
         equal(targets.length, 3, "recording owns the full command batch");
         equal(targets[0].target, 0.4, "recording copies immutable target values");
-        equal(Std.string(targets[1].mode), Std.string(robotkit.world.JointTargetMode.Velocity),
+        equal(Std.string(targets[1].mode), Std.string(robotkit.core.JointTargetMode.Velocity),
           "recording preserves velocity interpretation");
-        equal(Std.string(targets[2].mode), Std.string(robotkit.world.JointTargetMode.Effort),
+        equal(Std.string(targets[2].mode), Std.string(robotkit.core.JointTargetMode.Effort),
           "recording preserves effort interpretation");
       case _:
         check(false, "recording retains a joint target batch");
@@ -395,7 +440,7 @@ class RobotWorldTests {
     switch decoded.event {
       case Command(JointTargets(targets, _)):
         equal(targets.length, 3, "recording codec round-trips every target in a batch");
-        equal(Std.string(targets[0].mode), Std.string(robotkit.world.JointTargetMode.Position),
+        equal(Std.string(targets[0].mode), Std.string(robotkit.core.JointTargetMode.Position),
           "recording codec preserves position mode");
         equal(targets[1].target, -0.25, "recording codec preserves velocity values");
         equal(targets[2].target, 3.5, "recording codec preserves effort values");
@@ -405,21 +450,21 @@ class RobotWorldTests {
 
     var replay = new ReplayRobot("batch-robot", recording);
     replay.submit(RobotCommand.JointTargets([
-      robotkit.world.JointTarget.position(0, -0.1),
-      robotkit.world.JointTarget.velocity(1, 0.5)
+      robotkit.core.JointTarget.position(0, -0.1),
+      robotkit.core.JointTarget.velocity(1, 0.5)
     ], null));
     switch replay.generatedCommands.commands[0] {
       case JointTargets(targets, _):
         equal(targets.length, 2, "replay captures generated commands as one batch");
-        equal(Std.string(targets[1].mode), Std.string(robotkit.world.JointTargetMode.Velocity),
+        equal(Std.string(targets[1].mode), Std.string(robotkit.core.JointTargetMode.Velocity),
           "replay preserves generated target modes");
       case _:
         check(false, "replay generated command keeps batch form");
     }
     replay.close();
-    throws(function() robotkit.world.JointTarget.copyBatch([
-      robotkit.world.JointTarget.position(0, 0.0),
-      robotkit.world.JointTarget.effort(0, 1.0)
+    throws(function() robotkit.core.JointTarget.copyBatch([
+      robotkit.core.JointTarget.position(0, 0.0),
+      robotkit.core.JointTarget.effort(0, 1.0)
     ]), "duplicate joints rejected within one atomic batch");
   }
 
@@ -466,8 +511,8 @@ class RobotWorldTests {
     check(switch differentialRobot.lastCommand {
       case JointTargets(targets, _):
         targets.length == 2 && targets[0].joint == 0 && targets[1].joint == 1 &&
-          targets[0].mode == robotkit.world.JointTargetMode.Velocity &&
-          targets[1].mode == robotkit.world.JointTargetMode.Velocity &&
+          targets[0].mode == robotkit.core.JointTargetMode.Velocity &&
+          targets[1].mode == robotkit.core.JointTargetMode.Velocity &&
           Math.abs(targets[0].target - 1.0) < 1e-9 &&
           Math.abs(targets[1].target - 4.0) < 1e-9;
       case _: false;
@@ -514,8 +559,8 @@ class RobotWorldTests {
       "Ackermann drive limits yaw rate to the configured steering angle");
     check(switch ackermannRobot.lastCommand {
       case JointTargets(targets, _):
-        targets.length == 2 && targets[0].mode == robotkit.world.JointTargetMode.Position &&
-          targets[1].mode == robotkit.world.JointTargetMode.Velocity &&
+        targets.length == 2 && targets[0].mode == robotkit.core.JointTargetMode.Position &&
+          targets[1].mode == robotkit.core.JointTargetMode.Velocity &&
           Math.abs(targets[0].target) <= 0.5 && targets[1].target > 0.0;
       case _: false;
     }, "Ackermann drive submits steering position and wheel velocity together");
@@ -541,9 +586,9 @@ class RobotWorldTests {
     check(switch holonomicRobot.lastCommand {
       case JointTargets(targets, _):
         targets.length == 3 && targets[0].joint == 0 && targets[1].joint == 1 && targets[2].joint == 2 &&
-          targets[0].mode == robotkit.world.JointTargetMode.Velocity &&
-          targets[1].mode == robotkit.world.JointTargetMode.Velocity &&
-          targets[2].mode == robotkit.world.JointTargetMode.Velocity;
+          targets[0].mode == robotkit.core.JointTargetMode.Velocity &&
+          targets[1].mode == robotkit.core.JointTargetMode.Velocity &&
+          targets[2].mode == robotkit.core.JointTargetMode.Velocity;
       case _: false;
     }, "holonomic drive submits all three wheel velocities as one atomic command");
     var straightTargets = new robotkit.mobile.HolonomicDrive([0, 1, 2], 0.05, 0.3).targets(new Twist2(1.0, 0.0));
@@ -638,6 +683,7 @@ class RobotWorldTests {
   }
 
   static function testModelDrivenConfiguration():Void {
+    var profile = new robotkit.profile.RobotProfile();
     var model = new RobotModel("authored-forklift");
     var base = model.addLink(new Link("base", "link/base"));
     var left = model.addLink(new Link("left wheel", "link/left-wheel"));
@@ -656,13 +702,13 @@ class RobotWorldTests {
     addJoint("joint/lift", "mast lift", JointType.Prismatic, mast, 0.0, 2.0);
     addJoint("joint/tilt", "fork tilt", JointType.Revolute, tilt, -0.5, 0.7);
     addJoint("joint/spread", "fork spread", JointType.Prismatic, spread, 0.0, 0.8);
-    model.mobileBase = new RobotMobileConfiguration(
+    profile.mobileBase = new RobotMobileConfiguration(
       RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel", 0.1, 0.5),
       1.2, 1.5, 0.8, 1.0, 2.2, 1.1);
-    model.forkMechanism = new RobotForkConfiguration("joint/lift",
+    profile.forkMechanism = new RobotForkConfiguration("joint/lift",
       1000.0, 600.0, 1.8, "joint/tilt", "joint/spread");
 
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    var blueprint = RobotRuntimeCompiler.compile(model, profile);
     var runtimeConfiguration:Null<RobotRuntimeConfiguration> = blueprint.configuration;
     check(runtimeConfiguration != null,
       "runtime compilation preserves authored mobile and fork roles");
@@ -693,7 +739,7 @@ class RobotWorldTests {
     robot.positions = [0.0, 0.0, 0.25, 0.1, 0.3];
     robot.velocities = [0.0, 0.0, 0.0, -0.02, 0.0];
     robot.efforts = [0.0, 0.0, 2.0, 0.5, 0.25];
-    var mobile = MobileBase.fromRobot(robot, model);
+    var mobile = MobileBase.fromRobot(robot, model, profile);
     var footprint:Footprint = cast mobile.footprint;
     check(mobile.footprint != null && Math.abs(footprint.radius - 1.23) < 0.01,
       "MobileBase factory applies the model-authored footprint");
@@ -705,8 +751,18 @@ class RobotWorldTests {
         Math.abs(targets[1].target - 4.0) < 1e-9;
       case _: false;
     }, "MobileBase factory commands the joints selected by authored roles");
+    check(mobile.velocityEnvelope != null, "wheel rates supply a coupled velocity envelope");
+    var previousTwist = mobile.currentCommand();
+    var turning = mobile.command(new Twist2(1.0, 2.0), 0.01);
+    check(Math.abs(turning.linear - previousTwist.linear) <= mobile.motionLimits.maxLinearAcceleration * 0.01 + 1e-9 &&
+      Math.abs(turning.angular - previousTwist.angular) <= mobile.motionLimits.maxAngularAcceleration * 0.01 + 1e-9,
+      "coupled wheel-speed limiting must not jump past the acceleration limit in one tick");
+    var wheelEnvelope = mobile.velocityEnvelope;
+    if (wheelEnvelope == null) throw "Mobile base lost its wheel envelope";
+    check(Math.abs(turning.linear) + Math.abs(turning.angular) * wheelEnvelope.trackWidth / 2 <= wheelEnvelope.groundSpeed + 1e-9,
+      "the acceleration-limited command remains inside the wheel-speed envelope");
 
-    var forks = Forks.fromRobot(robot, model);
+    var forks = Forks.fromRobot(robot, model, profile);
     var blueprintForks = Forks.fromBlueprint(robot, blueprint);
     check(forks.config.lift.jointName == blueprintForks.config.lift.jointName,
       "Forks can be constructed from either the model or its compiled blueprint");
@@ -723,21 +779,21 @@ class RobotWorldTests {
       case _: false;
     }, "Forks factory commands the authored lift joint without manual names or indices");
 
-    var savedForkConfig = model.forkMechanism;
-    model.forkMechanism = null;
-    model.mobileBase = new RobotMobileConfiguration(
+    var savedForkConfig = profile.forkMechanism;
+    profile.forkMechanism = null;
+    profile.mobileBase = new RobotMobileConfiguration(
       RobotDriveConfiguration.Ackermann("joint/tilt", "joint/left-wheel",
         1.2, 0.1, 0.5), 1.2, 1.5);
-    var ackermannBlueprint = RobotRuntimeCompiler.compile(model);
+    var ackermannBlueprint = RobotRuntimeCompiler.compile(model, profile);
     var ackermann = MobileBase.fromBlueprint(robot, ackermannBlueprint);
     ackermann.command(new Twist2(0.5, 0.2));
     check(switch robot.lastCommand {
       case JointTargets(targets, _): targets.length == 2 &&
-        targets[0].joint == 3 && targets[0].mode == robotkit.world.JointTargetMode.Position &&
-        targets[1].joint == 0 && targets[1].mode == robotkit.world.JointTargetMode.Velocity;
+        targets[0].joint == 3 && targets[0].mode == robotkit.core.JointTargetMode.Position &&
+        targets[1].joint == 0 && targets[1].mode == robotkit.core.JointTargetMode.Velocity;
       case _: false;
     }, "model-driven Ackermann roles preserve the steering and wheel target modes");
-    model.forkMechanism = savedForkConfig;
+    profile.forkMechanism = savedForkConfig;
 
     var mismatched = new FakeRobot("wrong-joint-order");
     mismatched.jointNames = ["right wheel joint", "left wheel joint", "mast lift",
@@ -750,27 +806,27 @@ class RobotWorldTests {
     throws(function() Forks.fromBlueprint(ambiguous, blueprint),
       "model-driven fork factory rejects ambiguous duplicate joint names");
 
-    model.mobileBase = new RobotMobileConfiguration(
+    profile.mobileBase = new RobotMobileConfiguration(
       RobotDriveConfiguration.Differential("missing-left", "joint/right-wheel", 0.1, 0.5),
       1.2, 1.5);
-    var missingDiagnostics = RobotRuntimeCompiler.validate(model);
+    var missingDiagnostics = RobotRuntimeCompiler.validate(model, profile);
     var hasMissingRole = false;
     for (value in missingDiagnostics) if (value.code == "RK_ROLE_JOINT") hasMissingRole = true;
     check(missingDiagnostics.length > 0 &&
       hasMissingRole,
       "robot model validation rejects mechanism roles that reference missing joints");
-    model.mobileBase = new RobotMobileConfiguration(
+    profile.mobileBase = new RobotMobileConfiguration(
       RobotDriveConfiguration.Differential("joint/lift", "joint/right-wheel", 0.1, 0.5),
       1.2, 1.5);
-    var typeDiagnostics = RobotRuntimeCompiler.validate(model);
+    var typeDiagnostics = RobotRuntimeCompiler.validate(model, profile);
     var hasTypeError = false;
     for (value in typeDiagnostics) if (value.code == "RK_ROLE_TYPE") hasTypeError = true;
     check(hasTypeError,
       "robot model validation rejects joint types that cannot fill a mechanism role");
-    model.mobileBase = new RobotMobileConfiguration(
+    profile.mobileBase = new RobotMobileConfiguration(
       RobotDriveConfiguration.Differential("joint/left-wheel", "joint/left-wheel", 0.1, 0.5),
       1.2, 1.5);
-    var duplicateDiagnostics = RobotRuntimeCompiler.validate(model);
+    var duplicateDiagnostics = RobotRuntimeCompiler.validate(model, profile);
     var hasDuplicateRole = false;
     for (value in duplicateDiagnostics) if (value.code == "RK_ROLE_DUPLICATE") hasDuplicateRole = true;
     check(hasDuplicateRole,
@@ -778,12 +834,12 @@ class RobotWorldTests {
 
     // Each wheel's direction comes from its joint axis in the base frame: a right wheel
     // turning about its outward motor shaft (-Y) rolls back on a positive rate.
-    model.mobileBase = new RobotMobileConfiguration(
+    profile.mobileBase = new RobotMobileConfiguration(
       RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel", 0.1, 0.5),
       1.2, 1.5);
     var rightWheel = model.joints[1];
     function directions():Array<Int> {
-      var configuration:RobotRuntimeConfiguration = cast RobotRuntimeCompiler.compile(model).configuration;
+      var configuration:RobotRuntimeConfiguration = cast RobotRuntimeCompiler.compile(model, profile).configuration;
       var mobile:RobotRuntimeMobileConfiguration = cast configuration.mobileBase;
       return switch mobile.drive {
         case robotkit.runtime.RobotRuntimeDriveConfiguration.Differential(_, _, _, _, _, _, left, right): [left, right];
@@ -797,7 +853,7 @@ class RobotWorldTests {
     equal(directions().join(","), "1,1", "wheel directions follow the joint frame into the base frame");
     rightWheel.parentFrameRotation = [0.0, 0.0, 0.0, 1.0];
     rightWheel.axis = [0.0, 0.0, 1.0];
-    var axisDiagnostics = RobotRuntimeCompiler.validate(model);
+    var axisDiagnostics = RobotRuntimeCompiler.validate(model, profile);
     var hasAxisError = false;
     for (value in axisDiagnostics)
       if (value.code == "RK_ROLE_WHEEL_AXIS" && value.path == "mobileBase.drive.rightWheelJointId") hasAxisError = true;
@@ -812,19 +868,17 @@ class RobotWorldTests {
     var arm = model.addLink(new Link("arm"));
     var turn = model.addJoint(new Joint("turn", JointType.Continuous, base, arm));
     turn.limits = new JointLimits(-1e9, 1e9);
-    var legacy = new Actuator("legacy", 0.0, 0.0, Transmission.SimpleTransmission("turn", 1.0, 0.0));
-    legacy.drive = new robotkit.model.ActuatorDrive.ServoDrive(0.3, 1.2, 100.0, 200.0, 1e-5, 2048.0);
-    model.addActuator(legacy);
+    var servo = new Actuator("servo", null, null, Transmission.SimpleTransmission("turn", 1.0, 0.0));
+    servo.drive = new robotkit.model.ActuatorDrive.ServoDrive(0.3, 1.2, 100.0, 200.0, 1e-5, 2048.0);
+    model.addActuator(servo);
     var plain = RobotModelCodec.encode(model).toString();
     check(plain.indexOf("encoders") < 0, "a model without encoders keeps its bytes");
-    var inferred = model.encoderFor(legacy);
-    check(inferred != null && Math.abs(inferred.countsPerUnit - 2048.0 / (2.0 * Math.PI)) < 1e-9 &&
-      inferred.kind == robotkit.model.EncoderKind.Incremental, "a servo saved with its own count still has an encoder to read");
+    check(model.encoderFor(servo) == null, "feedback requires a wired encoder sensor");
     var shaft = model.addEncoder(robotkit.model.Encoder.perRevolution("shaft", "turn", robotkit.model.EncoderKind.Incremental, 4096.0, true));
     var absolute = model.addEncoder(robotkit.model.Encoder.perRevolution("pulley", "turn", robotkit.model.EncoderKind.Absolute, 1024.0));
-    legacy.encoder = "shaft";
-    legacy.efficiency = 0.85;
-    check(model.encoderFor(legacy) == shaft, "a motor that names an encoder reads that one");
+    servo.encoder = "shaft";
+    servo.efficiency = 0.85;
+    check(model.encoderFor(servo) == shaft, "a motor that names an encoder reads that one");
     check(RobotModelCodec.encode(model).toString() != plain, "encoders are saved");
     var restored = RobotModelCodec.decode(RobotModelCodec.encode(model));
     check(restored.encoders.length == 2 && restored.encoders[0].index && !restored.encoders[1].index &&
@@ -857,7 +911,9 @@ class RobotWorldTests {
   }
 
   static function testRobotModelCodec():Void {
-    var source = configuredForkliftModel();
+    var sourceDefinition = configuredForkliftModel();
+    var source = sourceDefinition.model;
+    var sourceProfile = sourceDefinition.profile;
     source.collisionApproximation = robotkit.model.CollisionApproximation.None;
     source.links[0].mass = 42.5;
     source.links[0].centerOfMass = [0.1, -0.2, 0.3];
@@ -898,6 +954,8 @@ class RobotWorldTests {
     source.couplings[0].backlash = 1.0e-4;
     source.couplings[0].drag = 0.02;
     source.actuators[0].fullStepsPerRevolution = 200.0;
+    source.actuators[0].microsteps = 16;
+    source.actuators[0].maxStepRate = 200000;
     source.actuators[0].servoDamping = 2.0;
     // A bare stepper writes only its steps, as models did before drive kinds; one with ratings writes its drive.
     var bare = RobotModelCodec.decode(RobotModelCodec.encode(source));
@@ -911,9 +969,12 @@ class RobotWorldTests {
     check(RobotModelCodec.encode(source).toString().indexOf('"assumed"') < 0,
       "models without provenance keep the field absent");
     source.couplings[0].assumed = ["belt stiffness", "belt drag"];
+    source.couplings[0].assumptions = [{quantity: "stiffness", label: "belt stiffness"}, {quantity: "drag", label: "belt drag"}];
     source.actuators[0].assumed = ["rotor inertia"];
+    source.actuators[0].assumptions = [{quantity: "inertia", label: "rotor inertia"}];
     var encoded = RobotModelCodec.encode(source);
     var restored = RobotModelCodec.decode(encoded);
+    var restoredProfile = robotkit.profile.RobotProfileCodec.decode(robotkit.profile.RobotProfileCodec.encode(sourceProfile));
     equal(restored.schemaVersion, RobotModel.CURRENT_VERSION,
       "decoded RobotModel uses the current semantic schema");
     equal(RobotModelCodec.encode(restored).toString(), encoded.toString(),
@@ -931,6 +992,8 @@ class RobotWorldTests {
     equal(restored.couplings.length, 1, "v5 RobotModel preserves joint couplings");
     check(restored.couplings[0].assumed.join(",") == "belt stiffness,belt drag" &&
       restored.actuators[0].assumed.join(",") == "rotor inertia", "RobotModel codec preserves engineering assumptions");
+    equal(restored.couplings[0].assumptions[0].quantity, "stiffness", "codec preserves quantity provenance");
+    equal(restored.actuators[0].assumptions[0].quantity, "inertia", "codec preserves motor quantity provenance");
 
     equal(restored.couplings[0].offset, 0.25,
       "v5 RobotModel preserves coupling offset independently of transmissions");
@@ -945,32 +1008,51 @@ class RobotWorldTests {
       "RobotModel codec resolves sensor frame references to shared frame objects");
     equal(restored.sensors[0].startAngleRadians, -0.4,
       "RobotModel codec preserves LiDAR angular origin");
-    check(restored.mobileBase != null && restored.forkMechanism != null,
-      "RobotModel codec preserves mobile and fork configurations");
-    equal(RobotRuntimeCompiler.compile(restored).jointCount, source.joints.length,
+    check(restoredProfile.mobileBase != null && restoredProfile.forkMechanism != null,
+      "RobotProfile codec preserves mobile and fork configurations");
+    var mechanicalRecord:Dynamic = haxe.Json.parse(encoded.toString());
+    check(!Reflect.hasField(mechanicalRecord, "mobileBase") && !Reflect.hasField(mechanicalRecord, "forkMechanism"),
+      "the canonical mechanical model has no interpretation fields");
+    var wrongVersion = robotkit.profile.RobotProfileCodec.toRecord(restoredProfile);
+    Reflect.setField(wrongVersion, "schemaVersion", 0);
+    var oldProfileError = "";
+    try robotkit.profile.RobotProfileCodec.fromRecord(wrongVersion)
+      catch (error:Dynamic) oldProfileError = Std.string(error);
+    Reflect.setField(wrongVersion, "schemaVersion", 99);
+    var futureProfileError = "";
+    try robotkit.profile.RobotProfileCodec.fromRecord(wrongVersion)
+      catch (error:Dynamic) futureProfileError = Std.string(error);
+    check(oldProfileError == "Unsupported RobotProfile schema version" && futureProfileError == oldProfileError,
+      "all unsupported profile versions have one rejection message");
+    var holonomicProfile = new robotkit.profile.RobotProfile(new RobotMobileConfiguration(
+      RobotDriveConfiguration.Holonomic(["wheel/left", "wheel/right", "wheel/back"], 0.1, 0.3), 0.5, 1.0));
+    var restoredHolonomic = robotkit.profile.RobotProfileCodec.decode(robotkit.profile.RobotProfileCodec.encode(holonomicProfile));
+    var holonomicConfiguration:RobotMobileConfiguration = cast restoredHolonomic.mobileBase;
+    check(switch holonomicConfiguration.drive {
+      case Holonomic(ids, radius, baseRadius): ids.join(",") == "wheel/left,wheel/right,wheel/back" && radius == 0.1 && baseRadius == 0.3;
+      case _: false;
+    }, "the profile's own record preserves all holonomic wheel IDs and geometry");
+    Reflect.setField(mechanicalRecord, "mobileBase", null);
+    throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(mechanicalRecord))),
+      "a current mechanical model rejects interpretation fields even when null");
+
+    equal(RobotRuntimeCompiler.compile(restored, restoredProfile).jointCount, source.joints.length,
       "decoded canonical model compiles through the normal runtime path");
-    var ackermannSource = configuredForkliftModel();
-    ackermannSource.mobileBase = new RobotMobileConfiguration(
+    var ackermannSourceDefinition = configuredForkliftModel();
+    var ackermannSource = ackermannSourceDefinition.model;
+    var ackermannSourceProfile = ackermannSourceDefinition.profile;
+    ackermannSourceProfile.mobileBase = new RobotMobileConfiguration(
       RobotDriveConfiguration.Ackermann("joint/tilt", "joint/left-wheel", 1.2, 0.1, 0.5),
       1.2, 1.5);
     var ackermannRestored = RobotModelCodec.decode(RobotModelCodec.encode(ackermannSource));
-    var ackermannMobile:RobotMobileConfiguration = cast ackermannRestored.mobileBase;
+    var ackermannProfile = robotkit.profile.RobotProfileCodec.decode(robotkit.profile.RobotProfileCodec.encode(ackermannSourceProfile));
+    var ackermannMobile:RobotMobileConfiguration = cast ackermannProfile.mobileBase;
     check(switch ackermannMobile.drive {
       case Ackermann(steering, drive, wheelBase, radius, maxAngle):
         steering == "joint/tilt" && drive == "joint/left-wheel" &&
           wheelBase == 1.2 && radius == 0.1 && maxAngle == 0.5;
       case _: false;
-    }, "RobotModel codec round-trips Ackermann drive configuration");
-
-    var channelRecords = [for (index in 0...source.joints.length)
-      {index: index, joint: source.joints[index].id}];
-    var deviceLayout = DeviceLayout.decode(haxe.io.Bytes.ofString(
-      haxe.Json.stringify({channels: channelRecords})));
-    deviceLayout.validateAgainst(source);
-    var wrongLayout = new DeviceLayout([for (index in 0...source.joints.length)
-      new DeviceChannel(index, source.joints[source.joints.length - index - 1].id)]);
-    throws(function() wrongLayout.validateAgainst(source),
-      "device channel mapping rejects order that differs from semantic model joints");
+    }, "RobotProfile codec round-trips Ackermann drive configuration");
 
     equal(restored.floatingBase, false, "RobotModel codec preserves a fixed base");
     equal(restored.joints[2].damping, 1.5, "RobotModel codec preserves joint damping");
@@ -990,7 +1072,7 @@ class RobotWorldTests {
       var restoredServo = restored.actuators[1].drive;
       check(restoredServo != null && restoredServo.kind() == "servo" && restoredServo.peakTorque() == 1.9 &&
         cast(restoredServo, robotkit.model.ActuatorDrive.ServoDrive).encoderCounts == 4096.0 &&
-        restored.actuators[1].planningEffort() == 1.9,
+        restored.actuators[1].requireEffort() == 1.9,
         "RobotModel codec preserves a servo's drive");
     }
     var restoredSurface = restored.links[1].collisionShapes[1].surface;
@@ -999,18 +1081,18 @@ class RobotWorldTests {
       "RobotModel codec preserves a collision shape's contact surface");
     equal(restored.links[1].collisionShapes[0].surface, null,
       "a shape without a surface keeps the simulator's defaults");
-    var nativeDynamics = RobotRuntimeCompiler.compile(restored).nativeValue().get_joint_dynamics(2);
+    var nativeDynamics = RobotRuntimeCompiler.compile(restored, restoredProfile).nativeValue().get_joint_dynamics(2);
     check(nativeDynamics.get_armature() == 0.02 && nativeDynamics.get_damping() == 1.5 &&
       nativeDynamics.get_friction_loss() == 0.3 && nativeDynamics.get_limit_time_constant() == 0.008 &&
       nativeDynamics.get_limit_impedance(2) == 0.01, "joint dynamics reach the native blueprint");
     var negativeDamping = RobotModelCodec.decode(encoded);
     negativeDamping.joints[0].damping = -1.0;
-    check(hasDiagnostic(RobotRuntimeCompiler.validate(negativeDamping), "RK_JOINT_DYNAMICS"),
+    check(hasDiagnostic(RobotRuntimeCompiler.validate(negativeDamping, new robotkit.profile.RobotProfile()), "RK_JOINT_DYNAMICS"),
       "compiler rejects negative joint damping");
     var badSurface = RobotModelCodec.decode(encoded);
     var badSurfaceValue:ContactSurface = cast badSurface.links[1].collisionShapes[1].surface;
     badSurfaceValue.frictionDimensions = 2;
-    check(hasDiagnostic(RobotRuntimeCompiler.validate(badSurface), "RK_COLLISION_SHAPE"),
+    check(hasDiagnostic(RobotRuntimeCompiler.validate(badSurface, new robotkit.profile.RobotProfile()), "RK_COLLISION_SHAPE"),
       "compiler rejects an invalid contact surface");
 
     var paired = RobotModelCodec.decode(encoded);
@@ -1023,19 +1105,19 @@ class RobotWorldTests {
       pairedRestored.contactPairs[0].surface.friction[0] == 0.5,
       "RobotModel codec preserves shape contact modes and contact pairs");
     paired.contactPairs[0].shapeB = 5;
-    check(hasDiagnostic(RobotRuntimeCompiler.validate(paired), "RK_CONTACT_PAIR"),
+    check(hasDiagnostic(RobotRuntimeCompiler.validate(paired, new robotkit.profile.RobotProfile()), "RK_CONTACT_PAIR"),
       "compiler rejects a contact pair naming a missing shape");
     throws(function() RobotModelCodec.encode(paired), "codec rejects a contact pair naming a missing shape");
 
-    var servo = robotkit.world.JointTarget.servo(1, 0.3, 0.1, 100.0, 5.0, -2.0);
+    var servo = robotkit.core.JointTarget.servo(1, 0.3, 0.1, 100.0, 5.0, -2.0);
     var servoCopy = servo.copy();
-    check(servoCopy.mode == robotkit.world.JointTargetMode.Servo && servoCopy.stiffness == 100.0 &&
+    check(servoCopy.mode == robotkit.core.JointTargetMode.Servo && servoCopy.stiffness == 100.0 &&
       servoCopy.servoVelocity == 0.1 && servoCopy.feedforward == -2.0, "servo targets copy their terms");
-    throws(function() robotkit.world.JointTarget.servo(0, 0.0, 0.0, -1.0, 0.0, 0.0),
+    throws(function() robotkit.core.JointTarget.servo(0, 0.0, 0.0, -1.0, 0.0, 0.0),
       "servo targets reject negative stiffness");
     var servoHarness = new SimulationHarness(0.02);
-    var servoRuntime = servoHarness.simulation.addRobot(RobotRuntimeCompiler.compile(restored));
-    servoRuntime.submitTargets([robotkit.world.JointTarget.servo(2, 0.4, 0.0, 100.0, 5.0, 0.0)], 1);
+    var servoRuntime = servoHarness.simulation.addRobot(RobotRuntimeCompiler.compile(restored, restoredProfile));
+    servoRuntime.submitTargets([robotkit.core.JointTarget.servo(2, 0.4, 0.0, 100.0, 5.0, 0.0)], 1);
     servoHarness.step(Int64.ofInt(0));
     check(Math.abs(servoRuntime.snapshot().q.get(2) - 0.4) < 1e-9,
       "a servo target reaches the deterministic backend's joint");
@@ -1044,7 +1126,7 @@ class RobotWorldTests {
     servoRecording.recordCommand(RobotCommand.JointTargets([servo], null));
     switch roundTripRecording(servoRecording.entries[0]).event {
       case Command(JointTargets(targets, _)):
-        check(targets[0].mode == robotkit.world.JointTargetMode.Servo &&
+        check(targets[0].mode == robotkit.core.JointTargetMode.Servo &&
           targets[0].stiffness == 100.0 && targets[0].feedforward == -2.0,
           "a recorded servo target replays with its terms");
       case _: throw "Expected recorded servo targets";
@@ -1056,7 +1138,7 @@ class RobotWorldTests {
     }, "RobotModel codec preserves capsule radius and half-length");
     equal(restored.links[0].collisionShapes[0].position[2], -0.2,
       "RobotModel codec preserves collision shape poses");
-    var shapeBlueprint = RobotRuntimeCompiler.compile(restored);
+    var shapeBlueprint = RobotRuntimeCompiler.compile(restored, restoredProfile);
     equal(shapeBlueprint.linkCollisionShapes.length, 4, "every link collision shape compiles");
     equal(shapeBlueprint.linkCollisionShapes[3].link, 1,
       "compiled collision shapes keep their runtime link index");
@@ -1066,7 +1148,7 @@ class RobotWorldTests {
     shapeHarness.dispose();
     var badShape = RobotModelCodec.decode(encoded);
     badShape.links[1].collisionShapes.push(new CollisionShape(CollisionPrimitive.Sphere(0.0)));
-    check(hasDiagnostic(RobotRuntimeCompiler.validate(badShape), "RK_COLLISION_SHAPE"),
+    check(hasDiagnostic(RobotRuntimeCompiler.validate(badShape, new robotkit.profile.RobotProfile()), "RK_COLLISION_SHAPE"),
       "compiler rejects a non-positive collision shape size");
     throws(function() RobotModelCodec.encode(badShape), "codec rejects an invalid collision shape");
     var unknownShape:Dynamic = haxe.Json.parse(encoded.toString());
@@ -1075,21 +1157,25 @@ class RobotWorldTests {
     Reflect.setField(unknownShapes[0], "kind", "cone");
     throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(unknownShape))),
       "codec rejects unknown collision shape kinds");
-    var floating = configuredForkliftModel();
-    floating.mobileBase = null;
-    floating.forkMechanism = null;
+    var floatingDefinition = configuredForkliftModel();
+    var floating = floatingDefinition.model;
+    var floatingProfile = floatingDefinition.profile;
+    floatingProfile.mobileBase = null;
+    floatingProfile.forkMechanism = null;
     floating.floatingBase = true;
     var floatingRestored = RobotModelCodec.decode(RobotModelCodec.encode(floating));
     equal(floatingRestored.floatingBase, true, "v6 RobotModel preserves a floating base");
-    var floatingBlueprint = RobotRuntimeCompiler.compile(floatingRestored);
+    var floatingBlueprint = RobotRuntimeCompiler.compile(floatingRestored, floatingProfile);
     equal(floatingBlueprint.floatingBase, true, "a floating base compiles into the blueprint");
     equal(floatingBlueprint.nativeValue().get_floating_base(), 1,
       "a floating base reaches the native blueprint");
-    equal(RobotRuntimeCompiler.compile(restored).nativeValue().get_floating_base(), 0,
+    equal(RobotRuntimeCompiler.compile(restored, restoredProfile).nativeValue().get_floating_base(), 0,
       "a fixed base stays kinematic in the native blueprint");
-    var wheeledFloating = configuredForkliftModel();
+    var wheeledFloatingDefinition = configuredForkliftModel();
+    var wheeledFloating = wheeledFloatingDefinition.model;
+    var wheeledFloatingProfile = wheeledFloatingDefinition.profile;
     wheeledFloating.floatingBase = true;
-    check(hasDiagnostic(RobotRuntimeCompiler.validate(wheeledFloating), "RK_FLOATING_MOBILE"),
+    check(hasDiagnostic(RobotRuntimeCompiler.validate(wheeledFloating, wheeledFloatingProfile), "RK_FLOATING_MOBILE"),
       "a floating base cannot also be a wheeled mobile base");
     var missingFloating:Dynamic = haxe.Json.parse(encoded.toString());
     Reflect.deleteField(missingFloating, "floatingBase");
@@ -1147,7 +1233,7 @@ class RobotWorldTests {
     check(toePair.linkA == "link/torso" && toePair.linkB == "link/left_foot" && toePair.shapeB == 0 &&
       toePair.surface.friction[0] == 0.8 && toePair.surface.frictionDimensions == 4 &&
       toePair.surface.contactTimeConstant == 0.01, "a contact pair keeps its own surface");
-    equal(RobotRuntimeCompiler.compile(model).contactPairs[0].shapeB, 3,
+    equal(RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()).contactPairs[0].shapeB, 3,
       "compiled contact pairs index the robot's shapes in link order");
     equal(knee.parentFramePosition[2], -0.38, "the joint frame sits at the joint anchor in the parent");
     equal(knee.childFramePosition[2], 0.02, "the joint frame sits at the joint anchor in the child");
@@ -1169,7 +1255,7 @@ class RobotWorldTests {
     equal(model.sensors.length, 1, "one IMU per sensor site");
     check(model.sensors[0].frame == model.frames[0], "the IMU mounts on its site frame");
     equal(model.frames[0].position[0], 0.02, "the IMU frame keeps the site position");
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     equal(blueprint.floatingBase, true, "the imported walker compiles with a floating base");
     equal(blueprint.linkCollisionShapes.length, 5, "every imported collision shape compiles");
   }
@@ -1225,7 +1311,7 @@ class RobotWorldTests {
       "skipped and approximated elements are reported");
     equal(RobotModelCodec.decode(RobotModelCodec.encode(model)).links.length, 4,
       "a loaded URDF round-trips through the RobotModel codec");
-    equal(RobotRuntimeCompiler.compile(model).linkCollisionShapes.length, 3,
+    equal(RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()).linkCollisionShapes.length, 3,
       "a loaded URDF compiles");
     throws(function() robotkit.model.urdf.UrdfLoader.load("<robot name='x'><link name='a'/>"),
       "malformed URDF XML is rejected");
@@ -1304,7 +1390,7 @@ class RobotWorldTests {
     var simulationHarness = new SimulationHarness();
 
     var simulation = simulationHarness.simulation;
-    var runtime = simulation.addRobot(RobotRuntimeCompiler.compile(simulated));
+    var runtime = simulation.addRobot(RobotRuntimeCompiler.compile(simulated, new robotkit.profile.RobotProfile()));
     var robot = new SimulatedRobot("gnss-sim", runtime, simulated.name, [simBase.name], []);
     simulationHarness.step(Int64.ofInt(1));
     simulationHarness.step(Int64.ofInt(2));
@@ -1807,8 +1893,8 @@ class RobotWorldTests {
     }, "Navigation starts and updates a path-following request");
     check(switch robot.lastCommand {
       case JointTargets(targets, _):
-        targets.length == 2 && targets[0].mode == robotkit.world.JointTargetMode.Velocity &&
-          targets[1].mode == robotkit.world.JointTargetMode.Velocity &&
+        targets.length == 2 && targets[0].mode == robotkit.core.JointTargetMode.Velocity &&
+          targets[1].mode == robotkit.core.JointTargetMode.Velocity &&
           Math.abs(targets[0].target - targets[1].target) < 1e-9;
       case _: false;
     }, "path follower commands both differential wheels through MobileBase");
@@ -1979,6 +2065,7 @@ class RobotWorldTests {
   }
 
   static function testMotionGuard():Void {
+    var profile = new robotkit.profile.RobotProfile();
     var model = new RobotModel("motion-guard-sim");
     var baseLink = model.addLink(new Link("base", "base"));
     var leftLink = model.addLink(new Link("left wheel", "left-wheel"));
@@ -1993,7 +2080,7 @@ class RobotWorldTests {
     right.axis = [0.0, 1.0, 0.0];
     right.limits = new JointLimits(-100.0, 100.0, 20.0, 100.0);
     model.addJoint(right);
-    model.mobileBase = new RobotMobileConfiguration(
+    profile.mobileBase = new RobotMobileConfiguration(
       RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel",
         0.1, 0.5), 0.6, 1.0, 2.0, 4.0, 0.6, 0.4);
     var lidar = model.addSensor(new Sensor("front lidar", "lidar", 0.0,
@@ -2001,7 +2088,7 @@ class RobotWorldTests {
     lidar.rayCount = 64;
     lidar.maxRange = 5.0;
 
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    var blueprint = RobotRuntimeCompiler.compile(model, profile);
     var simulationHarness = new SimulationHarness(0.01);
 
     var simulation = simulationHarness.simulation;
@@ -2423,6 +2510,7 @@ class RobotWorldTests {
       "Navigator still replans when the route ahead of an escape becomes blocked");
     marginNavigator.cancel();
 
+    var profile = new robotkit.profile.RobotProfile();
     var model = new RobotModel("navigator-sim");
     var baseLink = model.addLink(new Link("base", "link/base"));
     var leftLink = model.addLink(new Link("left wheel", "link/left-wheel"));
@@ -2437,7 +2525,7 @@ class RobotWorldTests {
     right.axis = [0.0, 1.0, 0.0];
     right.limits = new JointLimits(-100.0, 100.0, 20.0, 100.0);
     model.addJoint(right);
-    model.mobileBase = new RobotMobileConfiguration(
+    profile.mobileBase = new RobotMobileConfiguration(
       RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel",
         0.1, 0.5), 0.8, 1.5, 1.5, 2.0, 0.6, 0.4);
     var lidarFrame = model.addFrame(new Frame("lidar mount", baseLink, "frame/lidar"));
@@ -2448,7 +2536,7 @@ class RobotWorldTests {
     lidar.rayCount = 64;
     lidar.maxRange = 4.0;
 
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    var blueprint = RobotRuntimeCompiler.compile(model, profile);
     var simulationHarness = new SimulationHarness(0.02);
 
     var simulation = simulationHarness.simulation;
@@ -2704,6 +2792,7 @@ class RobotWorldTests {
   }
 
   static function testDifferentialDrivePlantKinematics():Void {
+    var profile = new robotkit.profile.RobotProfile();
     var model = new RobotModel("plant-kinematics");
     var baseLink = model.addLink(new Link("base", "link/base"));
     var leftLink = model.addLink(new Link("left wheel", "link/left-wheel"));
@@ -2718,12 +2807,12 @@ class RobotWorldTests {
     right.axis = [0.0, 1.0, 0.0];
     right.limits = new JointLimits(-1000.0, 1000.0, 10.0, 100.0);
     model.addJoint(right);
-    model.mobileBase = new RobotMobileConfiguration(
+    profile.mobileBase = new RobotMobileConfiguration(
       RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel",
         0.1, 0.5), 0.8, 1.5, 100.0, 100.0);
     var imu = model.addSensor(new Sensor("base imu", "imu", 0.0, "sensor/imu"));
     imu.frame = model.addFrame(new Frame("imu mount", baseLink, "frame/imu"));
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    var blueprint = RobotRuntimeCompiler.compile(model, profile);
     var simulationHarness = new SimulationHarness(0.02);
 
     var simulation = simulationHarness.simulation;
@@ -2794,19 +2883,17 @@ class RobotWorldTests {
       Math.abs(imuValue(snapshot, 3)) < 2e-2 && Math.abs(imuValue(snapshot, 4) - 0.5) < 2e-2,
       "IMU measures the arc's yaw rate and centripetal acceleration");
 
-    // 0.8 m/s with 1.5 rad/s asks 11.75 rad/s of the right wheel; the runtime
-    // saturates that wheel alone at its 10 rad/s limit and the plant rolls by
-    // the applied rates.
+    // Combined motion is scaled before submission, preserving curvature at the wheel ceiling.
     base.command(new Twist2(0.8, 1.5));
     var saturatedStart = plant.pose;
     plant.step(Int64.ofInt(tick++));
     var expectedSaturated = saturatedStart.integrateDisplacement(
-      (4.25 + 10.0) * 0.1 * 0.02 * 0.5, (10.0 - 4.25) * 0.1 * 0.02 / 0.5);
+      (4.25 / 1.175 + 10.0) * 0.1 * 0.02 * 0.5, (10.0 - 4.25 / 1.175) * 0.1 * 0.02 / 0.5);
     check(Math.abs(plant.pose.x - expectedSaturated.x) < 1e-9 &&
       Math.abs(plant.pose.y - expectedSaturated.y) < 1e-9 &&
       Math.abs(plant.pose.yaw - expectedSaturated.yaw) < 1e-9 &&
-      plant.appliedWheelRates().right == 10.0,
-      "DifferentialDrivePlant rolls by the runtime's rate-limited wheel targets");
+      Math.abs(plant.appliedWheelRates().right - 10.0) < 1e-12,
+      "DifferentialDrivePlant preserves curvature within the compiled wheel envelope");
 
     // Wheel targets submitted straight to the robot, bypassing MobileBase,
     // drive the chassis on the tick they are applied.
@@ -2814,8 +2901,8 @@ class RobotWorldTests {
     plant.step(Int64.ofInt(tick++));
     var directStart = plant.pose;
     robot.submit(RobotCommand.JointTargets([
-      robotkit.world.JointTarget.velocity(0, 3.0),
-      robotkit.world.JointTarget.velocity(1, 3.0)
+      robotkit.core.JointTarget.velocity(0, 3.0),
+      robotkit.core.JointTarget.velocity(1, 3.0)
     ], null));
     plant.step(Int64.ofInt(tick++));
     var directExpected = directStart.integrateDisplacement(3.0 * 0.1 * 0.02, 0.0);
@@ -2863,6 +2950,7 @@ class RobotWorldTests {
   }
 
   static function testHolonomicDrivePlantKinematics():Void {
+    var profile = new robotkit.profile.RobotProfile();
     var model = new RobotModel("omni-plant-kinematics");
     var baseLink = model.addLink(new Link("base", "link/base"));
     var wheelRadius = 0.05, baseRadius = 0.3;
@@ -2874,11 +2962,11 @@ class RobotWorldTests {
       model.addJoint(joint);
       wheelIds.push(joint.id);
     }
-    model.mobileBase = new RobotMobileConfiguration(
+    profile.mobileBase = new RobotMobileConfiguration(
       RobotDriveConfiguration.Holonomic(wheelIds, wheelRadius, baseRadius), 0.8, 1.5, 100.0, 100.0);
     var imu = model.addSensor(new Sensor("base imu", "imu", 0.0, "sensor/imu"));
     imu.frame = model.addFrame(new Frame("imu mount", baseLink, "frame/imu"));
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    var blueprint = RobotRuntimeCompiler.compile(model, profile);
     var simulationHarness = new SimulationHarness(0.02);
 
     var simulation = simulationHarness.simulation;
@@ -2966,7 +3054,7 @@ class RobotWorldTests {
     var wheelStart = plant.pose;
     var strafe = [for (i in 0...3) {
       var angle = Math.PI * 0.5 + i * Math.PI * 2.0 / 3.0;
-      robotkit.world.JointTarget.velocity(i, Math.cos(angle) * 0.3 / wheelRadius);
+      robotkit.core.JointTarget.velocity(i, Math.cos(angle) * 0.3 / wheelRadius);
     }];
     robot.submit(RobotCommand.JointTargets(strafe, null));
     for (_ in 0...10) plant.step(Int64.ofInt(tick++));
@@ -3025,9 +3113,9 @@ class RobotWorldTests {
         targets.length == 3 && targets[0].joint == 0 && targets[1].joint == 1 &&
           targets[2].joint == 2 && targets[0].target == 1.5 &&
           targets[1].target == 0.2 && targets[2].target == 0.4 &&
-          targets[0].mode == robotkit.world.JointTargetMode.Position &&
-          targets[1].mode == robotkit.world.JointTargetMode.Position &&
-          targets[2].mode == robotkit.world.JointTargetMode.Position;
+          targets[0].mode == robotkit.core.JointTargetMode.Position &&
+          targets[1].mode == robotkit.core.JointTargetMode.Position &&
+          targets[2].mode == robotkit.core.JointTargetMode.Position;
       case _: false;
     }, "Forks sends lift, tilt, and spread targets as one atomic batch");
 
@@ -3088,7 +3176,7 @@ class RobotWorldTests {
       "planar frame tree compiles body sensor mounts from the robot model");
     throws(function() perceptionFrames.lookup("base", "mast-camera"),
       "model frame helper omits articulated-link mounts that need joint-state transforms");
-    var articulatedBlueprint = RobotRuntimeCompiler.compile(perceptionModel);
+    var articulatedBlueprint = RobotRuntimeCompiler.compile(perceptionModel, new robotkit.profile.RobotProfile());
     var articulatedTree = RobotFrameTree2.fromSnapshot(perceptionModel,
       articulatedBlueprint, new RobotSnapshot("mast", Int64.ofInt(1),
         Int64.ofInt(100), [0.75], [0.0], [0.0], 1, 0), "base");
@@ -3106,7 +3194,7 @@ class RobotWorldTests {
     var turretFrame = rotatingModel.addFrame(new Frame("turret sensor", turret,
       "turret-sensor"));
     turretFrame.position = [1.0, 0.0, 0.0];
-    var rotatingBlueprint = RobotRuntimeCompiler.compile(rotatingModel);
+    var rotatingBlueprint = RobotRuntimeCompiler.compile(rotatingModel, new robotkit.profile.RobotProfile());
     var rotatingTree = RobotFrameTree2.fromSnapshot(rotatingModel,
       rotatingBlueprint, new RobotSnapshot("turret", Int64.ofInt(1),
         Int64.ofInt(100), [Math.PI * 0.5], [0.0], [0.0], 1, 0), "base");
@@ -3335,8 +3423,10 @@ class RobotWorldTests {
   }
 
   static function testSimulatedMaterialHandlingScenario():Void {
-    var model = configuredForkliftModel();
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    var modelDefinition = configuredForkliftModel();
+    var model = modelDefinition.model;
+    var modelProfile = modelDefinition.profile;
+    var blueprint = RobotRuntimeCompiler.compile(model, modelProfile);
     var simulationHarness = new SimulationHarness(0.02);
 
     var simulation = simulationHarness.simulation;
@@ -3520,8 +3610,10 @@ class RobotWorldTests {
   }
 
   static function testForkliftSkillsOnSimulationAndReplay():Void {
-    var model = configuredForkliftModel();
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    var modelDefinition = configuredForkliftModel();
+    var model = modelDefinition.model;
+    var modelProfile = modelDefinition.profile;
+    var blueprint = RobotRuntimeCompiler.compile(model, modelProfile);
     var linkNames = [for (link in model.links) link.name];
     var jointNames = [for (joint in model.joints) joint.name];
     var simulationHarness = new SimulationHarness(0.01);
@@ -3532,7 +3624,7 @@ class RobotWorldTests {
     var sourceRobot = new SimulatedRobot("forklift", simulation.addRobot(blueprint),
       "simulated forklift", linkNames, jointNames);
     var simulatedRobot = new RecordingRobot(sourceRobot, writer);
-    var base = MobileBase.fromRobot(simulatedRobot, model);
+    var base = MobileBase.fromRobot(simulatedRobot, model, modelProfile);
     var localization = new WheelOdometryLocalization(base);
     var navigation = new Navigation(base, localization, 0.2, 0.2, 0.8);
     var liveFootprint = base.footprint;
@@ -3546,7 +3638,7 @@ class RobotWorldTests {
       localization.update(snapshot);
       return new PerceptionSnapshot();
     };
-    var forks = Forks.fromRobot(simulatedRobot, model);
+    var forks = Forks.fromRobot(simulatedRobot, model, modelProfile);
     simulationHarness.step(Int64.ofInt(1));
     var configuredScan = sourceRobot.snapshot().sensors;
     check(configuredScan.length == 1 &&
@@ -3732,7 +3824,11 @@ class RobotWorldTests {
 
     var replayDescription = new RobotDescription("forklift", "recorded forklift",
       linkNames, jointNames);
-    var replayCapabilities = new RobotCapabilities("forklift", 5, true, true, true, false);
+    var replayCapabilities = new RobotCapabilities("forklift",
+      5,
+      [robotkit.core.JointTargetMode.Position, robotkit.core.JointTargetMode.Velocity, robotkit.core.JointTargetMode.Effort],
+      robotkit.core.ExecutionCapabilities.unavailable(),
+      new robotkit.core.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked));
 
     var goalReplay = new ReplayRobot("forklift", recording,
       replayDescription, replayCapabilities);
@@ -3972,7 +4068,8 @@ class RobotWorldTests {
       sys.FileSystem.deleteFile(recordingPath + ".incomplete.status");
   }
 
-  static function configuredForkliftModel():RobotModel {
+  static function configuredForkliftModel():robotkit.model.RobotDefinition {
+    var profile = new robotkit.profile.RobotProfile();
     var model = new RobotModel("authored-forklift");
     var base = model.addLink(new Link("base", "link/base"));
     var leftWheel = model.addLink(new Link("left wheel", "link/left-wheel"));
@@ -3995,10 +4092,10 @@ class RobotWorldTests {
     addJoint("joint/lift", "lift", JointType.Prismatic, mast, 0.0, 1.5, 1000.0);
     addJoint("joint/tilt", "tilt", JointType.Revolute, carriage, -0.5, 0.5, 1000.0);
     addJoint("joint/spread", "spread", JointType.Prismatic, forks, 0.0, 0.8, 1000.0);
-    model.mobileBase = new RobotMobileConfiguration(
+    profile.mobileBase = new RobotMobileConfiguration(
       RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel",
         0.1, 0.5), 0.5, 1.0, 2.0, 10.0, 2.0, 1.0);
-    model.forkMechanism = new RobotForkConfiguration("joint/lift",
+    profile.forkMechanism = new RobotForkConfiguration("joint/lift",
       1000.0, 700.0, 1.5, "joint/tilt", "joint/spread");
     var lidarFrame = model.addFrame(new Frame("front lidar mount", base,
       "frame/front-lidar"));
@@ -4008,7 +4105,7 @@ class RobotWorldTests {
     lidar.frame = lidarFrame;
     lidar.rayCount = 32;
     lidar.maxRange = 8.0;
-    return model;
+    return new robotkit.model.RobotDefinition(model, profile);
   }
 
   static function testMcapRoundTrip():Void {
@@ -4024,17 +4121,17 @@ class RobotWorldTests {
       Int64.ofInt(9), Int64.ofInt(150), [], Int64.ofInt(160), "link/base",
       [0.2, 0.0, 0.8], [0.0, 0.0, 0.0, 1.0], "robot-a.reset-2",
       "host.monotonic", new CameraImage(2, 1, "rgb8", cameraBytes));
-    var corruptSensor = robotkit.world.RobotRecordingCodec.sensor(camera, "robot-a");
+    var corruptSensor = robotkit.recording.RobotRecordingCodec.sensor(camera, "robot-a");
     corruptSensor.mountPosition = [0.0, 0.0];
     var decodeError = "";
-    try robotkit.world.RobotRecordingCodec.readSensor(corruptSensor)
+    try robotkit.recording.RobotRecordingCodec.readSensor(corruptSensor)
     catch (error:Dynamic) decodeError = Std.string(error);
     check(decodeError.indexOf("mount dimensions") >= 0,
       "recorded sensor mount position requires three finite values");
     corruptSensor.mountPosition = [0.0, 0.0, 0.0];
     corruptSensor.mountRotation = [0.0, 0.0, 0.0, 2.0];
     decodeError = "";
-    try robotkit.world.RobotRecordingCodec.readSensor(corruptSensor)
+    try robotkit.recording.RobotRecordingCodec.readSensor(corruptSensor)
     catch (error:Dynamic) decodeError = Std.string(error);
     check(decodeError.indexOf("unit quaternion") >= 0,
       "recorded sensor mount rotation requires unit length");
@@ -4042,19 +4139,19 @@ class RobotWorldTests {
       Int64.parseString("9223372036854775000"), [0.5], [0.25], [0.125], 1, 0,
       Int64.parseString("9223372036854775002"), [sensor, camera], "robot-a.reset-2", "host.monotonic",
       RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP);
-    var corruptSnapshot = robotkit.world.RobotRecordingCodec.snapshot(first);
+    var corruptSnapshot = robotkit.recording.RobotRecordingCodec.snapshot(first);
     corruptSnapshot.positions = [Math.sqrt(-1.0)];
     decodeError = "";
-    try robotkit.world.RobotRecordingCodec.readSnapshot(corruptSnapshot)
+    try robotkit.recording.RobotRecordingCodec.readSnapshot(corruptSnapshot)
     catch (error:Dynamic) decodeError = Std.string(error);
     check(decodeError.indexOf("not finite") >= 0,
       "recorded snapshot rejects non-finite joint values");
     var second = new RobotSnapshot("robot-b", Int64.ofInt(3), Int64.ofInt(10),
       [0.75], [], [], 1, 0, Int64.ofInt(20), [], "robot-b.boot-1", "host.monotonic");
     writer.recordCommand(RobotCommand.JointTargets([
-      robotkit.world.JointTarget.position(0, 0.75),
-      robotkit.world.JointTarget.velocity(1, -0.25),
-      robotkit.world.JointTarget.effort(2, 3.5)
+      robotkit.core.JointTarget.position(0, 0.75),
+      robotkit.core.JointTarget.velocity(1, -0.25),
+      robotkit.core.JointTarget.effort(2, 3.5)
     ], Int64.parseString("9223372036854775003")), "robot-a");
     writer.recordSnapshot(first);
     writer.recordSensor("robot-a", sensor);
@@ -4073,8 +4170,8 @@ class RobotWorldTests {
       v5Path = Sys.getCwd() + "/fixtures/recording-v5.mcap";
     var v5Error = "";
     try McapRecordingReader.load(v5Path) catch (error:Dynamic) v5Error = Std.string(error);
-    check(v5Error.indexOf("schema version is not 6") >= 0,
-      "Haxe reader rejects a pre-v6 MCAP file");
+    check(v5Error.indexOf("schema version is not 7") >= 0,
+      "Haxe reader rejects a pre-v7 MCAP file");
     var fixtureRoot = v5Path.substr(0, v5Path.lastIndexOf("/") + 1);
     var mismatchPath = fixtureRoot + "recording-schema-mismatch.mcap";
     var mismatch = new McapRecordingReader(mismatchPath, null, true);
@@ -4090,7 +4187,7 @@ class RobotWorldTests {
     var foreignPath = fixtureRoot + "recording-foreign.mcap";
     var foreign = new McapRecordingReader(foreignPath);
     check(foreign.next() == null && foreign.skippedUnknown == 1,
-      "file-level v6 metadata permits a foreign MCAP channel");
+      "file-level v7 metadata permits a foreign MCAP channel");
     foreign.close();
     equal(loaded.entries.length, 7, "MCAP reload preserves every event type");
     equal(loaded.processEvents.length, 1, "MCAP reload preserves process records");
@@ -4099,7 +4196,7 @@ class RobotWorldTests {
     switch loaded.commands[0] {
       case JointTargets(targets, expiry):
         equal(targets.length, 3, "MCAP preserves batched target count");
-        equal(Std.string(targets[1].mode), Std.string(robotkit.world.JointTargetMode.Velocity),
+        equal(Std.string(targets[1].mode), Std.string(robotkit.core.JointTargetMode.Velocity),
           "MCAP preserves velocity mode");
         equal(targets[2].target, 3.5, "MCAP preserves effort target value");
         equal(expiry, Int64.parseString("9223372036854775003"),
@@ -4127,7 +4224,7 @@ class RobotWorldTests {
     if (Sys.getEnv("ROBOTKIT_KEEP_MCAP") == null) sys.FileSystem.deleteFile(path);
     else Sys.println('RobotKit MCAP fixture: $path');
     for (compression in ["none", "lz4"]) {
-      var variantPath = '/tmp/robotkit-${Sys.getPid()}-$compression-v6.mcap';
+      var variantPath = '/tmp/robotkit-${Sys.getPid()}-$compression-v7.mcap';
       var channels = new RecordingChannels();
       channels.register(new TestRecordingChannel());
       var pixels = haxe.io.Bytes.alloc(512 * 1024 * 3);
@@ -4187,7 +4284,7 @@ class RobotWorldTests {
     antennaMount.position = [-0.2, 0.0, 1.1];
     var gnss = model.addSensor(new Sensor("gnss", "gnss_pose", 10.0, "sensor/gnss"));
     gnss.frame = antennaMount;
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     equal(blueprint.externalSensorLayout().length, 2,
       "model compilation keeps camera and GNSS sensors outside the native runtime");
     equal(blueprint.nativeSensorLayout().length, 3,
@@ -4264,7 +4361,7 @@ class RobotWorldTests {
       "tool-feedback/contact"));
     var pressure = model.addSensor(new Sensor("cup pressure", "tool_vacuum_kpa", 0.0,
       "tool-feedback/pressure"));
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     equal(blueprint.externalSensorLayout().length, 2,
       "tool contact and vacuum pressure compile as external sensor inputs");
     var simulationHarness = new SimulationHarness();
@@ -4408,7 +4505,7 @@ class RobotWorldTests {
     scan.rayCount = 360;
     scan.maxRange = 6.0;
     var imu = model.addSensor(new robotkit.model.Sensor("imu", "imu", 0, "sensor/imu"));
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     var simulationHarness = new SimulationHarness();
     var runtime = simulationHarness.simulation.addRobot(blueprint);
     var robot = new SimulatedRobot("full-scan", runtime, "full-scan", ["base"], []);
@@ -4462,7 +4559,7 @@ class RobotWorldTests {
     partial.maxRange = 3.0;
     partial.startAngleRadians = -Math.PI * 0.5;
     partial.fieldOfViewRadians = Math.PI;
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     mount.position[0] = 100.0;
     mount.name = "renamed";
     scan.name = "renamed scan";
@@ -4522,11 +4619,11 @@ class RobotWorldTests {
     scan.rayCount = 361;
     mount.rotation = [0.0, 0.0, 0.0, 0.0];
     noisy.updateRate = -1.0;
-    var diagnostics = RobotRuntimeCompiler.validate(model);
+    var diagnostics = RobotRuntimeCompiler.validate(model, new robotkit.profile.RobotProfile());
     check(hasDiagnostic(diagnostics, "RK_SENSOR_SCAN"), "oversized scans rejected before native lowering");
     scan.rayCount = 16;
     partial.fieldOfViewRadians = Math.PI * 2.1;
-    check(hasDiagnostic(RobotRuntimeCompiler.validate(model), "RK_SENSOR_SCAN"),
+    check(hasDiagnostic(RobotRuntimeCompiler.validate(model, new robotkit.profile.RobotProfile()), "RK_SENSOR_SCAN"),
       "LiDAR angular coverage beyond one revolution is rejected");
     partial.fieldOfViewRadians = Math.PI;
     check(hasDiagnostic(diagnostics, "RK_FRAME_POSE"), "non-unit mount rotations rejected");
@@ -4547,7 +4644,7 @@ class RobotWorldTests {
     check(Math.abs(current.binding.channels[0].stepsPerUnit - 3200.0 / (2.0 * Math.PI)) < 1e-9,
       "steps per radian come from the model and the wiring");
     equal(current.binding.channels[2].jointIndex, 2, "the lift's channel drives the lift joint");
-    check(current.binding.model.actuators[2].maxRate > 0.0,
+    check(current.binding.model.actuators[2].requireRate() > 0.0,
       "the binding's model carries the step tick's rate ceiling");
     // Deployments that named a compiled fingerprint say what to change.
     var legacy = sys.io.File.getContent(fixture + "deployment-v3.json");
@@ -4560,9 +4657,9 @@ class RobotWorldTests {
       return message;
     }
     var v3 = loads(legacy);
-    check(v3.indexOf("schemaVersion 5") >= 0 && v3.indexOf("device.controller") >= 0, "v3 is rejected with what to change: " + v3);
+    check(v3.indexOf("Unsupported robot deployment schema version") >= 0, "old deployments have one schema rejection: " + v3);
     var v4 = loads(StringTools.replace(legacy, "\"schemaVersion\": 3", "\"schemaVersion\": 4"));
-    check(v4.indexOf("schemaVersion 5") >= 0, "v4 is rejected with what to change");
+    check(v4.indexOf("Unsupported robot deployment schema version") >= 0, "v4 uses the same schema rejection");
     var withFingerprint = loads(StringTools.replace(sys.io.File.getContent(fixture + "deployment.json"),
       "\"controller\"", "\"fingerprint\""));
     check(withFingerprint.indexOf("fingerprint is gone") >= 0, "a v5 file with a fingerprint is rejected");
@@ -4591,27 +4688,29 @@ class RobotWorldTests {
     joint.limits.lower = -1.0;
     joint.limits.upper = 1.0;
     joint.limits.effort = 1.0;
-    var motor = new Actuator("axis-motor", 0.0, 0.0, Transmission.SimpleTransmission("joint/axis", 1.0, 0.0));
+    var motor = new Actuator("axis-motor", null, null, Transmission.SimpleTransmission("joint/axis", 1.0, 0.0));
     motor.fullStepsPerRevolution = 200.0;
+    motor.microsteps = 16;
+    motor.maxStepRate = 200000;
     model.addActuator(motor);
-    var layout = new DeviceLayout([new DeviceChannel(0, "", motor.id, 1, 16)]);
+    var layout = new DeviceLayout([new DeviceChannel(0, motor.id)]);
     var robot:Null<SerialRobot> = null;
     var failed = false;
-    try robot = new SerialRobot("serial-probe", model,
+    try robot = new SerialRobot("serial-probe", model, new robotkit.profile.RobotProfile(),
       '/dev/robotkit-missing-${Sys.getPid()}',
       "000102030405060708090a0b0c0d0e0f", layout, 1e-6) catch (_:Dynamic) failed = true;
     if (robot != null) robot.close();
     check(failed, "serial adapter reports an unavailable device path through Haxe FFI");
     var timingMessage = "";
-    try new SerialRobot("under-period", model,
+    try new SerialRobot("under-period", model, new robotkit.profile.RobotProfile(),
       '/dev/robotkit-missing-${Sys.getPid()}',
       "000102030405060708090a0b0c0d0e0f", layout, 1e-6, 115200,
       Int64.ofInt(1000000), Int64.ofInt(2000000))
     catch (error:Dynamic) timingMessage = Std.string(error);
-    check(timingMessage.indexOf("runtime.createSerial") >= 0,
+    check(timingMessage.indexOf("serialEndpoint.create") >= 0,
       "serial construction reports an unavailable device");
     var unwiredMessage = "";
-    try new SerialRobot("unwired", model, '/dev/robotkit-missing-${Sys.getPid()}',
+    try new SerialRobot("unwired", model, new robotkit.profile.RobotProfile(), '/dev/robotkit-missing-${Sys.getPid()}',
       "000102030405060708090a0b0c0d0e0f", new DeviceLayout([]), 1e-6)
     catch (error:Dynamic) unwiredMessage = Std.string(error);
     check(unwiredMessage.indexOf("from 1 to 64") >= 0, "a serial robot needs a wired layout, not a default one");
@@ -4622,7 +4721,7 @@ class RobotWorldTests {
       "fixtures/device-deployment/deployment.json");
     equal(deployment.channels.length, 1, "deployment declares one process channel");
     equal(deployment.channels[0].id, "sprayer.flow", "deployment keeps channel ID");
-    var blueprint = RobotRuntimeCompiler.compile(deployment.binding.model);
+    var blueprint = RobotRuntimeCompiler.compile(deployment.binding.model, deployment.profile);
     for (channel in deployment.channels) blueprint.channels.push(channel);
     var simulationHarness = new SimulationHarness();
 
@@ -4643,7 +4742,7 @@ class RobotWorldTests {
     var joint = model.addJoint(new Joint("axis", JointType.Revolute, base, tool));
     joint.limits.lower = -1.0;
     joint.limits.upper = 1.0;
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     blueprint.channels.push(new ProcessChannelDeclaration("sprayer.flow",
       ProcessEventValue.Digital(false)));
     var simulationHarness = new SimulationHarness();
@@ -4689,7 +4788,7 @@ class RobotWorldTests {
     simulationHarness.dispose();
     // A commanded stop takes an ordinary channel to its safe value but leaves one that keeps on stop,
     // such as a vacuum holding a part; that one still goes safe on an emergency stop.
-    var holdBlueprint = RobotRuntimeCompiler.compile(model);
+    var holdBlueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     holdBlueprint.channels.push(new ProcessChannelDeclaration("sprayer.flow", ProcessEventValue.Digital(false)));
     holdBlueprint.channels.push(new ProcessChannelDeclaration("tool.vacuum", ProcessEventValue.Digital(false), true));
     simulationHarness = new SimulationHarness();
@@ -4734,17 +4833,17 @@ class RobotWorldTests {
       Transmission.SimpleTransmission(viseJoint.id, 1.0, 0.0));
     viseActuator.drive = viseDrive;
     model.addActuator(viseActuator);
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     check(blueprint.pneumaticDrives.length == 2 && blueprint.channels.length == 4,
       "cylinder compilation binds process joints and declares digital valve coils");
     check(Math.abs(blueprint.pneumaticDrives[0].ratedSpeed - drive.ratedSpeed) < 1e-9 &&
       Math.abs(blueprint.pneumaticDrives[1].ratedSpeed - viseDrive.ratedSpeed) < 1e-9,
       "cylinder rated speed remains simulation metadata for flow damping");
-    check(model.actuators[0].planningEffort() == 0.0 && model.actuators[0].planningRate() == 0.0,
+    check(model.actuators[0].planningEffort() == null && model.actuators[0].planningRate() == null,
       "process-driven pneumatic axes are excluded from trajectory planning limits");
     var encoded = RobotModelCodec.encode(model);
     check(RobotModelCodec.decode(encoded).actuators[0].drive.kind() == "pneumatic",
-      "RobotModel v7 preserves pneumatic process drives");
+      "RobotModel v10 preserves pneumatic process drives");
 
     var simulationHarness = new SimulationHarness();
     var runtime = simulationHarness.simulation.addRobot(blueprint);
@@ -4824,15 +4923,15 @@ class RobotWorldTests {
     presence.maxRange = 3.0;
 
     var simulationHarness = new SimulationHarness(0.01);
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     check(blueprint.velocityDrives.length == 1 && blueprint.channels.length == 2,
       "process spindle compiles to typed analog speed and direction channels");
     var encoded = RobotModelCodec.encode(model);
     var restored = RobotModelCodec.decode(encoded).actuators[0].processVelocity;
-    check(RobotModelCodec.VERSION == 8 && restored != null &&
+    check(RobotModelCodec.VERSION == 11 && restored != null &&
       restored.speedChannel == "spindle.speed" && restored.directionChannel == "spindle.direction" &&
       Math.abs(restored.radiansPerSpeedUnit - 1.0) < 1e-9,
-      "RobotModel v8 preserves the typed spindle process binding");
+      "RobotModel v11 preserves the typed spindle process binding");
     var runtime = simulationHarness.simulation.addRobot(blueprint);
     var robot = new SimulatedRobot("discrete-process-sensors", runtime,
       "discrete-process-sensors", ["base", "carriage", "spindle"], ["slide", "spindle"]);
@@ -4890,7 +4989,7 @@ class RobotWorldTests {
     var tool = model.addLink(new Link("tool"));
     var joint = model.addJoint(new Joint("axis", JointType.Revolute, base, tool));
     joint.limits = new JointLimits(-2.0, 2.0, 3.0, 10.0, 10.0);
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     var options = new VirtualDeviceOptions();
     options.stepsPerUnit = [1000.0];
     var simulationHarness = new SimulationHarness(0.01);
@@ -4921,7 +5020,7 @@ class RobotWorldTests {
     var simulationHarness = new SimulationHarness();
 
     var simulation = simulationHarness.simulation;
-    var runtime = simulation.addRobot(RobotRuntimeCompiler.compile(model));
+    var runtime = simulation.addRobot(RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()));
     var robot = new SimulatedRobot("sensor-reset", runtime, "sensor-reset", ["base"], []);
     simulationHarness.spawnBox([2.0, 0.0, 0.0], [0.25, 0.25, 0.25]);
     simulationHarness.step(Int64.ofInt(100));
@@ -4939,7 +5038,7 @@ class RobotWorldTests {
     equal(robot.snapshot().sensors.length, 3, "second sample publishes measured IMU");
     var rejected = false;
     try robot.submit(RobotCommand.JointTargets([
-      robotkit.world.JointTarget.position(0, 0.0)
+      robotkit.core.JointTarget.position(0, 0.0)
     ], Int64.ofInt(100)))
     catch (_:Dynamic) rejected = true;
     check(rejected, "simulation never silently ignores an unsupported deadline");
@@ -4986,7 +5085,7 @@ class RobotWorldTests {
     input[5] = -1.0;
     equal(snapshot.sensors.get(1).values.get(5), 9.81, "runtime sensor payload owns a copy");
     var copy = snapshot.withRobotId(Int64.ofInt(5));
-    var frames = robotkit.world.RobotSensorFrames.fromRuntimeSnapshot(copy);
+    var frames = robotkit.core.RobotSensorFrames.fromRuntimeSnapshot(copy);
     equal(frames.length, 3, "runtime projection preserves valid measurements");
     var mutable = frames[1].values.toArray();
     mutable[5] = 0.0;
@@ -4995,7 +5094,7 @@ class RobotWorldTests {
     var absent = new robotkit.runtime.RobotSnapshot(Int64.ofInt(1), Int64.ofInt(0),
       Int64.ofInt(999), 0, 0, 1, 0, [], [], []);
     equal(absent.receivedTimestampNs, Int64.ofInt(0), "unknown receipt is not source time");
-    equal(robotkit.world.RobotSensorFrames.fromRuntimeSnapshot(absent).length, 0,
+    equal(robotkit.core.RobotSensorFrames.fromRuntimeSnapshot(absent).length, 0,
       "endpoints without sensors do not fabricate IMU or LiDAR");
     var intents = new robotkit.behavior.IntentBuffer();
     intents.publish(new robotkit.behavior.JointTargetIntent(0, 1, 0.5, Int64.ofInt(100)));
@@ -5016,7 +5115,7 @@ class RobotWorldTests {
     model.addSensor(new robotkit.model.Sensor("lidar", "lidar", 10, "sensor/lidar"));
     var frame = model.addFrame(new robotkit.model.Frame("base frame", base, "frame/base"));
     model.addFrame(new robotkit.model.Frame("tool frame", tool, "frame/tool"));
-    var original = RobotRuntimeCompiler.compile(model, 1, 9);
+    var original = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile(), 1, 9);
     equal(original.calibrationRevision, 9, "compiler preserves calibration revision");
     var revisionSimulationHarness = new SimulationHarness();
 
@@ -5039,7 +5138,7 @@ class RobotWorldTests {
     model.sensors.reverse();
     frame.name = "renamed frame";
     model.frames.reverse();
-    var edited = RobotRuntimeCompiler.compile(model, 2);
+    var edited = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile(), 2);
     var editedIds = edited.identity;
     if (editedIds == null) throw "missing edited identity";
     equal(originalIds.linkIndex(base.id), 0, "old blueprint retains link mapping");
@@ -5068,7 +5167,7 @@ class RobotWorldTests {
     model.addSensor(new robotkit.model.Sensor("empty ID", "imu", 0, ""));
     model.addFrame(new robotkit.model.Frame("duplicate", base, frame.id));
     model.addFrame(new robotkit.model.Frame("foreign", new Link("foreign"), ""));
-    var diagnostics = RobotRuntimeCompiler.validate(model);
+    var diagnostics = RobotRuntimeCompiler.validate(model, new robotkit.profile.RobotProfile());
     check(hasDiagnostic(diagnostics, "RK_LINK_ID_DUPLICATE"), "duplicate link IDs rejected");
     check(hasDiagnostic(diagnostics, "RK_JOINT_ID_DUPLICATE"), "duplicate joint IDs rejected");
     check(hasDiagnostic(diagnostics, "RK_SENSOR_ID_DUPLICATE"), "duplicate sensor IDs rejected");
@@ -5085,7 +5184,7 @@ class RobotWorldTests {
     var shoulder = model.addJoint(new Joint("shoulder", JointType.Revolute, base, tool));
     shoulder.limits.lower = -1.0;
     shoulder.limits.upper = 1.0;
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     equal(blueprint.jointCount, 1, "compiler lowers a valid topology");
     equal(blueprint.linkCount, 2, "compiler preserves link count");
 
@@ -5097,7 +5196,7 @@ class RobotWorldTests {
     cycle.limits.lower = 2.0;
     cycle.limits.upper = -2.0;
     invalid.addJoint(new Joint("cycle", JointType.Floating, branch, root));
-    var diagnostics = RobotRuntimeCompiler.validate(invalid);
+    var diagnostics = RobotRuntimeCompiler.validate(invalid, new robotkit.profile.RobotProfile());
     check(hasDiagnostic(diagnostics, "RK_LINK_DUPLICATE"),
       "compiler reports duplicate link names");
     check(hasDiagnostic(diagnostics, "RK_JOINT_DUPLICATE"),
@@ -5113,11 +5212,11 @@ class RobotWorldTests {
     var forest = new RobotModel("forest");
     forest.addLink(new Link("left"));
     forest.addLink(new Link("right"));
-    check(hasDiagnostic(RobotRuntimeCompiler.validate(forest), "RK_TOPOLOGY_ROOT"),
+    check(hasDiagnostic(RobotRuntimeCompiler.validate(forest, new robotkit.profile.RobotProfile()), "RK_TOPOLOGY_ROOT"),
       "compiler requires exactly one topology root");
     var threw = false;
     try {
-      RobotRuntimeCompiler.compile(invalid);
+      RobotRuntimeCompiler.compile(invalid, new robotkit.profile.RobotProfile());
     } catch (error:RobotCompileException) {
       threw = true;
       check(error.diagnostics.length >= 5,
@@ -5151,7 +5250,7 @@ class RobotWorldTests {
     for (index in 0...500) {
       host.step(Int64.ofInt(4000 + index));
       for (event in remote.events(Int64.ofInt(0), 8)) switch event {
-        case robotkit.world.RobotEvent.Observation(_, value):
+        case robotkit.core.RobotEvent.Observation(_, value):
           if (value.sensorId == "front_camera" && value.sourceFrameId == "frame/front")
             worldObservation = true;
         case _:
@@ -5270,7 +5369,7 @@ class RobotWorldTests {
     var robot = new FakeRobot("arm");
     world.attach(robot);
     var command = RobotCommand.JointTargets([
-      robotkit.world.JointTarget.position(3, 1.25)
+      robotkit.core.JointTarget.position(3, 1.25)
     ], Int64.ofInt(99));
     world.submit("arm", command);
     equal(Std.string(robot.lastCommand), Std.string(command), "command forwarded to selected robot");
@@ -5309,7 +5408,7 @@ class RobotWorldTests {
     var snapshot = world.snapshot().robot("recorded-arm");
     check(snapshot != null, "recording test has a robot snapshot");
     recording.recordCommand(RobotCommand.JointTargets([
-      robotkit.world.JointTarget.position(0, 0.5)
+      robotkit.core.JointTarget.position(0, 0.5)
     ], null));
     recording.recordSnapshot(cast snapshot);
     recording.recordFault(new RobotFault("fault-1", 7, "test fault", false));
@@ -5370,16 +5469,16 @@ class RobotWorldTests {
 
     var duplicateRejected = false;
     try world.submit("sim-a", RobotCommand.JointTargets([
-      robotkit.world.JointTarget.position(0, 0.1),
-      robotkit.world.JointTarget.effort(0, 2.0)
+      robotkit.core.JointTarget.position(0, 0.1),
+      robotkit.core.JointTarget.effort(0, 2.0)
     ], null)) catch (_:Dynamic) duplicateRejected = true;
     check(duplicateRejected, "simulated adapter rejects an ambiguous atomic batch");
     world.submit("sim-a", RobotCommand.JointTargets([
-      robotkit.world.JointTarget.position(0, 0.4),
-      robotkit.world.JointTarget.position(1, -0.2)
+      robotkit.core.JointTarget.position(0, 0.4),
+      robotkit.core.JointTarget.position(1, -0.2)
     ], null));
     world.submit("sim-b", RobotCommand.JointTargets([
-      robotkit.world.JointTarget.position(0, -0.3)
+      robotkit.core.JointTarget.position(0, -0.3)
     ], null));
     simulationHarness.step(Int64.ofInt(1000));
 
@@ -5458,11 +5557,13 @@ class RobotWorldTests {
     joint.limits.velocity = 2.0;
     model.addActuator(new Actuator("shoulder-motor", 100.0, 1.0,
       Transmission.SimpleTransmission(joint.id, 2.0, 0.0)));
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    model.materializeLimits();
+    equal(model.joints[0].limits.requireVelocity(), 0.5, "the compiled model derives its motor speed cap");
+    var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     equal(blueprint.joints[0].maxRate, 0.5,
-      "runtime blueprint converts actuator rate to joint rate");
+      "runtime blueprint reads the compiled joint rate");
     equal(blueprint.joints[0].maxEffort, 200.0,
-      "runtime blueprint converts actuator effort to joint effort");
+      "runtime blueprint reads the compiled joint effort");
 
     var simulationHarness = new SimulationHarness(0.1);
 
@@ -5483,9 +5584,11 @@ class RobotWorldTests {
 
     var segmentSimulation = segmentSimulationHarness.simulation;
     var segmentRuntime = segmentSimulation.addRobot(blueprint);
-    segmentRuntime.submitTrajectory(TrajectoryChunk.fromSegments([
-      new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(200000000), [[0.0, 0.5]])
-    ]), 1);
+    segmentRuntime.submitPlan(new robotkit.execution.ExecutionPlanSubmission(Int64.ofInt(1),
+      Int64.ofInt(blueprint.revision), Int64.ofInt(blueprint.calibrationRevision),
+      RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
+      [0.0], [0.0], [0.0],
+      [new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(200000000), [[0.0, 0.5]])]), 1);
     segmentSimulationHarness.step(Int64.ofInt(100));
     check(segmentRuntime.snapshot().trajectoryQueueDepth == 1,
       "Haxe segment submission reaches native knot queue");
@@ -5503,7 +5606,7 @@ class RobotWorldTests {
     var writer = new McapRobotRecording(planPath, 1024 * 1024);
     var recorded = new RecordingRobot(new SimulatedRobot("plan-session", planRuntime,
       model.name, ["base", "tool"], ["shoulder"]), writer);
-    var plan = new robotkit.world.ExecutionPlanSubmission(Int64.ofInt(77),
+    var plan = new robotkit.execution.ExecutionPlanSubmission(Int64.ofInt(77),
       Int64.ofInt(blueprint.revision), Int64.ofInt(blueprint.calibrationRevision),
       RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
       [0.0], [0.0], [0.0],
@@ -5556,18 +5659,35 @@ class RobotWorldTests {
       Transmission.SimpleTransmission(joint.id, 2.0, 0.0)));
     var second = model.addActuator(new Actuator("second", 40.0, 0.3,
       Transmission.SimpleTransmission(joint.id, -1.0, 0.0)));
-    var limits = RobotRuntimeCompiler.compile(model).joints[0];
+    model.materializeLimits();
+    var limits = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()).joints[0];
     equal(limits.maxRate, 0.3, "multiple actuators use the slowest joint rate");
     equal(limits.maxEffort, 240.0, "multiple actuators sum joint effort");
     second.transmission = Transmission.SimpleTransmission(joint.id, 1.0, 0.0);
-    var positive = RobotRuntimeCompiler.compile(model).joints[0];
+    model.materializeLimits();
+    var positive = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()).joints[0];
     equal(positive.maxRate, limits.maxRate, "negative ratio keeps the same rate limit");
     equal(positive.maxEffort, limits.maxEffort, "negative ratio keeps the same effort limit");
-    joint.limits.velocity = 0.2;
-    joint.limits.effort = 200.0;
-    var tighter = RobotRuntimeCompiler.compile(model).joints[0];
+    joint.mechanicalLimits.velocity = 0.2;
+    joint.mechanicalLimits.effort = 200.0;
+    model.materializeLimits();
+    var tighter = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()).joints[0];
     equal(tighter.maxRate, 0.2, "joint rate remains the tighter claim");
     equal(tighter.maxEffort, 200.0, "joint effort remains the tighter claim");
+    joint.mechanicalLimits.velocity = 2.0;
+    second.maxRate = 0.8;
+    model.materializeLimits();
+    equal(joint.limits.velocity, 0.5, "a rebuild can raise a formerly tighter motor cap");
+    model.materializeLimits();
+    equal(joint.limits.velocity, 0.5, "effective limits do not feed back into mechanical facts");
+    var copied = RobotModelCodec.decode(RobotModelCodec.encode(model));
+    copied.actuators[0].maxRate = 2.0;
+    copied.materializeLimits();
+    equal(copied.joints[0].limits.velocity, 0.8, "saved mechanical facts survive a rebuild");
+    joint.mechanicalLimits.velocity = 0.0;
+    model.materializeLimits();
+    equal(RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()).joints[0].maxRate, 0.0,
+      "a stated zero velocity remains a stopped joint");
   }
 
   static function check(value:Bool, message:String):Void {
@@ -5578,7 +5698,6 @@ class RobotWorldTests {
   static function commandSummary(command:RobotCommand):String return switch command {
     case JointTargets(targets, _): [for (target in targets)
       '${target.joint}:${Std.string(target.mode)}:${target.target}'].join(",");
-    case TrajectoryChunk(chunk): 'trajectory:${chunk.segments.length}';
     case ExecutionPlan(plan): 'plan:${Int64.toStr(plan.planId)}';
     case Hold: 'hold';
     case Resume: 'resume';
@@ -5627,14 +5746,11 @@ private class FakeRobot implements Robot {
   public function status():RobotStatus return Ready;
   public function description():RobotDescription return new RobotDescription(
     logicalId, logicalId, [], jointNames);
-  public function capabilities():RobotCapabilities return new RobotCapabilities(
-    logicalId,
-    positions.length,
-    true,
-    true,
-    true,
-    false
-  );
+  public function capabilities():RobotCapabilities return new RobotCapabilities(logicalId,
+      positions.length,
+      [robotkit.core.JointTargetMode.Position, robotkit.core.JointTargetMode.Velocity, robotkit.core.JointTargetMode.Effort],
+      robotkit.core.ExecutionCapabilities.unavailable(),
+      new robotkit.core.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked));
   public function snapshot():RobotSnapshot return new RobotSnapshot(
     logicalId,
     Int64.ofInt(1),
@@ -5646,7 +5762,7 @@ private class FakeRobot implements Robot {
     0
   );
   public function sensors():Array<SensorFrame> return [];
-  public function events(afterOrdinal:haxe.Int64, max:Int):Array<robotkit.world.RobotEvent> return [];
+  public function events(afterOrdinal:haxe.Int64, max:Int):Array<robotkit.core.RobotEvent> return [];
   public function fault():Null < RobotFault > return null;
   public function submit(command:RobotCommand):Void lastCommand = command;
   public function stop(mode:StopMode):Void lastStop = mode;

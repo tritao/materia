@@ -36,7 +36,7 @@ assert [channel.topic for _, channel, _ in messages] == ["robotkit/" + name for 
 for ordinal, (schema, channel, message) in enumerate(messages):
     assert schema.encoding == "robotkit-wire"
     assert channel.message_encoding == "msgpack"
-    assert channel.metadata["robotkit.schema_version"] == "6"
+    assert channel.metadata["robotkit.schema_version"] == "7"
     spec = json.loads(schema.data)
     assert spec["root"] in spec["declarations"]
     payload = msgpack.unpackb(message.data, raw=False, strict_map_key=False)

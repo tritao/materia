@@ -16,13 +16,16 @@ import materia.units.LengthUnit;
 
 /** Versioned transport and validation for reusable assembly definitions and states. */
 class AssemblyDefinitionCodec {
-	public static inline var VERSION:Int = 2;
-	/** Pneumatic process drives require v3; assemblies without them retain v2 bytes. */
-	public static inline var PROCESS_VERSION:Int = 3;
-	/** Optional native sensor bindings require v4; older assemblies retain their bytes. */
-	public static inline var SENSOR_VERSION:Int = 4;
-	/** Analog process-velocity bindings require v5; earlier assembly bytes remain stable. */
-	public static inline var VELOCITY_VERSION:Int = 5;
+	public static inline var VERSION:Int = 3;
+	/** Pneumatic process drives require v4; assemblies without them retain v3 bytes. */
+	public static inline var PROCESS_VERSION:Int = 4;
+	/** Optional native sensor bindings require v5; older assemblies retain their bytes. */
+	public static inline var SENSOR_VERSION:Int = 5;
+	/** Analog process-velocity bindings require v6; earlier assembly bytes remain stable. */
+	public static inline var VELOCITY_VERSION:Int = 6;
+
+	static function supportedVersion(version:Int):Bool
+		return version >= VERSION && version <= VELOCITY_VERSION;
 
 	public static function encode(definition:AssemblyDefinition):String {
 		validate(definition);
@@ -30,8 +33,6 @@ class AssemblyDefinitionCodec {
 	}
 
 	public static function decode(text:String):AssemblyDefinition {
-		if (Reflect.hasField(Json.parse(text), "schemaVersion"))
-			throw "Assembly definitions in the old JSON format are no longer supported";
 		var result:AssemblyDefinition = JsonWire.decode(text);
 		validate(result);
 		return result;
@@ -43,14 +44,14 @@ class AssemblyDefinitionCodec {
 	}
 
 	public static function decodeState(definition:AssemblyDefinition, text:String):AssemblyStateRecord {
-		if (Reflect.hasField(Json.parse(text), "schemaVersion"))
-			throw "Assembly states in the old JSON format are no longer supported";
 		var decoded:AssemblyStateRecord = JsonWire.decode(text);
 		validateState(definition, decoded);
 		return decoded;
 	}
 
 	public static function validate(definition:AssemblyDefinition):Void {
+		if (definition != null && !supportedVersion(definition.schemaVersion))
+			throw 'schema v${definition.schemaVersion} is unsupported; supported v$VERSION through v$VELOCITY_VERSION';
 		if (definition != null && definition.assemblies != null && definition.assemblies.length > 0) {
 			validateFlat(AssemblyDefinitionFlattener.flatten(definition));
 			return;
@@ -59,8 +60,7 @@ class AssemblyDefinitionCodec {
 	}
 
 	static function validateFlat(definition:AssemblyDefinition):Void {
-		if (definition == null || (definition.schemaVersion != VERSION && definition.schemaVersion != PROCESS_VERSION &&
-			definition.schemaVersion != SENSOR_VERSION && definition.schemaVersion != VELOCITY_VERSION) || !validText(definition.id) ||
+		if (definition == null || !supportedVersion(definition.schemaVersion) || !validText(definition.id) ||
 			definition.definitions == null || definition.definitions.length == 0 ||
 			definition.definitions.length > 1000 || definition.occurrences == null ||
 			definition.occurrences.length == 0 || definition.occurrences.length > 1000 ||
@@ -173,6 +173,33 @@ class AssemblyDefinitionCodec {
 			if (!sourcesByTarget.exists(coupling.target)) sourcesByTarget.set(coupling.target, []);
 			sourcesByTarget.get(coupling.target).push(coupling.source);
 		}
+		var networkIds = new Map<String, Bool>(), owned = new Map<String, Bool>();
+		if (definition.elasticNetworks != null) for (network in definition.elasticNetworks) {
+			if (!validText(network.id) || networkIds.exists(network.id) || network.spans.length == 0)
+				throw "Assembly has an invalid elastic network";
+			networkIds.set(network.id, true);
+			for (id in network.couplings) {
+				if (!names.exists(id) || owned.exists(id)) throw "Elastic networks require distinct, existing motion couplings";
+				owned.set(id, true);
+			}
+			var clearanceJoints = new Map<String, Bool>();
+			if (network.clearances != null) for (clearance in network.clearances) {
+				if (!movable.exists(clearance.joint) || clearanceJoints.exists(clearance.joint) || !Math.isFinite(clearance.allowance) || clearance.allowance < 0)
+					throw "Elastic network has an invalid tooth-clearance coordinate";
+				clearanceJoints.set(clearance.joint, true);
+			}
+			for (span in network.spans) {
+				if (!(span.stiffness > 0) || !Math.isFinite(span.stiffness) || span.terms.length == 0)
+					throw "Elastic span needs positive finite stiffness and coordinate terms";
+				var terms = new Map<String, Bool>();
+				for (term in span.terms) {
+					if (!movable.exists(term.joint) || terms.exists(term.joint) || !Math.isFinite(term.coefficient) || term.coefficient == 0)
+						throw "Elastic span has an invalid or duplicate coordinate";
+					terms.set(term.joint, true);
+				}
+			}
+		}
+
 		var actuators = definition.actuators == null ? [] : definition.actuators;
 		if (actuators.length > 4000) throw "Assembly has too many actuators";
 		var actuatorIds = new Map<String, Bool>();
@@ -258,8 +285,7 @@ class AssemblyDefinitionCodec {
 		validate(definition);
 		state = AssemblyDefinitionFlattener.flattenState(definition, state);
 		definition = AssemblyDefinitionFlattener.flatten(definition);
-		if (state == null || (state.schemaVersion != VERSION && state.schemaVersion != PROCESS_VERSION &&
-			state.schemaVersion != SENSOR_VERSION && state.schemaVersion != VELOCITY_VERSION) || state.definition != definition.id ||
+		if (state == null || !supportedVersion(state.schemaVersion) || state.definition != definition.id ||
 			state.jointCoordinates == null || state.rootPoses == null ||
 			state.jointCoordinates.length > definition.joints.length ||
 			state.rootPoses.length > definition.occurrences.length)
@@ -388,6 +414,8 @@ class AssemblyDefinitionCodec {
 				if (index >= 2 && index % 2 == 0 && !(curve[index] > curve[index - 2])) return false;
 			}
 		}
+		if (actuator.fullStepsPerRevolution != null && actuator.fullStepsPerRevolution > 0
+			&& (actuator.microsteps == null || actuator.maxStepRate == null)) return false;
 		var kind = actuator.drive;
 		if (kind == null) return true;
 		if (kind == "pneumatic") {
@@ -397,7 +425,8 @@ class AssemblyDefinitionCodec {
 				validText(p.channelA) && (p.channelB == null || validText(p.channelB)) && Math.abs(p.extendSign) == 1;
 		}
 		if (actuator.pneumatic != null) return false;
-		if (kind == "stepper") return actuator.fullStepsPerRevolution != null && actuator.holdingTorque != null && curve != null;
+		if (kind == "stepper") return actuator.fullStepsPerRevolution != null && actuator.holdingTorque != null && curve != null
+			&& actuator.microsteps != null && actuator.maxStepRate != null;
 		if (kind == "servo")
 			return actuator.ratedTorque != null && actuator.peakTorque != null && actuator.ratedSpeed != null &&
 				actuator.maxSpeed != null && actuator.ratedTorque > 0 && actuator.peakTorque >= actuator.ratedTorque &&

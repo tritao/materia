@@ -47,7 +47,7 @@ class AccessibilityBridge {
 		var requestedFocus = focused == null ? NativeKitConstants.NK_ACCESSIBILITY_ROOT : focused.value;
 		var batch = buildUpdate(snapshot, previousParents, requestedFocus);
 		NativeKit.nk_surface_accessibility_update_with_removed_ids_checked(surface.nativeHandle(),
-			batch.nativeUpdate, batch.removedNodeIds, batch.removedNodeIds.length);
+			batch.nativeUpdate, batch.removedNodeIds);
 		previousParents = currentParents;
 	}
 

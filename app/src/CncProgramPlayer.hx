@@ -13,8 +13,8 @@ import robotkit.device.DeviceBinding;
 import robotkit.device.DeviceLayout;
 import robotkit.model.SteadyLoads;
 import robotkit.runtime.Simulation;
-import robotkit.world.ProcessChannelDeclaration;
-import robotkit.world.ProcessEventValue;
+import robotkit.execution.ProcessChannelDeclaration;
+import robotkit.execution.ProcessEventValue;
 import toolpathkit.motion.ToolpathSourceMap;
 import toolpathkit.path.MoveKind;
 import toolpathkit.path.Provenance;
@@ -206,7 +206,8 @@ class CncProgramPlayer implements SessionMember {
 			// lead screw and the motor turning it.
 			// Gravity, rail friction and the drives' drag come off what the motors can accelerate with.
 			var coupled = machineModel.coupledLimits(id, steady);
-			if (!(coupled.velocity > 0) || !(coupled.maxAcceleration > 0))
+			if (coupled.velocity == null || coupled.maxAcceleration == null ||
+					!(coupled.velocity > 0) || !(coupled.maxAcceleration > 0))
 				throw 'CNC axis "$id" needs velocity and acceleration limits, its own or its motors\'';
 			rapid = Math.max(rapid, coupled.velocity);
 			axes.push(new MotionAxisBlueprint(id, [id], lower * metresPerUnit, upper * metresPerUnit,

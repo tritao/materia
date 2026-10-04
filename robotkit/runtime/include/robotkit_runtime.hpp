@@ -2,7 +2,7 @@
 #define ROBOTKIT_RUNTIME_HPP
 
 #include "robotkit_runtime.h"
-#include "motionkit.hpp"
+#include "trajectory_core.hpp"
 
 #include <chrono>
 #include <condition_variable>

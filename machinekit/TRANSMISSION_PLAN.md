@@ -421,7 +421,7 @@ loops, PWM or thermal mass.
   `AssemblyModel.actuateDrive` takes a whole record; the bridge builds the drive.
   `RobotModelCodec` still writes `fullStepsPerRevolution` for every stepper and adds a
   `drive` object only for a stepper with ratings or a servo, so a model with a bare
-  stepper keeps its bytes and older models decode.
+  stepper keeps its bytes. X9 replaces earlier saved-model readers with one current schema.
   MachineKit: the `MotorDrive` interface (a part says its own actuator) is what
   `MachineAssembly.addMotor` calls. `NemaStepper` implements it, with a pull-out curve
   of the first-order model (`pullOutCurve`: points at 1, 1.1, 1.25 ... 8 times the
@@ -964,14 +964,12 @@ X8b implementation:
   stays intrinsic. Motor and driver families must match. Generic driver ratings join the actuator's
   assumption labels.
 - Optional actuator fields 21/22 carry microsteps and the driver's maximum step-input rate through
-  flattening, the CAD bridge and RobotModel's codec. DeviceLayout uses the actuator setting before
-  its legacy default. Legacy models omit these fields and retain their saved bytes. Deployment
-  enforcement and removal of job microsteps remain X8e.
-- An intrinsic servo encoder is now an actual sensor, replaced by separately wired feedback.
+  flattening, the CAD bridge and RobotModel's codec. DeviceLayout uses actuator driver settings. X9 requires these fields for every step/dir actuator.
+- X9 requires an explicitly wired encoder sensor instead of inferring one from servo ratings.
   Its counts are expressed at the joint, including gearbox reduction, rather than retaining an
   inline motor count as the new model's feedback. Sensor references are prefixed on inclusion.
-  Explicit encoder records distinguish wired feedback from the generated sensor even when they
-  use the same conventional id; later rewiring retains the previous wired sensor.
+  Encoder records are the sole source of feedback; servo curve counts are ratings, and
+  rewiring replaces the explicit sensor record.
 - Router and CoreXY drivers are fixed to their frames, arm amplifiers to the pedestal and wheel
   drivers to the base plate outside the battery footprint. Assumed solid envelopes add fixed mass:
   router 33.1 → 36.3 kg (four DM542-class drivers), mobile base 27 → 28.6 kg (two), CoreXY
@@ -1053,30 +1051,701 @@ X8d implementation:
 
 X8e implementation:
 
-- Machining jobs retain only `controller.stepTickHz`. Their decoder discards legacy job microsteps,
-  and subsequent saves omit them; driver settings come from the machine's actuator model.
-  `DeviceLayout.forActuators` no longer accepts a global microstep setting. It derives each channel
-  from its actuator, using full steps only for legacy models without driver settings.
-- Explicit channel wiring must agree with modelled microsteps. Legacy RobotModels without the
-  optional driver fields may retain explicit per-channel microsteps; existing device deployments
-  use this representation. Legacy virtual-device fixtures now state their channel wiring directly.
+- Machining jobs retain only `controller.stepTickHz`; driver settings come from the machine's actuator
+  model. X9 layouts carry actuator wiring only and require explicit driver settings on every stepper.
 - Pulse frequency is capped by `min(controller.stepTickHz, driver.maxStepRate)` before conversion
   to actuator rate. A faster board clock is valid: it idles between pulses. The tightened model
   supplies that same ceiling to planning and virtual/device execution without changing the source.
 - `SerialDeployment` already has controller identity/timing separate from channel wiring and no
   global microsteps, so its schema does not change. Runtime protocol and robotd documentation now
   describe driver-setting agreement and the driver input-rate ceiling.
-- Tests cover model codec settings, mismatched wiring, faster/slower controller clocks, immutable
-  source rates, legacy channel settings and discarding obsolete job settings. The legacy artifact
-  fixture replaces its length-prefixed JSON section: haxeon cannot add fields to a fixed anonymous
-  record or cast a dynamic object into that record. `IrGenerator` lowers a dynamic cast through
-  `checkedCast`/`safeCast`, not structural field reconstruction; reflection delegates to HashLink's
-  existing-field setters. The fixture avoids both restrictions without changing haxeon.
-- Validation: focused ProjectKit passed (100 assertions), then the full `x7-suite-x8e-complete.txt`
-  gate passed every suite, application build and project-source tests. RobotKit world passed
-  4906 assertions and MotionKit 9756. All X8d engineering baselines are unchanged: router plate
-  times 220.2/201.6 s, deviations 0.05/1.89 mm, CoreXY 204.1 rad/s, 649.6 mm/s and 71.6/34 m/s²,
-  arm/mobile mission times and the mobile obstacle summary. No scope remains in X7 or X8.
+- Tests cover model codec settings, faster/slower controller clocks and immutable source rates.
+  X9 replaces the earlier saved-data recovery paths and fixtures with current-schema rejection.
+
+
+### X9 — Review fixes, no legacy compatibility, and the belt and load model
+
+Status: X9a–X9d complete (2026-10-03), from a review of X7/X8 (`45d44846..351e772c`). The full suite passed
+at `351e772c`, but that review found two confirmed bugs (arm and wheel joints lost their limits;
+CoreXY Y takes the X strand's belt stiffness) plus model gaps and loose ends.
+
+Policy for this milestone and after: **no backward compatibility for saved data.** Old files,
+saved models, jobs and layouts are not migrated. Each saved format has one current schema
+version, and anything else is rejected with one generic message ("schema vN is unsupported;
+expected vM"). Remove compatibility code instead of maintaining it. Example projects, fixtures and
+test data are regenerated by the current code. Wire ids may stay as they are, but comments about
+retired ids go.
+
+Each step has its own commit. At the user's request, the full suite (`x7-suite.sh`) ran after
+the complete milestone rather than at each intermediate change. The final combined gate
+`x7-suite-x9-final7.txt` passes all 13 kit suites, the app build and project-source tests.
+MotionKit passes 9881 assertions and RobotKit world passes 4912. Seven selected native suites
+pass (`x9-native-final2-tests.log`): runtime, validation, RKD6 compiler, virtual endpoint, MotionKit
+validation, generator and path. Focused continuous-jog/session-end/blend checks pass 72/484/1036
+assertions too. Each changed engineering number and its reason is recorded below; wall times,
+allocations and collection counts remain performance observations.
+
+#### X9a — Correctness
+
+Progress: complete. Catalog selectors, document motor/encoder sources, required sense, per-field overrides,
+read-only derived couplings and chain type/spec checks are implemented. Rebuilds retain incompatible
+transmissions with actionable diagnostics and warn when resolved values replace a saved coupling.
+Nullable effective limits now reach the compiled model and native runtime; native presence bits
+separate missing caps from stated zeros. Runtime lowering no longer derives coupled caps. The axis
+convenience compilers use the physical assembly and its resolved transmissions, retaining rated
+motor assumptions; they state a 24 V rated-current drive with 16 microsteps and the generic DM542
+step-input rating. Each stage's grounded preview parts attach to its motor body. Driver/controller
+ceilings are named in plan-check `speedLimits` (informational, not plan violations). RKD6 feedback reconstructs independent carriage coordinates from the measured motor Jacobian,
+including summed CoreXY terms and offsets; unobservable wired combinations are rejected. Native
+float segment seams use twice the declared conversion error, while queued C2 checks retain a
+bounded nanosecond quantization allowance. Hardware rate and position checks remain enforced. Mechanical limits are retained separately from effective limits,
+so rebuilds cannot feed derived follower caps back into the sources and motor edits can raise caps.
+The combined milestone gate above verifies the final implementation, including physical limits,
+held/replaced/jogged motion, virtual motor feedback and real-discontinuity rejection.
+
+X9a number changes: convenience NEMA 23 / 10 mm screw axes requested at 100 mm/s now cap near
+43.7 mm/s: they use the actual 24 V rated-current motor curve through the resolved screw, rather
+than a synthetic rated motor. XYZ fixtures now carry 7 links / 6 joints instead of 4 / 3: the
+three motor shafts remain explicit alongside the three carriage travels (three independent DOFs).
+The convenience XYZ carriage body origins are 82 rather than 112 mm on each axis: the old datum
+was the bore connector; the physical body origin is 30 mm behind it. Kinematics checks now derive
+that offset from each carriage connector. Virtual channel ratios become 1 for explicit shaft
+coordinates; the source screw coupling still owns the signed travel-to-rotation ratio. Start vectors, goals,
+jerks, IK jump guards and tolerances use the saved axis mapping, including shaft units. Accepted
+jog fixtures change 50 → 40 and 80 → 43 mm/s (reversal −50 → −40 mm/s) to stay below the physical
+43.7 mm/s ceiling. The clamp fixture requests the compiled ceiling rather than 100 mm/s, and
+the rejected-jog test derives its bound as 1.001 times that ceiling.
+The late-replacement fixture uses 40 mm/s for 2.5 s instead of 50 mm/s for 2 s, retaining its
+100 mm endpoint. It delays the replacement at tick 80 rather than 40, so the two-second stream
+window includes the longer jog's final deceleration before the deliberately late arrival.
+A Cartesian acceleration-cap regression compares 0.4 against 2 m/s² rather
+than requiring the peak to reach 2: the retiming grid reaches 1.515 m/s² at the lower speed cap. The router summaries
+read screw critical speed from mechanical limits, rather than accidentally labelling a motor's
+compiled effective cap as the screw critical speed.
+
+The Cartesian blend fixture at these physical caps takes 2.524 s with exact stops, 2.544 s
+with a 0.5 mm fillet and 2.457 s with a 2 mm fillet. A small fillet is not guaranteed to be
+faster under the conservative junction bounds. The test keeps the 0.5 mm geometry and
+non-stop checks, and uses the 2 mm fillet to demonstrate the speed/tolerance tradeoff.
+
+Haxeon issue: `ExpressionTyper.comparison` contextually types its right operand as the left Int
+before numeric promotion; a Float-valued conditional therefore fails E1003. The local workaround
+uses `driverRate == null || stepTickHz < driverRate`. `Parser.parseEnumAbstract` accepts only
+constants, so finding-kind quantity selection lives in the `PlanDiagnostic` helper class instead
+of an enum-abstract method. Haxeon is unchanged. Cartesian validation now normalizes mapped shaft
+coordinates to carriage units, keeping the 1 nm continuity claim independent of screw ratio.
+Cartesian retiming and Hermite lowering use those same units, so their 1 µm distance tolerance
+does not become a shaft-angle tolerance that changes with gearing.
+Followers' polynomial coefficients are rebuilt from the axis mapping after lowering instead of
+keeping independent Hermite fits. Axis moves and jog replacements run Ruckig once per logical
+axis and project its complete polynomial onto the physical joints, so followers cannot acquire
+independent rounding or synchronization profiles. Smooth replacements recover the whole trajectory's
+clock origin from the streamer's recorded chunk offset; a later chunk tag cannot restart that clock
+at zero. Continuous-jog regressions exercise replacements on both sides of chunk boundaries.
+Native Ruckig lowering preserves the requested position, velocity and acceleration exactly at
+time zero when an initial phase collapses below a nanosecond; its rounding belongs to the next
+phase seam, rather than changing the promised replacement anchor.
+Path limits allow 1 pm of floating-point roundoff for ordinary
+travel ranges; a 1 nm authored excursion is still rejected. Checked machine streams declare the
+same half-nanosecond jerk-based seam allowance as the native runtime, whose physical cap remains.
+Machine submissions project their 1e-6 logical-unit position/velocity/acceleration tolerances
+through the axis mapping too. For a 2 mm-lead screw the shaft allowance is 0.003142 rather than
+0.000001 rad (or its derivative units), retaining the same 1 µm carriage allowance through a
+blended-path continuation. Native checked-C2 comparisons still cap the declared allowance by
+the clock quantization bound.
+Native C0 comparisons use the position range's numerical tolerance, bounded by one clock quantum
+of observed travel, rather than the requested jump as their scale. Regression tests cover
+metres/radians, shifted origins, broad continuous-joint ranges and a real discontinuity. A
+0.137 µrad screw seam (0.044 nm of carriage travel) no longer fails; wide joint ranges cannot
+widen this allowance unchecked.
+
+- **Compiled joint limits.** `RobotModel` is the compiled model, so it holds the effective
+  limits.
+  - After adding actuators, `AssemblySimulationBridge` writes `RobotModel.coupledLimits(joint)`
+    into each joint's velocity/effort/acceleration limits: the tighter of the mechanical stop and
+    the drive.
+  - MachineKit joints state only mechanical limits.
+  - A missing limit stays missing (`Null`). Remove the bridge's `null → 0` ("unlimited")
+    conversion, and every place that reads 0 as unlimited.
+  - `RobotRuntimeCompiler` then reads the compiled limits instead of deriving its own.
+  - Test: the arm's compiled joint limits equal its drives' (2.09/2.09/2.38/2.99/2.99/4.03 rad/s
+    before gearbox changes), and the mission planner and jogging use them. Without this, the
+    mission planner falls back to 2.0 rad/s and jogging is unbounded.
+- **One screw path in the compiler.** `MachineKitRobotCompiler.compileLinearAxisModel` and
+  `compileXYZGantry` compile through the axis's `MachineAssembly` and `compileAssemblyAxes`.
+  Delete `addPrismaticJoint`'s own `2π / travelPerRevolution` ratio. Compiled motors keep their
+  assumption labels.
+- **Design errors are diagnostics, not throws.**
+  - Rebuilding (`fromDescription`, `include`, document load) always yields the assembly plus
+    `machinekit.assembly.Diagnostics`.
+  - A transmission whose parts don't fit stays unresolved, with an error naming it and the fix:
+    a screw/nut thread mismatch ("update the nut to match the screw"), gear/rack module mismatch,
+    a chain member that isn't a chain or doesn't match the sprocket.
+  - Only malformed data (wrong schema, missing members) still throws.
+- **Derived couplings are read-only.**
+  - `MachineAssembly` throws on any edit by id of a coupling a transmission owns.
+  - On load, a stored coupling that differs from its resolved values gives a warning naming the
+    transmission.
+  - (Implements X7's planned guard, which was skipped.)
+- **API cleanups.**
+  - `Sense` is required on `addTransmission` (no default); restore the per-kind meaning of +1 in
+    the `Transmission` docs.
+  - Overrides are set per field (state / clear / leave each of stiffness, backlash, drag), not
+    all three at once.
+  - `RollerChain` checks the chain member's type and that it matches the sprocket's spec.
+  - Recipes list their options from the catalog. `GearedArmJoint` lacks `GENERIC-SERVO-100W`
+    today. Add a test that every recipe offers every catalog entry.
+- **Documents save sources, not compiled arrays.** `MachineAssemblyDocuments` saves the
+  machine-side source records, including motor bindings and wired `EncoderRecord`s (missing even
+  before X8), and compiles actuators and sensors on load. No document may lose a binding.
+- **Driver step-input ceiling always applies.** The driver's maximum step rate caps the model's
+  planning limits on its own. A bound controller's tick rate caps them further. When either one is
+  what limits an axis, the plan check names it ("y limited by driver step input").
+- Fix the stale `MobileBase` docs (the gearhead is now drawn; the wheel no longer sits on the
+  motor shaft).
+
+#### X9b — Remove legacy compatibility
+
+Progress: complete, verified by the combined milestone gate. Scene artifacts now have
+one schema (v15), with no snapshot section or old-version readers. App previews and the inspector
+read the current assembly definition/state directly. RobotModel v7 saves drive records and nullable
+caps; layouts use schema v1 and actuator wiring only. Stepper models require driver settings.
+
+Compatibility survey: removed MachineKit's derived-property migration, edited-default recovery,
+missing-tool-input fallback, old scene readers and controller microstep recovery, joint-only layouts,
+channel microsteps/full-step fallback, legacy assembly snapshots/codecs, inferred servo encoder
+sensors, and deployment-specific migration instructions. The shared CadKit DocumentCodec also
+accepts only v11, because MachineKit recipes load through it; its v1–v10 branches and migration
+registry are removed. BimKit uses the same current v11 document format; its old wrapper/import
+readers and fixtures are removed. Obsolete document/naming fixtures are removed. Native derivative claims use
+presence bits only; MotionKit's internal TOPPRA validator explicitly claims its velocity and
+acceleration bounds too. Current fixtures are regenerated through the v7 model and v1 layout
+codecs, with explicit drivers and current deployment versions. Optional current-format fields remain optional. Runtime detector
+records, hook APIs and protocol rejection tests are not saved-data migration paths. App user-data
+migrations remain out of scope.
+
+Delete, with their tests and fixtures:
+
+- `MachineAssembly.checkDescriptionVersion`'s version-specific messages. Use one generic check
+  inside `fromDescription`, so every caller (including direct `JsonWire.decode` users such as
+  `EndEffectorExampleChecks`) gets it.
+- `SceneArtifact`: dropping old `controller.microsteps`, and the length-prefixed legacy-artifact
+  fixture in `ProjectKitTests`. Machining jobs carry `stepTickHz` only.
+- `DeviceLayout`/`DeviceBinding`:
+  - layouts that name joints (layouts name actuators);
+  - the full-steps fallback for models without driver settings;
+  - explicit per-channel microsteps (they come from the actuator).
+  - A stepper actuator without `microsteps` and a step-rate ceiling is a model error. Regenerate
+    the virtual-device fixtures from models.
+- `AssemblyActuator`: "absent for legacy actuators" wording; driver fields are required for
+  step/dir actuators.
+- Comments and plan text that justify behaviour by old data ("older models still load", "legacy
+  models may state…", "retired id").
+- Other compatibility paths in the kits this work touches (machinekit, projectkit, robotkit,
+  motionkit). Survey them, remove those that only serve old saved data, and record each one here.
+  Known candidates:
+  - the `machinekit.legacy-derived-properties` document migration and the edited-defaults version
+    check in `MachineKitRecipes`;
+  - `AssemblyRecord`'s legacy snapshot and `MateriaProjectRunner.legacySnapshot`.
+
+  App-level user data (`AppPreferences` legacy-file import, `EditorWorkspaceLayout` viewport
+  migration, `ScriptOwnershipRecord`) is out of scope: leave it unless the user decides otherwise.
+
+#### X9c — Belt and load model
+
+Progress: complete, verified by the combined milestone gate. Belt paths save an explicit
+clamp connector and wrap connectors in loop order (approved by the user), so assembly poses identify
+moving wraps. Assembly schema v6 saves these sources and rebuilds them, including nested tools.
+Drive stiffness uses both elastic paths to a held drive pulley and the weakest sampled travel pose;
+part length and attachment routing must agree. Idlers carry no elastic spring. The shared drive
+compliance is the inverse of Jᵀ diag(K_motor) J with rigid motor constraints; motor lost motion is
+projected through the full Jacobian. A shared belt uses the weakest motor-side spring found
+across its sampled leader travels, making the rebuilt matrix a conservative constant envelope.
+Plan checks apply the force vector including gravity to this compliance. Missing catalog belt modulus, rail drag and gearbox input inertia stay labelled
+assumptions. Per-quantity provenance follows rebuilds and each diagnostic selects the fields it uses.
+
+
+X9c baseline changes (physical deterministic results; per-tick wall times and collection counts
+are performance observations, not engineering baselines):
+
+- Belt router planned Y/X acceleration 12.35/14.18 → 12.25/14.06 m/s²: passive idler bearing drag
+  now reaches the axis load. Bare motor acceleration stays 12.79/15.08 m/s².
+- Belt router worst deviation 1.894 → 1.759 mm; tolerance findings 64 → 76: clamp-to-drive span
+  lengths and the shared Jacobian replace the selected-strand and series/share approximations.
+  The worst finding moves from line 150/op 4 at 1973.551 mm (0.027 s) to line 252/op 9 at
+  270.48 mm (0.04 s), because the governing elastic load changes. Flagged plans stay 57 of 126.
+- Belt router worst motor utilization 56.6 → 56.4%: the matrix/load projection and idler drag
+  change the motor load sampled along each retimed plan. No stepper stalls remain.
+- CoreXY bare X acceleration 71.6 → 71.5 m/s² (71.549 in the app): idlers no longer apply drive
+  efficiency to their reflected inertia. Bare Y remains 34 m/s²; motor speed and axis speed
+  remain 204.1 rad/s and 649.6 mm/s.
+- CoreXY deviation 0.088 → 0.148 mm at planned limits: Y uses its actual frame spans, shared
+  belt compliance and passive bearing drag.
+  Planned accelerations 57.957/27.542 → 38.264/21.306 m/s²: five passive idler bearings per
+  belt now contribute drag under steady loads. The square takes 79 → 85 ticks, with peak motor
+  speeds 96.2/132 → 86.8/124.5 rad/s because those short moves accelerate more slowly.
+  Accuracy findings are checked separately from stall findings; the belts exceed 0.1 mm.
+- The deliberate overload fixture uses 10× rather than 3× caps: the conservative Y acceleration
+  with idler drag no longer stalls on the old short move. Its diagonal uses equal X/Y caps to
+  keep one motor still, rather than generating a curved move with different axis accelerations.
+
+Unchanged router machining baselines: screw/belt 220.2/201.6 s; removed 9914.9 of 9996.5 mm³,
+leftover 63.5 mm³ and gouge 0.6 mm³; rapid-labelled cutting ticks 0/6. Screw utilization/deviation
+remain 56.7% / 0.05 mm, with 126 plans and no findings. Router bare and controller-limited speeds,
+screw accelerations, belt tooth counts and part lengths are unchanged.
+
+- **Belt stiffness from geometry.** `TimingBelt(belt, pulley)` drops the hand-picked strand
+  index. The resolver works out, from the belt's path, how much each span stretches per unit of the
+  leader, and takes the stiffness from those span lengths and stretches.
+  - A two-pulley loop reproduces `EA(1/a + 1/(L − a))`.
+  - CoreXY Y gets its frame spans. Today both axes use strand 0, so the recorded 0.088 mm CoreXY
+    deviation is wrong.
+- **Idlers are not drives.** A new source kind `BeltIdler(belt, pulley)` resolves ratio and bearing
+  drag only. Belt stiffness belongs to the pulley that delivers torque. The router's and CoreXY's
+  idlers use it, so no consumer can count a belt twice.
+- **Axis stiffness from the coupling Jacobian.** Replace `DriveLoads`' `terms > 1` series rule and
+  share-weighted compliance with the general rule:
+  - axis stiffness matrix `Jᵀ · diag(K_motor-side) · J`, with `J` from the coupling ratios (motor
+    coordinates per axis unit);
+  - backlash as the worst projection of each motor's lost motion.
+
+  This covers single drives, parallel dual-Y and CoreXY (equal belt tension whatever the motors)
+  without special cases.
+- **Provenance per field.**
+  - Assumption labels are kept per quantity (stiffness, backlash, drag, efficiency, inertia, motor
+    curve, speed limit), and each finding kind declares which quantities it uses. Deviation uses
+    stiffness, backlash, drag and steady loads; stall uses the motor curve, inertia, efficiency and
+    drag.
+  - The screw critical-speed label moves from the coupling to the joint's speed limit.
+  - Label what is still unlabelled: rigid screw/gear/chain couplings ("rigid"), rail drag,
+    `ArmJoint`'s servo ratings basis (saved in its recipe).
+- **Gearbox reflected inertia.** Gearbox entries carry input inertia, added to the motor's
+  armature through the ratio. It is assumed until there's catalog data.
+
+#### X9d — Example design follow-ups
+
+Progress: complete, verified by the combined milestone gate. Gearboxes declare a saved mass and
+housing inertia, using a steel-class annular engineering estimate until catalog data is available.
+The base plate derives its width from the wheel slots and checks a 10 mm minimum web; track remains
+380 mm. Wheel limits read rebuilt actuator ratings from the connected battery, with a 48 V regression.
+The shared KinematicsKit helper derives the unicycle envelope from compiled wheel caps; navigation, path
+trajectory planning and commands all use it, and the preview checks combined translation and turning.
+Deployment note: RKD6 at 40 kHz and 16 microsteps caps this base near 0.59 m/s; 8 microsteps or a
+faster board can raise that ceiling.
+
+
+X9d baseline changes:
+
+- Arm mass above the base flange 18.3 → 20.3 kg; total 148.1 → 150.1 kg: steel-class annular
+  declared gearbox masses replace aluminium display-envelope estimates.
+- Mobile base 29.3 → 30.8 kg; plate width 440 → 452 mm: steel-class gearheads and a plate sized
+  from wheel slots plus a checked 10 mm edge web replace the old 4 mm web. Track stays 380 mm.
+- Mobile cell mission completion times 9.6/15.1/23.6/29/34.5/41/46.6/57.6 →
+  9.6/15.1/25.2/30.6/36.1/47.8/53.2/61 s: combined turning/translation now respects the wheel
+  envelope, with declared gearhead masses in the MuJoCo plant.
+- Mobile obstacle round 59 → 65 s, closest obstacle 419 → 416 mm: the same wheel envelope and
+  plant mass changes alter path timing and sensor-triggered replanning. Cruise/minimum speed
+  remain 0.4/0 m/s, with one replan.
+
+Held example baselines: arm pick/place 5.8/12/17.2/23.5 s; both mobile backends travel 400 mm
+in 1 s and turn 0.5 rad, with 400 mm odometry. Definition/occurrence/BOM counts stay arm 32/38,
+router 33/61/32, mobile 11/20/11 and CoreXY 17/38/17; the mobile cell still has 48 definitions
+and 3 goals.
+
+
+- **Gearbox mass from catalog data.** `Gearbox` entries state mass and inertia
+  (`declaredMass`), assumed steel-class values until there's catalog data. The aluminium envelope
+  stays for display and collision only. The rebuilt moving mass is 20.3 kg with these assumptions,
+  replacing the preliminary estimate near 20.6 kg.
+- **Derived base plate.** Keep the derived 380 mm track. The plate half-width becomes wheel slot
+  edge plus a minimum web (design rule, 10 mm, checked), replacing today's 4 mm web.
+- **Base velocity envelope.** The base's speed limits are a unicycle envelope from the wheels:
+  `|v| + |ω|·b/2 ≤ ω_wheel·r`, used by the planner and the preview check. Today a fast turn at top
+  speed asks for 15.7 rad/s against 13.7.
+- **Supply-derived wheel limits.** `WHEEL_SPEED`/`WHEEL_TORQUE` come from the battery through the
+  power graph, not the stated 24 V fallback, so changing the pack (the mobile welder's 48 V) moves
+  every limit.
+- Design note, no code: on the RKD6 board (40 kHz tick, 16 microsteps) the base tops out near
+  0.59 m/s. With the X9a ceiling this shows in the plan check. Choosing 8 microsteps for the
+  wheels, or a faster board, is a deployment decision.
+
+Merge order: X7–X9 onto local main first, then rebase the `mobile-welder` branch. It must take
+the 24 V → supply-derived wheel limits and the `RobotArm.hx` changes.
+
+#### X9e — Review fixes for X9
+
+Status: complete (2026-10-03). `x7-suite-x9e-final2.txt` reports 11/11 kit suites, CadKit,
+MachineKit, app build and project-source suite at exit 0. Focused app worker/scene tests,
+humanoid tests and mixed-scene command, and native RobotKit/SimKit MuJoCo tests also passed.
+This review follows X9 on local main `4b952231f` (X9 merged with the robot welder).
+
+**Breaks (fix first):**
+
+- **Worker examples don't open.** `app/examples/worker-rack-to-table.materia` and
+  `worker-gallery.materia` embed a `cadkit.document` at v9. Since X9b only v11 loads, so the Start
+  page examples and `--worker-demo` fail. Regenerate rack-to-table with the current code, then the
+  gallery from it (`app/tools/make-worker-gallery.py`). Add both to the gate.
+- **Plan check uses the wrong axes for partial plans.** `PlanCheck.hx` (around line 205) builds
+  forces only for the plan's axes, but `loads[0].elastic` is a `DriveCompliance` over every driven
+  axis in the model, and `DriveCompliance.deflections` never checks the size.
+  - Build the compliance for the plan's axes: other axes are held by their own drives.
+  - Make `deflections` reject a size mismatch.
+  - Test with a model that has a driven axis outside the plan, ordered before the plan's axes.
+- **Under-actuated coupled pairs throw everywhere.** `DriveLoads.of` always inverts the shared
+  matrix (`DriveCompliance.invert` throws "singular coupling Jacobian"), and `RobotModel.steadyForce`
+  and the effective limits go through it.
+  - A CoreXY with one motor bound (mid-edit) must give a design diagnostic and per-axis limits
+    from what is driven, not a throw.
+  - Build loads and the matrix once per model, not once per `forAxis` call.
+- **Humanoid mixed scene arm is frozen.** `robotkit/tools/humanoid/src/humanoid/MixedScene.hx:55`
+  sets `velocity = 0.0`, which X9a made a real cap of 0. Use `null` or a real cap. Make its check
+  prove the arm moves, not just that it matches the arm alone.
+- **Sensor documents don't reload.** `app/src/SensorConfiguration.hx` saves missing limits as
+  `null` but loads them with `finite()`. Load them as nullable, and save `maxAcceleration` and the
+  mechanical limits too. Test the round-trip with a URDF joint that has no velocity limit.
+
+**Model errors:**
+
+- **Gearbox input inertia.** `Gearbox`'s default 5e-5 kg·m² for every size is about 17× the 50 W
+  servo's rotor; real 60 mm planetary and size 14–17 strain-wave heads are about 1e-6–8e-6. Scale it
+  with gearbox size (or take it from catalog entries), labelled assumed. Re-record the arm's numbers.
+- **Idler drag.** `BeltIdler` resolves with the belt family's drag, so CoreXY (5 idlers a belt) counts
+  belt drag about 6× and applies it to both axes even when an idler doesn't turn. Use an idler
+  bearing drag, and apply it only along the axes that turn that idler. Re-record CoreXY's
+  acceleration (57.96 → 38.26 m/s² came from this).
+- **Belt stiffness minimum on 2-D paths.** `BeltStretch` samples only the leader's own travel, with
+  other joints at their defaults. For a clamp that moves with two axes (CoreXY), search the joint
+  workspace (corners plus the balanced-length points) for the softest pose. With no travel limits,
+  report that the minimum is unknown instead of using the default pose alone.
+- **Mobile base envelope vs acceleration.** `robotkit/mobile/MobileBase.hx` scales the command to
+  the velocity envelope after `motionLimits.constrain`, so a turn request can cut forward speed in
+  one tick. Apply the envelope before the acceleration limits, so deceleration stays within them.
+  Make the preview check test something `constrain()` doesn't guarantee by construction.
+- **Rebuilt end effectors keep diagnostics.** `MachineAssembly.copyInto` (used by
+  `EndEffector.fromDescription` and `EndEffectorSet.fromDescription`) drops `diagnostics`, so a
+  tool's design error resurfaces as a throw in `addTo`. Copy them.
+- **Smaller:**
+  - Gearbox mass: derive it from size (or catalog) on every rebuild, not a saved `massKg`, and
+    label it assumed.
+  - A stated stiffness skips the belt-geometry derivation instead of failing with it.
+  - `MachineKitRobotCompiler` must not save a requested planning speed/acceleration as a mechanical
+    limit.
+  - A stated effort of 0 means the same in runtime, simulation and MuJoCo (today: fault vs unlimited).
+  - `writeTransmission` clears a screw speed cap when a later resolve has none.
+  - The recipe-catalog test covers every catalog-backed parameter, not only ones named `servo`.
+
+**Stale docs from X9b:**
+
+- `robotkit/robotd/README.md` (layout channels no longer state `microsteps`; layouts carry
+  `schemaVersion: 1`) and `robotkit/runtime/DEVICE_PROTOCOL.md` ("legacy models may state them").
+- CadKit: `MODELING.md` ("older documents remain readable"), `TopologyFingerprint.hx` comments,
+  `cadkit/plans/TOPOLOGICAL_NAMING.md` and `CONSTRAINT_SOLVING.md` (the deleted pre-v10
+  `BOX_FILLET_V10` case is still listed as passing).
+- `projectkit/README.md` (scene artifact v10) and `machinekit/TODO.md` (compatibility reader).
+
+Also record in this plan that X9b removed CadKit `DocumentCodec` v1–v10 and the BimKit v2 import,
+beyond the kits X9b listed. The user accepted it with the no-compatibility policy.
+
+X9b also removed CadKit `DocumentCodec` v1–v10 and the BimKit v2 import. The
+user accepted both under the no-compatibility policy; old fixtures and docs
+describing those readers are historical only.
+
+**Watch:** the welder arm now plans at its drive caps (2.09–4.03 rad/s) instead of the 2.0 rad/s
+fallback. Check the robot welder's timing expectations (`ProjectSourceTests.checkRobotWelder`) and
+re-record any that move.
+
+**X10 review findings to fix in the same pass (2026-10-03):** The passing X10 gate exercised
+the folded-Z network, but did not establish correct behavior for every mixed machine.
+
+- A network anywhere switches every axis to `ElasticSolve`. Scope assumptions, compliance,
+  backlash, and diagnostics to the network's connected axes. Test a CoreXY and an independent
+  screw axis alongside a shaft-belt network. Preserve the largest lost-motion allowance for
+  several couplings driving one joint, and keep an unbound motor from breaking unrelated axes.
+- Derive belt-reduction direction from the pulley contact sides and axes of the posed path;
+  validate authored `Sense` against that direction. Check an ordinary two-pulley loop and a
+  back-side serpentine wrap. A sign that only follows the authored coupling is insufficient.
+- Give every loaded screw pulley in a Z-sync loop the tooth-contact clearance, including
+  outputs joined by lead-screw constraints rather than their own reduction record.
+- Make the folded-Z motor mount tensionable with an explicit range and verify belt working
+  tension against a stated catalog or engineering limit. Assert its expected speed,
+  acceleration, stiffness, backlash and mass so those numbers cannot drift silently.
+- Finish the shared belt-span calculation for both carriage clamps and rotary attachments;
+  validate path wrap count before indexing; specify pretension and reject load cases that
+  would slacken a span. Record the cost of posing a copy on each `describe()` rebuild.
+- Verify the suspected HXI ordering defect before changing haxeon: `PackageResolver.resolveFiles`
+  alphabetizes RobotKit's interfaces, but the pinned haxeon also orders them by declared
+  dependencies before registration. Keep the router's CadBridge assertions in MachineKit tests;
+  record whether the compiler issue actually remains.
+
+The completed fix pass has a passing full gate, and each changed engineering number is recorded
+here with a reason.
+
+X9e resolves belt-network compliance only for axes connected by shared motors or elastic spans;
+independent screw axes retain their own solve and assumptions. Under-actuated groups keep a design
+diagnostic and per-axis limits without blocking independent groups. A pulley reduction gets its
+direction from the belt's contact sides and posed joint axes; an incompatible authored Sense is a
+design error. Every loaded screw pulley in a Z-sync loop receives tooth clearance. Belts use the
+same free-span spring calculation for carriage and shaft attachments, validate their wrap count,
+and state assumed pretension and a working-tension bound. The folded-Z motor pilot and bolts have
+5 mm tensioning slots; its 6 mm GT2 belt uses an assumed 120 N pretension and 250 N working limit.
+The folded stage still asserts 43.653927/21.826964 mm/s, 6117.456/3263.410 mm/s²,
+486.867 MN/m, 0.05/0.0505 mm backlash, and 36.9/37.1 kg with the baseline router.
+`describe()` still poses a copy for each rebuild: pose context is shared across its belt paths,
+but the copy remains proportional to assembly size and is not cached across rebuilds.
+
+X9e numerical changes from the X10 gate (per-tick wall times and collection counts are performance
+observations, not engineering baselines):
+
+- Assumed input inertia for a 60 x 40 mm gearbox 5e-5 → 5e-6 kg·m²: the size-scaled steel-class
+  estimate replaces a single oversized value. Other sizes scale with the authored diameter and
+  length; mass is recomputed from those dimensions on each rebuild. Arm mass stays 20.3 kg above
+  the flange, 150.1 kg in all, and pick/place stays 5.8/12/17.2/23.5 s.
+- Belt router controller-limited Y/X acceleration 12.25/14.06 → 12.35/14.17 m/s²: passive idlers
+  contribute bearing drag only where their pulley actually turns. Bare motor limits stay
+  12.79/15.08 m/s². Worst motor utilization 56.4 → 56.5%, and over-tolerance findings 76 → 64:
+  corrected idler drag and the 2-D softest-pose belt stiffness change the retimed load projection.
+  Worst deviation 1.759 → 1.758 mm, at line 252/op 9 → line 171/op 4: the new weakest path and
+  sampled load move the governing finding. The rounded 1.76 mm worst deviation remains unchanged.
+- MotionKit CoreXY planned X/Y acceleration 38.264/21.306 → 57.409/27.415 m/s²: unpowered
+  zero-ratio idlers no longer charge both axes bearing drag. The square takes 85 → 79 ticks and
+  peak motor rates 86.8/124.5 → 96.2/131.9 rad/s because the corrected drives accelerate more
+  strongly. Worst deviation 0.148 → 0.133 mm: the changed load and 2-D workspace stiffness alter
+  its elastic deflection. Bare speed and acceleration remain 204.1 rad/s, 649.6 mm/s and
+  71.5/34 m/s².
+
+The screw and belt router plate times remain 220.2/201.6 s; screw deviation/utilization remain
+0.05 mm/56.7%, and the belt keeps 57 flagged plans with no stepper stalls. The robot welder's
+20.2/21.6 s MuJoCo runs and four-side 19.9 s run match the X10 app log. The mobile cell keeps
+9.6/15.1/25.2/30.6/36.1/47.8/53.2/61 s mission steps and a 65 s obstacle round with 416 mm
+closest clearance and one replan. The mobile limiter now applies the wheel envelope before
+independent linear/angular acceleration caps, then stays inside their convex intersection;
+the first X9e gate found that scaling both acceleration deltas together delayed steering and
+hit a table, while the corrected focused mobile run follows the original route.
+
+The suspected haxeon HXI dependency-order defect was already fixed in the pinned submodule by
+`bd014aec` (2026-09-29). `PackageResolver.resolveFiles` still sorts interface paths, but
+`CompilerSession` calls `HxiInterfaceOrder.dependenciesFirst` before registration and immediate
+composition validation. `HxiInterfaceOrderMain` tests a dependent path that sorts first; X9e's app
+build log also shows `RobotKitRuntime` loading before `RobotKitInference`. No further compiler
+change or submodule pin change is needed for this issue. The CadBridge assertions remain in
+MachineKit tests; keeping them out of the router example is no longer required by HXI ordering.
+
+### X10 — Belt reductions and loops between shafts
+
+Status: X10a–X10d complete (2026-10-03). Shared belt-span elasticity is implemented across
+MachineKit and RobotKit. The combined full suite passed after the complete milestone:
+`x7-suite-x10-final3.txt` reports 13/13 kit/CadKit stages, app build and project-source suite
+at exit 0. The intermediate X10a–X10d commits were checked with focused tests; the combined
+gate was run on the completed tree, as requested.
+
+X9c derives belt stiffness from the belt's path, but only for a belt clamped to a sliding
+carriage: `BeltStretch` throws unless the leader is prismatic. Common drives that turn a shaft
+through a belt can't be modelled with real parts:
+
+- folded-back motors on ball or lead screws (1:1 or 2:1);
+- rotary 4th axes (3:1–6:1);
+- belt-driven spindles;
+- Z-sync loops tying two or four lead screws to one motor (Voron Trident, many printers);
+- belt reduction stages (Voron 2.4 Z 80:16);
+- belt-driven arm joints (Moveo/Thor-style arms, SCARA, wrist motors moved toward the base).
+
+Faking these as `GearMesh` gets the direction wrong (a belt keeps the turning direction) and has
+no belt stretch.
+
+One physical belt must compile to one elastic network. MachineKit owns its attachments,
+geometry and belt-family assumptions; RobotKit solves the derived span network under the
+combined loads. Pairwise stiffness is a result of that network under stated boundary conditions,
+not a collection of independent springs replacing the belt.
+
+#### X10a — `BeltReduction`
+
+- New source kind `BeltReduction(belt, driver, driven)`. Both pulleys are `TimingPulley` members
+  on the same belt; the driver turns on the leader joint, the driven pulley on the follower.
+  - **Ratio:** `driver.teeth / driven.teeth` (follower radians per leader radian). A belt keeps
+    the turning direction, so `Same` means both turn the same way about the belt plane's normal.
+  - **Efficiency and drag:** the belt family's values, as for `TimingBelt`.
+  - **Stiffness at the leader (N·m/rad), as the two-terminal case of the span network:**
+    - hold the driven pulley's teeth in place;
+    - turn the leader by a small angle;
+    - measure the stretch of the two belt paths between the pulleys;
+    - stiffness = `EA · (da²/a + db²/b)`, with the stretch per radian.
+
+    For a pretensioned two-pulley loop this is `EA (1/L₁ + 1/L₂) r_driver²`, where the free
+    lengths end at tooth engagement, rather than the middles of the engaged pulley arcs.
+    Convert N·mm/rad to N·m/rad at the assembly boundary. Record the assumed pretensioned
+    operating mode. A slack span cannot be modelled as a bilateral linear spring: either solve
+    tension-only spans with stated pretension and load direction, or reject the unsupported
+    mode explicitly; do not silently apply the two-span formula without pretension.
+  - **Backlash:** a timing-belt tooth-clearance allowance at the driven pulley's pitch circle,
+    converted to leader radians. It is an assumed belt-family value until there's catalog data.
+- `BeltStretch` generalises to elastic paths between attachments. A clamp on a carriage
+  (prismatic leader) and teeth engaged on a pulley (revolute leader) use the same span-energy
+  calculation. Remove the prismatic-only check. Validate that each pulley follows its stated
+  joint and that its axis is aligned with the belt-plane normal; account for local axis signs.
+- **Router or CoreXY-style axis drive through a reduction:** a motor pulley drives a big pulley
+  whose shaft carries the carriage belt's drive pulley. That is `BeltReduction` from motor to
+  shaft plus `TimingBelt` from shaft to carriage, with coupling orientation following the
+  assembly's planning-coordinate convention. Preserve the intermediate shaft as an elastic
+  coordinate until the solve eliminates it. Check that the two networks' compliances add in
+  series at the axis, with squared ratio scaling, and that each spring is counted once.
+
+X10a implementation: source wire id 7, MachineKit schema 7, optional clamp for shaft-only
+paths, matching pulley pitch radii and rotary attachments, and assumed pretensioned stiffness.
+Tooth clearance is 1% of family pitch, pending measured data. Existing example numbers have
+not intentionally changed. The focused test project now includes the example roots and dependencies
+its source graph requires; the completed milestone passed the combined gate.
+
+#### X10b — Belt loops with several driven pulleys
+
+- One belt can drive several pulleys: a Z-sync loop driving 2–4 lead-screw pulleys from one motor,
+  or a reduction with a tensioner idler.
+  - Use `BeltReduction(belt, driver, drivenN)` for each new motion relation; idlers on the
+    loop use `BeltIdler`. When a screw already follows a common carriage through a `LeadScrew`
+    relation, do not add another motion term to that follower: the terms would sum and double
+    its travel. Its attached rotary pulley is still a loaded terminal of the same belt network.
+    Loaded rotary terminals are derived from the wrap attachments and fixed shaft mounts;
+    explicit `BeltIdler` sources identify free terminals.
+  - These source records describe motion relations and reference the same belt network; they
+    must not compile into independent copies of its springs.
+  - Resolve a driven pulley's scalar stiffness with the other driven pulleys free only for
+    reporting and two-terminal verification. Combined loads use the full network.
+  - Check: a loop's tooth count, wrap radii, pulley profiles and attachment order must agree,
+    as for any belt. Free idlers pass tension and contribute their bearing drag and inertia;
+    they do not anchor the belt elastically.
+
+The original shared-axis claim was incomplete: X9c's motor-coordinate Jacobian handles CoreXY
+loads, but cannot represent independent stretch between several loaded pulleys on one loop.
+For three equal free spans with stiffness `k = EA/L`, holding the motor gives the two outputs
+the stiffness matrix `k [[2, -1], [-1, 2]]`. Either output with the other free measures `1.5k`.
+With equal force `F` on both, the actual deflection is `F/k` at each; independent `1.5k` springs
+predict `2F/(3k)`, understating deflection by one third.
+
+- **MachineKit:** derive each free span's length and attachment-displacement coefficients
+  from the posed belt path. Split a span at a clamp; exclude engaged arcs at loaded pulleys;
+  retain the free paths through freely turning idlers. Each span contributes energy
+  `EA/(2L) · (delta_length)²`. Preserve pulley coordinates and shared belt identity so the
+  solver can distinguish separate loads. Material stiffness and tooth-clearance assumptions
+  live in the belt family; overrides have an explicit scope and cannot duplicate a network.
+- **Assembly bridge:** carry the derived network into RobotKit with explicit units and joint
+  references. Save physical sources and attachments as the authority, and derive the network
+  on every rebuild. If a derived snapshot is stored, replace it from those sources on load.
+  Keep existing wire ids stable, allocate new ids and bump affected current schema versions;
+  reject older schemas as in X9b, without adding compatibility paths.
+- **RobotKit:** assemble span energies together with other transmission springs, held-motor
+  constraints and the actual mechanical constraints joining screws to a common carriage.
+  Apply loads at the coordinates they act on, then eliminate internal coordinates to obtain
+  axis deflections. Nominal motion couplings must not rigidly suppress the stretch being
+  solved. A shared motor's summed motion relation alone is not a multi-screw constraint.
+  Keep existing non-belt drive behavior and the CoreXY coordinate mapping intact.
+- **Checks:** verify the analytic two-pulley spring, the three-span matrix above (equal,
+  unequal and single-output loads), a free idler, 2–4 screw outputs on a common axis, and a
+  carriage belt in series with a reduction. Check signs, units, energy symmetry, force balance,
+  invariance to source-record order, and that referencing one belt several times does not
+  multiply its stiffness. Reject unresolved attachments and unsupported elastic mechanisms
+  with a useful diagnostic instead of treating them as rigid.
+
+X10b implementation: AssemblyDefinition schema 3, MachineKit schema 8 and RobotModel schema 8
+carry derived network snapshots with stable new wire ids. Each shaft belt owns its motion
+couplings once, and its spans preserve shaft coordinates through the constrained energy solve.
+Adjoining spans share one tooth-contact clearance. A stated two-terminal spring scales the
+whole network; pairwise stiffness overrides on a multi-output belt are rejected.
+
+The supported shaft-loop model has fixed free-path geometry. Rebuild checks joint perturbations
+and authored travel endpoints, rejecting moving tensioners/eccentric paths whose stretch Jacobian
+is not represented. Carriage belts remain their existing scalar elastic paths; a separate
+shaft-reduction belt and carriage belt combine in the same constrained solve. A loop mixing shaft
+reduction and carriage sources is explicitly rejected pending a full geometric span Jacobian,
+rather than silently counting their springs twice. This preserves current carriage/CoreXY
+baselines and leaves the generic span-coordinate format available for that extension.
+
+Focused analytic checks cover the three-span matrix, load combinations, contact clearance,
+source order, serialization, common-axis screw constraints and series compliance. No existing
+example baseline intentionally changed in X10b.
+The first combined run exposed seven authored RobotModel JSON fixtures at schema v7; X10b's
+RobotModel v8 bump requires their current-schema headers to be v8. Their physical data and
+numbers are unchanged. RobotKit's full test project passed after the fixture update.
+
+#### X10c — Belt-path cleanup
+
+- `BeltPathRecord.strand` is still a hand-picked index (which span the clamp sits on). Derive it
+  from the clamp connector's position: the straight span the clamp point lies on, within a
+  tolerance. Reject a clamp that is on no span, or on a wrap.
+- `BeltStretch` copies the whole assembly through JSON encode/decode on every resolve. Pose a
+  shared copy once per rebuild for all belts, and measure the router's rebuild time before and
+  after.
+- Record the pose-sampling policy. The existing scalar stiffness is the weakest over sampled
+  travel, a conservative constant that overstates mid-travel deviation. For a shared network,
+  preserve each complete sampled matrix: independent minima of matrix entries or pairwise
+  springs do not establish a conservative network. Evaluate the network at the requested pose,
+  or use a documented conservative envelope over complete samples; do not claim an envelope
+  covers unsampled travel without justification.
+
+X10c implementation: the stored clamp-strand field (former wire id 3) is removed, with
+MachineKit schema 9; its connector is projected onto the unique straight span. A connector on
+a tangent/wrap or on no span is rejected. Existing CoreXY/router clamps keep their geometry.
+A `BeltPoseContext` clones and unbounds the assembly once per rebuild, then resets its pose
+before each belt resolves. It also serves the shaft-loop network and saved-data rebuilds.
+
+Router `describe()` benchmark, three timed rebuilds after one warmup in the same test entry:
+screw router 0.027 → 0.036 s/rebuild (wall-time variation; it has no belt path and does not
+allocate a pose context); belt router 0.123 → 0.059 s/rebuild (one posed copy serves its three
+belts). These are local wall timings, not a real-time guarantee. X9c's carriage stiffness is
+the minimum over authored default, ends of travel and any interior balance point. This
+constant is conservative for the sampled travel and overstates mid-travel deviation; it does
+not prove a bound outside those samples. A shaft network requires fixed free-path geometry over
+sampled motion; it rejects moving paths rather than claiming a constant remains valid.
+
+#### X10d — Example
+
+Add a belt reduction to an existing example rather than a new machine. For example, fold the
+screw router's Z motor back beside its screw with a 2:1 `BeltReduction` (it then fits under the
+gantry), or give the robot arm's wrist a belt stage. Record how Z speed, acceleration and
+stiffness change against the direct-coupled Z, with a reason for each.
+
+X10d implementation: `CncRouter(false, true)` and `CncRouterPreview.foldedZRouter()` add an
+optional folded Z stage to the existing screw router. A 20-tooth motor pulley drives a
+40-tooth screw pulley through a 129-tooth GT2 belt; its two free spans compile into one
+elastic network. The screw and motor retain separate rotary joints, and the motor sits on
+a machined bracket below the gantry. The original router remains the default. Focused
+checks compare the direct and folded robot models, test belt tooth fit and Z kinematics
+at three travel poses, check collisions around the folded stage, and exercise the folded
+Z stage together with the X/Y carriage belts.
+The folded checks live in MachineKit's test source and run from `MachineKitSmoke`;
+the router example keeps its existing runtime dependencies for the app's project-source
+compiler. A separate app build fix adds the lifecycle's empty `beforeReset` to weld-bead
+view state, which has no runtime work to cancel. The router-only source check then passes
+with unchanged default plate times of 220.2/201.6 s and belt deviation of 1.76 mm.
+
+At the same poses and limits, direct → folded Z baselines are:
+
+- Z speed 43.654 → 21.827 mm/s: the motor turns twice for each screw revolution, so its
+  unchanged rate cap allows half the axis speed.
+- Z acceleration 6117.5 → 3263.4 mm/s²: the 2:1 stage reflects more motor inertia into
+  the axis; belt loss and the extra hardware also contribute.
+- Z stiffness rigid (no finite compliance in the direct-coupler model) → 486.9 MN/m:
+  the 129-tooth belt's two actual free spans and the GT2 family's assumed tensile EA
+  supply the new elastic compliance.
+- Z backlash 0.0500 → 0.0505 mm: the GT2 family's assumed 1%-pitch tooth clearance
+  adds 0.0005 mm at the axis through the screw pulley and 2 mm lead.
+- Router mass 36.9 → 37.1 kg: pulleys, belt, bearing and the folded motor plate replace
+  the direct coupler and standoffs. These are rounded assembly masses.
+
+The belt and its radial screw support are represented as manufacturable parts. The
+screw's bearing journal and axial-retention machining are not detailed in this example;
+the bearing is fixed in the assembly model. Those details would be required before
+fabrication, but they do not affect the modeled drive ratio or belt-span solve.
+
+Final combined gate: screw and belt router plates remain 220.2/201.6 s; belt worst deviation
+remains 1.76 mm. CoreXY remains 204.1 rad/s at its motors, 649.6 mm/s at its axes and
+71.5/34 m/s² (71.549 m/s² unrounded for X in the app). These are X9 baselines, unchanged
+by X10. The optional folded Z values above are the only intentionally changed example
+performance figures in this milestone. Router rebuild timings are recorded under X10c.
+
+Validation: one commit per step, focused checks when needed during implementation, and the
+combined full suite (`/home/joao/dev/materia-cache/claude-scratch/x7-suite.sh <tag>`) after X10d.
+Record the final gate result, every changed baseline with its physical reason, and the router
+rebuild timings here. Reconcile any fixes into their owning step commits. Do not claim untested
+intermediate commits passed the full suite. No pushing, merging into main or submodule changes.
 
 ### Later
 

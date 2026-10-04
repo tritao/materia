@@ -486,8 +486,8 @@ Decisions TN-D1..D15 recorded above; nothing implemented yet. Next: TN0.
   one edit and classes the result. The suite also checks that every oracle
   singles out exactly one element, so "correct" cannot be vacuous. `EXPECTED`
   pins every row; raise rows there as stages land.
-- `NamingLegacyFixtures.BOX_FILLET_V10`: a version-10 document generated
-  once and kept verbatim. Never regenerate it.
+- Historical fixture `NamingLegacyFixtures.BOX_FILLET_V10` was removed by X9b
+  when `DocumentCodec` stopped reading v1–v10. The old result below is archival.
 - Cases as planned, except case 7 (sketch edits): "move line" (both
   endpoints of the line under the face move 2 mm) is added, and "delete
   the line" is replaced by "split line". Deleting a line opens the profile,
@@ -503,7 +503,7 @@ Decisions TN-D1..D15 recorded above; nothing implemented yet. Next: TN0.
   | 5 pattern boss rim | correct | spacing (instance 1 does not move) | count |
   | 6 part connector, two equal bores | correct | — | widen, move bore (ambiguous) |
   | 7 sketch-made side face | correct | redraw line (identical geometry) | move line; split line (the right answer) |
-  | 8 legacy v10 | correct | | |
+  | 8 legacy v10 (archived; no longer run) | correct | | |
 
   TN3's target from this: every row correct except "slot across" and
   "split line" (reported), and case 6 correct after TN4.
@@ -633,7 +633,7 @@ Decisions TN-D1..D15 recorded above; nothing implemented yet. Next: TN0.
   overlap. Haxe reads names in bulk, so no `cad_shape_find_element` was
   needed. After every successful remap the reference re-captures its
   element, so its name follows it, and a legacy reference gets one on its
-  first resolution (tested: the v10 fixture saves with its name at v11).
+  first resolution (historically tested with the v10 fixture; that fixture was removed by X9b).
 - **Cross-recompute history removed** (TN-D2): from `TopologyReference` and
   `EditorScene.remapSelectedCadFace`. `TopologyHistoryMap` and
   `TopologyRemapResult` are deleted. HaxeonSmoke's history check now reads

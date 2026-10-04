@@ -157,6 +157,7 @@ static void convex_link_and_box_link_build() {
         link.inertia_tensor[0] = link.inertia_tensor[4] = link.inertia_tensor[8] = 1.0;
     }
     model.joints[0] = {0, RK_RUNTIME_JOINT_REVOLUTE, 0, 1, -3.14, 3.14, 100.0};
+    model.joints[0].limit_flags |= RK_LIMIT_EFFORT;
     model.joints[0].parent_frame_rotation[3] = model.joints[0].child_frame_rotation[3] = 1.0;
     model.joints[0].axis[2] = 1.0;
     auto robot_desc_storage = std::make_unique<rk_simulation_robot_desc>();
@@ -452,6 +453,7 @@ static void floating_base_falls_and_settles(bool floating) {
             model.links[i].inertia_tensor[8] = 0.02 / 3.0;
     }
     model.joints[0] = {0, RK_RUNTIME_JOINT_REVOLUTE, 0, 1, -3.14, 3.14, 100.0};
+    model.joints[0].limit_flags |= RK_LIMIT_EFFORT;
     model.joints[0].parent_frame_position[0] = 0.25;
     model.joints[0].parent_frame_rotation[3] = model.joints[0].child_frame_rotation[3] = 1.0;
     model.joints[0].axis[0] = 1.0;
@@ -529,6 +531,7 @@ static void robot_base_can_be_pushed(bool floating) {
             model.links[i].inertia_tensor[8] = 0.02 / 3.0;
     }
     model.joints[0] = {0, RK_RUNTIME_JOINT_REVOLUTE, 0, 1, -3.14, 3.14, 100.0};
+    model.joints[0].limit_flags |= RK_LIMIT_EFFORT;
     model.joints[0].parent_frame_position[0] = 0.25;
     model.joints[0].parent_frame_rotation[3] = model.joints[0].child_frame_rotation[3] = 1.0;
     model.joints[0].axis[0] = 1.0;
@@ -640,6 +643,7 @@ static rk_robot_runtime_blueprint gravity_arm(double max_effort, double friction
     }
     model.links[1].center_of_mass[0] = 0.5;
     model.joints[0] = {0, RK_RUNTIME_JOINT_REVOLUTE, 0, 1, -3.14, 3.14, max_effort};
+    model.joints[0].limit_flags |= RK_LIMIT_EFFORT;
     model.joints[0].parent_frame_rotation[3] = model.joints[0].child_frame_rotation[3] = 1.0;
     model.joints[0].axis[1] = 1.0;
     model.joint_dynamics[0].friction_loss = friction_loss;
@@ -691,6 +695,9 @@ static void actuator_limit_stalls_then_lifts() {
     const auto strong = run_gravity_arm(gravity_arm(20.0, 0.0, 2.0), lift, 3.0);
     assert(std::abs(strong.position + 0.3) < 0.01);
     assert(std::abs(strong.effort) < 20.0);
+    const auto unpowered = run_gravity_arm(gravity_arm(0.0), lift, 1.0);
+    assert(unpowered.position > 0.2);
+    assert(std::abs(unpowered.effort) < 1e-8);
 }
 
 // A servo target is a plain PD with feedforward: it sags by load / stiffness,
@@ -932,6 +939,7 @@ static void fixed_joint_targets_are_ignored() {
     model.links[2].inertia_tensor[0] = model.links[2].inertia_tensor[4] =
         model.links[2].inertia_tensor[8] = 0.01;
     model.joints[1] = {1, RK_RUNTIME_JOINT_FIXED, 1, 2, 0.0, 0.0, 0.0};
+    model.joints[1].limit_flags |= RK_LIMIT_EFFORT;
     model.joints[1].parent_frame_rotation[3] = model.joints[1].child_frame_rotation[3] = 1.0;
     model.joints[1].parent_frame_position[0] = 1.0;
     model.joints[1].axis[1] = 1.0;
@@ -1087,6 +1095,7 @@ int main() {
         model.links[i].inertia_tensor[0] = model.links[i].inertia_tensor[4] = model.links[i].inertia_tensor[8] = 1.0;
     }
     model.joints[0] = {0, RK_RUNTIME_JOINT_REVOLUTE, 0, 1, -3.14, 3.14, 100.0};
+    model.joints[0].limit_flags |= RK_LIMIT_EFFORT;
     model.joints[0].parent_frame_rotation[3] = model.joints[0].child_frame_rotation[3] = 1.0;
     model.joints[0].axis[2] = 1.0;
     model.sensor_count = 2;

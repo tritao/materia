@@ -61,6 +61,7 @@ class ArmJoint extends MachineComponent implements MotorDrive {
 		return new ComponentValues().setNumber("diameter", diameter).setNumber("length", length)
 			.setNumber("flangePitchCircle", flange == null ? 0 : flange.spec.pitchCircle)
 			.setToken("servo", servo == null ? "none" : servo.designation)
+			.setToken("servoBasis", servo == null ? "assumed" : servo.basisToken())
 			.setToken("material", materialSpec());
 
 	/** The servo inside the module as an actuator on joint `joint`; a module with no servo is not a motor. */

@@ -211,18 +211,56 @@ class TimingBelt extends MachineComponent {
 
 	/** Assumed power efficiency of a timing belt drive. */
 	public static inline var DEFAULT_EFFICIENCY:Float = 0.97;
-	/** Assumed pulley and idler bearing drag, N m. */
+	/** Assumed belt-drive drag at a powered pulley, N m. */
 	public static inline var DEFAULT_DRAG:Float = 0.005;
+	/** Assumed rolling-bearing drag at a free idler, N m. */
+	public static inline var IDLER_BEARING_DRAG:Float = 0.0002;
 
 	/** Resolve from the current loop geometry and width, never a saved stiffness. */
-	public static function relation(belt:TimingBelt, pulley:TimingPulley, strand:Int, alignment:Float):TransmissionRelation {
-		if (belt.beltProfile != pulley.beltProfile) throw "Belt and pulley profiles must match";
-		var result = new TransmissionRelation(alignment * 2 / pulley.pitchDiameter, DEFAULT_EFFICIENCY,
-			belt.carriageStiffness(strand), null, DEFAULT_DRAG);
-		result.setBasis("stiffness", ValueBasis.Assumed, "belt stiffness");
+	public static function relation(belt:TimingBelt, pulley:TimingPulley, alignment:Float, idler:Bool = false):TransmissionRelation {
+		if (belt.beltProfile != pulley.beltProfile) throw new machinekit.transmission.TransmissionDesignError("Belt and pulley profiles differ; update the belt to match the pulley");
+		var result = new TransmissionRelation(alignment * 2 / pulley.pitchDiameter, idler ? 1.0 : DEFAULT_EFFICIENCY,
+			null, null, idler ? IDLER_BEARING_DRAG : DEFAULT_DRAG);
+		if (!idler) {
+			result.setBasis("stiffness", ValueBasis.Assumed, "belt stiffness");
+			result.setBasis("efficiency", ValueBasis.Assumed, "belt efficiency");
+		}
+		result.setBasis("drag", ValueBasis.Assumed, idler ? "idler bearing drag" : "belt drag");
+		return result;
+	}
+
+	/** A tooth-clearance allowance at the pitch line, mm, pending measured family data. */
+	public static function toothClearance(profile:TimingBeltProfile):Float
+		return TimingPulley.profileDimensions(profile).pitch * 0.01;
+
+	/** Same keeps direction about the belt normal; assembly attachments check the joint axes. */
+	public static function reduction(belt:TimingBelt, driver:TimingPulley, driven:TimingPulley,
+			alignment:Float):TransmissionRelation {
+		if (driver.beltProfile != belt.beltProfile || driven.beltProfile != belt.beltProfile)
+			throw new TransmissionDesignError("Belt and reduction pulley profiles differ; update the pulleys");
+		var ratio = alignment * driver.teeth / driven.teeth;
+		var result = new TransmissionRelation(ratio, DEFAULT_EFFICIENCY, null,
+			toothClearance(belt.beltProfile) / (driven.pitchDiameter / 2) / Math.abs(ratio), DEFAULT_DRAG);
 		result.setBasis("efficiency", ValueBasis.Assumed, "belt efficiency");
 		result.setBasis("drag", ValueBasis.Assumed, "belt drag");
+		result.setBasis("stiffness", ValueBasis.Assumed, "belt stiffness with pretension");
+		result.setBasis("backlash", ValueBasis.Assumed, "belt tooth clearance");
 		return result;
+	}
+
+	/** Free elastic lengths between two engaged pulleys; other wraps turn freely. */
+	public function freePaths(first:Int, second:Int):Array<Float> {
+		if (first == second || first < 0 || second < 0 || first >= loop.length || second >= loop.length)
+			throw new TransmissionDesignError("Belt reduction needs two distinct wraps");
+		var a = 0.0, index = first;
+		while (index != second) {
+			a += strandList[index].length;
+			index = (index + 1) % loop.length;
+			if (index != second) a += loop[index].radius * sweeps[index];
+		}
+		var b = length - a - loop[first].radius * sweeps[first] - loop[second].radius * sweeps[second];
+		if (!(a > 0 && b > 0)) throw new TransmissionDesignError("Belt has no free elastic paths between its pulleys");
+		return [a, b];
 	}
 
 	/**
@@ -237,6 +275,25 @@ class TimingBelt extends MachineComponent {
 			case GT2: 2500.0;
 			case _: throw "No belt stiffness is recorded for this profile";
 		};
+
+	/** Assumed 2.5% breaking strain with a 1.5 working factor; replace with a belt maker's rating. */
+	public function assumedWorkingTension():Float
+		return cordStiffnessPerMm(beltProfile) * width * 0.025 / 1.5;
+
+	/** Assumed installed tension: 20 N per mm of GT2 width until a tensioner setting is measured. */
+	public function assumedPretension():Float
+		return width * 20.0;
+
+	/** A belt under differential pulley force must keep both spans taut and below its working limit. */
+	public function checkTension(differential:Float, pretension:Float):Void {
+		if (!(pretension > 0) || !Math.isFinite(pretension) || !Math.isFinite(differential))
+			throw new TransmissionDesignError("Belt needs positive finite pretension and finite transmitted force");
+		var half = Math.abs(differential) / 2;
+		if (pretension <= half)
+			throw new TransmissionDesignError("Belt load slackens a span; increase pretension or reduce motor force");
+		if (pretension + half > assumedWorkingTension())
+			throw new TransmissionDesignError("Belt tight span exceeds its assumed working tension");
+	}
 
 	/**
 	 * Stiffness at a carriage clamped on strand `strand`, in N/mm of carriage travel, in the worst
@@ -288,6 +345,56 @@ class TimingBelt extends MachineComponent {
 		if (!(Math.abs(along) > 0.5 * Math.sqrt(travelX * travelX + travelY * travelY)))
 			throw 'Timing belt strand $strand does not run along the carriage\'s travel';
 		return loop[wrap].side * (along > 0 ? 1 : -1);
+	}
+
+	/** Arc phase held by a stationary driving pulley, halfway through its contact. */
+	public function anchorPhase(wrap:Int):Float return arrivals[wrap] + loop[wrap].side * sweeps[wrap] / 2;
+
+	/** Distance from the start of strand 0 to a material point held on a driving pulley. */
+	public function anchorDistance(wrap:Int, phase:Float):Float {
+		var progress = loop[wrap].side * (phase - arrivals[wrap]);
+		progress -= 2 * Math.PI * Math.floor(progress / (2 * Math.PI));
+		if (progress > sweeps[wrap] + 1e-6)
+			throw new TransmissionDesignError("Belt leaves its held drive anchor; update the wrap attachments");
+		var distance = 0.0;
+		for (index in 0...loop.length) {
+			distance += strandList[index].length;
+			var next = (index + 1) % loop.length;
+			if (next == wrap) return distance + loop[wrap].radius * progress;
+			distance += loop[next].radius * sweeps[next];
+		}
+		throw "Belt has no such drive wrap";
+	}
+
+	/** Distance to the unique straight span containing a physical clamp. A tangent is a wrap. */
+	public function clampDistanceAt(x:Float, y:Float):Float {
+		var found = -1;
+		for (index in 0...strandList.length) {
+			var run = strandList[index];
+			var along = (x - run.startX) * run.dx + (y - run.startY) * run.dy;
+			var across = (x - run.startX) * run.dy - (y - run.startY) * run.dx;
+			if (Math.abs(across) <= 1e-5 && along >= -1e-5 && along <= run.length + 1e-5) {
+				if (along <= 1e-5 || along >= run.length - 1e-5)
+					throw new TransmissionDesignError("Belt clamp lies on a wrap; move its connector inside a straight span");
+				if (found >= 0) throw new TransmissionDesignError("Belt clamp lies on several spans; give it one straight attachment");
+				found = index;
+			}
+		}
+		if (found < 0) throw new TransmissionDesignError("Belt clamp lies on no straight span; update its connector");
+		return clampDistance(found, x, y);
+	}
+
+	/** Distance along a specified straight span; callers can derive that span with `clampDistanceAt`. */
+	public function clampDistance(strand:Int, x:Float, y:Float):Float {
+		if (strand < 0 || strand >= strandList.length) throw "Belt clamp strand is out of range";
+		var run = strandList[strand];
+		var along = (x - run.startX) * run.dx + (y - run.startY) * run.dy;
+		var across = (x - run.startX) * run.dy - (y - run.startY) * run.dx;
+		if (along < -1e-5 || along > run.length + 1e-5 || Math.abs(across) > 1e-5)
+			throw new TransmissionDesignError("Belt clamp leaves its attached strand; update its connector or the belt path");
+		var distance = along;
+		for (index in 0...strand) distance += strandList[index].length + loop[index + 1].radius * sweeps[index + 1];
+		return distance;
 	}
 
 	/**

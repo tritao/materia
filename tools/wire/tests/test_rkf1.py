@@ -7,7 +7,7 @@ from tools.wire.rkf1 import check, scan
 from tools.wire.validate import ValidationError
 
 ROOT = Path(__file__).resolve().parents[3]
-SOURCE = ROOT / "robotkit/haxe/robotkit/protocol"
+SOURCE = ROOT / "robotkit/remote/haxe/robotkit/protocol"
 
 
 class Rkf1LockTests(unittest.TestCase):

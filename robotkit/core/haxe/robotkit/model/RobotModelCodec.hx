@@ -1,0 +1,845 @@
+package robotkit.model;
+
+
+import haxe.Json;
+import haxe.io.Bytes;
+import robotkit.model.ActuatorDrive;
+import robotkit.model.ProcessVelocityDrive;
+import robotkit.model.CollisionShape;
+import robotkit.model.Transmission;
+
+/** Canonical, versioned JSON artifact for an editable RobotModel. */
+class RobotModelCodec {
+  public static inline final VERSION:Int = RobotModel.CURRENT_VERSION;
+  static inline final LEGACY_VERSION:Int = VERSION - 2;
+  static inline final PREVIOUS_VERSION:Int = VERSION - 1;
+
+  public static function encode(model:RobotModel):Bytes {
+    if (model == null) throw "RobotModel is required";
+    requireText(model.name, "name");
+    collisionName(model.collisionApproximation);
+    var links = new Map<String, Bool>();
+    for (link in model.links) {
+      requireText(link.id, "link id");
+      requireText(link.name, "link name");
+      if (links.exists(link.id)) throw 'Duplicate robot link ${link.id}';
+      links.set(link.id, true);
+      vector(link.centerOfMass, 3, "link centerOfMass");
+      vector(link.inertiaTensor, 9, "link inertiaTensor");
+      finite(link.mass, "link mass");
+      if (link.collisionShapes == null) throw 'Link ${link.id} has no collision shape list';
+      for (shape in link.collisionShapes) {
+        var error = shape == null ? "collision shape is null" : shape.validate();
+        if (error != null) throw 'Link ${link.id}: $error';
+      }
+    }
+    var frames = new Map<String, Bool>();
+    for (frame in model.frames) {
+      requireText(frame.id, "frame id");
+      if (!links.exists(frame.link.id)) throw 'Frame ${frame.id} references an unknown link';
+      if (frames.exists(frame.id)) throw 'Duplicate robot frame ${frame.id}';
+      frames.set(frame.id, true);
+      requireText(frame.name, "frame name");
+      vector(frame.position, 3, "frame position");
+      vector(frame.rotation, 4, "frame rotation");
+    }
+    var linkShapes = new Map<String, Int>();
+    for (link in model.links) linkShapes.set(link.id, link.collisionShapes.length);
+    for (pair in model.contactPairs) {
+      if (pair == null) throw "Robot contact pair is null";
+      if (!linkShapes.exists(pair.linkA) || !linkShapes.exists(pair.linkB) || pair.linkA == pair.linkB ||
+          pair.shapeA < 0 || pair.shapeA >= linkShapes.get(pair.linkA) ||
+          pair.shapeB < 0 || pair.shapeB >= linkShapes.get(pair.linkB))
+        throw 'Contact pair ${pair.linkA}/${pair.shapeA} - ${pair.linkB}/${pair.shapeB} references no shape on two links';
+      var error = pair.surface == null ? "contact pair surface is null" : pair.surface.validate();
+      if (error != null) throw error;
+    }
+    var joints = new Map<String, Bool>();
+    for (joint in model.joints) {
+      requireText(joint.id, "joint id");
+      requireText(joint.name, "joint name");
+      if (joints.exists(joint.id)) throw 'Duplicate robot joint ${joint.id}';
+      if (!links.exists(joint.parent.id) || !links.exists(joint.child.id))
+        throw 'Joint ${joint.id} references an unknown link';
+      joints.set(joint.id, true);
+      vector(joint.parentFramePosition, 3, "joint parentFramePosition");
+      vector(joint.parentFrameRotation, 4, "joint parentFrameRotation");
+      vector(joint.childFramePosition, 3, "joint childFramePosition");
+      vector(joint.childFrameRotation, 4, "joint childFrameRotation");
+      vector(joint.axis, 3, "joint axis");
+      nonNegative(joint.armature, "joint armature");
+      nonNegative(joint.damping, "joint damping");
+      nonNegative(joint.frictionLoss, "joint frictionLoss");
+      nonNegative(joint.limitTimeConstant, "joint limitTimeConstant");
+      nonNegative(joint.limitDampingRatio, "joint limitDampingRatio");
+      vector(joint.limitImpedance, 5, "joint limitImpedance");
+      var mechanical = joint.mechanicalLimits;
+      if (mechanical != null) {
+        var error = mechanical.validate();
+        if (error != null) throw 'joint mechanical limits: $error';
+      }
+      finite(joint.limits.lower, "joint limits.lower");
+      finite(joint.limits.upper, "joint limits.upper");
+      if (joint.limits.velocity != null) finite(joint.limits.velocity, "joint limits.velocity");
+      if (joint.limits.effort != null) finite(joint.limits.effort, "joint limits.effort");
+      if (joint.limits.maxAcceleration != null) finite(joint.limits.maxAcceleration, "joint limits.maxAcceleration");
+      if (joint.limits.maxAcceleration != null && joint.limits.maxAcceleration < 0.0)
+        throw "joint limits.maxAcceleration must be non-negative";
+      finite(joint.limits.overtravel, "joint limits.overtravel");
+      if (joint.limits.overtravel < 0.0)
+        throw "joint limits.overtravel must be non-negative";
+      jointTypeName(joint.type);
+    }
+    var actuators = new Map<String, Bool>();
+    for (actuator in model.actuators) {
+      validateActuator(actuator, joints);
+      if (actuators.exists(actuator.id)) throw 'Duplicate robot actuator ${actuator.id}';
+      actuators.set(actuator.id, true);
+    }
+    var encoderIds = new Map<String, Bool>();
+    for (encoder in model.encoders) {
+      if (encoder == null) throw "Robot encoder is null";
+      requireText(encoder.id, "encoder ID");
+      if (encoderIds.exists(encoder.id)) throw 'Duplicate robot encoder ${encoder.id}';
+      encoderIds.set(encoder.id, true);
+      if (!joints.exists(encoder.joint)) throw 'Encoder ${encoder.id} references unknown joint ${encoder.joint}';
+      finite(encoder.countsPerUnit, "encoder countsPerUnit");
+    }
+    for (actuator in model.actuators)
+      if (actuator.encoder != "" && !encoderIds.exists(actuator.encoder))
+        throw 'Actuator ${actuator.id} references unknown encoder ${actuator.encoder}';
+    var couplingIds = new Map<String, Bool>();
+    var pairs = new Map<String, Bool>();
+    for (coupling in model.couplings) {
+      if (coupling == null) throw "Robot joint coupling is null";
+      if (couplingIds.exists(coupling.id)) throw 'Duplicate robot coupling ${coupling.id}';
+      if (!joints.exists(coupling.leader) || !joints.exists(coupling.follower))
+        throw 'Coupling ${coupling.id} references an unknown joint';
+      if (pairs.exists(coupling.follower + "\n" + coupling.leader))
+        throw 'Joint ${coupling.follower} is coupled to ${coupling.leader} more than once';
+      if (!(coupling.efficiency > 0 && coupling.efficiency <= 1))
+        throw 'Coupling ${coupling.id} has an invalid efficiency';
+      couplingIds.set(coupling.id, true);
+      pairs.set(coupling.follower + "\n" + coupling.leader, true);
+    }
+    var networkIds:Array<String> = [], networkOwners:Array<String> = [];
+    for (network in model.elasticNetworks) {
+      network.validate(model.joints, model.couplings);
+      if (networkIds.indexOf(network.id) >= 0) throw "Duplicate elastic network";
+      networkIds.push(network.id);
+      for (owner in network.couplings) {
+        if (networkOwners.indexOf(owner) >= 0) throw "A motion coupling belongs to several elastic networks";
+        networkOwners.push(owner);
+      }
+    }
+    var cycle = JointCoupling.cycleThrough(model.couplings);
+    if (cycle != null) throw 'Joint $cycle depends on itself through its couplings';
+    var sensors = new Map<String, Bool>();
+    for (sensor in model.sensors) {
+      requireText(sensor.id, "sensor id");
+      if (sensors.exists(sensor.id)) throw 'Duplicate robot sensor ${sensor.id}';
+      sensors.set(sensor.id, true);
+      requireText(sensor.name, "sensor name");
+      requireText(sensor.kind, "sensor kind");
+      if (sensor.frame != null && !frames.exists(sensor.frame.id))
+        throw 'Sensor ${sensor.id} references an unknown frame';
+      finite(sensor.updateRate, "sensor updateRate");
+      finite(sensor.maxRange, "sensor maxRange");
+      finite(sensor.startAngleRadians, "sensor startAngleRadians");
+      finite(sensor.fieldOfViewRadians, "sensor fieldOfViewRadians");
+      finite(sensor.noiseStddev, "sensor noiseStddev");
+      if (sensor.kind == "joint_switch" || sensor.kind == "at_speed") {
+        requireText(sensor.joint, 'sensor ${sensor.id} joint');
+        if (!joints.exists(sensor.joint)) throw 'Sensor ${sensor.id} references unknown joint ${sensor.joint}';
+        finite(sensor.windowLower, "sensor windowLower");
+        finite(sensor.windowUpper, "sensor windowUpper");
+        finite(sensor.hysteresis, "sensor hysteresis");
+        if (sensor.kind == "joint_switch" && (sensor.windowLower > sensor.windowUpper || sensor.hysteresis < 0.0))
+          throw 'Sensor ${sensor.id} has an invalid switch window';
+        if (sensor.kind == "at_speed" && sensor.windowLower <= 0.0)
+          throw 'Sensor ${sensor.id} needs a positive at-speed threshold';
+      }
+      if (sensor.kind == "presence" && sensor.maxRange <= 0.0)
+        throw 'Sensor ${sensor.id} needs a positive presence range';
+    }
+    var encodedSensors:Array<Dynamic> = [for (sensor in model.sensors) {
+      id: sensor.id, name: sensor.name, kind: sensor.kind,
+      updateRate: sensor.updateRate,
+      frame: sensor.frame == null ? null : sensor.frame.id,
+      rayCount: sensor.rayCount, maxRange: sensor.maxRange,
+      startAngleRadians: sensor.startAngleRadians,
+      fieldOfViewRadians: sensor.fieldOfViewRadians,
+      noiseStddev: sensor.noiseStddev, noiseSeed: sensor.noiseSeed
+    }];
+    for (index in 0...model.sensors.length) {
+      var sensor = model.sensors[index], record:Dynamic = encodedSensors[index];
+      if (sensor.kind == "joint_switch" || sensor.kind == "at_speed") {
+        Reflect.setField(record, "joint", sensor.joint);
+        Reflect.setField(record, "windowLower", sensor.windowLower);
+        Reflect.setField(record, "windowUpper", sensor.windowUpper);
+        if (sensor.kind == "joint_switch") Reflect.setField(record, "hysteresis", sensor.hysteresis);
+      }
+    }
+    var document:Dynamic = {
+      schemaVersion: hasProcessVelocityDrive(model) ? VERSION :
+        hasPneumaticDrive(model) ? PREVIOUS_VERSION : LEGACY_VERSION,
+      name: model.name,
+      collisionApproximation: collisionName(model.collisionApproximation),
+      floatingBase: model.floatingBase,
+      links: [for (link in model.links) {
+        id: link.id, name: link.name, mass: link.mass,
+        centerOfMass: link.centerOfMass, inertiaTensor: link.inertiaTensor,
+        visualGeometry: link.visualGeometry, collisionGeometry: link.collisionGeometry,
+        collisionShapes: [for (shape in link.collisionShapes) encodeCollisionShape(shape)]
+      }],
+      joints: [for (joint in model.joints) {
+        var record:Dynamic = {id: joint.id, name: joint.name, type: jointTypeName(joint.type),
+        parentLink: joint.parent.id, childLink: joint.child.id,
+        limits: encodeLimits(joint.limits),
+        parentFramePosition: joint.parentFramePosition,
+        parentFrameRotation: joint.parentFrameRotation,
+        childFramePosition: joint.childFramePosition,
+        childFrameRotation: joint.childFrameRotation,
+        axis: joint.axis,
+        dynamics: {armature: joint.armature, damping: joint.damping, frictionLoss: joint.frictionLoss,
+          limitTimeConstant: joint.limitTimeConstant, limitDampingRatio: joint.limitDampingRatio,
+          limitImpedance: joint.limitImpedance}};
+        var mechanical = joint.mechanicalLimits;
+        if (mechanical != null) record.mechanicalLimits = encodeLimits(mechanical);
+        record;
+      }],
+      actuators: [for (actuator in model.actuators) encodeActuator(actuator)],
+      couplings: [for (coupling in model.couplings) encodeCoupling(coupling)],
+      elasticNetworks: [for (network in model.elasticNetworks) {id: network.id, couplings: network.couplings,
+        spans: network.spans, assumptions: network.assumptions, clearances: network.clearances}],
+      frames: [for (frame in model.frames) {
+        id: frame.id, name: frame.name, link: frame.link.id,
+        position: frame.position, rotation: frame.rotation
+      }],
+      sensors: encodedSensors,
+      contactPairs: [for (pair in model.contactPairs) {
+        linkA: pair.linkA, shapeA: pair.shapeA, linkB: pair.linkB, shapeB: pair.shapeB,
+        surface: encodeSurface(pair.surface)
+      }]
+    };
+    // Written only when there are some, so models without encoders keep their bytes.
+    if (model.encoders.length > 0) document.encoders = [for (encoder in model.encoders) encodeEncoder(encoder)];
+    if (model.elasticNetworks.length == 0) Reflect.deleteField(document, "elasticNetworks");
+    return Bytes.ofString(Json.stringify(document));
+  }
+
+  static function encodeEncoder(encoder:Encoder):Dynamic {
+    var record:Dynamic = {id: encoder.id, joint: encoder.joint, kind: encoder.kind, countsPerUnit: encoder.countsPerUnit};
+    if (encoder.index) record.index = true;
+    return record;
+  }
+
+  static function readEncoder(record:Dynamic):Encoder {
+    var kind = text(record, "kind");
+    if (kind != EncoderKind.Incremental && kind != EncoderKind.Absolute) throw 'Unsupported encoder kind $kind';
+    var counts = number(record, "countsPerUnit");
+    if (!(counts > 0.0)) throw "Encoder countsPerUnit must be positive";
+    return new Encoder(text(record, "id"), text(record, "joint"), kind, counts,
+      Reflect.hasField(record, "index") && Reflect.field(record, "index") == true);
+  }
+
+  public static function decode(bytes:Bytes):RobotModel {
+    var root:Dynamic;
+    try root = Json.parse(bytes.toString()) catch (_:Dynamic)
+      throw "Malformed RobotModel artifact";
+    var version = fieldInt(root, "schemaVersion");
+    if (version != VERSION && version != PREVIOUS_VERSION && version != LEGACY_VERSION)
+      throw 'Unsupported RobotModel schema version $version; supported $LEGACY_VERSION, $PREVIOUS_VERSION and $VERSION';
+    if (Reflect.hasField(root, "mobileBase") || Reflect.hasField(root, "forkMechanism"))
+      throw "RobotModel cannot contain interpretation profiles";
+
+    var model = new RobotModel(text(root, "name"));
+    model.collisionApproximation = readCollision(text(root, "collisionApproximation"));
+    model.floatingBase = bool(root, "floatingBase");
+    var links = new Map<String, Link>();
+    for (record in array(root, "links")) {
+      var id = text(record, "id");
+      if (links.exists(id)) throw 'Duplicate robot link $id';
+      var link = model.addLink(new Link(text(record, "name"), id));
+      link.mass = number(record, "mass");
+      link.centerOfMass = vectorField(record, "centerOfMass", 3);
+      link.inertiaTensor = vectorField(record, "inertiaTensor", 9);
+      link.visualGeometry = optionalText(record, "visualGeometry");
+      link.collisionGeometry = optionalText(record, "collisionGeometry");
+      for (shape in array(record, "collisionShapes")) {
+        var decoded = readCollisionShape(shape);
+        var error = decoded.validate();
+        if (error != null) throw 'Link $id: $error';
+        link.collisionShapes.push(decoded);
+      }
+      links.set(id, link);
+    }
+
+    var joints = new Map<String, Bool>();
+    for (record in array(root, "joints")) {
+      if (Reflect.hasField(record, "drive"))
+        throw "RobotModel v5 does not accept joint.drive; use root actuators";
+      var id = text(record, "id");
+      if (joints.exists(id)) throw 'Duplicate robot joint $id';
+      joints.set(id, true);
+      var parentId = text(record, "parentLink");
+      var childId = text(record, "childLink");
+      var parent = links.get(parentId), child = links.get(childId);
+      if (parent == null || child == null) throw 'Joint $id references an unknown link';
+      var joint = model.addJoint(new Joint(text(record, "name"),
+        readJointType(text(record, "type")), parent, child, id));
+      var limits:Dynamic = required(record, "limits");
+      var maxAcceleration = nullableNumber(limits, "maxAcceleration");
+      joint.limits = new JointLimits(number(limits, "lower"), number(limits, "upper"),
+        nullableNumber(limits, "velocity"), nullableNumber(limits, "effort"), maxAcceleration);
+      if (Reflect.hasField(record, "mechanicalLimits")) {
+        var mechanical:Dynamic = required(record, "mechanicalLimits");
+        joint.mechanicalLimits = new JointLimits(number(mechanical, "lower"), number(mechanical, "upper"),
+          nullableNumber(mechanical, "velocity"), nullableNumber(mechanical, "effort"), nullableNumber(mechanical, "maxAcceleration"));
+        if (Reflect.hasField(mechanical, "overtravel")) joint.mechanicalLimits.overtravel = number(mechanical, "overtravel");
+        if (Reflect.hasField(mechanical, "velocityLimiter")) joint.mechanicalLimits.velocityLimiter = text(mechanical, "velocityLimiter");
+      }
+      joint.limits.assumptions = readAssumptions(limits);
+      if (joint.mechanicalLimits != null) joint.mechanicalLimits.assumptions = readAssumptions(Reflect.field(record, "mechanicalLimits"));
+      if (Reflect.hasField(limits, "velocityLimiter")) joint.limits.velocityLimiter = text(limits, "velocityLimiter");
+      // Written only when a joint has overtravel.
+      if (Reflect.hasField(limits, "overtravel")) joint.limits.overtravel = number(limits, "overtravel");
+      joint.parentFramePosition = vectorField(record, "parentFramePosition", 3);
+      joint.parentFrameRotation = vectorField(record, "parentFrameRotation", 4);
+      joint.childFramePosition = vectorField(record, "childFramePosition", 3);
+      joint.childFrameRotation = vectorField(record, "childFrameRotation", 4);
+      joint.axis = vectorField(record, "axis", 3);
+      var dynamics:Dynamic = required(record, "dynamics");
+      joint.armature = nonNegative(number(dynamics, "armature"), "joint armature");
+      joint.damping = nonNegative(number(dynamics, "damping"), "joint damping");
+      joint.frictionLoss = nonNegative(number(dynamics, "frictionLoss"), "joint frictionLoss");
+      joint.limitTimeConstant = nonNegative(number(dynamics, "limitTimeConstant"), "joint limitTimeConstant");
+      joint.limitDampingRatio = nonNegative(number(dynamics, "limitDampingRatio"), "joint limitDampingRatio");
+      joint.limitImpedance = vectorField(dynamics, "limitImpedance", 5);
+    }
+
+    var couplingIds = new Map<String, Bool>();
+    var pairs = new Map<String, Bool>();
+    for (record in array(root, "couplings")) {
+      var coupling = new JointCoupling(text(record, "id"), text(record, "leader"),
+        text(record, "follower"), number(record, "ratio"), number(record, "offset"));
+      var efficiency = optionalNumber(record, "efficiency");
+      if (efficiency != null) {
+        if (!(efficiency > 0 && efficiency <= 1)) throw 'Coupling ${coupling.id} has an invalid efficiency';
+        coupling.efficiency = efficiency;
+      }
+      if (Reflect.hasField(record, "stiffness")) coupling.stiffness = nonNegative(number(record, "stiffness"), "coupling stiffness");
+      if (Reflect.hasField(record, "backlash")) coupling.backlash = nonNegative(number(record, "backlash"), "coupling backlash");
+      if (Reflect.hasField(record, "drag")) coupling.drag = nonNegative(number(record, "drag"), "coupling drag");
+      coupling.assumed = readAssumed(record);
+      coupling.assumptions = readAssumptions(record);
+      if (!joints.exists(coupling.leader) || !joints.exists(coupling.follower))
+        throw 'Coupling ${coupling.id} references an unknown joint';
+      var pair = coupling.follower + "\n" + coupling.leader;
+      if (couplingIds.exists(coupling.id) || pairs.exists(pair))
+        throw 'Duplicate robot coupling ${coupling.id} or leader and follower pair';
+      couplingIds.set(coupling.id, true);
+      pairs.set(pair, true);
+      model.addCoupling(coupling);
+    }
+    var cycle = JointCoupling.cycleThrough(model.couplings);
+    if (cycle != null) throw 'Joint $cycle depends on itself through its couplings';
+
+    for (record in (Reflect.hasField(root, "elasticNetworks") ? array(root, "elasticNetworks") : [])) {
+      var spans:Array<robotkit.model.ElasticNetwork.ElasticSpan> = [];
+      for (span in array(record, "spans")) {
+        var terms:Array<robotkit.model.ElasticNetwork.ElasticTerm> = [];
+        for (term in array(span, "terms")) terms.push({joint: text(term, "joint"), coefficient: number(term, "coefficient")});
+        spans.push({stiffness: number(span, "stiffness"), terms: terms});
+      }
+      var owners:Array<String> = [];
+      for (owner in array(record, "couplings")) owners.push(Std.string(owner));
+      var network = new ElasticNetwork(text(record, "id"), owners, spans);
+      network.assumptions = readAssumptions(record);
+      for (clearance in array(record, "clearances"))
+        network.clearances.push({joint: text(clearance, "joint"), allowance: number(clearance, "allowance")});
+      network.validate(model.joints, model.couplings);
+      model.elasticNetworks.push(network);
+    }
+
+    var actuatorIds = new Map<String, Bool>();
+    for (record in array(root, "actuators")) {
+      var actuator = readActuator(record);
+      if (actuatorIds.exists(actuator.id)) throw 'Duplicate robot actuator ${actuator.id}';
+      actuatorIds.set(actuator.id, true);
+      switch actuator.transmission {
+        case SimpleTransmission(jointId, _, _):
+          if (!joints.exists(jointId))
+            throw 'Actuator ${actuator.id} references unknown joint $jointId';
+      }
+      model.addActuator(actuator);
+    }
+    if (Reflect.hasField(root, "encoders")) {
+      var encoderIds = new Map<String, Bool>();
+      for (record in array(root, "encoders")) {
+        var encoder = readEncoder(record);
+        if (encoderIds.exists(encoder.id)) throw 'Duplicate robot encoder ${encoder.id}';
+        encoderIds.set(encoder.id, true);
+        if (!joints.exists(encoder.joint)) throw 'Encoder ${encoder.id} references unknown joint ${encoder.joint}';
+        model.addEncoder(encoder);
+      }
+      for (actuator in model.actuators)
+        if (actuator.encoder != "" && !encoderIds.exists(actuator.encoder))
+          throw 'Actuator ${actuator.id} references unknown encoder ${actuator.encoder}';
+    }
+
+    var frames = new Map<String, Frame>();
+    for (record in array(root, "frames")) {
+      var id = text(record, "id");
+      if (frames.exists(id)) throw 'Duplicate robot frame $id';
+      var linkId = text(record, "link"), link = links.get(linkId);
+      if (link == null) throw 'Frame $id references an unknown link';
+      var frame = model.addFrame(new Frame(text(record, "name"), link, id));
+      frame.position = vectorField(record, "position", 3);
+      frame.rotation = vectorField(record, "rotation", 4);
+      frames.set(id, frame);
+    }
+
+    var sensors = new Map<String, Bool>();
+    for (record in array(root, "sensors")) {
+      var id = text(record, "id");
+      if (sensors.exists(id)) throw 'Duplicate robot sensor $id';
+      sensors.set(id, true);
+      var sensor = model.addSensor(new Sensor(text(record, "name"), text(record, "kind"),
+        number(record, "updateRate"), id));
+      var frameId = optionalText(record, "frame");
+      if (frameId != null) {
+        sensor.frame = frames.get(frameId);
+        if (sensor.frame == null) throw 'Sensor $id references an unknown frame';
+      }
+      sensor.rayCount = fieldInt(record, "rayCount");
+      sensor.maxRange = number(record, "maxRange");
+      sensor.startAngleRadians = number(record, "startAngleRadians");
+      sensor.fieldOfViewRadians = number(record, "fieldOfViewRadians");
+      sensor.noiseStddev = number(record, "noiseStddev");
+      sensor.noiseSeed = fieldInt(record, "noiseSeed");
+      if (Reflect.hasField(record, "joint")) sensor.joint = text(record, "joint");
+      sensor.windowLower = fieldNumberDefault(record, "windowLower", 0.0);
+      sensor.windowUpper = fieldNumberDefault(record, "windowUpper", 0.0);
+      sensor.hysteresis = fieldNumberDefault(record, "hysteresis", 0.0);
+    }
+
+    for (record in array(root, "contactPairs")) {
+      var linkA = text(record, "linkA"), linkB = text(record, "linkB");
+      var shapeA = fieldInt(record, "shapeA"), shapeB = fieldInt(record, "shapeB");
+      var a = links.get(linkA), b = links.get(linkB);
+      if (a == null || b == null || linkA == linkB || shapeA < 0 || shapeA >= a.collisionShapes.length ||
+          shapeB < 0 || shapeB >= b.collisionShapes.length)
+        throw 'Contact pair $linkA/$shapeA - $linkB/$shapeB references no shape on two links';
+      var surface = readSurface(required(record, "surface"));
+      var error = surface.validate();
+      if (error != null) throw error;
+      model.contactPairs.push(new ContactPair(linkA, shapeA, linkB, shapeB, surface));
+    }
+    var networkNames:Array<String> = [], owners:Array<String> = [];
+    for (network in model.elasticNetworks) {
+      if (networkNames.indexOf(network.id) >= 0) throw "Duplicate elastic network";
+      networkNames.push(network.id);
+      for (owner in network.couplings) {
+        if (owners.indexOf(owner) >= 0) throw "A coupling belongs to several elastic networks";
+        owners.push(owner);
+      }
+    }
+    return model;
+  }
+
+  static function hasPneumaticDrive(model:RobotModel):Bool {
+    for (actuator in model.actuators)
+      if (actuator.drive != null && Std.isOfType(actuator.drive, PneumaticDrive)) return true;
+    return false;
+  }
+
+  static function hasProcessVelocityDrive(model:RobotModel):Bool {
+    for (actuator in model.actuators) if (actuator.processVelocity != null) return true;
+    return false;
+  }
+
+  public static function encodeCollisionShape(shape:CollisionShape):Dynamic {
+    var kind:String, size:Array<Float>;
+    switch shape.primitive {
+      case Box(x, y, z): kind = "box"; size = [x, y, z];
+      case Sphere(radius): kind = "sphere"; size = [radius];
+      case Capsule(radius, half): kind = "capsule"; size = [radius, half];
+      case Cylinder(radius, half): kind = "cylinder"; size = [radius, half];
+    }
+    var surface = shape.surface;
+    return {kind: kind, size: size, position: shape.position, rotation: shape.rotation,
+      surface: surface == null ? null : encodeSurface(surface),
+      contact: switch shape.contact {
+        case Layers: "layers";
+        case PairsOnly: "pairs";
+        case PairsAndEnvironment: "pairs-and-environment";
+      }};
+  }
+
+  static function encodeSurface(surface:ContactSurface):Dynamic return {
+    friction: surface.friction, frictionDimensions: surface.frictionDimensions,
+    contactTimeConstant: surface.contactTimeConstant,
+    contactDampingRatio: surface.contactDampingRatio
+  };
+
+  static function readSurface(record:Dynamic):ContactSurface {
+    return new ContactSurface(vectorField(record, "friction", 3),
+      fieldInt(record, "frictionDimensions"), number(record, "contactTimeConstant"),
+      number(record, "contactDampingRatio"));
+  }
+
+  public static function readCollisionShape(record:Dynamic):CollisionShape {
+    var primitive = switch text(record, "kind") {
+      case "box":
+        var size = vectorField(record, "size", 3);
+        Box(size[0], size[1], size[2]);
+      case "sphere": Sphere(vectorField(record, "size", 1)[0]);
+      case "capsule":
+        var size = vectorField(record, "size", 2);
+        Capsule(size[0], size[1]);
+      case "cylinder":
+        var size = vectorField(record, "size", 2);
+        Cylinder(size[0], size[1]);
+      case other: throw 'Unsupported RobotModel collision shape kind $other';
+    };
+    var shape = new CollisionShape(primitive, vectorField(record, "position", 3),
+      vectorField(record, "rotation", 4));
+    var surface:Dynamic = required(record, "surface");
+    if (surface != null) shape.surface = readSurface(surface);
+    shape.contact = switch text(record, "contact") {
+      case "layers": Layers;
+      case "pairs": PairsOnly;
+      case "pairs-and-environment": PairsAndEnvironment;
+      case other: throw 'Unsupported RobotModel shape contact $other';
+    };
+    return shape;
+  }
+
+  /** Stiffness, backlash and drag are written only when a coupling has some, so other models keep their bytes. */
+  static function encodeCoupling(coupling:JointCoupling):Dynamic {
+    var record:Dynamic = {
+      id: coupling.id, leader: coupling.leader, follower: coupling.follower,
+      ratio: coupling.ratio, offset: coupling.offset, efficiency: coupling.efficiency
+    };
+    if (coupling.stiffness != 0.0) record.stiffness = nonNegative(coupling.stiffness, "coupling stiffness");
+    if (coupling.backlash != 0.0) record.backlash = nonNegative(coupling.backlash, "coupling backlash");
+    if (coupling.drag != 0.0) record.drag = nonNegative(coupling.drag, "coupling drag");
+    if (coupling.assumptions.length > 0) record.assumptions = coupling.assumptions.copy();
+    if (coupling.assumed.length > 0) record.assumed = coupling.assumed.copy();
+    return record;
+  }
+
+  static function encodeActuator(value:Actuator):Dynamic {
+    var record:Dynamic = {
+      id: value.id, maxEffort: value.maxEffort, maxRate: value.maxRate,
+      servoStiffness: value.servoStiffness, servoDamping: value.servoDamping,
+      transmission: switch value.transmission {
+        case SimpleTransmission(jointId, ratio, offset):
+          {kind: "simple", jointId: jointId, ratio: ratio, offset: offset};
+      }
+    };
+    if (value.positionLoopRate > 0) record.positionLoopRate = value.positionLoopRate;
+    if (value.speedLimiter != "") record.speedLimiter = value.speedLimiter;
+    if (value.encoder != "") record.encoder = value.encoder;
+    if (value.assumptions.length > 0) record.assumptions = value.assumptions.copy();
+    if (value.assumed.length > 0) record.assumed = value.assumed.copy();
+    if (value.microsteps != null) record.microsteps = value.microsteps;
+    if (value.maxStepRate != null) record.maxStepRate = value.maxStepRate;
+    if (value.efficiency != 1.0) record.efficiency = value.efficiency;
+    if (value.processVelocity != null) {
+      var process = value.processVelocity;
+      record.processVelocity = {speedChannel: process.speedChannel,
+        directionChannel: process.directionChannel,
+        radiansPerSpeedUnit: process.radiansPerSpeedUnit};
+    }
+    // A bare stepper is its steps alone, as before drive kinds; anything with ratings gets a drive.
+    var drive = value.drive;
+    if (drive != null) {
+      var stepper = drive.stepper();
+      var servo = drive.servo();
+      var pneumatic = drive.pneumatic();
+      if (stepper != null) {
+        record.drive = {kind: "stepper", fullStepsPerRevolution: stepper.fullStepsPerRevolution,
+          rotorInertia: stepper.rotorInertia, holdingTorque: stepper.holdingTorque, curve: stepper.curve.flatten()};
+      } else if (servo != null) {
+        record.drive = {kind: "servo", ratedTorque: servo.ratedTorque, peakTorque: servo.peakTorqueValue,
+          ratedSpeed: servo.ratedSpeed, maxSpeed: servo.maxSpeedValue, rotorInertia: servo.rotorInertia,
+          encoderCounts: servo.encoderCounts, curve: servo.curve.flatten()};
+      } else if (pneumatic != null) {
+        record.drive = {kind: "pneumatic", bore: pneumatic.bore, rod: pneumatic.rod,
+          stroke: pneumatic.stroke, ratedSpeed: pneumatic.ratedSpeed, pressurePa: pneumatic.pressurePa,
+          channelA: pneumatic.channelA, channelB: pneumatic.channelB,
+          normallyToA: pneumatic.normallyToA, extendSign: pneumatic.extendSign};
+      } else throw 'Actuator ${value.id} has an unsupported drive';
+    }
+    return record;
+  }
+
+  static function readActuatorDrive(record:Dynamic):ActuatorDrive {
+    if (text(record, "kind") == "pneumatic")
+      return new PneumaticDrive(number(record, "bore"), number(record, "rod"), number(record, "stroke"),
+        number(record, "ratedSpeed"), number(record, "pressurePa"), text(record, "channelA"),
+        optionalText(record, "channelB"), bool(record, "normallyToA"), number(record, "extendSign"));
+    var curveValues:Dynamic = required(record, "curve");
+    if (!Std.isOfType(curveValues, Array)) throw "Invalid RobotModel field curve";
+    var curve = TorqueSpeedCurve.unflatten([for (entry in (cast curveValues : Array<Dynamic>)) {
+      if (!Std.isOfType(entry, Int) && !Std.isOfType(entry, Float)) throw "Invalid RobotModel field curve";
+      finite(entry, "curve");
+    }]);
+    return switch text(record, "kind") {
+      case "stepper": new StepperDrive(number(record, "fullStepsPerRevolution"), nonNegative(number(record, "rotorInertia"), "drive rotorInertia"),
+        nonNegative(number(record, "holdingTorque"), "drive holdingTorque"), curve);
+      case "servo": new ServoDrive(number(record, "ratedTorque"), number(record, "peakTorque"), number(record, "ratedSpeed"),
+        number(record, "maxSpeed"), nonNegative(number(record, "rotorInertia"), "drive rotorInertia"),
+        nonNegative(number(record, "encoderCounts"), "drive encoderCounts"), curve);
+      case kind: throw 'Unsupported actuator drive kind $kind';
+    };
+  }
+
+  static function validateActuator(value:Actuator, joints:Map<String, Bool>):Void {
+    if (value == null) throw "Robot actuator is null";
+    nonNegative(value.servoStiffness, "actuator servoStiffness");
+    nonNegative(value.servoDamping, "actuator servoDamping");
+    if (!(value.efficiency > 0.0 && value.efficiency <= 1.0)) throw "Actuator efficiency must be in (0, 1]";
+    nonNegative(value.fullStepsPerRevolution, "actuator fullStepsPerRevolution");
+    if (value.fullStepsPerRevolution > 0 && (value.microsteps == null || value.maxStepRate == null))
+      throw 'Stepper actuator "${value.id}" requires microsteps and a driver step-rate ceiling';
+    if (value.microsteps != null && (value.microsteps < 1 || value.microsteps > 1024))
+      throw "Actuator microsteps must be an integer from 1 to 1024";
+    if (value.maxStepRate != null && (!(value.maxStepRate > 0) || !Math.isFinite(value.maxStepRate)))
+      throw "Actuator maxStepRate must be finite and positive";
+    if (value.drive != null && !Std.isOfType(value.drive, StepperDrive) && !Std.isOfType(value.drive, ServoDrive) &&
+        !Std.isOfType(value.drive, PneumaticDrive))
+      throw 'Actuator ${value.id} has an unsupported drive';
+    requireText(value.id, "actuator ID");
+    if (value.maxEffort != null) finite(value.maxEffort, "actuator maxEffort");
+    if (value.maxRate != null) finite(value.maxRate, "actuator maxRate");
+    if ((value.maxEffort != null && value.maxEffort < 0.0) || (value.maxRate != null && value.maxRate < 0.0))
+      throw "Actuator limits must be non-negative";
+    if (value.transmission == null) throw "Actuator transmission is required";
+    switch value.transmission {
+      case SimpleTransmission(jointId, ratio, offset):
+        if (!joints.exists(jointId)) throw 'Actuator ${value.id} references unknown joint $jointId';
+        finite(ratio, "transmission ratio");
+        finite(offset, "transmission offset");
+        if (ratio == 0.0) throw "Transmission ratio must be nonzero";
+    }
+  }
+
+  static function readActuator(value:Dynamic):Actuator {
+    var transmission = required(value, "transmission");
+    var parsed:Transmission = switch text(transmission, "kind") {
+      case "simple": SimpleTransmission(text(transmission, "jointId"),
+        number(transmission, "ratio"), number(transmission, "offset"));
+      case kind: throw 'Unsupported transmission kind $kind';
+    };
+    var actuator = new Actuator(text(value, "id"), nullableNumber(value, "maxEffort"),
+      nullableNumber(value, "maxRate"), parsed);
+    if (Reflect.hasField(value, "positionLoopRate"))
+      actuator.positionLoopRate = nonNegative(number(value, "positionLoopRate"), "actuator positionLoopRate");
+    if (Reflect.hasField(value, "speedLimiter")) actuator.speedLimiter = text(value, "speedLimiter");
+    actuator.servoStiffness = nonNegative(number(value, "servoStiffness"), "actuator servoStiffness");
+    actuator.servoDamping = nonNegative(number(value, "servoDamping"), "actuator servoDamping");
+    if (Reflect.hasField(value, "drive") && Reflect.field(value, "drive") != null)
+      actuator.drive = readActuatorDrive(Reflect.field(value, "drive"));
+    if (Reflect.hasField(value, "processVelocity") && Reflect.field(value, "processVelocity") != null) {
+      var process:Dynamic = Reflect.field(value, "processVelocity");
+      actuator.processVelocity = new ProcessVelocityDrive(text(process, "speedChannel"),
+        text(process, "directionChannel"), number(process, "radiansPerSpeedUnit"));
+    }
+    if (Reflect.hasField(value, "encoder") && Reflect.field(value, "encoder") != null)
+      actuator.encoder = text(value, "encoder");
+    if (Reflect.hasField(value, "efficiency") && Reflect.field(value, "efficiency") != null) {
+      actuator.efficiency = number(value, "efficiency");
+      if (!(actuator.efficiency > 0.0 && actuator.efficiency <= 1.0)) throw "Actuator efficiency must be in (0, 1]";
+    }
+    if (Reflect.hasField(value, "microsteps")) {
+      var microsteps = number(value, "microsteps");
+      if (microsteps < 1 || microsteps > 1024 || microsteps != Std.int(microsteps))
+        throw "Actuator microsteps must be an integer from 1 to 1024";
+      actuator.microsteps = Std.int(microsteps);
+    }
+    if (Reflect.hasField(value, "maxStepRate")) {
+      var rate = number(value, "maxStepRate");
+      if (!(rate > 0) || !Math.isFinite(rate)) throw "Actuator maxStepRate must be finite and positive";
+      actuator.maxStepRate = rate;
+    }
+    if (actuator.fullStepsPerRevolution > 0 && (actuator.microsteps == null || actuator.maxStepRate == null))
+      throw 'Stepper actuator "${actuator.id}" requires microsteps and a driver step-rate ceiling';
+    actuator.assumed = readAssumed(value);
+    actuator.assumptions = readAssumptions(value);
+    return actuator;
+  }
+
+  static function collisionName(value:CollisionApproximation):String return switch value {
+    case CollisionApproximation.None: "none";
+    case CollisionApproximation.BoundsBox: "bounds-box";
+    case _: throw "Unsupported RobotModel collision approximation";
+  };
+
+  static function readCollision(value:String):CollisionApproximation return switch value {
+    case "none": CollisionApproximation.None;
+    case "bounds-box": CollisionApproximation.BoundsBox;
+    case _: throw 'Unsupported RobotModel collision approximation $value';
+  };
+
+  static function jointTypeName(value:JointType):String return switch value {
+    case JointType.Fixed: "fixed";
+    case JointType.Revolute: "revolute";
+    case JointType.Continuous: "continuous";
+    case JointType.Prismatic: "prismatic";
+    case JointType.Floating: "floating";
+    case _: throw "Unsupported RobotModel joint type";
+  };
+
+  static function readJointType(value:String):JointType return switch value {
+    case "fixed": JointType.Fixed;
+    case "revolute": JointType.Revolute;
+    case "continuous": JointType.Continuous;
+    case "prismatic": JointType.Prismatic;
+    case "floating": JointType.Floating;
+    case _: throw 'Unsupported RobotModel joint type $value';
+  };
+
+  static function required(value:Dynamic, name:String):Dynamic {
+    if (value == null || !Reflect.hasField(value, name)) throw 'Missing RobotModel field $name';
+    return Reflect.field(value, name);
+  }
+
+  static function text(value:Dynamic, name:String):String {
+    var result:Dynamic = required(value, name);
+    if (!Std.isOfType(result, String)) throw 'Invalid RobotModel field $name';
+    requireText(result, name);
+    return result;
+  }
+
+  /** Overtravel is written only when a joint has some, so models without it keep their bytes. */
+  static function nullableNumber(value:Dynamic, name:String):Null<Float> {
+    if (!Reflect.hasField(value, name)) throw 'Missing RobotModel field $name';
+    var field:Dynamic = Reflect.field(value, name);
+    return field == null ? null : number(value, name);
+  }
+
+  static function encodeLimits(limits:JointLimits):Dynamic {
+    var result:Dynamic = {lower: limits.lower, upper: limits.upper, velocity: limits.velocity,
+      effort: limits.effort, maxAcceleration: limits.maxAcceleration};
+    if (limits.assumptions.length > 0) Reflect.setField(result, "assumptions", limits.assumptions.copy());
+    if (limits.velocityLimiter != "") Reflect.setField(result, "velocityLimiter", limits.velocityLimiter);
+    if (limits.overtravel > 0.0) Reflect.setField(result, "overtravel", limits.overtravel);
+    return result;
+  }
+
+  static function optionalText(value:Dynamic, name:String):Null<String> {
+    var result:Dynamic = required(value, name);
+    if (result == null) return null;
+    if (!Std.isOfType(result, String)) throw 'Invalid RobotModel field $name';
+    return result;
+  }
+
+  static function number(value:Dynamic, name:String):Float {
+    var result:Dynamic = required(value, name);
+    if (!Std.isOfType(result, Int) && !Std.isOfType(result, Float))
+      throw 'Invalid RobotModel field $name';
+    return finite(result, name);
+  }
+
+  static function fieldNumberDefault(value:Dynamic, name:String, fallback:Float):Float
+    return Reflect.hasField(value, name) ? number(value, name) : fallback;
+
+  static function optionalNumber(value:Dynamic, name:String):Null<Float> {
+    var result:Dynamic = required(value, name);
+    if (result == null) return null;
+    if (!Std.isOfType(result, Int) && !Std.isOfType(result, Float))
+      throw 'Invalid RobotModel field $name';
+    return finite(result, name);
+  }
+
+  static function nonNegative(value:Float, name:String):Float {
+    if (!Math.isFinite(value) || value < 0.0) throw 'RobotModel field $name must be finite and non-negative';
+    return value;
+  }
+
+  static function bool(value:Dynamic, name:String):Bool {
+    var result:Dynamic = required(value, name);
+    if (!Std.isOfType(result, Bool)) throw 'Invalid RobotModel field $name';
+    return result;
+  }
+
+  static function fieldInt(value:Dynamic, name:String):Int {
+    var result:Dynamic = required(value, name);
+    if (!Std.isOfType(result, Int)) throw 'Invalid RobotModel field $name';
+    return result;
+  }
+
+  static function array(value:Dynamic, name:String):Array<Dynamic> {
+    var result:Dynamic = required(value, name);
+    if (!Std.isOfType(result, Array)) throw 'Invalid RobotModel field $name';
+    return cast result;
+  }
+
+  static function vectorField(value:Dynamic, name:String, length:Int):Array<Float> {
+    var values:Dynamic = required(value, name);
+    if (!Std.isOfType(values, Array)) throw 'Invalid RobotModel field $name';
+    var floatValues:Null<Array<Float>> = null;
+    try floatValues = cast values catch (_:Dynamic) {}
+    if (floatValues != null) {
+      if (floatValues.length != length)
+        throw 'RobotModel field $name must contain $length values';
+      return [for (item in floatValues) finite(item, name)];
+    }
+    var intValues:Null<Array<Int>> = null;
+    try intValues = cast values catch (_:Dynamic) {}
+    if (intValues != null) {
+      if (intValues.length != length)
+        throw 'RobotModel field $name must contain $length values';
+      return [for (item in intValues) item];
+    }
+    var dynamicValues = array(value, name);
+    if (dynamicValues.length != length)
+      throw 'RobotModel field $name must contain $length values';
+    return [for (item in dynamicValues) {
+      if (!Std.isOfType(item, Int) && !Std.isOfType(item, Float))
+        throw 'Invalid RobotModel field $name';
+      finite(item, name);
+    }];
+  }
+
+  static function vector(values:Array<Float>, length:Int, name:String):Void {
+    if (values == null || values.length != length) throw 'RobotModel $name must contain $length values';
+    for (value in values) finite(value, name);
+  }
+
+  static function finite(value:Float, name:String):Float {
+    if (!Math.isFinite(value)) throw 'RobotModel field $name must be finite';
+    return value;
+  }
+
+  static function readAssumptions(value:Dynamic):Array<robotkit.model.EngineeringAssumptions.QuantityAssumption> {
+    var result:Array<robotkit.model.EngineeringAssumptions.QuantityAssumption> = [];
+    if (!Reflect.hasField(value, "assumptions")) return result;
+    var rows:Dynamic = Reflect.field(value, "assumptions");
+    if (!Std.isOfType(rows, Array)) throw "Engineering assumptions must be an array";
+    for (row in (cast rows:Array<Dynamic>)) {
+      var quantity = text(row, "quantity"), label = text(row, "label");
+      if (quantity == "" || label == "") throw "Engineering assumptions need a quantity and a label";
+      robotkit.model.EngineeringAssumptions.add(result, quantity, label);
+    }
+    return result;
+  }
+
+  static function readAssumed(value:Dynamic):Array<String> {
+    if (!Reflect.hasField(value, "assumed")) return [];
+    return [for (item in array(value, "assumed")) {
+      if (!Std.isOfType(item, String)) throw "Assumed input labels must be strings";
+      var label:String = cast item;
+      requireText(label, "assumed input");
+      label;
+    }];
+  }
+
+  static function requireText(value:String, name:String):Void {
+    if (value == null || StringTools.trim(value).length == 0)
+      throw 'RobotModel field $name must not be empty';
+  }
+}

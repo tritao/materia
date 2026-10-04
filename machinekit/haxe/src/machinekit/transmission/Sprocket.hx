@@ -37,6 +37,7 @@ class Sprocket extends MachineComponent {
 		var result = new TransmissionRelation(alignment * 2 / sprocket.pitchDiameter, DEFAULT_EFFICIENCY, null, null, DEFAULT_DRAG);
 		result.setBasis("efficiency", ValueBasis.Assumed, "chain efficiency");
 		result.setBasis("drag", ValueBasis.Assumed, "chain drag");
+		result.setBasis("stiffness", machinekit.transmission.ValueBasis.Assumed, "rigid");
 		return result;
 	}
 

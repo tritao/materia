@@ -23,8 +23,8 @@ import robotkit.model.EncoderKind;
 import robotkit.model.Sensor;
 import robotkit.model.Frame;
 import robotkit.model.TorqueSpeedCurve;
-import robotkit.model.RobotDriveConfiguration;
-import robotkit.model.RobotMobileConfiguration;
+import robotkit.profile.RobotDriveConfiguration;
+import robotkit.profile.RobotMobileConfiguration;
 import materia.project.SceneArtifact.SceneArtifactMobileBase;
 import cadkit.modeling.AssemblyState;
 
@@ -34,6 +34,7 @@ import cadkit.modeling.AssemblyState;
  */
 typedef AssemblySimulationModel = {
   var model:RobotModel;
+  var profile:robotkit.profile.RobotProfile;
   /** Each part's convex hull, in its link's frame, for Simulation.addRobotAtPose. */
   var linkHulls:Array<AssemblyLinkHull>;
   /** Each simulated part's link and its frame within that link. */
@@ -131,6 +132,7 @@ class AssemblySimulationBridge {
       {x: mobileBase.origin.x / scale, y: mobileBase.origin.y / scale, z: 0.0, qx: 0.0, qy: 0.0,
         qz: Math.sin(mobileBase.origin.yaw / 2), qw: Math.cos(mobileBase.origin.yaw / 2)};
     var model = new RobotModel(definition.id);
+    var profile = new robotkit.profile.RobotProfile();
     var root = model.addLink(new Link("assembly-root"));
     var links = [root];
     // Mass, centre of mass (link frame, metres) and inertia (about that centre, link axes) of each
@@ -241,8 +243,10 @@ class AssemblySimulationBridge {
       var factor = edge.type == AssemblyJointType.Prismatic ? scale : 1.0;
       joint.limits = new JointLimits(edge.limits.lower == null ? -1e9 : (edge.limits.lower - initial) * factor,
         edge.limits.upper == null ? 1e9 : (edge.limits.upper - initial) * factor,
-        edge.limits.velocity == null ? 0 : edge.limits.velocity * factor,
-        edge.limits.effort == null ? 0 : edge.limits.effort);
+        edge.limits.velocity == null ? null : edge.limits.velocity * factor,
+        edge.limits.effort);
+      if (edge.limits.assumptions != null) joint.limits.assumptions = [for (value in edge.limits.assumptions)
+        {quantity: value.quantity, label: value.label}];
       if (edge.limits.acceleration != null) joint.limits.maxAcceleration = edge.limits.acceleration * factor;
       joint.limits.overtravel = edge.limits.overtravel != null ? edge.limits.overtravel * factor :
         edge.type == AssemblyJointType.Prismatic ? DEFAULT_PRISMATIC_OVERTRAVEL : DEFAULT_ROTARY_OVERTRAVEL;
@@ -273,7 +277,33 @@ class AssemblySimulationBridge {
       if (stiffness != null) added.stiffness = stiffness / leaderScale;
       if (backlash != null) added.backlash = backlash * leaderScale;
       if (drag != null) added.drag = drag * followerScale;
+      if (coupling.assumptions != null) added.assumptions = [for (value in coupling.assumptions)
+        {quantity: value.quantity, label: value.label}];
       if (coupling.assumed != null) added.assumed = [for (label in coupling.assumed) label];
+    }
+    if (definition.elasticNetworks != null) for (network in definition.elasticNetworks) {
+      var spans:Array<robotkit.model.ElasticNetwork.ElasticSpan> = [];
+      for (span in network.spans) {
+        var terms:Array<robotkit.model.ElasticNetwork.ElasticTerm> = [];
+        for (term in span.terms) {
+          var edge:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
+          for (candidate in definition.joints) if (candidate.id == term.joint) edge = candidate;
+          if (edge == null) throw 'Elastic network "${network.id}" references no simulated joint';
+          var coordinateScale = edge.type == AssemblyJointType.Prismatic ? scale : 1.0;
+          terms.push({joint: term.joint, coefficient: term.coefficient * scale / coordinateScale});
+        }
+        spans.push({stiffness: span.stiffness / scale, terms: terms});
+      }
+      var added = new robotkit.model.ElasticNetwork(network.id, network.couplings.copy(), spans);
+      if (network.assumptions != null) added.assumptions = network.assumptions.copy();
+      if (network.clearances != null) for (clearance in network.clearances) {
+        var coordinateScale = 1.0;
+        for (edge in definition.joints) if (edge.id == clearance.joint && edge.type == AssemblyJointType.Prismatic)
+          coordinateScale = scale;
+        added.clearances.push({joint: clearance.joint, allowance: clearance.allowance * coordinateScale});
+      }
+      added.validate(model.joints, model.couplings);
+      model.elasticNetworks.push(added);
     }
     // A motor on a joint: its effort and rate in robot units, and its rotor turning with the joint.
     if (definition.actuators != null) for (actuator in definition.actuators) {
@@ -329,11 +359,14 @@ class AssemblySimulationBridge {
       if (actuator.servoDamping != null) added.servoDamping = actuator.servoDamping;
       // The encoder that reads the motor is its own sensor; a servo that names one does not also hold a count.
       if (actuator.encoder != null) added.encoder = actuator.encoder;
+      if (actuator.assumptions != null) added.assumptions = [for (value in actuator.assumptions)
+        {quantity: value.quantity, label: value.label}];
       model.addActuator(added);
       if (actuator.rotorInertia != null)
         // The rotor turns `gear` times as fast as the joint, so its inertia at the joint is `gear` squared times as much.
         driven.armature += edge.type == AssemblyJointType.Prismatic ? 0.0 : actuator.rotorInertia * gear * gear;
     }
+    model.materializeLimits();
     // Encoders: sensors on joints. Counts per millimetre on a sliding joint, per revolution on a turning one.
     if (definition.encoders != null) for (encoder in definition.encoders) {
       var edge:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
@@ -385,14 +418,14 @@ class AssemblySimulationBridge {
       for (wheel in [mobileBase.leftWheel, mobileBase.rightWheel])
         if ([for (joint in model.joints) if (joint.id == wheel) joint].length != 1)
           throw 'Mobile base wheel "$wheel" is not a moving joint of the assembly';
-      model.mobileBase = new RobotMobileConfiguration(
+      profile.mobileBase = new RobotMobileConfiguration(
         RobotDriveConfiguration.Differential(mobileBase.leftWheel, mobileBase.rightWheel,
           mobileBase.wheelRadius, mobileBase.trackWidth),
         mobileBase.maxLinearSpeed, mobileBase.maxAngularSpeed,
         mobileBase.maxLinearAcceleration, mobileBase.maxAngularAcceleration,
         mobileBase.footprintLength, mobileBase.footprintWidth);
     }
-    return {model: model, linkHulls: linkHulls, partLinks: partLinks,
+    return {model: model, profile: profile, linkHulls: linkHulls, partLinks: partLinks,
       closureIds: closures, closures: closureGeometry};
   }
 

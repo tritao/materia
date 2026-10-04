@@ -460,7 +460,7 @@ Do:
     moving; replacement segments must start at degree ≥ 2.
 - Session state in the snapshot: `idle | executing | holding | held |
   stopping | faulted`.
-- Haxe: `robotkit.world.ExecutionPlanSubmission` and snapshot fields. Keep
+- Haxe: `robotkit.execution.ExecutionPlanSubmission` and snapshot fields. Keep
   it a thin mapping.
 
 Tests:

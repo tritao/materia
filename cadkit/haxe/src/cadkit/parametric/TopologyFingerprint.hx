@@ -22,14 +22,13 @@ class TopologyFingerprint {
 	public final dz:Float;
 	public final measure:Float;
 	/**
-		Edges only: (x, y, z) is the edge's midpoint (true, captured since document version 10) rather than its
-		first vertex (false, older documents). The midpoint does not depend on the edge's orientation or, for a
+		Edges only: (x, y, z) is the edge's midpoint. The midpoint does not depend on the edge's orientation or, for a
 		closed edge, on where its seam vertex lies.
 	*/
 	public final midpoint:Bool;
 	/**
-		The element's topological name (plans/TOPOLOGICAL_NAMING.md), captured since document version 11; null for
-		older records and unnamed shapes. Resolution tries it first (`TopologyResolver`); the geometry above is then
+		The element's topological name (plans/TOPOLOGICAL_NAMING.md), null for unnamed shapes.
+		Resolution tries it first (`TopologyResolver`); the geometry above is then
 		the tie-breaker and the fallback.
 	*/
 	public final name:Null<String>;

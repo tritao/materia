@@ -3,7 +3,7 @@ package machinekit.component;
 import haxeon.Equality;
 
 /** Service-port mating rules. Thread designations with -M/-F include sex;
- * legacy designations without a suffix retain exact-match behaviour. */
+ * designations without a suffix match exactly. */
 class PortInterfaces {
 	public static function compatible(first:PortInterface, second:PortInterface):Bool {
 		if (first == Unspecified || second == Unspecified) return true;

@@ -49,9 +49,9 @@ import motionkit.path.PoseLine;
 import motionkit.path.PoseArc;
 import motionkit.path.PoseWaypoint;
 import motionkit.path.OrientationPolicy;
-import motionkit.robot.ToolpathPosePath;
-import robotkit.process.Toolpath;
-import robotkit.process.ToolpathPoint;
+import processkit.motion.ToolpathPosePath;
+import processkit.path.Toolpath;
+import processkit.path.ToolpathPoint;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
 import robotkit.spatial.Quat;
@@ -70,7 +70,7 @@ import motionkit.program.MoveTarget;
 import motionkit.trajectory.MotionLimits;
 import motionkit.trajectory.Trajectory;
 import motionkit.trajectory.ExecutionPlan;
-import motionkit.trajectory.ValidationGuarantee;
+import trajectorykit.validation.ValidationGuarantee;
 import motionkit.trajectory.PlanLimitError;
 import motionkit.trajectory.ValidationLimits;
 import robotkit.model.Joint;
@@ -89,25 +89,25 @@ import robotkit.runtime.VirtualActuatorOptions;
 import robotkit.runtime.RobotRuntimeError;
 import robotkit.runtime.RobotRuntimeCompiler;
 import RobotKitRuntime;
-import robotkit.world.RecordingRobot;
-import robotkit.world.ReplayRobot;
-import robotkit.world.RobotRecording;
-import robotkit.world.SimulatedRobot;
-import robotkit.world.RobotCommand;
-import robotkit.world.Robot;
-import robotkit.world.RobotCapabilities;
-import robotkit.world.RobotDescription;
-import robotkit.world.RobotFault;
-import robotkit.world.RobotId;
-import robotkit.world.RobotSnapshot;
-import robotkit.world.RobotStatus;
-import robotkit.world.RuntimeRobotAdapter;
-import robotkit.world.SensorFrame;
-import robotkit.world.StopMode;
-import robotkit.world.ExecutionPlanSubmission;
-import robotkit.world.ProcessChannelDeclaration;
-import robotkit.world.ProcessEventValue;
-import robotkit.world.TrajectorySegment;
+import robotkit.recording.RecordingRobot;
+import robotkit.recording.ReplayRobot;
+import robotkit.recording.RobotRecording;
+import robotkit.simulation.SimulatedRobot;
+import robotkit.core.RobotCommand;
+import robotkit.core.Robot;
+import robotkit.core.RobotCapabilities;
+import robotkit.core.RobotDescription;
+import robotkit.core.RobotFault;
+import robotkit.core.RobotId;
+import robotkit.core.RobotSnapshot;
+import robotkit.core.RobotStatus;
+import robotkit.runtime.RuntimeRobotAdapter;
+import robotkit.core.SensorFrame;
+import robotkit.core.StopMode;
+import robotkit.execution.ExecutionPlanSubmission;
+import robotkit.execution.ProcessChannelDeclaration;
+import robotkit.execution.ProcessEventValue;
+import robotkit.execution.TrajectorySegment;
 
 import MotionKitTestSupport.WristBranchSolver;
 import MotionKitTestSupport.PlanarSolver;
@@ -303,25 +303,25 @@ class PlannerTests extends MotionKitTestSupport {
       initialGuarantees.jerk == Unchecked &&
       initialGuarantees.taskSpace == Unchecked,
       "guarantee summary separates exact, failed, and unchecked checks");
-    near(report.checks[MotionKitNativeConstants.MK_CHECK_VELOCITY].value, 1.0,
+    near(report.checks[TrajectoryCoreConstants.MK_CHECK_VELOCITY].value, 1.0,
       "validation records chord speed");
-    near(report.checks[MotionKitNativeConstants.MK_CHECK_VELOCITY].margin, -0.2,
+    near(report.checks[TrajectoryCoreConstants.MK_CHECK_VELOCITY].margin, -0.2,
       "validation reports signed limit margin");
-    near(report.checks[MotionKitNativeConstants.MK_CHECK_VELOCITY].tolerance, 0.8e-9,
+    near(report.checks[TrajectoryCoreConstants.MK_CHECK_VELOCITY].tolerance, 0.8e-9,
       "validation reports comparison tolerance", 1e-12);
-    check(report.checks[MotionKitNativeConstants.MK_CHECK_JERK].status ==
-      MotionKitNativeConstants.MK_CHECK_UNCHECKED, "unclaimed jerk is unchecked");
-    check(report.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
-      MotionKitNativeConstants.MK_CHECK_UNCHECKED, "task-space slot is reserved");
+    check(report.checks[TrajectoryCoreConstants.MK_CHECK_JERK].status ==
+      TrajectoryCoreConstants.MK_CHECK_UNCHECKED, "unclaimed jerk is unchecked");
+    check(report.checks[TrajectoryCoreConstants.MK_CHECK_TASK_SPACE].status ==
+      TrajectoryCoreConstants.MK_CHECK_UNCHECKED, "task-space slot is reserved");
     check(Int64.compare(
-      report.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].resolutionNs,
+      report.checks[TrajectoryCoreConstants.MK_CHECK_TASK_SPACE].resolutionNs,
       Int64.ofInt(0)) == 0, "unset task-space check has no sampling resolution");
-    report.setTaskSpace(MotionKitNativeConstants.MK_CHECK_FAILED, 0.006, 0.75,
+    report.setTaskSpace(TrajectoryCoreConstants.MK_CHECK_FAILED, 0.006, 0.75,
       0.005, Int64.ofInt(1000000));
-    var taskSpace = report.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE];
-    check(taskSpace.status == MotionKitNativeConstants.MK_CHECK_FAILED,
+    var taskSpace = report.checks[TrajectoryCoreConstants.MK_CHECK_TASK_SPACE];
+    check(taskSpace.status == TrajectoryCoreConstants.MK_CHECK_FAILED,
       "Haxe wrapper records task-space status");
-    check(taskSpace.method == MotionKitNativeConstants.MK_CHECK_METHOD_SAMPLED,
+    check(taskSpace.method == TrajectoryCoreConstants.MK_CHECK_METHOD_SAMPLED,
       "task-space report identifies sampled validation");
     near(taskSpace.value, 0.006, "Haxe wrapper records worst task-space deviation");
     near(taskSpace.timeSeconds, 0.75, "Haxe wrapper records worst task-space time");
@@ -475,11 +475,20 @@ class PlannerTests extends MotionKitTestSupport {
       [for (joint in blueprint.model.joints) joint.name]);
     var machine = MotionSystem.fromBlueprint(robot, blueprint);
     var options = new MotionOptions(0.2, 2.0);
+    var gentle = planned(machine.moveLinear(Pose.xyz(0.02, 0.0, 0.0),
+      Feed.metresPerSecond(0.2), new MotionOptions(0.2, 0.4)));
+    var gentleAcceleration = peakChordAcceleration(gentle, 0);
+    check(gentleAcceleration <= 0.4 + 1e-6, "moveLinear obeys the lower authored acceleration");
+    runMotion(machine, simulationHarness);
+    machine.home();
+    runMotion(machine, simulationHarness);
     var xOnly = planned(machine.moveLinear(Pose.xyz(0.02, 0.0, 0.0),
       Feed.metresPerSecond(0.2), options));
     var peakAcceleration = peakChordAcceleration(xOnly, 0);
-    check(peakAcceleration > 1.9,
-      "moveLinear uses an authored 2 m/s² acceleration limit");
+    // At the motor's 43.7 mm/s cap, the retiming grid need not reach 2 m/s².
+    // Raising the authored cap must still raise acceleration, within that cap.
+    check(peakAcceleration > 2.0 * gentleAcceleration && peakAcceleration <= 2.0 + 1e-6,
+      'moveLinear uses its authored acceleration cap ($gentleAcceleration -> $peakAcceleration)');
 
     runMotion(machine, simulationHarness);
 
@@ -488,6 +497,10 @@ class PlannerTests extends MotionKitTestSupport {
     for (joint in 0...3)
       check(peakChordAcceleration(diagonal, joint) <= 2.0 + 1e-6,
         "diagonal moveLinear chords stay within per-axis acceleration caps");
+    throws(function() {
+      var outside = machine.moveLinear(Pose.xyz(0.080000001, 0.0, 0.0),
+        Feed.metresPerSecond(0.2), options);
+    }, "path limits reject a 1 nm excursion while accepting homing roundoff");
     simulationHarness.dispose();
   }
 
@@ -565,8 +578,8 @@ class PlannerTests extends MotionKitTestSupport {
     var mixedReport = mixedRig.machine.lastPathValidationReport;
     if (mixedReport == null) throw "Mixed blend did not record validation";
     check(mixedTimed.durationSeconds() > 0.0 &&
-      mixedReport.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
-        MotionKitNativeConstants.MK_CHECK_PASSED,
+      mixedReport.checks[TrajectoryCoreConstants.MK_CHECK_TASK_SPACE].status ==
+        TrajectoryCoreConstants.MK_CHECK_PASSED,
       "mixed blend times and validates through the runtime plan");
     runMotion(mixedRig.machine, mixedRig.harness);
     near(mixedRig.robot.snapshot().positions.get(0), 0.07,
@@ -582,8 +595,15 @@ class PlannerTests extends MotionKitTestSupport {
     var blendedRig = gantryRig(true);
     var blended = blendedRig.machine.movePath(path, PathPlanningOptions.blend(0.0005),
       new MotionOptions(0.08, 0.4));
-    check(blended.durationSeconds() < exact.durationSeconds(),
-      '0.5 mm fillet ${blended.durationSeconds()} is faster than exact stop ${exact.durationSeconds()}');
+    // A tiny fillet can cost time under conservative junction limits. A
+    // larger permitted deviation demonstrates the speed/tolerance tradeoff.
+    var widerRig = gantryRig(true);
+    var wider = widerRig.machine.movePath(path, PathPlanningOptions.blend(0.002),
+      new MotionOptions(0.08, 0.4));
+    check(wider.durationSeconds() < exact.durationSeconds(),
+      '2 mm fillet ${wider.durationSeconds()} is faster than exact stop ${exact.durationSeconds()}');
+    Sys.println('cartesian blends: exact ${exact.durationSeconds()} s, 0.5 mm ${blended.durationSeconds()} s, 2 mm ${wider.durationSeconds()} s');
+    widerRig.harness.dispose();
     var closestCorner = 1.0;
     var cornerSpeed = 0.0;
     for (index in 0...501) {
@@ -603,8 +623,8 @@ class PlannerTests extends MotionKitTestSupport {
     check(cornerSpeed > 1e-3, "0.5 mm fillet carries speed through the corner");
     var blendReport = blendedRig.machine.lastPathValidationReport;
     if (blendReport == null) throw "Blend path did not record validation";
-    var taskCheck = blendReport.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE];
-    check(taskCheck.status == MotionKitNativeConstants.MK_CHECK_PASSED &&
+    var taskCheck = blendReport.checks[TrajectoryCoreConstants.MK_CHECK_TASK_SPACE];
+    check(taskCheck.status == TrajectoryCoreConstants.MK_CHECK_PASSED &&
       Math.abs(taskCheck.limit - 0.0005) < 1e-12,
       "blend validation checks the authored 0.5 mm tolerance");
     runMotion(blendedRig.machine, blendedRig.harness);
@@ -693,9 +713,13 @@ class PlannerTests extends MotionKitTestSupport {
       var limits = new ValidationLimits(count,
         Int64.ofInt(blueprint.runtime.revision),
         Int64.ofInt(blueprint.runtime.calibrationRevision));
-      var velocity = [for (_ in 0...count) 0.1];
-      var acceleration = [for (_ in 0...count) 0.4];
-      var jerk = [for (_ in 0...count) 10.0];
+      var ids = [for (joint in blueprint.model.joints) joint.id];
+      var scales = [for (_ in ids) 0.0];
+      for (axis in blueprint.axes) for (slot in 0...axis.jointIds.length)
+        scales[ids.indexOf(axis.jointIds[slot])] = Math.abs(axis.jointScales[slot]);
+      var velocity = [for (joint in blueprint.model.joints) joint.limits.requireVelocity()];
+      var acceleration = [for (joint in blueprint.model.joints) joint.limits.requireAcceleration()];
+      var jerk = [for (scale in scales) 10.0 * scale];
       for (joint in 0...count) {
         var bounds = blueprint.model.joints[joint].limits;
         if (bounds.lower < bounds.upper)
@@ -705,8 +729,10 @@ class PlannerTests extends MotionKitTestSupport {
         limits.jerk(joint, jerk[joint]);
       }
       var compiler = new ProgramCompiler(solver, limits, "work", velocity,
-        acceleration, jerk, StartTolerances.uniform(count,
-          0.0005, 0.004, 0.01));
+        acceleration, jerk, new StartTolerances([for (scale in scales) 0.0005 * scale],
+          [for (scale in scales) 0.004 * scale], [for (scale in scales) 0.01 * scale]),
+        null, 0.01, 0.5, 0.005, 0.02, null, null,
+        [for (scale in scales) 0.5 * scale], ids, blueprint.model.couplings);
       var primitive = new TestCircularPosePrimitive(circular, 0.05);
       var path = new PosePath("work", [primitive]).withAuthoredGeometry(authored, 0.001);
       var compiled = compiler.compile(new MotionProgram([

@@ -1,6 +1,6 @@
 package processkit;
 
-import robotkit.world.FiredProcessEvent;
+import robotkit.execution.FiredProcessEvent;
 
 /** Device readiness, fault and safe-output boundary for a process run. */
 interface ProcessDevice {

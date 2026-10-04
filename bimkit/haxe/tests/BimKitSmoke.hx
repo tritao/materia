@@ -54,15 +54,6 @@ class BimKitSmoke {
 		return property.value;
 	}
 
-	static function encodePlacement(value:Placement):Dynamic {
-		var plane = value.location.plane;
-		return {
-			origin: {x: plane.origin.x, y: plane.origin.y, z: plane.origin.z},
-			xDirection: {x: plane.xDirection.x, y: plane.xDirection.y, z: plane.xDirection.z},
-			normal: {x: plane.normal.x, y: plane.normal.y, z: plane.normal.z}
-		};
-	}
-
 	static function spatialBackbone():Void {
 		var model = new BimDocument();
 		var project = model.createProject("Project");
@@ -425,48 +416,6 @@ class BimKitSmoke {
 		var failedReload = BimCodec.decode(BimCodec.encode(model));
 		check(failedReload.relationship(first.id).wallId.value == firstWall.id.value, "a failed graph update leaves a reloadable document");
 		failedReload.close();
-
-		var legacyGraph:Dynamic = Json.parse(DocumentCodec.encode(model.cad));
-		Reflect.setField(legacyGraph, "version", 3);
-		Reflect.setField(legacyGraph, "implicitOutput", null);
-		Reflect.setField(legacyGraph, "relationships", null);
-		var legacyElements:Array<Dynamic> = cast Reflect.field(legacyGraph, "elements");
-		for (record in legacyElements)
-			Reflect.setField(record, "properties", null);
-		var legacyDefinitions:Array<Dynamic> = cast Reflect.field(legacyGraph, "definitions");
-		for (record in legacyDefinitions)
-			Reflect.setField(record, "properties", null);
-		var legacyWalls:Array<Dynamic> = [];
-		for (role in model.allWallRoles())
-			legacyWalls.push({element: role.elementId.value, uncutOutput: role.uncutOutput.id.toInt()});
-		var legacyRelationships:Array<Dynamic> = [];
-		for (value in model.allRelationships())
-			legacyRelationships.push({
-				opening: value.openingId.value,
-				wall: value.wallId.value,
-				along: value.along,
-				sill: value.sill,
-				output: value.outputName,
-				unhostPlacement: encodePlacement(value.unhostPlacement),
-				unhostParent: value.unhostParent == null ? null : {
-					document: value.unhostParent.documentId.value,
-					element: value.unhostParent.elementId.value
-				},
-				unhostDepth: value.unhostDepth
-			});
-		var legacyText = Json.stringify({
-			format: BimCodec.LEGACY_FORMAT,
-			version: BimCodec.LEGACY_VERSION,
-			cadkit: Json.stringify(legacyGraph),
-			walls: legacyWalls,
-			relationships: legacyRelationships
-		});
-		var migratedLegacy = BimCodec.decode(legacyText);
-		check(migratedLegacy.cad.implicitOutputEnabled == false
-			&& migratedLegacy.wallRole(firstWall.id).uncutOutput.id.toInt() == model.wallRole(firstWall.id).uncutOutput.id.toInt()
-			&& migratedLegacy.relationship(first.id).wallId.value == firstWall.id.value,
-			"legacy BimKit v2 data migrates into typed document properties and relationships");
-		migratedLegacy.close();
 
 		model.rehostOpening(first.id, secondWall.id, 500, 700);
 		near(firstWall.shape().volume(), 6000.0 * 200 * 3000 - 1200.0 * 200 * 1500, "rehosting rebuilds the old wall cut graph");

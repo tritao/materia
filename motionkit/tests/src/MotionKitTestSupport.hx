@@ -47,9 +47,9 @@ import motionkit.path.PoseLine;
 import motionkit.path.PoseArc;
 import motionkit.path.PoseWaypoint;
 import motionkit.path.OrientationPolicy;
-import motionkit.robot.ToolpathPosePath;
-import robotkit.process.Toolpath;
-import robotkit.process.ToolpathPoint;
+import processkit.motion.ToolpathPosePath;
+import processkit.path.Toolpath;
+import processkit.path.ToolpathPoint;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
 import robotkit.spatial.Quat;
@@ -68,7 +68,7 @@ import motionkit.program.MoveTarget;
 import motionkit.trajectory.MotionLimits;
 import motionkit.trajectory.Trajectory;
 import motionkit.trajectory.ExecutionPlan;
-import motionkit.trajectory.ValidationGuarantee;
+import trajectorykit.validation.ValidationGuarantee;
 import motionkit.trajectory.PlanLimitError;
 import motionkit.trajectory.ValidationLimits;
 import robotkit.model.Joint;
@@ -87,25 +87,25 @@ import robotkit.runtime.VirtualActuatorOptions;
 import robotkit.runtime.RobotRuntimeError;
 import robotkit.runtime.RobotRuntimeCompiler;
 import RobotKitRuntime;
-import robotkit.world.RecordingRobot;
-import robotkit.world.ReplayRobot;
-import robotkit.world.RobotRecording;
-import robotkit.world.SimulatedRobot;
-import robotkit.world.RobotCommand;
-import robotkit.world.Robot;
-import robotkit.world.RobotCapabilities;
-import robotkit.world.RobotDescription;
-import robotkit.world.RobotFault;
-import robotkit.world.RobotId;
-import robotkit.world.RobotSnapshot;
-import robotkit.world.RobotStatus;
-import robotkit.world.RuntimeRobotAdapter;
-import robotkit.world.SensorFrame;
-import robotkit.world.StopMode;
-import robotkit.world.ExecutionPlanSubmission;
-import robotkit.world.ProcessChannelDeclaration;
-import robotkit.world.ProcessEventValue;
-import robotkit.world.TrajectorySegment;
+import robotkit.recording.RecordingRobot;
+import robotkit.recording.ReplayRobot;
+import robotkit.recording.RobotRecording;
+import robotkit.simulation.SimulatedRobot;
+import robotkit.core.RobotCommand;
+import robotkit.core.Robot;
+import robotkit.core.RobotCapabilities;
+import robotkit.core.RobotDescription;
+import robotkit.core.RobotFault;
+import robotkit.core.RobotId;
+import robotkit.core.RobotSnapshot;
+import robotkit.core.RobotStatus;
+import robotkit.runtime.RuntimeRobotAdapter;
+import robotkit.core.SensorFrame;
+import robotkit.core.StopMode;
+import robotkit.execution.ExecutionPlanSubmission;
+import robotkit.execution.ProcessChannelDeclaration;
+import robotkit.execution.ProcessEventValue;
+import robotkit.execution.TrajectorySegment;
 
 
 class MotionKitTestSupport {
@@ -239,7 +239,7 @@ class MotionKitTestSupport {
     var robot = new RuntimeRobotAdapter("limits", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name], false, false,
-      "simulated runtime fault", queueSupport);
+      "simulated runtime fault", queueSupport ? null : robotkit.core.ExecutionCapabilities.unavailable());
     var machine = MotionSystem.fromBlueprint(robot, blueprint);
     if (begin == null) machine.moveAxes([new AxisTarget("x", 0.15)], new MotionOptions(0.05, 0.4));
     else begin(machine);
@@ -330,7 +330,7 @@ class MotionKitTestSupport {
     var robot = new RuntimeRobotAdapter("rig", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name], false, false,
-      "simulated runtime fault", queueSupport);
+      "simulated runtime fault", queueSupport ? null : robotkit.core.ExecutionCapabilities.unavailable());
     return new TrialRig(MotionSystem.fromBlueprint(robot, blueprint), simulationHarness, robot);
   }
 
@@ -368,7 +368,7 @@ class MotionKitTestSupport {
     var robot = new RecordingRobot(new RuntimeRobotAdapter("dual-motor-geared", runtime,
       blueprint.model.name, [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name], false, false,
-      "simulated runtime fault", queueSupport), recording);
+      "simulated runtime fault", queueSupport ? null : robotkit.core.ExecutionCapabilities.unavailable()), recording);
     return new TrialRig(MotionSystem.fromBlueprint(robot, blueprint), simulationHarness, robot, recording);
   }
 
@@ -482,7 +482,7 @@ class SessionTransitionRobot implements Robot {
       value.queueEndTimeNs, value.setpointPositions.toArray());
   }
   public function sensors():Array<SensorFrame> return inner.sensors();
-  public function events(afterOrdinal:Int64, max:Int):Array<robotkit.world.RobotEvent>
+  public function events(afterOrdinal:Int64, max:Int):Array<robotkit.core.RobotEvent>
     return inner.events(afterOrdinal, max);
   public function fault():Null<RobotFault> return inner.fault();
   public function submit(command:RobotCommand):Void {
@@ -592,7 +592,7 @@ class LaggingRobot implements Robot {
   public function capabilities():RobotCapabilities return inner.capabilities();
   public function snapshot():RobotSnapshot return inner.snapshot();
   public function sensors():Array<SensorFrame> return inner.sensors();
-  public function events(afterOrdinal:Int64, max:Int):Array<robotkit.world.RobotEvent>
+  public function events(afterOrdinal:Int64, max:Int):Array<robotkit.core.RobotEvent>
     return inner.events(afterOrdinal, max);
   public function fault():Null<RobotFault> return inner.fault();
   public function submit(command:RobotCommand):Void {

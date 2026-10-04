@@ -9,7 +9,7 @@ import motionkit.program.MotionOp;
 import motionkit.program.MotionProgram;
 import motionkit.robot.MotionSession;
 import motionkit.robot.SessionState;
-import robotkit.world.FiredProcessEvent;
+import robotkit.execution.FiredProcessEvent;
 
 /** Plans process spans and logs interruption and recovery transitions. */
 class ProcessRun {

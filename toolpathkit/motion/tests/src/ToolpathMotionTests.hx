@@ -27,6 +27,11 @@ class ToolpathMotionTests {
       [new Setup("1", new Point3(0, 0, 0))]);
 
   static function main():Void {
+    if (Sys.getEnv("TOOLPATH_VIRTUAL_CNC_ONLY") == "1") {
+      new ToolpathProcessTests().testVirtualCncProgram();
+      Sys.println('Virtual CNC tests passed (${MotionKitTestSupport.assertions} assertions)');
+      return;
+    }
     acceptsBinding(null);
     var origin = Provenance.cam(7, "face:2");
     var machine = new MachineBinding("work", "x", "y", "z", 0.2);
@@ -88,7 +93,7 @@ class ToolpathMotionTests {
       ToolpathOp.Move(Cut,
         PathGeometry.Line(new Point3(0, 0, 0), new Point3(0.01, 0, 0)),
         0.01, 0, Provenance.cam(8))
-    ]), [0.0, 0.0, 0.0], Int64.ofInt(1));
+    ]), [for (_ in blueprint.model.joints) 0.0], Int64.ofInt(1));
     if (compiled.blocks.length == 0) throw "robot binding produced no plans";
     compiled.dispose();
     // A rapid down that carries straight on as a slower plunge is one motion; the exact
@@ -111,7 +116,12 @@ class ToolpathMotionTests {
           throw 'each move keeps its own speed, got $speeds under $feed';
       case _: throw "entry path missing";
     }
-    var entryPlans = robotBinding.compile(pathProgram(entryOps), [0.0, 0.0, 0.012], Int64.ofInt(1));
+    var entryStart = [for (_ in blueprint.model.joints) 0.0];
+    var zAxis = blueprint.axes[2];
+    for (slot in 0...zAxis.jointIds.length)
+      entryStart[[for (joint in blueprint.model.joints) joint.id].indexOf(zAxis.jointIds[slot])] =
+        zAxis.jointScales[slot] * 0.012;
+    var entryPlans = robotBinding.compile(pathProgram(entryOps), entryStart, Int64.ofInt(1));
     var planCount = 0;
     for (block in entryPlans.blocks) planCount += block.plans.length;
     entryPlans.dispose();

@@ -30,10 +30,11 @@ class Rack extends MachineComponent {
 	/** Resolve the coupling from these parts. */
 	public static function relation(pinion:SpurGear, rack:Null<Rack>, alignment:Float):TransmissionRelation {
 		if (rack != null && (rack.moduleSize != pinion.moduleSize || rack.pressureAngle != pinion.pressureAngle))
-			throw "Rack and pinion module and pressure angle must match";
+			throw new machinekit.transmission.TransmissionDesignError("Rack and pinion module or pressure angle differ; update the rack to match the pinion");
 		var result = new TransmissionRelation(alignment * 2 / pinion.pitchDiameter, DEFAULT_EFFICIENCY,
 			null, pinion.backlash + (rack == null ? 0 : rack.backlash));
 		result.setBasis("efficiency", ValueBasis.Assumed, "rack efficiency");
+		result.setBasis("stiffness", machinekit.transmission.ValueBasis.Assumed, "rigid");
 		return result;
 	}
 

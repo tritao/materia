@@ -74,7 +74,23 @@ class Transaction {
 			text.paragraphStyle.direction != TextDirection.Rtl || textStyle.fontSize != 30.0 ||
 			paragraphStyle.wrap != TextWrap.None)
 			return 19;
+		var beforeColors = text.measure();
+		text.setColorRanges([new TextColorRange(0, 3, new Color(1.0, 0.0, 0.0))]);
+		text.setColor(new Color(0.0, 0.0, 1.0));
+		var overlapRejected = false;
+		try {
+			text.setColorRanges([new TextColorRange(0, 3, new Color(1.0, 0.0, 0.0)),
+				new TextColorRange(2, 4, new Color(0.0, 1.0, 0.0))]);
+		} catch (_:String) {
+			overlapRejected = true;
+		}
+		if (!overlapRejected)
+			return 20;
+		text.setColorRanges([]);
+		text.setColorRanges([new TextColorRange(0, 7, new Color(0.0, 0.85, 0.0))]);
 		var metrics = text.measure();
+		if (metrics.width != beforeColors.width || metrics.height != beforeColors.height)
+			return 21;
 		var position = text.hitTest(16.0, 24.0);
 		var caret = text.caret(position);
 		if (metrics.width <= 0.0 || position.offset < 0 || caret.slope != caret.slope)

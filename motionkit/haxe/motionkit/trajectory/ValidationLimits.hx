@@ -1,9 +1,9 @@
 package motionkit.trajectory;
 
-import MotionKitNative;
+import TrajectoryCore;
 import haxe.Int64;
 
-/** Explicit claims about one native trajectory. A zero derivative limit is unclaimed. */
+/** Explicit claims about one native trajectory. Each derivative claim carries its presence separately from its value. */
 class ValidationLimits {
   public final jointCount:Int;
   public final modelRevision:Int64;
@@ -11,7 +11,7 @@ class ValidationLimits {
   final native:mk_limits;
 
   public function new(jointCount:Int, modelRevision:Int64, calibrationRevision:Int64) {
-    if (jointCount < 1 || jointCount > MotionKitNativeConstants.MK_MAX_JOINTS)
+    if (jointCount < 1 || jointCount > TrajectoryCoreConstants.MK_MAX_JOINTS)
       throw "Invalid validation joint count";
     this.jointCount = jointCount;
     this.modelRevision = modelRevision;
@@ -36,18 +36,21 @@ class ValidationLimits {
     validJoint(joint);
     validMaximum(maximum);
     native.set_max_velocity(joint, maximum);
+    native.set_derivative_claimed(joint, native.get_derivative_claimed(joint) | 1);
   }
 
   public function acceleration(joint:Int, maximum:Float):Void {
     validJoint(joint);
     validMaximum(maximum);
     native.set_max_acceleration(joint, maximum);
+    native.set_derivative_claimed(joint, native.get_derivative_claimed(joint) | 2);
   }
 
   public function jerk(joint:Int, maximum:Float):Void {
     validJoint(joint);
     validMaximum(maximum);
     native.set_max_jerk(joint, maximum);
+    native.set_derivative_claimed(joint, native.get_derivative_claimed(joint) | 4);
   }
 
   public function continuity(order:Int, maximumJump:Float):Void {
@@ -72,8 +75,10 @@ class ValidationLimits {
       if (native.get_position_claimed(joint) != 0)
         result.position(joint, native.get_position_lower(joint),
           native.get_position_upper(joint));
-      result.velocity(joint, native.get_max_velocity(joint));
-      result.acceleration(joint, native.get_max_acceleration(joint));
+      if ((native.get_derivative_claimed(joint) & 1) != 0)
+        result.velocity(joint, native.get_max_velocity(joint));
+      if ((native.get_derivative_claimed(joint) & 2) != 0)
+        result.acceleration(joint, native.get_max_acceleration(joint));
     }
     for (order in 0...3)
       result.continuity(order, native.get_max_continuity_jump(order));

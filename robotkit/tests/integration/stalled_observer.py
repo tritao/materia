@@ -6,7 +6,7 @@ import sys
 import threading
 import time
 
-from stalled_controller import read_frame, send_frame
+from stalled_controller import PROTOCOL_VERSION, read_frame, send_frame
 
 
 def main(port):
@@ -14,13 +14,13 @@ def main(port):
         observer.settimeout(5)
         # The observer requests large camera frames and detections, then stops reading.
         send_frame(observer, threading.Lock(), 1, {
-            1: 1, 2: "stalled-observer", 3: "", 4: "observer",
+            1: PROTOCOL_VERSION, 2: "stalled-observer", 3: "", 4: "observer",
             5: [{1: "camera", 2: 0.0}, {1: "observation", 2: 0.0}],
         })
         with socket.create_connection(("127.0.0.1", port), timeout=5) as controller:
             controller.settimeout(5)
             lock = threading.Lock()
-            send_frame(controller, lock, 1, {1: 1, 2: "active-controller", 3: "", 4: "controller"})
+            send_frame(controller, lock, 1, {1: PROTOCOL_VERSION, 2: "active-controller", 3: "", 4: "controller", 5: []})
             kind, _, _, welcome, _ = read_frame(controller)
             assert kind == 2 and welcome[5] is True
             session, robot, lease = welcome[3], welcome[4], welcome[6]

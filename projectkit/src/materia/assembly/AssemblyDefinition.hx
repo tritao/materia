@@ -68,6 +68,7 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(5) @:optional var overtravel:Null<Float>;
 	/** Largest acceleration the joint's drive can give, in the joint's units per second squared. */
 	@:id(6) @:optional var acceleration:Null<Float>;
+	@:id(7) @:optional var assumptions:Null<ReadOnlyArray<QuantityAssumption>>;
 }
 
 /** Connectors belong to a reusable component definition, not an occurrence. */
@@ -145,6 +146,34 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(9) @:optional var drag:Null<Float>;
 	/** Engineering inputs assumed by the source of this coupling; absent when none. */
 	@:id(10) @:optional var assumed:Null<ReadOnlyArray<String>>;
+	@:id(11) @:optional var assumptions:Null<ReadOnlyArray<QuantityAssumption>>;
+}
+
+/** A derived elastic span; displacement coefficients use assembly length per joint unit. */
+@:wire typedef AssemblyElasticTerm = {
+	@:id(1) var joint:String;
+	@:id(2) var coefficient:Float;
+}
+
+@:wire typedef AssemblyElasticSpan = {
+	/** Axial force per assembly length, N/mm in a millimetre assembly. */
+	@:id(1) var stiffness:Float;
+	@:id(2) var terms:Array<AssemblyElasticTerm>;
+}
+
+/** One physical elastic network replaces the scalar springs of its listed motion couplings. */
+@:wire typedef AssemblyElasticClearance = {
+	@:id(1) var joint:String;
+	/** Bounded tooth motion in this joint's coordinate units. */
+	@:id(2) var allowance:Float;
+}
+
+@:wire typedef AssemblyElasticNetwork = {
+	@:id(1) var id:String;
+	@:id(2) var couplings:Array<String>;
+	@:id(3) var spans:Array<AssemblyElasticSpan>;
+	@:id(4) @:optional var assumptions:Array<QuantityAssumption>;
+	@:id(5) @:optional var clearances:Array<AssemblyElasticClearance>;
 }
 
 /**
@@ -188,14 +217,15 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(19) @:optional var gearEfficiency:Null<Float>;
 	/** Engineering inputs assumed by this motor's rating or curve; absent when none. */
 	@:id(20) @:optional var assumed:Null<ReadOnlyArray<String>>;
-	/** Driver setting and input ceiling; absent for legacy and non-stepper actuators. */
+	/** Driver setting and input ceiling; required for step/dir actuators and absent for other drives. */
 	@:id(21) @:optional var microsteps:Null<Int>;
 	@:id(22) @:optional var maxStepRate:Null<Float>;
+	@:id(23) @:optional var assumptions:Null<ReadOnlyArray<QuantityAssumption>>;
 	/** Servo driver position-loop frequency in Hz; absent for other actuators. */
-	@:id(23) @:optional var positionLoopRate:Null<Float>;
-	@:id(24) @:optional var pneumatic:Null<AssemblyPneumaticDrive>;
+	@:id(24) @:optional var positionLoopRate:Null<Float>;
+	@:id(25) @:optional var pneumatic:Null<AssemblyPneumaticDrive>;
 	/** Optional process-speed channels for a continuously rotating joint; speed units use radians per second. */
-	@:id(25) @:optional var processVelocity:Null<AssemblyProcessVelocityDrive>;
+	@:id(26) @:optional var processVelocity:Null<AssemblyProcessVelocityDrive>;
 }
 
 /**
@@ -233,7 +263,8 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(7) @:optional var mates:Array<AssemblyMate>;
 	@:id(8) @:optional var actuators:Array<AssemblyActuator>;
 	@:id(9) @:optional var encoders:Array<AssemblyEncoder>;
-	@:id(10) @:optional var sensors:Array<AssemblySensor>;
+	@:id(10) @:optional var elasticNetworks:Array<AssemblyElasticNetwork>;
+	@:id(11) @:optional var sensors:Array<AssemblySensor>;
 }
 
 /**
@@ -255,7 +286,8 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(10) @:optional var mates:Array<AssemblyMate>;
 	@:id(11) @:optional var actuators:Array<AssemblyActuator>;
 	@:id(12) @:optional var encoders:Array<AssemblyEncoder>;
-	@:id(13) @:optional var sensors:Array<AssemblySensor>;
+	@:id(13) @:optional var elasticNetworks:Array<AssemblyElasticNetwork>;
+	@:id(14) @:optional var sensors:Array<AssemblySensor>;
 }
 
 @:wire typedef AssemblyJointCoordinate = {
@@ -308,4 +340,10 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(7) @:optional var windowUpper:Null<Float>;
 	@:id(8) @:optional var hysteresis:Null<Float>;
 	@:id(9) @:optional var range:Null<Float>;
+}
+
+/** An engineering assumption attached to the quantity that uses it. */
+@:wire typedef QuantityAssumption = {
+	@:id(1) var quantity:String;
+	@:id(2) var label:String;
 }

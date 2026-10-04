@@ -658,8 +658,8 @@ class ProgramCompiler {
       var time = plan.durationSeconds * sample / timeSteps;
       inspect(taskSampleDistances[sample], time);
     }
-    plan.report.setTaskSpace(failure == null ? MotionKitNativeConstants.MK_CHECK_PASSED :
-      MotionKitNativeConstants.MK_CHECK_FAILED, worst, worstTime, tolerance,
+    plan.report.setTaskSpace(failure == null ? TrajectoryCoreConstants.MK_CHECK_PASSED :
+      TrajectoryCoreConstants.MK_CHECK_FAILED, worst, worstTime, tolerance,
       Trajectory.nanoseconds(plan.durationSeconds / timeSteps));
     if (failure != null) throw failure;
   }

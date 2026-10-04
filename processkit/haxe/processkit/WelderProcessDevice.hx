@@ -1,9 +1,9 @@
 package processkit;
 
-import robotkit.tool.WeldFault;
-import robotkit.tool.WeldSensor;
-import robotkit.world.FiredProcessEvent;
-import robotkit.world.ProcessEventValue;
+import processkit.tool.WeldFault;
+import processkit.tool.WeldSensor;
+import robotkit.execution.FiredProcessEvent;
+import robotkit.execution.ProcessEventValue;
 
 /** The names of the channels a welder is worked by, as the end effector derives them. */
 typedef WelderChannels = {arc:String, wireSpeed:String, voltage:String};

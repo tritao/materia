@@ -9,16 +9,24 @@ import ParagraphStyle;
 import Rect;
 import TextLayout;
 import TextStyle;
+import TextColorRange;
 import nativekit.editorkit.TextDocument;
 
 /** Retained layouts for bounded groups of paragraphs in one editor document. */
 class TextEditorLayout {
 	static inline var paragraphsPerLayout:Int = 64;
+	static inline var maximumParagraphsPerLayout:Int = 128;
 	public var text(get, never):String;
 	public var width(default, null):Float;
 	public final textStyle:TextStyle;
 	public final paragraphStyle:ParagraphStyle;
 	public var paragraphCount(get, never):Int;
+	/** Supplies sorted, disjoint absolute codepoint ranges for one visible chunk.
+	 * Ranges may extend beyond the requested chunk and are clipped to it.
+	 * The provider is queried at paint time, so text edits can refresh styles.
+	 */
+	public var colorRangeProvider:Null<(Int, Int)->Array<TextColorRange>>;
+	public var decorationProvider:Null<(Int, Int)->Array<TextDecoration>>;
 
 	final fonts:FontCollection;
 	var paragraphs:Array<TextEditorParagraphRecord>;
@@ -40,6 +48,8 @@ class TextEditorLayout {
 		this.fonts = fonts;
 		this.textStyle = copyTextStyle(textStyle);
 		this.paragraphStyle = copyParagraphStyle(paragraphStyle);
+		colorRangeProvider = null;
+		decorationProvider = null;
 		paragraphs = [];
 		rangeGeometryCache = [];
 		offsets = null;
@@ -144,6 +154,7 @@ class TextEditorLayout {
 				var textChanged = record.text != paragraphText;
 				if (textChanged || record.layout.width != nextWidth || styleChanged) {
 					record.layout.update(paragraphText, nextWidth, textStyle, paragraphStyle);
+					record.renderRanges = null;
 					record.text = paragraphText;
 				}
 			} else {
@@ -172,10 +183,8 @@ class TextEditorLayout {
 	public function setText(value:String, ?offsetMap:TextDocument):Void
 		update(value, width, textStyle, paragraphStyle, offsetMap);
 
-	/**
-	 * Updates paragraph records after one document replacement. Unaffected
-	 * records are carried by paragraph index, so a keystroke does not rebuild a
-	 * document-wide text-to-record lookup table or reslice every paragraph.
+	/** Updates the affected chunk window while preserving all other boundaries.
+	 * Chunks grow locally to the hard paragraph bound before being split.
 	 */
 	public function setTextAfterEdit(nextOffsets:TextDocument,
 			oldStart:Int, oldEnd:Int, newStart:Int, newEnd:Int,
@@ -187,97 +196,9 @@ class TextEditorLayout {
 			updateDocument(nextOffsets, width, textStyle, paragraphStyle);
 			return;
 		}
-		if (nextOffsets.paragraphCount() != paragraphLineCount) {
-			setTextAfterParagraphEdit(nextOffsets, oldStart, oldEnd,
-				oldDocumentLength);
-			return;
-		}
-
-		var previous = paragraphs;
-		var oldFirst = paragraphIndexAtOffsetIn(previous, oldStart, oldDocumentLength);
-		var oldLast = paragraphIndexAtOffsetIn(previous, oldEnd, oldDocumentLength);
-		oldFirst = oldFirst > 0 ? oldFirst - 1 : oldFirst;
-		oldLast = oldLast + 1 < previous.length ? oldLast + 1 : oldLast;
-
-		var nextCount = chunkCount(nextOffsets);
-		var newFirst = Std.int(nextOffsets.paragraphIndexAtOffset(newStart) / paragraphsPerLayout);
-		var newLast = Std.int(nextOffsets.paragraphIndexAtOffset(newEnd) / paragraphsPerLayout);
-		newFirst = newFirst > 0 ? newFirst - 1 : newFirst;
-		newLast = newLast + 1 < nextCount ? newLast + 1 : newLast;
-
-		var oldDirtyCount = oldLast - oldFirst + 1;
-		var newDirtyCount = newLast - newFirst + 1;
-		var paragraphDelta = newDirtyCount - oldDirtyCount;
-		var reusable = new Map<String, Array<TextEditorParagraphRecord>>();
-		for (index in oldFirst...(oldLast + 1)) {
-			var oldRecord = previous[index];
-			var records = reusable.get(oldRecord.text);
-			if (records == null) {
-				records = [];
-				reusable.set(oldRecord.text, records);
-			}
-			records.push(oldRecord);
-		}
-		var usedDirty:Array<TextEditorParagraphRecord> = [];
-		var next:Array<TextEditorParagraphRecord> = [];
-		for (index in 0...nextCount) {
-			var range = chunkRangeAt(nextOffsets, index);
-			var record:TextEditorParagraphRecord = null;
-			var paragraphText:Null<String> = null;
-			if (index < newFirst) {
-				// The edit is after this prefix, so its record text is unchanged.
-				record = previous[index];
-			} else if (index > newLast) {
-				// Paragraph indexes after the dirty window shift by the local delta.
-				var oldIndex = index - paragraphDelta;
-				if (oldIndex >= 0 && oldIndex < previous.length)
-					record = previous[oldIndex];
-			}
-
-			if (record == null) {
-				paragraphText = nextOffsets.sliceCodepoints(range.start, range.end);
-				var matching = reusable.get(paragraphText);
-				if (matching != null)
-					while (matching.length > 0 && record == null) {
-						var candidate = matching.pop();
-						if (candidate != null && !containsRecord(usedDirty, candidate))
-							record = candidate;
-					}
-				if (record == null)
-					record = new TextEditorParagraphRecord(paragraphText,
-						TextLayout.create(fonts, paragraphText, width, textStyle, paragraphStyle));
-				else if (record.text != paragraphText) {
-					record.layout.update(paragraphText, width, textStyle, paragraphStyle);
-					record.text = paragraphText;
-				}
-				usedDirty.push(record);
-			}
-			record.start = range.start;
-			record.end = range.end;
-			record.y = 0.0;
-			next.push(record);
-		}
-		for (index in oldFirst...(oldLast + 1)) {
-			var oldRecord = previous[index];
-			if (!containsRecord(usedDirty, oldRecord))
-				oldRecord.layout.dispose();
-		}
-
-		offsets = nextOffsets;
-		paragraphLineCount = nextOffsets.paragraphCount();
-		clearRangeGeometryCache();
-		paragraphs = next;
-		recomputeMetrics();
-	}
-
-	/** Keeps chunks outside a newline edit and repartitions only its neighborhood. */
-	function setTextAfterParagraphEdit(nextOffsets:TextDocument,
-			oldStart:Int, oldEnd:Int, oldDocumentLength:Int):Void {
 		var previous = paragraphs;
 		var first = paragraphIndexAtOffsetIn(previous, oldStart, oldDocumentLength);
 		var last = paragraphIndexAtOffsetIn(previous, oldEnd, oldDocumentLength);
-		first = first > 0 ? first - 1 : first;
-		last = last + 1 < previous.length ? last + 1 : last;
 		var delta = nextOffsets.codepointCount - oldDocumentLength;
 		var firstOffset = previous[first].start;
 		var lastOffset = clamp(previous[last].end + delta, firstOffset,
@@ -291,8 +212,8 @@ class TextEditorLayout {
 		var paragraph = firstParagraph;
 		while (paragraph <= lastParagraph) {
 			var remaining = lastParagraph - paragraph + 1;
-			var chunksRemaining = Std.int((remaining + paragraphsPerLayout - 1) /
-				paragraphsPerLayout);
+			var chunksRemaining = remaining <= maximumParagraphsPerLayout ? 1 :
+				Std.int((remaining + paragraphsPerLayout - 1) / paragraphsPerLayout);
 			var chunkSize = Std.int((remaining + chunksRemaining - 1) / chunksRemaining);
 			var paragraphEnd = paragraph + chunkSize - 1;
 			var chunkStart = paragraph == firstParagraph ? firstOffset :
@@ -320,7 +241,20 @@ class TextEditorLayout {
 				record = new TextEditorParagraphRecord(chunkText,
 					TextLayout.create(fonts, chunkText, width, textStyle, paragraphStyle));
 			else if (record.text != chunkText) {
-				record.layout.update(chunkText, width, textStyle, paragraphStyle);
+				// Keep only source-mapped prefix/suffix portions. Repartitioned
+				// boundaries may change both ends of a chunk, so the middle
+				// replacement includes any newly assigned neighboring text.
+				var prefix = record.start == chunkStart ?
+					clamp(Std.int(Math.min(oldStart, newStart)) - chunkStart, 0,
+						Std.int(Math.min(record.end - record.start, chunkEnd - chunkStart))) : 0;
+				var suffix = record.end + delta == chunkEnd ?
+					Std.int(Math.min(record.end - Math.max(oldEnd, record.start),
+						chunkEnd - Math.max(newEnd, chunkStart))) : 0;
+				suffix = clamp(suffix, 0, Std.int(Math.min(record.end - record.start - prefix,
+					chunkEnd - chunkStart - prefix)));
+				record.layout.edit(prefix, record.end - record.start - suffix,
+					nextOffsets.sliceCodepoints(chunkStart + prefix, chunkEnd - suffix), chunkText);
+				record.renderRanges = null;
 				record.text = chunkText;
 			}
 			used.push(record);
@@ -350,6 +284,19 @@ class TextEditorLayout {
 	public function measure():TextMetrics
 		return new TextMetrics(0.0, 0.0, contentWidth, contentHeight);
 
+	/** First visual caret of a logical paragraph, using retained shaping geometry. */
+	public function paragraphCaret(index:Int):TextCaret {
+		ensureLive();
+		if (index < 0 || index >= paragraphLineCount) throw "Paragraph index out of bounds";
+		return caret(new TextPosition(offsets.paragraphRangeAtIndex(index).start, 0));
+	}
+
+	/** Logical paragraph containing a vertical position in the shaped document. */
+	public function paragraphIndexAtY(y:Float):Int {
+		ensureLive();
+		return offsets.paragraphIndexAtOffset(hitTest(0.0, y).offset);
+	}
+
 	/** Measures this retained content against the constraints of a Custom node. */
 	public function measureForConstraints(constraints:LayoutMeasureConstraints):LayoutMeasureResult {
 		ensureLive();
@@ -376,10 +323,13 @@ class TextEditorLayout {
 
 	/** Paints retained paragraphs intersecting the visible document range. */
 	public function paint(canvas:Canvas, color:Color, minY:Float = 0.0,
-			maxY:Float = 1.0e30):Void {
+			maxY:Float = 1.0e30, minX:Float = 0.0, maxX:Float = 1.0e30,
+			includeBackground:Bool = true):Void {
 		ensureLive();
 		if (canvas == null || color == null)
 			throw "Editor layout paint arguments are invalid";
+		if (includeBackground)
+			paintDecorations(canvas, true, minY, maxY, minX, maxX);
 		var low = 0;
 		var high = paragraphs.length;
 		while (low < high) {
@@ -402,8 +352,120 @@ class TextEditorLayout {
 					record.layout.setColor(color);
 					record.renderColor = color;
 				}
+				applyForegroundRanges(record);
 				canvas.drawText(record.layout, 0.0, record.y);
 			}
+		}
+		paintDecorations(canvas, false, minY, maxY, minX, maxX);
+	}
+
+	/** Paints one decoration layer using cached measured range geometry. */
+	public function paintDecorations(canvas:Canvas, behindText:Bool, minY:Float, maxY:Float,
+			minX:Float, maxX:Float):Void {
+		ensureLive();
+		// Keep one provider for this layer even if a callback replaces the widget's provider.
+		var provider = decorationProvider;
+		if (provider == null)
+			return;
+		var low = 0;
+		var high = paragraphs.length;
+		while (low < high) {
+			var middle = (low + high) >> 1;
+			var candidate = paragraphs[middle];
+			if (candidate.y + candidate.height <= minY)
+				low = middle + 1;
+			else
+				high = middle;
+		}
+		for (index in low...paragraphs.length) {
+			var record = paragraphs[index];
+			if (record.y + record.height <= minY)
+				continue;
+			if (record.y >= maxY)
+				break;
+			var values = provider(record.start, record.end);
+			if (values == null)
+				throw "Text decoration provider returned null";
+			for (value in values) {
+				if (value == null || value.end > offsets.codepointCount)
+					throw "Text decoration is outside the document";
+				var isBackground = value.kind == Background || value.kind == WholeLineBackground;
+				if (isBackground != behindText)
+					continue;
+				if (value.start == value.end) {
+					if (value.start < record.start || value.start > record.end ||
+						(value.start == record.end && record.end < offsets.codepointCount))
+						continue;
+				} else if (value.end <= record.start || value.start >= record.end)
+					continue;
+				var rects = value.rectangles(this, Math.max(minY, record.y),
+					Math.min(maxY, record.y + record.height));
+				value.paint(canvas, rects, minX, maxX);
+			}
+		}
+	}
+
+	/** Whole-line decoration geometry from indexed visual rows in the viewport. */
+	public function wholeLineRects(start:Int, end:Int, minY:Float, maxY:Float):Array<Rect> {
+		ensureLive();
+		if (start < 0 || end < start || end > offsets.codepointCount || maxY < minY)
+			throw "Whole-line range is outside the document";
+		var result:Array<Rect> = [];
+		var low = 0;
+		var high = paragraphs.length;
+		while (low < high) {
+			var middle = (low + high) >> 1;
+			if (paragraphs[middle].y + paragraphs[middle].height <= minY)
+				low = middle + 1;
+			else
+				high = middle;
+		}
+		for (index in low...paragraphs.length) {
+			var record = paragraphs[index];
+			if (record.y >= maxY)
+				break;
+			if (record.y + record.height <= minY || record.end <= start || record.start >= end)
+				continue;
+			var localStart = Std.int(Math.max(start, record.start)) - record.start;
+			var localEnd = Std.int(Math.min(end, record.end)) - record.start;
+			for (rect in record.layout.lineRects(localStart, localEnd,
+				minY - record.y, maxY - record.y))
+				result.push(new Rect(0.0, record.y + rect.y, width, rect.height));
+		}
+		return result;
+	}
+
+	function applyForegroundRanges(record:TextEditorParagraphRecord):Void {
+		var ranges:Array<TextColorRange> = [];
+		if (colorRangeProvider != null) {
+			var supplied = colorRangeProvider(record.start, record.end);
+			if (supplied == null)
+				throw "Text foreground provider returned null";
+			var previousEnd = 0;
+			for (range in supplied) {
+				if (range == null || range.start < previousEnd)
+					throw "Text foreground ranges must be sorted and disjoint";
+				previousEnd = range.end;
+				var start = Std.int(Math.max(range.start, record.start));
+				var end = Std.int(Math.min(range.end, record.end));
+				if (start < end)
+					ranges.push(new TextColorRange(start - record.start, end - record.start, range.color));
+			}
+		}
+		var previous = record.renderRanges;
+		var changed = previous == null || previous.length != ranges.length;
+		if (!changed && previous != null)
+			for (index in 0...ranges.length) {
+				var before = previous[index];
+				var after = ranges[index];
+				if (before.start != after.start || before.end != after.end ||
+					before.color.red != after.color.red || before.color.green != after.color.green ||
+					before.color.blue != after.color.blue || before.color.alpha != after.color.alpha)
+					changed = true;
+			}
+		if (changed) {
+			record.layout.setColorRanges(ranges);
+			record.renderRanges = ranges;
 		}
 	}
 
@@ -472,17 +534,18 @@ class TextEditorLayout {
 			throw "Text selection endpoints cannot be null";
 		if (!Math.isFinite(minY) || !Math.isFinite(maxY) || maxY < minY)
 			throw "Text selection geometry bounds are invalid";
-		var forward = start.offset <= end.offset;
+		var startOffset = offsetFromPosition(start), endOffset = offsetFromPosition(end);
+		var forward = startOffset <= endOffset;
 		var firstPosition = forward ? start : end;
 		var lastPosition = forward ? end : start;
-		var first = clamp(firstPosition.offset, 0, offsets.codepointCount);
-		var last = clamp(lastPosition.offset, 0, offsets.codepointCount);
+		var first = clamp(forward ? startOffset : endOffset, 0, offsets.codepointCount);
+		var last = clamp(forward ? endOffset : startOffset, 0, offsets.codepointCount);
 		var firstAffinity = firstPosition.affinity;
 		var lastAffinity = lastPosition.affinity;
 		if (first == last)
 			return [];
 		for (entry in rangeGeometryCache)
-			if (entry.start == first && entry.end == last &&
+			if (entry.start == firstPosition.offset && entry.end == lastPosition.offset &&
 				entry.startAffinity == firstAffinity && entry.endAffinity == lastAffinity &&
 				entry.minY == minY && entry.maxY == maxY)
 				return entry.rectangles.copy();
@@ -534,15 +597,21 @@ class TextEditorLayout {
 			}
 			if (localEnd <= localStart)
 				continue;
+			// An affinity endpoint can belong to the preceding chunk while its logical
+			// insertion offset starts this one. Use this chunk's canonical edge then.
+			var useFirstPosition = localStart == first && firstPosition.offset >= record.start &&
+				firstPosition.offset < record.end;
+			var useLastPosition = localEnd == last && lastPosition.offset >= record.start &&
+				lastPosition.offset <= record.end;
 			for (rect in record.layout.selectionRangeRects(
-				new TextPosition(localStart - record.start,
-					localStart == first ? firstAffinity : 0),
-				new TextPosition(localEnd - record.start,
-					localEnd == last ? lastAffinity : 0)))
+				new TextPosition((useFirstPosition ? firstPosition.offset : localStart) - record.start,
+					useFirstPosition ? firstAffinity : 0),
+				new TextPosition((useLastPosition ? lastPosition.offset : localEnd) - record.start,
+					useLastPosition ? lastAffinity : 0)))
 				result.push(new TextRangeRect(rect.start + record.start, rect.end + record.start,
 					rect.x, rect.y + record.y, rect.width, rect.height, rect.visualLeftIsStart));
 		}
-		rangeGeometryCache.push(new TextEditorRangeGeometryCache(first, last, firstAffinity,
+		rangeGeometryCache.push(new TextEditorRangeGeometryCache(firstPosition.offset, lastPosition.offset, firstAffinity,
 			lastAffinity, minY, maxY, result.copy()));
 		if (rangeGeometryCache.length > 2)
 			rangeGeometryCache.shift();
@@ -742,6 +811,7 @@ class TextEditorParagraphRecord {
 	public var y:Float;
 	public var height:Float;
 	public var renderColor:Null<Color>;
+	public var renderRanges:Null<Array<TextColorRange>>;
 	public final layout:TextLayout;
 
 	public function new(text:String, layout:TextLayout) {
@@ -752,6 +822,7 @@ class TextEditorParagraphRecord {
 		y = 0.0;
 		height = 0.0;
 		renderColor = null;
+		renderRanges = null;
 	}
 }
 

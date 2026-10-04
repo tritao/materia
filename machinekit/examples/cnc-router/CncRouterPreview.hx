@@ -30,8 +30,8 @@ class CncRouterPreview {
 	 * Geometry, joints and initial pose of the router (parts with equal designations share geometry),
 	 * and its machining job: CAM made from the motor plate it mills, with the plate as the target.
 	 */
-	public static function router(belts:Bool = false):Bytes {
-		var router = new CncRouter(belts);
+	public static function router(belts:Bool = false, foldedZ:Bool = false):Bytes {
+		var router = new CncRouter(belts, foldedZ);
 		var scene = AssemblyPreview.scene(router, ASSEMBLY_ID);
 		var plate = motorPlate();
 		var part = plate.geometry(ComponentDetail.Preview);
@@ -49,6 +49,9 @@ class CncRouterPreview {
 	/** The same router with belts on X and Y instead of lead screws. */
 	public static function beltRouter():Bytes return router(true);
 
+	/** The same screw router with the Z motor folded below the gantry through a 2:1 belt. */
+	public static function foldedZRouter():Bytes return router(false, true);
+
 	/** The part the router mills from its stock block. */
 	public static function motorPlate():NemaMountPlate
 		return new NemaMountPlate(NemaStepper.frame(23), CncRouter.STOCK_WIDTH, CncRouter.STOCK_DEPTH, CncRouter.STOCK_HEIGHT, 6);
@@ -56,7 +59,7 @@ class CncRouterPreview {
 
 /** Geometry builds, the axes move the tool where machine coordinates say, and nothing collides. */
 class CncRouterChecks {
-	static function near(actual:Float, expected:Float, message:String, tolerance:Float = 1e-6):Void {
+	public static function near(actual:Float, expected:Float, message:String, tolerance:Float = 1e-6):Void {
 		if (!(Math.abs(actual - expected) <= tolerance))
 			throw '$message: expected $expected, got $actual';
 	}
@@ -169,6 +172,7 @@ class CncRouterChecks {
 		runBelts();
 	}
 
+
 	/**
 	 * The belt-driven router: its pulleys turn travel over their pitch radius (and the right way, by
 	 * the rule of a belt's strand), its belts are whole teeth long, clear the frame and are clamped on
@@ -266,7 +270,7 @@ class CncRouterChecks {
 	static function beltDrive(router:CncRouter, pulley:String):machinekit.assembly.MachineAssemblyDescription.TransmissionRecord {
 		var drive = router.transmissionFor(pulley + "-belt");
 		if (drive == null) throw '$pulley should turn through a belt drive';
-		if (!switch drive.source { case TimingBelt(_, id, _): id == pulley; default: false; }) throw '$pulley should turn through a belt drive';
+		if (!switch drive.source { case TimingBelt(_, id), BeltIdler(_, id): id == pulley; default: false; }) throw '$pulley should turn through a belt drive';
 		return drive;
 	}
 
@@ -290,7 +294,7 @@ class CncRouterChecks {
 	}
 
 	/** No member of `moving` intersects a member of `others` at machine position `at`. */
-	static function checkClear(router:CncRouter, state:AssemblyState, at:Array<Float>, moving:Array<String>,
+	public static function checkClear(router:CncRouter, state:AssemblyState, at:Array<Float>, moving:Array<String>,
 			others:Array<String>):Void {
 		for (a in moving) for (b in others) {
 			var volume = overlap(router, state, at, a, b);

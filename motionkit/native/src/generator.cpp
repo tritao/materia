@@ -7,6 +7,8 @@
 #include <cstdint>
 #include <limits>
 #include <vector>
+#include <memory>
+#include <new>
 
 namespace motionkit {
 namespace {
@@ -134,6 +136,14 @@ mk_result generate(const mk_state_to_state_request &request, Trajectory &traject
             segment.coefficients[joint].value[1] = velocity;
             segment.coefficients[joint].value[2] = acceleration / 2.0;
             segment.coefficients[joint].value[3] = midpoint_jerk[joint] / 6.0;
+            if (begin == 0) {
+                // A sub-nanosecond initial phase can collapse into the next
+                // phase. Keep the requested start state exact at time zero;
+                // its quantization belongs to the subsequent phase seam.
+                segment.coefficients[joint].value[0] = request.current_position[joint];
+                segment.coefficients[joint].value[1] = request.current_velocity[joint];
+                segment.coefficients[joint].value[2] = request.current_acceleration[joint] / 2.0;
+            }
         }
         if (!trajectory.append(segment)) return MK_ERROR_GENERATION;
     }
@@ -141,3 +151,34 @@ mk_result generate(const mk_state_to_state_request &request, Trajectory &traject
 }
 
 } // namespace motionkit
+
+mk_result MK_CALL mk_generate_state_to_state(const mk_state_to_state_request *request,
+    mk_trajectory_handle *out_trajectory, int32_t *out_ruckig_result) {
+    if (out_trajectory != nullptr) out_trajectory->id = 0;
+    if (out_ruckig_result != nullptr) *out_ruckig_result = -100; // Ruckig ErrorInvalidInput.
+    if (request == nullptr || out_trajectory == nullptr || out_ruckig_result == nullptr ||
+        request->struct_size < sizeof(mk_state_to_state_request) ||
+        request->joint_count == 0 || request->joint_count > MK_MAX_JOINTS)
+        return MK_ERROR_INVALID_ARGUMENT;
+    *out_ruckig_result = 0;
+    try {
+        auto generated = std::make_unique<motionkit::Trajectory>(request->joint_count);
+        const auto result = motionkit::generate(*request, *generated, *out_ruckig_result);
+        if (result != MK_OK) return result;
+        auto status = mk_trajectory_create(request->joint_count, out_trajectory);
+        if (status != MK_OK) return status;
+        for (uint32_t index = 0; index < generated->segment_count(); ++index) {
+            status = mk_trajectory_append_segment(*out_trajectory, &generated->segment(index));
+            if (status != MK_OK) {
+                mk_trajectory_destroy(*out_trajectory);
+                out_trajectory->id = 0;
+                return status;
+            }
+        }
+        return MK_OK;
+    } catch (const std::bad_alloc &) {
+        return MK_ERROR_OUT_OF_MEMORY;
+    } catch (...) {
+        return MK_ERROR_GENERATION;
+    }
+}

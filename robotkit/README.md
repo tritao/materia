@@ -4,19 +4,36 @@ RobotKit is the complete robotics layer for Materia. It owns robot models,
 commands, control, runtime ownership, endpoint adapters, world orchestration,
 and the protocol shared by `robotd` and editor clients.
 
-The current increment contains deliberately small boundaries:
+RobotKit is split at dependency boundaries. Select `robotkit-core` for model
+and runtime use; the convenience `robotkit` package includes the standard
+adapters and autonomy but excludes optional ONNX implementations.
 
-- `runtime`: engine-neutral values and validation, an owner-thread runtime,
-  command mailbox, immutable snapshots, and the first framed serial endpoint;
-- `haxe/robotkit/protocol`: versioned framing independent of any particular transport;
-- `haxe`: Haxeon façades, protocol clients, and `RobotWorld` orchestration;
-- `robotd`: one independently deployable logical robot host;
-- `Simulation`: one shared SimKit-backed universe and clock for any number of
-  simulated robots.
+| Package | Owns | Additional dependencies |
+| --- | --- | --- |
+| `robotkit-core` | Model, profile, compiler, control/execution contracts, clocks, safety, streams and world composition | NativeKit, TrajectoryKit |
+| `robotkit-sim` | Simulation, drive plants, presentation, simulated adapters/tools | SimKit, autonomy |
+| `robotkit-remote` | Client, transport and wire protocol | Core |
+| `robotkit-serial` | Device layout/binding and serial endpoint | Core |
+| `robotkit-recording` | Recording and replay | Core, remote protocol |
+| `robotkit-autonomy` | Navigation, localization, manipulation, perception and deployment interpretation | Core/adapters, VisionKit, KinematicsKit |
+| `robotkit-inference` | ONNX image inference, detector implementation and perception host integration | Core/autonomy/simulation |
+| `robotkit-policy` | ONNX control policies | Core |
 
-The semantic robot model and native-runtime compiler are reusable Haxe APIs
-under `haxe/robotkit`; `robotd` supplies only process hosting and deployment
-policy.
+Each package's public modules live under its own `haxe/robotkit` source root.
+Pure planar/spatial values and immutable image/detection records stay in core;
+interpreting them belongs to autonomy. Simulation is the only RobotKit package
+that directly depends on SimKit. The model/runtime dependency closure is
+exactly core, NativeKit and TrajectoryKit.
+
+Perception hosts explicitly call `ObjectDetectorPipeline.install()` after opting
+into `robotkit-inference`. Deployment records validate model digests without
+loading ONNX. `SerialDeployment.openRobot(id)` owns deployment interpretation;
+the serial adapter itself accepts a model/profile pair and no vision dependency.
+
+Run `python3 tools/check-robotkit-packages.py` to audit the declarations.
+`robotkit/core/tests` builds and runs a standalone model/runtime consumer with
+simulation, vision and ONNX explicitly disabled.
+
 RobotKit receives only compiled runtime blueprints and bulk data at execution
 boundaries. A standalone `RobotRuntime` can use the in-memory endpoint for
 host bring-up, while `Simulation` owns the shared SimKit backend for live
@@ -48,8 +65,7 @@ available.
 The canonical native CMake target is `RobotKit::runtime`.
 
 `robotd/native` enables the SimKit simulation and builds the native dependency
-graph consumed by the Haxeon host. The Haxe façade and wire protocol are under
-`haxe/robotkit`;
+graph consumed by the Haxeon host. The Haxe façade and wire protocol live in the owning package source roots;
 its bindings deliberately submit one command batch and retrieve one snapshot
 per tick.
 
@@ -139,17 +155,17 @@ contact. Set `blueprint.selfCollision = false` for a model whose simple box
 collision approximation is too coarse; it keeps environment collision while
 disabling contacts between that robot's own links.
 
-`robotkit.world.SimulatedRobot` adapts one simulation-owned runtime to the same
-`Robot` interface used by `RemoteRobot`. `robotkit.world.SerialRobot` compiles
-an authored `RobotModel`, opens a POSIX serial device, and owns its standalone
+`robotkit.simulation.SimulatedRobot` adapts one simulation-owned runtime to the same
+`Robot` interface used by `RemoteRobot`. `robotkit.serial.SerialRobot` compiles
+an authored `RobotModel` with its `RobotProfile`, opens a POSIX serial device, and owns its standalone
 runtime. Both can be attached to `RobotWorld` and used through the same command
 and snapshot interfaces. The serial endpoint executes RKD6 scheduled plans. It receives queue status and
 actuator state from the device. `robotd --server --deployment=FILE` hosts that
 endpoint behind the existing remote protocol; see
 [the device protocol](runtime/DEVICE_PROTOCOL.md).
 
-Use `new SerialRobot(id, model, devicePath, controllerHex, layout, maxTargetError)`
-or `RobotRuntime.createSerial(...)`. The controller is the board's unique id
+Use `new SerialRobot(id, model, profile, devicePath, controllerHex, layout, maxTargetError)`.
+For direct runtime ownership, pass a `SerialRuntimeEndpoint` to `RobotRuntime.create(blueprint, endpoint)`. The controller is the board's unique id
 (`robotd identify` prints it) and the layout wires its channels to the model's
 actuators; the error budget bounds the converted
 trajectory's position error in the joint's SI units. Serial devices do not
@@ -206,7 +222,7 @@ wheel rate. `Pose2`, `Twist2`, and `Footprint` are transport-neutral values.
 `DifferentialOdometry` integrates wheel-position changes from `RobotSnapshot`
 and resets its encoder baseline when the source clock identity changes.
 
-Drive roles can be authored on `RobotModel` with stable joint IDs instead of
+Drive roles can be authored on `RobotProfile` with stable joint IDs instead of
 repeating runtime array positions and wheel geometry in application factories.
 The compiler resolves those roles against the model's joint ordering and stores
 the resolved configuration on `RobotRuntimeBlueprint`. It rejects missing or
@@ -215,10 +231,11 @@ creation. Factories also check the live robot description against the compiled
 joint ordering before exposing a control view.
 
 ```haxe
-model.mobileBase = new RobotMobileConfiguration(
+var profile = new RobotProfile();
+profile.mobileBase = new RobotMobileConfiguration(
   RobotDriveConfiguration.Differential(leftWheelId, rightWheelId, 0.1, 0.5),
   1.5, 1.2, 0.8, 1.5, 0.8, 0.55);
-var blueprint = RobotRuntimeCompiler.compile(model);
+var blueprint = RobotRuntimeCompiler.compile(model, profile);
 var base = MobileBase.fromBlueprint(robot, blueprint);
 base.command(new Twist2(0.6, 0.2), 0.02);
 ```
@@ -330,9 +347,9 @@ Fork axes can use model-owned joint limits and IDs. Compile the model once and
 construct both views from its blueprint:
 
 ```haxe
-model.forkMechanism = new RobotForkConfiguration(liftJointId,
+profile.forkMechanism = new RobotForkConfiguration(liftJointId,
   1000.0, 600.0, 1.8, tiltJointId, spreadJointId);
-var blueprint = RobotRuntimeCompiler.compile(model);
+var blueprint = RobotRuntimeCompiler.compile(model, profile);
 var base = MobileBase.fromBlueprint(robot, blueprint);
 var forks = Forks.fromBlueprint(robot, blueprint);
 ```
@@ -440,17 +457,17 @@ runner.start(pick);
 ### Persistent recordings
 
 `McapRobotRecording` can preserve an in-memory `RobotRecording` while enqueueing
-versioned JSON payloads to a byte-bounded native writer thread. Pass
+version-7 MessagePack payloads to a byte-bounded native writer thread. Pass
 `retainInMemory = false` for file-only capture. Call `close()` to
 drain the queue and write the MCAP footer. Queue overflow, I/O failure, and a
 writer destroyed without a clean finish are explicit failures; `status()`
 exposes accepted, written, queued-event, queued-byte, and dropped counts.
 Terminal status is persisted beside the recording and can be inspected after
 restart with `McapRecordingReader.status(path)`. Files are currently
-uncompressed for straightforward inspection.
+LZ4-compressed by default, with an uncompressed option.
 
 `RecordingRobot` decorates any `Robot` with a `RobotRecordingSink`. It records
-each returned observation and each accepted `JointTargets` batch while
+each returned observation and each accepted command while
 delegating status, transport, and lifecycle to the wrapped adapter. Both the
 in-memory and MCAP writers implement the sink, so a control client can record a
 simulation or remote robot without changing its skill code. Logging failures
@@ -459,17 +476,15 @@ command or observation results.
 
 Every message carries a recording-wide 64-bit ordinal. It is the sole replay
 ordering key: robot and sensor source timestamps retain their clock-domain IDs
-and are never compared across domains. Wide sequences and timestamps are JSON
-decimal strings, avoiding precision loss in generic JSON tools. Payload schemas
-cover commands, robot snapshots, individual sensor frames, faults, world
-snapshots, and world lifecycle events. Schema v2 records complete joint target
-batches; readers also load v1 single-position commands as one-target batches.
+and are never compared across domains. MessagePack preserves their full-width
+integers. Payload schemas cover joint targets, execution plans and lifecycle
+commands, robot snapshots, individual sensor frames, faults, world snapshots,
+world lifecycle events and process events. Readers accept version 7 only.
 Recorded commands are history only; loading a file never forwards them to a
 live adapter.
 
 Recording timestamps are captured separately from event ordinals and stored in
-both MCAP time fields; the ordinal remains a full-width decimal string in the
-payload instead of masquerading as a timestamp. The reader validates
+MCAP log time; MCAP publish time stores the full-width ordinal for replay ordering. The reader validates
 the exact channel schema, channel/event type agreement, envelope ordinal and
 timestamp, and payload contract. `McapRecordingReader.next()` is an incremental
 cursor; the convenience `load()` method is the explicitly retaining variant.
@@ -508,3 +523,7 @@ latest expiring intent through `IntentBuffer`. `robotd` turns supported intents
 into bulk runtime commands; behaviors never access native handles or MuJoCo
 state directly. The initial `robotd --behavior=oscillate` behavior is an
 integration probe for this path, not a permanent controller API.
+
+Process work, finishing, welding and earthwork live in [ProcessKit](../processkit/README.md).
+Its skills use RobotKit's generic skill and tool interfaces; RobotKit does not
+import process planning or simulated weld behavior.

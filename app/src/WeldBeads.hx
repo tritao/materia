@@ -4,10 +4,10 @@ import app.AssemblyRobot.AssemblyPart;
 import haxe.io.Bytes;
 import materia.project.SceneArtifact.SceneArtifactWeld;
 import nativekit.scene.GeometryData;
-import robotkit.runtime.SimulatedWelder;
+import processkit.simulation.SimulatedWelder;
 import robotkit.runtime.Simulation;
-import robotkit.tool.WeldBead;
-import robotkit.tool.WeldPathBead;
+import processkit.tool.WeldBead;
+import processkit.tool.WeldPathBead;
 
 /** The weld metal laid along one seam of the mission, and where it is shown. */
 class SeamBead {
@@ -169,7 +169,7 @@ class WeldBeads implements SessionMember {
     }
   }
 
-  /** Nothing runs through the robots' runtimes here: the beads only read what the welder deposited. */
+  /** The beads hold no pending runtime action to stop before the reset. */
   public function beforeReset():Void {}
 
   /** A reset forgets the metal: the workpiece is bare again. */

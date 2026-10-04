@@ -1,15 +1,15 @@
 package tests;
 
 import haxe.Int64;
-import motionkit.robot.SurfacePlanRunner;
+import processkit.motion.SurfacePlanRunner;
 import robotkit.model.RobotModel;
 import robotkit.model.Link;
 import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.JointLimits;
 import robotkit.model.Frame;
-import robotkit.model.RobotMobileConfiguration;
-import robotkit.model.RobotDriveConfiguration;
+import robotkit.profile.RobotMobileConfiguration;
+import robotkit.profile.RobotDriveConfiguration;
 import robotkit.spatial.Vec3;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
@@ -33,32 +33,32 @@ import robotkit.navigation.Costmap2;
 import robotkit.navigation.AStarPlanner;
 import robotkit.perception.PerceptionSnapshot;
 import robotkit.perception.PointCloud;
-import robotkit.perception.SimulatedSurfaceScanner;
+import processkit.perception.SimulatedSurfaceScanner;
 import robotkit.skill.Skill;
 import robotkit.skill.SkillRunner;
 import robotkit.skill.SkillStatus;
-import robotkit.skill.ScanSurface;
-import robotkit.skill.RegisterSurface;
-import robotkit.skill.FinishSurface;
-import robotkit.skill.Paint;
-import robotkit.skill.Sand;
+import processkit.skill.ScanSurface;
+import processkit.skill.RegisterSurface;
+import processkit.skill.FinishSurface;
+import processkit.skill.Paint;
+import processkit.skill.Sand;
 import robotkit.tool.SimulatedSprayer;
 import robotkit.tool.SimulatedSander;
 import robotkit.tool.Tool;
 import robotkit.tool.ToolCollisionShape;
-import robotkit.work.WorkSurface;
-import robotkit.work.Polygon2;
-import robotkit.work.Point2;
-import robotkit.world.SimulatedRobot;
-import robotkit.world.RecordingRobot;
-import robotkit.world.ReplayRobot;
-import robotkit.world.McapRobotRecording;
-import robotkit.world.McapRecordingReader;
-import robotkit.world.RobotDescription;
-import robotkit.world.RobotCapabilities;
-import robotkit.world.RobotSnapshot;
-import robotkit.world.ProcessChannelDeclaration;
-import robotkit.world.ProcessEventValue;
+import processkit.work.WorkSurface;
+import processkit.work.Polygon2;
+import processkit.work.Point2;
+import robotkit.simulation.SimulatedRobot;
+import robotkit.recording.RecordingRobot;
+import robotkit.recording.ReplayRobot;
+import robotkit.recording.McapRobotRecording;
+import robotkit.recording.McapRecordingReader;
+import robotkit.core.RobotDescription;
+import robotkit.core.RobotCapabilities;
+import robotkit.core.RobotSnapshot;
+import robotkit.execution.ProcessChannelDeclaration;
+import robotkit.execution.ProcessEventValue;
 
 /**
  * M10 acceptance tests: `ScanSurface`, `RegisterSurface`, `Paint`, and
@@ -85,7 +85,7 @@ class ConstructionSkillTests {
     var manipulator = fixture.arm;
     var linkNames = [for (link in model.links) link.name];
     var jointNames = [for (joint in model.joints) joint.name];
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    var blueprint = RobotRuntimeCompiler.compile(model, fixture.profile);
     blueprint.channels.push(new ProcessChannelDeclaration("surface.process",
       ProcessEventValue.Digital(false)));
 
@@ -168,7 +168,7 @@ class ConstructionSkillTests {
 
     // -- Paint --
     var sprayer = new SimulatedSprayer();
-    function eventSource():{events:Array<robotkit.world.FiredProcessEvent>, overflow:Bool} {
+    function eventSource():{events:Array<robotkit.execution.FiredProcessEvent>, overflow:Bool} {
       var batch = runtime.pollEvents();
       for (event in batch.events) writer.recordProcessEvent(robot.id(), event);
       return batch;
@@ -235,8 +235,11 @@ class ConstructionSkillTests {
     // Replay the plan command stream and inspect its recorded process output.
     var replayDescription = new RobotDescription("construction-robot",
       "recorded construction robot", linkNames, jointNames);
-    var replayCapabilities = new RobotCapabilities("construction-robot", jointNames.length,
-      true, true, true, false, true, true);
+    var replayCapabilities = new RobotCapabilities("construction-robot",
+      jointNames.length,
+      [robotkit.core.JointTargetMode.Position, robotkit.core.JointTargetMode.Velocity, robotkit.core.JointTargetMode.Effort],
+      new robotkit.core.ExecutionCapabilities(true, 5, 64, 4096, true, true, true, trajectorykit.validation.ValidationGuarantee.Unchecked),
+      new robotkit.core.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked));
     var replay = new ReplayRobot("construction-robot", recording,
       replayDescription, replayCapabilities);
     for (command in recording.commands) {
@@ -254,7 +257,8 @@ class ConstructionSkillTests {
       sys.FileSystem.deleteFile(recordingPath + ".incomplete.status");
   }
 
-  static function buildFixture():{model:RobotModel, arm:Manipulator, wheelRadius:Float, baseRadius:Float} {
+  static function buildFixture():{model:RobotModel, profile:robotkit.profile.RobotProfile, arm:Manipulator, wheelRadius:Float, baseRadius:Float} {
+    var profile = new robotkit.profile.RobotProfile();
     var model = new RobotModel("construction-skill-robot");
     var base = model.addLink(new Link("base", "link/base"));
 
@@ -275,7 +279,7 @@ class ConstructionSkillTests {
       model.addJoint(joint);
       wheelIds.push(joint.id);
     }
-    model.mobileBase = new RobotMobileConfiguration(
+    profile.mobileBase = new RobotMobileConfiguration(
       RobotDriveConfiguration.Holonomic(wheelIds, wheelRadius, baseRadius),
       0.4, 0.6, 0.5, 1.0, 0.5, 0.5);
 
@@ -311,8 +315,8 @@ class ConstructionSkillTests {
     }
     var flange = model.addFrame(new Frame("flange", links[6], "frame/flange"));
     flange.position = [0.0, d6, 0.0];
-    var arm = new Manipulator(model, base.id, flange.id);
-    return { model: model, arm: arm, wheelRadius: wheelRadius, baseRadius: baseRadius };
+    var arm = new Manipulator(model, base.id, flange.id, null, null, null, profile);
+    return { model: model, profile: profile, arm: arm, wheelRadius: wheelRadius, baseRadius: baseRadius };
   }
 
   static function check(value:Bool, message:String):Void {

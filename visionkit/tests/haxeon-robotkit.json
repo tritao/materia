@@ -1,19 +1,34 @@
 {
   "version": 1,
-  "package": { "name": "visionkit-robotkit-tests" },
+  "package": {
+    "name": "visionkit-robotkit-tests"
+  },
   "entry": "tests.VisionKitRobotKitTests",
-  "sourceRoots": ["robotkit-src"],
+  "sourceRoots": [
+    "robotkit-src"
+  ],
   "dependencies": {
-    "visionkit": { "path": ".." },
-    "robotkit": { "path": "../../robotkit" }
+    "visionkit": {
+      "path": ".."
+    },
+    "robotkit": {
+      "path": "../../robotkit"
+    },
+    "robotkit-inference": {
+      "path": "../../robotkit/inference"
+    }
   },
   "native": {
     "cmake": {
       "source": "../native",
       "target": "visionkit_core",
-      "inputs": ["../native/CMakeLists.txt", "../native/include/visionkit.h",
-        "../native/src/visionkit.cpp", "../native/src/fiducial.cpp",
-        "../native/src/calibration.cpp"]
+      "inputs": [
+        "../native/CMakeLists.txt",
+        "../native/include/visionkit.h",
+        "../native/src/visionkit.cpp",
+        "../native/src/fiducial.cpp",
+        "../native/src/calibration.cpp"
+      ]
     }
   },
   "target": "host",

@@ -1,10 +1,21 @@
 {
   "version": 1,
-  "package": { "name": "project-source-tests" },
+  "package": {
+    "name": "project-source-tests"
+  },
   "entry": "app.ProjectSourceTests",
-  "sourceRoots": ["../src"],
+  "sourceRoots": [
+    "../src"
+  ],
   "scopeSourceRoots": false,
-  "dependencies": { "app": { "path": "../.." } },
+  "dependencies": {
+    "app": {
+      "path": "../.."
+    },
+    "processkit": {
+      "path": "../../../processkit"
+    }
+  },
   "target": "host",
   "outputDir": "build"
 }

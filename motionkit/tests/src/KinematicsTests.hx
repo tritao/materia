@@ -52,9 +52,9 @@ import motionkit.path.PoseLine;
 import motionkit.path.PoseArc;
 import motionkit.path.PoseWaypoint;
 import motionkit.path.OrientationPolicy;
-import motionkit.robot.ToolpathPosePath;
-import robotkit.process.Toolpath;
-import robotkit.process.ToolpathPoint;
+import processkit.motion.ToolpathPosePath;
+import processkit.path.Toolpath;
+import processkit.path.ToolpathPoint;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
 import robotkit.spatial.Quat;
@@ -73,7 +73,7 @@ import motionkit.program.MoveTarget;
 import motionkit.trajectory.MotionLimits;
 import motionkit.trajectory.Trajectory;
 import motionkit.trajectory.ExecutionPlan;
-import motionkit.trajectory.ValidationGuarantee;
+import trajectorykit.validation.ValidationGuarantee;
 import motionkit.trajectory.PlanLimitError;
 import motionkit.trajectory.ValidationLimits;
 import robotkit.model.Joint;
@@ -92,26 +92,26 @@ import robotkit.runtime.VirtualActuatorOptions;
 import robotkit.runtime.RobotRuntimeError;
 import robotkit.runtime.RobotRuntimeCompiler;
 import RobotKitRuntime;
-import robotkit.world.RecordingRobot;
-import robotkit.world.ReplayRobot;
-import robotkit.world.RobotRecording;
-import robotkit.world.SimulatedRobot;
-import robotkit.world.RobotCommand;
-import robotkit.world.JointTarget;
-import robotkit.world.Robot;
-import robotkit.world.RobotCapabilities;
-import robotkit.world.RobotDescription;
-import robotkit.world.RobotFault;
-import robotkit.world.RobotId;
-import robotkit.world.RobotSnapshot;
-import robotkit.world.RobotStatus;
-import robotkit.world.RuntimeRobotAdapter;
-import robotkit.world.SensorFrame;
-import robotkit.world.StopMode;
-import robotkit.world.ExecutionPlanSubmission;
-import robotkit.world.ProcessChannelDeclaration;
-import robotkit.world.ProcessEventValue;
-import robotkit.world.TrajectorySegment;
+import robotkit.recording.RecordingRobot;
+import robotkit.recording.ReplayRobot;
+import robotkit.recording.RobotRecording;
+import robotkit.simulation.SimulatedRobot;
+import robotkit.core.RobotCommand;
+import robotkit.core.JointTarget;
+import robotkit.core.Robot;
+import robotkit.core.RobotCapabilities;
+import robotkit.core.RobotDescription;
+import robotkit.core.RobotFault;
+import robotkit.core.RobotId;
+import robotkit.core.RobotSnapshot;
+import robotkit.core.RobotStatus;
+import robotkit.runtime.RuntimeRobotAdapter;
+import robotkit.core.SensorFrame;
+import robotkit.core.StopMode;
+import robotkit.execution.ExecutionPlanSubmission;
+import robotkit.execution.ProcessChannelDeclaration;
+import robotkit.execution.ProcessEventValue;
+import robotkit.execution.TrajectorySegment;
 
 import MotionKitTestSupport.WristBranchSolver;
 import MotionKitTestSupport.PlanarSolver;
@@ -433,7 +433,7 @@ class KinematicsTests extends MotionKitTestSupport {
     var fixture = buildContractArmFixture();
     for (joint in fixture.model.joints) { joint.limits.velocity = 2.0; joint.limits.maxAcceleration = 4.0; }
     fixture.model.joints[0].limits.upper = 1.2;
-    var blueprint = RobotRuntimeCompiler.compile(fixture.model);
+    var blueprint = RobotRuntimeCompiler.compile(fixture.model, new robotkit.profile.RobotProfile());
     var harness = new SimulationHarness(0.01);
     var options:Null<VirtualDeviceOptions> = null;
     if (virtual) {
@@ -588,7 +588,7 @@ class KinematicsTests extends MotionKitTestSupport {
     for (joint in fixture.model.joints) { joint.limits.velocity = 2.0; joint.limits.maxAcceleration = 4.0; }
     fixture.model.joints[0].limits.upper = 1.2;
     var harness = new SimulationHarness(0.01);
-    var runtime = harness.simulation.addRobot(RobotRuntimeCompiler.compile(fixture.model));
+    var runtime = harness.simulation.addRobot(RobotRuntimeCompiler.compile(fixture.model, new robotkit.profile.RobotProfile()));
     var robot = new SimulatedRobot("servo-arm", runtime, fixture.model.name,
       [for (link in fixture.model.links) link.name], [for (joint in fixture.model.joints) joint.name]);
     var arm = fixture.arm;
@@ -705,9 +705,9 @@ class KinematicsTests extends MotionKitTestSupport {
     first.limits.upper = 0.08;
     second.limits.lower = -0.16;
     second.limits.upper = 0.01;
-    model.addActuator(new Actuator("left-motor", 0.0, 1.0,
+    model.addActuator(new Actuator("left-motor", null, 1.0,
       Transmission.SimpleTransmission(first.id, 1.0, 0.0)));
-    model.addActuator(new Actuator("right-motor", 0.0, 1.0,
+    model.addActuator(new Actuator("right-motor", null, 1.0,
       Transmission.SimpleTransmission(second.id, -0.5, 0.01)));
     var authored = new MotionAxisBlueprint("x", [first.id, second.id],
       0.0, 0.08, 0.08, 0.4);

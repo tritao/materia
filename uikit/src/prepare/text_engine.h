@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <utility>
 
 #include "layout/layout_types.h"
 
@@ -58,25 +59,51 @@ struct GlyphBatch {
     uint32_t index_count = 0;
 };
 
+/** Logical codepoint cluster represented by one rendered quad. */
+struct GlyphSourceRange {
+    uint32_t first_vertex = 0;
+    uint32_t vertex_count = 0;
+    int32_t start = 0;
+    int32_t end = 0;
+};
+
 struct PreparedGlyphs {
     std::vector<GlyphVertex> vertices;
     std::vector<uint32_t> indices;
     std::vector<GlyphBatch> batches;
+    std::vector<GlyphSourceRange> source_ranges;
     float origin_x = 0.0f;
     float origin_y = 0.0f;
     float pixel_scale = 1.0f;
     GlyphMode mode = GlyphMode::Alpha;
     TextLayoutId layout_id = 0;
     uint64_t layout_generation = 0;
+    uint64_t line_revision = 0;
+    uint64_t publication_key = 0;
+    int32_t source_start = -1;
+    int32_t first_line = -1;
+    int32_t end_line = -1;
 };
 
-/** Opaque white: publishing without a tint leaves prepared vertex colors unchanged. */
+/** Opaque white is the default foreground color. */
 struct GlyphTint {
     uint8_t red = 255;
     uint8_t green = 255;
     uint8_t blue = 255;
     uint8_t alpha = 255;
 };
+
+/** Sorted, disjoint half-open codepoint ranges; clusters use their first codepoint. */
+struct GlyphColorRange {
+    int32_t start = 0;
+    int32_t end = 0;
+    GlyphTint tint{};
+};
+
+bool valid_glyph_color_ranges(const std::vector<GlyphColorRange> &ranges);
+/** Recolors geometry in place without shaping or rasterization. */
+void apply_glyph_colors(PreparedGlyphs &glyphs, GlyphTint base,
+                        const std::vector<GlyphColorRange> &ranges);
 
 struct TextPosition {
     int32_t offset = 0;
@@ -146,6 +173,8 @@ struct TextEngineStats {
     uint64_t prepared_batch_count = 0;
     uint64_t text_layout_cache_hits = 0;
     uint64_t text_layout_cache_misses = 0;
+    uint64_t incremental_ascii_edits = 0;
+    uint64_t edit_layout_fallbacks = 0;
     uint64_t atlas_pages = 0;
     uint64_t atlas_bytes = 0;
     uint32_t scale_generation = 0;
@@ -196,10 +225,25 @@ class TextEngine {
     bool layout_utf8(const char *text, float width, const TextLayoutOptions &options);
     bool layout_utf8(const char *text, float width, const TextLayoutOptions &options,
                      TextLayoutResult *result);
+    /** Replaces a codepoint range in the active layout, retaining its style and width. */
+    bool edit_utf8(int32_t start, int32_t end, const char *replacement,
+                   TextLayoutResult *result);
     void prune_layout_cache(const std::vector<TextLayoutId> &retained_ids, std::size_t max_entries);
     bool has_layout(TextLayoutId id) const;
     bool prepare_glyphs(float origin_x, float origin_y, float pixel_scale, GlyphMode mode,
                         PreparedGlyphs &output);
+    /** Conservative visual-line range intersecting local vertical bounds. */
+    std::pair<uint32_t, uint32_t> visible_lines(float min_y, float max_y) const;
+    TextRect line_bounds(uint32_t index) const;
+    /** Logical line rectangles intersecting a codepoint and vertical range. */
+    std::vector<TextRect> line_rects(int32_t start, int32_t end, float min_y,
+                                     float max_y) const;
+    bool prepare_glyphs_for_lines(uint32_t first, uint32_t end, float origin_x, float origin_y,
+                                  float pixel_scale, GlyphMode mode, PreparedGlyphs &output);
+    std::shared_ptr<const PreparedGlyphs> published_glyphs_for_lines(
+        TextLayoutId id, uint32_t first, uint32_t end, float origin_x, float origin_y,
+        float pixel_scale, GlyphMode mode, GlyphTint tint = {},
+        const std::vector<GlyphColorRange> &ranges = {});
     bool prepare_glyphs_for_line(uint32_t line_index, float origin_x, float origin_y,
                                  float pixel_scale, GlyphMode mode, PreparedGlyphs &output);
     bool prepare_glyphs_for_line(TextLayoutId id, uint32_t line_index, float origin_x,
@@ -208,8 +252,8 @@ class TextEngine {
     /**
      * Returns an immutable glyph snapshot for one layout or one of its lines.
      *
-     * Snapshots are shared: repeated requests with the same layout generation,
-     * geometry, scale, and mode return the same object, and a snapshot stays
+     * Snapshots are shared: repeated requests with the same layout or row revision,
+     * geometry, scale, mode and colors return the same object, and a snapshot stays
      * valid after later preparation passes. That makes them safe to bind into an
      * owned resource set that outlives the frame that produced it, without
      * copying glyph buffers. Returns null for an unknown layout, an out-of-range
@@ -217,11 +261,14 @@ class TextEngine {
      */
     std::shared_ptr<const PreparedGlyphs> published_glyphs(TextLayoutId id, float origin_x,
                                                            float origin_y, float pixel_scale,
-                                                           GlyphMode mode, GlyphTint tint = {});
+                                                           GlyphMode mode, GlyphTint tint = {},
+                                                           const std::vector<GlyphColorRange> &ranges = {});
     std::shared_ptr<const PreparedGlyphs>
     published_glyphs_for_line(TextLayoutId id, uint32_t line_index, float origin_x, float origin_y,
-                              float pixel_scale, GlyphMode mode, GlyphTint tint = {});
+                              float pixel_scale, GlyphMode mode, GlyphTint tint = {},
+                              const std::vector<GlyphColorRange> &ranges = {});
     bool prepared_glyphs_current(const PreparedGlyphs &glyphs) const;
+    int32_t text_count() const;
     TextRect bounds() const;
     TextPosition hit_test(float x, float y) const;
     int32_t offset_from_position(TextPosition position) const;
@@ -254,10 +301,11 @@ class TextEngine {
     std::shared_ptr<const PreparedGlyphs> publish_glyphs(TextLayoutId id, int32_t line_index,
                                                          float origin_x, float origin_y,
                                                          float pixel_scale, GlyphMode mode,
-                                                         GlyphTint tint);
+                                                         GlyphTint tint,
+                                                         const std::vector<GlyphColorRange> &ranges, int32_t end_line = -1);
     bool prepare_glyphs_internal(TextLayoutId id, float origin_x, float origin_y, float pixel_scale,
                                  GlyphMode mode, PreparedGlyphs &output, int32_t line_start,
-                                 int32_t line_end, float line_x, float line_y);
+                                 int32_t line_end, float line_x, float line_y, int32_t line_index = -1, int32_t end_line = -1);
 
     State *state_ = nullptr;
 };

@@ -1,8 +1,6 @@
 package materia.project;
 
 import haxe.io.Bytes;
-import materia.assembly.AssemblyCodec;
-import materia.assembly.AssemblyRecord;
 import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyStateRecord;
 import materia.assembly.AssemblyDefinitionCodec;
@@ -43,7 +41,7 @@ typedef SceneArtifactPart = {
 	/**
 		What each B-rep face offers an assembly mate, from the producer's geometry kernel (CadKit's
 		`GeometricConnectors.describeFaces`): opaque here, indexed like `faceRanges.faceIndex`. Lets an editor
-		without the B-rep author mates on faces (since version 11).
+		without the B-rep author mates on faces.
 	*/
 	@:optional var faceDescriptors:String;
 }
@@ -53,7 +51,6 @@ typedef SceneArtifactData = {
 	/** Metres represented by one coordinate in every mesh stream. */
 	var metresPerUnit:Float;
 	var parts:Array<SceneArtifactPart>;
-	@:optional var assembly:AssemblyRecord;
 	/** Geometry definitions are parts; occurrences live in this separate kinematic definition. */
 	@:optional var assemblyDefinition:AssemblyDefinition;
 	@:optional var assemblyState:AssemblyStateRecord;
@@ -73,7 +70,7 @@ typedef SceneArtifactData = {
 }
 
 /**
- * A sensor on the assembly's robot (since version 14), as its part declares it. A `lidar` scans the
+ * A sensor on the assembly's robot, as its part declares it. A `lidar` scans the
  * horizontal plane of the connector `mount.connector` of the occurrence `mount.occurrence`, `rayCount`
  * rays round the full circle from the connector's +X axis, seeing out to `maxRange` metres and scanning
  * `updateRate` times a second. `id` names it in the robot's observations.
@@ -88,7 +85,7 @@ typedef SceneArtifactRobotSensor = {
 }
 
 /**
- * A tool on the assembly's robot and how it is worked (since version 13), as its parts' declared
+ * A tool on the assembly's robot and how it is worked, as its parts' declared
  * capabilities say: a `suction` tool seals on what touches the occurrence `contact.occurrence` at its
  * connector `contact.connector` while the digital process channel `channel` is on, and reports the
  * vacuum it pulls on the sensor `sensor` when it has one.
@@ -127,7 +124,7 @@ typedef SceneArtifactTorch = {
 }
 
 /**
- * The assembly is a differential-drive robot that rolls on the floor (since version 13). Its root body
+ * The assembly is a differential-drive robot that rolls on the floor. Its root body
  * is the chassis, driven over the floor plane in the assembly frame: +X forward, +Z up, the origin on
  * the floor between the wheels' contacts. `leftWheel` and `rightWheel` are its wheel joints (+Y side
  * first), each turning about its own axle; the simulation reads each one's rolling direction from
@@ -155,7 +152,7 @@ typedef SceneArtifactMobileBase = {
 }
 
 /**
- * Work the assembly's robot does on its own when the simulation runs (since version 13): its
+ * Work the assembly's robot does on its own when the simulation runs: its
  * steps in order, starting over after the last when `loop`. Steps name what they act on in the
  * assembly, so where they lead follows the model. Picking and placing work the robot's one suction
  * tool (see SceneArtifactRobotTool).
@@ -324,7 +321,7 @@ typedef SceneArtifactTool = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 14;
+	public static inline var VERSION:Int = 15;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -336,7 +333,6 @@ class SceneArtifact {
 		var unitText = Bytes.ofString(unit);
 		var names:Array<{id:Bytes, name:Bytes, finish:Bytes, materialId:Bytes, materialSpec:Bytes,
 			density:Float, volume:Float, center:Array<Float>, inertia:Array<Float>, faces:Bytes}> = [];
-		var assembly = data.assembly == null ? Bytes.alloc(0) : Bytes.ofString(AssemblyCodec.encode(data.assembly));
 		var assemblyDefinition = data.assemblyDefinition == null ? Bytes.alloc(0)
 			: Bytes.ofString(AssemblyDefinitionCodec.encode(data.assemblyDefinition));
 		var assemblyState = data.assemblyState == null ? Bytes.alloc(0)
@@ -344,7 +340,7 @@ class SceneArtifact {
 		var recipeDocument = data.recipeDocument == null ? Bytes.alloc(0) : Bytes.ofString(data.recipeDocument);
 		var recipeDiagnostics = data.recipeDiagnostics == null ? Bytes.alloc(0)
 			: Bytes.ofString(haxe.Json.stringify(data.recipeDiagnostics));
-		if (assembly.length > 2000000 || assemblyDefinition.length > 2000000 || assemblyState.length > 2000000)
+		if (assemblyDefinition.length > 2000000 || assemblyState.length > 2000000)
 			throw "Scene artifact assembly metadata is too large";
 		if (recipeDocument.length > 2000000) throw "Scene artifact recipe document is too large";
 		if (recipeDiagnostics.length > 2000000) throw "Scene artifact recipe diagnostics are too large";
@@ -357,7 +353,7 @@ class SceneArtifact {
 		if (robotTools.length > 100000) throw "Scene artifact robot tools are too large";
 		var robotSensors = data.robotSensors == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.robotSensors));
 		if (robotSensors.length > 100000) throw "Scene artifact robot sensors are too large";
-		var length = 40 + unitText.length + assembly.length + assemblyDefinition.length + assemblyState.length + recipeDocument.length + recipeDiagnostics.length + 4
+		var length = 36 + unitText.length + assemblyDefinition.length + assemblyState.length + recipeDocument.length + recipeDiagnostics.length + 4
 			+ machining.length + 4 + mobileBase.length + 4 + mission.length + 4 + robotTools.length + 4 + robotSensors.length + 4;
 		for (part in data.parts) {
 			validatePart(part, true);
@@ -436,8 +432,6 @@ class SceneArtifact {
 			offset = putInt(result, offset, text.faces.length);
 			result.blit(offset, text.faces, 0, text.faces.length); offset += text.faces.length;
 		}
-		offset = putInt(result, offset, assembly.length);
-		result.blit(offset, assembly, 0, assembly.length); offset += assembly.length;
 		offset = putInt(result, offset, assemblyDefinition.length);
 		result.blit(offset, assemblyDefinition, 0, assemblyDefinition.length); offset += assemblyDefinition.length;
 		offset = putInt(result, offset, assemblyState.length);
@@ -478,24 +472,12 @@ class SceneArtifact {
 				throw "Scene artifact has a duplicate or empty part ID";
 			ids.set(part.id, true);
 		}
-		var assembly = data.assembly;
-		if (assembly != null) {
-			AssemblyCodec.validate(assembly);
-			if (data.assemblyDefinition == null && assembly.instances.length != data.parts.length)
-				throw "Assembly must place every scene artifact part";
-			for (instance in assembly.instances) if (data.assemblyDefinition == null && !ids.exists(instance.id))
-				throw 'Assembly instance "${instance.id}" has no geometry part';
-		}
 		if (data.assemblyState != null && data.assemblyDefinition == null)
 			throw "Scene artifact assembly state has no definition";
 		var assemblyDefinition = data.assemblyDefinition;
 		if (assemblyDefinition != null) {
 			AssemblyDefinitionCodec.validate(assemblyDefinition);
-			var topLevelCount = assemblyDefinition.occurrences.length;
 			assemblyDefinition = AssemblyDefinitionFlattener.flatten(assemblyDefinition);
-			if (assembly != null && assembly.instances.length != assemblyDefinition.occurrences.length &&
-				assembly.instances.length != topLevelCount)
-				throw "Assembly snapshot does not match its occurrences";
 			for (definition in assemblyDefinition.definitions) if (!ids.exists(definition.id))
 				throw 'Assembly component definition "${definition.id}" has no geometry part';
 			if (data.assemblyState != null)
@@ -1009,6 +991,8 @@ class SceneArtifact {
 		if (loop != null) machining.loop = Std.isOfType(loop, Bool) ? (loop:Bool) : fail();
 		var controller:Dynamic = Reflect.field(decoded, "controller");
 		if (controller != null) {
+			for (field in Reflect.fields(controller)) if (field != "stepTickHz")
+				throw 'Machining controller has an unknown field "$field"';
 			var tick:Dynamic = Reflect.field(controller, "stepTickHz");
 			if (!Std.isOfType(tick, Int)) fail();
 			machining.controller = {stepTickHz: (tick:Int)};
@@ -1100,11 +1084,10 @@ private class SceneArtifactReader {
 		for (expected in [77, 84, 82, 71]) if (readByte() != expected)
 			throw "Scene artifact has an invalid signature";
 		var version = readInt();
-		if (version != 2 && version != 3 && version != 4 && version != 5 && version != 6 && version != 7 &&
-			version != 8 && version != 9 && version != 10 && version != 11 && version != 12 && version != 13 && version != SceneArtifact.VERSION)
-			throw 'Unsupported scene artifact version $version';
+		if (version != SceneArtifact.VERSION)
+			throw 'schema v$version is unsupported; expected v${SceneArtifact.VERSION}';
 		var metresPerUnit = readDouble();
-		var lengthUnit = version >= 8 ? readText() : null;
+		var lengthUnit = readText();
 		var count = readInt();
 		if (!Math.isFinite(metresPerUnit) || metresPerUnit <= 0.0 || count <= 0 || count > 1000)
 			throw "Scene artifact has invalid units or part count";
@@ -1114,29 +1097,26 @@ private class SceneArtifactReader {
 			if (ids.exists(id)) throw 'Scene artifact has duplicate part ID "$id"';
 			ids.set(id, true);
 			var red = readFloat(), green = readFloat(), blue = readFloat();
-			var appearance:Appearance = version >= 7
-				? {finish: readText(), metallic: readFloat(), roughness: readFloat()}
-				: Appearances.neutral();
-			var materialId = version >= 8 ? readText() :
-				(MaterialLibrary.get(appearance.finish) == null ? "neutral" : appearance.finish);
-			var density = version >= 8 ? readDouble() : null;
-			var materialSpec = version >= 8 ? readText() : null;
-			var volume = version >= 8 ? readDouble() : null;
-			var center = version >= 8 ? [for (_ in 0...3) readDouble()] : null;
-			var inertia = version >= 8 ? [for (_ in 0...9) readDouble()] : null;
+			var appearance:Appearance = {finish: readText(), metallic: readFloat(), roughness: readFloat()};
+			var materialId = readText();
+			var density = readDouble();
+			var materialSpec = readText();
+			var volume = readDouble();
+			var center = [for (_ in 0...3) readDouble()];
+			var inertia = [for (_ in 0...9) readDouble()];
 			var vertexCount = readInt(), indexCount = readInt(), rangeCount = readInt();
-			var edgeByteCount = version >= 4 ? readInt() : 0;
+			var edgeByteCount = readInt();
 			if (vertexCount <= 0 || vertexCount > 2000000 || indexCount <= 0 ||
 				indexCount % 3 != 0 || indexCount / 3 > 4000000 || rangeCount < 0 || rangeCount > 100000 ||
 				edgeByteCount < 0 || edgeByteCount % 48 != 0 || edgeByteCount > SceneArtifact.MAX_BYTES)
 				throw 'Scene artifact part "$id" has invalid mesh counts';
 		var vertices = readBytes(vertexCount * 24), normals = readBytes(vertexCount * 24),
 				indices = readBytes(indexCount * 4), edgeSegments = readBytes(edgeByteCount);
-			var edgeIds = version >= 5 ? readBytes(Std.int(edgeByteCount / 48) * 4) : null;
+			var edgeIds = readBytes(Std.int(edgeByteCount / 48) * 4);
 			var faceRanges:Array<SceneArtifactFaceRange> = [];
 			for (_ in 0...rangeCount)
 				faceRanges.push({faceIndex: readInt(), firstIndex: readInt(), indexCount: readInt()});
-			var faceDescriptors = version >= 11 ? readOpaqueText(16000000, 'part "$id" face descriptors') : "";
+			var faceDescriptors = readOpaqueText(16000000, 'part "$id" face descriptors');
 			var part:SceneArtifactPart = {id: id, name: name, red: red, green: green, blue: blue,
 				appearance: appearance, materialId: materialId, materialDensity: density, materialSpec: materialSpec,
 				volume: volume, centerOfMass: center, inertia: inertia,
@@ -1144,90 +1124,68 @@ private class SceneArtifactReader {
 				indices: indices, edgeSegments: edgeSegments, edgeIds: edgeIds,
 				faceRanges: faceRanges};
 			if (faceDescriptors.length > 0) part.faceDescriptors = faceDescriptors;
-			@:privateAccess SceneArtifact.validatePart(part, version >= 5);
+			@:privateAccess SceneArtifact.validatePart(part, true);
 			parts.push(part);
 		}
-		var assembly:Null<AssemblyRecord> = null;
-		if (version >= 3) {
-			var length = readInt();
-			if (length < 0 || length > 2000000) throw "Scene artifact assembly metadata is too large";
-			if (length > 0) assembly = AssemblyCodec.decode(readBytes(length).getString(0, length));
-		}
 		var assemblyDefinition:Null<AssemblyDefinition> = null, assemblyState:Null<AssemblyStateRecord> = null;
-		if (version >= 6) {
-			var definitionLength = readInt();
-			if (definitionLength < 0 || definitionLength > 2000000)
-				throw "Scene artifact assembly definition is too large";
-			if (definitionLength > 0)
-				assemblyDefinition = AssemblyDefinitionCodec.decode(readBytes(definitionLength).getString(0, definitionLength));
-			var stateLength = readInt();
-			if (stateLength < 0 || stateLength > 2000000)
-				throw "Scene artifact assembly state is too large";
-			if (stateLength > 0) {
-				if (assemblyDefinition == null) throw "Scene artifact assembly state has no definition";
-				assemblyState = AssemblyDefinitionCodec.decodeState(assemblyDefinition,
-					readBytes(stateLength).getString(0, stateLength));
-			}
+		var definitionLength = readInt();
+		if (definitionLength < 0 || definitionLength > 2000000)
+			throw "Scene artifact assembly definition is too large";
+		if (definitionLength > 0)
+			assemblyDefinition = AssemblyDefinitionCodec.decode(readBytes(definitionLength).getString(0, definitionLength));
+		var stateLength = readInt();
+		if (stateLength < 0 || stateLength > 2000000)
+			throw "Scene artifact assembly state is too large";
+		if (stateLength > 0) {
+			if (assemblyDefinition == null) throw "Scene artifact assembly state has no definition";
+			assemblyState = AssemblyDefinitionCodec.decodeState(assemblyDefinition,
+				readBytes(stateLength).getString(0, stateLength));
 		}
 		var recipeDocument:Null<String> = null;
-		if (version >= 9) {
-			var documentLength = readInt();
-			if (documentLength < 0 || documentLength > 2000000)
-				throw "Scene artifact recipe document is too large";
-			if (documentLength > 0) recipeDocument = readBytes(documentLength).getString(0, documentLength);
-		}
+		var documentLength = readInt();
+		if (documentLength < 0 || documentLength > 2000000)
+			throw "Scene artifact recipe document is too large";
+		if (documentLength > 0) recipeDocument = readBytes(documentLength).getString(0, documentLength);
 		var recipeDiagnostics:Null<Array<String>> = null;
-		if (version >= 10) {
-			var diagnosticsLength = readInt();
-			if (diagnosticsLength < 0 || diagnosticsLength > 2000000)
-				throw "Scene artifact recipe diagnostics are too large";
-			if (diagnosticsLength > 0) {
-				var decoded:Dynamic = haxe.Json.parse(readBytes(diagnosticsLength).getString(0, diagnosticsLength));
-				if (!Std.isOfType(decoded, Array)) throw "Scene artifact recipe diagnostics are invalid";
-				for (entry in (cast decoded:Array<Dynamic>))
-					if (!Std.isOfType(entry, String)) throw "Scene artifact recipe diagnostics are invalid";
-				recipeDiagnostics = cast decoded;
-			}
+		var diagnosticsLength = readInt();
+		if (diagnosticsLength < 0 || diagnosticsLength > 2000000)
+			throw "Scene artifact recipe diagnostics are too large";
+		if (diagnosticsLength > 0) {
+			var decoded:Dynamic = haxe.Json.parse(readBytes(diagnosticsLength).getString(0, diagnosticsLength));
+			if (!Std.isOfType(decoded, Array)) throw "Scene artifact recipe diagnostics are invalid";
+			for (entry in (cast decoded:Array<Dynamic>))
+				if (!Std.isOfType(entry, String)) throw "Scene artifact recipe diagnostics are invalid";
+			recipeDiagnostics = cast decoded;
 		}
 		var machining:Null<SceneArtifactMachining> = null;
-		if (version >= 12) {
-			var machiningLength = readInt();
-			if (machiningLength < 0 || machiningLength > 8000000) throw "Scene artifact machining job is too large";
-			if (machiningLength > 0) {
-				machining = @:privateAccess SceneArtifact.decodeMachining(haxe.Json.parse(readBytes(machiningLength).getString(0, machiningLength)));
-			}
+		var machiningLength = readInt();
+		if (machiningLength < 0 || machiningLength > 8000000) throw "Scene artifact machining job is too large";
+		if (machiningLength > 0) {
+			machining = @:privateAccess SceneArtifact.decodeMachining(haxe.Json.parse(readBytes(machiningLength).getString(0, machiningLength)));
 		}
 		var mobileBase:Null<SceneArtifactMobileBase> = null;
-		if (version >= 13) {
-			var mobileLength = readInt();
-			if (mobileLength < 0 || mobileLength > 100000) throw "Scene artifact mobile base is too large";
-			if (mobileLength > 0)
-				mobileBase = @:privateAccess SceneArtifact.decodeMobileBase(haxe.Json.parse(readBytes(mobileLength).getString(0, mobileLength)));
-		}
+		var mobileLength = readInt();
+		if (mobileLength < 0 || mobileLength > 100000) throw "Scene artifact mobile base is too large";
+		if (mobileLength > 0)
+			mobileBase = @:privateAccess SceneArtifact.decodeMobileBase(haxe.Json.parse(readBytes(mobileLength).getString(0, mobileLength)));
 		var mission:Null<SceneArtifactMission> = null;
-		if (version >= 13) {
-			var missionLength = readInt();
-			if (missionLength < 0 || missionLength > 1000000) throw "Scene artifact mission is too large";
-			if (missionLength > 0)
-				mission = @:privateAccess SceneArtifact.decodeMission(haxe.Json.parse(readBytes(missionLength).getString(0, missionLength)));
-		}
+		var missionLength = readInt();
+		if (missionLength < 0 || missionLength > 1000000) throw "Scene artifact mission is too large";
+		if (missionLength > 0)
+			mission = @:privateAccess SceneArtifact.decodeMission(haxe.Json.parse(readBytes(missionLength).getString(0, missionLength)));
 		var robotTools:Null<Array<SceneArtifactRobotTool>> = null;
-		if (version >= 13) {
-			var toolsLength = readInt();
-			if (toolsLength < 0 || toolsLength > 100000) throw "Scene artifact robot tools are too large";
-			if (toolsLength > 0)
-				robotTools = @:privateAccess SceneArtifact.decodeRobotTools(haxe.Json.parse(readBytes(toolsLength).getString(0, toolsLength)));
-		}
+		var toolsLength = readInt();
+		if (toolsLength < 0 || toolsLength > 100000) throw "Scene artifact robot tools are too large";
+		if (toolsLength > 0)
+			robotTools = @:privateAccess SceneArtifact.decodeRobotTools(haxe.Json.parse(readBytes(toolsLength).getString(0, toolsLength)));
 		var robotSensors:Null<Array<SceneArtifactRobotSensor>> = null;
-		if (version >= 14) {
-			var sensorsLength = readInt();
-			if (sensorsLength < 0 || sensorsLength > 100000) throw "Scene artifact robot sensors are too large";
-			if (sensorsLength > 0)
-				robotSensors = @:privateAccess SceneArtifact.decodeRobotSensors(haxe.Json.parse(readBytes(sensorsLength).getString(0, sensorsLength)));
-		}
+		var sensorsLength = readInt();
+		if (sensorsLength < 0 || sensorsLength > 100000) throw "Scene artifact robot sensors are too large";
+		if (sensorsLength > 0)
+			robotSensors = @:privateAccess SceneArtifact.decodeRobotSensors(haxe.Json.parse(readBytes(sensorsLength).getString(0, sensorsLength)));
 		if (offset != source.length) throw "Scene artifact contains trailing data";
 		var result:SceneArtifactData = {metresPerUnit: metresPerUnit, lengthUnit: lengthUnit,
-			parts: parts, assembly: assembly,
+			parts: parts,
 			assemblyDefinition: assemblyDefinition, assemblyState: assemblyState, recipeDocument: recipeDocument,
 			recipeDiagnostics: recipeDiagnostics, machining: machining, mobileBase: mobileBase, mission: mission,
 			robotTools: robotTools, robotSensors: robotSensors};

@@ -7,6 +7,7 @@ haxeon="$repo_dir/haxeon/scripts/haxeon"
 cadkit_build="${CADKIT_BUILD_ROOT:-$repo_dir/cadkit/build/debug}"
 cadkit_library="$cadkit_build/core/libcadkit-core.so"
 mujoco_source="$repo_dir/simkit/vendor/mujoco"
+robotkit_build="${ROBOTKIT_BUILD_ROOT:-$robotkit_dir/build}"
 
 say() {
   printf '\n== %s ==\n' "$1"
@@ -46,7 +47,7 @@ ensure_mujoco() {
 say "Haxe world tests"
 run python3 "$robotkit_dir/tools/recording/generate_schemas.py" check \
   --lock "$robotkit_dir/schema/rkf1.lock.json" \
-  --output "$robotkit_dir/haxe/robotkit/world/RecordingSchemas.hx"
+  --output "$robotkit_dir/recording/haxe/robotkit/recording/RecordingSchemas.hx"
 run "$haxeon" run --project "$robotkit_dir/tests/haxeon.json"
 
 if [[ "${ROBOTKIT_TEST_SENSORKIT_SPIKE:-0}" == "1" ]]; then
@@ -60,10 +61,10 @@ run cargo test --manifest-path "$robotkit_dir/device_virtual/Cargo.toml"
 run "$robotkit_dir/device_protocol/tools/check-mcu-build.sh"
 
 say "RobotKit native tests"
-run cmake -S "$robotkit_dir" -B "$robotkit_dir/build" -GNinja \
+run cmake -S "$robotkit_dir" -B "$robotkit_build" -GNinja \
   -DCMAKE_BUILD_TYPE=Debug
-run cmake --build "$robotkit_dir/build" -j "${CMAKE_BUILD_PARALLEL_LEVEL:-6}"
-run ctest --test-dir "$robotkit_dir/build" --output-on-failure
+run cmake --build "$robotkit_build" -j "${CMAKE_BUILD_PARALLEL_LEVEL:-6}"
+run ctest --test-dir "$robotkit_build" --output-on-failure
 
 build_cadkit_core
 
@@ -87,7 +88,7 @@ else
 fi
 
 say "World TCP integration"
-run python3 -m tools.wire.rkf1 check --source "$robotkit_dir/haxe/robotkit/protocol" --lock "$robotkit_dir/schema/rkf1.lock.json"
+run python3 -m tools.wire.rkf1 check --source "$robotkit_dir/remote/haxe/robotkit/protocol" --lock "$robotkit_dir/schema/rkf1.lock.json"
 run python3 -m unittest tools.wire.tests.test_rkf1
 run "$haxeon" run --project "$robotkit_dir/tests/integration/haxeon.json" -- --outbound-scheduler
 run "$robotkit_dir/tests/world-tcp.sh"

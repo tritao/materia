@@ -12,8 +12,8 @@ import motionkit.program.MoveTarget;
 import motionkit.trajectory.ValidationLimits;
 import robotkit.manipulation.Manipulator;
 import robotkit.spatial.Vec3;
-import robotkit.world.FiredProcessEvent;
-import robotkit.world.Robot;
+import robotkit.execution.FiredProcessEvent;
+import robotkit.core.Robot;
 
 /**
  * Picks and places with an arm: a motion program that comes down onto the contact point from above
@@ -47,7 +47,7 @@ class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
     for (joint in 0...count) {
       var bound = manipulator.group.limitsOf(joint);
       if (bound.lower < bound.upper) limits.position(joint, bound.lower, bound.upper);
-      limits.velocity(joint, bound.velocity > 0.0 ? bound.velocity : 2.0);
+      limits.velocity(joint, bound.velocity != null ? bound.velocity : 2.0);
       limits.acceleration(joint, maxAcceleration);
       limits.jerk(joint, 20.0);
     }
@@ -55,7 +55,7 @@ class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
     var compiler = new ProgramCompiler(solver, limits, FRAME,
       [for (joint in 0...count) {
         var speed = manipulator.group.limitsOf(joint).velocity;
-        speed > 0.0 ? speed : 2.0;
+        speed != null ? speed : 2.0;
       }], [for (_ in 0...count) maxAcceleration], [for (_ in 0...count) 20.0],
       StartTolerances.uniform(count, 0.005, maxAcceleration * 0.01, 20.0 * 0.01),
       null, 0.0075, 0.2, 0.002, 0.02, new IkTolerance(2e-3, 5e-3, 300, 0.03));

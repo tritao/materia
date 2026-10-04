@@ -7,8 +7,8 @@ import materia.sensor.wire.MessageType;
 import materia.sensor.wire.PixelFormat;
 import materia.sensor.wire.SensorWireCodec;
 import robotkit.model.RobotModel;
-import robotkit.world.CameraImage;
-import robotkit.world.SensorFrame;
+import robotkit.streams.CameraImage;
+import robotkit.core.SensorFrame;
 
 /** Phase 7 prototype: one explicit sensorkit wire to RobotKit conversion point. */
 class SensorkitCameraAdapter {

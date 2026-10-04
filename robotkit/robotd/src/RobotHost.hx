@@ -4,9 +4,9 @@ import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.Link;
 import robotkit.model.RobotModel;
-import robotkit.model.RobotDriveConfiguration;
-import robotkit.model.RobotForkConfiguration;
-import robotkit.model.RobotMobileConfiguration;
+import robotkit.profile.RobotDriveConfiguration;
+import robotkit.profile.RobotForkConfiguration;
+import robotkit.profile.RobotMobileConfiguration;
 import robotkit.runtime.RobotRuntime;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
@@ -66,6 +66,7 @@ class RobotHost {
     if (cameraFixture && deployment != null)
       throw "robotd: --camera-fixture requires the demo robot";
     // A deployment plans on its binding's model, whose actuator rates are what the step tick can drive.
+    var profile = deployment == null ? new robotkit.profile.RobotProfile() : deployment.profile;
     var robot = deployment == null ? new RobotModel(multiJoint ? "demo-forklift" : "demo-arm") : deployment.binding.model;
     if (deployment == null) {
     var base = robot.addLink(new Link("base"));
@@ -94,10 +95,10 @@ class RobotHost {
       liftJoint.limits.velocity = 2.0;
       liftJoint.limits.effort = 100.0;
       liftJoint.limits.maxAcceleration = 1.0;
-      robot.mobileBase = new RobotMobileConfiguration(
+      profile.mobileBase = new RobotMobileConfiguration(
         RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel",
           0.1, 0.5), 0.5, 1.0, 1.0, 1.0);
-      robot.forkMechanism = new RobotForkConfiguration("joint/lift", 1000.0,
+      profile.forkMechanism = new RobotForkConfiguration("joint/lift", 1000.0,
         600.0, 1.0);
     } else {
       var tool = robot.addLink(new Link("tool"));
@@ -128,7 +129,7 @@ class RobotHost {
       }
     }
     }
-    var blueprint = RobotRuntimeCompiler.compile(robot);
+    var blueprint = RobotRuntimeCompiler.compile(robot, profile);
     if (deployment != null) {
       blueprint.ownerPeriodNs = deployment.ownerPeriodNs;
       blueprint.serialProcessingAllowanceNs = deployment.processingAllowanceNs;
@@ -139,9 +140,9 @@ class RobotHost {
       var serverRuntime:Null<RobotRuntime> = null;
       try {
         if (serialPath != null)
-          serverRuntime = RobotRuntime.createSerial(blueprint, serialPath,
+          serverRuntime = RobotRuntime.create(blueprint, robotkit.serial.SerialRuntimeEndpoint.create(blueprint, serialPath,
             controller, binding, targetError, baud,
-            linkLossTimeoutNs, clockSyncBoundNs);
+            linkLossTimeoutNs, clockSyncBoundNs));
         else {
           var newServerSimulation = new SimulationHarness();
           serverSimulation = newServerSimulation;
@@ -158,9 +159,9 @@ class RobotHost {
           var pixels = haxe.io.Bytes.alloc(fixtureWidth * fixtureHeight * 3);
           for (index in 0...pixels.length) pixels.set(index,
             perceptionFixtureModel == null ? index % 251 : 51);
-          var image = new robotkit.world.CameraImage(fixtureWidth, fixtureHeight, "rgb8", pixels);
+          var image = new robotkit.streams.CameraImage(fixtureWidth, fixtureHeight, "rgb8", pixels);
           var oversizeImage = perceptionFixtureModel == null
-            ? new robotkit.world.CameraImage(1920, 1080, "rgb8", haxe.io.Bytes.alloc(1920 * 1080 * 3))
+            ? new robotkit.streams.CameraImage(1920, 1080, "rgb8", haxe.io.Bytes.alloc(1920 * 1080 * 3))
             : null;
           var fixtureSequence = haxe.Int64.ofInt(0);
           var nextFixtureNs = haxe.Int64.ofInt(0);
@@ -181,7 +182,7 @@ class RobotHost {
           var pixels = haxe.io.Bytes.alloc(6);
           for (index in 0...6) pixels.set(index, index + 1);
           hostedRuntime.publishCameraFrame("demo/camera",
-            new robotkit.world.CameraImage(2, 1, "rgb8", pixels),
+            new robotkit.streams.CameraImage(2, 1, "rgb8", pixels),
             haxe.Int64.ofInt(1), haxe.Int64.ofInt(1), "camera.fixture");
         }
         var server = new RobotServer(robot, blueprint, hostedRuntime, serverSimulation,
@@ -205,8 +206,8 @@ class RobotHost {
     var simulation:Null<SimulationHarness> = null;
     var runtime:RobotRuntime;
     if (serialPath != null)
-      runtime = RobotRuntime.createSerial(blueprint, serialPath, controller, binding, targetError,
-        baud, linkLossTimeoutNs, clockSyncBoundNs);
+      runtime = RobotRuntime.create(blueprint, robotkit.serial.SerialRuntimeEndpoint.create(blueprint, serialPath, controller, binding, targetError,
+        baud, linkLossTimeoutNs, clockSyncBoundNs));
     else if (inMemory)
       runtime = RobotRuntime.create(blueprint);
     else {
@@ -238,7 +239,7 @@ class RobotHost {
     var baud = Std.parseInt(args[2]);
     if (baud == null || [115200, 230400, 460800, 921600].indexOf(baud) < 0)
       throw "robotd: identify baud must be one of 115200, 230400, 460800, 921600";
-    Sys.println(RobotRuntime.identifySerial(args[1], baud));
+    Sys.println(robotkit.serial.SerialRuntimeEndpoint.identify(args[1], baud));
   }
 
   function parsePort():Int {

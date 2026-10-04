@@ -81,7 +81,7 @@ if(RK_BUILD_TESTS)
     find_package(Python3 COMPONENTS Interpreter REQUIRED)
     add_test(NAME robotkit_rkf1_lock
         COMMAND ${Python3_EXECUTABLE} -m tools.wire.rkf1 check
-            --source ${CMAKE_CURRENT_SOURCE_DIR}/haxe/robotkit/protocol
+            --source ${CMAKE_CURRENT_SOURCE_DIR}/remote/haxe/robotkit/protocol
             --lock ${CMAKE_CURRENT_SOURCE_DIR}/schema/rkf1.lock.json)
     set_tests_properties(robotkit_rkf1_lock PROPERTIES
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/.. LABELS "robot;wire")
@@ -92,9 +92,9 @@ if(RK_BUILD_SHARED AND NOT EMSCRIPTEN)
     set(RK_LIBRARY_TYPE SHARED)
 endif()
 
-if(NOT TARGET motionkit_core)
-    set(MK_BUILD_SHARED ${RK_BUILD_SHARED} CACHE BOOL "Build MotionKit with RobotKit" FORCE)
-    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../motionkit/native" motionkit)
+if(NOT TARGET trajectory_core)
+    set(TC_BUILD_SHARED ${RK_BUILD_SHARED} CACHE BOOL "Build the shared trajectory core" FORCE)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../trajectorykit/native" trajectory)
 endif()
 
 if(RK_BUILD_VISIONKIT AND NOT TARGET visionkit_core)

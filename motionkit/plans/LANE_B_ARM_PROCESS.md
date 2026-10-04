@@ -74,7 +74,7 @@ Do (pure `motionkit`):
     handles pure reorientation segments: use a rotation-to-length weight
     documented in metres per radian, never a unitless sum.
 - `PathEvent`s are attached by distance (C1).
-- Conversion `robotkit.process.Toolpath` → `PosePath` + events, in
+- Conversion `processkit.path.Toolpath` → `PosePath` + events, in
   `motionkit.robot` since it needs RobotKit types:
   - `processOn` transitions become events on a caller-named channel;
   - feed rates become per-segment speed limits.

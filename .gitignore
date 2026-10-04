@@ -30,3 +30,11 @@
 /build/
 /uikit/build-web/
 /robotkit/tools/humanoid/tests/build/
+
+/robotkit/tests/spike/build/
+
+/app/tests/fixtures/pin-plate/build/
+
+/robotkit/tests/integration/__pycache__/
+
+/robotkit/core/tests/build/

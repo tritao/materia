@@ -18,9 +18,6 @@ import materia.project.MeshMassProperties;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.assembly.AssemblyRecord.AssemblyConnector;
-import materia.assembly.AssemblyRecord.AssemblyInstance;
-import materia.assembly.AssemblyRecord.AssemblyJoint;
-import materia.assembly.AssemblyRecord;
 import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyComponentDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyJointRole;
@@ -347,7 +344,6 @@ class MateriaProjectRunner {
     var scale = artifact.metresPerUnit;
     var poses:Map<String, AssemblyFrame> = new Map();
     var componentUseCount = new Map<String, Int>();
-    var resolvedAssembly = artifact.assembly;
     var runtimeState:Null<AssemblyState> = null;
     if (artifact.assemblyDefinition != null) {
       runtimeState = new AssemblyState(artifact.assemblyDefinition, artifact.assemblyState);
@@ -356,9 +352,6 @@ class MateriaProjectRunner {
         var count = componentUseCount.get(occurrence.definition);
         componentUseCount.set(occurrence.definition, count == null ? 1 : count + 1);
       }
-      resolvedAssembly = legacySnapshot(artifact.assemblyDefinition, runtimeState);
-    } else if (artifact.assembly != null) {
-      for (instance in artifact.assembly.instances) poses.set(instance.id, instance.pose);
     }
 
     var boundsByDefinition:Map<String, {minimum:Array<Float>, maximum:Array<Float>}> = new Map();
@@ -413,23 +406,13 @@ class MateriaProjectRunner {
           poses.get(occurrence.id), componentUseCount.get(occurrence.definition),
           boundsByDefinition, geometryKeyByDefinition, scale);
       }
-    } else if (artifact.assembly != null) {
-      // A distinct name from the map above: the compiler keeps a local map's facts only when it is declared once.
-      var partsByInstance = new Map<String, SceneArtifactPart>();
-      for (part in artifact.parts) partsByInstance.set(part.id, part);
-      for (instance in artifact.assembly.instances) {
-        var component = partsByInstance.get(instance.id);
-        if (component == null) continue;
-        addOccurrenceRecord(records, component, instance.id, instance.id, poses.get(instance.id), 1,
-          boundsByDefinition, geometryKeyByDefinition, scale);
-      }
     } else {
       for (component in artifact.parts)
         addOccurrenceRecord(records, component, component.id, component.id, null, 1,
           boundsByDefinition, geometryKeyByDefinition, scale);
     }
 
-    return {objects: records, assembly: resolvedAssembly,
+    return {objects: records,
       geometryBySnapshot: geometryBySnapshot,
       assemblyDefinition: artifact.assemblyDefinition,
       assemblyState: runtimeState == null ? null : runtimeState.record(),
@@ -533,7 +516,7 @@ class MateriaProjectRunner {
       item.z = worldCenter.z * generated.metresPerUnit;
       item.rotation = [pose.qx, pose.qy, pose.qz, pose.qw];
     }
-    return {objects: objects, assembly: legacySnapshot(definition, state),
+    return {objects: objects,
       geometryBySnapshot: generated.geometryBySnapshot, assemblyDefinition: definition,
       assemblyState: state.record(), localCentersByDefinition: generated.localCentersByDefinition,
       faceDescriptorsByDefinition: generated.faceDescriptorsByDefinition, metresPerUnit: generated.metresPerUnit, physical: generated.physical,
@@ -575,29 +558,6 @@ class MateriaProjectRunner {
       rotation: pose == null ? null : [pose.qx, pose.qy, pose.qz, pose.qw]});
   }
 
-  public static function legacySnapshot(definition:AssemblyDefinition, state:AssemblyState):AssemblyRecord {
-    var definitions = new Map<String, AssemblyComponentDefinition>();
-    var instances:Array<AssemblyInstance> = [];
-    for (component in definition.definitions) definitions.set(component.id, component);
-    for (occurrence in definition.occurrences) {
-      var component = definitions.get(occurrence.definition);
-      if (component == null) throw 'Assembly occurrence "${occurrence.id}" has no component definition';
-      var connectors:Array<AssemblyConnector> = [];
-      for (connector in component.connectors) connectors.push({name: connector.name, frame: connector.frame});
-      instances.push({id: occurrence.id, pose: state.worldPose(occurrence.id), connectors: connectors});
-    }
-    var joints:Array<AssemblyJoint> = [];
-    // Put tree edges first so the legacy tree view cannot mistake a closure for a parent edge.
-    for (role in [AssemblyJointRole.Tree, AssemblyJointRole.Closure])
-      for (joint in definition.joints) if (joint.role == role) {
-        var value = AssemblyDefinitionCodec.hasCoordinate(joint.type) && role == AssemblyJointRole.Tree
-          ? state.joint(joint.id) : 0.0;
-        joints.push({id: joint.id, kind: joint.type, parent: joint.parent,
-          parentConnector: joint.parentConnector, child: joint.child,
-          childConnector: joint.childConnector, value: value});
-      }
-    return {instances: instances, joints: joints};
-  }
 
   static function projectToolsDirectory():String {
     return ProjectPath.join([installationRoot(), "app", "tools"]);
@@ -672,7 +632,6 @@ typedef ProjectExecutionRequirement = {
 
 typedef GeneratedAssemblyScene = {
   var objects:Array<SceneObjectData>;
-  var assembly:Null<AssemblyRecord>;
   var geometryBySnapshot:Map<String, GeometryData>;
   var assemblyDefinition:Null<AssemblyDefinition>;
   var assemblyState:Null<AssemblyStateRecord>;

@@ -6,7 +6,12 @@
 	"entry": "MachineAssemblyDescriptionTests",
 	"sourceRoots": [
 		"src",
-		"../examples"
+		"../examples",
+		"../examples/robot-arm",
+		"../examples/cnc-router",
+		"../examples/mobile-base",
+		"../examples/robot-welder",
+		"../examples/corexy"
 	],
 	"dependencies": {
 		"projectkit": {
@@ -21,11 +26,23 @@
 		"machinekit": {
 			"path": ".."
 		},
+		"machinekit-picking-station-example": {
+			"path": "../examples/picking-station"
+		},
+		"robotkit": {
+			"path": "../../robotkit"
+		},
 		"cadbridge": {
 			"path": "../../robotkit/cadbridge"
 		},
-		"machinekit-picking-station-example": {
-			"path": "../examples/picking-station"
+		"toolpathkit": {
+			"path": "../../toolpathkit"
+		},
+		"camkit": {
+			"path": "../../camkit"
+		},
+		"cnckit": {
+			"path": "../../cnckit"
 		}
 	},
 	"target": "host",

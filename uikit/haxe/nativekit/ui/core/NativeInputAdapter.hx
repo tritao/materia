@@ -10,6 +10,7 @@ import NativeKitEvents.NativeKitEventSubscription;
 class NativeInputAdapter {
 	final context:UiContext;
 	final source:Handle;
+	/** Surface source for accessibility and transactional text edits. */
 	final accessibilitySource:Handle;
 	final cursor:NativeCursorController;
 	final window:WindowHandle;

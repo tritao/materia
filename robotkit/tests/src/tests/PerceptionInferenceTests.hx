@@ -4,16 +4,16 @@ import haxe.Int64;
 import haxe.io.Bytes;
 import robotkit.deployment.SerialDeployment;
 import robotkit.inference.InferenceSession;
-import robotkit.perception.ImageDetection;
-import robotkit.perception.ImageDetectionObservation;
-import robotkit.perception.ObjectDetectorPipeline;
+import robotkit.streams.ImageDetection;
+import robotkit.streams.ImageDetectionObservation;
+import robotkit.inference.ObjectDetectorPipeline;
 import robotkit.perception.PerceptionHost;
 import robotkit.perception.PerceptionPipelineRegistry;
-import robotkit.world.CameraImage;
-import robotkit.world.ReplayRobot;
-import robotkit.world.RobotRecording;
-import robotkit.world.RobotSnapshot;
-import robotkit.world.SensorFrame;
+import robotkit.streams.CameraImage;
+import robotkit.recording.ReplayRobot;
+import robotkit.recording.RobotRecording;
+import robotkit.core.RobotSnapshot;
+import robotkit.core.SensorFrame;
 
 class PerceptionInferenceTests {
   static var assertions = 0;
@@ -47,6 +47,7 @@ class PerceptionInferenceTests {
     throw "Detector did not finish";
   }
   public static function run():Int {
+    robotkit.inference.ObjectDetectorPipeline.install();
     var deployment = new SerialDeployment(fixture("perception-valid.json"));
     check(deployment.perception.length == 1, "v5 deployment loads perception");
     check(deployment.perception[0].host == "robotd" &&

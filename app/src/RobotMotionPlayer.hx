@@ -2,8 +2,8 @@ package app;
 
 import nativekit.sim.SimSession;
 import robotkit.model.RobotModel;
-import robotkit.world.JointTarget;
-import robotkit.world.RobotCommand;
+import robotkit.core.JointTarget;
+import robotkit.core.RobotCommand;
 import robotkit.world.RobotWorld;
 
 /**

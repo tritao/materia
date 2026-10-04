@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "package": {
+    "name": "robotkit-core"
+  },
+  "sourceRoots": [
+    "haxe"
+  ],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "nativekit": {
+      "path": "../../nativekit"
+    },
+    "trajectorykit": {
+      "path": "../../trajectorykit"
+    }
+  },
+  "target": "host",
+  "ffi": {
+    "interfaces": [
+      "../runtime/bindings/robotkit-runtime.hxi"
+    ],
+    "projections": [
+      "../runtime/bindings/robotkit-runtime.hxmap"
+    ]
+  }
+}

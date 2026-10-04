@@ -210,13 +210,14 @@ class LidarPuck extends MachineComponent {
  * The robot drives along +X with its axles along Y; the assembly origin is on the floor (z = 0)
  * midway between the wheels' floor contacts. The plates own the layout: every part mates to a
  * named seat on the base plate or the deck through its own connector, and each wheel's bore mates
- * to its motor's shaft on continuous joint `wheel_l` (+Y side) or `wheel_r`. Each joint turns about
+ * to its gearhead's output on continuous joint `wheel_l` (+Y side) or `wheel_r`. Each joint turns about
  * its own shaft, which points outward, so a positive speed rolls the left wheel forward and the
  * right wheel backward, as each motor's encoder counts it.
  */
 class MobileBase extends MachineAssembly {
 	public static inline var LENGTH:Float = 600;
-	public static inline var WIDTH:Float = 440;
+	public static inline var MINIMUM_WEB:Float = 10;
+	public static inline var WHEEL_HUB_LENGTH:Float = 10;
 	public static inline var WHEEL_DIAMETER:Float = 150;
 	public static inline var WHEEL_WIDTH:Float = 40;
 	/** Underside of the base plate. */
@@ -241,27 +242,22 @@ class MobileBase extends MachineAssembly {
 	 * The wheel drive: each NEMA 23 turns its wheel through a 10:1 gearhead at 90% efficiency, on a 24 V
 	 * supply with half the holding torque relied on (`NemaStepper.actuator`'s default margin). The gearhead
 	 * ratio, its efficiency and the supply are assumptions (a planetary gearhead on a NEMA 23 is typically 3:1
-	 * to 100:1 at 0.8 to 0.95); the gearhead is not drawn, the wheel sits on the motor's shaft.
+	 * to 100:1 at 0.8 to 0.95). The model includes the gearhead housing between motor and wheel.
 	 */
 	public static final WHEEL_GEARBOX = new Gearbox(10, 0.9, 60, 40, 6.35, true);
 	public static inline var WHEEL_SUPPLY:Float = 24;
-	static function wheelDriver(wired:Bool = false):MotorDriver return new MotorDriver("GENERIC-DM542", 2.8, 16, wired ? null : WHEEL_SUPPLY);
-	/** The motor's actuator as `MachineAssembly.addMotor` makes it, before the gearbox. */
-	static function wheelMotor():materia.assembly.AssemblyDefinition.AssemblyActuator {
-		var driver = wheelDriver();
-		var voltage = driver.statedVoltage;
-		if (voltage == null) throw "The nominal wheel driver needs a stated supply voltage";
-		return NemaStepper.frame(23).actuator("wheel", "wheel", voltage, 0.5, driver.current);
+	public static final WIDTH:Float = 2 * (BRACKET_Y + BRACKET_THICKNESS + HUB_GAP + WHEEL_GEARBOX.length + WHEEL_HUB_LENGTH + WHEEL_WIDTH + 6 + MINIMUM_WEB);
+	static function wheelDriver():MotorDriver return new MotorDriver("GENERIC-DM542", 2.8, 16);
+	/** Limits resolved from the battery's power connections, after assembly construction. */
+	public function wheelSpeed():Float {
+		return actuatorFor("driveLeft").maxRate / WHEEL_GEARBOX.ratio;
+	}
+	public function wheelTorque():Float {
+		return actuatorFor("driveLeft").maxEffort * WHEEL_GEARBOX.ratio * WHEEL_GEARBOX.efficiency;
 	}
 	/**
-	 * Wheel speed limit in rad/s and torque in N·m, from the drive: the stepper's usable speed over the gearhead
-	 * ratio (about 13.7 rad/s, a little over 1 m/s on the 75 mm wheel) and its usable torque through the gearhead.
-	 */
-	public static final WHEEL_SPEED:Float = WHEEL_GEARBOX.jointSpeed(wheelMotor().maxRate);
-	public static final WHEEL_TORQUE:Float = WHEEL_GEARBOX.jointTorque(wheelMotor().maxEffort);
-	/**
 	 * Drive limits the base is run at: m/s, rad/s, m/s², rad/s². Operating limits, assumed, set under what the
-	 * wheels can do (`WHEEL_SPEED` times the wheel radius is the ground speed they top out at).
+	 * wheels can do (`wheelSpeed()` times the wheel radius is the ground speed they top out at).
 	 */
 	public static inline var MAX_LINEAR_SPEED:Float = 0.8;
 	public static inline var MAX_ANGULAR_SPEED:Float = 2.0;
@@ -287,20 +283,21 @@ class MobileBase extends MachineAssembly {
 	 * The bare base, or with `arm` standing on the deck's payload seat by its pedestal's `floor`; the arm
 	 * then joins the robot as `arm/...`, its joints `arm/j1`..`arm/j6`.
 	 */
-	public function new(?arm:RobotArm) {
+	public function new(?arm:RobotArm, supplyVoltage:Float = WHEEL_SUPPLY) {
 		super();
 		this.arm = arm;
 		motor = NemaStepper.frame(23);
-		wheel = new DriveWheel(WHEEL_DIAMETER, WHEEL_WIDTH, motor.variant.shaftDiameter, 40, 10);
+		wheel = new DriveWheel(WHEEL_DIAMETER, WHEEL_WIDTH, motor.variant.shaftDiameter, 40, WHEEL_HUB_LENGTH);
 		caster = new CasterWheel(75, 25, BASE_Z, 30, 60);
 		var axleZ = wheel.radius;
 		bracket = new MotorBracket(motor, 80, axleZ - 40, BASE_Z - axleZ, BRACKET_THICKNESS, 40, 5);
 		post = new TubePost(new RectTube(40, 40, 3), DECK_Z - BASE_Z - BASE_THICKNESS);
 
+		for (slot in wheelSlots()) if (WIDTH / 2 - Math.abs(slot.y) - slot.width / 2 < MINIMUM_WEB) throw "Base plate needs its minimum wheel-slot web";
 		addComponent("basePlate", new ChassisPlate(LENGTH, WIDTH, BASE_THICKNESS, "Base plate", baseSeats(),
 			wheelSlots()), AssemblyFrames.translation(0, 0, BASE_Z));
 
-		addComponent("battery", new BatteryPack(260, 180, 110, WHEEL_SUPPLY));
+		addComponent("battery", new BatteryPack(260, 180, 110, supplyVoltage));
 		addMate("battery-mount", "fixed", "basePlate", "battery", "battery", "base");
 
 		// Drives: the bracket hangs from its seat, the motor sits on the bracket, and the wheel turns at the gearhead output.
@@ -319,7 +316,7 @@ class MobileBase extends MachineAssembly {
 				{x: 0, y: 1, z: 0}, 0, {lower: null, upper: null, velocity: null, effort: null});
 			// The wheel's drive: the stepper through the gearhead, which is where those limits come from.
 			var driver = 'driver${side.name}';
-			addComponent(driver, wheelDriver(true));
+			addComponent(driver, wheelDriver());
 			addMemberConnector("basePlate", driver, Solids.axial(side.sign * 210, 0, BASE_THICKNESS));
 			addMate('$driver-mount', "fixed", "basePlate", driver, driver, "mount");
 			connectPorts('$driver-power', "battery", 'power${side.name}', driver, "power");

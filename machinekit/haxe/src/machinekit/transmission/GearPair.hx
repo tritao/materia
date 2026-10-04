@@ -16,6 +16,7 @@ class GearPair extends MachineAssembly {
 		var result = new TransmissionRelation(-alignment * driver.teeth / driven.teeth, DEFAULT_EFFICIENCY,
 			null, mesh(driver, driven).backlash / (driver.pitchDiameter / 2));
 		result.setBasis("efficiency", ValueBasis.Assumed, "gear efficiency");
+		result.setBasis("stiffness", machinekit.transmission.ValueBasis.Assumed, "rigid");
 		return result;
 	}
 
@@ -41,7 +42,7 @@ class GearPair extends MachineAssembly {
 		var distance = a.centerDistance(b);
 		var baseRadiusSum = (a.baseDiameter + b.baseDiameter) / 2;
 		if (!(distance > baseRadiusSum + 1e-10))
-			throw "Meshing gear profile shifts produce an invalid operating pressure angle";
+			throw new machinekit.transmission.TransmissionDesignError("Gear profile shifts cannot mesh; choose compatible profile shifts");
 		centerDistance = distance;
 		operatingPressureAngle = Math.acos(baseRadiusSum / distance);
 		backlash = a.backlash + b.backlash;

@@ -1,11 +1,37 @@
 {
   "version": 1,
-  "package": { "name": "motionkit" },
-  "sourceRoots": ["haxe"],
-  "scopeSourceRoots": false,
-  "dependencies": {},
-  "ffi": {
-    "interfaces": ["native/bindings/motionkit.hxi"]
+  "package": {
+    "name": "motionkit"
   },
-  "target": "host"
+  "sourceRoots": [
+    "haxe"
+  ],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "trajectorykit": {
+      "path": "../trajectorykit"
+    }
+  },
+  "ffi": {
+    "interfaces": [
+      "native/bindings/motionkit.hxi"
+    ]
+  },
+  "target": "host",
+  "native": {
+    "cmake": {
+      "source": "native",
+      "target": "motionkit_core",
+      "library": "motionkit_core",
+      "inputs": [
+        "native/CMakeLists.txt",
+        "native/include/motionkit.h",
+        "native/include/motionkit.hpp",
+        "native/src/generator.cpp",
+        "native/src/path.cpp",
+        "native/src/opw.cpp",
+        "native/src/configuration.cpp"
+      ]
+    }
+  }
 }

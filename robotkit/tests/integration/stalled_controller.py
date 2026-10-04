@@ -2,10 +2,16 @@
 """A raw TCP controller that keeps its lease while pausing socket reads."""
 
 import socket
+import re
+from pathlib import Path
 import struct
 import sys
 import threading
 import time
+
+
+PROTOCOL_VERSION = int(re.search(r"VERSION:Int = (\d+)",
+    (Path(__file__).resolve().parents[2] / "remote/haxe/robotkit/protocol/RobotFrame.hx").read_text()).group(1))
 
 
 def pack(value):
@@ -96,7 +102,7 @@ def read_frame(sock):
     magic, version, kind, flags, length, attachments, session, sequence, timestamp = struct.unpack(
         ">4sHHIIIQQQ", read_exact(sock, 44)
     )
-    assert magic == b"RKF1" and version == 1 and flags == 0
+    assert magic == b"RKF1" and version == PROTOCOL_VERSION and flags == 0
     payload = read_exact(sock, length)
     sizes = []
     for _ in range(attachments):
@@ -108,7 +114,7 @@ def read_frame(sock):
 
 def send_frame(sock, lock, kind, payload, session=0):
     body = pack(payload)
-    frame = struct.pack(">4sHHIIIQQQ", b"RKF1", 1, kind, 0, len(body), 0, session, 0, 0) + body
+    frame = struct.pack(">4sHHIIIQQQ", b"RKF1", PROTOCOL_VERSION, kind, 0, len(body), 0, session, 0, 0) + body
     with lock:
         sock.sendall(frame)
 
@@ -117,7 +123,7 @@ def main(port):
     with socket.create_connection(("127.0.0.1", port), timeout=5) as sock:
         sock.settimeout(5)
         lock = threading.Lock()
-        send_frame(sock, lock, 1, {1: 1, 2: "stalled-bulk", 3: "", 4: "controller"})
+        send_frame(sock, lock, 1, {1: PROTOCOL_VERSION, 2: "stalled-bulk", 3: "", 4: "controller", 5: []})
         kind, _, _, welcome, _ = read_frame(sock)
         assert kind == 2 and welcome[5] is True, "controller lease was not granted"
         session, robot, lease = welcome[3], welcome[4], welcome[6]

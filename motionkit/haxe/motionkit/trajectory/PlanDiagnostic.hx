@@ -10,6 +10,7 @@ enum abstract PlanDiagnosticKind(String) from String to String {
   var ServoRatedTorque = "servo-rated-torque";
   /** The axis's drive stretches or lags by more than the tolerance. */
   var Accuracy = "accuracy";
+
 }
 
 /**
@@ -18,6 +19,12 @@ enum abstract PlanDiagnosticKind(String) from String to String {
  * many samples were over.
  */
 class PlanDiagnostic {
+  /** Quantities used by each finding's calculation. */
+  public static function quantities(kind:PlanDiagnosticKind):Array<String> return switch kind {
+    case PlanDiagnosticKind.Accuracy: ["stiffness", "backlash", "drag", "steady loads"];
+    case _: ["motor curve", "inertia", "efficiency", "drag"];
+  };
+
   public final kind:PlanDiagnosticKind;
   /** The program op the plan came from, -1 when unknown. */
   public final opIndex:Int;
@@ -113,6 +120,8 @@ class PlanSlip {
 /** What checking one plan found: its diagnostics and how near the limits it came. */
 class PlanCheckResult {
   public final diagnostics:Array<PlanDiagnostic>;
+  /** Active hardware speed ceilings; these explain planning limits rather than flagging violations. */
+  public var speedLimits:Array<String> = [];
   /** The largest torque a motor needed over what its drive gives at that speed (1 is exactly at the limit); 0 when no motor is checked. */
   public final worstTorqueRatio:Float;
   public final worstMotor:String;

@@ -36,10 +36,10 @@ import robotkit.model.JointType;
 import robotkit.model.JointLimits;
 import robotkit.model.JointCoupling;
 import robotkit.model.SteadyLoads;
-import robotkit.world.TrajectorySegment;
-import robotkit.world.ProcessTimedEvent;
-import robotkit.world.ProcessEventValue;
-import robotkit.world.ExecutionPlanSubmission;
+import robotkit.execution.TrajectorySegment;
+import robotkit.execution.ProcessTimedEvent;
+import robotkit.execution.ProcessEventValue;
+import robotkit.execution.ExecutionPlanSubmission;
 import robotkit.device.DeviceBinding;
 import robotkit.device.DeviceLayout;
 import motionkit.trajectory.PlanDiagnostic;
@@ -67,7 +67,7 @@ class ProjectSourceTests {
     var simulationHarness = new SimulationHarness(0.01, 1, backend);
 
     var simulation = simulationHarness.simulation;
-    var runtime = simulation.addRobot(RobotRuntimeCompiler.compile(model));
+    var runtime = simulation.addRobot(RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()));
     runtime.submitPosition(0, 0.3, 1);
     for (index in 0...200) simulationHarness.step(Int64.ofInt(index));
     var q = runtime.snapshot().q;
@@ -84,7 +84,7 @@ class ProjectSourceTests {
     var simulationHarness = new SimulationHarness(0.01, 1, backend);
 
     var simulation = simulationHarness.simulation;
-    simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model), [0.0, 0.0, 0.0],
+    simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()), [0.0, 0.0, 0.0],
       [0.0, 0.0, 0.0, 1.0], null, [enabled ? [0.5, 0.5, 0.5] : null]);
     var box = simulationHarness.spawnBox([0.0, 0.0, 1.25], [0.1, 0.1, 0.1], true, 1.0);
     for (index in 0...200) simulationHarness.step(Int64.ofInt(index));
@@ -107,7 +107,7 @@ class ProjectSourceTests {
     var simulationHarness = new SimulationHarness(0.01, 1, backend);
 
     var simulation = simulationHarness.simulation;
-    simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model), [0.0, 0.0, 0.0],
+    simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()), [0.0, 0.0, 0.0],
       [0.0, 0.0, 0.0, 1.0], null, null, [enabled ? vertices : null]);
     var box = simulationHarness.spawnBox([0.0, 0.0, 1.25], [0.1, 0.1, 0.1], true, 1.0);
     for (index in 0...200) simulationHarness.step(Int64.ofInt(index));
@@ -128,7 +128,7 @@ class ProjectSourceTests {
       var simulationHarness = new SimulationHarness(0.01, 1, backend);
 
       var simulation = simulationHarness.simulation;
-      simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model), [0.0, 0.0, 0.0],
+      simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()), [0.0, 0.0, 0.0],
         [0.0, 0.0, 0.0, 1.0], null, null, [wedge]);
       var box = simulationHarness.spawnBox([0.35, 0.0, 1.25], [0.1, 0.1, 0.1], true, 1.0);
       for (index in 0...200) simulationHarness.step(Int64.ofInt(index));
@@ -168,7 +168,7 @@ class ProjectSourceTests {
         var simulationHarness = new SimulationHarness(0.01, 1, backend);
 
         var simulation = simulationHarness.simulation;
-        simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model), [0.0, 0.0, 0.0],
+        simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()), [0.0, 0.0, 0.0],
           [0.0, 0.0, 0.0, 1.0], null, null, [enabled ? hull : null]);
         var box = simulationHarness.spawnBox([0.0, 0.0, top + 0.5], [0.05, 0.05, 0.05], true, 1.0);
         for (index in 0...200) simulationHarness.step(Int64.ofInt(index));
@@ -304,7 +304,7 @@ class ProjectSourceTests {
     var definition = session.projectAssemblyDefinition, physical = session.projectPhysical;
     if (definition == null || physical == null) throw '$label has no assembly to build a robot from';
     var model = AssemblySimulationBridge.toRobotModel(definition, physical, session.projectAssemblyState, null, null, session.mobileBase).model;
-    var compiled = RobotRuntimeCompiler.compile(model);
+    var compiled = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     var found = new Map<String, Array<Float>>();
     for (id in driven) {
       var index = -1;
@@ -316,11 +316,15 @@ class ProjectSourceTests {
       check(index >= 0 && motors.length == 1, '$label drives joint $id with exactly one motor');
       var motor = motors[0];
       var ratio = switch motor.transmission { case SimpleTransmission(_, ratio, _): Math.abs(ratio); };
-      var speed = motor.planningRate() / ratio, torque = motor.planningEffort() * ratio * motor.efficiency;
-      check(Math.abs(compiled.joints[index].maxRate - speed) <= 1e-9 * speed && Math.abs(compiled.joints[index].maxEffort - torque) <= 1e-9 * torque,
-        '$label joint $id is limited to ${compiled.joints[index].maxRate} rad/s and ${compiled.joints[index].maxEffort} N m, its drive gives $speed and $torque');
+      var speed = motor.requireRate() / ratio, torque = motor.requireEffort() * ratio * motor.efficiency;
+      var effective = model.joints[index].limits;
+      check(effective.velocity != null && effective.effort != null &&
+        Math.abs(effective.requireVelocity() - speed) <= 1e-9 * speed && Math.abs(effective.requireEffort() - torque) <= 1e-9 * torque,
+        '$label compiled model preserves the drive limits used by mission planning and jogging on $id');
+      check(Math.abs(compiled.joints[index].requireRate() - speed) <= 1e-9 * speed && Math.abs(compiled.joints[index].requireEffort() - torque) <= 1e-9 * torque,
+        '$label joint $id is limited to ${compiled.joints[index].requireRate()} rad/s and ${compiled.joints[index].requireEffort()} N m, its drive gives $speed and $torque');
       check(motor.drive != null && ratio > 1.0, '$label joint $id has a drive and a gearbox');
-      found.set(id, [compiled.joints[index].maxRate, compiled.joints[index].maxEffort]);
+      found.set(id, [compiled.joints[index].requireRate(), compiled.joints[index].requireEffort()]);
     }
     return found;
   }
@@ -343,14 +347,14 @@ class ProjectSourceTests {
     for (coupling in model.couplings) leaders.set(coupling.follower, (leaders.exists(coupling.follower) ? leaders.get(coupling.follower) : 0) + 1);
     check(leaders.get("pulleyA-turn") == 2 && leaders.get("pulleyB-turn") == 2 && leaders.get("idlerAStart-turn") == 1,
       "each motor's pulley follows two axes, a gantry idler one");
-    var compiled = RobotRuntimeCompiler.compile(model);
+    var compiled = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     check(compiled.couplings.length == 16, "the runtime blueprint carries a coupling for each term");
     var xLimits = model.coupledLimits("x"), yLimits = model.coupledLimits("y");
-    check(Math.abs(xLimits.velocity - 0.6496) < 1e-3 && Math.abs(xLimits.velocity - yLimits.velocity) < 1e-12,
-      'both axes get 650 mm/s from the two motors, got ${xLimits.velocity} and ${yLimits.velocity}');
-    check(xLimits.maxAcceleration > yLimits.maxAcceleration && yLimits.maxAcceleration > 20,
-      'the carriage accelerates harder than the gantry it rides: ${xLimits.maxAcceleration} against ${yLimits.maxAcceleration}');
-    Sys.println('corexy plotter: axes to ${Math.round(xLimits.velocity * 1e4) / 10} mm/s and ${Math.round(xLimits.maxAcceleration * 1e3) / 1e3} m/s²');
+    check(Math.abs(xLimits.requireVelocity() - 0.6496) < 1e-3 && Math.abs(xLimits.requireVelocity() - yLimits.requireVelocity()) < 1e-12,
+      'both axes get 650 mm/s from the two motors, got ${xLimits.requireVelocity()} and ${yLimits.requireVelocity()}');
+    check(xLimits.requireAcceleration() > yLimits.requireAcceleration() && yLimits.requireAcceleration() > 20,
+      'the carriage accelerates harder than the gantry it rides: ${xLimits.requireAcceleration()} against ${yLimits.requireAcceleration()}');
+    Sys.println('corexy plotter: axes to ${Math.round(xLimits.requireVelocity() * 1e4) / 10} mm/s and ${Math.round(xLimits.requireAcceleration() * 1e3) / 1e3} m/s²');
     var world = new RobotWorld();
     var simulation = new ApplicationSimulation(world);
     simulation.setBackend(ApplicationSimulation.MUJOCO);
@@ -895,7 +899,7 @@ class ProjectSourceTests {
 
   /** A welder cell open in the simulation on MuJoCo, from one of the example's manifests. */
   static function openWelder(root:String, manifestName:String, ?adjust:app.MateriaProjectRunner.GeneratedAssemblyScene -> Void):{session:ProjectDocumentSession,
-      simulation:ApplicationSimulation, mission:MissionPlayer, welder:robotkit.runtime.SimulatedWelder, beads:WeldBeads} {
+      simulation:ApplicationSimulation, mission:MissionPlayer, welder:processkit.simulation.SimulatedWelder, beads:WeldBeads} {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-welder/" + manifestName);
     var generated = MateriaProjectRunner.loadProject(manifest);
     if (adjust != null) adjust(generated);
@@ -1211,20 +1215,22 @@ class ProjectSourceTests {
     var axisNames = job.axes;
     var axes = [for (joint in model.joints) if (axisNames.indexOf(Std.string(joint.id)) >= 0) joint];
     check([for (joint in axes) Std.string(joint.id)].join(",") == "y,x,z", "mill has three mechanical axes");
-    var blueprint = RobotRuntimeCompiler.compile(model);
+    var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     check(blueprint.fastestPositionLoopRate() == 4000, "mill driver loop rate survives project generation");
     check(blueprint.servoStabilityInterval() > 0 && Math.isFinite(blueprint.servoStabilityInterval()),
       "mill servo stability bound comes from its reflected inertia");
     var limits:Array<String> = [];
     for (joint in axes) {
       var rate = model.coupledLimits(joint.id, new SteadyLoads());
-      check(rate.velocity >= 8.0 / 60, 'mill ${joint.id} rapid reaches 8 m/min, got ${rate.velocity}');
-      limits.push('${joint.id}: ${Math.round(rate.velocity * 6000) / 100} m/min, ${Math.round(rate.maxAcceleration * 100) / 100} m/s²');
+      var rapid = rate.requireVelocity();
+      var acceleration = rate.requireAcceleration();
+      check(rapid >= 8.0 / 60, 'mill ${joint.id} rapid reaches 8 m/min, got $rapid');
+      limits.push('${joint.id}: ${Math.round(rapid * 6000) / 100} m/min, ${Math.round(acceleration * 100) / 100} m/s²');
     }
     Sys.println('bench mill derived limits: ${limits.join("; ")}');
     var session = new ProjectDocumentSession(null, false);
     var simulation = new ApplicationSimulation(new RobotWorld());
-    session.openGeneratedScene(generated.objects, manifest, generated.assembly,
+    session.openGeneratedScene(generated.objects, manifest,
       generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
       generated.localCentersByDefinition, generated.metresPerUnit, generated.physical,
       generated.recipeDocument, generated.robotMotions, null, generated.cncJob);
@@ -1288,12 +1294,14 @@ class ProjectSourceTests {
     var model = AssemblySimulationBridge.toRobotModel(definition, generated.physical).model;
     var doorActuator:Null<Actuator> = null;
     for (actuator in model.actuators) if (actuator.id == "door-cylinder") doorActuator = actuator;
-    check(doorActuator != null && Math.abs(doorActuator.maxEffort - 294.524311274) < 0.01,
-      'assembly bridge keeps the 25 mm door cylinder force in newtons, got ${doorActuator == null ? "missing" : doorActuator.maxEffort}');
+    var doorEffort:Float = doorActuator == null || doorActuator.maxEffort == null ? 0.0 : doorActuator.maxEffort;
+    check(Math.abs(doorEffort - 294.524311274) < 0.01,
+      'assembly bridge keeps the 25 mm door cylinder force in newtons, got $doorEffort');
     var viseActuator:Null<Actuator> = null;
     for (actuator in model.actuators) if (actuator.id == "vise-cylinder") viseActuator = actuator;
-    check(viseActuator != null && Math.abs(viseActuator.maxEffort - 482.54863159) < 0.01,
-      'assembly bridge keeps the 32 mm vise cylinder force in newtons, got ${viseActuator == null ? "missing" : viseActuator.maxEffort}');
+    var viseEffort:Float = viseActuator == null || viseActuator.maxEffort == null ? 0.0 : viseActuator.maxEffort;
+    check(Math.abs(viseEffort - 482.54863159) < 0.01,
+      'assembly bridge keeps the 32 mm vise cylinder force in newtons, got $viseEffort');
     check([for (joint in model.joints) if (joint.type == JointType.Prismatic) joint].length == 5,
       "enclosed project retains three mill axes, door and jaw");
     check(generated.cncJob != null, "enclosed mill exports its clamped bearing-block job");
@@ -1302,11 +1310,11 @@ class ProjectSourceTests {
     var datum = state.worldConnector("mill/vise/body", "datum");
     check(opening.y < datum.y && opening.z < datum.z, "door opening and vise datum survive project generation");
     if (doorActuator == null || viseActuator == null) throw "Enclosed mill lost its pneumatic drives";
-    var enclosedRate = RobotRuntimeCompiler.compile(model).fastestPositionLoopRate();
+    var enclosedRate = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()).fastestPositionLoopRate();
     checkPneumaticDynamics(model, doorActuator, viseActuator, Math.ceil(enclosedRate * 0.01));
     var session = new ProjectDocumentSession(null, false);
     var simulation = new ApplicationSimulation(new RobotWorld());
-    session.openGeneratedScene(generated.objects, manifest, generated.assembly,
+    session.openGeneratedScene(generated.objects, manifest,
       generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
       generated.localCentersByDefinition, generated.metresPerUnit, generated.physical,
       generated.recipeDocument, generated.robotMotions, null, generated.cncJob);
@@ -1377,7 +1385,7 @@ class ProjectSourceTests {
     viseJoint.limitDampingRatio = 1.0;
     fixture.addActuator(doorActuator);
     fixture.addActuator(viseActuator);
-    var blueprint = RobotRuntimeCompiler.compile(fixture);
+    var blueprint = RobotRuntimeCompiler.compile(fixture, new robotkit.profile.RobotProfile());
     var physical = new SimulationHarness(0.01, physicsSubsteps, SimulationSpace.MUJOCO);
     try {
       var runtime = physical.simulation.addRobot(blueprint);
@@ -1483,8 +1491,9 @@ class ProjectSourceTests {
     // generate at its microstepping (40 kHz over 3200 steps a turn: 78.5 rad/s), and the screw's
     // critical speed, all through the axis's ratio to the motor.
     var motorSpeed = 2 * 24 / (50 * 2.5e-3 * 2.8);
-    var stepSpeed = controller.stepTickHz / (200.0 * DeviceLayout.forActuators(model).channels[0].microsteps / (2 * Math.PI));
-    var wired = DeviceBinding.bind(model, DeviceLayout.forActuators(model), controller.stepTickHz).model;
+    var binding = DeviceBinding.bind(model, DeviceLayout.forActuators(model), controller.stepTickHz);
+    var stepSpeed = controller.stepTickHz / binding.channels[0].stepsPerUnit;
+    var wired = binding.model;
     var steady = new SteadyLoads();
     var derived:Array<String> = [], free:Array<String> = [];
     for (joint in axes) {
@@ -1493,23 +1502,25 @@ class ProjectSourceTests {
         for (actuator in model.actuators) switch actuator.transmission {
           case SimpleTransmission(target, _, _): if (target == coupling.follower) motorRatio = Math.abs(coupling.ratio);
         }
-        for (follower in model.joints) if (follower.id == coupling.follower && follower.limits.velocity > 0)
-        {
-          critical = Math.min(critical, follower.limits.velocity / Math.abs(coupling.ratio));
-          leadRatio = Math.abs(coupling.ratio);
+        for (follower in model.joints) if (follower.id == coupling.follower) {
+          var mechanical = follower.mechanicalLimits;
+          if (mechanical != null && mechanical.velocity != null) {
+            critical = Math.min(critical, mechanical.requireVelocity() / Math.abs(coupling.ratio));
+            leadRatio = Math.abs(coupling.ratio);
+          }
         }
       }
       check(motorRatio > 0, '$kind axis ${joint.id} has a motor');
       var expected = Math.min(Math.min(motorSpeed, stepSpeed) / motorRatio, critical);
       var limits = wired.coupledLimits(joint.id, steady);
-      check(Math.abs(limits.velocity - expected) < 1e-9,
-        '$kind axis ${joint.id} is as fast as its motor, controller and screw allow: ${limits.velocity} m/s, expected $expected');
-      check(limits.maxAcceleration > 0.5 && limits.maxAcceleration < 50,
-        '$kind axis ${joint.id} accelerates as its motors move it: ${limits.maxAcceleration} m/s²');
-      derived.push('${joint.id} ${Math.round(limits.velocity * 1e4) / 10} mm/s, ${Math.round(limits.maxAcceleration * 100) / 100} m/s²' +
+      check(Math.abs(limits.requireVelocity() - expected) < 1e-9,
+        '$kind axis ${joint.id} is as fast as its motor, controller and screw allow: ${limits.requireVelocity()} m/s, expected $expected');
+      check(limits.requireAcceleration() > 0.5 && limits.requireAcceleration() < 50,
+        '$kind axis ${joint.id} accelerates as its motors move it: ${limits.requireAcceleration()} m/s²');
+      derived.push('${joint.id} ${Math.round(limits.requireVelocity() * 1e4) / 10} mm/s, ${Math.round(limits.requireAcceleration() * 100) / 100} m/s²' +
         (critical < Math.POSITIVE_INFINITY ? ' (screw held to ${Math.round(critical * (Math.abs(leadRatio) > 0 ? leadRatio : 1) * 60 / (2 * Math.PI))} rpm)' : ''));
       var bare = model.coupledLimits(joint.id);
-      free.push('${joint.id} ${Math.round(bare.velocity * 1e4) / 10} mm/s, ${Math.round(bare.maxAcceleration * 100) / 100} m/s²');
+      free.push('${joint.id} ${Math.round(bare.requireVelocity() * 1e4) / 10} mm/s, ${Math.round(bare.requireAcceleration() * 100) / 100} m/s²');
     }
     Sys.println('cnc $kind axes with the controller and steady loads: ${derived.join("; ")}');
     Sys.println('cnc $kind axes from their motors and screws alone: ${free.join("; ")}');
@@ -1518,7 +1529,7 @@ class ProjectSourceTests {
       "the router generates a looping job that machines its stock to a target part with an end mill and a drill");
     var session = new ProjectDocumentSession(null, false);
     var simulation = new ApplicationSimulation(new RobotWorld());
-    session.openGeneratedScene(generated.objects, manifest, generated.assembly,
+    session.openGeneratedScene(generated.objects, manifest,
       generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
       generated.localCentersByDefinition, generated.metresPerUnit, generated.physical,
       generated.recipeDocument, generated.robotMotions, null, generated.cncJob);
@@ -1659,7 +1670,7 @@ class ProjectSourceTests {
     var generated = MateriaProjectRunner.loadProject(manifest);
     var session = new ProjectDocumentSession(null, false);
     var simulation = new ApplicationSimulation(new RobotWorld());
-    session.openGeneratedScene(generated.objects, manifest, generated.assembly,
+    session.openGeneratedScene(generated.objects, manifest,
       generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
       generated.localCentersByDefinition, generated.metresPerUnit, generated.physical,
       generated.recipeDocument, generated.robotMotions, null, generated.cncJob);
@@ -1757,7 +1768,7 @@ class ProjectSourceTests {
     var descriptors = generated.faceDescriptorsByDefinition;
     check(descriptors != null && descriptors.exists("plate") && descriptors.exists("pin"), "the project describes its faces");
     var session = new ProjectDocumentSession(null, false);
-    session.openGeneratedScene(generated.objects, manifest, generated.assembly, generated.geometryBySnapshot,
+    session.openGeneratedScene(generated.objects, manifest, generated.geometryBySnapshot,
       generated.assemblyDefinition, generated.assemblyState, generated.localCentersByDefinition, generated.metresPerUnit,
       generated.physical, generated.recipeDocument, generated.robotMotions, descriptors);
     check(session.assemblyMateStatus() == null, "a project without mates shows no mate status");
@@ -1809,7 +1820,7 @@ class ProjectSourceTests {
   static function checkMateJoint(manifest:String, generated:MateriaProjectRunner.GeneratedAssemblyScene):Void {
     var descriptors = generated.faceDescriptorsByDefinition;
     var session = new ProjectDocumentSession(null, false);
-    session.openGeneratedScene(generated.objects, manifest, generated.assembly, generated.geometryBySnapshot,
+    session.openGeneratedScene(generated.objects, manifest, generated.geometryBySnapshot,
       generated.assemblyDefinition, generated.assemblyState, generated.localCentersByDefinition, generated.metresPerUnit,
       generated.physical, generated.recipeDocument, generated.robotMotions, descriptors);
     var top = describedFace(descriptors, "plate", "plane", 1), bore = describedFace(descriptors, "plate", "axis", 0);
@@ -1858,7 +1869,7 @@ class ProjectSourceTests {
   static function checkMatePick(manifest:String, generated:MateriaProjectRunner.GeneratedAssemblyScene):Void {
     var descriptors = generated.faceDescriptorsByDefinition;
     var session = new ProjectDocumentSession(null, false);
-    session.openGeneratedScene(generated.objects, manifest, generated.assembly, generated.geometryBySnapshot,
+    session.openGeneratedScene(generated.objects, manifest, generated.geometryBySnapshot,
       generated.assemblyDefinition, generated.assemblyState, generated.localCentersByDefinition, generated.metresPerUnit,
       generated.physical, generated.recipeDocument, generated.robotMotions, descriptors);
     check(session.canMateFaces(), "a project with described faces can be mated");
@@ -2095,7 +2106,7 @@ class ProjectSourceTests {
     var machineSession = new ProjectDocumentSession(null, false);
     var machineWorld = new RobotWorld();
     var machineSimulation = new ApplicationSimulation(machineWorld);
-      machineSession.openGeneratedScene(machineScene.objects, machineManifest, machineScene.assembly,
+      machineSession.openGeneratedScene(machineScene.objects, machineManifest,
         machineScene.geometryBySnapshot, machineScene.assemblyDefinition, machineScene.assemblyState,
         machineScene.localCentersByDefinition, machineScene.metresPerUnit,
         machineScene.physical, machineScene.recipeDocument);
@@ -2241,7 +2252,7 @@ class ProjectSourceTests {
     var output = "/tmp/materia-project-source-" + Sys.getPid() + ".materia.json";
     var stage = "open generated scene";
     try {
-      session.openGeneratedScene(generated, manifest, generatedScene.assembly,
+      session.openGeneratedScene(generated, manifest,
         generatedScene.geometryBySnapshot, generatedScene.assemblyDefinition,
         generatedScene.assemblyState, generatedScene.localCentersByDefinition,
         generatedScene.metresPerUnit, generatedScene.physical,
@@ -2261,7 +2272,7 @@ class ProjectSourceTests {
         restored.restoreLiveState(live);
         check(restored.isDirty() && restored.path == null,
           "unsaved project stays untitled and dirty after reload");
-        check(restored.projectReference == manifest && restored.projectAssembly != null,
+        check(restored.projectReference == manifest && restored.projectAssemblyDefinition != null,
           "reload keeps the generated project and assembly");
         check(restored.sensors.robotModels().length == 0,
           "reload keeps a generated assembly free of an implicit sensor robot");

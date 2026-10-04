@@ -9,7 +9,7 @@ import materia.automation.fleet.FleetAssignment;
 import materia.automation.fleet.TrafficManager;
 import robotkit.skill.Skill;
 import robotkit.skill.SkillStatus;
-import robotkit.world.Robot;
+import robotkit.core.Robot;
 import materia.automation.task.TaskKind;
 import materia.automation.task.Transport;
 

@@ -1,44 +1,67 @@
 {
-	"version": 1,
-	"package": { "name": "cadbridge-tests" },
-	"entry": "tests.CadBridgeTests",
-	"sourceRoots": ["src", "../../../machinekit/examples", "../../../machinekit/examples/mobile-base", "../../../machinekit/examples/robot-arm"],
-	"dependencies": {
-		"nativekit": { "path": "../../../nativekit" },
-		"projectkit": { "path": "../../../projectkit" },
-		"robotkit": { "path": "../.." },
-		"cadkit": { "path": "../../../cadkit" },
-		"machinekit": { "path": "../../../machinekit" },
-		"bimkit": { "path": "../../../bimkit" },
-		"cadbridge": { "path": ".." }
-	},
-	"native": {
-		"cmake": {
-			"source": "../../robotd/native",
-			"target": "robotd_native",
-			"inputs": [
-				"../../robotd/native/CMakeLists.txt",
-				"../../CMakeLists.txt",
-				"../../runtime/CMakeLists.txt",
-				"../../runtime/include/robotkit_runtime.h",
-				"../../runtime/include/robotkit_simkit.h",
-				"../../../motionkit/native/CMakeLists.txt",
-				"../../../motionkit/native/include/motionkit.h",
-				"../../../motionkit/native/src/trajectory.cpp",
-				"../../../motionkit/native/src/validation.cpp",
-				"../../../motionkit/native/src/generator.cpp",
-				"../../../motionkit/native/vendor/ruckig/CMakeLists.txt",
-				"../../../nativekit/CMakeLists.txt",
-				"../../../simkit/CMakeLists.txt",
-				"../../inference/CMakeLists.txt",
-				"../../inference/src/inference.cpp",
-				"../../inference/include/robotkit_inference.h",
-				"../../policy/CMakeLists.txt",
-				"../../policy/src/policy.cpp",
-				"../../policy/include/robotkit_policy.h"
-			]
-		}
-	},
-	"target": "host",
-	"outputDir": "build"
+  "version": 1,
+  "package": {
+    "name": "cadbridge-tests"
+  },
+  "entry": "tests.CadBridgeTests",
+  "sourceRoots": [
+    "src",
+    "../../../machinekit/examples",
+    "../../../machinekit/examples/mobile-base",
+    "../../../machinekit/examples/robot-arm"
+  ],
+  "dependencies": {
+    "nativekit": {
+      "path": "../../../nativekit"
+    },
+    "projectkit": {
+      "path": "../../../projectkit"
+    },
+    "robotkit": {
+      "path": "../.."
+    },
+    "cadkit": {
+      "path": "../../../cadkit"
+    },
+    "machinekit": {
+      "path": "../../../machinekit"
+    },
+    "bimkit": {
+      "path": "../../../bimkit"
+    },
+    "cadbridge": {
+      "path": ".."
+    },
+    "processkit": {
+      "path": "../../../processkit"
+    }
+  },
+  "native": {
+    "cmake": {
+      "source": "../../robotd/native",
+      "target": "robotd_native",
+      "inputs": [
+        "../../robotd/native/CMakeLists.txt",
+        "../../CMakeLists.txt",
+        "../../runtime/CMakeLists.txt",
+        "../../runtime/include/robotkit_runtime.h",
+        "../../runtime/include/robotkit_simkit.h",
+        "../../../trajectorykit/native/src/trajectory.cpp",
+        "../../../trajectorykit/native/src/validation.cpp",
+        "../../../trajectorykit/native/CMakeLists.txt",
+        "../../../trajectorykit/native/include/trajectory_core.h",
+        "../../../trajectorykit/native/include/trajectory_core.hpp",
+        "../../../nativekit/CMakeLists.txt",
+        "../../../simkit/CMakeLists.txt",
+        "../../inference/CMakeLists.txt",
+        "../../inference/src/inference.cpp",
+        "../../inference/include/robotkit_inference.h",
+        "../../policy/CMakeLists.txt",
+        "../../policy/src/policy.cpp",
+        "../../policy/include/robotkit_policy.h"
+      ]
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
 }
