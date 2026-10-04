@@ -616,7 +616,16 @@ W5 implementation notes (in progress, 2026-10-04):
 - Focused command: `haxeon/scripts/haxeon run --project motionkit/tests/weave/haxeon.json` with the standard
   OCCT/library environment. It passes 738 assertions, including numeric first/second derivatives in a rotating
   material frame, zero amplitude, endpoint taper, edge holds, frequency units and unchanged event coordinates.
-  Recipe/bead integration, multi-pass schema and grounding, restart hump, and app quality gates remain open.
+  Saved recipe integration, multi-pass schema and grounding, restart hump, and app quality gates remain open.
+- ProcessKit's weld parameters can carry the spatial profile. `WeldingPlanRunner.pathOf` applies it per CAD seam,
+  deriving the lateral axis from the travel tangent and open-face bisector; torch roll never supplies that axis.
+  Endpoint envelopes meet at the seam corners while phase continues across seams. The same generated path is used
+  for native preflight and execution, so preflight IK and swept clearance see the woven trajectory. The existing
+  bead projection deposits the woven tip into seam stations without a separate travel-length normalization.
+  Focused ProcessKit weave tests pass 106 assertions: a quarter-turn of torch roll leaves the weave unchanged,
+  authored seam length remains unchanged, and a simulated woven pass measures a 7 mm leg with no gaps or stray
+  metal and the prescribed total volume. This is a bead-model test; MuJoCo quality remains to be proven. Existing
+  ProcessKit welder/planning/rate/process checks still pass 52/44/11/23 assertions.
 
 **W6. Real welder interface.** Map the channels to:
 - the retrofit I/O board: an optoMOS relay for the trigger, an isolated 0–10 V

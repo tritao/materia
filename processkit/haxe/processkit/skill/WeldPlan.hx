@@ -20,6 +20,8 @@ typedef WeldParameters = {
   var startDwell:Float;
   var craterDwell:Float;
   var burnback:Float;
+  /** Optional spatial weave; its material direction comes from each CAD segment's open side. */
+  @:optional var weave:motionkit.path.WeaveProfile;
 }
 
 /**

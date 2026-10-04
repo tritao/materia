@@ -9,6 +9,8 @@ import motionkit.path.OrientationPolicy;
 import motionkit.path.PoseLine;
 import motionkit.path.PosePath;
 import motionkit.path.PosePrimitive;
+import motionkit.path.WeavePath;
+import motionkit.path.FixedWeaveFrame;
 import robotkit.spatial.Quat;
 import motionkit.path.PoseWaypoint;
 import motionkit.program.Blend;
@@ -385,7 +387,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
    * where the torch would otherwise stand still to turn. How long the stretch is comes from the angle and the wrist's
    * limits (`WeldCorner`), and a corner takes at most `WeldCorner.SHARE` of a segment.
    */
-  static function pathOf(plan:WeldPlan, travel:Float, wrist:WristLimits, styles:Array<Int>):Array<PosePrimitive> {
+  public static function pathOf(plan:WeldPlan, travel:Float, wrist:WristLimits, styles:Array<Int>):Array<PosePrimitive> {
     var segments = plan.segments;
     var primitives:Array<PosePrimitive> = [];
     function waypoint(point:Vec3, rotation:Quat):PoseWaypoint
@@ -401,7 +403,9 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
           from.add(to.sub(from).scale(f1)), WeldCorner.orientationAt(r1, r2, s0 + (s1 - s0) * f1, travelA, travelB, style));
       }
     }
+    var progress = 0.0;
     for (index in 0...segments.length) {
+      var firstPrimitive = primitives.length;
       var segment = segments[index];
       var a = segment.start.translation, b = segment.stop.translation;
       var length = segment.length();
@@ -424,6 +428,16 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
       if (until.sub(from).norm() > 1e-6) line(from, startRotation, until, stopRotation);
       // The first half of the turn to the segment after.
       if (after) turn(until, b, stopRotation, segments[index + 1].start.rotation, 0.0, 0.5, afterAngle, direction, directionOf(segments[index + 1]), styles[index + 1]);
+      var weave = plan.parameters.weave;
+      if (weave != null && weave.amplitude > 0.0) {
+        var open = segment.open;
+        if (open == null) throw "A woven weld needs the CAD segment's material frame";
+        var lateral = direction.cross(open).normalized();
+        var base = new PosePath(FRAME, primitives.splice(firstPrimitive, primitives.length - firstPrimitive));
+        var woven = WeavePath.apply(base, weave, new FixedWeaveFrame([lateral.x, lateral.y, lateral.z]), progress);
+        for (primitive in woven.primitives) primitives.push(primitive);
+      }
+      progress += length;
     }
     return primitives;
   }
