@@ -11,6 +11,7 @@ import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import robotkit.model.RobotModel;
 import robotkit.model.Link;
+import robotkit.model.Frame;
 import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.JointLimits;
@@ -277,6 +278,7 @@ class AssemblySimulationBridge {
       };
       var joint = model.addJoint(new Joint(edge.id, kind, linkOf(edge.parent),
         linkOf(edge.child)));
+      joint.includePath = edge.includePath == null ? "" : edge.includePath;
       var parentFrame = AssemblyFrames.compose(offsetOf(edge.parent),
         connector(definitions.get(occurrenceDefinition(definition, edge.parent)), edge.parentConnector));
       var initial = placement.joint(edge.id);
@@ -458,6 +460,18 @@ class AssemblySimulationBridge {
           'Assembly presence sensor "${sensor.id}" has no connector or range');
         added.maxRange = range * scale;
       }
+    }
+    // Preserve the physical flange and its owning include after fixed parts collapse into links.
+    for (occurrence in definition.occurrences) {
+      if (free.exists(occurrence.id)) continue;
+      var component:materia.assembly.AssemblyDefinition.AssemblyComponentDefinition = definitions.get(occurrence.definition);
+      if (component == null) throw "Missing assembly component definition";
+      if (component.robotFlangeConnector == null) continue;
+      var mount = AssemblyFrames.compose(offsetOf(occurrence.id), connector(component, component.robotFlangeConnector));
+      var frame = model.addFrame(new Frame(occurrence.id + " robot flange", linkOf(occurrence.id)));
+      frame.position = [mount.x * scale, mount.y * scale, mount.z * scale];
+      frame.rotation = [mount.qx, mount.qy, mount.qz, mount.qw];
+      frame.flangeIncludePath = occurrence.includePath == null ? "" : occurrence.includePath;
     }
     if (mobileBase != null) {
       for (wheel in [mobileBase.leftWheel, mobileBase.rightWheel])

@@ -4,6 +4,8 @@ package robotkit.model;
 class Frame {
   public final id:FrameId;
   public var name:String;
+  /** Owning include when this is a standard robot flange; null for other frames. */
+  public var flangeIncludePath:Null<String> = null;
   public final link:Link;
   public var position:Array<Float> = [0.0, 0.0, 0.0];
   public var rotation:Array<Float> = [0.0, 0.0, 0.0, 1.0];

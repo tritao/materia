@@ -124,7 +124,7 @@ class KinematicGroup {
 
     dofs = [];
     external = [];
-    var named = externalAxes == null ? [] : externalAxes;
+    var named = externalAxes == null ? ExternalAxes.derive(robot, rootLink, flangeFrame) : externalAxes;
     for (joint in path) addDof(joint, named.indexOf(joint.id) >= 0);
     for (id in named) {
       var found = false;

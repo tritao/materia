@@ -83,6 +83,8 @@ class AssemblyDefinitionCodec {
 				if (reference != null && (reference.length == 0 || reference.length > 4096))
 					throw 'Connector "${connector.name}" of "${component.id}" has an invalid reference';
 			}
+			if (component.robotFlangeConnector != null && !names.exists(component.robotFlangeConnector))
+				throw 'Robot flange "${component.id}" references a missing face connector';
 			definitions.set(component.id, component);
 		}
 

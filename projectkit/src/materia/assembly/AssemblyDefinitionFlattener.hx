@@ -224,10 +224,14 @@ class AssemblyDefinitionFlattener {
 				var component = localDefinitions.get(occurrence.definition);
 				if (component == null) throw 'Assembly "$path" references a missing component definition';
 				if (!emittedDefinitions.exists(component.id)) {
-					flat.definitions.push({id: scoped(prefix, component.id), connectors: component.connectors});
+					var copied:AssemblyComponentDefinition = {id: scoped(prefix, component.id), connectors: component.connectors};
+					if (component.robotFlangeConnector != null) copied.robotFlangeConnector = component.robotFlangeConnector;
+					flat.definitions.push(copied);
 					emittedDefinitions.set(component.id, true);
 				}
 				var flatOccurrence:AssemblyComponentOccurrence = {id: path, definition: scoped(prefix, occurrence.definition), initialPose: worldPose};
+				flatOccurrence.includePath = occurrence.includePath == null || occurrence.includePath == ""
+					? prefix : scoped(prefix, occurrence.includePath);
 				if (occurrence.grounded == true) flatOccurrence.grounded = true;
 				flat.occurrences.push(flatOccurrence);
 				for (connector in component.connectors)
@@ -244,6 +248,7 @@ class AssemblyDefinitionFlattener {
 				defaultValue: joint.defaultValue};
 			if (joint.closureTolerance != null) expanded.closureTolerance = joint.closureTolerance;
 			if (joint.driven == true) expanded.driven = true;
+			expanded.includePath = joint.includePath == null || joint.includePath == "" ? prefix : scoped(prefix, joint.includePath);
 			flat.joints.push(expanded);
 		}
 		if (networks != null) {

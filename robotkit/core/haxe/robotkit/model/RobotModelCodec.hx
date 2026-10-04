@@ -195,6 +195,7 @@ class RobotModelCodec {
       joints: [for (joint in model.joints) {
         var record:Dynamic = {id: joint.id, name: joint.name, type: jointTypeName(joint.type),
         parentLink: joint.parent.id, childLink: joint.child.id,
+        includePath: joint.includePath,
         limits: encodeLimits(joint.limits),
         parentFramePosition: joint.parentFramePosition,
         parentFrameRotation: joint.parentFrameRotation,
@@ -214,7 +215,7 @@ class RobotModelCodec {
         spans: network.spans, assumptions: network.assumptions, clearances: network.clearances}],
       frames: [for (frame in model.frames) {
         id: frame.id, name: frame.name, link: frame.link.id,
-        position: frame.position, rotation: frame.rotation
+        position: frame.position, rotation: frame.rotation, flangeIncludePath: frame.flangeIncludePath
       }],
       sensors: encodedSensors,
       contactPairs: [for (pair in model.contactPairs) {
@@ -309,6 +310,7 @@ class RobotModelCodec {
       joint.childFramePosition = vectorField(record, "childFramePosition", 3);
       joint.childFrameRotation = vectorField(record, "childFrameRotation", 4);
       joint.axis = vectorField(record, "axis", 3);
+      joint.includePath = includeScope(record, "includePath");
       var dynamics:Dynamic = required(record, "dynamics");
       joint.armature = nonNegative(number(dynamics, "armature"), "joint armature");
       joint.damping = nonNegative(number(dynamics, "damping"), "joint damping");
@@ -397,6 +399,7 @@ class RobotModelCodec {
       var frame = model.addFrame(new Frame(text(record, "name"), link, id));
       frame.position = vectorField(record, "position", 3);
       frame.rotation = vectorField(record, "rotation", 4);
+      frame.flangeIncludePath = includeScope(record, "flangeIncludePath");
       frames.set(id, frame);
     }
 
@@ -705,6 +708,16 @@ class RobotModelCodec {
   static function required(value:Dynamic, name:String):Dynamic {
     if (value == null || !Reflect.hasField(value, name)) throw 'Missing RobotModel field $name';
     return Reflect.field(value, name);
+  }
+
+  static function includeScope(value:Dynamic, name:String):Null<String> {
+    var field:Dynamic = Reflect.field(value, name);
+    if (field == null) return null;
+    if (!Std.isOfType(field, String)) throw 'Invalid RobotModel field $name';
+    var scope:String = field;
+    if (scope != "") for (segment in scope.split("/"))
+      if (segment == "" || segment == "." || segment == "..") throw 'Invalid include scope "$scope"';
+    return scope;
   }
 
   static function text(value:Dynamic, name:String):String {

@@ -553,9 +553,9 @@ G0 → G1 → G2 → G3 ──────────────────�
 |------|-------|---------|
 | G0 | done; full gate passed | `a8349cdea`, `29b9da11b` |
 | G1 | done | `e0b50b5ec` |
-| G2 | Complete; full gate passed | `c73877872` preparation; this step commit |
-| G3 | planned | — |
-| G4 | R0/R1 source integration complete; full gate passed | `05271b08d`; source merges `7db70f2cf`, `bce647683` |
+| G2 | Complete; full gate passed | `c73877872`, `566ad9ec4` |
+| G3 | Complete; full gate passed | final ownership/derivation commit `(gantries G3)` |
+| G4 | R0–R6 and W4 source integration complete; full gates passed | `05271b08d`, `bd2ccec83`; source boundaries `bce647683`, `af673c4f4` |
 | G5 | planned | — |
 | G6 | planned | — |
 | G7 | planned | — |
@@ -805,3 +805,110 @@ and full project-source tests (all exit 0). MotionKit passes 13342 assertions
 All recorded G0 mechanical, drive, cutting and mission numbers hold. This
 follow-up completes G2. The next G4 boundary will take committed main through
 R6 and the whole-weldment W4 work before G3 adopts the package layout.
+
+### G4 — R2–R6 and W4 source integration complete (2026-10-04)
+
+The source boundary is committed local main `af673c4f4`. A three-way squash
+integration preserves the earlier decision to import sources without main ancestry.
+Unrelated UI changes, CAD build tooling and dependency pins remain at the gantries
+versions. Conflicting earlier R0/R1 copies follow main's package layout; G1's
+drive-derived planning limits and G2's tool freedom remain in the moved sources.
+W4's wrist acceleration uses the minimum planning acceleration of its wrist joints,
+instead of reintroducing the old scalar acceleration. Main's tighter welding IK
+position tolerance (50 micrometres) is retained for the W4 path-clearance gate.
+The existing typed capability comparison and three-argument NativeKit send
+workarounds are retained. New interface calls pass explicit null for optional
+freedom, matching the pinned compiler workaround documented under G2.
+Integration checks found old surface-runner callers and one lost synthetic fixture
+velocity cap in conflicting test files; these retain G1's explicit limits. New W4
+solver fixtures implement G2's freedom arguments. The app retains the previously
+validated aggregate CadKit configuration: the main configuration assumed a CadKit
+package migration that this source integration excludes. Configuration confirms
+prebuilt OCCT 8.0.1. A missing `haxe.Int64` import in the new weld compilation path
+is explicit now. Focused RobotKit passes 4,981 assertions, MotionKit freedom passes
+283, ProcessKit passes its 52 welder, 44 planning, 11 schedule and 23 general
+assertions, and the app compiles. The package-boundary checker passes. Two early
+full runs were deliberately stopped after diagnosed integration failures; they
+were not unexplained terminations. The final `g4-r6-final` gate passed all 14 library suites, app build and full
+project-source validation; the runner exited zero. RobotKit has 4,981 assertions
+(+26 from the R6 integration), MotionKit 13,342 (unchanged), and ProcessKit adds
+44 weld-planning and 11 rate-schedule assertions to its existing 52/23 checks.
+This step commit imports the source boundary `af673c4f4`; no submodule pin changed.
+
+Arm, router and CoreXY assembly counts/masses/poses are exact matches to the G2
+gate. Arm mission, both mobile missions, obstacle navigation, CNC plan checks and
+controls match exactly. Screw/belt machining remains 220.2/201.6 seconds, with
+unchanged volumes, gouge, rapid-cut ticks, speeds, accelerations and accuracy.
+CPU timings and allocation/GC counts vary with execution.
+
+The intentional W4 numerical changes are:
+- Welder 36/42/41 definitions/occurrences/BOM lines becomes 38/44/43: neck and
+  nozzle are separate collision bodies. Mass stays 315.2 kg.
+- Ready wire tip moves from (132, -620, 254) to (132, -584, 330) mm: the cell's
+  ready pose lifts the torch clear of the table; the wire direction is unchanged.
+- Single-seam normal time is 20.6 s on both backends (was 20.2); restart is
+  22.0 s MuJoCo and 22.1 s test backend (was 21.6): W4's revised geometry and
+  clearance-safe entry/retreat change the travel. MuJoCo's rounded tip error
+  improves from 0.1 to 0 mm; seam length, arc ticks, current, leg measurements,
+  overlap, restart count and stray metal remain unchanged.
+- The newly tested whole weldment has 10 seams, 680 mm in four runs, with
+  386 mm air travel and 176 degrees turning versus 846/290 in discovery order.
+  Both backends complete in 106.5 s, runs at 31.3/65.7/85.9/106.5 s, with
+  no clearance violation and tip error at most 0.1 mm. This expands the former
+  single-seam mission rather than changing its deposition requirements.
+
+Logs are retained in `gantries-g4-r6-final-gate-logs` in the handoff scratch area.
+The next implementation step is G3, against the new package/profile layout.
+
+### G3 — assembly ownership and external derivation complete
+
+RobotFlange declares its face as a physical capability. Mechanical definitions
+preserve that connector, and flattened occurrences and joints carry their owning
+include paths. The bridge emits a physical flange frame with that ownership,
+even when fixed parts share a simulated link. KinematicGroup derives externals
+when no explicit list is supplied, so Manipulator gets the same derivation.
+The nearest marked flange on the tool chain owns the arm; joints in other
+includes are external, while child includes of the arm remain arm joints.
+Ambiguous ownership or a missing joint scope fails explicitly. Non-assembly
+models with no marked flange retain their existing behavior. The RobotModel
+codec preserves this metadata, including an empty root include.
+Handling, surface, toolpath and welding runners now accept KinematicGroup.
+The coordinated workcell fixture derives its rail instead of listing it, with
+checks for no swivel, external-axis parameterization and posture preference.
+The existing 283 tool-freedom assertions and 196 redundancy assertions pass.
+CadBridge passes 172 assertions (+15): a real six-joint arm with base and tool
+RobotFlanges sits on a prismatic track below two include levels, while other
+flanges sit on the track and root. The nearest tool flange selects the arm, the
+track is external, no swivel is fabricated, the parameterization is external,
+and posture retains seven coordinates. Frozen descriptions and RobotModel
+round trips preserve ownership, including the empty root scope. A flange
+referencing an absent connector is rejected.
+A one-iteration tracking comparison against the same model with an explicit
+empty external list confirms that the derived track receives external damping:
+it moves toward the target, but less than the undamped control.
+
+The nested fixture exposed a pre-existing shared-definition compaction bug:
+a root occurrence could share a definition first named inside an include,
+leaving a child-path definition ID in a local subdefinition. Compaction now
+reassigns such retained definitions to deterministic local IDs and updates
+their occurrences. It preserves sharing and definition counts. The deeper
+assembly regression fails without this correction and passes with it.
+Pinned Haxeon requires an explicit class value after the nullable flange
+selection; the test uses a typed cast after checking the selection.
+The first full gate passed the twelve kit suites, then CadKit's exact nested
+versus hand-built flat comparison failed because the expected flat fixture
+lacked the new ownership fields. The expected root/member/joint include paths
+are now explicit; the full equality assertion remains intact. The focused
+CadKit suite passes. That gate was deliberately terminated before completing
+MachineKit and application checks; its logs are archived separately.
+The `g3-final` full gate passes all fourteen library suites, the application
+build (1,745 sources), and the project-source runtime suite, with terminal exit
+0. MotionKit passes 13,345 assertions (+3); CadBridge passes 172 (+15).
+The 64 MachineKit physical/reachability lines match G4 exactly. All 34 application
+physical result lines also match G4 after excluding CPU timing: arm mission
+5.8/12/17.2/23.5 s; both whole weldments 106.5 s with no clearance violation;
+single welds 20.6 s and restart 22.0/22.1 s; CNC screw/belt 220.2/201.6 s,
+unchanged cuts, limits and plan checks; mobile mission 61 s and obstacle 65 s
+with 416 mm clearance. No physical baseline changed. Logs are archived in
+`gantries-g3-final-gate-logs`; the deliberately stopped first gate has its own
+archive. No dependency pins or publication state changed.

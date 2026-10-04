@@ -23,7 +23,7 @@ import motionkit.robot.ProgramCompiler;
 import motionkit.robot.PlanningLimits;
 import processkit.WelderProcessDevice.WelderChannels;
 import robotkit.manipulation.ArmClearance;
-import robotkit.manipulation.Manipulator;
+import robotkit.manipulation.KinematicGroup;
 import processkit.skill.WeldPlan;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
@@ -150,11 +150,11 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
   }
 
   /** The same complete-motion planner used by execution, without a robot or channel owner. */
-  public static function planning(manipulator:Manipulator, maxAcceleration:Float, ?clearance:ArmClearance):WeldPlanning {
+  public static function planning(manipulator:KinematicGroup, maxAcceleration:Float, ?clearance:ArmClearance):WeldPlanning {
     return planningWithLimits(manipulator, PlanningLimits.ofGroup(manipulator, new robotkit.model.SteadyLoads(), maxAcceleration), clearance);
   }
 
-  static function planningWithLimits(manipulator:Manipulator, planning:PlanningLimits, ?clearance:ArmClearance):WeldPlanning {
+  static function planningWithLimits(manipulator:KinematicGroup, planning:PlanningLimits, ?clearance:ArmClearance):WeldPlanning {
     var count = manipulator.group.count();
     planning.requireGroup(manipulator);
     var limits = planning.validation();
@@ -181,7 +181,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
    * An arm's welding runner. `channels` are the torch's; `maxAcceleration` the joint acceleration programs plan with.
    * `clearance`, when given, is what the welds are planned to be clear of the work with (`WeldPathPlanner`).
    */
-  public static function create(robot:Robot, manipulator:Manipulator,
+  public static function create(robot:Robot, manipulator:KinematicGroup,
       eventSource:Void -> {events:Array<FiredProcessEvent>, overflow:Bool}, channels:WelderChannels, limits:PlanningLimits,
       ?maxRestarts:Int = 3, ?clearance:ArmClearance):WeldingPlanRunner {
     var checked = planningWithLimits(manipulator, limits, clearance);

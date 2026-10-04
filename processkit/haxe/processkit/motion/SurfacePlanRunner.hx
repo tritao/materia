@@ -13,7 +13,7 @@ import motionkit.program.Blend;
 import motionkit.program.MotionOp;
 import motionkit.program.MotionProgram;
 import motionkit.program.MoveTarget;
-import robotkit.manipulation.Manipulator;
+import robotkit.manipulation.KinematicGroup;
 import processkit.manipulation.WorkPatch;
 import processkit.path.Toolpath;
 import processkit.path.ToolpathPoint;
@@ -25,11 +25,11 @@ import robotkit.core.Robot;
 /** Lowers one raster patch into approach, process and retract plans. */
 class SurfacePlanRunner implements processkit.skill.SurfacePlanRunner {
   public final motion:ManipulatorMotion;
-  public final manipulator:Manipulator;
+  public final manipulator:KinematicGroup;
   public final channel:String;
   public final feed:Float;
 
-  public static function create(robot:Robot, manipulator:Manipulator,
+  public static function create(robot:Robot, manipulator:KinematicGroup,
       eventSource:Void -> {events:Array<FiredProcessEvent>, overflow:Bool},
       feed:Float, planning:PlanningLimits, maxJointJump:Float,
       ?modelRevision:Int64, ?calibrationRevision:Int64,
@@ -52,7 +52,7 @@ class SurfacePlanRunner implements processkit.skill.SurfacePlanRunner {
     return new SurfacePlanRunner(motion, manipulator, "surface.process", feed);
   }
 
-  public function new(motion:ManipulatorMotion, manipulator:Manipulator,
+  public function new(motion:ManipulatorMotion, manipulator:KinematicGroup,
       channel:String, feed:Float) {
     if (motion == null || manipulator == null || channel == null || channel.length == 0 ||
         !Math.isFinite(feed) || feed <= 0.0)

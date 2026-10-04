@@ -167,6 +167,7 @@ class MotionKitTestSupport {
     var carriage = model.addLink(new Link("carriage"));
     var rail = model.addJoint(new Joint("rail", JointType.Prismatic, floor, carriage));
     rail.axis = [1.0, 0.0, 0.0];
+    rail.includePath = "";
     rail.limits.lower = 0.0;
     rail.limits.upper = 2.0;
     var links = [carriage].concat([for (name in ["shoulder", "upper-arm", "forearm", "wrist-1", "wrist-2", "wrist-3"])
@@ -176,6 +177,7 @@ class MotionKitTestSupport {
     var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]];
     for (joint in 0...6) {
       var value = model.addJoint(new Joint('joint-$joint', JointType.Revolute, links[joint], links[joint + 1]));
+      value.includePath = "arm";
       value.parentFramePosition = offsets[joint];
       value.axis = axes[joint];
       value.limits.lower = -Math.PI;
@@ -183,6 +185,7 @@ class MotionKitTestSupport {
     }
     var flange = model.addFrame(new Frame("flange", links[6]));
     flange.position = [0.0, 0.0823, 0.0];
+    flange.flangeIncludePath = "arm";
     var table = model.addLink(new Link("table"));
     var turntable = model.addJoint(new Joint("turntable", JointType.Revolute, floor, table));
     // Two turns either way: a positioner turns the workpiece round and round.
@@ -197,7 +200,7 @@ class MotionKitTestSupport {
       joint.limits.maxAcceleration = 2.0;
     }
     return {model: model, group: new robotkit.manipulation.KinematicGroup(model, floor.id, flange.id, work.id,
-      null, null, [rail.id])};
+      null, null, null)};
   }
 
   public function poseRotationDelta(from:Pose3, to:Pose3, scale:Float):Array<Float> {

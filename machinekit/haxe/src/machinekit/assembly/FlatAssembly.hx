@@ -47,14 +47,16 @@ class FlatAssembly {
 			definitions: [], occurrences: [], joints: [], couplings: []};
 	}
 
-	public function addMember(id:String, component:MachineComponent, pose:AssemblyFrame):Void {
+	public function addMember(id:String, component:MachineComponent, pose:AssemblyFrame, includePath:String = ""):Void {
 		members.push({id: id, component: component});
 		memberById.set(id, component);
 		var entry:AssemblyComponentDefinition = {id: id, connectors: [for (connector in component.connectors())
 			{name: connector.name, frame: MachineAssembly.copyFrame(connector.frame)}]};
 		definition.definitions.push(entry);
+		var flange = machinekit.robotics.RobotFlangeFacet.of(component);
+		if (flange != null) entry.robotFlangeConnector = flange.connector;
 		definitionById.set(id, entry);
-		definition.occurrences.push({id: id, definition: id, initialPose: pose});
+		definition.occurrences.push({id: id, definition: id, initialPose: pose, includePath: includePath});
 	}
 
 	public function addConnector(id:String, name:String, frame:AssemblyFrame):Void

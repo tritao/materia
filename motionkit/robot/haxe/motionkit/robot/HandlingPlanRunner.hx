@@ -9,7 +9,7 @@ import motionkit.path.OrientationPolicy;
 import motionkit.program.MotionOp;
 import motionkit.program.MotionProgram;
 import motionkit.program.MoveTarget;
-import robotkit.manipulation.Manipulator;
+import robotkit.manipulation.KinematicGroup;
 import robotkit.spatial.Vec3;
 import robotkit.execution.FiredProcessEvent;
 import robotkit.core.Robot;
@@ -37,7 +37,7 @@ class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
   public final dwell:Float;
   public final pressDepth:Float;
 
-  public static function create(robot:Robot, manipulator:Manipulator,
+  public static function create(robot:Robot, manipulator:KinematicGroup,
       eventSource:Void -> {events:Array<FiredProcessEvent>, overflow:Bool}, channel:String,
       planning:PlanningLimits, ?approachHeight:Float = 0.12, ?travelSpeed:Float = 0.3, ?contactSpeed:Float = 0.08,
       ?dwell:Float = 0.4, ?pressDepth:Float = 0.003):HandlingPlanRunner {

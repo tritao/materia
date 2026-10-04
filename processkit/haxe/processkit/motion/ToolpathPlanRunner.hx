@@ -9,14 +9,14 @@ import motionkit.program.Blend;
 import motionkit.program.MotionOp;
 import motionkit.program.MotionProgram;
 import motionkit.program.MoveTarget;
-import robotkit.manipulation.Manipulator;
+import robotkit.manipulation.KinematicGroup;
 import processkit.path.Toolpath;
 import robotkit.core.Robot;
 
 /** Plans joint moves through the authored poses of a toolpath. */
 class ToolpathPlanRunner implements processkit.skill.ToolpathPlanRunner {
   public final motion:ManipulatorMotion;
-  public final manipulator:Manipulator;
+  public final manipulator:KinematicGroup;
   public final positionTolerance:Float;
   public final orientationTolerance:Float;
   public final ikMaxIterations:Int;
@@ -25,7 +25,7 @@ class ToolpathPlanRunner implements processkit.skill.ToolpathPlanRunner {
   var cutActive:Bool = false;
   var processSpans:Array<Bool> = [];
 
-  public static function create(robot:Robot, manipulator:Manipulator, frameId:String,
+  public static function create(robot:Robot, manipulator:KinematicGroup, frameId:String,
       planning:PlanningLimits, maxJointJump:Float, positionTolerance:Float,
       orientationTolerance:Float, ikMaxIterations:Int, ikDamping:Float):ToolpathPlanRunner {
     var count = manipulator.group.count();
@@ -48,7 +48,7 @@ class ToolpathPlanRunner implements processkit.skill.ToolpathPlanRunner {
       orientationTolerance, ikMaxIterations, ikDamping, maxJointJump);
   }
 
-  public function new(motion:ManipulatorMotion, manipulator:Manipulator,
+  public function new(motion:ManipulatorMotion, manipulator:KinematicGroup,
       positionTolerance:Float, orientationTolerance:Float,
       ikMaxIterations:Int, ikDamping:Float, maxJointJump:Float) {
     this.motion = motion;

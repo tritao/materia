@@ -344,11 +344,17 @@ class ProgramTests extends MotionKitTestSupport {
     var cell = fixture.group;
     check(cell.dofCount() == 8, 'the group holds the rail, the arm and the turntable (${cell.dofCount()})');
     check(cell.external[0] && !cell.external[1] && cell.external[7], "the rail and the turntable are external axes");
+    check(cell.swivel == null, "six arm joints plus external axes do not create a seven-joint swivel");
     var solver = new ManipulatorKinematics(cell, 1e-8);
+    check(Std.isOfType(solver.redundancy(), motionkit.robot.ExternalAxesParameterization),
+      "derived external axes use external-axis redundancy parameterization");
     var tolerance = new IkTolerance();
     // Rail in front of the table, arm reaching forward with the tool pointing down.
     var start = [0.75, 1.57, -1.2, 1.6, -1.97, -1.57, 0.0, 0.0];
     var here = solver.forward(start);
+    var preferred = cell.solve(cell.tcpPose(start), start,
+      new robotkit.manipulation.IkOptions().preferring(start));
+    check(preferred.converged && preferred.q.length == 8, "posture preference retains the external coordinates");
 
     // The relative Jacobian is the derivative of the tool pose in the work frame.
     var jacobian = cell.tcpJacobian(start);

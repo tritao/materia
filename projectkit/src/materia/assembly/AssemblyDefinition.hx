@@ -75,6 +75,8 @@ enum abstract AssemblyMateKind(String) from String to String {
 @:wire typedef AssemblyComponentDefinition = {
 	@:id(1) var id:String;
 	@:id(2) var connectors:Array<AssemblyConnector>;
+	/** Standard robot tool flange face, declared by the component. */
+	@:id(3) @:optional var robotFlangeConnector:String;
 }
 
 /** An occurrence references shared component data and has a local initial pose. */
@@ -86,6 +88,8 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(4) @:optional var assembly:String;
 	/** Mates never move it (see `AssemblyMateSolver`). */
 	@:id(5) @:optional var grounded:Bool;
+	/** Include owning this occurrence; empty for the root assembly. */
+	@:id(6) @:optional var includePath:String;
 }
 
 /** A placement relation between two occurrence connectors (see `AssemblyMateKind`). */
@@ -122,6 +126,8 @@ enum abstract AssemblyMateKind(String) from String to String {
 		joints that are not coupling targets can be driven.
 	*/
 	@:id(12) @:optional var driven:Bool;
+	/** Include owning this joint; empty for the root assembly. */
+	@:id(13) @:optional var includePath:String;
 }
 
 /**

@@ -156,6 +156,8 @@ class MachineAssemblyCodec {
 				if (Equality.equals(candidate.connectors, connectors)) definition = candidate;
 			if (definition == null) {
 				definition = {id: id, connectors: connectors};
+				var flange = machinekit.robotics.RobotFlangeFacet.of(member.component);
+				if (flange != null) definition.robotFlangeConnector = flange.connector;
 				level.definitions.push(definition);
 				if (candidates == null) {
 					candidates = [];

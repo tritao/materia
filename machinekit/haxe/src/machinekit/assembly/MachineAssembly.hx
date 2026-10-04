@@ -711,7 +711,7 @@ class MachineAssembly {
 			var member = mechanical.member(id);
 			if (member != null) {
 				flat.addMember(map(id), member.component,
-					pose == null ? copyFrame(member.pose) : AssemblyFrames.compose(pose, member.pose));
+					pose == null ? copyFrame(member.pose) : AssemblyFrames.compose(pose, member.pose), prefix);
 				continue;
 			}
 			var entry = mechanical.requireSubassembly(id);

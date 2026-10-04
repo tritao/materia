@@ -3,6 +3,8 @@ package robotkit.model;
 class Joint {
   public final id:JointId;
   public var name:String;
+  /** Assembly include that owns this joint; null for non-assembly models. */
+  public var includePath:Null<String> = null;
   public final type:JointType;
   public final parent:Link;
   public final child:Link;
