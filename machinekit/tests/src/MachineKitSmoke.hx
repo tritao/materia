@@ -2548,6 +2548,7 @@ class MachineKitSmoke {
 		namedStepperFaces();
 		MachineKitNamingAudit.run();
 		MachineAssemblyDescriptionTests.run();
+		AxisBuilderChecks.run();
 		EndEffectorTests.run();
 		EndEffectorSetTests.run();
 		EndEffectorComponentTests.run();

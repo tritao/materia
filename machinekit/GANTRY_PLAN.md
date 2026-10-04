@@ -554,9 +554,9 @@ G0 → G1 → G2 → G3 ──────────────────�
 | G0 | done; full gate passed | `a8349cdea`, `29b9da11b` |
 | G1 | done | `e0b50b5ec` |
 | G2 | Complete; full gate passed | `c73877872`, `566ad9ec4` |
-| G3 | Complete; full gate passed | final ownership/derivation commit `(gantries G3)` |
-| G4 | R0–R6 and W4 source integration complete; full gates passed | `05271b08d`, `bd2ccec83`; source boundaries `bce647683`, `af673c4f4` |
-| G5 | planned | — |
+| G3 | Complete; full gate passed | `d9d6de8f7` |
+| G4 | R0–R6/W4/W5 complete; full gates passed | `05271b08d`, `bd2ccec83`, `0ec408c0d`; source boundaries `bce647683`, `af673c4f4`, `757127cf0` |
+| G5 | complete; full gate passed | Shared axis builder, router/CoreXY extraction and physical rack regression |
 | G6 | planned | — |
 | G7 | planned | — |
 | G8 | planned | — |
@@ -912,3 +912,75 @@ unchanged cuts, limits and plan checks; mobile mission 61 s and obstacle 65 s
 with 416 mm clearance. No physical baseline changed. Logs are archived in
 `gantries-g3-final-gate-logs`; the deliberately stopped first gate has its own
 archive. No dependency pins or publication state changed.
+
+### G4 — W5 source integration complete
+
+At the G3 boundary local main is `757127cf0`. Its committed changes since
+`af673c4f4` add seam-progress weaving, CAD-derived multipass recipes, interpass
+cooling, deposited-bead grounding and clearance, scene schema 16, saved woven
+and multipass examples, and smaller restart humps. These support the G15
+process gantry. The existing source-only integration decision remains: apply
+the committed main delta with a three-way merge, without changing dependency
+pins or importing another branch or worktree's uncommitted content.
+The sole conflict is weld-runner construction in MissionPlayer. W5 rebuilds
+clearance whenever it creates a runner; the resolution retains that behavior
+and G1's drive-derived PlanningLimits. G3's KinematicGroup runner signatures
+and G2's tool-freedom changes remain present.
+The focused ProcessKit suite passes: 55 welder, 44 planning, 16 rate-schedule,
+106 weave, 13 pass-sequencing, 12 bead-work, 19 pass-path, and 23 general
+assertions. Standalone MotionKit weave passes 738 assertions and MachineKit
+welding recipes pass 33. The full-gate helper now includes both standalone
+suites in addition to the original fourteen, followed by the application build
+and project-source runtime checks. The `g4-w5-final` gate passed all sixteen
+suites, the application build and project-source checks, with terminal exit 0.
+Logs are archived in `gantries-g4-w5-final-gate-logs` in the handoff scratch directory.
+W5 intentionally reduces restart backoff from 10 to 2 mm, uses minimum stable
+wire feed for the recovery overlap, and omits its pooling dwell. The gate verifies
+21.1 s recovery on both backends, 3 mm overlap, and a 5.4 mm peak instead of
+9.4 mm; the ordinary seam remains 20.6 s. Recovery has 1623 arc ticks instead
+of 1706 and mean leg 5.0 mm instead of 5.2 mm. Both whole-weldment runs remain
+106.5 s. The 64 MachineKit physical/reachability lines match G3 exactly; router,
+CoreXY, arm and mobile application physical results retain their baselines.
+
+New quality checks pass on both backends: woven 7 mm target gives
+6.9982130667 mm leg in 27.17 s with one strike; three-pass 10 mm target gives
+9.9993558074 mm (MuJoCo) and 9.9991930154 mm (deterministic) in 65.55 s with
+three strikes. ProjectKit passes 138 assertions, seven more for schema 16.
+CPU planning and simulation timings vary and are not physical invariants.
+
+### G5 — shared axis builder complete
+
+G4 W5 is committed as `0ec408c0d`. The shared `AxisBuilder` base now owns
+placement, connector attachment, slide/overtravel, screw/nut support, belt
+couplings, two-pulley axes and physical rack-and-pinion construction. Router
+and CoreXY inherit it; platform-specific mounting plates remain in their
+examples. Construction order, identifiers and geometry formulas are preserved.
+A new physical rack fixture checks transmission ratio, motor drive, initial
+position, endpoint FK and rail overtravel. All ten regression checks pass.
+
+Decision: retain `LinearAxis` as the `compileAssemblyAxes` fixture until G9,
+when that compilation route is retired. G5 does not change its behavior.
+
+G5 validation notes: the initial rack regression accessed optional coupling
+and actuator arrays directly, causing pinned haxeon E1005. Explicit local
+null checks fix the typing. Its first runtime attempt used the mechanical
+description, which deliberately excludes compiled actuators; the fixture now
+uses `addTo(AssemblyModel)` and the resulting definition, as the existing
+motor-drive tests do. The second corrected build compiles all 1011 sources
+and passes the smoke suite. No compiler or dependency changes were needed.
+
+The corrected focused MachineKit run passes with terminal exit 0. Its 64
+selected physical/reachability lines match G4 W5 exactly, and the CoreXY drive
+summary remains 204.1 rad/s motors, 649.6 mm/s axes, 71.5/34 m/s² acceleration.
+The required full G5 gate completed with terminal exit 0: all sixteen suites,
+application build and project-source runtime pass. Physical results remain at
+the G4 W5 baseline: screw/belt machining 220.2/201.6 s, unchanged drive limits
+and deviations, both weldment runs 106.5 s, normal/recovery welds 20.6/21.1 s,
+7 mm woven fillets 27.17 s and 10 mm three-pass fillets 65.55 s on both backends.
+CPU timings vary. Logs are archived in `gantries-g5-final-gate-logs` under the
+handoff scratch directory.
+
+Local main advanced to `b25366059` during validation. The next G4 boundary will
+integrate its committed X9e source repairs before G6; dependency pins remain
+unchanged. Its expected folded-Z backlash change is 0.0505 to 0.051 mm because
+both pulley contacts contribute clearance.
