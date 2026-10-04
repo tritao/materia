@@ -1952,3 +1952,20 @@ actuated nonpassive shafts with no hold or staged targets. C/Haxe exposure,
 controller invocation exactly once per side per latch cycle, atomic multi-side
 handling and device support remain pending. No tests or builds ran. This source
 foundation does not establish verified independent calibration or squaring.
+
+### G12 — atomic multi-side counter rebasing
+
+Counter-rebase foundation: `61a3a5a08`. Replace the internal single-shaft
+operation with a complete batch. Runtime and simulation endpoint reject empty,
+null, duplicate, unknown or nonfinite batches before changing state. Validate
+every side's readiness, measured result and endpoint origin/alignment results,
+then commit all counter origins and cached measurements together. The endpoint
+contract explicitly requires all-or-none behavior. Preserve existing stationary,
+no-hold/no-staging and physical-target invariants.
+
+Successful side calibration advances the calibration revision, refusing
+overflow before mutation. Plan revision admission moves under the owner/queue
+locks so a plan prepared before rebasing cannot race the calibration commit.
+C/Haxe exposure and once-per-cycle controller invocation remain pending. Other
+coordinate-calibration revision paths still need auditing. No tests or builds
+ran; atomic behavior and compilation remain unverified.

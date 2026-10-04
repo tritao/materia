@@ -7,17 +7,26 @@
 
 namespace robotkit {
 
-rk_result SimulationRobot::rebase_counter(uint32_t joint, double delta) {
-    if (joint >= counter_origin_.size() || !std::isfinite(delta) ||
-        !actuated_joints_[joint] || passive_[joint]) return RK_ERROR_INVALID_ARGUMENT;
-    if (squaring_hold_[joint] || staged_valid_ || !pending_targets_.empty())
-        return RK_ERROR_INVALID_STATE;
-    const double origin = counter_origin_[joint] + delta;
-    const double alignment = squaring_offset_[joint] - delta;
-    if (!std::isfinite(origin) || !std::isfinite(alignment)) return RK_ERROR_INVALID_ARGUMENT;
-    // Their sum is unchanged: subsequent physical targets and held pose are preserved.
-    counter_origin_[joint] = origin;
-    squaring_offset_[joint] = alignment;
+rk_result SimulationRobot::rebase_counters(const uint32_t *joints, const double *deltas,
+                                          uint32_t count) {
+    if (!joints || !deltas || count == 0 || count > counter_origin_.size())
+        return RK_ERROR_INVALID_ARGUMENT;
+    if (staged_valid_ || !pending_targets_.empty()) return RK_ERROR_INVALID_STATE;
+    for (uint32_t i = 0; i < count; ++i) {
+        const auto joint = joints[i];
+        if (joint >= counter_origin_.size() || !std::isfinite(deltas[i]) ||
+            !actuated_joints_[joint] || passive_[joint]) return RK_ERROR_INVALID_ARGUMENT;
+        if (squaring_hold_[joint]) return RK_ERROR_INVALID_STATE;
+        for (uint32_t k = 0; k < i; ++k)
+            if (joints[k] == joint) return RK_ERROR_INVALID_ARGUMENT;
+        if (!std::isfinite(counter_origin_[joint] + deltas[i]) ||
+            !std::isfinite(squaring_offset_[joint] - deltas[i])) return RK_ERROR_INVALID_ARGUMENT;
+    }
+    // All sides are validated before writing; preserve each physical target sum.
+    for (uint32_t i = 0; i < count; ++i) {
+        counter_origin_[joints[i]] += deltas[i];
+        squaring_offset_[joints[i]] -= deltas[i];
+    }
     return RK_OK;
 }
 

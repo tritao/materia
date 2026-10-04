@@ -578,8 +578,10 @@ rk_result RobotRuntime::calibrate_coordinates(const double *offsets, uint32_t co
     return RK_OK;
 }
 
-rk_result RobotRuntime::calibrate_home_drive(uint32_t joint, double side_zero) {
-    if (joint >= blueprint_.joint_count || !std::isfinite(side_zero)) return RK_ERROR_INVALID_ARGUMENT;
+rk_result RobotRuntime::calibrate_home_drives(const uint32_t *joints, const double *side_zeros,
+                                            uint32_t count) {
+    if (!joints || !side_zeros || count == 0 || count > blueprint_.joint_count)
+        return RK_ERROR_INVALID_ARGUMENT;
     std::lock_guard owner_lock(owner_mutex_);
     std::lock_guard queue_lock(queue_mutex_);
     std::lock_guard state_lock(state_mutex_);
@@ -588,18 +590,29 @@ rk_result RobotRuntime::calibrate_home_drive(uint32_t joint, double side_zero) {
         return RK_ERROR_SAFETY_STOPPED;
     if (!commands_.empty() || !trajectory_.empty() || control_.trajectory_active ||
         control_.stop_ramp_active) return RK_ERROR_INVALID_STATE;
-    if (!references_locked()[joint]) return RK_ERROR_UNREFERENCED;
     for (uint32_t i = 0; i < blueprint_.joint_count; ++i)
         if (std::abs(state_.velocity[i]) > 1e-6 ||
             (control_.active[i] && control_.targets[i].mode != RK_TARGET_POSITION &&
              control_.targets[i].mode != RK_TARGET_SERVO)) return RK_ERROR_INVALID_STATE;
-    const double delta = coordinate_offsets_[joint] - side_zero;
-    if (!std::isfinite(delta) || !std::isfinite(state_.position[joint] - delta))
-        return RK_ERROR_INVALID_ARGUMENT;
-    const auto result = endpoint_->rebase_counter(joint, delta);
+    std::array<double, RK_MAX_JOINTS> deltas{};
+    const auto referenced = references_locked();
+    for (uint32_t i = 0; i < count; ++i) {
+        const auto joint = joints[i];
+        if (joint >= blueprint_.joint_count || !std::isfinite(side_zeros[i]))
+            return RK_ERROR_INVALID_ARGUMENT;
+        for (uint32_t k = 0; k < i; ++k)
+            if (joints[k] == joint) return RK_ERROR_INVALID_ARGUMENT;
+        if (!referenced[joint]) return RK_ERROR_UNREFERENCED;
+        deltas[i] = coordinate_offsets_[joint] - side_zeros[i];
+        if (!std::isfinite(deltas[i]) || !std::isfinite(state_.position[joint] - deltas[i]))
+            return RK_ERROR_INVALID_ARGUMENT;
+    }
+    if (blueprint_.calibration_revision == UINT64_MAX) return RK_ERROR_INVALID_STATE;
+    const auto result = endpoint_->rebase_counters(joints, deltas.data(), count);
     if (result != RK_OK) return result;
-    // Logical plan targets retain their coupling contract; only the measured counter changes.
-    state_.position[joint] -= delta;
+    // Logical plan targets retain their coupling contract; only measured counters change.
+    for (uint32_t i = 0; i < count; ++i) state_.position[joints[i]] -= deltas[i];
+    ++blueprint_.calibration_revision;
     state_backup_valid_ = false;
     return RK_OK;
 }
@@ -619,9 +632,6 @@ rk_result RobotRuntime::limit_input(uint32_t joint, bool active) {
 rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
     if (validate_plan_for_blueprint(plan, blueprint_) != RK_OK)
         return RK_ERROR_INVALID_ARGUMENT;
-    if (plan.model_revision != blueprint_.revision ||
-        plan.calibration_revision != blueprint_.calibration_revision)
-        return RK_ERROR_MODEL_MISMATCH;
     if ((plan.required_capabilities & ~(RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE |
             RK_PLAN_CAPABILITY_EVENTS)) != 0 ||
         !supports_trajectory_queue())
@@ -630,6 +640,9 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
     try {
         std::lock_guard owner_lock(owner_mutex_);
         std::lock_guard queue_lock(queue_mutex_);
+        if (plan.model_revision != blueprint_.revision ||
+            plan.calibration_revision != blueprint_.calibration_revision)
+            return RK_ERROR_MODEL_MISMATCH;
         if ((plan.flags & (RK_PLAN_JOG | RK_PLAN_HOMING)) == 0) {
             const auto referenced = references_locked();
             for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
