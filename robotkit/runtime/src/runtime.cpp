@@ -578,6 +578,32 @@ rk_result RobotRuntime::calibrate_coordinates(const double *offsets, uint32_t co
     return RK_OK;
 }
 
+rk_result RobotRuntime::calibrate_home_drive(uint32_t joint, double side_zero) {
+    if (joint >= blueprint_.joint_count || !std::isfinite(side_zero)) return RK_ERROR_INVALID_ARGUMENT;
+    std::lock_guard owner_lock(owner_mutex_);
+    std::lock_guard queue_lock(queue_mutex_);
+    std::lock_guard state_lock(state_mutex_);
+    if (endpoint_->executes_trajectory_queue()) return RK_ERROR_UNSUPPORTED;
+    if (state_.safety == RK_SAFETY_FAULT || state_.safety == RK_SAFETY_EMERGENCY_STOP)
+        return RK_ERROR_SAFETY_STOPPED;
+    if (!commands_.empty() || !trajectory_.empty() || control_.trajectory_active ||
+        control_.stop_ramp_active) return RK_ERROR_INVALID_STATE;
+    if (!references_locked()[joint]) return RK_ERROR_UNREFERENCED;
+    for (uint32_t i = 0; i < blueprint_.joint_count; ++i)
+        if (std::abs(state_.velocity[i]) > 1e-6 ||
+            (control_.active[i] && control_.targets[i].mode != RK_TARGET_POSITION &&
+             control_.targets[i].mode != RK_TARGET_SERVO)) return RK_ERROR_INVALID_STATE;
+    const double delta = coordinate_offsets_[joint] - side_zero;
+    if (!std::isfinite(delta) || !std::isfinite(state_.position[joint] - delta))
+        return RK_ERROR_INVALID_ARGUMENT;
+    const auto result = endpoint_->rebase_counter(joint, delta);
+    if (result != RK_OK) return result;
+    // Logical plan targets retain their coupling contract; only the measured counter changes.
+    state_.position[joint] -= delta;
+    state_backup_valid_ = false;
+    return RK_OK;
+}
+
 rk_result RobotRuntime::limit_input(uint32_t joint, bool active) {
     std::lock_guard owner_lock(owner_mutex_);
     std::lock_guard queue_lock(queue_mutex_);

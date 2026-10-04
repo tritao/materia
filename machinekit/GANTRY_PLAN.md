@@ -1935,3 +1935,20 @@ contract needs an explicit independent-side extension.
 Reject simulation shaft holds on virtual-device bindings. Router beforeReset
 now aborts active homing so side-release cleanup runs before native reset, as
 in mission playback. No tests or builds ran; behavior remains unverified.
+
+### G12 — native independent counter-rebase foundation
+
+Retained side zeros: `f5a752c6c`. Keep the planner/native coordinate-offset
+coupling contract intact by rebasing the individual simulation motor counter
+origin. Internal calibrate_home_drive computes delta = propagated zero minus
+that motor's captured side zero. Require referenced, stationary joints and no
+pending commands, trajectory or stop ramp. The endpoint shifts counter_origin
+by delta and alignment by minus delta, preserving their sum and physical
+targets. Adjust the cached measured logical position by minus delta; commanded
+logical targets remain coupled. Preflight finite results before endpoint writes.
+
+The default endpoint rejects this operation; SimulationRobot accepts only
+actuated nonpassive shafts with no hold or staged targets. C/Haxe exposure,
+controller invocation exactly once per side per latch cycle, atomic multi-side
+handling and device support remain pending. No tests or builds ran. This source
+foundation does not establish verified independent calibration or squaring.

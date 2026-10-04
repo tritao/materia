@@ -7,6 +7,20 @@
 
 namespace robotkit {
 
+rk_result SimulationRobot::rebase_counter(uint32_t joint, double delta) {
+    if (joint >= counter_origin_.size() || !std::isfinite(delta) ||
+        !actuated_joints_[joint] || passive_[joint]) return RK_ERROR_INVALID_ARGUMENT;
+    if (squaring_hold_[joint] || staged_valid_ || !pending_targets_.empty())
+        return RK_ERROR_INVALID_STATE;
+    const double origin = counter_origin_[joint] + delta;
+    const double alignment = squaring_offset_[joint] - delta;
+    if (!std::isfinite(origin) || !std::isfinite(alignment)) return RK_ERROR_INVALID_ARGUMENT;
+    // Their sum is unchanged: subsequent physical targets and held pose are preserved.
+    counter_origin_[joint] = origin;
+    squaring_offset_[joint] = alignment;
+    return RK_OK;
+}
+
 std::vector<SimulationRobot::JointCommand> &SimulationRobot::staged_commands() {
     if (!staged_valid_) {
         commanded_.resize(joints_.size());

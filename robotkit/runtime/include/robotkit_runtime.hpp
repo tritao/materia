@@ -125,6 +125,8 @@ public:
     /** Returns true when sample() supplies the endpoint's observed safety state. */
     virtual bool reports_safety_state() const noexcept { return false; }
     /** Physical coordinate for sensor synthesis, distinct from a power-up counter origin. */
+    /** Shift a motor counter origin without changing the physical target or pose. */
+    virtual rk_result rebase_counter(uint32_t, double) { return RK_ERROR_UNSUPPORTED; }
     virtual double physical_position(uint32_t, double counter_position) const noexcept {
         return counter_position;
     }
@@ -217,7 +219,8 @@ public:
     rk_result limit_input(uint32_t joint, bool active);
     /** Atomically establish logical = endpoint position + offset at rest. */
     rk_result calibrate_coordinates(const double *offsets, uint32_t count,
-        const uint32_t *reference_joints = nullptr, uint32_t reference_count = 0);
+                                   const uint32_t *reference_joints = nullptr, uint32_t reference_count = 0);
+    rk_result calibrate_home_drive(uint32_t joint, double side_zero);
     rk_result latch_reference(uint32_t joint);
     rk_result reference_status(uint32_t joint, uint32_t &out_referenced) const;
     /** Copies the latest robot state without advancing endpoint time. */

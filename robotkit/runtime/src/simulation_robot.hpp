@@ -19,6 +19,7 @@ class SimulationRobot final : public RobotEndpoint {
 public:
     rk_result apply(const rk_robot_command &command) override;
     rk_result sample(uint64_t timestamp_ns, rk_robot_state &state) override;
+    rk_result rebase_counter(uint32_t joint, double delta) override;
     double physical_position(uint32_t joint, double counter_position) const noexcept override {
         return counter_position + (joint < counter_origin_.size() ? counter_origin_[joint] : 0.0);
     }
