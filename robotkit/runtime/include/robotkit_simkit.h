@@ -248,6 +248,11 @@ typedef struct rk_simulation_robot_desc {
     uint8_t virtual_device_input_active_above[64];
     int64_t virtual_device_input_threshold_steps[64];
     uint8_t virtual_device_input_switch_ids[4096];
+    /** Optional original shaft feedback mappings; count zero keeps legacy mappings. */
+    uint32_t virtual_device_feedback_count;
+    uint8_t virtual_device_feedback_joint[64];
+    double virtual_device_feedback_ratio[64];
+    double virtual_device_feedback_offset[64];
 } rk_simulation_robot_desc;
 
 /** Latest numeric device observation, independent of the authored sensor layout. */

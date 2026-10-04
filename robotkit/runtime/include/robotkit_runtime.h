@@ -755,6 +755,11 @@ typedef struct rk_serial_device_desc {
     uint8_t input_actuator[64]; /**< Captured physical actuator channel per input. */
     uint8_t input_active_high[64]; /**< Electrical polarity: zero or one. */
     uint8_t input_switch_ids[64 * 64]; /**< NUL-terminated model switch IDs. */
+    /** Optional original shaft feedback mappings; count zero keeps legacy mappings. */
+    uint32_t feedback_count;
+    uint8_t feedback_joint[64];
+    double feedback_ratio[64];
+    double feedback_offset[64];
 } rk_serial_device_desc;
 
 /** Asynchronous device homing control; acceptance is queried separately. */

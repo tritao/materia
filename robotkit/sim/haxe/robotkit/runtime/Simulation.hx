@@ -184,6 +184,7 @@ class Simulation {
             robotDesc.set_virtual_device_input_switch_ids(i * 64 + byte, input.switchId.charCodeAt(byte));
         }
         robotDesc.set_virtual_device_actuator_count(virtualDevice.actuators.length);
+        robotDesc.set_virtual_device_feedback_count(virtualDevice.actuators.length);
         for (i in 0...virtualDevice.actuators.length) {
           var actuator = virtualDevice.actuators[i];
           if (actuator.jointIndex >= blueprint.jointCount)
@@ -191,6 +192,10 @@ class Simulation {
           robotDesc.set_virtual_device_actuator_joint(i, actuator.jointIndex);
           robotDesc.set_virtual_device_actuator_ratio(i, actuator.ratio);
           robotDesc.set_virtual_device_actuator_offset(i, actuator.offset);
+          robotDesc.set_virtual_device_feedback_joint(i,
+            actuator.feedbackJointIndex < 0 ? 255 : actuator.feedbackJointIndex);
+          robotDesc.set_virtual_device_feedback_ratio(i, actuator.feedbackRatio);
+          robotDesc.set_virtual_device_feedback_offset(i, actuator.feedbackOffset);
           robotDesc.set_virtual_device_actuator_steps_per_unit(i, actuator.stepsPerUnit);
           robotDesc.set_virtual_device_actuator_max_rate(i, actuator.maxRate);
           robotDesc.set_virtual_device_actuator_direction_setup_ticks(i,

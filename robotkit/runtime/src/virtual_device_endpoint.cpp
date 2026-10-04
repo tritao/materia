@@ -309,8 +309,8 @@ std::vector<double> VirtualDeviceEndpoint::joint_positions() const {
     rk_robot_state state{};
     for (std::size_t i = 0; i < positions.size(); ++i) {
         const auto &mapping = actuators_[i];
-        if (mapping.joint < joint_count_)
-            state.position[mapping.joint] = positions[i] / mapping.ratio + mapping.offset;
+        if (mapping.measured_joint() < joint_count_)
+            state.position[mapping.measured_joint()] = positions[i] / mapping.measured_ratio() + mapping.measured_offset();
     }
     inner_->reconstruct_feedback(state);
     return std::vector<double>(state.position, state.position + joint_count_);

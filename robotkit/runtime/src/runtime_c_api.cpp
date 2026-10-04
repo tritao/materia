@@ -96,6 +96,7 @@ rk_result RK_CALL rk_robot_runtime_create_serial6(const rk_robot_runtime_bluepri
         !device_path || !*device_path || blueprint->joint_count > RK_MAX_SERIAL_JOINTS ||
         !device || device->struct_size < sizeof(*device) || device->actuator_count == 0 ||
         device->actuator_count > RK_MAX_SERIAL_JOINTS || device->input_count > 64 ||
+        (device->feedback_count != 0 && device->feedback_count != device->actuator_count) ||
         !std::isfinite(max_target_error) || max_target_error < 0.0 ||
         step_tick_hz == 0 || link_loss_timeout_ns == 0 || clock_bound_ns == 0)
         return RK_ERROR_INVALID_ARGUMENT;
@@ -107,6 +108,11 @@ rk_result RK_CALL rk_robot_runtime_create_serial6(const rk_robot_runtime_bluepri
         actuator.joint = device->actuator_joint[i];
         actuator.ratio = device->actuator_ratio[i];
         actuator.offset = device->actuator_offset[i];
+        if (device->feedback_count) {
+            actuator.feedback_joint = device->feedback_joint[i];
+            actuator.feedback_ratio = device->feedback_ratio[i];
+            actuator.feedback_offset = device->feedback_offset[i];
+        }
         actuator.steps_per_unit = device->actuator_steps_per_unit[i];
         actuator.max_rate = device->actuator_max_rate[i];
         actuator.direction_setup_ticks = device->actuator_direction_setup_ticks[i];

@@ -2813,3 +2813,19 @@ reconstruction and counter-delta conversion must now carry this metadata before
 runtime calibrate_home_drives can safely commit acknowledged device batches.
 This prerequisite does not complete calibration, router homing or G13. Full
 verification remains at the Phase C boundary.
+
+### G13 — native physical shaft feedback mappings
+
+Serial and simulation descriptors now carry optional original shaft indices,
+ratios and offsets. A zero metadata count retains legacy planner mappings;
+virtual per-channel sentinel 255 supports manually authored configurations.
+Rkd6 validates the resolved mappings and reconstructs leader feedback from
+physical shaft measurements, preserving independently measured follower shafts
+instead of overwriting a shared leader. Explicit duplicate shaft measurements
+are rejected. Virtual diagnostic joint positions use the same mapping. Simulation
+size guards retain access to older profile/input tails after the ABI extension.
+
+No builds/tests ran. FFI generation and native compilation remain queued for the
+Phase C boundary. Asynchronous runtime counter calibration, side adapter,
+controlled-stop bookkeeping, router homing and hardware support remain pending;
+G13 is still incomplete.

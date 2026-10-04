@@ -147,7 +147,10 @@ std::shared_ptr<Rkd6Endpoint> Rkd6Endpoint::attach(std::unique_ptr<Rkd6Transport
     }
     for (std::size_t i = 0; i < actuator_count; ++i) {
         const auto mapping = layout.empty() ? DeviceActuator6{static_cast<std::uint8_t>(i)} : layout[i];
-        if (mapping.joint >= blueprint.joint_count || !std::isfinite(mapping.ratio) ||
+        if (mapping.measured_joint() >= blueprint.joint_count ||
+            !std::isfinite(mapping.measured_ratio()) || mapping.measured_ratio() == 0 ||
+            !std::isfinite(mapping.measured_offset()) || mapping.joint >= blueprint.joint_count ||
+            !std::isfinite(mapping.ratio) ||
             mapping.ratio == 0 || !std::isfinite(mapping.offset) ||
             !std::isfinite(mapping.steps_per_unit) || mapping.steps_per_unit <= 0 ||
             !std::isfinite(mapping.max_rate) || mapping.max_rate < 0 ||
@@ -285,7 +288,9 @@ bool Rkd6Endpoint::configure_feedback(const rk_robot_runtime_blueprint &blueprin
     std::vector<bool> follower(joint_count_, false), measured(joint_count_, false);
     for (auto joint : feedback_followers_) follower[joint] = true;
     for (std::size_t i = 0; i < (layout_.empty() ? joint_count_ : layout_.size()); ++i) {
-        const auto joint = layout_.empty() ? i : layout_[i].joint;
+        const auto joint = layout_.empty() ? i : layout_[i].measured_joint();
+        // Explicit shaft mappings must not silently overwrite another motor measurement.
+        if (measured[joint] && !layout_.empty() && layout_[i].feedback_joint != 255) return false;
         if (!measured[joint]) feedback_joints_.push_back(joint);
         measured[joint] = true;
     }
@@ -963,9 +968,9 @@ rk_result Rkd6Endpoint::sample(std::uint64_t timestamp_ns, rk_robot_state &state
         state.effort[joint] = 0.0;
     for (std::size_t i = 0; i < state_header_.actuator_count; ++i) {
         const auto mapping = layout_.empty() ? DeviceActuator6{static_cast<std::uint8_t>(i)} : layout_[i];
-        state.position[mapping.joint] = actuators_[i].position / mapping.ratio + mapping.offset;
-        state.velocity[mapping.joint] = actuators_[i].velocity / mapping.ratio;
-        state.effort[mapping.joint] += actuators_[i].effort * mapping.ratio;
+        state.position[mapping.measured_joint()] = actuators_[i].position / mapping.measured_ratio() + mapping.measured_offset();
+        state.velocity[mapping.measured_joint()] = actuators_[i].velocity / mapping.measured_ratio();
+        state.effort[mapping.measured_joint()] += actuators_[i].effort * mapping.measured_ratio();
     }
     state.sensor_count = 0;
     std::size_t value_cursor = 0;

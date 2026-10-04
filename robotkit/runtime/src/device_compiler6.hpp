@@ -21,6 +21,13 @@ struct DeviceActuator6 {
     std::uint16_t direction_setup_ticks = 0;
     double dual_drive_skew_bound = 0.0;
     std::string id;
+    // Original shaft mapping; 255 retains the legacy planner mapping.
+    std::uint8_t feedback_joint = 255;
+    double feedback_ratio = 1.0;
+    double feedback_offset = 0.0;
+    std::uint8_t measured_joint() const { return feedback_joint == 255 ? joint : feedback_joint; }
+    double measured_ratio() const { return feedback_joint == 255 ? ratio : feedback_ratio; }
+    double measured_offset() const { return feedback_joint == 255 ? offset : feedback_offset; }
 };
 
 struct DeviceInput6 {

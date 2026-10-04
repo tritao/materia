@@ -30,6 +30,7 @@ class SerialRuntimeEndpoint {
     var device = new rk_serial_device_desc();
     device.set_struct_size(rk_serial_device_desc.size());
     device.set_actuator_count(binding.channels.length);
+    device.set_feedback_count(binding.channels.length);
     for (i in 0...16)
       device.set_controller(i, Std.parseInt("0x" + controllerHex.substr(i * 2, 2)));
     for (i in 0...binding.channels.length) {
@@ -37,6 +38,9 @@ class SerialRuntimeEndpoint {
       device.set_actuator_joint(i, channel.jointIndex);
       device.set_actuator_ratio(i, channel.ratio);
       device.set_actuator_offset(i, channel.offset);
+      device.set_feedback_joint(i, channel.feedbackJointIndex);
+      device.set_feedback_ratio(i, channel.feedbackRatio);
+      device.set_feedback_offset(i, channel.feedbackOffset);
       device.set_actuator_steps_per_unit(i, channel.stepsPerUnit);
       device.set_actuator_max_rate(i, channel.maxRate);
       device.set_actuator_direction_setup_ticks(i, channel.directionSetupTicks);
