@@ -2707,3 +2707,20 @@ pending acknowledgment readiness before advancing. Counter-zero batches and
 feedback offsets, virtual-router integration, Nucleo handlers and Phase C tests
 remain incomplete. These additive API calls stay within the under-development
 API 30/RKD6 revision 13 change, awaiting generated-binding/compiler verification.
+
+### G13 — acknowledgment-aware HomingCycle sequencing
+
+Added an optional HomingControlReadiness contract for asynchronous side controls.
+HomingCycle waits for scope acceptance before seek, all side holds before the
+latch stop, releases before consuming/latching captures, calibration before scope
+end and scope end before Return. Operations are issued once; later observations
+poll readiness rather than reissuing them. Synchronous adapters retain immediate
+transitions through the same helper paths. Wait phases retain normal freshness,
+travel/time limits and fault/cancellation cleanup.
+
+No tests/builds ran. The device adapter still needs to implement queued controls
+and readiness, with delayed/rejected-ack regression coverage at the Phase C gate.
+Important pending integration: an intentional controlled latch stop must preserve
+the homing scope, while cancellation/ordinary stop must clear it. The current
+device stop cleanup does not yet distinguish those purposes. Counter batches,
+router integration, board GPIO and full Phase C verification remain unfinished.

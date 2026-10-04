@@ -4,7 +4,7 @@ import motionkit.robot.HomingDriver.HomingObservation;
 import haxe.Int64;
 
 private enum HomingPhase {
-  Idle; Seek; StopAfterSeek; Backoff; StopAfterBackoff; Approach; StopAfterLatch; Return; Complete; Fault;
+  Idle; AwaitScope; Seek; StopAfterSeek; Backoff; StopAfterBackoff; Approach; AwaitSideHolds; StopAfterLatch; AwaitRelease; AwaitCalibration; AwaitScopeEnd; Return; Complete; Fault;
 }
 
 /** Sensor-driven homing with controlled stops between every change of direction. */
@@ -74,8 +74,8 @@ class HomingCycle {
       throw "Homing must start with the axis at rest";
     captures = [for (_ in axis.switches) null]; releasePosition = null;
     if (axis.switches.length > 1) sides.beginSquaring([for (contact in axis.switches) contact.id]);
-    if (anyActive(axis, observation)) enter(Backoff, observation);
-    else enter(Seek, observation);
+    if (!controlsReady()) enter(AwaitScope, observation);
+    else startSeeking(axis, observation);
   }
 
   public function update(dt:Float):Bool {
@@ -91,6 +91,16 @@ class HomingCycle {
         throw 'Homing axis "${axis.id}" did not reach its switch within physical travel';
       var stopped = Math.abs(observation.velocity) <= axis.latchSpeed * 0.01;
       switch phase {
+        case AwaitScope:
+          if (controlsReady()) startSeeking(axis, observation);
+        case AwaitSideHolds:
+          if (controlsReady()) enter(StopAfterLatch, observation);
+        case AwaitRelease:
+          if (controlsReady()) latchAndCalibrate(axis);
+        case AwaitCalibration:
+          if (controlsReady()) finishCalibration(axis);
+        case AwaitScopeEnd:
+          if (controlsReady()) enter(Return, driver.observe(axis.joint));
         case Seek:
           if (anyActive(axis, observation)) enter(StopAfterSeek, observation);
         case StopAfterSeek:
@@ -125,21 +135,12 @@ class HomingCycle {
             }
             if (captures[i] == null) all = false;
           }
-          if (all) enter(StopAfterLatch, observation);
+          if (all) enter(controlsReady() ? StopAfterLatch : AwaitSideHolds, observation);
         case StopAfterLatch:
-          if (stopped && observation.calibrationReady) {
+          if (stopped && observation.calibrationReady && controlsReady()) {
             if (sides != null) sides.releaseAll();
-            for (i in 0...axis.switches.length) {
-              var capture = captures[i];
-              if (capture == null) throw "Homing has no captured latch position";
-              var leaderCapture:Null<Float> = axis.switches.length > 1 ? sides.leaderCapture(axis.switches[i].id, capture) : null;
-              driver.latch(axis.switches[i].id, capture, leaderCapture);
-            }
-            if (axis.switches.length > 1) {
-              sides.calibrate([for (contact in axis.switches) contact.id]);
-              sides.endSquaring();
-            }
-            enter(Return, driver.observe(axis.joint));
+            if (!controlsReady()) enter(AwaitRelease, observation);
+            else latchAndCalibrate(axis);
           }
         case Return:
           if (stopped && observation.calibrationReady && Math.abs(observation.position - axis.home) <= axis.positionTolerance) {
@@ -165,6 +166,35 @@ class HomingCycle {
     try driver.stop(axes[index].joint, axes[index].acceleration) catch (error:Dynamic) failure = Std.string(error);
     try releaseSides() catch (error:Dynamic) { if (failure == null) failure = Std.string(error); }
     if (failure != null) throw failure;
+  }
+
+  function controlsReady():Bool {
+    if (sides == null || !Std.isOfType(sides, robotkit.runtime.HomingControlReadiness)) return true;
+    var asynchronous:robotkit.runtime.HomingControlReadiness = cast sides;
+    return asynchronous.controlsReady();
+  }
+
+  function startSeeking(axis:HomingAxis, observation:HomingObservation):Void {
+    enter(anyActive(axis, observation) ? Backoff : Seek, observation);
+  }
+
+  function latchAndCalibrate(axis:HomingAxis):Void {
+    for (i in 0...axis.switches.length) {
+      var capture = captures[i];
+      if (capture == null) throw "Homing has no captured latch position";
+      var leaderCapture:Null<Float> = axis.switches.length > 1 ? sides.leaderCapture(axis.switches[i].id, capture) : null;
+      driver.latch(axis.switches[i].id, capture, leaderCapture);
+    }
+    if (axis.switches.length > 1) sides.calibrate([for (contact in axis.switches) contact.id]);
+    if (!controlsReady()) enter(AwaitCalibration, driver.observe(axis.joint));
+    else finishCalibration(axis);
+  }
+
+  function finishCalibration(axis:HomingAxis):Void {
+    if (axis.switches.length > 1) sides.endSquaring();
+    var observation = driver.observe(axis.joint);
+    if (!controlsReady()) enter(AwaitScopeEnd, observation);
+    else enter(Return, observation);
   }
 
   function releaseSides():Void { if (sides != null) sides.endSquaring(); }
