@@ -2955,3 +2955,16 @@ the deployment fixture explicitly installs its device bindings.
 No builds/tests ran. The router virtual-device fixture still needs to invoke this
 factory with explicit wiring and skew budget. Hardware controls/GPIO, uncertain
 transaction recovery and Phase C validation remain pending; G13 is incomplete.
+
+### G13 — delayed first-side acknowledgment regression
+
+Added a homing fixture with deliberately delayed side hold acknowledgments.
+It checks that control polling advances while the second switch remains open,
+that the cycle does not issue its latch stop while holds are pending, and that
+acceptance permits that stop. Located the actual router model fixture in
+app/tests/src/app/ProjectSourceTests.hx (checkCncRouter) for the upcoming
+protocol-backed router variant.
+
+No builds/tests ran. The new regression is queued for Phase C alongside native
+transaction coverage. Router virtual-device execution and Nucleo/bench support
+remain pending; G13 is not complete.

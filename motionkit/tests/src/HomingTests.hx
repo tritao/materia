@@ -6,6 +6,7 @@ import motionkit.robot.HomingDriver.HomingObservation;
 import motionkit.robot.HomingDriver.HomingSwitchObservation;
 import robotkit.model.JointSwitch;
 import robotkit.runtime.HomingSideControl;
+import robotkit.runtime.HomingControlReadiness;
 
 /** Cycle sequencing and cleanup; physical endpoint behavior is covered by native simkit. */
 class HomingTests {
@@ -21,6 +22,21 @@ class HomingTests {
     driver.events = [];
   }
   public static function run():Void {
+    var delayed = new DelayedHomingFixture(), delayedCycle = delayed.cycle();
+    approach(delayed, delayedCycle);
+    delayed.delayHolds = true;
+    delayed.next(-0.001, true, false, 2, 0); delayedCycle.update(0.01);
+    delayed.next(-0.0015, true, false, 2, 0); delayedCycle.update(0.01);
+    check(delayed.holdPolls > 0 && delayedCycle.status() == "Approach",
+      "First-side hold acknowledgment must progress while the second switch is open");
+    delayed.next(-0.002, true, true, 2, 1); delayedCycle.update(0.01);
+    check(delayedCycle.status() == "AwaitSideHolds" && delayed.events.indexOf("stop") < 0,
+      "Slow approach must await both side hold acknowledgments before stopping");
+    delayed.delayHolds = false;
+    delayed.next(-0.002, true, true, 2, 1); delayedCycle.update(0.01);
+    check(delayedCycle.status() == "StopAfterLatch" && delayed.events.indexOf("stop") >= 0,
+      "Accepted side holds must allow the latch stop");
+
     var driver = new HomingFixture(), cycle = driver.cycle();
     approach(driver, cycle);
     driver.next(-0.001, true, false, 2, 0); cycle.update(0.01);
@@ -98,6 +114,25 @@ class HomingFixture implements HomingDriver implements HomingSideControl {
   public function releaseAll():Void events.push("release");
   public function calibrate(ids:Array<String>):Void events.push("calibrate");
   public function leaderCapture(id:String, sideCapture:Float):Float return id == "left" ? sideCapture - 0.001 : sideCapture;
+}
+
+class DelayedHomingFixture extends HomingFixture implements HomingControlReadiness {
+  public var delayHolds:Bool = false;
+  public var holdPolls:Int = 0;
+  var waiting:Bool = false;
+  public function new() { super(); }
+  override public function hold(id:String):Void {
+    super.hold(id);
+    waiting = true;
+  }
+  public function controlsReady():Bool {
+    if (waiting) {
+      holdPolls++;
+      if (delayHolds) return false;
+      waiting = false;
+    }
+    return true;
+  }
 }
 
 function main():Void HomingTests.run();
