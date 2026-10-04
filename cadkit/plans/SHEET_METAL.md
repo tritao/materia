@@ -704,7 +704,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 
 | Step | State | Commits |
 |---|---|---|
-| SM0 | worktree ready on 38601ac61: haxeon + nativekit populated, quick-gate baseline passes | |
+| SM0 | done: clean branch on 38601ac61, pins verified, prerequisite documents read; quick gate `sm0-setup` passes (ProjectKit 138, ManufacturingKit 54) | setup commit |
 | SM1 | planned | |
 | SM2 | planned | |
 | SM3 | planned | |
