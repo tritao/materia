@@ -8,6 +8,8 @@ use robotkit_device_protocol::{
 };
 use std::collections::VecDeque;
 pub mod welder;
+#[cfg(test)]
+mod retrofit_tests;
 
 const ACTUATORS: usize = 64;
 const CHANNELS: usize = 32;

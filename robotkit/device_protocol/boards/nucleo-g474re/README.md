@@ -3,6 +3,21 @@
 This is the external MCU reference target for Linux-to-device UART bring-up.
 It runs the no_std RKD6 scheduled core with two virtual wheel joints. No pins drive motors. The adapter provides USART1 RX/TX and DWT-derived monotonic time.
 
+The optional welding connector profile in `src/welder_profile.rs` reserves PA4/DAC1 channel 1
+for wire speed, PA5/DAC1 channel 2 for voltage, PB2 for the optoMOS trigger, PB0/ADC1 channel 15
+for Hall current, PB1/ADC1 channel 12 for isolated arc voltage, and PB10 for independent touch.
+HAL trait checks verify the DAC and ADC assignments with `cargo check --offline`.
+The DAC pins require isolated external amplifiers to produce 0–10 V; the sensor inputs require
+conditioning to the ADC voltage range. None of these pins conflict with PC4/PC5 UART.
+The bench image retains its virtual outputs; this pin profile does not enable or flash a welding driver.
+
+`../welder_retrofit.rs` defines the shared retrofit I/O policy. Calibration specifies wire speed
+and welding voltage at 10 V, Hall zero and A/V, isolated arc V/V, current threshold, no-arc timeout,
+persistent-short threshold/duration and supply efficiency. Arc established comes from measured
+current. A sustained high-current/low-voltage short reports the existing wire-stuck fault (3);
+brief MIG shorts are allowed. Faults latch until an explicit reset with safe outputs.
+The profile is tested against virtual I/O in `device_virtual/src/retrofit_tests.rs`.
+
 The board uses its HSI 16 MHz clock and USART1 at 921600 baud, 8N1. On the
 NUCLEO-G474RE, Arduino D1 is PC4/USART1_TX and D0 is PC5/USART1_RX. Connect
 D1 to the STM32MP1 UART RX, D0 to its TX, and connect grounds. Both ends must

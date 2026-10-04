@@ -19,3 +19,6 @@ pub use step_generator::*;
 pub use device_events::*;
 #[cfg(feature = "std")]
 pub use virtual_board::*;
+
+#[path = "../boards/welder_retrofit.rs"]
+pub mod welder_retrofit;

@@ -1,6 +1,8 @@
 #![no_std]
 #![no_main]
 
+mod welder_profile;
+
 use cortex_m::peripheral::DWT;
 use cortex_m_rt::entry;
 use embedded_hal_old::serial::{Read, Write};

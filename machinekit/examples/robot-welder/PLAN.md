@@ -748,6 +748,14 @@ W6 implementation notes (started after W5 main sync, 2026-10-04):
   Four framed virtual-device tests and the native endpoint suite pass, including sensor metadata, values and stale
   packet handling. The host's native endpoint test uses a mock transport; the unchanged welding mission still needs
   to exercise the complete virtual-device link and the Modbus backend.
+- The retrofit policy lives beside board configuration and maps an optoMOS trigger, two external 0–10 V outputs,
+  calibrated Hall current/isolated voltage inputs and independent digital touch. Current derives arc established;
+  no-arc and sustained high-current/low-voltage faults latch and safe the outputs. A persistent short uses the
+  existing wire-stuck code 3; brief MIG shorts reset the persistence timer instead of faulting.
+  Nucleo's optional PA4/PA5 DAC, PB0/PB1 ADC, PB2 trigger and PB10 touch profile passes `cargo check --offline`,
+  with HAL traits checking analog pin capabilities. Three virtual I/O tests pass for scaling, feedback, no-arc,
+  short persistence, reset and invalid command safety. The bench firmware remains a virtual-output UART image;
+  the pin profile is defined and checked, but no physical welding firmware is enabled or flashed.
 
 ## Phase 2: mobile welder
 
