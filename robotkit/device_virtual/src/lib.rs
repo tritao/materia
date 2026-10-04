@@ -261,6 +261,29 @@ impl VirtualDevice {
                 self.publish_state();
                 true
             }
+            20 => {
+                let command = HomingCounterBatch6::decode(payload).unwrap();
+                let mut accepted = false;
+                if command.session == self.session && command.sequence > self.control_sequence &&
+                    self.profile == 1 {
+                    self.control_sequence = command.sequence;
+                    let core = self.core.as_ref().unwrap();
+                    if self.homing_scope == Some(command.scope) && self.homing_stop && core.is_stopped() &&
+                        core.remaining_capacity() == CAPACITY &&
+                        core.velocities().iter().all(|value| value.abs() <= 1e-6) {
+                        accepted = self.steps.rebase_homing_counters(&[
+                            (command.first as usize, command.first_delta),
+                            (command.second as usize, command.second_delta),
+                        ]);
+                    }
+                }
+                let ack = HomingControlAck6 { session: self.session, sequence: command.sequence,
+                    scope: command.scope, accepted: accepted as u8 };
+                let mut bytes = [0; HomingControlAck6::SIZE];
+                ack.encode(&mut bytes).unwrap(); self.emit(19, &bytes);
+                if accepted { self.publish_state(); }
+                true
+            }
             17 | 18 => {
                 let (session, sequence, scope) = if kind == 17 {
                     let command = HomingScope6::decode(payload).unwrap();
@@ -511,7 +534,6 @@ impl VirtualDevice {
             input_bits: (0..self.input_count).fold(0u64, |bits, channel|
                 bits | (u64::from(self.board.read_input(channel)) << channel)),
         };
-        let positions = self.board.actuator_positions();
         let targets = self.board.position_targets();
         let velocity = core.velocities();
         let counts = self.board.step_counts();
@@ -519,7 +541,7 @@ impl VirtualDevice {
         header.encode(&mut body[..State6Header::SIZE]).unwrap();
         for i in 0..self.active_count {
             let row = ActuatorState6 {
-                position: if self.profile == 2 { targets[i] } else { positions[i] as f32 },
+                position: if self.profile == 2 { targets[i] } else { self.steps.counter_position(&self.board, i).unwrap() as f32 },
                 velocity: velocity[i],
                 effort: 0.0,
                 step_count: counts[i],

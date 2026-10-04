@@ -51,7 +51,8 @@ inline bool decode(std::span<const std::uint8_t> bytes, Frame &frame) {
         (bytes[4] == 16 && length != device_wire6::Event6::SIZE) ||
         (bytes[4] == 17 && length != device_wire6::HomingScope6::SIZE) ||
         (bytes[4] == 18 && length != device_wire6::HomingSide6::SIZE) ||
-        (bytes[4] == 19 && length != device_wire6::HomingControlAck6::SIZE)) return false;
+        (bytes[4] == 19 && length != device_wire6::HomingControlAck6::SIZE) ||
+        (bytes[4] == 20 && length != device_wire6::HomingCounterBatch6::SIZE)) return false;
     if (bytes[4] == 17) {
         device_wire6::HomingScope6 command{};
         if (!device_wire6::decode(bytes.subspan(HEADER_SIZE, command.SIZE), command) ||
@@ -63,6 +64,13 @@ inline bool decode(std::span<const std::uint8_t> bytes, Frame &frame) {
         device_wire6::HomingSide6 command{};
         if (!device_wire6::decode(bytes.subspan(HEADER_SIZE, command.SIZE), command) ||
             !command.session || !command.sequence || !command.scope || command.actuator >= 64 || command.hold > 1) return false;
+    }
+    if (bytes[4] == 20) {
+        device_wire6::HomingCounterBatch6 batch{};
+        if (!device_wire6::decode(bytes.subspan(HEADER_SIZE, batch.SIZE), batch) ||
+            !batch.session || !batch.sequence || !batch.scope || batch.first >= 64 ||
+            batch.second >= 64 || batch.first == batch.second ||
+            !std::isfinite(batch.first_delta) || !std::isfinite(batch.second_delta)) return false;
     }
     if (bytes[4] == 19) {
         device_wire6::HomingControlAck6 ack{};

@@ -70,6 +70,7 @@ fn validate_payload(kind: u8, bytes: &[u8]) -> Result<(), Frame6Error> {
         21 => None,
         17 => Some(HomingScope6::SIZE), 18 => Some(HomingSide6::SIZE),
         19 => Some(HomingControlAck6::SIZE),
+        20 => Some(HomingCounterBatch6::SIZE),
         _ => return Err(Frame6Error::BadType),
     };
     if let Some(size) = exact {
@@ -150,6 +151,14 @@ fn validate_payload(kind: u8, bytes: &[u8]) -> Result<(), Frame6Error> {
     if kind == 18 {
         let side = HomingSide6::decode(bytes).map_err(|_| Frame6Error::BadPayload)?;
         if side.session == 0 || side.sequence == 0 || side.scope == 0 || side.actuator >= 64 || side.hold > 1 {
+            return Err(Frame6Error::BadPayload);
+        }
+    }
+    if kind == 20 {
+        let batch = HomingCounterBatch6::decode(bytes).map_err(|_| Frame6Error::BadPayload)?;
+        if batch.session == 0 || batch.sequence == 0 || batch.scope == 0 ||
+            batch.first >= 64 || batch.second >= 64 || batch.first == batch.second ||
+            !batch.first_delta.is_finite() || !batch.second_delta.is_finite() {
             return Err(Frame6Error::BadPayload);
         }
     }

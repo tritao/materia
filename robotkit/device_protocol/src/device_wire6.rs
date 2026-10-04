@@ -25,7 +25,11 @@ pub enum MessageType6 {
     QueueStatus = 14,
     State6 = 15,
     Event = 16,
-    Sensor6 = 17,
+    Sensor6 = 21,
+    HomingScope = 17,
+    HomingSide = 18,
+    HomingControlAck = 19,
+    HomingCounterBatch = 20,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -1203,5 +1207,250 @@ impl InputState6 {
         offset += 8;
         let _ = offset;
         Ok(Self { closing_count, opening_count, captured_steps, captured_ticks })
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct HomingScope6 {
+    pub session: u64,
+    pub sequence: u64,
+    pub scope: u64,
+    pub action: u8,
+    pub first: u8,
+    pub second: u8,
+    pub skew_bound: f32,
+}
+
+impl HomingScope6 {
+    pub const SIZE: usize = 31;
+
+    pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {
+        if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }
+        let mut offset = 0usize;
+        out[offset..offset + 8].copy_from_slice(&self.session.to_le_bytes());
+        offset += 8;
+        out[offset..offset + 8].copy_from_slice(&self.sequence.to_le_bytes());
+        offset += 8;
+        out[offset..offset + 8].copy_from_slice(&self.scope.to_le_bytes());
+        offset += 8;
+        out[offset..offset + 1].copy_from_slice(&self.action.to_le_bytes());
+        offset += 1;
+        out[offset..offset + 1].copy_from_slice(&self.first.to_le_bytes());
+        offset += 1;
+        out[offset..offset + 1].copy_from_slice(&self.second.to_le_bytes());
+        offset += 1;
+        out[offset..offset + 4].copy_from_slice(&self.skew_bound.to_le_bytes());
+        offset += 4;
+        Ok(offset)
+    }
+
+    pub fn decode(input: &[u8]) -> Result<Self, Error> {
+        if input.len() != Self::SIZE { return Err(Error::WrongLength); }
+        let mut offset = 0usize;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let session = u64::from_le_bytes(bytes);
+        offset += 8;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let sequence = u64::from_le_bytes(bytes);
+        offset += 8;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let scope = u64::from_le_bytes(bytes);
+        offset += 8;
+        let mut bytes = [0u8; 1];
+        bytes.copy_from_slice(&input[offset..offset + 1]);
+        let action = u8::from_le_bytes(bytes);
+        offset += 1;
+        let mut bytes = [0u8; 1];
+        bytes.copy_from_slice(&input[offset..offset + 1]);
+        let first = u8::from_le_bytes(bytes);
+        offset += 1;
+        let mut bytes = [0u8; 1];
+        bytes.copy_from_slice(&input[offset..offset + 1]);
+        let second = u8::from_le_bytes(bytes);
+        offset += 1;
+        let mut bytes = [0u8; 4];
+        bytes.copy_from_slice(&input[offset..offset + 4]);
+        let skew_bound = f32::from_le_bytes(bytes);
+        offset += 4;
+        let _ = offset;
+        Ok(Self { session, sequence, scope, action, first, second, skew_bound })
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct HomingSide6 {
+    pub session: u64,
+    pub sequence: u64,
+    pub scope: u64,
+    pub actuator: u8,
+    pub hold: u8,
+}
+
+impl HomingSide6 {
+    pub const SIZE: usize = 26;
+
+    pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {
+        if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }
+        let mut offset = 0usize;
+        out[offset..offset + 8].copy_from_slice(&self.session.to_le_bytes());
+        offset += 8;
+        out[offset..offset + 8].copy_from_slice(&self.sequence.to_le_bytes());
+        offset += 8;
+        out[offset..offset + 8].copy_from_slice(&self.scope.to_le_bytes());
+        offset += 8;
+        out[offset..offset + 1].copy_from_slice(&self.actuator.to_le_bytes());
+        offset += 1;
+        out[offset..offset + 1].copy_from_slice(&self.hold.to_le_bytes());
+        offset += 1;
+        Ok(offset)
+    }
+
+    pub fn decode(input: &[u8]) -> Result<Self, Error> {
+        if input.len() != Self::SIZE { return Err(Error::WrongLength); }
+        let mut offset = 0usize;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let session = u64::from_le_bytes(bytes);
+        offset += 8;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let sequence = u64::from_le_bytes(bytes);
+        offset += 8;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let scope = u64::from_le_bytes(bytes);
+        offset += 8;
+        let mut bytes = [0u8; 1];
+        bytes.copy_from_slice(&input[offset..offset + 1]);
+        let actuator = u8::from_le_bytes(bytes);
+        offset += 1;
+        let mut bytes = [0u8; 1];
+        bytes.copy_from_slice(&input[offset..offset + 1]);
+        let hold = u8::from_le_bytes(bytes);
+        offset += 1;
+        let _ = offset;
+        Ok(Self { session, sequence, scope, actuator, hold })
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct HomingControlAck6 {
+    pub session: u64,
+    pub sequence: u64,
+    pub scope: u64,
+    pub accepted: u8,
+}
+
+impl HomingControlAck6 {
+    pub const SIZE: usize = 25;
+
+    pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {
+        if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }
+        let mut offset = 0usize;
+        out[offset..offset + 8].copy_from_slice(&self.session.to_le_bytes());
+        offset += 8;
+        out[offset..offset + 8].copy_from_slice(&self.sequence.to_le_bytes());
+        offset += 8;
+        out[offset..offset + 8].copy_from_slice(&self.scope.to_le_bytes());
+        offset += 8;
+        out[offset..offset + 1].copy_from_slice(&self.accepted.to_le_bytes());
+        offset += 1;
+        Ok(offset)
+    }
+
+    pub fn decode(input: &[u8]) -> Result<Self, Error> {
+        if input.len() != Self::SIZE { return Err(Error::WrongLength); }
+        let mut offset = 0usize;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let session = u64::from_le_bytes(bytes);
+        offset += 8;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let sequence = u64::from_le_bytes(bytes);
+        offset += 8;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let scope = u64::from_le_bytes(bytes);
+        offset += 8;
+        let mut bytes = [0u8; 1];
+        bytes.copy_from_slice(&input[offset..offset + 1]);
+        let accepted = u8::from_le_bytes(bytes);
+        offset += 1;
+        let _ = offset;
+        Ok(Self { session, sequence, scope, accepted })
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct HomingCounterBatch6 {
+    pub session: u64,
+    pub sequence: u64,
+    pub scope: u64,
+    pub first: u8,
+    pub second: u8,
+    pub first_delta: f64,
+    pub second_delta: f64,
+}
+
+impl HomingCounterBatch6 {
+    pub const SIZE: usize = 42;
+
+    pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {
+        if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }
+        let mut offset = 0usize;
+        out[offset..offset + 8].copy_from_slice(&self.session.to_le_bytes());
+        offset += 8;
+        out[offset..offset + 8].copy_from_slice(&self.sequence.to_le_bytes());
+        offset += 8;
+        out[offset..offset + 8].copy_from_slice(&self.scope.to_le_bytes());
+        offset += 8;
+        out[offset..offset + 1].copy_from_slice(&self.first.to_le_bytes());
+        offset += 1;
+        out[offset..offset + 1].copy_from_slice(&self.second.to_le_bytes());
+        offset += 1;
+        out[offset..offset + 8].copy_from_slice(&self.first_delta.to_le_bytes());
+        offset += 8;
+        out[offset..offset + 8].copy_from_slice(&self.second_delta.to_le_bytes());
+        offset += 8;
+        Ok(offset)
+    }
+
+    pub fn decode(input: &[u8]) -> Result<Self, Error> {
+        if input.len() != Self::SIZE { return Err(Error::WrongLength); }
+        let mut offset = 0usize;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let session = u64::from_le_bytes(bytes);
+        offset += 8;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let sequence = u64::from_le_bytes(bytes);
+        offset += 8;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let scope = u64::from_le_bytes(bytes);
+        offset += 8;
+        let mut bytes = [0u8; 1];
+        bytes.copy_from_slice(&input[offset..offset + 1]);
+        let first = u8::from_le_bytes(bytes);
+        offset += 1;
+        let mut bytes = [0u8; 1];
+        bytes.copy_from_slice(&input[offset..offset + 1]);
+        let second = u8::from_le_bytes(bytes);
+        offset += 1;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let first_delta = f64::from_le_bytes(bytes);
+        offset += 8;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let second_delta = f64::from_le_bytes(bytes);
+        offset += 8;
+        let _ = offset;
+        Ok(Self { session, sequence, scope, first, second, first_delta, second_delta })
     }
 }

@@ -2759,3 +2759,21 @@ physical steps after scope end. No builds/tests ran. The device owner must still
 verify drained stationary motion before invoking the primitive; acknowledged
 counter-batch wire transport and host feedback/target-zero composition remain
 pending. Do not infer completed physical homing from this foundation.
+
+### G13 — acknowledged atomic counter-batch record and stationary admission
+
+Added HomingCounterBatch6 to revision 13: session, monotonic sequence, scope,
+two actuator indices and double-precision origin deltas in actuator units. Both
+wire validators reject invalid IDs, duplicate/out-of-range sides and non-finite
+values. The virtual device checks the active scope, explicit controlled-homing
+stop, fully drained queue, stopped core and all velocities at rest before asking
+the atomic step-generator primitive to apply the batch (which also requires
+released sides). Acceptance/rejection uses HomingControlAck6; accepted batches
+publish fresh state. Actuator positions in State6 now use rebased logical
+counters, while physical step counts and captured steps remain raw.
+
+No tests/builds ran. Host batch submission/ack tracking must retain acknowledged
+origin shifts for captured-position conversion and handle uncertain delivery
+without pretending calibration completed. Existing native calibrate_home_drives
+must integrate that asynchronous transaction before revision commit. Router and
+Nucleo controls/GPIO and Phase C verification remain pending; G13 is incomplete.

@@ -24,6 +24,7 @@ enum MessageType6 : u8 {
     homing_scope = 17
     homing_side = 18
     homing_control_ack = 19
+    homing_counter_batch = 20
 }
 
 packed SessionBegin6 endian little {
@@ -212,4 +213,15 @@ packed HomingControlAck6 endian little {
     scope : u64
     # 1 accepted, 0 rejected
     accepted : u8
+}
+
+# Atomic two-side origin shifts, in actuator coordinate units; physical steps do not change.
+packed HomingCounterBatch6 endian little {
+    session : u64
+    sequence : u64
+    scope : u64
+    first : u8
+    second : u8
+    first_delta : f64
+    second_delta : f64
 }

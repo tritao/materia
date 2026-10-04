@@ -28,7 +28,11 @@ enum class MessageType6 : std::uint8_t {
     queue_status = 14,
     state6 = 15,
     event = 16,
-    sensor6 = 17,
+    sensor6 = 21,
+    homing_scope = 17,
+    homing_side = 18,
+    homing_control_ack = 19,
+    homing_counter_batch = 20,
 };
 
 inline constexpr std::size_t SessionBegin6_SIZE = 5013;
@@ -1727,6 +1731,414 @@ inline bool decode(std::span<const std::uint8_t> input, InputState6 &value) {
     bits_captured_ticks |= static_cast<std::uint64_t>(input[offset++]) << 48;
     bits_captured_ticks |= static_cast<std::uint64_t>(input[offset++]) << 56;
     value.captured_ticks = bits_captured_ticks;
+    return true;
+}
+
+inline constexpr std::size_t HomingScope6_SIZE = 31;
+struct HomingScope6 {
+    static constexpr std::size_t SIZE = HomingScope6_SIZE;
+    std::uint64_t session{};
+    std::uint64_t sequence{};
+    std::uint64_t scope{};
+    std::uint8_t action{};
+    std::uint8_t first{};
+    std::uint8_t second{};
+    float skew_bound{};
+};
+
+inline bool encode(const HomingScope6 &value, std::span<std::uint8_t> out) {
+    if (out.size() < HomingScope6_SIZE) return false;
+    std::size_t offset = 0;
+    const std::uint64_t bits_session = static_cast<std::uint64_t>(value.session);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 56);
+    const std::uint64_t bits_sequence = static_cast<std::uint64_t>(value.sequence);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 56);
+    const std::uint64_t bits_scope = static_cast<std::uint64_t>(value.scope);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 56);
+    const std::uint8_t bits_action = static_cast<std::uint8_t>(value.action);
+    out[offset++] = static_cast<std::uint8_t>(bits_action >> 0);
+    const std::uint8_t bits_first = static_cast<std::uint8_t>(value.first);
+    out[offset++] = static_cast<std::uint8_t>(bits_first >> 0);
+    const std::uint8_t bits_second = static_cast<std::uint8_t>(value.second);
+    out[offset++] = static_cast<std::uint8_t>(bits_second >> 0);
+    const std::uint32_t bits_skew_bound = std::bit_cast<std::uint32_t>(value.skew_bound);
+    out[offset++] = static_cast<std::uint8_t>(bits_skew_bound >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_skew_bound >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_skew_bound >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_skew_bound >> 24);
+    return true;
+}
+
+inline bool decode(std::span<const std::uint8_t> input, HomingScope6 &value) {
+    if (input.size() != HomingScope6_SIZE) return false;
+    std::size_t offset = 0;
+    std::uint64_t bits_session = 0;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.session = bits_session;
+    std::uint64_t bits_sequence = 0;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.sequence = bits_sequence;
+    std::uint64_t bits_scope = 0;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.scope = bits_scope;
+    std::uint8_t bits_action = 0;
+    bits_action |= static_cast<std::uint8_t>(input[offset++]) << 0;
+    value.action = bits_action;
+    std::uint8_t bits_first = 0;
+    bits_first |= static_cast<std::uint8_t>(input[offset++]) << 0;
+    value.first = bits_first;
+    std::uint8_t bits_second = 0;
+    bits_second |= static_cast<std::uint8_t>(input[offset++]) << 0;
+    value.second = bits_second;
+    std::uint32_t bits_skew_bound = 0;
+    bits_skew_bound |= static_cast<std::uint32_t>(input[offset++]) << 0;
+    bits_skew_bound |= static_cast<std::uint32_t>(input[offset++]) << 8;
+    bits_skew_bound |= static_cast<std::uint32_t>(input[offset++]) << 16;
+    bits_skew_bound |= static_cast<std::uint32_t>(input[offset++]) << 24;
+    value.skew_bound = std::bit_cast<float>(bits_skew_bound);
+    return true;
+}
+
+inline constexpr std::size_t HomingSide6_SIZE = 26;
+struct HomingSide6 {
+    static constexpr std::size_t SIZE = HomingSide6_SIZE;
+    std::uint64_t session{};
+    std::uint64_t sequence{};
+    std::uint64_t scope{};
+    std::uint8_t actuator{};
+    std::uint8_t hold{};
+};
+
+inline bool encode(const HomingSide6 &value, std::span<std::uint8_t> out) {
+    if (out.size() < HomingSide6_SIZE) return false;
+    std::size_t offset = 0;
+    const std::uint64_t bits_session = static_cast<std::uint64_t>(value.session);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 56);
+    const std::uint64_t bits_sequence = static_cast<std::uint64_t>(value.sequence);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 56);
+    const std::uint64_t bits_scope = static_cast<std::uint64_t>(value.scope);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 56);
+    const std::uint8_t bits_actuator = static_cast<std::uint8_t>(value.actuator);
+    out[offset++] = static_cast<std::uint8_t>(bits_actuator >> 0);
+    const std::uint8_t bits_hold = static_cast<std::uint8_t>(value.hold);
+    out[offset++] = static_cast<std::uint8_t>(bits_hold >> 0);
+    return true;
+}
+
+inline bool decode(std::span<const std::uint8_t> input, HomingSide6 &value) {
+    if (input.size() != HomingSide6_SIZE) return false;
+    std::size_t offset = 0;
+    std::uint64_t bits_session = 0;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.session = bits_session;
+    std::uint64_t bits_sequence = 0;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.sequence = bits_sequence;
+    std::uint64_t bits_scope = 0;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.scope = bits_scope;
+    std::uint8_t bits_actuator = 0;
+    bits_actuator |= static_cast<std::uint8_t>(input[offset++]) << 0;
+    value.actuator = bits_actuator;
+    std::uint8_t bits_hold = 0;
+    bits_hold |= static_cast<std::uint8_t>(input[offset++]) << 0;
+    value.hold = bits_hold;
+    return true;
+}
+
+inline constexpr std::size_t HomingControlAck6_SIZE = 25;
+struct HomingControlAck6 {
+    static constexpr std::size_t SIZE = HomingControlAck6_SIZE;
+    std::uint64_t session{};
+    std::uint64_t sequence{};
+    std::uint64_t scope{};
+    std::uint8_t accepted{};
+};
+
+inline bool encode(const HomingControlAck6 &value, std::span<std::uint8_t> out) {
+    if (out.size() < HomingControlAck6_SIZE) return false;
+    std::size_t offset = 0;
+    const std::uint64_t bits_session = static_cast<std::uint64_t>(value.session);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 56);
+    const std::uint64_t bits_sequence = static_cast<std::uint64_t>(value.sequence);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 56);
+    const std::uint64_t bits_scope = static_cast<std::uint64_t>(value.scope);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 56);
+    const std::uint8_t bits_accepted = static_cast<std::uint8_t>(value.accepted);
+    out[offset++] = static_cast<std::uint8_t>(bits_accepted >> 0);
+    return true;
+}
+
+inline bool decode(std::span<const std::uint8_t> input, HomingControlAck6 &value) {
+    if (input.size() != HomingControlAck6_SIZE) return false;
+    std::size_t offset = 0;
+    std::uint64_t bits_session = 0;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.session = bits_session;
+    std::uint64_t bits_sequence = 0;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.sequence = bits_sequence;
+    std::uint64_t bits_scope = 0;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.scope = bits_scope;
+    std::uint8_t bits_accepted = 0;
+    bits_accepted |= static_cast<std::uint8_t>(input[offset++]) << 0;
+    value.accepted = bits_accepted;
+    return true;
+}
+
+inline constexpr std::size_t HomingCounterBatch6_SIZE = 42;
+struct HomingCounterBatch6 {
+    static constexpr std::size_t SIZE = HomingCounterBatch6_SIZE;
+    std::uint64_t session{};
+    std::uint64_t sequence{};
+    std::uint64_t scope{};
+    std::uint8_t first{};
+    std::uint8_t second{};
+    double first_delta{};
+    double second_delta{};
+};
+
+inline bool encode(const HomingCounterBatch6 &value, std::span<std::uint8_t> out) {
+    if (out.size() < HomingCounterBatch6_SIZE) return false;
+    std::size_t offset = 0;
+    const std::uint64_t bits_session = static_cast<std::uint64_t>(value.session);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 56);
+    const std::uint64_t bits_sequence = static_cast<std::uint64_t>(value.sequence);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 56);
+    const std::uint64_t bits_scope = static_cast<std::uint64_t>(value.scope);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_scope >> 56);
+    const std::uint8_t bits_first = static_cast<std::uint8_t>(value.first);
+    out[offset++] = static_cast<std::uint8_t>(bits_first >> 0);
+    const std::uint8_t bits_second = static_cast<std::uint8_t>(value.second);
+    out[offset++] = static_cast<std::uint8_t>(bits_second >> 0);
+    const std::uint64_t bits_first_delta = std::bit_cast<std::uint64_t>(value.first_delta);
+    out[offset++] = static_cast<std::uint8_t>(bits_first_delta >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_first_delta >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_first_delta >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_first_delta >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_first_delta >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_first_delta >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_first_delta >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_first_delta >> 56);
+    const std::uint64_t bits_second_delta = std::bit_cast<std::uint64_t>(value.second_delta);
+    out[offset++] = static_cast<std::uint8_t>(bits_second_delta >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_second_delta >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_second_delta >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_second_delta >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_second_delta >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_second_delta >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_second_delta >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_second_delta >> 56);
+    return true;
+}
+
+inline bool decode(std::span<const std::uint8_t> input, HomingCounterBatch6 &value) {
+    if (input.size() != HomingCounterBatch6_SIZE) return false;
+    std::size_t offset = 0;
+    std::uint64_t bits_session = 0;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.session = bits_session;
+    std::uint64_t bits_sequence = 0;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.sequence = bits_sequence;
+    std::uint64_t bits_scope = 0;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_scope |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.scope = bits_scope;
+    std::uint8_t bits_first = 0;
+    bits_first |= static_cast<std::uint8_t>(input[offset++]) << 0;
+    value.first = bits_first;
+    std::uint8_t bits_second = 0;
+    bits_second |= static_cast<std::uint8_t>(input[offset++]) << 0;
+    value.second = bits_second;
+    std::uint64_t bits_first_delta = 0;
+    bits_first_delta |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_first_delta |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_first_delta |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_first_delta |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_first_delta |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_first_delta |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_first_delta |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_first_delta |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.first_delta = std::bit_cast<double>(bits_first_delta);
+    std::uint64_t bits_second_delta = 0;
+    bits_second_delta |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_second_delta |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_second_delta |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_second_delta |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_second_delta |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_second_delta |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_second_delta |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_second_delta |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.second_delta = std::bit_cast<double>(bits_second_delta);
     return true;
 }
 

@@ -19,6 +19,7 @@
         "event": 16,
         "hold": 8,
         "homing_control_ack": 19,
+        "homing_counter_batch": 20,
         "homing_scope": 17,
         "homing_side": 18,
         "queue_begin": 5,
@@ -26,7 +27,7 @@
         "reset_safety": 13,
         "resume": 9,
         "segment": 6,
-        "sensor6": 17,
+        "sensor6": 21,
         "session_ack6": 2,
         "session_begin6": 1,
         "state6": 15,
@@ -156,6 +157,47 @@
         }
       ],
       "size": 25
+    },
+    "HomingCounterBatch6": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "session",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "sequence",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "scope",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "first",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "second",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "first_delta",
+          "type": "f64"
+        },
+        {
+          "length": 1,
+          "name": "second_delta",
+          "type": "f64"
+        }
+      ],
+      "size": 42
     },
     "HomingScope6": {
       "endian": "little",
