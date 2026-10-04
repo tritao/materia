@@ -32,7 +32,8 @@ class RobotRuntime {
   public final endpoint:RuntimeEndpoint;
   /** Identity of the native source timestamp domain; receipt time has a separate clock. */
   public final sourceClockId:String;
-  final references:JointReferenceState;
+  var references:JointReferenceState;
+  final referenceMutex = new Mutex();
   final defaultMaxRates:Array<Null<Float>>;
   final defaultMaxEfforts:Array<Null<Float>>;
   final sensorLayout:Array<RobotRuntimeSensorBlueprint>;
@@ -397,6 +398,62 @@ class RobotRuntime {
     command.set_target_count(0);
     check(endpoint.submit(command),
       "runtime.resetSafety");
+  }
+
+  /** Synchronize host reference metadata after the stopped simulation's native reset. */
+  @:allow(robotkit.runtime.Simulation)
+  function afterNativeReset():Void {
+    referenceMutex.acquire();
+    references.invalidate();
+    referenceMutex.release();
+    externalMutex.acquire();
+    externalFrames.clear();
+    externalMutex.release();
+  }
+
+  /** Latch an actual home edge in endpoint/counter coordinates, never an ordinary move. */
+  public function latchHome(switchId:String, counterPosition:Float):Void {
+    ensureLive();
+    referenceMutex.acquire();
+    try {
+      var candidate = references.copy();
+      candidate.latch(switchId, counterPosition);
+      var joint = candidate.homeJoint(switchId);
+      var ready:Array<Int> = candidate.isReferenced(joint) ? [joint] : [];
+      check(endpoint.calibrateHome(candidate.coordinateOffsets(), ready), "runtime.latchHome");
+      references = candidate;
+    } catch (error:Dynamic) {
+      referenceMutex.release();
+      throw error;
+    }
+    referenceMutex.release();
+  }
+
+  public function isReferenced(joint:Int):Bool {
+    ensureLive();
+    referenceMutex.acquire();
+    try {
+      var ready = references.isReferenced(joint);
+      referenceMutex.release();
+      return ready;
+    } catch (error:Dynamic) {
+      referenceMutex.release();
+      throw error;
+    }
+  }
+
+  /** Coordinate translation used to convert endpoint edge captures after latch. */
+  public function referenceOffset(joint:Int):Float {
+    ensureLive();
+    referenceMutex.acquire();
+    try {
+      var zero = references.offset(joint);
+      referenceMutex.release();
+      return zero;
+    } catch (error:Dynamic) {
+      referenceMutex.release();
+      throw error;
+    }
   }
 
   /** Actual endpoint coordinates for physical switch synthesis, unaffected by coordinate zeros. */

@@ -1597,3 +1597,20 @@ a multi-switch joint. RuntimeEndpoint exposes this operation for the driver.
 Regenerate bindings from the header. Haxe reference-state proposals and monitor
 reset still need to invoke it. Device queues remain unsupported until G13
 calibration transport. No tests or project builds ran.
+
+
+### G11 — transact runtime home latches from Haxe
+
+Atomic native admission: `f7df755a7`. JointReferenceState now makes detached
+candidate copies and exposes a copied full zero array. RobotRuntime.latchHome
+applies an actual captured endpoint/counter coordinate to a candidate, invokes
+the atomic native calibrate_home operation, then commits Haxe state only on
+success. All home signals on the joint must be latched before its reference
+index is included. Serialize candidates and reference queries with a mutex.
+Expose reference readiness and zero for driver observation conversion.
+
+Simulation.resetRobot synchronizes Haxe invalidation after the native reset
+and clears old external frames, preventing reuse of pre-reset switch data or
+host-side references. Mechanical switch-reader reset/reseed and monitor reset
+at latch still need integration, as do homing commands and startup. No tests
+or project builds ran; latch behavior is unverified.

@@ -576,6 +576,7 @@ class Simulation {
     ensureLive();
     check(RobotKitSimKit.rk_simulation_reset_robot(owner.borrow(), robotIndex),
       "simulation.resetRobot");
+    robots[robotIndex].afterNativeReset();
   }
 
   /**

@@ -12,7 +12,17 @@ class JointReferenceState {
   final offsets:Array<Float> = [];
   final couplings:Array<RobotRuntimeJointCouplingBlueprint>;
 
-  public function new(blueprint:RobotRuntimeBlueprint) {
+  public function new(blueprint:RobotRuntimeBlueprint, ?template:JointReferenceState) {
+    if (template != null) {
+      homes = template.homes.copy(); couplings = template.couplings.copy();
+      for (value in template.names) names.push(value);
+      for (value in template.homeJoints) homeJoints.push(value);
+      for (value in template.latched) latched.push(value);
+      for (value in template.latchOffsets) latchOffsets.push(value);
+      for (value in template.referenced) referenced.push(value);
+      for (value in template.offsets) offsets.push(value);
+      return;
+    }
     if (blueprint == null) throw "Reference state requires a runtime blueprint";
     for (joint in 0...blueprint.jointCount) {
       var id = blueprint.identity == null ? null : blueprint.identity.jointId(joint);
@@ -32,6 +42,16 @@ class JointReferenceState {
       homeJoints.push(joint); latched.push(false); latchOffsets.push(0.0);
     }
     refresh();
+  }
+
+  /** Detached candidate for an atomic native calibration transaction. */
+  public function copy():JointReferenceState return new JointReferenceState(null, this);
+
+  public function coordinateOffsets():Array<Float> return offsets.copy();
+
+  public function homeJoint(switchId:String):Int {
+    for (i in 0...homes.length) if (homes[i].id == switchId) return homeJoints[i];
+    throw 'Unknown home switch "$switchId"';
   }
 
   /** Only directly monitored joints need native requirements; coupling readiness propagates there. */
