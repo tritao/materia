@@ -63,6 +63,8 @@ class DeviceBindingTests {
     near(slow.channels[0].maxRate, 10.0, "an actuator slower than the step tick keeps its rate");
     var unlimited = DeviceBinding.bind(axisModel(null), layout, 20000);
     near(unlimited.channels[0].maxRate, 20000.0 / channel.stepsPerUnit, "an unlimited actuator takes the step tick's ceiling");
+    near(channel.feedbackRatio, -1.0, "physical shaft feedback retains the direct reversed transmission");
+    check(channel.feedbackJointIndex != channel.jointIndex, "shaft feedback remains distinct from its carriage leader");
     var options = binding.virtualActuators();
     check(options.length == 1 && options[0].id == "motor" && options[0].jointIndex == 0 &&
       Math.abs(options[0].stepsPerUnit - channel.stepsPerUnit) < 1e-9, "the virtual device gets the same layout");

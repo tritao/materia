@@ -2796,3 +2796,20 @@ must still stage its revision/coordinate mutation around this request/status
 contract, and State6 freshness/uncertain-delivery regression coverage remains
 for Phase C. Queued device side adapter, homing stop bookkeeping, router test and
 Nucleo GPIO/control support remain unfinished.
+
+### G13 — preserve physical shaft feedback alongside planner mapping
+
+Calibration integration exposed a missing distinction: DeviceBinding's composed
+leader mapping is suitable for planning/grouping, but using it for feedback loses
+independent motor counters when two actuators share a leader. BoundChannel now
+retains the original SimpleTransmission shaft index, ratio and zero in addition
+to the composed leader mapping. VirtualActuatorOptions carries the same physical
+feedback metadata, with a legacy sentinel for manually authored configurations.
+Reversed driver wiring applies to both mappings. Queued binding assertions check
+that screw shaft feedback remains distinct from the carriage leader.
+
+No builds/tests ran. Native serial/simulation descriptors, endpoint feedback
+reconstruction and counter-delta conversion must now carry this metadata before
+runtime calibrate_home_drives can safely commit acknowledged device batches.
+This prerequisite does not complete calibration, router homing or G13. Full
+verification remains at the Phase C boundary.

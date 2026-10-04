@@ -19,9 +19,14 @@ class BoundChannel {
   public final maxRate:Float;
   public final directionSetupTicks:Int;
   public final skewBound:Float;
+  /** Original physical shaft mapping, before collapsing its leader coupling. */
+  public final feedbackJointIndex:Int;
+  public final feedbackRatio:Float;
+  public final feedbackOffset:Float;
 
   public function new(channel:Int, actuatorId:String, jointIndex:Int, ratio:Float, offset:Float,
-      stepsPerUnit:Float, maxRate:Float, directionSetupTicks:Int, skewBound:Float) {
+      stepsPerUnit:Float, maxRate:Float, directionSetupTicks:Int, skewBound:Float,
+      feedbackJointIndex:Int, feedbackRatio:Float, feedbackOffset:Float) {
     this.channel = channel;
     this.actuatorId = actuatorId;
     this.jointIndex = jointIndex;
@@ -31,6 +36,9 @@ class BoundChannel {
     this.maxRate = maxRate;
     this.directionSetupTicks = directionSetupTicks;
     this.skewBound = skewBound;
+    this.feedbackJointIndex = feedbackJointIndex;
+    this.feedbackRatio = feedbackRatio;
+    this.feedbackOffset = feedbackOffset;
   }
 }
 
@@ -104,8 +112,18 @@ class DeviceBinding {
       var ceiling = pulseRate / stepsPerUnit;
       var motorRate = actuator.planningRate();
       var rate = motorRate == null ? ceiling : Math.min(motorRate, ceiling);
+      var feedbackJoint = -1, feedbackRatio = 0.0, feedbackOffset = 0.0;
+      switch actuator.transmission {
+        case SimpleTransmission(shaft, directRatio, directOffset):
+          for (index in 0...robot.joints.length) if (robot.joints[index].id == shaft) feedbackJoint = index;
+          feedbackRatio = directRatio * channel.direction;
+          feedbackOffset = directOffset;
+      }
+      if (feedbackJoint < 0 || !Math.isFinite(feedbackRatio) || feedbackRatio == 0 || !Math.isFinite(feedbackOffset))
+        throw "Device actuator has no valid physical feedback mapping";
       bound.push(new BoundChannel(position, name, jointIndex, ratio * channel.direction, offset,
-        stepsPerUnit, rate, channel.directionSetupTicks, channel.skewBound));
+        stepsPerUnit, rate, channel.directionSetupTicks, channel.skewBound,
+        feedbackJoint, feedbackRatio, feedbackOffset));
       var capped = find(tightened, name);
       if (capped != null) {
         if ((stepTickHz < driverRate) &&
@@ -174,7 +192,8 @@ class DeviceBinding {
   public function virtualActuators():Array<VirtualActuatorOptions>
     return [for (channel in channels) new VirtualActuatorOptions(channel.actuatorId,
       channel.jointIndex, channel.ratio, channel.offset, channel.stepsPerUnit, channel.maxRate,
-      channel.directionSetupTicks, channel.skewBound)];
+      channel.directionSetupTicks, channel.skewBound, channel.feedbackJointIndex,
+      channel.feedbackRatio, channel.feedbackOffset)];
 
   static function find(robot:RobotModel, id:String):Null<Actuator> {
     for (actuator in robot.actuators) if (actuator.id == id) return actuator;

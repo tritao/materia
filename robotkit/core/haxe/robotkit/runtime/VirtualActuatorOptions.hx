@@ -10,10 +10,14 @@ class VirtualActuatorOptions {
   public final maxRate:Float;
   public final directionSetupTicks:Int;
   public final skewBound:Float;
+  public final feedbackJointIndex:Int;
+  public final feedbackRatio:Float;
+  public final feedbackOffset:Float;
 
   public function new(id:String, jointIndex:Int, ratio:Float, offset:Float,
       stepsPerUnit:Float, maxRate:Float = 0.0, directionSetupTicks:Int = 0,
-      skewBound:Float = 0.0) {
+      skewBound:Float = 0.0, feedbackJointIndex:Int = -1,
+      feedbackRatio:Float = 1.0, feedbackOffset:Float = 0.0) {
     if (id == null || id.length == 0 || id.length > 63 ||
         jointIndex < 0 || jointIndex >= 64 || !Math.isFinite(ratio) || ratio == 0.0 ||
         !Math.isFinite(offset) || !Math.isFinite(stepsPerUnit) || stepsPerUnit <= 0.0 ||
@@ -31,5 +35,10 @@ class VirtualActuatorOptions {
     this.maxRate = maxRate;
     this.directionSetupTicks = directionSetupTicks;
     this.skewBound = skewBound;
+    if (feedbackJointIndex < -1 || feedbackJointIndex >= 64 || !Math.isFinite(feedbackRatio) ||
+        feedbackRatio == 0.0 || !Math.isFinite(feedbackOffset)) throw "Invalid physical feedback mapping";
+    this.feedbackJointIndex = feedbackJointIndex;
+    this.feedbackRatio = feedbackRatio;
+    this.feedbackOffset = feedbackOffset;
   }
 }
