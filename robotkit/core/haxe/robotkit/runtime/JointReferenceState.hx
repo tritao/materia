@@ -34,6 +34,12 @@ class JointReferenceState {
     refresh();
   }
 
+  /** Only directly monitored joints need native requirements; coupling readiness propagates there. */
+  public function requiresHome(joint:Int):Bool {
+    requireJoint(joint);
+    return homeJoints.indexOf(joint) >= 0;
+  }
+
   /** A joint without a home switch retains its existing reference convention. */
   public function isReferenced(joint:Int):Bool {
     requireJoint(joint);

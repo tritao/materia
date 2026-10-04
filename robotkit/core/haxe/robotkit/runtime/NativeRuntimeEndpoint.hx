@@ -25,6 +25,8 @@ class NativeRuntimeEndpoint implements RuntimeEndpoint {
     RobotKitRuntime.rk_robot_runtime_stop(nativeHandle());
   public function capabilities(value:rk_robot_capabilities):Int
     return RobotKitRuntime.rk_robot_runtime_capabilities(nativeHandle(), value).status;
+  public function requireReference(joint:Int, required:Bool):Int
+    return RobotKitRuntime.rk_robot_runtime_require_reference(nativeHandle(), joint, required ? 1 : 0);
   public function submitPlanArrays(header:rk_plan_header, starts:Array<Int64>, durations:Array<Int64>,
       degrees:Array<Int>, coefficients:Array<Float>, joints:Array<Int>, events:Array<rk_timed_event>):Int
     return RobotKitRuntime.rk_robot_runtime_submit_plan(nativeHandle(), header, starts,

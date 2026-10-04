@@ -1408,3 +1408,21 @@ so a later ordinary move cannot inherit the jog admission category.
 This is source integration only. No tests or project builds ran. Runtime
 reference configuration, calibration, homing-driver execution, overtravel and
 limit enforcement remain pending; G11 remains in progress.
+
+
+### G11 — configure native reference requirements on runtime creation
+
+Execution-purpose integration: `b75c926e3`. RuntimeEndpoint now exposes native
+reference requirement configuration. RobotRuntime creates its per-machine
+JointReferenceState and configures each directly home-monitored joint before
+returning the runtime to its caller. Coupled follower readiness remains native
+fixed-point propagation, without redundant follower requirements. A failed
+initialization closes the endpoint instead of leaving its handle owned by an
+unconstructed runtime. Models with no home switches retain their existing
+reference convention.
+
+Machines with authored homes now reject ordinary plans and positional targets
+until real homing establishes references. No synthetic startup latch is added.
+The runtime latch/calibration and HomingDriver connection still need work, so
+router/picker startup remains incomplete. No tests or builds ran; this source
+change and its effects on application startup are unverified.

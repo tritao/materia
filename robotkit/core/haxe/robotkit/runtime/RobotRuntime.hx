@@ -30,6 +30,7 @@ import sys.thread.Mutex;
  */
 class RobotRuntime {
   public final endpoint:RuntimeEndpoint;
+  final references:JointReferenceState;
   final defaultMaxRates:Array<Null<Float>>;
   final defaultMaxEfforts:Array<Null<Float>>;
   final sensorLayout:Array<RobotRuntimeSensorBlueprint>;
@@ -63,6 +64,11 @@ class RobotRuntime {
     couplings = [for (coupling in blueprint.couplings)
       new robotkit.core.CoupledJoint(coupling.follower, coupling.leader, coupling.ratio, coupling.offset)];
     externalSensorLayout = blueprint.externalSensorLayout();
+    references = new JointReferenceState(blueprint);
+    // Configure before any worker or shared simulation tick can admit motion.
+    for (joint in 0...blueprint.jointCount)
+      if (references.requiresHome(joint))
+        check(endpoint.requireReference(joint, true), 'runtime.requireReference[$joint]');
   }
 
   /** Contacts from the latest simulation tick. Standalone runtimes have none. */
@@ -85,7 +91,10 @@ class RobotRuntime {
   public static function create(blueprint:RobotRuntimeBlueprint, ?endpoint:RuntimeEndpoint):RobotRuntime {
     if (blueprint == null) throw "Runtime requires a compiled blueprint";
     if (endpoint == null) endpoint = RuntimeEndpoints.inMemory(blueprint);
-    return new RobotRuntime(endpoint, blueprint);
+    try return new RobotRuntime(endpoint, blueprint) catch (error:Dynamic) {
+      endpoint.close();
+      throw error;
+    }
   }
 
   /** Starts a standalone runtime worker; Simulation-owned runtimes reject this. */
