@@ -30,6 +30,8 @@ import sys.thread.Mutex;
  */
 class RobotRuntime {
   public final endpoint:RuntimeEndpoint;
+  /** Identity of the native source timestamp domain; receipt time has a separate clock. */
+  public final sourceClockId:String;
   final references:JointReferenceState;
   final defaultMaxRates:Array<Null<Float>>;
   final defaultMaxEfforts:Array<Null<Float>>;
@@ -55,8 +57,9 @@ class RobotRuntime {
   static final jointMapScratch = new Arena(256);
   var disposed:Bool = false;
 
-  private function new(endpoint:RuntimeEndpoint, blueprint:RobotRuntimeBlueprint) {
+  private function new(endpoint:RuntimeEndpoint, blueprint:RobotRuntimeBlueprint, sourceClockId:String) {
     this.endpoint = endpoint;
+    this.sourceClockId = sourceClockId;
     defaultMaxRates = [for (joint in blueprint.joints) joint.maxRate];
     defaultMaxEfforts = [for (joint in blueprint.joints) joint.maxEffort];
     sensorLayout = blueprint.nativeSensorLayout();
@@ -88,10 +91,12 @@ class RobotRuntime {
   }
 
   /** Creates a runtime from a compiled model and an endpoint factory's result. */
-  public static function create(blueprint:RobotRuntimeBlueprint, ?endpoint:RuntimeEndpoint):RobotRuntime {
+  public static function create(blueprint:RobotRuntimeBlueprint, ?endpoint:RuntimeEndpoint,
+      ?sourceClockId:String = "unspecified"):RobotRuntime {
     if (blueprint == null) throw "Runtime requires a compiled blueprint";
+    if (sourceClockId == null || sourceClockId.length == 0) throw "Runtime source clock requires an ID";
     if (endpoint == null) endpoint = RuntimeEndpoints.inMemory(blueprint);
-    try return new RobotRuntime(endpoint, blueprint) catch (error:Dynamic) {
+    try return new RobotRuntime(endpoint, blueprint, sourceClockId) catch (error:Dynamic) {
       endpoint.close();
       throw error;
     }

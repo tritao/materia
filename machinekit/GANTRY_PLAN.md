@@ -1493,3 +1493,19 @@ sources retain the existing sampled-position repeatability budget. Post-latch
 coordinate rereads may share the same physics sample and are not a new control
 update. Actual driver construction and counter transformations remain pending.
 No tests or builds ran; no freshness or homing behavior is runtime-verified.
+
+
+### G11 — preserve simulation source-clock identity
+
+Freshness enforcement: `da46ecf94`. Native ordinary simulation samples use
+simulation time (simulation_robot.cpp), while RuntimeRobotAdapter previously
+labeled every position snapshot "unspecified". RobotRuntime now retains an
+explicit source clock supplied at creation; the adapter carries it into its
+transport-independent snapshot. Ordinary Simulation runtimes declare
+"robotkit.simulation", matching their switch sensor frames. Virtual-device and
+other existing factories retain "unspecified" until their actual source domain
+is explicitly configured; no device clock conversion is inferred.
+
+This fixes the source-clock mismatch needed by the homing freshness checks.
+The concrete observation/motion driver and calibration remain pending. No
+tests or builds ran; the source integration remains unverified at runtime.
