@@ -728,7 +728,7 @@ class ProgramTests extends MotionKitTestSupport {
     var unsupported = new RuntimeRobotAdapter("unsupported-arm", runtime,
       fixture.model.name, [for (link in fixture.model.links) link.name],
       [for (joint in fixture.model.joints) joint.name], false, false,
-      "simulated runtime fault", false);
+      "simulated runtime fault", robotkit.world.ExecutionCapabilities.unavailable());
     throws(function() new ManipulatorMotion(unsupported, compiler,
       function(_) return null, function() return runtime.pollEvents()),
       "manipulator requires plan support at construction");

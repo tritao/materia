@@ -46,13 +46,30 @@ class RuntimeEndpointTests {
     try robotkit.protocol.CapabilityCodec.decode(encoded, "test/remote")
       catch (_:Dynamic) invalidModeRejected = true;
     if (!invalidModeRejected) throw "Unknown remote control mode was accepted";
+    var bounded = new robotkit.world.RuntimeRobotAdapter("test/bounded", runtime, "bounded", [], ["joint"],
+      false, false, "bounded fault", new robotkit.world.ExecutionCapabilities(true, 0, 1, 1,
+        false, false, false, trajectorykit.validation.ValidationGuarantee.Unchecked));
+    var tooLarge = new robotkit.world.ExecutionPlanSubmission(haxe.Int64.ofInt(1),
+      haxe.Int64.ofInt(1), haxe.Int64.ofInt(1), 0, [0.0], [0.0], [0.0],
+      [new robotkit.world.TrajectorySegment(haxe.Int64.ofInt(0), haxe.Int64.ofInt(1000000), [[0.0, 0.1]])]);
+    var limitRejected = false;
+    try bounded.submit(robotkit.world.RobotCommand.ExecutionPlan(tooLarge))
+      catch (_:Dynamic) limitRejected = true;
+    if (!limitRejected) throw "Adapter accepted a plan above its advertised polynomial degree";
+    var inflatedRejected = false;
+    try new robotkit.world.RuntimeRobotAdapter("test/inflated", runtime, "inflated", [], ["joint"],
+      false, false, "inflated fault", new robotkit.world.ExecutionCapabilities(true, 6, 64, 4096,
+        true, true, true, trajectorykit.validation.ValidationGuarantee.Unchecked))
+      catch (_:Dynamic) inflatedRejected = true;
+    if (!inflatedRejected) throw "Adapter allowed a policy to invent endpoint capabilities";
+    bounded.close();
     runtime.dispose();
     runtime.dispose();
     if (endpoint.closes != 1) throw "Runtime did not release its endpoint exactly once";
     var rejected = false;
     try runtime.start() catch (_:Dynamic) rejected = true;
     if (!rejected) throw "Disposed runtime accepted a start";
-    return 7;
+    return 9;
   }
 }
 

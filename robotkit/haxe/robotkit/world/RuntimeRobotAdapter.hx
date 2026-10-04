@@ -23,7 +23,8 @@ class RuntimeRobotAdapter implements Robot {
 
   public function new(id:RobotId, runtime:RobotRuntime, name:String,
       links:Array<String>, joints:Array<String>, ?ownsRuntime:Bool = false,
-      ?startRuntime:Bool = false, ?faultMessage:String = "robot runtime fault") {
+      ?startRuntime:Bool = false, ?faultMessage:String = "robot runtime fault",
+      ?executionPolicy:ExecutionCapabilities) {
     if (id == null || id.length == 0)
       throw "RuntimeRobotAdapter requires a non-empty logical ID";
     if (runtime == null)
@@ -33,7 +34,24 @@ class RuntimeRobotAdapter implements Robot {
     this.ownsRuntime = ownsRuntime;
     this.faultMessage = faultMessage;
     robotDescription = new RobotDescription(id, name, links, joints, runtime.channels, runtime.couplings);
-    robotCapabilities = runtime.capabilities(id);
+    var actual = runtime.capabilities(id);
+    var policy = executionPolicy;
+    var execution = actual.execution;
+    if (policy != null) {
+      if ((policy.plans && !execution.plans) ||
+          policy.maximumPolynomialDegree > execution.maximumPolynomialDegree ||
+          policy.maximumJoints > execution.maximumJoints || policy.maximumSegments > execution.maximumSegments ||
+          (policy.timedEvents && !execution.timedEvents) ||
+          (policy.replacementBoundaries && !execution.replacementBoundaries) ||
+          (policy.holdResume && !execution.holdResume))
+        throw "Execution policy exceeds endpoint capabilities";
+      execution = policy.plans ? new ExecutionCapabilities(true, policy.maximumPolynomialDegree,
+        policy.maximumJoints, policy.maximumSegments, policy.timedEvents,
+        policy.replacementBoundaries, policy.holdResume, actual.execution.polynomialLimits)
+        : ExecutionCapabilities.unavailable();
+    }
+    robotCapabilities = new RobotCapabilities(id, actual.jointCount, actual.controlModes,
+      execution, actual.timing, actual.streams);
     if (startRuntime) {
       try runtime.start() catch (error:Dynamic) {
         if (ownsRuntime) runtime.dispose();
@@ -98,12 +116,26 @@ class RuntimeRobotAdapter implements Robot {
       case ExecutionPlan(plan):
         if (!robotCapabilities.execution.plans)
           throw "Runtime endpoint does not support execution plans";
+        var contract = robotCapabilities.execution;
+        var payload = plan.arrays;
+        var count = payload == null ? plan.segments.length : payload.count();
+        if (plan.startPosition.length > contract.maximumJoints || count > contract.maximumSegments ||
+            (plan.events.length > 0 && !contract.timedEvents) ||
+            (Int64.compare(plan.replaceAfterPlanId, Int64.ofInt(0)) != 0 && !contract.replacementBoundaries))
+          throw "Plan exceeds endpoint execution capabilities";
+        for (index in 0...count) {
+          var degree = payload == null ? plan.segments[index].degree : payload.degrees.get(index);
+          if (degree > contract.maximumPolynomialDegree)
+            throw "Plan exceeds endpoint polynomial degree";
+        }
         commandSequence++;
         runtime.submitPlan(plan, commandSequence);
       case Hold:
+        if (!robotCapabilities.execution.holdResume) throw "Endpoint cannot hold a plan";
         commandSequence++;
         runtime.submitHold(commandSequence);
       case Resume:
+        if (!robotCapabilities.execution.holdResume) throw "Endpoint cannot resume a plan";
         commandSequence++;
         runtime.submitResume(commandSequence);
       case Abort:
