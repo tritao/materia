@@ -156,7 +156,7 @@ class AssemblyRobot {
    */
   public static function add(candidate:Simulation, scene:EditorScene, session:ProjectDocumentSession,
       assembly:AssemblyDefinition, supportsClosures:Bool, revision:Int, robotIndex:Int,
-      ?channels:Array<ProcessChannelDeclaration>):AssemblyRobot {
+      ?channels:Array<ProcessChannelDeclaration>, virtualWelder:Bool = false):AssemblyRobot {
     var warnings:Array<String> = [];
     var parts:Array<AssemblyPart> = [];
     var physical = session.projectPhysical;
@@ -284,7 +284,8 @@ class AssemblyRobot {
     }
     var machine = session.machineMotion;
     var device:Null<robotkit.runtime.VirtualDeviceOptions> = null;
-    if (machine != null && machine.virtualDevice == true) {
+    if (virtualWelder) device = robotkit.runtime.VirtualServoOptions.fromModel(converted.model);
+    else if (machine != null && machine.virtualDevice == true) {
       var binding = robotkit.device.DeviceBinding.bind(converted.model,
         robotkit.device.DeviceLayout.forActuators(converted.model), 40000);
       converted.model = binding.model;
@@ -292,6 +293,14 @@ class AssemblyRobot {
       device.actuators = binding.virtualActuators();
     }
     if (machine != null && machine.program != null) converted.model.materializeLimits(true);
+    if (virtualWelder) {
+      // The device's braking bound is the same arm-program policy, rather than an invented motor acceleration.
+      for (joint in converted.model.joints) {
+        var acceleration = joint.limits.maxAcceleration;
+        joint.limits.maxAcceleration = acceleration == null ? MissionPlayer.ARM_ACCELERATION
+          : Math.min(acceleration, MissionPlayer.ARM_ACCELERATION);
+      }
+    }
     var blueprint = RobotRuntimeCompiler.compile(converted.model, converted.profile, revision);
     // Process channels (a machine's spindle and coolant, a tool's vacuum) must be declared before the
     // robot is added.
@@ -303,6 +312,15 @@ class AssemblyRobot {
       var welder = tool.torch;
       blueprint.addTool(welder == null ? new robotkit.tool.SuctionChannels(tool.channel)
         : new processkit.tool.WeldChannels(tool.channel, welder.wireSpeedChannel, welder.voltageChannel));
+    }
+    if (virtualWelder) {
+      var torches = [for (tool in session.robotTools) if (tool.torch != null) tool];
+      if (torches.length != 1 || device == null) throw "A virtual welding device needs exactly one torch";
+      var torch = torches[0];
+      var welding = torch.torch;
+      if (welding == null) throw "Virtual welding profile is missing";
+      processkit.simulation.VirtualWelderSupply.configure(device, blueprint,
+        {arc:torch.channel, wireSpeed:welding.wireSpeedChannel, voltage:welding.voltageChannel}, welding.efficiency);
     }
     // A mobile robot stands at its origin on the floor; its root link is framed there.
     var origin = session.mobileBase == null ? null : session.mobileBase.origin;

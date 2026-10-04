@@ -42,6 +42,9 @@ class SimulatedWelder implements SimulationStepObserver {
   public final model:WeldArcModel;
   /** The supply is on and healthy; clear it to model a dropout of the mains or the gas. */
   public var supplyReady:Bool = true;
+  /** Optional device supply; its real feedback also controls the bead model. */
+  public var supply:Null<SimulationWelderSupply> = null;
+  var deviceReading:WeldReading = {arc:false, currentA:0.0, voltageV:0.0, touch:false, fault:0, powerW:0.0};
 
   final work:processkit.tool.GroundedWork;
   final tipPosition:Array<Float>;
@@ -74,7 +77,7 @@ class SimulatedWelder implements SimulationStepObserver {
   }
 
   /** The latest reading. */
-  public function reading():WeldReading return model.reading;
+  public function reading():WeldReading return supply == null ? model.reading : deviceReading;
 
   /** Metal deposited on a grounded workpiece extends its electrical contact geometry. */
   public function addWork(work:WeldWork):Void this.work.addWork(work);
@@ -96,6 +99,12 @@ class SimulatedWelder implements SimulationStepObserver {
     var link = simulation.linkPose(robotIndex, linkIndex);
     var tip = place(link.position, link.rotation, tipPosition);
     var wire = turn(link.rotation, wireDirection);
+    if (supply != null) {
+      var touching = work.distance(tip[0], tip[1], tip[2]) <= WeldArcModel.STRIKE_REACH;
+      var ahead = work.ray(tip[0], tip[1], tip[2], wire[0], wire[1], wire[2], WeldArcModel.STRIKE_REACH);
+      deviceReading = supply.observe(dt, sourceTimestampNs, supplyReady && (touching || ahead <= WeldArcModel.STRIKE_REACH));
+      return;
+    }
     var reading = model.step(dt, {
       arcCommanded: digital(arcChannel),
       wireSpeed: Math.max(0.0, analog(wireSpeedChannel)),
@@ -111,6 +120,7 @@ class SimulatedWelder implements SimulationStepObserver {
   /** The session reset restored the robot's channels: forget the arc and any fault. */
   public function reset():Void {
     model.reset();
+    if (supply != null) supply.reset();
     lastTimestampNs = null;
   }
 

@@ -36,6 +36,9 @@ class ApplicationSimulation {
   public static inline var DETERMINISTIC:Int=0;
   public static inline var MUJOCO:Int=1;
   public final world:RobotWorld;
+  /** Supply selection belongs to the cell, while its authored mission stays unchanged. */
+  public var virtualWelder:Bool = false;
+  public var welderSupplyFactory:Null<processkit.simulation.SimulatedWelder -> processkit.simulation.SimulationWelderSupply> = null;
   public var appliedRevision(default, null):Int = 0;
   public var appliedDocumentRevision(default, null):Int = -1;
   public var appliedEnvironmentRevision(default, null):Int = -1;
@@ -184,7 +187,7 @@ class ApplicationSimulation {
         var robotIndex = candidateRobots.length;
         assemblyIndex = robotIndex;
         var built = AssemblyRobot.add(candidate, scene, session, assembly, backend == MUJOCO,
-          appliedRevision + 1, robotIndex, session.cncJob == null ? null : CncProgramPlayer.processChannels());
+          appliedRevision + 1, robotIndex, session.cncJob == null ? null : CncProgramPlayer.processChannels(), virtualWelder);
         candidateRobots.push(built.robot);
         candidateLinks.push([for (link in built.model.links) link.id]);
         candidateRobotModels.push(built.model);
@@ -240,8 +243,11 @@ class ApplicationSimulation {
       var freeObjects = [for (entry in candidateObjects) entry.object];
       if (session != null && candidateAssembly != null) for (tool in session.robotTools) {
         if (tool.kind == "torch") {
-          candidate.addStepObserver(candidateTools.addWelder(SimulatedTools.welderFor(candidate, candidateAssembly,
-            assemblyIndex, tool, session)));
+          var welder = SimulatedTools.welderFor(candidate, candidateAssembly, assemblyIndex, tool, session);
+          if (virtualWelder) welder.supply = new processkit.simulation.VirtualWelderSupply(candidate,
+            candidateAssembly.runtime, assemblyIndex, tool.sensor);
+          else if (welderSupplyFactory != null) welder.supply = welderSupplyFactory(welder);
+          candidate.addStepObserver(candidateTools.addWelder(welder));
           continue;
         }
         var carrier = candidateAssembly.part("project:" + tool.contact.occurrence);
@@ -372,6 +378,7 @@ class ApplicationSimulation {
     running = true; presentAssemblyPhysics = true;
   }
   public function stop():Void { var active = space; if (active != null) active.session.stop(); running = false; pumpStamp = -1.0;
+    if (tools != null) tools.safeWelders();
     if (presentAssemblyPhysics) presentationEpoch++;
     presentAssemblyPhysics = false; }
   public function reset():Bool {

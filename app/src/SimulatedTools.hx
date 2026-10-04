@@ -93,6 +93,10 @@ class SimulatedTools implements SessionMember {
 
 	public function beforeReset():Void {}
 
+	public function safeWelders():Void {
+		for (welder in welders) if (welder.supply != null) welder.supply.safe();
+	}
+
 	public function reset():Void {
 		for (tool in tools) tool.reset();
 		for (welder in welders) welder.reset();
