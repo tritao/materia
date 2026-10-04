@@ -78,3 +78,10 @@ import cadkit.sheetmetal.SheetMaterial.SheetMechanical;
 	@:id(1) var source:Int;
 	@:id(2) var bend:Int;
 }
+
+@:wire typedef SheetCutRecord = {
+	@:id(1) var source:Int;
+	@:id(2) var profile:Int;
+	@:id(3) var wall:Int;
+	@:id(4) var side:SheetSide;
+}

@@ -39,6 +39,7 @@ import cadkit.sheetmetal.SheetFeature;
 import cadkit.sheetmetal.SheetEdgeFlangeFeature;
 import cadkit.sheetmetal.SheetHemFeature;
 import cadkit.sheetmetal.SheetRipFeature;
+import cadkit.sheetmetal.SheetCutFeature;
 import cadkit.sheetmetal.HemSpec;
 import cadkit.sheetmetal.LengthSpec;
 import cadkit.sheetmetal.FlangePosition;
@@ -138,6 +139,11 @@ class DocumentBuilder {
 		var feature = document.add(new SheetBaseFeature(source, selectedStock, side));
 		if (thickness != null) bind(thickness, feature, "sheet.thickness");
 		return feature;
+	}
+
+	/** Through-wall cut from an exact constrained sketch on the chosen sheet side. */
+	public function sheetCut(source:SheetFeature, profile:ConstrainedSketchFeature, wall:Int, side:SheetSide = A):SheetCutFeature {
+		check(); return document.add(new SheetCutFeature(source, profile, wall, side));
 	}
 
 	/** Cut the child-side seam of one permanent bend without deleting its allowance strip. */

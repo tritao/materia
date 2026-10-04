@@ -22,6 +22,8 @@ import cadkit.sheetmetal.SheetEdgeFlangeFeature;
 import cadkit.sheetmetal.SheetEdgeFeature;
 import cadkit.sheetmetal.SheetHemFeature;
 import cadkit.sheetmetal.SheetRipFeature;
+import cadkit.sheetmetal.SheetCutFeature;
+import cadkit.sheetmetal.SheetFeatureRecord.SheetCutRecord;
 import cadkit.sheetmetal.SheetFeatureRecord.SheetRipRecord;
 import cadkit.sheetmetal.SheetFeatureRecord.SheetHemRecord;
 import cadkit.sheetmetal.SheetIdentityLedger;
@@ -303,6 +305,12 @@ class DocumentCodec {
 					var source = Std.downcast(requiredFeature(document, data.source), SheetFeature);
 					if (source == null) throw new ParametricError("rip source must be a sheet feature");
 					feature = document.add(new SheetRipFeature(source, data.bend));
+				} else if (featureType == "sheet-cut") {
+					var data:SheetCutRecord = JsonWire.decode(Json.stringify(requiredField(record, "sheet")));
+					var source = Std.downcast(requiredFeature(document, data.source), SheetFeature);
+					var profile = Std.downcast(requiredFeature(document, data.profile), ConstrainedSketchFeature);
+					if (source == null || profile == null) throw new ParametricError("sheet cut requires a sheet source and constrained sketch");
+					feature = document.add(new SheetCutFeature(source, profile, data.wall, data.side));
 				} else if (featureType == "datum-sketch") {
 					feature = document.add(new DatumSketchFeature(stringField(record, "profile"), numberField(record, "width"), numberField(record, "height"),
 						decodeElementReferenceInDocument(requiredField(record, "datum")), numberField(record, "offset")));
@@ -597,6 +605,12 @@ class DocumentCodec {
 			var rip = Std.downcast(feature, SheetRipFeature);
 			if (rip == null) throw new ParametricError("sheet-rip has the wrong feature class");
 			var data:SheetRipRecord = {source: rip.source.id.toInt(), bend: rip.bend};
+			return {id: feature.id.toInt(), type: featureType, sheet: Json.parse(JsonWire.encode(data)), references: references};
+		}
+		if (featureType == "sheet-cut") {
+			var cut = Std.downcast(feature, SheetCutFeature);
+			if (cut == null) throw new ParametricError("sheet-cut has the wrong feature class");
+			var data:SheetCutRecord = {source: cut.source.id.toInt(), profile: cut.profile.id.toInt(), wall: cut.wall, side: cut.side};
 			return {id: feature.id.toInt(), type: featureType, sheet: Json.parse(JsonWire.encode(data)), references: references};
 		}
 		if (featureType == "datum-sketch") {

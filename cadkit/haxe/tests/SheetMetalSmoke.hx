@@ -87,6 +87,7 @@ class SheetMetalSmoke {
 		assertions += SheetReliefSmoke.run();
 		assertions += SheetHemSmoke.run();
 		assertions += SheetRipSmoke.run();
+		assertions += SheetCutSmoke.run();
 		trace("Sheet metal smoke passed (" + assertions + " assertions)");
 	}
 }

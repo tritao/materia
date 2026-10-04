@@ -9,7 +9,7 @@ import cadkit.parametric.TopologyFingerprint;
 class SheetEdgeSelection {
 	public static function identify(sheet:Sheet, face:Shape):SheetEdge {
 		if (face.kind() != CadKit.ShapeKind.Face || face.surfaceKind() != CadKit.SurfaceKind.Plane)
-			throw new SheetDiagnosis("sheet.flange-edge-selection", "A flange requires a straight wall-side face");
+			throw new SheetDiagnosis("sheet.edge-selection", "Selection requires a straight wall-side face");
 		var selected = TopologyFingerprint.withoutName(TopologyFingerprint.capture(face));
 		var evaluated = sheet.evaluate(sheet.folded());
 		var candidates:Array<SheetEdge> = [];
@@ -32,8 +32,8 @@ class SheetEdgeSelection {
 				}
 		}
 		if (candidates.length != 1)
-			throw new SheetDiagnosis("sheet.flange-edge-selection", "Resolved face matches " + candidates.length
-				+ " straight graph segments; a flange requires exactly one");
+			throw new SheetDiagnosis("sheet.edge-selection", "Resolved face matches " + candidates.length
+				+ " straight graph segments; selection requires exactly one");
 		return candidates[0];
 	}
 }
