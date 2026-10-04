@@ -2343,3 +2343,19 @@ to isolate the terminal check. Final native build passed. The full ctest run
 passed the other 17 tests; the corrected runtime test passed its targeted retry
 (1/1), restoring green results for all 18 without repeating the unchanged
 17 tests. The picker is being retried against this runtime. G13 is unstarted.
+
+### G12 checkpoint — homing-to-program anchor handoff
+
+The terminal-rounding fix let the picker finish homing and reach its first
+pick, where the program planner rejected a start position at a joint limit.
+Homing previously declared the return complete from a small measured speed
+and repeatability band alone; it now also waits for the drained, stationary
+endpoint, preventing a still-running return from becoming a program start.
+The focused fixture checks that an apparently at-home position does not finish
+the cycle while the return remains active. ManipulatorMotion and PlanExecutor
+now use snapshot.setpointPositions for the initial program/held-joint anchor,
+matching native admission's commanded-coordinate contract and avoiding measured
+following error outside a boundary becoming the planned seed. Snapshot's
+existing measured fallback remains available for adapters without setpoints.
+MotionKit and app compiler retries are running before the justified focused
+homing/picker reruns. No native source changed after its passing results.

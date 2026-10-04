@@ -142,7 +142,7 @@ class HomingCycle {
             enter(Return, driver.observe(axis.joint));
           }
         case Return:
-          if (stopped && Math.abs(observation.position - axis.home) <= axis.positionTolerance) {
+          if (stopped && observation.calibrationReady && Math.abs(observation.position - axis.home) <= axis.positionTolerance) {
             index++;
             if (index == axes.length) phase = Complete;
             else beginAxis();

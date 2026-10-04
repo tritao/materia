@@ -35,6 +35,10 @@ class HomingTests {
     check(driver.events.join(",") == "hold:left,hold:right,stop,release,latch:left,latch:right,calibrate,end,return",
       "Home must stop, release, latch and calibrate all sides before returning");
     check(driver.leaderCaptureSeen == -0.002, "Leader latch must include travel after first side held");
+    driver.calibrationReady = false;
+    driver.next(0.0, false, false, 2, 1); cycle.update(0.01);
+    check(!cycle.isComplete(), "Home must wait for the return plan to drain before completion");
+    driver.calibrationReady = true;
     driver.next(0.0, false, false, 2, 1); cycle.update(0.01);
     check(cycle.isComplete(), "Referenced return must finish homing");
 

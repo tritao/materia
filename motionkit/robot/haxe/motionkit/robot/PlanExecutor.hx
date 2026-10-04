@@ -59,7 +59,7 @@ class PlanExecutor {
     if (plan.evaluate(0.0).positions.length != jointIndices.length)
       throw "PlanExecutor plan and robot joint map disagree";
     planEvents = plan.events;
-    fixedPositions = robot.snapshot().positions.toArray();
+    fixedPositions = robot.snapshot().setpointPositions.toArray();
     if (ExecutionPlan.COEFFICIENT_STRIDE != SegmentArrays.STRIDE)
       throw "MotionKit and RobotKit disagree on the segment coefficient layout";
     var arrays = new SegmentArrays(plan.segmentStarts(), plan.segmentDurations(),
