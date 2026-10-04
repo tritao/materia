@@ -384,6 +384,7 @@ impl VirtualDevice {
                 true
             }
             10 => {
+                self.steps.end_homing_pair(); self.homing_scope = None;
                 self.core.as_mut().unwrap().abort();
                 if let Some(reason) = self.core.as_ref().unwrap().stop_reason() {
                     self.events.as_mut().unwrap().stop(&mut self.board, reason);
@@ -392,12 +393,14 @@ impl VirtualDevice {
                 true
             }
             11 => {
+                self.steps.end_homing_pair(); self.homing_scope = None;
                 self.core.as_mut().unwrap().stop(StopReason::Stop);
                 self.events.as_mut().unwrap().stop(&mut self.board, StopReason::Stop);
                 self.update_welder(0.0);
                 true
             }
             12 => {
+                self.steps.end_homing_pair(); self.homing_scope = None;
                 self.core.as_mut().unwrap().emergency_stop(&mut self.board);
                 self.events.as_mut().unwrap().stop(&mut self.board, StopReason::EmergencyStop);
                 self.final_safe_applied = true;

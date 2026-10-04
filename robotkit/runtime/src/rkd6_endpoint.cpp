@@ -265,6 +265,7 @@ std::shared_ptr<Rkd6Endpoint> Rkd6Endpoint::attach(std::unique_ptr<Rkd6Transport
         std::move(transport), ack, target_error, clock_bound_ns, link_latency_ns,
         std::vector<DeviceActuator6>(layout.begin(), layout.end()), blueprint.joint_count));
     endpoint->input_layout_.assign(inputs.begin(), inputs.end());
+    endpoint->control_timeout_ns_ = link_loss_timeout_ns;
     if (!endpoint->configure_feedback(blueprint)) {
         if (error) *error = RK_ERROR_MODEL_MISMATCH;
         return {};
@@ -754,7 +755,9 @@ rk_result Rkd6Endpoint::apply(const rk_robot_command &command) {
         case RK_COMMAND_NONE: return RK_OK;
         default: return RK_ERROR_UNSUPPORTED;
     }
-    return send_record(kind, {}) ? RK_OK : RK_ERROR_BACKEND;
+    if (!send_record(kind, {})) return RK_ERROR_BACKEND;
+    if (kind >= 10 && kind <= 13 && control_sequence_) control_accepted_ = false;
+    return RK_OK;
 }
 
 void Rkd6Endpoint::poll_frames(std::uint64_t owner_now_ns) {
@@ -768,6 +771,11 @@ void Rkd6Endpoint::poll_frames(std::uint64_t owner_now_ns) {
                 clock_.observe(reply.host_send_ns,
                     transport_->received_at_ns() ? transport_->received_at_ns() : owner_now_ns,
                     reply.device_rx_ticks, reply.device_tx_ticks);
+        } else if (decoded.kind == 19) {
+            device_wire6::HomingControlAck6 ack{};
+            if (device_wire6::decode(decoded.payload, ack) && ack.session == ack_.session &&
+                ack.sequence == control_sequence_ && ack.scope == control_scope_ && !control_accepted_.has_value())
+                control_accepted_ = ack.accepted != 0;
         } else if (decoded.kind == 14) {
             if (device_wire6::decode(decoded.payload, status_)) {
                 has_status_ = true;
@@ -1062,5 +1070,45 @@ rk_result Rkd6Endpoint::device_input(const char *switch_id, rk_device_input_obse
         return std::isfinite(out.captured_position) ? RK_OK : RK_ERROR_BACKEND;
     }
     return RK_ERROR_INVALID_ARGUMENT;
+}
+}
+
+namespace robotkit {
+rk_result Rkd6Endpoint::homing_control_status(std::uint64_t sequence) const {
+    if (!sequence || sequence != control_sequence_) return RK_ERROR_STALE_COMMAND;
+    if (control_accepted_) return *control_accepted_ ? RK_OK : RK_ERROR_INVALID_STATE;
+    if (now_ns_ - std::min(now_ns_, control_sent_ns_) >= control_timeout_ns_) return RK_ERROR_BACKEND;
+    return RK_ERROR_STALE_STATE;
+}
+
+rk_result Rkd6Endpoint::request_homing_scope(std::uint64_t sequence, std::uint64_t scope,
+    bool begin, std::uint8_t first, std::uint8_t second, double skew_bound) {
+    if (!sequence || !scope || first >= ack_.actuator_count || second >= ack_.actuator_count || first == second ||
+        !std::isfinite(skew_bound) || skew_bound <= 0 || skew_bound > std::numeric_limits<float>::max())
+        return RK_ERROR_INVALID_ARGUMENT;
+    if (sequence <= control_sequence_) return RK_ERROR_STALE_COMMAND;
+    if (control_sequence_ && !control_accepted_) return RK_ERROR_INVALID_STATE;
+    device_wire6::HomingScope6 command{};
+    command.session = ack_.session; command.sequence = sequence; command.scope = scope;
+    command.action = begin ? 0 : 1; command.first = first; command.second = second;
+    command.skew_bound = static_cast<float>(skew_bound);
+    std::array<std::uint8_t, device_wire6::HomingScope6::SIZE> bytes{};
+    if (!device_wire6::encode(command, bytes) || !send_record(17, bytes)) return RK_ERROR_BACKEND;
+    control_sequence_ = sequence; control_scope_ = scope; control_sent_ns_ = now_ns_; control_accepted_.reset();
+    return RK_OK;
+}
+
+rk_result Rkd6Endpoint::request_homing_side(std::uint64_t sequence, std::uint64_t scope,
+    std::uint8_t actuator, bool hold) {
+    if (!sequence || !scope || actuator >= ack_.actuator_count) return RK_ERROR_INVALID_ARGUMENT;
+    if (sequence <= control_sequence_) return RK_ERROR_STALE_COMMAND;
+    if (control_sequence_ && !control_accepted_) return RK_ERROR_INVALID_STATE;
+    device_wire6::HomingSide6 command{};
+    command.session = ack_.session; command.sequence = sequence; command.scope = scope;
+    command.actuator = actuator; command.hold = hold;
+    std::array<std::uint8_t, device_wire6::HomingSide6::SIZE> bytes{};
+    if (!device_wire6::encode(command, bytes) || !send_record(18, bytes)) return RK_ERROR_BACKEND;
+    control_sequence_ = sequence; control_scope_ = scope; control_sent_ns_ = now_ns_; control_accepted_.reset();
+    return RK_OK;
 }
 }

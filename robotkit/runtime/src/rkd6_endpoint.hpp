@@ -75,6 +75,12 @@ public:
     std::optional<DeviceInputObservation6> input_observation(std::string_view switch_id) const;
 
     rk_result device_input(const char *, rk_device_input_observation &) const override;
+    rk_result request_homing_scope(std::uint64_t sequence, std::uint64_t scope,
+        bool begin, std::uint8_t first, std::uint8_t second, double skew_bound);
+    rk_result request_homing_side(std::uint64_t sequence, std::uint64_t scope,
+        std::uint8_t actuator, bool hold);
+    /** STALE_STATE means waiting for acknowledgment; OK means device acceptance. */
+    rk_result homing_control_status(std::uint64_t sequence) const;
     rk_result apply(const rk_robot_command &command) override;
     rk_result sample(std::uint64_t timestamp_ns, rk_robot_state &state) override;
     bool reports_safety_state() const noexcept override { return true; }
@@ -168,6 +174,11 @@ private:
     std::array<device_wire6::ActuatorState6, device_wire6::MAX_ACTUATORS> actuators_{};
     std::array<device_wire6::InputState6, 64> inputs_{};
     std::vector<DeviceInput6> input_layout_;
+    std::uint64_t control_sequence_ = 0;
+    std::uint64_t control_scope_ = 0;
+    std::uint64_t control_sent_ns_ = 0;
+    std::uint64_t control_timeout_ns_ = 500'000'000;
+    std::optional<bool> control_accepted_;
     bool has_state_ = false;
     std::array<device_wire6::Sensor6Header, RK_MAX_SENSORS> sensor_headers_{};
     std::array<std::array<float, RK_MAX_SENSOR_VALUES>, RK_MAX_SENSORS> sensor_values_{};

@@ -2677,3 +2677,18 @@ loop. New session initialization clears scope/control sequence.
 No build/test ran. Host command/ack transport, immediate lifecycle cleanup audit,
 side counter-zero batches, physical feedback correction and Nucleo handlers remain
 pending. The revision is still under development and not proven by device homing.
+
+### G13 — host control acknowledgment and immediate scope cleanup
+
+Rkd6Endpoint can send scope and side-control requests with monotonic sequence,
+explicit scope and bounded fields. It permits one outstanding request and tracks
+only matching-session/sequence/scope acknowledgments. Status distinguishes waiting,
+accepted, rejected and link-timeout; a sent frame is not reported as device
+acceptance. Stop/abort/emergency/reset invalidates a pending host acknowledgment.
+The virtual device now clears side holds and skew scope immediately on receipt
+of abort/stop/emergency commands, in addition to tick-time fault/link-loss cleanup.
+
+No tests/builds ran. Runtime ABI exposure, asynchronous HomingCycle readiness,
+virtual wrapper forwarding, counter-zero batches and Nucleo controls still remain.
+A timed-out control requires stop/recovery before issuing another; this is not a
+claim that control lifecycle is fully integrated or that G13 passes its gate.
