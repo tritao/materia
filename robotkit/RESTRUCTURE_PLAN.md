@@ -189,6 +189,24 @@ Other worktrees and their uncommitted work remain untouched.
 
 ## R4 — Split `robotkit.world`
 
+Completed on 2026-10-04. The world namespace now contains only RobotWorld,
+WorldSnapshot, RobotWorldEvent and RobotWorldSubscription. Robot contracts,
+capabilities and observations live in core; execution plans and process events
+in execution; recorder/replay types in recording; adapters in their endpoint
+namespaces; CameraImage in streams. Imports and recording generators were
+updated repository-wide, without re-export aliases. The move is a separate
+mechanical commit.
+
+All required checks passed: workspace suites (4,950 RobotWorld and 9,865 MotionKit
+assertions), all 52 compile targets, all RobotKit suites and managed TCP modes,
+16 native tests, device host/MCU, robotd, humanoid, welder, completed worker demo,
+8 MotionKit Release and 3 CAD tests, four-platform ABI audits and exact planner
+fixture comparison. The initial workspace run exposed an existing race in the
+planner shutdown test: an unbounded worker could finish before its registration
+was counted. Both test workers now wait on bounded lookahead; the complete
+MotionKit suite passed separately after that deterministic test fix. Every other
+workspace suite passed in the initial run. R4 is merged before R5 begins.
+
 Started from the quiet point immediately after R3 main merge `d1a42c128`.
 Live branches with committed changes to affected files require rebase/import
 updates: drywall-scoped-d8 (12 files), gantries (10 files), machine-tending (21 files), machinekit-restructure (1 files), mobile-welder (2 files), motion-loose-ends (10 files), sketching (1 files), uikit-extract (1 files), x7-transmissions (8 files).
