@@ -604,6 +604,20 @@ W5 design note while waiting for R3/R4 (2026-10-04; implementation has not start
   (12.5, 18.75 and 18.75 mm²). Derive offsets from the seam's face normals and previously deposited height.
   Earlier station geometry must participate in both grounded-work sensing and clearance before later passes ignite.
 
+W5 implementation notes (in progress, 2026-10-04):
+- MotionKit's `WeavePath` wraps pose primitives without changing seam-progress length, feed or event distances.
+  The lateral material frame supplies its axis and exact first/second derivatives separately from torch roll;
+  product-rule derivatives include the frame's motion. A quintic endpoint envelope starts and ends on the seam
+  with zero added velocity and acceleration. Phase continues across base primitives.
+- Sine uses cosine half-waves between edges. Triangle uses equal linear traverses; zigzag uses a 3:1 outward/return
+  traverse ratio. Edge holds consume forward distance at nominal seam speed within the requested cycle, so the
+  frequency remains unchanged; holds that consume the whole period are rejected. Frequency helpers accept
+  cycles/mm or cycles/s. Pattern joins become explicit primitive boundaries with one-sided derivatives.
+- Focused command: `haxeon/scripts/haxeon run --project motionkit/tests/weave/haxeon.json` with the standard
+  OCCT/library environment. It passes 738 assertions, including numeric first/second derivatives in a rotating
+  material frame, zero amplitude, endpoint taper, edge holds, frequency units and unchanged event coordinates.
+  Recipe/bead integration, multi-pass schema and grounding, restart hump, and app quality gates remain open.
+
 **W6. Real welder interface.** Map the channels to:
 - the retrofit I/O board: an optoMOS relay for the trigger, an isolated 0–10 V
   output for wire speed and voltage, a Hall-effect current sensor, an isolated
