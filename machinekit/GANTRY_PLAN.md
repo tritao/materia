@@ -2309,3 +2309,16 @@ observation, which the strict validator correctly rejects. Switch publication
 now uses the timestamp of the same runtime joint snapshot used for its counter
 conversion. Sequence checks and clock compatibility remain strict. Recompiling
 the app entry for a picker retry; this is not yet a verified homing integration.
+
+### G12 checkpoint — wait for endpoint calibration readiness
+
+The timestamp correction compiled and the picker passed switch freshness,
+then reached native latch calibration, which rejected the endpoint as busy
+(status -2). The cycle's selected-axis speed budget did not guarantee native
+calibration readiness: the whole endpoint must finish stopping, drain its
+trajectory and have every joint below the native 1e-6 velocity threshold.
+RuntimeHomingObserver now reports that readiness from the same snapshot;
+StopAfterLatch waits for it before releasing holds and calibrating. The focused
+homing fixture now checks that both holds remain while readiness is false.
+App and MotionKit compiler retries are running. A focused homing rerun is
+justified by this controller change; the unchanged native tests need no repeat.

@@ -38,13 +38,15 @@ class HomingSwitchObservation {
 
 /** Counter position before latch, calibrated logical position after latch. */
 class HomingObservation {
+  /** The whole endpoint has drained its stop and is stationary for calibration. */
+  public final calibrationReady:Bool;
   public final position:Float;
   public final velocity:Float;
   public final switches:Array<HomingSwitchObservation>;
   public final timestampNs:Int64;
   public final clockId:String;
   public function new(position:Float, velocity:Float, switches:Array<HomingSwitchObservation>,
-      timestampNs:Int64, clockId:String) {
+      timestampNs:Int64, clockId:String, calibrationReady:Bool = true) {
     if (!Math.isFinite(position) || !Math.isFinite(velocity) || switches == null)
       throw "Homing observation requires finite position/velocity and switch readings";
     if (timestampNs == null || Int64.compare(timestampNs, Int64.ofInt(0)) < 0 ||
@@ -56,5 +58,6 @@ class HomingObservation {
     }
     this.position = position; this.velocity = velocity; this.switches = switches.copy();
     this.timestampNs = timestampNs; this.clockId = clockId;
+    this.calibrationReady = calibrationReady;
   }
 }

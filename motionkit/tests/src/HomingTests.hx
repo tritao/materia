@@ -26,6 +26,11 @@ class HomingTests {
     driver.next(-0.001, true, false, 2, 0); cycle.update(0.01);
     check(driver.events.join(",") == "hold:left", "First captured side must hold independently");
     driver.next(-0.002, true, true, 2, 1); cycle.update(0.01);
+    driver.calibrationReady = false;
+    driver.next(-0.002, true, true, 2, 1); cycle.update(0.01);
+    check(driver.events.join(",") == "hold:left,hold:right,stop",
+      "Home must keep side holds until the whole endpoint is ready for calibration");
+    driver.calibrationReady = true;
     driver.next(-0.002, true, true, 2, 1); cycle.update(0.01);
     check(driver.events.join(",") == "hold:left,hold:right,stop,release,latch:left,latch:right,calibrate,end,return",
       "Home must stop, release, latch and calibrate all sides before returning");
@@ -52,6 +57,7 @@ class HomingTests {
 class HomingFixture implements HomingDriver implements HomingSideControl {
   public var events:Array<String> = [];
   public var failStop:Bool = false;
+  public var calibrationReady:Bool = true;
   public var leaderCaptureSeen:Float = 0.0;
   var tick:Int = 1;
   var position:Float = 0.0;
@@ -73,7 +79,7 @@ class HomingFixture implements HomingDriver implements HomingSideControl {
     var sequence = Int64.ofInt(tick), time = Int64.ofInt(tick * 10000000);
     return new HomingObservation(position, 0.0, [
       new HomingSwitchObservation("left", left, sequence, time, "fixture", leftEdges > 0 ? -0.001 : null, leftEdges),
-      new HomingSwitchObservation("right", right, sequence, time, "fixture", rightEdges > 0 ? -0.002 : null, rightEdges)], time, "fixture");
+      new HomingSwitchObservation("right", right, sequence, time, "fixture", rightEdges > 0 ? -0.002 : null, rightEdges)], time, "fixture", calibrationReady);
   }
   public function velocity(joint:Int, velocity:Float, acceleration:Float):Void events.push("velocity");
   public function stop(joint:Int, acceleration:Float):Void { events.push("stop"); if (failStop) throw "stop failed"; }

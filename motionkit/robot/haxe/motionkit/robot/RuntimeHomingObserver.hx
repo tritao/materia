@@ -61,7 +61,10 @@ class RuntimeHomingObserver {
       signals.push(new HomingSwitchObservation(contact.id, reading.active,
         frame.sequence, frame.sourceTimestampNs, frame.sourceClockId, translatedEdge, count));
     }
+    var ready = snapshot.mode == RobotKitRuntimeConstants.RK_ROBOT_MODE_IDLE &&
+      snapshot.trajectoryQueueDepth == 0 && !snapshot.trajectoryActive;
+    for (velocity in snapshot.velocities.toArray()) if (Math.abs(velocity) > 1e-6) ready = false;
     return new HomingObservation(translatePosition(joint, snapshot.positions.get(joint)),
-      snapshot.velocities.get(joint), signals, snapshot.sourceTimestampNs, snapshot.sourceClockId);
+      snapshot.velocities.get(joint), signals, snapshot.sourceTimestampNs, snapshot.sourceClockId, ready);
   }
 }

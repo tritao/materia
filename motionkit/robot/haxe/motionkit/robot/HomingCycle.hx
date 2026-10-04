@@ -127,7 +127,7 @@ class HomingCycle {
           }
           if (all) enter(StopAfterLatch, observation);
         case StopAfterLatch:
-          if (stopped) {
+          if (stopped && observation.calibrationReady) {
             if (sides != null) sides.releaseAll();
             for (i in 0...axis.switches.length) {
               var capture = captures[i];
