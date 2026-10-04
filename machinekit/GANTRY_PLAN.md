@@ -2403,3 +2403,16 @@ MotionKit compiled the captured-revision changes. App compilation required
 an explicit nullable local and guard when following the renewed handling
 runner inside the picker loop; added that guard and restarted only the failed
 app compiler. No native/controller source changed in this follow-up.
+
+### G12 checkpoint — clear the picker's front crossbar
+
+The revision changes compiled (including the renewed-runner guard). The
+picker now admits its first mission motion, then reports a real root-to-Z-body
+contact at (-0.00778, -0.09975, 0.84076) metres, at 77.95 seconds: the suction
+tool meets the front frame crossbar while lowering near Y=0. GantrySpec now
+authors a finite, non-negative frontExtension dimension, default zero, with
+assumed provenance. It extends the actual side rails/frame/post layout ahead
+of Y travel. The picker explicitly uses a 200 mm extension to keep the
+crossbar beyond the tool's vertical sweep and homing overtravel; nominal travel
+and contact assertions are unchanged. MachineKit compiler and focused picker
+retries are running. No native/controller source changed in this correction.

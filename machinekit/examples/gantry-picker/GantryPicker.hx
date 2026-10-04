@@ -1,6 +1,7 @@
 import machinekit.gantry.Gantry;
 import machinekit.gantry.GantrySpec;
 import machinekit.gantry.GantrySpec.GantryDrive;
+import machinekit.gantry.GantrySpec.GantryHead;
 import machinekit.transmission.TimingBeltProfile;
 import machinekit.robotics.RobotFlange;
 import machinekit.robotics.SuctionTool;
@@ -23,7 +24,10 @@ class GantryPicker extends Gantry {
 
 	public function new() {
 		var belt:GantryDrive = Belt(TimingBeltProfile.GT2, 20, 9);
-		super(new GantrySpec(1500, 1000, 500, belt, belt, belt));
+		// The suction tool projects in front of the slide. Keep the front crossbar
+		// beyond its vertical sweep, including the guide's homing overtravel.
+		super(new GantrySpec(1500, 1000, 500, belt, belt, belt, true, "MGN12C", 23,
+			"HFS5-4040", "HFS5-4040", false, GantryHead.None, 0.5, 24, 16, 200));
 		var flange:RobotFlange = cast component("flange");
 		tool = new SuctionTool(flange);
 		include("tool", tool);
