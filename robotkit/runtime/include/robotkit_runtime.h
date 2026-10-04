@@ -796,6 +796,10 @@ RK_API rk_result RK_CALL rk_robot_runtime_calibrate_coordinates(rk_robot_runtime
 RK_API rk_result RK_CALL rk_robot_runtime_calibrate_home(rk_robot_runtime runtime,
     const double *offsets RK_IN_ARRAY(count), uint32_t count,
     const uint32_t *reference_joints RK_IN_ARRAY(reference_count), uint32_t reference_count);
+/** Atomically establish individual motor counter zeros after every side is referenced and at rest.
+ * Unsupported by endpoints without independent counter-origin support. Physical targets stay unchanged. */
+RK_API rk_result RK_CALL rk_robot_runtime_calibrate_home_drives(rk_robot_runtime runtime,
+    const uint32_t *joints RK_IN_ARRAY(count), const double *side_zeros RK_IN_ARRAY(count), uint32_t count);
 /** Read the snapshot positions and setpoints in endpoint coordinates for physical sensor synthesis. */
 RK_API rk_result RK_CALL rk_robot_runtime_snapshot_endpoint(rk_robot_runtime runtime, rk_robot_snapshot *out_snapshot);
 

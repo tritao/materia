@@ -185,6 +185,12 @@ rk_result RK_CALL rk_robot_runtime_calibrate_home(rk_robot_runtime runtime,
                  : RK_ERROR_INVALID_HANDLE;
 }
 
+rk_result RK_CALL rk_robot_runtime_calibrate_home_drives(rk_robot_runtime runtime,
+    const uint32_t *joints, const double *side_zeros, uint32_t count) {
+    const auto value = robotkit::internal::resolve_runtime(runtime);
+    return value ? value->calibrate_home_drives(joints, side_zeros, count) : RK_ERROR_INVALID_HANDLE;
+}
+
 rk_result RK_CALL rk_robot_runtime_limit_input(rk_robot_runtime runtime, uint32_t joint, uint32_t active) {
     if (active > 1) return RK_ERROR_INVALID_ARGUMENT;
     const auto value = robotkit::internal::resolve_runtime(runtime);

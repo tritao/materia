@@ -27,6 +27,11 @@ class NativeRuntimeEndpoint implements RuntimeEndpoint {
     return RobotKitRuntime.rk_robot_runtime_calibrate_home(nativeHandle(), offsets, referenceJoints);
   public function calibrateCoordinates(offsets:Array<Float>):Int
     return RobotKitRuntime.rk_robot_runtime_calibrate_coordinates(nativeHandle(), offsets);
+  public function calibrateHomeDrives(joints:Array<Int>, sideZeros:Array<Float>):Int {
+    if (joints == null || sideZeros == null || joints.length == 0 || joints.length != sideZeros.length)
+      return RobotKitRuntimeConstants.RK_ERROR_INVALID_ARGUMENT;
+    return RobotKitRuntime.rk_robot_runtime_calibrate_home_drives(nativeHandle(), joints, sideZeros);
+  }
   public function stop():Int return closed ? RobotKitRuntimeConstants.RK_OK :
     RobotKitRuntime.rk_robot_runtime_stop(nativeHandle());
   public function capabilities(value:rk_robot_capabilities):Int

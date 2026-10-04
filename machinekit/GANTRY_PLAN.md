@@ -1969,3 +1969,17 @@ locks so a plan prepared before rebasing cannot race the calibration commit.
 C/Haxe exposure and once-per-cycle controller invocation remain pending. Other
 coordinate-calibration revision paths still need auditing. No tests or builds
 ran; atomic behavior and compilation remain unverified.
+
+### G12 — expose atomic motor-counter calibration
+
+Atomic native batch: `3bf133ebb`. Runtime API 29 adds
+rk_robot_runtime_calibrate_home_drives with borrowed equal-length joint/zero
+arrays. Add matching RuntimeEndpoint and NativeRuntimeEndpoint methods; reject
+null, empty or mismatched Haxe arrays before borrowing. The native method
+validates all motors and commits the batch while preserving physical targets.
+
+Regenerate runtime and simulation FFI declarations for four portable ABI
+targets (source generation only); simulation imports the updated runtime
+declarations without a local generated diff. RobotRuntime switch-ID projection,
+once-per-latch tracking and HomingCycle invocation remain pending. No tests or
+project builds ran; compilation and behavior remain unverified.
