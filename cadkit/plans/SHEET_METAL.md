@@ -31,7 +31,7 @@ The work spans kits:
 
 ## What exists
 
-Surveyed 2026-10-03, updated 2026-10-04 on local main 712019dbc (= origin/main), plus the
+Surveyed 2026-10-03, updated 2026-10-04 on local main 38601ac61, plus the
 `machine-tending` and `collision` branches. Since 1048bf768, main gained transmissions X7–X10 and
 the robot welder (W0–W4); see "On main since the first survey" below.
 
@@ -91,24 +91,35 @@ the robot welder (W0–W4); see "On main since the first survey" below.
 - **No backward compatibility** (X9b, and the rule in `robotkit/RESTRUCTURE_PLAN.md`): one
   schema version per saved format, older versions rejected with one generic message; bump versions
   when a format changes, regenerate fixtures, delete old paths. No migrations, shims or aliases.
-- RobotKit restructuring plan (`robotkit/RESTRUCTURE_PLAN.md`, 315e5e2d8, planned, starts after X9e): process-specific skills and
-  simulated process tools move from RobotKit to ProcessKit (R3); a new robot kind is a
-  `RobotProfile`, never a `RobotModel` field (R2); `TrajectoryChunk` is removed in favour of
-  execution plans (R1), which changes the D5 streaming API.
+- RobotKit restructuring R0–R6 is done on main (`robotkit/RESTRUCTURE_PLAN.md`; R7 review fixes
+  planned, they may still touch skill and endpoint APIs):
+  - process-specific skills and simulated process tools live in ProcessKit (`processkit.skill`:
+    `WeldSeam`, `WeldRunner`, `Paint`, ...; `processkit.tool`: `WeldArcModel`, `WeldBead`, ...);
+    RobotKit keeps generic skills (`GoTo`, `HandlePart`, ...);
+  - a robot kind is a `RobotProfile` (`robotkit.profile`) held beside the `RobotModel` in a
+    `RobotDefinition`, never a `RobotModel` field;
+  - `TrajectoryChunk` is gone: execution plans only; streamed servoing is MotionKit's
+    `ServoSession`/`ManipulatorServo` (`motionkit/robot`);
+  - package boundaries are checked by `tools/check-robotkit-packages.py`; the maintained gate is
+    `tools/robotkit-restructure-suite.sh` (its workspace stage is
+    `haxeon workspace test --workspace materia.workspace.json`).
+- Welder W5 (woven and multi-pass welds) is on main too.
 
 **On the `machine-tending` branch (not on main yet) and needed here**
 - Done there: `BallScrew`/`BallNut`/BK–BF supports and HGR rails (MT1), `BenchMill` (MT2),
   `CobotArm` size classes `Reach500/850/900/1300` (MT3; tending chose Reach850 on a 550 mm riser),
   enclosure and reach study (MT4).
-- In progress / planned there: pneumatic actuators as process-driven joints, `addSwitch`
-  (`joint_switch` sensors), `addPresence` (MT5); two controllers per cell + `CellSignals` (MT6);
+- Also done there (2026-10-04): pneumatic actuators as process-driven joints, `addSwitch`
+  (`joint_switch` sensors), `addPresence` (MT5). Planned there: two controllers per cell +
+  `CellSignals` (MT6);
   the machine-side `RobotInterface` state machine pattern (MT7); a real parallel gripper and the
   `gripper` robot-tool kind (MT8); mission steps `signal`/`waitFor`/`moveVia` (MT10).
 - Collision: `kinematicskit` `CollisionWorld` on coal exists only on branch `collision` (CL1,
   335ef1b98, unmerged). No collision-aware planner (CL6).
 - SimKit: `hold_object`/`release_object`, kinematic actors, MuJoCo weld equalities (used for
   closures in `mujoco_backend.cpp`). No deformable bodies.
-- RobotKit: no regrasp, no force control, D5 streamed Cartesian servoing exists (MotionKit Lane D).
+- RobotKit: no regrasp, no force control. Streamed Cartesian servoing exists (MotionKit Lane D5,
+  now `ServoSession`).
 - Real hardware path: `robotd` + RKD6 serial protocol to a Nucleo STM32G474 (Rust no_std);
   output channels with safe values and timed events; no pins driven yet (board layer, encoder
   inputs and servo modes are follow-on work in MotionKit Lane A).
@@ -296,7 +307,7 @@ table in `tools/README.md`.
 - Registration: approach the fingers, creep until both finger switches make, then hold. Position
   control plus contact sensing; no robot force control.
 - Follow: the gripped wall's press-frame pose is a function of the measured ram position
-  (`SheetState` with the angle from `BendProcess`). The robot runs it as a D5 streamed servo task
+  (`SheetState` with the angle from `BendProcess`). The robot runs it as a streamed servo task (`ServoSession`)
   keyed to the ram position input, never to time. The same code drives a real press whose speeds
   drift with oil temperature.
 - The gripper deviation from the gripped wall during the follow is measured in simulation and
@@ -366,15 +377,14 @@ Demo parts (all in material A unless noted):
 
 **SM0. Base and setup.**
 - Worktree `/home/joao/dev/materia-worktrees/sheet-metal`, branch `sheet-metal`, rebased on local
-  main 712019dbc (= origin/main) on 2026-10-04. Commit on this branch; do not create other
-  branches.
-- Phase A needs only the `haxeon` submodule (pin 03ce62d4). The `x7-transmissions` worktree is at
-  the same commit as main with populated submodules: `git clone --no-checkout
-  /home/joao/dev/materia-worktrees/x7-transmissions/haxeon <wt>/haxeon`, check out the pinned sha
-  (`git submodule status`), and copy `haxeon/.tools/` and `haxeon/out/haxeon_runtime.hdll` from
-  that worktree. Phase B also needs `nativekit` and the kits' vendors for the MachineKit suite;
-  clone them the same way. Write guarded paths in destructive commands (`"${WT:?}"/...`).
-- CadKit native: `cadkit/core` is unchanged between origin/main 3fd620e4 and 712019dbc, so use
+  main 38601ac61 on 2026-10-04. Commit on this branch; do not create other branches.
+- Populated at the pins: `haxeon` 8521d494 (with `.tools/` and `out/haxeon_runtime.hdll` copied
+  from the `machine-tending` worktree, same pin) and `nativekit` 88cb8f88. The other submodules are
+  empty; `/home/joao/dev/materia-cache/claude-scratch/sm-populate.sh` fills them from local checkouts
+  that have the pinned commits (needed for the full gate). After merging a newer `main`, re-check
+  `git submodule status` and move any changed pin the same way (fetch the sha from a checkout that
+  has it, never `--shared`). Write guarded paths in destructive commands (`"${WT:?}"/...`).
+- CadKit native: `cadkit/core` is unchanged between origin/main 3fd620e4 and 38601ac61, so use
   `CADKIT_BUILD_ROOT=/home/joao/dev/materia-worktrees/topological-naming/cadkit/build/debug`
   until SM5 changes the native core. The shared checkout's build lacks `cad_shape_stamp_names`.
 - When SM5 needs a native build: configure CadKit in the worktree with
@@ -382,9 +392,12 @@ Demo parts (all in material A unless noted):
   configure (`-DCADKIT_BUILD_OCCT=OFF`). Never build OCCT.
 - Tests: `cadkit/scripts/test-haxeon` with `CADKIT_SMOKE_ENTRY=<entry>`. Add a
   `SheetMetalSmoke.hx` entry in `cadkit/haxe/tests/` and keep `HaxeonSmoke` passing.
-- Full gate for phase B and C changes: `/home/joao/dev/materia-cache/claude-scratch/x7-suite.sh`
-  (the transmissions sessions' suite; copy and adapt it, do not edit the original).
-- Disk: check `df -h /` first (14 GB free on 2026-10-04). Populate other submodules only when a
+- Gates: `/home/joao/dev/materia-cache/claude-scratch/sm-suite.sh <tag>` (quick: cadkit,
+  SheetMetalSmoke, projectkit, manufacturingkit, machinekit) and `sm-suite.sh <tag> full` (adds
+  `haxeon workspace test` over `materia.workspace.json`, the app build and the project-source
+  tests). Phase C steps that touch RobotKit or ProcessKit also run
+  `tools/robotkit-restructure-suite.sh <build-root>` (all stages) at their final commit.
+- Disk: check `df -h /` first (12 GB free on 2026-10-04). Populate other submodules only when a
   later step needs them.
 - Read `cadkit/ARCHITECTURE.md`, `cadkit/haxe/MODELING.md`, `cadkit/plans/TOPOLOGICAL_NAMING.md`
   before writing code; match their conventions.
@@ -608,9 +621,9 @@ Demo parts (all in material A unless noted):
 - Mission steps: reuse MT10's `signal`, `waitFor`, `moveVia`, oriented `pick`/`place`; add `bend`
   (register to fingers by creeping until both switches make → `request_stroke` → follow streamed
   from the ram position → release or keep → retract) and `regrip`. The `BendFollow` skill and the
-  press-handshake device live in ProcessKit (process-specific, per RobotKit restructuring R3; put
-  them there even if R3 has not run yet); RobotKit only gains generic pieces if needed. Use the
-  streaming API that exists after R1 (execution plans), not `TrajectoryChunk`, if R1 has landed.
+  press-handshake device live in ProcessKit (`processkit.skill`, `processkit.tool`, beside the
+  welder's), per the restructured layout; RobotKit only gains generic pieces, and only if the
+  package checker allows them. Follow streams through MotionKit's `ServoSession` on execution plans.
   App `MissionPlayer` mapping and scene validation as for the weld step.
 - `BendingMission.generate(cell, part, program)` from the SM10 program.
 - Acceptance (`ProjectSourceTests.checkPressBrakeCell`, MuJoCo): P1 from the stack to the outfeed;
@@ -691,7 +704,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 
 | Step | State | Commits |
 |---|---|---|
-| SM0 | worktree created; rebased on 712019dbc | |
+| SM0 | worktree ready on 38601ac61: haxeon + nativekit populated, quick-gate baseline passes | |
 | SM1 | planned | |
 | SM2 | planned | |
 | SM3 | planned | |
