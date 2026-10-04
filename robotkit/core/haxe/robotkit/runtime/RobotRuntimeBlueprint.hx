@@ -21,9 +21,26 @@ class RobotRuntimeBlueprint {
   public final linkCount:Int;
   public final frameCount:Int;
   public final joints:Array<RobotRuntimeJointBlueprint> = [];
+  /** Fastest specified drive position loop, Hz. */
+  public function fastestPositionLoopRate():Float {
+    var rate = 0.0;
+    for (joint in joints) rate = Math.max(rate, joint.positionLoopRate);
+    return rate;
+  }
+  /** Conservative integration interval from servo gain and reflected inertia, seconds. */
+  public function servoStabilityInterval():Float {
+    var interval = Math.POSITIVE_INFINITY;
+    for (joint in joints) if (joint.servoStiffness > 0 && joint.reflectedInertia > 0)
+      interval = Math.min(interval, 0.5 * Math.sqrt(joint.reflectedInertia / joint.servoStiffness));
+    return interval;
+  }
   public final couplings:Array<RobotRuntimeJointCouplingBlueprint> = [];
   public final sensors:Array<RobotRuntimeSensorBlueprint> = [];
   public final channels:Array<ProcessChannelDeclaration> = [];
+  /** Pneumatic process drives are bound to channels, never to trajectory axes. */
+  public final pneumaticDrives:Array<RobotRuntimePneumaticDriveBlueprint> = [];
+  /** Velocity process drives are bound to analog channels, never to trajectory axes. */
+  public final velocityDrives:Array<RobotRuntimeVelocityDriveBlueprint> = [];
   public final links:Array<RobotRuntimeLinkBlueprint> = [];
   /**
    * Sets a tool's channels up with the safe values and stop policy the tool owns (`ToolChannels`). A channel the robot's
@@ -32,17 +49,19 @@ class RobotRuntimeBlueprint {
    */
   public function addTool(tool:ToolChannels):Void {
     if (tool == null) throw "A tool is required";
-    for (declaration in tool.declarations()) {
-      var existing:Null<ProcessChannelDeclaration> = null;
-      for (channel in channels) if (channel.id == declaration.id) existing = channel;
-      if (existing == null) {
-        channels.push(declaration);
-        continue;
-      }
-      if (existing.keepOnStop != declaration.keepOnStop || !RobotRuntimeBlueprint.sameValue(existing.safeValue, declaration.safeValue))
-        throw 'Channel "${declaration.id}" is declared with another safe value or stop policy than its tool needs (the tool ' +
-          (declaration.keepOnStop ? "keeps" : "drops") + " its output on a stop)";
+    for (declaration in tool.declarations()) addChannel(declaration);
+  }
+
+  /** Adds a declaration once, requiring every owner to agree on its typed safe value and stop policy. */
+  public function addChannel(declaration:ProcessChannelDeclaration):Void {
+    if (declaration == null) throw "A process channel declaration is required";
+    for (channel in channels) if (channel.id == declaration.id) {
+      if (channel.keepOnStop != declaration.keepOnStop ||
+          !RobotRuntimeBlueprint.sameValue(channel.safeValue, declaration.safeValue))
+        throw 'Channel "${declaration.id}" has conflicting safe values or stop policies';
+      return;
     }
+    channels.push(declaration);
   }
 
   static function sameValue(a:ProcessEventValue, b:ProcessEventValue):Bool
@@ -172,6 +191,45 @@ class RobotRuntimeBlueprint {
         : RobotKitRuntimeConstants.RK_CHANNEL_SAFE_ON_STOP);
       value.set_channels(index, nativeChannel);
     }
+    if (pneumaticDrives.length > RobotKitRuntimeConstants.RK_MAX_JOINTS)
+      throw "Too many process-driven joints";
+    var processJointIds = new Map<Int, Bool>();
+    for (drive in pneumaticDrives) {
+      if (drive.joint < 0 || drive.joint >= jointCount)
+        throw 'Pneumatic process drive references unknown joint ${drive.joint}';
+      if (processJointIds.exists(drive.joint))
+        throw 'Multiple process drives reference joint ${drive.joint}';
+      processJointIds.set(drive.joint, true);
+      var channelA = false, channelB = drive.channelB == null;
+      for (channel in channels) {
+        if (channel.id == drive.channelA && channel.safeValue == Digital(false)) channelA = true;
+        if (drive.channelB != null && channel.id == drive.channelB && channel.safeValue == Digital(false)) channelB = true;
+      }
+      if (!channelA || !channelB)
+        throw 'Pneumatic drive on joint ${drive.joint} needs declared digital coil channels';
+      value.set_process_joint(drive.joint, 1);
+    }
+    if (velocityDrives.length > RobotKitRuntimeConstants.RK_MAX_JOINTS)
+      throw "Too many process-driven joints";
+    for (drive in velocityDrives) {
+      if (drive.joint < 0 || drive.joint >= jointCount)
+        throw 'Velocity process drive references unknown joint ${drive.joint}';
+      if (processJointIds.exists(drive.joint))
+        throw 'Multiple process drives reference joint ${drive.joint}';
+      processJointIds.set(drive.joint, true);
+      if (!(drive.radiansPerSpeedUnit > 0.0) || !Math.isFinite(drive.radiansPerSpeedUnit) ||
+          !(drive.maxRate > 0.0) || !Math.isFinite(drive.maxRate) ||
+          !Math.isFinite(drive.maxEffort) || drive.maxEffort < 0.0)
+        throw 'Velocity process drive on joint ${drive.joint} has invalid ratings';
+      var speedChannel = false, directionChannel = false;
+      for (channel in channels) {
+        if (channel.id == drive.speedChannel && channel.safeValue == Analog(0.0)) speedChannel = true;
+        if (channel.id == drive.directionChannel && channel.safeValue == Analog(0.0)) directionChannel = true;
+      }
+      if (!speedChannel || !directionChannel)
+        throw 'Velocity drive on joint ${drive.joint} needs declared analog speed and direction channels';
+      value.set_process_joint(drive.joint, 1);
+    }
     for (joint in 0...jointCount) {
       var bound = followingErrorBounds[joint];
       if (!Math.isFinite(bound) || bound < 0.0)
@@ -183,8 +241,10 @@ class RobotRuntimeBlueprint {
     if (couplings.length > RobotKitRuntimeConstants.RK_MAX_JOINT_COUPLINGS)
       throw "Too many runtime joint couplings";
     value.set_coupling_count(couplings.length);
-    for (index in 0...couplings.length)
+    for (index in 0...couplings.length) {
       value.set_couplings(index, couplings[index].nativeValue());
+      value.set_coupling_stiffness(index, couplings[index].stiffness);
+    }
     value.set_link_count(linkCount);
     value.set_frame_count(frameCount);
     value.set_collision_approximation(collisionApproximation);
@@ -196,7 +256,20 @@ class RobotRuntimeBlueprint {
     var layout = nativeSensorLayout();
     if (layout.length > RobotKitRuntimeConstants.RK_MAX_SENSORS) throw "Too many sensors";
     value.set_sensor_count(layout.length);
-    for (i in 0...layout.length) value.set_sensors(i, layout[i].nativeValue());
+    for (i in 0...RobotKitRuntimeConstants.RK_MAX_SENSORS) {
+      value.set_sensor_joint(i, -1);
+      value.set_sensor_window_lower(i, 0.0);
+      value.set_sensor_window_upper(i, 0.0);
+      value.set_sensor_hysteresis(i, 0.0);
+    }
+    for (i in 0...layout.length) {
+      var sensor = layout[i];
+      value.set_sensors(i, sensor.nativeValue());
+      value.set_sensor_joint(i, sensor.joint);
+      value.set_sensor_window_lower(i, sensor.windowLower);
+      value.set_sensor_window_upper(i, sensor.windowUpper);
+      value.set_sensor_hysteresis(i, sensor.hysteresis);
+    }
     for (index in 0...joints.length) {
       var joint = joints[index];
       value.set_joints(index, joint.nativeValue());
@@ -218,6 +291,7 @@ class RobotRuntimeBlueprint {
       servo.set_stiffness(joint.servoStiffness);
       servo.set_damping(joint.servoDamping);
       value.set_joint_servo(index, servo);
+      value.set_servo_reflected_inertia(index, joint.reflectedInertia);
     }
     if (links.length != linkCount) throw "RobotKit runtime blueprint is missing link physical properties";
     for (index in 0...links.length) value.set_links(index, links[index].nativeValue());

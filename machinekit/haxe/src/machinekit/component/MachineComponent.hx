@@ -39,6 +39,12 @@ class MachineComponent {
 		return result;
 	}
 
+	/** Typed pneumatic model when this component is a cylinder. */
+	public function pneumaticCylinderSpec():Null<machinekit.pneumatic.PneumaticCylinderSpec> return null;
+
+	/** Typed pneumatic model when this component is a directional valve. */
+	public function pneumaticValveSpec():Null<machinekit.pneumatic.PneumaticValveSpec> return null;
+
 	function addCapability(capability:ComponentCapability):Void {
 		if (capability == null) throw 'Null capability on "$designation"';
 		switch capability {

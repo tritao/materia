@@ -8,6 +8,8 @@ class RobotRuntimeJointCouplingBlueprint {
   public final follower:Int;
   public final ratio:Float;
   public final offset:Float;
+  /** Follower-coordinate stiffness; zero keeps the backend default. */
+  public var stiffness:Float = 0.0;
 
   public function new(leader:Int, follower:Int, ratio:Float, offset:Float) {
     this.leader = leader;

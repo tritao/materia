@@ -20,6 +20,8 @@ import robotkit.model.Actuator;
 import robotkit.model.ActuatorDrive;
 import robotkit.model.Encoder;
 import robotkit.model.EncoderKind;
+import robotkit.model.Sensor;
+import robotkit.model.Frame;
 import robotkit.model.TorqueSpeedCurve;
 import robotkit.profile.RobotDriveConfiguration;
 import robotkit.profile.RobotMobileConfiguration;
@@ -318,6 +320,24 @@ class AssemblySimulationBridge {
       var gear = actuator.gearRatio == null ? 1.0 : actuator.gearRatio;
       var added = new Actuator(actuator.id, actuator.maxEffort, actuator.maxRate,
         Transmission.SimpleTransmission(driven.id, gear / factor, -initial * factor));
+      if (actuator.pneumatic != null) {
+        var p = actuator.pneumatic;
+        // Pneumatic force is already in newtons; only linear dimensions and speed need unit scaling.
+        added.drive = new robotkit.model.ActuatorDrive.PneumaticDrive(p.bore * scale, p.rod * scale,
+          p.stroke * scale, p.ratedSpeed * scale, p.pressurePa, p.channelA, p.channelB,
+          p.normallyToA, p.extendSign);
+        var pneumatic = added.drive.pneumatic();
+        if (pneumatic != null && driven.limits.overtravel > 0.0) {
+          driven.limitTimeConstant = pneumatic.limitTimeConstant(driven.child.mass,
+            driven.limits.overtravel);
+          driven.limitDampingRatio = 1.0;
+        }
+      }
+      if (actuator.processVelocity != null) {
+        var process = actuator.processVelocity;
+        added.processVelocity = new robotkit.model.ProcessVelocityDrive(process.speedChannel,
+          process.directionChannel, process.radiansPerSpeedUnit);
+      }
       if (actuator.gearEfficiency != null) added.efficiency = actuator.gearEfficiency;
       if (actuator.assumed != null) added.assumed = [for (label in actuator.assumed) label];
       added.microsteps = actuator.microsteps;
@@ -334,6 +354,7 @@ class AssemblySimulationBridge {
       else if (actuator.drive == "servo" && rated != null && peak != null && ratedSpeed != null && topSpeed != null)
         added.drive = new ServoDrive(rated, peak, ratedSpeed, topSpeed, inertia,
           actuator.encoderCounts == null ? 0.0 : actuator.encoderCounts, curve);
+      if (actuator.positionLoopRate != null) added.positionLoopRate = actuator.positionLoopRate;
       if (actuator.servoStiffness != null) added.servoStiffness = actuator.servoStiffness;
       if (actuator.servoDamping != null) added.servoDamping = actuator.servoDamping;
       // The encoder that reads the motor is its own sensor; a servo that names one does not also hold a count.
@@ -358,6 +379,40 @@ class AssemblySimulationBridge {
       model.addEncoder(edge.type == AssemblyJointType.Prismatic
         ? Encoder.perMillimetre(encoder.id, onJoint.id, kind, encoder.counts, index)
         : Encoder.perRevolution(encoder.id, onJoint.id, kind, encoder.counts, index));
+    }
+    if (definition.sensors != null) for (sensor in definition.sensors) {
+      var added = model.addSensor(new Sensor(sensor.id, sensor.kind, 0.0, sensor.id));
+      if (sensor.kind == "joint_switch" || sensor.kind == "at_speed") {
+        var edge:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
+        var driven:Null<Joint> = null;
+        for (candidate in definition.joints) if (candidate.id == sensor.joint) edge = candidate;
+        for (joint in model.joints) if (joint.id == sensor.joint) driven = joint;
+        if (edge == null || driven == null)
+          throw 'Assembly sensor "${sensor.id}" has no simulated joint';
+        var factor = edge.type == AssemblyJointType.Prismatic ? scale : 1.0;
+        var initial = placement.joint(edge.id);
+        var windowLower = requiredFloat(sensor.windowLower,
+          'Assembly sensor "${sensor.id}" has no lower window');
+        added.joint = edge.id;
+        added.windowLower = (windowLower - initial) * factor;
+        added.windowUpper = sensor.windowUpper == null ? 0.0 : (sensor.windowUpper - initial) * factor;
+        added.hysteresis = sensor.hysteresis == null ? 0.0 : sensor.hysteresis * factor;
+      } else if (sensor.kind == "presence") {
+        if (sensor.occurrence == null || sensor.connector == null)
+          throw 'Assembly presence sensor "${sensor.id}" has no connector or range';
+        var definitionId = occurrenceDefinition(definition, sensor.occurrence);
+        var local = connector(definitions.get(definitionId), sensor.connector);
+        var mounted = AssemblyFrames.compose(offsetOf(sensor.occurrence), local);
+        var index = linkIndexOfPart.get(sensor.occurrence);
+        if (index == null) throw 'Assembly presence sensor "${sensor.id}" has no simulated link';
+        var frame = model.addFrame(new Frame(sensor.id, links[index], "frame/" + sensor.id));
+        frame.position = [mounted.x * scale, mounted.y * scale, mounted.z * scale];
+        frame.rotation = [mounted.qx, mounted.qy, mounted.qz, mounted.qw];
+        added.frame = frame;
+        var range = requiredFloat(sensor.range,
+          'Assembly presence sensor "${sensor.id}" has no connector or range');
+        added.maxRange = range * scale;
+      }
     }
     if (mobileBase != null) {
       for (wheel in [mobileBase.leftWheel, mobileBase.rightWheel])
@@ -414,6 +469,11 @@ class AssemblySimulationBridge {
   static function occurrenceDefinition(definition:AssemblyDefinition, id:String):String {
     for (occurrence in definition.occurrences) if (occurrence.id == id) return occurrence.definition;
     throw 'Unknown assembly occurrence "$id"';
+  }
+
+  static function requiredFloat(value:Null<Float>, message:String):Float {
+    if (value == null) throw message;
+    return value;
   }
 
   static function connector(component:materia.assembly.AssemblyDefinition.AssemblyComponentDefinition,

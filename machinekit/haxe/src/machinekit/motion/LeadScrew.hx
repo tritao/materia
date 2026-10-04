@@ -22,12 +22,21 @@ class LeadScrew extends MachineComponent {
 	public static function relation(screw:LeadScrew, nut:LeadScrewNut, alignment:Float):machinekit.transmission.TransmissionRelation {
 		if (screw.thread.designation != nut.thread.designation) throw new machinekit.transmission.TransmissionDesignError("Lead screw and nut threads differ; update the nut to match the screw");
 		var result = new machinekit.transmission.TransmissionRelation(2 * Math.PI * alignment / screw.thread.signedLead(),
-			nut.efficiency(), null, nut.backlash(), nut.drag());
-		result.setBasis("efficiency", machinekit.transmission.ValueBasis.Assumed, "nut friction");
+			nut.efficiency(), screw.thread.family == Ball ? screw.axialStiffness() : null, nut.backlash(), nut.drag());
+		if (screw.thread.family == Ball) result.setBasis("stiffness", machinekit.transmission.ValueBasis.Assumed, "ball screw shaft stiffness (nut and bearing compliance omitted)");
+		result.setBasis("efficiency", machinekit.transmission.ValueBasis.Assumed, screw.thread.family == Ball ? "ball screw efficiency" : "nut friction");
 		result.setBasis("backlash", machinekit.transmission.ValueBasis.Assumed, "nut backlash");
 		result.setBasis("drag", machinekit.transmission.ValueBasis.Assumed, "nut drag");
 		result.setBasis("stiffness", machinekit.transmission.ValueBasis.Assumed, "rigid");
 		return result;
+	}
+
+	/** Shaft-only axial stiffness, N/mm, from the race root and full shaft length.
+	 * Nut and support compliance must be supplied by a measured transmission override.
+	 */
+	public function axialStiffness():Float {
+		var root = thread.rootDiameter();
+		return YOUNGS_MODULUS / 1e6 * Math.PI * root * root / (4 * totalLength);
 	}
 
 	public final thread:LeadScrewThread;

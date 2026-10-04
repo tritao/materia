@@ -1,0 +1,47 @@
+{
+	"version": 1,
+	"package": {
+		"name": "machinekit-tending-reach"
+	},
+	"entry": "TendingReach",
+	"sources": [
+		"TendingReach.hx",
+		"TendingToolEnvelope.hx",
+		"../bench-mill/EnclosedBenchMill.hx",
+		"../bench-mill/BenchMill.hx",
+		"../cnc-router/CncRouter.hx"
+	],
+	"sourceRoots": [
+		".",
+		"../bench-mill",
+		"../cnc-router"
+	],
+	"dependencies": {
+		"projectkit": {
+			"path": "../../../projectkit"
+		},
+		"cadkit": {
+			"path": "../../../cadkit"
+		},
+		"machinekit": {
+			"path": "../../"
+		},
+		"robotkit": {
+			"path": "../../../robotkit"
+		},
+		"cadbridge": {
+			"path": "../../../robotkit/cadbridge"
+		},
+		"toolpathkit": {
+			"path": "../../../toolpathkit"
+		},
+		"camkit": {
+			"path": "../../../camkit"
+		},
+		"cnckit": {
+			"path": "../../../cnckit"
+		}
+	},
+	"target": "host",
+	"outputDir": "build"
+}

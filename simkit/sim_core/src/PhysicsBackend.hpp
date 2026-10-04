@@ -102,6 +102,10 @@ struct BackendJointTarget {
     double stiffness = 0.0;
     double damping = 0.0;
     double feedforward = 0.0;
+    double end_position = 0.0;
+    double end_velocity = 0.0;
+    double reference_duration = 0.0;
+    double reflected_inertia = 0.0;
 };
 
 struct BackendJointCoupling {
@@ -109,6 +113,7 @@ struct BackendJointCoupling {
     std::uint64_t follower = 0;
     double ratio = 0.0;
     double offset = 0.0;
+    double stiffness = 0.0;
 };
 
 struct BackendClosure {
@@ -164,6 +169,7 @@ public:
     virtual nksim_result begin_topology_update() { return NKSIM_OK; }
     virtual nksim_result end_topology_update() { return NKSIM_OK; }
 
+    virtual nksim_result configure_integration(std::uint32_t) { return NKSIM_OK; }
     virtual nksim_result step(double dt, std::uint32_t substeps) = 0;
     virtual nksim_result read_body_states(BackendBodyState *states,
                                           std::uint32_t count) = 0;

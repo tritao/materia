@@ -13,6 +13,9 @@ class MujocoSimWorld {
         this.world = world;
     }
 
+    public function configureIntegration(substeps:Int, integrator:Int):Void
+        world.configureIntegration(substeps, integrator);
+
     public static function create(scene:Scene, ?options:SimWorldOptions):MujocoSimWorld {
         var desc = SimWorld.makeDescription(scene, options);
         var result = NativeKitSimMujoco.nksim_mujoco_world_create(desc);

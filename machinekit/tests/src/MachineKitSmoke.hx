@@ -2559,6 +2559,10 @@ class MachineKitSmoke {
 		EndEffectorExampleChecks.run();
 		RobotArmChecks.run();
 		CncRouterChecks.run();
+		BenchMillPreview.BenchMillChecks.run();
+		BenchMillPreview.EnclosedMillChecks.run();
+		TendingReach.run();
+		CobotArmPreview.CobotArmChecks.run();
 		FoldedZRouterCheck.main();
 		MobileBaseChecks.run();
 		RobotWelderChecks.run();
@@ -2567,6 +2571,8 @@ class MachineKitSmoke {
 		assemblyPreviewSharing();
 		RecipeContractTests.run();
 		MotorDriverTests.run();
+		MillPartTests.run();
+		PneumaticPartTests.run();
 		PowerSupplyTests.run();
 		GearboxTests.run();
 		componentRecipes();

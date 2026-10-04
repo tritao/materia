@@ -207,6 +207,7 @@ class ProgramTests extends MotionKitTestSupport {
       "runtime rejects compiled program whose start exceeds tight tolerance");
     simulationHarness.dispose();
     compiled.dispose();
+
   }
 
   /** D3: a 7-axis arm keeps its swivel point by point, and a path picks and smooths it as a whole. */
@@ -470,6 +471,24 @@ class ProgramTests extends MotionKitTestSupport {
       compiled.blocks[0].plans[0].durationSeconds).positions[0], goal[0],
       "program compiler reaches the MoveJ target", 1e-6);
     compiled.dispose();
+
+    var outputBeforeWait = compiler.compile(new MotionProgram([
+      MotionOp.SetOutput("spindle.speed", EventValue.Analog(8000.0)),
+      MotionOp.WaitInput("spindle.at_speed", InputPredicate.Equals(
+        EventValue.Digital(true)), 3.0)
+    ]), start, Int64.ofInt(150));
+    check(outputBeforeWait.blocks.length == 1 &&
+      outputBeforeWait.blocks[0].plans.length == 1,
+      "output before a wait gets a plan in the preceding block");
+    var startup = outputBeforeWait.blocks[0].plans[0];
+    check(startup.events.length == 1 &&
+      Int64.compare(startup.events[0].timeNs, Int64.ofInt(0)) == 0,
+      "spindle output fires at the start of the wait's preceding plan");
+    near(startup.durationSeconds, 0.01,
+      "stationary output plan lasts one controller cycle", 1e-9);
+    near(startup.evaluate(startup.durationSeconds).positions[0], start[0],
+      "output plan holds the starting position", 1e-9);
+    outputBeforeWait.dispose();
 
     var startPose = solver.forward(start);
     var endQ = start.copy(); endQ[0] += 0.025;

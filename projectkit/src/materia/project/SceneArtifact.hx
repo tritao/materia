@@ -205,6 +205,7 @@ typedef SceneArtifactMission = {
  *   `at.connector`, wherever the part is when the step starts.
  * - `place`: set what the tool holds down with its base on the connector `at.connector` of
  *   `at.occurrence`, and let go.
+ * - `moveJoints`: move the chain ending at `at` to absolute joint coordinates in radians or metres.
  * - `weld`: weld the seam `weld` describes with the robot's torch.
  */
 typedef SceneArtifactMissionStep = {
@@ -212,6 +213,13 @@ typedef SceneArtifactMissionStep = {
 	@:optional var pose:SceneArtifactFloorPose;
 	@:optional var at:SceneArtifactPlace;
 	@:optional var weld:SceneArtifactWeld;
+	@:optional var joints:Array<SceneArtifactJointTarget>;
+}
+
+/** Absolute mechanical joint position, in radians or metres. */
+typedef SceneArtifactJointTarget = {
+	var joint:String;
+	var position:Float;
 }
 
 /**
@@ -791,6 +799,26 @@ class SceneArtifact {
 				case "pick" | "place":
 					handles = true;
 					if (!exists(step.at)) fail('step $index names no connector of an occurrence in the assembly');
+				case "moveJoints":
+					if (!exists(step.at)) fail('step $index names no connector of an occurrence in the assembly');
+					if (step.joints == null || step.joints.length == 0 || step.joints.length > 64)
+						fail('step $index needs between one and 64 joint targets');
+					var seen = new Map<String, Bool>();
+					for (target in step.joints) {
+						if (target == null || !finite(target.position) || seen.exists(target.joint))
+							fail('step $index has an invalid or repeated joint target');
+						seen.set(target.joint, true);
+						var mechanism:AssemblyDefinition = cast flat;
+						var found = [for (joint in mechanism.joints) if (joint.id == target.joint) joint];
+						if (found.length != 1 || Std.string(found[0].role) != "tree" ||
+							(Std.string(found[0].type) != "revolute" && Std.string(found[0].type) != "continuous" && Std.string(found[0].type) != "prismatic"))
+							fail('step $index names no movable joint "${target.joint}"');
+						var joint = found[0];
+						var scale = Std.string(joint.type) == "prismatic" ? data.metresPerUnit : 1.0;
+						if ((joint.limits.lower != null && target.position < joint.limits.lower * scale) ||
+							(joint.limits.upper != null && target.position > joint.limits.upper * scale))
+							fail('step $index targets joint "${target.joint}" past its limits');
+					}
 				case "weld":
 					welds = true;
 					validateWeld(step.weld, index, flat, fail);
@@ -983,6 +1011,15 @@ class SceneArtifact {
 			if (pose != null) step.pose = {x: number(pose, "x"), y: number(pose, "y"), yaw: number(pose, "yaw")};
 			var at:Dynamic = Reflect.field(raw, "at");
 			if (at != null) step.at = place(at);
+			var targets:Dynamic = Reflect.field(raw, "joints");
+			if (targets != null) {
+				if (!Std.isOfType(targets, Array)) fail();
+				step.joints = [for (target in (cast targets:Array<Dynamic>)) {
+					var joint:Dynamic = Reflect.field(target, "joint");
+					if (!Std.isOfType(joint, String)) fail();
+					{joint: (joint:String), position: number(target, "position")};
+				}];
+			}
 			var weld:Dynamic = Reflect.field(raw, "weld");
 			if (weld != null) step.weld = decodeWeld(weld);
 			step;

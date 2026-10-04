@@ -13,7 +13,7 @@ import machinekit.transmission.TimingBeltProfile;
 /** Shared parameter constructors and parsed enum inputs for component recipes. */
 class ComponentRecipeSupport {
 	public static function threadParameters():Array<ComponentParameter> return [
-		choice("family", ["MetricTrapezoidal", "Acme"], "MetricTrapezoidal"),
+		choice("family", ["MetricTrapezoidal", "Acme", "Ball"], "MetricTrapezoidal"),
 		length("screwDiameter", 8), length("pitch", 2), count("starts", 1),
 		choice("hand", ["RightHand", "LeftHand"], "RightHand")];
 
@@ -40,6 +40,7 @@ class ComponentRecipeSupport {
 	public static function family(value:String):LeadScrewThreadFamily return switch value {
 		case "MetricTrapezoidal": MetricTrapezoidal;
 		case "Acme": Acme;
+		case "Ball": Ball;
 		default: throw 'Unknown thread family "$value"';
 	};
 	public static function hand(value:String):LeadScrewHand return switch value {

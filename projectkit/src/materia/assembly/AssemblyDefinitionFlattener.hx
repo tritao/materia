@@ -85,16 +85,20 @@ class AssemblyDefinitionFlattener {
 		flat.couplings = [];
 		if (source.actuators != null) flat.actuators = [];
 		if (source.encoders != null) flat.encoders = [];
+		if (source.sensors != null) flat.sensors = [];
+		if (source.elasticNetworks != null) flat.elasticNetworks = [];
 		var active = new Map<String, Bool>();
 		var rootMembers = expand("", AssemblyFrames.identity(), source.definitions, source.occurrences, source.joints,
-			source.couplings, source.mates, library, flat, active, source.actuators, source.encoders, source.elasticNetworks);
+			source.couplings, source.mates, library, flat, active, source.actuators, source.encoders,
+			source.sensors, source.elasticNetworks);
 		exposed(source.exposedConnectors, rootMembers, source.id);
 		for (entry in source.assemblies) {
 			var unused:AssemblyDefinition = {schemaVersion: source.schemaVersion, id: entry.id,
 				definitions: [], occurrences: [], joints: [], couplings: []};
 			active.set(entry.id, true);
 			var members = expand("", AssemblyFrames.identity(), entry.definitions, entry.occurrences, entry.joints,
-				entry.couplings, entry.mates, library, unused, active, entry.actuators, entry.encoders, entry.elasticNetworks);
+				entry.couplings, entry.mates, library, unused, active, entry.actuators, entry.encoders,
+				entry.sensors, entry.elasticNetworks);
 			active.remove(entry.id);
 			exposed(entry.exposedConnectors, members, entry.id);
 			AssemblyDefinitionCodec.validate(unused);
@@ -109,6 +113,22 @@ class AssemblyDefinitionFlattener {
 		if (actuator.fullStepsPerRevolution != null) copy.fullStepsPerRevolution = actuator.fullStepsPerRevolution;
 		if (actuator.microsteps != null) copy.microsteps = actuator.microsteps;
 		if (actuator.maxStepRate != null) copy.maxStepRate = actuator.maxStepRate;
+		if (actuator.positionLoopRate != null) copy.positionLoopRate = actuator.positionLoopRate;
+		if (actuator.pneumatic != null) {
+			var p = actuator.pneumatic;
+			var prefix = id.substr(0, id.length - actuator.id.length);
+			copy.pneumatic = {bore: p.bore, rod: p.rod, stroke: p.stroke, ratedSpeed: p.ratedSpeed,
+				pressurePa: p.pressurePa, channelA: prefix + p.channelA,
+				channelB: p.channelB == null ? null : prefix + p.channelB,
+				normallyToA: p.normallyToA, extendSign: p.extendSign};
+		}
+		if (actuator.processVelocity != null) {
+			var process = actuator.processVelocity;
+			var prefix = id.substr(0, id.length - actuator.id.length);
+			copy.processVelocity = {speedChannel: prefix + process.speedChannel,
+				directionChannel: prefix + process.directionChannel,
+				radiansPerSpeedUnit: process.radiansPerSpeedUnit};
+		}
 		if (actuator.drive != null) copy.drive = actuator.drive;
 		if (actuator.torqueSpeed != null) copy.torqueSpeed = actuator.torqueSpeed.copy();
 		if (actuator.holdingTorque != null) copy.holdingTorque = actuator.holdingTorque;
@@ -135,6 +155,19 @@ class AssemblyDefinitionFlattener {
 		return copy;
 	}
 
+	/** A copy of `sensor` under the supplied scope prefix. */
+	public static function copySensor(sensor:AssemblySensor, id:String, prefix:String):AssemblySensor {
+		var copy:AssemblySensor = {id: scoped(prefix, id), kind: sensor.kind};
+		if (sensor.joint != null) copy.joint = scoped(prefix, sensor.joint);
+		if (sensor.occurrence != null) copy.occurrence = scoped(prefix, sensor.occurrence);
+		if (sensor.connector != null) copy.connector = sensor.connector;
+		if (sensor.windowLower != null) copy.windowLower = sensor.windowLower;
+		if (sensor.windowUpper != null) copy.windowUpper = sensor.windowUpper;
+		if (sensor.hysteresis != null) copy.hysteresis = sensor.hysteresis;
+		if (sensor.range != null) copy.range = sensor.range;
+		return copy;
+	}
+
 	/** Keep every coordinate and motion-source reference in a network's namespace. */
 	public static function copyElasticNetwork(network:materia.assembly.AssemblyDefinition.AssemblyElasticNetwork,
 			map:String->String):materia.assembly.AssemblyDefinition.AssemblyElasticNetwork return {
@@ -149,6 +182,7 @@ class AssemblyDefinitionFlattener {
 			occurrences:Array<AssemblyComponentOccurrence>, joints:Array<KinematicJoint>, couplings:Array<AssemblyJointCoupling>,
 			mates:Null<Array<AssemblyMate>>, library:Map<String, AssemblySubdefinition>, flat:AssemblyDefinition, active:Map<String, Bool>,
 			?actuators:Array<AssemblyActuator>, ?encoders:Array<AssemblyEncoder>,
+			?sensors:Array<AssemblySensor>,
 			?networks:Array<materia.assembly.AssemblyDefinition.AssemblyElasticNetwork>):Map<String, FlatMember> {
 		if (definitions == null || occurrences == null || joints == null) throw "Nested assembly has missing members or joints";
 		var localDefinitions = new Map<String, AssemblyComponentDefinition>();
@@ -182,7 +216,8 @@ class AssemblyDefinitionFlattener {
 				if (nested == null) throw 'Assembly "$path" references a missing nested definition';
 				active.set(nested.id, true);
 				var children = expand(path, worldPose, nested.definitions, nested.occurrences, nested.joints,
-					nested.couplings, nested.mates, library, flat, active, nested.actuators, nested.encoders, nested.elasticNetworks);
+					nested.couplings, nested.mates, library, flat, active, nested.actuators, nested.encoders,
+					nested.sensors, nested.elasticNetworks);
 				active.remove(nested.id);
 				connectors = exposed(nested.exposedConnectors, children, path);
 			} else {
@@ -240,6 +275,10 @@ class AssemblyDefinitionFlattener {
 			if (flat.encoders == null) flat.encoders = [];
 			for (encoder in encoders)
 				flat.encoders.push(copyEncoder(encoder, scoped(prefix, encoder.id), scoped(prefix, encoder.joint)));
+		}
+		if (sensors != null) {
+			if (flat.sensors == null) flat.sensors = [];
+			for (sensor in sensors) flat.sensors.push(copySensor(sensor, sensor.id, prefix));
 		}
 		if (mates != null) for (mate in mates) {
 			var first = endpoint(members, mate.first, mate.firstConnector, prefix);

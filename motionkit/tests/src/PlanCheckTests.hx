@@ -147,11 +147,12 @@ class PlanCheckTests extends MotionKitTestSupport {
       joint.limits.velocity = 2.0;
       joint.limits.maxAcceleration = 4.0;
     }
-    var blueprint = robotkit.runtime.RobotRuntimeCompiler.compile(fixture.model);
     var actuator = new Actuator("weak-servo", null, null,
       Transmission.SimpleTransmission(fixture.model.joints[0].id, 1.0, 0.0));
     actuator.drive = new ServoDrive(0.00001, 0.00002, 100.0, 200.0, 1e-3, 4096.0);
     fixture.model.addActuator(actuator);
+    var blueprint = robotkit.runtime.RobotRuntimeCompiler.compile(fixture.model,
+      new robotkit.profile.RobotProfile());
     var harness = new SimulationHarness(0.01);
     var runtime = harness.simulation.addRobot(blueprint);
     var robot = new SimulatedRobot("checked-servo", runtime, fixture.model.name,

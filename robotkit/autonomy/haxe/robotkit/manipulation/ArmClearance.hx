@@ -14,7 +14,7 @@ typedef ClearanceBodyData = {
   var tool:Bool;
 }
 
-/** Two bodies closer than they may be. `distance` is negative when they overlap. */
+/** Two bodies closer than they may be. `distance` is zero when they touch or overlap. */
 typedef ClearanceViolation = {
   var a:String;
   var b:String;
@@ -198,11 +198,13 @@ class ArmClearance {
     return null;
   }
 
+
   /** The distance between two bodies whose corners are `cornersA` and `cornersB` in the arm's frame (`enough`: see `ConvexDistance`). */
   static function distance(a:ClearanceBody, cornersA:Array<Float>, ta:Transform3, b:ClearanceBody, cornersB:Array<Float>, tb:Transform3,
       enough:Float):Float {
     var gap = a.centreIn(ta).sub(b.centreIn(tb)).norm() - a.radius - b.radius;
     if (gap > enough) return gap;
     return ConvexDistance.between(cornersA, cornersB, enough);
+
   }
 }

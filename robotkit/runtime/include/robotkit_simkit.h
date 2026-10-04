@@ -129,6 +129,29 @@ typedef struct rk_simulation_contact_pair {
     uint32_t reserved0;
 } rk_simulation_contact_pair;
 
+/** A simulation-owned cylinder and valve latch acting on one process joint. */
+typedef struct rk_simulation_pneumatic_drive {
+    uint32_t joint;
+    uint32_t channel_a;
+    uint32_t channel_b; /**< UINT32_MAX for a single-coil, spring-return valve. */
+    uint32_t normally_to_a;
+    double extension_force;
+    double retraction_force;
+    double extend_sign;
+    double rated_speed;
+} rk_simulation_pneumatic_drive;
+
+/** A simulation-owned continuous joint whose speed is set by analog process channels. */
+typedef struct rk_simulation_velocity_drive {
+    uint32_t joint;
+    uint32_t speed_channel;
+    uint32_t direction_channel;
+    uint32_t reserved0;
+    double radians_per_speed_unit;
+    double max_effort;
+    double max_rate;
+} rk_simulation_velocity_drive;
+
 /**
  * Optional settings for one robot added to a Simulation. An initial_pose whose
  * struct_size is zero keeps the default placement.
@@ -207,6 +230,12 @@ typedef struct rk_simulation_robot_desc {
      */
     uint32_t link_hull_count;
     rk_simulation_link_hull link_hulls[RK_MAX_LINK_HULLS];
+    /** Appended v28 tail: physical cylinders are simulation models, not runtime targets. */
+    uint32_t pneumatic_drive_count;
+    rk_simulation_pneumatic_drive pneumatic_drives[RK_MAX_JOINTS];
+    /** Appended v29 tail: spindle speed is a typed analog process drive. */
+    uint32_t velocity_drive_count;
+    rk_simulation_velocity_drive velocity_drives[RK_MAX_JOINTS];
     /** Optional board-defined peripheral profile; zero disables it. */
     uint32_t virtual_peripheral_kind;
     uint32_t virtual_peripheral_parameter_count;

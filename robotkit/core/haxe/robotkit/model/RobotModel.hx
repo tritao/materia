@@ -5,7 +5,7 @@ import robotkit.model.Transmission;
 
 /** Editable static definition of a robot's links, joints, and sensors. */
 class RobotModel {
-  public static inline var CURRENT_VERSION:Int = 9;
+  public static inline var CURRENT_VERSION:Int = 11;
   public final schemaVersion:Int = CURRENT_VERSION;
   public final name:String;
   public final links:Array<Link> = [];

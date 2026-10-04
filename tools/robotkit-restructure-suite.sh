@@ -70,4 +70,3 @@ cmake --build "$build_root/motion-release" --target motionkit_runtime_fixtures
 cmake -E compare_files "$build_root/runtime-fixtures.hpp" robotkit/runtime/tests/runtime_trajectory_fixtures.hpp
 ctest --test-dir "$build_root/cad" --output-on-failure -j 1
 fi
-

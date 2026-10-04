@@ -174,7 +174,11 @@ rk_result validate_appended_path(
     limits.max_continuity_jump[0] = 1e-9;
     for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
         const auto &source = blueprint.joints[joint];
-        limits.position_claimed[joint] = 1;
+        // A process drive may be compressing its end cushion while the motion
+        // planner carries a constant observation of that joint.
+        limits.position_claimed[joint] = blueprint.struct_size >=
+            offsetof(rk_robot_runtime_blueprint, sensor_joint) &&
+            blueprint.process_joint[joint] ? 0 : 1;
         limits.position_lower[joint] = source.lower_limit;
         limits.position_upper[joint] = source.upper_limit;
         limits.max_velocity[joint] = source.max_velocity;
@@ -192,10 +196,60 @@ rk_result validate_appended_path(
     return RK_OK;
 }
 
+/**
+  The blueprint with each coupled joint that has no velocity or acceleration limit of its own
+  given its leaders', scaled by the ratios and summed: a lead screw turns as fast as its axis
+  moves it, and a CoreXY motor as fast as both axes together can turn it. Its motion is its
+  leaders', so this bounds nothing new, but every stop and check that budgets joint by joint then
+  has a limit to work with. A follower waits until every leader has the limit.
+**/
+rk_robot_runtime_blueprint with_coupled_limits(const rk_robot_runtime_blueprint &source) {
+    rk_robot_runtime_blueprint blueprint{};
+    std::memcpy(&blueprint, &source, std::min<std::size_t>(source.struct_size, sizeof(blueprint)));
+    if (blueprint.struct_size < offsetof(rk_robot_runtime_blueprint, process_joint)) return blueprint;
+    const auto count = std::min(blueprint.coupling_count,
+        static_cast<uint32_t>(RK_MAX_JOINT_COUPLINGS));
+    // Each pass settles at least one more link of every chain.
+    for (uint32_t pass = 0; pass < count; ++pass) {
+        bool changed = false;
+        for (uint32_t i = 0; i < count; ++i) {
+            const auto &coupling = blueprint.couplings[i];
+            if (coupling.leader >= blueprint.joint_count || coupling.follower >= blueprint.joint_count ||
+                !robotkit::internal::first_term_of_follower(blueprint.couplings, i))
+                continue;
+            auto &follower = blueprint.joints[coupling.follower];
+            double velocity = 0.0, acceleration = 0.0;
+            bool has_velocity = true, has_acceleration = true;
+            for (uint32_t k = 0; k < count; ++k) {
+                const auto &term = blueprint.couplings[k];
+                if (term.follower != coupling.follower) continue;
+                if (term.leader >= blueprint.joint_count) { has_velocity = has_acceleration = false; break; }
+                const auto &leader = blueprint.joints[term.leader];
+                const double scale = std::abs(term.ratio);
+                if (leader.max_velocity > 0.0) velocity += scale * leader.max_velocity;
+                else has_velocity = false;
+                if (leader.max_acceleration > 0.0) acceleration += scale * leader.max_acceleration;
+                else has_acceleration = false;
+            }
+            if (!(follower.max_velocity > 0.0) && has_velocity) {
+                follower.max_velocity = velocity;
+                changed = true;
+            }
+            if (!(follower.max_acceleration > 0.0) && has_acceleration) {
+                follower.max_acceleration = acceleration;
+                changed = true;
+            }
+        }
+        if (!changed) break;
+    }
+    return blueprint;
+}
+
 /** Missing acceleration has no numeric sentinel: presence is carried in the blueprint. */
 double acceleration_limit(const rk_robot_runtime_joint &joint) {
     return (joint.limit_flags & RK_LIMIT_ACCELERATION) ? joint.max_acceleration
         : std::numeric_limits<double>::infinity();
+
 }
 
 /** Queued knots, excluding the end marker, once `added` replaces it. */
@@ -448,6 +502,11 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
             // A drained path or completed stop holds its last commanded
             // setpoint. Endpoint samples are observations, not plan anchors.
             for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
+                if (blueprint_.struct_size >= offsetof(rk_robot_runtime_blueprint, sensor_joint) &&
+                    blueprint_.process_joint[joint]) {
+                    anchor_position[joint] = state_.position[joint];
+                    continue;
+                }
                 if (control_.active[joint] &&
                     control_.targets[joint].mode != RK_TARGET_POSITION &&
                     control_.targets[joint].mode != RK_TARGET_SERVO)
@@ -496,6 +555,10 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
         if (replace && first.degree < 2)
             return RK_ERROR_INVALID_STATE;
         for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
+            // A process drive owns its joint independently of planned motion. Its observed
+            // position can change while a program waits for a process input.
+            if (blueprint_.struct_size >= offsetof(rk_robot_runtime_blueprint, sensor_joint) &&
+                blueprint_.process_joint[joint]) continue;
             const double position_tolerance = plan.position_tolerance[joint] > 0.0
                 ? plan.position_tolerance[joint] : default_tolerance;
             const double velocity_tolerance = plan.velocity_tolerance[joint] > 0.0
@@ -805,14 +868,15 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
     double stop_crossing_rate = 0.0;
     double stop_after_crossing_seconds = 0.0;
     double stop_path_velocities[RK_MAX_TRAJECTORY_JOINTS]{};
-    // Planning limits belong to the active queued segment, never the mechanical blueprint.
+    // The active queued segment owns the planning limit used by stops and resumes.
     if (control_.trajectory_active && !trajectory_.empty()) {
         const auto *selected = &trajectory_.front();
         for (const auto &point : trajectory_) {
             if (point.point.time_from_start_ns > control_.trajectory_time_ns) break;
             selected = &point;
         }
-        std::copy_n(selected->control_acceleration, RK_MAX_TRAJECTORY_JOINTS, control_.control_acceleration);
+        std::copy_n(selected->control_acceleration, RK_MAX_TRAJECTORY_JOINTS,
+            control_.control_acceleration);
     }
     auto control_acceleration = [&](uint32_t joint) {
         const auto physical = acceleration_limit(blueprint_.joints[joint]);
@@ -821,171 +885,177 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
             ? control_.control_acceleration[joint] : 0.0;
         return requested > 0.0 ? std::min(physical, requested) : physical;
     };
-    if (control_.trajectory_active && !trajectory_.empty()) {
-        const auto period_count = period_.count();
-        const auto period_ns = period_count > 0 ? static_cast<uint64_t>(period_count) : 0;
-        const double period_seconds = static_cast<double>(period_ns) / 1'000'000'000.0;
-        double time_ns = static_cast<double>(control_.trajectory_time_ns) +
-            control_.trajectory_time_remainder_ns;
-        if (control_.plan_just_submitted) {
-            control_.plan_just_submitted = false;
-            control_.device_queue_end_ns = 0;
-        } else if (!control_.stop_ramp_active && !control_.hold_requested &&
-                   !control_.resume_requested) {
-            // The runtime's copy of a device's queue follows the device: it
-            // starts the queue after a link and clock delay, so a copy that
-            // ran on the owner clock alone would retire knots the device has
-            // not executed (and take an append for a new plan). The device
-            // reports its queue running from submission (path time 0 until it
-            // starts). Once it has finished, or failed, the copy is done at
-            // once up to the end of the queue the device was running, and
-            // runs out on the owner clock through anything appended since.
-            if (device_running) {
-                time_ns = std::max(time_ns, static_cast<double>(device_path_time_ns));
-                control_.device_queue_end_ns = trajectory_.back().point.time_from_start_ns;
-            } else {
-                time_ns += static_cast<double>(period_ns);
-                if (endpoint_->executes_trajectory_queue())
-                    time_ns = std::max(time_ns, static_cast<double>(control_.device_queue_end_ns));
-            }
-        } else if (control_.stop_ramp_active || control_.hold_requested) {
-            // Path-following stop. A joint moves at rate * v and accelerates
-            // at rate' * v + rate^2 * a, where v and a belong to the queued
-            // trajectory itself. Lower the rate as fast as every joint's limit
-            // allows, so braking already present in the trajectory is counted
-            // rather than stacked on top of the stop. The rate is integrated
-            // in substeps because at low speed one period can change it a lot.
-            constexpr int substeps = 16;
-            const double step_seconds = period_seconds / substeps;
-            const double end_ns =
-                static_cast<double>(trajectory_.back().point.time_from_start_ns);
-            const auto region = path_region(trajectory_.knots(),
-                control_.trajectory_history_valid ? &control_.trajectory_history : nullptr);
-            double rate = control_.trajectory_rate;
-            for (int step = 0; step < substeps && rate > 0.0; ++step) {
-                mk_path_derivative_estimate estimate{};
-                motionkit::estimate_path_derivatives(region, static_cast<int64_t>(time_ns),
-                    period_ns, estimate);
-                const auto *velocities = estimate.velocity;
-                if (estimate.has_forward_acceleration)
-                    std::copy_n(estimate.acceleration, blueprint_.joint_count,
-                        control_.stop_path_accelerations);
-                const auto *accelerations = control_.stop_path_accelerations;
-                const auto *recent = estimate.recent_acceleration;
-                double max_decrease = std::numeric_limits<double>::infinity();
-                for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
-                    const double speed = std::abs(velocities[joint]);
-                    if (speed <= 1e-12)
-                        continue;
-                    const double direction = velocities[joint] > 0.0 ? 1.0 : -1.0;
-                    // With rate' = -k, the path's own braking consumes part
-                    // of the joint acceleration budget. MotionKit gives
-                    // analytic derivatives for degree >= 2 and conservative
-                    // chord differences at degree 1, including the recent
-                    // knot behind the clock. Budgeting rate * |a| rather than
-                    // the continuous rate^2 * |a| covers a whole velocity
-                    // step when the clock is slowed and is conservative for
-                    // smooth segments too. Path speed-ups are not credited.
-                    const double braking = std::max(0.0, std::max(
-                        -direction * accelerations[joint], -direction * recent[joint]));
-                    max_decrease = std::min(max_decrease,
-                        (control_acceleration(joint) - rate * braking) / speed);
+    auto advance_reference_clock = [&]() {
+        if (control_.trajectory_active && !trajectory_.empty()) {
+            const auto period_count = period_.count();
+            const auto period_ns = period_count > 0 ? static_cast<uint64_t>(period_count) : 0;
+            const double period_seconds = static_cast<double>(period_ns) / 1'000'000'000.0;
+            double time_ns = static_cast<double>(control_.trajectory_time_ns) +
+                control_.trajectory_time_remainder_ns;
+            if (control_.plan_just_submitted) {
+                control_.plan_just_submitted = false;
+                control_.device_queue_end_ns = 0;
+            } else if (!control_.stop_ramp_active && !control_.hold_requested &&
+                       !control_.resume_requested) {
+                // The runtime's copy of a device's queue follows the device: it
+                // starts the queue after a link and clock delay, so a copy that
+                // ran on the owner clock alone would retire knots the device has
+                // not executed (and take an append for a new plan). The device
+                // reports its queue running from submission (path time 0 until it
+                // starts). Once it has finished, or failed, the copy is done at
+                // once up to the end of the queue the device was running, and
+                // runs out on the owner clock through anything appended since.
+                if (device_running) {
+                    time_ns = std::max(time_ns, static_cast<double>(device_path_time_ns));
+                    control_.device_queue_end_ns = trajectory_.back().point.time_from_start_ns;
+                } else {
+                    time_ns += static_cast<double>(period_ns);
+                    if (endpoint_->executes_trajectory_queue())
+                        time_ns = std::max(time_ns, static_cast<double>(control_.device_queue_end_ns));
+
                 }
-                // No joint moving: the trajectory is at rest and can stop now.
-                // A non-positive bound means the trajectory already brakes at
-                // the limit, so it keeps its rate and brakes by itself.
-                const double next_rate = !std::isfinite(max_decrease) ? 0.0 :
-                    std::clamp(rate - std::max(0.0, max_decrease) * step_seconds, 0.0, rate);
-                const double step_ns = 0.5 * (rate + next_rate) * step_seconds * 1'000'000'000.0;
-                if (time_ns + step_ns >= end_ns && next_rate > 0.0) {
-                    const double fraction = step_ns > 0.0
-                        ? std::clamp((end_ns - time_ns) / step_ns, 0.0, 1.0) : 1.0;
-                    stop_crossed_queue_end = true;
-                    stop_crossing_rate = rate + (next_rate - rate) * fraction;
-                    stop_after_crossing_seconds =
-                        ((1.0 - fraction) + (substeps - step - 1)) * step_seconds;
-                    const auto &last = region.back();
-                    if (last.degree >= 2) {
-                        mk_trajectory_state endpoint{};
-                        motionkit::evaluate_segment(last,
-                            static_cast<double>(last.duration_ns) * 1e-9, endpoint);
-                        std::copy_n(endpoint.velocity, blueprint_.joint_count,
-                            stop_path_velocities);
-                    } else {
-                        // A chord velocity belongs at its midpoint. Continue
-                        // its finite-difference braking estimate to the end.
-                        const double half_span_seconds =
-                            static_cast<double>(last.duration_ns) * 0.5e-9;
-                        for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
-                            const double extrapolated = velocities[joint] +
-                                accelerations[joint] * half_span_seconds;
-                            stop_path_velocities[joint] =
-                                extrapolated * velocities[joint] > 0.0 ? extrapolated : 0.0;
-                        }
+            } else if (control_.stop_ramp_active || control_.hold_requested) {
+                // Path-following stop. A joint moves at rate * v and accelerates
+                // at rate' * v + rate^2 * a, where v and a belong to the queued
+                // trajectory itself. Lower the rate as fast as every joint's limit
+                // allows, so braking already present in the trajectory is counted
+                // rather than stacked on top of the stop. The rate is integrated
+                // in substeps because at low speed one period can change it a lot.
+                constexpr int substeps = 16;
+                const double step_seconds = period_seconds / substeps;
+                const double end_ns =
+                    static_cast<double>(trajectory_.back().point.time_from_start_ns);
+                const auto region = path_region(trajectory_.knots(),
+                    control_.trajectory_history_valid ? &control_.trajectory_history : nullptr);
+                double rate = control_.trajectory_rate;
+                for (int step = 0; step < substeps && rate > 0.0; ++step) {
+                    mk_path_derivative_estimate estimate{};
+                    motionkit::estimate_path_derivatives(region, static_cast<int64_t>(time_ns),
+                        period_ns, estimate);
+                    const auto *velocities = estimate.velocity;
+                    if (estimate.has_forward_acceleration)
+                        std::copy_n(estimate.acceleration, blueprint_.joint_count,
+                            control_.stop_path_accelerations);
+                    const auto *accelerations = control_.stop_path_accelerations;
+                    const auto *recent = estimate.recent_acceleration;
+                    double max_decrease = std::numeric_limits<double>::infinity();
+                    for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
+                        const double speed = std::abs(velocities[joint]);
+                        if (speed <= 1e-12)
+                            continue;
+                        const double direction = velocities[joint] > 0.0 ? 1.0 : -1.0;
+                        // With rate' = -k, the path's own braking consumes part
+                        // of the joint acceleration budget. MotionKit gives
+                        // analytic derivatives for degree >= 2 and conservative
+                        // chord differences at degree 1, including the recent
+                        // knot behind the clock. Budgeting rate * |a| rather than
+                        // the continuous rate^2 * |a| covers a whole velocity
+                        // step when the clock is slowed and is conservative for
+                        // smooth segments too. Path speed-ups are not credited.
+                        const double braking = std::max(0.0, std::max(
+                            -direction * accelerations[joint], -direction * recent[joint]));
+                        max_decrease = std::min(max_decrease,
+                            (control_acceleration(joint) - rate * braking) / speed);
                     }
-                    time_ns = end_ns;
+                    // No joint moving: the trajectory is at rest and can stop now.
+                    // A non-positive bound means the trajectory already brakes at
+                    // the limit, so it keeps its rate and brakes by itself.
+                    const double next_rate = !std::isfinite(max_decrease) ? 0.0 :
+                        std::clamp(rate - std::max(0.0, max_decrease) * step_seconds, 0.0, rate);
+                    const double step_ns = 0.5 * (rate + next_rate) * step_seconds * 1'000'000'000.0;
+                    if (time_ns + step_ns >= end_ns && next_rate > 0.0) {
+                        const double fraction = step_ns > 0.0
+                            ? std::clamp((end_ns - time_ns) / step_ns, 0.0, 1.0) : 1.0;
+                        stop_crossed_queue_end = true;
+                        stop_crossing_rate = rate + (next_rate - rate) * fraction;
+                        stop_after_crossing_seconds =
+                            ((1.0 - fraction) + (substeps - step - 1)) * step_seconds;
+                        const auto &last = region.back();
+                        if (last.degree >= 2) {
+                            mk_trajectory_state endpoint{};
+                            motionkit::evaluate_segment(last,
+                                static_cast<double>(last.duration_ns) * 1e-9, endpoint);
+                            std::copy_n(endpoint.velocity, blueprint_.joint_count,
+                                stop_path_velocities);
+                        } else {
+                            // A chord velocity belongs at its midpoint. Continue
+                            // its finite-difference braking estimate to the end.
+                            const double half_span_seconds =
+                                static_cast<double>(last.duration_ns) * 0.5e-9;
+                            for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
+                                const double extrapolated = velocities[joint] +
+                                    accelerations[joint] * half_span_seconds;
+                                stop_path_velocities[joint] =
+                                    extrapolated * velocities[joint] > 0.0 ? extrapolated : 0.0;
+                            }
+                        }
+                        time_ns = end_ns;
+                        rate = next_rate;
+                        break;
+                    }
+                    time_ns += step_ns;
                     rate = next_rate;
-                    break;
                 }
-                time_ns += step_ns;
-                rate = next_rate;
+                control_.trajectory_rate = rate;
+                trajectory_stop_completed = control_.stop_ramp_active && rate <= 0.0 &&
+                    !stop_crossed_queue_end;
+            } else {
+                // Resume uses the same joint acceleration budget as hold. The
+                // path's own acceleration is charged before increasing its rate.
+                constexpr int substeps = 16;
+                const double step_seconds = period_seconds / substeps;
+                const auto region = path_region(trajectory_.knots(),
+                    control_.trajectory_history_valid ? &control_.trajectory_history : nullptr);
+                double rate = control_.trajectory_rate;
+                for (int step = 0; step < substeps; ++step) {
+                    if (rate >= 1.0) {
+                        time_ns += step_seconds * 1'000'000'000.0;
+                        continue;
+                    }
+                    mk_path_derivative_estimate estimate{};
+                    motionkit::estimate_path_derivatives(region, static_cast<int64_t>(time_ns),
+                        period_ns, estimate);
+                    double max_increase = std::numeric_limits<double>::infinity();
+                    for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
+                        const double speed = std::abs(estimate.velocity[joint]);
+                        if (speed <= 1e-12) continue;
+                        const double path_acceleration = std::max(std::abs(estimate.acceleration[joint]),
+                            std::abs(estimate.recent_acceleration[joint]));
+                        max_increase = std::min(max_increase,
+                            std::max(0.0, control_acceleration(joint) -
+                                rate * path_acceleration) / speed);
+                    }
+                    const double next_rate = !std::isfinite(max_increase) ? 1.0 :
+                        std::clamp(rate + max_increase * step_seconds, rate, 1.0);
+                    time_ns += 0.5 * (rate + next_rate) * step_seconds * 1'000'000'000.0;
+                    rate = next_rate;
+                }
+                if (rate >= 1.0) control_.resume_requested = false;
+                control_.trajectory_rate = rate;
             }
-            control_.trajectory_rate = rate;
-            trajectory_stop_completed = control_.stop_ramp_active && rate <= 0.0 &&
-                !stop_crossed_queue_end;
-        } else {
-            // Resume uses the same joint acceleration budget as hold. The
-            // path's own acceleration is charged before increasing its rate.
-            constexpr int substeps = 16;
-            const double step_seconds = period_seconds / substeps;
-            const auto region = path_region(trajectory_.knots(),
-                control_.trajectory_history_valid ? &control_.trajectory_history : nullptr);
-            double rate = control_.trajectory_rate;
-            for (int step = 0; step < substeps; ++step) {
-                if (rate >= 1.0) {
-                    time_ns += step_seconds * 1'000'000'000.0;
-                    continue;
-                }
-                mk_path_derivative_estimate estimate{};
-                motionkit::estimate_path_derivatives(region, static_cast<int64_t>(time_ns),
-                    period_ns, estimate);
-                double max_increase = std::numeric_limits<double>::infinity();
-                for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
-                    const double speed = std::abs(estimate.velocity[joint]);
-                    if (speed <= 1e-12) continue;
-                    const double path_acceleration = std::max(std::abs(estimate.acceleration[joint]),
-                        std::abs(estimate.recent_acceleration[joint]));
-                    max_increase = std::min(max_increase,
-                        std::max(0.0, control_acceleration(joint) -
-                            rate * path_acceleration) / speed);
-                }
-                const double next_rate = !std::isfinite(max_increase) ? 1.0 :
-                    std::clamp(rate + max_increase * step_seconds, rate, 1.0);
-                time_ns += 0.5 * (rate + next_rate) * step_seconds * 1'000'000'000.0;
-                rate = next_rate;
+            const double max_time = static_cast<double>(std::numeric_limits<uint64_t>::max());
+            if (time_ns >= max_time) {
+                control_.trajectory_time_ns = std::numeric_limits<uint64_t>::max();
+                control_.trajectory_time_remainder_ns = 0.0;
+            } else {
+                const auto whole = static_cast<uint64_t>(time_ns);
+                control_.trajectory_time_ns = std::max(control_.trajectory_time_ns, whole);
+                control_.trajectory_time_remainder_ns = time_ns - static_cast<double>(whole);
+
             }
-            if (rate >= 1.0) control_.resume_requested = false;
-            control_.trajectory_rate = rate;
         }
-        const double max_time = static_cast<double>(std::numeric_limits<uint64_t>::max());
-        if (time_ns >= max_time) {
-            control_.trajectory_time_ns = std::numeric_limits<uint64_t>::max();
-            control_.trajectory_time_remainder_ns = 0.0;
-        } else {
-            const auto whole = static_cast<uint64_t>(time_ns);
-            control_.trajectory_time_ns = std::max(control_.trajectory_time_ns, whole);
-            control_.trajectory_time_remainder_ns = time_ns - static_cast<double>(whole);
+        if (control_.stop_ramp_active) {
+            const auto period_count = period_.count();
+            const auto period_ns = period_count > 0 ? static_cast<uint64_t>(period_count) : 0;
+            if (std::numeric_limits<uint64_t>::max() - control_.stop_ramp_time_ns < period_ns)
+                control_.stop_ramp_time_ns = control_.stop_ramp_duration_ns;
+            else
+                control_.stop_ramp_time_ns = std::min(control_.stop_ramp_duration_ns,
+                    control_.stop_ramp_time_ns + period_ns);
         }
-    }
-    if (control_.stop_ramp_active) {
-        const auto period_count = period_.count();
-        const auto period_ns = period_count > 0 ? static_cast<uint64_t>(period_count) : 0;
-        if (std::numeric_limits<uint64_t>::max() - control_.stop_ramp_time_ns < period_ns)
-            control_.stop_ramp_time_ns = control_.stop_ramp_duration_ns;
-        else
-            control_.stop_ramp_time_ns = std::min(control_.stop_ramp_duration_ns,
-                control_.stop_ramp_time_ns + period_ns);
-    }
+
+    };
+    advance_reference_clock();
 
     const bool has_command = !commands.empty();
     rk_command_kind final_kind = RK_COMMAND_NONE;
@@ -1044,7 +1114,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
     // travel limit is closer than that, the ramp is shortened to stop at the
     // limit instead of running into it; if that means braking harder than a
     // joint allows, the fault is latched once the ramp reaches rest.
-    auto start_stop_ramp = [&](const double *positions, const double *velocities) {
+    auto stop_ramp_bounds = [&](const double *positions, const double *velocities) {
         const auto period_count = period_.count();
         const auto period_ns = period_count > 0 ? static_cast<uint64_t>(period_count) : 1;
         double duration_seconds = 2.0 * static_cast<double>(period_ns) / 1'000'000'000.0;
@@ -1069,9 +1139,13 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                 ramp_hits_limit = true;
             duration_seconds = std::min(duration_seconds, 2.0 * room / speed);
         }
-        control_.stop_ramp_hits_limit = ramp_hits_limit;
-        control_.stop_ramp_duration_ns =
-            static_cast<uint64_t>(std::ceil(duration_seconds * 1'000'000'000.0));
+        return std::pair<uint64_t, bool>{
+            static_cast<uint64_t>(std::ceil(duration_seconds * 1'000'000'000.0)), ramp_hits_limit};
+    };
+    auto start_stop_ramp = [&](const double *positions, const double *velocities) {
+        const auto bounds = stop_ramp_bounds(positions, velocities);
+        control_.stop_ramp_hits_limit = bounds.second;
+        control_.stop_ramp_duration_ns = bounds.first;
         control_.stop_ramp_time_ns = 0;
         std::copy_n(positions, blueprint_.joint_count, control_.stop_ramp_positions);
         std::copy_n(velocities, blueprint_.joint_count, control_.stop_ramp_velocities);
@@ -1460,24 +1534,39 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
     bool stop_ramp_finished = false;
     auto write_stop_ramp_targets = [&](rk_robot_command &value) {
         value.kind = RK_COMMAND_JOINT_TARGETS;
-        value.target_count = blueprint_.joint_count;
         const double duration = static_cast<double>(control_.stop_ramp_duration_ns) /
             1'000'000'000.0;
         const double elapsed = static_cast<double>(control_.stop_ramp_time_ns) /
             1'000'000'000.0;
         const double t = std::min(duration, elapsed);
         const double blend = duration <= 0.0 ? 0.0 : t - 0.5 * t * t / duration;
+        value.reference_duration = std::min(std::chrono::duration<double>(period_).count(),
+            std::max(0.0, duration - t));
+        uint32_t target_count = 0;
         for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
-            value.targets[joint].joint = joint;
-            value.targets[joint].mode = RK_TARGET_POSITION;
+            if (blueprint_.struct_size >= offsetof(rk_robot_runtime_blueprint, sensor_joint) &&
+                blueprint_.process_joint[joint]) continue;
+            auto &target = value.targets[target_count];
+            target.joint = joint;
+            target.mode = RK_TARGET_POSITION;
             const auto &limits = blueprint_.joints[joint];
-            value.targets[joint].target = std::clamp(
+            target.target = std::clamp(
                 control_.stop_ramp_positions[joint] +
                     control_.stop_ramp_velocities[joint] * blend,
                 limits.lower_limit, limits.upper_limit);
-            value.targets[joint].max_rate = 0.0;
-            value.targets[joint].max_effort = 0.0;
+            if (joint < RK_MAX_SERVO_JOINTS && duration > 0.0 && t < duration) {
+                const double end_t = std::min(duration, t + value.reference_duration);
+                value.servos[target_count].velocity = control_.stop_ramp_velocities[joint] * (1.0 - t / duration);
+                value.reference_end_position[target_count] = std::clamp(control_.stop_ramp_positions[joint] +
+                    control_.stop_ramp_velocities[joint] * (end_t - 0.5 * end_t * end_t / duration),
+                    limits.lower_limit, limits.upper_limit);
+                value.reference_end_velocity[target_count] = control_.stop_ramp_velocities[joint] * (1.0 - end_t / duration);
+            }
+            target.max_rate = 0.0;
+            target.max_effort = 0.0;
+            ++target_count;
         }
+        value.target_count = target_count;
         if (control_.stop_ramp_time_ns >= control_.stop_ramp_duration_ns) {
             control_.stop_ramp_active = false;
             stop_ramp_finished = true;
@@ -1503,15 +1592,88 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         }
         const auto &front = trajectory_.front();
         double point_positions[RK_MAX_TRAJECTORY_JOINTS]{};
-        evaluate_knot(front, control_.trajectory_time_ns, point_positions);
+        double point_velocities[RK_MAX_TRAJECTORY_JOINTS]{};
+        evaluate_knot(front, control_.trajectory_time_ns, point_positions, point_velocities);
+        output.reference_duration = std::chrono::duration<double>(period_).count();
+        // Predict with the same clock integration the next cycle will use. Holding and
+        // resuming therefore use the next command's state, including its path clock rate.
+        const auto saved_control = control_;
+        const bool saved_crossed = stop_crossed_queue_end;
+        const double saved_crossing_rate = stop_crossing_rate;
+        const double saved_after_crossing = stop_after_crossing_seconds;
+        const bool saved_completed = trajectory_stop_completed;
+        double saved_stop_velocities[RK_MAX_JOINTS]{};
+        std::copy_n(stop_path_velocities, blueprint_.joint_count, saved_stop_velocities);
+        advance_reference_clock();
+        const auto end_time = control_.trajectory_time_ns;
+        double end_rate = control_.trajectory_rate;
+        const RuntimeTrajectoryPoint *end_knot = &front;
+        for (const auto &knot : trajectory_) {
+            if (knot.point.time_from_start_ns > end_time) break;
+            end_knot = &knot;
+        }
+        double end_positions[RK_MAX_TRAJECTORY_JOINTS]{};
+        double end_velocities[RK_MAX_TRAJECTORY_JOINTS]{};
+        evaluate_knot(*end_knot, end_time, end_positions, end_velocities);
+        // Queue exhaustion can switch the next command to the bounded straight
+        // stop ramp. Predict that same state rather than the stationary end marker.
+        if (end_time >= trajectory_.back().point.time_from_start_ns &&
+            !trajectory_stop_completed && !trajectory_.back().ends_at_rest &&
+            trajectory_.back().plan_id != 0) {
+            if (!stop_crossed_queue_end) {
+                const RuntimeTrajectoryPoint *terminal = nullptr;
+                for (auto it = trajectory_.rbegin(); it != trajectory_.rend(); ++it)
+                    if (it->has_segment) { terminal = &*it; break; }
+                if (!terminal && control_.trajectory_history_valid &&
+                    control_.trajectory_history.has_segment)
+                    terminal = &control_.trajectory_history;
+                if (terminal) {
+                    mk_trajectory_state state{};
+                    motionkit::evaluate_segment(terminal->segment.native(),
+                        static_cast<double>(terminal->segment.duration_ns) * 1e-9, state);
+                    std::copy_n(state.velocity, blueprint_.joint_count, stop_path_velocities);
+                }
+            }
+            double velocities[RK_MAX_JOINTS]{};
+            const double rate = stop_crossed_queue_end ? stop_crossing_rate : end_rate;
+            for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
+                velocities[joint] = rate * stop_path_velocities[joint];
+            const auto bounds = stop_ramp_bounds(end_positions, velocities);
+            const double duration = static_cast<double>(bounds.first) * 1e-9;
+            const double t = std::min(duration,
+                static_cast<double>(static_cast<uint64_t>(stop_after_crossing_seconds * 1e9)) * 1e-9);
+            for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
+                const auto &limits = blueprint_.joints[joint];
+                end_positions[joint] = std::clamp(end_positions[joint] + velocities[joint] *
+                    (duration > 0.0 ? t - 0.5 * t * t / duration : 0.0),
+                    limits.lower_limit, limits.upper_limit);
+                end_velocities[joint] = duration > 0.0 ? velocities[joint] * (1.0 - t / duration) : 0.0;
+            }
+            end_rate = 1.0;
+        }
+        control_ = saved_control;
+        std::copy_n(saved_stop_velocities, blueprint_.joint_count, stop_path_velocities);
+        stop_crossed_queue_end = saved_crossed;
+        stop_crossing_rate = saved_crossing_rate;
+        stop_after_crossing_seconds = saved_after_crossing;
+        trajectory_stop_completed = saved_completed;
         output.kind = RK_COMMAND_JOINT_TARGETS;
-        output.target_count = front.point.joint_count;
+        output.target_count = 0;
         for (uint32_t joint = 0; joint < front.point.joint_count; ++joint) {
-            output.targets[joint].joint = joint;
-            output.targets[joint].mode = RK_TARGET_POSITION;
-            output.targets[joint].target = point_positions[joint];
-            output.targets[joint].max_rate = 0.0;
-            output.targets[joint].max_effort = 0.0;
+            if (blueprint_.struct_size >= offsetof(rk_robot_runtime_blueprint, sensor_joint) &&
+                blueprint_.process_joint[joint]) continue;
+            const auto target_index = output.target_count++;
+            output.targets[target_index].joint = joint;
+            output.targets[target_index].mode = RK_TARGET_POSITION;
+            output.targets[target_index].target = point_positions[joint];
+            if (target_index < RK_MAX_SERVO_JOINTS) {
+                const double rate = control_.trajectory_rate;
+                output.servos[target_index].velocity = point_velocities[joint] * rate;
+                output.reference_end_position[target_index] = end_positions[joint];
+                output.reference_end_velocity[target_index] = end_velocities[joint] * end_rate;
+            }
+            output.targets[target_index].max_rate = 0.0;
+            output.targets[target_index].max_effort = 0.0;
         }
         const bool queue_exhausted =
             control_.trajectory_time_ns >= trajectory_.back().point.time_from_start_ns;
@@ -1667,11 +1829,18 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         latch_fault();
         return result;
     }
+    bool interpolating = false;
+    if (output.reference_duration > 0.0)
+        for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
+            interpolating = interpolating || blueprint_.joint_servo[joint].stiffness > 0.0;
     if (output.kind == RK_COMMAND_JOINT_TARGETS)
         for (uint32_t index = 0; index < output.target_count; ++index)
             if (output.targets[index].mode == RK_TARGET_POSITION ||
                 output.targets[index].mode == RK_TARGET_SERVO)
-                commanded_position_[output.targets[index].joint] = output.targets[index].target;
+                // The sampled physics state is at the end of the drive interval.
+                // Its setpoint and a subsequent plan's anchor must name that same instant.
+                commanded_position_[output.targets[index].joint] = interpolating && index < RK_MAX_SERVO_JOINTS
+                    ? output.reference_end_position[index] : output.targets[index].target;
     if (stop_ramp_finished && control_.stop_ramp_hits_limit) {
         // The commanded setpoint is clamped to the travel limit; distinguish
         // this backstop from an ordinary endpoint completion.
@@ -1807,7 +1976,7 @@ rk_result RobotRuntime::publish_sample_impl(uint64_t timestamp_ns,
     if (result != RK_OK || sample_validation != RK_OK ||
         next.joint_count != blueprint_.joint_count ||
         next.sensor_count > configured_sensor_count ||
-        (next.sensor_count != 0 && next.sensor_count != configured_sensor_count)) {
+            (next.sensor_count != 0 && next.sensor_count != configured_sensor_count)) {
         latch_fault();
         return result != RK_OK ? result : RK_ERROR_BACKEND;
     }

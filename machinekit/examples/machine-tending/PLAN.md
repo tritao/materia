@@ -1,0 +1,709 @@
+# Machine tending plan
+
+**Goal.** A six-axis arm with a pneumatic parallel gripper tends an enclosed benchtop vertical mill,
+without anyone touching it. Each cycle runs like this:
+1. The arm takes a blank from an infeed tray.
+2. It asks the mill to open its door, puts the blank in a pneumatic vise and asks for a clamp.
+3. It leaves the machine and asks for the door to close and the cycle to start.
+4. The mill cuts the part in real time, as the router does.
+5. The arm takes the finished part out to an outfeed tray.
+6. The cycle repeats until the infeed tray is empty.
+
+Everything physical is simulated the way the hardware works:
+- the fingers grip and the vise clamps by force and friction;
+- the door and the vise are moved by pneumatic cylinders driven by valves;
+- the two machines are separate controllers that talk only through wired signals.
+
+The same signal names would then drive a real cell.
+
+The work is split into two examples:
+- `machinekit/examples/bench-mill/`: the mill on its own, a CNC project like the router;
+- `machinekit/examples/machine-tending/`: the cell. It includes the mill, the arm with its gripper, the trays, the controllers and the wiring, the same way `WeldingCell` includes `RobotArm`.
+
+## What exists
+
+Surveyed 2026-10-03 on local main 1048bf768, plus the `mobile-welder` and `x7-transmissions` branches.
+
+**CNC**
+- `machinekit/examples/cnc-router/`: an assembly with three prismatic axes, lead screws, steppers, overtravel and `CncRouterChecks`.
+- The scene artifact's `machining` section (v12+): program, axes, spindle gauge line, `workOffset`, tools, stock, target and controller.
+- `app/CncProgramPlayer` takes G-code through `CncCompiler`, `ToolpathMotion.lower`, `ManipulatorMotion` and `ProgramPlanner`, and plays it on the assembly robot.
+- `app/MachiningStock` cuts StockKit tri-dexel stock from the tool tip's live pose. `StockPreviewWorker` contours it off the frame thread.
+- `CncPanel` provides hold, resume, restart-at-line and speed override.
+- Handshakes are `MotionOp.WaitInput` barriers answered by the player's input callback. The `cnc.tool_change.N` and `spindle.at_speed` handshakes are answered at once.
+
+**Arm and tools**
+- `machinekit/examples/robot-arm/RobotArm`: six revolute joints, ServoMotor and gearbox drives (X6), and a reach of about 0.73 m from the shoulder to the flange.
+- Its wrist is inline (roll–pitch–roll). It is not the cobot layout of UR-type arms (shoulder, elbow and wrist 1 parallel; offset wrist).
+- On the welder branch, `ArmTool` (`build`/`expose`/`ready`) and `RobotArm(withCell, ?armTool)`.
+- MotionKit has analytic IK only for spherical wrists (`OpwKinematics`). Everything else uses KinematicsKit's numeric IK.
+
+**Missions**
+- `app/MissionPlayer` runs scene `mission` steps `goTo`, `pick`, `place` and `weld`.
+- Pick and place go through `HandlingPlanRunner`. It moves straight down, with no orientation or yaw.
+- Grasping is the suction kind only: `SimulatedSuctionTool` uses `holdObjectOnLink`, a kinematic hold.
+
+**ProcessKit and I/O**
+- `WelderProcessDevice` (outputs, feedback, channels) is the pattern for "one interface, sim or hardware".
+- Outputs are process channels (`ProcessChannelDeclaration`, `MotionOp.SetOutput`).
+- Inputs are sensor frames (`publishSensorFrame`).
+
+**Collision**
+- `robotkit.manipulation.ArmClearance` (welder branch d7d3d0f14): distances from the arm and tool hulls to the cell's hulls, and straight joint-space sweeps.
+- `kinematicskit` `CollisionWorld` on coal (branch `collision`, CL1).
+- There is no collision-aware planner yet (CL6).
+
+**MachineKit parts**
+- Rails: `LinearRailSystem` (MGN catalogue).
+- Screws and motors: `LeadScrew` (trapezoidal or Acme), `ScrewSupport`, `ServoMotor` (50/100/200 W, assumed values), `Gearbox`, `ShaftCoupling`, `ShaftEncoder`, `LinearScale`.
+- Grippers: `ParallelGripper`, an envelope box with `open`/`close` pneumatic ports and `Grip(stroke, force, open, close)`.
+- Ports: `PortKind.Signal` exists.
+
+**Simulation**
+- MuJoCo joint targets can be POSITION, VELOCITY, EFFORT or SERVO.
+- Free objects are boxes (`dynamicParts`).
+- Each part gets one convex hull of at most 64 vertices; there is no convex decomposition.
+
+## What is missing
+
+**Mill hardware**
+- No ball screw, cast structure, enclosure, door, vise, spindle drive, pneumatic cylinder or solenoid valve.
+- No binary sensors: door switch, cylinder reed switch, part present.
+
+**Simulation and runtime**
+- Nothing turns a valve output into a force on a joint, so the runtime has no joints that a process drives.
+- `ParallelGripper` has no jaws, so a gripper cannot be simulated by contact.
+- There is no `gripper` robot-tool kind.
+
+**Controllers and signals**
+- One assembly becomes one robot. The mill and the arm cannot be separate controllers, and the CNC player and the mission do not coordinate.
+- Mission steps have no signals and no waits, and there is no signal bus.
+- There is no machine-side interlock logic: cycle start, door, clamp, robot clear.
+
+**Parts and stock**
+- Stock has to be a part on a robot link, so a loose blank cannot be machined.
+- Nothing excludes contact between the cutter and the blank.
+- The finished part does not get its mass back from the stock.
+- Pick and place have no orientation. Grasp frames, the vise datum and the work offset are not derived from geometry.
+
+## Decisions
+
+**MT-D1. Two controllers, two robots.**
+- The mill controller owns X/Y/Z, the spindle, the door and the vise. The robot controller owns the arm joints and the gripper jaws.
+- A joint belongs to the controller that its actuator's driver or valve is wired to. This is derived from the X8 motor/driver/controller split, never listed by hand.
+- `AssemblySimulationBridge` builds one `RobotModel` per controller from one cell assembly. The parts that no controller owns are environment.
+- **Rejected:** motion groups on one runtime. Real cells have two controllers with their own timing, devices and faults. A runtime with two independent trajectory queues would be a second mechanism with nothing in the hardware behind it.
+
+**MT-D2. The mill controller's interlock logic owns the door, vise and cycle.**
+- The robot only *requests* (door open/close, clamp/unclamp, cycle start) and reports *robot clear*.
+- The mill answers with states: ready, door open/closed, clamped/open, part present, in cycle, cycle complete, alarm. The signal set is the usual robot-interface set of commercial VMCs.
+- The G-code stays the part program. Its only cell-specific line is the final `G53` move to the load position, which is derived from the machine.
+- LinuxCNC `M62`–`M66` are a later option for programs that want to drive I/O themselves.
+
+**MT-D3. Signals are wires.**
+- Controller cabinets carry `Signal` ports, and `connectPorts` wires an output of one controller to an input of the other.
+- The scene's signal map is derived from that wiring, the same way the welder's grounding is traced from the work lead.
+- In simulation a `CellSignals` bus carries each wire with a latency of one controller tick. On hardware the same names map to digital I/O.
+
+**MT-D4. Pneumatic cylinders are actuators.**
+- A cylinder part (bore, rod, stroke) plus `addCylinder(joint, cylinder, valve)` becomes an `AssemblyActuator` of kind Pneumatic.
+- Force is supply pressure × piston area: the full bore extending, the bore minus the rod retracting.
+- A flow restriction limits speed, as a damping term sized from the rated piston speed.
+- The cylinder's assumed 2 mm end cushion sets each process joint's tolerated stop compression;
+  its critically damped stop rate is derived from moving mass and piston force. The physics
+  stop remains at the stroke boundary, while the runtime tolerates that compression.
+- The valve's digital coil channels pick the direction. The simulation reads them, owns the valve latch state and applies the cylinder effort every physics substep. The runtime owns only those outputs and leaves the cylinder joint out of motion planning ("process-driven joints").
+- Solenoid valves are parts wired to controller outputs; their channel names are derived, not chosen.
+
+**MT-D5. Grip and clamp by contact.**
+- Jaw force plus friction holds the blank, in the fingers and in the vise. There is no `holdObjectOnLink` for the gripper or the vise.
+- Slip is measured, not assumed. A kinematic fallback is only added if measurements show MuJoCo cannot hold a clamped box under the mill's accelerations, and the plan is updated first.
+
+**MT-D6. Geometry decides.**
+- Grasp frames come from the blank's opposite planar faces: the closing axis is normal to them, and the width is the distance between them. This mirrors `WeldSeams.find`.
+- The vise datum is the fixed jaw face, the top of the parallels and the end stop. G54 is derived from that datum at the axes' zero instead of being typed in, unlike `CncRouter.workOffset()`.
+- The load position is the axis values that bring the vise nearest the door. Approach via-poses come from the door opening's frame.
+
+**MT-D7. Blanks are free bodies with identity.**
+- Every blank is a `dynamicParts` occurrence and owns its own StockKit stock.
+- `MachiningStock` follows the blank's live object pose, not a part on a robot link.
+- Physics never pairs the cutter with blanks. The cutter still touches the vise and the table.
+- After unloading, the part's mass is the stock's volume × density, and the contoured stock becomes its runtime geometry.
+
+**MT-D8. One tool, no tool changes.**
+- The first job uses one 6 mm end mill: pockets and circular pockets only.
+- A tool-change request during an unattended run is an alarm. The current instant answer is an operator shortcut.
+- An automatic tool changer is a later step.
+
+**MT-D9. Collision.**
+- Until CL6, approaches are derived via-poses.
+- Every segment is swept with `ArmClearance` against the cell hulls, with the door at its open pose, when the mission is generated. A failure rejects the mission.
+- "Robot clear" is computed from the arm and tool hulls against the machine's zone box, not taught.
+
+**MT-D10. Concave things are several convex parts.**
+- The enclosure is panels, and the front is split around the door opening, so each part's hull is honest.
+- T-slots and pockets stay in the CAD solids. Collision sees their hulls, which is fine for a table or a vise body.
+
+**MT-D11. Cobot arms in size classes.**
+- A new `CobotArm` family has the UR-type layout:
+  - base pan;
+  - shoulder, elbow and wrist 1 about parallel axes;
+  - wrist 2 at right angles, then wrist 3 roll;
+  - lateral offsets between the joint modules.
+- Size classes follow the published sizes of the typical cobot classes. The names are generic, so no trade names appear in code.
+- Each class fixes:
+  - its kinematic lengths;
+  - which joint module size sits at each joint;
+  - joint speed limits;
+  - rated payload;
+  - total mass.
+- Joints are one family of modules in sizes 0–4: a housing, a servo and a strain-wave gearbox (ratio about 100). The sizes share a catalogue of diameter, length, rated and peak torque, speed and mass.
+- Classes are built from that catalogue, not from per-arm numbers. Datasheet figures are reference values, marked assumed like the existing `ServoMotor` rows, and the X6 plan check confirms that each class's drives carry its rated payload.
+- `RobotArm` stays as it is, so the arm, welder and router examples are not touched.
+
+## The machine (starting numbers, fixed in MT1–MT4)
+
+| Item | Value |
+|---|---|
+| Travel X / Y / Z | 250 / 150 / 250 mm |
+| Table | 400 × 130 mm, three 10 mm T-slots |
+| Structure | Cast base, column bolted to the base's back, saddle (Y) on the base, table (X) on the saddle, head (Z) on the column |
+| Rails | HGR15 on all axes (new catalogue rows) |
+| Screws | Ball screws SFU1605 (Ø16, lead 5, preloaded), BK12 fixed end and BF12 support end |
+| Axis drives | 400 W servos (new row, marked assumed), direct coupling. Z keeps its holding brake as a property. |
+| Spindle | ER20 cartridge, max 10 000 rpm, 1.1 kW motor, HTD-5M belt 1:1. The spindle is a continuous joint driven by `spindle.speed`. |
+| Enclosure | Steel panels on a chip tray, front frame around a 450 × 400 mm opening, sliding door with a polycarbonate window |
+| Door | Door on a guide rail, moved by a pneumatic cylinder (Ø25, stroke 460). Door-closed safety switch plus a reed switch at each end of the cylinder. |
+| Vise | 100 mm pneumatic vise. The moving jaw is preset by its screw for the blank, then a 6 mm air stroke clamps. Reeds sense clamped and open; an air-gauge sensor at the datum senses part present. |
+| Stand | 750 mm. The controller cabinet sits on the side. |
+| Air | FRL unit, then a manifold with 5/2 valves (door, vise; gripper on the arm) |
+| Part | 608-bearing block from a 60 × 40 × 20 mm 6061 blank: Ø22 seat, two Ø10 counterbores and a contour pocket, one 6 mm end mill |
+
+The current arm reaches about 0.73 m from shoulder to flange, and the gripper adds about 0.15 m. That is marginal through a door to a vise brought to the load position, so the cell uses a cobot from MT3 instead. The 850 mm class is the usual choice for tending a benchtop mill, and the 1300 mm class is the alternative. The MT4 reach study picks the class and the riser height before the gripper or the cell are built.
+
+## Steps
+
+**MT0. Base.**
+- Branch `machine-tending` comes from local main 1048bf768, in the worktree `materia-worktrees/machine-tending`.
+- Done (2026-10-03): local main b99c948fa was merged in (c5438ba4d). It brings the robot welder through W4's stop policy and clearance: `ArmTool`, `ArmClearance`, `ConvexDistance`, `ProgramPlanner.shutdown()` and the mission machinery.
+- `x7-transmissions` through X8e (351e772c5) was merged after that (8ad034403). Its only conflict was `RobotArm.hx`, where X8's driver and gearbox members were kept, along with the welder's `armTool.build`.
+- Build on the X7 `Transmission` API and the X8 motor/driver/supply members (`addMotor(id, joint, motor, driver, margin, ?gearbox)`), never on the old `Drive` names.
+- `ArmTool` lives in the robot-arm example (`RobotArm.hx`). MT3 moves it into `machinekit.robotics`, so the library's `CobotArm` and the example `RobotArm` share it.
+- All submodules are populated: cloned with `--shared` from the x7 worktree at the same pins, with `coal` and `proxsuite` as symlinks to the kinematicskit worktree. Disk is tight, so check `df -h /` before large builds.
+- `CADKIT_OCCT_DIR` points at the shared prebuilt OCCT. Never rebuild it.
+
+**MT1. Mill parts.**
+- `motion.BallScrew`, with a thread family or variant `Ball(d, lead)`:
+  - efficiency about 0.9, zero backlash when preloaded, critical speed as for lead screws;
+  - catalogue row SFU1605;
+  - `BallNut` with a flange;
+  - `ScrewSupportUnit` BK12/BF12 that maps onto `ScrewSupport.Fixed`/`Simple`.
+  - The X7 transmission resolver gets the ball-screw relation (efficiency, stiffness, backlash) from these parts.
+- HGR15 rail and block rows in the rail catalogue.
+- ServoMotor 400 W and 750 W rows, marked assumed like the existing ones.
+- An HTD-5M profile for `TimingPulley`/`TimingBelt`, if only GT2 exists.
+- Cast parts: `MillBase`, `MillColumn`, `MillSaddle`, `MillTable` (T-slots) and `MillHead`. They are solids with rail pads, screw bores and mounting holes, plus connectors for rails, nut brackets and motors.
+- Spindle: `SpindleCartridge` (gauge line connector, ER20 nose), `Er20Holder`, `SpindleMotor` (1.1 kW, max rpm), with the existing `EndMill`.
+- Tests: MachineKit unit tests for the ball-screw ratio and efficiency, catalogue rows, part masses, and connector frames.
+
+Done. What was built and decided:
+- First full gate `mt1-parts` exposed an unwanted MachineKit → ToolpathKit dependency in the
+  spindle holder-profile adapter. Keep the spindle mechanical library independent; the CNC
+  example will derive its cutter holder profile from these dimensions in MT2.
+- Reuse the existing `Transmission.LeadScrew` resolver: `BallScrew` and `BallNut` are recipe-backed
+  screw/nut parts, with a `Ball` race family and a separate `PreloadedBallNut` allowance. Existing
+  sliding screws and unpreloaded ball-nut allowances are unchanged. SFU1605 is 16 mm diameter,
+  5 mm lead, 90% assumed efficiency, zero assumed preloaded reversal clearance and 0.02 N m drag.
+- The ball-screw relation derives shaft-only axial stiffness from race root and full length:
+  a 400 mm shaft with an assumed 13 mm race root gives 66366.7 N/mm. Nut/bearing compliance is
+  omitted and explicitly labelled assumed; measured total stiffness can override the relation.
+- BK12/BF12 support envelopes map to `Fixed`/`Simple`. HGR15/HGH15CA reference rail/block
+  dimensions and the 400/750 W servo rows are explicitly assumed. Named standalone servos now
+  have recipes; custom rating objects remain code-only. HTD-5M already exists.
+- Cast base/column have cores and machined rail pads; saddle has a screw bore; table has three
+  10 mm T-slot mouths; head has a cartridge bore. Bodies and mounting holes carry semantic names.
+- ER20 cartridge and holder share the gauge-line frame; the generic 1.1 kW spindle motor is rated
+  at 8000 rpm and capped at 10000 rpm, with assumed ratings and envelope.
+- MachineKit smoke passed on the current parts: computed casting masses are base 50.10 kg,
+  column 46.04 kg, saddle 28.41 kg, table 13.30 kg and head 30.67 kg. The 400/750 W servos
+  derive rated torques 1.273/2.387 N m at 3000 rpm; maximum speed is 5000 rpm (assumed).
+- The first gate passed MachineKit and the application build, but its application run was interrupted
+  (exit 130) during the router case. Following X7's documented workaround, run the replacement
+  full gate in a separate process session with `setsid`. This is a test-process interruption,
+  not a compiler bug. Arm mission 5.8/12/17.2/23.5 s and welder 20.2/19.9 s reproduced unchanged
+  before the interruption. The replacement `mt1-final` gate passed every kit, MachineKit smoke,
+  the application build and the complete project-source suite. All stated baselines reproduced
+  unchanged, including screw/belt router 220.2/201.6 s and removal, CoreXY, arm, mobile and welder.
+- Tests include recipe reconstruction, signed screw ratio, preload allowance, shaft stiffness,
+  bearing boundaries, rail room, mounting frames, rated power and computed casting masses.
+
+**MT2. The bench mill without enclosure.**
+- `BenchMill extends MachineAssembly`, in the cnc-router idiom: `place`/`attach`/`slide`, overtravel from the rail room, `addTransmission`, `supportScrew`, `addMotor`, and `addEncoder` for the servos.
+- The spindle belt is `TimingBelt`. The spindle is a continuous joint, not planned. It runs from `spindle.speed` once MT5 provides process-driven joints; until then it stays fixed.
+- `BenchMillChecks` in the MachineKit smoke suite cover FK of the gauge line at travel corners, no overlap at the ends of travel, screw ratios, a servo-derived feed of at least 8 m/min rapid, and the BOM.
+- `bench-mill/materia.project.json` uses a toe-clamped blank first, with the stock as an assembly part, as on the router. The single-tool bearing-block job comes from `BearingBlockJob` (CamKit) and goes into `scene.machining`.
+- Start-page entry.
+- `ProjectSourceTests.checkBenchMill` mirrors `checkCncRouter`: removed volume within 2 % of closed form, no gouge, `rapidContacts == 0`, `collisions == 0`, allocation budget, no stalls.
+
+Done. What was built and decided:
+- X/Y are moving-table coordinates: the table and saddle move against their positive CNC axes,
+  while the head moves with Z. The zero poses derive from rail/block heights, casting seats,
+  cartridge mount and tool length; overtravel is measured from rail room.
+- Fitting the swept saddle and real bearing supports changed the designed base depth to 550 mm
+  and saddle depth to 130 mm. The X nut needs matching clearance recesses in the saddle and
+  table; its flange adapter and the Y screw bore share dimensions with `BallNut`.
+- SFU1605 now has assumed 12 mm machined journals (50 mm input, 25 mm output), so the BK12/BF12
+  seats and coupling fit physical shaft surfaces. Screw speed still conservatively uses full length.
+- The single-tool exercise has a 22 mm seat 7 mm deep, two blind 10 mm fastening recesses 5 mm
+  deep, and a 12 × 8 mm contour pocket 3 mm deep with 3.5 mm corners. Blind recesses keep this
+  first setup a single 6 mm tool exercise. The seat is centred; the contour is forward of it,
+  leaving the back-corner toe clamps clear. CAM reads pocket boundaries and floors from the solid.
+- The CNC player previously applied a pulse-channel binding to every actuator, which rejected
+  servo motors. It now derives pulse channels only for steppers and retains the servo motor/driver
+  limits; mixed-drive binding tests cover this. RobotKit world assertions grow from 4926 to 4930.
+- The rounded contour exposed an open-arc fitting defect: approximating the last vertex
+  moved the fitted endpoint, making the following G-code arc inconsistent with its modal start.
+  Open fits now interpolate both endpoints; closed-circle fits keep their existing construction.
+  Three regression assertions raise CamKit from 12308 to 12311. The full gate preserves both
+  router cycle times, removal, plan checks and tracking deviations.
+- A contour corner exactly equal to the cutter radius collapses the sampled polygon offset.
+  Giving the contour a larger designed radius avoids that degeneration without changing CamKit.
+
+- Keep the controller period at 10 ms. The runtime supplies exact polynomial position and velocity
+  at both tick endpoints. The drive evaluates their cubic Hermite interpolant at physics substeps,
+  and adds reflected inertia times its second derivative as torque feedforward. Endpoint prediction
+  shares the existing hold/resume clock integration; straight stop ramps supply their analytic endpoints.
+  Reported servo-machine setpoints use the interval end, matching the measured physics timestamp.
+- The generic servo amplifier assumes a 4000 Hz position loop. The blueprint reports the fastest
+  specified loop and a conservative gain/inertia interval of `0.5 sqrt(J/k)`. SimulationSpace chooses
+  the stricter interval and implicit-fast integration; ApplicationSimulation only attaches the space.
+  The driver rate is optional assembly field 23 and survives nested assembly flattening.
+- Coupling stiffness comes from the X7 transmission relation, converted to follower coordinates
+  (`k_follower = k_leader / ratio²`). MuJoCo derives critical-damping solref from follower inertia,
+  with a lower time constant of twice the physics timestep. No transmission-wide hardening override.
+  See [MuJoCo solver parameters](https://mujoco.readthedocs.io/en/stable/modeling.html#solver-parameters).
+- A HashLink allocation census identified over ten million temporary endpoint `Pose3` objects
+  in the authored-path distance check. Evaluate point-to-line distance directly from coordinates,
+  preserving its arithmetic, task-space samples and tolerance. No allocation budget or tick change.
+- Native tests cover Hermite tracking of an accelerating reference at 10 ms, force saturation with
+  implicit integration, and matching tick endpoints across hold/resume/stop and a queued replan. All native MuJoCo and
+  runtime tests pass, including normal queue underflow and a stop that outlives the queued path.
+- The 72-member mill derives X rapid 15.10 m/min and Y/Z rapid 25.00 m/min; acceleration limits
+  are X 30.06, Y 31.09 and Z 30.03 m/s². The job cuts at 1.2 m/min with an 8000 rpm spindle.
+- At the 10 ms controller period, the drive requires an interval no longer than 0.248589 ms:
+  41 physics substeps. Peak tracking error is X 0.07537, Y 0.05032 and Z 0.02937 mm.
+- The bearing block takes 49.98 s: 3716.58 of 3702.78 mm³ removed, leftover 7.22 mm³, gouge
+  0.58 mm³ (within the 1 mm³ numerical cutting allowance), no rapid contacts or collisions.
+  Its 77 plans include 56 flagged plans: 42 peak-torque and 35 rated-RMS-torque findings.
+  There are no stalls or accuracy findings. These torque findings remain visible sizing limits.
+- Allocation is 68 KB per controller tick, below the unchanged 80 KB budget. All kit suites,
+  MachineKit smoke and the full application gate pass; existing router, belt router, CoreXY,
+  arm, mobile-base and welder measurements are unchanged. Only the added assertion counts grow.
+  The final gate is `mt-suite-mt2-final.txt` (every suite exit 0); native runtime and MuJoCo
+  assertion executables also pass. No haxeon compiler workaround was needed.
+
+**MT3. Cobot arm size classes.**
+- **Joint modules.** `CobotJoint` (`machinekit.robotics`) is a housing with a stator connector and a rotor connector.
+  - It contains a `ServoMotor` with a `Gearbox` (strain-wave, ratio about 100, efficiency assumed), plus an output encoder through `addEncoder` (X6d).
+  - It comes in sizes 0–4. Reference torques (N·m, assumed engineering values): 0 = 12, 1 = 28, 2 = 56, 3 = 150, 4 = 330 (assumed rated torques; peak twice rated). Speeds are 180–360 °/s for small sizes and 120 °/s for size 4.
+  - Each size's diameter and length are assumed module envelopes. The assembled mass is computed
+    from the parts; the maker's complete-arm mass is a reference, not an exact target for generic internals.
+- **Links.** `CobotLink` is a round tube between two module seats, with the lateral offset of the cobot layout built into its end caps. Each link is one part, so it gets one convex hull.
+- **Classes.** `CobotArm(cls:CobotClass, ?tool:ArmTool)`, with class lengths in the usual d1/a2/a3/d4/d5/d6 form. Dimensions are checked against the maker's [DH table](https://www.universal-robots.com/developer/hardware-and-motion/robot-motion-dh-parameters/); payload, joint speeds and mass against the [November 2023 technical data sheet](https://www.universal-robots.com/media/1829346/11_2023_collective_data-sheet.pdf). The table gives magnitudes of a2/a3; DH uses negative values:
+
+  | Class | Reach | Payload | d1 | a2 | a3 | d4 | d5 | d6 | Modules J1–J3 / J4–J6 | Mass |
+  |---|---|---|---|---|---|---|---|---|---|---|
+  | `Reach500` (UR3 class) | 500 mm | 3 kg | 151.85 | 243.55 | 213.2 | 131.05 | 85.35 | 92.1 | 2 / 0 | 11.2 kg |
+  | `Reach850` (UR5 class) | 850 mm | 5 kg | 162.5 | 425.0 | 392.2 | 133.3 | 99.7 | 99.6 | 3 / 1 | 20.6 kg |
+  | `Reach900` (UR16 class) | 900 mm | 16 kg | 180.7 | 478.4 | 360.0 | 174.15 | 119.85 | 116.55 | 4·4·3 / 2 | 33.1 kg |
+  | `Reach1300` (UR10 class) | 1300 mm | 12.5 kg | 180.7 | 612.7 | 571.55 | 174.15 | 119.85 | 116.55 | 4·4·3 / 2 | 33.5 kg |
+
+- **Mounting.** `CobotArm` stands on a `RobotFlange` base plate. The cell can put it on a `Pedestal` or a riser of any height.
+- **Tool.** The tool flange is an ISO 9409-1-50-4-M6 pattern, so `ArmTool`s fit every class. `tcp` and `ready()` work as on `RobotArm`.
+- **IK.** KinematicsKit's numeric IK (DLS for tracking, LM for reaching) works on this layout. An analytic solver for the UR-type layout, with its eight closed-form branches, is a later option.
+- **Checks** (`CobotArmChecks` in the MachineKit smoke suite), for every class:
+  - FK of the flange at zero and at four poses equals the DH table within 0.01 mm;
+  - shoulder-to-flange distance at DH zero equals the distance derived from the verified DH offsets;
+    the published nominal reach remains class metadata, rather than changing DH lengths to fit it;
+  - assembled mass finite and positive, reported beside the maker's complete-arm reference;
+    changes in assumed gearbox mass are recorded rather than hidden by a tolerance;
+  - no self-overlap at zero or at the joint limits taken one joint at a time;
+  - assembly-derived gravity moments hold the rated payload at the horizontally stretched DH-zero
+    pose without exceeding rated torque on any joint. X6 steady loads currently model sliding
+    gravity only, so its rotary plan check cannot establish this static holding claim.
+- **Preview.** `CobotArmPreview.arm(cls)` gives a project entry per class with a short looping motion, like `robot-arm`, so each class can be looked at and simulated alone. `ProjectSourceTests.checkCobotArms` runs each class's motion on MuJoCo: joint tracking within 1 mrad, no collisions.
+
+Done. What was built and decided:
+- `ArmTool` and the existing suction implementation move into `machinekit.robotics`; the arm
+  and welder keep the same construction, connectors and service wiring.
+- Four size classes use the verified e-series DH offsets, joint speed limits and reference masses.
+  Housing dimensions, internal construction, 100:1 reduction, 0.85 efficiency, torque ratings,
+  80%-of-maximum rated motor speed, rotor inertia and output encoders remain assumed values.
+  Position-loop stiffness assumes peak torque at 10 mrad motor error; damping is critical for
+  the stated rotor inertia. Explicit gains select the physical interpolated drive model.
+- Link seats subtract the preceding module length from DH translation, and the final seat
+  subtracts the real flange thickness. Tube routes clear stator rims and gearheads leave room
+  for the base flange pilot. Five FK poses and the full-turn limits pass for every class.
+- Computed arm masses (offboard amplifiers/supply and optional tool excluded) are 11.450,
+  19.484, 33.119 and 33.380 kg. The rated-payload shoulder moments are 29.666, 95.026,
+  234.048 and 288.315 N m; elbow moments are 10.402, 35.134, 89.853 and 123.446 N m.
+- After integrating main's derived steel-class `Gearbox.massKg` assumption, assembled masses are
+  13.616, 19.484, 35.342 and 35.603 kg for Reach500/850/900/1300. Published complete-arm
+  masses remain 11.2/20.6/33.1/33.5 kg. The generic gearhead model changes the assembled
+  mass and gravity loads, especially for Reach500; its assumptions are not vendor internals.
+  The updated rated-payload shoulder moments are 31.436, 95.026, 252.330 and 314.138 N m.
+  The MachineKit smoke passes with these model-derived values; no reference row was rewritten.
+- The proposed 1% equality between catalogue reach and a fully stretched DH flange distance
+  does not follow from the verified offsets. Keep the source geometry and check its explicit
+  shoulder reference distance instead; do not rescale a2/a3 to force the catalogue label.
+- Each class gets a project/Start-page entry and a planned free-motion loop through a generic
+  `moveJoints` mission step. Typed targets are absolute mechanical coordinates in radians/metres;
+  MotionKit `MoveJ` and the trajectory runtime execute them. The 1 mrad check applies to free
+  motion: the handling runner deliberately presses 3 mm into a rigid blank, so contact reaction
+  forces make its pick dwell unsuitable for a free-motion tracking requirement. Existing arm
+  handling tests continue to cover that separate behavior.
+- The three-step free-motion loop takes 2.06 s (206 ticks) for each class. Peak errors,
+  in class order, are 0.00475, 0.00631, 0.01115 and 0.01723 mrad at the unchanged 10 ms
+  controller tick; no self-collision. The DH-zero shoulder reference distances are 515.462,
+  855.569, 895.425 and 1225.283 mm.
+- The complete `mt3-session` gate passes every kit, CAD, MachineKit smoke, application build
+  and full project-source suite. ProjectKit grows from 146 to 151 assertions for mission-data
+  round trip, duplicate/unknown/nonfinite targets and SI conversion of mechanical limits.
+  All router, belt, CoreXY, arm, mobile, welder and MT2 mill measurements are unchanged.
+- The first gate's application run received SIGINT (exit 130) during a project compilation,
+  with no assertion failure. A separate session with SIGINT ignored completed the replacement
+  full gate. No materia code change or haxeon compiler workaround was needed for it.
+
+**MT4. Enclosure, door, vise and reach.**
+- Panels, front frame pieces, chip tray, stand and cabinet as separate parts. The door rides a prismatic joint on its guide, but no actuator moves it yet.
+- `PneumaticVise`:
+  - body and fixed jaw;
+  - moving jaw on a prismatic joint (6 mm stroke), with the screw preset as a construction parameter;
+  - parallels and an end stop;
+  - a `datum` connector.
+- The work offset comes from the datum (MT-D6). Remove the hand-typed offset path for this machine.
+- The load position comes from geometry: the axis values that bring the vise datum nearest the door opening.
+- Export the job on a blank seated against the datum, still as an assembly part. Keep the running bare-mill entrypoint for this step; enable the enclosed physical cut in MT5 after its jaw has a real clamp force. A free unactuated jaw cannot hold its preset during table acceleration.
+- Checks:
+  - the door slides clear of the panels over its whole stroke;
+  - the head at Z top clears the door opening;
+  - the vise opening holds the blank with 1.5 mm clearance per side;
+  - every enclosure part's hull error ratio is within the warning threshold.
+- **Reach study** (static check `TendingReach`): solve IK for the gripper at the vise (load position, tool down), at every tray slot and at the via-poses outside and inside the door, with at least 10 % joint margin and away from wrist singularity. Start with `Reach850` and try riser heights in 50 mm steps. Use `Reach1300` if no height works, or if the margin is under 10 %. Record the chosen class and riser here.
+
+Done. What was built and decided:
+- `MillPanel` is recipe-backed; enclosure walls, roof, four front-frame pieces, chip tray,
+  stand deck/legs and six cabinet panels are separate convex parts. The window uses reference
+  polycarbonate density 1200 kg/m³. The default bare-mill project keeps running; a separate
+  enclosed Start-page project previews the mechanics until MT5 supplies clamping force.
+- The mill's swept part bounds are [-585, -455, 0]..[445, 275, 900] mm. They determine panel
+  positions on the 750 mm stand and 2 mm tray. The 450 × 400 mm opening spans Z 878..1278 mm,
+  with its top 10 mm below the retracted head. The door travels 460 mm; an invariant Y
+  separating plane proves clearance over its complete X stroke, with CAD samples as a second
+  check. Every panel/window hull stays within 5% error.
+- The preset vise has 43 mm open jaw separation for the 40 mm blank (1.5 mm per side), a 6 mm
+  guided air stroke, two 10 mm parallels and an end stop. Its datum derives from the actual
+  locating faces, giving G54 [95, 55, -230] mm. Projection of that datum onto the table travel
+  gives the load position [95, 150, 0] mm. The typed toolpath ends with retract-then-position
+  `MachineMove` operations; export/recompile verifies their final G53 coordinates.
+- Static `TendingReach` chooses **Reach850 on a 550 mm riser**, with 15 poses (vise, two door
+  via-poses, twelve tray slots), 27.24693% minimum joint margin and minimum |sin(q5)| ≈ 1.
+  It checks the actual mill and open-door hulls with 5 mm clearance (1 mm for the tool at the
+  vise); the grasped blank is the intended contact target. The future gripper is explicitly
+  an assumed 80 × 50 × 150 mm body/finger envelope with 16 mm opening travel, not an MT8
+  operational gripper. World TCP frames and solved joints are returned for the later cell.
+- The doorway must pass the wrist as well as the tool: via height comes from its header,
+  tool length and wrist-module geometry. Numeric IK checks alternate elbow/wrist branches
+  when its first solution hits a panel; the first outfeed solution otherwise crossed the
+  right front frame. No clearance or joint-margin threshold was relaxed.
+- Clearance queries now skip nearest-point projection when a separating hull face already
+  proves the required distance. Close points keep the exact solver, including corner and
+  penetration checks. This preserves collision decisions and makes full mill-hull checks
+  practical; three RobotKit regressions cover the distance cutoff.
+- A diagnostic enclosed MuJoCo cut exposed the unactuated jaw drifting during table
+  acceleration (fault at 35.86 s). MT4 therefore exports and verifies the seated job but
+  leaves its physical cycle for MT5, instead of adding an artificial jaw lock or motor.
+  With the vise mass, derived acceleration is X 29.56 / Y 30.55 / Z 30.03 m/s²; rapid rates
+  remain X 15.10 / Y 25 / Z 25 m/min.
+- Full gate `mt4-final` passed every kit, CAD, MachineKit smoke, application build and complete
+  project-source suite. The focused RobotKit tool/process/weld/clearance suite also passed,
+  including the three new distance-cutoff assertions. All starting baselines and MT3 class
+  tracking numbers are unchanged. The bare mill still takes 49.98 s, removes 3716.5811 mm³,
+  and tracks X/Y/Z within 0.075366/0.050317/0.029369 mm at 10 ms. Its allocation measurement
+  is 67.5 KB/tick after moving fault-message construction off the test's successful tick path;
+  this is a measurement-harness change, not a simulation performance claim. The enclosed
+  project generation contains 103 parts and all five mechanical slides.
+
+**MT5. Pneumatics as actuators; switches and presence.**
+- Parts:
+  - `PneumaticCylinder` (bore, rod, stroke, catalogue: ISO 6432 / ISO 15552 sizes), with ports A and B;
+  - `SolenoidValve` (5/2, single or double solenoid) with ports P, A, B and a `Signal` coil;
+  - `AirSupply`/FRL with the supply pressure;
+  - the manifold reuses `PneumaticManifold`.
+  - Hoses from valve to cylinder use `connectPorts`, and the BOM picks them up.
+- Assembly: `addCylinder(id, joint, cylinderMember, valveMember)` produces `AssemblyActuator` kind `Pneumatic{bore, rod, stroke, ratedSpeed}`. Pressure is traced through the ports to the supply. This needs a projectkit format bump.
+- Bridge → RobotKit `PneumaticDrive` → runtime blueprint:
+  - The joint is process-driven: the simulation reads the digital valve coils and applies an EFFORT target each tick (± force, damping sized for the rated speed).
+  - A trajectory may carry its constant observed coordinate for full-robot indexing, but cannot move it; the runtime emits no position target for it.
+  - Planning models leave it out, just as CNC planning models already keep only their axes.
+- Sensors:
+  - `addSwitch(id, joint, window, hysteresis)` produces a digital `joint_switch` sensor kind: reed switches, the door safety switch and the clamped/open switches.
+  - `addPresence(id, connector, range)` produces a digital `presence` sensor that is true when a free object's box lies within range of the connector's face: the vise air gauge, tray slot sensors and the gripper's part sensor if used.
+  - Both publish sensor frames, and the switch quantity uses hysteresis.
+- The spindle's continuous joint becomes velocity-driven from `spindle.speed`, and a process `at_speed` reading replaces the instant answer.
+- Emergency stop de-energises both door and vise valve coils. Both use double-solenoid valves, so their spools hold the last selected outlet and the trapped supply force remains; the FRL stays pressurised because this cell has no dump valve. This is a simulation decision, not a safety-rated machine design.
+- Tests, pure and MuJoCo:
+  - door extension within 10 % of stroke ÷ rated speed; retraction uses the annular-to-bore force ratio with the shared flow damping;
+  - vise clamp force = p·A within 5 % (measured from the joint constraint force);
+  - switches flip at their windows;
+  - the trajectory runtime rejects a plan that touches a process-driven joint.
+
+The blocked-door request timeout is tested in MT7 with `RobotInterface`, which owns requests,
+switch interpretation and alarms; MT5 supplies the physical switch and cylinder only.
+
+Done. What was built and decided:
+- Reconstructible ISO 6432/15552 cylinders, moving rods, 5/2 valves and regulated supply;
+  pressure follows A/B hoses through the manifold. All 13 bore/rod reference rows agree with
+  the rounded theoretical 6 bar force tables in [Festo DSNU (2012), p. 13](https://ftp.festo.com/Public/PNEUMATIC/SOFTWARE_SERVICE/Documentation/2012/EN/DSNU-ISO_EN.PDF)
+  and [Festo DSBC (2024), p. 14](https://www.festo.com/media/pim/132/D15000100122132.pdf).
+  Envelopes, fittings, flow-limited speed and end-cushion compression are assumed.
+- The vise owns one cylinder body and rod and exports its air ports. The enclosure owns the
+  valves, FRL and hoses. Saved assemblies keep actuator, switch, presence and process-velocity
+  bindings through flattening and codec round trips.
+- The runtime owns only process output channels. The simulation owns valve latch state, piston
+  force and spindle velocity. An emergency stop drops both coils; double-solenoid spools hold
+  their last outlet and the FRL stays pressurised without a dump valve. The runtime rejects
+  planned motion on process joints and omits them from endpoint position commands.
+- The 25/10 mm door cylinder delivers 294.5243 N advancing and 247.4004 N retracting;
+  the 32/12 mm vise delivers 482.5486 N advancing and 414.6902 N retracting. MuJoCo measured
+  door open 1.50 s, close 1.79 s, and vise clamp 0.18 s at 482.5486 N. Retraction is slower
+  because its annular area produces less force against the same flow damping.
+- The bare mill takes 51.12 s with a physical spindle at-speed wait, 78 plans and the same
+  0.075366/0.050317/0.029369 mm X/Y/Z tracking peaks and 3716.5811 mm³ removed. Its
+  earlier 49.98 s cycle moves by 1.14 s for spindle spin-up; the vise rod is only in the
+  enclosed assembly and does not change the bare mill mass or tracking.
+- The enclosed Start-page project now runs its pressure-clamped bearing-block job. With the
+  vise spool initially latched to clamp, MuJoCo completes one pass in 51.73 s and removes
+  3716.5718 mm³, with no rapid or holder contact.
+- MachineKit smoke passed with cylinder force, valve, pressure, hose, saved-format, switch
+  and vise checks. RobotKit checks cover coil emergency stop and trajectory rejection;
+  the app's MuJoCo check covers physical timing and force. The CNC panel's hold, resume and
+  restart check exposed a one-tick race at a completed plan boundary; MotionKit now waits for
+  the runtime owner to apply Resume before starting another plan, and retires a held plan
+  already at its endpoint without sending a stale Resume.
+- The output-before-input barrier now has a one-controller-cycle stationary plan so spindle
+  outputs reach the physical spindle before its at-speed wait. This changes both router jobs
+  from 126 to 128 plans. The screw router remains 220.2 s with 0.05 mm worst deviation;
+  the belt router takes 201.7 s (was 201.6 s), has 56 flagged plans (was 57) and 62 over
+  tolerance (was 64), with the same 1.89 mm worst deviation. The changed plan boundaries,
+  rather than a change to belt or screw mechanics, account for these numbers.
+- The `mt5-typed-final` full gate passed: RobotKit world 4947, MotionKit 9762, CadBridge 156,
+  CncKit 317, CamKit 12311, ProjectKit 151, and ProcessKit 23 plus welder 52 assertions;
+  MachineKit smoke and app project-source passed. CoreXY, arm mission, mobile base and welder
+  timing and geometry baselines stayed unchanged.
+
+**Post-MT5 integration with main (RobotKit R0–R6, welder W4 and transmission X9–X10).**
+- Process-owned spindle and pneumatic actuators are excluded from `DriveLoads` planner budgets;
+  their typed channel bindings and simulation forces remain active. The merged runtime uses the
+  profile-aware compiler and main's nullable limit semantics. The current main submodule pins
+  are inherited unchanged; no new pin was chosen for machine tending.
+- The screw router remains 220.2 s, 128 plans and 0.05 mm worst deviation. Main's belt path
+  and elasticity work changes the belt router's worst Y deviation from 1.89 to 1.76 mm; it
+  remains 201.7 s with 128 plans, now 56 flagged and 62 over tolerance. CoreXY still reaches
+  649.6 mm/s; its derived X acceleration is 71.549 rather than 71.577 m/s² after main's
+  transmission updates.
+- The arm mission remains at pick 5.8/place 12/pick 17.2/place 23.5 s. The mobile mission's
+  final goTo moves from 57.6 to 61 s, and its obstacle round from 59 to 65 s, with main's
+  updated wheel/controller model. Main's W4 weld planning and stop-policy changes move the
+  MuJoCo welder from 20.2/21.6 to 20.6/22.0 s (one restart, 11 mm overlap), and the
+  four-sided post from 19.9 to 29.8 s. The mill remains 51.12 s bare and 51.73 s enclosed, with
+  0.075366/0.050317/0.029369 mm X/Y/Z tracking, 1.50/1.79 s door and 0.18 s vise at 482.55 N.
+- Main's removal of legacy saved-format tests changes ProjectKit's assertion count from 151
+  to 136. RobotKit world rises from 4947 to 4993 and MotionKit from 9762 to 9869 through
+  main's new checks; CadBridge rises 156 to 157. CncKit remains 317, CamKit 12311,
+  ProcessKit 23 plus welder 52. Main's W4 far-plate welder case completes in 20.86 s
+  with a 4.9973 mm first leg. The R6 sequential gate is `mt-suite-final-r6.txt`.
+
+**Post-MT5 integration with main's welder W5.**
+- W5's weld-pass planning and scene schema merge with the machine tending joint-motion mission
+  path. The ordinary MuJoCo seam remains 20.6 s; recovery improves from 22.0 to 21.1 s,
+  with one restart and overlap reduced from 11 to 3 mm. The four-sided post remains 29.8 s.
+  The 7 mm woven pass measures 6.998 mm in 27.17 s, and the three-pass 10 mm weld measures
+  9.999 mm in 65.55 s. Both backends complete the ten-seam weldment in 106.5 s.
+- The bare and enclosed mill remain 51.12/51.73 s, with the same axis tracking, door and vise
+  measurements above. Router, CoreXY, arm and mobile baselines also remain unchanged from the
+  R6 integration. W5 adds 19 weld-pass path assertions to ProcessKit's 23 and raises
+  ProjectKit from 136 to 143; RobotKit world remains 4993. The complete sequential gate is
+  `mt-suite-final-w5.txt`; all kits, MachineKit smoke, app build and project-source pass.
+
+**Post-MT5 local main sync (RobotKit R7, motion loose ends and transmission X9e).**
+- The merged runtime keeps the machine tending process channels and servo reference clock while
+  applying main's per-plan acceleration budget to stops and resumes. A plan's control-acceleration
+  vector is per joint, so a two-joint, one-segment pneumatic plan must allocate two entries.
+  The merged mission builder retains joint-motion frames alongside main's virtual device, and
+  motion completion waits for a settled final state.
+- Main's measured-endpoint and exact-stop changes move the bare mill from 51.12 to 51.19 s
+  (5111 to 5118 ticks) and the enclosed mill from 51.73 to 51.92 s. Removed volume and
+  0.075366/0.050317/0.029369 mm X/Y/Z peak tracking remain stable. The door remains
+  1.50/1.79 s and the vise 0.18 s at 482.55 N. The same stop-policy change moves the screw
+  router from 220.2 to 232.2 s and the belt router from 201.7 to 215.2 s; both retain 128
+  plans, their material-removal figures and 0.05/1.76 mm worst deviations. CoreXY, arm,
+  mobile, cobot and welder measurements remain unchanged.
+- The latest RobotKit world suite passes 4997 assertions, MotionKit 67533, and toolpath motion
+  2952 scenario assertions; the other kit counts and MachineKit smoke remain as above. The
+  full sequential gate is `mt-suite-main-sync-final.txt`.
+
+**MT6. Controllers, robots and signals.**
+- Controller parts:
+  - `CncController` cabinet: digital I/O ports, axis driver outputs, valve outputs;
+  - `RobotController` cabinet.
+  - Axis servos, valves and switches are wired to them (X8 driver/controller wiring).
+- A controller owns the joints its actuators are wired to (MT-D1). Joints with no controller are an error; parts with no controller are environment.
+- Scene v15:
+  - `controllers: [{id, kind:"cnc"|"robot", joints, sensors, channels}]`;
+  - `machining` and `mission` name their controller;
+  - `signals: [{name, from:{controller, output}, to:{controller, input}}]`, derived from the `Signal` wiring.
+- App:
+  - `AssemblyRobot.add` builds one RobotKit robot per controller, sharing one MuJoCo world.
+  - `ApplicationSimulation` attaches `CncProgramPlayer` and `MissionPlayer` to their own robots.
+  - A `CellSignals` bus copies outputs to inputs with one tick of latency and feeds each `ManipulatorMotion` input callback and sensor frames.
+  - The bench-mill project alone still has one controller and behaves as before.
+- Tests:
+  - two robots from one assembly with disjoint joints;
+  - signals arrive after exactly one tick;
+  - `checkBenchMill` unchanged;
+  - router, arm and welder project tests unchanged, since a project with no controllers keeps one robot.
+
+**MT7. The mill's robot interface.**
+- `cnckit.controller.RobotInterface` is a pure state machine with:
+  - **inputs:** `robot.request_door_open/close`, `robot.request_clamp/unclamp`, `robot.cycle_start`, `robot.clear`, `robot.fault_reset`, plus switches and presence;
+  - **outputs:** `cnc.ready`, `cnc.door_open`, `cnc.door_closed`, `cnc.clamped`, `cnc.unclamped`, `cnc.part_present`, `cnc.in_cycle`, `cnc.cycle_complete`, `cnc.alarm` (with code), and the door and vise valve outputs.
+- It enforces the interlocks:
+  - the door opens only when out of cycle, the spindle is stopped and the axes are at the load position;
+  - a cycle starts only with the door closed, the vise clamped, a part present and the robot clear;
+  - unclamping is refused while in cycle;
+  - the door opening during a cycle (switch lost) is a hold plus an alarm;
+  - every request has a timeout and becomes an alarm.
+- `CncProgramPlayer` idles until cycle start, runs one pass, then raises cycle complete. The program ends with `G53` to the load position (MT-D6). `CamJob`/`CncWriter` gain an end position. Tool-change requests are alarms (MT-D8).
+- Tests:
+  - pure tests: every interlock refusal and timeout;
+  - a blocked door request times out when its physical open switch never arrives;
+  - a scripted-signal sim test with no robot: open door, place the blank by script, clamp, close, start, wait for complete, open, unclamp. Volume as in MT2.
+
+**MT8. The parallel gripper, for real.**
+- `ParallelGripper` becomes an assembly:
+  - a body;
+  - two jaws on prismatic joints, the second mirror-coupled (ratio −1, X5 coupling);
+  - an internal piston as a `Pneumatic` actuator on the first jaw. Force and stroke come from a catalogue of generic 2-jaw pneumatic grippers, sizes 25/32/40, marked assumed.
+  - fingers as parametric parts (length, pad width, optional V or step for the blank), mounted on the jaws;
+  - jaw `joint_switch` windows for open, closed-empty and gripped (the width band of the expected part).
+- `ArmGripperTool implements ArmTool`: plate, gripper, valve on the arm (like the welder's feeder seat), hoses, TCP between the finger pads.
+- Robot-tool kind `gripper`: scene validation, the cadbridge binding and `EndEffectorControls` (`Gripper` control). The app does not make a `SimulatedSuctionTool` for it, because the jaws are physical.
+- `Grasp.find(part)` derives grasp frames from opposite planar faces (MT-D6), with the width and approach direction, ranked by finger fit. Pick and place targets carry a full pose.
+- `HandlingPlanRunner` gets oriented approach and retract along the grasp frame's approach axis, and stays compatible with suction.
+- The grasp is judged from the jaw switch: the gripped band means OK, closed-empty means missed.
+- Tests on MuJoCo:
+  - pick, carry and place a blank 50 times on a table;
+  - slip relative to the fingers stays under 0.5 mm at the arm's planned accelerations;
+  - a missing blank reports a miss;
+  - the existing suction mission still passes.
+
+**MT9. Blanks, trays and stock on free bodies.**
+- `PartTray` (grid of pockets with chamfers, `slot-r-c` seat connectors, presence sensor per slot optional) for infeed and outfeed, on a cell table.
+- N blanks are `dynamicParts` (free boxes) in the infeed slots.
+- `MachiningStock` gets one stock per blank. The stock follows the blank's object pose, and the stock is chosen by which blank the vise's presence sensor sees when the cycle starts.
+- Physics excludes the cutter–blank pair (MT-D7). Blanks keep contact with the vise, the fingers, trays and each other.
+- At cycle complete, the blank's mass becomes stock volume × density, and the stock contour is attached as runtime geometry to the blank's scene node. It is still displayed after the part leaves the machine.
+- Tests (scripted robot positions, before the mission exists):
+  - a clamped blank moves less than 0.05 mm relative to the vise during the cutting pass, at the mill's real accelerations;
+  - removed volume within 2 %;
+  - the finished part's mass is within 2 % of the CAD target's;
+  - nothing reports `rapidContacts` or `collisions`.
+
+**MT10. The tending cell and its mission.**
+- `TendingCell` includes the mill (`include("mill", new BenchMill(...))`), the `CobotArm` class with `ArmGripperTool` on the riser chosen in MT4, the trays, the cabinets, the air supply and the wiring.
+- `machine-tending/materia.project.json`, plus a Start-page entry.
+- Mission steps, each with a timeout:
+  - `signal{name, value}`;
+  - `waitFor{name, value, timeout}`;
+  - `moveVia{poses}`, joint- or pose-space via-points;
+  - oriented `pick`/`place` on `{occurrence, connector}` or a grasp.
+- `TendingMission.generate(cell, slots)` produces the steps per part, unrolled like `WeldingMission.generate`:
+  1. pick from infeed;
+  2. request door open, wait for door open;
+  3. via-poses in;
+  4. place in the vise, request clamp, wait for clamped and part present, release;
+  5. via-poses out, signal clear;
+  6. request door close and cycle start, wait for cycle complete;
+  7. request door open and go in, grip, request unclamp, wait for unclamped;
+  8. come out and place in the outfeed slot.
+- Via-poses come from the door opening frame and the vise datum. Every segment is swept with `ArmClearance` against the cell hulls with the door open when the mission is generated (MT-D9).
+- "Robot clear" comes from the arm and tool hulls against the machine zone, each tick.
+- Acceptance (`ProjectSourceTests.checkMachineTending`, MuJoCo):
+  - 4 parts unattended, 4 finished parts in the outfeed;
+  - every removed volume within 2 %;
+  - 0 collisions and 0 interlock alarms;
+  - cycle time and spindle use reported;
+  - the welder, router and arm tests are unchanged.
+
+**MT11. Faults and recovery.**
+- Injected faults, each ending in the safe state with a named mission failure and an alarm code:
+  - empty infeed slot;
+  - missed grasp;
+  - part dropped in transit (jaw switch leaves the gripped band);
+  - clamp with no part (presence false);
+  - door jam (switch timeout);
+  - cycle alarm (a tool-change request, or a stall from the X6 plan check);
+  - e-stop.
+- After `robot.fault_reset` and the cause removed, the mission resumes at the step that failed. Parts already finished stay finished.
+- Tests: one scenario per fault.
+
+**MT12. Throughput.**
+- Pre-staging: while the mill cuts, the arm picks the next blank and waits outside the door.
+- A dual gripper (two grippers at 90° on one plate, `ArmTool`) swaps the finished part and the next blank in one door opening.
+- The timeline is a per-cycle breakdown: door, load, clamp, cut, unload, idle. The panel shows spindle use.
+- Target: spindle use ≥ 75 % for the bearing-block job, with numbers recorded here.
+
+**Later.**
+- Real I/O:
+  - LinuxCNC HAL pins and `halui`, with `M62`–`M66` in `CncInterpreter` (`ToolpathOp.SetOutput`/`WaitInput`);
+  - robot digital I/O through RKD6 device channels;
+  - the same `RobotInterface` running on the CNC side or as LinuxCNC logic.
+- An umbrella automatic tool changer (`M6` handled by the machine).
+- Planned approaches with CL6/CL7 in place of derived via-poses.
+- A second operation with a regrip or flip station.
+- Tray registration by camera (VisionKit).
+- Chips and coolant.
+- Mobile tending: the arm on the mobile base, docking, and touch or vision registration to the machine (the welder's P3).
+
+## Order
+
+```
+MT0 ─┬─ MT1 ── MT2 ─┬─ MT4 (reach study) ─┐
+     ├─ MT3 (arms) ─┘                     ├─ MT6 ── MT7 ─┐
+     └─ (welder + X7/X8 merged) ──────────┘              ├─ MT10 ── MT11 ── MT12
+                        MT5 (after MT4) ── MT8 ── MT9 ───┘
+```
+
+- MT1–MT4 need only X7's transmission API. MT3 can run in parallel with MT1–MT2.
+- MT5 is independent of controllers, but the gripper (MT8) and the vise and door actuation need it.
+- MT6 needs X8 wiring.
+- MT10 needs everything before it.
+
+## Progress
+
+| Step | State | Commits |
+|---|---|---|
+| MT0 | done: main and X7+X8 merged | c5438ba4d, 8ad034403 |
+| MT1 | done | 592affc2f, 7d9f192b1, 5e40b76fe, 53248d881 |
+| MT2 | done | 06c9bf5fd, 73a14c58e |
+| MT3 | done | 4d58cd5d3, 8a44aeb53 |
+| MT4 | done | c945a0dc8, f518b0dff |
+| MT5 | done | 453d890ad, 5f06c32e5, a397b187a, a6230c46e |
+| MT6 | planned | |
+| MT7 | planned | |
+| MT8 | planned | |
+| MT9 | planned | |
+| MT10 | planned | |
+| MT11 | planned | |
+| MT12 | planned | |

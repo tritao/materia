@@ -21,6 +21,9 @@ import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.JointLimits;
 import robotkit.model.Actuator;
+import robotkit.model.ActuatorDrive.PneumaticDrive;
+import robotkit.model.ActuatorDrive.ServoDrive;
+import robotkit.model.ProcessVelocityDrive;
 import robotkit.model.Transmission;
 import robotkit.model.Link;
 import robotkit.model.RobotModel;
@@ -263,6 +266,8 @@ class RobotWorldTests {
     testSerialDeploymentVersions();
     testProcessChannelDeployment();
     testRuntimeProcessEvents();
+    testPneumaticProcessDrive();
+    testDiscreteNativeSensors();
     testVirtualDeviceSimulation();
     assertions += SpatialTests.run();
     assertions += KinematicsTests.run();
@@ -4827,6 +4832,177 @@ class RobotWorldTests {
     holdRuntime.submitStop(3, true);
     for (tick in 80...83) simulationHarness.step(Int64.ofInt(tick * 10000000));
     check(!on("tool.vacuum"), "an emergency stop takes even a keep-on-stop channel safe");
+    simulationHarness.dispose();
+  }
+
+  static function testPneumaticProcessDrive():Void {
+    var model = new RobotModel("pneumatic-process-drive");
+    var base = model.addLink(new Link("base"));
+    var carriage = model.addLink(new Link("carriage"));
+    var viseCarriage = model.addLink(new Link("vise-carriage"));
+    var joint = model.addJoint(new Joint("door", JointType.Prismatic, base, carriage));
+    joint.limits.lower = 0.0; joint.limits.upper = 0.46; joint.axis = [0.0, 1.0, 0.0];
+    var viseJoint = model.addJoint(new Joint("vise", JointType.Prismatic, base, viseCarriage));
+    viseJoint.limits.lower = 0.0; viseJoint.limits.upper = 0.006; viseJoint.axis = [1.0, 0.0, 0.0];
+    var drive = new PneumaticDrive(0.025, 0.010, 0.460, 0.300, 600000.0,
+      "door-valve/coilA", "door-valve/coilB", false, 1.0);
+    var actuator = new Actuator("door-cylinder", drive.extensionForce(), drive.ratedSpeed,
+      Transmission.SimpleTransmission(joint.id, 1.0, 0.0));
+    actuator.drive = drive;
+    model.addActuator(actuator);
+    var viseDrive = new PneumaticDrive(0.032, 0.012, 0.006, 0.030, 600000.0,
+      "vise-valve/coilA", "vise-valve/coilB", false, 1.0);
+    var viseActuator = new Actuator("vise-cylinder", viseDrive.extensionForce(), viseDrive.ratedSpeed,
+      Transmission.SimpleTransmission(viseJoint.id, 1.0, 0.0));
+    viseActuator.drive = viseDrive;
+    model.addActuator(viseActuator);
+    var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
+    check(blueprint.pneumaticDrives.length == 2 && blueprint.channels.length == 4,
+      "cylinder compilation binds process joints and declares digital valve coils");
+    check(Math.abs(blueprint.pneumaticDrives[0].ratedSpeed - drive.ratedSpeed) < 1e-9 &&
+      Math.abs(blueprint.pneumaticDrives[1].ratedSpeed - viseDrive.ratedSpeed) < 1e-9,
+      "cylinder rated speed remains simulation metadata for flow damping");
+    check(model.actuators[0].planningEffort() == null && model.actuators[0].planningRate() == null,
+      "process-driven pneumatic axes are excluded from trajectory planning limits");
+    var encoded = RobotModelCodec.encode(model);
+    check(RobotModelCodec.decode(encoded).actuators[0].drive.kind() == "pneumatic",
+      "RobotModel v10 preserves pneumatic process drives");
+
+    var simulationHarness = new SimulationHarness();
+    var runtime = simulationHarness.simulation.addRobot(blueprint);
+    function pressureForce(index:Int):Float return runtime.snapshot().effort.get(index);
+    check(Math.abs(pressureForce(0)) < 1e-9 && Math.abs(pressureForce(1)) < 1e-9,
+      "cylinders start with no reported force before first tick");
+    var segment = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(100000000), [[0.0, 0.0], [0.0, 0.0]]);
+    runtime.submitPlan(new ExecutionPlanSubmission(Int64.ofInt(1200), Int64.ofInt(blueprint.revision),
+      Int64.ofInt(blueprint.calibrationRevision), RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE |
+      RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_EVENTS, [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [segment], null, null,
+      null, null, null, true, [new ProcessTimedEvent(Int64.ofInt(20000000), "door-valve/coilA",
+        ProcessEventValue.Digital(true)), new ProcessTimedEvent(Int64.ofInt(20000000), "vise-valve/coilA",
+        ProcessEventValue.Digital(true))]), 1);
+    for (tick in 1...5) simulationHarness.step(Int64.ofInt(tick * 10000000));
+    check(Math.abs(pressureForce(0) - drive.extensionForce()) < 1e-6 &&
+      Math.abs(pressureForce(1) - viseDrive.extensionForce()) < 1e-6,
+      "door and vise coils select their pressure forces");
+    runtime.submitStop(2, true);
+    simulationHarness.step(Int64.ofInt(50000000));
+    var doorSafe = switch runtime.channelValue("door-valve/coilA") {case Digital(value): !value; case _: false;};
+    var doorCoilBSafe = switch runtime.channelValue("door-valve/coilB") {case Digital(value): !value; case _: false;};
+    var viseSafe = switch runtime.channelValue("vise-valve/coilA") {case Digital(value): !value; case _: false;};
+    var viseCoilBSafe = switch runtime.channelValue("vise-valve/coilB") {case Digital(value): !value; case _: false;};
+    check(doorSafe && doorCoilBSafe && viseSafe && viseCoilBSafe &&
+      Math.abs(pressureForce(0) - drive.extensionForce()) < 1e-6 &&
+      Math.abs(pressureForce(1) - viseDrive.extensionForce()) < 1e-6,
+      "emergency stop drops door and vise coils while latched valves retain supply force");
+    var rejected = false;
+    try runtime.submitPosition(0, 0.1, 2) catch (_:Dynamic) rejected = true;
+    check(rejected, "host position commands cannot take ownership of a process-driven joint");
+    rejected = false;
+    try {
+      var moving = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(100000000), [[0.0, 1.0], [0.0, 0.0]]);
+      runtime.submitPlan(new ExecutionPlanSubmission(Int64.ofInt(1201), Int64.ofInt(blueprint.revision),
+        Int64.ofInt(blueprint.calibrationRevision), RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
+        [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [moving], null, null, null, null, null, true), 3);
+    } catch (_:Dynamic) rejected = true;
+    check(rejected, "trajectory validation rejects a moving process-driven joint");
+    simulationHarness.dispose();
+
+  }
+
+  static function testDiscreteNativeSensors():Void {
+    var model = new RobotModel("discrete-process-sensors");
+    var base = model.addLink(new Link("base", "link/base"));
+    var carriage = model.addLink(new Link("carriage", "link/carriage"));
+    var spindle = model.addLink(new Link("spindle", "link/spindle"));
+    var slideJoint = new Joint("slide", JointType.Prismatic, base, carriage, "joint/slide");
+    slideJoint.axis = [0.0, 0.0, 1.0];
+    slideJoint.limits = new robotkit.model.JointLimits(-1.0, 1.0, 1.0, 1000.0);
+    model.addJoint(slideJoint);
+    var spindleJoint = new Joint("spindle", JointType.Continuous, base, spindle, "joint/spindle");
+    spindleJoint.axis = [0.0, 0.0, 1.0];
+    spindleJoint.limits = new robotkit.model.JointLimits(-100.0, 100.0, 10.0, 1000.0);
+    model.addJoint(spindleJoint);
+    var spindleActuator = new Actuator("spindle-drive", 5.0, 20.0,
+      Transmission.SimpleTransmission(spindleJoint.id, 1.0, 0.0));
+    spindleActuator.drive = new ServoDrive(2.0, 5.0, 10.0, 20.0, 0.001, 1000.0);
+    spindleActuator.processVelocity = new ProcessVelocityDrive("spindle.speed", "spindle.direction", 1.0);
+    model.addActuator(spindleActuator);
+
+    var closed = model.addSensor(new robotkit.model.Sensor("door-closed", "joint_switch", 0,
+      "sensor/door-closed"));
+    closed.joint = slideJoint.id;
+    closed.windowLower = 0.1;
+    closed.windowUpper = 0.2;
+    closed.hysteresis = 0.05;
+    var atSpeed = model.addSensor(new robotkit.model.Sensor("spindle-at-speed", "at_speed", 0,
+      "sensor/spindle-at-speed"));
+    atSpeed.joint = spindleJoint.id;
+    atSpeed.windowLower = 0.25;
+    var presenceFrame = model.addFrame(new robotkit.model.Frame("sensor-face", base, "frame/sensor-face"));
+    presenceFrame.position = [0.0, 0.0, 0.5];
+    var presence = model.addSensor(new robotkit.model.Sensor("stock-present", "presence", 0,
+      "sensor/stock-present"));
+    presence.frame = presenceFrame;
+    presence.maxRange = 3.0;
+
+    var simulationHarness = new SimulationHarness(0.01);
+    var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
+    check(blueprint.velocityDrives.length == 1 && blueprint.channels.length == 2,
+      "process spindle compiles to typed analog speed and direction channels");
+    var encoded = RobotModelCodec.encode(model);
+    var restored = RobotModelCodec.decode(encoded).actuators[0].processVelocity;
+    check(RobotModelCodec.VERSION == 11 && restored != null &&
+      restored.speedChannel == "spindle.speed" && restored.directionChannel == "spindle.direction" &&
+      Math.abs(restored.radiansPerSpeedUnit - 1.0) < 1e-9,
+      "RobotModel v11 preserves the typed spindle process binding");
+    var runtime = simulationHarness.simulation.addRobot(blueprint);
+    var robot = new SimulatedRobot("discrete-process-sensors", runtime,
+      "discrete-process-sensors", ["base", "carriage", "spindle"], ["slide", "spindle"]);
+    function value(snapshot:RobotSnapshot, id:String):Float {
+      for (index in 0...snapshot.sensors.length) {
+        var sample = snapshot.sensors.get(index);
+        if (sample.sensorId == id) return sample.values.get(0);
+      }
+      throw 'Missing native sensor $id';
+    }
+
+    simulationHarness.step(Int64.ofInt(1));
+    var snapshot = robot.snapshot();
+    equal(value(snapshot, "sensor/stock-present"), 0.0,
+      "presence starts clear when its connector face sees no object");
+    simulationHarness.spawnBox([0.0, 0.0, 2.0], [0.2, 0.2, 0.2]);
+    simulationHarness.step(Int64.ofInt(2));
+    snapshot = robot.snapshot();
+    equal(value(snapshot, "sensor/stock-present"), 1.0,
+      "presence reports a free object inside the connector range");
+
+    runtime.submitPosition(0, 0.15, 1);
+    for (tick in 3...33) simulationHarness.step(Int64.ofInt(tick));
+    snapshot = robot.snapshot();
+    equal(value(snapshot, "sensor/door-closed"), 1.0,
+      "joint switch closes inside its authored position window");
+    runtime.submitPosition(0, 0.23, 2);
+    for (tick in 33...63) simulationHarness.step(Int64.ofInt(tick));
+    equal(value(robot.snapshot(), "sensor/door-closed"), 1.0,
+      "joint switch hysteresis holds its state just outside the window");
+    runtime.submitPosition(0, 0.27, 3);
+    for (tick in 63...93) simulationHarness.step(Int64.ofInt(tick));
+    equal(value(robot.snapshot(), "sensor/door-closed"), 0.0,
+      "joint switch opens after crossing its hysteresis boundary");
+
+    var spinSegment = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(100000000),
+      [[0.27, 0.0], [0.0, 0.0]]);
+    runtime.submitPlan(new ExecutionPlanSubmission(Int64.ofInt(1300), Int64.ofInt(blueprint.revision),
+      Int64.ofInt(blueprint.calibrationRevision), RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE |
+      RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_EVENTS, [0.27, 0.0], [0.0, 0.0], [0.0, 0.0],
+      [spinSegment], null, null, null, null, null, true,
+      [new ProcessTimedEvent(Int64.ofInt(0), "spindle.speed", ProcessEventValue.Analog(5.0)),
+       new ProcessTimedEvent(Int64.ofInt(0), "spindle.direction", ProcessEventValue.Analog(1.0))]), 4);
+    for (tick in 94...104) simulationHarness.step(Int64.ofInt(tick));
+    check(Math.abs(robot.snapshot().velocities.get(1) - 5.0) < 1e-3 &&
+      value(robot.snapshot(), "sensor/spindle-at-speed") == 1.0,
+      "simulation drives the spindle from analog channels and its at-speed sensor reads motion");
+    robot.close();
     simulationHarness.dispose();
   }
 

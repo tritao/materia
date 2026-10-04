@@ -221,6 +221,11 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(21) @:optional var microsteps:Null<Int>;
 	@:id(22) @:optional var maxStepRate:Null<Float>;
 	@:id(23) @:optional var assumptions:Null<ReadOnlyArray<QuantityAssumption>>;
+	/** Servo driver position-loop frequency in Hz; absent for other actuators. */
+	@:id(24) @:optional var positionLoopRate:Null<Float>;
+	@:id(25) @:optional var pneumatic:Null<AssemblyPneumaticDrive>;
+	/** Optional process-speed channels for a continuously rotating joint; speed units use radians per second. */
+	@:id(26) @:optional var processVelocity:Null<AssemblyProcessVelocityDrive>;
 }
 
 /**
@@ -259,6 +264,7 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(8) @:optional var actuators:Array<AssemblyActuator>;
 	@:id(9) @:optional var encoders:Array<AssemblyEncoder>;
 	@:id(10) @:optional var elasticNetworks:Array<AssemblyElasticNetwork>;
+	@:id(11) @:optional var sensors:Array<AssemblySensor>;
 }
 
 /**
@@ -281,6 +287,7 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(11) @:optional var actuators:Array<AssemblyActuator>;
 	@:id(12) @:optional var encoders:Array<AssemblyEncoder>;
 	@:id(13) @:optional var elasticNetworks:Array<AssemblyElasticNetwork>;
+	@:id(14) @:optional var sensors:Array<AssemblySensor>;
 }
 
 @:wire typedef AssemblyJointCoordinate = {
@@ -299,6 +306,40 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(2) var definition:String;
 	@:id(3) var jointCoordinates:Array<AssemblyJointCoordinate>;
 	@:id(4) var rootPoses:Array<AssemblyRootPose>;
+}
+
+/** Cylinder dimensions and speed use the assembly length unit; gauge pressure is Pa. */
+@:wire typedef AssemblyPneumaticDrive = {
+	@:id(1) var bore:Float;
+	@:id(2) var rod:Float;
+	@:id(3) var stroke:Float;
+	@:id(4) var ratedSpeed:Float;
+	@:id(5) var pressurePa:Float;
+	@:id(6) var channelA:String;
+	@:id(7) @:optional var channelB:Null<String>;
+	@:id(8) var normallyToA:Bool;
+	@:id(9) var extendSign:Float;
+}
+
+/** A CNC speed setpoint in RPM and a signed direction signal drive a continuous joint. */
+@:wire typedef AssemblyProcessVelocityDrive = {
+	@:id(1) var speedChannel:String;
+	@:id(2) var directionChannel:String;
+	/** Convert the speed channel's units to radians per second. */
+	@:id(3) var radiansPerSpeedUnit:Float;
+}
+
+/** A native discrete sensor mounted to a joint coordinate or a connector face. */
+@:wire typedef AssemblySensor = {
+	@:id(1) var id:String;
+	@:id(2) var kind:String;
+	@:id(3) @:optional var joint:Null<String>;
+	@:id(4) @:optional var occurrence:Null<String>;
+	@:id(5) @:optional var connector:Null<String>;
+	@:id(6) @:optional var windowLower:Null<Float>;
+	@:id(7) @:optional var windowUpper:Null<Float>;
+	@:id(8) @:optional var hysteresis:Null<Float>;
+	@:id(9) @:optional var range:Null<Float>;
 }
 
 /** An engineering assumption attached to the quantity that uses it. */

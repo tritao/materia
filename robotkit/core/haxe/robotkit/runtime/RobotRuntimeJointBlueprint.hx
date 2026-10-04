@@ -32,6 +32,8 @@ class RobotRuntimeJointBlueprint {
    */
   public var servoStiffness:Float = 0.0;
   public var servoDamping:Float = 0.0;
+  public var reflectedInertia:Float = 0.0;
+  public var positionLoopRate:Float = 0.0;
   public var armature:Float = 0.0;
   public var damping:Float = 0.0;
   public var frictionLoss:Float = 0.0;

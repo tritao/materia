@@ -245,6 +245,8 @@ typedef struct nksim_joint_coupling_desc {
     nksim_joint follower;
     double ratio;
     double offset;
+    /** Follower-coordinate stiffness; zero preserves the backend default. */
+    double stiffness;
 } nksim_joint_coupling_desc;
 
 /** Closed-loop fixed, revolute, or prismatic joint between tree bodies. */
@@ -278,6 +280,11 @@ typedef struct nksim_joint_target {
     double stiffness;
     double damping;
     double feedforward;
+    /* Drive reference advanced from the command epoch at every physics substep. */
+    double end_position;
+    double end_velocity;
+    double reference_duration;
+    double reflected_inertia;
 } nksim_joint_target;
 
 /**
@@ -366,6 +373,9 @@ NKSIM_API nksim_result NKSIM_CALL nksim_world_get_clock(nksim_world world,
 NKSIM_API nksim_result NKSIM_CALL nksim_world_begin_topology_update(nksim_world world);
 /** Commits a staged topology update with one backend rebuild. */
 NKSIM_API nksim_result NKSIM_CALL nksim_world_end_topology_update(nksim_world world);
+/** Configures drive-required integration before the first world step. */
+NKSIM_API nksim_result NKSIM_CALL nksim_world_configure_integration(
+    nksim_world world, uint32_t substeps, uint32_t integrator);
 NKSIM_API nksim_result NKSIM_CALL nksim_world_step(nksim_world world,
                                                    nksim_step_result *out_result NK_INOUT);
 NKSIM_API nksim_result NKSIM_CALL nksim_world_apply_forces(

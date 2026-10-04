@@ -17,6 +17,15 @@ import materia.units.LengthUnit;
 /** Versioned transport and validation for reusable assembly definitions and states. */
 class AssemblyDefinitionCodec {
 	public static inline var VERSION:Int = 3;
+	/** Pneumatic process drives require v4; assemblies without them retain v3 bytes. */
+	public static inline var PROCESS_VERSION:Int = 4;
+	/** Optional native sensor bindings require v5; older assemblies retain their bytes. */
+	public static inline var SENSOR_VERSION:Int = 5;
+	/** Analog process-velocity bindings require v6; earlier assembly bytes remain stable. */
+	public static inline var VELOCITY_VERSION:Int = 6;
+
+	static function supportedVersion(version:Int):Bool
+		return version >= VERSION && version <= VELOCITY_VERSION;
 
 	public static function encode(definition:AssemblyDefinition):String {
 		validate(definition);
@@ -41,8 +50,8 @@ class AssemblyDefinitionCodec {
 	}
 
 	public static function validate(definition:AssemblyDefinition):Void {
-		if (definition != null && definition.schemaVersion != VERSION)
-			throw 'schema v${definition.schemaVersion} is unsupported; expected v$VERSION';
+		if (definition != null && !supportedVersion(definition.schemaVersion))
+			throw 'schema v${definition.schemaVersion} is unsupported; supported v$VERSION through v$VELOCITY_VERSION';
 		if (definition != null && definition.assemblies != null && definition.assemblies.length > 0) {
 			validateFlat(AssemblyDefinitionFlattener.flatten(definition));
 			return;
@@ -51,7 +60,7 @@ class AssemblyDefinitionCodec {
 	}
 
 	static function validateFlat(definition:AssemblyDefinition):Void {
-		if (definition == null || definition.schemaVersion != VERSION || !validText(definition.id) ||
+		if (definition == null || !supportedVersion(definition.schemaVersion) || !validText(definition.id) ||
 			definition.definitions == null || definition.definitions.length == 0 ||
 			definition.definitions.length > 1000 || definition.occurrences == null ||
 			definition.occurrences.length == 0 || definition.occurrences.length > 1000 ||
@@ -203,7 +212,48 @@ class AssemblyDefinitionCodec {
 				!validDrive(actuator))
 				throw 'Assembly has an invalid actuator "${actuator == null ? "" : actuator.id}"';
 			actuatorIds.set(actuator.id, true);
+			if (actuator.drive == "pneumatic" && definition.schemaVersion == VERSION)
+				throw "Pneumatic assembly drives require schema v$PROCESS_VERSION";
+			if (actuator.processVelocity != null && definition.schemaVersion != VELOCITY_VERSION)
+				throw 'Process-velocity assembly drives require schema v$VELOCITY_VERSION';
+			if (actuator.processVelocity != null) {
+				var process = actuator.processVelocity;
+				var joint = movable.get(actuator.joint);
+				if (actuator.drive != "servo" || actuator.pneumatic != null || joint == null ||
+					joint.type != AssemblyJointType.Continuous || !validText(process.speedChannel) ||
+					!validText(process.directionChannel) || process.speedChannel == process.directionChannel ||
+					!(process.radiansPerSpeedUnit > 0) || !Math.isFinite(process.radiansPerSpeedUnit))
+					throw 'Assembly actuator "${actuator.id}" has an invalid process-velocity binding';
+			}
 		}
+		var sensorIds = new Map<String, Bool>();
+		var sensors = definition.sensors == null ? [] : definition.sensors;
+		if (sensors.length > 4000) throw "Assembly has too many sensors";
+		for (sensor in sensors) {
+			if (sensor == null || !validText(sensor.id) || sensorIds.exists(sensor.id) ||
+				(sensor.kind != "joint_switch" && sensor.kind != "at_speed" && sensor.kind != "presence"))
+				throw "Assembly has an invalid or duplicate native sensor";
+			sensorIds.set(sensor.id, true);
+			if (sensor.kind == "joint_switch" || sensor.kind == "at_speed") {
+				var joint = sensor.joint == null ? null : movable.get(sensor.joint);
+				if (joint == null || sensor.occurrence != null || sensor.connector != null ||
+					sensor.windowLower == null || !Math.isFinite(sensor.windowLower) ||
+					sensor.hysteresis == null || !Math.isFinite(sensor.hysteresis) || sensor.hysteresis < 0 ||
+					(sensor.kind == "joint_switch" && (sensor.windowUpper == null ||
+						!Math.isFinite(sensor.windowUpper) || sensor.windowLower > sensor.windowUpper)) ||
+					(sensor.kind == "at_speed" && (sensor.windowLower <= 0 || sensor.windowUpper != null)))
+					throw 'Assembly sensor "${sensor.id}" has an invalid joint window';
+			} else {
+				var member = sensor.occurrence == null ? null : occurrences.get(sensor.occurrence);
+				if (sensor.joint != null || sensor.windowLower != null || sensor.windowUpper != null ||
+					sensor.hysteresis != null || member == null || !validText(sensor.connector) ||
+					!hasConnector(definitions.get(member.definition), sensor.connector) || sensor.range == null ||
+					!(sensor.range > 0) || !Math.isFinite(sensor.range))
+					throw 'Assembly sensor "${sensor.id}" has an invalid presence connector or range';
+			}
+		}
+		if (sensors.length > 0 && definition.schemaVersion < SENSOR_VERSION)
+			throw "Native assembly sensors require schema v$SENSOR_VERSION";
 		var encoders = definition.encoders == null ? [] : definition.encoders;
 		if (encoders.length > 4000) throw "Assembly has too many encoders";
 		var encoderIds = new Map<String, Bool>();
@@ -235,9 +285,7 @@ class AssemblyDefinitionCodec {
 		validate(definition);
 		state = AssemblyDefinitionFlattener.flattenState(definition, state);
 		definition = AssemblyDefinitionFlattener.flatten(definition);
-		if (state != null && state.schemaVersion != VERSION)
-			throw 'schema v${state.schemaVersion} is unsupported; expected v$VERSION';
-		if (state == null || state.schemaVersion != VERSION || state.definition != definition.id ||
+		if (state == null || !supportedVersion(state.schemaVersion) || state.definition != definition.id ||
 			state.jointCoordinates == null || state.rootPoses == null ||
 			state.jointCoordinates.length > definition.joints.length ||
 			state.rootPoses.length > definition.occurrences.length)
@@ -354,6 +402,7 @@ class AssemblyDefinitionCodec {
 				actuator.encoderCounts, actuator.servoStiffness, actuator.servoDamping])
 			if (value != null && !(value >= 0 && Math.isFinite(value))) return false;
 		if (actuator.microsteps != null && (actuator.microsteps < 1 || actuator.microsteps > 1024)) return false;
+		if (actuator.positionLoopRate != null && (!(actuator.positionLoopRate > 0) || !Math.isFinite(actuator.positionLoopRate))) return false;
 		if (actuator.maxStepRate != null && (!(actuator.maxStepRate > 0) || !Math.isFinite(actuator.maxStepRate))) return false;
 		if (actuator.gearRatio != null && !(actuator.gearRatio > 0 && Math.isFinite(actuator.gearRatio))) return false;
 		if (actuator.gearEfficiency != null && !(actuator.gearEfficiency > 0 && actuator.gearEfficiency <= 1)) return false;
@@ -369,6 +418,13 @@ class AssemblyDefinitionCodec {
 			&& (actuator.microsteps == null || actuator.maxStepRate == null)) return false;
 		var kind = actuator.drive;
 		if (kind == null) return true;
+		if (kind == "pneumatic") {
+			var p = actuator.pneumatic;
+			return p != null && p.bore > p.rod && p.rod > 0 && p.stroke > 0 && p.ratedSpeed > 0 &&
+				p.pressurePa >= 0 && Math.isFinite(p.bore + p.rod + p.stroke + p.ratedSpeed + p.pressurePa) &&
+				validText(p.channelA) && (p.channelB == null || validText(p.channelB)) && Math.abs(p.extendSign) == 1;
+		}
+		if (actuator.pneumatic != null) return false;
 		if (kind == "stepper") return actuator.fullStepsPerRevolution != null && actuator.holdingTorque != null && curve != null
 			&& actuator.microsteps != null && actuator.maxStepRate != null;
 		if (kind == "servo")

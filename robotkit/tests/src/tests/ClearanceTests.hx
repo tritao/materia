@@ -128,6 +128,14 @@ class ClearanceTests {
   static function testSolidEdges():Void {
     var solid = new ConvexSolid(box(0.0, 0.1, 0.0, 0.2, 0.0, 0.3));
     check(solid.cornerPoints().length == 24, "a box has eight corners");
+    check(solid.distanceBelow(0.2, 0.3, 0.4, 0.005) >= 0.005,
+      "a separating face proves a distant point clear");
+    var corner = solid.distanceBelow(0.103, 0.203, 0.303, 0.005);
+    check(Math.abs(corner - Math.sqrt(3.0) * 0.003) < 1e-9,
+      "below-threshold face distances still solve the true corner distance");
+    check(Math.abs(solid.distanceBelow(0.05, 0.1, 0.15, 0.005) - solid.distance(0.05, 0.1, 0.15)) < 1e-12,
+      "clearance cutoff preserves penetration depth");
+
     // The distance between hulls: two boxes 0.05 apart face to face, and 0.05 apart edge to edge (a diagonal gap of 0.05 * sqrt(2)).
     var a = box(0.0, 1.0, 0.0, 1.0, 0.0, 1.0);
     near(ConvexDistance.between(a, box(1.05, 2.0, 0.0, 1.0, 0.0, 1.0), 1.0), 0.05, 1e-9, "boxes apart face to face");
@@ -160,6 +168,7 @@ class ClearanceTests {
   static function near(actual:Float, expected:Float, tolerance:Float, message:String):Void {
     assertions++;
     if (!(Math.abs(actual - expected) <= tolerance)) throw 'Assertion failed: $message (expected $expected, got $actual)';
+
   }
 
   static function check(value:Bool, message:String):Void {

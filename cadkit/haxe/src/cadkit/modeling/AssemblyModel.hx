@@ -193,6 +193,10 @@ class AssemblyModel {
 	 * curve, torques, speeds and encoder counts, as `AssemblyActuator` names them.
 	 */
 	public function actuateDrive(actuator:materia.assembly.AssemblyDefinition.AssemblyActuator):Void {
+		if (actuator.pneumatic != null && data.schemaVersion < AssemblyDefinitionCodec.PROCESS_VERSION)
+			data.schemaVersion = AssemblyDefinitionCodec.PROCESS_VERSION;
+		if (actuator.processVelocity != null)
+			data.schemaVersion = AssemblyDefinitionCodec.VELOCITY_VERSION;
 		if (data.actuators == null) data.actuators = [];
 		data.actuators.push(materia.assembly.AssemblyDefinitionFlattener.copyActuator(actuator, actuator.id, actuator.joint));
 	}
@@ -205,6 +209,14 @@ class AssemblyModel {
 	public function addEncoder(encoder:materia.assembly.AssemblyDefinition.AssemblyEncoder):Void {
 		if (data.encoders == null) data.encoders = [];
 		data.encoders.push(materia.assembly.AssemblyDefinitionFlattener.copyEncoder(encoder, encoder.id, encoder.joint));
+	}
+
+	/** Adds a native discrete sensor and versions the assembly only when one is present. */
+	public function addSensor(sensor:materia.assembly.AssemblyDefinition.AssemblySensor):Void {
+		if (data.schemaVersion < AssemblyDefinitionCodec.SENSOR_VERSION)
+			data.schemaVersion = AssemblyDefinitionCodec.SENSOR_VERSION;
+		if (data.sensors == null) data.sensors = [];
+		data.sensors.push(materia.assembly.AssemblyDefinitionFlattener.copySensor(sensor, sensor.id, ""));
 	}
 
 	/** Add derived span energies separately from nominal motion couplings. */

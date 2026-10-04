@@ -256,7 +256,12 @@ class DriveLoads {
     var motors:Array<MotorLoad> = [];
     var motorJoints:Array<Joint> = [];
     var total = 0.0;
-    for (actuator in model.actuators) switch actuator.transmission {
+    for (actuator in model.actuators) {
+      // Process-owned axes receive effort from a valve or spindle channel, not
+      // from the trajectory planner's motor budget.
+      if (actuator.processVelocity != null ||
+          (actuator.drive != null && actuator.drive.pneumatic() != null)) continue;
+      switch actuator.transmission {
       case SimpleTransmission(target, transmissionRatio, _):
         var index = -1;
         for (candidate in 0...reached.length) if (reached[candidate].id == target) index = candidate;
@@ -274,6 +279,7 @@ class DriveLoads {
         motors.push(motor);
         motorJoints.push(reached[index]);
         total += efficiencies[index] * actuator.efficiency * actuator.requireEffort() * Math.abs(motorRatio);
+      }
     }
     if (motors.length == 0) return null;
     for (motor in motors)

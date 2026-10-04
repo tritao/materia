@@ -25,7 +25,7 @@ class SimulationHarness {
       ?backend:Int = SimulationSpace.DETERMINISTIC, ?solver:SimWorldOptions) {
     space = SimulationSpace.create(backend, fixedTimestep, physicsSubsteps, solver);
     try {
-      simulation = Simulation.inSession(space.session);
+      simulation = Simulation.inSpace(space);
     } catch (error:Dynamic) {
       space.dispose();
       throw error;

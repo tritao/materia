@@ -272,6 +272,7 @@ public:
     nksim_result get_clock(nksim_clock *out_clock) const noexcept;
     nksim_result begin_topology_update();
     nksim_result end_topology_update();
+    nksim_result configure_integration(std::uint32_t substeps, std::uint32_t integrator);
     nksim_result step(nksim_step_result *out_result);
     nksim_result apply_forces(const nksim_body_force *forces, std::uint32_t count);
     nksim_result set_joint_targets(const nksim_joint_target *targets, std::uint32_t count);

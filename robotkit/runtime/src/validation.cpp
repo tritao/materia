@@ -133,11 +133,26 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
                 !is_finite(servo.damping) || servo.damping < 0.0)
                 return RK_ERROR_INVALID_ARGUMENT;
         }
+    constexpr auto legacy_complete_size = offsetof(rk_robot_runtime_blueprint, process_joint);
+    constexpr auto process_complete_size = offsetof(rk_robot_runtime_blueprint, sensor_joint);
+    if (blueprint->struct_size >= legacy_complete_size) {
+        if (blueprint->coupling_count > RK_MAX_JOINT_COUPLINGS) return RK_ERROR_INVALID_ARGUMENT;
+        for (uint32_t joint = 0; joint < blueprint->joint_count; ++joint)
+            if (!is_finite(blueprint->servo_reflected_inertia[joint]) || blueprint->servo_reflected_inertia[joint] < 0.0)
+                return RK_ERROR_INVALID_ARGUMENT;
+        for (uint32_t coupling = 0; coupling < blueprint->coupling_count; ++coupling)
+            if (!is_finite(blueprint->coupling_stiffness[coupling]) || blueprint->coupling_stiffness[coupling] < 0.0)
+                return RK_ERROR_INVALID_ARGUMENT;
+    }
     constexpr auto channels_size = offsetof(rk_robot_runtime_blueprint, coupling_count);
     if (blueprint->struct_size > offsetof(rk_robot_runtime_blueprint, channel_count) &&
         blueprint->struct_size < channels_size) return RK_ERROR_INVALID_ARGUMENT;
-    if (blueprint->struct_size > channels_size &&
-        blueprint->struct_size < sizeof(*blueprint)) return RK_ERROR_INVALID_ARGUMENT;
+    if (blueprint->struct_size > channels_size && blueprint->struct_size < legacy_complete_size)
+        return RK_ERROR_INVALID_ARGUMENT;
+    if (blueprint->struct_size > legacy_complete_size && blueprint->struct_size < process_complete_size)
+        return RK_ERROR_INVALID_ARGUMENT;
+    if (blueprint->struct_size > process_complete_size && blueprint->struct_size < sizeof(*blueprint))
+        return RK_ERROR_INVALID_ARGUMENT;
     if (blueprint->struct_size >= channels_size) {
         if (blueprint->channel_count > RK_MAX_PROCESS_CHANNELS) return RK_ERROR_INVALID_ARGUMENT;
         for (uint32_t i = 0; i < blueprint->channel_count; ++i) {
@@ -171,6 +186,9 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
                 blueprint->joint_count, nullptr, order, ordered))
             return RK_ERROR_INVALID_ARGUMENT;
     }
+    if (blueprint->struct_size >= process_complete_size)
+        for (uint32_t joint = 0; joint < blueprint->joint_count; ++joint)
+            if (blueprint->process_joint[joint] > 1) return RK_ERROR_INVALID_ARGUMENT;
     for (uint32_t i = 0; i < blueprint->link_count; ++i) {
         const auto &link = blueprint->links[i];
         if (!is_finite(link.mass) || link.mass <= 0.0) return RK_ERROR_INVALID_ARGUMENT;
@@ -188,7 +206,7 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
     uint64_t pooled_values = 0;
     for (uint32_t i = 0; i < blueprint->sensor_count; ++i) {
         const auto &sensor = blueprint->sensors[i];
-        if (sensor.kind < RK_SENSOR_ENCODER || sensor.kind > RK_SENSOR_LIDAR ||
+        if (sensor.kind < RK_SENSOR_ENCODER || sensor.kind > RK_SENSOR_PRESENCE ||
             sensor.link >= blueprint->link_count || !is_finite(sensor.update_rate) || sensor.update_rate < 0.0 ||
             !is_finite(sensor.noise_stddev) || sensor.noise_stddev < 0.0)
             return RK_ERROR_INVALID_ARGUMENT;
@@ -201,8 +219,21 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
             !is_finite(sensor.start_angle) || !is_finite(sensor.field_of_view) ||
             sensor.field_of_view < 0.0 || sensor.field_of_view > 6.283185307179586))
             return RK_ERROR_INVALID_ARGUMENT;
+        if (sensor.kind == RK_SENSOR_PRESENCE && (!is_finite(sensor.max_range) || sensor.max_range <= 0.0))
+            return RK_ERROR_INVALID_ARGUMENT;
+        if (sensor.kind == RK_SENSOR_JOINT_SWITCH || sensor.kind == RK_SENSOR_AT_SPEED) {
+            if (blueprint->struct_size < sizeof(*blueprint) || blueprint->sensor_joint[i] >= blueprint->joint_count ||
+                !is_finite(blueprint->sensor_window_lower[i]) || !is_finite(blueprint->sensor_window_upper[i]) ||
+                !is_finite(blueprint->sensor_hysteresis[i]) || blueprint->sensor_hysteresis[i] < 0.0 ||
+                (sensor.kind == RK_SENSOR_JOINT_SWITCH &&
+                    blueprint->sensor_window_lower[i] > blueprint->sensor_window_upper[i]) ||
+                (sensor.kind == RK_SENSOR_AT_SPEED && blueprint->sensor_window_lower[i] <= 0.0))
+                return RK_ERROR_INVALID_ARGUMENT;
+        }
         pooled_values += sensor.kind == RK_SENSOR_LIDAR ? sensor.ray_count
-            : sensor.kind == RK_SENSOR_IMU ? 6 : blueprint->joint_count;
+            : sensor.kind == RK_SENSOR_IMU ? 6
+            : sensor.kind == RK_SENSOR_JOINT_SWITCH || sensor.kind == RK_SENSOR_AT_SPEED ||
+                sensor.kind == RK_SENSOR_PRESENCE ? 1 : blueprint->joint_count;
     }
     if (pooled_values > RK_SENSOR_VALUE_POOL) return RK_ERROR_INVALID_ARGUMENT;
     for (uint32_t index = 0; index < blueprint->joint_count; ++index) {
@@ -244,9 +275,15 @@ rk_result RK_CALL rk_robot_command_validate(const rk_robot_command *command) {
     if (command->kind == RK_COMMAND_TRAJECTORY_SEGMENTS && command->target_count != 0)
         return RK_ERROR_INVALID_ARGUMENT;
 
+    if (!is_finite(command->reference_duration) || command->reference_duration < 0.0)
+        return RK_ERROR_INVALID_ARGUMENT;
     bool targeted[RK_MAX_JOINTS]{};
     for (uint32_t index = 0; index < command->target_count; ++index) {
         const auto &target = command->targets[index];
+        if (index < RK_MAX_SERVO_JOINTS &&
+            (!is_finite(command->reference_end_position[index]) || !is_finite(command->reference_end_velocity[index]) ||
+             !is_finite(command->servos[index].velocity)))
+            return RK_ERROR_INVALID_ARGUMENT;
         if (target.joint >= RK_MAX_JOINTS || !valid_target_mode(target.mode) ||
             !is_finite(target.target) || !is_finite(target.max_rate) ||
             !is_finite(target.max_effort) || target.max_rate < 0.0 || target.max_effort < 0.0)
@@ -274,6 +311,9 @@ rk_result RK_CALL rk_robot_command_validate_for_blueprint(
         return RK_ERROR_INVALID_ARGUMENT;
     for (uint32_t index = 0; index < command->target_count; ++index) {
         if (command->targets[index].joint >= blueprint->joint_count)
+            return RK_ERROR_INVALID_ARGUMENT;
+        if (blueprint->struct_size >= offsetof(rk_robot_runtime_blueprint, sensor_joint) &&
+            blueprint->process_joint[command->targets[index].joint])
             return RK_ERROR_INVALID_ARGUMENT;
     }
     if (has_couplings(blueprint) && command->kind == RK_COMMAND_JOINT_TARGETS) {
@@ -397,6 +437,14 @@ rk_result validate_segments_for_blueprint(const SegmentBatch &batch,
                         return RK_ERROR_INVALID_ARGUMENT;
                 }
             }
+    if (blueprint.struct_size >= offsetof(rk_robot_runtime_blueprint, sensor_joint))
+        for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
+            if (!blueprint.process_joint[joint]) continue;
+            for (const auto &segment : batch.segments)
+                for (uint32_t degree = 1; degree <= segment.degree; ++degree)
+                    if (std::abs(segment.coefficients[joint].value[degree]) > 1e-12)
+                        return RK_ERROR_INVALID_ARGUMENT;
+        }
     return RK_OK;
 }
 
@@ -424,6 +472,13 @@ rk_result validate_plan_for_blueprint(const PlanRequest &plan,
         !coupled_values(&blueprint, plan.start_velocity, 1e-6, false) ||
         !coupled_values(&blueprint, plan.start_acceleration, 1e-6, false))
         return RK_ERROR_INVALID_ARGUMENT;
+    if (blueprint.struct_size >= offsetof(rk_robot_runtime_blueprint, sensor_joint))
+        for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
+            if (!blueprint.process_joint[joint]) continue;
+            if (std::abs(plan.segments.segments.front().coefficients[joint].value[0] -
+                    plan.start_position[joint]) > 1e-9)
+                return RK_ERROR_INVALID_ARGUMENT;
+        }
     if (plan.events.size() > RK_MAX_TRAJECTORY_QUEUE_POINTS ||
         (!plan.events.empty() && (plan.required_capabilities & RK_PLAN_CAPABILITY_EVENTS) == 0))
         return RK_ERROR_INVALID_ARGUMENT;
@@ -444,4 +499,3 @@ rk_result validate_plan_for_blueprint(const PlanRequest &plan,
 }
 
 } // namespace robotkit
-

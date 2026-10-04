@@ -1,0 +1,44 @@
+{
+	"version": 1,
+	"package": {
+		"name": "machinekit-bench-mill-example"
+	},
+	"entry": "BenchMillPreview",
+	"sources": [
+		"BenchMill.hx",
+		"BenchMillPreview.hx",
+		"BearingBlock.hx",
+		"BearingBlockJob.hx",
+		"../cnc-router/CncRouter.hx",
+		"EnclosedBenchMill.hx"
+	],
+	"sourceRoots": [
+		".",
+		"../cnc-router"
+	],
+	"dependencies": {
+		"projectkit": {
+			"path": "../../../projectkit"
+		},
+		"cadkit": {
+			"path": "../../../cadkit"
+		},
+		"machinekit": {
+			"path": "../../"
+		},
+		"manufacturingkit": {
+			"path": "../../../manufacturingkit"
+		},
+		"toolpathkit": {
+			"path": "../../../toolpathkit"
+		},
+		"camkit": {
+			"path": "../../../camkit"
+		},
+		"cnckit": {
+			"path": "../../../cnckit"
+		}
+	},
+	"target": "host",
+	"outputDir": "build"
+}

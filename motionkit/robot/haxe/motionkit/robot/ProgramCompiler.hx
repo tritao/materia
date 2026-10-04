@@ -70,6 +70,7 @@ class ProgramCompiler {
   public final configurationSelector:Null<PathConfigurationSelector>;
   final jointIds:Null<Array<String>>;
   final couplings:Null<Array<JointCoupling>>;
+  final controllerPeriodSeconds:Float;
   /**
    * The plan check every compiled program goes through, or null for none, for simulation and device.
    * Its findings are on `ExecutionPlan.checked`. Direct MotionSystem moves and live ServoSession
@@ -90,7 +91,7 @@ class ProgramCompiler {
       startTolerances, timing, cartesianResolution, maxJointJump, positionTolerance,
       orientationTolerance, ikTolerance,
       configurationSelector == null ? null : configurationSelector.withSolver(forked),
-      perJointMaxJump, jointIds, couplings);
+      perJointMaxJump, jointIds, couplings, controllerPeriodSeconds);
     // The worker plans one program in order, so it remembers which way each axis last moved.
     if (planCheck != null) worker.planCheck = planCheck.fork();
     worker.motorSpace = motorSpace;
@@ -104,11 +105,14 @@ class ProgramCompiler {
       ?positionTolerance:Float = 0.005, ?orientationTolerance:Float = 0.02,
       ?ikTolerance:IkTolerance, ?configurationSelector:PathConfigurationSelector,
       ?perJointMaxJump:Array<Float>, ?jointIds:Array<String>,
-      ?couplings:Array<JointCoupling>) {
+      ?couplings:Array<JointCoupling>, ?controllerPeriodSeconds:Float = 0.01) {
     if (solver == null || limits == null || solver.jointCount() != limits.jointCount)
       throw "Program compiler needs matching kinematics and validation limits";
     if (frameId == null || StringTools.trim(frameId).length == 0)
       throw "Program compiler needs a frame ID";
+    if (!Math.isFinite(controllerPeriodSeconds) || controllerPeriodSeconds <= 0.0)
+      throw "Program compiler controller period must be finite and positive";
+    this.controllerPeriodSeconds = controllerPeriodSeconds;
     var count = limits.jointCount;
     if (startTolerances == null) throw "Program compiler start tolerances are required";
     startTolerances.validate(count);
@@ -219,6 +223,18 @@ class ProgramCompiler {
   /** Ends the current block at a barrier. */
   function barrier(c:ProgramCompilation, barrier:ProgramBarrier):Void {
     retire(c);
+    if (c.leadingOutputs.length > 0) {
+      // An output before a wait must run before the wait can observe its input.
+      var trajectory = Trajectory.fromSegments([{
+        timeFromStartNs: Int64.ofInt(0),
+        durationNs: Trajectory.nanoseconds(controllerPeriodSeconds),
+        coefficients: [for (position in c.q) [position, 0.0]]
+      }]);
+      var pending = new PendingMotion(c.currentIndex, c.q, c.q, trajectory, [], null, null);
+      attachLeadingOutputs(pending, c.leadingOutputs);
+      c.pending = pending;
+      retire(c);
+    }
     c.sink.barrier(barrier);
   }
 
@@ -655,15 +671,21 @@ class ProgramCompiler {
     if (failure != null) throw failure;
   }
 
-  static function distanceToSegment(point:Pose3, start:Pose3, end:Pose3):Float {
-    var dx = end.x - start.x, dy = end.y - start.y, dz = end.z - start.z;
+  static function distanceToSegment(point:Pose3, start:Pose3, end:Pose3):Float
+    return pointToSegmentDistance(point.x, point.y, point.z, start.x, start.y, start.z,
+      end.x, end.y, end.z);
+
+  /** Distance uses coordinates directly; authored polylines are checked at every trajectory sample. */
+  static function pointToSegmentDistance(px:Float, py:Float, pz:Float,
+      sx:Float, sy:Float, sz:Float, ex:Float, ey:Float, ez:Float):Float {
+    var dx = ex - sx, dy = ey - sy, dz = ez - sz;
     var lengthSquared = dx * dx + dy * dy + dz * dz;
     var fraction = lengthSquared <= 0.0 ? 0.0 : Math.max(0.0, Math.min(1.0,
-      ((point.x - start.x) * dx + (point.y - start.y) * dy +
-        (point.z - start.z) * dz) / lengthSquared));
-    var x = point.x - start.x - fraction * dx;
-    var y = point.y - start.y - fraction * dy;
-    var z = point.z - start.z - fraction * dz;
+      ((px - sx) * dx + (py - sy) * dy +
+        (pz - sz) * dz) / lengthSquared));
+    var x = px - sx - fraction * dx;
+    var y = py - sy - fraction * dy;
+    var z = pz - sz - fraction * dz;
     return Math.sqrt(x * x + y * y + z * z);
   }
 
@@ -672,9 +694,8 @@ class ProgramCompiler {
     for (primitive in geometry.primitives) {
       var candidate = if (Std.isOfType(primitive, LineSegment)) {
         var line:LineSegment = cast primitive;
-        distanceToSegment(point,
-          new Pose3(line.start.x, line.start.y, line.start.z),
-          new Pose3(line.end.x, line.end.y, line.end.z));
+        pointToSegmentDistance(point.x, point.y, point.z,
+          line.start.x, line.start.y, line.start.z, line.end.x, line.end.y, line.end.z);
       } else if (Std.isOfType(primitive, ArcSegment)) {
         var arc:ArcSegment = cast primitive;
         var angle = Math.atan2(point.y - arc.center.y,

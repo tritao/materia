@@ -1,0 +1,17 @@
+{
+	"format": "materia.project",
+	"version": 1,
+	"name": "Enclosed bench mill",
+	"defaultEntrypoint": "enclosure",
+	"build": {
+		"system": "haxeon",
+		"manifest": "haxeon.json"
+	},
+	"entrypoints": {
+		"enclosure": {
+			"kind": "cad-preview",
+			"module": "BenchMillPreview",
+			"function": "enclosure"
+		}
+	}
+}

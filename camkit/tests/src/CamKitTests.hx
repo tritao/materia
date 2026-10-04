@@ -153,6 +153,23 @@ class CamKitTests {
     }
     check(hasProfileSpan && hasPocketSpan && hasDrillSpan,
       "CAM source map identifies each authored operation");
+    // A fitted open arc must retain the authored endpoint even when samples only
+    // approximately lie on a circle. Otherwise the next arc's relative I/J is wrong.
+    var samples = [for (index in 0...13) new Point3(0.04 + 0.002 * Math.cos(index * Math.PI / 24),
+      0.02 + 0.002 * Math.sin(index * Math.PI / 24), -0.001)];
+    samples[12] = new Point3(samples[12].x + 0.000005, samples[12].y, samples[12].z);
+    var sampleSpan = Provenance.cam(99);
+    var sampled:Array<ToolpathOp> = [for (index in 1...samples.length)
+      ToolpathOp.Move(Cut, PathGeometry.Line(samples[index - 1], samples[index]), 0.01, 0.0, sampleSpan)];
+    var fitted = toolpathkit.path.ArcFitting.fit(sampled, 0.00002);
+    check(fitted.length == 1, "an approximate open circle still fits one arc");
+    switch fitted[0] {
+      case Move(_, geometry, _, _, _):
+        near(GeometryTools.pointAt(geometry, 0).distanceTo(samples[0]), 0, "fitted arc retains its start", 1e-12);
+        near(GeometryTools.pointAt(geometry, GeometryTools.length(geometry)).distanceTo(samples[12]), 0,
+          "fitted arc retains its end", 1e-12);
+      case _: throw "expected a fitted cutting move";
+    }
     var gcode = machine.export(program, CamTestSetup.standard());
     var parsed = machine.compileDetailed(gcode);
     check(parsed.diagnostics.length == 0,

@@ -24,5 +24,8 @@ class RobotCapabilities {
   }
   function get_controlModes():Array<JointTargetMode> return modes.copy();
   function get_streams():Array<String> return streamKinds.copy();
-  public function accepts(mode:JointTargetMode):Bool return modes.contains(mode);
+  public function accepts(mode:JointTargetMode):Bool {
+    for (candidate in modes) if (candidate == mode) return true;
+    return false;
+  }
 }

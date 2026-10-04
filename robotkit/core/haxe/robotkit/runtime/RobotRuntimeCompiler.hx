@@ -13,6 +13,8 @@ import robotkit.profile.RobotForkConfiguration;
 import robotkit.profile.RobotMobileConfiguration;
 import robotkit.model.ActuatorDrive.ServoDrive;
 import robotkit.model.Transmission;
+import robotkit.execution.ProcessChannelDeclaration;
+import robotkit.execution.ProcessEventValue;
 import RobotKitRuntime;
 
 /** Compiles the editable semantic robot model into an execution blueprint. */
@@ -46,6 +48,20 @@ class RobotRuntimeCompiler {
         [for (link in robot.links) link.visualGeometry],
         [for (link in robot.links) link.collisionGeometry], robot.collisionApproximation),
       compileConfiguration(robot, profile), calibrationRevision);
+    for (actuator in robot.actuators) {
+      var drive = actuator.drive;
+      var pneumatic = drive == null ? null : drive.pneumatic();
+      if (pneumatic != null) {
+        ensureDigitalChannel(result, pneumatic.channelA);
+        if (pneumatic.channelB != null) ensureDigitalChannel(result, pneumatic.channelB);
+      }
+      var processVelocity = actuator.processVelocity;
+      if (processVelocity != null) {
+        ensureAnalogChannel(result, processVelocity.speedChannel);
+        ensureAnalogChannel(result, processVelocity.directionChannel);
+      }
+    }
+
     result.floatingBase = robot.floatingBase;
     result.collisionApproximation = switch (robot.collisionApproximation) {
       case CollisionApproximation.None: RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_NONE;
@@ -85,19 +101,49 @@ class RobotRuntimeCompiler {
         joint.childFramePosition, joint.childFrameRotation, joint.axis,
         joint.limits.maxAcceleration);
       compiled.overtravel = joint.limits.overtravel;
-      // A servo motor whose joint is coupled to others carries them: it runs as a torque-limited servo
-      // and the coupling moves the rest. A servo on a joint with no couplings, such as an arm joint, keeps
-      // the computed-torque tracking limited to its effort. Stepper machines keep kinematic following.
-      if (inCoupling.exists(joint.id))
-        for (actuator in robot.actuators) switch actuator.transmission {
-          case SimpleTransmission(jointId, ratio, _) if (jointId == joint.id && Std.isOfType(actuator.drive, ServoDrive)):
-            var drive:ServoDrive = cast actuator.drive;
-            var stiffness = actuator.servoStiffness > 0.0 ? actuator.servoStiffness : drive.defaultStiffness();
-            var damping = actuator.servoDamping > 0.0 ? actuator.servoDamping : ServoDrive.defaultDamping(stiffness);
-            compiled.servoStiffness += stiffness * ratio * ratio;
-            compiled.servoDamping += damping * ratio * ratio;
-          case _:
-        }
+      for (actuator in robot.actuators) switch actuator.transmission {
+        case SimpleTransmission(jointId, ratio, _) if (jointId == joint.id):
+          var drive = actuator.drive;
+          var pneumatic = drive == null ? null : drive.pneumatic();
+          if (pneumatic != null) {
+            result.pneumaticDrives.push(new RobotRuntimePneumaticDriveBlueprint(index,
+              pneumatic.channelA, pneumatic.channelB, pneumatic.normallyToA,
+              pneumatic.extensionForce(), pneumatic.retractionForce(), pneumatic.extendSign,
+              pneumatic.ratedSpeed));
+          }
+          if (actuator.processVelocity != null) {
+            var process = actuator.processVelocity;
+            result.velocityDrives.push(new RobotRuntimeVelocityDriveBlueprint(index,
+              process.speedChannel, process.directionChannel, process.radiansPerSpeedUnit,
+              requiredProcessLimit(actuator.maxEffort, actuator.id, "effort") * Math.abs(ratio) * actuator.efficiency,
+              requiredProcessLimit(actuator.maxRate, actuator.id, "rate") / Math.abs(ratio)));
+          }
+        case _:
+      }
+      // Coupled servos carry their followers. An uncoupled drive with explicit
+      // physical gains uses the same position loop; unspecified gains retain
+      // the existing computed-torque model. Stepper following is unchanged.
+      for (actuator in robot.actuators) switch actuator.transmission {
+        case SimpleTransmission(jointId, ratio, _) if (jointId == joint.id):
+          var drive = actuator.drive;
+          var servo = drive == null ? null : drive.servo();
+          if (actuator.processVelocity == null && servo != null &&
+              (inCoupling.exists(joint.id) || actuator.servoStiffness > 0.0 || actuator.servoDamping > 0.0)) {
+          var stiffness = actuator.servoStiffness > 0.0 ? actuator.servoStiffness : servo.defaultStiffness();
+          var damping = actuator.servoDamping > 0.0 ? actuator.servoDamping : ServoDrive.defaultDamping(stiffness);
+          compiled.servoStiffness += stiffness * ratio * ratio;
+          compiled.servoDamping += damping * ratio * ratio;
+          compiled.positionLoopRate = Math.max(compiled.positionLoopRate, actuator.positionLoopRate);
+          for (load in robotkit.model.DriveLoads.of(robot))
+            if (load.motors.length == 1) {
+              var motor = load.motors[0];
+              if (motor.actuator.id == actuator.id)
+                compiled.reflectedInertia += load.axis == joint.id ? load.mass :
+                  (motor.rotorInertia + load.mass / (motor.ratio * motor.ratio)) * ratio * ratio;
+            }
+          }
+        case _:
+      }
       compiled.armature = joint.armature;
       compiled.damping = joint.damping;
       compiled.frictionLoss = joint.frictionLoss;
@@ -115,7 +161,10 @@ class RobotRuntimeCompiler {
     }
     for (pair in robot.contactPairs) {
       // Validation guarantees both links exist.
-      var firstA:Int = cast firstShape.get(pair.linkA), firstB:Int = cast firstShape.get(pair.linkB);
+      var firstAValue = firstShape.get(pair.linkA), firstBValue = firstShape.get(pair.linkB);
+      if (firstAValue == null || firstBValue == null)
+        throw 'Contact pair "${pair.linkA}/${pair.linkB}" references an unknown link';
+      var firstA = firstAValue, firstB = firstBValue;
       result.contactPairs.push(new RobotRuntimeContactPair(firstA + pair.shapeA,
         firstB + pair.shapeB, pair.surface));
     }
@@ -125,8 +174,10 @@ class RobotRuntimeCompiler {
         if (robot.joints[index].id == coupling.leader) leader = index;
         if (robot.joints[index].id == coupling.follower) follower = index;
       }
-      result.couplings.push(new RobotRuntimeJointCouplingBlueprint(
-        leader, follower, coupling.ratio, coupling.offset));
+      var compiledCoupling = new RobotRuntimeJointCouplingBlueprint(
+        leader, follower, coupling.ratio, coupling.offset);
+      compiledCoupling.stiffness = coupling.stiffness / (coupling.ratio * coupling.ratio);
+      result.couplings.push(compiledCoupling);
     }
     var children = [for (joint in robot.joints) joint.child];
     var root = robot.links[0];
@@ -137,14 +188,55 @@ class RobotRuntimeCompiler {
     for (sensor in robot.sensors) {
       var frame = sensor.frame;
       var link = frame == null ? root : frame.link;
+      var sensorJoint = -1;
+      if (sensor.joint != null) for (jointIndex in 0...robot.joints.length)
+        if (robot.joints[jointIndex].id == sensor.joint) sensorJoint = jointIndex;
       result.sensors.push(new RobotRuntimeSensorBlueprint(sensor.id, sensor.kind,
         frame == null ? link.id : frame.id, link.id, robot.links.indexOf(link),
         frame == null ? [0.0, 0.0, 0.0] : frame.position,
         frame == null ? [0.0, 0.0, 0.0, 1.0] : frame.rotation,
         sensor.updateRate, sensor.rayCount, sensor.maxRange, sensor.noiseStddev, sensor.noiseSeed,
-        sensor.startAngleRadians, sensor.fieldOfViewRadians));
+        sensor.startAngleRadians, sensor.fieldOfViewRadians, sensorJoint,
+        sensor.windowLower, sensor.windowUpper, sensor.hysteresis));
     }
     return result;
+  }
+
+  static function positiveFinite(value:Null<Float>):Bool {
+    var bound:Float = value == null ? 0.0 : value;
+    return bound > 0.0 && Math.isFinite(bound);
+  }
+
+  static function requiredProcessLimit(value:Null<Float>, actuatorId:String, label:String):Float {
+    if (value == null || !(value > 0.0) || !Math.isFinite(value))
+      throw 'Process actuator "$actuatorId" needs a positive finite $label limit';
+    return value;
+  }
+
+  static function tighterLimit(first:Float, second:Float):Float {
+    if (first == 0.0) return second;
+    if (second == 0.0) return first;
+    return Math.min(first, second);
+  }
+
+  static function ensureDigitalChannel(blueprint:RobotRuntimeBlueprint, id:String):Void {
+    for (channel in blueprint.channels) if (channel.id == id) {
+      if (channel.safeValue != robotkit.execution.ProcessEventValue.Digital(false))
+        throw 'Pneumatic valve channel "$id" must be digital and safe when de-energized';
+      return;
+    }
+    blueprint.channels.push(new ProcessChannelDeclaration(id,
+      robotkit.execution.ProcessEventValue.Digital(false), false));
+  }
+
+  static function ensureAnalogChannel(blueprint:RobotRuntimeBlueprint, id:String):Void {
+    for (channel in blueprint.channels) if (channel.id == id) {
+      if (channel.safeValue != ProcessEventValue.Analog(0.0))
+        throw 'Process velocity channel "$id" must be analog and safe at zero';
+      return;
+    }
+    blueprint.channels.push(new ProcessChannelDeclaration(id,
+      ProcessEventValue.Analog(0.0), false));
   }
 
   /** Returns all semantic diagnostics without attempting native lowering. */
@@ -402,6 +494,29 @@ class RobotRuntimeCompiler {
             diagnostics.push(new RobotCompileDiagnostic("RK_TRANSMISSION_VALUE",
               '$path.transmission', "transmission ratio must be finite and nonzero, and offset finite"));
       }
+      if (actuator.processVelocity != null) {
+        var process = actuator.processVelocity;
+        var processJoint:Null<Joint> = null;
+        switch actuator.transmission {
+          case SimpleTransmission(jointId, _, _):
+            for (joint in robot.joints) if (joint.id == jointId) processJoint = joint;
+          case _:
+        }
+        if (process.speedChannel == null || process.speedChannel.length == 0 ||
+            process.directionChannel == null || process.directionChannel.length == 0 ||
+            process.speedChannel == process.directionChannel ||
+            !(process.radiansPerSpeedUnit > 0.0) || !Math.isFinite(process.radiansPerSpeedUnit) ||
+            !positiveFinite(actuator.maxRate) || !positiveFinite(actuator.maxEffort))
+          diagnostics.push(new RobotCompileDiagnostic("RK_PROCESS_VELOCITY", '$path.processVelocity',
+            "process velocity needs distinct channels, positive finite speed scale, effort and rate"));
+        if (processJoint == null || processJoint.type != JointType.Continuous)
+          diagnostics.push(new RobotCompileDiagnostic("RK_PROCESS_VELOCITY_JOINT", '$path.processVelocity',
+            "process velocity drive needs a continuous joint in this model"));
+        var drive = actuator.drive;
+        if (drive != null && drive.pneumatic() != null)
+          diagnostics.push(new RobotCompileDiagnostic("RK_PROCESS_VELOCITY_DRIVE", '$path.processVelocity',
+            "a process velocity joint cannot also be a pneumatic joint"));
+      }
     }
 
     var frameIds = new Map<String, Bool>();
@@ -429,7 +544,8 @@ class RobotRuntimeCompiler {
     var pooledValues = 0;
     for (sensor in robot.sensors) if (sensor != null)
       pooledValues += sensor.kind == "lidar" ? sensor.rayCount : sensor.kind == "imu" ? 6
-        : sensor.kind == "joint_encoder" ? robot.joints.length : 0;
+        : sensor.kind == "joint_encoder" ? robot.joints.length
+        : sensor.kind == "joint_switch" || sensor.kind == "at_speed" || sensor.kind == "presence" ? 1 : 0;
     if (pooledValues > RobotKitRuntimeConstants.RK_SENSOR_VALUE_POOL)
       diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_VALUES", "sensors", "sensors report more values together than a state holds"));
     var sensorIds = new Map<String, Bool>();
@@ -476,6 +592,21 @@ class RobotRuntimeCompiler {
           || sensor.fieldOfViewRadians <= 0.0 || sensor.fieldOfViewRadians > Math.PI * 2.0 + 1e-6))
         diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_SCAN", path,
           "invalid LiDAR resolution, range, or angular coverage"));
+      if (sensor.kind == "joint_switch" || sensor.kind == "at_speed") {
+        var index = -1;
+        for (jointIndex in 0...robot.joints.length) if (robot.joints[jointIndex].id == sensor.joint) index = jointIndex;
+        if (index < 0) diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_JOINT", '$path.joint',
+          "native joint sensor needs a joint in this model"));
+        if (!Math.isFinite(sensor.windowLower) || !Math.isFinite(sensor.windowUpper) ||
+            !Math.isFinite(sensor.hysteresis) || sensor.hysteresis < 0.0 ||
+            (sensor.kind == "joint_switch" && sensor.windowLower > sensor.windowUpper) ||
+            (sensor.kind == "at_speed" && sensor.windowLower <= 0.0))
+          diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_WINDOW", path,
+            "invalid joint sensor window or speed threshold"));
+      }
+      if (sensor.kind == "presence" && (!Math.isFinite(sensor.maxRange) || sensor.maxRange <= 0.0))
+        diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_RANGE", '$path.maxRange',
+          "presence range must be positive"));
       if (!Math.isFinite(sensor.updateRate) || sensor.updateRate < 0.0)
         diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_RATE", '$path.updateRate',
           "sensor update rate must be non-negative"));

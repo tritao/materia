@@ -18,7 +18,7 @@ nksim_result NKSIM_CALL nksim_joint_create(nksim_world world, const nksim_joint_
 
 nksim_result NKSIM_CALL nksim_joint_couple(nksim_world world,
                                            const nksim_joint_coupling_desc *desc) {
-    if (!desc || desc->struct_size < sizeof(*desc)) return NKSIM_ERROR_INVALID_ARGUMENT;
+    if (!desc || desc->struct_size < offsetof(nksim_joint_coupling_desc, stiffness)) return NKSIM_ERROR_INVALID_ARGUMENT;
     const auto value = nksim::resolve_world(world);
     return value ? value->couple_joint(*desc) : NKSIM_ERROR_INVALID_HANDLE;
 }

@@ -26,6 +26,8 @@ class Actuator {
    */
   public var servoStiffness:Float = 0.0;
   public var servoDamping:Float = 0.0;
+  /** Position-loop frequency supplied by the driver, Hz; zero when unspecified. */
+  public var positionLoopRate:Float = 0.0;
   /**
    * What kind of motor this is and what it can deliver, or null for a bare effort and rate. For a
    * stepper or a servo, `maxEffort` and `maxRate` are the torque and speed a planner may rely
@@ -33,6 +35,8 @@ class Actuator {
    * and the drive carries the rest: the torque-speed curve the plan check compares against.
    */
   public var drive:Null<ActuatorDrive> = null;
+  /** Process velocity binding for a CNC spindle; setpoints come from analog channels, not trajectories. */
+  public var processVelocity:Null<ProcessVelocityDrive> = null;
   /**
    * The id of the `Encoder` that reads this motor, or empty for none. A servo's feedback comes from it
    * (the drive also states its feedback resolution).
@@ -76,6 +80,7 @@ class Actuator {
    */
   public function planningEffort():Null<Float> {
     var current = drive, effort = maxEffort;
+    if (processVelocity != null || (current != null && current.pneumatic() != null)) return null;
     if (current == null || !Std.isOfType(current, ServoDrive)) return effort;
     return effort == null ? current.peakTorque() : Math.min(effort, current.peakTorque());
   }
@@ -83,6 +88,7 @@ class Actuator {
   /** Missing motor speed stays missing until a stated drive or driver supplies a cap. */
   public function planningRate():Null<Float> {
     var current = drive, rate = maxRate;
+    if (processVelocity != null || (current != null && current.pneumatic() != null)) return null;
     if (current != null && Std.isOfType(current, ServoDrive))
       rate = rate == null ? current.maxSpeed() : Math.min(rate, current.maxSpeed());
     var setting = microsteps, inputRate = maxStepRate;

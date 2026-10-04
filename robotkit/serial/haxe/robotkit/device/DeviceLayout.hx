@@ -30,6 +30,15 @@ class DeviceLayout {
     return bytes;
   }
 
+  /** Pulse channels cover only steppers; servo limits remain in their motor/driver model. */
+  public static function forSteppers(model:RobotModel, directionSetupTicks:Int = 0):DeviceLayout {
+    var channels:Array<DeviceChannel> = [];
+    for (actuator in model.actuators) if (actuator.fullStepsPerRevolution > 0) {
+      channels.push(new DeviceChannel(channels.length, actuator.id, 1, directionSetupTicks));
+    }
+    return new DeviceLayout(channels);
+  }
+
   public static function decode(bytes:Bytes):DeviceLayout {
     var root:Dynamic;
     try root = Json.parse(bytes.toString()) catch (_:Dynamic)

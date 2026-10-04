@@ -98,6 +98,8 @@ class CncProgramPlayer implements SessionMember {
 	/** Machine coordinates from the axis joints' positions, and those joints' indices on the robot. */
 	final solver:AxisKinematics;
 	final axisJoints:Array<Int>;
+	/** Peak observed following error per machine axis, metres, aligned with the drive interval end. */
+	public final axisTrackingPeak:Array<Float> = [];
 	var program:MotionProgram;
 	var sourceMap:ToolpathSourceMap;
 	final kindByLine = new Map<Int, MoveKind>();
@@ -153,6 +155,8 @@ class CncProgramPlayer implements SessionMember {
 	public var speedOverride(default, null):Float = 1.0;
 	final source:String;
 	final recipe:MachiningRecipe;
+	/** Sensor selected from the assembled machine; null on routers without at-speed feedback. */
+	final atSpeedSensorId:Null<String>;
 	/** The restart the operator asked for, until the machine can take it. */
 	var restartRequest:Null<{op:Int, distance:Float}> = null;
 	var pendingContinuation:Null<MachiningContinuation> = null;
@@ -177,12 +181,14 @@ class CncProgramPlayer implements SessionMember {
 		var placement = new AssemblyState(definition, state);
 		checkOptions = check == null ? new PlanCheckOptions() : check.copy();
 		var steady = checkOptions.steady;
-		// The controller's step rate caps what the motors could do: the same binding a device deployment makes.
+		// Pulse timing caps stepper channels; servos retain their own motor/driver limits.
 		var machineModel = robot.model;
 		var wiring = job.controller;
-		if (wiring != null)
-			machineModel = DeviceBinding.bind(robot.model, DeviceLayout.forActuators(robot.model),
-				wiring.stepTickHz).model;
+		if (wiring != null) {
+			var pulseLayout = DeviceLayout.forSteppers(robot.model);
+			if (pulseLayout.channels.length > 0)
+				machineModel = DeviceBinding.bind(robot.model, pulseLayout, wiring.stepTickHz).model;
+		}
 		var axes:Array<MotionAxisBlueprint> = [];
 		var start:Array<Float> = [];
 		// Rapids ask for the fastest axis speed; the planner still holds each joint to its own limit.
@@ -239,6 +245,9 @@ class CncProgramPlayer implements SessionMember {
 			return compiled.program;
 		};
 		this.robot = robot;
+		var sensorId:Null<String> = null;
+		for (sensor in robot.blueprint.sensors) if (sensor.kind == "at_speed") sensorId = sensor.id;
+		atSpeedSensorId = sensorId;
 		solver = binding.solver;
 		axisJoints = planning.indices;
 		// Compiling from the starting pose now reports a bad program before the simulation starts.
@@ -278,18 +287,19 @@ class CncProgramPlayer implements SessionMember {
 		}
 		toolObject = job.toolPart == null ? null : "project:" + job.toolPart;
 		toolShape = job.toolPart == null ? null : toolShapeIn(job.toolPart, job.spindle, placement, project, metresPerUnit);
-		// Spindle-speed handshakes are always ready. A tool change is the operator loading that tool,
-		// which the stock then cuts with and the spindle shows.
+		// Spindle-speed handshakes read the assembled machine's at-speed sensor. A router with no
+		// spindle feedback keeps the existing ready behavior; tool changes remain operator inputs.
 		var robotIndex = spindleLink.robotIndex;
 		var axisJoint = new Map<String, Int>();
 		for (index in 0...job.axes.length) axisJoint.set(job.axes[index], planning.indices[index]);
+		for (_ in axisJoints) axisTrackingPeak.push(0.0);
 		encoders = new EncoderMonitor(robot.model, [for (_ in robot.model.joints) 0.0]);
 		slip = new StepperSlip(robot.robot.description().couplings, axisJoint,
 			(joint, offset) -> simulation.setJointSlip(robotIndex, joint, offset));
 		newMotion = () -> {
 			var made = new ManipulatorMotion(robot.robot, binding.compiler,
 				channel -> {
-					if (channel == "spindle.at_speed") return EventValue.Digital(true);
+					if (channel == "spindle.at_speed") return spindleAtSpeed();
 					if (!StringTools.startsWith(channel, TOOL_CHANGE)) return null;
 					var number = Std.parseInt(channel.substr(TOOL_CHANGE.length));
 					if (number == null || !toolsByNumber.exists(number)) throw 'The machining program loads unknown tool $channel';
@@ -306,6 +316,19 @@ class CncProgramPlayer implements SessionMember {
 		};
 		motion = newMotion();
 	}
+
+	function spindleAtSpeed():EventValue {
+		var sensorId = atSpeedSensorId;
+		if (sensorId == null) return EventValue.Digital(true);
+		var frames = robot.robot.snapshot().sensors;
+		for (index in 0...frames.length) {
+			var frame = frames.get(index);
+			if (frame.sensorId == sensorId)
+				return EventValue.Digital(frame.values.length > 0 && frame.values.get(0) >= 0.5);
+		}
+		return EventValue.Digital(false);
+	}
+
 
 	/**
 	 * Geometry of a tool in the spindle for part `toolPart`'s scene object: the tool's profile hung its
@@ -361,6 +384,11 @@ class CncProgramPlayer implements SessionMember {
 		if (encoders.readings.length > 0) {
 			var seen = robot.robot.snapshot();
 			encoders.observe(seen.positions.toArray(), seen.setpointPositions.toArray(), session.simulationTime());
+			for (axis in 0...axisJoints.length) {
+				var joint = axisJoints[axis];
+				axisTrackingPeak[axis] = Math.max(axisTrackingPeak[axis],
+					Math.abs(seen.positions.get(joint) - seen.setpointPositions.get(joint)));
+			}
 		}
 		var spent = Sys.time() - clock;
 		motionSeconds += spent;
@@ -391,6 +419,7 @@ class CncProgramPlayer implements SessionMember {
 			commandedProvenance = nowProvenance;
 			cuttingSeconds += Sys.time() - clock;
 		}
+
 	}
 
 	/** What the plan checks have found in the plans the machine has started: stall and accuracy findings and how near the drives came. */

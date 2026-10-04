@@ -104,8 +104,8 @@ class ExecutionPlanSubmission {
     this.positionTolerances = new ImmutableFloatArray(pTol);
     this.velocityTolerances = new ImmutableFloatArray(vTol);
     this.accelerationTolerances = new ImmutableFloatArray(aTol);
-    var control = controlAcceleration == null ? [for (_ in 0...count) 0.0] : controlAcceleration;
-    if (control.length != count) throw "Execution plan control acceleration count mismatch";
+    var control = controlAcceleration == null ? [for (_ in 0...joints) 0.0] : controlAcceleration;
+    if (control.length != joints) throw "Execution plan control acceleration joint count mismatch";
     for (value in control) if (!Math.isFinite(value) || value < 0.0)
       throw "Invalid execution plan control acceleration";
     this.controlAcceleration = new ImmutableFloatArray(control);
