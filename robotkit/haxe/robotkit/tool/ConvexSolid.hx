@@ -75,46 +75,6 @@ class ConvexSolid {
   /** The solid's corners, as x, y, z triples in its own frame. */
   public function cornerPoints():Array<Float> return corners.copy();
 
-  /**
-   * Points on the solid's edges, its corners included, no more than `spacing` apart along an edge: a hull edge is where
-   * two planes that are not parallel meet. The surface the solid can touch another's faces with is covered by its edges
-   * and corners, so the distance from these points to another solid is the clearance between the two.
-   */
-  public function edgePoints(spacing:Float):Array<Float> {
-    if (!(spacing > 0.0)) throw "Edge sampling needs a positive spacing";
-    var count = Std.int(corners.length / 3);
-    var result = corners.copy();
-    var scale = 0.0;
-    for (value in corners) scale = Math.max(scale, Math.abs(value));
-    var slack = 1e-7 * Math.max(scale, 1e-6);
-    for (i in 0...count) for (j in i + 1...count) {
-      var shared:Array<Int> = [];
-      for (plane in 0...offsets.length) {
-        var nx = normals[3 * plane], ny = normals[3 * plane + 1], nz = normals[3 * plane + 2];
-        if (Math.abs(nx * corners[3 * i] + ny * corners[3 * i + 1] + nz * corners[3 * i + 2] - offsets[plane]) <= slack &&
-            Math.abs(nx * corners[3 * j] + ny * corners[3 * j + 1] + nz * corners[3 * j + 2] - offsets[plane]) <= slack)
-          shared.push(plane);
-      }
-      var edge = false;
-      for (a in 0...shared.length) for (b in a + 1...shared.length) {
-        var cx = normals[3 * shared[a] + 1] * normals[3 * shared[b] + 2] - normals[3 * shared[a] + 2] * normals[3 * shared[b] + 1];
-        var cy = normals[3 * shared[a] + 2] * normals[3 * shared[b]] - normals[3 * shared[a]] * normals[3 * shared[b] + 2];
-        var cz = normals[3 * shared[a]] * normals[3 * shared[b] + 1] - normals[3 * shared[a] + 1] * normals[3 * shared[b]];
-        if (cx * cx + cy * cy + cz * cz > 1e-12) edge = true;
-      }
-      if (!edge) continue;
-      var dx = corners[3 * j] - corners[3 * i], dy = corners[3 * j + 1] - corners[3 * i + 1], dz = corners[3 * j + 2] - corners[3 * i + 2];
-      var steps = Std.int(Math.ceil(Math.sqrt(dx * dx + dy * dy + dz * dz) / spacing));
-      for (step in 1...steps) {
-        var t = step / steps;
-        result.push(corners[3 * i] + dx * t);
-        result.push(corners[3 * i + 1] + dy * t);
-        result.push(corners[3 * i + 2] + dz * t);
-      }
-    }
-    return result;
-  }
-
   function addPlane(nx:Float, ny:Float, nz:Float, offset:Float):Void {
     for (index in 0...offsets.length) {
       if (Math.abs(normals[3 * index] - nx) < 1e-9 && Math.abs(normals[3 * index + 1] - ny) < 1e-9 &&
