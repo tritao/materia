@@ -70,12 +70,12 @@ class RotaryHead extends AxisBuilder {
 		if (hasTilt) {
 			buildTilt(aCableWrap);
 			flangeZero = AssemblyFrames.translation(0, 0, A_AXIS + A_REACH);
-			attach("flange", flange, flangeZero, "aStem");
+			attach("outputFlange", flange, flangeZero, "aStem");
 		} else {
 			flangeZero = AssemblyFrames.translation(0, 0, C_OUTPUT + flange.thickness);
-			attach("flange", flange, flangeZero, "cShaft");
+			attach("outputFlange", flange, flangeZero, "cShaft");
 		}
-		exposeConnector("toolFlange", "flange", "face");
+		exposeConnector("toolFlange", "outputFlange", "face");
 	}
 
 	function buildTilt(cableWrap:Float):Void {

@@ -3,6 +3,9 @@ package machinekit.gantry;
 import machinekit.assembly.AxisBuilder;
 import machinekit.assembly.AxisBuilder.AxisSpec;
 import machinekit.gantry.GantrySpec.GantryDrive;
+import machinekit.gantry.RotaryHead.CHead;
+import machinekit.gantry.RotaryHead.CaHead;
+import cadkit.modeling.AssemblyState;
 import machinekit.gantry.GantryParts.GantryExtrusion;
 import machinekit.gantry.GantryParts.GantryPlate;
 import machinekit.gantry.GantryParts.GantryIdlerPin;
@@ -35,11 +38,16 @@ class Gantry extends AxisBuilder {
 	public final axes:Array<AxisSpec>;
 	public final flangeZero:AssemblyFrame;
 	public final railMargin:Float;
+	public final head:Null<RotaryHead>;
+	var headMountZero:Null<AssemblyFrame> = null;
 	var driverIndex:Int = 0;
 
 	public function new(spec:GantrySpec) {
 		super();
 		this.spec = spec;
+		head = switch spec.head { case None: null; case C: new CHead(); case CA: new CaHead(); };
+		var headDepth = head == null ? 0.0 : head.flangeZero.z;
+		var headRadius = head == null ? 0.0 : head.radialEnvelopeMm;
 		axes = [{id: "x", lower: 0.0, upper: spec.travelX, initial: 0.0},
 			{id: "y", lower: 0.0, upper: spec.travelY, initial: 0.0, rackingTolerance: spec.dualY ? spec.racking : null},
 			{id: "z", lower: 0.0, upper: spec.travelZ, initial: 0.0}];
@@ -48,11 +56,11 @@ class Gantry extends AxisBuilder {
 		var guide = LinearRailBlock.metric(spec.railProfile).spec;
 		var flange = new RobotFlange(50);
 		// The flange's rear rim must clear the column's projecting rail by 3 mm.
-		var toolReach = Math.max(spec.toolReach, flange.flangeDiameter / 2 + 3 - (guide.blockHeight - guide.railHeight + 4));
+		var toolReach = Math.max(spec.toolReach, Math.max(flange.flangeDiameter / 2, headRadius) + 3 - (guide.blockHeight - guide.railHeight + 4));
 		railMargin = Math.max(Math.max(80, Math.max(frame.size / 2 + 66, 89)), guide.railEndMargin + guide.blockLength / 2 + 20);
 		var guideOvertravel = railMargin - guide.railEndMargin - guide.blockLength / 2;
 		var zDriveX = 40 + Math.max((NemaStepper.frame(spec.motorFrame).spec.face + 12) / 2, 30) + 12 + 3;
-		var sideRoom = Math.max(railMargin, zDriveX + Math.max((NemaStepper.frame(spec.motorFrame).spec.face + 12) / 2, 30) + frame.size / 2 + 3);
+		var sideRoom = Math.max(Math.max(railMargin, headRadius + frame.size / 2 + 3), zDriveX + Math.max((NemaStepper.frame(spec.motorFrame).spec.face + 12) / 2, 30) + frame.size / 2 + 3);
 		var left = -sideRoom - spec.sideExtension - guideOvertravel;
 		var right = spec.travelX + sideRoom + spec.sideExtension + guideOvertravel;
 		// Keep the front crossmember ahead of the full vertical carriage sweep.
@@ -60,10 +68,10 @@ class Gantry extends AxisBuilder {
 		var carriageFront = columnY - frame.height / 2 - guide.blockHeight - 8 - toolReach;
 		var switchSpec = machinekit.motion.ProximitySwitch.catalog().get("GENERIC-INDUCTIVE-M8");
 		var sensorFront = columnY - frame.height / 2 - guide.blockHeight - 3 - switchSpec.length - switchSpec.sensingDistance - 6;
-		var flangeFront = columnY - frame.height / 2 - guide.blockHeight - 4 - toolReach - flange.flangeDiameter / 2;
+		var flangeFront = columnY - frame.height / 2 - guide.blockHeight - 4 - toolReach - Math.max(flange.flangeDiameter / 2, headRadius);
 		var front = Math.min(-railMargin, Math.min(flangeFront, Math.min(carriageFront, sensorFront)) - frame.size / 2 - 3 - guideOvertravel) - spec.frontExtension;
 		var back = spec.travelY + railMargin;
-		var frameZ = spec.travelZ + 350 + spec.frameLift;
+		var frameZ = spec.travelZ + 350 + spec.frameLift + headDepth;
 		var endAllowance = Math.max(frame.size / 2, NemaStepper.frame(spec.motorFrame).variant.shaftLength + 6);
 		var up = [0.0, 0, 1], alongX = [1.0, 0, 0], alongY = [0.0, 1, 0];
 		place("frameFront", new GantryExtrusion(frame, right - left - frame.size),
@@ -123,11 +131,21 @@ class Gantry extends AxisBuilder {
 		var carriageDrop = carriageHeight - guide.blockHolePitchC / 2 - 3;
 		attach("zCarriage", new GantryPlate("Z carriage", 80, 8 + toolReach, carriageHeight),
 			AssemblyFrames.translation(0, zPlateY - toolReach / 2, xPlateZ - railMargin - carriageDrop), "blockZ");
-		flangeZero = AxisBuilder.orient(0, zPlateY - toolReach, xPlateZ - railMargin - carriageDrop - flange.thickness,
+		var mountZero = AxisBuilder.orient(0, zPlateY - toolReach, xPlateZ - railMargin - carriageDrop - flange.thickness,
 			[0.0, 1, 0], [0.0, 0, -1]);
-		attach("flange", flange, flangeZero, "zCarriage");
-		exposeConnector("toolFlange", "flange", "face");
-		attach("powerSupply", new PowerSupply(spec.supplyVoltage, 20, spec.dualY ? 4 : 3),
+		attach("flange", flange, mountZero, "zCarriage");
+		if (head == null) {
+			flangeZero = mountZero;
+			exposeConnector("toolFlange", "flange", "face");
+		} else {
+			include("head", head);
+			addMate("head-mount", "fixed", "flange", "face", "head/mount", "mount");
+			exposeConnector("toolFlange", "head/outputFlange", "face");
+			var state = new AssemblyState(definition());
+			headMountZero = state.worldPose("head/mount");
+			flangeZero = state.worldPose("head/outputFlange");
+		}
+		attach("powerSupply", new PowerSupply(spec.supplyVoltage, 20, (spec.dualY ? 4 : 3) + (head == null ? 0 : head.rotaryJoints.length)),
 			AssemblyFrames.translation(left - 180, front, 30), "frameFront");
 		buildDrive(axes[1], spec.driveY, "YLeft", "frameLeft", "beamFootLeft",
 			[left - 70, 0.0, feetZ + 6], alongY);
@@ -140,6 +158,18 @@ class Gantry extends AxisBuilder {
 		// Leave the corner bracket's 12 mm arm outside the 80 mm carriage.
 		buildDrive(axes[2], spec.driveZ, "Z", "zColumn", "zCarriage",
 			[zDriveX, zPlateY, xPlateZ - railMargin - zDriveDrop], [0.0, 0, -1]);
+		if (head != null) {
+			var drivers:Array<String> = [];
+			for (joint in head.rotaryJoints) {
+				var id = joint.id + "HeadDriver";
+				attach(id, new MotorDriver("GENERIC-SERVO-AMP", 5),
+					AssemblyFrames.translation(-railMargin - 180, -railMargin - 130 - 125 * driverIndex, 30), "frameFront");
+				driverIndex++;
+				connectPorts(id + "-power", "powerSupply", 'power$driverIndex', id, "power");
+				drivers.push(id);
+			}
+			head.bindDrives(this, "head", drivers);
+		}
 		buildSwitches(axes[1], "YLeft", "frameLeft", "beamFootLeft", 0, -1, alongY);
 		if (spec.dualY) buildSwitches(axes[1], "YRight", "frameRight", "beamFootRight", 0, 1, alongY);
 		buildSwitches(axes[0], "X", "beam", "xCarriage", 1, -1, alongX);
@@ -267,6 +297,7 @@ class Gantry extends AxisBuilder {
 	/** All descendants carried by X, including the Z carriage and its guide allowance. */
 	function movingBounds(moving:String):GantryBox {
 		var definition = this.definition();
+		var state = new AssemblyState(definition);
 		var lo = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
 		var hi = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
 		for (member in components()) {
@@ -281,7 +312,12 @@ class Gantry extends AxisBuilder {
 				cursor = parent;
 			}
 			if (!carried || !member.component.hasGeometry()) continue;
-			var box = mountBounds(member.component, zeroPose(member.id));
+			var box:GantryBox;
+			if (head != null && StringTools.startsWith(member.id, "head/")) {
+				var origin:AssemblyFrame = cast headMountZero;
+				box = {min: [origin.x - head.radialEnvelopeMm, origin.y - head.radialEnvelopeMm, origin.z - head.axialEnvelopeMm],
+					max: [origin.x + head.radialEnvelopeMm, origin.y + head.radialEnvelopeMm, origin.z]};
+			} else box = mountBounds(member.component, state.worldPose(member.id));
 			if (movesZ) { box.max[2] += axisOvertravel("z"); box.min[2] -= spec.travelZ + axisOvertravel("z"); }
 			for (i in 0...3) { lo[i] = Math.min(lo[i], box.min[i]); hi[i] = Math.max(hi[i], box.max[i]); }
 		}

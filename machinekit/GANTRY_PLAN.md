@@ -565,7 +565,7 @@ G0 → G1 → G2 → G3 ──────────────────�
 | G11 | in progress; reference-state foundation added | see progress notes |
 | G12 | implemented; requested compiler/runtime/picker/homing checkpoint passed | see progress notes |
 | G13 | in progress; board input and physical virtual switches implemented | see progress notes |
-| G14 | planned | — |
+| G14 | in progress; integrated C/CA mechanics and clearance passed, yaw picker under validation | `7822171b5`; see progress notes |
 | G15 | planned | — |
 | G16 | planned | — |
 | G17 | planned | — |
@@ -3651,3 +3651,16 @@ MachineKit, RobotKit (5021 assertions), picker (48 plans) and homing passed.
 The full MotionKit suite is being rerun after the hold fix. Existing passing
 welder and other phase checks have not been repeated. Phase C stays open until
 that final MotionKit result; G14 integration and yaw handling are separate work.
+
+### G14 — integrated head mechanics and clearance
+
+GantrySpec now selects the included C or CA head, exposes its output flange,
+wires its servo drivers in the fixed cabinet, and expands frame elevation and
+side/front clearances from the head's conservative envelope. The nominal tool
+Z envelope is preserved. The mounting and output flanges have distinct member
+names, avoiding conflicting generated mount connectors when geometry is shared.
+
+Focused head compiler/runtime checks passed derived servo export, FK at XYZ
+corners, flange offsets, physical A stops, and solid clearance against the
+carrying frame, beam, rails and carriages at the rotary cable limits. G14's
+heading-constrained picker remains under validation; no Phase D full gate yet.
