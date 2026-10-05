@@ -3071,7 +3071,32 @@ class ProjectSourceTests {
     return code;
   }
 
+  static function checkJointMotionPolicy():Void {
+    var policy = new JointMotionPolicy(3.0, 12.0, 0.4, 1.5);
+    var mechanical = new JointLimits(-1.0, 1.0, 0.7, 10.0, 0.2);
+    var rotary = policy.rates(JointType.Revolute, mechanical);
+    var linear = policy.rates(JointType.Prismatic, mechanical);
+    if (rotary.velocity != 0.7 || rotary.acceleration != 0.2 || rotary.jerk != 12.0 ||
+        linear.acceleration != 0.2 || linear.jerk != 1.5)
+      throw "Joint-motion policy must respect hardware caps and distinguish angular from linear rates";
+    var withoutAcceleration = new JointLimits(-1.0, 1.0, 0.7);
+    if (policy.rates(JointType.Revolute, withoutAcceleration).acceleration != 3.0 ||
+        policy.rates(JointType.Prismatic, withoutAcceleration).acceleration != 0.4)
+      throw "Unrated acceleration must use the explicit requested motion policy";
+    var zeroRejected = false;
+    try {
+      var invalid = policy.rates(JointType.Revolute, new JointLimits(-1.0, 1.0, 0.7, 10.0, 0.0));
+    } catch (_:Dynamic) { zeroRejected = true; }
+    if (!zeroRejected) throw "A zero hardware acceleration cap must forbid motion";
+    var missingRejected = false;
+    try {
+      var invalid = policy.rates(JointType.Revolute, new JointLimits(-1.0, 1.0));
+    } catch (_:Dynamic) { missingRejected = true; }
+    if (!missingRejected) throw "Joint-motion policy must not fabricate a mechanical speed cap";
+  }
+
   static function checks():Int {
+    checkJointMotionPolicy();
     var flat = Bytes.alloc(4 * 24);
     for (index in 0...4) {
       flat.setDouble(index * 24, (index & 1) == 0 ? 0.0 : 2.0);

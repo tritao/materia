@@ -204,10 +204,11 @@ class MissionPlayer implements SessionMember {
   var wheelsSeeded:Bool = false;
   final timestep:Float;
   final cellInput:Null<String->Null<EventValue>>;
+  final jointMotionPolicy:JointMotionPolicy;
   final idle = new PerceptionSnapshot();
 
   public function new(mission:SceneArtifactMission, robot:AssemblyRobot, simulation:Simulation, robotIndex:Int,
-      timestep:Float, obstacles:Array<FloorObstacle>, objects:Array<GripObject>, project:ProjectDocumentSession, cellRobots:Array<AssemblyRobot>, weldAcceleration:Float = ARM_ACCELERATION, ?cellInput:String->Null<EventValue>) {
+      timestep:Float, obstacles:Array<FloorObstacle>, objects:Array<GripObject>, project:ProjectDocumentSession, cellRobots:Array<AssemblyRobot>, weldAcceleration:Float = ARM_ACCELERATION, ?cellInput:String->Null<EventValue>, ?jointMotionPolicy:JointMotionPolicy) {
     if (!Math.isFinite(weldAcceleration) || weldAcceleration <= 0.0 || weldAcceleration > ARM_ACCELERATION)
       throw "Invalid welding planning acceleration";
     if (mission.steps.length == 0) throw "A mission needs steps";
@@ -216,6 +217,7 @@ class MissionPlayer implements SessionMember {
     this.cellRobots = cellRobots.copy();
     this.timestep = timestep;
     this.cellInput = cellInput;
+    this.jointMotionPolicy = jointMotionPolicy == null ? JointMotionPolicy.mission() : jointMotionPolicy;
     this.obstacles = standing(obstacles);
     this.simulation = simulation;
     this.weldAcceleration = weldAcceleration;
@@ -706,24 +708,21 @@ class MissionPlayer implements SessionMember {
       var limits = new ValidationLimits(count, Int64.ofInt(1), Int64.ofInt(0));
       var velocities:Array<Float> = [];
       var accelerations:Array<Float> = [];
+      var jerks:Array<Float> = [];
       for (i in 0...count) {
         var bound = arm.group.limitsOf(i);
         if (bound.lower < bound.upper) limits.position(i, bound.lower, bound.upper);
-        var speedLimit:Float = bound.velocity == null ? 0.0 : bound.velocity;
-        if (!(speedLimit > 0) || !Math.isFinite(speedLimit))
-          throw 'Joint "${robot.model.joints[indices[i]].name}" needs a finite mechanical velocity limit';
-        var speed = speedLimit;
-        velocities.push(speed);
-        limits.velocity(i, speed);
-        var accelerationLimit:Float = bound.maxAcceleration == null ? 0.0 : bound.maxAcceleration;
-        var acceleration = accelerationLimit > 0 ? Math.min(ARM_ACCELERATION, accelerationLimit) : ARM_ACCELERATION;
-        accelerations.push(acceleration);
-        limits.acceleration(i, acceleration);
-        limits.jerk(i, 20.0);
+        var rates = jointMotionPolicy.rates(robot.model.joints[indices[i]].type, bound);
+        velocities.push(rates.velocity);
+        accelerations.push(rates.acceleration);
+        jerks.push(rates.jerk);
+        limits.velocity(i, rates.velocity);
+        limits.acceleration(i, rates.acceleration);
+        limits.jerk(i, rates.jerk);
       }
       var compiler = new ProgramCompiler(new ManipulatorKinematics(arm, 1e-8), limits, FRAME,
-        velocities, accelerations, [for (_ in 0...count) 20.0],
-        StartTolerances.uniform(count, 0.005, ARM_ACCELERATION * 0.01, 0.2));
+        velocities, accelerations, jerks,
+        StartTolerances.uniform(count, 0.005, 0.02, 0.2));
       motion = new ManipulatorMotion(robot.robot, compiler,
         channel -> cellInput == null ? null : cellInput(channel), () -> robot.runtime.pollEvents(), indices);
       jointMotions.set(name, motion);
