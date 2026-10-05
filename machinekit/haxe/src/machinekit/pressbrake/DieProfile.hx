@@ -43,11 +43,11 @@ class DieProfile {
 					var centerY = i == 3 ? groove.vWidth / 2 : -groove.vWidth / 2;
 					var middle = plane.toWorld(new Vector(centerY + groove.shoulderRadius * Math.cos(angle),
 						-groove.shoulderRadius + groove.shoulderRadius * Math.sin(angle)));
-					edges.push(Curve.arc(a, middle, finish));
-				} else edges.push(Curve.line(a, finish));
+					edges.push(Curve.named(Curve.arc(a, middle, finish), i == 3 ? "die.shoulder.right" : "die.shoulder.left"));
+				} else edges.push(Curve.named(Curve.line(a, finish), 'die.section.$i'));
 			}
 			wire = Curve.wire(edges);
-			sketch = Sketch.face(wire, [], plane);
+			sketch = Sketch.named(Sketch.face(wire, [], plane), "die.section");
 			var result = sketch.extrude(end - start);
 			sketch.close();
 			wire.close();

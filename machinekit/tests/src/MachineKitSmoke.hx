@@ -2578,6 +2578,7 @@ class MachineKitSmoke {
 			{name: "MillPartTests.run", run: () -> MillPartTests.run(), weight: 1.0},
 			{name: "PneumaticPartTests.run", run: () -> PneumaticPartTests.run(), weight: 1.0},
 			{name: "ToolProfileTests.run", run: () -> ToolProfileTests.run(), weight: 0.1},
+			{name: "ToolLayoutTests.run", run: () -> ToolLayoutTests.run(), weight: 0.1},
 			{name: "namedStepperFaces", run: namedStepperFaces, weight: 0.1},
 			{name: "MachineKitNamingAudit.run", run: MachineKitNamingAudit.run, weight: 0.4},
 			{name: "MachineAssemblyDescriptionTests.run", run: MachineAssemblyDescriptionTests.run, weight: 10.5},

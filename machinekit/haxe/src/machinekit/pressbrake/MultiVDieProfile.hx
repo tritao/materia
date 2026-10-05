@@ -4,6 +4,7 @@ import cadkit.modeling.Axis;
 import cadkit.modeling.Location;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
+import machinekit.component.Solids;
 
 /** Four independent grooves on a square block. The active face is placed at z=0. */
 class MultiVDieProfile {
@@ -47,7 +48,7 @@ class MultiVDieProfile {
 					var placement = Location.translation(new Vector(0, 0, -size / 2))
 						.compose(Location.rotation(Axis.X(), (face - activeFace) * Math.PI / 2))
 						.compose(Location.translation(new Vector(0, 0, size / 2)));
-					placed = cutter.placed(placement);
+					placed = Solids.named(cutter.placed(placement), 'groove.$face');
 					var next = block.subtract(placed);
 					block.close();
 					block = next;

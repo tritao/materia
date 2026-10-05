@@ -76,10 +76,11 @@ class PunchProfile {
 				var a = plane.toWorld(new Vector(points[i].y, points[i].z));
 				var b = points[(i + 1) % points.length];
 				var finish = plane.toWorld(new Vector(b.y, b.z));
-				edges.push(i == contactEdge ? Curve.arc(a, plane.toWorld(new Vector(0, 0)), finish) : Curve.line(a, finish));
+				edges.push(Curve.named(i == contactEdge ? Curve.arc(a, plane.toWorld(new Vector(0, 0)), finish) : Curve.line(a, finish),
+					i == contactEdge ? "punch.contact" : 'punch.section.$i'));
 			}
 			wire = Curve.wire(edges);
-			sketch = Sketch.face(wire, [], plane);
+			sketch = Sketch.named(Sketch.face(wire, [], plane), "punch.section");
 			var part = sketch.extrude(end - start);
 			sketch.close();
 			wire.close();

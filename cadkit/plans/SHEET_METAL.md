@@ -936,7 +936,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM4b | done: typed editor base/flange commands, explicit stock input, parameter inspector, folded/flat publication, bend table, exact fold-line overlay and DXF/SVG commands; P2 editor workflow passes; full gate `sm4b-editor-full` passes | be21d1579 |
 | SM5 | in progress: SM5a unique native ancestry count/index/bulk queries and typed owning Haxe wrappers; three native suites and focused ancestry checks pass; quick gate `sm5a-ancestry` (5974 sheet assertions); recognition and convert feature deferred by user direction on 2026-10-05 | 51c4f2d5c |
 | SM6 | done: SM6a typed air-bending predictions, physical springback inversion and exact contact depth; focused process smoke passes 1235 assertions; quick gate `sm6a-air-bending` passes (7209 sheet assertions); SM6b explicit lot/tool/angle-band calibration with measured radius and additive depth correction, focused smoke passes 1257 assertions, quick gate `sm6b-calibration` passes (7231 sheet assertions); SM6 complete: typed grade defaults, editor selection, Process-rule persistence and tooling minimums; full gate `sm6-process-material-full` passes all stages (7248 sheet assertions, ProjectKit 155); final material integration and CAD workflow checks pass | 7148a8bb8; 6458df23b; d664caa22 |
-| SM7 | in progress: SM7a typed section points and validated simple polygons; convex decomposition preserves concave reliefs; profile checks pass in MachineKit smoke; quick gate `sm7a-profile-foundation` passes all five suites with unchanged original MachineKit summaries; SM7b exact R0.6 straight/gooseneck/acute punches, native section extrusion and bounded conservative nose covers pass quick gate `sm7b-punch-profiles`; SM7c exact single-V and four-V die catalogue, shoulder-centre contact datums and shared bounded arc covers pass quick gate `sm7c-die-profiles`; segments, stations, layout and clamps remain | c4e418ba5; 310a41894 |
+| SM7 | done: typed exact punch and single-/four-V die catalogue; standard segments and physical horns; independently segmented paired rows and validated bed layouts; derived process contact data; registered segment/clamp recipes and manual/powered clamp capabilities; strong unique tooling face names. Quick gates `sm7a-profile-foundation`, `sm7b-punch-profiles`, `sm7c-die-profiles` and full gate `sm7-tooling-verified-full` pass; original MachineKit and router engineering summaries unchanged | c4e418ba5; 310a41894; 67da9cae8; final tooling integration |
 | SM8a | planned | |
 | SM8b | planned (waits for MT5 on main) | |
 | SM9 | planned | |
@@ -1325,3 +1325,34 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
   shoulder covers contain sampled exact contacts; convex pieces conserve section area.
   Quick gate `sm7c-die-profiles` passes all five suites with unchanged original MachineKit
   summaries and 7504 sheet assertions. No unchecked cast or new compiler workaround is needed.
+
+- SM7 station representation: each station pairs independently segmented homogeneous punch
+  and die rows at one bed offset. Row material length is the sum of segment lengths; row span
+  includes every gap. Station length reports punch material length, while the die row exposes
+  its own; the station reserves the larger row span, preventing another station from intruding
+  into its tooling setup. Touching station ends are allowed. Process contact dimensions are
+  derived from the installed profiles on demand, including the selected four-V face.
+  Punch horns remove upper end material while retaining the contact nose; the mounting connector
+  lies in the unrelieved length. Convex collision prisms are clipped by the same authored end
+  interval and remaining height. Horn shape dimensions are explicit, with no inferred rating.
+
+- SM7 clamp assumptions: a 50 x 40 x 60 mm steel envelope with no inferred holding rating.
+  Manual clamps declare a manual tooling-lock capability. Powered reference clamps use an
+  assumed pneumatic service (6 mm tube) with separate lock/unlock signal inputs and locked-state
+  feedback output. This is the declared hardware interface; runtime actuation belongs to the
+  later simulation steps. Segment and clamp recipes reconstruct catalogue selections, material,
+  horn end/dimensions and powered/manual interfaces. A custom profile reusing a catalogue id
+  does not acquire that recipe unless its complete authored specification matches.
+
+- SM7 naming verification: the first full gate (`sm7-tooling-full`) exposed unlabelled section
+  edges on the new default segment during MachineKitNamingAudit and was stopped. Tool contact,
+  authored section edges and section faces now own names before extrusion; four-V groove cuts
+  carry per-face provenance. The existing naming audit passes, and focused checks confirm strong,
+  unique faces for every catalogue profile and both horn ends, including recipe reconstruction.
+  Row homogeneity compares complete authored specifications, not ids alone.
+
+- SM7 final verification: `sm7-tooling-verified-full` passes CadKit, SheetMetalSmoke
+  (7504 assertions), ProjectKit (155), ManufacturingKit (54), MachineKit, all workspace
+  suites (MotionKit 67533), the app build and the complete project-source runtime suite.
+  The original five MachineKit summaries and router engineering baselines remain unchanged;
+  only performance timings vary. No new cast or Haxeon compiler workaround was introduced.
