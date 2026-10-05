@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "processkit-weld-station-tests"},
+  "entry": "WeldStationTests",
+  "sourceRoots": ["."],
+  "dependencies": {"processkit": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "build"
+}

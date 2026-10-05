@@ -995,7 +995,7 @@ Dependencies:
 | W5 | Done (2026-10-04) | Seam-progress weave; CAD-derived pass recipes; deposited bead grounding and clearance; scene schema 16 rejects older versions; smaller restart hump. Woven 7 mm measures 6.998 mm, three-pass 10 mm measures 9.999 mm on both backends; all affected gates pass. |
 | W6 | Done (2026-10-04) | RKD6 numeric feedback and virtual welder; checked retrofit profile; Modbus map/adapter with independent ProcessKit owner; unchanged seam and all six shutdown cases pass. Full welder, arm, mobile and MachineKit smoke gates pass; phase one lands on local main. |
 | P1 | Done (2026-10-05) | Mobile welding carrier, insulated storage and converter service graph; CAD fit/mass checks and both-backend carrier movement pass. |
-| P2 | Open | Reach/clearance-derived station cover and ordered goTo/weld mission. |
+| P2 | In progress (2026-10-05), branch only | Reach/clearance-derived station cover and ordered goTo/weld mission. |
 | P3 | Open | Executed touch searches and correction under injected parking error. |
 | P4 | Open | Measured load integration, voltage sag/cutoff and pre-seam docking/charging. |
 | P5 | Open; required | Rendered-depth laser profiler and executed live seam correction. |
@@ -1408,3 +1408,20 @@ existing goTo/weld steps, so planning alone does not require a saved-format sche
 P1 final commits: `fd2845b0f7282a907a25e37eac2ada846415191b` records the carrier decisions;
 `3941a1a7e52b011b30da24db8e4d04668d78b2fa` isolates the mobile welding wheel drive supply.
 P2–P5 remain required and open; carrier movement is not proof of a mobile welding mission.
+
+P2 first implementation: `processkit.WeldStationPlanner` selects an exact minimum cover over
+supplied candidates, then the cheapest feasible directed open route from the initial pose.
+Access callbacks own full-motion reach/clearance evidence; navigation callbacks own feasible
+route cost. Route edges are computed lazily and cached, including unreachable edges. Each seam
+is assigned once even when station coverage overlaps. Missing coverage and unreachable complete
+covers fail explicitly. The focused `processkit/tests/stations` compiler-only suite passes
+26 checks, including a greedy-cover counterexample, count-before-cost priority, directed blocked
+edges, overlapping assignment, input validation and route-call caching. No native build needed.
+CAD candidate generation, actual swept access checks and complete mobile mission execution
+remain open. Inspection also found that MissionPlayer's weld reference-frame lookup and clearance
+currently assume work on robot links: P2 must include independent object frames/hulls, as P1's
+simulated grounding already does. This cannot be claimed complete from the selection unit tests.
+
+P1 landed on local main at `7e3474144d11ab731d01b661ce4a5b0d5228879c` using the guarded
+fast-forward from `8a209d9ff03522eac26200b1595947da14c41225`. Main was merged before P2
+and was already up to date. No branches were created and no remote was changed.
