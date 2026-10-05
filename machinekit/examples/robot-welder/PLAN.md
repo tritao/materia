@@ -2272,3 +2272,23 @@ corridors before accepting a stage. ProcessKit exposes observed-only configurati
 separately from the full discovery API; neither authorizes movement. Focused native tests
 pass 94 assertions, including observed-branch reachable/unreachable normal checks. Full
 mission production validation and measured speedup remain pending; main is unchanged.
+
+The observed-stage full-mission trial completed deterministic station-one registration at
+282.52 s, its five welds and checked stow, then drove and completed five probe pairs at
+station two (second-face retreat at 671.39 s). This proves the previously expensive
+second-face discovery now progresses through executed stages, but the complete mission
+is not passed: final-face selection remained expensive and the trial was stopped. The
+selection policy is refined to preserve 9/17/33 resolution priority: at each lattice size,
+try observed branches across faces, then full global discovery across faces, before moving
+to a finer lattice. Thus branch changes on the coarse lattice do not wait behind every
+fine-grid continuation attempt. Every global/fine fallback and its original budget remains.
+
+App tests now expose a separate 20 mm per-axis/2-degree registration boundary and log
+mission/probe phases. The full-mission watchdog sums the original 1,200 s allowance with
+the established 1,200 s per-registration allowance; runtime safety deadlines are unchanged.
+These test modes compile (1,864 sources); boundary and full-mission execution remain pending.
+The artifact producer completed 66 records / 2,877,017 bytes again, without the old missing
+preview.hl failure. Disk recovered to 6.3 GB free. Local main advanced independently to
+111384a5f4e06d1be1e6412e74b19c12f0718c90; merge only local main before final gates and adapt
+the registration bridge to its shared PlanningLimits APIs. No main sync is authorized by
+these partial results.

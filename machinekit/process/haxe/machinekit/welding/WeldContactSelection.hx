@@ -54,9 +54,9 @@ class WeldContactSelection {
     });
     var start = positions();
     var reasons:Array<String> = [];
-    // Prefer observed-branch stages across faces before global discovery on any face.
+    // At each resolution, prefer observed branches across faces before global discovery.
     // Full preparation still proves every trajectory and sensing corridor.
-    for (discover in [false, true]) for (divisions in [9, 17, 33]) {
+    for (divisions in [9, 17, 33]) for (discover in [false, true]) {
       var previous = [for (normal in normals) new Vector(normal.x, normal.y, normal.z)];
       var geometric = WeldProbePatterns.stages(geometry, count, previous, provider, 3, divisions);
       // Rank by geometric observability, then prove one face at a time. Unused faces need no IK solves.
