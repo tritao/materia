@@ -3586,3 +3586,27 @@ dual-drive squaring. The four requested compiler-only projects also passed on
 the final source. The app's full runtime has completed the arm/cobot variants,
 picker and its first whole-weldment run; the remaining welding and router
 fixtures are still running. This is a port checkpoint, not Phase C completion.
+
+
+### G14 — standalone C and CA head mechanics
+
+Added `machinekit.gantry.RotaryHead.CHead` and `CaHead`: generic 50 W servos,
+130:1 gearheads, supported rotary shafts, an ISO-style flange and a fork with
+a tilt stem and stop bars. Cable allowances bound C and A; the A hard-stop
+angle is derived from the flange rim, pivot reach and stop height. Conservative
+radial/axial envelopes are available for the carrying gantry's frame clearance.
+`bindDrives` connects these motor/gearhead parts to drivers in the carrying
+machine's fixed cabinet; the head does not carry the cabinet.
+
+The focused 473-source compiler and runtime check passed C/CA FK, powered
+servo export and solid contact with both A stops beyond permitted travel.
+GantrySpec integration and the C-head yaw picker remain pending. G14 is not
+complete, and no full Phase D test pass has been started. The rebase/Phase C
+app gate continues independently; both full weldment backends, seam restarts,
+weave and the bench mill have passed so far.
+
+The app phase pass completed both full weldments, restart/fault/quality fixtures,
+the bench mill and enclosed mill, plus virtual-device router homing. The ordinary
+MuJoCo screw router then rejected the first Z homing plan with lifecycle status
+-2. That admission failure is under investigation; Phase C remains open and the
+standalone G14 heads are not integrated into GantrySpec yet.

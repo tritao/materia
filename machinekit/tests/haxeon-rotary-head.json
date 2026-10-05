@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": { "name": "machinekit-rotary-head-tests" },
+  "entry": "RotaryHeadCheck",
+  "sourceRoots": ["src"],
+  "dependencies": { "machinekit": { "path": ".." } },
+  "target": "host",
+  "outputDir": "build/rotary-head"
+}
