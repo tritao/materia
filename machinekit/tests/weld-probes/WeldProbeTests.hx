@@ -78,6 +78,19 @@ class WeldProbeTests {
     var poses = cell.solvedPoses();
     var work = WeldProbeGeometry.findIn(cell, weldment, poses, ["table", "clamp"]);
     var useful = [for (face in work.faces) if (face.target) face];
+    var savedFaces = work.contactFaces(0.001);
+    materia.project.SceneContactRegistration.validate({frame: weldment.reference, nominal: AssemblyFrames.identity(),
+      translation: [0.02, 0.02, 0.0], rotation: [0.0, 0.0, 2 * Math.PI / 180],
+      measurementError: 0.00001, contactOffset: 0.0005, faces: savedFaces},
+      [for (face in work.faces) face.member].concat([weldment.reference]));
+    var reconstructed = WeldProbeGeometry.fromContactFaces(savedFaces, 0.001);
+    check(reconstructed.faces.length == work.faces.length, "Saved nominal CAD faces preserve fixtures and registration targets");
+    for (i in 0...work.faces.length) {
+      var original = work.faces[i], copy = reconstructed.faces[i];
+      check(original.name() == copy.name() && original.target == copy.target && original.centre.subtract(copy.centre).length() < 1e-7 &&
+        original.chords.length == copy.chords.length, "Saved contact geometry preserves CAD identity, units and contours");
+      for (point in original.samples(5, 1)) check(copy.contains(point, 1), "Reconstructed contact geometry accepts the same CAD material samples");
+    }
     check(useful.length >= 12, "Actual mobile weldment supplies polygonal contact patches");
     var chassis = AssemblyFrames.translation(-500, -1700, 0);
     var envelope = new WeldProbeParkingBounds(chassis, new Vector(20, 20, 0), 2 * Math.PI / 180);

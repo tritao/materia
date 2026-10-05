@@ -1791,3 +1791,10 @@ SceneArtifact fixtures were found to regenerate. Generated artifacts use the cur
 ProjectKit passes 18 new saved-contact assertions and 143 existing assertions. The new mission step
 is not yet emitted by the mobile generator or executed by MissionPlayer: those are the next P3
 integration changes, followed by actual noisy multi-face registration on both backends.
+
+MachineKit now exports probe patches to the saved contact face format with explicit CAD-to-metre
+conversion and reconstructs them without reopening CAD solids. The actual mobile cell's faces,
+fixture masks, holes and material samples survive this conversion. Its exported geometry passes
+saved-job validation, and the focused CAD suite passes 4,912 assertions with 468 exposed samples.
+This establishes the CAD data boundary; it does not prove arm reach, actual multi-face execution or
+the injected-parking welding mission. No native build or milestone-wide gate was run for this change.

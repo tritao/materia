@@ -9,6 +9,7 @@ import machinekit.component.ComponentDetail;
 import machinekit.welding.WeldSeams.SeamSolid;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
+import materia.project.SceneContactRegistration.SceneContactFace;
 
 /** A polygonal CAD face available to touch sensing, expressed in the weldment reference frame. */
 class WeldProbeFace {
@@ -102,6 +103,24 @@ class WeldProbeFace {
 class WeldProbeGeometry {
   public final faces:Array<WeldProbeFace>;
   public function new(faces:Array<WeldProbeFace>) this.faces = faces.copy();
+
+  /** Persist CAD-derived boundaries in metres; no live work pose or contact result is included. */
+  public function contactFaces(metresPerUnit:Float):Array<SceneContactFace> {
+    if (!Math.isFinite(metresPerUnit) || !(metresPerUnit > 0)) throw "Contact faces need a positive CAD unit scale";
+    function point(value:Vector):Array<Float> return [value.x * metresPerUnit, value.y * metresPerUnit, value.z * metresPerUnit];
+    return [for (face in faces) {member: face.member, face: face.face, target: face.target,
+      normal: [face.normal.x, face.normal.y, face.normal.z], centre: point(face.centre),
+      chords: [for (edge in face.chords) [for (vertex in edge) point(vertex)]]}];
+  }
+
+  /** Reconstruct polygonal probe geometry from a validated contact job, without reopening CAD solids. */
+  public static function fromContactFaces(faces:Array<SceneContactFace>, metresPerUnit:Float):WeldProbeGeometry {
+    if (faces == null || !Math.isFinite(metresPerUnit) || !(metresPerUnit > 0)) throw "Contact faces need a positive CAD unit scale";
+    function point(value:Array<Float>):Vector return new Vector(value[0] / metresPerUnit, value[1] / metresPerUnit, value[2] / metresPerUnit);
+    return new WeldProbeGeometry([for (face in faces) new WeldProbeFace(face.member, face.face, face.target,
+      new Vector(face.normal[0], face.normal[1], face.normal[2]), point(face.centre),
+      [for (edge in face.chords) [for (vertex in edge) point(vertex)]])]);
+  }
 
   /** Borrowed parts already posed in a common reference frame. Curved boundaries are deliberately unsupported. */
   public static function of(parts:Map<String, Part>, targets:Array<String>):WeldProbeGeometry {
