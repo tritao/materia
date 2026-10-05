@@ -105,7 +105,6 @@ struct BackendJointTarget {
     double end_position = 0.0;
     double end_velocity = 0.0;
     double reference_duration = 0.0;
-    double reflected_inertia = 0.0;
 };
 
 struct BackendJointCoupling {

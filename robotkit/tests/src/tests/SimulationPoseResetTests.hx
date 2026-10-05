@@ -49,6 +49,7 @@ class SimulationPoseResetTests {
     boxSimulationHarness.dispose();
     if (backend == 1) toolProximity();
     driveReferenceCompilation();
+    downstreamInertia();
     coupling(backend);
     stepperSlip(backend);
     if (backend == 1) servoCoupling();
@@ -69,8 +70,8 @@ class SimulationPoseResetTests {
     actuator.drive = new ServoDrive(1, 2, 100, 200, 5e-6, 4096);
     actuator.positionLoopRate = 4000;
     model.addActuator(actuator);
-    var legacy = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
-    if (legacy.joints[0].servoStiffness != 0 || legacy.fastestPositionLoopRate() != 0)
+    var computed = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
+    if (computed.joints[0].servoStiffness != 0 || computed.fastestPositionLoopRate() != 0)
       throw "Unspecified uncoupled gains must retain the existing tracking model";
     actuator.servoStiffness = 200;
     actuator.servoDamping = 1;
@@ -80,6 +81,37 @@ class SimulationPoseResetTests {
       throw "Explicit motor gains must be reflected to the joint drive";
     if (Math.abs(physical.joints[0].reflectedInertia - 0.25) > 1e-12)
       throw "An uncoupled geared joint must not reflect its load inertia twice";
+  }
+
+  /** The drive stability estimate includes masses beyond the immediate child. */
+  static function downstreamInertia():Void {
+    var model = new RobotModel("carried inertia");
+    var base = model.addLink(new Link("base"));
+    var first = model.addLink(new Link("first"));
+    first.mass = 2;
+    first.centerOfMass = [0.5, 0, 0];
+    first.inertiaTensor = [0.1, 0, 0, 0, 0.2, 0, 0, 0, 0.3];
+    var second = model.addLink(new Link("second"));
+    second.mass = 3;
+    second.centerOfMass = [0.5, 0, 0];
+    second.inertiaTensor = [0.4, 0, 0, 0, 0.5, 0, 0, 0, 0.6];
+    var shoulder = model.addJoint(new Joint("shoulder", JointType.Revolute, base, first));
+    shoulder.axis = [0, 0, 1];
+    var elbow = model.addJoint(new Joint("elbow", JointType.Revolute, first, second));
+    elbow.axis = [0, 0, 1];
+    elbow.parentFramePosition = [1, 0, 0];
+    for (joint in [shoulder, elbow]) {
+      var actuator = new Actuator(joint.name, 0, 0, Transmission.SimpleTransmission(joint.id, 1, 0));
+      actuator.drive = new ServoDrive(1, 2, 100, 200, 5e-6, 4096);
+      actuator.positionLoopRate = 4000;
+      actuator.servoStiffness = 200;
+      actuator.servoDamping = 1;
+      model.addActuator(actuator);
+    }
+    var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
+    if (Math.abs(blueprint.joints[0].reflectedInertia - 8.15) > 1e-10 ||
+        Math.abs(blueprint.joints[1].reflectedInertia - 1.35) > 1e-10)
+      throw "Drive inertia must include downstream tensors and parallel-axis offsets";
   }
 
   /** A joint a stepper lost steps on sits its slip behind the command, and what it turns with goes along. */

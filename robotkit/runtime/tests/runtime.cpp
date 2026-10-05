@@ -385,7 +385,6 @@ void drive_reference_timing_is_per_coupled_group(const rk_robot_runtime_blueprin
     for (bool coupled : {false, true}) {
         auto mixed = blueprint;
         mixed.joint_servo[0] = {200.0, 10.0};
-        mixed.servo_reflected_inertia[0] = 1.0;
         if (coupled) {
             mixed.coupling_count = 1;
             mixed.couplings[0] = {0, 1, -1.0, 0.0};

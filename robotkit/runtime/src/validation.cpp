@@ -102,7 +102,6 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
         if (!is_finite(blueprint->joint_overtravel[joint]) || blueprint->joint_overtravel[joint] < 0.0 ||
             !is_finite(servo.stiffness) || servo.stiffness < 0.0 ||
             !is_finite(servo.damping) || servo.damping < 0.0 ||
-            !is_finite(blueprint->servo_reflected_inertia[joint]) || blueprint->servo_reflected_inertia[joint] < 0.0 ||
             blueprint->process_joint[joint] > 1)
             return RK_ERROR_INVALID_ARGUMENT;
     }

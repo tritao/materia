@@ -251,29 +251,38 @@ class RobotModel {
     return mass;
   }
 
-  /**
-   * What a joint moves per unit of its own acceleration: a revolute joint's child link inertia
-   * about the joint axis, plus its armature; a sliding joint's carried mass.
-   */
+  /** Neutral-configuration inertia of the whole carried subtree about this joint.
+      Every descendant contributes its rotated tensor and parallel-axis term.
+      Simulation uses the live articulated mass matrix for acceleration feedforward. */
   @:allow(robotkit.model.DriveLoads)
   function turningInertia(joint:Joint):Float {
     if (joint.type == JointType.Prismatic) return carriedMass(joint) + joint.armature;
-    var link = joint.child, q = joint.childFrameRotation;
-    // The joint axis in the child link's frame: rotate by the joint frame's quaternion.
-    var x = q[0], y = q[1], z = q[2], w = q[3], v = joint.axis;
-    var tx = 2 * (y * v[2] - z * v[1]), ty = 2 * (z * v[0] - x * v[2]), tz = 2 * (x * v[1] - y * v[0]);
-    var a = [v[0] + w * tx + (y * tz - z * ty), v[1] + w * ty + (z * tx - x * tz), v[2] + w * tz + (x * ty - y * tx)];
-    var length = Math.sqrt(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]);
-    if (!(length > 0)) return joint.armature;
-    for (i in 0...3) a[i] /= length;
-    var t = link.inertiaTensor, about = 0.0;
-    for (i in 0...3) for (j in 0...3) about += a[i] * t[i * 3 + j] * a[j];
-    // Parallel axis: the centre of mass's distance from the axis line through the joint.
-    var d = [for (i in 0...3) link.centerOfMass[i] - joint.childFramePosition[i]];
-    var along = d[0] * a[0] + d[1] * a[1] + d[2] * a[2];
-    var squared = d[0] * d[0] + d[1] * d[1] + d[2] * d[2] - along * along;
-    return about + link.mass * Math.max(0.0, squared) + joint.armature;
+    var childFrame = jointFrame(joint.childFramePosition, joint.childFrameRotation);
+    var axis = childFrame.transformVector(new robotkit.spatial.Vec3(joint.axis[0], joint.axis[1], joint.axis[2])).normalized();
+    var origin = childFrame.translation;
+    var frontier = [{link: joint.child, pose: robotkit.spatial.Transform3.identity()}];
+    var seen:Array<Link> = [], inertia = joint.armature;
+    while (frontier.length > 0) {
+      var entry = frontier.pop();
+      if (entry == null || seen.indexOf(entry.link) >= 0) continue;
+      seen.push(entry.link);
+      var localAxis = entry.pose.rotation.conjugate().rotate(axis);
+      var components = [localAxis.x, localAxis.y, localAxis.z], tensor = entry.link.inertiaTensor;
+      for (i in 0...3) for (j in 0...3) inertia += components[i] * tensor[i * 3 + j] * components[j];
+      var center = entry.link.centerOfMass;
+      var offset = entry.pose.transformPoint(new robotkit.spatial.Vec3(center[0], center[1], center[2])).sub(origin);
+      var along = offset.dot(axis);
+      inertia += entry.link.mass * Math.max(0.0, offset.dot(offset) - along * along);
+      for (next in joints) if (next.parent == entry.link)
+        frontier.push({link: next.child, pose: entry.pose.compose(jointFrame(next.parentFramePosition, next.parentFrameRotation))
+          .compose(jointFrame(next.childFramePosition, next.childFrameRotation).inverse())});
+    }
+    return inertia;
   }
+
+  static function jointFrame(position:Array<Float>, rotation:Array<Float>):robotkit.spatial.Transform3
+    return new robotkit.spatial.Transform3(new robotkit.spatial.Vec3(position[0], position[1], position[2]),
+      new robotkit.spatial.Quat(rotation[0], rotation[1], rotation[2], rotation[3]));
 
   public function addSensor(sensor:Sensor):Sensor {
     sensors.push(sensor);

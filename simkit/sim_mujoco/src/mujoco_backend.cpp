@@ -2,6 +2,7 @@
 
 #include "PhysicsBackend.hpp"
 #include "internal.hpp"
+#include "servo_feedforward.hpp"
 
 #include <mujoco/mujoco.h>
 
@@ -83,7 +84,6 @@ struct JointRecord {
     double target_feedforward = 0.0;
     double end_position = 0.0;
     double end_velocity = 0.0;
-    double reflected_inertia = 0.0;
     double reference_duration = 0.0;
     double reference_epoch = 0.0;
 };
@@ -724,6 +724,8 @@ public:
 
         for (std::uint32_t index = 0; index < count; ++index) {
             auto &record = joints.at(targets[index].backend_joint);
+            if (record.target_mode != targets[index].mode || record.target_max_force != targets[index].max_force)
+                servo_coordinates_dirty = true;
             record.target_mode = targets[index].mode;
             record.target = targets[index].target;
             record.target_max_force = targets[index].max_force;
@@ -733,7 +735,6 @@ public:
             record.target_feedforward = targets[index].feedforward;
             record.end_position = targets[index].end_position;
             record.end_velocity = targets[index].end_velocity;
-            record.reflected_inertia = targets[index].reflected_inertia;
             record.reference_duration = targets[index].reference_duration;
             record.reference_epoch = data ? data->time : 0.0;
         }
@@ -1327,10 +1328,90 @@ private:
             }
         }
         derived_stale = false;
+        rebuild_servo_coordinates();
         apply_joint_targets();
         mj_forward(model, data);
         rebuild_coupling_responses();
         return NKSIM_OK;
+    }
+
+    struct ServoReference { double position, velocity, acceleration; };
+
+    ServoReference servo_reference(const JointRecord &joint) const {
+        ServoReference result{joint.target, joint.target_velocity, 0.0};
+        if (joint.reference_duration <= 0.0) return result;
+        const double duration = joint.reference_duration;
+        const double elapsed = data->time - joint.reference_epoch;
+        const double t = std::clamp(elapsed, 0.0, duration);
+        const double delta = joint.end_position - joint.target;
+        const double c2 = (3.0 * delta / duration - 2.0 * joint.target_velocity - joint.end_velocity) / duration;
+        const double c3 = (-2.0 * delta / duration + joint.target_velocity + joint.end_velocity) / (duration * duration);
+        result.position += t * (joint.target_velocity + t * (c2 + t * c3));
+        result.velocity += t * (2.0 * c2 + 3.0 * t * c3);
+        if (elapsed < duration) result.acceleration = 2.0 * c2 + 6.0 * t * c3;
+        return result;
+    }
+
+    // All scalar coordinates share one cached nominal transmission space. The
+    // mass matrix couples independent axes too, so splitting by transmission
+    // would lose the articulated cross terms between an arm's joints.
+    void rebuild_servo_coordinates() {
+        servo_space = {};
+        std::unordered_map<std::uint64_t, std::size_t> columns;
+        for (auto id : joint_order) {
+            const int joint = model_joint_id(joints.at(id));
+            if (joint < 0 || (model->jnt_type[joint] != mjJNT_HINGE && model->jnt_type[joint] != mjJNT_SLIDE)) continue;
+            columns.emplace(id, servo_space.dofs.size());
+            servo_space.dofs.push_back(model->jnt_dofadr[joint]);
+        }
+        std::map<std::uint64_t, std::vector<double>> rows;
+        for (const auto &term : couplings) {
+            if (!columns.count(term.follower) || !columns.count(term.leader)) continue;
+            auto [row, fresh] = rows.try_emplace(term.follower, servo_space.dofs.size(), 0.0);
+            if (fresh) row->second[columns.at(term.follower)] = 1.0;
+            row->second[columns.at(term.leader)] -= term.ratio;
+        }
+        DenseRows equations;
+        for (auto &[id, row] : rows) {
+            double norm = 0.0;
+            for (double value : row) norm += value * value;
+            norm = std::sqrt(norm);
+            if (norm > 0.0) for (double &value : row) value /= norm;
+            equations.push_back(std::move(row));
+        }
+        servo_space.basis = coupling_nullspace(std::move(equations), servo_space.dofs.size());
+        servo_accelerations.assign(model->nv, 0.0);
+        servo_qacc.assign(model->nv, 0.0);
+        servo_mass_effort.assign(model->nv, 0.0);
+        servo_effort.assign(model->nv, 0.0);
+        servo_limits.assign(model->nv, 0.0);
+        servo_coordinates_dirty = true;
+    }
+
+    void servo_inertia_feedforward() {
+        std::fill(servo_accelerations.begin(), servo_accelerations.end(), 0.0);
+        std::fill(servo_qacc.begin(), servo_qacc.end(), 0.0);
+        std::fill(servo_effort.begin(), servo_effort.end(), 0.0);
+        std::vector<int> active;
+        for (auto id : joint_order) {
+            const auto &joint = joints.at(id);
+            if (joint.target_mode != NKSIM_JOINT_TARGET_SERVO) continue;
+            const double limit = joint.target_max_force != 0.0 ? joint.target_max_force : joint.desc.max_force;
+            if (limit < 0.0) continue;
+            const int native = model_joint_id(joint);
+            if (native < 0 || (model->jnt_type[native] != mjJNT_HINGE && model->jnt_type[native] != mjJNT_SLIDE)) continue;
+            const int dof = model->jnt_dofadr[native];
+            if (servo_coordinates_dirty) active.push_back(dof);
+            servo_accelerations[dof] = servo_reference(joint).acceleration;
+            servo_limits[dof] = limit;
+        }
+        if (servo_coordinates_dirty) {
+            servo_coordinates = std::make_unique<ServoCoordinateMap>(servo_space, active);
+            servo_coordinates_dirty = false;
+        }
+        servo_coordinates->accelerations(servo_accelerations, servo_qacc);
+        mj_mulM(model, data, servo_mass_effort.data(), servo_qacc.data());
+        servo_coordinates->efforts(servo_mass_effort, servo_limits, servo_effort);
     }
 
     // MuJoCo's mass-normalised equality response follows transmission compliance
@@ -1942,6 +2023,7 @@ private:
             }
         }
         mj_mulM(model, data, m_qacc.data(), qacc_desired.data());
+        servo_inertia_feedforward();
 
         for (const auto joint_id : joint_order) {
             auto &joint = joints.at(joint_id);
@@ -1956,30 +2038,17 @@ private:
                 const bool servoing = joint.target_mode == NKSIM_JOINT_TARGET_SERVO && limit >= 0.0;
                 auto *servo_gain = model->actuator_gainprm + mjNGAIN * servo;
                 auto *servo_bias = model->actuator_biasprm + mjNBIAS * servo;
-                double reference = joint.target, velocity = joint.target_velocity, acceleration = 0.0;
-                if (joint.reference_duration > 0.0) {
-                    const double duration = joint.reference_duration;
-                    const double t = std::clamp(data->time - joint.reference_epoch, 0.0, duration);
-                    // Hermite in dimensional time: q(t) = q0 + v0 t + c2 t² + c3 t³.
-                    const double delta = joint.end_position - joint.target;
-                    const double c2 = (3.0 * delta / duration - 2.0 * joint.target_velocity
-                        - joint.end_velocity) / duration;
-                    const double c3 = (-2.0 * delta / duration + joint.target_velocity
-                        + joint.end_velocity) / (duration * duration);
-                    reference += t * (joint.target_velocity + t * (c2 + t * c3));
-                    velocity += t * (2.0 * c2 + 3.0 * t * c3);
-                    // Once the reference interval ends, the drive holds its end state.
-                    // The final polynomial acceleration must not keep producing torque.
-                    if (data->time - joint.reference_epoch < duration)
-                        acceleration = 2.0 * c2 + 6.0 * t * c3;
-                }
+                const auto reference = servo_reference(joint);
+                const int native_joint = model_joint_id(joint);
+                const double inertia_effort = native_joint >= 0
+                    ? servo_effort[model->jnt_dofadr[native_joint]] : 0.0;
                 servo_gain[0] = servoing ? joint.target_stiffness : 0.0;
                 servo_bias[0] = servoing
-                    ? joint.target_damping * velocity + joint.target_feedforward
-                        + joint.reflected_inertia * acceleration : 0.0;
+                    ? joint.target_damping * reference.velocity + joint.target_feedforward
+                        + inertia_effort : 0.0;
                 servo_bias[1] = servoing ? -joint.target_stiffness : 0.0;
                 servo_bias[2] = servoing ? -joint.target_damping : 0.0;
-                data->ctrl[servo] = servoing ? reference : 0.0;
+                data->ctrl[servo] = servoing ? reference.position : 0.0;
                 // Every mode clamps to this same bound, so a joint-level clamp
                 // changes nothing for the motor's already-clamped torque.
                 const auto joint_model = model_joint_id(joint);
@@ -2089,6 +2158,10 @@ private:
     }
     std::vector<nksim::BackendJointCoupling> couplings;
     std::vector<std::pair<int, double>> coupling_responses;
+    DriveCoordinateSpace servo_space;
+    std::unique_ptr<ServoCoordinateMap> servo_coordinates;
+    bool servo_coordinates_dirty = true;
+    std::vector<mjtNum> servo_accelerations, servo_qacc, servo_mass_effort, servo_effort, servo_limits;
     std::vector<nksim::BackendClosure> closures;
     std::unordered_map<std::uint64_t, mjsBody *> rebuild_bodies;
     std::unordered_map<std::uint64_t, BodyRecord> saved_bodies;

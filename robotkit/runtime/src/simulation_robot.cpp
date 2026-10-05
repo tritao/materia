@@ -211,7 +211,6 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
                 staged_squaring_offset_[source.joint] + counter_origin_[source.joint];
             target.end_velocity = command.reference_end_velocity[index];
             target.reference_duration = command.reference_duration;
-            target.reflected_inertia = reflected_inertia_[source.joint];
         }
         if (squaring_hold_[source.joint]) {
             target.target = squaring_position_[source.joint];

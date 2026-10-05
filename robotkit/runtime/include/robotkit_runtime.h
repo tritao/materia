@@ -482,8 +482,6 @@ typedef struct rk_robot_runtime_blueprint {
     double joint_overtravel[RK_MAX_JOINTS];
     /** Servo gains, indexed by joint; zero disables position-loop interpolation. */
     rk_robot_joint_servo joint_servo[RK_MAX_JOINTS];
-    /** Joint-coordinate inertia known to the servo drive, for acceleration feedforward. */
-    double servo_reflected_inertia[RK_MAX_JOINTS];
     /** Coupling stiffness in follower-coordinate effort per unit of follower travel. */
     double coupling_stiffness[RK_MAX_JOINT_COUPLINGS];
     /** Command ownership: process joints accept no host or trajectory targets. */

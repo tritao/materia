@@ -791,9 +791,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         binding->squaring_hold_.assign(blueprint.joint_count, 0);
         binding->squaring_position_.assign(blueprint.joint_count, 0.0);
         binding->servo_.assign(blueprint.joint_count, rk_robot_joint_servo{});
-        binding->reflected_inertia_.assign(blueprint.joint_count, 0.0);
-        std::copy_n(blueprint.servo_reflected_inertia, blueprint.joint_count,
-                binding->reflected_inertia_.begin());
+
         binding->passive_.assign(blueprint.joint_count, 0);
         binding->step_ = fixed_timestep_;
         {

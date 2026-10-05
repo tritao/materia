@@ -317,7 +317,6 @@ class RobotRuntimeBlueprint {
       servo.set_stiffness(joint.servoStiffness);
       servo.set_damping(joint.servoDamping);
       value.set_joint_servo(index, servo);
-      value.set_servo_reflected_inertia(index, joint.reflectedInertia);
     }
     var processOwned = processJoints();
     for (index in 0...processOwned.length) value.set_process_joint(index, processOwned[index] ? 1 : 0);

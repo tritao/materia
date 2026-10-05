@@ -275,7 +275,7 @@ typedef struct nksim_joint_target {
     uint32_t mode;
     double target;
     double max_force; /**< 0: inherit joint ceiling; negative: unpowered; positive: override ceiling. */
-    /* NKSIM_JOINT_TARGET_SERVO terms, read when struct_size includes them. */
+    /* NKSIM_JOINT_TARGET_SERVO terms; the complete current layout is required. */
     double velocity;
     double stiffness;
     double damping;
@@ -284,7 +284,6 @@ typedef struct nksim_joint_target {
     double end_position;
     double end_velocity;
     double reference_duration;
-    double reflected_inertia;
 } nksim_joint_target;
 
 /**

@@ -556,12 +556,10 @@ nksim_result World::set_joint_targets(const nksim_joint_target *targets, std::ui
             target.feedforward = source.feedforward;
             {
                 if (!std::isfinite(source.end_position) || !std::isfinite(source.end_velocity) ||
-                    !std::isfinite(source.reflected_inertia) || source.reflected_inertia < 0.0 ||
                     !std::isfinite(source.reference_duration) || source.reference_duration < 0.0)
                     return NKSIM_ERROR_INVALID_ARGUMENT;
                 target.end_position = source.end_position;
                 target.end_velocity = source.end_velocity;
-                target.reflected_inertia = source.reflected_inertia;
                 target.reference_duration = source.reference_duration;
             }
         }

@@ -2146,7 +2146,7 @@ void servo_target_is_a_saturating_pd() {
 
 // A saturated servo has the same force and velocity derivative as a constant effort.
 // A joint-only force clamp otherwise leaves its unsaturated damping in implicitfast.
-void servo_interpolates_accelerating_reference_between_controller_ticks() {
+void servo_interpolates_accelerating_reference_between_controller_ticks(double payload_mass = 0.0) {
     nkscene_scene scene = 0;
     assert(nkscene_scene_create(&scene) == NKS_OK);
     nksim_world_desc desc{};
@@ -2169,6 +2169,16 @@ void servo_interpolates_accelerating_reference_between_controller_ticks() {
     joint.upper_limit = 1;
     nksim_joint id = 0;
     assert(nksim_joint_create(world, &joint, &id) == NKSIM_OK);
+    if (payload_mass > 0.0) {
+        auto payload = make_body(world, make_node(scene, 0), NKSIM_MOTION_DYNAMIC, payload_mass);
+        nksim_joint_desc mount{};
+        mount.struct_size = sizeof(mount);
+        mount.type = NKSIM_JOINT_FIXED;
+        mount.body_a = slider;
+        mount.body_b = payload;
+        nksim_joint attachment = 0;
+        assert(nksim_joint_create(world, &mount, &attachment) == NKSIM_OK);
+    }
     assert(nksim_joint_set_state(world, id, 0, 0.5) == NKSIM_OK);
     for (int tick = 0; tick < 10; ++tick) {
         const double t = tick * 0.01;
@@ -2184,7 +2194,6 @@ void servo_interpolates_accelerating_reference_between_controller_ticks() {
         command.reference_duration = 0.01;
         command.stiffness = 1000;
         command.damping = 63;
-        command.reflected_inertia = 1.0; // One kilogram of reflected mass.
         assert(nksim_world_set_joint_targets(world, &command, 1) == NKSIM_OK);
         step_world(world, 1);
         nksim_joint_state state{};
@@ -2204,13 +2213,12 @@ void servo_interpolates_accelerating_reference_between_controller_ticks() {
     last.end_position = last.target + 0.5 * 0.3 * 0.01 * 0.01;
     last.end_velocity = 0.3 * 0.01;
     last.reference_duration = 0.01;
-    last.reflected_inertia = 1.0;
     assert(nksim_world_set_joint_targets(world, &last, 1) == NKSIM_OK);
     step_world(world, 1);
     nksim_joint_state accelerating{};
     accelerating.struct_size = sizeof(accelerating);
     assert(nksim_joint_get_state(world, id, &accelerating) == NKSIM_OK);
-    assert(std::abs(accelerating.effort - 0.3) < 1e-6);
+    assert(std::abs(accelerating.effort - 0.3 * (1.0 + payload_mass)) < 1e-6);
     step_world(world, 1);
     nksim_joint_state held{};
     held.struct_size = sizeof(held);
@@ -2219,6 +2227,121 @@ void servo_interpolates_accelerating_reference_between_controller_ticks() {
     assert(nksim_world_configure_integration(world, 1, NKSIM_INTEGRATOR_EULER) == NKSIM_ERROR_INVALID_STATE);
     nksim_world_destroy(world);
     nkscene_scene_destroy(scene);
+}
+
+// A screw drive reflects its translated load through its actual lead; no
+// controller scalar is supplied to the physics target.
+void servo_feedforward_reflects_transmission_load() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    nksim_world_desc desc{};
+    desc.struct_size = sizeof(desc); desc.scene = scene;
+    desc.fixed_timestep = 1e-6; desc.physics_substeps = 1;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
+    auto base = make_body(world, make_node(scene, 0), NKSIM_MOTION_STATIC, 0);
+    auto load = make_body(world, make_node(scene, 0), NKSIM_MOTION_DYNAMIC, 10);
+    nksim_body_desc rotor_desc{};
+    rotor_desc.struct_size = sizeof(rotor_desc);
+    rotor_desc.node = make_node(scene, 0);
+    rotor_desc.motion_type = NKSIM_MOTION_DYNAMIC;
+    rotor_desc.mass = 1; rotor_desc.has_inertial_properties = 1;
+    rotor_desc.inertia_tensor[0] = rotor_desc.inertia_tensor[4] = rotor_desc.inertia_tensor[8] = 0.01;
+    nksim_body rotor = 0;
+    assert(nksim_body_create(world, &rotor_desc, &rotor) == NKSIM_OK);
+    nksim_joint motor = 0, slide = 0;
+    nksim_joint_desc joint{};
+    joint.struct_size = sizeof(joint); joint.body_a = base;
+    joint.body_b = rotor; joint.type = NKSIM_JOINT_REVOLUTE; joint.axis_a[2] = 1;
+    assert(nksim_joint_create(world, &joint, &motor) == NKSIM_OK);
+    joint.body_b = load; joint.type = NKSIM_JOINT_PRISMATIC;
+    joint.axis_a[2] = 0; joint.axis_a[0] = 1;
+    assert(nksim_joint_create(world, &joint, &slide) == NKSIM_OK);
+    const double lead = 0.005 / (2 * 3.14159265358979323846);
+    nksim_joint_coupling_desc relation{};
+    relation.struct_size = sizeof(relation);
+    relation.leader = motor; relation.follower = slide; relation.ratio = lead;
+    assert(nksim_joint_couple(world, &relation) == NKSIM_OK);
+    nksim_joint_target target{};
+    target.struct_size = sizeof(target); target.joint = motor;
+    target.mode = NKSIM_JOINT_TARGET_SERVO;
+    target.end_position = 0.005; target.end_velocity = 1; target.reference_duration = 0.01;
+    assert(nksim_world_set_joint_targets(world, &target, 1) == NKSIM_OK);
+    step_world(world, 1);
+    nksim_joint_state state{}; state.struct_size = sizeof(state);
+    assert(nksim_joint_get_state(world, motor, &state) == NKSIM_OK);
+    assert(std::abs(state.effort - 100 * (0.01 + 10 * lead * lead)) < 1e-8);
+    nksim_world_destroy(world); nkscene_scene_destroy(scene);
+}
+
+// Inertia and cross-axis effort follow the live elbow angle, not a scalar
+// cached from the shoulder's immediate child or the neutral configuration.
+void servo_feedforward_uses_articulated_configuration() {
+    for (double elbow_angle : {0.0, 1.5707963267948966}) {
+        nkscene_scene scene = 0;
+        assert(nkscene_scene_create(&scene) == NKS_OK);
+        nksim_world_desc desc{};
+        desc.struct_size = sizeof(desc);
+        desc.scene = scene;
+        desc.fixed_timestep = 1e-6;
+        desc.physics_substeps = 1;
+        nksim_world world = 0;
+        assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
+        auto base = make_body(world, make_node(scene, 0), NKSIM_MOTION_STATIC, 0);
+        auto shape = make_box(world);
+        auto link = [&](double x, double mass) {
+            nksim_body_desc body{};
+            body.struct_size = sizeof(body);
+            body.node = make_node(scene, x);
+            body.motion_type = NKSIM_MOTION_DYNAMIC;
+            body.mass = mass;
+            body.shape = shape;
+            body.has_inertial_properties = 1;
+            body.inertia_tensor[0] = body.inertia_tensor[4] = body.inertia_tensor[8] = mass / 150.0;
+            nksim_body result = 0;
+            assert(nksim_body_create(world, &body, &result) == NKSIM_OK);
+            return result;
+        };
+        auto first = link(0.5, 1);
+        auto second = link(1.5, 2);
+        nksim_joint ids[2]{};
+        for (int index = 0; index < 2; ++index) {
+            nksim_joint_desc joint{};
+            joint.struct_size = sizeof(joint);
+            joint.type = NKSIM_JOINT_REVOLUTE;
+            joint.body_a = index == 0 ? base : first;
+            joint.body_b = index == 0 ? first : second;
+            joint.axis_a[2] = 1;
+            joint.anchor_a[0] = index == 0 ? 0 : 0.5;
+            joint.anchor_b[0] = -0.5;
+            assert(nksim_joint_create(world, &joint, &ids[index]) == NKSIM_OK);
+        }
+        assert(nksim_joint_set_state(world, ids[1], elbow_angle, 0) == NKSIM_OK);
+        nksim_joint_target targets[2]{};
+        for (int index = 0; index < 2; ++index) {
+            targets[index].struct_size = sizeof(targets[index]);
+            targets[index].joint = ids[index];
+            targets[index].mode = NKSIM_JOINT_TARGET_SERVO;
+            targets[index].target = index == 0 ? 0 : elbow_angle;
+            targets[index].end_position = targets[index].target + (index == 0 ? 0.5 * 0.3 * 0.01 * 0.01 : 0);
+            targets[index].end_velocity = index == 0 ? 0.3 * 0.01 : 0;
+            targets[index].reference_duration = 0.01;
+        }
+        assert(nksim_world_set_joint_targets(world, targets, 2) == NKSIM_OK);
+        step_world(world, 1);
+        const double cosine = std::cos(elbow_angle);
+        const double expected[2] = {0.3 * (2.77 + 2 * cosine), 0.3 * (0.5133333333333333 + cosine)};
+        for (int index = 0; index < 2; ++index) {
+            nksim_joint_state state{};
+            state.struct_size = sizeof(state);
+            assert(nksim_joint_get_state(world, ids[index], &state) == NKSIM_OK);
+            if (std::abs(state.effort - expected[index]) >= 1e-5)
+                std::fprintf(stderr, "articulated angle %.9g joint %d effort %.12g expected %.12g\n", elbow_angle, index, state.effort, expected[index]);
+            assert(std::abs(state.effort - expected[index]) < 1e-5);
+        }
+        nksim_world_destroy(world);
+        nkscene_scene_destroy(scene);
+    }
 }
 
 void saturated_servo_matches_effort_with_implicit_integration() {
@@ -2447,6 +2570,9 @@ int main() {
     contact_filters_and_pairs_decide_contacts();
     servo_target_is_a_saturating_pd();
     servo_interpolates_accelerating_reference_between_controller_ticks();
+    servo_interpolates_accelerating_reference_between_controller_ticks(3.0);
+    servo_feedforward_reflects_transmission_load();
+    servo_feedforward_uses_articulated_configuration();
     saturated_servo_matches_effort_with_implicit_integration();
     joint_dynamics_reach_the_backend();
     surface_friction_decides_sliding();

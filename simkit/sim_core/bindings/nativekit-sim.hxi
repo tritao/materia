@@ -35,9 +35,21 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 */
 	const NKSIM_INTEGRATOR_IMPLICIT_FAST = 2;
 	const NKSIM_INTEGRATOR_RK4 = 3;
+	/**
+	 * < A shared axis line, free to slide and turn along it.
+	 */
+	const NKSIM_JOINT_CYLINDRICAL = 5;
 	const NKSIM_JOINT_FIXED = 1;
+	/**
+	 * < body_b slides and turns in body_a's plane through anchor_a with normal axis_a.
+	 */
+	const NKSIM_JOINT_PLANAR = 6;
 	const NKSIM_JOINT_PRISMATIC = 3;
 	const NKSIM_JOINT_REVOLUTE = 2;
+	/**
+	 * < A shared point.
+	 */
+	const NKSIM_JOINT_SPHERICAL = 4;
 	const NKSIM_JOINT_TARGET_EFFORT = 3;
 	const NKSIM_JOINT_TARGET_POSITION = 1;
 	/**
@@ -164,6 +176,12 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 */
 	extern fn nksim_session_hold_object(session: nksim_session, object: nksim_object, carrier: nksim_body, offset: ptr<const<nksim_pose>>) -> nksim_result;
 	/**
+	 * True when the oriented query box intersects a free dynamic box object in
+	 * the latest physics state. Static fixtures, kinematic actors and carried
+	 * objects are excluded. Query dimensions are positive half extents.
+	 */
+	extern fn nksim_session_overlap_free_boxes(session: nksim_session, pose: ptr<const<nksim_pose>>, half_extents: ptr<const<f64>>, out_present: ptr<u32> @out) -> nksim_result;
+	/**
 	 * Adds a keyframe to an actor's trajectory: the pose of every part at
 	 * simulation time `time`, while stopped or running. Each tick moves every
 	 * part to its pose interpolated at the tick's end time (linear position,
@@ -181,7 +199,6 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 * is nearer.
 	 */
 	extern fn nksim_session_raycast(session: nksim_session, ray: ptr<const<nksim_ray>>, out_distance: ptr<f64> @out) -> nksim_result;
-	extern fn nksim_session_overlap_free_boxes(session: nksim_session, pose: ptr<const<nksim_pose>>, half_extents: ptr<const<f64>>, out_present: ptr<u32> @out) -> nksim_result;
 	/**
 	 * Releases a held object as DYNAMIC from the next tick, retaining the
 	 * carrier point's velocity. Releasing a free object is INVALID_STATE.
@@ -258,6 +275,10 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 * Stages body and joint additions before the first world step.
 	 */
 	extern fn nksim_world_begin_topology_update(world: nksim_world) -> nksim_result;
+	/**
+	 * Configures drive-required integration before the first world step.
+	 */
+	extern fn nksim_world_configure_integration(world: nksim_world, substeps: u32, integrator: u32) -> nksim_result;
 	extern fn nksim_world_create(desc: ptr<const<nksim_world_desc>>, out_world: ptr<nksim_world> @out @owned) -> nksim_result;
 	extern fn nksim_world_destroy(world: nksim_world) -> void;
 	/**
@@ -276,7 +297,6 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	extern fn nksim_world_reset(world: nksim_world) -> nksim_result;
 	extern fn nksim_world_set_joint_targets(world: nksim_world, targets: ptr<const<nksim_joint_target>> @in_array("count"), count: u32) -> nksim_result;
 	extern fn nksim_world_snapshot(world: nksim_world, out_snapshot: ptr<nksim_snapshot> @out @owned) -> nksim_result;
-	extern fn nksim_world_configure_integration(world: nksim_world, substeps: u32, integrator: u32) -> nksim_result;
 	extern fn nksim_world_step(world: nksim_world, out_result: ptr<nksim_step_result> @inout) -> nksim_result;
 	/**
 	 * One kinematic body of an actor.
@@ -339,14 +359,14 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	struct nksim_closure_desc @layout(64, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		/**
-		 * < NKSIM_JOINT_FIXED, REVOLUTE, or PRISMATIC.
+		 * < NKSIM_JOINT_FIXED, REVOLUTE, PRISMATIC, SPHERICAL, CYLINDRICAL or PLANAR.
 		 */
 		type: u32 @offset(4);
 		body_a: nksim_body @offset(8);
 		body_b: nksim_body @offset(12);
 		anchor_a: array<f64, 3> @offset(16);
 		/**
-		 * < Unit hinge axis in body_a's local frame.
+		 * < Unit axis (hinge, slide, or plane normal) in body_a's local frame.
 		 */
 		axis_a: array<f64, 3> @offset(40);
 	}
@@ -384,7 +404,9 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		surface: nksim_surface @offset(24);
 	}
 	/**
-	 * Follower = ratio * leader + offset, in joint coordinates.
+	 * One term of a follower's value, in joint coordinates: ratio * leader + offset. A follower with
+	 * several couplings is the sum of their terms (a CoreXY motor follows both axes). Each leader and
+	 * follower pair is coupled once, and the couplings may not form a cycle.
 	 */
 	struct nksim_joint_coupling_desc @layout(40, 8) {
 		struct_size: u32 @offset(0) @struct_size;
@@ -392,6 +414,9 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		follower: nksim_joint @offset(8);
 		ratio: f64 @offset(16);
 		offset: f64 @offset(24);
+		/**
+		 * Follower-coordinate stiffness; zero preserves the backend default.
+		 */
 		stiffness: f64 @offset(32);
 	}
 	struct nksim_joint_desc @layout(288, 8) {
@@ -407,7 +432,9 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		axis_a: array<f64, 3> @offset(64);
 		lower_limit: f64 @offset(88);
 		upper_limit: f64 @offset(96);
-		/** 0 unspecified; negative explicitly unpowered; positive force ceiling. */
+		/**
+		 * < 0: unspecified; negative: explicitly unpowered; positive: force ceiling.
+		 */
 		max_force: f64 @offset(104);
 		/**
 		 * Joint-frame orientation relative to body_a/body_b (x, y, z, w),
@@ -435,12 +462,14 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		reserved0: u32 @offset(32);
 		reserved: array<u64, 2> @offset(40);
 	}
-	struct nksim_joint_target @layout(96, 8) {
+	struct nksim_joint_target @layout(88, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		joint: nksim_joint @offset(4);
 		mode: u32 @offset(8);
 		target: f64 @offset(16);
-		/** 0 inherits joint ceiling; negative disables force; positive overrides it. */
+		/**
+		 * < 0: inherit joint ceiling; negative: unpowered; positive: override ceiling.
+		 */
 		max_force: f64 @offset(24);
 		velocity: f64 @offset(32);
 		stiffness: f64 @offset(40);
@@ -449,7 +478,6 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		end_position: f64 @offset(64);
 		end_velocity: f64 @offset(72);
 		reference_duration: f64 @offset(80);
-		reflected_inertia: f64 @offset(88);
 	}
 	struct nksim_object_desc @layout(160, 8) {
 		struct_size: u32 @offset(0) @struct_size;
