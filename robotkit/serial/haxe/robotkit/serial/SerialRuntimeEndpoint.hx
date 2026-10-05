@@ -49,7 +49,8 @@ class SerialRuntimeEndpoint {
       blueprint.nativeValue(), devicePath, baud, device, maxTargetError,
       binding.stepTickHz, linkLossTimeoutNs, clockSyncBoundNs, haxe.Int64.ofInt(100000));
     RobotRuntime.check(result.status, "serialEndpoint.create");
-    return new NativeRuntimeEndpoint(result.out_runtime);
+    return new NativeRuntimeEndpoint(result.out_runtime,
+      new robotkit.time.SourceClock("robotkit.device." + controllerHex.toLowerCase()));
   }
 
   /** Reads the unique id (32 lowercase hex digits) of the board on a serial port. */

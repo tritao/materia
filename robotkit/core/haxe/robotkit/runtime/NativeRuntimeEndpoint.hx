@@ -5,10 +5,14 @@ import runtime.memory.NativeSpan;
 /** Owns the native endpoint handle. In-memory, serial and simulation factories share its ABI. */
 class NativeRuntimeEndpoint implements RuntimeEndpoint {
   final owner:Ownedrk_robot_runtime;
+  final sourceClock:robotkit.time.SourceClock;
   final captureContacts:Null<Void -> Array<RobotContact>>;
   var closed:Bool = false;
-  public function new(owner:Ownedrk_robot_runtime, ?captureContacts:Void -> Array<RobotContact>) {
+  public function new(owner:Ownedrk_robot_runtime, sourceClock:robotkit.time.SourceClock,
+      ?captureContacts:Void -> Array<RobotContact>) {
     this.owner = owner;
+    if (sourceClock == null) throw "Native endpoint requires its source clock";
+    this.sourceClock = sourceClock;
     this.captureContacts = captureContacts;
   }
   /** Used by simulation's native adapter to identify its attached robot. */
@@ -19,8 +23,15 @@ class NativeRuntimeEndpoint implements RuntimeEndpoint {
   public function start():Int return RobotKitRuntime.rk_robot_runtime_start(nativeHandle());
   public function submit(command:rk_robot_command):Int
     return RobotKitRuntime.rk_robot_runtime_submit(nativeHandle(), command);
-  public function observe(snapshot:rk_robot_snapshot):Int
-    return RobotKitRuntime.rk_robot_runtime_snapshot_full(nativeHandle(), snapshot).status;
+  public function sourceClockId():String return sourceClock.id();
+  /** Simulation's factory reports a successful owner reset before any new observations. */
+  @:allow(robotkit.runtime.SimulationEndpoints)
+  function beginSourceEpoch():Void sourceClock.beginEpoch();
+  public function observe(snapshot:rk_robot_snapshot):Int {
+    var result = RobotKitRuntime.rk_robot_runtime_snapshot_full(nativeHandle(), snapshot).status;
+    if (result == RobotKitRuntimeConstants.RK_OK) sourceClock.observe(snapshot.get_source_timestamp_ns());
+    return result;
+  }
   public function stop():Int return closed ? RobotKitRuntimeConstants.RK_OK :
     RobotKitRuntime.rk_robot_runtime_stop(nativeHandle());
   public function capabilities(value:rk_robot_capabilities):Int

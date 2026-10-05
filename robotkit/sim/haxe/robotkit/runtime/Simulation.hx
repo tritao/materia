@@ -36,6 +36,7 @@ class Simulation {
   final session:SimSession;
   /** Runs this simulation's step observers after each session tick. */
   final sessionObserverId:Int;
+  final sessionResetObserverId:Int;
   final fixedTimestepNs:Int64;
   var sourceTimeNs:Int64 = Int64.ofInt(0);
   var disposed:Bool = false;
@@ -49,6 +50,9 @@ class Simulation {
     check(attached.status, "simulation.createInSession");
     owner = attached.out_simulation;
     sessionObserverId = session.addStepObserver(afterStep);
+    sessionResetObserverId = session.addResetObserver(function() {
+      for (runtime in robots) SimulationEndpoints.beginEpoch(runtime.endpoint);
+    });
   }
 
   /** Attaches robots to a stopped session the caller owns, steps, and outlives. */
@@ -564,6 +568,7 @@ class Simulation {
     ensureLive();
     check(RobotKitSimKit.rk_simulation_reset_robot(owner.borrow(), robotIndex),
       "simulation.resetRobot");
+    SimulationEndpoints.beginEpoch(robots[robotIndex].endpoint);
   }
 
   /**
@@ -869,6 +874,7 @@ class Simulation {
   public function dispose():Void {
     if (disposed) return;
     session.removeStepObserver(sessionObserverId);
+    session.removeResetObserver(sessionResetObserverId);
     stepObservers.resize(0);
     for (runtime in robots) runtime.dispose();
     robots.resize(0);

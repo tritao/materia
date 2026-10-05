@@ -12,6 +12,7 @@ import nativekit.scene.Scene;
 class SimSession {
     final owner:Ownednksim_session;
     final stepObservers:Array<{id:Int, callback:Void->Void}> = [];
+    final resetObservers:Array<{id:Int, callback:Void->Void}> = [];
     var nextStepObserverId:Int = 1;
     var disposed:Bool = false;
 
@@ -105,6 +106,27 @@ class SimSession {
     public function reset():Void {
         ensureLive();
         SimWorld.check(NativeKitSim.nksim_session_reset(owner.borrow()), "session.reset");
+        for (entry in resetObservers.copy()) {
+            var registered = false;
+            for (current in resetObservers) if (current.id == entry.id) registered = true;
+            if (registered) entry.callback();
+        }
+    }
+
+    /** Runs after a successful reset. Clock owners invalidate the preceding observation epoch. */
+    public function addResetObserver(callback:Void->Void):Int {
+        ensureLive();
+        if (callback == null) throw "Simulation session reset observer is required";
+        var id = nextStepObserverId++;
+        resetObservers.push({id:id, callback:callback});
+        return id;
+    }
+
+    public function removeResetObserver(id:Int):Void {
+        for (index in 0...resetObservers.length) if (resetObservers[index].id == id) {
+            resetObservers.splice(index, 1);
+            return;
+        }
     }
 
     public function isRunning():Bool
@@ -206,6 +228,7 @@ class SimSession {
         if (disposed)
             return;
         stepObservers.resize(0);
+        resetObservers.resize(0);
         owner.close();
         disposed = true;
     }

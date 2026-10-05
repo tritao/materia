@@ -6,6 +6,6 @@ class RuntimeEndpoints {
     if (blueprint == null) throw "Endpoint requires a compiled blueprint";
     var result = RobotKitRuntime.rk_robot_runtime_create(blueprint.nativeValue());
     RobotRuntime.check(result.status, "inMemoryEndpoint.create");
-    return new NativeRuntimeEndpoint(result.out_runtime);
+    return new NativeRuntimeEndpoint(result.out_runtime, new robotkit.time.SourceClock("robotkit.monotonic"));
   }
 }
