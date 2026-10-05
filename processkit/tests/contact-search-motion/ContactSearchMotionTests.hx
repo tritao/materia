@@ -23,6 +23,7 @@ import robotkit.simulation.SimulatedRobot;
 import robotkit.spatial.Vec3;
 import motionkit.robot.ServoSession;
 
+@:access(WeldPlanningTests)
 class ContactSearchMotionTests {
   static var checks = 0;
   static function check(ok:Bool, message:String):Void { checks++; if (!ok) throw message; }
@@ -45,6 +46,16 @@ class ContactSearchMotionTests {
     if (!dropFeedback && !noTouch) {
       var planning = WeldingPlanRunner.planning(arm, 1.0);
       var probePlanner = new ProbeMotionPlanner(arm, planning.compiler);
+      var preparedProbe = new processkit.ProbePosePlanner(probePlanner).prepare(new Vec3(0, 0, -0.02),
+        new Vec3(0, 0, -1), 0.02, [0.0], WeldArcModel.TOUCH_TOLERANCE, 0.003, 1);
+      check(Math.abs(preparedProbe.approach.translation.z + 0.043) < 1e-9 &&
+        Math.abs(preparedProbe.distance - 0.043) < 1e-9, "Prepared search covers both signs of normal uncertainty in metres");
+      check(preparedProbe.approach.rotation.rotate(new Vec3(0, 0, 1)).sub(preparedProbe.direction).norm() < 1e-9,
+        "Prepared torch wire points into the CAD plane");
+      var corridorRejected = false;
+      try new processkit.ProbePosePlanner(probePlanner).prepare(new Vec3(0, 0, 0.095), new Vec3(0, 0, -1),
+        0.02, [0.0], 0, 0.003, 1) catch (error:Dynamic) corridorRejected = Std.string(error).indexOf("corridor") >= 0;
+      check(corridorRejected, "A reachable nominal contact cannot hide an unreachable uncertainty corridor");
       var approach = probePlanner.approach(new Transform3(new Vec3(0, 0, 0.03), Quat.identity()), [0.0], 32);
       check(Math.abs(approach.endJoints[0] - 0.03) < 5e-5, 'Checked approach ends at the requested search pose (${approach.endJoints[0]})');
       var retreat = probePlanner.line(Transform3.identity(), approach.endJoints, 0.01);
@@ -175,8 +186,22 @@ class ContactSearchMotionTests {
     check(Math.abs(robot.snapshot().velocities.get(0)) < 1e-5, "Completed retreat leaves the joint at rest");
     harness.dispose();
   }
+  static function sixAxisPreparation():Void {
+    var fixture = WeldPlanningTests.arm();
+    var planning = WeldingPlanRunner.planning(fixture.arm, 1.0);
+    var prepared = new processkit.ProbePosePlanner(new ProbeMotionPlanner(fixture.arm, planning.compiler));
+    var start = [0.0, -1.5708, 1.5708, -1.5708, -1.5708, 0.0];
+    for (normal in [new Vec3(0, 0, 1), new Vec3(0, 1, 0), new Vec3(1, 0, 0)]) {
+      var request = prepared.prepare(new Vec3(0.35, 0.2, 0.15), normal, 0.02, start, 0.0005);
+      check(request.approach.rotation.rotate(new Vec3(0, 0, 1)).sub(normal.scale(-1)).norm() < 1e-8,
+        "Six-axis preparation aligns the wire with each independent CAD normal");
+      var move = prepared.motion.approach(request.approach, start);
+      check(fixture.arm.tcpPose(move.endJoints).translation.sub(request.approach.translation).norm() < 0.0001,
+        "Six-axis checked approach reaches the prepared uncertain contact pose");
+    }
+  }
   public static function main():Void {
-    run(false, false); run(true, false); run(false, true); completeProbe(); completeProbe(true);
+    run(false, false); run(true, false); run(false, true); completeProbe(); completeProbe(true); sixAxisPreparation();
     Sys.println('Contact search native motion: $checks assertions passed');
   }
 }

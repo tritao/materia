@@ -1798,3 +1798,26 @@ fixture masks, holes and material samples survive this conversion. Its exported 
 saved-job validation, and the focused CAD suite passes 4,912 assertions with 468 exposed samples.
 This establishes the CAD data boundary; it does not prove arm reach, actual multi-face execution or
 the injected-parking welding mission. No native build or milestone-wide gate was run for this change.
+
+### P3 normal probe pose preparation (2026-10-05)
+
+`ProbePosePlanner` prepares a normal sensing corridor from a nominal root-frame CAD point, outward
+normal and conservative remaining normal travel. Wire +Z points inward. Sixteen rolls are tried,
+nearest the observed torch orientation first; each accepted prepared air pose has a complete checked
+approach through ProbeMotionPlanner. The air offset is normalTravel plus 3 mm, and the bounded search
+distance is twice normalTravel plus 3 mm, covering either sign of the unknown plane displacement.
+Continued IK is checked at 1 mm intervals over that entire corridor, rather than accepting a reachable
+nominal point while a possible displaced contact lies beyond the arm's reachable branch.
+
+Corridor kinematics do not turn a search into a nominal buffered contact move: before localization,
+that nominal move might penetrate the real plane. CAD patch/approach-region screening checks geometric
+exposure, and the executed search retains its measured collision/braking checks. This separation is
+necessary under parking error; checked approach and post-contact refinement/retreat remain unchanged.
+
+The focused native motion suite passes 43 assertions. New cases verify wire alignment, both signs of
+normal uncertainty and rejection specifically at an unreachable corridor despite reachable nominal
+contact/approach poses. On the existing six-axis arm fixture, three independent plane normals produce
+prepared wire orientations and checked approaches ending within 0.1 mm of their requests. This is
+six-axis preparation evidence, not an executed registration of the actual mobile CAD weldment. Saved
+mission emission/execution, actual mobile probe selection and both-backend parking-error gates remain
+open. No native build or milestone-wide app gate was run.
