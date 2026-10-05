@@ -44,6 +44,17 @@ class ContactPoseEnvelopeTests {
         "Additional independent contacts reduce the provisional pose error");
     }
     var interiorActual = new Transform3(new Vec3(), Quat.fromRollPitchYaw(0, 0, 0.03)).inverse().compose(nominal);
+    for (x in [-0.02, 0.02]) for (y in [-0.02, 0.02]) for (yaw in [-2.0, 2.0]) {
+      var error = new Transform3(new Vec3(x, y, 0), Quat.fromRollPitchYaw(0, 0, yaw * Math.PI / 180));
+      var actual = error.inverse().compose(nominal);
+      var horizontal = new ContactPoseEnvelope(nominal, new Vec3(0.02, 0.02, 0),
+        new Vec3(0, 0, 2 * Math.PI / 180), 0.00001);
+      var normal = new Vec3(0, 0, 1);
+      horizontal.refine([for (point in [new Vec3(-0.1, -0.1, 0.05), new Vec3(0.1, -0.1, 0.05), new Vec3(0, 0.1, 0.05)])
+        new PlaneContact(normal, 0.05, actual.transformPoint(point))]);
+      check(horizontal.cells == 1, "A horizontal plane does not subdivide unobservable parking yaw");
+      encloses(horizontal, actual, horizontal.estimate());
+    }
     var interior = new ContactPoseEnvelope(nominal, new Vec3(0.02, 0.02, 0), new Vec3(0, 0, 0.04), 0.00001);
     interior.refine(samples(interiorActual, 0.000005).slice(0, 3));
     var unresolved = interior.region(new Vec3(0.29, 0.03, 0.04), new Vec3(0, 1, 0), new Vec3(1, 0, 0), new Vec3(0, 0, 1), interior.estimate());

@@ -23,7 +23,10 @@ class ContactRegistrationSequenceTests {
     var sequence = new ContactRegistrationSequence(envelope, (count, normals, bounds) -> {
       calls.push(count);
       check(normals.length == 3 - count && bounds == envelope, "Selection receives prior independent normals and measured bounds");
-      if (count < 3) check(bounds.cells > 1, "Later stages receive refined uncertainty rather than a replaced zero prior");
+      if (count < 3) {
+        var unresolved = bounds.region(points[5], new Vec3(1, 0, 0), new Vec3(0, 1, 0), new Vec3(0, 0, 1), bounds.estimate());
+        check(unresolved.normalTravel > 0.005, "Later stages retain unobserved displacement rather than a replaced zero prior");
+      }
       var start = count == 3 ? 0 : count == 2 ? 3 : 5;
       var normal = planeNormals[3 - count];
       return new ContactRegistrationStage(normal, normal.dot(points[start]),

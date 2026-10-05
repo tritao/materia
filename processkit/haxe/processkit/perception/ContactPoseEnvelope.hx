@@ -139,7 +139,11 @@ class ContactPoseEnvelope {
         var normal = constraint.normal.toArray();
         for (i in 0...3) sensitivities[i] = Math.max(sensitivities[i], Math.abs(normal[i]));
       }
-      for (i in 3...6) sensitivities[i] = Math.max(sensitivities[i], constraint.point.norm());
+      var radius = constraint.point.norm();
+      for (i in 3...5) sensitivities[i] = Math.max(sensitivities[i], radius);
+      // A yaw derivative is Z cross the rotated point. A horizontal plane cannot observe it.
+      var horizontalNormal = Math.sqrt(constraint.normal.x * constraint.normal.x + constraint.normal.y * constraint.normal.y);
+      sensitivities[5] = Math.max(sensitivities[5], radius * horizontalNormal);
     }
     while (pending.length > 0) {
       var box:PoseBox = cast pending.shift();
