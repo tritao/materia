@@ -124,15 +124,14 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 	@:id(8) @:optional var brake:Null<MotorBrakeRecord>;
 }
 
-/**
- * A pneumatic cylinder driving a prismatic joint through a directional valve. Only the parts are
- * kept; pressure, force and direction are worked out from them and the air wiring.
- */
+/** A fluid cylinder on a prismatic joint; pressure, force and direction come from installed parts. */
 @:wire typedef CylinderRecord = {
 	@:id(1) var actuator:String;
 	@:id(2) var joint:String;
 	@:id(3) var cylinder:String;
 	@:id(4) var valve:String;
+	/** Authored hydraulic phase speeds; physical stroke and pressure are rebuilt from the parts. */
+	@:id(5) @:optional var phases:Null<machinekit.fluid.CylinderPhaseRecord>;
 }
 
 /**

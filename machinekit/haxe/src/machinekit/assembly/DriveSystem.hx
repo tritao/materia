@@ -18,6 +18,9 @@ import materia.assembly.AssemblyFrames;
 import cadkit.modeling.AssemblyState;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import machinekit.assembly.MachineAssemblyDescription.CylinderRecord;
+import machinekit.fluid.CylinderControlSpec;
+import machinekit.fluid.CylinderPhaseSpeeds;
+import machinekit.fluid.ValveControlSpec;
 import materia.assembly.AssemblyDefinition.AssemblyJointCoupling;
 import materia.assembly.AssemblyDefinition.KinematicJoint;
 import materia.assembly.AssemblyDefinition.QuantityAssumption;
@@ -487,8 +490,25 @@ class DriveSystem {
 
 	/** Check a cylinder binding: typed cylinder and valve parts on a prismatic tree joint with no other drive. */
 	public static function checkCylinder(flat:FlatAssembly, record:CylinderRecord):Void {
-		if (flat.member(record.cylinder).cylinderSpec() == null || flat.member(record.valve).valveSpec() == null)
+		var cylinder = flat.member(record.cylinder).cylinderSpec();
+		var valve = flat.member(record.valve).valveSpec();
+		if (cylinder == null || valve == null)
 			throw "Cylinder binding needs cylinder and valve parts";
+		switch cylinder.controlSpec() {
+			case CylinderControlSpec.PressureEffort(_):
+				if (record.phases != null) throw "Pneumatic binding does not accept hydraulic phase speeds";
+				switch valve.controlSpec() {
+					case ValveControlSpec.ClosedCentre: throw "Pneumatic cylinder needs a pneumatic directional valve";
+					case ValveControlSpec.PressureEffort(_, _):
+				}
+			case CylinderControlSpec.FlowLimited:
+				if (record.phases == null || cylinderPhases(record, cylinder.strokeMm()) == null)
+					throw "Hydraulic binding needs explicit phase speeds for its cylinder stroke";
+					switch valve.controlSpec() {
+					case ValveControlSpec.PressureEffort(_, _): throw "Hydraulic cylinder needs a closed-centre hydraulic valve";
+					case ValveControlSpec.ClosedCentre:
+				}
+		}
 		for (cylinder in flat.cylinders) if (cylinder.actuator == record.actuator || cylinder.joint == record.joint)
 			throw "Duplicate cylinder actuator or joint";
 		for (motor in flat.motors) if (motor.actuator == record.actuator || motor.joint == record.joint)
@@ -500,17 +520,22 @@ class DriveSystem {
 		if (!found) throw 'Cylinder "${record.actuator}" needs a prismatic tree joint';
 	}
 
-	/** A cylinder's actuator: force from the supply pressure, direction from its hoses and geometry. */
+	/** A fluid cylinder drive: pressure, direction and control law come from its installed parts. */
 	static function compileCylinder(flat:FlatAssembly, record:CylinderRecord):AssemblyActuator {
 		var cylinder = flat.member(record.cylinder).cylinderSpec();
 		var valve = flat.member(record.valve).valveSpec();
 		if (cylinder == null || valve == null) throw "Cylinder binding lost its typed cylinder or valve part";
-		var pressure = airPressure(flat, record.valve, "P");
+		var pressure = fluidPressure(flat, record.valve, "P");
 		var valvePart = flat.member(record.valve);
-		var a = ServiceNetwork.trace(flat, ServiceNetwork.portRef(record.cylinder, "A"),
-			(part, port) -> part == valvePart && (port.name == "A" || port.name == "B")).port;
-		var b = ServiceNetwork.trace(flat, ServiceNetwork.portRef(record.cylinder, "B"),
-			(part, port) -> part == valvePart && (port.name == "A" || port.name == "B")).port;
+		function toValvePort(portName:String):machinekit.assembly.MachineAssembly.PortRef {
+			var trace = ServiceNetwork.trace(flat, ServiceNetwork.portRef(record.cylinder, portName),
+				(component, port) -> component == valvePart && (port.name == "A" || port.name == "B"));
+			if (!trace.supplied || trace.external || trace.port.instanceId != record.valve ||
+				(trace.port.portName != "A" && trace.port.portName != "B"))
+				throw "Cylinder hoses must connect to the bound valve's A/B outlets";
+			return trace.port;
+		}
+		var a = toValvePort("A"), b = toValvePort("B");
 		if (a.instanceId != record.valve || b.instanceId != record.valve || a.portName == b.portName ||
 			(a.portName != "A" && a.portName != "B") || (b.portName != "A" && b.portName != "B"))
 			throw "Cylinder hoses must connect to the bound valve's A/B outlets";
@@ -532,35 +557,70 @@ class DriveSystem {
 		if (slider == null || Math.sqrt(Math.pow(extension.x - slider.x, 2) + Math.pow(extension.y - slider.y, 2) +
 			Math.pow(extension.z - slider.z, 2)) > 1e-5)
 			throw "Cylinder extension tip must meet the guided member at its default pose";
-		var hoseSign = a.portName == "A" ? 1.0 : -1.0;
-		var extendCoil = valve.isDoubleSolenoid() && hoseSign < 0 ? "coilB" : "coilA";
-		var retractCoil = valve.isDoubleSolenoid() && hoseSign < 0 ? "coilA" : "coilB";
-		return {id: record.actuator, joint: record.joint, maxEffort: cylinder.extendForce(pressure), maxRate: cylinder.ratedSpeedMmPerSecond(),
-			drive: "pneumatic", assumed: ["cylinder envelope", "flow-limited cylinder speed", "installed pneumatic fittings"],
-			pneumatic: {bore: cylinder.boreMm(), rod: cylinder.rodMm(), stroke: cylinder.strokeMm(), ratedSpeed: cylinder.ratedSpeedMmPerSecond(),
-				pressurePa: pressure, channelA: record.valve + "/" + extendCoil, channelB: valve.isDoubleSolenoid() ? record.valve + "/" + retractCoil : null,
-				normallyToA: hoseSign > 0 ? valve.defaultsToA() : !valve.defaultsToA(), extendSign: dot > 0 ? 1.0 : -1.0}};
+		var reversed = a.portName == "B";
+		var extendSign = dot > 0 ? 1.0 : -1.0;
+		return switch cylinder.controlSpec() {
+			case CylinderControlSpec.PressureEffort(speed):
+				switch valve.controlSpec() {
+					case ValveControlSpec.ClosedCentre: throw "Pneumatic cylinder needs a pneumatic directional valve";
+					case ValveControlSpec.PressureEffort(doubleSolenoid, normallyToA):
+						{id: record.actuator, joint: record.joint, maxEffort: cylinder.extendForce(pressure), maxRate: speed,
+							drive: "pneumatic", assumed: ["cylinder envelope", "flow-limited cylinder speed", "installed pneumatic fittings"],
+							pneumatic: {bore: cylinder.boreMm(), rod: cylinder.rodMm(), stroke: cylinder.strokeMm(), ratedSpeed: speed,
+								pressurePa: pressure, channelA: record.valve + (doubleSolenoid && reversed ? "/coilB" : "/coilA"),
+								channelB: doubleSolenoid ? record.valve + (reversed ? "/coilA" : "/coilB") : null,
+								normallyToA: reversed ? !normallyToA : normallyToA, extendSign: extendSign}};
+				}
+			case CylinderControlSpec.FlowLimited:
+				switch valve.controlSpec() {
+					case ValveControlSpec.PressureEffort(_, _): throw "Hydraulic cylinder needs a closed-centre hydraulic valve";
+					case ValveControlSpec.ClosedCentre:
+						for (joint in flat.definition.joints) if (joint.id == record.joint) {
+							var home = extendSign > 0 ? joint.limits.lower : joint.limits.upper;
+							if (home == null || Math.abs(joint.defaultValue - home) > 1e-6)
+								throw "Hydraulic cylinder tip must meet its guide at the retracted limit";
+						}
+						var phases = cylinderPhases(record, cylinder.strokeMm());
+						if (phases == null) throw "Hydraulic cylinder binding lost its explicit phase profile";
+						{id: record.actuator, joint: record.joint, maxEffort: cylinder.extendForce(pressure), maxRate: phases.maximumSpeed(),
+							drive: "hydraulic", assumed: ["cylinder envelope", "hydraulic phase speeds", "installed hydraulic fittings"],
+							hydraulic: {bore: cylinder.boreMm(), rod: cylinder.rodMm(), stroke: cylinder.strokeMm(), pressurePa: pressure,
+								approachSpeed: phases.approach, workingSpeed: phases.working, returnSpeed: phases.returning,
+								changePoint: phases.changePoint, channelA: record.valve + (reversed ? "/coilB" : "/coilA"),
+								channelB: record.valve + (reversed ? "/coilA" : "/coilB"), extendSign: extendSign}};
+				}
+		};
 	}
 
-	/** Gauge pressure at a pneumatic consumer, traced through its current air wiring to a modelled supply. */
-	public static function airPressure(flat:FlatAssembly, instanceId:String, portName:String):Float {
+	/** Gauge pressure at a pneumatic consumer. */
+	public static function airPressure(flat:FlatAssembly, instanceId:String, portName:String):Float
+		return fluidPressure(flat, instanceId, portName);
+
+	/** Gauge pressure at a fluid consumer, traced through its current service wiring to a modelled supply. */
+	public static function fluidPressure(flat:FlatAssembly, instanceId:String, portName:String):Float {
 		var consumer = ServiceNetwork.portRef(instanceId, portName);
 		var input = ServiceNetwork.requirePort(flat, consumer);
-		if (input.kind != Pneumatic || input.role != Consumer)
-			throw '"$instanceId/$portName" is not a pneumatic consumer';
+		if ((input.kind != Pneumatic && input.kind != Hydraulic) || input.role != Consumer)
+			throw '"$instanceId/$portName" is not a fluid consumer';
 		var checked = new Diagnostics();
 		ServiceNetwork.check(flat, checked, false);
 		checked.throwIfErrors();
 		var source = ServiceNetwork.trace(flat, consumer);
 		if (!source.supplied) throw ServiceNetwork.unsuppliedMessage(source.chain);
-		if (source.external) throw 'Air pressure at "$instanceId/$portName" needs a modelled supply';
+		if (source.external) throw 'Fluid pressure at "$instanceId/$portName" needs a modelled supply';
 		var part = flat.member(source.port.instanceId);
 		var supply = part.pressureSource();
 		if (supply == null)
-			throw 'Air source "${source.port.instanceId}/${source.port.portName}" does not state pressure';
+			throw 'Fluid source "${source.port.instanceId}/${source.port.portName}" does not state pressure';
 		var pressure = supply.outputPressure(source.port.portName);
-		if (!(pressure >= 0) || !Math.isFinite(pressure)) throw "Air pressure must be finite and nonnegative";
+		if (!(pressure >= 0) || !Math.isFinite(pressure)) throw "Fluid pressure must be finite and nonnegative";
 		return pressure;
+	}
+
+	static function cylinderPhases(record:CylinderRecord, stroke:Float):Null<CylinderPhaseSpeeds> {
+		var saved = record.phases;
+		return saved == null ? null : new CylinderPhaseSpeeds(stroke, saved.approach, saved.working,
+			saved.returning, saved.changePoint);
 	}
 
 	public static function checkSensor(flat:FlatAssembly, record:AssemblySensor):Void {
@@ -613,8 +673,13 @@ class DriveSystem {
 		return result;
 	}
 
-	public static function copyCylinder(record:CylinderRecord, map:String->String):CylinderRecord
-		return {actuator: map(record.actuator), joint: map(record.joint), cylinder: map(record.cylinder), valve: map(record.valve)};
+	public static function copyCylinder(record:CylinderRecord, map:String->String):CylinderRecord {
+		var copy:CylinderRecord = {actuator: map(record.actuator), joint: map(record.joint),
+			cylinder: map(record.cylinder), valve: map(record.valve)};
+		if (record.phases != null) copy.phases = {approach: record.phases.approach, working: record.phases.working,
+			returning: record.phases.returning, changePoint: record.phases.changePoint};
+		return copy;
+	}
 
 	public static function copySensor(sensor:AssemblySensor, map:String->String):AssemblySensor {
 		var copy:AssemblySensor = {id: map(sensor.id), kind: sensor.kind};

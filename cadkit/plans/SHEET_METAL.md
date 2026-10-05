@@ -942,7 +942,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM6 | done: SM6a typed air-bending predictions, physical springback inversion and exact contact depth; focused process smoke passes 1235 assertions; quick gate `sm6a-air-bending` passes (7209 sheet assertions); SM6b explicit lot/tool/angle-band calibration with measured radius and additive depth correction, focused smoke passes 1257 assertions, quick gate `sm6b-calibration` passes (7231 sheet assertions); SM6 complete: typed grade defaults, editor selection, Process-rule persistence and tooling minimums; full gate `sm6-process-material-full` passes all stages (7248 sheet assertions, ProjectKit 155); final material integration and CAD workflow checks pass | 7148a8bb8; 6458df23b; d664caa22 |
 | SM7 | done: typed exact punch and single-/four-V die catalogue; standard segments and physical horns; independently segmented paired rows and validated bed layouts; derived process contact data; registered segment/clamp recipes and manual/powered clamp capabilities; strong unique tooling face names. Quick gates `sm7a-profile-foundation`, `sm7b-punch-profiles`, `sm7c-die-profiles` and full gate `sm7-tooling-verified-full` pass; original MachineKit and router engineering summaries unchanged | c4e418ba5; 310a41894; 67da9cae8; final tooling integration |
 | SM8a | done: cylinder parts and coupled mechanical assembly; typed planning geometry derived from physical datums, independent reference comparisons, full-bed force/depth and conservative demo/frame checks; Start-page project with editable ram, X/R and depth-stop axes. Quick gates `sm8a-cylinder-parts`, `sm8a-mechanical-assembly` and full gate `sm8a-press-assembly-full` pass every stage; original MachineKit and router engineering summaries unchanged | c4517c795; ed8faa29b; final assembly integration |
-| SM8b | in progress: MT5 is on local main 1484b924d and merged; shared typed fluid cylinder/valve/pressure-source interfaces replace pneumatic-only interfaces, and pressure resolution no longer casts components; explicit immutable phase-speed model added, its quick gate `sm8b-phase-speeds` passes all five suites; assembly format 7 hydraulic data passes focused tests (187 ProjectKit assertions), full gate `sm8b-hydraulic-format-full` passes every stage; quick gate `sm8b-fluid-interfaces` passes all five suites with unchanged original MachineKit summaries; typed shared cylinder runtime and current RobotModel 12 fixtures pass focused model (30), both-backend hydraulic (14), world (5004), maintained MuJoCo and four-platform ABI checks; full gate `sm8b-cylinder-runtime-verified-full` passes every stage including project-source runtime; actual press service wiring and switches remain | edf913c0f; 68768fcae; 22ce57f1c; runtime checkpoint |
+| SM8b | in progress: MT5 is on local main 1484b924d and merged; shared typed fluid cylinder/valve/pressure-source interfaces replace pneumatic-only interfaces, and pressure resolution no longer casts components; explicit immutable phase-speed model added, its quick gate `sm8b-phase-speeds` passes all five suites; assembly format 7 hydraulic data passes focused tests (187 ProjectKit assertions), full gate `sm8b-hydraulic-format-full` passes every stage; quick gate `sm8b-fluid-interfaces` passes all five suites with unchanged original MachineKit summaries; typed shared cylinder runtime and current RobotModel 12 fixtures pass focused model (30), both-backend hydraulic (14), world (5004), maintained MuJoCo and four-platform ABI checks; full gate `sm8b-cylinder-runtime-verified-full` passes every stage including project-source runtime; actual press hydraulic service, distribution blocks, bore-area frame-pressure limit and both guide bindings pass quick gate `sm8b-fluid-bindings-verified`; physical switches and scripted stroke remain | edf913c0f; 68768fcae; 22ce57f1c; 439ca8690; fluid assembly checkpoint |
 | SM9 | planned | |
 | SM10 | planned | |
 | SM11 | planned | |
@@ -1508,3 +1508,38 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
   engineering summaries are unchanged; model artifacts now carry the single current version 12.
   The shared bridge's edited-placement hydraulic home is derived from the signed nominal limit.
   The actual press cylinder/valve service bindings, physical switches and scripted stroke remain SM8b.
+
+- SM8b fluid assembly checkpoint in progress: cylinder and valve capabilities now expose
+  typed pressure-effort versus flow-limited/closed-centre variants. Hydraulic phase records
+  save only authored speeds and change travel; cylinder geometry owns stroke. Every rebuild
+  resolves pressure, forces, valve channels and guide sign from installed parts and hoses.
+  Normal and reversed A/B hoses, current-codec rebuilding, authored phase edits/copy isolation,
+  nested channel scoping and invalid pressure/phase/valve inputs pass the focused hydraulic
+  tests (`sm8b-hydraulic-fluid-focus.log`). No cast or new compiler workaround is introduced.
+  MachineAssembly has one current schema 14, removing the feature-dependent 9–12 readers.
+  Version 13 is already a distinct hierarchical format on local main; 14 avoids reusing it.
+  Hydraulic port id 7, cylinder/rod/source/closed-centre-valve recipes and modeled tank return
+  are registered. The reference press wires both cylinders through one valve, two physical distribution blocks and eight hose
+  assemblies, and derives regulated pressure as frame capacity divided by both bore areas.
+  Joint connector datums move to the actual rod tips while guide placement and axis stay unchanged.
+  Quick gate `sm8b-fluid-bindings-verified` passes all five suites; the physical contact switches and scripted stroke
+  remain outstanding. Reference phase setup explicitly assumes 80 mm gap, 1.5 mm stock and
+  10 mm clearance; other setups supply their profile rather than inferring stock thickness.
+
+- The first fluid-binding quick gate exposed reused valve A/B outlets when wiring both cylinders.
+  The service graph correctly requires a physical distribution fitting. Two hydraulic manifold
+  parts now own distinct work outlets; the shared upstream tracer can stop at the bound valve,
+  so cylinder compilation follows actual fittings before mapping A/B coil direction. Direct and
+  distributed, normal and reversed work lines are covered by the focused hydraulic tests.
+  `sm8b-fluid-bindings` is retained as the failed attempt; a fresh complete quick gate follows the fix.
+
+- SM8b fluid assembly checkpoint passes `sm8b-fluid-bindings-verified`: CadKit,
+  SheetMetalSmoke (7504), ProjectKit (187), ManufacturingKit (54) and MachineKit all return zero.
+  Original five MachineKit engineering summaries match baseline exactly. Press checks cover both
+  ram bindings, shared valve channels, geometry-preserving rod-tip joint datums and installed force
+  equal to the assumed 392266 N frame capacity. Regulated pressure is approximately 9.75485 MPa;
+  the independent 10 MPa cylinder area fixtures remain unchanged. The service includes a feed,
+  tank return, A/B distribution blocks and eight explicitly assumed hose assemblies. Every saved
+  MachineAssembly uses schema 14 and all tested recipe fixtures are reconstructed by current code;
+  old feature-dependent format paths and pneumatic-only capability forwarding methods are deleted.
+  The real finger contact mechanism and scripted empty-machine stroke remain the next checkpoints.

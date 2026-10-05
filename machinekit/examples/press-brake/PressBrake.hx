@@ -16,6 +16,10 @@ import machinekit.motion.PowerSupply;
 import machinekit.motion.ServoMotor;
 import machinekit.motion.ScrewSupportUnit;
 import machinekit.pressbrake.HydraulicCylinder;
+import machinekit.pressbrake.HydraulicSupply;
+import machinekit.pressbrake.HydraulicValve;
+import machinekit.pressbrake.HydraulicManifold;
+import machinekit.fluid.CylinderPhaseSpeeds;
 import machinekit.pressbrake.PressBrakeProfile;
 import machinekit.pressbrake.ToolClamp;
 import machinekit.pressbrake.ToolLayout;
@@ -110,6 +114,8 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
 	public final gaugeRTravel:Float = 120;
 	public final toolLayout:ToolLayout;
 	public final cylinder:HydraulicCylinder;
+	public final phaseSpeeds:CylinderPhaseSpeeds;
+	public final supplyPressurePa:Float;
 	public final withR:Bool;
 	public final gaugeBaseHeight:Float;
 	final poses:Map<String, AssemblyFrame> = [];
@@ -123,10 +129,15 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
 		ramJoint: "Y1", gaugeXJoint: "X", gaugeRJoint: withR ? "R" : null, tools: toolDatums.copy()
 	};
 
-	public function new(withR:Bool = true, ?layout:ToolLayout) {
+	public function new(withR:Bool = true, ?layout:ToolLayout, ?phases:CylinderPhaseSpeeds) {
 		super();
 		this.withR = withR;
 		cylinder = new HydraulicCylinder(160, 100, stroke);
+		// Reference setup: 80 mm open tool gap, 1.5 mm blank and 10 mm approach clearance.
+		// Other setups supply their own explicit change travel; thickness is never inferred.
+		phaseSpeeds = phases == null ? new CylinderPhaseSpeeds(stroke, 80, 8, 70, 68.5) : phases;
+		if (Math.abs(phaseSpeeds.stroke - stroke) > 1e-6) throw "Press flow setup must match the ram stroke";
+		supplyPressurePa = capacityN / (2 * cylinder.pistonArea());
 		var punch = ToolingCatalogue.straight(), die = ToolingCatalogue.dies()[1];
 		var punchRow = new ToolRow([new ToolSegment(Punch(punch), 100), new ToolSegment(Punch(punch), 50)], [0]);
 		var dieRow = new ToolRow([new ToolSegment(SingleV(die), 200)], []);
@@ -143,7 +154,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
 			var x = side * (bedLength / 2 + 25);
 			fixed('frame$name', new PressSideFrame(50, throat, bedHeight, openHeight), at(x, 0, 0), "bed");
 			slide(side < 0 ? "Y1" : "Y2", guide, new PressBlock("Ram guide", 40, 100, 160),
-				at(x, -160, bedHeight + openHeight), 'frame$name', {x: 0, y: 0, z: -1}, stroke);
+				at(x, -160, bedHeight + openHeight), 'frame$name', {x: 0, y: 0, z: -1}, stroke, at(side * 650, 0, bedHeight + openHeight + 220));
 			fixed('scale$name', new LinearScale(stroke + 40, 1000),
 				at(x, 180, bedHeight + openHeight - stroke), 'frame$name');
 			addEncoder('ram$name', side < 0 ? "Y1" : "Y2", 'scale$name');
@@ -154,6 +165,23 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
 			fixed('rod$name', cylinder.movingRod(), {x: side * 650, y: 0, z: tip, qx: 1, qy: 0, qz: 0, qw: 0}, guide);
 		}
 		addCoupling("torsion-bar", "Y1", "Y2", 1);
+		fixed("hydraulicSupply", new HydraulicSupply(supplyPressurePa), at(500, 350, 500), "bed");
+		fixed("ramValve", new HydraulicValve(), at(500, 350, 740), "bed");
+		var hose:machinekit.component.BomItem = {partNumber: "ASSUMED-HYDRAULIC-G1/2-HOSE",
+			description: "Assumed G1/2 hydraulic hose assembly", quantity: 1, material: null};
+		connectPorts("hydraulic-feed", "hydraulicSupply", "P", "ramValve", "P", hose);
+		connectPorts("hydraulic-return", "ramValve", "T", "hydraulicSupply", "T", hose);
+		for (chamber in ["A", "B"]) {
+			fixed('ramDistribution$chamber', new HydraulicManifold(2), at(chamber == "A" ? 400 : 650, 350, 740), "bed");
+			connectPorts('ramDistribution$chamber-feed', "ramValve", chamber, 'ramDistribution$chamber', "input", hose);
+		}
+		for (side in [-1, 1]) {
+			var name = side < 0 ? "Left" : "Right";
+			var outlet = side < 0 ? "out1" : "out2";
+			connectPorts('ram$name-A', "ramDistributionA", outlet, 'cylinder$name', "A", hose);
+			connectPorts('ram$name-B', "ramDistributionB", outlet, 'cylinder$name', "B", hose);
+			addCylinder('hydraulic$name', side < 0 ? "Y1" : "Y2", 'cylinder$name', "ramValve", phaseSpeeds);
+		}
 		fixed("ram", new PressBlock("Ram beam", bedLength, 100, 220), at(0, 0, bedHeight + openHeight), "guideLeft");
 		for (side in [-1, 1]) fixed(side < 0 ? "ramBracketLeft" : "ramBracketRight",
 			new PressBlock("Ram guide bracket", 160, 180, 80), at(side * 750, -80, bedHeight + openHeight + 80), "ram");
@@ -260,8 +288,9 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
 		place(id, part, pose); meeting(parent, id);
 		addMate('$id-fixed', "fixed", parent, 'to-$id', id, 'attach-$id');
 	}
-	function slide(joint:String, id:String, part:MachineComponent, pose:AssemblyFrame, parent:String, axis:AssemblyVector, travel:Float):Void {
-		place(id, part, pose); meeting(parent, id);
+	function slide(joint:String, id:String, part:MachineComponent, pose:AssemblyFrame, parent:String, axis:AssemblyVector, travel:Float,
+			?datum:AssemblyFrame):Void {
+		place(id, part, pose); meeting(parent, id, datum);
 		addMateOnAxis(joint, "prismatic", parent, 'to-$id', id, 'attach-$id', axis, 0,
 			{lower: 0, upper: travel, velocity: null, effort: null, overtravel: 0});
 	}
@@ -270,8 +299,8 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
 		if (result == null) throw 'Press has no member "$id"';
 		return result;
 	}
-	function meeting(parent:String, child:String):Void {
-		var p = pose(child), meeting = at(p.x, p.y, p.z);
+	function meeting(parent:String, child:String, ?datum:AssemblyFrame):Void {
+		var p = pose(child), meeting = datum == null ? at(p.x, p.y, p.z) : datum;
 		addMemberConnector(parent, 'to-$child', AssemblyFrames.compose(AssemblyFrames.inverse(pose(parent)), meeting));
 		addMemberConnector(child, 'attach-$child', AssemblyFrames.compose(AssemblyFrames.inverse(p), meeting));
 	}

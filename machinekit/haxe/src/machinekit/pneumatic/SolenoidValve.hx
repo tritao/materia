@@ -41,8 +41,7 @@ class SolenoidValve extends MachineComponent implements ValveSpec {
 	/** Pure spool transition. Retain the previous state when double coils agree. */
 	public function routesToA(coilA:Bool, coilB:Bool, previousToA:Bool):Bool
 		return doubleSolenoid ? (coilA == coilB ? previousToA : coilA) : (coilA ? !normallyToA : normallyToA);
-	public function isDoubleSolenoid():Bool return doubleSolenoid;
-	public function defaultsToA():Bool return normallyToA;
+	public function controlSpec():machinekit.fluid.ValveControlSpec return PressureEffort(doubleSolenoid, normallyToA);
 	override public function valveSpec():Null<ValveSpec> return this;
 	override public function hasGeometry():Bool return true;
 	override public function geometry(detail:ComponentDetail = Preview):Part

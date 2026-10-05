@@ -5,7 +5,7 @@ interface CylinderSpec {
 	function boreMm():Float;
 	function rodMm():Float;
 	function strokeMm():Float;
-	function ratedSpeedMmPerSecond():Float;
+	function controlSpec():CylinderControlSpec;
 	function extendForce(pressurePa:Float):Float;
 	function retractForce(pressurePa:Float):Float;
 }

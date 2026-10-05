@@ -415,7 +415,7 @@ class MachineAssemblyCodec {
 		for (entry in machine.portExposures) target.exposePort(entry.name, entry.instanceId, entry.portName);
 		// Motors too: their actuators follow the motor parts as they are now.
 		for (motor in machine.motors) target.addMotorRecord(motor);
-		for (cylinder in machine.cylinders) target.addCylinder(cylinder.actuator, cylinder.joint, cylinder.cylinder, cylinder.valve);
+		for (cylinder in machine.cylinders) target.addCylinderRecord(cylinder);
 		for (sensor in machine.sensors) target.addSensorRecord(sensor);
 		for (contact in machine.switches) target.addTripSwitch(contact.id, contact.joint, contact.part,
 			{instanceId: contact.trigger, connectorName: contact.triggerConnector}, contact.side, contact.role, contact.seed, contact.driveJoint);

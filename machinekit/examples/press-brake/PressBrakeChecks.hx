@@ -52,7 +52,21 @@ class PressBrakeChecks {
 			if (bomQuantity < press.components().length) throw "Press BOM loses components";
 			var model = new AssemblyModel("mm");
 			press.addTo(model, "");
-			var state = new AssemblyState(model.definition("press-brake"));
+			var definition = model.definition("press-brake");
+			var hydraulicCount = 0, installedForce = 0.0;
+			if (definition.actuators != null) for (actuator in definition.actuators) {
+				var drive = actuator.hydraulic;
+				if (drive != null) {
+					hydraulicCount++; installedForce += actuator.maxEffort;
+					near(drive.pressurePa, press.supplyPressurePa, "Installed hydraulic pressure");
+					near(drive.changePoint, press.phaseSpeeds.changePoint, "Installed change travel");
+					if (drive.channelA != "ramValve/coilA" || drive.channelB != "ramValve/coilB" || drive.extendSign != 1)
+						throw "Press cylinder lost its common directional valve or downward guide alignment";
+				}
+			}
+			if (hydraulicCount != 2) throw "Press needs both installed hydraulic cylinder drives";
+			near(installedForce, press.capacityN, "Regulated force respects the assumed frame capacity");
+			var state = new AssemblyState(definition);
 			for (travel in [0.0, 37, 100]) {
 				state.setJoint("Y1", travel);
 				state.setJoint("X", travel * 5);

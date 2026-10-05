@@ -2577,6 +2577,7 @@ class MachineKitSmoke {
 			{name: "MobileWelderChecks.run", run: () -> MobileWelderChecks.run(false), weight: 1.0},
 			{name: "MillPartTests.run", run: () -> MillPartTests.run(), weight: 1.0},
 			{name: "PneumaticPartTests.run", run: () -> PneumaticPartTests.run(), weight: 1.0},
+			{name: "HydraulicPartTests.run", run: () -> HydraulicPartTests.run(), weight: 0.5},
 			{name: "ToolProfileTests.run", run: () -> ToolProfileTests.run(), weight: 0.1},
 			{name: "ToolLayoutTests.run", run: () -> ToolLayoutTests.run(), weight: 0.1},
 			{name: "PressBrakePartTests.run", run: () -> PressBrakePartTests.run(), weight: 0.1},

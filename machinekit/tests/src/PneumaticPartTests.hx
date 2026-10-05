@@ -64,8 +64,8 @@ class PneumaticPartTests {
 		assembly.connectPorts("retractHose", "valve", "B", "cylinder", "B", hose);
 		var upstream = assembly.upstream("cylinder", "A");
 		if (upstream.port.instanceId != "supply" || upstream.port.portName != "air") throw "Cylinder pressure does not trace to supply";
-		close(assembly.airPressure("cylinder", "A"), 600000, "pressure traced through valve");
-		close(assembly.airPressure("cylinder", "B"), 600000, "pressure traced through second hose");
+		close(assembly.fluidPressure("cylinder", "A"), 600000, "pressure traced through valve");
+		close(assembly.fluidPressure("cylinder", "B"), 600000, "pressure traced through second hose");
 		var lines = assembly.billOfMaterials().lines();
 		var quantity = 0.0;
 		for (line in lines) if (line.partNumber == hose.partNumber) quantity += line.quantity;

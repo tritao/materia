@@ -11,6 +11,8 @@ import machinekit.component.MachineComponent;
 import machinekit.component.MassProperties;
 import machinekit.assembly.MachineAssemblyDescription;
 import machinekit.assembly.MachineAssemblyDescription.TransmissionRecord;
+import machinekit.assembly.MachineAssemblyDescription.CylinderRecord;
+import machinekit.fluid.CylinderPhaseSpeeds;
 import materia.assembly.AssemblyDefinitionCodec;
 import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyFrames;
@@ -511,17 +513,33 @@ class MachineAssembly {
 
 
 	/** Bind a cylinder to an existing prismatic guide joint; pressure and direction are rebuilt from parts. */
-	public function addCylinder(id:String, joint:String, cylinderMember:String, valveMember:String):Void {
+	public function addCylinder(id:String, joint:String, cylinderMember:String, valveMember:String,
+			?phases:CylinderPhaseSpeeds):Void {
 		requireOperationId(id);
-		var record = {actuator: id, joint: joint, cylinder: cylinderMember, valve: valveMember};
+		var record:CylinderRecord = {actuator: id, joint: joint, cylinder: cylinderMember, valve: valveMember};
+		if (phases != null) record.phases = {approach: phases.approach, working: phases.working,
+			returning: phases.returning, changePoint: phases.changePoint};
 		DriveSystem.checkCylinder(flat(), record);
-		drives.cylinders.push(record);
+		drives.cylinders.push(DriveSystem.copyCylinder(record, same));
 		changed();
+	}
+
+	function addCylinderRecord(record:CylinderRecord):Void {
+		var cylinder = requireMember(record.cylinder).cylinderSpec();
+		if (cylinder == null) throw "Cylinder binding lost its typed cylinder part";
+		var saved = record.phases;
+		var phases = saved == null ? null : new CylinderPhaseSpeeds(cylinder.strokeMm(), saved.approach,
+			saved.working, saved.returning, saved.changePoint);
+		addCylinder(record.actuator, record.joint, record.cylinder, record.valve, phases);
 	}
 
 	/** Gauge pressure at a pneumatic consumer, resolved from its current service wiring. */
 	public function airPressure(instanceId:String, portName:String):Float
 		return DriveSystem.airPressure(flat(), instanceId, portName);
+
+	/** Gauge pressure at a fluid consumer, resolved from its current service wiring. */
+	public function fluidPressure(instanceId:String, portName:String):Float
+		return DriveSystem.fluidPressure(flat(), instanceId, portName);
 
 	/** A physical switch whose trip travel follows its fixed housing and moving trigger. */
 	public function addTripSwitch(id:String, joint:String, part:String,

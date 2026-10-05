@@ -58,7 +58,7 @@ class PneumaticCylinder extends MachineComponent implements CylinderSpec {
 	public function boreMm():Float return bore;
 	public function rodMm():Float return rod;
 	public function strokeMm():Float return stroke;
-	public function ratedSpeedMmPerSecond():Float return ratedSpeed;
+	public function controlSpec():machinekit.fluid.CylinderControlSpec return PressureEffort(ratedSpeed);
 	override public function cylinderSpec():Null<CylinderSpec> return this;
 	static function checkedPressure(value:Float):Float {
 		if (!(value >= 0) || !Math.isFinite(value)) throw "Cylinder pressure must be finite and nonnegative";

@@ -21,6 +21,17 @@ drawings. Frame and demo envelope checks do not rate the tools or certify a
 bend sequence. Tool contact and bend-order collisions are checked by the later
 single-bend and sequence-planning steps.
 
-Hydraulic actuation and stroke interlocks are the next plan step, SM8b. The
-editor currently exposes mechanical travel, including positions beyond a safe
+Both ram cylinders are bound to their existing guide joints through a shared
+closed-centre valve block. Its pressure feed and tank return, and each cylinder's
+A/B hoses through two distribution blocks, are assembly service connections included in the BOM. Regulated
+pressure is derived from the two 160 mm bore areas to limit their combined
+extension force to the assumed 40 t frame capacity.
+
+The reference flow setup is 80/8/70 mm/s approach/working/return, changing at
+68.5 mm extension: an explicitly assumed 80 mm gap, 1.5 mm blank and 10 mm
+clearance. `PressBrake` accepts a `CylinderPhaseSpeeds` for other setups; it
+never infers thickness. Agreeing valve coils close the centre.
+
+Physical switches and the scripted demonstration stroke remain in SM8b. The
+editor exposes nominal mechanical travel, including positions beyond a safe
 installed-tool stroke; it does not execute a bending cycle.

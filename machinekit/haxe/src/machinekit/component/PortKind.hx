@@ -9,4 +9,6 @@ package machinekit.component;
 	@:id(5) Gas;
 	/** Consumable welding wire, fed from a spool through a liner. */
 	@:id(6) Wire;
+	/** Hydraulic oil service, distinct from compressed air. */
+	@:id(7) Hydraulic;
 }
