@@ -54,6 +54,11 @@ if(NK_BUILD_TESTS)
 endif()
 
 if(NK_BUILD_TESTS)
+    add_executable(nativekit_sim_brake_state_tests tests/brake_state.cpp)
+    target_compile_features(nativekit_sim_brake_state_tests PRIVATE cxx_std_20)
+    add_test(NAME sim_brake_state COMMAND nativekit_sim_brake_state_tests)
+    set_tests_properties(sim_brake_state PROPERTIES LABELS "sim;brake" TIMEOUT 30)
+
     add_executable(nativekit_sim_core_tests tests/sim_core.cpp)
     target_compile_features(nativekit_sim_core_tests PRIVATE cxx_std_20)
     target_link_libraries(nativekit_sim_core_tests PRIVATE NativeKit::sim_core)
