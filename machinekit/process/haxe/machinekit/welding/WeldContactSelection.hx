@@ -15,6 +15,7 @@ import processkit.perception.ContactRegistrationSequence;
 import processkit.perception.ContactRegistrationSequence.ContactRegistrationStage;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
+import haxe.io.BytesOutput;
 
 /** Bridge saved nominal CAD patches to measured registration and checked arm probe preparation. */
 class WeldContactSelection {
@@ -47,16 +48,25 @@ class WeldContactSelection {
 
   function select(count:Int, normals:Array<Vec3>, envelope:ContactPoseEnvelope):ContactRegistrationStage {
     var estimate = envelope.estimate();
+    // The envelope cannot change during this synchronous selection. Reuse exact
+    // face/point bounds across ranking, reach screens and lattice refinement.
+    var regions = new Map<String, WeldProbeRegionBounds>();
     var provider = new WeldProbeObservedBounds((face, point) -> {
+      var key = pointKey(geometry.faces.indexOf(face), point);
+      var cached = regions.get(key);
+      if (cached != null) return cached;
       var bounds = envelope.region(metres(point), direction(face.normal), direction(face.u), direction(face.v), estimate);
-      return new WeldProbeRegionBounds(bounds.halfU * 1000, bounds.halfV * 1000,
+      var result = new WeldProbeRegionBounds(bounds.halfU * 1000, bounds.halfV * 1000,
         bounds.normalTravel * 1000, bounds.tiltU, bounds.tiltV);
+      regions.set(key, result);
+      return result;
     });
     var start = positions();
     var reasons:Array<String> = [];
-    // Refine observed branches without global discovery; then retain every global fallback.
+    // At each resolution, try observed continuation before global discovery.
+    // A coarse alternate branch precedes exhaustive refinement of a blocked one.
     // Full preparation still proves every trajectory and sensing corridor.
-    for (discover in [false, true]) for (divisions in [9, 17, 33]) {
+    for (divisions in [9, 17, 33]) for (discover in [false, true]) {
       var previous = [for (normal in normals) new Vector(normal.x, normal.y, normal.z)];
       var geometric = WeldProbePatterns.stages(geometry, count, previous, provider, 3, divisions);
       // Rank by geometric observability, then prove one face at a time. Unused faces need no IK solves.
@@ -86,5 +96,16 @@ class WeldContactSelection {
     }
     throw reasons.length == 0 ? 'No CAD patch contains the measured uncertainty with reachable clear configurations for $count contact probes'
       : 'No checked reachable $count-contact CAD stage: ${reasons.join("; ")}';
+  }
+
+  static function pointKey(face:Int, point:Vector):String {
+    var output = new BytesOutput();
+    output.writeDouble(point.x);
+    output.writeDouble(point.y);
+    output.writeDouble(point.z);
+    var bytes = output.getBytes();
+    var result = face + ":";
+    for (i in 0...24) result += bytes.get(i) + ":";
+    return result;
   }
 }

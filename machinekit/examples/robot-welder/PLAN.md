@@ -2464,3 +2464,24 @@ unsupported-chain cases). Native contact motion passes 98 assertions. The app
 compiles with the change. These are unit/integration results, not a complete
 P3 mission pass; the full mission and final milestone gates remain pending.
 Logs: ignored app/build/p3-reach-*.log.
+
+
+Main advanced to 3bc5f73aa2b3f6185416ef4a8e25fdbefea72295 during these checks;
+merge 28ec1d1f4645c77a9939278c6c1a7f3251d7e710 brings it into this worktree.
+Clay was checked out at main's recorded revision, without authoring a pin change.
+The app's native build passes (four incremental UIKit steps), with prebuilt OCCT.
+
+The same completed mission profile justifies caching uncertainty regions within
+one synchronous CAD selection call. Keys include canonical face identity and
+all 24 IEEE coordinate bytes, so close points cannot share a rounded bound.
+The local cache is discarded before the next observation; no stale envelope is
+reused. Bounds are immutable and all geometry/clearance checks still execute.
+
+Coarse-to-fine selection now tries observed then global branches at each of the
+original 9/17/33 resolutions. The earlier local-all-resolutions priority assumed
+cheap observed screening; the 30-minute final-face trial and its local-IK profile
+contradict that assumption. Trying a coarse alternate branch before fine local
+refinement retains the complete search and can resolve a blocked observed branch
+sooner. Both changes are confined to the optional CAD/process bridge, so they do
+not invalidate the already running CAD producer. The app compiles 1,937 sources;
+full mission validation remains pending (app/build/p3-region-cache-app-build.log).
