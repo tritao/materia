@@ -2,7 +2,7 @@
 	"version": 1,
 	"package": { "name": "machinekit-tests" },
 	"entry": "MachineKitSmoke",
-	"sourceRoots": ["src", "../examples", "../examples/robot-arm", "../examples/cnc-router", "../examples/mobile-base", "../examples/robot-welder", "../examples/corexy", "../examples/bench-mill", "../examples/cobot-arm", "../examples/machine-tending"],
+	"sourceRoots": ["src", "../examples", "../examples/robot-arm", "../examples/cnc-router", "../examples/mobile-base", "../examples/robot-welder", "../examples/corexy", "../examples/bench-mill", "../examples/cobot-arm", "../examples/machine-tending", "mobile-welder/src"],
 	"dependencies": {
 		"projectkit": { "path": "../../projectkit" },
 		"manufacturingkit": { "path": "../../manufacturingkit" },

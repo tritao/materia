@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-mobile-welder-tests"
+  },
+  "entry": "MobileWelderChecks",
+  "sourceRoots": [
+    "src",
+    "../../examples/mobile-base",
+    "../../examples/robot-welder",
+    "../../examples/robot-arm"
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": "../.."
+    },
+    "machinekit-robot": {
+      "path": "../../robot"
+    },
+    "cadbridge": {
+      "path": "../../../robotkit/cadbridge"
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
+}

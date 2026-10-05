@@ -2560,6 +2560,7 @@ class MachineKitSmoke {
 		CobotArmPreview.CobotArmChecks.run();
 		FoldedZRouterCheck.main();
 		MobileBaseChecks.run();
+		MobileWelderChecks.run(false);
 		RobotWelderChecks.run();
 		CoreXyPlotterChecks.run();
 		CoreXyDriveTests.run();
