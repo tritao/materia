@@ -1606,3 +1606,18 @@ P2 commit ledger before this final record:
 - `574d49ba97fa49250c1650de4a806dec13b0e14c` App: reacquire live arm starts between mission motion owners
 - `0e20c96730971d68e02d969280381216ac447a65` App: verify complete mobile welding missions on both backends
 - `619f2cf2734a048e37823d030fda4a197b6ed873` ProcessKit: record the observed-frame design for mobile weld registration
+
+### P3 rigid contact fit implementation (2026-10-05)
+
+`processkit.perception.ContactRegistration` fits nominal CAD planes to measured observer-frame
+contact points. The scaled six-dimensional normal system uses a symmetric pseudoinverse so
+partial fits update only observable directions. One face gives rank three, two faces rank five;
+only a converged rank-six fit inside residual, translation and rotation bounds authorizes welding.
+Partial estimates remain available to guide subsequent probes. No live work-body pose is an input.
+
+The focused contact-registration suite passes 109 assertions: full rigid-frame recovery,
+chassis-origin parking extremes (20 mm per axis and 2 degrees yaw), observer-frame equivariance,
+scaled plane equations, deficient/duplicate contacts, inconsistent observations, exceeded limits,
+iteration exhaustion and invalid inputs. This is numerical solver evidence only. Executed contact
+searches, CAD probe-region selection, saved mission integration and displaced-parking weld checks
+remain open; P3 has not passed its milestone gate. P4 and P5 remain required and open.
