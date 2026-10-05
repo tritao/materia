@@ -1469,3 +1469,13 @@ joint configuration, including the compiled trajectory endpoint, so ordered runs
 from the actual branch instead of resetting their proof to a home seed. The focused planning
 suite passes 44 existing planning assertions and 19 pass-path assertions, plus a complete compiled
 factory check and a retreat-endpoint check within 0.5 mm. No native build needed.
+
+P2 stow validation exposed a real nozzle/upright collision on the direct retreat-to-ready joint
+move. `robotkit.manipulation.JointRoute` supplies a generic bounded bidirectional joint-space
+search with deterministic low-discrepancy sampling, finite joint bounds and caller-owned directed
+edge checks. It keeps exact endpoints and shortcuts only checked edges. Search exhaustion is
+reported as a budget failure, not proof of geometric impossibility. The focused suite passes
+21 assertions for detours, exact endpoints, deterministic output, blocked endpoints, bounded
+failure and direction-sensitive checks. The mobile integration checks each proposed air edge
+against both the joint-space sweep and the actual compiled exact-stop trajectory; the CAD
+station integration result remains pending.

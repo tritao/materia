@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "robotkit-joint-route-tests"},
+  "entry": "JointRouteTests",
+  "sourceRoots": ["."],
+  "dependencies": {"robotkit": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "build"
+}
