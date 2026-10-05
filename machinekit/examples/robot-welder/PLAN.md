@@ -2512,3 +2512,37 @@ a forced independent spin on that fixture is explicitly unreachable. The app
 compiles 1,937 sources (32.9 s). Full mission and final P3 gates remain pending;
 this ProcessKit change legitimately invalidates the CAD producer fingerprint.
 Logs: ignored app/build/p3-axis-*.log.
+
+
+The axis-first full trial completed five probe pairs at station one (203.35
+simulated seconds), but final-face selection continued. A 1,502-sample profile
+with no unresolved frames/dropped records attributed 17.18% to axis discovery
+and 81.56% to the retained full-pose DLS fallback. The trial was stopped for
+another geometric reach repair; it is not a mission pass.
+
+The original triangle-only pivot sphere loses cancellation of axial offsets.
+MotionKit now derives a tighter sphere from projected pivot-chain prefixes.
+The first pivot span's component along the first axis is a fixed centre shift.
+For each following prefix, components parallel to the second axis add signed,
+while perpendicular lengths bound their rotating sum. Every arbitrary carrier
+axis is covered by a rotation error allowance: Rodrigues' formula gives
+||R(u,t)-R(+/-b,t)|| <= 5 min(||u-b||,||u+b||) for unit axes at every angle;
+telescoping these errors over each span bounds the position deviation. Taking
+the smallest conservative prefix sphere preserves all configurations without
+requiring a parallel-axis pattern threshold or joint-limit approximation.
+Remaining spans, TCP offsets and task tolerances retain their existing bounds.
+
+Focused reach checks pass 17,059 assertions, including 6,000 six-axis FK samples
+with parallel/nonparallel axes and rotated child frames, and rejection of an
+impossible pose inside the former triangle-only sphere. Native probe motion
+passes 104 assertions; weld planning passes 54. The app compiles 1,937 sources
+(34.5 s). Complete mission validation remains pending; logs are ignored
+app/build/p3-projected-*.log.
+
+Operational recovery: removal of the mobile-base worktree invalidated borrowed
+Git object paths in this worktree's libwebsockets and sokol clones. They were
+repacked into their own object stores using read-only shared objects, and the
+alternates removed. Recorded pins remain 2491a1b101283cf7886d05033345b7e821825319
+and ab128b97b27d33b8cc7e19e0c98f850e08315569. Git status works again.
+Obsolete owned native-test build caches/intermediates were also removed as disk
+space fell; current app/integration libraries and verification reports are kept.

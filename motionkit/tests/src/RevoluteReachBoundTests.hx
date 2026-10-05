@@ -91,6 +91,40 @@ class RevoluteReachBoundTests {
       "prismatic chain keeps unrestricted solver behavior");
     check(RevoluteReachBound.of(new KinematicGroup(simple, base.id, tool.id, tool.id)) == null,
       "moving work frame keeps unrestricted solver behavior");
+    projectedPrefixes();
     Sys.println('Revolute reach bound tests passed ($assertions assertions)');
+  }
+
+  static function projectedPrefixes():Void {
+    for (variant in 0...3) {
+      var model = new RobotModel('projected-prefix-$variant');
+      var links = [for (i in 0...7) model.addLink(new Link('link-$i'))];
+      var offsets = [[0.0,0,0.1], [0.0,0.135,0], [0.0,-0.12,0.425],
+        [0.0,0,0.392], [0.0,0.109,0], [0.0,0,0.095]];
+      var axes = [[0.0,0,1], [0.0,1,0], [0.0,1,0], [1.0,0,0], [0.0,1,0], [0.0,0,1]];
+      if (variant == 1) axes[2] = [0.3,0.95,0.2];
+      for (i in 0...6) {
+        var joint = model.addJoint(new Joint('joint-$i', JointType.Revolute, links[i], links[i+1]));
+        joint.axis = Vec3.fromArray(axes[i]).normalized().toArray();
+        joint.parentFramePosition = offsets[i];
+        if (variant == 2) {
+          joint.childFramePosition = [0.01,-0.02,0.03];
+          joint.childFrameRotation = Quat.fromRollPitchYaw(0.1,0.2,-0.3).toArray();
+        }
+      }
+      var frame = model.addFrame(new Frame("tip", links[6]));
+      frame.position = [0,0.08,0];
+      var group = new KinematicGroup(model, links[0].id, frame.id);
+      var bound = RevoluteReachBound.of(group);
+      for (sample in 0...2000) {
+        var q = [for (joint in 0...6) Math.sin((sample+1)*(joint+2)*0.617)*Math.PI];
+        var actual = group.tcpPose(q);
+        check(!bound.excludes(actual,0,0,true), 'Projected prefix retains full FK pose ($variant)');
+        check(!bound.excludes(actual,0,0,false,true), 'Projected prefix retains axis FK pose ($variant)');
+      }
+      if (variant == 0)
+        check(bound.excludes(new Transform3(new Vec3(1.1,0.08,0.1), Quat.identity()),0,0,true),
+          "Axial offsets cancel: reject a pose inside the old triangle-only sphere");
+    }
   }
 }
