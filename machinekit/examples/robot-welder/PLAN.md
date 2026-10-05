@@ -2015,3 +2015,45 @@ The affected CAD probe suite passes 4,940 assertions and retains 468 exposed sam
 nearest-point preservation, one screening call per immediately reachable face, rejection
 fallback ordering and entirely unreachable faces. The production retry after this optimization
 is still required. P3 is incomplete and main has not been advanced.
+
+### P3 executed-phase diagnosis and probe wire model (2026-10-05)
+
+The subsequent retry reproduced the ten-touch sequence and was interrupted without a terminal
+registration result. A phase-instrumented app retry then established that all executed searches
+so far were the three probes on the first face, not two completed faces. Four touch episodes
+occurred during air approaches (two before the first coarse search and two before the third).
+The first face's final retreat began at 52.51 simulated seconds; computation then delayed the
+second-face selection/preparation. The single-contact screening optimization is valid focused
+work but did not address this observed delay. The diagnostic run was stopped to repair the
+confirmed air-contact omission and an identified envelope refinement inefficiency.
+
+ContactPoseEnvelope now bounds yaw sensitivity by point radius times the horizontal component
+of the observed plane normal. This follows d(Rz p)/d(yaw) = Z cross Rz p. A horizontal plane's
+residual is yaw-invariant, so splitting its unobserved yaw interval cannot improve a constraint.
+The previous all-axis radius bound could create 256 redundant cells. The full parking prior
+remains present in one cell for that case; no pose component is assumed known. Focused tests
+pass 67 envelope assertions (including all planar parking corners), 18 sequence assertions,
+109 fit assertions and the existing 20 search assertions. The affected CAD suite still passes
+4,940 assertions and 468 exposed samples. Commit: 4cae123ecb9b76e79f0cefcadc9b8d1f18435ec5.
+
+The rigid physics hull deliberately excludes consumed wire, but the unlit protruding wire is
+real geometry during contact probing. ProcessKit ProbeWireClearance derives a conservative
+circumscribed wire envelope from the supplied CAD diameter, stickout and link-local tip. It
+checks wire pairs against non-tool solids, including intervening air paths and predicted
+braking. The wire's own rigid tool skins are excluded from these additional pairs; ArmClearance
+continues to check the complete arm/nozzle with its original margins. Air wire clearance is
+3 mm. Near-contact sensing permits positive separation below that air margin but rejects
+touch/overlap of the wire envelope. No physical simulation collision body or saved schema was
+changed, and no nominal contact motion is used to locate the real plane.
+
+ProbeMotionPlanner and ProbePosePlanner include this optional, matching-arm wire check. The app
+supplies it only for registration, from the current saved torch facet; fixed welding planning
+keeps its original clearance. Scene collision-body extraction is shared so both checks use the
+same posed hulls. Native probe tests pass 57 assertions, including wire-only intervening
+collisions and braking, near-contact sensing and penetration rejection. Commits:
+db47f8a261504e6f287f493ab525e0d9186729db (wire checks) and
+f02af8e5180c83403736ac94d97b8339010c5fd8 (sweep input validation).
+
+The updated app compiles 1,864 sources. Its production retry is running with per-probe phase
+diagnostics; no production pass is claimed yet. All builds remain compiler-only using existing
+native libraries. Main remains f4dc7456a65fb32dd2459d9a36d36dd8c80457a1; P3, P4 and P5 remain open.
