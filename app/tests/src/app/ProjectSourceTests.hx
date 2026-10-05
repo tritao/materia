@@ -2573,6 +2573,32 @@ class ProjectSourceTests {
       checkFarPlateWeld(root);
       return 0;
     }
+    // Resume the phase gate after the whole-weldment and seam checks.
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "after-welder-seam") {
+      checkWeldInTheAir(root);
+      checkWeldCraterFault(root);
+      checkWeldFollowsWorkpiece(root);
+      checkWeldPost(root);
+      checkWeldQualities(root);
+      checkMates(root);
+      checkBenchMill(root);
+      checkEnclosedMillProject(root);
+      checkVirtualRouterHoming(root);
+      checkCncRouter(root);
+      checkBeltRouter(root);
+      checkCoreXyPlotter(root);
+      checkMobileBase(root);
+      checkMobileMission(root);
+      checkMobileObstacle(root);
+      checkMissionOverlayEdge();
+      checkCncControls(root);
+      checkBackgroundLaunch(root);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "welder-air") {
+      checkWeldInTheAir(root);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "welder-quality") {
       checkWeldQualities(root);
       return 0;

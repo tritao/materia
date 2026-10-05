@@ -108,6 +108,28 @@ class ToolFreedomTests extends MotionKitTestSupport {
     stopped.dispose();
   }
 
+  public function testNumericalZeroMove():Void {
+    var solver = cartesian(true);
+    var seed = [0.1, 0.1, 0.1, 0.0];
+    var target = new Pose3(seed[0] + 1e-16, seed[1], seed[2], 0, 0, Math.sin(0.5), Math.cos(0.5));
+    var compiled = compilerFor(solver).compile(new MotionProgram([
+      MotionOp.SetOutput("torch.enable", motionkit.event.EventValue.Digital(true)),
+      MotionOp.MoveL(target, "work", 0.1, Blend.ExactStop, OrientationPolicy.FreeAboutTool)
+    ]), seed, Int64.ofInt(32));
+    var plan = compiled.blocks[0].plans[0];
+    check(plan.events.length == 1, "Numerically stationary MoveL retains its leading output");
+    var end = plan.evaluate(plan.durationSeconds).positions;
+    for (i in 0...seed.length) near(end[i], seed[i], "Free spin at an unchanged tip holds the joints", 1e-12);
+    compiled.dispose();
+    var rotated = new Pose3(seed[0] + 1e-16, seed[1], seed[2], 0, 0, Math.sin(0.05), Math.cos(0.05));
+    var turn = compilerFor(solver).compile(new MotionProgram([
+      MotionOp.MoveL(rotated, "work", 0.1, Blend.ExactStop, OrientationPolicy.Interpolated)
+    ]), seed, Int64.ofInt(33));
+    near(turn.blocks[0].plans[0].evaluate(turn.blocks[0].plans[0].durationSeconds).positions[3],
+      0.1, "Numerical translation does not erase a constrained rotation", 1e-4);
+    turn.dispose();
+  }
+
   public function testUnreachableTilt():Void {
     var solver = cartesian(false);
     var seed = [0.0, 0.0, 0.0];

@@ -11,6 +11,7 @@ class MotionKitBootstrapTests {
     if (Sys.getEnv("MOTIONKIT_FREEDOM_ONLY") == "1") {
       var tests = new ToolFreedomTests();
       tests.testFreeSpinPath();
+      tests.testNumericalZeroMove();
       tests.testUnreachableTilt();
       tests.testConeAndRedundancy();
       tests.testFullOrientationIdentity();
@@ -106,6 +107,7 @@ class MotionKitBootstrapTests {
     HomingTests.run();
     var freedomTests = new ToolFreedomTests();
     freedomTests.testFreeSpinPath();
+    freedomTests.testNumericalZeroMove();
     freedomTests.testUnreachableTilt();
     freedomTests.testConeAndRedundancy();
     freedomTests.testFullOrientationIdentity();

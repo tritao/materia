@@ -316,8 +316,21 @@ class ProgramCompiler {
             var start = new PoseWaypoint(solver.forward(q), positionTolerance,
               orientationTolerance);
             var end = new PoseWaypoint(pose, positionTolerance, orientationTolerance);
-            pending = lowerPath(speedScale, new PosePath(frameId, [new PoseLine(start, end,
-              freedom == null ? OrientationPolicy.Interpolated : freedom, 0.1, feed)]), q, feed, [], index);
+            var policy = freedom == null ? OrientationPolicy.Interpolated : freedom;
+            // Recovery can return to the same tip within floating-point roundoff.
+            // Keep a controller tick so leading outputs and op completion still run.
+            if (Math.isFinite(feed) && feed > 0 && PoseMath.distance(start.pose, pose) <= 1e-10 &&
+                orientationError(start.pose, pose, policy) <= 1e-7) {
+              var hold = Trajectory.fromSegments([{
+                timeFromStartNs: Int64.ofInt(0),
+                durationNs: Trajectory.nanoseconds(controllerPeriodSeconds),
+                coefficients: [for (position in q) [position, 0.0]]
+              }]);
+              pending = new PendingMotion(index, q, q, hold, [], null, null);
+            } else {
+              pending = lowerPath(speedScale, new PosePath(frameId, [new PoseLine(start, end,
+                policy, 0.1, feed)]), q, feed, [], index);
+            }
           }
           c.pending = pending;
           c.q = pending.endQ.copy();

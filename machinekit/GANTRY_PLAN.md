@@ -3770,3 +3770,21 @@ error stays within the 2 degree process bound, and there are no restarts,
 gaps or clearance violations. The shared entry retry fix covers both MoveJ
 and approach MoveL; ProcessKit passes 53 planning assertions. G15 is
 implemented; the Phase D full build/runtime gate remains pending.
+
+### Phase D boundary — recovery timing regression
+
+The boundary run passed MachineKit (including every example), RobotKit (5059 assertions),
+MotionKit (71391), CadBridge (173), Toolpath Motion (12/2/12/3008), ProcessKit
+(56/53/16/106/13/12/19/23), the app and dependent compiler-only builds, and native CTest
+(19/19). The app passed both picker variants, the complete gantry-welder mission, and
+RobotWelder whole-weldment and seam checks on both backends before the weld-in-air fault
+case failed timing recovery op 3.
+
+Tracing isolated a recovery MoveL with a 4.7e-16 m displacement and zero hard orientation
+error. Compiling numerical-zero task moves as one controller tick preserves leading
+outputs, joint holds and op completion. PoseLine uses angular length when a real rotation
+has only numerical translation. A focused regression reproduced the timing failure before
+the fix and now passes, including retained output events and constrained rotation.
+The focused freedom suite passes 340 assertions; the air fault check now exhausts three
+restarts after 8.4 simulated seconds, recording four NoArc faults without arc or deposited
+metal. MotionKit and the remaining app checks are being rerun before Phase D is closed.
