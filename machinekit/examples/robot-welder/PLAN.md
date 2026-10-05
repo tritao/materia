@@ -1699,3 +1699,29 @@ trajectory. Waiting for measured rest has a finite bound derived from observed s
 joint acceleration plus two seconds; a brake that does not settle fails instead of waiting forever.
 Detection-time contact capture remains unchanged. The focused native suite passes 31 assertions,
 including observed rest at every basic search handoff and the prepared refinement integration.
+
+### P3 complete single-probe execution (2026-10-05)
+
+`ProbeMotionPlanner` checks complete compiled approach and straight refinement/retreat trajectories,
+including short swept clearance edges. Approach IK candidates use bounded JointRoute detours; a
+blocked endpoint-to-endpoint sweep cannot become an accepted move merely because its goal is clear.
+Prismatic checks sample at 1 mm joint increments, revolute checks at 0.02 rad, and actual compiler
+end joints are retained. A measured per-joint deadline-brake prediction is also screened during
+searches. This is a predicted stopping reference from observed velocities and configured acceleration,
+not a proof of every possible Cartesian QP braking path or an independent safety controller.
+
+`ContactProbeRunner` executes an arc/wire-off checked approach, a coarse search, checked withdrawal,
+a fresh slow contact measurement and checked retreat. Servo and motion programs own the arm in
+separate phases. Observed rest alone does not release a sticky native velocity target: the runner
+submits a measured position hold, waits for its native owner tick, and reacquires the program start
+before retreat/refinement. This resolves the native -2 rejection at the first withdrawal without
+changing RobotRuntime or weakening the plan anchor contract. Fresh servo instances are disposed
+between searches. Failed probing clears its contact result and stops the robot with its existing
+channel-safe policy; a contact is only complete after retreat.
+
+The focused deterministic native suite passes 31 assertions. The full one-axis probe executes two
+separate touch episodes, refines a 20 mm-deep plane observation to within 6 micrometres, returns to
+its prepared air pose and leaves the joint at rest with arc and wire off throughout. Separate cases
+verify stale/no-touch stops, unreachable goals, intervening fixtures and predicted braking obstruction.
+This proves a complete single probe; CAD stage selection, measured posterior bounds, mobile scene
+steps and the noisy multi-face welding mission remain open. P3 has not passed its milestone gates.
