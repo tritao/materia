@@ -1,9 +1,9 @@
 package app;
 
-/** Compatibility subclass for the reusable EditorKit orbit camera. */
-class PerspectiveCamera extends nativekit.editorkit.PerspectiveCamera {
+/** Compatibility subclass for the reusable SceneKit orbit camera. */
+class PerspectiveCamera extends nativekit.scene.PerspectiveCamera {
   public function new() super();
 }
-typedef PerspectiveRay = nativekit.editorkit.PerspectiveCamera.PerspectiveRay;
-typedef PerspectivePlanePoint = nativekit.editorkit.PerspectiveCamera.PerspectivePlanePoint;
-typedef PerspectiveScreenPoint = nativekit.editorkit.PerspectiveCamera.PerspectiveScreenPoint;
+typedef PerspectiveRay = nativekit.scene.PerspectiveCamera.PerspectiveRay;
+typedef PerspectivePlanePoint = nativekit.scene.PerspectiveCamera.PerspectivePlanePoint;
+typedef PerspectiveScreenPoint = nativekit.scene.PerspectiveCamera.PerspectiveScreenPoint;

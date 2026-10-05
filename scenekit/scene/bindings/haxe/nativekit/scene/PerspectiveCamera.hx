@@ -1,6 +1,5 @@
-package nativekit.editorkit;
+package nativekit.scene;
 
-import nativekit.scene.Transform;
 
 /** Testable orbit camera state shared by perspective input and rendering. */
 class PerspectiveCamera {

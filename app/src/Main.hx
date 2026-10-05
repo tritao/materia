@@ -98,7 +98,7 @@ import haxeon.ui.widgets.controls.TabItem;
 import haxeon.ui.widgets.controls.Tabs;
 import haxeon.ui.widgets.text.Text;
 import haxeon.ui.widgets.text.TextArea;
-import nativekit.editorkit.TextDocument;
+import haxeon.editor.TextDocument;
 import haxeon.ui.widgets.text.TextField;
 import haxeon.ui.widgets.collections.TreeRootMetadata;
 import haxeon.ui.widgets.collections.TreeView;

@@ -160,7 +160,7 @@ its incremental render path. `editor/TelemetryPanel` owns the retained plot.
 build the dock content; `editor/SceneObjectCommands`,
 `editor/SceneViewCommands`, and `editor/EditorDocumentCommands` register the
 corresponding actions. `Main` composes these modules and the desktop host.
-The orbit camera lives in `editorkit`; `app/PerspectiveCamera` retains the
+The orbit camera lives in `scenekit`; `app/PerspectiveCamera` retains the
 existing import names for callers.
 
 The Sensors workspace tab edits RobotKit sensor definitions without exposing
