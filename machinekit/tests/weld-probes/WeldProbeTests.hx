@@ -164,6 +164,30 @@ class WeldProbeTests {
       "Second-plane contacts observe the remaining rotational component");
     var thirdStages = WeldProbePatterns.stages(work, 1, [firstNormal, secondStages[0].face.normal], reduced);
     check(thirdStages.length > 0, "Third-plane candidates complete the independent three-plane basis");
+    var screenings = [0];
+    var nearestStages = WeldProbePatterns.stages(work, 1, [firstNormal, secondStages[0].face.normal], reduced, 3, 9,
+      (_, _, _) -> { screenings[0]++; return true; });
+    var unscreenedStages = WeldProbePatterns.stages(work, 1, [firstNormal, secondStages[0].face.normal], reduced, 3, 9);
+    check(screenings[0] == nearestStages.length && nearestStages.length > 0,
+      "Single-contact selection checks only the nearest candidate when it is reachable");
+    for (index in 0...nearestStages.length)
+      check(nearestStages[index].face.name() == unscreenedStages[index].face.name() &&
+        nearestStages[index].points[0].subtract(unscreenedStages[index].points[0]).length() < 1e-10,
+        "Lazy screening retains the nearest-point choice and face ordering");
+    var previousDistance = new Map<String, Float>();
+    var afterRejection = WeldProbePatterns.stages(work, 1, [firstNormal, secondStages[0].face.normal], reduced, 3, 9,
+      (face, point, _) -> {
+        var delta = point.subtract(face.centre), square = delta.dot(delta);
+        var prior = previousDistance.get(face.name());
+        previousDistance.set(face.name(), square);
+        if (prior == null) return false;
+        check(square >= prior, "An unreachable nearest point is followed by the next closest candidate");
+        return true;
+      });
+    check(afterRejection.length == nearestStages.length,
+      "Rejecting the nearest point still permits the next reachable single-contact candidate");
+    check(WeldProbePatterns.stages(work, 1, [firstNormal, secondStages[0].face.normal], reduced, 3, 9,
+      (_, _, _) -> false).length == 0, "An entirely unreachable third plane is rejected");
     for (stage in thirdStages) check(Math.abs(firstNormal.cross(secondStages[0].face.normal).dot(stage.face.normal)) > 1e-3,
       "Third-plane normals observe the remaining translation");
     var actual = new Transform3(new Vec3(0.02, -0.02, 0), Quat.fromRollPitchYaw(0, 0, 2 * Math.PI / 180));

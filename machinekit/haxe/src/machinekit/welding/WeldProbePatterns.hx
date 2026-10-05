@@ -38,7 +38,7 @@ class WeldProbePatterns {
         var approach = bounds.normalTravel + clearance;
         if (!geometry.exposedRegion(face, point, bounds.halfU + approach * bounds.tiltU,
           bounds.halfV + approach * bounds.tiltV, approach, clearance)) continue;
-        if (possible != null && !possible(face, point, bounds)) continue;
+        if (count != 1 && possible != null && !possible(face, point, bounds)) continue;
         candidates.push(point); travel = Math.max(travel, approach);
       }
       if (candidates.length < count) continue;
@@ -74,12 +74,23 @@ class WeldProbePatterns {
         if (span < clearance) continue;
         points = [first, second]; score = span * span;
       } else {
-        var chosen = candidates[0], distance = Math.POSITIVE_INFINITY;
-        for (point in candidates) {
-          var delta = point.subtract(face.centre), square = delta.dot(delta);
-          if (square < distance) { chosen = point; distance = square; }
+        // Only one contact is needed: screen nearest points lazily instead of solving IK for the whole patch.
+        var chosen:Null<Vector> = null, distance = Math.POSITIVE_INFINITY;
+        while (candidates.length > 0) {
+          var nearest = 0;
+          distance = Math.POSITIVE_INFINITY;
+          for (index in 0...candidates.length) {
+            var delta = candidates[index].subtract(face.centre), square = delta.dot(delta);
+            if (square < distance) { nearest = index; distance = square; }
+          }
+          var point = candidates[nearest];
+          candidates.splice(nearest, 1);
+          var bounds = uncertainty.region(face, point);
+          if (possible != null && !possible(face, point, bounds)) continue;
+          chosen = point; travel = bounds.normalTravel + clearance; break;
         }
-        points = [chosen]; score = -distance;
+        if (chosen == null) continue;
+        points = [cast chosen]; score = -distance;
       }
       stages.push(new WeldProbeStage(face, points, travel, score));
     }

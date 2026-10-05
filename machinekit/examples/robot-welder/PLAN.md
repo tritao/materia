@@ -1984,3 +1984,34 @@ claimed. This new tool/environment failure triggers the user's outside-scope sto
 P3 remains incomplete, with production registration, full two-station coverage and boundary
 validation still open. Main remains f4dc7456a65fb32dd2459d9a36d36dd8c80457a1; no fast-forward was
 attempted. P4 energy/docking and required P5 rendered-depth tracking remain open.
+
+### P3 disk-space retry and lazy single-contact screening (2026-10-05)
+
+The user asked to continue and suggested low disk space as the temporary-output failure's cause.
+With 4.9 GB free, a retry using TMPDIR under app/build/project-tmp compiled and generated the
+expected production artifact (66 components, 2,877,017 bytes). This demonstrates that the tool
+failure no longer reproduces; it does not establish its original cause. No compiler/runtime or
+producer change was needed. All temporary files and the existing dependency-fingerprinted cache
+remain inside this worktree.
+
+The first uninstrumented registration run was stopped after approximately 25 minutes without a
+result. Test-only parking/contact progress messages were added and the app rebuilt successfully
+(1,863 sources). Its retry loaded the cached scene and executed ten touch episodes on the
+deterministic backend, from 27.05 through 52.48 simulated seconds, passing the former nonfinite
+servo prerequisite. It was stopped while still computing after approximately 20 minutes, to
+repair an identified avoidable candidate-screening cost. Neither interrupted run is a pass or
+a terminal registration failure; measured frame accuracy and bead acceptance remain unverified.
+
+For the one-contact stage, WeldProbePatterns formerly screened arm configurations for every
+geometrically admissible point, then selected the nearest reachable point to the face centre.
+It now screens nearest points in order and stops at the first reachable point on each face.
+Grid-order ties remain deterministic, rejected points fall through to the next nearest point,
+and an entirely unreachable face is rejected. The approach bound is derived from the selected
+point. Three- and two-contact broad-baseline selection, exposure/uncertainty checks and full
+checked motion preparation are unchanged. This avoids redundant IK/clearance work without
+reducing the candidate lattice, search bounds or physical proof requirements.
+
+The affected CAD probe suite passes 4,940 assertions and retains 468 exposed samples, including
+nearest-point preservation, one screening call per immediately reachable face, rejection
+fallback ordering and entirely unreachable faces. The production retry after this optimization
+is still required. P3 is incomplete and main has not been advanced.
