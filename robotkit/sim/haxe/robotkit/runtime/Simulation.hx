@@ -893,6 +893,12 @@ class Simulation {
     return result.out_body;
   }
 
+  /** The native body carrying an environment object, or zero while free. */
+  public function objectCarrier(object:nativekit.sim.SimObject):nksim_body {
+    ensureLive();
+    return session.objectCarrier(object);
+  }
+
   /** Where a session object is now. */
   public function objectPose(object:nativekit.sim.SimObject):nativekit.sim.SimPose {
     ensureLive();

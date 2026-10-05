@@ -47,6 +47,15 @@ class SimShape {
             default: Math.POSITIVE_INFINITY;
         };
 
+    /** Half extents of a local box enclosing this finite primitive; null for an infinite plane. */
+    public function boundingHalfExtents():Null<{x:Float, y:Float, z:Float}> return switch type {
+        case Box: {x: a, y: b, z: c};
+        case Sphere: {x: a, y: a, z: a};
+        case Cylinder: {x: a, y: a, z: b * 0.5};
+        case Capsule: {x: a, y: a, z: b * 0.5 + a};
+        case _: null;
+    };
+
     public function toNative():nksim_shape_desc {
         var value = new nksim_shape_desc();
         value.set_struct_size(nksim_shape_desc.size());

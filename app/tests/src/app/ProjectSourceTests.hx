@@ -1214,6 +1214,86 @@ class ProjectSourceTests {
     simulation.dispose(); session.dispose();
   }
 
+  /** A scene prop outside controller ownership must block a joint plan before submission. */
+  static function checkJointSceneClearance(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/cobot-arm/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var definition = requiredAssemblyDefinition(generated.assemblyDefinition);
+    var placement = new AssemblyState(definition, generated.assemblyState);
+    var flange = placement.worldPose("toolFlange");
+    generated.objects.push({id: "joint-plan-obstacle", label: "Independent scene obstacle", type: "rectangle",
+      x: flange.x * 0.001, y: flange.y * 0.001, z: flange.z * 0.001,
+      width: 0.08, height: 0.08, depth: 0.08, collisionEnabled: true, dynamicBody: false,
+      mass: 0.0, red: 1.0, green: 0.0, blue: 0.0, visible: true});
+    var session = new ProjectDocumentSession(null, false);
+    session.openGeneratedProject(generated, manifest);
+    var simulation = new ApplicationSimulation(new RobotWorld());
+    simulation.setBackend(ApplicationSimulation.MUJOCO);
+    check(simulation.rebuild(session.sensors, session.scene, session), "scene-clearance fixture builds: " + simulation.error);
+    var mission = simulation.missionPlayer();
+    if (mission == null) throw "Scene-clearance fixture needs its joint mission";
+    var ticks = 0;
+    while (mission.failure == null && ticks < 300) { simulation.step(); ticks++; }
+    var failure = mission.failure;
+    check(failure != null && failure.indexOf("joint-plan-obstacle") >= 0,
+      "an independently owned scene obstacle rejects the joint plan: " + failure);
+    check(mission.completed == 0, "the blocked joint plan is never completed");
+    simulation.dispose(); session.dispose();
+  }
+
+  /** A held blank's swept path follows its carrier, rather than remaining a fixed scene obstacle. */
+  static function checkHeldJointSceneClearance(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/cobot-arm/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var definition = requiredAssemblyDefinition(generated.assemblyDefinition);
+    var initial = new AssemblyState(definition, generated.assemblyState);
+    var ending = new AssemblyState(definition, generated.assemblyState);
+    var task = generated.mission;
+    if (task == null) throw "Held-clearance fixture needs its joint mission";
+    var targets = task.steps[0].joints;
+    if (targets == null) throw "Held-clearance fixture needs joint targets";
+    for (target in targets) ending.setJoint(target.joint, target.position);
+    task.loop = false;
+    task.steps = [task.steps[0]];
+    var start = materia.assembly.AssemblyFrames.compose(initial.worldPose("toolFlange"),
+      materia.assembly.AssemblyFrames.translation(0, 0, 150));
+    var finish = materia.assembly.AssemblyFrames.compose(ending.worldPose("toolFlange"),
+      materia.assembly.AssemblyFrames.translation(0, 0, 150));
+    for (held in [true, false]) {
+      var point = held ? start : finish;
+      generated.objects.push({id: held ? "held-clearance-probe" : "held-plan-obstacle", label: "Held clearance fixture",
+        type: "rectangle", x: point.x * 0.001, y: point.y * 0.001, z: point.z * 0.001,
+        width: 0.01, height: 0.01, depth: 0.01, collisionEnabled: true, dynamicBody: held,
+        mass: held ? 0.001 : 0.0, red: 1.0, green: 0.0, blue: 0.0, visible: true});
+    }
+    var session = new ProjectDocumentSession(null, false);
+    session.openGeneratedProject(generated, manifest);
+    var simulation = new ApplicationSimulation(new RobotWorld());
+    simulation.setBackend(ApplicationSimulation.MUJOCO);
+    check(simulation.rebuild(session.sensors, session.scene, session), "held-clearance fixture builds: " + simulation.error);
+    var mission = simulation.missionPlayer(), object = simulation.environmentObject("held-clearance-probe");
+    if (mission == null || object == null) throw "Held-clearance fixture needs its robot and loose object";
+    var flange = [for (hull in mission.robot.hulls) if (hull.part == "toolFlange") hull];
+    if (flange.length != 1) throw "Held-clearance fixture needs one flange hull";
+    var link = flange[0].link, pose = mission.simulation.linkPose(mission.robotIndex, link);
+    var carrier = new robotkit.spatial.Transform3(new robotkit.spatial.Vec3(pose.position[0], pose.position[1], pose.position[2]),
+      new robotkit.spatial.Quat(pose.rotation[0], pose.rotation[1], pose.rotation[2], pose.rotation[3]));
+    var relative = carrier.inverse().compose(new robotkit.spatial.Transform3(
+      new robotkit.spatial.Vec3(start.x * 0.001, start.y * 0.001, start.z * 0.001), robotkit.spatial.Quat.identity()));
+    mission.simulation.holdObjectOnLink(object, mission.robotIndex, link,
+      new nativekit.sim.SimPose(relative.translation.x, relative.translation.y, relative.translation.z,
+        relative.rotation.x, relative.rotation.y, relative.rotation.z, relative.rotation.w));
+    check(mission.simulation.objectCarrier(object) == mission.simulation.linkBody(mission.robotIndex, link),
+      "the probe has its physical robot carrier");
+    var ticks = 0;
+    while (mission.failure == null && ticks < 300) { simulation.step(); ticks++; }
+    var failure = mission.failure;
+    check(failure != null && failure.indexOf("held-clearance-probe") >= 0 && failure.indexOf("held-plan-obstacle") >= 0,
+      "the carried object's future collision rejects the joint plan: " + failure);
+    check(mission.completed == 0, "the blocked carried-object plan is never completed");
+      simulation.dispose(); session.dispose();
+  }
+
   static function checkRobotArm(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-arm/materia.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
@@ -3117,8 +3197,15 @@ class ProjectSourceTests {
       checkRobotWelder(root);
       return 0;
     }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "clearance") {
+      checkJointSceneClearance(root);
+      checkHeldJointSceneClearance(root);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "cobot") {
       checkCobotArms(root);
+      checkJointSceneClearance(root);
+      checkHeldJointSceneClearance(root);
       return 0;
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mill") {
@@ -3481,6 +3568,8 @@ class ProjectSourceTests {
     checkGantryPicker(root, true);
     checkGantryWelder(root);
     checkTrackArm(root);
+    checkJointSceneClearance(root);
+    checkHeldJointSceneClearance(root);
     checkRobotWelder(root);
     checkMates(root);
     checkBenchMill(root);

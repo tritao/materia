@@ -396,6 +396,32 @@ class MissionPlayer implements SessionMember {
         included.set(hull.part, true);
       }
     }
+    for (entry in objects) {
+      var prefix = "project:";
+      var name = StringTools.startsWith(entry.id, prefix) ? entry.id.substr(prefix.length) : entry.id;
+      if (included.exists(name) || ignored.indexOf(name) >= 0) continue;
+      var half = entry.object.shape.boundingHalfExtents();
+      if (half == null) throw 'Joint clearance needs finite collision geometry for "${entry.id}"';
+      var pose = simulation.objectPose(entry.object);
+      var worldPose = new Transform3(new Vec3(pose.x, pose.y, pose.z), new Quat(pose.qx, pose.qy, pose.qz, pose.qw));
+      var carrier = simulation.objectCarrier(entry.object), attached = -1;
+      for (index in 0...links.length)
+        if (simulation.linkBody(robotIndex, index) == carrier) {attached = index; break;}
+      var inverse = baseInverse;
+      if (attached >= 0) {
+        var body = simulation.linkPose(robotIndex, attached);
+        inverse = new Transform3(new Vec3(body.position[0], body.position[1], body.position[2]),
+          new Quat(body.rotation[0], body.rotation[1], body.rotation[2], body.rotation[3])).inverse();
+      }
+      var localPose = inverse.compose(worldPose), vertices:Array<Float> = [];
+      for (corner in 0...8) {
+        var point = localPose.transformPoint(new Vec3((corner & 1) == 0 ? -half.x : half.x,
+          (corner & 2) == 0 ? -half.y : half.y, (corner & 4) == 0 ? -half.z : half.z));
+        vertices.push(point.x); vertices.push(point.y); vertices.push(point.z);
+      }
+      bodies.push({name: name, link: links[attached >= 0 ? attached : 0].id, vertices: vertices, tool: attached >= 0});
+      included.set(name, true);
+    }
     for (hull in depositedWeldHulls()) {
       var vertices:Array<Float> = [];
       for (index in 0...Std.int(hull.vertices.length / 3)) {
