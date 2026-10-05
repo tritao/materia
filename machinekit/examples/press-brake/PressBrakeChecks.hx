@@ -19,6 +19,7 @@ class PressBrakeChecks {
 	public static function main():Void run();
 	public static function run():Void {
 		BendSetupChecks.run();
+		BendRegistrationChecks.run();
 		var recipeFixture = new MachineAssembly();
 		recipeFixture.addComponent("finger", new GaugeFinger());
 		recipeFixture.addComponent("base", new GaugeFinger());
