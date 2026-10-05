@@ -565,8 +565,8 @@ G0 → G1 → G2 → G3 ──────────────────�
 | G11 | in progress; reference-state foundation added | see progress notes |
 | G12 | implemented; requested compiler/runtime/picker/homing checkpoint passed | see progress notes |
 | G13 | complete; restructure and Phase C gate passed | `38f15b995`, `ad5211f04`, `acb1ab460`; see progress notes |
-| G14 | implemented; focused mechanics and C-head yaw picker passed, Phase D gate pending | `7822171b5`, `58075ec63`; see progress notes |
-| G15 | implemented; four-run/ten-seam MuJoCo mission passed, Phase D gate pending | see progress notes |
+| G14 | complete; Phase D build/runtime gate passed | `7822171b5`, `58075ec63`; see progress notes |
+| G15 | complete; four-run/ten-seam MuJoCo mission and Phase D gate passed | see progress notes |
 | G16 | planned | — |
 | G17 | planned | — |
 | G18 | planned | — |
@@ -3788,3 +3788,16 @@ the fix and now passes, including retained output events and constrained rotatio
 The focused freedom suite passes 340 assertions; the air fault check now exhausts three
 restarts after 8.4 simulated seconds, recording four NoArc faults without arc or deposited
 metal. MotionKit and the remaining app checks are being rerun before Phase D is closed.
+
+### Phase D complete
+
+After the recovery timing fix, full MotionKit passes 71397 assertions. Final app,
+CadBridge and Toolpath Motion compiler-only builds pass; CadBridge passes 173 and
+Toolpath Motion passes 12/2/12/3008. The app gate resumed immediately after its already
+passed whole-weldment and seam checks and exited successfully, covering the air/crater
+faults, displaced workpiece, four-sided post, weave/multipass on both backends, mates,
+bench/enclosed mills, virtual-device homing, screw/belt routers, CoreXY, mobile missions,
+controls and background launch. The post planner remains expensive in wall time; its
+execution and bead checks pass. Combined with the preceding kit/native and app-prefix
+results, this closes G14/G15 and Phase D. Phase E is next, with focused checks per step
+and full suites only at its boundary.
