@@ -142,6 +142,22 @@ class MachineAssembly {
 		addMember(id, component, pose);
 	}
 
+	/** Replace a local part while retaining its assembly identity, mates and wiring. */
+	public function replaceComponent(id:String, component:MachineComponent):Void {
+		var entry = mechanical.member(id);
+		if (entry == null || component == null) throw 'Cannot replace unknown local member "$id"';
+		// Preserve the interface used by this assembly before mutating the member.
+		for (connector in entry.component.connectors()) component.connector(connector.name);
+		for (port in entry.component.ports()) {
+			var replacement = component.port(port.name);
+			if (replacement.kind != port.kind || replacement.role != port.role ||
+				!machinekit.component.PortInterfaces.compatible(replacement.iface, port.iface))
+				throw 'Replacement changes the port interface "$id/${port.name}"';
+		}
+		entry.component = component;
+		changed();
+	}
+
 	/**
 	 * Add a member whose local name is a path, such as `bin-01/indicator`, to group members without
 	 * a subassembly. The first segment cannot name a subassembly.
