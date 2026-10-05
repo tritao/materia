@@ -22,6 +22,20 @@ class PrismSatQuery implements SheetCollisionQuery {
 		return true;
 	}
 	function separated(a:Array<Vector>, b:Array<Vector>, origin:Vector, axis:Vector):Bool {
+		return gap(a, b, origin, axis) >= -penetrationTolerance;
+	}
+	public function separation(a:ConvexPrism, b:ConvexPrism):Float {
+		var pointsA = a.vertices(), pointsB = b.vertices(), origin = pointsA[0];
+		var result = Math.NEGATIVE_INFINITY;
+		for (axis in a.faceNormals()) result = Math.max(result, gap(pointsA, pointsB, origin, axis));
+		for (axis in b.faceNormals()) result = Math.max(result, gap(pointsA, pointsB, origin, axis));
+		for (edgeA in a.edgeDirections()) for (edgeB in b.edgeDirections()) {
+			var cross = edgeA.cross(edgeB), length = cross.length();
+			if (length > 0) result = Math.max(result, gap(pointsA, pointsB, origin, cross.scale(1 / length)));
+		}
+		return result;
+	}
+	function gap(a:Array<Vector>, b:Array<Vector>, origin:Vector, axis:Vector):Float {
 		var lowA = Math.POSITIVE_INFINITY, highA = Math.NEGATIVE_INFINITY;
 		var lowB = Math.POSITIVE_INFINITY, highB = Math.NEGATIVE_INFINITY;
 		for (point in a) {
@@ -32,6 +46,6 @@ class PrismSatQuery implements SheetCollisionQuery {
 			var distance = point.subtract(origin).dot(axis);
 			lowB = Math.min(lowB, distance); highB = Math.max(highB, distance);
 		}
-		return highA <= lowB + penetrationTolerance || highB <= lowA + penetrationTolerance;
+		return Math.max(lowB - highA, lowA - highB);
 	}
 }

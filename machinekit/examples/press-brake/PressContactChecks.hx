@@ -20,6 +20,9 @@ import machinekit.pressbrake.planning.ConvexPrism;
 import machinekit.pressbrake.planning.PressBendSection;
 import machinekit.pressbrake.planning.PressBendPrismQuery;
 import machinekit.pressbrake.planning.PressCollisionGeometry;
+import machinekit.pressbrake.planning.PressCollisionBody;
+import machinekit.pressbrake.planning.PressMaterialQuery;
+import machinekit.pressbrake.planning.PrismSatQuery;
 import machinekit.pressbrake.planning.PressContactQuery;
 import machinekit.pressbrake.planning.PressGeometry;
 import machinekit.pressbrake.planning.PressPrismSection;
@@ -98,6 +101,7 @@ class PressContactChecks {
 		var press = new PressBrake(true,null,null,30), geometry = PressGeometry.of(press), station = press.toolLayout.stations()[0];
 		var tooling = station.processTooling(), physical = geometry.station(station.id), contactQuery = new PressContactQuery();
 		var bendQuery = new PressBendPrismQuery();
+		var materialQuery = new PressMaterialQuery(new PrismSatQuery());
 		var stock = new SheetMaterial("exact-contact-steel",1.5,BendRule.Process(new ProcessBendRule(tooling)),{uts:400,yield:250,youngs:205000});
 		for (sign in [1.0,-1.0]) {
 			var sheet = new Sheet(stock), root = sheet.addWall(WallOutline.rectangle(60,100));
@@ -116,6 +120,23 @@ class PressContactChecks {
 				if (cap == null || cap.length != 1) throw "Missing full-width bend cap";
 				var zone = pose.evaluation.bend(bend.id), expected = zone.allowance*zone.thickness;
 				var materialPoint = pose.placement.plane.toWorld(zone.point(0.5,50,0.75));
+				for (body in bodies) {
+					var far = new PressCollisionBody(MachineMember("far-probe"),[probe(new Vector(1e6,1e6,1e6))],0.1);
+					check(materialQuery.overlap(sheet,pose,body,far) == false,"Approximation error still permits certified distant clearance");
+					switch body.owner {
+						case SheetBend(_):
+							var exact = new PressCollisionBody(MachineMember("interior-probe"),[probe(materialPoint)],0);
+							check(materialQuery.overlap(sheet,pose,body,exact) == true,"Exact bend refinement proves a machine material collision");
+							var uncertain = new PressCollisionBody(MachineMember("approximate-probe"),[probe(materialPoint)],0.1);
+							check(materialQuery.overlap(sheet,pose,body,uncertain) == null,"Approximate overlap is unresolved rather than an invented physical collision");
+						case SheetWall(_):
+							var exact = new PressCollisionBody(MachineMember("wall-copy"),body.pieces(),0);
+							check(materialQuery.overlap(sheet,pose,body,exact) == true,"Exact wall pieces prove positive machine material overlap");
+							var approximate = new PressCollisionBody(MachineMember("bounded-wall-copy"),body.pieces(),0.01);
+							check(materialQuery.overlap(sheet,pose,body,approximate) == true,"Inset material proves collision despite a declared boundary error");
+						case _:
+					}
+				}
 				check(bendQuery.overlap(bend,zone,pose.placement,probe(materialPoint)) == true,"Exact bend query detects interior material through flat and loaded strokes");
 				var outside = pose.placement.plane.toWorld(zone.point(0.5,0,0.75)).add(pose.placement.direction(zone.frame.direction(new Vector(0,110,0))));
 				check(bendQuery.overlap(bend,zone,pose.placement,probe(outside)) == false,"Exact bend query clips the finite axis rather than extending it indefinitely");

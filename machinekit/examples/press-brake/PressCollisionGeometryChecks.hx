@@ -126,6 +126,15 @@ class PressCollisionGeometryChecks {
 		check(minimum(member(actualMachine,"gaugeX"),2) == 660,"Backgauge carriage does not follow R");
 		check(minimum(member(actualMachine,"gaugeR"),2) == 810,"Backgauge lift follows physical R");
 		check(minimum(member(actualMachine,"ramBracketLeft"),2) == 1120,"Ram bracket follows physical downward stroke");
+		var clampId = press.pressGeometryDatums().tools[0].punch + "-clamp";
+		var clamp = member(actualMachine,clampId), homeClamp = member(PressCollisionGeometry.machineMembers(actual,0,50,20),clampId);
+		check(Math.abs(minimum(homeClamp,2)-minimum(clamp,2)-80)<1e-8,"Installed clamp follows the actual ram stroke");
+		for (entry in press.components()) if (entry.id == clampId) {
+			var part = entry.component.geometry(), same = Math.abs(part.volume()-volume(clamp)) < 1e-6;
+			part.close(); check(same,"Installed clamp collision material preserves native CAD volume");
+		}
+		var copiedDatums = press.pressGeometryDatums(), removedBox = copiedDatums.frames[0].boxes.pop();
+		check(press.pressGeometryDatums().frames[0].boxes.length == 3,"Returned frame data cannot mutate authored collision volumes");
 		check(overlaps([member(actualMachine,"supportLeft")],new Vector(-450,-240,790)),"Fixed support participates in collision geometry");
 		var withoutR = PressGeometry.of(new PressBrake(false,null,null,30));
 		var absentR = true;

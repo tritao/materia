@@ -2,7 +2,11 @@ package machinekit.pressbrake.planning;
 
 import cadkit.sheetmetal.SheetDiagnosis;
 
-/** Material pieces belonging to one physical body, with an explicit geometric error in mm. */
+/** Material pieces belonging to one physical body, with bounded boundary deformation in mm.
+ * The authored-material correspondence must preserve interior ownership: points farther than
+ * error from every piece face remain material. A Hausdorff bound without that correspondence
+ * is insufficient. Wall chord, bend mapping and tool-profile builders supply this contract.
+ */
 class PressCollisionBody {
 	public final owner:PressCollisionOwner;
 	public final error:Float;

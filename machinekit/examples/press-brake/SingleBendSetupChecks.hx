@@ -13,6 +13,9 @@ import machinekit.pressbrake.planning.BendOrientation;
 import machinekit.pressbrake.planning.BendSetup;
 import machinekit.pressbrake.planning.GaugeEdge;
 import machinekit.pressbrake.planning.PressGeometry;
+import machinekit.pressbrake.planning.PressStrokeCollision;
+import machinekit.pressbrake.planning.PrismSatQuery;
+import machinekit.pressbrake.planning.BackgaugeStroke;
 
 /** Whole single-bend setup acceptance and named manufacturing refusals. */
 class SingleBendSetupChecks {
@@ -38,6 +41,22 @@ class SingleBendSetupChecks {
 		var sheet = SheetDemoParts.p2(stock), bend = sheet.bends()[0], state = sheet.flat();
 		var orientation = new BendOrientation(true, false, -10), edge = new GaugeEdge(bend.wallB, new WallEdge(1));
 		var result = planner.plan(sheet, state, bend.id, station, orientation, edge, process);
+		var collision = new PressStrokeCollision(geometry, new PrismSatQuery());
+		var unretracted = diagnosis("press.collision", function() { collision.check(sheet, result); });
+		if (unretracted.elements.indexOf("machine:fingerLeft") < 0)
+			throw "Unretracted backgauge collision must name the physical finger";
+		var withdrawal = new BackgaugeStroke(result.registration, 20);
+		collision.check(sheet, result, withdrawal);
+		near(withdrawal.strokeX, result.registration.x + 20, "Withdrawal is an explicit X motion");
+		var withdrawalSamples = withdrawal.withdrawal();
+		near(withdrawalSamples[0], result.registration.x, "Withdrawal starts at registered stock");
+		near(withdrawalSamples[20], withdrawal.strokeX, "Withdrawal reaches its held stroke coordinate");
+		var overtravel = diagnosis("press.collision-travel", function() {
+			collision.check(sheet, result, new BackgaugeStroke(result.registration, 500));
+		});
+		var negativeRetract = diagnosis("press.gauge-retract", function() {
+			var rejected = new BackgaugeStroke(result.registration, -1);
+		});
 		var expected = process.predict(stock, tooling, bend.angle, 120);
 		near(result.registration.x, 40 - bend.radius - stock.thickness + expected.bendAllowance / 2, "Complete setup mould-line distance");
 		near(result.registration.r, 0, "Complete setup flat R datum");

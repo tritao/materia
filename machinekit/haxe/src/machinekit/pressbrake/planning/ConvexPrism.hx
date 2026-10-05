@@ -39,6 +39,39 @@ class ConvexPrism {
 	public function vertices():Array<Vector> return corners.copy();
 	public function faceNormals():Array<Vector> return normals.copy();
 	public function edgeDirections():Array<Vector> return directions.copy();
+	/** Euclidean inset of every physical face plane; null means no positive material remains. */
+	public function inset(distance:Float):Null<ConvexPrism> {
+		if (!Math.isFinite(distance) || distance < 0) fail("Inset distance must be finite nonnegative mm");
+		if (distance == 0) return this;
+		var thickness = Math.abs(extrusion.dot(normals[0]));
+		if (2 * distance >= thickness) return null;
+		var center = new Vector();
+		for (point in base) center = center.add(point.scale(1.0 / base.length));
+		var polygon = base.copy();
+		for (i in 0...base.length) {
+			var origin = base[i], edge = base[(i + 1) % base.length].subtract(origin);
+			var inward = edge.cross(extrusion).normalized();
+			if (center.subtract(origin).dot(inward) < 0) inward = inward.scale(-1);
+			var clipped:Array<Vector> = [];
+			for (j in 0...polygon.length) {
+				var a = polygon[j], b = polygon[(j + 1) % polygon.length];
+				var da = a.subtract(origin).dot(inward) - distance, db = b.subtract(origin).dot(inward) - distance;
+				if (da >= 0) clipped.push(a);
+				if ((da >= 0) != (db >= 0)) clipped.push(a.add(b.subtract(a).scale(da / (da - db))));
+			}
+			polygon = [];
+			for (point in clipped)
+				if (polygon.length == 0 || point.subtract(polygon[polygon.length - 1]).length() > 1e-10) polygon.push(point);
+			if (polygon.length > 1 && polygon[0].subtract(polygon[polygon.length - 1]).length() <= 1e-10) { var removed = polygon.pop(); }
+			if (polygon.length < 3) return null;
+		}
+		var area = new Vector(), origin = polygon[0];
+		for (i in 0...polygon.length)
+			area = area.add(polygon[i].subtract(origin).cross(polygon[(i + 1) % polygon.length].subtract(origin)));
+		if (area.length() <= 1e-8) return null;
+		var capShift = extrusion.scale(distance / thickness);
+		return new ConvexPrism(id, [for (point in polygon) point.add(capShift)], extrusion.scale(1 - 2 * distance / thickness));
+	}
 	public function placed(location:Location):ConvexPrism
 		return new ConvexPrism(id, [for (point in base) location.plane.toWorld(point)], location.direction(extrusion));
 }

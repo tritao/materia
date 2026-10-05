@@ -37,6 +37,22 @@ class PrismCollisionChecks {
 		checks = 0;
 		var query:SheetCollisionQuery = new PrismSatQuery();
 		var rod = box("rod", 2, 0.2, 0.2), contained = box("contained", 0.1, 0.1, 0.1);
+		var rodInset = rod.inset(0.1);
+		check(rodInset != null, "Inset retains a sufficiently thick prism");
+		if (rodInset == null) throw "Missing retained inset fixture";
+		for (point in rodInset.vertices())
+			check(Math.abs(point.x) <= 1.9 + 1e-8 && Math.abs(point.y) <= 0.1 + 1e-8 && Math.abs(point.z) <= 0.1 + 1e-8,
+				"Euclidean inset moves every box face inward by the declared distance");
+		check(rod.inset(0.2) == null, "Collapsed thickness has no inset material");
+		check(rod.inset(0) == rod, "Zero inset preserves immutable material");
+		var insetFixture = new ConvexPrism("oblique-inset",[new Vector(-1,-1,0),new Vector(1,-1,0),new Vector(1,1,0),new Vector(-1,1,0)],new Vector(1,0,2));
+		var obliqueInner = insetFixture.inset(0.1);
+		check(obliqueInner != null, "Oblique extrusion retains its face inset");
+		if (obliqueInner == null) throw "Missing oblique inset fixture";
+		for (point in obliqueInner.vertices())
+			check(point.z >= 0.1 - 1e-8 && point.z <= 1.9 + 1e-8 && Math.abs(point.y) <= 0.9 + 1e-8
+				&& Math.abs(2*point.x-point.z) <= 2-0.1*Math.sqrt(5)+1e-8,
+				"Oblique inset respects Euclidean side planes rather than shrinking vertex coordinates");
 		check(query.overlap(rod, rod), "A prism overlaps itself");
 		check(query.overlap(rod, contained), "Containment is overlap");
 		check(query.overlap(contained, rod), "Containment is symmetric");
@@ -46,6 +62,10 @@ class PrismCollisionChecks {
 		check(!query.overlap(rod, touching), "Face contact has no positive penetration");
 		check(query.overlap(rod, penetrating), "Positive penetration is overlap");
 		check(!query.overlap(rod, separated), "Separated prisms do not overlap");
+		check(Math.abs(query.separation(rod, separated) - 0.1) < 1e-8, "Support gap has physical mm units");
+		check(Math.abs(query.separation(separated, rod) - 0.1) < 1e-8, "Support gap is symmetric");
+		check(Math.abs(query.separation(rod, touching)) < 1e-8, "Touching has zero support gap");
+		check(query.separation(rod, penetrating) < 0, "Overlapping prisms have negative support gaps");
 		check(!query.overlap(rod, rod.placed(Location.translation(new Vector(4, 0.4, 0.4)))), "Vertex contact is permitted");
 		var tiny = rod.placed(Location.translation(new Vector(3.995, 0, 0)));
 		check(query.overlap(rod, tiny), "Small penetration above default tolerance is detected");
@@ -55,10 +75,12 @@ class PrismCollisionChecks {
 		check(faceProjectionsOverlap(rod, skew), "Skew fixture overlaps on every face-normal projection");
 		check(!query.overlap(rod, skew), "Edge-cross-product axis separates the skew rods");
 		check(!query.overlap(skew, rod), "Skew separation is symmetric");
+		check(query.separation(rod, skew) > 0, "Edge-axis separation also certifies a positive distance bound");
 		var common = Location.translation(new Vector(1000, 2000, 3000)).compose(
 			Location.rotation(new Axis(new Vector(), new Vector(3, 1, 2)), 0.7));
 		check(query.overlap(rod.placed(common), penetrating.placed(common)), "Rigid transform preserves penetration");
 		check(!query.overlap(rod.placed(common), skew.placed(common)), "Rigid transform preserves edge-axis separation");
+		check(Math.abs(query.separation(rod.placed(common), separated.placed(common)) - 0.1) < 1e-8, "Rigid transform preserves the metric support gap");
 		check(query.overlap(rod.placed(common), contained.placed(common)), "Rigid transform preserves containment");
 		var almostParallel = separated.placed(Location.rotation(Axis.Z(), 1e-13));
 		check(!query.overlap(rod, almostParallel), "Nearly parallel edges retain a stable separation");

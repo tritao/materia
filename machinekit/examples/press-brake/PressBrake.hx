@@ -124,6 +124,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
 	final poses:Map<String, AssemblyFrame> = [];
 	final toolDatums:Array<PressToolDatum> = [];
 	final frameVolumes:Array<PressMemberVolume> = [];
+	final toolClampMembers:Array<String> = [];
 
 	public function pressAssembly():MachineAssembly return this;
 	public function pressProfile():PressBrakeProfile return profile;
@@ -132,8 +133,8 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
 	public function pressGeometryDatums():PressGeometryDatums return {
 		bed: "bed", ram: "ram", throat: "frameLeft", fingers: ["fingerLeft", "fingerRight"],
 		ramJoint: "Y1", gaugeXJoint: "X", gaugeRJoint: withR ? "R" : null, tools: toolDatums.copy(),
-		frames: frameVolumes.copy(), fixedMembers: ["bed", "supportLeft", "supportRight"],
-		ramMembers: ["guideLeft", "guideRight", "ramBracketLeft", "ramBracketRight", "torsionBar"],
+		frames: [for (volume in frameVolumes) {member: volume.member, boxes: volume.boxes.copy()}], fixedMembers: ["bed", "supportLeft", "supportRight"],
+		ramMembers: ["guideLeft", "guideRight", "ramBracketLeft", "ramBracketRight", "torsionBar"].concat(toolClampMembers),
 		gaugeXMembers: ["gaugeX"], gaugeXRMembers: withR ? ["gaugeR"] : []
 	};
 
@@ -284,6 +285,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
 				if (holderHeight <= 0) throw "Tool stack leaves no space for the upper clamp";
 				fixed('$id-clamp', new ToolClamp(Manual, placement.segment.length, 40, holderHeight),
 					at(placement.start + placement.segment.length / 2, 0, bedHeight + openHeight - holderHeight), "ram");
+				toolClampMembers.push('$id-clamp');
 				fixed(id, placement.segment, at(placement.start, 0, bedHeight + dieHeight + 80), '$id-clamp');
 			}
 			if (firstPunch == null || firstDie == null) throw 'Station "${station.id}" has no physical contact members';
