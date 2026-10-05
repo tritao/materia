@@ -798,8 +798,8 @@ This changes the implementation order, not the required correctness of a future 
 
 **SM9. Single-bend setup.**
 - It takes a `PressGeometry` (bed, die-top height, punch line, ram envelope, backgauge travel and
-  finger shape, as plain numbers in `machinekit.pressbrake.planning`) filled from the reference
-  numbers, so it does not wait for SM8a; SM8a checks that the assembly agrees.
+  finger shape/contact datums, as plain numbers in `machinekit.pressbrake.planning`) rebuilt
+  from the installed SM8 assembly. An independent reference fixture checks those dimensions.
 - Manufacturing acceptance parts take explicit stock and derive each signed bend radius and
   setback from it, retaining the default reference parts. Manual lateral finger spacing is an
   authored assembly setup; planning contact datums come from the physical connectors.
@@ -808,7 +808,9 @@ This changes the implementation order, not the required correctness of a future 
   neutral length remain unchanged; incompatible process radii or allowances are diagnosed.
 - `BendSetup.plan(sheet, state, bend, station, orientation, gaugeEdge, process)`: backgauge X and
   R from the evaluated state in the press frame (SM-D10), depth and overbend from SM6, tonnage
-  check, minimum flange check, finger contact points, the part's swing envelope.
+  check, minimum flange check, finger contact points and press-frame stroke poses/bounds.
+  The sampled bounds serve broad-phase rejection; SM10 checks actual convex geometry through
+  those stroke poses before declaring a collision-free setup.
 - Tests: first-bend X equals the mould-line distance and later bends equal `b + flange difference`
   (FreeCAD's rule) on P2; tonnage refusal on an over-long bend; a short flange refused with the
   named reason.
@@ -957,7 +959,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM7 | done: typed exact punch and single-/four-V die catalogue; standard segments and physical horns; independently segmented paired rows and validated bed layouts; derived process contact data; registered segment/clamp recipes and manual/powered clamp capabilities; strong unique tooling face names. Quick gates `sm7a-profile-foundation`, `sm7b-punch-profiles`, `sm7c-die-profiles` and full gate `sm7-tooling-verified-full` pass; original MachineKit and router engineering summaries unchanged | c4e418ba5; 310a41894; 67da9cae8; final tooling integration |
 | SM8a | done: cylinder parts and coupled mechanical assembly; typed planning geometry derived from physical datums, independent reference comparisons, full-bed force/depth and conservative demo/frame checks; Start-page project with editable ram, X/R and depth-stop axes. Quick gates `sm8a-cylinder-parts`, `sm8a-mechanical-assembly` and full gate `sm8a-press-assembly-full` pass every stage; original MachineKit and router engineering summaries unchanged | c4517c795; ed8faa29b; final assembly integration |
 | SM8b | done: MT5 is on local main 1484b924d and merged; shared typed fluid cylinder/valve/pressure-source interfaces replace pneumatic-only interfaces, and pressure resolution no longer casts components; explicit immutable phase-speed model added, its quick gate `sm8b-phase-speeds` passes all five suites; assembly format 7 hydraulic data passes focused tests (187 ProjectKit assertions), full gate `sm8b-hydraulic-format-full` passes every stage; quick gate `sm8b-fluid-interfaces` passes all five suites with unchanged original MachineKit summaries; typed shared cylinder runtime and current RobotModel 12 fixtures pass focused model (30), both-backend hydraulic (14), world (5004), maintained MuJoCo and four-platform ABI checks; full gate `sm8b-cylinder-runtime-verified-full` passes every stage including project-source runtime; actual press hydraulic service, distribution blocks, bore-area frame-pressure limit and both guide bindings pass quick gate `sm8b-fluid-bindings-verified`; authored passive-joint support reaches assembly/model/runtime, passes 36 model, 192 ProjectKit and both-backend ownership tests (MuJoCo gravity verified); full gate `sm8b-passive-joints-full` passes every stage with unchanged five engineering summaries and app engineering baselines; typed convex-hull contact settings and maintained primitive/hull finger-contact tests pass 6 MuJoCo assertions and the four-platform ABI audit; full gate `sm8b-hull-contact-full` passes every stage with unchanged original MachineKit and app engineering baselines; the later health audit strengthens contact proof to 12 fault-free outcomes; typed assembly 9, machine recipe 16 and scene 17 transport stops, contacts and native timed outputs; quick gate `sm8b-assembled-press-verified` passes all five suites with unchanged original MachineKit summaries; assembled press contacts, stroke, home and lifecycle pass in the rebuilt app; full gate `sm8b-assembled-press-full` passes every stage, including workspace, app build and complete project-source runtime (215 ProjectKit assertions and 12 fault-free finger-contact outcomes) | edf913c0f; 68768fcae; 22ce57f1c; 439ca8690; b15e594c6; 19fc1938c; bf3d5cd31; 63357537d |
-| SM9 | in progress: explicit loaded-stroke evaluation preserves authored neutral length and bounds all inactive bends; SM9a focused SheetMetalSmoke passes 7550 assertions and quick gate `sm9a-loaded-stroke` passes all five suites with unchanged original MachineKit engineering summaries; SM9b process-compatible P1–P5 stock and physical manual finger setup pass focused checks and quick gate `sm9b-manufacturing-setup` passes all five suites; SM9c typed symmetric press placement passes focused checks and quick gate `sm9c-press-placement`; SM9d exact backgauge registration passes focused checks and quick gate `sm9d-backgauge-registration` | ce5b1e66b; d1e0876b8; 5a6e8663a |
+| SM9 | done: typed loaded-stroke evaluation, explicit process-compatible P1–P5 stock, physical manual finger datums, symmetric press placement and exact straight/arc backgauge registration; complete setup checks process compatibility, tonnage, both flange minima, material-bearing tool support and sampled nominal ram travel. Maintained checks pass independent P2 first/later oracles, folded R lift, physical contacts, loaded depth/force, sampled swing and named refusals. Quick gates `sm9a-loaded-stroke`, `sm9b-manufacturing-setup`, `sm9c-press-placement`, `sm9d-backgauge-registration` and final `sm9-single-bend-complete` pass all five suites (7594 sheet assertions); original engineering results unchanged | ce5b1e66b; d1e0876b8; 5a6e8663a; 3d51a5b2c; final setup integration |
 | SM10 | planned | |
 | SM11 | planned | |
 | SM12 | planned | |
@@ -1707,3 +1709,14 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
   distance, later-bend `b + flange difference` (+20 mm), the folded flange's 40 mm R setting,
   both actual ±30 mm contacts, exact circular contacts and the three refusal cases. Quick
   gate `sm9d-backgauge-registration` passes all five suites with unchanged engineering results; complete setup feasibility/result remain.
+
+- SM9 complete-API focused proof: `BendSetup` owns typed press geometry and takes the
+  installed `ToolStation`, explicit orientation/gauge boundary and a `BendProcess`. Its
+  derived result owns registration, process predictions, physical ram travel and sampled
+  press-frame sheet poses/envelope. The sampled envelope is a broad-phase bound, not a
+  collision-clearance certificate; SM10 consumes the actual poses. Stock/state compatibility,
+  tonnage, both straight flange depths, material-bearing punch/die support and every sampled
+  nominal ram position are checked with named diagnoses. `sm9-plan-focus.log` passes whole
+  first/later setups, the independent flange oracles, depth/force, exact loaded endpoint,
+  caller-state isolation, sampled bend containment and tonnage/short-flange/support/ram-travel
+  refusals. Final quick gate `sm9-single-bend-complete` passes every suite with unchanged original engineering results.
