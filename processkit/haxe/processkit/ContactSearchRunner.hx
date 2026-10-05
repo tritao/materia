@@ -15,6 +15,7 @@ class ContactSearchRunner {
   public var stopped(default, null):Bool = false;
   var sequence = 0;
   var previous:Null<Int64> = null;
+  var stopDeadline:Null<Int64> = null;
 
   /** A fresh servo session takes over after the caller approaches the CAD region with arc and wire off. */
   public function new(servo:ServoSession, sensor:String, direction:Vec3, distance:Float, speed:Float,
@@ -53,8 +54,23 @@ class ContactSearchRunner {
           now + search.maxAgeNs);
         if (rejected != null) throw 'Contact search servo command rejected: $rejected';
       } else servo.stop();
+      if (!search.running() && stopDeadline == null) {
+        var brakeSeconds = 0.0;
+        var indices = servo.manipulator.jointIndices();
+        for (joint in 0...indices.length) {
+          var acceleration = servo.manipulator.group.limitsOf(joint).maxAcceleration;
+          if (acceleration != null && Math.isFinite(acceleration) && acceleration > 0)
+            brakeSeconds = Math.max(brakeSeconds, Math.abs(snapshot.velocities.get(indices[joint])) / acceleration);
+        }
+        stopDeadline = now + Int64.fromFloat((brakeSeconds + 2.0) * 1e9);
+      }
+      if (stopDeadline != null && now > cast(stopDeadline, Int64)) throw "Contact search did not reach observed rest within its braking bound";
       var tick = servo.update();
-      if (!search.running() && tick.atRest) stopped = true;
+      var observedRest = !snapshot.trajectoryActive;
+      for (index in servo.manipulator.jointIndices())
+        if (Math.abs(snapshot.velocities.get(index)) > 1e-5) observedRest = false;
+      // Submitted zeros take effect on the next owner tick. A program may take over only after rest is observed.
+      if (!search.running() && tick.atRest && observedRest) stopped = true;
     } catch (error:Dynamic) {
       search.cancel();
       servo.stop();

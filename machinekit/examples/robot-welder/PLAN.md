@@ -1689,3 +1689,13 @@ then a horizontal one: the second vertical face measures the unresolved horizont
 before a narrow top patch is approached. Choose feasible stages by current measured uncertainty,
 not by a fixed top-first order. Fine contact refinement is needed so detection-period error divided
 by the first-stage baseline does not amplify into unacceptable seam error far from those contacts.
+
+### P3 observed-rest correction (2026-10-05)
+
+The complete probe integration exposed an ownership boundary in `ContactSearchRunner`: a servo
+braking tick's `atRest` describes its commanded zeros, which are applied on the next native owner
+tick. Search completion now also requires observed joint velocities below 1e-5 and no active
+trajectory. Waiting for measured rest has a finite bound derived from observed speed and configured
+joint acceleration plus two seconds; a brake that does not settle fails instead of waiting forever.
+Detection-time contact capture remains unchanged. The focused native suite passes 31 assertions,
+including observed rest at every basic search handoff and the prepared refinement integration.
