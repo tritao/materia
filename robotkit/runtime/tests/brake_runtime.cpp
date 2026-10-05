@@ -81,6 +81,22 @@ bool release_coil(robotkit::RobotRuntime &runtime) {
 
 int main() {
     auto spec = blueprint();
+    {
+        auto starting = std::make_shared<BrakeFeedbackEndpoint>();
+        starting->position = 0.4;
+        robotkit::RobotRuntime cold(*spec, starting, std::chrono::milliseconds(10));
+        assert(cold.apply_pending_commands(10'000'000) == RK_OK);
+        assert(starting->last.kind == RK_COMMAND_NONE);
+        assert(starting->position == 0.4);
+        assert(cold.publish_sample(10'000'000) == RK_OK);
+        assert(cold.apply_pending_commands(20'000'000) == RK_OK);
+        assert(starting->position == 0.4);
+        cold.discard_pending_commands();
+        assert(!release_coil(cold));
+        assert(cold.apply_pending_commands(20'000'000) == RK_OK);
+        assert(starting->position == 0.4);
+        assert(release_coil(cold));
+    }
     auto endpoint = std::make_shared<BrakeFeedbackEndpoint>();
     robotkit::RobotRuntime runtime(*spec, endpoint, std::chrono::milliseconds(10));
     robotkit::SegmentBatch batch{};

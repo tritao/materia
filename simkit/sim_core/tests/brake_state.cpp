@@ -38,6 +38,17 @@ int main() {
     brake.advance(0.1);
     assert(brake.released());
 
+    // Reset must engage immediately, without retaining a release transition.
+    brake.reset();
+    assert(!brake.release_coil());
+    assert(!brake.released());
+    assert(brake.friction_effort() == 4.0);
+    brake.set_release_coil(true);
+    brake.advance(0.02);
+    brake.reset();
+    brake.advance(1.0);
+    assert(!brake.released());
+
     auto immediate_state = nksim::BrakeState::create({2.0, 0.0, 0.0});
     assert(immediate_state);
     auto &immediate = *immediate_state;

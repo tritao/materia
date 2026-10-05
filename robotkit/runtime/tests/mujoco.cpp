@@ -279,8 +279,8 @@ static void tool_piece_contact_is_reported(double obstacle_z, bool expected_acti
     auto *legacy = reinterpret_cast<rk_robot_contact *>(legacy_storage);
     legacy->struct_size = sizeof(legacy_storage);
     uint32_t legacy_count = 0;
-    assert(rk_simulation_get_robot_contacts(simulation, robot, legacy, 1, &legacy_count) == RK_OK);
-    assert(legacy_count == count && legacy->struct_size == sizeof(legacy_storage));
+    assert(rk_simulation_get_robot_contacts(simulation, robot, legacy, 1, &legacy_count) == RK_ERROR_INVALID_ARGUMENT);
+    assert(legacy->struct_size == sizeof(legacy_storage));
     rk_robot_contact zero_initialized{};
     assert(rk_simulation_get_robot_contacts(simulation, robot, &zero_initialized, 1,
         &legacy_count) == RK_OK);

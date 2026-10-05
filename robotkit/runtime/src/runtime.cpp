@@ -1150,6 +1150,24 @@ void RobotRuntime::latch_fault(bool clear_control, int32_t fault_code) {
 
 rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
     std::lock_guard owner_lock(owner_mutex_);
+    // A braked axis cannot establish a hold pose until its first real sample.
+    // Keep normal commands queued while the owner publishes that sample;
+    // emergency stop must still reach the endpoint immediately.
+    if (blueprint_.brake_count) {
+        bool sampled;
+        {
+            std::lock_guard state_lock(state_mutex_);
+            sampled = state_.sequence != 0;
+        }
+        if (!sampled) {
+            std::lock_guard queue_lock(queue_mutex_);
+            const bool emergency = std::any_of(commands_.begin(), commands_.end(),
+                [](const QueuedCommand &queued) {
+                    return queued.command.kind == RK_COMMAND_EMERGENCY_STOP;
+                });
+            if (!emergency) return RK_OK;
+        }
+    }
     std::deque<QueuedCommand> commands;
     {
         std::lock_guard queue_lock(queue_mutex_);
@@ -1166,6 +1184,13 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         device_path_time_ns = state_.trajectory_time_ns;
     }
     control_backup_ = control_;
+    brake_backup_.interlocks = brake_interlocks_;
+    std::copy_n(brake_sample_sequences_, RK_MAX_JOINTS, brake_backup_.sample_sequences);
+    std::copy_n(brake_sample_owner_ns_, RK_MAX_JOINTS, brake_backup_.sample_owner_ns);
+    std::copy_n(brake_hold_positions_, RK_MAX_JOINTS, brake_backup_.hold_positions);
+    std::copy_n(brake_powered_, RK_MAX_JOINTS, brake_backup_.powered);
+    brake_backup_.motion_ready = brakes_motion_ready_;
+    brake_backup_.hold_active = brake_hold_active_;
     trajectory_.begin_tick();
     std::copy_n(channel_outputs_, RK_MAX_PROCESS_CHANNELS, channel_outputs_backup_);
     std::copy_n(commanded_position_, RK_MAX_JOINTS, commanded_position_backup_);
@@ -2561,6 +2586,13 @@ void RobotRuntime::discard_pending_commands_locked() noexcept {
         state_ = state_backup_;
         trajectory_.undo_tick();
         control_ = control_backup_;
+        brake_interlocks_ = brake_backup_.interlocks;
+        std::copy_n(brake_backup_.sample_sequences, RK_MAX_JOINTS, brake_sample_sequences_);
+        std::copy_n(brake_backup_.sample_owner_ns, RK_MAX_JOINTS, brake_sample_owner_ns_);
+        std::copy_n(brake_backup_.hold_positions, RK_MAX_JOINTS, brake_hold_positions_);
+        std::copy_n(brake_backup_.powered, RK_MAX_JOINTS, brake_powered_);
+        brakes_motion_ready_ = brake_backup_.motion_ready;
+        brake_hold_active_ = brake_backup_.hold_active;
         std::copy_n(channel_outputs_backup_, RK_MAX_PROCESS_CHANNELS, channel_outputs_);
         std::copy_n(commanded_position_backup_, RK_MAX_JOINTS, commanded_position_);
         std::copy_n(velocity_anchor_pending_backup_, RK_MAX_JOINTS,

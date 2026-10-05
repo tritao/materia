@@ -520,6 +520,7 @@ public:
             auto &joint = joints.at(incoming);
             joint.state.position = joint.state.velocity = joint.state.effort = 0.0;
             joint.target_mode = 0;
+            if (joint.brake) joint.brake->reset();
             if (joint_id >= 0) {
                 data->qpos[model->jnt_qposadr[joint_id]] = 0.0;
                 data->qvel[model->jnt_dofadr[joint_id]] = 0.0;

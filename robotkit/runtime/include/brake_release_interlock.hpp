@@ -1,8 +1,18 @@
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
+#include <cmath>
 
 namespace robotkit::internal {
+
+/** Sensor acquisition is quantized to owner cycles, including a zero-rate contact. */
+inline bool brake_feedback_cadence_valid(double rate, uint64_t period_ns, uint64_t max_age_ns) {
+    if (!std::isfinite(rate) || rate < 0.0 || !period_ns || !max_age_ns) return false;
+    const double cycles = rate == 0.0 ? 1.0 :
+        std::max(1.0, std::ceil(1.0e9 / rate / static_cast<double>(period_ns)));
+    return cycles * static_cast<double>(period_ns) <= static_cast<double>(max_age_ns);
+}
 
 struct BrakeReleaseFeedback {
     uint64_t sequence = 0;

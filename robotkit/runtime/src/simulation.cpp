@@ -223,6 +223,14 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                                 const rk_simulation_robot_desc *robot_desc) {
     if (robot_desc && robot_desc->struct_size != sizeof(*robot_desc))
         return RK_ERROR_INVALID_ARGUMENT;
+    if (rk_robot_runtime_blueprint_validate(&blueprint) != RK_OK)
+        return RK_ERROR_INVALID_ARGUMENT;
+    for (uint32_t i = 0; i < blueprint.brake_count; ++i) {
+        const auto &brake = blueprint.brakes[i];
+        if (!internal::brake_feedback_cadence_valid(blueprint.sensors[brake.released_sensor].update_rate,
+                static_cast<uint64_t>(period_.count()), brake.feedback_max_age_ns))
+            return RK_ERROR_INVALID_ARGUMENT;
+    }
     // A zero-sized initial pose keeps the default placement, so a descriptor
     // can carry collision or device settings without choosing a pose.
     const auto *initial_pose = robot_desc && robot_desc->initial_pose.struct_size != 0

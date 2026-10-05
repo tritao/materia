@@ -38,6 +38,15 @@ int main() {
     blueprint.joint_servo[0] = {100.0, 10.0};
     blueprint.brakes[0] = {0, 0, 0, 0, 250'000'000, 30'000'000};
     assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_OK);
+    blueprint.sensors[0].update_rate = 20.0;
+    assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_ERROR_INVALID_ARGUMENT);
+    blueprint.sensors[0].update_rate = 100.0;
+    assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_OK);
+    blueprint.sensors[0].update_rate = 0.0;
+    blueprint.owner_period_ns = 50'000'000;
+    assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_ERROR_INVALID_ARGUMENT);
+    blueprint.owner_period_ns = 10'000'000;
+    assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_OK);
     blueprint.channels[0].safe_value.digital = 1;
     assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_ERROR_INVALID_ARGUMENT);
     blueprint.channels[0].safe_value.digital = 0;

@@ -195,6 +195,13 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
             blueprint->sensor_joint[brake.released_sensor] != brake.joint)
             return RK_ERROR_INVALID_ARGUMENT;
         const auto &channel = blueprint->channels[brake.release_channel];
+        const auto &feedback = blueprint->sensors[brake.released_sensor];
+        // A feedback source must publish within the contact freshness policy.
+        // A zero rate uses the owner cycle rather than an independent sensor clock.
+        if (!robotkit::internal::brake_feedback_cadence_valid(feedback.update_rate,
+                blueprint->owner_period_ns == 0 ? 10'000'000 : blueprint->owner_period_ns,
+                brake.feedback_max_age_ns))
+            return RK_ERROR_INVALID_ARGUMENT;
         if (channel.kind != RK_EVENT_DIGITAL || channel.safe_value.digital != 0 ||
             channel.stop_policy != RK_CHANNEL_KEEP_ON_STOP)
             return RK_ERROR_INVALID_ARGUMENT;

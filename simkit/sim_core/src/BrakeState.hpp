@@ -44,6 +44,12 @@ public:
     }
 
     bool released() const { return released_; }
+    /** Reset the physical device to its unpowered, spring-applied state. */
+    void reset() {
+        energized_ = false;
+        released_ = false;
+        transition_time_ = 0.0;
+    }
     bool release_coil() const { return energized_; }
     double friction_effort() const { return released_ ? 0.0 : parameters_.holding_effort; }
 

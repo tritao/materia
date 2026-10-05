@@ -403,6 +403,15 @@ private:
     bool brakes_motion_ready_ = true;
     bool brake_hold_active_ = false;
     bool brake_powered_[RK_MAX_JOINTS]{};
+    struct BrakeTickSnapshot {
+        std::vector<internal::BrakeReleaseInterlock> interlocks;
+        uint64_t sample_sequences[RK_MAX_JOINTS]{};
+        uint64_t sample_owner_ns[RK_MAX_JOINTS]{};
+        double hold_positions[RK_MAX_JOINTS]{};
+        bool motion_ready = true;
+        bool hold_active = false;
+        bool powered[RK_MAX_JOINTS]{};
+    } brake_backup_;
     int32_t update_brake_interlocks(uint64_t owner_ns, bool servo_enabled, const rk_robot_state &sample);
     std::condition_variable queue_condition_;
     std::deque<QueuedCommand> commands_;

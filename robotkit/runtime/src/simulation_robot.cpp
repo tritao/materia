@@ -483,7 +483,8 @@ rk_result SimulationRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) 
             }
             for (uint32_t i = 0; i < sample.value_count; ++i) {
                 if (config.noise_stddev > 0.0 && config.kind != RK_SENSOR_JOINT_SWITCH &&
-                    config.kind != RK_SENSOR_AT_SPEED && config.kind != RK_SENSOR_PRESENCE)
+                    config.kind != RK_SENSOR_AT_SPEED && config.kind != RK_SENSOR_PRESENCE &&
+                    config.kind != RK_SENSOR_BRAKE_RELEASED)
                     sensor.values[i] += config.noise_stddev * sensors::gaussian(sensor.random);
                 if (config.kind == RK_SENSOR_LIDAR)
                     sensor.values[i] = std::clamp(sensor.values[i], 0.0, config.max_range);

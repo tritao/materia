@@ -4,6 +4,9 @@
 using namespace robotkit::internal;
 
 int main() {
+    assert(brake_feedback_cadence_valid(40.0, 10'000'000, 30'000'000));
+    assert(!brake_feedback_cadence_valid(40.0, 20'000'000, 30'000'000));
+    assert(!brake_feedback_cadence_valid(0.0, 50'000'000, 30'000'000));
     BrakeReleaseInterlock interlock(250, 30);
     interlock.update(false, 0, {1, 0, false});
     assert(!interlock.release_coil() && !interlock.motion_ready());
