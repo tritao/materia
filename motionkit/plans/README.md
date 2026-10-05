@@ -8,6 +8,7 @@
 | `LANE_B_ARM_PROCESS.md` | Arm toolpaths as validated plans, path-synchronized process events, `ManipulatorMotion`, wall finishing and excavator migration, ProcessKit. |
 | `LANE_C_PLANNING.md` | Native path trajectories and TOPP-RA timing, corner blending, OPW IK, configuration selection, CncKit, virtual CNC end to end. |
 | `LANE_D_REDUNDANCY_SERVO.md` | **Stub, not scheduled.** Native mink-shaped QP differential IK (OSQP), 7-axis redundancy, live Cartesian servoing through the execution session, collision-avoidance limits, coordinated external axes. Uses mink as the design reference and an optional test oracle. |
+| `PROCESS_PATH_PLANNING.md` | Process paths (welds, surface passes, arm toolpaths, arm + track) planned as one ladder graph over analytic IK branches, external-axis and free-roll lattices; lazy collision; timed once. Replaces the numeric beam search and the weld planner's generate-and-test. |
 
 **Order:** §P0, merged to `main`, then Lanes A, B and C in parallel, each in
 its own worktree.
