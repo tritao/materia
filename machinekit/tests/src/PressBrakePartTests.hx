@@ -12,7 +12,11 @@ class PressBrakePartTests {
 		if (CadKit.shapeValidChecked(body.shape.borrowHandle()) == 0 || CadKit.shapeValidChecked(rod.shape.borrowHandle()) == 0)
 			throw "Hydraulic cylinder native validity";
 		near(body.volume(), Math.PI / 4 * (200 * 200 * 180 - 160 * 160 * 100 - 100 * 100 * 40), "Barrel material volume");
-		near(rod.volume(), Math.PI / 4 * 100 * 100 * 150, "Moving rod volume");
+		near(rod.volume(), Math.PI / 4 * 100 * 100 * 190, "Moving rod volume");
+		var rodLength = cylinder.movingRod().length;
+		near(cylinder.bodyLength + cylinder.stemLength - rodLength, cylinder.capLength, "Retracted rod end in bore");
+		near(cylinder.bodyLength + cylinder.stemLength + cylinder.stroke - rodLength,
+			cylinder.bodyLength - cylinder.capLength, "Extended rod end in bore");
 		body.close(); rod.close();
 		near(cylinder.connector("extension").frame.z, 230, "Retracted rod-tip datum");
 		reject(function() { var invalid = new HydraulicCylinder(100, 100, 100); });

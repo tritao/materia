@@ -44,7 +44,7 @@ class HydraulicCylinder extends MachineComponent {
 		if (!Math.isFinite(value) || value < 0) throw "Hydraulic pressure must be finite and nonnegative";
 		return value;
 	}
-	public function movingRod():HydraulicCylinderRod return new HydraulicCylinderRod(rod, stroke + stemLength);
+	public function movingRod():HydraulicCylinderRod return new HydraulicCylinderRod(rod, stroke + capLength + stemLength);
 	override public function hasGeometry():Bool return true;
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Solids.building([], parts -> {
