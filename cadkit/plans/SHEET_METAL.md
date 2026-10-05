@@ -413,6 +413,18 @@ table in `tools/README.md`.
     inner surface, die shoulder circles (radius `rd`, centres `±V/2` apart) tangent to the outer
     surface, flanges straight and tangent to both. Derive the closed form; test it against a
     numeric construction.
+- SM6a distinguishes final inner radius `Rf` from loaded radius `Ri`. The assumed natural
+  radius is `Rf`; invert the physical springback branch to obtain `Ri`. If that would lie below
+  the punch tip, the punch governs `Ri` and its released radius is derived from the same relation.
+  The neutral-axis assumption for this process is explicitly `T/2`, as in the springback formula;
+  it is distinct from an authored K-factor rule. Signed angles retain their bend direction.
+- With `beta = abs(loaded angle)/2`, `a = V/2`, shoulder centre height `-rd`, and loaded
+  inner radius `Ri`, the common tangent gives `h*cos(beta) + a*sin(beta) = Ri + T + rd`.
+  Punch-bottom depth below the die top is `rd + Ri - h`. For a tip smaller than `Ri`, internal
+  tangency at the bottom shifts the punch centre by `Ri-rp`; its bottom position is unchanged.
+  Tests independently recover the tangent angle from the centre distance and numerically solve
+  depth at every degree from 20 to 150 for nine thickness/radius combinations (1 micrometre
+  tolerance). Unsupported tool contact and included-angle limits have named diagnoses.
 - A `CalibrationTable` keyed by (material lot, thickness, punch, die, angle band) stores
   measured corrections (depth offset, radius) that override the analytic values.
 - With a `Process` bend rule, the flat pattern is computed for the chosen tooling.
@@ -686,6 +698,10 @@ setbacks; these define new fixtures, with no existing baseline-number changes.
   through the editor commands and exports a DXF.
 
 **SM5. Convert a solid into a sheet.**
+
+Deferred by user direction on 2026-10-05: prioritize authored sheets, the process model and
+the press brake. SM5a remains available; recognition and STEP conversion remain incomplete.
+This changes the implementation order, not the required correctness of a future conversion.
 - Native: `cad_shape_ancestors(shape, sub, kind, ...)` (edge → faces) with an indexed
   Haxe-friendly variant, a C smoke test in `cadkit/tests/core_smoke.cpp`, regenerate
   `CadKit.hxi` with `cadkit/scripts/generate-haxeon-hxi`.
@@ -908,8 +924,8 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM3o | planned: optional corner closure after SM6, before phase B; gap/overlap and round/square relief semantics remain | |
 | SM4 | done: SM4a exact developed blank regions, typed domain owners, sorted bend data and interrupted fold markings, authored grain frame and typed version-14 snapshot; quick gate `sm4a-flat-verified` (5259 sheet assertions); SM4c typed shared drawing data, exact R12 DXF/SVG, bend annotations and grain arrow; quick gate `sm4c-drawing-exports` (5888 sheet assertions); SM4d typed cut/relief boundary provenance and propagation; quick gate `sm4d-boundary-provenance` (5911 sheet assertions); SM4e six typed manufacturability findings with exact geometry and minimum flange depth; quick gate `sm4e-checks-verified` (5944 sheet assertions); typed blank requirement with explicit order context; quick gate `sm4-flat-pattern-complete` (5963 sheet assertions) | a5508e566; 83a7a8c18; 723b0bac4; 27f66bb9e; a7156977e |
 | SM4b | done: typed editor base/flange commands, explicit stock input, parameter inspector, folded/flat publication, bend table, exact fold-line overlay and DXF/SVG commands; P2 editor workflow passes; full gate `sm4b-editor-full` passes | be21d1579 |
-| SM5 | in progress: SM5a unique native ancestry count/index/bulk queries and typed owning Haxe wrappers; three native suites and focused ancestry checks pass; quick gate `sm5a-ancestry` (5974 sheet assertions); recognition and convert feature remain | SM5a final sub-step commit |
-| SM6 | planned | |
+| SM5 | in progress: SM5a unique native ancestry count/index/bulk queries and typed owning Haxe wrappers; three native suites and focused ancestry checks pass; quick gate `sm5a-ancestry` (5974 sheet assertions); recognition and convert feature deferred by user direction on 2026-10-05 | 51c4f2d5c |
+| SM6 | in progress: SM6a typed air-bending predictions, physical springback inversion and exact contact depth; focused process smoke passes 1235 assertions; quick gate `sm6a-air-bending` passes (7209 sheet assertions); calibration, process rule and material-library integration remain | |
 | SM7 | planned | |
 | SM8a | planned | |
 | SM8b | planned (waits for MT5 on main) | |
@@ -1159,3 +1175,13 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
   Quick gate `sm5a-ancestry` passes all five suites: 5974 sheet assertions, ProjectKit 143,
   ManufacturingKit 54 and unchanged original MachineKit summaries. No saved format, vendor pin
   or haxeon source change is introduced. Solid recognition and the convert feature remain SM5.
+
+- SM6a: typed process/tooling inputs predict final/loaded radius, conserved neutral length,
+  signed overbend, punch-bottom depth, kN force and assumed 90-degree flange minimum. The
+  physical springback branch is inverted with a bracketed solve. Radius bends respect the punch
+  under load and derive the released radius; tool angle/contact limits are diagnosed. Independent
+  circle-centre tangent construction verifies depth over 20–150 degrees for nine stock/radius
+  combinations. Focused process smoke passes 1235 assertions; quick gate `sm6a-air-bending`
+  passes all five suites (7209 sheet assertions, ProjectKit 143, ManufacturingKit 54), with
+  unchanged original MachineKit summaries. No schema, cast, native or compiler change is made.
+  Calibration, saved Process rules and material-library integration remain required for SM6.
