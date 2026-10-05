@@ -1525,3 +1525,24 @@ arc is established. Weld and stow clearance checks pass, and driving/stow transi
 the arc out. The cover is minimum among the documented CAD-derived candidate grid; this is
 not a claim of global optimality over continuous parking space. The final welder, arm, mobile
 and MachineKit milestone regression gates and main sync remain pending.
+
+### P3 observation and registration design, prepared while P2 gates run
+
+Use three CAD-derived, nonparallel work faces and a 3–2–1 contact pattern to constrain the
+complete rigid work frame: three separated contacts on the first face, two on the second and
+one on the third. Fit point-to-plane constraints from measured joint configurations and fresh
+`tool_weld.touch` observations; reject deficient rank or inconsistent residuals. Do not reuse
+`SurfaceRegistration` as a complete weld-frame solution: its documented single-plane result
+leaves translation in the plane and rotation about its normal unobserved.
+
+CAD supplies the nominal faces, reachable probe regions and search bounds. Executed contacts
+supply the correction. The registration input must not include live simulation object poses.
+Those poses remain valid for physical grounding, bead attachment, clearance and test assertions.
+Keep contact search and welding registration in ProcessKit, CAD probe selection in
+`machinekit.welding`, and generic motion/servo mechanisms in their existing owners. Reacquire
+the frame after every parking step, and use the accepted observation for all station seams.
+Injected parking displacement must change the real base pose without giving the estimator the
+same correction: Simulation exposes base teleport while preserving the shared clock, and wheel
+odometry can retain the estimated pose. The test must demonstrate that executed contacts,
+rather than an exact simulation localization or work-body lookup, recover the weld frame.
+P3 implementation, saved-format changes and executed noise checks have not started.
