@@ -812,8 +812,8 @@ Done. What was built and decided:
 | MT5 | done | 453d890ad, 5f06c32e5, a397b187a, a6230c46e, 1484b924d |
 | MT5b | done: review regressions | 04d3d092d |
 | MT5b follow-up | done: review fixes and complete closing gate | 4ff013c90; full history in [REVIEW_FIXES.md](REVIEW_FIXES.md) |
-| MT5b second review | verified: final commits and Haxeon pin decision pending | see [REVIEW_FIXES.md](REVIEW_FIXES.md) |
-| MT6 | done | 4c9e6ebec |
+| MT5b second review | verified: Haxeon pin decision pending | 3c5eef1dd; see [REVIEW_FIXES.md](REVIEW_FIXES.md) |
+| MT6 | done, second-review corrections verified | 4c9e6ebec, daf20e12d, 3c5eef1dd |
 | MT7 | planned | |
 | MT8 | planned | |
 | MT9 | planned | |
