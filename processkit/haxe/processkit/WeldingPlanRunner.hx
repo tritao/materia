@@ -57,6 +57,18 @@ private class LatestReading implements WelderFeedback {
   public function reading():WeldReading return value;
 }
 
+/** Complete welding motion checks shared by CAD station planning and runtime execution. */
+class WeldPlanning {
+  public final compiler:ProgramCompiler;
+  public final wrist:WristLimits;
+  public final planner:WeldPathPlanner;
+  public function new(compiler:ProgramCompiler, wrist:WristLimits, planner:WeldPathPlanner) {
+    this.compiler = compiler;
+    this.wrist = wrist;
+    this.planner = planner;
+  }
+}
+
 /**
  * Welds one seam with an arm: a MotionKit program, run by `ManipulatorMotion`, whose process is driven by a
  * `ProcessRun` over a `WelderProcessDevice`. It works through the robot alone: the torch's channels and the arm's
@@ -139,13 +151,8 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     return compiler.compile(new MotionProgram(ops), start, Int64.ofInt(1));
   }
 
-  /**
-   * An arm's welding runner. `channels` are the torch's; `maxAcceleration` the joint acceleration programs plan with.
-   * `clearance`, when given, is what the welds are planned to be clear of the work with (`WeldPathPlanner`).
-   */
-  public static function create(robot:Robot, manipulator:Manipulator,
-      eventSource:Void -> {events:Array<FiredProcessEvent>, overflow:Bool}, channels:WelderChannels, maxAcceleration:Float,
-      ?maxRestarts:Int = 3, ?clearance:ArmClearance):WeldingPlanRunner {
+  /** The same complete-motion planner used by execution, without a robot or channel owner. */
+  public static function planning(manipulator:Manipulator, maxAcceleration:Float, ?clearance:ArmClearance):WeldPlanning {
     var count = manipulator.group.count();
     var limits = new ValidationLimits(count, Int64.ofInt(1), Int64.ofInt(0));
     for (joint in 0...count) {
@@ -163,11 +170,6 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
       }], [for (_ in 0...count) maxAcceleration], [for (_ in 0...count) 20.0],
       StartTolerances.uniform(count, 0.005, maxAcceleration * 0.01, 20.0 * 0.01),
       null, 0.002, 0.2, PATH_TOLERANCE, 0.02, new IkTolerance(5e-5, 1e-3, 300, 0.03));
-    var indices = [for (target in manipulator.toJointTargets([for (_ in 0...count) 0.0])) target.joint];
-    // The program waits on the established arc, which the welder's reading says.
-    var latest = new LatestReading();
-    var motion = new ManipulatorMotion(robot, compiler, function(channel) return channel == ARC_ESTABLISHED
-      ? EventValue.Digital(latest.reading().arc) : null, eventSource, indices);
     // The torch turns at corners as the wrist allows: the slowest of its last three joints, and the programs' acceleration.
     var wristSpeed = Math.POSITIVE_INFINITY;
     for (joint in Std.int(Math.max(0, count - 3))...count) {
@@ -177,7 +179,25 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     var wrist:WristLimits = {angularSpeed: wristSpeed, angularAcceleration: maxAcceleration};
     var planner = new WeldPathPlanner(compiler.solver, compiler.ikTolerance, compiler.maxVelocity, wrist, clearance, compiler.perJointMaxJump,
       function(planned, start) return compileWeld(compiler, wrist, planned, start));
-    return new WeldingPlanRunner(motion, channels, latest, maxRestarts, planner, wrist);
+    return new WeldPlanning(compiler, wrist, planner);
+  }
+
+  /**
+   * An arm's welding runner. `channels` are the torch's; `maxAcceleration` the joint acceleration programs plan with.
+   * `clearance`, when given, is what the welds are planned to be clear of the work with (`WeldPathPlanner`).
+   */
+  public static function create(robot:Robot, manipulator:Manipulator,
+      eventSource:Void -> {events:Array<FiredProcessEvent>, overflow:Bool}, channels:WelderChannels, maxAcceleration:Float,
+      ?maxRestarts:Int = 3, ?clearance:ArmClearance):WeldingPlanRunner {
+    var checked = planning(manipulator, maxAcceleration, clearance);
+    var count = manipulator.group.count();
+    var compiler = checked.compiler;
+    var indices = [for (target in manipulator.toJointTargets([for (_ in 0...count) 0.0])) target.joint];
+    // The program waits on the established arc, which the welder's reading says.
+    var latest = new LatestReading();
+    var motion = new ManipulatorMotion(robot, compiler, function(channel) return channel == ARC_ESTABLISHED
+      ? EventValue.Digital(latest.reading().arc) : null, eventSource, indices);
+    return new WeldingPlanRunner(motion, channels, latest, maxRestarts, checked.planner, checked.wrist);
   }
 
   /** Over an existing motion, whose input wait reads the established arc from `latest`. */

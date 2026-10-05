@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "processkit-weld-planning-tests"},
+  "entry": "WeldPlanningMain",
+  "sourceRoots": [".", "../src"],
+  "dependencies": {"processkit": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "build"
+}

@@ -38,8 +38,11 @@ class PlannedWeld {
   public final styles:Array<Int>;
   /** How many poses of the motion were checked for reach, and for clearance. */
   public final checked:Int;
+  /** Verified joint configuration after retreat, for planning the next motion on the same branch. */
+  public final endJoints:Array<Float>;
 
-  public function new(plan:WeldPlan, rolls:Array<Float>, styles:Array<Int>, entry:WeldEntry, retreat:Pose3, exitName:String, checked:Int) {
+  public function new(plan:WeldPlan, rolls:Array<Float>, styles:Array<Int>, entry:WeldEntry, retreat:Pose3, exitName:String, checked:Int,
+      endJoints:Array<Float>) {
     this.styles = styles;
     this.plan = plan;
     this.rolls = rolls;
@@ -47,6 +50,7 @@ class PlannedWeld {
     this.retreat = retreat;
     this.exitName = exitName;
     this.checked = checked;
+    this.endJoints = endJoints.copy();
   }
 }
 
@@ -272,9 +276,10 @@ class WeldPathPlanner {
       if (index == requested.segments.length - 1) {
         var out = leave(requested, turned, done.q, label);
         if (out == null) continue;
-        var candidate = new PlannedWeld(new WeldPlan(finished, requested.parameters), rollsNow, stylesNow, entry, out.retreat, out.name, checked);
-        if (!verify(candidate, start, label)) continue;
-        return new PlannedWeld(candidate.plan, rollsNow, stylesNow, entry, out.retreat, out.name, checked);
+        var candidate = new PlannedWeld(new WeldPlan(finished, requested.parameters), rollsNow, stylesNow, entry, out.retreat, out.name, checked, out.q);
+        var end = verify(candidate, start, label);
+        if (end == null) continue;
+        return new PlannedWeld(candidate.plan, rollsNow, stylesNow, entry, out.retreat, out.name, checked, end);
       }
       var rest = search(requested, start, index + 1, finished, rollsNow, stylesNow, done.q, roll, entry);
       if (rest != null) return rest;
@@ -283,9 +288,9 @@ class WeldPathPlanner {
   }
 
   /** Check the compiler's actual trajectories before accepting a sampled path, without sending anything to the robot. */
-  function verify(candidate:PlannedWeld, start:Array<Float>, label:String):Bool {
+  function verify(candidate:PlannedWeld, start:Array<Float>, label:String):Null<Array<Float>> {
     var compile = compileMotion;
-    if (compile == null) return true;
+    if (compile == null) return candidate.endJoints.copy();
     var compiled:Null<CompiledProgram> = null;
     try {
       compiled = compile(candidate, start);
@@ -304,12 +309,15 @@ class WeldPathPlanner {
           if (hit != null) throw describe(hit, tip);
         }
       }
+      var end = candidate.endJoints.copy();
+      for (block in compiled.blocks) for (trajectory in block.plans)
+        end = trajectory.evaluate(trajectory.durationSeconds).positions.copy();
       compiled.dispose();
-      return true;
+      return end;
     } catch (error:Dynamic) {
       if (compiled != null) compiled.dispose();
       unreachable.push('$label, compiled motion: $error');
-      return false;
+      return null;
     }
   }
 
@@ -378,7 +386,7 @@ class WeldPathPlanner {
   }
 
   /** How the torch leaves the end of the last segment: the first way that is reachable and clear from the weld's end. */
-  function leave(requested:WeldPlan, segment:WeldSegment, from:Array<Float>, label:String):Null<{retreat:Pose3, name:String}> {
+  function leave(requested:WeldPlan, segment:WeldSegment, from:Array<Float>, label:String):Null<{retreat:Pose3, name:String, q:Array<Float>}> {
     var wireOut = segment.stop.rotation.rotate(new Vec3(0.0, 0.0, 1.0));
     var distance = requested.parameters.approach;
     var end = segment.stop.translation;
@@ -392,7 +400,7 @@ class WeldPathPlanner {
       line(end, segment.stop.rotation, lift, segment.stop.rotation, steps, false);
       line(lift, segment.stop.rotation, away, segment.stop.rotation, steps, true);
       var done = chain(steps, [from], '$label, leaving ${way.name}');
-      if (done.q != null) return {retreat: pose(away, segment.stop.rotation), name: way.name};
+      if (done.q != null) return {retreat: pose(away, segment.stop.rotation), name: way.name, q: done.q};
     }
     return null;
   }

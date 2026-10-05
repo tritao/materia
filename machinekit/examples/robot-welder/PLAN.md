@@ -1454,3 +1454,18 @@ translation and yaw transform every station; no world parking coordinates are au
 resolution and standoff band are explicit planning parameters. Candidates remain unproven until
 navigation and full-motion checks accept them. The focused station suite passes 148 checks,
 including mounted-arm distances, heading, rigid-work-frame equivariance and invalid bounds.
+
+P2 shared planning boundaries: the existing posed-obstacle floor rasterizer is extracted into
+`robotkit.navigation.FloorMap`, preserving navigation ownership and the public MissionPlayer
+helper surface. Focused tests pass 82 assertions for rotated-obstacle detours and blocked parking.
+The follow-up map fix anchors cells to world multiples of the resolution; 482 assertions now
+also prove that adding candidate goals does not move obstacles between cells. Mission maps must
+include the robot's initial live pose, not only destinations, because a one-station mobile weld
+can start farther from its destination than the previous fixed map margin.
+
+`WeldingPlanRunner.planning` exposes the same compiled swept-motion checks used by execution,
+without creating a robot/channel owner. `PlannedWeld.endJoints` records the verified retreat's
+joint configuration, including the compiled trajectory endpoint, so ordered runs can continue
+from the actual branch instead of resetting their proof to a home seed. The focused planning
+suite passes 44 existing planning assertions and 19 pass-path assertions, plus a complete compiled
+factory check and a retreat-endpoint check within 0.5 mm. No native build needed.
