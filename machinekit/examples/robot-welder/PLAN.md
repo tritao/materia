@@ -1640,3 +1640,9 @@ The focused suite passes 20 search assertions plus the existing 109 registration
 The servo adapter compiles, but its executed native motion has not yet been exercised: the unit
 suite proves the search policy and constructor validation, not a mobile contact-search mission.
 CAD probe selection, safe approach/retreat, saved mission steps and observed-frame use remain open.
+
+P3's focused native-motion suite now passes 15 assertions on the deterministic backend. A
+prismatic probe executes the real ServoSession and native runtime against WeldArcModel contact
+feedback: calibrated contact is within 0.06 mm of a physical plane, the recorded point precedes
+braking, and stale feedback and a no-touch search both brake to rest without a registration point.
+This proves the adapter's executed motion boundary, not the multi-face mobile mission or MuJoCo.
