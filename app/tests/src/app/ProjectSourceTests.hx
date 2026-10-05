@@ -2231,6 +2231,10 @@ class ProjectSourceTests {
     }
     Sys.setCwd(root);
     // PROJECT_SOURCE_ONLY=mobile, =arm or =welder runs just those example's checks, for iterating on them.
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-registration-boundary") {
+      MobileWelderTests.runRegistration(root, true);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-registration") {
       MobileWelderTests.runRegistration(root);
       return 0;

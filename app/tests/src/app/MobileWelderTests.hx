@@ -92,7 +92,7 @@ class MobileWelderTests {
     simulation.clear(); session.dispose();
   }
   /** Contacts must recover a parked work frame while wheel odometry retains its pre-jump estimate. */
-  public static function runRegistration(root:String):Void {
+  public static function runRegistration(root:String, boundary:Bool = false):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-welder/materia.mobilemission.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
     var authored:materia.project.SceneArtifact.SceneArtifactMission = cast generated.mission;
@@ -116,14 +116,14 @@ class MobileWelderTests {
             var base = physics.linkPose(mission.robotIndex, 0);
             var old = new robotkit.spatial.Transform3(new robotkit.spatial.Vec3(base.position[0], base.position[1], base.position[2]),
               robotkit.spatial.Quat.fromArray(base.rotation));
-            var error = new robotkit.spatial.Transform3(new robotkit.spatial.Vec3(0.012, -0.009, 0),
-              robotkit.spatial.Quat.fromRollPitchYaw(0, 0, 0.025));
+            var error = new robotkit.spatial.Transform3(new robotkit.spatial.Vec3(boundary ? 0.020 : 0.012, boundary ? -0.020 : -0.009, 0),
+              robotkit.spatial.Quat.fromRollPitchYaw(0, 0, boundary ? 2 * Math.PI / 180 : 0.025));
             var shifted = old.compose(error);
             physics.placeRobotBase(mission.robotIndex, shifted.translation.toArray(), shifted.rotation.toArray());
             // placeRobotBase applies on the next owner tick. Publish the displaced plant before planning its clearance world.
             simulation.activeSession().step();
             injected = true;
-            Sys.println('mobile contact registration ($backend): injected parking error');
+            Sys.println('mobile contact registration ($backend): injected ${boundary ? "20 mm/2 degree boundary" : "parking error"}');
           }
           simulation.step();
           if (mission.failure != null) throw 'Mobile contact registration ($backend) failed: ${mission.failure}';
@@ -270,12 +270,31 @@ class MobileWelderTests {
         if (!simulation.rebuild(session.sensors, session.scene, session)) throw simulation.error;
         var mission = simulation.missionPlayer(), beads = simulation.weldBeads(), welder = simulation.welder();
         if (mission == null || beads == null || welder == null) throw "Mobile welding mission is incomplete";
-        var limit = simulation.activeSession().simulationTime() + 1200;
-        var tick = 0, stowing = -1;
+        // Preserve the original mission allowance and the validated per-registration test allowance.
+        var registrations = [for (step in authored.steps) if (step.kind == "findWork") step].length;
+        var limit = simulation.activeSession().simulationTime() + 1200 * (1 + registrations);
+        var tick = 0, stowing = -1, reportedStep = -1;
+        var reportedProbe = "";
         var worst = 0.0;
         var stowClearance:Null<robotkit.manipulation.ArmClearance> = null;
         while (!mission.finished && simulation.activeSession().simulationTime() < limit) {
           simulation.step(); tick++;
+          if (mission.stepIndex != reportedStep) {
+            reportedStep = mission.stepIndex;
+            var kind = reportedStep < authored.steps.length ? authored.steps[reportedStep].kind : "done";
+            Sys.println('mobile welding ($backend): step $reportedStep $kind at ${simulation.activeSession().simulationTime()} s');
+          }
+          if (mission.stepIndex < authored.steps.length && authored.steps[mission.stepIndex].kind == "findWork") {
+            var finding:processkit.skill.FindWeldWork = cast mission.runner.activeSkill();
+            if (finding != null && finding.runner != null) {
+              var active = finding.runner;
+              var progress = '${mission.stepIndex}: ${active.sequence.normals.length + 1}/${active.sequence.index + 1} ${active.probe.phase}';
+              if (progress != reportedProbe) {
+                reportedProbe = progress;
+                Sys.println('mobile welding ($backend): probe $progress at ${simulation.activeSession().simulationTime()} s');
+              }
+            }
+          }
           if (mission.failure != null) throw 'Mobile weld failed at ${simulation.activeSession().simulationTime()} s: ${mission.failure}';
           var weldStep = mission.weldingStep();
           if (weldStep >= 0) {
