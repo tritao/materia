@@ -4702,6 +4702,38 @@ class ProjectSourceTests {
     missing.dispose();
   }
 
+  /** The press preview is a mechanical assembly whose coupled ram and gauges remain editable. */
+  static function checkPressBrake(root:String):Void {
+    var manifest = root + "/machinekit/examples/press-brake/materia.project.json";
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var definition = generated.assemblyDefinition;
+    if (definition == null) throw "Press preview lost its assembly definition";
+    check(generated.objects.length == definition.occurrences.length, "press preview includes every physical member");
+    for (part in generated.objects) check(part.mass > 0, 'press part ${part.id} has material-derived mass');
+    var session = new ProjectDocumentSession(null, false);
+    try {
+      session.openGeneratedScene(generated.objects, manifest, generated.geometryBySnapshot, definition,
+        generated.assemblyState, generated.localCentersByDefinition, generated.metresPerUnit,
+        generated.physical, generated.recipeDocument);
+      var initial = new AssemblyState(definition, session.projectAssemblyState);
+      var ramZ = initial.worldConnector("ram", "tool-mount").z;
+      check(session.setAssemblyJointCoordinate("Y1", 25), "press ram can move through the editor");
+      check(session.setAssemblyJointCoordinate("X", 125), "press X backgauge can move through the editor");
+      check(session.setAssemblyJointCoordinate("R", 20), "press R backgauge can move through the editor");
+      check(session.setAssemblyJointCoordinate("depth", 30), "press depth stop can move independently");
+      var moved = new AssemblyState(definition, session.projectAssemblyState);
+      check(Math.abs(moved.worldConnector("ram", "tool-mount").z - (ramZ - 25)) < 1e-6,
+        "editor ram coordinate moves its installed tool stack");
+      check(Math.abs(moved.worldPose("guideLeft").z - moved.worldPose("guideRight").z) < 1e-6,
+        "editor keeps the torsion-bar ram guides together");
+      var finger = moved.worldConnector("fingerLeft", "contact");
+      check(Math.abs(finger.y - 125) < 1e-6 && Math.abs(finger.z - 850) < 1e-6,
+        "editor X/R coordinates move the physical finger contact");
+    } catch (error:Dynamic) { session.dispose(); throw error; }
+    session.dispose();
+    Sys.println("press brake project: coupled ram, independent depth stop and X/R editor axes passed");
+  }
+
   public static function main():Int {
     var code = checks();
     // No worker may still be planning when the process exits: the native library's destructors would run under it.
@@ -4791,6 +4823,10 @@ class ProjectSourceTests {
       root = parent;
     }
     Sys.setCwd(root);
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "press-brake") {
+      checkPressBrake(root);
+      return 0;
+    }
     // PROJECT_SOURCE_ONLY=mobile, =arm or =welder runs just those example's checks, for iterating on them.
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-registration-boundary") {
       MobileWelderTests.runRegistration(root, true);
@@ -5347,6 +5383,7 @@ class ProjectSourceTests {
     }
     session.dispose();
     if (FileSystem.exists(output)) FileSystem.deleteFile(output);
+    checkPressBrake(root);
     checkRobotArm(root);
     checkParallelGripperMission(root);
     checkCobotArms(root);

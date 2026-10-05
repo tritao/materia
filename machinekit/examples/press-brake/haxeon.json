@@ -1,0 +1,14 @@
+{
+	"version": 1,
+	"package": { "name": "machinekit-press-brake-example" },
+	"entry": "PressBrakePreview",
+	"sources": ["PressBrake.hx", "PressBrakePreview.hx", "PressBrakeChecks.hx"],
+	"sourceRoots": ["."],
+	"dependencies": {
+		"projectkit": { "path": "../../../projectkit" },
+		"cadkit": { "path": "../../../cadkit" },
+		"machinekit": { "path": "../../" }
+	},
+	"target": "host",
+	"outputDir": "build"
+}

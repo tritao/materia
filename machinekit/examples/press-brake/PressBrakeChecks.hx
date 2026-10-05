@@ -1,13 +1,46 @@
 import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.AssemblyState;
+import machinekit.pressbrake.planning.PressGeometry;
+import machinekit.pressbrake.planning.PressEnvelope;
+import machinekit.pressbrake.ToolLayout;
+import machinekit.pressbrake.ToolStation;
+import machinekit.pressbrake.ToolRow;
+import machinekit.pressbrake.ToolSegment;
+import machinekit.pressbrake.ToolProfiles;
+import machinekit.pressbrake.ToolingCatalogue;
+import cadkit.sheetmetal.Sheet;
+import cadkit.sheetmetal.SheetDemoParts;
+import cadkit.sheetmetal.process.AirBending;
 
 /** Check the installed press's joint tree, coupled ram and physical tool datums. */
 class PressBrakeChecks {
 	public static function main():Void run();
 	public static function run():Void {
-		for (withR in [false, true]) {
-			var press = new PressBrake(withR);
+		var tallest = new ToolLayout(1600, [new ToolStation("four-V", new ToolRow([
+			new ToolSegment(Punch(ToolingCatalogue.gooseneck()), 200)], []), new ToolRow([
+			new ToolSegment(FourV(ToolingCatalogue.fourV(), 0), 200)], []), 700)]);
+		for (variant in 0...3) {
+			var withR = variant != 0;
+			var press = new PressBrake(withR, variant == 2 ? tallest : null);
 			press.validate();
+			var geometry = PressGeometry.of(press), reference = PressGeometry.reference(press.toolLayout, withR);
+			near(geometry.bedLength, reference.bedLength, "Derived bed length");
+			near(geometry.bedTopHeight, reference.bedTopHeight, "Derived bed top");
+			near(geometry.openHeight, reference.openHeight, "Derived open mount separation");
+			near(geometry.throatY, reference.throatY, "Derived throat plane");
+			near(geometry.capacityN, reference.capacityN, "Declared frame capacity");
+			near(geometry.ramTravel.upper, reference.ramTravel.upper, "Derived ram stroke");
+			near(geometry.backgaugeX.upper, reference.backgaugeX.upper, "Derived X travel");
+			near(geometry.backgaugeR.upper, reference.backgaugeR.upper, "Derived R travel");
+			checkEnvelope(geometry.ramEnvelope, reference.ramEnvelope, "Derived ram bounds");
+			for (i in 0...geometry.fingers().length) checkEnvelope(geometry.fingers()[i], reference.fingers()[i], "Derived finger bounds");
+			for (station in geometry.stations()) {
+				var expected = reference.station(station.id);
+				near(station.dieTopHeight, expected.dieTopHeight, "Derived die top");
+				near(station.punchLineY, expected.punchLineY, "Derived punch line");
+				near(station.openTipHeight, expected.openTipHeight, "Derived open tool gap");
+			}
+			checkCapacityAndFrame(press, geometry);
 			for (entry in press.components()) {
 				var part = entry.component.geometry();
 				var valid = CadKit.shapeValidChecked(part.shape.borrowHandle()) != 0 && part.volume() > 0;
@@ -30,11 +63,66 @@ class PressBrakeChecks {
 				near(state.worldPose("guideRight").z, state.worldPose("guideLeft").z, "Torsion-bar equality");
 				near(state.worldConnector("ram", "tool-mount").z, press.bedHeight + press.openHeight - travel, "Ram mount");
 				near(state.worldConnector("fingerLeft", "contact").y, travel * 5, "Backgauge distance");
-				near(state.worldConnector("fingerRight", "contact").z, press.bedHeight + 30 + (withR ? travel * 1.2 : 0), "Backgauge lift");
+				near(state.worldConnector("fingerRight", "contact").z, press.gaugeBaseHeight + (withR ? travel * 1.2 : 0), "Backgauge lift");
 				near(state.worldPose("depthStop").z, press.bedHeight + press.openHeight - travel, "Independent depth stop");
 			}
 		}
 		trace("Press brake assembly checks passed");
+	}
+	static function checkCapacityAndFrame(press:PressBrake, geometry:PressGeometry):Void {
+		var process = new AirBending();
+		for (station in press.toolLayout.stations()) {
+			var prediction = process.predict(SheetDemoParts.materialA(), station.processTooling(), Math.PI / 2, geometry.bedLength);
+			if (prediction.force * 1000 > geometry.capacityN) throw "Full-bed material-A bend exceeds frame capacity";
+			var contact = geometry.station(station.id);
+			if (prediction.depth > geometry.ramTravel.upper - (contact.openTipHeight - contact.dieTopHeight))
+				throw "Installed tool stack cannot reach the predicted bending depth";
+		}
+		var tallestPunch = 0.0, tallestDie = 0.0;
+		for (profile in ToolProfiles.catalogueProfiles()) {
+			if (ToolProfiles.isPunch(profile)) tallestPunch = Math.max(tallestPunch, ToolProfiles.height(profile));
+			else tallestDie = Math.max(tallestDie, ToolProfiles.height(profile));
+		}
+		if (tallestPunch + tallestDie >= geometry.openHeight - geometry.ramTravel.upper)
+			throw "Tallest catalogue tooling consumes the structural mount opening";
+		for (sheet in [SheetDemoParts.p1(), SheetDemoParts.p2(), SheetDemoParts.p3(), SheetDemoParts.p4(), SheetDemoParts.p5()]) {
+			// These demo descendants are rectangular and all nested hinges are parallel. The
+			// straight-leg plus outer bend-arc length bounds vertical/rearward reach at every angle.
+			var reach = sheet.thickness();
+			for (wall in sheet.walls()) reach = Math.max(reach, sheet.thickness() + branchReach(sheet, wall.id));
+			var root = sheet.walls()[0], rear = 0.0;
+			for (segment in root.outline.loops()[0]) {
+				if (!segment.isLine()) throw "Demo frame bound needs straight root edges";
+				rear = Math.max(rear, Math.max(segment.start.x, segment.end.x));
+			}
+			if (rear + reach >= geometry.throatY) throw "Demo swing envelope reaches the rear throat plane";
+			for (station in geometry.stations())
+				if (station.dieTopHeight + reach >= geometry.ramEnvelope.minZ - geometry.ramTravel.upper)
+					throw "Demo swing envelope reaches the ram beam within its stroke";
+			if (rear + reach > geometry.backgaugeX.upper - geometry.backgaugeX.lower)
+				throw "Demo rearward envelope exceeds the backgauge range";
+		}
+	}
+	static function branchReach(sheet:Sheet, wall:Int):Float {
+		for (bend in sheet.bends()) if (bend.wallB == wall) {
+			var outline = sheet.wall(wall).outline;
+			if (outline.loops().length != 1 || outline.loops()[0].length != 4
+				|| bend.edgeB.span.start.x != 0 || bend.edgeB.span.end.x != 0)
+				throw "Demo frame bound needs rectangular descendants hinged at x=0";
+			for (segment in outline.loops()[0]) if (!segment.isLine()) throw "Demo frame bound needs straight child edges";
+			for (incoming in sheet.bends()) if (incoming.wallB == bend.wallA) {
+				var a = incoming.edgeB.span, b = bend.edgeA.span;
+				var cross = (a.end.x - a.start.x) * (b.end.y - b.start.y) - (a.end.y - a.start.y) * (b.end.x - b.start.x);
+				if (Math.abs(cross) > 1e-9 * a.length() * b.length()) throw "Demo frame bound needs parallel nested hinges";
+			}
+			return branchReach(sheet, bend.wallA) + outline.segment(0, 0).length()
+				+ sheet.bendAllowance(bend) + Math.abs(bend.angle) * sheet.thickness();
+		}
+		return 0;
+	}
+	static function checkEnvelope(actual:PressEnvelope, expected:PressEnvelope, label:String):Void {
+		near(actual.minX, expected.minX, label); near(actual.minY, expected.minY, label); near(actual.minZ, expected.minZ, label);
+		near(actual.maxX, expected.maxX, label); near(actual.maxY, expected.maxY, label); near(actual.maxZ, expected.maxZ, label);
 	}
 	public static function near(actual:Float, expected:Float, label:String):Void {
 		if (!Math.isFinite(actual) || Math.abs(actual - expected) > 1e-6) throw '$label: $actual instead of $expected';

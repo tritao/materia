@@ -737,7 +737,7 @@ This changes the implementation order, not the required correctness of a future 
   - depth: closed form equals the numeric three-circle construction within 1 µm over 20°–150°;
   - a calibration entry overrides the analytic depth and radius.
 
-### Phase B: the press brake and bend planning (MachineKit; only SM8b waits, for MT5)
+### Phase B: the press brake and bend planning (MachineKit; required dependencies are on main)
 
 **SM7. Tooling catalogue.**
 - No prerequisite: tooling is plain parts, with no transmissions or drives.
@@ -765,8 +765,10 @@ This changes the implementation order, not the required correctness of a future 
 - `PressGeometry.of(pressBrake)` derives SM9's plain-number geometry from the assembly, and a
   check asserts it equals the reference `PressGeometry`.
 - `PressBrakeChecks` in the MachineKit smoke suite: tonnage capacity vs the SM6 formula for the
-  bed length; open height and throat clear the tallest tooling and P1–P5 at every stroke
-  position; backgauge reach covers the demo parts' gauge distances; BOM.
+  bed length; the structural mount opening accepts the tallest tooling throughout the nominal stroke;
+  conservative P1–P5 swing envelopes clear the ram beam and rear throat throughout that stroke;
+  backgauge reach covers the demo envelopes; BOM. Installed tool contact/collision feasibility
+  belongs to SM9/SM10, since nominal mechanical travel includes positions beyond a safe tool stroke.
 - `press-brake/materia.project.json` and a Start-page entry showing the machine alone (joints
   moved by the editor, no actuation yet).
 
@@ -779,8 +781,10 @@ This changes the implementation order, not the required correctness of a future 
   valve block part, and the switches (top, speed change, bottom, finger contacts) through
   `addSwitch`. Bump the projectkit format and regenerate fixtures.
 - `PressBrakeChecks` in the MachineKit smoke suite: tonnage capacity vs the SM6 formula for the
-  bed length; open height and throat clear the tallest tooling and P1–P5 at every stroke
-  position; backgauge reach covers the demo parts' gauge distances; BOM.
+  bed length; the structural mount opening accepts the tallest tooling throughout the nominal stroke;
+  conservative P1–P5 swing envelopes clear the ram beam and rear throat throughout that stroke;
+  backgauge reach covers the demo envelopes; BOM. Installed tool contact/collision feasibility
+  belongs to SM9/SM10, since nominal mechanical travel includes positions beyond a safe tool stroke.
 - `press-brake/materia.project.json` and a Start-page entry showing the machine alone with a
   scripted stroke.
 
@@ -937,7 +941,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM5 | in progress: SM5a unique native ancestry count/index/bulk queries and typed owning Haxe wrappers; three native suites and focused ancestry checks pass; quick gate `sm5a-ancestry` (5974 sheet assertions); recognition and convert feature deferred by user direction on 2026-10-05 | 51c4f2d5c |
 | SM6 | done: SM6a typed air-bending predictions, physical springback inversion and exact contact depth; focused process smoke passes 1235 assertions; quick gate `sm6a-air-bending` passes (7209 sheet assertions); SM6b explicit lot/tool/angle-band calibration with measured radius and additive depth correction, focused smoke passes 1257 assertions, quick gate `sm6b-calibration` passes (7231 sheet assertions); SM6 complete: typed grade defaults, editor selection, Process-rule persistence and tooling minimums; full gate `sm6-process-material-full` passes all stages (7248 sheet assertions, ProjectKit 155); final material integration and CAD workflow checks pass | 7148a8bb8; 6458df23b; d664caa22 |
 | SM7 | done: typed exact punch and single-/four-V die catalogue; standard segments and physical horns; independently segmented paired rows and validated bed layouts; derived process contact data; registered segment/clamp recipes and manual/powered clamp capabilities; strong unique tooling face names. Quick gates `sm7a-profile-foundation`, `sm7b-punch-profiles`, `sm7c-die-profiles` and full gate `sm7-tooling-verified-full` pass; original MachineKit and router engineering summaries unchanged | c4e418ba5; 310a41894; 67da9cae8; final tooling integration |
-| SM8a | in progress: typed positioning profile and explicit hydraulic cylinder/rod parts; independent pressure-area and native material-volume checks pass; quick gate `sm8a-cylinder-parts` passes all five suites with unchanged original MachineKit summaries; typed frame/ram/stop/backgauge assembly and native/BOM/kinematic focused checks pass; quick gate `sm8a-mechanical-assembly` passes all five suites with unchanged original MachineKit summaries; derived planning geometry, demo clearance checks and project preview remain | c4517c795 |
+| SM8a | done: cylinder parts and coupled mechanical assembly; typed planning geometry derived from physical datums, independent reference comparisons, full-bed force/depth and conservative demo/frame checks; Start-page project with editable ram, X/R and depth-stop axes. Quick gates `sm8a-cylinder-parts`, `sm8a-mechanical-assembly` and full gate `sm8a-press-assembly-full` pass every stage; original MachineKit and router engineering summaries unchanged | c4517c795; ed8faa29b; final assembly integration |
 | SM8b | planned: MT5 dependency is on local main 1484b924d and merged | |
 | SM9 | planned | |
 | SM10 | planned | |
@@ -1368,8 +1372,8 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 
 - SM8a assembly assumptions: the bed top is 800 mm above the floor. Two 50 mm side
   plates provide the 230 mm throat and 320 mm open mount separation. The continuous
-  ram beam attaches to its left guide and closes rigidly onto its right; Y2 = Y1 is
-  the torsion-bar coupling. The guides and torsion bar sit in front of the side plates.
+  ram beam attaches to its left guide; Y2 = Y1 is the torsion-bar coupling that
+  maintains right-guide alignment. No redundant rigid loop repeats that coordinate relation. The guides and torsion bar sit in front of the side plates.
   The initial tooling station has a 150 mm straight punch row and 200 mm V12 die row.
   Upper clamp height derives from mount separation minus punch and die heights minus
   an explicitly assumed 80 mm open tool gap; this leaves 20 mm penetration within the
@@ -1384,3 +1388,30 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
   Integrating the moving rod exposed that its retained length must include the rear
   cap: rod length is stroke + cap length + initial stem, keeping its inner end in the
   bore at both stroke limits. Independent endpoint checks now verify this.
+
+- SM8a planning geometry: `PressGeometrySource` declares member/joint identities through
+  function-only typed behaviour. `PressGeometry.of` rebuilds bed and station contact datums,
+  structural opening/throat, ram/finger bounds and finite travel intervals from the assembly.
+  Optional R is a fixed zero interval when absent. `reference(layout)` is an independent
+  numeric fixture; default and tallest gooseneck/four-V installations agree with it. The
+  example accepts typed layouts, and the lowest installed die sets the gauge base height.
+  Forces are converted explicitly from SM6's kN to the frame's declared N capacity.
+  Demo/frame clearance uses an outer-arc plus straight-leg bound along each hinge chain,
+  valid at every partial fold and ram position; checks require rectangular descendants
+  and parallel nested hinges rather than silently applying the bound to other graph shapes.
+  This is a structural frame check; die/punch/sheet contact and setup/order feasibility
+  remain SM9/SM10. Nominal stroke is not an installed-tool safety limit.
+
+- SM8a editor verification: the focused app test compiles the project, loads 56 physical
+  members with material-derived masses, and moves Y1, X, R and the independent depth stop
+  through editor operations. Its first run exposed a redundant rigid ram-guide closure:
+  `AssemblyState.dependentJoints` treated the unmarked Y1 on that loop as solved. The
+  torsion-bar coupling already owns Y2 = Y1, so the duplicate closure was removed instead
+  of adding an editor exception or another saved input choice. Coupled guide/ram alignment
+  remains verified by FK at 0/37/100 mm travel; the editor test now passes. No new cast,
+  schema compatibility path or Haxeon compiler workaround was needed.
+
+- SM8a final gate `sm8a-press-assembly-full`: CadKit, SheetMetalSmoke (7504),
+  ProjectKit (155), ManufacturingKit (54), MachineKit, workspace, app build and
+  project-source runtime all return zero. Original five MachineKit engineering
+  summaries and router cutting/drive results are unchanged; no new compiler issue.

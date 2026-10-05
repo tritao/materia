@@ -23,6 +23,9 @@ import machinekit.pressbrake.ToolRow;
 import machinekit.pressbrake.ToolSegment;
 import machinekit.pressbrake.ToolStation;
 import machinekit.pressbrake.ToolingCatalogue;
+import machinekit.pressbrake.planning.PressGeometrySource;
+import machinekit.pressbrake.planning.PressGeometryDatums;
+import machinekit.pressbrake.planning.PressToolDatum;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.assembly.AssemblyDefinition.AssemblyVector;
@@ -95,7 +98,7 @@ class PressLightCurtain extends MachineComponent {
 /** Reference 40 t torsion-bar press. X is along the bed, Y toward the backgauge, Z upward.
  * Joint Y1/Y2 values are downward ram travel; backgauge X is distance behind the punch line.
  */
-class PressBrake extends MachineAssembly {
+class PressBrake extends MachineAssembly implements PressGeometrySource {
 	public final profile:PressBrakeProfile = StopControlled;
 	public final bedLength:Float = 1600;
 	public final bedHeight:Float = 800;
@@ -108,16 +111,30 @@ class PressBrake extends MachineAssembly {
 	public final toolLayout:ToolLayout;
 	public final cylinder:HydraulicCylinder;
 	public final withR:Bool;
+	public final gaugeBaseHeight:Float;
 	final poses:Map<String, AssemblyFrame> = [];
+	final toolDatums:Array<PressToolDatum> = [];
 
-	public function new(withR:Bool = true) {
+	public function pressAssembly():MachineAssembly return this;
+	public function pressProfile():PressBrakeProfile return profile;
+	public function pressCapacityN():Float return capacityN;
+	public function pressGeometryDatums():PressGeometryDatums return {
+		bed: "bed", ram: "ram", throat: "frameLeft", fingers: ["fingerLeft", "fingerRight"],
+		ramJoint: "Y1", gaugeXJoint: "X", gaugeRJoint: withR ? "R" : null, tools: toolDatums.copy()
+	};
+
+	public function new(withR:Bool = true, ?layout:ToolLayout) {
 		super();
 		this.withR = withR;
 		cylinder = new HydraulicCylinder(160, 100, stroke);
 		var punch = ToolingCatalogue.straight(), die = ToolingCatalogue.dies()[1];
 		var punchRow = new ToolRow([new ToolSegment(Punch(punch), 100), new ToolSegment(Punch(punch), 50)], [0]);
 		var dieRow = new ToolRow([new ToolSegment(SingleV(die), 200)], []);
-		toolLayout = new ToolLayout(bedLength, [new ToolStation("V12", punchRow, dieRow, (bedLength - 200) / 2)]);
+		toolLayout = layout == null ? new ToolLayout(bedLength, [new ToolStation("V12", punchRow, dieRow, (bedLength - 200) / 2)]) : layout;
+		if (toolLayout.bedLength != bedLength || toolLayout.stations().length == 0) throw "Reference press needs installed tooling on its 1600 mm bed";
+		var minimumDie = Math.POSITIVE_INFINITY;
+		for (station in toolLayout.stations()) minimumDie = Math.min(minimumDie, machinekit.pressbrake.ToolProfiles.height(station.dies.profile));
+		gaugeBaseHeight = bedHeight + minimumDie;
 		place("bed", new PressBlock("Press bed", bedLength, 180, 200), at(0, 0, bedHeight - 200));
 		addMemberConnector("bed", "left", at(-bedLength / 2, 0, 200));
 		addMemberConnector("bed", "right", at(bedLength / 2, 0, 200));
@@ -140,9 +157,8 @@ class PressBrake extends MachineAssembly {
 		fixed("ram", new PressBlock("Ram beam", bedLength, 100, 220), at(0, 0, bedHeight + openHeight), "guideLeft");
 		for (side in [-1, 1]) fixed(side < 0 ? "ramBracketLeft" : "ramBracketRight",
 			new PressBlock("Ram guide bracket", 160, 180, 80), at(side * 750, -80, bedHeight + openHeight + 80), "ram");
-		addMemberConnector("ram", "right-guide-closure", AssemblyFrames.compose(AssemblyFrames.inverse(pose("ram")), pose("guideRight")));
-		addMemberConnector("guideRight", "ram-closure", AssemblyFrames.identity());
-		addConstraint("ram-right-guide", "fixed", "ram", "right-guide-closure", "guideRight", "ram-closure");
+		// The torsion-bar coupling owns the equality of both guide coordinates. Adding
+		// the same relation as a rigid closure would incorrectly introduce a solved input.
 		addMemberConnector("ram", "tool-mount", at(0, 0, 0));
 		fixed("torsionBar", new PressBlock("Torsion bar", bedLength + 50, 30, 30), at(0, -160, bedHeight + openHeight + 100), "ram");
 		installTools();
@@ -173,28 +189,33 @@ class PressBrake extends MachineAssembly {
 			{x: 0, y: 1, z: 0}, {x: 0, y: 1, z: 0}, "GENERIC-SERVO-200W", 2);
 		var gaugeParent = "gaugeX";
 		if (withR) {
-			slide("R", "gaugeR", new PressBlock("Backgauge lift", 800, 40, 40), at(0, 40, bedHeight + die.height - 40),
+			slide("R", "gaugeR", new PressBlock("Backgauge lift", 800, 40, 40), at(0, 40, gaugeBaseHeight - 40),
 				"gaugeX", {x: 0, y: 0, z: 1}, gaugeRTravel);
 			for (side in [-1, 1]) {
 				var name = side < 0 ? "Left" : "Right";
 				fixed('gaugeRRail$name', LinearRail.metric("MGN12C", 250), at(side * 200, 40, 730), "gaugeX");
-				fixed('gaugeRBlock$name', LinearRailBlock.metric("MGN12C"), at(side * 200, 40, 780), "gaugeR");
+				fixed('gaugeRBlock$name', LinearRailBlock.metric("MGN12C"), at(side * 200, 40, gaugeBaseHeight - 50), "gaugeR");
 			}
-			servoScrew("R", "gaugeR", "gaugeR", new BallScrew(300), at(0, 60, 700), at(0, 60, 800),
+			servoScrew("R", "gaugeR", "gaugeR", new BallScrew(300), at(0, 60, gaugeBaseHeight - 130), at(0, 60, gaugeBaseHeight - 30),
 				{x: 0, y: 0, z: 1}, {x: 0, y: 0, z: 1}, "GENERIC-SERVO-100W", 3, "gaugeX");
 			gaugeParent = "gaugeR";
 		}
 		for (side in [-1, 1]) fixed(side < 0 ? "fingerLeft" : "fingerRight", new PressGaugeFinger(),
-			at(side * 300, 0, bedHeight + die.height), gaugeParent);
+			at(side * 300, 0, gaugeBaseHeight), gaugeParent);
 	}
 
 	function installTools():Void {
 		for (station in toolLayout.stations()) {
-			for (placement in station.dies.placements(station.offset - bedLength / 2))
-				fixed('${station.id}-die-${Dimension.format(placement.start)}', placement.segment,
+			var firstDie:Null<String> = null, firstPunch:Null<String> = null;
+			for (placement in station.dies.placements(station.offset - bedLength / 2)) {
+				var id = '${station.id}-die-${Dimension.format(placement.start)}';
+				if (firstDie == null) firstDie = id;
+				fixed(id, placement.segment,
 					at(placement.start, 0, bedHeight + machinekit.pressbrake.ToolProfiles.height(placement.segment.profile)), "bed");
+			}
 			for (placement in station.punches.placements(station.offset - bedLength / 2)) {
 				var id = '${station.id}-punch-${Dimension.format(placement.start)}';
+				if (firstPunch == null) firstPunch = id;
 				var punchHeight = machinekit.pressbrake.ToolProfiles.height(placement.segment.profile);
 				var dieHeight = machinekit.pressbrake.ToolProfiles.height(station.dies.profile);
 				var holderHeight = openHeight - punchHeight - dieHeight - 80;
@@ -203,6 +224,8 @@ class PressBrake extends MachineAssembly {
 					at(placement.start + placement.segment.length / 2, 0, bedHeight + openHeight - holderHeight), "ram");
 				fixed(id, placement.segment, at(placement.start, 0, bedHeight + dieHeight + 80), '$id-clamp');
 			}
+			if (firstPunch == null || firstDie == null) throw 'Station "${station.id}" has no physical contact members';
+			toolDatums.push({station: station.id, punch: firstPunch, die: firstDie});
 		}
 	}
 
