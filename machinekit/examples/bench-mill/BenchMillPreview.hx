@@ -22,7 +22,7 @@ class BenchMillPreview {
 		var part = block.geometry(ComponentDetail.Preview);
 		var program = BearingBlockJob.program(mill, block, part);
 		scene.parts.push(AssemblyPreview.part(TARGET_PART, "Finished bearing block", part, block.materialId, 0.002));
-		scene.machining = {program: program, axes: ["x", "y", "z"], spindle: "spindle",
+		scene.machining = {program: program, axes: ["x", "y", "z"], spindle: "spindle", channelScope: "",
 			workOffset: [for (v in mill.workOffset()) v / 1000],
 			tools: [for (tool in mill.tools()) {number: tool.number, length: tool.length, profile: tool.profile().encode()}],
 			stock: "stock", toolPart: "tool", loadedTool: 1, target: TARGET_PART, loop: true,
@@ -40,7 +40,7 @@ class BenchMillPreview {
 		var part = block.geometry(ComponentDetail.Preview);
 		var program = BearingBlockJob.program(mill, block, part, cell.loadPosition);
 		scene.parts.push(AssemblyPreview.part(TARGET_PART, "Finished bearing block", part, block.materialId, 0.002));
-		scene.machining = {program: program, axes: ["mill/x", "mill/y", "mill/z"], spindle: "mill/spindle",
+		scene.machining = {program: program, axes: ["mill/x", "mill/y", "mill/z"], spindle: "mill/spindle", channelScope: "mill",
 			workOffset: [for (v in mill.workOffset()) v / 1000],
 			tools: [for (tool in mill.tools()) {number: tool.number, length: tool.length, profile: tool.profile().encode()}],
 			stock: "mill/stock", toolPart: "mill/tool", loadedTool: 1, target: TARGET_PART, loop: true,
@@ -173,7 +173,7 @@ class BenchMillChecks {
 				for (rotor in [hubId, discId]) {
 					if (mountOverlap(mill, state, rotor, "motor" + suffix + "Plate", 0, 0, 0) > 1e-7)
 						throw "Rotating brake part interferes with the motor plate";
-					for (role in ["front", "shell", "back"]) for (sector in [0, 8])
+					for (role in ["front", "shell", "back"]) for (sector in 0...machinekit.motion.ShaftBrakePart.sectorCount(motor.rating.shaftDiameter, role))
 						if (mountOverlap(mill, state, rotor, "motor" + suffix + 'Brake-$role-$sector', 0, 0, 0) > 1e-7)
 							throw "Released brake rotor interferes with its stator";
 				}

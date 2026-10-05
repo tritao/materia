@@ -35,6 +35,8 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 */
 	const NKSIM_INTEGRATOR_IMPLICIT_FAST = 2;
 	const NKSIM_INTEGRATOR_RK4 = 3;
+	const NKSIM_JOINT_BRAKE_CONFIGURED = 1;
+	const NKSIM_JOINT_BRAKE_RELEASED = 2;
 	/**
 	 * < A shared axis line, free to slide and turn along it.
 	 */
@@ -117,10 +119,6 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	extern fn nksim_joint_couple(world: nksim_world, desc: ptr<const<nksim_joint_coupling_desc>>) -> nksim_result;
 	extern fn nksim_joint_create(world: nksim_world, desc: ptr<const<nksim_joint_desc>>, out_joint: ptr<nksim_joint> @out) -> nksim_result;
 	extern fn nksim_joint_destroy(world: nksim_world, joint: nksim_joint) -> void;
-	/**
-	 * Physical released contact after the simulated mechanical delay.
-	 */
-	extern fn nksim_joint_get_brake_released(world: nksim_world, joint: nksim_joint, out_released: ptr<u32> @out) -> nksim_result;
 	extern fn nksim_joint_get_state(world: nksim_world, joint: nksim_joint, out_state: ptr<nksim_joint_state> @inout) -> nksim_result;
 	/**
 	 * Digital release coil; zero de-energizes, one energizes.
@@ -142,6 +140,11 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 * dynamic bodies they move into and are never pushed back.
 	 */
 	extern fn nksim_session_create_actor(session: nksim_session, parts: ptr<const<nksim_actor_part>> @in_array("part_count"), part_count: u32, out_actor: ptr<nksim_actor> @out) -> nksim_result;
+	/**
+	 * Creates a convex object from 4 to 64 hull vertices in its local frame.
+	 * The descriptor selects CONVEX; coordinates are copied before returning.
+	 */
+	extern fn nksim_session_create_convex_object(session: nksim_session, desc: ptr<const<nksim_object_desc>>, vertices: ptr<const<f64>> @in_array("coordinate_count"), coordinate_count: u32, out_object: ptr<nksim_object> @out) -> nksim_result;
 	/**
 	 * Adds one environment body while stopped.
 	 */
@@ -191,11 +194,11 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 */
 	extern fn nksim_session_hold_object(session: nksim_session, object: nksim_object, carrier: nksim_body, offset: ptr<const<nksim_pose>>) -> nksim_result;
 	/**
-	 * True when the oriented query box intersects a free dynamic box object in
+	 * True when the oriented query box intersects a free dynamic object in
 	 * the latest physics state. Static fixtures, kinematic actors and carried
 	 * objects are excluded. Query dimensions are positive half extents.
 	 */
-	extern fn nksim_session_overlap_free_boxes(session: nksim_session, pose: ptr<const<nksim_pose>>, half_extents: ptr<const<f64>>, out_present: ptr<u32> @out) -> nksim_result;
+	extern fn nksim_session_overlap_free_objects(session: nksim_session, pose: ptr<const<nksim_pose>>, half_extents: ptr<const<f64>>, out_present: ptr<u32> @out) -> nksim_result;
 	/**
 	 * Adds a keyframe to an actor's trajectory: the pose of every part at
 	 * simulation time `time`, while stopped or running. Each tick moves every
@@ -347,7 +350,12 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		 * < Row-major symmetric tensor in kg m².
 		 */
 		inertia_tensor: array<f64, 9> @offset(72);
-		reserved: array<u64, 2> @offset(144);
+		/**
+		 * Nonzero groups preserve mounted contacts across separate articulations.
+		 * Only geometry overlapping in the declared rest pose is excluded.
+		 */
+		rest_contact_group: u64 @offset(144);
+		reserved: array<u64, 1> @offset(152);
 	}
 	struct nksim_body_force @layout(56, 8) {
 		struct_size: u32 @offset(0) @struct_size;
@@ -478,16 +486,14 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		limit_damping_ratio: f64 @offset(240);
 		limit_impedance: array<f64, 5> @offset(248);
 	}
-	struct nksim_joint_state @layout(64, 8) {
+	struct nksim_joint_state @layout(56, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		joint: nksim_joint @offset(4);
 		position: f64 @offset(8);
 		velocity: f64 @offset(16);
 		effort: f64 @offset(24);
-		reserved0: u32 @offset(32);
+		flags: u32 @offset(32);
 		reserved: array<u64, 2> @offset(40);
-		brake_configured: u32 @offset(56);
-		brake_released: u32 @offset(60);
 	}
 	struct nksim_joint_target @layout(88, 8) {
 		struct_size: u32 @offset(0) @struct_size;
@@ -526,7 +532,11 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		 */
 		collision_layer: u32 @offset(136);
 		collision_mask: u32 @offset(140);
-		reserved: array<u64, 2> @offset(144);
+		/**
+		 * < Same mounted-contact policy as nksim_body_desc.
+		 */
+		rest_contact_group: u64 @offset(144);
+		reserved: array<u64, 1> @offset(152);
 	}
 	struct nksim_pose @layout(64, 8) {
 		struct_size: u32 @offset(0) @struct_size;
@@ -598,7 +608,7 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		count: u32 @offset(16);
 		bodies: array<nksim_body_state, 64> @offset(24);
 	}
-	struct nksim_snapshot_joint_page @layout(4120, 8) {
+	struct nksim_snapshot_joint_page @layout(3608, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		start_index: u64 @offset(8);
 		count: u32 @offset(16);

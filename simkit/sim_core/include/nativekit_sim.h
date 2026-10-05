@@ -168,7 +168,10 @@ typedef struct nksim_body_desc {
     uint32_t has_inertial_properties;
     double center_of_mass[3];
     double inertia_tensor[9]; /**< Row-major symmetric tensor in kg m². */
-    uint64_t reserved[2];
+    /** Nonzero groups preserve mounted contacts across separate articulations.
+     * Only geometry overlapping in the declared rest pose is excluded. */
+    uint64_t rest_contact_group;
+    uint64_t reserved[1];
 } nksim_body_desc;
 
 typedef struct nksim_body_state {
@@ -252,16 +255,20 @@ typedef struct nksim_closure_desc {
     double axis_a[3]; /**< Unit axis (hinge, slide, or plane normal) in body_a's local frame. */
 } nksim_closure_desc;
 
+/** Joint snapshot status flags; kept in the existing state storage. */
+enum {
+    NKSIM_JOINT_BRAKE_CONFIGURED = 1,
+    NKSIM_JOINT_BRAKE_RELEASED = 2
+};
+
 typedef struct nksim_joint_state {
     uint32_t struct_size NK_STRUCT_SIZE;
     nksim_joint joint;
     double position;
     double velocity;
     double effort;
-    uint32_t reserved0;
+    uint32_t flags;
     uint64_t reserved[2];
-    uint32_t brake_configured;
-    uint32_t brake_released;
 } nksim_joint_state;
 
 /** Digital release output; physical contact and effort are independent of this command. */
@@ -485,9 +492,7 @@ NKSIM_API nksim_result NKSIM_CALL nksim_joint_set_brake_release(
 /** Applies a complete batch on the physics owner thread. */
 NKSIM_API nksim_result NKSIM_CALL nksim_world_set_brake_outputs(
     nksim_world world, const nksim_brake_output *outputs NK_IN_ARRAY(count), uint32_t count);
-/** Physical released contact after the simulated mechanical delay. */
-NKSIM_API nksim_result NKSIM_CALL nksim_joint_get_brake_released(
-    nksim_world world, nksim_joint joint, uint32_t *out_released NK_OUT);
+
 
 NKSIM_API void NKSIM_CALL nksim_snapshot_destroy(nksim_snapshot snapshot);
 NKSIM_API nksim_result NKSIM_CALL nksim_snapshot_get_clock(

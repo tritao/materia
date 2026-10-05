@@ -396,6 +396,8 @@ typedef SceneArtifactMachining = {
 	var program:String;
 	var axes:Array<String>;
 	var spindle:String;
+	/** Process-channel namespace, explicitly selected by the machine generator. */
+	var channelScope:String;
 	var workOffset:Array<Float>;
 	var tools:Array<SceneArtifactTool>;
 	@:optional var stock:String;
@@ -425,7 +427,7 @@ typedef SceneArtifactTool = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 17;
+	public static inline var VERSION:Int = 18;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -666,6 +668,7 @@ class SceneArtifact {
 		var validSensors = new Map<String, Bool>();
 		if (flat.sensors != null) for (sensor in flat.sensors) validSensors.set(sensor.id, true);
 		var owners = new Map<String, String>();
+		var sensorOwners = new Map<String, String>();
 		var cabinetIds = new Map<String, Bool>();
 		var outputs = new Map<String, Array<String>>();
 		for (cabinet in controllers) {
@@ -686,16 +689,44 @@ class SceneArtifact {
 					throw 'Scene artifact cell joint "$joint" has no unique owner';
 				owners.set(joint, cabinet.id);
 			}
-			for (sensor in cabinet.sensors) if (!validSensors.exists(sensor))
-				throw 'Scene artifact cell sensor "$sensor" is unknown';
+			for (sensor in cabinet.sensors) {
+				if (!validSensors.exists(sensor) || sensorOwners.exists(sensor))
+					throw 'Scene artifact cell sensor "$sensor" has no unique owner';
+				sensorOwners.set(sensor, cabinet.id);
+			}
 		}
 		for (joint in validJoints.keys()) if (!owners.exists(joint))
 			throw 'Scene artifact cell joint "$joint" has no controller';
+		if (flat.couplings != null) for (coupling in flat.couplings)
+			if (owners.get(coupling.source) != owners.get(coupling.target))
+				throw 'Scene artifact coupling "${coupling.id}" crosses controllers';
+		if (flat.sensors != null) for (sensor in flat.sensors) {
+			var owner = sensorOwners.get(sensor.id);
+			if (owner == null) throw 'Scene artifact cell sensor "${sensor.id}" has no controller';
+			if (sensor.joint != null && owners.exists(sensor.joint) && owners.get(sensor.joint) != owner)
+				throw 'Scene artifact sensor "${sensor.id}" is wired to "$owner" but observes joint "${sensor.joint}" owned by "${owners.get(sensor.joint)}"';
+		}
+		if (flat.actuators != null) for (actuator in flat.actuators) {
+			var cabinet = owners.get(actuator.joint), channels = cabinet == null ? null : outputs.get(cabinet);
+			function requireChannel(channel:String):Void {
+				if (channels == null || channels.indexOf(channel) < 0)
+					throw 'Scene artifact actuator "${actuator.id}" has no output "$channel" on its joint owner';
+			}
+			var pneumatic = actuator.pneumatic;
+			if (pneumatic != null) {
+				requireChannel(pneumatic.channelA);
+				if (pneumatic.channelB != null) requireChannel(pneumatic.channelB);
+			}
+			var speed = actuator.processVelocity;
+			if (speed != null) {requireChannel(speed.speedChannel); requireChannel(speed.directionChannel);}
+			var brake = actuator.brake;
+			if (brake != null) requireChannel(brake.releaseChannel);
+		}
 		var signalIds = new Map<String, Bool>(), destinations = new Map<String, Bool>();
 		if (data.signals != null) for (signal in data.signals) {
 			if (signal == null || signal.name == null || signal.name.length == 0 || signal.from == null || signal.to == null ||
 				!cabinetIds.exists(signal.from.controller) || !cabinetIds.exists(signal.to.controller) ||
-				signal.from.port == null || signal.to.port == null || signalIds.exists(signal.name) ||
+				signal.from.port == null || signal.from.port.length == 0 || signal.to.port == null || signal.to.port.length == 0 || signalIds.exists(signal.name) ||
 				destinations.exists(signal.to.controller + "/" + signal.to.port))
 				throw "Scene artifact cell has an invalid signal";
 			signalIds.set(signal.name, true);
@@ -707,6 +738,17 @@ class SceneArtifact {
 		if (data.machining != null && (data.machining.controllerId == null ||
 			[for (c in controllers) if (c.id == data.machining.controllerId && c.kind == "cnc") c].length != 1))
 			throw "Scene artifact machining job needs its CNC controller";
+		var machining = data.machining;
+		if (machining != null) for (axis in machining.axes)
+			if (owners.get(axis) != machining.controllerId)
+				throw 'Scene artifact CNC axis "$axis" belongs to a different controller';
+		var motion = data.machineMotion;
+		if (motion != null && motion.program != null) {
+			var axes = motion.program.axes;
+			if (axes.length == 0 || !owners.exists(axes[0])) throw "Scene artifact axis program has no controller";
+			for (axis in axes) if (owners.get(axis) != owners.get(axes[0]))
+				throw 'Scene artifact axis program crosses controllers at "$axis"';
+		}
 		if (data.mission != null && (data.mission.controllerId == null ||
 			[for (c in controllers) if (c.id == data.mission.controllerId && c.kind == "robot") c].length != 1))
 			throw "Scene artifact mission needs its robot controller";
@@ -1348,6 +1390,10 @@ class SceneArtifact {
 		validatePowerUpOffsets(machining.powerUpOffsets, definition);
 		validatePowerUpSideOffsets(machining.powerUpSideOffsets, definition);
 		if (machining.program == null) fail("has no program");
+		if (machining.channelScope == null) fail("has no process-channel scope");
+		if (machining.channelScope.length > 0) for (part in machining.channelScope.split("/"))
+			if (StringTools.trim(part) != part || part.length == 0 || part == "." || part == "..")
+				fail("has an invalid process-channel scope");
 		if (definition == null) throw "Scene artifact machining job needs the machine's assembly definition";
 		var occurrences = new Map<String, Bool>(), joints = new Map<String, Bool>();
 		for (occurrence in definition.occurrences) occurrences.set(occurrence.id, true);
@@ -1404,6 +1450,7 @@ class SceneArtifact {
 		var machining:SceneArtifactMachining = {program: text(Reflect.field(decoded, "program")),
 			axes: [for (axis in list(Reflect.field(decoded, "axes"))) text(axis)],
 			spindle: text(Reflect.field(decoded, "spindle")),
+			channelScope: text(Reflect.field(decoded, "channelScope")),
 			workOffset: [for (value in list(Reflect.field(decoded, "workOffset"))) number(value)],
 			tools: tools};
 		var stock:Dynamic = Reflect.field(decoded, "stock");

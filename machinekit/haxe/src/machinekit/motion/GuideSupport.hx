@@ -22,19 +22,26 @@ typedef GuideBlockLoad = {
 }
 
 /** Reference load sharing for four equal-stiffness blocks on a rigid carriage.
- * The minimum-norm block loads reproduce the complete applied wrench. Preload, flexible
+ * The drive carries force along travel at its measured line of action; the blocks
+ * carry transverse force and the remaining moments. Preload, flexible
  * castings and unequal block stiffness are not included; the capacity check needs an
  * explicit safety factor. This calculation is not a bearing-life estimate. */
 class GuideSupport {
 	public final railSpacing:Float;
 	public final blockSpacing:Float;
+	public final driveX:Float;
+	public final driveY:Float;
 
-	public function new(railSpacing:Float, blockSpacing:Float) {
+	public function new(railSpacing:Float, blockSpacing:Float, driveX:Float, driveY:Float) {
 		if (!Math.isFinite(railSpacing) || !(railSpacing > 0) ||
 			!Math.isFinite(blockSpacing) || !(blockSpacing > 0))
 			throw "Guide support needs finite positive rail and block spacing in metres";
+		if (!Math.isFinite(driveX) || !Math.isFinite(driveY))
+			throw "Guide drive line must be finite";
 		this.railSpacing = railSpacing;
 		this.blockSpacing = blockSpacing;
+		this.driveX = driveX;
+		this.driveY = driveY;
 	}
 
 	public function loads(wrench:GuideSupportWrench):Array<GuideBlockLoad> {
@@ -42,13 +49,15 @@ class GuideSupport {
 			if (!Math.isFinite(value)) throw "Guide support wrench must be finite";
 		var across2 = railSpacing * railSpacing;
 		var along2 = blockSpacing * blockSpacing;
+		var mx = wrench.mx - driveY * wrench.fz;
+		var my = wrench.my + driveX * wrench.fz;
 		var result:Array<GuideBlockLoad> = [];
 		for (sx in [-1, 1]) for (sz in [-1, 1]) {
 			var x = sx * railSpacing / 2;
 			var z = sz * blockSpacing / 2;
-			var fx = wrench.fx / 4 + wrench.my * z / (across2 + along2);
-			var fy = wrench.fy / 4 + wrench.mz * x / across2 - wrench.mx * z / along2;
-			var fz = wrench.fz / 4 - wrench.my * x / (across2 + along2);
+			var fx = wrench.fx / 4 + my * z / along2;
+			var fy = wrench.fy / 4 + wrench.mz * x / across2 - mx * z / along2;
+			var fz = 0.0;
 			result.push({x: x, z: z, fx: fx, fy: fy, fz: fz,
 				magnitude: Math.sqrt(fx * fx + fy * fy + fz * fz)});
 		}

@@ -159,7 +159,10 @@ Surveyed 2026-10-03 on local main 1048bf768, plus the `mobile-welder` and `x7-tr
   - total mass.
 - Joints are one family of modules in sizes 0–4: a housing, a servo and a strain-wave gearbox (ratio about 100). The sizes share a catalogue of diameter, length, rated and peak torque, speed and mass.
 - Classes are built from that catalogue, not from per-arm numbers. Datasheet figures are reference values, marked assumed like the existing `ServoMotor` rows, and the X6 plan check confirms that each class's drives carry its rated payload.
-- `RobotArm` stays as it is, so the arm, welder and router examples are not touched.
+- `RobotArm` keeps its mechanical design and motion limits. The follow-up electrical
+  review selects explicit assumed 48 V winding variants and sizes its amplifier,
+  source and mobile-welder converter from their demand; this supersedes the earlier
+  promise to leave all of its electrical hardware untouched.
 
 ## The machine (starting numbers, fixed in MT1–MT4)
 
@@ -615,8 +618,13 @@ Done. What was built and decided:
   750 W: 19×35 mm; spindle: 20×30 mm). Geometry checks verify actual shaft engagement.
   The Z motor is 750 W to meet vertical-axis load, superseding the original 400 W proposal.
 - Check servo phase RMS current, back EMF, winding losses, amplifier efficiency, combined
-  source draw and regeneration. Assumed mill reference hardware uses a 310 V/32 A source
-  with an 8 kW shunt and 20 A AC amplifiers. Arm and cobot sources are sized independently.
+  source draw and regeneration. The follow-up reference design uses an explicit 400 V,
+  50 Hz three-phase mains boundary and capacitor rectifier (565.685 V nominal DC bus),
+  a 20 A DC source, 8 kW shunt, matching 400 V class windings and 20 A phase-RMS
+  amplifiers. These are assumed component ratings, not a commercial hardware selection.
+  Mobile arms use independently sized 48 V winding variants; cobot amplifiers are sized
+  per module rather than all being just above the largest joint requirement.
+  AC RMS/DC voltages and DC/phase-RMS currents are distinct quantity types.
   Larger offboard arm hardware changes assembly mass from 150.1 to 155.9 kg (welder:
   315.2 to 321 kg), without changing moving-arm mass.
 - State the SFU1605 race root explicitly at an assumed 13 mm; every other ball race must
@@ -804,6 +812,7 @@ Done. What was built and decided:
 | MT5 | done | 453d890ad, 5f06c32e5, a397b187a, a6230c46e, 1484b924d |
 | MT5b | done: review regressions | 04d3d092d |
 | MT5b follow-up | done: review fixes and complete closing gate | 4ff013c90; full history in [REVIEW_FIXES.md](REVIEW_FIXES.md) |
+| MT5b second review | verified: final commits and Haxeon pin decision pending | see [REVIEW_FIXES.md](REVIEW_FIXES.md) |
 | MT6 | done | 4c9e6ebec |
 | MT7 | planned | |
 | MT8 | planned | |
@@ -849,3 +858,27 @@ Final MT5b follow-up gate — done (2026-10-05):
 - The full gate reproduces the final mill measurements above: 52.57/53.22 s bare/enclosed, 1.2 m/min pocket feed and 0.3 m/min entry feed, 0.085940/0.051497/0.060011 mm X/Y/Z tracking at 10 ms, 0.665314 mm brake application sag, door 1.50/1.79 s and seated clamp 0.08 s/482.548632 N. All four cobot classes retain 2.06 s cycles. Reach stays Reach850/600 mm at fifteen poses and 16.239926% minimum joint margin.
 - Screw/belt router, CoreXY, arm, mobile and welder reproduce the previously recorded post-main/review baselines. Only intended mill geometry, rotating inertia and brake sequencing changes move its figures. ProjectKit's 146→144 count reflects removed legacy compatibility checks plus added current-format checks, as requested for the clean break.
 - Closing fixes: `61fd8f6af` resolves one default session clock for every phase; `144010183` preserves staged emergency outputs after a fault; `295d426ea` removes the dynamic-compound child cap with last-child contact verification; `4ff013c90` installs and saves the physical brake and scoped controller binding. The generated binding receives the matching clock documentation. No new confirmed haxeon bug or compiler patch. MT7 is not started.
+
+
+Electrical follow-up checkpoint (2026-10-05, MachineKit verified; application gate open):
+- Replace the interim high-voltage mobile arm supply with assumed 48 V windings, a 75 A DC source and 32 A phase-RMS amplifiers. Keep the mechanical motor curves. Per-motor resistance follows an assumed 5% rated copper-loss budget; fast cobot wrists reserve DC-bus headroom at their own maximum speed.
+- Separate AC RMS voltage, DC voltage, DC current and phase-RMS current with no-conversion abstract types. Carry phase system and frequency in `AcMains`. Remove the redundant `ElectricalSource.outputVoltage` API and migrate call sites directly.
+- Haxeon's abstract receiver bug is fixed in local compiler commit `1c51f79e`; quantity accessors use `return this` without casts or class workarounds. The parent Haxeon pin remains unchanged. Compiler TestMain, five abstract runtime programs, operator/enum-abstract tests and official-Haxe parity pass. MachineKit compiled 1336 sources and its complete smoke suite passed.
+- Moving arm mass stays 20.3 kg; revised amplifier envelopes change total arm mass 155.9 to 155.1 kg and mobile welding payload 583.6 to 582.8 kg. Its derived acceleration rounds from 0.207 to 0.208 m/s². Mill rapids stay 15.09554/25/21.52183 m/min versus the rebased checkpoint. Full application timing/tracking verification remains open.
+
+Second-review closing work (validated):
+
+- Powered emergency stop retains measured-position servo holding until fresh brake-engaged feedback; hard power loss removes torque immediately. The brake coil drops immediately in both cases. Brake state uses the existing joint-state flag word, and stator geometry uses the minimum sectors needed to clear its rotor.
+- Joint plans require conservative continuous hull-motion certificates instead of fixed angular samples. Guide blocks carry transverse loads and residual moments while the screw carries axial force at its assembled line of action.
+- MT6 validates sensor and program ownership, retains single-cabinet identities and animates each controller's belts independently. Shared mounted geometry has an explicit transient contact group; unrelated robots and loose objects retain contact. Environment CAD uses the existing bounded hull generator.
+- Presence sensing tests every supported loose-object shape against its volume. CNC process scope is explicit in SceneArtifact v18, with migrated producers and no old-format reader. Unpowered spindles coast; asymmetric belt tests distinguish coordinate direction from power direction.
+- The sequential `review-final` gate and its focused retries cover the completed implementation. Compiler corrections, regression evidence, final measurements and commits are recorded in [REVIEW_FIXES.md](REVIEW_FIXES.md). MT7 and later remain paused.
+
+Done. What was built and decided (second-review validation):
+
+- The sequential kit gate passed every kit except the initial MachineKit compile, which exposed a compiler defect. The repaired compiler's MachineKit retry passed. Project-source coverage completed with focused retries after two invalid new fixtures were corrected; the full editor AppTests suite, thirteen native suites, supplemental RobotKit tool/process/weld/clearance suites and HXI binding integration all passed. Long welder searches were not repeated.
+- The mill retains a 10 ms controller tick and drive-derived 0.25 ms physics interval. X/Y/Z rapids remain 15.095544/25/21.521827 m/min, with 0.085940/0.051497/0.060011 mm peak tracking. Bare/enclosed bearing-block cycles are 52.58/53.23 s (+one tick after changing the installed brake's stator decomposition and carried mass), 78 plans and 55 existing torque diagnostics. Door opening/closing remains 1.50/1.79 s; the seated-blank clamp remains 0.08 s at 482.548632 N. Powered e-stop Z sag falls from 0.665314 to 0.000376 mm because servo holding persists until fresh engaged feedback; settled drift is 0.000020016 mm over 0.5 s.
+- Correct screw/guide reactions produce bare X/Y/Z guide utilizations 0.156532/0.383137/0.825162 and enclosed 0.216948/0.446731/0.825162. Capacity and cutting load remain assumed reference envelopes. The enclosure now has 156 parts after reducing the brake stator from 48 to 26 convex pieces. Reach stays Reach850 on a 600 mm riser, fifteen cell poses and 16.239926% minimum joint margin.
+- Screw/belt router baselines remain 232.2/215.2 s, 128 plans and 0.05/1.76 mm worst deviation. CoreXY remains 649.6 mm/s and 71.549 m/s²; arm pick/place remains 5.8/12/17.2/23.5 s; welder remains 20.6/21.1 s seam runs, 29.8 s post and 106.5 s whole weldment on both backends. All cobot classes remain 2.06 s. Reach850 peak changes 0.005987→0.006131 mrad because upstream `574d49ba9` reacquires the live arm start between mission owners: disabling that reset reproduces the old peak exactly. The other three peaks remain 0.004640/0.011236/0.016598 mrad.
+- The rebased upstream world-aligned floor grid (`75c98a563`) changes mobile mission completion 61→56.4 s and obstacle round 65→60 s. Restoring the old grid origin reproduces both prior timings exactly; restoring box lidar envelopes does not. The 400 mm straight move and 0.5 rad turn remain unchanged. Every diagnostic source change was restored.
+- Quantity APIs separate AC RMS voltage, DC voltage, DC current and phase-RMS current without implicit conversions. Local Haxeon corrections `1c51f79e`, `d934742e`, `8be7ca0e` fix abstract receivers, generated callback handles and nullable comprehensions/IR array growth; compiler TestMain and real HashLink/HXI regressions pass. The parent Haxeon pin remains unchanged pending the original no-pin-change constraint. No main integration or MT7 work was performed.

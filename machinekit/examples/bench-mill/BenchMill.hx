@@ -21,7 +21,7 @@ import machinekit.motion.LinearRailBlock;
 import machinekit.motion.ServoMotor;
 import machinekit.motion.ShaftBrakePart;
 import machinekit.motion.MotorDriver;
-import machinekit.motion.PowerSupply;
+import machinekit.power.ThreePhaseRectifier;
 import machinekit.motion.ShaftCoupling;
 import machinekit.motion.ShaftEncoder;
 import machinekit.transmission.TimingBelt;
@@ -191,7 +191,8 @@ class BenchMill extends MachineAssembly {
 
 		exposeConnector("gaugeLine", "spindle", "gaugeLine");
 		exposeConnector("toolTip", "tool", "tip");
-		attach("powerSupply", new PowerSupply(310, 32, 4, 240, 120, 100, 8000), AssemblyFrames.translation(-190, columnPose.y, 0), "base");
+		attach("powerSupply", new ThreePhaseRectifier(new machinekit.power.AcMains(ThreePhase, new machinekit.power.AcRmsVoltage(400), 50), new machinekit.power.DcCurrent(20), 4, 240, 120, 100, 8000), AssemblyFrames.translation(-190, columnPose.y, 0), "base");
+		exposePort("mains", "powerSupply", "mains");
 		var xScrewLength = table.width + specs[0].upper - specs[0].lower +
 			2 * (BallScrew.INPUT_JOURNAL_LENGTH + ScrewSupportUnit.bk12().length);
 		driveScrew(specs[0], "saddle", "table", [-xScrewLength / 2, saddleY, tableBottom - railSpec.blockHeight / 2],
@@ -211,7 +212,7 @@ class BenchMill extends MachineAssembly {
 		var belt = TimingBelt.twoPulley(HTD5M, 20, 20, 150, 15, 5000); // Assumed glass-cord EA per mm width, pending vendor data.
 		var beltZ = gaugeZero.z + spindle.connector("pulley").frame.z;
 		attach("spindlePulley", pulley, AssemblyFrames.translation(0, spindleY, beltZ), "spindle");
-		var spindleDrive = new SpindleMotor();
+		var spindleDrive = new SpindleMotor(true);
 		var motorFaceZ = beltZ + motorPulley.thickness;
 		attach("spindleMotor", spindleDrive, orient(150, spindleY, motorFaceZ, [0.0, 1, 0], [0.0, 0, -1]), "head");
 		var shelfBottom = motorFaceZ - 8;
@@ -232,7 +233,7 @@ class BenchMill extends MachineAssembly {
 		var motorRatio = addTransmission("spindle-belt", "spindle-turn", "spindle-motor-turn",
 			Transmission.BeltReduction("spindleBelt", "spindlePulley", "spindleMotorPulley"), machinekit.assembly.Sense.Same);
 		var spindleDriver = "spindleMotorDriver";
-		attach(spindleDriver, new MotorDriver("GENERIC-AC-SERVO-AMP", 20),
+		attach(spindleDriver, new MotorDriver("GENERIC-400V-SERVO-AMP", new machinekit.power.PhaseRmsCurrent(20)),
 			AssemblyFrames.translation(-190, base.depth / 2 - 30, 0), "base");
 		connectPorts("spindle-power", "powerSupply", "power4", spindleDriver, "power");
 		addMotor("spindleMotor", "spindle-motor-turn", "spindleMotor", spindleDriver, 0.5, null,
@@ -245,7 +246,7 @@ class BenchMill extends MachineAssembly {
 			up:Array<Float>, length:Float, nutCenter:Array<Float>):Void {
 		var id = "screw" + spec.id.toUpperCase();
 		var motorId = "motor" + spec.id.toUpperCase();
-		var motor = ServoMotor.model(spec.id == "z" ? "GENERIC-SERVO-750W" : "GENERIC-SERVO-400W");
+		var motor = ServoMotor.model(spec.id == "z" ? "GENERIC-HV-SERVO-750W" : "GENERIC-HV-SERVO-400W");
 		var screw = new BallScrew(length), nut = new BallNut();
 		var brake = spec.id == "z" ? new ShaftBrakePart(motor.rating.shaftDiameter, "shell") : null;
 		var plateThickness = 8.0;
@@ -273,7 +274,7 @@ class BenchMill extends MachineAssembly {
 		if (brake != null) {
 			var brakePose = orient(motorPose.x + along[0] * plateThickness,
 				motorPose.y + along[1] * plateThickness, motorPose.z + along[2] * plateThickness, up, along);
-			for (role in ["front", "shell", "back"]) for (sector in 0...ShaftBrakePart.SECTORS) {
+			for (role in ["front", "shell", "back"]) for (sector in 0...ShaftBrakePart.sectorCount(brake.bore, role)) {
 				var part = role == "shell" && sector == 0 ? brake : new ShaftBrakePart(brake.bore, role, sector);
 				attach(motorId + 'Brake-$role-$sector', part, brakePose, parent);
 			}
@@ -341,7 +342,7 @@ class BenchMill extends MachineAssembly {
 		supportScrew(id + "-lead", near.support, far.support);
 		var driver = motorId + "Driver";
 		var index = spec.id == "x" ? 1 : spec.id == "y" ? 2 : 3;
-		attach(driver, new MotorDriver("GENERIC-AC-SERVO-AMP", 20),
+		attach(driver, new MotorDriver("GENERIC-400V-SERVO-AMP", new machinekit.power.PhaseRmsCurrent(20)),
 			AssemblyFrames.translation(-190 + index * 65, base.depth / 2 - 30, 0), "base");
 		connectPorts(driver + "-power", "powerSupply", 'power$index', driver, "power");
 		addMotor(motorId, id + "-turn", motorId, driver);

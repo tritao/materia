@@ -232,6 +232,49 @@ class MachineAssemblyDescriptionTests {
 	}
 
 	static function electricalSizing():Void {
+		var mains = new machinekit.power.AcMains(ThreePhase, new machinekit.power.AcRmsVoltage(400), 50);
+		var rectifier = new machinekit.power.ThreePhaseRectifier(mains, new machinekit.power.DcCurrent(20), 4, 240, 120, 100, 8000);
+		var dc = rectifier.outputRating("power1");
+		if (Math.abs(dc.voltage.volts() - 565.685424949238) > 1e-9 || dc.current.amps() != 20)
+			throw "The 400 V three-phase rectifier lost its DC bus or current rating";
+		var rectifierType = rectifier.componentType();
+		if (rectifierType == null) throw "The rectifier needs a saved component recipe";
+		var restoredSource = rectifierType.create(rectifier.values()).electricalSource();
+		if (restoredSource == null || Math.abs(restoredSource.outputRating("power4").voltage.volts() - dc.voltage.volts()) > 1e-9)
+			throw "Rectifier reconstruction lost the explicit AC-to-DC conversion";
+		var wrongMains = false;
+		try {var wrong = new machinekit.power.ThreePhaseRectifier(new machinekit.power.AcMains(SinglePhase,
+			new machinekit.power.AcRmsVoltage(230), 50), new machinekit.power.DcCurrent(20));}
+		catch (error:Dynamic) {wrongMains = true;}
+		if (!wrongMains) throw "A three-phase rectifier accepted single-phase mains";
+		var highMotor = machinekit.motion.ServoMotor.model("GENERIC-HV-SERVO-750W");
+		var highDriver = new MotorDriver("GENERIC-400V-SERVO-AMP", new machinekit.power.PhaseRmsCurrent(20));
+		var highLoad = new machinekit.motion.ServoElectricalLoad(highMotor.actuator("hv", "hv", dc.voltage.volts(), 0.5),
+			highMotor.rating.electrical, highDriver);
+		highLoad.check(highDriver, dc.voltage, "hv");
+		MotorDriver.validateVoltage(highDriver.rating, dc.voltage);
+		var wrongBus = false;
+		try MotorDriver.validateVoltage(highDriver.rating, new machinekit.power.DcVoltage(310));
+		catch (error:Dynamic) {wrongBus = true;}
+		if (!wrongBus) throw "A 400 V class amplifier accepted a 200 V class DC bus";
+		var lowVoltage = machinekit.motion.ServoMotor.model("GENERIC-LV-SERVO-200W");
+		var lowDriver = new MotorDriver("GENERIC-LV-SERVO-AMP", new machinekit.power.PhaseRmsCurrent(25));
+		var lowLoad = new machinekit.motion.ServoElectricalLoad(lowVoltage.actuator("lv", "lv", 48, 0.5),
+			lowVoltage.rating.electrical, lowDriver);
+		lowLoad.check(lowDriver, new machinekit.power.DcVoltage(48), "lv");
+		var lowType = lowVoltage.componentType();
+		if (lowType == null) throw "The low-voltage winding needs a saved catalogue recipe";
+		var restoredLow = lowType.create(lowVoltage.values()).motorDrive();
+		if (restoredLow == null) throw "Rebuilding the low-voltage catalogue motor lost its drive";
+		var restoredWinding:Null<machinekit.motion.ServoElectricalRating> = restoredLow.electricalRating();
+		if (restoredWinding == null ||
+			restoredWinding.backEmfConstant != lowVoltage.rating.electrical.backEmfConstant)
+			throw "Rebuilding the low-voltage catalogue motor changed its winding";
+		var lowRejected = false;
+		try {lowLoad.check(new MotorDriver("GENERIC-LV-SERVO-AMP", new machinekit.power.PhaseRmsCurrent(5)), new machinekit.power.DcVoltage(48), "lv");}
+		catch (e:Dynamic) {lowRejected = true;}
+		if (!lowRejected || lowLoad.peakPower > 800 || lowLoad.regenerativePower > 600.000001)
+			throw "The 48 V reference winding lost its amplifier, loss or regenerative requirements";
 		function definition(assembly:MachineAssembly):materia.assembly.AssemblyDefinition {
 			var model = new cadkit.modeling.AssemblyModel("mm");
 			assembly.addTo(model, "");
@@ -240,11 +283,11 @@ class MachineAssemblyDescriptionTests {
 		function bank(current:Float, regeneration:Float):MachineAssembly {
 			var assembly = new MachineAssembly();
 			assembly.addComponent("base", new RobotFlange(50));
-			assembly.addComponent("supply", new machinekit.motion.PowerSupply(310, current, 2, 120, 60, 30, regeneration));
+			assembly.addComponent("supply", new machinekit.motion.PowerSupply(new machinekit.power.DcVoltage(310), new machinekit.power.DcCurrent(current), 2, 120, 60, 30, regeneration));
 			for (i in 0...2) {
 				var id = 'motor$i', driver = 'driver$i';
 				assembly.addComponent(id, machinekit.motion.ServoMotor.model("GENERIC-SERVO-400W"));
-				assembly.addComponent(driver, new MotorDriver("GENERIC-AC-SERVO-AMP", 10));
+				assembly.addComponent(driver, new MotorDriver("GENERIC-AC-SERVO-AMP", new machinekit.power.PhaseRmsCurrent(10)));
 				assembly.connectPorts('power$i', "supply", 'power${i + 1}', driver, "power");
 				assembly.addMateOnAxis('turn$i', "continuous", "base", "face", id, "shaftAxis", {x: 0, y: 1, z: 0});
 				assembly.addMotor(id, 'turn$i', id, driver);
@@ -259,11 +302,11 @@ class MachineAssemblyDescriptionTests {
 		var good = definition(bank(12, 3000));
 		if (good.actuators == null || good.actuators.length != 2) throw "A correctly sized servo bank lost a drive";
 		var motor = machinekit.motion.ServoMotor.model("GENERIC-SERVO-750W");
-		var driver = new MotorDriver("GENERIC-AC-SERVO-AMP", 10);
+		var driver = new MotorDriver("GENERIC-AC-SERVO-AMP", new machinekit.power.PhaseRmsCurrent(10));
 		var load = new machinekit.motion.ServoElectricalLoad(motor.actuator("z", "z", 310, 0.5), motor.rating.electrical, driver);
 		var undercurrent = false, undervoltage = false;
-		try {load.check(driver, 310, "z");} catch (e:Dynamic) {undercurrent = true;}
-		try {load.check(new MotorDriver("GENERIC-AC-SERVO-AMP", 20), 48, "z");} catch (e:Dynamic) {undervoltage = true;}
+		try {load.check(driver, new machinekit.power.DcVoltage(310), "z");} catch (e:Dynamic) {undercurrent = true;}
+		try {load.check(new MotorDriver("GENERIC-AC-SERVO-AMP", new machinekit.power.PhaseRmsCurrent(20)), new machinekit.power.DcVoltage(48), "z");} catch (e:Dynamic) {undervoltage = true;}
 		if (!undercurrent || !undervoltage) throw "Servo winding current and back-EMF constraints were not enforced";
 		var noRoot = false;
 		try {var invalid = new machinekit.motion.LeadScrewThread(Ball, 16, 5);} catch (e:Dynamic) {noRoot = true;}
@@ -276,8 +319,8 @@ class MachineAssemblyDescriptionTests {
 		var spindle = new MachineAssembly();
 		spindle.addComponent("base", new RobotFlange(50));
 		spindle.addComponent("servo", machinekit.motion.ServoMotor.model("GENERIC-SERVO-400W"));
-		spindle.addComponent("driver", new MotorDriver("GENERIC-AC-SERVO-AMP", 10));
-		spindle.addComponent("supply", new machinekit.motion.PowerSupply(310, 10, 1, 120, 60, 30, 2000));
+		spindle.addComponent("driver", new MotorDriver("GENERIC-AC-SERVO-AMP", new machinekit.power.PhaseRmsCurrent(10)));
+		spindle.addComponent("supply", new machinekit.motion.PowerSupply(new machinekit.power.DcVoltage(310), new machinekit.power.DcCurrent(10), 1, 120, 60, 30, 2000));
 		spindle.connectPorts("servo-power", "supply", "power1", "driver", "power");
 		spindle.addMateOnAxis("turn", "continuous", "base", "face", "servo", "shaftAxis",
 			{x: 0, y: 1, z: 0});
@@ -724,7 +767,7 @@ class MachineAssemblyDescriptionTests {
 		assembly.addMateOnAxis("slide", "prismatic", "base", "face", "slider", "face", {x: 0, y: 1, z: 0});
 		assembly.addMateOnAxis("turn", "continuous", "base", "face", "screw", "input", {x: 0, y: 1, z: 0});
 		assembly.addTransmission("lead", "slide", "turn", Transmission.LeadScrew("screw", "nut"), Same);
-		assembly.addComponent("driver", new MotorDriver("GENERIC-DM542", 2.8, 16, 24));
+		assembly.addComponent("driver", new MotorDriver("GENERIC-DM542", new machinekit.power.PhaseRmsCurrent(2.8), 16, new machinekit.power.DcVoltage(24)));
 		assembly.addMotor("drive", "turn", "motor", "driver");
 		function definition(machine:MachineAssembly):materia.assembly.AssemblyDefinition {
 			var model = new AssemblyModel("mm");
@@ -788,7 +831,7 @@ class MachineAssemblyDescriptionTests {
 		var rejectedDriver = false;
 		try assembly.addMotor("bad-driver", "turn", "motor", "base") catch (_:Dynamic) rejectedDriver = true;
 		if (!rejectedDriver) throw "A non-driver member cannot supply an actuator";
-		assembly.addComponent("wrong-family", new MotorDriver("GENERIC-SERVO-AMP", 1, 1, 24));
+		assembly.addComponent("wrong-family", new MotorDriver("GENERIC-SERVO-AMP", new machinekit.power.PhaseRmsCurrent(1), 1, new machinekit.power.DcVoltage(24)));
 		rejectedDriver = false;
 		try assembly.addMotor("bad-family", "turn", "motor", "wrong-family") catch (error:Dynamic)
 			rejectedDriver = Std.string(error).indexOf("different drive families") >= 0;
@@ -815,8 +858,8 @@ class MachineAssemblyDescriptionTests {
 		servoMachine.addComponent("base", new RobotFlange(50));
 		servoMachine.addComponent("servo", new TestServo());
 		servoMachine.addMateOnAxis("turn", "continuous", "base", "face", "servo", "shaft", {x: 0, y: 1, z: 0});
-		servoMachine.addComponent("driver", new MotorDriver("GENERIC-LV-SERVO-AMP", 40));
-		servoMachine.addComponent("supply", new machinekit.motion.PowerSupply(48, 40, 1, 120, 60, 30, 1000));
+		servoMachine.addComponent("driver", new MotorDriver("GENERIC-LV-SERVO-AMP", new machinekit.power.PhaseRmsCurrent(40)));
+		servoMachine.addComponent("supply", new machinekit.motion.PowerSupply(new machinekit.power.DcVoltage(48), new machinekit.power.DcCurrent(40), 1, 120, 60, 30, 1000));
 		servoMachine.connectPorts("servo-power", "supply", "power1", "driver", "power");
 		servoMachine.addMotor("servo-drive", "turn", "servo", "driver");
 		var servoActuator = actuatorsOf(definition(servoMachine))[0];
@@ -859,7 +902,7 @@ class MachineAssemblyDescriptionTests {
 		closed.addComponent("encoder", new machinekit.motion.ShaftEncoder(1024, false, false));
 		closed.addMateOnAxis("turn", "continuous", "base", "face", "motor", "shaftAxis", {x: 0, y: 1, z: 0});
 		closed.addMate("encoder-mount", "fixed", "motor", "mountFace", "encoder", "mount");
-		closed.addComponent("driver", new MotorDriver("GENERIC-DM542", 2.8, 16, 24));
+		closed.addComponent("driver", new MotorDriver("GENERIC-DM542", new machinekit.power.PhaseRmsCurrent(2.8), 16, new machinekit.power.DcVoltage(24)));
 		closed.addMotor("closed-drive", "turn", "motor", "driver");
 		closed.addEncoder("closed-encoder", "turn", "encoder", "closed-drive");
 		roundTrip(closed, "closed-loop stepper", false);
@@ -1217,7 +1260,7 @@ class MachineAssemblyDescriptionTests {
 		var contacts:Array<materia.assembly.AssemblyDefinition.AssemblyElasticClearance> = cast definition.elasticNetworks[0].clearances;
 		if (contacts.length != 2) throw "Both leader and follower belt contacts need tooth clearance";
 		assembly.addComponent("motor", NemaStepper.frame(23));
-		var driver = new machinekit.motion.MotorDriver("GENERIC-DM542", 2.8, 16, 24);
+		var driver = new machinekit.motion.MotorDriver("GENERIC-DM542", new machinekit.power.PhaseRmsCurrent(2.8), 16, new machinekit.power.DcVoltage(24));
 		assembly.addComponent("amplifier", driver);
 		assembly.addMotor("motor-drive", "input", "motor", "amplifier");
 		if (assembly.check().hasErrors()) throw "Normal NEMA 23 usable torque must fit a 20-tooth GT2-6 belt";
@@ -1234,7 +1277,7 @@ class MachineAssemblyDescriptionTests {
 		var mismatchedSaved = assembly.describe();
 		driver.rating.family = family;
 		assembly.addComponent("unrelatedMotor", NemaStepper.frame(17));
-		var unrelated = new machinekit.motion.MotorDriver("GENERIC-TMC2209", 1.0, 16, 24);
+		var unrelated = new machinekit.motion.MotorDriver("GENERIC-TMC2209", new machinekit.power.PhaseRmsCurrent(1.0), 16, new machinekit.power.DcVoltage(24));
 		assembly.addComponent("unrelatedDriver", unrelated);
 		// An electrical fault outside this belt must not invalidate its elastic network.
 		assembly.addMemberConnector("base", "other", AssemblyFrames.translation(0, 100, 0));
@@ -1288,7 +1331,7 @@ private class TestServo extends machinekit.component.MachineComponent implements
 	}
 
 	override public function motorDrive():Null<machinekit.motion.MotorDrive> return this;
-	public function electricalRating():Null<machinekit.motion.ServoElectricalRating> return machinekit.motion.ServoMotor.lowVoltageWinding();
+	public function electricalRating():Null<machinekit.motion.ServoElectricalRating> return machinekit.motion.ServoMotor.lowVoltageWinding(0.64, 314, 500);
 	public function actuator(id:String, joint:String, volts:Float, margin:Float, ?current:Float):materia.assembly.AssemblyDefinition.AssemblyActuator
 		return {id: id, joint: joint, maxEffort: 1.9, maxRate: 500, rotorInertia: 2e-5, drive: "servo",
 			ratedTorque: 0.64, peakTorque: 1.9, ratedSpeed: 314, maxSpeed: 500, encoderCounts: 4096,

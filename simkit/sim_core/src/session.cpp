@@ -1,5 +1,6 @@
 #include "nativekit_sim_session.h"
 #include "internal.hpp"
+#include "convex_overlap.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -74,6 +75,65 @@ bool boxes_overlap(const nksim_pose &query, const double query_half[3],
         if (centre > radius) return false;
     }
     return true;
+}
+
+Vec3 shape_support(const nksim_shape_desc &shape, const Vec3 &direction,
+                   const std::vector<double> &vertices = {}) {
+    Vec3 point{};
+    if (shape.type == NKSIM_SHAPE_BOX) {
+        for (int axis = 0; axis < 3; ++axis)
+            point[axis] = direction[axis] >= 0.0 ? shape.parameters[axis] : -shape.parameters[axis];
+    } else if (shape.type == NKSIM_SHAPE_SPHERE || shape.type == NKSIM_SHAPE_CAPSULE) {
+        const double length = std::sqrt(geometry::dot(direction, direction));
+        if (length > 0.0) for (int axis = 0; axis < 3; ++axis)
+            point[axis] = shape.parameters[0] * direction[axis] / length;
+        if (shape.type == NKSIM_SHAPE_CAPSULE)
+            point[2] += (direction[2] >= 0.0 ? 0.5 : -0.5) * shape.parameters[1];
+    } else if (shape.type == NKSIM_SHAPE_CONVEX) {
+        double best = -std::numeric_limits<double>::infinity();
+        for (std::size_t i = 0; i < vertices.size(); i += 3) {
+            const Vec3 candidate{vertices[i], vertices[i + 1], vertices[i + 2]};
+            const double score = geometry::dot(candidate, direction);
+            if (score > best) {best = score; point = candidate;}
+        }
+    } else if (shape.type == NKSIM_SHAPE_CYLINDER) {
+        const double radial = std::hypot(direction[0], direction[1]);
+        if (radial > 0.0) for (int axis = 0; axis < 2; ++axis)
+            point[axis] = shape.parameters[0] * direction[axis] / radial;
+        point[2] = (direction[2] >= 0.0 ? 0.5 : -0.5) * shape.parameters[1];
+    }
+    return point;
+}
+
+nksim_result volume_overlap(const nksim_pose &query, const double half_extents[3],
+                            const nksim_body_state &object, const nksim_shape_desc &shape,
+                            bool &present, const std::vector<double> &vertices) {
+    if (shape.type == NKSIM_SHAPE_BOX) {
+        present = boxes_overlap(query, half_extents, object, shape.parameters);
+        return NKSIM_OK;
+    }
+    if (shape.type != NKSIM_SHAPE_SPHERE && shape.type != NKSIM_SHAPE_CAPSULE &&
+        shape.type != NKSIM_SHAPE_CYLINDER && shape.type != NKSIM_SHAPE_CONVEX)
+        return NKSIM_ERROR_UNSUPPORTED;
+    nksim_shape_desc box{};
+    box.type = NKSIM_SHAPE_BOX;
+    std::copy_n(half_extents, 3, box.parameters);
+    const auto overlap = geometry::overlap([&](const Vec3 &direction) {
+        Vec3 query_direction{}, object_direction{}, query_point{}, object_point{};
+        rotate(query.rotation, direction.data(), query_direction.data(), true);
+        const Vec3 opposite{-direction[0], -direction[1], -direction[2]};
+        rotate(object.rotation, opposite.data(), object_direction.data(), true);
+        const auto local_query = shape_support(box, query_direction);
+        const auto local_object = shape_support(shape, object_direction, vertices);
+        rotate(query.rotation, local_query.data(), query_point.data());
+        rotate(object.rotation, local_object.data(), object_point.data());
+        for (int axis = 0; axis < 3; ++axis)
+            query_point[axis] += query.position[axis] - object.position[axis] - object_point[axis];
+        return query_point;
+    });
+    if (overlap == geometry::Overlap::unresolved) return NKSIM_ERROR_BACKEND;
+    present = overlap == geometry::Overlap::intersecting;
+    return NKSIM_OK;
 }
 
 void multiply(const double a[4], const double b[4], double out[4]) {
@@ -278,6 +338,8 @@ struct Part {
     nksim_shape shape = 0;
     nksim_body body = 0;
     nksim_shape_desc shape_desc{};
+    std::vector<double> vertices;
+    std::vector<std::array<double, 4>> planes;
     nksim_pose initial{};
     /** The pose most recently written to the node. */
     nksim_pose pose{};
@@ -439,21 +501,35 @@ public:
         return NKSIM_OK;
     }
 
-    nksim_result create_object(const nksim_object_desc &desc, nksim_object &out) {
+    nksim_result create_object(const nksim_object_desc &desc, nksim_object &out,
+                               const double *vertices = nullptr, uint32_t coordinates = 0) {
         std::lock_guard lock(mutex);
         if (host_ != 0) return NKSIM_ERROR_INVALID_STATE;
-        if (desc.motion_type > NKSIM_MOTION_DYNAMIC || !valid_shape(desc.shape) ||
+        const bool convex = desc.shape.type == NKSIM_SHAPE_CONVEX;
+        if (convex) {
+            if (!vertices || coordinates < 12 || coordinates > 192 || coordinates % 3 != 0)
+                return NKSIM_ERROR_INVALID_ARGUMENT;
+            for (uint32_t i = 0; i < coordinates; ++i)
+                if (!std::isfinite(vertices[i])) return NKSIM_ERROR_INVALID_ARGUMENT;
+        } else if (vertices || coordinates) return NKSIM_ERROR_INVALID_ARGUMENT;
+        if (desc.motion_type > NKSIM_MOTION_DYNAMIC || (!convex && !valid_shape(desc.shape)) ||
             (desc.shape.type == NKSIM_SHAPE_PLANE && desc.motion_type != NKSIM_MOTION_STATIC) ||
             desc.pose.struct_size < sizeof(desc.pose) || !valid_pose(desc.pose) ||
             (desc.motion_type == NKSIM_MOTION_DYNAMIC &&
              !(std::isfinite(desc.mass) && desc.mass > 0.0)))
             return NKSIM_ERROR_INVALID_ARGUMENT;
         Object object;
+        if (convex) {
+            object.part.vertices.assign(vertices, vertices + coordinates);
+            object.part.planes = geometry::hull_planes(object.part.vertices);
+            if (object.part.planes.size() < 4) return NKSIM_ERROR_INVALID_ARGUMENT;
+        }
         object.motion_type = desc.motion_type;
         const bool default_layers = desc.collision_layer == 0 && desc.collision_mask == 0;
         const auto result = create_part(object.part, desc.shape, desc.pose, desc.motion_type,
             desc.motion_type == NKSIM_MOTION_DYNAMIC ? desc.mass : 0.0,
-            default_layers ? 1u : desc.collision_layer, default_layers ? 1u : desc.collision_mask);
+            default_layers ? 1u : desc.collision_layer, default_layers ? 1u : desc.collision_mask,
+            desc.rest_contact_group);
         if (result != NKSIM_OK) return result;
         out = next_object_++;
         objects_.emplace(out, std::move(object));
@@ -659,8 +735,11 @@ public:
             for (int axis = 0; axis < 3; ++axis) delta[axis] = origin[axis] - state.position[axis];
             rotate(state.rotation, delta, local_origin, true);
             rotate(state.rotation, direction, local_direction, true);
-            nearest = std::min(nearest, ray_shape(part.shape_desc, local_origin,
-                                                  local_direction, nearest));
+            const double hit = part.shape_desc.type == NKSIM_SHAPE_CONVEX ?
+                geometry::ray_hull(part.planes, {local_origin[0], local_origin[1], local_origin[2]},
+                    {local_direction[0], local_direction[1], local_direction[2]}, nearest) :
+                ray_shape(part.shape_desc, local_origin, local_direction, nearest);
+            nearest = std::min(nearest, hit);
             return NKSIM_OK;
         };
         for (const auto &[id, object] : objects_)
@@ -672,18 +751,20 @@ public:
         return NKSIM_OK;
     }
 
-    nksim_result overlap_free_boxes(const nksim_pose &pose, const double half_extents[3],
+    nksim_result overlap_free_objects(const nksim_pose &pose, const double half_extents[3],
                                     uint32_t &out) {
         std::lock_guard lock(mutex);
         out = 0;
         for (const auto &[id, object] : objects_) {
-            if (object.motion_type != NKSIM_MOTION_DYNAMIC || object.carrier != 0 ||
-                object.part.shape_desc.type != NKSIM_SHAPE_BOX) continue;
+            if (object.motion_type != NKSIM_MOTION_DYNAMIC || object.carrier != 0) continue;
             nksim_body_state state{};
             state.struct_size = sizeof(state);
             if (const auto result = body_state(object.part.body, state); result != NKSIM_OK)
                 return result;
-            if (boxes_overlap(pose, half_extents, state, object.part.shape_desc.parameters)) {
+            bool present = false;
+            if (const auto result = volume_overlap(pose, half_extents, state, object.part.shape_desc, present, object.part.vertices);
+                result != NKSIM_OK) return result;
+            if (present) {
                 out = 1;
                 break;
             }
@@ -947,7 +1028,8 @@ private:
     }
 
     nksim_result create_part(Part &part, const nksim_shape_desc &shape, const nksim_pose &pose,
-                             uint32_t motion_type, double mass, uint32_t layer, uint32_t mask) {
+                             uint32_t motion_type, double mass, uint32_t layer, uint32_t mask,
+                             uint64_t rest_contact_group = 0) {
         part.shape_desc = shape;
         part.initial = part.pose = part.tick_pose = pose;
         nkscene_transaction transaction = 0;
@@ -964,7 +1046,9 @@ private:
         if (changes != 0) nkscene_change_set_destroy(changes);
         auto shape_desc = shape;
         shape_desc.struct_size = sizeof(shape_desc);
-        auto result = nksim_shape_create(world_, &shape_desc, &part.shape);
+        auto result = shape.type == NKSIM_SHAPE_CONVEX ?
+            nksim_shape_create_convex(world_, part.vertices.data(), part.vertices.size(), &part.shape) :
+            nksim_shape_create(world_, &shape_desc, &part.shape);
         if (result != NKSIM_OK) {
             destroy_part(part);
             return result;
@@ -977,6 +1061,7 @@ private:
         body.shape = part.shape;
         body.collision_layer = layer;
         body.collision_mask = mask;
+        body.rest_contact_group = rest_contact_group;
         if ((result = nksim_body_create(world_, &body, &part.body)) != NKSIM_OK) {
             destroy_part(part);
             return result;
@@ -1274,6 +1359,16 @@ nksim_result NKSIM_CALL nksim_session_create_object(nksim_session session,
     return value->create_object(*desc, *out_object);
 }
 
+nksim_result NKSIM_CALL nksim_session_create_convex_object(nksim_session session,
+    const nksim_object_desc *desc, const double *vertices, uint32_t coordinate_count,
+    nksim_object *out_object) {
+    if (!desc || !out_object || !nksim::valid_struct_size(desc->struct_size, sizeof(*desc)) ||
+        desc->shape.type != NKSIM_SHAPE_CONVEX) return NKSIM_ERROR_INVALID_ARGUMENT;
+    *out_object = 0;
+    NKSIM_SESSION_OR_FAIL(value);
+    return value->create_object(*desc, *out_object, vertices, coordinate_count);
+}
+
 nksim_result NKSIM_CALL nksim_session_destroy_object(nksim_session session, nksim_object object) {
     NKSIM_SESSION_OR_FAIL(value);
     return value->destroy_object(object);
@@ -1365,7 +1460,7 @@ nksim_result NKSIM_CALL nksim_session_raycast(nksim_session session, const nksim
     return value->raycast(ray->origin, ray->direction, ray->max_distance, *out_distance);
 }
 
-nksim_result NKSIM_CALL nksim_session_overlap_free_boxes(nksim_session session,
+nksim_result NKSIM_CALL nksim_session_overlap_free_objects(nksim_session session,
                                                           const nksim_pose *pose,
                                                           const double half_extents[3],
                                                           uint32_t *out_present) {
@@ -1376,7 +1471,7 @@ nksim_result NKSIM_CALL nksim_session_overlap_free_boxes(nksim_session session,
         if (!std::isfinite(half_extents[axis]) || half_extents[axis] <= 0.0)
             return NKSIM_ERROR_INVALID_ARGUMENT;
     NKSIM_SESSION_OR_FAIL(value);
-    return value->overlap_free_boxes(*pose, half_extents, *out_present);
+    return value->overlap_free_objects(*pose, half_extents, *out_present);
 }
 
 nksim_result NKSIM_CALL nksim_session_capture(nksim_session session, nksim_frame *out_frame) {

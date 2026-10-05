@@ -45,6 +45,7 @@ struct BackendBodyDesc {
     std::array<double, 4> rotation{0.0, 0.0, 0.0, 1.0};
     std::uint32_t collision_layer = 0;
     std::uint32_t collision_mask = 0;
+    std::uint64_t rest_contact_group = 0;
     bool has_inertial_properties = false;
     std::array<double, 3> center_of_mass{};
     std::array<double, 9> inertia_tensor{};
@@ -160,7 +161,6 @@ public:
     virtual nksim_result joint_destroy(std::uint64_t joint) = 0;
     virtual nksim_result joint_configure_brake(std::uint64_t joint, BrakeParameters parameters) = 0;
     virtual nksim_result joint_set_brake_release(std::uint64_t joint, bool energized) = 0;
-    virtual nksim_result joint_brake_released(std::uint64_t joint, bool *released) const = 0;
     virtual nksim_result joint_couple(const BackendJointCoupling &coupling) = 0;
     virtual nksim_result closure_create(const BackendClosure &closure) = 0;
     /** Backends without explicit pairs keep their own contact rules. */

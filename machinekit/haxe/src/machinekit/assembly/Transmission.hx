@@ -19,6 +19,7 @@ package machinekit.assembly;
 	@:id(5) RollerChain(chain:Null<String>, sprocket:String);
 	/** An idler follows belt motion and contributes bearing drag, without delivering torque. */
 	@:id(6) BeltIdler(belt:String, pulley:String);
-	/** Two pulleys on one belt; the driver follows the leader and the driven follows the follower. */
-	@:id(7) BeltReduction(belt:String, driver:String, driven:String);
+	/** Two pulleys on one belt, named by their coordinate joints. The motor may be on either
+	 * pulley; the leader is the planned coordinate, not the source of mechanical power. */
+	@:id(7) BeltReduction(belt:String, leaderPulley:String, followerPulley:String);
 }

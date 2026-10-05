@@ -228,7 +228,7 @@ class MobileBase extends MachineAssembly {
 	public static final WHEEL_GEARBOX = new Gearbox(10, 0.9, 60, 40, 6.35, true);
 	public static inline var WHEEL_SUPPLY:Float = 24;
 	public static final WIDTH:Float = 2 * (BRACKET_Y + BRACKET_THICKNESS + HUB_GAP + WHEEL_GEARBOX.length + WHEEL_HUB_LENGTH + WHEEL_WIDTH + 6 + MINIMUM_WEB);
-	static function wheelDriver():MotorDriver return new MotorDriver("GENERIC-DM542", 2.8, 16);
+	static function wheelDriver():MotorDriver return new MotorDriver("GENERIC-DM542", new machinekit.power.PhaseRmsCurrent(2.8), 16);
 	/** Limits resolved from the battery's power connections, after assembly construction. */
 	public function wheelSpeed():Float {
 		return actuatorFor("driveLeft").maxRate / WHEEL_GEARBOX.ratio;

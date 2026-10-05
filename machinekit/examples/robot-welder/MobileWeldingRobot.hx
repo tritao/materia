@@ -24,8 +24,8 @@ class MobileWeldingRobot extends MobileBase {
     if (storage.nominalVolts != conversion.inputVolts || storage.outlets < 4)
       throw "The mobile welding pack must match the inverter and supply four branches";
     var weldingArm = new RobotArm(false, new ArmWeldingTool());
-    // The arm keeps its 200 V class servo windings; the pack converter supplies their DC bus and regeneration.
-    weldingArm.replaceComponent("powerSupply", new IsolatedDcConverter(storage.nominalVolts, 310, 10, 6, 120, 60, 30, 0.95, 2, 2500));
+    // The isolated 48 V branch supports the low-voltage arm windings and regeneration.
+    weldingArm.replaceComponent("powerSupply", new IsolatedDcConverter(storage.nominalVolts, 48, 75, 6, 120, 60, 30, 0.95, 2, 2500));
     super(weldingArm, storage.nominalVolts, payloadLayout(storage, supply, conversion));
     source = supply;
     inverter = conversion;

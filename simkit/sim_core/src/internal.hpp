@@ -308,7 +308,6 @@ public:
     nksim_result configure_joint_brake(nksim_joint joint, BrakeParameters parameters);
     nksim_result set_brake_outputs(const nksim_brake_output *outputs, uint32_t count);
     nksim_result set_joint_brake_release(nksim_joint joint, bool energized);
-    nksim_result get_joint_brake_released(nksim_joint joint, bool *released) const;
 
     const nksim_world_desc &desc() const noexcept { return world_desc; }
 

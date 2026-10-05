@@ -55,6 +55,7 @@ class EnclosedBenchMill extends MachineAssembly {
 		var centreX = (left + right) / 2, centreY = (front + back) / 2;
 		panel("chipTray", width, depth, trayThickness, centreX, centreY, standHeight);
 		include("mill", mill, AssemblyFrames.translation(0, 0, floorOffset));
+		exposePort("mains", "mill/powerSupply", "mains");
 		addMemberConnector("chipTray", "millSeat", AssemblyFrames.compose(AssemblyFrames.inverse(poses.get("chipTray")),
 			AssemblyFrames.translation(0, 0, floorOffset)));
 		addMemberConnector("mill/base", "standSeat", AssemblyFrames.identity());

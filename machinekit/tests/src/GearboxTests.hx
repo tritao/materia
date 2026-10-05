@@ -20,8 +20,8 @@ class GearboxTests {
 		var machine = new MachineAssembly();
 		machine.addComponent("base", new RobotFlange(50));
 		machine.addComponent("motor", new ArmJoint(80, 80, null, ServoMotor.model("GENERIC-SERVO-50W")));
-		machine.addComponent("driver", new MotorDriver("GENERIC-AC-SERVO-AMP", 5));
-		machine.addComponent("servo-supply", new machinekit.motion.PowerSupply(310, 5, 1, 120, 60, 30, 1000));
+		machine.addComponent("driver", new MotorDriver("GENERIC-AC-SERVO-AMP", new machinekit.power.PhaseRmsCurrent(5)));
+		machine.addComponent("servo-supply", new machinekit.motion.PowerSupply(new machinekit.power.DcVoltage(310), new machinekit.power.DcCurrent(5), 1, 120, 60, 30, 1000));
 		machine.connectPorts("servo-power", "servo-supply", "power1", "driver", "power");
 		machine.addComponent("gearbox", new Gearbox(10, 0.9, 60, 40, 8, true));
 		machine.addMateOnAxis("turn", "continuous", "base", "face", "motor", "stator", {x: 0, y: 0, z: 1});

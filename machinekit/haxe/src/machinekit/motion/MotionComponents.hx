@@ -15,6 +15,7 @@ class MotionComponents {
 		registry.register(ShaftBrakePart.recipeType());
 		registry.register(MotorDriver.recipeType());
 		registry.register(PowerSupply.recipeType());
+		registry.register(machinekit.power.ThreePhaseRectifier.recipeType());
 		registry.register(Gearbox.recipeType());
 		registry.register(FlangeBearingHousing.recipeType());
 		registry.register(LeadScrew.recipeType());

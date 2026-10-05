@@ -24,6 +24,19 @@ class BeltElasticityTests {
 		function hold(value:RobotModel, id:String):Void {
 			value.addActuator(new Actuator(id + ".motor", 1, 10, SimpleTransmission(id, 1, 0)));
 		}
+		// Plan at the spindle while the motor is the faster follower. Mechanical power
+		// direction is independent of which coordinate leads the coupling.
+		var spindle = model(["spindle", "spindleMotor"]);
+		hold(spindle, "spindleMotor");
+		var spindleBelt = spindle.addCoupling(new JointCoupling("spindle-belt", "spindle", "spindleMotor", 2, 0));
+		spindleBelt.efficiency = 0.8;
+		var spindleLoad = DriveLoads.forAxis(spindle, "spindle");
+		if (spindleLoad == null || spindleLoad.motors.length != 1) throw "Spindle belt needs one motor load";
+		near(spindleLoad.motors[0].ratio, 2, "output-planned spindle keeps asymmetric tooth ratio");
+		near(spindleLoad.motorTorqueWithoutDrag(spindleLoad.motors[0], 1, 0, 4), 2.5,
+			"motor supplies output torque plus belt losses");
+		near(spindleLoad.motorTorqueWithoutDrag(spindleLoad.motors[0], 1, 0, -4), -1.6,
+			"back-driven spindle loses power before reaching motor");
 		var value = model(["a", "b", "motor"]);
 		hold(value, "motor");
 		var k = 1200.0;

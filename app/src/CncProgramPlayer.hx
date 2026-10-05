@@ -57,6 +57,8 @@ typedef CncJob = {
 	var source:String;
 	var axes:Array<String>;
 	var spindle:String;
+	/** Explicit process-channel namespace; independent of the spindle occurrence path. */
+	var channelScope:String;
 	/** G54 in machine coordinates. */
 	var workOffset:Array<Float>;
 	/** The tool table; G43 H numbers are tool numbers. */
@@ -90,8 +92,7 @@ class CncProgramPlayer implements SessionMember {
 
 	/** Spindle and coolant channels a CNC program's events need on the machine's runtime. */
 	public static function channelsFor(job:CncJob):ToolpathChannels {
-		var slash = job.spindle.lastIndexOf("/");
-		return new ToolpathChannels(slash < 0 ? "" : job.spindle.substr(0, slash));
+		return new ToolpathChannels(job.channelScope);
 	}
 
 	public static function processChannels(job:CncJob):Array<ProcessChannelDeclaration> {

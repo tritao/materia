@@ -518,6 +518,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             std::copy_n(blueprint.links[index].center_of_mass, 3, desc.center_of_mass);
             std::copy_n(blueprint.links[index].inertia_tensor, 9, desc.inertia_tensor);
             desc.shape = shape_;
+            desc.rest_contact_group = robot_desc ? robot_desc->rest_contact_group : 0;
             bool has_link_shape = robot_desc;
             const auto hull_count = robot_desc
                 ? robot_desc->collision_hull_count[index] : 0;

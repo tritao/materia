@@ -20,14 +20,14 @@ class PowerSupplyTests {
 		var machine = new MachineAssembly();
 		machine.addComponent("base", new RobotFlange(50));
 		machine.addComponent("motor", NemaStepper.frame(23));
-		machine.addComponent("driver", new MotorDriver("GENERIC-DM542", 2.8, 16, stated));
+		machine.addComponent("driver", new MotorDriver("GENERIC-DM542", new machinekit.power.PhaseRmsCurrent(2.8), 16, stated == null ? null : new machinekit.power.DcVoltage(stated)));
 		machine.addMateOnAxis("turn", "continuous", "base", "face", "motor", "mountFace", {x: 0, y: 0, z: 1});
 		machine.addMate("driver-mount", "fixed", "base", "face", "driver", "mount");
 		machine.addMotor("drive", "turn", "motor", "driver");
 		return machine;
 	}
 	static function supply(machine:MachineAssembly, voltage:Float):Void {
-		machine.addComponent("supply", new PowerSupply(voltage, 10));
+		machine.addComponent("supply", new PowerSupply(new machinekit.power.DcVoltage(voltage), new machinekit.power.DcCurrent(10)));
 		machine.addMate("supply-mount", "fixed", "base", "face", "supply", "mount");
 		machine.connectPorts("driver-power", "supply", "power1", "driver", "power");
 	}
@@ -79,7 +79,7 @@ class PowerSupplyTests {
 		supply(excessive, 60);
 		rejects(() -> { var result = rate(excessive); }, "A supply outside the driver voltage range must be rejected");
 		var unknown = fixture(24);
-		unknown.addComponent("upstream-driver", new MotorDriver("GENERIC-DM542", 2.8, 16, 24));
+		unknown.addComponent("upstream-driver", new MotorDriver("GENERIC-DM542", new machinekit.power.PhaseRmsCurrent(2.8), 16, new machinekit.power.DcVoltage(24)));
 		unknown.addMate("upstream-mount", "fixed", "base", "face", "upstream-driver", "mount");
 		unknown.connectPorts("unknown-voltage", "upstream-driver", "motor", "driver", "power");
 		rejects(() -> { var result = rate(unknown); }, "A modelled source without an output voltage cannot silently use the fallback");
@@ -87,8 +87,8 @@ class PowerSupplyTests {
 		servo.addComponent("base", new RobotFlange(50));
 		servo.addComponent("motor", new machinekit.robotics.ArmJoint(80, 80, null,
 			machinekit.motion.ServoMotor.model("GENERIC-SERVO-50W")));
-		servo.addComponent("driver", new MotorDriver("GENERIC-AC-SERVO-AMP", 5));
-		servo.addComponent("servo-supply", new machinekit.motion.PowerSupply(310, 5, 1, 120, 60, 30, 1000));
+		servo.addComponent("driver", new MotorDriver("GENERIC-AC-SERVO-AMP", new machinekit.power.PhaseRmsCurrent(5)));
+		servo.addComponent("servo-supply", new machinekit.motion.PowerSupply(new machinekit.power.DcVoltage(310), new machinekit.power.DcCurrent(5), 1, 120, 60, 30, 1000));
 		servo.connectPorts("servo-power", "servo-supply", "power1", "driver", "power");
 		servo.addMateOnAxis("turn", "continuous", "base", "face", "motor", "stator", {x: 0, y: 0, z: 1});
 		servo.addMate("driver-mount", "fixed", "base", "face", "driver", "mount");

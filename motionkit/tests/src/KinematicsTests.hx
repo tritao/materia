@@ -149,10 +149,48 @@ class KinematicsTests extends MotionKitTestSupport {
     limits.position(0, -1, 1); limits.velocity(0, 2); limits.acceleration(0, 4); limits.jerk(0, 10);
     var plan = motionkit.trajectory.ExecutionPlan.create(trajectory, limits, Int64.ofInt(1),
       [-0.2], [1.6], [-3.2], [1e-6], [1e-6], [1e-6]);
-    var validator = new motionkit.robot.ArmPlanClearance(clearance, [0.001]);
+    var validator = new motionkit.robot.ArmPlanClearance(clearance);
     var rejected = false;
     try validator.fork().check(plan) catch (error:Dynamic) rejected = Std.string(error).indexOf("fixed obstacle") >= 0;
     check(rejected, "timed polynomial clearance rejects an interior collision despite its returning endpoint");
+    plan.dispose(); trajectory.dispose();
+  }
+
+  /** A two-metre lever crosses a thin edge between the old 0.02-rad samples. */
+  public function testJointPlanClearanceCertifiesThinEdgeIntervals():Void {
+    var model = new robotkit.model.RobotModel("long lever clearance");
+    var base = model.addLink(new robotkit.model.Link("base"));
+    var tool = model.addLink(new robotkit.model.Link("tool"));
+    var joint = model.addJoint(new robotkit.model.Joint("turn", robotkit.model.JointType.Revolute, base, tool));
+    var frame = model.addFrame(new robotkit.model.Frame("tool-frame", tool));
+    var arm = new Manipulator(model, base.id, frame.id);
+    var moving:Array<Float> = [], obstacle:Array<Float> = [];
+    for (corner in 0...8) {
+      var x = (corner & 1) == 0 ? -0.0001 : 0.0001;
+      var y = (corner & 2) == 0 ? -0.0001 : 0.0001;
+      var z = (corner & 4) == 0 ? -0.0001 : 0.0001;
+      moving.push(2 + x); moving.push(y); moving.push(z);
+      obstacle.push(2 * Math.cos(0.007) + x);
+      obstacle.push(2 * Math.sin(0.007) + y); obstacle.push(z);
+    }
+    var clearance = new robotkit.manipulation.ArmClearance(arm, [
+      {name: "long tool", link: tool.id, vertices: moving, tool: false},
+      {name: "thin door edge", link: base.id, vertices: obstacle, tool: false}
+    ], [0.0]);
+    for (q in [0.0, 0.01, 0.02]) check(clearance.violation([q]) == null, "endpoints and midpoint miss the thin edge");
+    check(clearance.intervalClear([0.0], [0.0]), "stationary clear interval is certified");
+    check(!clearance.intervalClear([0.01], [0.01]), "hull travel prevents certifying the crossing interval");
+    var trajectory = motionkit.trajectory.Trajectory.fromSegments([
+      {timeFromStartNs: Int64.ofInt(0), durationNs: Int64.ofInt(1000000000), coefficients: [[0.0, 0.02]]}
+    ]);
+    var limits = new motionkit.trajectory.ValidationLimits(1, Int64.ofInt(1), Int64.ofInt(1));
+    limits.position(0, -1, 1); limits.velocity(0, 1); limits.acceleration(0, 1); limits.jerk(0, 1);
+    var plan = motionkit.trajectory.ExecutionPlan.create(trajectory, limits, Int64.ofInt(1),
+      [0.0], [0.02], [0.0], [1e-6], [1e-6], [1e-6]);
+    var rejected = false;
+    try new motionkit.robot.ArmPlanClearance(clearance).check(plan)
+    catch (error:Dynamic) rejected = Std.string(error).indexOf("thin door edge") >= 0;
+    check(rejected, "continuous interval admission catches an edge missed by angular samples");
     plan.dispose(); trajectory.dispose();
   }
 

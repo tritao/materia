@@ -73,7 +73,8 @@ typedef struct nksim_object_desc {
     /** Both zero selects layer 1 and mask 1, the ordinary environment category. */
     uint32_t collision_layer;
     uint32_t collision_mask;
-    uint64_t reserved[2];
+    uint64_t rest_contact_group; /**< Same mounted-contact policy as nksim_body_desc. */
+    uint64_t reserved[1];
 } nksim_object_desc;
 
 /** One kinematic body of an actor. */
@@ -135,6 +136,12 @@ NKSIM_API nksim_result NKSIM_CALL nksim_session_reset(nksim_session session);
 /** Adds one environment body while stopped. */
 NKSIM_API nksim_result NKSIM_CALL nksim_session_create_object(
     nksim_session session, const nksim_object_desc *desc, nksim_object *out_object NK_OUT);
+/** Creates a convex object from 4 to 64 hull vertices in its local frame.
+ * The descriptor selects CONVEX; coordinates are copied before returning. */
+NKSIM_API nksim_result NKSIM_CALL nksim_session_create_convex_object(
+    nksim_session session, const nksim_object_desc *desc,
+    const double *vertices NK_IN_ARRAY(coordinate_count), uint32_t coordinate_count,
+    nksim_object *out_object NK_OUT);
 /** Removes one environment body while stopped. */
 NKSIM_API nksim_result NKSIM_CALL nksim_session_destroy_object(
     nksim_session session, nksim_object object);
@@ -218,11 +225,11 @@ NKSIM_API nksim_result NKSIM_CALL nksim_session_raycast(
     nksim_session session, const nksim_ray *ray, double *out_distance NK_OUT);
 
 /**
- * True when the oriented query box intersects a free dynamic box object in
+ * True when the oriented query box intersects a free dynamic object in
  * the latest physics state. Static fixtures, kinematic actors and carried
  * objects are excluded. Query dimensions are positive half extents.
  */
-NKSIM_API nksim_result NKSIM_CALL nksim_session_overlap_free_boxes(
+NKSIM_API nksim_result NKSIM_CALL nksim_session_overlap_free_objects(
     nksim_session session, const nksim_pose *pose,
     const double half_extents[3], uint32_t *out_present NK_OUT);
 

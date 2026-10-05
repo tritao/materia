@@ -409,8 +409,8 @@ nksim_result World::read_backend_state() {
             joint.state.position = state.position;
             joint.state.velocity = state.velocity;
             joint.state.effort = state.effort;
-            joint.state.brake_configured = joint.brake_configured ? 1 : 0;
-            joint.state.brake_released = state.brake_released ? 1 : 0;
+            joint.state.flags = (joint.brake_configured ? NKSIM_JOINT_BRAKE_CONFIGURED : 0) |
+                (state.brake_released ? NKSIM_JOINT_BRAKE_RELEASED : 0);
         });
     }
     return NKSIM_OK;
@@ -843,6 +843,7 @@ nksim_result World::create_body(const nksim_body_desc &desc, nksim_body *out_bod
     backend_desc.rotation = rotation;
     backend_desc.collision_layer = desc.collision_layer;
     backend_desc.collision_mask = desc.collision_mask;
+    backend_desc.rest_contact_group = desc.rest_contact_group;
     backend_desc.has_inertial_properties = desc.has_inertial_properties != 0;
     std::copy_n(desc.center_of_mass, 3, backend_desc.center_of_mass.begin());
     std::copy_n(desc.inertia_tensor, 9, backend_desc.inertia_tensor.begin());
@@ -1128,7 +1129,7 @@ nksim_result World::configure_joint_brake(nksim_joint handle, BrakeParameters pa
     const auto result = backend->joint_configure_brake(joint->backend_joint, parameters);
     if (result == NKSIM_OK) {
         joint->brake_configured = true;
-        joint->state.brake_configured = 1;
+        joint->state.flags |= NKSIM_JOINT_BRAKE_CONFIGURED;
     }
     return result;
 }
@@ -1153,13 +1154,6 @@ nksim_result World::set_joint_brake_release(nksim_joint handle, bool energized) 
     if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
     const auto *joint = joints.get(handle);
     return joint ? backend->joint_set_brake_release(joint->backend_joint, energized)
-        : NKSIM_ERROR_INVALID_HANDLE;
-}
-
-nksim_result World::get_joint_brake_released(nksim_joint handle, bool *released) const {
-    if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
-    const auto *joint = joints.get(handle);
-    return joint ? backend->joint_brake_released(joint->backend_joint, released)
         : NKSIM_ERROR_INVALID_HANDLE;
 }
 

@@ -162,6 +162,18 @@ int main() {
     tick += 10'000'000;
     assert(runtime.apply_pending_commands(tick) == RK_OK);
     assert(!release_coil(runtime));
+    assert(endpoint->last.kind == RK_COMMAND_JOINT_TARGETS);
+    assert(endpoint->last.target_count == 1 && endpoint->last.servos[0].velocity == 0.0);
+    const double held = endpoint->last.targets[0].target;
+    assert(runtime.publish_sample(tick) == RK_OK);
+    tick += 10'000'000;
+    assert(runtime.apply_pending_commands(tick) == RK_OK);
+    assert(endpoint->last.kind == RK_COMMAND_JOINT_TARGETS && endpoint->last.targets[0].target == held);
+    endpoint->released = false;
+    assert(runtime.publish_sample(tick) == RK_OK);
+    tick += 10'000'000;
+    assert(runtime.apply_pending_commands(tick) == RK_OK);
+    assert(endpoint->last.kind == RK_COMMAND_EMERGENCY_STOP && endpoint->last.target_count == 0);
     assert(runtime.publish_sample(tick) == RK_OK);
     assert(runtime.submit(lifecycle(4, RK_COMMAND_RESET_SAFETY)) == RK_OK);
     tick += 10'000'000;

@@ -78,7 +78,10 @@ class BenchMillGuideLoads {
 					minX = Math.min(minX, point.x); maxX = Math.max(maxX, point.x);
 					minZ = Math.min(minZ, point.z); maxZ = Math.max(maxZ, point.z);
 				}
-				var support = new GuideSupport((maxX - minX) * lengthScale, (maxZ - minZ) * lengthScale);
+				var screw = state.worldPose(prefix + "screw" + study.axis.toUpperCase());
+				var drive = AssemblyFrames.transformPoint(inverse, screw.x, screw.y, screw.z);
+				var support = new GuideSupport((maxX - minX) * lengthScale, (maxZ - minZ) * lengthScale,
+					(drive.x - centre.x) * lengthScale, (drive.y - centre.y) * lengthScale);
 				var masses:Array<{mass:Float, x:Float, y:Float, z:Float, mask:Int}> = [];
 				for (entry in mill.components()) if (descends(entry.id, study.root, parents)) {
 					var definition = definitions.get(prefix + entry.id);

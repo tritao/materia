@@ -766,8 +766,8 @@ class ProjectSourceTests {
    * the workpiece off its pad, sets it on the other, and brings it back, each pick confirmed by the
    * tool's vacuum sensor, and a reset puts the workpiece back for the next run.
    */
-  static function checkCobotArms(root:String):Void {
-    for (size in [500, 850, 900, 1300]) {
+  static function checkCobotArms(root:String, ?sizes:Array<Int>):Void {
+    for (size in sizes == null ? [500, 850, 900, 1300] : sizes) {
       var filename = size == 850 ? "materia.project.json" : 'materia.reach$size.project.json';
       var manifest = FileSystem.fullPath(root + "/machinekit/examples/cobot-arm/" + filename);
       var generated = MateriaProjectRunner.loadProject(manifest);
@@ -2155,7 +2155,7 @@ class ProjectSourceTests {
           var held = runtime.snapshot();
           var drift = held.q.get(zIndex) - applied.q.get(zIndex);
           var sag = applied.q.get(zIndex) - stopped.q.get(zIndex);
-          check(Math.abs(drift) < 0.00001 && Math.abs(sag) < 0.005,
+          check(Math.abs(drift) < 0.00001 && Math.abs(sag) < 0.0002,
             'installed brake holds the actual mill Z load: sag=$sag m, settled drift=$drift m');
           runtime.resetSafety(4);
           for (tick in 0...50) physical.step();
@@ -2335,6 +2335,46 @@ class ProjectSourceTests {
     simulation.dispose();
     session.dispose();
     Sys.println('enclosed mill project: ${generated.objects.length} objects, five mechanical slides');
+    checkSingleCabinetMotion(generated, manifest);
+  }
+
+  static function checkSingleCabinetMotion(generated:MateriaProjectRunner.GeneratedAssemblyScene, manifest:String):Void {
+    var definition = requiredAssemblyDefinition(generated.assemblyDefinition);
+    var model = AssemblySimulationBridge.toRobotModel(definition, generated.physical).model;
+    check(generated.controllers != null && generated.controllers.length == 1,
+      "the enclosed mill is a single-cabinet assembly");
+    var identity = "assembly:" + definition.id;
+    var relations = [for (term in model.couplings) if (term.leader == "mill/x" && term.follower == "mill/screwX-turn") term];
+    check(relations.length == 1, "saved mill tracks use the exported screw relation");
+    var relation = relations[0];
+    generated.cncJob = null;
+    generated.robotMotions = [
+      new RobotMotionTrack(identity, 0, false,
+        [{time: 0.0, position: 0.0}, {time: 0.5, position: 10.0}], "mill/screwX-turn"),
+      new RobotMotionTrack(identity, 0, false,
+        [{time: 0.0, position: -relation.offset / relation.ratio},
+         {time: 0.5, position: (10.0 - relation.offset) / relation.ratio}], "mill/x")];
+    var trackedSession = new ProjectDocumentSession(null, false);
+    trackedSession.openGeneratedProject(generated, manifest);
+    var tracked = new ApplicationSimulation(new RobotWorld());
+    tracked.setBackend(ApplicationSimulation.MUJOCO);
+    try {
+      check(tracked.rebuild(trackedSession.sensors, trackedSession.scene, trackedSession),
+        "single-cabinet saved motion retains its robot id: " + tracked.error);
+      check(tracked.simulatedRobotIds().join(",") == identity,
+        "adding one cabinet preserves the assembly robot identity");
+      var robot = tracked.world.robot(identity);
+      if (robot == null) throw "Tracked single-cabinet robot is missing";
+      var motor = robot.description().joints.indexOf("mill/screwX-turn");
+      var axis = robot.description().joints.indexOf("mill/x");
+      if (motor < 0 || axis < 0) throw "Tracked mill has no X motor and slide";
+      var start = robot.snapshot().positions.get(axis);
+      for (_ in 0...100) tracked.step();
+      check(Math.abs(robot.snapshot().positions.get(motor) - 10.0) < 0.01 &&
+        Math.abs(robot.snapshot().positions.get(axis) - start) > 0.001,
+        "a motion track with the original assembly robot id drives its motor and coupled slide");
+    } catch (error:Dynamic) {tracked.dispose(); trackedSession.dispose(); throw error;}
+    tracked.dispose(); trackedSession.dispose();
   }
 
   /** One cell assembly produces independent CNC and cobot runtimes. */
@@ -2441,6 +2481,65 @@ class ProjectSourceTests {
           high = true;
       }
       check(high, "the receiving runtime publishes the real high digital input");
+      check(simulation.cncPlayer() == null, "the controller-only cell has no CNC job player");
+      simulation.capturePresentationSnapshot();
+      var beltUpdates = simulation.beltDisplayUpdates();
+      var millPose = target.snapshot().setpointPositions.toArray();
+      // Passive coordinates are measured physics states. Author the held plan
+      // from its leaders so its coefficients obey the mechanical couplings.
+      var couplings = target.description().couplings;
+      for (axis in ["x", "y", "z"]) {
+        var slide = target.description().joints.indexOf("mill/mill/" + axis);
+        var motor = target.description().joints.indexOf("mill/mill/screw" + axis.toUpperCase() + "-turn");
+        var terms = [for (term in couplings) if (term.leader == slide && term.follower == motor) term];
+        check(terms.length == 1, "the held spindle plan has one screw relation for " + axis);
+        var term = terms[0];
+        millPose[slide] = (millPose[motor] - term.offset) / term.ratio;
+      }
+      for (_ in 0...couplings.length) {
+        var sums = new Map<Int, Float>();
+        for (term in couplings) {
+          var previous = sums.get(term.follower);
+          sums.set(term.follower, (previous == null ? 0.0 : previous) +
+            term.ratio * millPose[term.leader] + term.offset);
+        }
+        for (follower in sums.keys()) millPose[follower] = sums.get(follower);
+      }
+      var millState = target.snapshot();
+      check(millState.safety == RobotKitRuntimeConstants.RK_SAFETY_READY,
+        'mill spindle plan requires a ready controller: safety ${millState.safety}, fault ${millState.faultCode}');
+      for (i in 0...millPose.length)
+        check(Math.abs(millPose[i] - millState.setpointPositions.get(i)) <= 1e-6,
+          'held mill plan agrees with ${target.description().joints[i]} anchor: ${millPose[i]} versus ${millState.setpointPositions.get(i)}');
+      var millZero = [for (_ in millPose) 0.0];
+      var millHold = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(1000000000),
+        [for (position in millPose) [position, 0.0]]);
+      var spindleChannels = new toolpathkit.motion.ToolpathChannels("mill/mill");
+      for (name in [spindleChannels.spindleDirection, spindleChannels.spindleSpeed])
+        check([for (channel in target.description().channels) if (channel.id == name) channel].length == 1,
+          "the mill controller owns spindle output " + name);
+      target.submit(robotkit.core.RobotCommand.ExecutionPlan(new ExecutionPlanSubmission(
+        Int64.ofInt(1802), Int64.ofInt(simulation.appliedRevision), Int64.ofInt(0),
+        RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE |
+          RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_EVENTS, millPose, millZero, millZero, [millHold],
+        null, null, null, null, null, true, [
+          new ProcessTimedEvent(Int64.ofInt(0), spindleChannels.spindleDirection, ProcessEventValue.Analog(1.0)),
+          new ProcessTimedEvent(Int64.ofInt(0), spindleChannels.spindleSpeed, ProcessEventValue.Analog(1000.0))])));
+      var spindleIndex = target.description().joints.indexOf("mill/mill/spindle-motor-turn");
+      if (spindleIndex < 0) throw "Cell has no spindle motor joint";
+      var spindleStart = target.snapshot().positions.get(spindleIndex);
+      for (_ in 0...100) simulation.step();
+      simulation.capturePresentationSnapshot();
+      check(Math.abs(target.snapshot().positions.get(spindleIndex) - spindleStart) > 0.1,
+        "cell spindle outputs rotate its physical motor without a CNC player");
+      check(simulation.beltDisplayUpdates() > beltUpdates,
+        "cell spindle belt animates on its owning controller without a CNC job");
+      var spindleSpeed = Math.abs(target.snapshot().velocities.get(spindleIndex));
+      check(spindleSpeed > 1.0, "the spindle is rotating before emergency stop");
+      target.stop(robotkit.core.StopMode.Emergency);
+      simulation.step();
+      check(Math.abs(target.snapshot().velocities.get(spindleIndex)) > 0.9 * spindleSpeed,
+        "an emergency-stopped spindle coasts instead of applying full braking torque");
       Sys.println('tending controllers: ${ids.length} robots, ${[for (_ in joints.keys()) _].length} disjoint joints');
     } catch (error:Dynamic) {
       simulation.dispose(); session.dispose(); throw error;
@@ -2712,6 +2811,13 @@ class ProjectSourceTests {
     check(job != null && job.loop && job.stock == "stock" && job.spindle == "spindle" && job.target != null &&
       job.loadedTool == 1 && [for (tool in job.tools) tool.number].join(",") == "1,2",
       "the router generates a looping job that machines its stock to a target part with an end mill and a drill");
+    if (job != null) {
+      var originalScope = job.channelScope;
+      job.channelScope = "other-cabinet/process";
+      check(app.CncProgramPlayer.channelsFor(job).spindleSpeed == "other-cabinet/process/spindle.speed",
+        "CNC process scope is explicit and independent of the spindle part path");
+      job.channelScope = originalScope;
+    }
     var session = new ProjectDocumentSession(null, false);
     var simulation = new ApplicationSimulation(new RobotWorld());
     session.openGeneratedScene(generated.objects, manifest,
@@ -3225,6 +3331,20 @@ class ProjectSourceTests {
 
   static function checks():Int {
     checkJointMotionPolicy();
+    // Four joints and two segments distinguish per-joint stopping limits from
+    // per-segment storage, including the constructor's default path.
+    var stationary = [0.0, 0.0, 0.0, 0.0];
+    var shortPlan = [for (i in 0...2) new TrajectorySegment(Int64.ofInt(i * 100000000),
+      Int64.ofInt(100000000), [for (_ in stationary) [0.0]])];
+    var defaultStops = new ExecutionPlanSubmission(Int64.ofInt(1), Int64.ofInt(1), Int64.ofInt(0),
+      RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE, stationary, stationary, stationary, shortPlan);
+    check(defaultStops.controlAcceleration.length == 4,
+      "default stopping acceleration has one entry per joint, independent of segment count");
+    var explicitStops = new ExecutionPlanSubmission(Int64.ofInt(2), Int64.ofInt(1), Int64.ofInt(0),
+      RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE, stationary, stationary, stationary, shortPlan,
+      null, null, null, null, null, true, null, false, null, [1.0, 2.0, 3.0, 4.0]);
+    check(explicitStops.controlAcceleration.get(3) == 4.0,
+      "explicit stopping acceleration accepts all four joints in a two-segment plan");
     var flat = Bytes.alloc(4 * 24);
     for (index in 0...4) {
       flat.setDouble(index * 24, (index & 1) == 0 ? 0.0 : 2.0);
@@ -3362,6 +3482,10 @@ class ProjectSourceTests {
       checkHeldJointSceneClearance(root);
       return 0;
     }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "cobot850") {
+      checkCobotArms(root, [850]);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mill") {
       checkBenchMill(root);
       checkEnclosedMillProject(root);
@@ -3376,6 +3500,11 @@ class ProjectSourceTests {
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "cell") {
       checkTendingControllers(root);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "identity") {
+      var manifest = FileSystem.fullPath(root + "/machinekit/examples/bench-mill/materia.enclosed.project.json");
+      checkSingleCabinetMotion(MateriaProjectRunner.loadProject(manifest), manifest);
       return 0;
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "pneumatic") {
@@ -3448,6 +3577,10 @@ class ProjectSourceTests {
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "controls") {
       checkCncControls(root);
+      checkBackgroundLaunch(root);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "background") {
       checkBackgroundLaunch(root);
       return 0;
     }

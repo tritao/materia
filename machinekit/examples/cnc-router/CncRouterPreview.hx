@@ -38,7 +38,7 @@ class CncRouterPreview {
 		var part = plate.geometry(ComponentDetail.Preview);
 		var program = MountPlateJob.program(router, plate, part);
 		scene.parts.push(AssemblyPreview.part(TARGET_PART, "Finished motor plate", part, plate.materialId, TARGET_DEFLECTION));
-		scene.machining = {program: program, axes: ["x", "y", "z"], spindle: "spindle",
+		scene.machining = {program: program, axes: ["x", "y", "z"], spindle: "spindle", channelScope: "",
 			workOffset: [for (value in CncRouter.workOffset()) value / 1000],
 			tools: [for (tool in router.tools()) {number: tool.number, length: tool.length, profile: tool.profile().encode()}],
 			stock: "stock", sacrificial: ["spoilboard"], toolPart: "tool", loadedTool: 1,

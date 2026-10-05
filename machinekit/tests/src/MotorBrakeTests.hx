@@ -15,8 +15,8 @@ class MotorBrakeTests {
 		var assembly = new MachineAssembly();
 		assembly.addComponent("base", new RobotFlange(50));
 		assembly.addComponent("servo", ServoMotor.model("GENERIC-SERVO-750W"));
-		assembly.addComponent("driver", new MotorDriver("GENERIC-AC-SERVO-AMP", 20));
-		assembly.addComponent("supply", new PowerSupply(310, 20, 1, 120, 60, 30, 4000));
+		assembly.addComponent("driver", new MotorDriver("GENERIC-AC-SERVO-AMP", new machinekit.power.PhaseRmsCurrent(20)));
+		assembly.addComponent("supply", new PowerSupply(new machinekit.power.DcVoltage(310), new machinekit.power.DcCurrent(20), 1, 120, 60, 30, 4000));
 		assembly.addComponent("brake", new ShaftBrakePart(19, "shell"));
 		assembly.connectPorts("power", "supply", "power1", "driver", "power");
 		assembly.addMateOnAxis("turn", "continuous", "base", "face", "servo", "shaftAxis", {x: 0, y: 1, z: 0});
@@ -61,7 +61,7 @@ class MotorBrakeTests {
 		pair.include("first", assembly); pair.include("second", assembly);
 		checkBinding(pair, "first/"); checkBinding(pair, "second/");
 		for (role in ["hub", "disc", "front", "shell", "back"]) {
-			var pieces = role == "hub" || role == "disc" ? 1 : ShaftBrakePart.SECTORS;
+			var pieces = ShaftBrakePart.sectorCount(19, role);
 			for (sector in 0...pieces) {
 				var part = new ShaftBrakePart(19, role, sector);
 				var recipe = part.componentType();

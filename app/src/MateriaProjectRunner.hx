@@ -467,6 +467,7 @@ class MateriaProjectRunner {
     for (id in entered) for (record in records) if (record.id == "project:" + id) record.collisionEnabled = false;
     var target = machining.target;
     return {source: machining.program, axes: machining.axes, spindle: machining.spindle,
+      channelScope: machining.channelScope,
       workOffset: machining.workOffset, loop: machining.loop == true,
       tools: [for (tool in machining.tools) Tool.shaped(tool.number, tool.length, CutterProfile.decode(tool.profile))],
       stock: stock, stockMesh: stockMesh, target: target == null ? null : partMesh(target),

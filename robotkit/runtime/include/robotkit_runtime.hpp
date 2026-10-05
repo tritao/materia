@@ -412,7 +412,8 @@ private:
         bool hold_active = false;
         bool powered[RK_MAX_JOINTS]{};
     } brake_backup_;
-    int32_t update_brake_interlocks(uint64_t owner_ns, bool servo_enabled, const rk_robot_state &sample);
+    bool brake_stop_holding() const;
+    int32_t update_brake_interlocks(uint64_t owner_ns, internal::BrakePowerMode mode, const rk_robot_state &sample);
     std::condition_variable queue_condition_;
     std::deque<QueuedCommand> commands_;
     std::thread worker_;

@@ -228,12 +228,12 @@ class CoreXyPlotter extends AxisBuilder {
 		exposeConnector("penTip", "pen", "tip");
 
 		// Supply and drivers stay on the fixed frame; the supply's service port sets their voltage.
-		attach("powerSupply", new PowerSupply(SUPPLY_VOLTS, 10, 2),
+		attach("powerSupply", new PowerSupply(new machinekit.power.DcVoltage(SUPPLY_VOLTS), new machinekit.power.DcCurrent(10), 2),
 			AssemblyFrames.translation(BASE_WIDTH / 2 + 70, 0, BASE_TOP), "base");
 		// Each stepper turns its belt's driving pulley.
 		for (entry in [{id: "A", x: -30.0}, {id: "B", x: 30.0}]) {
 			var driver = 'driver${entry.id}';
-			attach(driver, new MotorDriver("GENERIC-TMC2209", 1.68, 16),
+			attach(driver, new MotorDriver("GENERIC-TMC2209", new machinekit.power.PhaseRmsCurrent(1.68), 16),
 				AssemblyFrames.translation(entry.x, -BASE_DEPTH / 2 + 20, BASE_TOP), "base");
 			connectPorts('$driver-power', "powerSupply", entry.id == "A" ? "power1" : "power2", driver, "power");
 			addMotor('motor${entry.id}', 'pulley${entry.id}-turn', 'motor${entry.id}', driver);

@@ -238,14 +238,15 @@ class TimingBelt extends MachineComponent {
 	public static function toothClearance(profile:TimingBeltProfile):Float
 		return TimingPulley.profileDimensions(profile).pitch * 0.01;
 
-	/** Same keeps direction about the belt normal; assembly attachments check the joint axes. */
-	public static function reduction(belt:TimingBelt, driver:TimingPulley, driven:TimingPulley,
+	/** Follower rotation per leader rotation. Power direction belongs to the motor/load, so
+	 * the same efficiency applies when the motor is on the follower. */
+	public static function reduction(belt:TimingBelt, leaderPulley:TimingPulley, followerPulley:TimingPulley,
 			alignment:Float):TransmissionRelation {
-		if (driver.beltProfile != belt.beltProfile || driven.beltProfile != belt.beltProfile)
+		if (leaderPulley.beltProfile != belt.beltProfile || followerPulley.beltProfile != belt.beltProfile)
 			throw new TransmissionDesignError("Belt and reduction pulley profiles differ; update the pulleys");
-		var ratio = alignment * driver.teeth / driven.teeth;
+		var ratio = alignment * leaderPulley.teeth / followerPulley.teeth;
 		var result = new TransmissionRelation(ratio, DEFAULT_EFFICIENCY, null,
-			toothClearance(belt.beltProfile) / (driven.pitchDiameter / 2) / Math.abs(ratio), DEFAULT_DRAG);
+			toothClearance(belt.beltProfile) / (followerPulley.pitchDiameter / 2) / Math.abs(ratio), DEFAULT_DRAG);
 		result.setBasis("efficiency", ValueBasis.Assumed, "belt efficiency");
 		result.setBasis("drag", ValueBasis.Assumed, "belt drag");
 		result.setBasis("stiffness", ValueBasis.Assumed, "belt stiffness with pretension");

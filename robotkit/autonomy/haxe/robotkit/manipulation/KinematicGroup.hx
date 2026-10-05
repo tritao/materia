@@ -255,8 +255,8 @@ class KinematicGroup {
   public function moves(link:LinkId):Bool {
     for (joint in walk(robot, rootLink, link)) {
       var index = model.jointIndex(joint.id);
-      if(index>=0)for(term in model.jointTermStart[index]...model.jointTermStart[index+1])
-        if(dofs.indexOf(model.jointTermDof[term])>=0)return true;
+      if (index >= 0) for (term in model.jointTermStart[index]...model.jointTermStart[index + 1])
+        if (model.jointTermScale[term] != 0.0 && dofs.indexOf(model.jointTermDof[term]) >= 0) return true;
     }
     return false;
   }

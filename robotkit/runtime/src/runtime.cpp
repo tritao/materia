@@ -74,8 +74,18 @@ void RobotRuntime::safe_channels(uint64_t owner_ns, rk_event_cause cause, bool h
     if (!hold_only) control_.events.clear();
 }
 
-int32_t RobotRuntime::update_brake_interlocks(uint64_t owner_ns, bool servo_enabled,
+bool RobotRuntime::brake_stop_holding() const {
+    return std::any_of(brake_interlocks_.begin(), brake_interlocks_.end(),
+        [](const auto &brake) { return brake.holding_required(); });
+}
+
+int32_t RobotRuntime::update_brake_interlocks(uint64_t owner_ns, internal::BrakePowerMode mode,
     const rk_robot_state &sample) {
+    const bool servo_enabled = mode == internal::BrakePowerMode::enabled;
+    const bool stop_begins = mode == internal::BrakePowerMode::controlled_stop &&
+        std::any_of(brake_interlocks_.begin(), brake_interlocks_.end(),
+            [](const auto &brake) { return brake.release_coil(); });
+    if (stop_begins) std::copy_n(sample.position, blueprint_.joint_count, brake_hold_positions_);
     brakes_motion_ready_ = true;
     int32_t fault = 0;
     for (uint32_t i = 0; i < blueprint_.brake_count; ++i) {
@@ -98,7 +108,10 @@ int32_t RobotRuntime::update_brake_interlocks(uint64_t owner_ns, bool servo_enab
             }
         }
         auto &brake = brake_interlocks_[i];
-        brake.update(servo_enabled, owner_ns, feedback);
+        brake.update(mode, owner_ns, feedback);
+        if (mode == internal::BrakePowerMode::controlled_stop &&
+            brake.fault() != internal::BrakeReleaseFault::none)
+            control_.diagnostic_code = RK_FAULT_BRAKE_FEEDBACK;
         brakes_motion_ready_ = brakes_motion_ready_ && brake.motion_ready();
         rk_event_value coil{};
         coil.kind = RK_EVENT_DIGITAL;
@@ -110,7 +123,7 @@ int32_t RobotRuntime::update_brake_interlocks(uint64_t owner_ns, bool servo_enab
                 ? RK_FAULT_BRAKE_RELEASE_TIMEOUT : RK_FAULT_BRAKE_FEEDBACK;
     }
     if (!servo_enabled) {
-        brake_hold_active_ = false;
+        brake_hold_active_ = brake_stop_holding();
     } else if (!brakes_motion_ready_ && !brake_hold_active_) {
         std::copy_n(sample.position, blueprint_.joint_count, brake_hold_positions_);
         brake_hold_active_ = true;
@@ -1236,7 +1249,13 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
     }
     const bool servo_enabled = emergency == nullptr &&
         (safety == RK_SAFETY_READY || safety == RK_SAFETY_STOPPING || last_reset_index != commands.size());
-    const auto brake_result = update_brake_interlocks(owner_time_ns, servo_enabled, current);
+    const bool was_brake_stopping = brake_stop_holding();
+    const bool powered_emergency = emergency != nullptr ||
+        (safety == RK_SAFETY_EMERGENCY_STOP && last_reset_index == commands.size());
+    const auto brake_mode = powered_emergency ? internal::BrakePowerMode::controlled_stop :
+        servo_enabled ? internal::BrakePowerMode::enabled : internal::BrakePowerMode::power_off;
+    const auto brake_result = update_brake_interlocks(owner_time_ns, brake_mode, current);
+    const bool stop_holding = brake_stop_holding();
     if (brake_result != 0) {
         latch_fault(true, brake_result);
         return RK_ERROR_SAFETY_STOPPED;
@@ -2185,7 +2204,8 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         output.target_count = active_count;
         if (active_count == 0 && has_command && final_kind == RK_COMMAND_NONE)
             output.kind = RK_COMMAND_NONE;
-        else if (active_count == 0 && (!blueprint_.brake_count || !servo_enabled)) {
+        else if (active_count == 0 && (!blueprint_.brake_count || !servo_enabled) &&
+                 !stop_holding && !was_brake_stopping) {
             if (!stop_ramp_finished && !control_.trajectory_active &&
                 !control_.stop_ramp_active) {
                 std::lock_guard state_lock(state_mutex_);
@@ -2200,6 +2220,28 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         }
     }
 
+    if (powered_emergency && blueprint_.brake_count) {
+        if (stop_holding) {
+            if (emergency != nullptr) {
+                // Stop the endpoint's motion first, while keeping its position
+                // loop enabled. Host-owned joints then hold the measured pose;
+                // a queued device retains its own stopped position reference.
+                rk_robot_command stopped{};
+                stopped.struct_size = sizeof(stopped);
+                stopped.kind = RK_COMMAND_STOP;
+                stopped.sequence = ++endpoint_command_sequence_;
+                const auto result = endpoint_->apply(stopped);
+                if (result != RK_OK) { latch_fault(); return result; }
+            }
+            output.kind = RK_COMMAND_JOINT_TARGETS;
+            output.target_count = 0;
+        } else if (emergency != nullptr || was_brake_stopping) {
+            // Fresh engagement acknowledgement completes the powered handoff.
+            output.kind = RK_COMMAND_EMERGENCY_STOP;
+            output.target_count = 0;
+        }
+    }
+
     if (blueprint_.brake_count && servo_enabled &&
         (output.kind == RK_COMMAND_STOP || output.kind == RK_COMMAND_RESET_SAFETY)) {
         output.sequence = ++endpoint_command_sequence_;
@@ -2208,7 +2250,8 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         output.kind = RK_COMMAND_JOINT_TARGETS;
         output.target_count = 0;
     }
-    if (servo_enabled && output.kind == RK_COMMAND_JOINT_TARGETS) {
+    if ((servo_enabled || stop_holding && !endpoint_->executes_trajectory_queue()) &&
+        output.kind == RK_COMMAND_JOINT_TARGETS) {
         for (uint32_t i = 0; i < blueprint_.brake_count; ++i) {
             const auto joint = blueprint_.brakes[i].joint;
             bool targeted = false;
@@ -2238,6 +2281,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
             const auto joint = target.joint;
             target.mode = blueprint_.joint_servo[joint].stiffness > 0.0 ? RK_TARGET_SERVO : RK_TARGET_POSITION;
             target.target = brake_hold_positions_[joint];
+            target.max_effort = blueprint_.joints[joint].max_effort;
             control_.position_reference[joint] = target.target;
             control_.reference_initialized[joint] = true;
             if (i < RK_MAX_SERVO_JOINTS) {
@@ -2250,7 +2294,8 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         }
     }
     output.sequence = ++endpoint_command_sequence_;
-    const bool device_executes = device_plan_cycle && output.kind == RK_COMMAND_JOINT_TARGETS;
+    const bool device_executes = (device_plan_cycle || stop_holding && endpoint_->executes_trajectory_queue()) &&
+        output.kind == RK_COMMAND_JOINT_TARGETS;
     auto endpoint_output = output;
     if (endpoint_output.kind == RK_COMMAND_JOINT_TARGETS)
         for (uint32_t index = 0; index < endpoint_output.target_count; ++index) {

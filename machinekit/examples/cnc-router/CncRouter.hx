@@ -801,10 +801,10 @@ class CncRouter extends AxisBuilder {
 	function addDriver(motor:String):String {
 		var id = motor + "Driver";
 		if (!supplyAdded) {
-			attach("powerSupply", new PowerSupply(SUPPLY_VOLTS, 20, 4), AssemblyFrames.translation(0, -320, 0), "sideLeft");
+			attach("powerSupply", new PowerSupply(new machinekit.power.DcVoltage(SUPPLY_VOLTS), new machinekit.power.DcCurrent(20), 4), AssemblyFrames.translation(0, -320, 0), "sideLeft");
 			supplyAdded = true;
 		}
-		attach(id, new MotorDriver("GENERIC-DM542", 2.8, MICROSTEPS),
+		attach(id, new MotorDriver("GENERIC-DM542", new machinekit.power.PhaseRmsCurrent(2.8), MICROSTEPS),
 			AssemblyFrames.translation(-180 + 125 * driverIndex++, -200, 0), "sideLeft");
 		connectPorts('$id-power', "powerSupply", 'power$driverIndex', id, "power");
 		return id;

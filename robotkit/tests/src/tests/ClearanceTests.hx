@@ -31,6 +31,7 @@ class ClearanceTests {
     testCrossingEdges();
     testBoundsPreserveHullChecks();
     testSolidEdges();
+    testCombinedCouplingBounds();
     Sys.println('RobotKit clearance tests passed ($assertions assertions)');
     return assertions;
   }
@@ -137,6 +138,28 @@ class ClearanceTests {
     check(cell.clearance.sweep([0.0, 0.0], [1.4, 0.0]) != null, "the arm swinging round through the post is found along the way");
     check(cell.clearance.sweep([0.0, 0.0], [-1.4, 0.0]) == null, "the same swing away from the post is clear");
     check(cell.clearance.pairCount() > 0 && cell.clearance.bodyCount() == 3, "the arm's bodies are checked against the post");
+  }
+
+  static function testCombinedCouplingBounds():Void {
+    var model = new RobotModel("combined clearance");
+    var base = model.addLink(new Link("base"));
+    var links = [for (name in ["a", "b", "combined"]) model.addLink(new Link(name))];
+    for (link in links) {
+      var joint = model.addJoint(new Joint(link.id, JointType.Prismatic, base, link));
+      joint.axis = [1.0, 0.0, 0.0];
+    }
+    model.addCoupling(new robotkit.model.JointCoupling("first", "a", "combined", 1, 0));
+    model.addCoupling(new robotkit.model.JointCoupling("second", "b", "combined", 2, 0));
+    var frame = model.addFrame(new Frame("tip", links[1]));
+    var arm = new Manipulator(model, base.id, frame.id);
+    check(arm.moves(links[2].id), "a combined follower moves with the group's second coupling term");
+    var clearance = new ArmClearance(arm, [
+      {name: "coupled slide", link: links[2].id, vertices: box(-0.01, 0.01, -0.01, 0.01, -0.01, 0.01), tool: false},
+      {name: "fixture", link: base.id, vertices: box(1.99, 2.01, -0.01, 0.01, -0.01, 0.01), tool: false}
+    ], [0.0]);
+    check(clearance.violation([1.0]) != null, "combined follower collision is included in checked pairs");
+    check(clearance.intervalClear([0.8], [0.0]), "stationary combined follower is clear");
+    check(!clearance.intervalClear([0.8], [0.2]), "summed coupling scale bounds its interval travel");
   }
 
   static function testMargins():Void {

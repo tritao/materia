@@ -16,8 +16,8 @@ class JointState {
         position = value.get_position();
         velocity = value.get_velocity();
         effort = value.get_effort();
-        brakeConfigured = value.get_brake_configured() != 0;
-        brakeReleased = value.get_brake_released() != 0;
+        brakeConfigured = (value.get_flags() & NativeKitSimConstants.NKSIM_JOINT_BRAKE_CONFIGURED) != 0;
+        brakeReleased = (value.get_flags() & NativeKitSimConstants.NKSIM_JOINT_BRAKE_RELEASED) != 0;
     }
 
     @:allow(Joint)

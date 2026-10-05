@@ -23,6 +23,8 @@ class CobotJoint extends GearedArmJoint implements machinekit.motion.EncoderPart
 	public final motor:ServoMotor;
 	public final outputRatedTorque:Float;
 	public final outputPeakTorque:Float;
+	/** Assumed amplifier classes, with headroom above each module's phase RMS peak. */
+	public final driverCurrent:machinekit.power.PhaseRmsCurrent;
 	static var recipe:Null<ComponentType>;
 
 	public function new(size:Int, speedDegrees:Float = 180, inputPilotDepth:Float = 0) {
@@ -39,13 +41,14 @@ class CobotJoint extends GearedArmJoint implements machinekit.motion.EncoderPart
 		var servo = new ServoMotor({designation: 'COBOT-SERVO-$size-${speedDegrees}-P${inputPilotDepth}',
 			ratedTorque: torque, peakTorque: 2 * torque, ratedSpeed: 0.8 * rate, maxSpeed: rate,
 			rotorInertia: (size + 1) * 1e-5, encoderCounts: 131072,
-			bodyDiameter: pockets[size] - 2, bodyLength: pocketLengths[size] - 2, shaftDiameter: 8, shaftLength: 10, electrical: ServoMotor.lowVoltageWinding()}, Assumed);
+			bodyDiameter: pockets[size] - 2, bodyLength: pocketLengths[size] - 2, shaftDiameter: 8, shaftLength: 10, electrical: ServoMotor.lowVoltageWinding(torque, 0.8 * rate, rate)}, Assumed);
 		super(diameters[size], lengths[size], pockets[size], pocketLengths[size], null, servo);
 		motor = servo;
 		// Assumed bulk mass allocation for the generic module, not vendor casing metallurgy.
 		// Sizes 2/4 allocate more package mass to the housing; size 2 uses a lighter gearhead shell.
 		setMaterial(size == 2 || size == 4 ? "steel" : "aluminium 6061");
 		this.size = size;
+		driverCurrent = new machinekit.power.PhaseRmsCurrent([6.0, 8, 16, 40, 100][size]);
 		this.inputPilotDepth = inputPilotDepth;
 		addConnector("gearheadSeat", Mount, machinekit.component.Solids.axial(0, 0, 0.5 + inputPilotDepth));
 		outputRatedTorque = torques[size];

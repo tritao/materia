@@ -14,7 +14,7 @@ import machinekit.component.Solids;
  * collision hulls clear of the shaft and released disc. Dimensions are mm, delays seconds.
  * These envelopes, steel mass allocation and ratings are reference values, not vendor data. */
 class ShaftBrakePart extends MachineComponent implements MotorBrakeSpec {
-	public static inline var SECTORS:Int = 16;
+	public final sectors:Int;
 	public final bore:Float;
 	public final role:String;
 	public final sector:Int;
@@ -29,21 +29,31 @@ class ShaftBrakePart extends MachineComponent implements MotorBrakeSpec {
 	public function new(bore:Float, role:String, sector:Int = 0) {
 		if (!(bore > 0) || !Math.isFinite(bore) ||
 			["hub", "disc", "front", "shell", "back"].indexOf(role) < 0 ||
-			sector < 0 || sector >= SECTORS || ((role == "hub" || role == "disc") && sector != 0))
+			sector < 0 || sector >= sectorCount(bore, role) || ((role == "hub" || role == "disc") && sector != 0))
 			throw "Shaft brake needs a positive bore and a valid part role/sector";
 		super('SHAFT-BRAKE-4NM-$bore-$role-$sector', "Assumed spring-applied shaft brake " + role, "steel");
 		this.bore = bore; this.role = role; this.sector = sector;
+		sectors = sectorCount(bore, role);
 		hubRadius = bore / 2 + 2;
 		discRadius = bore / 2 + 8;
 		bodyRadius = bore / 2 + 16;
-		// The inner chord of every convex sector must clear the rotating envelope.
-		if ((hubRadius + 1) * Math.cos(Math.PI / SECTORS) <= hubRadius ||
-			(discRadius + 1) * Math.cos(Math.PI / SECTORS) <= discRadius)
-			throw "Shaft brake sector hull cannot clear this bore";
 		var section = sectionGeometry();
 		addConnector("mount", Mount, Solids.axial(0, 0, section.start));
 		addConnector("axis", Axis, Solids.axial(0, 0, (section.start + section.end) / 2));
 		addConnector("end", Face, Solids.axial(0, 0, section.end));
+	}
+
+	/** Fewest sectors whose convex inner chord clears the actual rotating radius. */
+	public static function sectorCount(bore:Float, role:String):Int {
+		if (role == "hub" || role == "disc") return 1;
+		var rotor = bore / 2 + (role == "shell" ? 8 : 2);
+		var inner = rotor + 1;
+		var count = 3;
+		while (inner * Math.cos(Math.PI / count) <= rotor) {
+			count++;
+			if (count > 64) throw "Shaft brake bore exceeds the convex sector budget";
+		}
+		return count;
 	}
 
 	public function holdingTorque():Float return 4;
@@ -75,7 +85,7 @@ class ShaftBrakePart extends MachineComponent implements MotorBrakeSpec {
 				[Solids.named(Part.cylinderSpan(inner, start - 0.1, end + 0.1), "bore")]);
 			parts.push(ring);
 			if (role == "hub" || role == "disc") return ring;
-			var first = sector * 2 * Math.PI / SECTORS, last = (sector + 1) * 2 * Math.PI / SECTORS;
+			var first = sector * 2 * Math.PI / sectors, last = (sector + 1) * 2 * Math.PI / sectors;
 			var radius = outer * 2;
 			var wedge = Part.prism([new Vector(0, 0),
 				new Vector(radius * Math.cos(first), radius * Math.sin(first)),

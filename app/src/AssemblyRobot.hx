@@ -163,7 +163,8 @@ class AssemblyRobot {
    */
   public static function add(candidate:Simulation, scene:EditorScene, session:ProjectDocumentSession,
       assembly:AssemblyDefinition, supportsClosures:Bool, revision:Int, robotIndex:Int,
-      ?channels:Array<ProcessChannelDeclaration>, virtualWelder:Bool = false, ?control:SceneArtifactCellController):AssemblyRobot {
+      ?channels:Array<ProcessChannelDeclaration>, virtualWelder:Bool = false, ?control:SceneArtifactCellController,
+      ?restContactGroup:haxe.Int64):AssemblyRobot {
     var warnings:Array<String> = [];
     var parts:Array<AssemblyPart> = [];
     var physical = session.projectPhysical;
@@ -363,7 +364,7 @@ class AssemblyRobot {
     // Like a machine whose servos are on, its joints hold their designed pose until something commands
     // them, such as an arm while its base drives.
     var runtime = candidate.addRobotAtPose(blueprint, position, rotation, device, null, null, closures, null, null, null, null,
-      linkHulls, true);
+      linkHulls, true, restContactGroup);
     var authored:Null<Array<materia.project.SceneArtifact.SceneArtifactPowerUpOffset>> = session.cncJob != null ? session.cncJob.powerUpOffsets :
       session.mission == null ? null : session.mission.powerUpOffsets;
     var sideOffsets:Null<Array<materia.project.SceneArtifact.SceneArtifactPowerUpSideOffset>> = session.cncJob != null ? session.cncJob.powerUpSideOffsets :

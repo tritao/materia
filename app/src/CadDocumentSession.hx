@@ -44,6 +44,25 @@ class CadDocumentSession {
     return publishedGeometry == null ? new GeometryData() : publishedGeometry;
   }
 
+  /** Convex collision envelope of the published CAD result, in viewport metres
+   * relative to its collision-bounds centre. Rebuilds derive it from the current
+   * shape, rather than retaining geometry from an earlier document revision. */
+  public function collisionHull():cadkit.ConvexHullVertices.CollisionHullResult {
+    ensureOpen();
+    var bounds = collisionBounds;
+    if (bounds == null) throw "CAD collision bounds are unavailable";
+    var source = copyPublishedShape();
+    try {
+      var mesh = source.tessellate(0.5, 0.75);
+      var hull = cadkit.ConvexHullVertices.safeFromMesh(mesh.vertices, mesh.vertexCount, 0.5);
+      var scale = CadSceneGeometry.METRES_PER_MILLIMETRE;
+      var centre = [bounds.center.x, bounds.center.y, bounds.center.z];
+      var vertices = [for (i in 0...hull.vertices.length) hull.vertices[i] * scale - centre[i % 3]];
+      source.close();
+      return {vertices: vertices, warning: hull.warning, errorRatio: hull.errorRatio};
+    } catch (error:Dynamic) {source.close(); throw error;}
+  }
+
   /** Return an owning snapshot that remains valid across the next recompute. */
   public function copyPublishedShape():Shape {
     ensureOpen();

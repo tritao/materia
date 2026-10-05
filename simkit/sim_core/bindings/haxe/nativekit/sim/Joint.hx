@@ -64,9 +64,9 @@ class Joint {
     /** Reads the physical released contact, independently of the coil command. */
     public function brakeReleased():Bool {
         ensureLive();
-        var result = NativeKitSim.nksim_joint_get_brake_released(world.nativeHandle(), value);
-        SimWorld.check(result.status, "joint.brakeReleased");
-        return result.out_released != 0;
+        var sampled = state();
+        if (!sampled.brakeConfigured) throw "joint.brakeReleased: joint has no brake";
+        return sampled.brakeReleased;
     }
 
     public function dispose():Void {

@@ -749,9 +749,7 @@ class MissionPlayer implements SessionMember {
       }
       if (!found) throw 'Joint "${target.joint}" is outside the chain ending at "$name"';
     }
-    motion.compiler.planValidator = new ArmPlanClearance(cellClearance(arm, null, [], ArmClearance.MARGIN),
-      [for (index in indices) robot.model.joints[index].type == robotkit.model.JointType.Prismatic ?
-        ArmPlanClearance.LINEAR_STEP : ArmPlanClearance.ANGULAR_STEP]);
+    motion.compiler.planValidator = new ArmPlanClearance(cellClearance(arm, null, [], ArmClearance.MARGIN));
     return new MotionProgramSkill(motion, new MotionProgram([
       MotionOp.MoveJ(MoveTarget.JointTarget(q), new MotionOptions(), Blend.ExactStop)],configurationFor(step)));
   }

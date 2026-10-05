@@ -19,6 +19,7 @@ class TendingControllers extends MachineAssembly {
 		mill = new EnclosedBenchMill();
 		arm = new CobotArm(Reach850);
 		include("mill", mill);
+		exposePort("mains", "mill/mill/powerSupply", "mains");
 		var baseX = arm.reference.d[3];
 		var baseY = mill.opening.y - 250;
 		var turn = AssemblyFrames.fromRotationMatrix(0, 0, 0, [0.0, 1, 0, -1, 0, 0, 0, 0, 1]);
@@ -56,8 +57,27 @@ class TendingControllerChecks {
 			for (sensor in ["mill/door-closed", "mill/door-open", "mill/vise-open", "mill/vise-clamped", "mill/stock-present"])
 				if (control.sensors.indexOf(sensor) < 0) throw 'Cabinet input wiring did not own sensor "$sensor"';
 		}
+		var mill = [for (control in scene.controllers) if (control.id == "mill/cncController") control][0];
+		var robot = [for (control in scene.controllers) if (control.id == "robotController") control][0];
+		var sensor = "mill/door-closed";
+		mill.sensors.remove(sensor); robot.sensors.push(sensor);
+		rejects(scene, "observes joint", "A field sensor wired away from its joint owner needs a cell signal");
+		robot.sensors.remove(sensor); mill.sensors.push(sensor);
+		robot.sensors.push(sensor);
+		rejects(scene, "unique owner", "A sensor cannot belong to both runtimes");
+		robot.sensors.remove(sensor);
+		var channel = mill.channels[0]; mill.channels.push(channel);
+		rejects(scene, "duplicate or empty channel", "Controller channels must be unique after shared-valve deduplication");
+		mill.channels.pop();
+		SceneArtifact.encode(scene);
 		var model = new AssemblyModel("mm");
 		new TendingControllers().addTo(model, "");
 		if (owners.keys().hasNext() == false) throw "Tending cell has no moving joints";
+	}
+
+	static function rejects(scene:materia.project.SceneArtifact.SceneArtifactData, expected:String, message:String):Void {
+		var rejected = false;
+		try SceneArtifact.encode(scene) catch (error:Dynamic) rejected = Std.string(error).indexOf(expected) >= 0;
+		if (!rejected) throw message;
 	}
 }

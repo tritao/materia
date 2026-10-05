@@ -46,9 +46,9 @@ class MotorDriver extends MachineComponent {
 	static var table:Null<Catalog<MotorDriverRating>>;
 	static var recipe:Null<ComponentType>;
 	public final rating:MotorDriverRating;
-	public final current:Float;
+	public final current:machinekit.power.PhaseRmsCurrent;
 	public final microsteps:Int;
-	public final statedVoltage:Null<Float>;
+	public final statedVoltage:Null<machinekit.power.DcVoltage>;
 
 	public static function catalog():Catalog<MotorDriverRating> {
 		if (table == null) table = new Catalog("motor driver", row -> row.designation, [
@@ -64,6 +64,9 @@ class MotorDriver extends MachineComponent {
 			{designation: "GENERIC-AC-SERVO-AMP", family: Servo, control: Bus,
 				minimumVoltage: 200.0, maximumVoltage: 400.0, maximumCurrent: 20.0, efficiency: 0.95,
 				maximumMicrosteps: 1, maximumStepRate: 0.0, positionLoopRate: 4000.0, width: 120.0, height: 80.0, depth: 45.0},
+			{designation: "GENERIC-400V-SERVO-AMP", family: Servo, control: Bus,
+				minimumVoltage: 450.0, maximumVoltage: 680.0, maximumCurrent: 20.0, efficiency: 0.95,
+				maximumMicrosteps: 1, maximumStepRate: 0.0, positionLoopRate: 4000.0, width: 120.0, height: 80.0, depth: 45.0},
 			{designation: "GENERIC-LV-SERVO-AMP", family: Servo, control: Bus,
 				minimumVoltage: 24.0, maximumVoltage: 60.0, maximumCurrent: 150.0, efficiency: 0.95,
 				maximumMicrosteps: 1, maximumStepRate: 0.0, positionLoopRate: 4000.0, width: 120.0, height: 70.0, depth: 45.0}
@@ -72,17 +75,17 @@ class MotorDriver extends MachineComponent {
 		return table;
 	}
 
-	public function new(designation:String, current:Float, microsteps:Int = 1, ?statedVoltage:Float) {
+	public function new(designation:String, current:machinekit.power.PhaseRmsCurrent, microsteps:Int = 1, ?statedVoltage:machinekit.power.DcVoltage) {
 		var row = catalog().get(designation);
-		if (!(current > 0 && current <= row.maximumCurrent) || !Math.isFinite(current))
+		if (!(current.amps() > 0 && current.amps() <= row.maximumCurrent) || !Math.isFinite(current.amps()))
 			throw 'Driver "$designation" current must be positive and within its rating';
 		if (microsteps < 1 || microsteps > row.maximumMicrosteps || (microsteps & (microsteps - 1)) != 0)
 			throw 'Driver "$designation" needs a supported power-of-two microstep setting';
 		if (row.family == Servo && microsteps != 1) throw "A servo driver has no microstep setting";
 		if (statedVoltage != null) validateVoltage(row, statedVoltage);
-		super('$designation-${Dimension.format(current)}A-M$microsteps' +
-			(statedVoltage == null ? "-WIRED" : '-${Dimension.format(statedVoltage)}V'),
-			'$designation motor driver, ${Dimension.format(current)} A rms', "aluminium 6061");
+		super('$designation-${Dimension.format(current.amps())}A-M$microsteps' +
+			(statedVoltage == null ? "-WIRED" : '-${Dimension.format(statedVoltage.volts())}V'),
+			'$designation motor driver, ${Dimension.format(current.amps())} A rms', "aluminium 6061");
 		this.rating = row;
 		this.current = current;
 		this.microsteps = microsteps;
@@ -97,8 +100,8 @@ class MotorDriver extends MachineComponent {
 
 	override public function motorDriver():Null<MotorDriver> return this;
 
-	public static function validateVoltage(row:MotorDriverRating, voltage:Float):Void {
-		if (!Math.isFinite(voltage) || voltage < row.minimumVoltage || voltage > row.maximumVoltage)
+	public static function validateVoltage(row:MotorDriverRating, voltage:machinekit.power.DcVoltage):Void {
+		if (!Math.isFinite(voltage.volts()) || voltage.volts() < row.minimumVoltage || voltage.volts() > row.maximumVoltage)
 			throw 'Driver "${row.designation}" supply is outside ${row.minimumVoltage}–${row.maximumVoltage} V';
 	}
 
@@ -109,15 +112,15 @@ class MotorDriver extends MachineComponent {
 		ComponentRecipeSupport.count("microsteps", 1),
 		ComponentRecipeSupport.flag("wiredSupply", true),
 		ComponentRecipeSupport.scalar("voltage", 24, 0.001)
-	], v -> new MotorDriver(v.token("designation"), v.number("current"), v.integer("microsteps"),
-		v.boolean("wiredSupply") ? null : v.number("voltage")));
+	], v -> new MotorDriver(v.token("designation"), new machinekit.power.PhaseRmsCurrent(v.number("current")), v.integer("microsteps"),
+		v.boolean("wiredSupply") ? null : new machinekit.power.DcVoltage(v.number("voltage"))));
 		return recipe;
 	}
 
 	override public function componentType():Null<ComponentType> return Std.isExactType(this, MotorDriver) ? recipeType() : null;
 	override public function values():ComponentValues return new ComponentValues()
-		.setToken("designation", rating.designation).setNumber("current", current).setInteger("microsteps", microsteps)
-		.setBoolean("wiredSupply", statedVoltage == null).setNumber("voltage", statedVoltage == null ? 24 : statedVoltage)
+		.setToken("designation", rating.designation).setNumber("current", current.amps()).setInteger("microsteps", microsteps)
+		.setBoolean("wiredSupply", statedVoltage == null).setNumber("voltage", statedVoltage == null ? 24 : statedVoltage.volts())
 		.setToken("material", materialSpec());
 	override public function hasGeometry():Bool return true;
 	override public function geometry(detail:ComponentDetail = Preview):Part

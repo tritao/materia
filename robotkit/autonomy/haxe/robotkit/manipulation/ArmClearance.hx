@@ -1,6 +1,7 @@
 package robotkit.manipulation;
 
 import robotkit.model.LinkId;
+import robotkit.model.JointType;
 import robotkit.spatial.Transform3;
 import robotkit.tool.ConvexDistance;
 import robotkit.tool.ConvexSolid;
@@ -199,6 +200,74 @@ class ArmClearance {
     var allowed = contactBodies;
     return allowed == null || allowed.exists(name);
   }
+
+  /** Certify a whole joint-coordinate box around q. Excursions bound every
+   * coordinate's distance from q throughout the interval, including polynomial
+   * interiors. Triangle bounds on link lengths and coupled coordinates bound
+   * every hull point's travel; no obstacle can hide between sample poses. */
+  public function intervalClear(q:Array<Float>, excursions:Array<Float>):Bool {
+    if (q == null || excursions == null || q.length != arm.dofCount() || excursions.length != q.length)
+      throw "Clearance interval needs one position and excursion per group coordinate";
+    for (i in 0...q.length) if (!Math.isFinite(q[i]) || !Math.isFinite(excursions[i]) || excursions[i] < 0)
+      throw "Clearance interval positions and nonnegative excursions must be finite";
+    var ids = arm.jointIds(), model = arm.model;
+    var state = arm.stateOf(q);
+    var dofExcursions = [for (_ in 0...model.dofCount()) 0.0];
+    for (i in 0...ids.length) dofExcursions[model.dofIndex(ids[i])] = excursions[i];
+    var spans:Array<Array<Float>> = [];
+    for (joint in 0...model.jointCount()) {
+      var value = model.jointConstant[joint], excursion = 0.0;
+      for (term in model.jointTermStart[joint]...model.jointTermStart[joint + 1]) {
+        var dof = model.jointTermDof[term], scale = model.jointTermScale[term];
+        value += scale * state.q[dof];
+        excursion += Math.abs(scale) * dofExcursions[dof];
+      }
+      spans.push([value, excursion]);
+    }
+    var movement:Array<Float> = [];
+    for (body in bodies) {
+      var reach = 0.0;
+      for (i in 0...Std.int(body.corners.length / 3)) {
+        var x = body.corners[3 * i], y = body.corners[3 * i + 1], z = body.corners[3 * i + 2];
+        reach = Math.max(reach, Math.sqrt(x * x + y * y + z * z));
+      }
+      var travel = 0.0, link = body.link;
+      var visited = new Map<String, Bool>();
+      while (true) {
+        if (visited.exists(link)) throw "Clearance cannot bound a cyclic link tree";
+        visited.set(link, true);
+        var parents = [for (joint in arm.robot.joints) if (joint.child.id == link) joint];
+        if (parents.length == 0) break;
+        if (parents.length != 1) throw "Clearance needs one parent per link";
+        var joint = parents[0], range = spans[model.jointIndex(joint.id)];
+        reach += vectorLength(joint.childFramePosition);
+        switch (joint.type) {
+          case JointType.Prismatic:
+            travel += range[1];
+            reach += Math.abs(range[0]) + range[1];
+          case JointType.Revolute, JointType.Continuous:
+            travel += Math.min(2.0, range[1]) * reach;
+          case JointType.Fixed:
+          case JointType.Floating: throw "Clearance interval cannot certify a floating joint";
+        }
+        reach += vectorLength(joint.parentFramePosition);
+        link = joint.parent.id;
+      }
+      movement.push(travel);
+    }
+    var poses = arm.linkPoses(q, links);
+    var placed = [for (body in bodies) body.placed(poses[body.linkIndex])];
+    for (pair in pairs) {
+      var a = bodies[pair[0]], b = bodies[pair[1]];
+      var required = margin + movement[pair[0]] + movement[pair[1]];
+      if (distance(a, placed[pair[0]], poses[a.linkIndex], b, placed[pair[1]], poses[b.linkIndex], required) <= required)
+        return false;
+    }
+    return true;
+  }
+
+  static function vectorLength(v:Array<Float>):Float
+    return Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
 
   /**
    * The first pair closer than it may be with the arm at `q`, or null. With `contact` the tool's bodies may come as close to

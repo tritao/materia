@@ -39,12 +39,30 @@ typedef ServoRating = {
  * CAD frame: mounting face at z=0, body toward -Z, shaft along +Z. Connectors: `mountFace`, `shaftAxis`.
  */
 class ServoMotor extends MachineComponent implements MotorDrive {
-	/** Reference low-voltage winding; each catalogue row keeps this assumption explicitly. */
-	public static function lowVoltageWinding():ServoElectricalRating return {torqueConstant: 0.03 * Math.sqrt(3.0),
-		backEmfConstant: 0.03, phaseResistance: 0.02, mechanicalEfficiency: 0.95};
-	/** Reference 200 V class AC winding; these values are assumed, like the mechanical rows. */
-	public static function acWinding():ServoElectricalRating return {torqueConstant: 0.3 * Math.sqrt(3.0),
-		backEmfConstant: 0.3, phaseResistance: 1.5, mechanicalEfficiency: 0.95};
+	/** Assumed 48 V winding: back EMF uses at most eighty percent of the bus
+	 * at maximum speed, capped at 0.06 V/(rad/s) line RMS. Rated copper loss
+	 * is five percent of mechanical output. Resistance scales with the motor. */
+	public static function lowVoltageWinding(ratedTorque:Float, ratedSpeed:Float, maxSpeed:Float):ServoElectricalRating {
+		var backEmf = Math.min(0.06, 0.8 * 48 / (Math.sqrt(2.0) * maxSpeed));
+		var constant = backEmf * Math.sqrt(3.0);
+		var current = ratedTorque / constant;
+		return {torqueConstant: constant, backEmfConstant: backEmf,
+			phaseResistance: 0.05 * ratedTorque * ratedSpeed / (3 * current * current), mechanicalEfficiency: 0.95};
+	}
+	/** Reference 200 V class AC winding, with the same assumed rated loss budget. */
+	public static function acWinding(ratedTorque:Float, ratedSpeed:Float):ServoElectricalRating {
+		return winding(ratedTorque, ratedSpeed, 0.3);
+	}
+	/** Assumed 400 V class winding, selected independently of the installed supply. */
+	public static function highVoltageWinding(ratedTorque:Float, ratedSpeed:Float):ServoElectricalRating {
+		return winding(ratedTorque, ratedSpeed, 0.6);
+	}
+	static function winding(ratedTorque:Float, ratedSpeed:Float, backEmf:Float):ServoElectricalRating {
+		var constant = backEmf * Math.sqrt(3.0);
+		var current = ratedTorque / constant;
+		return {torqueConstant: constant, backEmfConstant: backEmf,
+			phaseResistance: 0.05 * ratedTorque * ratedSpeed / (3 * current * current), mechanicalEfficiency: 0.95};
+	}
 	static var table:Null<Array<ServoRating>>;
 
 	public final rating:ServoRating;
@@ -56,7 +74,7 @@ class ServoMotor extends MachineComponent implements MotorDrive {
 			function generic(name:String, watts:Float, inertia:Float, face:Float, length:Float, shaftDiameter:Float, shaftLength:Float):ServoRating {
 				var rated = watts / (3000.0 * rpm);
 				return {designation: name, ratedTorque: rated, peakTorque: 3.0 * rated, ratedSpeed: 3000.0 * rpm, maxSpeed: 5000.0 * rpm,
-					rotorInertia: inertia, encoderCounts: 131072, bodyDiameter: face, bodyLength: length, shaftDiameter: shaftDiameter, shaftLength: shaftLength, electrical: acWinding()};
+					rotorInertia: inertia, encoderCounts: 131072, bodyDiameter: face, bodyLength: length, shaftDiameter: shaftDiameter, shaftLength: shaftLength, electrical: acWinding(rated, 3000.0 * rpm)};
 			}
 			table = [
 				generic("GENERIC-SERVO-50W", 50, 3.0e-6, 40, 70, 8, 20),
@@ -65,6 +83,18 @@ class ServoMotor extends MachineComponent implements MotorDrive {
 				generic("GENERIC-SERVO-400W", 400, 5.0e-5, 60, 130, 14, 30),
 				generic("GENERIC-SERVO-750W", 750, 1.2e-4, 80, 145, 19, 35)
 			];
+			// Distinct saved designations preserve the selected winding on reconstruction.
+			var baseRows = table.copy();
+			for (row in baseRows) table.push({designation: StringTools.replace(row.designation, "GENERIC-SERVO-", "GENERIC-LV-SERVO-"),
+				ratedTorque: row.ratedTorque, peakTorque: row.peakTorque, ratedSpeed: row.ratedSpeed, maxSpeed: row.maxSpeed,
+				rotorInertia: row.rotorInertia, encoderCounts: row.encoderCounts, bodyDiameter: row.bodyDiameter,
+				bodyLength: row.bodyLength, shaftDiameter: row.shaftDiameter, shaftLength: row.shaftLength,
+				electrical: lowVoltageWinding(row.ratedTorque, row.ratedSpeed, row.maxSpeed)});
+			for (row in baseRows) table.push({designation: StringTools.replace(row.designation, "GENERIC-SERVO-", "GENERIC-HV-SERVO-"),
+				ratedTorque: row.ratedTorque, peakTorque: row.peakTorque, ratedSpeed: row.ratedSpeed, maxSpeed: row.maxSpeed,
+				rotorInertia: row.rotorInertia, encoderCounts: row.encoderCounts, bodyDiameter: row.bodyDiameter,
+				bodyLength: row.bodyLength, shaftDiameter: row.shaftDiameter, shaftLength: row.shaftLength,
+				electrical: highVoltageWinding(row.ratedTorque, row.ratedSpeed)});
 		}
 		return table;
 	}

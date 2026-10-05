@@ -3,6 +3,7 @@
 #include "nativekit_sim_session.h"
 
 #include <cassert>
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <string>
@@ -140,18 +141,77 @@ void presence_counts_only_free_boxes_in_its_volume() {
     const double half_extents[3] = {0.5, 0.5, 0.5};
     const auto query = pose_at(0.0, 0.0, 2.0);
     uint32_t present = 1;
-    assert(nksim_session_overlap_free_boxes(space.session, &query, half_extents, &present) == NKSIM_OK);
+    assert(nksim_session_overlap_free_objects(space.session, &query, half_extents, &present) == NKSIM_OK);
     assert(present == 0);
     desc.motion_type = NKSIM_MOTION_DYNAMIC;
     desc.mass = 1.0;
     desc.pose = pose_at(0.4, 0.0, 2.0);
     nksim_object blank = 0;
     assert(nksim_session_create_object(space.session, &desc, &blank) == NKSIM_OK);
-    assert(nksim_session_overlap_free_boxes(space.session, &query, half_extents, &present) == NKSIM_OK);
+    assert(nksim_session_overlap_free_objects(space.session, &query, half_extents, &present) == NKSIM_OK);
     assert(present == 1);
     const auto far = pose_at(1.2, 0.0, 2.0);
-    assert(nksim_session_overlap_free_boxes(space.session, &far, half_extents, &present) == NKSIM_OK);
+    assert(nksim_session_overlap_free_objects(space.session, &far, half_extents, &present) == NKSIM_OK);
     assert(present == 0);
+}
+
+void presence_uses_loose_object_shapes() {
+    for (const auto type : {NKSIM_SHAPE_SPHERE, NKSIM_SHAPE_CAPSULE, NKSIM_SHAPE_CYLINDER}) {
+        Space space;
+        nksim_object_desc desc{};
+        desc.struct_size = sizeof(desc);
+        desc.shape.type = type;
+        desc.shape.parameters[0] = 0.2;
+        desc.shape.parameters[1] = 0.6;
+        desc.pose = pose_at(0.65, 0.65, 2.0);
+        desc.motion_type = NKSIM_MOTION_DYNAMIC;
+        desc.mass = 1.0;
+        nksim_object object = 0;
+        assert(nksim_session_create_object(space.session, &desc, &object) == NKSIM_OK);
+        const double half_extents[3] = {0.5, 0.5, 0.5};
+        uint32_t present = 1;
+        const auto query = pose_at(0.0, 0.0, 2.0);
+        assert(nksim_session_overlap_free_objects(space.session, &query, half_extents, &present) == NKSIM_OK);
+        assert(present == 0); // The primitive's bounding box overlaps, but its rounded corner does not.
+        const auto closer = pose_at(0.01, 0.01, 2.0);
+        assert(nksim_session_overlap_free_objects(space.session, &closer, half_extents, &present) == NKSIM_OK);
+        assert(present == 1); // Off-axis contact with the volume, not its centre ray.
+    }
+}
+
+void convex_objects_keep_their_actual_volume() {
+    Space space;
+    nksim_object_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.shape.type = NKSIM_SHAPE_CONVEX;
+    desc.pose = pose_at(0, 0, 0);
+    desc.motion_type = NKSIM_MOTION_DYNAMIC;
+    desc.mass = 1.0;
+    double vertices[] = {0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1};
+    nksim_object object = 0;
+    assert(nksim_session_create_convex_object(space.session, &desc, vertices, 12, &object) == NKSIM_OK);
+    std::fill(std::begin(vertices), std::end(vertices), 0.0); // Creation owns a copy.
+    const double half_extents[] = {0.05, 0.05, 0.05};
+    uint32_t present = 1;
+    const auto outside = pose_at(0.8, 0.8, 0.8);
+    assert(nksim_session_overlap_free_objects(space.session, &outside, half_extents, &present) == NKSIM_OK);
+    assert(present == 0); // Inside its bounding box, outside its convex volume.
+    const auto inside = pose_at(0.1, 0.1, 0.1);
+    assert(nksim_session_overlap_free_objects(space.session, &inside, half_extents, &present) == NKSIM_OK);
+    assert(present == 1);
+    nksim_ray ray{};
+    ray.struct_size = sizeof(ray);
+    ray.origin[0] = ray.origin[1] = 0.1;
+    ray.origin[2] = 2;
+    ray.direction[2] = -1;
+    ray.max_distance = 3;
+    double distance = 0;
+    assert(nksim_session_raycast(space.session, &ray, &distance) == NKSIM_OK);
+    assert(near(distance, 1.2)); // The sloped face, not the box's top at distance 1.
+    ray.origin[0] = ray.origin[1] = 0.8;
+    assert(nksim_session_raycast(space.session, &ray, &distance) == NKSIM_OK);
+    assert(near(distance, 3));
+    assert(nksim_session_create_convex_object(space.session, &desc, vertices, 12, &object) == NKSIM_ERROR_INVALID_ARGUMENT);
 }
 
 void actors_follow_timed_keyframes() {
@@ -514,6 +574,8 @@ int main() {
     planes_and_cylinders_are_objects();
     objects_follow_their_motion_type();
     presence_counts_only_free_boxes_in_its_volume();
+    presence_uses_loose_object_shapes();
+    convex_objects_keep_their_actual_volume();
     actors_follow_timed_keyframes();
     participants_share_every_tick();
     return 0;

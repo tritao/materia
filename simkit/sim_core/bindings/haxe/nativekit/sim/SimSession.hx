@@ -145,7 +145,7 @@ class SimSession {
         return status().get_fixed_timestep();
 
     public function createObject(motion:MotionType, shape:SimShape, pose:SimPose,
-            mass:Float = 0.0):SimObject {
+            mass:Float = 0.0, ?restContactGroup:haxe.Int64):SimObject {
         ensureLive();
         var desc = new nksim_object_desc();
         desc.set_struct_size(nksim_object_desc.size());
@@ -153,9 +153,18 @@ class SimSession {
         desc.set_shape(shape.toNative());
         desc.set_pose(pose.toNative());
         desc.set_mass(mass);
-        var result = NativeKitSim.nksim_session_create_object(owner.borrow(), desc);
-        SimWorld.check(result.status, "session.createObject");
-        return new SimObject(this, result.out_object, motion, shape);
+        if (restContactGroup != null) desc.set_rest_contact_group(restContactGroup);
+        var handle:nksim_object;
+        if (shape.type == ShapeType.Convex) {
+            var result = NativeKitSim.nksim_session_create_convex_object(owner.borrow(), desc, shape.convexVertices());
+            SimWorld.check(result.status, "session.createConvexObject");
+            handle = result.out_object;
+        } else {
+            var result = NativeKitSim.nksim_session_create_object(owner.borrow(), desc);
+            SimWorld.check(result.status, "session.createObject");
+            handle = result.out_object;
+        }
+        return new SimObject(this, handle, motion, shape);
     }
 
     /** Drive a dynamic object from a carrier body's frame on every tick. */

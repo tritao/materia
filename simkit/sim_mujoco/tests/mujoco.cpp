@@ -57,13 +57,14 @@ nksim_shape make_box(nksim_world world) {
 }
 
 nksim_body make_body(nksim_world world, nkscene_node_id node,
-                    uint32_t motion_type, double mass, nksim_shape shape = 0) {
+                    uint32_t motion_type, double mass, nksim_shape shape = 0, uint64_t rest_contact_group = 0) {
     nksim_body_desc desc{};
     desc.struct_size = sizeof(desc);
     desc.node = node;
     desc.motion_type = motion_type;
     desc.mass = mass;
     desc.shape = shape;
+    desc.rest_contact_group = rest_contact_group;
     desc.collision_layer = 1;
     desc.collision_mask = 1;
     nksim_body body = 0;
@@ -1858,6 +1859,37 @@ void convex_hulls_overlapping_at_rest_do_not_collide() {
     nkscene_scene_destroy(scene);
 }
 
+void mounted_contact_groups_span_articulations_only() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    nksim_world_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.scene = scene;
+    desc.fixed_timestep = 0.001;
+    desc.physics_substeps = 1;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
+    const auto shape = make_box(world);
+    const auto first = make_body(world, make_node(scene, 0), NKSIM_MOTION_DYNAMIC, 1, shape, 42);
+    const auto second = make_body(world, make_node(scene, 0), NKSIM_MOTION_DYNAMIC, 1, shape, 42);
+    const auto loose = make_body(world, make_node(scene, 0), NKSIM_MOTION_DYNAMIC, 1, shape);
+    step_world(world, 1);
+    nksim_contact contacts[64]{};
+    uint32_t count = 0;
+    assert(nksim_world_get_contacts(world, contacts, 64, &count) == NKSIM_OK);
+    assert(count > 0 && count <= 64);
+    bool loose_contact = false;
+    for (uint32_t i = 0; i < count; ++i) {
+        const auto &contact = contacts[i];
+        assert(!((contact.body_a == first && contact.body_b == second) ||
+                 (contact.body_a == second && contact.body_b == first)));
+        loose_contact = loose_contact || contact.body_a == loose || contact.body_b == loose;
+    }
+    assert(loose_contact); // Contact groups must not swallow loose workpieces.
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
 void assembly_closures_compile_as_equalities() {
     for (const auto closure_type : {NKSIM_JOINT_FIXED, NKSIM_JOINT_REVOLUTE,
                                     NKSIM_JOINT_PRISMATIC, NKSIM_JOINT_SPHERICAL,
@@ -2419,30 +2451,31 @@ void spring_applied_brake_holds_without_a_motor_target() {
     assert(nksim_joint_configure_brake(rig.world, rig.joint, -1.0, 0.05, 0.03) == NKSIM_ERROR_INVALID_ARGUMENT);
     assert(nksim_joint_configure_brake(rig.world, rig.joint, 10.0, 0.05, 0.03) == NKSIM_OK);
     assert(nksim_joint_configure_brake(rig.world, rig.joint, 10.0, 0.05, 0.03) == NKSIM_ERROR_INVALID_STATE);
-    uint32_t released = 1;
-    assert(nksim_joint_get_brake_released(rig.world, rig.joint, &released) == NKSIM_OK);
-    assert(released == 0);
+    nksim_joint_state contact{};
+    contact.struct_size = sizeof(contact);
+    auto released = [&]() {
+        assert(nksim_joint_get_state(rig.world, rig.joint, &contact) == NKSIM_OK);
+        assert((contact.flags & NKSIM_JOINT_BRAKE_CONFIGURED) != 0);
+        return (contact.flags & NKSIM_JOINT_BRAKE_RELEASED) != 0;
+    };
+    assert(!released());
     // No actuator command at all: holding comes from friction, not servo PD.
     step_world(rig.world, 500);
     assert(std::abs(arm_angle(rig)) < 0.01);
     assert(nksim_joint_set_brake_release(rig.world, rig.joint, 2) == NKSIM_ERROR_INVALID_ARGUMENT);
     assert(nksim_joint_set_brake_release(rig.world, rig.joint, 1) == NKSIM_OK);
     step_world(rig.world, 20);
-    assert(nksim_joint_get_brake_released(rig.world, rig.joint, &released) == NKSIM_OK);
-    assert(released == 0);
+    assert(!released());
     assert(nksim_joint_set_brake_release(rig.world, rig.joint, 1) == NKSIM_OK);
     step_world(rig.world, 6);
-    assert(nksim_joint_get_brake_released(rig.world, rig.joint, &released) == NKSIM_OK);
-    assert(released == 1);
+    assert(released());
     step_world(rig.world, 150);
     assert(std::abs(arm_angle(rig)) > 0.15);
     assert(nksim_joint_set_brake_release(rig.world, rig.joint, 0) == NKSIM_OK);
     step_world(rig.world, 14);
-    assert(nksim_joint_get_brake_released(rig.world, rig.joint, &released) == NKSIM_OK);
-    assert(released == 1);
+    assert(released());
     step_world(rig.world, 2);
-    assert(nksim_joint_get_brake_released(rig.world, rig.joint, &released) == NKSIM_OK);
-    assert(released == 0);
+    assert(!released());
     assert(nksim_joint_set_state(rig.world, rig.joint, 0.0, 0.0) == NKSIM_OK);
     step_world(rig.world, 500);
     assert(std::abs(arm_angle(rig)) < 0.01);
@@ -2661,6 +2694,7 @@ int main() {
     coupled_prismatic_joints_use_equality_and_convex_collision();
     a_follower_with_two_leaders_uses_a_tendon_equality();
     convex_hulls_overlapping_at_rest_do_not_collide();
+    mounted_contact_groups_span_articulations_only();
     assembly_closures_compile_as_equalities();
     compound_shape_preserves_an_l_shaped_gap();
     convex_mesh_margin_detects_before_gap_force();

@@ -520,6 +520,7 @@ public:
             auto &joint = joints.at(incoming);
             joint.state.position = joint.state.velocity = joint.state.effort = 0.0;
             joint.target_mode = 0;
+            servo_coordinates_dirty = true;
             if (joint.brake) joint.brake->reset();
             if (joint_id >= 0) {
                 data->qpos[model->jnt_qposadr[joint_id]] = 0.0;
@@ -692,15 +693,6 @@ public:
         if (found == joints.end()) return NKSIM_ERROR_INVALID_HANDLE;
         if (!found->second.brake) return NKSIM_ERROR_INVALID_STATE;
         found->second.brake->set_release_coil(energized);
-        return NKSIM_OK;
-    }
-
-    nksim_result joint_brake_released(std::uint64_t id, bool *released) const override {
-        const auto found = joints.find(id);
-        if (found == joints.end()) return NKSIM_ERROR_INVALID_HANDLE;
-        if (!released) return NKSIM_ERROR_INVALID_ARGUMENT;
-        if (!found->second.brake) return NKSIM_ERROR_INVALID_STATE;
-        *released = found->second.brake->released();
         return NKSIM_OK;
     }
 
@@ -1569,8 +1561,11 @@ private:
             for (std::size_t j = i + 1; j < body_order.size(); ++j) {
                 const auto first = body_order[i], second = body_order[j];
                 const auto &body_a = bodies.at(first), &body_b = bodies.at(second);
-                const bool real_exclude = is_same_articulation(first, second) &&
-                    (is_parent_child(first, second) || geometries_overlap_at_rest(body_a, body_b));
+                const bool same_articulation = is_same_articulation(first, second);
+                const bool same_mount = body_a.desc.rest_contact_group != 0 &&
+                    body_a.desc.rest_contact_group == body_b.desc.rest_contact_group;
+                const bool real_exclude = (same_articulation && is_parent_child(first, second)) ||
+                    ((same_articulation || same_mount) && geometries_overlap_at_rest(body_a, body_b));
                 if (real_exclude) real_excludes.emplace(std::min(first, second), std::max(first, second));
                 if (!real_exclude) continue;
                 auto *exclude = mjs_addExclude(spec);
@@ -1652,6 +1647,7 @@ private:
                 if (parts[part].contact_filter != NKSIM_CONTACT_PAIRS_AND_ENVIRONMENT) continue;
                 for (const auto other : body_order) {
                     if (find(other) == find(body_id)) continue;
+                    if (real_excludes.count({std::min(body_id, other), std::max(body_id, other)})) continue;
                     const auto &other_body = bodies.at(other).desc;
                     if ((body.collision_layer & other_body.collision_mask) == 0 &&
                         (other_body.collision_layer & body.collision_mask) == 0)

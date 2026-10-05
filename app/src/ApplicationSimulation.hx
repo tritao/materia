@@ -164,6 +164,7 @@ class ApplicationSimulation {
       var hasWorkers = false;
       for (record in scene.records()) if (record.type == "human-worker") { hasWorkers = true; break; }
       var assembly = session == null ? null : session.projectAssemblyDefinition;
+      var restContactGroup = haxe.Int64.ofInt(1); // This session contains one generated assembly.
       if (models.length == 0 && assembly == null && participants.length == 0 &&
           !hasWorkers) throw "Nothing to simulate";
       for (configured in models) {
@@ -215,7 +216,7 @@ class ApplicationSimulation {
           var job = session.cncJob;
           var ownsJob = job != null && (control == null || job.controllerId == control.id);
           var built = AssemblyRobot.add(candidate, scene, session, assembly, backend == MUJOCO,
-            appliedRevision + 1, robotIndex, ownsJob ? CncProgramPlayer.processChannels(job) : null, virtualWelder, control);
+            appliedRevision + 1, robotIndex, ownsJob ? CncProgramPlayer.processChannels(job) : null, virtualWelder, control, restContactGroup);
           candidateRobots.push(built.robot);
           candidateLinks.push([for (link in built.model.links) link.id]);
           candidateRobotModels.push(built.model);
@@ -258,18 +259,38 @@ class ApplicationSimulation {
       for (object in environmentRecords) if (object.collisionEnabled && !assemblyOwned.exists(object.id)) {
         var centerX=object.x,centerY=object.y,centerZ=object.z;
         var halfX=object.width/2.0,halfY=object.height/2.0,halfZ=object.depth/2.0;
+        var shape = SimShape.box(halfX, halfY, halfZ);
         if(scene.isCadPart(object.id)){
           var bounds=scene.cadSession(object.id).collisionBounds;
           if(bounds==null)throw "CAD collision bounds are unavailable for: "+object.id;
           var offset = rotateOffset(bounds.center.x, bounds.center.y, bounds.center.z, object.rotation);
           centerX+=offset[0];centerY+=offset[1];centerZ+=offset[2];
           halfX=bounds.halfExtents.x;halfY=bounds.halfExtents.y;halfZ=bounds.halfExtents.z;
+          var hull:Null<Array<Float>> = null;
+          var definition = session == null ? null : session.projectAssemblyDefinition;
+          var physical = session == null ? null : session.projectPhysical;
+          if (session != null && definition != null && physical != null) for (occurrence in definition.occurrences)
+            if (object.id == "project:" + occurrence.id) for (part in physical.parts)
+              if (part.id == occurrence.definition) {
+                var vertices = part.collisionHull;
+                if (vertices == null) throw "Environment part has no physical collision hull: " + object.id;
+                var centre = session.assemblyPreviewCenter(occurrence.definition);
+                if (centre == null) throw "Environment part has no preview centre: " + object.id;
+                hull = [for (i in 0...vertices.length) (vertices[i] - centre[i % 3]) * physical.metresPerUnit];
+              }
+          if (hull == null) {
+            var derived = scene.cadSession(object.id).collisionHull();
+            hull = derived.vertices;
+            if (derived.warning != null) candidateWarnings.push(object.id + ": " + derived.warning);
+          }
+          shape = SimShape.convex(hull);
         }
         var rotation=object.rotation==null?[0.0,0.0,0.0,1.0]:object.rotation;
         var created=createdSpace.session.createObject(
-          object.dynamicBody?MotionType.Dynamic:MotionType.Static,SimShape.box(halfX,halfY,halfZ),
+          object.dynamicBody?MotionType.Dynamic:MotionType.Static,shape,
           new SimPose(centerX,centerY,centerZ,rotation[0],rotation[1],rotation[2],rotation[3]),
-          object.dynamicBody?object.mass:0.0);
+          object.dynamicBody?object.mass:0.0,
+          !object.dynamicBody && assembly != null && [for (part in assembly.occurrences) if (object.id == "project:" + part.id) part].length == 1 ? restContactGroup : null);
         candidateObjects.push({id:object.id,object:created});
         if (!object.dynamicBody) heldBoxes.push({id: object.id, x: centerX, y: centerY, z: centerZ,
           halfX: halfX, halfY: halfY, halfZ: halfZ,

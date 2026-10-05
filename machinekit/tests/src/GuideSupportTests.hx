@@ -9,16 +9,17 @@ class GuideSupportTests {
 	}
 
 	public static function run():Void {
-		var support = new GuideSupport(0.14, 0.0654);
+		var support = new GuideSupport(0.14, 0.0654, 0.02, -0.03);
 		var cases:Array<GuideSupportWrench> = [
 			{fx: 0, fy: 1000, fz: 0, mx: 0, my: 0, mz: 0},
 			{fx: 170, fy: -2300, fz: 480, mx: 63, my: -37, mz: 121},
 			{fx: -170, fy: 2300, fz: -480, mx: -63, my: 37, mz: -121}
 		];
 		for (wrench in cases) {
-			var fx = 0.0, fy = 0.0, fz = 0.0;
-			var mx = 0.0, my = 0.0, mz = 0.0;
+			var fx = 0.0, fy = 0.0, fz = wrench.fz;
+			var mx = support.driveY * wrench.fz, my = -support.driveX * wrench.fz, mz = 0.0;
 			for (load in support.loads(wrench)) {
+				near(load.fz, 0, "guides cannot carry force along their free axis");
 				fx += load.fx; fy += load.fy; fz += load.fz;
 				mx -= load.z * load.fy;
 				my += load.z * load.fx - load.x * load.fz;
@@ -34,8 +35,13 @@ class GuideSupportTests {
 		near(support.utilization(cases[0], 1000, 2), 0.5, "equal gravity sharing");
 		if (!(support.utilization(cases[1], 100, 2) > 1))
 			throw "Guide support must report an overloaded bearing";
-		var wider = new GuideSupport(0.28, 0.1308);
+		var wider = new GuideSupport(0.28, 0.1308, support.driveX, support.driveY);
 		if (!(wider.utilization(cases[1], 1000, 2) < support.utilization(cases[1], 1000, 2)))
 			throw "Wider support must reduce the moment-induced bearing load";
+		var axial:GuideSupportWrench = {fx: 0, fy: 0, fz: 1000, mx: 0, my: 0, mz: 0};
+		var centred = new GuideSupport(0.14, 0.0654, 0, 0);
+		near(centred.utilization(axial, 1000, 2), 0, "centred drive carries the axial load");
+		if (!(support.utilization(axial, 1000, 2) > 0))
+			throw "An offset drive must transfer its reaction moment to the guides";
 	}
 }

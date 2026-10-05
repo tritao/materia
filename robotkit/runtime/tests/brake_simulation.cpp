@@ -122,7 +122,11 @@ void check_brake(double holding_force, bool holds, bool implicit_clock = false, 
     for (int i = 0; i < 30; ++i) step();
     std::fprintf(stderr, "brake %.1f N: powered %.9f m, applied %.9f m, drift %.9f m\n",
         holding_force, stopped, applied, state.position[0] - applied);
-    if (holds) assert(std::abs(state.position[0] - applied) < 1.0e-5);
+    if (holds) {
+        assert(std::abs(state.position[0] - applied) < 1.0e-5);
+        // The motor holds through the physical engagement delay, then hands off.
+        assert(std::abs(applied - stopped) < 0.0001);
+    }
     else assert(applied - state.position[0] > 0.1); // motor torque is off; an undersized brake slips
     if (holds) {
         command.sequence = 4;

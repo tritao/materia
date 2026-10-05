@@ -36,10 +36,10 @@ class ServoElectricalLoad {
 		minimumBusVoltage = volts;
 	}
 
-	public function check(driver:MotorDriver, voltage:Float, id:String):Void {
-		if (driver.current + 1e-9 < phaseCurrent)
-			throw 'Servo "$id" needs $phaseCurrent A phase RMS, but its driver is limited to ${driver.current} A';
-		if (voltage + 1e-9 < minimumBusVoltage)
-			throw 'Servo "$id" needs at least $minimumBusVoltage V DC for its curve, but its bus supplies $voltage V';
+	public function check(driver:MotorDriver, voltage:machinekit.power.DcVoltage, id:String):Void {
+		if (driver.current.amps() + 1e-9 < phaseCurrent)
+			throw 'Servo "$id" needs $phaseCurrent A phase RMS, but its driver is limited to ${driver.current.amps()} A';
+		if (voltage.volts() + 1e-9 < minimumBusVoltage)
+			throw 'Servo "$id" needs at least $minimumBusVoltage V DC for its curve, but its bus supplies ${voltage.volts()} V';
 	}
 }

@@ -286,6 +286,10 @@ std::optional<ProcessChannelFault> SimulationRobot::apply_pneumatic_valves(const
 
 std::optional<ProcessChannelFault> SimulationRobot::apply_velocity_drives(const RobotRuntime &runtime,
                                         std::vector<nksim_joint_target> &targets, bool deenergized) {
+    if (velocity_drives_.empty()) return std::nullopt;
+    rk_robot_state state{};
+    runtime.snapshot(state);
+    deenergized = deenergized || state.safety == RK_SAFETY_EMERGENCY_STOP || state.safety == RK_SAFETY_FAULT;
     const ProcessChannelReader reader([&runtime](const char *channel, rk_event_value &value) {
         return runtime.channel_value(channel, value);
     });
@@ -302,6 +306,13 @@ std::optional<ProcessChannelFault> SimulationRobot::apply_velocity_drives(const 
         target.mode = NKSIM_JOINT_TARGET_VELOCITY;
         target.target = velocity;
         target.max_force = drive.max_effort;
+        // A disabled or faulted spindle amplifier supplies no braking torque.
+        // A commanded zero speed while powered remains a controlled stop.
+        if (deenergized || stopped_) {
+            target.mode = NKSIM_JOINT_TARGET_EFFORT;
+            target.target = 0.0;
+            target.max_force = 0.0;
+        }
         targets.push_back(target);
         commanded_[drive.joint] = {target.mode, target.target};
     }
@@ -349,7 +360,8 @@ rk_result SimulationRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) 
                 state.position[target] = source.position - counter_origin_[target];
                 state.velocity[target] = source.velocity;
                 state.effort[target] = source.effort;
-                joint_brake_state_[target] = {source.brake_configured != 0, source.brake_released != 0};
+                joint_brake_state_[target] = {(source.flags & NKSIM_JOINT_BRAKE_CONFIGURED) != 0,
+                    (source.flags & NKSIM_JOINT_BRAKE_RELEASED) != 0};
                 break;
             }
         }
@@ -443,7 +455,7 @@ rk_result SimulationRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) 
                 const double half_extents[3] = {config.max_range, config.max_range,
                                                 config.max_range * 0.5};
                 uint32_t present = 0;
-                if (nksim_session_overlap_free_boxes(simulation_.session_, &volume,
+                if (nksim_session_overlap_free_objects(simulation_.session_, &volume,
                                                      half_extents, &present) != NKSIM_OK)
                     return RK_ERROR_BACKEND;
                 sensor.values[0] = present ? 1.0 : 0.0;

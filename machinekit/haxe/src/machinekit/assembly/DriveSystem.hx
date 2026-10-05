@@ -283,10 +283,10 @@ class DriveSystem {
 
 	/** A modelled supply wins over the explicit fallback; an exposed boundary has no voltage of its own. */
 	public static function driverVoltage(flat:FlatAssembly, id:String, driver:machinekit.motion.MotorDriver,
-			complete:Bool):Null<Float> {
+			complete:Bool):Null<machinekit.power.DcVoltage> {
 		var trace = ServiceNetwork.trace(flat, ServiceNetwork.portRef(id, "power"));
 		var voltage = driver.statedVoltage;
-		if (trace.supplied && !trace.external) {
+		if (trace.supplied) {
 			// Energy traces to the pack, but a converter's output sets the driver's voltage.
 			var delivered = ServiceNetwork.trace(flat, ServiceNetwork.portRef(id, "power"),
 				(part, port) -> part.electricalSource() != null);
@@ -297,10 +297,12 @@ class DriveSystem {
 				checked.throwIfErrors();
 			}
 			var part = flat.member(source.instanceId);
-			if (part.electricalSource() == null)
+			if (!delivered.external && part.electricalSource() == null)
 				throw 'Power source "${source.instanceId}/${source.portName}" does not state an output voltage';
-			var supply = part.electricalSource();
-			voltage = supply.outputVoltage(source.portName);
+			if (!delivered.external) {
+				var supply = part.electricalSource();
+				voltage = supply.outputRating(source.portName).voltage;
+			}
 		} else if (!trace.supplied && trace.chain.length > 1) throw ServiceNetwork.unsuppliedMessage(trace.chain);
 		if (voltage != null) machinekit.motion.MotorDriver.validateVoltage(driver.rating, voltage);
 		return voltage;
@@ -312,7 +314,7 @@ class DriveSystem {
 		if (voltage == null) throw 'Motor "${record.actuator}" needs a wired supply or a stated driver voltage';
 		var motor = flat.member(record.motor).motorDrive();
 		if (motor == null) throw 'Motor "${record.motor}" has no typed drive';
-		var added = motor.actuator(record.actuator, record.joint, voltage, record.margin, driver.current);
+		var added = motor.actuator(record.actuator, record.joint, voltage.volts(), record.margin, driver.current.amps());
 		if (record.processVelocity != null) added.processVelocity = record.processVelocity;
 		if (record.brake != null) {
 			var binding = record.brake;
@@ -420,14 +422,14 @@ class DriveSystem {
 			if (winding == null) continue; // Steppers retain their explicit current/pull-out model.
 			var driver = motorDriver(flat, record);
 			var trace = ServiceNetwork.trace(flat, ServiceNetwork.portRef(record.driver, "power"));
-			if (!trace.supplied || trace.external)
+			if (!trace.supplied)
 				throw 'Servo "${record.actuator}" needs a wired source with current and regenerative ratings';
 			var port = ServiceNetwork.trace(flat, ServiceNetwork.portRef(record.driver, "power"),
 				(part, port) -> part.electricalSource() != null).port;
 			var source = flat.member(port.instanceId).electricalSource();
 			if (source == null) throw 'Source "${port.instanceId}" has no electrical ratings';
 			var rating = source.outputRating(port.portName);
-			var actuator = motor.actuator(record.actuator, record.joint, rating.voltage, record.margin, driver.current);
+			var actuator = motor.actuator(record.actuator, record.joint, rating.voltage.volts(), record.margin, driver.current.amps());
 			var load = new machinekit.motion.ServoElectricalLoad(actuator, winding, driver);
 			load.check(driver, rating.voltage, record.actuator);
 			var demand = demands.get(port.instanceId);
@@ -437,8 +439,8 @@ class DriveSystem {
 		}
 		for (id in demands.keys()) {
 			var demand = demands.get(id), rating = demand.rating;
-			if (demand.peak > rating.voltage * rating.current + 1e-9)
-				throw 'Source "$id" supplies ${rating.voltage * rating.current} W DC; simultaneous servo demand is ${demand.peak} W';
+			if (demand.peak > rating.voltage.volts() * rating.current.amps() + 1e-9)
+				throw 'Source "$id" supplies ${rating.voltage.volts() * rating.current.amps()} W DC; simultaneous servo demand is ${demand.peak} W';
 			if (demand.regeneration > rating.regenerativePower + 1e-9)
 				throw 'Source "$id" absorbs ${rating.regenerativePower} W; servo regeneration needs ${demand.regeneration} W';
 		}

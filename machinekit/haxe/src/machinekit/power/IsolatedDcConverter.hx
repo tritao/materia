@@ -12,7 +12,7 @@ class IsolatedDcConverter extends PowerSupply {
     if (!Math.isFinite(inputVolts) || inputVolts <= 0 || !Math.isFinite(efficiency) ||
         efficiency <= 0 || efficiency > 1 || !Math.isFinite(massKg) || massKg <= 0)
       throw "Invalid isolated DC converter ratings";
-    super(outputVolts, outputAmps, outlets, width, height, depth, regenerativePower);
+    super(new DcVoltage(outputVolts), new DcCurrent(outputAmps), outlets, width, height, depth, regenerativePower);
     this.inputVolts = inputVolts;
     this.efficiency = efficiency;
     addPort({name: "dc", kind: ElectricalPower, role: Consumer, iface: Unspecified, required: true});
@@ -20,7 +20,7 @@ class IsolatedDcConverter extends PowerSupply {
     declareMass(massKg, new Vector(0, 0, depth / 2));
   }
   public function inputPower(watts:Float):Float {
-    if (!Math.isFinite(watts) || watts < 0 || watts > voltage * current)
+    if (!Math.isFinite(watts) || watts < 0 || watts > voltage.volts() * current.amps())
       throw "DC converter load exceeds its output rating";
     return watts / efficiency;
   }

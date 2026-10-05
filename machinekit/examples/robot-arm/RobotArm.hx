@@ -150,13 +150,13 @@ class RobotArm extends MachineAssembly {
 		// before they came from drives (2 to 4 rad/s), and the servo is the smallest generic one that carries the
 		// joint's torque: the shoulder and elbow 200 W, the wrist 50 W. j3 turns about -X, so a positive j3
 		// folds the forearm the opposite way from a positive j2.
-		// Limits are assumed industrial ranges in degrees. The elbow's connector
+		// Limits are taken from the selected arm class. The elbow's connector
 		// sets the horizontal zero; its starting coordinate preserves the former
 		// physical ready pose so cell fixtures need not move without reach evidence.
 		var initial = [0.0, 0.4, pi / 2 - 1.4, 0.0, pi - 1.8, 0.0];
 		var ratios = [250.0, 250.0, 220.0, 175.0, 175.0, 130.0];
 		specs = [for (i in 0...6) spec('j${i + 1}', reference.lowerDegrees[i] * pi / 180,
-			reference.upperDegrees[i] * pi / 180, initial[i], i < 3 ? "GENERIC-SERVO-200W" : "GENERIC-SERVO-50W", ratios[i])];
+			reference.upperDegrees[i] * pi / 180, initial[i], i < 3 ? "GENERIC-LV-SERVO-200W" : "GENERIC-LV-SERVO-50W", ratios[i])];
 		function housing(index:Int, diameter:Float, length:Float, ?flange:RobotFlange):ArmJoint {
 			var source = specs[index].gearbox;
 			var gear = new Gearbox(source.ratio, source.efficiency, diameter * 0.6, length * 0.5, 8, true);
@@ -197,13 +197,13 @@ class RobotArm extends MachineAssembly {
 		}
 		addComponent("toolFlange", toolFlange);
 		revolute(specs[5], "joint6", "tool", "toolFlange", "face");
-		addComponent("powerSupply", new PowerSupply(310, 10, 6, 180, 80, 60, 2500));
+		addComponent("powerSupply", new PowerSupply(new machinekit.power.DcVoltage(48), new machinekit.power.DcCurrent(75), 6, 180, 80, 60, 2500));
 		addMemberConnector("pedestal", "powerSupply", Solids.axial(-300, 0, 0));
 		addMate("powerSupply-mount", "fixed", "pedestal", "powerSupply", "powerSupply", "mount");
 		// Each joint's servo, through its gearbox, drives it: the limits above are what the drives deliver.
 		for (index in 0...6) {
 			var driver = 'driver${index + 1}';
-			addComponent(driver, new MotorDriver("GENERIC-AC-SERVO-AMP", 5));
+			addComponent(driver, new MotorDriver("GENERIC-LV-SERVO-AMP", new machinekit.power.PhaseRmsCurrent(32)));
 			addMemberConnector("pedestal", driver, Solids.axial(300, (index - 2.5) * 70, 0));
 			addMate('$driver-mount', "fixed", "pedestal", driver, driver, "mount");
 			connectPorts('$driver-power', "powerSupply", 'power${index + 1}', driver, "power");

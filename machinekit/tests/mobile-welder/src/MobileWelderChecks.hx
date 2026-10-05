@@ -12,7 +12,7 @@ class MobileWelderChecks {
     var defaultBase = new MobileBase(new RobotArm(false));
     if (!defaultBase.hasPort("compressedAir")) throw "Suction tool services must still pass through";
     var welding = new RobotArm(false, new ArmWeldingTool());
-    welding.replaceComponent("powerSupply", new IsolatedDcConverter(48, 310, 10, 6, 120, 60, 30, 0.95, 2, 2500));
+    welding.replaceComponent("powerSupply", new IsolatedDcConverter(48, 48, 75, 6, 120, 60, 30, 0.95, 2, 2500));
     var robot = new MobileBase(welding, 48, {length: 2400, width: 1000, payloadX: 700,
       batteryX: -600, battery: new BatteryPack(48, 25000, 1000, 600, 180, 230, 4)});
     if (robot.hasPort("compressedAir") || !robot.hasPort("torchPower")) throw "Base must expose the actual tool services";
@@ -30,7 +30,7 @@ class MobileWelderChecks {
       if (trace.indexOf("driveSupply/dc") < 0 || trace.indexOf("battery/power1") < 0)
         throw 'Wheel driver $driver bypasses the isolated drive supply';
     }
-    if (carrier.driveSupply == null || carrier.driveSupply.voltage != 48) throw "Drive supply rating is missing";
+    if (carrier.driveSupply == null || carrier.driveSupply.voltage.volts() != 48) throw "Drive supply rating is missing";
     var parents = carrier.mateParents();
     for (name in ["source", "inverter", "cylinder"]) if (parents.get(name) != "deck") throw 'Equipment $name is not carried';
     var poses = carrier.solvedPoses();

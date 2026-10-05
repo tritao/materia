@@ -525,7 +525,11 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		struct_size: u32 @offset(0) @struct_size;
 		flags: u32 @offset(4);
 		initial_pose: rk_simulation_pose @offset(8);
-		reserved: array<u64, 2> @offset(72);
+		/**
+		 * < Mounted assembly identity across controllers; zero keeps articulations separate.
+		 */
+		rest_contact_group: u64 @offset(72);
+		reserved: array<u64, 1> @offset(80);
 		virtual_device_enabled: u32 @offset(88);
 		virtual_device_step_tick_hz: u32 @offset(92);
 		virtual_device_tick_hz: u64 @offset(96);
