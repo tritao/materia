@@ -1821,3 +1821,35 @@ prepared wire orientations and checked approaches ending within 0.1 mm of their 
 six-axis preparation evidence, not an executed registration of the actual mobile CAD weldment. Saved
 mission emission/execution, actual mobile probe selection and both-backend parking-error gates remain
 open. No native build or milestone-wide app gate was run.
+
+### P3 mission integration draft (2026-10-05)
+
+The current uncommitted integration emits `findWork` after each mobile parking step and executes it
+through `FindWeldWork`/ContactRegistrationRunner. A measured root_T_work is scoped to that station;
+starting another goTo or resetting the mission clears it. Welds whose frame has a contact job require
+an accepted measurement and compose it with the same wheel estimate used by WeldSeam, cancelling
+that estimate when expressing the motion in the robot root. Registration's nominal input uses the
+wheel estimate and saved CAD assembly_T_work; live body poses are used only by clearance checks and
+test assertions, not by the registration fit or nominal prior.
+
+The saved-CAD-to-probe adapter is in an optional `machinekit-process` integration package under
+`machinekit/process`, in the `machinekit.welding` namespace. Adding ProcessKit to machinekit-robot
+would create a dependency cycle through CadBridge, so the core packages remain unchanged. ProcessKit
+owns measured sequence execution and probe motion; MachineKit supplies CAD patch selection and the
+adapter. The application wires those owners to its skill lifecycle and station frame scope.
+
+The application compiles (1,862 sources). A focused production-scene check is running: it injects a
+12/-9 mm chassis-frame translation and 0.025 rad yaw after parking, without resetting wheel odometry,
+then requires contact registration and the first weld on both backends. The first run failed before
+probing: geometrically selected broad patterns included blocked/unreachable approach endpoints.
+This draft is not a passing P3 milestone and is not landed on main.
+
+P3 candidate-screening repair: ProbePosePlanner now screens prepared approach configurations over
+its torch rolls and IK candidates, including endpoint clearance. WeldProbePatterns accepts an
+optional point predicate before selecting its broad contact pattern. A geometrically good but
+unreachable extreme no longer displaces all reachable interior points. This remains candidate
+screening: selected probes still require the complete checked approach and bounded corridor, and
+execution rechecks its actual measured start. Focused native tests pass 45 assertions; CAD tests
+pass 4,913 assertions. The mission adapter tries 9/17/33-point-per-axis lattices in order until a
+checked pattern succeeds, retaining finite search and avoiding the densest scan when unnecessary.
+The repaired focused mission check remains pending.

@@ -114,6 +114,8 @@ class WeldProbeTests {
       }
     }
     var firstStages = WeldProbePatterns.stages(work, 3, [], envelope);
+    check(WeldProbePatterns.stages(work, 3, [], envelope, 3, 9, (_, _, _) -> false).length == 0,
+      "A contact pattern cannot reuse points excluded by arm configuration screening");
     check(firstStages.length > 0, "Actual CAD supplies first-plane patterns under the complete parking envelope");
     for (stage in firstStages) {
       check(stage.points.length == 3, "First-plane patterns contain three contacts");

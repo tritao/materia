@@ -2,6 +2,7 @@ package machinekit.welding;
 
 import cadkit.modeling.Vector;
 import machinekit.welding.WeldProbeGeometry.WeldProbeFace;
+import machinekit.welding.WeldProbeParkingBounds.WeldProbeRegionBounds;
 
 /** A CAD-derived stage of a 3–2–1 registration sequence, before arm-motion feasibility checks. */
 class WeldProbeStage {
@@ -17,7 +18,8 @@ class WeldProbeStage {
 /** Select geometrically observable contact patterns from patches large enough for the current uncertainty. */
 class WeldProbePatterns {
   public static function stages(geometry:WeldProbeGeometry, count:Int, previousNormals:Array<Vector>,
-      uncertainty:WeldProbeUncertainty, clearance:Float = 3, divisions:Int = 33):Array<WeldProbeStage> {
+      uncertainty:WeldProbeUncertainty, clearance:Float = 3, divisions:Int = 33,
+      ?possible:WeldProbeFace->Vector->WeldProbeRegionBounds->Bool):Array<WeldProbeStage> {
     if (geometry == null || uncertainty == null || previousNormals == null || count < 1 || count > 3 ||
         previousNormals.length != 3 - count || !Math.isFinite(clearance) || !(clearance > 0))
       throw "Contact patterns need CAD geometry, uncertainty and a 3-2-1 sequence of independent normals";
@@ -36,6 +38,7 @@ class WeldProbePatterns {
         var approach = bounds.normalTravel + clearance;
         if (!geometry.exposedRegion(face, point, bounds.halfU + approach * bounds.tiltU,
           bounds.halfV + approach * bounds.tiltV, approach, clearance)) continue;
+        if (possible != null && !possible(face, point, bounds)) continue;
         candidates.push(point); travel = Math.max(travel, approach);
       }
       if (candidates.length < count) continue;
