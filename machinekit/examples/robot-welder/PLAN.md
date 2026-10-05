@@ -2057,3 +2057,31 @@ f02af8e5180c83403736ac94d97b8339010c5fd8 (sweep input validation).
 The updated app compiles 1,864 sources. Its production retry is running with per-probe phase
 diagnostics; no production pass is claimed yet. All builds remain compiler-only using existing
 native libraries. Main remains f4dc7456a65fb32dd2459d9a36d36dd8c80457a1; P3, P4 and P5 remain open.
+
+### P3 parking-fault publication boundary (2026-10-05)
+
+The wire-aware production run removed the two first-probe approach contacts, but one contact
+remained during the third approach. Its diagnostic retry terminated with exit 1 at that contact:
+FK matched the physical tool point within 8.968100940422724e-16 m, while the frozen clearance
+world returned null. The measured joints were 0.6676030989851316, -0.21797454761040297,
+-0.9093220264586326, -1.3662865416110088, -0.7644976321991027, 2.464939730522297.
+The stricter test now rejects unexpected touch during any checked air approach instead of
+waiting for the final touch-count assertion. Log: ignored app/build/p3-air-diagnostic.log.
+
+A focused posture replay parks the production carrier, applies that joint configuration and
+compares the sensor/FK and hull queries without executing the expensive probe selector. It
+passes: sensor/FK error 8.955206467987463e-16 m, physical touch true, grounded distance
+-0.0008329146493810356 m, wire clearance correctly rejected against work/postRight. The matching
+point-to-hull distance is -0.0008329046672925777 m and the convex wire distance is zero. This
+rules out the hypothesized wire-query or sparse-sampling explanation for the remaining contact.
+Diagnostic geometry is saved only beneath ignored app/build/p3-wire-posture.json. Its focused
+PROJECT_SOURCE_ONLY filter is mobile-welder-wire-clearance.
+
+The fault-injection test violated placeRobotBase's documented next-tick semantics: it queued
+the jump, then started findWork before the plant published it. Planning captured clearance
+against the old root pose and execution used the jumped pose. The test now advances the plant
+and sensor observers once directly after injection, before feeding the mission. It does not
+reset wheel odometry, copy the physical root into the registration prior, or reset source-clock
+epochs. A consistent post-jump observation precedes planning, while the same stale wheel pose
+and injected parking uncertainty remain inputs to contact registration. No simulation/runtime
+source change was needed. The new full registration retry is pending.
