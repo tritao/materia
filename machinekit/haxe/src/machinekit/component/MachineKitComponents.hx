@@ -15,6 +15,7 @@ class MachineKitComponents {
 		machinekit.milling.MillingComponents.register(registry);
 		machinekit.assembly.AssemblyComponents.register(registry);
 		machinekit.control.ControlComponents.register(registry);
+		registry.register(machinekit.structural.RectTubeMember.recipeType());
 		return registry;
 	}
 

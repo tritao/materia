@@ -8,6 +8,5 @@ class ControlComponents {
 		registry.register(CncController.recipeType());
 		registry.register(RobotController.recipeType());
 		registry.register(DigitalSensor.recipeType());
-		registry.register(ControllerCabinet.Support.recipeType());
 	}
 }

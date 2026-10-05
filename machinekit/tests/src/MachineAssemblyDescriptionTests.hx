@@ -286,7 +286,7 @@ class MachineAssemblyDescriptionTests {
 		var outer = new MachineAssembly();
 		outer.include("mill", spindle);
 		var restored = MachineAssembly.decode(outer.encode());
-		var motors = restored.describe().machine.motors;
+		var motors = restored.derived().motors;
 		if (motors == null || motors.length != 1 || motors[0].actuator != "mill/spindle")
 			throw "A nested rebuild dropped its spindle motor";
 		var binding = motors[0].processVelocity;
@@ -294,7 +294,7 @@ class MachineAssemblyDescriptionTests {
 			throw "A nested rebuild dropped its spindle velocity drive";
 		var two = new MachineAssembly();
 		two.include("first", spindle); two.include("second", spindle);
-		var pair = MachineAssembly.decode(two.encode()).describe().machine.motors;
+		var pair = MachineAssembly.decode(two.encode()).derived().motors;
 		if (pair == null || pair.length != 2) throw "Two included mills lost their motors";
 		var firstDrive = pair[0].processVelocity, secondDrive = pair[1].processVelocity;
 		if (firstDrive == null || secondDrive == null || firstDrive.speedChannel != "first/spindle.speed" ||
@@ -304,7 +304,7 @@ class MachineAssemblyDescriptionTests {
 		var root = MachineAssemblyDocuments.defineAssembly(document, outer);
 		var reopened = DocumentCodec.decode(DocumentCodec.encode(document), false, false);
 		var fromDocument = MachineAssemblyDocuments.rebuildAssembly(reopened.element(root.id));
-		var savedMotors = fromDocument.describe().machine.motors;
+		var savedMotors = fromDocument.derived().motors;
 		if (savedMotors == null || savedMotors.length != 1 || savedMotors[0].processVelocity == null)
 			throw "A saved nested assembly dropped its spindle velocity drive";
 		reopened.close(); document.close();
@@ -394,7 +394,7 @@ class MachineAssemblyDescriptionTests {
 
 	/** A coupling's ratio comes from the parts that drive it, so editing a part changes it. */
 	static function transmissionsFollowTheirParts():Void {
-		for (version in [2, 3, 4, 9, 10, 11, 12, 13]) {
+		for (version in [2, 3, 4, 9, 10, 11, 12, 13, 14, 15, 16]) {
 			var oldRejected = false;
 			var oldVersion:machinekit.assembly.MachineAssemblyDescription.DescriptionVersion = {schemaVersion: version};
 			var oldText = haxeon.wire.JsonWire.encode(oldVersion);

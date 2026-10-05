@@ -51,7 +51,7 @@ typedef MachineAssemblyMassProperties = {
 @:allow(machinekit.assembly)
 class MachineAssembly {
 	/** Current MachineKit assembly format; older descriptions require migration. */
-	public static inline var SCHEMA_VERSION:Int = 16;
+	public static inline var SCHEMA_VERSION:Int = 17;
 	/** Findings from rebuilding sources; invalid transmissions remain available for repair. */
 	public final diagnostics:Diagnostics = new Diagnostics();
 	final mechanical:MechanicalAssembly = new MechanicalAssembly();
@@ -697,7 +697,7 @@ class MachineAssembly {
 		var compiled = DriveSystem.compileMotors(flat);
 		for (actuator in compiled.actuators) {
 			var copy = materia.assembly.AssemblyDefinitionFlattener.copyActuator(actuator, join(prefix, actuator.id),
-				join(prefix, actuator.joint));
+				join(prefix, actuator.joint), prefix.length == 0 ? "" : prefix + "/");
 			if (actuator.encoder != null) copy.encoder = join(prefix, actuator.encoder);
 			model.actuateDrive(copy);
 		}
