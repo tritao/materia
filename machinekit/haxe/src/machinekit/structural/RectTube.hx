@@ -28,8 +28,8 @@ class RectTube implements StructuralProfile {
 
 	public function geometry(length:Float):Part {
 		if (!(length > 0)) throw "Rect tube needs a positive length";
-		var outer = Part.prism(rectangle(width, height), 0, length);
-		var inner = Part.prism(rectangle(width - 2 * wall, height - 2 * wall), -0.1, length + 0.1);
+		var outer = Solids.named(Part.prism(rectangle(width, height), 0, length), "outer");
+		var inner = Solids.named(Part.prism(rectangle(width - 2 * wall, height - 2 * wall), -0.1, length + 0.1), "bore");
 		return Solids.cut(outer, [inner]);
 	}
 

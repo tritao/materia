@@ -2147,7 +2147,7 @@ class ProjectSourceTests {
         "; sensors " + [for (sensor in finishedState.sensors.toArray()) '${sensor.sensorId}=${sensor.values.toArray()}'].join(", "));
       var stock = simulation.machiningStock();
       if (stock == null) throw "Mill has no stock";
-      var removal = (Math.PI * (121 * 7 + 2 * 25 * 5) + (96 - (4 - Math.PI) * 12.25) * 3) / 1e9;
+      var removal = (Math.PI * (121 * 7 + 2 * 25 * 5) + (144 - (4 - Math.PI) * 12.25) * 3) / 1e9;
       var deviation = stock.deviation();
       check(player.atSpeedSensorId != null, "mill waits for physical spindle readiness feedback");
       check(player.axisTrackingPeak.length == 3, "mill reports all three tracking errors");
@@ -2234,7 +2234,8 @@ class ProjectSourceTests {
       check(player.passes == 1, "enclosed mill completes one bearing-block pass");
       var stock = simulation.machiningStock();
       if (stock == null) throw "Enclosed mill lost its machining stock";
-      check(stock.removed > 3.6e-6 && stock.rapidContacts == 0 && stock.collisions == 0,
+      var removal = (Math.PI * (121 * 7 + 2 * 25 * 5) + (144 - (4 - Math.PI) * 12.25) * 3) / 1e9;
+      check(Math.abs(stock.removed - removal) < removal * 0.02 && stock.rapidContacts == 0 && stock.collisions == 0,
         "enclosed mill cuts the bearing block without rapid or holder contact");
       Sys.println('enclosed mill bearing block: ${simulation.activeSession().simulationTime()} s, ${stock.removed * 1e9} mm³ removed');
     } catch (error:Dynamic) {

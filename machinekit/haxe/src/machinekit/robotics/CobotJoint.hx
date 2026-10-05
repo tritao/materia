@@ -20,6 +20,7 @@ class CobotJoint extends GearedArmJoint implements machinekit.motion.EncoderPart
 	public final size:Int;
 	public final inputPilotDepth:Float;
 	public final gearbox:Gearbox;
+	public final motor:ServoMotor;
 	public final outputRatedTorque:Float;
 	public final outputPeakTorque:Float;
 	static var recipe:Null<ComponentType>;
@@ -40,6 +41,9 @@ class CobotJoint extends GearedArmJoint implements machinekit.motion.EncoderPart
 			rotorInertia: (size + 1) * 1e-5, encoderCounts: 131072,
 			bodyDiameter: pockets[size] - 2, bodyLength: pocketLengths[size] - 2, shaftDiameter: 8, shaftLength: 10, electrical: ServoMotor.lowVoltageWinding()}, Assumed);
 		super(diameters[size], lengths[size], pockets[size], pocketLengths[size], null, servo);
+		motor = servo;
+		// Assumed bulk mass allocation for the generic module, not vendor casing metallurgy.
+		// Sizes 2/4 allocate more package mass to the housing; size 2 uses a lighter gearhead shell.
 		setMaterial(size == 2 || size == 4 ? "steel" : "aluminium 6061");
 		this.size = size;
 		this.inputPilotDepth = inputPilotDepth;
@@ -71,7 +75,6 @@ class CobotJoint extends GearedArmJoint implements machinekit.motion.EncoderPart
 	override public function actuator(id:String, joint:String, volts:Float, margin:Float,
 			?current:Float):materia.assembly.AssemblyDefinition.AssemblyActuator {
 		var result = super.actuator(id, joint, volts, margin, current);
-		var motor:ServoMotor = cast servo;
 		var stiffness = motor.rating.peakTorque / 0.01;
 		result.servoStiffness = stiffness;
 		result.servoDamping = 2 * Math.sqrt(stiffness * motor.rating.rotorInertia);
@@ -94,7 +97,6 @@ class CobotJoint extends GearedArmJoint implements machinekit.motion.EncoderPart
 	}
 	override public function componentType():Null<ComponentType> return moduleRecipeType();
 	override public function values():ComponentValues {
-		var motor:ServoMotor = cast servo;
 		return new ComponentValues().setNumber("size", size)
 			.setNumber("speedDegrees", motor.rating.maxSpeed / RATIO * 180 / Math.PI)
 			.setNumber("inputPilotDepth", inputPilotDepth)

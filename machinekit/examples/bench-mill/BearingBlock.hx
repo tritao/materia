@@ -12,6 +12,8 @@ class BearingBlock extends MachineComponent {
 	public final width:Float;
 	public final depth:Float;
 	public final height:Float;
+	/** Assumed minimum stock ligament between recesses and at the blank perimeter. */
+	public static inline var MIN_WALL:Float = 3;
 	public static inline var SEAT_DIAMETER:Float = 22;
 	public static inline var SEAT_DEPTH:Float = 7;
 	public static inline var COUNTERBORE_DIAMETER:Float = 10;
@@ -26,18 +28,20 @@ class BearingBlock extends MachineComponent {
 	public final pocketY:Float;
 
 	public function new(width:Float, depth:Float, height:Float) {
-		if (width < 60 || depth < 40 || height <= SEAT_DEPTH) throw "Bearing-block stock is too small for its recesses";
+		if (width < 60 || depth < 60 || height <= SEAT_DEPTH) throw "Bearing-block stock is too small for its recesses";
 		super('BEARING-BLOCK-${Dimension.format(width)}x${Dimension.format(depth)}x${Dimension.format(height)}',
 			"608 bearing block, single-tool pocket exercise", "aluminium 6061", true);
 		this.width = width;
 		this.depth = depth;
 		this.height = height;
-		seatY = 0;
 		counterboreY = -depth * 0.3;
 		counterboreX = width / 3;
 		pocketWidth = width / 5;
 		pocketDepth = depth / 5;
-		pocketY = -depth * 0.3875;
+		pocketY = -depth / 2 + MIN_WALL + pocketDepth / 2;
+		seatY = 0;
+		if (seatY - SEAT_DIAMETER / 2 - pocketY - pocketDepth / 2 < MIN_WALL)
+			throw "Bearing-block depth cannot leave its required recess walls";
 	}
 	override public function hasGeometry():Bool return true;
 	override public function geometry(detail:ComponentDetail = Preview):Part {

@@ -56,7 +56,7 @@ typedef MillAxisDrive = {
 class BenchMill extends MachineAssembly {
 	public static inline var RAIL:String = "HGR15";
 	public static inline var STOCK_WIDTH:Float = 60;
-	public static inline var STOCK_DEPTH:Float = 40;
+	public static inline var STOCK_DEPTH:Float = 60;
 	public static inline var STOCK_HEIGHT:Float = 20;
 	public static inline var STEP_TICK_HZ:Int = 40000;
 	public final vise:Null<machinekit.milling.PneumaticVise>;

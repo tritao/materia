@@ -138,6 +138,15 @@ class BenchMillChecks {
 		var solid = block.geometry();
 		if (Math.abs(solid.volume() - (block.width * block.depth * block.height - block.removedVolume())) > 1)
 			throw "Bearing block removal disagrees with its solid";
+		// Material witnesses independently check the actual cut walls, rather than their construction parameters.
+		for (sample in [{x: 0.0, y: -28.5, width: 12.0, depth: 3.0},
+			{x: 0.0, y: -13.0, width: 2.0, depth: 3.0}]) {
+			var witness = Part.box(sample.width, sample.depth, 3).translated(new Vector(sample.x, sample.y, 17));
+			var material = solid.intersect(witness);
+			if (Math.abs(material.volume() - witness.volume()) > 0.001)
+				throw "Bearing-block machining leaves less than 3 mm of material at its front or seat ligament";
+			material.close(); witness.close();
+		}
 		solid.close();
 		if (mill.billOfMaterials().lines().length < 20) throw "Mill BOM lacks its drive parts";
 		trace('Bench mill geometry and CNC job passed (${mill.components().length} members)');
@@ -223,6 +232,19 @@ class EnclosedMillChecks {
 		if (headBottom < cell.opening.z + cell.openingHeight) throw "Retracted head casting crosses the doorway";
 		var vise = cell.mill.vise;
 		if (vise == null) throw "Enclosed mill has no vise";
+		var cabinet = BenchMillChecks.posed(cell, state, "cabinetBottom");
+		for (x in [-1, 1]) for (y in [-1, 1]) {
+			var id = 'cabinetLeg${x + 1}${y + 1}';
+			var leg = BenchMillChecks.posed(cell, state, id), bounds = leg.shape.bounds();
+			if (Math.abs(bounds.get_min().get_z()) > 1e-6 ||
+				Math.abs(bounds.get_max().get_z() - cabinet.shape.bounds().get_min().get_z()) > 1e-6)
+				throw "Cabinet legs must reach the floor and the cabinet bottom";
+			var pressed = leg.translated(new Vector(0, 0, 0.1)), contact = pressed.intersect(cabinet);
+			if (contact.volume() < 20) throw "Cabinet leg has no supporting contact with its bottom";
+			if (Math.abs(leg.volume() - 168000) > 0.01) throw "Cabinet leg must retain its hollow section";
+			contact.close(); pressed.close(); leg.close();
+		}
+		cabinet.close();
 		var processDefinition = state.definition;
 		if (processDefinition.schemaVersion != materia.assembly.AssemblyDefinitionCodec.VERSION)
 			throw "Enclosed mill did not keep the process-velocity schema";

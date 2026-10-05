@@ -127,6 +127,10 @@ class EnclosedBenchMill extends MachineAssembly {
 		panel("cabinetBack", 200, 2, 300, cabinetX, cabinetY + 100, cabinetZ, false);
 		panel("cabinetBottom", 200, 200, 2, cabinetX, cabinetY, cabinetZ, false);
 		panel("cabinetTop", 200, 200, 2, cabinetX, cabinetY, cabinetZ + 300, false);
+		// The cabinet has its own floor-supported welded tube legs.
+		for (x in [-1, 1]) for (y in [-1, 1])
+			fixed('cabinetLeg${x + 1}${y + 1}', new machinekit.structural.RectTubeMember(30, 30, 2, cabinetZ),
+				AssemblyFrames.translation(cabinetX + x * 80, cabinetY + y * 80, 0), "cabinetBottom");
 		fixed("cncController", new machinekit.control.CncController(4, 16, 16, 4),
 			AssemblyFrames.translation(cabinetX, cabinetY, cabinetZ + 10), "chipTray");
 		for (axis in ["X", "Y", "Z"])
