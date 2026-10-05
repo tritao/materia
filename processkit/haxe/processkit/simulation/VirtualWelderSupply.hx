@@ -18,7 +18,6 @@ class VirtualWelderSupply implements SimulationWelderSupply {
   final slot:Int;
   var sequence:Int64 = Int64.ofInt(0);
   var publicationSequence:Int64 = Int64.ofInt(0);
-  var epoch:Int = 0;
   var latest:WeldReading = {arc:false, currentA:0.0, voltageV:0.0, touch:false, fault:0, powerW:0.0};
 
   public function new(simulation:Simulation, runtime:RobotRuntime, robotIndex:Int, sensorId:String, slot:Int = 0) {
@@ -47,7 +46,11 @@ class VirtualWelderSupply implements SimulationWelderSupply {
       var values = [for (i in 0...sample.get_value_count()) value.get_values(i)];
       if (!WeldSensor.valid(values)) throw "Malformed virtual welding sensor";
       publicationSequence = Int64.add(publicationSequence, Int64.ofInt(1));
-      runtime.publishSensorFrame(sensorId, values, publicationSequence, sample.get_source_timestamp_ns(), "robotkit.device." + epoch);
+      // RKD6 joint and peripheral records carry ticks from the same board oscillator.
+      // Observe the runtime first so an endpoint reset has advanced its clock epoch.
+      runtime.snapshot();
+      runtime.publishSensorFrame(sensorId, values, publicationSequence, sample.get_source_timestamp_ns(),
+        runtime.endpoint.sourceClockId());
       sequence = sample.get_sequence(); latest = WeldSensor.reading(values);
     }
     return latest;
@@ -56,7 +59,6 @@ class VirtualWelderSupply implements SimulationWelderSupply {
   public function reset():Void {
     // The simulation recreates the board; preserve publication ordering across that device epoch.
     sequence = Int64.ofInt(0);
-    epoch++;
     latest = {arc:false, currentA:0.0, voltageV:0.0, touch:false, fault:0, powerW:0.0};
   }
 }

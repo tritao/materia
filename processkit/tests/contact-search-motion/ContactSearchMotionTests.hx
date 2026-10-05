@@ -205,8 +205,54 @@ class ContactSearchMotionTests {
         "Six-axis checked approach reaches the prepared uncertain contact pose");
     }
   }
+  static function resetEpochs():Void {
+    for (mode in 0...3) resetEpoch(mode);
+  }
+  static function resetEpoch(mode:Int):Void {
+    var fixture = axis(true);
+    var blueprint = RobotRuntimeCompiler.compile(fixture.model, new robotkit.profile.RobotProfile());
+    var channels = {arc:"torch.arc", wireSpeed:"torch.wire", voltage:"torch.voltage"};
+    blueprint.addTool(new processkit.tool.WeldChannels(channels.arc, channels.wireSpeed, channels.voltage));
+    var harness = new SimulationHarness(0.01);
+    var runtime = harness.simulation.addRobot(blueprint);
+    var robot = new SimulatedRobot("reset-probe", runtime, fixture.model.name, ["base", "tool"], ["probe"]);
+    if (mode == 0) {
+      var servo = new ServoSession(robot, fixture.arm);
+      var search = new ContactSearchRunner(servo, "torch", new Vec3(0, 0, -1), 0.04, 0.005);
+      harness.resetRobot(0);
+      var rejected = false;
+      try search.update() catch (error:Dynamic) rejected = Std.string(error).indexOf("changed epoch") >= 0;
+      check(rejected && search.search.contact == null, "Search aborts a reset even when numeric joint time repeats");
+      servo.dispose(); harness.dispose(); return;
+    }
+    var planning = WeldingPlanRunner.planning(fixture.arm, 1.0);
+    var motion = new ManipulatorMotion(robot, planning.compiler, (_) -> null, () -> runtime.pollEvents(), [0]);
+    var probe = new ContactProbeRunner(motion, new ProbeMotionPlanner(fixture.arm, planning.compiler), channels, "torch",
+      () -> new ServoSession(robot, fixture.arm));
+    var requested = new ContactProbeRequest(new Transform3(new Vec3(0, 0, 0.01), fixture.arm.tcpPose([0.0]).rotation),
+      new Vec3(0, 0, -1), 0.04);
+    if (mode == 1) {
+      probe.start(requested);
+      check(probe.failure == null, 'Reset test starts a valid probe: ${probe.failure}');
+      harness.resetRobot(0); probe.update(0.01);
+      check(probe.failure != null && probe.failure.indexOf("changed epoch") >= 0 && probe.contact == null,
+        "Probe rejects a reset across buffered approach/refinement/retreat ownership");
+      harness.dispose(); return;
+    }
+    var registration = new processkit.ContactRegistrationRunner(probe,
+      new processkit.perception.ContactRegistrationSequence(
+        new processkit.perception.ContactPoseEnvelope(Transform3.identity(), new Vec3(0, 0, 0.001), new Vec3(), 0.00001),
+        (_, _, _) -> new processkit.perception.ContactRegistrationSequence.ContactRegistrationStage(new Vec3(0, 0, 1), 0,
+          [requested, requested, requested])));
+    registration.start();
+    check(registration.failure == null, 'Reset test starts a valid registration: ${registration.failure}');
+    harness.resetRobot(0); registration.update(0.01);
+    check(registration.failure == "Contact registration joint clock changed epoch" && registration.workFrame == null,
+      'Registration never combines contact points across endpoint reset epochs: ${registration.failure}');
+    harness.dispose();
+  }
   public static function main():Void {
-    run(false, false); run(true, false); run(false, true); completeProbe(); completeProbe(true); sixAxisPreparation();
+    run(false, false); run(true, false); run(false, true); completeProbe(); completeProbe(true); sixAxisPreparation(); resetEpochs();
     Sys.println('Contact search native motion: $checks assertions passed');
   }
 }

@@ -51,9 +51,11 @@ class ContactProbeRunner {
   var search:Null<ContactSearchRunner> = null;
   var pendingContact:Null<Vec3> = null;
   var handoffAt:Int64 = Int64.ofInt(0);
+  final mappings:Null<robotkit.time.ClockMappings>;
+  var sourceClock:String = "";
 
   public function new(motion:ManipulatorMotion, planner:ProbeMotionPlanner, channels:WelderChannels,
-      sensor:String, makeServo:Void -> ServoSession) {
+      sensor:String, makeServo:Void -> ServoSession, ?mappings:robotkit.time.ClockMappings) {
     if (motion == null || planner == null || motion.compiler != planner.compiler || channels == null ||
         sensor == null || sensor.length == 0 || makeServo == null)
       throw "Contact probe needs one motion owner, its checked planner, torch channels and a fresh servo factory";
@@ -62,6 +64,7 @@ class ContactProbeRunner {
     if (channels.arc == channels.wireSpeed || channels.arc == channels.voltage || channels.wireSpeed == channels.voltage)
       throw "Contact probe torch channels must be distinct";
     this.motion = motion; this.planner = planner; this.channels = channels; this.sensor = sensor; this.makeServo = makeServo;
+    this.mappings = mappings;
   }
 
   public function running():Bool return phase != Idle && phase != Done && phase != Failed;
@@ -76,6 +79,7 @@ class ContactProbeRunner {
     if (request == null || running() || motion.running) throw "Contact probe cannot start without an idle exclusive motion owner";
     this.request = request; contact = null; failure = null;
     try {
+      sourceClock = motion.robot.snapshot().sourceClockId;
       motion.reset();
       var move = planner.approach(request.approach, positions());
       // These records precede every movement; stop policy also keeps them safe through servo ownership.
@@ -94,7 +98,7 @@ class ContactProbeRunner {
     }
     try {
       search = new ContactSearchRunner(servo, sensor, cast(request, ContactProbeRequest).direction, distance, speed,
-        0.02, 0.002, cast(request, ContactProbeRequest).contactOffset);
+        0.02, 0.002, cast(request, ContactProbeRequest).contactOffset, mappings);
     } catch (error:Dynamic) { servo.dispose(); throw error; }
   }
 
@@ -108,6 +112,7 @@ class ContactProbeRunner {
     if (!running()) return;
     if (!Math.isFinite(dt) || !(dt > 0)) throw "Contact probe update needs a positive finite duration";
     try {
+      if (motion.robot.snapshot().sourceClockId != sourceClock) throw "Contact probe joint clock changed epoch";
       var requested:ContactProbeRequest = cast request;
       switch phase {
         case Approaching | Backoff | Retreat:

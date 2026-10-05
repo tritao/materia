@@ -11,6 +11,7 @@ class ContactRegistrationRunner {
   public var failure(default, null):Null<String> = null;
   var active = false;
   var started = false;
+  var sourceClock:String = "";
 
   public function new(probe:ContactProbeRunner, sequence:ContactRegistrationSequence) {
     if (probe == null || sequence == null) throw "Contact registration runner needs a probe owner and measured sequence";
@@ -22,13 +23,18 @@ class ContactRegistrationRunner {
   public function start():Void {
     if (started || probe.running()) throw "Contact registration runner needs an idle owner and cannot be reused";
     started = true; active = true;
-    try probe.start(sequence.start()) catch (error:Dynamic) fail(Std.string(error));
+    try {
+      sourceClock = probe.motion.robot.snapshot().sourceClockId;
+      probe.start(sequence.start());
+    } catch (error:Dynamic) fail(Std.string(error));
     if (probe.failure != null) fail(cast probe.failure);
   }
 
   public function update(dt:Float):Void {
     if (!active) return;
     try {
+      if (probe.motion.robot.snapshot().sourceClockId != sourceClock)
+        throw "Contact registration joint clock changed epoch";
       probe.update(dt);
       if (probe.failure != null) throw probe.failure;
       if (!probe.completed()) return;

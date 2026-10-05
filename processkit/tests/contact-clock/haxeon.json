@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "processkit-contact-clock-tests"},
+  "entry": "ContactClockTests",
+  "sourceRoots": [".", "../contact-registration"],
+  "dependencies": {"processkit": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "build"
+}
