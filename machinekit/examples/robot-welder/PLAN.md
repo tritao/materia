@@ -1479,3 +1479,10 @@ reported as a budget failure, not proof of geometric impossibility. The focused 
 failure and direction-sensitive checks. The mobile integration checks each proposed air edge
 against both the joint-space sweep and the actual compiled exact-stop trajectory; the CAD
 station integration result remains pending.
+
+P2 scene pass interpretation is moved unchanged from MissionPlayer to `processkit.WeldScenePlan`.
+The CAD station checker and live mission runner now share process, weave, corner-normal and
+pass-offset conversion. ProcessKit depends on ProjectKit's scene data contract; ProjectKit has
+no dependency on ProcessKit, so this introduces no dependency cycle. Scene schema stays 16.
+The focused CAD station target compiles this shared conversion and uses it in full-motion checks;
+the complete mobile execution gate is still pending.

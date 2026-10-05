@@ -4,6 +4,7 @@
   "sourceRoots": ["haxe"],
   "scopeSourceRoots": false,
   "dependencies": {
+    "projectkit": { "path": "../projectkit" },
     "motionkit": { "path": "../motionkit" },
     "motionkit-robot": { "path": "../motionkit/robot" },
     "robotkit": { "path": "../robotkit" }
