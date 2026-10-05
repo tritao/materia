@@ -994,7 +994,7 @@ Dependencies:
 | W4 | Done (2026-10-04) | Whole CAD weldment: 10 seams / 680 mm in 4 runs; swept clearance and derived corner turns; 106.5 s on both backends, legs 4.9–5.1 mm; affected gates pass. Timing changes recorded above. |
 | W5 | Done (2026-10-04) | Seam-progress weave; CAD-derived pass recipes; deposited bead grounding and clearance; scene schema 16 rejects older versions; smaller restart hump. Woven 7 mm measures 6.998 mm, three-pass 10 mm measures 9.999 mm on both backends; all affected gates pass. |
 | W6 | Done (2026-10-04) | RKD6 numeric feedback and virtual welder; checked retrofit profile; Modbus map/adapter with independent ProcessKit owner; unchanged seam and all six shutdown cases pass. Full welder, arm, mobile and MachineKit smoke gates pass; phase one lands on local main. |
-| P1 | Implemented; milestone gates running (2026-10-05), branch only | Mobile welding carrier, insulated storage and converter service graph; CAD fit/mass checks and both-backend carrier movement pass. |
+| P1 | Done (2026-10-05) | Mobile welding carrier, insulated storage and converter service graph; CAD fit/mass checks and both-backend carrier movement pass. |
 | P2 | Open | Reach/clearance-derived station cover and ordered goTo/weld mission. |
 | P3 | Open | Executed touch searches and correction under injected parking error. |
 | P4 | Open | Measured load integration, voltage sag/cutoff and pre-seam docking/charging. |
@@ -1361,18 +1361,19 @@ Robot selection works on the flattened copy and does not mutate the source assem
 hulls outside the robot follow their actual simulated object poses, using the same preview-centred
 body frame as those objects; hulls on robot links keep their existing path.
 
-Validation so far: 17 power checks and the existing PowerSupplyTests pass; default MobileBaseChecks
-pass; mobile equipment fit, mass, service graph, scene and bridge selection checks pass.
-`PROJECT_SOURCE_ONLY=mobile-welder` passes on deterministic and MuJoCo: **400 mm in 2 s**, with
-battery and power source following the chassis. App compilation passes (1,840 sources). The full
-fixed-welder regression gate is running once. Because shared app integration changed, arm and mobile
-regressions and the once-per-milestone MachineKit smoke remain pending before P1's guarded main sync.
-The captured-local IR bug was avoided by using direct expressions in the inherited track-width
-method; no haxeon checkout or pin was changed.
-
-P1 gate progress: the MuJoCo whole-weldment case passes unchanged at 106.5 s, 680 mm,
-legs 4.9–5.1 mm, tip within 0.1 mm and no clearance violation. The full welder gate remains
-live; deterministic and recovery cases must finish before the arm/mobile/smoke sequence and sync.
+Validation: 17 power checks and the existing PowerSupplyTests pass; default MobileBaseChecks
+and the mobile equipment fit, mass, service graph, scene and bridge-selection checks pass.
+Final `PROJECT_SOURCE_ONLY=mobile-welder` passes on deterministic and MuJoCo: **400 mm in 2 s**,
+with the battery and power source following the chassis (66 component records, including drive
+isolation). App compilation passes (1,840 sources). The full fixed-welder gate completes with
+exit 0: whole-weldment cycle **106.5 s**, 10 seams / 680 mm, legs **4.9–5.1 mm**, tip within
+0.1 mm and no clearance violation on both backends. Single seam is 20.6 s, recovery 21.1 s with
+one restart, woven 7 mm measures 6.998 mm, and three-pass 10 mm measures 9.999 mm. These match
+the W5/W6 baselines and their previously recorded timing corrections.
+Shared-app regressions pass: arm mission **23.5 s**; mobile handling round **61 s**;
+mobile obstacle round **65 s**, one replan, closest 416 mm. MachineKit smoke passes with exit 0, including the mobile carrier checks. All P1 gates pass;
+the milestone is ready for the guarded main sync. The captured-local IR bug was avoided by using direct
+expressions in the inherited track-width method; no haxeon checkout or pin was changed.
 
 P1 commits so far (since the W6 landing):
 
@@ -1389,4 +1390,21 @@ P1 drive-isolation completion: the wheel drivers now receive 48 V through a dedi
 DC converter, matching the phase-2 hardware contract. The optional converter belongs to the reusable
 base layout; the default base remains directly battery-fed. Posed-solid fit and service tracing
 pass with the additional 2 kg component. The full fixed-welder gate completed with exit 0;
-both three-pass checks measure 9.999 mm at 65.55 s. Carrier, arm, mobile and smoke gates follow.
+both three-pass checks measure 9.999 mm at 65.55 s. Carrier, arm, mobile and smoke gates now all pass.
+
+### P2 station-planning design
+
+Station policy belongs in ProcessKit; MachineKit supplies CAD seams, mounted-arm geometry and
+posed collision bodies. A finite candidate grid is derived around the weldment with spacing and
+standoff documented as planning parameters. Each accepted coverage relation must prove the actual
+torch angles, whole path, approach and retreat reachable and clear; sampling only endpoints is
+insufficient. Navigation feasibility and transition costs use the same footprint/map as execution.
+Select the minimum number of stations over this explicit candidate set, then minimize feasible
+route cost among equal-cardinality covers. This is not a claim of a global continuous optimum.
+Uncovered seams or disconnected covers fail with a reason; the mission never silently drops work.
+Within each station, retain the existing weld-run ordering and direction policy. The output uses
+existing goTo/weld steps, so planning alone does not require a saved-format schema change.
+
+P1 final commits: `fd2845b0f7282a907a25e37eac2ada846415191b` records the carrier decisions;
+`3941a1a7e52b011b30da24db8e4d04668d78b2fa` isolates the mobile welding wheel drive supply.
+P2–P5 remain required and open; carrier movement is not proof of a mobile welding mission.
