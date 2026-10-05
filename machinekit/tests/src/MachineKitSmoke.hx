@@ -11,6 +11,7 @@ import MobileBasePreview.MobileBaseChecks;
 import RobotWelderPreview.RobotWelderChecks;
 import CoreXyPlotterPreview.CoreXyPlotterChecks;
 import GantryPickerPreview.GantryPickerChecks;
+import TrackArmPreview.TrackArmChecks;
 import machinekit.assembly.AssemblyPreview;
 import machinekit.assembly.LinearAxis;
 import machinekit.assembly.MachineAssembly;
@@ -2553,6 +2554,7 @@ class MachineKitSmoke {
 		GantryChecks.run();
 		RotaryHeadCheck.run();
 		LinearTrackCheck.run();
+		TrackArmChecks.run();
 		GantryPickerChecks.run();
 		EndEffectorTests.run();
 		EndEffectorSetTests.run();

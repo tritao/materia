@@ -8,6 +8,11 @@ class MotionKitBootstrapTests {
     var kinematicsTests:KinematicsTests = new KinematicsTests();
     var processTests:ProcessTests = new ProcessTests();
 
+    if (Sys.getEnv("MOTIONKIT_POSTURE_ONLY") == "1") {
+      programTests.testExternalPathPosture();
+      Sys.println('External path posture tests passed (${MotionKitTestSupport.assertions} assertions)');
+      return;
+    }
     if (Sys.getEnv("MOTIONKIT_FREEDOM_ONLY") == "1") {
       var tests = new ToolFreedomTests();
       tests.testFreeSpinPath();
@@ -94,6 +99,7 @@ class MotionKitBootstrapTests {
       kinematicsTests.testKinematicsContract();
       programTests.testProgramCompiler();
       programTests.testRedundantArmPaths();
+      programTests.testExternalPathPosture();
       programTests.testCoordinatedExternalAxes();
       kinematicsTests.testPathConfigurationSelector();
       Sys.println('Redundancy focused tests passed (${MotionKitTestSupport.assertions} assertions)');
@@ -134,6 +140,7 @@ class MotionKitBootstrapTests {
     programTests.testMotionProgramContracts();
     programTests.testProgramCompiler();
     programTests.testRedundantArmPaths();
+    programTests.testExternalPathPosture();
     programTests.testCoordinatedExternalAxes();
     programTests.testProgramStartTolerances();
     programTests.testProgramPlanner();

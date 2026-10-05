@@ -502,6 +502,15 @@ class MissionPlayer implements SessionMember {
   /** After a tick: a finished step hands over to the next, a failed one stops the mission. */
   function settle():Void switch runner.status() {
     case Succeeded:
+      // Different motion runners own their last commanded coordinates. A joint
+      // move changes the handling station; a handling/process step invalidates
+      // cached joint-move anchors before another controller takes over.
+      if (mission.steps[stepIndex].kind == "moveJoints") {
+        var make = newHandling;
+        if (make != null) handling = make();
+      } else {
+        jointMotions = new Map<String, ManipulatorMotion>();
+      }
       completed++;
       if (stepIndex + 1 < mission.steps.length || mission.loop == true)
         stepIndex = (stepIndex + 1) % mission.steps.length;

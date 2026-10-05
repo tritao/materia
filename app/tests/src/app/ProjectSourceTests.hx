@@ -1073,6 +1073,97 @@ class ProjectSourceTests {
    * reaches the leg the weldment asked for along the seam's length. A second run loses the arc part-way: the weld is
    * interrupted, the torch re-approaches and restarts with an overlap, and the bead is continuous.
    */
+  static function checkTrackArm(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/track-arm/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var session = new ProjectDocumentSession(null, false);
+    session.openGeneratedProject(generated, manifest);
+    var simulation = new ApplicationSimulation(new RobotWorld());
+    simulation.setBackend(ApplicationSimulation.MUJOCO);
+    try {
+      check(simulation.rebuild(session.sensors, session.scene, session), "track arm builds: " + simulation.error);
+      var mission = simulation.missionPlayer();
+      if (mission == null || mission.handling == null) throw "Track arm has no handling mission";
+      var indices = mission.handling.motion.jointIndices;
+      check(indices.length == 7 && mission.robot.model.joints[indices[0]].name == "track",
+        "track leads six logical arm joints");
+      var travel = 0.0, lastDone = 0;
+      while (!mission.finished && simulation.activeSession().simulationTime() < 180) {
+        simulation.step();
+        check(mission.failure == null, "track positioning mission: " + mission.failure);
+        var positions = mission.robot.robot.snapshot().positions;
+        travel = Math.max(travel, positions.get(indices[0]));
+        if (mission.completed > lastDone) {
+          Sys.println('track arm positioning step ${mission.completed}: ${simulation.activeSession().simulationTime()} s, track ${positions.get(indices[0])} m');
+          lastDone = mission.completed;
+        }
+      }
+      check(mission.finished && mission.completed == 6, "both track stations complete");
+      check(travel >= 2.9, "track carries the arm between table stations");
+      var work = [for (part in simulation.capturePresentationSnapshot().environment) if (part.id == "project:workpiece") part];
+      check(work.length == 1 && Math.abs(work[0].position[0] - 2.85) < 0.005, "part reaches the far landing pad");
+      var make = mission.newHandling;
+      if (make == null) throw "Track arm cannot create coordinated motion";
+      var runner = make();
+      check(Math.abs(runner.home[0] - 3.0) < 0.001, "handling retains its current external station");
+      checkTrackArmPath(simulation, mission, runner.motion);
+    } catch (error:Dynamic) { simulation.clear(); session.dispose(); throw error; }
+    simulation.clear(); session.dispose();
+    checkWholeWeldment(root, ApplicationSimulation.MUJOCO, "track MuJoCo", "track-arm");
+  }
+
+  static function checkTrackArmPath(simulation:ApplicationSimulation, mission:MissionPlayer,
+      motion:motionkit.robot.ManipulatorMotion):Void {
+    var solver = motion.compiler.solver;
+    var entry = [0.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+    motion.run(new motionkit.program.MotionProgram([
+      motionkit.program.MotionOp.MoveJ(motionkit.program.MoveTarget.JointTarget(entry),
+        new motionkit.MotionOptions(), motionkit.program.Blend.ExactStop)]));
+    var limit = simulation.activeSession().simulationTime() + 60;
+    while (!motion.completed && motion.failure == null && simulation.activeSession().simulationTime() < limit) {
+      motion.update(simulation.timestep); simulation.step();
+    }
+    check(motion.completed && motion.failure == null, "track coordinated entry: " + motion.failure);
+    var start = solver.forward(entry);
+    var stop = new motionkit.kinematics.Pose3(start.x + 2.6, start.y, start.z, start.qx, start.qy, start.qz, start.qw);
+    var path = new motionkit.path.PosePath(motionkit.robot.HandlingPlanRunner.FRAME, [new motionkit.path.PoseLine(
+      new motionkit.path.PoseWaypoint(start, 0.002, 0.02), new motionkit.path.PoseWaypoint(stop, 0.002, 0.02),
+      motionkit.path.OrientationPolicy.FreeAboutTool, 0.1, 0.08)]);
+    // 1.2 m conservatively bounds this arm's links, joint housings and tool reach.
+    check(path.length() > 2 * 1.2, "coordinated path exceeds twice the arm's reach");
+    var kinematics:motionkit.robot.ManipulatorKinematics = cast solver;
+    kinematics.preferredPosture = entry;
+    check(kinematics.manipulator.external[0] && kinematics.manipulator.swivel == null,
+      "coordinated planning derives the track without inventing a swivel");
+    motion.run(new motionkit.program.MotionProgram([
+      motionkit.program.MotionOp.FollowPath(path, motionkit.robot.HandlingPlanRunner.FRAME, 0.08, [])]));
+    var worst = 0.0, margin = Math.POSITIVE_INFINITY, jump = 0.0, previous = entry.copy(), last = entry.copy();
+    limit = simulation.activeSession().simulationTime() + 120;
+    while (!motion.completed && motion.failure == null && simulation.activeSession().simulationTime() < limit) {
+      motion.update(simulation.timestep); simulation.step();
+      var feedback = mission.robot.robot.snapshot().positions;
+      last = [for (index in motion.jointIndices) feedback.get(index)];
+      var tip = mission.toolContact();
+      var along = Math.max(0.0, Math.min(2.6, tip.x - start.x));
+      worst = Math.max(worst, Math.sqrt(Math.pow(tip.x - start.x - along, 2) + Math.pow(tip.y - start.y, 2) + Math.pow(tip.z - start.z, 2)));
+      for (index in 1...7) {
+        var bound = kinematics.manipulator.group.limitsOf(index);
+        margin = Math.min(margin, Math.min(last[index] - bound.lower, bound.upper - last[index]));
+        jump = Math.max(jump, Math.abs(last[index] - previous[index]));
+      }
+      check(-1.4 + last[3] < -0.2, "coordinated path retains its elbow branch");
+      check(Math.abs(last[6] - entry[6]) < 1.0, "coordinated path retains its wrist winding");
+      previous = last.copy();
+    }
+    check(motion.completed && motion.failure == null, "track coordinated path: " + motion.failure);
+    var end = mission.toolContact();
+    check(Math.sqrt(Math.pow(end.x - stop.x, 2) + Math.pow(end.y - stop.y, 2) + Math.pow(end.z - stop.z, 2)) < 0.002, "coordinated TCP reaches its endpoint within 2 mm");
+    check(worst < 0.002, 'track path error stays within 2 mm ($worst m)');
+    check(last[0] - entry[0] > 0.8 * 2.6, "track supplies most of the coordinated travel");
+    check(margin > 0.15 && jump < 0.05, 'arm retains 0.15 rad posture margin without branch jumps ($margin margin, $jump jump)');
+    Sys.println('track arm coordinated: 2.6 m path, ${last[0] - entry[0]} m track travel, ${worst * 1000} mm error, $margin rad posture margin, $jump rad maximum joint step');
+  }
+
   static function checkRobotWelder(root:String):Void {
     checkWholeWeldment(root, ApplicationSimulation.MUJOCO, "MuJoCo");
     checkWholeWeldment(root, ApplicationSimulation.DETERMINISTIC, "test backend");
@@ -1175,7 +1266,7 @@ class ProjectSourceTests {
    */
   static function checkWholeWeldment(root:String, backend:Int, label:String, example:String = "robot-welder"):Void {
     var onlyStep = example == "gantry-welder" ? Sys.getEnv("GANTRY_WELD_ONLY_STEP") : null;
-    var cell = openWelder(root, "materia.project.json", onlyStep == null ? null : function(generated) {
+    var cell = openWelder(root, example == "track-arm" ? "materia.welder.project.json" : "materia.project.json", onlyStep == null ? null : function(generated) {
       var mission:materia.project.SceneArtifact.SceneArtifactMission = cast generated.mission;
       var index = Std.parseInt(onlyStep);
       if (index == null || index < 0 || index >= mission.steps.length) throw "Invalid gantry weld step filter";
@@ -1183,13 +1274,16 @@ class ProjectSourceTests {
     }, backend, example);
     var simulation = cell.simulation, mission = cell.mission, welder = cell.welder, beads = cell.beads;
     var steps = mission.mission.steps;
-    var expectedRuns = onlyStep == null ? 4 : 1;
+    var expectedRuns = onlyStep == null && example != "track-arm" ? 4 : 1;
     check(steps.length == expectedRuns, 'the weld mission has $expectedRuns runs, got ${steps.length}');
     var seams = 0;
     for (step in steps) seams += cast(step.weld, materia.project.SceneArtifact.SceneArtifactWeld).path.length;
-    check(seams == (onlyStep == null ? 10 : cast(steps[0].weld, materia.project.SceneArtifact.SceneArtifactWeld).path.length), 'the runs hold the requested CAD seams, got $seams');
+    check(seams == (onlyStep == null && example != "track-arm" ? 10 : cast(steps[0].weld, materia.project.SceneArtifact.SceneArtifactWeld).path.length), 'the runs hold the requested CAD seams, got $seams');
     var strayed = 0.0, nearest = 1e9, wireError = 0.0;
     var violation:Null<String> = null;
+    var trackStart:Null<Float> = null, trackLast = 0.0;
+    var armMargin = Math.POSITIVE_INFINITY, armJump = 0.0;
+    var previousArm:Null<Array<Float>> = null;
     var restarts = 0, done = 0, tick = 0;
     var finished:Array<Float> = [];
     var limit = simulation.activeSession().simulationTime() + 600;
@@ -1219,10 +1313,24 @@ class ProjectSourceTests {
         nearest = Math.min(nearest, best);
         if (welder.reading().arc) {
           strayed = Math.max(strayed, best);
-          if (example == "gantry-welder") {
+          if (example == "gantry-welder" || example == "track-arm") {
             var welding:processkit.WeldingPlanRunner = cast mission.welding;
             var motion = welding.motion;
             var observed = mission.robot.robot.snapshot();
+            if (example == "track-arm") {
+              var solver:motionkit.robot.ManipulatorKinematics = cast motion.compiler.solver;
+              check(solver.manipulator.external[0] && solver.manipulator.swivel == null,
+                "track welding derives one external axis without a swivel");
+              var q = [for (index in motion.jointIndices) observed.positions.get(index)];
+              if (trackStart == null) trackStart = q[0];
+              trackLast = q[0];
+              for (index in 1...7) {
+                var bound = solver.manipulator.group.limitsOf(index);
+                armMargin = Math.min(armMargin, Math.min(q[index] - bound.lower, bound.upper - q[index]));
+                if (previousArm != null) armJump = Math.max(armJump, Math.abs(q[index] - previousArm[index]));
+              }
+              previousArm = q;
+            }
             var seam:motionkit.path.PosePath = cast welding.seam;
             var desired = seam.poseAt(welding.travelled());
             var actual = motion.compiler.solver.forward([for (index in motion.jointIndices) observed.positions.get(index)]);
@@ -1242,10 +1350,19 @@ class ProjectSourceTests {
     check(mission.finished && mission.failure == null, '$label: the whole weldment is welded within $time s: ${mission.failure}');
     check(done == expectedRuns, '$label: $expectedRuns welds finished, got $done');
     check(violation == null, '$label: no clearance violation along the way: $violation');
-    if (example == "gantry-welder") check(wireError <= 2 * Math.PI / 180,
+    if (example == "gantry-welder" || example == "track-arm") check(wireError <= 2 * Math.PI / 180,
       '$label: work/travel directions stay within 2 degrees of the authored process wire axis ($wireError rad)');
     check(restarts == 0, '$label: the weldment is welded without losing the arc ($restarts restarts)');
     check(strayed < 0.0015, '$label: the wire tip stayed within ${strayed * 1000} mm of the seams while the arc burned');
+    if (example == "track-arm") {
+      Sys.println('track weld: ${Math.abs(trackLast - (trackStart == null ? 0.0 : trackStart))} m track travel, $armMargin rad posture margin, $armJump rad maximum joint step');
+      check(trackStart != null && Math.abs(trackLast - (trackStart == null ? 0.0 : trackStart)) > 0.7 * 2.6,
+        'track carries at least 70% of the 2.6 m weld ($trackStart to $trackLast m)');
+      check(armMargin > 0.15 && armJump < 0.05,
+        'track welding keeps 0.15 rad arm margin without IK branch jumps ($armMargin margin, $armJump jump)');
+      check(beads.beads.length == 1 && beads.beads[0].bead.length > 2 * 1.2,
+        "CAD weld seam exceeds twice the conservative 1.2 m arm reach");
+    }
     var legs:Array<String> = [];
     var lengths:Array<String> = [];
     for (entry in beads.beads) {
@@ -2536,6 +2653,14 @@ class ProjectSourceTests {
       checkCoreXyPlotter(root);
       return 0;
     }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "track-weld") {
+      checkWholeWeldment(root, ApplicationSimulation.MUJOCO, "track MuJoCo", "track-arm");
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "track-arm") {
+      checkTrackArm(root);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "gantry-welder") {
       checkGantryWelder(root);
       return 0;
@@ -2915,6 +3040,7 @@ class ProjectSourceTests {
     checkGantryPicker(root);
     checkGantryPicker(root, true);
     checkGantryWelder(root);
+    checkTrackArm(root);
     checkRobotWelder(root);
     checkMates(root);
     checkBenchMill(root);

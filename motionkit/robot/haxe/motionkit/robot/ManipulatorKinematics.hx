@@ -223,6 +223,7 @@ class ManipulatorKinematics implements RedundantPathSolver {
     if (named == null || (uniform && fullyConstrained(request.startQ, freedom)))
       return new PathSolution(request.followPointByPoint(this));
     named.preferringOrientation(preferredOrientation, preferTargetOrientation);
+    named.preferringPosture(preferredPosture);
     return new RedundancyResolver(named).solve(this, request);
   }
 

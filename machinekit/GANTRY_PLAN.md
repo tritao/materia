@@ -568,7 +568,7 @@ G0 → G1 → G2 → G3 ──────────────────�
 | G14 | complete; Phase D build/runtime gate passed | `7822171b5`, `58075ec63`; see progress notes |
 | G15 | complete; four-run/ten-seam MuJoCo mission and Phase D gate passed | see progress notes |
 | G16 | complete; focused FK, solid/runtime clearance, drive and ownership checks passed | see progress notes |
-| G17 | planned | — |
+| G17 | complete | Two-station handling, 2.6 m FollowPath and CAD fillet pass; Phase E app gate pending. |
 | G18 | planned | — |
 
 ### G0 — merged-base baseline (2026-10-04)
@@ -3822,3 +3822,44 @@ leader body may now meet the fixed drive body; only individual hull pairs touchi
 at reference receive the existing interface exemption. The same fixed link's separate
 obstacle remains checked. Focused RobotKit clearance passes 40 assertions, including
 that obstacle regression. G17 follows; no full suites were run at this step.
+
+
+### G17 — track arm and coordinated process mode
+
+`examples/track-arm` includes the whole six-axis `RobotArm` on the 3 m
+`LinearTrack`. The default project picks at the near station, carries the loaded
+arm to the far station, and places the workpiece. A second project,
+`materia.welder.project.json`, equips the arm with the existing welding tool and
+welds one CAD-derived 2.6 m, 5 mm-leg fillet on a long T-joint. Service connections
+and equipment limits use the same welding model as the Phase D cells.
+
+The positioning test exposed a stale motion anchor when a joint-positioning step
+handed control back to the handling runner. MissionPlayer now refreshes handling
+after positioning and invalidates cached joint-move anchors after other actors
+move the robot. Handling's home keeps external axes at their current station while
+returning the arm to its saved posture.
+
+Focused positioning completes all six steps in 15.68 simulated seconds, including
+the loaded 3 m transfer. The plain coordinated 2.6 m FollowPath passes 2 mm path
+and endpoint tolerance, with 2.59979 m supplied by the track, 0.7584 rad minimum
+arm limit margin, and no elbow/wrist branch or winding changes. The process variant
+checks actual arc-on travel, wire direction, clearance, arm margin and joint
+continuity, deposited leg and full bead coverage. The process run passes with
+2.599999 m of track travel, 0.7754 rad minimum arm limit margin and 0.00001774 rad
+maximum joint step. Its 236.6-second simulated cycle deposits the entire 2600 mm
+seam at the requested 5 mm leg, with no arc restart or clearance violation.
+Planning remains expensive: 689.93 seconds and 224878 checked poses.
+
+The first coordinated weld reached an arm joint limit despite a clear, accurate
+path. `WeldingPlanRunner` now gives external-axis groups their current working
+posture as a preference, and whole-path redundancy planning carries that preference
+through both the held-parameter solve and its fallback. External axes supply the
+remaining travel while the hard TCP position and wire direction remain enforced.
+A focused regression fails when posture forwarding is removed and passes three
+assertions with it restored. Ordinary groups retain their existing behavior when
+no posture is requested.
+
+The full MachineKit, RobotKit (5061), CadBridge (173), Toolpath Motion
+(12/2/12/3008), ProcessKit and native CTest (19/19) gates pass. After the posture
+fix, affected compiler-only builds pass and CadBridge/Toolpath Motion/ProcessKit
+runtime suites pass again. The final MotionKit and app gates remain pending.

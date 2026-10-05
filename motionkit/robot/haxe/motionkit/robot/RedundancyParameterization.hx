@@ -13,6 +13,8 @@ import motionkit.kinematics.Pose3;
 interface RedundancyParameterization {
   /** Sets the soft orientation preference; preferTarget uses each target when preference is null. */
   function preferringOrientation(preference:Null<Pose3>, ?preferTarget:Bool):Void;
+  /** Sets the arm posture preference, leaving external axes free to supply the remaining motion. */
+  function preferringPosture(preference:Null<Array<Float>>):Void;
   /** How many values name the redundancy. */
   function dimension():Int;
   /** The values at `q`, or null where they are undefined (e.g. a straight elbow). */

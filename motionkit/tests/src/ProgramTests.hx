@@ -342,6 +342,34 @@ class ProgramTests extends MotionKitTestSupport {
   }
 
   /** D6: a path on a turning workpiece, planned over the arm, its rail and the positioner as one plan. */
+  public function testExternalPathPosture():Void {
+    var fixture = buildWorkcellFixture();
+    var flange = [for (frame in fixture.model.frames) if (frame.name == "flange") frame][0];
+    // The last wrist axis is local +Y; make it the tool's free wire axis.
+    flange.rotation = [-Math.sqrt(0.5), 0.0, 0.0, Math.sqrt(0.5)];
+    var work = [for (frame in fixture.model.frames) if (frame.name == "work") frame][0];
+    var group = new robotkit.manipulation.KinematicGroup(fixture.model, fixture.model.links[0].id,
+      flange.id, work.id, null, null, null);
+    var solver = new ManipulatorKinematics(group, 1e-8);
+    var preferred = [0.75, 1.57, -1.2, 1.6, -1.97, -1.57, 0.0, 0.0];
+    var start = preferred.copy(); start[6] = 0.5;
+    solver.preferredPosture = preferred;
+    var target = solver.forward(preferred);
+    var route = solver.solvePath(new motionkit.kinematics.PathRequest([0.0, 0.05],
+      [solver.forward(start), target], start, new IkTolerance(), [for (_ in 0...8) 1.0],
+      [for (_ in 0...8) 1.0], 4, [OrientationPolicy.FreeAboutTool, OrientationPolicy.FreeAboutTool]));
+    var end = route[1];
+    check(end != null && Math.abs(end[6]) < 0.01,
+      "whole-path external redundancy retains the requested arm posture instead of the seed's wrist winding");
+    if (end != null) {
+      var reached = solver.forward(end);
+      check(Math.sqrt(Math.pow(reached.x - target.x, 2) + Math.pow(reached.y - target.y, 2) +
+        Math.pow(reached.z - target.z, 2)) < 1e-4, "posture preference preserves the hard TCP target");
+      check(motionkit.robot.ToolFreedom.orientationError(reached, target, OrientationPolicy.FreeAboutTool) < 0.001,
+        "posture preference preserves the hard wire direction");
+    }
+  }
+
   public function testCoordinatedExternalAxes():Void {
     var fixture = buildWorkcellFixture();
     var cell = fixture.group;

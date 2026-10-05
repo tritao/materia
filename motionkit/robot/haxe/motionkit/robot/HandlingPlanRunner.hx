@@ -47,7 +47,11 @@ class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
     planning.requireGroup(manipulator);
     var limits = planning.validation();
     var solver = new ManipulatorKinematics(manipulator, 1e-8);
-    var home = [for (_ in 0...count) 0.0];
+    var indices = [for (target in manipulator.toJointTargets([for (_ in 0...count) 0.0])) target.joint];
+    var positions = robot.snapshot().setpointPositions;
+    // A positioning axis stays at its current station while the arm returns
+    // to its home posture. Arm coordinates remain relative to the saved pose.
+    var home = [for (index in 0...count) manipulator.external[index] ? positions.get(indices[index]) : 0.0];
     solver.preferredOrientation = solver.forward(home);
     var compiler = new ProgramCompiler(solver, limits, FRAME,
       planning.velocity, planning.acceleration, planning.jerk,
@@ -55,9 +59,8 @@ class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
       null, 0.0075, 0.2, 0.002, 0.02, new IkTolerance(2e-3, 5e-3, 300, 0.03));
     compiler.planningAssumptions = planning.assumptions.copy();
     compiler.planCheck = planning.check();
-    var indices = [for (target in manipulator.toJointTargets([for (_ in 0...count) 0.0])) target.joint];
     var motion = new ManipulatorMotion(robot, compiler, function(_) return null, eventSource, indices);
-    // Joint values are relative to the robot's starting pose, so home is all zeros.
+    // Arm joint values are relative to the robot's starting pose.
     return new HandlingPlanRunner(motion, channel, home, solver.forward(home), approachHeight, travelSpeed,
       contactSpeed, dwell, pressDepth);
   }

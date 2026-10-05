@@ -182,7 +182,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
   }
 
   /**
-   * An arm's welding runner. `channels` are the torch's; `maxAcceleration` the joint acceleration programs plan with.
+   * An arm's welding runner. `channels` are the torch's; `limits` supplies the drive-derived caps in joint order.
    * `clearance`, when given, is what the welds are planned to be clear of the work with (`WeldPathPlanner`).
    */
   public static function create(robot:Robot, manipulator:KinematicGroup,
@@ -192,6 +192,12 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     var count = manipulator.group.count();
     var compiler = checked.compiler;
     var indices = [for (target in manipulator.toJointTargets([for (_ in 0...count) 0.0])) target.joint];
+    // External axes bring the seam to the arm's working posture. Carry the
+    // preference through point IK and the whole-path redundancy search.
+    if (manipulator.external.indexOf(true) >= 0) {
+      var positions = robot.snapshot().setpointPositions;
+      cast(compiler.solver, ManipulatorKinematics).preferredPosture = [for (index in indices) positions.get(index)];
+    }
     // The program waits on the established arc, which the welder's reading says.
     var latest = new LatestReading();
     var motion = new ManipulatorMotion(robot, compiler, function(channel) return channel == ARC_ESTABLISHED

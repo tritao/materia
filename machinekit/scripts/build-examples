@@ -14,3 +14,5 @@ haxeon="$materia_root/haxeon/scripts/haxeon"
 "$haxeon" build --project "$repo_root/examples/gantry-picker/haxeon.json"
 
 "$haxeon" build --project "$repo_root/examples/gantry-welder/haxeon.json"
+
+"$haxeon" build --project "$repo_root/examples/track-arm/haxeon.json"
