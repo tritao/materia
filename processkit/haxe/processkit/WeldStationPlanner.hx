@@ -32,6 +32,21 @@ class WeldStationPlan {
  * The caller orders weld runs within each returned station using the existing weld planner.
  */
 class WeldStationPlanner {
+  /**
+   * Use a conservative cheap screen first, then prove only the selected coverage edges.
+   * The screen may reject only when it establishes that the motion is impossible.
+   * A null screen result is provisional; it never substitutes for the full motion check.
+   * Failed edges are removed and selection repeats. A successful optimistic minimum cover is
+   * also a minimum proven cover: rejecting other provisional edges cannot improve its count/cost.
+   */
+  public static function verified(required:Array<String>, candidates:Array<WeldStationCandidate>, start:Pose2,
+      screen:(WeldStationCandidate, String) -> Null<String>,
+      verify:(WeldStationCandidate, String) -> Null<String>,
+      route:(Pose2, Pose2) -> Null<Float>):WeldStationPlan {
+    if (screen == null || verify == null) throw "Verified station planning requires a screen and full motion check";
+    return new StationVerification(screen, verify).solve(required, candidates, start, route);
+  }
+
   public static function plan(required:Array<String>, candidates:Array<WeldStationCandidate>, start:Pose2,
       access:(WeldStationCandidate, String) -> Null<String>,
       route:(Pose2, Pose2) -> Null<Float>):WeldStationPlan {
@@ -49,6 +64,51 @@ class WeldStationPlanner {
     }
     if (required.length == 0) return new WeldStationPlan([], [], 0);
     return new StationSearch(required, candidates, start, access, route).solve();
+  }
+}
+
+private class StationVerification {
+  final screen:(WeldStationCandidate, String) -> Null<String>;
+  final verify:(WeldStationCandidate, String) -> Null<String>;
+  final screened:Map<String, Map<String, Null<String>>> = new Map();
+  final verified:Map<String, Map<String, Null<String>>> = new Map();
+
+  public function new(screen:(WeldStationCandidate, String) -> Null<String>, verify:(WeldStationCandidate, String) -> Null<String>) {
+    this.screen = screen;
+    this.verify = verify;
+  }
+
+  function results(table:Map<String, Map<String, Null<String>>>, id:String):Map<String, Null<String>> {
+    var found = table.get(id);
+    if (found != null) return found;
+    var made:Map<String, Null<String>> = new Map();
+    table.set(id, made);
+    return made;
+  }
+
+  function access(station:WeldStationCandidate, seam:String):Null<String> {
+    var full = results(verified, station.id);
+    if (full.exists(seam)) return full.get(seam);
+    var cheap = results(screened, station.id);
+    if (!cheap.exists(seam)) cheap.set(seam, screen(station, seam));
+    return cheap.get(seam);
+  }
+
+  public function solve(required:Array<String>, candidates:Array<WeldStationCandidate>, start:Pose2,
+      route:(Pose2, Pose2) -> Null<Float>):WeldStationPlan {
+    while (true) {
+      var plan = WeldStationPlanner.plan(required, candidates, start, access, route);
+      var complete = true;
+      for (index in 0...plan.stations.length) {
+        var station = plan.stations[index];
+        var full = results(verified, station.id);
+        for (seam in plan.seams[index]) {
+          if (!full.exists(seam)) full.set(seam, verify(station, seam));
+          if (full.get(seam) != null) complete = false;
+        }
+      }
+      if (complete) return plan;
+    }
   }
 }
 

@@ -1437,3 +1437,12 @@ an external weld mission builds, both motion and deposition follow a live 12/-8 
 the carrier's ready pose clears, and putting the external base plate through the torch produces a
 clearance violation naming that workpiece. App compiler-only build passes (1,842 sources).
 The complete mobile weld execution and once-per-P2 full welder/arm/mobile gates remain pending.
+
+P2 planning cost: station selection now supports conservative screening followed by deferred
+full-motion verification of every assigned station/seam edge. Rejected full checks remove edges
+and rerun exact selection; proven edges are cached. A successful minimum optimistic cover is also
+minimum over proven feasible covers, since removing other provisional edges cannot improve its
+count or route cost. Screens may reject only impossible edges, not merely unproven ones.
+The focused station suite passes 37 checks, including a provisional one-station cover whose
+swept entry fails, retry to a proven two-station cover, cached full checks and no unverified
+assignment. This is an optimization of proof order, not a substitute for swept motion checks.

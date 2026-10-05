@@ -61,6 +61,22 @@ class WeldStationTests {
     WeldStationPlanner.plan(seams, candidates, new Pose2(), access, counted);
     for (count in calls) check(count == 1, "Each needed navigation edge is computed only once");
     check(!calls.exists("0>10"), "Navigation does not plan routes to candidates outside a minimum cover");
+    var fullCalls = new Map<String, Int>();
+    function prove(station:WeldStationCandidate, seam:String):Null<String> {
+      var key = station.id + ":" + seam;
+      var before = fullCalls.get(key);
+      fullCalls.set(key, before == null ? 1 : before + 1);
+      return station.id == "greedy" ? "swept entry collision" : access(station, seam);
+    }
+    var proven = WeldStationPlanner.verified(["a", "b", "c"], candidates, new Pose2(), access, prove, distance);
+    check(proven.stations.length == 2, "Provisional one-station coverage is rejected after its swept entry fails");
+    for (count in fullCalls) check(count == 1, "Full coverage checks are cached across selection retries");
+    for (index in 0...proven.stations.length) for (name in proven.seams[index])
+      check(fullCalls.exists(proven.stations[index].id + ":" + name), "Every assigned seam has a full-motion proof");
+    rejects(() -> {
+      WeldStationPlanner.verified(["a"], candidates, new Pose2(), (_, _) -> null,
+        (_, _) -> "all entries collide", distance);
+    }, "all entries collide");
     rejects(() -> { WeldStationPlanner.plan(["missing"], candidates, new Pose2(), access, distance); }, "missing");
     rejects(() -> { WeldStationPlanner.plan(seams, candidates, new Pose2(), access, (_, _) -> null); }, "no navigation route");
     rejects(() -> { WeldStationPlanner.plan(["a", "a"], candidates, new Pose2(), access, distance); }, "unique");
