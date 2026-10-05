@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-process"},
+  "sourceRoots": ["haxe"],
+  "dependencies": {
+    "machinekit": {"path": ".."},
+    "processkit": {"path": "../../processkit"}
+  },
+  "target": "host"
+}
