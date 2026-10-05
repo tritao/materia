@@ -108,16 +108,14 @@ class ProbeMotionPlanner {
     return approachCandidates(goalsFor(target, start), start, proposals);
   }
 
-  /** Try all checked direct IK alternatives before committing to a detour search. */
-  public function directApproach(target:Transform3, start:Array<Float>):CheckedProbeMove {
+  /** Prove continuation from observed joints before requesting any globally discovered branch. */
+  public function observedApproach(target:Transform3, start:Array<Float>):CheckedProbeMove {
     if (target == null || start == null || start.length != arm.group.count())
-      throw "Direct probe approach needs a target and matching joint start";
-    for (goal in goalsFor(target, start)) {
-      if (!edge(start, goal)) continue;
-      var program = new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(goal), new MotionOptions(), Blend.ExactStop)]);
-      return new CheckedProbeMove(program, inspect(program, start, false));
-    }
-    throw "Probe approach has no checked direct IK configuration";
+      throw "Observed probe approach needs a target and matching joint start";
+    var goal = compiler.solver.solvePose(pose(target), start, compiler.ikTolerance);
+    if (goal == null || !edge(start, goal)) throw "Probe approach has no checked observed IK configuration";
+    var program = new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(goal), new MotionOptions(), Blend.ExactStop)]);
+    return new CheckedProbeMove(program, inspect(program, start, false));
   }
 
   function goalsFor(target:Transform3, start:Array<Float>):Array<Array<Float>> {

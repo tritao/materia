@@ -2380,3 +2380,34 @@ a proved continuation, alternate-branch fallback after compiler rejection,
 blocked-entry pruning, corner selection and collision refusal. Logs are ignored
 app/build/p3-lazy-weld-entry-*.log. Full mobile execution and fixed-welder gates
 remain required; no claim is made that path/time baselines are unchanged.
+
+### P3 latest-main boundary and observed preparation (2026-10-05)
+
+The 20 mm per-axis / 2-degree executed parking boundary passes on both rebuilt
+backends: exactly twelve touch episodes each, 0.007946892 mm deterministic and
+0.008690203 mm MuJoCo seam-frame error, with the first weld's bead checks passing.
+The CAD producer emits 66 records / 2,885,787 bytes on latest main. Its full
+verification remains expensive (about eighteen minutes); no producer speedup
+is claimed. Log: app/build/p3-lazy-entry-registration-boundary.log.
+
+The subsequent full-mission trial completed five probe pairs at station one
+(233.99999999993216 simulated seconds), then spent over eleven wall minutes
+in final-face selection. It was deliberately stopped (exit 143), not passed.
+Inspection found that ProbePosePlanner's supposedly observed preparation pass
+called directApproach, which eagerly sampled global IK candidates before using
+continuation. That defeated the tier's intended policy.
+
+ProbeMotionPlanner now exposes observedApproach: solve from observed joints,
+prove the complete joint edge and compile/check its motion. ProbePosePlanner
+tries this for every roll before its unchanged global/detour second pass. The
+misleading directApproach entry point is removed from its three callers. No
+KinematicsSolver contract expansion is needed for this repair; lazy global
+visitation can remain future work if execution evidence requires it. All
+existing global candidate, roll and route budgets remain unchanged.
+
+Latest-main focused native contact motion passes 95 assertions, including a
+counting solver proving zero global discovery for the observed preparation
+pass, blocked-fixture refusal, sensing corridor coverage and measured contact
+execution. Logs: app/build/p3-true-observed-probe-*.log. The earlier boundary
+pass predates this preparation repair; the full mission and final milestone
+gates remain open. Main has not advanced; P4/P5 are still required.

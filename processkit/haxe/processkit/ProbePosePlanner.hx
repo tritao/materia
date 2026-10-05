@@ -74,7 +74,7 @@ class ProbePosePlanner {
     for (pass in 0...2) for (rotation in candidates) {
       try {
         var approach = new Transform3(approachPoint, rotation);
-        var checked = pass == 0 ? motion.directApproach(approach, start) : motion.approach(approach, start);
+        var checked = pass == 0 ? motion.observedApproach(approach, start) : motion.approach(approach, start);
         // Contact is not yet localized, so a nominal contact move could penetrate the real plane.
         // Check corridor kinematics here; CAD region screening and measured servo/brake checks own obstruction checks.
         if (!motion.corridorReachable(checked.endJoints, outward.scale(-1), distance))

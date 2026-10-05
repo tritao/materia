@@ -45,7 +45,14 @@ class ContactSearchMotionTests {
     var model = fixture.model, arm = fixture.arm, base = fixture.base, tool = fixture.tool;
     if (!dropFeedback && !noTouch) {
       var planning = WeldingPlanRunner.planning(arm, 1.0);
-      var probePlanner = new ProbeMotionPlanner(arm, planning.compiler);
+      var source = planning.compiler;
+      var solver = new ObservedProbeSolver(arm);
+      var compiler = new motionkit.robot.ProgramCompiler(solver, source.limits, source.frameId,
+        source.maxVelocity, source.maxAcceleration, source.maxJerk, source.startTolerances,
+        source.timing, source.cartesianResolution, source.maxJointJump, source.positionTolerance,
+        source.orientationTolerance, source.ikTolerance, null, source.perJointMaxJump);
+      compiler.planCheck = source.planCheck;
+      var probePlanner = new ProbeMotionPlanner(arm, compiler);
       var screening = new processkit.ProbePosePlanner(probePlanner);
       check(screening.hasClearApproachConfiguration(new Vec3(0, 0, -0.02), new Vec3(0, 0, -1), 0.02, [0.0]),
         "Candidate screening keeps a reachable aligned probe");
@@ -55,17 +62,19 @@ class ContactSearchMotionTests {
         "observed branch screening accepts a clear reachable normal");
       check(!screening.hasClearObservedApproachConfiguration(new Vec3(0, 0, -0.02), new Vec3(0, 1, 0), 0.02, [0.0]),
         "observed branch screening rejects an unreachable normal");
+      solver.discoveries = 0;
       var preparedProbe = new processkit.ProbePosePlanner(probePlanner).prepare(new Vec3(0, 0, -0.02),
         new Vec3(0, 0, -1), 0.02, [0.0], WeldArcModel.TOUCH_TOLERANCE, 0.003, 1);
       check(Math.abs(preparedProbe.approach.translation.z + 0.043 + probePlanner.airPoseReserve) < 1e-9 &&
         Math.abs(preparedProbe.distance - 0.043 - probePlanner.airPoseReserve) < 1e-9, "Prepared search covers both signs of uncertainty and the IK air-clearance reserve in metres");
       check(preparedProbe.approachJoints != null, "Preparation retains the checked sensing configuration");
+      check(solver.discoveries == 0, "Observed-branch preparation proves the sensing corridor without global IK discovery");
       var locked = probePlanner.approachJoints(cast preparedProbe.approachJoints, [0.0]);
       check(arm.tcpPose(locked.endJoints).translation.sub(preparedProbe.approach.translation).norm() < 0.0001,
         "Joint-goal execution preserves the prepared TCP approach");
       check(!probePlanner.corridorReachable([0.09], new Vec3(0, 0, 1), 0.04),
         "Execution rejects a sensing corridor beyond mechanical travel");
-      var direct = probePlanner.directApproach(new Transform3(new Vec3(0, 0, 0.03), Quat.identity()), [0.0]);
+      var direct = probePlanner.observedApproach(new Transform3(new Vec3(0, 0, 0.03), Quat.identity()), [0.0]);
       check(Math.abs(direct.endJoints[0] - 0.03) < 5e-5, "Direct approach reaches the checked goal");
       check(preparedProbe.approach.rotation.rotate(new Vec3(0, 0, 1)).sub(preparedProbe.direction).norm() < 1e-9,
         "Prepared torch wire points into the CAD plane");
@@ -122,7 +131,7 @@ class ContactSearchMotionTests {
       check(forbidden, "Compiled straight air motion checks the protruding wire");
       var guarded = new ProbeMotionPlanner(arm, planning.compiler, blocked);
       forbidden = false;
-      try guarded.directApproach(new Transform3(new Vec3(0, 0, 0.03), Quat.identity()), [0.0]) catch (_:Dynamic) forbidden = true;
+      try guarded.observedApproach(new Transform3(new Vec3(0, 0, 0.03), Quat.identity()), [0.0]) catch (_:Dynamic) forbidden = true;
       check(forbidden, "Direct preference cannot authorize an intervening fixture collision");
       check(guarded.stoppingClear([0.0], [0.0], 0.02), "A stationary clear probe has a safe braking sweep");
       check(!guarded.stoppingClear([0.008], [0.1], 0.02), "A clear current posture can still have an obstructed braking sweep");
@@ -321,5 +330,19 @@ class ContactSearchMotionTests {
   public static function main():Void {
     run(false, false); run(true, false); run(false, true); completeProbe(); completeProbe(true); sixAxisPreparation(); resetEpochs();
     Sys.println('Contact search native motion: $checks assertions passed');
+  }
+}
+
+private class ObservedProbeSolver extends motionkit.robot.ManipulatorKinematics {
+  public var discoveries:Int = 0;
+  public function new(arm:Manipulator) {
+    super(arm, 1e-8);
+    preferTargetOrientation = true;
+  }
+  override public function sampleCandidates(target:motionkit.kinematics.Pose3, maxCount:Int,
+      tolerance:motionkit.kinematics.IkTolerance,
+      ?freedom:motionkit.path.OrientationPolicy):Array<Array<Float>> {
+    discoveries++;
+    return super.sampleCandidates(target, maxCount, tolerance, freedom);
   }
 }
