@@ -12,5 +12,6 @@ class PressBrakeComponents {
 		registry.register(HydraulicSupply.recipeType());
 		registry.register(HydraulicValve.recipeType());
 		registry.register(HydraulicManifold.recipeType());
+		registry.register(GaugeFinger.recipeType());
 	}
 }

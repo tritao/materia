@@ -100,6 +100,6 @@ class PressGeometry {
 		return new PressGeometry(1600, 800, 320, 230, 40 * 1000 * 9.80665, StopControlled,
 			new PressEnvelope(-800, -50, 1120, 800, 50, 1340), new PressTravel(0, 100), new PressTravel(0, 500),
 			new PressTravel(0, withR ? 120 : 0), stations,
-			[new PressEnvelope(-310, 0, fingerTop - 20, -290, 60, fingerTop), new PressEnvelope(290, 0, fingerTop - 20, 310, 60, fingerTop)]);
+			[new PressEnvelope(-310, 0, fingerTop - 20, -290, 60, fingerTop + 1), new PressEnvelope(290, 0, fingerTop - 20, 310, 60, fingerTop + 1)]);
 	}
 }

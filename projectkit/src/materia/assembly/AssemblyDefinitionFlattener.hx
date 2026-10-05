@@ -281,6 +281,8 @@ class AssemblyDefinitionFlattener {
 			if (joint.driven == true) expanded.driven = true;
 			expanded.includePath = joint.includePath == null || joint.includePath == "" ? prefix : scoped(prefix, joint.includePath);
 			if (joint.passive == true) expanded.passive = true;
+			if (joint.stop != null) expanded.stop = {timeConstantSec: joint.stop.timeConstantSec,
+				dampingRatio: joint.stop.dampingRatio};
 			flat.joints.push(expanded);
 		}
 		if (networks != null) {

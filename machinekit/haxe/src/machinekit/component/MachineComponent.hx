@@ -24,6 +24,8 @@ class MachineComponent {
 	public function motorDriver():Null<machinekit.motion.MotorDriver> return null;
 	public function electricalSource():Null<machinekit.motion.ElectricalSource> return null;
 	public function motorBrakeSpec():Null<machinekit.motion.MotorBrakeSpec> return null;
+	/** Explicit contact assumptions for this part's generated simulation hull. */
+	public function simulationContact():Null<materia.project.SceneContactSurface> return null;
 
 	/** Typed fluid model when this component is a cylinder. */
 	public function cylinderSpec():Null<machinekit.fluid.CylinderSpec> return null;

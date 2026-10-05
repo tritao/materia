@@ -16,7 +16,13 @@ import materia.units.LengthUnit;
 
 /** Versioned transport and validation for reusable assembly definitions and states. */
 class AssemblyDefinitionCodec {
-	public static inline var VERSION:Int = 9;
+	public static inline var VERSION:Int = 10;
+
+	public static function validateStop(stop:AssemblyJointStop, joint:String):Void {
+		if (stop == null || !Math.isFinite(stop.timeConstantSec) || stop.timeConstantSec <= 0 ||
+			!Math.isFinite(stop.dampingRatio) || stop.dampingRatio <= 0)
+			throw 'Assembly joint "$joint" has an invalid end-stop response';
+	}
 
 	static function supportedVersion(version:Int):Bool return version == VERSION;
 
@@ -121,6 +127,12 @@ class AssemblyDefinitionCodec {
 				(closureOnlyType(joint.type) && joint.role != AssemblyJointRole.Closure) ||
 				!validLimits(joint.limits, joint.defaultValue))
 				throw "Assembly definition has an invalid joint";
+			if (joint.stop != null) {
+				if (joint.role != AssemblyJointRole.Tree || !hasCoordinate(joint.type) ||
+					joint.limits.lower == null || joint.limits.upper == null || joint.limits.lower >= joint.limits.upper)
+					throw 'Assembly joint "${joint.id}" needs bounded tree travel for its end stops';
+				validateStop(joint.stop, joint.id);
+			}
 			joints.set(joint.id, true);
 			if (joint.role == AssemblyJointRole.Tree && hasCoordinate(joint.type)) movable.set(joint.id, joint);
 			var parent = occurrences.get(joint.parent), child = occurrences.get(joint.child);

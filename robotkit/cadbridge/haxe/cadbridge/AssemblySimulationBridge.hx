@@ -359,6 +359,11 @@ class AssemblySimulationBridge {
         linkOf(edge.child)));
       joint.includePath = edge.includePath == null ? "" : edge.includePath;
       joint.passive = edge.passive == true;
+      var stop = edge.stop;
+      if (stop != null) {
+        joint.limitTimeConstant = stop.timeConstantSec;
+        joint.limitDampingRatio = stop.dampingRatio;
+      }
       var parentFrame = AssemblyFrames.compose(offsetOf(edge.parent),
         connector(definitions.get(occurrenceDefinition(definition, edge.parent)), edge.parentConnector));
       var initial = placement.joint(edge.id);
@@ -468,7 +473,7 @@ class AssemblySimulationBridge {
           p.stroke * scale, p.ratedSpeed * scale, p.pressurePa, p.channelA, p.channelB,
           p.normallyToA, p.extendSign);
         var pneumatic = added.drive.pneumatic();
-        if (pneumatic != null && driven.limits.overtravel > 0.0) {
+        if (pneumatic != null && edge.stop == null && driven.limits.overtravel > 0.0) {
           driven.limitTimeConstant = pneumatic.limitTimeConstant(driven.child.mass,
             driven.limits.overtravel);
           driven.limitDampingRatio = 1.0;

@@ -254,6 +254,20 @@ class MachineAssembly {
 		throw 'Missing assembly joint "$jointId"';
 	}
 
+	/** Declare the physical response of a bounded joint's mechanical end stops. */
+	public function setJointStop(jointId:String, stop:materia.assembly.AssemblyJointStop):Void {
+		AssemblyDefinitionCodec.validateStop(stop, jointId);
+		for (joint in mechanical.joints) if (joint.id == jointId) {
+			if (joint.role != AssemblyJointRole.Tree || !AssemblyDefinitionCodec.hasCoordinate(joint.type) ||
+				joint.limits.lower == null || joint.limits.upper == null || joint.limits.lower >= joint.limits.upper)
+				throw 'Assembly joint "$jointId" needs bounded tree travel for its end stops';
+			joint.stop = {timeConstantSec: stop.timeConstantSec, dampingRatio: stop.dampingRatio};
+			changed();
+			return;
+		}
+		throw 'Missing assembly joint "$jointId"';
+	}
+
 	public function addCoupling(id:String, source:String, target:String, ratio:Float, offset:Float = 0,
 			?efficiency:Float, ?stiffness:Float, ?backlash:Float, ?drag:Float, ?assumed:haxe.ds.ReadOnlyArray<String>,
 			?assumptions:haxe.ds.ReadOnlyArray<materia.assembly.AssemblyDefinition.QuantityAssumption>):Void {
@@ -726,6 +740,7 @@ class MachineAssembly {
 					joint.parentConnector, join(prefix, joint.child), joint.childConnector,
 					joint.axis, joint.closureTolerance, joint.limits);
 			if (joint.passive == true) model.setPassive(join(prefix, joint.id));
+			if (joint.stop != null) model.setJointStop(join(prefix, joint.id), joint.stop);
 		}
 		if (mechanical.couplings != null) for (coupling in mechanical.couplings)
 			model.couple(join(prefix, coupling.id), join(prefix, coupling.source),

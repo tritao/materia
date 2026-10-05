@@ -11,6 +11,8 @@ import materia.project.SceneArtifact.SceneArtifactCellController;
 import materia.project.MaterialLibrary;
 import robotkit.mobile.MobileBase;
 import robotkit.model.CollisionApproximation;
+import robotkit.model.CollisionShape.ContactSurface;
+import robotkit.model.CollisionShape.ShapeContact;
 import robotkit.model.RobotModel;
 import robotkit.model.Transmission;
 import robotkit.runtime.RobotRuntime;
@@ -277,6 +279,10 @@ class AssemblyRobot {
           if (joint.id == left || joint.id == right) rolling.set(converted.model.links.indexOf(joint.child), true);
       case _:
     }
+    var contacts = new Map<String, materia.project.SceneContactSurface>();
+    var motion = session.machineMotion;
+    if (motion != null && motion.contacts != null)
+      for (contact in motion.contacts) contacts.set(contact.occurrence, contact.surface);
     var linkHulls:Array<SimulationLinkHull> = [];
     // CAD physical-part hulls retain their exact convex geometry. A pneumatic
     // joint's connected links need an explicit contact response: the simulator's
@@ -324,13 +330,23 @@ class AssemblyRobot {
     for (hull in converted.linkHulls) {
       var record = sceneParts.get("project:" + hull.part);
       if (record != null && record.collisionEnabled && !rolling.exists(hull.link)) {
-        var simulationHull:SimulationLinkHull = {link: hull.link, vertices: hull.vertices};
-        var padSurface = fingerPadSurfaces.get(hull.part);
-        if (padSurface != null)
-          simulationHull.surface = padSurface;
-        else if (pneumaticContact != null && pneumaticContactLinks.exists(hull.link))
-          simulationHull.surface = pneumaticContact;
-        linkHulls.push(simulationHull);
+        var linkHull:SimulationLinkHull = {link: hull.link, vertices: hull.vertices};
+        var surface = contacts.get(hull.part);
+        if (surface != null) {
+          linkHull.surface = new ContactSurface(surface.friction.copy(), surface.frictionDimensions,
+            surface.contactTimeConstant, surface.contactDampingRatio);
+          linkHull.contact = switch surface.filter {
+            case Layers: ShapeContact.Layers;
+            case PairsOnly: ShapeContact.PairsOnly;
+            case PairsAndEnvironment: ShapeContact.PairsAndEnvironment;
+          };
+        }
+        if (surface == null) {
+          var padSurface = fingerPadSurfaces.get(hull.part);
+          if (padSurface != null) linkHull.surface = padSurface;
+          else if (pneumaticContact != null && pneumaticContactLinks.exists(hull.link)) linkHull.surface = pneumaticContact;
+        }
+        linkHulls.push(linkHull);
       }
     }
     if (converted.closureIds.length > 0 && !supportsClosures)

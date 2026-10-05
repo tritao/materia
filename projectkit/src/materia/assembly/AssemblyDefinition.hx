@@ -1,5 +1,7 @@
 package materia.assembly;
 
+import materia.assembly.AssemblyJointStop;
+
 import haxe.ds.ReadOnlyArray;
 
 import materia.assembly.AssemblyRecord.AssemblyFrame;
@@ -134,6 +136,8 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(13) @:optional var includePath:String;
 	/** Passive physical motion; host position control and power-on holding are disabled. */
 	@:id(14) @:optional var passive:Bool;
+	/** Authored mechanical end-stop response; nominal travel remains in `limits`. */
+	@:id(15) @:optional var stop:AssemblyJointStop;
 }
 
 /**

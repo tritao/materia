@@ -1,4 +1,6 @@
 import cadkit.modeling.AssemblyModel;
+import machinekit.assembly.MachineAssembly;
+import machinekit.pressbrake.GaugeFinger;
 import cadkit.modeling.AssemblyState;
 import machinekit.pressbrake.planning.PressGeometry;
 import machinekit.pressbrake.planning.PressEnvelope;
@@ -16,6 +18,32 @@ import cadkit.sheetmetal.process.AirBending;
 class PressBrakeChecks {
 	public static function main():Void run();
 	public static function run():Void {
+		var recipeFixture = new MachineAssembly();
+		recipeFixture.addComponent("finger", new GaugeFinger());
+		recipeFixture.addComponent("base", new GaugeFinger());
+		recipeFixture.addMateOnAxis("contact-hinge", "revolute", "base", "mount", "finger", "mount",
+			{x: -1, y: 0, z: 0}, 0,
+			{lower: -GaugeFinger.DROP_ANGLE, upper: 0, velocity: null, effort: null,
+				overtravel: GaugeFinger.OVERTRAVEL});
+		recipeFixture.setPassive("contact-hinge");
+		recipeFixture.setJointStop("contact-hinge", GaugeFinger.stopResponse());
+		recipeFixture.addSwitch("contact-observed", "contact-hinge",
+			{lower: -GaugeFinger.SWITCH_WINDOW, upper: GaugeFinger.OVERTRAVEL, velocity: null, effort: null}, 0);
+		var rebuilt = MachineAssembly.decode(recipeFixture.encode());
+		rebuilt.addTo(new AssemblyModel("mm"), "");
+		var invalidObserved = MachineAssembly.decode(recipeFixture.encode());
+		invalidObserved.addSwitch("outside-observed", "contact-hinge",
+			{lower: GaugeFinger.OVERTRAVEL * 2, upper: GaugeFinger.OVERTRAVEL * 3, velocity: null, effort: null}, 0);
+		var rejectedObservation = false;
+		try invalidObserved.addTo(new AssemblyModel("mm"), "") catch (_:Dynamic) rejectedObservation = true;
+		if (!rejectedObservation) throw "Switch outside declared observed travel was accepted";
+		var stopped = rebuilt.describe().mechanical.joints[0].stop;
+		if (stopped == null) throw "Saved contact hinge lost its mechanical stop";
+		near(stopped.timeConstantSec, GaugeFinger.stopResponse().timeConstantSec, "Saved contact hinge stop response");
+		var contact = rebuilt.components()[0].component.simulationContact();
+		if (contact == null || contact.filter != materia.project.SceneContactFilter.PairsAndEnvironment)
+			throw "Saved gauge finger lost its authored contact surface";
+		near(contact.contactTimeConstant, GaugeFinger.stopResponse().timeConstantSec, "Saved gauge finger contact compliance");
 		var tallest = new ToolLayout(1600, [new ToolStation("four-V", new ToolRow([
 			new ToolSegment(Punch(ToolingCatalogue.gooseneck()), 200)], []), new ToolRow([
 			new ToolSegment(FourV(ToolingCatalogue.fourV(), 0), 200)], []), 700)]);
@@ -53,6 +81,21 @@ class PressBrakeChecks {
 			var model = new AssemblyModel("mm");
 			press.addTo(model, "");
 			var definition = model.definition("press-brake");
+			for (name in ["fingerLeft", "fingerRight"]) {
+				var joints = [for (joint in definition.joints) if (joint.id == '$name-hinge') joint];
+				if (joints.length != 1 || joints[0].passive != true || joints[0].driven == true)
+					throw 'Press finger "$name" lost physical joint ownership';
+				var lower = joints[0].limits.lower, overtravel = joints[0].limits.overtravel;
+				if (lower == null || overtravel == null) throw 'Press finger "$name" lost its mechanical bounds';
+				near(lower, -GaugeFinger.DROP_ANGLE, "Declared finger drop travel");
+				near(overtravel, GaugeFinger.OVERTRAVEL, "Declared finger observation margin");
+			}
+			var switches = definition.sensors;
+			if (switches == null) throw "Press lost its measured switches";
+			for (id in ["ram-top", "ram-speed-change", "ram-bottom", "fingerLeft-contact", "fingerRight-contact"]) {
+				var found = [for (sensor in switches) if (sensor.id == id && sensor.kind == "joint_switch") sensor];
+				if (found.length != 1) throw 'Press lost measured switch "$id"';
+			}
 			var hydraulicCount = 0, installedForce = 0.0;
 			if (definition.actuators != null) for (actuator in definition.actuators) {
 				var drive = actuator.hydraulic;

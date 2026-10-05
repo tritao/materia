@@ -25,6 +25,12 @@ class AssemblyPreview {
 		assembly.addTo(model, "");
 		var parts:Array<SceneArtifactPart> = [];
     var machineMotion = movingBelts(assembly);
+    var contacts:Array<materia.project.SceneArtifact.SceneArtifactHullContact> = [];
+    for (entry in assembly.components()) {
+      var surface = entry.component.simulationContact();
+      if (surface != null) contacts.push({occurrence: entry.id, surface: surface});
+    }
+    if (contacts.length > 0) machineMotion.contacts = contacts;
 		var definitionByOccurrence = new Map<String, String>();
 		var definitionByDesignation = new Map<String, String>();
 		for (entry in assembly.components()) {

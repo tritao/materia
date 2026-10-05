@@ -125,7 +125,17 @@ class Simulation {
     if (blueprint == null) throw "Simulation requires a robot blueprint";
     if (virtualDevice == null && blueprint.switches.length > 0)
       SimulatedSwitchSensorAdapter.bindingIndices(blueprint);
-    if (space != null) space.requireDrives(blueprint);
+    if (space != null) {
+      space.requireDrives(blueprint);
+      space.requireStops(blueprint);
+      for (shape in blueprint.linkCollisionShapes) {
+        var surface = shape.shape.surface;
+        if (surface != null) space.requireContact(surface);
+      }
+      for (pair in blueprint.contactPairs) space.requireContact(pair.surface);
+      if (linkHulls != null) for (hull in linkHulls)
+        if (hull.surface != null) space.requireContact(hull.surface);
+    }
     var robotDesc:Null<rk_simulation_robot_desc> = null;
     if (initialPose != null || virtualDevice != null || blueprint.cylinderDrives.length > 0 ||
         blueprint.velocityDrives.length > 0 || blueprint.brakePhysics.length > 0 ||

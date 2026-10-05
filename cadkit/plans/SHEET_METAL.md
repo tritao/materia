@@ -447,6 +447,14 @@ table in `tools/README.md`.
 - The mechanical depth stop is its own axis (motor + screw) on stop-controlled machines.
 - Backgauge X (and optional R) are axes with servo drives and X7 transmissions; fingers are parts
   with contact switches (MT5 `addSwitch`).
+- The reference gravity-return finger has a passive hinge and an explicit critically damped
+  mechanical stop. Its assumed 1 mrad compression stores the full nominal gravity-drop energy:
+  `k = 2 m g Δz / δ²`, `τ = sqrt(Ihinge/k)`, using the box inertia about its hinge and
+  standard gravity 9.80665 m/s². Stock contact uses the same assumed elastic response. These
+  are reference simulation assumptions, not manufacturer measurements. Shape contacts and
+  joint stops derive physics substeps so each positive time constant spans at least two physics
+  steps. A stock-contact test advances to the contact datum, and verifies fault-free runtime
+  observations throughout gravity opening, contact closure and release.
 - Tools are catalogue parts (Promecam-style punches and dies in segments, SM7). A
   `ToolClamp` capability is manual or powered (lock/unlock output + state sensor, shaped like
   `ChangerLock`).
@@ -942,7 +950,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM6 | done: SM6a typed air-bending predictions, physical springback inversion and exact contact depth; focused process smoke passes 1235 assertions; quick gate `sm6a-air-bending` passes (7209 sheet assertions); SM6b explicit lot/tool/angle-band calibration with measured radius and additive depth correction, focused smoke passes 1257 assertions, quick gate `sm6b-calibration` passes (7231 sheet assertions); SM6 complete: typed grade defaults, editor selection, Process-rule persistence and tooling minimums; full gate `sm6-process-material-full` passes all stages (7248 sheet assertions, ProjectKit 155); final material integration and CAD workflow checks pass | 7148a8bb8; 6458df23b; d664caa22 |
 | SM7 | done: typed exact punch and single-/four-V die catalogue; standard segments and physical horns; independently segmented paired rows and validated bed layouts; derived process contact data; registered segment/clamp recipes and manual/powered clamp capabilities; strong unique tooling face names. Quick gates `sm7a-profile-foundation`, `sm7b-punch-profiles`, `sm7c-die-profiles` and full gate `sm7-tooling-verified-full` pass; original MachineKit and router engineering summaries unchanged | c4e418ba5; 310a41894; 67da9cae8; final tooling integration |
 | SM8a | done: cylinder parts and coupled mechanical assembly; typed planning geometry derived from physical datums, independent reference comparisons, full-bed force/depth and conservative demo/frame checks; Start-page project with editable ram, X/R and depth-stop axes. Quick gates `sm8a-cylinder-parts`, `sm8a-mechanical-assembly` and full gate `sm8a-press-assembly-full` pass every stage; original MachineKit and router engineering summaries unchanged | c4517c795; ed8faa29b; final assembly integration |
-| SM8b | in progress: MT5 is on local main 1484b924d and merged; shared typed fluid cylinder/valve/pressure-source interfaces replace pneumatic-only interfaces, and pressure resolution no longer casts components; explicit immutable phase-speed model added, its quick gate `sm8b-phase-speeds` passes all five suites; assembly format 7 hydraulic data passes focused tests (187 ProjectKit assertions), full gate `sm8b-hydraulic-format-full` passes every stage; quick gate `sm8b-fluid-interfaces` passes all five suites with unchanged original MachineKit summaries; typed shared cylinder runtime and current RobotModel 12 fixtures pass focused model (30), both-backend hydraulic (14), world (5004), maintained MuJoCo and four-platform ABI checks; full gate `sm8b-cylinder-runtime-verified-full` passes every stage including project-source runtime; actual press hydraulic service, distribution blocks, bore-area frame-pressure limit and both guide bindings pass quick gate `sm8b-fluid-bindings-verified`; authored passive-joint support reaches assembly/model/runtime, passes 36 model, 192 ProjectKit and both-backend ownership tests (MuJoCo gravity verified); full gate `sm8b-passive-joints-full` passes every stage with unchanged five engineering summaries and app engineering baselines; typed convex-hull contact settings and maintained primitive/hull finger-contact tests pass 6 MuJoCo assertions and the four-platform ABI audit; full gate `sm8b-hull-contact-full` passes every stage with unchanged original MachineKit and app engineering baselines; assembled switches and scripted stroke remain | edf913c0f; 68768fcae; 22ce57f1c; 439ca8690; b15e594c6; 19fc1938c; hull-contact checkpoint in progress |
+| SM8b | done: MT5 is on local main 1484b924d and merged; shared typed fluid cylinder/valve/pressure-source interfaces replace pneumatic-only interfaces, and pressure resolution no longer casts components; explicit immutable phase-speed model added, its quick gate `sm8b-phase-speeds` passes all five suites; assembly format 7 hydraulic data passes focused tests (187 ProjectKit assertions), full gate `sm8b-hydraulic-format-full` passes every stage; quick gate `sm8b-fluid-interfaces` passes all five suites with unchanged original MachineKit summaries; typed shared cylinder runtime and current RobotModel 12 fixtures pass focused model (30), both-backend hydraulic (14), world (5004), maintained MuJoCo and four-platform ABI checks; full gate `sm8b-cylinder-runtime-verified-full` passes every stage including project-source runtime; actual press hydraulic service, distribution blocks, bore-area frame-pressure limit and both guide bindings pass quick gate `sm8b-fluid-bindings-verified`; authored passive-joint support reaches assembly/model/runtime, passes 36 model, 192 ProjectKit and both-backend ownership tests (MuJoCo gravity verified); full gate `sm8b-passive-joints-full` passes every stage with unchanged five engineering summaries and app engineering baselines; typed convex-hull contact settings and maintained primitive/hull finger-contact tests pass 6 MuJoCo assertions and the four-platform ABI audit; full gate `sm8b-hull-contact-full` passes every stage with unchanged original MachineKit and app engineering baselines; the later health audit strengthens contact proof to 12 fault-free outcomes; typed assembly 9, machine recipe 16 and scene 17 transport stops, contacts and native timed outputs; quick gate `sm8b-assembled-press-verified` passes all five suites with unchanged original MachineKit summaries; assembled press contacts, stroke, home and lifecycle pass in the rebuilt app; full gate `sm8b-assembled-press-full` passes every stage, including workspace, app build and complete project-source runtime (215 ProjectKit assertions and 12 fault-free finger-contact outcomes) | edf913c0f; 68768fcae; 22ce57f1c; 439ca8690; b15e594c6; 19fc1938c; bf3d5cd31 |
 | SM9 | planned | |
 | SM10 | planned | |
 | SM11 | planned | |
@@ -1546,7 +1554,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 
 - SM8b passive-contact support is in progress. An authored passive joint carries no host
   position target or hold-at-rest servo; cylinders and motors cannot bind to it. Assembly
-  definitions use current version 9 (hydraulic drive introduced v8, passive ownership adds v9), MachineAssembly uses 15 and RobotModel uses 13.
+  definitions use current version 10 (hydraulic drive introduced v8, passive ownership adds v9, mechanical stop response adds v10), MachineAssembly uses 16 and RobotModel uses 13.
   Seven robot fixtures are regenerated through typed authors and the current codec, preserving
   every existing model fact. ProjectKit passes 192 assertions and the core-only package passes
   36 hydraulic/model assertions. The maintained MuJoCo entry passes three passive checks:
@@ -1565,7 +1573,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
   MuJoCo adds three physical passive/controlled hinge checks alongside unchanged seven hydraulic
   and64 wall-finishing assertions. The original five MachineKit summaries, router cutting/drive
   results, pneumatic timings/force and welding engineering summaries are unchanged.
-  AssemblyDefinition9, MachineAssembly15 and RobotModel13 each have one supported format;
+  AssemblyDefinition10, MachineAssembly16 and RobotModel13 each have one supported format;
   fixtures are written by current code. No new cast or Haxeon workaround is introduced.
   The physical press finger contact, ram switches and scripted stroke remain outstanding.
 
@@ -1576,8 +1584,9 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 - SM8b physical-contact checkpoint in progress: CAD-style per-link convex hulls now carry
   the same typed `ContactSurface` and `ShapeContact` settings as authored primitives.
   Unspecified settings keep backend defaults; the four-platform SimKit ABI audit passes.
-  Maintained MuJoCo `PressFingerContactTests` proves gravity opening, sheet-contact closing
-  and gravity reset for both primitive and convex-hull geometry (6 assertions).
+  Maintained MuJoCo `PressFingerContactTests` checks gravity opening, sheet-contact closing
+  and gravity reset for both primitive and convex-hull geometry (6 assertions at this checkpoint;
+  the later assembled-contact audit below found a missing runtime-health assertion).
   The probe uses an explicitly assumed 2 ms contact time constant and damping ratio 1,
   with `PairsAndEnvironment` so environment defaults do not soften the contact by blending.
   These are simulation contact assumptions, not inferred material or manufacturer properties.
@@ -1594,3 +1603,69 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
   passing gate; only planning/tick wall time and allocation statistics vary.
   Four-platform SimKit ABI audit `sm8b-hull-surface-hxi.log` passes. No new cast
   or compiler workaround. Assembled press switches and the scripted stroke remain.
+
+- SM8b assembled-contact audit (2026-10-05, integration still in progress): focused
+  ProjectKit scene-metadata and end-stop checks pass 215 assertions and `PressBrakeChecks` passes.
+  The assembled MuJoCo test exposed a first-tick limit fault. The native debugger identified
+  a reference slide at -1.151185936e-10 m with explicitly zero observed end-stop room.
+  The reference slides now retain the bridge's established 1 mm default observation margin.
+  The audit also found that the earlier 1 ms contact test faulted at tick 9 and could accept
+  its last published position; its historical green result did not prove healthy operation.
+  The maintained test now checks runtime fault and safety on every tick, and covers primitive
+  and hull contacts at 1 ms and the normal app 10 ms tick. Explicit stops and contact response
+  are derived from the gravity-drop energy under SM-D9; stock ends at its authored contact
+  datum instead of being pushed 0.2 mm beyond it. Focused gate
+  `sm8b-contact-resolution-focus.log` passes all 12 contact outcomes with no runtime fault.
+  Native debugger evidence `sm8b-contact-native-substeps.log` confirms actual MuJoCo substeps.
+  Assembly end-stop response is carried as typed current-schema data (assembly 9,
+  MachineAssembly 16), including frozen descriptions and the regenerated hydraulic fixture;
+  assembled press proof remains to be completed before
+  the required quick/full gates and integration commit. The app event-time conversion now
+  rounds in Float before Int64 truncation, avoiding Math.floor's 32-bit intermediate.
+
+- The assembled-contact diagnostic confirms the authored finger mass (0.19782 kg), exact
+  eight-corner CAD hull and 0.0004968594779560878 s contact/stop response survive lowering.
+  An isolated test with the CAD-style offset child hinge frame passes all 12 outcomes
+  (`sm8b-offset-finger-focus.log`), ruling out that frame convention as the cause of the
+  assembled switch remaining open. The full assembly still needs physical contact proof.
+
+- The assembled stock check must follow the measured backgauge carrier while contact settles;
+  fixing the plate at an earlier carrier position accidentally overpushes the finger as the
+  carrier settles. The typed timed-output player also accepts the runtime's documented cleared
+  active plan id at terminal idle only after checking every submitted event receipt. Contact
+  and stroke checks reset between scenarios so a looping second stroke cannot masquerade as
+  the first stroke's home measurement. Stroke endpoint validation is still in progress.
+
+- Empty-stroke timing audit: the first measured peak is 71.759993 mm and the same ideal
+  70 mm return leaves 1.760022 mm above home. MuJoCo's velocity target uses a finite
+  50/s acceleration response, and phase selection occurs on measured tick positions, so
+  ideal flow durations are not exact position control. The demo now reserves the full nominal
+  cylinder travel for return and checks actual positive installed-tool clearance plus the
+  measured speed-change switch; the unsupported 70 ±1 mm test is removed. The 10 mm
+  allowance is an ideal-timing assumption, not a claimed measured clearance. Exact depth
+  control belongs to the press controller; physical home and safe end-stop behavior still
+  need verification before the SM8b integration gate.
+
+- The full-travel return reaches home at -0.000177 mm without a runtime fault, but a
+  switch window starting exactly at zero excludes that seated observation. Sensor validation
+  now permits windows within explicitly declared overtravel; commands and planning retain
+  nominal limits. Reference slides explicitly declare the same existing 1 mm observation room,
+  and top/bottom switches cover ±0.1 mm around their physical datums. Focused checks cover an
+  accepted window within that room and rejection beyond it. This resolves the prior mismatch
+  between end-stop observations and the nominal-travel-only switch validator.
+
+- Focused assembled MuJoCo proof now passes (`sm8b-press-app-focus.log`): both CAD-hull
+  fingers open by gravity, close against stock at the measured carrier datum and reopen on
+  removal; the first native timed hydraulic cycle completes with a 71.759993 mm peak below
+  the 80 mm installed-tool contact gap, and returns to its measured top switch. Reset/restart,
+  native emergency-stop diagnosis and reset recovery also pass. Reference sensor validation
+  checks pass `sm8b-press-switches-focus.log`, including the saved in-overtravel switch and
+  rejection outside declared observation room. Required quick/full integration gates remain.
+
+- SM8b final integration: quick gate `sm8b-assembled-press-verified` and full gate
+  `sm8b-assembled-press-full` pass every stage. All five original MachineKit engineering
+  summaries and the existing app engineering results remain unchanged; wall time and
+  allocation statistics vary. The reference fingers now weigh 0.19782 kg each because their
+  contact faces reach the stock datum (+0.01884 kg total). The new physical empty-stroke
+  measurement is 71.759993 mm; it is not a depth-control guarantee. Saved formats are
+  assembly 9, MachineAssembly 16 and scene 17, with typed contacts, stops and timed outputs.

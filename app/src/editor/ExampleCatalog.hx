@@ -92,7 +92,7 @@ class ExampleCatalog {
       tag: "Editable project",
       kind: Project("machinekit/examples/cnc-router/materia.project.json")},
     {id: "press-brake", title: "Sheet metal press brake",
-      description: ["A torsion-bar press brake", "with editable ram and gauge axes"],
+      description: ["A hydraulic press brake", "with a simulated empty stroke"],
       tag: "Project · first build ~30 s",
       kind: Project("machinekit/examples/press-brake/materia.project.json")},
     {id: "mobile-base", title: "Mobile base",

@@ -78,6 +78,7 @@ class ApplicationSimulation {
   var cnc:Null<CncProgramPlayer> = null;
   var beltVisuals:Array<BeltVisuals> = [];
   var machineProgram:Null<MachineProgramPlayer> = null;
+  var digitalProgram:Null<MachineDigitalProgramPlayer> = null;
   /** The project's wheeled assembly's drive, when it has one. */
   var mobile:Null<robotkit.mobile.MobileBase> = null;
   /** The work the assembly robot does on its own, when its project ships a mission. */
@@ -148,6 +149,7 @@ class ApplicationSimulation {
     if (power != null) members.push(power);
     if (cnc != null) members.push(cnc);
     if (machineProgram != null) members.push(machineProgram);
+    if (digitalProgram != null) members.push(digitalProgram);
     if (mission != null) members.push(mission);
     if (beads != null) members.push(beads);
     if (workforce != null) members.push(workforce);
@@ -173,6 +175,7 @@ class ApplicationSimulation {
       input:Null<String->Null<EventValue>>, interfaceManaged:Bool}> = null;
     var candidateBelts:Array<BeltVisuals> = [];
     var candidateProgram:Null<MachineProgramPlayer> = null;
+    var candidateDigital:Null<MachineDigitalProgramPlayer> = null;
     var candidateMobile:Null<robotkit.mobile.MobileBase> = null;
     var candidatePower:Null<SimulatedMobilePower> = null;
     var candidateMission:Null<MissionPlayer> = null;
@@ -288,9 +291,17 @@ class ApplicationSimulation {
         }
         if (session.machineMotion != null && session.machineMotion.program != null && candidateProgram == null)
           throw "Machine axis program has no controller owning its axes";
+        if (machine != null && machine.digitalProgram != null) {
+          if (job != null || machine.program != null || session.mission != null || built.mobile != null)
+            throw "Machine digital program needs exclusive assembly execution ownership";
+          candidateDigital = new MachineDigitalProgramPlayer(machine.digitalProgram, built);
+        }
       }
       var resolvedMotions = RobotMotionPlayer.resolve(candidateMotions,
         [for (robot in candidateRobots) robot.id()], candidateRobotModels);
+      if (candidateDigital != null && candidateAssembly != null)
+        for (track in resolvedMotions) if (track.robotId == candidateAssembly.robot.id())
+          throw "Machine digital program cannot share its assembly with a robot motion track";
       var environmentRecords = scene.records();
       environmentRecords.sort(function(a, b) return Reflect.compare(a.id, b.id));
       var hasPneumaticActuator = candidateAssembly != null &&
@@ -479,6 +490,8 @@ class ApplicationSimulation {
       beltVisuals = candidateBelts;
       if (machineProgram != null) machineProgram.beforeReset();
       machineProgram = candidateProgram;
+      if (digitalProgram != null) digitalProgram.beforeReset();
+      digitalProgram = candidateDigital;
       cnc = candidateCnc;
       mobile = candidateMobile;
       mission = candidateMission;
@@ -615,6 +628,7 @@ class ApplicationSimulation {
   /** The project's CNC program player, or null when the project has no CNC job. */
   public function cncPlayer():Null<CncProgramPlayer> return cnc;
   public function programPlayer():Null<MachineProgramPlayer> return machineProgram;
+  public function digitalProgramPlayer():Null<MachineDigitalProgramPlayer> return digitalProgram;
   public function beltDisplayUpdates():Int {
     var count = 0;
     for (visual in beltVisuals) count += visual.updates;
@@ -790,6 +804,8 @@ class ApplicationSimulation {
     beltVisuals = [];
     if (machineProgram != null) machineProgram.beforeReset();
     machineProgram = null;
+    if (digitalProgram != null) digitalProgram.beforeReset();
+    digitalProgram = null;
     cnc = null; mobile = null; mission = null; beads = null; cellSignals = null; refreshMembers();
     // A mission's programs are planned on worker threads that finish the plan they are on after they are cancelled; the
     // world they plan for goes now, so wait for them (see ProgramPlanner).

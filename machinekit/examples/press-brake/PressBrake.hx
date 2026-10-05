@@ -16,6 +16,7 @@ import machinekit.motion.PowerSupply;
 import machinekit.motion.ServoMotor;
 import machinekit.motion.ScrewSupportUnit;
 import machinekit.pressbrake.HydraulicCylinder;
+import machinekit.pressbrake.GaugeFinger;
 import machinekit.pressbrake.HydraulicSupply;
 import machinekit.pressbrake.HydraulicValve;
 import machinekit.pressbrake.HydraulicManifold;
@@ -73,19 +74,6 @@ class PressSideFrame extends MachineComponent {
 				.translated(new Vector(0, (throat - 101) / 2, bedHeight)), "throat-opening"));
 			return Solids.cut(parts[0], [parts[1]]);
 		});
-}
-
-/** A gauge finger's front contact is local y=0, z=0; its body remains behind that face. */
-class PressGaugeFinger extends MachineComponent {
-	public function new() {
-		super("PRESS-GAUGE-FINGER", "Assumed backgauge finger with contact switch", "steel", true);
-		addConnector("mount", Mount, Solids.axial(0, 50, -20));
-		addConnector("contact", Face, Solids.axial(0, 0, 0));
-		addPort({name: "contact", kind: Signal, role: Supply, iface: Plug("generic", 3), required: false});
-	}
-	override public function hasGeometry():Bool return true;
-	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Solids.named(Part.box(20, 60, 20).translated(new Vector(0, 30, -20)), "finger");
 }
 
 /** Reference light-curtain receiver envelope and its clear-field signal. No safety rating is inferred. */
@@ -182,6 +170,12 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
 			connectPorts('ram$name-B', "ramDistributionB", outlet, 'cylinder$name', "B", hose);
 			addCylinder('hydraulic$name', side < 0 ? "Y1" : "Y2", 'cylinder$name', "ramValve", phaseSpeeds);
 		}
+		// Assumed 0.1 mm switch windows and release hysteresis; coordinates are measured ram travel.
+		addSwitch("ram-top", "Y1", {lower: -0.1, upper: 0.1, velocity: null, effort: null}, 0.1);
+		addSwitch("ram-speed-change", "Y1", {lower: phaseSpeeds.changePoint, upper: stroke,
+			velocity: null, effort: null}, 0.1);
+		addSwitch("ram-bottom", "Y1", {lower: stroke - 0.1, upper: stroke + 0.1,
+			velocity: null, effort: null}, 0.1);
 		fixed("ram", new PressBlock("Ram beam", bedLength, 100, 220), at(0, 0, bedHeight + openHeight), "guideLeft");
 		for (side in [-1, 1]) fixed(side < 0 ? "ramBracketLeft" : "ramBracketRight",
 			new PressBlock("Ram guide bracket", 160, 180, 80), at(side * 750, -80, bedHeight + openHeight + 80), "ram");
@@ -228,8 +222,22 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
 				{x: 0, y: 0, z: 1}, {x: 0, y: 0, z: 1}, "GENERIC-SERVO-100W", 3, "gaugeX");
 			gaugeParent = "gaugeR";
 		}
-		for (side in [-1, 1]) fixed(side < 0 ? "fingerLeft" : "fingerRight", new PressGaugeFinger(),
-			at(side * 300, 0, gaugeBaseHeight), gaugeParent);
+		for (side in [-1, 1]) {
+			var id = side < 0 ? "fingerLeft" : "fingerRight";
+			place(id, new GaugeFinger(), at(side * 300, 0, gaugeBaseHeight));
+			meeting(gaugeParent, id, at(side * 300, GaugeFinger.PIVOT_DEPTH_MM,
+				gaugeBaseHeight - GaugeFinger.DATUM_HEIGHT_MM));
+			var joint = '$id-hinge';
+			addMateOnAxis(joint, "revolute", gaugeParent, 'to-$id', id, 'attach-$id',
+				{x: -1, y: 0, z: 0}, 0,
+				{lower: -GaugeFinger.DROP_ANGLE, upper: 0, velocity: null, effort: null,
+					overtravel: GaugeFinger.OVERTRAVEL});
+			setPassive(joint);
+			setJointStop(joint, GaugeFinger.stopResponse());
+			addSwitch('$id-contact', joint,
+				{lower: -GaugeFinger.SWITCH_WINDOW, upper: 0,
+					velocity: null, effort: null}, GaugeFinger.SWITCH_HYSTERESIS);
+		}
 	}
 
 	function installTools():Void {
@@ -292,7 +300,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
 			?datum:AssemblyFrame):Void {
 		place(id, part, pose); meeting(parent, id, datum);
 		addMateOnAxis(joint, "prismatic", parent, 'to-$id', id, 'attach-$id', axis, 0,
-			{lower: 0, upper: travel, velocity: null, effort: null, overtravel: 0});
+			{lower: 0, upper: travel, velocity: null, effort: null, overtravel: 1});
 	}
 	function pose(id:String):AssemblyFrame {
 		var result = poses.get(id);

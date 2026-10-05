@@ -142,6 +142,20 @@ class AssemblyModel {
 		throw 'Missing assembly joint "$jointId"';
 	}
 
+	/** Give a bounded moving joint its authored mechanical end-stop response. */
+	public function setJointStop(jointId:String, stop:materia.assembly.AssemblyJointStop):Void {
+		AssemblyDefinitionCodec.validateStop(stop, jointId);
+		for (joint in data.joints) if (joint.id == jointId) {
+			if (joint.role != AssemblyJointRole.Tree || !AssemblyDefinitionCodec.hasCoordinate(joint.type) ||
+				joint.limits.lower == null || joint.limits.upper == null || joint.limits.lower >= joint.limits.upper)
+				throw 'Assembly joint "$jointId" needs bounded tree travel for its end stops';
+			joint.stop = {timeConstantSec: stop.timeConstantSec, dampingRatio: stop.dampingRatio};
+			solved = null;
+			return;
+		}
+		throw 'Missing assembly joint "$jointId"';
+	}
+
 	/** Records a closure; its residual is checked against solved poses on read. */
 	public function constrain(id:String, kind:String, parent:String, parentConnector:String,
 			child:String, childConnector:String, ?tolerance:Float):Void {

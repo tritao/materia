@@ -387,6 +387,8 @@ class MachineAssemblyCodec {
 					child.instanceId, child.connectorName, joint.axis, joint.defaultValue, joint.limits);
 			else target.addConstraintOnAxis(joint.id, joint.type, parent.instanceId, parent.connectorName,
 				child.instanceId, child.connectorName, joint.axis, joint.closureTolerance, joint.limits);
+			if (joint.passive == true) target.setPassive(joint.id);
+			if (joint.stop != null) target.setJointStop(joint.id, joint.stop);
 		}
 		for (coupling in level.couplings)
 			target.addCoupling(coupling.id, coupling.source, coupling.target, coupling.ratio, coupling.offset,
