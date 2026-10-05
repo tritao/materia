@@ -2670,6 +2670,56 @@ class FrameworkSmoke {
 		context.pointerUp(lockedTabContextGeometry.x + 2.0, lockedTabContextGeometry.y + 2.0, 1);
 		if (tabMenus != 3 || tabs.selectedKey != "first") return 1007;
 
+		var closes = 0, closeSelections = 0, closeDrags = 0;
+		var closable = new TabItem("closable", "Close me", new Text("close page"));
+		closable.onClose = function() closes++;
+		var closeTabs = new Tabs("close-tabs", [new TabItem("keep", "Keep", new Text("keep page")), closable],
+			"keep", function(_) closeSelections++, null, function(_, _) closeDrags++);
+		closeTabs.headerRevision = function() return "stable";
+		context.pointerMove(0, 180);
+		var closeRoot = context.submit(closeTabs, tabsFrame);
+		var closeRow = closeRoot.children[0].children[1].children[0];
+		var closeNode = closeRow.children[1].children[0];
+		var closeWidth = closeRow.globalBounds().width;
+		if (closeNode.layout.style.visible || cast(closeNode.semantics, Semantics).label != "Close Close me") throw "Close buttons must start hidden and expose an accessible name";
+		var closeBounds = closeRow.globalBounds();
+		context.pointerMove(closeBounds.x + 2, closeBounds.y + 2);
+		closeRoot = context.submit(closeTabs, tabsFrame);
+		closeRow = closeRoot.children[0].children[1].children[0];
+		closeNode = closeRow.children[1].children[0];
+		if (!closeNode.layout.style.visible || closeRow.globalBounds().width != closeWidth) throw "Hover must reveal the close target without changing tab width";
+		closeBounds = closeNode.globalBounds();
+		context.pointerMove(closeBounds.x + 12, closeBounds.y + 12);
+		context.pointerDown(closeBounds.x + 12, closeBounds.y + 12, 0);
+		context.pointerUp(closeBounds.x + 12, closeBounds.y + 12, 0);
+		if (closes != 1 || closeSelections != 0 || closeDrags != 0 || closeTabs.selectedKey != "keep") throw "Closing an inactive tab must not select it or start a drag";
+		var tabBody = closeRow.children[0].globalBounds();
+		context.pointerDown(tabBody.x + 2, tabBody.y + 2, 2);
+		closeRoot = context.submit(closeTabs, tabsFrame);
+		context.pointerUp(tabBody.x + 2, tabBody.y + 2, 2);
+		if (closes != 2 || closeSelections != 0 || closeDrags != 0 || closeTabs.selectedKey != "keep")
+			throw "Middle-click must close an inactive tab without selecting or dragging it";
+		closeRow = closeRoot.children[0].children[1].children[0];
+		closeNode = closeRow.children[1].children[0];
+		context.focusWidget(closeRoot.children[0].children[0].children[0].id);
+		context.pointerMove(0, 180);
+		closeRoot = context.submit(closeTabs, tabsFrame);
+		closeRow = closeRoot.children[0].children[1].children[0];
+		closeNode = closeRow.children[1].children[0];
+		if (closeNode.layout.style.visible) throw "Leaving a tab must hide its close target";
+		context.focusWidget(closeRow.children[0].id);
+		context.submit(closeTabs, tabsFrame);
+		if (!closeNode.layout.style.visible) throw "Keyboard focus must reveal the close action";
+
+		for (value in ["🙂🙂🙂🙂🙂🙂🙂🙂-a-very-long-filename.txt", "日本語の長いファイル名-a-very-long-filename.hx"]) {
+			var ellipsisStyle = new LayoutStyle();
+			ellipsisStyle.width = LayoutAxis.fixed(31);
+			var ellipsis = new nativekit.ui.widgets.text.MiddleEllipsisText("unicode-ellipsis", value);
+			context.submit(new Row("unicode-ellipsis-row", [new KeyedView("label", ellipsis)], ellipsisStyle), tabsFrame);
+			context.submit(new Row("unicode-ellipsis-row", [new KeyedView("label", ellipsis)], ellipsisStyle), tabsFrame);
+			if (!ellipsis.truncated) throw "Unicode ellipsis fixture did not exercise truncation";
+		}
+
 		var theme = new Theme();
 		if (theme.tokens.textPrimary != theme.text || theme.tokens.textSecondary != theme.mutedText ||
 			theme.tokens.surface != theme.panelBackground || theme.tokens.focusRing != theme.buttonFocused ||
@@ -4939,6 +4989,26 @@ class FrameworkSmoke {
 		uiContext.key(UiEventKind.KeyDown, UiKey.Enter);
 		if (disabledRuns != 0)
 			return false;
+		var pointerResults = 0, pointerDismissals = 0;
+		var pointerPalette = new CommandPalette("pointer-palette", surfaceRegistry, null, 0, 0, "",
+			function() pointerDismissals++, function(_) pointerResults++);
+		var pointerFrame = new LayoutFrame(640, 480);
+		var pointerRoot = uiContext.submit(pointerPalette, pointerFrame);
+		var runRow:Null<RenderNode> = null;
+		pointerRoot.walk(function(node) {
+			if (node.semantics != null && node.semantics.role == AccessibilityRole.CollectionItem &&
+				node.semantics.label == "Run simulation") runRow = node;
+		});
+		if (runRow == null) return false;
+		var rowBounds = runRow.globalBounds();
+		uiContext.pointerDown(rowBounds.x + 20, rowBounds.y + 18, 1);
+		uiContext.pointerUp(rowBounds.x + 20, rowBounds.y + 18, 1);
+		if (surfaceRuns != 2 || pointerResults != 0) return false;
+		uiContext.pointerDown(rowBounds.x + 20, rowBounds.y + 18, 0);
+		uiContext.submit(pointerPalette, pointerFrame);
+		uiContext.pointerUp(rowBounds.x + 20, rowBounds.y + 18, 0);
+		if (surfaceRuns != 3 || pointerResults != 1 || pointerDismissals != 1)
+			throw "A palette row primary click must execute exactly once and dismiss the palette";
 		return true;
 	}
 

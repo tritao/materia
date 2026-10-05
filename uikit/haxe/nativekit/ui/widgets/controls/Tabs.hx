@@ -172,7 +172,10 @@ class Tabs implements View {
 			tabDragState = context.state(context.id("tab-drag"), new TabDragState());
 		for (item in items) {
 			var button = new Button(item.displayLabel == null ? item.label : item.displayLabel,
-				null, function() { select(item.key); }, item.key);
+				null, null, item.key);
+			button.onClickEvent = function(event) {
+				if (event.kind == UiEventKind.Activate || event.button == 0) select(item.key);
+			};
 			button.accessibilityLabel = item.label + (item.badgeCount > 0 ? ", " + item.badgeCount : "");
 				if (item.badgeCount > 0) button.trailingView = new CountBadge(item.badgeCount);
 			button.variant = ButtonVariant.Navigation;
@@ -193,7 +196,14 @@ class Tabs implements View {
 			var header = new RenderNode(context.id("tab-header:" + item.key),
 				LayoutVisualKind.Box, headerStyle);
 			header.hitTestSelf = false;
-			header.add(buttonNode);
+			if (item.enabled && item.onClose != null) header.on(UiEventKind.Click, function(event) {
+				if (event.button != 2) return;
+				event.preventDefault();
+				event.stopPropagation();
+				var close = item.onClose;
+				if (close != null) close();
+			}, "capture");
+			header.add(item.onClose == null ? buttonNode : buildClosableHeader(context, item, buttonNode));
 			var indicatorStyle = new LayoutStyle();
 			indicatorStyle.width = LayoutAxis.grow();
 			indicatorStyle.height = LayoutAxis.fixed(2.0);
@@ -246,6 +256,57 @@ class Tabs implements View {
 			});
 		}
 		return strip;
+	}
+
+	function buildClosableHeader(context:BuildContext, item:TabItem, buttonNode:RenderNode):RenderNode {
+		var rowStyle = new LayoutStyle();
+		rowStyle.direction = LayoutDirection.LeftToRight;
+		rowStyle.childAlignY = LayoutAlignmentY.Center;
+		rowStyle.background = buttonNode.layout.style.background;
+		var row = new RenderNode(context.id("tab-actions:" + item.key), LayoutVisualKind.Box, rowStyle);
+		row.hitTestSelf = false;
+		row.add(buttonNode);
+		var hover = context.state(context.id("tab-close-hover:" + item.key), false);
+		var focused = context.state(context.id("tab-close-focus:" + item.key), false);
+		var slotStyle = new LayoutStyle();
+		slotStyle.width = LayoutAxis.fixed(28);
+		slotStyle.height = LayoutAxis.fixed(24);
+		var slot = new RenderNode(context.id("tab-close-slot:" + item.key), LayoutVisualKind.Box, slotStyle);
+		slot.hitTestSelf = true;
+		var closeStyle = new LayoutStyle();
+		closeStyle.width = LayoutAxis.fixed(24);
+		closeStyle.height = LayoutAxis.fixed(24);
+		closeStyle.padding = new Insets(4, 4, 4, 4);
+		var close = new Button("", closeStyle, null, "tab-close:" + item.key);
+		close.leadingIcon = nativekit.ui.icons.IconName.Close;
+		close.iconSize = 14;
+		close.variant = ButtonVariant.Navigation;
+		close.classes = ["tab-close"];
+		close.enabled = item.enabled;
+		close.accessibilityLabel = "Close " + item.label;
+		close.onClickEvent = function(event) {
+			event.stopPropagation();
+			var handler = item.onClose;
+			if ((event.kind == UiEventKind.Activate || event.button == 0) && handler != null) handler();
+		};
+		var closeNode = close.build(context);
+		closeNode.on(UiEventKind.PointerDown, function(event) event.stopPropagation());
+		closeNode.on(UiEventKind.PointerUp, function(event) event.stopPropagation());
+		var refresh = function() { closeNode.layout.style.visible = hover.value || focused.value; };
+		refresh();
+		row.on(UiEventKind.HoverEnter, function(event) {
+			if (event.target.equals(row.id)) { hover.update(true); refresh(); }
+		});
+		row.on(UiEventKind.HoverLeave, function(event) {
+			if (event.target.equals(row.id)) { hover.update(false); refresh(); }
+		});
+		for (node in [buttonNode, closeNode]) {
+			node.on(UiEventKind.Focus, function(_) { focused.update(true); refresh(); });
+			node.on(UiEventKind.Blur, function(_) { focused.update(false); refresh(); });
+		}
+		slot.add(closeNode);
+		row.add(slot);
+		return row;
 	}
 
 	function isEnabled(key:String):Bool {

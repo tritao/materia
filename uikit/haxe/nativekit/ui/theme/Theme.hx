@@ -192,6 +192,15 @@ class Theme {
 			[StyleValue.background(tokens.surfaceRaised)]);
 		styles.rule(StyleSelector.widget("button").className("tab-header").state(StyleState.Focused),
 			[StyleValue.borderColor(tokens.focusRing), StyleValue.borderWidth(1.0)]);
+		styles.rule(StyleSelector.widget("button").className("tab-close"),
+			[StyleValue.background(Color.rgba(0, 0, 0, 0))]);
+		for (state in [StyleState.Focused, StyleState.Pressed])
+			styles.rule(StyleSelector.widget("button").className("tab-close").state(state),
+				[StyleValue.background(Color.rgba(0, 0, 0, 0))]);
+		styles.rule(StyleSelector.widget("button").className("tab-close").state(StyleState.Hovered),
+			[StyleValue.background(tokens.surfaceHover)]);
+		styles.rule(StyleSelector.widget("button").className("tab-close").state(StyleState.Disabled),
+			[StyleValue.background(Color.rgba(0, 0, 0, 0))]);
 		styles.rule(StyleSelector.widget("button").className("viewport-tool"), [
 			StyleValue.height(LayoutAxis.fixed(30.0)),
 			StyleValue.padding(new Insets(7.0, 5.0, 7.0, 5.0)),

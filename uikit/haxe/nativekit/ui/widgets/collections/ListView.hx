@@ -45,6 +45,8 @@ class ListView implements View {
 	public var selectedIndex(default, null):Int;
 	public var onSelectionChanged:Null<Int->Void>;
 	public var onItemActivated:Null<Int->Void>;
+	/** Opt in for launcher lists whose primary click invokes the selected item. */
+	public var activateOnClick:Bool = false;
 
 	final fallbackViewportHeight:Float;
 	var selectedState:Null<State<Int>>;
@@ -158,7 +160,7 @@ class ListView implements View {
 					var row = new ListViewRow("row", itemKey, item, cachedCount, itemIndex,
 						window.extentAt(itemIndex), selectedIndex == itemIndex,
 						itemMetadata == null ? null : itemMetadata.labelAt(itemIndex),
-						itemEnabled(itemIndex),
+						itemEnabled(itemIndex), activateOnClick,
 						function() { select(itemIndex); },
 						function() { if (onItemActivated != null) onItemActivated(itemIndex); },
 						function(event) { handleItemKey(context, itemIndex, event); },
@@ -361,13 +363,14 @@ private class ListViewRow implements View {
 	final selected:Bool;
 	final label:Null<String>;
 	final enabled:Bool;
+	final activateOnClick:Bool;
 	final onSelect:Void->Void;
 	final onActivate:Void->Void;
 	final onKey:UiEvent->Void;
 	final onBuilt:WidgetId->Void;
 
 	public function new(key:String, itemKey:String, child:View, setSize:Int, index:Int, extent:Float,
-			selected:Bool, label:Null<String>, enabled:Bool,
+			selected:Bool, label:Null<String>, enabled:Bool, activateOnClick:Bool,
 			onSelect:Void->Void, onActivate:Void->Void,
 			onKey:UiEvent->Void, onBuilt:WidgetId->Void) {
 		this.key = key;
@@ -379,6 +382,7 @@ private class ListViewRow implements View {
 		this.selected = selected;
 		this.label = label;
 		this.enabled = enabled;
+		this.activateOnClick = activateOnClick;
 		this.onSelect = onSelect;
 		this.onActivate = onActivate;
 		this.onKey = onKey;
@@ -407,7 +411,10 @@ private class ListViewRow implements View {
 			semantics.positionInSet = index + 1;
 			node.semantics = semantics;
 			if (enabled) {
-				node.on(UiEventKind.Click, function(_) { onSelect(); });
+				node.on(UiEventKind.Click, function(event) {
+					onSelect();
+					if (activateOnClick && event.button == 0) onActivate();
+				});
 				node.on(UiEventKind.Activate, function(_) { onSelect(); onActivate(); });
 				node.on(UiEventKind.KeyDown, onKey);
 				node.on(UiEventKind.KeyRepeat, onKey);

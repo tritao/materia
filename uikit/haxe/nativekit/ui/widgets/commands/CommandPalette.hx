@@ -89,6 +89,7 @@ class CommandPalette implements View {
 			var list = new ListView("commands", model, listStyle, null, listHeight,
 				model.firstEnabledIndex(),
 				null, activate, null, model);
+			list.activateOnClick = true;
 			search.onSubmit = function(_) activate(list.selectedIndex < 0
 				? model.firstEnabledIndex() : list.selectedIndex);
 			var contentStyle = new LayoutStyle();

@@ -505,7 +505,9 @@ class UiContext {
 			if (node.resolved.visible &&
 				(node.resolved.width <= 0.0 || node.resolved.height <= 0.0))
 				emptyPaintNodes++;
-			if (node.resolved.width <= 0.0 || node.resolved.height <= 0.0 ||
+			// A hidden painter records nothing; do not cache that empty result as its content.
+			// Keep any existing local list so it can be rebound when the node becomes visible.
+			if (!node.resolved.visible || node.resolved.width <= 0.0 || node.resolved.height <= 0.0 ||
 				node.resolved.clipBounds.width <= 0.0 || node.resolved.clipBounds.height <= 0.0) {
 				clearCustomPaintBindings(nodeId);
 				return;

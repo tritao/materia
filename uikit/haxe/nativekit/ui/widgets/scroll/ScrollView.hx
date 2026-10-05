@@ -85,10 +85,6 @@ class ScrollView implements View {
 			visibility.value.bindSource(controller);
 			var policy:Int = scrollbarVisibility == null ? context.environment.scrollbarVisibility : scrollbarVisibility;
 			visibility.value.configure(showScrollbar ? policy : ScrollbarVisibility.Hidden, context.environment.reducedMotion);
-			binding.value.attach(controller, context.animations, function(_) {
-				visibility.value.reveal();
-				context.commands.refresh();
-			});
 
 			var contentStyle = new LayoutStyle();
 			contentStyle.width = axis == ScrollAxis.Vertical ? LayoutAxis.stretch() : LayoutAxis.fit();
@@ -101,6 +97,12 @@ class ScrollView implements View {
 				return context.withScope(new Key("content"), function() return child.build(context));
 			});
 			translatedContent.add(content);
+			binding.value.attach(controller, context.animations, function(_) {
+				translatedContent.layout.style.transform = Transform2D.identity().translated(-controller.offsetX, -controller.offsetY);
+				visibility.value.reveal();
+				context.commands.refresh();
+			});
+
 			viewport.add(translatedContent);
 			var overlayHost = scrollbarOverlayHost == null ? viewport : scrollbarOverlayHost;
 			var scrollbar = showScrollbar && policy != ScrollbarVisibility.Hidden && axis != ScrollAxis.Horizontal

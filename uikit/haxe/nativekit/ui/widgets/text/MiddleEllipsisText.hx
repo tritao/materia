@@ -1,6 +1,7 @@
 package nativekit.ui.widgets.text;
 
 import FontFamily;
+import nativekit.editorkit.TextDocument;
 import LayoutAxis;
 import LayoutStyle;
 import ParagraphStyle;
@@ -57,17 +58,18 @@ class MiddleEllipsisText implements View {
             resolved.textStyle, paragraph);
           next = value;
           if (layout.measure().width > available + 1.0) {
-            var low = 0, high = value.length;
+            var document = new TextDocument(value);
+            var low = 0, high = document.codepointCount;
             while (low < high) {
               var count = (low + high + 1) >> 1;
               var prefix = middle ? (count + 1) >> 1 : count;
-              var candidate = value.substr(0, prefix) + "…" + value.substr(value.length - (count - prefix));
+              var candidate = document.sliceCodepoints(0, prefix) + "…" + document.sliceCodepoints(document.codepointCount - (count - prefix), document.codepointCount);
               layout.setText(candidate);
               if (layout.measure().width <= available) low = count;
               else high = count - 1;
             }
             var prefix = middle ? (low + 1) >> 1 : low;
-            next = value.substr(0, prefix) + "…" + value.substr(value.length - (low - prefix));
+            next = document.sliceCodepoints(0, prefix) + "…" + document.sliceCodepoints(document.codepointCount - (low - prefix), document.codepointCount);
           }
           layout.dispose();
           memo.store(value, available, resolved.textStyle, resolved.paragraphStyle, next);
