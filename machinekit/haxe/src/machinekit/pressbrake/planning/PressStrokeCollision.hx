@@ -17,8 +17,7 @@ class PressStrokeCollision {
 		if (stroke.length < 2)
 			throw new SheetDiagnosis("press.stroke-collision", "Stroke collision needs both stroke endpoints");
 		var motion = gauge == null ? new BackgaugeStroke(setup.registration, 0) : gauge;
-		if (motion.registeredX != setup.registration.x || motion.r != setup.registration.r)
-			throw new SheetDiagnosis("press.gauge-retract", "Backgauge stroke must start at the setup registration");
+		motion.validate(setup.registration);
 		var unresolved:PressStrokeCollisionResult = Clear;
 		for (sample in 0...stroke.length) {
 			var pose = stroke[sample], angle = pose.evaluation.bend(setup.bend).angle;
@@ -75,7 +74,7 @@ class PressStrokeCollision {
 		return new SheetDiagnosis(code, a + reason + b + " at " + angle * 180 / Math.PI + " degrees (sample " + sample + ")",
 			[a, b, "sample:" + sample]);
 	}
-	static function ownerName(owner:PressCollisionOwner):String return switch owner {
+	public static function ownerName(owner:PressCollisionOwner):String return switch owner {
 		case SheetWall(id): "wall:" + id;
 		case SheetBend(id): "bend:" + id;
 		case Punch(station, segment): "punch:" + station + ":segment:" + segment;

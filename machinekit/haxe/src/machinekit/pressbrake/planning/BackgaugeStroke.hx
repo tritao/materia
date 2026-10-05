@@ -19,4 +19,8 @@ class BackgaugeStroke {
 			throw new SheetDiagnosis("press.gauge-retract", "Backgauge withdrawal needs between 1 and 3600 sample intervals");
 		return [for (i in 0...(samples + 1)) registeredX + (strokeX - registeredX) * i / samples];
 	}
+	public function validate(registration:BendRegistration):Void {
+		if (registeredX != registration.x || r != registration.r)
+			throw new SheetDiagnosis("press.gauge-retract", "Backgauge stroke must start at the setup registration");
+	}
 }

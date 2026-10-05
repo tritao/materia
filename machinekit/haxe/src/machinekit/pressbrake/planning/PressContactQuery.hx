@@ -12,11 +12,7 @@ class PressContactQuery {
 		switch body.owner {
 			case SheetWall(_):
 				if (body.error != 0) return null;
-				for (prism in body.pieces()) for (contact in tool.prisms()) {
-					var section = PressPrismSection.of(prism, contact.start, contact.end);
-					if (section != null && sections.overlap(section, contact.section)) return true;
-				}
-				return false;
+				return exactPrisms(body.pieces(), tool);
 			case SheetBend(id):
 				for (contact in tool.prisms()) {
 					var material = PressBendSection.of(sheet.bend(id), pose.evaluation.bend(id), pose.placement, contact.start, contact.end);
@@ -26,5 +22,13 @@ class PressContactQuery {
 				return false;
 			case _: throw new SheetDiagnosis("press.contact-body", "Tool contact refinement requires evaluated sheet material");
 		}
+	}
+	/** Any exact convex material, including a gripper box, against the authored tool sections. */
+	public function exactPrisms(prisms:Array<ConvexPrism>, tool:PressToolContact):Bool {
+		for (prism in prisms) for (contact in tool.prisms()) {
+			var section = PressPrismSection.of(prism, contact.start, contact.end);
+			if (section != null && sections.overlap(section, contact.section)) return true;
+		}
+		return false;
 	}
 }

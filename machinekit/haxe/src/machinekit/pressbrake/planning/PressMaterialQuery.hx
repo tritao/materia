@@ -7,16 +7,18 @@ import cadkit.sheetmetal.SheetDiagnosis;
 class PressMaterialQuery {
 	final prisms:SheetCollisionQuery;
 	final bends:PressBendPrismQuery;
+	final walls:PressWallPrismQuery;
 	public function new(prisms:SheetCollisionQuery) {
 		if (prisms == null) throw new SheetDiagnosis("press.material-query", "Material collision checks need a prism query");
-		this.prisms = prisms; bends = new PressBendPrismQuery();
+		this.prisms = prisms; bends = new PressBendPrismQuery(); walls = new PressWallPrismQuery();
 	}
 	/** False proves clearance, true proves material overlap, null requests geometric refinement. */
 	public function overlap(sheet:Sheet, pose:PressSheetPose, material:PressCollisionBody, obstacle:PressCollisionBody):Null<Bool> {
 		switch material.owner {
-			case SheetWall(_):
-				if (material.error == 0 && obstacle.error == 0) {
-					for (a in material.pieces()) for (b in obstacle.pieces()) if (prisms.overlap(a, b)) return true;
+			case SheetWall(id):
+				if (obstacle.error == 0) {
+					for (piece in obstacle.pieces())
+						if (walls.overlap(sheet.wall(id).outline, sheet.thickness(), pose.wall(id), piece)) return true;
 					return false;
 				}
 			case SheetBend(id):

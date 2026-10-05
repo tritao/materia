@@ -39,12 +39,12 @@ class ConvexPrism {
 	public function vertices():Array<Vector> return corners.copy();
 	public function faceNormals():Array<Vector> return normals.copy();
 	public function edgeDirections():Array<Vector> return directions.copy();
-	/** Euclidean inset of every physical face plane; null means no positive material remains. */
+	/** Euclidean inset of every physical face plane; null means no resolvable inset material remains. */
 	public function inset(distance:Float):Null<ConvexPrism> {
 		if (!Math.isFinite(distance) || distance < 0) fail("Inset distance must be finite nonnegative mm");
 		if (distance == 0) return this;
 		var thickness = Math.abs(extrusion.dot(normals[0]));
-		if (2 * distance >= thickness) return null;
+		if (thickness - 2 * distance <= 1e-8) return null;
 		var center = new Vector();
 		for (point in base) center = center.add(point.scale(1.0 / base.length));
 		var polygon = base.copy();
@@ -61,8 +61,8 @@ class ConvexPrism {
 			}
 			polygon = [];
 			for (point in clipped)
-				if (polygon.length == 0 || point.subtract(polygon[polygon.length - 1]).length() > 1e-10) polygon.push(point);
-			if (polygon.length > 1 && polygon[0].subtract(polygon[polygon.length - 1]).length() <= 1e-10) { var removed = polygon.pop(); }
+				if (polygon.length == 0 || point.subtract(polygon[polygon.length - 1]).length() > 1e-8) polygon.push(point);
+			if (polygon.length > 1 && polygon[0].subtract(polygon[polygon.length - 1]).length() <= 1e-8) { var removed = polygon.pop(); }
 			if (polygon.length < 3) return null;
 		}
 		var area = new Vector(), origin = polygon[0];

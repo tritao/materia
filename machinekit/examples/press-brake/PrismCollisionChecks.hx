@@ -44,6 +44,9 @@ class PrismCollisionChecks {
 			check(Math.abs(point.x) <= 1.9 + 1e-8 && Math.abs(point.y) <= 0.1 + 1e-8 && Math.abs(point.z) <= 0.1 + 1e-8,
 				"Euclidean inset moves every box face inward by the declared distance");
 		check(rod.inset(0.2) == null, "Collapsed thickness has no inset material");
+		check(rod.inset(0.2-1e-9) == null, "Subresolution cap thickness does not construct an invalid prism");
+		var longThin = box("long-thin-inset",10000,0.2,1);
+		check(longThin.inset(0.2-1e-9) == null, "Large area does not hide subresolution side edges");
 		check(rod.inset(0) == rod, "Zero inset preserves immutable material");
 		var insetFixture = new ConvexPrism("oblique-inset",[new Vector(-1,-1,0),new Vector(1,-1,0),new Vector(1,1,0),new Vector(-1,1,0)],new Vector(1,0,2));
 		var obliqueInner = insetFixture.inset(0.1);
