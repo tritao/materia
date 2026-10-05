@@ -25,6 +25,7 @@ if(NK_SIM_MUJOCO_USE_VENDORED)
     set(MUJOCO_BUILD_SHARED OFF CACHE BOOL
         "Embed a PIC static MuJoCo runtime in the NativeKit backend" FORCE)
 
+    include("${CMAKE_CURRENT_LIST_DIR}/VendoredMujocoDependencies.cmake")
     add_subdirectory("${NK_MUJOCO_SOURCE_DIR}"
         "${CMAKE_BINARY_DIR}/vendor/mujoco")
     set(NK_MUJOCO_TARGET mujoco::mujoco)

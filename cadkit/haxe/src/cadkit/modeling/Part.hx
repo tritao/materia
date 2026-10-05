@@ -117,19 +117,32 @@ class Part extends Model {
 		}
 	}
 
-	/** Fuse borrowed parts into an independently owned result. */
+	/**
+	 * Fuse borrowed parts into an independently owned result.
+	 *
+	 * The parts are fused as a balanced tree: each boolean joins two halves of similar size, so most of them work on small
+	 * shapes. Fusing them one after another instead grows one result through every step, and each boolean (and the validity
+	 * check after it) pays for everything fused so far; for a frame of dozens of members that was most of the time to build it.
+	 */
 	public static function fuseAll(parts:Array<Part>):Part {
 		if (parts.length == 0) throw "Fuse needs at least one part";
-		var result = new Part(parts[0].shape.cloneShape());
+		return fuseRange(parts, 0, parts.length);
+	}
+
+	static function fuseRange(parts:Array<Part>, from:Int, to:Int):Part {
+		var count = to - from;
+		if (count == 1) return new Part(parts[from].shape.cloneShape());
+		if (count == 2) return parts[from].combine(parts[from + 1]);
+		var middle = from + (count >> 1), left = fuseRange(parts, from, middle), right:Null<Part> = null;
 		try {
-			for (i in 1...parts.length) {
-				var next = result.combine(parts[i]);
-				result.close();
-				result = next;
-			}
+			right = fuseRange(parts, middle, to);
+			var result = left.combine(right);
+			left.close();
+			right.close();
 			return result;
 		} catch (error:Dynamic) {
-			result.close();
+			left.close();
+			if (right != null) right.close();
 			throw error;
 		}
 	}

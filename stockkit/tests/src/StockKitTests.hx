@@ -1,3 +1,5 @@
+import haxeon.test.Shards;
+import haxeon.test.Shards.TestGroup;
 import fixtures.ChainFixtures;
 import fixtures.CoreComparison;
 import fixtures.CoreFixtures;
@@ -9,14 +11,20 @@ import toolpathkit.tool.CutterZone;
 
 class StockKitTests {
   public static function main():Void {
-    profiles();
-    CutMoveTests.run();
-    SampledReferenceFixtures.run();
-    CoreFixtures.run();
-    OracleFixtures.run();
-    ChainFixtures.run();
-    Sys.println('StockKit tests passed (${Assert.count} assertions, '
-      + '${CoreComparison.raysCompared} core rays checked against references)');
+    // Each group is independent of the others, so that the workspace can run them as parallel shards.
+    var groups:Array<TestGroup> = [
+      {name: "profiles", run: profiles, weight: 0.05},
+      {name: "CutMoveTests", run: CutMoveTests.run, weight: 0.05},
+      {name: "SampledReferenceFixtures", run: SampledReferenceFixtures.run, weight: 4},
+      {name: "CoreFixtures", run: CoreFixtures.run, weight: 4.5},
+      {name: "OracleFixtures", run: OracleFixtures.run, weight: 4.3}
+    ];
+    for (group in ChainFixtures.groups())
+      groups.push(group);
+    var everything = Shards.run(groups);
+    if (everything)
+      Sys.println('StockKit tests passed (${Assert.count} assertions, '
+        + '${CoreComparison.raysCompared} core rays checked against references)');
   }
 
   static function profiles():Void {

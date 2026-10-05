@@ -1,5 +1,6 @@
 package machinekit.assembly;
 
+import cadkit.modeling.AssemblyState;
 import cadkit.modeling.Location;
 import cadkit.modeling.Part;
 import cadkit.modeling.Plane;
@@ -44,6 +45,55 @@ class PosedParts {
 		}
 		var x = AssemblyFrames.transformVector(pose, 1, 0, 0), z = AssemblyFrames.transformVector(pose, 0, 0, 1);
 		return local.placed(new Location(new Plane(new Vector(pose.x, pose.y, pose.z), new Vector(x.x, x.y, x.z), new Vector(z.x, z.y, z.z))));
+	}
+
+	/** The member `id` of `assembly` at its pose in `state`: a new owned part. `label` names the assembly in the error for an unknown id. */
+	public function member(assembly:MachineAssembly, state:AssemblyState, label:String, id:String):Part {
+		for (entry in assembly.components()) if (entry.id == id) return posed(entry.component, state.worldPose(id));
+		throw '$label has no member "$id"';
+	}
+
+	/** The volume (mm³) members `a` and `b` of `assembly` share at the poses in `state`. */
+	public function volume(assembly:MachineAssembly, state:AssemblyState, label:String, a:String, b:String):Float {
+		var first = member(assembly, state, label, a), second = member(assembly, state, label, b);
+		var shared = commonVolume(first, boxOf(first), second, boxOf(second));
+		first.close();
+		second.close();
+		return shared;
+	}
+
+	/**
+	 * Throws, worded by `describe(moving, other, volume)`, for the first member of `moving` that shares more than `limit` mm³
+	 * with a member of `others`, trying pairs in order. Each member is posed once for all its pairs.
+	 */
+	public function checkClear(assembly:MachineAssembly, state:AssemblyState, label:String, moving:Array<String>, others:Array<String>,
+			describe:(String, String, Float) -> String, limit:Float = 1e-3):Void {
+		var first:Array<Part> = [], second:Array<Part> = [];
+		try {
+			for (id in moving) first.push(member(assembly, state, label, id));
+			for (id in others) second.push(member(assembly, state, label, id));
+			var firstBoxes = [for (part in first) boxOf(part)], secondBoxes = [for (part in second) boxOf(part)];
+			for (a in 0...first.length) for (b in 0...second.length) {
+				var shared = commonVolume(first[a], firstBoxes[a], second[b], secondBoxes[b]);
+				if (shared > limit) throw describe(moving[a], others[b], shared);
+			}
+		} catch (error:Dynamic) {
+			closeAll(first);
+			closeAll(second);
+			throw error;
+		}
+		closeAll(first);
+		closeAll(second);
+	}
+
+	/** Runs `body` with a new `PosedParts` and closes it afterwards, including when `body` throws. */
+	public static function scope(body:PosedParts -> Void):Void {
+		var parts = new PosedParts();
+		try body(parts) catch (error:Dynamic) {
+			parts.close();
+			throw error;
+		}
+		parts.close();
 	}
 
 	/** Closes the geometry this object keeps. */

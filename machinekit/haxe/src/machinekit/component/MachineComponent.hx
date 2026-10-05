@@ -39,13 +39,6 @@ class MachineComponent {
 	public var bom(get, never):BomItem;
 	public final description:String;
 	var cachedBom:Null<BomItem>;
-	/**
-	 * Mass properties computed from a recipe's preview geometry, shared by every component built from the same recipe
-	 * inputs and material. Computing them cuts and integrates real solids, and each machine compile builds new component
-	 * instances, so a per-instance cache never hit across compiles (a third of the MotionKit tests' time).
-	 */
-	static final computedMass:Map<String, MassProperties> = [];
-
 	static var nextInstanceId = 0;
 
 	/** Tells this component from every other, including ones built from the same recipe. */
@@ -118,11 +111,14 @@ class MachineComponent {
 	public function massProperties():MassProperties {
 		if (declaredMass != null) return declaredMass;
 		if (cachedMass != null && cachedMassMaterialId == materialId) return cachedMass;
-		var recipe = type, shareKey = recipe == null ? null : recipe.id + "|" + recipe.key(values()) + "|" + materialId;
-		if (shareKey != null && computedMass.exists(shareKey)) {
-			cachedMass = computedMass.get(shareKey);
-			cachedMassMaterialId = materialId;
-			return cachedMass;
+		var recipe = type, shareKey = recipe == null ? null : geometryKey(Preview);
+		if (shareKey != null) {
+			var known = recipe.knownMass(shareKey);
+			if (known != null) {
+				cachedMass = known;
+				cachedMassMaterialId = materialId;
+				return known;
+			}
 		}
 		var part:Part;
 		try part = geometry(Preview) catch (_:NoGeometry)
@@ -139,7 +135,7 @@ class MachineComponent {
 			throw error;
 		}
 		part.close();
-		if (shareKey != null) computedMass.set(shareKey, cachedMass);
+		if (shareKey != null) recipe.rememberMass(shareKey, cachedMass);
 		return cachedMass;
 	}
 

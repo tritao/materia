@@ -74,16 +74,14 @@ class MobileBaseChecks {
 	}
 
 	public static function run():Void {
-		parts = new PosedParts();
-		try runChecks() catch (error:Dynamic) {
-			parts.close();
-			throw error;
-		}
-		parts.close();
+		PosedParts.scope(posed -> {
+			clearance = posed;
+			runChecks();
+		});
 	}
 
-	/** The geometry of the members posed by this run, built once each; closed when the run ends. */
-	static var parts:PosedParts;
+	/** The members posed by this run, with their geometry built once each; closed when the run ends. */
+	static var clearance:PosedParts;
 
 	static function runChecks():Void {
 		var scene = SceneArtifact.decode(MobileBasePreview.base());
@@ -284,8 +282,7 @@ class MobileBaseChecks {
 	}
 
 	static function posed(robot:MachineAssembly, state:AssemblyState, id:String):Part {
-		for (entry in robot.components()) if (entry.id == id) return parts.posed(entry.component, state.worldPose(id));
-		throw 'Mobile base has no member "$id"';
+		return clearance.member(robot, state, "Mobile base", id);
 	}
 }
 
