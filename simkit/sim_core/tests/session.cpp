@@ -227,6 +227,7 @@ struct Recorder {
     bool fail_prepare = false;
     nksim_session session = 0;
     uint64_t last_step = 0;
+    uint64_t owner_time = 0;
 };
 
 void participants_share_every_tick() {
@@ -237,19 +238,23 @@ void participants_share_every_tick() {
         nksim_participant_desc desc{};
         desc.struct_size = sizeof(desc);
         desc.user = &recorder;
-        desc.prepare = [](void *user, const nksim_tick *) -> nksim_result {
+        desc.prepare = [](void *user, const nksim_tick *tick) -> nksim_result {
             auto &self = *static_cast<Recorder *>(user);
             self.log += "p";
+            self.owner_time = tick->owner_time_ns;
             return self.fail_prepare ? NKSIM_ERROR_INVALID_ARGUMENT : NKSIM_OK;
         };
         desc.discard = [](void *user) { static_cast<Recorder *>(user)->log += "d"; };
-        desc.submit = [](void *user, const nksim_tick *) -> nksim_result {
-            static_cast<Recorder *>(user)->log += "s";
+        desc.submit = [](void *user, const nksim_tick *tick) -> nksim_result {
+            auto &self = *static_cast<Recorder *>(user);
+            assert(tick->owner_time_ns == self.owner_time);
+            self.log += "s";
             return NKSIM_OK;
         };
         desc.publish = [](void *user, const nksim_tick *tick) -> nksim_result {
             auto &self = *static_cast<Recorder *>(user);
             self.log += "u";
+            assert(tick->owner_time_ns == self.owner_time);
             // Callbacks may re-enter the session under its lock.
             assert(nksim_session_latest_snapshot(self.session) != 0);
             self.last_step = tick->step_index;
@@ -267,6 +272,7 @@ void participants_share_every_tick() {
     assert(nksim_session_add_participant(space.session, &desc_b, &b) == NKSIM_OK);
     assert(nksim_session_step(space.session, 0, nullptr) == NKSIM_OK);
     assert(first.log == "psu" && second.log == "psu" && second.last_step == 1);
+    assert(first.owner_time == 10'000'000 && second.owner_time == first.owner_time);
 
     // One participant's rejected commands discard everyone's and skip the tick.
     second.fail_prepare = true;

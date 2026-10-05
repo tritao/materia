@@ -97,7 +97,8 @@ NKSIM_API nksim_result NKSIM_CALL nksim_session_get_status(
  * Advances exactly one fixed tick on the caller's thread: every participant
  * prepares, then submits, physics advances, and every participant publishes.
  * owner_time_ns is the timestamp participants that follow the owner's clock
- * receive. Returns NKSIM_ERROR_INVALID_STATE while running realtime.
+ * receive. Zero selects the fixed-step simulation clock for every phase.
+ * Returns NKSIM_ERROR_INVALID_STATE while running realtime.
  */
 NKSIM_API nksim_result NKSIM_CALL nksim_session_step(
     nksim_session session, uint64_t owner_time_ns, nksim_clock *out_clock NK_INOUT);

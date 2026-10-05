@@ -800,7 +800,10 @@ private:
         info.step_index = step_index_ + 1;
         info.simulation_time = static_cast<double>(step_index_ + 1) * fixed_timestep_;
         info.fixed_timestep = fixed_timestep_;
-        info.owner_time_ns = owner_time_ns;
+        // Manual callers may omit their clock. Resolve it once so prepare,
+        // submit and publish observe the same owner time.
+        info.owner_time_ns = owner_time_ns != 0 ? owner_time_ns
+            : info.step_index * static_cast<uint64_t>(std::llround(fixed_timestep_ * 1e9));
         info.realtime = realtime ? 1u : 0u;
         // Iterate a copy so a callback may add or remove participants.
         const auto participants = participants_;

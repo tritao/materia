@@ -6,7 +6,7 @@
 #include <memory>
 #include <cstdio>
 
-void check_brake(double holding_force, bool holds) {
+void check_brake(double holding_force, bool holds, bool implicit_clock = false) {
     nkscene_scene scene = 0;
     nksim_world world = 0;
     nksim_session session = 0;
@@ -67,7 +67,7 @@ void check_brake(double holding_force, bool holds) {
     uint64_t tick = 0;
     auto step = [&]() {
         tick += 10'000'000;
-        const auto result = nksim_session_step(session, tick, nullptr);
+        const auto result = nksim_session_step(session, implicit_clock ? 0 : tick, nullptr);
         if (result != NKSIM_OK) {
             const auto snapshot_result = rk_robot_runtime_snapshot_full(runtime, &state);
             std::fprintf(stderr, "brake step %llu: result %d, snapshot %d, fault %d, safety %u\n",
@@ -130,4 +130,5 @@ void check_brake(double holding_force, bool holds) {
 int main() {
     check_brake(150.0, true);
     check_brake(50.0, false);
+    check_brake(150.0, true, true); // every phase must share the default owner clock
 }
