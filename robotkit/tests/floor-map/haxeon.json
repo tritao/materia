@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "robotkit-floor-map-tests"},
+  "entry": "FloorMapTests",
+  "sourceRoots": ["."],
+  "dependencies": {"robotkit": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "build"
+}

@@ -62,16 +62,7 @@ import robotkit.skill.SkillStatus;
 import robotkit.core.RobotSnapshot;
 
 /** A box held where it stands: centre, half extents and heading, in metres and radians. */
-typedef FloorObstacle = {
-  var id:String;
-  var x:Float;
-  var y:Float;
-  var z:Float;
-  var halfX:Float;
-  var halfY:Float;
-  var halfZ:Float;
-  var yaw:Float;
-}
+typedef FloorObstacle = robotkit.navigation.FloorMap.FloorBox;
 
 /**
  * What a view of the running mission draws, all in the map frame and metres: the route being followed,
@@ -356,50 +347,14 @@ class MissionPlayer implements SessionMember {
 
   /** The boxes that stand in the robot's way: above the floor and below its height; the floor itself and overhead boxes are not. */
   public static function standing(boxes:Array<FloorObstacle>):Array<FloorObstacle>
-    return [for (box in boxes) if (box.z - box.halfZ < CLEARANCE && box.z + box.halfZ > 0.01) box];
+    return robotkit.navigation.FloorMap.standing(boxes, CLEARANCE);
 
   /**
    * An occupancy grid covering the obstacles and `poses` with a margin: a cell is occupied when its
    * square overlaps a box that stands within the robot's height.
    */
-  public static function floorPlan(obstacles:Array<FloorObstacle>, poses:Array<Pose2>):OccupancyGrid2 {
-    var minX = Math.POSITIVE_INFINITY, minY = Math.POSITIVE_INFINITY;
-    var maxX = Math.NEGATIVE_INFINITY, maxY = Math.NEGATIVE_INFINITY;
-    function extend(x:Float, y:Float):Void {
-      minX = Math.min(minX, x); maxX = Math.max(maxX, x);
-      minY = Math.min(minY, y); maxY = Math.max(maxY, y);
-    }
-    var blocking = standing(obstacles);
-    for (box in blocking) {
-      var reach = Math.sqrt(box.halfX * box.halfX + box.halfY * box.halfY);
-      extend(box.x - reach, box.y - reach);
-      extend(box.x + reach, box.y + reach);
-    }
-    for (pose in poses) extend(pose.x, pose.y);
-    if (!Math.isFinite(minX)) throw "A mobile mission needs somewhere to drive";
-    var width = Math.ceil((maxX - minX + 2 * MARGIN) / RESOLUTION);
-    var height = Math.ceil((maxY - minY + 2 * MARGIN) / RESOLUTION);
-    var grid = new OccupancyGrid2(RESOLUTION, new Pose2(minX - MARGIN, minY - MARGIN), width, height, FRAME,
-      OccupancyCell.Free);
-    // A cell square overlaps a box when its centre lies within the box grown by half a cell's diagonal
-    // projected on each box axis; growing by the full half-diagonal is the safe side of that.
-    var grow = RESOLUTION * Math.sqrt(0.5);
-    for (box in blocking) {
-      var c = Math.cos(box.yaw), s = Math.sin(box.yaw);
-      var reach = Math.sqrt(box.halfX * box.halfX + box.halfY * box.halfY) + grow;
-      var low = grid.worldToCell(new Pose2(box.x - reach, box.y - reach));
-      var high = grid.worldToCell(new Pose2(box.x + reach, box.y + reach));
-      if (low == null || high == null) throw 'Obstacle "${box.id}" is off the map';
-      for (cx in low.x...high.x + 1) for (cy in low.y...high.y + 1) {
-        var centre = grid.cellCenter(cx, cy);
-        var dx = centre.x - box.x, dy = centre.y - box.y;
-        var along = dx * c + dy * s, across = -dx * s + dy * c;
-        if (Math.abs(along) <= box.halfX + grow && Math.abs(across) <= box.halfY + grow)
-          grid.setCell(cx, cy, OccupancyCell.Occupied);
-      }
-    }
-    return grid;
-  }
+  public static function floorPlan(obstacles:Array<FloorObstacle>, poses:Array<Pose2>):OccupancyGrid2
+    return robotkit.navigation.FloorMap.rasterize(obstacles, poses, RESOLUTION, MARGIN, CLEARANCE, FRAME);
 
   public function feed():Void {
     if (failure != null || finished) return;
