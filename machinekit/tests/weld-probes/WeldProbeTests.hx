@@ -6,6 +6,9 @@ import machinekit.welding.WeldProbeGeometry.WeldProbeFace;
 import materia.assembly.AssemblyFrames;
 import machinekit.welding.WeldProbeParkingBounds;
 import machinekit.welding.WeldProbePatterns;
+import machinekit.welding.WeldProbeUncertainty.WeldProbeObservedBounds;
+import machinekit.welding.WeldProbeParkingBounds.WeldProbeRegionBounds;
+import processkit.perception.ContactPoseEnvelope;
 import processkit.perception.ContactRegistration;
 import processkit.perception.ContactRegistration.PlaneContact;
 import robotkit.spatial.Transform3;
@@ -15,6 +18,15 @@ import robotkit.spatial.Quat;
 class WeldProbeTests {
   static var checks = 0;
   static function check(ok:Bool, reason:String):Void { checks++; if (!ok) throw reason; }
+  static function metres(point:Vector):Vec3 return new Vec3(point.x * 0.001, point.y * 0.001, point.z * 0.001);
+  static function direction(point:Vector):Vec3 return new Vec3(point.x, point.y, point.z);
+  static function observedBounds(envelope:ContactPoseEnvelope):WeldProbeObservedBounds {
+    var estimate = envelope.estimate();
+    return new WeldProbeObservedBounds((face, point) -> {
+      var bound = envelope.region(metres(point), direction(face.normal), direction(face.u), direction(face.v), estimate);
+      return new WeldProbeRegionBounds(bound.halfU * 1000, bound.halfV * 1000, bound.normalTravel * 1000, bound.tiltU, bound.tiltV);
+    });
+  }
   static function main():Void {
     var plate = Part.box(100, 80, 10);
     var cutter = Part.box(20, 20, 20);
@@ -96,6 +108,39 @@ class WeldProbeTests {
         "First-plane contacts are noncollinear");
       for (point in stage.points) check(envelope.fits(stage.face, point, 3), "Each first contact contains the full parking uncertainty");
     }
+    // Later stages use a measured feasible set, never a fabricated zero-error parking pose.
+    var nominalWork = new Transform3(new Vec3(0.5, 1.7, 0), Quat.identity());
+    var measuredEnvelope = new ContactPoseEnvelope(nominalWork, new Vec3(0.02, 0.02, 0),
+      new Vec3(0, 0, 2 * Math.PI / 180), 0.00001);
+    var parkingError = new Transform3(new Vec3(0.011, -0.014, 0), Quat.fromRollPitchYaw(0, 0, 0.025));
+    var measuredWork = parkingError.inverse().compose(nominalWork);
+    var measuredContacts:Array<PlaneContact> = [];
+    var measuredNormals:Array<Vector> = [];
+    for (count in [3, 2, 1]) {
+      var provider = observedBounds(measuredEnvelope);
+      var options = WeldProbePatterns.stages(work, count, measuredNormals, provider, 3, 9);
+      check(options.length > 0, 'Measured uncertainty permits a CAD-derived $count-contact stage');
+      var stage = options[0];
+      for (point in stage.points) {
+        var bound = provider.region(stage.face, point);
+        var normal = direction(stage.face.normal);
+        var command = measuredEnvelope.estimate().transformPoint(metres(point));
+        var ray = measuredWork.inverse().rotation.rotate(measuredEnvelope.estimate().rotation.rotate(normal));
+        var located = measuredWork.inverse().transformPoint(command);
+        var distance = (stage.face.offset() * 0.001 - normal.dot(located)) / normal.dot(ray);
+        var delta = located.add(ray.scale(distance)).sub(metres(point));
+        check(Math.abs(delta.dot(direction(stage.face.u))) * 1000 <= bound.halfU + 1e-6 &&
+          Math.abs(delta.dot(direction(stage.face.v))) * 1000 <= bound.halfV + 1e-6 &&
+          Math.abs(distance) * 1000 <= bound.normalTravel + 1e-6,
+          "Measured CAD region encloses the physical probe intersection after recentering");
+        measuredContacts.push(new PlaneContact(normal, stage.face.offset() * 0.001,
+          measuredWork.transformPoint(metres(point))));
+      }
+      measuredNormals.push(stage.face.normal);
+      measuredEnvelope.refine(measuredContacts, 4096, 32);
+    }
+    var measuredFit = ContactRegistration.fit(measuredContacts, nominalWork);
+    check(measuredFit.accepted && measuredFit.rank == 6, "Measured-bound CAD stages yield a fully observable registration");
     var reduced = new WeldProbeParkingBounds(chassis, new Vector(), 0);
     var firstNormal = firstStages[0].face.normal;
     var secondStages = WeldProbePatterns.stages(work, 2, [firstNormal], reduced);

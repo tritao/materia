@@ -1740,3 +1740,14 @@ with explicit metre units and calibrated contact error. Focused tests pass 51 en
 20 search assertions and 109 rigid-fit assertions. They cover parking extremes, partially observed
 interior poses, general six-component uncertainty, exact tolerance boundaries and budget exhaustion.
 CAD selection using these measured bounds and the executed mobile registration mission remain open.
+
+P3 CAD pattern selection now accepts a `WeldProbeUncertainty` region provider. The analytic parking
+prior implements this interface; observed bounds are supplied through an explicit provider without
+adding a ProcessKit dependency to MachineKit. Region extents/travel use CAD length units while tilt
+is dimensionless. The focused CAD test converts measured metre bounds explicitly and selects all
+three 3-2-1 stages using the surviving pose set, updating it after each stage rather than substituting
+zero uncertainty. For an interior displaced chassis pose, each selected search-ray intersection is
+inside its predicted region, and the six contacts produce an accepted rank-six fit. The CAD suite
+passes 3,177 assertions with 468 exposed samples. These observations are synthesized for the focused
+geometry test; execution on the mobile robot, saved registration steps and noisy mission gates are
+still required before P3 can land.

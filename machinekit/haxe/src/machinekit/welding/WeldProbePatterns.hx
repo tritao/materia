@@ -17,7 +17,7 @@ class WeldProbeStage {
 /** Select geometrically observable contact patterns from patches large enough for the current uncertainty. */
 class WeldProbePatterns {
   public static function stages(geometry:WeldProbeGeometry, count:Int, previousNormals:Array<Vector>,
-      uncertainty:WeldProbeParkingBounds, clearance:Float = 3, divisions:Int = 33):Array<WeldProbeStage> {
+      uncertainty:WeldProbeUncertainty, clearance:Float = 3, divisions:Int = 33):Array<WeldProbeStage> {
     if (geometry == null || uncertainty == null || previousNormals == null || count < 1 || count > 3 ||
         previousNormals.length != 3 - count || !Math.isFinite(clearance) || !(clearance > 0))
       throw "Contact patterns need CAD geometry, uncertainty and a 3-2-1 sequence of independent normals";

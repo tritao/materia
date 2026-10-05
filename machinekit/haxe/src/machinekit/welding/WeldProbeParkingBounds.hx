@@ -19,7 +19,7 @@ class WeldProbeRegionBounds {
 }
 
 /** Parking error rotates about the chassis origin, not about the workpiece or the arm mount. */
-class WeldProbeParkingBounds {
+class WeldProbeParkingBounds implements WeldProbeUncertainty {
   final rootInWork:AssemblyFrame;
   final workInRoot:AssemblyFrame;
   final translation:Vector;
