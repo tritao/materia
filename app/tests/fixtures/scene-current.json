@@ -1482,9 +1482,9 @@
   },
   "bim": {
     "format": "cadkit.document",
-    "version": 15,
+    "version": 16,
     "lengthUnit": "mm",
-    "documentId": "document-0a0969172b8b456800000001",
+    "documentId": "document-0a5956d42b8b456800000001",
     "implicitOutput": false,
     "features": [],
     "parameters": [],

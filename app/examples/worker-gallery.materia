@@ -1255,7 +1255,7 @@
   ],
   "bim": {
     "format": "cadkit.document",
-    "version": 11,
+    "version": 16,
     "lengthUnit": "mm",
     "documentId": "document-2dc790362b8b456800000001",
     "implicitOutput": false,

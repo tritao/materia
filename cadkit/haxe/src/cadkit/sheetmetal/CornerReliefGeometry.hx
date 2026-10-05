@@ -4,6 +4,11 @@ package cadkit.sheetmetal;
 class CornerReliefGeometry {
 	public static function apply(source:Sheet, firstBend:Int, secondBend:Int, type:CornerRelief,
 		size:Float, owner:String):Sheet {
+		return SheetCutGeometry.applyEdits(source, [], [cut(source, firstBend, secondBend, type, size, owner)]);
+	}
+	/** Keep the tool authored in the parent blank while a corner stages both flange contours. */
+	public static function cut(source:Sheet, firstBend:Int, secondBend:Int, type:CornerRelief,
+		size:Float, owner:String):SheetDevelopedCut {
 		var first = source.bend(firstBend); var second = source.bend(secondBend);
 		if (first.id == second.id || first.wallA != second.wallA || first.wallB == second.wallB
 			|| source.isRipped(first.id) || source.isRipped(second.id))
@@ -16,7 +21,7 @@ class CornerReliefGeometry {
 			throw new SheetDiagnosis("sheet.corner-adjacency", "Parallel bend seams do not define a corner", ["bend:" + firstBend, "bend:" + secondBend]);
 		var along = ((b.start.x - a.start.x) * by - (b.start.y - a.start.y) * bx) / determinant;
 		var center = new Point2(a.start.x + along * ax, a.start.y + along * ay);
-		return SheetCutGeometry.apply(source, first.wallA, tool(center, ax, ay, type, size), owner, BoundaryOrigin.Relief(owner));
+		return new SheetDevelopedCut(first.wallA, tool(center, ax, ay, type, size), owner, BoundaryOrigin.Relief(owner));
 	}
 	public static function tool(center:Point2, dx:Float, dy:Float, type:CornerRelief, size:Float):WallOutline {
 		if (!Math.isFinite(size) || size <= 0 || !Math.isFinite(dx) || !Math.isFinite(dy)

@@ -384,6 +384,33 @@ reloaded shape. The JSON stores the feature graph and current parameters,
 including the selection recipe; it does not store the undo/redo session stack.
 After reload, subsequent edits create a new undo/redo history.
 
+### Sheet corners
+
+`SheetCornerEdge.fromFace(source.sheet(), face)` resolves a picked straight side
+face into a permanent wall id and authored boundary identity. A corner closes
+two flange ends on a common parent. `CornerJoin.Gap` gives each end the stated
+perpendicular stand-off from its mate's full thickness slab; `OverlapFirst` or
+`OverlapSecond` extends that flange past the mate's far face by the stated overlap.
+The selected supporting edges must run along the folded planes' intersection.
+Parallel planes and missing selections receive named diagnoses.
+
+```haxe
+var gap = builder.length("corner.gap", 0.5);
+var relief = builder.length("corner.relief", 8);
+var corner = builder.sheetCorner(source,
+    SheetCornerEdge.fromFace(source.sheet(), firstSide),
+    SheetCornerEdge.fromFace(source.sheet(), secondSide),
+    gap, CornerRelief.Round, relief);
+```
+
+Round relief size is diameter; square size is side length, with its first axis
+along the first parent bend seam. One exact blank-space tool trims adjoining
+walls and bend strips. Contour changes and relief publish together after seam
+validation, retaining wall/bend ids and nominal datums. A gap that needs more
+seam trimming than the relief provides fails material validation. Saved corners
+contain authored picks and dimensions; development and solids are rebuilt.
+The current document format is 16 and rejects previous versions.
+
 ### Sheet manufacturing blanks
 
 `SheetBlank.requirement(FlatPattern.of(sheet), order)` derives material, thickness

@@ -40,6 +40,10 @@ import cadkit.sheetmetal.SheetEdgeFlangeFeature;
 import cadkit.sheetmetal.SheetHemFeature;
 import cadkit.sheetmetal.SheetRipFeature;
 import cadkit.sheetmetal.SheetCutFeature;
+import cadkit.sheetmetal.SheetCornerFeature;
+import cadkit.sheetmetal.SheetCornerEdge;
+import cadkit.sheetmetal.CornerJoin;
+import cadkit.sheetmetal.CornerRelief;
 import cadkit.sheetmetal.HemSpec;
 import cadkit.sheetmetal.LengthSpec;
 import cadkit.sheetmetal.FlangePosition;
@@ -149,6 +153,18 @@ class DocumentBuilder {
 	/** Cut the child-side seam of one permanent bend without deleting its allowance strip. */
 	public function sheetRip(source:SheetFeature, bend:Int):SheetRipFeature {
 		check(); return document.add(new SheetRipFeature(source, bend));
+	}
+
+	/** Close two graph-owned flange ends, with shared gap, relief and optional overlap dimensions. */
+	public function sheetCorner(source:SheetFeature, first:SheetCornerEdge, second:SheetCornerEdge,
+		gap:NamedParameter, relief:CornerRelief, reliefSize:NamedParameter, join:CornerJoin = Gap,
+		?overlap:NamedParameter):SheetCornerFeature {
+		check();
+		var feature = document.add(new SheetCornerFeature(source, first, second, join, gap.value,
+			overlap == null ? 0 : overlap.value, relief, reliefSize.value));
+		bind(gap, feature, "sheet.corner.gap"); bind(reliefSize, feature, "sheet.corner.relief-size");
+		if (overlap != null) bind(overlap, feature, "sheet.corner.overlap");
+		return feature;
 	}
 
 	/** Return hem on selected wall-side faces, with one shared straight-return dimension. */

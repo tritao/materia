@@ -88,3 +88,16 @@ import cadkit.sheetmetal.process.ProcessRuleRecord;
 	@:id(3) var wall:Int;
 	@:id(4) var side:SheetSide;
 }
+
+@:wire typedef SheetCornerRecord = {
+	@:id(1) var source:Int;
+	@:id(2) var firstWall:Int;
+	@:id(3) var firstEdge:String;
+	@:id(4) var secondWall:Int;
+	@:id(5) var secondEdge:String;
+	@:id(6) var join:CornerJoin;
+	@:id(7) var gap:Float;
+	@:id(8) var overlap:Float;
+	@:id(9) var relief:CornerRelief;
+	@:id(10) var reliefSize:Float;
+}

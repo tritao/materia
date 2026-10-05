@@ -23,6 +23,9 @@ import cadkit.sheetmetal.SheetEdgeFeature;
 import cadkit.sheetmetal.SheetHemFeature;
 import cadkit.sheetmetal.SheetRipFeature;
 import cadkit.sheetmetal.SheetCutFeature;
+import cadkit.sheetmetal.SheetCornerFeature;
+import cadkit.sheetmetal.SheetCornerEdge;
+import cadkit.sheetmetal.SheetFeatureRecord.SheetCornerRecord;
 import cadkit.sheetmetal.SheetFeatureRecord.SheetCutRecord;
 import cadkit.sheetmetal.SheetFeatureRecord.SheetRipRecord;
 import cadkit.sheetmetal.SheetFeatureRecord.SheetHemRecord;
@@ -81,7 +84,7 @@ import cadkit.parametric.RelationshipId;
 /** Versioned JSON persistence for the Haxeon parametric document layer. */
 class DocumentCodec {
 	public static inline var FORMAT:String = "cadkit.document";
-	public static inline var VERSION:Int = 15;
+	public static inline var VERSION:Int = 16;
 	public static function encode(document:Document):String {
 		var encodedFeatures:Array<Dynamic> = [];
 		for (index in 0...document.featureCount()) {
@@ -306,6 +309,12 @@ class DocumentCodec {
 					var source = Std.downcast(requiredFeature(document, data.source), SheetFeature);
 					if (source == null) throw new ParametricError("rip source must be a sheet feature");
 					feature = document.add(new SheetRipFeature(source, data.bend));
+				} else if (featureType == "sheet-corner") {
+					var data:SheetCornerRecord = JsonWire.decode(Json.stringify(requiredField(record, "sheet")));
+					var source = Std.downcast(requiredFeature(document, data.source), SheetFeature);
+					if (source == null) throw new ParametricError("corner source must be a sheet feature");
+					feature = document.add(new SheetCornerFeature(source, new SheetCornerEdge(data.firstWall, data.firstEdge),
+						new SheetCornerEdge(data.secondWall, data.secondEdge), data.join, data.gap, data.overlap, data.relief, data.reliefSize));
 				} else if (featureType == "sheet-cut") {
 					var data:SheetCutRecord = JsonWire.decode(Json.stringify(requiredField(record, "sheet")));
 					var source = Std.downcast(requiredFeature(document, data.source), SheetFeature);
@@ -606,6 +615,14 @@ class DocumentCodec {
 			var rip = Std.downcast(feature, SheetRipFeature);
 			if (rip == null) throw new ParametricError("sheet-rip has the wrong feature class");
 			var data:SheetRipRecord = {source: rip.source.id.toInt(), bend: rip.bend};
+			return {id: feature.id.toInt(), type: featureType, sheet: Json.parse(JsonWire.encode(data)), references: references};
+		}
+		if (featureType == "sheet-corner") {
+			var corner = Std.downcast(feature, SheetCornerFeature);
+			if (corner == null) throw new ParametricError("sheet-corner has the wrong feature class");
+			var data:SheetCornerRecord = {source: corner.source.id.toInt(), firstWall: corner.first.wall, firstEdge: corner.first.identity,
+				secondWall: corner.second.wall, secondEdge: corner.second.identity, join: corner.join, gap: corner.gap.value,
+				overlap: corner.overlap.value, relief: corner.relief, reliefSize: corner.reliefSize.value};
 			return {id: feature.id.toInt(), type: featureType, sheet: Json.parse(JsonWire.encode(data)), references: references};
 		}
 		if (featureType == "sheet-cut") {

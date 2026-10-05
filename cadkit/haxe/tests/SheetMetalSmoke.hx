@@ -101,6 +101,8 @@ class SheetMetalSmoke {
 		assertions += SheetProcessRuleSmoke.run();
 		assertions += SheetCornerGeometrySmoke.run();
 		assertions += SheetCornerReliefSmoke.run();
+		assertions += SheetCornerSmoke.run();
+		assertions += SheetCornerFeatureSmoke.run();
 		trace("Sheet metal smoke passed (" + assertions + " assertions)");
 	}
 }
