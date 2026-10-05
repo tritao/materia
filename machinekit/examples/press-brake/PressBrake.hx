@@ -31,6 +31,8 @@ import machinekit.pressbrake.ToolingCatalogue;
 import machinekit.pressbrake.planning.PressGeometrySource;
 import machinekit.pressbrake.planning.PressGeometryDatums;
 import machinekit.pressbrake.planning.PressToolDatum;
+import machinekit.pressbrake.planning.PressMemberVolume;
+import machinekit.pressbrake.planning.PressEnvelope;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.assembly.AssemblyDefinition.AssemblyVector;
@@ -52,6 +54,9 @@ class PressBlock extends MachineComponent {
 
 /** Side plate with its throat open toward -Y; the punch line is y=0. */
 class PressSideFrame extends MachineComponent {
+	static inline var depth:Float = 600;
+	static inline var rearOffset:Float = 200;
+	static inline var height:Float = 1600;
 	public final thickness:Float;
 	public final throat:Float;
 	public final bedHeight:Float;
@@ -59,7 +64,7 @@ class PressSideFrame extends MachineComponent {
 	public function new(thickness:Float, throat:Float, bedHeight:Float, openHeight:Float) {
 		for (value in [thickness, throat, bedHeight, openHeight])
 			if (!Math.isFinite(value) || value <= 0) throw "Invalid press side-frame dimensions";
-		if (throat >= 500 || bedHeight + openHeight >= 1600) throw "Press side-frame opening consumes its rear or upper web";
+		if (throat >= rearOffset + depth / 2 || bedHeight + openHeight >= height) throw "Press side-frame opening consumes its rear or upper web";
 		super('PRESS-SIDE-FRAME-${Dimension.format(thickness)}-${Dimension.format(throat)}-${Dimension.format(bedHeight)}-${Dimension.format(openHeight)}',
 			"Assumed WC67Y-style side plate", "steel", true);
 		this.thickness = thickness; this.throat = throat; this.bedHeight = bedHeight; this.openHeight = openHeight;
@@ -67,9 +72,17 @@ class PressSideFrame extends MachineComponent {
 		addConnector("throat", Face, Solids.axial(0, throat, bedHeight));
 	}
 	override public function hasGeometry():Bool return true;
+	/** Exact boxes preserve the same open throat cut from the CAD side plate. */
+	public function collisionBoxes():Array<PressEnvelope> {
+		var left = -thickness / 2, right = thickness / 2;
+		var front = rearOffset - depth / 2, rear = rearOffset + depth / 2;
+		return [new PressEnvelope(left, front, 0, right, throat, bedHeight),
+			new PressEnvelope(left, throat, 0, right, rear, height),
+			new PressEnvelope(left, front, bedHeight + openHeight, right, throat, height)];
+	}
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Solids.building([], parts -> {
-			parts.push(Solids.named(Part.box(thickness, 600, 1600).translated(new Vector(0, 200, 0)), "side-plate"));
+			parts.push(Solids.named(Part.box(thickness, depth, height).translated(new Vector(0, rearOffset, 0)), "side-plate"));
 			parts.push(Solids.named(Part.box(thickness + 2, throat + 101, openHeight)
 				.translated(new Vector(0, (throat - 101) / 2, bedHeight)), "throat-opening"));
 			return Solids.cut(parts[0], [parts[1]]);
@@ -110,13 +123,18 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
 	public final gaugeBaseHeight:Float;
 	final poses:Map<String, AssemblyFrame> = [];
 	final toolDatums:Array<PressToolDatum> = [];
+	final frameVolumes:Array<PressMemberVolume> = [];
 
 	public function pressAssembly():MachineAssembly return this;
 	public function pressProfile():PressBrakeProfile return profile;
 	public function pressCapacityN():Float return capacityN;
+	public function pressToolLayout():ToolLayout return toolLayout;
 	public function pressGeometryDatums():PressGeometryDatums return {
 		bed: "bed", ram: "ram", throat: "frameLeft", fingers: ["fingerLeft", "fingerRight"],
-		ramJoint: "Y1", gaugeXJoint: "X", gaugeRJoint: withR ? "R" : null, tools: toolDatums.copy()
+		ramJoint: "Y1", gaugeXJoint: "X", gaugeRJoint: withR ? "R" : null, tools: toolDatums.copy(),
+		frames: frameVolumes.copy(), fixedMembers: ["bed", "supportLeft", "supportRight"],
+		ramMembers: ["guideLeft", "guideRight", "ramBracketLeft", "ramBracketRight", "torsionBar"],
+		gaugeXMembers: ["gaugeX"], gaugeXRMembers: withR ? ["gaugeR"] : []
 	};
 
 	public function new(withR:Bool = true, ?layout:ToolLayout, ?phases:CylinderPhaseSpeeds, fingerHalfSpacing:Float = 300) {
@@ -146,7 +164,9 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
 		for (side in [-1, 1]) {
 			var name = side < 0 ? "Left" : "Right", guide = 'guide$name';
 			var x = side * (bedLength / 2 + 25);
-			fixed('frame$name', new PressSideFrame(50, throat, bedHeight, openHeight), at(x, 0, 0), "bed");
+			var frame = new PressSideFrame(50, throat, bedHeight, openHeight);
+			frameVolumes.push({member: 'frame$name', boxes: frame.collisionBoxes()});
+			fixed('frame$name', frame, at(x, 0, 0), "bed");
 			slide(side < 0 ? "Y1" : "Y2", guide, new PressBlock("Ram guide", 40, 100, 160),
 				at(x, -160, bedHeight + openHeight), 'frame$name', {x: 0, y: 0, z: -1}, stroke, at(side * 650, 0, bedHeight + openHeight + 220));
 			fixed('scale$name', new LinearScale(stroke + 40, 1000),

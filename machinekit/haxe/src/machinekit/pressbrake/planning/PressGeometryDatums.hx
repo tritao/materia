@@ -12,4 +12,9 @@ typedef PressGeometryDatums = {
 	final gaugeXJoint:String;
 	final gaugeRJoint:Null<String>;
 	final tools:Array<PressToolDatum>;
+	final frames:Array<PressMemberVolume>;
+	final fixedMembers:Array<String>;
+	final ramMembers:Array<String>;
+	final gaugeXMembers:Array<String>;
+	final gaugeXRMembers:Array<String>;
 }

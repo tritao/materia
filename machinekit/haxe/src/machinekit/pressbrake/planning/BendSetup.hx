@@ -22,6 +22,8 @@ class BendSetup {
 			?lot:String, samples:Int = 36):BendSetupResult {
 		if (samples < 1 || samples > 3600)
 			throw new SheetDiagnosis("press.stroke-samples", "Stroke sampling needs between 1 and 3600 intervals");
+		if (station != press.installedStation(station.id))
+			throw new SheetDiagnosis("press.station-not-installed", "Setup requires the installed tool station, not a different specification with its identity", [station.id]);
 		var before = sheet.evaluate(state), record = sheet.bend(bend);
 		if (state.angle(bend) != 0)
 			throw new SheetDiagnosis("press.bend-state", "The active bend must be flat before its stroke", ["bend:" + bend]);
