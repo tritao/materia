@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-track-checks"
+  },
+  "entry": "LinearTrackCheck",
+  "sourceRoots": [
+    "src",
+    "../examples",
+    "../examples/robot-arm",
+    "../examples/cnc-router",
+    "../examples/mobile-base",
+    "../examples/robot-welder",
+    "../examples/corexy",
+    "../examples/bench-mill",
+    "../examples/cobot-arm",
+    "../examples/machine-tending",
+    "../examples/gantry-picker"
+  ],
+  "dependencies": {
+    "projectkit": {
+      "path": "../../projectkit"
+    },
+    "manufacturingkit": {
+      "path": "../../manufacturingkit"
+    },
+    "cadkit": {
+      "path": "../../cadkit"
+    },
+    "machinekit": {
+      "path": ".."
+    },
+    "machinekit-robot": {
+      "path": "../robot"
+    },
+    "machinekit-picking-station-example": {
+      "path": "../examples/picking-station"
+    },
+    "robotkit": {
+      "path": "../../robotkit"
+    },
+    "cadbridge": {
+      "path": "../../robotkit/cadbridge"
+    },
+    "toolpathkit": {
+      "path": "../../toolpathkit"
+    },
+    "camkit": {
+      "path": "../../camkit"
+    },
+    "cnckit": {
+      "path": "../../cnckit"
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
+}

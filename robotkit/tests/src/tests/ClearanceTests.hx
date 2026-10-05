@@ -24,6 +24,7 @@ class ClearanceTests {
     testMargins();
     testTouchingByDesign();
     testCoupledDriveContact();
+    testMovingRackContact();
     testCrossingEdges();
     testSolidEdges();
     Sys.println('RobotKit clearance tests passed ($assertions assertions)');
@@ -52,6 +53,32 @@ class ClearanceTests {
     var hit = clearance.violation([0.3]);
     check(hit != null && (hit.a == "work" || hit.b == "work"),
       "drive contact does not exempt the carriage from a workpiece collision");
+  }
+
+  static function testMovingRackContact():Void {
+    var model = new RobotModel("rack-pinion-clearance");
+    var base = model.addLink(new Link("base"));
+    var carriage = model.addLink(new Link("carriage"));
+    var pinion = model.addLink(new Link("pinion"));
+    var slide = model.addJoint(new Joint("track", JointType.Prismatic, base, carriage));
+    slide.axis = [1.0, 0, 0]; slide.parentFramePosition = [0.0, 0, 0.02];
+    slide.limits.lower = 0.0; slide.limits.upper = 0.4;
+    var shaft = model.addJoint(new Joint("pinion", JointType.Continuous, carriage, pinion));
+    shaft.axis = [0.0, 1, 0];
+    model.addCoupling(new robotkit.model.JointCoupling("rack", slide.id, shaft.id, -50, 0));
+    var tip = model.addFrame(new Frame("tip", carriage));
+    var group = new Manipulator(model, base.id, tip.id);
+    var clearance = new ArmClearance(group, [
+      {name: "carriage", link: carriage.id, vertices: box(-0.02, 0.02, -0.04, 0.04, 0.08, 0.1), tool: false},
+      {name: "pinion", link: pinion.id, vertices: box(-0.03, 0.03, -0.01, 0.01, -0.03, 0.03), tool: false},
+      {name: "rack", link: base.id, vertices: box(-0.1, 0.6, -0.01, 0.01, -0.02, 0), tool: false},
+      {name: "work", link: base.id, vertices: box(0.28, 0.32, -0.02, 0.02, 0.01, 0.04), tool: false}
+    ], [0.0]);
+    check(clearance.violation([0.0]) == null && clearance.violation([0.1]) == null,
+      "a moving pinion retains its designed engagement with the fixed rack");
+    var hit = clearance.violation([0.3]);
+    check(hit != null && (hit.a == "work" || hit.b == "work") && (hit.a == "pinion" || hit.b == "pinion"),
+      "rack engagement does not exempt the pinion from another body on the same fixed link");
   }
 
   /** The vertices of the box spanning the given ranges. */

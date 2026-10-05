@@ -567,7 +567,7 @@ G0 → G1 → G2 → G3 ──────────────────�
 | G13 | complete; restructure and Phase C gate passed | `38f15b995`, `ad5211f04`, `acb1ab460`; see progress notes |
 | G14 | complete; Phase D build/runtime gate passed | `7822171b5`, `58075ec63`; see progress notes |
 | G15 | complete; four-run/ten-seam MuJoCo mission and Phase D gate passed | see progress notes |
-| G16 | planned | — |
+| G16 | complete; focused FK, solid/runtime clearance, drive and ownership checks passed | see progress notes |
 | G17 | planned | — |
 | G18 | planned | — |
 
@@ -3801,3 +3801,24 @@ controls and background launch. The post planner remains expensive in wall time;
 execution and bead checks pass. Combined with the preceding kit/native and app-prefix
 results, this closes G14/G15 and Phase D. Phase E is next, with focused checks per step
 and full suites only at its boundary.
+
+### G16 — linear track complete
+
+`LinearTrack` uses AxisBuilder with one prismatic leader, four HGR15 guide blocks,
+a module-2/20-tooth rack drive, a moving NEMA34 motor, a 48 V supply and a DM542
+at 3 A. The 3 m track has a carriage flange and bored pedestal adapter, 50 mm
+rail overtravel, and an explicit side strip reserved for the cable chain. Layout
+and electrical choices retain assumption provenance. `includeArm` preserves the
+whole arm and forwards its exposed service ports to the track boundary.
+
+The focused check passes FK at both travel ends, initial shaft alignment, solid
+clearance against the floor structure, runtime hull clearance, all seven drives,
+whole-arm ownership, one derived external axis, no fabricated swivel, and derived
+limits of 4 m/s and 0.829545 m/s² with the arm's moving mass.
+
+Runtime hull clearance initially rejected the designed rack/pinion mesh. A minimal
+moving-pinion regression reproduced it before the fix. A follower carried by the
+leader body may now meet the fixed drive body; only individual hull pairs touching
+at reference receive the existing interface exemption. The same fixed link's separate
+obstacle remains checked. Focused RobotKit clearance passes 40 assertions, including
+that obstacle regression. G17 follows; no full suites were run at this step.

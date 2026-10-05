@@ -148,6 +148,13 @@ class ArmClearance {
       if (leader == null || follower == null) continue;
       neighbours.set(leader.child.id + "\n" + follower.child.id, true);
       neighbours.set(follower.child.id + "\n" + leader.child.id, true);
+      // A follower carried by the translating body meets a fixed drive member
+      // (the rack). The reference-touch test below still exempts individual
+      // body pairs, so another obstacle on the fixed link remains checked.
+      if (follower.parent.id == leader.child.id) {
+        neighbours.set(leader.parent.id + "\n" + follower.child.id, true);
+        neighbours.set(follower.child.id + "\n" + leader.parent.id, true);
+      }
     }
     var poses = arm.linkPoses(reference, links);
     for (i in 0...bodies.length) for (j in i + 1...bodies.length) {
