@@ -248,6 +248,8 @@ enum abstract AssemblyMateKind(String) from String to String {
 	/** Optional process-speed channels for a continuously rotating joint; speed units use radians per second. */
 	@:id(26) @:optional var processVelocity:Null<AssemblyProcessVelocityDrive>;
 	@:id(27) @:optional var brake:Null<AssemblyMotorBrake>;
+	/** Hydraulic cylinder on the same process-driven joint mechanism as a pneumatic drive. */
+	@:id(28) @:optional var hydraulic:Null<AssemblyHydraulicDrive>;
 }
 
 /**
@@ -362,6 +364,24 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(7) @:optional var channelB:Null<String>;
 	@:id(8) var normallyToA:Bool;
 	@:id(9) var extendSign:Float;
+}
+
+/** Hydraulic dimensions are assembly length units, phase speeds length units/s and pressure Pa.
+ * Both valve coils off, or both on, select a closed centre; one coil requests extension or return.
+ */
+@:wire typedef AssemblyHydraulicDrive = {
+	@:id(1) var bore:Float;
+	@:id(2) var rod:Float;
+	@:id(3) var stroke:Float;
+	@:id(4) var approachSpeed:Float;
+	@:id(5) var workingSpeed:Float;
+	@:id(6) var returnSpeed:Float;
+	/** Extension from the retracted cylinder datum at which working speed begins. */
+	@:id(7) var changePoint:Float;
+	@:id(8) var pressurePa:Float;
+	@:id(9) var channelA:String;
+	@:id(10) var channelB:String;
+	@:id(11) var extendSign:Float;
 }
 
 /** A CNC speed setpoint in RPM and a signed direction signal drive a continuous joint. */

@@ -128,6 +128,14 @@ class AssemblyDefinitionFlattener {
 				channelB: p.channelB == null ? null : prefix + p.channelB,
 				normallyToA: p.normallyToA, extendSign: p.extendSign};
 		}
+		if (actuator.hydraulic != null) {
+			var h = actuator.hydraulic;
+			var prefix = id.substr(0, id.length - actuator.id.length);
+			copy.hydraulic = {bore: h.bore, rod: h.rod, stroke: h.stroke,
+				approachSpeed: h.approachSpeed, workingSpeed: h.workingSpeed, returnSpeed: h.returnSpeed,
+				changePoint: h.changePoint, pressurePa: h.pressurePa,
+				channelA: prefix + h.channelA, channelB: prefix + h.channelB, extendSign: h.extendSign};
+		}
 		if (actuator.processVelocity != null) {
 			var process = actuator.processVelocity;
 			copy.processVelocity = {speedChannel: prefix + process.speedChannel,

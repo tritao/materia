@@ -54,7 +54,7 @@ class AssemblyDefinitionCodec {
 	}
 
 	static function validateFlat(definition:AssemblyDefinition):Void {
-		if (definition == null || !supportedVersion(definition.schemaVersion) || !validText(definition.id) ||
+		if (definition == null || definition.schemaVersion != VERSION || !validText(definition.id) ||
 			definition.definitions == null || definition.definitions.length == 0 ||
 			definition.definitions.length > 1000 || definition.occurrences == null ||
 			definition.occurrences.length == 0 || definition.occurrences.length > 1000 ||
@@ -216,10 +216,20 @@ class AssemblyDefinitionCodec {
 				!validDrive(actuator))
 				throw 'Assembly has an invalid actuator "${actuator == null ? "" : actuator.id}"';
 			actuatorIds.set(actuator.id, true);
+			if (actuator.drive == "hydraulic") {
+				var joint = movable.get(actuator.joint);
+				if (joint == null || joint.type != AssemblyJointType.Prismatic) throw 'Hydraulic actuator "${actuator.id}" needs a prismatic joint';
+				var h = actuator.hydraulic;
+				if (h == null || joint.limits.lower == null || joint.limits.upper == null ||
+					Math.abs(joint.limits.upper - joint.limits.lower - h.stroke) > 1e-6)
+					throw 'Hydraulic actuator "${actuator.id}" stroke differs from its guide travel';
+				if (actuator.maxRate < Math.max(h.approachSpeed, Math.max(h.workingSpeed, h.returnSpeed)))
+					throw 'Hydraulic actuator "${actuator.id}" phase speed exceeds its rate ceiling';
+			}
 			if (actuator.processVelocity != null) {
 				var process = actuator.processVelocity;
 				var joint = movable.get(actuator.joint);
-				if (actuator.drive != "servo" || actuator.pneumatic != null || joint == null ||
+				if (actuator.drive != "servo" || actuator.pneumatic != null || actuator.hydraulic != null || joint == null ||
 					joint.type != AssemblyJointType.Continuous || !validText(process.speedChannel) ||
 					!validText(process.directionChannel) || process.speedChannel == process.directionChannel ||
 					!(process.radiansPerSpeedUnit > 0) || !Math.isFinite(process.radiansPerSpeedUnit))
@@ -494,7 +504,17 @@ class AssemblyDefinitionCodec {
 				!Math.isFinite(brake.releaseDelay + brake.applicationDelay) ||
 				brake.releaseTimeoutMs <= brake.releaseDelay * 1000 || brake.feedbackMaxAgeMs <= 0) return false;
 		}
-		if (kind == null) return actuator.pneumatic == null;
+		if (kind == null) return actuator.pneumatic == null && actuator.hydraulic == null;
+		if (kind == "hydraulic") {
+			var h = actuator.hydraulic;
+			return actuator.pneumatic == null && actuator.processVelocity == null && h != null &&
+				h.bore > h.rod && h.rod > 0 && h.stroke > 0 && h.approachSpeed > 0 &&
+				h.workingSpeed > 0 && h.returnSpeed > 0 && h.changePoint >= 0 && h.changePoint <= h.stroke &&
+				h.pressurePa >= 0 && Math.isFinite(h.bore + h.rod + h.stroke + h.approachSpeed +
+					h.workingSpeed + h.returnSpeed + h.changePoint + h.pressurePa) &&
+				validText(h.channelA) && validText(h.channelB) && h.channelA != h.channelB && Math.abs(h.extendSign) == 1;
+		}
+		if (actuator.hydraulic != null) return false;
 		if (kind == "pneumatic") {
 			var p = actuator.pneumatic;
 			return p != null && p.bore > p.rod && p.rod > 0 && p.stroke > 0 && p.ratedSpeed > 0 &&

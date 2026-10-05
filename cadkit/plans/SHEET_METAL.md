@@ -942,7 +942,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM6 | done: SM6a typed air-bending predictions, physical springback inversion and exact contact depth; focused process smoke passes 1235 assertions; quick gate `sm6a-air-bending` passes (7209 sheet assertions); SM6b explicit lot/tool/angle-band calibration with measured radius and additive depth correction, focused smoke passes 1257 assertions, quick gate `sm6b-calibration` passes (7231 sheet assertions); SM6 complete: typed grade defaults, editor selection, Process-rule persistence and tooling minimums; full gate `sm6-process-material-full` passes all stages (7248 sheet assertions, ProjectKit 155); final material integration and CAD workflow checks pass | 7148a8bb8; 6458df23b; d664caa22 |
 | SM7 | done: typed exact punch and single-/four-V die catalogue; standard segments and physical horns; independently segmented paired rows and validated bed layouts; derived process contact data; registered segment/clamp recipes and manual/powered clamp capabilities; strong unique tooling face names. Quick gates `sm7a-profile-foundation`, `sm7b-punch-profiles`, `sm7c-die-profiles` and full gate `sm7-tooling-verified-full` pass; original MachineKit and router engineering summaries unchanged | c4e418ba5; 310a41894; 67da9cae8; final tooling integration |
 | SM8a | done: cylinder parts and coupled mechanical assembly; typed planning geometry derived from physical datums, independent reference comparisons, full-bed force/depth and conservative demo/frame checks; Start-page project with editable ram, X/R and depth-stop axes. Quick gates `sm8a-cylinder-parts`, `sm8a-mechanical-assembly` and full gate `sm8a-press-assembly-full` pass every stage; original MachineKit and router engineering summaries unchanged | c4517c795; ed8faa29b; final assembly integration |
-| SM8b | in progress: MT5 is on local main 1484b924d and merged; shared typed fluid cylinder/valve/pressure-source interfaces replace pneumatic-only interfaces, and pressure resolution no longer casts components; explicit immutable phase-speed model added, its quick gate `sm8b-phase-speeds` passes all five suites; quick gate `sm8b-fluid-interfaces` passes all five suites with unchanged original MachineKit summaries | |
+| SM8b | in progress: MT5 is on local main 1484b924d and merged; shared typed fluid cylinder/valve/pressure-source interfaces replace pneumatic-only interfaces, and pressure resolution no longer casts components; explicit immutable phase-speed model added, its quick gate `sm8b-phase-speeds` passes all five suites; assembly format 7 hydraulic data passes focused tests (187 ProjectKit assertions), full gate `sm8b-hydraulic-format-full` passes every stage; quick gate `sm8b-fluid-interfaces` passes all five suites with unchanged original MachineKit summaries | edf913c0f; 68768fcae; hydraulic format checkpoint |
 | SM9 | planned | |
 | SM10 | planned | |
 | SM11 | planned | |
@@ -1436,3 +1436,25 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
   68.5 mm change travel, 4.79375 s extension and 1.42857 s return. The class does
   not infer a sheet thickness or supply pressure; setup supplies the change point.
   Quick gate `sm8b-phase-speeds` passes all five suites with unchanged original MachineKit summaries; saved/runtime integration remains in progress.
+
+- SM8b saved drive checkpoint: assembly definitions and states now use only version 8. The rebased main already used v7 for sensor and process-velocity fields, so adding the hydraulic drive is a new format revision.
+  Feature-dependent v3/v4/v5/v6 constants, codec acceptance and model upgrades are
+  removed. `AssemblyHydraulicDrive` adds explicit bore/rod/stroke, pressure, three
+  phase speeds, extension change travel and distinct A/B valve channels with a
+  signed guide direction. Its declared valve is closed-centre when both coils
+  agree; runtime actuation remains the next checkpoint. The bridge diagnoses the
+  missing hydraulic simulation drive instead of treating it as an electric motor.
+  Validation requires a prismatic guide of matching stroke and sufficient rate
+  ceiling; nested assembly copying scopes both channels and owns the copied DTO.
+  The new hydraulic fixture is written by the current codec using
+  `PROJECTKIT_WRITE_FIXTURES=1`; existing assembly examples generate current v8
+  records from code. Focused ProjectKit checks pass 187 assertions (+32 for format,
+  nesting and invalid hydraulic inputs); full gate `sm8b-hydraulic-format-full` passes every stage.
+  No new cast, old-version alias or compiler workaround was introduced.
+
+- SM8b format gate `sm8b-hydraulic-format-full` passes CadKit, SheetMetalSmoke
+  (7504), ProjectKit (187), ManufacturingKit (54), MachineKit, workspace, app build
+  and project-source runtime. Original five MachineKit summaries and router
+  engineering results match baseline; serialized assembly payloads change for v8
+  and the new optional hydraulic field. Hydraulic runtime and press actuation
+  remain in progress; no new Haxeon issue was found.
