@@ -628,7 +628,9 @@ enum NK_ENUM(nkui_font_family) {
     /** General-purpose text font. */
     NKUI_FONT_FAMILY_DEFAULT = 0,
     /** Font intended to provide emoji glyphs. */
-    NKUI_FONT_FAMILY_EMOJI = 1
+    NKUI_FONT_FAMILY_EMOJI = 1,
+    /** Fixed-width text, independent of general-purpose UI fonts. */
+    NKUI_FONT_FAMILY_MONOSPACE = 4
 };
 
 /** Word-breaking policy used by both explicit and automatic text layouts. */

@@ -32,4 +32,7 @@ enum abstract IconName(Int) from Int to Int {
 	var Reset = 27;
 	var Stop = 28;
 	var FolderClosed = 29;
+	var AlertTriangle = 30;
+	var ErrorCircle = 31;
+	var InfoCircle = 32;
 }

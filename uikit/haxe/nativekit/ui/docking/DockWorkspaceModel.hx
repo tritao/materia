@@ -41,6 +41,12 @@ class DockWorkspaceModel {
 			activePanelId = panel.id;
 	}
 
+	public function setPanelBadge(panelId:String, count:Int):Bool {
+		var panel = get(panelId);
+		if (panel == null || count < 0 || panel.badgeCount == count) return false;
+		panel.setBadgeCount(count); revision++; return true;
+	}
+
 	public function get(panelId:String):Null<DockPanelDescriptor>
 		return panelId == null ? null : panels.get(panelId);
 

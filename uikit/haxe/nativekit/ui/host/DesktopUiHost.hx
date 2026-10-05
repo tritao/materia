@@ -144,6 +144,7 @@ class DesktopUiHost {
 			var surfaceAvailable = false;
 			var framePending = false;
 			var frameRequested = false;
+			var repaintOnlyRequested = false;
 			var frameRequestedAt = -1.0;
 			var nextCaretFrameAt = -1.0;
 			var frameRequestReason = "none";
@@ -167,6 +168,7 @@ class DesktopUiHost {
 				counts.set(key, previous == null ? 1 : previous + 1);
 			};
 			var scheduleFrameWithReason = function(reason:String):Void {
+				repaintOnlyRequested = (!frameRequested || repaintOnlyRequested) && reason == "text-caret";
 				frameRequested = true;
 				frameRequestedAt = Sys.time();
 				frameRequestReason = reason;
@@ -229,6 +231,7 @@ class DesktopUiHost {
 									framePending = false;
 									if (!active || !surfaceAvailable || !frameRequested) return;
 									var requestedAt = frameRequestedAt;
+									var repaintOnly = repaintOnlyRequested;
 									var requestReason = frameRequestReason;
 									var requestSerial = frameRequestSerial;
 									// Keep delivered text input even if caret/API requests coalesce.
@@ -242,7 +245,7 @@ class DesktopUiHost {
 									runtime.resize(runtime.logicalWidth, runtime.logicalHeight, width, height);
 									var frameStartedAt = Sys.time();
 									frameGc.beginFrame();
-									var rendered = runtime.render(Sys.time());
+									var rendered = runtime.render(Sys.time(), repaintOnly);
 									var collectionStartedAt = options.captureDirectory == null ? 0.0 : Sys.time();
 									frameGc.endFrame();
 									var collectionSeconds = options.captureDirectory == null ? 0.0 : Sys.time() - collectionStartedAt;
@@ -259,6 +262,8 @@ class DesktopUiHost {
 										var metrics = runtime.app() == null ? null : runtime.app().context().frameMetrics;
 										frameHistory.push({
 											frame: runtime.rendered,
+											repaintOnly: repaintOnly,
+											allocatedBytes: runtime.lastFrameAllocatedBytes,
 											startedAtSeconds: frameStartedAt,
 											requestReason: requestReason,
 											requestSerial: requestSerial,
@@ -329,6 +334,8 @@ class DesktopUiHost {
 				if (!active) return false;
 				try {
 				var hadEvent = pump.poll();
+				var backgroundPoll:Null<Void->Void> = hostContext.onPoll;
+				if (active && backgroundPoll != null) backgroundPoll();
 				if (session.state == UiHostLifecycle.Failed) throw session.error;
 				if (active && captureState.startedAt >= 0.0 && options.captureSeconds > 0.0 &&
 					Sys.time() - captureState.startedAt >= options.captureSeconds) {

@@ -13,12 +13,16 @@ class UiHostContext {
 	var applicationZoom:Float = 1.0;
 	@:allow(nativekit.ui.host.UiHostRuntime)
 	var onZoomChanged:Null<Float->Void>;
-
 	public final events:NativeKitEvents;
 	/** An application may defer closing while it asks to save or confirm. */
 	public var onCloseRequested:Null<(Void->Void)->Void> = null;
 	final close:Void->Void;
 	final scheduleFrame:Void->Void;
+	/** Runs background work during host iterations, independently of rendering. */
+	public var onPoll:Null<Void->Void> = null;
+	/** True only while delivering a frame requested exclusively for caret repaint. */
+	@:allow(nativekit.ui.host.UiHostRuntime)
+	public var repaintOnly(default, null):Bool = false;
 	public var gpuRendererId(default, null):Int = 0;
 
 	public function new(fonts:FontCollection, events:NativeKitEvents,

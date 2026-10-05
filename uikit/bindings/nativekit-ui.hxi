@@ -251,6 +251,10 @@ interface NativeKitUI @target("portable-abi64") @library("nativekit_ui") @depend
 		 * Font intended to provide emoji glyphs.
 		 */
 		NKUI_FONT_FAMILY_EMOJI = 1;
+		/**
+		 * Fixed-width text, independent of general-purpose UI fonts.
+		 */
+		NKUI_FONT_FAMILY_MONOSPACE = 4;
 	}
 	/**
 	 * Sampling filter used when an image is scaled.

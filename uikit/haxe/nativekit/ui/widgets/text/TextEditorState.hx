@@ -46,6 +46,9 @@ class TextEditorState {
 	public final layout:TextEditorLayout;
 	public final renderContent:LayoutRenderableContent;
 	var presentationRevision:Int = -1;
+	var surroundingWindow:Null<TextInputWindow>;
+	var surroundingRevision:Int = -1;
+	var surroundingDocument:Null<TextDocument>;
 	public final textStyle:TextStyle;
 	public final paragraphStyle:ParagraphStyle;
 	/** Cached conversions between document code points, UTF-8 bytes and UTF-16 units. */
@@ -409,7 +412,12 @@ class TextEditorState {
 		}
 		var start = Std.int(Math.max(0, first - Std.int(Math.max(0, maxBefore))));
 		var end = Std.int(Math.min(offsets.codepointCount, last + Std.int(Math.max(0, maxAfter))));
-		return new TextInputWindow(offsets.sliceCodepoints(start, end), start, end);
+		if (surroundingWindow != null && surroundingDocument == offsets && surroundingRevision == offsets.revision &&
+			surroundingWindow.start == start && surroundingWindow.end == end) return surroundingWindow;
+		surroundingDocument = offsets;
+		surroundingRevision = offsets.revision;
+		surroundingWindow = new TextInputWindow(offsets.sliceCodepoints(start, end), start, end);
+		return surroundingWindow;
 	}
 
 	/** Applies one transactional NativeKit composition/edit update. */

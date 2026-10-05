@@ -7,6 +7,14 @@ import PathBuilder;
 class IconData {
 	public static function build(name:IconName):Path {
 		return switch name {
+			case IconName.AlertTriangle: new PathBuilder().moveTo(12, 3).lineTo(22, 21).lineTo(2, 21).lineTo(12, 3)
+				.moveTo(12, 9).lineTo(12, 14).moveTo(12, 17).lineTo(12, 17.2).build();
+			case IconName.ErrorCircle: new PathBuilder().moveTo(22, 12).cubicTo(22, 17.52, 17.52, 22, 12, 22)
+				.cubicTo(6.48, 22, 2, 17.52, 2, 12).cubicTo(2, 6.48, 6.48, 2, 12, 2).cubicTo(17.52, 2, 22, 6.48, 22, 12)
+				.moveTo(8, 8).lineTo(16, 16).moveTo(16, 8).lineTo(8, 16).build();
+			case IconName.InfoCircle: new PathBuilder().moveTo(22, 12).cubicTo(22, 17.52, 17.52, 22, 12, 22)
+				.cubicTo(6.48, 22, 2, 17.52, 2, 12).cubicTo(2, 6.48, 6.48, 2, 12, 2).cubicTo(17.52, 2, 22, 6.48, 22, 12)
+				.moveTo(12, 11).lineTo(12, 17).moveTo(12, 7).lineTo(12, 7.2).build();
 			case IconName.Search: search();
 			case IconName.Close: close();
 			case IconName.Sun: sun();

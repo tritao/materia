@@ -250,13 +250,29 @@ class ScrollView implements View {
 			visibility.setFocused(false);
 			visibility.setDragging(true);
 			dragState.value.pointerY = event.y;
+			dragState.value.lastPointerY = event.y;
 			dragState.value.offsetY = controller.offsetY;
+			dragState.value.maxScrollY = controller.maxScrollY;
+			dragState.value.travel = Math.max(0.0, track.layout.style.height.value - thumb.layout.style.height.value);
 			dragState.update(dragState.value);
 			event.capturePointer();
 			event.stopPropagation();
 			event.preventDefault();
 		});
+		// Metrics may change while the pointer is captured (window resize or reflow).
+		// Rebase at the last pointer position so subsequent movement uses the new range.
+		track.onResolved(function(_) {
+			var drag = dragState.value;
+			var travel = Math.max(0.0, track.layout.style.height.value - thumb.layout.style.height.value);
+			if (drag.dragging && (drag.maxScrollY != controller.maxScrollY || drag.travel != travel)) {
+				drag.pointerY = drag.lastPointerY;
+				drag.offsetY = controller.offsetY;
+				drag.maxScrollY = controller.maxScrollY;
+				drag.travel = travel;
+			}
+		});
 		thumb.on(UiEventKind.PointerMove, function(event) {
+			dragState.value.lastPointerY = event.y;
 			var travel = Math.max(0.0, track.layout.style.height.value -
 				thumb.layout.style.height.value);
 			if (!dragState.value.dragging || travel <= 0.0)
@@ -338,6 +354,9 @@ class ScrollView implements View {
 private class ScrollbarDragState {
 	public var dragging:Bool = false;
 	public var pointerY:Float = 0.0;
+	public var lastPointerY:Float = 0.0;
 	public var offsetY:Float = 0.0;
+	public var maxScrollY:Float = 0.0;
+	public var travel:Float = 0.0;
 	public function new() {}
 }

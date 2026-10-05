@@ -43,6 +43,7 @@ class Button implements View {
 	public var leadingIcon:Null<IconName>;
 	/** Custom decorative view inside the same button hit target. */
 	public var leadingView:Null<View>;
+	public var trailingView:Null<View> = null;
 	public var trailingIcon:Null<IconName>;
 	public var iconSize:Float;
 	/** Semantic role override used by composite controls such as tabs and menus. */
@@ -141,7 +142,9 @@ class Button implements View {
 			});
 			node.add(labelNode);
 		}
-		if (trailingIcon != null)
+		if (trailingView != null)
+			node.add(context.withScope(new Key("trailing-view"), function() return trailingView.build(context)));
+		else if (trailingIcon != null)
 			node.add(new Icon("trailing-icon", trailingIcon, iconSize, foreground).build(context));
 		return node;
 	}

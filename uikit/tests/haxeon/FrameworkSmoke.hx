@@ -473,7 +473,22 @@ class FrameworkSmoke {
 	static function clickEvent(time:Float, x:Float = 10.0, button:Int = 0):nativekit.ui.core.UiEvent
 		return new nativekit.ui.core.UiEvent(UiEventKind.Click, new WidgetId(90502), x, 10.0, 0.0, 0.0, button, 0, 0, null, null, 0, 0, time);
 
+	@:access(nativekit.ui.core.TextInputBridge)
 	static function main():Int {
+		var originalTypography = new nativekit.ui.core.ResolvedTextStyle(
+			new TextStyle(16.0), new ParagraphStyle(TextWrap.WordCharacter), Color.fromBytes(0, 0, 0));
+		var mergedTypography = originalTypography.merge(new TextStyleOverride(null, 20.0, null,
+			TextWrap.None, null, 0.0));
+		originalTypography.textStyle.fontSize = 30.0;
+		originalTypography.paragraphStyle.wrap = TextWrap.Word;
+		if (mergedTypography.textStyle.fontSize != 20.0 || mergedTypography.paragraphStyle.wrap != TextWrap.None ||
+			mergedTypography.paragraphStyle.lineHeight != 0.0)
+			throw "Merged typography must preserve overrides and own its style values";
+		var copiedTypography = mergedTypography.merge(null);
+		copiedTypography.textStyle.fontSize = 24.0;
+		copiedTypography.paragraphStyle.wrap = TextWrap.Word;
+		if (mergedTypography.textStyle.fontSize != 20.0 || mergedTypography.paragraphStyle.wrap != TextWrap.None)
+			throw "Typography copies must remain independent";
 		var clickSequence = new nativekit.ui.core.PointerClickSequence();
 		if (clickSequence.register("a", clickEvent(1.0)) != 1 || clickSequence.register("a", clickEvent(1.1)) != 2
 			|| clickSequence.register("a", clickEvent(1.2)) != 1 || clickSequence.register("b", clickEvent(1.3)) != 1
@@ -607,6 +622,9 @@ class FrameworkSmoke {
 			return 38;
 		emptyEditor.dispose();
 		var editor = new TextEditorState(fonts, "á🙂");
+		var surrounding = editor.surroundingText(2048, 2048);
+		if (surrounding.text != "á🙂" || surrounding != editor.surroundingText(2048, 2048))
+			throw "unchanged surrounding text did not retain its window";
 		if (Utf8Text.length(editor.text) != 3)
 			return 32;
 		if (Utf8Text.slice(editor.text, 0, 2) != "á")
@@ -615,6 +633,8 @@ class FrameworkSmoke {
 			return 35;
 		if (!editor.deleteForward() || editor.text != "á")
 			return 36;
+		if (editor.surroundingText(2048, 2048).text != "á")
+			throw "surrounding text cache retained deleted Unicode text";
 		if (!editor.deleteBackward() || editor.text != "")
 			return 37;
 		editor.insert("hi");
@@ -630,6 +650,21 @@ class FrameworkSmoke {
 		if (compositionGeometry.length != 1 || compositionGeometry[0].start != 2 ||
 			compositionGeometry[0].end != 4)
 			return 275;
+		var publishedRects:Array<Float> = [];
+		var inputRects = [new TextRangeRect(0, 1, 2.0, 3.0, 4.0, 5.0)];
+		nativekit.ui.core.TextInputBridge.rememberRects(inputRects, publishedRects);
+		if (!nativekit.ui.core.TextInputBridge.matchesRects(inputRects, publishedRects))
+			throw "Unchanged input geometry should reuse its published snapshot";
+		inputRects[0] = new TextRangeRect(0, 1, 3.0, 3.0, 4.0, 5.0);
+		if (nativekit.ui.core.TextInputBridge.matchesRects(inputRects, publishedRects))
+			throw "Moving input geometry must invalidate the published snapshot";
+		inputRects[0] = new TextRangeRect(0, 1, 2.0, 3.0, 4.0, 5.0, false);
+		if (nativekit.ui.core.TextInputBridge.matchesRects(inputRects, publishedRects) ||
+			nativekit.ui.core.TextInputBridge.matchesRects([], publishedRects))
+			throw "Direction changes and cleared selections must be published";
+		nativekit.ui.core.TextInputBridge.rememberRects(null, publishedRects);
+		if (!nativekit.ui.core.TextInputBridge.matchesRects([], publishedRects))
+			throw "Empty input geometry should reuse its published snapshot";
 		var nativeDeleteEditor = new TextEditorState(fonts, "ab");
 		var nativeDelete = new NativeKitTextEdit(TextEditAction.Delete, null, 1, 2,
 			1, 1, -1, -1, 1, 2);
@@ -1944,6 +1979,21 @@ class FrameworkSmoke {
 			scrollbarTrack.y + 4.0, 0);
 		if (scrollView.controller.offsetY != 0.0)
 			return 246;
+		// Keep a captured thumb responsive when a resize clamps the old offset.
+		scrollView.controller.jumpTo(0.0, 320.0);
+		scrollRoot = context.submit(scrollView, scrollFrame);
+		var heldThumb:ResolvedLayoutItem = cast scrollRoot.children[1].children[0].resolved;
+		var heldX = heldThumb.x + heldThumb.width * 0.5;
+		var heldY = heldThumb.y + heldThumb.height * 0.5;
+		context.pointerDown(heldX, heldY, 0);
+		scrollView.style.height = LayoutAxis.fixed(160.0);
+		scrollRoot = context.submit(scrollView, new LayoutFrame(256.0, 160.0));
+		context.pointerMove(heldX, heldY - 2.0);
+		if (scrollView.controller.offsetY >= 240.0 || scrollView.controller.offsetY < 230.0)
+			return 270;
+		context.pointerUp(heldX, heldY - 2.0, 0);
+		scrollView.style.height = LayoutAxis.fixed(80.0);
+		scrollRoot = context.submit(scrollView, scrollFrame);
 		scrollView.controller.jumpTo(0.0, 160.0);
 		if (!context.focusWidget(scrollRoot.id))
 			return 244;
@@ -2522,6 +2572,26 @@ class FrameworkSmoke {
 			return 94;
 
 		var tabChanges = 0;
+		var retainedHeaderBuilds = 0;
+		var retainedHeaderRevision = "initial";
+		var retainedTabOptions = new nativekit.ui.widgets.controls.TabsOptions();
+		retainedTabOptions.selectionMode = nativekit.ui.widgets.controls.TabsSelectionMode.Controlled;
+		var retainedTabs = Tabs.withOptions("retained-tabs-smoke", [
+			new TabItem("first", "First", new Text("first page")),
+			new TabItem("second", "Second", new Text("second page"))
+		], "first", null, retainedTabOptions);
+		retainedTabs.headerRevision = function() return retainedHeaderRevision;
+		retainedTabs.onTabHeaderBuilt = function(_, _) { retainedHeaderBuilds++; };
+		context.submit(retainedTabs, new LayoutFrame(320, 192));
+		context.submit(retainedTabs, new LayoutFrame(320, 192));
+		if (retainedHeaderBuilds != 2) throw "Unchanged tab headers must be retained";
+		retainedTabs.selectedKey = "second";
+		context.submit(retainedTabs, new LayoutFrame(320, 192));
+		if (retainedHeaderBuilds != 4) throw "Selection changes must update retained tab headers";
+		retainedTabs.items[0] = new TabItem("first", "First *", new Text("edited page"));
+		retainedHeaderRevision = "edited";
+		context.submit(retainedTabs, new LayoutFrame(320, 192));
+		if (retainedHeaderBuilds != 6) throw "Label changes must update retained tab headers";
 		var tabs = new Tabs("tabs-smoke", [
 			new TabItem("first", "First", new Text("First page")),
 			new TabItem("second", "Second", new Text("Second page")),
@@ -5031,9 +5101,9 @@ class FrameworkSmoke {
 		var model = new nativekit.ui.widgets.sidebar.SidebarModel();
 		var files = 0, search = 0;
 		model.register("search", function() { search++; return new Text("Search content"); },
-			new nativekit.ui.widgets.sidebar.SidebarModeOptions("Search", 10, true, 320));
+			new nativekit.ui.widgets.sidebar.SidebarModeOptions("Search", 10, true));
 		model.register("files", function() { files++; return new Text("Files content"); },
-			new nativekit.ui.widgets.sidebar.SidebarModeOptions("Files", 0, true, 240));
+			new nativekit.ui.widgets.sidebar.SidebarModeOptions("Files", 0, true));
 		model.select("files");
 		if (files != 0 || search != 0 || model.modes[0].id != "files") return false;
 		var view = new nativekit.ui.widgets.sidebar.SidebarHost("sidebar-regression", model, function(id) { model.select(id); });
@@ -5042,7 +5112,7 @@ class FrameworkSmoke {
 		model.select("search");
 		context.submit(view, new LayoutFrame(320, 240));
 		var filesMode = model.find("files");
-		if (filesMode == null || files != 1 || search != 1 || filesMode.width != 240) return false;
+		if (filesMode == null || files != 1 || search != 1 || model.width != 320) return false;
 		model.setVisible(false);
 		context.submit(view, new LayoutFrame(320, 240));
 		if (files != 1 || search != 1) return false;
@@ -5051,7 +5121,7 @@ class FrameworkSmoke {
 		restored.register("files", function() return new Text("Files"), new nativekit.ui.widgets.sidebar.SidebarModeOptions("Files"));
 		restored.register("search", function() return new Text("Search"), new nativekit.ui.widgets.sidebar.SidebarModeOptions("Search"));
 		var searchMode = restored.find("search");
-		if (searchMode == null || restored.activeId != "search" || restored.visible || searchMode.width != 320) return false;
+		if (searchMode == null || restored.activeId != "search" || restored.visible || restored.width != 320) return false;
 		var before = restored.encode();
 		for (invalid in ["2|search|1|", "1|search|1|search,NaN,1", "1|search|1|search,320oops,1", "1|search|1|search,320,1;search,240,1"])
 			if (restored.restore(invalid) || restored.encode() != before) return false;
@@ -5077,8 +5147,8 @@ class FrameworkSmoke {
 		if (!restored.unregister("search") || !restored.restore("1|future|1|future,360,1")) return false;
 		restored.register("future", function() return new Text("Future"), new nativekit.ui.widgets.sidebar.SidebarModeOptions("Future"));
 		var future = restored.selected();
-		if (future == null || future.id != "future" || future.width != 360) return false;
-		trace("PASS: sidebar lazy providers, mode widths, deferred registration and atomic persistence");
+		if (future == null || future.id != "future" || restored.width != 360) return false;
+		trace("PASS: sidebar lazy providers, shared width, deferred registration and atomic persistence");
 		return true;
 	}
 

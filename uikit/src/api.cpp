@@ -1109,7 +1109,7 @@ bool read_layout_transaction(const uint8_t *bytes, uint32_t byte_count,
                 return false;
             if (!std::isfinite(node.style.aspect_ratio) || node.style.aspect_ratio < 0.0f)
                 return false;
-            if (font_family > static_cast<uint32_t>(nkui::FontFamily::Emoji) ||
+            if ((font_family != NKUI_FONT_FAMILY_DEFAULT && font_family != NKUI_FONT_FAMILY_EMOJI && font_family != NKUI_FONT_FAMILY_MONOSPACE) ||
                 !std::isfinite(node.text_style.font_size) || node.text_style.font_size <= 0.0f ||
                 !std::isfinite(node.text_style.letter_spacing) ||
                 !std::isfinite(node.paragraph_style.line_height) ||
@@ -1138,7 +1138,7 @@ bool text_options_from_api(const nkui_text_style *text_style,
         paragraph_style->struct_size < sizeof(*paragraph_style))
         return false;
     if (text_style->family < NKUI_FONT_FAMILY_DEFAULT ||
-        text_style->family > NKUI_FONT_FAMILY_EMOJI ||
+        (text_style->family != NKUI_FONT_FAMILY_DEFAULT && text_style->family != NKUI_FONT_FAMILY_EMOJI && text_style->family != NKUI_FONT_FAMILY_MONOSPACE) ||
         paragraph_style->wrap < NKUI_TEXT_WRAP_NONE ||
         paragraph_style->wrap > NKUI_TEXT_WRAP_WORD_CHARACTER ||
         paragraph_style->alignment < NKUI_TEXT_ALIGN_START ||
@@ -1860,7 +1860,7 @@ extern "C" nkui_result nkui_font_collection_create(nkui_resource *out_fonts) {
 
 extern "C" nkui_result nkui_font_collection_add(nkui_resource fonts, const char *path,
                                                 nkui_font_family family) {
-    if (!path || !*path || (family != NKUI_FONT_FAMILY_DEFAULT && family != NKUI_FONT_FAMILY_EMOJI))
+    if (!path || !*path || (family != NKUI_FONT_FAMILY_DEFAULT && family != NKUI_FONT_FAMILY_EMOJI && family != NKUI_FONT_FAMILY_MONOSPACE))
         return NKUI_ERROR_INVALID_ARGUMENT;
     std::lock_guard<std::mutex> lock(resources_mutex);
     auto *slot = resolve(fonts, nkui::ResourceKind::FontCollection);
@@ -1870,7 +1870,7 @@ extern "C" nkui_result nkui_font_collection_add(nkui_resource fonts, const char 
     if (mutable_result != NKUI_OK)
         return mutable_result;
     {
-        slot->fonts.push_back({path, family == NKUI_FONT_FAMILY_EMOJI ? nkui::FontFamily::Emoji
+        slot->fonts.push_back({path, family == NKUI_FONT_FAMILY_MONOSPACE ? nkui::FontFamily::Monospace : family == NKUI_FONT_FAMILY_EMOJI ? nkui::FontFamily::Emoji
                                                                       : nkui::FontFamily::Default});
         const auto &entry = slot->fonts.back();
         if (!slot->font_collection->add_font(entry.path.c_str(), entry.family)) {
@@ -1885,7 +1885,7 @@ extern "C" nkui_result nkui_font_collection_add_data(nkui_resource fonts, const 
                                                      const uint8_t *font_data, uint32_t font_bytes,
                                                      nkui_font_family family) {
     if (!name || !*name || !font_data || !font_bytes ||
-        (family != NKUI_FONT_FAMILY_DEFAULT && family != NKUI_FONT_FAMILY_EMOJI))
+        (family != NKUI_FONT_FAMILY_DEFAULT && family != NKUI_FONT_FAMILY_EMOJI && family != NKUI_FONT_FAMILY_MONOSPACE))
         return NKUI_ERROR_INVALID_ARGUMENT;
     std::lock_guard<std::mutex> lock(resources_mutex);
     auto *slot = resolve(fonts, nkui::ResourceKind::FontCollection);
@@ -1898,7 +1898,7 @@ extern "C" nkui_result nkui_font_collection_add_data(nkui_resource fonts, const 
         auto data = std::make_shared<std::vector<uint8_t>>(font_data, font_data + font_bytes);
         slot->fonts.push_back(
             {name,
-             family == NKUI_FONT_FAMILY_EMOJI ? nkui::FontFamily::Emoji : nkui::FontFamily::Default,
+             family == NKUI_FONT_FAMILY_MONOSPACE ? nkui::FontFamily::Monospace : family == NKUI_FONT_FAMILY_EMOJI ? nkui::FontFamily::Emoji : nkui::FontFamily::Default,
              std::move(data)});
         const auto &entry = slot->fonts.back();
         if (!slot->font_collection->add_font_from_shared_data(entry.path.c_str(), entry.data,

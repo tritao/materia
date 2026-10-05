@@ -242,6 +242,8 @@ class BrowserUiHost {
 				stopHost();
 				return session.state == UiHostLifecycle.Failed ? -1 : 0;
 			}
+			var backgroundPoll:Null<Void->Void> = hostContext == null ? null : hostContext.onPoll;
+			if (backgroundPoll != null) backgroundPoll();
 			var activeRuntime = runtime;
 			if (frameRequested && activeRuntime != null && activeRuntime.surfaceReady &&
 				session.state == UiHostLifecycle.Running) {

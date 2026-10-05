@@ -11,15 +11,14 @@ class SidebarModel {
 	var savedActive:String = "";
 	var sequence:Int = 0;
 	static final widthPattern = ~/^[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$/;
-	var savedWidths:Map<String, Float> = [];
+	public var width(default, null):Float = 240;
 	var savedVisible:Map<String, Bool> = [];
 	public function new() {}
 
 	public function register(id:String, provider:Void->View, options:SidebarModeOptions):Void {
 		if (!validId(id) || provider == null || options == null || options.label.length == 0 ||
-			!validWidth(options.width) || find(id) != null) throw "Invalid or duplicate sidebar mode";
+			find(id) != null) throw "Invalid or duplicate sidebar mode";
 		var mode = new SidebarMode(id, provider, options, sequence++);
-		if (savedWidths.exists(id)) mode.width = savedWidths.get(id);
 		if (savedVisible.exists(id)) mode.visible = savedVisible.get(id);
 		modes.push(mode);
 		modes.sort(function(a, b) return a.order == b.order ? a.sequence - b.sequence : a.order - b.order);
@@ -30,7 +29,7 @@ class SidebarModel {
 	public function unregister(id:String):Bool {
 		var mode = find(id);
 		if (mode == null) return false;
-		savedWidths.set(id, mode.width); savedVisible.set(id, mode.visible);
+		savedVisible.set(id, mode.visible);
 		modes.remove(mode);
 		var active = selected(); activeId = active == null ? "" : active.id; savedActive = activeId;
 		onChange(); return true;
@@ -54,9 +53,9 @@ class SidebarModel {
 		if (visible == value) return;
 		visible = value; onChange();
 	}
-	public function rememberWidth(id:String, width:Float):Void {
-		var mode = find(id);
-		if (mode != null && validWidth(width)) { mode.width = width; savedWidths.set(id, width); }
+	/** Container width is shared by every destination. Resolution records it without a rebuild. */
+	public function rememberWidth(width:Float):Void {
+		if (validWidth(width)) this.width = width;
 	}
 	public function setModeVisible(id:String, value:Bool):Bool {
 		var mode = find(id);
@@ -66,35 +65,44 @@ class SidebarModel {
 		onChange(); return true;
 	}
 	public function encode():String {
-		var values:Array<String> = [];
-		for (mode in modes) values.push(mode.id + "," + mode.width + "," + (mode.visible ? "1" : "0"));
-		for (id in savedWidths.keys()) if (find(id) == null)
-			values.push(id + "," + savedWidths.get(id) + "," + (savedVisible.get(id) == false ? "0" : "1"));
+		var shown:Map<String, Bool> = [];
+		for (id in savedVisible.keys()) shown.set(id, savedVisible.get(id));
+		for (mode in modes) shown.set(mode.id, mode.visible);
+		var values = [for (id in shown.keys()) id + "," + (shown.get(id) ? "1" : "0")];
 		values.sort(Reflect.compare);
-		return "1|" + (savedActive == "" ? activeId : savedActive) + "|" + (visible ? "1" : "0") + "|" + values.join(";");
+		return "2|" + (savedActive == "" ? activeId : savedActive) + "|" + (visible ? "1" : "0") + "|" + width + "|" + values.join(";");
 	}
-	/** Reject malformed input atomically; unknown providers can register later. */
+	/** Parse atomically. Legacy layouts migrate using the saved active destination's width. */
 	public function restore(value:String):Bool {
 		if (value.length > 65536) return false;
 		var parts = value.split("|");
-		if (parts.length != 4 || parts[0] != "1" || (parts[1] != "" && !validId(parts[1])) ||
-			(parts[2] != "0" && parts[2] != "1")) return false;
-		var widths:Map<String, Float> = [], shown:Map<String, Bool> = [];
-		if (parts[3] != "") for (row in parts[3].split(";")) {
+		var legacy = parts[0] == "1";
+		if ((legacy ? parts.length != 4 : parts.length != 5 || parts[0] != "2") ||
+			(parts[1] != "" && !validId(parts[1])) || (parts[2] != "0" && parts[2] != "1")) return false;
+		var nextWidth = width;
+		if (!legacy) {
+			if (!widthPattern.match(parts[3])) return false;
+			nextWidth = Std.parseFloat(parts[3]);
+			if (!validWidth(nextWidth)) return false;
+		}
+		var shown:Map<String, Bool> = [];
+		var rows = parts[legacy ? 3 : 4];
+		if (rows != "") for (row in rows.split(";")) {
 			var fields = row.split(",");
-			if (fields.length != 3 || !validId(fields[0]) || widths.exists(fields[0]) ||
-				(fields[2] != "0" && fields[2] != "1")) return false;
-			if (!widthPattern.match(fields[1])) return false;
-			var width = Std.parseFloat(fields[1]);
-			if (!validWidth(width)) return false;
-			widths.set(fields[0], width); shown.set(fields[0], fields[2] == "1");
+			if (fields.length != (legacy ? 3 : 2) || !validId(fields[0]) || shown.exists(fields[0])) return false;
+			var flag = fields[legacy ? 2 : 1];
+			if (flag != "0" && flag != "1") return false;
+			if (legacy) {
+				if (!widthPattern.match(fields[1])) return false;
+				var oldWidth = Std.parseFloat(fields[1]);
+				if (!validWidth(oldWidth)) return false;
+				if (fields[0] == parts[1]) nextWidth = oldWidth;
+			}
+			shown.set(fields[0], flag == "1");
 		}
-		savedActive = parts[1]; savedWidths = widths; savedVisible = shown;
+		savedActive = parts[1]; savedVisible = shown; width = nextWidth;
 		visible = parts[2] == "1";
-		for (mode in modes) {
-			if (widths.exists(mode.id)) mode.width = widths.get(mode.id);
-			if (shown.exists(mode.id)) mode.visible = shown.get(mode.id);
-		}
+		for (mode in modes) if (shown.exists(mode.id)) mode.visible = shown.get(mode.id);
 		activeId = savedActive;
 		var active = selected(); activeId = active == null ? "" : active.id;
 		onChange(); return true;

@@ -8,6 +8,7 @@ import NativeKitEvents;
 import NativeKitSurface;
 import Renderer;
 import Surface;
+import nativekit.ui.debug.AllocationProbe;
 import nativekit.ffi.NativeKitTypes;
 import nativekit.ui.core.NativeInputAdapter;
 
@@ -20,6 +21,7 @@ class UiHostRuntime {
 	public var framebufferHeight(get, never):Int;
 	public var scale(get, never):Float;
 	public var rendered(default, null):Int = 0;
+	public var lastFrameAllocatedBytes(default, null):Float = 0.0;
 	/** The most recent skipped frame; cleared by the next successful render. */
 	public var lastRenderResourceError(default, null):Null<String> = null;
 	public var surfaceReady(get, never):Bool;
@@ -100,6 +102,7 @@ class UiHostRuntime {
 	}
 
 	public function setScale(value:Float):Void frameState.setScale(value);
+
 	function applyZoom(value:Float):Void {
 		frameState.setZoom(value);
 		if (input != null) input.coordinateScale = value;
@@ -111,10 +114,11 @@ class UiHostRuntime {
 	public function setSurfaceReady(value:Bool):Void frameState.setSurfaceAvailable(value);
 
 	/** Renders at most once for the adapter's scheduling callback. */
-	public function render(timeSeconds:Float):Bool {
+	public function render(timeSeconds:Float, repaintOnly:Bool = false):Bool {
 		if (disposed || session.state != UiHostLifecycle.Running || !frameState.canRender() ||
 			application == null || renderer == null)
 			return false;
+		var allocatedAt = AllocationProbe.now();
 		try {
 			callbackDepth++;
 			var renderSurface = Surface.fromNativeHandle(surface);
@@ -122,19 +126,23 @@ class UiHostRuntime {
 			frame.setViewport(frameState.layoutWidth, frameState.layoutHeight);
 			frame.deltaSeconds = frameState.nextDelta(timeSeconds);
 			frameInfo.set(frameState.layoutWidth, frameState.layoutHeight, framebufferWidth, framebufferHeight, frameState.renderScale);
+			context.repaintOnly = repaintOnly;
 			application.submit(frame);
+			context.repaintOnly = false;
 			if (session.state != UiHostLifecycle.Running || disposeRequested) {
 				callbackDepth--;
 				if (callbackDepth == 0 && disposeRequested) disposeNow();
 				return false;
 			}
 			application.context().render(renderer, renderSurface, frameInfo);
+			lastFrameAllocatedBytes = AllocationProbe.now() - allocatedAt;
 			lastRenderResourceError = null;
 			rendered++;
 			callbackDepth--;
 			if (callbackDepth == 0 && disposeRequested) disposeNow();
 			return true;
 		} catch (error:Dynamic) {
+			context.repaintOnly = false;
 			if (callbackDepth > 0) callbackDepth--;
 			if (Std.isOfType(error, UiError)) {
 				var uiError:UiError = cast error;

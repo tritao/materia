@@ -10,10 +10,9 @@ class SidebarMode {
 	public final order:Int;
 	public final sequence:Int;
 	public var visible:Bool;
-	public var width:Float;
 	public function new(id:String, provider:Void->View, options:SidebarModeOptions, sequence:Int) {
 		this.sequence = sequence;
 		this.id = id; this.provider = provider; label = options.label; order = options.order;
-		visible = options.visible; width = options.width;
+		visible = options.visible;
 	}
 }

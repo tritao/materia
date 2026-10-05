@@ -67,6 +67,7 @@ class UiContext {
 	var submittedStyleSheet:Null<StyleSheet>;
 	final hitTestIds:Array<Int>;
 	var disposed:Bool;
+	final stalePaintNodes:Array<Int> = [];
 	var customCanvases:Map<Int, Canvas>;
 	var customLists:Map<Int, DisplayList>;
 	var customGeometries:Map<Int, ResolvedLayoutItem>;
@@ -472,6 +473,15 @@ class UiContext {
 		accessibilityBridge.update(root, focus.focusedId);
 	}
 
+	/** Matches the render traversal's eligibility checks without a second node map. */
+	function hasCurrentCustomPaint(nodeId:Int):Bool {
+		var node = currentNodesById.get(nodeId);
+		if (node == null || !node.hasPaintHandler() || node.resolved == null) return false;
+		var geometry = node.resolved;
+		return geometry.width > 0.0 && geometry.height > 0.0 &&
+			geometry.clipBounds.width > 0.0 && geometry.clipBounds.height > 0.0;
+	}
+
 	public function render(renderer:Renderer, surface:Surface, frame:FrameInfo):Void {
 		var renderStartedAt = Sys.time();
 		var renderStartAllocatedAt = AllocationProbe.now();
@@ -480,7 +490,6 @@ class UiContext {
 		if (root == null)
 			throw "Submit a view before rendering the UI context";
 		diagnosticStage = 21;
-		var painted = new Map<Int, Bool>();
 		var paintedNodes = 0;
 		var paintSkippedNodes = 0;
 		var emptyPaintNodes = 0;
@@ -584,21 +593,14 @@ class UiContext {
 			}
 			if (contentReused)
 				paintSkippedNodes++;
-			painted.set(nodeId, true);
 		});
 		diagnosticStage = 23;
-		var stale:Array<Int> = [];
-		var staleSeen = new Map<Int, Bool>();
+		var stale = stalePaintNodes;
+		stale.resize(0);
 		for (nodeId in customLists.keys())
-			if (!painted.exists(nodeId) && !staleSeen.exists(nodeId)) {
-				stale.push(nodeId);
-				staleSeen.set(nodeId, true);
-			}
+			if (!hasCurrentCustomPaint(nodeId)) stale.push(nodeId);
 		for (nodeId in customCompositeLists.keys())
-			if (!painted.exists(nodeId) && !staleSeen.exists(nodeId)) {
-				stale.push(nodeId);
-				staleSeen.set(nodeId, true);
-			}
+			if (!customLists.exists(nodeId) && !hasCurrentCustomPaint(nodeId)) stale.push(nodeId);
 		for (nodeId in stale) {
 			clearCustomPaintBindings(nodeId);
 			var canvas = customCanvases.get(nodeId);

@@ -10,12 +10,20 @@ class ResolvedTextStyle {
 	public final paragraphStyle:ParagraphStyle;
 	public final textColor:Color;
 
-	public function new(textStyle:TextStyle, paragraphStyle:ParagraphStyle, textColor:Color) {
+	public function new(textStyle:TextStyle, paragraphStyle:ParagraphStyle, textColor:Color,
+			?override:TextStyleOverride) {
 		if (textStyle == null || paragraphStyle == null || textColor == null)
 			throw "Resolved text styles require complete values";
-		this.textStyle = copyTextStyle(textStyle);
-		this.paragraphStyle = copyParagraphStyle(paragraphStyle);
-		this.textColor = textColor;
+		this.textStyle = new TextStyle(
+			override == null || override.fontSize == null ? textStyle.fontSize : override.fontSize,
+			override == null || override.font == null ? textStyle.font : override.font,
+			override == null || override.letterSpacing == null ? textStyle.letterSpacing : override.letterSpacing);
+		this.paragraphStyle = new ParagraphStyle(
+			override == null || override.wrap == null ? paragraphStyle.wrap : override.wrap,
+			override == null || override.alignment == null ? paragraphStyle.alignment : override.alignment,
+			override == null || override.lineHeight == null ? paragraphStyle.lineHeight : override.lineHeight,
+			override == null || override.direction == null ? paragraphStyle.direction : override.direction);
+		this.textColor = override == null || override.color == null ? textColor : override.color;
 	}
 
 	public static function fromTheme(theme:Theme):ResolvedTextStyle {
@@ -31,21 +39,8 @@ class ResolvedTextStyle {
 	}
 
 	/** Applies sparse local changes without mutating either input style. */
-	public function merge(override:Null<TextStyleOverride>):ResolvedTextStyle {
-		if (override == null)
-			return new ResolvedTextStyle(textStyle, paragraphStyle, textColor);
-		var nextText = new TextStyle(
-			override.fontSize == null ? textStyle.fontSize : override.fontSize,
-			override.font == null ? textStyle.font : override.font,
-			override.letterSpacing == null ? textStyle.letterSpacing : override.letterSpacing);
-		var nextParagraph = new ParagraphStyle(
-			override.wrap == null ? paragraphStyle.wrap : override.wrap,
-			override.alignment == null ? paragraphStyle.alignment : override.alignment,
-			override.lineHeight == null ? paragraphStyle.lineHeight : override.lineHeight,
-			override.direction == null ? paragraphStyle.direction : override.direction);
-		return new ResolvedTextStyle(nextText, nextParagraph,
-			override.color == null ? textColor : override.color);
-	}
+	public function merge(override:Null<TextStyleOverride>):ResolvedTextStyle
+		return new ResolvedTextStyle(textStyle, paragraphStyle, textColor, override);
 
 	/** Returns this snapshot with a state-dependent foreground color. */
 	public function withTextColor(color:Color):ResolvedTextStyle {
@@ -54,9 +49,4 @@ class ResolvedTextStyle {
 		return new ResolvedTextStyle(textStyle, paragraphStyle, color);
 	}
 
-	static function copyTextStyle(value:TextStyle):TextStyle
-		return new TextStyle(value.fontSize, value.font, value.letterSpacing);
-
-	static function copyParagraphStyle(value:ParagraphStyle):ParagraphStyle
-		return new ParagraphStyle(value.wrap, value.alignment, value.lineHeight, value.direction);
 }
