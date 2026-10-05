@@ -2125,3 +2125,15 @@ with 468 exposed samples, including unchanged extrema/order, unreachable-extreme
 all-unreachable rejection and two checks per face when both extrema are reachable. An initial
 call-count assertion incorrectly ignored geometrically narrow patches discarded after
 screening; that assertion was corrected. No production speedup or P3 pass is claimed yet.
+
+Three-contact selection now applies the same lazy ranking policy to the original four
+farthest-point sweeps and largest-area third point. It first finds the earliest reachable
+lattice point, then rejects unreachable points in each geometric rank order. Already
+rejected points cannot affect any later sweep. With a fixed feasibility predicate this
+produces the same choices as eager filtering; lattice-order ties remain deterministic.
+The approach bound is derived from the three selected points. Reachable patterns need six
+ranked checks per face rather than a complete lattice of IK checks. Focused CAD tests pass
+5,141 assertions and 468 exposed samples, including unchanged geometric scores, ordering
+and point choices with six reach checks per face. The two-contact-only production retry was
+interrupted (exit 143) during initial-face planning; no additional production pass is claimed.
+The next retry includes lazy screening for all three contact-pattern sizes.

@@ -17,15 +17,13 @@ class WeldProbeStage {
 
 /** Select geometrically observable contact patterns from patches large enough for the current uncertainty. */
 class WeldProbePatterns {
-  /** Preserve lattice-order ties while rejecting unreachable extrema from the outside inward. */
-  static function reachableExtreme(candidates:Array<Vector>, axis:Vector, maximum:Bool, face:WeldProbeFace,
+  /** Preserve lattice-order ties while rejecting unreachable candidates in geometric rank order. */
+  static function reachableBest(candidates:Array<Vector>, rank:Vector->Float, face:WeldProbeFace,
       uncertainty:WeldProbeUncertainty, possible:Null<WeldProbeFace->Vector->WeldProbeRegionBounds->Bool>):Null<Vector> {
     while (candidates.length > 0) {
       var chosen = 0;
-      for (index in 1...candidates.length) {
-        var value = candidates[index].dot(axis), current = candidates[chosen].dot(axis);
-        if (maximum ? value > current : value < current) chosen = index;
-      }
+      for (index in 1...candidates.length)
+        if (rank(candidates[index]) > rank(candidates[chosen])) chosen = index;
       var point = candidates[chosen];
       if (possible == null || possible(face, point, uncertainty.region(face, point))) return point;
       candidates.splice(chosen, 1);
@@ -54,7 +52,6 @@ class WeldProbePatterns {
         var approach = bounds.normalTravel + clearance;
         if (!geometry.exposedRegion(face, point, bounds.halfU + approach * bounds.tiltU,
           bounds.halfV + approach * bounds.tiltV, approach, clearance)) continue;
-        if (count == 3 && possible != null && !possible(face, point, bounds)) continue;
         candidates.push(point); travel = Math.max(travel, approach);
       }
       if (candidates.length < count) continue;
@@ -62,28 +59,30 @@ class WeldProbePatterns {
       var score = 0.0;
       if (count == 3) {
         // Farthest-point sweeps find a broad baseline without a quadratic scan of the whole lattice.
-        var first = candidates[0], second = first;
+        var initial = reachableBest(candidates, (_) -> 0.0, face, uncertainty, possible);
+        if (initial == null) continue;
+        var first:Vector = initial, second:Vector = initial;
         for (_ in 0...4) {
-          var distance = -1.0;
-          for (point in candidates) {
-            var delta = point.subtract(first), square = delta.dot(delta);
-            if (square > distance) { second = point; distance = square; }
-          }
+          var origin = first;
+          second = cast reachableBest(candidates, (point) -> {
+            var delta = point.subtract(origin); return delta.dot(delta);
+          }, face, uncertainty, possible);
           var swap = first; first = second; second = swap;
         }
-        var third = first, area = 0.0;
-        for (point in candidates) {
-          var value = Math.abs(second.subtract(first).cross(point.subtract(first)).dot(face.normal));
-          if (value > area) { third = point; area = value; }
-        }
+        var anchor = first, edge = second.subtract(first);
+        var third:Vector = cast reachableBest(candidates,
+          (point) -> Math.abs(edge.cross(point.subtract(anchor)).dot(face.normal)), face, uncertainty, possible);
+        var area = Math.abs(edge.cross(third.subtract(anchor)).dot(face.normal));
         if (area < clearance * clearance) continue;
         points = [first, second, third]; score = area;
+        travel = Math.max(uncertainty.region(face, first).normalTravel,
+          Math.max(uncertainty.region(face, second).normalTravel, uncertainty.region(face, third).normalTravel)) + clearance;
       } else if (count == 2) {
         // Separation along the planes' intersection observes rotation about the first plane's normal.
         var axis = normals[0].cross(face.normal).normalized();
-        var first = reachableExtreme(candidates, axis, false, face, uncertainty, possible);
+        var first = reachableBest(candidates, (point) -> -point.dot(axis), face, uncertainty, possible);
         if (first == null) continue;
-        var second = reachableExtreme(candidates, axis, true, face, uncertainty, possible);
+        var second = reachableBest(candidates, (point) -> point.dot(axis), face, uncertainty, possible);
         if (second == null) continue;
         var span = Math.abs(second.subtract(first).dot(axis));
         if (span < clearance) continue;

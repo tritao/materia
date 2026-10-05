@@ -162,6 +162,22 @@ class WeldProbeTests {
     check(secondStages.length > 0, "Independent second-plane patterns are available after uncertainty is reduced");
     for (stage in secondStages) check(Math.abs(stage.points[1].subtract(stage.points[0]).dot(firstNormal.cross(stage.face.normal))) >= 3,
       "Second-plane contacts observe the remaining rotational component");
+    var tripleChecks = new Map<String, Int>();
+    var lazyTriples = WeldProbePatterns.stages(work, 3, [], reduced, 3, 9,
+      (face, _, _) -> {
+        var prior = tripleChecks.get(face.name());
+        tripleChecks.set(face.name(), prior == null ? 1 : prior + 1); return true;
+      });
+    var geometricTriples = WeldProbePatterns.stages(work, 3, [], reduced, 3, 9);
+    check(lazyTriples.length == geometricTriples.length && lazyTriples.length > 0,
+      "Lazy breadth selection retains every geometric three-contact stage");
+    for (tested in tripleChecks) check(tested == 6, "Reachable broad patterns need only six ranked checks per face");
+    for (index in 0...lazyTriples.length) {
+      check(lazyTriples[index].face.name() == geometricTriples[index].face.name() &&
+        lazyTriples[index].score == geometricTriples[index].score, "Lazy breadth selection preserves stage scores and order");
+      for (point in 0...3) check(lazyTriples[index].points[point].subtract(geometricTriples[index].points[point]).length() < 1e-10,
+        "Lazy breadth selection preserves each farthest-point choice");
+    }
     var pairChecks = new Map<String, Int>();
     var directPairs = WeldProbePatterns.stages(work, 2, [firstNormal], reduced, 3, 9,
       (face, _, _) -> {
