@@ -936,7 +936,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM4b | done: typed editor base/flange commands, explicit stock input, parameter inspector, folded/flat publication, bend table, exact fold-line overlay and DXF/SVG commands; P2 editor workflow passes; full gate `sm4b-editor-full` passes | be21d1579 |
 | SM5 | in progress: SM5a unique native ancestry count/index/bulk queries and typed owning Haxe wrappers; three native suites and focused ancestry checks pass; quick gate `sm5a-ancestry` (5974 sheet assertions); recognition and convert feature deferred by user direction on 2026-10-05 | 51c4f2d5c |
 | SM6 | done: SM6a typed air-bending predictions, physical springback inversion and exact contact depth; focused process smoke passes 1235 assertions; quick gate `sm6a-air-bending` passes (7209 sheet assertions); SM6b explicit lot/tool/angle-band calibration with measured radius and additive depth correction, focused smoke passes 1257 assertions, quick gate `sm6b-calibration` passes (7231 sheet assertions); SM6 complete: typed grade defaults, editor selection, Process-rule persistence and tooling minimums; full gate `sm6-process-material-full` passes all stages (7248 sheet assertions, ProjectKit 155); final material integration and CAD workflow checks pass | 7148a8bb8; 6458df23b; d664caa22 |
-| SM7 | in progress: SM7a typed section points and validated simple polygons; convex decomposition preserves concave reliefs; profile checks pass in MachineKit smoke; quick gate `sm7a-profile-foundation` passes all five suites with unchanged original MachineKit summaries; SM7b exact R0.6 straight/gooseneck/acute punches, native section extrusion and bounded conservative nose covers pass quick gate `sm7b-punch-profiles`; dies, segments, stations, layout and clamps remain | c4e418ba5 |
+| SM7 | in progress: SM7a typed section points and validated simple polygons; convex decomposition preserves concave reliefs; profile checks pass in MachineKit smoke; quick gate `sm7a-profile-foundation` passes all five suites with unchanged original MachineKit summaries; SM7b exact R0.6 straight/gooseneck/acute punches, native section extrusion and bounded conservative nose covers pass quick gate `sm7b-punch-profiles`; SM7c exact single-V and four-V die catalogue, shoulder-centre contact datums and shared bounded arc covers pass quick gate `sm7c-die-profiles`; segments, stations, layout and clamps remain | c4e418ba5; 310a41894 |
 | SM8a | planned | |
 | SM8b | planned (waits for MT5 on main) | |
 | SM9 | planned | |
@@ -1311,3 +1311,17 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
   with 0.1, 0.01 and 0.001 mm maximum outward errors; convex pieces preserve section area.
   The gooseneck relief stays empty. Quick gate `sm7b-punch-profiles` passes all five suites,
   retaining 7504 sheet assertions and all five original MachineKit engineering summaries.
+
+- SM7 die body assumptions: single V8/V12/V16/V22 profiles are 40 mm wide and 30 mm high,
+  with an 88-degree groove and R1 shoulders. The four-V block is a 60 mm square with the same
+  grooves on consecutive faces. Opening measures between shoulder centres, as in SM6; exact
+  shoulder tangents and groove depth are derived. All four grooves stay in both physical and
+  collision geometry when a face is selected. No manufacturer dimensions or strength rating
+  are inferred from these demonstration profiles.
+
+- SM7c verification: sharp and rounded single-V native solids are valid; independent sharp
+  volume and contact tangent/depth checks pass. All four-V face selections retain the same
+  physical volume, including every groove, and leave the active opening clear. Conservative
+  shoulder covers contain sampled exact contacts; convex pieces conserve section area.
+  Quick gate `sm7c-die-profiles` passes all five suites with unchanged original MachineKit
+  summaries and 7504 sheet assertions. No unchecked cast or new compiler workaround is needed.

@@ -1,3 +1,5 @@
+import machinekit.pressbrake.DieProfile;
+import machinekit.pressbrake.DieGroove;
 import machinekit.pressbrake.ToolingCatalogue;
 import machinekit.pressbrake.PunchProfile;
 import machinekit.pressbrake.PunchKind;
@@ -126,6 +128,70 @@ class ToolProfileTests {
 			if (Math.abs(sum - cover.area) > 1e-7) throw "Catalogue punch convex coverage";
 			if (profile.kind == Gooseneck && inside(cover.points(), new ToolProfilePoint(0, 50)))
 				throw "Gooseneck collision cover fills its relief";
+		}
+		var sharpDie = new DieGroove(12, Math.PI / 2, 0);
+		if (Math.abs(sharpDie.depth() - 6) > 1e-9) throw "Sharp V12 depth";
+		var roundedDie = new DieGroove(12, Math.PI / 2, 1);
+		if (Math.abs(roundedDie.tangentY() - (6 - Math.sqrt(0.5))) > 1e-9
+			|| Math.abs(roundedDie.tangentZ() - (Math.sqrt(0.5) - 1)) > 1e-9
+			|| Math.abs(roundedDie.depth() - (7 - Math.sqrt(2))) > 1e-9)
+			throw "Rounded die tangents and depth";
+		var consumed = false;
+		try { var invalid = new DieGroove(1, Math.PI / 2, 1); }
+		catch (_:Dynamic) consumed = true;
+		if (!consumed) throw "Die accepted overlapping shoulders";
+		for (radius in [0.0, 1.0]) {
+			var die = new DieProfile("test-v12", new DieGroove(12, Math.PI / 2, radius), 30, 20);
+			var dieSolid = die.geometry(13, 113);
+			if (CadKit.shapeValidChecked(dieSolid.shape.borrowHandle()) == 0) throw "Exact die shoulders produce a valid solid";
+			if (radius == 0 && Math.abs(dieSolid.volume() - 56400) > 1e-5) throw "Sharp die independent volume";
+			if (radius > 0 && !(dieSolid.volume() > 56400)) throw "Rounded die removes less material than sharp V";
+			var dieBox = dieSolid.shape.bounds();
+			if (Math.abs(dieBox.get_min().get_z() + 20) > 1e-6 || Math.abs(dieBox.get_max().get_z()) > 1e-6)
+				throw "Die mounting and top datums";
+			var exactArea = dieSolid.volume() / 100;
+			for (error in [0.1, 0.01, 0.001]) {
+				var cover = die.collisionSection(error);
+				if (cover.area < exactArea - 1e-8) throw "Die collision cover loses material";
+				var sum = 0.0;
+				for (piece in cover.convexPieces()) sum += new ToolProfilePolygon(piece).area;
+				if (Math.abs(sum - cover.area) > 1e-7) throw "Die collision decomposition area";
+				if (radius > 0) for (i in 0...101) {
+					var theta = Math.PI / 2 + Math.PI / 4 * i / 100;
+					if (!inside(cover.points(), new ToolProfilePoint(6 + Math.cos(theta), -1 + Math.sin(theta))))
+						throw "Die collision cover omits shoulder contact";
+				}
+			}
+			dieSolid.close();
+		}
+		var dies = ToolingCatalogue.dies();
+		if (dies.length != 4) throw "Reference single-V catalogue rows";
+		var openings = [8, 12, 16, 22];
+		for (i in 0...dies.length) {
+			if (dies[i].groove.vWidth != openings[i]) throw "Reference die openings";
+			var part = dies[i].geometry(0, 100);
+			if (CadKit.shapeValidChecked(part.shape.borrowHandle()) == 0) throw "Reference die native geometry";
+			part.close();
+		}
+		var fourV = ToolingCatalogue.fourV();
+		var expectedVolume = -3 * 60 * 60 * 100.0;
+		for (face in 0...4) {
+			var single = new DieProfile("independent-face", fourV.groove(face), 60, 60).geometry(0, 100);
+			expectedVolume += single.volume();
+			single.close();
+		}
+		for (face in 0...4) {
+			if (fourV.groove(face).vWidth != openings[face]) throw "Four-V selected contact opening";
+			var part = fourV.geometry(0, 100, face);
+			if (CadKit.shapeValidChecked(part.shape.borrowHandle()) == 0) throw "Four-V block native validity";
+			if (Math.abs(part.volume() - expectedVolume) > 1e-4) throw "Four-V block preserves every groove after rotation";
+			var cover = fourV.collisionSection(0.01, face);
+			if (cover.area < part.volume() / 100 - 1e-7) throw "Four-V collision cover loses material";
+			if (inside(cover.points(), new ToolProfilePoint(0, -0.1))) throw "Four-V active groove filled by collision cover";
+			var sum = 0.0;
+			for (piece in cover.convexPieces()) sum += new ToolProfilePolygon(piece).area;
+			if (Math.abs(sum - cover.area) > 1e-6) throw "Four-V convex pieces conserve area";
+			part.close();
 		}
 		trace("Tool profile tests passed");
 	}

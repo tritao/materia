@@ -7,6 +7,12 @@ package machinekit.pressbrake;
 class ToolingCatalogue {
 	public static function punches():Array<PunchProfile> return [straight(), gooseneck(), acute()];
 
+	public static function dies():Array<DieProfile> return [for (opening in [8, 12, 16, 22])
+		new DieProfile('reference-v$opening-88-r1', new DieGroove(opening, 88 * Math.PI / 180, 1), 40, 30)];
+
+	public static function fourV():MultiVDieProfile return new MultiVDieProfile("reference-four-v-8-12-16-22", 60,
+		[for (opening in [8, 12, 16, 22]) new DieGroove(opening, 88 * Math.PI / 180, 1)]);
+
 	public static function straight():PunchProfile return tapered("reference-straight-88-r06", Straight, 88 * Math.PI / 180, 100);
 
 	public static function acute():PunchProfile return tapered("reference-acute-30-r06", Acute, Math.PI / 6, 100);

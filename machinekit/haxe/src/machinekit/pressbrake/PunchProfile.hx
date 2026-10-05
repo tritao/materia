@@ -97,21 +97,13 @@ class PunchProfile {
 	public function collisionSection(maximumError:Float):ToolProfilePolygon {
 		if (!Math.isFinite(maximumError) || !(maximumError > 0))
 			throw 'Punch profile "$id" needs a positive collision section error';
-		var sweep = Math.PI - includedAngle;
-		var maximumSweep = 2 * Math.acos(tipRadius / (tipRadius + maximumError));
-		if (!(maximumSweep > 0)) throw 'Punch profile "$id" collision error is below numerical resolution';
-		var count = Math.ceil(sweep / maximumSweep);
-		if (count > 100000) throw 'Punch profile "$id" collision section needs too many contact facets';
-		var step = sweep / count;
-		var radius = tipRadius / Math.cos(step / 2);
+		var arc = new ToolProfileArc(new ToolProfilePoint(0, tipRadius), tipRadius,
+			-Math.PI + includedAngle / 2, Math.PI - includedAngle);
 		var result:Array<ToolProfilePoint> = [];
 		var points = upperSection.points();
 		for (i in 0...points.length) {
 			result.push(points[i]);
-			if (i == contactEdge) for (j in 0...count) {
-				var angle = -Math.PI + includedAngle / 2 + (j + 0.5) * step;
-				result.push(new ToolProfilePoint(radius * Math.cos(angle), tipRadius + radius * Math.sin(angle)));
-			}
+			if (i == contactEdge) for (point in arc.tangentVertices(maximumError)) result.push(point);
 		}
 		return new ToolProfilePolygon(result);
 	}
