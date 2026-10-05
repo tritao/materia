@@ -11,6 +11,7 @@ import motionkit.robot.ProgramCompiler;
 import motionkit.robot.CompiledProgram;
 import robotkit.manipulation.Manipulator;
 import robotkit.manipulation.ArmClearance;
+import robotkit.manipulation.ArmClearance.ClearanceViolation;
 import robotkit.manipulation.JointRoute;
 import robotkit.spatial.Transform3;
 import robotkit.model.JointType;
@@ -29,19 +30,32 @@ class ProbeMotionPlanner {
   public final arm:Manipulator;
   public final compiler:ProgramCompiler;
   public final clearance:Null<ArmClearance>;
+  public final wireClearance:Null<ProbeWireClearance>;
   final interval:Float;
   final jointStep:Float;
 
-  public function new(arm:Manipulator, compiler:ProgramCompiler, ?clearance:ArmClearance) {
-    if (arm == null || compiler == null || compiler.solver.jointCount() != arm.group.count())
+  public function new(arm:Manipulator, compiler:ProgramCompiler, ?clearance:ArmClearance, ?wireClearance:ProbeWireClearance) {
+    if (arm == null || compiler == null || compiler.solver.jointCount() != arm.group.count() ||
+        wireClearance != null && wireClearance.arm != arm)
       throw "Probe motion planning needs matching arm kinematics and compiler";
     this.arm = arm; this.compiler = compiler; this.clearance = clearance;
+    this.wireClearance = wireClearance;
     var period = Math.POSITIVE_INFINITY, smallest = Math.POSITIVE_INFINITY;
     for (joint in 0...arm.group.count()) {
       var step = arm.robot.joints[arm.jointIndices()[joint]].type == JointType.Prismatic ? 0.001 : 0.02;
       period = Math.min(period, step / compiler.maxVelocity[joint]); smallest = Math.min(smallest, step);
     }
     interval = period; jointStep = smallest;
+  }
+
+  public function violation(q:Array<Float>, contact:Bool = false):Null<ClearanceViolation> {
+    var hit = clearance == null ? null : clearance.violation(q, contact);
+    return hit != null || wireClearance == null ? hit : wireClearance.violation(q, contact);
+  }
+
+  function sweep(from:Array<Float>, to:Array<Float>, contact:Bool):Null<ClearanceViolation> {
+    var hit = clearance == null ? null : clearance.sweep(from, to, contact, jointStep);
+    return hit != null || wireClearance == null ? hit : wireClearance.sweep(from, to, contact, jointStep);
   }
 
   static function pose(frame:Transform3):Pose3 {
@@ -54,15 +68,13 @@ class ProbeMotionPlanner {
     var compiled:CompiledProgram = compiler.compile(program, start, Int64.ofInt(1));
     try {
       var last = start.copy();
-      if (clearance != null && clearance.violation(last, contact) != null) throw "Probe motion starts in collision";
+      if (violation(last, contact) != null) throw "Probe motion starts in collision";
       for (block in compiled.blocks) for (trajectory in block.plans) {
         var samples = Std.int(Math.max(1.0, Math.ceil(trajectory.durationSeconds / interval)));
         for (sample in 0...samples + 1) {
           var q = trajectory.evaluate(trajectory.durationSeconds * sample / samples).positions;
-          if (clearance != null) {
-            var hit = clearance.sweep(last, q, contact, jointStep);
-            if (hit != null) throw 'Probe motion collision: ${hit.a} against ${hit.b}, ${hit.distance} m < ${hit.required} m';
-          }
+          var hit = sweep(last, q, contact);
+          if (hit != null) throw 'Probe motion collision: ${hit.a} against ${hit.b}, ${hit.distance} m < ${hit.required} m';
           last = q.copy();
         }
       }
@@ -75,8 +87,8 @@ class ProbeMotionPlanner {
   function edge(from:Array<Float>, to:Array<Float>):Bool {
     var moving = false;
     for (joint in 0...from.length) if (Math.abs(from[joint] - to[joint]) > 1e-12) moving = true;
-    if (!moving) return clearance == null || clearance.violation(from) == null;
-    if (clearance != null && clearance.sweep(from, to, false, jointStep) != null) return false;
+    if (!moving) return violation(from) == null;
+    if (sweep(from, to, false) != null) return false;
     try {
       inspect(new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(to), new MotionOptions(), Blend.ExactStop)]), from, false);
       return true;
@@ -144,7 +156,7 @@ class ProbeMotionPlanner {
         if (limits.lower < limits.upper && (end < limits.lower || end > limits.upper)) return false;
         q.push(end);
       }
-      if (clearance != null && clearance.sweep(last, q, true, jointStep) != null) return false;
+      if (sweep(last, q, true) != null) return false;
       last = q;
     }
     return true;

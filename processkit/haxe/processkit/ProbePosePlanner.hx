@@ -40,9 +40,9 @@ class ProbePosePlanner {
     for (rotation in orientations(outward, current, 16)) {
       var target = pose(new Transform3(at, rotation));
       var q = motion.compiler.solver.solvePose(target, start, motion.compiler.ikTolerance);
-      if (q != null && (motion.clearance == null || motion.clearance.violation(q) == null)) return true;
+      if (q != null && motion.violation(q) == null) return true;
       for (candidate in motion.compiler.solver.sampleCandidates(target, 12, motion.compiler.ikTolerance))
-        if (motion.clearance == null || motion.clearance.violation(candidate) == null) return true;
+        if (motion.violation(candidate) == null) return true;
     }
     return false;
   }

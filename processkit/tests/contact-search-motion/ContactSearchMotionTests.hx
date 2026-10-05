@@ -73,6 +73,22 @@ class ContactSearchMotionTests {
       var blocked = new ArmClearance(arm, [
         {name: "tool", link: tool.id, vertices: cube(0), tool: true},
         {name: "fixture", link: base.id, vertices: cube(0.015), tool: false}], [0.0], 0.003);
+      var wire = new processkit.ProbeWireClearance(arm, tool.id, Transform3.identity(), 0.001, 0.015,
+        [{name: "fixture", link: base.id, vertices: cube(0.015), tool: false}]);
+      var wireGuarded = new ProbeMotionPlanner(arm, planning.compiler, null, wire);
+      check(wireGuarded.violation([0.0]) == null, "The CAD wire is initially clear of the fixture");
+      check(wireGuarded.violation([0.012]) != null, "Air clearance includes the wire beyond the nozzle");
+      check(wireGuarded.violation([0.0135], true) == null, "Calibrated near-contact sensing permits the wire to approach without penetration");
+      check(wireGuarded.violation([0.0145], true) != null, "Touch sensing cannot authorize wire penetration");
+      check(!wireGuarded.stoppingClear([0.011], [0.1], 0.02), "Predicted braking also guards the unconsumed wire");
+      forbidden = false;
+      try wireGuarded.approach(new Transform3(new Vec3(0, 0, 0.06), Quat.identity()), [0.0], 32)
+        catch (_:Dynamic) forbidden = true;
+      check(forbidden, "Clear approach endpoints cannot hide a wire collision between them");
+      forbidden = false;
+      try wireGuarded.line(new Transform3(new Vec3(0, 0, 0.06), Quat.identity()), [0.0], 0.01)
+        catch (_:Dynamic) forbidden = true;
+      check(forbidden, "Compiled straight air motion checks the protruding wire");
       var guarded = new ProbeMotionPlanner(arm, planning.compiler, blocked);
       check(guarded.stoppingClear([0.0], [0.0], 0.02), "A stationary clear probe has a safe braking sweep");
       check(!guarded.stoppingClear([0.008], [0.1], 0.02), "A clear current posture can still have an obstructed braking sweep");
