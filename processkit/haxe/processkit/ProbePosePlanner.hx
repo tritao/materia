@@ -37,13 +37,15 @@ class ProbePosePlanner {
       throw "Probe candidate screening needs a unit normal, observed joints and finite search bounds";
     var current = motion.arm.tcpPose(start).rotation;
     var at = point.add(outward.scale(normalTravel + 0.003 + motion.airPoseReserve));
-    for (rotation in orientations(outward, current, 16)) {
-      var target = pose(new Transform3(at, rotation));
+    var targets = [for (rotation in orientations(outward, current, 16)) pose(new Transform3(at, rotation))];
+    // Try every roll on the observed branch before paying for global branch discovery.
+    for (target in targets) {
       var q = motion.compiler.solver.solvePose(target, start, motion.compiler.ikTolerance);
       if (q != null && motion.violation(q) == null) return true;
+    }
+    for (target in targets)
       for (candidate in motion.compiler.solver.sampleCandidates(target, 12, motion.compiler.ikTolerance))
         if (motion.violation(candidate) == null) return true;
-    }
     return false;
   }
 

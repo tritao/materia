@@ -2241,3 +2241,14 @@ produce the first weld without wrong leg or gaps. Deterministic final fine touch
 calibrated sensing durations. App compilation passes 1,864 sources. Exit 0 log:
 ignored app/build/p3-registration-budget.log. Full two-station, parking-boundary and baseline
 validation still remain before P3 can pass or main can advance.
+
+The first full-mission trial was deliberately terminated after over 30 minutes of CPU-active
+execution without a completed backend result; exit 143 is not a validation pass or a motion
+failure. The candidate-screening loop still performed global numerical branch discovery for
+each roll before trying the next roll on the observed branch. Screening now tries all 16
+rolls from observed joints first, then preserves the same 12-candidate global searches for
+every roll as fallback. This changes discovery order, not Boolean eligibility, budgets or
+clearance authority. Native focused tests pass 92 assertions including reachable and
+unreachable normal screening. No production speedup is claimed yet. Full-mission retries
+will print station-step progress, and a separate registration entry point injects the
+20 mm per-axis/2-degree parking boundary without rerunning the smaller-error test.
