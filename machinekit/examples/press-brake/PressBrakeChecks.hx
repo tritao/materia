@@ -47,11 +47,11 @@ class PressBrakeChecks {
 		var tallest = new ToolLayout(1600, [new ToolStation("four-V", new ToolRow([
 			new ToolSegment(Punch(ToolingCatalogue.gooseneck()), 200)], []), new ToolRow([
 			new ToolSegment(FourV(ToolingCatalogue.fourV(), 0), 200)], []), 700)]);
-		for (variant in 0...3) {
+		for (variant in 0...4) {
 			var withR = variant != 0;
-			var press = new PressBrake(withR, variant == 2 ? tallest : null);
+			var press = new PressBrake(withR, variant == 2 ? tallest : null, null, variant == 3 ? 30 : 300);
 			press.validate();
-			var geometry = PressGeometry.of(press), reference = PressGeometry.reference(press.toolLayout, withR);
+			var geometry = PressGeometry.of(press), reference = PressGeometry.reference(press.toolLayout, withR, press.fingerHalfSpacing);
 			near(geometry.bedLength, reference.bedLength, "Derived bed length");
 			near(geometry.bedTopHeight, reference.bedTopHeight, "Derived bed top");
 			near(geometry.openHeight, reference.openHeight, "Derived open mount separation");
@@ -62,6 +62,13 @@ class PressBrakeChecks {
 			near(geometry.backgaugeR.upper, reference.backgaugeR.upper, "Derived R travel");
 			checkEnvelope(geometry.ramEnvelope, reference.ramEnvelope, "Derived ram bounds");
 			for (i in 0...geometry.fingers().length) checkEnvelope(geometry.fingers()[i], reference.fingers()[i], "Derived finger bounds");
+			for (i in 0...geometry.fingerContacts().length) {
+				var actual = geometry.fingerContacts()[i], expected = reference.fingerContacts()[i];
+				if (actual.id != expected.id) throw "Derived finger contact identity";
+				near(actual.x, expected.x, "Derived finger contact lateral setup");
+				near(actual.y, expected.y, "Derived finger contact zero X");
+				near(actual.z, expected.z, "Derived finger contact zero R");
+			}
 			for (station in geometry.stations()) {
 				var expected = reference.station(station.id);
 				near(station.dieTopHeight, expected.dieTopHeight, "Derived die top");

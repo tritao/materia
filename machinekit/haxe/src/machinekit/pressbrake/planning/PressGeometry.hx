@@ -22,21 +22,23 @@ class PressGeometry {
 	public final backgaugeR:PressTravel;
 	final toolStations:Array<PressStationGeometry>;
 	final fingerShapes:Array<PressEnvelope>;
+	final contactDatums:Array<PressFingerDatum>;
 
 	function new(bedLength:Float, bedTopHeight:Float, openHeight:Float, throatY:Float, capacityN:Float,
 			profile:PressBrakeProfile, ramEnvelope:PressEnvelope, ramTravel:PressTravel, backgaugeX:PressTravel,
-			backgaugeR:PressTravel, stations:Array<PressStationGeometry>, fingers:Array<PressEnvelope>) {
+			backgaugeR:PressTravel, stations:Array<PressStationGeometry>, fingers:Array<PressEnvelope>, contacts:Array<PressFingerDatum>) {
 		if (profile == null || !(bedLength > 0 && openHeight > 0 && capacityN > 0) || !Math.isFinite(bedLength + bedTopHeight + openHeight + throatY + capacityN))
 			throw "Invalid press geometry dimensions or capacity";
 		this.bedLength = bedLength; this.bedTopHeight = bedTopHeight; this.openHeight = openHeight;
 		this.throatY = throatY; this.capacityN = capacityN; this.profile = profile;
 		this.ramEnvelope = ramEnvelope; this.ramTravel = ramTravel; this.backgaugeX = backgaugeX; this.backgaugeR = backgaugeR;
-		toolStations = stations.copy(); fingerShapes = fingers.copy();
+		toolStations = stations.copy(); fingerShapes = fingers.copy(); contactDatums = contacts.copy();
 		for (i in 0...toolStations.length) for (j in 0...i)
 			if (toolStations[i].id == toolStations[j].id) throw 'Duplicate press station "${toolStations[i].id}"';
 	}
 	public function stations():Array<PressStationGeometry> return toolStations.copy();
 	public function fingers():Array<PressEnvelope> return fingerShapes.copy();
+	public function fingerContacts():Array<PressFingerDatum> return contactDatums.copy();
 	public function station(id:String):PressStationGeometry {
 		for (station in toolStations) if (station.id == id) return station;
 		throw 'Press geometry has no installed station "$id"';
@@ -65,10 +67,15 @@ class PressGeometry {
 			stations.push(new PressStationGeometry(tool.station, die.z, punch.y, punch.z));
 		}
 		var fingers:Array<PressEnvelope> = [];
-		for (id in datums.fingers) fingers.push(envelope(assembly, state, id));
+		var contacts:Array<PressFingerDatum> = [];
+		for (id in datums.fingers) {
+			fingers.push(envelope(assembly, state, id));
+			var point = state.worldConnector(id, "contact");
+			contacts.push(new PressFingerDatum(id, point.x, point.y, point.z));
+		}
 		return new PressGeometry(Math.abs(right.x - left.x), left.z, ramMount.z - left.z, throat.y,
 			source.pressCapacityN(), source.pressProfile(), envelope(assembly, state, datums.ram), travel(state, datums.ramJoint),
-			travel(state, datums.gaugeXJoint), datums.gaugeRJoint == null ? new PressTravel(0, 0) : travel(state, datums.gaugeRJoint), stations, fingers);
+			travel(state, datums.gaugeXJoint), datums.gaugeRJoint == null ? new PressTravel(0, 0) : travel(state, datums.gaugeRJoint), stations, fingers, contacts);
 	}
 	static function travel(state:AssemblyState, id:String):PressTravel {
 		for (joint in state.definition.joints) if (joint.id == id) {
@@ -87,7 +94,7 @@ class PressGeometry {
 		throw 'Press geometry has no member "$id"';
 	}
 	/** Independent reference fixture for the fixed WC67Y-class dimensions in the plan. */
-	public static function reference(layout:ToolLayout, withR:Bool = true):PressGeometry {
+	public static function reference(layout:ToolLayout, withR:Bool = true, fingerHalfSpacing:Float = 300):PressGeometry {
 		if (layout == null || layout.bedLength != 1600 || layout.stations().length == 0)
 			throw "Reference press geometry needs tooling on the 1600 mm bed";
 		var stations:Array<PressStationGeometry> = [];
@@ -100,6 +107,9 @@ class PressGeometry {
 		return new PressGeometry(1600, 800, 320, 230, 40 * 1000 * 9.80665, StopControlled,
 			new PressEnvelope(-800, -50, 1120, 800, 50, 1340), new PressTravel(0, 100), new PressTravel(0, 500),
 			new PressTravel(0, withR ? 120 : 0), stations,
-			[new PressEnvelope(-310, 0, fingerTop - 20, -290, 60, fingerTop + 1), new PressEnvelope(290, 0, fingerTop - 20, 310, 60, fingerTop + 1)]);
+			[new PressEnvelope(-fingerHalfSpacing - 10, 0, fingerTop - 20, -fingerHalfSpacing + 10, 60, fingerTop + 1),
+				new PressEnvelope(fingerHalfSpacing - 10, 0, fingerTop - 20, fingerHalfSpacing + 10, 60, fingerTop + 1)],
+			[new PressFingerDatum("fingerLeft", -fingerHalfSpacing, 0, fingerTop),
+				new PressFingerDatum("fingerRight", fingerHalfSpacing, 0, fingerTop)]);
 	}
 }

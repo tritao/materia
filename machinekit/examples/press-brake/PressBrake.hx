@@ -98,6 +98,8 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
 	public final stroke:Float = 100;
 	public final throat:Float = 230;
 	public final capacityN:Float = 40 * 1000 * 9.80665;
+	public final gaugeWidth:Float = 800;
+	public final fingerHalfSpacing:Float;
 	public final gaugeTravel:Float = 500;
 	public final gaugeRTravel:Float = 120;
 	public final toolLayout:ToolLayout;
@@ -117,9 +119,13 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
 		ramJoint: "Y1", gaugeXJoint: "X", gaugeRJoint: withR ? "R" : null, tools: toolDatums.copy()
 	};
 
-	public function new(withR:Bool = true, ?layout:ToolLayout, ?phases:CylinderPhaseSpeeds) {
+	public function new(withR:Bool = true, ?layout:ToolLayout, ?phases:CylinderPhaseSpeeds, fingerHalfSpacing:Float = 300) {
 		super();
 		this.withR = withR;
+		if (!Math.isFinite(fingerHalfSpacing) || fingerHalfSpacing <= GaugeFinger.WIDTH_MM / 2
+			|| fingerHalfSpacing > (gaugeWidth - GaugeFinger.WIDTH_MM) / 2)
+			throw "Manual finger spacing must separate both fingers and keep them on the backgauge carrier";
+		this.fingerHalfSpacing = fingerHalfSpacing;
 		cylinder = new HydraulicCylinder(160, 100, stroke);
 		// Reference setup: 80 mm open tool gap, 1.5 mm blank and 10 mm approach clearance.
 		// Other setups supply their own explicit change travel; thickness is never inferred.
@@ -195,7 +201,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
 			at(0, 300, bedHeight + openHeight), "bed", {x: 0, y: 0, z: -1}, stroke);
 		servoScrew("depth", "depthStop", "depth", new BallScrew(300), at(0, 300, bedHeight + openHeight - 180),
 			at(0, 300, bedHeight + openHeight - 20), {x: 0, y: 0, z: -1}, {x: 0, y: 0, z: 1}, "GENERIC-SERVO-50W", 1);
-		slide("X", "gaugeX", new PressBlock("Backgauge carriage", 800, 80, 60), at(0, 0, 660), "bed", {x: 0, y: 1, z: 0}, gaugeTravel);
+		slide("X", "gaugeX", new PressBlock("Backgauge carriage", gaugeWidth, 80, 60), at(0, 0, 660), "bed", {x: 0, y: 1, z: 0}, gaugeTravel);
 		for (side in [-1, 1]) {
 			var name = side < 0 ? "Left" : "Right", block = LinearRailBlock.metric("MGN12C");
 			var railZ = 660 - (block.spec.blockHeight - block.spec.railHeight);
@@ -211,7 +217,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
 			{x: 0, y: 1, z: 0}, {x: 0, y: 1, z: 0}, "GENERIC-SERVO-200W", 2);
 		var gaugeParent = "gaugeX";
 		if (withR) {
-			slide("R", "gaugeR", new PressBlock("Backgauge lift", 800, 40, 40), at(0, 40, gaugeBaseHeight - 40),
+			slide("R", "gaugeR", new PressBlock("Backgauge lift", gaugeWidth, 40, 40), at(0, 40, gaugeBaseHeight - 40),
 				"gaugeX", {x: 0, y: 0, z: 1}, gaugeRTravel);
 			for (side in [-1, 1]) {
 				var name = side < 0 ? "Left" : "Right";
@@ -224,8 +230,8 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
 		}
 		for (side in [-1, 1]) {
 			var id = side < 0 ? "fingerLeft" : "fingerRight";
-			place(id, new GaugeFinger(), at(side * 300, 0, gaugeBaseHeight));
-			meeting(gaugeParent, id, at(side * 300, GaugeFinger.PIVOT_DEPTH_MM,
+			place(id, new GaugeFinger(), at(side * fingerHalfSpacing, 0, gaugeBaseHeight));
+			meeting(gaugeParent, id, at(side * fingerHalfSpacing, GaugeFinger.PIVOT_DEPTH_MM,
 				gaugeBaseHeight - GaugeFinger.DATUM_HEIGHT_MM));
 			var joint = '$id-hinge';
 			addMateOnAxis(joint, "revolute", gaugeParent, 'to-$id', id, 'attach-$id',

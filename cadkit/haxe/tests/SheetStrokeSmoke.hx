@@ -25,6 +25,18 @@ class SheetStrokeSmoke {
 		checks = 0;
 		var setup = new ProcessBendRule(new ProcessTooling("acute", "v12", 0.5, Math.PI / 6, 12, Math.PI / 6, 0.5));
 		var stock = new SheetMaterial("stroke-steel", 1.5, BendRule.Process(setup), {uts: 400, yield: 250, youngs: 205000});
+		for (sheet in [SheetDemoParts.p1(stock), SheetDemoParts.p2(stock), SheetDemoParts.p3(stock),
+				SheetDemoParts.p4(stock), SheetDemoParts.p5(stock)]) {
+			var developed = sheet.evaluate(sheet.flat());
+			var folded = sheet.evaluate(sheet.folded());
+			check(sheet.material == stock, "manufacturing part owns explicitly selected stock");
+			for (bend in sheet.bends()) {
+				var process = setup.predict(stock, bend.angle, bend.edgeA.span.length());
+				near(bend.radius, process.innerRadius, "manufacturing radius comes from selected process");
+				near(developed.bend(bend.id).allowance, process.bendAllowance, "manufacturing blank uses process allowance");
+				near(folded.bend(bend.id).curvedInnerRadius(), process.innerRadius, "released manufacturing radius");
+			}
+		}
 		for (sign in [1.0, -1.0]) {
 			var sheet = new Sheet(stock);
 			var base = sheet.addWall(WallOutline.rectangle(60, 100));

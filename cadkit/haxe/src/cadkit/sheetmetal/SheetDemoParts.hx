@@ -2,7 +2,9 @@ package cadkit.sheetmetal;
 
 import materia.project.MaterialLibrary;
 
-/** Dimensioned acceptance parts shared by sheet, tooling and planning tests. All dimensions are mm. */
+/** Dimensioned acceptance parts shared by sheet, tooling and planning tests. All dimensions are mm.
+ * Omitted stock selects the authored reference radius; supplied stock derives the radius on rebuild.
+ */
 class SheetDemoParts {
 	/** Authored reference-part radius; process-driven parts derive theirs from selected tooling. */
 	public static inline var RADIUS:Float = 1;
@@ -13,44 +15,53 @@ class SheetDemoParts {
 	}
 
 	/** 100 along the bend, 60 outside base, 40 outside height. */
-	public static function p1():Sheet {
-		var sheet = new Sheet(materialA());
-		var setback = BendDimensions.outsideSetback(sheet.thickness(), RADIUS, Math.PI / 2);
+	public static function p1(?material:SheetMaterial):Sheet {
+		var sheet = new Sheet(material == null ? materialA() : material);
+		var radius = sheet.material.defaultRadius(Math.PI / 2);
+		var setback = BendDimensions.outsideSetback(sheet.thickness(), radius, Math.PI / 2);
 		var base = sheet.addWall(WallOutline.rectangle(60 - setback, 100));
-		flange(sheet, base, 1, 40 - setback, Math.PI / 2);
+		flange(sheet, base, 1, 40 - setback, Math.PI / 2, radius);
 		return sheet;
 	}
 	/** 120 long, 60 outside width, equal 40 outside flanges. */
-	public static function p2():Sheet {
-		return channel(false);
+	public static function p2(?material:SheetMaterial):Sheet {
+		return channel(false, material);
 	}
 	/** 120 long, 60 outside web, 40 outside legs in opposite directions (78.5 overall height). */
-	public static function p3():Sheet {
-		return channel(true);
+	public static function p3(?material:SheetMaterial):Sheet {
+		return channel(true, material);
 	}
-	static function channel(opposite:Bool):Sheet {
-		var sheet = new Sheet(materialA());
-		var setback = BendDimensions.outsideSetback(sheet.thickness(), RADIUS, Math.PI / 2);
-		var base = sheet.addWall(WallOutline.rectangle(60 - 2 * setback, 120));
-		flange(sheet, base, 1, 40 - setback, Math.PI / 2);
-		flange(sheet, base, 3, 40 - setback, opposite ? -Math.PI / 2 : Math.PI / 2);
+	static function channel(opposite:Bool, ?material:SheetMaterial):Sheet {
+		var sheet = new Sheet(material == null ? materialA() : material);
+		var radius = sheet.material.defaultRadius(Math.PI / 2);
+		var setback = BendDimensions.outsideSetback(sheet.thickness(), radius, Math.PI / 2);
+		var secondAngle = opposite ? -Math.PI / 2 : Math.PI / 2;
+		var secondRadius = sheet.material.defaultRadius(secondAngle);
+		var secondSetback = BendDimensions.outsideSetback(sheet.thickness(), secondRadius, secondAngle);
+		var base = sheet.addWall(WallOutline.rectangle(60 - setback - secondSetback, 120));
+		flange(sheet, base, 1, 40 - setback, Math.PI / 2, radius);
+		flange(sheet, base, 3, 40 - secondSetback, secondAngle, secondRadius);
 		return sheet;
 	}
 	/** Hat: 120 long, 60 outside crown, 40 height and 20 outside lips; overall width 97. */
-	public static function p4():Sheet {
-		var sheet = new Sheet(materialA());
-		var setback = BendDimensions.outsideSetback(sheet.thickness(), RADIUS, Math.PI / 2);
+	public static function p4(?material:SheetMaterial):Sheet {
+		var sheet = new Sheet(material == null ? materialA() : material);
+		var radius = sheet.material.defaultRadius(Math.PI / 2);
+		var setback = BendDimensions.outsideSetback(sheet.thickness(), radius, Math.PI / 2);
+		var lipRadius = sheet.material.defaultRadius(-Math.PI / 2);
+		var lipSetback = BendDimensions.outsideSetback(sheet.thickness(), lipRadius, -Math.PI / 2);
 		var base = sheet.addWall(WallOutline.rectangle(60 - 2 * setback, 120));
 		for (edge in [1, 3]) {
-			var side = flange(sheet, base, edge, 40 - 2 * setback, Math.PI / 2);
-			var lip = flange(sheet, side, 1, 20 - setback, -Math.PI / 2);
+			var side = flange(sheet, base, edge, 40 - setback - lipSetback, Math.PI / 2, radius);
+			var lip = flange(sheet, side, 1, 20 - lipSetback, -Math.PI / 2, lipRadius);
 		}
 		return sheet;
 	}
 	/** Open-corner tray: 150 by 100 by 25 outside, with 2 mm square corner reliefs. */
-	public static function p5():Sheet {
-		var sheet = new Sheet(materialA());
-		var setback = BendDimensions.outsideSetback(sheet.thickness(), RADIUS, Math.PI / 2);
+	public static function p5(?material:SheetMaterial):Sheet {
+		var sheet = new Sheet(material == null ? materialA() : material);
+		var radius = sheet.material.defaultRadius(Math.PI / 2);
+		var setback = BendDimensions.outsideSetback(sheet.thickness(), radius, Math.PI / 2);
 		var w = 150 - 2 * setback;
 		var h = 100 - 2 * setback;
 		var g = 2.0;
@@ -59,7 +70,7 @@ class SheetDemoParts {
 			new Point2(w, h - g), new Point2(w - g, h - g), new Point2(w - g, h), new Point2(g, h),
 			new Point2(g, h - g), new Point2(0, h - g), new Point2(0, g), new Point2(g, g)
 		]));
-		for (edge in [0, 3, 6, 9]) { var side = flange(sheet, base, edge, 25 - setback, Math.PI / 2); }
+		for (edge in [0, 3, 6, 9]) { var side = flange(sheet, base, edge, 25 - setback, Math.PI / 2, radius); }
 		return sheet;
 	}
 	/** Add an edge-to-edge rectangular wall; dimensions are straight leg and bend radius. */
