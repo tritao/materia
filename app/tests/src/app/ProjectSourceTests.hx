@@ -51,6 +51,7 @@ import haxe.io.Bytes;
 @:access(app.MissionPlayer)
 @:access(motionkit.robot.ManipulatorMotion)
 @:access(motionkit.robot.PlanExecutor)
+@:access(processkit.WeldingPlanRunner)
 class ProjectSourceTests {
   static function check(value:Bool, message:String):Void {
     if (!value) throw message;
@@ -1172,16 +1173,22 @@ class ProjectSourceTests {
    * asked for, the wire tip stays on the seams, the arm and torch never come closer to the cell than the planner's margins
    * (measured on the simulated arm's real joints), and no arc is lost. The cycle time is reported.
    */
-  static function checkWholeWeldment(root:String, backend:Int, label:String):Void {
-    var cell = openWelder(root, "materia.project.json", null, backend);
+  static function checkWholeWeldment(root:String, backend:Int, label:String, example:String = "robot-welder"):Void {
+    var onlyStep = example == "gantry-welder" ? Sys.getEnv("GANTRY_WELD_ONLY_STEP") : null;
+    var cell = openWelder(root, "materia.project.json", onlyStep == null ? null : function(generated) {
+      var mission:materia.project.SceneArtifact.SceneArtifactMission = cast generated.mission;
+      var index = Std.parseInt(onlyStep);
+      if (index == null || index < 0 || index >= mission.steps.length) throw "Invalid gantry weld step filter";
+      mission.steps = [mission.steps[index]];
+    }, backend, example);
     var simulation = cell.simulation, mission = cell.mission, welder = cell.welder, beads = cell.beads;
-    var generated = MateriaProjectRunner.loadProject(FileSystem.fullPath(root + "/machinekit/examples/robot-welder/materia.project.json"));
-    var steps = cast(generated.mission, materia.project.SceneArtifact.SceneArtifactMission).steps;
-    check(steps.length == 4, 'the default mission welds the weldment in four runs, got ${steps.length}');
+    var steps = mission.mission.steps;
+    var expectedRuns = onlyStep == null ? 4 : 1;
+    check(steps.length == expectedRuns, 'the weld mission has $expectedRuns runs, got ${steps.length}');
     var seams = 0;
     for (step in steps) seams += cast(step.weld, materia.project.SceneArtifact.SceneArtifactWeld).path.length;
-    check(seams == 10, 'the runs hold all ten seams, got $seams');
-    var strayed = 0.0, nearest = 1e9;
+    check(seams == (onlyStep == null ? 10 : cast(steps[0].weld, materia.project.SceneArtifact.SceneArtifactWeld).path.length), 'the runs hold the requested CAD seams, got $seams');
+    var strayed = 0.0, nearest = 1e9, wireError = 0.0;
     var violation:Null<String> = null;
     var restarts = 0, done = 0, tick = 0;
     var finished:Array<Float> = [];
@@ -1189,12 +1196,12 @@ class ProjectSourceTests {
     while (!mission.finished && simulation.activeSession().simulationTime() < limit) {
       simulation.step();
       tick++;
-      if (mission.failure != null) throw '$label: the weldment weld failed after ${simulation.activeSession().simulationTime()} s: ${mission.failure}';
+      if (mission.failure != null) throw '$label: the weldment weld failed after ${simulation.activeSession().simulationTime()} s: ${mission.failure}; reading=${haxe.Json.stringify(welder.reading())}, tip=${welder.tip()}, max seam error=$strayed, wire angle=$wireError';
       if (mission.completed > done) {
         // The runner's restarts still belong to the weld that just finished.
         restarts += mission.weldRestarts();
         done = mission.completed;
-        Sys.println('robot welder ($label): run $done planned in ' + mission.planReport());
+        Sys.println('welder ($label): run $done planned in ' + mission.planReport());
         finished.push(Math.round(simulation.activeSession().simulationTime() * 10) / 10);
       }
       var step = mission.weldingStep();
@@ -1210,7 +1217,21 @@ class ProjectSourceTests {
             Math.pow(relative[2] - bead.tangent[2] * clamped, 2)));
         }
         nearest = Math.min(nearest, best);
-        if (welder.reading().arc) strayed = Math.max(strayed, best);
+        if (welder.reading().arc) {
+          strayed = Math.max(strayed, best);
+          if (example == "gantry-welder") {
+            var welding:processkit.WeldingPlanRunner = cast mission.welding;
+            var motion = welding.motion;
+            var observed = mission.robot.robot.snapshot();
+            var seam:motionkit.path.PosePath = cast welding.seam;
+            var desired = seam.poseAt(welding.travelled());
+            var actual = motion.compiler.solver.forward([for (index in motion.jointIndices) observed.positions.get(index)]);
+            var axis = new robotkit.spatial.Vec3(0, 0, 1);
+            var wanted = new robotkit.spatial.Quat(desired.qx, desired.qy, desired.qz, desired.qw).rotate(axis);
+            var seen = new robotkit.spatial.Quat(actual.qx, actual.qy, actual.qz, actual.qw).rotate(axis);
+            wireError = Math.max(wireError, Math.acos(Math.max(-1.0, Math.min(1.0, wanted.dot(seen)))));
+          }
+        }
         if (tick % 5 == 0 && violation == null) {
           var found = mission.clearanceViolation(best <= processkit.WeldPathPlanner.CONTACT_ZONE);
           if (found != null) violation = '${found.a} is ${Math.round(found.distance * 10000) / 10} mm from ${found.b} (needs ${Math.round(found.required * 10000) / 10}) at ${Math.round(simulation.activeSession().simulationTime() * 10) / 10} s';
@@ -1219,8 +1240,10 @@ class ProjectSourceTests {
     }
     var time = Math.round(simulation.activeSession().simulationTime() * 10) / 10;
     check(mission.finished && mission.failure == null, '$label: the whole weldment is welded within $time s: ${mission.failure}');
-    check(done == 4, '$label: four welds finished, got $done');
+    check(done == expectedRuns, '$label: $expectedRuns welds finished, got $done');
     check(violation == null, '$label: no clearance violation along the way: $violation');
+    if (example == "gantry-welder") check(wireError <= 2 * Math.PI / 180,
+      '$label: work/travel directions stay within 2 degrees of the authored process wire axis ($wireError rad)');
     check(restarts == 0, '$label: the weldment is welded without losing the arc ($restarts restarts)');
     check(strayed < 0.0015, '$label: the wire tip stayed within ${strayed * 1000} mm of the seams while the arc burned');
     var legs:Array<String> = [];
@@ -1238,17 +1261,20 @@ class ProjectSourceTests {
       var path = beads.beadOf(step);
       check(path.gaps() == 0 && path.stray < 0.1 * path.deposited, '$label: step $step: the bead has no gap and little missed the seams');
     }
-    Sys.println('robot welder ($label): whole weldment, ${steps.length} runs and $seams seams, cycle ${time} s (runs done at ${finished.join(", ")} s), ' +
+    Sys.println('welder ($label): whole weldment, ${steps.length} runs and $seams seams, cycle ${time} s (runs done at ${finished.join(", ")} s), ' +
       'tip within ${Math.round(strayed * 10000) / 10} mm of the seams, legs ${legs.join("/")} mm, bead lengths ${lengths.join("/")} mm, no clearance violation');
     simulation.clear();
     cell.session.dispose();
   }
 
+  static function checkGantryWelder(root:String):Void
+    checkWholeWeldment(root, ApplicationSimulation.MUJOCO, "gantry MuJoCo", "gantry-welder");
+
   /** A welder cell open in the simulation on MuJoCo, from one of the example's manifests. */
   static function openWelder(root:String, manifestName:String, ?adjust:app.MateriaProjectRunner.GeneratedAssemblyScene -> Void,
-      ?backend:Int):{session:ProjectDocumentSession, simulation:ApplicationSimulation, mission:MissionPlayer, welder:processkit.simulation.SimulatedWelder,
+      ?backend:Int, example:String = "robot-welder"):{session:ProjectDocumentSession, simulation:ApplicationSimulation, mission:MissionPlayer, welder:processkit.simulation.SimulatedWelder,
       beads:WeldBeads} {
-    var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-welder/" + manifestName);
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/" + example + "/" + manifestName);
     var generated = MateriaProjectRunner.loadProject(manifest);
     if (adjust != null) adjust(generated);
     var session = new ProjectDocumentSession(null, false);
@@ -1258,6 +1284,14 @@ class ProjectSourceTests {
     check(simulation.rebuild(session.sensors, session.scene, session), "the welding cell builds: " + simulation.error);
     var mission = simulation.missionPlayer(), welder = simulation.welder(), beads = simulation.weldBeads();
     if (mission == null || welder == null || beads == null) throw "the welding cell has no mission, welder or weld metal";
+    if (example == "gantry-welder") {
+      var welding:processkit.WeldingPlanRunner = cast mission.welding;
+      var motion = welding.motion;
+      check(motion.compiler.solver.jointCount() == 5, "the gantry welds with XYZ and CA");
+      var solver:motionkit.robot.ManipulatorKinematics = cast motion.compiler.solver;
+      check(processkit.WeldingPlanRunner.wristJointIndices(solver.manipulator).length == 2,
+        "the gantry welding wrist derives its two rotary limits");
+    }
     return {session: session, simulation: simulation, mission: mission, welder: welder, beads: beads};
   }
 
@@ -2502,6 +2536,10 @@ class ProjectSourceTests {
       checkCoreXyPlotter(root);
       return 0;
     }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "gantry-welder") {
+      checkGantryWelder(root);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "gantry-yaw") {
       checkGantryPicker(root, true);
       return 0;
@@ -2850,6 +2888,7 @@ class ProjectSourceTests {
     checkCobotArms(root);
     checkGantryPicker(root);
     checkGantryPicker(root, true);
+    checkGantryWelder(root);
     checkRobotWelder(root);
     checkMates(root);
     checkBenchMill(root);

@@ -203,6 +203,10 @@ class RobotWorldTests {
       Sys.println("Current RobotKit fixtures regenerated");
       return;
     }
+    if (Sys.getEnv("ROBOTKIT_ONLY") == "clearance") {
+      ClearanceTests.run();
+      return;
+    }
     // ROBOTKIT_ONLY=construction runs just the construction skills (they plan arm motions through MotionKit).
     if (Sys.getEnv("ROBOTKIT_ONLY") == "construction") {
       Sys.println('RobotKit construction skills passed (${ConstructionSkillTests.run()} assertions)');
@@ -271,6 +275,7 @@ class RobotWorldTests {
     testVirtualDeviceSimulation();
     assertions += SpatialTests.run();
     assertions += KinematicsTests.run();
+    assertions += ClearanceTests.run();
     assertions += ToolTests.run();
     assertions += ProcessTests.run();
     assertions += WeldChannelTests.run();

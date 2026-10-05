@@ -137,15 +137,15 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
       start:Array<Float>):motionkit.robot.CompiledProgram {
     var plan = planned.plan;
     var ops:Array<MotionOp> = [MotionOp.MoveJ(MoveTarget.JointTarget(planned.entry.joints), new MotionOptions(), Blend.ExactStop)];
-    for (move in planned.entry.moves) ops.push(MotionOp.MoveL(move, FRAME, APPROACH_SPEED, Blend.ExactStop));
-    ops.push(MotionOp.MoveL(pose(plan.start()), FRAME, APPROACH_SPEED, Blend.ExactStop));
+    for (move in planned.entry.moves) ops.push(MotionOp.MoveL(move, FRAME, APPROACH_SPEED, Blend.ExactStop, OrientationPolicy.FreeAboutTool));
+    ops.push(MotionOp.MoveL(pose(plan.start()), FRAME, APPROACH_SPEED, Blend.ExactStop, OrientationPolicy.FreeAboutTool));
     if (plan.parameters.startDwell > 0) ops.push(MotionOp.Dwell(plan.parameters.startDwell));
     ops.push(MotionOp.FollowPath(new PosePath(FRAME, pathOf(plan, plan.parameters.travelSpeed, wrist, planned.styles)), FRAME,
       plan.parameters.travelSpeed, []));
     if (plan.parameters.craterDwell > 0) ops.push(MotionOp.Dwell(plan.parameters.craterDwell));
     ops.push(MotionOp.MoveL(along(pose(plan.stop()), plan.stop(), -LIFT), FRAME,
-      Math.max(LIFT / plan.parameters.burnback, 0.01), Blend.ExactStop));
-    ops.push(MotionOp.MoveL(planned.retreat, FRAME, APPROACH_SPEED, Blend.ExactStop));
+      Math.max(LIFT / plan.parameters.burnback, 0.01), Blend.ExactStop, OrientationPolicy.FreeAboutTool));
+    ops.push(MotionOp.MoveL(planned.retreat, FRAME, APPROACH_SPEED, Blend.ExactStop, OrientationPolicy.FreeAboutTool));
     return compiler.compile(new MotionProgram(ops), start, haxe.Int64.ofInt(1));
   }
 
@@ -159,16 +159,19 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     planning.requireGroup(manipulator);
     var limits = planning.validation();
     var solver = new ManipulatorKinematics(manipulator, 1e-8);
+    solver.preferTargetOrientation = true;
     var compiler = new ProgramCompiler(solver, limits, FRAME,
       planning.velocity, planning.acceleration, planning.jerk,
       planning.startTolerances(0.005),
       null, 0.002, 0.2, PATH_TOLERANCE, 0.02, new IkTolerance(5e-5, 1e-3, 300, 0.03));
     compiler.planningAssumptions = planning.assumptions.copy();
     compiler.planCheck = planning.check();
-    // The torch turns at corners as the wrist allows: the slowest of its last three joints, and the programs' acceleration.
+    // Corner turns use the nearest rotary joints on the tool chain, in angular units.
+    // A fixed torch has no angular cap to add; IK still rejects any change
+    // of its hard wire axis. Linear drive limits are never angular limits.
     var wristSpeed = Math.POSITIVE_INFINITY;
     var wristAcceleration = Math.POSITIVE_INFINITY;
-    for (joint in Std.int(Math.max(0, count - 3))...count) {
+    for (joint in wristJointIndices(manipulator)) {
       wristSpeed = Math.min(wristSpeed, planning.velocity[joint]);
       wristAcceleration = Math.min(wristAcceleration, planning.acceleration[joint]);
     }
@@ -194,6 +197,22 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     var motion = new ManipulatorMotion(robot, compiler, function(channel) return channel == ARC_ESTABLISHED
       ? EventValue.Digital(latest.reading().arc) : null, eventSource, indices);
     return new WeldingPlanRunner(motion, channels, latest, maxRestarts, checked.planner, checked.wrist);
+  }
+
+  /** Up to three rotary drivers nearest the tool; work-positioner joints are excluded. */
+  public static function wristJointIndices(manipulator:robotkit.manipulation.KinematicGroup):Array<Int> {
+    var ids = [for (id in manipulator.jointIds()) Std.string(id)];
+    var path = robotkit.manipulation.KinematicGroup.walk(manipulator.robot, manipulator.rootLink, manipulator.flangeLink);
+    path.reverse();
+    var indices:Array<Int> = [];
+    for (joint in path) {
+      if (joint.type != robotkit.model.JointType.Revolute && joint.type != robotkit.model.JointType.Continuous) continue;
+      var index = ids.indexOf(Std.string(joint.id));
+      if (index < 0) continue;
+      indices.push(index);
+      if (indices.length == 3) break;
+    }
+    return indices;
   }
 
   /** Over an existing motion, whose input wait reads the established arc from `latest`. */
@@ -248,10 +267,10 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     if (parameters.craterDwell > 0) exit.push(MotionOp.Dwell(parameters.craterDwell));
     exit.push(MotionOp.SetOutput(channels.wireSpeed, EventValue.Analog(0.0)));
     if (parameters.burnback > 0) {
-      exit.push(MotionOp.MoveL(along(stop, plan.stop(), -LIFT), FRAME, Math.max(LIFT / parameters.burnback, 0.01), Blend.ExactStop));
+      exit.push(MotionOp.MoveL(along(stop, plan.stop(), -LIFT), FRAME, Math.max(LIFT / parameters.burnback, 0.01), Blend.ExactStop, OrientationPolicy.FreeAboutTool));
     }
     exit.push(MotionOp.SetOutput(channels.arc, EventValue.Digital(false)));
-    var recipe = new ProcessRecipe(travel * 0.5, travel * 2.0, travel, 0.0, OrientationPolicy.Interpolated, 0.001,
+    var recipe = new ProcessRecipe(travel * 0.5, travel * 2.0, travel, 0.0, OrientationPolicy.FreeAboutTool, 0.001,
       parameters.wireSpeed / travel, 0.0, BACKOFF, FeedChangePolicy.Reject, new ProcessEngagement(entry, exit, recoveryEntry), APPROACH_SPEED,
       PREPARE_TIMEOUT);
     var device = new WelderProcessDevice(outputs, latest, channels, {voltage: parameters.voltage});
@@ -336,14 +355,14 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
   /** Starts the process run's program, the first time from a joint move to the approach pose. */
   function launch(first:Bool):Void {
     var process = cast(current, ProcessRun);
-    var retreatMove = MotionOp.MoveL(cast(retreat, Pose3), FRAME, APPROACH_SPEED, Blend.ExactStop);
+    var retreatMove = MotionOp.MoveL(cast(retreat, Pose3), FRAME, APPROACH_SPEED, Blend.ExactStop, OrientationPolicy.FreeAboutTool);
     var body = process.takeProgram(retreatMove);
     var ops:Array<MotionOp> = outputs.drain();
     if (first) {
       var current = cast(plan, WeldPlan);
       var entry = cast(planned, PlannedWeld).entry;
       ops.push(MotionOp.MoveJ(MoveTarget.JointTarget(entry.joints), new MotionOptions(), Blend.ExactStop));
-      for (move in entry.moves) ops.push(MotionOp.MoveL(move, FRAME, APPROACH_SPEED, Blend.ExactStop));
+      for (move in entry.moves) ops.push(MotionOp.MoveL(move, FRAME, APPROACH_SPEED, Blend.ExactStop, OrientationPolicy.FreeAboutTool));
     }
     followIndex = ops.length + process.followOp;
     // The entry is the two outputs, the wait for the arc, and perhaps a dwell, just before the path.
@@ -417,7 +436,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     function waypoint(point:Vec3, rotation:Quat):PoseWaypoint
       return new PoseWaypoint(new Pose3(point.x, point.y, point.z, rotation.x, rotation.y, rotation.z, rotation.w), PATH_TOLERANCE, 0.01);
     function line(from:Vec3, fromRotation:Quat, to:Vec3, toRotation:Quat):Void
-      primitives.push(new PoseLine(waypoint(from, fromRotation), waypoint(to, toRotation), OrientationPolicy.Interpolated, 0.1, travel));
+      primitives.push(new PoseLine(waypoint(from, fromRotation), waypoint(to, toRotation), OrientationPolicy.FreeAboutTool, 0.1, travel));
     /** A stretch of a turn from `r1` to `r2` of `angle` radians, taking it from fraction `s0` to `s1`, in steps of at most TURN_STEP radians. */
     function turn(from:Vec3, to:Vec3, r1:Quat, r2:Quat, s0:Float, s1:Float, angle:Float, travelA:Vec3, travelB:Vec3, style:Int):Void {
       var steps = Std.int(Math.max(1.0, Math.ceil(angle * (s1 - s0) / TURN_STEP)));

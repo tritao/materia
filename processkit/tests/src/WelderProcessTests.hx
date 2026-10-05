@@ -232,7 +232,7 @@ class WelderProcessTests {
       MotionOp.WaitInput("weld.arc_established", InputPredicate.Equals(EventValue.Digital(true)), 2.0), MotionOp.Dwell(0.15)];
     var exit = [MotionOp.Dwell(0.15), MotionOp.SetOutput(channels.wireSpeed, EventValue.Analog(0.0)),
       MotionOp.SetOutput(channels.arc, EventValue.Digital(false))];
-    var recipe = new ProcessRecipe(0.005, 0.03, 0.0115, 0.0, OrientationPolicy.Interpolated, 0.001, 8.0 / 0.0115, 0.0, 0.01,
+    var recipe = new ProcessRecipe(0.005, 0.03, 0.0115, 0.0, OrientationPolicy.FreeAboutTool, 0.001, 8.0 / 0.0115, 0.0, 0.01,
       FeedChangePolicy.Reject, new ProcessEngagement(entry, exit), 0.08);
     var session = new MotionSession();
     var run = new ProcessRun(recipe, seamPath(), device, channels.wireSpeed, session);
@@ -246,7 +246,9 @@ class WelderProcessTests {
       "the approach, then the entry, the path and the exit: " + kinds(program));
     check(run.followOp == 4, "the path is the fifth operation");
     switch program.ops[0] {
-      case MoveL(_, _, feed, _, _): near(feed, 0.08, "the approach moves at the recipe's approach speed");
+      case MoveL(_, _, feed, _, freedom):
+        near(feed, 0.08, "the approach moves at the recipe's approach speed");
+        check(freedom == OrientationPolicy.FreeAboutTool, "the approach preserves the recipe's tool-axis freedom");
       case _: check(false, "the program begins with a straight move");
     }
     switch program.ops[4] {

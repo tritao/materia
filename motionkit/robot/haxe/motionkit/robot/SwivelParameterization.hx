@@ -9,6 +9,7 @@ import robotkit.manipulation.KinematicGroup;
 class SwivelParameterization implements RedundancyParameterization {
   public final group:KinematicGroup;
   var orientationPreference:Null<Pose3> = null;
+  var preferTargetOrientation:Bool = false;
   /** Swivel resolution per metre of path (radians). */
   public final rate:Float;
 
@@ -19,7 +20,10 @@ class SwivelParameterization implements RedundancyParameterization {
     this.rate = rate;
   }
 
-  public function preferringOrientation(preference:Null<Pose3>):Void orientationPreference = preference;
+  public function preferringOrientation(preference:Null<Pose3>, ?preferTarget:Bool = false):Void {
+    orientationPreference = preference;
+    preferTargetOrientation = preferTarget;
+  }
 
   public function dimension():Int return 1;
 
@@ -33,7 +37,7 @@ class SwivelParameterization implements RedundancyParameterization {
   public function solveAt(target:Pose3, seed:Array<Float>, values:Array<Float>, tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>> {
     var task = ToolFreedom.of(target, freedom, tolerance.orientation);
     var result = group.solve(RedundancyPoses.transform(task.target), seed,
-      task.options(tolerance, orientationPreference).atSwivel(values[0], true));
+      task.options(tolerance, orientationPreference == null && preferTargetOrientation ? target : orientationPreference).atSwivel(values[0], true));
     return result.converged ? result.q : null;
   }
 
@@ -42,7 +46,7 @@ class SwivelParameterization implements RedundancyParameterization {
     if (!Math.isFinite(angle)) return null;
     var task = ToolFreedom.of(target, freedom, tolerance.orientation);
     var result = group.solve(RedundancyPoses.transform(task.target), seed,
-      task.options(tolerance, orientationPreference).atSwivel(angle, false));
+      task.options(tolerance, orientationPreference == null && preferTargetOrientation ? target : orientationPreference).atSwivel(angle, false));
     return result.converged ? result.q : null;
   }
 

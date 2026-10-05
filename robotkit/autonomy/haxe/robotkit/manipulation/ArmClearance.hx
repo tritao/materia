@@ -82,7 +82,7 @@ private class ClearanceBody {
  * Every collision body is a convex hull on a link (the hulls the simulation collides with). A body is *moving* when its
  * link is carried by one of the arm's joints, *fixed* otherwise (the pedestal, the table, the workpiece). Moving bodies
  * are checked against fixed bodies and against other moving bodies on links that are not neighbours. Bodies on one link,
- * and bodies of neighbouring links that touch (within `TOUCH`) in the reference configuration, are one rigid assembly or
+ * and bodies of neighbouring or drive-coupled links that touch (within `TOUCH`) in the reference configuration, are one rigid assembly or
  * a joint and never counted: they touch by design.
  *
  * The distance between two hulls is the exact distance between their convex hulls (`ConvexDistance`, from the hulls' corners;
@@ -135,6 +135,19 @@ class ArmClearance {
     for (joint in arm.robot.joints) if (joint != null && joint.parent != null && joint.child != null) {
       neighbours.set(joint.parent.id + "\n" + joint.child.id, true);
       neighbours.set(joint.child.id + "\n" + joint.parent.id, true);
+    }
+    // Drive followers also meet their logical carriage by design (for example
+    // a lead screw inside its travelling nut). Only bodies touching at the
+    // reference pose get the same exemption as an ordinary joint interface.
+    for (coupling in arm.robot.couplings) {
+      var leader:Null<robotkit.model.Joint> = null, follower:Null<robotkit.model.Joint> = null;
+      for (joint in arm.robot.joints) {
+        if (joint.id == coupling.leader) leader = joint;
+        if (joint.id == coupling.follower) follower = joint;
+      }
+      if (leader == null || follower == null) continue;
+      neighbours.set(leader.child.id + "\n" + follower.child.id, true);
+      neighbours.set(follower.child.id + "\n" + leader.child.id, true);
     }
     var poses = arm.linkPoses(reference, links);
     for (i in 0...bodies.length) for (j in i + 1...bodies.length) {

@@ -38,9 +38,42 @@ class ManipulatorKinematics implements RedundantPathSolver {
   public var preferredPosture:Null<Array<Float>> = null;
   /** Soft tool orientation preference for reduced tasks; hard rows always win. */
   public var preferredOrientation:Null<Pose3> = null;
+  /** Prefer each authored orientation softly while preserving the hard task freedom. */
+  public var preferTargetOrientation:Bool = false;
   public final differentialDamping:Float;
   /** Residuals from the last failed solve, for planner diagnostics. */
   public var lastFailure:Null<String> = null;
+  /** True when the hard tool task leaves no joint-space null direction. */
+  function fullyConstrained(q:Array<Float>, freedom:OrientationPolicy):Bool {
+    switch freedom {
+      case Free | Cone(_, _): return false;
+      default:
+    }
+    var n = jointCount();
+    var projection = ToolFreedom.twistRows(forward(q), freedom);
+    if (projection.length < n) return false;
+    var jacobian = manipulator.tcpJacobian(q);
+    var reduced:Array<Float> = [];
+    for (row in projection) for (joint in 0...n) {
+      var value = 0.0;
+      for (axis in 0...6) value += row[axis] * jacobian[axis*n + joint];
+      reduced.push(value);
+    }
+    // Normalize columns before the rank test so metres and radians do not
+    // choose the numerical threshold for each other.
+    for (joint in 0...n) {
+      var norm = 0.0;
+      for (row in 0...projection.length) norm += reduced[row*n + joint] * reduced[row*n + joint];
+      if (!(norm > 1e-20)) return false;
+      norm = Math.sqrt(norm);
+      for (row in 0...projection.length) reduced[row*n + joint] /= norm;
+    }
+    var normal = [for (_ in 0...n*n) 0.0], rhs = [for (_ in 0...n) 0.0];
+    LinearAlgebra.normalEquationsDense(reduced, projection.length, n,
+      [for (_ in 0...projection.length) 0.0], normal, rhs);
+    return LinearAlgebra.solveInPlace(normal, rhs, n, [for (_ in 0...n) 0.0], 1e-10);
+  }
+
   /** How the group's redundancy is named; null for a group without any. */
   final parameterization:Null<RedundancyParameterization>;
 
@@ -59,6 +92,7 @@ class ManipulatorKinematics implements RedundantPathSolver {
     var copy = new ManipulatorKinematics(manipulator, differentialDamping);
     copy.preferredPosture = preferredPosture == null ? null : preferredPosture.copy();
     copy.preferredOrientation = preferredOrientation;
+    copy.preferTargetOrientation = preferTargetOrientation;
     return copy;
   }
 
@@ -131,6 +165,19 @@ class ManipulatorKinematics implements RedundantPathSolver {
       candidates.push(solved);
       if (candidates.length >= branchLimit) break;
     }
+    // The coarse lattice can miss a branch close to a bounded axis's end.
+    // Probe each joint near both ends with the other joints centred. This
+    // also covers high-index joints when the product lattice is budgeted.
+    for (joint in 0...jointCount()) for (fraction in [0.05, 0.95]) {
+      if (candidates.length >= branchLimit) break;
+      var seed = [for (i in 0...jointCount()) {
+        var limits = manipulator.group.limitsOf(i);
+        limits.lower < limits.upper ? limits.lower + (limits.upper - limits.lower) * (i == joint ? fraction : 0.5)
+          : (i == joint ? (fraction < 0.5 ? -Math.PI : Math.PI) : 0.0);
+      }];
+      var solved = solvePose(target, seed, tolerance, freedom);
+      if (solved != null && !containsNear(candidates, solved, tolerance.candidateSeparation)) candidates.push(solved);
+    }
     return redundant ? sweepSwivel(target, candidates, maxCount, tolerance, freedom) : candidates;
   }
 
@@ -170,8 +217,12 @@ class ManipulatorKinematics implements RedundantPathSolver {
   /** The path and, for a redundant group, the exact rate of its redundancy along it (see `RedundancyResolver`). */
   public function solvePathWithRates(request:PathRequest):PathSolution {
     var named = parameterization;
-    if (named == null) return new PathSolution(request.followPointByPoint(this));
-    named.preferringOrientation(preferredOrientation);
+    var freedom = request.freedoms[0];
+    var uniform = true;
+    for (policy in request.freedoms) if (policy != freedom) uniform = false;
+    if (named == null || (uniform && fullyConstrained(request.startQ, freedom)))
+      return new PathSolution(request.followPointByPoint(this));
+    named.preferringOrientation(preferredOrientation, preferTargetOrientation);
     return new RedundancyResolver(named).solve(this, request);
   }
 
@@ -283,7 +334,8 @@ class ManipulatorKinematics implements RedundantPathSolver {
 
   function options(tolerance:IkTolerance, ?freedom:OrientationPolicy, ?target:Pose3):IkOptions {
     var result = target == null ? new IkOptions(tolerance.position, tolerance.orientation, tolerance.maxIterations, tolerance.damping)
-      : ToolFreedom.of(target, freedom, tolerance.orientation).options(tolerance, preferredOrientation);
+      : ToolFreedom.of(target, freedom, tolerance.orientation).options(tolerance,
+          preferredOrientation == null && preferTargetOrientation ? target : preferredOrientation);
     var posture = preferredPosture;
     if (posture != null) result.preferring(posture);
     return result;

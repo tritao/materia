@@ -11,8 +11,8 @@ import motionkit.kinematics.Pose3;
  * axes, later a mobile base's pose.
  */
 interface RedundancyParameterization {
-  /** Sets the soft tool orientation for this solver-owned parameterization. */
-  function preferringOrientation(preference:Null<Pose3>):Void;
+  /** Sets the soft orientation preference; preferTarget uses each target when preference is null. */
+  function preferringOrientation(preference:Null<Pose3>, ?preferTarget:Bool):Void;
   /** How many values name the redundancy. */
   function dimension():Int;
   /** The values at `q`, or null where they are undefined (e.g. a straight elbow). */

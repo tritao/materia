@@ -566,7 +566,7 @@ G0 → G1 → G2 → G3 ──────────────────�
 | G12 | implemented; requested compiler/runtime/picker/homing checkpoint passed | see progress notes |
 | G13 | complete; restructure and Phase C gate passed | `38f15b995`, `ad5211f04`, `acb1ab460`; see progress notes |
 | G14 | implemented; focused mechanics and C-head yaw picker passed, Phase D gate pending | `7822171b5`, `58075ec63`; see progress notes |
-| G15 | planned | — |
+| G15 | implemented; four-run/ten-seam MuJoCo mission passed, Phase D gate pending | see progress notes |
 | G16 | planned | — |
 | G17 | planned | — |
 | G18 | planned | — |
@@ -3693,3 +3693,80 @@ MuJoCo completed all twelve pick/place steps in 184.36 simulated seconds,
 execution tick. Every carton is within 2 mm and 2 degrees of its requested seat
 and heading. The regular and yaw picker plus head mechanics are included in the
 next phase-boundary suites. G15 is next; full Phase D testing remains pending.
+
+
+### G15 — process gantry implementation in progress
+
+The new `gantry-welder` example reuses the robot-welder torch, plate/tube-frame
+weldment, welding equipment and four-run/ten-seam mission on screw-driven XYZ
+with a CA head. The example compiles and exports all ten CAD-derived seams.
+Welding wrist limits now come from the rotary joints nearest the tool; weld
+planning and motion carry the hard wire-axis task with spin free.
+
+Focused validation exposed two integration issues. Screw/nut drive interfaces
+were counted as self-collisions because their links are coupling siblings;
+ArmClearance now exempts only the specific coupled body pairs that touch in the
+reference pose, and still detects a fixed obstacle at the carriage. The process
+run's final approach discarded the recipe's orientation policy; it now preserves
+that policy, including on recovery. Welding explicitly prefers authored torch
+roll softly while keeping the wire axis hard. Other motion callers keep their
+existing free-spin behavior.
+
+Focused checks passed: clearance 38 assertions, tool freedom 289 assertions,
+and ProcessKit's welder/planning/rate/weave/pass/bead/path suites. The app's
+whole-weldment MuJoCo check is still pending; G15 and the Phase D boundary gate
+are not complete. No Phase E implementation has started.
+
+The first weld now executes after preserving approach freedom. Reach analysis
+then identified that a 500 mm table Y position put the rear-facing torch beyond
+the carriage's upper Y limit; the example places the table and weldment at Y=400
+mm instead. A remaining reachable entry near C=-pi was missed by the coarse IK
+seed lattice. Supplemental near-limit probes now find it; a five-axis bent-torch
+regression fails with the old sampling and passes with the probes. Full-weldment
+validation, including direct comparison of the actual wire axis with the authored
+path, remains pending.
+
+With the Y placement corrected, the far plate seam's direct joint approach was
+rejected for fixture clearance. A 500 mm frame lift gives the planner's existing
+100 mm higher approach room to reach. Both plate seams now execute in MuJoCo,
+including that higher approach; the two four-seam tube runs remain under
+validation. The 3 mm air clearance margin is unchanged.
+
+The connected tube-run search at Y=400 exposed a further workspace restriction:
+the rear seam had only one CA wrist branch. The second branch needed more Y
+travel. The table and weldment now sit at Y=200 mm; isolated FK/IK checks find
+both branches for each of the four run starts, retaining the authored rotary
+limits. The full MuJoCo validation is running on this layout. Earlier layout
+runs are superseded; neither the gantry gate nor G15 is marked complete yet.
+
+The Y=200 mm whole mission reached the first tube run but failed to hold the
+arc after three restarts. Its cause remains under investigation. A focused tube
+run also exposed excessive planning retries: a clearance failure in the compiled
+initial MoveJ was repeated for downstream seam-roll choices that could not
+change that entry. The planner now abandons that entry and checks another one,
+while retaining complete compiled-trajectory validation and the 3 mm margin.
+A two-seam regression verifies that each blocked entry is compiled only once
+and every seam remains in the accepted run. ProcessKit passes with 50 planning
+assertions. Reduced-task Jacobian rank detection avoids redundant external-axis
+search for the fully constrained five-axis CA task; tool-freedom checks pass
+334 assertions. G15 and the Phase D gate remain incomplete.
+
+The arc failure was isolated to the timed wire rate, not tracking: XYZ must
+counter the bent torch's long lever arm during corner turns. The original
+24 V Tr16×4 drives slowed those turns until the quantity-preserving wire feed
+fell below the welder's stable 1 m/min minimum. The example now uses generic
+16 mm, 10 mm lead ball screws and a 48 V supply, within the existing DM542
+and servo-amplifier voltage envelopes. No feed floor, bead tolerance or
+clearance margin was changed. The focused first tube run completes in 85.1
+simulated seconds: four 40 mm beads, 5 mm legs, tip within 0.1 mm, no restarts
+or clearance violation. Temporary stage/fault logging has been removed.
+The complete four-run/ten-seam mission and Phase D gate are next.
+
+The complete mission now passes on the clean build: all four runs and ten
+seams complete in 182.3 simulated seconds, with run completions at 46, 74.3,
+124 and 182.3 seconds. All legs are 5 mm; lengths are 180/180 mm for the
+plate and 40 mm for every tube seam. Tip error stays below 0.1 mm, wire-axis
+error stays within the 2 degree process bound, and there are no restarts,
+gaps or clearance violations. The shared entry retry fix covers both MoveJ
+and approach MoveL; ProcessKit passes 53 planning assertions. G15 is
+implemented; the Phase D full build/runtime gate remains pending.

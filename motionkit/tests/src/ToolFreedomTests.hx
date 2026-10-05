@@ -11,6 +11,7 @@ import motionkit.kinematics.Twist6;
 import motionkit.path.OrientationPolicy;
 import motionkit.path.PoseLine;
 import motionkit.path.PosePath;
+import motionkit.path.PoseMath;
 import motionkit.path.PoseWaypoint;
 import motionkit.program.Blend;
 import motionkit.program.MotionOp;
@@ -56,6 +57,13 @@ class ToolFreedomTests extends MotionKitTestSupport {
     var forked:ManipulatorKinematics = cast solver.fork();
     check(forked.preferredOrientation == solver.preferredOrientation, "Worker retains the immutable orientation preference");
     solver.preferredOrientation = null;
+    solver.preferTargetOrientation = true;
+    var authored = solver.solvePose(target, seed, tolerance, OrientationPolicy.FreeAboutTool);
+    check(authored != null, "A target orientation preference leaves unreachable spin free");
+    near(authored[3], 0.2, "An explicit target preference selects the closest permitted spin", 1e-5);
+    var targetFork:ManipulatorKinematics = cast solver.fork();
+    check(targetFork.preferTargetOrientation, "Worker retains the target orientation preference");
+    solver.preferTargetOrientation = false;
     var compiler = compilerFor(solver);
     var path = new PosePath("work", [new PoseLine(new PoseWaypoint(solver.forward(seed), 1e-4, 1e-4),
       new PoseWaypoint(target, 1e-4, 1e-4), OrientationPolicy.FreeAboutTool, 0.1, 0.1)]);
@@ -202,6 +210,62 @@ class ToolFreedomTests extends MotionKitTestSupport {
     var newSeven = seven.solvePose(sevenTarget, sevenSeed, tolerance, OrientationPolicy.Interpolated);
     check(oldSeven.converged && newSeven != null, "The G0 swivel-preserving solve reaches the comparison target");
     for (i in 0...7) check(newSeven[i] == oldSeven.q[i], "Full redundant pose IK retains G0 solver bits");
+  }
+
+  public function testCaNearCableLimit():Void {
+    var model = new RobotModel("xyz-ca-bent-torch");
+    var base = model.addLink(new Link("base")), parent = base;
+    for (i in 0...5) {
+      var child = model.addLink(new Link('ca-link-$i'));
+      var joint = model.addJoint(new Joint('ca-joint-$i', i < 3 ? JointType.Prismatic : JointType.Revolute, parent, child));
+      joint.axis = i == 0 ? [0.0, 1.0, 0.0] : i == 1 ? [1.0, 0.0, 0.0] : i == 2 ? [0.0, 0.0, -1.0]
+        : i == 3 ? [0.0, 0.0, 1.0] : [1.0, 0.0, 0.0];
+      joint.limits.lower = i < 3 ? 0 : i == 3 ? -Math.PI : -Math.PI/2;
+      joint.limits.upper = i == 0 ? 1 : i == 1 ? 1.2 : i == 2 ? 0.6 : i == 3 ? Math.PI : Math.PI/2;
+      if (i == 3) {
+        joint.parentFramePosition = [0.0, -0.367, 1.4025];
+        joint.parentFrameRotation = [Math.cos(Math.PI/8), Math.sin(Math.PI/8), 0.0, 0.0];
+      }
+      if (i == 4) joint.parentFramePosition = [-0.074, 0.0, 0.122];
+      parent = child;
+    }
+    var flange = model.addFrame(new Frame("ca-flange", parent));
+    flange.position = [0.074, 0.0, 0.070];
+    var clock = Quat.fromAxisAngle(new Vec3(0, 0, 1), Math.PI/4);
+    var offset = new Transform3(clock.rotate(new Vec3(0.1365, 0, 0.3105)),
+      clock.multiply(Quat.fromAxisAngle(new Vec3(0, 1, 0), Math.PI/4)));
+    var solver = new ManipulatorKinematics(new KinematicGroup(model, base.id, flange.id, null, offset, null,
+      ["ca-joint-0", "ca-joint-1", "ca-joint-2"]));
+    solver.preferTargetOrientation = true;
+    var goal = [0.9081, 0.5779, 0.0922, -2.91185, -0.02117];
+    var target = solver.forward(goal), tolerance = new IkTolerance(5e-5, 1e-3, 300, 0.03);
+    var candidates = solver.sampleCandidates(target, 12, tolerance, OrientationPolicy.FreeAboutTool);
+    check(candidates.length > 0, "Bent torch CA sampling reaches the seam near the C cable limit");
+    for (q in candidates) {
+      check(PoseMath.distance(solver.forward(q), target) <= tolerance.position, "CA candidate reaches the authored wire tip");
+      near(ToolFreedom.orientationError(solver.forward(q), target, OrientationPolicy.FreeAboutTool), 0,
+        "CA candidate preserves the wire direction", tolerance.orientation);
+    }
+    var distances:Array<Float> = [], poses:Array<Pose3> = [], policies:Array<OrientationPolicy> = [];
+    for (i in 0...11) {
+      var q = goal.copy();
+      q[1] += i * 0.002;
+      q[3] += i * 0.01;
+      distances.push(i * 0.005);
+      poses.push(solver.forward(q));
+      policies.push(OrientationPolicy.FreeAboutTool);
+    }
+    var route = solver.solvePathWithRates(new PathRequest(distances, poses, goal, tolerance,
+      [for (_ in goal) 0.2], [for (_ in goal) 1.0], 12, policies));
+    check(route.redundancyRates == null, "A fully constrained CA path has no external-axis redundancy curve");
+    for (i in 0...poses.length) {
+      var q = route.configurations[i];
+      check(q != null, "The fully constrained CA path stays on its entry branch");
+      check(PoseMath.distance(solver.forward(q), poses[i]) <= tolerance.position, "CA path follows the authored tip positions");
+      near(ToolFreedom.orientationError(solver.forward(q), poses[i], policies[i]), 0,
+        "CA path follows the authored wire axes", tolerance.orientation);
+      near(q[3], goal[3] + i * 0.01, "CA path has no C branch flip", 1e-3);
+    }
   }
 
   function compilerFor(solver:ManipulatorKinematics):ProgramCompiler {

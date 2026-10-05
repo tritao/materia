@@ -110,7 +110,7 @@ class ProcessRun {
     var engagement = recipe.engagement;
     var ops:Array<MotionOp> = [
       MotionOp.MoveL(continuation.waypointAt(0.0).pose, path.frameId,
-        approach == null ? currentFeed : approach, Blend.ExactStop)
+        approach == null ? currentFeed : approach, Blend.ExactStop, recipe.orientationPolicy)
     ];
     if (engagement != null) {
       var entry = state == ProcessRunState.Recovery ? engagement.recoveryEntry : engagement.entry;

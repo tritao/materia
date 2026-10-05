@@ -14,6 +14,7 @@ class MotionKitBootstrapTests {
       tests.testUnreachableTilt();
       tests.testConeAndRedundancy();
       tests.testFullOrientationIdentity();
+      tests.testCaNearCableLimit();
       Sys.println('Tool freedom tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
     }
@@ -108,6 +109,7 @@ class MotionKitBootstrapTests {
     freedomTests.testUnreachableTilt();
     freedomTests.testConeAndRedundancy();
     freedomTests.testFullOrientationIdentity();
+    freedomTests.testCaNearCableLimit();
     new PlanCheckTests().testPlanningLimits();
     new PlanCheckTests().testHandlingUsesCoupledLimits();
     new PlanCheckTests().testPlanCheck();

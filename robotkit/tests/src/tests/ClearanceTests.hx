@@ -23,10 +23,35 @@ class ClearanceTests {
     testPosesAndPath();
     testMargins();
     testTouchingByDesign();
+    testCoupledDriveContact();
     testCrossingEdges();
     testSolidEdges();
     Sys.println('RobotKit clearance tests passed ($assertions assertions)');
     return assertions;
+  }
+
+  static function testCoupledDriveContact():Void {
+    var model = new RobotModel("screw-carriage-clearance");
+    var base = model.addLink(new Link("base"));
+    var carriage = model.addLink(new Link("carriage"));
+    var shaft = model.addLink(new Link("shaft"));
+    var slide = model.addJoint(new Joint("x", JointType.Prismatic, base, carriage));
+    slide.axis = [1.0, 0, 0]; slide.limits.lower = -0.05; slide.limits.upper = 0.4;
+    var screw = model.addJoint(new Joint("screw", JointType.Continuous, base, shaft));
+    screw.axis = [1.0, 0, 0];
+    model.addCoupling(new robotkit.model.JointCoupling("thread", slide.id, screw.id, 100, 0));
+    var tip = model.addFrame(new Frame("tip", carriage));
+    var group = new Manipulator(model, base.id, tip.id);
+    var clearance = new ArmClearance(group, [
+      {name: "nut", link: carriage.id, vertices: box(-0.02, 0.02, -0.04, 0.04, -0.04, 0.04), tool: false},
+      {name: "screw", link: shaft.id, vertices: box(-0.1, 0.5, -0.006, 0.006, -0.006, 0.006), tool: false},
+      {name: "work", link: base.id, vertices: box(0.28, 0.32, 0.025, 0.04, -0.025, 0.025), tool: false}
+    ], [0.0]);
+    check(clearance.violation([0.0]) == null && clearance.violation([0.1]) == null,
+      "a driven nut's designed engagement stays clear at rest and through travel");
+    var hit = clearance.violation([0.3]);
+    check(hit != null && (hit.a == "work" || hit.b == "work"),
+      "drive contact does not exempt the carriage from a workpiece collision");
   }
 
   /** The vertices of the box spanning the given ranges. */

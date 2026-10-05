@@ -14,6 +14,7 @@ import robotkit.manipulation.KinematicGroup;
 class ExternalAxesParameterization implements RedundancyParameterization {
   public final group:KinematicGroup;
   var orientationPreference:Null<Pose3> = null;
+  var preferTargetOrientation:Bool = false;
   final indices:Array<Int>;
   final rates:Array<Float>;
   /** Cost factor of an external axis's motion against the arm's. */
@@ -38,7 +39,10 @@ class ExternalAxesParameterization implements RedundancyParameterization {
     }
   }
 
-  public function preferringOrientation(preference:Null<Pose3>):Void orientationPreference = preference;
+  public function preferringOrientation(preference:Null<Pose3>, ?preferTarget:Bool = false):Void {
+    orientationPreference = preference;
+    preferTargetOrientation = preferTarget;
+  }
 
   public function dimension():Int return indices.length;
 
@@ -58,14 +62,14 @@ class ExternalAxesParameterization implements RedundancyParameterization {
     }
     var task = ToolFreedom.of(target, freedom, tolerance.orientation);
     var result = group.solve(RedundancyPoses.transform(task.target), seed,
-      task.options(tolerance, orientationPreference).holding(indices, values));
+      task.options(tolerance, orientationPreference == null && preferTargetOrientation ? target : orientationPreference).holding(indices, values));
     return result.converged ? result.q : null;
   }
 
   public function solveNear(target:Pose3, seed:Array<Float>, tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>> {
     var task = ToolFreedom.of(target, freedom, tolerance.orientation);
     var result = group.solve(RedundancyPoses.transform(task.target), seed,
-      task.options(tolerance, orientationPreference));
+      task.options(tolerance, orientationPreference == null && preferTargetOrientation ? target : orientationPreference));
     return result.converged ? result.q : null;
   }
 
