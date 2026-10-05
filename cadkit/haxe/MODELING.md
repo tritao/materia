@@ -407,3 +407,33 @@ The selected sheet feature exposes editable dimensions and the bend table.
 bend intervals in blue/orange. This is view state; it does not edit the saved
 feature graph. Flanges are created in folded view. **Export flat DXF** and
 **Export flat SVG** export the exact current blank, bend marks and annotations.
+
+### Air-bending predictions
+
+`cadkit.sheetmetal.process.BendProcess` accepts typed stock and tooling, a signed
+bend angle in radians and an effective bend length in mm. `AirBending` requires
+UTS, yield and Young's modulus in MPa. Tool included angles are radians; tool
+radii and V opening are mm. Predictions distinguish the loaded and released
+inner radii, conserve neutral length, and return signed overbend, punch-bottom
+depth below the die top, force in kN and an assumed 90-degree minimum flange.
+The initial formulas are assumed estimates; tool angle/contact failures are
+named diagnoses.
+
+```haxe
+var stock = new SheetMaterial("mild-steel", 1.5, null,
+    {uts: 400, yield: 250, youngs: 205000});
+var tools = new ProcessTooling("acute-punch", "v12", 0.6,
+    Math.PI / 6, 12, Math.PI / 6, 0.5);
+var process:BendProcess = new AirBending();
+var prediction = process.predict(stock, tools, Math.PI / 2, 120);
+```
+
+`CalibrationEntry` supplies an explicit material lot, thickness, tool ids,
+half-open angle-magnitude band, depth offset and measured final inner radius.
+Pass an immutable `CalibrationTable` to `AirBending` and the lot as the fifth
+prediction argument to apply it. The model reconstructs loaded radius and depth
+from the measured final radius before adding the offset. Overlapping entries
+and measurements incompatible with the punch are refused. Without a matching
+lot/key, `calibrated` is false and depth remains analytic. These predictions do
+not yet replace the sheet's authored development rule; saved process rules and
+material-library integration are the remaining SM6 work.

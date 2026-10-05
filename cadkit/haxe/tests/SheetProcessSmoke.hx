@@ -3,6 +3,8 @@ import cadkit.sheetmetal.SheetMaterial;
 import cadkit.sheetmetal.process.AirBending;
 import cadkit.sheetmetal.process.BendProcess;
 import cadkit.sheetmetal.process.ProcessTooling;
+import cadkit.sheetmetal.process.CalibrationEntry;
+import cadkit.sheetmetal.process.CalibrationTable;
 
 /** Independent contact construction and released-angle checks for the assumed process model. */
 class SheetProcessSmoke {
@@ -66,6 +68,10 @@ class SheetProcessSmoke {
 		var steelAngle = Math.PI / 2 * 2.5 * steel.thickness / (steelLoaded + steel.thickness / 2);
 		var aluminiumAngle = Math.PI / 2 * 2.5 * aluminium.thickness / (aluminiumLoaded + aluminium.thickness / 2);
 		check(aluminiumAngle > steelAngle, "material B needs more overbend at the same final R/T");
+		var broadRadius = AirBending.loadRadius(1000, 1, aluminiumMechanical);
+		near(AirBending.unloadRadius(broadRadius, 1, aluminiumMechanical), 1000, 1e-8, "final radius beyond loaded branch still has a physical inverse");
+		var ratio = 2 * steelMechanical.yield / (steelMechanical.youngs * 1.5);
+		near(AirBending.unloadRadius(2, 1.5, steelMechanical), 2 / (4 * ratio * ratio * ratio - 3 * ratio + 1), 1e-12, "published cubic radius relation");
 		for (thickness in [0.5, 1.5, 2.0]) for (radius in [0.8, 1.5, 2.5]) {
 			var tooling = new ProcessTooling("acute", "v16", 0.5, Math.PI / 9, 16, Math.PI / 9, 0.5);
 			for (degrees in 20...151) {
@@ -87,6 +93,36 @@ class SheetProcessSmoke {
 		diagnosis("sheet.invalid-process-tooling", function() { var result = new ProcessTooling("p", "d", 0.5, 1, 0, 1, 0.5); });
 		diagnosis("sheet.springback-domain", function() { var result = AirBending.unloadRadius(1000, 1, aluminiumMechanical); });
 		diagnosis("sheet.tool-contact-limit", function() { var result = AirBending.depth(2, 8, largeTip, 1); });
+		var calibratedTools = new ProcessTooling("acute", "v12", 0.5, Math.PI / 6, 12, Math.PI / 6, 0.5);
+		var entry = new CalibrationEntry("lot-a", 1.5, "acute", "v12", 1, 2, 0.125, 2);
+		var rows = [entry]; var table = new CalibrationTable(rows); rows.pop();
+		check(table.entries().length == 1, "calibration owns its input array");
+		var exposed = table.entries(); exposed.pop();
+		check(table.entries().length == 1, "calibration isolates returned arrays");
+		check(table.find("lot-a", 1.5, calibratedTools, 1) == entry, "lower band endpoint included");
+		check(table.find("lot-a", 1.5, calibratedTools, 2) == null, "upper band endpoint excluded");
+		check(table.find("lot-a", 1.5, calibratedTools, -1.5) == entry, "calibration bands use bend magnitude");
+		check(table.find("lot-b", 1.5, calibratedTools, 1.5) == null, "another lot has no correction");
+		check(table.find("lot-a", 1.500001, calibratedTools, 1.5) == null, "thickness matching does not guess");
+		check(table.find("lot-a", 1.5, largeTip, 1.5) == null, "another tooling pair has no correction");
+		var measuredProcess:BendProcess = new AirBending(table);
+		var measured = measuredProcess.predict(steel, calibratedTools, Math.PI / 2, 120, "lot-a");
+		check(measured.calibrated, "prediction reports measured correction");
+		near(measured.innerRadius, 2, 1e-12, "measured radius overrides analytic radius");
+		near(measured.depth, AirBending.depth(1.5, measured.loadedRadius, calibratedTools, measured.loadedAngle) + 0.125, 1e-12, "depth correction applies after measured-radius reconstruction");
+		near(measured.depthOffset, 0.125, 1e-12, "depth correction remains explicit");
+		near(measured.bendAllowance, Math.PI / 2 * 2.75, 1e-12, "measured radius changes development");
+		var unmeasured = measuredProcess.predict(steel, calibratedTools, Math.PI / 2, 120);
+		check(!unmeasured.calibrated, "unspecified lot does not inherit a calibration");
+		near(unmeasured.depth, unmeasured.analyticDepth, 1e-12, "uncalibrated depth is analytic");
+		var adjacent = new CalibrationEntry("lot-a", 1.5, "acute", "v12", 2, 2.5, -0.1, 2.1);
+		var adjacentTable = new CalibrationTable([entry, adjacent]);
+		check(adjacentTable.find("lot-a", 1.5, calibratedTools, 2) == adjacent, "adjacent bands meet without ambiguity");
+		diagnosis("sheet.ambiguous-calibration", function() { var result = new CalibrationTable([entry, entry]); });
+		diagnosis("sheet.invalid-calibration", function() { var result = new CalibrationEntry("lot-a", 1.5, "p", "d", 2, 1, 0, 2); });
+		diagnosis("sheet.invalid-calibration-key", function() { var result = table.find("", 1.5, calibratedTools, 1.5); });
+		var impossible = new AirBending(new CalibrationTable([new CalibrationEntry("lot-a", 1.5, "radius-punch", "v16", 1, 2, 0, 2)]));
+		diagnosis("sheet.calibration-tool-radius", function() { var result = impossible.predict(steel, largeTip, Math.PI / 2, 120, "lot-a"); });
 		return checks;
 	}
 	static function main():Void { trace("Sheet process smoke passed (" + run() + " assertions)"); }

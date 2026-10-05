@@ -9,6 +9,9 @@ typedef BendProcessResult = {
 	final loadedAngle:Float;
 	final overbend:Float;
 	final depth:Float;
+	final analyticDepth:Float;
+	final depthOffset:Float;
+	final calibrated:Bool;
 	final force:Float;
 	final minimumFlange:Float;
 	final radiusBend:Bool;

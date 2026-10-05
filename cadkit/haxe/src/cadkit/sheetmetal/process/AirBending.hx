@@ -6,9 +6,12 @@ import cadkit.sheetmetal.SheetMaterial.SheetMechanical;
 
 /** Assumed air-bending formulas. Calibration and catalogue ratings remain separate inputs. */
 class AirBending implements BendProcess {
-	public function new() {}
+	public final calibration:CalibrationTable;
+	public function new(?calibration:CalibrationTable) {
+		this.calibration = calibration == null ? new CalibrationTable([]) : calibration;
+	}
 
-	public function predict(material:SheetMaterial, tooling:ProcessTooling, targetAngle:Float, length:Float):BendProcessResult {
+	public function predict(material:SheetMaterial, tooling:ProcessTooling, targetAngle:Float, length:Float, ?lot:String):BendProcessResult {
 		if (!Math.isFinite(targetAngle) || Math.abs(targetAngle) <= 0 || Math.abs(targetAngle) >= Math.PI)
 			throw new SheetDiagnosis("sheet.invalid-process-angle", "Air bending needs a nonzero target below 180 degrees");
 		if (!Math.isFinite(length) || length <= 0)
@@ -20,9 +23,13 @@ class AirBending implements BendProcess {
 		// Assumed natural final radius and 90-degree minimum flange, pending measured calibration.
 		var naturalRadius = 0.16 * tooling.vWidth * mechanical.uts / 410;
 		var innerRadius = Math.max(naturalRadius, tooling.punchRadius);
+		var entry:Null<CalibrationEntry> = lot == null ? null : calibration.find(lot, thickness, tooling, targetAngle);
+		if (entry != null) innerRadius = entry.innerRadius;
 		var loadedRadius = loadRadius(innerRadius, thickness, mechanical);
 		// A physical punch cannot impose a radius smaller than its tip. Its loaded radius governs.
 		if (loadedRadius < tooling.punchRadius) {
+			if (entry != null)
+				throw new SheetDiagnosis("sheet.calibration-tool-radius", "Measured radius requires a loaded radius smaller than the punch tip", [tooling.punchId, tooling.dieId]);
 			loadedRadius = tooling.punchRadius;
 			innerRadius = unloadRadius(loadedRadius, thickness, mechanical);
 		}
@@ -31,12 +38,18 @@ class AirBending implements BendProcess {
 		if (magnitude >= maximum)
 			throw new SheetDiagnosis("sheet.tool-angle-limit", "The loaded bend reaches the punch or die included-angle limit", [tooling.punchId, tooling.dieId]);
 		var loadedAngle = targetAngle < 0 ? -magnitude : magnitude;
+		var analyticDepth = depth(thickness, loadedRadius, tooling, magnitude);
+		var depthOffset = entry == null ? 0.0 : entry.depthOffset;
+		var force = 650 * thickness * thickness * (length / 1000) / tooling.vWidth * mechanical.uts / 450;
+		if (!Math.isFinite(force) || !Math.isFinite(analyticDepth + depthOffset))
+			throw new SheetDiagnosis("sheet.process-range", "Process dimensions exceed the finite calculation range");
 		return {
 			innerRadius: innerRadius, loadedRadius: loadedRadius,
 			bendAllowance: Math.abs(targetAngle) * (innerRadius + thickness / 2),
 			targetAngle: targetAngle, loadedAngle: loadedAngle, overbend: loadedAngle - targetAngle,
-			depth: depth(thickness, loadedRadius, tooling, magnitude),
-			force: 650 * thickness * thickness * (length / 1000) / tooling.vWidth * mechanical.uts / 450,
+			depth: analyticDepth + depthOffset, analyticDepth: analyticDepth,
+			depthOffset: depthOffset, calibrated: entry != null,
+			force: force,
 			minimumFlange: 0.7 * tooling.vWidth,
 			radiusBend: tooling.punchRadius > naturalRadius,
 			recommendedOpening: tooling.vWidth >= 6 * thickness && tooling.vWidth <= 12 * thickness
@@ -52,8 +65,13 @@ class AirBending implements BendProcess {
 		var ratio = loadedRadius * mechanical.yield / (mechanical.youngs * thickness);
 		if (ratio >= 0.5)
 			throw new SheetDiagnosis("sheet.springback-domain", "The bend is outside the plastic radius relation");
-		var recovery = 4 * ratio * ratio * ratio - 3 * ratio + 1;
-		return loadedRadius / recovery;
+		// Factored form avoids cancellation close to the physical branch's double root at 1/2.
+		var remaining = 1 - 2 * ratio;
+		var recovery = remaining * remaining * (1 + ratio);
+		var result = loadedRadius / recovery;
+		if (!Math.isFinite(result))
+			throw new SheetDiagnosis("sheet.springback-domain", "Released radius exceeds the finite plastic radius relation");
+		return result;
 	}
 
 	/** Invert the monotone physical branch with a bracketed solve, without a guessed iteration seed. */
@@ -64,6 +82,8 @@ class AirBending implements BendProcess {
 			throw new SheetDiagnosis("sheet.invalid-springback-input", "Springback needs positive radii, thickness and elastic modulus above yield");
 		var low = 0.0;
 		var high = Math.min(finalRadius, 0.499999999 * mechanical.youngs * thickness / mechanical.yield);
+		if (unloadRadius(high, thickness, mechanical) < finalRadius)
+			throw new SheetDiagnosis("sheet.springback-domain", "Released radius cannot be bracketed on the physical branch");
 		for (iteration in 0...80) {
 			var middle = (low + high) / 2;
 			if (unloadRadius(middle, thickness, mechanical) > finalRadius) high = middle;

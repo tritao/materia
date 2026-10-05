@@ -426,7 +426,12 @@ table in `tools/README.md`.
   depth at every degree from 20 to 150 for nine thickness/radius combinations (1 micrometre
   tolerance). Unsupported tool contact and included-angle limits have named diagnoses.
 - A `CalibrationTable` keyed by (material lot, thickness, punch, die, angle band) stores
-  measured corrections (depth offset, radius) that override the analytic values.
+  measured corrections (depth offset, final inner radius) that override the analytic values.
+  SM6b uses exact thickness and tool identities and half-open magnitude bands `[first, last)`;
+  overlapping bands for one key are rejected. A prediction applies calibration only with an
+  explicit lot. Its measured final radius derives a fresh loaded radius and analytic depth,
+  then the measured depth offset is added. A measured radius incompatible with the punch is
+  diagnosed rather than clamped. Tables and entries are immutable; no nearest-key fallback.
 - With a `Process` bend rule, the flat pattern is computed for the chosen tooling.
 
 **SM-D9. The press brake is an ordinary MachineKit assembly.**
@@ -925,7 +930,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM4 | done: SM4a exact developed blank regions, typed domain owners, sorted bend data and interrupted fold markings, authored grain frame and typed version-14 snapshot; quick gate `sm4a-flat-verified` (5259 sheet assertions); SM4c typed shared drawing data, exact R12 DXF/SVG, bend annotations and grain arrow; quick gate `sm4c-drawing-exports` (5888 sheet assertions); SM4d typed cut/relief boundary provenance and propagation; quick gate `sm4d-boundary-provenance` (5911 sheet assertions); SM4e six typed manufacturability findings with exact geometry and minimum flange depth; quick gate `sm4e-checks-verified` (5944 sheet assertions); typed blank requirement with explicit order context; quick gate `sm4-flat-pattern-complete` (5963 sheet assertions) | a5508e566; 83a7a8c18; 723b0bac4; 27f66bb9e; a7156977e |
 | SM4b | done: typed editor base/flange commands, explicit stock input, parameter inspector, folded/flat publication, bend table, exact fold-line overlay and DXF/SVG commands; P2 editor workflow passes; full gate `sm4b-editor-full` passes | be21d1579 |
 | SM5 | in progress: SM5a unique native ancestry count/index/bulk queries and typed owning Haxe wrappers; three native suites and focused ancestry checks pass; quick gate `sm5a-ancestry` (5974 sheet assertions); recognition and convert feature deferred by user direction on 2026-10-05 | 51c4f2d5c |
-| SM6 | in progress: SM6a typed air-bending predictions, physical springback inversion and exact contact depth; focused process smoke passes 1235 assertions; quick gate `sm6a-air-bending` passes (7209 sheet assertions); calibration, process rule and material-library integration remain | |
+| SM6 | in progress: SM6a typed air-bending predictions, physical springback inversion and exact contact depth; focused process smoke passes 1235 assertions; quick gate `sm6a-air-bending` passes (7209 sheet assertions); SM6b explicit lot/tool/angle-band calibration with measured radius and additive depth correction, focused smoke passes 1257 assertions, quick gate `sm6b-calibration` passes (7231 sheet assertions); process rule and material-library integration remain | 7148a8bb8 |
 | SM7 | planned | |
 | SM8a | planned | |
 | SM8b | planned (waits for MT5 on main) | |
@@ -1185,3 +1190,15 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
   passes all five suites (7209 sheet assertions, ProjectKit 143, ManufacturingKit 54), with
   unchanged original MachineKit summaries. No schema, cast, native or compiler change is made.
   Calibration, saved Process rules and material-library integration remain required for SM6.
+
+- SM6b: immutable calibration entries match an explicit lot, exact thickness/tool identities
+  and half-open angle-magnitude bands. Overlap is refused; caller and returned arrays are
+  isolated. Measured final radius derives fresh loaded radius, allowance, overbend and analytic
+  depth, then the measured depth offset is added with explicit result provenance. Missing keys
+  retain analytic predictions; incompatible measured/punch radii are diagnosed. Springback uses
+  the factored cubic to avoid cancellation and the inverse brackets only the loaded physical
+  branch, including large released radii. Focused smoke passes 1257 assertions; quick gate
+  `sm6b-calibration` passes all five suites (7231 sheet assertions, ProjectKit 143,
+  ManufacturingKit 54), with unchanged original MachineKit summaries. No cast, schema, native
+  or compiler change is made. Saved Process rules, tooling-based sheet checks and material-library
+  integration remain required before SM6's full gate and final commit.
