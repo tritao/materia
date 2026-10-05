@@ -101,11 +101,11 @@ typedef MissionOverlay = {
  */
 class MissionPlayer implements SessionMember {
   /** Map cells, in metres: fine enough that a wall a tenth of a metre thick covers whole cells. */
-  public static inline var RESOLUTION:Float = 0.05;
+  public static inline var RESOLUTION:Float = robotkit.navigation.FloorMap.DEFAULT_RESOLUTION;
   /** Room left round the obstacles' extent so the robot's own place is always on the map. */
-  public static inline var MARGIN:Float = 1.0;
+  public static inline var MARGIN:Float = robotkit.navigation.FloorMap.DEFAULT_MARGIN;
   /** Boxes this far above the floor or higher pass over the robot. */
-  public static inline var CLEARANCE:Float = 1.0;
+  public static inline var CLEARANCE:Float = robotkit.navigation.FloorMap.DEFAULT_CLEARANCE;
   public static inline var FRAME:String = "map";
   /** How close a `goTo` stands to its pose, in metres and radians. */
   public static inline var POSITION_TOLERANCE:Float = 0.05;
@@ -217,7 +217,11 @@ class MissionPlayer implements SessionMember {
       if (base == null) throw "A mission that drives needs the project's wheeled assembly";
       var footprint = base.footprint;
       if (footprint == null) throw "A mission that drives needs the robot's footprint";
-      var map = new Costmap2(floorPlan(obstacles, [for (step in drives) floorPose(step)]), footprint.radius, true, 0.3, 1.5, MEMORY_SECONDS);
+      var poses = [for (step in drives) floorPose(step)];
+      var initial = simulation.linkPose(robotIndex, 0);
+      poses.push(new Transform3(new Vec3(initial.position[0], initial.position[1], initial.position[2]),
+        new Quat(initial.rotation[0], initial.rotation[1], initial.rotation[2], initial.rotation[3])).toPose2());
+      var map = new Costmap2(floorPlan(obstacles, poses), footprint.radius, true, 0.3, 1.5, MEMORY_SECONDS);
       costmap = map;
       var navigation = new Navigation(base, localization, 0.35, 0.5, 1.2, false);
       var lidars = [for (sensor in project.robotSensors) if (sensor.kind == "lidar") sensor];

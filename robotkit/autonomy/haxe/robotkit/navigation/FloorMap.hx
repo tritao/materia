@@ -16,6 +16,9 @@ typedef FloorBox = {
 
 /** Rasterizes posed obstacle boxes for both navigation execution and upstream parking planners. */
 class FloorMap {
+  public static inline var DEFAULT_RESOLUTION:Float = 0.05;
+  public static inline var DEFAULT_MARGIN:Float = 1.0;
+  public static inline var DEFAULT_CLEARANCE:Float = 1.0;
   public static function standing(boxes:Array<FloorBox>, clearance:Float):Array<FloorBox>
     return [for (box in boxes) if (box.z - box.halfZ < clearance && box.z + box.halfZ > 0.01) box];
 
@@ -35,9 +38,12 @@ class FloorMap {
     }
     for (pose in poses) extend(pose.x, pose.y);
     if (!Math.isFinite(minX)) throw "A mobile mission needs somewhere to drive";
-    var width = Math.ceil((maxX - minX + 2 * margin) / resolution);
-    var height = Math.ceil((maxY - minY + 2 * margin) / resolution);
-    var grid = new OccupancyGrid2(resolution, new Pose2(minX - margin, minY - margin), width, height, frame,
+    // Keep world cell boundaries stable when planners consider different sets of goals.
+    var originX = Math.floor((minX - margin) / resolution) * resolution;
+    var originY = Math.floor((minY - margin) / resolution) * resolution;
+    var width = Math.ceil((maxX + margin - originX) / resolution);
+    var height = Math.ceil((maxY + margin - originY) / resolution);
+    var grid = new OccupancyGrid2(resolution, new Pose2(originX, originY), width, height, frame,
       OccupancyCell.Free);
     // A cell square overlaps a box when its centre lies within the box grown by half a cell's diagonal
     // projected on each box axis; growing by the full half-diagonal is the safe side of that.

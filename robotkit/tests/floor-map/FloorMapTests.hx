@@ -33,6 +33,13 @@ class FloorMapTests {
     try planner.plan(start, new Pose2()) catch (_:Dynamic) rejected = true;
     check(rejected, "An occupied parking pose is rejected");
     check(obstacles.length == 3, "Mapping does not change its source obstacle list");
+    var expanded = FloorMap.rasterize(obstacles, [start, goal, new Pose2(-3.127, 2.013)], 0.05, 1, 1, "map");
+    for (x in 0...20) for (y in 0...20) {
+      var pose = new Pose2(-0.975 + x * 0.1, -0.975 + y * 0.1);
+      var old:robotkit.navigation.GridCell2 = cast grid.worldToCell(pose);
+      var added:robotkit.navigation.GridCell2 = cast expanded.worldToCell(pose);
+      check(grid.cell(old.x, old.y) == expanded.cell(added.x, added.y), "Extra candidate goals do not move rasterized world obstacles");
+    }
     Sys.println('RobotKit floor map tests passed ($assertions assertions)');
   }
 }
