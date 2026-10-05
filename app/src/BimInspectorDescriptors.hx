@@ -1,6 +1,6 @@
 package app;
 
-import nativekit.ui.widgets.text.Text;
+import haxeon.ui.widgets.text.Text;
 
 
 import cadkit.parametric.Definition;
@@ -10,11 +10,11 @@ import cadkit.parametric.DefinitionInput;
 import cadkit.parametric.QuantityKind;
 import cadkit.parametric.TypedProperty;
 import cadkit.parametric.UnitConversion;
-import nativekit.ui.properties.PropertyDescriptor;
-import nativekit.ui.properties.PropertyDescriptorOptions;
-import nativekit.ui.properties.PropertyType;
-import nativekit.ui.properties.PropertyValue;
-import nativekit.ui.properties.PropertyOption;
+import haxeon.ui.properties.PropertyDescriptor;
+import haxeon.ui.properties.PropertyDescriptorOptions;
+import haxeon.ui.properties.PropertyType;
+import haxeon.ui.properties.PropertyValue;
+import haxeon.ui.properties.PropertyOption;
 
 /** Adapts persistent CadKit values into the shared typed property inspector. */
 class BimInspectorDescriptors {

@@ -25,7 +25,7 @@ class TourFailure(Exception):
     pass
 
 
-# nativekit.ui.semantics.AccessibilityRole values, by the names WAI-ARIA gives those roles.
+# haxeon.ui.semantics.AccessibilityRole values, by the names WAI-ARIA gives those roles.
 ROLES = {"button": 1, "checkbox": 2, "radio": 3, "text": 4, "textbox": 5, "link": 6, "slider": 11, "dialog": 13,
          "menu": 14, "menuitem": 16, "tablist": 17, "tab": 18, "switch": 20, "combobox": 22, "treeitem": 31}
 

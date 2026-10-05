@@ -1,31 +1,34 @@
 package app;
 
-import Canvas;
+import haxeon.platform.GraphicsImageRef;
+import haxeon.ui.Image;
+
+import haxeon.ui.Canvas;
 import app.MissionPlayer.MissionOverlay;
-import Color;
-import GraphicsSurface;
-import GradientStop;
-import LayoutAxis;
-import LayoutStyle;
-import LayoutVisualKind;
-import Rect;
-import PathBuilder;
-import ResolvedLayoutItem;
+import haxeon.ui.Color;
+import haxeon.ui.GraphicsSurface;
+import haxeon.ui.GradientStop;
+import haxeon.ui.LayoutAxis;
+import haxeon.ui.LayoutStyle;
+import haxeon.ui.LayoutVisualKind;
+import haxeon.ui.Rect;
+import haxeon.ui.PathBuilder;
+import haxeon.ui.ResolvedLayoutItem;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import nativekit.scene.SceneRenderer;
 import nativekit.scene.SceneView;
 import nativekit.scene.Transform;
-import nativekit.ui.core.BuildContext;
-import nativekit.ui.core.Key;
-import nativekit.ui.core.RenderNode;
-import nativekit.ui.core.UiEvent;
-import nativekit.ui.core.UiEventKind;
-import nativekit.ui.core.UiKey;
-import nativekit.ui.core.View;
-import nativekit.ui.host.UiHostContext;
-import nativekit.ui.semantics.AccessibilityRole;
-import nativekit.ui.semantics.Semantics;
+import haxeon.ui.core.BuildContext;
+import haxeon.ui.core.Key;
+import haxeon.ui.core.RenderNode;
+import haxeon.ui.core.UiEvent;
+import haxeon.ui.core.UiEventKind;
+import haxeon.ui.core.UiKey;
+import haxeon.ui.core.View;
+import haxeon.ui.host.UiHostContext;
+import haxeon.ui.semantics.AccessibilityRole;
+import haxeon.ui.semantics.Semantics;
 
 /** Fixed-camera SceneKit GPU render composited into the editor UI. */
 class EditorPerspectiveViewport implements View {

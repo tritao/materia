@@ -1,34 +1,34 @@
 package app;
 
-import nativekit.ui.properties.PropertyDescriptor;
-import nativekit.ui.widgets.controls.Select;
+import haxeon.ui.properties.PropertyDescriptor;
+import haxeon.ui.widgets.controls.Select;
 
 
 import bimkit.BimDocument;
-import nativekit.ui.editing.EditorDocument;
+import haxeon.ui.editing.EditorDocument;
 import cadkit.parametric.Definition;
 import cadkit.parametric.Element;
 import cadkit.parametric.ElementId;
 import cadkit.parametric.InstanceElement;
-import LayoutAxis;
-import LayoutStyle;
-import Insets;
-import TextWrap;
-import nativekit.ui.core.BuildContext;
-import nativekit.ui.core.RenderNode;
-import nativekit.ui.core.TextStyleOverride;
-import nativekit.ui.core.View;
-import nativekit.ui.widgets.controls.Button;
-import nativekit.ui.widgets.controls.ButtonVariant;
-import nativekit.ui.widgets.controls.IconButton;
-import nativekit.ui.icons.IconName;
-import nativekit.ui.widgets.layout.Column;
-import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.properties.PropertyInspector;
-import nativekit.ui.widgets.layout.Row;
-import nativekit.ui.widgets.text.Text;
-import nativekit.ui.widgets.collections.TreeView;
-import nativekit.ui.widgets.scroll.ScrollView;
+import haxeon.ui.LayoutAxis;
+import haxeon.ui.LayoutStyle;
+import haxeon.ui.Insets;
+import haxeon.ui.TextWrap;
+import haxeon.ui.core.BuildContext;
+import haxeon.ui.core.RenderNode;
+import haxeon.ui.core.TextStyleOverride;
+import haxeon.ui.core.View;
+import haxeon.ui.widgets.controls.Button;
+import haxeon.ui.widgets.controls.ButtonVariant;
+import haxeon.ui.widgets.controls.IconButton;
+import haxeon.ui.icons.IconName;
+import haxeon.ui.widgets.layout.Column;
+import haxeon.ui.widgets.KeyedView;
+import haxeon.ui.widgets.properties.PropertyInspector;
+import haxeon.ui.widgets.layout.Row;
+import haxeon.ui.widgets.text.Text;
+import haxeon.ui.widgets.collections.TreeView;
+import haxeon.ui.widgets.scroll.ScrollView;
 
 /** Reusable editor surface combining spatial/type trees with the generic inspector. */
 class BimModelEditor implements View {
@@ -160,8 +160,8 @@ class BimModelEditor implements View {
 			showingTypes ? "BIM Type Properties" : "BIM Object Properties");
 	}
 
-	private function inspectorDescriptors():Array<nativekit.ui.properties.PropertyDescriptor> {
-		var result:Array<nativekit.ui.properties.PropertyDescriptor> = [];
+	private function inspectorDescriptors():Array<haxeon.ui.properties.PropertyDescriptor> {
+		var result:Array<haxeon.ui.properties.PropertyDescriptor> = [];
 		if (selectedDefinitionId != null) {
 			var definition = findDefinition(selectedDefinitionId);
 			if (definition != null)

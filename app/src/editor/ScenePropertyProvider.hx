@@ -6,11 +6,11 @@ import cadkit.parametric.features.ExtrudeFeature;
 import cadkit.parametric.features.FilletFeature;
 import materia.project.Appearance.Appearances;
 import materia.project.MaterialLibrary;
-import nativekit.ui.properties.PropertyDescriptor;
-import nativekit.ui.properties.PropertyDescriptorOptions;
-import nativekit.ui.properties.PropertyOption;
-import nativekit.ui.properties.PropertyType;
-import nativekit.ui.properties.PropertyValue;
+import haxeon.ui.properties.PropertyDescriptor;
+import haxeon.ui.properties.PropertyDescriptorOptions;
+import haxeon.ui.properties.PropertyOption;
+import haxeon.ui.properties.PropertyType;
+import haxeon.ui.properties.PropertyValue;
 
 /** Builds inspector descriptors against a retained scene and stable object identity. */
 @:access(app.EditorScene)

@@ -2,7 +2,7 @@ package tests;
 
 import app.Main.ReferenceEditorApp;
 import app.examples.TwoRobotSetupScript;
-import FontCollection;
+import haxeon.ui.FontCollection;
 import nativekit.sim.SimPose;
 import nativekit.sim.SimSession;
 import sys.FileSystem;
@@ -26,9 +26,9 @@ class HumanSimulationTests {
     var directory = "build/human-simulation-test";
     if (!FileSystem.exists(directory)) FileSystem.createDirectory(directory);
     var fonts = FontCollection.create();
-    fonts.add(requirePath(["uikit/vendor/harfbuzz/perf/fonts/Roboto-Regular.ttf",
-      "../../uikit/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf",
-      "../../../uikit/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf"]));
+    fonts.add(requirePath(["haxeon/packages/ui/vendor/harfbuzz/perf/fonts/Roboto-Regular.ttf",
+      "../../haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf",
+      "../../../haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf"]));
     var editor = new ReferenceEditorApp(fonts, directory + "/workspace.json", null, null, null,
       TwoRobotSetupScript.REFERENCE);
     editor.enableCharacterPreview(requirePath(["animkit/assets/quaternius/worker.glb",

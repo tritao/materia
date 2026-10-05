@@ -1,15 +1,15 @@
 package app;
 
-import FontFamily;
+import haxeon.ui.FontFamily;
 import app.Main.ReferenceEditorApp;
 import haxe.CallStack;
-import nativekit.ui.host.BrowserUiHost;
-import nativekit.ui.host.BrowserUiHostOptions;
-import nativekit.ui.host.BrowserUiHostOptions.BrowserUiFontAsset;
-import nativekit.ui.host.BrowserUiHostSession;
-import nativekit.ui.host.DesktopUiHostContext;
-import nativekit.ui.host.UiHostSession.UiHostLifecycle;
-import nativekit.ui.theme.Theme;
+import haxeon.ui.host.BrowserUiHost;
+import haxeon.ui.host.BrowserUiHostOptions;
+import haxeon.ui.host.BrowserUiHostOptions.BrowserUiFontAsset;
+import haxeon.ui.host.BrowserUiHostSession;
+import haxeon.ui.host.DesktopUiHostContext;
+import haxeon.ui.host.UiHostSession.UiHostLifecycle;
+import haxeon.ui.theme.Theme;
 
 /**
  * Browser entry point for the reference editor. The page calls the exposed `configure`, then `main` once, then
@@ -88,7 +88,7 @@ class MainWeb {
   /**
    * Prints one `materia-report` line of JSON to the page's console: the editor's mode, scene objects, command
    * availability and diagnostic state, and every visible widget with a style key or accessibility label, with its
-   * accessibility role (nativekit.ui.semantics.AccessibilityRole) and value and its bounds in CSS pixels. Browser tests (`web/tools/tour.py`) find controls through it and check each step.
+   * accessibility role (haxeon.ui.semantics.AccessibilityRole) and value and its bounds in CSS pixels. Browser tests (`web/tools/tour.py`) find controls through it and check each step.
    */
   @:expose public static function report():Int {
     var app = editor;
@@ -148,7 +148,7 @@ class MainWeb {
     return command.isEnabled();
   }
 
-  static function collectWidgets(node:nativekit.ui.core.RenderNode, into:Array<Dynamic>):Void {
+  static function collectWidgets(node:haxeon.ui.core.RenderNode, into:Array<Dynamic>):Void {
     var resolved = node.resolved, semantics = node.semantics;
     var label:Null<String> = null, value:Null<String> = null, role:Null<Int> = null;
     if (semantics != null) {

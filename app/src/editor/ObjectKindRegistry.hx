@@ -8,7 +8,7 @@ import app.CadPlateModel;
 import app.CadSessionModel;
 import app.EditorScene;
 import app.SceneObjectData;
-import nativekit.ui.properties.PropertyDescriptor;
+import haxeon.ui.properties.PropertyDescriptor;
 
 /** The single list of kinds known to the editor. */
 class ObjectKindRegistry {

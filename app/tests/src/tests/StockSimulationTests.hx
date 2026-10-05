@@ -3,8 +3,8 @@ package tests;
 import app.EditorScene;
 import app.SceneCodec;
 import app.StockSimulationSession;
-import nativekit.ui.properties.PropertyBinding;
-import nativekit.ui.properties.PropertyValue;
+import haxeon.ui.properties.PropertyBinding;
+import haxeon.ui.properties.PropertyValue;
 
 /** The editor's stock-simulation object: scrubbing, colouring, and picking back to G-code. */
 class StockSimulationTests {

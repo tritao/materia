@@ -4,11 +4,11 @@ import app.CadDocumentSession;
 import app.EditorScene;
 import app.SceneObjectData;
 import app.StockSimulationSession;
-import nativekit.ui.properties.PropertyDescriptor;
-import nativekit.ui.properties.PropertyDescriptorOptions;
-import nativekit.ui.properties.PropertyOption;
-import nativekit.ui.properties.PropertyType;
-import nativekit.ui.properties.PropertyValue;
+import haxeon.ui.properties.PropertyDescriptor;
+import haxeon.ui.properties.PropertyDescriptorOptions;
+import haxeon.ui.properties.PropertyOption;
+import haxeon.ui.properties.PropertyType;
+import haxeon.ui.properties.PropertyValue;
 
 /**
   A block of stock cut by a machining program with StockKit. Its inspector

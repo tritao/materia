@@ -1,11 +1,11 @@
 package app;
 
 import app.editor.EditorGrid;
-import nativekit.ui.properties.PropertyOption;
-import nativekit.ui.properties.PropertyType;
-import nativekit.ui.properties.PropertyValue;
-import nativekit.ui.settings.SettingOptions;
-import nativekit.ui.settings.SettingsRegistry;
+import haxeon.ui.properties.PropertyOption;
+import haxeon.ui.properties.PropertyType;
+import haxeon.ui.properties.PropertyValue;
+import haxeon.ui.settings.SettingOptions;
+import haxeon.ui.settings.SettingsRegistry;
 
 /** Every editor setting Materia defines, by path. */
 class AppSettings {

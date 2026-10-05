@@ -5,23 +5,23 @@ import app.EditorScene;
 import app.ProjectDocumentSession;
 import app.SceneObjectData;
 import haxe.Json;
-import LayoutFrame;
-import LayoutStyle;
-import LayoutVisualKind;
-import TextWrap;
-import FontCollection;
+import haxeon.ui.LayoutFrame;
+import haxeon.ui.LayoutStyle;
+import haxeon.ui.LayoutVisualKind;
+import haxeon.ui.TextWrap;
+import haxeon.ui.FontCollection;
 import nativekit.scene.SpatialIndex;
 import nativekit.scene.SceneView;
 import nativekit.scene.Transform;
-import nativekit.ui.core.RenderNode;
-import nativekit.ui.docking.DockNode;
-import nativekit.ui.host.FrameGcScheduler;
-import nativekit.ui.editing.EditOperation;
-import nativekit.ui.core.UiEventKind;
-import nativekit.ui.core.UiKey;
-import nativekit.ui.core.UiModifier;
-import nativekit.ui.debug.UiFrameMetrics;
-import nativekit.ui.semantics.AccessibilityRole;
+import haxeon.ui.core.RenderNode;
+import haxeon.ui.docking.DockNode;
+import haxeon.ui.host.FrameGcScheduler;
+import haxeon.ui.editing.EditOperation;
+import haxeon.ui.core.UiEventKind;
+import haxeon.ui.core.UiKey;
+import haxeon.ui.core.UiModifier;
+import haxeon.ui.debug.UiFrameMetrics;
+import haxeon.ui.semantics.AccessibilityRole;
 import robotkit.model.CollisionApproximation;
 import sys.FileSystem;
 import sys.io.File;
@@ -88,7 +88,7 @@ class HeadlessEditorProfile {
 
   static function run(output:String, cycles:Int, scenario:String, heapDumpPath:Null<String>):Void {
     profileSpans = Sys.getEnv("HAXEON_PROFILE_SPANS") == "1";
-    var fontPath = "../uikit/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf";
+    var fontPath = "../haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf";
     if (!FileSystem.exists(fontPath)) throw "Benchmark font is unavailable: " + fontPath;
     var fonts = FontCollection.create();
     fonts.add(fontPath);
@@ -273,7 +273,7 @@ class HeadlessEditorProfile {
       input();
       if (Sys.getEnv("MATERIA_TRACE_STATE") == "1" && !results.exists(name)) {
         var changed = editor.ui.stateStore.idsChangedSince(stateRevision);
-        Sys.println("state-changes " + name + ": " + [for (id in changed) editor.ui.stateStore.describe(new nativekit.ui.core.WidgetId(id))].join(" | "));
+        Sys.println("state-changes " + name + ": " + [for (id in changed) editor.ui.stateStore.describe(new haxeon.ui.core.WidgetId(id))].join(" | "));
       }
       var dirty = editor.ui.isDirty();
       submit(editor, frame, frames, name);
@@ -650,20 +650,20 @@ class HeadlessEditorProfile {
     var ctx = editor.ui.buildContext;
     var n = 5000;
     measurePrimitive("beginFrame", n, function(i) ctx.beginFrame());
-    measurePrimitive("withScope(Key) empty", n, function(i) { ctx.beginFrame(); ctx.withScope(new nativekit.ui.core.Key("a"), function() return 1); });
-    measurePrimitive("scope + id", n, function(i) { ctx.beginFrame(); ctx.withScope(new nativekit.ui.core.Key("a"), function() return ctx.id("x")); });
-    measurePrimitive("new WidgetId", n, function(i) new nativekit.ui.core.WidgetId(i + 1));
-    measurePrimitive("new RenderNode", n, function(i) new RenderNode(new nativekit.ui.core.WidgetId(i + 1), LayoutVisualKind.Box, null));
-    measurePrimitive("new StyleTarget", n, function(i) new nativekit.ui.style.StyleTarget("button", "k", "k", ["a"], ["button"], 0));
-    var target = new nativekit.ui.style.StyleTarget("button", "k", "k", ["a"], ["button"], 0);
+    measurePrimitive("withScope(Key) empty", n, function(i) { ctx.beginFrame(); ctx.withScope(new haxeon.ui.core.Key("a"), function() return 1); });
+    measurePrimitive("scope + id", n, function(i) { ctx.beginFrame(); ctx.withScope(new haxeon.ui.core.Key("a"), function() return ctx.id("x")); });
+    measurePrimitive("new WidgetId", n, function(i) new haxeon.ui.core.WidgetId(i + 1));
+    measurePrimitive("new RenderNode", n, function(i) new RenderNode(new haxeon.ui.core.WidgetId(i + 1), LayoutVisualKind.Box, null));
+    measurePrimitive("new StyleTarget", n, function(i) new haxeon.ui.style.StyleTarget("button", "k", "k", ["a"], ["button"], 0));
+    var target = new haxeon.ui.style.StyleTarget("button", "k", "k", ["a"], ["button"], 0);
     measurePrimitive("resolve (cache hit)", n, function(i) ctx.styleResolver.resolve(target, ctx.inheritedStyle, ctx.theme.styles, ctx.styleSheet, null, ctx.environment));
     var computed = ctx.styleResolver.resolve(target, ctx.inheritedStyle, ctx.theme.styles, ctx.styleSheet, null, ctx.environment);
     measurePrimitive("computed.toLayoutStyle", n, function(i) computed.toLayoutStyle());
     measurePrimitive("new LayoutStyle", n, function(i) new LayoutStyle());
-    measurePrimitive("new Semantics", n, function(i) new nativekit.ui.semantics.Semantics(nativekit.ui.semantics.AccessibilityRole.Button, "x"));
-    measurePrimitive("Text widget build", n, function(i) { ctx.beginFrame(); new nativekit.ui.widgets.text.Text("hello").build(ctx); });
-    measurePrimitive("Button widget build", n, function(i) { ctx.beginFrame(); new nativekit.ui.widgets.controls.Button("Label", null, null, "b").build(ctx); });
-    measurePrimitive("resolveTextRole", n, function(i) ctx.resolveTextRole(nativekit.ui.theme.TextRole.Button, nativekit.ui.core.TextStyleOverride.paragraph(TextWrap.None)));
+    measurePrimitive("new Semantics", n, function(i) new haxeon.ui.semantics.Semantics(haxeon.ui.semantics.AccessibilityRole.Button, "x"));
+    measurePrimitive("Text widget build", n, function(i) { ctx.beginFrame(); new haxeon.ui.widgets.text.Text("hello").build(ctx); });
+    measurePrimitive("Button widget build", n, function(i) { ctx.beginFrame(); new haxeon.ui.widgets.controls.Button("Label", null, null, "b").build(ctx); });
+    measurePrimitive("resolveTextRole", n, function(i) ctx.resolveTextRole(haxeon.ui.theme.TextRole.Button, haxeon.ui.core.TextStyleOverride.paragraph(TextWrap.None)));
   }
 
   static function submit(editor:ReferenceEditorApp, frame:LayoutFrame,

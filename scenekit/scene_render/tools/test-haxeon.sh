@@ -17,8 +17,8 @@ mkdir -p "$generated_dir"
 scene_header="$scenekit_dir/scene/include/nativekit_scene.h"
 render_header="$scenekit_dir/scene_render/include/nativekit_scene_render.h"
 interaction_header="$scenekit_dir/scene_interaction/include/nativekit_scene_interaction.h"
-nativekit_import_header="$nativekit_dir/bindings/haxe/nativekit_import.h"
-gpu_import_header="$nativekit_dir/modules/gpu/bindings/nativekit_gpu_import.h"
+nativekit_import_header="$haxeon_dir/packages/platform/bindings/nativekit_import.h"
+gpu_import_header="$haxeon_dir/packages/gpu/bindings/nativekit_gpu_import.h"
 nativekit_header="$nativekit_dir/include/nativekit.h"
 graphics_header="$nativekit_dir/include/nativekit_graphics.h"
 gpu_header="$nativekit_dir/modules/gpu/include/nativekit_gpu.h"
@@ -45,7 +45,7 @@ import_hxi \
 	--interface=NativeKitGpu \
 	--depends=NativeKit \
 	--include="$nativekit_dir/modules/gpu/include" \
-	--include="$nativekit_dir/modules/gpu/bindings" \
+	--include="$haxeon_dir/packages/gpu/bindings" \
 	--include="$nativekit_dir/include" \
 	--exclude-header="$nativekit_header" \
 	--exclude-header="$graphics_header" \

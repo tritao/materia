@@ -1,17 +1,17 @@
 package app.editor;
 
 import app.Main.ReferenceEditorApp;
-import Insets;
-import nativekit.ui.core.TextStyleOverride;
-import nativekit.ui.core.View;
-import nativekit.ui.icons.IconName;
-import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.controls.Button;
-import nativekit.ui.widgets.layout.Column;
-import nativekit.ui.widgets.layout.Row;
-import nativekit.ui.widgets.properties.PropertyInspector;
+import haxeon.ui.Insets;
+import haxeon.ui.core.TextStyleOverride;
+import haxeon.ui.core.View;
+import haxeon.ui.icons.IconName;
+import haxeon.ui.widgets.KeyedView;
+import haxeon.ui.widgets.controls.Button;
+import haxeon.ui.widgets.layout.Column;
+import haxeon.ui.widgets.layout.Row;
+import haxeon.ui.widgets.properties.PropertyInspector;
 import app.editor.SheetWorkflowPanel;
-import nativekit.ui.widgets.text.Text;
+import haxeon.ui.widgets.text.Text;
 
 /** Selected-object inspector dock panel. */
 @:access(app.Main.ReferenceEditorApp)

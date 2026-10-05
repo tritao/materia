@@ -1,6 +1,6 @@
 package app;
 
-import Color;
+import haxeon.ui.Color;
 
 /** Neutral viewport gradient shared by the editor's 2D and 3D views. */
 class ViewportBackground {

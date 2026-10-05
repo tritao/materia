@@ -25,9 +25,10 @@ endif()
 
 get_filename_component(MATERIA_SOURCE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
 set(MATERIA_NATIVEKIT_DIR "${MATERIA_SOURCE_ROOT}/nativekit")
-set(MATERIA_UIKIT_DIR "${MATERIA_SOURCE_ROOT}/uikit")
+set(MATERIA_UIKIT_DIR "${MATERIA_SOURCE_ROOT}/haxeon/packages/ui")
 
 add_subdirectory("${MATERIA_NATIVEKIT_DIR}" nativekit)
+set(NKUI_NATIVEKIT_DIR "${MATERIA_NATIVEKIT_DIR}" CACHE PATH "NativeKit source for the UI package" FORCE)
 add_subdirectory("${MATERIA_UIKIT_DIR}" uikit)
 
 # Build the scene model and spatial queries used by the editor document.

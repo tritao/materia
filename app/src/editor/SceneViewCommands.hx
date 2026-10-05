@@ -2,11 +2,11 @@ package app.editor;
 
 import app.AppSettings;
 import app.Main.ReferenceEditorApp;
-import nativekit.ui.properties.PropertyValue;
-import nativekit.ui.core.Command;
-import nativekit.ui.core.Shortcut;
-import nativekit.ui.core.UiKey;
-import nativekit.ui.core.UiModifier;
+import haxeon.ui.properties.PropertyValue;
+import haxeon.ui.core.Command;
+import haxeon.ui.core.Shortcut;
+import haxeon.ui.core.UiKey;
+import haxeon.ui.core.UiModifier;
 
 /**
  * Viewport, lighting, grid, and nudge command registrations. Grid and lighting

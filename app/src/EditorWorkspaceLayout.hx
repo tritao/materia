@@ -1,9 +1,9 @@
 package app;
 
-import nativekit.ui.docking.DockNode;
-import nativekit.ui.docking.DockSplitAxis;
-import nativekit.ui.docking.DockDropZone;
-import nativekit.ui.docking.DockWorkspaceModel;
+import haxeon.ui.docking.DockNode;
+import haxeon.ui.docking.DockSplitAxis;
+import haxeon.ui.docking.DockDropZone;
+import haxeon.ui.docking.DockWorkspaceModel;
 
 /** Default editor dock layout. */
 class EditorWorkspaceLayout {

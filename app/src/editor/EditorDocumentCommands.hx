@@ -1,10 +1,10 @@
 package app.editor;
 
 import app.Main.ReferenceEditorApp;
-import nativekit.ui.core.Command;
-import nativekit.ui.core.Shortcut;
-import nativekit.ui.core.UiKey;
-import nativekit.ui.core.UiModifier;
+import haxeon.ui.core.Command;
+import haxeon.ui.core.Shortcut;
+import haxeon.ui.core.UiKey;
+import haxeon.ui.core.UiModifier;
 
 /** Shared document history and file commands. */
 @:access(app.Main.ReferenceEditorApp)

@@ -1,9 +1,9 @@
 package app.editor;
 
 import app.Main.ReferenceEditorApp;
-import nativekit.ui.core.Command;
-import nativekit.ui.core.Shortcut;
-import nativekit.ui.core.UiModifier;
+import haxeon.ui.core.Command;
+import haxeon.ui.core.Shortcut;
+import haxeon.ui.core.UiModifier;
 
 /** Object and CAD editing command registrations. */
 @:access(app.Main.ReferenceEditorApp)

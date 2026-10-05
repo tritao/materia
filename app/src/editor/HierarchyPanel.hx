@@ -1,19 +1,19 @@
 package app.editor;
 
 import app.Main.ReferenceEditorApp;
-import Insets;
-import LayoutStyle;
-import nativekit.ui.core.TextStyleOverride;
-import nativekit.ui.core.View;
-import nativekit.ui.icons.IconName;
-import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.collections.TreeView;
-import nativekit.ui.widgets.controls.Button;
-import nativekit.ui.widgets.controls.ButtonVariant;
-import nativekit.ui.widgets.controls.SearchField;
-import nativekit.ui.widgets.layout.Column;
-import nativekit.ui.widgets.layout.Row;
-import nativekit.ui.widgets.text.Text;
+import haxeon.ui.Insets;
+import haxeon.ui.LayoutStyle;
+import haxeon.ui.core.TextStyleOverride;
+import haxeon.ui.core.View;
+import haxeon.ui.icons.IconName;
+import haxeon.ui.widgets.KeyedView;
+import haxeon.ui.widgets.collections.TreeView;
+import haxeon.ui.widgets.controls.Button;
+import haxeon.ui.widgets.controls.ButtonVariant;
+import haxeon.ui.widgets.controls.SearchField;
+import haxeon.ui.widgets.layout.Column;
+import haxeon.ui.widgets.layout.Row;
+import haxeon.ui.widgets.text.Text;
 
 /** Hierarchy dock panel. */
 @:access(app.Main.ReferenceEditorApp)

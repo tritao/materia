@@ -31,7 +31,8 @@ set(NK_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(NK_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(NK_SOKOL_BACKEND gles3 CACHE STRING "WebGL2" FORCE)
 add_subdirectory("${MATERIA_SOURCE_ROOT}/nativekit" nativekit)
-add_subdirectory("${MATERIA_SOURCE_ROOT}/uikit" uikit)
+set(NKUI_NATIVEKIT_DIR "${MATERIA_SOURCE_ROOT}/nativekit" CACHE PATH "NativeKit source for the UI package" FORCE)
+add_subdirectory("${MATERIA_SOURCE_ROOT}/haxeon/packages/ui" uikit)
 
 set(NKSCENE_NATIVEKIT_DIR "${MATERIA_SOURCE_ROOT}/nativekit")
 set(NK_LIBRARY_TYPE STATIC)
@@ -92,12 +93,12 @@ set(NKUI_HAXEON_HOST_HEAP_LIMIT ${NK_WASM_HOST_HEAP_LIMIT})
 set(NKUI_HAXEON_GUEST_MEMORY_BASE ${NKUI_HAXEON_HOST_HEAP_LIMIT})
 set(NKUI_HAXEON_GUEST_MEMORY_LIMIT ${MATERIA_WEB_GUEST_MEMORY_LIMIT})
 set(NKUI_HAXEON_MEMORY_LIMIT ${MATERIA_WEB_GUEST_MEMORY_LIMIT})
-configure_file("${MATERIA_SOURCE_ROOT}/uikit/cmake/wasm_memory_contract.h.in"
+configure_file("${MATERIA_SOURCE_ROOT}/haxeon/packages/ui/cmake/wasm_memory_contract.h.in"
     "${CMAKE_CURRENT_BINARY_DIR}/nativekit_haxeon_memory_contract.h" @ONLY)
 
 add_executable(materia_web
     host.cpp
-    "${MATERIA_SOURCE_ROOT}/uikit/src/platform/wasm/haxeon_memory_contract.cpp")
+    "${MATERIA_SOURCE_ROOT}/haxeon/packages/ui/src/platform/wasm/haxeon_memory_contract.cpp")
 target_include_directories(materia_web PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 target_link_libraries(materia_web PRIVATE
     NativeKit::nativekit NativeKit::gpu NativeKit::ui NativeKit::scene NativeKit::scene_render

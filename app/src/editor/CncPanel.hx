@@ -2,22 +2,22 @@ package app.editor;
 
 import app.ApplicationSimulation;
 import app.CncProgramPlayer;
-import Color;
-import Insets;
-import LayoutAxis;
-import LayoutStyle;
-import nativekit.ui.core.TextStyleOverride;
-import nativekit.ui.core.View;
-import nativekit.ui.theme.ThemeTokens;
-import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.collections.ListView;
-import nativekit.ui.widgets.collections.ListViewModel;
-import nativekit.ui.widgets.controls.Button;
-import nativekit.ui.widgets.controls.Slider;
-import nativekit.ui.widgets.layout.Column;
-import nativekit.ui.widgets.layout.Row;
-import nativekit.ui.widgets.scroll.ScrollController;
-import nativekit.ui.widgets.text.Text;
+import haxeon.ui.Color;
+import haxeon.ui.Insets;
+import haxeon.ui.LayoutAxis;
+import haxeon.ui.LayoutStyle;
+import haxeon.ui.core.TextStyleOverride;
+import haxeon.ui.core.View;
+import haxeon.ui.theme.ThemeTokens;
+import haxeon.ui.widgets.KeyedView;
+import haxeon.ui.widgets.collections.ListView;
+import haxeon.ui.widgets.collections.ListViewModel;
+import haxeon.ui.widgets.controls.Button;
+import haxeon.ui.widgets.controls.Slider;
+import haxeon.ui.widgets.layout.Column;
+import haxeon.ui.widgets.layout.Row;
+import haxeon.ui.widgets.scroll.ScrollController;
+import haxeon.ui.widgets.text.Text;
 
 /**
  * The CNC dock panel: the running program's G-code with the executing line marked and followed,

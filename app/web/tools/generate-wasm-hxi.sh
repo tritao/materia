@@ -6,9 +6,9 @@ haxeon_dir=${HAXEON_DIR:-"$materia_dir/haxeon"}
 mkdir -p "$1"
 output_dir=$(cd "$1" && pwd)
 generators=(
-	"nativekit/tools/audit-haxeon-abi.sh:nativekit.hxi:--output="
-	"nativekit/modules/gpu/tools/check-hxi.sh:nativekit-gpu.hxi"
-	"uikit/tools/check-hxi.sh:nativekit-ui.hxi"
+	"haxeon/packages/platform/tools/audit-haxeon-abi.sh:nativekit.hxi:--output="
+	"haxeon/packages/gpu/tools/check-hxi.sh:nativekit-gpu.hxi"
+	"haxeon/packages/ui/tools/check-hxi.sh:nativekit-ui.hxi"
 	"scenekit/scene/tools/check-hxi.sh:nativekit-scene.hxi"
 	"scenekit/scene_render/tools/check-hxi.sh:nativekit-scene-render.hxi"
 	"simkit/sim_core/tools/check-hxi.sh:nativekit-sim.hxi"

@@ -1,5 +1,5 @@
-import nativekit.ui.host.WindowIcon;
-import nativekit.ui.host.ApplicationIconSet;
+import haxeon.ui.host.WindowIcon;
+import haxeon.ui.host.ApplicationIconSet;
 import haxe.io.Bytes;
 
 /** Small vector drawing rasterized into the executable at startup. */

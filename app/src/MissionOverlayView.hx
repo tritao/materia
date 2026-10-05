@@ -1,8 +1,8 @@
 package app;
 
-import Canvas;
-import Color;
-import PathBuilder;
+import haxeon.ui.Canvas;
+import haxeon.ui.Color;
+import haxeon.ui.PathBuilder;
 import app.MissionPlayer.MissionOverlay;
 import robotkit.mobile.Pose2;
 import robotkit.navigation.Costmap2;

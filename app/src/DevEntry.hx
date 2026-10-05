@@ -1,6 +1,6 @@
 package app;
 
-import nativekit.ui.host.DesktopUiHostSession;
+import haxeon.ui.host.DesktopUiHostSession;
 
 /** Short-call entry points for a development host that owns the loaded module. */
 class DevEntry {

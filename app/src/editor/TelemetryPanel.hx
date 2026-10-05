@@ -2,19 +2,19 @@ package app.editor;
 
 import app.ApplicationPresentationSnapshot;
 import app.ApplicationSimulation;
-import Color;
-import Insets;
-import LayoutAxis;
-import LayoutStyle;
-import nativekit.ui.core.View;
-import nativekit.ui.plotting.PlotModel;
-import nativekit.ui.plotting.PlotPoint;
-import nativekit.ui.plotting.PlotSeries;
-import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.layout.Column;
-import nativekit.ui.widgets.plotting.PlotView;
-import nativekit.ui.widgets.text.Text;
-import nativekit.ui.core.TextStyleOverride;
+import haxeon.ui.Color;
+import haxeon.ui.Insets;
+import haxeon.ui.LayoutAxis;
+import haxeon.ui.LayoutStyle;
+import haxeon.ui.core.View;
+import haxeon.ui.plotting.PlotModel;
+import haxeon.ui.plotting.PlotPoint;
+import haxeon.ui.plotting.PlotSeries;
+import haxeon.ui.widgets.KeyedView;
+import haxeon.ui.widgets.layout.Column;
+import haxeon.ui.widgets.plotting.PlotView;
+import haxeon.ui.widgets.text.Text;
+import haxeon.ui.core.TextStyleOverride;
 
 /** Builds the telemetry dock panel around its retained plot model. */
 class TelemetryPanel {

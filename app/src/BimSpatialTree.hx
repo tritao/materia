@@ -5,12 +5,12 @@ import bimkit.BimSchema;
 import cadkit.parametric.Element;
 import cadkit.parametric.ElementId;
 import cadkit.parametric.TypedProperty;
-import nativekit.ui.core.View;
-import nativekit.ui.widgets.text.Text;
-import nativekit.ui.widgets.text.MiddleEllipsisText;
-import nativekit.ui.widgets.overlays.Tooltip;
-import nativekit.ui.widgets.collections.TreeRootMetadata;
-import nativekit.ui.widgets.collections.TreeViewModel;
+import haxeon.ui.core.View;
+import haxeon.ui.widgets.text.Text;
+import haxeon.ui.widgets.text.MiddleEllipsisText;
+import haxeon.ui.widgets.overlays.Tooltip;
+import haxeon.ui.widgets.collections.TreeRootMetadata;
+import haxeon.ui.widgets.collections.TreeViewModel;
 
 /** Editor tree projection over BIM aggregate, containment, and host relationships. */
 class BimSpatialTree implements TreeViewModel {

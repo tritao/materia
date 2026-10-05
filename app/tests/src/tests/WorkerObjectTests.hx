@@ -4,15 +4,15 @@ import app.EditorScene;
 import app.Main.ReferenceEditorApp;
 import app.SceneCodec;
 import app.WorkerObjectData;
-import nativekit.ui.properties.PropertyBinding;
-import nativekit.ui.properties.PropertyType;
-import nativekit.ui.properties.PropertyValue;
+import haxeon.ui.properties.PropertyBinding;
+import haxeon.ui.properties.PropertyType;
+import haxeon.ui.properties.PropertyValue;
 
 /** Document worker creation, inspection, persistence and undo. */
 class WorkerObjectTests {
   static function check(value:Bool, message:String):Void if (!value) throw message;
 
-  static function property(scene:EditorScene, label:String):nativekit.ui.properties.PropertyDescriptor {
+  static function property(scene:EditorScene, label:String):haxeon.ui.properties.PropertyDescriptor {
     for (descriptor in scene.properties()) if (descriptor.label == label) return descriptor;
     throw 'Missing worker property "$label"';
   }
@@ -67,7 +67,7 @@ class WorkerObjectTests {
         job:'{"version":1,"loop":false,"steps":[{"action":"pick","object":"'+targetId+'","hand":"left"},{"action":"wait","seconds":1}]}',
         zones:[targetId]});
       app.editor.HumanWorkerKind.selectStep(workerId, 1);
-      var action:Null<nativekit.ui.properties.PropertyDescriptor> = null;
+      var action:Null<haxeon.ui.properties.PropertyDescriptor> = null;
       for (field in app.scene.properties())
         if (StringTools.endsWith(field.id, "worker-step-1-action")) action = field;
       if (action == null) throw "Missing second worker step action";

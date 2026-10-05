@@ -3,7 +3,7 @@ package app.editor;
 import app.CadDocumentSession;
 import app.EditorScene;
 import app.SceneObjectData;
-import nativekit.ui.properties.PropertyDescriptor;
+import haxeon.ui.properties.PropertyDescriptor;
 
 /** Object-kind behavior consumed by creation, menus, inspection and picking. */
 interface ObjectKindProvider {

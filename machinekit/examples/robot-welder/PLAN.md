@@ -416,7 +416,7 @@ Done before W4, on the review of W0-W3. What was found and decided:
   `app/build/host/native`, which can change under a run. A plain `haxeon build --project app/haxeon.project-source.json
   --output=<wt>/app/build/host/project-source.hl` (no `--compiler-only`) builds them into `<wt>/app/build/host/native`
   (`app`, `kinematicskit-native`, `stockkit`; 207 MB, about 8 minutes on 20 cores, against the shared prebuilt OCCT via
-  `CADKIT_OCCT_DIR`). It needs the worktree's submodules for `animkit/native/vendor/*` and `uikit/vendor/*`
+  `CADKIT_OCCT_DIR`). It needs the worktree's submodules for `animkit/native/vendor/*` and `haxeon/packages/ui/vendor/*`
   (`git clone --shared --no-checkout <src> <wt>/<path>` and `git checkout <pinned sha>`; no network). After that
   `--compiler-only` rebuilds the test program in a minute, and the run takes
   `LD_LIBRARY_PATH=<wt>/haxeon/out:<wt>/haxeon/.tools/hashlink:<wt>/app/build/host/native/{app,kinematicskit-native,stockkit}:$OCCT/lib`.
