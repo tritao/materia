@@ -994,6 +994,11 @@ Dependencies:
 | W4 | Done (2026-10-04) | Whole CAD weldment: 10 seams / 680 mm in 4 runs; swept clearance and derived corner turns; 106.5 s on both backends, legs 4.9–5.1 mm; affected gates pass. Timing changes recorded above. |
 | W5 | Done (2026-10-04) | Seam-progress weave; CAD-derived pass recipes; deposited bead grounding and clearance; scene schema 16 rejects older versions; smaller restart hump. Woven 7 mm measures 6.998 mm, three-pass 10 mm measures 9.999 mm on both backends; all affected gates pass. |
 | W6 | Done (2026-10-04) | RKD6 numeric feedback and virtual welder; checked retrofit profile; Modbus map/adapter with independent ProcessKit owner; unchanged seam and all six shutdown cases pass. Full welder, arm, mobile and MachineKit smoke gates pass; phase one lands on local main. |
+| P1 | Implemented; milestone gates running (2026-10-05), branch only | Mobile welding carrier, insulated storage and converter service graph; CAD fit/mass checks and both-backend carrier movement pass. |
+| P2 | Open | Reach/clearance-derived station cover and ordered goTo/weld mission. |
+| P3 | Open | Executed touch searches and correction under injected parking error. |
+| P4 | Open | Measured load integration, voltage sag/cutoff and pre-seam docking/charging. |
+| P5 | Open; required | Rendered-depth laser profiler and executed live seam correction. |
 
 
 ### W6 latest-main retry: nonzero device start anchor blocks the mission
@@ -1315,3 +1320,67 @@ manufacturer claims or inferred battery mass from a solid enclosure. The focused
 12 checks covering capacity discovery, supply tracing through the inverter, losses, overload and
 invalid ratings. No native build was needed. P1 assembly integration and its gates remain open;
 the original example-local battery will be replaced rather than kept as a compatibility layer.
+
+
+### P1 mobile carrier implementation (2026-10-05)
+
+The carrier reuses the existing `RobotArm(false, new ArmWeldingTool())`. No RobotArm or ArmTool
+changes were needed. `MobileBaseLayout` provides instance plate dimensions, payload and battery
+positions; posts, caster seats and lidar placement follow the plate. The default base keeps its
+600 mm plate, 380 mm track and geometry; its previous example-local battery is removed in favour
+of `machinekit.power.BatteryPack`. Default pack capacity (480 Wh) and mass (5.148 kg) are explicit
+fixture assumptions; the mobile welder's 48 V-class, 25 kWh LFP envelope (1,000 x 600 x 180 mm,
+230 kg) and inverter envelope (600 x 400 x 300 mm, 45 kg) are engineering profile inputs,
+not vendor-verified hardware claims.
+
+The 10 kW inverter feeds the unchanged welding source's mains port. Separate isolated DC branches
+feed the arm and computer. The pack has no conductive connection to the chassis; the work lead
+ends at the clamp on the separate weldment. `replaceComponent` preserves a local member's mating
+and port interfaces, allowing the arm's standalone supply to be replaced by an isolated converter
+without editing the reusable arm. Supply voltage resolution uses the nearest electrical conversion
+output, while energy-source tracing traverses that conversion to the battery. Focused tests prove
+that a 48 V pack through a 24 V converter preserves the 24 V motor curve, and a rejected replacement
+does not mutate the assembly.
+
+The initial layout placed the battery too close to the wheels; actual posed-solid overlap caught
+it. Its forward edge now includes the wheel radius plus a 40 mm service gap. The equipment layout
+then derives a 2,450 x 820 mm platform. Tests verify the battery, power source, inverter, cylinder
+and computer converter are within the platform and intersect no other carried component.
+Total carried mass is **577.6 kg**, with no unaccounted component mass. Drive effort, wheel radius
+and that mass set **0.209 m/s²** acceleration, including a 20% effort reserve. The yaw acceleration
+uses the platform rectangle's mass-inertia approximation; this is an explicit conservative operating
+profile, not a claim of measured yaw inertia. The actual mounting envelopes and source dimensions
+remain CAD-derived.
+
+The mobile scene is `materia.mobile.project.json`, with a grounded weldment on an independent
+worktable. It has a torch, planar scanner and drive, but no generated welding mission until P2.
+The CAD-to-runtime bridge now distinguishes robot membership from dynamic/free ownership: it selects
+the declared mobile robot's kinematic subgraph and leaves joined stationary surroundings outside it.
+A genuinely dynamic joined part or a joint/coupling/network crossing the robot boundary still fails.
+Robot selection works on the flattened copy and does not mutate the source assembly. Grounded work
+hulls outside the robot follow their actual simulated object poses, using the same preview-centred
+body frame as those objects; hulls on robot links keep their existing path.
+
+Validation so far: 17 power checks and the existing PowerSupplyTests pass; default MobileBaseChecks
+pass; mobile equipment fit, mass, service graph, scene and bridge selection checks pass.
+`PROJECT_SOURCE_ONLY=mobile-welder` passes on deterministic and MuJoCo: **400 mm in 2 s**, with
+battery and power source following the chassis. App compilation passes (1,840 sources). The full
+fixed-welder regression gate is running once. Because shared app integration changed, arm and mobile
+regressions and the once-per-milestone MachineKit smoke remain pending before P1's guarded main sync.
+The captured-local IR bug was avoided by using direct expressions in the inherited track-width
+method; no haxeon checkout or pin was changed.
+
+P1 gate progress: the MuJoCo whole-weldment case passes unchanged at 106.5 s, 680 mm,
+legs 4.9–5.1 mm, tip within 0.1 mm and no clearance violation. The full welder gate remains
+live; deterministic and recovery cases must finish before the arm/mobile/smoke sequence and sync.
+
+P1 commits so far (since the W6 landing):
+
+- `8d26c6e57080feee474ca1ba149e5e851bcfb785` MachineKit: model mobile battery storage and inverter conversion
+- `b995b593bbb91fb49bc07c724bb2f6dd4c328eae` MachineKit: support an isolated DC supply in reusable assemblies
+- `b5e4a8f6fdd86fd7ddf8cd52be4efe9a8b7ec3c2` MachineKit: resolve driver voltage at the nearest conversion output
+- `4f8c7ecaa2e3d06286dc7c7970e2db445a6c3f8a` MachineKit: derive mobile platform geometry from its payload layout
+- `1e5e320b060116a299e0cc3708c1dc99e5e98b63` CadBridge: select mobile robot membership separately from free parts
+- `8b5b827ccb1315e2b610a5ba25f165ff13fd720f` App: ground external weldments through their live object poses
+- `6d48e10bbc8afd77751ebb91e6824925e88eed0f` MachineKit: assemble the battery-powered mobile welding carrier
+- `60d00e14721c5fb70f132058fa61b1b94771803f` App: verify the mobile welding carrier on both simulation backends
