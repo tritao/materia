@@ -2211,3 +2211,15 @@ assertions: complete refined probing still succeeds, three six-axis sensing bran
 positive bounded speeds, the prismatic deadline/brake travel fits its reserve, longer reaction
 reduces speed, larger calibration permits more speed, and absent/insufficient wire calibration
 fails. Production validation with derived speed remains pending.
+
+The calibrated-speed production retry completed the second face’s first coarse and fine
+touches (eight touch episodes total), then rejected the next approach with a blocked joint
+route endpoint. The preceding retreat preserved the measured contact rotation rather than
+the checked air configuration. Probe preparation now reserves IK position tolerance plus
+wire extent times angular tolerance beyond its minimum air offset. Retreat first withdraws
+linearly at the measured orientation, then restores the original checked joint goal through
+a collision-checked correction; its final endpoint must satisfy full air clearance. This
+keeps rotation away from contact and preserves the proved branch for the next probe. Named
+start/goal clearance failures replace the generic endpoint message. Focused native tests
+pass 92 assertions, including exact restoration of all six joints on three probe normals.
+Production registration remains pending; main has not been advanced.

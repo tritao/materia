@@ -53,8 +53,8 @@ class ContactSearchMotionTests {
         "Candidate screening excludes unreachable torch orientations before pattern selection");
       var preparedProbe = new processkit.ProbePosePlanner(probePlanner).prepare(new Vec3(0, 0, -0.02),
         new Vec3(0, 0, -1), 0.02, [0.0], WeldArcModel.TOUCH_TOLERANCE, 0.003, 1);
-      check(Math.abs(preparedProbe.approach.translation.z + 0.043) < 1e-9 &&
-        Math.abs(preparedProbe.distance - 0.043) < 1e-9, "Prepared search covers both signs of normal uncertainty in metres");
+      check(Math.abs(preparedProbe.approach.translation.z + 0.043 + probePlanner.airPoseReserve) < 1e-9 &&
+        Math.abs(preparedProbe.distance - 0.043 - probePlanner.airPoseReserve) < 1e-9, "Prepared search covers both signs of uncertainty and the IK air-clearance reserve in metres");
       check(preparedProbe.approachJoints != null, "Preparation retains the checked sensing configuration");
       var locked = probePlanner.approachJoints(cast preparedProbe.approachJoints, [0.0]);
       check(arm.tcpPose(locked.endJoints).translation.sub(preparedProbe.approach.translation).norm() < 0.0001,
@@ -262,6 +262,10 @@ class ContactSearchMotionTests {
       var move = prepared.motion.approachJoints(cast request.approachJoints, start);
       check(fixture.arm.tcpPose(move.endJoints).translation.sub(request.approach.translation).norm() < 0.0001,
         "Six-axis checked approach reaches the prepared uncertain contact pose");
+      var near = move.endJoints.copy(); near[0] += 0.001;
+      var returned = prepared.motion.retreat(request.approach, near, 0.01, move.endJoints);
+      for (joint in 0...move.endJoints.length) check(Math.abs(returned.endJoints[joint] - move.endJoints[joint]) < 1e-8,
+        "Retreat restores the original checked joint configuration after Cartesian withdrawal");
     }
   }
   static function resetEpochs():Void {

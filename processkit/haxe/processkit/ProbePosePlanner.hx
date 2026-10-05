@@ -36,7 +36,7 @@ class ProbePosePlanner {
         !Math.isFinite(normalTravel) || normalTravel < 0 || start == null || start.length != motion.arm.group.count())
       throw "Probe candidate screening needs a unit normal, observed joints and finite search bounds";
     var current = motion.arm.tcpPose(start).rotation;
-    var at = point.add(outward.scale(normalTravel + 0.003));
+    var at = point.add(outward.scale(normalTravel + 0.003 + motion.airPoseReserve));
     for (rotation in orientations(outward, current, 16)) {
       var target = pose(new Transform3(at, rotation));
       var q = motion.compiler.solver.solvePose(target, start, motion.compiler.ikTolerance);
@@ -56,8 +56,8 @@ class ProbePosePlanner {
       throw "Probe pose preparation needs a unit plane normal, observed joints and finite search bounds";
     var current = motion.arm.tcpPose(start).rotation;
     var candidates = orientations(outward, current, rolls);
-    var approachPoint = point.add(outward.scale(normalTravel + airMargin));
-    var distance = 2 * normalTravel + airMargin;
+    var approachPoint = point.add(outward.scale(normalTravel + airMargin + motion.airPoseReserve));
+    var distance = 2 * normalTravel + airMargin + motion.airPoseReserve;
     var reasons:Array<String> = [];
     for (pass in 0...2) for (rotation in candidates) {
       try {

@@ -56,6 +56,7 @@ class ContactProbeRunner {
   var handoffAt:Int64 = Int64.ofInt(0);
   final mappings:Null<robotkit.time.ClockMappings>;
   var sourceClock:String = "";
+  var approachGoal:Null<Array<Float>> = null;
 
   public function new(motion:ManipulatorMotion, planner:ProbeMotionPlanner, channels:WelderChannels,
       sensor:String, makeServo:Void -> ServoSession, ?mappings:robotkit.time.ClockMappings) {
@@ -92,6 +93,7 @@ class ContactProbeRunner {
         throw "Prepared probe joint goal does not match its TCP approach";
       if (!planner.corridorReachable(move.endJoints, request.direction, request.distance))
         throw "Probe sensing corridor leaves the executed IK branch";
+      approachGoal = move.endJoints.copy();
       // These records precede every movement; stop policy also keeps them safe through servo ownership.
       var ops:Array<MotionOp> = [MotionOp.SetOutput(channels.wireSpeed, EventValue.Analog(0.0)),
         MotionOp.SetOutput(channels.arc, EventValue.Digital(false))];
@@ -177,7 +179,7 @@ class ContactProbeRunner {
             motion.run(move.program); phase = Backoff;
           } else {
             contact = measured;
-            var move = planner.line(new Transform3(requested.approach.translation, current.rotation), q, requested.coarseSpeed, true);
+            var move = planner.retreat(requested.approach, q, requested.coarseSpeed, cast approachGoal);
             motion.run(move.program); phase = Retreat;
           }
         case Idle | Done | Failed:

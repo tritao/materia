@@ -33,6 +33,7 @@ class ProbeMotionPlanner {
   public final compiler:ProgramCompiler;
   public final clearance:Null<ArmClearance>;
   public final wireClearance:Null<ProbeWireClearance>;
+  public final airPoseReserve:Float;
   final interval:Float;
   final jointStep:Float;
 
@@ -42,6 +43,9 @@ class ProbeMotionPlanner {
       throw "Probe motion planning needs matching arm kinematics and compiler";
     this.arm = arm; this.compiler = compiler; this.clearance = clearance;
     this.wireClearance = wireClearance;
+    var zero = [for (_ in 0...arm.group.count()) 0.0];
+    airPoseReserve = compiler.ikTolerance.position + (wireClearance == null ? 0.0
+      : wireClearance.extentFrom(zero, arm.tcpPose(zero).translation) * compiler.ikTolerance.orientation);
     var period = Math.POSITIVE_INFINITY, smallest = Math.POSITIVE_INFINITY;
     for (joint in 0...arm.group.count()) {
       var step = arm.robot.joints[arm.jointIndices()[joint]].type == JointType.Prismatic ? 0.001 : 0.02;
@@ -140,9 +144,13 @@ class ProbeMotionPlanner {
   function approachCandidates(goals:Array<Array<Float>>, start:Array<Float>, proposals:Int):CheckedProbeMove {
     var lower = [for (i in 0...arm.group.count()) arm.group.limitsOf(i).lower];
     var upper = [for (i in 0...arm.group.count()) arm.group.limitsOf(i).upper];
+    var initialHit = violation(start);
+    if (initialHit != null) throw 'Probe approach start is blocked: ${initialHit.a} against ${initialHit.b}, clearance ${initialHit.distance} m (required ${initialHit.required} m)';
     var reasons:Array<String> = [];
     for (goal in goals) {
       try {
+        var goalHit = violation(goal);
+        if (goalHit != null) throw 'Probe approach goal is blocked: ${goalHit.a} against ${goalHit.b}, clearance ${goalHit.distance} m (required ${goalHit.required} m)';
         var route = JointRoute.plan(start, goal, lower, upper, edge, proposals);
         var ops:Array<MotionOp> = [for (i in 1...route.length)
           MotionOp.MoveJ(MoveTarget.JointTarget(route[i]), new MotionOptions(), Blend.ExactStop)];
@@ -276,6 +284,23 @@ class ProbeMotionPlanner {
       last = q;
     }
     return null;
+  }
+
+  /** Withdraw without rotating near contact, then restore the original proved air configuration. */
+  public function retreat(target:Transform3, start:Array<Float>, speed:Float, goal:Array<Float>):CheckedProbeMove {
+    if (target == null || goal == null || goal.length != arm.group.count()) throw "Probe retreat needs its checked air goal";
+    var withdrawn = line(new Transform3(target.translation, arm.tcpPose(start).rotation), start, speed, true);
+    var correction = false;
+    for (joint in 0...goal.length) if (Math.abs(withdrawn.endJoints[joint] - goal[joint]) > 1e-8) correction = true;
+    var checked = withdrawn;
+    if (correction) {
+      var program = new MotionProgram(withdrawn.program.ops.concat([
+        MotionOp.MoveJ(MoveTarget.JointTarget(goal.copy()), new MotionOptions(), Blend.ExactStop)]));
+      checked = new CheckedProbeMove(program, inspect(program, start, true));
+    }
+    var hit = violation(checked.endJoints);
+    if (hit != null) throw 'Probe retreat cannot restore air clearance: ${hit.a} against ${hit.b}, clearance ${hit.distance} m (required ${hit.required} m)';
+    return checked;
   }
 
   /** Straight air motion leaves/refines an already measured contact, with the tool contact margin when requested. */
