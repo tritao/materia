@@ -107,10 +107,25 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	extern fn nksim_frame_get_body_state(frame: nksim_frame, body: nksim_body, out_state: ptr<nksim_body_state> @inout) -> nksim_result;
 	extern fn nksim_frame_get_clock(frame: nksim_frame, out_clock: ptr<nksim_clock> @inout) -> nksim_result;
 	extern fn nksim_frame_get_object_pose(frame: nksim_frame, object: nksim_object, out_pose: ptr<nksim_pose> @inout) -> nksim_result;
+	/**
+	 * Attach one spring-applied brake to a one-DOF joint. Effort is N m for a
+	 * rotary joint or N for a prismatic joint; delays are seconds. The brake starts
+	 * applied and adds passive dry friction independently of motor targets.
+	 * Backends without physical friction return NKSIM_ERROR_UNSUPPORTED.
+	 */
+	extern fn nksim_joint_configure_brake(world: nksim_world, joint: nksim_joint, holding_effort: f64, release_delay: f64, application_delay: f64) -> nksim_result;
 	extern fn nksim_joint_couple(world: nksim_world, desc: ptr<const<nksim_joint_coupling_desc>>) -> nksim_result;
 	extern fn nksim_joint_create(world: nksim_world, desc: ptr<const<nksim_joint_desc>>, out_joint: ptr<nksim_joint> @out) -> nksim_result;
 	extern fn nksim_joint_destroy(world: nksim_world, joint: nksim_joint) -> void;
+	/**
+	 * Physical released contact after the simulated mechanical delay.
+	 */
+	extern fn nksim_joint_get_brake_released(world: nksim_world, joint: nksim_joint, out_released: ptr<u32> @out) -> nksim_result;
 	extern fn nksim_joint_get_state(world: nksim_world, joint: nksim_joint, out_state: ptr<nksim_joint_state> @inout) -> nksim_result;
+	/**
+	 * Digital release coil; zero de-energizes, one energizes.
+	 */
+	extern fn nksim_joint_set_brake_release(world: nksim_world, joint: nksim_joint, energized: u32) -> nksim_result;
 	/**
 	 * Places a one-DOF joint at a position and velocity, moving the bodies it
 	 * carries, as a pose to start from; it is not a target. Coupled followers are
@@ -437,11 +452,8 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		 */
 		max_force: f64 @offset(104);
 		/**
-		 * Joint-frame orientation relative to body_a/body_b (x, y, z, w),
-		 * appended after the original fields so an old struct prefix remains
-		 * valid. A struct_size that ends before rotation_b means the
-		 * caller predates these fields; backends must treat them as identity
-		 * rather than reading past the caller's actual struct.
+		 * Joint-frame orientation relative to body_a/body_b (x, y, z, w).
+		 * The complete current descriptor is required.
 		 */
 		rotation_a: array<f64, 4> @offset(112);
 		rotation_b: array<f64, 4> @offset(144);

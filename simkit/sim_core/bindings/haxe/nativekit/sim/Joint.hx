@@ -46,6 +46,29 @@ class Joint {
         world.stageJointTarget(this, JointTargetMode.Effort, target, maxForce);
     }
 
+    /** Configures passive spring-applied friction and physical contact delays, in SI units. */
+    public function configureBrake(holdingEffort:Float, releaseDelay:Float, applicationDelay:Float):Void {
+        ensureLive();
+        var result = NativeKitSim.nksim_joint_configure_brake(world.nativeHandle(), value,
+            holdingEffort, releaseDelay, applicationDelay);
+        SimWorld.check(result, "joint.configureBrake");
+    }
+
+    /** Writes the digital release coil; physical contact changes after its configured delay. */
+    public function setBrakeRelease(energized:Bool):Void {
+        ensureLive();
+        var result = NativeKitSim.nksim_joint_set_brake_release(world.nativeHandle(), value, energized ? 1 : 0);
+        SimWorld.check(result, "joint.setBrakeRelease");
+    }
+
+    /** Reads the physical released contact, independently of the coil command. */
+    public function brakeReleased():Bool {
+        ensureLive();
+        var result = NativeKitSim.nksim_joint_get_brake_released(world.nativeHandle(), value);
+        SimWorld.check(result.status, "joint.brakeReleased");
+        return result.out_released != 0;
+    }
+
     public function dispose():Void {
         if (disposed)
             return;

@@ -12,7 +12,7 @@ current format, and remove obsolete paths. Reference hardware data remains expli
 | R3 | Physical Z brake and fault sequencing; full downstream inertia feedforward | in progress: inertia and brake physics verified; assembly/controller integration remains | `6e94de72f`, `ea48834a8`, `f38740676` |
 | R4 | Swept clearance for joint moves; assembled limits; independent geometry/mass/speed checks | in progress: joint-plan clearance and environment objects implemented | `4fc64fbee`, `8b22593be` |
 | R5 | Per-joint servo interpolation; consistent slip; typed channel faults; cached coupling setup; qualified channels and two-mill check | done | `dd0c14091` |
-| R6 | Rail support/load paths, bearing walls, cabinet mounts and material assumptions; remaining diagnostics and dead code | implemented: supports, paired guides and load admission verified; closing gate pending | `20f0d3e16` |
+| R6 | Rail support/load paths, bearing walls, cabinet mounts and material assumptions; remaining diagnostics and dead code | implemented: supports, paired guides and load admission verified; closing gate pending | `20f0d3e16`, `56923ba3e` |
 
 ## Verification
 
@@ -135,7 +135,7 @@ The implementation and verification below track these requirements.
 - The standalone native state test passes with warnings treated as errors. It covers delayed release, delayed application, cancelled release, interrupted application, zero-delay devices and invalid values. The test is registered in CMake with assertions enabled in Release.
 - Native SimKit APIs now configure one brake per joint, set its digital release coil and read its physical released contact. MuJoCo advances contact state each physics substep and adds bounded dry-friction effort to the joint's existing friction, independently of motor targets. The kinematic test backend reports this physical capability as unsupported.
 - The rebuilt complete MuJoCo native suite passes, including unpowered gravity holding, delayed release/application and slipping with insufficient capacity. SimCore and its C API tests pass. All changed translation units pass syntax checks with production flags, and the state test passes with exceptions disabled. NativeKit's no-exceptions policy required replacing the initial throwing constructor with a checked factory and explicit failure returns. These native checks verify `f38740676`; the preceding app gate used the earlier libraries without brake bindings.
-- Typed assembly/blueprint bindings, generated Haxe APIs, the physical brake part, runtime release interlocks and stop/fault/reset checks are still required. The state test alone does not prove the complete brake behavior.
+- The regenerated portable SimKit interface and typed Joint brake methods pass the Haxeon compile check, with all three methods reachable from the compile fixture. Typed assembly/blueprint bindings, the physical brake part, runtime release interlocks and stop/fault/reset checks are still required. The state test alone does not prove the complete brake behavior.
 
 ## R6 paired guides in progress
 
