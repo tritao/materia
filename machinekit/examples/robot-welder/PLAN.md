@@ -2292,3 +2292,30 @@ preview.hl failure. Disk recovered to 6.3 GB free. Local main advanced independe
 111384a5f4e06d1be1e6412e74b19c12f0718c90; merge only local main before final gates and adapt
 the registration bridge to its shared PlanningLimits APIs. No main sync is authorized by
 these partial results.
+
+### P3 latest-main build stop (2026-10-05)
+
+Merged local main 111384a5f4e06d1be1e6412e74b19c12f0718c90 as c116f20a4, then its
+follow-up 213d24ef9235f0e9bdb19e3345222e48bb2e74c9 (extracted platform/GPU package
+descriptors). Three conflicts preserve endpoint-owned source-clock observation/reset epochs
+alongside main’s endpoint snapshots, drive-coordinate calibration and simulation homing
+reset operations. Endpoint-only observations update the same clock owner as full snapshots.
+No RobotArm or RobotRuntime source edit was made for the merge. Existing submodule working
+checkouts were aligned to main’s recorded commits, fetching missing objects into this
+worktree’s clones; no recorded pins were edited and no shared checkout was modified.
+
+The compiler-only app check on these recorded Haxeon/NativeKit sources fails outside the
+welder code with the exact error:
+robotkit/transport/NativeTransport.hx:72:18: E1008: Function
+"nativekit.ffi.NativeKit.nk_transport_receive" expects 2 arguments, got 3.
+The compiler loads the tracked nativekit/bindings/haxe/nativekit.hxi; its data parameter
+is an input array whose size is projected away. NativeTransport still supplies buffer and
+capacity separately, and the unchanged call is present on current main. This is not a disk
+error or a missing local object. Log: ignored app/build/p3-latest-main-app-build.log.
+Per the user’s outside-scope stop rule, do not repair unrelated RobotKit transport here.
+
+P3 is not complete and mobile-welder has not advanced main. Latest focused native result
+(94 assertions) and the earlier two-backend injected-registration pass apply before this
+main merge; no latest-main runtime pass is claimed. Full-mission, 20 mm/2-degree executed
+boundary and final welder/arm/mobile/MachineKit gates remain pending. P4/P5 remain open.
+All production trials are stopped; no heavy check is left running.
