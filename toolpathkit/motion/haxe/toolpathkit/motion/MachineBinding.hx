@@ -4,6 +4,7 @@ import toolpathkit.setup.TravelEnvelope;
 
 /** Machine axes and execution limits, independent of a G-code controller. */
 class MachineBinding {
+  public final channels:ToolpathChannels;
   public final frameId:String;
   public final xAxisId:String;
   public final yAxisId:String;
@@ -15,7 +16,7 @@ class MachineBinding {
   public var travel(default, null):Null<TravelEnvelope> = null;
 
   public function new(frameId:String, xAxisId:String, yAxisId:String,
-      zAxisId:String, rapidSpeed:Float,
+      zAxisId:String, rapidSpeed:Float, channels:ToolpathChannels,
       positionTolerance:Float = 0.0005,
       orientationTolerance:Float = 0.02,
       maxBlendTurnAngleRadians:Float = Math.PI * 5.0 / 6.0) {
@@ -30,6 +31,8 @@ class MachineBinding {
         !Math.isFinite(maxBlendTurnAngleRadians) ||
         maxBlendTurnAngleRadians <= 0.0 || maxBlendTurnAngleRadians >= Math.PI)
       throw "machine binding needs positive speed and tolerances";
+    if (channels == null) throw "machine binding needs its controller channels";
+    this.channels = channels;
     this.frameId = frameId; this.xAxisId = xAxisId; this.yAxisId = yAxisId;
     this.zAxisId = zAxisId; this.rapidSpeed = rapidSpeed;
     this.positionTolerance = positionTolerance;

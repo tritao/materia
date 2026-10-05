@@ -52,10 +52,10 @@ class RobotRuntimeCompiler {
       var drive = actuator.drive;
       var pneumatic = drive == null ? null : drive.pneumatic();
       if (pneumatic != null) {
-        // A single-solenoid gripper needs its energized coil through an ordinary
-        // program stop. An emergency stop still de-energizes every channel.
-        ensureDigitalChannel(result, pneumatic.channelA, pneumatic.channelB == null);
-        if (pneumatic.channelB != null) ensureDigitalChannel(result, pneumatic.channelB, false);
+        // An ordinary program stop preserves pneumatic outputs. Emergency stops
+        // and faults de-energize coils; the simulated valve owns its latch state.
+        ensureDigitalChannel(result, pneumatic.channelA, true);
+        if (pneumatic.channelB != null) ensureDigitalChannel(result, pneumatic.channelB, true);
       }
       var processVelocity = actuator.processVelocity;
       if (processVelocity != null) {

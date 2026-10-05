@@ -135,9 +135,15 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	const RK_FAULT_COMMAND_EXPIRED = 7;
 	const RK_FAULT_DUAL_DRIVE_SKEW = 5;
 	/**
-	 * A velocity target outlived its command's expires_at_ns; the joint brakes to zero.
+	 * A drive failed to reach its geometry trip switch.
 	 */
 	const RK_FAULT_LIMIT_SWITCH = 8;
+	/** A required process input is absent. */
+	const RK_FAULT_PROCESS_CHANNEL_MISSING = 9;
+	/** A process input has the wrong value type. */
+	const RK_FAULT_PROCESS_CHANNEL_TYPE = 10;
+	/** A process input carries an invalid value. */
+	const RK_FAULT_PROCESS_CHANNEL_VALUE = 11;
 	const RK_FAULT_QUEUE_REVISION_MISMATCH = 6;
 	const RK_FAULT_RAMP_LIMIT = 3;
 	const RK_FAULT_TRAJECTORY_UNDERFLOW = 2;
@@ -856,7 +862,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		 */
 		following_error_bound: array<f64, 64> @offset(209864);
 		/**
-		 * < Zero selects the 10 ms default; versioned by struct_size.
+		 * < Zero selects the 10 ms default.
 		 */
 		owner_period_ns: u64 @offset(210376);
 		/**
@@ -864,7 +870,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		 */
 		serial_processing_allowance_ns: u64 @offset(210384);
 		/**
-		 * < Versioned: absent means no process channels.
+		 * < Number of declared process channels.
 		 */
 		channel_count: u32 @offset(210392);
 		channels: array<rk_channel_declaration, 32> @offset(210400);
@@ -874,11 +880,11 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		coupling_count: u32 @offset(214752);
 		couplings: array<rk_robot_joint_coupling, 512> @offset(214760);
 		/**
-		 * Versioned: absent means no passive dynamics. Indexed by joint.
+		 * Passive dynamics, indexed by joint; zero disables each contribution.
 		 */
 		joint_dynamics: array<rk_robot_joint_dynamics, 512> @offset(227048);
 		/**
-		 * Versioned: how far, in joint units, an observed position may pass a
+		 * How far, in joint units, an observed position may pass a
 		 * joint limit before the runtime faults. Zero keeps limits exact. A robot
 		 * that rests on its mechanical stops, such as a legged robot on its knee
 		 * stops, needs room for a simulator's or joint's compliant stops.
@@ -886,7 +892,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		 */
 		observed_limit_tolerance: f64 @offset(268008);
 		/**
-		 * Versioned: per-joint overtravel in joint units, indexed by joint: how
+		 * Per-joint overtravel in joint units, indexed by joint: how
 		 * far a joint can travel past its position limits before it meets its end
 		 * stop, as a machine's limit switch sits beyond its soft limit. Commands
 		 * must still lie within the limits; the runtime faults only when an
@@ -896,7 +902,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		 */
 		joint_overtravel: array<f64, 512> @offset(268016);
 		/**
-		 * Versioned: absent means no servo motor joints. Indexed by joint.
+		 * Servo gains, indexed by joint; zero disables position-loop interpolation.
 		 */
 		joint_servo: array<rk_robot_joint_servo, 512> @offset(272112);
 		/**
@@ -908,11 +914,19 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		 */
 		coupling_stiffness: array<f64, 512> @offset(284400);
 		/**
+<<<<<<< HEAD
 		 * Versioned command ownership: process joints accept no host or trajectory targets.
 		 */
 		process_joint: array<u32, 512> @offset(288496);
 		/**
 		 * Versioned metadata for joint switches and speed sensors; ordinary sensor slots use UINT32_MAX.
+=======
+		 * Versioned command ownership: process joints accept no host or trajectory targets.
+		 */
+		process_joint: array<u32, 512> @offset(288496);
+		/**
+		 * Versioned metadata for joint switches and speed sensors; ordinary sensor slots use UINT32_MAX.
+>>>>>>> 0c733751b (Scope drive references and remove legacy runtime paths (machine tending MT5b))
 		 */
 		sensor_joint: array<u32, 8> @offset(290544);
 		sensor_window_lower: array<f64, 8> @offset(290576);

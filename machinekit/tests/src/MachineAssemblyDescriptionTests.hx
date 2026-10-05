@@ -290,8 +290,16 @@ class MachineAssemblyDescriptionTests {
 		if (motors == null || motors.length != 1 || motors[0].actuator != "mill/spindle")
 			throw "A nested rebuild dropped its spindle motor";
 		var binding = motors[0].processVelocity;
-		if (binding == null || binding.speedChannel != "spindle.speed")
+		if (binding == null || binding.speedChannel != "mill/spindle.speed")
 			throw "A nested rebuild dropped its spindle velocity drive";
+		var two = new MachineAssembly();
+		two.include("first", spindle); two.include("second", spindle);
+		var pair = MachineAssembly.decode(two.encode()).describe().machine.motors;
+		if (pair == null || pair.length != 2) throw "Two included mills lost their motors";
+		var firstDrive = pair[0].processVelocity, secondDrive = pair[1].processVelocity;
+		if (firstDrive == null || secondDrive == null || firstDrive.speedChannel != "first/spindle.speed" ||
+			secondDrive.speedChannel != "second/spindle.speed" || firstDrive.directionChannel == secondDrive.directionChannel)
+			throw "Two included mills lost their distinct process channels";
 		var document = new Document();
 		var root = MachineAssemblyDocuments.defineAssembly(document, outer);
 		var reopened = DocumentCodec.decode(DocumentCodec.encode(document), false, false);

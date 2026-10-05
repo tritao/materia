@@ -11,6 +11,7 @@
 #include <cmath>
 #include <cstdint>
 #include <memory>
+#include <map>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -827,27 +828,11 @@ public:
         if (!model || !data || !std::isfinite(dt) || dt <= 0.0 || substeps == 0)
             return NKSIM_ERROR_INVALID_ARGUMENT;
         model->opt.timestep = dt / static_cast<double>(substeps);
-        // MuJoCo solref uses mass-normalised stiffness. Derive its time constant
-        // from the follower inertia and transmission stiffness, never below 2 dt.
-        for (const auto &coupling : couplings) {
-            double compliance = 0.0;
-            bool specified = true;
-            for (const auto &term : couplings) if (term.follower == coupling.follower) {
-                if (term.stiffness > 0.0) compliance += 1.0 / term.stiffness;
-                else specified = false;
-            }
-            if (!specified || compliance <= 0.0) continue;
-            const auto &follower = joints.at(coupling.follower);
-            const int jid = model_joint_id(follower);
-            const std::string name = "nksim_drive_coupling_" + std::to_string(coupling.follower);
-            const int equality = mj_name2id(model, mjOBJ_EQUALITY, name.c_str());
-            if (jid < 0 || equality < 0) continue;
-            const int dof = model->jnt_dofadr[jid];
-            const double inverse_inertia = model->dof_invweight0[dof];
-            if (!(inverse_inertia > 0.0)) continue;
-            model->eq_solref[2 * equality] = std::max(2.0 * model->opt.timestep,
-                std::sqrt(compliance / inverse_inertia));
-            model->eq_solref[2 * equality + 1] = 1.0;
+        // Topology owns the physical response; only the integration floor changes here.
+        for (const auto &response : coupling_responses) {
+            model->eq_solref[2 * response.first] =
+                std::max(2.0 * model->opt.timestep, response.second);
+            model->eq_solref[2 * response.first + 1] = 1.0;
         }
         const auto drives = kinematic_drives();
         for (std::uint32_t index = 0; index < substeps; ++index) {
@@ -1344,7 +1329,30 @@ private:
         derived_stale = false;
         apply_joint_targets();
         mj_forward(model, data);
+        rebuild_coupling_responses();
         return NKSIM_OK;
+    }
+
+    // MuJoCo's mass-normalised equality response follows transmission compliance
+    // and follower inertia. Resolve names and combine terms once per model rebuild.
+    void rebuild_coupling_responses() {
+        coupling_responses.clear();
+        std::map<std::uint64_t, std::pair<double, bool>> responses;
+        for (const auto &term : couplings) {
+            auto [entry, inserted] = responses.try_emplace(term.follower, 0.0, true);
+            if (term.stiffness > 0.0) entry->second.first += 1.0 / term.stiffness;
+            else entry->second.second = false;
+        }
+        for (const auto &[follower_id, response] : responses) {
+            if (!response.second || response.first <= 0.0) continue;
+            const int jid = model_joint_id(joints.at(follower_id));
+            const std::string name = "nksim_drive_coupling_" + std::to_string(follower_id);
+            const int equality = mj_name2id(model, mjOBJ_EQUALITY, name.c_str());
+            if (jid < 0 || equality < 0) continue;
+            const double inverse_inertia = model->dof_invweight0[model->jnt_dofadr[jid]];
+            if (inverse_inertia > 0.0)
+                coupling_responses.emplace_back(equality, std::sqrt(response.first / inverse_inertia));
+        }
     }
 
     // F2: a single motor actuator per non-fixed joint. apply_joint_targets
@@ -2080,6 +2088,7 @@ private:
         return false;
     }
     std::vector<nksim::BackendJointCoupling> couplings;
+    std::vector<std::pair<int, double>> coupling_responses;
     std::vector<nksim::BackendClosure> closures;
     std::unordered_map<std::uint64_t, mjsBody *> rebuild_bodies;
     std::unordered_map<std::uint64_t, BodyRecord> saved_bodies;

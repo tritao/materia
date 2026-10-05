@@ -626,8 +626,8 @@ class DriveSystem {
 		var copy:MotorRecord = {actuator: map(motor.actuator), joint: map(motor.joint), motor: map(motor.motor),
 			driver: map(motor.driver), margin: motor.margin, gearbox: motor.gearbox == null ? null : map(motor.gearbox)};
 		var process = motor.processVelocity;
-		if (process != null) copy.processVelocity = {speedChannel: process.speedChannel,
-			directionChannel: process.directionChannel, radiansPerSpeedUnit: process.radiansPerSpeedUnit};
+		if (process != null) copy.processVelocity = {speedChannel: map(process.speedChannel),
+			directionChannel: map(process.directionChannel), radiansPerSpeedUnit: process.radiansPerSpeedUnit};
 		return copy;
 	}
 

@@ -2069,6 +2069,10 @@ class ProjectSourceTests {
       if (stock == null) throw "Mill has no stock";
       var removal = (Math.PI * (121 * 7 + 2 * 25 * 5) + (96 - (4 - Math.PI) * 12.25) * 3) / 1e9;
       var deviation = stock.deviation();
+      check(player.atSpeedSensorId != null, "mill waits for physical spindle readiness feedback");
+      check(player.axisTrackingPeak.length == 3, "mill reports all three tracking errors");
+      for (error in player.axisTrackingPeak)
+        check(Math.isFinite(error) && error < 0.00015, "mill servo peak tracking stays below 0.15 mm through the complete job");
       Sys.println('bench mill tracking at 10 ms (axis order x,y,z), peak mm: ' +
         [for (error in player.axisTrackingPeak) error * 1000].join(", "));
       Sys.println('bench mill measurement: ${simulation.activeSession().simulationTime()} s, ${stock.removed * 1e9}/${removal * 1e9} mm³, ' +

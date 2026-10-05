@@ -1,6 +1,7 @@
 #include "runtime_trajectory_fixtures.hpp"
 // This test uses assert for setup calls; keep them active in Release builds.
 #include "robotkit_runtime.hpp"
+#include "../src/process_channels.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -15,6 +16,30 @@
 #include <vector>
 
 namespace {
+
+void process_channel_reads_are_typed() {
+    const robotkit::ProcessChannelReader reader([](const char *channel, rk_event_value &value) {
+        if (std::strcmp(channel, "missing") == 0) return RK_ERROR_INVALID_ARGUMENT;
+        value.kind = std::strcmp(channel, "coil") == 0 ? RK_EVENT_DIGITAL : RK_EVENT_ANALOG;
+        value.digital = 1;
+        value.analog = std::strcmp(channel, "invalid") == 0 ? std::nan("") : 3000.0;
+        return RK_OK;
+    });
+    const auto coil = reader.digital("coil");
+    assert(!coil.fault && coil.value);
+    const auto speed = reader.analog("speed");
+    assert(!speed.fault && speed.value == 3000.0);
+    const auto missing = reader.digital("missing");
+    assert(missing.fault && missing.fault->reason == robotkit::ProcessChannelFault::Reason::Missing &&
+           missing.fault->channel == "missing" && missing.fault->source_result == RK_ERROR_INVALID_ARGUMENT &&
+           missing.fault->code() == RK_FAULT_PROCESS_CHANNEL_MISSING);
+    const auto wrong = reader.analog("coil");
+    assert(wrong.fault && wrong.fault->reason == robotkit::ProcessChannelFault::Reason::Type &&
+           wrong.fault->code() == RK_FAULT_PROCESS_CHANNEL_TYPE);
+    const auto invalid = reader.analog("invalid");
+    assert(invalid.fault && invalid.fault->reason == robotkit::ProcessChannelFault::Reason::Value &&
+           invalid.fault->code() == RK_FAULT_PROCESS_CHANNEL_VALUE);
+}
 
 class FaultEndpoint final : public robotkit::RobotEndpoint {
 public:
@@ -354,6 +379,51 @@ void unsupported_trajectory_queue_is_rejected(const rk_robot_runtime_blueprint &
     assert(state.trajectory_active == 0);
     assert(state.safety == RK_SAFETY_READY);
     assert(endpoint->apply_count == 0);
+}
+
+void drive_reference_timing_is_per_coupled_group(const rk_robot_runtime_blueprint &blueprint) {
+    for (bool coupled : {false, true}) {
+        auto mixed = blueprint;
+        mixed.joint_servo[0] = {200.0, 10.0};
+        mixed.servo_reflected_inertia[0] = 1.0;
+        if (coupled) {
+            mixed.coupling_count = 1;
+            mixed.couplings[0] = {0, 1, -1.0, 0.0};
+        }
+        assert(rk_robot_runtime_blueprint_validate(&mixed) == RK_OK);
+        auto endpoint = std::make_shared<EchoEndpoint>(mixed.joint_count);
+        robotkit::RobotRuntime runtime(mixed, endpoint, std::chrono::milliseconds(50));
+        uint64_t timestamp = 0;
+        assert(runtime.submit_segments(trajectory_command(1),
+            trajectory_batch({{0, 0.0}, {100'000'000, 0.5}, {200'000'000, 1.0}})) == RK_OK);
+        apply_cycle(runtime, timestamp);
+        rk_robot_snapshot state{};
+        state.struct_size = sizeof(state);
+        assert(runtime.snapshot_full(state) == RK_OK);
+        const auto &command = endpoint->last_command;
+        assert(command.reference_duration > 0.0);
+        assert(state.setpoint_position[0] == command.reference_end_position[0]);
+        assert(state.setpoint_position[1] == (coupled ? command.reference_end_position[1] : command.targets[1].target));
+        assert(command.targets[1].target != command.reference_end_position[1]);
+    }
+}
+
+void process_fault_is_confined_to_its_runtime(const rk_robot_runtime_blueprint &blueprint) {
+    auto first_endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
+    auto second_endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
+    robotkit::RobotRuntime first(blueprint, first_endpoint, std::chrono::milliseconds(10));
+    robotkit::RobotRuntime second(blueprint, second_endpoint, std::chrono::milliseconds(10));
+    first.fail_tick(RK_FAULT_PROCESS_CHANNEL_TYPE);
+    rk_robot_snapshot failed{};
+    failed.struct_size = sizeof(failed);
+    assert(first.snapshot_full(failed) == RK_OK);
+    assert(failed.safety == RK_SAFETY_FAULT && failed.fault_code == RK_FAULT_PROCESS_CHANNEL_TYPE);
+    uint64_t timestamp = 0;
+    assert(second.submit_segments(trajectory_command(1),
+        trajectory_batch({{0, 0.0}, {100'000'000, 0.5}, {200'000'000, 1.0}})) == RK_OK);
+    apply_cycle(second, timestamp);
+    const auto healthy = apply_cycle(second, timestamp);
+    assert(healthy.safety == RK_SAFETY_READY && healthy.position[0] > 0.0);
 }
 
 void timestamped_trajectory_interpolates_and_reports_progress(
@@ -2388,6 +2458,7 @@ void queued_coordinate_calibration_translates_device_plan(const rk_robot_runtime
 }
 
 int main() {
+    process_channel_reads_are_typed();
     static_assert(sizeof(rk_robot_command) < 20'000,
         "trajectory payload must not be embedded in the command mailbox value");
     rk_robot_runtime_blueprint blueprint{};
@@ -2409,6 +2480,8 @@ int main() {
         joint.parent_frame_rotation[3] = joint.child_frame_rotation[3] = 1.0;
         joint.axis[2] = 1.0;
     }
+    drive_reference_timing_is_per_coupled_group(blueprint);
+    process_fault_is_confined_to_its_runtime(blueprint);
     trajectory_drive_endpoints_join_at_queue_exhaustion(blueprint);
     trajectory_drive_endpoints_join_through_hold_resume_and_stop(blueprint);
     presampled_publication_does_not_sample_again(blueprint);

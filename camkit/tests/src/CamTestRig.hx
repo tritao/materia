@@ -16,7 +16,7 @@ class CamTestRig {
   public var toolLibrary(get, never):ToolLibrary;
 
   public function new() {
-    binding = new MachineBinding("work", "x", "y", "z", 0.2);
+    binding = new MachineBinding("work", "x", "y", "z", 0.2, new toolpathkit.motion.ToolpathChannels(""));
   }
 
   function get_toolLibrary():ToolLibrary return controller.toolLibrary;

@@ -319,6 +319,23 @@ RobotRuntime::RobotRuntime(const rk_robot_runtime_blueprint &blueprint,
                            std::shared_ptr<RobotEndpoint> endpoint,
                  std::chrono::nanoseconds period)
     : blueprint_(blueprint), endpoint_(std::move(endpoint)), period_(period) {
+    // The validated blueprint is immutable throughout execution.
+    if (rk_robot_runtime_blueprint_validate(&blueprint_) == RK_OK) {
+        for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
+            interpolated_reference_[joint] = blueprint_.joint_servo[joint].stiffness > 0.0;
+        bool changed = true;
+        while (changed) {
+            changed = false;
+            for (uint32_t index = 0; index < blueprint_.coupling_count; ++index) {
+                const auto &coupling = blueprint_.couplings[index];
+                if (!interpolated_reference_[coupling.leader] && !interpolated_reference_[coupling.follower])
+                    continue;
+                if (!interpolated_reference_[coupling.leader] || !interpolated_reference_[coupling.follower])
+                    changed = true;
+                interpolated_reference_[coupling.leader] = interpolated_reference_[coupling.follower] = true;
+            }
+        }
+    }
     for (uint32_t i = 0; i < blueprint_.channel_count && i < RK_MAX_PROCESS_CHANNELS; ++i)
         channel_outputs_[i] = blueprint_.channels[i].safe_value;
     state_.struct_size = sizeof(state_);
@@ -2103,18 +2120,19 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         latch_fault();
         return result;
     }
-    bool interpolating = false;
-    if (output.reference_duration > 0.0)
-        for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
-            interpolating = interpolating || blueprint_.joint_servo[joint].stiffness > 0.0;
     if (output.kind == RK_COMMAND_JOINT_TARGETS)
-        for (uint32_t index = 0; index < output.target_count; ++index)
-            if (output.targets[index].mode == RK_TARGET_POSITION ||
-                output.targets[index].mode == RK_TARGET_SERVO)
-                // The sampled physics state is at the end of the drive interval.
-                // Its setpoint and a subsequent plan's anchor must name that same instant.
-                commanded_position_[output.targets[index].joint] = interpolating && index < RK_MAX_SERVO_JOINTS
-                    ? output.reference_end_position[index] : output.targets[index].target;
+        for (uint32_t index = 0; index < output.target_count; ++index) {
+            const auto &target = output.targets[index];
+            if (target.mode != RK_TARGET_POSITION && target.mode != RK_TARGET_SERVO)
+                continue;
+            const bool interpolating = output.reference_duration > 0.0 &&
+                index < RK_MAX_SERVO_JOINTS && (target.mode == RK_TARGET_SERVO ||
+                interpolated_reference_[target.joint]);
+            // Only a drive that interpolates samples its reference at the interval end.
+            // Other joints retain the position actually sent to their endpoint.
+            commanded_position_[target.joint] = interpolating
+                ? output.reference_end_position[index] : target.target;
+        }
     if (stop_ramp_finished && control_.stop_ramp_hits_limit) {
         // The commanded setpoint is clamped to the travel limit; distinguish
         // this backstop from an ordinary endpoint completion.
@@ -2422,14 +2440,14 @@ void RobotRuntime::discard_pending_commands() noexcept {
     }
 }
 
-void RobotRuntime::fail_tick() noexcept {
+void RobotRuntime::fail_tick(int32_t fault_code) noexcept {
     discard_pending_commands();
     std::lock_guard owner_lock(owner_mutex_);
     {
         std::lock_guard state_lock(state_mutex_);
         if (state_.safety == RK_SAFETY_FAULT || state_.safety == RK_SAFETY_EMERGENCY_STOP) return;
     }
-    latch_fault();
+    latch_fault(true, fault_code);
 }
 
 void RobotRuntime::reset_state() noexcept {

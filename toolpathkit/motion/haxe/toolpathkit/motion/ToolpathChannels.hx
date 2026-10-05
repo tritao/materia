@@ -1,15 +1,26 @@
 package toolpathkit.motion;
 
-/** Default controller channel mapping for the motion adapter. */
+/** Controller channels scoped to one machine. A standalone machine uses an empty scope. */
 class ToolpathChannels {
-  public static inline var SpindleDirection = "spindle.direction";
-  public static inline var SpindleSpeed = "spindle.speed";
-  public static inline var SpindleAtSpeed = "spindle.at_speed";
-  public static inline var CoolantMist = "coolant.mist";
-  public static inline var CoolantFlood = "coolant.flood";
-  public static inline var OperatorResume = "cnc.operator.resume";
-  public static inline var ToolChangePrefix = "cnc.tool_change.";
+  public final spindleDirection:String;
+  public final spindleSpeed:String;
+  public final spindleAtSpeed:String;
+  public final coolantMist:String;
+  public final coolantFlood:String;
+  public final operatorResume:String;
+  public final toolChangePrefix:String;
 
-  public static function toolChange(number:Int):String
-    return ToolChangePrefix + number;
+  public function new(scope:String) {
+    if (scope == null || StringTools.endsWith(scope, "/")) throw "CNC channel scope must omit its trailing slash";
+    var prefix = scope.length == 0 ? "" : scope + "/";
+    spindleDirection = prefix + "spindle.direction";
+    spindleSpeed = prefix + "spindle.speed";
+    spindleAtSpeed = prefix + "spindle.at_speed";
+    coolantMist = prefix + "coolant.mist";
+    coolantFlood = prefix + "coolant.flood";
+    operatorResume = prefix + "cnc.operator.resume";
+    toolChangePrefix = prefix + "cnc.tool_change.";
+  }
+
+  public function toolChange(number:Int):String return toolChangePrefix + number;
 }

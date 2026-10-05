@@ -107,7 +107,7 @@ class AssemblyDefinitionFlattener {
 	}
 
 	/** A copy of `actuator` under a new id, on a new joint, with every drive field. */
-	public static function copyActuator(actuator:AssemblyActuator, id:String, joint:String):AssemblyActuator {
+	public static function copyActuator(actuator:AssemblyActuator, id:String, joint:String, prefix:String):AssemblyActuator {
 		var copy:AssemblyActuator = {id: id, joint: joint, maxEffort: actuator.maxEffort, maxRate: actuator.maxRate};
 		if (actuator.rotorInertia != null) copy.rotorInertia = actuator.rotorInertia;
 		if (actuator.fullStepsPerRevolution != null) copy.fullStepsPerRevolution = actuator.fullStepsPerRevolution;
@@ -116,7 +116,6 @@ class AssemblyDefinitionFlattener {
 		if (actuator.positionLoopRate != null) copy.positionLoopRate = actuator.positionLoopRate;
 		if (actuator.pneumatic != null) {
 			var p = actuator.pneumatic;
-			var prefix = id.substr(0, id.length - actuator.id.length);
 			copy.pneumatic = {bore: p.bore, rod: p.rod, stroke: p.stroke, ratedSpeed: p.ratedSpeed,
 				pressurePa: p.pressurePa, channelA: prefix + p.channelA,
 				channelB: p.channelB == null ? null : prefix + p.channelB,
@@ -124,7 +123,6 @@ class AssemblyDefinitionFlattener {
 		}
 		if (actuator.processVelocity != null) {
 			var process = actuator.processVelocity;
-			var prefix = id.substr(0, id.length - actuator.id.length);
 			copy.processVelocity = {speedChannel: prefix + process.speedChannel,
 				directionChannel: prefix + process.directionChannel,
 				radiansPerSpeedUnit: process.radiansPerSpeedUnit};
@@ -282,7 +280,7 @@ class AssemblyDefinitionFlattener {
 		if (actuators != null) {
 			if (flat.actuators == null) flat.actuators = [];
 			for (actuator in actuators) {
-				var copy = copyActuator(actuator, scoped(prefix, actuator.id), scoped(prefix, actuator.joint));
+				var copy = copyActuator(actuator, scoped(prefix, actuator.id), scoped(prefix, actuator.joint), prefix.length == 0 ? "" : prefix + "/");
 				if (actuator.encoder != null) copy.encoder = scoped(prefix, actuator.encoder);
 				flat.actuators.push(copy);
 			}

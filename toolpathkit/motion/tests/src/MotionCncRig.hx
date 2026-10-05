@@ -12,7 +12,7 @@ class MotionCncRig {
       zAxisId:String, rapidSpeed:Float, ?initialPosition:Array<Float>,
       ?positionTolerance:Float = 0.0005) {
     binding = new MachineBinding(frameId, xAxisId, yAxisId, zAxisId,
-      rapidSpeed, positionTolerance);
+      rapidSpeed, new toolpathkit.motion.ToolpathChannels(""), positionTolerance);
     var initial = initialPosition == null ? [0.0, 0.0, 0.0] : initialPosition;
     start = new Point3(initial[0], initial[1], initial[2]);
   }

@@ -294,7 +294,7 @@ public:
      * shared Simulation calls it so one robot's rejected command or
      * out-of-limit reading does not fail the tick of every other robot.
      */
-    void fail_tick() noexcept;
+    void fail_tick(int32_t fault_code = RK_FAULT_ENDPOINT) noexcept;
     void reset_state() noexcept;
     void set_externally_driven(bool value) noexcept;
 
@@ -361,6 +361,8 @@ private:
     std::array<bool, RK_MAX_JOINTS> limit_inputs_{};
 
     rk_robot_runtime_blueprint blueprint_{};
+    /** Drive intervals include mechanically coupled followers, never unrelated joints. */
+    bool interpolated_reference_[RK_MAX_JOINTS]{};
     std::shared_ptr<RobotEndpoint> endpoint_;
     std::chrono::nanoseconds period_;
     uint64_t last_owner_timestamp_ns_ = 0;

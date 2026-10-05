@@ -34,7 +34,7 @@ class ToolpathMotionTests {
     }
     acceptsBinding(null);
     var origin = Provenance.cam(7, "face:2");
-    var machine = new MachineBinding("work", "x", "y", "z", 0.2);
+    var machine = new MachineBinding("work", "x", "y", "z", 0.2, new toolpathkit.motion.ToolpathChannels(""));
     var result = ToolpathMotion.lower(pathProgram([
       ToolpathOp.Spindle(Clockwise, 12000, origin),
       ToolpathOp.Move(Cut,
@@ -88,7 +88,7 @@ class ToolpathMotionTests {
       new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(200, 200, 200)),
       0.1, 0.4);
     var robotBinding = new ToolpathMotionBinding(
-      new MachineBinding("work", "x", "y", "z", 0.08), blueprint);
+      new MachineBinding("work", "x", "y", "z", 0.08, new toolpathkit.motion.ToolpathChannels("")), blueprint);
     var compiled = robotBinding.compile(pathProgram([
       ToolpathOp.Move(Cut,
         PathGeometry.Line(new Point3(0, 0, 0), new Point3(0.01, 0, 0)),
@@ -142,7 +142,7 @@ class ToolpathMotionTests {
       ToolpathOp.Coolant(true, false, origin),
       ToolpathOp.Move(Cut, PathGeometry.Line(new Point3(0.01, 0, 0),
         new Point3(0.01, 0.01, 0)), 0.01, 0.0004, origin)
-    ]), new MachineBinding("work", "x", "y", "z", 0.2));
+    ]), new MachineBinding("work", "x", "y", "z", 0.2, new toolpathkit.motion.ToolpathChannels("")));
     var eventProgram:motionkit.program.MotionProgram = cast eventResult.program;
     if (eventProgram == null || eventProgram.ops.length != 1)
       throw "coolant added a motion stop";
@@ -153,7 +153,27 @@ class ToolpathMotionTests {
           throw "coolant must be a position-tied path event";
       case _: throw "blended path missing";
     }
-    Sys.println("ToolpathKit Motion tests passed (12 assertions)");
+    for (scope in ["first", "second"]) {
+      var channels = new toolpathkit.motion.ToolpathChannels(scope);
+      var lowered = ToolpathMotion.lower(pathProgram([
+        ToolpathOp.Spindle(Clockwise, 3000, origin)
+      ]), new MachineBinding("work", "x", "y", "z", 0.2, channels));
+      var program = lowered.program;
+      if (program == null || program.ops.length != 3) throw "Scoped spindle did not lower";
+      switch program.ops[0] {
+        case SetOutput(channel, _) if (channel == scope + "/spindle.direction"):
+        case _: throw "Spindle direction escaped its machine scope";
+      }
+      switch program.ops[1] {
+        case SetOutput(channel, _) if (channel == scope + "/spindle.speed"):
+        case _: throw "Spindle speed escaped its machine scope";
+      }
+      switch program.ops[2] {
+        case WaitInput(channel, _, _) if (channel == scope + "/spindle.at_speed"):
+        case _: throw "Spindle readiness escaped its machine scope";
+      }
+    }
+    Sys.println("ToolpathKit Motion tests passed (18 assertions)");
     Sys.println('Toolpath accuracy tests passed (${ToolpathAccuracyTests.run()} assertions)');
     MachiningRunTests.run();
     ToolpathScenarioTests.main();

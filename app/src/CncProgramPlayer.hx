@@ -36,6 +36,7 @@ import motionkit.robot.StepperSlip;
 import robotkit.runtime.EncoderMonitor;
 import nativekit.sim.SimSession;
 import toolpathkit.motion.MachineBinding;
+import toolpathkit.motion.ToolpathChannels;
 import toolpathkit.motion.ToolpathMotion;
 import toolpathkit.motion.ToolpathMotionBinding;
 import toolpathkit.motion.MachiningContinuation;
@@ -88,13 +89,20 @@ class CncProgramPlayer implements SessionMember {
 	static inline final STOCK_SPACING = 0.0005;
 
 	/** Spindle and coolant channels a CNC program's events need on the machine's runtime. */
-	public static function processChannels():Array<ProcessChannelDeclaration>
+	public static function channelsFor(job:CncJob):ToolpathChannels {
+		var slash = job.spindle.lastIndexOf("/");
+		return new ToolpathChannels(slash < 0 ? "" : job.spindle.substr(0, slash));
+	}
+
+	public static function processChannels(job:CncJob):Array<ProcessChannelDeclaration> {
+		var channels = channelsFor(job);
 		return [
-			new ProcessChannelDeclaration("spindle.speed", ProcessEventValue.Analog(0.0)),
-			new ProcessChannelDeclaration("spindle.direction", ProcessEventValue.Analog(0.0)),
-			new ProcessChannelDeclaration("coolant.mist", ProcessEventValue.Digital(false)),
-			new ProcessChannelDeclaration("coolant.flood", ProcessEventValue.Digital(false))
+			new ProcessChannelDeclaration(channels.spindleSpeed, ProcessEventValue.Analog(0.0)),
+			new ProcessChannelDeclaration(channels.spindleDirection, ProcessEventValue.Analog(0.0)),
+			new ProcessChannelDeclaration(channels.coolantMist, ProcessEventValue.Digital(false)),
+			new ProcessChannelDeclaration(channels.coolantFlood, ProcessEventValue.Digital(false))
 		];
+	}
 
 	final session:SimSession;
 	final project:ProjectDocumentSession;
@@ -110,7 +118,7 @@ class CncProgramPlayer implements SessionMember {
 	final kindByLine = new Map<Int, MoveKind>();
 	final newStock:Null<Void->MachiningStock>;
 	final stockObject:Null<String>;
-	static inline final TOOL_CHANGE = "cnc.tool_change.";
+	final channels:ToolpathChannels;
 	final toolsByNumber = new Map<Int, Tool>();
 	/** The tool in the spindle at the start, and now; -1 for none. */
 	final initialTool:Int;
@@ -167,7 +175,7 @@ class CncProgramPlayer implements SessionMember {
 	final source:String;
 	final recipe:MachiningRecipe;
 	/** Sensor selected from the assembled machine; null on routers without at-speed feedback. */
-	final atSpeedSensorId:Null<String>;
+	public final atSpeedSensorId:Null<String>;
 	final cellInput:Null<String->Null<EventValue>>;
 	/** The restart the operator asked for, until the machine can take it. */
 	var restartRequest:Null<{op:Int, distance:Float}> = null;
@@ -187,6 +195,7 @@ class CncProgramPlayer implements SessionMember {
 		var definition = project.projectAssemblyDefinition, physical = project.projectPhysical;
 		if (definition == null || physical == null) throw "A CNC job needs the project's machine";
 		var metresPerUnit = physical.metresPerUnit, state = project.projectAssemblyState;
+		channels = channelsFor(job);
 		this.session = session;
 		this.cellInput = cellInput;
 		this.project = project;
@@ -231,7 +240,7 @@ class CncProgramPlayer implements SessionMember {
 		if (top == null) throw "The machine's Z axis needs an upper limit";
 		recipe = new MachiningRecipe(0.01, 0.0, top * metresPerUnit - 0.001);
 		var planning = planningModel(machineModel, job.axes, steady);
-		var machine = new MachineBinding("machine", job.axes[0], job.axes[1], job.axes[2], rapid);
+		var machine = new MachineBinding("machine", job.axes[0], job.axes[1], job.axes[2], rapid, channels);
 		var binding = new ToolpathMotionBinding(machine,
 			new MotionSystemBlueprint(planning.model, robot.blueprint, axes, session.fixedTimestep()));
 		// Every plan the compiler makes is checked against the motors' drives: torque along the plan and
@@ -256,8 +265,17 @@ class CncProgramPlayer implements SessionMember {
 			return compiled.program;
 		};
 		this.robot = robot;
+		var spindlePart = robot.part("project:" + job.spindle);
 		var sensorId:Null<String> = null;
-		for (sensor in robot.blueprint.sensors) if (sensor.kind == "at_speed") sensorId = sensor.id;
+		for (sensor in robot.blueprint.sensors) if (sensor.kind == "at_speed" && sensor.joint >= 0 &&
+				robot.blueprint.joints[sensor.joint].childLink == spindlePart.linkIndex) {
+			if (sensorId != null) throw 'Spindle "${job.spindle}" has multiple readiness sensors';
+			sensorId = sensor.id;
+		}
+		var processOwned = robot.blueprint.processJoints();
+		for (joint in robot.blueprint.joints) if (joint.childLink == spindlePart.linkIndex &&
+				processOwned[joint.joint] && sensorId == null)
+			throw 'Process spindle "${job.spindle}" needs its own readiness sensor';
 		atSpeedSensorId = sensorId;
 		solver = binding.solver;
 		axisJoints = planning.indices;
@@ -327,9 +345,9 @@ class CncProgramPlayer implements SessionMember {
 			currentBinding.compiler.planCheck = binding.compiler.planCheck;
 			var made = new ManipulatorMotion(robot.robot, currentBinding.compiler,
 				channel -> {
-					if (channel == "spindle.at_speed") return spindleAtSpeed();
-					if (!StringTools.startsWith(channel, TOOL_CHANGE)) return cellInput == null ? null : cellInput(channel);
-					var number = Std.parseInt(channel.substr(TOOL_CHANGE.length));
+					if (channel == channels.spindleAtSpeed) return spindleAtSpeed();
+					if (!StringTools.startsWith(channel, channels.toolChangePrefix)) return cellInput == null ? null : cellInput(channel);
+					var number = Std.parseInt(channel.substr(channels.toolChangePrefix.length));
 					if (number == null || !toolsByNumber.exists(number)) throw 'The machining program loads unknown tool $channel';
 					if (number != loadedTool) {
 						loadedTool = number;
@@ -532,7 +550,7 @@ class CncProgramPlayer implements SessionMember {
 	function takeRestart():Void {
 		var request = restartRequest;
 		if (request != null) {
-			var run = new MachiningRun(recipe, program, motion);
+			var run = new MachiningRun(recipe, program, motion, channels);
 			if (motion.running && motion.sessionState() != SessionState.Held) motion.hold();
 			else if (motion.running) {
 				pendingContinuation = run.prepareRestart(request.op, request.distance);
@@ -546,7 +564,7 @@ class CncProgramPlayer implements SessionMember {
 		if (next == null || motion.running || motion.sessionState() != SessionState.Idle) return;
 		var snapshot = robot.robot.snapshot();
 		if (snapshot.trajectoryActive || snapshot.trajectoryQueueDepth > 0 || snapshot.safety != 0) return;
-		new MachiningRun(recipe, program, motion).resumePrepared(next);
+		new MachiningRun(recipe, program, motion, channels).resumePrepared(next);
 		continuation = next;
 		pendingContinuation = null;
 		started = true;

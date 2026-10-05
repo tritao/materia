@@ -194,7 +194,7 @@ class AssemblyModel {
 	 */
 	public function actuateDrive(actuator:materia.assembly.AssemblyDefinition.AssemblyActuator):Void {
 		if (data.actuators == null) data.actuators = [];
-		data.actuators.push(materia.assembly.AssemblyDefinitionFlattener.copyActuator(actuator, actuator.id, actuator.joint));
+		data.actuators.push(materia.assembly.AssemblyDefinitionFlattener.copyActuator(actuator, actuator.id, actuator.joint, ""));
 	}
 
 	/**

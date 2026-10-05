@@ -22,7 +22,7 @@ class CncTestRig {
       ?maxBlendTurnAngleRadians:Float = Math.PI * 5.0 / 6.0) {
     controller = new CncController(dialect);
     binding = new MachineBinding(frameId, xAxisId, yAxisId, zAxisId,
-      rapidSpeed, positionTolerance, orientationTolerance,
+      rapidSpeed, new toolpathkit.motion.ToolpathChannels(""), positionTolerance, orientationTolerance,
       maxBlendTurnAngleRadians);
     var initial = initialPosition == null ? [0.0, 0.0, 0.0] : initialPosition;
     if (initial.length != 3) throw "CNC test start needs three coordinates";

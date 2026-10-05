@@ -557,12 +557,14 @@ typedef struct rk_plan_header {
     double control_acceleration[RK_MAX_TRAJECTORY_JOINTS];
 } rk_plan_header;
 
-/** Non-latched runtime diagnostic; safety remains READY. */
-enum { RK_FAULT_TRAJECTORY_UNDERFLOW = 2, RK_FAULT_RAMP_LIMIT = 3,
+/** Runtime fault and diagnostic codes. Channel faults latch only the owning robot. */
+enum { RK_FAULT_ENDPOINT = 1, RK_FAULT_TRAJECTORY_UNDERFLOW = 2, RK_FAULT_RAMP_LIMIT = 3,
     RK_FAULT_CLOCK_SYNC_LOST = 4, RK_FAULT_DUAL_DRIVE_SKEW = 5,
     RK_FAULT_QUEUE_REVISION_MISMATCH = 6,
     /** A velocity target outlived its command's expires_at_ns; the joint brakes to zero. */
-    RK_FAULT_COMMAND_EXPIRED = 7, RK_FAULT_LIMIT_SWITCH = 8 };
+    RK_FAULT_COMMAND_EXPIRED = 7, RK_FAULT_LIMIT_SWITCH = 8,
+    RK_FAULT_PROCESS_CHANNEL_MISSING = 9, RK_FAULT_PROCESS_CHANNEL_TYPE = 10,
+    RK_FAULT_PROCESS_CHANNEL_VALUE = 11 };
 
 typedef uint32_t rk_session_state;
 enum {

@@ -1776,10 +1776,17 @@ rk_result Simulation::submit(const nksim_tick &tick) {
         }
         auto targets = binding->take_pending_targets();
         if (binding_index >= runtimes_.size()) return RK_ERROR_BACKEND;
-        const auto process_result = binding->apply_pneumatic_valves(*runtimes_[binding_index], targets);
-        if (process_result != RK_OK) return process_result;
-        const auto velocity_result = binding->apply_velocity_drives(*runtimes_[binding_index], targets);
-        if (velocity_result != RK_OK) return velocity_result;
+        auto &runtime = *runtimes_[binding_index];
+        auto process_fault = binding->apply_pneumatic_valves(runtime, targets);
+        if (!process_fault) process_fault = binding->apply_velocity_drives(runtime, targets);
+        if (process_fault) {
+            // Reject this robot's staged motion, keep the shared world advancing, and
+            // apply physical de-energized behavior (latched valves retain supply air).
+            runtime.fail_tick(process_fault->code());
+            targets = binding->take_pending_targets();
+            const auto safe_valves = binding->apply_pneumatic_valves(runtime, targets, true);
+            const auto safe_velocity = binding->apply_velocity_drives(runtime, targets, true);
+        }
         if (virtual_devices_[binding_index]) {
             rk_robot_state state{};
             const auto result = virtual_devices_[binding_index]->sample(simulation_ns, state);

@@ -47,9 +47,10 @@ class MachiningRunTests {
     var robot = new SimulatedRobot("cam-pocket", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name]);
-    var binding = new MachineBinding("work", "x", "y", "z", 0.02);
     homeFixture(robot, blueprint, runtime, simulationHarness);
-    var robotBinding = new ToolpathMotionBinding(binding, blueprint, runtime.snapshot().modelRevision, runtime.snapshot().calibrationRevision);
+    var binding = new MachineBinding("work", "x", "y", "z", 0.02,
+      new toolpathkit.motion.ToolpathChannels(""));
+    var robotBinding = new ToolpathMotionBinding(binding, blueprint);
     var contour = new CamContour([
       new Point3(0.004, 0.004, 0.01), new Point3(0.012, 0.004, 0.01),
       new Point3(0.012, 0.012, 0.01), new Point3(0.004, 0.012, 0.01)
@@ -100,7 +101,7 @@ class MachiningRunTests {
         StringTools.startsWith(channel, "cnc.tool_change.") ?
         EventValue.Digital(true) : null,
       function() return runtime.pollEvents());
-    var run = new MachiningRun(new MachiningRecipe(0.01, 0.0, 0.014), program, motion);
+    var run = new MachiningRun(new MachiningRecipe(0.01, 0.0, 0.014), program, motion, binding.channels);
     run.start();
     var tick = 0, heldAt = -1.0;
     for (_ in 0...5000) {
@@ -169,7 +170,7 @@ class MachiningRunTests {
         0.01, 0.0, Provenance.cam(91))
     ], new ToolLibrary(), [setup]), binding);
     var faultRun = new MachiningRun(new MachiningRecipe(0.01),
-      cast faultPath.program, motion);
+      cast faultPath.program, motion, binding.channels);
     faultRun.start();
     var active = false;
     for (_ in 0...500) {
@@ -240,7 +241,8 @@ class MachiningRunTests {
       [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name]);
     homeFixture(robot, blueprint, runtime, harness);
-    var binding = new MachineBinding("work", "x", "y", "z", 0.02);
+    var binding = new MachineBinding("work", "x", "y", "z", 0.02,
+      new toolpathkit.motion.ToolpathChannels(""));
     var contour = new CamContour([
       new Point3(0.004, 0.004, 0.01), new Point3(0.012, 0.004, 0.01),
       new Point3(0.012, 0.012, 0.01), new Point3(0.004, 0.012, 0.01)

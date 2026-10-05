@@ -4,6 +4,7 @@
 #include "robotkit_runtime.hpp"
 #include "robotkit_simkit.h"
 #include "nativekit_sim.h"
+#include "process_channels.hpp"
 
 #include <algorithm>
 #include <memory>
@@ -76,11 +77,11 @@ private:
     /** Hands this tick's targets to the backend and commits what they command. */
     std::vector<nksim_joint_target> take_pending_targets();
     /** Resolves valve coils and queues simulation-owned cylinder effort for this physics tick. */
-    rk_result apply_pneumatic_valves(const RobotRuntime &runtime,
-                                     std::vector<nksim_joint_target> &targets);
+    std::optional<ProcessChannelFault> apply_pneumatic_valves(const RobotRuntime &runtime,
+                                     std::vector<nksim_joint_target> &targets, bool deenergized = false);
     /** Resolves spindle setpoint channels and queues their velocity targets. */
-    rk_result apply_velocity_drives(const RobotRuntime &runtime,
-                                    std::vector<nksim_joint_target> &targets);
+    std::optional<ProcessChannelFault> apply_velocity_drives(const RobotRuntime &runtime,
+                                    std::vector<nksim_joint_target> &targets, bool deenergized = false);
     /** Queues a zero-velocity hold for one actuated joint. */
     void queue_velocity_hold(std::size_t joint);
     /** Mutable copy of the committed joint commands for the apply in progress. */

@@ -149,7 +149,7 @@ std::shared_ptr<Snapshot> resolve_snapshot(nksim_snapshot snapshot) noexcept {
 }
 
 bool valid_struct_size(std::uint32_t provided, std::size_t required) noexcept {
-    return provided >= required;
+    return provided == required;
 }
 
 void copy_surface(const nksim_surface &surface, BackendShapePart &part) noexcept {
@@ -531,13 +531,10 @@ nksim_result World::set_joint_targets(const nksim_joint_target *targets, std::ui
     std::vector<BackendJointTarget> backend_targets;
     backend_targets.reserve(count);
     for (std::uint32_t index = 0; index < count; ++index) {
-        // The servo terms are an optional tail; older callers stop before it.
         const auto &source = targets[index];
-        const bool has_servo = source.struct_size >= offsetof(nksim_joint_target, end_position);
-        if (!valid_struct_size(source.struct_size, offsetof(nksim_joint_target, velocity)))
+        if (!valid_struct_size(source.struct_size, sizeof(source)))
             return NKSIM_ERROR_INVALID_ARGUMENT;
-        if (source.mode < NKSIM_JOINT_TARGET_POSITION || source.mode > NKSIM_JOINT_TARGET_SERVO ||
-            (source.mode == NKSIM_JOINT_TARGET_SERVO && !has_servo))
+        if (source.mode < NKSIM_JOINT_TARGET_POSITION || source.mode > NKSIM_JOINT_TARGET_SERVO)
             return NKSIM_ERROR_INVALID_ARGUMENT;
         if (source.mode == NKSIM_JOINT_TARGET_SERVO &&
             (!std::isfinite(source.velocity) || !std::isfinite(source.stiffness) ||
@@ -557,7 +554,7 @@ nksim_result World::set_joint_targets(const nksim_joint_target *targets, std::ui
             target.stiffness = source.stiffness;
             target.damping = source.damping;
             target.feedforward = source.feedforward;
-            if (source.struct_size >= sizeof(source)) {
+            {
                 if (!std::isfinite(source.end_position) || !std::isfinite(source.end_velocity) ||
                     !std::isfinite(source.reflected_inertia) || source.reflected_inertia < 0.0 ||
                     !std::isfinite(source.reference_duration) || source.reference_duration < 0.0)
@@ -1033,19 +1030,10 @@ nksim_result World::reset() {
     return pull_backend_state();
 }
 
-namespace {
-// Bytes a caller must provide for the fields that predate rotation_a/rotation_b;
-// a struct_size at least this large is accepted, but rotation_a/rotation_b are
-// only read (never touched, so never over-read) when struct_size covers the
-// full current struct. This is the "old prefixes remain valid" convention
-// nk_init_options documents.
-constexpr std::size_t joint_desc_legacy_size = offsetof(nksim_joint_desc, rotation_a);
-} // namespace
-
 nksim_result World::create_joint(const nksim_joint_desc &desc, nksim_joint *out_joint) {
     if (!owns_thread() || !out_joint)
         return !owns_thread() ? NKSIM_ERROR_WRONG_THREAD : NKSIM_ERROR_INVALID_ARGUMENT;
-    if (!valid_struct_size(desc.struct_size, joint_desc_legacy_size) || !valid_joint_type(desc.type))
+    if (!valid_struct_size(desc.struct_size, sizeof(desc)) || !valid_joint_type(desc.type))
         return NKSIM_ERROR_INVALID_ARGUMENT;
     const auto *body_a = bodies.get(desc.body_a);
     const auto *body_b = bodies.get(desc.body_b);
@@ -1066,17 +1054,8 @@ nksim_result World::create_joint(const nksim_joint_desc &desc, nksim_joint *out_
     joint->desc.lower_limit = desc.lower_limit;
     joint->desc.upper_limit = desc.upper_limit;
     joint->desc.max_force = desc.max_force;
-    joint->desc.rotation_a[3] = 1.0; // identity default for legacy-sized callers
-    joint->desc.rotation_b[3] = 1.0;
-    if (desc.struct_size >= offsetof(nksim_joint_desc, rotation_b) + sizeof(desc.rotation_b)) {
-        std::copy(std::begin(desc.rotation_a), std::end(desc.rotation_a), std::begin(joint->desc.rotation_a));
-        std::copy(std::begin(desc.rotation_b), std::end(desc.rotation_b), std::begin(joint->desc.rotation_b));
-    }
-    // A zero-initialized struct (a common `Type{}` idiom, e.g. in tests
-    // predating these fields) reads back an unnormalizable rotation, not a
-    // deliberately invalid one; treat that exactly like a legacy-sized
-    // caller and default to identity, matching normalize_quaternion's own
-    // zero-length fallback elsewhere in this file.
+    std::copy(std::begin(desc.rotation_a), std::end(desc.rotation_a), std::begin(joint->desc.rotation_a));
+    std::copy(std::begin(desc.rotation_b), std::end(desc.rotation_b), std::begin(joint->desc.rotation_b));
     std::array<double, 4> normalized_rotation_a{
         joint->desc.rotation_a[0], joint->desc.rotation_a[1],
         joint->desc.rotation_a[2], joint->desc.rotation_a[3]};
@@ -1102,7 +1081,7 @@ nksim_result World::create_joint(const nksim_joint_desc &desc, nksim_joint *out_
     backend_desc.max_force = joint->desc.max_force;
     std::copy(std::begin(joint->desc.rotation_a), std::end(joint->desc.rotation_a), backend_desc.rotation_a.begin());
     std::copy(std::begin(joint->desc.rotation_b), std::end(joint->desc.rotation_b), backend_desc.rotation_b.begin());
-    if (desc.struct_size >= offsetof(nksim_joint_desc, friction_loss) + sizeof(desc.friction_loss)) {
+    {
         if (!std::isfinite(desc.armature) || !std::isfinite(desc.damping) ||
             !std::isfinite(desc.friction_loss) || desc.armature < 0.0 || desc.damping < 0.0 ||
             desc.friction_loss < 0.0) {
@@ -1113,7 +1092,7 @@ nksim_result World::create_joint(const nksim_joint_desc &desc, nksim_joint *out_
         joint->desc.damping = backend_desc.damping = desc.damping;
         joint->desc.friction_loss = backend_desc.friction_loss = desc.friction_loss;
     }
-    if (desc.struct_size >= offsetof(nksim_joint_desc, limit_impedance) + sizeof(desc.limit_impedance)) {
+    {
         bool valid = std::isfinite(desc.limit_time_constant) && desc.limit_time_constant >= 0.0 &&
             std::isfinite(desc.limit_damping_ratio) && desc.limit_damping_ratio >= 0.0;
         for (const double value : desc.limit_impedance) valid = valid && std::isfinite(value);
@@ -1149,7 +1128,8 @@ nksim_result World::couple_joint(const nksim_joint_coupling_desc &desc) {
     if (!leader || !follower) return NKSIM_ERROR_INVALID_HANDLE;
     if (leader->desc.type == NKSIM_JOINT_FIXED || follower->desc.type == NKSIM_JOINT_FIXED)
         return NKSIM_ERROR_INVALID_ARGUMENT;
-    const double stiffness = desc.struct_size >= sizeof(desc) ? desc.stiffness : 0.0;
+    if (!valid_struct_size(desc.struct_size, sizeof(desc))) return NKSIM_ERROR_INVALID_ARGUMENT;
+    const double stiffness = desc.stiffness;
     if (!std::isfinite(stiffness) || stiffness < 0.0) return NKSIM_ERROR_INVALID_ARGUMENT;
     return backend->joint_couple({leader->backend_joint, follower->backend_joint,
                                   desc.ratio, desc.offset, stiffness});
@@ -1211,13 +1191,9 @@ namespace nksim {
 nksim_result create_world_with_backend(const nksim_world_desc &provided,
                                        std::unique_ptr<PhysicsBackend> backend,
                                        nksim_world *out_world) {
-    // The integrator and friction cone are an optional tail: copy only the
-    // caller's prefix so older callers get zero, the backend default.
-    if (!valid_struct_size(provided.struct_size, offsetof(nksim_world_desc, integrator)))
+    if (!valid_struct_size(provided.struct_size, sizeof(provided)))
         return NKSIM_ERROR_INVALID_ARGUMENT;
-    nksim_world_desc desc{};
-    std::memcpy(&desc, &provided, std::min<std::size_t>(provided.struct_size, sizeof(desc)));
-    desc.struct_size = sizeof(desc);
+    const auto &desc = provided;
     if (desc.integrator > NKSIM_INTEGRATOR_RK4 || desc.friction_cone > NKSIM_FRICTION_CONE_ELLIPTIC)
         return NKSIM_ERROR_INVALID_ARGUMENT;
     if (!out_world ||
@@ -1260,7 +1236,7 @@ nksim_result NKSIM_CALL nksim_world_create(const nksim_world_desc *desc,
                                            nksim_world *out_world) {
     if (!desc || !out_world)
         return NKSIM_ERROR_INVALID_ARGUMENT;
-    if (!nksim::valid_struct_size(desc->struct_size, offsetof(nksim_world_desc, integrator)) ||
+    if (!nksim::valid_struct_size(desc->struct_size, sizeof(*desc)) ||
         !nksim::finite_positive(desc->fixed_timestep) || desc->physics_substeps == 0 ||
         !std::isfinite(desc->gravity[0]) || !std::isfinite(desc->gravity[1]) ||
         !std::isfinite(desc->gravity[2]))

@@ -76,29 +76,29 @@ class ToolpathLowering {
         });
         if (direction != Off && !spindleOn) {
           flush(); drainQueued();
-          add(MotionOp.SetOutput(ToolpathChannels.SpindleDirection,
+          add(MotionOp.SetOutput(machine.channels.spindleDirection,
             directionValue), span);
-          add(MotionOp.SetOutput(ToolpathChannels.SpindleSpeed,
+          add(MotionOp.SetOutput(machine.channels.spindleSpeed,
             EventValue.Analog(rpm)), span);
-          add(MotionOp.WaitInput(ToolpathChannels.SpindleAtSpeed,
+          add(MotionOp.WaitInput(machine.channels.spindleAtSpeed,
             InputPredicate.Equals(EventValue.Digital(true)), null), span);
         } else {
-          outputEvent(ToolpathChannels.SpindleDirection, directionValue, span);
-          outputEvent(ToolpathChannels.SpindleSpeed, EventValue.Analog(rpm), span);
+          outputEvent(machine.channels.spindleDirection, directionValue, span);
+          outputEvent(machine.channels.spindleSpeed, EventValue.Analog(rpm), span);
         }
         spindleOn = direction != Off;
       case Coolant(mist, flood, span):
-        outputEvent(ToolpathChannels.CoolantMist,
+        outputEvent(machine.channels.coolantMist,
           EventValue.Digital(mist), span);
-        outputEvent(ToolpathChannels.CoolantFlood,
+        outputEvent(machine.channels.coolantFlood,
           EventValue.Digital(flood), span);
       case ToolChange(number, span):
-        flush(); drainQueued(); add(MotionOp.WaitInput(ToolpathChannels.toolChange(number),
+        flush(); drainQueued(); add(MotionOp.WaitInput(machine.channels.toolChange(number),
           InputPredicate.Equals(EventValue.Digital(true)), null), span);
       case ToolLengthOffset(_, _, _):
         // ToolpathMotion already moved Z to the controlled point.
       case OptionalStop(span), ProgramStop(span):
-        flush(); drainQueued(); add(MotionOp.WaitInput(ToolpathChannels.OperatorResume,
+        flush(); drainQueued(); add(MotionOp.WaitInput(machine.channels.operatorResume,
           InputPredicate.Equals(EventValue.Digital(true)), null), span);
       case End(_): flush(); drainQueued();
     }

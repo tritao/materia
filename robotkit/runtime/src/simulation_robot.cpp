@@ -197,10 +197,6 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
             target.damping = gains.damping;
             if (index < RK_MAX_SERVO_JOINTS) {
                 target.velocity = command.servos[index].velocity;
-                target.end_position = command.reference_end_position[index];
-                target.end_velocity = command.reference_end_velocity[index];
-                target.reference_duration = command.reference_duration;
-                target.reflected_inertia = reflected_inertia_[source.joint];
             }
         }
         if (source.mode == RK_TARGET_SERVO) {
@@ -210,9 +206,21 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
             target.damping = servo.damping;
             target.feedforward = servo.feedforward;
         }
+        if (target.mode == NKSIM_JOINT_TARGET_SERVO && index < RK_MAX_SERVO_JOINTS) {
+            target.end_position = command.reference_end_position[index] + slip_[source.joint] +
+                staged_squaring_offset_[source.joint] + counter_origin_[source.joint];
+            target.end_velocity = command.reference_end_velocity[index];
+            target.reference_duration = command.reference_duration;
+            target.reflected_inertia = reflected_inertia_[source.joint];
+        }
         if (squaring_hold_[source.joint]) {
             target.target = squaring_position_[source.joint];
             target.velocity = 0.0;
+            if (target.mode == NKSIM_JOINT_TARGET_SERVO) {
+                target.end_position = target.target;
+                target.end_velocity = 0.0;
+                target.feedforward = 0.0;
+            }
         }
         pending_targets_.push_back(target);
         staged[source.joint] = {target.mode, target.target};
@@ -231,51 +239,53 @@ std::vector<nksim_joint_target> SimulationRobot::take_pending_targets() {
     return result;
 }
 
-rk_result SimulationRobot::apply_pneumatic_valves(const RobotRuntime &runtime,
-                                                   std::vector<nksim_joint_target> &targets) {
-    for (auto &drive : pneumatic_drives_) {
-        rk_event_value channel_a{};
-        auto result = runtime.channel_value(drive.channel_a.c_str(), channel_a);
-        if (result != RK_OK || channel_a.kind != RK_EVENT_DIGITAL) return RK_ERROR_INVALID_STATE;
-        const bool coil_a = channel_a.digital != 0;
+std::optional<ProcessChannelFault> SimulationRobot::apply_pneumatic_valves(const RobotRuntime &runtime,
+                                        std::vector<nksim_joint_target> &targets, bool deenergized) {
+    const ProcessChannelReader reader([&runtime](const char *channel, rk_event_value &value) {
+        return runtime.channel_value(channel, value);
+    });
+    // Resolve every coil before committing any valve latch state.
+    std::vector<bool> spool_states;
+    for (const auto &drive : pneumatic_drives_) {
+        const auto a = deenergized ? ProcessChannelReading<bool>{} : reader.digital(drive.channel_a);
+        if (a.fault) return a.fault;
         bool to_a = drive.to_a;
         if (!drive.has_channel_b) {
-            to_a = coil_a ? !drive.normally_to_a : drive.normally_to_a;
+            to_a = a.value ? !drive.normally_to_a : drive.normally_to_a;
         } else {
-            rk_event_value channel_b{};
-            result = runtime.channel_value(drive.channel_b.c_str(), channel_b);
-            if (result != RK_OK || channel_b.kind != RK_EVENT_DIGITAL) return RK_ERROR_INVALID_STATE;
-            const bool coil_b = channel_b.digital != 0;
-            // A double-solenoid valve holds its last spool position when both coils
-            // are off (including an emergency stop), or when both are energized.
-            if (coil_a != coil_b) to_a = coil_a;
+            const auto b = deenergized ? ProcessChannelReading<bool>{} : reader.digital(drive.channel_b);
+            if (b.fault) return b.fault;
+            // Both coils off or on hold the last double-solenoid spool state.
+            if (a.value != b.value) to_a = a.value;
         }
-        drive.to_a = to_a;
+        spool_states.push_back(to_a);
+    }
+    for (std::size_t index = 0; index < pneumatic_drives_.size(); ++index) {
+        auto &drive = pneumatic_drives_[index];
+        drive.to_a = spool_states[index];
         nksim_joint_target target{};
         target.struct_size = sizeof(target);
         target.joint = joints_[drive.joint];
         target.mode = NKSIM_JOINT_TARGET_EFFORT;
-        target.target = to_a ? drive.extension_force * drive.extend_sign
+        target.target = drive.to_a ? drive.extension_force * drive.extend_sign
             : -drive.retraction_force * drive.extend_sign;
         target.max_force = std::max(drive.extension_force, drive.retraction_force);
         targets.push_back(target);
     }
-    return RK_OK;
+    return std::nullopt;
 }
 
-rk_result SimulationRobot::apply_velocity_drives(const RobotRuntime &runtime,
-                                                  std::vector<nksim_joint_target> &targets) {
+std::optional<ProcessChannelFault> SimulationRobot::apply_velocity_drives(const RobotRuntime &runtime,
+                                        std::vector<nksim_joint_target> &targets, bool deenergized) {
+    const ProcessChannelReader reader([&runtime](const char *channel, rk_event_value &value) {
+        return runtime.channel_value(channel, value);
+    });
     for (const auto &drive : velocity_drives_) {
-        rk_event_value speed{};
-        auto result = runtime.channel_value(drive.speed_channel.c_str(), speed);
-        if (result != RK_OK || speed.kind != RK_EVENT_ANALOG) return RK_ERROR_INVALID_STATE;
-        rk_event_value direction{};
-        result = runtime.channel_value(drive.direction_channel.c_str(), direction);
-        if (result != RK_OK || direction.kind != RK_EVENT_ANALOG) return RK_ERROR_INVALID_STATE;
-        if (!std::isfinite(speed.analog) || !std::isfinite(direction.analog))
-            return RK_ERROR_INVALID_STATE;
-        const auto signed_direction = std::clamp(direction.analog, -1.0, 1.0);
-        const auto velocity = std::clamp(speed.analog * signed_direction *
+        const auto speed = deenergized ? ProcessChannelReading<double>{} : reader.analog(drive.speed_channel);
+        if (speed.fault) return speed.fault;
+        const auto direction = deenergized ? ProcessChannelReading<double>{} : reader.analog(drive.direction_channel);
+        if (direction.fault) return direction.fault;
+        const auto velocity = std::clamp(speed.value * std::clamp(direction.value, -1.0, 1.0) *
             drive.radians_per_speed_unit, -drive.max_rate, drive.max_rate);
         nksim_joint_target target{};
         target.struct_size = sizeof(target);
@@ -284,11 +294,9 @@ rk_result SimulationRobot::apply_velocity_drives(const RobotRuntime &runtime,
         target.target = velocity;
         target.max_force = drive.max_effort;
         targets.push_back(target);
-        // Process velocity targets are resolved after take_pending_targets(). Keep
-        // the applied target for the at-speed sensor and the next stop command.
         commanded_[drive.joint] = {target.mode, target.target};
     }
-    return RK_OK;
+    return std::nullopt;
 }
 
 rk_result SimulationRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) {

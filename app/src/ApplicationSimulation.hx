@@ -214,7 +214,7 @@ class ApplicationSimulation {
           var job = session.cncJob;
           var ownsJob = job != null && (control == null || job.controllerId == control.id);
           var built = AssemblyRobot.add(candidate, scene, session, assembly, backend == MUJOCO,
-            appliedRevision + 1, robotIndex, ownsJob ? CncProgramPlayer.processChannels() : null, virtualWelder, control);
+            appliedRevision + 1, robotIndex, ownsJob ? CncProgramPlayer.processChannels(job) : null, virtualWelder, control);
           candidateRobots.push(built.robot);
           candidateLinks.push([for (link in built.model.links) link.id]);
           candidateRobotModels.push(built.model);

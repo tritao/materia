@@ -2139,8 +2139,8 @@ void servo_target_is_a_saturating_pd() {
     invalid.stiffness = 1.0;
     invalid.struct_size = offsetof(nksim_joint_target, velocity); // Too short to carry servo terms.
     assert(nksim_world_set_joint_targets(rig.world, &invalid, 1) == NKSIM_ERROR_INVALID_ARGUMENT);
-    invalid.mode = NKSIM_JOINT_TARGET_EFFORT; // The legacy prefix still works for other modes.
-    assert(nksim_world_set_joint_targets(rig.world, &invalid, 1) == NKSIM_OK);
+    invalid.mode = NKSIM_JOINT_TARGET_EFFORT; // Every mode requires the current complete layout.
+    assert(nksim_world_set_joint_targets(rig.world, &invalid, 1) == NKSIM_ERROR_INVALID_ARGUMENT);
     destroy_arm_rig(rig);
 }
 
@@ -2364,10 +2364,9 @@ void world_options_are_validated() {
     nksim_world_destroy(world);
     desc.integrator = 9;
     assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_ERROR_INVALID_ARGUMENT);
-    desc.integrator = 7; // Beyond the prefix an older caller supplies, so never read.
+    desc.integrator = NKSIM_INTEGRATOR_IMPLICIT_FAST; // Incomplete layouts are rejected.
     desc.struct_size = offsetof(nksim_world_desc, integrator);
-    assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
-    nksim_world_destroy(world);
+    assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_ERROR_INVALID_ARGUMENT);
     nkscene_scene_destroy(scene);
 }
 

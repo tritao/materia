@@ -13,15 +13,17 @@ import motionkit.kinematics.Pose3;
 
 /** Runs a machining program and prepares a safe mid-path continuation. */
 class MachiningRun {
+  public final channels:ToolpathChannels;
   public final recipe:MachiningRecipe;
   public final program:MotionProgram;
   public final motion:ManipulatorMotion;
   public var spindleFaulted(default, null):Bool = false;
 
   public function new(recipe:MachiningRecipe, program:MotionProgram,
-      motion:ManipulatorMotion) {
-    if (recipe == null || program == null || motion == null)
+      motion:ManipulatorMotion, channels:ToolpathChannels) {
+    if (recipe == null || program == null || motion == null || channels == null)
       throw "machining run needs a recipe, program and motion controller";
+    this.channels = channels;
     this.recipe = recipe;
     this.program = program;
     this.motion = motion;
@@ -74,7 +76,7 @@ class MachiningRun {
       var limit = index == opIndex ? start : Math.POSITIVE_INFINITY;
       switch program.ops[index] {
         case SetOutput(channel, value): states.set(channel, value);
-        case WaitInput(channel, _, _) if (StringTools.startsWith(channel, ToolpathChannels.ToolChangePrefix)):
+        case WaitInput(channel, _, _) if (StringTools.startsWith(channel, channels.toolChangePrefix)):
           toolChange = program.ops[index];
         case FollowPath(_, _, _, events):
           for (event in events)
@@ -104,18 +106,18 @@ class MachiningRun {
     }
     // The tool goes in before the spindle starts, as the program did.
     if (toolChange != null) result.push(toolChange);
-    for (channel in [ToolpathChannels.SpindleDirection,
-        ToolpathChannels.SpindleSpeed, ToolpathChannels.CoolantMist,
-        ToolpathChannels.CoolantFlood]) {
+    for (channel in [channels.spindleDirection,
+        channels.spindleSpeed, channels.coolantMist,
+        channels.coolantFlood]) {
       var value = states.get(channel);
       if (value != null) result.push(MotionOp.SetOutput(channel, value));
     }
-    var spindle = states.get(ToolpathChannels.SpindleSpeed);
+    var spindle = states.get(channels.spindleSpeed);
     if (spindle != null && switch spindle {
       case Analog(rpm): rpm > 0.0;
       case _: false;
     })
-      result.push(MotionOp.WaitInput(ToolpathChannels.SpindleAtSpeed,
+      result.push(MotionOp.WaitInput(channels.spindleAtSpeed,
         InputPredicate.Equals(EventValue.Digital(true)), null));
     result.push(MotionOp.MoveL(target, frame, recipe.approachFeed, Blend.ExactStop));
     var resumeOp = result.length;
@@ -155,13 +157,13 @@ class MachiningRun {
         snapshot.safety != 0)
       throw "spindle fault shutdown waits for a controlled stop";
     return new MotionProgram([
-      MotionOp.SetOutput(ToolpathChannels.SpindleSpeed,
+      MotionOp.SetOutput(channels.spindleSpeed,
         EventValue.Analog(0.0)),
-      MotionOp.SetOutput(ToolpathChannels.SpindleDirection,
+      MotionOp.SetOutput(channels.spindleDirection,
         EventValue.Analog(0.0)),
-      MotionOp.SetOutput(ToolpathChannels.CoolantMist,
+      MotionOp.SetOutput(channels.coolantMist,
         EventValue.Digital(false)),
-      MotionOp.SetOutput(ToolpathChannels.CoolantFlood,
+      MotionOp.SetOutput(channels.coolantFlood,
         EventValue.Digital(false))
     ]);
   }
