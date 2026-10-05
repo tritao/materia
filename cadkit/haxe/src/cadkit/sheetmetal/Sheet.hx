@@ -4,6 +4,7 @@ import cadkit.modeling.Location;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import cadkit.sheetmetal.BendSeam.SeamInterval;
+import cadkit.sheetmetal.process.BendProcessResult;
 
 /** One sheet graph owns identities and dimensions; solids and flat patterns are derived from it. */
 class Sheet {
@@ -233,6 +234,34 @@ class Sheet {
 	}
 
 	public function evaluate(state:SheetState, root:Int = 0, tolerance:Float = 1e-8):SheetEvaluation {
+		return evaluateAngles(state, root, tolerance, 0, 0);
+	}
+
+	/** Evaluate one manufacturing stroke without changing the authored target or developed blank. */
+	public function evaluateStroke(state:SheetState, activeBend:Int, process:BendProcessResult,
+			root:Int = 0, tolerance:Float = 1e-8):SheetEvaluation {
+		var active = bend(activeBend);
+		if (isRipped(activeBend))
+			throw new SheetDiagnosis("sheet.ripped-stroke", "A ripped bend cannot carry a manufacturing stroke", ["bend:" + activeBend]);
+		var allowance = bendAllowance(active);
+		var neutralOffset = allowance / Math.abs(active.angle) - active.radius;
+		if (!Math.isFinite(process.targetAngle) || !Math.isFinite(process.loadedAngle)
+			|| !Math.isFinite(process.innerRadius) || !Math.isFinite(process.loadedRadius)
+			|| !Math.isFinite(process.bendAllowance)
+			|| Math.abs(process.targetAngle - active.angle) > 1e-8
+			|| process.loadedAngle * active.angle <= 0
+			|| Math.abs(process.loadedAngle) < Math.abs(active.angle)
+			|| Math.abs(process.loadedAngle) >= 2 * Math.PI
+			|| process.loadedRadius < 0
+			|| Math.abs(process.innerRadius - active.radius) > 1e-8
+			|| Math.abs(process.bendAllowance - allowance) > 1e-8
+			|| Math.abs(allowance / Math.abs(process.loadedAngle) - neutralOffset - process.loadedRadius) > 1e-8)
+			throw new SheetDiagnosis("sheet.stroke-process-mismatch",
+				"Loaded process geometry must conserve this bend's authored neutral length and radii", ["bend:" + activeBend]);
+		return evaluateAngles(state, root, tolerance, activeBend, process.loadedAngle);
+	}
+
+	function evaluateAngles(state:SheetState, root:Int, tolerance:Float, activeBend:Int, loadedAngle:Float):SheetEvaluation {
 		if (!Math.isFinite(tolerance) || tolerance <= 0)
 			throw new SheetDiagnosis("sheet.invalid-tolerance", "Closure tolerance must be finite and positive");
 		if (material.bendRule == null)
@@ -247,8 +276,9 @@ class Sheet {
 			validateBend(b);
 			validateMaterial(b);
 			var a = state.angle(b.id);
-			if (a * b.angle < 0 || Math.abs(a) > Math.abs(b.angle))
-				throw new SheetDiagnosis("sheet.invalid-state", "State angle must lie between zero and its target", ["bend:" + b.id]);
+			var limit = b.id == activeBend ? loadedAngle : b.angle;
+			if (a * limit < 0 || Math.abs(a) > Math.abs(limit))
+				throw new SheetDiagnosis("sheet.invalid-state", "State angle must lie between zero and its permitted target", ["bend:" + b.id]);
 		}
 		var frames:Map<Int, Location> = new Map();
 		var tree:Map<Int, Bool> = new Map();

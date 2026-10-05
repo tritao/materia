@@ -99,6 +99,7 @@ class SheetMetalSmoke {
 		assertions += SheetAncestorSmoke.run();
 		assertions += SheetProcessSmoke.run();
 		assertions += SheetProcessRuleSmoke.run();
+		assertions += SheetStrokeSmoke.run();
 		assertions += SheetCornerGeometrySmoke.run();
 		assertions += SheetCornerReliefSmoke.run();
 		assertions += SheetCornerSmoke.run();
