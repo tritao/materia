@@ -118,8 +118,9 @@ class MobileWeldStations {
     candidates = WeldStationCandidates.around(points, work.toPose2(), armMount.translation, 0.45, 0.65, 3, 12);
     var poses = [for (candidate in candidates) candidate.pose]; poses.push(start);
     var length:Float = cast base.footprintLength, width:Float = cast base.footprintWidth;
+    var radius = Math.sqrt(length * length + width * width) / 2;
     var map = new Costmap2(FloorMap.rasterize(boxes, poses, FloorMap.DEFAULT_RESOLUTION,
-      FloorMap.DEFAULT_MARGIN, FloorMap.DEFAULT_CLEARANCE, "map"), Math.sqrt(length * length + width * width) / 2, true, 0.3, 1.5);
+      FloorMap.navigationMargin(radius, 0.3), FloorMap.DEFAULT_CLEARANCE, "map"), radius, true, 0.3, 1.5);
     navigation = new AStarPlanner(map);
   }
 

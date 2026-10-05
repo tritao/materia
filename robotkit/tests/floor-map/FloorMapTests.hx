@@ -40,6 +40,19 @@ class FloorMapTests {
       var added:robotkit.navigation.GridCell2 = cast expanded.worldToCell(pose);
       check(grid.cell(old.x, old.y) == expanded.cell(added.x, added.y), "Extra candidate goals do not move rasterized world obstacles");
     }
+    var table:FloorBox = {id: "table", x: 2, y: 0, z: 0.2, halfX: 0.15, halfY: 0.45, halfZ: 0.2, yaw: 0};
+    var west = new Pose2(0.35, 0), east = new Pose2(3.65, 0);
+    var goals = [new Pose2(-1.5, -0.8), west, east];
+    var radius = Math.sqrt(2.45 * 2.45 + 0.82 * 0.82) / 2;
+    var clipped = new AStarPlanner(new Costmap2(FloorMap.rasterize([table], goals, 0.05, 1, 1, "map"), radius, true, 0.3, 1.5));
+    var clippedRoute = false;
+    try clipped.plan(west, east) catch (_:Dynamic) clippedRoute = true;
+    check(clippedRoute, "A fixed one-metre map margin clips the enlarged carrier's detour");
+    var roomy = new AStarPlanner(new Costmap2(FloorMap.rasterize([table], goals, 0.05,
+      FloorMap.navigationMargin(radius, 0.3), 1, "map"), radius, true, 0.3, 1.5));
+    var detour = roomy.plan(west, east);
+    check(detour.length > east.x - west.x, "Footprint-derived bounds preserve the route between selected stations");
+    check(FloorMap.navigationMargin(0.3, 0.3) == 1, "Light carrier mapping keeps its existing margin");
     Sys.println('RobotKit floor map tests passed ($assertions assertions)');
   }
 }

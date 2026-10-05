@@ -19,6 +19,14 @@ class FloorMap {
   public static inline var DEFAULT_RESOLUTION:Float = 0.05;
   public static inline var DEFAULT_MARGIN:Float = 1.0;
   public static inline var DEFAULT_CLEARANCE:Float = 1.0;
+  /** Leave space to detour around inflated obstacles even when only the selected goals bound the map. */
+  public static function navigationMargin(footprintRadius:Float, inflationDistance:Float,
+      resolution:Float = DEFAULT_RESOLUTION):Float {
+    if (!Math.isFinite(footprintRadius) || footprintRadius < 0 || !Math.isFinite(inflationDistance) ||
+        inflationDistance < 0 || !Math.isFinite(resolution) || resolution <= 0)
+      throw "Navigation map margin needs finite nonnegative footprint and inflation and a positive resolution";
+    return Math.max(DEFAULT_MARGIN, footprintRadius + inflationDistance + 2 * resolution);
+  }
   public static function standing(boxes:Array<FloorBox>, clearance:Float):Array<FloorBox>
     return [for (box in boxes) if (box.z - box.halfZ < clearance && box.z + box.halfZ > 0.01) box];
 

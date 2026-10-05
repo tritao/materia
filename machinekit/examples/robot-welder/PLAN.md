@@ -1497,3 +1497,13 @@ created from the normalized current-schema scene so resolved material properties
 `materia.mobilemission.project.json` exposes the planned mission while the carrier-only manifest
 continues serving the focused carrier check. This CAD result proves planning and coverage; P2
 remains incomplete until complete mobile execution and the required regression gates pass.
+
+P2 first complete execution reached the first station's welds and checked stow, but failed on
+step 9 (the second `goTo`) at 111.72 s: AStarPlanner could not find a traversable route. The
+focused floor-map regression reproduces the cause: a fixed one-metre margin clips the enlarged
+carrier's detour when the map bounds include only selected stations, while the proposal map has
+more distant candidates. `FloorMap.navigationMargin` now derives bounds from the actual footprint
+radius, soft inflation distance and two grid cells, keeping the old one-metre minimum for light
+carriers. CAD planning and execution use the same rule. All 485 floor-map assertions pass,
+including rejection of the clipped route and successful detour with derived bounds. The app
+execution retry and milestone gates remain pending.

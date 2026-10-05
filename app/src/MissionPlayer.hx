@@ -221,7 +221,8 @@ class MissionPlayer implements SessionMember {
       var initial = simulation.linkPose(robotIndex, 0);
       poses.push(new Transform3(new Vec3(initial.position[0], initial.position[1], initial.position[2]),
         new Quat(initial.rotation[0], initial.rotation[1], initial.rotation[2], initial.rotation[3])).toPose2());
-      var map = new Costmap2(floorPlan(obstacles, poses), footprint.radius, true, 0.3, 1.5, MEMORY_SECONDS);
+      var margin = robotkit.navigation.FloorMap.navigationMargin(footprint.radius, 0.3, RESOLUTION);
+      var map = new Costmap2(floorPlan(obstacles, poses, margin), footprint.radius, true, 0.3, 1.5, MEMORY_SECONDS);
       costmap = map;
       var navigation = new Navigation(base, localization, 0.35, 0.5, 1.2, false);
       var lidars = [for (sensor in project.robotSensors) if (sensor.kind == "lidar") sensor];
@@ -357,8 +358,8 @@ class MissionPlayer implements SessionMember {
    * An occupancy grid covering the obstacles and `poses` with a margin: a cell is occupied when its
    * square overlaps a box that stands within the robot's height.
    */
-  public static function floorPlan(obstacles:Array<FloorObstacle>, poses:Array<Pose2>):OccupancyGrid2
-    return robotkit.navigation.FloorMap.rasterize(obstacles, poses, RESOLUTION, MARGIN, CLEARANCE, FRAME);
+  public static function floorPlan(obstacles:Array<FloorObstacle>, poses:Array<Pose2>, margin:Float = MARGIN):OccupancyGrid2
+    return robotkit.navigation.FloorMap.rasterize(obstacles, poses, RESOLUTION, margin, CLEARANCE, FRAME);
 
   public function feed():Void {
     if (failure != null || finished) return;
