@@ -18,6 +18,7 @@ import cadkit.sheetmetal.process.AirBending;
 class PressBrakeChecks {
 	public static function main():Void run();
 	public static function run():Void {
+		BendSetupChecks.run();
 		var recipeFixture = new MachineAssembly();
 		recipeFixture.addComponent("finger", new GaugeFinger());
 		recipeFixture.addComponent("base", new GaugeFinger());
