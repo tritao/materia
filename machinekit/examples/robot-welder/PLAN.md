@@ -2411,3 +2411,32 @@ pass, blocked-fixture refusal, sensing corridor coverage and measured contact
 execution. Logs: app/build/p3-true-observed-probe-*.log. The earlier boundary
 pass predates this preparation repair; the full mission and final milestone
 gates remain open. Main has not advanced; P4/P5 are still required.
+
+### P3 explicit local refinement and sequential stages (2026-10-05)
+
+Focused clock observations pass 24 assertions on latest main. The corrected
+observed-approach full-mission trial regenerated the same 66-record / 2,885,787-byte
+artifact and executed five probe pairs at station one (223.97999999994127 s),
+then again spent substantial time selecting the final face. It was stopped
+(exit 143), not counted as a full-mission pass.
+
+A second tier leak remained: the observed CAD screen called full prepare, whose
+second pass could invoke global discovery. ProcessKit now has prepareObserved
+with no global fallback, and full prepare retains that fallback. Focused native
+contact motion passes 98 assertions, explicitly proving both failure behaviors.
+The app compiles 1,936 sources (28.9 s). No solver interface or search budget
+change is needed.
+
+With the local tier now bounded to observed continuation, CAD selection refines
+all original 9/17/33 local lattices before global discovery at those same sizes.
+This revises the earlier per-resolution priority: its motivation assumed the
+observed tier was cheap, but it was inadvertently executing global preparation.
+The new separation permits local refinement without paying for that discovery,
+and retains every original global/fine fallback.
+
+Multi-point stages are prepared sequentially from each preceding probe's checked
+approach configuration. Execution's checked retreat restores that configuration;
+proving every point from the initial stage posture could reject a valid sequence
+and did not represent its actual transitions. Execution still plans from measured
+joints and rechecks all clearance/corridor guards. Logs: ignored
+app/build/p3-tiered-*.log. Complete mission and final milestone gates remain open.

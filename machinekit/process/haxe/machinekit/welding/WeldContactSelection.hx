@@ -54,9 +54,9 @@ class WeldContactSelection {
     });
     var start = positions();
     var reasons:Array<String> = [];
-    // At each resolution, prefer observed branches across faces before global discovery.
+    // Refine observed branches without global discovery; then retain every global fallback.
     // Full preparation still proves every trajectory and sensing corridor.
-    for (divisions in [9, 17, 33]) for (discover in [false, true]) {
+    for (discover in [false, true]) for (divisions in [9, 17, 33]) {
       var previous = [for (normal in normals) new Vector(normal.x, normal.y, normal.z)];
       var geometric = WeldProbePatterns.stages(geometry, count, previous, provider, 3, divisions);
       // Rank by geometric observability, then prove one face at a time. Unused faces need no IK solves.
@@ -67,10 +67,17 @@ class WeldContactSelection {
           try {
             var probes:Array<ContactProbeRequest> = [];
             var normal = direction(stage.face.normal);
+            var from = start;
             for (point in stage.points) {
               var bounds = provider.region(stage.face, point);
-              probes.push(prepare.prepare(estimate.transformPoint(metres(point)), estimate.rotation.rotate(normal),
-                bounds.normalTravel * 0.001, start, job.contactOffset));
+              var rootPoint = estimate.transformPoint(metres(point));
+              var rootNormal = estimate.rotation.rotate(normal);
+              var checked = discover
+                ? prepare.prepare(rootPoint, rootNormal, bounds.normalTravel * 0.001, from, job.contactOffset)
+                : prepare.prepareObserved(rootPoint, rootNormal, bounds.normalTravel * 0.001, from, job.contactOffset);
+              probes.push(checked);
+              // Retreat restores this proved configuration before the next search begins.
+              from = cast checked.approachJoints;
             }
             return new ContactRegistrationStage(normal, stage.face.offset() * 0.001, probes);
           } catch (error:Dynamic) reasons.push('${stage.face.name()}: ${Std.string(error)}');
