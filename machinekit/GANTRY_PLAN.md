@@ -568,7 +568,7 @@ G0 → G1 → G2 → G3 ──────────────────�
 | G14 | complete; Phase D build/runtime gate passed | `7822171b5`, `58075ec63`; see progress notes |
 | G15 | complete; four-run/ten-seam MuJoCo mission and Phase D gate passed | see progress notes |
 | G16 | complete; focused FK, solid/runtime clearance, drive and ownership checks passed | see progress notes |
-| G17 | complete | Two-station handling, 2.6 m FollowPath and CAD fillet pass; Phase E app gate pending. |
+| G17 | complete | Two-station handling, 2.6 m FollowPath and CAD fillet pass; full Phase E gate passes. |
 | G18 | planned | — |
 
 ### G0 — merged-base baseline (2026-10-04)
@@ -3862,4 +3862,30 @@ no posture is requested.
 The full MachineKit, RobotKit (5061), CadBridge (173), Toolpath Motion
 (12/2/12/3008), ProcessKit and native CTest (19/19) gates pass. After the posture
 fix, affected compiler-only builds pass and CadBridge/Toolpath Motion/ProcessKit
-runtime suites pass again. The final MotionKit and app gates remain pending.
+runtime suites pass again. The final MotionKit suite passes 71400 assertions,
+including the posture regression. The full app gate exits successfully.
+
+
+### Phase E boundary — mandatory G16/G17 complete
+
+Compiler-only builds pass for app, RobotKit, MotionKit, CadBridge, Toolpath Motion
+and ProcessKit. MachineKit's full `scripts/test-haxeon` passes, including the track
+and track-arm examples. Native runtime builds are current and CTest passes 19/19.
+Full runtime suites pass: RobotKit 5061, MotionKit 71400, CadBridge 173,
+Toolpath Motion 12/2/12/3008, and ProcessKit 56/53/16/106/13/12/19/23.
+
+The complete app ProjectSourceTests run exits 0. It covers ordinary arms/cobots,
+both gantry pickers, the four-run/ten-seam gantry welder, both G17 modes, the whole
+robot weldment and recovery runs on both backends, air/crater/displaced-workpiece
+faults, four-sided post, weave/multipass, mates, mills, virtual homing, screw and
+belt routers, CoreXY, mobile missions, controls and background launch. G17's weld
+again supplies 2.599999 m through the track, keeps 0.7754 rad arm margin, and deposits
+all 2600 mm at a 5 mm leg in 236.6 simulated seconds. The existing post planner
+remains expensive but its motion and bead checks pass; inspection confirms that
+cell has six owned arm joints and no external-axis posture preference.
+
+Logs are in `/home/joao/dev/materia-cache/claude-scratch/`, with
+`gantries-phase-e-*` and `gantries-g17-posture-*` prefixes. The final complete app
+log is `gantries-phase-e-app-posture-runtime.log`. No diagnostic selectors or
+traces from the topology inspection remain in source. G18 is the optional inverted
+arm variant and remains unstarted; mandatory Phase E work is complete.
