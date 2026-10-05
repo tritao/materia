@@ -1,6 +1,8 @@
 import processkit.WeldStationPlanner;
+import processkit.WeldStationCandidates;
 import processkit.WeldStationPlanner.WeldStationCandidate;
 import robotkit.mobile.Pose2;
+import robotkit.spatial.Vec3;
 
 class WeldStationTests {
   static var checks:Int = 0;
@@ -16,6 +18,7 @@ class WeldStationTests {
   static function distance(from:Pose2, to:Pose2):Null<Float>
     return Math.sqrt(Math.pow(from.x - to.x, 2) + Math.pow(from.y - to.y, 2));
   public static function main():Void {
+    candidateGeometry();
     var seams = ["a", "b", "c", "d", "e", "f"];
     var candidates = [new WeldStationCandidate("greedy", new Pose2(10, 0)),
       new WeldStationCandidate("left", new Pose2(2, 0)), new WeldStationCandidate("right", new Pose2(1, 0))];
@@ -85,5 +88,32 @@ class WeldStationTests {
     check(WeldStationPlanner.plan([], [], new Pose2(), access, distance).stations.length == 0, "Empty work needs no stations");
     check(seams.length == 6 && candidates.length == 3, "Planning leaves its inputs unchanged");
     Sys.println('ProcessKit welding station tests passed ($checks checks)');
+  }
+
+  static function candidateGeometry():Void {
+    var endpoints = [new Vec3(-0.2, -0.1, 0.9), new Vec3(0.2, 0.1, 1.1)];
+    var mount = new Vec3(0.925, 0.04, 0.328);
+    var work = new Pose2(2.0, -0.15, Math.PI / 2);
+    var grid = WeldStationCandidates.around(endpoints, work, mount, 0.45, 0.65, 3, 12);
+    check(grid.length == 36, "Documented heading/standoff grid produces every candidate");
+    for (index in 0...grid.length) {
+      var candidate = grid[index];
+      var arm = candidate.pose.compose(new Pose2(mount.x, mount.y));
+      var dx = work.x - arm.x, dy = work.y - arm.y;
+      var standoff = 0.45 + 0.1 * (index % 3);
+      check(Math.abs(Math.sqrt(dx * dx + dy * dy) - standoff) < 1e-9,
+        "Standoff measures the mounted arm's position, not the long chassis centre");
+      check(Math.abs(Pose2.wrapAngle(Math.atan2(dy, dx) - arm.yaw)) < 1e-9, "Mounted arm faces the work bounds");
+    }
+    var shift = new Pose2(-1.2, 0.8, -0.3);
+    var moved = WeldStationCandidates.around(endpoints, shift.compose(work), mount, 0.45, 0.65, 3, 12);
+    for (index in 0...grid.length) {
+      var expected = shift.compose(grid[index].pose);
+      check(Math.abs(expected.x - moved[index].pose.x) < 1e-9 && Math.abs(expected.y - moved[index].pose.y) < 1e-9 &&
+        Math.abs(Pose2.wrapAngle(expected.yaw - moved[index].pose.yaw)) < 1e-9,
+        "A displaced CAD work frame displaces its stations without authored world coordinates");
+    }
+    rejects(() -> { WeldStationCandidates.around([], work, mount, 0.4, 0.6); }, "seam endpoints");
+    rejects(() -> { WeldStationCandidates.around(endpoints, work, mount, 0.6, 0.4); }, "standoffs");
   }
 }

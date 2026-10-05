@@ -1446,3 +1446,11 @@ count or route cost. Screens may reject only impossible edges, not merely unprov
 The focused station suite passes 37 checks, including a provisional one-station cover whose
 swept entry fails, retry to a proven two-station cover, cached full checks and no unverified
 assignment. This is an optimization of proof order, not a substitute for swept motion checks.
+
+P2 candidate geometry: `WeldStationCandidates.around` proposes a documented heading/standoff grid
+around CAD seam endpoint bounds in the work frame. The chassis pose subtracts the actual mounted
+arm offset, so standoff describes arm access rather than a long platform's centre. Work-frame
+translation and yaw transform every station; no world parking coordinates are authored. Grid
+resolution and standoff band are explicit planning parameters. Candidates remain unproven until
+navigation and full-motion checks accept them. The focused station suite passes 148 checks,
+including mounted-arm distances, heading, rigid-work-frame equivariance and invalid bounds.
