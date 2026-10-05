@@ -13,6 +13,8 @@ class WallFinishingMuJoCoRunner {
     SimulationPoseResetTests.run(1);
     var passiveAssertions = PassiveJointRuntimeTests.run(1);
     Sys.println('Passive MuJoCo runtime tests passed ($passiveAssertions assertions)');
+    var contactAssertions = PressFingerContactTests.run();
+    Sys.println('Press finger contact tests passed ($contactAssertions assertions)');
     var strokeAssertions = HydraulicRuntimeTests.run(1);
     var pressureAssertions = HydraulicRuntimeTests.pressureLoss(1);
     Sys.println('Hydraulic MuJoCo runtime tests passed (${strokeAssertions + pressureAssertions} assertions)');

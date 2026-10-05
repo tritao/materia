@@ -8,6 +8,7 @@ import nativekit.sim.SimSession;
 import robotkit.mobile.Pose2;
 import robotkit.model.CollisionShape.CollisionPrimitive;
 import robotkit.model.CollisionShape.ShapeContact;
+import robotkit.model.CollisionShape.ContactSurface;
 import robotkit.tool.ToolCollisionShape;
 import robotkit.tool.ToolCollisionShapes;
 import robotkit.spatial.Vec3;
@@ -357,11 +358,19 @@ class Simulation {
         }
         var surface = source.surface;
         if (surface != null) {
+          var issue = surface.validate();
+          if (issue != null) throw 'Simulation link hull: $issue';
           for (axis in 0...3) native.set_friction(axis, surface.friction[axis]);
           native.set_friction_dimensions(surface.frictionDimensions);
           native.set_contact_time_constant(surface.contactTimeConstant);
           native.set_contact_damping_ratio(surface.contactDampingRatio);
         }
+        var contact = source.contact;
+        native.set_contact_filter(contact == null ? 0 : switch contact {
+          case Layers: 0;
+          case PairsOnly: 1;
+          case PairsAndEnvironment: 2;
+        });
         robotDesc.set_link_hulls(index, native);
       }
     }
@@ -1092,7 +1101,8 @@ class Simulation {
 typedef SimulationLinkHull = {
   var link:Int;
   var vertices:Array<Float>;
-  @:optional var surface:robotkit.model.CollisionShape.ContactSurface;
+  @:optional var surface:ContactSurface;
+  @:optional var contact:ShapeContact;
 }
 
 typedef SimulationOmniDriveState = {
