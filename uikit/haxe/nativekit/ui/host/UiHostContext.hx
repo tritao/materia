@@ -8,6 +8,12 @@ import nativekit.ffi.NativeKit;
 /** Live, platform-neutral services available to a hosted application. */
 class UiHostContext {
 	public final fonts:FontCollection;
+	/** Application zoom is independent of the monitor pixel scale. */
+	public var zoom(get, set):Float;
+	var applicationZoom:Float = 1.0;
+	@:allow(nativekit.ui.host.UiHostRuntime)
+	var onZoomChanged:Null<Float->Void>;
+
 	public final events:NativeKitEvents;
 	/** An application may defer closing while it asks to save or confirm. */
 	public var onCloseRequested:Null<(Void->Void)->Void> = null;
@@ -21,6 +27,17 @@ class UiHostContext {
 		this.events = events;
 		this.close = close;
 		this.scheduleFrame = scheduleFrame;
+	}
+
+	function get_zoom():Float return applicationZoom;
+	function set_zoom(value:Float):Float {
+		if (!Math.isFinite(value) || value <= 0) throw "Application zoom must be positive and finite";
+		if (value != applicationZoom) {
+			applicationZoom = value;
+			if (onZoomChanged != null) onZoomChanged(value);
+			requestFrame();
+		}
+		return applicationZoom;
 	}
 
 	public function supports(capability:Int64):Bool {

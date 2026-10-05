@@ -17,6 +17,8 @@ class NativeInputAdapter {
 	var attachedEvents:Null<NativeKitEvents>;
 	var eventSubscription:Null<NativeKitEventSubscription>;
 	final eventListener:NativeKitEventValue->Void;
+	/** Converts window logical coordinates into application layout coordinates. */
+	public var coordinateScale:Float = 1.0;
 	var pointerX:Float;
 	var pointerY:Float;
 
@@ -82,18 +84,18 @@ class NativeInputAdapter {
 			case PointerMove(eventSource, x, y) if (matches(eventSource)):
 				pointerX = x;
 				pointerY = y;
-				context.pointerMove(x, y);
+				context.pointerMove(x / coordinateScale, y / coordinateScale);
 				true;
 			case PointerButton(eventSource, button, action, modifiers, x, y) if (matches(eventSource)):
 				pointerX = x;
 				pointerY = y;
 				if (action == InputAction.Press)
-					context.pointerDown(x, y, button, modifiers);
+					context.pointerDown(x / coordinateScale, y / coordinateScale, button, modifiers);
 				else if (action == InputAction.Release)
-					context.pointerUp(x, y, button, modifiers);
+					context.pointerUp(x / coordinateScale, y / coordinateScale, button, modifiers);
 				action == InputAction.Press || action == InputAction.Release;
 			case PointerScroll(eventSource, deltaX, deltaY) if (matches(eventSource)):
-				context.scroll(pointerX, pointerY, deltaX, deltaY);
+				context.scroll(pointerX / coordinateScale, pointerY / coordinateScale, deltaX / coordinateScale, deltaY / coordinateScale);
 				true;
 			case PointerEnter(eventSource, entered) if (matches(eventSource)):
 				if (!entered)
@@ -106,7 +108,7 @@ class NativeInputAdapter {
 						if (button != null)
 							context.pointerReenter(
 								NativeKit.nk_pointer_button_get_state_checked(window, cast button) ==
-								InputAction.Press, pointerX, pointerY);
+								InputAction.Press, pointerX / coordinateScale, pointerY / coordinateScale);
 					} catch (_:Dynamic) {}
 				}
 				true;
@@ -141,13 +143,13 @@ class NativeInputAdapter {
 				var routedId = touchPointerId(pointerId);
 				var data = new UiTouchData(tool, pressure, tiltX, tiltY);
 				if (action == TouchAction.Begin)
-					context.pointerDown(x, y, 0, modifiers, routedId, data);
+					context.pointerDown(x / coordinateScale, y / coordinateScale, 0, modifiers, routedId, data);
 				else if (action == TouchAction.Move)
-					context.pointerMove(x, y, modifiers, routedId, data);
+					context.pointerMove(x / coordinateScale, y / coordinateScale, modifiers, routedId, data);
 				else if (action == TouchAction.End)
-					context.pointerUp(x, y, 0, modifiers, routedId, data);
+					context.pointerUp(x / coordinateScale, y / coordinateScale, 0, modifiers, routedId, data);
 				else if (action == TouchAction.Cancel)
-					context.pointerCancel(routedId, x, y, modifiers, data);
+					context.pointerCancel(routedId, x / coordinateScale, y / coordinateScale, modifiers, data);
 				action == TouchAction.Begin || action == TouchAction.Move ||
 					action == TouchAction.End || action == TouchAction.Cancel;
 			case _:

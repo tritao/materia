@@ -11,6 +11,8 @@ import nativekit.ui.widgets.text.TextInputWindow;
 
 /** Synchronizes Haxe editor state with NativeKit's custom-surface IME API. */
 class TextInputBridge {
+	/** Application layout to window logical coordinates for IME geometry. */
+	public var coordinateScale:Float = 1.0;
 	var surface:Null<NativeKitSurface>;
 	var requestedActive:Bool;
 	var activeOwner:Null<WidgetId>;
@@ -94,6 +96,12 @@ class TextInputBridge {
 		if (surface == null || surface.isDisposed() || !requestedActive || cursor == null ||
 			(platformChecked && !platformSupported))
 			return;
+		if (coordinateScale != 1.0) {
+			cursor = new Rect(cursor.x * coordinateScale, cursor.y * coordinateScale,
+				cursor.width * coordinateScale, cursor.height * coordinateScale);
+			selectionRects = scaleRects(selectionRects);
+			compositionRects = scaleRects(compositionRects);
+		}
 		var result = NativeKitTextInput.updateResult(surface, window.text, window.start,
 			documentLength, selectionStart,
 			selectionEnd, compositionStart, compositionEnd, cast inputType, cast flags,
@@ -104,6 +112,12 @@ class TextInputBridge {
 			compositionStart, compositionEnd, encodeRangeRects(selectionRects),
 			encodeRangeRects(compositionRects));
 		checkPlatformResult(result, "text-input geometry update");
+	}
+
+	function scaleRects(rects:Array<TextRangeRect>):Array<TextRangeRect> {
+		return rects == null ? [] : [for (rect in rects) new TextRangeRect(rect.start, rect.end,
+			rect.x * coordinateScale, rect.y * coordinateScale,
+			rect.width * coordinateScale, rect.height * coordinateScale, rect.visualLeftIsStart)];
 	}
 
 	public function dispose():Void {

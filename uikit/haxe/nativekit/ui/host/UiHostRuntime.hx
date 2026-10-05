@@ -46,6 +46,8 @@ class UiHostRuntime {
 		this.window = window;
 		this.surface = surface;
 		frameState = new UiHostFrameState(width, height);
+		context.onZoomChanged = applyZoom;
+		frameState.setZoom(context.zoom);
 		frame = new LayoutFrame(width, height);
 		frameInfo = new FrameInfo(width, height, width, height, 1.0);
 	}
@@ -79,6 +81,9 @@ class UiHostRuntime {
 				created.context().attachPlatformWindow(window);
 				input = new NativeInputAdapter(created.context(), new Handle(window.rawValue()),
 					new Handle(surface.rawValue()));
+				input.coordinateScale = context.zoom;
+				created.context().textInput.coordinateScale = context.zoom;
+				created.context().platformCoordinateScale = context.zoom;
 				input.attach(context.events);
 				session.transition(UiHostLifecycle.Running);
 			}
@@ -95,6 +100,14 @@ class UiHostRuntime {
 	}
 
 	public function setScale(value:Float):Void frameState.setScale(value);
+	function applyZoom(value:Float):Void {
+		frameState.setZoom(value);
+		if (input != null) input.coordinateScale = value;
+		if (application != null) {
+			application.context().textInput.coordinateScale = value;
+			application.context().platformCoordinateScale = value;
+		}
+	}
 	public function setSurfaceReady(value:Bool):Void frameState.setSurfaceAvailable(value);
 
 	/** Renders at most once for the adapter's scheduling callback. */
@@ -106,9 +119,9 @@ class UiHostRuntime {
 			callbackDepth++;
 			var renderSurface = Surface.fromNativeHandle(surface);
 			context.setGpuRenderer(renderer.prepare(renderSurface));
-			frame.setViewport(logicalWidth, logicalHeight);
+			frame.setViewport(frameState.layoutWidth, frameState.layoutHeight);
 			frame.deltaSeconds = frameState.nextDelta(timeSeconds);
-			frameInfo.set(logicalWidth, logicalHeight, framebufferWidth, framebufferHeight, scale);
+			frameInfo.set(frameState.layoutWidth, frameState.layoutHeight, framebufferWidth, framebufferHeight, frameState.renderScale);
 			application.submit(frame);
 			if (session.state != UiHostLifecycle.Running || disposeRequested) {
 				callbackDepth--;
@@ -157,6 +170,7 @@ class UiHostRuntime {
 	function disposeNow():Void {
 		if (disposed) return;
 		disposed = true;
+		context.onZoomChanged = null;
 		var ownedInput = input;
 		input = null;
 		if (ownedInput != null)

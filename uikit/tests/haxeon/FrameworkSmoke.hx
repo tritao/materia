@@ -1621,9 +1621,14 @@ class FrameworkSmoke {
 		if (!input.consume(PointerMove(source, 4.0, 4.0)) || hoverEnters != 0 ||
 			!input.consume(PointerScroll(source, 1.5, -24.0)) || scrollEvents != 1)
 			return 13;
-		if (!input.consume(PointerButton(source, 0, InputAction.Press, 0, 4.0, 4.0)) ||
-			!input.consume(PointerButton(source, 0, InputAction.Release, 0, 4.0, 4.0)) || clicks != 2)
+		input.coordinateScale = 2;
+		var scaledBounds = buttonNode.globalBounds();
+		var scaledX = (scaledBounds.x + scaledBounds.width * 0.75) * 2;
+		var scaledY = (scaledBounds.y + scaledBounds.height * 0.75) * 2;
+		if (!input.consume(PointerButton(source, 0, InputAction.Press, 0, scaledX, scaledY)) ||
+			!input.consume(PointerButton(source, 0, InputAction.Release, 0, scaledX, scaledY)) || clicks != 2)
 			return 14;
+		input.coordinateScale = 1;
 		if (!input.consume(Key(source, UiKey.Enter, 28, InputAction.Press, 0)) ||
 			!input.consume(Key(source, UiKey.Enter, 28, InputAction.Repeat, 0)) ||
 			keyEvents != 1 || repeatEvents != 1 || clicks != 3)
@@ -3861,12 +3866,18 @@ class FrameworkSmoke {
 		var state = new UiHostFrameState(800, 600);
 		if (state.canRender()) return false;
 		state.setSurfaceAvailable(true);
+		state.setScale(2); state.setZoom(1.25);
+		if (state.layoutWidth != 640 || state.layoutHeight != 480 || state.renderScale != 2.5 || state.scale != 2) return false;
+		state.setZoom(1);
 		if (!state.canRender() || state.nextDelta(10.0) != 0.0) return false;
 		if (state.nextDelta(10.25) != 0.1) return false;
 		state.setSurfaceAvailable(false);
 		state.resize(1024, 768, 2048, 1536);
 		if (state.canRender()) return false;
 		state.setSurfaceAvailable(true);
+		state.setScale(2); state.setZoom(1.25);
+		if (state.layoutWidth != 640 || state.layoutHeight != 480 || state.renderScale != 2.5 || state.scale != 2) return false;
+		state.setZoom(1);
 		if (!state.canRender() || state.nextDelta(30.0) != 0.0) return false;
 		state.resize(1024, 768, 0, 0);
 		return !state.canRender();

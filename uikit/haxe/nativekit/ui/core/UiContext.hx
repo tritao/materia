@@ -93,6 +93,8 @@ class UiContext {
 	var frameNumber:Int;
 	var diagnosticStage:Int = 0;
 	public final textInput:TextInputBridge;
+	/** Application layout to window logical coordinates for platform geometry. */
+	public var platformCoordinateScale:Float = 1.0;
 
 	public function new(?session:LayoutSession, ?fonts:FontCollection, ?theme:Theme) {
 		this.session = session == null ? LayoutSession.create() : session;
@@ -416,8 +418,10 @@ class UiContext {
 		submittedStyleSheet = buildContext.styleSheet;
 		if (accessibilityBridge != null && (styleInvalidation.treeChanged ||
 			styleInvalidation.semanticsInvalidatedNodes > 0 ||
-			resolvedGeometryChangedNodes > 0 || focusChanged))
+			resolvedGeometryChangedNodes > 0 || focusChanged)) {
+			accessibilityBridge.coordinateScale = platformCoordinateScale;
 			accessibilityBridge.update(next, focus.focusedId);
+		}
 		// A newly mounted focus trap chooses its first target after layout. Rebuild
 		// once with that focus state before returning the frame for painting.
 		if (reconcileNewFocus && focusChanged && nextFocus != null)
@@ -462,6 +466,7 @@ class UiContext {
 			accessibilitySurface = surface;
 			accessibilityBridge = new AccessibilityBridge(surface);
 		}
+		accessibilityBridge.coordinateScale = platformCoordinateScale;
 		accessibilityBridge.update(root, focus.focusedId);
 	}
 
