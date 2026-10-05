@@ -69,6 +69,17 @@ class ContactSearchMotionTests {
         Math.abs(preparedProbe.distance - 0.043 - probePlanner.airPoseReserve) < 1e-9, "Prepared search covers both signs of uncertainty and the IK air-clearance reserve in metres");
       check(preparedProbe.approachJoints != null, "Preparation retains the checked sensing configuration");
       check(solver.discoveries == 0, "Observed-branch preparation proves the sensing corridor without global IK discovery");
+      var local = screening.prepareObserved(new Vec3(0, 0, -0.02), new Vec3(0, 0, -1),
+        0.02, [0.0], WeldArcModel.TOUCH_TOLERANCE, 0.003, 1);
+      check(local.approachJoints != null && solver.discoveries == 0, "Observed-only preparation returns a checked sensing goal");
+      var localRejected = false;
+      try screening.prepareObserved(new Vec3(0, 0, -0.02), new Vec3(0, 1, 0),
+        0.02, [0.0], WeldArcModel.TOUCH_TOLERANCE, 0.003, 1) catch (_:Dynamic) localRejected = true;
+      check(localRejected && solver.discoveries == 0, "A failed local refinement never invokes global IK discovery");
+      var globalRejected = false;
+      try screening.prepare(new Vec3(0, 0, -0.02), new Vec3(0, 1, 0),
+        0.02, [0.0], WeldArcModel.TOUCH_TOLERANCE, 0.003, 1) catch (_:Dynamic) globalRejected = true;
+      check(globalRejected && solver.discoveries > 0, "Full preparation retains global discovery after local failure");
       var locked = probePlanner.approachJoints(cast preparedProbe.approachJoints, [0.0]);
       check(arm.tcpPose(locked.endJoints).translation.sub(preparedProbe.approach.translation).norm() < 0.0001,
         "Joint-goal execution preserves the prepared TCP approach");

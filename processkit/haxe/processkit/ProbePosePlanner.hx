@@ -62,6 +62,17 @@ class ProbePosePlanner {
   /** Wire +Z points inward; roll is chosen by reach and clearance, nearest the observed torch orientation first. */
   public function prepare(point:Vec3, outward:Vec3, normalTravel:Float, start:Array<Float>, contactOffset:Float,
       airMargin:Float = 0.003, rolls:Int = 16):ContactProbeRequest {
+    return prepareChecked(point, outward, normalTravel, start, contactOffset, airMargin, rolls, true);
+  }
+
+  /** Local refinement must not trigger global discovery when a checked continuation fails. */
+  public function prepareObserved(point:Vec3, outward:Vec3, normalTravel:Float, start:Array<Float>, contactOffset:Float,
+      airMargin:Float = 0.003, rolls:Int = 16):ContactProbeRequest {
+    return prepareChecked(point, outward, normalTravel, start, contactOffset, airMargin, rolls, false);
+  }
+
+  function prepareChecked(point:Vec3, outward:Vec3, normalTravel:Float, start:Array<Float>, contactOffset:Float,
+      airMargin:Float, rolls:Int, discover:Bool):ContactProbeRequest {
     if (point == null || outward == null || Math.abs(outward.norm() - 1) > 1e-8 ||
         !Math.isFinite(normalTravel) || normalTravel < 0 || start == null || start.length != motion.arm.group.count() ||
         !Math.isFinite(airMargin) || !(airMargin > 0) || rolls < 1 || rolls > 64)
@@ -71,7 +82,7 @@ class ProbePosePlanner {
     var approachPoint = point.add(outward.scale(normalTravel + airMargin + motion.airPoseReserve));
     var distance = 2 * normalTravel + airMargin + motion.airPoseReserve;
     var reasons:Array<String> = [];
-    for (pass in 0...2) for (rotation in candidates) {
+    for (pass in 0...(discover ? 2 : 1)) for (rotation in candidates) {
       try {
         var approach = new Transform3(approachPoint, rotation);
         var checked = pass == 0 ? motion.observedApproach(approach, start) : motion.approach(approach, start);
