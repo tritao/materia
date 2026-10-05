@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-power-tests"
+  },
+  "entry": "PowerComponentTests",
+  "sourceRoots": [
+    "src"
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": "../.."
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
+}

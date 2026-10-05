@@ -1284,3 +1284,34 @@ is reported after the guarded `git update-ref` fast-forward from that exact old 
 Hardware bench/flashing and a verified vendor register map remain follow-ups: phase one proves
 the unchanged CAD mission against simulated devices, including the independent supply owner and
 arc-off shutdown behavior.
+
+
+### Phase 2 execution scope (2026-10-05)
+
+The user requested completing P1 through P5. P5 is now required rather than an optional stretch.
+Work remains in `mobile-welder`; merge only local main before each milestone and land a milestone
+only after its affected focused checks and its app gate pass. Hardware commissioning remains
+separate from proving this complete mobile workflow against simulated hardware.
+
+- P1: one mobile welding assembly with CAD-derived equipment placement, footprint and service
+  connections; reusable battery/inverter parts, declared mass and discoverable capacity; no tool-specific
+  requirements on ArmTool and no RobotArm changes. Validate fit, mass, power tracing and scene generation.
+- P2: a reach/clearance-based station cover and ordering over every CAD seam, generating actual
+  `goTo` and `weld` steps; validate coverage and a complete mobile weld mission.
+- P3: executed contact-search moves on multiple work faces produce the observed work frame;
+  injected parking errors up to 20 mm and 2 degrees must still yield correct bead length and leg.
+- P4: battery observations integrate measured welder power, torque/speed motor power and auxiliaries,
+  conversion losses and voltage sag; reserve the whole seam plus a route to the dock and execute
+  charging before resuming. Validate discharge, cutoff, reserve decisions and an actual charging mission.
+- P5: SensorKit's line profiler uses rendered depth observations; pre-weld localization and live
+  seam correction run through the servo lane. Validate sensor geometry and correction with injected
+  seam displacement during an executed weld, including stale/missing observation behavior.
+
+P1 starts with `machinekit.power.BatteryPack`, `BatteryStorage` and `Inverter`. Storage is a
+component facet; immutable runtime `robotkit.power.BatteryState` remains the observation type.
+The inverter owns its conversion rating and efficiency; the service graph records a conversion,
+not a transparent DC bridge. Envelopes, capacity and mass are explicit CAD inputs, avoiding
+manufacturer claims or inferred battery mass from a solid enclosure. The focused power suite passes
+12 checks covering capacity discovery, supply tracing through the inverter, losses, overload and
+invalid ratings. No native build was needed. P1 assembly integration and its gates remain open;
+the original example-local battery will be replaced rather than kept as a compatibility layer.
