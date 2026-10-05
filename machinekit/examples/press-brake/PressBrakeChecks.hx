@@ -22,6 +22,7 @@ class PressBrakeChecks {
 		BendRegistrationChecks.run();
 		SingleBendSetupChecks.run();
 		PrismCollisionChecks.run();
+		SheetPrismChecks.run();
 		var recipeFixture = new MachineAssembly();
 		recipeFixture.addComponent("finger", new GaugeFinger());
 		recipeFixture.addComponent("base", new GaugeFinger());
