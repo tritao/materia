@@ -1,4 +1,6 @@
 import cadkit.modeling.Vector;
+import cadkit.modeling.Location;
+import cadkit.modeling.Plane;
 import cadkit.sheetmetal.BendRule;
 import cadkit.sheetmetal.Point2;
 import cadkit.sheetmetal.Segment;
@@ -16,6 +18,7 @@ import machinekit.pressbrake.ToolingCatalogue;
 import machinekit.pressbrake.planning.BendOrientation;
 import machinekit.pressbrake.planning.ConvexPrism;
 import machinekit.pressbrake.planning.PressBendSection;
+import machinekit.pressbrake.planning.PressBendPrismQuery;
 import machinekit.pressbrake.planning.PressCollisionGeometry;
 import machinekit.pressbrake.planning.PressContactQuery;
 import machinekit.pressbrake.planning.PressGeometry;
@@ -33,6 +36,12 @@ class PressContactChecks {
 		return WallOutline.polygon([new Point2(x,y),new Point2(x+w,y),new Point2(x+w,y+h),new Point2(x,y+h)]);
 	static function circle(x:Float,y:Float,radius:Float):WallOutline
 		return new WallOutline([Segment.arc(new Point2(x,y),radius,0,2*Math.PI)]);
+	static function probe(point:Vector):ConvexPrism {
+		var r = 0.001;
+		return new ConvexPrism("material-probe", [new Vector(point.x-r,point.y-r,point.z-r),
+			new Vector(point.x+r,point.y-r,point.z-r),new Vector(point.x+r,point.y+r,point.z-r),
+			new Vector(point.x-r,point.y+r,point.z-r)],new Vector(0,0,2*r));
+	}
 	static function polygon(points:Array<machinekit.pressbrake.ToolProfilePoint>):WallOutline
 		return WallOutline.polygon([for (point in points) new Point2(point.y,point.z)]);
 	static function nativeVolume(segment:ToolSegment):Void {
@@ -88,6 +97,7 @@ class PressContactChecks {
 
 		var press = new PressBrake(true,null,null,30), geometry = PressGeometry.of(press), station = press.toolLayout.stations()[0];
 		var tooling = station.processTooling(), physical = geometry.station(station.id), contactQuery = new PressContactQuery();
+		var bendQuery = new PressBendPrismQuery();
 		var stock = new SheetMaterial("exact-contact-steel",1.5,BendRule.Process(new ProcessBendRule(tooling)),{uts:400,yield:250,youngs:205000});
 		for (sign in [1.0,-1.0]) {
 			var sheet = new Sheet(stock), root = sheet.addWall(WallOutline.rectangle(60,100));
@@ -105,6 +115,16 @@ class PressContactChecks {
 				var cap = PressBendSection.of(bend,pose.evaluation.bend(bend.id),pose.placement,-100,100);
 				if (cap == null || cap.length != 1) throw "Missing full-width bend cap";
 				var zone = pose.evaluation.bend(bend.id), expected = zone.allowance*zone.thickness;
+				var materialPoint = pose.placement.plane.toWorld(zone.point(0.5,50,0.75));
+				check(bendQuery.overlap(bend,zone,pose.placement,probe(materialPoint)) == true,"Exact bend query detects interior material through flat and loaded strokes");
+				var outside = pose.placement.plane.toWorld(zone.point(0.5,0,0.75)).add(pose.placement.direction(zone.frame.direction(new Vector(0,110,0))));
+				check(bendQuery.overlap(bend,zone,pose.placement,probe(outside)) == false,"Exact bend query clips the finite axis rather than extending it indefinitely");
+				var rotated = new Location(new Plane(new Vector(17,23,31),new Vector(0,1,0),new Vector(0,0,1))).compose(pose.placement);
+				check(bendQuery.overlap(bend,zone,rotated,probe(rotated.plane.toWorld(zone.point(0.5,50,0.75)))) == true,"A previously formed bend may have an axis perpendicular to the tool bed");
+				if (zone.angle != 0) {
+					var cavity = rotated.plane.toWorld(zone.axis().add(zone.frame.direction(new Vector(0,50,0))));
+					check(bendQuery.overlap(bend,zone,rotated,probe(cavity)) == false,"The curved bend's empty interior is not filled by its convex envelope");
+				}
 				if (zone.angle != 0) expected = Math.abs(zone.angle)*zone.thickness*(zone.curvedInnerRadius()+zone.thickness/2);
 				check(Math.abs(cap[0].area()-expected)<1e-6,"Independent exact annular-sector material area");
 			}
@@ -124,6 +144,7 @@ class PressContactChecks {
 			check(highDie,"Raised die intersects actual stock and is diagnosed as material overlap");
 			var allowance = sheet.bendAllowance(bend);
 			var changed = sheet.cutBend(bend.id,rect(allowance*0.4,40,allowance*0.2,20),"exact-contact-hole");
+			check(bendQuery.overlap(sheet.bend(bend.id),loaded.evaluation.bend(bend.id),loaded.placement,probe(new Vector())) == null,"Cut bends explicitly require the query retaining along-axis variation");
 			var cutBodies = PressCollisionGeometry.sheet(sheet,loaded), materialPoint = loaded.placement.plane.toWorld(loaded.evaluation.bend(bend.id).point(0.5,50,0.75));
 			var holeProbe = new PressToolContact(Punch("probe",0),[new ToolContactPrism(rect(materialPoint.y-0.001,materialPoint.z-0.001,0.002,0.002),materialPoint.x-0.01,materialPoint.x+0.01)]);
 			var wideProbe = new PressToolContact(Punch("probe",0),[new ToolContactPrism(rect(materialPoint.y-0.001,materialPoint.z-0.001,0.002,0.002),-100,100)]);
