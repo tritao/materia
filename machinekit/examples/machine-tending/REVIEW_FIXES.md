@@ -1,18 +1,19 @@
 # Machine tending remaining review fixes
 
-MT1–MT6 and MT5b are complete. These fixes precede MT7. Each group gets focused checks,
-measured baseline comparisons and a commit; the complete sequential gate closes the work.
+MT1–MT6 and the MT5b review fixes are complete. All six groups passed the complete
+sequential closing gate and focused native checks. MT7 remains a separate handoff.
+The sections below retain checkpoint history; final verification closes every earlier pending item.
 Do not retain old-format compatibility: migrate in-repo callers and fixtures, require the
 current format, and remove obsolete paths. Reference hardware data remains explicitly assumed.
 
 | Group | Work | State | Commits |
 |---|---|---|---|
-| R1 | One current assembly schema and runtime layout; migrate producers/tests; delete legacy defaults and dead helpers | done; descriptor-entry cleanup awaits closing verification | `0121118f2`, `57db394b3`, `b9acdd4a5` |
+| R1 | One current assembly schema and runtime layout; migrate producers/tests; delete legacy defaults and dead helpers | done; current schemas and complete native layouts verified | `0121118f2`, `57db394b3`, `b9acdd4a5` |
 | R2 | Motor/driver/supply sizing; real spindle belt transmission; motor shaft and coupling engagement; explicit screw root | done | `59791d003` |
-| R3 | Physical Z brake and fault sequencing; full downstream inertia feedforward | implemented: actual mill brake mechanics, saved binding and fault sequencing verified; closing gate pending | `6e94de72f`, `ea48834a8`, `f38740676`, `b248a1301`, `a56345609`, `03838fb54`, `b9acdd4a5`, `61fd8f6af`, `144010183` |
-| R4 | Swept clearance for joint moves; assembled limits; independent geometry/mass/speed checks | implemented: clearance, environment objects and explicit motion policy; closing gate pending | `4fc64fbee`, `8b22593be`, `4bd869718` |
+| R3 | Physical Z brake and fault sequencing; full downstream inertia feedforward | done; actual mill brake, saved bindings, fault sequencing and full gate verified | `6e94de72f`, `ea48834a8`, `f38740676`, `b248a1301`, `9dfc9bf1f`, `a56345609`, `03838fb54`, `b9acdd4a5`, `61fd8f6af`, `144010183`, `295d426ea`, `4ff013c90` |
+| R4 | Swept clearance for joint moves; assembled limits; independent geometry/mass/speed checks | done; clearance, environment objects and explicit motion policy verified | `4fc64fbee`, `8b22593be`, `4bd869718` |
 | R5 | Per-joint servo interpolation; consistent slip; typed channel faults; cached coupling setup; qualified channels and two-mill check | done | `dd0c14091` |
-| R6 | Rail support/load paths, bearing walls, cabinet mounts and material assumptions; remaining diagnostics and dead code | implemented: supports, paired guides and load admission verified; closing gate pending | `20f0d3e16`, `56923ba3e` |
+| R6 | Rail support/load paths, bearing walls, cabinet mounts and material assumptions; remaining diagnostics and dead code | done; supports, paired guides and load admission verified | `20f0d3e16`, `56923ba3e` |
 
 ## Verification
 
@@ -213,3 +214,18 @@ Current physical mill verification: healthy release, commanded Z travel, normal 
 Installed brake geometry smoke passed (`/tmp/mt-brake-geometry-smoke.log`), including actual stator/plate mounting, shaft seating, rotor clearance, recipe/document/nested binding round trips and the registered reach study. Rapids remain 15.095544/25/21.521827 m/min; Z guide utilization becomes 0.636247 from 0.630236 because the assembled brake contributes mass. The full app first exposed the unrelated 64-child compound limit while building the larger fixed link. `295d426ea` removes this arbitrary cap from dynamic compounds. Complete native MuJoCo checks pass with an 80-part compound, retained concave opening and a load supported by its final part (`/tmp/mt-large-compound-mujoco.log`). Mill cycle verification is rerunning after this fix. All temporary native diagnostics have been removed.
 
 Physical mill checkpoint passed (`/tmp/mt-installed-brake-mill2.log`, exit 0): bare/enclosed cycles 52.57/53.22 s, versus paired-guide 52.54/53.19 s. Both grow 0.03 s after brake release sequencing and the changed rotating assembly. X/Y/Z tracking peaks at 10 ms are 0.085940/0.051497/0.060011 mm. Rapids remain 15.095544/25/21.521827 m/min; accelerations are 29.77/28.24/27.16 m/s² (Z grows from 26.44 because the shorter coupling reduces rotating inertia despite the added rotor). Bare removal is 3860.657927 of nominal 3846.780671 mm³, leftover 7.130270, gouge 0.657927, no rapid or holder contacts, 78 plans/55 flagged. Enclosed removal is 3860.667926 mm³. Door open/close remains 1.50/1.79 s; seated-blank clamp remains 0.08 s at 482.548632 N. The bare/enclosed artifacts contain 129/178 physical parts. With the final hub axial clearance, actual brake sag is 0.665314 mm and settled drift 0.000020016 mm over 0.5 s. All six review groups are implemented; the complete sequential closing gate and baseline audit remain.
+
+
+## Final verification — 2026-10-05
+
+Done. What was built and decided:
+
+- `mt-suite-review-closing-brake.txt`: all eleven kits, CadKit, MachineKit smoke, the absolute-path app build and complete project-source run exit 0. The app log has no uncaught exception. Production code was unchanged during the run.
+- Final kit counts: RobotKit world 5,006; MotionKit 67,535; CadBridge 157; CncKit 317; CamKit 12,311; ProjectKit 144; ProcessKit 23 plus weld-path 19. ProjectKit's reduction from the original 146 reflects intentional deletion of legacy assembly/scene compatibility checks, offset by new current-format tests; no current-format test was skipped.
+- Twelve native suites were recompiled against current headers and run sequentially against the app's rebuilt libraries: runtime, brake runtime, ABI validation, runtime C API, SimCore, session, SimCore C API, MuJoCo backend, RobotKit MuJoCo, RobotKit kinematic simulation, physical brake simulation and release handshake. All exit 0 (`/tmp/mt-closing-native-summary.txt`). The gravity fixture verifies both explicit/default clocks, zero motor effort after release timeout, rated holding and insufficient-brake slip. The 80-part MuJoCo compound verifies its gap and last-child load support.
+- SimKit, runtime and runtime–simulation binding checks all exit 0 (`/tmp/mt-closing-bindings-summary.txt`). Regeneration updates only the session clock documentation in the SimKit interface; ABI declarations are unchanged.
+- Final bare/enclosed mill cycles are 52.57/53.22 s, with X/Y/Z peak tracking 0.085940/0.051497/0.060011 mm at 10 ms. Rapids are 15.095544/25/21.521827 m/min; programmed pocket feed is 1.2 m/min, entry feed 0.3 m/min. Brake release/fault/stop/reset checks pass; emergency-stop sag is 0.665314 mm and settled drift 0.000020016 mm over 0.5 s. Door remains 1.50/1.79 s; seated clamp remains 0.08 s at 482.548632 N.
+- Existing post-main/review baselines reproduce: screw/belt router 232.2/215.2 s, 128 plans, 0.05/1.76 mm worst deviation; CoreXY 649.6 mm/s and 71.549 m/s²; arm 5.8/12/17.2/23.5 s; mobile final goTo 61 s and obstacle round 65 s; welder 20.6/21.1 s seams, 29.8 s post and 106.5 s whole weldment on both backends. Cobot classes all take 2.06 s with the recorded 0.004640/0.005987/0.011236/0.016598 mrad peaks.
+- Reach remains Reach850 on a 600 mm riser: fifteen cell-derived poses, 16.239926% minimum joint margin. Two cell controllers own sixteen disjoint joints. The new physical brake and paired-guide changes intentionally alter mill mass, inertia and cycle figures as recorded above; other example baselines do not move in this closing gate.
+- No new confirmed haxeon compiler defect was found, and haxeon was not patched. The section-return expression avoids a captured-local definite-assignment diagnostic; the earlier enum `Array.contains` claim remains unconfirmed.
+- Current formats are MachineKit v16, ProjectKit assembly/state v8 and RobotModel v12. Old acceptance paths are removed and in-repo producers/fixtures migrated. No push or merge into main was performed. MT7–MT12 remain planned; live monitoring of moving foreign obstacles and device-owned brake queue handshakes are not introduced in this handoff.

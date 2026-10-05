@@ -798,7 +798,7 @@ Done. What was built and decided:
 | MT4 | done | c945a0dc8, f518b0dff |
 | MT5 | done | 453d890ad, 5f06c32e5, a397b187a, a6230c46e, 1484b924d |
 | MT5b | done: review regressions | 04d3d092d |
-| MT5b follow-up | in progress: physical brake binding and closing gate | see [REVIEW_FIXES.md](REVIEW_FIXES.md) |
+| MT5b follow-up | done: review fixes and complete closing gate | 4ff013c90; full history in [REVIEW_FIXES.md](REVIEW_FIXES.md) |
 | MT6 | done | 4c9e6ebec |
 | MT7 | planned | |
 | MT8 | planned | |
@@ -836,3 +836,11 @@ Physical mill brake follow-up (closing gate pending):
 - Brake geometry and saved-binding checks now pass in the complete MachineKit smoke. The actual added mass raises the checked Z guide utilization to 0.636247. App assembly setup exposed a 64-child compound cap; `295d426ea` removes that arbitrary limit from dynamically stored compound shapes. Complete native MuJoCo checks pass with 80 children, a clear concave gap and physical support on the last child. Full mill cycle measurements are pending the rerun.
 
 - Physical mill checkpoint passed with geometry and installed mass: bare/enclosed bearing-block cycles 52.57/53.22 s (both +0.03 s from the paired-guide checkpoint); 78 plans, 55 flagged, no rapid or holder contacts. X/Y/Z peaks are 0.085940/0.051497/0.060011 mm at 10 ms. Rapids stay 15.095544/25/21.521827 m/min; accelerations are 29.77/28.24/27.16 m/s². Z acceleration increases from 26.44 m/s² because the coupling shortened around the installed brake, lowering net rotating inertia. Door 1.50/1.79 s and seated clamp 0.08 s/482.548632 N are unchanged. Final installed-brake emergency sag is 0.665314 mm, settled drift 0.000020016 mm over 0.5 s. The complete closing gate and cross-example baseline audit remain pending.
+
+
+Final MT5b follow-up gate — done (2026-10-05):
+
+- `mt-suite-review-closing-brake.txt` passes all eleven kit suites, CadKit, MachineKit smoke, app build and complete project-source tests. Twelve recompiled native suites and three generated-binding checks also pass. See [REVIEW_FIXES.md](REVIEW_FIXES.md#final-verification--2026-10-05) for counts, evidence and commit history.
+- The full gate reproduces the final mill measurements above: 52.57/53.22 s bare/enclosed, 1.2 m/min pocket feed and 0.3 m/min entry feed, 0.085940/0.051497/0.060011 mm X/Y/Z tracking at 10 ms, 0.665314 mm brake application sag, door 1.50/1.79 s and seated clamp 0.08 s/482.548632 N. All four cobot classes retain 2.06 s cycles. Reach stays Reach850/600 mm at fifteen poses and 16.239926% minimum joint margin.
+- Screw/belt router, CoreXY, arm, mobile and welder reproduce the previously recorded post-main/review baselines. Only intended mill geometry, rotating inertia and brake sequencing changes move its figures. ProjectKit's 146→144 count reflects removed legacy compatibility checks plus added current-format checks, as requested for the clean break.
+- Closing fixes: `61fd8f6af` resolves one default session clock for every phase; `144010183` preserves staged emergency outputs after a fault; `295d426ea` removes the dynamic-compound child cap with last-child contact verification; `4ff013c90` installs and saves the physical brake and scoped controller binding. The generated binding receives the matching clock documentation. No new confirmed haxeon bug or compiler patch. MT7 is not started.

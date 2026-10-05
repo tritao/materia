@@ -232,7 +232,8 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 * Advances exactly one fixed tick on the caller's thread: every participant
 	 * prepares, then submits, physics advances, and every participant publishes.
 	 * owner_time_ns is the timestamp participants that follow the owner's clock
-	 * receive. Returns NKSIM_ERROR_INVALID_STATE while running realtime.
+	 * receive. Zero selects the fixed-step simulation clock for every phase.
+	 * Returns NKSIM_ERROR_INVALID_STATE while running realtime.
 	 */
 	extern fn nksim_session_step(session: nksim_session, owner_time_ns: u64, out_clock: ptr<nksim_clock> @inout) -> nksim_result;
 	/**
