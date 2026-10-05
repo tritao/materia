@@ -2,6 +2,7 @@ import haxeon.test.Shards;
 
 class MotionKitBootstrapTests {
   public static function main():Void {
+    if (Sys.getEnv("MOTIONKIT_REACH_ONLY") == "1") { RevoluteReachBoundTests.main(); return; }
     if (Sys.getEnv("MOTIONKIT_HOMING_ONLY") == "1") { HomingTests.run(); return; }
     var plannerTests:PlannerTests = new PlannerTests();
     var streamTests:StreamTests = new StreamTests();
@@ -115,6 +116,7 @@ class MotionKitBootstrapTests {
     var freedomTests = new ToolFreedomTests();
     // Each group is independent of the others, so that the workspace can run them as parallel shards.
     var everything = Shards.run([
+      {name: "RevoluteReachBoundTests.main", run: () -> RevoluteReachBoundTests.main(), weight: 1.0},
       {name: "HomingTests.run", run: () -> HomingTests.run(), weight: 1.0},
       {name: "freedomTests.testFreeSpinPath", run: () -> freedomTests.testFreeSpinPath(), weight: 1.0},
       {name: "freedomTests.testNumericalZeroMove", run: () -> freedomTests.testNumericalZeroMove(), weight: 1.0},

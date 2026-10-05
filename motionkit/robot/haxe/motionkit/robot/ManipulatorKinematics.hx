@@ -76,6 +76,7 @@ class ManipulatorKinematics implements RedundantPathSolver {
 
   /** How the group's redundancy is named; null for a group without any. */
   final parameterization:Null<RedundancyParameterization>;
+  final reachBound:Null<RevoluteReachBound>;
 
   public function new(manipulator:KinematicGroup, ?differentialDamping:Float = 1e-6) {
     if (manipulator == null) throw "Manipulator kinematics requires a manipulator";
@@ -83,6 +84,7 @@ class ManipulatorKinematics implements RedundantPathSolver {
       throw "Differential IK damping must be finite and positive";
     this.manipulator = manipulator;
     this.differentialDamping = differentialDamping;
+    reachBound = RevoluteReachBound.of(manipulator);
     parameterization = manipulator.redundant() ? new SwivelParameterization(manipulator)
       : manipulator.external.indexOf(true) >= 0 ? new ExternalAxesParameterization(manipulator) : null;
   }
@@ -105,6 +107,14 @@ class ManipulatorKinematics implements RedundantPathSolver {
     requireTolerance(tolerance);
     lastFailure = null;
     var task = ToolFreedom.of(target, freedom, tolerance.orientation);
+    if (seed != null && seed.length != jointCount())
+      throw 'Kinematic group requires ${jointCount()} values, got ${seed.length}';
+    var toolAxisFixed = switch freedom { case FreeAboutTool: true; default: false; };
+    if (reachBound != null && reachBound.excludes(toTransform(target), tolerance.position,
+        tolerance.orientation, ToolFreedom.isFull(freedom), toolAxisFixed)) {
+      lastFailure = "Tool pose is outside the revolute chain reach bound";
+      return null;
+    }
     var preference = preferredOrientation;
     if (!ToolFreedom.isFull(freedom) && preference != null) {
       var preferred = PoseMath.angle(target, preference) <= tolerance.orientation ? target

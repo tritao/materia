@@ -2440,3 +2440,27 @@ proving every point from the initial stage posture could reject a valid sequence
 and did not represent its actual transitions. Execution still plans from measured
 joints and rechecks all clearance/corridor guards. Logs: ignored
 app/build/p3-tiered-*.log. Complete mission and final milestone gates remain open.
+
+
+The tiered full mission was stopped after five probe pairs at station one
+(179.64 simulated seconds); final-face selection had not advanced after over
+30 wall minutes. Its completed 5,494-sample live profile resolved every sample:
+57.37% was local clear-approach IK and 36.57% uncertainty-region evaluation.
+No global candidate sampling appeared in that capture.
+
+MotionKit's manipulator adapter now rejects poses outside a conservative reach
+bound derived from the authored fixed/revolute joint frames. The triangle
+inequality bounds the last pivot about the first pivot; the TCP offset and
+position/orientation tolerances enlarge it. Free tool spin retains the axial
+offset and allows the entire perpendicular offset. Unrestricted orientation
+uses the weaker TCP sphere. Prismatic chains and work-frame groups keep their
+existing behavior. All existing IK seeds, roll/lattice resolutions, clearance
+checks and route fallbacks remain available inside the bound. This belongs in
+the generic kinematics adapter, rather than a welding-specific reach heuristic.
+
+Focused reach tests pass 5,058 assertions (rotated parent/child frames, intervening
+fixed joints, tool offsets, dense FK samples, free spin, boundary/tolerance and
+unsupported-chain cases). Native contact motion passes 98 assertions. The app
+compiles with the change. These are unit/integration results, not a complete
+P3 mission pass; the full mission and final milestone gates remain pending.
+Logs: ignored app/build/p3-reach-*.log.
