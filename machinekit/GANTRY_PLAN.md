@@ -3961,3 +3961,38 @@ forward-kinematics evaluation, rather than moving entry compilation earlier.
 `KinematicGroup.evaluate()` currently reevaluates a snapshot even when a TCP
 query and a clearance query use exactly the same joint state; a future cache
 must also account for root-pose changes and mutation of state DOF arrays.
+
+### Long-weld planning — reuse unchanged kinematic snapshots
+
+`KinematicSnapshot.evaluate()` now reuses its existing poses, joint origins and
+axes when all state DOF values and immutable root transforms match the last
+evaluation. The DOF key is read from the snapshot's already evaluated driving
+joint values, so mutating a caller's `q` array cannot silently change the key
+and a separate DOF-key copy is unnecessary. Root identity is conservative:
+new equivalent transforms cause a recomputation. State/model and dimension
+validation still runs before accepting a hit. Compiled models are immutable,
+as required by the existing `KinematicModel` contract.
+
+A controlled 128-body/seven-DOF benchmark of 20,000 identical-state evaluations
+fell from 0.184 s to 0.0013 s. Changing-state evaluations were 0.180 s before
+and after, with identical final poses. An initial separate-copy key added a
+small miss-path cost; using the stored driving-joint values removed it.
+
+The final focused G17 2.6 m MuJoCo weld passed and planned in 306.21 s, versus
+359.66 s for the preceding uncached diagnostic baseline (14.9% less observed
+planning time). An initial cached implementation also passed at 321.74 s.
+Shared CPU load varies, so these are observed timings, not a fixed guarantee.
+The final run retained all 224,878 checked poses and exactly the same -90 degree
+roll, entry/exit, 2.599998690 m track travel, 0.775421815 rad arm margin,
+0.000017742 rad maximum joint step, 236.6 s simulated cycle, 2600 mm seam and
+5 mm bead leg, with no clearance violation. Planner search, sample spacing,
+IK preferences, tolerances and compiled validation remain unchanged.
+
+KinematicsKit passed 325 assertions, including fresh-snapshot comparisons after
+in-place DOF mutation, copied states, independent root changes, restoring model
+roots, and invalid state dimensions. Jacobians and multi-leader/downstream
+couplings are covered, including changing DOFs while a combined joint's value
+stays constant. RobotKit's focused clearance tests passed 406 assertions and
+MotionKit's external-path posture regression passed three. KinematicsKit,
+RobotKit, MotionKit and the app compiled with `--compiler-only`. No native
+sources changed and no full cross-kit phase-boundary gate was repeated.

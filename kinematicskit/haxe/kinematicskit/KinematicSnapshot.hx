@@ -3,7 +3,8 @@ package kinematicskit;
 /**
  * World poses of every body and frame, and every movable joint's world
  * origin and axis, for one `KinematicState`. `evaluate` reuses its arrays,
- * so one snapshot serves any number of states without allocating.
+ * so one snapshot serves any number of states without allocating. Repeated
+ * evaluations reuse the result when DOF values and immutable root poses match.
  */
 class KinematicSnapshot {
   public final model:KinematicModel;
@@ -16,10 +17,15 @@ class KinematicSnapshot {
   final axes:Array<Float>;
   final scratch:Array<Float> = [for (_ in 0...21) 0.0];
   var evaluated = false;
+  final roots:Array<Int>;
+  /** Transforms are immutable; root identity is a conservative cache key. */
+  final previousRoots:Array<Null<Transform>>;
 
   public function new(model:KinematicModel) {
     if (model == null) throw "Kinematic snapshot requires a model";
     this.model = model;
+    roots = [for (body in model.bodyOrder) if (model.bodyParentJoint[body] < 0) body];
+    previousRoots = [for (_ in roots) null];
     values = [for (_ in 0...model.jointCount()) 0.0];
     poses = [for (_ in 0...model.bodyCount() * 7) 0.0];
     origins = [for (_ in 0...model.jointCount() * 3) 0.0];
@@ -35,8 +41,17 @@ class KinematicSnapshot {
 
   public function evaluate(state:KinematicState):Void {
     if (state == null || state.model != model) throw "Kinematic snapshot requires a state of its own model";
+    if (state.q.length != model.dofCount())
+      throw 'Kinematic snapshot requires ${model.dofCount()} DOF values, got ${state.q.length}';
+    var same = evaluated;
+    // Driving joints retain the evaluated DOF values, independent of the
+    // caller's mutable q array. Reuse them rather than copying another key.
+    if (same) for (i in 0...model.dofCount()) if (state.q[i] != values[model.dofJoint[i]]) { same = false; break; }
+    if (same) for (i in 0...roots.length) if (state.rootPose(roots[i]) != previousRoots[i]) { same = false; break; }
+    if (same) return;
+    evaluated = false;
     evaluateValues(state.q);
-    for (body in model.bodyOrder) if (model.bodyParentJoint[body] < 0) {
+    for (body in roots) {
       var root = state.rootPose(body);
       var o = body * 7;
       poses[o] = root.x; poses[o + 1] = root.y; poses[o + 2] = root.z;
@@ -71,6 +86,7 @@ class KinematicSnapshot {
       FlatTransform.compose(scratch, 0, scratch, 7, scratch, 14);
       FlatTransform.compose(scratch, 14, jointTChild, joint * 7, poses, childOffset);
     }
+    for (i in 0...roots.length) previousRoots[i] = state.rootPose(roots[i]);
     evaluated = true;
   }
 
