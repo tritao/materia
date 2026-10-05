@@ -745,6 +745,86 @@ class FrameworkSmoke {
 			}
 		}
 		if (applicationArrows != 8) throw "text field swallowed application arrow shortcuts";
+		var historyDocument = new TextDocument("");
+		var historyField = TextField.withDocument("field-history", historyDocument);
+		var historyRoot = context.submit(historyField, new LayoutFrame(256.0, 192.0));
+		var historyState:State<TextEditorState> = context.buildContext.existingState(historyRoot.id);
+		var historyEditor:TextEditorState = cast historyState.value;
+		if (!context.focusWidget(historyRoot.id)) throw "history field did not focus";
+		var historyModifier = #if (mac || ios) UiModifier.Super #else UiModifier.Control #end;
+		var leakedUndo = 0;
+		context.commands.register(new Command("field-history-global-undo", "Global undo", function() leakedUndo++,
+			new Shortcut(UiKey.Z, historyModifier)));
+		for (letter in ["a", "b", "c"]) context.text(UiEventKind.TextInput, letter);
+		context.key(UiEventKind.KeyDown, UiKey.Z, historyModifier);
+		if (historyDocument.text != "" || leakedUndo != 0) throw "typing did not undo as a field-local group";
+		context.key(UiEventKind.KeyDown, UiKey.Z, historyModifier | UiModifier.Shift);
+		if (historyDocument.text != "abc") throw "shift-Z redo failed";
+		historyEditor.insert(" pasted", TextEditorHistoryKind.Paste);
+		context.key(UiEventKind.KeyDown, UiKey.Z, historyModifier);
+		if (historyDocument.text != "abc") throw "paste merged with typing history";
+		context.key(UiEventKind.KeyDown, UiKey.Y, historyModifier);
+		if (historyDocument.text != "abc pasted") throw "Y redo failed";
+		context.key(UiEventKind.KeyDown, UiKey.Backspace, #if (mac || ios) UiModifier.Alt #else UiModifier.Control #end);
+		context.key(UiEventKind.KeyDown, UiKey.Z, historyModifier);
+		if (historyDocument.text != "abc pasted") throw "word deletion did not undo separately";
+		context.key(UiEventKind.KeyDown, UiKey.Z, historyModifier);
+		context.text(UiEventKind.TextInput, "!");
+		context.key(UiEventKind.KeyDown, UiKey.Z, historyModifier | UiModifier.Shift);
+		if (historyDocument.text != "abc!") throw "new typing did not clear redo";
+		historyEditor.placeCaret(1, false);
+		context.text(UiEventKind.TextInput, "X");
+		context.key(UiEventKind.KeyDown, UiKey.Z, historyModifier);
+		if (historyDocument.text != "abc!" || historyEditor.selectionFocus != 1) throw "navigation did not split typing history";
+		historyField.readOnly = true;
+		context.submit(historyField, new LayoutFrame(256.0, 192.0));
+		context.key(UiEventKind.KeyDown, UiKey.Z, historyModifier);
+		if (historyDocument.text != "abc!" || leakedUndo != 0) throw "read-only undo changed text or escaped to application";
+		historyDocument.replace(0, historyDocument.codepointCount, "fresh");
+		historyField.readOnly = false;
+		context.submit(historyField, new LayoutFrame(256.0, 192.0));
+		context.key(UiEventKind.KeyDown, UiKey.Z, historyModifier);
+		if (historyDocument.text != "fresh") throw "external replacement retained stale field history";
+		var selectionHistory = new TextEditorState(fonts, "a🙂bc");
+		selectionHistory.setAnchoredSelection(new TextSelection(3, 1));
+		selectionHistory.replace(1, 3, "X");
+		if (!selectionHistory.undo() || selectionHistory.text != "a🙂bc" ||
+			selectionHistory.selectionAnchor != 3 || selectionHistory.selectionFocus != 1)
+			throw "undo did not restore a reversed Unicode selection";
+		selectionHistory.dispose();
+		var compositionHistory = new TextEditorState(fonts, "");
+		compositionHistory.applyTransaction(new EditTransaction(0, 0, "a", 1, 1, true, 0, 1, 0, null, TextEditorHistoryKind.Composition));
+		compositionHistory.applyTransaction(new EditTransaction(0, 1, "あ", 1, 1, true, 0, 1, 0, null, TextEditorHistoryKind.Composition));
+		compositionHistory.applyTransaction(new EditTransaction(0, 1, "あい", 2, 2, false, -1, -1, 0, null, TextEditorHistoryKind.Composition));
+		if (!compositionHistory.undo() || compositionHistory.text != "" || !compositionHistory.redo() || compositionHistory.text != "あい")
+			throw "IME composition did not undo as one edit";
+		compositionHistory.dispose();
+		context.commands.unregister("field-history-global-undo");
+		var wordDocument = new TextDocument("café hello");
+		var wordField = TextField.withDocument("word-delete-field", wordDocument);
+		var wordRoot = context.submit(wordField, new LayoutFrame(256.0, 192.0));
+		var wordState:State<TextEditorState> = context.buildContext.existingState(wordRoot.id);
+		var wordDeleteEditor:TextEditorState = cast wordState.value;
+		if (!context.focusWidget(wordRoot.id)) throw "word deletion field did not focus";
+		var wordModifier = #if (mac || ios) UiModifier.Alt #else UiModifier.Control #end;
+		context.key(UiEventKind.KeyDown, UiKey.Backspace, wordModifier);
+		if (wordDocument.text != "café ") throw "word backspace did not delete the preceding word";
+		context.key(UiEventKind.KeyDown, UiKey.Backspace);
+		if (wordDocument.text != "café") throw "plain backspace stopped deleting one grapheme";
+		wordDeleteEditor.placeCaret(0, false);
+		context.key(UiEventKind.KeyDown, UiKey.Delete, wordModifier);
+		if (wordDocument.text != "") throw "word delete did not delete Unicode text ahead";
+		context.key(UiEventKind.KeyDown, UiKey.Backspace, wordModifier);
+		if (wordDocument.text != "") throw "word deletion at document boundary changed text";
+		wordDocument.replace(0, 0, "first last");
+		context.submit(wordField, new LayoutFrame(256.0, 192.0));
+		wordDeleteEditor.setSelection(0, 5);
+		context.key(UiEventKind.KeyDown, UiKey.Backspace, wordModifier);
+		if (wordDocument.text != " last") throw "word deletion expanded an existing selection";
+		wordField.readOnly = true;
+		context.submit(wordField, new LayoutFrame(256.0, 192.0));
+		context.key(UiEventKind.KeyDown, UiKey.Delete, wordModifier);
+		if (wordDocument.text != " last") throw "word deletion changed a read-only field";
 		var sharedDocument = new TextDocument("start");
 		var sharedEdit:Null<EditTransaction> = null;
 		var sharedField = TextField.withDocument("shared-document-field", sharedDocument,
@@ -818,7 +898,7 @@ class FrameworkSmoke {
 		context.key(UiEventKind.KeyDown, UiKey.Right, UiModifier.Shift);
 		if (controlledSelection.anchor != 0 || controlledSelection.focus != 1) return 343;
 		editDelivered = false;
-		controlledField.onEditIntent = function(intent) {
+		controlledField.onEditIntent = function(intent, layout) {
 			switch intent {
 				case Insert(text):
 					controlledDocument.replace(0, controlledDocument.codepointCount, text + "!");

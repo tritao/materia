@@ -64,8 +64,10 @@ class TextField implements View {
 	public var additionalSelectionProvider:Null<Void->Array<TextSelection>>;
 	/** Handles navigation of all selections when additional carets are present. */
 	public var onNavigationIntent:Null<(TextNavigationIntent, TextEditorLayout)->Bool>;
-	/** Return true after applying an operation to the controlled document. */
-	public var onEditIntent:Null<TextEditIntent->Bool>;
+	/** Return true after applying an operation; the live layout supplies shaped word boundaries. */
+	/** True when an application document owns undo/redo. */
+	public var historyManagedExternally:Bool = false;
+	public var onEditIntent:Null<(TextEditIntent, TextEditorLayout)->Bool>;
 	/** Optional aggregate selected text for clipboard copy/cut. */
 	public var selectionTextProvider:Null<Void->Null<String>>;
 	/** Typed selector classes used by composite fields such as ComboBox. */
@@ -356,7 +358,7 @@ class TextField implements View {
 			};
 			var delegateEdit = function(intent:TextEditIntent):Bool {
 				var handler = onEditIntent;
-				if (handler == null || !handler(intent)) return false;
+				if (handler == null || !handler(intent, editor.layout)) return false;
 				if (document != null) editor.syncDocument(document);
 				else editor.syncExternal(value);
 				if (selectionProvider != null) editor.setAnchoredSelection(selectionProvider());
@@ -481,6 +483,7 @@ class TextField implements View {
 			var blur = function(event:UiEvent) {
 				if (!editor.focused && !editor.draggingSelection)
 					return;
+				editor.breakHistoryGroup();
 				editor.focused = false;
 				editor.draggingSelection = false;
 				editor.cancelPointerClick();
@@ -539,6 +542,7 @@ class TextField implements View {
 				editor.draggingSelection = false;
 			});
 
+			editor.configureHistory(!historyManagedExternally);
 			var handleKey = function(event:UiEvent) {
 				if (!enabled)
 					return;
@@ -550,6 +554,15 @@ class TextField implements View {
 					 event.key == UiKey.Up || event.key == UiKey.Down)) return;
 				var extend = (event.modifiers & UiModifier.Shift) != 0;
 				var command = (event.modifiers & (UiModifier.Control | UiModifier.Super)) != 0;
+				if (command && (event.key == UiKey.Z || event.key == UiKey.Y)) {
+					if (historyManagedExternally) return;
+					var previousRevision = editor.documentRevision();
+					var changed = !readOnly && (event.key == UiKey.Y || extend ? editor.redo() : editor.undo());
+					if (changed) publishTextChange(previousRevision);
+					editor.resetCaretBlink(Sys.time());
+					event.preventDefault();
+					return;
+				}
 				var macWordNavigation = #if (mac || ios)
 					(event.modifiers & UiModifier.Alt) != 0 &&
 					(event.modifiers & UiModifier.Control) == 0;
@@ -589,8 +602,8 @@ class TextField implements View {
 					}
 				}
 				if (!readOnly) {
-					var consumed = event.key == UiKey.Backspace ? delegateEdit(DeleteBackward) :
-						event.key == UiKey.Delete ? delegateEdit(DeleteForward) :
+					var consumed = event.key == UiKey.Backspace ? delegateEdit(wordNavigation ? DeleteWordBackward(macWordNavigation) : DeleteBackward) :
+						event.key == UiKey.Delete ? delegateEdit(wordNavigation ? DeleteWordForward(macWordNavigation) : DeleteForward) :
 						event.key == UiKey.Enter && multiline ? delegateEdit(Insert("\n")) : false;
 					if (consumed) { event.preventDefault(); return; }
 				}
@@ -618,7 +631,7 @@ class TextField implements View {
 								return;
 							if (delegateEdit(Paste(pasted))) return;
 							var beforePaste = editor.documentRevision();
-							if (editor.insert(pasted)) {
+							if (editor.insert(pasted, TextEditorHistoryKind.Paste)) {
 								editor.resetCaretBlink(Sys.time());
 								publishTextChange(beforePaste);
 							}
@@ -655,14 +668,14 @@ class TextField implements View {
 					if (readOnly)
 						handled = false;
 					else {
-						changed = editor.deleteBackward();
+						changed = wordNavigation ? editor.deleteWord(-1, macWordNavigation) : editor.deleteBackward();
 						textEdited = true;
 					}
 				} else if (event.key == UiKey.Delete) {
 					if (readOnly)
 						handled = false;
 					else {
-						changed = editor.deleteForward();
+						changed = wordNavigation ? editor.deleteWord(1, macWordNavigation) : editor.deleteForward();
 						textEdited = true;
 					}
 				} else if (event.key == UiKey.Enter) {

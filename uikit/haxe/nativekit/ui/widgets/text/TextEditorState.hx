@@ -2,6 +2,8 @@ package nativekit.ui.widgets.text;
 
 import nativekit.ffi.NativeKitTypes.TextEditAction;
 import FontCollection;
+import nativekit.ui.editing.EditHistory;
+import nativekit.ui.editing.EditOperation;
 import Color;
 import TextColorRange;
 import LayoutMeasureConstraints;
@@ -66,6 +68,73 @@ class TextEditorState {
 	var hasDesiredVerticalX:Bool;
 	var caretBlinkResetTime:Float;
 	var disposed:Bool;
+	public var historyEnabled:Bool = true;
+	final history = new EditHistory(256, 2097152);
+	var replayingHistory:Bool = false;
+	var lastHistoryEdit:Null<FieldHistoryEdit>;
+
+	public function configureHistory(enabled:Bool):Void {
+		if (historyEnabled != enabled) { history.clear(); lastHistoryEdit = null; historyEnabled = enabled; }
+	}
+
+	public function breakHistoryGroup():Void { history.breakCoalescing(); lastHistoryEdit = null; }
+	public function undo():Bool {
+		ensureLive();
+		if (offsets.revision != lastLayoutRevision) syncDocument(offsets);
+		lastHistoryEdit = null;
+		return historyEnabled && history.undo();
+	}
+	public function redo():Bool {
+		ensureLive();
+		if (offsets.revision != lastLayoutRevision) syncDocument(offsets);
+		lastHistoryEdit = null;
+		return historyEnabled && history.redo();
+	}
+
+	function replayHistory(edit:FieldHistoryEdit, backwards:Bool):Void {
+		var removed = backwards ? edit.inserted : edit.removed;
+		var inserted = backwards ? edit.removed : edit.inserted;
+		var selection = backwards ? edit.before : edit.after;
+		replayingHistory = true;
+		try {
+			applyTransaction(new EditTransaction(edit.start, edit.start + TextOffsetMap.countCodepoints(removed), inserted,
+				Std.int(Math.min(selection.anchor, selection.focus)), Std.int(Math.max(selection.anchor, selection.focus)),
+				false, -1, -1, selection.focusAffinity));
+			setAnchoredSelection(selection);
+		} catch (error:Dynamic) { replayingHistory = false; throw error; }
+		replayingHistory = false;
+	}
+
+	function recordHistory(transaction:EditTransaction, before:TextSelection):Void {
+		if (!historyEnabled || replayingHistory) return;
+		var edit = new FieldHistoryEdit(transaction, before,
+			new TextSelection(selectionAnchor, selectionFocus, selectionAnchorAffinity, selectionFocusAffinity));
+		var previous = lastHistoryEdit;
+		var compositionJoin = previous != null && previous.composing && edit.composition &&
+			edit.start == previous.start && edit.removed == previous.inserted;
+		var join = transaction.historyKind == TextEditorHistoryKind.Typing && previous != null &&
+			previous.typing && edit.removed == "" && previous.removed == "" &&
+			edit.start == previous.start + TextOffsetMap.countCodepoints(previous.inserted) &&
+			edit.time - previous.time < 1.0 && previous.inserted.length + edit.inserted.length < 4096 &&
+			previous.inserted.indexOf(" ") < 0 && edit.inserted.indexOf(" ") < 0 &&
+			previous.inserted.indexOf("\n") < 0 && edit.inserted.indexOf("\n") < 0;
+		join = join || compositionJoin;
+		if (!join) history.breakCoalescing();
+		var bytes = 256 + (edit.removed.length + edit.inserted.length) * 4;
+		if (join && previous != null) bytes += 256 + (previous.removed.length + previous.inserted.length) * 4;
+		if (bytes > history.maxEstimatedBytes) { history.clear(); lastHistoryEdit = null; return; }
+		history.record(new EditOperation("Edit text", function() replayHistory(edit, false),
+			function() replayHistory(edit, true), edit.typing ? "typing" : edit.composition ? "composition" : null, function(next) {
+				var following:FieldHistoryEdit = cast next.mergeData;
+				edit.inserted = edit.composition ? following.inserted : edit.inserted + following.inserted;
+				edit.composing = following.composing;
+				edit.after = following.after;
+				edit.time = following.time;
+				return true;
+			}, edit, bytes));
+		lastHistoryEdit = join ? previous : edit;
+	}
+
 
 	public function new(fonts:FontCollection, text:String, ?textStyle:TextStyle,
 			?paragraphStyle:ParagraphStyle, ?document:TextDocument) {
@@ -126,6 +195,7 @@ class TextEditorState {
 		var next = value == null ? "" : value;
 		if (next == offsets.text)
 			return false;
+		history.clear(); lastHistoryEdit = null;
 		cancelPointerClick();
 		offsets.replace(0, offsets.codepointCount, next);
 		var caret = offsets.codepointCount;
@@ -164,6 +234,7 @@ class TextEditorState {
 			throw "Text editor document cannot be null";
 		if (offsets == document && offsets.revision == lastLayoutRevision)
 			return false;
+		history.clear(); lastHistoryEdit = null;
 		cancelPointerClick();
 		if (offsets != document) {
 			offsets = document;
@@ -223,14 +294,14 @@ class TextEditorState {
 	}
 
 	/** Inserts committed text over the current selection. */
-	public function insert(value:String):Bool {
+	public function insert(value:String, kind:TextEditorHistoryKind = TextEditorHistoryKind.Typing):Bool {
 		if (value == null || value.length == 0)
 			return false;
-		return replace(selectionStart, selectionEnd, value);
+		return replace(selectionStart, selectionEnd, value, kind);
 	}
 
 	/** Replaces a code-point range and places a collapsed caret after the insertion. */
-	public function replace(start:Int, end:Int, value:String):Bool {
+	public function replace(start:Int, end:Int, value:String, kind:TextEditorHistoryKind = TextEditorHistoryKind.Generic):Bool {
 		ensureLive();
 		var count = offsets.codepointCount;
 		var first = clamp(start, 0, count);
@@ -241,7 +312,7 @@ class TextEditorState {
 			last = swap;
 		}
 		var caret = first + TextOffsetMap.countCodepoints(value == null ? "" : value);
-		return applyTransaction(new EditTransaction(first, last, value, caret, caret));
+		return applyTransaction(new EditTransaction(first, last, value, caret, caret, false, -1, -1, 0, null, kind));
 	}
 
 	/** Applies one replacement and its resulting selection and composition together. */
@@ -249,6 +320,7 @@ class TextEditorState {
 		ensureLive();
 		if (transaction == null) return false;
 		lastEditTransaction = null;
+		var historyBefore = new TextSelection(selectionAnchor, selectionFocus, selectionAnchorAffinity, selectionFocusAffinity);
 		var count = offsets.codepointCount;
 		var first = clamp(transaction.replacementStart, 0, count);
 		var last = clamp(transaction.replacementEnd, 0, count);
@@ -288,6 +360,9 @@ class TextEditorState {
 				selectionStart, selectionEnd, compositionStart >= 0, compositionStart,
 				compositionEnd, selectionFocusAffinity, transaction.compositionAttributes,
 				transaction.historyKind, replacedText);
+		var appliedEdit = lastEditTransaction;
+		if (textChanged && appliedEdit != null) recordHistory(appliedEdit, historyBefore);
+		if (!transaction.hasComposition && transaction.historyKind == TextEditorHistoryKind.Composition) breakHistoryGroup();
 		return textChanged || previousStart != selectionStart || previousEnd != selectionEnd ||
 			previousAnchorAffinity != selectionAnchorAffinity ||
 			previousFocusAffinity != selectionFocusAffinity ||
@@ -363,6 +438,7 @@ class TextEditorState {
 			case TextEditAction.SetComposition:
 				setComposition(edit.compositionStart, edit.compositionEnd);
 			case TextEditAction.FinishComposition:
+				breakHistoryGroup();
 				clearComposition();
 				setSelection(edit.selectionStart, edit.selectionEnd, edit.selectionAffinity);
 			case _:
@@ -427,6 +503,7 @@ class TextEditorState {
 	}
 
 	public function selectAll():Bool {
+		breakHistoryGroup();
 		var first = selectionStart != 0 || selectionEnd != offsets.codepointCount ||
 			selectionAnchor != 0 || selectionFocus != offsets.codepointCount ||
 			selectionAnchorLayoutOffset != 0 ||
@@ -447,6 +524,7 @@ class TextEditorState {
 	/** Places a caret and optionally extends the existing anchored selection. */
 	public function placeCaret(offset:Int, extend:Bool, affinity:Int = 0):Bool {
 		ensureLive();
+		breakHistoryGroup();
 		resetVerticalNavigation();
 		var next = clamp(layout.alignGrapheme(clamp(offset, 0, offsets.codepointCount)),
 			0, offsets.codepointCount);
@@ -671,6 +749,7 @@ class TextEditorState {
 	}
 
 	function moveFocusTo(next:Int, extend:Bool):Bool {
+		breakHistoryGroup();
 		var previousFocusLayoutOffset = selectionFocusLayoutOffset;
 		var wasCollapsed = selectionStart == selectionEnd;
 		if (!extend) {
@@ -702,6 +781,16 @@ class TextEditorState {
 			return false;
 		var previous = layout.previousGrapheme(selectionStart);
 		return replace(previous, selectionStart, "");
+	}
+
+	/** Deletes a selection or one shaped word as a single edit. */
+	public function deleteWord(direction:Int, macStyle:Bool = false):Bool {
+		ensureLive();
+		if (direction != -1 && direction != 1) throw "Word deletion direction must be -1 or 1";
+		if (selectionStart != selectionEnd) return replace(selectionStart, selectionEnd, "");
+		var other = layout.moveWord(selectionFocus, direction, macStyle);
+		return replace(Std.int(Math.min(other, selectionFocus)),
+			Std.int(Math.max(other, selectionFocus)), "");
 	}
 
 	public function deleteForward():Bool {
@@ -870,6 +959,7 @@ class TextEditorState {
 	}
 
 	public function dispose():Void {
+		history.clear(); lastHistoryEdit = null;
 		if (disposed)
 			return;
 		renderContent.dispose();
@@ -950,4 +1040,25 @@ class TextEditorState {
 
 	static inline function clampFloat(value:Float, minimum:Float, maximum:Float):Float
 		return value < minimum ? minimum : value > maximum ? maximum : value;
+}
+
+private class FieldHistoryEdit {
+	public final start:Int;
+	public final removed:String;
+	public var inserted:String;
+	public final before:TextSelection;
+	public var after:TextSelection;
+	public var time:Float;
+	public final typing:Bool;
+	public final composition:Bool;
+	public var composing:Bool;
+	public function new(edit:EditTransaction, before:TextSelection, after:TextSelection) {
+		start = edit.replacementStart;
+		removed = edit.replacedText == null ? "" : edit.replacedText;
+		inserted = edit.replacementText == null ? "" : edit.replacementText;
+		this.before = before; this.after = after; time = Sys.time();
+		typing = edit.historyKind == TextEditorHistoryKind.Typing;
+		composition = edit.historyKind == TextEditorHistoryKind.Composition;
+		composing = edit.hasComposition;
+	}
 }
