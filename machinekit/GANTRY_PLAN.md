@@ -3610,3 +3610,20 @@ the bench mill and enclosed mill, plus virtual-device router homing. The ordinar
 MuJoCo screw router then rejected the first Z homing plan with lifecycle status
 -2. That admission failure is under investigation; Phase C remains open and the
 standalone G14 heads are not integrated into GantrySpec yet.
+
+### Phase C gate — coherent initial held coordinates
+
+The full app gate reached the ordinary MuJoCo router after the picker,
+welder, mills and virtual-device homing checks passed. Its first homing plan
+was rejected: independently settled screw-shaft feedback had been copied
+into the held commands, while the logical-axis planner projects those shafts
+from their linear leaders. The first generic runtime observation now projects
+held commands through the coupling graph, as the device-origin path already
+does. Raw feedback remains unchanged and admission tolerances remain strict.
+A native regression checks both coordinate domains and accepts a coupled plan
+from the projected origin. Native build and CTest passed 19/19. The app's native
+runtime copy was also rebuilt.
+
+The router now gets past homing admission. Remaining app validation is still
+in progress; G13/Phase C is not yet complete. Temporary diagnostic prints were
+removed. The already-passing welder checks are not being repeated.

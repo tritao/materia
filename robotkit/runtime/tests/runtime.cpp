@@ -1073,6 +1073,38 @@ void moving_degree_one_plan_cannot_retarget(const rk_robot_runtime_blueprint &bl
     assert(runtime.submit_plan(plan) == RK_ERROR_INVALID_STATE);
 }
 
+void initial_coupled_anchor_preserves_feedback(const rk_robot_runtime_blueprint &source) {
+    auto blueprint = source;
+    blueprint.coupling_count = 1;
+    blueprint.couplings[0] = {0, 1, -1.0, 0.0};
+    constexpr double origin = 0.000023;
+    auto endpoint = std::make_shared<OffsetEndpoint>(origin);
+    auto runtime = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint,
+        std::chrono::milliseconds(10));
+    assert(runtime->publish_sample(1) == RK_OK);
+    rk_robot_snapshot snapshot{};
+    assert(runtime->snapshot_full(snapshot) == RK_OK);
+    assert(snapshot.position[0] == origin);
+    assert(snapshot.position[1] == 0.0);
+    assert(snapshot.setpoint_position[0] == origin);
+    assert(snapshot.setpoint_position[1] == -origin);
+
+    robotkit::PlanRequest plan{};
+    plan.sequence = 1;
+    plan.plan_id = 93;
+    plan.model_revision = blueprint.revision;
+    plan.calibration_revision = blueprint.calibration_revision;
+    plan.start_position[0] = origin;
+    plan.start_position[1] = -origin;
+    plan.position_tolerance[0] = plan.position_tolerance[1] = 1e-6;
+    plan.segments = cubic_plan_chunk(93);
+    plan.segments.segments[0].coefficients[0].value[0] = origin;
+    plan.segments.segments[0].coefficients[1].value[0] = -origin;
+    plan.segments.segments[0].coefficients[0].value[3] = 0.2;
+    plan.segments.segments[0].coefficients[1].value[3] = -0.2;
+    assert(runtime->submit_plan(plan) == RK_OK);
+}
+
 void idle_plan_uses_commanded_anchor_and_following_error(
     const rk_robot_runtime_blueprint &source) {
     // Four runtimes and two plans exceed a comfortable stack; keep the
@@ -2408,6 +2440,7 @@ int main() {
     plan_event_records_report_overflow(blueprint);
     accepted_plan_keeps_committed_region_identical(blueprint);
     moving_degree_one_plan_cannot_retarget(blueprint);
+    initial_coupled_anchor_preserves_feedback(blueprint);
     idle_plan_uses_commanded_anchor_and_following_error(blueprint);
     initial_device_origin_is_held_once_and_reset(blueprint);
     submitted_start_tolerances_control_acceptance(blueprint);
