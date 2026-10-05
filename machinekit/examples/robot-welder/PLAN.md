@@ -1853,3 +1853,102 @@ execution rechecks its actual measured start. Focused native tests pass 45 asser
 pass 4,913 assertions. The mission adapter tries 9/17/33-point-per-axis lattices in order until a
 checked pattern succeeds, retaining finite search and avoiding the densest scan when unnecessary.
 The repaired focused mission check remains pending.
+
+P4 preparation audit while the P3 production preview runs: declared component mass is currently
+lost at the preview boundary. MachineComponent.massProperties returns declared vendor kg/COM and
+optional centroidal inertia in kg mm², but AssemblyPreview.scene exports Part.massProperties from
+the preview solid. MateriaProjectRunner then computes kg as volume*density*scale³, and CadBridge
+uses that same geometric mass unless its occurrence callback overrides it. The saved scene currently
+has geometric inertia moments, scaled by density*scale⁵, rather than explicit physical mass/inertia.
+P4 must repair this producer/data/consumer boundary before claiming measured motor-energy realism;
+changing pack ratings or multiplying loads afterward would hide the physical-model mismatch.
+No energy implementation or mass-format change has been made during this P3 execution check.
+
+The filtered focused run is live after production CAD generation; no pass/fail result is available
+at this point. Its source geometry artifact is cached beneath app/build/project-cache using the
+existing content/dependency/native-stamp fingerprint, keeping cache writes in this worktree. The
+next compiled focused check additionally requires twelve coarse/fine touch episodes, verifies that
+wheel localization did not receive the injected base jump, and measures frame error at the first
+weld's actual CAD seam endpoints rather than an arbitrary nearby point. Those added assertions have
+not yet been compiled/run; the current live process uses the preceding test binary.
+
+### P3 clock ownership stop (2026-10-05)
+
+The filtered focused run has terminated with exit 1. It now reaches the coarse contact search, then
+fails exactly: `step 1 (findWork): Coarse: contact search needs fresh welding feedback on the joint clock`.
+The scene generator completed and emitted 66 component records (2,877,017-byte artifact). No successful
+registration or weld is claimed; the enhanced contact-count/odometry/seam-endpoint assertions remain
+uncompiled and unrun.
+
+The concrete framework mismatch is RuntimeRobotAdapter.snapshot (robotkit/core/haxe/robotkit/runtime/
+RuntimeRobotAdapter.hx, source-clock argument): it labels all joint snapshots `unspecified`.
+VirtualWelderSupply publishes raw device-clock observations as `robotkit.device.<epoch>`.
+VirtualDeviceEndpoint::sensor_sample converts board timestamp ticks to nanoseconds at the device
+rate, retaining its device epoch; it does not map them into the joint observation clock. Equal numeric
+units do not establish a shared clock, and republishing at receipt time would hide sampling uncertainty.
+The existing strict ContactSearch condition is therefore correctly failing.
+
+A clean prerequisite is authoritative source-clock metadata from the runtime adapter/endpoint plus
+an explicit bounded device-to-joint mapping, using RobotKit's existing ClockMapping/ClockMappings
+contracts or an endpoint-owned equivalent. Its uncertainty must count against the permitted contact
+skew/position error; clock epochs, missing mappings and stale observations must fail. RobotRuntime.hx
+has not been edited, and the clock equality/freshness guard has not been weakened. This crosses the
+brief's RobotKit framework ownership boundary, so execution work stops here for an owner repair or
+explicitly authorized scope change. The mission adapter/application/generator draft remains uncommitted;
+main remains f4dc7456a65fb32dd2459d9a36d36dd8c80457a1. P3, P4 and P5 remain incomplete.
+
+### P3 authorized clock prerequisite (2026-10-05)
+
+The user authorized the framework repair across the earlier ownership boundary. RobotRuntime.hx
+and RobotArm.hx remain untouched. Inspection corrects the earlier diagnosis: RKD6 joint records,
+like its peripheral samples, retain board ticks converted to nanoseconds. They already share the
+same board oscillator; their source clock must not be called the host/simulation clock and does
+not need a fictitious device-to-joint calibration. Direct simulation joint records use physics time.
+
+RuntimeEndpoint now exposes its source-clock identity. Factories supply endpoint-owned identities
+with instance tokens and reset epochs; RuntimeRobotAdapter preserves that identity on joint and
+native sensor observations, while external frames retain their actual publisher's clock. SimKit
+notifies observers after a successful session reset so RobotKit can invalidate every endpoint epoch
+even when a later timestamp numerically repeats; individual robot resets invalidate that endpoint.
+This is a Haxe lifecycle change with no native ABI change or rebuild. Unexpected backward endpoint
+time also starts a distinct epoch; no mapping across it is inferred.
+
+SimulatedWelder publishes the completed physics observation's actual joint source timestamp and
+endpoint clock, rather than the separately monotonic step-observer integration time. The virtual
+supply retains raw board sample time and uses the same board clock identity as its joint records.
+For genuinely independent devices, ContactSearch and its execution wrappers accept explicit
+ClockMappings. The complete mapped uncertainty interval must precede measured FK and fit inside
+the existing age budget, retaining the speed*age contact-position bound. Unknown identities,
+missing/expired mappings, excessive uncertainty and a changed joint or sensor epoch fail probing.
+
+Final focused checks pass: 24 endpoint-clock assertions including a 70 ms device offset, 125 ppm
+drift, preserved external clocks and repeated-timestamp resets; a separate-process clock-identity
+check; 20 existing search assertions plus 10 mapping/epoch/invalid-time assertions; 50 native
+probe-motion assertions. The latter also prove that a repeated-timestamp reset aborts search,
+buffered probing and the entire registration sequence before points from different epochs can
+be combined. The final app source compiles 1,863 sources, using compiler-only builds and existing
+native libraries. No OCCT/native rebuild was performed.
+
+The production registration retry completed CAD generation (66 records, 2,877,017 bytes), passed
+the former clock prerequisite and reached the coarse servo search. It then terminated with exit 1:
+`step 1 (findWork): Coarse: Joint target must be finite`. The twelve-contact/seam checks did not run
+to completion; neither backend has a successful P3 registration result. The final epoch-guard
+additions were checked in the focused native suite and the app was recompiled after them.
+
+A separate diagnostic beneath ignored app/build/servo-diagnostic reproduces the framework error
+without CAD: one bounded prismatic DOF, velocity limit 0.1, absent maxAcceleration, requested TCP
+speed -0.005 m/s and dt 0.01. ManipulatorServo produces `velocity=NaN, fallback=true, status=-1`.
+The same call with acceleration override 1 produces `velocity=-0.004999989999781267`, finite,
+`fallback=false, status=0`. ManipulatorServo maps an absent acceleration to positive infinity;
+StepLimits.brakingSpeed then evaluates infinity times zero for a finite travel distance, and its
+NaN bounds propagate through the differential-IK fallback into the joint target. No MotionKit or
+KinematicsKit source was changed in this clock prerequisite. The user's outside-scope stop rule
+applies to this newly exposed framework defect; the clean next repair belongs to the acceleration
+limit contract and bounded differential IK, followed by resuming the P3 mission check.
+
+Clock repair commits are `bcfcd3e07f79869cb89a633a71e1f7898b92be7b` (RobotKit endpoint clocks
+and reset epochs) and `cfe73e334` (ProcessKit mapped-clock probing and simulation observations).
+The mission adapter/application/generator draft remains uncommitted. P3 is not a passing milestone,
+so no main fast-forward was attempted; main remains f4dc7456a65fb32dd2459d9a36d36dd8c80457a1.
+P3 full two-station and 20 mm/2-degree boundary validation, P4 energy/docking and P5 rendered-depth
+tracking remain required and open.
