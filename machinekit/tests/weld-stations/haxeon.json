@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-weld-station-tests"},
+  "entry": "MobileWeldStationChecks",
+  "sourceRoots": [".", "../../examples/robot-welder", "../../examples/robot-arm", "../../examples/mobile-base"],
+  "dependencies": {
+    "machinekit": {"path": "../.."},
+    "machinekit-robot": {"path": "../../robot"},
+    "cadbridge": {"path": "../../../robotkit/cadbridge"},
+    "processkit": {"path": "../../../processkit"}
+  },
+  "target": "host",
+  "outputDir": "build"
+}

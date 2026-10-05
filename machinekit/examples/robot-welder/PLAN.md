@@ -1486,3 +1486,14 @@ pass-offset conversion. ProcessKit depends on ProjectKit's scene data contract; 
 no dependency on ProcessKit, so this introduces no dependency cycle. Scene schema stays 16.
 The focused CAD station target compiles this shared conversion and uses it in full-motion checks;
 the complete mobile execution gate is still pending.
+
+P2 CAD station integration now passes: two stations cover all ten CAD seams, with 14 mission
+steps and 9.323968 m of A* route. Candidates come from work-local seam bounds and the mounted
+arm offset, then conservative parking screening and full compiled weld checks select the cover.
+Actual ordered runs continue from verified retreat joints. Stow uses checked joint-space detours
+and emits absolute mechanical joint targets by restoring the CAD initial-position offset.
+The previous nozzle/upright collision is resolved by the validated detour. Physical views are
+created from the normalized current-schema scene so resolved material properties are available.
+`materia.mobilemission.project.json` exposes the planned mission while the carrier-only manifest
+continues serving the focused carrier check. This CAD result proves planning and coverage; P2
+remains incomplete until complete mobile execution and the required regression gates pass.

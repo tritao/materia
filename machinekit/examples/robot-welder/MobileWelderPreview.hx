@@ -8,8 +8,16 @@ import materia.project.SceneArtifact;
 /** Mobile welding scene. Station planning supplies its mission in P2. */
 class MobileWelderPreview {
   public static inline var ASSEMBLY_ID:String = "mobile-welder";
-  public static function cell():Bytes {
+  public static function cell():Bytes return SceneArtifact.encode(design(new MobileWelderCell()));
+
+  public static function plannedCell():Bytes {
     var cell = new MobileWelderCell();
+    var scene = design(cell);
+    scene.mission = {steps: new MobileWeldStations(cell, scene).mission()};
+    return SceneArtifact.encode(scene);
+  }
+
+  public static function design(cell:MobileWelderCell):materia.project.SceneArtifact.SceneArtifactData {
     var scene = AssemblyPreview.scene(cell, ASSEMBLY_ID);
     var model = new AssemblyModel("mm");
     cell.addTo(model, "");
@@ -33,6 +41,6 @@ class MobileWelderPreview {
         acceleration * 6 * robot.trackWidth() / 1000 / (Math.pow(robot.length / 1000, 2) + Math.pow(robot.width / 1000, 2))),
       footprintLength: robot.length / 1000, footprintWidth: robot.width / 1000,
       origin: {x: MobileWelderCell.ORIGIN.x / 1000, y: MobileWelderCell.ORIGIN.y / 1000, yaw: MobileWelderCell.ORIGIN.yaw}};
-    return SceneArtifact.encode(scene);
+    return scene;
   }
 }

@@ -2,9 +2,11 @@
 	"version": 1,
 	"package": { "name": "machinekit-robot-welder-example" },
 	"entry": "RobotWelderPreview",
-	"sources": ["ArmWeldingTool.hx", "WeldingCell.hx", "WeldingWorkpiece.hx", "WeldSeamChecks.hx", "RobotWelderPreview.hx", "../robot-arm/RobotArm.hx", "MobileWeldingRobot.hx", "MobileWelderCell.hx", "MobileWelderPreview.hx"],
+	"sources": ["ArmWeldingTool.hx", "WeldingCell.hx", "WeldingWorkpiece.hx", "WeldSeamChecks.hx", "RobotWelderPreview.hx", "../robot-arm/RobotArm.hx", "MobileWeldingRobot.hx", "MobileWelderCell.hx", "MobileWelderPreview.hx", "MobileWeldStations.hx"],
 	"sourceRoots": [".", "../robot-arm", "../mobile-base"],
 	"dependencies": {
+		"cadbridge": { "path": "../../../robotkit/cadbridge" },
+		"processkit": { "path": "../../../processkit" },
 		"projectkit": { "path": "../../../projectkit" },
 		"cadkit": { "path": "../../../cadkit" },
 		"machinekit": { "path": "../../" },
