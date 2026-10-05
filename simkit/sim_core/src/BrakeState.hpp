@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cmath>
-#include <stdexcept>
+#include <optional>
 
 namespace nksim {
 
@@ -11,17 +11,20 @@ struct BrakeParameters {
     double holding_effort;
     double release_delay;
     double application_delay;
+    bool valid() const {
+        return std::isfinite(holding_effort) && holding_effort > 0.0 &&
+            std::isfinite(release_delay) && release_delay >= 0.0 &&
+            std::isfinite(application_delay) && application_delay >= 0.0;
+    }
 };
 
 /** Physical coil/contact state. The simulation advances it at physics substeps;
  * the controller supplies only the release coil and observes released feedback. */
 class BrakeState {
 public:
-    explicit BrakeState(BrakeParameters parameters) : parameters_(parameters) {
-        if (!std::isfinite(parameters.holding_effort) || parameters.holding_effort <= 0.0 ||
-            !std::isfinite(parameters.release_delay) || parameters.release_delay < 0.0 ||
-            !std::isfinite(parameters.application_delay) || parameters.application_delay < 0.0)
-            throw std::invalid_argument("Brake effort must be positive and delays finite and nonnegative");
+    static std::optional<BrakeState> create(BrakeParameters parameters) {
+        if (!parameters.valid()) return std::nullopt;
+        return BrakeState(parameters);
     }
 
     void set_release_coil(bool energized) {
@@ -31,12 +34,13 @@ public:
         finish_transition_if_due();
     }
 
-    void advance(double seconds) {
+    bool advance(double seconds) {
         if (!std::isfinite(seconds) || seconds < 0.0)
-            throw std::invalid_argument("Brake substep must be finite and nonnegative");
-        if (released_ == energized_) return;
+            return false;
+        if (released_ == energized_) return true;
         transition_time_ += seconds;
         finish_transition_if_due();
+        return true;
     }
 
     bool released() const { return released_; }
@@ -44,6 +48,7 @@ public:
     double friction_effort() const { return released_ ? 0.0 : parameters_.holding_effort; }
 
 private:
+    explicit BrakeState(BrakeParameters parameters) : parameters_(parameters) {}
     void finish_transition_if_due() {
         const double delay = energized_ ? parameters_.release_delay : parameters_.application_delay;
         if (released_ != energized_ && transition_time_ >= delay) released_ = energized_;

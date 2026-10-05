@@ -216,6 +216,17 @@ public:
         return joints.size() == before ? NKSIM_ERROR_INVALID_HANDLE : NKSIM_OK;
     }
 
+    // This kinematic test backend cannot represent passive friction or brake holding.
+    nksim_result joint_configure_brake(std::uint64_t, BrakeParameters) override {
+        return NKSIM_ERROR_UNSUPPORTED;
+    }
+    nksim_result joint_set_brake_release(std::uint64_t, bool) override {
+        return NKSIM_ERROR_UNSUPPORTED;
+    }
+    nksim_result joint_brake_released(std::uint64_t, bool *) const override {
+        return NKSIM_ERROR_UNSUPPORTED;
+    }
+
     nksim_result joint_couple(const BackendJointCoupling &coupling) override {
         if (!find_joint(coupling.leader) || !find_joint(coupling.follower))
             return NKSIM_ERROR_INVALID_HANDLE;

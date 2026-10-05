@@ -12,6 +12,7 @@
 #include <cmath>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <map>
 #include <set>
 #include <string>
@@ -86,6 +87,7 @@ struct JointRecord {
     double end_velocity = 0.0;
     double reference_duration = 0.0;
     double reference_epoch = 0.0;
+    std::optional<nksim::BrakeState> brake;
 };
 
 double dot(const Vec3 &a, const Vec3 &b) {
@@ -668,6 +670,34 @@ public:
         return topology_update ? NKSIM_OK : rebuild();
     }
 
+    nksim_result joint_configure_brake(std::uint64_t id, nksim::BrakeParameters parameters) override {
+        const auto found = joints.find(id);
+        if (found == joints.end()) return NKSIM_ERROR_INVALID_HANDLE;
+        if (found->second.desc.type == NKSIM_JOINT_FIXED || found->second.brake)
+            return NKSIM_ERROR_INVALID_STATE;
+        const auto state = nksim::BrakeState::create(parameters);
+        if (!state) return NKSIM_ERROR_INVALID_ARGUMENT;
+        found->second.brake = state;
+        return NKSIM_OK;
+    }
+
+    nksim_result joint_set_brake_release(std::uint64_t id, bool energized) override {
+        const auto found = joints.find(id);
+        if (found == joints.end()) return NKSIM_ERROR_INVALID_HANDLE;
+        if (!found->second.brake) return NKSIM_ERROR_INVALID_STATE;
+        found->second.brake->set_release_coil(energized);
+        return NKSIM_OK;
+    }
+
+    nksim_result joint_brake_released(std::uint64_t id, bool *released) const override {
+        const auto found = joints.find(id);
+        if (found == joints.end()) return NKSIM_ERROR_INVALID_HANDLE;
+        if (!released) return NKSIM_ERROR_INVALID_ARGUMENT;
+        if (!found->second.brake) return NKSIM_ERROR_INVALID_STATE;
+        *released = found->second.brake->released();
+        return NKSIM_OK;
+    }
+
     nksim_result joint_couple(const nksim::BackendJointCoupling &coupling) override {
         if (joints.find(coupling.leader) == joints.end() ||
             joints.find(coupling.follower) == joints.end())
@@ -837,6 +867,13 @@ public:
         }
         const auto drives = kinematic_drives();
         for (std::uint32_t index = 0; index < substeps; ++index) {
+            for (auto &[id, joint] : joints) if (joint.brake) {
+                if (!joint.brake->advance(model->opt.timestep)) return NKSIM_ERROR_INVALID_ARGUMENT;
+                const int native = model_joint_id(joint);
+                if (native < 0) return NKSIM_ERROR_BACKEND;
+                model->dof_frictionloss[model->jnt_dofadr[native]] =
+                    joint.desc.friction_loss + joint.brake->friction_effort();
+            }
             if (!drives.empty())
                 place_kinematic_drives(drives,
                     static_cast<double>(substeps - index) * model->opt.timestep);

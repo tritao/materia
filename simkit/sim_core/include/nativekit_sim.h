@@ -463,6 +463,19 @@ NKSIM_API nksim_result NKSIM_CALL nksim_joint_get_state(
  */
 NKSIM_API nksim_result NKSIM_CALL nksim_joint_set_state(
     nksim_world world, nksim_joint joint, double position, double velocity);
+/** Attach one spring-applied brake to a one-DOF joint. Effort is N m for a
+ * rotary joint or N for a prismatic joint; delays are seconds. The brake starts
+ * applied and adds passive dry friction independently of motor targets.
+ * Backends without physical friction return NKSIM_ERROR_UNSUPPORTED. */
+NKSIM_API nksim_result NKSIM_CALL nksim_joint_configure_brake(
+    nksim_world world, nksim_joint joint, double holding_effort,
+    double release_delay, double application_delay);
+/** Digital release coil; zero de-energizes, one energizes. */
+NKSIM_API nksim_result NKSIM_CALL nksim_joint_set_brake_release(
+    nksim_world world, nksim_joint joint, uint32_t energized);
+/** Physical released contact after the simulated mechanical delay. */
+NKSIM_API nksim_result NKSIM_CALL nksim_joint_get_brake_released(
+    nksim_world world, nksim_joint joint, uint32_t *out_released NK_OUT);
 
 NKSIM_API void NKSIM_CALL nksim_snapshot_destroy(nksim_snapshot snapshot);
 NKSIM_API nksim_result NKSIM_CALL nksim_snapshot_get_clock(

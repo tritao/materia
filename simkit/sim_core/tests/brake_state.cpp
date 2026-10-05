@@ -4,7 +4,9 @@
 #include <limits>
 
 int main() {
-    nksim::BrakeState brake({4.0, 0.05, 0.03});
+    auto state = nksim::BrakeState::create({4.0, 0.05, 0.03});
+    assert(state);
+    auto &brake = *state;
     assert(!brake.released());
     assert(brake.friction_effort() == 4.0);
     brake.set_release_coil(true);
@@ -36,18 +38,14 @@ int main() {
     brake.advance(0.1);
     assert(brake.released());
 
-    nksim::BrakeState immediate({2.0, 0.0, 0.0});
+    auto immediate_state = nksim::BrakeState::create({2.0, 0.0, 0.0});
+    assert(immediate_state);
+    auto &immediate = *immediate_state;
     immediate.set_release_coil(true);
     assert(immediate.released());
     immediate.set_release_coil(false);
     assert(!immediate.released());
 
-    bool rejected = false;
-    try { nksim::BrakeState invalid({-1.0, 0.0, 0.0}); }
-    catch (const std::invalid_argument &) { rejected = true; }
-    assert(rejected);
-    rejected = false;
-    try { brake.advance(std::numeric_limits<double>::quiet_NaN()); }
-    catch (const std::invalid_argument &) { rejected = true; }
-    assert(rejected);
+    assert(!nksim::BrakeState::create({-1.0, 0.0, 0.0}));
+    assert(!brake.advance(std::numeric_limits<double>::quiet_NaN()));
 }

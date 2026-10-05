@@ -2399,6 +2399,49 @@ double falling_arm_angle(double armature, double damping, double friction_loss, 
     return angle;
 }
 
+// A passive brake holds an unpowered arm, releases only after its mechanical
+// delay, and applies after its coil drops. An undersized brake still slips.
+void spring_applied_brake_holds_without_a_motor_target() {
+    auto rig = make_arm_rig(0.0, 0.0, 0.0);
+    assert(nksim_joint_configure_brake(rig.world, rig.joint, -1.0, 0.05, 0.03) == NKSIM_ERROR_INVALID_ARGUMENT);
+    assert(nksim_joint_configure_brake(rig.world, rig.joint, 10.0, 0.05, 0.03) == NKSIM_OK);
+    assert(nksim_joint_configure_brake(rig.world, rig.joint, 10.0, 0.05, 0.03) == NKSIM_ERROR_INVALID_STATE);
+    uint32_t released = 1;
+    assert(nksim_joint_get_brake_released(rig.world, rig.joint, &released) == NKSIM_OK);
+    assert(released == 0);
+    // No actuator command at all: holding comes from friction, not servo PD.
+    step_world(rig.world, 500);
+    assert(std::abs(arm_angle(rig)) < 0.01);
+    assert(nksim_joint_set_brake_release(rig.world, rig.joint, 2) == NKSIM_ERROR_INVALID_ARGUMENT);
+    assert(nksim_joint_set_brake_release(rig.world, rig.joint, 1) == NKSIM_OK);
+    step_world(rig.world, 20);
+    assert(nksim_joint_get_brake_released(rig.world, rig.joint, &released) == NKSIM_OK);
+    assert(released == 0);
+    assert(nksim_joint_set_brake_release(rig.world, rig.joint, 1) == NKSIM_OK);
+    step_world(rig.world, 6);
+    assert(nksim_joint_get_brake_released(rig.world, rig.joint, &released) == NKSIM_OK);
+    assert(released == 1);
+    step_world(rig.world, 150);
+    assert(std::abs(arm_angle(rig)) > 0.15);
+    assert(nksim_joint_set_brake_release(rig.world, rig.joint, 0) == NKSIM_OK);
+    step_world(rig.world, 14);
+    assert(nksim_joint_get_brake_released(rig.world, rig.joint, &released) == NKSIM_OK);
+    assert(released == 1);
+    step_world(rig.world, 2);
+    assert(nksim_joint_get_brake_released(rig.world, rig.joint, &released) == NKSIM_OK);
+    assert(released == 0);
+    assert(nksim_joint_set_state(rig.world, rig.joint, 0.0, 0.0) == NKSIM_OK);
+    step_world(rig.world, 500);
+    assert(std::abs(arm_angle(rig)) < 0.01);
+    destroy_arm_rig(rig);
+
+    auto undersized = make_arm_rig(0.0, 0.0, 0.0);
+    assert(nksim_joint_configure_brake(undersized.world, undersized.joint, 1.0, 0.0, 0.0) == NKSIM_OK);
+    step_world(undersized.world, 150);
+    assert(std::abs(arm_angle(undersized)) > 0.1);
+    destroy_arm_rig(undersized);
+}
+
 // Joint damping and armature slow a released arm (unit inertia about its
 // centre, 1.25 kg m^2 about the hinge); friction loss above the gravity load
 // holds it, apart from the creep MuJoCo's soft dry friction allows.
@@ -2566,6 +2609,7 @@ void joint_limit_softness_reaches_the_backend() {
 }
 
 int main() {
+    spring_applied_brake_holds_without_a_motor_target();
     joint_limit_softness_reaches_the_backend();
     contact_filters_and_pairs_decide_contacts();
     servo_target_is_a_saturating_pd();

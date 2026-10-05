@@ -1116,6 +1116,30 @@ nksim_result World::create_joint(const nksim_joint_desc &desc, nksim_joint *out_
     return NKSIM_OK;
 }
 
+nksim_result World::configure_joint_brake(nksim_joint handle, BrakeParameters parameters) {
+    if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
+    if (!parameters.valid())
+        return NKSIM_ERROR_INVALID_ARGUMENT;
+    const auto *joint = joints.get(handle);
+    if (!joint) return NKSIM_ERROR_INVALID_HANDLE;
+    if (joint->desc.type == NKSIM_JOINT_FIXED) return NKSIM_ERROR_INVALID_STATE;
+    return backend->joint_configure_brake(joint->backend_joint, parameters);
+}
+
+nksim_result World::set_joint_brake_release(nksim_joint handle, bool energized) {
+    if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
+    const auto *joint = joints.get(handle);
+    return joint ? backend->joint_set_brake_release(joint->backend_joint, energized)
+        : NKSIM_ERROR_INVALID_HANDLE;
+}
+
+nksim_result World::get_joint_brake_released(nksim_joint handle, bool *released) const {
+    if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
+    const auto *joint = joints.get(handle);
+    return joint ? backend->joint_brake_released(joint->backend_joint, released)
+        : NKSIM_ERROR_INVALID_HANDLE;
+}
+
 nksim_result World::couple_joint(const nksim_joint_coupling_desc &desc) {
     if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
     if (!std::isfinite(desc.ratio) || desc.ratio == 0.0 ||

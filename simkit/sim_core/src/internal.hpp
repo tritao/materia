@@ -304,6 +304,9 @@ public:
     nksim_result destroy_joint(nksim_joint joint);
     nksim_result get_joint_state(nksim_joint joint, nksim_joint_state *out_state) const;
     nksim_result set_joint_state(nksim_joint joint, double position, double velocity);
+    nksim_result configure_joint_brake(nksim_joint joint, BrakeParameters parameters);
+    nksim_result set_joint_brake_release(nksim_joint joint, bool energized);
+    nksim_result get_joint_brake_released(nksim_joint joint, bool *released) const;
 
     const nksim_world_desc &desc() const noexcept { return world_desc; }
 

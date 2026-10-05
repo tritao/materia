@@ -1,6 +1,7 @@
 #pragma once
 
 #include "nativekit_sim.h"
+#include "BrakeState.hpp"
 
 #include <array>
 #include <cstdint>
@@ -156,6 +157,9 @@ public:
     virtual nksim_result joint_create(const BackendJointDesc &desc,
                                       std::uint64_t *out_joint) = 0;
     virtual nksim_result joint_destroy(std::uint64_t joint) = 0;
+    virtual nksim_result joint_configure_brake(std::uint64_t joint, BrakeParameters parameters) = 0;
+    virtual nksim_result joint_set_brake_release(std::uint64_t joint, bool energized) = 0;
+    virtual nksim_result joint_brake_released(std::uint64_t joint, bool *released) const = 0;
     virtual nksim_result joint_couple(const BackendJointCoupling &coupling) = 0;
     virtual nksim_result closure_create(const BackendClosure &closure) = 0;
     /** Backends without explicit pairs keep their own contact rules. */
