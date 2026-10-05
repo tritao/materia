@@ -10,7 +10,7 @@ package kinematicskit;
  *   only move back.
  * - Velocity: |Δ| ≤ v·dt with `velocity` per column (unlimited without).
  * - Acceleration, with `previousVelocity`: the velocity changes by at most
- *   a·dt per step (`acceleration` per DOF; 0 = unlimited), and a DOF never
+ *   a·dt per step (`acceleration` per DOF; absent, 0 or positive infinity = unlimited), and a DOF never
  *   approaches a stop faster than it can brake: one step of travel plus a
  *   full brake fits in the distance left, |v|·dt + v²/(2a) ≤ distance. Where
  *   the two conflict (a DOF already too fast near a stop), the position and
@@ -69,8 +69,12 @@ class StepLimits {
       var accel = acceleration != null ? acceleration[column] : 0.0;
       if (!(accel >= 0.0)) throw "Step acceleration limits must be non-negative";
       var previous:Array<Float> = previousVelocity;
-      if (previous != null && accel > 0.0) {
+      if (previous != null) {
         var before = previous[column];
+        if (!Math.isFinite(before)) throw "Step previous velocities must be finite";
+        // Unlimited acceleration still has a travel bound, including an interior
+        // turning point when a streamed step ramps from a nonzero velocity.
+        if (accel == 0.0) accel = Math.POSITIVE_INFINITY;
         // Braking: one step of travel (or ramp) plus a full brake fits in the distance to the stop.
         var safeLow = vLow, safeHigh = vHigh;
         if (ramped) {
@@ -116,7 +120,9 @@ class StepLimits {
   public static function rampedBrakingSpeed(accel:Float, dt:Float, before:Float, distance:Float):Float {
     if (distance == Math.POSITIVE_INFINITY) return Math.POSITIVE_INFINITY;
     var left = distance - 0.5 * before * dt;
-    if (left > 0.0) return accel * (Math.sqrt(0.25 * dt * dt + 2.0 * left / accel) - 0.5 * dt);
+    // Rationalizing avoids cancellation at large acceleration and infinity*zero
+    // for an unlimited acceleration. Its limit is the ramp's travel bound.
+    if (left > 0.0) return 2.0 * left / (Math.sqrt(0.25 * dt * dt + 2.0 * left / accel) + 0.5 * dt);
     // The DOF must turn back within this step: keep the ramp's turning point,
     // before²·dt / (2·(before − v)), inside the distance.
     if (distance > 0.0 && before > 0.0) return before - before * before * dt / (2.0 * distance);
@@ -127,6 +133,6 @@ class StepLimits {
   public static function brakingSpeed(accel:Float, dt:Float, distance:Float):Float {
     if (!(distance > 0.0)) return 0.0;
     if (distance == Math.POSITIVE_INFINITY) return Math.POSITIVE_INFINITY;
-    return accel * (Math.sqrt(dt * dt + 2.0 * distance / accel) - dt);
+    return 2.0 * distance / (Math.sqrt(dt * dt + 2.0 * distance / accel) + dt);
   }
 }
