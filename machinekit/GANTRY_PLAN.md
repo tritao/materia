@@ -564,7 +564,7 @@ G0 → G1 → G2 → G3 ──────────────────�
 | G10 | implementation added; mechanical/simulation verification deferred | see progress notes |
 | G11 | in progress; reference-state foundation added | see progress notes |
 | G12 | implemented; requested compiler/runtime/picker/homing checkpoint passed | see progress notes |
-| G13 | in progress; board input and physical virtual switches implemented | see progress notes |
+| G13 | complete; restructure and Phase C gate passed | `38f15b995`, `ad5211f04`, `acb1ab460`; see progress notes |
 | G14 | in progress; integrated C/CA mechanics and clearance passed, yaw picker under validation | `7822171b5`; see progress notes |
 | G15 | planned | — |
 | G16 | planned | — |
@@ -3664,3 +3664,10 @@ Focused head compiler/runtime checks passed derived servo export, FK at XYZ
 corners, flange offsets, physical A stops, and solid clearance against the
 carrying frame, beam, rails and carriages at the rotary cable limits. G14's
 heading-constrained picker remains under validation; no Phase D full gate yet.
+
+Phase C's final MotionKit rerun passed 71302 assertions. The refreshed
+CADBridge/Toolpath compiler-only builds and their runtimes also passed:
+CADBridge 173 assertions; Toolpath core 12, accuracy 2, machining 12, scenarios
+3008. Together with the preceding full MachineKit/RobotKit/native/app results,
+this completes the requested restructure gate and G13. Board pin assignments
+remain documented assumptions, not a claim of hardware verification.
