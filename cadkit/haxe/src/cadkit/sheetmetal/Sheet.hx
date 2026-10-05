@@ -169,8 +169,8 @@ class Sheet {
 		return result;
 	}
 	/** Add an exact developed-region cut; the strip's nominal seam datums remain fixed. */
-	public function cutBend(id:Int, region:WallOutline, owner:String):Bend {
-		var previous = bend(id); var cuts = previous.cutTools(); cuts.push(new BendCut(region, owner));
+	public function cutBend(id:Int, region:WallOutline, owner:String, ?origin:BoundaryOrigin):Bend {
+		var previous = bend(id); var cuts = previous.cutTools(); cuts.push(new BendCut(region, owner, origin));
 		var result = new Bend(id, previous.wallA, previous.edgeA, previous.wallB, previous.edgeB, previous.angle, previous.radius, cuts);
 		bendData[bendData.indexOf(previous)] = result; return result;
 	}

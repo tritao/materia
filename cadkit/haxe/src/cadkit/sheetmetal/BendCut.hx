@@ -4,8 +4,10 @@ package cadkit.sheetmetal;
 class BendCut {
 	public final region:WallOutline;
 	public final owner:String;
-	public function new(region:WallOutline, owner:String) {
+	public final origin:BoundaryOrigin;
+	public function new(region:WallOutline, owner:String, ?origin:BoundaryOrigin) {
 		if (owner == null || owner.length == 0) throw new SheetDiagnosis("sheet.cut-identity", "Bend cut requires an authored identity");
 		this.region = region; this.owner = owner;
+		this.origin = origin == null ? BoundaryOrigin.Cut(owner) : origin;
 	}
 }
