@@ -1855,6 +1855,35 @@ class FrameworkSmoke {
 			!context.accessibilityAction(initialId.value, 3, null, -1, -1, 1) ||
 			context.focus.focusedId != null)
 			return 29;
+		var moveModifiers = -1;
+		var wheelModifiers = -1;
+		buttonNode.on(UiEventKind.PointerMove, function(event) moveModifiers = event.modifiers);
+		buttonNode.on(UiEventKind.Scroll, function(event) wheelModifiers = event.modifiers);
+		input.consume(Key(source, 340, 0, InputAction.Press, 0));
+		input.consume(PointerMove(source, 4.0, 4.0));
+		input.consume(PointerScroll(source, 0, -40));
+		if (moveModifiers != UiModifier.Shift || wheelModifiers != UiModifier.Shift)
+			throw "modifier press must affect subsequent move and wheel events";
+		input.consume(Key(source, 344, 0, InputAction.Press, UiModifier.Shift));
+		input.consume(Key(source, 340, 0, InputAction.Release, UiModifier.Shift));
+		input.consume(PointerScroll(source, 0, -40));
+		if (wheelModifiers != UiModifier.Shift)
+			throw "releasing one Shift must preserve the other Shift";
+		input.consume(Key(source, 344, 0, InputAction.Release, UiModifier.Shift));
+		input.consume(PointerScroll(source, 0, -40));
+		if (wheelModifiers != 0) throw "modifier release snapshot must not leave Shift stuck";
+		input.consume(Key(source, UiKey.A, 0, InputAction.Press, UiModifier.Control | UiModifier.Alt));
+		input.consume(Key(new Handle(18), UiKey.A, 0, InputAction.Press, 0));
+		input.consume(PointerMove(source, 4.0, 4.0));
+		if (moveModifiers != (UiModifier.Control | UiModifier.Alt))
+			throw "foreign window must not change pointer modifiers";
+		input.consume(WindowStateChanged(source, 0));
+		input.consume(PointerScroll(source, 0, -40));
+		if (wheelModifiers != 0) throw "focus loss must clear pointer modifiers";
+		input.consume(Key(source, 341, 0, InputAction.Press, 0));
+		input.detach();
+		input.consume(PointerScroll(source, 0, -40));
+		if (wheelModifiers != 0) throw "detach must clear pointer modifiers";
 		var sameTargetHandlers = 0;
 		var immediateTargetHandlers = 0;
 		var parentHandlers = 0;
