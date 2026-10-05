@@ -1,6 +1,6 @@
 package app;
 
-import app.AssemblyRobot.AssemblyPart;
+import app.SimulationAssemblyParts.SimulationAssemblyPart;
 import haxe.io.Bytes;
 import materia.project.SceneArtifact.SceneArtifactWeld;
 import nativekit.scene.GeometryData;
@@ -36,13 +36,13 @@ class SeamBead {
 
 /** The part that carries the weld metal of some seams: the beads are shown as parts of its scene object. */
 private class BeadHost {
-  public final part:AssemblyPart;
+  public final part:SimulationAssemblyPart;
   public final beads:Array<SeamBead> = [];
   public var parts:Int = 0;
   /** The object shows beads now. */
   public var shown:Bool = false;
 
-  public function new(part:AssemblyPart) this.part = part;
+  public function new(part:SimulationAssemblyPart) this.part = part;
 }
 
 /**
@@ -69,7 +69,7 @@ class WeldBeads implements SessionMember {
   /** The metal of every segment of every weld step, in step and path order. */
   public final beads:Array<SeamBead> = [];
 
-  final paths:Array<{step:Int, path:WeldPathBead, frame:Null<AssemblyPart>}> = [];
+  final paths:Array<{step:Int, path:WeldPathBead, frame:Null<SimulationAssemblyPart>}> = [];
   final mission:MissionPlayer;
   final welder:SimulatedWelder;
   final simulation:Simulation;
@@ -80,10 +80,10 @@ class WeldBeads implements SessionMember {
   var shownAt:Float = Math.NEGATIVE_INFINITY;
 
   /**
-   * `parts` are the simulated parts, from which each weld's `metal` occurrence is taken; `wireDiameterMm` is the
+   * The mission resolves each weld's metal and reference occurrence; `wireDiameterMm` is the
    * torch's wire and `depositionEfficiency` the fraction of its melted metal that reaches the weld.
    */
-  public function new(mission:MissionPlayer, welder:SimulatedWelder, simulation:Simulation, parts:Array<AssemblyPart>,
+  public function new(mission:MissionPlayer, welder:SimulatedWelder, simulation:Simulation,
       scene:EditorScene, timestep:Float, wireDiameterMm:Float, depositionEfficiency:Float) {
     this.mission = mission;
     this.welder = welder;
@@ -99,18 +99,14 @@ class WeldBeads implements SessionMember {
       var host:Null<BeadHost> = null;
       for (candidate in hosts) if (candidate.part.id == id) host = candidate;
       if (host == null) {
-        var found = [for (part in parts) if (part.id == id) part];
-        if (found.length != 1) throw 'The weld metal part "${weld.metal}" is not part of the simulated assembly';
-        host = new BeadHost(found[0]);
+        host = new BeadHost(mission.assemblyParts.get(id));
         hosts.push(host);
       }
       var path = new WeldPathBead([for (segment in weld.path) segment.start.position], [for (segment in weld.path) segment.stop.position],
         [for (segment in weld.path) segment.normals], wireDiameterMm, depositionEfficiency);
-      var frame:Null<AssemblyPart> = null;
+      var frame:Null<SimulationAssemblyPart> = null;
       if (weld.frame != null && weld.frame != "") {
-        var named = [for (part in parts) if (part.id == "project:" + weld.frame) part];
-        if (named.length != 1) throw 'The weld frame "${weld.frame}" is not part of the simulated assembly';
-        frame = named[0];
+        frame = mission.assemblyParts.get("project:" + weld.frame);
       }
       var entry = {step: index, path: path, frame: frame};
       paths.push(entry);
@@ -157,9 +153,9 @@ class WeldBeads implements SessionMember {
   }
 
   /** The pose of weld step `step`'s frame in the world now: its reference member's, or the world's own. */
-  function frameOf(entry:{step:Int, path:WeldPathBead, frame:Null<AssemblyPart>}):{position:Array<Float>, rotation:Array<Float>} {
+  function frameOf(entry:{step:Int, path:WeldPathBead, frame:Null<SimulationAssemblyPart>}):{position:Array<Float>, rotation:Array<Float>} {
     var part = entry.frame;
-    return part == null ? {position: [0.0, 0.0, 0.0], rotation: [0.0, 0.0, 0.0, 1.0]} : AssemblyRobot.partPose(simulation, part);
+    return part == null ? {position: [0.0, 0.0, 0.0], rotation: [0.0, 0.0, 0.0, 1.0]} : part.pose();
   }
 
   /** The world pose, in metres, of the frame weld step `step`'s seams are given in, now. */
@@ -221,7 +217,7 @@ class WeldBeads implements SessionMember {
     shownAt = elapsed;
     for (host in hosts) {
       var changed:Map<Int, GeometryData> = new Map();
-      var pose = AssemblyRobot.partPose(simulation, host.part);
+      var pose = host.part.pose();
       for (seam in host.beads) if (seam.dirtyTo >= seam.dirtyFrom) {
         var frame = frameOf([for (entry in paths) if (entry.step == seam.step) entry][0]);
         // A station's mesh depends on its neighbours' legs, so the chunks beside the changed stretch change too.

@@ -60,39 +60,16 @@ class SimulatedTools implements SessionMember {
 			qx: contact.qx, qy: contact.qy, qz: contact.qz, qw: contact.qw});
 		var wire = AssemblyRobot.rotate([tip.qx, tip.qy, tip.qz, tip.qw], [0.0, 0.0, 1.0]);
 		var work = new GroundedWork();
+		var parts = new SimulationAssemblyParts(simulation, robot, objects, project);
 		for (id in welding.groundedWork) {
-			var found = false;
-			for (hull in robot.hulls) if (hull.part == id) {
-				found = true;
-				var link = hull.link;
-				work.add(new ConvexSolid(hull.vertices), () -> simulation.linkPose(robotIndex, link));
-			}
-			if (!found) {
-				var candidates = [for (entry in objects) if (entry.id == "project:" + id) entry];
-				var occurrence = [for (entry in flat.occurrences) if (entry.id == id) entry];
-				if (candidates.length != 1 || occurrence.length != 1 || physical == null)
-					throw 'Grounded work "$id" has no collision body';
-				var body = [for (entry in physical.parts) if (entry.id == occurrence[0].definition) entry];
-				var center = project.assemblyPreviewCenter(occurrence[0].definition);
-				if (body.length != 1 || body[0].collisionHull == null || center == null)
-					throw 'Grounded work "$id" has no CAD collision hull';
-				var hull:Array<Float> = cast body[0].collisionHull;
-				var vertices = [for (index in 0...hull.length) (hull[index] - center[index % 3]) * metres];
-				work.add(new ConvexSolid(vertices), objectPoseReader(simulation, candidates[0].object));
-			}
+			var body = parts.get("project:" + id);
+			if (body.vertices.length < 12) throw 'Grounded work "$id" has no CAD collision hull';
+			work.add(new ConvexSolid(body.vertices), body.pose);
 		}
 		return new SimulatedWelder(simulation, robot.runtime, robotIndex, part.linkIndex, [tip.x, tip.y, tip.z], wire, work, tool.channel,
 			welding.wireSpeedChannel, welding.voltageChannel, sensor,
 			{maxCurrentA: welding.maxCurrentA, efficiency: welding.efficiency, wireDiameterMm: welding.wireDiameterMm,
 				stickoutMm: welding.stickoutMm});
-	}
-
-	/** Bind one body per closure, independent of the caller's loop variables. */
-	static function objectPoseReader(simulation:Simulation, object:SimObject):Void->processkit.tool.GroundedWork.WeldBodyPose {
-		return () -> {
-			var pose = simulation.objectPose(object);
-			return {position: [pose.x, pose.y, pose.z], rotation: [pose.qx, pose.qy, pose.qz, pose.qw]};
-		};
 	}
 
 	/** Scene ids of the objects the tools hold right now. */

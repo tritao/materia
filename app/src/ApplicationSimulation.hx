@@ -268,7 +268,7 @@ class ApplicationSimulation {
           var active:ProjectDocumentSession = cast session;
           var torch = [for (tool in active.robotTools) if (tool.kind == "torch") tool][0].torch;
           if (candidateTools.welders.length != 1 || torch == null) throw "A mission that welds needs the robot's one simulated welder";
-          candidateBeads = new WeldBeads(candidateMission, candidateTools.welders[0], candidate, candidateAssembly.parts, scene,
+          candidateBeads = new WeldBeads(candidateMission, candidateTools.welders[0], candidate, scene,
             timestep, torch.wireDiameterMm, torch.depositionEfficiency);
         }
       }

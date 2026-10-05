@@ -1425,3 +1425,15 @@ simulated grounding already does. This cannot be claimed complete from the selec
 P1 landed on local main at `7e3474144d11ab731d01b661ce4a5b0d5228879c` using the guarded
 fast-forward from `8a209d9ff03522eac26200b1595947da14c41225`. Main was merged before P2
 and was already up to date. No branches were created and no remote was changed.
+
+P2 external-work integration: `SimulationAssemblyParts` resolves CAD occurrence frames and convex
+hulls uniformly from robot links or independent scene objects, restoring the CAD origin from each
+preview centre. Weld grounding, mission reference frames and bead geometry now use that resolver.
+External collision hulls are transformed from their current object poses into the arm's base frame
+when each pass is planned, alongside the robot and deposited-metal hulls. The internal WeldBeads
+constructor no longer takes a robot-only membership list. No RobotArm, ArmTool or saved schema changed.
+Focused `PROJECT_SOURCE_ONLY=mobile-welder-frames` passes with exit 0 on deterministic and MuJoCo:
+an external weld mission builds, both motion and deposition follow a live 12/-8 mm work displacement,
+the carrier's ready pose clears, and putting the external base plate through the torch produces a
+clearance violation naming that workpiece. App compiler-only build passes (1,842 sources).
+The complete mobile weld execution and once-per-P2 full welder/arm/mobile gates remain pending.

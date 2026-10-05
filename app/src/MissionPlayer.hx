@@ -135,6 +135,7 @@ class MissionPlayer implements SessionMember {
   public final mission:SceneArtifactMission;
   /** The navigation map, when the mission drives. */
   public final costmap:Null<Costmap2>;
+  public final assemblyParts:SimulationAssemblyParts;
   /** The boxes the map was drawn from: those standing in the robot's way. */
   public final obstacles:Array<FloorObstacle>;
   /** The software guard that slows and stops the base for what the lidar sees, when the robot has a lidar. */
@@ -205,6 +206,7 @@ class MissionPlayer implements SessionMember {
     this.objects = objects;
     this.robotIndex = robotIndex;
     this.project = project;
+    assemblyParts = new SimulationAssemblyParts(simulation, robot, objects, project);
     var physical = project.projectPhysical;
     metres = physical == null ? 1.0 : physical.metresPerUnit;
     var definition = project.projectAssemblyDefinition;
@@ -301,6 +303,19 @@ class MissionPlayer implements SessionMember {
     var base = simulation.linkPose(robotIndex, 0);
     var baseInverse = new Transform3(new Vec3(base.position[0], base.position[1], base.position[2]),
       new Quat(base.rotation[0], base.rotation[1], base.rotation[2], base.rotation[3])).inverse();
+    for (entry in objects) if (StringTools.startsWith(entry.id, "project:") && ignored.indexOf(entry.id.substr(8)) < 0) {
+      var part = assemblyParts.get(entry.id);
+      if (part.vertices.length == 0) continue;
+      var live = part.pose();
+      var pose = baseInverse.compose(new Transform3(new Vec3(live.position[0], live.position[1], live.position[2]),
+        new Quat(live.rotation[0], live.rotation[1], live.rotation[2], live.rotation[3])));
+      var vertices:Array<Float> = [];
+      for (index in 0...Std.int(part.vertices.length / 3)) {
+        var point = pose.transformPoint(new Vec3(part.vertices[index * 3], part.vertices[index * 3 + 1], part.vertices[index * 3 + 2]));
+        vertices.push(point.x); vertices.push(point.y); vertices.push(point.z);
+      }
+      bodies.push({name: entry.id.substr(8), link: links[0].id, vertices: vertices, tool: false});
+    }
     for (hull in depositedWeldHulls()) {
       var vertices:Array<Float> = [];
       for (index in 0...Std.int(hull.vertices.length / 3)) {
@@ -552,7 +567,7 @@ class MissionPlayer implements SessionMember {
   /** The world pose of a weld's reference member now, or the world's own when the weld names none. */
   function referenceFrame(weld:SceneArtifactWeld):Transform3 {
     if (weld.frame == null || weld.frame == "") return Transform3.identity();
-    var live = AssemblyRobot.partPose(simulation, robot.part("project:" + weld.frame));
+    var live = assemblyParts.get("project:" + weld.frame).pose();
     return new Transform3(new Vec3(live.position[0], live.position[1], live.position[2]),
       new Quat(live.rotation[0], live.rotation[1], live.rotation[2], live.rotation[3]));
   }
