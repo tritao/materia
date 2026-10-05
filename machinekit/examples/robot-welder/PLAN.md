@@ -1646,3 +1646,28 @@ prismatic probe executes the real ServoSession and native runtime against WeldAr
 feedback: calibrated contact is within 0.06 mm of a physical plane, the recorded point precedes
 braking, and stale feedback and a no-touch search both brake to rest without a registration point.
 This proves the adapter's executed motion boundary, not the multi-face mobile mission or MuJoCo.
+
+### P3 CAD probe patches and parking envelopes (2026-10-05)
+
+`machinekit.welding.WeldProbeGeometry` extracts polygonal planar B-rep faces in the nominal
+weldment reference frame. Face boundaries and holes determine sample regions; table and clamp
+faces can obstruct nominal approach rays without becoming registration targets. Containment of
+an entire rectangular uncertainty region checks boundary crossings as well as corners, so a hole
+inside a region cannot be missed. Unsupported curved geometry fails explicitly instead of being
+silently dropped from visibility. This initial implementation supports the example's polygonal
+solids; curved registration geometry remains unsupported.
+
+`WeldProbeParkingBounds` derives conservative face-plane intersection bounds from the nominal
+CAD chassis frame, per-axis translation limits and yaw about that chassis. Projected yaw extrema
+are analytic over the continuous angle interval, rather than a discrete corner-only sample. Ray
+normal projection and tangential rotation expand the region bounds. Planar parking error introduces
+no artificial vertical uncertainty on horizontal CAD faces. At a 1.7 m chassis lever arm, the
+20 mm/2 degree envelope can exceed 70 mm laterally, rejecting narrow first-contact patches.
+
+The focused CAD suite passes 3,101 assertions, including actual mobile-workpiece patches (468
+nominally exposed samples), hole/boundary rejection, fixture masking, world-placement invariance,
+unsupported geometry and dense displaced-ray checks of the continuous parking bounds. No native
+build or OCCT rebuild was needed. These are geometric candidates, not reach-approved probe moves.
+Multi-face selection, checked approach/refinement/retreat and mission observed-frame integration
+remain open. Probe order must follow observable uncertainty and feasible patch width rather than
+always assuming the top face is the first usable datum.
