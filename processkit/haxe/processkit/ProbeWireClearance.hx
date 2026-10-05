@@ -89,6 +89,9 @@ class ProbeWireClearance {
   }
 
   public function sweep(from:Array<Float>, to:Array<Float>, contact:Bool, maxJointStep:Float):Null<ClearanceViolation> {
+    if (from == null || to == null || from.length != arm.group.count() || to.length != from.length ||
+        !Math.isFinite(maxJointStep) || !(maxJointStep > 0))
+      throw "Probe wire sweep needs matching arm configurations and a finite positive joint step";
     var steps = 1;
     for (joint in 0...from.length)
       steps = Std.int(Math.max(steps, Math.ceil(Math.abs(to[joint] - from[joint]) / maxJointStep)));
