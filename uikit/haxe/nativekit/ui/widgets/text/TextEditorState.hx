@@ -68,6 +68,9 @@ class TextEditorState {
 	var hasDesiredVerticalX:Bool;
 	var caretBlinkResetTime:Float;
 	var disposed:Bool;
+	var pointerGranularity:Int = 1;
+	var pointerRangeStart:Int = 0;
+	var pointerRangeEnd:Int = 0;
 	public var historyEnabled:Bool = true;
 	final history = new EditHistory(256, 2097152);
 	var replayingHistory:Bool = false;
@@ -892,6 +895,32 @@ class TextEditorState {
 			return false;
 		var range = layout.lineRangeAt(position.offset);
 		return setSelection(range.start, range.end);
+	}
+
+	/** Retains the original word/line so dragging extends whole semantic units. */
+	public function beginPointerSelection(position:TextPosition, clicks:Int, extend:Bool):Bool {
+		pointerGranularity = extend ? 1 : clicks;
+		var changed = switch pointerGranularity {
+			case 2: selectWordAt(position);
+			case 3: selectLineAt(position);
+			case _: placeCaretAt(position, extend);
+		};
+		pointerRangeStart = selectionStart;
+		pointerRangeEnd = selectionEnd;
+		return changed;
+	}
+
+	public function extendPointerSelection(position:TextPosition):Bool {
+		if (pointerGranularity == 1) return placeCaretAt(position, true);
+		var first:Int; var last:Int;
+		if (pointerGranularity == 2) {
+			var word = layout.wordRange(position); first = word[0]; last = word[1];
+		} else {
+			var line = layout.lineRangeAt(position.offset); first = line.start; last = line.end;
+		}
+		return setAnchoredSelection(first < pointerRangeStart
+			? new TextSelection(pointerRangeEnd, first)
+			: new TextSelection(pointerRangeStart, last));
 	}
 
 	/** Returns 1 for a single click, 2 for a double click, and 3 for a triple click. */

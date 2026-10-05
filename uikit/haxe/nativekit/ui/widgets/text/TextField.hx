@@ -67,6 +67,8 @@ class TextField implements View {
 	/** Return true after applying an operation; the live layout supplies shaped word boundaries. */
 	/** True when an application document owns undo/redo. */
 	public var historyManagedExternally:Bool = false;
+	/** Optional external viewport scroll; delta uses application layout coordinates. */
+	public var onSelectionDragScroll:Null<Float->Bool>;
 	public var onEditIntent:Null<(TextEditIntent, TextEditorLayout)->Bool>;
 	/** Optional aggregate selected text for clipboard copy/cut. */
 	public var selectionTextProvider:Null<Void->Null<String>>;
@@ -495,6 +497,25 @@ class TextField implements View {
 			node.on(UiEventKind.Blur, blur);
 			node.on(UiEventKind.FocusLost, blur);
 
+			var drag = context.resourceState(context.id("selection-drag"),
+				function() return new SelectionDragController(), function(value) value.dispose()).value;
+			var extendDrag = function(x:Float, y:Float):Void {
+				var geometry = textNode.resolved;
+				if (geometry == null) return;
+				var clip = geometry.clipBounds;
+				var clampedY = Math.max(clip.y, Math.min(clip.y + clip.height, y));
+				var point = geometry.viewportToLayout(x, clampedY);
+				var position = editor.hitTest(point.x - geometry.x, point.y - geometry.y + editor.scrollOffsetY);
+				if (editor.extendPointerSelection(position)) {
+					editor.resetCaretBlink(Sys.time());
+					updateState();
+				}
+			};
+			drag.configure(context.animations, editor, function() return textNode.resolved, extendDrag, function(delta) {
+				var changed = onSelectionDragScroll == null ? editor.scrollBy(delta) : onSelectionDragScroll(delta);
+				if (changed) refresh();
+				return changed;
+			});
 			node.on(UiEventKind.PointerDown, function(event) {
 				if (!enabled || event.button != 0 || textNode.resolved == null)
 					return;
@@ -509,11 +530,7 @@ class TextField implements View {
 					editor.cancelPointerClick();
 				var clickCount = extend ? 1 : editor.registerPointerClick(position,
 					context.gestures.timeSeconds(), event.x, event.y);
-				var changed = switch (clickCount) {
-					case 2: editor.selectWordAt(position);
-					case 3: editor.selectLineAt(position);
-					case _: editor.placeCaretAt(position, extend);
-				};
+				var changed = editor.beginPointerSelection(position, clickCount, extend);
 				if (changed)
 					updateState();
 				editor.draggingSelection = true;
@@ -523,21 +540,16 @@ class TextField implements View {
 				if (!enabled || !editor.draggingSelection || textNode.resolved == null)
 					return;
 				editor.cancelPointerClickIfMoved(event.x, event.y);
-				var geometry:ResolvedLayoutItem = cast textNode.resolved;
-				var point = geometry.viewportToLayout(event.x, event.y);
-				var position = editor.hitTest(point.x - geometry.x,
-					point.y - geometry.y + editor.scrollOffsetY);
-				if (editor.placeCaretAt(position, true)) {
-					editor.resetCaretBlink(Sys.time());
-					editor.cancelPointerClick();
-					updateState();
-				}
+				extendDrag(event.x, event.y);
+				drag.update(event.x, event.y);
 			});
 			node.on(UiEventKind.PointerUp, function(event) {
+				drag.stop();
 				editor.completePointerClick(event.x, event.y);
 				editor.draggingSelection = false;
 			});
 			node.on(UiEventKind.PointerCancel, function(_) {
+				drag.stop();
 				editor.cancelPointerClick();
 				editor.draggingSelection = false;
 			});
@@ -576,8 +588,8 @@ class TextField implements View {
 				#end
 				if (additionalSelections.length > 0 && onNavigationIntent != null) {
 					var navigation:Null<TextNavigationIntent> = switch (event.key) {
-						case UiKey.Left: wordNavigation ? Word(-1, extend, macWordNavigation) : Character(-1, extend);
-						case UiKey.Right: wordNavigation ? Word(1, extend, macWordNavigation) : Character(1, extend);
+						case UiKey.Left: #if (mac || ios) (event.modifiers & UiModifier.Super) != 0 ? LineBoundary(false, extend) : #end wordNavigation ? Word(-1, extend, macWordNavigation) : Character(-1, extend);
+						case UiKey.Right: #if (mac || ios) (event.modifiers & UiModifier.Super) != 0 ? LineBoundary(true, extend) : #end wordNavigation ? Word(1, extend, macWordNavigation) : Character(1, extend);
 						case UiKey.Up: wordNavigation ? Paragraph(-1, extend, macWordNavigation) :
 							multiline ? VisualLine(-1, extend) : null;
 						case UiKey.Down: wordNavigation ? Paragraph(1, extend, macWordNavigation) :
@@ -636,7 +648,14 @@ class TextField implements View {
 								publishTextChange(beforePaste);
 							}
 						});
-				} else if (wordNavigation && event.key == UiKey.Left)
+				}
+				#if (mac || ios)
+				else if ((event.modifiers & UiModifier.Super) != 0 && event.key == UiKey.Left)
+					changed = editor.moveCaretToLineBoundary(false, extend);
+				else if ((event.modifiers & UiModifier.Super) != 0 && event.key == UiKey.Right)
+					changed = editor.moveCaretToLineBoundary(true, extend);
+				#end
+				else if (wordNavigation && event.key == UiKey.Left)
 					changed = editor.moveCaretByWord(-1, extend, macWordNavigation);
 				else if (wordNavigation && event.key == UiKey.Right)
 					changed = editor.moveCaretByWord(1, extend, macWordNavigation);
