@@ -106,6 +106,7 @@ class RobotRuntimeCompiler {
         joint.childFramePosition, joint.childFrameRotation, joint.axis,
         joint.limits.maxAcceleration);
       compiled.overtravel = joint.limits.overtravel;
+      compiled.passive = joint.passive;
       for (actuator in robot.actuators) switch actuator.transmission {
         case SimpleTransmission(jointId, ratio, _) if (jointId == joint.id):
           var drive = actuator.drive;
@@ -411,6 +412,9 @@ class RobotRuntimeCompiler {
         }
       }
 
+      if (joint.passive && (joint.type == JointType.Fixed || joint.type == JointType.Floating))
+        diagnostics.push(new RobotCompileDiagnostic("RK_PASSIVE_JOINT", path,
+          "passive ownership requires a movable single-axis joint"));
       if (joint.limits == null)
         diagnostics.push(new RobotCompileDiagnostic("RK_LIMITS_NULL", '$path.limits',
           "joint limits are missing"));
@@ -521,6 +525,9 @@ class RobotRuntimeCompiler {
           "actuator transmission is missing"));
       else switch actuator.transmission {
         case SimpleTransmission(jointId, ratio, offset):
+          for (joint in robot.joints) if (joint != null && joint.id == jointId && joint.passive)
+            diagnostics.push(new RobotCompileDiagnostic("RK_PASSIVE_ACTUATOR", '$path.transmission.jointId',
+              'an actuator cannot drive passive joint "$jointId"'));
           if (!jointIds.exists(jointId))
             diagnostics.push(new RobotCompileDiagnostic("RK_TRANSMISSION_JOINT",
               '$path.transmission.jointId', 'unknown joint ID "$jointId"'));

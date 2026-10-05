@@ -284,7 +284,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         const auto &drive = robot_desc->cylinder_drives[index];
         if (drive.joint >= blueprint.joint_count ||
             blueprint.joints[drive.joint].type != RK_RUNTIME_JOINT_PRISMATIC ||
-            !blueprint.process_joint[drive.joint] ||
+            !blueprint.external_joint[drive.joint] ||
             drive.channel_a >= blueprint.channel_count ||
             (drive.channel_b != UINT32_MAX && drive.channel_b >= blueprint.channel_count) ||
             drive.channel_a == drive.channel_b || drive.normally_to_a > 1 ||
@@ -318,7 +318,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
     for (uint32_t index = 0; index < velocity_count; ++index) {
         const auto &drive = robot_desc->velocity_drives[index];
         if (drive.joint >= blueprint.joint_count ||
-            !blueprint.process_joint[drive.joint] ||
+            !blueprint.external_joint[drive.joint] ||
             drive.speed_channel >= blueprint.channel_count ||
             drive.direction_channel >= blueprint.channel_count ||
             drive.speed_channel == drive.direction_channel ||
@@ -723,7 +723,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             // A cylinder's overtravel is its compressible end cushion: keep
             // the physics stop at the stroke boundary while the runtime tolerates
             // that small penetration in the observed joint position.
-            const double overtravel = blueprint.process_joint[index] ? 0.0 : blueprint.joint_overtravel[index];
+            const double overtravel = blueprint.external_joint[index] ? 0.0 : blueprint.joint_overtravel[index];
             desc.lower_limit = source.lower_limit - overtravel;
             desc.upper_limit = source.upper_limit + overtravel;
             // SimKit uses zero for an unspecified force ceiling. A negative
@@ -751,8 +751,8 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             nksim_joint joint = 0;
             require_sim(nksim_joint_create(world, &desc, &joint), "nksim_joint_create");
             binding->joints_.push_back(joint);
-            const bool process_joint = blueprint.process_joint[index] != 0;
-            binding->actuated_joints_.push_back(source.type != RK_RUNTIME_JOINT_FIXED && !process_joint);
+            const bool external_joint = blueprint.external_joint[index] != 0;
+            binding->actuated_joints_.push_back(source.type != RK_RUNTIME_JOINT_FIXED && !external_joint);
             joints_.push_back(joint);
         }
         for (uint32_t i = 0; i < brake_count; ++i) {
@@ -935,7 +935,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 if (binding->passive_[index]) held[index] = 0;
             }
             for (uint32_t index = 0; index < blueprint.joint_count; ++index)
-                    if (blueprint.process_joint[index]) held[index] = 0;
+                    if (blueprint.external_joint[index]) held[index] = 0;
             binding->hold_at_rest(std::move(held));
         }
         bindings_.push_back(binding);

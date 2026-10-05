@@ -280,6 +280,7 @@ class AssemblyDefinitionFlattener {
 			if (joint.closureTolerance != null) expanded.closureTolerance = joint.closureTolerance;
 			if (joint.driven == true) expanded.driven = true;
 			expanded.includePath = joint.includePath == null || joint.includePath == "" ? prefix : scoped(prefix, joint.includePath);
+			if (joint.passive == true) expanded.passive = true;
 			flat.joints.push(expanded);
 		}
 		if (networks != null) {

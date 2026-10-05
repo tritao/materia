@@ -132,6 +132,8 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(12) @:optional var driven:Bool;
 	/** Include owning this joint; empty for the root assembly. */
 	@:id(13) @:optional var includePath:String;
+	/** Passive physical motion; host position control and power-on holding are disabled. */
+	@:id(14) @:optional var passive:Bool;
 }
 
 /**

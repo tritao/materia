@@ -16,8 +16,7 @@ import materia.units.LengthUnit;
 
 /** Versioned transport and validation for reusable assembly definitions and states. */
 class AssemblyDefinitionCodec {
-	/** Current assembly definition and state format. Older formats must be migrated before loading. */
-	public static inline var VERSION:Int = 8;
+	public static inline var VERSION:Int = 9;
 
 	static function supportedVersion(version:Int):Bool return version == VERSION;
 
@@ -118,6 +117,7 @@ class AssemblyDefinitionCodec {
 				(joint.closureTolerance != null && (joint.role != AssemblyJointRole.Closure ||
 					!Math.isFinite(joint.closureTolerance) || joint.closureTolerance < 0)) ||
 				(joint.driven == true && (joint.role != AssemblyJointRole.Tree || !hasCoordinate(joint.type))) ||
+				(joint.passive == true && (joint.driven == true || joint.role != AssemblyJointRole.Tree || !hasCoordinate(joint.type))) ||
 				(closureOnlyType(joint.type) && joint.role != AssemblyJointRole.Closure) ||
 				!validLimits(joint.limits, joint.defaultValue))
 				throw "Assembly definition has an invalid joint";
@@ -215,6 +215,8 @@ class AssemblyDefinitionCodec {
 				(actuator.fullStepsPerRevolution != null && !(actuator.fullStepsPerRevolution > 0 && Math.isFinite(actuator.fullStepsPerRevolution))) ||
 				!validDrive(actuator))
 				throw 'Assembly has an invalid actuator "${actuator == null ? "" : actuator.id}"';
+			var boundJoint = movable.get(actuator.joint);
+			if (boundJoint != null && boundJoint.passive == true) throw 'Actuator "${actuator.id}" cannot drive passive joint "${actuator.joint}"';
 			actuatorIds.set(actuator.id, true);
 			if (actuator.drive == "hydraulic") {
 				var joint = movable.get(actuator.joint);

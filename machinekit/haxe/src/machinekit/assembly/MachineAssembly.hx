@@ -236,6 +236,24 @@ class MachineAssembly {
 		changed();
 	}
 
+	/** Declare physical motion without host position control or a power-on hold. */
+	public function setPassive(jointId:String, passive:Bool = true):Void {
+		for (joint in mechanical.joints) if (joint.id == jointId) {
+			if (joint.role != AssemblyJointRole.Tree || !AssemblyDefinitionCodec.hasCoordinate(joint.type) ||
+				(passive && joint.driven == true)) throw 'Assembly joint "$jointId" cannot be passive';
+			if (passive) {
+				for (motor in drives.motors) if (motor.joint == jointId)
+					throw 'Passive assembly joint "$jointId" cannot have a motor';
+				for (cylinder in drives.cylinders) if (cylinder.joint == jointId)
+					throw 'Passive assembly joint "$jointId" cannot have a cylinder';
+				joint.passive = true;
+			} else Reflect.deleteField(joint, "passive");
+			changed();
+			return;
+		}
+		throw 'Missing assembly joint "$jointId"';
+	}
+
 	public function addCoupling(id:String, source:String, target:String, ratio:Float, offset:Float = 0,
 			?efficiency:Float, ?stiffness:Float, ?backlash:Float, ?drag:Float, ?assumed:haxe.ds.ReadOnlyArray<String>,
 			?assumptions:haxe.ds.ReadOnlyArray<materia.assembly.AssemblyDefinition.QuantityAssumption>):Void {
@@ -457,6 +475,8 @@ class MachineAssembly {
 			processVelocity: processVelocity});
 
 	function addMotorRecord(record:MotorRecord):Void {
+		for (joint in mechanical.joints) if (joint.id == record.joint && joint.passive == true)
+			throw 'Passive assembly joint "${record.joint}" cannot have a motor';
 		DriveSystem.checkMotor(flat(), record);
 		drives.motors.push(DriveSystem.copyMotor(record, same));
 		changed();
@@ -519,6 +539,8 @@ class MachineAssembly {
 		var record:CylinderRecord = {actuator: id, joint: joint, cylinder: cylinderMember, valve: valveMember};
 		if (phases != null) record.phases = {approach: phases.approach, working: phases.working,
 			returning: phases.returning, changePoint: phases.changePoint};
+		for (edge in mechanical.joints) if (edge.id == joint && edge.passive == true)
+			throw 'Passive assembly joint "$joint" cannot have a cylinder';
 		DriveSystem.checkCylinder(flat(), record);
 		drives.cylinders.push(DriveSystem.copyCylinder(record, same));
 		changed();
@@ -703,6 +725,7 @@ class MachineAssembly {
 			else model.constrainOnAxis(join(prefix, joint.id), joint.type, join(prefix, joint.parent),
 					joint.parentConnector, join(prefix, joint.child), joint.childConnector,
 					joint.axis, joint.closureTolerance, joint.limits);
+			if (joint.passive == true) model.setPassive(join(prefix, joint.id));
 		}
 		if (mechanical.couplings != null) for (coupling in mechanical.couplings)
 			model.couple(join(prefix, coupling.id), join(prefix, coupling.source),

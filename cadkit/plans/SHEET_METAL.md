@@ -942,7 +942,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM6 | done: SM6a typed air-bending predictions, physical springback inversion and exact contact depth; focused process smoke passes 1235 assertions; quick gate `sm6a-air-bending` passes (7209 sheet assertions); SM6b explicit lot/tool/angle-band calibration with measured radius and additive depth correction, focused smoke passes 1257 assertions, quick gate `sm6b-calibration` passes (7231 sheet assertions); SM6 complete: typed grade defaults, editor selection, Process-rule persistence and tooling minimums; full gate `sm6-process-material-full` passes all stages (7248 sheet assertions, ProjectKit 155); final material integration and CAD workflow checks pass | 7148a8bb8; 6458df23b; d664caa22 |
 | SM7 | done: typed exact punch and single-/four-V die catalogue; standard segments and physical horns; independently segmented paired rows and validated bed layouts; derived process contact data; registered segment/clamp recipes and manual/powered clamp capabilities; strong unique tooling face names. Quick gates `sm7a-profile-foundation`, `sm7b-punch-profiles`, `sm7c-die-profiles` and full gate `sm7-tooling-verified-full` pass; original MachineKit and router engineering summaries unchanged | c4e418ba5; 310a41894; 67da9cae8; final tooling integration |
 | SM8a | done: cylinder parts and coupled mechanical assembly; typed planning geometry derived from physical datums, independent reference comparisons, full-bed force/depth and conservative demo/frame checks; Start-page project with editable ram, X/R and depth-stop axes. Quick gates `sm8a-cylinder-parts`, `sm8a-mechanical-assembly` and full gate `sm8a-press-assembly-full` pass every stage; original MachineKit and router engineering summaries unchanged | c4517c795; ed8faa29b; final assembly integration |
-| SM8b | in progress: MT5 is on local main 1484b924d and merged; shared typed fluid cylinder/valve/pressure-source interfaces replace pneumatic-only interfaces, and pressure resolution no longer casts components; explicit immutable phase-speed model added, its quick gate `sm8b-phase-speeds` passes all five suites; assembly format 7 hydraulic data passes focused tests (187 ProjectKit assertions), full gate `sm8b-hydraulic-format-full` passes every stage; quick gate `sm8b-fluid-interfaces` passes all five suites with unchanged original MachineKit summaries; typed shared cylinder runtime and current RobotModel 12 fixtures pass focused model (30), both-backend hydraulic (14), world (5004), maintained MuJoCo and four-platform ABI checks; full gate `sm8b-cylinder-runtime-verified-full` passes every stage including project-source runtime; actual press hydraulic service, distribution blocks, bore-area frame-pressure limit and both guide bindings pass quick gate `sm8b-fluid-bindings-verified`; physical switches and scripted stroke remain | edf913c0f; 68768fcae; 22ce57f1c; 439ca8690; fluid assembly checkpoint |
+| SM8b | in progress: MT5 is on local main 1484b924d and merged; shared typed fluid cylinder/valve/pressure-source interfaces replace pneumatic-only interfaces, and pressure resolution no longer casts components; explicit immutable phase-speed model added, its quick gate `sm8b-phase-speeds` passes all five suites; assembly format 7 hydraulic data passes focused tests (187 ProjectKit assertions), full gate `sm8b-hydraulic-format-full` passes every stage; quick gate `sm8b-fluid-interfaces` passes all five suites with unchanged original MachineKit summaries; typed shared cylinder runtime and current RobotModel 12 fixtures pass focused model (30), both-backend hydraulic (14), world (5004), maintained MuJoCo and four-platform ABI checks; full gate `sm8b-cylinder-runtime-verified-full` passes every stage including project-source runtime; actual press hydraulic service, distribution blocks, bore-area frame-pressure limit and both guide bindings pass quick gate `sm8b-fluid-bindings-verified`; authored passive-joint support reaches assembly/model/runtime, passes 36 model, 192 ProjectKit and both-backend ownership tests (MuJoCo gravity verified); full gate `sm8b-passive-joints-full` passes every stage with unchanged five engineering summaries and app engineering baselines; physical switches and scripted stroke remain | edf913c0f; 68768fcae; 22ce57f1c; 439ca8690; b15e594c6; passive checkpoint in progress |
 | SM9 | planned | |
 | SM10 | planned | |
 | SM11 | planned | |
@@ -1543,3 +1543,32 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
   MachineAssembly uses schema 14 and all tested recipe fixtures are reconstructed by current code;
   old feature-dependent format paths and pneumatic-only capability forwarding methods are deleted.
   The real finger contact mechanism and scripted empty-machine stroke remain the next checkpoints.
+
+- SM8b passive-contact support is in progress. An authored passive joint carries no host
+  position target or hold-at-rest servo; cylinders and motors cannot bind to it. Assembly
+  definitions use current version 9 (hydraulic drive introduced v8, passive ownership adds v9), MachineAssembly uses 15 and RobotModel uses 13.
+  Seven robot fixtures are regenerated through typed authors and the current codec, preserving
+  every existing model fact. ProjectKit passes 192 assertions and the core-only package passes
+  36 hydraulic/model assertions. The maintained MuJoCo entry passes three passive checks:
+  host targets are rejected, a passive hinge falls under gravity with hold-at-rest enabled,
+  and the equivalent ordinary hinge stays held. Existing hydraulic seven and wall-finishing
+  64 assertions still pass (`sm8b-passive-maintained-mujoco.log`). The deterministic backend
+  is deliberately kinematic for articulated bodies (`simkit/sim_core/src/physics_backend.cpp`);
+  its ownership checks cannot establish gravity or contact response. Physical finger contact,
+  switches and the scripted stroke remain outstanding; the final full gate is not yet run.
+
+- SM8b passive-joint checkpoint full gate `sm8b-passive-joints-full` passes every stage,
+  including workspace, app build and complete project-source runtime. ProjectKit increases
+  from187 to192 assertions (current-version rejection and passive ownership/invalid bindings),
+  core model checks from30 to36 (version rejection and passive save/load/actuator ownership),
+  and RobotKit world from5004 to5007 (native command ownership and hold-at-rest behavior).
+  MuJoCo adds three physical passive/controlled hinge checks alongside unchanged seven hydraulic
+  and64 wall-finishing assertions. The original five MachineKit summaries, router cutting/drive
+  results, pneumatic timings/force and welding engineering summaries are unchanged.
+  AssemblyDefinition9, MachineAssembly15 and RobotModel13 each have one supported format;
+  fixtures are written by current code. No new cast or Haxeon workaround is introduced.
+  The physical press finger contact, ram switches and scripted stroke remain outstanding.
+
+- The current MJCF writer also builds and reproduces its complete version13 walker fixture
+  (`sm8b-passive-mjcf-build.log`, `sm8b-passive-mjcf-fixture.log`). The regenerated runtime
+  binding retains the four-platform ABI audit (`sm8b-passive-runtime-hxi.log`).

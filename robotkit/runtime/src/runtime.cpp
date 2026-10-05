@@ -279,7 +279,7 @@ rk_result validate_appended_path(
         // planner carries a constant observation of that joint.
         limits.position_claimed[joint] = blueprint.struct_size >=
             offsetof(rk_robot_runtime_blueprint, sensor_joint) &&
-            blueprint.process_joint[joint] ? 0 : 1;
+            blueprint.external_joint[joint] ? 0 : 1;
         const bool has_overtravel = blueprint.struct_size >=
             offsetof(rk_robot_runtime_blueprint, joint_overtravel) + sizeof(blueprint.joint_overtravel);
         const double travel = homing && has_overtravel ? blueprint.joint_overtravel[joint] : 0.0;
@@ -821,7 +821,7 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
             // A drained path or completed stop holds its last commanded
             // setpoint. Endpoint samples are observations, not plan anchors.
             for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
-                if (    blueprint_.process_joint[joint]) {
+                if (    blueprint_.external_joint[joint]) {
                     anchor_position[joint] = state_.position[joint];
                     continue;
                 }
@@ -875,7 +875,7 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
         for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
             // A process drive owns its joint independently of planned motion. Its observed
             // position can change while a program waits for a process input.
-            if (blueprint_.process_joint[joint]) continue;
+            if (blueprint_.external_joint[joint]) continue;
             const double position_tolerance = plan.position_tolerance[joint] > 0.0
                 ? plan.position_tolerance[joint] : default_tolerance;
             const double velocity_tolerance = plan.velocity_tolerance[joint] > 0.0
@@ -1970,7 +1970,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
             std::max(0.0, duration - t));
         uint32_t target_count = 0;
         for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
-            if (blueprint_.process_joint[joint]) continue;
+            if (blueprint_.external_joint[joint]) continue;
             auto &target = value.targets[target_count];
             target.joint = joint;
             target.mode = RK_TARGET_POSITION;
@@ -2089,7 +2089,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         output.kind = RK_COMMAND_JOINT_TARGETS;
         output.target_count = 0;
         for (uint32_t joint = 0; joint < front.point.joint_count; ++joint) {
-            if (blueprint_.process_joint[joint]) continue;
+            if (blueprint_.external_joint[joint]) continue;
             const auto target_index = output.target_count++;
             output.targets[target_index].joint = joint;
             output.targets[target_index].mode = RK_TARGET_POSITION;

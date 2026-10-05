@@ -36,6 +36,7 @@ class HydraulicModelTests {
     processPlanning();
     savedDrive();
     invalidBindings();
+    passiveOwnership();
     Sys.println('Hydraulic model tests passed ($assertions assertions)');
   }
   static function forceAndBlueprint():Void {
@@ -80,15 +81,15 @@ class HydraulicModelTests {
     if (restoredDrive == null) throw "Saved hydraulic actuator lost its drive";
     var restoredHydraulic = restoredDrive.hydraulic();
     if (restoredHydraulic == null) throw "Saved hydraulic actuator lost its typed hydraulic data";
-    check(restored.schemaVersion == 12 && restoredDrive.kind() == "hydraulic", "one current RobotModel format");
+    check(restored.schemaVersion == robotkit.model.RobotModel.CURRENT_VERSION && restoredDrive.kind() == "hydraulic", "one current RobotModel format");
     near(restoredHydraulic.changePoint, 0.0685, "saved phase boundary");
     near(restoredHydraulic.extensionForce(), hydraulic.extensionForce(), "saved pressure-area force");
     check(restoredHydraulic.channelA == "valve/coilA" && restoredHydraulic.channelB == "valve/coilB",
       "saved valve channels");
     var text = encoded.toString();
-    check(text.indexOf('"schemaVersion":12') >= 0, "serialized current version");
-    for (version in [9, 10, 11]) {
-      var old = Bytes.ofString(StringTools.replace(text, '"schemaVersion":12', '"schemaVersion":' + version));
+    check(text.indexOf('"schemaVersion":' + robotkit.model.RobotModel.CURRENT_VERSION) >= 0, "serialized current version");
+    for (version in [9, 10, 11, 12]) {
+      var old = Bytes.ofString(StringTools.replace(text, '"schemaVersion":' + robotkit.model.RobotModel.CURRENT_VERSION, '"schemaVersion":' + version));
       reject(function() { var invalid = RobotModelCodec.decode(old); }, "older RobotModel rejected");
     }
   }
@@ -110,6 +111,22 @@ class HydraulicModelTests {
     reject(function() {
       var invalid = new HydraulicDrive(0.16, 0.1, 0.1, 10e6, 0.08, 0.008, 0.07, 0.0685, "A", "A", 1);
     }, "coils need distinct channels");
+  }
+  static function passiveOwnership():Void {
+    var source = model();
+    source.joints[0].passive = true;
+    diagnosed(source, "RK_PASSIVE_ACTUATOR");
+    reject(function() { var encoded = RobotModelCodec.encode(source); },
+      "passive joint cannot retain a cylinder actuator");
+    source.actuators.resize(0);
+    var restored = RobotModelCodec.decode(RobotModelCodec.encode(source));
+    check(restored.joints[0].passive, "saved passive ownership");
+    var blueprint = RobotRuntimeCompiler.compile(restored, new RobotProfile());
+    check(blueprint.joints[0].passive && blueprint.cylinderDrives.length == 0,
+      "passive ownership reaches runtime without a drive");
+    source.joints[0].passive = false;
+    var controlled = RobotModelCodec.decode(RobotModelCodec.encode(source));
+    check(!controlled.joints[0].passive, "ordinary joints retain host ownership");
   }
   static function diagnosed(model:RobotModel, code:String):Void {
     var found = false;

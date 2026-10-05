@@ -61,6 +61,8 @@ class RobotModelCodec {
       if (joints.exists(joint.id)) throw 'Duplicate robot joint ${joint.id}';
       if (!links.exists(joint.parent.id) || !links.exists(joint.child.id))
         throw 'Joint ${joint.id} references an unknown link';
+      if (joint.passive && (joint.type == JointType.Fixed || joint.type == JointType.Floating))
+        throw 'Passive joint ${joint.id} needs a movable single-axis joint';
       joints.set(joint.id, true);
       vector(joint.parentFramePosition, 3, "joint parentFramePosition");
       vector(joint.parentFrameRotation, 4, "joint parentFrameRotation");
@@ -94,6 +96,12 @@ class RobotModelCodec {
     var actuators = new Map<String, Bool>();
     for (actuator in model.actuators) {
       validateActuator(actuator, joints);
+      switch actuator.transmission {
+        case SimpleTransmission(jointId, _, _):
+          for (joint in model.joints) if (joint.id == jointId && joint.passive)
+            throw 'Actuator ${actuator.id} cannot drive passive joint $jointId';
+        case _:
+      }
       if (actuators.exists(actuator.id)) throw 'Duplicate robot actuator ${actuator.id}';
       actuators.set(actuator.id, true);
     }
@@ -215,6 +223,7 @@ class RobotModelCodec {
         dynamics: {armature: joint.armature, damping: joint.damping, frictionLoss: joint.frictionLoss,
           limitTimeConstant: joint.limitTimeConstant, limitDampingRatio: joint.limitDampingRatio,
           limitImpedance: joint.limitImpedance}};
+        if (joint.passive) record.passive = true;
         var mechanical = joint.mechanicalLimits;
         if (mechanical != null) record.mechanicalLimits = encodeLimits(mechanical);
         record;
@@ -338,6 +347,7 @@ class RobotModelCodec {
       joint.childFrameRotation = vectorField(record, "childFrameRotation", 4);
       joint.axis = vectorField(record, "axis", 3);
       joint.includePath = includeScope(record, "includePath");
+      joint.passive = Reflect.hasField(record, "passive") && bool(record, "passive");
       var dynamics:Dynamic = required(record, "dynamics");
       joint.armature = nonNegative(number(dynamics, "armature"), "joint armature");
       joint.damping = nonNegative(number(dynamics, "damping"), "joint damping");

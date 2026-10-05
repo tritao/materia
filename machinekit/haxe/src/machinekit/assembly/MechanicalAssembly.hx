@@ -112,6 +112,8 @@ class MechanicalAssembly {
 			copy.limits.assumptions = [for (value in joint.limits.assumptions)
 				{quantity: value.quantity, label: value.label}];
 		if (joint.closureTolerance != null) copy.closureTolerance = joint.closureTolerance;
+		if (joint.includePath != null) copy.includePath = joint.includePath;
+		if (joint.passive == true) copy.passive = true;
 		return copy;
 	}
 

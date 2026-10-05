@@ -358,6 +358,7 @@ class AssemblySimulationBridge {
       var joint = model.addJoint(new Joint(edge.id, kind, linkOf(edge.parent),
         linkOf(edge.child)));
       joint.includePath = edge.includePath == null ? "" : edge.includePath;
+      joint.passive = edge.passive == true;
       var parentFrame = AssemblyFrames.compose(offsetOf(edge.parent),
         connector(definitions.get(occurrenceDefinition(definition, edge.parent)), edge.parentConnector));
       var initial = placement.joint(edge.id);

@@ -250,6 +250,8 @@ class RobotRuntimeBlueprint {
     for (drive in cylinderDrives) {
       if (drive.joint < 0 || drive.joint >= jointCount)
         throw 'Cylinder process drive references unknown joint ${drive.joint}';
+      if (joints[drive.joint].passive)
+        throw 'Process drive cannot command passive joint ${drive.joint}';
       if (processJointIds.exists(drive.joint))
         throw 'Multiple process drives reference joint ${drive.joint}';
       processJointIds.set(drive.joint, true);
@@ -266,6 +268,8 @@ class RobotRuntimeBlueprint {
     for (drive in velocityDrives) {
       if (drive.joint < 0 || drive.joint >= jointCount)
         throw 'Velocity process drive references unknown joint ${drive.joint}';
+      if (joints[drive.joint].passive)
+        throw 'Process drive cannot command passive joint ${drive.joint}';
       if (processJointIds.exists(drive.joint))
         throw 'Multiple process drives reference joint ${drive.joint}';
       processJointIds.set(drive.joint, true);
@@ -356,6 +360,7 @@ class RobotRuntimeBlueprint {
     for (index in 0...joints.length) {
       var joint = joints[index];
       value.set_joints(index, joint.nativeValue());
+      if (joint.passive) value.set_external_joint(index, 1);
       if (!Math.isFinite(joint.overtravel) || joint.overtravel < 0.0)
         throw "Joint overtravel must be finite and non-negative";
       value.set_joint_overtravel(index, joint.overtravel);
@@ -376,7 +381,7 @@ class RobotRuntimeBlueprint {
       value.set_joint_servo(index, servo);
     }
     var processOwned = processJoints();
-    for (index in 0...processOwned.length) value.set_process_joint(index, processOwned[index] ? 1 : 0);
+    for (index in 0...processOwned.length) value.set_external_joint(index, (processOwned[index] || joints[index].passive) ? 1 : 0);
     if (links.length != linkCount) throw "RobotKit runtime blueprint is missing link physical properties";
     for (index in 0...links.length) value.set_links(index, links[index].nativeValue());
     return value;

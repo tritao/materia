@@ -281,6 +281,7 @@ class RobotWorldTests {
     testRuntimeProcessEvents();
     testControllerProcessOutputs();
     testPneumaticProcessDrive();
+    assertions += PassiveJointRuntimeTests.run(0);
     assertions += HydraulicRuntimeTests.run(0);
     assertions += HydraulicRuntimeTests.pressureLoss(0);
     testDiscreteNativeSensors();

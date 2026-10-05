@@ -8,6 +8,8 @@ class Joint {
   public final type:JointType;
   public final parent:Link;
   public final child:Link;
+  /** No position command or power-on hold; gravity, contact and constraints own its motion. */
+  public var passive:Bool = false;
   public var limits:JointLimits;
   /** Mechanical inputs retained when `limits` becomes the compiled effective result. */
   public var mechanicalLimits:Null<JointLimits>;
