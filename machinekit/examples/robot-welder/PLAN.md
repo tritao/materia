@@ -2165,3 +2165,20 @@ clearance checks are unchanged. WeldProbePatterns can restrict screening to one 
 The focused CAD suite passes 5,148 assertions and 468 exposed samples, including exclusion of
 unused faces and preservation of the selected geometric stage. Main remains unchanged and
 P3 production validation is pending.
+
+The demand-driven production retry generated the artifact and entered first-face motion
+within roughly 37 app CPU seconds, compared with minutes of eager unused-face screening.
+It completed six first-face touch episodes without air contact, then reached the second
+face's first coarse touch at 65.45 simulation seconds. The deterministic run terminated
+with exit 1: "Coarse: Contact probe predicted braking motion is obstructed". This is a
+concrete guarded-execution failure, not a pass or a disk error. Log:
+ignored app/build/p3-demand-registration.log. CAD bridge commit:
+2564c246d (compiled optional machinekit-process dependency and demand-driven stage selection).
+
+The braking inspector now preserves the named CAD pair or joint travel-bound violation.
+ContactProbeRunner includes that finding and observed joints/velocities in its rejection.
+Its guard remains unchanged; no unsafe search speed, contact clearance or deadline was
+relaxed. The focused native probe suite passes 65 assertions, including named wire/fixture
+findings. Production diagnosis must distinguish stopping-speed limits from a contact patch
+whose required sensing motion cannot clear another body before changing policy. Main and
+P3 completion status remain unchanged.

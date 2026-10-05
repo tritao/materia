@@ -88,6 +88,9 @@ class ContactSearchMotionTests {
       check(wireGuarded.violation([0.012]) != null, "Air clearance includes the wire beyond the nozzle");
       check(wireGuarded.violation([0.0135], true) == null, "Calibrated near-contact sensing permits the wire to approach without penetration");
       check(wireGuarded.violation([0.0145], true) != null, "Touch sensing cannot authorize wire penetration");
+      var brakingHit = wireGuarded.stoppingViolation([0.011], [0.1], 0.02);
+      check(brakingHit != null && brakingHit.a == "contact sensing wire" && brakingHit.b == "fixture",
+        "A rejected deadline brake retains the obstructing CAD bodies");
       check(!wireGuarded.stoppingClear([0.011], [0.1], 0.02), "Predicted braking also guards the unconsumed wire");
       forbidden = false;
       try wireGuarded.approach(new Transform3(new Vec3(0, 0, 0.06), Quat.identity()), [0.0], 32)

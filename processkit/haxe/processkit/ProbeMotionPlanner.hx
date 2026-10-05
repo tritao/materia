@@ -171,7 +171,11 @@ class ProbeMotionPlanner {
   }
 
   /** Reject an obstructed predicted per-joint deadline brake from the current measured motion. */
-  public function stoppingClear(start:Array<Float>, velocity:Array<Float>, keepaliveSeconds:Float):Bool {
+  public function stoppingClear(start:Array<Float>, velocity:Array<Float>, keepaliveSeconds:Float):Bool
+    return stoppingViolation(start, velocity, keepaliveSeconds) == null;
+
+  /** Preserve the named body or joint-bound finding when the deadline-brake proof fails. */
+  public function stoppingViolation(start:Array<Float>, velocity:Array<Float>, keepaliveSeconds:Float):Null<ClearanceViolation> {
     if (start == null || velocity == null || start.length != arm.group.count() || velocity.length != start.length ||
         !Math.isFinite(keepaliveSeconds) || keepaliveSeconds < 0)
       throw "Probe stopping check needs joint observations and a finite nonnegative keepalive";
@@ -197,13 +201,16 @@ class ProbeMotionPlanner {
         var direction = v < 0 ? -1.0 : 1.0;
         var end = start[joint] + v * (hold + braking) - direction * 0.5 * acceleration * braking * braking;
         var limits = arm.group.limitsOf(joint);
-        if (limits.lower < limits.upper && (end < limits.lower || end > limits.upper)) return false;
+        if (limits.lower < limits.upper && (end < limits.lower || end > limits.upper))
+          return {a: arm.robot.joints[arm.jointIndices()[joint]].id, b: "joint travel bound",
+            distance: Math.min(end - limits.lower, limits.upper - end), required: 0.0};
         q.push(end);
       }
-      if (sweep(last, q, true) != null) return false;
+      var hit = sweep(last, q, true);
+      if (hit != null) return hit;
       last = q;
     }
-    return true;
+    return null;
   }
 
   /** Straight air motion leaves/refines an already measured contact, with the tool contact margin when requested. */

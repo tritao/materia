@@ -141,9 +141,11 @@ class ContactProbeRunner {
           var active:ContactSearchRunner = cast search;
           var snapshot = motion.robot.snapshot();
           var indices = motion.jointIndices;
-          if (!planner.stoppingClear([for (index in indices) snapshot.positions.get(index)],
-            [for (index in indices) snapshot.velocities.get(index)], 0.02))
-            throw "Contact probe predicted braking motion is obstructed";
+          var joints = [for (index in indices) snapshot.positions.get(index)];
+          var velocity = [for (index in indices) snapshot.velocities.get(index)];
+          var hit = planner.stoppingViolation(joints, velocity, 0.02);
+          if (hit != null)
+            throw 'Contact probe predicted braking motion is obstructed: ${hit.a} against ${hit.b}, ${hit.distance} m < ${hit.required} m; joints=${joints.join(",")}; velocity=${velocity.join(",")}';
           active.update();
           if (active.stopped) {
             if (!active.completed()) throw active.search.failure;
