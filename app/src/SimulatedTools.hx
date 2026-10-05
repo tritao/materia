@@ -37,11 +37,10 @@ class SimulatedTools implements SessionMember {
 
 	/**
 	 * The welder a `torch` robot tool describes, on the link of the assembly robot that carries the torch. The wire
-	 * tip is the tool's contact connector and the wire runs along its +Z. The grounded work is the collision hulls of
-	 * the occurrences the tool names, each following its link; an occurrence without a hull (a free workpiece, or a
-	 * part with collision turned off) cannot be work, and is refused rather than silently left out.
+	 * tip is the tool's contact connector and the wire runs along its +Z. Grounded CAD hulls follow either their
+	 * robot link or their independent scene object. Missing or disabled collision geometry is refused.
 	 */
-	public static function welderFor(simulation:Simulation, robot:AssemblyRobot, robotIndex:Int, tool:SceneArtifactRobotTool,
+	public function welderFor(simulation:Simulation, robot:AssemblyRobot, robotIndex:Int, tool:SceneArtifactRobotTool,
 			project:ProjectDocumentSession):SimulatedWelder {
 		var welding = tool.torch;
 		var sensor = tool.sensor;
@@ -68,12 +67,32 @@ class SimulatedTools implements SessionMember {
 				var link = hull.link;
 				work.add(new ConvexSolid(hull.vertices), () -> simulation.linkPose(robotIndex, link));
 			}
-			if (!found) throw 'Grounded work "$id" has no collision hull in the simulated robot';
+			if (!found) {
+				var candidates = [for (entry in objects) if (entry.id == "project:" + id) entry];
+				var occurrence = [for (entry in flat.occurrences) if (entry.id == id) entry];
+				if (candidates.length != 1 || occurrence.length != 1 || physical == null)
+					throw 'Grounded work "$id" has no collision body';
+				var body = [for (entry in physical.parts) if (entry.id == occurrence[0].definition) entry];
+				var center = project.assemblyPreviewCenter(occurrence[0].definition);
+				if (body.length != 1 || body[0].collisionHull == null || center == null)
+					throw 'Grounded work "$id" has no CAD collision hull';
+				var hull:Array<Float> = cast body[0].collisionHull;
+				var vertices = [for (index in 0...hull.length) (hull[index] - center[index % 3]) * metres];
+				work.add(new ConvexSolid(vertices), objectPoseReader(simulation, candidates[0].object));
+			}
 		}
 		return new SimulatedWelder(simulation, robot.runtime, robotIndex, part.linkIndex, [tip.x, tip.y, tip.z], wire, work, tool.channel,
 			welding.wireSpeedChannel, welding.voltageChannel, sensor,
 			{maxCurrentA: welding.maxCurrentA, efficiency: welding.efficiency, wireDiameterMm: welding.wireDiameterMm,
 				stickoutMm: welding.stickoutMm});
+	}
+
+	/** Bind one body per closure, independent of the caller's loop variables. */
+	static function objectPoseReader(simulation:Simulation, object:SimObject):Void->processkit.tool.GroundedWork.WeldBodyPose {
+		return () -> {
+			var pose = simulation.objectPose(object);
+			return {position: [pose.x, pose.y, pose.z], rotation: [pose.qx, pose.qy, pose.qz, pose.qw]};
+		};
 	}
 
 	/** Scene ids of the objects the tools hold right now. */

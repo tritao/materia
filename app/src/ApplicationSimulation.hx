@@ -244,7 +244,7 @@ class ApplicationSimulation {
       var freeObjects = [for (entry in candidateObjects) entry.object];
       if (session != null && candidateAssembly != null) for (tool in session.robotTools) {
         if (tool.kind == "torch") {
-          var welder = SimulatedTools.welderFor(candidate, candidateAssembly, assemblyIndex, tool, session);
+          var welder = candidateTools.welderFor(candidate, candidateAssembly, assemblyIndex, tool, session);
           if (virtualWelder) welder.supply = new processkit.simulation.VirtualWelderSupply(candidate,
             candidateAssembly.runtime, assemblyIndex, tool.sensor);
           else if (welderSupplyFactory != null) welder.supply = welderSupplyFactory(welder);
