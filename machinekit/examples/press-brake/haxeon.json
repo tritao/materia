@@ -2,7 +2,7 @@
 	"version": 1,
 	"package": { "name": "machinekit-press-brake-example" },
 	"entry": "PressBrakePreview",
-	"sources": ["PressBrake.hx", "PressBrakePreview.hx", "PressBrakeChecks.hx", "BendSetupChecks.hx", "BendRegistrationChecks.hx", "SingleBendSetupChecks.hx", "PrismCollisionChecks.hx", "SheetPrismChecks.hx"],
+	"sources": ["PressBrake.hx", "PressBrakePreview.hx", "PressBrakeChecks.hx", "BendSetupChecks.hx", "BendRegistrationChecks.hx", "SingleBendSetupChecks.hx", "PrismCollisionChecks.hx", "SheetPrismChecks.hx", "BendPrismChecks.hx"],
 	"sourceRoots": ["."],
 	"dependencies": {
 		"projectkit": { "path": "../../../projectkit" },
