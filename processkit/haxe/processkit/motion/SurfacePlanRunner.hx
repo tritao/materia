@@ -2,7 +2,7 @@ package processkit.motion;
 
 import motionkit.robot.*;
 
-import robotkit.manipulation.IkOptions;
+import processkit.manipulation.ReachabilityChecker;
 import motionkit.MotionOptions;
 import haxe.Int64;
 import motionkit.event.HoldPolicy;
@@ -13,8 +13,7 @@ import motionkit.program.Blend;
 import motionkit.program.MotionOp;
 import motionkit.program.MotionProgram;
 import motionkit.program.MoveTarget;
-import motionkit.trajectory.ValidationLimits;
-import robotkit.manipulation.Manipulator;
+import robotkit.manipulation.KinematicGroup;
 import processkit.manipulation.WorkPatch;
 import processkit.path.Toolpath;
 import processkit.path.ToolpathPoint;
@@ -26,35 +25,26 @@ import robotkit.core.Robot;
 /** Lowers one raster patch into approach, process and retract plans. */
 class SurfacePlanRunner implements processkit.skill.SurfacePlanRunner {
   public final motion:ManipulatorMotion;
-  public final manipulator:Manipulator;
+  public final manipulator:KinematicGroup;
   public final channel:String;
   public final feed:Float;
 
-  public static function create(robot:Robot, manipulator:Manipulator,
+  public static function create(robot:Robot, manipulator:KinematicGroup,
       eventSource:Void -> {events:Array<FiredProcessEvent>, overflow:Bool},
-      feed:Float, maxAcceleration:Float, maxJointJump:Float,
+      feed:Float, planning:PlanningLimits, maxJointJump:Float,
       ?modelRevision:Int64, ?calibrationRevision:Int64,
       ?cartesianResolution:Float = 0.01):SurfacePlanRunner {
     var count = manipulator.group.count();
-    var limits = new ValidationLimits(count,
-      modelRevision == null ? Int64.ofInt(1) : modelRevision,
-      calibrationRevision == null ? Int64.ofInt(0) : calibrationRevision);
-    for (joint in 0...count) {
-      var bound = manipulator.group.limitsOf(joint);
-      if (bound.lower < bound.upper) limits.position(joint, bound.lower, bound.upper);
-      limits.velocity(joint, bound.velocity != null ? bound.velocity : 2.0);
-      limits.acceleration(joint, maxAcceleration);
-      limits.jerk(joint, 20.0);
-    }
+    planning.requireGroup(manipulator);
+    var limits = planning.validation(modelRevision, calibrationRevision);
     var solver = new ManipulatorKinematics(manipulator, 1e-8);
     var compiler = new ProgramCompiler(solver, limits, "arm-base",
-      [for (joint in 0...count) {
-        var speed = manipulator.group.limitsOf(joint).velocity;
-        speed != null ? speed : 2.0;
-      }], [for (_ in 0...count) maxAcceleration], [for (_ in 0...count) 20.0],
-      StartTolerances.uniform(count, 0.005, maxAcceleration * 0.01, 20.0 * 0.01),
+      planning.velocity, planning.acceleration, planning.jerk,
+      planning.startTolerances(0.005),
       null, Math.min(cartesianResolution, 0.0075), maxJointJump, 0.005, 0.02,
       new IkTolerance(2e-3, 5e-3, 300, 0.03));
+    compiler.planningAssumptions = planning.assumptions.copy();
+    compiler.planCheck = planning.check();
     var indices = [for (target in manipulator.toJointTargets(
       [for (_ in 0...count) 0.0])) target.joint];
     var motion = new ManipulatorMotion(robot, compiler,
@@ -62,7 +52,7 @@ class SurfacePlanRunner implements processkit.skill.SurfacePlanRunner {
     return new SurfacePlanRunner(motion, manipulator, "surface.process", feed);
   }
 
-  public function new(motion:ManipulatorMotion, manipulator:Manipulator,
+  public function new(motion:ManipulatorMotion, manipulator:KinematicGroup,
       channel:String, feed:Float) {
     if (motion == null || manipulator == null || channel == null || channel.length == 0 ||
         !Math.isFinite(feed) || feed <= 0.0)
@@ -89,9 +79,8 @@ class SurfacePlanRunner implements processkit.skill.SurfacePlanRunner {
       event.channel, event.value, event.leadSeconds, HoldPolicy.RestoreOnResume)];
     var start = points[0].work_T_tcp;
     var end = points[points.length - 1].work_T_tcp;
-    var ik = manipulator.solve(start, seed, new IkOptions(2e-3, 5e-3, 300, 0.03).reaching());
-    if (!ik.converged)
-      throw 'Surface patch approach pose is unreachable (position=${ik.positionError}, orientation=${ik.orientationError}, status=${ik.status})';
+    var ik = ReachabilityChecker.solveApproach(manipulator, start, seed, 2e-3, 5e-3, 300, 0.03);
+    if (!ik.converged) throw 'Surface patch approach pose is unreachable (position=${ik.positionError}, orientation=${ik.orientationError}, status=${ik.status})';
     var localEnd = patch.toolpath.points[patch.toolpath.points.length - 1].work_T_tcp;
     var retractLocal = new Transform3(
       localEnd.translation.add(new Vec3(0.0, 0.0, 0.03)), localEnd.rotation);

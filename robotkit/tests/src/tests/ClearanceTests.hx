@@ -1,5 +1,8 @@
 package tests;
 
+import robotkit.spatial.Transform3;
+import robotkit.spatial.Vec3;
+
 import robotkit.manipulation.ArmClearance;
 import robotkit.manipulation.Manipulator;
 import robotkit.model.Frame;
@@ -23,10 +26,63 @@ class ClearanceTests {
     testPosesAndPath();
     testMargins();
     testTouchingByDesign();
+    testCoupledDriveContact();
+    testMovingRackContact();
     testCrossingEdges();
+    testBoundsPreserveHullChecks();
     testSolidEdges();
     Sys.println('RobotKit clearance tests passed ($assertions assertions)');
     return assertions;
+  }
+
+  static function testCoupledDriveContact():Void {
+    var model = new RobotModel("screw-carriage-clearance");
+    var base = model.addLink(new Link("base"));
+    var carriage = model.addLink(new Link("carriage"));
+    var shaft = model.addLink(new Link("shaft"));
+    var slide = model.addJoint(new Joint("x", JointType.Prismatic, base, carriage));
+    slide.axis = [1.0, 0, 0]; slide.limits.lower = -0.05; slide.limits.upper = 0.4;
+    var screw = model.addJoint(new Joint("screw", JointType.Continuous, base, shaft));
+    screw.axis = [1.0, 0, 0];
+    model.addCoupling(new robotkit.model.JointCoupling("thread", slide.id, screw.id, 100, 0));
+    var tip = model.addFrame(new Frame("tip", carriage));
+    var group = new Manipulator(model, base.id, tip.id);
+    var clearance = new ArmClearance(group, [
+      {name: "nut", link: carriage.id, vertices: box(-0.02, 0.02, -0.04, 0.04, -0.04, 0.04), tool: false},
+      {name: "screw", link: shaft.id, vertices: box(-0.1, 0.5, -0.006, 0.006, -0.006, 0.006), tool: false},
+      {name: "work", link: base.id, vertices: box(0.28, 0.32, 0.025, 0.04, -0.025, 0.025), tool: false}
+    ], [0.0]);
+    check(clearance.violation([0.0]) == null && clearance.violation([0.1]) == null,
+      "a driven nut's designed engagement stays clear at rest and through travel");
+    var hit = clearance.violation([0.3]);
+    check(hit != null && (hit.a == "work" || hit.b == "work"),
+      "drive contact does not exempt the carriage from a workpiece collision");
+  }
+
+  static function testMovingRackContact():Void {
+    var model = new RobotModel("rack-pinion-clearance");
+    var base = model.addLink(new Link("base"));
+    var carriage = model.addLink(new Link("carriage"));
+    var pinion = model.addLink(new Link("pinion"));
+    var slide = model.addJoint(new Joint("track", JointType.Prismatic, base, carriage));
+    slide.axis = [1.0, 0, 0]; slide.parentFramePosition = [0.0, 0, 0.02];
+    slide.limits.lower = 0.0; slide.limits.upper = 0.4;
+    var shaft = model.addJoint(new Joint("pinion", JointType.Continuous, carriage, pinion));
+    shaft.axis = [0.0, 1, 0];
+    model.addCoupling(new robotkit.model.JointCoupling("rack", slide.id, shaft.id, -50, 0));
+    var tip = model.addFrame(new Frame("tip", carriage));
+    var group = new Manipulator(model, base.id, tip.id);
+    var clearance = new ArmClearance(group, [
+      {name: "carriage", link: carriage.id, vertices: box(-0.02, 0.02, -0.04, 0.04, 0.08, 0.1), tool: false},
+      {name: "pinion", link: pinion.id, vertices: box(-0.03, 0.03, -0.01, 0.01, -0.03, 0.03), tool: false},
+      {name: "rack", link: base.id, vertices: box(-0.1, 0.6, -0.01, 0.01, -0.02, 0), tool: false},
+      {name: "work", link: base.id, vertices: box(0.28, 0.32, -0.02, 0.02, 0.01, 0.04), tool: false}
+    ], [0.0]);
+    check(clearance.violation([0.0]) == null && clearance.violation([0.1]) == null,
+      "a moving pinion retains its designed engagement with the fixed rack");
+    var hit = clearance.violation([0.3]);
+    check(hit != null && (hit.a == "work" || hit.b == "work") && (hit.a == "pinion" || hit.b == "pinion"),
+      "rack engagement does not exempt the pinion from another body on the same fixed link");
   }
 
   /** The vertices of the box spanning the given ranges. */
@@ -123,6 +179,51 @@ class ClearanceTests {
     check(crossing != null && crossing.distance <= 0.0, "they overlap");
     var below = rig([{name: "bar", vertices: box(0.45, 0.46, -0.2, 0.2, -0.02, -0.0121)}], 0.004);
     check(below.clearance.violation([0.0, 0.0]) == null, "the same bar 8 mm under the arm is clear");
+  }
+
+  static function testBoundsPreserveHullChecks():Void {
+    // Compare the broad-phase result with direct hull distances throughout a
+    // rotation. Long thin obstacles defeat spheres; rotated bars and near
+    // contact ensure a box cannot replace the exact hull test.
+    var obstacles = [
+      box(-2.0, 2.0, 0.07, 0.09, -0.01, 0.01),
+      box(0.44, 0.46, -2.0, 2.0, -0.01, 0.01),
+      box(-2.0, 2.0, -2.0, 2.0, -0.04, -0.026)
+    ];
+    for (vertices in obstacles) {
+      var model = new RobotModel("bounds-clearance");
+      var base = model.addLink(new Link("base"));
+      var moving = model.addLink(new Link("moving"));
+      var obstacle = model.addLink(new Link("obstacle"));
+      model.addJoint(new Joint("fixture", JointType.Fixed, base, obstacle));
+      var joint = model.addJoint(new Joint("turn", JointType.Revolute, base, moving));
+      joint.axis = [0.0, 0.0, 1.0];
+      var flange = model.addFrame(new Frame("flange", moving));
+      var group = new Manipulator(model, base.id, flange.id);
+      var tool = box(0.3, 0.6, -0.025, 0.025, -0.025, 0.025);
+      var clearance = new ArmClearance(group, [
+        {name: "tool", link: moving.id, vertices: tool, tool: true},
+        {name: "obstacle", link: obstacle.id, vertices: vertices, tool: false}
+      ], [0.0]);
+      for (sample in 0...61) {
+        var q = [-Math.PI + sample * Math.PI / 30];
+        var poses = group.linkPoses(q, [moving.id, obstacle.id]);
+        function placed(points:Array<Float>, pose:Transform3):Array<Float> {
+          var result:Array<Float> = [];
+          for (i in 0...Std.int(points.length / 3)) {
+            var point = pose.transformPoint(new Vec3(points[3*i], points[3*i+1], points[3*i+2]));
+            result.push(point.x); result.push(point.y); result.push(point.z);
+          }
+          return result;
+        }
+        for (contact in [false, true]) {
+          var margin = contact ? ArmClearance.CONTACT_MARGIN : ArmClearance.MARGIN;
+          var exact = ConvexDistance.between(placed(tool, poses[0]), placed(vertices, poses[1]), margin);
+          check((clearance.violation(q, contact) != null) == (exact < margin),
+            "bounds preserve exact rotated hull clearance and contact margins");
+        }
+      }
+    }
   }
 
   static function testSolidEdges():Void {

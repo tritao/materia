@@ -30,6 +30,7 @@ class SerialRuntimeEndpoint {
     var device = new rk_serial_device_desc();
     device.set_struct_size(rk_serial_device_desc.size());
     device.set_actuator_count(binding.channels.length);
+    device.set_feedback_count(binding.channels.length);
     for (i in 0...16)
       device.set_controller(i, Std.parseInt("0x" + controllerHex.substr(i * 2, 2)));
     for (i in 0...binding.channels.length) {
@@ -37,6 +38,9 @@ class SerialRuntimeEndpoint {
       device.set_actuator_joint(i, channel.jointIndex);
       device.set_actuator_ratio(i, channel.ratio);
       device.set_actuator_offset(i, channel.offset);
+      device.set_feedback_joint(i, channel.feedbackJointIndex);
+      device.set_feedback_ratio(i, channel.feedbackRatio);
+      device.set_feedback_offset(i, channel.feedbackOffset);
       device.set_actuator_steps_per_unit(i, channel.stepsPerUnit);
       device.set_actuator_max_rate(i, channel.maxRate);
       device.set_actuator_direction_setup_ticks(i, channel.directionSetupTicks);
@@ -45,12 +49,38 @@ class SerialRuntimeEndpoint {
       for (byte in 0...channel.actuatorId.length)
         device.set_actuator_ids(i * 64 + byte, channel.actuatorId.charCodeAt(byte));
     }
+    device.set_input_count(binding.inputs.length);
+    for (i in 0...binding.inputs.length) {
+      var input = binding.inputs[i];
+      device.set_input_actuator(i, input.actuatorChannel);
+      device.set_input_active_high(i, input.wiring.activeHigh ? 1 : 0);
+      var id = input.wiring.switchId;
+      if (id.length > 63) throw "Serial switch ID is longer than 63 characters";
+      for (byte in 0...id.length) device.set_input_switch_ids(i * 64 + byte, id.charCodeAt(byte));
+    }
     var result = RobotKitRuntime.rk_robot_runtime_create_serial6(
       blueprint.nativeValue(), devicePath, baud, device, maxTargetError,
       binding.stepTickHz, linkLossTimeoutNs, clockSyncBoundNs, haxe.Int64.ofInt(100000));
     RobotRuntime.check(result.status, "serialEndpoint.create");
     return new NativeRuntimeEndpoint(result.out_runtime,
       new robotkit.time.SourceClock("robotkit.device." + controllerHex.toLowerCase()));
+  }
+
+  /** Create a runtime with its physical device switches published during observation. */
+  public static function createRuntime(blueprint:RobotRuntimeBlueprint,
+      devicePath:String, controllerHex:String, binding:DeviceBinding, maxTargetError:Float,
+      baud:Int = 115200, ?linkLossTimeoutNs:haxe.Int64, ?clockSyncBoundNs:haxe.Int64):RobotRuntime {
+    var endpoint = create(blueprint, devicePath, controllerHex, binding, maxTargetError,
+      baud, linkLossTimeoutNs, clockSyncBoundNs);
+    var runtime = RobotRuntime.create(blueprint, endpoint, "robotkit.device");
+    try {
+      var switches = new robotkit.device.DeviceSwitchSensorAdapter(blueprint, runtime, binding);
+      runtime.installSensorPoller(snapshot -> switches.poll(snapshot));
+      return runtime;
+    } catch (error:Dynamic) {
+      runtime.dispose();
+      throw error;
+    }
   }
 
   /** Reads the unique id (32 lowercase hex digits) of the board on a serial port. */

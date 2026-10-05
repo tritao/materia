@@ -94,6 +94,7 @@ class CadBridgeTests {
     testDerivedRuntimeBindings();
     testTorchBindings();
     testAssemblySimulationBridge();
+    testDerivedExternalAxes();
     testMobileBaseBridge();
     testFaceBridgeOnPlainBoxFace();
     testFaceBridgePreservesConcaveWireOrder();
@@ -619,6 +620,75 @@ class CadBridgeTests {
       "the arc is worked by the robot's welder, so the kinematic tool runtime declares no channel for it");
   }
 
+  static function testDerivedExternalAxes():Void {
+    var arm = new MachineAssembly();
+    for (index in 0...7) arm.addComponent('link$index', new BridgeCollisionBlock(10, 10, 10, 10));
+    for (index in 0...6) arm.addMateOnAxis('axis$index', "revolute", 'link$index', "end", 'link${index + 1}', "mount",
+      {x: 0.0, y: 0.0, z: 1.0}, 0.0, {lower: -2.0, upper: 2.0, velocity: 1.0, effort: 100.0});
+    arm.addComponent("baseFlange", new machinekit.robotics.RobotFlange(63));
+    arm.addMate("baseFace", "fixed", "link0", "mount", "baseFlange", "face");
+    arm.addComponent("toolFlange", new machinekit.robotics.RobotFlange(31.5));
+    arm.addMate("toolFace", "fixed", "link6", "end", "toolFlange", "face");
+    var cell = new MachineAssembly();
+    cell.addComponent("floor", new BridgeCollisionBlock(10, 10, 10, 10));
+    cell.addComponent("carriage", new BridgeCollisionBlock(10, 10, 10, 10));
+    cell.addComponent("trackFlange", new machinekit.robotics.RobotFlange(63));
+    cell.addMate("trackFace", "fixed", "floor", "mount", "trackFlange", "face");
+    cell.addMateOnAxis("track", "prismatic", "floor", "end", "carriage", "mount", {x: 1.0, y: 0.0, z: 0.0},
+      0.0, {lower: 0.0, upper: 1000.0, velocity: 100.0, effort: 1000.0});
+    cell.include("arm", arm);
+    cell.addMate("armMount", "fixed", "carriage", "end", "arm/link0", "mount");
+    var outer = new MachineAssembly();
+    outer.addComponent("rootFlange", new machinekit.robotics.RobotFlange(50));
+    outer.include("cell", cell);
+    var definition = outer.definition();
+    var physical:cadbridge.AssemblySimulationBridge.AssemblyPhysicalData = {metresPerUnit: 0.001,
+      parts: [for (part in outer.components()) {id: part.id, materialId: "steel", volume: 1000.0,
+        centerOfMass: [0.0, 0.0, 0.0], inertia: [100000.0, 0.0, 0.0, 0.0, 100000.0, 0.0, 0.0, 0.0, 100000.0], density: 7850.0}]};
+    var translated = AssemblySimulationBridge.toRobotModel(definition, physical);
+    var model = translated.model;
+    var physicalFlange:Null<Frame> = null;
+    for (frame in model.frames) if (frame.name == "cell/arm/toolFlange robot flange") physicalFlange = frame;
+    check(physicalFlange != null && physicalFlange.flangeIncludePath == "cell/arm",
+      "a real flange capability survives nested assembly freezing and the bridge");
+    var flange:Frame = cast physicalFlange;
+    var tcp = model.addFrame(new Frame("tcp", flange.link));
+    tcp.position = flange.position.copy(); tcp.rotation = flange.rotation.copy();
+    var manipulator = new Manipulator(model, model.links[0].id, tcp.id);
+    check(manipulator.group.count() == 7 && manipulator.external[0], "the nearest tool flange, rather than the root and track flanges, determines the external track");
+    for (index in 1...7) check(!manipulator.external[index], "the arm's six joints stay inside its include");
+    check(manipulator.swivel == null, "an assembly six-axis arm on a track has no swivel");
+    var solver = new motionkit.robot.ManipulatorKinematics(manipulator);
+    check(Std.isOfType(solver.redundancy(), motionkit.robot.ExternalAxesParameterization),
+      "the derived track uses external-axis parameterization");
+    var seed = [0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+    var result = manipulator.solve(manipulator.tcpPose(seed), seed, new robotkit.manipulation.IkOptions().preferring(seed));
+    check(result.converged && result.q.length == 7, "posture includes the derived external coordinate");
+    // One tracking step exposes the external cost: reaching the same target
+    // takes a smaller track step than a group treating every joint as an arm joint.
+    var destination = seed.copy(); destination[0] = 0.2;
+    var target = manipulator.tcpPose(destination);
+    var tracking = new robotkit.manipulation.IkOptions(1e-6, 1e-6, 1);
+    var damped = manipulator.solve(target, seed, tracking);
+    var undamped = new robotkit.manipulation.KinematicGroup(model, model.links[0].id, tcp.id,
+      null, null, null, []);
+    var control = undamped.solve(target, seed, tracking);
+    check(damped.q[0] > seed[0] && damped.q[0] < control.q[0] - 1e-4,
+      "an assembly-derived external track receives damping during a tracking solve");
+    var copy = robotkit.model.RobotModelCodec.decode(robotkit.model.RobotModelCodec.encode(model));
+    var rootOwner = false;
+    for (frame in copy.frames) if (frame.name == "rootFlange robot flange" && frame.flangeIncludePath == "") rootOwner = true;
+    check(rootOwner, "the model codec preserves an empty root include rather than dropping flange ownership");
+    var copied = new Manipulator(copy, copy.links[0].id, tcp.id);
+    check(copied.external[0] && copied.swivel == null, "model round trips retain flange and joint include ownership");
+    var flat = materia.assembly.AssemblyDefinitionFlattener.flatten(definition);
+    var bad:materia.assembly.AssemblyDefinition = haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(flat));
+    bad.definitions[0].robotFlangeConnector = "absent";
+    var rejected = false;
+    try materia.assembly.AssemblyDefinitionCodec.validate(bad) catch (_:Dynamic) rejected = true;
+    check(rejected, "a physical flange cannot name a missing face connector");
+  }
+
   static function testAssemblySimulationBridge():Void {
     var assembly = new AssemblyModel();
     assembly.add("base");
@@ -741,6 +811,14 @@ class CadBridgeTests {
     check(translated.linkHulls.length == 2 && translated.linkHulls[0].link == 0 &&
       translated.linkHulls[1].link == 1 && translated.linkHulls[1].vertices.length <= 64 * 3,
       "physical-part view supplies each part's bounded hull on its link");
+    var authored = assembly.definition("authored-collision");
+    var authoredSlider = [for (entry in authored.definitions) if (entry.id == "slider") entry][0];
+    authoredSlider.collisionHulls = machinekit.component.CollisionHullFacet.fromBoxes([
+      [-20, -20, 0, -10, 20, 5], [10, -20, 0, 20, 20, 5]]).hulls;
+    var pieces = AssemblySimulationBridge.toRobotModel(authored, parts).linkHulls;
+    check(pieces.length == 3 && pieces[1].link == 1 && pieces[2].link == 1 &&
+      pieces[1].vertices.length == 24 && pieces[2].vertices.length == 24,
+      "authored convex pieces replace the envelope hull without filling the gap");
     var baseLink = translated.partLinks.get("base"), sliderLink = translated.partLinks.get("slider");
     check(baseLink != null && sliderLink != null && baseLink.link == 0 && sliderLink.link == 1,
       "each part knows its link");

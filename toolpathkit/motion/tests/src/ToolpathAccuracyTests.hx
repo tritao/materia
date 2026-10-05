@@ -10,14 +10,14 @@ import motionkit.robot.MachineKitRobotCompiler;
 **/
 class ToolpathAccuracyTests {
   public static function run():Int {
-    var blueprint = MachineKitRobotCompiler.compileXYZGantry(
-      new LinearAxis(23, 10, 200), new LinearAxis(23, 10, 200),
-      new LinearAxis(23, 10, 200), 0.05, 0.5);
+    var blueprint = MachineKitRobotCompiler.compileGantry(
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(200, 200, 200)),
+      0.05, 0.5);
     var cnc = new MotionCncRig("work", "x", "y", "z", 0.05, [0.02, 0.02, 0.0], 0.00001);
     var binding = ToolpathTestSupport.cncBinding(cnc, blueprint);
     // The joints where the interpreter's start position is.
     var start = binding.solver.solvePose(new motionkit.kinematics.Pose3(0.02, 0.02, 0.0),
-      [for (_ in blueprint.model.joints) 0.0], new motionkit.kinematics.IkTolerance());
+      [for (_ in blueprint.model.joints) 0.0], new motionkit.kinematics.IkTolerance(), null);
     if (start == null) throw "the gantry reaches its start";
     var assertions = 0;
 

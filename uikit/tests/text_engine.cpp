@@ -19,6 +19,28 @@ int main() {
     if (!shared_fonts->valid() || !shared_fonts->add_font(NKUI_TEST_FONT_PATH) ||
         shared_fonts->font_load_count() != 1)
         return 48;
+    // Scratch is reusable and does not become part of retained layout ownership.
+    {
+        TextEngine scratch(shared_fonts);
+        TextLayoutResult previous;
+        if (!scratch.layout_utf8("retained before scratch reuse", 200.0f,
+                                 TextLayoutOptions{}, &previous)) return 182;
+        for (int i = 0; i < 200; ++i) {
+            TextLayoutResult current;
+            const std::string text = "changed scratch " + std::to_string(i);
+            if (!scratch.layout_utf8(text.c_str(), 200.0f, TextLayoutOptions{}, &current)) return 183;
+            scratch.prune_layout_cache({previous.id, current.id}, 2);
+            PreparedGlyphs glyphs;
+            if (!scratch.prepare_glyphs_for_line(previous.id, 0, 0.0f, 0.0f,
+                                                1.0f, GlyphMode::Alpha, glyphs) ||
+                glyphs.vertices.empty()) return 184;
+            TextIntrinsicMetrics measured;
+            if (!scratch.measure_intrinsic_utf8(text.c_str(), TextLayoutOptions{}, &measured)) return 185;
+            const auto stats = scratch.stats();
+            if (stats.scratch_used_bytes != 0 || stats.scratch_allocated_bytes > 128 * 1024) return 186;
+            if (stats.atlas_bytes > 256 * 256 * 4) return 187;
+        }
+    }
     TextEngine empty_hit_test(shared_fonts);
     for (const char *text : {"", "\n", "abc\n", "abc\n\n"}) {
         if (!empty_hit_test.layout_utf8("previous content", 200.0f, 16.0f) ||

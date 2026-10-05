@@ -99,7 +99,7 @@ class ManipulatorMotion {
     release(); programCompleted = false; failure = null; events = [];
     blockIndex = 0; planIndex = 0; barrierElapsed = 0.0; planStarted = false; startedPlans = 0;
     try {
-      var positions = robot.snapshot().positions;
+      var positions = robot.snapshot().setpointPositions;
       var started = new ProgramPlanner(compiler, program, lastCommandedQ == null
         ? [for (index in jointIndices) positions.get(index)]
         : lastCommandedQ.copy(), nextPlanId, 0, speedOverride, LOOKAHEAD_SECONDS);

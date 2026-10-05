@@ -230,7 +230,7 @@ bool execute_render_plan(UiRenderer &renderer, const RenderPlan &plan,
         bool complete = false;
         ~FrameGuard() {
             if (!complete)
-                renderer.endFrame();
+                renderer.abortFrame();
         }
     } frame_guard{renderer};
     std::unordered_set<uint32_t> internal_targets;

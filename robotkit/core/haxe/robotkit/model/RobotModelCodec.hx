@@ -85,6 +85,7 @@ class RobotModelCodec {
       if (joint.limits.maxAcceleration != null) finite(joint.limits.maxAcceleration, "joint limits.maxAcceleration");
       if (joint.limits.maxAcceleration != null && joint.limits.maxAcceleration < 0.0)
         throw "joint limits.maxAcceleration must be non-negative";
+      nonNegative(joint.limits.rackingTolerance, "joint limits.rackingTolerance");
       finite(joint.limits.overtravel, "joint limits.overtravel");
       if (joint.limits.overtravel < 0.0)
         throw "joint limits.overtravel must be non-negative";
@@ -134,6 +135,15 @@ class RobotModelCodec {
     }
     var cycle = JointCoupling.cycleThrough(model.couplings);
     if (cycle != null) throw 'Joint $cycle depends on itself through its couplings';
+    var switchIds = new Map<String, Bool>();
+    for (contact in model.switches) {
+      if (contact == null) throw "Robot switch is null";
+      if (switchIds.exists(contact.id)) throw 'Duplicate robot switch ${contact.id}';
+      switchIds.set(contact.id, true);
+      if (!joints.exists(contact.joint) || !frames.exists(contact.frameId) ||
+          (contact.driveJoint != null && !joints.exists(contact.driveJoint)))
+        throw 'Switch ${contact.id} references an unknown joint or frame';
+    }
     var sensors = new Map<String, Bool>();
     for (sensor in model.sensors) {
       requireText(sensor.id, "sensor id");
@@ -195,6 +205,7 @@ class RobotModelCodec {
       joints: [for (joint in model.joints) {
         var record:Dynamic = {id: joint.id, name: joint.name, type: jointTypeName(joint.type),
         parentLink: joint.parent.id, childLink: joint.child.id,
+        includePath: joint.includePath,
         limits: encodeLimits(joint.limits),
         parentFramePosition: joint.parentFramePosition,
         parentFrameRotation: joint.parentFrameRotation,
@@ -214,7 +225,7 @@ class RobotModelCodec {
         spans: network.spans, assumptions: network.assumptions, clearances: network.clearances}],
       frames: [for (frame in model.frames) {
         id: frame.id, name: frame.name, link: frame.link.id,
-        position: frame.position, rotation: frame.rotation
+        position: frame.position, rotation: frame.rotation, flangeIncludePath: frame.flangeIncludePath
       }],
       sensors: encodedSensors,
       contactPairs: [for (pair in model.contactPairs) {
@@ -224,6 +235,14 @@ class RobotModelCodec {
     };
     // Written only when there are some, so models without encoders keep their bytes.
     if (model.encoders.length > 0) document.encoders = [for (encoder in model.encoders) encodeEncoder(encoder)];
+    // Additive metadata: models without switches retain their existing encoded shape.
+    if (model.switches.length > 0) document.switches = [for (contact in model.switches) {
+      var encoded:Dynamic = {id: contact.id, joint: contact.joint, frame: contact.frameId, role: contact.role,
+      side: contact.side, trip: contact.trip, hysteresis: contact.hysteresis,
+      repeatability: contact.repeatability, seed: contact.seed};
+      if (contact.driveJoint != null) encoded.driveJoint = contact.driveJoint;
+      encoded;
+    }];
     if (model.elasticNetworks.length == 0) Reflect.deleteField(document, "elasticNetworks");
     return Bytes.ofString(Json.stringify(document));
   }
@@ -296,6 +315,7 @@ class RobotModelCodec {
         var mechanical:Dynamic = required(record, "mechanicalLimits");
         joint.mechanicalLimits = new JointLimits(number(mechanical, "lower"), number(mechanical, "upper"),
           nullableNumber(mechanical, "velocity"), nullableNumber(mechanical, "effort"), nullableNumber(mechanical, "maxAcceleration"));
+        if (Reflect.hasField(mechanical, "rackingTolerance")) joint.mechanicalLimits.rackingTolerance = number(mechanical, "rackingTolerance");
         if (Reflect.hasField(mechanical, "overtravel")) joint.mechanicalLimits.overtravel = number(mechanical, "overtravel");
         if (Reflect.hasField(mechanical, "velocityLimiter")) joint.mechanicalLimits.velocityLimiter = text(mechanical, "velocityLimiter");
       }
@@ -303,12 +323,14 @@ class RobotModelCodec {
       if (joint.mechanicalLimits != null) joint.mechanicalLimits.assumptions = readAssumptions(Reflect.field(record, "mechanicalLimits"));
       if (Reflect.hasField(limits, "velocityLimiter")) joint.limits.velocityLimiter = text(limits, "velocityLimiter");
       // Written only when a joint has overtravel.
+      if (Reflect.hasField(limits, "rackingTolerance")) joint.limits.rackingTolerance = number(limits, "rackingTolerance");
       if (Reflect.hasField(limits, "overtravel")) joint.limits.overtravel = number(limits, "overtravel");
       joint.parentFramePosition = vectorField(record, "parentFramePosition", 3);
       joint.parentFrameRotation = vectorField(record, "parentFrameRotation", 4);
       joint.childFramePosition = vectorField(record, "childFramePosition", 3);
       joint.childFrameRotation = vectorField(record, "childFrameRotation", 4);
       joint.axis = vectorField(record, "axis", 3);
+      joint.includePath = includeScope(record, "includePath");
       var dynamics:Dynamic = required(record, "dynamics");
       joint.armature = nonNegative(number(dynamics, "armature"), "joint armature");
       joint.damping = nonNegative(number(dynamics, "damping"), "joint damping");
@@ -397,7 +419,27 @@ class RobotModelCodec {
       var frame = model.addFrame(new Frame(text(record, "name"), link, id));
       frame.position = vectorField(record, "position", 3);
       frame.rotation = vectorField(record, "rotation", 4);
+      frame.flangeIncludePath = includeScope(record, "flangeIncludePath");
       frames.set(id, frame);
+    }
+
+    if (Reflect.hasField(root, "switches")) {
+      var switchIds = new Map<String, Bool>();
+      for (record in array(root, "switches")) {
+        var side = number(record, "side"), seed = number(record, "seed");
+        if ((side != -1 && side != 1) || seed != Math.floor(seed) || seed < -2147483648.0 || seed > 2147483647.0)
+          throw "Switch side/seed must be valid integers";
+        var contact = new JointSwitch(text(record, "id"), text(record, "joint"), text(record, "frame"),
+          text(record, "role"), Std.int(side), number(record, "trip"), number(record, "hysteresis"),
+          number(record, "repeatability"), Std.int(seed),
+          Reflect.hasField(record, "driveJoint") ? text(record, "driveJoint") : null);
+        if (switchIds.exists(contact.id)) throw 'Duplicate robot switch ${contact.id}';
+        switchIds.set(contact.id, true);
+        if (!joints.exists(contact.joint) || !frames.exists(contact.frameId) ||
+            (contact.driveJoint != null && !joints.exists(contact.driveJoint)))
+          throw 'Switch ${contact.id} references an unknown joint or frame';
+        model.addSwitch(contact);
+      }
     }
 
     var sensors = new Map<String, Bool>();
@@ -707,6 +749,16 @@ class RobotModelCodec {
     return Reflect.field(value, name);
   }
 
+  static function includeScope(value:Dynamic, name:String):Null<String> {
+    var field:Dynamic = Reflect.field(value, name);
+    if (field == null) return null;
+    if (!Std.isOfType(field, String)) throw 'Invalid RobotModel field $name';
+    var scope:String = field;
+    if (scope != "") for (segment in scope.split("/"))
+      if (segment == "" || segment == "." || segment == "..") throw 'Invalid include scope "$scope"';
+    return scope;
+  }
+
   static function text(value:Dynamic, name:String):String {
     var result:Dynamic = required(value, name);
     if (!Std.isOfType(result, String)) throw 'Invalid RobotModel field $name';
@@ -726,6 +778,7 @@ class RobotModelCodec {
       effort: limits.effort, maxAcceleration: limits.maxAcceleration};
     if (limits.assumptions.length > 0) Reflect.setField(result, "assumptions", limits.assumptions.copy());
     if (limits.velocityLimiter != "") Reflect.setField(result, "velocityLimiter", limits.velocityLimiter);
+    if (limits.rackingTolerance > 0.0) Reflect.setField(result, "rackingTolerance", limits.rackingTolerance);
     if (limits.overtravel > 0.0) Reflect.setField(result, "overtravel", limits.overtravel);
     return result;
   }

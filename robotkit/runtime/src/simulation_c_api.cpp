@@ -237,10 +237,32 @@ rk_result RK_CALL rk_simulation_reset_robot(rk_simulation simulation, uint32_t r
     return value ? value->reset_robot(robot_index) : RK_ERROR_INVALID_HANDLE;
 }
 
+rk_result RK_CALL rk_simulation_set_power_up_offsets(rk_simulation simulation,
+    uint32_t robot_index, const double *offsets, uint32_t count) {
+    const auto value = resolve(simulation);
+    return value ? value->set_power_up_offsets(robot_index, offsets, count) : RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_simulation_set_power_up_sides(rk_simulation simulation,
+    uint32_t robot_index, const double *offsets, uint32_t count,
+    const uint32_t *side_drives, uint32_t side_count) {
+    const auto value = resolve(simulation);
+    return value ? value->set_power_up_offsets(robot_index, offsets, count, side_drives, side_count)
+                 : RK_ERROR_INVALID_HANDLE;
+}
+
 rk_result RK_CALL rk_simulation_set_joint_slip(rk_simulation simulation, uint32_t robot_index,
                                                 uint32_t joint, double offset) {
     const auto value = resolve(simulation);
     return value ? value->set_joint_slip(robot_index, joint, offset) : RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_simulation_set_squaring_hold(rk_simulation simulation, uint32_t robot_index,
+                                                uint32_t joint, uint32_t active, double position) {
+    if (active > 1) return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = resolve(simulation);
+    return value ? value->set_squaring_hold(robot_index, joint, active != 0, position)
+                 : RK_ERROR_INVALID_HANDLE;
 }
 
 rk_result RK_CALL rk_simulation_teleport_robot(rk_simulation simulation, uint32_t robot_index,

@@ -1,17 +1,17 @@
 package motionkit.robot;
 
-import haxe.Int64;
 import motionkit.MotionOptions;
 import motionkit.event.EventValue;
 import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.Pose3;
 import motionkit.program.Blend;
+import motionkit.path.OrientationPolicy;
 import motionkit.program.MotionOp;
 import motionkit.program.MotionProgram;
 import motionkit.program.MoveTarget;
-import motionkit.trajectory.ValidationLimits;
-import robotkit.manipulation.Manipulator;
+import robotkit.manipulation.KinematicGroup;
 import robotkit.spatial.Vec3;
+import robotkit.spatial.Quat;
 import robotkit.execution.FiredProcessEvent;
 import robotkit.core.Robot;
 
@@ -21,7 +21,8 @@ import robotkit.core.Robot;
  * and returns to the arm's home joints, run by `ManipulatorMotion` like every other arm program. To
  * pick, it presses `pressDepth` past the contact, as a compliant suction cup is pressed onto a part,
  * so the cup meets the part within the motion's position tolerance.
- * The tool keeps its home orientation throughout. The arm's other joints, such as a mobile base's
+ * Without an explicit orientation the tool keeps its home Z direction and spin is free.
+ * A requested orientation fixes its heading as well. Other joints, such as a mobile base's
  * wheels, hold still while the program runs.
  */
 class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
@@ -38,31 +39,28 @@ class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
   public final dwell:Float;
   public final pressDepth:Float;
 
-  public static function create(robot:Robot, manipulator:Manipulator,
+  public static function create(robot:Robot, manipulator:KinematicGroup,
       eventSource:Void -> {events:Array<FiredProcessEvent>, overflow:Bool}, channel:String,
-      maxAcceleration:Float, ?approachHeight:Float = 0.12, ?travelSpeed:Float = 0.3, ?contactSpeed:Float = 0.08,
+      planning:PlanningLimits, ?approachHeight:Float = 0.12, ?travelSpeed:Float = 0.3, ?contactSpeed:Float = 0.08,
       ?dwell:Float = 0.4, ?pressDepth:Float = 0.003):HandlingPlanRunner {
     var count = manipulator.group.count();
-    var limits = new ValidationLimits(count, Int64.ofInt(1), Int64.ofInt(0));
-    for (joint in 0...count) {
-      var bound = manipulator.group.limitsOf(joint);
-      if (bound.lower < bound.upper) limits.position(joint, bound.lower, bound.upper);
-      limits.velocity(joint, bound.velocity != null ? bound.velocity : 2.0);
-      limits.acceleration(joint, maxAcceleration);
-      limits.jerk(joint, 20.0);
-    }
+    planning.requireGroup(manipulator);
+    var limits = planning.validation();
     var solver = new ManipulatorKinematics(manipulator, 1e-8);
-    var compiler = new ProgramCompiler(solver, limits, FRAME,
-      [for (joint in 0...count) {
-        var speed = manipulator.group.limitsOf(joint).velocity;
-        speed != null ? speed : 2.0;
-      }], [for (_ in 0...count) maxAcceleration], [for (_ in 0...count) 20.0],
-      StartTolerances.uniform(count, 0.005, maxAcceleration * 0.01, 20.0 * 0.01),
-      null, 0.0075, 0.2, 0.002, 0.02, new IkTolerance(2e-3, 5e-3, 300, 0.03));
     var indices = [for (target in manipulator.toJointTargets([for (_ in 0...count) 0.0])) target.joint];
+    var positions = robot.snapshot().setpointPositions;
+    // A positioning axis stays at its current station while the arm returns
+    // to its home posture. Arm coordinates remain relative to the saved pose.
+    var home = [for (index in 0...count) manipulator.external[index] ? positions.get(indices[index]) : 0.0];
+    solver.preferredOrientation = solver.forward(home);
+    var compiler = new ProgramCompiler(solver, limits, FRAME,
+      planning.velocity, planning.acceleration, planning.jerk,
+      planning.startTolerances(0.005),
+      null, 0.0075, 0.2, 0.002, 0.02, new IkTolerance(2e-3, 5e-3, 300, 0.03));
+    compiler.planningAssumptions = planning.assumptions.copy();
+    compiler.planCheck = planning.check();
     var motion = new ManipulatorMotion(robot, compiler, function(_) return null, eventSource, indices);
-    // Joint values are relative to the robot's starting pose, so home is all zeros.
-    var home = [for (_ in 0...count) 0.0];
+    // Arm joint values are relative to the robot's starting pose.
     return new HandlingPlanRunner(motion, channel, home, solver.forward(home), approachHeight, travelSpeed,
       contactSpeed, dwell, pressDepth);
   }
@@ -83,20 +81,22 @@ class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
     this.pressDepth = pressDepth;
   }
 
-  public function run(contact:Vec3, hold:Bool):Void motion.run(program(contact, hold));
+  public function run(contact:Vec3, hold:Bool, ?orientation:Quat):Void motion.run(program(contact, hold, orientation));
 
   /** The program `run` executes. */
-  public function program(contact:Vec3, hold:Bool):MotionProgram {
+  public function program(contact:Vec3, hold:Bool, ?orientation:Quat):MotionProgram {
     if (contact == null) throw "HandlingPlanRunner needs a contact point";
-    var q = homePose;
-    var above = new Pose3(contact.x, contact.y, contact.z + approachHeight, q.qx, q.qy, q.qz, q.qw);
-    var at = new Pose3(contact.x, contact.y, contact.z - (hold ? pressDepth : 0.0), q.qx, q.qy, q.qz, q.qw);
+    var q = orientation == null ? new Quat(homePose.qx, homePose.qy, homePose.qz, homePose.qw) : orientation;
+    var policy = orientation == null ? OrientationPolicy.FreeAboutTool : OrientationPolicy.Fixed;
+    var above = new Pose3(contact.x, contact.y, contact.z + approachHeight, q.x, q.y, q.z, q.w);
+    var at = new Pose3(contact.x, contact.y, contact.z - (hold ? pressDepth : 0.0), q.x, q.y, q.z, q.w);
     return new MotionProgram([
-      MotionOp.MoveL(above, FRAME, travelSpeed, Blend.ExactStop),
-      MotionOp.MoveL(at, FRAME, contactSpeed, Blend.ExactStop),
+      MotionOp.MoveL(above, FRAME, travelSpeed, Blend.ExactStop,
+        orientation == null ? policy : OrientationPolicy.Interpolated),
+      MotionOp.MoveL(at, FRAME, contactSpeed, Blend.ExactStop, policy),
       MotionOp.SetOutput(channel, EventValue.Digital(hold)),
       MotionOp.Dwell(dwell),
-      MotionOp.MoveL(above, FRAME, contactSpeed, Blend.ExactStop),
+      MotionOp.MoveL(above, FRAME, contactSpeed, Blend.ExactStop, policy),
       MotionOp.MoveJ(MoveTarget.JointTarget(home), new MotionOptions(), Blend.ExactStop)
     ]);
   }

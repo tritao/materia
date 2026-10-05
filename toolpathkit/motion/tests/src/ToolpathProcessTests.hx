@@ -117,31 +117,9 @@ import MotionKitTestSupport.TrialRig;
 
 class ToolpathProcessTests extends ToolpathTestSupport {
   public function testPhysicalAssemblyCncBinding():Void {
+    var gantry = new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(80, 80, 80));
     var assembly = new AssemblyModel();
-    var axes = [new LinearAxis(23, 10, 80), new LinearAxis(23, 10, 80),
-      new LinearAxis(23, 10, 80)];
-    var ids = ["x", "y", "z"];
-    var bindings:Array<motionkit.robot.MachineKitRobotCompiler.AssemblyAxisBinding> = [];
-    for (index in 0...3) {
-      var id = ids[index], axis = axes[index];
-      axis.motor.addTo(assembly, '$id.motor');
-      axis.coupling.addTo(assembly, '$id.coupling');
-      axis.carriage.addTo(assembly, '$id.carriage');
-      assembly.mate('$id.shaft', "continuous", '$id.motor', "shaftTip",
-        '$id.coupling', "axis");
-      assembly.mateOnAxis('$id.travel', "prismatic", '$id.motor', "shaftTip",
-        '$id.carriage', "bore", {x: 0, y: 1, z: 0}, axis.travelMin,
-        {lower: axis.travelMin, upper: axis.travelMax, velocity: 100, effort: null});
-      var ratio = 2 * Math.PI / axis.nut.travelPerRevolution();
-      assembly.couple('$id.lead', '$id.travel', '$id.shaft', ratio,
-        -axis.travelMin * ratio);
-      if (index > 0) {
-        assembly.connector('${ids[index - 1]}.carriage', "stage", AssemblyFrames.identity());
-        assembly.connector('$id.motor', "stage", AssemblyFrames.identity());
-        assembly.mate('$id.mount', "fixed", '${ids[index - 1]}.carriage', "stage",
-          '$id.motor', "stage");
-      }
-    }
+    gantry.addTo(assembly, "");
     var definition = assembly.definition("physical-gantry");
     var vertices = Bytes.alloc(4 * 24);
     var support = [0.0, 0.0, 0.0, 10.0, 0.0, 0.0,
@@ -158,30 +136,13 @@ class ToolpathProcessTests extends ToolpathTestSupport {
       }
     ]});
     var physical = AssemblySimulationBridge.toRobotModel(definition, parts);
-    for (index in 0...3) {
-      var id = ids[index];
-      var motor = physical.partLinks.get('$id.motor');
-      if (motor == null) throw 'motor $id has no link';
-      bindings.push({id: id, axis: axes[index],
-        motorLinkId: physical.model.links[motor.link].id,
-        shaftJointId: '$id.shaft', travelJointId: '$id.travel'});
-    }
-    var mismatched = bindings.copy();
-    mismatched[0] = {id: "x", axis: axes[0], motorLinkId: "wrong.motor",
-      shaftJointId: "x.shaft", travelJointId: "x.travel"};
-    var rejected = false;
-    try MachineKitRobotCompiler.compileAssemblyAxes(physical.model, mismatched,
-      0.1, 0.4) catch (_:Dynamic) rejected = true;
-    check(rejected && physical.model.actuators.length == 0,
-      "assembly drive attachment rejects a mismatched motor without changing the model");
-    var blueprint = MachineKitRobotCompiler.compileAssemblyAxes(physical.model,
-      bindings, 0.1, 0.4);
-    // The root absorbs the grounded X motor; each carriage carries the next axis's motor.
-    check(blueprint.model.links.length == 7 && blueprint.model.actuators.length == 3 &&
-      bindings[1].motorLinkId == "x.carriage" && bindings[2].motorLinkId == "y.carriage",
-      "physical gantry has one link per rigid body and three motor actuators");
-    check(blueprint.model.couplings.length == 3,
-      "physical gantry keeps its lead-screw joint couplings");
+    var blueprint = MachineKitRobotCompiler.compileGantry(gantry, 0.1, 0.4);
+    check(blueprint.model.joints.length == blueprint.model.couplings.length + 3 && blueprint.model.actuators.length == 4,
+      "physical gantry includes three leaders and four authored motors");
+    var gantryCouplings = gantry.definition().couplings;
+    if (gantryCouplings == null) throw "Gantry definition has no drive couplings";
+    check(blueprint.model.couplings.length == gantryCouplings.length,
+      "physical gantry keeps every part-derived drive coupling");
     var hasTenMillimetreVertex = false, linksValid = physical.linkHulls.length > 0;
     for (hull in physical.linkHulls) {
       if (hull.link < 0 || hull.link >= blueprint.model.links.length) linksValid = false;
@@ -261,7 +222,10 @@ class ToolpathProcessTests extends ToolpathTestSupport {
     var robot = new SimulatedRobot("physical-cnc", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name]);
-    var binding = ToolpathTestSupport.cncBinding(cnc, blueprint);
+    homeGantryFixture(blueprint, runtime, simulationHarness, robot);
+    var state = runtime.snapshot();
+    var binding = new toolpathkit.motion.ToolpathMotionBinding(cnc.binding, blueprint,
+      state.modelRevision, state.calibrationRevision);
     var motion = new ManipulatorMotion(robot, binding.compiler,
       function(channel) return channel == "spindle.at_speed" ?
         EventValue.Digital(true) : null,
@@ -281,9 +245,9 @@ class ToolpathProcessTests extends ToolpathTestSupport {
   }
 
   public function testCncProgramBinding():Void {
-    var blueprint = MachineKitRobotCompiler.compileXYZGantry(
-      new LinearAxis(23, 10, 200), new LinearAxis(23, 10, 200),
-      new LinearAxis(23, 10, 200), 0.1, 0.4);
+    var blueprint = MachineKitRobotCompiler.compileGantry(
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(200, 200, 200)),
+      0.1, 0.4);
     var cnc = new MotionCncRig("work", "x", "y", "z", 0.08);
     var binding = ToolpathTestSupport.cncBinding(cnc, blueprint);
     check(cnc.binding.travel != null,

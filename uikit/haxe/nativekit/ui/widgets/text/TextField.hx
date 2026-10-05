@@ -64,8 +64,12 @@ class TextField implements View {
 	public var additionalSelectionProvider:Null<Void->Array<TextSelection>>;
 	/** Handles navigation of all selections when additional carets are present. */
 	public var onNavigationIntent:Null<(TextNavigationIntent, TextEditorLayout)->Bool>;
-	/** Return true after applying an operation to the controlled document. */
-	public var onEditIntent:Null<TextEditIntent->Bool>;
+	/** Return true after applying an operation; the live layout supplies shaped word boundaries. */
+	/** True when an application document owns undo/redo. */
+	public var historyManagedExternally:Bool = false;
+	/** Optional external viewport scroll; delta uses application layout coordinates. */
+	public var onSelectionDragScroll:Null<Float->Bool>;
+	public var onEditIntent:Null<(TextEditIntent, TextEditorLayout)->Bool>;
 	/** Optional aggregate selected text for clipboard copy/cut. */
 	public var selectionTextProvider:Null<Void->Null<String>>;
 	/** Typed selector classes used by composite fields such as ComboBox. */
@@ -356,7 +360,7 @@ class TextField implements View {
 			};
 			var delegateEdit = function(intent:TextEditIntent):Bool {
 				var handler = onEditIntent;
-				if (handler == null || !handler(intent)) return false;
+				if (handler == null || !handler(intent, editor.layout)) return false;
 				if (document != null) editor.syncDocument(document);
 				else editor.syncExternal(value);
 				if (selectionProvider != null) editor.setAnchoredSelection(selectionProvider());
@@ -481,6 +485,7 @@ class TextField implements View {
 			var blur = function(event:UiEvent) {
 				if (!editor.focused && !editor.draggingSelection)
 					return;
+				editor.breakHistoryGroup();
 				editor.focused = false;
 				editor.draggingSelection = false;
 				editor.cancelPointerClick();
@@ -492,6 +497,25 @@ class TextField implements View {
 			node.on(UiEventKind.Blur, blur);
 			node.on(UiEventKind.FocusLost, blur);
 
+			var drag = context.resourceState(context.id("selection-drag"),
+				function() return new SelectionDragController(), function(value) value.dispose()).value;
+			var extendDrag = function(x:Float, y:Float):Void {
+				var geometry = textNode.resolved;
+				if (geometry == null) return;
+				var clip = geometry.clipBounds;
+				var clampedY = Math.max(clip.y, Math.min(clip.y + clip.height, y));
+				var point = geometry.viewportToLayout(x, clampedY);
+				var position = editor.hitTest(point.x - geometry.x, point.y - geometry.y + editor.scrollOffsetY);
+				if (editor.extendPointerSelection(position)) {
+					editor.resetCaretBlink(Sys.time());
+					updateState();
+				}
+			};
+			drag.configure(context.animations, editor, function() return textNode.resolved, extendDrag, function(delta) {
+				var changed = onSelectionDragScroll == null ? editor.scrollBy(delta) : onSelectionDragScroll(delta);
+				if (changed) refresh();
+				return changed;
+			});
 			node.on(UiEventKind.PointerDown, function(event) {
 				if (!enabled || event.button != 0 || textNode.resolved == null)
 					return;
@@ -506,11 +530,7 @@ class TextField implements View {
 					editor.cancelPointerClick();
 				var clickCount = extend ? 1 : editor.registerPointerClick(position,
 					context.gestures.timeSeconds(), event.x, event.y);
-				var changed = switch (clickCount) {
-					case 2: editor.selectWordAt(position);
-					case 3: editor.selectLineAt(position);
-					case _: editor.placeCaretAt(position, extend);
-				};
+				var changed = editor.beginPointerSelection(position, clickCount, extend);
 				if (changed)
 					updateState();
 				editor.draggingSelection = true;
@@ -520,30 +540,41 @@ class TextField implements View {
 				if (!enabled || !editor.draggingSelection || textNode.resolved == null)
 					return;
 				editor.cancelPointerClickIfMoved(event.x, event.y);
-				var geometry:ResolvedLayoutItem = cast textNode.resolved;
-				var point = geometry.viewportToLayout(event.x, event.y);
-				var position = editor.hitTest(point.x - geometry.x,
-					point.y - geometry.y + editor.scrollOffsetY);
-				if (editor.placeCaretAt(position, true)) {
-					editor.resetCaretBlink(Sys.time());
-					editor.cancelPointerClick();
-					updateState();
-				}
+				extendDrag(event.x, event.y);
+				drag.update(event.x, event.y);
 			});
 			node.on(UiEventKind.PointerUp, function(event) {
+				drag.stop();
 				editor.completePointerClick(event.x, event.y);
 				editor.draggingSelection = false;
 			});
 			node.on(UiEventKind.PointerCancel, function(_) {
+				drag.stop();
 				editor.cancelPointerClick();
 				editor.draggingSelection = false;
 			});
 
+			editor.configureHistory(!historyManagedExternally);
 			var handleKey = function(event:UiEvent) {
 				if (!enabled)
 					return;
+				// Ctrl+Alt arrows belong to application navigation, including its
+				// Shift variant. Leave them unconsumed for the command route.
+				if ((event.modifiers & (UiModifier.Control | UiModifier.Alt)) ==
+					(UiModifier.Control | UiModifier.Alt) &&
+					(event.key == UiKey.Left || event.key == UiKey.Right ||
+					 event.key == UiKey.Up || event.key == UiKey.Down)) return;
 				var extend = (event.modifiers & UiModifier.Shift) != 0;
 				var command = (event.modifiers & (UiModifier.Control | UiModifier.Super)) != 0;
+				if (command && (event.key == UiKey.Z || event.key == UiKey.Y)) {
+					if (historyManagedExternally) return;
+					var previousRevision = editor.documentRevision();
+					var changed = !readOnly && (event.key == UiKey.Y || extend ? editor.redo() : editor.undo());
+					if (changed) publishTextChange(previousRevision);
+					editor.resetCaretBlink(Sys.time());
+					event.preventDefault();
+					return;
+				}
 				var macWordNavigation = #if (mac || ios)
 					(event.modifiers & UiModifier.Alt) != 0 &&
 					(event.modifiers & UiModifier.Control) == 0;
@@ -557,8 +588,8 @@ class TextField implements View {
 				#end
 				if (additionalSelections.length > 0 && onNavigationIntent != null) {
 					var navigation:Null<TextNavigationIntent> = switch (event.key) {
-						case UiKey.Left: wordNavigation ? Word(-1, extend, macWordNavigation) : Character(-1, extend);
-						case UiKey.Right: wordNavigation ? Word(1, extend, macWordNavigation) : Character(1, extend);
+						case UiKey.Left: #if (mac || ios) (event.modifiers & UiModifier.Super) != 0 ? LineBoundary(false, extend) : #end wordNavigation ? Word(-1, extend, macWordNavigation) : Character(-1, extend);
+						case UiKey.Right: #if (mac || ios) (event.modifiers & UiModifier.Super) != 0 ? LineBoundary(true, extend) : #end wordNavigation ? Word(1, extend, macWordNavigation) : Character(1, extend);
 						case UiKey.Up: wordNavigation ? Paragraph(-1, extend, macWordNavigation) :
 							multiline ? VisualLine(-1, extend) : null;
 						case UiKey.Down: wordNavigation ? Paragraph(1, extend, macWordNavigation) :
@@ -583,8 +614,8 @@ class TextField implements View {
 					}
 				}
 				if (!readOnly) {
-					var consumed = event.key == UiKey.Backspace ? delegateEdit(DeleteBackward) :
-						event.key == UiKey.Delete ? delegateEdit(DeleteForward) :
+					var consumed = event.key == UiKey.Backspace ? delegateEdit(wordNavigation ? DeleteWordBackward(macWordNavigation) : DeleteBackward) :
+						event.key == UiKey.Delete ? delegateEdit(wordNavigation ? DeleteWordForward(macWordNavigation) : DeleteForward) :
 						event.key == UiKey.Enter && multiline ? delegateEdit(Insert("\n")) : false;
 					if (consumed) { event.preventDefault(); return; }
 				}
@@ -612,12 +643,19 @@ class TextField implements View {
 								return;
 							if (delegateEdit(Paste(pasted))) return;
 							var beforePaste = editor.documentRevision();
-							if (editor.insert(pasted)) {
+							if (editor.insert(pasted, TextEditorHistoryKind.Paste)) {
 								editor.resetCaretBlink(Sys.time());
 								publishTextChange(beforePaste);
 							}
 						});
-				} else if (wordNavigation && event.key == UiKey.Left)
+				}
+				#if (mac || ios)
+				else if ((event.modifiers & UiModifier.Super) != 0 && event.key == UiKey.Left)
+					changed = editor.moveCaretToLineBoundary(false, extend);
+				else if ((event.modifiers & UiModifier.Super) != 0 && event.key == UiKey.Right)
+					changed = editor.moveCaretToLineBoundary(true, extend);
+				#end
+				else if (wordNavigation && event.key == UiKey.Left)
 					changed = editor.moveCaretByWord(-1, extend, macWordNavigation);
 				else if (wordNavigation && event.key == UiKey.Right)
 					changed = editor.moveCaretByWord(1, extend, macWordNavigation);
@@ -649,14 +687,14 @@ class TextField implements View {
 					if (readOnly)
 						handled = false;
 					else {
-						changed = editor.deleteBackward();
+						changed = wordNavigation ? editor.deleteWord(-1, macWordNavigation) : editor.deleteBackward();
 						textEdited = true;
 					}
 				} else if (event.key == UiKey.Delete) {
 					if (readOnly)
 						handled = false;
 					else {
-						changed = editor.deleteForward();
+						changed = wordNavigation ? editor.deleteWord(1, macWordNavigation) : editor.deleteForward();
 						textEdited = true;
 					}
 				} else if (event.key == UiKey.Enter) {

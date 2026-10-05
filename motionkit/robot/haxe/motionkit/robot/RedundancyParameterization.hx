@@ -1,6 +1,7 @@
 package motionkit.robot;
 
 import motionkit.kinematics.IkTolerance;
+import motionkit.path.OrientationPolicy;
 import motionkit.kinematics.Pose3;
 
 /**
@@ -10,14 +11,18 @@ import motionkit.kinematics.Pose3;
  * axes, later a mobile base's pose.
  */
 interface RedundancyParameterization {
+  /** Sets the soft orientation preference; preferTarget uses each target when preference is null. */
+  function preferringOrientation(preference:Null<Pose3>, ?preferTarget:Bool):Void;
+  /** Sets the arm posture preference, leaving external axes free to supply the remaining motion. */
+  function preferringPosture(preference:Null<Array<Float>>):Void;
   /** How many values name the redundancy. */
   function dimension():Int;
   /** The values at `q`, or null where they are undefined (e.g. a straight elbow). */
   function valuesAt(q:Array<Float>):Null<Array<Float>>;
   /** IK for the tool target with the redundancy held at `values`, seeded by `seed`; null if it does not solve. */
-  function solveAt(target:Pose3, seed:Array<Float>, values:Array<Float>, tolerance:IkTolerance):Null<Array<Float>>;
+  function solveAt(target:Pose3, seed:Array<Float>, values:Array<Float>, tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>>;
   /** IK keeping the redundancy as near the seed's as the target allows (where `solveAt` is blocked, e.g. by a limit). */
-  function solveNear(target:Pose3, seed:Array<Float>, tolerance:IkTolerance):Null<Array<Float>>;
+  function solveNear(target:Pose3, seed:Array<Float>, tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>>;
   /**
    * The values' Jacobian at `q`: `dimension()` rows of one entry per group DOF, row-major
    * (d values = G · dq), or null where the values are undefined.

@@ -4,19 +4,11 @@ project(RobotKit VERSION 0.1.0 LANGUAGES C CXX)
 
 include(GNUInstallDirs)
 include(CTest)
-include(FetchContent)
 
-# Header-only MCAP C++ implementation, pinned for reproducible recordings.
-FetchContent_Declare(mcap
-    GIT_REPOSITORY https://github.com/foxglove/mcap.git
-    GIT_TAG 1420296ffcfdcde4b6894c0c1aba0ad083f93dde
-    GIT_SHALLOW TRUE)
-if(POLICY CMP0169)
-    cmake_policy(SET CMP0169 OLD)
-endif()
-FetchContent_GetProperties(mcap)
-if(NOT mcap_POPULATED)
-    FetchContent_Populate(mcap)
+# Header-only MCAP C++ implementation, pinned (as a submodule) for reproducible recordings.
+set(mcap_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vendor/mcap")
+if(NOT EXISTS "${mcap_SOURCE_DIR}/cpp/mcap/include")
+    message(FATAL_ERROR "MCAP is missing at '${mcap_SOURCE_DIR}'; run git submodule update --init robotkit/vendor/mcap")
 endif()
 add_library(robotkit_mcap_headers INTERFACE)
 target_include_directories(robotkit_mcap_headers INTERFACE
@@ -37,13 +29,9 @@ if(RK_USE_SYSTEM_LZ4)
         $<BUILD_INTERFACE:${RK_LZ4_LIBRARY}>
         $<INSTALL_INTERFACE:lz4>)
 else()
-    FetchContent_Declare(robotkit_lz4_source
-        GIT_REPOSITORY https://github.com/lz4/lz4.git
-        GIT_TAG ebb370ca83af193212df4dcbadcc5d87bc0de2f0
-        GIT_SHALLOW FALSE)
-    FetchContent_GetProperties(robotkit_lz4_source)
-    if(NOT robotkit_lz4_source_POPULATED)
-        FetchContent_Populate(robotkit_lz4_source)
+    set(robotkit_lz4_source_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vendor/lz4")
+    if(NOT EXISTS "${robotkit_lz4_source_SOURCE_DIR}/lib/lz4.c")
+        message(FATAL_ERROR "LZ4 is missing at '${robotkit_lz4_source_SOURCE_DIR}'; run git submodule update --init robotkit/vendor/lz4")
     endif()
     add_library(robotkit_lz4 STATIC
         "${robotkit_lz4_source_SOURCE_DIR}/lib/lz4.c"

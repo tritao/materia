@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <cstdio>
 
 namespace robotkit {
 
@@ -34,6 +35,7 @@ void ClockEstimator6::observe(std::uint64_t host_send_ns, std::uint64_t host_rec
     if (ready_ && std::abs((sample.device_ticks - (offset_ + rate_ * sample.host_ns)) / rate_) >
                       static_cast<double>(bound_ns_)) {
         if (++bad_samples_ >= 3) {
+            std::fprintf(stderr, "RKD6 clock sync lost: host=%.0f device=%.0f predicted=%.0f rate=%.12g bound=%llu ns\n", sample.host_ns, sample.device_ticks, offset_ + rate_ * sample.host_ns, rate_, static_cast<unsigned long long>(bound_ns_));
             sync_lost_ = true;
             ready_ = false;
             count_ = next_ = 0;
@@ -46,7 +48,10 @@ void ClockEstimator6::observe(std::uint64_t host_send_ns, std::uint64_t host_rec
     next_ = (next_ + 1) % samples_.size();
     count_ = std::min(count_ + 1, samples_.size());
     fit();
-    if (ready_) sync_lost_ = uncertainty_ns_ > bound_ns_;
+    if (ready_) {
+        sync_lost_ = uncertainty_ns_ > bound_ns_;
+        if (sync_lost_) std::fprintf(stderr, "RKD6 clock uncertainty: uncertainty=%llu bound=%llu rate=%.12g host=%.0f device=%.0f\n", static_cast<unsigned long long>(uncertainty_ns_), static_cast<unsigned long long>(bound_ns_), rate_, sample.host_ns, sample.device_ticks);
+    }
 }
 
 void ClockEstimator6::fit() {

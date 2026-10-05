@@ -6,7 +6,18 @@ import cadkit.modeling.Vector;
 import toolpathkit.path.PathGeometry;
 import toolpathkit.path.Point3;
 import oracle.ExactOracle;
+import haxeon.test.Shards.TestGroup;
 import toolpathkit.tool.CutterProfile;
+
+typedef ChainTool = {
+  final name:String;
+  final profile:CutterProfile;
+  final depth:Float;
+  final corners:Array<Float>;
+
+  /** Roughly how long its cases take, in seconds, to balance shards. */
+  final weight:Float;
+}
 
 /**
   Multi-move toolpaths whose moves join tangentially, cut with the exact
@@ -17,35 +28,61 @@ import toolpathkit.tool.CutterProfile;
 **/
 class ChainFixtures {
   static inline final DEPTH_TOLERANCE = 1e-7; // relative volume
+  static inline final RADIUS = 0.003;
 
+  /** Every case, one after another. */
   public static function run():Void {
-    var r = 0.003;
+    for (group in groups())
+      group.run();
+  }
+
+  /**
+    The cases as independent groups, one per tool and one for the refusal check, so a test program can run them as parallel
+    shards. Together they are what `run` does.
+  **/
+  public static function groups():Array<TestGroup> {
+    var result:Array<TestGroup> = [for (tool in tools()) toolGroup(tool)];
+    result.push({name: "ChainFixtures ball arc refused", run: ballArcRefused, weight: 0.1});
+    return result;
+  }
+
+  static function toolGroup(tool:ChainTool):TestGroup
+    return {name: 'ChainFixtures ${tool.name}', run: () -> runTool(tool), weight: tool.weight};
+
+  static function tools():Array<ChainTool> {
+    var r = RADIUS;
     // Corners at exactly the tool radius are CamKit's outside corners. The
     // oracle refuses them for tools with a curved edge at that radius, so
     // those tools use the smallest corners it accepts.
-    var tools:Array<{name:String, profile:CutterProfile, depth:Float, corners:Array<Float>}> = [
-      {name: "flat", profile: CutterProfile.flat(2 * r, 0.02), depth: 0.002, corners: [r, 1.5 * r]},
-      {name: "ball", profile: CutterProfile.ball(2 * r, 0.02), depth: 0.004, corners: [1.01 * r, 1.5 * r]},
+    return [
+      {name: "flat", profile: CutterProfile.flat(2 * r, 0.02), depth: 0.002, corners: [r, 1.5 * r], weight: 9.4},
+      {name: "ball", profile: CutterProfile.ball(2 * r, 0.02), depth: 0.004, corners: [1.01 * r, 1.5 * r], weight: 7.5},
       {name: "bull-nose", profile: CutterProfile.bullNose(2 * r, 0.001, 0.02), depth: 0.002,
-        corners: [1.01 * r, 1.5 * r]},
+        corners: [1.01 * r, 1.5 * r], weight: 13.5},
       {name: "V-bit", profile: CutterProfile.vee(2 * r, Math.PI / 2, 0.02), depth: 0.002,
-        corners: [r, 1.5 * r]}
+        corners: [r, 1.5 * r], weight: 5.3}
     ];
-    var origins = [new Vector(0, 0, 0), new Vector(0.0137, -0.0213, 0.0041),
-      new Vector(0.25, 0.1, -0.05)];
-    for (tool in tools)
-      for (corner in tool.corners)
-        for (origin in origins) {
-          var label = '${tool.name} corner ${corner} at (${origin.x}, ${origin.y}, ${origin.z})';
-          roundedRectangle(tool.profile, tool.depth, corner, origin, label);
-        }
+  }
+
+  static function origins():Array<Vector>
+    return [new Vector(0, 0, 0), new Vector(0.0137, -0.0213, 0.0041), new Vector(0.25, 0.1, -0.05)];
+
+  static function runTool(tool:ChainTool):Void {
+    var origins = origins();
+    for (corner in tool.corners)
+      for (origin in origins) {
+        var label = '${tool.name} corner ${corner} at (${origin.x}, ${origin.y}, ${origin.z})';
+        roundedRectangle(tool.profile, tool.depth, corner, origin, label);
+      }
+    sCurve(tool.profile, tool.depth, 1.5 * RADIUS, origins[1], '${tool.name} S-curve');
+  }
+
+  static function ballArcRefused():Void {
     var refused = false;
-    try ExactOracle.sweptSolid(CutterProfile.ball(2 * r, 0.02),
-      Arc(new Point3(0, 0, 0), r, 0, Math.PI / 2)).close()
+    try ExactOracle.sweptSolid(CutterProfile.ball(2 * RADIUS, 0.02),
+      Arc(new Point3(0, 0, 0), RADIUS, 0, Math.PI / 2)).close()
     catch (_:Dynamic) refused = true;
     Assert.check(refused, "a ball-mill arc of the ball's own radius is refused");
-    for (tool in tools)
-      sCurve(tool.profile, tool.depth, 1.5 * r, origins[1], '${tool.name} S-curve');
   }
 
   /** A closed loop of four lines and four quarter arcs, cut at one depth. */

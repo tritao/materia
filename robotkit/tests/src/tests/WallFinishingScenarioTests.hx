@@ -1,5 +1,7 @@
 package tests;
 
+import motionkit.robot.PlanningLimits;
+
 import haxe.Int64;
 import processkit.motion.SurfacePlanRunner;
 import motionkit.robot.ProgramCompiler;
@@ -235,7 +237,7 @@ class WallFinishingScenarioTests {
         var batch = runtime.pollEvents();
         for (event in batch.events) writer.recordProcessEvent(robot.id(), event);
         return batch;
-      }, 0.03, 0.3, 0.6, null, null, 0.02);
+      }, 0.03, PlanningLimits.ofGroup(manipulator, null, 0.3), 0.6, null, null, 0.02);
     var adapter = new ChannelToolAdapter();
     adapter.bindSprayerFlow("surface.process", sprayer, 0.3);
 
@@ -530,7 +532,8 @@ class WallFinishingScenarioTests {
       joint.axis = axes[i];
       joint.limits.lower = -2.0 * Math.PI;
       joint.limits.upper = 2.0 * Math.PI;
-      joint.limits.velocity = null;
+      // Synthetic arm: retain the former runner assumption as an explicit fixture cap.
+      joint.limits.velocity = 2.0;
       joint.limits.maxAcceleration = 0.3;
     }
     var flangeOffset = new Vec3(0.0, d6, 0.0);

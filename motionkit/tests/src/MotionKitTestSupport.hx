@@ -1,3 +1,4 @@
+import motionkit.path.OrientationPolicy;
 import haxe.Int64;
 import haxe.io.Bytes;
 import machinekit.assembly.LinearAxis;
@@ -166,6 +167,7 @@ class MotionKitTestSupport {
     var carriage = model.addLink(new Link("carriage"));
     var rail = model.addJoint(new Joint("rail", JointType.Prismatic, floor, carriage));
     rail.axis = [1.0, 0.0, 0.0];
+    rail.includePath = "";
     rail.limits.lower = 0.0;
     rail.limits.upper = 2.0;
     var links = [carriage].concat([for (name in ["shoulder", "upper-arm", "forearm", "wrist-1", "wrist-2", "wrist-3"])
@@ -175,6 +177,7 @@ class MotionKitTestSupport {
     var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]];
     for (joint in 0...6) {
       var value = model.addJoint(new Joint('joint-$joint', JointType.Revolute, links[joint], links[joint + 1]));
+      value.includePath = "arm";
       value.parentFramePosition = offsets[joint];
       value.axis = axes[joint];
       value.limits.lower = -Math.PI;
@@ -182,6 +185,7 @@ class MotionKitTestSupport {
     }
     var flange = model.addFrame(new Frame("flange", links[6]));
     flange.position = [0.0, 0.0823, 0.0];
+    flange.flangeIncludePath = "arm";
     var table = model.addLink(new Link("table"));
     var turntable = model.addJoint(new Joint("turntable", JointType.Revolute, floor, table));
     // Two turns either way: a positioner turns the workpiece round and round.
@@ -196,7 +200,7 @@ class MotionKitTestSupport {
       joint.limits.maxAcceleration = 2.0;
     }
     return {model: model, group: new robotkit.manipulation.KinematicGroup(model, floor.id, flange.id, work.id,
-      null, null, [rail.id])};
+      null, null, null)};
   }
 
   public function poseRotationDelta(from:Pose3, to:Pose3, scale:Float):Array<Float> {
@@ -213,15 +217,53 @@ class MotionKitTestSupport {
 
   public function runMotion(machine:MotionSystem, harness:SimulationHarness):Void {
     var tick = 0;
+    var homeStatus = machine.homingStatus();
+    var maximumTicks = homeStatus != "Idle" && homeStatus != "Complete" && homeStatus != "Fault"
+      ? 60000 : 2000;
     while (machine.isMoving()) {
+      harness.step();
       machine.update();
-      harness.step(Int64.ofInt(tick++));
-      if (tick > 2000) {
+      tick++;
+      if (tick > maximumTicks) {
         var snapshot = machine.robot.snapshot();
         throw 'MotionKit trajectory did not complete: safety=${snapshot.safety} fault=${snapshot.faultCode} session=${snapshot.sessionState} active=${snapshot.trajectoryActive} queue=${snapshot.trajectoryQueueDepth} time=${snapshot.trajectoryTimeNs} duration=${snapshot.trajectoryDurationNs} committed=${snapshot.committedUntilNs}';
       }
     }
-    for (_ in 0...4) harness.step(Int64.ofInt(tick++));
+    for (_ in 0...4) harness.step();
+  }
+
+  var gantryBlueprint_:Null<MotionSystemBlueprint> = null;
+
+  /** Reuse the unchanging CAD fixture; every trial still owns fresh runtime and simulation state. */
+  public function gantryBlueprint():MotionSystemBlueprint {
+    var compiled = gantryBlueprint_;
+    if (compiled == null) {
+      compiled = MachineKitRobotCompiler.compileGantry(
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(200, 60, 40)),
+      0.1, 0.4);
+      gantryBlueprint_ = compiled;
+    }
+    return compiled;
+  }
+
+  /** Establish actual switch references before fixtures submit ordinary gantry plans. */
+  public function homeGantryFixture(blueprint:MotionSystemBlueprint,
+      runtime:robotkit.runtime.RobotRuntime, harness:SimulationHarness, ?fixtureRobot:Robot,
+      ?fixtureMotion:MotionSystem):Int {
+    var model = blueprint.model;
+    var robot:Robot = fixtureRobot == null ? new SimulatedRobot("homing-fixture", runtime, model.name,
+      [for (link in model.links) link.name], [for (joint in model.joints) joint.name]) : fixtureRobot;
+    var homing = fixtureMotion == null ? new MotionSystem(robot, blueprint) : fixtureMotion;
+    homing.configureRuntimeHoming(runtime, () -> {}, harness.simulation.homingSides(0));
+    var tick = 1;
+    harness.step(Int64.ofInt(tick));
+    homing.home();
+    while (homing.homingStatus() != "Complete" && tick < 60000) {
+      harness.step(Int64.ofInt(++tick));
+      homing.update(0.01);
+    }
+    check(homing.homingStatus() == "Complete", "Gantry fixture establishes physical switch references");
+    return tick;
   }
 
   /**
@@ -231,8 +273,7 @@ class MotionKitTestSupport {
    */
   public function gantryTrial(queueSupport:Bool, eventTick:Int, event:MotionSystem -> Void,
       resumeAfterStop:Bool, ?begin:MotionSystem -> Void):Array<Float> {
-    var blueprint = MachineKitRobotCompiler.compileXYZGantry(new LinearAxis(23, 10, 200),
-      new LinearAxis(23, 10, 60), new LinearAxis(23, 10, 40), 0.1, 0.4);
+    var blueprint = gantryBlueprint();
     var simulationHarness = new SimulationHarness(0.01);
     var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
@@ -241,6 +282,7 @@ class MotionKitTestSupport {
       [for (joint in blueprint.model.joints) joint.name], false, false,
       "simulated runtime fault", queueSupport ? null : robotkit.core.ExecutionCapabilities.unavailable());
     var machine = MotionSystem.fromBlueprint(robot, blueprint);
+    if (queueSupport) homeGantryFixture(blueprint, runtime, simulationHarness, robot, machine);
     if (begin == null) machine.moveAxes([new AxisTarget("x", 0.15)], new MotionOptions(0.05, 0.4));
     else begin(machine);
     var positions:Array<Float> = [];
@@ -248,7 +290,8 @@ class MotionKitTestSupport {
     var stillTicks = 0;
     function step():Void {
       machine.update();
-      try simulationHarness.step(Int64.ofInt(tick++)) catch (error:Dynamic)
+      tick++;
+      try simulationHarness.step() catch (error:Dynamic)
         throw 'gantry trial (queue $queueSupport, event at $eventTick) failed at tick $tick: $error';
       var position = robot.snapshot().positions.get(0);
       stillTicks = positions.length > 0 &&
@@ -291,7 +334,8 @@ class MotionKitTestSupport {
     var stillTicks = 0;
     function step():Void {
       machine.update();
-      rig.harness.step(Int64.ofInt(tick++));
+      rig.harness.step();
+      tick++;
       var current = rig.robot.snapshot().positions.toArray();
       var still = positions.length > 0;
       if (still)
@@ -323,15 +367,16 @@ class MotionKitTestSupport {
   }
 
   public function gantryRig(queueSupport:Bool):TrialRig {
-    var blueprint = MachineKitRobotCompiler.compileXYZGantry(new LinearAxis(23, 10, 200),
-      new LinearAxis(23, 10, 60), new LinearAxis(23, 10, 40), 0.1, 0.4);
+    var blueprint = gantryBlueprint();
     var simulationHarness = new SimulationHarness(0.01);
     var runtime = simulationHarness.simulation.addRobot(blueprint.runtime);
     var robot = new RuntimeRobotAdapter("rig", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name], false, false,
       "simulated runtime fault", queueSupport ? null : robotkit.core.ExecutionCapabilities.unavailable());
-    return new TrialRig(MotionSystem.fromBlueprint(robot, blueprint), simulationHarness, robot);
+    var machine = MotionSystem.fromBlueprint(robot, blueprint);
+    if (queueSupport) homeGantryFixture(blueprint, runtime, simulationHarness, robot, machine);
+    return new TrialRig(machine, simulationHarness, robot);
   }
 
   public function segmentDistance(x:Float, y:Float, ax:Float, ay:Float, bx:Float, by:Float):Float {
@@ -420,18 +465,18 @@ class WristBranchSolver implements KinematicsSolver {
   public function jointCount():Int return 6;
   public function forward(q:Array<Float>):Pose3 return new Pose3(q[0]);
   public function solvePose(target:Pose3, seed:Array<Float>,
-      tolerance:IkTolerance):Null<Array<Float>> {
+      tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>> {
     var q = seed.copy();
     q[0] = target.x;
     q[4] = !jump || target.x < 0.5 ? 0.1 : -2.0;
     return q;
   }
   public function sampleCandidates(target:Pose3, maxCount:Int,
-      tolerance:IkTolerance):Array<Array<Float>>
+      tolerance:IkTolerance, ?freedom:OrientationPolicy):Array<Array<Float>>
     return [solvePose(target, [for (_ in 0...6) 0.0], tolerance)];
   public function solvePath(request:motionkit.kinematics.PathRequest):Array<Null<Array<Float>>>
     return request.followPointByPoint(this);
-  public function solveDifferential(q:Array<Float>, twist:Twist6, ?redundancyRate:Array<Float>):Null<Array<Float>>
+  public function solveDifferential(q:Array<Float>, twist:Twist6, ?redundancyRate:Array<Float>, ?freedom:OrientationPolicy):Null<Array<Float>>
     return [twist.linearX, 0.0, 0.0, 0.0, 0.0, 0.0];
 }
 
@@ -442,17 +487,17 @@ class PlanarSolver implements KinematicsSolver {
   public function jointCount():Int return 6;
   public function forward(q:Array<Float>):Pose3 return new Pose3(q[0], q[1]);
   public function solvePose(target:Pose3, seed:Array<Float>,
-      tolerance:IkTolerance):Null<Array<Float>> {
+      tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>> {
     var q = seed.copy();
     q[0] = target.x; q[1] = target.y;
     return q;
   }
   public function sampleCandidates(target:Pose3, maxCount:Int,
-      tolerance:IkTolerance):Array<Array<Float>>
+      tolerance:IkTolerance, ?freedom:OrientationPolicy):Array<Array<Float>>
     return [solvePose(target, [for (_ in 0...6) 0.0], tolerance)];
   public function solvePath(request:motionkit.kinematics.PathRequest):Array<Null<Array<Float>>>
     return request.followPointByPoint(this);
-  public function solveDifferential(q:Array<Float>, twist:Twist6, ?redundancyRate:Array<Float>):Null<Array<Float>>
+  public function solveDifferential(q:Array<Float>, twist:Twist6, ?redundancyRate:Array<Float>, ?freedom:OrientationPolicy):Null<Array<Float>>
     return [twist.linearX, twist.linearY, 0.0, 0.0, 0.0, 0.0];
 }
 

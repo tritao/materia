@@ -15,6 +15,7 @@ import materia.assembly.AssemblyDefinition.AssemblyJointRole;
 import materia.assembly.AssemblyDefinition.AssemblyJointType;
 import materia.assembly.AssemblyDefinition.AssemblySensor;
 import materia.assembly.AssemblyFrames;
+import cadkit.modeling.AssemblyState;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import machinekit.assembly.MachineAssemblyDescription.CylinderRecord;
 import materia.assembly.AssemblyDefinition.AssemblyJointCoupling;
@@ -40,8 +41,71 @@ class DriveSystem {
 	public final encoders:Array<EncoderRecord> = [];
 	public final cylinders:Array<CylinderRecord> = [];
 	public final sensors:Array<AssemblySensor> = [];
+	public final switches:Array<materia.assembly.AssemblyDefinition.AssemblySwitch> = [];
 
 	public function new() {}
+
+	static function followsSwitchJoint(flat:FlatAssembly, member:String, child:String):Bool {
+		for (_ in 0...flat.definition.joints.length + 1) {
+			if (member == child) return true;
+			var parent:Null<String> = null;
+			for (edge in flat.definition.joints) if (edge.role == AssemblyJointRole.Tree && edge.child == member)
+				parent = edge.parent;
+			if (parent == null) return false;
+			member = parent;
+		}
+		throw "Switch geometry contains a cyclic member chain";
+	}
+
+	public static function resolveSwitch(flat:FlatAssembly, contact:materia.assembly.AssemblyDefinition.AssemblySwitch, state:AssemblyState):Void {
+		var edge:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
+		for (candidate in flat.definition.joints) if (candidate.id == contact.joint) edge = candidate;
+		if (edge == null || edge.type != materia.assembly.AssemblyDefinition.AssemblyJointType.Prismatic ||
+			!followsSwitchJoint(flat, contact.trigger, edge.child) || followsSwitchJoint(flat, contact.part, edge.child))
+			throw 'Switch "${contact.id}" needs a fixed switch and a trigger carried by its prismatic joint';
+		if (contact.id == null || contact.id.length == 0 || (contact.role != "home" && contact.role != "limit") ||
+			(contact.side != -1 && contact.side != 1)) throw "Switch needs a valid ID, role and side";
+		if (contact.driveJoint != null) {
+			var driveFound = false;
+			for (drive in flat.definition.joints) if (drive.id == contact.driveJoint &&
+				drive.type != materia.assembly.AssemblyDefinition.AssemblyJointType.Fixed) driveFound = true;
+			if (!driveFound) throw 'Switch "${contact.id}" has no movable drive joint "${contact.driveJoint}"';
+		}
+		var member = flat.member(contact.part);
+		if (!Std.isOfType(member, machinekit.motion.SwitchPart)) throw 'Part "${contact.part}" is not a switch';
+		var source:machinekit.motion.SwitchPart = cast member;
+		contact.connector = source.tripConnector();
+		contact.hysteresis = source.switchHysteresis();
+		contact.repeatability = source.switchRepeatability();
+		if (!Math.isFinite(contact.hysteresis) || contact.hysteresis < 0 ||
+			!Math.isFinite(contact.repeatability) || contact.repeatability < 0)
+			throw "Switch hysteresis and repeatability must be finite and non-negative";
+		var base = state.worldConnector(edge.parent, edge.parentConnector);
+		var axis = AssemblyFrames.transformVector(base, edge.axis.x, edge.axis.y, edge.axis.z);
+		var norm = axis.x * axis.x + axis.y * axis.y + axis.z * axis.z;
+		if (!(norm > 0) || !Math.isFinite(norm)) throw "Switch joint has no finite direction";
+		var switchPoint = state.worldConnector(contact.part, contact.connector);
+		var triggerPoint = state.worldConnector(contact.trigger, contact.triggerConnector);
+		contact.trip = state.joint(contact.joint) + ((switchPoint.x - triggerPoint.x) * axis.x +
+			(switchPoint.y - triggerPoint.y) * axis.y + (switchPoint.z - triggerPoint.z) * axis.z) / Math.sqrt(norm);
+		var movement = contact.trip - state.joint(contact.joint), length = Math.sqrt(norm);
+		var dx = switchPoint.x - triggerPoint.x - axis.x * movement / length;
+		var dy = switchPoint.y - triggerPoint.y - axis.y * movement / length;
+		var dz = switchPoint.z - triggerPoint.z - axis.z * movement / length;
+		if (dx * dx + dy * dy + dz * dz > 1e-10)
+			throw 'Switch "${contact.id}" trigger path misses its trip connector';
+		// The stated uncertainty band must leave room on both sides before an end stop.
+		var limits = edge.limits, room = limits.overtravel == null ? 0.0 : limits.overtravel;
+		var bound = contact.side < 0 ? limits.lower : limits.upper;
+		if (bound == null || !(room > 0) || !Math.isFinite(contact.trip) ||
+			contact.side * (contact.trip - bound) <= contact.repeatability ||
+			contact.side * (contact.trip - bound) + contact.repeatability >= room)
+			throw 'Switch "${contact.id}" trip must lie strictly between the soft limit and its end stop';
+	}
+
+	public static function copySwitch(contact:materia.assembly.AssemblyDefinition.AssemblySwitch, map:String->String):materia.assembly.AssemblyDefinition.AssemblySwitch
+		return materia.assembly.AssemblyDefinitionFlattener.copySwitch(contact, map);
+
 
 	public function transmission(coupling:String):Null<TransmissionRecord> {
 		for (entry in transmissions) if (entry.coupling == coupling) return entry;
@@ -90,6 +154,17 @@ class DriveSystem {
 				flat.diagnostics.error("transmission.parts", path.belt, error.message);
 			} catch (error:Dynamic) {
 				flat.diagnostics.error("transmission.parts", path.belt, Std.string(error));
+			}
+		}
+		if (flat.switches.length > 0) {
+			mechanical.switches = [];
+			var state = new AssemblyState(mechanical);
+			for (record in flat.switches) {
+				var contact = copySwitch(record, id -> id);
+				try {
+					resolveSwitch(flat, contact, state);
+					mechanical.switches.push(contact);
+				} catch (error:Dynamic) flat.diagnostics.error("assembly.switch-geometry", contact.id, Std.string(error));
 			}
 		}
 	}

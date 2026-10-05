@@ -357,6 +357,28 @@ class BuildContext {
 	public function endPatchFrame():Void
 		patchPriors.clear();
 
+	/** Retire builders whose widgets are absent from the committed render tree. */
+	public function pruneSelfUpdatingBuilds(mounted:Map<Int, RenderNode>):Void {
+		var stale:Array<Int> = [];
+		for (id in selfUpdatingBuilds.keys())
+			if (!mounted.exists(id)) stale.push(id);
+		for (id in stale) {
+			var entry = selfUpdatingBuilds.get(id);
+			entry.root = null;
+			entry.pending = false;
+			selfUpdatingBuilds.remove(id);
+		}
+		if (stale.length > 0)
+			pendingPatches = [for (entry in pendingPatches) if (entry.root != null) entry];
+	}
+
+	/** Releases builders and pending patches when the owning UI context is disposed. */
+	public function dispose():Void {
+		selfUpdatingBuilds.clear();
+		pendingPatches = [];
+		patchPriors.clear();
+	}
+
 	/** A retained subtree whose root was rebuilt in place since the cache saw it must return the replacement, not the old node. */
 	public function currentRoot(root:RenderNode):RenderNode
 		return RenderNode.latest(root);

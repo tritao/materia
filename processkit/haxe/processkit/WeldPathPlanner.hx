@@ -128,6 +128,8 @@ class WeldPathPlanner {
   var checked:Int = 0;
   var budget:Int = 0;
   var attempts:Int = 0;
+  /** The compiled entry moves are shared by every downstream roll from this entry. */
+  var entryMotionBlocked:Bool = false;
   /** The weld path of the plan being planned: where the torch works. */
   var path:Array<Segment3> = [];
   final collisions:Array<String> = [];
@@ -160,6 +162,7 @@ class WeldPathPlanner {
     checked = 0;
     budget = BUDGET;
     attempts = 0;
+    entryMotionBlocked = false;
     collisions.splice(0, collisions.length);
     unreachable.splice(0, unreachable.length);
     path = [for (item in requested.segments) ({from: item.start.translation, to: item.stop.translation} : Segment3)];
@@ -235,6 +238,7 @@ class WeldPathPlanner {
       candidates = [continued].concat([for (roll in candidates) if (Math.abs(roll - continued) > 1e-6) roll]);
     }
     for (roll in candidates) {
+      if (index > 0 && entryMotionBlocked) return null;
       if (index > 0 && budget <= 0) return null;
       if (index > 0) budget--;
       attempts++;
@@ -263,6 +267,7 @@ class WeldPathPlanner {
   function follow(requested:WeldPlan, start:Array<Float>, index:Int, turned:WeldSegment, rolled:Array<WeldSegment>,
       rolls:Array<Float>, styles:Array<Int>, q:Array<Float>, roll:Float, entry:WeldEntry, label:String):Null<PlannedWeld> {
     for (style in 0...(index == 0 ? 1 : WeldCorner.STYLES)) {
+      if (entryMotionBlocked) return null;
       if (budget <= 0) return null;
       if (style > 0) {
         budget--;
@@ -306,7 +311,12 @@ class WeldPathPlanner {
           var contact = block.opIndices[index] != 0 && near(new Vec3(tip.x, tip.y, tip.z));
           var hit = clearance.violation(q, contact);
           checked++;
-          if (hit != null) throw describe(hit, tip);
+          if (hit != null) {
+            // Later seam rolls cannot change the same entry or approach. Try
+            // another entry rather than rechecking this blocked trajectory.
+            if (block.opIndices[index] <= candidate.entry.moves.length + 1) entryMotionBlocked = true;
+            throw describe(hit, tip) + ' in operation ${block.opIndices[index]} at ${trajectory.durationSeconds * sample / samples}s';
+          }
         }
       }
       var end = candidate.endJoints.copy();
@@ -337,8 +347,8 @@ class WeldPathPlanner {
       var upright = new Vec3(0.0, 0.0, VIA_HEIGHT);
       var waypoints = way.high ? [approach.add(upright), approach] : [approach];
       var poses = [for (point in waypoints) pose(point, segment.start.rotation)];
-      var goals = solver.sampleCandidates(poses[0], GOALS, tolerance);
-      var continued = solver.solvePose(poses[0], start, tolerance);
+      var goals = solver.sampleCandidates(poses[0], GOALS, tolerance, motionkit.path.OrientationPolicy.FreeAboutTool);
+      var continued = solver.solvePose(poses[0], start, tolerance, motionkit.path.OrientationPolicy.FreeAboutTool);
       if (continued != null) {
         var duplicate = false;
         for (goal in goals) {
@@ -365,6 +375,7 @@ class WeldPathPlanner {
         line(from, segment.start.rotation, segment.start.translation, segment.start.rotation, steps, true);
         var done = chain(steps, [goal], '$label, ${way.name}');
         if (done.q != null) {
+          entryMotionBlocked = false;
           var accepted = accept(new WeldEntry(way.name, goal, poses.slice(1)), cast done.q);
           if (accepted != null) return accepted;
         }
@@ -477,7 +488,7 @@ class WeldPathPlanner {
       for (index in 0...steps.length) {
         var step = steps[index];
         var previous = cast(q, Array<Float>).copy();
-        q = solver.solvePose(step.pose, cast q, tolerance);
+        q = solver.solvePose(step.pose, cast q, tolerance, motionkit.path.OrientationPolicy.FreeAboutTool);
         if (q == null) {
           failure = 'unreachable at ' + where(step.pose);
           break;

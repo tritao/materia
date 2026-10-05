@@ -18,6 +18,8 @@ class TextEditorLayout {
 	static inline var maximumParagraphsPerLayout:Int = 128;
 	public var text(get, never):String;
 	public var width(default, null):Float;
+	/** Changes whenever edits or shaping constraints recompute paragraph geometry. */
+	public var geometryRevision(default, null):Int = 0;
 	public final textStyle:TextStyle;
 	public final paragraphStyle:ParagraphStyle;
 	public var paragraphCount(get, never):Int;
@@ -721,6 +723,7 @@ class TextEditorLayout {
 	}
 
 	function recomputeMetrics():Void {
+		geometryRevision++;
 		contentWidth = 0.0;
 		contentHeight = 0.0;
 		firstBaseline = 0.0;

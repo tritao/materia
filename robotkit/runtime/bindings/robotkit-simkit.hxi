@@ -261,6 +261,22 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * RK_ERROR_INVALID_STATE for a floating-base robot.
 	 */
 	extern fn rk_simulation_set_omni_drive(simulation: rk_simulation, robot_index: u32, desc: ptr<const<rk_simulation_omni_drive_desc>>) -> rk_result;
+	/**
+	 * Place a cold/reset robot at a coupling-consistent physical offset while keeping its counter origin.
+	 * Full joint vector in SI units; accepted only in a stopped world before the first runtime sample.
+	 */
+	extern fn rk_simulation_set_power_up_offsets(simulation: rk_simulation, robot_index: u32, offsets: ptr<const<f64>> @in_array("count"), count: u32) -> rk_result;
+	/**
+	 * Cold startup placement with explicit independently displaced motor followers.
+	 * All other joints must retain coupling-consistent displacement. Reset clears the placement.
+	 */
+	extern fn rk_simulation_set_power_up_sides(simulation: rk_simulation, robot_index: u32, offsets: ptr<const<f64>> @in_array("count"), count: u32, side_drives: ptr<const<u32>> @in_array("side_count"), side_count: u32) -> rk_result;
+	/**
+	 * Hold an actuated, nonpassive shaft at a physical SI position during squaring.
+	 * active must be 0 or 1. Release preserves accumulated follower slip; reset clears it.
+	 * The caller owns homing authorization and must release holds on cancellation or fault.
+	 */
+	extern fn rk_simulation_set_squaring_hold(simulation: rk_simulation, robot_index: u32, joint: u32, active: u32, position: f64) -> rk_result;
 	extern fn rk_simulation_set_virtual_device_input(simulation: rk_simulation, robot_index: u32, input: u32, value: f64) -> rk_result;
 	/**
 	 * Deliver STOP6 before freezing the simulated board's clock.
@@ -495,7 +511,7 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		position: array<f64, 3> @offset(32);
 		rotation: array<f64, 4> @offset(56);
 	}
-	struct rk_simulation_robot_desc @layout(2515632, 8) {
+	struct rk_simulation_robot_desc @layout(2521536, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		flags: u32 @offset(4);
 		initial_pose: rk_simulation_pose @offset(8);
@@ -588,6 +604,22 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		virtual_peripheral_parameter_count: u32 @offset(2515492);
 		virtual_external_sensor_mask: u32 @offset(2515496);
 		virtual_peripheral_parameters: array<f64, 16> @offset(2515504);
+		/**
+		 * Optional physical virtual-device switch wiring and step thresholds.
+		 */
+		virtual_device_input_count: u32 @offset(2515632);
+		virtual_device_input_actuator: array<u8, 64> @offset(2515636);
+		virtual_device_input_active_high: array<u8, 64> @offset(2515700);
+		virtual_device_input_active_above: array<u8, 64> @offset(2515764);
+		virtual_device_input_threshold_steps: array<i64, 64> @offset(2515832);
+		virtual_device_input_switch_ids: array<u8, 4096> @offset(2516344);
+		/**
+		 * Optional original shaft feedback mappings; count zero keeps legacy mappings.
+		 */
+		virtual_device_feedback_count: u32 @offset(2520440);
+		virtual_device_feedback_joint: array<u8, 64> @offset(2520444);
+		virtual_device_feedback_ratio: array<f64, 64> @offset(2520512);
+		virtual_device_feedback_offset: array<f64, 64> @offset(2521024);
 	}
 	/**
 	 * World-frame twist of one body: metres per second and radians per second.

@@ -84,7 +84,9 @@ enum NK_ENUM(nkui_result) {
     /** The operation could not allocate the required memory. */
     NKUI_ERROR_OUT_OF_MEMORY = -4,
     /** The graphics backend could not initialize or execute the render. */
-    NKUI_ERROR_RENDERING = -5
+    NKUI_ERROR_RENDERING = -5,
+    /** A frame exceeded its stream budget or could not allocate another page. Retryable. */
+    NKUI_ERROR_RESOURCE_LIMIT = -6
 };
 
 /** Opaque handle for a retained display list. */
@@ -626,7 +628,9 @@ enum NK_ENUM(nkui_font_family) {
     /** General-purpose text font. */
     NKUI_FONT_FAMILY_DEFAULT = 0,
     /** Font intended to provide emoji glyphs. */
-    NKUI_FONT_FAMILY_EMOJI = 1
+    NKUI_FONT_FAMILY_EMOJI = 1,
+    /** Fixed-width text, independent of general-purpose UI fonts. */
+    NKUI_FONT_FAMILY_MONOSPACE = 4
 };
 
 /** Word-breaking policy used by both explicit and automatic text layouts. */

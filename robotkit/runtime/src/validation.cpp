@@ -451,7 +451,9 @@ rk_result validate_segments_for_blueprint(const SegmentBatch &batch,
 rk_result validate_plan_for_blueprint(const PlanRequest &plan,
     const rk_robot_runtime_blueprint &blueprint) {
     if (plan.sequence == 0 || plan.plan_id == 0 ||
-        (plan.flags & ~RK_PLAN_JERK_UNCHECKED) != 0 ||
+        (plan.flags & ~(RK_PLAN_JERK_UNCHECKED | RK_PLAN_JOG | RK_PLAN_HOMING)) != 0 ||
+        (plan.flags & (RK_PLAN_JOG | RK_PLAN_HOMING)) == (RK_PLAN_JOG | RK_PLAN_HOMING) ||
+        ((plan.flags & (RK_PLAN_JOG | RK_PLAN_HOMING)) != 0 && !plan.events.empty()) ||
         validate_segments_for_blueprint(plan.segments, blueprint) != RK_OK ||
         (plan.replace_after_plan_id == 0 && plan.replace_after_time_ns != 0) ||
         (plan.replace_after_plan_id != 0 && plan.replace_after_time_ns == 0))

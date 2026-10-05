@@ -19,7 +19,7 @@ fn rkd6_records_round_trip() {
         max_acceleration: 4.0, actuator_max_acceleration: [4.0; 64], steps_per_unit: [400.0; 64], max_rate: [0.0; 64], direction_setup_ticks: [0; 64], actuator_joint: [0; 64], actuator_ratio: [1.0; 64], dual_drive_skew_bound: [0.0; 64], link_loss_timeout_ns: 500_000_000,
         channel_count: 0, channel_id: [0; 1536], channel_kind: [0; 32],
         safe_digital: [0; 32], safe_analog: [0.0; 32],
-        safe_argument: [0.0; 32], safe_command: [0; 1536], channel_stop_policy: [0; 32] };
+        safe_argument: [0.0; 32], safe_command: [0; 1536], channel_stop_policy: [0; 32], input_count: 0, input_actuator: [0; 64], input_active_high: 0 };
     let mut bytes = [0; SessionBegin6::SIZE];
     begin.encode(&mut bytes).unwrap();
     assert_eq!(SessionBegin6::decode(&bytes).unwrap(), begin);
@@ -29,7 +29,7 @@ fn rkd6_records_round_trip() {
     assert_eq!(TimeSyncRequest::decode(&bytes).unwrap(), sync);
     let segment = Segment6Header { queue_revision: 3, plan_id: 2,
         t0_ticks: 12_000, duration_ticks: 8_000, degree: 5,
-        actuator_count: 2, ends_at_rest: 1, reserved: 0 };
+        actuator_count: 2, ends_at_rest: 1, purpose: 0 };
     let mut bytes = [0; Segment6Header::SIZE];
     segment.encode(&mut bytes).unwrap();
     assert_eq!(Segment6Header::decode(&bytes).unwrap(), segment);
@@ -69,7 +69,7 @@ fn session_begin_carries_per_actuator_acceleration_limits() {
         actuator_max_acceleration: limits, steps_per_unit: [400.0; 64], max_rate: [0.0; 64], direction_setup_ticks: [0; 64], actuator_joint: [0; 64], actuator_ratio: [1.0; 64], dual_drive_skew_bound: [0.0; 64], link_loss_timeout_ns: 500_000_000,
         channel_count: 0, channel_id: [0; 1536], channel_kind: [0; 32],
         safe_digital: [0; 32], safe_analog: [0.0; 32],
-        safe_argument: [0.0; 32], safe_command: [0; 1536], channel_stop_policy: [0; 32] };
+        safe_argument: [0.0; 32], safe_command: [0; 1536], channel_stop_policy: [0; 32], input_count: 0, input_actuator: [0; 64], input_active_high: 0 };
     let mut body = [0; SessionBegin6::SIZE];
     begin.encode(&mut body).unwrap();
     let mut frame = [0; MAX_FRAME_SIZE];
@@ -141,7 +141,7 @@ fn config_digest_covers_the_channel_stop_policy() {
         max_acceleration: 4.0, actuator_max_acceleration: [4.0; 64], steps_per_unit: [400.0; 64], max_rate: [0.0; 64], direction_setup_ticks: [0; 64], actuator_joint: [0; 64], actuator_ratio: [1.0; 64], dual_drive_skew_bound: [0.0; 64], link_loss_timeout_ns: 500_000_000,
         channel_count: 0, channel_id: [0; 1536], channel_kind: [0; 32],
         safe_digital: [0; 32], safe_analog: [0.0; 32],
-        safe_argument: [0.0; 32], safe_command: [0; 1536], channel_stop_policy: [0; 32] };
+        safe_argument: [0.0; 32], safe_command: [0; 1536], channel_stop_policy: [0; 32], input_count: 0, input_actuator: [0; 64], input_active_high: 0 };
     let mut safe = [0; SessionBegin6::SIZE];
     begin.encode(&mut safe).unwrap();
     begin.channel_stop_policy[3] = 1;

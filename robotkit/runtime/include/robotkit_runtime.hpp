@@ -4,6 +4,7 @@
 #include "robotkit_runtime.h"
 #include "trajectory_core.hpp"
 
+#include <array>
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
@@ -122,7 +123,21 @@ public:
     virtual rk_result sample(uint64_t timestamp_ns, rk_robot_state &state) = 0;
 
     /** Returns true when sample() supplies the endpoint's observed safety state. */
+    virtual rk_result device_homing_control(const rk_device_homing_control &) { return RK_ERROR_UNSUPPORTED; }
+    virtual rk_result device_homing_status(uint64_t) const { return RK_ERROR_UNSUPPORTED; }
+    virtual rk_result device_input(const char *, rk_device_input_observation &) const {
+        return RK_ERROR_UNSUPPORTED;
+    }
     virtual bool reports_safety_state() const noexcept { return false; }
+    /** Atomically shift motor counter origins without changing physical targets or poses.
+     * Implementations must validate the complete batch before modifying any motor. */
+    virtual rk_result rebase_counters(const uint32_t *, const double *, uint32_t) {
+        return RK_ERROR_UNSUPPORTED;
+    }
+    /** Physical coordinate for sensor synthesis, distinct from a power-up counter origin. */
+    virtual double physical_position(uint32_t, double counter_position) const noexcept {
+        return counter_position;
+    }
 
     /**
      * Relative precision of the positions sample() reports: 0 for full double
@@ -208,10 +223,21 @@ public:
     /** Queues segments; the command's kind is RK_COMMAND_TRAJECTORY_SEGMENTS. */
     rk_result submit_segments(const rk_robot_command &command, SegmentBatch batch);
     rk_result submit_plan(const PlanRequest &plan);
+    rk_result require_reference(uint32_t joint, bool required);
+    rk_result limit_input(uint32_t joint, bool active);
+    rk_result device_input(const char *switch_id, rk_device_input_observation &out) const;
+    rk_result device_homing_control(const rk_device_homing_control &control);
+    rk_result device_homing_status(uint64_t sequence);
+    /** Atomically establish logical = endpoint position + offset at rest. */
+    rk_result calibrate_coordinates(const double *offsets, uint32_t count,
+                                   const uint32_t *reference_joints = nullptr, uint32_t reference_count = 0);
+    rk_result calibrate_home_drives(const uint32_t *joints, const double *side_zeros, uint32_t count);
+    rk_result latch_reference(uint32_t joint);
+    rk_result reference_status(uint32_t joint, uint32_t &out_referenced) const;
     /** Copies the latest robot state without advancing endpoint time. */
     rk_result snapshot(rk_robot_state &out_state) const;
     /** Copies the latest state plus revision, endpoint, and fault metadata. */
-    rk_result snapshot_full(rk_robot_snapshot &out_snapshot) const;
+    rk_result snapshot_full(rk_robot_snapshot &out_snapshot, bool endpoint_coordinates = false) const;
     rk_result poll_events(rk_event_record_batch &out_batch);
     /** The current output value of a declared process channel. */
     rk_result channel_value(const char *channel, rk_event_value &out_value) const;
@@ -251,6 +277,7 @@ public:
         uint64_t chunk_base_time_ns = 0;
         uint64_t tag = 0;
         uint64_t plan_id = 0;
+        uint32_t plan_flags = 0;
         bool ends_at_rest = true;
         double control_acceleration[RK_MAX_TRAJECTORY_JOINTS]{};
     };
@@ -319,6 +346,8 @@ private:
         int32_t diagnostic_code = 0;
         /** Set when the unclamped straight ramp reaches a joint travel limit. */
         bool stop_ramp_hits_limit = false;
+        /** Preserve the interrupted homing bounds after its queue is cleared. */
+        bool stop_ramp_homing = false;
     };
 
     struct QueuedCommand {
@@ -329,6 +358,7 @@ private:
     void run();
     rk_result step_owner(uint64_t timestamp_ns);
     void latch_fault(bool clear_control = true, int32_t fault_code = 1);
+    std::array<bool, RK_MAX_JOINTS> limit_inputs_{};
 
     rk_robot_runtime_blueprint blueprint_{};
     std::shared_ptr<RobotEndpoint> endpoint_;
@@ -339,6 +369,21 @@ private:
     mutable std::mutex state_mutex_;
     rk_robot_state state_{};
     mutable std::mutex queue_mutex_;
+    struct PendingDriveCalibration {
+        std::array<uint32_t, RK_MAX_JOINTS> joints{};
+        std::array<double, RK_MAX_JOINTS> zeros{};
+        std::array<double, RK_MAX_JOINTS> deltas{};
+        uint32_t count = 0;
+        bool acknowledged = false;
+    };
+    std::optional<PendingDriveCalibration> pending_drive_calibration_;
+    std::optional<uint64_t> pending_homing_stop_;
+    /** Last source timestamp before a queued-device Stop; wait for fresh rest feedback. */
+    std::optional<uint64_t> pending_device_stop_source_;
+    std::array<double, RK_MAX_JOINTS> coordinate_offsets_{};
+    std::array<bool, RK_MAX_JOINTS> reference_required_{};
+    std::array<bool, RK_MAX_JOINTS> reference_latched_{};
+    std::array<bool, RK_MAX_JOINTS> references_locked() const;
     /** Serializes plan submission with owner queue/clock mutations. */
     mutable std::mutex owner_mutex_;
     /**
@@ -422,6 +467,8 @@ private:
     void reset_control();
     /** Last position sent to the endpoint, retained after a trajectory drains. */
     double commanded_position_[RK_MAX_JOINTS]{};
+    /** A queued device's counters establish its first held anchor, before any plan. */
+    bool device_anchor_initialized_ = false;
     double commanded_position_backup_[RK_MAX_JOINTS]{};
     bool velocity_anchor_pending_[RK_MAX_JOINTS]{};
     bool velocity_anchor_pending_backup_[RK_MAX_JOINTS]{};

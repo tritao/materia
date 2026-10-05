@@ -18,6 +18,10 @@
         "emergency_stop": 12,
         "event": 16,
         "hold": 8,
+        "homing_control_ack": 23,
+        "homing_counter_batch": 24,
+        "homing_scope": 21,
+        "homing_side": 22,
         "queue_begin": 5,
         "queue_status": 14,
         "reset_safety": 13,
@@ -127,6 +131,171 @@
         }
       ],
       "size": 84
+    },
+    "HomingControlAck6": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "session",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "sequence",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "scope",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "accepted",
+          "type": "u8"
+        }
+      ],
+      "size": 25
+    },
+    "HomingCounterBatch6": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "session",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "sequence",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "scope",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "first",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "second",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "first_delta",
+          "type": "f64"
+        },
+        {
+          "length": 1,
+          "name": "second_delta",
+          "type": "f64"
+        }
+      ],
+      "size": 42
+    },
+    "HomingScope6": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "session",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "sequence",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "scope",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "action",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "first",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "second",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "skew_bound",
+          "type": "f32"
+        }
+      ],
+      "size": 31
+    },
+    "HomingSide6": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "session",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "sequence",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "scope",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "actuator",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "hold",
+          "type": "u8"
+        }
+      ],
+      "size": 26
+    },
+    "InputState6": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "closing_count",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "opening_count",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "captured_steps",
+          "type": "i64"
+        },
+        {
+          "length": 1,
+          "name": "captured_ticks",
+          "type": "u64"
+        }
+      ],
+      "size": 32
     },
     "QueueBegin6": {
       "endian": "little",
@@ -306,7 +475,7 @@
         },
         {
           "length": 1,
-          "name": "reserved",
+          "name": "purpose",
           "type": "u8"
         }
       ],
@@ -537,9 +706,24 @@
           "length": 32,
           "name": "channel_stop_policy",
           "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "input_count",
+          "type": "u8"
+        },
+        {
+          "length": 64,
+          "name": "input_actuator",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "input_active_high",
+          "type": "u64"
         }
       ],
-      "size": 4940
+      "size": 5013
     },
     "State6Header": {
       "endian": "little",
@@ -583,9 +767,19 @@
           "length": 1,
           "name": "path_clock_ticks",
           "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "input_count",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "input_bits",
+          "type": "u64"
         }
       ],
-      "size": 36
+      "size": 45
     },
     "TimeSyncReply": {
       "endian": "little",

@@ -3,6 +3,7 @@ use robotkit_device_protocol::{Board, ScheduledCore, ScheduledSegment, QueueErro
 #[derive(Default)]
 struct TestBoard { tick: u64, position: f32, velocity: f32, stopped: bool }
 impl Board for TestBoard {
+    fn read_input(&self, _channel: usize) -> bool { false }
     fn now_ticks(&self) -> u64 { self.tick }
     fn tick_hz(&self) -> u64 { 1_000 }
     fn position_target(&mut self, _: usize, value: f32) { self.position = value; }
@@ -15,6 +16,37 @@ impl Board for TestBoard {
 }
 fn line(t0: u64, duration: u64, at_rest: bool) -> ScheduledSegment<1> {
     ScheduledSegment::new(1, t0, duration, 1, [[t0 as f32 / 1_000.0, 1.0, 0.0, 0.0, 0.0, 0.0]], at_rest).unwrap()
+}
+
+#[test]
+fn normal_stop_restarts_from_counter_anchor_and_current_clock() {
+    let mut core = ScheduledCore::<1, 4>::new(1_000, [10.0], [-10.0], [10.0], 5_000);
+    let mut board = TestBoard::default();
+    core.queue_begin(1, 0).unwrap();
+    core.push_segment(line(0, 3_000, true)).unwrap();
+    core.commit(3_000).unwrap();
+    board.tick = 250;
+    core.tick(&mut board);
+    core.stop(StopReason::Stop);
+    assert_eq!(core.prepare_stopped_queue(250, [0.3]), Err(QueueError::Stopped));
+    for tick in 251..=400 { board.tick = tick; core.tick(&mut board); }
+    assert!(core.is_stopped());
+    assert_eq!(core.committed_until(), 0);
+    // A long stopped interval and a quantized held counter must not carry
+    // the old path horizon or continuous target into the next revision.
+    board.tick = 2_000;
+    core.prepare_stopped_queue(board.tick, [0.3]).unwrap();
+    core.queue_begin_with_state(2, 2_100, [0.3], [0.0]).unwrap();
+    let next = ScheduledSegment::new(2, 2_100, 1_000, 1,
+        [[0.3, 0.1, 0.0, 0.0, 0.0, 0.0]], true).unwrap();
+    core.push_segment(next).unwrap();
+    core.commit(3_100).unwrap();
+    board.tick = 2_100; core.tick(&mut board);
+    board.tick = 2_200; core.tick(&mut board);
+    assert!((core.positions()[0] - 0.31).abs() < 1e-6);
+    assert_eq!(core.stop_reason(), None);
+    core.emergency_stop(&mut board);
+    assert_eq!(core.queue_begin(3, 4_000), Err(QueueError::Stopped));
 }
 #[test]
 fn replace_respects_committed_horizon() {
@@ -269,4 +301,22 @@ fn completed_rest_plan_does_not_fault_when_link_goes_idle() {
     board.tick = 2_000;
     core.tick(&mut board);
     assert_eq!(core.stop_reason(), None);
+}
+
+#[test]
+fn segment_purpose_is_retained_and_invalid_purpose_is_rejected() {
+    let mut core = ScheduledCore::<1, 4>::new(1000, [10.0], [-10.0], [10.0], 500);
+    core.queue_begin(1, 0).unwrap();
+    let home = ScheduledSegment::new_with_purpose(9, 0, 100, 1,
+        [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]], true, 2).unwrap();
+    core.push_segment(home).unwrap();
+    core.commit(100).unwrap();
+    assert_eq!(core.executing_purpose(), Some(2));
+    let mut invalid = home;
+    invalid.purpose = 3;
+    assert_eq!(core.push_segment(invalid), Err(QueueError::InvalidSegment));
+    assert!(ScheduledSegment::<1>::new_with_purpose(9, 0, 100, 1,
+        [[0.0; 6]], true, 3).is_err());
+    let program = ScheduledSegment::<1>::new(10, 100, 100, 1, [[0.0; 6]], true).unwrap();
+    assert_eq!(program.purpose, 0);
 }

@@ -27,7 +27,7 @@ class PoseMath {
       case Cone(axis, halfAngle):
         if (axis == null || axis.length != 3 || !Math.isFinite(halfAngle) || halfAngle < 0.0)
           throw "Invalid orientation cone";
-      case Interpolated | FreeAboutTool:
+      case Interpolated | FreeAboutTool | Free:
     }
     var dot = a.qx * b.qx + a.qy * b.qy + a.qz * b.qz + a.qw * b.qw;
     var sign = dot < 0.0 ? -1.0 : 1.0;

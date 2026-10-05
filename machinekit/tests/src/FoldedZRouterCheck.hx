@@ -1,5 +1,6 @@
 /** Focused folded router fixture without the rest of MachineKit smoke. */
 import CncRouterPreview.CncRouterChecks;
+import machinekit.assembly.PosedParts;
 import machinekit.assembly.Transmission;
 import machinekit.transmission.TimingBelt;
 import cadbridge.AssemblyPhysicalPartView;
@@ -10,7 +11,7 @@ import materia.project.SceneArtifact;
 
 class FoldedZRouterCheck {
 	public static function main():Void {
-		runFoldedZ();
+		CncRouterChecks.withGeometry(runFoldedZ);
 		var combined = new CncRouter(true, true);
 		var networks = combined.definition().elasticNetworks;
 		if (networks == null || networks.length != 1 ||
@@ -47,10 +48,11 @@ class FoldedZRouterCheck {
 		if (stage == null || !switch stage.source { case BeltReduction("beltZ", "pulleyScrewZ", "pulleyMotorZ"): true; case _: false; })
 			throw "Folded Z must compile from its actual two pulleys";
 		var directZ = direct.coupledLimits("z"), foldedZ = converted.coupledLimits("z");
+		Sys.println('folded Z acceleration: direct ${directZ.requireAcceleration() * 1000}, folded ${foldedZ.requireAcceleration() * 1000} mm/s²');
 		CncRouterChecks.near(directZ.requireVelocity() * 1000, 43.6539272481, "direct Z speed baseline", 1e-6);
 		CncRouterChecks.near(foldedZ.requireVelocity() * 1000, 21.8269636240, "folded Z speed baseline", 1e-6);
-		CncRouterChecks.near(directZ.requireAcceleration() * 1000, 6117.45629356, "direct Z acceleration baseline", 1e-3);
-		CncRouterChecks.near(foldedZ.requireAcceleration() * 1000, 3263.41002285, "folded Z acceleration baseline", 1e-3);
+		CncRouterChecks.near(directZ.requireAcceleration() * 1000, 6116.92589072, "direct Z acceleration baseline", 1e-3);
+		CncRouterChecks.near(foldedZ.requireAcceleration() * 1000, 3263.33221329, "folded Z acceleration baseline", 1e-3);
 		CncRouterChecks.near(foldedZ.requireVelocity() * 2, directZ.requireVelocity(), "the two-to-one belt uses twice the motor rate", 1e-9);
 		if (!(foldedZ.requireAcceleration() > 0 && foldedZ.requireAcceleration() < directZ.requireAcceleration()))
 			throw "The folded motor's inertia must tighten the Z acceleration bound";
@@ -60,8 +62,9 @@ class FoldedZRouterCheck {
 		CncRouterChecks.near(foldedLoad.stiffness / 1e6, 486.86732785, "folded Z stiffness baseline, MN/m", 0.01);
 		CncRouterChecks.near(directLoad.backlash * 1000, 0.05, "direct Z backlash baseline", 1e-6);
 		CncRouterChecks.near(foldedLoad.backlash * 1000, 0.051, "folded Z backlash baseline", 1e-6);
-		CncRouterChecks.near(new CncRouter().massProperties().mass, 36.9, "direct router mass baseline", 0.1);
-		CncRouterChecks.near(folded.massProperties().mass, 37.1, "folded router mass baseline", 0.1);
+		Sys.println('router mass: direct ${new CncRouter().massProperties().mass}, folded ${folded.massProperties().mass}');
+		CncRouterChecks.near(new CncRouter().massProperties().mass, 37.013596686290356, "direct router mass baseline", 1e-6);
+		CncRouterChecks.near(folded.massProperties().mass, 37.15604020969244, "folded router mass baseline", 1e-6);
 		if (CncRouter.FoldedZMotorPlate.TENSION_TRAVEL < 4.0)
 			throw "Folded Z motor plate needs at least 4 mm of slot adjustment";
 		var centre = belt.wraps()[1].x - belt.wraps()[0].x;
@@ -83,11 +86,13 @@ class FoldedZRouterCheck {
 			CncRouterChecks.near(state.joint("screwZ-turn"), Math.PI * position[2], "folded Z screw follows its lead", 1e-6);
 			CncRouterChecks.near(state.joint("motorZ-turn"), -2 * Math.PI * position[2], "folded Z motor keeps the belt's world direction", 1e-6);
 		}
-		for (position in [[150.0, 150, 0], [0.0, 0, -80], [300.0, 300, -80]]) {
-			CncRouterChecks.checkClear(folded, state, position, ["motorZ"], ["xPlate", "zPlate", "spindle", "uprightRight", "beamUpper", "beamLower"]);
-			CncRouterChecks.checkClear(folded, state, position, ["beltZ"], ["zPlate", "spindle", "uprightRight", "beamUpper"]);
-			CncRouterChecks.checkClear(folded, state, position, ["foldedMotorPlateZ"], ["screwZ", "spindle", "uprightRight", "beamUpper"]);
-		}
+		PosedParts.scope(parts -> {
+			for (position in [[150.0, 150, 0], [0.0, 0, -80], [300.0, 300, -80]]) {
+				CncRouterChecks.checkClearWith(parts, folded, state, position, ["motorZ"], ["xPlate", "zPlate", "spindle", "uprightRight", "beamUpper", "beamLower"]);
+				CncRouterChecks.checkClearWith(parts, folded, state, position, ["beltZ"], ["zPlate", "spindle", "uprightRight", "beamUpper"]);
+				CncRouterChecks.checkClearWith(parts, folded, state, position, ["foldedMotorPlateZ"], ["screwZ", "spindle", "uprightRight", "beamUpper"]);
+			}
+		});
 		Sys.println('folded Z: ${belt.teeth} teeth; direct/folded speed ${directZ.requireVelocity() * 1000}/${foldedZ.requireVelocity() * 1000} mm/s, acceleration ${directZ.requireAcceleration() * 1000}/${foldedZ.requireAcceleration() * 1000} mm/s², stiffness rigid/${foldedLoad.stiffness} N/m, backlash ${directLoad.backlash * 1000}/${foldedLoad.backlash * 1000} mm, mass ${Math.round(new CncRouter().massProperties().mass * 10) / 10}/${Math.round(folded.massProperties().mass * 10) / 10} kg');
 	}
 

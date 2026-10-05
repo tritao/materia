@@ -1,6 +1,8 @@
 //! Hardware boundary for scheduled execution. Time is monotonic device ticks.
 
 pub trait Board {
+    /// Raw electrical level of an input channel; polarity belongs to deployment wiring.
+    fn read_input(&self, channel: usize) -> bool;
     fn now_ticks(&self) -> u64;
     fn tick_hz(&self) -> u64;
     fn position_target(&mut self, actuator: usize, position: f32);

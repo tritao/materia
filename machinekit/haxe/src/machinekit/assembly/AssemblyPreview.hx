@@ -26,10 +26,12 @@ class AssemblyPreview {
 		var definitionByOccurrence = new Map<String, String>();
 		var definitionByDesignation = new Map<String, String>();
 		for (entry in assembly.components()) {
-			var definitionId = definitionByDesignation.get(entry.component.designation);
+			var collision = machinekit.component.CollisionHullFacet.of(entry.component);
+			var designationKey = entry.component.designation + (collision == null ? "" : haxe.Json.stringify(collision.hulls));
+			var definitionId = definitionByDesignation.get(designationKey);
 			if (definitionId == null) {
 				definitionId = entry.id;
-				definitionByDesignation.set(entry.component.designation, definitionId);
+				definitionByDesignation.set(designationKey, definitionId);
         var rendered = part(definitionId, entry.component.designation,
           entry.component.geometry(ComponentDetail.Preview), entry.component.materialId);
         if (Std.isOfType(entry.component, machinekit.transmission.TimingBelt)) {
@@ -44,6 +46,7 @@ class AssemblyPreview {
 		}
 		var definition = model.definition(assemblyId);
 		var state = model.initialState(assemblyId).record();
+		preserveOwnership(definition, assembly.derived().definition);
 		shareDefinitions(definition, definitionByOccurrence);
 		return {lengthUnit: "mm", metresPerUnit: LengthUnit.metresPerUnit("mm"), parts: parts,
 			assemblyDefinition: definition, assemblyState: state, machineMotion: machineMotion};
@@ -80,6 +83,21 @@ class AssemblyPreview {
 					connector: path.wraps[i].connectorName, radius: wraps[i].radius, side: wraps[i].side}]});
 		}
 		return {belts: belts};
+	}
+
+	/** Preserve include scopes and component metadata from the flattened export. */
+	public static function preserveOwnership(definition:AssemblyDefinition, source:AssemblyDefinition):Void {
+		for (occurrence in definition.occurrences) for (original in source.occurrences)
+			if (original.id == occurrence.id) {
+				occurrence.includePath = original.includePath;
+				for (entry in source.definitions) if (entry.id == original.definition)
+					for (target in definition.definitions) if (target.id == occurrence.definition) {
+						target.robotFlangeConnector = entry.robotFlangeConnector;
+						if (entry.collisionHulls != null) target.collisionHulls = [for (hull in entry.collisionHulls) hull.copy()];
+					}
+			}
+		for (joint in definition.joints) for (original in source.joints)
+			if (original.id == joint.id) joint.includePath = original.includePath;
 	}
 
 	/**

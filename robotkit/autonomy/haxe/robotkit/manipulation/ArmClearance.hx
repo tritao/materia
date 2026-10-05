@@ -82,11 +82,11 @@ private class ClearanceBody {
  * Every collision body is a convex hull on a link (the hulls the simulation collides with). A body is *moving* when its
  * link is carried by one of the arm's joints, *fixed* otherwise (the pedestal, the table, the workpiece). Moving bodies
  * are checked against fixed bodies and against other moving bodies on links that are not neighbours. Bodies on one link,
- * and bodies of neighbouring links that touch (within `TOUCH`) in the reference configuration, are one rigid assembly or
+ * and bodies of neighbouring or drive-coupled links that touch (within `TOUCH`) in the reference configuration, are one rigid assembly or
  * a joint and never counted: they touch by design.
  *
  * The distance between two hulls is the exact distance between their convex hulls (`ConvexDistance`, from the hulls' corners;
- * zero when they touch or overlap), after a first rejection of pairs whose bounding spheres are far apart.
+ * zero when they touch or overlap), after rejecting pairs whose bounding spheres or axis-aligned bounds are far apart.
  *
  * Margins: a pair must be at least `margin` apart. A tool body against fixed bodies in the contact zone (the caller says
  * so: the wire tip is working a seam) need only keep `contactMargin`, since the nozzle sits a few
@@ -136,6 +136,26 @@ class ArmClearance {
       neighbours.set(joint.parent.id + "\n" + joint.child.id, true);
       neighbours.set(joint.child.id + "\n" + joint.parent.id, true);
     }
+    // Drive followers also meet their logical carriage by design (for example
+    // a lead screw inside its travelling nut). Only bodies touching at the
+    // reference pose get the same exemption as an ordinary joint interface.
+    for (coupling in arm.robot.couplings) {
+      var leader:Null<robotkit.model.Joint> = null, follower:Null<robotkit.model.Joint> = null;
+      for (joint in arm.robot.joints) {
+        if (joint.id == coupling.leader) leader = joint;
+        if (joint.id == coupling.follower) follower = joint;
+      }
+      if (leader == null || follower == null) continue;
+      neighbours.set(leader.child.id + "\n" + follower.child.id, true);
+      neighbours.set(follower.child.id + "\n" + leader.child.id, true);
+      // A follower carried by the translating body meets a fixed drive member
+      // (the rack). The reference-touch test below still exempts individual
+      // body pairs, so another obstacle on the fixed link remains checked.
+      if (follower.parent.id == leader.child.id) {
+        neighbours.set(leader.parent.id + "\n" + follower.child.id, true);
+        neighbours.set(follower.child.id + "\n" + leader.parent.id, true);
+      }
+    }
     var poses = arm.linkPoses(reference, links);
     for (i in 0...bodies.length) for (j in i + 1...bodies.length) {
       var a = bodies[i], b = bodies[j];
@@ -162,7 +182,9 @@ class ArmClearance {
    */
   public function violation(q:Array<Float>, contact:Bool = false, ?wanted:Float):Null<ClearanceViolation> {
     var poses = arm.linkPoses(q, links);
+    var centres = [for (body in bodies) body.centreIn(poses[body.linkIndex])];
     var placed:Array<Null<Array<Float>>> = [for (_ in bodies) null];
+    var bounds:Array<Null<Array<Float>>> = [for (_ in bodies) null];
     function corners(index:Int):Array<Float> {
       var found = placed[index];
       if (found != null) return found;
@@ -170,12 +192,35 @@ class ArmClearance {
       placed[index] = made;
       return made;
     }
+    function box(index:Int):Array<Float> {
+      var found = bounds[index];
+      if (found != null) return found;
+      var points = corners(index);
+      var made = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY,
+        Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
+      for (point in 0...Std.int(points.length / 3)) for (axis in 0...3) {
+        var value = points[3 * point + axis];
+        made[axis] = Math.min(made[axis], value);
+        made[axis + 3] = Math.max(made[axis + 3], value);
+      }
+      bounds[index] = made;
+      return made;
+    }
     for (pair in pairs) {
       var a = bodies[pair[0]], b = bodies[pair[1]];
       var required = contact && (a.tool && !b.moving || b.tool && !a.moving) ? contactMargin : (wanted == null ? margin : Math.min(margin, wanted));
       // Whole bodies clear by more than the margin: bounding spheres.
-      var gap = a.centreIn(poses[a.linkIndex]).sub(b.centreIn(poses[b.linkIndex])).norm() - a.radius - b.radius;
+      var gap = centres[pair[0]].sub(centres[pair[1]]).norm() - a.radius - b.radius;
       if (gap > required) continue;
+      // Long rails and tables have large spheres. Their world bounds give
+      // another conservative lower bound before the exact hull query.
+      var boxA = box(pair[0]), boxB = box(pair[1]);
+      var gap2 = 0.0;
+      for (axis in 0...3) {
+        var separation = Math.max(0.0, Math.max(boxA[axis] - boxB[axis + 3], boxB[axis] - boxA[axis + 3]));
+        gap2 += separation * separation;
+      }
+      if (gap2 > required * required) continue;
       var apart = ConvexDistance.between(corners(pair[0]), corners(pair[1]), required);
       if (apart < required) return {a: a.name, b: b.name, distance: apart, required: required};
     }

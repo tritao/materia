@@ -1,6 +1,7 @@
 package motionkit.robot;
 
 import motionkit.kinematics.IkTolerance;
+import motionkit.path.OrientationPolicy;
 import motionkit.kinematics.Pose3;
 import robotkit.manipulation.KinematicGroup;
 
@@ -12,6 +13,9 @@ import robotkit.manipulation.KinematicGroup;
  */
 class ExternalAxesParameterization implements RedundancyParameterization {
   public final group:KinematicGroup;
+  var orientationPreference:Null<Pose3> = null;
+  var preferTargetOrientation:Bool = false;
+  var posturePreference:Null<Array<Float>> = null;
   final indices:Array<Int>;
   final rates:Array<Float>;
   /** Cost factor of an external axis's motion against the arm's. */
@@ -36,6 +40,14 @@ class ExternalAxesParameterization implements RedundancyParameterization {
     }
   }
 
+  public function preferringOrientation(preference:Null<Pose3>, ?preferTarget:Bool = false):Void {
+    orientationPreference = preference;
+    preferTargetOrientation = preferTarget;
+  }
+
+  public function preferringPosture(preference:Null<Array<Float>>):Void
+    posturePreference = preference == null ? null : preference.copy();
+
   public function dimension():Int return indices.length;
 
   public function valuesAt(q:Array<Float>):Null<Array<Float>> return [for (index in indices) q[index]];
@@ -47,17 +59,24 @@ class ExternalAxesParameterization implements RedundancyParameterization {
     return rows;
   }
 
-  public function solveAt(target:Pose3, seed:Array<Float>, values:Array<Float>, tolerance:IkTolerance):Null<Array<Float>> {
+  public function solveAt(target:Pose3, seed:Array<Float>, values:Array<Float>, tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>> {
     for (k in 0...indices.length) {
       var limits = group.group.limitsOf(indices[k]);
       if (limits.lower < limits.upper && (values[k] < limits.lower || values[k] > limits.upper)) return null;
     }
-    var result = group.solve(RedundancyPoses.transform(target), seed, RedundancyPoses.options(tolerance).holding(indices, values));
+    var task = ToolFreedom.of(target, freedom, tolerance.orientation);
+    var options = task.options(tolerance, orientationPreference == null && preferTargetOrientation ? target : orientationPreference);
+    if (posturePreference != null) options.preferring(posturePreference);
+    var result = group.solve(RedundancyPoses.transform(task.target), seed,
+      options.holding(indices, values));
     return result.converged ? result.q : null;
   }
 
-  public function solveNear(target:Pose3, seed:Array<Float>, tolerance:IkTolerance):Null<Array<Float>> {
-    var result = group.solve(RedundancyPoses.transform(target), seed, RedundancyPoses.options(tolerance));
+  public function solveNear(target:Pose3, seed:Array<Float>, tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>> {
+    var task = ToolFreedom.of(target, freedom, tolerance.orientation);
+    var options = task.options(tolerance, orientationPreference == null && preferTargetOrientation ? target : orientationPreference);
+    if (posturePreference != null) options.preferring(posturePreference);
+    var result = group.solve(RedundancyPoses.transform(task.target), seed, options);
     return result.converged ? result.q : null;
   }
 

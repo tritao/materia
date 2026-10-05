@@ -90,7 +90,7 @@ class AssemblyDefinitionFlattener {
 		var active = new Map<String, Bool>();
 		var rootMembers = expand("", AssemblyFrames.identity(), source.definitions, source.occurrences, source.joints,
 			source.couplings, source.mates, library, flat, active, source.actuators, source.encoders,
-			source.sensors, source.elasticNetworks);
+			source.sensors, source.elasticNetworks, source.switches);
 		exposed(source.exposedConnectors, rootMembers, source.id);
 		for (entry in source.assemblies) {
 			var unused:AssemblyDefinition = {schemaVersion: source.schemaVersion, id: entry.id,
@@ -98,7 +98,7 @@ class AssemblyDefinitionFlattener {
 			active.set(entry.id, true);
 			var members = expand("", AssemblyFrames.identity(), entry.definitions, entry.occurrences, entry.joints,
 				entry.couplings, entry.mates, library, unused, active, entry.actuators, entry.encoders,
-				entry.sensors, entry.elasticNetworks);
+				entry.sensors, entry.elasticNetworks, entry.switches);
 			active.remove(entry.id);
 			exposed(entry.exposedConnectors, members, entry.id);
 			AssemblyDefinitionCodec.validate(unused);
@@ -167,6 +167,15 @@ class AssemblyDefinitionFlattener {
 		if (sensor.range != null) copy.range = sensor.range;
 		return copy;
 	}
+	/** Copy physical switch references into a containing namespace. */
+	public static function copySwitch(contact:materia.assembly.AssemblyDefinition.AssemblySwitch,
+			map:String->String):materia.assembly.AssemblyDefinition.AssemblySwitch return {
+		id: map(contact.id), joint: map(contact.joint), part: map(contact.part), connector: contact.connector,
+		trigger: map(contact.trigger), triggerConnector: contact.triggerConnector, role: contact.role,
+		side: contact.side, trip: contact.trip, hysteresis: contact.hysteresis,
+		repeatability: contact.repeatability, seed: contact.seed,
+		driveJoint: contact.driveJoint == null ? null : map(contact.driveJoint)
+	};
 
 	/** Keep every coordinate and motion-source reference in a network's namespace. */
 	public static function copyElasticNetwork(network:materia.assembly.AssemblyDefinition.AssemblyElasticNetwork,
@@ -183,7 +192,7 @@ class AssemblyDefinitionFlattener {
 			mates:Null<Array<AssemblyMate>>, library:Map<String, AssemblySubdefinition>, flat:AssemblyDefinition, active:Map<String, Bool>,
 			?actuators:Array<AssemblyActuator>, ?encoders:Array<AssemblyEncoder>,
 			?sensors:Array<AssemblySensor>,
-			?networks:Array<materia.assembly.AssemblyDefinition.AssemblyElasticNetwork>):Map<String, FlatMember> {
+			?networks:Array<materia.assembly.AssemblyDefinition.AssemblyElasticNetwork>, ?switches:Array<materia.assembly.AssemblyDefinition.AssemblySwitch>):Map<String, FlatMember> {
 		if (definitions == null || occurrences == null || joints == null) throw "Nested assembly has missing members or joints";
 		var localDefinitions = new Map<String, AssemblyComponentDefinition>();
 		var emittedDefinitions = new Map<String, Bool>();
@@ -217,17 +226,22 @@ class AssemblyDefinitionFlattener {
 				active.set(nested.id, true);
 				var children = expand(path, worldPose, nested.definitions, nested.occurrences, nested.joints,
 					nested.couplings, nested.mates, library, flat, active, nested.actuators, nested.encoders,
-					nested.sensors, nested.elasticNetworks);
+					nested.sensors, nested.elasticNetworks, nested.switches);
 				active.remove(nested.id);
 				connectors = exposed(nested.exposedConnectors, children, path);
 			} else {
 				var component = localDefinitions.get(occurrence.definition);
 				if (component == null) throw 'Assembly "$path" references a missing component definition';
 				if (!emittedDefinitions.exists(component.id)) {
-					flat.definitions.push({id: scoped(prefix, component.id), connectors: component.connectors});
+					var copied:AssemblyComponentDefinition = {id: scoped(prefix, component.id), connectors: component.connectors};
+					if (component.robotFlangeConnector != null) copied.robotFlangeConnector = component.robotFlangeConnector;
+					if (component.collisionHulls != null) copied.collisionHulls = [for (hull in component.collisionHulls) hull.copy()];
+					flat.definitions.push(copied);
 					emittedDefinitions.set(component.id, true);
 				}
 				var flatOccurrence:AssemblyComponentOccurrence = {id: path, definition: scoped(prefix, occurrence.definition), initialPose: worldPose};
+				flatOccurrence.includePath = occurrence.includePath == null || occurrence.includePath == ""
+					? prefix : scoped(prefix, occurrence.includePath);
 				if (occurrence.grounded == true) flatOccurrence.grounded = true;
 				flat.occurrences.push(flatOccurrence);
 				for (connector in component.connectors)
@@ -244,6 +258,7 @@ class AssemblyDefinitionFlattener {
 				defaultValue: joint.defaultValue};
 			if (joint.closureTolerance != null) expanded.closureTolerance = joint.closureTolerance;
 			if (joint.driven == true) expanded.driven = true;
+			expanded.includePath = joint.includePath == null || joint.includePath == "" ? prefix : scoped(prefix, joint.includePath);
 			flat.joints.push(expanded);
 		}
 		if (networks != null) {
@@ -280,6 +295,18 @@ class AssemblyDefinitionFlattener {
 			if (flat.sensors == null) flat.sensors = [];
 			for (sensor in sensors) flat.sensors.push(copySensor(sensor, sensor.id, prefix));
 		}
+		if (switches != null) {
+			if (flat.switches == null) flat.switches = [];
+			for (contact in switches) {
+				var part = switchEndpoint(members, flat, contact.part, contact.connector, prefix);
+				var trigger = switchEndpoint(members, flat, contact.trigger, contact.triggerConnector, prefix);
+				flat.switches.push({id: scoped(prefix, contact.id), joint: scoped(prefix, contact.joint),
+					part: part.occurrence, connector: part.connector, trigger: trigger.occurrence,
+					triggerConnector: trigger.connector, role: contact.role, side: contact.side,
+					trip: contact.trip, hysteresis: contact.hysteresis, repeatability: contact.repeatability, seed: contact.seed,
+					driveJoint: contact.driveJoint == null ? null : scoped(prefix, contact.driveJoint)});
+			}
+		}
 		if (mates != null) for (mate in mates) {
 			var first = endpoint(members, mate.first, mate.firstConnector, prefix);
 			var second = endpoint(members, mate.second, mate.secondConnector, prefix);
@@ -300,6 +327,18 @@ class AssemblyDefinitionFlattener {
 			result.set(item.name, endpoint(members, item.occurrence, item.connector, path));
 		}
 		return result;
+	}
+
+	/** Builder side records can name concrete paths below a nested occurrence. */
+	static function switchEndpoint(members:Map<String, FlatMember>, flat:AssemblyDefinition,
+			occurrence:String, connector:String, prefix:String):FlatEndpoint {
+		if (members.exists(occurrence)) return endpoint(members, occurrence, connector, prefix);
+		var path = scoped(prefix, occurrence);
+		for (item in flat.occurrences) if (item.id == path)
+			for (definition in flat.definitions) if (definition.id == item.definition)
+				for (mount in definition.connectors) if (mount.name == connector)
+					return {occurrence: path, connector: connector};
+		throw 'Assembly "$prefix" has a missing switch connector "$occurrence.$connector"';
 	}
 
 	static function endpoint(members:Map<String, FlatMember>, occurrence:String, connector:String, path:String):FlatEndpoint {

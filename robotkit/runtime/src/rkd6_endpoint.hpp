@@ -12,6 +12,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -47,6 +48,12 @@ public:
     virtual std::optional<std::size_t> queued_output_bytes() const noexcept { return std::nullopt; }
 };
 
+struct DeviceInputObservation6 {
+    bool active = false;
+    std::uint64_t timestamp_ticks = 0;
+    device_wire6::InputState6 capture{};
+};
+
 class RK_API Rkd6Endpoint final : public RobotEndpoint {
 public:
     static std::uint64_t minimum_baud(std::uint8_t actuator_count,
@@ -59,12 +66,26 @@ public:
         std::uint64_t session, double target_error, std::uint64_t clock_bound_ns,
         std::uint64_t link_latency_ns, std::uint32_t step_tick_hz = 40'000,
         std::uint64_t link_loss_timeout_ns = 500'000'000,
-        std::span<const DeviceActuator6> layout = {}, rk_result *error = nullptr);
+        std::span<const DeviceActuator6> layout = {}, rk_result *error = nullptr, std::span<const DeviceInput6> inputs = {});
 
     /** Reads a board's own controller id by opening a session no board accepts. */
     static rk_result identify(std::unique_ptr<Rkd6Transport> transport, std::uint64_t session,
         std::array<std::uint8_t, 16> &controller);
 
+    std::optional<DeviceInputObservation6> input_observation(std::string_view switch_id) const;
+
+    rk_result device_input(const char *, rk_device_input_observation &) const override;
+    rk_result device_homing_control(const rk_device_homing_control &) override;
+    rk_result rebase_counters(const uint32_t *, const double *, uint32_t) override;
+    rk_result device_homing_status(uint64_t sequence) const override { return homing_control_status(sequence); }
+    rk_result request_homing_scope(std::uint64_t sequence, std::uint64_t scope,
+        std::uint8_t action, std::uint8_t first, std::uint8_t second, double skew_bound);
+    rk_result request_homing_counter_batch(std::uint64_t sequence, std::uint64_t scope,
+        std::uint8_t first, std::uint8_t second, double first_delta, double second_delta);
+    rk_result request_homing_side(std::uint64_t sequence, std::uint64_t scope,
+        std::uint8_t actuator, bool hold);
+    /** STALE_STATE means waiting for acknowledgment; OK means device acceptance. */
+    rk_result homing_control_status(std::uint64_t sequence) const;
     rk_result apply(const rk_robot_command &command) override;
     rk_result sample(std::uint64_t timestamp_ns, rk_robot_state &state) override;
     bool reports_safety_state() const noexcept override { return true; }
@@ -156,6 +177,24 @@ private:
     device_wire6::QueueStatus6 status_{};
     device_wire6::State6Header state_header_{};
     std::array<device_wire6::ActuatorState6, device_wire6::MAX_ACTUATORS> actuators_{};
+    std::array<device_wire6::InputState6, 64> inputs_{};
+    std::vector<DeviceInput6> input_layout_;
+    std::uint64_t control_sequence_ = 0;
+    std::uint64_t control_scope_ = 0;
+    std::uint64_t control_sent_ns_ = 0;
+    std::uint64_t control_timeout_ns_ = 500'000'000;
+    std::optional<bool> control_accepted_;
+    std::optional<device_wire6::HomingCounterBatch6> counter_batch_;
+    struct PendingRebase {
+        std::array<std::uint32_t, 2> joints;
+        std::array<double, 2> deltas;
+        std::uint64_t sequence;
+    };
+    std::optional<PendingRebase> pending_rebase_;
+    std::array<double, 64> counter_origins_{};
+    std::uint64_t counter_state_sequence_ = 0;
+    bool counter_state_pending_ = false;
+    bool homing_stop_pending_ = false;
     bool has_state_ = false;
     std::array<device_wire6::Sensor6Header, RK_MAX_SENSORS> sensor_headers_{};
     std::array<std::array<float, RK_MAX_SENSOR_VALUES>, RK_MAX_SENSORS> sensor_values_{};

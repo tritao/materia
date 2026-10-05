@@ -7,6 +7,13 @@ class UiHostFrameState {
 	public var framebufferWidth(default, null):Int;
 	public var framebufferHeight(default, null):Int;
 	public var scale(default, null):Float = 1.0;
+	public var zoom(default, null):Float = 1.0;
+	public var layoutWidth(get, never):Float;
+	public var layoutHeight(get, never):Float;
+	public var renderScale(get, never):Float;
+	function get_layoutWidth():Float return logicalWidth / zoom;
+	function get_layoutHeight():Float return logicalHeight / zoom;
+	function get_renderScale():Float return scale * zoom;
 	public var surfaceAvailable(default, null):Bool = false;
 	var previousTime:Float = -1.0;
 
@@ -26,7 +33,8 @@ class UiHostFrameState {
 		this.framebufferHeight = framebufferHeight;
 	}
 
-	public function setScale(value:Float):Void if (value > 0.0) scale = value;
+	public function setScale(value:Float):Void if (Math.isFinite(value) && value > 0.0) scale = value;
+	public function setZoom(value:Float):Void if (Math.isFinite(value) && value > 0.0) zoom = value;
 
 	public function setSurfaceAvailable(value:Bool):Void {
 		if (surfaceAvailable != value) previousTime = -1.0;

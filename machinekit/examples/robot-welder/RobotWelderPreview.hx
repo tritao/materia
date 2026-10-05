@@ -157,16 +157,15 @@ class RobotWelderChecks {
 	}
 
 	public static function run():Void {
-		parts = new PosedParts();
-		try runChecks() catch (error:Dynamic) {
-			parts.close();
-			throw error;
-		}
-		parts.close();
+		PosedParts.scope(posed -> {
+			clearance = posed;
+			try runChecks() catch (error:Dynamic) { clearance = null; throw error; }
+			clearance = null;
+		});
 	}
 
-	/** The geometry of the members posed by this run, built once each; closed when the run ends. */
-	static var parts:PosedParts;
+	/** The members posed by this run, with their geometry built once each; closed when the run ends. */
+	static var clearance:PosedParts;
 
 	static function runChecks():Void {
 		var scene = SceneArtifact.decode(RobotWelderPreview.cell());
@@ -527,10 +526,9 @@ class RobotWelderChecks {
 	}
 
 	public static function checkApart(cell:WeldingCell, state:AssemblyState, a:String, b:String):Void {
-		var first = posed(cell, state, a), second = posed(cell, state, b);
-		var volume = PosedParts.commonVolume(first, PosedParts.boxOf(first), second, PosedParts.boxOf(second));
-		first.close();
-		second.close();
+		var volume = 0.0;
+		if (clearance != null) volume = clearance.volume(cell, state, "Robot welder", a, b);
+		else PosedParts.scope(parts -> { volume = parts.volume(cell, state, "Robot welder", a, b); });
 		if (volume > 1e-3) throw '$a hits $b: ${Math.round(volume)} mm³';
 	}
 
@@ -549,10 +547,6 @@ class RobotWelderChecks {
 
 	static function round2(value:Float):Float return Math.round(value * 100) / 100;
 
-	static function posed(cell:WeldingCell, state:AssemblyState, id:String):Part {
-		for (entry in cell.components()) if (entry.id == id) return parts.posed(entry.component, state.worldPose(id));
-		throw 'Robot welder has no member "$id"';
-	}
 }
 
 /**

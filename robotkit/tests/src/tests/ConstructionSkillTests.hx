@@ -1,5 +1,7 @@
 package tests;
 
+import motionkit.robot.PlanningLimits;
+
 import haxe.Int64;
 import processkit.motion.SurfacePlanRunner;
 import robotkit.model.RobotModel;
@@ -174,7 +176,7 @@ class ConstructionSkillTests {
       return batch;
     }
     var paintMotion = SurfacePlanRunner.create(robot, manipulator, eventSource,
-      spec.feedRate, spec.maxAcceleration, spec.maxJointStep);
+      spec.feedRate, PlanningLimits.ofGroup(manipulator, null, spec.maxAcceleration), spec.maxJointStep);
     var paint = new Paint(navigator, manipulator, robot, registered.frame_T_surface, registered, spec,
       observe, sprayer, 0.3, 2.0, seed, paintMotion);
     check(runToCompletion(paint) == SkillStatus.Succeeded, 'Paint completes through SkillRunner (${paint.status()})');
@@ -188,7 +190,7 @@ class ConstructionSkillTests {
     // -- Sand --
     var sander = new SimulatedSander();
     var sandMotion = SurfacePlanRunner.create(robot, manipulator, eventSource,
-      spec.feedRate, spec.maxAcceleration, spec.maxJointStep);
+      spec.feedRate, PlanningLimits.ofGroup(manipulator, null, spec.maxAcceleration), spec.maxJointStep);
     var sand = new Sand(navigator, manipulator, robot, registered.frame_T_surface, registered, spec,
       observe, sander, 8000.0, 15.0, seed, sandMotion);
     check(runToCompletion(sand) == SkillStatus.Succeeded, 'Sand completes through SkillRunner (${sand.status()})');

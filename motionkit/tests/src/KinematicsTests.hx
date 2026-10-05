@@ -177,7 +177,7 @@ class KinematicsTests extends MotionKitTestSupport {
     var target = solver.forward(q);
     var seed = [for (value in q) value + 0.03];
     var tolerance = new IkTolerance(1e-5, 1e-4, 200, 0.02, 1e-3);
-    var solved = solver.solvePose(target, seed, tolerance);
+    var solved = solver.solvePose(target, seed, tolerance, null);
     check(solved != null, "kinematics adapter solves a reachable TCP pose");
     var achieved = solver.forward(cast solved);
     near(achieved.x, target.x, "forward/solve round trip preserves TCP x", 1e-5);
@@ -188,8 +188,8 @@ class KinematicsTests extends MotionKitTestSupport {
       "forward/solve round trip preserves TCP orientation", 1e-4);
 
     var zeroTarget = solver.forward([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
-    var firstCandidates = solver.sampleCandidates(zeroTarget, 4, tolerance);
-    var secondCandidates = solver.sampleCandidates(zeroTarget, 4, tolerance);
+    var firstCandidates = solver.sampleCandidates(zeroTarget, 4, tolerance, null);
+    var secondCandidates = solver.sampleCandidates(zeroTarget, 4, tolerance, null);
     check(firstCandidates.length > 0 && firstCandidates.length == secondCandidates.length,
       "candidate sampling returns a deterministic non-empty set");
     for (candidate in 0...firstCandidates.length) {
@@ -209,7 +209,7 @@ class KinematicsTests extends MotionKitTestSupport {
       requested.push(value);
     }
     var qdot = solver.solveDifferential(q, new Twist6(requested[0], requested[1], requested[2],
-      requested[3], requested[4], requested[5]));
+      requested[3], requested[4], requested[5]), null, null);
     check(qdot != null, "differential IK solves a reachable tool twist");
     var epsilon = 1e-6;
     var plus = q.copy();
@@ -280,7 +280,7 @@ class KinematicsTests extends MotionKitTestSupport {
     near(actual.x, reference.x, "OPW forward agrees with RobotKit X", 1e-9);
     near(actual.y, reference.y, "OPW forward agrees with RobotKit Y", 1e-9);
     near(actual.z, reference.z, "OPW forward agrees with RobotKit Z", 1e-9);
-    var candidates = solver.sampleCandidates(reference, 8, new IkTolerance());
+    var candidates = solver.sampleCandidates(reference, 8, new IkTolerance(), null);
     var found = false;
     for (candidate in candidates) {
       var error = 0.0;
@@ -758,22 +758,22 @@ class KinematicsTests extends MotionKitTestSupport {
       new MotionAxisBlueprint("z", ["z"], -0.05, 0.05, 0.1, 0.4)]);
     var solver = new AxisKinematics(blueprint);
     var target = new Pose3(0.01, 0.02, -0.03);
-    var q = solver.solvePose(target, [0.0, 0.02, 0.0, 0.0], new IkTolerance());
+    var q = solver.solvePose(target, [0.0, 0.02, 0.0, 0.0], new IkTolerance(), null);
     check(q != null, "axis IK reaches a pose within logical limits");
     if (q == null) throw "axis IK returned no solution";
     near(q[0], 0.01, "axis IK maps the X leader");
     near(q[1], 0.005, "axis IK keeps the coupled follower in proportion");
     near(solver.forward(q).y, 0.02, "axis FK maps Y to the tool");
-    check(solver.sampleCandidates(target, 8, new IkTolerance()).length == 1,
+    check(solver.sampleCandidates(target, 8, new IkTolerance(), null).length == 1,
       "axis IK exposes one exact candidate");
     var velocity = solver.solveDifferential(q,
-      new Twist6(0.02, 0.01, -0.01, 0.0, 0.0, 0.0));
+      new Twist6(0.02, 0.01, -0.01, 0.0, 0.0, 0.0), null, null);
     check(velocity != null, "axis differential IK maps a linear twist");
     if (velocity == null) throw "axis differential IK returned no solution";
     near(velocity[0], 0.02, "axis differential IK maps X velocity");
     near(velocity[1], -0.03,
       "axis differential IK keeps follower velocity in proportion");
-    check(solver.solvePose(new Pose3(0.06), q, new IkTolerance()) == null,
+    check(solver.solvePose(new Pose3(0.06), q, new IkTolerance(), null) == null,
       "axis IK rejects poses beyond logical limits");
   }
 

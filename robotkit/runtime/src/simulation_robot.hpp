@@ -19,6 +19,10 @@ class SimulationRobot final : public RobotEndpoint {
 public:
     rk_result apply(const rk_robot_command &command) override;
     rk_result sample(uint64_t timestamp_ns, rk_robot_state &state) override;
+    rk_result rebase_counters(const uint32_t *joints, const double *deltas, uint32_t count) override;
+    double physical_position(uint32_t joint, double counter_position) const noexcept override {
+        return counter_position + (joint < counter_origin_.size() ? counter_origin_[joint] : 0.0);
+    }
     void discard_pending() noexcept override {
         pending_targets_.clear();
         if (staged_valid_)
@@ -27,6 +31,9 @@ public:
     }
     void reset() noexcept {
         std::fill(slip_.begin(), slip_.end(), 0.0);
+        std::fill(squaring_offset_.begin(), squaring_offset_.end(), 0.0);
+        std::fill(counter_origin_.begin(), counter_origin_.end(), 0.0);
+        std::fill(squaring_hold_.begin(), squaring_hold_.end(), 0);
         pending_targets_.clear();
         staged_valid_ = false;
         staged_stopped_ = false;
@@ -84,6 +91,7 @@ private:
     std::vector<JointCommand> &staged_commands();
 
     Simulation &simulation_;
+    std::vector<rk_robot_joint_coupling> kinematic_couplings_;
     std::vector<nkscene_node_id> nodes_;
     std::vector<nksim_body> bodies_;
     std::vector<nksim_joint> joints_;
@@ -93,6 +101,13 @@ private:
      * lost steps is: added to every position or servo target. Zero is none; reset clears it.
      */
     std::vector<double> slip_;
+    /** Side alignment is retained separately from later simulated lost steps. */
+    std::vector<double> squaring_offset_;
+    std::vector<double> staged_squaring_offset_;
+    std::vector<double> counter_origin_;
+    /** Physical shaft holds during dual-drive squaring. */
+    std::vector<uint8_t> squaring_hold_;
+    std::vector<double> squaring_position_;
     /** Servo gains per joint: a joint with stiffness runs as a servo on its position targets. */
     std::vector<rk_robot_joint_servo> servo_;
     std::vector<double> reflected_inertia_;

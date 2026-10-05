@@ -1,0 +1,35 @@
+{
+	"version": 1,
+	"package": {
+		"name": "machinekit-gantry-welder-example"
+	},
+	"entry": "GantryWelderPreview",
+	"sources": [
+		"GantryWelder.hx",
+		"GantryWelderPreview.hx",
+		"../robot-welder/ArmWeldingTool.hx",
+		"../robot-welder/WeldingWorkpiece.hx",
+		"../robot-arm/RobotArm.hx"
+	],
+	"sourceRoots": [
+		".",
+		"../robot-welder",
+		"../robot-arm"
+	],
+	"dependencies": {
+		"projectkit": {
+			"path": "../../../projectkit"
+		},
+		"cadkit": {
+			"path": "../../../cadkit"
+		},
+		"machinekit": {
+			"path": "../../"
+		},
+		"machinekit-robot": {
+			"path": "../../robot"
+		}
+	},
+	"target": "host",
+	"outputDir": "build"
+}

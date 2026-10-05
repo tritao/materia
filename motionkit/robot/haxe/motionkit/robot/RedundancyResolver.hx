@@ -5,6 +5,7 @@ import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.PathRequest;
 import motionkit.kinematics.PathSolution;
 import motionkit.kinematics.Pose3;
+import motionkit.path.OrientationPolicy;
 
 /** One configuration in the beam: its cheapest cost from the path's start, and the previous sample's candidate it came from. */
 private class Candidate {
@@ -61,7 +62,7 @@ class RedundancyResolver {
     for (index in 1...request.poses.length) {
       var spacing = request.distances[index] - request.distances[index - 1];
       var steps = [for (rate in rates) rate * spacing];
-      var next = grow(request.poses[index], layers[index - 1], steps, weights, request);
+      var next = grow(request.poses[index], layers[index - 1], steps, weights, request, request.freedoms[index]);
       if (next.length == 0) throw 'No continuous configuration reaches path sample $index';
       layers.push(next);
     }
@@ -85,7 +86,7 @@ class RedundancyResolver {
   }
 
   function grow(target:Pose3, previous:Array<Candidate>, steps:Array<Float>, weights:Array<Float>,
-      request:PathRequest):Array<Candidate> {
+      request:PathRequest, freedom:OrientationPolicy):Array<Candidate> {
     var dimension = parameterization.dimension();
     var tolerance = request.tolerance;
     // Held first, then one step up and down along each value.
@@ -98,8 +99,8 @@ class RedundancyResolver {
       var values = parameterization.valuesAt(seed.q);
       if (values == null) continue;
       var goal = [for (d in 0...dimension) values[d] + offsets[o][d] * steps[d]];
-      var solved = parameterization.solveAt(target, seed.q, goal, tolerance);
-      if (solved == null && o == 0) solved = parameterization.solveNear(target, seed.q, tolerance);
+      var solved = parameterization.solveAt(target, seed.q, goal, tolerance, freedom);
+      if (solved == null && o == 0) solved = parameterization.solveNear(target, seed.q, tolerance, freedom);
       if (solved == null) continue;
       var reached = parameterization.valuesAt(solved);
       if (reached == null) continue;
@@ -214,7 +215,7 @@ class RedundancyResolver {
     var refined = [chosen[0].copy()];
     for (i in 1...count) {
       var seed = refined[i - 1];
-      var solved = parameterization.solveAt(request.poses[i], seed, smoothed[i], request.tolerance);
+      var solved = parameterization.solveAt(request.poses[i], seed, smoothed[i], request.tolerance, request.freedoms[i]);
       if (solved == null) return null;
       for (joint in 0...solved.length) if (Math.abs(solved[joint] - seed[joint]) > request.maxJump[joint]) return null;
       refined.push(solved.copy());

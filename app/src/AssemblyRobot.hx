@@ -340,6 +340,27 @@ class AssemblyRobot {
     // them, such as an arm while its base drives.
     var runtime = candidate.addRobotAtPose(blueprint, position, rotation, device, null, null, closures, null, null, null, null,
       linkHulls, true);
+    var authored:Null<Array<materia.project.SceneArtifact.SceneArtifactPowerUpOffset>> = session.cncJob != null ? session.cncJob.powerUpOffsets :
+      session.mission == null ? null : session.mission.powerUpOffsets;
+    var sideOffsets:Null<Array<materia.project.SceneArtifact.SceneArtifactPowerUpSideOffset>> = session.cncJob != null ? session.cncJob.powerUpSideOffsets :
+      session.mission == null ? null : session.mission.powerUpSideOffsets;
+    if ((authored != null && authored.length > 0) || (sideOffsets != null && sideOffsets.length > 0)) {
+      var named = new Map<String, Float>();
+      if (authored != null) for (entry in authored) {
+        if (entry == null || named.exists(entry.joint)) throw "Duplicate or null scene power-up offset";
+        named.set(entry.joint, entry.offset);
+      }
+      var base = robotkit.runtime.PowerUpOffsets.resolve(blueprint, named);
+      if (sideOffsets != null && sideOffsets.length > 0) {
+        var sides = new Map<String, Float>();
+        for (entry in sideOffsets) {
+          if (entry == null || sides.exists(entry.homeSwitch)) throw "Duplicate or null scene side offset";
+          sides.set(entry.homeSwitch, entry.offset);
+        }
+        var placement = robotkit.runtime.PowerUpSideOffsets.resolve(blueprint, base, sides);
+        candidate.setPowerUpSides(robotIndex, placement.offsets, placement.drives);
+      } else candidate.setPowerUpOffsets(robotIndex, base);
+    }
     var robot = new SimulatedRobot(idFor(assembly), runtime, converted.model.name,
       [for (link in converted.model.links) link.id],
       [for (joint in converted.model.joints) joint.id]);

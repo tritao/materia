@@ -27,7 +27,9 @@ import motionkit.program.MotionProgram;
 import motionkit.robot.AxisKinematics;
 import motionkit.robot.ManipulatorMotion;
 import motionkit.robot.MotionSystemBlueprint;
+import motionkit.robot.MotionSystem;
 import motionkit.robot.PlanCheck;
+import motionkit.robot.PlanningLimits;
 import motionkit.robot.PlanCheck.PlanCheckOptions;
 import motionkit.robot.PlanCheckSummary;
 import motionkit.robot.StepperSlip;
@@ -49,6 +51,8 @@ import toolpathkit.path.Point3;
  * spindle axis. Each tool hangs its length below it.
  */
 typedef CncJob = {
+	@:optional var powerUpSideOffsets:Array<materia.project.SceneArtifact.SceneArtifactPowerUpSideOffset>;
+	@:optional var powerUpOffsets:Array<materia.project.SceneArtifact.SceneArtifactPowerUpOffset>;
 	var source:String;
 	var axes:Array<String>;
 	var spindle:String;
@@ -149,6 +153,12 @@ class CncProgramPlayer implements SessionMember {
 	 * machine has no encoders.
 	 */
 	public final encoders:EncoderMonitor;
+	/** Physical homing time, excluded from machining planning/execution timings. */
+	public var homingSeconds(default, null):Float = 0.0;
+	final newHoming:Void -> Null<MotionSystem>;
+	var homing:Null<MotionSystem> = null;
+	var homingStarted:Bool = false;
+	var homingComplete:Bool = false;
 	/** The G-code line the machine is executing; 0 between lines. */
 	public var currentLine(default, null):Int = 0;
 	/** Speed of every move, as a fraction of the program's. */
@@ -181,14 +191,11 @@ class CncProgramPlayer implements SessionMember {
 		var placement = new AssemblyState(definition, state);
 		checkOptions = check == null ? new PlanCheckOptions() : check.copy();
 		var steady = checkOptions.steady;
-		// Pulse timing caps stepper channels; servos retain their own motor/driver limits.
+		// Apply the controller pulse ceiling to stepper planning.
 		var machineModel = robot.model;
 		var wiring = job.controller;
-		if (wiring != null) {
-			var pulseLayout = DeviceLayout.forSteppers(robot.model);
-			if (pulseLayout.channels.length > 0)
-				machineModel = DeviceBinding.bind(robot.model, pulseLayout, wiring.stepTickHz).model;
-		}
+		if (wiring != null)
+			machineModel = DeviceBinding.planningModel(robot.model, wiring.stepTickHz);
 		var axes:Array<MotionAxisBlueprint> = [];
 		var start:Array<Float> = [];
 		// Rapids ask for the fastest axis speed; the planner still holds each joint to its own limit.
@@ -296,8 +303,25 @@ class CncProgramPlayer implements SessionMember {
 		encoders = new EncoderMonitor(robot.model, [for (_ in robot.model.joints) 0.0]);
 		slip = new StepperSlip(robot.robot.description().couplings, axisJoint,
 			(joint, offset) -> simulation.setJointSlip(robotIndex, joint, offset));
+		newHoming = () -> {
+			var hasHomes = false;
+			for (contact in robot.blueprint.switches) if (contact.role == "home") hasHomes = true;
+			if (!hasHomes) return null;
+			var view = new MotionSystem(robot.robot,
+				new MotionSystemBlueprint(machineModel, robot.blueprint, axes, session.fixedTimestep()));
+			view.configureRuntimeHoming(robot.runtime, () -> {
+				slip.rebaseAfterHoming();
+				encoders.reset(robot.runtime.snapshot().q.toArray());
+			}, simulation.homingSides(robotIndex));
+			return view;
+		};
+		homing = newHoming();
+		homingComplete = homing == null;
 		newMotion = () -> {
-			var made = new ManipulatorMotion(robot.robot, binding.compiler,
+			var state = robot.runtime.snapshot();
+			var currentBinding = new ToolpathMotionBinding(machine, binding.blueprint, state.modelRevision, state.calibrationRevision);
+			currentBinding.compiler.planCheck = binding.compiler.planCheck;
+			var made = new ManipulatorMotion(robot.robot, currentBinding.compiler,
 				channel -> {
 					if (channel == "spindle.at_speed") return spindleAtSpeed();
 					if (!StringTools.startsWith(channel, TOOL_CHANGE)) return null;
@@ -355,6 +379,34 @@ class CncProgramPlayer implements SessionMember {
 
 	public function feed():Void {
 		if (failure != null) return;
+		var homeView = homing;
+		if (!homingComplete && homeView != null) {
+			try {
+				if (!homingStarted) {
+					// feed runs before physics; wait for the first actual switch observations.
+					var seen = robot.robot.snapshot(), available = new Map<String, Bool>();
+					for (frame in seen.sensors.toArray()) available.set(frame.sensorId, true);
+					for (contact in robot.blueprint.switches)
+						if (contact.role == "home" && !available.exists(contact.id)) return;
+					homeView.home();
+					homingStarted = true;
+					return;
+				}
+				homingSeconds += session.fixedTimestep();
+				homeView.update(session.fixedTimestep());
+				if (homeView.homingStatus() != "Complete") return;
+				homingComplete = true;
+				// Latching changed the calibration revision used by every machining plan.
+				motion = newMotion();
+				if (speedOverride != 1.0) motion.setSpeedOverride(speedOverride);
+				var positions = robot.robot.snapshot().positions;
+				var pose = solver.forward([for (index in axisJoints) positions.get(index)]);
+				compileFrom(new Point3(pose.x, pose.y, pose.z));
+			} catch (error:Dynamic) {
+				failure = 'Machine homing: $error';
+				return;
+			}
+		}
 		var clock = Sys.time();
 		takeRestart();
 		if (started && motion.completed && !passCounted) {
@@ -498,12 +550,18 @@ class CncProgramPlayer implements SessionMember {
 	}
 
 	/** The session is back at its start, and the robot with it: run the program again on fresh stock. */
-	public function beforeReset():Void {}
+	public function beforeReset():Void {
+		if (homing != null && homing.isMoving()) homing.abort();
+	}
 
 	public function reset():Void {
 		slip.reset();
 		encoders.reset([for (_ in robot.model.joints) 0.0]);
 		motion = newMotion();
+		homing = newHoming();
+		homingStarted = false;
+		homingComplete = homing == null;
+		homingSeconds = 0.0;
 		if (speedOverride != 1.0) motion.setSpeedOverride(speedOverride);
 		restartRequest = null;
 		pendingContinuation = null;
@@ -563,7 +621,9 @@ class CncProgramPlayer implements SessionMember {
 		var planning = new RobotModel(model.name + ".axes");
 		var parent = planning.addLink(new Link("machine.base"));
 		var indices:Array<Int> = [];
-		for (id in axes) {
+		var limits = PlanningLimits.of(model, axes, steady);
+		for (slot in 0...axes.length) {
+			var id = axes[slot];
 			var index = -1;
 			for (candidate in 0...model.joints.length) if (Std.string(model.joints[candidate].id) == id) index = candidate;
 			if (index < 0) throw 'CNC axis "$id" is not a joint of the machine';
@@ -571,7 +631,7 @@ class CncProgramPlayer implements SessionMember {
 			var child = planning.addLink(new Link(id + ".carriage"));
 			var joint = planning.addJoint(new Joint(id, source.type, parent, child, source.id));
 			joint.axis = source.axis.copy();
-			joint.limits = model.coupledLimits(source.id, steady);
+			joint.limits = limits.bounds[slot].copy();
 			indices.push(index);
 			parent = child;
 		}

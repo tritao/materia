@@ -27,5 +27,7 @@ class MotionComponents {
 		registry.register(ShaftCoupling.recipeType());
 		registry.register(ShaftEncoder.recipeType());
 		registry.register(LinearScale.recipeType());
+		registry.register(LimitSwitch.recipeType());
+		registry.register(ProximitySwitch.recipeType());
 	}
 }

@@ -41,12 +41,18 @@ class MotionSystem {
   function get_planChecks():PlanCheckSummary return stream.planChecks;
   public final axes:Array<MotionAxis>;
   final axisPlanner:AxisPlanner;
-  final pathPlanner:PathPlanner;
+  final homingAxes:Array<HomingAxis> = [];
+  var homingDriver:Null<HomingDriver> = null;
+  var homingSides:Null<robotkit.runtime.HomingSideControl> = null;
+  var homingCycle:Null<HomingCycle> = null;
+  var refreshHomeRevision:Null<Void -> Void> = null;
+  var pathPlanner:PathPlanner;
   public final fixedTimestepSeconds:Float;
   public final replacementMarginOwnerPeriods:Int;
   public final replacementOwnerPeriodSeconds:Float;
   /** Joint and sampled Cartesian checks for the last planned path. */
   public var lastPathValidationReport(default, null):Null<ValidationReport> = null;
+  var jogTrajectories:haxe.ds.ObjectMap<Trajectory, Bool> = new haxe.ds.ObjectMap();
   var pathJerkUnchecked:haxe.ds.ObjectMap<Trajectory, Bool> = new haxe.ds.ObjectMap();
   public var lastPathPlanningDiagnostics(default, null):Array<String> = [];
   /** Native trajectory currently submitted to the runtime queue. */
@@ -66,7 +72,7 @@ class MotionSystem {
   var bufferedCompletedSeconds:Float = 0.0;
   var plannedEndPositions:Null<Array<Float>> = null;
   final modelRevision:Int64;
-  final calibrationRevision:Int64;
+  var calibrationRevision:Int64;
 
   public static function fromBlueprint(robot:Robot, blueprint:MotionSystemBlueprint):MotionSystem
     return new MotionSystem(robot, blueprint);
@@ -100,7 +106,11 @@ class MotionSystem {
     this.axes = [];
     jointTolerances = [for (_ in description.joints) 1e-6];
     var axisIds = new Map<String, Bool>();
-    for (axisBlueprint in blueprint.axes) {
+    var hasHomes = false;
+    for (contact in blueprint.runtime.switches) if (contact.role == "home") hasHomes = true;
+    var resolvedAxes = hasHomes
+      ? MotionAxisCouplings.expand(blueprint.axes, blueprint.runtime, description.joints) : blueprint.axes;
+    for (axisBlueprint in resolvedAxes) {
       var axis = new MotionAxis(axisBlueprint, description.joints);
       if (axisIds.exists(axis.id)) throw 'Duplicate motion axis "${axis.id}"';
       axisIds.set(axis.id, true);
@@ -108,6 +118,25 @@ class MotionSystem {
       var tolerance = [for (_ in description.joints) 0.0];
       axis.writeLogicalDelta(tolerance, 1e-6);
       for (joint in axis.jointIndices) jointTolerances[joint] = Math.abs(tolerance[joint]);
+    }
+    for (axis in this.axes) {
+      var joint = axis.jointIndices[0];
+      var homes = [for (contact in blueprint.runtime.switches)
+        if (contact.role == "home" && contact.joint == description.joints[joint]) contact];
+      if (homes.length > 0) {
+        var physical = blueprint.runtime.joints[joint];
+        if (physical.maxRate == null || physical.maxAcceleration == null)
+          throw 'Homing axis "${axis.id}" needs physical drive limits';
+        homingAxes.push(new HomingAxis(axis.id, joint, homes, physical.maxRate,
+          physical.maxAcceleration, physical.lowerLimit, physical.upperLimit,
+          physical.overtravel, axis.jointOffset(0) + axis.jointScale(0) * axis.homePosition,
+          fixedTimestepSeconds));
+      }
+    }
+    for (contact in blueprint.runtime.switches) if (contact.role == "home") {
+      var mapped = false;
+      for (home in homingAxes) for (signal in home.switches) if (signal.id == contact.id) mapped = true;
+      if (!mapped) throw 'Home switch "${contact.id}" has no independent motion axis';
     }
     axisPlanner = new AxisPlanner(this.axes, fixedTimestepSeconds);
     pathPlanner = new PathPlanner(this.axes, fixedTimestepSeconds,
@@ -121,7 +150,8 @@ class MotionSystem {
 
   /** True while a trajectory is active, held, or waiting to start after a stop. */
   public function isMoving():Bool
-    return activeTrajectory != null || session.isStopping() || session.hasPending();
+    return (homingCycle != null && homingCycle.isActive()) ||
+      activeTrajectory != null || session.isStopping() || session.hasPending();
 
   public function sessionState():SessionState return session.state;
 
@@ -283,6 +313,12 @@ class MotionSystem {
    * path before discarding it; an emergency stop acts immediately.
    */
   public function abort(?mode:StopMode = StopMode.Normal):Void {
+    if (homingCycle != null && homingCycle.isActive()) {
+      homingCycle.cancel();
+      if (mode == StopMode.Emergency) robot.stop(mode);
+      session.stop(Discard, []);
+      return;
+    }
     checkSnapshot();
     if (mode == StopMode.Normal && isMotionInProgress() && elapsedSeconds > 1e-9) {
       submitCommand(RobotCommand.Abort);
@@ -305,6 +341,7 @@ class MotionSystem {
    * the current path and plans the captured request from where it came to rest.
    */
   function replaceMotion(planned:Trajectory, request:MotionRequest):Null<Trajectory> {
+    if (homingCycle != null && homingCycle.isActive()) throw "Ordinary motion cannot interrupt homing";
     if (!isMotionInProgress()) {
       clearBufferedMotion();
       beginImmediate(planned);
@@ -377,8 +414,10 @@ class MotionSystem {
         clearBufferedMotion();
         var axisValue = axis(axisId);
         if (axisValue == null) throw 'Unknown motion axis "$axisId"';
-        beginImmediate(axisPlanner.planJog(robot.snapshot().positions.toArray(),
-          axisValue, velocity, durationSeconds, acceleration).trajectory);
+        var plannedJog = axisPlanner.planJog(robot.snapshot().positions.toArray(),
+          axisValue, velocity, durationSeconds, acceleration).trajectory;
+        jogTrajectories.set(plannedJog, true);
+        beginImmediate(plannedJog);
         session.jogAxis = axisId;
       case Queued(command):
         switch command {
@@ -418,8 +457,40 @@ class MotionSystem {
     return result.trajectory;
   }
 
-  /** Software homing for the bootstrap: move to each authored home coordinate. */
+  /** Bind the runtime owner and its encoder/slip reset before sensor homing. */
+  public function configureRuntimeHoming(runtime:robotkit.runtime.RobotRuntime,
+      afterLatch:Void -> Void, ?sides:robotkit.runtime.HomingSideControl):Void {
+    if (runtime == null || afterLatch == null) throw "Homing requires a runtime and latch monitor reset";
+    if (isMoving()) throw "Cannot replace a homing driver during motion";
+    if (homingAxes.length == 0) throw "Machine has no physical home switches";
+    var scopedStop:Null<Void -> Bool> = null;
+    if (sides != null && Std.isOfType(sides, robotkit.runtime.HomingStopControl)) {
+      var stopControl:robotkit.runtime.HomingStopControl = cast sides;
+      scopedStop = () -> stopControl.controlledStop();
+    }
+    function refreshRevision():Void {
+      calibrationRevision = runtime.snapshot().calibrationRevision;
+      pathPlanner = new PathPlanner(axes, fixedTimestepSeconds, modelRevision, calibrationRevision);
+    }
+    refreshRevision();
+    refreshHomeRevision = refreshRevision;
+    homingDriver = new RuntimeHomingDriver(robot, runtime, homingAxes, axes, afterLatch, scopedStop);
+    homingSides = sides;
+  }
+
+  public function homingStatus():String
+    return homingCycle == null ? "Idle" : homingCycle.status();
+
+  /** Sensor homing when authored switches exist; coordinate move for unswitched robots. */
   public function home(?options:MotionOptions):Null<Trajectory> {
+    if (homingAxes.length > 0) {
+      if (isMoving() || queuedTrajectories.length > 0) throw "Homing requires an idle motion system";
+      var driver = homingDriver;
+      if (driver == null) throw "Physical homing requires a configured runtime driver and monitor reset";
+      homingCycle = new HomingCycle(driver, homingAxes, homingSides);
+      homingCycle.start();
+      return null;
+    }
     return moveAxes([for (axisValue in axes) new AxisTarget(axisValue.id, axisValue.homePosition)], options);
   }
 
@@ -447,8 +518,10 @@ class MotionSystem {
     if (continued != null) return continued;
     function planJog():Trajectory {
       var start = robot.snapshot().positions.toArray();
-      return axisPlanner.planJog(start, axisValue, velocity,
+      var plannedJog = axisPlanner.planJog(start, axisValue, velocity,
         durationSeconds, acceleration).trajectory;
+      jogTrajectories.set(plannedJog, true);
+      return plannedJog;
     }
     return replaceMotion(planJog(), MotionRequestCapture.jog(axisValue.id,
       velocity, durationSeconds, acceleration));
@@ -501,7 +574,9 @@ class MotionSystem {
   function submitSmoothReplacement(planned:Trajectory, state:TrajectoryState,
       observation:RobotSnapshot, anchorNs:Int64, jogAxis:Null<String>):Trajectory {
     var tag = stream.submitSmoothReplacement(planned, state, observation,
-      anchorNs, modelRevision, calibrationRevision, jointTolerances);
+      anchorNs, modelRevision, calibrationRevision, jointTolerances,
+      jogAxis == null ? robotkit.execution.ExecutionPlanPurpose.Program : robotkit.execution.ExecutionPlanPurpose.Jog);
+    if (jogAxis != null) jogTrajectories.set(planned, true);
     setActive(planned);
     session.jogAxis = jogAxis;
     bufferedTotalSeconds = planned.durationSeconds();
@@ -519,6 +594,14 @@ class MotionSystem {
     var dt = dtSeconds < 0.0 ? fixedTimestepSeconds : dtSeconds;
     if (!Math.isFinite(dt) || dt <= 0.0) throw "Motion-system update duration must be finite and positive";
     updateCount++;
+    var homing = homingCycle;
+    if (homing != null && homing.isActive()) {
+      var active = homing.update(dt);
+      var refresh = refreshHomeRevision;
+      // Dual-side counter calibration commits after individual switch latches.
+      if (!active && homing.status() == "Complete" && refresh != null) refresh();
+      return active;
+    }
     checkSnapshot();
     if (session.isHolding() || session.isStopping()) {
       // No refills while stopping: beginStop() already queued enough path for
@@ -589,6 +672,7 @@ class MotionSystem {
   }
 
   function enqueueTrajectory(trajectoryValue:Trajectory):Void {
+    if (homingCycle != null && homingCycle.isActive()) throw "Ordinary motion cannot queue during homing";
     if (activeTrajectory == null && queuedTrajectories.length == 0) {
       bufferedTotalSeconds = 0.0;
       bufferedCompletedSeconds = 0.0;
@@ -631,7 +715,8 @@ class MotionSystem {
       stream.fill(session,
         (first, last, tag, startNs, _) -> stream.motionSubmission(
           trajectoryValue, first, last, tag, startNs, modelRevision,
-          calibrationRevision, jerkUnchecked, jointTolerances),
+          calibrationRevision, jerkUnchecked, jointTolerances,
+          jogTrajectories.exists(trajectoryValue) ? robotkit.execution.ExecutionPlanPurpose.Jog : robotkit.execution.ExecutionPlanPurpose.Program),
         (first, last, error) ->
           'plan chunk [$first,$last] of ${trajectoryValue.segments().length}: $error');
     } catch (error:Dynamic) {
@@ -652,6 +737,7 @@ class MotionSystem {
     if (activeTrajectory == null) return;
     bufferedCompletedSeconds += activeTrajectory.durationSeconds();
     pathJerkUnchecked.remove(activeTrajectory);
+    jogTrajectories.remove(activeTrajectory);
     activeTrajectory = null;
     activeStationary = false;
     stream.clear();
@@ -681,6 +767,7 @@ class MotionSystem {
 
   function discardNativeTrajectory(value:Trajectory):Void {
     pathJerkUnchecked.remove(value);
+    jogTrajectories.remove(value);
     value.dispose();
   }
 

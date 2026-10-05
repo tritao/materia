@@ -4,13 +4,38 @@
 #include "sensor_math.hpp"
 #include <algorithm>
 #include <cmath>
+#include <memory>
 
 namespace robotkit {
+
+rk_result SimulationRobot::rebase_counters(const uint32_t *joints, const double *deltas,
+                                          uint32_t count) {
+    if (!joints || !deltas || count == 0 || count > counter_origin_.size())
+        return RK_ERROR_INVALID_ARGUMENT;
+    if (staged_valid_ || !pending_targets_.empty()) return RK_ERROR_INVALID_STATE;
+    for (uint32_t i = 0; i < count; ++i) {
+        const auto joint = joints[i];
+        if (joint >= counter_origin_.size() || !std::isfinite(deltas[i]) ||
+            !actuated_joints_[joint] || passive_[joint]) return RK_ERROR_INVALID_ARGUMENT;
+        if (squaring_hold_[joint]) return RK_ERROR_INVALID_STATE;
+        for (uint32_t k = 0; k < i; ++k)
+            if (joints[k] == joint) return RK_ERROR_INVALID_ARGUMENT;
+        if (!std::isfinite(counter_origin_[joint] + deltas[i]) ||
+            !std::isfinite(squaring_offset_[joint] - deltas[i])) return RK_ERROR_INVALID_ARGUMENT;
+    }
+    // All sides are validated before writing; preserve each physical target sum.
+    for (uint32_t i = 0; i < count; ++i) {
+        counter_origin_[joints[i]] += deltas[i];
+        squaring_offset_[joints[i]] -= deltas[i];
+    }
+    return RK_OK;
+}
 
 std::vector<SimulationRobot::JointCommand> &SimulationRobot::staged_commands() {
     if (!staged_valid_) {
         commanded_.resize(joints_.size());
         staged_ = commanded_;
+        staged_squaring_offset_ = squaring_offset_;
         staged_stopped_ = stopped_;
         staged_valid_ = true;
     }
@@ -24,7 +49,7 @@ void SimulationRobot::queue_rest_holds() noexcept {
         target.struct_size = sizeof(target);
         target.joint = joints_[joint];
         target.mode = NKSIM_JOINT_TARGET_POSITION;
-        target.target = 0.0;
+        target.target = joint < counter_origin_.size() ? counter_origin_[joint] : 0.0;
         if (joint < servo_.size() && servo_[joint].stiffness > 0.0) {
             target.mode = NKSIM_JOINT_TARGET_SERVO;
             target.stiffness = servo_[joint].stiffness;
@@ -92,9 +117,54 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
         return RK_OK;
     if (command.kind != RK_COMMAND_JOINT_TARGETS)
         return RK_ERROR_UNSUPPORTED;
+    // Full plans already name followers. Sparse direct commands still need the
+    // old coupling propagation, now applied before per-shaft physical offsets.
+    bool needs_projection = false;
+    for (const auto &term : kinematic_couplings_) {
+        bool leader = false, follower = false;
+        for (uint32_t i = 0; i < command.target_count; ++i) {
+            leader |= command.targets[i].joint == term.leader;
+            follower |= command.targets[i].joint == term.follower;
+        }
+        needs_projection |= leader && !follower;
+    }
+    if (needs_projection) {
+        auto expanded = std::make_unique<rk_robot_command>(command);
+        bool added = false;
+        for (std::size_t pass = 0; pass < joints_.size(); ++pass) {
+            bool changed = false;
+            for (const auto &term : kinematic_couplings_) {
+                const rk_joint_target *leader = nullptr;
+                bool follower = false;
+                for (uint32_t i = 0; i < expanded->target_count; ++i) {
+                    if (expanded->targets[i].joint == term.leader) leader = &expanded->targets[i];
+                    if (expanded->targets[i].joint == term.follower) follower = true;
+                }
+                if (!leader || follower) continue;
+                if (expanded->target_count >= RK_MAX_JOINTS) return RK_ERROR_INVALID_ARGUMENT;
+                rk_joint_target target = *leader;
+                target.joint = term.follower;
+                if (target.mode == RK_TARGET_POSITION || target.mode == RK_TARGET_SERVO) {
+                    target.mode = RK_TARGET_POSITION;
+                    target.target = term.ratio * leader->target + term.offset;
+                } else if (target.mode == RK_TARGET_VELOCITY) target.target *= term.ratio;
+                else return RK_ERROR_UNSUPPORTED;
+                if (!std::isfinite(target.target)) return RK_ERROR_INVALID_ARGUMENT;
+                expanded->targets[expanded->target_count++] = target;
+                changed = added = true;
+            }
+            if (!changed) break;
+        }
+        if (added) return apply(*expanded);
+    }
     for (uint32_t index = 0; index < command.target_count; ++index)
         if (command.targets[index].joint >= joints_.size())
             return RK_ERROR_INVALID_ARGUMENT;
+    for (uint32_t index = 0; index < command.target_count; ++index) {
+        const auto &source = command.targets[index];
+        if (squaring_hold_[source.joint] && source.mode != RK_TARGET_POSITION &&
+            source.mode != RK_TARGET_SERVO) return RK_ERROR_INVALID_STATE;
+    }
     auto &staged = staged_commands();
     for (uint32_t index = 0; index < command.target_count; ++index) {
         const auto &source = command.targets[index];
@@ -112,8 +182,12 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
         target.mode = source.mode;
         target.target = source.target;
         target.max_force = source.max_effort;
+        if (positional && squaring_hold_[source.joint])
+            staged_squaring_offset_[source.joint] = squaring_position_[source.joint] - source.target -
+                counter_origin_[source.joint] - slip_[source.joint];
         if (positional && source.joint < slip_.size())
-            target.target += slip_[source.joint];
+            target.target += slip_[source.joint] + staged_squaring_offset_[source.joint] +
+                counter_origin_[source.joint];
         if (source.mode == RK_TARGET_POSITION && source.joint < servo_.size() &&
             servo_[source.joint].stiffness > 0.0) {
             // The drive interpolates the analytic trajectory reference within this cycle.
@@ -136,6 +210,10 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
             target.damping = servo.damping;
             target.feedforward = servo.feedforward;
         }
+        if (squaring_hold_[source.joint]) {
+            target.target = squaring_position_[source.joint];
+            target.velocity = 0.0;
+        }
         pending_targets_.push_back(target);
         staged[source.joint] = {target.mode, target.target};
     }
@@ -147,6 +225,7 @@ std::vector<nksim_joint_target> SimulationRobot::take_pending_targets() {
     pending_targets_.clear();
     if (staged_valid_) {
         commanded_ = staged_;
+        squaring_offset_ = staged_squaring_offset_;
         staged_valid_ = false;
     }
     return result;
@@ -230,7 +309,7 @@ rk_result SimulationRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) 
             return RK_ERROR_BACKEND;
         for (uint32_t target = 0; target < state.joint_count; ++target) {
             if (source.joint == joints_[target]) {
-                state.position[target] = source.position;
+                state.position[target] = source.position - counter_origin_[target];
                 state.velocity[target] = source.velocity;
                 state.effort[target] = source.effort;
                 break;

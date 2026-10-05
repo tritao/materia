@@ -26,6 +26,12 @@ import motionkit.program.MotionOp;
 import motionkit.program.MoveTarget;
 import motionkit.program.Blend;
 import motionkit.MotionOptions;
+import motionkit.robot.MotionSystem;
+import motionkit.robot.MotionSystemBlueprint;
+import motionkit.axis.MotionAxisBlueprint;
+import motionkit.robot.StepperSlip;
+import robotkit.runtime.EncoderMonitor;
+import motionkit.robot.PlanningLimits;
 import processkit.WeldingPlanRunner;
 import processkit.skill.WeldPlan;
 import processkit.skill.WeldSeam;
@@ -35,6 +41,7 @@ import robotkit.manipulation.ArmClearance;
 import robotkit.manipulation.ArmClearance.ClearanceViolation;
 import robotkit.manipulation.Manipulator;
 import robotkit.model.Frame;
+import robotkit.model.SteadyLoads;
 import robotkit.skill.HandlePart;
 import robotkit.spatial.Vec3;
 import robotkit.localization.SimulationTruthLocalization;
@@ -111,7 +118,7 @@ class MissionPlayer implements SessionMember {
   /** How close a `goTo` stands to its pose, in metres and radians. */
   public static inline var POSITION_TOLERANCE:Float = 0.05;
   public static inline var HEADING_TOLERANCE:Float = 0.05;
-  /** Joint acceleration the arm programs plan with, rad/s². */
+  /** Assumed acceleration only for arm joints whose drive model supplies no cap, rad/s². */
   public static inline var ARM_ACCELERATION:Float = 2.0;
   /** A lidar return this close (m) to a mapped cell belongs to the map: it is the room, not an obstacle. */
   public static inline var MAP_TOLERANCE:Float = 0.1;
@@ -144,6 +151,12 @@ class MissionPlayer implements SessionMember {
   public var finished(default, null):Bool = false;
 
   final robot:AssemblyRobot;
+  var homing:Null<MotionSystem> = null;
+  var homingStarted:Bool = false;
+  var homingComplete:Bool = false;
+  public var homingSeconds(default, null):Float = 0.0;
+  var homingEncoders:Null<EncoderMonitor> = null;
+  var homingSlip:Null<StepperSlip> = null;
   var runner = new SkillRunner();
   var jointMotions = new Map<String, ManipulatorMotion>();
   /** The arm and its suction tool's vacuum sensor, when the mission picks and places. */
@@ -260,8 +273,11 @@ class MissionPlayer implements SessionMember {
       var tool = suctions[0];
       vacuumSensor = tool.sensor;
       var arm = toolArm(tool);
-      newHandling = () -> HandlingPlanRunner.create(robot.robot, arm, () -> robot.runtime.pollEvents(), tool.channel,
-        ARM_ACCELERATION);
+      newHandling = () -> {
+        var state = robot.runtime.snapshot();
+        return HandlingPlanRunner.create(robot.robot, arm, () -> robot.runtime.pollEvents(), tool.channel,
+          PlanningLimits.ofGroup(arm, new SteadyLoads(), ARM_ACCELERATION, null, state.modelRevision, state.calibrationRevision));
+      };
       handling = newHandling();
     }
     if (!welds) {
@@ -280,9 +296,11 @@ class MissionPlayer implements SessionMember {
       // Welds are planned clear of everything the simulation collides with except the weld metal, which is the bead.
       var metal = [for (step in mission.steps) if (step.kind == "weld") cast(step.weld, SceneArtifactWeld).metal];
       newWelding = () -> {
+        var state = robot.runtime.snapshot();
         var planned = weldClearance(arm, tool.contact.occurrence, metal);
         clearance = planned;
-        return WeldingPlanRunner.create(robot.robot, arm, () -> robot.runtime.pollEvents(), channels, weldAcceleration, 3, planned);
+        return WeldingPlanRunner.create(robot.robot, arm, () -> robot.runtime.pollEvents(), channels,
+          PlanningLimits.ofGroup(arm, new SteadyLoads(), weldAcceleration, null, state.modelRevision, state.calibrationRevision), 3, planned);
       };
       welding = newWelding();
       newRegistration = (job) -> {
@@ -312,6 +330,7 @@ class MissionPlayer implements SessionMember {
         return new processkit.ContactRegistrationRunner(probe, selection.sequence(rootWork));
       };
     }
+    configureHoming();
   }
 
   /**
@@ -399,8 +418,62 @@ class MissionPlayer implements SessionMember {
   public static function floorPlan(obstacles:Array<FloorObstacle>, poses:Array<Pose2>, margin:Float = MARGIN):OccupancyGrid2
     return robotkit.navigation.FloorMap.rasterize(obstacles, poses, RESOLUTION, margin, CLEARANCE, FRAME);
 
+  function configureHoming():Void {
+    var axes:Array<MotionAxisBlueprint> = [], axisJoints = new Map<String, Int>();
+    var names = robot.robot.description().joints;
+    for (joint in 0...robot.blueprint.jointCount) {
+      var required = false;
+      for (contact in robot.blueprint.switches)
+        if (contact.role == "home" && contact.joint == names[joint]) required = true;
+      if (!required) continue;
+      var physical = robot.blueprint.joints[joint];
+      if (physical.maxRate == null || physical.maxAcceleration == null)
+        throw "Mission home axis requires physical drive limits";
+      axes.push(new MotionAxisBlueprint(names[joint], [names[joint]],
+        physical.lowerLimit, physical.upperLimit, physical.maxRate, physical.maxAcceleration,
+        Math.max(physical.lowerLimit, Math.min(physical.upperLimit, 0.0)), [1.0], [0.0]));
+      axisJoints.set(names[joint], joint);
+    }
+    homingStarted = false; homingSeconds = 0.0;
+    if (axes.length == 0) { homing = null; homingComplete = true; return; }
+    var encoders = new EncoderMonitor(robot.model, robot.runtime.snapshot().q.toArray());
+    var slip = new StepperSlip(robot.robot.description().couplings, axisJoints,
+      (joint, offset) -> simulation.setJointSlip(robotIndex, joint, offset));
+    homingEncoders = encoders; homingSlip = slip;
+    var view = new MotionSystem(robot.robot, new MotionSystemBlueprint(robot.model, robot.blueprint, axes, timestep));
+    view.configureRuntimeHoming(robot.runtime, () -> {
+      slip.rebaseAfterHoming();
+      encoders.reset(robot.runtime.snapshot().q.toArray());
+    }, simulation.homingSides(robotIndex));
+    homing = view; homingComplete = false;
+  }
+
   public function feed():Void {
     if (failure != null || finished) return;
+    var homeView = homing;
+    if (!homingComplete && homeView != null) {
+      try {
+        if (!homingStarted) {
+          var available = new Map<String, Bool>();
+          for (frame in robot.robot.snapshot().sensors.toArray()) available.set(frame.sensorId, true);
+          for (contact in robot.blueprint.switches)
+            if (contact.role == "home" && !available.exists(contact.id)) return;
+          homeView.home(); homingStarted = true;
+          return;
+        }
+        homingSeconds += timestep;
+        homeView.update(timestep);
+        if (homeView.homingStatus() != "Complete") return;
+        homingComplete = true;
+        var make = newHandling;
+        if (make != null) handling = make();
+        var makeWelding = newWelding;
+        if (makeWelding != null) welding = makeWelding();
+      } catch (error:Dynamic) {
+        failure = 'Mission homing: $error';
+        return;
+      }
+    }
     var snapshot = robot.robot.snapshot();
     localization.update(snapshot);
     trackWheels(snapshot);
@@ -417,7 +490,10 @@ class MissionPlayer implements SessionMember {
   }
 
   /** The step that was running stops through the robot's runtime, which still answers until the session resets. */
-  public function beforeReset():Void runner.cancel();
+  public function beforeReset():Void {
+    runner.cancel();
+    if (homing != null && homing.isMoving()) homing.abort();
+  }
 
   /** Back to the first step; the next tick starts it from wherever the reset put the robot. */
   public function reset():Void {
@@ -432,6 +508,7 @@ class MissionPlayer implements SessionMember {
     wheelsSeeded = false;
     scanned = null;
     sensed = new PerceptionSnapshot();
+    configureHoming();
     var make = newHandling;
     if (make != null) handling = make();
     var makeWelding = newWelding;
@@ -464,6 +541,15 @@ class MissionPlayer implements SessionMember {
   /** After a tick: a finished step hands over to the next, a failed one stops the mission. */
   function settle():Void switch runner.status() {
     case Succeeded:
+      // Different motion runners own their last commanded coordinates. A joint
+      // move changes the handling station; a handling/process step invalidates
+      // cached joint-move anchors before another controller takes over.
+      if (mission.steps[stepIndex].kind == "moveJoints") {
+        var make = newHandling;
+        if (make != null) handling = make();
+      } else {
+        jointMotions = new Map<String, ManipulatorMotion>();
+      }
       completed++;
       if (stepIndex + 1 < mission.steps.length || mission.loop == true)
         stepIndex = (stepIndex + 1) % mission.steps.length;
@@ -486,10 +572,10 @@ class MissionPlayer implements SessionMember {
       case "pick":
         var at:SceneArtifactPlace = cast step.at;
         grasped = at;
-        return HandlePart.pick(cast handling, localization, () -> graspPoint(at), vacuumSensor);
+        return HandlePart.pick(cast handling, localization, () -> graspPoint(at), vacuumSensor, 40.0, handlingOrientation(step));
       case "place":
         var at:SceneArtifactPlace = cast step.at;
-        return HandlePart.place(cast handling, localization, () -> placeContact(at), vacuumSensor);
+        return HandlePart.place(cast handling, localization, () -> placeContact(at, step.yaw), vacuumSensor, 40.0, handlingOrientation(step));
       case "weld":
         var weld:SceneArtifactWeld = cast step.weld;
         return new processkit.skill.WeldPasses([for (pass in weld.passes)
@@ -672,14 +758,47 @@ class MissionPlayer implements SessionMember {
    * where the tool's contact now stands from the part's origin, which rests on the seat. Both are read
    * as they are, so a grip a little off the grasp point still sets the part down where it belongs.
    */
-  function placeContact(at:SceneArtifactPlace):Vec3 {
+  function placeContact(at:SceneArtifactPlace, ?yaw:Float):Vec3 {
     var held = grasped;
     if (held == null) throw "Nothing was picked to place";
     var seat = AssemblyFrames.compose(staticPose(at.occurrence), connectorFrame(at));
     var origin = partFrame(held.occurrence);
     var tool = toolContact();
-    return new Vec3(seat.x * metres + tool.x - origin.x, seat.y * metres + tool.y - origin.y,
-      seat.z * metres + tool.z - origin.z);
+    var offset = new Vec3(tool.x - origin.x, tool.y - origin.y, tool.z - origin.z);
+    if (yaw != null) offset = yawRotation(yaw - frameYaw(origin)).rotate(offset);
+    return new Vec3(seat.x * metres + offset.x, seat.y * metres + offset.y, seat.z * metres + offset.z);
+  }
+
+  static function frameYaw(frame:AssemblyFrame):Float {
+    var x = new Quat(frame.qx, frame.qy, frame.qz, frame.qw).rotate(new Vec3(1, 0, 0));
+    return Math.atan2(x.y, x.x);
+  }
+
+  static function yawRotation(yaw:Float):Quat return Quat.fromAxisAngle(new Vec3(0, 0, 1), yaw);
+
+  /** Fix the part's heading while preserving the tool-to-part grasp rotation. */
+  function handlingOrientation(step:SceneArtifactMissionStep):Null<Void -> Quat> {
+    var yaw = step.yaw;
+    if (yaw == null) return null;
+    return () -> {
+      if (step.kind == "pick") {
+        var runner:HandlingPlanRunner = cast handling;
+        var home = runner.homePose;
+        var state = localization.state();
+        if (state == null) throw "Handling orientation needs a localized base";
+        var worldHome = Transform3.fromPose2(state.pose).rotation.multiply(
+          new Quat(home.qx, home.qy, home.qz, home.qw));
+        var at:SceneArtifactPlace = cast step.at;
+        return yawRotation(yaw - frameYaw(staticPose(at.occurrence))).multiply(worldHome);
+      }
+      var held = grasped;
+      var tip = toolTip;
+      if (held == null || tip == null) throw "A heading-constrained place needs a held part and tool";
+      var link = simulation.linkPose(robotIndex, toolLink);
+      var rotation = new Quat(link.rotation[0], link.rotation[1], link.rotation[2], link.rotation[3])
+        .multiply(new Quat(tip.qx, tip.qy, tip.qz, tip.qw));
+      return yawRotation(yaw - frameYaw(partFrame(held.occurrence))).multiply(rotation);
+    };
   }
 
   /** Where the tool's contact is now, in metres. */

@@ -41,12 +41,16 @@ import nativekit.ui.style.StyleState;
 
 /** Renders a DockWorkspaceModel using split panes, tab groups, and lazy panels. */
 class DockWorkspace implements View {
+	public static inline final DividerExtent = 8.0;
+	public static inline final MinimumHorizontalExtent = 190.0;
 	public final key:String;
 	public final model:DockWorkspaceModel;
 	public var interaction(default, null):DockWorkspaceInteraction;
 	public final style:LayoutStyle;
 	/** Available content height when the workspace sits below application chrome. */
 	public var availableHeight:Null<Float> = null;
+	/** Available content width when the workspace sits beside application chrome. */
+	public var availableWidth:Null<Float> = null;
 	final suppliedInteraction:Bool;
 	final panelContents:Map<String, DockPanelContent>;
 
@@ -89,7 +93,7 @@ class DockWorkspace implements View {
 			context.id("pane-tree-cache:" + key), new DockPanelCache()).value;
 		paneCache.retain(context);
 		var content = buildNode(model.root, context, [], "layout",
-			context.viewportWidth, availableHeight == null ? context.viewportHeight : availableHeight,
+			availableWidth == null ? context.viewportWidth : availableWidth, availableHeight == null ? context.viewportHeight : availableHeight,
 			labelWidths, panelCache, paneCache);
 		var layout = new SizedBox("layout", content, LayoutAxis.grow(), LayoutAxis.grow());
 		var root = new Column(key, [new KeyedView("content", layout)], style).build(context);
@@ -146,19 +150,23 @@ class DockWorkspace implements View {
 		for (descriptor in visiblePanels) {
 			var iconWidth = 20.0 + (descriptor.icon == null ? 0.0 : 14.0);
 			var labelWidth = tabLabelWidth(descriptor.title, context, labelWidths);
-			var labelledWidth = iconWidth + (descriptor.icon == null ? 0.0 : 8.0) + labelWidth;
+			var badgeWidth = descriptor.badgeCount > 0 ? 28.0 + Std.string(descriptor.badgeCount).length * 6 : 0.0;
+			var labelledWidth = badgeWidth + iconWidth + (descriptor.icon == null ? 0.0 : 8.0) + labelWidth;
 			allWidth += labelledWidth;
 			selectedWidth += descriptor.id == selectedId || descriptor.icon == null
-				? labelledWidth : iconWidth;
+				? labelledWidth : iconWidth + badgeWidth;
 		}
 		var showAllLabels = visiblePanels.length <= 1 || allWidth <= availableWidth;
 		var showSelectedLabel = showAllLabels || selectedWidth <= availableWidth;
-		for (descriptor in visiblePanels)
-			items.push(new TabItem(descriptor.id, descriptor.title,
+		for (descriptor in visiblePanels) {
+			var item = new TabItem(descriptor.id, descriptor.title,
 				panelView(descriptor.id, availableWidth, panelCache),
 				descriptor.enabled, descriptor.icon,
 				!showAllLabels && descriptor.icon != null &&
-					(descriptor.id != selectedId || !showSelectedLabel) ? "" : null));
+					(descriptor.id != selectedId || !showSelectedLabel) ? "" : null);
+			item.badgeCount = descriptor.badgeCount;
+			items.push(item);
+		}
 		var tabsStyle = new LayoutStyle();
 		// The panel must follow its split pane even when the active tab's content
 		// has a larger intrinsic width (for example, sensor property rows).
@@ -227,8 +235,8 @@ class DockWorkspace implements View {
 		var available = horizontal ? availableWidth : availableHeight;
 		if (available <= 0.0)
 			available = 1000.0;
-		var minimum = horizontal ? 190.0 : 120.0;
-		var divider = 8.0;
+		var minimum = horizontal ? MinimumHorizontalExtent : 120.0;
+		var divider = DividerExtent;
 		var maximum = available - minimum - divider;
 		if (maximum < minimum)
 			maximum = minimum;
@@ -280,7 +288,7 @@ class DockWorkspace implements View {
 		for (panelId in panelIds) {
 			var descriptor = model.get(panelId);
 			if (descriptor != null)
-				text += "|" + panelId + ":" + descriptor.title + ":" + Std.string(descriptor.icon) + ":" + descriptor.enabled + ":" + Std.string(descriptor.headerMode);
+				text += "|" + panelId + ":" + descriptor.title + ":" + descriptor.badgeCount + ":" + Std.string(descriptor.icon) + ":" + descriptor.enabled + ":" + Std.string(descriptor.headerMode);
 		}
 		return text + "|content=" + contentKey();
 	}

@@ -470,7 +470,32 @@ class FrameworkSmoke {
 		return true;
 	}
 
+	static function clickEvent(time:Float, x:Float = 10.0, button:Int = 0):nativekit.ui.core.UiEvent
+		return new nativekit.ui.core.UiEvent(UiEventKind.Click, new WidgetId(90502), x, 10.0, 0.0, 0.0, button, 0, 0, null, null, 0, 0, time);
+
+	@:access(nativekit.ui.core.TextInputBridge)
 	static function main():Int {
+		var originalTypography = new nativekit.ui.core.ResolvedTextStyle(
+			new TextStyle(16.0), new ParagraphStyle(TextWrap.WordCharacter), Color.fromBytes(0, 0, 0));
+		var mergedTypography = originalTypography.merge(new TextStyleOverride(null, 20.0, null,
+			TextWrap.None, null, 0.0));
+		originalTypography.textStyle.fontSize = 30.0;
+		originalTypography.paragraphStyle.wrap = TextWrap.Word;
+		if (mergedTypography.textStyle.fontSize != 20.0 || mergedTypography.paragraphStyle.wrap != TextWrap.None ||
+			mergedTypography.paragraphStyle.lineHeight != 0.0)
+			throw "Merged typography must preserve overrides and own its style values";
+		var copiedTypography = mergedTypography.merge(null);
+		copiedTypography.textStyle.fontSize = 24.0;
+		copiedTypography.paragraphStyle.wrap = TextWrap.Word;
+		if (mergedTypography.textStyle.fontSize != 20.0 || mergedTypography.paragraphStyle.wrap != TextWrap.None)
+			throw "Typography copies must remain independent";
+		var clickSequence = new nativekit.ui.core.PointerClickSequence();
+		if (clickSequence.register("a", clickEvent(1.0)) != 1 || clickSequence.register("a", clickEvent(1.1)) != 2
+			|| clickSequence.register("a", clickEvent(1.2)) != 1 || clickSequence.register("b", clickEvent(1.3)) != 1
+			|| clickSequence.register("b", clickEvent(2.0)) != 1 || clickSequence.register("b", clickEvent(2.1, 30.0)) != 1
+			|| clickSequence.register("b", clickEvent(2.2, 30.0, 1)) != 1 || clickSequence.register("b", clickEvent(2.3, 30.0)) != 1)
+			throw "pointer double-click boundaries failed";
+
 		if (!hostFrameLifecycleValid())
 			return 270;
 		if (!hostSessionLifecycleValid())
@@ -584,6 +609,12 @@ class FrameworkSmoke {
 			return 30;
 		if (!commandHistoryValid(context))
 			return 230;
+		if (!selfUpdatingLifetimeValid(context)) throw "self-updating widget lifetime regression";
+		if (!transientWidgetLifetimeValid(context)) throw "transient widget lifetime regression";
+		if (!externalScrollbarValid(context)) throw "external scrollbar placement or input regression";
+		if (!scrollbarVisibilityValid(context)) throw "scrollbar visibility regression";
+		if (!smoothScrollValid(context)) throw "smooth scrolling motion or lifetime regression";
+		if (!sidebarValid(context)) throw "sidebar registry, persistence or lazy provider regression";
 		if (!dockWorkspaceValid(context))
 			return 231;
 		var emptyEditor = new TextEditorState(fonts, "");
@@ -591,6 +622,9 @@ class FrameworkSmoke {
 			return 38;
 		emptyEditor.dispose();
 		var editor = new TextEditorState(fonts, "á🙂");
+		var surrounding = editor.surroundingText(2048, 2048);
+		if (surrounding.text != "á🙂" || surrounding != editor.surroundingText(2048, 2048))
+			throw "unchanged surrounding text did not retain its window";
 		if (Utf8Text.length(editor.text) != 3)
 			return 32;
 		if (Utf8Text.slice(editor.text, 0, 2) != "á")
@@ -599,6 +633,8 @@ class FrameworkSmoke {
 			return 35;
 		if (!editor.deleteForward() || editor.text != "á")
 			return 36;
+		if (editor.surroundingText(2048, 2048).text != "á")
+			throw "surrounding text cache retained deleted Unicode text";
 		if (!editor.deleteBackward() || editor.text != "")
 			return 37;
 		editor.insert("hi");
@@ -614,6 +650,21 @@ class FrameworkSmoke {
 		if (compositionGeometry.length != 1 || compositionGeometry[0].start != 2 ||
 			compositionGeometry[0].end != 4)
 			return 275;
+		var publishedRects:Array<Float> = [];
+		var inputRects = [new TextRangeRect(0, 1, 2.0, 3.0, 4.0, 5.0)];
+		nativekit.ui.core.TextInputBridge.rememberRects(inputRects, publishedRects);
+		if (!nativekit.ui.core.TextInputBridge.matchesRects(inputRects, publishedRects))
+			throw "Unchanged input geometry should reuse its published snapshot";
+		inputRects[0] = new TextRangeRect(0, 1, 3.0, 3.0, 4.0, 5.0);
+		if (nativekit.ui.core.TextInputBridge.matchesRects(inputRects, publishedRects))
+			throw "Moving input geometry must invalidate the published snapshot";
+		inputRects[0] = new TextRangeRect(0, 1, 2.0, 3.0, 4.0, 5.0, false);
+		if (nativekit.ui.core.TextInputBridge.matchesRects(inputRects, publishedRects) ||
+			nativekit.ui.core.TextInputBridge.matchesRects([], publishedRects))
+			throw "Direction changes and cleared selections must be published";
+		nativekit.ui.core.TextInputBridge.rememberRects(null, publishedRects);
+		if (!nativekit.ui.core.TextInputBridge.matchesRects([], publishedRects))
+			throw "Empty input geometry should reuse its published snapshot";
 		var nativeDeleteEditor = new TextEditorState(fonts, "ab");
 		var nativeDelete = new NativeKitTextEdit(TextEditAction.Delete, null, 1, 2,
 			1, 1, -1, -1, 1, 2);
@@ -717,6 +768,100 @@ class FrameworkSmoke {
 			fieldDiagnostics.selectionStart != 5 || fieldDiagnostics.selectionEnd != 5 ||
 			fieldDiagnostics.caretOffset != 5 || fieldDiagnostics.caretRect == null)
 			return 209;
+		var applicationArrows = 0;
+		for (key in [UiKey.Left, UiKey.Right, UiKey.Up, UiKey.Down]) {
+			for (extend in [false, true]) {
+				var modifiers = UiModifier.Control | UiModifier.Alt | (extend ? UiModifier.Shift : 0);
+				var id = "test.application-arrow-" + key + "-" + modifiers;
+				context.commands.register(new Command(id, "Application navigation", function() applicationArrows++,
+					new Shortcut(key, modifiers)));
+				context.key(UiEventKind.KeyDown, key, modifiers);
+				context.commands.unregister(id);
+				if (fieldEditor.selectionStart != 5 || fieldEditor.selectionEnd != 5)
+					throw "application arrow chord changed text selection";
+			}
+		}
+		if (applicationArrows != 8) throw "text field swallowed application arrow shortcuts";
+		var historyDocument = new TextDocument("");
+		var historyField = TextField.withDocument("field-history", historyDocument);
+		var historyRoot = context.submit(historyField, new LayoutFrame(256.0, 192.0));
+		var historyState:State<TextEditorState> = context.buildContext.existingState(historyRoot.id);
+		var historyEditor:TextEditorState = cast historyState.value;
+		if (!context.focusWidget(historyRoot.id)) throw "history field did not focus";
+		var historyModifier = #if (mac || ios) UiModifier.Super #else UiModifier.Control #end;
+		var leakedUndo = 0;
+		context.commands.register(new Command("field-history-global-undo", "Global undo", function() leakedUndo++,
+			new Shortcut(UiKey.Z, historyModifier)));
+		for (letter in ["a", "b", "c"]) context.text(UiEventKind.TextInput, letter);
+		context.key(UiEventKind.KeyDown, UiKey.Z, historyModifier);
+		if (historyDocument.text != "" || leakedUndo != 0) throw "typing did not undo as a field-local group";
+		context.key(UiEventKind.KeyDown, UiKey.Z, historyModifier | UiModifier.Shift);
+		if (historyDocument.text != "abc") throw "shift-Z redo failed";
+		historyEditor.insert(" pasted", TextEditorHistoryKind.Paste);
+		context.key(UiEventKind.KeyDown, UiKey.Z, historyModifier);
+		if (historyDocument.text != "abc") throw "paste merged with typing history";
+		context.key(UiEventKind.KeyDown, UiKey.Y, historyModifier);
+		if (historyDocument.text != "abc pasted") throw "Y redo failed";
+		context.key(UiEventKind.KeyDown, UiKey.Backspace, #if (mac || ios) UiModifier.Alt #else UiModifier.Control #end);
+		context.key(UiEventKind.KeyDown, UiKey.Z, historyModifier);
+		if (historyDocument.text != "abc pasted") throw "word deletion did not undo separately";
+		context.key(UiEventKind.KeyDown, UiKey.Z, historyModifier);
+		context.text(UiEventKind.TextInput, "!");
+		context.key(UiEventKind.KeyDown, UiKey.Z, historyModifier | UiModifier.Shift);
+		if (historyDocument.text != "abc!") throw "new typing did not clear redo";
+		historyEditor.placeCaret(1, false);
+		context.text(UiEventKind.TextInput, "X");
+		context.key(UiEventKind.KeyDown, UiKey.Z, historyModifier);
+		if (historyDocument.text != "abc!" || historyEditor.selectionFocus != 1) throw "navigation did not split typing history";
+		historyField.readOnly = true;
+		context.submit(historyField, new LayoutFrame(256.0, 192.0));
+		context.key(UiEventKind.KeyDown, UiKey.Z, historyModifier);
+		if (historyDocument.text != "abc!" || leakedUndo != 0) throw "read-only undo changed text or escaped to application";
+		historyDocument.replace(0, historyDocument.codepointCount, "fresh");
+		historyField.readOnly = false;
+		context.submit(historyField, new LayoutFrame(256.0, 192.0));
+		context.key(UiEventKind.KeyDown, UiKey.Z, historyModifier);
+		if (historyDocument.text != "fresh") throw "external replacement retained stale field history";
+		var selectionHistory = new TextEditorState(fonts, "a🙂bc");
+		selectionHistory.setAnchoredSelection(new TextSelection(3, 1));
+		selectionHistory.replace(1, 3, "X");
+		if (!selectionHistory.undo() || selectionHistory.text != "a🙂bc" ||
+			selectionHistory.selectionAnchor != 3 || selectionHistory.selectionFocus != 1)
+			throw "undo did not restore a reversed Unicode selection";
+		selectionHistory.dispose();
+		var compositionHistory = new TextEditorState(fonts, "");
+		compositionHistory.applyTransaction(new EditTransaction(0, 0, "a", 1, 1, true, 0, 1, 0, null, TextEditorHistoryKind.Composition));
+		compositionHistory.applyTransaction(new EditTransaction(0, 1, "あ", 1, 1, true, 0, 1, 0, null, TextEditorHistoryKind.Composition));
+		compositionHistory.applyTransaction(new EditTransaction(0, 1, "あい", 2, 2, false, -1, -1, 0, null, TextEditorHistoryKind.Composition));
+		if (!compositionHistory.undo() || compositionHistory.text != "" || !compositionHistory.redo() || compositionHistory.text != "あい")
+			throw "IME composition did not undo as one edit";
+		compositionHistory.dispose();
+		context.commands.unregister("field-history-global-undo");
+		var wordDocument = new TextDocument("café hello");
+		var wordField = TextField.withDocument("word-delete-field", wordDocument);
+		var wordRoot = context.submit(wordField, new LayoutFrame(256.0, 192.0));
+		var wordState:State<TextEditorState> = context.buildContext.existingState(wordRoot.id);
+		var wordDeleteEditor:TextEditorState = cast wordState.value;
+		if (!context.focusWidget(wordRoot.id)) throw "word deletion field did not focus";
+		var wordModifier = #if (mac || ios) UiModifier.Alt #else UiModifier.Control #end;
+		context.key(UiEventKind.KeyDown, UiKey.Backspace, wordModifier);
+		if (wordDocument.text != "café ") throw "word backspace did not delete the preceding word";
+		context.key(UiEventKind.KeyDown, UiKey.Backspace);
+		if (wordDocument.text != "café") throw "plain backspace stopped deleting one grapheme";
+		wordDeleteEditor.placeCaret(0, false);
+		context.key(UiEventKind.KeyDown, UiKey.Delete, wordModifier);
+		if (wordDocument.text != "") throw "word delete did not delete Unicode text ahead";
+		context.key(UiEventKind.KeyDown, UiKey.Backspace, wordModifier);
+		if (wordDocument.text != "") throw "word deletion at document boundary changed text";
+		wordDocument.replace(0, 0, "first last");
+		context.submit(wordField, new LayoutFrame(256.0, 192.0));
+		wordDeleteEditor.setSelection(0, 5);
+		context.key(UiEventKind.KeyDown, UiKey.Backspace, wordModifier);
+		if (wordDocument.text != " last") throw "word deletion expanded an existing selection";
+		wordField.readOnly = true;
+		context.submit(wordField, new LayoutFrame(256.0, 192.0));
+		context.key(UiEventKind.KeyDown, UiKey.Delete, wordModifier);
+		if (wordDocument.text != " last") throw "word deletion changed a read-only field";
 		var sharedDocument = new TextDocument("start");
 		var sharedEdit:Null<EditTransaction> = null;
 		var sharedField = TextField.withDocument("shared-document-field", sharedDocument,
@@ -790,7 +935,7 @@ class FrameworkSmoke {
 		context.key(UiEventKind.KeyDown, UiKey.Right, UiModifier.Shift);
 		if (controlledSelection.anchor != 0 || controlledSelection.focus != 1) return 343;
 		editDelivered = false;
-		controlledField.onEditIntent = function(intent) {
+		controlledField.onEditIntent = function(intent, layout) {
 			switch intent {
 				case Insert(text):
 					controlledDocument.replace(0, controlledDocument.codepointCount, text + "!");
@@ -944,6 +1089,51 @@ class FrameworkSmoke {
 		if (arabicEditor.text != "مرحبا بالعالم" || hebrewEditor.text != "x")
 			return 224;
 
+		var semanticDrag = new TextEditorState(fonts, "first second\nthird fourth\nfifth");
+		semanticDrag.beginPointerSelection(new TextPosition(2, 0), 2, false);
+		semanticDrag.extendPointerSelection(new TextPosition(8, 0));
+		if (semanticDrag.selectionStart != 0 || semanticDrag.selectionEnd != 12) throw "word drag lost whole-word selection";
+		semanticDrag.beginPointerSelection(new TextPosition(8, 0), 2, false);
+		semanticDrag.extendPointerSelection(new TextPosition(2, 0));
+		if (semanticDrag.selectionAnchor != 12 || semanticDrag.selectionFocus != 0) throw "backward word drag lost its anchor";
+		semanticDrag.beginPointerSelection(new TextPosition(2, 0), 3, false);
+		semanticDrag.extendPointerSelection(new TextPosition(15, 0));
+		if (semanticDrag.selectionStart != 0 || semanticDrag.selectionEnd != 26) throw "line drag lost whole-line selection";
+		semanticDrag.placeCaret(3, false);
+		semanticDrag.beginPointerSelection(new TextPosition(8, 0), 1, true);
+		semanticDrag.extendPointerSelection(new TextPosition(10, 0));
+		if (semanticDrag.selectionAnchor != 3 || semanticDrag.selectionFocus != 10) throw "shift drag changed its original anchor";
+		semanticDrag.dispose();
+		var edgeStyle = new LayoutStyle();
+		edgeStyle.width = LayoutAxis.fixed(200.0); edgeStyle.height = LayoutAxis.fixed(64.0);
+		var edgeText = [for (line in 0...80) "row " + line].join("\n");
+		var edgeArea = new TextArea("selection-edge-scroll", edgeText, null, edgeStyle);
+		var edgeFrame = new LayoutFrame(200.0, 64.0);
+		var edgeRoot = context.submit(edgeArea, edgeFrame);
+		var edgeState:State<TextEditorState> = context.buildContext.existingState(edgeRoot.id);
+		var edgeEditor:TextEditorState = cast edgeState.value;
+		edgeEditor.placeCaret(0, false);
+		edgeEditor.scrollBy(-100000.0);
+		context.submit(edgeArea, edgeFrame);
+		var edgeBounds = edgeRoot.globalBounds();
+		context.pointerDown(edgeBounds.x + 15.0, edgeBounds.y + 12.0, 0);
+		context.pointerMove(edgeBounds.x + 15.0, edgeBounds.y + edgeBounds.height + 20.0);
+		var scrollBeforeTick = edgeEditor.scrollOffsetY;
+		edgeFrame.deltaSeconds = 0.05;
+		for (tick in 0...6) context.submit(edgeArea, edgeFrame);
+		if (edgeEditor.scrollOffsetY <= scrollBeforeTick || edgeEditor.selectionEnd <= edgeEditor.selectionStart)
+			throw "stationary edge drag did not scroll and extend selection";
+		context.pointerUp(edgeBounds.x + 15.0, edgeBounds.y + edgeBounds.height + 20.0, 0);
+		var stoppedScroll = edgeEditor.scrollOffsetY;
+		for (tick in 0...3) context.submit(edgeArea, edgeFrame);
+		if (edgeEditor.scrollOffsetY != stoppedScroll) throw "edge scroll continued after pointer release";
+		#if (mac || ios)
+		edgeEditor.placeCaret(2, false);
+		context.key(UiEventKind.KeyDown, UiKey.Right, UiModifier.Super | UiModifier.Shift);
+		if (edgeEditor.selectionAnchor != 2 || edgeEditor.selectionFocus != 5) throw "Cmd+Shift+Right did not select to line end";
+		context.key(UiEventKind.KeyDown, UiKey.Left, UiModifier.Super);
+		if (edgeEditor.selectionFocus != 0) throw "Cmd+Left did not move to line start";
+		#end
 		var wordArea = new TextArea("word-navigation", "one two\nthree four");
 		var wordAreaRoot = context.submit(wordArea, new LayoutFrame(256.0, 192.0));
 		var wordAreaState:State<TextEditorState> = context.buildContext.existingState(wordAreaRoot.id);
@@ -1593,9 +1783,14 @@ class FrameworkSmoke {
 		if (!input.consume(PointerMove(source, 4.0, 4.0)) || hoverEnters != 0 ||
 			!input.consume(PointerScroll(source, 1.5, -24.0)) || scrollEvents != 1)
 			return 13;
-		if (!input.consume(PointerButton(source, 0, InputAction.Press, 0, 4.0, 4.0)) ||
-			!input.consume(PointerButton(source, 0, InputAction.Release, 0, 4.0, 4.0)) || clicks != 2)
+		input.coordinateScale = 2;
+		var scaledBounds = buttonNode.globalBounds();
+		var scaledX = (scaledBounds.x + scaledBounds.width * 0.75) * 2;
+		var scaledY = (scaledBounds.y + scaledBounds.height * 0.75) * 2;
+		if (!input.consume(PointerButton(source, 0, InputAction.Press, 0, scaledX, scaledY)) ||
+			!input.consume(PointerButton(source, 0, InputAction.Release, 0, scaledX, scaledY)) || clicks != 2)
 			return 14;
+		input.coordinateScale = 1;
 		if (!input.consume(Key(source, UiKey.Enter, 28, InputAction.Press, 0)) ||
 			!input.consume(Key(source, UiKey.Enter, 28, InputAction.Repeat, 0)) ||
 			keyEvents != 1 || repeatEvents != 1 || clicks != 3)
@@ -1618,9 +1813,11 @@ class FrameworkSmoke {
 			return 16;
 		var edit = new NativeKitTextEdit(TextEditAction.Compose, "compose", 0, 0,
 			0, 0, 0, 7);
-		if (input.consume(TextEdit(source, edit)) || editSeen ||
-			input.consume(TextEdit(new Handle(20), edit)) || editSeen ||
-			!input.consume(TextEdit(surface, edit)) || !editSeen)
+		if (input.consume(TextEdit(new Handle(20), edit)) || editSeen ||
+			!input.consume(TextEdit(source, edit)) || !editSeen)
+			return 17;
+		editSeen = false;
+		if (!input.consume(TextEdit(surface, edit)) || !editSeen)
 			return 17;
 		if (!input.consume(PointerEnter(source, false)) || hoverLeaves == 0)
 			return 18;
@@ -1660,6 +1857,35 @@ class FrameworkSmoke {
 			!context.accessibilityAction(initialId.value, 3, null, -1, -1, 1) ||
 			context.focus.focusedId != null)
 			return 29;
+		var moveModifiers = -1;
+		var wheelModifiers = -1;
+		buttonNode.on(UiEventKind.PointerMove, function(event) moveModifiers = event.modifiers);
+		buttonNode.on(UiEventKind.Scroll, function(event) wheelModifiers = event.modifiers);
+		input.consume(Key(source, 340, 0, InputAction.Press, 0));
+		input.consume(PointerMove(source, 4.0, 4.0));
+		input.consume(PointerScroll(source, 0, -40));
+		if (moveModifiers != UiModifier.Shift || wheelModifiers != UiModifier.Shift)
+			throw "modifier press must affect subsequent move and wheel events";
+		input.consume(Key(source, 344, 0, InputAction.Press, UiModifier.Shift));
+		input.consume(Key(source, 340, 0, InputAction.Release, UiModifier.Shift));
+		input.consume(PointerScroll(source, 0, -40));
+		if (wheelModifiers != UiModifier.Shift)
+			throw "releasing one Shift must preserve the other Shift";
+		input.consume(Key(source, 344, 0, InputAction.Release, UiModifier.Shift));
+		input.consume(PointerScroll(source, 0, -40));
+		if (wheelModifiers != 0) throw "modifier release snapshot must not leave Shift stuck";
+		input.consume(Key(source, UiKey.A, 0, InputAction.Press, UiModifier.Control | UiModifier.Alt));
+		input.consume(Key(new Handle(18), UiKey.A, 0, InputAction.Press, 0));
+		input.consume(PointerMove(source, 4.0, 4.0));
+		if (moveModifiers != (UiModifier.Control | UiModifier.Alt))
+			throw "foreign window must not change pointer modifiers";
+		input.consume(WindowStateChanged(source, 0));
+		input.consume(PointerScroll(source, 0, -40));
+		if (wheelModifiers != 0) throw "focus loss must clear pointer modifiers";
+		input.consume(Key(source, 341, 0, InputAction.Press, 0));
+		input.detach();
+		input.consume(PointerScroll(source, 0, -40));
+		if (wheelModifiers != 0) throw "detach must clear pointer modifiers";
 		var sameTargetHandlers = 0;
 		var immediateTargetHandlers = 0;
 		var parentHandlers = 0;
@@ -1784,6 +2010,21 @@ class FrameworkSmoke {
 			scrollbarTrack.y + 4.0, 0);
 		if (scrollView.controller.offsetY != 0.0)
 			return 246;
+		// Keep a captured thumb responsive when a resize clamps the old offset.
+		scrollView.controller.jumpTo(0.0, 320.0);
+		scrollRoot = context.submit(scrollView, scrollFrame);
+		var heldThumb:ResolvedLayoutItem = cast scrollRoot.children[1].children[0].resolved;
+		var heldX = heldThumb.x + heldThumb.width * 0.5;
+		var heldY = heldThumb.y + heldThumb.height * 0.5;
+		context.pointerDown(heldX, heldY, 0);
+		scrollView.style.height = LayoutAxis.fixed(160.0);
+		scrollRoot = context.submit(scrollView, new LayoutFrame(256.0, 160.0));
+		context.pointerMove(heldX, heldY - 2.0);
+		if (scrollView.controller.offsetY >= 240.0 || scrollView.controller.offsetY < 230.0)
+			return 270;
+		context.pointerUp(heldX, heldY - 2.0, 0);
+		scrollView.style.height = LayoutAxis.fixed(80.0);
+		scrollRoot = context.submit(scrollView, scrollFrame);
 		scrollView.controller.jumpTo(0.0, 160.0);
 		if (!context.focusWidget(scrollRoot.id))
 			return 244;
@@ -2362,6 +2603,26 @@ class FrameworkSmoke {
 			return 94;
 
 		var tabChanges = 0;
+		var retainedHeaderBuilds = 0;
+		var retainedHeaderRevision = "initial";
+		var retainedTabOptions = new nativekit.ui.widgets.controls.TabsOptions();
+		retainedTabOptions.selectionMode = nativekit.ui.widgets.controls.TabsSelectionMode.Controlled;
+		var retainedTabs = Tabs.withOptions("retained-tabs-smoke", [
+			new TabItem("first", "First", new Text("first page")),
+			new TabItem("second", "Second", new Text("second page"))
+		], "first", null, retainedTabOptions);
+		retainedTabs.headerRevision = function() return retainedHeaderRevision;
+		retainedTabs.onTabHeaderBuilt = function(_, _) { retainedHeaderBuilds++; };
+		context.submit(retainedTabs, new LayoutFrame(320, 192));
+		context.submit(retainedTabs, new LayoutFrame(320, 192));
+		if (retainedHeaderBuilds != 2) throw "Unchanged tab headers must be retained";
+		retainedTabs.selectedKey = "second";
+		context.submit(retainedTabs, new LayoutFrame(320, 192));
+		if (retainedHeaderBuilds != 4) throw "Selection changes must update retained tab headers";
+		retainedTabs.items[0] = new TabItem("first", "First *", new Text("edited page"));
+		retainedHeaderRevision = "edited";
+		context.submit(retainedTabs, new LayoutFrame(320, 192));
+		if (retainedHeaderBuilds != 6) throw "Label changes must update retained tab headers";
 		var tabs = new Tabs("tabs-smoke", [
 			new TabItem("first", "First", new Text("First page")),
 			new TabItem("second", "Second", new Text("Second page")),
@@ -2410,6 +2671,56 @@ class FrameworkSmoke {
 		context.pointerDown(lockedTabContextGeometry.x + 2.0, lockedTabContextGeometry.y + 2.0, 1);
 		context.pointerUp(lockedTabContextGeometry.x + 2.0, lockedTabContextGeometry.y + 2.0, 1);
 		if (tabMenus != 3 || tabs.selectedKey != "first") return 1007;
+
+		var closes = 0, closeSelections = 0, closeDrags = 0;
+		var closable = new TabItem("closable", "Close me", new Text("close page"));
+		closable.onClose = function() closes++;
+		var closeTabs = new Tabs("close-tabs", [new TabItem("keep", "Keep", new Text("keep page")), closable],
+			"keep", function(_) closeSelections++, null, function(_, _) closeDrags++);
+		closeTabs.headerRevision = function() return "stable";
+		context.pointerMove(0, 180);
+		var closeRoot = context.submit(closeTabs, tabsFrame);
+		var closeRow = closeRoot.children[0].children[1].children[0];
+		var closeNode = closeRow.children[1].children[0];
+		var closeWidth = closeRow.globalBounds().width;
+		if (closeNode.layout.style.visible || cast(closeNode.semantics, Semantics).label != "Close Close me") throw "Close buttons must start hidden and expose an accessible name";
+		var closeBounds = closeRow.globalBounds();
+		context.pointerMove(closeBounds.x + 2, closeBounds.y + 2);
+		closeRoot = context.submit(closeTabs, tabsFrame);
+		closeRow = closeRoot.children[0].children[1].children[0];
+		closeNode = closeRow.children[1].children[0];
+		if (!closeNode.layout.style.visible || closeRow.globalBounds().width != closeWidth) throw "Hover must reveal the close target without changing tab width";
+		closeBounds = closeNode.globalBounds();
+		context.pointerMove(closeBounds.x + 12, closeBounds.y + 12);
+		context.pointerDown(closeBounds.x + 12, closeBounds.y + 12, 0);
+		context.pointerUp(closeBounds.x + 12, closeBounds.y + 12, 0);
+		if (closes != 1 || closeSelections != 0 || closeDrags != 0 || closeTabs.selectedKey != "keep") throw "Closing an inactive tab must not select it or start a drag";
+		var tabBody = closeRow.children[0].globalBounds();
+		context.pointerDown(tabBody.x + 2, tabBody.y + 2, 2);
+		closeRoot = context.submit(closeTabs, tabsFrame);
+		context.pointerUp(tabBody.x + 2, tabBody.y + 2, 2);
+		if (closes != 2 || closeSelections != 0 || closeDrags != 0 || closeTabs.selectedKey != "keep")
+			throw "Middle-click must close an inactive tab without selecting or dragging it";
+		closeRow = closeRoot.children[0].children[1].children[0];
+		closeNode = closeRow.children[1].children[0];
+		context.focusWidget(closeRoot.children[0].children[0].children[0].id);
+		context.pointerMove(0, 180);
+		closeRoot = context.submit(closeTabs, tabsFrame);
+		closeRow = closeRoot.children[0].children[1].children[0];
+		closeNode = closeRow.children[1].children[0];
+		if (closeNode.layout.style.visible) throw "Leaving a tab must hide its close target";
+		context.focusWidget(closeRow.children[0].id);
+		context.submit(closeTabs, tabsFrame);
+		if (!closeNode.layout.style.visible) throw "Keyboard focus must reveal the close action";
+
+		for (value in ["🙂🙂🙂🙂🙂🙂🙂🙂-a-very-long-filename.txt", "日本語の長いファイル名-a-very-long-filename.hx"]) {
+			var ellipsisStyle = new LayoutStyle();
+			ellipsisStyle.width = LayoutAxis.fixed(31);
+			var ellipsis = new nativekit.ui.widgets.text.MiddleEllipsisText("unicode-ellipsis", value);
+			context.submit(new Row("unicode-ellipsis-row", [new KeyedView("label", ellipsis)], ellipsisStyle), tabsFrame);
+			context.submit(new Row("unicode-ellipsis-row", [new KeyedView("label", ellipsis)], ellipsisStyle), tabsFrame);
+			if (!ellipsis.truncated) throw "Unicode ellipsis fixture did not exercise truncation";
+		}
 
 		var theme = new Theme();
 		if (theme.tokens.textPrimary != theme.text || theme.tokens.textSecondary != theme.mutedText ||
@@ -3833,6 +4144,9 @@ class FrameworkSmoke {
 		var state = new UiHostFrameState(800, 600);
 		if (state.canRender()) return false;
 		state.setSurfaceAvailable(true);
+		state.setScale(2); state.setZoom(1.25);
+		if (state.layoutWidth != 640 || state.layoutHeight != 480 || state.renderScale != 2.5 || state.scale != 2) return false;
+		state.setZoom(1);
 		if (!state.canRender() || state.nextDelta(10.0) != 0.0) return false;
 		if (state.nextDelta(10.25) != 0.1) return false;
 		state.setSurfaceAvailable(false);
@@ -4677,6 +4991,265 @@ class FrameworkSmoke {
 		uiContext.key(UiEventKind.KeyDown, UiKey.Enter);
 		if (disabledRuns != 0)
 			return false;
+		var pointerResults = 0, pointerDismissals = 0;
+		var pointerPalette = new CommandPalette("pointer-palette", surfaceRegistry, null, 0, 0, "",
+			function() pointerDismissals++, function(_) pointerResults++);
+		var pointerFrame = new LayoutFrame(640, 480);
+		var pointerRoot = uiContext.submit(pointerPalette, pointerFrame);
+		var runRow:Null<RenderNode> = null;
+		pointerRoot.walk(function(node) {
+			if (node.semantics != null && node.semantics.role == AccessibilityRole.CollectionItem &&
+				node.semantics.label == "Run simulation") runRow = node;
+		});
+		if (runRow == null) return false;
+		var rowBounds = runRow.globalBounds();
+		uiContext.pointerDown(rowBounds.x + 20, rowBounds.y + 18, 1);
+		uiContext.pointerUp(rowBounds.x + 20, rowBounds.y + 18, 1);
+		if (surfaceRuns != 2 || pointerResults != 0) return false;
+		uiContext.pointerDown(rowBounds.x + 20, rowBounds.y + 18, 0);
+		uiContext.submit(pointerPalette, pointerFrame);
+		uiContext.pointerUp(rowBounds.x + 20, rowBounds.y + 18, 0);
+		if (surfaceRuns != 3 || pointerResults != 1 || pointerDismissals != 1)
+			throw "A palette row primary click must execute exactly once and dismiss the palette";
+		return true;
+	}
+
+	static function transientWidgetLifetimeValid(context:UiContext):Bool {
+		var frame = new LayoutFrame(240, 80);
+		context.submit(new Text("lifetime baseline"), frame);
+		var before = context.buildContext.stateStore.diagnosticCounts();
+		for (index in 0...40) {
+			var content = new LayoutStyle(); content.height = LayoutAxis.fixed(500);
+			var label = new nativekit.ui.widgets.text.MiddleEllipsisText("label-" + index, "A long transient label");
+			var children:Array<KeyedView> = [new KeyedView("label", label)];
+			var scroll = new ScrollView("scroll-" + index, new Column("content", children, content));
+			context.submit(scroll, frame);
+			context.submit(new Text("lifetime baseline"), frame);
+		}
+		var after = context.buildContext.stateStore.diagnosticCounts();
+		return after.values == before.values && after.resources == before.resources && after.paths == before.paths;
+	}
+
+	static function selfUpdatingLifetimeValid(context:UiContext):Bool {
+		var field = new TextField("builder-lifetime", "document");
+		var view = new nativekit.ui.core.RetainedView("builder-retained", function(_) return field);
+		var frame = new LayoutFrame(240, 80);
+		var root = context.submit(view, frame);
+		var id = root.id;
+		// Retained trees must keep patching without rebuilding their widget.
+		context.submit(view, frame);
+		if (!context.buildContext.requestPatch(id)) return false;
+		context.submit(view, frame);
+		context.submit(new Text("unmounted builder"), frame);
+		if (context.buildContext.requestPatch(id)) return false;
+		// A fresh mount with the same key restores a live builder.
+		root = context.submit(view, frame);
+		if (!root.id.equals(id) || !context.buildContext.requestPatch(id)) return false;
+		context.submit(new Text("unmounted again"), frame);
+		return !context.buildContext.requestPatch(id);
+	}
+
+	static function externalScrollbarValid(context:UiContext):Bool {
+		var controller = new ScrollController();
+		var view = new ExternalScrollbarSmoke(controller);
+		var frame = new LayoutFrame(240, 80); frame.deltaSeconds = 0;
+		var root = context.submit(view, frame);
+		var track = root.children[0], viewport = root.children[1], fixed = root.children[2];
+		var bounds = track.globalBounds(), side = fixed.globalBounds();
+		if (viewport.children.length != 1 || Math.abs(bounds.x + bounds.width - 238) > 0.01
+			|| bounds.x < side.x || Math.abs(controller.viewportWidth - 160) > 0.01) return false;
+		context.pointerMove(bounds.x + 5, bounds.y + 40);
+		context.scroll(bounds.x + 5, bounds.y + 40, 0, 20);
+		if (controller.offsetY != 20) return false;
+		root = context.submit(view, frame); track = root.children[0];
+		var thumb = track.children[0];
+		if (!context.focusWidget(thumb.id)) return false;
+		context.key(UiEventKind.KeyDown, UiKey.PageDown);
+		if (controller.offsetY <= 20) return false;
+		root = context.submit(view, frame); track = root.children[0]; thumb = track.children[0];
+		var thumbBounds = thumb.globalBounds(), before = controller.offsetY;
+		context.pointerDown(thumbBounds.x + 4, thumbBounds.y + thumbBounds.height / 2, 0);
+		context.pointerMove(-20, thumbBounds.y + thumbBounds.height / 2 + 15);
+		if (controller.offsetY <= before) return false;
+		context.pointerUp(-20, thumbBounds.y + thumbBounds.height / 2 + 15, 0);
+		frame.deltaSeconds = 0.8; root = context.submit(view, frame);
+		var color = root.children[0].children[0].layout.style.background;
+		if (color == null || color.alpha != 0) return false;
+		frame.deltaSeconds = 0; context.submit(new Text("external-unmounted"), frame);
+		return context.animations.activeCount == 0;
+	}
+
+	static function scrollbarAlpha(root:RenderNode):Float {
+		var color = root.children[1].children[0].layout.style.background;
+		return color == null ? -1.0 : color.alpha;
+	}
+
+	static function scrollbarVisibilityValid(context:UiContext):Bool {
+		var clock = new AnimationScheduler();
+		var visibility = new nativekit.ui.widgets.scroll.ScrollbarVisibilityController();
+		visibility.attach(clock, function() {}); visibility.setAvailable(true);
+		if (visibility.opacity != 0) return false;
+		visibility.reveal(); clock.advance(0.49);
+		if (visibility.opacity != 1) return false;
+		clock.advance(0.11);
+		if (visibility.opacity < 0.49 || visibility.opacity > 0.51) return false;
+		visibility.setHovered(true); clock.advance(1);
+		if (visibility.opacity != 1 || clock.activeCount != 0) return false;
+		visibility.setDragging(true); visibility.setHovered(false); clock.advance(1);
+		if (visibility.opacity != 1 || clock.activeCount != 0) return false;
+		visibility.setDragging(false); clock.advance(0.71);
+		if (visibility.opacity != 0 || clock.activeCount != 0) return false;
+		visibility.configure(nativekit.ui.widgets.scroll.ScrollbarVisibility.Auto, true);
+		visibility.reveal(); clock.advance(0.49);
+		if (visibility.opacity != 1) return false;
+		clock.advance(0.02); if (visibility.opacity != 0) return false;
+		visibility.configure(nativekit.ui.widgets.scroll.ScrollbarVisibility.Always, false);
+		if (visibility.opacity != 1 || clock.activeCount != 0) return false;
+		visibility.configure(nativekit.ui.widgets.scroll.ScrollbarVisibility.Hidden, false);
+		visibility.setHovered(true); if (visibility.opacity != 0) return false;
+		visibility.setHovered(false);
+		visibility.configure(nativekit.ui.widgets.scroll.ScrollbarVisibility.Auto, false);
+		visibility.reveal(); visibility.dispose(); if (clock.activeCount != 0) return false;
+
+		var oldPolicy = context.buildContext.environment.scrollbarVisibility;
+		context.buildContext.environment.scrollbarVisibility = nativekit.ui.widgets.scroll.ScrollbarVisibility.Auto;
+		var style = new LayoutStyle(); style.width = LayoutAxis.fixed(180); style.height = LayoutAxis.fixed(80);
+		var content = new LayoutStyle(); content.width = LayoutAxis.fixed(180); content.height = LayoutAxis.fixed(600);
+		var frame = new LayoutFrame(180, 80); frame.deltaSeconds = 0;
+		var controller = new ScrollController();
+		var view = new ScrollView("visibility-regression", new Column("content", [], content), style, ScrollAxis.Vertical, controller);
+		var root = context.submit(view, frame);
+		var paintRevision = root.children[1].children[0].contentRevision;
+		if (scrollbarAlpha(root) != 0 || root.children[1].children[0].hitTestSelf) return false;
+		var track:ResolvedLayoutItem = cast root.children[1].resolved;
+		context.pointerMove(track.x + 5, track.y + 50);
+		root = context.submit(view, frame);
+		if (scrollbarAlpha(root) != 1 || controller.offsetY != 0 || controller.viewportWidth != 180
+			|| root.children[1].children[0].contentRevision <= paintRevision) return false;
+		paintRevision = root.children[1].children[0].contentRevision;
+		context.pointerMove(20, 20);
+		frame.deltaSeconds = 0.49; root = context.submit(view, frame);
+		if (scrollbarAlpha(root) != 1) return false;
+		frame.deltaSeconds = 0.11; root = context.submit(view, frame);
+		if (scrollbarAlpha(root) <= 0 || scrollbarAlpha(root) >= 1
+			|| root.children[1].children[0].contentRevision <= paintRevision) return false;
+		frame.deltaSeconds = 0.11; root = context.submit(view, frame);
+		if (scrollbarAlpha(root) != 0) return false;
+		frame.deltaSeconds = 0;
+		context.scroll(20, 20, 0, 40); root = context.submit(view, frame);
+		if (scrollbarAlpha(root) != 1 || controller.offsetY != 40) return false;
+		context.buildContext.environment.scrollbarVisibility = nativekit.ui.widgets.scroll.ScrollbarVisibility.Hidden;
+		root = context.submit(view, frame);
+		if (root.children.length != 1 || controller.offsetY != 40 || context.animations.activeCount != 0) return false;
+		context.buildContext.environment.scrollbarVisibility = nativekit.ui.widgets.scroll.ScrollbarVisibility.Always;
+		root = context.submit(view, frame); root = context.submit(view, frame);
+		if (scrollbarAlpha(root) != 1) return false;
+		context.buildContext.environment.scrollbarVisibility = nativekit.ui.widgets.scroll.ScrollbarVisibility.Auto;
+		context.pointerMove(track.x + 5, track.y + 50);
+		root = context.submit(view, frame);
+		context.pointerMove(20, 20);
+		context.submit(new Text("unmounted"), frame);
+		context.buildContext.environment.scrollbarVisibility = oldPolicy;
+		return context.animations.activeCount == 0;
+	}
+
+	static function smoothScrollValid(context:UiContext):Bool {
+		var motion = new ScrollController(); motion.configureAnimation(true);
+		motion.scrollBy(0, 100); motion.advance(1.0 / 60.0);
+		if (motion.offsetY <= 40 || motion.offsetY >= 100) return false;
+		for (_ in 0...7) motion.advance(1.0 / 60.0);
+		if (motion.offsetY < 99) return false;
+		motion.jumpTo(0, 0); motion.scrollBy(0, 100); motion.advance(1.0 / 60.0);
+		var before = motion.offsetY; motion.scrollBy(0, -20); motion.advance(1.0 / 60.0);
+		if (motion.offsetY >= before) return false;
+		var slow = new ScrollController(), fast = new ScrollController();
+		slow.configureAnimation(true); fast.configureAnimation(true);
+		slow.scrollBy(1000, 1000); fast.scrollBy(1000, 1000);
+		for (_ in 0...3) slow.advance(1.0 / 30.0);
+		for (_ in 0...12) fast.advance(1.0 / 120.0);
+		if (Math.abs(slow.offsetY - fast.offsetY) > 0.000001) return false;
+		motion.jumpTo(0, 30); if (motion.advance(0.1) || motion.offsetY != 30) return false;
+		motion.configureAnimation(true, 0); motion.scrollBy(0, 10);
+		if (motion.offsetY != 40) return false;
+		motion.configureAnimation(true); motion.scrollBy(0, 100); motion.configureAnimation(false);
+		if (motion.offsetY != 140 || motion.advance(0.1)) return false;
+		var style = new LayoutStyle(); style.width = LayoutAxis.fixed(200); style.height = LayoutAxis.fixed(100);
+		var content = new LayoutStyle(); content.width = LayoutAxis.fixed(200); content.height = LayoutAxis.fixed(1000);
+		var frame = new LayoutFrame(200, 100); frame.deltaSeconds = 0;
+		var mounted = new ScrollController(); mounted.configureAnimation(true);
+		context.submit(new ScrollView("smooth-lifetime", new Column("content", [], content), style, ScrollAxis.Vertical, mounted), frame);
+		context.scroll(20, 20, 0, 100);
+		if (mounted.offsetY != 0 || context.animations.activeCount != 2) return false;
+		frame.deltaSeconds = 1.0 / 60.0;
+		context.submit(new ScrollView("smooth-lifetime", new Column("content", [], content), style, ScrollAxis.Vertical, mounted), frame);
+		if (mounted.offsetY <= 40 || mounted.offsetY >= 100) return false;
+		var replacement = new ScrollController(); replacement.configureAnimation(true);
+		frame.deltaSeconds = 0;
+		context.submit(new ScrollView("smooth-lifetime", new Column("content", [], content), style, ScrollAxis.Vertical, replacement), frame);
+		if (context.animations.activeCount != 0) return false;
+		replacement.scrollBy(0, 100);
+		if (context.animations.activeCount != 2) return false;
+		// Moving a supplied controller creates the new mount before retiring the old one.
+		context.submit(new ScrollView("smooth-moved", new Column("content", [], content), style, ScrollAxis.Vertical, replacement), frame);
+		if (context.animations.activeCount != 1) throw "old scroll mount detached replacement binding";
+		context.animations.advance(1.0 / 60.0);
+		if (replacement.offsetY <= 40) return false;
+		context.submit(new Text("unmounted"), frame);
+		return context.animations.activeCount == 0 && !replacement.advance(0.1);
+	}
+
+	static function sidebarValid(context:UiContext):Bool {
+		var model = new nativekit.ui.widgets.sidebar.SidebarModel();
+		var files = 0, search = 0;
+		model.register("search", function() { search++; return new Text("Search content"); },
+			new nativekit.ui.widgets.sidebar.SidebarModeOptions("Search", 10, true));
+		model.register("files", function() { files++; return new Text("Files content"); },
+			new nativekit.ui.widgets.sidebar.SidebarModeOptions("Files", 0, true));
+		model.select("files");
+		if (files != 0 || search != 0 || model.modes[0].id != "files") return false;
+		var view = new nativekit.ui.widgets.sidebar.SidebarHost("sidebar-regression", model, function(id) { model.select(id); });
+		context.submit(view, new LayoutFrame(240, 240));
+		if (files != 1 || search != 0) return false;
+		model.select("search");
+		context.submit(view, new LayoutFrame(320, 240));
+		var filesMode = model.find("files");
+		if (filesMode == null || files != 1 || search != 1 || model.width != 320) return false;
+		model.setVisible(false);
+		context.submit(view, new LayoutFrame(320, 240));
+		if (files != 1 || search != 1) return false;
+		var state = model.encode(), restored = new nativekit.ui.widgets.sidebar.SidebarModel();
+		if (!restored.restore(state)) return false;
+		restored.register("files", function() return new Text("Files"), new nativekit.ui.widgets.sidebar.SidebarModeOptions("Files"));
+		restored.register("search", function() return new Text("Search"), new nativekit.ui.widgets.sidebar.SidebarModeOptions("Search"));
+		var searchMode = restored.find("search");
+		if (searchMode == null || restored.activeId != "search" || restored.visible || restored.width != 320) return false;
+		var before = restored.encode();
+		for (invalid in ["2|search|1|", "1|search|1|search,NaN,1", "1|search|1|search,320oops,1", "1|search|1|search,320,1;search,240,1"])
+			if (restored.restore(invalid) || restored.encode() != before) return false;
+		if (!restored.setModeVisible("search", false)) return false;
+		var selected = restored.selected();
+		if (selected == null || selected.id != "files") return false;
+		var dock = new DockWorkspaceModel();
+		dock.register(new DockPanelDescriptor("sidebar", "Sidebar"));
+		dock.register(new DockPanelDescriptor("editor", "Editor"));
+		dock.setDefaultLayout(DockNode.Split(DockSplitAxis.Horizontal, 0.25, DockNode.Panel("sidebar"), DockNode.Panel("editor")));
+		if (!dock.setPanelWidth("sidebar", 320, 1000)) return false;
+		switch dock.root { case Split(_, ratio, _, _): if (ratio != 0.32) return false; case _: return false; }
+		if (!dock.setPanelWidth("editor", 500, 1000, 8)) return false;
+		switch dock.root { case Split(_, ratio, _, _): if (Math.abs(ratio - 0.492) > 0.0001) return false; case _: return false; }
+		dock.register(new DockPanelDescriptor("outer", "Outer"));
+		dock.setDefaultLayout(DockNode.Split(DockSplitAxis.Horizontal, 0.6,
+			DockNode.Split(DockSplitAxis.Horizontal, 0.2, DockNode.Panel("sidebar"), DockNode.Panel("editor")), DockNode.Panel("outer")));
+		if (!dock.setPanelWidth("sidebar", 240, 1000, 8)) return false;
+		switch dock.root { case Split(_, outerRatio, Split(_, innerRatio, _, _), _):
+			if (outerRatio != 0.6 || Math.abs(innerRatio - 0.4) > 0.0001) return false;
+			case _: return false;
+		}
+		if (!restored.unregister("search") || !restored.restore("1|future|1|future,360,1")) return false;
+		restored.register("future", function() return new Text("Future"), new nativekit.ui.widgets.sidebar.SidebarModeOptions("Future"));
+		var future = restored.selected();
+		if (future == null || future.id != "future" || restored.width != 360) return false;
+		trace("PASS: sidebar lazy providers, shared width, deferred registration and atomic persistence");
 		return true;
 	}
 
@@ -5437,5 +6010,26 @@ private class SmokeHostApplication implements UiApplication {
 	public function dispose():Void {
 		disposeCalls++;
 		if (throwOnDispose) throw "application dispose failure";
+	}
+}
+
+/** Fixed sibling content shares the pane overlay, without becoming scroll content. */
+private class ExternalScrollbarSmoke implements View {
+	final controller:ScrollController;
+	public function new(controller:ScrollController) this.controller = controller;
+	public function build(context:BuildContext):RenderNode {
+		return context.withScope(new nativekit.ui.core.Key("external-scrollbar-smoke"), function() {
+			var style = new LayoutStyle(); style.width = LayoutAxis.fixed(240); style.height = LayoutAxis.fixed(80);
+			style.direction = LayoutDirection.LeftToRight;
+			var host = new RenderNode(context.id("host"), LayoutVisualKind.Box, style);
+			var viewportStyle = new LayoutStyle(); viewportStyle.width = LayoutAxis.grow(); viewportStyle.height = LayoutAxis.grow();
+			var contentStyle = new LayoutStyle(); contentStyle.width = LayoutAxis.stretch(); contentStyle.height = LayoutAxis.fixed(600);
+			var viewport = new ScrollView("external-viewport", new Column("content", [], contentStyle), viewportStyle, ScrollAxis.Vertical, controller);
+			viewport.scrollbarOverlayHost = host;
+			host.add(viewport.build(context));
+			var sideStyle = new LayoutStyle(); sideStyle.width = LayoutAxis.fixed(80); sideStyle.height = LayoutAxis.grow();
+			host.add(new RenderNode(context.id("fixed-side"), LayoutVisualKind.Box, sideStyle));
+			return host;
+		});
 	}
 }

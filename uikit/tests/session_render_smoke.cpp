@@ -25,6 +25,7 @@
 
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <thread>
@@ -833,6 +834,50 @@ int main() {
                     static_cast<unsigned long long>(restored_rows.raster_cache_misses - moved_rows.raster_cache_misses));
 
 
+        }
+        // Cached row origins use layout coordinates even when raster density changes.
+        // Read back separated glyph rows to catch double zoom and disappearing rows.
+        if (!result && (nkui_text_layout_set_text(wrapped_rows, "Hg\nHg\nHg\nHg") != NKUI_OK ||
+            nkui_text_layout_set_color(wrapped_rows, {0.0f, 0.0f, 0.85f, 1.0f}) != NKUI_OK))
+            result = 57;
+        for (float zoom : {1.5f, 2.0f}) {
+            for (float scroll : {0.0f, 24.0f}) {
+                if (result) break;
+                std::vector<uint8_t> zoom_commands;
+                append_bytes(zoom_commands, nkui_transform_command{
+                    {NKUI_COMMAND_SET_TRANSFORM, NKUI_COMMAND_VERSION, sizeof(nkui_transform_command)},
+                    {1.0f, 0.0f, 0.0f, 1.0f, 8.0f, 4.0f - scroll}});
+                append_bytes(zoom_commands, nkui_draw_rect_command{
+                    {NKUI_COMMAND_DRAW_TEXT_LAYOUT, NKUI_COMMAND_VERSION, sizeof(nkui_draw_rect_command)},
+                    wrapped_rows, 0.0f, 0.0f, 0.0f, 0.0f});
+                const nkui_frame_info zoom_info{sizeof(zoom_info), framebuffer_width / zoom,
+                    framebuffer_height / zoom, framebuffer_width, framebuffer_height, zoom};
+                if (nkui_display_list_submit(text_list, zoom_commands.data(),
+                    static_cast<uint32_t>(zoom_commands.size())) != NKUI_OK ||
+                    nkui_layout_session_render_frame(renderer, session, surface, &zoom_info, 0) != NKUI_OK) {
+                    result = 58;
+                    break;
+                }
+                std::vector<uint8_t> pixels(framebuffer_width * framebuffer_height * 4);
+                glReadPixels(0, 0, framebuffer_width, framebuffer_height, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+                std::vector<int> starts;
+                bool previous = false;
+                for (int y = 0; y < framebuffer_height; ++y) {
+                    bool ink = false;
+                    for (int x = 0; x < framebuffer_width; ++x) {
+                        const auto *rgba = &pixels[(y * framebuffer_width + x) * 4];
+                        ink = ink || (rgba[2] > 150 && rgba[0] < 80 && rgba[1] < 80);
+                    }
+                    if (ink && !previous) starts.push_back(y);
+                    previous = ink;
+                }
+                // The fixed-size custom node clips the last row at larger zooms.
+                if (starts.size() < 2 || starts.size() > 4) result = 59;
+                for (size_t row = 1; row < starts.size(); ++row)
+                    if (std::abs((starts[row] - starts[row - 1]) - 24.0f * zoom) > 1.0f) result = 60;
+                if (result) std::fprintf(stderr, "zoom row regression: zoom=%.1f scroll=%.1f rows=%zu code=%d\n",
+                    zoom, scroll, starts.size(), result);
+            }
         }
         if (wrapped_rows.id)
             nkui_resource_destroy(wrapped_rows);

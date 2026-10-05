@@ -21,6 +21,19 @@ struct DeviceActuator6 {
     std::uint16_t direction_setup_ticks = 0;
     double dual_drive_skew_bound = 0.0;
     std::string id;
+    // Original shaft mapping; 255 retains the legacy planner mapping.
+    std::uint8_t feedback_joint = 255;
+    double feedback_ratio = 1.0;
+    double feedback_offset = 0.0;
+    std::uint8_t measured_joint() const { return feedback_joint == 255 ? joint : feedback_joint; }
+    double measured_ratio() const { return feedback_joint == 255 ? ratio : feedback_ratio; }
+    double measured_offset() const { return feedback_joint == 255 ? offset : feedback_offset; }
+};
+
+struct DeviceInput6 {
+    std::uint8_t actuator = 0;
+    bool active_high = false;
+    std::string switch_id;
 };
 
 struct DeviceSegment6 {
@@ -40,6 +53,8 @@ struct CompiledDevicePlan6 {
   Each boundary maps to device ticks through `clock`; a nonzero `anchor_ticks`
   starts the plan on that tick instead, keeping the clock's rate, so a
   continuation meets the queued path exactly.
+  Homing alone may use the blueprint's declared overtravel past soft limits;
+  derivative and actuator step-rate limits still apply.
 **/
 CompiledDevicePlan6 compile_device_segments6(
     std::span<const robotkit::TrajectorySegment> segments, std::uint64_t plan_id,
@@ -48,6 +63,6 @@ CompiledDevicePlan6 compile_device_segments6(
     std::uint64_t device_tick_hz, std::uint64_t step_tick_hz,
     std::uint8_t max_degree, double target_error,
     std::span<const DeviceActuator6> layout = {},
-    std::uint64_t anchor_ticks = 0);
+    std::uint64_t anchor_ticks = 0, bool homing = false);
 
 } // namespace robotkit

@@ -7,7 +7,7 @@ class DeviceChannel {
   /** 1, or -1 when the driver is wired in reverse. */
   public final direction:Int;
   public final directionSetupTicks:Int;
-  /** Largest tolerated disagreement between dual-driven actuator coordinates. */
+  /** Largest tolerated disagreement after pulse counts are normalized to SI leader coordinates. */
   public final skewBound:Float;
 
   public function new(index:Int, actuator:String, direction:Int = 1,

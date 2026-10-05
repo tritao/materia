@@ -48,9 +48,12 @@ class QueueExecutingEndpoint final : public robotkit::RobotEndpoint {
 public:
     int plans = 0;
     int sampled_targets = 0;
+    robotkit::PlanRequest received_plan;
+    rk_robot_runtime_blueprint received_blueprint{};
     bool executes_trajectory_queue() const noexcept override { return true; }
-    rk_result submit_device_plan(const robotkit::PlanRequest &, uint64_t,
-        uint64_t, uint64_t, const rk_robot_runtime_blueprint &) override {
+    rk_result submit_device_plan(const robotkit::PlanRequest &plan, uint64_t,
+        uint64_t, uint64_t, const rk_robot_runtime_blueprint &blueprint) override {
+        received_plan = plan; received_blueprint = blueprint;
         ++plans;
         return RK_OK;
     }
@@ -64,6 +67,32 @@ public:
         state.source_timestamp_ns = timestamp_ns;
         state.active_plan_id = 99;
         state.committed_until_ns = 250'000'000;
+        return RK_OK;
+    }
+};
+
+class HomingStopEndpoint final : public robotkit::RobotEndpoint {
+public:
+    double velocity = 0.0;
+    double positions[2] = {0.25, -0.25};
+    double leader_rebase_delta = 0.0;
+    rk_result rebase_counters(const uint32_t *joints, const double *deltas, uint32_t count) override {
+        for (uint32_t i = 0; i < count; ++i) positions[joints[i]] -= deltas[i];
+        positions[0] += leader_rebase_delta;
+        return RK_OK;
+    }
+    bool executes_trajectory_queue() const noexcept override { return true; }
+    rk_result apply(const rk_robot_command &) override { return RK_OK; }
+    rk_result device_homing_control(const rk_device_homing_control &) override { return RK_OK; }
+    rk_result device_homing_status(uint64_t) const override { return RK_OK; }
+    rk_result sample(uint64_t timestamp, rk_robot_state &state) override {
+        state.struct_size = sizeof(state);
+        state.joint_count = 2;
+        state.source_timestamp_ns = state.received_timestamp_ns = timestamp;
+        state.position[0] = positions[0]; state.position[1] = positions[1];
+        state.velocity[0] = velocity;
+        state.trajectory_active = 0; state.trajectory_queue_depth = 0;
+        state.session_state = RK_SESSION_IDLE;
         return RK_OK;
     }
 };
@@ -1042,6 +1071,38 @@ void moving_degree_one_plan_cannot_retarget(const rk_robot_runtime_blueprint &bl
     plan.start_position[1] = -0.5;
     plan.segments = linear_segment_chunk(0.5, 0.5, 500'000'000, 82);
     assert(runtime.submit_plan(plan) == RK_ERROR_INVALID_STATE);
+}
+
+void initial_coupled_anchor_preserves_feedback(const rk_robot_runtime_blueprint &source) {
+    auto blueprint = source;
+    blueprint.coupling_count = 1;
+    blueprint.couplings[0] = {0, 1, -1.0, 0.0};
+    constexpr double origin = 0.000023;
+    auto endpoint = std::make_shared<OffsetEndpoint>(origin);
+    auto runtime = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint,
+        std::chrono::milliseconds(10));
+    assert(runtime->publish_sample(1) == RK_OK);
+    rk_robot_snapshot snapshot{};
+    assert(runtime->snapshot_full(snapshot) == RK_OK);
+    assert(snapshot.position[0] == origin);
+    assert(snapshot.position[1] == 0.0);
+    assert(snapshot.setpoint_position[0] == origin);
+    assert(snapshot.setpoint_position[1] == -origin);
+
+    robotkit::PlanRequest plan{};
+    plan.sequence = 1;
+    plan.plan_id = 93;
+    plan.model_revision = blueprint.revision;
+    plan.calibration_revision = blueprint.calibration_revision;
+    plan.start_position[0] = origin;
+    plan.start_position[1] = -origin;
+    plan.position_tolerance[0] = plan.position_tolerance[1] = 1e-6;
+    plan.segments = cubic_plan_chunk(93);
+    plan.segments.segments[0].coefficients[0].value[0] = origin;
+    plan.segments.segments[0].coefficients[1].value[0] = -origin;
+    plan.segments.segments[0].coefficients[0].value[3] = 0.2;
+    plan.segments.segments[0].coefficients[1].value[3] = -0.2;
+    assert(runtime->submit_plan(plan) == RK_OK);
 }
 
 void idle_plan_uses_commanded_anchor_and_following_error(
@@ -2085,6 +2146,41 @@ void quantized_motor_seams_keep_the_c2_bound(const rk_robot_runtime_blueprint &s
     }
 }
 
+void quantized_terminal_acceleration_is_bounded(const rk_robot_runtime_blueprint &source) {
+    auto blueprint = source;
+    for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
+        blueprint.joints[joint].limit_flags |= RK_LIMIT_ACCELERATION;
+        blueprint.joints[joint].max_acceleration = 100.0;
+    }
+    for (double gap : {4e-6, 1e-4}) {
+        auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
+        robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(10));
+        robotkit::PlanRequest plan{};
+        plan.sequence = 1; plan.plan_id = 403;
+        plan.model_revision = blueprint.revision;
+        plan.calibration_revision = blueprint.calibration_revision;
+        plan.ends_at_rest = true;
+        plan.segments = linear_segment_chunk(0.0, 0.0, 1000, 403);
+        auto &segment = plan.segments.segments[0];
+        segment.degree = 3;
+        // A 10,000-unit jerk permits at most 5e-6 acceleration error from
+        // rounding the terminal time by half a nanosecond, never 1e-4.
+        for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
+            auto &c = segment.coefficients[joint].value;
+            c[1] = 5000.0 * 1e-12 - gap * 1e-6;
+            c[2] = (gap - 0.01) / 2.0;
+            c[3] = 10000.0 / 6.0;
+            plan.start_velocity[joint] = c[1];
+            plan.start_acceleration[joint] = 2.0 * c[2];
+            // This fixture isolates terminal readiness from the start-anchor check.
+            plan.acceleration_tolerance[joint] = 0.02;
+        }
+        const auto result = runtime.submit_plan(plan);
+        if (gap < 5e-6) assert(result == RK_OK);
+        else assert(result == RK_ERROR_INVALID_ARGUMENT);
+    }
+}
+
 void expired_velocity_targets_brake_within_limits(const rk_robot_runtime_blueprint &blueprint) {
     // Joint 0 brakes at 2 rad/s^2; joint 1 has no acceleration limit.
     auto limited = blueprint;
@@ -2268,6 +2364,29 @@ void trajectory_drive_endpoints_join_at_queue_exhaustion(
     }
 }
 
+void queued_coordinate_calibration_translates_device_plan(const rk_robot_runtime_blueprint &blueprint) {
+    auto endpoint = std::make_shared<QueueExecutingEndpoint>();
+    robotkit::RobotRuntime runtime(blueprint, endpoint);
+    const double offsets[] = {-0.1, 0.0};
+    assert(runtime.calibrate_coordinates(offsets, 2, nullptr, 0) == RK_OK);
+    rk_robot_snapshot snapshot{};
+    assert(runtime.snapshot_full(snapshot) == RK_OK);
+    assert(snapshot.calibration_revision == blueprint.calibration_revision + 1);
+    robotkit::PlanRequest plan{};
+    plan.sequence = 1; plan.plan_id = 11; plan.model_revision = blueprint.revision;
+    plan.calibration_revision = blueprint.calibration_revision;
+    plan.segments = cubic_plan_chunk(11);
+    plan.start_position[0] = -0.1;
+    for (auto &segment : plan.segments.segments) segment.coefficients[0].value[0] -= 0.1;
+    assert(runtime.submit_plan(plan) == RK_ERROR_MODEL_MISMATCH);
+    plan.calibration_revision = snapshot.calibration_revision;
+    assert(runtime.submit_plan(plan) == RK_OK);
+    assert(std::abs(endpoint->received_plan.start_position[0]) < 1e-12);
+    assert(std::abs(endpoint->received_plan.segments.segments[0].coefficients[0].value[0]) < 1e-12);
+    assert(std::abs(endpoint->received_blueprint.joints[0].lower_limit -
+        (blueprint.joints[0].lower_limit + 0.1)) < 1e-12);
+}
+
 int main() {
     static_assert(sizeof(rk_robot_command) < 20'000,
         "trajectory payload must not be embedded in the command mailbox value");
@@ -2305,6 +2424,7 @@ int main() {
     stop_ramp_stays_within_travel(blueprint);
     stated_zero_speed_stops_position_commands(blueprint);
     quantized_motor_seams_keep_the_c2_bound(blueprint);
+    quantized_terminal_acceleration_is_bounded(blueprint);
     expired_velocity_targets_brake_within_limits(blueprint);
     plan_end_does_not_restore_earlier_targets(blueprint);
     single_precision_reading_at_a_limit_is_not_a_fault(blueprint);
@@ -2313,12 +2433,14 @@ int main() {
     trajectory_chunk_speed_is_limited(blueprint);
     trajectory_queue_is_bounded(blueprint);
     mixed_queue_depth_counts_knots(blueprint);
+    queued_coordinate_calibration_translates_device_plan(blueprint);
     plan_submission_checks_and_replacement(blueprint);
     device_queue_endpoint_does_not_receive_sampled_targets(blueprint);
     plan_events_follow_path_clock(blueprint);
     plan_event_records_report_overflow(blueprint);
     accepted_plan_keeps_committed_region_identical(blueprint);
     moving_degree_one_plan_cannot_retarget(blueprint);
+    initial_coupled_anchor_preserves_feedback(blueprint);
     idle_plan_uses_commanded_anchor_and_following_error(blueprint);
     initial_device_origin_is_held_once_and_reset(blueprint);
     submitted_start_tolerances_control_acceptance(blueprint);
@@ -2558,5 +2680,43 @@ int main() {
     assert(sample_failure_endpoint->emergency_stop_count == 1);
     assert(sample_failure.snapshot(state) == RK_OK);
     assert(state.safety == RK_SAFETY_FAULT);
+    {
+        auto stop_endpoint = std::make_shared<HomingStopEndpoint>();
+        robotkit::RobotRuntime stopped(blueprint, stop_endpoint);
+        assert(stopped.publish_sample(100'000'000) == RK_OK);
+        rk_device_homing_control stop{};
+        stop.struct_size = sizeof(stop); stop.action = 4;
+        stop.sequence = 1; stop.scope = 1; stop.first = 0; stop.second = 1;
+        stop.skew_bound = 0.01;
+        assert(stopped.device_homing_control(stop) == RK_OK);
+        // Acceptance must not let the caller use the snapshot from before ACK.
+        assert(stopped.device_homing_status(1) == RK_ERROR_STALE_STATE);
+        stop_endpoint->velocity = 0.01;
+        assert(stopped.publish_sample(200'000'000) == RK_OK);
+        assert(stopped.device_homing_status(1) == RK_ERROR_STALE_STATE);
+        stop_endpoint->velocity = 0.0;
+        assert(stopped.publish_sample(300'000'000) == RK_OK);
+        assert(stopped.device_homing_status(1) == RK_OK);
+    }
+    {
+        auto calibrated_blueprint = std::make_unique<rk_robot_runtime_blueprint>(blueprint);
+        calibrated_blueprint->coupling_count = 1;
+        calibrated_blueprint->couplings[0] = {0, 1, -1.0, 0.0};
+        auto calibrated_endpoint = std::make_shared<HomingStopEndpoint>();
+        calibrated_endpoint->positions[1] = -0.24;
+        calibrated_endpoint->leader_rebase_delta = 0.005;
+        auto calibrated = std::make_unique<robotkit::RobotRuntime>(*calibrated_blueprint, calibrated_endpoint);
+        assert(calibrated->publish_sample(100'000'000) == RK_OK);
+        const uint32_t shaft = 1;
+        const double side_zero = 0.01;
+        assert(calibrated->calibrate_home_drives(&shaft, &side_zero, 1) == RK_OK);
+        auto calibrated_state = std::make_unique<rk_robot_snapshot>();
+        calibrated_state->struct_size = sizeof(*calibrated_state);
+        assert(calibrated->snapshot_full(*calibrated_state) == RK_OK);
+        // Retain individual measured feedback but hand off a coupled command.
+        assert(std::abs(calibrated_state->position[1] - -0.23) < 1e-12);
+        assert(std::abs(calibrated_state->setpoint_position[0] - 0.255) < 1e-12);
+        assert(std::abs(calibrated_state->setpoint_position[1] - -0.255) < 1e-12);
+    }
     return 0;
 }

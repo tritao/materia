@@ -24,6 +24,7 @@ class StepperSlip {
   final stepsBefore = new Map<String, Float>();
   var running:Array<PlanSlip> = [];
   var touched = new Map<Int, Float>();
+  var referenceOffsets = new Map<Int, Float>();
 
   /**
    * `jointOfAxis` maps an axis id to its robot joint index; `couplings` are the robot's, to carry the
@@ -73,10 +74,19 @@ class StepperSlip {
 
   /** Forgets all lost steps, as homing the machine does, and puts every joint back on its command. */
   public function reset():Void {
+    referenceOffsets.clear();
     running = [];
     for (axis in lostNow.keys()) lostNow.set(axis, 0.0);
     lostBefore.clear();
     apply();
+  }
+
+  /** Clear loss history after calibration without changing any physical endpoint offset. */
+  public function rebaseAfterHoming():Void {
+    running = [];
+    lostNow.clear(); lostBefore.clear(); stepsBefore.clear();
+    referenceOffsets = new Map<Int, Float>();
+    for (joint in touched.keys()) referenceOffsets.set(joint, touched.get(joint));
   }
 
   /** Writes each axis's offset (behind its command, so negative along the motion) to its joint and what couples to it. */
@@ -108,6 +118,10 @@ class StepperSlip {
           changed = true;
         }
       }
+    }
+    for (joint in referenceOffsets.keys()) {
+      var loss = offsets.get(joint);
+      offsets.set(joint, referenceOffsets.get(joint) + (loss == null ? 0.0 : loss));
     }
     for (joint in offsets.keys()) {
       var previous = touched.get(joint);

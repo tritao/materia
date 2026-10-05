@@ -141,20 +141,30 @@ class ToolpathTestSupport extends MotionKitTestSupport {
     return binding.compile(parsed.program, joints, planId);
   }
   public function cncTrial(virtualDevice:Bool, ?linkLoss:Bool = false):Array<Float> {
-    var blueprint = MachineKitRobotCompiler.compileXYZGantry(
-      new LinearAxis(23, 10, 200), new LinearAxis(23, 10, 200),
-      new LinearAxis(23, 10, 200), 0.01, 0.04);
+    var blueprint = MachineKitRobotCompiler.compileGantry(
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(200, 200, 200)),
+      0.01, 0.04);
     for (channel in ["spindle.speed", "spindle.direction"])
       blueprint.runtime.channels.push(new ProcessChannelDeclaration(channel,
         ProcessEventValue.Analog(0.0)));
     var options:Null<VirtualDeviceOptions> = null;
+    var wired:Null<DeviceBinding> = null;
     if (virtualDevice) {
       options = new VirtualDeviceOptions();
-      // The motors' 200 full steps at 16 microsteps a turn, wired in model order.
-      var binding = DeviceBinding.bind(blueprint.model,
-        new DeviceLayout([for (index in 0...blueprint.model.actuators.length)
-        new robotkit.device.DeviceChannel(index, blueprint.model.actuators[index].id, 1, 2)]), options.stepTickHz);
-      options.actuators = binding.virtualActuators();
+      var inputs:Array<robotkit.device.DeviceInput> = [];
+      for (contact in blueprint.model.switches) {
+        var drives:Array<robotkit.model.Actuator> = [];
+        for (actuator in blueprint.model.actuators) switch actuator.transmission {
+          case SimpleTransmission(shaft, _, _) if (shaft == contact.driveJoint): drives.push(actuator);
+          case _:
+        }
+        if (drives.length != 1) throw "CNC switch needs one physical drive side: " + contact.id;
+        inputs.push(new robotkit.device.DeviceInput(inputs.length, contact.id, drives[0].id, false));
+      }
+      wired = DeviceBinding.bind(blueprint.model,
+        new DeviceLayout(DeviceLayout.forActuators(blueprint.model, 2).channels, inputs), options.stepTickHz);
+      options.actuators = wired.virtualActuators();
+      options.inputs = wired.virtualInputs();
     }
     var simulationHarness = new SimulationHarness(0.01);
     var simulation = simulationHarness.simulation;
@@ -163,9 +173,22 @@ class ToolpathTestSupport extends MotionKitTestSupport {
     var robot = new SimulatedRobot("cnc-gantry", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name]);
+    if (virtualDevice) {
+      var sides = robotkit.device.DeviceHomingSides.install(runtime, blueprint.runtime, cast wired, 0.01);
+      var homing = new motionkit.robot.MotionSystem(robot, blueprint);
+      homing.configureRuntimeHoming(runtime, () -> {}, sides);
+      homing.home();
+      var ticks = 0;
+      while (homing.homingStatus() != "Complete" && ticks++ < 60000) {
+        simulationHarness.step();
+        homing.update(0.01);
+      }
+      check(homing.homingStatus() == "Complete", "CNC device establishes switch references");
+    } else homeGantryFixture(blueprint, runtime, simulationHarness, robot);
     var cnc = new MotionCncRig("work", "x", "y", "z", 0.01,
       null, 0.001);
-    var binding = cncBinding(cnc, blueprint);
+    var state = runtime.snapshot();
+    var binding = new ToolpathMotionBinding(cnc.binding, blueprint, state.modelRevision, state.calibrationRevision);
     var program = cncProgram(cnc,
       "G21 G90 G17\nS12000 M3\nG0 X10 Y10\nF600 G3 X20 Y20 I0 J10\nM5\nM2\n");
     var motion = new ManipulatorMotion(robot, binding.compiler,
@@ -178,7 +201,7 @@ class ToolpathTestSupport extends MotionKitTestSupport {
     var holdIssued = false, holdTicks = 0, linkCut = false;
     for (tick in 0...3000) {
       if (!linkCut) motion.update(0.01);
-      simulationHarness.step(Int64.ofInt(virtualDevice ? tick + 21 : tick));
+      simulationHarness.step();
       var q = robot.snapshot().positions.toArray();
       trace.push(q[0]); trace.push(q[1]);
       var projection = Math.max(0.0, Math.min(1.0, (q[0] + q[1]) / 0.02));
@@ -219,7 +242,7 @@ class ToolpathTestSupport extends MotionKitTestSupport {
       var previous = robot.snapshot().positions.toArray();
       var quiet = 0;
       for (extra in 0...300) {
-        simulationHarness.step(Int64.ofInt(4000 + extra));
+        simulationHarness.step();
         var current = robot.snapshot().positions.toArray();
         if (Math.abs(current[0] - previous[0]) < 1e-6 &&
             Math.abs(current[1] - previous[1]) < 1e-6) quiet++;
@@ -239,7 +262,7 @@ class ToolpathTestSupport extends MotionKitTestSupport {
     near(robot.snapshot().positions.get(0), 0.02, "CNC finishes X", 2e-4);
     near(robot.snapshot().positions.get(1), 0.02, "CNC finishes Y", 2e-4);
     if (virtualDevice) for (extra in 0...20)
-      simulationHarness.step(Int64.ofInt(4000 + extra));
+      simulationHarness.step();
     var events = motion.firedEvents();
     check(Lambda.exists(events, function(event) return event.channel == "spindle.speed" &&
       switch event.value { case ProcessEventValue.Analog(value): value == 12000.0;

@@ -117,6 +117,7 @@ class RobotFlange extends MachineComponent {
 		thickness = 1.5 * screw.diameter;
 		pilotHeight = 0.5 * screw.diameter;
 		addConnector("face", Face, pinAlignedFrame(0));
+		addFacet(new RobotFlangeFacet("face"));
 		var i = 1;
 		for (point in boltPattern()) addConnector('bolt${i++}', Mount, Solids.axial(point.x, point.y, 0));
 		var pin = pinPoint();

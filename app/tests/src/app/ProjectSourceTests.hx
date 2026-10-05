@@ -49,6 +49,9 @@ import haxe.io.Bytes;
 
 /** Save and reopen a generated project without persisting its mesh buffers. */
 @:access(app.MissionPlayer)
+@:access(motionkit.robot.ManipulatorMotion)
+@:access(motionkit.robot.PlanExecutor)
+@:access(processkit.WeldingPlanRunner)
 class ProjectSourceTests {
   static function check(value:Bool, message:String):Void {
     if (!value) throw message;
@@ -809,6 +812,163 @@ class ProjectSourceTests {
     }
   }
 
+  /** Runs the actual Cartesian picker mission and measures its placement and drive budget. */
+  static function checkGantryPicker(root:String, yaw:Bool = false):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/gantry-picker/" + (yaw ? "materia.yaw.project.json" : "materia.project.json"));
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var definition:AssemblyDefinition = cast generated.assemblyDefinition;
+    var placement = new AssemblyState(definition, generated.assemblyState);
+    var session = new ProjectDocumentSession(null, false);
+    var simulation = new ApplicationSimulation(new RobotWorld());
+    session.openGeneratedProject(generated, manifest);
+    simulation.setBackend(ApplicationSimulation.MUJOCO);
+    try {
+      check(simulation.rebuild(session.sensors, session.scene, session), "gantry picker builds: " + simulation.error);
+      var mission = simulation.missionPlayer();
+      if (mission == null || mission.handling == null) throw "gantry picker has no handling mission";
+      var motion = mission.handling.motion;
+      var model = mission.robot.model;
+      check(motion.compiler.solver.jointCount() == (yaw ? 4 : 3), "picker plans XYZ and its selected C head");
+      for (index in 0...motion.jointIndices.length) {
+        var joint = model.joints[motion.jointIndices[index]];
+        var coupled = model.coupledLimits(joint.id, new SteadyLoads());
+        check(motion.compiler.maxVelocity[index] <= coupled.requireVelocity() + 1e-9,
+          "picker planner respects coupled speed on " + joint.id);
+        if (coupled.maxAcceleration != null)
+          check(motion.compiler.maxAcceleration[index] <= coupled.requireAcceleration() + 1e-9,
+            "picker planner respects coupled acceleration on " + joint.id);
+        else check([for (assumption in motion.compiler.planningAssumptions)
+          if (assumption.indexOf('joint "${joint.id}" acceleration') >= 0) assumption].length == 1,
+          "picker states the assumed acceleration for a servo without a derived cap");
+      }
+      function pose(id:String):app.ApplicationSimulation.SimulationPoseVisual {
+        var found = [for (entry in simulation.capturePresentationSnapshot().environment) if (entry.id == id) entry];
+        if (found.length != 1) throw "picker has no unique pose for " + id;
+        return found[0];
+      }
+      var lastDone = 0, placed = 0, ticks = 0;
+      var bytes = 0.0, measuredTicks = 0;
+      var previousPlan:Null<motionkit.trajectory.ExecutionPlan> = null;
+      var planned = 0;
+      var supports:Array<{object:Int, x:Float, y:Float, z:Float}> = [];
+      for (index in 0...6) {
+        var carton = simulation.environmentObject("project:box" + index);
+        if (carton == null) throw "picker has no carton body";
+        for (seatId in ["infeedSeat" + index, "slot" + index]) {
+          var seat = placement.worldConnector(seatId, "top");
+          supports.push({object: cast carton.handle, x: seat.x * generated.metresPerUnit,
+            y: seat.y * generated.metresPerUnit, z: seat.z * generated.metresPerUnit});
+        }
+      }
+      while (!mission.finished && simulation.activeSession().simulationTime() < 600) {
+        var before = hl.Gc.totalAllocated();
+        var priorPlan = motion.executor.plan;
+        simulation.step();
+        var currentHandling:Null<motionkit.robot.HandlingPlanRunner> = mission.handling;
+        if (currentHandling == null) throw "Picker handling runner disappeared";
+        motion = currentHandling.motion;
+        var allocated = hl.Gc.totalAllocated() - before;
+        ticks++;
+        if (mission.failure != null) {
+          var failed = mission.robot.runtime.snapshot();
+          throw 'gantry picker mission: ${mission.failure}; time=${simulation.activeSession().simulationTime()} names=${mission.robot.robot.description().joints} offsets=${[for (joint in 0...failed.q.length) mission.robot.runtime.referenceOffset(joint)]} q=${failed.q.toArray()} setpoint=${mission.robot.robot.snapshot().setpointPositions.toArray()}';
+        }
+        var plan = motion.executor.plan;
+        // Planning happens on a worker. Measure ordinary execution ticks separately from plan admission.
+        if (priorPlan != null && plan == priorPlan) { bytes += allocated; measuredTicks++; }
+        if (plan != null && plan != previousPlan) {
+          previousPlan = plan; planned++;
+          check(plan.checked != null, "every picker plan has a drive check");
+          for (sample in 0...101) {
+            var state = plan.evaluate(plan.durationSeconds * sample / 100);
+            for (axis in 0...state.velocities.length)
+              check(Math.abs(state.velocities[axis]) <= motion.compiler.maxVelocity[axis] * 1.000001 + 1e-9,
+                "picker planned speed remains within its coupled limit");
+          }
+        }
+        for (contact in mission.simulation.robotContacts(mission.robot.runtime)) {
+          if (!contact.active || contact.distance >= -0.0005) continue;
+          // Tables and seats belong to the fixed root. Cartons settle on their
+          // own authored pads; allow only shallow, vertical support there.
+          var supported = false;
+          var supportDepth = currentHandling.pressDepth + 0.002;
+          if (contact.linkIndex == 0 && contact.otherKind == robotkit.runtime.RobotContactOtherKind.Object &&
+              contact.distance >= -supportDepth && Math.abs(contact.normal.z) >= 0.99) {
+            for (seat in supports) if (contact.otherObject == seat.object &&
+                Math.abs(contact.position.x - seat.x) <= 0.0451 &&
+                Math.abs(contact.position.y - seat.y) <= 0.0451 &&
+                Math.abs(contact.position.z - seat.z) <= supportDepth) supported = true;
+          }
+          if (supported) continue;
+          if (contact.linkIndex != mission.toolLink) {
+            var body = mission.simulation.linkPose(0, contact.linkIndex);
+            for (hull in mission.robot.hulls) if (hull.link == contact.linkIndex) {
+              var lo = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
+              var hi = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
+              for (vertex in 0...Std.int(hull.vertices.length / 3)) {
+                var point = rotateVector(hull.vertices[vertex * 3], hull.vertices[vertex * 3 + 1],
+                  hull.vertices[vertex * 3 + 2], body.rotation);
+                for (axis in 0...3) {
+                  lo[axis] = Math.min(lo[axis], point[axis] + body.position[axis]);
+                  hi[axis] = Math.max(hi[axis], point[axis] + body.position[axis]);
+                }
+              }
+              var point = [contact.position.x, contact.position.y, contact.position.z];
+              var near = true;
+              for (axis in 0...3) if (point[axis] < lo[axis] - 0.002 || point[axis] > hi[axis] + 0.002) near = false;
+              if (near) Sys.println("picker contact candidate: " + hull.part + "; bounds=" + lo.join(",") + " / " + hi.join(","));
+            }
+          }
+          // The compliant cup deliberately presses at most 3 mm into its intended grasp surface.
+          check(contact.linkIndex == mission.toolLink && contact.otherKind == robotkit.runtime.RobotContactOtherKind.Object &&
+            contact.distance >= -0.004, "picker has no unintended robot contact: link=" + contact.linkIndex +
+              " (" + model.links[contact.linkIndex].id + "), otherKind=" + contact.otherKind +
+              ", otherLink=" + contact.otherLink + ", object=" + contact.otherObject +
+              ", distance=" + contact.distance + ", point=" + contact.position.x + "," + contact.position.y + "," + contact.position.z +
+              "; time=" + simulation.activeSession().simulationTime() + "; completed=" + mission.completed);
+        }
+        var held = simulation.heldObjectIds();
+        check(held.length <= 1, "picker holds at most one carton");
+        if (mission.completed == lastDone) continue;
+        check(mission.completed == lastDone + 1, "picker completes each step individually");
+        var step = mission.mission.steps[lastDone];
+        if (step.kind == "pick") {
+          var at = step.at;
+          if (at == null) throw "picker pick has no carton";
+          check(held.join(",") == "project:" + at.occurrence, "picker picks the intended carton");
+        } else {
+          check(held.length == 0, "picker releases each carton");
+          for (_ in 0...50) simulation.step();
+          var at = step.at;
+          if (at == null) throw "picker place has no slot";
+          var seat = placement.worldConnector(at.occurrence, at.connector);
+          var box = pose("project:box" + placed);
+          var scale = generated.metresPerUnit;
+          var error = Math.sqrt(Math.pow(box.position[0] - seat.x * scale, 2) +
+            Math.pow(box.position[1] - seat.y * scale, 2) +
+            Math.pow(box.position[2] - (seat.z * scale + 0.025), 2));
+          check(error <= 0.002, "picker carton is within 2 mm of its slot: " + error);
+          var targetYaw:Float = step.yaw == null ? 0.0 : step.yaw;
+          var angle = new robotkit.spatial.Quat(box.rotation[0], box.rotation[1], box.rotation[2], box.rotation[3])
+            .angularDistance(robotkit.spatial.Quat.fromAxisAngle(new robotkit.spatial.Vec3(0, 0, 1), targetYaw));
+          check(angle <= 2 * Math.PI / 180, "picker carton is within 2 degrees of its slot");
+          placed++;
+        }
+        lastDone = mission.completed;
+      }
+      check(mission.finished && mission.completed == 12 && placed == 6, "picker places all six cartons: completed=" +
+        mission.completed + ", placed=" + placed + ", plans=" + planned + ", homing=" + mission.homingSeconds +
+        ", time=" + simulation.activeSession().simulationTime() + ", motion=" + motion.sessionState() +
+        ", q=" + mission.robot.runtime.snapshot().q.toArray().join(","));
+      check(planned > 0 && motion.checks.plans > 0, "picker executes physically checked plans");
+      check(motion.checks.count(PlanDiagnosticKind.StepperStall) == 0, "picker drive checks report no stall");
+      check(measuredTicks > 0 && bytes / measuredTicks < 200000, "picker allocates below its assumed 200 KB execution-tick budget");
+      Sys.println((yaw ? "gantry C-head yaw picker mission: " : "gantry picker mission: ") + simulation.activeSession().simulationTime() + " s, six cartons; " +
+        Math.round(bytes / measuredTicks) + " bytes per execution tick; " + planned + " plans, no stalls");
+      simulation.clear(); session.dispose();
+    } catch (error:Dynamic) { simulation.clear(); session.dispose(); throw error; }
+  }
+
   static function checkRobotArm(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-arm/materia.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
@@ -913,6 +1073,97 @@ class ProjectSourceTests {
    * reaches the leg the weldment asked for along the seam's length. A second run loses the arc part-way: the weld is
    * interrupted, the torch re-approaches and restarts with an overlap, and the bead is continuous.
    */
+  static function checkTrackArm(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/track-arm/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var session = new ProjectDocumentSession(null, false);
+    session.openGeneratedProject(generated, manifest);
+    var simulation = new ApplicationSimulation(new RobotWorld());
+    simulation.setBackend(ApplicationSimulation.MUJOCO);
+    try {
+      check(simulation.rebuild(session.sensors, session.scene, session), "track arm builds: " + simulation.error);
+      var mission = simulation.missionPlayer();
+      if (mission == null || mission.handling == null) throw "Track arm has no handling mission";
+      var indices = mission.handling.motion.jointIndices;
+      check(indices.length == 7 && mission.robot.model.joints[indices[0]].name == "track",
+        "track leads six logical arm joints");
+      var travel = 0.0, lastDone = 0;
+      while (!mission.finished && simulation.activeSession().simulationTime() < 180) {
+        simulation.step();
+        check(mission.failure == null, "track positioning mission: " + mission.failure);
+        var positions = mission.robot.robot.snapshot().positions;
+        travel = Math.max(travel, positions.get(indices[0]));
+        if (mission.completed > lastDone) {
+          Sys.println('track arm positioning step ${mission.completed}: ${simulation.activeSession().simulationTime()} s, track ${positions.get(indices[0])} m');
+          lastDone = mission.completed;
+        }
+      }
+      check(mission.finished && mission.completed == 6, "both track stations complete");
+      check(travel >= 2.9, "track carries the arm between table stations");
+      var work = [for (part in simulation.capturePresentationSnapshot().environment) if (part.id == "project:workpiece") part];
+      check(work.length == 1 && Math.abs(work[0].position[0] - 2.85) < 0.005, "part reaches the far landing pad");
+      var make = mission.newHandling;
+      if (make == null) throw "Track arm cannot create coordinated motion";
+      var runner = make();
+      check(Math.abs(runner.home[0] - 3.0) < 0.001, "handling retains its current external station");
+      checkTrackArmPath(simulation, mission, runner.motion);
+    } catch (error:Dynamic) { simulation.clear(); session.dispose(); throw error; }
+    simulation.clear(); session.dispose();
+    checkWholeWeldment(root, ApplicationSimulation.MUJOCO, "track MuJoCo", "track-arm");
+  }
+
+  static function checkTrackArmPath(simulation:ApplicationSimulation, mission:MissionPlayer,
+      motion:motionkit.robot.ManipulatorMotion):Void {
+    var solver = motion.compiler.solver;
+    var entry = [0.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+    motion.run(new motionkit.program.MotionProgram([
+      motionkit.program.MotionOp.MoveJ(motionkit.program.MoveTarget.JointTarget(entry),
+        new motionkit.MotionOptions(), motionkit.program.Blend.ExactStop)]));
+    var limit = simulation.activeSession().simulationTime() + 60;
+    while (!motion.completed && motion.failure == null && simulation.activeSession().simulationTime() < limit) {
+      motion.update(simulation.timestep); simulation.step();
+    }
+    check(motion.completed && motion.failure == null, "track coordinated entry: " + motion.failure);
+    var start = solver.forward(entry);
+    var stop = new motionkit.kinematics.Pose3(start.x + 2.6, start.y, start.z, start.qx, start.qy, start.qz, start.qw);
+    var path = new motionkit.path.PosePath(motionkit.robot.HandlingPlanRunner.FRAME, [new motionkit.path.PoseLine(
+      new motionkit.path.PoseWaypoint(start, 0.002, 0.02), new motionkit.path.PoseWaypoint(stop, 0.002, 0.02),
+      motionkit.path.OrientationPolicy.FreeAboutTool, 0.1, 0.08)]);
+    // 1.2 m conservatively bounds this arm's links, joint housings and tool reach.
+    check(path.length() > 2 * 1.2, "coordinated path exceeds twice the arm's reach");
+    var kinematics:motionkit.robot.ManipulatorKinematics = cast solver;
+    kinematics.preferredPosture = entry;
+    check(kinematics.manipulator.external[0] && kinematics.manipulator.swivel == null,
+      "coordinated planning derives the track without inventing a swivel");
+    motion.run(new motionkit.program.MotionProgram([
+      motionkit.program.MotionOp.FollowPath(path, motionkit.robot.HandlingPlanRunner.FRAME, 0.08, [])]));
+    var worst = 0.0, margin = Math.POSITIVE_INFINITY, jump = 0.0, previous = entry.copy(), last = entry.copy();
+    limit = simulation.activeSession().simulationTime() + 120;
+    while (!motion.completed && motion.failure == null && simulation.activeSession().simulationTime() < limit) {
+      motion.update(simulation.timestep); simulation.step();
+      var feedback = mission.robot.robot.snapshot().positions;
+      last = [for (index in motion.jointIndices) feedback.get(index)];
+      var tip = mission.toolContact();
+      var along = Math.max(0.0, Math.min(2.6, tip.x - start.x));
+      worst = Math.max(worst, Math.sqrt(Math.pow(tip.x - start.x - along, 2) + Math.pow(tip.y - start.y, 2) + Math.pow(tip.z - start.z, 2)));
+      for (index in 1...7) {
+        var bound = kinematics.manipulator.group.limitsOf(index);
+        margin = Math.min(margin, Math.min(last[index] - bound.lower, bound.upper - last[index]));
+        jump = Math.max(jump, Math.abs(last[index] - previous[index]));
+      }
+      check(-1.4 + last[3] < -0.2, "coordinated path retains its elbow branch");
+      check(Math.abs(last[6] - entry[6]) < 1.0, "coordinated path retains its wrist winding");
+      previous = last.copy();
+    }
+    check(motion.completed && motion.failure == null, "track coordinated path: " + motion.failure);
+    var end = mission.toolContact();
+    check(Math.sqrt(Math.pow(end.x - stop.x, 2) + Math.pow(end.y - stop.y, 2) + Math.pow(end.z - stop.z, 2)) < 0.002, "coordinated TCP reaches its endpoint within 2 mm");
+    check(worst < 0.002, 'track path error stays within 2 mm ($worst m)');
+    check(last[0] - entry[0] > 0.8 * 2.6, "track supplies most of the coordinated travel");
+    check(margin > 0.15 && jump < 0.05, 'arm retains 0.15 rad posture margin without branch jumps ($margin margin, $jump jump)');
+    Sys.println('track arm coordinated: 2.6 m path, ${last[0] - entry[0]} m track travel, ${worst * 1000} mm error, $margin rad posture margin, $jump rad maximum joint step');
+  }
+
   static function checkRobotWelder(root:String):Void {
     checkWholeWeldment(root, ApplicationSimulation.MUJOCO, "MuJoCo");
     checkWholeWeldment(root, ApplicationSimulation.DETERMINISTIC, "test backend");
@@ -1013,29 +1264,38 @@ class ProjectSourceTests {
    * asked for, the wire tip stays on the seams, the arm and torch never come closer to the cell than the planner's margins
    * (measured on the simulated arm's real joints), and no arc is lost. The cycle time is reported.
    */
-  static function checkWholeWeldment(root:String, backend:Int, label:String):Void {
-    var cell = openWelder(root, "materia.project.json", null, backend);
+  static function checkWholeWeldment(root:String, backend:Int, label:String, example:String = "robot-welder"):Void {
+    var onlyStep = example == "gantry-welder" ? Sys.getEnv("GANTRY_WELD_ONLY_STEP") : null;
+    var cell = openWelder(root, example == "track-arm" ? "materia.welder.project.json" : "materia.project.json", onlyStep == null ? null : function(generated) {
+      var mission:materia.project.SceneArtifact.SceneArtifactMission = cast generated.mission;
+      var index = Std.parseInt(onlyStep);
+      if (index == null || index < 0 || index >= mission.steps.length) throw "Invalid gantry weld step filter";
+      mission.steps = [mission.steps[index]];
+    }, backend, example);
     var simulation = cell.simulation, mission = cell.mission, welder = cell.welder, beads = cell.beads;
-    var generated = MateriaProjectRunner.loadProject(FileSystem.fullPath(root + "/machinekit/examples/robot-welder/materia.project.json"));
-    var steps = cast(generated.mission, materia.project.SceneArtifact.SceneArtifactMission).steps;
-    check(steps.length == 4, 'the default mission welds the weldment in four runs, got ${steps.length}');
+    var steps = mission.mission.steps;
+    var expectedRuns = onlyStep == null && example != "track-arm" ? 4 : 1;
+    check(steps.length == expectedRuns, 'the weld mission has $expectedRuns runs, got ${steps.length}');
     var seams = 0;
     for (step in steps) seams += cast(step.weld, materia.project.SceneArtifact.SceneArtifactWeld).path.length;
-    check(seams == 10, 'the runs hold all ten seams, got $seams');
-    var strayed = 0.0, nearest = 1e9;
+    check(seams == (onlyStep == null && example != "track-arm" ? 10 : cast(steps[0].weld, materia.project.SceneArtifact.SceneArtifactWeld).path.length), 'the runs hold the requested CAD seams, got $seams');
+    var strayed = 0.0, nearest = 1e9, wireError = 0.0;
     var violation:Null<String> = null;
+    var trackStart:Null<Float> = null, trackLast = 0.0;
+    var armMargin = Math.POSITIVE_INFINITY, armJump = 0.0;
+    var previousArm:Null<Array<Float>> = null;
     var restarts = 0, done = 0, tick = 0;
     var finished:Array<Float> = [];
     var limit = simulation.activeSession().simulationTime() + 600;
     while (!mission.finished && simulation.activeSession().simulationTime() < limit) {
       simulation.step();
       tick++;
-      if (mission.failure != null) throw '$label: the weldment weld failed after ${simulation.activeSession().simulationTime()} s: ${mission.failure}';
+      if (mission.failure != null) throw '$label: the weldment weld failed after ${simulation.activeSession().simulationTime()} s: ${mission.failure}; reading=${haxe.Json.stringify(welder.reading())}, tip=${welder.tip()}, max seam error=$strayed, wire angle=$wireError';
       if (mission.completed > done) {
         // The runner's restarts still belong to the weld that just finished.
         restarts += mission.weldRestarts();
         done = mission.completed;
-        Sys.println('robot welder ($label): run $done planned in ' + mission.planReport());
+        Sys.println('welder ($label): run $done planned in ' + mission.planReport());
         finished.push(Math.round(simulation.activeSession().simulationTime() * 10) / 10);
       }
       var step = mission.weldingStep();
@@ -1051,7 +1311,35 @@ class ProjectSourceTests {
             Math.pow(relative[2] - bead.tangent[2] * clamped, 2)));
         }
         nearest = Math.min(nearest, best);
-        if (welder.reading().arc) strayed = Math.max(strayed, best);
+        if (welder.reading().arc) {
+          strayed = Math.max(strayed, best);
+          if (example == "gantry-welder" || example == "track-arm") {
+            var welding:processkit.WeldingPlanRunner = cast mission.welding;
+            var motion = welding.motion;
+            var observed = mission.robot.robot.snapshot();
+            if (example == "track-arm") {
+              var solver:motionkit.robot.ManipulatorKinematics = cast motion.compiler.solver;
+              check(solver.manipulator.external[0] && solver.manipulator.swivel == null,
+                "track welding derives one external axis without a swivel");
+              var q = [for (index in motion.jointIndices) observed.positions.get(index)];
+              if (trackStart == null) trackStart = q[0];
+              trackLast = q[0];
+              for (index in 1...7) {
+                var bound = solver.manipulator.group.limitsOf(index);
+                armMargin = Math.min(armMargin, Math.min(q[index] - bound.lower, bound.upper - q[index]));
+                if (previousArm != null) armJump = Math.max(armJump, Math.abs(q[index] - previousArm[index]));
+              }
+              previousArm = q;
+            }
+            var seam:motionkit.path.PosePath = cast welding.seam;
+            var desired = seam.poseAt(welding.travelled());
+            var actual = motion.compiler.solver.forward([for (index in motion.jointIndices) observed.positions.get(index)]);
+            var axis = new robotkit.spatial.Vec3(0, 0, 1);
+            var wanted = new robotkit.spatial.Quat(desired.qx, desired.qy, desired.qz, desired.qw).rotate(axis);
+            var seen = new robotkit.spatial.Quat(actual.qx, actual.qy, actual.qz, actual.qw).rotate(axis);
+            wireError = Math.max(wireError, Math.acos(Math.max(-1.0, Math.min(1.0, wanted.dot(seen)))));
+          }
+        }
         if (tick % 5 == 0 && violation == null) {
           var found = mission.clearanceViolation(best <= processkit.WeldPathPlanner.CONTACT_ZONE);
           if (found != null) violation = '${found.a} is ${Math.round(found.distance * 10000) / 10} mm from ${found.b} (needs ${Math.round(found.required * 10000) / 10}) at ${Math.round(simulation.activeSession().simulationTime() * 10) / 10} s';
@@ -1060,10 +1348,21 @@ class ProjectSourceTests {
     }
     var time = Math.round(simulation.activeSession().simulationTime() * 10) / 10;
     check(mission.finished && mission.failure == null, '$label: the whole weldment is welded within $time s: ${mission.failure}');
-    check(done == 4, '$label: four welds finished, got $done');
+    check(done == expectedRuns, '$label: $expectedRuns welds finished, got $done');
     check(violation == null, '$label: no clearance violation along the way: $violation');
+    if (example == "gantry-welder" || example == "track-arm") check(wireError <= 2 * Math.PI / 180,
+      '$label: work/travel directions stay within 2 degrees of the authored process wire axis ($wireError rad)');
     check(restarts == 0, '$label: the weldment is welded without losing the arc ($restarts restarts)');
     check(strayed < 0.0015, '$label: the wire tip stayed within ${strayed * 1000} mm of the seams while the arc burned');
+    if (example == "track-arm") {
+      Sys.println('track weld: ${Math.abs(trackLast - (trackStart == null ? 0.0 : trackStart))} m track travel, $armMargin rad posture margin, $armJump rad maximum joint step');
+      check(trackStart != null && Math.abs(trackLast - (trackStart == null ? 0.0 : trackStart)) > 0.7 * 2.6,
+        'track carries at least 70% of the 2.6 m weld ($trackStart to $trackLast m)');
+      check(armMargin > 0.15 && armJump < 0.05,
+        'track welding keeps 0.15 rad arm margin without IK branch jumps ($armMargin margin, $armJump jump)');
+      check(beads.beads.length == 1 && beads.beads[0].bead.length > 2 * 1.2,
+        "CAD weld seam exceeds twice the conservative 1.2 m arm reach");
+    }
     var legs:Array<String> = [];
     var lengths:Array<String> = [];
     for (entry in beads.beads) {
@@ -1079,17 +1378,20 @@ class ProjectSourceTests {
       var path = beads.beadOf(step);
       check(path.gaps() == 0 && path.stray < 0.1 * path.deposited, '$label: step $step: the bead has no gap and little missed the seams');
     }
-    Sys.println('robot welder ($label): whole weldment, ${steps.length} runs and $seams seams, cycle ${time} s (runs done at ${finished.join(", ")} s), ' +
+    Sys.println('welder ($label): whole weldment, ${steps.length} runs and $seams seams, cycle ${time} s (runs done at ${finished.join(", ")} s), ' +
       'tip within ${Math.round(strayed * 10000) / 10} mm of the seams, legs ${legs.join("/")} mm, bead lengths ${lengths.join("/")} mm, no clearance violation');
     simulation.clear();
     cell.session.dispose();
   }
 
+  static function checkGantryWelder(root:String):Void
+    checkWholeWeldment(root, ApplicationSimulation.MUJOCO, "gantry MuJoCo", "gantry-welder");
+
   /** A welder cell open in the simulation on MuJoCo, from one of the example's manifests. */
   static function openWelder(root:String, manifestName:String, ?adjust:app.MateriaProjectRunner.GeneratedAssemblyScene -> Void,
-      ?backend:Int):{session:ProjectDocumentSession, simulation:ApplicationSimulation, mission:MissionPlayer, welder:processkit.simulation.SimulatedWelder,
+      ?backend:Int, example:String = "robot-welder"):{session:ProjectDocumentSession, simulation:ApplicationSimulation, mission:MissionPlayer, welder:processkit.simulation.SimulatedWelder,
       beads:WeldBeads} {
-    var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-welder/" + manifestName);
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/" + example + "/" + manifestName);
     var generated = MateriaProjectRunner.loadProject(manifest);
     if (adjust != null) adjust(generated);
     var session = new ProjectDocumentSession(null, false);
@@ -1099,6 +1401,14 @@ class ProjectSourceTests {
     check(simulation.rebuild(session.sensors, session.scene, session), "the welding cell builds: " + simulation.error);
     var mission = simulation.missionPlayer(), welder = simulation.welder(), beads = simulation.weldBeads();
     if (mission == null || welder == null || beads == null) throw "the welding cell has no mission, welder or weld metal";
+    if (example == "gantry-welder") {
+      var welding:processkit.WeldingPlanRunner = cast mission.welding;
+      var motion = welding.motion;
+      check(motion.compiler.solver.jointCount() == 5, "the gantry welds with XYZ and CA");
+      var solver:motionkit.robot.ManipulatorKinematics = cast motion.compiler.solver;
+      check(processkit.WeldingPlanRunner.wristJointIndices(solver.manipulator).length == 2,
+        "the gantry welding wrist derives its two rotary limits");
+    }
     return {session: session, simulation: simulation, mission: mission, welder: welder, beads: beads};
   }
 
@@ -1665,6 +1975,69 @@ class ProjectSourceTests {
     physical.dispose();
   }
 
+  /** Test deployment wiring is explicit; no physical bench pins are inferred here. */
+  static function routerDeviceBinding(model:RobotModel, stepTickHz:Int):DeviceBinding {
+    var inputs:Array<robotkit.device.DeviceInput> = [];
+    for (contact in model.switches) {
+      var matches:Array<robotkit.model.Actuator> = [];
+      for (actuator in model.actuators) switch actuator.transmission {
+        case SimpleTransmission(shaft, _, _): if (shaft == contact.driveJoint) matches.push(actuator);
+      }
+      check(matches.length == 1, "Router switch has exactly one physical motor side: " + contact.id);
+      inputs.push(new robotkit.device.DeviceInput(inputs.length, contact.id, matches[0].id, false));
+    }
+    var channels = DeviceLayout.forActuators(model).channels;
+    return DeviceBinding.bind(model, new DeviceLayout(channels, inputs), stepTickHz);
+  }
+
+  /** Physical screw router homes using RKD6 switch captures, never host switch synthesis. */
+  static function checkVirtualRouterHoming(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/cnc-router/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var definition:AssemblyDefinition = cast generated.assemblyDefinition;
+    var model = AssemblySimulationBridge.toRobotModel(definition, generated.physical).model;
+    var homes = [for (contact in model.switches) if (contact.role == "home") contact];
+    check(homes.length == 4, "Physical router declares X, Z and two independent Y home switches");
+    var binding = routerDeviceBinding(model, 40000);
+    var axes = [for (joint in binding.model.joints) if (joint.type == JointType.Prismatic) {
+      var limits = binding.model.coupledLimits(joint.id, new SteadyLoads());
+      new motionkit.axis.MotionAxisBlueprint(joint.id, [joint.id], joint.limits.lower,
+        joint.limits.upper, limits.requireVelocity(), limits.requireAcceleration(),
+        joint.id == "z" ? joint.limits.upper : joint.limits.lower);
+    }];
+    var blueprint = motionkit.robot.MotionSystemBlueprint.fromRobotModel(binding.model, axes);
+    var options = new robotkit.runtime.VirtualDeviceOptions();
+    // Four motors' short home ramps require more than the default 921600-baud link.
+    // This is the virtual deployment's rate, not a verified bench UART assignment.
+    options.baud = 2000000;
+    options.actuators = binding.virtualActuators(); options.inputs = binding.virtualInputs();
+    var harness = new SimulationHarness(0.01);
+    try {
+      var runtime = harness.simulation.addRobot(blueprint.runtime, null, options);
+      for (_ in 0...30) harness.step();
+      var robot = new robotkit.simulation.SimulatedRobot("virtual-router", runtime, binding.model.name,
+        [for (link in binding.model.links) link.name], [for (joint in binding.model.joints) joint.name]);
+      var sides = robotkit.device.DeviceHomingSides.install(runtime, blueprint.runtime, binding, 0.01);
+      var motion = new motionkit.robot.MotionSystem(robot, blueprint);
+      motion.configureRuntimeHoming(runtime, () -> {}, sides);
+      motion.home();
+      var ticks = 0;
+      while (motion.homingStatus() != "Complete" && ticks++ < 60000) {
+        harness.step();
+        motion.update(0.01);
+      }
+      check(motion.homingStatus() == "Complete", "Router homes through virtual RKD6: " + motion.homingStatus());
+      var snapshot = runtime.snapshot();
+      for (index in 0...binding.model.joints.length) if (binding.model.joints[index].type == JointType.Prismatic) {
+        check(runtime.isReferenced(index), "Device-homed router axis is referenced");
+        check(Math.abs(snapshot.q.get(index) - (binding.model.joints[index].id == "z"
+          ? binding.model.joints[index].limits.upper : binding.model.joints[index].limits.lower)) < 0.00005,
+          "Device-homed router returns to its reference within 50 micrometres");
+      }
+      harness.dispose();
+    } catch (error:Dynamic) { harness.dispose(); throw error; }
+  }
+
   static function checkCncRouter(root:String, belts:Bool = false):Void {
     var kind = belts ? "belt router" : "screw router";
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/cnc-router/" + (belts ? "belts/" : "") + "materia.project.json");
@@ -1700,7 +2073,7 @@ class ProjectSourceTests {
     // generate at its microstepping (40 kHz over 3200 steps a turn: 78.5 rad/s), and the screw's
     // critical speed, all through the axis's ratio to the motor.
     var motorSpeed = 2 * 24 / (50 * 2.5e-3 * 2.8);
-    var binding = DeviceBinding.bind(model, DeviceLayout.forActuators(model), controller.stepTickHz);
+    var binding = routerDeviceBinding(model, controller.stepTickHz);
     var stepSpeed = controller.stepTickHz / binding.channels[0].stepsPerUnit;
     var wired = binding.model;
     var steady = new SteadyLoads();
@@ -1762,6 +2135,7 @@ class ProjectSourceTests {
     // The Z screw (and the X screw of the screw router) turns half a turn for every millimetre of its axis.
     var screwParts = belts ? ["", "screwZCoupling"] : ["screwXCoupling", "screwZCoupling"];
     var screwStart = [for (id in screwParts) id == "" ? [] : partRotation(id)];
+    var lastHomingSeconds = player.homingSeconds, machiningReference = false;
     var lowest = 0.0, steps = 0, stepping = 0.0, tools:Array<Int> = [player.loadedTool];
     // Allocation is counted, not timed, so it holds whatever else the machine is doing.
     var allocatedBefore = hl.Gc.totalAllocated(), collectionsBefore = hl.Gc.collections();
@@ -1770,9 +2144,16 @@ class ProjectSourceTests {
       simulation.step();
       stepping += Sys.time() - before;
       check(simulation.cncFailure() == null, 'the router program runs: ${simulation.cncFailure()}');
-      if (steps % 10 == 0) lowest = Math.min(lowest, toolPosition()[2] - start[2]);
+      if (machiningReference && steps % 10 == 0) lowest = Math.min(lowest, toolPosition()[2] - start[2]);
       if (player.loadedTool != tools[tools.length - 1]) tools.push(player.loadedTool);
-      if (steps % 1000 == 0) {
+      if (!machiningReference && lastHomingSeconds > 0 && player.homingSeconds == lastHomingSeconds) {
+        // Homing establishes coordinate and drive zeros independently. Compare
+        // physical screw travel from the completed homing reference.
+        start = toolPosition();
+        screwStart = [for (id in screwParts) id == "" ? [] : partRotation(id)];
+        machiningReference = true;
+        lowest = 0.0;
+      } else if (machiningReference && steps % 1000 == 0) {
         // The X and Z screws turn half a turn for every millimetre their axes move.
         var now = toolPosition();
         for (axis in [0, 2]) {
@@ -1784,7 +2165,10 @@ class ProjectSourceTests {
             'the ${axis == 0 ? "X" : "Z"} screw turns with its axis: ${2 * Math.acos(Math.min(1.0, dot))} rad for $turned');
         }
       }
+      lastHomingSeconds = player.homingSeconds;
     }
+    check(player.passes == 1,
+      'the $kind finishes its program: total=${simulation.activeSession().simulationTime()} s, homing=${player.homingSeconds} s, line=${player.currentLine}, homingStatus=${@:privateAccess player.homing.homingStatus()}');
     var allocatedPerTick = (hl.Gc.totalAllocated() - allocatedBefore) / steps;
     var collections = hl.Gc.collections() - collectionsBefore;
     // About 46 KB a tick when measured (2026-10-02, sensor values pooled per snapshot): mostly robot snapshots, then the stock's cut moves.
@@ -1792,7 +2176,10 @@ class ProjectSourceTests {
     // The pass ends with the drill; the next pass, started as this one is counted, loads the end mill again.
     var changes = tools.join(",");
     check(changes == "1,2" || changes == "1,2,1", 'the router starts with the end mill and changes to the drill, got $tools');
-    var seconds = simulation.activeSession().simulationTime();
+    var totalSeconds = simulation.activeSession().simulationTime();
+    var homingSeconds = player.homingSeconds;
+    var seconds = totalSeconds - homingSeconds;
+    check(homingSeconds > 0 && seconds > 0, 'the $kind reports homing separately from machining');
     check(player.passes == 1, 'the router finishes one pass of its program, at $seconds s');
     // What the plan checks found over the pass: stepper stalls and the drives' stretch against the tolerance.
     var checks = player.planChecks();
@@ -1820,7 +2207,14 @@ class ProjectSourceTests {
     check(stock.rapidContacts == 0 && stock.collisions == 0,
       'no rapid runs through the stock and the holder never touches it (${stock.rapidContacts}, ${stock.collisions})');
     var deviation = stock.deviation();
-    check(deviation.gouge < 1e-9, 'nothing is cut from the finished plate, gouge ${deviation.gouge} m³');
+    // Homing has finite repeatability. Bound missing target volume by the
+    // machined wall/floor area swept through the stated positional tolerance.
+    // A raw ray-stock volume comparison includes even sub-tolerance offsets.
+    var wallArea = Math.PI * (0.0383 * 0.006 + 4 * 0.010 * 0.0054 + 4 * 0.0055 * (0.020 - 0.0054));
+    var floorArea = Math.PI * (0.01915 * 0.01915 + 4 * (0.005 * 0.005 - 0.00275 * 0.00275));
+    var gougeAllowance = (wallArea + floorArea) * MachiningStock.TOLERANCE;
+    check(deviation.gouge < gougeAllowance + 1e-9,
+      'the homed plate stays within its machining tolerance: gouge ${deviation.gouge} m³, surface-volume bound $gougeAllowance m³');
     check(deviation.leftover < recesses * 0.02,
       'only slivers of stock are left on the plate, leftover ${deviation.leftover} m³');
     check(stock.geometry().triangleCount() > 12, "the machined stock meshes");
@@ -1831,7 +2225,7 @@ class ProjectSourceTests {
       check(simulation.cncFailure() == null, 'the looping program starts its next pass: ${simulation.cncFailure()}');
     }
     session.dispose();
-    Sys.println('cnc $kind milled the motor plate in ${Math.round(seconds * 10) / 10} s of machining: removed ' +
+    Sys.println('cnc $kind milled the motor plate in ${Math.round(seconds * 10) / 10} s of machining (homing ${Math.round(homingSeconds * 10) / 10} s, total ${Math.round(totalSeconds * 10) / 10} s): removed ' +
       '${Math.round(stock.removed * 1e10) / 10} mm³ of ${Math.round(recesses * 1e10) / 10}, leftover ' +
       '${Math.round(deviation.leftover * 1e10) / 10} mm³, gouge ${Math.round(deviation.gouge * 1e10) / 10} mm³; ' +
       '${Math.round(stepping / steps * 1e5) / 100} ms per simulated tick; ${stock.rapidContacts} ticks of rapid label cut');
@@ -1897,6 +2291,7 @@ class ProjectSourceTests {
       return until == null;
     }
     var lines = player.sourceLines();
+    check(run(600.0, () -> @:privateAccess player.homingComplete), "the router completes physical homing before machining controls");
     check(run(20.0, () -> player.currentLine > 0), "the player reports the line it runs");
     check(StringTools.trim(lines[player.currentLine - 1]).length > 0, "the running line is a line of the program");
     // The CNC panel, laid out on its own and operated by pointer.
@@ -2270,6 +2665,26 @@ class ProjectSourceTests {
       checkCoreXyPlotter(root);
       return 0;
     }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "track-weld") {
+      checkWholeWeldment(root, ApplicationSimulation.MUJOCO, "track MuJoCo", "track-arm");
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "track-arm") {
+      checkTrackArm(root);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "gantry-welder") {
+      checkGantryWelder(root);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "gantry-yaw") {
+      checkGantryPicker(root, true);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "gantry") {
+      checkGantryPicker(root);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "arm") {
       checkRobotArm(root);
       return 0;
@@ -2295,6 +2710,32 @@ class ProjectSourceTests {
       checkFarPlateWeld(root);
       return 0;
     }
+    // Resume the phase gate after the whole-weldment and seam checks.
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "after-welder-seam") {
+      checkWeldInTheAir(root);
+      checkWeldCraterFault(root);
+      checkWeldFollowsWorkpiece(root);
+      checkWeldPost(root);
+      checkWeldQualities(root);
+      checkMates(root);
+      checkBenchMill(root);
+      checkEnclosedMillProject(root);
+      checkVirtualRouterHoming(root);
+      checkCncRouter(root);
+      checkBeltRouter(root);
+      checkCoreXyPlotter(root);
+      checkMobileBase(root);
+      checkMobileMission(root);
+      checkMobileObstacle(root);
+      checkMissionOverlayEdge();
+      checkCncControls(root);
+      checkBackgroundLaunch(root);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "welder-air") {
+      checkWeldInTheAir(root);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "welder-quality") {
       checkWeldQualities(root);
       return 0;
@@ -2302,6 +2743,22 @@ class ProjectSourceTests {
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "welder-seam") {
       checkRobotWelderOn(root, ApplicationSimulation.MUJOCO, "MuJoCo");
       checkRobotWelderOn(root, ApplicationSimulation.DETERMINISTIC, "test backend");
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "router-device-home") {
+      checkVirtualRouterHoming(root);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "remaining") {
+      checkCncRouter(root);
+      checkBeltRouter(root);
+      checkCoreXyPlotter(root);
+      checkMobileBase(root);
+      checkMobileMission(root);
+      checkMobileObstacle(root);
+      checkMissionOverlayEdge();
+      checkCncControls(root);
+      checkBackgroundLaunch(root);
       return 0;
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "router") {
@@ -2315,6 +2772,7 @@ class ProjectSourceTests {
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "controls") {
       checkCncControls(root);
+      checkBackgroundLaunch(root);
       return 0;
     }
     var manifest = FileSystem.fullPath(root + "/cadkit/examples/modeling/materia.project.json");
@@ -2591,10 +3049,15 @@ class ProjectSourceTests {
     if (FileSystem.exists(output)) FileSystem.deleteFile(output);
     checkRobotArm(root);
     checkCobotArms(root);
+    checkGantryPicker(root);
+    checkGantryPicker(root, true);
+    checkGantryWelder(root);
+    checkTrackArm(root);
     checkRobotWelder(root);
     checkMates(root);
     checkBenchMill(root);
     checkEnclosedMillProject(root);
+    checkVirtualRouterHoming(root);
     checkCncRouter(root);
     checkBeltRouter(root);
     checkCoreXyPlotter(root);

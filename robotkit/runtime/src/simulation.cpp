@@ -5,6 +5,7 @@
 #include "sensor_math.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <limits>
 #include <stdexcept>
@@ -329,7 +330,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             config.peripheral_parameters.assign(robot_desc->virtual_peripheral_parameters,
                 robot_desc->virtual_peripheral_parameters + robot_desc->virtual_peripheral_parameter_count);
         }
-        if (robot_desc->struct_size >= sizeof(*robot_desc) && robot_desc->virtual_device_profile)
+        if (robot_desc->struct_size >= offsetof(rk_simulation_robot_desc, virtual_device_profile) + sizeof(robot_desc->virtual_device_profile) && robot_desc->virtual_device_profile)
             config.profile = robot_desc->virtual_device_profile;
         if (robot_desc->struct_size >=
             offsetof(rk_simulation_robot_desc, collision_half_extents) &&
@@ -340,6 +341,13 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 actuator.joint = robot_desc->virtual_device_actuator_joint[i];
                 actuator.ratio = robot_desc->virtual_device_actuator_ratio[i];
                 actuator.offset = robot_desc->virtual_device_actuator_offset[i];
+                if (robot_desc->struct_size >= sizeof(*robot_desc) && robot_desc->virtual_device_feedback_count) {
+                    if (robot_desc->virtual_device_feedback_count != robot_desc->virtual_device_actuator_count)
+                        return RK_ERROR_INVALID_ARGUMENT;
+                    actuator.feedback_joint = robot_desc->virtual_device_feedback_joint[i];
+                    actuator.feedback_ratio = robot_desc->virtual_device_feedback_ratio[i];
+                    actuator.feedback_offset = robot_desc->virtual_device_feedback_offset[i];
+                }
                 actuator.steps_per_unit = robot_desc->virtual_device_actuator_steps_per_unit[i];
                 actuator.max_rate = robot_desc->virtual_device_actuator_max_rate[i];
                 actuator.direction_setup_ticks =
@@ -351,6 +359,23 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 actuator.id.assign(reinterpret_cast<const char *>(id),
                     reinterpret_cast<const char *>(end));
                 config.actuators.push_back(actuator);
+            }
+        }
+        if (robot_desc->struct_size >= offsetof(rk_simulation_robot_desc, virtual_device_feedback_count)) {
+            if (robot_desc->virtual_device_input_count > 64) return RK_ERROR_INVALID_ARGUMENT;
+            for (std::uint32_t i = 0; i < robot_desc->virtual_device_input_count; ++i) {
+                const auto *id = robot_desc->virtual_device_input_switch_ids + i * 64;
+                const auto *end = std::find(id, id + 64, 0);
+                if (end == id || end == id + 64 ||
+                    robot_desc->virtual_device_input_active_high[i] > 1 ||
+                    robot_desc->virtual_device_input_active_above[i] > 1) return RK_ERROR_INVALID_ARGUMENT;
+                VirtualInputSwitch6 input;
+                input.wiring.actuator = robot_desc->virtual_device_input_actuator[i];
+                input.wiring.active_high = robot_desc->virtual_device_input_active_high[i] != 0;
+                input.wiring.switch_id.assign(reinterpret_cast<const char *>(id), reinterpret_cast<const char *>(end));
+                input.active_above = robot_desc->virtual_device_input_active_above[i] != 0;
+                input.threshold_steps = robot_desc->virtual_device_input_threshold_steps[i];
+                config.inputs.push_back(std::move(input));
             }
         }
         virtual_endpoint = VirtualDeviceEndpoint::create(blueprint, config);
@@ -681,8 +706,60 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             binding->actuated_joints_.push_back(source.type != RK_RUNTIME_JOINT_FIXED && !process_joint);
             joints_.push_back(joint);
         }
+        // Parallel powered drive shafts need independent targets for squaring.
+        // An unpowered idler following the same axis is not a second drive. Keep
+        // ordinary single-output transmissions physically constrained so their
+        // load and shaft cannot drift apart while tracking a moving target.
+        std::vector<uint8_t> independent_coupling(blueprint.joint_count, 0);
+        for (uint32_t i = 0; i < blueprint.coupling_count; ++i)
+            for (uint32_t k = 0; k < i; ++k)
+                if (blueprint.couplings[i].leader == blueprint.couplings[k].leader &&
+                    blueprint.couplings[i].follower != blueprint.couplings[k].follower &&
+                    (blueprint.joints[blueprint.couplings[i].follower].limit_flags & RK_LIMIT_EFFORT) &&
+                    blueprint.joints[blueprint.couplings[i].follower].max_effort > 0.0 &&
+                    (blueprint.joints[blueprint.couplings[k].follower].limit_flags & RK_LIMIT_EFFORT) &&
+                    blueprint.joints[blueprint.couplings[k].follower].max_effort > 0.0)
+                    independent_coupling[blueprint.couplings[i].leader] = 1;
+        for (uint32_t pass = 0; pass < blueprint.joint_count; ++pass) {
+            bool changed = false;
+            for (uint32_t i = 0; i < blueprint.coupling_count; ++i) {
+                const auto &term = blueprint.couplings[i];
+                if (independent_coupling[term.leader] || independent_coupling[term.follower]) {
+                    changed |= !independent_coupling[term.leader] || !independent_coupling[term.follower];
+                    independent_coupling[term.leader] = independent_coupling[term.follower] = 1;
+                }
+            }
+            if (!changed) break;
+        }
+        std::vector<uint8_t> physical_coupling(blueprint.joint_count, 0);
+        for (uint32_t i = 0; i < blueprint.joint_count; ++i)
+            physical_coupling[i] = !independent_coupling[i];
+        if (blueprint.struct_size >= offsetof(rk_robot_runtime_blueprint, joint_servo) +
+                sizeof(blueprint.joint_servo))
+            for (uint32_t i = 0; i < blueprint.joint_count; ++i)
+                physical_coupling[i] |= blueprint.joint_servo[i].stiffness > 0.0;
+        // Multiple-input mechanisms keep their physical summed constraint.
+        for (uint32_t i = 0; i < blueprint.coupling_count; ++i)
+            for (uint32_t k = 0; k < i; ++k)
+                if (blueprint.couplings[i].follower == blueprint.couplings[k].follower)
+                    physical_coupling[blueprint.couplings[i].follower] = 1;
+        for (uint32_t pass = 0; pass < blueprint.joint_count; ++pass) {
+            bool changed = false;
+            for (uint32_t i = 0; i < blueprint.coupling_count; ++i) {
+                const auto &term = blueprint.couplings[i];
+                if (physical_coupling[term.leader] || physical_coupling[term.follower]) {
+                    changed |= !physical_coupling[term.leader] || !physical_coupling[term.follower];
+                    physical_coupling[term.leader] = physical_coupling[term.follower] = 1;
+                }
+            }
+            if (!changed) break;
+        }
         for (uint32_t index = 0; index < blueprint.coupling_count; ++index) {
             const auto &source = blueprint.couplings[index];
+            if (!physical_coupling[source.follower]) {
+                binding->kinematic_couplings_.push_back(source);
+                continue;
+            }
             nksim_joint_coupling_desc coupling{};
             coupling.struct_size = sizeof(coupling);
             coupling.leader = binding->joints_[source.leader];
@@ -729,6 +806,10 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         // Servo motor joints (see rk_robot_joint_servo) carry the joints coupled to them, which then
         // take no commands of their own.
         binding->slip_.assign(blueprint.joint_count, 0.0);
+        binding->squaring_offset_.assign(blueprint.joint_count, 0.0);
+        binding->counter_origin_.assign(blueprint.joint_count, 0.0);
+        binding->squaring_hold_.assign(blueprint.joint_count, 0);
+        binding->squaring_position_.assign(blueprint.joint_count, 0.0);
         binding->servo_.assign(blueprint.joint_count, rk_robot_joint_servo{});
         binding->reflected_inertia_.assign(blueprint.joint_count, 0.0);
         if (blueprint.struct_size >= offsetof(rk_robot_runtime_blueprint, process_joint))
@@ -846,6 +927,78 @@ rk_result Simulation::reset_robots() {
     return RK_OK;
 }
 
+rk_result Simulation::set_power_up_offsets(uint32_t robot_index, const double *offsets, uint32_t count,
+                                         const uint32_t *side_drives, uint32_t side_count) {
+    Lock lock(session_);
+    const auto world = stopped_world();
+    if (!world || !offsets || robot_index >= bindings_.size()) return RK_ERROR_INVALID_ARGUMENT;
+    auto binding = bindings_[robot_index].lock();
+    if (!binding) return RK_ERROR_INVALID_HANDLE;
+    if (std::find(virtual_bindings_.begin(), virtual_bindings_.end(), binding) != virtual_bindings_.end())
+        return RK_ERROR_UNSUPPORTED;
+    const auto &blueprint = runtimes_[robot_index]->blueprint();
+    if (count != blueprint.joint_count) return RK_ERROR_INVALID_ARGUMENT;
+    if (side_count > count || (side_count != 0 && !side_drives)) return RK_ERROR_INVALID_ARGUMENT;
+    std::array<bool, RK_MAX_JOINTS> independent_sides{};
+    for (uint32_t i = 0; i < side_count; ++i) {
+        const auto joint = side_drives[i];
+        if (joint >= count || independent_sides[joint] || !binding->actuated_joints_[joint] ||
+            binding->passive_[joint]) return RK_ERROR_INVALID_ARGUMENT;
+        uint32_t terms = 0;
+        for (uint32_t k = 0; k < blueprint.coupling_count; ++k)
+            if (blueprint.couplings[k].follower == joint) ++terms;
+        if (terms != 1) return RK_ERROR_INVALID_ARGUMENT;
+        independent_sides[joint] = true;
+    }
+    rk_robot_state observed{};
+    runtimes_[robot_index]->snapshot(observed);
+    if (observed.sequence != 0) return RK_ERROR_INVALID_STATE;
+    std::array<nksim_joint_state, RK_MAX_JOINTS> before{};
+    for (uint32_t joint = 0; joint < count; ++joint) {
+        if (!std::isfinite(offsets[joint]) || binding->counter_origin_[joint] != 0.0 ||
+            binding->slip_[joint] != 0.0 || binding->squaring_offset_[joint] != 0.0)
+            return RK_ERROR_INVALID_ARGUMENT;
+        if (blueprint.joints[joint].type == RK_RUNTIME_JOINT_FIXED) {
+            if (offsets[joint] != 0.0) return RK_ERROR_INVALID_ARGUMENT;
+            continue;
+        }
+        before[joint].struct_size = sizeof(before[joint]);
+        if (nksim_joint_get_state(world, binding->joints_[joint], &before[joint]) != NKSIM_OK)
+            return RK_ERROR_BACKEND;
+        const double position = before[joint].position + offsets[joint];
+        const auto &limits = blueprint.joints[joint];
+        if (!std::isfinite(position) || position < limits.lower_limit || position > limits.upper_limit)
+            return RK_ERROR_LIMIT;
+    }
+    for (uint32_t joint = 0; joint < count; ++joint) {
+        bool coupled = false; double expected = 0.0;
+        for (uint32_t k = 0; k < blueprint.coupling_count; ++k)
+            if (blueprint.couplings[k].follower == joint) {
+                coupled = true;
+                expected += blueprint.couplings[k].ratio * offsets[blueprint.couplings[k].leader];
+            }
+        if (coupled && !independent_sides[joint] &&
+            (!std::isfinite(expected) || std::abs(expected - offsets[joint]) > 1e-6))
+            return RK_ERROR_INVALID_ARGUMENT;
+    }
+    for (uint32_t joint = 0; joint < count; ++joint) {
+        if (blueprint.joints[joint].type == RK_RUNTIME_JOINT_FIXED) continue;
+        if (nksim_joint_set_state(world, binding->joints_[joint],
+                before[joint].position + offsets[joint], 0.0) != NKSIM_OK) {
+            for (uint32_t restore = 0; restore <= joint; ++restore)
+                if (blueprint.joints[restore].type != RK_RUNTIME_JOINT_FIXED)
+                    nksim_joint_set_state(world, binding->joints_[restore],
+                        before[restore].position, before[restore].velocity);
+            return RK_ERROR_BACKEND;
+        }
+    }
+    std::copy_n(offsets, count, binding->counter_origin_.begin());
+    // Replace initial holds with physical holds at the offset pose.
+    binding->pending_targets_.clear();
+    binding->queue_rest_holds();
+    return RK_OK;
+}
+
 rk_result Simulation::set_joint_slip(uint32_t robot_index, uint32_t joint, double offset) {
     // The tick lock orders this between completed host steps, like a base drive.
     Lock lock(session_);
@@ -857,6 +1010,23 @@ rk_result Simulation::set_joint_slip(uint32_t robot_index, uint32_t joint, doubl
     if (joint >= binding->slip_.size())
         return RK_ERROR_INVALID_ARGUMENT;
     binding->slip_[joint] = offset;
+    return RK_OK;
+}
+
+rk_result Simulation::set_squaring_hold(uint32_t robot_index, uint32_t joint, bool active,
+                                       double position) {
+    Lock lock(session_);
+    if (robot_index >= bindings_.size() || !std::isfinite(position))
+        return RK_ERROR_INVALID_ARGUMENT;
+    auto binding = bindings_[robot_index].lock();
+    if (!binding) return RK_ERROR_INVALID_HANDLE;
+    if (std::find(virtual_bindings_.begin(), virtual_bindings_.end(), binding) != virtual_bindings_.end())
+        return RK_ERROR_UNSUPPORTED;
+    if (joint >= binding->squaring_hold_.size() || !binding->actuated_joints_[joint] ||
+        binding->passive_[joint]) return RK_ERROR_INVALID_ARGUMENT;
+    binding->squaring_position_[joint] = position;
+    binding->squaring_hold_[joint] = active ? 1 : 0;
+    // Releasing preserves alignment separately from subsequent lost-step slip.
     return RK_OK;
 }
 

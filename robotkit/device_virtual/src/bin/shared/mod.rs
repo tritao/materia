@@ -51,7 +51,7 @@ pub fn run(joints: usize, controller: [u8; 16], steps_per_unit: f64) {
         while input.len() >= 8 {
             if &input[..4] != b"RKD6" { input.remove(0); continue; }
             let payload = u16::from_le_bytes([input[6], input[7]]) as usize;
-            if payload > 5000 { input.remove(0); continue; }
+            if payload + 12 > robotkit_device_protocol::frame6::MAX_FRAME_SIZE { input.remove(0); continue; }
             let size = 8 + payload + 4;
             if input.len() < size { break; }
             let frame: Vec<u8> = input.drain(..size).collect();

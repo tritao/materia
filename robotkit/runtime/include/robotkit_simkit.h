@@ -241,6 +241,18 @@ typedef struct rk_simulation_robot_desc {
     uint32_t virtual_peripheral_parameter_count;
     uint32_t virtual_external_sensor_mask;
     double virtual_peripheral_parameters[16];
+    /** Optional physical virtual-device switch wiring and step thresholds. */
+    uint32_t virtual_device_input_count;
+    uint8_t virtual_device_input_actuator[64];
+    uint8_t virtual_device_input_active_high[64];
+    uint8_t virtual_device_input_active_above[64];
+    int64_t virtual_device_input_threshold_steps[64];
+    uint8_t virtual_device_input_switch_ids[4096];
+    /** Optional original shaft feedback mappings; count zero keeps legacy mappings. */
+    uint32_t virtual_device_feedback_count;
+    uint8_t virtual_device_feedback_joint[64];
+    double virtual_device_feedback_ratio[64];
+    double virtual_device_feedback_offset[64];
 } rk_simulation_robot_desc;
 
 /** Latest numeric device observation, independent of the authored sensor layout. */
@@ -437,6 +449,20 @@ RK_API rk_result RK_CALL rk_simulation_reset_robot(rk_simulation simulation,
  */
 RK_API rk_result RK_CALL rk_simulation_set_joint_slip(
     rk_simulation simulation, uint32_t robot_index, uint32_t joint, double offset);
+/** Hold an actuated, nonpassive shaft at a physical SI position during squaring.
+ * active must be 0 or 1. Release preserves accumulated follower slip; reset clears it.
+ * The caller owns homing authorization and must release holds on cancellation or fault. */
+RK_API rk_result RK_CALL rk_simulation_set_squaring_hold(
+    rk_simulation simulation, uint32_t robot_index, uint32_t joint, uint32_t active, double position);
+/** Place a cold/reset robot at a coupling-consistent physical offset while keeping its counter origin.
+ * Full joint vector in SI units; accepted only in a stopped world before the first runtime sample. */
+RK_API rk_result RK_CALL rk_simulation_set_power_up_offsets(rk_simulation simulation,
+    uint32_t robot_index, const double *offsets RK_IN_ARRAY(count), uint32_t count);
+/** Cold startup placement with explicit independently displaced motor followers.
+ * All other joints must retain coupling-consistent displacement. Reset clears the placement. */
+RK_API rk_result RK_CALL rk_simulation_set_power_up_sides(rk_simulation simulation,
+    uint32_t robot_index, const double *offsets RK_IN_ARRAY(count), uint32_t count,
+    const uint32_t *side_drives RK_IN_ARRAY(side_count), uint32_t side_count);
 /** Teleports one attached robot's base while the simulation is stopped.
  * This does not change the pose restored by reset or resetRobot. */
 RK_API rk_result RK_CALL rk_simulation_teleport_robot(

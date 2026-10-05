@@ -83,6 +83,16 @@ class AssemblyDefinitionCodec {
 				if (reference != null && (reference.length == 0 || reference.length > 4096))
 					throw 'Connector "${connector.name}" of "${component.id}" has an invalid reference';
 			}
+			if (component.robotFlangeConnector != null && !names.exists(component.robotFlangeConnector))
+				throw 'Robot flange "${component.id}" references a missing face connector';
+			if (component.collisionHulls != null) {
+				if (component.collisionHulls.length == 0) throw 'Component "${component.id}" has no collision pieces';
+				for (hull in component.collisionHulls) {
+					if (hull == null || hull.length < 12 || hull.length > 192 || hull.length % 3 != 0)
+						throw 'Component "${component.id}" has an invalid collision hull';
+					for (value in hull) if (!Math.isFinite(value)) throw 'Component "${component.id}" has a non-finite collision hull';
+				}
+			}
 			definitions.set(component.id, component);
 		}
 
@@ -254,6 +264,23 @@ class AssemblyDefinitionCodec {
 		}
 		if (sensors.length > 0 && definition.schemaVersion < SENSOR_VERSION)
 			throw "Native assembly sensors require schema v$SENSOR_VERSION";
+		var switches = definition.switches == null ? [] : definition.switches;
+		if (switches.length > 4000) throw "Assembly has too many switches";
+		var switchIds = new Map<String, Bool>();
+		for (contact in switches) {
+			if (contact == null) throw "Assembly has a null switch";
+			var part = occurrences.get(contact.part), trigger = occurrences.get(contact.trigger);
+			if (!validText(contact.id) || switchIds.exists(contact.id) || movable.get(contact.joint) == null ||
+				(contact.driveJoint != null && (!validText(contact.driveJoint) || movable.get(contact.driveJoint) == null)) ||
+				part == null || trigger == null || part.id == trigger.id ||
+				!hasConnector(definitions.get(part.definition), contact.connector) ||
+				!hasConnector(definitions.get(trigger.definition), contact.triggerConnector) ||
+				(contact.role != "home" && contact.role != "limit") || (contact.side != -1 && contact.side != 1) ||
+				!Math.isFinite(contact.trip) || !Math.isFinite(contact.hysteresis) || contact.hysteresis < 0 ||
+				!Math.isFinite(contact.repeatability) || contact.repeatability < 0)
+				throw 'Assembly has an invalid switch "${contact.id}"';
+			switchIds.set(contact.id, true);
+		}
 		var encoders = definition.encoders == null ? [] : definition.encoders;
 		if (encoders.length > 4000) throw "Assembly has too many encoders";
 		var encoderIds = new Map<String, Bool>();
@@ -388,6 +415,7 @@ class AssemblyDefinitionCodec {
 			if (limit != null && !Math.isFinite(limit)) return false;
 		if (limits.lower != null && limits.upper != null && limits.lower > limits.upper) return false;
 		if ((limits.velocity != null && limits.velocity < 0) || (limits.effort != null && limits.effort < 0)) return false;
+		if (limits.rackingTolerance != null && (!Math.isFinite(limits.rackingTolerance) || limits.rackingTolerance <= 0)) return false;
 		if (limits.overtravel != null && (!Math.isFinite(limits.overtravel) || limits.overtravel < 0)) return false;
 		if (limits.acceleration != null && (!Math.isFinite(limits.acceleration) || limits.acceleration < 0)) return false;
 		return withinLimits(limits, value);

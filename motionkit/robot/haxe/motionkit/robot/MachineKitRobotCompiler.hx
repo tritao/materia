@@ -15,7 +15,7 @@ import robotkit.model.RobotModel;
 import robotkit.model.Transmission;
 
 /** Stable joint IDs from a physical MachineKit axis assembly. */
-typedef AssemblyAxisBinding = {
+private typedef AssemblyAxisBinding = {
   var id:String;
   var axis:LinearAxis;
   /** The link carrying the motor body; fixed parts share one link per rigid body. */
@@ -30,10 +30,72 @@ class MachineKitRobotCompiler {
   public static inline final DEFAULT_MAX_VELOCITY:Float = 0.15;
   public static inline final DEFAULT_MAX_ACCELERATION:Float = 0.5;
 
+  /** Compile the authored gantry, including its drives, through the app's bridge.
+   * Logical ceilings restrict a job; they do not replace physical drive ratings. */
+  public static function compileGantry(gantry:machinekit.gantry.Gantry,
+      maxVelocity:Float = DEFAULT_MAX_VELOCITY,
+      maxAcceleration:Float = DEFAULT_MAX_ACCELERATION):MotionSystemBlueprint {
+    if (gantry == null) throw "A physical gantry assembly is required";
+    if (!Math.isFinite(maxVelocity) || maxVelocity <= 0 ||
+        !Math.isFinite(maxAcceleration) || maxAcceleration <= 0)
+      throw "Gantry job ceilings must be finite and positive";
+    var model = physicalAssemblyModel(gantry);
+    var ids = [for (axis in gantry.axes) axis.id];
+    // Preserve the logical XYZ order while retaining every physical shaft joint.
+    var order = [for (joint in model.joints) joint.id];
+    model.joints.sort((a, b) -> {
+      var first = ids.indexOf(a.id), second = ids.indexOf(b.id);
+      if (first < 0) first = ids.length + order.indexOf(a.id);
+      if (second < 0) second = ids.length + order.indexOf(b.id);
+      return first - second;
+    });
+    var axes:Array<MotionAxisBlueprint> = [];
+    for (axis in gantry.axes) {
+      var joints = [axis.id];
+      for (_ in 0...model.joints.length) for (coupling in model.couplings) {
+        var inputs = 0;
+        for (candidate in model.couplings) if (candidate.follower == coupling.follower) inputs++;
+        if (inputs == 1 && joints.indexOf(coupling.leader) >= 0 && joints.indexOf(coupling.follower) < 0)
+          joints.push(coupling.follower);
+      }
+      var limits = model.coupledLimits(axis.id);
+      axes.push(new MotionAxisBlueprint(axis.id, joints,
+        axis.lower * MILLIMETRES_TO_METRES, axis.upper * MILLIMETRES_TO_METRES,
+        Math.min(maxVelocity, limits.requireVelocity()),
+        Math.min(maxAcceleration, limits.requireAcceleration())));
+    }
+    return MotionSystemBlueprint.fromRobotModel(model, axes);
+  }
+
+  /** Physical mass/inertia and saved actuator metadata enter one bridge invocation. */
+  static function physicalAssemblyModel(assembly:MachineAssembly):RobotModel {
+    var mechanical = new AssemblyModel();
+    assembly.addTo(mechanical, "");
+    var definition = mechanical.definition("machinekit-machine");
+    machinekit.assembly.AssemblyPreview.preserveOwnership(definition, assembly.definition());
+    var components = assembly.components();
+    var parts:Array<cadbridge.AssemblySimulationBridge.AssemblyPhysicalPart> = [];
+    for (entry in definition.definitions) {
+      var occurrence = [for (candidate in definition.occurrences) if (candidate.definition == entry.id) candidate][0];
+      var component = [for (candidate in components) if (candidate.id == occurrence.id) candidate.component][0];
+      var mass = component.massProperties();
+      var inertia = mass.inertia;
+      if (inertia == null) throw 'Machine member "${occurrence.id}" needs inertia';
+      parts.push({id: entry.id, materialId: component.materialSpec(), density: 1.0,
+        volume: mass.mass * 1e9,
+        centerOfMass: [mass.centreOfMass.x, mass.centreOfMass.y, mass.centreOfMass.z],
+        inertia: [inertia.xx * 1e9, inertia.xy * 1e9, inertia.xz * 1e9,
+          inertia.xy * 1e9, inertia.yy * 1e9, inertia.yz * 1e9,
+          inertia.xz * 1e9, inertia.yz * 1e9, inertia.zz * 1e9]});
+    }
+    return AssemblySimulationBridge.toRobotModel(definition,
+      {metresPerUnit: MILLIMETRES_TO_METRES, parts: parts}).model;
+  }
+
   /** Attach MachineKit drives to the part-level assembly model. The motor
    * drives its shaft joint; the existing lead-screw JointCoupling relates
    * shaft rotation to carriage travel. No second joint topology is built. */
-  public static function compileAssemblyAxes(model:RobotModel,
+  static function attachLinearAxisDrives(model:RobotModel,
       bindings:Array<AssemblyAxisBinding>,
       ?maxVelocity:Float = DEFAULT_MAX_VELOCITY,
       ?maxAcceleration:Float = DEFAULT_MAX_ACCELERATION):MotionSystemBlueprint {
@@ -139,41 +201,6 @@ class MachineKitRobotCompiler {
       ?maxAcceleration:Float = DEFAULT_MAX_ACCELERATION):RobotModel
     return compileLinearAxis(axis, axisId, maxVelocity, maxAcceleration).model;
 
-  /** Compiles three MachineKit axes into one serial XYZ gantry robot. */
-  public static function compileXYZGantry(xAxis:LinearAxis, yAxis:LinearAxis, zAxis:LinearAxis,
-      ?maxVelocity:Float = DEFAULT_MAX_VELOCITY,
-      ?maxAcceleration:Float = DEFAULT_MAX_ACCELERATION):MotionSystemBlueprint {
-    requireAxis(xAxis, "x");
-    requireAxis(yAxis, "y");
-    requireAxis(zAxis, "z");
-    if (!Math.isFinite(maxVelocity) || maxVelocity < 0.0)
-      throw "Gantry maximum velocity must be finite and non-negative";
-    if (!Math.isFinite(maxAcceleration) || maxAcceleration < 0.0)
-      throw "Gantry maximum acceleration must be finite and non-negative";
-
-    var assembly = new MachineAssembly();
-    var axes = [xAxis, yAxis, zAxis];
-    var ids = ["x", "y", "z"];
-    var half = Math.sqrt(0.5);
-    var rotations = [
-      {x: 0.0, y: 0.0, z: 0.0, qx: 0.0, qy: half, qz: 0.0, qw: half},
-      {x: 0.0, y: 0.0, z: 0.0, qx: -half, qy: 0.0, qz: 0.0, qw: half},
-      AssemblyFrames.identity()
-    ];
-    for (index in 0...3) {
-      assembly.include(ids[index], axes[index], rotations[index]);
-      if (index > 0) {
-        // The stage mount fixes the next motor to the preceding carriage with its machine orientation.
-        var relative = AssemblyFrames.compose(AssemblyFrames.inverse(rotations[index - 1]), rotations[index]);
-        assembly.addMemberConnector(ids[index - 1] + "/carriage", "stage", relative);
-        assembly.addMemberConnector(ids[index] + "/motor", "stage", AssemblyFrames.identity());
-        assembly.addMate(ids[index] + ".mount", "fixed", ids[index - 1] + "/carriage", "stage",
-          ids[index] + "/motor", "stage");
-      }
-    }
-    return compilePhysicalAxes(assembly, ids, axes, maxVelocity, maxAcceleration);
-  }
-
   /** Compile actual members and joints; their resolved transmissions are the only screw ratios. */
   static function compilePhysicalAxes(assembly:MachineAssembly, ids:Array<String>, axes:Array<LinearAxis>,
       maxVelocity:Float, maxAcceleration:Float):MotionSystemBlueprint {
@@ -227,7 +254,7 @@ class MachineKitRobotCompiler {
       bindings.push({id: id, axis: axes[index], motorLinkId: physical.model.links[motor.link].id,
         shaftJointId: id + "/coupling", travelJointId: id + "/carriage-slide"});
     }
-    return compileAssemblyAxes(physical.model, bindings, maxVelocity, maxAcceleration);
+    return attachLinearAxisDrives(physical.model, bindings, maxVelocity, maxAcceleration);
   }
 
   /** Read the axis's resolved coupling, then convert its mm leader to SI. */

@@ -30,6 +30,7 @@ class KinematicsKitTests {
     testTransformAlgebra();
     testPlanar2R();
     testPrismaticAndRootPose();
+    testSnapshotStateChanges();
     testBranchingForest();
     testCouplings();
     testMultiLeaderCouplings();
@@ -113,6 +114,48 @@ class KinematicsKitTests {
     pose = KinematicSnapshot.of(state).bodyPose(carriage);
     check(near(pose.x, 0.0, 1e-12) && near(pose.y, 3.0, 1e-12), "a state root pose overrides the model's");
     rejects(() -> state.setRootPose(carriage, Transform.identity()), "only roots take root poses");
+  }
+
+  static function testSnapshotStateChanges():Void {
+    var builder = new KinematicModelBuilder();
+    var base = builder.addBody("base"), carriage = builder.addBody("carriage");
+    var otherRoot = builder.addBody("other-root");
+    builder.addJoint("slide", JointKind.Prismatic, base, carriage, Transform.identity(),
+      Transform.identity(), new Vector3(1.0, 0.0, 0.0));
+    var tip = builder.addFrame("tip", carriage, Transform.translation(0.0, 0.2, 0.0));
+    var model = builder.build();
+    var state = new KinematicState(model, [0.3]);
+    var snapshot = new KinematicSnapshot(model);
+    function compare(current:KinematicState):Void {
+      snapshot.evaluate(current);
+      var fresh = KinematicSnapshot.of(current);
+      for (body in 0...model.bodyCount()) {
+        var actual = snapshot.bodyPose(body), expected = fresh.bodyPose(body);
+        check(near(actual.x, expected.x, 1e-12) && near(actual.y, expected.y, 1e-12) && near(actual.z, expected.z, 1e-12) &&
+          near(actual.qx, expected.qx, 1e-12) && near(actual.qy, expected.qy, 1e-12) &&
+          near(actual.qz, expected.qz, 1e-12) && near(actual.qw, expected.qw, 1e-12),
+          "reused snapshots match fresh evaluation across state changes");
+      }
+      var actual = snapshot.frameJacobian(tip), expected = fresh.frameJacobian(tip);
+      for (i in 0...actual.length) check(near(actual[i], expected[i], 1e-12), "cached joint origins and axes remain current");
+    }
+    compare(state);
+    compare(state); // Identical object and values.
+    compare(state.copy()); // Different object, identical configuration.
+    state.q[0] = 0.7; // In-place mutations must invalidate the snapshot.
+    compare(state);
+    state.setRootPose(base, Transform.translation(2.0, 3.0, 0.0).compose(Transform.axisAngle(0, 0, 1, 0.5)));
+    compare(state);
+    compare(state.copy());
+    state.setRootPose(otherRoot, Transform.translation(-1.0, 0.0, 0.0));
+    compare(state); // A root unrelated to the tool still changes body poses.
+    compare(new KinematicState(model, [0.7])); // Restore model roots at the same q.
+    state.q[0] = 0.3;
+    compare(state); // Restore earlier q with different root overrides.
+    state.q.push(0.0);
+    rejects(() -> snapshot.evaluate(state), "cached evaluation still validates state dimensions");
+    state.q.pop();
+    compare(state);
   }
 
   static function testBranchingForest():Void {
@@ -208,6 +251,17 @@ class KinematicsKitTests {
     // Rotating about z by a = x + y moves the tip along y: d(tipY)/dx = d(tipY)/dy = cos(a).
     check(near(jacobian[model.dofCount() + 0], Math.cos(1.0), 1e-12) && near(jacobian[model.dofCount() + 1], Math.cos(1.0), 1e-12),
       "a combined joint's Jacobian sums its terms");
+    var state = new KinematicState(model, [0.5, 0.25]);
+    for (q in [[0.6, 0.15], [0.6, 0.15], [-0.2, 0.15], [0.5, 0.25]]) {
+      state.q[0] = q[0]; state.q[1] = q[1];
+      snapshot.evaluate(state);
+      var fresh = KinematicSnapshot.of(state);
+      for (joint in 0...model.jointCount()) check(near(snapshot.jointValue(joint), fresh.jointValue(joint), 1e-15),
+        "snapshot reuse updates every combined and downstream coupled joint");
+      var actual = snapshot.framePose(tip), expected = fresh.framePose(tip);
+      check(near(actual.x, expected.x, 1e-12) && near(actual.y, expected.y, 1e-12),
+        "DOF changes invalidate snapshots even when a combined joint's value is unchanged");
+    }
     var threw = false;
     var twice = new KinematicModelBuilder();
     var tb = twice.addBody("base"), t1 = twice.addBody("one"), t2 = twice.addBody("two");

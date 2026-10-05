@@ -29,7 +29,11 @@ private typedef StepObserverEntry = {id:Int, observer:SimulationStepObserver};
 class Simulation {
   final owner:Ownedrk_simulation;
   final robots:Array<RobotRuntime> = [];
+  final robotBlueprints:Array<RobotRuntimeBlueprint> = [];
   final stepObservers:Array<StepObserverEntry> = [];
+  final switchObservers:Map<Int, SimulatedSwitchSensorAdapter> = new Map();
+  final powerUpOffsets:Map<Int, Array<Float>> = new Map();
+  final powerUpSideDrives:Map<Int, Array<Int>> = new Map();
   var nextStepObserverId = 1;
   public final fixedTimestepSeconds:Float;
   /** The session this simulation joined. */
@@ -116,6 +120,9 @@ class Simulation {
       ?toolLink:Int, ?toolMargin:Float, ?toolGap:Float, ?linkHulls:Array<SimulationLinkHull>,
       holdAtRest:Bool = false):RobotRuntime {
     ensureLive();
+    if (blueprint == null) throw "Simulation requires a robot blueprint";
+    if (virtualDevice == null && blueprint.switches.length > 0)
+      SimulatedSwitchSensorAdapter.bindingIndices(blueprint);
     if (space != null) space.requireDrives(blueprint);
     var robotDesc:Null<rk_simulation_robot_desc> = null;
     if (initialPose != null || virtualDevice != null || blueprint.pneumaticDrives.length > 0 ||
@@ -163,7 +170,25 @@ class Simulation {
         robotDesc.set_virtual_device_target_error(virtualDevice.targetError);
         robotDesc.set_virtual_device_clock_bound_ns(virtualDevice.clockBoundNs);
         robotDesc.set_virtual_device_link_loss_timeout_ns(virtualDevice.linkLossTimeoutNs);
+        if (virtualDevice.inputs.length > 64 || (virtualDevice.inputs.length > 0 && virtualDevice.profile != 1))
+          throw "Physical virtual switches require the full device profile and at most 64 inputs";
+        robotDesc.set_virtual_device_input_count(virtualDevice.inputs.length);
+        var inputIds = new Map<String, Bool>();
+        for (i in 0...virtualDevice.inputs.length) {
+          var input = virtualDevice.inputs[i];
+          if (input.actuator < 0 || input.actuator >= virtualDevice.actuators.length ||
+              input.switchId.length == 0 || input.switchId.length > 63 || inputIds.exists(input.switchId))
+            throw "Virtual input requires a unique switch ID and a wired actuator";
+          inputIds.set(input.switchId, true);
+          robotDesc.set_virtual_device_input_actuator(i, input.actuator);
+          robotDesc.set_virtual_device_input_active_high(i, input.activeHigh ? 1 : 0);
+          robotDesc.set_virtual_device_input_active_above(i, input.activeAbove ? 1 : 0);
+          robotDesc.set_virtual_device_input_threshold_steps(i, input.thresholdSteps);
+          for (byte in 0...input.switchId.length)
+            robotDesc.set_virtual_device_input_switch_ids(i * 64 + byte, input.switchId.charCodeAt(byte));
+        }
         robotDesc.set_virtual_device_actuator_count(virtualDevice.actuators.length);
+        robotDesc.set_virtual_device_feedback_count(virtualDevice.actuators.length);
         for (i in 0...virtualDevice.actuators.length) {
           var actuator = virtualDevice.actuators[i];
           if (actuator.jointIndex >= blueprint.jointCount)
@@ -171,6 +196,10 @@ class Simulation {
           robotDesc.set_virtual_device_actuator_joint(i, actuator.jointIndex);
           robotDesc.set_virtual_device_actuator_ratio(i, actuator.ratio);
           robotDesc.set_virtual_device_actuator_offset(i, actuator.offset);
+          robotDesc.set_virtual_device_feedback_joint(i,
+            actuator.feedbackJointIndex < 0 ? 255 : actuator.feedbackJointIndex);
+          robotDesc.set_virtual_device_feedback_ratio(i, actuator.feedbackRatio);
+          robotDesc.set_virtual_device_feedback_offset(i, actuator.feedbackOffset);
           robotDesc.set_virtual_device_actuator_steps_per_unit(i, actuator.stepsPerUnit);
           robotDesc.set_virtual_device_actuator_max_rate(i, actuator.maxRate);
           robotDesc.set_virtual_device_actuator_direction_setup_ticks(i,
@@ -440,8 +469,19 @@ class Simulation {
     var endpoint = virtualDevice == null
       ? SimulationEndpoints.simulation(result.out_runtime, capture)
       : SimulationEndpoints.virtualDevice(result.out_runtime, capture);
-    runtime = RobotRuntime.create(blueprint, endpoint);
+    runtime = RobotRuntime.create(blueprint, endpoint,
+      virtualDevice == null ? "robotkit.simulation" : "robotkit.device");
     robots.push(runtime);
+    robotBlueprints.push(blueprint);
+    // Native simulation samples actual physics coordinates, including applied slip.
+    // Virtual-device inputs are supplied by the device protocol rather than host synthesis.
+    if (virtualDevice == null && blueprint.switches.length > 0) {
+      var observedRuntime:RobotRuntime = runtime;
+      var switches = new SimulatedSwitchSensorAdapter(blueprint, observedRuntime,
+        () -> observedRuntime.physicalPositions(), "robotkit.simulation");
+      addStepObserver(switches);
+      switchObservers.set(robots.length - 1, switches);
+    }
     return runtime;
   }
 
@@ -568,7 +608,19 @@ class Simulation {
     ensureLive();
     check(RobotKitSimKit.rk_simulation_reset_robot(owner.borrow(), robotIndex),
       "simulation.resetRobot");
+
     SimulationEndpoints.beginEpoch(robots[robotIndex].endpoint);
+
+    var offsets = powerUpOffsets.get(robotIndex);
+    if (offsets != null) {
+      var drives = powerUpSideDrives.get(robotIndex);
+      if (drives == null) setPowerUpOffsets(robotIndex, offsets);
+      else setPowerUpSides(robotIndex, offsets, drives);
+    }
+    robots[robotIndex].afterNativeReset();
+    var switches = switchObservers.get(robotIndex);
+    if (switches != null) switches.reset();
+
   }
 
   /**
@@ -576,10 +628,48 @@ class Simulation {
    * on, as a stepper that lost steps is, until reset. A joint's coupled joints need the matching
    * offsets. Accepted while the simulation runs.
    */
+  /** Configure a stopped cold/reset robot's physical power-up pose and unknown counter origin.
+   * Full coupling-consistent joint vector in SI units; later lost steps use setJointSlip. */
+  public function setPowerUpOffsets(robotIndex:Int, offsets:Array<Float>):Void {
+    ensureLive();
+    if (offsets == null) throw "Power-up offsets require a full joint vector";
+    check(RobotKitSimKit.rk_simulation_set_power_up_offsets(owner.borrow(), robotIndex, offsets),
+      "simulation.setPowerUpOffsets");
+    powerUpOffsets.set(robotIndex, offsets.copy());
+    powerUpSideDrives.remove(robotIndex);
+  }
+
+  /** Cold placement including explicit motor-side racking; retain it across robot reset. */
+  public function setPowerUpSides(robotIndex:Int, offsets:Array<Float>, drives:Array<Int>):Void {
+    ensureLive();
+    if (offsets == null || drives == null || drives.length == 0)
+      throw "Side startup placement requires offsets and explicit motor followers";
+    check(RobotKitSimKit.rk_simulation_set_power_up_sides(owner.borrow(), robotIndex, offsets, drives),
+      "simulation.setPowerUpSides");
+    powerUpOffsets.set(robotIndex, offsets.copy());
+    powerUpSideDrives.set(robotIndex, drives.copy());
+  }
+
   public function setJointSlip(robotIndex:Int, joint:Int, offset:Float):Void {
     ensureLive();
     check(RobotKitSimKit.rk_simulation_set_joint_slip(owner.borrow(), robotIndex, joint, offset),
       "simulation.setJointSlip");
+  }
+
+  /** Hold one motor-side shaft at a physical SI position while its leader continues.
+   * Release retains follower slip. The homing owner must release on every exit path. */
+  public function setSquaringHold(robotIndex:Int, joint:Int, active:Bool, position:Float):Void {
+    ensureLive();
+    if (!Math.isFinite(position)) throw "Squaring hold requires a finite physical shaft position";
+    check(RobotKitSimKit.rk_simulation_set_squaring_hold(owner.borrow(), robotIndex, joint,
+      active ? 1 : 0, position), "simulation.setSquaringHold");
+  }
+
+  /** Create a side controller tied to the runtime owned at this robot index. */
+  public function homingSides(robotIndex:Int):HomingSideControl {
+    ensureLive();
+    if (robotIndex < 0 || robotIndex >= robots.length) throw "Unknown homing robot index";
+    return new SimulatedHomingSides(this, robotIndex, robots[robotIndex], robotBlueprints[robotIndex]);
   }
 
   /** Teleports one robot base while leaving the shared clock untouched. The
@@ -876,8 +966,12 @@ class Simulation {
     session.removeStepObserver(sessionObserverId);
     session.removeResetObserver(sessionResetObserverId);
     stepObservers.resize(0);
+    switchObservers.clear();
+    powerUpOffsets.clear();
+    powerUpSideDrives.clear();
     for (runtime in robots) runtime.dispose();
     robots.resize(0);
+    robotBlueprints.resize(0);
     owner.close();
     disposed = true;
   }

@@ -145,7 +145,9 @@ class AxisPlanner {
       maxVelocity.push(speed); maxAcceleration.push(accel); maxJerk.push(jerk);
     }
     for (joint in 0...start.length)
-      if (!mapped[joint]) throw 'Joint $joint needs a logical axis mapping';
+      if (!mapped[joint] && (Math.abs(target[joint] - start[joint]) > 1e-12 ||
+          Math.abs(velocity[joint]) > 1e-12 || Math.abs(acceleration[joint]) > 1e-12))
+        throw 'Moving joint $joint needs a logical axis mapping';
     var native = Trajectory.generateStateToState(logicalStart, logicalVelocity,
       logicalAcceleration, logicalTarget, maxVelocity, maxAcceleration, maxJerk);
     var lowered = native.segments();

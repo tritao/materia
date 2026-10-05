@@ -11,6 +11,17 @@
 
 namespace robotkit {
 
+namespace {
+void project_commanded_couplings(const rk_robot_runtime_blueprint &blueprint, double *positions) {
+    uint32_t followers[RK_MAX_JOINTS], count = 0;
+    if (!internal::order_followers(blueprint.couplings, blueprint.coupling_count,
+            blueprint.joint_count, nullptr, followers, count)) return;
+    for (uint32_t index = 0; index < count; ++index)
+        positions[followers[index]] = internal::coupled_follower_value(blueprint.couplings,
+            blueprint.coupling_count, followers[index], positions, true);
+}
+}
+
 rk_result RobotRuntime::poll_events(rk_event_record_batch &out_batch) {
     if (out_batch.struct_size < sizeof(out_batch)) return RK_ERROR_INVALID_ARGUMENT;
     std::lock_guard owner_lock(owner_mutex_);
@@ -139,7 +150,7 @@ void evaluate_knot(const RobotRuntime::RuntimeTrajectoryPoint &knot, uint64_t ti
 rk_result validate_appended_path(
     const std::deque<RobotRuntime::RuntimeTrajectoryPoint> &queued,
     const std::vector<RobotRuntime::RuntimeTrajectoryPoint> &added,
-    const rk_robot_runtime_blueprint &blueprint) {
+    const rk_robot_runtime_blueprint &blueprint, bool homing = false) {
     mk_trajectory_handle handle{};
     if (mk_trajectory_create(blueprint.joint_count, &handle) != MK_OK)
         return RK_ERROR_OUT_OF_MEMORY;
@@ -179,8 +190,16 @@ rk_result validate_appended_path(
         limits.position_claimed[joint] = blueprint.struct_size >=
             offsetof(rk_robot_runtime_blueprint, sensor_joint) &&
             blueprint.process_joint[joint] ? 0 : 1;
-        limits.position_lower[joint] = source.lower_limit;
-        limits.position_upper[joint] = source.upper_limit;
+        const bool has_overtravel = blueprint.struct_size >=
+            offsetof(rk_robot_runtime_blueprint, joint_overtravel) + sizeof(blueprint.joint_overtravel);
+        const double travel = homing && has_overtravel ? blueprint.joint_overtravel[joint] : 0.0;
+        limits.position_lower[joint] = source.lower_limit - travel;
+        limits.position_upper[joint] = source.upper_limit + travel;
+        if (!std::isfinite(limits.position_lower[joint]) ||
+            !std::isfinite(limits.position_upper[joint])) {
+            mk_trajectory_destroy(handle);
+            return RK_ERROR_LIMIT;
+        }
         limits.max_velocity[joint] = source.max_velocity;
         limits.max_acceleration[joint] = source.max_acceleration;
         limits.derivative_claimed[joint] = ((source.limit_flags & RK_LIMIT_VELOCITY) ? 1u : 0u) |
@@ -392,6 +411,60 @@ rk_result RobotRuntime::stop() {
     return RK_OK;
 }
 
+std::array<bool, RK_MAX_JOINTS> RobotRuntime::references_locked() const {
+    std::array<bool, RK_MAX_JOINTS> ready;
+    ready.fill(true);
+    for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
+        ready[joint] = !reference_required_[joint] || reference_latched_[joint];
+    for (uint32_t pass = 0; pass < blueprint_.joint_count; ++pass) {
+        bool changed = false;
+        for (uint32_t term = 0; term < blueprint_.coupling_count; ++term) {
+            const auto &coupling = blueprint_.couplings[term];
+            if (ready[coupling.follower] && !ready[coupling.leader]) {
+                ready[coupling.follower] = false;
+                changed = true;
+            }
+        }
+        if (!changed) break;
+    }
+    return ready;
+}
+
+rk_result RobotRuntime::require_reference(uint32_t joint, bool required) {
+    if (joint >= blueprint_.joint_count) return RK_ERROR_INVALID_ARGUMENT;
+    std::lock_guard owner_lock(owner_mutex_);
+    std::lock_guard queue_lock(queue_mutex_);
+    std::lock_guard state_lock(state_mutex_);
+    if (!commands_.empty() || control_.trajectory_active || control_.stop_ramp_active ||
+        std::abs(state_.velocity[joint]) > 1e-6 ||
+        (control_.active[joint] && control_.targets[joint].mode == RK_TARGET_VELOCITY &&
+         std::abs(control_.targets[joint].target) > 1e-6)) return RK_ERROR_INVALID_STATE;
+    reference_required_[joint] = required;
+    reference_latched_[joint] = false;
+    return RK_OK;
+}
+
+rk_result RobotRuntime::latch_reference(uint32_t joint) {
+    if (joint >= blueprint_.joint_count) return RK_ERROR_INVALID_ARGUMENT;
+    std::lock_guard owner_lock(owner_mutex_);
+    std::lock_guard queue_lock(queue_mutex_);
+    std::lock_guard state_lock(state_mutex_);
+    if (!reference_required_[joint] || !commands_.empty() || control_.trajectory_active ||
+        control_.stop_ramp_active || std::abs(state_.velocity[joint]) > 1e-6 ||
+        (control_.active[joint] && control_.targets[joint].mode == RK_TARGET_VELOCITY &&
+         std::abs(control_.targets[joint].target) > 1e-6))
+        return RK_ERROR_INVALID_STATE;
+    reference_latched_[joint] = true;
+    return RK_OK;
+}
+
+rk_result RobotRuntime::reference_status(uint32_t joint, uint32_t &out_referenced) const {
+    if (joint >= blueprint_.joint_count) return RK_ERROR_INVALID_ARGUMENT;
+    std::lock_guard queue_lock(queue_mutex_);
+    out_referenced = references_locked()[joint] ? 1u : 0u;
+    return RK_OK;
+}
+
 rk_result RobotRuntime::submit(const rk_robot_command &command) {
     if (command.kind == RK_COMMAND_TRAJECTORY_SEGMENTS)
         return RK_ERROR_INVALID_ARGUMENT;
@@ -399,6 +472,20 @@ rk_result RobotRuntime::submit(const rk_robot_command &command) {
         return RK_ERROR_INVALID_ARGUMENT;
     try {
         std::lock_guard lock(queue_mutex_);
+        if ((pending_drive_calibration_ || pending_homing_stop_ || pending_device_stop_source_) && command.kind == RK_COMMAND_JOINT_TARGETS)
+            return RK_ERROR_INVALID_STATE;
+        if (endpoint_->executes_trajectory_queue() && command.kind == RK_COMMAND_JOINT_TARGETS &&
+            std::any_of(commands_.begin(), commands_.end(), [](const QueuedCommand &queued) {
+                return queued.command.kind == RK_COMMAND_STOP;
+            })) return RK_ERROR_INVALID_STATE;
+        if (command.kind == RK_COMMAND_JOINT_TARGETS) {
+            const auto referenced = references_locked();
+            for (uint32_t index = 0; index < command.target_count; ++index) {
+                const auto &target = command.targets[index];
+                if (!referenced[target.joint] && target.mode != RK_TARGET_VELOCITY)
+                    return RK_ERROR_UNREFERENCED;
+            }
+        }
         if (command.sequence == 0 || command.sequence <= last_command_sequence_)
             return RK_ERROR_STALE_COMMAND;
         if (commands_.size() >= 128)
@@ -427,6 +514,9 @@ rk_result RobotRuntime::submit_segments(const rk_robot_command &command, Segment
     }
     try {
         std::lock_guard lock(queue_mutex_);
+        const auto referenced = references_locked();
+        for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
+            if (!referenced[joint]) return RK_ERROR_UNREFERENCED;
         if (command.sequence == 0 || command.sequence <= last_command_sequence_)
             return RK_ERROR_STALE_COMMAND;
         if (commands_.size() >= 128) return RK_ERROR_QUEUE_FULL;
@@ -449,12 +539,165 @@ rk_result RobotRuntime::submit_segments(const rk_robot_command &command, Segment
     }
 }
 
+rk_result RobotRuntime::calibrate_coordinates(const double *offsets, uint32_t count,
+                                             const uint32_t *reference_joints, uint32_t reference_count) {
+    if (!offsets || count != blueprint_.joint_count || reference_count > count ||
+        (reference_count != 0 && !reference_joints)) return RK_ERROR_INVALID_ARGUMENT;
+    std::lock_guard owner_lock(owner_mutex_);
+    std::lock_guard queue_lock(queue_mutex_);
+    std::lock_guard state_lock(state_mutex_);
+    if (pending_drive_calibration_ || pending_device_stop_source_) return RK_ERROR_INVALID_STATE;
+    for (uint32_t i = 0; i < reference_count; ++i) {
+        if (reference_joints[i] >= count || !reference_required_[reference_joints[i]])
+            return RK_ERROR_INVALID_ARGUMENT;
+        for (uint32_t j = 0; j < i; ++j)
+            if (reference_joints[j] == reference_joints[i]) return RK_ERROR_INVALID_ARGUMENT;
+    }
+    if (blueprint_.calibration_revision == UINT64_MAX) return RK_ERROR_INVALID_STATE;
+    if (state_.safety == RK_SAFETY_FAULT || state_.safety == RK_SAFETY_EMERGENCY_STOP)
+        return RK_ERROR_SAFETY_STOPPED;
+    if (!commands_.empty() || !trajectory_.empty() || control_.trajectory_active ||
+        control_.stop_ramp_active || device_queue_active_ ||
+        (endpoint_->executes_trajectory_queue() && state_.trajectory_queue_depth != 0))
+        return RK_ERROR_INVALID_STATE;
+    for (uint32_t joint = 0; joint < count; ++joint) {
+        if (!std::isfinite(offsets[joint])) return RK_ERROR_INVALID_ARGUMENT;
+        if (std::abs(state_.velocity[joint]) > 1e-6 ||
+            (control_.active[joint] && control_.targets[joint].mode != RK_TARGET_POSITION &&
+             control_.targets[joint].mode != RK_TARGET_SERVO)) return RK_ERROR_INVALID_STATE;
+        const double delta = offsets[joint] - coordinate_offsets_[joint];
+        if (!std::isfinite(delta) || !std::isfinite(state_.position[joint] + delta) ||
+            !std::isfinite(commanded_position_[joint] + delta) ||
+            !std::isfinite(control_.position_reference[joint] + delta) ||
+            (control_.active[joint] && !std::isfinite(control_.targets[joint].target + delta)))
+            return RK_ERROR_INVALID_ARGUMENT;
+    }
+    // A coordinate translation has no affine coupling intercept: those are
+    // already carried in both endpoint and logical coordinates by the blueprint.
+    for (uint32_t i = 0; i < blueprint_.coupling_count; ++i) {
+        const auto &term = blueprint_.couplings[i];
+        if (!internal::first_term_of_follower(blueprint_.couplings, i)) continue;
+        double expected = 0.0;
+        for (uint32_t k = 0; k < blueprint_.coupling_count; ++k)
+            if (blueprint_.couplings[k].follower == term.follower)
+                expected += blueprint_.couplings[k].ratio * offsets[blueprint_.couplings[k].leader];
+        if (!std::isfinite(expected) || std::abs(offsets[term.follower] - expected) > 1e-6)
+            return RK_ERROR_INVALID_ARGUMENT;
+    }
+    for (uint32_t joint = 0; joint < count; ++joint) {
+        const double delta = offsets[joint] - coordinate_offsets_[joint];
+        state_.position[joint] += delta;
+        commanded_position_[joint] += delta;
+        control_.position_reference[joint] += delta;
+        if (control_.active[joint]) control_.targets[joint].target += delta;
+        coordinate_offsets_[joint] = offsets[joint];
+    }
+    for (uint32_t i = 0; i < reference_count; ++i)
+        reference_latched_[reference_joints[i]] = true;
+    ++blueprint_.calibration_revision;
+    state_backup_valid_ = false;
+    return RK_OK;
+}
+
+rk_result RobotRuntime::calibrate_home_drives(const uint32_t *joints, const double *side_zeros,
+                                            uint32_t count) {
+    if (!joints || !side_zeros || count == 0 || count > blueprint_.joint_count)
+        return RK_ERROR_INVALID_ARGUMENT;
+    std::lock_guard owner_lock(owner_mutex_);
+    std::lock_guard queue_lock(queue_mutex_);
+    std::lock_guard state_lock(state_mutex_);
+    const bool queued_endpoint = endpoint_->executes_trajectory_queue();
+    if (pending_device_stop_source_) return RK_ERROR_INVALID_STATE;
+    if (pending_drive_calibration_) {
+        const auto &pending = *pending_drive_calibration_;
+        if (count != pending.count) return RK_ERROR_INVALID_STATE;
+        for (uint32_t i = 0; i < count; ++i)
+            if (joints[i] != pending.joints[i] || side_zeros[i] != pending.zeros[i])
+                return RK_ERROR_INVALID_STATE;
+    }
+    if (state_.safety == RK_SAFETY_FAULT || state_.safety == RK_SAFETY_EMERGENCY_STOP)
+        return RK_ERROR_SAFETY_STOPPED;
+    if (!commands_.empty() || !trajectory_.empty() || control_.trajectory_active ||
+        control_.stop_ramp_active) return RK_ERROR_INVALID_STATE;
+    for (uint32_t i = 0; i < blueprint_.joint_count; ++i)
+        if (std::abs(state_.velocity[i]) > 1e-6 ||
+            (control_.active[i] && control_.targets[i].mode != RK_TARGET_POSITION &&
+             control_.targets[i].mode != RK_TARGET_SERVO)) return RK_ERROR_INVALID_STATE;
+    std::array<double, RK_MAX_JOINTS> deltas{};
+    const auto referenced = references_locked();
+    for (uint32_t i = 0; i < count; ++i) {
+        const auto joint = joints[i];
+        if (joint >= blueprint_.joint_count || !std::isfinite(side_zeros[i]))
+            return RK_ERROR_INVALID_ARGUMENT;
+        for (uint32_t k = 0; k < i; ++k)
+            if (joints[k] == joint) return RK_ERROR_INVALID_ARGUMENT;
+        if (!referenced[joint]) return RK_ERROR_UNREFERENCED;
+        deltas[i] = coordinate_offsets_[joint] - side_zeros[i];
+        if (!std::isfinite(deltas[i]) || !std::isfinite(state_.position[joint] - deltas[i]))
+            return RK_ERROR_INVALID_ARGUMENT;
+    }
+    if (blueprint_.calibration_revision == UINT64_MAX) return RK_ERROR_INVALID_STATE;
+    if (queued_endpoint && !pending_drive_calibration_) {
+        PendingDriveCalibration pending;
+        pending.count = count;
+        for (uint32_t i = 0; i < count; ++i) {
+            pending.joints[i] = joints[i]; pending.zeros[i] = side_zeros[i]; pending.deltas[i] = deltas[i];
+        }
+        pending_drive_calibration_ = pending;
+    }
+    if (!pending_drive_calibration_ || !pending_drive_calibration_->acknowledged) {
+        const auto result = endpoint_->rebase_counters(joints,
+            pending_drive_calibration_ ? pending_drive_calibration_->deltas.data() : deltas.data(), count);
+        if (result != RK_OK) {
+            if (result == RK_ERROR_INVALID_ARGUMENT || result == RK_ERROR_UNSUPPORTED ||
+                result == RK_ERROR_INVALID_STATE) pending_drive_calibration_.reset();
+            return result;
+        }
+        if (pending_drive_calibration_) pending_drive_calibration_->acknowledged = true;
+    }
+    if (queued_endpoint) {
+        // The device already rebased its counters. Refresh instead of subtracting
+        // deltas from a sample that may already contain the new origins.
+        auto fresh = state_;
+        const auto result = endpoint_->sample(last_owner_timestamp_ns_, fresh);
+        if (result != RK_OK) return result;
+        if (fresh.joint_count != blueprint_.joint_count) return RK_ERROR_BACKEND;
+        for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
+            state_.position[joint] = fresh.position[joint] + coordinate_offsets_[joint];
+            state_.velocity[joint] = fresh.velocity[joint];
+            state_.effort[joint] = fresh.effort[joint];
+        }
+        state_.source_timestamp_ns = fresh.source_timestamp_ns;
+        state_.received_timestamp_ns = fresh.received_timestamp_ns;
+    } else {
+        for (uint32_t i = 0; i < count; ++i) state_.position[joints[i]] -= deltas[i];
+    }
+    if (queued_endpoint) std::copy_n(state_.position, blueprint_.joint_count, commanded_position_);
+    // Independently captured sides are observations in the rebased frame.
+    // Their commanded coordinates must again follow the nominal coupling;
+    // retaining pre-calibration side offsets makes the next coupled plan jump.
+    project_commanded_couplings(blueprint_, commanded_position_);
+    pending_drive_calibration_.reset();
+    ++blueprint_.calibration_revision;
+    state_backup_valid_ = false;
+    return RK_OK;
+}
+
+rk_result RobotRuntime::limit_input(uint32_t joint, bool active) {
+    std::lock_guard owner_lock(owner_mutex_);
+    std::lock_guard queue_lock(queue_mutex_);
+    if (joint >= blueprint_.joint_count) return RK_ERROR_INVALID_ARGUMENT;
+    limit_inputs_[joint] = active;
+    if (active) {
+        commands_.clear();
+        latch_fault(true, RK_FAULT_LIMIT_SWITCH);
+    }
+    return RK_OK;
+}
+
 rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
     if (validate_plan_for_blueprint(plan, blueprint_) != RK_OK)
         return RK_ERROR_INVALID_ARGUMENT;
-    if (plan.model_revision != blueprint_.revision ||
-        plan.calibration_revision != blueprint_.calibration_revision)
-        return RK_ERROR_MODEL_MISMATCH;
     if ((plan.required_capabilities & ~(RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE |
             RK_PLAN_CAPABILITY_EVENTS)) != 0 ||
         !supports_trajectory_queue())
@@ -463,6 +706,15 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
     try {
         std::lock_guard owner_lock(owner_mutex_);
         std::lock_guard queue_lock(queue_mutex_);
+        if (pending_drive_calibration_ || pending_homing_stop_ || pending_device_stop_source_) return RK_ERROR_INVALID_STATE;
+        if (plan.model_revision != blueprint_.revision ||
+            plan.calibration_revision != blueprint_.calibration_revision)
+            return RK_ERROR_MODEL_MISMATCH;
+        if ((plan.flags & (RK_PLAN_JOG | RK_PLAN_HOMING)) == 0) {
+            const auto referenced = references_locked();
+            for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
+                if (!referenced[joint]) return RK_ERROR_UNREFERENCED;
+        }
         if (plan.sequence <= last_command_sequence_) return RK_ERROR_STALE_COMMAND;
         // A pending command could change the anchor before the owner applies
         // it. Reject rather than accepting a plan against stale state.
@@ -621,13 +873,22 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
                                 rest_scale[blueprint_.couplings[k].leader];
                     rest_scale[followers[index]] = std::max(1.0, sum);
                 }
-            for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
+            for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
+                const auto &limits = blueprint_.joints[joint];
+                const double acceleration_scale = (limits.limit_flags & RK_LIMIT_ACCELERATION)
+                    ? limits.max_acceleration : rest_scale[joint];
+                const double terminal_jerk = endpoint.jerk[joint];
+                const double quantized_acceleration = std::min(
+                    0.5e-9 * std::abs(terminal_jerk),
+                    1e-6 * std::max(1.0, acceleration_scale));
                 // TOPP-RA can stop with nonzero endpoint acceleration. A
                 // checked-jerk plan must also join the held state smoothly.
                 if (std::abs(endpoint.velocity[joint]) > 1e-6 * rest_scale[joint] ||
                     ((plan.flags & RK_PLAN_JERK_UNCHECKED) == 0 &&
-                     std::abs(endpoint.acceleration[joint]) > 1e-6 * rest_scale[joint]))
+                     std::abs(endpoint.acceleration[joint]) >
+                        std::max(1e-6 * rest_scale[joint], quantized_acceleration)))
                     return RK_ERROR_INVALID_ARGUMENT;
+            }
         }
         // A replacement keeps the queue only up to its anchor, so it works on a copy.
         std::deque<RuntimeTrajectoryPoint> replaced;
@@ -671,6 +932,7 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
             knot.chunk_base_time_ns = base_time;
             knot.tag = plan.segments.tag;
             knot.plan_id = plan.plan_id;
+            knot.plan_flags = plan.flags;
             knot.ends_at_rest = ends_at_rest;
             std::copy_n(plan.control_acceleration, RK_MAX_TRAJECTORY_JOINTS, knot.control_acceleration);
             added.push_back(std::move(knot));
@@ -684,17 +946,40 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
         end.chunk_base_time_ns = base_time;
         end.tag = plan.segments.tag;
         end.plan_id = plan.plan_id;
+        end.plan_flags = plan.flags;
         end.ends_at_rest = ends_at_rest;
         std::copy_n(plan.control_acceleration, RK_MAX_TRAJECTORY_JOINTS, end.control_acceleration);
         added.push_back(std::move(end));
         if (knots_after_append(kept, added) > RK_MAX_TRAJECTORY_QUEUE_POINTS)
             return RK_ERROR_QUEUE_FULL;
-        const auto checked = validate_appended_path(kept, added, blueprint_);
+        const auto checked = validate_appended_path(kept, added, blueprint_,
+            (plan.flags & RK_PLAN_HOMING) != 0);
         if (checked != RK_OK) return checked;
         if (endpoint_->executes_trajectory_queue()) {
             const auto owner_now = externally_driven_ ? last_owner_timestamp_ns_ : monotonic_now_ns();
-            const auto submitted = endpoint_->submit_device_plan(plan, base_time, owner_now,
-                committed, blueprint_);
+            bool translated = false;
+            for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
+                translated |= coordinate_offsets_[joint] != 0.0;
+            rk_result submitted;
+            if (translated) {
+                // Host validation and queue anchors use referenced coordinates;
+                // device polynomials and deployment limits use endpoint coordinates.
+                auto device_plan = plan;
+                auto device_blueprint = std::make_unique<rk_robot_runtime_blueprint>(blueprint_);
+                for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
+                    const auto offset = coordinate_offsets_[joint];
+                    device_plan.start_position[joint] -= offset;
+                    for (auto &segment : device_plan.segments.segments)
+                        segment.coefficients[joint].value[0] -= offset;
+                    device_blueprint->joints[joint].lower_limit -= offset;
+                    device_blueprint->joints[joint].upper_limit -= offset;
+                }
+                submitted = endpoint_->submit_device_plan(device_plan, base_time, owner_now,
+                    committed, *device_blueprint);
+            } else {
+                submitted = endpoint_->submit_device_plan(plan, base_time, owner_now,
+                    committed, blueprint_);
+            }
             if (submitted != RK_OK) return submitted;
         }
         const bool was_idle = !control_.trajectory_active;
@@ -738,7 +1023,7 @@ rk_result RobotRuntime::snapshot(rk_robot_state &out_state) const {
     return RK_OK;
 }
 
-rk_result RobotRuntime::snapshot_full(rk_robot_snapshot &out_snapshot) const {
+rk_result RobotRuntime::snapshot_full(rk_robot_snapshot &out_snapshot, bool endpoint_coordinates) const {
     // The diagnostic lives with owner-controlled execution state. Serialize
     // with the owner before reading it alongside the published sample.
     std::lock_guard owner_lock(owner_mutex_);
@@ -776,6 +1061,13 @@ rk_result RobotRuntime::snapshot_full(rk_robot_snapshot &out_snapshot) const {
     std::copy_n(state_.sensors, state_.sensor_count, out_snapshot.sensors);
     std::copy_n(state_.sensor_values, RK_SENSOR_VALUE_POOL, out_snapshot.sensor_values);
     std::copy_n(commanded_position_, state_.joint_count, out_snapshot.setpoint_position);
+    if (endpoint_coordinates)
+        for (uint32_t joint = 0; joint < state_.joint_count; ++joint) {
+            out_snapshot.position[joint] = endpoint_->physical_position(joint,
+                out_snapshot.position[joint] - coordinate_offsets_[joint]);
+            out_snapshot.setpoint_position[joint] = endpoint_->physical_position(joint,
+                out_snapshot.setpoint_position[joint] - coordinate_offsets_[joint]);
+        }
     return RK_OK;
 }
 
@@ -1115,6 +1407,19 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
     // limit instead of running into it; if that means braking harder than a
     // joint allows, the fault is latched once the ramp reaches rest.
     auto stop_ramp_bounds = [&](const double *positions, const double *velocities) {
+        // Select the interrupted chunk, never a later appended chunk's purpose.
+        const RuntimeTrajectoryPoint *interrupted = nullptr;
+        for (const auto &knot : trajectory_) {
+            if (knot.point.time_from_start_ns > control_.trajectory_time_ns) break;
+            interrupted = &knot;
+        }
+        control_.stop_ramp_homing = interrupted != nullptr &&
+            (interrupted->plan_flags & RK_PLAN_HOMING) != 0;
+        const bool has_overtravel = blueprint_.struct_size >=
+            offsetof(rk_robot_runtime_blueprint, joint_overtravel) + sizeof(blueprint_.joint_overtravel);
+        const auto ramp_overtravel = [&](uint32_t joint) {
+            return control_.stop_ramp_homing && has_overtravel ? blueprint_.joint_overtravel[joint] : 0.0;
+        };
         const auto period_count = period_.count();
         const auto period_ns = period_count > 0 ? static_cast<uint64_t>(period_count) : 1;
         double duration_seconds = 2.0 * static_cast<double>(period_ns) / 1'000'000'000.0;
@@ -1134,7 +1439,8 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                 continue;
             const auto &limits = blueprint_.joints[joint];
             const double room = std::max(0.0, velocities[joint] > 0.0
-                ? limits.upper_limit - positions[joint] : positions[joint] - limits.lower_limit);
+                ? limits.upper_limit + ramp_overtravel(joint) - positions[joint]
+                : positions[joint] - (limits.lower_limit - ramp_overtravel(joint)));
             if (0.5 * speed * unconstrained_duration >= room - 1e-12)
                 ramp_hits_limit = true;
             duration_seconds = std::min(duration_seconds, 2.0 * room / speed);
@@ -1263,6 +1569,8 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
             final_kind = value.kind;
 
             if (value.kind == RK_COMMAND_RESET_SAFETY) {
+                for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
+                    if (limit_inputs_[joint]) return RK_ERROR_SAFETY_STOPPED;
                 reset_control();
                 latched_fault_code_ = 1;
                 controlled_stop = false;
@@ -1277,7 +1585,16 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
 
             if (value.kind == RK_COMMAND_STOP) {
                 safe_channels(owner_time_ns, RK_EVENT_STOP_SAFE, false, true);
-                controlled_stop = begin_controlled_stop();
+                if (endpoint_->executes_trajectory_queue()) {
+                    // The device owns its queued path and deceleration. A host
+                    // ramp is never sent to a queue-executing endpoint.
+                    reset_control();
+                    if (!pending_device_stop_source_) {
+                        std::lock_guard state_lock(state_mutex_);
+                        pending_device_stop_source_ = state_.source_timestamp_ns;
+                    }
+                    controlled_stop = false;
+                } else controlled_stop = begin_controlled_stop();
                 safety = RK_SAFETY_READY;
                 if (has_later_effective_command) {
                     const auto result = apply_intermediate_lifecycle(value);
@@ -1550,16 +1867,20 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
             target.joint = joint;
             target.mode = RK_TARGET_POSITION;
             const auto &limits = blueprint_.joints[joint];
+            const bool has_overtravel = blueprint_.struct_size >=
+                offsetof(rk_robot_runtime_blueprint, joint_overtravel) + sizeof(blueprint_.joint_overtravel);
+            const double travel = control_.stop_ramp_homing && has_overtravel
+                ? blueprint_.joint_overtravel[joint] : 0.0;
             target.target = std::clamp(
                 control_.stop_ramp_positions[joint] +
                     control_.stop_ramp_velocities[joint] * blend,
-                limits.lower_limit, limits.upper_limit);
+                limits.lower_limit - travel, limits.upper_limit + travel);
             if (joint < RK_MAX_SERVO_JOINTS && duration > 0.0 && t < duration) {
                 const double end_t = std::min(duration, t + value.reference_duration);
                 value.servos[target_count].velocity = control_.stop_ramp_velocities[joint] * (1.0 - t / duration);
                 value.reference_end_position[target_count] = std::clamp(control_.stop_ramp_positions[joint] +
                     control_.stop_ramp_velocities[joint] * (end_t - 0.5 * end_t * end_t / duration),
-                    limits.lower_limit, limits.upper_limit);
+                    limits.lower_limit - travel, limits.upper_limit + travel);
                 value.reference_end_velocity[target_count] = control_.stop_ramp_velocities[joint] * (1.0 - end_t / duration);
             }
             target.max_rate = 0.0;
@@ -1824,7 +2145,14 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
 
     output.sequence = ++endpoint_command_sequence_;
     const bool device_executes = device_plan_cycle && output.kind == RK_COMMAND_JOINT_TARGETS;
-    const auto result = device_executes ? RK_OK : endpoint_->apply(output);
+    auto endpoint_output = output;
+    if (endpoint_output.kind == RK_COMMAND_JOINT_TARGETS)
+        for (uint32_t index = 0; index < endpoint_output.target_count; ++index) {
+            auto &target = endpoint_output.targets[index];
+            if (target.mode == RK_TARGET_POSITION || target.mode == RK_TARGET_SERVO)
+                target.target -= coordinate_offsets_[target.joint];
+        }
+    const auto result = device_executes ? RK_OK : endpoint_->apply(endpoint_output);
     if (result != RK_OK) {
         latch_fault();
         return result;
@@ -1942,6 +2270,9 @@ rk_result RobotRuntime::publish_sample_impl(uint64_t timestamp_ns,
     next.received_timestamp_ns = 0;
     next.sensor_count = 0;
     const auto result = sample ? (next = *sample, sample_result) : endpoint_->sample(timestamp_ns, next);
+    if (result == RK_OK && next.joint_count == blueprint_.joint_count)
+        for (uint32_t joint = 0; joint < next.joint_count; ++joint)
+            next.position[joint] += coordinate_offsets_[joint];
     if (endpoint_->executes_trajectory_queue()) {
         control_.diagnostic_code = endpoint_->diagnostic_code();
         // The runtime's copy of the device's queue follows the device's path time, so it runs
@@ -1977,6 +2308,7 @@ rk_result RobotRuntime::publish_sample_impl(uint64_t timestamp_ns,
         next.joint_count != blueprint_.joint_count ||
         next.sensor_count > configured_sensor_count ||
             (next.sensor_count != 0 && next.sensor_count != configured_sensor_count)) {
+        std::fprintf(stderr, "RobotRuntime observation rejected: result=%d joints=%u/%u sensors=%u/%u\n", result, next.joint_count, blueprint_.joint_count, next.sensor_count, configured_sensor_count);
         latch_fault();
         return result != RK_OK ? result : RK_ERROR_BACKEND;
     }
@@ -1994,18 +2326,24 @@ rk_result RobotRuntime::publish_sample_impl(uint64_t timestamp_ns,
                 precision * std::max(1.0, std::abs(limits.lower_limit)) ||
             next.position[joint] > limits.upper_limit + margin +
                 precision * std::max(1.0, std::abs(limits.upper_limit))) {
+            std::fprintf(stderr, "RobotRuntime observed limit: joint=%u position=%.17g bounds=[%.17g,%.17g] margin=%.17g precision=%.17g\n", joint, next.position[joint], limits.lower_limit, limits.upper_limit, margin, precision);
             latch_fault();
             return RK_ERROR_LIMIT;
         }
     }
     {
+        std::lock_guard queue_lock(queue_mutex_);
         std::lock_guard state_lock(state_mutex_);
         // The first accepted observation establishes the held origin for untouched joints.
         // Explicit commands and plans already own their anchors, even before that observation.
         if (state_.sequence == 0 && !control_.trajectory_active && trajectory_.empty() &&
-            !control_.stop_ramp_active)
+            !control_.stop_ramp_active) {
             for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
                 if (!control_.active[joint]) commanded_position_[joint] = next.position[joint];
+            // Feedback can include independent settling of coupled shafts.
+            // Held commands must describe one consistent coupling state.
+            project_commanded_couplings(blueprint_, commanded_position_);
+        }
         next.sequence = state_.sequence + 1;
         // Source epoch zero is valid. Receipt is always the local monotonic
         // acceptance clock, never the caller's simulation/source tick.
@@ -2019,7 +2357,33 @@ rk_result RobotRuntime::publish_sample_impl(uint64_t timestamp_ns,
                 ? old.received_timestamp_ns : next.received_timestamp_ns;
         }
         next.struct_size = sizeof(next);
+        if (pending_device_stop_source_ &&
+            next.source_timestamp_ns > *pending_device_stop_source_ &&
+            next.trajectory_active == 0 && next.trajectory_queue_depth == 0 &&
+            next.safety != RK_SAFETY_FAULT && next.safety != RK_SAFETY_EMERGENCY_STOP &&
+            std::all_of(next.velocity, next.velocity + blueprint_.joint_count,
+                [](double velocity) { return std::abs(velocity) <= 1e-6; })) {
+            std::copy_n(next.position, blueprint_.joint_count, commanded_position_);
+            project_commanded_couplings(blueprint_, commanded_position_);
+            pending_device_stop_source_.reset();
+        }
+        if (pending_device_stop_source_ && next.safety != RK_SAFETY_FAULT &&
+            next.safety != RK_SAFETY_EMERGENCY_STOP) {
+            next.mode = RK_ROBOT_MODE_STOPPING;
+            next.session_state = RK_SESSION_STOPPING;
+            next.trajectory_active = 1;
+        }
         state_ = next;
+        if (endpoint_->executes_trajectory_queue() && !device_anchor_initialized_ &&
+            next.source_timestamp_ns != 0 && result == RK_OK &&
+            !control_.trajectory_active && trajectory_.empty() && !control_.stop_ramp_active) {
+            // A device boots with its own counter origin. Model placement is
+            // not evidence of the held motor coordinates; seed only once.
+            for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
+                if (!control_.active[joint]) commanded_position_[joint] = next.position[joint];
+            project_commanded_couplings(blueprint_, commanded_position_);
+            device_anchor_initialized_ = true;
+        }
         // After velocity control stops, use its observed resting position as
         // the next plan anchor. Position-controlled and untouched joints keep
         // their commanded anchor despite small observation offsets.
@@ -2142,11 +2506,16 @@ void RobotRuntime::reset_state() noexcept {
     state_.mode = state_.safety == RK_SAFETY_EMERGENCY_STOP ||
         state_.safety == RK_SAFETY_FAULT ? RK_ROBOT_MODE_FAULT : RK_ROBOT_MODE_IDLE;
     control_ = {};
+    coordinate_offsets_.fill(0.0);
+    reference_latched_.fill(false);
+    limit_inputs_.fill(false);
     // A robot reset to its start has every output at its safe value again.
     for (uint32_t i = 0; i < blueprint_.channel_count && i < RK_MAX_PROCESS_CHANNELS; ++i)
         channel_outputs_[i] = blueprint_.channels[i].safe_value;
     latched_fault_code_ = 1;
     std::fill_n(commanded_position_, RK_MAX_JOINTS, 0.0);
+    device_anchor_initialized_ = false;
+    pending_device_stop_source_.reset();
     std::fill_n(commanded_position_backup_, RK_MAX_JOINTS, 0.0);
     std::fill_n(velocity_anchor_pending_, RK_MAX_JOINTS, false);
     std::fill_n(velocity_anchor_pending_backup_, RK_MAX_JOINTS, false);
@@ -2156,3 +2525,63 @@ void RobotRuntime::reset_state() noexcept {
 }
 
 } // namespace robotkit
+
+namespace robotkit {
+rk_result RobotRuntime::device_input(const char *switch_id, rk_device_input_observation &out) const {
+    if (!switch_id || !*switch_id) return RK_ERROR_INVALID_ARGUMENT;
+    std::lock_guard owner_lock(owner_mutex_);
+    return endpoint_ ? endpoint_->device_input(switch_id, out) : RK_ERROR_BACKEND;
+}
+}
+
+namespace robotkit {
+rk_result RobotRuntime::device_homing_control(const rk_device_homing_control &control) {
+    if (control.struct_size < sizeof(control) || control.action > 5 || !control.sequence || !control.scope)
+        return RK_ERROR_INVALID_ARGUMENT;
+    std::lock_guard owner_lock(owner_mutex_);
+    std::lock_guard queue_lock(queue_mutex_);
+    if (control.action == 5) {
+        const auto result = endpoint_ ? endpoint_->device_homing_control(control) : RK_ERROR_BACKEND;
+        std::lock_guard state_lock(state_mutex_);
+        safe_channels(current_owner_time_ns_, RK_EVENT_STOP_SAFE);
+        commands_.clear(); reset_control(); pending_homing_stop_.reset();
+        state_.mode = RK_ROBOT_MODE_FAULT; state_.safety = RK_SAFETY_EMERGENCY_STOP;
+        state_backup_valid_ = false;
+        // A counter batch may already have applied: retain uncertain calibration.
+        return result;
+    }
+    if (pending_homing_stop_ || pending_drive_calibration_ || pending_device_stop_source_) return RK_ERROR_INVALID_STATE;
+    const auto result = endpoint_ ? endpoint_->device_homing_control(control) : RK_ERROR_BACKEND;
+    if (result == RK_OK && control.action == 4) pending_homing_stop_ = control.sequence;
+    return result;
+}
+rk_result RobotRuntime::device_homing_status(uint64_t sequence) {
+    if (!sequence) return RK_ERROR_INVALID_ARGUMENT;
+    std::lock_guard owner_lock(owner_mutex_);
+    const auto result = endpoint_ ? endpoint_->device_homing_status(sequence) : RK_ERROR_BACKEND;
+    std::lock_guard queue_lock(queue_mutex_);
+    if (pending_homing_stop_ && *pending_homing_stop_ == sequence) {
+        if (result == RK_OK) {
+            std::lock_guard state_lock(state_mutex_);
+            safe_channels(current_owner_time_ns_, RK_EVENT_STOP_SAFE, false, true);
+            commands_.clear();
+            reset_control();
+            device_queue_active_ = false;
+            state_.trajectory_active = 0; state_.trajectory_queue_depth = 0;
+            state_.active_plan_id = 0; state_.committed_until_ns = 0;
+            state_.queue_end_time_ns = 0;
+            state_.mode = RK_ROBOT_MODE_STOPPING; state_.safety = RK_SAFETY_STOPPING;
+            // The acknowledgment precedes completion of device deceleration.
+            // Hold admissions until fresh stationary feedback supplies the
+            // actual anchor, including independently held squaring sides.
+            pending_device_stop_source_ = state_.source_timestamp_ns;
+            state_backup_valid_ = false;
+            pending_homing_stop_.reset();
+        } else if (result == RK_ERROR_INVALID_STATE) pending_homing_stop_.reset();
+    }
+    // The caller must not act on its pre-ack snapshot in this same tick.
+    // Report readiness only after the rest barrier has refreshed the anchor.
+    if (result == RK_OK && pending_device_stop_source_) return RK_ERROR_STALE_STATE;
+    return result;
+}
+}

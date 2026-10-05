@@ -2,7 +2,8 @@ package humanoid;
 
 import RobotKitRuntime;
 import haxe.Int64;
-import machinekit.assembly.LinearAxis;
+import machinekit.gantry.Gantry;
+import machinekit.gantry.GantrySpec;
 import motionkit.robot.MachineKitRobotCompiler;
 import robotkit.model.Joint;
 import robotkit.model.JointType;
@@ -59,8 +60,8 @@ class MixedScene {
   }
 
   static function gantry():RobotRuntimeBlueprint {
-    return MachineKitRobotCompiler.compileXYZGantry(new LinearAxis(23, 10, 200),
-      new LinearAxis(23, 10, 200), new LinearAxis(23, 10, 200), 0.02, 0.08).runtime;
+    return MachineKitRobotCompiler.compileGantry(new Gantry(new GantrySpec(200, 200, 200)),
+      0.02, 0.08).runtime;
   }
 
   /** The scripted job: positions for the arm's and the gantry's joints at a tick. */
@@ -72,11 +73,21 @@ class MixedScene {
 
   static function gantryTargets(blueprint:RobotRuntimeBlueprint, tick:Int):Array<Float> {
     var t = tick * TIMESTEP;
-    return [for (i in 0...3) {
+    var positions = [for (_ in blueprint.joints) 0.0];
+    for (i in 0...3) {
       var joint = blueprint.joints[i];
-      var mid = 0.5 * (joint.lowerLimit + joint.upperLimit), span = 0.3 * (joint.upperLimit - joint.lowerLimit);
-      mid + span * Math.sin((1.1 + 0.6 * i) * t);
-    }];
+      var frequency = 1.1 + 0.6 * i;
+      var mid = 0.5 * (joint.lowerLimit + joint.upperLimit);
+      var rate = joint.maxRate, acceleration = joint.maxAcceleration;
+      if (rate == null || acceleration == null) throw "Mixed-scene gantry needs physical drive limits";
+      var span = Math.min(0.3 * (joint.upperLimit - joint.lowerLimit),
+        Math.min(rate * 0.5 / frequency,
+          acceleration * 0.5 / (frequency * frequency)));
+      positions[i] = mid + span * Math.sin(frequency * t);
+    }
+    for (_ in blueprint.couplings) for (coupling in blueprint.couplings)
+      positions[coupling.follower] = coupling.ratio * positions[coupling.leader] + coupling.offset;
+    return positions;
   }
 
   static function robotsTrace(simulation:Simulation, robots:Array<RobotRuntime>, links:Array<Int>):Array<Float> {
@@ -105,14 +116,14 @@ class MixedScene {
 
   /** Runs the job; with `humanoid`, the G1 falls 10 m away and is commanded every tick. */
   static function job(humanoid:Null<RobotModel>):{trace:Array<Float>, failedSteps:Int,
-      safeties:Array<Int>, humanoidSafety:Int} {
+      safeties:Array<Int>, humanoidSafety:Int, record:Int} {
     var harness = new SimulationHarness(TIMESTEP, SUBSTEPS, SimulationSpace.MUJOCO);
     var simulation = harness.simulation;
     var armBlueprint = arm(), gantryBlueprint = gantry();
     var armRuntime = simulation.addRobotAtPose(armBlueprint, [0.0, 0.0, 0.5], [0.0, 0.0, 0.0, 1.0]);
     var gantryRuntime = simulation.addRobotAtPose(gantryBlueprint, [3.0, 0.0, 0.5], [0.0, 0.0, 0.0, 1.0]);
     var present = [armRuntime, gantryRuntime];
-    var counts = [7, 4];
+    var counts = [armBlueprint.links.length, gantryBlueprint.links.length];
     var g1:Null<RobotRuntime> = null;
     var g1Zero:Array<Float> = [];
     if (humanoid != null) {
@@ -138,7 +149,9 @@ class MixedScene {
     }
     var result = {trace: trace, failedSteps: failed,
       safeties: [for (runtime in present) runtime.snapshot().safety],
-      humanoidSafety: g1 == null ? -1 : g1.snapshot().safety};
+      humanoidSafety: g1 == null ? -1 : g1.snapshot().safety,
+      record: armBlueprint.jointCount * 3 + armBlueprint.linkCount * 7 +
+        gantryBlueprint.jointCount * 3 + gantryBlueprint.linkCount * 7};
     harness.dispose();
     return result;
   }
@@ -186,7 +199,7 @@ class MixedScene {
     check(alone.trace.length == mixed.trace.length, "the traces differ in length");
     // Both robots share one MuJoCo solve with the G1, so their trajectories
     // match to solver round-off (see MIXED_SCENE.md).
-    var armWorst = 0.0, gantryWorst = 0.0, armLength = 6 * 3 + 7 * 7, record = armLength + 3 * 3 + 4 * 7;
+    var armWorst = 0.0, gantryWorst = 0.0, armLength = 6 * 3 + 7 * 7, record = mixed.record;
     var armTravel = 0.0;
     for (tick in 0...TICKS)
       armTravel = Math.max(armTravel, Math.abs(mixed.trace[tick * record] - mixed.trace[0]));

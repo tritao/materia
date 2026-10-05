@@ -32,11 +32,11 @@ class AssemblyNestingSmoke {
 			definitions: [{id: "root-part", connectors: [{name: "tip", frame: at(10)}]},
 				{id: "module/part", connectors: [{name: "base", frame: AssemblyFrames.identity()},
 					{name: "tip", frame: at(5)}]}],
-			occurrences: [{id: "root", definition: "root-part", initialPose: at(100)},
-				{id: "module/body", definition: "module/part", initialPose: at(10)}],
+			occurrences: [{id: "root", definition: "root-part", initialPose: at(100), includePath: ""},
+				{id: "module/body", definition: "module/part", initialPose: at(10), includePath: "module"}],
 			joints: [{id: "join", type: AssemblyJointType.Fixed, role: AssemblyJointRole.Tree,
 				parent: "root", parentConnector: "tip", child: "module/body", childConnector: "base",
-				axis: {x: 0, y: 1, z: 0}, limits: emptyLimits(), defaultValue: 0}], couplings: []};
+				axis: {x: 0, y: 1, z: 0}, limits: emptyLimits(), defaultValue: 0, includePath: ""}], couplings: []};
 		if (!Equality.equals(flat, handBuilt)) throw "Nested and flat assembly definitions differ";
 		var restored = AssemblyDefinitionCodec.decode(AssemblyDefinitionCodec.encode(nested));
 		if (!Equality.equals(AssemblyDefinitionFlattener.flatten(restored), flat))

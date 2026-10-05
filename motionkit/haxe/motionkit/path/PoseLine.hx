@@ -17,7 +17,9 @@ class PoseLine implements PosePrimitive {
     this.start = start; this.end = end; this.policy = policy;
     this.rotationWeight = rotationWeight; this.feed = feed;
     var distance = PoseMath.distance(start.pose, end.pose);
-    pathLength = distance > 0.0 ? distance : rotationWeight * PoseMath.angle(start.pose, end.pose);
+    // Roundoff translation must not parameterize a rotation over a vanishing length.
+    var angle = PoseMath.angle(start.pose, end.pose);
+    pathLength = distance > 1e-10 || angle == 0.0 ? distance : rotationWeight * angle;
     if (pathLength <= 0.0) throw "Pose line needs translation or rotation";
   }
 

@@ -110,6 +110,7 @@ class MachineAssembly {
 		for (entry in drives.encoders) target.drives.encoders.push(DriveSystem.copyEncoder(entry, same));
 		for (entry in drives.cylinders) target.drives.cylinders.push(DriveSystem.copyCylinder(entry, same));
 		for (entry in drives.sensors) target.drives.sensors.push(DriveSystem.copySensor(entry, same));
+		for (entry in drives.switches) target.drives.switches.push(DriveSystem.copySwitch(entry, same));
 		for (entry in inventory.items) target.inventory.items.push({item: copyBomItem(entry.item),
 			quantity: entry.quantity, mass: entry.mass});
 		target.changed();
@@ -128,6 +129,9 @@ class MachineAssembly {
 		if (recipe == null) return component;
 		var result = recipe.create(component.values());
 		result.setMaterial(component.materialSpec());
+		var collision = machinekit.component.CollisionHullFacet.of(component);
+		if (collision != null && machinekit.component.CollisionHullFacet.of(result) == null)
+			@:privateAccess result.addFacet(new machinekit.component.CollisionHullFacet(collision.hulls));
 		return result;
 	}
 
@@ -493,6 +497,26 @@ class MachineAssembly {
 	public function airPressure(instanceId:String, portName:String):Float
 		return DriveSystem.airPressure(flat(), instanceId, portName);
 
+	/** A physical switch whose trip travel follows its fixed housing and moving trigger. */
+	public function addTripSwitch(id:String, joint:String, part:String,
+			trigger:{instanceId:String, connectorName:String}, side:Int, role:String = "home", seed:Int = 1, ?driveJoint:String):Void {
+		if (trigger == null) throw "Switch registration requires a trigger connector";
+		var member = requireMember(part);
+		if (!Std.isOfType(member, machinekit.motion.SwitchPart)) throw 'Part "$part" is not a switch';
+		var source:machinekit.motion.SwitchPart = cast member;
+		requireConnector(trigger.instanceId, trigger.connectorName);
+		requireMember(part).connector(source.tripConnector());
+		var contact:materia.assembly.AssemblyDefinition.AssemblySwitch = {
+			id: id, joint: joint, part: part, connector: source.tripConnector(), trigger: trigger.instanceId,
+			triggerConnector: trigger.connectorName, role: role, side: side, trip: 0,
+			hysteresis: source.switchHysteresis(), repeatability: source.switchRepeatability(), seed: seed, driveJoint: driveJoint};
+		if (drives.switches != null) for (previous in drives.switches)
+			if (previous.id == id) throw 'Duplicate assembly switch "$id"';
+		DriveSystem.resolveSwitch(flat(), contact, new AssemblyState(flat().definition));
+		drives.switches.push(contact);
+		changed();
+	}
+
 	/** A reed or limit switch with an inclusive coordinate window and release hysteresis. */
 	public function addSwitch(id:String, joint:String, window:AssemblyJointLimits, hysteresis:Float = 0):Void {
 		if (window == null || window.lower == null || window.upper == null)
@@ -622,6 +646,8 @@ class MachineAssembly {
 				coupling.stiffness, coupling.backlash, coupling.drag, coupling.assumed, coupling.assumptions);
 		if (mechanical.elasticNetworks != null) for (network in mechanical.elasticNetworks)
 			model.addElasticNetwork(materia.assembly.AssemblyDefinitionFlattener.copyElasticNetwork(network, id -> join(prefix, id)));
+		if (mechanical.switches != null) for (contact in mechanical.switches)
+			model.addSwitch(DriveSystem.copySwitch(contact, id -> join(prefix, id)));
 		var compiled = DriveSystem.compileMotors(flat);
 		for (actuator in compiled.actuators) {
 			var copy = materia.assembly.AssemblyDefinitionFlattener.copyActuator(actuator, join(prefix, actuator.id),
@@ -711,7 +737,7 @@ class MachineAssembly {
 			var member = mechanical.member(id);
 			if (member != null) {
 				flat.addMember(map(id), member.component,
-					pose == null ? copyFrame(member.pose) : AssemblyFrames.compose(pose, member.pose));
+					pose == null ? copyFrame(member.pose) : AssemblyFrames.compose(pose, member.pose), prefix);
 				continue;
 			}
 			var entry = mechanical.requireSubassembly(id);
@@ -719,7 +745,11 @@ class MachineAssembly {
 			entry.assembly.flattenInto(flat, map(id), pose == null ? copyFrame(local) : AssemblyFrames.compose(pose, local), false);
 		}
 		for (entry in mechanical.memberConnectors) flat.addConnector(map(entry.instanceId), entry.name, entry.frame);
-		for (joint in mechanical.joints) flat.definition.joints.push(MechanicalAssembly.copyJoint(joint, map));
+		for (joint in mechanical.joints) {
+			var copy = MechanicalAssembly.copyJoint(joint, map);
+			copy.includePath = prefix;
+			flat.definition.joints.push(copy);
+		}
 		for (coupling in mechanical.couplings) flat.definition.couplings.push(MechanicalAssembly.copyCoupling(coupling, map));
 		for (entry in services.connections) flat.connections.push({id: map(entry.id),
 			fromInstance: map(entry.fromInstance), fromPort: entry.fromPort,
@@ -732,6 +762,7 @@ class MachineAssembly {
 		for (entry in drives.encoders) flat.encoders.push(DriveSystem.copyEncoder(entry, map));
 		for (entry in drives.cylinders) flat.cylinders.push(DriveSystem.copyCylinder(entry, map));
 		for (entry in drives.sensors) flat.sensors.push(DriveSystem.copySensor(entry, map));
+		for (entry in drives.switches) flat.switches.push(DriveSystem.copySwitch(entry, map));
 		for (entry in inventory.items) flat.bomItems.push({item: entry.item, quantity: entry.quantity,
 			mass: switch entry.mass {
 				case Unknown: Unknown;

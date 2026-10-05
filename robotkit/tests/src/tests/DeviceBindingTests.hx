@@ -36,8 +36,8 @@ class DeviceBindingTests {
     var binding = DeviceBinding.bind(model, layout, 20000);
     var channel = binding.channels[0];
     near(channel.stepsPerUnit, 3200.0 / (2.0 * Math.PI), "steps per radian from the motor's steps and the driver's microsteps");
-    near(channel.ratio, -1.0, "a reversed driver flips the device ratio");
-    check(channel.jointIndex == 1 && channel.directionSetupTicks == 2, "the joint comes from the transmission");
+    near(channel.ratio, Math.PI * 1000.0, "a reversed driver flips the composed screw ratio");
+    check(channel.jointIndex == 0 && channel.directionSetupTicks == 2, "the channel follows the independent carriage leader");
     near(channel.maxRate, 20000.0 / channel.stepsPerUnit, "the step tick caps the actuator's rate below its own 100 rad/s");
     near(model.actuators[0].requireRate(), 100.0, "binding leaves the model alone");
     near(binding.model.actuators[0].requireRate(), channel.maxRate, "the tightened model carries the cap");
@@ -63,8 +63,10 @@ class DeviceBindingTests {
     near(slow.channels[0].maxRate, 10.0, "an actuator slower than the step tick keeps its rate");
     var unlimited = DeviceBinding.bind(axisModel(null), layout, 20000);
     near(unlimited.channels[0].maxRate, 20000.0 / channel.stepsPerUnit, "an unlimited actuator takes the step tick's ceiling");
+    near(channel.feedbackRatio, -1.0, "physical shaft feedback retains the direct reversed transmission");
+    check(channel.feedbackJointIndex != channel.jointIndex, "shaft feedback remains distinct from its carriage leader");
     var options = binding.virtualActuators();
-    check(options.length == 1 && options[0].id == "motor" && options[0].jointIndex == 1 &&
+    check(options.length == 1 && options[0].id == "motor" && options[0].jointIndex == 0 &&
       Math.abs(options[0].stepsPerUnit - channel.stepsPerUnit) < 1e-9, "the virtual device gets the same layout");
 
     fails(function() DeviceBinding.bind(model, new DeviceLayout([]), 20000), "from 1 to 64",
@@ -122,6 +124,50 @@ class DeviceBindingTests {
     check(slowBoard.model.joints[0].limits.velocityLimiter == "controller tick",
       "the axis names its controller speed ceiling");
     check(pulseLimited.actuators[0].maxRate == null, "driver binding keeps the source motor speed unspecified");
+    var dual = axisModel();
+    dual.joints[0].limits.rackingTolerance = 0.0005;
+    var rightLink = dual.addLink(new Link("right screw"));
+    var right = dual.addJoint(new Joint("right turn", JointType.Revolute, dual.links[0], rightLink));
+    right.limits = new JointLimits(-1e9, 1e9);
+    dual.addCoupling(new JointCoupling("right lead", "axis", "right turn", Math.PI * 1000, 0));
+    var rightMotor = new Actuator("right motor", 0.6, 100, Transmission.SimpleTransmission("right turn", 1, 0));
+    rightMotor.fullStepsPerRevolution = 200;
+    rightMotor.microsteps = 16;
+    rightMotor.maxStepRate = 200000;
+    dual.addActuator(rightMotor);
+    var dualLayout = DeviceLayout.forActuators(dual);
+    near(dualLayout.channels[0].skewBound, 0.0005, "left drive inherits SI racking tolerance");
+    near(dualLayout.channels[1].skewBound, 0.0005, "right drive inherits SI racking tolerance");
+    var dualBinding = DeviceBinding.bind(dual, dualLayout, 40000);
+    check(dualBinding.channels[0].jointIndex == 0 && dualBinding.channels[1].jointIndex == 0,
+      "opposed screw shafts group on their shared leader");
+    near(dualBinding.channels[0].ratio, -dualBinding.channels[1].ratio, "opposed shafts retain signed ratios");
+    near(automatic.channels[0].skewBound, 0, "a single drive has no skew group");
+    var restoredDual = robotkit.model.RobotModelCodec.decode(robotkit.model.RobotModelCodec.encode(dual));
+    near(restoredDual.joints[0].limits.rackingTolerance, 0.0005, "racking tolerance survives the model codec");
+    // Joint-coordinate zeros compose independently of electrical direction.
+    var zeroModel = axisModel();
+    zeroModel.actuators[0].transmission = Transmission.SimpleTransmission("turn", 2, 3);
+    var zeroBinding = DeviceBinding.bind(zeroModel, layout, 20000);
+    near(zeroBinding.channels[0].offset, -3 / leadRatio, "shaft zero is expressed in leader coordinates");
+    near(zeroBinding.channels[0].ratio, 2 * leadRatio, "direction changes ratio without changing zero");
+    dual.actuators[1].transmission = Transmission.SimpleTransmission("right turn", 1, 1);
+    fails(function() DeviceBinding.bind(dual, dualLayout, 40000), "equal leader-coordinate offsets",
+      "RKD6 refuses guarded drives with different zeros");
+    var switched = axisModel();
+    switched.addFrame(new robotkit.model.Frame("home-frame", switched.links[0]));
+    switched.addSwitch(new robotkit.model.JointSwitch("home", "axis", "home-frame", "home", -1, -0.01, 0.0, 0.0));
+    var inputLayout = DeviceLayout.decode(Bytes.ofString('{"schemaVersion":1,"channels":[{"index":0,"actuator":"motor"}],"inputs":[{"index":0,"switch_id":"home","actuator":"motor","active_high":false,"pin":"PA0"}]}'));
+    var inputBinding = DeviceBinding.bind(switched, inputLayout, 20000);
+    check(inputBinding.inputs.length == 1 && inputBinding.inputs[0].actuatorChannel == 0 &&
+      !inputBinding.inputs[0].wiring.activeHigh, "switch wiring resolves to the physical actuator and polarity");
+    var restoredInputs = DeviceLayout.decode(DeviceLayout.encode(inputLayout));
+    check(restoredInputs.inputs[0].switchId == "home" && restoredInputs.inputs[0].pin == "PA0",
+      "deployment input wiring round trips");
+    fails(function() DeviceBinding.bind(switched, layout, 20000), "no deployment input",
+      "a machine switch cannot silently lose its input wiring");
+    fails(function() DeviceBinding.bind(model, inputLayout, 20000), "one model switch",
+      "unknown model switch input is rejected");
     return assertions;
   }
 

@@ -26,6 +26,14 @@ public:
                 config.peripheral_kind, config.peripheral_parameters.data(), config.peripheral_parameters.size())) {
             rkd_virtual_destroy(device_); device_ = nullptr;
         }
+        for (std::size_t i = 0; device_ && i < config.inputs.size(); ++i) {
+            const auto &input = config.inputs[i];
+            if (!rkd_virtual_configure_switch(device_, i, input.wiring.actuator,
+                input.threshold_steps, input.active_above, input.wiring.active_high)) {
+                rkd_virtual_destroy(device_);
+                device_ = nullptr;
+            }
+        }
     }
     ~Link() override { rkd_virtual_destroy(device_); }
     bool valid() const noexcept { return device_ != nullptr; }
@@ -212,12 +220,20 @@ std::shared_ptr<VirtualDeviceEndpoint> VirtualDeviceEndpoint::create(
         for (std::size_t j = 0; j < i; ++j)
             if (config.actuators[j].id == config.actuators[i].id) return {};
     }
+    if (config.inputs.size() > 64 || (!config.inputs.empty() && config.profile != 1)) return {};
+    std::vector<DeviceInput6> input_wiring;
+    for (const auto &input : config.inputs) {
+        if (input.wiring.actuator >= count || input.wiring.switch_id.empty()) return {};
+        for (const auto &prior : input_wiring)
+            if (prior.switch_id == input.wiring.switch_id) return {};
+        input_wiring.push_back(input.wiring);
+    }
     auto transport = std::make_unique<Link>(config, count);
     if (!transport->valid()) return {};
     auto *link = transport.get();
     auto inner = Rkd6Endpoint::attach(std::move(transport), blueprint, config.controller,
         config.seed ? config.seed : 1, config.target_error, config.clock_bound_ns,
-        config.latency_ns, config.step_tick_hz, config.link_loss_timeout_ns, config.actuators);
+        config.latency_ns, config.step_tick_hz, config.link_loss_timeout_ns, config.actuators, nullptr, input_wiring);
     if (!inner) return {};
     auto actuators = config.actuators;
     return std::shared_ptr<VirtualDeviceEndpoint>(new VirtualDeviceEndpoint(std::move(inner), link,
@@ -293,8 +309,8 @@ std::vector<double> VirtualDeviceEndpoint::joint_positions() const {
     rk_robot_state state{};
     for (std::size_t i = 0; i < positions.size(); ++i) {
         const auto &mapping = actuators_[i];
-        if (mapping.joint < joint_count_)
-            state.position[mapping.joint] = positions[i] / mapping.ratio + mapping.offset;
+        if (mapping.measured_joint() < joint_count_)
+            state.position[mapping.measured_joint()] = positions[i] / mapping.measured_ratio() + mapping.measured_offset();
     }
     inner_->reconstruct_feedback(state);
     return std::vector<double>(state.position, state.position + joint_count_);

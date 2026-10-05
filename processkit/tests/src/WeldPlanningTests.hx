@@ -30,16 +30,45 @@ class WeldPlanningTests {
   public static function run():Int {
     assertions = 0;
     testCornerTurn();
+    testRotaryWristSelection();
     testRollAvoidsTheWall();
     testEntryBranchReachesTheWholeWeld();
     testClosedRunChoosesAReachableCorner();
     testBranchJumpIsRefused();
     testCompiledMotionRejectsAnEntry();
+    testBlockedJointEntrySkipsDownstreamRolls();
     testEntryUsesTheCurrentConfiguration();
     testReverseTravelPreservesThePushAngle();
     testCollidingWeldIsRefused();
     Sys.println('ProcessKit weld planning tests passed ($assertions assertions)');
     return assertions;
+  }
+
+  static function testRotaryWristSelection():Void {
+    var model = new RobotModel("XYZ-CA");
+    var base = model.addLink(new Link("base")), parent = base;
+    for (id in ["x", "y", "z", "c", "a"]) {
+      var child = model.addLink(new Link(id + "-link"));
+      var rotary = id == "c" || id == "a";
+      var joint = model.addJoint(new Joint(id, rotary ? JointType.Revolute : JointType.Prismatic, parent, child));
+      joint.axis = id == "x" || id == "a" ? [1.0, 0, 0] : id == "y" ? [0.0, 1, 0] : [0.0, 0, 1];
+      joint.limits.lower = -3.0; joint.limits.upper = 3.0; joint.limits.velocity = rotary ? 2.0 : 0.1;
+      parent = child;
+    }
+    var flange = model.addFrame(new Frame("flange", parent));
+    var group = new Manipulator(model, base.id, flange.id);
+    var ids = [for (id in group.jointIds()) Std.string(id)];
+    var selected = [for (index in processkit.WeldingPlanRunner.wristJointIndices(group)) ids[index]];
+    check(selected.join(",") == "a,c", "a CA wrist uses both rotary joints and no linear velocity as an angular cap");
+    var z = [for (link in model.links) if (link.id == "z-link") link][0];
+    var fixedFrame = model.addFrame(new Frame("fixed-torch", z));
+    var xyz = new Manipulator(model, base.id, fixedFrame.id);
+    check(processkit.WeldingPlanRunner.wristJointIndices(xyz).length == 0,
+      "a fixed XYZ torch has no rotary wrist limits");
+    var fixture = arm();
+    ids = [for (id in fixture.arm.jointIds()) Std.string(id)];
+    selected = [for (index in processkit.WeldingPlanRunner.wristJointIndices(fixture.arm)) ids[index]];
+    check(selected.join(",") == "j5,j4,j3", "a six-axis arm retains its nearest three rotary wrist joints");
   }
 
   static function testCornerTurn():Void {
@@ -143,6 +172,7 @@ class WeldPlanningTests {
     var start = [0.0, -1.5708, 1.5708, -1.5708, -1.5708, 0.0];
     var clearance = new ArmClearance(made.arm, bodies, start);
     var solver = new ManipulatorKinematics(made.arm, 1e-8);
+    solver.preferTargetOrientation = true;
     var planner = new WeldPathPlanner(solver, new IkTolerance(2e-4, 1e-3, 300, 0.03), [for (_ in 0...6) 3.0], WRIST, clearance);
     return {planner: planner, clearance: clearance, start: start};
   }
@@ -226,6 +256,39 @@ class WeldPlanningTests {
     near(planned.entry.joints[0], 0.3, 1e-9, "the current arm configuration can reach an entry missed by broad IK sampling");
   }
 
+  static function testBlockedJointEntrySkipsDownstreamRolls():Void {
+    for (op in [0, 1]) testBlockedEntryOperation(op);
+  }
+
+  static function testBlockedEntryOperation(op:Int):Void {
+    var made = arm();
+    var clearance = new EntryTrajectoryClearance(made.arm);
+    var probe = {calls: 0};
+    var straight = seam();
+    var middle = new Transform3(new Vec3(0.4, 0.2, 0.15), straight.start().rotation);
+    var requested = new WeldPlan([
+      new processkit.skill.WeldPlan.WeldSegment(straight.start(), middle, "first"),
+      new processkit.skill.WeldPlan.WeldSegment(middle, straight.stop(), "second")
+    ], PARAMETERS);
+    var planner = new WeldPathPlanner(new EntryTrajectorySolver(), new IkTolerance(2e-4, 1e-3, 300, 0.03),
+      [3.0], WRIST, clearance, null, function(planned, start) {
+        probe.calls++;
+        // The sampled entry sweep clears, but the compiler's actual entry
+        // passes through the obstacle on the first two entry branches.
+        var q = planned.entry.joints[0] < 1.0 ? 3.0 : 1.0;
+        var trajectory = motionkit.trajectory.Trajectory.generateStateToState([q], [0.0], [0.0], [q + 0.001], [3.0], [2.0], [100.0]);
+        var limits = new motionkit.trajectory.ValidationLimits(1, haxe.Int64.ofInt(1), haxe.Int64.ofInt(1));
+        var plan = motionkit.trajectory.ExecutionPlan.create(trajectory, limits, haxe.Int64.ofInt(1),
+          [q], [0.0], [0.0], [0.01], [0.01], [0.01]);
+        trajectory.dispose();
+        return new motionkit.robot.CompiledProgram([new motionkit.robot.ProgramBlock([plan], [op], null)], []);
+      });
+    var planned = planner.plan(requested, [0.0]);
+    check(probe.calls == 3, 'blocked entry operation $op is checked once, regardless of downstream seam rolls');
+    check(planned.entry.joints[0] == 1.0, "a blocked compiled entry advances to a clear entry branch");
+    check(planned.plan.segments.length == 2, "entry pruning preserves every seam in the accepted run");
+  }
+
   static function testReverseTravelPreservesThePushAngle():Void {
     var down = seam().start().rotation;
     var tilted = Quat.fromAxisAngle(new Vec3(0.0, 1.0, 0.0), -0.17453292519943295).multiply(down);
@@ -258,12 +321,12 @@ private class EntryBranchFixture implements motionkit.kinematics.KinematicsSolve
   public function fork():motionkit.kinematics.KinematicsSolver return this;
   public function forward(q:Array<Float>):motionkit.kinematics.Pose3 throw "The fixture only solves poses";
   public function sampleCandidates(target:motionkit.kinematics.Pose3, maxCount:Int,
-      tolerance:motionkit.kinematics.IkTolerance):Array<Array<Float>> return [[0.0], [0.5], [1.0]];
+      tolerance:motionkit.kinematics.IkTolerance, ?freedom:motionkit.path.OrientationPolicy):Array<Array<Float>> return [[0.0], [0.5], [1.0]];
   public function solvePose(target:motionkit.kinematics.Pose3, seed:Array<Float>,
-      tolerance:motionkit.kinematics.IkTolerance):Null<Array<Float>>
+      tolerance:motionkit.kinematics.IkTolerance, ?freedom:motionkit.path.OrientationPolicy):Null<Array<Float>>
     return seed[0] < 1.0 && target.x >= 0.4 ? null : seed.copy();
   public function solveDifferential(q:Array<Float>, twist:motionkit.kinematics.Twist6,
-      ?redundancyRate:Array<Float>):Null<Array<Float>> throw "The fixture only solves poses";
+      ?redundancyRate:Array<Float>, ?freedom:motionkit.path.OrientationPolicy):Null<Array<Float>> throw "The fixture only solves poses";
   public function solvePath(request:motionkit.kinematics.PathRequest):Array<Null<Array<Float>>> throw "The fixture only solves poses";
 }
 
@@ -271,24 +334,37 @@ private class EntryBranchFixture implements motionkit.kinematics.KinematicsSolve
 private class EntryCornerFixture extends EntryBranchFixture {
   public function new() super();
   override public function sampleCandidates(target:motionkit.kinematics.Pose3, maxCount:Int,
-      tolerance:motionkit.kinematics.IkTolerance):Array<Array<Float>> return target.x >= 0.4 ? [[1.0]] : [];
+      tolerance:motionkit.kinematics.IkTolerance, ?freedom:motionkit.path.OrientationPolicy):Array<Array<Float>> return target.x >= 0.4 ? [[1.0]] : [];
 }
 
 /** Each pose has an IK answer, but reaching the second half requires a discontinuous joint change. */
 private class BranchJumpFixture extends EntryBranchFixture {
   public function new() super();
   override public function solvePose(target:motionkit.kinematics.Pose3, seed:Array<Float>,
-      tolerance:motionkit.kinematics.IkTolerance):Null<Array<Float>> return [seed[0] + (target.x >= 0.4 ? 1.0 : 0.0)];
+      tolerance:motionkit.kinematics.IkTolerance, ?freedom:motionkit.path.OrientationPolicy):Null<Array<Float>> return [seed[0] + (target.x >= 0.4 ? 1.0 : 0.0)];
 }
 
 private class ContinuousBranchFixture extends EntryBranchFixture {
   public function new() super();
   override public function solvePose(target:motionkit.kinematics.Pose3, seed:Array<Float>,
-      tolerance:motionkit.kinematics.IkTolerance):Null<Array<Float>> return seed.copy();
+      tolerance:motionkit.kinematics.IkTolerance, ?freedom:motionkit.path.OrientationPolicy):Null<Array<Float>> return seed.copy();
 }
 
 private class CurrentEntryFixture extends ContinuousBranchFixture {
   public function new() super();
   override public function sampleCandidates(target:motionkit.kinematics.Pose3, maxCount:Int,
-      tolerance:motionkit.kinematics.IkTolerance):Array<Array<Float>> return [];
+      tolerance:motionkit.kinematics.IkTolerance, ?freedom:motionkit.path.OrientationPolicy):Array<Array<Float>> return [];
+}
+
+private class EntryTrajectorySolver extends ContinuousBranchFixture {
+  public function new() super();
+  override public function forward(q:Array<Float>):motionkit.kinematics.Pose3
+    return new motionkit.kinematics.Pose3(0.35, 0.2, 0.19, 0, 0, 0, 1);
+}
+
+private class EntryTrajectoryClearance extends ArmClearance {
+  public function new(group:robotkit.manipulation.KinematicGroup)
+    super(group, [], [for (_ in group.jointIds()) 0.0]);
+  override public function violation(q:Array<Float>, contact:Bool = false, ?wanted:Float):Null<robotkit.manipulation.ArmClearance.ClearanceViolation>
+    return q[0] > 2.0 ? {a: "torch", b: "upright", distance: 0.002, required: 0.003} : null;
 }

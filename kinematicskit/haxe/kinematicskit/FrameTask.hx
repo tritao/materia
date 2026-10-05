@@ -52,6 +52,7 @@ class FrameTask implements KinematicTask {
   final referenceFlat:Array<Float> = [for (_ in 0...7) 0.0];
   /** The target in world coordinates for this evaluation (0..6), the reference pose (7..13). */
   final goal:Array<Float> = [for (_ in 0...14) 0.0];
+  var preference:Bool = false;
   var lastPositionError = 0.0;
   var lastOrientationError = 0.0;
 
@@ -116,11 +117,16 @@ class FrameTask implements KinematicTask {
 
   public function label():String return name;
   public function rowCount():Int return rows;
-  public function isSoft():Bool return false;
+  /** Makes this task a preference, optimized after the hard tasks. */
+  public function asPreference():FrameTask {
+    preference = true;
+    return this;
+  }
+  public function isSoft():Bool return preference;
   public function positionError():Float return lastPositionError;
   public function orientationError():Float return lastOrientationError;
   public function satisfied():Bool
-    return lastPositionError <= positionTolerance && lastOrientationError <= orientationTolerance;
+    return preference || lastPositionError <= positionTolerance && lastOrientationError <= orientationTolerance;
 
   /** The frame's current world pose in an evaluated snapshot. */
   public function currentPose(snapshot:KinematicSnapshot):Transform {

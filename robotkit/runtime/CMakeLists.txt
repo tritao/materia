@@ -1,3 +1,7 @@
+file(GLOB_RECURSE RK_DEVICE_RUST_SOURCES CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/src/*.rs
+    ${CMAKE_CURRENT_SOURCE_DIR}/../device_virtual/src/*.rs)
+
 if(RK_BUILD_VIRTUAL_DEVICE)
     find_program(RK_VIRTUAL_CARGO_EXECUTABLE cargo REQUIRED)
     set(RK_VIRTUAL_LIB ${CMAKE_CURRENT_BINARY_DIR}/cargo-virtual/debug/librobotkit_device_virtual.a)
@@ -14,6 +18,8 @@ if(RK_BUILD_VIRTUAL_DEVICE)
             ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/src/scheduled_core.rs
             ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/src/device_events.rs
             ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/src/virtual_board.rs
+            ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/Cargo.toml
+            ${RK_DEVICE_RUST_SOURCES}
         VERBATIM)
     add_custom_target(robotkit_device_virtual_build DEPENDS ${RK_VIRTUAL_LIB})
     add_library(robotkit_device_virtual STATIC IMPORTED GLOBAL)
@@ -79,7 +85,7 @@ if(RK_BUILD_TESTS)
     find_program(RK_CARGO_EXECUTABLE cargo)
     if(RK_CARGO_EXECUTABLE)
         add_test(NAME robotkit_device_protocol_rust
-            COMMAND ${RK_CARGO_EXECUTABLE} test
+            COMMAND ${RK_CARGO_EXECUTABLE} test --offline --features std
                 --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/Cargo.toml
                 --target-dir ${CMAKE_CURRENT_BINARY_DIR}/cargo-target)
         set_tests_properties(robotkit_device_protocol_rust PROPERTIES
@@ -130,6 +136,10 @@ if(RK_BUILD_TESTS)
         target_link_libraries(robotkit_virtual_device_endpoint_tests PRIVATE RobotKit::runtime)
         add_test(NAME robotkit_virtual_device_endpoint COMMAND robotkit_virtual_device_endpoint_tests)
         set_tests_properties(robotkit_virtual_device_endpoint PROPERTIES LABELS "robot;runtime;virtual" TIMEOUT 30)
+        add_test(NAME robotkit_device_virtual_rust COMMAND ${RK_VIRTUAL_CARGO_EXECUTABLE}
+            test --offline --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/../device_virtual/Cargo.toml
+            --target-dir ${CMAKE_CURRENT_BINARY_DIR}/cargo-virtual-tests --lib)
+        set_tests_properties(robotkit_device_virtual_rust PROPERTIES LABELS "robot;rust;virtual" TIMEOUT 60)
     endif()
 
 
@@ -167,9 +177,8 @@ if(RK_BUILD_TESTS)
                 --bin pty_device
             DEPENDS
                 ${CMAKE_CURRENT_SOURCE_DIR}/../device_virtual/Cargo.toml
-                ${CMAKE_CURRENT_SOURCE_DIR}/../device_virtual/src/lib.rs
-                ${CMAKE_CURRENT_SOURCE_DIR}/../device_virtual/src/bin/pty_device.rs
-                ${CMAKE_CURRENT_SOURCE_DIR}/../device_virtual/src/bin/shared/mod.rs
+                ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/Cargo.toml
+                ${RK_DEVICE_RUST_SOURCES}
             VERBATIM)
         add_custom_target(robotkit_pty_device DEPENDS
             ${CMAKE_CURRENT_BINARY_DIR}/cargo-target/debug/pty_device)

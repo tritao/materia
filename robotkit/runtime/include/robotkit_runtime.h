@@ -87,7 +87,7 @@ enum {
     RK_PROCESS_CHANNEL_ID_BYTES = 48,
     RK_PROCESS_COMMAND_BYTES = 48,
     RK_MAX_JOINT_COUPLINGS = 512,
-    RK_API_VERSION = 29 /**< Discrete sensors, simulation process drives and typed velocity outputs. */
+    RK_API_VERSION = 30 /**< Serial deployment input wiring and device switch captures. */
 };
 
 /** Result returned by RobotKit C ABI functions. */
@@ -106,7 +106,8 @@ enum {
     RK_ERROR_LIMIT = -10, /**< Command violates a compiled joint or actuator limit. */
     RK_ERROR_STALE_STATE = -11, /**< The endpoint only supplied an old observation. */
     RK_ERROR_MODEL_MISMATCH = -12, /**< The device is not the deployment's controller or disagrees with its configuration. */
-    RK_ERROR_FOLLOWING_ERROR = -13 /**< Measured state exceeds the configured distance from the commanded setpoint. */
+    RK_ERROR_FOLLOWING_ERROR = -13, /**< Measured state exceeds the configured distance from the commanded setpoint. */
+    RK_ERROR_UNREFERENCED = -14 /**< Ordinary motion requires an established joint reference. */
 };
 
 /* ------------------------------------------------------------------------- */
@@ -524,7 +525,7 @@ enum {
 };
 
 /** Validation property carried from MotionKit's plan report. */
-enum { RK_PLAN_JERK_UNCHECKED = 1u };
+enum { RK_PLAN_JERK_UNCHECKED = 1u, RK_PLAN_JOG = 2u, RK_PLAN_HOMING = 4u };
 
 /**
  * A plan's identity and start state, submitted with its segments and events by
@@ -540,7 +541,7 @@ typedef struct rk_plan_header {
     uint64_t replace_after_plan_id; /**< Zero means append/start, not replace. */
     uint64_t replace_after_time_ns;
     uint64_t tag; /**< Reported as the trajectory tag while the plan runs. */
-    uint32_t flags; /**< RK_PLAN_JERK_UNCHECKED when jerk validation is unchecked. */
+    uint32_t flags; /**< RK_PLAN_JERK_UNCHECKED and optional exclusive RK_PLAN_JOG/RK_PLAN_HOMING purpose. */
     uint32_t ends_at_rest; /**< One for a final plan, zero if more motion is expected. */
     double start_position[RK_MAX_TRAJECTORY_JOINTS];
     double start_velocity[RK_MAX_TRAJECTORY_JOINTS];
@@ -559,7 +560,7 @@ enum { RK_FAULT_TRAJECTORY_UNDERFLOW = 2, RK_FAULT_RAMP_LIMIT = 3,
     RK_FAULT_CLOCK_SYNC_LOST = 4, RK_FAULT_DUAL_DRIVE_SKEW = 5,
     RK_FAULT_QUEUE_REVISION_MISMATCH = 6,
     /** A velocity target outlived its command's expires_at_ns; the joint brakes to zero. */
-    RK_FAULT_COMMAND_EXPIRED = 7 };
+    RK_FAULT_COMMAND_EXPIRED = 7, RK_FAULT_LIMIT_SWITCH = 8 };
 
 typedef uint32_t rk_session_state;
 enum {
@@ -750,7 +751,47 @@ typedef struct rk_serial_device_desc {
     uint16_t actuator_direction_setup_ticks[RK_MAX_SERIAL_JOINTS];
     double actuator_skew_bound[RK_MAX_SERIAL_JOINTS];
     uint8_t actuator_ids[RK_MAX_SERIAL_JOINTS * 64]; /**< 64 NUL-terminated ASCII IDs, 64 bytes each. */
+    uint32_t input_count; /**< Wired switch inputs, zero to 64. */
+    uint8_t input_actuator[64]; /**< Captured physical actuator channel per input. */
+    uint8_t input_active_high[64]; /**< Electrical polarity: zero or one. */
+    uint8_t input_switch_ids[64 * 64]; /**< NUL-terminated model switch IDs. */
+    /** Optional original shaft feedback mappings; count zero keeps legacy mappings. */
+    uint32_t feedback_count;
+    uint8_t feedback_joint[64];
+    double feedback_ratio[64];
+    double feedback_offset[64];
 } rk_serial_device_desc;
+
+/** Asynchronous device homing control; acceptance is queried separately. */
+typedef struct rk_device_homing_control {
+    uint32_t struct_size RK_STRUCT_SIZE;
+    uint32_t action; /**< 0 begin pair, 1 end scope, 2 hold side, 3 release side, 4 controlled homing stop, 5 cancel homing immediately. */
+    uint64_t sequence;
+    uint64_t scope;
+    uint32_t first; /**< Physical actuator index, or the selected side for hold/release. */
+    uint32_t second;
+    double skew_bound;
+} rk_device_homing_control;
+
+RK_API rk_result RK_CALL rk_robot_runtime_device_homing_control(rk_robot_runtime runtime,
+    const rk_device_homing_control *control);
+/** STALE_STATE is pending; OK is accepted; INVALID_STATE is rejected. */
+RK_API rk_result RK_CALL rk_robot_runtime_device_homing_status(rk_robot_runtime runtime, uint64_t sequence);
+
+/** Copy of a physical switch observation in the endpoint's source clock. */
+typedef struct rk_device_input_observation {
+    uint32_t struct_size RK_STRUCT_SIZE;
+    uint32_t active;
+    uint64_t source_timestamp_ns;
+    uint64_t closing_count;
+    uint64_t opening_count;
+    int64_t captured_steps;
+    uint64_t captured_timestamp_ns;
+    double captured_position; /**< Captured steps converted to the monitored leader SI coordinate. */
+} rk_device_input_observation;
+
+RK_API rk_result RK_CALL rk_robot_runtime_device_input(rk_robot_runtime runtime,
+    const char *switch_id RK_UTF8, rk_device_input_observation *out_observation RK_OUT);
 
 /** The unique id of a controller board. */
 typedef struct rk_controller_id {
@@ -787,6 +828,30 @@ RK_API void RK_CALL rk_robot_runtime_destroy(rk_robot_runtime runtime);
 RK_API rk_result RK_CALL rk_robot_runtime_start(rk_robot_runtime runtime);
 /** Stops a standalone runtime's owner worker, if it is running. */
 RK_API rk_result RK_CALL rk_robot_runtime_stop(rk_robot_runtime runtime);
+
+/** Atomically establish logical = endpoint position + offsets at rest. Device queues require transport support. */
+RK_API rk_result RK_CALL rk_robot_runtime_calibrate_coordinates(rk_robot_runtime runtime,
+    const double *offsets RK_IN_ARRAY(count), uint32_t count);
+/** Install coordinate zeros and admit completely homed joints in the same at-rest transaction. */
+RK_API rk_result RK_CALL rk_robot_runtime_calibrate_home(rk_robot_runtime runtime,
+    const double *offsets RK_IN_ARRAY(count), uint32_t count,
+    const uint32_t *reference_joints RK_IN_ARRAY(reference_count), uint32_t reference_count);
+/** Atomically establish individual motor counter zeros after every side is referenced and at rest.
+ * Unsupported by endpoints without independent counter-origin support. Physical targets stay unchanged. */
+RK_API rk_result RK_CALL rk_robot_runtime_calibrate_home_drives(rk_robot_runtime runtime,
+    const uint32_t *joints RK_IN_ARRAY(count), const double *side_zeros RK_IN_ARRAY(count), uint32_t count);
+/** Read the snapshot positions and setpoints in endpoint coordinates for physical sensor synthesis. */
+RK_API rk_result RK_CALL rk_robot_runtime_snapshot_endpoint(rk_robot_runtime runtime, rk_robot_snapshot *out_snapshot RK_INOUT);
+
+/** Configure whether a stationary joint needs homing; requiring it invalidates its latch. */
+RK_API rk_result RK_CALL rk_robot_runtime_require_reference(rk_robot_runtime runtime, uint32_t joint, uint32_t required);
+/** Mark a stationary joint referenced after the homing controller establishes its coordinate zero. */
+RK_API rk_result RK_CALL rk_robot_runtime_latch_reference(rk_robot_runtime runtime, uint32_t joint);
+/** Report aggregated physical limit inputs for a joint. An active input latches a fault and prevents safety reset. */
+RK_API rk_result RK_CALL rk_robot_runtime_limit_input(rk_robot_runtime runtime, uint32_t joint, uint32_t active);
+
+/** Read reference readiness, including all leader dependencies of a coupled follower. */
+RK_API rk_result RK_CALL rk_robot_runtime_reference_status(rk_robot_runtime runtime, uint32_t joint, uint32_t *out_referenced);
 
 /**
  * Submits one complete command batch to the runtime mailbox.

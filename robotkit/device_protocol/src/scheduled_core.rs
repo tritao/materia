@@ -2,7 +2,7 @@
 use crate::Board;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum QueueError { StaleRevision, Committed, BadBoundary, BadExpectedState, Full, InvalidSegment, InvalidCommit }
+pub enum QueueError { StaleRevision, Committed, BadBoundary, BadExpectedState, Full, InvalidSegment, InvalidCommit, Stopped }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StopReason { Underflow, LinkLost, Abort, Stop, EmergencyStop, DualDriveSkew, ProcessFault }
 
@@ -14,6 +14,7 @@ pub struct ScheduledSegment<const A: usize> {
     pub degree: u8,
     pub coefficients: [[f32; 6]; A],
     pub ends_at_rest: bool,
+    pub purpose: u8,
 }
 
 impl<const A: usize> ScheduledSegment<A> {
@@ -24,7 +25,14 @@ impl<const A: usize> ScheduledSegment<A> {
             return Err(QueueError::InvalidSegment);
         }
         t0_ticks.checked_add(duration_ticks).ok_or(QueueError::InvalidSegment)?;
-        Ok(Self { plan_id, t0_ticks, duration_ticks, degree, coefficients, ends_at_rest })
+        Ok(Self { plan_id, t0_ticks, duration_ticks, degree, coefficients, ends_at_rest, purpose: 0 })
+    }
+    pub fn new_with_purpose(plan_id: u64, t0_ticks: u64, duration_ticks: u64, degree: u8,
+        coefficients: [[f32; 6]; A], ends_at_rest: bool, purpose: u8) -> Result<Self, QueueError> {
+        if purpose > 2 { return Err(QueueError::InvalidSegment); }
+        let mut segment = Self::new(plan_id, t0_ticks, duration_ticks, degree, coefficients, ends_at_rest)?;
+        segment.purpose = purpose;
+        Ok(segment)
     }
     pub fn end_ticks(&self) -> u64 { self.t0_ticks + self.duration_ticks }
     pub fn evaluate(&self, path_ticks: u64, tick_hz: u64) -> ([f32; A], [f32; A]) {
@@ -115,6 +123,15 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
     pub fn remaining_capacity(&self) -> usize { CAP - self.len }
     pub fn positions(&self) -> [f32; A] { self.position }
     pub fn velocities(&self) -> [f32; A] { self.velocity }
+    pub fn executing_purpose(&self) -> Option<u8> {
+        if self.stopped { return None; }
+        for segment in self.segments[..self.committed_len()].iter().flatten() {
+            if self.path_clock >= segment.t0_ticks && self.path_clock <= segment.end_ticks() {
+                return Some(segment.purpose);
+            }
+        }
+        None
+    }
     pub fn executing_plan_id(&self) -> u64 {
         for segment in self.segments[..self.committed_len()].iter().flatten() {
             if self.path_clock >= segment.t0_ticks && self.path_clock <= segment.end_ticks() {
@@ -142,6 +159,10 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
         self.path_clock = now_ticks;
     }
     pub fn queue_begin(&mut self, revision: u64, replace_after: u64) -> Result<(), QueueError> {
+        if self.stopping.is_some() &&
+            !(self.stopped && self.stopping == Some(StopReason::Stop)) {
+            return Err(QueueError::Stopped);
+        }
         if revision <= self.revision { return Err(QueueError::StaleRevision); }
         if replace_after < self.committed_until { return Err(QueueError::Committed); }
         if replace_after < self.path_clock { return Err(QueueError::BadBoundary); }
@@ -158,6 +179,27 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
         self.len = keep;
         self.revision = revision;
         self.replace_after = replace_after;
+        if self.stopping == Some(StopReason::Stop) {
+            self.stopping = None;
+            self.stopped = false;
+            self.rate = 1.0;
+            self.target_rate = 1.0;
+        }
+        Ok(())
+    }
+    /// After a normal Stop, a new queue starts at the held physical counters.
+    /// Rebase time so the first tick excludes the interval spent stopped.
+    pub fn prepare_stopped_queue(&mut self, now_ticks: u64, positions: [f32; A])
+        -> Result<(), QueueError> {
+        if !self.stopped || self.stopping != Some(StopReason::Stop) || self.len != 0 ||
+            self.velocity.iter().any(|v| v.abs() > 1e-6) {
+            return Err(QueueError::Stopped);
+        }
+        if !positions.iter().all(|v| v.is_finite()) {
+            return Err(QueueError::BadExpectedState);
+        }
+        self.position = positions;
+        self.initialize_clock(now_ticks);
         Ok(())
     }
     pub fn queue_begin_with_state(&mut self, revision: u64, replace_after: u64,
@@ -181,6 +223,7 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
         self.queue_begin(revision, replace_after)
     }
     pub fn push_segment(&mut self, segment: ScheduledSegment<A>) -> Result<(), QueueError> {
+        if segment.purpose > 2 { return Err(QueueError::InvalidSegment); }
         if self.len == CAP { return Err(QueueError::Full); }
         if self.len == 0 {
             if segment.t0_ticks != self.replace_after || segment.t0_ticks < self.path_clock {
@@ -239,6 +282,7 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
         self.target_rate = 0.0;
         self.abort_at_end = false;
         self.len = 0;
+        self.committed_until = 0;
         self.segments.fill(None);
     }
     pub fn emergency_stop<B: Board>(&mut self, board: &mut B) {

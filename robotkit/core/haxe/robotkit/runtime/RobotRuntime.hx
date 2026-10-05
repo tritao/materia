@@ -30,6 +30,10 @@ import sys.thread.Mutex;
  */
 class RobotRuntime {
   public final endpoint:RuntimeEndpoint;
+  /** Identity of the native source timestamp domain; receipt time has a separate clock. */
+  public final sourceClockId:String;
+  var references:JointReferenceState;
+  final referenceMutex = new Mutex();
   final defaultMaxRates:Array<Null<Float>>;
   final defaultMaxEfforts:Array<Null<Float>>;
   final sensorLayout:Array<RobotRuntimeSensorBlueprint>;
@@ -39,6 +43,9 @@ class RobotRuntime {
   final externalSensorLayout:Array<RobotRuntimeSensorBlueprint>;
   final externalMutex = new Mutex();
   final externalFrames:Map<String, SensorFrame> = new Map();
+  final sensorPollMutex = new Mutex();
+  var sensorPoller:Null<RobotSnapshot->Void> = null;
+  final limitJoints:Map<String, Int> = new Map();
 
   /**
    * Native output buffers reused across calls. `rk_robot_snapshot` is 17 KB and `rk_event_record_batch` 10 KB
@@ -54,8 +61,9 @@ class RobotRuntime {
   static final jointMapScratch = new Arena(256);
   var disposed:Bool = false;
 
-  private function new(endpoint:RuntimeEndpoint, blueprint:RobotRuntimeBlueprint) {
+  private function new(endpoint:RuntimeEndpoint, blueprint:RobotRuntimeBlueprint, sourceClockId:String) {
     this.endpoint = endpoint;
+    this.sourceClockId = sourceClockId;
     defaultMaxRates = [for (joint in blueprint.joints) joint.maxRate];
     defaultMaxEfforts = [for (joint in blueprint.joints) joint.maxEffort];
     sensorLayout = blueprint.nativeSensorLayout();
@@ -63,6 +71,18 @@ class RobotRuntime {
     couplings = [for (coupling in blueprint.couplings)
       new robotkit.core.CoupledJoint(coupling.follower, coupling.leader, coupling.ratio, coupling.offset)];
     externalSensorLayout = blueprint.externalSensorLayout();
+    references = new JointReferenceState(blueprint);
+    for (contact in blueprint.switches) if (contact.role == "limit") {
+      var index = -1;
+      for (joint in 0...blueprint.jointCount)
+        if (blueprint.identity != null && blueprint.identity.jointId(joint) == contact.joint) index = joint;
+      if (index < 0) throw 'Limit switch "${contact.id}" monitors an unknown joint';
+      limitJoints.set(contact.id, index);
+    }
+    // Configure before any worker or shared simulation tick can admit motion.
+    for (joint in 0...blueprint.jointCount)
+      if (references.requiresHome(joint))
+        check(endpoint.requireReference(joint, true), 'runtime.requireReference[$joint]');
   }
 
   /** Contacts from the latest simulation tick. Standalone runtimes have none. */
@@ -82,10 +102,15 @@ class RobotRuntime {
   }
 
   /** Creates a runtime from a compiled model and an endpoint factory's result. */
-  public static function create(blueprint:RobotRuntimeBlueprint, ?endpoint:RuntimeEndpoint):RobotRuntime {
+  public static function create(blueprint:RobotRuntimeBlueprint, ?endpoint:RuntimeEndpoint,
+      ?sourceClockId:String = "unspecified"):RobotRuntime {
     if (blueprint == null) throw "Runtime requires a compiled blueprint";
+    if (sourceClockId == null || sourceClockId.length == 0) throw "Runtime source clock requires an ID";
     if (endpoint == null) endpoint = RuntimeEndpoints.inMemory(blueprint);
-    return new RobotRuntime(endpoint, blueprint);
+    try return new RobotRuntime(endpoint, blueprint, sourceClockId) catch (error:Dynamic) {
+      endpoint.close();
+      throw error;
+    }
   }
 
   /** Starts a standalone runtime worker; Simulation-owned runtimes reject this. */
@@ -221,7 +246,13 @@ class RobotRuntime {
     header.set_calibration_revision(plan.calibrationRevision);
     header.set_required_capabilities(plan.requiredCapabilities);
     header.set_ends_at_rest(plan.endsAtRest ? 1 : 0);
-    header.set_flags(plan.jerkUnchecked ? RobotKitRuntimeConstants.RK_PLAN_JERK_UNCHECKED : 0);
+    var flags = plan.jerkUnchecked ? RobotKitRuntimeConstants.RK_PLAN_JERK_UNCHECKED : 0;
+    flags |= switch plan.purpose {
+      case Program: 0;
+      case Jog: RobotKitRuntimeConstants.RK_PLAN_JOG;
+      case Homing: RobotKitRuntimeConstants.RK_PLAN_HOMING;
+    };
+    header.set_flags(flags);
     header.set_replace_after_plan_id(plan.replaceAfterPlanId);
     header.set_replace_after_time_ns(plan.replaceAfterTimeNs);
     var positions = plan.startPosition.toArray(), velocities = plan.startVelocity.toArray(),
@@ -371,6 +402,134 @@ class RobotRuntime {
       "runtime.resetSafety");
   }
 
+  /** Synchronize host reference metadata after the stopped simulation's native reset. */
+  @:allow(robotkit.runtime.Simulation)
+  function afterNativeReset():Void {
+    referenceMutex.acquire();
+    references.invalidate();
+    referenceMutex.release();
+    externalMutex.acquire();
+    externalFrames.clear();
+    externalMutex.release();
+  }
+
+  /** Latch an actual home edge in endpoint/counter coordinates, never an ordinary move. */
+  public function latchHome(switchId:String, counterPosition:Float, leaderCounterPosition:Null<Float> = null):Void {
+    ensureLive();
+    referenceMutex.acquire();
+    try {
+      var candidate = references.copy();
+      candidate.latch(switchId, counterPosition, leaderCounterPosition);
+      var joint = candidate.homeJoint(switchId);
+      var ready:Array<Int> = candidate.isReferenced(joint) ? [joint] : [];
+      check(endpoint.calibrateHome(candidate.coordinateOffsets(), ready), "runtime.latchHome");
+      references = candidate;
+    } catch (error:Dynamic) {
+      referenceMutex.release();
+      throw error;
+    }
+    referenceMutex.release();
+  }
+
+  /** Apply fresh side latches as one atomic endpoint counter-origin transaction. */
+  public function calibrateHomeDrives(switchIds:Array<String>):Void {
+    if (!tryCalibrateHomeDrives(switchIds)) throw "Motor calibration is awaiting device acknowledgment";
+  }
+
+  /** Return false while an identical device batch awaits acknowledgment/fresh state. */
+  public function tryCalibrateHomeDrives(switchIds:Array<String>):Bool {
+    ensureLive();
+    if (switchIds == null || switchIds.length == 0) throw "Motor calibration requires home switch IDs";
+    referenceMutex.acquire();
+    try {
+      var candidate = references.copy();
+      var joints:Array<Int> = [], zeros:Array<Float> = [];
+      for (id in switchIds) {
+        var joint = candidate.homeDriveJoint(id);
+        if (joints.indexOf(joint) >= 0) throw "Motor calibration requires distinct side drives";
+        if (!candidate.isReferenced(candidate.homeJoint(id))) throw "Motor calibration requires all side latches";
+        joints.push(joint); zeros.push(candidate.homeDriveOffset(id));
+      }
+      candidate.markHomeDrivesCalibrated(switchIds);
+      var status = endpoint.calibrateHomeDrives(joints, zeros);
+      if (status == RobotKitRuntimeConstants.RK_ERROR_STALE_STATE) {
+        referenceMutex.release();
+        return false;
+      }
+      check(status, "runtime.calibrateHomeDrives");
+      references = candidate;
+    } catch (error:Dynamic) {
+      referenceMutex.release();
+      throw error;
+    }
+    referenceMutex.release();
+    return true;
+  }
+
+  /** Read the individual motor-side zero captured by a physical home switch. */
+  public function homeDriveOffset(switchId:String):Float {
+    ensureLive();
+    referenceMutex.acquire();
+    try {
+      var zero = references.homeDriveOffset(switchId);
+      referenceMutex.release();
+      return zero;
+    } catch (error:Dynamic) {
+      referenceMutex.release();
+      throw error;
+    }
+  }
+
+  public function isReferenced(joint:Int):Bool {
+    ensureLive();
+    referenceMutex.acquire();
+    try {
+      var ready = references.isReferenced(joint);
+      referenceMutex.release();
+      return ready;
+    } catch (error:Dynamic) {
+      referenceMutex.release();
+      throw error;
+    }
+  }
+
+  /** Coordinate translation used to convert endpoint edge captures after latch. */
+  public function referenceOffset(joint:Int):Float {
+    ensureLive();
+    referenceMutex.acquire();
+    try {
+      var zero = references.offset(joint);
+      referenceMutex.release();
+      return zero;
+    } catch (error:Dynamic) {
+      referenceMutex.release();
+      throw error;
+    }
+  }
+
+  /** Actual endpoint coordinates for physical switch synthesis, unaffected by coordinate zeros. */
+  public function physicalPositions():Array<Float> {
+    ensureLive();
+    scratchMutex.acquire();
+    try {
+      snapshotScratch.set_struct_size(rk_robot_snapshot.size());
+      check(endpoint.observeEndpoint(snapshotScratch), "runtime.physicalPositions");
+      var positions = RobotSnapshot.fromNative(snapshotScratch, sensorLayout).q.toArray();
+      scratchMutex.release();
+      return positions;
+    } catch (error:Dynamic) {
+      scratchMutex.release();
+      throw error;
+    }
+  }
+
+  /** Install a device sensor source before exposing the runtime to consumers. */
+  public function installSensorPoller(poll:RobotSnapshot->Void):Void {
+    ensureLive();
+    if (poll == null || sensorPoller != null) throw "Runtime device sensor source is already installed or missing";
+    sensorPoller = poll;
+  }
+
   /** Reads the latest published native state without advancing time. */
   public function snapshot():RobotSnapshot {
     ensureLive();
@@ -386,6 +545,12 @@ class RobotRuntime {
       throw error;
     }
     scratchMutex.release();
+    var poll = sensorPoller;
+    if (poll != null) {
+      sensorPollMutex.acquire();
+      try poll(native) catch (error:Dynamic) { sensorPollMutex.release(); throw error; }
+      sensorPollMutex.release();
+    }
     if (externalSensorLayout.length == 0) return native;
     var frames = native.sensors.toArray();
     externalMutex.acquire();
@@ -444,9 +609,12 @@ class RobotRuntime {
       case "gnss_pose":
         if (image != null || values.length != 3)
           throw 'GNSS "$sensorId" publication requires latitude, longitude, and yaw';
+      case "trip_switch":
+        if (image != null || !JointSwitchFrame.valid(values))
+          throw 'Switch "$sensorId" publication requires digital state and optional closing-edge capture';
       case "tool_contact":
         if (image != null || values.length != 1 || (values[0] != 0.0 && values[0] != 1.0))
-          throw 'Contact "$sensorId" publication requires one digital value';
+          throw 'Digital sensor "$sensorId" publication requires one zero-or-one value';
       case "tool_vacuum_kpa":
         if (image != null || values.length != 1 || values[0] < 0.0)
           throw 'Vacuum "$sensorId" publication requires one non-negative kPa value';
@@ -466,6 +634,20 @@ class RobotRuntime {
       throw 'Sensor "$sensorId" received a stale sequence';
     }
     externalFrames.set(sensorId, frame);
+    var limitJoint = limitJoints.get(sensorId);
+    if (limitJoint != null) {
+      var active = false;
+      for (id in limitJoints.keys()) if (limitJoints.get(id) == limitJoint) {
+        var signal = externalFrames.get(id);
+        if (signal != null && signal.values.get(0) == 1.0) active = true;
+      }
+      // Serialize frame changes and native aggregation so concurrent publishers
+      // cannot release one input over another's active update.
+      try check(endpoint.limitInput(limitJoint, active), "runtime.limitInput") catch (error:Dynamic) {
+        externalMutex.release();
+        throw error;
+      }
+    }
     externalMutex.release();
     return frame;
   }

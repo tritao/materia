@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-track-arm-example"
+  },
+  "entry": "TrackArmPreview",
+  "sources": [
+    "TrackArm.hx",
+    "TrackArmPreview.hx",
+    "../robot-arm/RobotArm.hx",
+    "TrackWelder.hx",
+    "TrackWelderPreview.hx",
+    "../robot-welder/ArmWeldingTool.hx"
+  ],
+  "sourceRoots": [
+    ".",
+    "../robot-arm",
+    "../robot-welder"
+  ],
+  "dependencies": {
+    "projectkit": {
+      "path": "../../../projectkit"
+    },
+    "cadkit": {
+      "path": "../../../cadkit"
+    },
+    "machinekit": {
+      "path": "../.."
+    },
+    "machinekit-robot": {
+      "path": "../../robot"
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
+}

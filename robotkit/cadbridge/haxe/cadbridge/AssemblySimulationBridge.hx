@@ -11,6 +11,7 @@ import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import robotkit.model.RobotModel;
 import robotkit.model.Link;
+import robotkit.model.Frame;
 import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.JointLimits;
@@ -224,8 +225,10 @@ class AssemblySimulationBridge {
         if (!Math.isFinite(mass) || mass <= 0) throw 'Assembly occurrence "$id" has an invalid mass';
         masses[index].push({mass: mass, center: [center.x * scale, center.y * scale, center.z * scale],
           inertia: rotated(part.inertia, offset, part.density * Math.pow(scale, 5) * mass / baseMass)});
-        var hull = part.collisionHull;
-        if (hull != null) {
+        var component = [for (entry in definition.definitions) if (entry.id == occurrence.definition) entry][0];
+        var hulls = component.collisionHulls == null ?
+          (part.collisionHull == null ? [] : [part.collisionHull]) : component.collisionHulls;
+        for (hull in hulls) {
           if (hull.length < 12 || hull.length > 64 * 3 || hull.length % 3 != 0)
             throw 'Assembly occurrence "$id" has an invalid collision hull';
           var vertices:Array<Float> = [];
@@ -277,6 +280,7 @@ class AssemblySimulationBridge {
       };
       var joint = model.addJoint(new Joint(edge.id, kind, linkOf(edge.parent),
         linkOf(edge.child)));
+      joint.includePath = edge.includePath == null ? "" : edge.includePath;
       var parentFrame = AssemblyFrames.compose(offsetOf(edge.parent),
         connector(definitions.get(occurrenceDefinition(definition, edge.parent)), edge.parentConnector));
       var initial = placement.joint(edge.id);
@@ -293,6 +297,7 @@ class AssemblySimulationBridge {
       if (edge.limits.assumptions != null) joint.limits.assumptions = [for (value in edge.limits.assumptions)
         {quantity: value.quantity, label: value.label}];
       if (edge.limits.acceleration != null) joint.limits.maxAcceleration = edge.limits.acceleration * factor;
+      joint.limits.rackingTolerance = edge.limits.rackingTolerance == null ? 0.0 : edge.limits.rackingTolerance * factor;
       joint.limits.overtravel = edge.limits.overtravel != null ? edge.limits.overtravel * factor :
         edge.type == AssemblyJointType.Prismatic ? DEFAULT_PRISMATIC_OVERTRAVEL : DEFAULT_ROTARY_OVERTRAVEL;
     }
@@ -458,6 +463,39 @@ class AssemblySimulationBridge {
           'Assembly presence sensor "${sensor.id}" has no connector or range');
         added.maxRange = range * scale;
       }
+    }
+    // Switch coordinates use the same placed zero as the monitored robot joint.
+    if (definition.switches != null) for (contact in definition.switches) {
+      var edge:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
+      for (candidate in definition.joints) if (candidate.id == contact.joint) edge = candidate;
+      if (edge == null || edge.type != AssemblyJointType.Prismatic)
+        throw 'Assembly switch "${contact.id}" requires a prismatic monitored joint';
+      var occurrence = [for (item in definition.occurrences) if (item.id == contact.part) item][0];
+      if (occurrence == null) throw 'Assembly switch "${contact.id}" has no physical part';
+      var component = definitions.get(occurrence.definition);
+      var mount = AssemblyFrames.compose(offsetOf(contact.part), connector(component, contact.connector));
+      var frame = model.addFrame(new Frame(contact.id + " switch mount", linkOf(contact.part)));
+      frame.position = [mount.x * scale, mount.y * scale, mount.z * scale];
+      frame.rotation = [mount.qx, mount.qy, mount.qz, mount.qw];
+      var added = new robotkit.model.JointSwitch(contact.id, contact.joint, frame.id, contact.role,
+        contact.side, (contact.trip - placement.joint(contact.joint)) * scale,
+        contact.hysteresis * scale, contact.repeatability * scale, contact.seed, contact.driveJoint);
+      model.addSwitch(added);
+      var sensor = new robotkit.model.Sensor(contact.id, "trip_switch", 0.0, contact.id);
+      sensor.frame = frame;
+      model.addSensor(sensor);
+    }
+    // Preserve the physical flange and its owning include after fixed parts collapse into links.
+    for (occurrence in definition.occurrences) {
+      if (free.exists(occurrence.id)) continue;
+      var component:materia.assembly.AssemblyDefinition.AssemblyComponentDefinition = definitions.get(occurrence.definition);
+      if (component == null) throw "Missing assembly component definition";
+      if (component.robotFlangeConnector == null) continue;
+      var mount = AssemblyFrames.compose(offsetOf(occurrence.id), connector(component, component.robotFlangeConnector));
+      var frame = model.addFrame(new Frame(occurrence.id + " robot flange", linkOf(occurrence.id)));
+      frame.position = [mount.x * scale, mount.y * scale, mount.z * scale];
+      frame.rotation = [mount.qx, mount.qy, mount.qz, mount.qw];
+      frame.flangeIncludePath = occurrence.includePath == null ? "" : occurrence.includePath;
     }
     if (mobileBase != null) {
       for (wheel in [mobileBase.leftWheel, mobileBase.rightWheel])

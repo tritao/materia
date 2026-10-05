@@ -219,6 +219,12 @@ class AssemblyModel {
 		data.sensors.push(materia.assembly.AssemblyDefinitionFlattener.copySensor(sensor, sensor.id, ""));
 	}
 
+	/** Add a geometry-derived switch record; the definition codec validates its references. */
+	public function addSwitch(contact:materia.assembly.AssemblyDefinition.AssemblySwitch):Void {
+		if (data.switches == null) data.switches = [];
+		data.switches.push(haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(contact)));
+	}
+
 	/** Add derived span energies separately from nominal motion couplings. */
 	public function addElasticNetwork(network:materia.assembly.AssemblyDefinition.AssemblyElasticNetwork):Void {
 		if (data.elasticNetworks == null) data.elasticNetworks = [];
@@ -292,6 +298,7 @@ class AssemblyModel {
 			(limits.upper != null && !Math.isFinite(limits.upper)) ||
 			(limits.velocity != null && (!Math.isFinite(limits.velocity) || limits.velocity < 0)) ||
 			(limits.effort != null && (!Math.isFinite(limits.effort) || limits.effort < 0)) ||
+			(limits.rackingTolerance != null && (!Math.isFinite(limits.rackingTolerance) || limits.rackingTolerance <= 0)) ||
 			(limits.overtravel != null && (!Math.isFinite(limits.overtravel) || limits.overtravel < 0)) ||
 			(limits.acceleration != null && (!Math.isFinite(limits.acceleration) || limits.acceleration < 0)) ||
 			(limits.lower != null && limits.upper != null && limits.lower > limits.upper) ||

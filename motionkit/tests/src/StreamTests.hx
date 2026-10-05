@@ -155,10 +155,9 @@ class StreamTests extends MotionKitTestSupport {
   }
 
   public function testBufferedExecution():Void {
-    var xAxis = new LinearAxis(23, 10, 80);
-    var yAxis = new LinearAxis(23, 10, 60);
-    var zAxis = new LinearAxis(23, 10, 40);
-    var blueprint = MachineKitRobotCompiler.compileXYZGantry(xAxis, yAxis, zAxis, 0.1, 0.4);
+    var blueprint = MachineKitRobotCompiler.compileGantry(
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(80, 60, 40)),
+      0.1, 0.4);
     var simulationHarness = new SimulationHarness(0.01);
     var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
@@ -168,6 +167,10 @@ class StreamTests extends MotionKitTestSupport {
     var recording = new RobotRecording();
     var instrumented = new RecordingRobot(robot, recording);
     var machine = MotionSystem.fromBlueprint(instrumented, blueprint);
+    var tick = homeGantryFixture(blueprint, runtime, simulationHarness, instrumented, machine) + 1;
+    var jobStartTick = tick;
+    // The assertions below count buffered job submissions after setup homing.
+    recording.commands.resize(0);
     var options = new MotionOptions(0.05, 0.2);
     check(machine.robot.capabilities().execution.plans,
       "simulation runtime advertises trajectory queue support");
@@ -190,7 +193,6 @@ class StreamTests extends MotionKitTestSupport {
         throw "buffer submitted a lifecycle command before motion started";
     }
 
-    var tick = 0;
     for (iteration in 0...5) {
       check(machine.update(), "buffer remains active while its first move is running");
       simulationHarness.step(Int64.ofInt(tick++));
@@ -246,7 +248,7 @@ class StreamTests extends MotionKitTestSupport {
     while (machine.isMoving()) {
       machine.update();
       simulationHarness.step(Int64.ofInt(tick++));
-      if (tick > 2000) throw "buffered MotionKit trajectory did not complete";
+      if (tick - jobStartTick > 2000) throw "buffered MotionKit trajectory did not complete";
     }
     near(robot.snapshot().positions.get(0), 0.04,
       "buffered trajectories execute in order", 1e-5);

@@ -149,13 +149,19 @@ class MachineAssemblyCodec {
 			var added = ownExtra.get(id);
 			if (added != null) for (record in added) connectors.push({name: record.name, frame: MachineAssembly.copyFrame(record.frame)});
 			connectors.sort((a, b) -> Reflect.compare(a.name, b.name));
+			var collision = machinekit.component.CollisionHullFacet.of(member.component);
+			var collisionHulls = collision == null ? null : collision.hulls;
 			var key = MachineAssembly.definitionKey(id, member.component);
 			var candidates = shared.get(key);
 			var definition:Null<AssemblyComponentDefinition> = null;
 			if (candidates != null) for (candidate in candidates)
-				if (Equality.equals(candidate.connectors, connectors)) definition = candidate;
+				if (Equality.equals(candidate.connectors, connectors) &&
+					Equality.equals(candidate.collisionHulls, collisionHulls)) definition = candidate;
 			if (definition == null) {
 				definition = {id: id, connectors: connectors};
+				var flange = machinekit.robotics.RobotFlangeFacet.of(member.component);
+				if (flange != null) definition.robotFlangeConnector = flange.connector;
+				if (collision != null) definition.collisionHulls = [for (hull in collision.hulls) hull.copy()];
 				level.definitions.push(definition);
 				if (candidates == null) {
 					candidates = [];
@@ -256,6 +262,7 @@ class MachineAssemblyCodec {
 				saved.sort((a, b) -> Reflect.compare(a.id, b.id));
 				saved;
 			},
+			switches: [for (entry in assembly.drives.switches) DriveSystem.copySwitch(entry, id -> id)],
 			bomExtras: [for (entry in assembly.inventory.items) {item: {partNumber: entry.item.partNumber,
 				description: entry.item.description, quantity: entry.item.quantity, material: entry.item.material,
 				typeId: entry.item.typeId, valuesKey: entry.item.valuesKey}, quantity: entry.quantity,
@@ -352,7 +359,16 @@ class MachineAssemblyCodec {
 			}
 			var member = sources.get(occurrence.id);
 			if (member == null) throw 'Missing member source "${occurrence.id}"';
-			target.addMember(occurrence.id, rebuildMember(member, registry), occurrence.initialPose);
+			var component = rebuildMember(member, registry);
+			var definition = [for (entry in level.definitions) if (entry.id == occurrence.definition) entry][0];
+			if (definition.collisionHulls != null) {
+				var collision = machinekit.component.CollisionHullFacet.of(component);
+				if (collision == null)
+					@:privateAccess component.addFacet(new machinekit.component.CollisionHullFacet(definition.collisionHulls));
+				else if (!Equality.equals(collision.hulls, definition.collisionHulls))
+					throw 'Collision hulls disagree with recipe for "${occurrence.id}"';
+			}
+			target.addMember(occurrence.id, component, occurrence.initialPose);
 		}
 		for (connector in machine.memberConnectors)
 			target.addMemberConnector(connector.instanceId, connector.name, connector.frame);
@@ -401,6 +417,8 @@ class MachineAssemblyCodec {
 		for (motor in machine.motors) target.addMotorRecord(motor);
 		for (cylinder in machine.cylinders) target.addCylinder(cylinder.actuator, cylinder.joint, cylinder.cylinder, cylinder.valve);
 		for (sensor in machine.sensors) target.addSensorRecord(sensor);
+		for (contact in machine.switches) target.addTripSwitch(contact.id, contact.joint, contact.part,
+			{instanceId: contact.trigger, connectorName: contact.triggerConnector}, contact.side, contact.role, contact.seed, contact.driveJoint);
 		// Encoders after the motors they read, whose actuators they point at.
 		for (encoder in machine.encoders) target.addEncoderRecord(encoder);
 		for (entry in machine.connectorExposures) target.exposeConnector(entry.name, entry.instanceId, entry.connectorName);

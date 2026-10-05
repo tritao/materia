@@ -65,17 +65,19 @@ class CncRouterChecks {
 			throw '$message: expected $expected, got $actual';
 	}
 
-	public static function run():Void {
-		parts = new PosedParts();
-		try runChecks() catch (error:Dynamic) {
-			parts.close();
-			throw error;
-		}
-		parts.close();
+	public static function run():Void withGeometry(runChecks);
+
+	/** Own the geometry cache for checks invoked from either standalone fixture. */
+	public static function withGeometry(check:Void -> Void):Void {
+		PosedParts.scope(posed -> {
+			clearance = posed;
+			try check() catch (error:Dynamic) { clearance = null; throw error; }
+			clearance = null;
+		});
 	}
 
-	/** The geometry of the members posed by this run, built once each; closed when the run ends. */
-	static var parts:PosedParts;
+	/** The members posed by this run, with their geometry built once each; closed when the run ends. */
+	static var clearance:PosedParts;
 
 	static function runChecks():Void {
 		var scene = SceneArtifact.decode(CncRouterPreview.router());
@@ -182,6 +184,7 @@ class CncRouterChecks {
 		var mass = router.massProperties().mass;
 		Sys.println('cnc router: ${scene.parts.length} definitions, ${definition.occurrences.length} occurrences, ' +
 			'${bom.length} BOM lines, ${Math.round(mass * 10) / 10} kg');
+		checkXHomeClearance(router);
 		runBelts();
 	}
 
@@ -277,6 +280,7 @@ class CncRouterChecks {
 			["crossBack", "sideLeft", "sideRight", "spoilboard"]);
 		checkClear(router, state, [300, 0, 0], ["xPlate", "beltBracketX", "blockXUpper", "blockXLower"], ["pulleyX", "idlerX", "motorX", "motorPlateX", "idlerPlateX"]);
 		checkClear(router, state, [0, 0, 0], ["xPlate", "beltBracketX", "blockXUpper", "blockXLower"], ["pulleyX", "idlerX", "motorX", "motorPlateX", "idlerPlateX"]);
+		checkXHomeClearance(router);
 		Sys.println('cnc router belts: ${report.join("; ")}');
 	}
 
@@ -307,25 +311,36 @@ class CncRouterChecks {
 	}
 
 	/** No member of `moving` intersects a member of `others` at machine position `at`. */
-	public static function checkClear(router:CncRouter, state:AssemblyState, at:Array<Float>, moving:Array<String>,
+	static function checkXHomeClearance(router:CncRouter):Void {
+		var definition = router.definition();
+		for (joint in definition.joints) if (joint.limits.overtravel != null) {
+			if (joint.limits.lower != null) joint.limits.lower -= joint.limits.overtravel;
+			if (joint.limits.upper != null) joint.limits.upper += joint.limits.overtravel;
+		}
+		var state = new AssemblyState(definition);
+		// Include the interior pose that blocked physical homing, and both guide ends.
+		for (x in [-router.axisOvertravel("x"), 0.0, 36.4, 150.0, 300.0, 300.0 + router.axisOvertravel("x")])
+			for (z in [-80.0 - router.axisOvertravel("z"), -80.0, 0.0, router.axisOvertravel("z")]) {
+				checkClear(router, state, [x, 150.0, z],
+					["xPlate", "zPlate", "blockZLeft", "blockZRight", "spindleClamp", "spindle", "tool", "homeTriggerZ"],
+					["homeX", "homeXMount"]);
+				checkClear(router, state, [x, 150.0, z], ["homeTriggerX"], ["beamUpper", "railXUpper"]);
+			}
+	}
+
+	/** `checkClearWith` for this run's members; only for use while `run` is in progress. */
+	public static function checkClear(router:CncRouter, state:AssemblyState, at:Array<Float>, moving:Array<String>, others:Array<String>):Void
+		checkClearWith(clearance, router, state, at, moving, others);
+
+	/**
+	 * Throws unless no member of `moving` intersects a member of `others` at machine position `at`. The members are posed
+	 * through `parts`, which the caller owns (see `PosedParts.scope`) and may reuse across calls.
+	 */
+	public static function checkClearWith(parts:PosedParts, router:CncRouter, state:AssemblyState, at:Array<Float>, moving:Array<String>,
 			others:Array<String>):Void {
 		moveTo(state, at);
-		var first:Array<Part> = [], second:Array<Part> = [];
-		try {
-			for (id in moving) first.push(posed(router, state, id));
-			for (id in others) second.push(posed(router, state, id));
-			var firstBoxes = [for (part in first) PosedParts.boxOf(part)], secondBoxes = [for (part in second) PosedParts.boxOf(part)];
-			for (a in 0...first.length) for (b in 0...second.length) {
-				var volume = PosedParts.commonVolume(first[a], firstBoxes[a], second[b], secondBoxes[b]);
-				if (volume > 1e-3) throw '${moving[a]} collides with ${others[b]} at machine ${at.join(", ")}: ${Math.round(volume)} mm³';
-			}
-		} catch (error:Dynamic) {
-			PosedParts.closeAll(first);
-			PosedParts.closeAll(second);
-			throw error;
-		}
-		PosedParts.closeAll(first);
-		PosedParts.closeAll(second);
+		parts.checkClear(router, state, "CNC router", moving, others,
+			(a, b, volume) -> '$a collides with $b at machine ${at.join(", ")}: ${Math.round(volume)} mm³');
 	}
 
 	static function moveTo(state:AssemblyState, at:Array<Float>):Void {
@@ -337,16 +352,7 @@ class CncRouterChecks {
 
 	static function overlap(router:CncRouter, state:AssemblyState, at:Array<Float>, a:String, b:String):Float {
 		moveTo(state, at);
-		var first = posed(router, state, a), second = posed(router, state, b);
-		var volume = PosedParts.commonVolume(first, PosedParts.boxOf(first), second, PosedParts.boxOf(second));
-		first.close();
-		second.close();
-		return volume;
-	}
-
-	static function posed(router:CncRouter, state:AssemblyState, id:String):Part {
-		for (entry in router.components()) if (entry.id == id) return parts.posed(entry.component, state.worldPose(id));
-		throw 'CNC router has no member "$id"';
+		return clearance.volume(router, state, "CNC router", a, b);
 	}
 }
 

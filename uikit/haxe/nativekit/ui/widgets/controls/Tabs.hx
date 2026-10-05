@@ -8,6 +8,8 @@ import Color;
 import nativekit.ui.core.BuildContext;
 import nativekit.ui.core.Key;
 import nativekit.ui.core.RenderNode;
+import nativekit.ui.core.RetainedView;
+import nativekit.ui.style.ComputedStyle;
 import nativekit.ui.core.State;
 import nativekit.ui.core.UiEvent;
 import nativekit.ui.core.UiEventKind;
@@ -40,6 +42,10 @@ class Tabs implements View {
 	public var onTabContextMenu:Null<String->UiEvent->Void>;
 	/** Called after each header is built so dock hosts can register geometry. */
 	public var onTabHeaderBuilt:Null<String->RenderNode->Void>;
+
+	/** Opt-in header retention; callers include all application-owned header inputs. */
+	public var headerRevision:Null<Void->String>;
+	public var transformHeaderStrip:Null<(RenderNode, BuildContext)->RenderNode>;
 
 	public function new(key:String, items:Array<TabItem>, selectedKey:String = "",
 			?onChange:String->Void, ?style:LayoutStyle,
@@ -112,89 +118,15 @@ class Tabs implements View {
 			var tabsSemantics = new Semantics(AccessibilityRole.TabList, "Tabs");
 			tabsSemantics.orientation = AccessibilityOrientation.Horizontal;
 			root.semantics = tabsSemantics;
-			var stripStyle = new LayoutStyle();
-			stripStyle.width = LayoutAxis.grow();
-			stripStyle.direction = LayoutDirection.LeftToRight;
-			stripStyle.childGap = 4.0;
-			var strip = new RenderNode(context.id("tab-strip"), LayoutVisualKind.Box, stripStyle);
-			var buttonNodes:Array<RenderNode> = [];
-			var tabDragState:Null<State<TabDragState>> = null;
-			if (onTabDragStart != null || onTabDragMove != null || onTabDragEnd != null ||
-				onTabDragCancel != null)
-				tabDragState = context.state(context.id("tab-drag"), new TabDragState());
-			for (item in items) {
-				var button = new Button(item.displayLabel == null ? item.label : item.displayLabel,
-					null, function() { select(item.key); }, item.key);
-				button.accessibilityLabel = item.label;
-				button.variant = ButtonVariant.Navigation;
-				button.classes = ["tab-header"];
-				button.leadingIcon = item.icon;
-				button.iconSize = 14.0;
-				button.enabled = item.enabled;
-				button.selected = item.key == active;
-				button.semanticRole = AccessibilityRole.Tab;
-				button.semanticActions = AccessibilityAction.Select;
-				var buttonNode = context.withStyleParent(rootComputed, function() {
-					return context.withScope(new Key(item.key),
-						function() return button.build(context));
-				});
-				var headerStyle = new LayoutStyle();
-				headerStyle.direction = LayoutDirection.TopToBottom;
-				var header = new RenderNode(context.id("tab-header:" + item.key),
-					LayoutVisualKind.Box, headerStyle);
-				header.hitTestSelf = false;
-				header.add(buttonNode);
-				var indicatorStyle = new LayoutStyle();
-				indicatorStyle.width = LayoutAxis.grow();
-				indicatorStyle.height = LayoutAxis.fixed(2.0);
-				indicatorStyle.background = item.key == active ? context.theme.tokens.accent :
-					Color.rgba(0.0, 0.0, 0.0, 0.0);
-				var indicator = new RenderNode(context.id("tab-indicator:" + item.key),
-					LayoutVisualKind.Box, indicatorStyle);
-				indicator.hitTestSelf = false;
-				header.add(indicator);
-				strip.add(header);
-				buttonNodes.push(buttonNode);
-				if (onTabHeaderBuilt != null)
-					onTabHeaderBuilt(item.key, buttonNode);
-				installTabDragHandlers(buttonNode, item.key, tabDragState);
-				if (item.enabled && onTabContextMenu != null) {
-					var requestMenu = function(event:UiEvent) {
-						var handler = onTabContextMenu;
-						if (handler == null) return;
-						handler(item.key, event);
-						event.preventDefault();
-						event.stopPropagation();
-					};
-					buttonNode.on(UiEventKind.PointerDown, function(event) {
-						if (event.button == 1) requestMenu(event);
-					});
-					buttonNode.on(UiEventKind.KeyDown, function(event) {
-						if (UiKey.isContextMenuRequest(event.key, event.modifiers))
-							requestMenu(event);
-					});
-				}
-			}
-			for (index in 0...buttonNodes.length) {
-				var tabIndex = index;
-				buttonNodes[index].on(UiEventKind.KeyDown, function(event) {
-					var direction = event.key == UiKey.Right || event.key == UiKey.Down ? 1 :
-						event.key == UiKey.Left || event.key == UiKey.Up ? -1 : 0;
-					if (direction == 0 || buttonNodes.length == 0)
-						return;
-					var nextIndex = tabIndex;
-					for (_ in 0...buttonNodes.length) {
-						nextIndex = (nextIndex + direction + buttonNodes.length) % buttonNodes.length;
-						if (items[nextIndex].enabled)
-							break;
-					}
-					if (items[nextIndex].enabled) {
-						select(items[nextIndex].key);
-						context.requestFocus(buttonNodes[nextIndex].id);
-						event.preventDefault();
-					}
-				});
-			}
+			var stripView = new TabsStripView(function(buildContext) {
+				var strip = buildStrip(buildContext, rootComputed, active, select);
+				var transform:Null<(RenderNode, BuildContext)->RenderNode> = transformHeaderStrip;
+				return transform == null ? strip : transform(strip, buildContext);
+			});
+			var revision:Null<Void->String> = headerRevision;
+			var strip = revision == null ? stripView.build(context) :
+				new RetainedView("tab-headers", function(_) return stripView,
+					function() return active.length + ":" + active + revision()).build(context);
 			root.add(strip);
 
 			var selectedItem:Null<TabItem> = null;
@@ -224,6 +156,157 @@ class Tabs implements View {
 			}
 			return root;
 		});
+	}
+
+	function buildStrip(context:BuildContext, rootComputed:ComputedStyle, active:String,
+			select:String->Void):RenderNode {
+		var stripStyle = new LayoutStyle();
+		stripStyle.width = LayoutAxis.grow();
+		stripStyle.direction = LayoutDirection.LeftToRight;
+		stripStyle.childGap = 4.0;
+		var strip = new RenderNode(context.id("tab-strip"), LayoutVisualKind.Box, stripStyle);
+		var buttonNodes:Array<RenderNode> = [];
+		var tabDragState:Null<State<TabDragState>> = null;
+		if (onTabDragStart != null || onTabDragMove != null || onTabDragEnd != null ||
+			onTabDragCancel != null)
+			tabDragState = context.state(context.id("tab-drag"), new TabDragState());
+		for (item in items) {
+			var button = new Button(item.displayLabel == null ? item.label : item.displayLabel,
+				null, null, item.key);
+			button.onClickEvent = function(event) {
+				if (event.kind == UiEventKind.Activate || event.button == 0) select(item.key);
+			};
+			button.accessibilityLabel = item.label + (item.badgeCount > 0 ? ", " + item.badgeCount : "");
+				if (item.badgeCount > 0) button.trailingView = new CountBadge(item.badgeCount);
+			button.variant = ButtonVariant.Navigation;
+			button.classes = ["tab-header"];
+			button.leadingIcon = item.icon;
+			button.leadingView = item.iconView;
+			button.iconSize = 14.0;
+			button.enabled = item.enabled;
+			button.selected = item.key == active;
+			button.semanticRole = AccessibilityRole.Tab;
+			button.semanticActions = AccessibilityAction.Select;
+			var buttonNode = context.withStyleParent(rootComputed, function() {
+				return context.withScope(new Key(item.key),
+				function() return button.build(context));
+			});
+			var headerStyle = new LayoutStyle();
+			headerStyle.direction = LayoutDirection.TopToBottom;
+			var header = new RenderNode(context.id("tab-header:" + item.key),
+				LayoutVisualKind.Box, headerStyle);
+			header.hitTestSelf = false;
+			if (item.enabled && item.onClose != null) header.on(UiEventKind.Click, function(event) {
+				if (event.button != 2) return;
+				event.preventDefault();
+				event.stopPropagation();
+				var close = item.onClose;
+				if (close != null) close();
+			}, "capture");
+			header.add(item.onClose == null ? buttonNode : buildClosableHeader(context, item, buttonNode));
+			var indicatorStyle = new LayoutStyle();
+			indicatorStyle.width = LayoutAxis.grow();
+			indicatorStyle.height = LayoutAxis.fixed(2.0);
+			indicatorStyle.background = item.key == active ? context.theme.tokens.accent :
+				Color.rgba(0.0, 0.0, 0.0, 0.0);
+			var indicator = new RenderNode(context.id("tab-indicator:" + item.key),
+				LayoutVisualKind.Box, indicatorStyle);
+			indicator.hitTestSelf = false;
+			header.add(indicator);
+			strip.add(header);
+			buttonNodes.push(buttonNode);
+			if (onTabHeaderBuilt != null)
+				onTabHeaderBuilt(item.key, buttonNode);
+			installTabDragHandlers(buttonNode, item.key, tabDragState);
+			if (item.enabled && onTabContextMenu != null) {
+				var requestMenu = function(event:UiEvent) {
+				var handler = onTabContextMenu;
+				if (handler == null) return;
+				handler(item.key, event);
+				event.preventDefault();
+				event.stopPropagation();
+				};
+				buttonNode.on(UiEventKind.PointerDown, function(event) {
+				if (event.button == 1) requestMenu(event);
+				});
+				buttonNode.on(UiEventKind.KeyDown, function(event) {
+				if (UiKey.isContextMenuRequest(event.key, event.modifiers))
+					requestMenu(event);
+				});
+			}
+		}
+		for (index in 0...buttonNodes.length) {
+			var tabIndex = index;
+			buttonNodes[index].on(UiEventKind.KeyDown, function(event) {
+				var direction = event.key == UiKey.Right || event.key == UiKey.Down ? 1 :
+				event.key == UiKey.Left || event.key == UiKey.Up ? -1 : 0;
+				if (direction == 0 || buttonNodes.length == 0)
+				return;
+				var nextIndex = tabIndex;
+				for (_ in 0...buttonNodes.length) {
+				nextIndex = (nextIndex + direction + buttonNodes.length) % buttonNodes.length;
+				if (items[nextIndex].enabled)
+					break;
+				}
+				if (items[nextIndex].enabled) {
+				select(items[nextIndex].key);
+				context.requestFocus(buttonNodes[nextIndex].id);
+				event.preventDefault();
+				}
+			});
+		}
+		return strip;
+	}
+
+	function buildClosableHeader(context:BuildContext, item:TabItem, buttonNode:RenderNode):RenderNode {
+		var rowStyle = new LayoutStyle();
+		rowStyle.direction = LayoutDirection.LeftToRight;
+		rowStyle.childAlignY = LayoutAlignmentY.Center;
+		rowStyle.background = buttonNode.layout.style.background;
+		var row = new RenderNode(context.id("tab-actions:" + item.key), LayoutVisualKind.Box, rowStyle);
+		row.hitTestSelf = false;
+		row.add(buttonNode);
+		var hover = context.state(context.id("tab-close-hover:" + item.key), false);
+		var focused = context.state(context.id("tab-close-focus:" + item.key), false);
+		var slotStyle = new LayoutStyle();
+		slotStyle.width = LayoutAxis.fixed(28);
+		slotStyle.height = LayoutAxis.fixed(24);
+		var slot = new RenderNode(context.id("tab-close-slot:" + item.key), LayoutVisualKind.Box, slotStyle);
+		slot.hitTestSelf = true;
+		var closeStyle = new LayoutStyle();
+		closeStyle.width = LayoutAxis.fixed(24);
+		closeStyle.height = LayoutAxis.fixed(24);
+		closeStyle.padding = new Insets(4, 4, 4, 4);
+		var close = new Button("", closeStyle, null, "tab-close:" + item.key);
+		close.leadingIcon = nativekit.ui.icons.IconName.Close;
+		close.iconSize = 14;
+		close.variant = ButtonVariant.Navigation;
+		close.classes = ["tab-close"];
+		close.enabled = item.enabled;
+		close.accessibilityLabel = "Close " + item.label;
+		close.onClickEvent = function(event) {
+			event.stopPropagation();
+			var handler = item.onClose;
+			if ((event.kind == UiEventKind.Activate || event.button == 0) && handler != null) handler();
+		};
+		var closeNode = close.build(context);
+		closeNode.on(UiEventKind.PointerDown, function(event) event.stopPropagation());
+		closeNode.on(UiEventKind.PointerUp, function(event) event.stopPropagation());
+		var refresh = function() { closeNode.layout.style.visible = hover.value || focused.value; };
+		refresh();
+		row.on(UiEventKind.HoverEnter, function(event) {
+			if (event.target.equals(row.id)) { hover.update(true); refresh(); }
+		});
+		row.on(UiEventKind.HoverLeave, function(event) {
+			if (event.target.equals(row.id)) { hover.update(false); refresh(); }
+		});
+		for (node in [buttonNode, closeNode]) {
+			node.on(UiEventKind.Focus, function(_) { focused.update(true); refresh(); });
+			node.on(UiEventKind.Blur, function(_) { focused.update(false); refresh(); });
+		}
+		slot.add(closeNode);
+		row.add(slot);
+		return row;
 	}
 
 	function isEnabled(key:String):Bool {
@@ -338,4 +421,10 @@ private class TabDragState {
 		startX = 0.0;
 		startY = 0.0;
 	}
+}
+
+private class TabsStripView implements View {
+	final buildStrip:BuildContext->RenderNode;
+	public function new(buildStrip:BuildContext->RenderNode) this.buildStrip = buildStrip;
+	public function build(context:BuildContext):RenderNode return buildStrip(context);
 }

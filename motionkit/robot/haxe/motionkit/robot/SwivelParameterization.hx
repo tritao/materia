@@ -1,12 +1,16 @@
 package motionkit.robot;
 
 import motionkit.kinematics.IkTolerance;
+import motionkit.path.OrientationPolicy;
 import motionkit.kinematics.Pose3;
 import robotkit.manipulation.KinematicGroup;
 
 /** A 7-axis arm's redundancy: its swivel angle (`robotkit.manipulation.ArmSwivel`). */
 class SwivelParameterization implements RedundancyParameterization {
   public final group:KinematicGroup;
+  var orientationPreference:Null<Pose3> = null;
+  var preferTargetOrientation:Bool = false;
+  var posturePreference:Null<Array<Float>> = null;
   /** Swivel resolution per metre of path (radians). */
   public final rate:Float;
 
@@ -17,6 +21,14 @@ class SwivelParameterization implements RedundancyParameterization {
     this.rate = rate;
   }
 
+  public function preferringOrientation(preference:Null<Pose3>, ?preferTarget:Bool = false):Void {
+    orientationPreference = preference;
+    preferTargetOrientation = preferTarget;
+  }
+
+  public function preferringPosture(preference:Null<Array<Float>>):Void
+    posturePreference = preference == null ? null : preference.copy();
+
   public function dimension():Int return 1;
 
   public function valuesAt(q:Array<Float>):Null<Array<Float>> {
@@ -26,15 +38,23 @@ class SwivelParameterization implements RedundancyParameterization {
 
   public function valuesJacobian(q:Array<Float>):Null<Array<Float>> return group.swivelJacobian(q);
 
-  public function solveAt(target:Pose3, seed:Array<Float>, values:Array<Float>, tolerance:IkTolerance):Null<Array<Float>> {
-    var result = group.solve(RedundancyPoses.transform(target), seed, RedundancyPoses.options(tolerance).atSwivel(values[0], true));
+  public function solveAt(target:Pose3, seed:Array<Float>, values:Array<Float>, tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>> {
+    var task = ToolFreedom.of(target, freedom, tolerance.orientation);
+    var options = task.options(tolerance, orientationPreference == null && preferTargetOrientation ? target : orientationPreference);
+    if (posturePreference != null) options.preferring(posturePreference);
+    var result = group.solve(RedundancyPoses.transform(task.target), seed,
+      options.atSwivel(values[0], true));
     return result.converged ? result.q : null;
   }
 
-  public function solveNear(target:Pose3, seed:Array<Float>, tolerance:IkTolerance):Null<Array<Float>> {
+  public function solveNear(target:Pose3, seed:Array<Float>, tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>> {
     var angle = group.swivelAngle(seed);
     if (!Math.isFinite(angle)) return null;
-    var result = group.solve(RedundancyPoses.transform(target), seed, RedundancyPoses.options(tolerance).atSwivel(angle, false));
+    var task = ToolFreedom.of(target, freedom, tolerance.orientation);
+    var options = task.options(tolerance, orientationPreference == null && preferTargetOrientation ? target : orientationPreference);
+    if (posturePreference != null) options.preferring(posturePreference);
+    var result = group.solve(RedundancyPoses.transform(task.target), seed,
+      options.atSwivel(angle, false));
     return result.converged ? result.q : null;
   }
 

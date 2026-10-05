@@ -21,6 +21,7 @@ class VirtualDeviceOptions {
   public var corruptionRate:Float = 0.0;
   public var seed:Int64 = Int64.ofInt(1);
   public var stepsPerUnit:Array<Float> = [];
+  public var inputs:Array<VirtualInputOptions> = [];
   public var actuators:Array<VirtualActuatorOptions> = [];
   /** The virtual board's unique id, 32 hex digits, which a deployment names; "Virtual-Device-1" by default. */
   public var controller:String = "5669727475616c2d4465766963652d31";

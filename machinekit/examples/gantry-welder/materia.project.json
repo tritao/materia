@@ -1,0 +1,17 @@
+{
+	"format": "materia.project",
+	"version": 1,
+	"name": "Gantry welder",
+	"defaultEntrypoint": "cell",
+	"build": {
+		"system": "haxeon",
+		"manifest": "haxeon.json"
+	},
+	"entrypoints": {
+		"cell": {
+			"kind": "cad-preview",
+			"module": "GantryWelderPreview",
+			"function": "cell"
+		}
+	}
+}

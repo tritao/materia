@@ -1,6 +1,7 @@
 package tests;
 
 import robotkit.manipulation.IkOptions;
+import kinematicskit.FrameOrientation;
 import haxe.Int64;
 import robotkit.model.RobotModel;
 import robotkit.model.Link;
@@ -33,6 +34,7 @@ class ToolTests {
     assertions = 0;
     testTcpOffsetUnderRotation();
     testIkToTcpTarget();
+    testMaskedToolTasks();
     testSimulatedSprayerStateHistory();
     testWorkpieceMassRollup();
     testPayloadChartAcrossJointMotion();
@@ -75,6 +77,59 @@ class ToolTests {
       "IK solution's TCP pose matches the requested TCP target position");
     check(achieved.rotation.angularDistance(target.rotation) < 1e-3,
       "IK solution's TCP pose matches the requested TCP target orientation");
+  }
+
+  static function testMaskedToolTasks():Void {
+    var model = new RobotModel("xyz-masked-tool");
+    var base = model.addLink(new Link("base"));
+    var parent = base;
+    for (i in 0...3) {
+      var child = model.addLink(new Link('slide-$i'));
+      var joint = model.addJoint(new Joint('axis-$i', JointType.Prismatic, parent, child));
+      joint.axis = [for (j in 0...3) j == i ? 1.0 : 0.0];
+      joint.limits.lower = -1.0;
+      joint.limits.upper = 1.0;
+      parent = child;
+    }
+    var flange = model.addFrame(new Frame("flange", parent));
+    var group = new Manipulator(model, base.id, flange.id);
+    var seed = [0.0, 0.0, 0.0];
+    var spun = new Transform3(new Vec3(0.2, -0.3, 0.1),
+      Quat.fromAxisAngle(new Vec3(0, 0, 1), 0.7));
+    var axisOptions = new IkOptions().freedom(Axis(0, 0, 1));
+    var copied = axisOptions.copy();
+    axisOptions.freedom(Full, 1);
+    check(copied.positionAxes == 7, "Copied IK options preserve the position mask");
+    var axis = group.solve(spun, seed, copied);
+    check(axis.converged && axis.positionError < 1e-4 && axis.orientationError < 1e-3,
+      "XYZ follows a tool-Z task while leaving unreachable spin free");
+    check(group.tcpPose(axis.q).rotation.angularDistance(spun.rotation) > 0.6,
+      "Free spin is not secretly solved as a full orientation");
+    var full = group.solve(spun, seed, new IkOptions());
+    check(!full.converged && full.orientationError > 0.6,
+      "The same XYZ target fails when spin is a hard orientation row");
+    var tilted = new Transform3(spun.translation,
+      Quat.fromAxisAngle(new Vec3(1, 0, 0), 0.4));
+    var free = group.solve(tilted, seed, new IkOptions().freedom(Free));
+    check(free.converged && free.positionError < 1e-4 && free.orientationError == 0.0,
+      "Position-only XYZ task drops every orientation row");
+    var tiltedAxis = group.solve(tilted, seed, copied);
+    check(!tiltedAxis.converged && tiltedAxis.orientationError > 0.3,
+      "Tool-axis task retains unreachable tilt as an orientation residual");
+    var masked = group.solve(new Transform3(new Vec3(0.25, 0.4, -0.6), Quat.identity()),
+      seed, new IkOptions().freedom(Free, 1));
+    check(masked.converged && approx(masked.q[0], 0.25, 1e-4) &&
+      approx(masked.q[1], 0, 1e-12) && approx(masked.q[2], 0, 1e-12),
+      "A selected position axis moves only its constrained XYZ DOF");
+    var worldMasked = group.solve(new Transform3(new Vec3(0.15, -0.4, 0.7), Quat.identity()), seed,
+      new IkOptions().freedom(Free, 1).movingBase(Transform3.identity(), 0));
+    check(worldMasked.converged && approx(worldMasked.q[0], 0.15, 1e-4) &&
+      approx(worldMasked.q[1], 0, 1e-12) && approx(worldMasked.q[2], 0, 1e-12),
+      "World-target moving-base solve receives the selected position and orientation rows");
+    var preference = new IkOptions().freedom(Axis(0, 0, 1))
+      .preferringOrientation(spun.rotation, 0.2).copy();
+    check(preference.orientationPreference == spun.rotation && preference.orientationPreferenceWeight == 0.2,
+      "Copied IK options preserve their immutable soft orientation preference");
   }
 
   static function testSimulatedSprayerStateHistory():Void {

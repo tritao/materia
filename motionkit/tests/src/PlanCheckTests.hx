@@ -1,3 +1,11 @@
+import motionkit.robot.PlanningLimits;
+import motionkit.robot.HandlingPlanRunner;
+import robotkit.manipulation.Manipulator;
+import robotkit.model.Frame;
+import robotkit.runtime.RobotRuntimeCompiler;
+import robotkit.execution.ProcessChannelDeclaration;
+import robotkit.execution.ProcessEventValue;
+import robotkit.spatial.Vec3;
 import haxe.Int64;
 import machinekit.assembly.LinearAxis;
 import motionkit.MotionOptions;
@@ -170,6 +178,138 @@ class PlanCheckTests extends MotionKitTestSupport {
     check(rejected && session.planChecks.flagged == 1, "a live servo chunk rejects a predicted overload");
     check(recording.commands.length == 0, "an overloaded servo chunk never reaches the runtime");
     session.dispose();
+    harness.dispose();
+  }
+
+  public function testPlanningLimits():Void {
+    var model = machine([1.0, 0.0, 0.0], false);
+    var armLink = model.addLink(new Link("arm-link"));
+    var arm = model.addJoint(new Joint("arm", JointType.Revolute, model.links[0], armLink));
+    arm.limits = new JointLimits(-1.0, 1.0, 0.7);
+    var steady = new SteadyLoads();
+    var limits = PlanningLimits.of(model, ["slide", "arm"], steady, 1.5, [3.0, 7.0]);
+    near(limits.velocity[0], model.coupledLimits("slide", steady).requireVelocity(),
+      "planning uses the screw's coupled speed");
+    near(limits.acceleration[0], model.coupledLimits("slide", steady).requireAcceleration(),
+      "planning derives slide acceleration after steady loads");
+    near(limits.acceleration[1], 1.5, "missing arm acceleration uses the named default");
+    check(arm.limits.maxAcceleration == null, "planning defaults do not rewrite the physical model");
+    check(limits.jerk[0] == 3.0 && limits.jerk[1] == 7.0, "jerk limits are per joint");
+    check(limits.assumptions.length == 1 && limits.assumptions[0].indexOf("arm") >= 0,
+      "the acceleration fallback is reported against its joint");
+    arm.limits.maxAcceleration = 0.4;
+    var authored = PlanningLimits.of(model, ["arm"]);
+    near(authored.acceleration[0], 0.4, "an authored acceleration wins over the fallback");
+    check(authored.assumptions.length == 1 && authored.assumptions[0].indexOf("jerk") >= 0,
+      "an unstated jerk cap is reported as assumed");
+    arm.limits.velocity = null;
+    var message = "";
+    try PlanningLimits.of(model, ["arm"]) catch (error:Dynamic) message = Std.string(error);
+    check(message.indexOf("arm") >= 0 && message.indexOf("velocity") >= 0,
+      "an unknown speed is rejected by joint name rather than invented");
+  }
+
+  /** Missions on an XYZ screw machine use drive caps and submit accepted runtime segments. */
+  public function testHandlingUsesCoupledLimits():Void {
+    var axis = new motionkit.axis.MotionAxis(new motionkit.axis.MotionAxisBlueprint("x", ["x"], -0.15, 0.15,
+      0.1, 0.2, 0.0, [1.0], [0.0]), ["c", "x"]);
+    var planner = new motionkit.robot.AxisPlanner([axis], 0.01);
+    var homingMove = planner.plan([0.3, 0.0], {targets: [new motionkit.AxisTarget("x", 0.04)], options: null}).trajectory;
+    for (sample in 0...11) {
+      var state = homingMove.evaluate(homingMove.durationSeconds() * sample / 10);
+      near(state.positions[0], 0.3, "homing keeps the unmapped C axis at its starting position");
+      near(state.velocities[0], 0.0, "homing commands no C velocity");
+      near(state.accelerations[0], 0.0, "homing commands no C acceleration");
+    }
+    throws(() -> planner.planRetarget(new motionkit.trajectory.TrajectoryState(
+      [0.3, 0.0], [0.1, 0.0], [0.0, 0.0], [0.0, 0.0]), [new motionkit.AxisTarget("x", 0.04)], null),
+      "an unmapped moving rotary joint still needs an axis mapping");
+    var model = new RobotModel("handling-screw-xyz");
+    var base = model.addLink(new Link("base"));
+    var parent = base;
+    var ids = ["x", "y", "z"];
+    var axes = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+    var rates = [2.5, 1.25, 2.0];
+    for (index in 0...3) {
+      var id = ids[index];
+      var carriage = model.addLink(new Link(id + "-carriage"));
+      carriage.mass = 2.0;
+      var slide = model.addJoint(new Joint(id, JointType.Prismatic, parent, carriage));
+      slide.axis = axes[index];
+      slide.limits = new JointLimits(-0.15, 0.15);
+      var rotor = model.addLink(new Link(id + "-rotor"));
+      rotor.mass = 0.1;
+      rotor.inertiaTensor = [1e-5, 0.0, 0.0, 0.0, 1e-5, 0.0, 0.0, 0.0, 1e-5];
+      var shaft = model.addJoint(new Joint(id + "-turn", JointType.Continuous, base, rotor));
+      shaft.limits = new JointLimits(-1e9, 1e9);
+      shaft.axis = axes[index];
+      shaft.armature = 3e-5;
+      var coupling = new JointCoupling(id + "-screw", id, shaft.id, 100.0, 0.0);
+      coupling.efficiency = 0.4;
+      model.addCoupling(coupling);
+      var actuator = new Actuator(id + "-motor", 0.63, rates[index],
+        Transmission.SimpleTransmission(shaft.id, 1.0, 0.0));
+      actuator.microsteps = 16;
+      actuator.maxStepRate = 200000;
+      actuator.drive = new StepperDrive(200.0, 3e-5, 1.26,
+        new TorqueSpeedCurve([0.0, 100.0], [1.26, 1.26]));
+      model.addActuator(actuator);
+      parent = carriage;
+    }
+    model.materializeLimits();
+    var flange = model.addFrame(new Frame("flange", parent));
+    var group = new Manipulator(model, base.id, flange.id);
+    var planning = PlanningLimits.ofGroup(group, null, 2.0, [2.0, 4.0, 6.0]);
+    var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
+    blueprint.channels.push(new ProcessChannelDeclaration("tool.hold", ProcessEventValue.Digital(false), false));
+    var harness = new SimulationHarness(0.01);
+    var runtime = harness.simulation.addRobot(blueprint);
+    var robot = new SimulatedRobot("handling", runtime, model.name,
+      [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
+    var runner = HandlingPlanRunner.create(robot, group, () -> runtime.pollEvents(), "tool.hold", planning,
+      0.02, 0.08, 0.02, 0.02, 0.001);
+    for (index in 0...3) {
+      near(runner.motion.compiler.maxVelocity[index], rates[index] / 100.0,
+        'handling joint ${ids[index]} plans at its coupled speed');
+      check(runner.motion.compiler.maxAcceleration[index] == planning.acceleration[index] &&
+        runner.motion.compiler.maxJerk[index] == planning.jerk[index],
+        "handling preserves each joint's acceleration and jerk");
+    }
+    var contact = new Vec3(0.04, 0.03, 0.06);
+    var free = runner.program(contact, true).ops;
+    var fixed = runner.program(contact, true, robotkit.spatial.Quat.fromAxisAngle(new Vec3(0, 0, 1), Math.PI / 2)).ops;
+    switch free[0] {
+      case MoveL(_, _, _, _, freedom):
+        check(freedom == motionkit.path.OrientationPolicy.FreeAboutTool, "ordinary handling leaves spin free");
+      case _: throw "handling must approach linearly";
+    }
+    switch fixed[0] {
+      case MoveL(_, _, _, _, freedom):
+        check(freedom == motionkit.path.OrientationPolicy.Interpolated, "approach turns smoothly to the requested heading");
+      case _: throw "handling must approach linearly";
+    }
+    switch fixed[1] {
+      case MoveL(pose, _, _, _, freedom):
+        check(freedom == motionkit.path.OrientationPolicy.Fixed, "requested handling orientation fixes spin");
+        near(pose.qz, Math.sin(Math.PI / 4), "an explicit handling orientation fixes the requested yaw");
+      case _: throw "handling must approach linearly";
+    }
+    runner.run(new Vec3(0.04, 0.03, 0.06), true);
+    var tick = 0;
+    while (!runner.completed() && runner.failure() == null && tick < 8000) {
+      runner.update(0.01);
+      harness.step(Int64.ofInt(++tick));
+      var snapshot = robot.snapshot();
+      for (index in 0...3) {
+        var joint = [for (slot in 0...model.joints.length) if (model.joints[slot].id == ids[index]) slot][0];
+        check(Math.abs(snapshot.velocities.get(joint)) <= planning.velocity[index] + 1e-6,
+          "every handling segment stays within the drive-derived speed");
+      }
+    }
+    check(runner.completed() && runner.failure() == null,
+      'the runtime accepts the entire handling program (${runner.failure()})');
+    check(runner.motion.checks.plans > 0 && runner.motion.checks.count(PlanDiagnosticKind.StepperStall) == 0,
+      "every handling plan is checked and no screw motor stalls");
     harness.dispose();
   }
 
@@ -365,8 +505,9 @@ class PlanCheckTests extends MotionKitTestSupport {
    * check predicts slip) or strong, with an encoder on the X motor, and returns what the encoder monitor saw.
    */
   function gantryRun(weak:Bool):GantryRun {
-    var blueprint = MachineKitRobotCompiler.compileXYZGantry(new LinearAxis(23, 10, 80), new LinearAxis(23, 10, 80),
-      new LinearAxis(23, 10, 80), 0.1, 0.4);
+    var blueprint = MachineKitRobotCompiler.compileGantry(
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(80, 80, 80)),
+      0.1, 0.4);
     var model = blueprint.model;
     for (actuator in model.actuators) {
       actuator.maxEffort = weak ? 0.002 : 1e7;
@@ -376,11 +517,25 @@ class PlanCheckTests extends MotionKitTestSupport {
     }
     // Explicit motor feedback detects lost steps; the load-side scale measures carriage error.
     model.addEncoder(Encoder.perRevolution("x.encoder", blueprint.axes[0].jointIds[1], EncoderKind.Incremental, 2000.0));
-    model.addEncoder(Encoder.perMillimetre("x.scale", "x/carriage-slide", EncoderKind.Incremental, 200.0));
+    model.addEncoder(Encoder.perMillimetre("x.scale", "x", EncoderKind.Incremental, 200.0));
     var ids = [for (joint in model.joints) joint.id];
+    var harness = new SimulationHarness(0.01);
+    var runtime = harness.simulation.addRobot(blueprint.runtime);
+    var robot = new SimulatedRobot("gantry", runtime, model.name, [for (link in model.links) link.name],
+      [for (joint in model.joints) joint.name]);
+    var homing = new motionkit.robot.MotionSystem(robot, blueprint);
+    homing.configureRuntimeHoming(runtime, () -> {}, harness.simulation.homingSides(0));
+    var tick = 1;
+    harness.step(Int64.ofInt(tick));
+    homing.home();
+    while (homing.homingStatus() != "Complete" && tick < 60000) {
+      harness.step(Int64.ofInt(++tick));
+      homing.update(0.01);
+    }
+    check(homing.homingStatus() == "Complete", "Slip fixture establishes physical home references");
     var solver = new AxisKinematics(blueprint);
     var limits = new ValidationLimits(ids.length, Int64.ofInt(blueprint.runtime.revision),
-      Int64.ofInt(blueprint.runtime.calibrationRevision));
+      runtime.snapshot().calibrationRevision);
     var scales = [for (_ in ids) 0.0];
     for (axis in blueprint.axes) for (slot in 0...axis.jointIds.length)
       scales[ids.indexOf(axis.jointIds[slot])] = Math.abs(axis.jointScales[slot]);
@@ -402,17 +557,13 @@ class PlanCheckTests extends MotionKitTestSupport {
     for (slot in 0...blueprint.axes[0].jointIds.length)
       goal[ids.indexOf(blueprint.axes[0].jointIds[slot])] = blueprint.axes[0].jointScales[slot] * 0.05;
     var moving = new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(goal), new MotionOptions(), Blend.ExactStop)]);
-    var harness = new SimulationHarness(0.01);
-    var runtime = harness.simulation.addRobot(blueprint.runtime);
-    var robot = new SimulatedRobot("gantry", runtime, model.name, [for (link in model.links) link.name],
-      [for (joint in model.joints) joint.name]);
     var motion = new ManipulatorMotion(robot, compiler, function(_) return null, function() return {events: [], overflow: false}, [for (joint in 0...ids.length) joint]);
     var slip = new StepperSlip([for (coupling in model.couplings) new CoupledJoint(ids.indexOf(coupling.follower),
       ids.indexOf(coupling.leader), coupling.ratio, coupling.offset)], [for (joint in 0...ids.length) ids[joint] => joint], (joint, offset) -> harness.simulation.setJointSlip(0, joint, offset));
     motion.slip = slip;
     var monitor = new EncoderMonitor(model, [for (_ in ids) 0.0]);
     motion.run(moving);
-    var tick = 0, guard = 0;
+    var guard = 0;
     var snapshot = robot.snapshot();
     while (!motion.completed && motion.failure == null && guard++ < 3000) {
       motion.update(0.01);
@@ -437,9 +588,9 @@ class PlanCheckTests extends MotionKitTestSupport {
   public function testEncoderSeesStepperSlip():Void {
     var weak = gantryRun(true);
     check(weak.completed, 'the weak machine runs its program (${weak.failure})');
-    check(weak.slip.slipped() && weak.slip.lost("x/carriage-slide") > 0.0, 'its X axis lost distance: ${weak.slip.lost("x/carriage-slide")}');
+    check(weak.slip.slipped() && weak.slip.lost("x") > 0.0, 'its X axis lost distance: ${weak.slip.lost("x")}');
     check(weak.position < weak.commanded - 1e-4, 'the simulated axis ends behind its command: ${weak.position} against ${weak.commanded}');
-    near(weak.commanded - weak.position, weak.slip.lost("x/carriage-slide"), "by the distance the plan check predicted", 1e-5);
+    near(weak.commanded - weak.position, weak.slip.lost("x"), "by the distance the plan check predicted", 1e-5);
     check(weak.monitor.faults(), "the encoder faults");
     var found = weak.monitor.findings[0];
     check(found.kind == robotkit.runtime.EncoderMonitor.EncoderFindingKind.LostSteps && found.encoder == "x.encoder" && found.joint == weak.motorJoint,
@@ -447,7 +598,7 @@ class PlanCheckTests extends MotionKitTestSupport {
     check(found.motor.length > 0 && found.steps > robotkit.runtime.EncoderMonitor.STEPPER_BOUND_STEPS && found.error * weak.motorRatio < 0.0,
       'with the motor, how many steps, and the sign: ${found.describe()}');
     var seen = weak.monitor.pathError("x.scale");
-    near(Math.abs(seen.last), weak.slip.lost("x/carriage-slide"), "the encoder reads the error that was kept", 5e-6);
+    near(Math.abs(seen.last), weak.slip.lost("x"), "the encoder reads the error that was kept", 5e-6);
 
     var strong = gantryRun(false);
     check(strong.completed && !strong.slip.slipped() && !strong.monitor.faults(),
@@ -491,8 +642,9 @@ class PlanCheckTests extends MotionKitTestSupport {
    * only when asked to.
    */
   public function testCompilerRunsPlanCheck():Void {
-    var blueprint = MachineKitRobotCompiler.compileXYZGantry(new LinearAxis(23, 10, 80), new LinearAxis(23, 10, 80),
-      new LinearAxis(23, 10, 80), 0.1, 0.4);
+    var blueprint = MachineKitRobotCompiler.compileGantry(
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(80, 80, 80)),
+      0.1, 0.4);
     var model = blueprint.model;
     // Motors that cannot hold their axes: a stepper of 0.002 N m against a 0.4 m/s² axis.
     for (actuator in model.actuators) {

@@ -116,6 +116,14 @@ struct SurfaceMeshView {
     std::array<float, 16> model_view_projection{};
 };
 
+/** Stream pages are retained and reused; this budget excludes images and targets. */
+struct UiStreamBufferConfig {
+    uint32_t vertex_page_bytes = 4 * 1024 * 1024;
+    uint32_t index_page_bytes = 4 * 1024 * 1024;
+    uint32_t small_vertex_page_bytes = 1024 * 1024;
+    uint64_t memory_budget_bytes = 64 * 1024 * 1024;
+};
+
 class UiRenderer {
   public:
     virtual ~UiRenderer() = default;
@@ -203,6 +211,9 @@ class UiRenderer {
                            const PreparedTexture *image) = 0;
     virtual bool endPass() = 0;
     virtual bool endFrame() = 0;
+    /** Discards incomplete recorded commands without presenting a partial frame. */
+    virtual void abortFrame() { endFrame(); }
+    virtual bool resourceLimited() const { return false; }
     virtual UiRendererStats stats() const = 0;
     virtual const char *lastError() const = 0;
 };
@@ -210,6 +221,8 @@ class UiRenderer {
 std::unique_ptr<UiRenderer> create_ui_renderer(nk_surface surface);
 std::unique_ptr<UiRenderer> create_ui_renderer(nk_surface surface,
                                                const nk_surface_frame_target *frame_target);
+std::unique_ptr<UiRenderer> create_ui_renderer(nk_surface surface,
+    const nk_surface_frame_target *frame_target, const UiStreamBufferConfig &streams);
 
 } // namespace nkui
 

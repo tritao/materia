@@ -1,5 +1,7 @@
 package motionkit.robot;
 
+import motionkit.path.OrientationPolicy;
+
 import TrajectoryCore;
 import MotionKitNative;
 import motionkit.kinematics.IkTolerance;
@@ -162,7 +164,8 @@ class OpwKinematics implements KinematicsSolver {
   }
 
   public function solvePose(target:Pose3, seed:Array<Float>,
-      tolerance:IkTolerance):Null<Array<Float>> {
+      tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>> {
+    if (!ToolFreedom.isFull(freedom)) return differential.solvePose(target, seed, tolerance, freedom);
     if (seed == null || seed.length != 6) throw "OPW pose solving needs six seed joints";
     var candidates = candidates(target, tolerance, seed);
     if (candidates.length == 0) return null;
@@ -171,7 +174,8 @@ class OpwKinematics implements KinematicsSolver {
   }
 
   public function sampleCandidates(target:Pose3, maxCount:Int,
-      tolerance:IkTolerance):Array<Array<Float>> {
+      tolerance:IkTolerance, ?freedom:OrientationPolicy):Array<Array<Float>> {
+    if (!ToolFreedom.isFull(freedom)) return differential.sampleCandidates(target, maxCount, tolerance, freedom);
     if (maxCount < 0) throw "OPW candidate count must be non-negative";
     if (maxCount == 0) return [];
     var result = candidates(target, tolerance, null);
@@ -180,8 +184,8 @@ class OpwKinematics implements KinematicsSolver {
   }
 
   public function solveDifferential(q:Array<Float>, twist:Twist6,
-      ?redundancyRate:Array<Float>):Null<Array<Float>>
-    return differential.solveDifferential(q, twist);
+      ?redundancyRate:Array<Float>, ?freedom:OrientationPolicy):Null<Array<Float>>
+    return differential.solveDifferential(q, twist, redundancyRate, freedom);
 
   /**
    * The path across the arm's analytic branches: every sample's OPW
@@ -189,6 +193,7 @@ class OpwKinematics implements KinematicsSolver {
    * call (`mk_select_opw_configurations`).
    */
   public function solvePath(request:PathRequest):Array<Null<Array<Float>>> {
+    for (freedom in request.freedoms) if (!ToolFreedom.isFull(freedom)) return differential.solvePath(request);
     var lower:Array<Float> = [], upper:Array<Float> = [];
     for (joint in 0...jointCount()) {
       var bounds = manipulator.group.limitsOf(joint);

@@ -8,12 +8,12 @@ use cortex_m_rt::entry;
 use embedded_hal_old::serial::{Read, Write};
 use nb::Error::WouldBlock;
 use panic_halt as _;
-use robotkit_device_protocol::{Board, ScheduledCore, ScheduledSegment, StopReason};
+use robotkit_device_protocol::{Board, InputBinding, InputCapture, ScheduledCore, ScheduledSegment, StopReason};
 use robotkit_device_protocol::config_digest::{config_digest6, controller_matches};
 use robotkit_device_protocol::device_wire6::*;
 use robotkit_device_protocol::frame6::{decode_frame6, encode_frame6,
     slide_to_frame_marker, MAX_FRAME_SIZE};
-use stm32g4xx_hal::{prelude::*, pwr::PwrExt, rcc, serial::FullConfig, stm32};
+use stm32g4xx_hal::{gpio::{AnyPin, Input}, prelude::*, pwr::PwrExt, rcc, serial::FullConfig, stm32};
 
 /// Base of the STM32G4's factory-programmed 96-bit unique device ID (RM0440, "Unique device ID").
 const UID_BASE: *const u32 = 0x1FFF_7590 as *const u32;
@@ -30,6 +30,7 @@ fn controller_id() -> [u8; 16] {
 }
 
 const JOINTS: usize = 2;
+const INPUTS: usize = 2;
 const ACTUATORS: usize = 64;
 const CAPACITY: usize = 8;
 const TICK_HZ: u64 = 1_000_000;
@@ -40,11 +41,26 @@ struct StubBoard {
     ticks: u64,
     position: [f32; ACTUATORS],
     velocity: [f32; ACTUATORS],
+    input_pins: [AnyPin<Input>; INPUTS],
+    inputs: InputCapture,
+    input_count: usize,
 }
 impl StubBoard {
-    fn new() -> Self { Self { ticks: 0, position: [0.0; ACTUATORS], velocity: [0.0; ACTUATORS] } }
+    fn new(input_pins: [AnyPin<Input>; INPUTS]) -> Self {
+        Self { ticks: 0, position: [0.0; ACTUATORS], velocity: [0.0; ACTUATORS],
+            input_pins, inputs: InputCapture::new(), input_count: 0 }
+    }
+    fn sample_inputs(&mut self) -> bool {
+        let mut inputs = core::mem::take(&mut self.inputs);
+        let valid = inputs.sample(self, None);
+        self.inputs = inputs;
+        valid
+    }
 }
 impl Board for StubBoard {
+    fn read_input(&self, channel: usize) -> bool {
+        self.input_pins.get(channel).map(|pin| pin.is_high()).unwrap_or(false)
+    }
     fn now_ticks(&self) -> u64 { self.ticks }
     fn tick_hz(&self) -> u64 { TICK_HZ }
     fn position_target(&mut self, i: usize, value: f32) { self.position[i] = value; }
@@ -65,7 +81,7 @@ fn send<T: Write<u8>>(tx: &mut T, kind: u8, payload: &[u8], frame: &mut [u8; MAX
 fn publish<T: Write<u8>>(tx: &mut T, core: &ScheduledCore<ACTUATORS, CAPACITY>,
     board: &StubBoard, session: u64, active_count: usize, received_bytes: u64, frame: &mut [u8; MAX_FRAME_SIZE]) {
     let fault = match core.stop_reason() {
-        None => 0, Some(StopReason::Underflow) => 2,
+        None | Some(StopReason::Stop) => 0, Some(StopReason::Underflow) => 2,
         Some(StopReason::LinkLost) => 3, Some(StopReason::DualDriveSkew) => 4,
         Some(_) => 1,
     };
@@ -77,13 +93,14 @@ fn publish<T: Write<u8>>(tx: &mut T, core: &ScheduledCore<ACTUATORS, CAPACITY>,
         underflow: core.underflow() as u8, fault,
         received_until_ticks: core.received_until(), received_bytes,
     };
-    let mut body = [0u8; State6Header::SIZE + JOINTS * ActuatorState6::SIZE];
+    let mut body = [0u8; State6Header::SIZE + JOINTS * ActuatorState6::SIZE + INPUTS * InputState6::SIZE];
     status.encode(&mut body).ok();
     send(tx, 14, &body[..QueueStatus6::SIZE], frame);
     let header = State6Header {
         session, timestamp_ticks: board.ticks, accepted_sequence: 0,
         safety: if fault == 0 { 0 } else { 3 }, fault, actuator_count: active_count as u8,
-        reserved: 0, path_clock_ticks: core.path_clock(),
+        reserved: 0, path_clock_ticks: core.path_clock(), input_count: board.input_count as u8,
+        input_bits: (0..board.input_count).fold(0u64, |bits, i| bits | ((board.read_input(i) as u64) << i)),
     };
     header.encode(&mut body[..State6Header::SIZE]).ok();
     for i in 0..active_count {
@@ -92,7 +109,16 @@ fn publish<T: Write<u8>>(tx: &mut T, core: &ScheduledCore<ACTUATORS, CAPACITY>,
         let start = State6Header::SIZE + i * ActuatorState6::SIZE;
         row.encode(&mut body[start..start + ActuatorState6::SIZE]).ok();
     }
-    send(tx, 15, &body[..State6Header::SIZE + active_count * ActuatorState6::SIZE], frame);
+    let input_start = State6Header::SIZE + active_count * ActuatorState6::SIZE;
+    for i in 0..board.input_count {
+        let Some(observation) = board.inputs.observation(i) else { return; };
+        let row = InputState6 { closing_count: observation.closing_count,
+            opening_count: observation.opening_count, captured_steps: observation.captured_steps,
+            captured_ticks: observation.captured_ticks };
+        let start = input_start + i * InputState6::SIZE;
+        row.encode(&mut body[start..start + InputState6::SIZE]).ok();
+    }
+    send(tx, 15, &body[..input_start + board.input_count * InputState6::SIZE], frame);
 }
 
 fn handle<T: Write<u8>>(input: &[u8], board: &mut StubBoard,
@@ -107,7 +133,8 @@ fn handle<T: Write<u8>>(input: &[u8], board: &mut StubBoard,
             let own = controller_id();
             let accepted = controller_matches(&begin.expected_controller, &own) &&
                 begin.actuator_count > 0 && begin.actuator_count as usize <= JOINTS && begin.session != 0 &&
-                begin.step_tick_hz == 40_000 && begin.channel_count == 0 &&
+                begin.step_tick_hz == 40_000 && begin.channel_count == 0 && begin.input_count as usize <= INPUTS &&
+                begin.input_actuator[..begin.input_count as usize].iter().all(|i| (*i as usize) < begin.actuator_count as usize) &&
                 begin.actuator_max_acceleration[..begin.actuator_count as usize].iter().all(|v| v.is_finite() && *v > 0.0);
             let mut ack = SessionAck6 {
                 session: begin.session, protocol_version: PROTOCOL_VERSION,
@@ -123,6 +150,13 @@ fn handle<T: Write<u8>>(input: &[u8], board: &mut StubBoard,
                 let mut next = ScheduledCore::new(TICK_HZ, limits,
                     [-1.0e12; ACTUATORS], [1.0e12; ACTUATORS], link_ticks.max(1));
                 next.initialize_clock(board.ticks);
+                let mut inputs = InputCapture::new();
+                for i in 0..begin.input_count as usize {
+                    if !inputs.bind(board, i, InputBinding { actuator: begin.input_actuator[i] as usize,
+                        active_high: (begin.input_active_high & (1u64 << i)) != 0 }, begin.actuator_count as usize) { return; }
+                }
+                board.inputs = inputs;
+                board.input_count = begin.input_count as usize;
                 *core = Some(next);
                 *session = begin.session;
                 *active_count = begin.actuator_count as usize;
@@ -146,6 +180,10 @@ fn handle<T: Write<u8>>(input: &[u8], board: &mut StubBoard,
             let Ok(begin) = QueueBegin6::decode(payload) else { return; };
             if begin.actuator_count as usize != *active_count { return; }
             if let Some(core) = core.as_mut() {
+                if core.is_stopped() && core.stop_reason() == Some(StopReason::Stop) {
+                    let positions = core.positions();
+                    core.prepare_stopped_queue(board.now_ticks(), positions).ok();
+                }
                 core.queue_begin_with_state(begin.queue_revision, begin.replace_after_ticks,
                     begin.expected_position, begin.expected_velocity).ok();
             }
@@ -160,8 +198,8 @@ fn handle<T: Write<u8>>(input: &[u8], board: &mut StubBoard,
                 if row.actuator as usize != i { return; }
                 *slot = [row.c0, row.c1, 0.0, 0.0, 0.0, 0.0];
             }
-            let Ok(segment) = ScheduledSegment::new(header.plan_id, header.t0_ticks,
-                header.duration_ticks, header.degree, coefficients, header.ends_at_rest != 0) else { return; };
+            let Ok(segment) = ScheduledSegment::new_with_purpose(header.plan_id, header.t0_ticks,
+                header.duration_ticks, header.degree, coefficients, header.ends_at_rest != 0, header.purpose) else { return; };
             if let Some(core) = core.as_mut() {
                 core.push_segment_for_revision(header.queue_revision, segment).ok();
             }
@@ -186,6 +224,8 @@ fn main() -> ! {
     let pwr = dp.PWR.constrain().freeze();
     let mut rcc = dp.RCC.freeze(rcc::Config::hsi(), pwr);
     let gpioc = dp.GPIOC.split(&mut rcc);
+    let gpiob = dp.GPIOB.split(&mut rcc);
+    let input_pins = [gpiob.pb0.into_pull_up_input().erase(), gpiob.pb1.into_pull_up_input().erase()];
     let serial = dp.USART1.usart(gpioc.pc4.into_alternate(), gpioc.pc5.into_alternate(),
         FullConfig::default().baudrate(921_600.bps()), &mut rcc).unwrap();
     let (mut tx, mut rx) = serial.split();
@@ -193,7 +233,7 @@ fn main() -> ! {
     cp.DWT.enable_cycle_counter();
     let mut previous_cycles = DWT::cycle_count();
     let mut elapsed_cycles = 0u64;
-    let mut board = StubBoard::new();
+    let mut board = StubBoard::new(input_pins);
     let mut core: Option<ScheduledCore<ACTUATORS, CAPACITY>> = None;
     let mut session = 0u64;
     let mut active_count = 0usize;
@@ -207,7 +247,10 @@ fn main() -> ! {
         elapsed_cycles += current.wrapping_sub(previous_cycles) as u64;
         previous_cycles = current;
         board.ticks = elapsed_cycles / HSI_CYCLES_PER_MICROSECOND;
-        if let Some(core) = core.as_mut() { core.tick(&mut board); }
+        if let Some(core) = core.as_mut() {
+            if !board.sample_inputs() { core.emergency_stop(&mut board); }
+            core.tick(&mut board);
+        }
         if board.ticks.saturating_sub(last_state) >= STATE_PERIOD_TICKS {
             if let Some(core) = core.as_ref() {
                 publish(&mut tx, core, &board, session, active_count, received_bytes, &mut output);

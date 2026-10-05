@@ -19,6 +19,8 @@ class RobotModel {
   public final sensors:Array<Sensor> = [];
   /** Encoders on joints; they are read from joint positions rather than compiled into the runtime. */
   public final encoders:Array<Encoder> = [];
+  /** Physical switch thresholds; readings are supplied as external digital sensors. */
+  public final switches:Array<JointSwitch> = [];
   /** Explicit contacts between link collision shapes. */
   public final contactPairs:Array<ContactPair> = [];
   public final frames:Array<Frame> = [];
@@ -47,6 +49,11 @@ class RobotModel {
   public function addJoint(joint:Joint):Joint {
     joints.push(joint);
     return joint;
+  }
+
+  public function addSwitch(contact:JointSwitch):JointSwitch {
+    switches.push(contact);
+    return contact;
   }
 
   public function addActuator(actuator:Actuator):Actuator {
@@ -94,6 +101,7 @@ class RobotModel {
     var limits = new JointLimits(own.lower, own.upper, own.velocity, own.effort, own.maxAcceleration);
     limits.assumptions = [for (value in own.assumptions) {quantity: value.quantity, label: value.label}];
     limits.overtravel = own.overtravel;
+    limits.rackingTolerance = own.rackingTolerance;
     limits.velocityLimiter = own.velocityLimiter;
     function tighten(current:Null<Float>, bound:Null<Float>):Null<Float>
       return bound == null ? current : current == null ? bound : Math.min(current, bound);
@@ -311,6 +319,22 @@ class RobotModel {
           if (!found) errors.push('actuator ${actuator.id} references unknown joint $jointId');
           if (!Math.isFinite(ratio) || ratio == 0.0 || !Math.isFinite(offset))
             errors.push('actuator ${actuator.id} has an invalid transmission');
+      }
+    }
+    var switchIds = new Map<String, Bool>();
+    for (contact in switches) {
+      if (contact == null) { errors.push("robot has a null switch"); continue; }
+      if (switchIds.exists(contact.id)) errors.push('duplicate switch ID ${contact.id}');
+      switchIds.set(contact.id, true);
+      var onJoint = false, mounted = false;
+      for (joint in joints) if (joint.id == contact.joint) onJoint = true;
+      for (frame in frames) if (frame.id == contact.frameId) mounted = true;
+      if (!onJoint) errors.push('switch ${contact.id} references unknown joint ${contact.joint}');
+      if (!mounted) errors.push('switch ${contact.id} references unknown frame ${contact.frameId}');
+      if (contact.driveJoint != null) {
+        var drive = false;
+        for (joint in joints) if (joint.id == contact.driveJoint) drive = true;
+        if (!drive) errors.push('switch ${contact.id} references unknown drive joint ${contact.driveJoint}');
       }
     }
     var encoderIds = new Map<String, Bool>();

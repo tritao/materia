@@ -119,6 +119,10 @@ impl<const CAP: usize> DeviceEvents<CAP> {
         self.revision = revision;
         self.replace_after = replace_after;
         self.committed_until = committed_until;
+        if self.stopped {
+            self.stopped = false;
+            self.held = false;
+        }
         Ok(())
     }
 

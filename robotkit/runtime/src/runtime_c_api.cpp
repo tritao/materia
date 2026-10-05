@@ -95,7 +95,8 @@ rk_result RK_CALL rk_robot_runtime_create_serial6(const rk_robot_runtime_bluepri
     if (!out_runtime || !blueprint || rk_robot_runtime_blueprint_validate(blueprint) != RK_OK ||
         !device_path || !*device_path || blueprint->joint_count > RK_MAX_SERIAL_JOINTS ||
         !device || device->struct_size < sizeof(*device) || device->actuator_count == 0 ||
-        device->actuator_count > RK_MAX_SERIAL_JOINTS ||
+        device->actuator_count > RK_MAX_SERIAL_JOINTS || device->input_count > 64 ||
+        (device->feedback_count != 0 && device->feedback_count != device->actuator_count) ||
         !std::isfinite(max_target_error) || max_target_error < 0.0 ||
         step_tick_hz == 0 || link_loss_timeout_ns == 0 || clock_bound_ns == 0)
         return RK_ERROR_INVALID_ARGUMENT;
@@ -107,6 +108,11 @@ rk_result RK_CALL rk_robot_runtime_create_serial6(const rk_robot_runtime_bluepri
         actuator.joint = device->actuator_joint[i];
         actuator.ratio = device->actuator_ratio[i];
         actuator.offset = device->actuator_offset[i];
+        if (device->feedback_count) {
+            actuator.feedback_joint = device->feedback_joint[i];
+            actuator.feedback_ratio = device->feedback_ratio[i];
+            actuator.feedback_offset = device->feedback_offset[i];
+        }
         actuator.steps_per_unit = device->actuator_steps_per_unit[i];
         actuator.max_rate = device->actuator_max_rate[i];
         actuator.direction_setup_ticks = device->actuator_direction_setup_ticks[i];
@@ -116,6 +122,16 @@ rk_result RK_CALL rk_robot_runtime_create_serial6(const rk_robot_runtime_bluepri
         if (end == id || end == id + 64) return RK_ERROR_INVALID_ARGUMENT;
         actuator.id.assign(reinterpret_cast<const char *>(id), reinterpret_cast<const char *>(end));
         layout.push_back(std::move(actuator));
+    }
+    std::vector<robotkit::DeviceInput6> inputs;
+    for (std::uint32_t i = 0; i < device->input_count; ++i) {
+        if (device->input_actuator[i] >= device->actuator_count || device->input_active_high[i] > 1)
+            return RK_ERROR_INVALID_ARGUMENT;
+        const auto *id = device->input_switch_ids + i * 64;
+        const auto *end = std::find(id, id + 64, 0);
+        if (end == id || end == id + 64) return RK_ERROR_INVALID_ARGUMENT;
+        inputs.push_back({device->input_actuator[i], device->input_active_high[i] != 0,
+            std::string(reinterpret_cast<const char *>(id), reinterpret_cast<const char *>(end))});
     }
     *out_runtime = RK_INVALID_ROBOT_RUNTIME;
 #if !defined(RK_HAS_SERIAL_DEVICE)
@@ -129,7 +145,7 @@ rk_result RK_CALL rk_robot_runtime_create_serial6(const rk_robot_runtime_bluepri
         rk_result endpoint_error = RK_ERROR_BACKEND;
         auto endpoint = robotkit::DeviceSerialEndpoint::open(device_path, baud, *copied,
             controller, max_target_error, step_tick_hz, link_loss_timeout_ns,
-            clock_bound_ns, link_latency_ns, layout, &endpoint_error);
+            clock_bound_ns, link_latency_ns, layout, &endpoint_error, inputs);
         if (!endpoint) return endpoint_error;
         auto runtime = std::make_shared<robotkit::RobotRuntime>(
             *copied, std::static_pointer_cast<robotkit::RobotEndpoint>(endpoint), period);
@@ -170,6 +186,67 @@ rk_result RK_CALL rk_robot_runtime_start(rk_robot_runtime runtime) {
 rk_result RK_CALL rk_robot_runtime_stop(rk_robot_runtime runtime) {
     const auto value = robotkit::internal::resolve_runtime(runtime);
     return value ? value->stop() : RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_robot_runtime_calibrate_coordinates(rk_robot_runtime runtime,
+                                                        const double *offsets, uint32_t count) {
+    const auto value = robotkit::internal::resolve_runtime(runtime);
+    return value ? value->calibrate_coordinates(offsets, count) : RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_robot_runtime_calibrate_home(rk_robot_runtime runtime,
+    const double *offsets, uint32_t count, const uint32_t *reference_joints, uint32_t reference_count) {
+    const auto value = robotkit::internal::resolve_runtime(runtime);
+    return value ? value->calibrate_coordinates(offsets, count, reference_joints, reference_count)
+                 : RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_robot_runtime_calibrate_home_drives(rk_robot_runtime runtime,
+    const uint32_t *joints, const double *side_zeros, uint32_t count) {
+    const auto value = robotkit::internal::resolve_runtime(runtime);
+    return value ? value->calibrate_home_drives(joints, side_zeros, count) : RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_robot_runtime_device_homing_control(rk_robot_runtime runtime,
+    const rk_device_homing_control *control) {
+    if (!control || control->struct_size < sizeof(*control)) return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = robotkit::internal::resolve_runtime(runtime);
+    return value ? value->device_homing_control(*control) : RK_ERROR_INVALID_HANDLE;
+}
+rk_result RK_CALL rk_robot_runtime_device_homing_status(rk_robot_runtime runtime, uint64_t sequence) {
+    const auto value = robotkit::internal::resolve_runtime(runtime);
+    return value ? value->device_homing_status(sequence) : RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_robot_runtime_device_input(rk_robot_runtime runtime,
+    const char *switch_id, rk_device_input_observation *out_observation) {
+    if (!out_observation || out_observation->struct_size < sizeof(*out_observation) ||
+        !switch_id || !*switch_id) return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = robotkit::internal::resolve_runtime(runtime);
+    return value ? value->device_input(switch_id, *out_observation) : RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_robot_runtime_limit_input(rk_robot_runtime runtime, uint32_t joint, uint32_t active) {
+    if (active > 1) return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = robotkit::internal::resolve_runtime(runtime);
+    return value ? value->limit_input(joint, active != 0) : RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_robot_runtime_require_reference(rk_robot_runtime runtime, uint32_t joint, uint32_t required) {
+    if (required > 1) return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = robotkit::internal::resolve_runtime(runtime);
+    return value ? value->require_reference(joint, required != 0) : RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_robot_runtime_latch_reference(rk_robot_runtime runtime, uint32_t joint) {
+    const auto value = robotkit::internal::resolve_runtime(runtime);
+    return value ? value->latch_reference(joint) : RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_robot_runtime_reference_status(rk_robot_runtime runtime, uint32_t joint, uint32_t *out_referenced) {
+    if (!out_referenced) return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = robotkit::internal::resolve_runtime(runtime);
+    return value ? value->reference_status(joint, *out_referenced) : RK_ERROR_INVALID_HANDLE;
 }
 
 rk_result RK_CALL rk_robot_runtime_submit(rk_robot_runtime runtime, const rk_robot_command *command) {
@@ -352,6 +429,14 @@ rk_result RK_CALL rk_robot_runtime_snapshot_full(rk_robot_runtime runtime,
         std::min<std::size_t>(caller_size, sizeof(complete)));
     out_snapshot->struct_size = caller_size;
     return RK_OK;
+}
+
+rk_result RK_CALL rk_robot_runtime_snapshot_endpoint(rk_robot_runtime runtime,
+                                                      rk_robot_snapshot *out_snapshot) {
+    if (!out_snapshot || out_snapshot->struct_size < sizeof(*out_snapshot))
+        return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = robotkit::internal::resolve_runtime(runtime);
+    return value ? value->snapshot_full(*out_snapshot, true) : RK_ERROR_INVALID_HANDLE;
 }
 
 rk_result RK_CALL rk_robot_runtime_capabilities(rk_robot_runtime runtime,

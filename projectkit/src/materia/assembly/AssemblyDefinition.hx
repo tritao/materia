@@ -68,6 +68,8 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(5) @:optional var overtravel:Null<Float>;
 	/** Largest acceleration the joint's drive can give, in the joint's units per second squared. */
 	@:id(6) @:optional var acceleration:Null<Float>;
+	/** Permitted dual-drive displacement disagreement, in the joint coordinate units. */
+	@:id(8) @:optional var rackingTolerance:Null<Float>;
 	@:id(7) @:optional var assumptions:Null<ReadOnlyArray<QuantityAssumption>>;
 }
 
@@ -75,6 +77,10 @@ enum abstract AssemblyMateKind(String) from String to String {
 @:wire typedef AssemblyComponentDefinition = {
 	@:id(1) var id:String;
 	@:id(2) var connectors:Array<AssemblyConnector>;
+	/** Standard robot tool flange face, declared by the component. */
+	@:id(3) @:optional var robotFlangeConnector:String;
+	/** Authored convex collision pieces in the component's local length unit. */
+	@:id(4) @:optional var collisionHulls:Array<Array<Float>>;
 }
 
 /** An occurrence references shared component data and has a local initial pose. */
@@ -86,6 +92,8 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(4) @:optional var assembly:String;
 	/** Mates never move it (see `AssemblyMateSolver`). */
 	@:id(5) @:optional var grounded:Bool;
+	/** Include owning this occurrence; empty for the root assembly. */
+	@:id(6) @:optional var includePath:String;
 }
 
 /** A placement relation between two occurrence connectors (see `AssemblyMateKind`). */
@@ -122,6 +130,8 @@ enum abstract AssemblyMateKind(String) from String to String {
 		joints that are not coupling targets can be driven.
 	*/
 	@:id(12) @:optional var driven:Bool;
+	/** Include owning this joint; empty for the root assembly. */
+	@:id(13) @:optional var includePath:String;
 }
 
 /**
@@ -245,6 +255,23 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(5) @:optional var index:Null<Bool>;
 }
 
+/** Geometry-derived switch event on a prismatic joint, in assembly coordinate units. */
+@:wire typedef AssemblySwitch = {
+	@:id(1) var id:String;
+	@:id(2) var joint:String;
+	@:id(3) var part:String;
+	@:id(4) var connector:String;
+	@:id(5) var trigger:String;
+	@:id(6) var triggerConnector:String;
+	@:id(7) var role:String;
+	@:id(8) var side:Int;
+	@:id(9) var trip:Float;
+	@:id(10) var hysteresis:Float;
+	@:id(11) var repeatability:Float;
+	@:id(12) var seed:Int;
+	@:id(13) @:optional var driveJoint:String;
+}
+
 /** A connector exported from a member of an assembly definition. */
 @:wire typedef AssemblyExposedConnector = {
 	@:id(1) var name:String;
@@ -265,6 +292,7 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(9) @:optional var encoders:Array<AssemblyEncoder>;
 	@:id(10) @:optional var elasticNetworks:Array<AssemblyElasticNetwork>;
 	@:id(11) @:optional var sensors:Array<AssemblySensor>;
+	@:id(12) @:optional var switches:Array<AssemblySwitch>;
 }
 
 /**
@@ -288,6 +316,7 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(12) @:optional var encoders:Array<AssemblyEncoder>;
 	@:id(13) @:optional var elasticNetworks:Array<AssemblyElasticNetwork>;
 	@:id(14) @:optional var sensors:Array<AssemblySensor>;
+	@:id(15) @:optional var switches:Array<AssemblySwitch>;
 }
 
 @:wire typedef AssemblyJointCoordinate = {

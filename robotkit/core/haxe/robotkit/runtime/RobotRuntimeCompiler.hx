@@ -62,6 +62,9 @@ class RobotRuntimeCompiler {
       }
     }
 
+    for (contact in robot.switches) result.switches.push(new robotkit.model.JointSwitch(
+      contact.id, contact.joint, contact.frameId, contact.role, contact.side, contact.trip,
+      contact.hysteresis, contact.repeatability, contact.seed, contact.driveJoint));
     result.floatingBase = robot.floatingBase;
     result.collisionApproximation = switch (robot.collisionApproximation) {
       case CollisionApproximation.None: RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_NONE;
@@ -251,6 +254,25 @@ class RobotRuntimeCompiler {
     if (profile == null) {
       diagnostics.push(new RobotCompileDiagnostic("RK_PROFILE_NULL", "profile", "robot profile is null"));
       return diagnostics;
+    }
+    var switchIds = new Map<String, Bool>();
+    for (index in 0...robot.switches.length) {
+      var contact = robot.switches[index];
+      var path = 'switches[$index]';
+      if (contact == null) {
+        diagnostics.push(new RobotCompileDiagnostic("RK_SWITCH_BINDING", path, "switch is null"));
+        continue;
+      }
+      var jointFound = false, frameFound = false, sensorFound = false, driveFound = contact.driveJoint == null;
+      for (joint in robot.joints) if (joint != null && joint.id == contact.driveJoint) driveFound = true;
+      for (joint in robot.joints) if (joint != null && joint.id == contact.joint) jointFound = true;
+      for (frame in robot.frames) if (frame != null && frame.id == contact.frameId) frameFound = true;
+      for (sensor in robot.sensors) if (sensor != null && sensor.id == contact.id && sensor.kind == "trip_switch" &&
+          sensor.frame != null && sensor.frame.id == contact.frameId) sensorFound = true;
+      if (switchIds.exists(contact.id) || !jointFound || !frameFound || !sensorFound || !driveFound)
+        diagnostics.push(new RobotCompileDiagnostic("RK_SWITCH_BINDING", path,
+          "switch needs a unique ID, monitored joint and matching mounted external digital sensor"));
+      switchIds.set(contact.id, true);
     }
     if (revision < 0)
       diagnostics.push(new RobotCompileDiagnostic("RK_REVISION", "revision",
@@ -550,7 +572,10 @@ class RobotRuntimeCompiler {
       diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_VALUES", "sensors", "sensors report more values together than a state holds"));
     var sensorIds = new Map<String, Bool>();
     var sensorNames = new Map<String, Bool>();
-    if (robot.sensors.length > RobotKitRuntimeConstants.RK_MAX_SENSORS)
+    var nativeSensorCount = 0;
+    for (sensor in robot.sensors) if (sensor != null && RobotRuntimeSensorBlueprint.isNativeKind(sensor.kind))
+      nativeSensorCount++;
+    if (nativeSensorCount > RobotKitRuntimeConstants.RK_MAX_SENSORS)
       diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_LIMIT", "sensors", "too many sensors"));
     for (index in 0...robot.sensors.length) {
       var sensor = robot.sensors[index];

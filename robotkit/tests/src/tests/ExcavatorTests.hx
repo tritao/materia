@@ -1,5 +1,7 @@
 package tests;
 
+import motionkit.robot.PlanningLimits;
+
 import robotkit.manipulation.IkOptions;
 import haxe.Int64;
 import processkit.motion.ToolpathPlanRunner;
@@ -74,7 +76,7 @@ class ExcavatorTests {
       fixture.manipulator.tcpPose([index * 0.04, 0.0, 0.0, 0.0]),
       0.4, index == 2 || index == 4)];
     var motion = ToolpathPlanRunner.create(robot, fixture.manipulator,
-      "excavator", 1.0, 1.0, 0.002, 0.01, 300, 0.03);
+      "excavator", PlanningLimits.ofGroup(fixture.manipulator, null, 1.0), 1.0, 0.002, 0.01, 300, 0.03);
     motion.run(new Toolpath("excavator", points), seed);
     var map = new HeightMap("excavator", -10.0, -10.0, 0.1, 201, 201);
     var active = false;
@@ -220,7 +222,7 @@ class ExcavatorTests {
     };
     var seed = [0.0, 0.3, -1.0, -1.0];
     var digMotion = ToolpathPlanRunner.create(robot, fixture.manipulator,
-      "excavator", spec.maxAcceleration, spec.maxJointStep,
+      "excavator", PlanningLimits.ofGroup(fixture.manipulator, null, spec.maxAcceleration), spec.maxJointStep,
       spec.positionTolerance, spec.orientationTolerance,
       spec.ikMaxIterations, spec.ikDamping);
     var dig = new DigTrench(fixture.manipulator, robot, heightMap, "excavator",
@@ -300,7 +302,7 @@ class ExcavatorTests {
     };
     var seed = [0.0, 0.3, -1.0, -1.0];
     var gradeMotion = ToolpathPlanRunner.create(robot, fixture.manipulator,
-      "excavator", spec.maxAcceleration, spec.maxJointStep,
+      "excavator", PlanningLimits.ofGroup(fixture.manipulator, null, spec.maxAcceleration), spec.maxJointStep,
       spec.positionTolerance, spec.orientationTolerance,
       spec.ikMaxIterations, spec.ikDamping);
     var grade = new GradeRegion(fixture.manipulator, robot, region, "excavator",
@@ -340,7 +342,7 @@ class ExcavatorTests {
     var seed = [0.8961, 0.994, -1.609, -1.185];
     var targetPose = DigCyclePlanner.poseAt(2.0, 2.5, 0.4, 0.6);
     var dumpMotion = ToolpathPlanRunner.create(robot, fixture.manipulator,
-      "excavator", 0.6, 6.5, 2e-3, 8e-3, 500, 0.03);
+      "excavator", PlanningLimits.ofGroup(fixture.manipulator, null, 0.6), 6.5, 2e-3, 8e-3, 500, 0.03);
     var dumpAt = new DumpAt(fixture.manipulator, robot, "excavator", targetPose, seed,
       0.4, 0.6, 6.5, 2e-3, 8e-3, 500, 0.03, dumpMotion);
 
@@ -401,6 +403,8 @@ class ExcavatorTests {
     bucket.limits.lower = -3.0;
     bucket.limits.upper = 3.0;
 
+    // Synthetic mechanism: state the former toolpath runner assumption explicitly.
+    for (joint in model.joints) joint.limits.velocity = 10.0;
     var flange = model.addFrame(new Frame("bucket_flange", bucketLink));
 
     var arm = new Manipulator(model, undercarriage.id, flange.id);

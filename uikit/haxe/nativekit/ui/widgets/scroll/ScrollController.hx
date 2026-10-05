@@ -1,7 +1,13 @@
 package nativekit.ui.widgets.scroll;
 
 /** Haxe-owned scroll offsets and resolved viewport/content metrics. */
-class ScrollController {
+class ScrollController implements nativekit.ui.animation.Animation {
+	public var animationDuration(default, null):Float = 0.12;
+	public var animated(default, null):Bool = false;
+	var targetX:Float;
+	var targetY:Float;
+	var scheduler:Null<nativekit.ui.animation.AnimationScheduler>;
+	var bindingOwner:Null<ScrollBinding>;
 	public var offsetX(default, null):Float;
 	public var offsetY(default, null):Float;
 	public var viewportWidth(default, null):Float;
@@ -16,6 +22,7 @@ class ScrollController {
 			throw "Scroll offsets must be finite and non-negative";
 		this.offsetX = offsetX;
 		this.offsetY = offsetY;
+		targetX = offsetX; targetY = offsetY;
 		viewportWidth = 0.0;
 		viewportHeight = 0.0;
 		contentWidth = 0.0;
@@ -36,8 +43,10 @@ class ScrollController {
 	public function jumpTo(x:Float, y:Float):Bool {
 		if (!Math.isFinite(x) || !Math.isFinite(y))
 			throw "Scroll offsets must be finite";
-		var nextX = Math.max(0.0, hasMetrics ? Math.min(x, maxScrollX) : x);
-		var nextY = Math.max(0.0, hasMetrics ? Math.min(y, maxScrollY) : y);
+		cancelAnimation();
+		var nextX = clampX(x);
+		var nextY = clampY(y);
+		targetX = nextX; targetY = nextY;
 		if (nextX == offsetX && nextY == offsetY)
 			return false;
 		offsetX = nextX;
@@ -46,13 +55,60 @@ class ScrollController {
 		return true;
 	}
 
-	/** Applies logical-pixel movement and returns whether the offset changed. */
-	public function scrollBy(x:Float, y:Float):Bool
-		return jumpTo(offsetX + x, offsetY + y);
+	/** Enables time-based exponential movement; jumpTo always remains immediate. */
+	public function configureAnimation(enabled:Bool, duration:Float = 0.12):Void {
+		if (!Math.isFinite(duration) || duration < 0) throw "Scroll duration must be finite and non-negative";
+		animated = enabled; animationDuration = duration;
+		if (!enabled || duration == 0) jumpTo(targetX, targetY);
+	}
 
-	@:allow(nativekit.ui.widgets.scroll.ScrollView)
-	function bind(callback:ScrollController->Void):Void
-		changed = callback;
+	/** Queues logical-pixel movement. Reversals discard the previous pending direction. */
+	public function scrollBy(x:Float, y:Float):Bool {
+		if (!Math.isFinite(x) || !Math.isFinite(y)) throw "Scroll movement must be finite";
+		if (!animated || animationDuration == 0) return jumpTo(offsetX + x, offsetY + y);
+		var nextX = clampX((x * (targetX - offsetX) < 0 ? offsetX : targetX) + x);
+		var nextY = clampY((y * (targetY - offsetY) < 0 ? offsetY : targetY) + y);
+		if (nextX == targetX && nextY == targetY) return false;
+		targetX = nextX; targetY = nextY;
+		if (scheduler != null) scheduler.track(this);
+		notifyChanged();
+		return true;
+	}
+
+	public function advance(deltaSeconds:Float):Bool {
+		if (!Math.isFinite(deltaSeconds) || deltaSeconds < 0) throw "Scroll time must be finite and non-negative";
+		if (deltaSeconds == 0) return offsetX != targetX || offsetY != targetY;
+		var remaining = animationDuration == 0 ? 0 : Math.pow(0.01, deltaSeconds / animationDuration);
+		var nextX = targetX + (offsetX - targetX) * remaining;
+		var nextY = targetY + (offsetY - targetY) * remaining;
+		if (Math.abs(nextX - targetX) < 0.5) nextX = targetX;
+		if (Math.abs(nextY - targetY) < 0.5) nextY = targetY;
+		if (nextX != offsetX || nextY != offsetY) {
+			offsetX = nextX; offsetY = nextY; notifyChanged();
+		}
+		return offsetX != targetX || offsetY != targetY;
+	}
+
+	public function cancelAnimation():Void {
+		if (scheduler != null) scheduler.remove(this);
+		targetX = offsetX; targetY = offsetY;
+	}
+
+	inline function clampX(value:Float):Float return Math.max(0, hasMetrics ? Math.min(value, maxScrollX) : value);
+	inline function clampY(value:Float):Float return Math.max(0, hasMetrics ? Math.min(value, maxScrollY) : value);
+
+	@:allow(nativekit.ui.widgets.scroll.ScrollBinding)
+	function bind(callback:ScrollController->Void, ?clock:nativekit.ui.animation.AnimationScheduler, ?owner:ScrollBinding):Void {
+		if (scheduler != null && scheduler != clock) scheduler.remove(this);
+		changed = callback; scheduler = clock; bindingOwner = owner;
+		if (scheduler != null && (offsetX != targetX || offsetY != targetY)) scheduler.track(this);
+	}
+
+	@:allow(nativekit.ui.widgets.scroll.ScrollBinding)
+	function unbind(owner:ScrollBinding):Void {
+		if (bindingOwner != owner) return;
+		cancelAnimation(); changed = null; scheduler = null; bindingOwner = null;
+	}
 
 	@:allow(nativekit.ui.widgets.scroll.ScrollView)
 	function updateMetrics(viewportWidth:Float, viewportHeight:Float,
@@ -65,6 +121,8 @@ class ScrollController {
 		this.contentWidth = contentWidth;
 		this.contentHeight = contentHeight;
 		hasMetrics = true;
+		targetX = Math.min(targetX, maxScrollX);
+		targetY = Math.min(targetY, maxScrollY);
 		var nextX = Math.min(offsetX, maxScrollX);
 		var nextY = Math.min(offsetY, maxScrollY);
 		if (nextX != offsetX || nextY != offsetY) {

@@ -21,6 +21,7 @@ class ExecutionPlanSubmission {
   public final controlAcceleration:ImmutableFloatArray;
   public final endsAtRest:Bool;
   public final jerkUnchecked:Bool;
+  public final purpose:ExecutionPlanPurpose;
   /** The payload, copied out of `arrays` on first use when the plan came as arrays. */
   public var segments(get, never):Array<TrajectorySegment>;
   /** The payload as native arrays an in-process runtime reads in place, or null. */
@@ -36,7 +37,7 @@ class ExecutionPlanSubmission {
       ?replaceAfterPlanId:Int64, ?replaceAfterTimeNs:Int64,
       ?positionTolerances:Array<Float>, ?velocityTolerances:Array<Float>,
       ?accelerationTolerances:Array<Float>, ?endsAtRest:Bool = true,
-      ?events:Array<ProcessTimedEvent>, ?jerkUnchecked:Bool = false, ?arrays:SegmentArrays, ?controlAcceleration:Array<Float>) {
+      ?events:Array<ProcessTimedEvent>, ?jerkUnchecked:Bool = false, ?arrays:SegmentArrays, ?controlAcceleration:Array<Float>, ?purpose:ExecutionPlanPurpose = Program) {
     var payloadJoints = arrays != null ? arrays.robotJointCount() :
       segments == null || segments.length == 0 || segments[0] == null ? -1 : segments[0].jointCount;
     if (planId == null || Int64.compare(planId, Int64.ofInt(0)) <= 0 ||
@@ -78,6 +79,9 @@ class ExecutionPlanSubmission {
     this.modelRevision = modelRevision;
     this.calibrationRevision = calibrationRevision;
     this.events = events == null ? [] : events.copy();
+    if (purpose != Program && this.events.length > 0)
+      throw "Jog and homing plans cannot carry process events";
+    this.purpose = purpose;
     var previous = Int64.ofInt(0);
     for (event in this.events) {
       if (event == null || Int64.compare(event.timeNs, previous) < 0 ||
@@ -125,11 +129,12 @@ class ExecutionPlanSubmission {
       requiredCapabilities:Int, startPosition:Array<Float>, startVelocity:Array<Float>,
       startAcceleration:Array<Float>, arrays:SegmentArrays, positionTolerances:Array<Float>,
       velocityTolerances:Array<Float>, accelerationTolerances:Array<Float>, endsAtRest:Bool,
-      events:Array<ProcessTimedEvent>, jerkUnchecked:Bool):ExecutionPlanSubmission
+      events:Array<ProcessTimedEvent>, jerkUnchecked:Bool,
+      ?purpose:ExecutionPlanPurpose = Program):ExecutionPlanSubmission
     return new ExecutionPlanSubmission(planId, modelRevision, calibrationRevision,
       requiredCapabilities, startPosition, startVelocity, startAcceleration, null, null, null,
       positionTolerances, velocityTolerances, accelerationTolerances, endsAtRest, events,
-      jerkUnchecked, arrays);
+      jerkUnchecked, arrays, null, purpose);
 
   function get_segments():Array<TrajectorySegment> {
     var stored = storedSegments;
@@ -153,5 +158,5 @@ class ExecutionPlanSubmission {
       requiredCapabilities, startPosition.toArray(), startVelocity.toArray(),
       startAcceleration.toArray(), arrays == null ? segments : null, replaceAfterPlanId,
       replaceAfterTimeNs, positionTolerances.toArray(), velocityTolerances.toArray(),
-      accelerationTolerances.toArray(), endsAtRest, events, jerkUnchecked, arrays, controlAcceleration.toArray());
+      accelerationTolerances.toArray(), endsAtRest, events, jerkUnchecked, arrays, controlAcceleration.toArray(), purpose);
 }

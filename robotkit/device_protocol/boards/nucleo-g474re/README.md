@@ -52,3 +52,23 @@ driven.
 Copy the bench deployment directory to the Linux board, edit `device.path`
 for the UART node, and run `robotd --server --auth=... --deployment=...`. Before physical
 actuators are attached, measure UART timing and stop behavior on the bench.
+
+## G13 switch input assignment — hardware unverified
+
+The minimal bench firmware assigns input channel 0 to **PB0** and channel 1
+to **PB1**. Both are configured as GPIO inputs with internal pull-ups. For the
+active-low bench setup, each dry contact closes to board ground; the deployment
+input entry must explicitly set `active_high: false` and name the model switch
+and its actuator. USART1 remains PC4 TX / PC5 RX. Identify PB0/PB1 on the exact
+board schematic before connecting; no connector-number assignment is asserted.
+
+These assignments and the GPIO/edge-capture path have **not been verified on
+hardware**. No motors are connected or driven by this firmware. It still
+advertises profile 2, two virtual actuator setpoints and degree-1 motion. Input
+edges are polled in the DWT source clock and State6 reports closing/opening
+counts and captured ticks; captured step counts remain zero because this bench
+adapter has no physical step generator. It is not a physical router homing
+controller and does not accept scoped motor holds or counter calibration.
+
+At the Phase C gate, compile with `cargo check --offline` from the firmware
+directory. That checks code, not electrical polarity, contact timing or wiring.

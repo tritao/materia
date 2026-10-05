@@ -128,12 +128,17 @@ class ProgramTests extends MotionKitTestSupport {
   public function new() { super(); }
 
   public function testProgramStartTolerances():Void {
-    var blueprint = MachineKitRobotCompiler.compileXYZGantry(
-      new LinearAxis(23, 10, 80), new LinearAxis(23, 10, 80),
-      new LinearAxis(23, 10, 80), 0.1, 0.4);
+    var blueprint = MachineKitRobotCompiler.compileGantry(
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(80, 80, 80)),
+      0.1, 0.4);
     var solver = new AxisKinematics(blueprint);
     var model = blueprint.model;
     var ids = [for (joint in model.joints) joint.id];
+    var simulationHarness = new SimulationHarness(0.01);
+    var runtime = simulationHarness.simulation.addRobot(blueprint.runtime);
+    var fixtureRobot = new robotkit.simulation.SimulatedRobot("start-tolerances", runtime,
+      model.name, [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
+    homeGantryFixture(blueprint, runtime, simulationHarness, fixtureRobot);
     var count = ids.length;
     var scales = [for (_ in ids) 0.0];
     for (axis in blueprint.axes) for (slot in 0...axis.jointIds.length)
@@ -142,7 +147,7 @@ class ProgramTests extends MotionKitTestSupport {
     var accelerations = [for (joint in model.joints) joint.limits.requireAcceleration()];
     var jerks = [for (scale in scales) 10.0 * scale];
     var limits = new ValidationLimits(count, Int64.ofInt(blueprint.runtime.revision),
-      Int64.ofInt(blueprint.runtime.calibrationRevision));
+      runtime.snapshot().calibrationRevision);
     for (joint in 0...count) {
       var bound = model.joints[joint].limits;
       limits.position(joint, bound.lower, bound.upper);
@@ -182,9 +187,6 @@ class ProgramTests extends MotionKitTestSupport {
     var plan = compiled.blocks[0].plans[0];
     near(plan.copyPositionTolerances()[0], 0.00001,
       "program compiler preserves tight start position tolerance", 1e-12);
-    var simulationHarness = new SimulationHarness(0.01);
-    var simulation = simulationHarness.simulation;
-    var runtime = simulation.addRobot(blueprint.runtime);
     var segments = [for (segment in plan.segments())
       new TrajectorySegment(segment.timeFromStartNs, segment.durationNs,
         segment.coefficients)];
@@ -196,11 +198,12 @@ class ProgramTests extends MotionKitTestSupport {
       plan.copyPositionTolerances(), plan.copyVelocityTolerances(),
       plan.copyAccelerationTolerances());
     var rejectedAtRuntime = false;
-    try runtime.submitPlan(submission, 1) catch (error:Dynamic) {
+    try fixtureRobot.submit(robotkit.core.RobotCommand.ExecutionPlan(submission)) catch (error:Dynamic) {
       if (Std.isOfType(error, RobotRuntimeError)) {
         var nativeError:RobotRuntimeError = cast error;
         rejectedAtRuntime = nativeError.status ==
           RobotKitRuntimeConstants.RK_ERROR_INVALID_STATE;
+        if (!rejectedAtRuntime) throw error;
       }
     }
     check(rejectedAtRuntime,
@@ -232,7 +235,7 @@ class ProgramTests extends MotionKitTestSupport {
     // A joint rate for a tool twist moves the swivel exactly at the asked rate.
     var askedSwivelRate = 0.7;
     var twist = new motionkit.kinematics.Twist6(0.05, 0.0, -0.02, 0.0, 0.1, 0.0);
-    var rate = solver.solveDifferential(start, twist, [askedSwivelRate]);
+    var rate = solver.solveDifferential(start, twist, [askedSwivelRate], null);
     check(rate != null, "a 7-axis arm has a joint rate for a tool twist");
     var tool = arm.tcpJacobian(start), wanted = twist.toArray();
     for (row in 0...6) {
@@ -254,7 +257,7 @@ class ProgramTests extends MotionKitTestSupport {
     for (i in 1...21) {
       var target = new Pose3(startPose.x, startPose.y + 0.01 * i, startPose.z, startPose.qx, startPose.qy,
         startPose.qz, startPose.qw);
-      var solved = solver.solvePose(target, q, tolerance);
+      var solved = solver.solvePose(target, q, tolerance, null);
       check(solved != null, 'point IK reaches step $i');
       q = solved;
       drift = Math.max(drift, Math.abs(arm.swivelAngle(q) - swivel));
@@ -271,7 +274,7 @@ class ProgramTests extends MotionKitTestSupport {
         var f = i / 35.0;
         var target = new Pose3(startPose.x - 0.1 * f, startPose.y + 0.3 * f, startPose.z - 0.15 * f, startPose.qx,
           startPose.qy, startPose.qz, startPose.qw);
-        var solved = solver.solvePose(target, chain, tolerance);
+        var solved = solver.solvePose(target, chain, tolerance, null);
         check(solved != null, 'the line solves point by point at $f');
         for (j in 0...7) pointTravel += Math.abs(solved[j] - chain[j]);
         chain = solved;
@@ -339,16 +342,50 @@ class ProgramTests extends MotionKitTestSupport {
   }
 
   /** D6: a path on a turning workpiece, planned over the arm, its rail and the positioner as one plan. */
+  public function testExternalPathPosture():Void {
+    var fixture = buildWorkcellFixture();
+    var flange = [for (frame in fixture.model.frames) if (frame.name == "flange") frame][0];
+    // The last wrist axis is local +Y; make it the tool's free wire axis.
+    flange.rotation = [-Math.sqrt(0.5), 0.0, 0.0, Math.sqrt(0.5)];
+    var work = [for (frame in fixture.model.frames) if (frame.name == "work") frame][0];
+    var group = new robotkit.manipulation.KinematicGroup(fixture.model, fixture.model.links[0].id,
+      flange.id, work.id, null, null, null);
+    var solver = new ManipulatorKinematics(group, 1e-8);
+    var preferred = [0.75, 1.57, -1.2, 1.6, -1.97, -1.57, 0.0, 0.0];
+    var start = preferred.copy(); start[6] = 0.5;
+    solver.preferredPosture = preferred;
+    var target = solver.forward(preferred);
+    var route = solver.solvePath(new motionkit.kinematics.PathRequest([0.0, 0.05],
+      [solver.forward(start), target], start, new IkTolerance(), [for (_ in 0...8) 1.0],
+      [for (_ in 0...8) 1.0], 4, [OrientationPolicy.FreeAboutTool, OrientationPolicy.FreeAboutTool]));
+    var end = route[1];
+    check(end != null && Math.abs(end[6]) < 0.01,
+      "whole-path external redundancy retains the requested arm posture instead of the seed's wrist winding");
+    if (end != null) {
+      var reached = solver.forward(end);
+      check(Math.sqrt(Math.pow(reached.x - target.x, 2) + Math.pow(reached.y - target.y, 2) +
+        Math.pow(reached.z - target.z, 2)) < 1e-4, "posture preference preserves the hard TCP target");
+      check(motionkit.robot.ToolFreedom.orientationError(reached, target, OrientationPolicy.FreeAboutTool) < 0.001,
+        "posture preference preserves the hard wire direction");
+    }
+  }
+
   public function testCoordinatedExternalAxes():Void {
     var fixture = buildWorkcellFixture();
     var cell = fixture.group;
     check(cell.dofCount() == 8, 'the group holds the rail, the arm and the turntable (${cell.dofCount()})');
     check(cell.external[0] && !cell.external[1] && cell.external[7], "the rail and the turntable are external axes");
+    check(cell.swivel == null, "six arm joints plus external axes do not create a seven-joint swivel");
     var solver = new ManipulatorKinematics(cell, 1e-8);
+    check(Std.isOfType(solver.redundancy(), motionkit.robot.ExternalAxesParameterization),
+      "derived external axes use external-axis redundancy parameterization");
     var tolerance = new IkTolerance();
     // Rail in front of the table, arm reaching forward with the tool pointing down.
     var start = [0.75, 1.57, -1.2, 1.6, -1.97, -1.57, 0.0, 0.0];
     var here = solver.forward(start);
+    var preferred = cell.solve(cell.tcpPose(start), start,
+      new robotkit.manipulation.IkOptions().preferring(start));
+    check(preferred.converged && preferred.q.length == 8, "posture preference retains the external coordinates");
 
     // The relative Jacobian is the derivative of the tool pose in the work frame.
     var jacobian = cell.tcpJacobian(start);
@@ -372,7 +409,7 @@ class ProgramTests extends MotionKitTestSupport {
     }
     var points = [for (k in 0...33) onCircle(2.0 * Math.PI * k / 32)];
     // Enter the circle in the configuration that leaves the turntable nearest home.
-    var options = solver.sampleCandidates(points[0], 8, tolerance);
+    var options = solver.sampleCandidates(points[0], 8, tolerance, null);
     check(options.length > 0, "the circle's first point is reachable");
     var entry = options[0];
     for (option in options) if (Math.abs(option[7]) < Math.abs(entry[7])) entry = option;
@@ -979,7 +1016,7 @@ class ProgramTests extends MotionKitTestSupport {
     check(run.lastProgramStart < run.interruptedAt,
       "recovery overlaps the interrupted pass");
     var approachMatches = switch continuation.ops[0] {
-      case MoveL(pose, _, _, _):
+      case MoveL(pose, _, _, _, _):
         motionkit.path.PoseMath.distance(pose,
           path.waypointAt(restart).pose) < 1e-6;
       case _: false;
@@ -1086,6 +1123,32 @@ class ProgramTests extends MotionKitTestSupport {
       'arm deferred resume sends one runtime command and completes: ${motion.failure}');
 
     motion.run(homeMove);
+    for (_ in 0...5) {
+      motion.update(0.01); simulationHarness.step(Int64.ofInt(tick++));
+    }
+    // Let the owner finish while the host still has its last active plan.
+    for (_ in 0...800) {
+      simulationHarness.step(Int64.ofInt(tick++));
+      if (!robot.snapshot().trajectoryActive) break;
+    }
+    check(!robot.snapshot().trajectoryActive, "the owner finishes before the host observes completion");
+    var holdsBefore = robot.commandCount("hold");
+    resumesBefore = robot.commandCount("resume");
+    motion.hold();
+    motion.update(0.01);
+    simulationHarness.step(Int64.ofInt(tick++));
+    check(motion.sessionState() == Held && robot.commandCount("hold") == holdsBefore &&
+      robot.snapshot().faultCode == 0,
+      "holding a finished owner plan stays local and preserves the program");
+    motion.resume();
+    for (_ in 0...800) {
+      motion.update(0.01); simulationHarness.step(Int64.ofInt(tick++));
+      if (!motion.running) break;
+    }
+    check(motion.completed && motion.failure == null && robot.commandCount("resume") == resumesBefore,
+      "resuming a hold at the finished plan advances without an empty runtime resume");
+
+    motion.run(longMove);
     for (_ in 0...5) {
       motion.update(0.01); simulationHarness.step(Int64.ofInt(tick++));
     }

@@ -1,0 +1,30 @@
+{
+	"version": 1,
+	"package": {
+		"name": "machinekit-gantry-picker-example"
+	},
+	"entry": "GantryPickerPreview",
+	"sources": [
+		"GantryPicker.hx",
+		"GantryPickerPreview.hx"
+	],
+	"sourceRoots": [
+		"."
+	],
+	"dependencies": {
+		"projectkit": {
+			"path": "../../../projectkit"
+		},
+		"cadkit": {
+			"path": "../../../cadkit"
+		},
+		"machinekit": {
+			"path": "../../"
+		},
+		"machinekit-robot": {
+			"path": "../../robot"
+		}
+	},
+	"target": "host",
+	"outputDir": "build"
+}

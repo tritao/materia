@@ -119,7 +119,13 @@ struct LayoutEngine::Impl {
         Clay_ErrorHandler error_handler{};
         error_handler.errorHandlerFunction = [](Clay_ErrorData data) {
             auto *state = static_cast<Impl *>(data.userData);
-            state->clay_error = data.errorText.chars ? data.errorText.chars : "Clay error";
+            state->clay_error = data.errorText.chars
+                ? std::string(data.errorText.chars, data.errorText.length) : "Clay error";
+            if (data.errorType == CLAY_ERROR_TYPE_STATE_CAPACITY_EXCEEDED) {
+                const auto details = Clay_GetStateCapacityError();
+                state->clay_error += " table=" + std::string(details.arrayName.chars, details.arrayName.length) +
+                    " capacity=" + std::to_string(details.capacity) + " element=" + std::to_string(details.elementId);
+            }
         };
         error_handler.userData = this;
         context = Clay_Initialize(
@@ -127,6 +133,9 @@ struct LayoutEngine::Impl {
             {1.0f, 1.0f}, error_handler);
         if (!context)
             return false;
+        // UIKit owns scroll offsets, gestures and lifetime. Clay only clips;
+        // ellipsized labels must not allocate native scroll state.
+        Clay_SetScrollTrackingEnabled(false);
         Clay_SetMeasureTextFunction(measure_text, this);
         Clay_SetMeasureTextIntrinsicFunction(measure_intrinsic_text, this);
         Clay_SetMeasureElementFunction(measure_element, this);
@@ -803,9 +812,6 @@ bool LayoutEngine::Impl::layout(const std::vector<LayoutNode> &nodes, float widt
     assign_layers(assign_layers, root, 0);
 
     Clay_SetLayoutDimensions({width, height});
-    // Retire scroll containers that disappeared from the previous layout. Clay
-    // keeps their records across frames and has a fixed 100-record capacity.
-    Clay_UpdateScrollContainers(false, {0.0f, 0.0f}, delta_seconds);
     Clay_BeginLayout();
     append_node(state, root, layers);
     const Clay_RenderCommandArray commands = Clay_EndLayout(delta_seconds);

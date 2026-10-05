@@ -72,7 +72,7 @@ class PathConfigurationSelector {
       throw "Configuration selector needs aligned path samples and start joints";
     var candidates:Array<Array<Array<Float>>> = [];
     for (index in 0...poses.length)
-      candidates.push(index == 0 ? [startQ.copy()] : solver.sampleCandidates(poses[index], maxCandidates, tolerance));
+      candidates.push(index == 0 ? [startQ.copy()] : solver.sampleCandidates(poses[index], maxCandidates, tolerance, null));
     return select(distances, candidates);
   }
 

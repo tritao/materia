@@ -62,6 +62,22 @@ class ModelingSmoke {
 		borrowedCut.close();
 		borrowedTool.close();
 		borrowedBase.close();
+		// Parts fuse to the same solid however many there are and however they are grouped: N bars of 2 x 1 x 1, each overlapping
+		// the next, make one bar of length N + 1, and a bar apart from them makes a second solid.
+		for (count in 1...9) {
+			var bars = [for (index in 0...count) Part.box(2, 1, 1, Min, Min, Min).translated(new Vector(index, 0, 0))];
+			var fused = Part.fuseAll(bars);
+			near(fused.volume(), count + 1);
+			check(fused.solidCount() == 1, "fuseAll of " + count + " overlapping bars is one solid");
+			fused.close();
+			bars.push(Part.box(2, 1, 1, Min, Min, Min).translated(new Vector(count + 10, 0, 0)));
+			var apart = Part.fuseAll(bars);
+			near(apart.volume(), count + 3);
+			check(apart.solidCount() == 2, "fuseAll of " + count + " bars and one apart is two solids");
+			apart.close();
+			for (bar in bars)
+				bar.close();
+		}
 		var plane = new Plane(new Vector(3, 4, 5), Vector.X(), Vector.Y().scale(-1));
 		var v = new Vector(1, 2, 3);
 		var local = plane.toLocal(plane.toWorld(v));
