@@ -658,7 +658,11 @@ setbacks; these define new fixtures, with no existing baseline-number changes.
     only if the bend zone is cut too (the cut is mapped to the flat pattern and back exactly);
   - `sheet-rip`: along an edge between two walls that would otherwise form a loop;
   - `sheet-corner` (closing two adjacent flanges: gap, overlap, corner relief round/square) can
-    land after the rest; record it as a sub-step. SM3o is scheduled after SM6 and before phase B,
+    land after the rest; record it as a sub-step. Gap is the perpendicular stand-off of a
+    non-overlapping flange end from its mate's full thickness slab. An overlap names the flange
+    whose end extends beyond its mate's far face by the stated perpendicular overlap; the mate
+    retains the stand-off. Oblique corners account for both thickness slabs rather than intersecting
+    zero-thickness surfaces. SM3o is scheduled after SM6 and before phase B,
     so the required feature chain can proceed to flat patterns while corner closure remains explicit.
 - Edits must keep wall and bend ids stable (a flange edit updates its wall and bend in place).
 - Tests (`SheetMetalSmoke`): build P1–P5 through the document API; codec round trip
@@ -928,11 +932,11 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM1 | done: exact line/arc regions, permanent graph ids, edits/cuts/rips, bidirectional FK, neutral-length conservation, closure and P1–P5 bounds; quick gate `sm1-core` passes (2102 sheet assertions) | 0713c4e0c; 54b5cab15 |
 | SM2 | done: named wall extrusions and bend revolutions fused for flat/folded/partial states; P1–P5 validity, single bodies, volumes, axes and stable names; quick gate `sm2-solid` passes (3757 sheet assertions) | 7a3836d8c |
 | SM3 | done (required feature chain); optional corner closure tracked separately as SM3o: SM3a atomic graph publication; SM3b exact sketch-backed base, side A/B, stock codec and named thickness builder; quick gates `sm3a-staging` (3773) and `sm3b-base` (3813 sheet assertions); SM3c authored segment names and exact face-to-graph picks; quick gate `sm3c-edges` (3843 sheet assertions); SM3d exact flange geometry and alignment; quick gate `sm3d-flange-geometry` (3880 sheet assertions); SM3e typed flange features, authored shared identities, gaps/extensions, stock radius defaults and P1–P5 document acceptance; quick gate `sm3e-flanges-typed` (4044 sheet assertions); SM3f exact planar subtraction foundation; quick gate `sm3f-outline-cuts` (4068 sheet assertions); SM3g typed rectangular/obround reliefs and sizing, exact gap/bend-width semantics, atomic edits and codec; quick gate `sm3g-reliefs` (4132 sheet assertions); SM3h closed/open/teardrop hems, shared edge selection, typed codec and builder; quick gate `sm3h-hems` (4303 sheet assertions); SM3i permanent bend-id rip feature, typed codec and builder; quick gate `sm3i-rips` (4315 sheet assertions); SM3j exact through-wall cuts on staged attached sketches, shared region mapping, typed codec and builder; quick gate `sm3j-wall-cuts` (4348 sheet assertions); SM3k nominal seam datums, exact bend material regions and seam validation; quick gate `sm3k-bend-regions` (4368 sheet assertions); SM3l native mapped positive-radius regions and adaptive volume integration; quick gate `sm3l-native-regions` (4368 sheet assertions); SM3m developed cuts across wall/bend/flange domains, named native patches, typed codec and edits, certified material bounds; quick gate `sm3m-cross-bend-cuts` (4633 sheet assertions); SM3n graph-derived collapsed-axis sectors, exact closed-hem cuts, material connectivity and production save/edit checks; quick gate `sm3n-closed-hem-cuts` (5200 sheet assertions) | 535ebc547; 08afd7a32; bb3405a64; 84a51f00d; 3ed9b3971; 31a696ed7; a02214101; f3ef57fa0; e5d66c947; 3d2d330dd; 6033a2f60; ee0d9e834; f83853060; db7e8be88; ab52986ef |
-| SM3o | planned: optional corner closure after SM6, before phase B; gap/overlap and round/square relief semantics remain | |
+| SM3o | in progress: SM3o-a derives exact gap/overlap supporting edges from folded planes and both stock thicknesses; quick gate `sm3oa-corner-geometry` passes (7282 sheet assertions, including 34 corner checks); feature, round/square reliefs, saved records and acceptance remain | |
 | SM4 | done: SM4a exact developed blank regions, typed domain owners, sorted bend data and interrupted fold markings, authored grain frame and typed version-14 snapshot; quick gate `sm4a-flat-verified` (5259 sheet assertions); SM4c typed shared drawing data, exact R12 DXF/SVG, bend annotations and grain arrow; quick gate `sm4c-drawing-exports` (5888 sheet assertions); SM4d typed cut/relief boundary provenance and propagation; quick gate `sm4d-boundary-provenance` (5911 sheet assertions); SM4e six typed manufacturability findings with exact geometry and minimum flange depth; quick gate `sm4e-checks-verified` (5944 sheet assertions); typed blank requirement with explicit order context; quick gate `sm4-flat-pattern-complete` (5963 sheet assertions) | a5508e566; 83a7a8c18; 723b0bac4; 27f66bb9e; a7156977e |
 | SM4b | done: typed editor base/flange commands, explicit stock input, parameter inspector, folded/flat publication, bend table, exact fold-line overlay and DXF/SVG commands; P2 editor workflow passes; full gate `sm4b-editor-full` passes | be21d1579 |
 | SM5 | in progress: SM5a unique native ancestry count/index/bulk queries and typed owning Haxe wrappers; three native suites and focused ancestry checks pass; quick gate `sm5a-ancestry` (5974 sheet assertions); recognition and convert feature deferred by user direction on 2026-10-05 | 51c4f2d5c |
-| SM6 | done: SM6a typed air-bending predictions, physical springback inversion and exact contact depth; focused process smoke passes 1235 assertions; quick gate `sm6a-air-bending` passes (7209 sheet assertions); SM6b explicit lot/tool/angle-band calibration with measured radius and additive depth correction, focused smoke passes 1257 assertions, quick gate `sm6b-calibration` passes (7231 sheet assertions); SM6 complete: typed grade defaults, editor selection, Process-rule persistence and tooling minimums; full gate `sm6-process-material-full` passes all stages (7248 sheet assertions, ProjectKit 155); final material integration and CAD workflow checks pass | 7148a8bb8; 6458df23b |
+| SM6 | done: SM6a typed air-bending predictions, physical springback inversion and exact contact depth; focused process smoke passes 1235 assertions; quick gate `sm6a-air-bending` passes (7209 sheet assertions); SM6b explicit lot/tool/angle-band calibration with measured radius and additive depth correction, focused smoke passes 1257 assertions, quick gate `sm6b-calibration` passes (7231 sheet assertions); SM6 complete: typed grade defaults, editor selection, Process-rule persistence and tooling minimums; full gate `sm6-process-material-full` passes all stages (7248 sheet assertions, ProjectKit 155); final material integration and CAD workflow checks pass | 7148a8bb8; 6458df23b; d664caa22 |
 | SM7 | planned | |
 | SM8a | planned | |
 | SM8b | planned (waits for MT5 on main) | |
@@ -1246,3 +1250,14 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
   wire validation. SheetMetalSmoke rises from 7231 to 7248 for Process-rule document acceptance
   and tooling-derived minimums. The original five MachineKit summaries and the SM4b router
   engineering summaries are unchanged; tick timings and collection counts are observations.
+
+- SM3o-a: `CornerGeometry` derives two supporting-edge offsets from the current folded planes,
+  selected authored outer segments and stock thickness. The closed `CornerJoin` enum names gap
+  or which flange overlaps. Segment directions must match the planes' intersection; parallel
+  planes, non-corner boundaries and invalid gap/overlap dimensions have named diagnoses. Both
+  depth endpoints are included in the stand-off and overlap calculation at oblique corners.
+  This is the geometry foundation only: document features, corner reliefs and their native/flat
+  acceptance checks remain required before SM3o is complete.
+  Quick gate `sm3oa-corner-geometry` passes all five suites with 7282 sheet assertions,
+  including 34 slab-clearance, overlap, selection-order and diagnosis checks. Original five
+  MachineKit summaries remain identical to baseline. No new haxeon issue or cast was introduced.
