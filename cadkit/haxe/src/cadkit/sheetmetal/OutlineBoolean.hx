@@ -115,14 +115,45 @@ class OutlineBoolean {
 			}
 			var identity = outline.identity(i, j);
 			if (reverse && mode != Union) identity = "cut:" + owner.length + ":" + owner + ":" + identity;
-			for (k in 0...retained.length) {
-				var name = retained.length == 1 ? identity : "fragment:" + identity.length + ":" + identity + ":cut:"
-					+ endpointKey(segment, others, retained[k].start) + ":" + endpointKey(segment, others, retained[k].end);
-				var duplicate = false;
-				for (existing in result) if (same(existing.segment, retained[k])) duplicate = true;
-				if (!duplicate) result.push(new OutlinePiece(retained[k], name, reverse && mode != Union ? origin : outline.origin(i, j)));
+			for (retainedPiece in retained) for (piece in uncovered(retainedPiece, result)) {
+				var name = retained.length == 1 && same(piece, retainedPiece) ? identity : "fragment:" + identity.length + ":" + identity + ":cut:"
+					+ endpointKey(segment, others, piece.start) + ":" + endpointKey(segment, others, piece.end);
+				result.push(new OutlinePiece(piece, name, reverse && mode != Union ? origin : outline.origin(i, j)));
 			}
 		}
+	}
+	/** Joined fragments can partly cover an already retained coincident boundary. Keep each interval once. */
+	static function uncovered(source:Segment, existing:Array<OutlinePiece>):Array<Segment> {
+		var remaining = [source];
+		for (record in existing) {
+			var boundary = record.segment;
+			if (!coincident(source, boundary)) continue;
+			var next:Array<Segment> = [];
+			for (piece in remaining) {
+				var parameters = [0.0, 1.0];
+				for (point in OutlineGeometry.intersections(piece, boundary)) {
+					var fraction = piece.fractionAt(point);
+					if (fraction > 1e-10 && fraction < 1 - 1e-10) parameters.push(fraction);
+				}
+				parameters.sort(function(a:Float, b:Float):Int return a < b ? -1 : a > b ? 1 : 0);
+				var unique:Array<Float> = [];
+				for (fraction in parameters) if (unique.length == 0 || fraction - unique[unique.length - 1] > 1e-10) unique.push(fraction);
+				for (i in 0...(unique.length - 1)) {
+					var part = slice(piece, unique[i], unique[i + 1]), midpoint = part.point(0.5), covered = false;
+					for (point in OutlineGeometry.intersections(part, boundary)) if (point.distance(midpoint) <= EPS) covered = true;
+					if (!covered) append(next, part);
+				}
+			}
+			remaining = next;
+		}
+		return remaining;
+	}
+	static function coincident(a:Segment, b:Segment):Bool {
+		if (a.isLine() != b.isLine()) return false;
+		if (!a.isLine()) return a.arcCenter().distance(b.arcCenter()) <= EPS && Math.abs(a.radius - b.radius) <= EPS;
+		var dx = (a.end.x - a.start.x) / a.length(), dy = (a.end.y - a.start.y) / a.length();
+		return Math.abs(dx * (b.start.y - a.start.y) - dy * (b.start.x - a.start.x)) <= EPS
+			&& Math.abs(dx * (b.end.y - a.start.y) - dy * (b.end.x - a.start.x)) <= EPS;
 	}
 	static function containsAny(outlines:Array<WallOutline>, point:Point2):Bool {
 		for (outline in outlines) if (outline.contains(point)) return true; return false;

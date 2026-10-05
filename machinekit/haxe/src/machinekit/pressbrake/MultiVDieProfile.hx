@@ -4,6 +4,9 @@ import cadkit.modeling.Axis;
 import cadkit.modeling.Location;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
+import cadkit.sheetmetal.Point2;
+import cadkit.sheetmetal.Segment;
+import cadkit.sheetmetal.WallOutline;
 import machinekit.component.Solids;
 
 /** Four independent grooves on a square block. The active face is placed at z=0. */
@@ -82,5 +85,24 @@ class MultiVDieProfile {
 			}
 		}
 		return new ToolProfilePolygon(result);
+	}
+	/** Exact boundary of every groove after placing the selected face at the top datum. */
+	public function contactSection(activeFace:Int = 0):WallOutline {
+		var active = groove(activeFace), result:Array<Segment> = [];
+		for (side in 0...4) {
+			var face = (side + activeFace) % 4, angle = side * Math.PI / 2;
+			var edges = new DieProfile(id + '-face-$face', faces[face], size, size).contactSection().loops()[0];
+			for (i in 2...(edges.length - 1)) {
+				var edge = edges[i];
+				result.push(edge.isLine() ? Segment.line(rotated(edge.start, angle), rotated(edge.end, angle))
+					: Segment.arc(rotated(edge.arcCenter(), angle), edge.radius, edge.startAngle + angle, edge.sweep));
+			}
+		}
+		return new WallOutline(result);
+	}
+	function rotated(point:Point2, angle:Float):Point2 {
+		var z = point.y + size / 2;
+		return new Point2(point.x * Math.cos(angle) - z * Math.sin(angle),
+			point.x * Math.sin(angle) + z * Math.cos(angle) - size / 2);
 	}
 }

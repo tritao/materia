@@ -4,6 +4,7 @@ import cadkit.modeling.Vector;
 import cadkit.sheetmetal.Sheet;
 import cadkit.sheetmetal.SheetDiagnosis;
 import machinekit.pressbrake.ToolRow;
+import machinekit.pressbrake.ToolContactPrism;
 
 /** Rebuild material collision geometry at each evaluated stroke pose, in press-frame mm. */
 class PressCollisionGeometry {
@@ -50,6 +51,26 @@ class PressCollisionGeometry {
 				pieces.push(new ConvexPrism(label + ":piece:" + pieces.length, polygon, new Vector(prism.end - prism.start, 0, 0)));
 			}
 			result.push(new PressCollisionBody(punch ? Punch(station, i) : Die(station, i), pieces, error));
+		}
+	}
+	/** Analytic sections share the installed row placements and retain every groove and horn. */
+	public static function toolContacts(press:PressGeometry, ramTravel:Float):Array<PressToolContact> {
+		travel(ramTravel, press.ramTravel, "ram");
+		var result:Array<PressToolContact> = [];
+		for (station in press.installedTools.stations()) {
+			var contact = press.station(station.id), offset = station.offset - press.bedLength / 2;
+			contactRow(result, station.punches, offset, contact.punchLineY, contact.openTipHeight - ramTravel, station.id, true);
+			contactRow(result, station.dies, offset, contact.punchLineY, contact.dieTopHeight, station.id, false);
+		}
+		return result;
+	}
+	static function contactRow(result:Array<PressToolContact>, row:ToolRow, offset:Float, y:Float, z:Float,
+			station:String, punch:Bool):Void {
+		var placed = row.placements(offset);
+		for (i in 0...placed.length) {
+			var segment = placed[i], prisms:Array<ToolContactPrism> = [];
+			for (prism in segment.segment.contactPrisms()) prisms.push(prism.placed(segment.start, y, z));
+			result.push(new PressToolContact(punch ? Punch(station, i) : Die(station, i), prisms));
 		}
 	}
 

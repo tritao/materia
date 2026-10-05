@@ -54,7 +54,7 @@ class BendPrismProfile {
 				var clip = WallOutline.polygon([new Point2(left, 0), new Point2(right, 0),
 					new Point2(right, zone.width), new Point2(left, zone.width)]);
 				var scale = Math.max(1, radius * Math.abs(zone.angle) / zone.allowance);
-				for (region in regions) for (part in OutlineBoolean.intersection(region, clip, id + ":sector:" + i)) {
+				for (region in regions) for (part in clipped(region, clip, id, i, left, right)) {
 					var profile = SheetPrismProfile.of(id + ":cut:" + i, part, 1, maximumError / (3 * scale));
 					for (piece in profile.pieces()) {
 						var vertices = piece.vertices(), size = Std.int(vertices.length / 2);
@@ -74,6 +74,13 @@ class BendPrismProfile {
 			}
 		}
 		return new BendPrismProfile(error, result);
+	}
+	static function clipped(region:WallOutline, clip:WallOutline, id:String, sector:Int, left:Float, right:Float):Array<WallOutline> {
+		try { return OutlineBoolean.intersection(region, clip, id + ":sector:" + sector); }
+		catch (failure:SheetDiagnosis) {
+			throw new SheetDiagnosis(failure.code, "Developed bend strip " + sector + " [" + left + ", " + right + "]: " + failure.message,
+				[id, "sector:" + sector]);
+		}
 	}
 	static function clean(points:Array<Vector>):Array<Vector> {
 		var result:Array<Vector> = [];

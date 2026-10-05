@@ -1,5 +1,8 @@
 package machinekit.pressbrake;
 
+import cadkit.sheetmetal.Point2;
+import cadkit.sheetmetal.Segment;
+
 /** Circular section arc with a conservative tangent-facet cover. Angles are radians. */
 class ToolProfileArc {
 	public final center:ToolProfilePoint;
@@ -21,6 +24,8 @@ class ToolProfileArc {
 		var angle = startAngle + fraction * sweep;
 		return new ToolProfilePoint(center.y + radius * Math.cos(angle), center.z + radius * Math.sin(angle));
 	}
+	/** Exact section coordinates use (Y,Z) as their two planar coordinates. */
+	public function segment():Segment return Segment.arc(new Point2(center.y, center.z), radius, startAngle, sweep);
 
 	/** Intersections of neighbouring circle tangents, excluding the exact endpoints.
 	 * The radial excess is at most `maximumError` mm; no inscribed chord enters the material.

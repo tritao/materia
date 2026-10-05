@@ -1,6 +1,9 @@
 package machinekit.pressbrake;
 
 import cadkit.modeling.Part;
+import cadkit.sheetmetal.OutlineBoolean;
+import cadkit.sheetmetal.Point2;
+import cadkit.sheetmetal.WallOutline;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
@@ -118,6 +121,22 @@ class ToolSegment extends MachineComponent {
 					horn.end == Left ? 0 : split, horn.end == Left ? split : length));
 			}
 		}
+		return result;
+	}
+	/** Exact rounded sections preserve the same end-horn relief for contact refinement. */
+	public function contactPrisms():Array<ToolContactPrism> {
+		var section = ToolProfiles.contactSection(profile);
+		if (horn == null) return [new ToolContactPrism(section, 0, length)];
+		var split = horn.end == Left ? horn.reliefLength : length - horn.reliefLength;
+		var result = [new ToolContactPrism(section, horn.end == Left ? split : 0, horn.end == Left ? length : split)];
+		var minY = Math.POSITIVE_INFINITY, maxY = Math.NEGATIVE_INFINITY, minZ = Math.POSITIVE_INFINITY;
+		for (loop in section.loops()) for (edge in loop) for (point in edge.extrema()) {
+			minY = Math.min(minY, point.x); maxY = Math.max(maxY, point.x); minZ = Math.min(minZ, point.y);
+		}
+		var clip = WallOutline.polygon([new Point2(minY - 1, minZ - 1), new Point2(maxY + 1, minZ - 1),
+			new Point2(maxY + 1, horn.remainingHeight), new Point2(minY - 1, horn.remainingHeight)]);
+		for (part in OutlineBoolean.intersection(section, clip, "tool-horn"))
+			result.push(new ToolContactPrism(part, horn.end == Left ? 0 : split, horn.end == Left ? split : length));
 		return result;
 	}
 }

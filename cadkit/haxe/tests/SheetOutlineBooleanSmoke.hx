@@ -34,6 +34,15 @@ class SheetOutlineBooleanSmoke {
 		var disjoint = OutlineBoolean.subtract(source, box(30, 30, 5, 5), "outside"); near(disjoint.area(), 200, "disjoint cut leaves source intact");
 		var nested = OutlineBoolean.subtract(hole, box(6, 3.5, 1, 1), "inside-hole"); near(nested.area(), 192, "cut within existing void changes no material");
 		var coincident = OutlineBoolean.subtract(source, box(0, 0, 4, 10), "coincident"); near(coincident.area(), 160, "coincident boundaries do not duplicate segments");
+		var touchingStrip = box(4, 0, 1, 10);
+		for (reverse in [false, true]) {
+			var clipped = reverse ? OutlineBoolean.intersection(touchingStrip, hole, "touching-hole")
+				: OutlineBoolean.intersection(hole, touchingStrip, "touching-hole");
+			check(clipped.length == 1, "partial coincident hole boundary retains one closed strip in either operand order");
+			near(clipped[0].area(), 10, "partial coincident boundaries count their material interval once");
+			check(clipped[0].loops().length == 1, "a hole touching only the clip boundary does not become an interior void");
+			check(clipped[0].contains(new Point2(4.5, 4)), "clipped strip retains material beside the touching hole");
+		}
 		var disk = new WallOutline([Segment.arc(new Point2(0, 0), 5, 0, 2 * Math.PI)]);
 		var secondDisk = new WallOutline([Segment.arc(new Point2(5, 0), 5, 0, 2 * Math.PI)]);
 		var crescent = OutlineBoolean.subtract(disk, secondDisk, "lens");

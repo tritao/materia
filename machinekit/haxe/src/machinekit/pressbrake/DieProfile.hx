@@ -5,6 +5,9 @@ import cadkit.modeling.Part;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Sketch;
 import cadkit.modeling.Vector;
+import cadkit.sheetmetal.Point2;
+import cadkit.sheetmetal.Segment;
+import cadkit.sheetmetal.WallOutline;
 
 /** Single-V die section with exact circular shoulders, top at z=0 and mounting face at -height. */
 class DieProfile {
@@ -70,16 +73,27 @@ class DieProfile {
 		for (i in 0...points.length) {
 			result.push(points[i]);
 			if (groove.shoulderRadius > 0 && (i == 3 || i == 6)) {
-				var arc = i == 3
-					? new ToolProfileArc(new ToolProfilePoint(groove.vWidth / 2, -groove.shoulderRadius),
-						groove.shoulderRadius, Math.PI / 2, (Math.PI - groove.includedAngle) / 2)
-					: new ToolProfileArc(new ToolProfilePoint(-groove.vWidth / 2, -groove.shoulderRadius),
-						groove.shoulderRadius, groove.includedAngle / 2, (Math.PI - groove.includedAngle) / 2);
+				var arc = contactArc(i);
 				for (point in arc.tangentVertices(maximumError)) result.push(point);
 			}
 		}
 		return new ToolProfilePolygon(result);
 	}
+	/** Exact straight flanks and circular shoulders, using the same authored section datums. */
+	public function contactSection():WallOutline {
+		var points = sectionPoints(), edges:Array<Segment> = [];
+		for (i in 0...points.length) {
+			var next = points[(i + 1) % points.length];
+			edges.push(groove.shoulderRadius > 0 && (i == 3 || i == 6) ? contactArc(i).segment()
+				: Segment.line(new Point2(points[i].y, points[i].z), new Point2(next.y, next.z)));
+		}
+		return new WallOutline(edges);
+	}
+	function contactArc(index:Int):ToolProfileArc return index == 3
+		? new ToolProfileArc(new ToolProfilePoint(groove.vWidth / 2, -groove.shoulderRadius),
+			groove.shoulderRadius, Math.PI / 2, (Math.PI - groove.includedAngle) / 2)
+		: new ToolProfileArc(new ToolProfilePoint(-groove.vWidth / 2, -groove.shoulderRadius),
+			groove.shoulderRadius, groove.includedAngle / 2, (Math.PI - groove.includedAngle) / 2);
 
 	function sectionPoints():Array<ToolProfilePoint> {
 		var result = [new ToolProfilePoint(-width / 2, -height), new ToolProfilePoint(width / 2, -height),

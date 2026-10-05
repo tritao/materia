@@ -1,6 +1,7 @@
 package machinekit.pressbrake;
 
 import cadkit.modeling.Part;
+import cadkit.sheetmetal.WallOutline;
 
 /** Typed operations shared by tooling segments; no runtime class casts are required. */
 class ToolProfiles {
@@ -64,6 +65,11 @@ class ToolProfiles {
 		case Punch(p): p.collisionSection(maximumError);
 		case SingleV(p): p.collisionSection(maximumError);
 		case FourV(p, face): p.collisionSection(maximumError, face);
+	};
+	public static function contactSection(profile:ToolProfile):WallOutline return switch profile {
+		case Punch(p): p.contactSection();
+		case SingleV(p): p.contactSection();
+		case FourV(p, face): p.contactSection(face);
 	};
 
 	/** Height between the contact and mounting datums. */

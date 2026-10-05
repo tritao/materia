@@ -487,6 +487,12 @@ table in `tools/README.md`.
   boxes. The first implementation is an exact separating-axis test for convex prisms inside the
   planner package, recorded as interim. When coal's collision world (collisionkit, CL2–CL4) is on
   main, switch the implementation and delete the interim one.
+- Curved approximations retain their geometric error. Prism overlap alone cannot diagnose a
+  physical collision at intended rounded contact. Refine those pairs against the exact authored
+  line/arc tool sections and evaluated bend sectors where their extrusion axes admit an exact
+  section query. Clip to the real bed interval and preserve developed cuts. Unsupported axes or
+  curved wall approximations request the general error-aware query; never exempt a whole active
+  bend, wall or tool body. This refinement remains when the interim prism SAT is replaced.
 - MachineKit must not depend on RobotKit, so the planner does not use `robotkit.tool.ConvexSolid`.
 
 **SM-D11. In simulation the sheet is welded wall bodies whose relative poses are the sheet's FK.**
@@ -960,7 +966,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM8a | done: cylinder parts and coupled mechanical assembly; typed planning geometry derived from physical datums, independent reference comparisons, full-bed force/depth and conservative demo/frame checks; Start-page project with editable ram, X/R and depth-stop axes. Quick gates `sm8a-cylinder-parts`, `sm8a-mechanical-assembly` and full gate `sm8a-press-assembly-full` pass every stage; original MachineKit and router engineering summaries unchanged | c4517c795; ed8faa29b; final assembly integration |
 | SM8b | done: MT5 is on local main 1484b924d and merged; shared typed fluid cylinder/valve/pressure-source interfaces replace pneumatic-only interfaces, and pressure resolution no longer casts components; explicit immutable phase-speed model added, its quick gate `sm8b-phase-speeds` passes all five suites; assembly format 7 hydraulic data passes focused tests (187 ProjectKit assertions), full gate `sm8b-hydraulic-format-full` passes every stage; quick gate `sm8b-fluid-interfaces` passes all five suites with unchanged original MachineKit summaries; typed shared cylinder runtime and current RobotModel 12 fixtures pass focused model (30), both-backend hydraulic (14), world (5004), maintained MuJoCo and four-platform ABI checks; full gate `sm8b-cylinder-runtime-verified-full` passes every stage including project-source runtime; actual press hydraulic service, distribution blocks, bore-area frame-pressure limit and both guide bindings pass quick gate `sm8b-fluid-bindings-verified`; authored passive-joint support reaches assembly/model/runtime, passes 36 model, 192 ProjectKit and both-backend ownership tests (MuJoCo gravity verified); full gate `sm8b-passive-joints-full` passes every stage with unchanged five engineering summaries and app engineering baselines; typed convex-hull contact settings and maintained primitive/hull finger-contact tests pass 6 MuJoCo assertions and the four-platform ABI audit; full gate `sm8b-hull-contact-full` passes every stage with unchanged original MachineKit and app engineering baselines; the later health audit strengthens contact proof to 12 fault-free outcomes; typed assembly 9, machine recipe 16 and scene 17 transport stops, contacts and native timed outputs; quick gate `sm8b-assembled-press-verified` passes all five suites with unchanged original MachineKit summaries; assembled press contacts, stroke, home and lifecycle pass in the rebuilt app; full gate `sm8b-assembled-press-full` passes every stage, including workspace, app build and complete project-source runtime (215 ProjectKit assertions and 12 fault-free finger-contact outcomes) | edf913c0f; 68768fcae; 22ce57f1c; 439ca8690; b15e594c6; 19fc1938c; bf3d5cd31; 63357537d |
 | SM9 | done: typed loaded-stroke evaluation, explicit process-compatible P1–P5 stock, physical manual finger datums, symmetric press placement and exact straight/arc backgauge registration; complete setup checks process compatibility, tonnage, both flange minima, material-bearing tool support and sampled nominal ram travel. Maintained checks pass independent P2 first/later oracles, folded R lift, physical contacts, loaded depth/force, sampled swing and named refusals. Quick gates `sm9a-loaded-stroke`, `sm9b-manufacturing-setup`, `sm9c-press-placement`, `sm9d-backgauge-registration` and final `sm9-single-bend-complete` pass all five suites (7594 sheet assertions); original engineering results unchanged | ce5b1e66b; d1e0876b8; 5a6e8663a; 3d51a5b2c; 5b63f5c9c |
-| SM10 | in progress: typed convex-prism data and narrow collision interface; interim exact SAT checks face normals and every edge-cross-product axis. Focused collision checks pass 24 assertions; quick gate `sm10a-prism-collision` passes all five suites with unchanged engineering results. SM10b wall decomposition preserves holes/concavity and explicit arc chord error; focused checks pass 19 assertions, quick gate `sm10b-sheet-prisms` passes all five suites. SM10c bend decomposition preserves developed holes through flat, partial, loaded and zero-radius hem states with explicit mapping error; focused checks pass 66 assertions; quick gate `sm10c-bend-prisms` passes all five suites with unchanged engineering results. SM10d press-frame collision assembly derives all installed tool rows, moving machine boxes and exact open frame volumes, retaining typed owners and approximation errors; focused checks pass 73 assertions; quick gate `sm10d-collision-geometry` passes all five suites with unchanged engineering results. Intended contact feasibility, grip checks and sequence search remain | 168867937; 6884dbacf; 4043105d5 |
+| SM10 | in progress: typed convex-prism data and narrow collision interface; interim exact SAT checks face normals and every edge-cross-product axis. Focused collision checks pass 24 assertions; quick gate `sm10a-prism-collision` passes all five suites with unchanged engineering results. SM10b wall decomposition preserves holes/concavity and explicit arc chord error; focused checks pass 19 assertions, quick gate `sm10b-sheet-prisms` passes all five suites. SM10c bend decomposition preserves developed holes through flat, partial, loaded and zero-radius hem states with explicit mapping error; focused checks pass 66 assertions; quick gate `sm10c-bend-prisms` passes all five suites with unchanged engineering results. SM10d press-frame collision assembly derives all installed tool rows, moving machine boxes and exact open frame volumes, retaining typed owners and approximation errors; focused checks pass 73 assertions; quick gate `sm10d-collision-geometry` passes all five suites with unchanged engineering results. SM10e analytic tool-contact refinement distinguishes material overlap from tip/shoulder tangency; focused checks pass 786 assertions; serial full gate `sm10e-exact-contact-full` passes every stage, including all five quick suites, workspace, app build and project-source runtime. Whole-stroke machine feasibility, general curved-body clearance, grip checks and sequence search remain | 168867937; 6884dbacf; 4043105d5; e1d55a1a4 |
 | SM11 | planned | |
 | SM12 | planned | |
 | SM13 | planned | |
@@ -1777,3 +1783,33 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 - SM10d quick gate `sm10d-collision-geometry` passes all five suites, including the maintained
   73 press-frame geometry checks. All 11 original MachineKit engineering/diagnostic rows
   remain unchanged; sheet assertions remain 7594, ProjectKit 215 and ManufacturingKit 54.
+
+- SM10e: exact line/arc contact sections reuse the authored punch/die profile data, including
+  every four-V groove and end-horn clipping. This is analytic refinement of the interim
+  prism query, not a whole-body contact exception. Positive-area overlap is found by exact
+  curve events and alternating material intervals; tangency alone remains clear. Convex
+  sheet prisms are clipped to the actual tool bed interval before projecting into Y/Z.
+  Bed-parallel bend axes refine against exact annular/flat sections. Developed cut regions
+  project only material present within that bed interval, preserving a hole that spans it.
+  Other bend axes and curved wall approximations explicitly request the general error-aware
+  query; they are never assumed clear. Focused `sm10-press-contact-focus.log` passes 786 checks:
+  line/circle/circle contacts and penetration, holes, clipped skew prisms, exact catalogue
+  and left/right horn volume against native CAD, conservative-tip/shoulder false-overlap
+  witnesses, both bend signs through all 37 loaded-stroke samples, intentionally overclosed
+  punch/raised die collisions, and developed-hole projection across narrow/wide tool spans.
+- That cut test exposed a CadKit Boolean defect: joined retained fragments could partly
+  duplicate an already retained coincident boundary, leaving a dangling open contour. The
+  collector now subtracts already-covered coincident curve intervals before naming/assembly,
+  preserving unaffected edge identities. Eight maintained regression assertions cover a
+  strip ending exactly on a rectangular hole boundary in both operand orders; the sheet
+  smoke count increases from 7594 to 7602 for these checks. Bend-strip clipping failures also
+  retain the precise bend/sector and developed interval in their diagnosis. Because this
+  fixes shared region Boolean code, SM10e runs the serial full gate, including its five
+  quick suites, workspace, app build and project-source runtime. Full sequence feasibility,
+  general curved-body clearance and gripper/search integration remain in SM10.
+
+- SM10e serial full gate `sm10e-exact-contact-full` passes every stage. All 786 contact
+  assertions are maintained in MachineKit; sheet assertions are 7602 (+8 Boolean regressions),
+  ProjectKit remains 215 and ManufacturingKit 54. All 11 original MachineKit engineering/
+  diagnostic rows and 58 selected app engineering/diagnostic rows match their earlier
+  baselines after excluding planning wall time and allocation/profiling statistics.

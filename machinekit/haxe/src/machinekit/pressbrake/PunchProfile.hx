@@ -5,6 +5,9 @@ import cadkit.modeling.Part;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Sketch;
 import cadkit.modeling.Vector;
+import cadkit.sheetmetal.Point2;
+import cadkit.sheetmetal.Segment;
+import cadkit.sheetmetal.WallOutline;
 
 /** Authored punch contact dimensions and its upper section, in millimetres and radians.
  * The upper section begins above the rounded tip's tangent points; the contact nose is derived
@@ -98,8 +101,7 @@ class PunchProfile {
 	public function collisionSection(maximumError:Float):ToolProfilePolygon {
 		if (!Math.isFinite(maximumError) || !(maximumError > 0))
 			throw 'Punch profile "$id" needs a positive collision section error';
-		var arc = new ToolProfileArc(new ToolProfilePoint(0, tipRadius), tipRadius,
-			-Math.PI + includedAngle / 2, Math.PI - includedAngle);
+		var arc = contactArc();
 		var result:Array<ToolProfilePoint> = [];
 		var points = upperSection.points();
 		for (i in 0...points.length) {
@@ -108,6 +110,18 @@ class PunchProfile {
 		}
 		return new ToolProfilePolygon(result);
 	}
+	/** Exact contact section for refining prism overlap at the rounded nose. */
+	public function contactSection():WallOutline {
+		var points = upperSection.points(), edges:Array<Segment> = [];
+		for (i in 0...points.length) {
+			var next = points[(i + 1) % points.length];
+			edges.push(i == contactEdge ? contactArc().segment()
+				: Segment.line(new Point2(points[i].y, points[i].z), new Point2(next.y, next.z)));
+		}
+		return new WallOutline(edges);
+	}
+	function contactArc():ToolProfileArc return new ToolProfileArc(new ToolProfilePoint(0, tipRadius), tipRadius,
+		-Math.PI + includedAngle / 2, Math.PI - includedAngle);
 
 	/** Tip at z=0; the circle centre is one radius above it. */
 	public function tangentHeight():Float return tipRadius * (1 - Math.sin(includedAngle / 2));
