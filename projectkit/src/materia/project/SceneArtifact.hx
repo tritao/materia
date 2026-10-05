@@ -207,6 +207,7 @@ typedef SceneArtifactMission = {
  *   `at.occurrence`, and let go.
  * - `moveJoints`: move the chain ending at `at` to absolute joint coordinates in radians or metres.
  * - `weld`: weld the seam `weld` describes with the robot's torch.
+ * - `findWork`: measure the named work frame from contact probes on saved nominal CAD faces.
  */
 typedef SceneArtifactMissionStep = {
 	var kind:String;
@@ -214,6 +215,7 @@ typedef SceneArtifactMissionStep = {
 	@:optional var at:SceneArtifactPlace;
 	@:optional var weld:SceneArtifactWeld;
 	@:optional var joints:Array<SceneArtifactJointTarget>;
+	@:optional var contactWork:SceneContactRegistration.SceneContactWork;
 }
 
 /** Absolute mechanical joint position, in radians or metres. */
@@ -372,7 +374,7 @@ typedef SceneArtifactTool = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 16;
+	public static inline var VERSION:Int = 17;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -822,6 +824,13 @@ class SceneArtifact {
 				case "weld":
 					welds = true;
 					validateWeld(step.weld, index, flat, fail);
+				case "findWork":
+					welds = true;
+					if (!exists(step.at)) fail('step $index names no contact connector');
+					var contactTool = data.robotTools == null ? [] : [for (tool in data.robotTools)
+						if (tool.kind == "torch" && step.at != null && tool.contact.occurrence == step.at.occurrence && tool.contact.connector == step.at.connector) tool];
+					if (contactTool.length != 1) fail('step $index needs the torch contact connector');
+					SceneContactRegistration.validate(cast step.contactWork, flat == null ? [] : [for (item in flat.occurrences) item.id]);
 				default: fail('step $index has unknown kind "${step.kind}"');
 			}
 		}
@@ -1022,6 +1031,8 @@ class SceneArtifact {
 			}
 			var weld:Dynamic = Reflect.field(raw, "weld");
 			if (weld != null) step.weld = decodeWeld(weld);
+			var contact:Dynamic = Reflect.field(raw, "contactWork");
+			if (contact != null) step.contactWork = SceneContactRegistration.decode(contact);
 			step;
 		}]};
 		var loop:Dynamic = Reflect.field(decoded, "loop");

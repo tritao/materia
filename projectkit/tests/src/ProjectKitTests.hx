@@ -309,6 +309,7 @@ class ProjectKitTests {
     rejects(function() SceneArtifact.encode(data), "a second torch");
     data.robotTools = [{kind: "suction", contact: {occurrence: "plate", connector: "tcp"}, channel: "cup.enable", torch: welder()}];
     rejects(function() SceneArtifact.encode(data), "a suction tool with a welder");
+    ContactWorkTests.run(data, torch());
     weldMission(data, torch);
   }
 

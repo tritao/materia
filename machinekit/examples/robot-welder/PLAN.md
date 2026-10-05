@@ -1772,3 +1772,22 @@ The native contact-motion suite passes 34 assertions: its new wrapper case execu
 off with observed joint rest. This one-axis case proves the execution/failure boundary, not successful
 six-component mobile registration. Saved mission integration, CAD-aware request preparation on the
 six-axis arm and both-backend injected-parking mission gates remain open. P4 and P5 remain required.
+
+### P3 saved contact job boundary (2026-10-05)
+
+SceneArtifact schema 17 adds `findWork` with the actual torch contact connector and a nominal CAD
+contact job. It stores the work reference occurrence, nominal assembly_T_work in metres, bounded
+chassis XYZ/RPY errors, calibrated observation error/contact offset, and polygonal target/fixture
+faces in the work frame. It stores no measured result or live body pose. Each face carries its
+occurrence/face identity, outward normal, plane centre and all contour edges, including holes.
+
+The strict decoder requires typed numeric/vector fields. Validation rejects missing occurrences,
+invalid frame quaternions, unsupported bounds, repeated face identities, non-unit normals,
+nonplanar/open boundaries and a target set without three independent normals. Probing must name
+the torch's connector, not another valid connector. Schema 16 is rejected; there is no migration.
+Tracked scene-envelope JSON examples have their own unchanged version 1; no tracked binary
+SceneArtifact fixtures were found to regenerate. Generated artifacts use the current schema.
+
+ProjectKit passes 18 new saved-contact assertions and 143 existing assertions. The new mission step
+is not yet emitted by the mobile generator or executed by MissionPlayer: those are the next P3
+integration changes, followed by actual noisy multi-face registration on both backends.
