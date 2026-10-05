@@ -3631,8 +3631,9 @@ static nkui_result renderer_render_frame_impl(nkui_renderer renderer, nkui_displ
                         auto row_command = command;
                         row_command.resource = nkui::make_resource_id(
                             nkui::ResourceKind::TextLayout, 0x0FFE, prepared_slot++);
-                        row_command.x += bounds.x * raster_scale;
-                        row_command.y += bounds.y * raster_scale;
+                        // Row origins stay in layout units; the device transform applies zoom.
+                        row_command.x += bounds.x;
+                        row_command.y += bounds.y;
                         row_command.width = bounds.width;
                         row_command.height = bounds.height;
                         row_command.transform = transform;
@@ -4295,8 +4296,9 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
                             nkui::ResourceKind::TextLayout, 0x0FFD,
                             static_cast<uint16_t>(prepared_slot++));
                         const auto glyph_id = row_command.resource;
-                        row_command.x += bounds.x * raster_scale;
-                        row_command.y += bounds.y * raster_scale;
+                        // Row origins stay in layout units; the device transform applies zoom.
+                        row_command.x += bounds.x;
+                        row_command.y += bounds.y;
                         row_command.width = bounds.width;
                         row_command.height = bounds.height;
                         row_command.content_generation =
