@@ -5,7 +5,8 @@
   },
   "entry": "PowerComponentTests",
   "sourceRoots": [
-    "src"
+    "src",
+    "../src"
   ],
   "dependencies": {
     "machinekit": {

@@ -212,7 +212,10 @@ class DriveSystem {
 		var trace = ServiceNetwork.trace(flat, ServiceNetwork.portRef(id, "power"));
 		var voltage = driver.statedVoltage;
 		if (trace.supplied && !trace.external) {
-			var source = trace.port;
+			// Energy traces to the pack, but a converter's output sets the driver's voltage.
+			var delivered = ServiceNetwork.trace(flat, ServiceNetwork.portRef(id, "power"),
+				(part, port) -> Std.isOfType(part, machinekit.motion.ElectricalSource));
+			var source = delivered.port;
 			if (complete) {
 				var checked = new Diagnostics();
 				ServiceNetwork.check(flat, checked, false);

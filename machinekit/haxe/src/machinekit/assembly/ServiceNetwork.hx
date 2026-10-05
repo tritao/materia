@@ -65,7 +65,8 @@ class ServiceNetwork {
 	}
 
 	/** Follow a service upstream through connections, bridges and a single-input converter. */
-	public static function trace(flat:FlatAssembly, start:PortRef):ServiceTrace {
+	public static function trace(flat:FlatAssembly, start:PortRef,
+			?stopAt:(machinekit.component.MachineComponent, ComponentPort)->Bool):ServiceTrace {
 		var current = start;
 		var seen:Map<String, Bool> = [];
 		var chain:Array<String> = [];
@@ -76,6 +77,8 @@ class ServiceNetwork {
 			chain.push('${current.instanceId}/${current.portName}');
 			var currentPort = requirePort(flat, current);
 			var component = flat.member(current.instanceId);
+			if (stopAt != null && currentPort.role == Supply && stopAt(component, currentPort))
+				return {port: current, external: false, supplied: true, chain: chain};
 			var previous:Array<PortRef> = [];
 			for (connection in flat.connections)
 				if (connection.toInstance == current.instanceId && connection.toPort == current.portName)
