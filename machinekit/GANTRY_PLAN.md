@@ -3889,3 +3889,34 @@ Logs are in `/home/joao/dev/materia-cache/claude-scratch/`, with
 log is `gantries-phase-e-app-posture-runtime.log`. No diagnostic selectors or
 traces from the topology inspection remain in source. G18 is the optional inverted
 arm variant and remains unstarted; mandatory Phase E work is complete.
+
+### Long-weld planning — clearance broad phase
+
+Added lazy world-axis bounds to `ArmClearance.violation()` after the existing
+sphere rejection, and compute each body's sphere centre once per configuration.
+Bounds only reject a pair when their separation proves the required clearance;
+remaining pairs still use the exact convex-hull distance. Sampling, margins, IK
+preferences, candidate order and compiled-trajectory validation are unchanged.
+
+The focused G17 2.6 m MuJoCo weld passed before and after the change. Planning
+fell from 627.86 s to 385.36 s (38.6% reduction, about 1.63x faster) in these
+runs; shared CPU load varied, so these are observed timings rather than a fixed
+performance guarantee. Both runs made 161 attempts, attempted 50 candidate compilations,
+and checked 224,878 poses. Sampled candidate checks fell from 338.73 s to
+158.08 s; final compiled clearance verification fell from 70.42 s to 19.66 s.
+
+Both produced the same -90 degree roll and entry/exit, 2.599998690 m track
+travel, 0.775421815 rad minimum arm margin, 0.000017742 rad maximum joint step,
+236.6 s simulated cycle, full 2600 mm seam coverage and 5 mm bead leg, with no
+clearance violation. RobotKit's focused clearance suite passed 406 assertions,
+including a new comparison against direct hull queries over rotated long thin
+obstacles and both normal/contact margins. Temporary profiling prints were
+removed. RobotKit and the app compiled with `--compiler-only`, including an
+app build after removing the instrumentation. No full phase-boundary suites
+were repeated.
+
+The remaining search cost includes 49 rejected compiled candidates (the timing
+counters do not distinguish compilation errors from subsequent clearance
+rejections) and repeated IK along unsuccessful candidates; investigating those
+failures is the next
+performance follow-up. G18 remains optional and unstarted.
