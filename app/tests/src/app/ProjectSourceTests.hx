@@ -2087,12 +2087,99 @@ class ProjectSourceTests {
   static var screwRouterSeconds = 0.0;
   static var screwRouterDeviation = 0.0;
 
+  /** Exercise the generated mill's complete masses, screw relation and installed brake. */
+  static function checkMillBrake(model:RobotModel):Void {
+    check(model.brakes.length == 1, "mill has one installed Z brake");
+    var brake = model.brakes[0];
+    var motorIndex = -1, zIndex = -1;
+    for (i in 0...model.joints.length) {
+      if (model.joints[i].id == brake.joint) motorIndex = i;
+      if (model.joints[i].id == "z") zIndex = i;
+    }
+    check(motorIndex >= 0 && zIndex >= 0, "installed mill brake binds the motor of the mechanical Z axis");
+    var requestedZ = -0.03, motorTarget = 0.0, screwTerms = 0;
+    for (coupling in model.couplings) if (coupling.leader == model.joints[zIndex].id && coupling.follower == brake.joint) {
+      motorTarget += coupling.ratio * requestedZ + coupling.offset;
+      screwTerms++;
+    }
+    check(screwTerms == 1, "mill brake check uses the installed Z screw relation");
+    for (jammed in [false, true]) {
+      var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
+      if (jammed) blueprint.brakePhysics[0] = new robotkit.runtime.RobotRuntimeBrakePhysicsBlueprint(
+        motorIndex, brake.holdingEffort, 1.0, brake.applicationDelay);
+      var physical = new SimulationHarness(0.01, 1, SimulationSpace.MUJOCO);
+      try {
+        var runtime = physical.simulation.addRobot(blueprint);
+        runtime.submitTargets([robotkit.core.JointTarget.position(zIndex, requestedZ),
+          robotkit.core.JointTarget.position(motorIndex, motorTarget)], 1);
+        for (tick in 0...4) physical.step();
+        var waiting = runtime.snapshot();
+        var contacts = [for (sensor in waiting.sensors.toArray()) if (sensor.sensorId == brake.releasedSensor) sensor];
+        check(contacts.length == 1 && contacts[0].values.get(0) == 0 && Math.abs(waiting.q.get(zIndex)) < 0.0001,
+          "actual mill waits for physical released contact before moving its Z load");
+        check(runtime.channelValue(brake.releaseChannel) == ProcessEventValue.Digital(true),
+          "actual mill energizes release while waiting for physical contact");
+        for (tick in 0...100) physical.step();
+        var moving = runtime.snapshot();
+        if (jammed) {
+          check(moving.faultCode == RobotKitRuntime.RobotKitRuntimeConstants.RK_FAULT_BRAKE_RELEASE_TIMEOUT,
+            "actual mill faults when the brake cannot release within the controller timeout");
+          check(Math.abs(moving.q.get(zIndex)) < 0.0001 && Math.abs(moving.effort.get(motorIndex)) < 1e-6,
+            'release fault removes motor effort while the applied brake holds the actual Z load: q=${moving.q.get(zIndex)}, effort=${moving.effort.get(motorIndex)}, motor=${moving.q.get(motorIndex)}');
+          check(runtime.channelValue(brake.releaseChannel) == ProcessEventValue.Digital(false),
+            "release fault de-energizes the device coil");
+        } else {
+          check(moving.q.get(zIndex) < -0.02,
+            'actual Z load moves after release: q=${moving.q.get(zIndex)}, motor=${moving.q.get(motorIndex)}, ' +
+            'setpoint=${moving.setpoint.get(zIndex)}, safety=${moving.safety}, fault=${moving.faultCode}, ' +
+            'coil=${runtime.channelValue(brake.releaseChannel)}, jammed=$jammed, ' +
+            'delay=${blueprint.brakePhysics[0].releaseDelay}, sourceNs=${moving.sourceTimestampNs}');
+          runtime.submitStop(2, false);
+          for (tick in 0...30) physical.step();
+          var stopped = runtime.snapshot();
+          check(runtime.channelValue(brake.releaseChannel) == ProcessEventValue.Digital(true) &&
+            Math.abs(stopped.q.get(zIndex) - moving.q.get(zIndex)) < 0.0001,
+            "ordinary stop retains released brake and powered Z hold");
+          runtime.submitStop(3, true);
+          for (tick in 0...50) physical.step();
+          var applied = runtime.snapshot();
+          check(runtime.channelValue(brake.releaseChannel) == ProcessEventValue.Digital(false) &&
+            Math.abs(applied.effort.get(motorIndex)) < 1e-6 && Math.abs(applied.effort.get(zIndex)) < 1e-6,
+            "emergency stop de-energizes the brake and disables motor and follower effort");
+          var appliedContacts = [for (sensor in applied.sensors.toArray()) if (sensor.sensorId == brake.releasedSensor) sensor];
+          check(appliedContacts.length == 1 && appliedContacts[0].values.get(0) == 0,
+            "actual mill reports applied physical brake contact after emergency stop");
+          for (tick in 0...50) physical.step();
+          var held = runtime.snapshot();
+          var drift = held.q.get(zIndex) - applied.q.get(zIndex);
+          var sag = applied.q.get(zIndex) - stopped.q.get(zIndex);
+          check(Math.abs(drift) < 0.00001 && Math.abs(sag) < 0.005,
+            'installed brake holds the actual mill Z load: sag=$sag m, settled drift=$drift m');
+          runtime.resetSafety(4);
+          for (tick in 0...50) physical.step();
+          var reset = runtime.snapshot();
+          check(reset.faultCode == 0 && Math.abs(reset.q.get(zIndex) - held.q.get(zIndex)) < 0.0001 &&
+            runtime.channelValue(brake.releaseChannel) == ProcessEventValue.Digital(true),
+            "mill reset releases afresh while holding the actual stopped Z pose");
+          Sys.println('actual mill Z brake: ${brake.holdingEffort} N m; e-stop sag ${sag * 1000} mm, ' +
+            'settled drift ${drift * 1000} mm over 0.5 s');
+        }
+        physical.dispose();
+      } catch (error:Dynamic) {
+        physical.dispose();
+        throw error;
+      }
+    }
+  }
+
   /** The moving-table mill machines its single-tool bearing block in the shared backend. */
   static function checkBenchMill(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/bench-mill/materia.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
-    var definition:AssemblyDefinition = cast(generated.assemblyDefinition, AssemblyDefinition);
+    var definition = generated.assemblyDefinition;
+    if (definition == null) throw "Mill project has no assembly definition";
     var model = AssemblySimulationBridge.toRobotModel(definition, generated.physical).model;
+    checkMillBrake(model);
     var job = generated.cncJob;
     if (job == null) throw "Mill project has no CNC job";
     var axisNames = job.axes;
@@ -3237,6 +3324,13 @@ class ProjectSourceTests {
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mill") {
       checkBenchMill(root);
       checkEnclosedMillProject(root);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "brake") {
+      var generated = MateriaProjectRunner.loadProject(FileSystem.fullPath(root + "/machinekit/examples/bench-mill/materia.project.json"));
+      var definition = generated.assemblyDefinition;
+      if (definition == null) throw "Mill brake check has no assembly definition";
+      checkMillBrake(AssemblySimulationBridge.toRobotModel(definition, generated.physical).model);
       return 0;
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "cell") {

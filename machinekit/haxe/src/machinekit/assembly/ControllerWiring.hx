@@ -59,6 +59,9 @@ class ControllerWiring {
 				owned(cabinet).channels.push(process.speedChannel);
 				owned(cabinet).channels.push(process.directionChannel);
 			}
+			// The drive bus carries the integrated brake release and contact, like motor feedback.
+			var brake = motor.brake;
+			if (brake != null) owned(cabinet).channels.push(brake.releaseChannel);
 		}
 		if (saved.cylinders != null) for (cylinder in saved.cylinders) {
 			var cabinet = terminal(cylinder.valve, "coilA");
@@ -88,7 +91,7 @@ class ControllerWiring {
 		}
 		if (definition.sensors != null) for (sensor in definition.sensors) {
 			var cabinet:Null<String> = null;
-			if (sensor.kind == "at_speed") cabinet = owner.get(sensor.joint);
+			if (sensor.kind == "at_speed" || sensor.kind == "brake_released") cabinet = owner.get(sensor.joint);
 			else {
 				var head = heads.get(sensor.id);
 				var expected = sensor.kind == "presence" ? "presence" : "reed";

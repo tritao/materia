@@ -51,7 +51,7 @@ typedef MachineAssemblyMassProperties = {
 @:allow(machinekit.assembly)
 class MachineAssembly {
 	/** Current MachineKit assembly format; older descriptions require migration. */
-	public static inline var SCHEMA_VERSION:Int = 15;
+	public static inline var SCHEMA_VERSION:Int = 16;
 	/** Findings from rebuilding sources; invalid transmissions remain available for repair. */
 	public final diagnostics:Diagnostics = new Diagnostics();
 	final mechanical:MechanicalAssembly = new MechanicalAssembly();
@@ -484,6 +484,31 @@ class MachineAssembly {
 		drives.encoders.push(DriveSystem.copyEncoder(record, same));
 		changed();
 	}
+
+	/** Bind the installed brake to a direct servo's motor joint. Ratings are rebuilt from the part. */
+	public function bindMotorBrake(actuator:String, part:String, releaseChannel:String,
+			releasedSensor:String, releaseTimeoutMs:Int, feedbackMaxAgeMs:Int):Void {
+		var spec = requireMember(part).motorBrakeSpec();
+		if (spec == null) throw 'Brake "$part" has no typed physical specification';
+		if (releaseChannel == null || releaseChannel.length == 0 || releasedSensor == null ||
+			releasedSensor.length == 0 || releaseTimeoutMs <= spec.releaseDelaySeconds() * 1000 ||
+			feedbackMaxAgeMs <= 0) throw "Brake needs distinct output/contact names and valid timing policy";
+		for (record in drives.motors) {
+			var existing = record.brake;
+			if (existing != null && (existing.part == part || existing.releaseChannel == releaseChannel ||
+				existing.releasedSensor == releasedSensor))
+				throw "Brake part, release output or contact already belongs to a motor";
+		}
+		for (record in drives.motors) if (record.actuator == actuator) {
+			if (record.brake != null) throw 'Motor "$actuator" already has a brake';
+			record.brake = {part: part, releaseChannel: releaseChannel, releasedSensor: releasedSensor,
+				releaseTimeoutMs: releaseTimeoutMs, feedbackMaxAgeMs: feedbackMaxAgeMs};
+			changed();
+			return;
+		}
+		throw 'Brake "$part" names unknown motor "$actuator"';
+	}
+
 
 	/** Bind a cylinder to an existing prismatic guide joint; pressure and direction are rebuilt from parts. */
 	public function addCylinder(id:String, joint:String, cylinderMember:String, valveMember:String):Void {

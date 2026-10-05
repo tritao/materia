@@ -2549,6 +2549,10 @@ class MachineKitSmoke {
 
 	/** The groups of this suite, each independent of the others, so that the workspace can run them as parallel shards. */
 	static function main():Void {
+		if (Sys.getEnv("MACHINEKIT_BRAKE_ONLY") == "1") {
+			MotorBrakeTests.run();
+			return;
+		}
 		var everything = Shards.run([
 			{name: "AxisBuilderChecks.run", run: () -> AxisBuilderChecks.run(), weight: 1.0},
 			{name: "GantryChecks.run", run: () -> GantryChecks.run(), weight: 1.0},
@@ -2567,6 +2571,7 @@ class MachineKitSmoke {
 			{name: "GuideSupportTests.run", run: () -> GuideSupportTests.run(), weight: 1.0},
 			{name: "TendingReach.run", run: () -> TendingReach.run(), weight: 1.0},
 			{name: "TendingControllers.TendingControllerChecks.run", run: () -> TendingControllers.TendingControllerChecks.run(), weight: 1.0},
+			{name: "MotorBrakeTests.run", run: () -> MotorBrakeTests.run(), weight: 0.5},
 			{name: "CobotArmPreview.CobotArmChecks.run", run: () -> CobotArmPreview.CobotArmChecks.run(), weight: 1.0},
 			{name: "MobileWelderChecks.run", run: () -> MobileWelderChecks.run(false), weight: 1.0},
 			{name: "MillPartTests.run", run: () -> MillPartTests.run(), weight: 1.0},

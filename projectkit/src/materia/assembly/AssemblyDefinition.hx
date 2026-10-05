@@ -190,6 +190,17 @@ enum abstract AssemblyMateKind(String) from String to String {
  * A motor driving a joint directly: its usable torque (N m) or force (N), its usable speed in the
  * joint's units per second, and the inertia of its rotor (kg m²), which turns with the joint.
  */
+@:wire typedef AssemblyMotorBrake = {
+	@:id(1) var id:String;
+	@:id(2) var releaseChannel:String;
+	@:id(3) var releasedSensor:String;
+	@:id(4) var holdingEffort:Float;
+	@:id(5) var releaseDelay:Float;
+	@:id(6) var applicationDelay:Float;
+	@:id(7) var releaseTimeoutMs:Int;
+	@:id(8) var feedbackMaxAgeMs:Int;
+}
+
 @:wire typedef AssemblyActuator = {
 	@:id(1) var id:String;
 	@:id(2) var joint:String;
@@ -236,6 +247,7 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(25) @:optional var pneumatic:Null<AssemblyPneumaticDrive>;
 	/** Optional process-speed channels for a continuously rotating joint; speed units use radians per second. */
 	@:id(26) @:optional var processVelocity:Null<AssemblyProcessVelocityDrive>;
+	@:id(27) @:optional var brake:Null<AssemblyMotorBrake>;
 }
 
 /**

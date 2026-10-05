@@ -23,6 +23,7 @@ class MachineComponent {
 	public function motorDrive():Null<machinekit.motion.MotorDrive> return null;
 	public function motorDriver():Null<machinekit.motion.MotorDriver> return null;
 	public function electricalSource():Null<machinekit.motion.ElectricalSource> return null;
+	public function motorBrakeSpec():Null<machinekit.motion.MotorBrakeSpec> return null;
 
 	/** Typed pneumatic model when this component is a cylinder. */
 	public function pneumaticCylinderSpec():Null<machinekit.pneumatic.PneumaticCylinderSpec> return null;

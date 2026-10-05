@@ -17,7 +17,7 @@ import materia.units.LengthUnit;
 /** Versioned transport and validation for reusable assembly definitions and states. */
 class AssemblyDefinitionCodec {
 	/** Current assembly definition and state format. Older formats must be migrated before loading. */
-	public static inline var VERSION:Int = 7;
+	public static inline var VERSION:Int = 8;
 
 	static function supportedVersion(version:Int):Bool return version == VERSION;
 
@@ -231,10 +231,15 @@ class AssemblyDefinitionCodec {
 		if (sensors.length > 4000) throw "Assembly has too many sensors";
 		for (sensor in sensors) {
 			if (sensor == null || !validText(sensor.id) || sensorIds.exists(sensor.id) ||
-				(sensor.kind != "joint_switch" && sensor.kind != "at_speed" && sensor.kind != "presence"))
+				(sensor.kind != "joint_switch" && sensor.kind != "at_speed" && sensor.kind != "presence" && sensor.kind != "brake_released"))
 				throw "Assembly has an invalid or duplicate native sensor";
 			sensorIds.set(sensor.id, true);
-			if (sensor.kind == "joint_switch" || sensor.kind == "at_speed") {
+			if (sensor.kind == "brake_released") {
+				if (sensor.joint == null || movable.get(sensor.joint) == null || sensor.occurrence != null ||
+					sensor.connector != null || sensor.windowLower != null || sensor.windowUpper != null ||
+					sensor.hysteresis != null || sensor.range != null)
+					throw 'Brake contact "${sensor.id}" needs only its motor joint';
+			} else if (sensor.kind == "joint_switch" || sensor.kind == "at_speed") {
 				var joint = sensor.joint == null ? null : movable.get(sensor.joint);
 				if (joint == null || sensor.occurrence != null || sensor.connector != null ||
 					sensor.windowLower == null || !Math.isFinite(sensor.windowLower) ||
@@ -299,6 +304,27 @@ class AssemblyDefinitionCodec {
 			homeVisiting.remove(id); homeVisited.set(id, true);
 		}
 		for (id in homeDependencies.keys()) visitHome(id);
+		var brakeIds = new Map<String, Bool>(), brakeOutputs = new Map<String, Bool>();
+		var brakeJoints = new Map<String, Bool>(), brakeContacts = new Map<String, Bool>();
+		for (actuator in actuators) if (actuator.brake != null) {
+			var brake = actuator.brake, joint = movable.get(actuator.joint);
+			if (brakeIds.exists(brake.id) || brakeOutputs.exists(brake.releaseChannel) ||
+				brakeJoints.exists(actuator.joint) || brakeContacts.exists(brake.releasedSensor) ||
+				joint == null || (joint.type != AssemblyJointType.Continuous && joint.type != AssemblyJointType.Revolute))
+				throw 'Brake "${brake.id}" has duplicate ownership or no turning motor joint';
+			brakeIds.set(brake.id, true); brakeOutputs.set(brake.releaseChannel, true);
+			brakeJoints.set(actuator.joint, true); brakeContacts.set(brake.releasedSensor, true);
+			var contact = false;
+			for (sensor in sensors) if (sensor.id == brake.releasedSensor && sensor.kind == "brake_released" &&
+				sensor.joint == actuator.joint) contact = true;
+			if (!contact) throw 'Brake "${brake.id}" needs its released contact on the motor joint';
+			for (other in actuators) {
+				var p = other.pneumatic, v = other.processVelocity;
+				if ((p != null && (p.channelA == brake.releaseChannel || p.channelB == brake.releaseChannel)) ||
+					(v != null && (v.speedChannel == brake.releaseChannel || v.directionChannel == brake.releaseChannel)))
+					throw 'Brake "${brake.id}" shares another device output';
+			}
+		}
 		var encoders = definition.encoders == null ? [] : definition.encoders;
 		if (encoders.length > 4000) throw "Assembly has too many encoders";
 		var encoderIds = new Map<String, Bool>();
@@ -463,6 +489,15 @@ class AssemblyDefinitionCodec {
 		if (actuator.fullStepsPerRevolution != null && actuator.fullStepsPerRevolution > 0
 			&& (actuator.microsteps == null || actuator.maxStepRate == null)) return false;
 		var kind = actuator.drive;
+		if (actuator.brake != null) {
+			var brake = actuator.brake;
+			if (kind != "servo" || actuator.gearRatio != null || !validText(brake.id) ||
+				!validText(brake.releaseChannel) || !validText(brake.releasedSensor) ||
+				!(brake.holdingEffort > 0) || !Math.isFinite(brake.holdingEffort) ||
+				brake.releaseDelay < 0 || brake.applicationDelay < 0 ||
+				!Math.isFinite(brake.releaseDelay + brake.applicationDelay) ||
+				brake.releaseTimeoutMs <= brake.releaseDelay * 1000 || brake.feedbackMaxAgeMs <= 0) return false;
+		}
 		if (kind == null) return actuator.pneumatic == null;
 		if (kind == "pneumatic") {
 			var p = actuator.pneumatic;

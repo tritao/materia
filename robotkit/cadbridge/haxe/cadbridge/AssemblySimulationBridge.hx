@@ -451,6 +451,12 @@ class AssemblySimulationBridge {
       if (actuator.assumptions != null) added.assumptions = [for (value in actuator.assumptions)
         {quantity: value.quantity, label: value.label}];
       model.addActuator(added);
+      if (actuator.brake != null) {
+        var brake = actuator.brake;
+        model.brakes.push(new robotkit.model.Brake(brake.id, actuator.joint,
+          brake.releaseChannel, brake.releasedSensor, brake.holdingEffort,
+          brake.releaseDelay, brake.applicationDelay, brake.releaseTimeoutMs, brake.feedbackMaxAgeMs));
+      }
       if (actuator.rotorInertia != null)
         // The rotor turns `gear` times as fast as the joint, so its inertia at the joint is `gear` squared times as much.
         driven.armature += edge.type == AssemblyJointType.Prismatic ? 0.0 : actuator.rotorInertia * gear * gear;
@@ -473,7 +479,10 @@ class AssemblySimulationBridge {
     if (definition.sensors != null) for (sensor in definition.sensors) {
 			if (ownedSensors != null && !selectedSensors.exists(sensor.id)) continue;
       var added = model.addSensor(new Sensor(sensor.id, sensor.kind, 0.0, sensor.id));
-      if (sensor.kind == "joint_switch" || sensor.kind == "at_speed") {
+      if (sensor.kind == "brake_released") {
+        if (sensor.joint == null) throw 'Brake contact "${sensor.id}" has no motor joint';
+        added.joint = sensor.joint;
+      } else if (sensor.kind == "joint_switch" || sensor.kind == "at_speed") {
         var edge:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
         var driven:Null<Joint> = null;
         for (candidate in definition.joints) if (candidate.id == sensor.joint) edge = candidate;

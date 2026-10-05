@@ -19,6 +19,7 @@ import machinekit.motion.ScrewSupportUnit;
 import machinekit.motion.LinearRail;
 import machinekit.motion.LinearRailBlock;
 import machinekit.motion.ServoMotor;
+import machinekit.motion.ShaftBrakePart;
 import machinekit.motion.MotorDriver;
 import machinekit.motion.PowerSupply;
 import machinekit.motion.ShaftCoupling;
@@ -33,13 +34,12 @@ import CncRouter.EndMill;
 import CncRouter.RouterPlate;
 import CncRouter.ToeClamp;
 
-/** Machine coordinates, mm; brake is a mechanical property of the vertical axis. */
+/** Machine coordinates, mm. */
 typedef MillAxisSpec = {
 	var id:String;
 	var lower:Float;
 	var upper:Float;
 	var initial:Float;
-	var holdingBrake:Bool;
 }
 
 /** Installed parts of one axis; references are shared with the mechanical assembly. */
@@ -47,6 +47,8 @@ typedef MillAxisDrive = {
 	var spec:MillAxisSpec;
 	var screw:BallScrew;
 	var motor:ServoMotor;
+	var coupling:ShaftCoupling;
+	var brake:Null<ShaftBrakePart>;
 }
 
 /** Table X and saddle Y move opposite the tool's work coordinates; the head moves along Z.
@@ -72,9 +74,9 @@ class BenchMill extends MachineAssembly {
 	public final tool = new EndMill(Er20Holder.BORE_DIAMETER, 22, 35);
 	public final guideBlock:LinearRailBlock = LinearRailBlock.metric(RAIL);
 	public final specs:Array<MillAxisSpec> = [
-		{id: "x", lower: 0, upper: 250, initial: 125, holdingBrake: false},
-		{id: "y", lower: 0, upper: 150, initial: 75, holdingBrake: false},
-		{id: "z", lower: -250, upper: 0, initial: 0, holdingBrake: true}
+		{id: "x", lower: 0, upper: 250, initial: 125},
+		{id: "y", lower: 0, upper: 150, initial: 75},
+		{id: "z", lower: -250, upper: 0, initial: 0}
 	];
 	public final axisDrives:Array<MillAxisDrive> = [];
 	public final tableTop:Float;
@@ -245,8 +247,14 @@ class BenchMill extends MachineAssembly {
 		var motorId = "motor" + spec.id.toUpperCase();
 		var motor = ServoMotor.model(spec.id == "z" ? "GENERIC-SERVO-750W" : "GENERIC-SERVO-400W");
 		var screw = new BallScrew(length), nut = new BallNut();
-		axisDrives.push({spec: spec, screw: screw, motor: motor});
-		var coupling = new ShaftCoupling(motor.rating.shaftDiameter, BallScrew.JOURNAL_DIAMETER);
+		var brake = spec.id == "z" ? new ShaftBrakePart(motor.rating.shaftDiameter, "shell") : null;
+		var plateThickness = 8.0;
+		var brakeEnd = brake == null ? 0.0 : plateThickness + brake.depth;
+		var couplingLength = brake == null ? null : 2 * (motor.rating.shaftLength - brakeEnd - 1);
+		var coupling = new ShaftCoupling(motor.rating.shaftDiameter, BallScrew.JOURNAL_DIAMETER, null, couplingLength);
+		if (coupling.length / 2 < Math.max(coupling.boreA, coupling.boreB) * 0.75)
+			throw "Shaft brake leaves insufficient coupling engagement";
+		axisDrives.push({spec: spec, screw: screw, motor: motor, coupling: coupling, brake: brake});
 		var shaftLength = motor.rating.shaftLength;
 		// The shaft seats through side A to the sleeve midpoint; side B seats on the screw.
 		if (shaftLength < coupling.length / 2) throw "Motor shaft is too short for its coupling";
@@ -262,6 +270,16 @@ class BenchMill extends MachineAssembly {
 
 		attach(id + "Coupling", coupling, couplingPose, id);
 		attach(motorId + "Shaft", motor.shaft(), motorPose, id);
+		if (brake != null) {
+			var brakePose = orient(motorPose.x + along[0] * plateThickness,
+				motorPose.y + along[1] * plateThickness, motorPose.z + along[2] * plateThickness, up, along);
+			for (role in ["front", "shell", "back"]) for (sector in 0...ShaftBrakePart.SECTORS) {
+				var part = role == "shell" && sector == 0 ? brake : new ShaftBrakePart(brake.bore, role, sector);
+				attach(motorId + 'Brake-$role-$sector', part, brakePose, parent);
+			}
+			for (role in ["hub", "disc"])
+				attach(motorId + 'Brake-$role', new ShaftBrakePart(brake.bore, role), brakePose, id);
+		}
 		var nutOffset = nut.bodyLength / 2;
 		attach(id + "Nut", nut, orient(nutCenter[0] - along[0] * nutOffset,
 			nutCenter[1] - along[1] * nutOffset, nutCenter[2] - along[2] * nutOffset, up, along), carriage);
@@ -278,7 +296,6 @@ class BenchMill extends MachineAssembly {
 				orient(start[0] + along[0] * offset, start[1] + along[1] * offset,
 					start[2] + along[2] * offset, up, along), parent);
 		}
-		var plateThickness = 8.0;
 		var couplingStart = shaftLength - coupling.length / 2;
 		var plateBore = couplingStart < plateThickness ? coupling.outerDiameter : motor.rating.shaftDiameter;
 		var motorPlate = new MillMotorPlate(motor.rating.bodyDiameter + 20, plateThickness, plateBore);
@@ -328,6 +345,8 @@ class BenchMill extends MachineAssembly {
 			AssemblyFrames.translation(-190 + index * 65, base.depth / 2 - 30, 0), "base");
 		connectPorts(driver + "-power", "powerSupply", 'power$index', driver, "power");
 		addMotor(motorId, id + "-turn", motorId, driver);
+		if (brake != null) bindMotorBrake(motorId, motorId + "Brake-shell-0",
+			"zBrake.release", "zBrake.released", 250, 30);
 		var encoderId = motorId + "Encoder";
 		attach(encoderId, new ShaftEncoder(motor.rating.encoderCounts, true),
 			orient(motorPose.x - along[0] * motor.rating.bodyLength, motorPose.y - along[1] * motor.rating.bodyLength,

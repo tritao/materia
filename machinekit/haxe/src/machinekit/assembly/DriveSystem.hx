@@ -314,6 +314,16 @@ class DriveSystem {
 		if (motor == null) throw 'Motor "${record.motor}" has no typed drive';
 		var added = motor.actuator(record.actuator, record.joint, voltage, record.margin, driver.current);
 		if (record.processVelocity != null) added.processVelocity = record.processVelocity;
+		if (record.brake != null) {
+			var binding = record.brake;
+			var brake = flat.member(binding.part).motorBrakeSpec();
+			if (brake == null || added.drive != "servo" || record.gearbox != null)
+				throw 'Motor "${record.actuator}" needs a direct servo brake part on its motor joint';
+			added.brake = {id: binding.part, releaseChannel: binding.releaseChannel,
+				releasedSensor: binding.releasedSensor, holdingEffort: brake.holdingTorque(),
+				releaseDelay: brake.releaseDelaySeconds(), applicationDelay: brake.applicationDelaySeconds(),
+				releaseTimeoutMs: binding.releaseTimeoutMs, feedbackMaxAgeMs: binding.feedbackMaxAgeMs};
+		}
 		if (driver.rating.positionLoopRate > 0) added.positionLoopRate = driver.rating.positionLoopRate;
 		var stepper = driver.rating.family == machinekit.motion.MotorDriver.MotorDriverFamily.Stepper;
 		if ((stepper && added.drive != "stepper") || (!stepper && added.drive != "servo"))
@@ -441,6 +451,13 @@ class DriveSystem {
 		var actuators = [for (record in flat.motors) resolveMotor(flat, record, true)];
 		for (cylinder in flat.cylinders) actuators.push(compileCylinder(flat, cylinder));
 		var sensors:Array<AssemblyEncoder> = [];
+		var nativeSensors = compileSensors(flat);
+		for (record in flat.motors) if (record.brake != null) {
+			var binding = record.brake;
+			for (sensor in nativeSensors) if (sensor.id == binding.releasedSensor)
+				throw 'Duplicate brake contact "${binding.releasedSensor}"';
+			nativeSensors.push({id: binding.releasedSensor, kind: "brake_released", joint: record.joint});
+		}
 		var sensorIds:Map<String, Bool> = [];
 		for (record in flat.encoders) {
 			var part:machinekit.motion.EncoderPart = cast flat.member(record.part);
@@ -464,7 +481,7 @@ class DriveSystem {
 				actuator.encoderCounts = null;
 			}
 		}
-		return {actuators: actuators, encoders: sensors, sensors: compileSensors(flat)};
+		return {actuators: actuators, encoders: sensors, sensors: nativeSensors};
 	}
 
 	/** Check a cylinder binding: typed cylinder and valve parts on a prismatic tree joint with no other drive. */
@@ -628,6 +645,12 @@ class DriveSystem {
 		var process = motor.processVelocity;
 		if (process != null) copy.processVelocity = {speedChannel: map(process.speedChannel),
 			directionChannel: map(process.directionChannel), radiansPerSpeedUnit: process.radiansPerSpeedUnit};
+		if (motor.brake != null) {
+			var brake = motor.brake;
+			copy.brake = {part: map(brake.part), releaseChannel: map(brake.releaseChannel),
+				releasedSensor: map(brake.releasedSensor), releaseTimeoutMs: brake.releaseTimeoutMs,
+				feedbackMaxAgeMs: brake.feedbackMaxAgeMs};
+		}
 		return copy;
 	}
 

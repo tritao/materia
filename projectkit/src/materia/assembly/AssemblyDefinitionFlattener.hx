@@ -127,6 +127,13 @@ class AssemblyDefinitionFlattener {
 				directionChannel: prefix + process.directionChannel,
 				radiansPerSpeedUnit: process.radiansPerSpeedUnit};
 		}
+		if (actuator.brake != null) {
+			var brake = actuator.brake;
+			copy.brake = {id: prefix + brake.id, releaseChannel: prefix + brake.releaseChannel,
+				releasedSensor: prefix + brake.releasedSensor, holdingEffort: brake.holdingEffort,
+				releaseDelay: brake.releaseDelay, applicationDelay: brake.applicationDelay,
+				releaseTimeoutMs: brake.releaseTimeoutMs, feedbackMaxAgeMs: brake.feedbackMaxAgeMs};
+		}
 		if (actuator.drive != null) copy.drive = actuator.drive;
 		if (actuator.torqueSpeed != null) copy.torqueSpeed = actuator.torqueSpeed.copy();
 		if (actuator.holdingTorque != null) copy.holdingTorque = actuator.holdingTorque;

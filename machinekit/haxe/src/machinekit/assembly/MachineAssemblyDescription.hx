@@ -103,6 +103,14 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
  * Motor and driver members driving a joint, its actuator given `margin` of the motor's holding
  * torque (see `MachineAssembly.addMotor`). Voltage and current come from the driver.
  */
+@:wire typedef MotorBrakeRecord = {
+	@:id(1) var part:String;
+	@:id(2) var releaseChannel:String;
+	@:id(3) var releasedSensor:String;
+	@:id(4) var releaseTimeoutMs:Int;
+	@:id(5) var feedbackMaxAgeMs:Int;
+}
+
 @:wire typedef MotorRecord = {
 	@:id(1) var actuator:String;
 	@:id(2) var joint:String;
@@ -113,6 +121,7 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 	@:id(6) @:optional var gearbox:Null<String>;
 	/** A process speed/direction pair for a CNC spindle; both channels are analog. */
 	@:id(7) @:optional var processVelocity:Null<materia.assembly.AssemblyDefinition.AssemblyProcessVelocityDrive>;
+	@:id(8) @:optional var brake:Null<MotorBrakeRecord>;
 }
 
 /**

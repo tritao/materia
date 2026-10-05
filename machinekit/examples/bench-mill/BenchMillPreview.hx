@@ -157,6 +157,27 @@ class BenchMillChecks {
 			var dx = shaftEnd.x - midpoint.x, dy = shaftEnd.y - midpoint.y, dz = shaftEnd.z - midpoint.z;
 			if (start > 1e-6 || depth <= 5 || dx * dx + dy * dy + dz * dz > 1e-12)
 				throw '${spec.id} motor shaft does not seat into its coupling';
+			var brake = drive.brake;
+			if (brake != null) {
+				var hubId = "motor" + suffix + "Brake-hub", discId = "motor" + suffix + "Brake-disc";
+				var hubStart = state.worldConnector(hubId, "mount"), hubEnd = state.worldConnector(hubId, "end");
+				var hubGrip = (hubEnd.x - hubStart.x) * axis.x + (hubEnd.y - hubStart.y) * axis.y + (hubEnd.z - hubStart.z) * axis.z;
+				if (hubGrip < motor.rating.shaftDiameter / 2)
+					throw "Installed brake hub has insufficient shaft engagement";
+				var back = state.worldConnector("motor" + suffix + "Brake-back-0", "end");
+				var gap = (face.x - back.x) * axis.x + (face.y - back.y) * axis.y + (face.z - back.z) * axis.z;
+				if (gap < 0.5) throw "Installed brake stator touches the rotating coupling";
+				if (mountOverlap(mill, state, "motor" + suffix + "Brake-front-0", "motor" + suffix + "Plate",
+					-axis.x * 0.05, -axis.y * 0.05, -axis.z * 0.05) < 1)
+					throw "Brake stator lacks a bearing face on the motor plate";
+				for (rotor in [hubId, discId]) {
+					if (mountOverlap(mill, state, rotor, "motor" + suffix + "Plate", 0, 0, 0) > 1e-7)
+						throw "Rotating brake part interferes with the motor plate";
+					for (role in ["front", "shell", "back"]) for (sector in [0, 8])
+						if (mountOverlap(mill, state, rotor, "motor" + suffix + 'Brake-$role-$sector', 0, 0, 0) > 1e-7)
+							throw "Released brake rotor interferes with its stator";
+				}
+			}
 			var rapid = Math.min(screw.criticalSpeed(Fixed, Simple), motor.rating.maxSpeed) * screw.thread.lead / (2 * Math.PI);
 			if (rapid < 8000.0 / 60) throw '${spec.id} rapid is below 8 m/min';
 			trace('Mill ${spec.id}: ${rapid * 60 / 1000} m/min source-derived rapid, ${mill.axisOvertravel(spec.id)} mm overtravel');
