@@ -2557,7 +2557,14 @@ class MachineKitSmoke {
 			{name: "TrackArmChecks.run", run: () -> TrackArmChecks.run(), weight: 1.0},
 			{name: "GantryPickerChecks.run", run: () -> GantryPickerChecks.run(), weight: 1.0},
 			{name: "BenchMillPreview.BenchMillChecks.run", run: () -> BenchMillPreview.BenchMillChecks.run(), weight: 1.0},
+			{name: "BenchMillGuideLoads.bare", run: () -> BenchMillGuideLoads.run(new BenchMill(),
+				SceneArtifact.decode(BenchMillPreview.mill()), ""), weight: 1.0},
 			{name: "BenchMillPreview.EnclosedMillChecks.run", run: () -> BenchMillPreview.EnclosedMillChecks.run(), weight: 1.0},
+			{name: "BenchMillGuideLoads.enclosed", run: () -> {
+				var cell = new EnclosedBenchMill();
+				BenchMillGuideLoads.run(cell.mill, SceneArtifact.decode(BenchMillPreview.enclosure()), "mill/");
+			}, weight: 1.0},
+			{name: "GuideSupportTests.run", run: () -> GuideSupportTests.run(), weight: 1.0},
 			{name: "TendingReach.run", run: () -> TendingReach.run(), weight: 1.0},
 			{name: "TendingControllers.TendingControllerChecks.run", run: () -> TendingControllers.TendingControllerChecks.run(), weight: 1.0},
 			{name: "CobotArmPreview.CobotArmChecks.run", run: () -> CobotArmPreview.CobotArmChecks.run(), weight: 1.0},

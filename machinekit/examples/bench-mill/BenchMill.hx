@@ -59,6 +59,8 @@ class BenchMill extends MachineAssembly {
 	public static inline var STOCK_DEPTH:Float = 60;
 	public static inline var STOCK_HEIGHT:Float = 20;
 	public static inline var STEP_TICK_HZ:Int = 40000;
+	/** Assumed assembly gap between carriage blocks, in mm. */
+	public static inline var BLOCK_GAP:Float = 4;
 	public final vise:Null<machinekit.milling.PneumaticVise>;
 	public final base = new MillBase();
 	public final column = new MillColumn();
@@ -68,6 +70,7 @@ class BenchMill extends MachineAssembly {
 	public final spindle = new SpindleCartridge();
 	public final holder = new Er20Holder();
 	public final tool = new EndMill(Er20Holder.BORE_DIAMETER, 22, 35);
+	public final guideBlock:LinearRailBlock = LinearRailBlock.metric(RAIL);
 	public final specs:Array<MillAxisSpec> = [
 		{id: "x", lower: 0, upper: 250, initial: 125, holdingBrake: false},
 		{id: "y", lower: 0, upper: 150, initial: 75, holdingBrake: false},
@@ -82,7 +85,8 @@ class BenchMill extends MachineAssembly {
 	public function new(withVise:Bool = false) {
 		super();
 		vise = withVise ? new machinekit.milling.PneumaticVise(STOCK_DEPTH, STOCK_WIDTH) : null;
-		var railSpec = LinearRailBlock.metric(RAIL).spec;
+		var railSpec = guideBlock.spec;
+		var halfSpan = (railSpec.blockLength + BLOCK_GAP) / 2;
 		var up = [0.0, 0, 1], alongX = [1.0, 0, 0], alongY = [0.0, 1, 0];
 		var baseTop = base.height;
 		var saddleBottom = baseTop + railSpec.blockHeight;
@@ -102,43 +106,62 @@ class BenchMill extends MachineAssembly {
 		attach("column", column, columnPose, "base");
 		var yRailStart = -base.depth / 2 + 5;
 		var yRailLength = columnFront - 5 - yRailStart;
+		var yRails:Array<LinearRail> = [];
 		for (side in [-1, 1]) {
 			var name = side < 0 ? "Left" : "Right";
-			attach('railY$name', LinearRail.metric(RAIL, yRailLength),
+			var guide = LinearRail.metric(RAIL, yRailLength);
+			yRails.push(guide);
+			attach('railY$name', guide,
 				orient(side * base.railSpacing / 2, yRailStart, baseTop + railSpec.railHeight, up, alongY), "base");
 		}
-		slide(specs[1], "railYLeft", "blockYLeft", LinearRailBlock.metric(RAIL),
-			orient(-base.railSpacing / 2, saddleY, baseTop + railSpec.railHeight, up, alongY), [0.0, -1, 0]);
+		var yBlocks = [for (side in [-1, 1]) for (span in [-halfSpan, halfSpan])
+			orient(side * base.railSpacing / 2, saddleY + span, baseTop + railSpec.railHeight, up, alongY)];
+		slide(specs[1], "railYLeft", yRails[0], "blockYLeft", guideBlock,
+			yBlocks[0], [0.0, -1, 0], yBlocks);
 		attach("saddle", saddle, AssemblyFrames.translation(0, saddleY, saddleBottom), "blockYLeft");
-		attach("blockYRight", LinearRailBlock.metric(RAIL),
-			orient(base.railSpacing / 2, saddleY, baseTop + railSpec.railHeight, up, alongY), "saddle");
+		attach("blockYLeftRear", guideBlock, yBlocks[1], "saddle");
+		attach("blockYRight", guideBlock, yBlocks[2], "saddle");
+		attach("blockYRightRear", guideBlock, yBlocks[3], "saddle");
 
 		var xRailLength = saddle.width - 10;
+		var xRails:Array<LinearRail> = [];
 		for (side in [-1, 1]) {
 			var name = side < 0 ? "Front" : "Back";
-			attach('railX$name', LinearRail.metric(RAIL, xRailLength),
+			var guide = LinearRail.metric(RAIL, xRailLength);
+			xRails.push(guide);
+			attach('railX$name', guide,
 				orient(-xRailLength / 2, saddleY + side * saddle.railSpacing / 2, saddleTop + railSpec.railHeight, up, alongX), "saddle");
 		}
-		slide(specs[0], "railXFront", "blockXFront", LinearRailBlock.metric(RAIL),
-			orient(tableX, saddleY - saddle.railSpacing / 2, saddleTop + railSpec.railHeight, up, alongX), [-1.0, 0, 0]);
+		var xBlocks = [for (side in [-1, 1]) for (span in [-halfSpan, halfSpan])
+			orient(tableX + span, saddleY + side * saddle.railSpacing / 2, saddleTop + railSpec.railHeight, up, alongX)];
+		slide(specs[0], "railXFront", xRails[0], "blockXFront", guideBlock,
+			xBlocks[0], [-1.0, 0, 0], xBlocks);
 		attach("table", table, AssemblyFrames.translation(tableX, saddleY, tableBottom), "blockXFront");
-		attach("blockXBack", LinearRailBlock.metric(RAIL),
-			orient(tableX, saddleY + saddle.railSpacing / 2, saddleTop + railSpec.railHeight, up, alongX), "table");
+		attach("blockXFrontRear", guideBlock, xBlocks[1], "table");
+		attach("blockXBack", guideBlock, xBlocks[2], "table");
+		attach("blockXBackRear", guideBlock, xBlocks[3], "table");
 
 		var headZ = gaugeZero.z + spindle.connector("mount").frame.z;
 		var zRailStart = columnPose.z + railSpec.railEndMargin;
 		var zRailLength = column.height - 2 * railSpec.railEndMargin;
 		var zBlock = headZ + head.height / 2;
+		var zRails:Array<LinearRail> = [];
 		for (side in [-1, 1]) {
 			var name = side < 0 ? "Left" : "Right";
-			attach('railZ$name', LinearRail.metric(RAIL, zRailLength),
+			var guide = LinearRail.metric(RAIL, zRailLength);
+			zRails.push(guide);
+			attach('railZ$name', guide,
 				orient(side * column.railSpacing / 2, columnFront - railSpec.railHeight, zRailStart, [0.0, -1, 0], [0.0, 0, 1]), "column");
 		}
-		slide(specs[2], "railZLeft", "blockZLeft", LinearRailBlock.metric(RAIL),
-			orient(-column.railSpacing / 2, columnFront - railSpec.railHeight, zBlock, [0.0, -1, 0], [0.0, 0, 1]), [0.0, 0, 1]);
+		var zBlocks = [for (side in [-1, 1]) for (span in [-halfSpan, halfSpan])
+			orient(side * column.railSpacing / 2, columnFront - railSpec.railHeight, zBlock + span,
+				[0.0, -1, 0], [0.0, 0, 1])];
+		slide(specs[2], "railZLeft", zRails[0], "blockZLeft", guideBlock,
+			zBlocks[0], [0.0, 0, 1], zBlocks);
 		attach("head", head, AssemblyFrames.translation(0, headY, headZ), "blockZLeft");
-		attach("blockZRight", LinearRailBlock.metric(RAIL),
-			orient(column.railSpacing / 2, columnFront - railSpec.railHeight, zBlock, [0.0, -1, 0], [0.0, 0, 1]), "head");
+		attach("blockZLeftTop", guideBlock, zBlocks[1], "head");
+		attach("blockZRight", guideBlock, zBlocks[2], "head");
+		attach("blockZRightTop", guideBlock, zBlocks[3], "head");
 		// The at-speed switch returns real feedback to the CNC program.
 		addComponent("spindle", spindle);
 		zeroPoses.set("spindle", gaugeZero);
@@ -358,15 +381,19 @@ class BenchMill extends MachineAssembly {
 		return room;
 	}
 
-	function slide(spec:MillAxisSpec, parent:String, id:String, block:LinearRailBlock, pose:AssemblyFrame,
-			axis:Array<Float>):Void {
-		var guide:LinearRail = cast component(parent);
+	function slide(spec:MillAxisSpec, parent:String, guide:LinearRail, id:String, block:LinearRailBlock,
+			pose:AssemblyFrame, axis:Array<Float>, blockPoses:Array<AssemblyFrame>):Void {
 		var inverse = AssemblyFrames.inverse(zeroPose(parent));
-		function along(coordinate:Float):Float return AssemblyFrames.transformPoint(inverse,
-			pose.x + axis[0] * coordinate, pose.y + axis[1] * coordinate, pose.z + axis[2] * coordinate).z;
-		var reach = guide.spec.railEndMargin + guide.spec.blockLength / 2;
-		var first = along(spec.lower), last = along(spec.upper);
-		var room = Math.min(Math.min(first, last) - reach, guide.length - reach - Math.max(first, last));
+		var reach = guide.spec.railEndMargin + block.spec.blockLength / 2;
+		var room = guide.length;
+		for (support in blockPoses) {
+			var first = AssemblyFrames.transformPoint(inverse,
+				support.x + axis[0] * spec.lower, support.y + axis[1] * spec.lower, support.z + axis[2] * spec.lower).z;
+			var last = AssemblyFrames.transformPoint(inverse,
+				support.x + axis[0] * spec.upper, support.y + axis[1] * spec.upper, support.z + axis[2] * spec.upper).z;
+			room = Math.min(room, Math.min(Math.min(first, last) - reach,
+				guide.length - reach - Math.max(first, last)));
+		}
 		if (!(room > 0)) throw 'Bench mill ${spec.id} needs room beyond travel on its rail';
 		overtravel.set(spec.id, room);
 		addComponent(id, block);

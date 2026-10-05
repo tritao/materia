@@ -30,23 +30,23 @@ class LinearRailSystem {
 			designation: "MGN12C", family: "HIWIN",
 			railWidth: 12, railHeight: 8, blockWidth: 27, blockHeight: 13, blockLength: 34.7,
 			blockHolePitchB: 20, blockHolePitchC: 15, blockMountScrew: "M3x8", railHolePitch: 25, railEndMargin: 10,
-			railMountScrew: "M3x8"
+			railMountScrew: "M3x8", staticLoadCapacity: 2600
 		}, {
 			designation: "HGR15", family: "GENERIC-HG",
 			railWidth: 15, railHeight: 15, blockWidth: 34, blockHeight: 28, blockLength: 61.4,
 			blockHolePitchB: 26, blockHolePitchC: 26, blockMountScrew: "M4x10", railHolePitch: 60, railEndMargin: 20,
-			railMountScrew: "M4x16"
+			railMountScrew: "M4x16", staticLoadCapacity: 10000
 		}];
 
 	/** HIWIN MGN/MGW linear guideway dimensions used by the MGN12C profile row. */
 	public static function catalog():Catalog<LinearRailProfileSpec> {
 		if (table == null)
 			table = new Catalog("linear rail profile", spec -> spec.designation, rows(), spec -> spec.designation == "HGR15" ? ({
-				source: "Assumed HGR15/HGH15CA reference envelope; not vendor verified",
+				source: "Assumed HGR15/HGH15CA reference envelope and 10 kN static block capacity; not vendor verified",
 				standard: null, standardEdition: null, dimensionKind: Nominal, conformance: GenericApproximation,
 				verifiedFields: []
 			}) : ({
-				source: "https://www.hiwin.com/wp-content/uploads/HIWIN-Linear-Guideway-Catalog.pdf",
+				source: "Dimensions: https://www.hiwin.com/wp-content/uploads/HIWIN-Linear-Guideway-Catalog.pdf; assumed 2.6 kN static block capacity, not vendor verified",
 				standard: null, standardEdition: null, dimensionKind: Nominal, conformance: NominalEnvelope,
 				verifiedFields: ["railWidth", "railHeight", "blockWidth", "blockHeight", "blockLength",
 					"blockMountScrew", "railHolePitch", "railEndMargin", "railMountScrew"]

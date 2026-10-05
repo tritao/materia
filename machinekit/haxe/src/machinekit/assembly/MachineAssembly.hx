@@ -51,7 +51,7 @@ typedef MachineAssemblyMassProperties = {
 @:allow(machinekit.assembly)
 class MachineAssembly {
 	/** Current MachineKit assembly format; older descriptions require migration. */
-	public static inline var SCHEMA_VERSION:Int = 14;
+	public static inline var SCHEMA_VERSION:Int = 15;
 	/** Findings from rebuilding sources; invalid transmissions remain available for repair. */
 	public final diagnostics:Diagnostics = new Diagnostics();
 	final mechanical:MechanicalAssembly = new MechanicalAssembly();

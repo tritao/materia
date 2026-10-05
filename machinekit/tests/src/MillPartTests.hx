@@ -46,10 +46,10 @@ class MillPartTests {
 			var mass = casting.massProperties();
 			var expectedMass = switch kind {
 				case Base: 58.6401;
-				case Column: 49.5415;
-				case Saddle: 22.4309;
+				case Column: 50.9425;
+				case Saddle: 25.4801;
 				case Table: 11.7125;
-				case Head: 30.6695;
+				case Head: 33.2253;
 			};
 			if (!Math.isFinite(mass.mass) || Math.abs(mass.mass - expectedMass) > 0.01 || mass.inertia == null)
 				throw 'Mill casting $kind mass ${mass.mass} kg differs from its checked design ($expectedMass kg)';

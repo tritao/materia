@@ -177,7 +177,7 @@ Surveyed 2026-10-03 on local main 1048bf768, plus the `mobile-welder` and `x7-tr
 | Vise | 100 mm pneumatic vise. The moving jaw is preset by its screw for the blank, then a 6 mm air stroke clamps. Reeds sense clamped and open; an air-gauge sensor at the datum senses part present. |
 | Stand | 750 mm. The controller cabinet sits on the side. |
 | Air | FRL unit, then a manifold with 5/2 valves (door, vise; gripper on the arm) |
-| Part | 608-bearing block from a 60 × 40 × 20 mm 6061 blank: Ø22 seat, two Ø10 counterbores and a contour pocket, one 6 mm end mill |
+| Part | 608-bearing block from a 60 × 60 × 20 mm 6061 blank: Ø22 seat, two Ø10 counterbores and a contour pocket, one 6 mm end mill |
 
 The current arm reaches about 0.73 m from shoulder to flange, and the gripper adds about 0.15 m. That is marginal through a door to a vise brought to the load position, so the cell uses a cobot from MT3 instead. The 850 mm class is the usual choice for tending a benchtop mill, and the 1300 mm class is the alternative. The MT4 reach study picks the class and the riser height before the gripper or the cell are built.
 
@@ -224,9 +224,10 @@ Done. What was built and decided:
   10 mm T-slot mouths; head has a cartridge bore. Bodies and mounting holes carry semantic names.
 - ER20 cartridge and holder share the gauge-line frame; the generic 1.1 kW spindle motor is rated
   at 8000 rpm and capped at 10000 rpm, with assumed ratings and envelope.
-- MachineKit smoke passed on the corrected castings: computed masses are base 58.64 kg,
-  column 49.54 kg, saddle 22.43 kg, table 11.71 kg and head 30.67 kg. The earlier values
-  predate the merged casting geometry and the saddle web correction. The 400/750 W servos
+- MachineKit smoke passed on the corrected castings: current computed masses are base 58.6401 kg,
+  column 50.9425 kg, saddle 25.4801 kg, table 11.7125 kg and head 33.2253 kg. MT5b's paired
+  guide supports lengthen the column, widen the saddle and raise the head; these replace the
+  previous 49.54/22.43/30.67 kg measurements for those three bodies. The 400/750 W servos
   derive rated torques 1.273/2.387 N m at 3000 rpm; maximum speed is 5000 rpm (assumed).
 - The first gate passed MachineKit and the application build, but its application run was interrupted
   (exit 130) during the router case. Following X7's documented workaround, run the replacement
@@ -260,9 +261,10 @@ Done. What was built and decided:
 - SFU1605 now has assumed 12 mm machined journals (50 mm input, 25 mm output), so the BK12/BF12
   seats and coupling fit physical shaft surfaces. Screw speed still conservatively uses full length.
 - The single-tool exercise has a 22 mm seat 7 mm deep, two blind 10 mm fastening recesses 5 mm
-  deep, and a 12 × 8 mm contour pocket 3 mm deep with 3.5 mm corners. Blind recesses keep this
-  first setup a single 6 mm tool exercise. The seat is centred; the contour is forward of it,
-  leaving the back-corner toe clamps clear. CAM reads pocket boundaries and floors from the solid.
+  deep, and a 12 × 12 mm contour pocket 3 mm deep with 3.5 mm corners. Blind recesses keep this
+  first setup a single 6 mm tool exercise. The seat remains centred. R6 enlarges the blank depth
+  to 60 mm and locates the contour from a 3 mm front wall, leaving 4 mm to the bearing seat
+  and keeping the back-corner toe clamps clear. CAM reads pocket boundaries and floors from the solid.
 - The CNC player previously applied a pulse-channel binding to every actuator, which rejected
   servo motors. It now derives pulse channels only for steppers and retains the servo motor/driver
   limits; mixed-drive binding tests cover this. RobotKit world assertions grow from 4926 to 4930.
@@ -803,3 +805,12 @@ Done. What was built and decided:
 | MT10 | planned | |
 | MT11 | planned | |
 | MT12 | planned | |
+
+**Environment clearance and support geometry (MT5b follow-up, verified in `8b22593be` and `20f0d3e16`).**
+
+- Joint-plan clearance includes independent scene collision objects at their actual simulated poses. Held objects follow their physical carrier link in planning FK. Two app regressions reject an independent obstruction and a carried object's future collision before completion; clear cobot missions retain their 2.06 s cycles and tracking peaks.
+- Four saved 30 × 30 × 2 mm steel tube legs support the cabinet to the floor. CAD checks verify floor reach, finite cabinet contact and the hollow section. The shared rectangular profile names its outer stock and bore separately; no naming-audit exception was added.
+- The bearing blank becomes 60 × 60 × 20 mm, retaining the centred 608 seat. The 12 × 12 mm contour leaves a 3 mm front wall and 4 mm seat ligament; CAD material witnesses check the actual cut solid. Moving the seat in the old blank caused CAM to reject a toe-clamp collision, so the design gives all features and clamps sufficient stock room.
+- Focused bare/enclosed app checks pass at 52.51/53.24 s, 78 plans. Nominal removal increases by 144 mm³ to 3846.78 mm³; measured removal is 3860.62 mm³, leftover 7.14 mm³ and gouge 0.618 mm³, with no rapid or holder collisions. X/Y/Z tracking peaks become 0.085925/0.051505/0.053502 mm at 10 ms. The larger blank increases carried mass; rapids remain 15.0955/25/22.8666 m/min and accelerations become approximately 29.86/28.95/26.93 m/s².
+- Door 1.50/1.79 s and seated clamp 0.08 s at 482.55 N remain unchanged. Cabinet supports add 5.2752 kg of stationary structure and bring the enclosed scene to 122 objects. Reach remains Reach850 on 600 mm, with 15 poses and 16.2399% joint margin.
+- All eleven kit suites, CadKit and MachineKit smoke passed. The first complete app run caught a stale analytical pocket-volume expectation; after correction, the complete app retry passed with exit 0 and no uncaught exception. Router, belt router, CoreXY, arm, mobile and welder baselines match their recorded values. The physical Z brake and rail support sizing remain open; no MT7 work has started.

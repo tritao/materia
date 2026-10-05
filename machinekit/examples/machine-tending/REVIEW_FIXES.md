@@ -7,12 +7,12 @@ current format, and remove obsolete paths. Reference hardware data remains expli
 
 | Group | Work | State | Commits |
 |---|---|---|---|
-| R1 | One current assembly schema and runtime layout; migrate producers/tests; delete legacy defaults and dead helpers | done | `0121118f2` |
+| R1 | One current assembly schema and runtime layout; migrate producers/tests; delete legacy defaults and dead helpers | done; descriptor-entry cleanup awaits closing verification | `0121118f2`, `57db394b3` |
 | R2 | Motor/driver/supply sizing; real spindle belt transmission; motor shaft and coupling engagement; explicit screw root | done | `59791d003` |
-| R3 | Physical Z brake and fault sequencing; full downstream inertia feedforward | in progress: inertia implemented; brake remains | `6e94de72f` |
-| R4 | Swept clearance for joint moves; assembled limits; independent geometry/mass/speed checks | in progress: joint-plan clearance implemented | |
+| R3 | Physical Z brake and fault sequencing; full downstream inertia feedforward | in progress: inertia and brake physics verified; assembly/controller integration remains | `6e94de72f`, `ea48834a8`, `f38740676` |
+| R4 | Swept clearance for joint moves; assembled limits; independent geometry/mass/speed checks | in progress: joint-plan clearance and environment objects implemented | `4fc64fbee`, `8b22593be` |
 | R5 | Per-joint servo interpolation; consistent slip; typed channel faults; cached coupling setup; qualified channels and two-mill check | done | `dd0c14091` |
-| R6 | Rail support/load paths, bearing walls, cabinet mounts and material assumptions; remaining diagnostics and dead code | planned | |
+| R6 | Rail support/load paths, bearing walls, cabinet mounts and material assumptions; remaining diagnostics and dead code | implemented: supports, paired guides and load admission verified; closing gate pending | `20f0d3e16` |
 
 ## Verification
 
@@ -26,7 +26,7 @@ current format, and remove obsolete paths. Reference hardware data remains expli
 
 ## R1 decisions
 
-- MachineKit descriptions use the current version for every assembly (v13 in R1, v14 after the R2 hardware recipe changes); ProjectKit assembly definitions
+- MachineKit descriptions use the current version for every assembly (v13 in R1, v14 after R2's hardware recipes, v15 after the paired-guide casting changes); ProjectKit assembly definitions
   and states use v7. Optional physical features stay optional, but do not select a different schema.
 - Native RobotKit blueprints and snapshots require their complete current layout. In-repo
   native and Haxe producers already emit the current layout; old-layout acceptance tests
@@ -92,3 +92,61 @@ Done. What was built and decided:
 - Compared with R2, mill and all existing example cycle baselines remain unchanged. Screw/belt router 232.2/215.2 s, 128 plans, 0.05/1.76 mm worst deviation; CoreXY 649.6 mm/s and 71.549 m/s²; arm 5.8/12/17.2/23.5 s; mobile mission/obstacle 61/65 s; welder 20.6/21.1 s and whole weldment 106.5 s.
 - Reach remains Reach850 on a 600 mm riser, with 15 poses and 16.2399% minimum joint margin. Door 1.50/1.79 s, seated blank clamp 0.08 s at 482.55 N. The cell has 16 disjoint joints: R2's separate spindle-motor rotation adds one to MT6's 15.
 - Open work: physical Z brake and fault sequencing (R3); remaining joint-limit and independent-environment clearance work (R4); rail/support sizing, bearing-block wall and cabinet mounts (R6). No new compiler defect was found.
+
+## R4 environment objects
+
+- Planning clearance includes independently owned collision objects, using their actual simulated poses and primitive geometry. Objects held by the planning robot are attached to their actual carrier link in the clearance model; other objects remain snapshots at planning start.
+- Native carrier handles stay typed throughout; there is no cast or integer sentinel conversion. Independent scene-obstacle and carried-object future-collision application regressions pass, and clear cobot missions retain their 2.06 s cycles and tracking peaks.
+
+## R6 support geometry in progress
+
+- A reusable, saved rectangular tube member uses the existing structural profile geometry. Four 30 × 30 × 2 mm steel legs carry the cabinet bottom to the floor, with CAD contact and hollow-section checks.
+- The blank becomes 60 × 60 × 20 mm. The contour pocket leaves a 3 mm front wall and a 4 mm ligament to the centred bearing seat, with the toe clamps remaining at the back corners. Actual material witnesses check both walls after the cuts. CAM reads the revised recesses from the solid. Bare/enclosed cycles become 52.51/53.24 s because the larger contour removes another 144 mm³. X/Y/Z peaks are 0.085925/0.051505/0.053502 mm at the unchanged 10 ms tick; the larger blank increases carried mass.
+- Per-size cobot housing and gearhead materials are explicitly assumed allocations of generic package mass, not claims about vendor casing metallurgy. Cobot modules retain a typed servo reference rather than recovering it with casts.
+- Rail support sizing and the physical Z brake remain open.
+
+Verified support checkpoint:
+
+- The sequential kit gate passed all eleven kits, CadKit and MachineKit smoke. Its first app run found the old 12 × 8 mm analytical removal expectation; the revised 12 × 12 mm expectation is independent of the production solid and now also checks the enclosed job quantitatively.
+- Focused mill app checks pass: 3860.62 of 3846.78 mm³ removed, 7.14 mm³ leftover, 0.618 mm³ gouge, zero rapid or holder collisions, 78 plans and the existing 55 flagged drive diagnostics (42 peak-torque, 34 rated-RMS findings). Rapids remain 15.0955/25/22.8666 m/min; accelerations are now approximately 29.86/28.95/26.93 m/s² from the increased blank mass.
+- Door open/close remains 1.50/1.79 s; seated clamp 0.08 s at 482.55 N. Four cabinet legs add 5.2752 kg of stationary structure; enclosed object count becomes 122. Reach remains Reach850/600 mm with 16.2399% minimum joint margin.
+- The complete app retry finished with exit 0 and no uncaught exception (`/tmp/mt-review-environment-support-app.log`). Together with the preceding unchanged kit gate, this closes verification of `20f0d3e16`. The original failed gate report remains intact; it is not presented as a passing app run. The subsequently registered guide test and native brake work are separate, still-open changes.
+- Existing baselines match: screw/belt router 232.2/215.2 s, 128 plans and 0.05/1.76 mm deviation; CoreXY 649.6 mm/s and 71.549 m/s²; arm 5.8/12/17.2/23.5 s; mobile mission/obstacle 61/65 s; welder seam 20.6/21.1 s, post 29.8 s and weldment 106.5 s.
+
+## R3 brake implementation requirements
+
+- Replace the unused example boolean with a typed brake part and binding on the physical motor joint. Its stator and rotor belong to the mechanical assembly, with one assumed rating/specification and derived mounting geometry.
+- The controller owns a digital release output and waits for released feedback before advancing motion. Hardware endpoints see coil outputs and feedback; cylinder or brake physics must never run in RobotRuntime. Missing release feedback prevents motion and faults the owning controller.
+- The simulation owns the spring-applied brake state, release/application delay and bounded passive friction effort, evaluated at physics substeps. Use the drive's integration settings and actual joint inertia; do not introduce an application heuristic or position-hold shortcut.
+- Ordinary stop retains release while the energized servo holds. Emergency stop and fault de-energize release; the spring applies the brake. Safety reset must require release confirmation again before motion resumes.
+- Check release-before-motion, stop/fault/reset sequencing, and gravity holding with motor effort disabled. Compare the torque capacity with the complete carried Z load. Any saved field or native layout change takes one current version, with every in-repo producer/fixture migrated and old paths removed.
+
+## R6 remaining guide implementation requirements
+
+- Give the carriage finite support span along travel as well as across rails, with paired blocks on each rail. Derive block centre spacing from actual block length and a stated assembly gap.
+- Size the saddle/head/column and rail lengths to seat every block at all travel limits. Compute overtravel from all blocks, including followers, without recovering rail types through casts.
+- Verify actual mount contact, block separation, and rail room at travel extremes. Evaluate load and moment reactions from assembled mass, commanded acceleration and an explicitly assumed cutting load; compare with explicitly assumed guide capacities and reject overloads in checks.
+
+The implementation and verification below track these requirements.
+
+## R3 physical brake state in progress
+
+- SimKit's `BrakeState` starts spring-applied, advances release/application delays only in simulation time, and exposes released contact feedback and passive friction effort. Repeated coil writes preserve the delay; a changed command cancels the previous transition. It does not generate motor targets or run in RobotRuntime.
+- The standalone native state test passes with warnings treated as errors. It covers delayed release, delayed application, cancelled release, interrupted application, zero-delay devices and invalid values. The test is registered in CMake with assertions enabled in Release.
+- Native SimKit APIs now configure one brake per joint, set its digital release coil and read its physical released contact. MuJoCo advances contact state each physics substep and adds bounded dry-friction effort to the joint's existing friction, independently of motor targets. The kinematic test backend reports this physical capability as unsupported.
+- The rebuilt complete MuJoCo native suite passes, including unpowered gravity holding, delayed release/application and slipping with insufficient capacity. SimCore and its C API tests pass. All changed translation units pass syntax checks with production flags, and the state test passes with exceptions disabled. NativeKit's no-exceptions policy required replacing the initial throwing constructor with a checked factory and explicit failure returns. These native checks verify `f38740676`; the preceding app gate used the earlier libraries without brake bindings.
+- Typed assembly/blueprint bindings, generated Haxe APIs, the physical brake part, runtime release interlocks and stop/fault/reset checks are still required. The state test alone does not prove the complete brake behavior.
+
+## R6 paired guides in progress
+
+- Each rail now carries two blocks separated by a 4 mm assembly gap, giving 65.4 mm centre spacing. There are twelve blocks in the mill. The slide builder receives the installed rail directly and measures overtravel across all four block poses; the rail cast is removed.
+- `GuideSupport` resolves a complete force/moment wrench onto the four equal-stiffness blocks. Its registered smoke test independently balances the result, verifies overload detection and checks that increased support span reduces the worst block load. An independent numerical check covered 1,000 wrenches with a maximum residual of 9.1e-13.
+- Saddle width becomes 450 mm, head height 130 mm and column height 670 mm. Machine descriptions require v15 for the changed casting recipes; no v14 acceptance remains. The full smoke checks verify CAD masses at 50.9425/25.4801/33.2253 kg for column/saddle/head. The initial column expectation omitted mounting-hole ligaments exposed by the longer core.
+- New CAD checks measure all block and rail bounds at every travel corner, compare their observed room with compiled overtravel, verify block separation and press each actual mounting face into its carriage to establish finite contact. These checks and the CNC geometry pass after fixing the test's projection onto connector Z instead of the mechanical +Y axis. Measured X/Y/Z overtravel is 11.6/39.6/20.6 mm; source-derived rapids are 15.0955/25/21.5218 m/min. The longer Z screw lowers its critical-speed cap. Both the mass-corrected smoke and the scoped load-check smoke pass.
+- Guide capacities are explicitly assumed at 10 kN per HGR15 block and 2.6 kN per MGN12C block, with no vendor-verification claim. Load admission uses the resolved physical-part view and mate tree, posed centres of mass and drive-derived acceleration limits. It combines all acceleration signs with an explicit 500 N cutting envelope per world axis at all travel corners. With a safety factor of two, bare X/Y/Z utilization is 14.5363/48.1601/63.0236%; the enclosed mill is 20.2625/54.7884/63.0236%. A one-newton capacity fails the same admission function.
+- The load study requires the already-resolved whole assembly artifact and an explicit prefix: the vise's required air ports are connected by the enclosure, so a stand-alone vise-equipped mill is not a valid physical assembly. All new study data stays typed without casts. Motion-direction normalization and metadata-derived unit conversion pass. The study lives in `machinekit/tests`, keeping its CadBridge dependency out of the example project; the corrected smoke registration passes in `/tmp/mt-guides-test-boundary.log`.
+- The rebuilt app's mill filter passes: bare/enclosed 52.54/53.19 s; X/Y/Z peaks 0.085940/0.051497/0.072365 mm at 10 ms; X/Y/Z acceleration approximately 29.77/28.24/26.44 m/s². Changed carried masses and the longer Z screw alter planning and tracking. Removal is 3860.66 of 3846.78 mm³, leftover 7.13 mm³ and gouge 0.659 mm³, with zero rapid or holder collisions, 78 plans and the existing 55 flagged drive diagnostics (42 peak, 34 rated RMS). Door 1.50/1.79 s and seated clamp 0.08 s at 482.55 N remain unchanged. The enclosed scene has 128 objects. The complete closing gate remains pending.
+
+Additional cleanup found while tracing the brake API:
+
+- Removed obsolete prefix-layout descriptions from `simkit/sim_core/include/nativekit_sim.h` and `simkit/sim_core/src/PhysicsBackend.hpp`. The joint-coupling C entry point now requires the same complete descriptor that the world layer already required, rather than checking the obsolete prefix first. Valid callers and physical behavior are unchanged; rebuilt SimCore, C API and MuJoCo tests pass.

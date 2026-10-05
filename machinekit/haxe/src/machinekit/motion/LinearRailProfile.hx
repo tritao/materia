@@ -17,4 +17,6 @@ typedef LinearRailProfileSpec = {
 	var railHolePitch:Float;
 	var railEndMargin:Float;
 	var railMountScrew:String;
+	/** Assumed static capacity of one block in N; not a verified vendor rating. */
+	var staticLoadCapacity:Float;
 }

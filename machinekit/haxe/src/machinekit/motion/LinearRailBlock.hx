@@ -29,6 +29,8 @@ class LinearRailBlock extends MachineComponent {
 		return new LinearRailBlock(spec, true);
 
 	private function new(spec:LinearRailProfileSpec, codeOnly:Bool = false) {
+		if (!Math.isFinite(spec.staticLoadCapacity) || !(spec.staticLoadCapacity > 0))
+			throw 'Linear rail profile "${spec.designation}" needs a finite positive static block capacity';
 		if (!(spec.blockWidth > 0) || !(spec.blockHeight > 0) || !(spec.blockLength > 0) ||
 			!(spec.blockHolePitchB > 0) || spec.blockHolePitchB > spec.blockLength ||
 			!(spec.blockHolePitchC > 0) || spec.blockHolePitchC > spec.blockWidth ||

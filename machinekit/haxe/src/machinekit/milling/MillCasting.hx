@@ -37,11 +37,11 @@ class MillCasting extends MachineComponent {
 		this.kind = kind;
 		var dims = switch kind {
 			case Base: [520.0, 550, 80, 140];
-			case Column: [180.0, 120, 650, 110];
+			case Column: [180.0, 120, 670, 110];
 			// The 50 mm nut-clearance bore leaves a continuous lower web and upper rail-side webs.
-			case Saddle: [400.0, 130, 70, 90];
+			case Saddle: [450.0, 130, 70, 90];
 			case Table: [400.0, 130, 40, 90];
-			case Head: [180.0, 220, 120, 110];
+			case Head: [180.0, 220, 130, 110];
 		};
 		width = dims[0]; depth = dims[1]; height = dims[2]; railSpacing = dims[3];
 		screwHeight = height / 2;

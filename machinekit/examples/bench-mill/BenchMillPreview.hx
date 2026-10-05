@@ -9,6 +9,7 @@ import cadkit.modeling.Location;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import materia.assembly.AssemblyFrames;
+import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 /** Bench mill preview with a toe-clamped single-tool bearing-block job. */
 class BenchMillPreview {
@@ -70,9 +71,37 @@ class BenchMillChecks {
 		if (!spindleBinding || !atSpeedSensor)
 			throw "Spindle process channels or at-speed feedback were not derived into the assembly";
 		var state = new AssemblyState(definition);
+		var railSpec = machinekit.motion.LinearRailBlock.metric(BenchMill.RAIL).spec;
+		var guides = [
+			{axis: "y", rail: "railYLeft", carriage: "saddle", blocks: ["blockYLeft", "blockYLeftRear"], dx: 0.0, dy: 0.0, dz: 0.05},
+			{axis: "y", rail: "railYRight", carriage: "saddle", blocks: ["blockYRight", "blockYRightRear"], dx: 0.0, dy: 0.0, dz: 0.05},
+			{axis: "x", rail: "railXFront", carriage: "table", blocks: ["blockXFront", "blockXFrontRear"], dx: 0.0, dy: 0.0, dz: 0.05},
+			{axis: "x", rail: "railXBack", carriage: "table", blocks: ["blockXBack", "blockXBackRear"], dx: 0.0, dy: 0.0, dz: 0.05},
+			{axis: "z", rail: "railZLeft", carriage: "head", blocks: ["blockZLeft", "blockZLeftTop"], dx: 0.0, dy: -0.05, dz: 0.0},
+			{axis: "z", rail: "railZRight", carriage: "head", blocks: ["blockZRight", "blockZRightTop"], dx: 0.0, dy: -0.05, dz: 0.0}
+		];
+		var observedRoom:Map<String, Float> = [];
 		for (x in [0.0, 250]) for (y in [0.0, 150]) for (z in [-250.0, 0]) {
 			state.setJoint("x", x); state.setJoint("y", y); state.setJoint("z", z);
 			state.forwardKinematics();
+			for (guide in guides) {
+				var inverse = AssemblyFrames.inverse(state.worldConnector(guide.rail, "axis"));
+				var rail = posed(mill, state, guide.rail);
+				var railBounds = alongBounds(rail, inverse); rail.close();
+				var previousUpper:Null<Float> = null;
+				for (id in guide.blocks) {
+					var block = posed(mill, state, id);
+					var bounds = alongBounds(block, inverse); block.close();
+					var room = Math.min(bounds.lower - railBounds.lower - railSpec.railEndMargin,
+						railBounds.upper - railSpec.railEndMargin - bounds.upper);
+					if (room < -1e-6) throw '$id leaves its usable rail at $x,$y,$z';
+					var previousRoom = observedRoom.get(guide.axis);
+					observedRoom.set(guide.axis, previousRoom == null ? room : Math.min(room, previousRoom));
+					if (previousUpper != null && bounds.lower - previousUpper < BenchMill.BLOCK_GAP - 1e-6)
+						throw '${guide.rail} blocks lack their assembly gap';
+					previousUpper = bounds.upper;
+				}
+			}
 			var gauge = state.worldConnector("spindle", "gaugeLine");
 			var stock = state.worldPose("stock");
 			if (Math.abs(gauge.z - mill.gaugeZero.z - z) > 1e-6 ||
@@ -94,10 +123,18 @@ class BenchMillChecks {
 			}
 			for (index in 0...3) {
 				var id = "screw" + mill.specs[index].id.toUpperCase();
-				var expected = 2 * Math.PI / 5 * [x, y, z][index];
+				var expected = 2 * Math.PI / mill.axisDrives[index].screw.thread.lead * [x, y, z][index];
 				if (Math.abs(state.joint(id + "-turn") - expected) > 1e-6) throw '$id ratio is wrong';
 			}
 		}
+		for (spec in mill.specs) {
+			var measured = observedRoom.get(spec.id);
+			if (measured == null || Math.abs(measured - mill.axisOvertravel(spec.id)) > 1e-5)
+				throw '${spec.id} overtravel disagrees with the actual posed block and rail bounds';
+		}
+		for (guide in guides) for (id in guide.blocks)
+			if (mountOverlap(mill, state, id, guide.carriage, guide.dx, guide.dy, guide.dz) < 1)
+				throw '$id lacks finite contact with ${guide.carriage}';
 		var saddleSolid = mill.saddle.geometry(), lowerWebProbe = Part.box(10, 10, 5);
 		var lowerWeb = saddleSolid.intersect(lowerWebProbe);
 		var lowerWebVolume = lowerWeb.volume();
@@ -161,6 +198,17 @@ class BenchMillChecks {
 			local.close(); return part;
 		}
 		throw 'Mill has no part "$id"';
+	}
+	static function alongBounds(part:Part, inverse:AssemblyFrame):{lower:Float, upper:Float} {
+		var box = part.shape.bounds(), lo = box.get_min(), hi = box.get_max();
+		// Mechanical connector frames use +Y as their axis, including the rail's axial connector.
+		var first = AssemblyFrames.transformPoint(inverse, lo.get_x(), lo.get_y(), lo.get_z()).y;
+		var lower = first, upper = first;
+		for (x in [lo.get_x(), hi.get_x()]) for (y in [lo.get_y(), hi.get_y()]) for (z in [lo.get_z(), hi.get_z()]) {
+			var along = AssemblyFrames.transformPoint(inverse, x, y, z).y;
+			lower = Math.min(lower, along); upper = Math.max(upper, along);
+		}
+		return {lower: lower, upper: upper};
 	}
 	static function mountOverlap(mill:machinekit.assembly.MachineAssembly, state:AssemblyState,
 			bracket:String, carriage:String, dx:Float, dy:Float, dz:Float):Float {
