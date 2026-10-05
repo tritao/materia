@@ -41,6 +41,9 @@ class SheetProcessSmoke {
 		var steel = new SheetMaterial("material-a", 1.5, null, {uts: 400, yield: 250, youngs: 205000});
 		var aluminium = new SheetMaterial("material-b", 1, null, {uts: 228, yield: 193, youngs: 70000});
 		var process:BendProcess = new AirBending();
+		near(AirBending.defaultOpening(1.5), 12, 1e-12, "thin-stock default die opening");
+		diagnosis("sheet.no-default-tooling", function() { var opening = AirBending.defaultOpening(4); });
+		diagnosis("sheet.invalid-die-opening", function() { var minimum = AirBending.minimumFlange(0); });
 		for (opening in [8.0, 12.0, 16.0]) {
 			var tooling = new ProcessTooling("acute-punch", "v" + opening, 0.5, Math.PI / 6, opening, Math.PI / 6, 0.5);
 			var result = process.predict(steel, tooling, Math.PI / 2, 120);

@@ -1,4 +1,5 @@
 import haxe.io.Bytes;
+import haxeon.wire.JsonWire;
 import materia.assembly.AssemblyCodec;
 import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyJointRole;
@@ -735,6 +736,35 @@ class ProjectKitTests {
     check(true, "valid custom material");
     rejects(function() MaterialLibrary.validateCustom([custom, custom]),
       "duplicate custom material");
+    var sheetGrades = MaterialLibrary.sheetMaterials();
+    check(sheetGrades.length == 2, "specific sheet grades have development defaults");
+    check(MaterialLibrary.require("painted").mechanical == null, "visual steel does not infer a structural grade");
+    var steel = MaterialLibrary.require("mild-steel");
+    MaterialLibrary.validateSheetProperties(steel);
+    var mechanical = steel.mechanical; if (mechanical == null) throw "missing steel properties";
+    near(mechanical.uts, 400, "plan material A UTS in MPa");
+    near(mechanical.youngs, 205000, "plan material A modulus in MPa");
+    var aluminium = MaterialLibrary.require("aluminium-5052-h32");
+    var aluminiumMechanical = aluminium.mechanical; if (aluminiumMechanical == null) throw "missing aluminium properties";
+    near(aluminiumMechanical.yield, 193, "plan material B yield in MPa");
+    var encoded = JsonWire.encode(sheetGrades);
+    var decoded:Array<MaterialDef> = JsonWire.decode(encoded);
+    check(decoded.length == 2, "typed material array round trip");
+    var decodedSheet = decoded[0].sheet; if (decodedSheet == null) throw "missing decoded sheet defaults";
+    near(decodedSheet.kFactorTable[1].k, 0.38, "typed sheet defaults round trip");
+    check(decodedSheet.grain, "rolling-direction requirement round trip");
+    custom.mechanical = {uts: 200, yield: 300, youngs: 70000};
+    rejects(function() MaterialLibrary.validateCustom([custom]), "yield above UTS rejected");
+    custom.mechanical = null;
+    custom.sheet = {kFactorTable: [{ratio: 1, k: 0.4}, {ratio: 1, k: 0.4}],
+      defaultRadiusRatio: 1, minRadiusRatio: 0.5, grain: false};
+    rejects(function() MaterialLibrary.validateCustom([custom]), "unordered or duplicate K rows rejected");
+    var customSheet = custom.sheet; if (customSheet == null) throw "missing custom sheet";
+    customSheet.kFactorTable = [{ratio: 0, k: 0.6}];
+    rejects(function() MaterialLibrary.validateCustom([custom]), "K outside ANSI range rejected");
+    customSheet.kFactorTable = [{ratio: 0, k: 0.4}];
+    customSheet.minRadiusRatio = 2;
+    rejects(function() MaterialLibrary.validateCustom([custom]), "default radius below minimum rejected");
     check(Appearances.same(Appearances.neutral(), null), "default appearance");
     check(Appearances.preset("rubber") != null, "appearance preset");
     Sys.println('ProjectKit tests passed ($assertions assertions)');

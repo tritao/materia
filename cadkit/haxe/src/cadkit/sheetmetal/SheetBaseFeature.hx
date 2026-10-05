@@ -6,7 +6,7 @@ import cadkit.parametric.FeatureId;
 import cadkit.parametric.Parameter;
 import cadkit.parametric.ParameterKind;
 import cadkit.parametric.features.ConstrainedSketchFeature;
-import cadkit.sheetmetal.SheetMaterial.SheetMechanical;
+import materia.project.MaterialDef.MaterialMechanical;
 
 /** Base sheet from one validated constrained-sketch region; the sketch can describe either sheet surface. */
 class SheetBaseFeature extends SheetFeature {
@@ -15,7 +15,7 @@ class SheetBaseFeature extends SheetFeature {
 	public final side:SheetSide;
 	public final materialId:String;
 	public final bendRule:Null<BendRule>;
-	public final mechanical:Null<SheetMechanical>;
+	public final mechanical:Null<MaterialMechanical>;
 	public final defaultRadiusRatio:Null<Float>;
 	public final minRadiusRatio:Null<Float>;
 	public final grainAngle:Null<Float>;

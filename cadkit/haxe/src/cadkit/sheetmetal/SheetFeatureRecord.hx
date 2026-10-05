@@ -1,7 +1,8 @@
 package cadkit.sheetmetal;
 
-import cadkit.sheetmetal.KFactorTable.KFactorRow;
-import cadkit.sheetmetal.SheetMaterial.SheetMechanical;
+import materia.project.MaterialDef.MaterialKFactorRow;
+import materia.project.MaterialDef.MaterialMechanical;
+import cadkit.sheetmetal.process.ProcessRuleRecord;
 
 /** Typed document payloads; JSON validation ends here before constructing sheet features. */
 @:wire typedef SheetBaseRecord = {
@@ -20,14 +21,15 @@ import cadkit.sheetmetal.SheetMaterial.SheetMechanical;
 @:wire typedef SheetStockRecord = {
 	@:id(1) var id:String;
 	@:id(2) var rule:Null<SheetSavedBendRule>;
-	@:id(3) var mechanical:Null<SheetMechanical>;
+	@:id(3) var mechanical:Null<MaterialMechanical>;
 	@:id(4) var defaultRadiusRatio:Null<Float>;
 	@:id(5) var minRadiusRatio:Null<Float>;
 	@:id(6) var grainAngle:Null<Float>;
 }
 
 @:wire enum SheetSavedBendRule {
-	@:id(1) KFactor(rows:Array<KFactorRow>);
+	@:id(1) KFactor(rows:Array<MaterialKFactorRow>);
+	@:id(2) Process(setup:ProcessRuleRecord);
 }
 
 @:wire typedef SheetFlangeRecord = {

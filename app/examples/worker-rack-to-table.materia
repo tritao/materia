@@ -1,6 +1,6 @@
 {
   "format": "materia.scene",
-  "version": 1,
+  "version": 2,
   "objects": [
     {
       "cadGraph": null,
@@ -128,7 +128,6 @@
       "worker": {
         "asset": "animkit/assets/quaternius/worker.glb",
         "job": "{\"version\":1,\"loop\":false,\"steps\":[{\"action\":\"pick\",\"object\":\"worker-demo-part\",\"hand\":\"right\",\"from\":\"worker-demo-rack\"},{\"action\":\"walkTo\",\"target\":{\"point\":[1.0,1.1]}},{\"action\":\"place\",\"onto\":\"worker-demo-table\",\"hand\":\"right\",\"offset\":[0.1,-0.05],\"retreat\":\"backward\"}]}",
-        "migrationNote": null,
         "zones": [
           "worker-demo-rack",
           "worker-demo-table"
@@ -147,8 +146,10 @@
         "schemaVersion": 1,
         "robotId": "materia/robot",
         "model": {
+          "schemaVersion": 9,
           "name": "Materia robot",
           "collisionApproximation": "bounds-box",
+          "floatingBase": false,
           "links": [
             {
               "centerOfMass": [
@@ -221,7 +222,25 @@
           ],
           "joints": [
             {
-              "axis": [
+              "id": "worker-demo-pivot",
+              "name": "Arm pivot",
+              "type": "revolute",
+              "parentLink": "base",
+              "childLink": "worker-demo-arm",
+              "limits": {
+                "lower": -0.8,
+                "upper": 0.8,
+                "velocity": 2,
+                "effort": 5,
+                "maxAcceleration": null
+              },
+              "parentFramePosition": [
+                0,
+                0,
+                1.3
+              ],
+              "parentFrameRotation": [
+                0,
                 0,
                 0,
                 1
@@ -237,34 +256,15 @@
                 0,
                 1
               ],
-              "id": "worker-demo-pivot",
-              "limits": {
-                "effort": 5,
-                "lower": -0.8,
-                "upper": 0.8,
-                "velocity": 2,
-                "maxAcceleration": null
-              },
-              "name": "Arm pivot",
-              "parentFramePosition": [
-                0,
-                0,
-                1.3
-              ],
-              "parentFrameRotation": [
-                0,
+              "axis": [
                 0,
                 0,
                 1
               ],
-              "type": "revolute",
-              "parentLink": "base",
-              "childLink": "worker-demo-arm",
               "dynamics": {
                 "armature": 0,
                 "damping": 0,
                 "frictionLoss": 0,
-                "limitTimeConstant": 0,
                 "limitDampingRatio": 0,
                 "limitImpedance": [
                   0,
@@ -272,13 +272,17 @@
                   0,
                   0,
                   0
-                ]
+                ],
+                "limitTimeConstant": 0
               }
             }
           ],
+          "actuators": [],
+          "couplings": [],
           "frames": [
             {
               "id": "base/sensors",
+              "link": "base",
               "name": "Base sensor mount",
               "position": [
                 0,
@@ -290,23 +294,22 @@
                 0,
                 0,
                 1
-              ],
-              "link": "base"
+              ]
             }
           ],
           "sensors": [
             {
-              "fieldOfViewRadians": 6.283185307179586,
               "id": "sensor/1",
-              "kind": "lidar",
-              "maxRange": 10,
               "name": "lidar 1",
-              "noiseSeed": 1,
-              "noiseStddev": 0,
-              "rayCount": 8,
-              "startAngleRadians": 0,
+              "kind": "lidar",
               "updateRate": 0,
-              "frame": "base/sensors"
+              "frame": "base/sensors",
+              "rayCount": 8,
+              "maxRange": 10,
+              "startAngleRadians": 0,
+              "fieldOfViewRadians": 6.283185307179586,
+              "noiseStddev": 0,
+              "noiseSeed": 1
             }
           ],
           "schemaVersion": 12,
@@ -340,374 +343,1458 @@
   },
   "script": null,
   "project": null,
-  "materials": [
-    {
-      "id": "neutral",
-      "name": "Neutral",
-      "physical": {
-        "density": 1000,
-        "spec": "unspecified"
-      },
-      "visual": {
-        "alpha": null,
-        "baseColor": [
-          0.7,
-          0.7,
-          0.7
+  "materials": {
+    "version": 1,
+    "value": [
+      [
+        [
+          "1:id",
+          "neutral"
         ],
-        "emissive": null,
-        "metallic": 0,
-        "roughness": 0.65
-      }
-    },
-    {
-      "id": "painted",
-      "name": "Painted steel",
-      "physical": {
-        "density": 7850,
-        "spec": "painted steel"
-      },
-      "visual": {
-        "alpha": null,
-        "baseColor": [
-          0.24,
-          0.34,
-          0.43
+        [
+          "2:name",
+          "Neutral"
         ],
-        "emissive": null,
-        "metallic": 0,
-        "roughness": 0.48
-      }
-    },
-    {
-      "id": "machined-steel",
-      "name": "Machined steel",
-      "physical": {
-        "density": 7850,
-        "spec": "steel"
-      },
-      "visual": {
-        "alpha": null,
-        "baseColor": [
-          0.62,
-          0.64,
-          0.67
+        [
+          "3:visual",
+          [
+            [
+              "1:baseColor",
+              [
+                0.7,
+                0.7,
+                0.7
+              ]
+            ],
+            [
+              "2:metallic",
+              0
+            ],
+            [
+              "3:roughness",
+              0.65
+            ],
+            [
+              "4:emissive",
+              null
+            ],
+            [
+              "5:alpha",
+              null
+            ]
+          ]
         ],
-        "emissive": null,
-        "metallic": 0.8,
-        "roughness": 0.34
-      }
-    },
-    {
-      "id": "steel-c45",
-      "name": "C45 steel",
-      "physical": {
-        "density": 7850,
-        "spec": "steel C45"
-      },
-      "visual": {
-        "alpha": null,
-        "baseColor": [
-          0.62,
-          0.64,
-          0.67
+        [
+          "4:physical",
+          [
+            [
+              "1:density",
+              1000
+            ],
+            [
+              "2:spec",
+              "unspecified"
+            ]
+          ]
         ],
-        "emissive": null,
-        "metallic": 0.8,
-        "roughness": 0.34
-      }
-    },
-    {
-      "id": "steel-8",
-      "name": "Class 8 steel",
-      "physical": {
-        "density": 7850,
-        "spec": "steel 8"
-      },
-      "visual": {
-        "alpha": null,
-        "baseColor": [
-          0.62,
-          0.64,
-          0.67
+        [
+          "5:mechanical",
+          null
         ],
-        "emissive": null,
-        "metallic": 0.8,
-        "roughness": 0.34
-      }
-    },
-    {
-      "id": "steel-8-8",
-      "name": "Class 8.8 steel",
-      "physical": {
-        "density": 7850,
-        "spec": "steel 8.8"
-      },
-      "visual": {
-        "alpha": null,
-        "baseColor": [
-          0.62,
-          0.64,
-          0.67
+        [
+          "6:sheet",
+          null
+        ]
+      ],
+      [
+        [
+          "1:id",
+          "painted"
         ],
-        "emissive": null,
-        "metallic": 0.8,
-        "roughness": 0.34
-      }
-    },
-    {
-      "id": "steel-12-9",
-      "name": "Class 12.9 steel",
-      "physical": {
-        "density": 7850,
-        "spec": "steel 12.9"
-      },
-      "visual": {
-        "alpha": null,
-        "baseColor": [
-          0.18,
-          0.19,
-          0.2
+        [
+          "2:name",
+          "Painted steel"
         ],
-        "emissive": null,
-        "metallic": 0.55,
-        "roughness": 0.52
-      }
-    },
-    {
-      "id": "black-oxide",
-      "name": "Black oxide steel",
-      "physical": {
-        "density": 7850,
-        "spec": "steel 12.9"
-      },
-      "visual": {
-        "alpha": null,
-        "baseColor": [
-          0.18,
-          0.19,
-          0.2
+        [
+          "3:visual",
+          [
+            [
+              "1:baseColor",
+              [
+                0.24,
+                0.34,
+                0.43
+              ]
+            ],
+            [
+              "2:metallic",
+              0
+            ],
+            [
+              "3:roughness",
+              0.48
+            ],
+            [
+              "4:emissive",
+              null
+            ],
+            [
+              "5:alpha",
+              null
+            ]
+          ]
         ],
-        "emissive": null,
-        "metallic": 0.55,
-        "roughness": 0.52
-      }
-    },
-    {
-      "id": "bearing-steel",
-      "name": "Bearing steel",
-      "physical": {
-        "density": 7810,
-        "spec": "bearing steel"
-      },
-      "visual": {
-        "alpha": null,
-        "baseColor": [
-          0.58,
-          0.61,
-          0.64
+        [
+          "4:physical",
+          [
+            [
+              "1:density",
+              7850
+            ],
+            [
+              "2:spec",
+              "painted steel"
+            ]
+          ]
         ],
-        "emissive": null,
-        "metallic": 0.78,
-        "roughness": 0.3
-      }
-    },
-    {
-      "id": "aluminium",
-      "name": "Anodized aluminium 6061",
-      "physical": {
-        "density": 2700,
-        "spec": "aluminium 6061"
-      },
-      "visual": {
-        "alpha": null,
-        "baseColor": [
-          0.68,
-          0.7,
-          0.72
+        [
+          "5:mechanical",
+          null
         ],
-        "emissive": null,
-        "metallic": 0.72,
-        "roughness": 0.42
-      }
-    },
-    {
-      "id": "rubber",
-      "name": "Rubber",
-      "physical": {
-        "density": 1100,
-        "spec": "rubber"
-      },
-      "visual": {
-        "alpha": null,
-        "baseColor": [
-          0.1,
-          0.1,
-          0.11
+        [
+          "6:sheet",
+          null
+        ]
+      ],
+      [
+        [
+          "1:id",
+          "machined-steel"
         ],
-        "emissive": null,
-        "metallic": 0,
-        "roughness": 0.9
-      }
-    },
-    {
-      "id": "nitrile-rubber",
-      "name": "Nitrile rubber",
-      "physical": {
-        "density": 1100,
-        "spec": "nitrile rubber NBR"
-      },
-      "visual": {
-        "alpha": null,
-        "baseColor": [
-          0.1,
-          0.1,
-          0.11
+        [
+          "2:name",
+          "Machined steel"
         ],
-        "emissive": null,
-        "metallic": 0,
-        "roughness": 0.9
-      }
-    },
-    {
-      "id": "plastic",
-      "name": "Engineering plastic",
-      "physical": {
-        "density": 1200,
-        "spec": "plastic"
-      },
-      "visual": {
-        "alpha": null,
-        "baseColor": [
-          0.28,
-          0.3,
-          0.32
+        [
+          "3:visual",
+          [
+            [
+              "1:baseColor",
+              [
+                0.62,
+                0.64,
+                0.67
+              ]
+            ],
+            [
+              "2:metallic",
+              0.8
+            ],
+            [
+              "3:roughness",
+              0.34
+            ],
+            [
+              "4:emissive",
+              null
+            ],
+            [
+              "5:alpha",
+              null
+            ]
+          ]
         ],
-        "emissive": null,
-        "metallic": 0,
-        "roughness": 0.55
-      }
-    },
-    {
-      "id": "polyurethane",
-      "name": "Polyurethane",
-      "physical": {
-        "density": 1200,
-        "spec": "polyurethane PU"
-      },
-      "visual": {
-        "alpha": null,
-        "baseColor": [
-          0.26,
-          0.34,
-          0.37
+        [
+          "4:physical",
+          [
+            [
+              "1:density",
+              7850
+            ],
+            [
+              "2:spec",
+              "steel"
+            ]
+          ]
         ],
-        "emissive": null,
-        "metallic": 0,
-        "roughness": 0.65
-      }
-    },
-    {
-      "id": "plywood-birch",
-      "name": "Birch plywood",
-      "physical": {
-        "density": 680,
-        "spec": "birch plywood"
-      },
-      "visual": {
-        "alpha": null,
-        "baseColor": [
-          0.7,
-          0.55,
-          0.34
+        [
+          "5:mechanical",
+          null
         ],
-        "emissive": null,
-        "metallic": 0,
-        "roughness": 0.72
-      }
-    },
-    {
-      "id": "cast-iron",
-      "name": "Cast iron",
-      "physical": {
-        "density": 7200,
-        "spec": "cast iron"
-      },
-      "visual": {
-        "alpha": null,
-        "baseColor": [
-          0.35,
-          0.37,
-          0.39
+        [
+          "6:sheet",
+          null
+        ]
+      ],
+      [
+        [
+          "1:id",
+          "steel-c45"
         ],
-        "emissive": null,
-        "metallic": 0.6,
-        "roughness": 0.55
-      }
-    },
-    {
-      "id": "bronze",
-      "name": "Bronze",
-      "physical": {
-        "density": 8800,
-        "spec": "bronze"
-      },
-      "visual": {
-        "alpha": null,
-        "baseColor": [
-          0.55,
-          0.38,
-          0.2
+        [
+          "2:name",
+          "C45 steel"
         ],
-        "emissive": null,
-        "metallic": 0.7,
-        "roughness": 0.38
-      }
-    },
-    {
-      "id": "brass",
-      "name": "Brass",
-      "physical": {
-        "density": 8500,
-        "spec": "brass"
-      },
-      "visual": {
-        "alpha": null,
-        "baseColor": [
-          0.69,
-          0.55,
-          0.29
+        [
+          "3:visual",
+          [
+            [
+              "1:baseColor",
+              [
+                0.62,
+                0.64,
+                0.67
+              ]
+            ],
+            [
+              "2:metallic",
+              0.8
+            ],
+            [
+              "3:roughness",
+              0.34
+            ],
+            [
+              "4:emissive",
+              null
+            ],
+            [
+              "5:alpha",
+              null
+            ]
+          ]
         ],
-        "emissive": null,
-        "metallic": 0.75,
-        "roughness": 0.34
-      }
-    },
-    {
-      "id": "spring-steel",
-      "name": "Spring steel",
-      "physical": {
-        "density": 7850,
-        "spec": "spring steel"
-      },
-      "visual": {
-        "alpha": null,
-        "baseColor": [
-          0.56,
-          0.58,
-          0.6
+        [
+          "4:physical",
+          [
+            [
+              "1:density",
+              7850
+            ],
+            [
+              "2:spec",
+              "steel C45"
+            ]
+          ]
         ],
-        "emissive": null,
-        "metallic": 0.75,
-        "roughness": 0.38
-      }
-    }
-  ],
+        [
+          "5:mechanical",
+          null
+        ],
+        [
+          "6:sheet",
+          null
+        ]
+      ],
+      [
+        [
+          "1:id",
+          "steel-8"
+        ],
+        [
+          "2:name",
+          "Class 8 steel"
+        ],
+        [
+          "3:visual",
+          [
+            [
+              "1:baseColor",
+              [
+                0.62,
+                0.64,
+                0.67
+              ]
+            ],
+            [
+              "2:metallic",
+              0.8
+            ],
+            [
+              "3:roughness",
+              0.34
+            ],
+            [
+              "4:emissive",
+              null
+            ],
+            [
+              "5:alpha",
+              null
+            ]
+          ]
+        ],
+        [
+          "4:physical",
+          [
+            [
+              "1:density",
+              7850
+            ],
+            [
+              "2:spec",
+              "steel 8"
+            ]
+          ]
+        ],
+        [
+          "5:mechanical",
+          null
+        ],
+        [
+          "6:sheet",
+          null
+        ]
+      ],
+      [
+        [
+          "1:id",
+          "steel-8-8"
+        ],
+        [
+          "2:name",
+          "Class 8.8 steel"
+        ],
+        [
+          "3:visual",
+          [
+            [
+              "1:baseColor",
+              [
+                0.62,
+                0.64,
+                0.67
+              ]
+            ],
+            [
+              "2:metallic",
+              0.8
+            ],
+            [
+              "3:roughness",
+              0.34
+            ],
+            [
+              "4:emissive",
+              null
+            ],
+            [
+              "5:alpha",
+              null
+            ]
+          ]
+        ],
+        [
+          "4:physical",
+          [
+            [
+              "1:density",
+              7850
+            ],
+            [
+              "2:spec",
+              "steel 8.8"
+            ]
+          ]
+        ],
+        [
+          "5:mechanical",
+          null
+        ],
+        [
+          "6:sheet",
+          null
+        ]
+      ],
+      [
+        [
+          "1:id",
+          "steel-12-9"
+        ],
+        [
+          "2:name",
+          "Class 12.9 steel"
+        ],
+        [
+          "3:visual",
+          [
+            [
+              "1:baseColor",
+              [
+                0.18,
+                0.19,
+                0.2
+              ]
+            ],
+            [
+              "2:metallic",
+              0.55
+            ],
+            [
+              "3:roughness",
+              0.52
+            ],
+            [
+              "4:emissive",
+              null
+            ],
+            [
+              "5:alpha",
+              null
+            ]
+          ]
+        ],
+        [
+          "4:physical",
+          [
+            [
+              "1:density",
+              7850
+            ],
+            [
+              "2:spec",
+              "steel 12.9"
+            ]
+          ]
+        ],
+        [
+          "5:mechanical",
+          null
+        ],
+        [
+          "6:sheet",
+          null
+        ]
+      ],
+      [
+        [
+          "1:id",
+          "black-oxide"
+        ],
+        [
+          "2:name",
+          "Black oxide steel"
+        ],
+        [
+          "3:visual",
+          [
+            [
+              "1:baseColor",
+              [
+                0.18,
+                0.19,
+                0.2
+              ]
+            ],
+            [
+              "2:metallic",
+              0.55
+            ],
+            [
+              "3:roughness",
+              0.52
+            ],
+            [
+              "4:emissive",
+              null
+            ],
+            [
+              "5:alpha",
+              null
+            ]
+          ]
+        ],
+        [
+          "4:physical",
+          [
+            [
+              "1:density",
+              7850
+            ],
+            [
+              "2:spec",
+              "steel 12.9"
+            ]
+          ]
+        ],
+        [
+          "5:mechanical",
+          null
+        ],
+        [
+          "6:sheet",
+          null
+        ]
+      ],
+      [
+        [
+          "1:id",
+          "bearing-steel"
+        ],
+        [
+          "2:name",
+          "Bearing steel"
+        ],
+        [
+          "3:visual",
+          [
+            [
+              "1:baseColor",
+              [
+                0.58,
+                0.61,
+                0.64
+              ]
+            ],
+            [
+              "2:metallic",
+              0.78
+            ],
+            [
+              "3:roughness",
+              0.3
+            ],
+            [
+              "4:emissive",
+              null
+            ],
+            [
+              "5:alpha",
+              null
+            ]
+          ]
+        ],
+        [
+          "4:physical",
+          [
+            [
+              "1:density",
+              7810
+            ],
+            [
+              "2:spec",
+              "bearing steel"
+            ]
+          ]
+        ],
+        [
+          "5:mechanical",
+          null
+        ],
+        [
+          "6:sheet",
+          null
+        ]
+      ],
+      [
+        [
+          "1:id",
+          "aluminium"
+        ],
+        [
+          "2:name",
+          "Anodized aluminium 6061"
+        ],
+        [
+          "3:visual",
+          [
+            [
+              "1:baseColor",
+              [
+                0.68,
+                0.7,
+                0.72
+              ]
+            ],
+            [
+              "2:metallic",
+              0.72
+            ],
+            [
+              "3:roughness",
+              0.42
+            ],
+            [
+              "4:emissive",
+              null
+            ],
+            [
+              "5:alpha",
+              null
+            ]
+          ]
+        ],
+        [
+          "4:physical",
+          [
+            [
+              "1:density",
+              2700
+            ],
+            [
+              "2:spec",
+              "aluminium 6061"
+            ]
+          ]
+        ],
+        [
+          "5:mechanical",
+          null
+        ],
+        [
+          "6:sheet",
+          null
+        ]
+      ],
+      [
+        [
+          "1:id",
+          "rubber"
+        ],
+        [
+          "2:name",
+          "Rubber"
+        ],
+        [
+          "3:visual",
+          [
+            [
+              "1:baseColor",
+              [
+                0.1,
+                0.1,
+                0.11
+              ]
+            ],
+            [
+              "2:metallic",
+              0
+            ],
+            [
+              "3:roughness",
+              0.9
+            ],
+            [
+              "4:emissive",
+              null
+            ],
+            [
+              "5:alpha",
+              null
+            ]
+          ]
+        ],
+        [
+          "4:physical",
+          [
+            [
+              "1:density",
+              1100
+            ],
+            [
+              "2:spec",
+              "rubber"
+            ]
+          ]
+        ],
+        [
+          "5:mechanical",
+          null
+        ],
+        [
+          "6:sheet",
+          null
+        ]
+      ],
+      [
+        [
+          "1:id",
+          "nitrile-rubber"
+        ],
+        [
+          "2:name",
+          "Nitrile rubber"
+        ],
+        [
+          "3:visual",
+          [
+            [
+              "1:baseColor",
+              [
+                0.1,
+                0.1,
+                0.11
+              ]
+            ],
+            [
+              "2:metallic",
+              0
+            ],
+            [
+              "3:roughness",
+              0.9
+            ],
+            [
+              "4:emissive",
+              null
+            ],
+            [
+              "5:alpha",
+              null
+            ]
+          ]
+        ],
+        [
+          "4:physical",
+          [
+            [
+              "1:density",
+              1100
+            ],
+            [
+              "2:spec",
+              "nitrile rubber NBR"
+            ]
+          ]
+        ],
+        [
+          "5:mechanical",
+          null
+        ],
+        [
+          "6:sheet",
+          null
+        ]
+      ],
+      [
+        [
+          "1:id",
+          "plastic"
+        ],
+        [
+          "2:name",
+          "Engineering plastic"
+        ],
+        [
+          "3:visual",
+          [
+            [
+              "1:baseColor",
+              [
+                0.28,
+                0.3,
+                0.32
+              ]
+            ],
+            [
+              "2:metallic",
+              0
+            ],
+            [
+              "3:roughness",
+              0.55
+            ],
+            [
+              "4:emissive",
+              null
+            ],
+            [
+              "5:alpha",
+              null
+            ]
+          ]
+        ],
+        [
+          "4:physical",
+          [
+            [
+              "1:density",
+              1200
+            ],
+            [
+              "2:spec",
+              "plastic"
+            ]
+          ]
+        ],
+        [
+          "5:mechanical",
+          null
+        ],
+        [
+          "6:sheet",
+          null
+        ]
+      ],
+      [
+        [
+          "1:id",
+          "polycarbonate"
+        ],
+        [
+          "2:name",
+          "Polycarbonate"
+        ],
+        [
+          "3:visual",
+          [
+            [
+              "1:baseColor",
+              [
+                0.58,
+                0.74,
+                0.79
+              ]
+            ],
+            [
+              "2:metallic",
+              0
+            ],
+            [
+              "3:roughness",
+              0.2
+            ],
+            [
+              "4:emissive",
+              null
+            ],
+            [
+              "5:alpha",
+              null
+            ]
+          ]
+        ],
+        [
+          "4:physical",
+          [
+            [
+              "1:density",
+              1200
+            ],
+            [
+              "2:spec",
+              "polycarbonate"
+            ]
+          ]
+        ],
+        [
+          "5:mechanical",
+          null
+        ],
+        [
+          "6:sheet",
+          null
+        ]
+      ],
+      [
+        [
+          "1:id",
+          "polyurethane"
+        ],
+        [
+          "2:name",
+          "Polyurethane"
+        ],
+        [
+          "3:visual",
+          [
+            [
+              "1:baseColor",
+              [
+                0.26,
+                0.34,
+                0.37
+              ]
+            ],
+            [
+              "2:metallic",
+              0
+            ],
+            [
+              "3:roughness",
+              0.65
+            ],
+            [
+              "4:emissive",
+              null
+            ],
+            [
+              "5:alpha",
+              null
+            ]
+          ]
+        ],
+        [
+          "4:physical",
+          [
+            [
+              "1:density",
+              1200
+            ],
+            [
+              "2:spec",
+              "polyurethane PU"
+            ]
+          ]
+        ],
+        [
+          "5:mechanical",
+          null
+        ],
+        [
+          "6:sheet",
+          null
+        ]
+      ],
+      [
+        [
+          "1:id",
+          "plywood-birch"
+        ],
+        [
+          "2:name",
+          "Birch plywood"
+        ],
+        [
+          "3:visual",
+          [
+            [
+              "1:baseColor",
+              [
+                0.7,
+                0.55,
+                0.34
+              ]
+            ],
+            [
+              "2:metallic",
+              0
+            ],
+            [
+              "3:roughness",
+              0.72
+            ],
+            [
+              "4:emissive",
+              null
+            ],
+            [
+              "5:alpha",
+              null
+            ]
+          ]
+        ],
+        [
+          "4:physical",
+          [
+            [
+              "1:density",
+              680
+            ],
+            [
+              "2:spec",
+              "birch plywood"
+            ]
+          ]
+        ],
+        [
+          "5:mechanical",
+          null
+        ],
+        [
+          "6:sheet",
+          null
+        ]
+      ],
+      [
+        [
+          "1:id",
+          "cast-iron"
+        ],
+        [
+          "2:name",
+          "Cast iron"
+        ],
+        [
+          "3:visual",
+          [
+            [
+              "1:baseColor",
+              [
+                0.35,
+                0.37,
+                0.39
+              ]
+            ],
+            [
+              "2:metallic",
+              0.6
+            ],
+            [
+              "3:roughness",
+              0.55
+            ],
+            [
+              "4:emissive",
+              null
+            ],
+            [
+              "5:alpha",
+              null
+            ]
+          ]
+        ],
+        [
+          "4:physical",
+          [
+            [
+              "1:density",
+              7200
+            ],
+            [
+              "2:spec",
+              "cast iron"
+            ]
+          ]
+        ],
+        [
+          "5:mechanical",
+          null
+        ],
+        [
+          "6:sheet",
+          null
+        ]
+      ],
+      [
+        [
+          "1:id",
+          "bronze"
+        ],
+        [
+          "2:name",
+          "Bronze"
+        ],
+        [
+          "3:visual",
+          [
+            [
+              "1:baseColor",
+              [
+                0.55,
+                0.38,
+                0.2
+              ]
+            ],
+            [
+              "2:metallic",
+              0.7
+            ],
+            [
+              "3:roughness",
+              0.38
+            ],
+            [
+              "4:emissive",
+              null
+            ],
+            [
+              "5:alpha",
+              null
+            ]
+          ]
+        ],
+        [
+          "4:physical",
+          [
+            [
+              "1:density",
+              8800
+            ],
+            [
+              "2:spec",
+              "bronze"
+            ]
+          ]
+        ],
+        [
+          "5:mechanical",
+          null
+        ],
+        [
+          "6:sheet",
+          null
+        ]
+      ],
+      [
+        [
+          "1:id",
+          "brass"
+        ],
+        [
+          "2:name",
+          "Brass"
+        ],
+        [
+          "3:visual",
+          [
+            [
+              "1:baseColor",
+              [
+                0.69,
+                0.55,
+                0.29
+              ]
+            ],
+            [
+              "2:metallic",
+              0.75
+            ],
+            [
+              "3:roughness",
+              0.34
+            ],
+            [
+              "4:emissive",
+              null
+            ],
+            [
+              "5:alpha",
+              null
+            ]
+          ]
+        ],
+        [
+          "4:physical",
+          [
+            [
+              "1:density",
+              8500
+            ],
+            [
+              "2:spec",
+              "brass"
+            ]
+          ]
+        ],
+        [
+          "5:mechanical",
+          null
+        ],
+        [
+          "6:sheet",
+          null
+        ]
+      ],
+      [
+        [
+          "1:id",
+          "spring-steel"
+        ],
+        [
+          "2:name",
+          "Spring steel"
+        ],
+        [
+          "3:visual",
+          [
+            [
+              "1:baseColor",
+              [
+                0.56,
+                0.58,
+                0.6
+              ]
+            ],
+            [
+              "2:metallic",
+              0.75
+            ],
+            [
+              "3:roughness",
+              0.38
+            ],
+            [
+              "4:emissive",
+              null
+            ],
+            [
+              "5:alpha",
+              null
+            ]
+          ]
+        ],
+        [
+          "4:physical",
+          [
+            [
+              "1:density",
+              7850
+            ],
+            [
+              "2:spec",
+              "spring steel"
+            ]
+          ]
+        ],
+        [
+          "5:mechanical",
+          null
+        ],
+        [
+          "6:sheet",
+          null
+        ]
+      ],
+      [
+        [
+          "1:id",
+          "mild-steel"
+        ],
+        [
+          "2:name",
+          "Mild steel sheet"
+        ],
+        [
+          "3:visual",
+          [
+            [
+              "1:baseColor",
+              [
+                0.62,
+                0.64,
+                0.67
+              ]
+            ],
+            [
+              "2:metallic",
+              0.8
+            ],
+            [
+              "3:roughness",
+              0.34
+            ],
+            [
+              "4:emissive",
+              null
+            ],
+            [
+              "5:alpha",
+              null
+            ]
+          ]
+        ],
+        [
+          "4:physical",
+          [
+            [
+              "1:density",
+              7850
+            ],
+            [
+              "2:spec",
+              "mild steel sheet"
+            ]
+          ]
+        ],
+        [
+          "5:mechanical",
+          [
+            [
+              "1:uts",
+              400
+            ],
+            [
+              "2:yield",
+              250
+            ],
+            [
+              "3:youngs",
+              205000
+            ]
+          ]
+        ],
+        [
+          "6:sheet",
+          [
+            [
+              "1:kFactorTable",
+              [
+                [
+                  [
+                    "1:ratio",
+                    0
+                  ],
+                  [
+                    "2:k",
+                    0.3
+                  ]
+                ],
+                [
+                  [
+                    "1:ratio",
+                    1
+                  ],
+                  [
+                    "2:k",
+                    0.38
+                  ]
+                ],
+                [
+                  [
+                    "1:ratio",
+                    3
+                  ],
+                  [
+                    "2:k",
+                    0.45
+                  ]
+                ]
+              ]
+            ],
+            [
+              "2:defaultRadiusRatio",
+              1
+            ],
+            [
+              "3:minRadiusRatio",
+              0.5
+            ],
+            [
+              "4:grain",
+              true
+            ]
+          ]
+        ]
+      ],
+      [
+        [
+          "1:id",
+          "aluminium-5052-h32"
+        ],
+        [
+          "2:name",
+          "5052-H32 aluminium sheet"
+        ],
+        [
+          "3:visual",
+          [
+            [
+              "1:baseColor",
+              [
+                0.68,
+                0.7,
+                0.72
+              ]
+            ],
+            [
+              "2:metallic",
+              0.72
+            ],
+            [
+              "3:roughness",
+              0.42
+            ],
+            [
+              "4:emissive",
+              null
+            ],
+            [
+              "5:alpha",
+              null
+            ]
+          ]
+        ],
+        [
+          "4:physical",
+          [
+            [
+              "1:density",
+              2680
+            ],
+            [
+              "2:spec",
+              "aluminium 5052-H32 sheet"
+            ]
+          ]
+        ],
+        [
+          "5:mechanical",
+          [
+            [
+              "1:uts",
+              228
+            ],
+            [
+              "2:yield",
+              193
+            ],
+            [
+              "3:youngs",
+              70000
+            ]
+          ]
+        ],
+        [
+          "6:sheet",
+          [
+            [
+              "1:kFactorTable",
+              [
+                [
+                  [
+                    "1:ratio",
+                    0
+                  ],
+                  [
+                    "2:k",
+                    0.33
+                  ]
+                ],
+                [
+                  [
+                    "1:ratio",
+                    1
+                  ],
+                  [
+                    "2:k",
+                    0.4
+                  ]
+                ],
+                [
+                  [
+                    "1:ratio",
+                    3
+                  ],
+                  [
+                    "2:k",
+                    0.45
+                  ]
+                ]
+              ]
+            ],
+            [
+              "2:defaultRadiusRatio",
+              1
+            ],
+            [
+              "3:minRadiusRatio",
+              1
+            ],
+            [
+              "4:grain",
+              true
+            ]
+          ]
+        ]
+      ]
+    ]
+  },
   "bim": {
     "format": "cadkit.document",
-    "version": 11,
+    "version": 15,
     "lengthUnit": "mm",
-    "documentId": "document-2dc790362b8b456800000001",
+    "documentId": "document-0a096929327b23c600000002",
     "implicitOutput": false,
     "features": [],
     "parameters": [],
@@ -725,24 +1812,24 @@
       "loop": true,
       "keys": [
         {
-          "time": 0,
-          "position": 0
+          "position": 0,
+          "time": 0
         },
         {
-          "time": 1.5,
-          "position": 0.6
+          "position": 0.6,
+          "time": 1.5
         },
         {
-          "time": 3,
-          "position": 0
+          "position": 0,
+          "time": 3
         },
         {
-          "time": 4.5,
-          "position": -0.6
+          "position": -0.6,
+          "time": 4.5
         },
         {
-          "time": 6,
-          "position": 0
+          "position": 0,
+          "time": 6
         }
       ]
     }

@@ -1,6 +1,7 @@
 package app;
 
 import haxe.Json;
+import haxeon.wire.JsonWire;
 import humankit.job.HumanJobSpec;
 import bimkit.BimCodec;
 import bimkit.BimDocument;
@@ -11,7 +12,7 @@ import materia.project.MaterialLibrary;
 
 class SceneCodec {
   public static inline var FORMAT:String = "materia.scene";
-  public static inline var VERSION:Int = 1;
+  public static inline var VERSION:Int = 2;
 
   public static function encode(scene:EditorScene,
     ? sensors:SensorConfiguration, ? script:ScriptOwnershipRecord, ? bim:BimDocument,
@@ -25,7 +26,7 @@ class SceneCodec {
     for (object in objects) encodedObjects.push(encodeObject(object, custom));
     return Json.stringify({format: FORMAT, version: VERSION, objects: encodedObjects,
       sensors: script == null && sensors != null ? sensors.records() : null,
-      script: script, project: project, materials: MaterialLibrary.all().concat(custom),
+      script: script, project: project, materials: Json.parse(JsonWire.encode(MaterialLibrary.all().concat(custom))),
       bim: bim == null ? null : Json.parse(BimCodec.encode(bim)),
       recipeDocument: recipeDocument,
       robotMotions: robotMotions == null || robotMotions.length == 0 ? null :
@@ -85,43 +86,18 @@ class SceneCodec {
   public static function decodeCustomMaterialsRoot(root:Dynamic):Array<MaterialDef> {
     if (!Reflect.hasField(root, "materials") || Reflect.field(root, "materials") == null) return [];
     var raw:Dynamic = Reflect.field(root, "materials");
-    if (!Std.isOfType(raw, Array)) throw "Scene materials must be an array";
     var custom:Array<MaterialDef> = [];
     var seen = new Map<String, Bool>();
-    var materials:Array<Dynamic> = cast raw;
+    var materials:Array<MaterialDef> = JsonWire.decode(Json.stringify(raw));
     for (material in materials) {
-      var id = stringField(material, "id");
+      var id = material.id;
       if (seen.exists(id)) throw "Duplicate scene material";
       seen.set(id, true);
       if (MaterialLibrary.get(id) != null) continue;
-      var visual = field(material, "visual"), physical = field(material, "physical");
-      var parsed:MaterialDef = {
-        id: id, name: stringField(material, "name"),
-        visual: {baseColor: materialColor(field(visual, "baseColor")),
-          metallic: numberField(visual, "metallic"), roughness: numberField(visual, "roughness")},
-        physical: {density: numberField(physical, "density"), spec: stringField(physical, "spec")}
-      };
-      if (Reflect.hasField(visual, "emissive") && Reflect.field(visual, "emissive") != null)
-        parsed.visual.emissive = materialColor(Reflect.field(visual, "emissive"));
-      if (Reflect.hasField(visual, "alpha") && Reflect.field(visual, "alpha") != null)
-        parsed.visual.alpha = numberField(visual, "alpha");
-      custom.push(parsed);
+      custom.push(material);
     }
     MaterialLibrary.validateCustom(custom);
     return custom;
-  }
-
-  static function materialColor(raw:Dynamic):Array<Float> {
-    if (!Std.isOfType(raw, Array)) throw "Scene material color must be an array";
-    var values:Array<Dynamic> = cast raw;
-    if (values.length != 3) throw "Scene material color must have three channels";
-    var color:Array<Float> = [];
-    for (value in values) {
-      if ((!Std.isOfType(value, Float) && !Std.isOfType(value, Int)) || !Math.isFinite(cast value))
-        throw "Scene material color must be finite";
-      color.push(cast value);
-    }
-    return color;
   }
 
   public static function decodeProjectRoot(root:Dynamic):Null<ProjectSceneRecord> {

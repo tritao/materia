@@ -23,7 +23,7 @@ class SceneObjectCommands {
       app.runSceneEdit("Could not create extrusion", function() app.scene.createExtrusion());
     }, null, function() return app.canEditObjects() && app.scene.canCreateExtrusion()));
     app.commands.register(new Command("scene.create-sheet-base", "Create sheet base", function() {
-      app.runSceneEdit("Could not create sheet base", function() return app.scene.createSheetBase(app.scene.sheetAuthoring.stock()));
+      app.runSceneEdit("Could not create sheet base", function() return app.scene.createSheetBase(app.scene.sheetAuthoring.stock(app.session.customMaterials)));
     }, null, function() return app.canEditObjects() && app.scene.canCreateExtrusion()));
     app.commands.register(new Command("scene.create-sheet-flange", "Create edge flange", function() {
       var input = app.scene.sheetAuthoring;

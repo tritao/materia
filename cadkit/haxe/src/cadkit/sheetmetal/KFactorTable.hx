@@ -1,5 +1,7 @@
 package cadkit.sheetmetal;
 
+import materia.project.MaterialDef.MaterialKFactorRow;
+
 /** Published or calibrated neutral-axis positions. Values are stored in the ANSI convention. */
 class KFactorTable {
 	final ratios:Array<Float>;
@@ -35,13 +37,7 @@ class KFactorTable {
 	}
 
 	/** Canonical ANSI rows for saved stock specifications; callers cannot mutate the table. */
-	public function rows():Array<KFactorRow> {
+	public function rows():Array<MaterialKFactorRow> {
 		return [for (i in 0...ratios.length) {ratio: ratios[i], k: factors[i]}];
 	}
-}
-
-/** Canonical ANSI rule row, also used by the typed sheet stock record. */
-@:wire typedef KFactorRow = {
-	@:id(1) var ratio:Float;
-	@:id(2) var k:Float;
 }

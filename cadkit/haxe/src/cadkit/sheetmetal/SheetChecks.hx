@@ -2,6 +2,8 @@ package cadkit.sheetmetal;
 
 import cadkit.modeling.Vector;
 import cadkit.sheetmetal.FlatDomain.FlatOwner;
+import cadkit.sheetmetal.process.AirBending;
+import cadkit.sheetmetal.process.ProcessTooling;
 
 /** Pure manufacturability checks retain exact offending geometry and explicit assumed rules. */
 class SheetChecks {
@@ -12,7 +14,7 @@ class SheetChecks {
 		}
 		return false;
 	}
-	public static function of(sheet:Sheet):SheetCheckReport {
+	public static function of(sheet:Sheet, ?tooling:ProcessTooling):SheetCheckReport {
 		var flat = FlatPattern.of(sheet); var findings:Array<SheetFinding> = []; var domains = flat.domains();
 		for (i in 0...domains.length) for (j in (i + 1)...domains.length) {
 			var regions = OutlineBoolean.intersection(domains[i].outline, domains[j].outline, "overlap");
@@ -38,12 +40,16 @@ class SheetChecks {
 			}
 			for (point in [guide.start, guide.end]) if (interior(flat, point)) findings.push(new SheetFinding(MissingRelief,
 				"Bend " + bend.id + " ends at (" + point.x + ", " + point.y + ") inside developed material without an opening", false, InteriorPoint(point), [BendMark(bend.id, guide), BendEnd(bend.id, point)]));
-			var minimum = 4 * sheet.thickness();
+			var opening = tooling != null ? tooling.vWidth : switch (sheet.material.bendRule) {
+				case Process(setup): setup.tooling.vWidth;
+				case _: AirBending.defaultOpening(sheet.thickness());
+			};
+			var minimum = AirBending.minimumFlange(opening);
 			for (side in 0...2) {
 				if (side == 1 && sheet.isRipped(bend.id)) {
 					var geometry = marks.copy();
 					for (domain in domains) switch (domain.owner) { case Bend(id): if (id == bend.id) geometry.push(Material(domain.owner, domain.outline)); case _: {} }
-					findings.push(new SheetFinding(ShortFlange, "Ripped bend " + bend.id + " has no straight return beyond its curved strip for the assumed 4T tooling minimum", true,
+					findings.push(new SheetFinding(ShortFlange, "Ripped bend " + bend.id + " has no straight return beyond its curved strip for the assumed 0.7V tooling minimum", true,
 						DistanceMm(0, minimum), geometry));
 					continue;
 				}
@@ -51,7 +57,7 @@ class SheetChecks {
 				var extent = FlangeDepth.minimum(wall.outline, attachment);
 				if (extent < minimum - 1e-8) {
 					var mapped = SheetProfile.transform(wall.outline, evaluated.wall(wall.id).plane, flat.plane);
-					findings.push(new SheetFinding(ShortFlange, "Wall " + wall.id + " at bend " + bend.id + " is shorter than the assumed 4T tooling minimum", true,
+					findings.push(new SheetFinding(ShortFlange, "Wall " + wall.id + " at bend " + bend.id + " is shorter than the assumed 0.7V tooling minimum", true,
 						DistanceMm(extent, minimum), [Material(FlatOwner.Wall(wall.id), mapped), BendMark(bend.id, guide)]));
 				}
 			}

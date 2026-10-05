@@ -53,7 +53,7 @@ class SheetEdgeFlangeFeature extends SheetEdgeFeature {
 		var graph = source.sheetForEvaluation(context);
 		var selected = selectedEdges(context, graph);
 		var walls = wallIds(); var bends = bendIds();
-		var bendRadius = useMaterialRadius ? graph.material.defaultRadius() : radius.value;
+		var bendRadius = useMaterialRadius ? graph.material.defaultRadius(angle.value) : radius.value;
 		var scale = reliefSizing == ThicknessRatio ? graph.thickness() : 1.0;
 		for (slot in 0...selected.length) {
 			var selection = selected[slot];

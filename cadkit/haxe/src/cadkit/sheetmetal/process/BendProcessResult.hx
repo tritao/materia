@@ -11,6 +11,7 @@ typedef BendProcessResult = {
 	final depth:Float;
 	final analyticDepth:Float;
 	final depthOffset:Float;
+	/** A radius/depth measurement applied; force and flange minimum remain assumed. */
 	final calibrated:Bool;
 	final force:Float;
 	final minimumFlange:Float;

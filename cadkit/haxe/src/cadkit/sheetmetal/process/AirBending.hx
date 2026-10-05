@@ -2,7 +2,7 @@ package cadkit.sheetmetal.process;
 
 import cadkit.sheetmetal.SheetDiagnosis;
 import cadkit.sheetmetal.SheetMaterial;
-import cadkit.sheetmetal.SheetMaterial.SheetMechanical;
+import materia.project.MaterialDef.MaterialMechanical;
 
 /** Assumed air-bending formulas. Calibration and catalogue ratings remain separate inputs. */
 class AirBending implements BendProcess {
@@ -50,14 +50,30 @@ class AirBending implements BendProcess {
 			depth: analyticDepth + depthOffset, analyticDepth: analyticDepth,
 			depthOffset: depthOffset, calibrated: entry != null,
 			force: force,
-			minimumFlange: 0.7 * tooling.vWidth,
+			minimumFlange: minimumFlange(tooling.vWidth),
 			radiusBend: tooling.punchRadius > naturalRadius,
 			recommendedOpening: tooling.vWidth >= 6 * thickness && tooling.vWidth <= 12 * thickness
 		};
 	}
 
+	/** Assumed thin-stock default V=8T; thicker stock requires an explicit tooling choice. */
+	public static function defaultOpening(thickness:Float):Float {
+		if (!Math.isFinite(thickness) || thickness <= 0)
+			throw new SheetDiagnosis("sheet.invalid-thickness", "Thickness must be positive mm");
+		if (thickness > 3)
+			throw new SheetDiagnosis("sheet.no-default-tooling", "Choose tooling explicitly for stock thicker than 3 mm");
+		return 8 * thickness;
+	}
+
+	/** Assumed minimum flange for 90-degree air bending, in mm. */
+	public static function minimumFlange(opening:Float):Float {
+		if (!Math.isFinite(opening) || opening <= 0)
+			throw new SheetDiagnosis("sheet.invalid-die-opening", "Die opening must be positive mm");
+		return 0.7 * opening;
+	}
+
 	/** Elastic-plastic radius relation; refuse the nonphysical branch instead of extrapolating. */
-	public static function unloadRadius(loadedRadius:Float, thickness:Float, mechanical:SheetMechanical):Float {
+	public static function unloadRadius(loadedRadius:Float, thickness:Float, mechanical:MaterialMechanical):Float {
 		if (!Math.isFinite(loadedRadius) || loadedRadius <= 0 || !Math.isFinite(thickness) || thickness <= 0
 			|| !Math.isFinite(mechanical.yield) || mechanical.yield <= 0
 			|| !Math.isFinite(mechanical.youngs) || mechanical.youngs <= mechanical.yield)
@@ -75,7 +91,7 @@ class AirBending implements BendProcess {
 	}
 
 	/** Invert the monotone physical branch with a bracketed solve, without a guessed iteration seed. */
-	public static function loadRadius(finalRadius:Float, thickness:Float, mechanical:SheetMechanical):Float {
+	public static function loadRadius(finalRadius:Float, thickness:Float, mechanical:MaterialMechanical):Float {
 		if (!Math.isFinite(finalRadius) || finalRadius <= 0 || !Math.isFinite(thickness) || thickness <= 0
 			|| !Math.isFinite(mechanical.yield) || mechanical.yield <= 0
 			|| !Math.isFinite(mechanical.youngs) || mechanical.youngs <= mechanical.yield)

@@ -36,6 +36,7 @@ import haxeon.wire.JsonWire;
 import cadkit.sheetmetal.SheetMaterial;
 import cadkit.sheetmetal.BendRule;
 import cadkit.sheetmetal.KFactorTable;
+import cadkit.sheetmetal.process.ProcessBendRule;
 import cadkit.sketch.ConstrainedSketch;
 import cadkit.sketch.SketchPoint;
 import cadkit.sketch.SketchEntity;
@@ -80,7 +81,7 @@ import cadkit.parametric.RelationshipId;
 /** Versioned JSON persistence for the Haxeon parametric document layer. */
 class DocumentCodec {
 	public static inline var FORMAT:String = "cadkit.document";
-	public static inline var VERSION:Int = 14;
+	public static inline var VERSION:Int = 15;
 	public static function encode(document:Document):String {
 		var encodedFeatures:Array<Dynamic> = [];
 		for (index in 0...document.featureCount()) {
@@ -871,6 +872,7 @@ class DocumentCodec {
 		if (stock.bendRule != null)
 			switch (stock.bendRule) {
 				case KFactor(table): rule = SheetSavedBendRule.KFactor(table.rows());
+				case Process(setup): rule = SheetSavedBendRule.Process(setup.record());
 			}
 		return {id: stock.id, rule: rule, mechanical: stock.mechanical,
 			defaultRadiusRatio: stock.defaultRadiusRatio, minRadiusRatio: stock.minRadiusRatio, grainAngle: stock.grainAngle};
@@ -880,6 +882,7 @@ class DocumentCodec {
 		if (record.rule != null)
 			switch (record.rule) {
 				case KFactor(rows): rule = BendRule.KFactor(new KFactorTable([for (row in rows) row.ratio], [for (row in rows) row.k]));
+				case Process(setup): rule = BendRule.Process(ProcessBendRule.fromRecord(setup));
 			}
 		return new SheetMaterial(record.id, thickness, rule, record.mechanical, record.defaultRadiusRatio, record.minRadiusRatio, record.grainAngle);
 	}

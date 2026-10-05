@@ -11,12 +11,15 @@ class BendDimensions {
 			throw new SheetDiagnosis("sheet.invalid-angle", "Bend angle must be finite and below one full turn");
 	}
 
-	public static function allowance(thickness:Float, radius:Float, angle:Float, rule:Null<BendRule>):Float {
+	public static function allowance(material:SheetMaterial, radius:Float, angle:Float, length:Float = 1):Float {
+		var thickness = material.thickness;
+		var rule = material.bendRule;
 		validate(thickness, radius, angle);
 		if (rule == null)
 			throw new SheetDiagnosis("sheet.no-bend-rule", "Choose a bend rule before developing a sheet");
 		return switch (rule) {
 			case KFactor(table): Math.abs(angle) * (radius + table.at(radius / thickness) * thickness);
+			case Process(setup): setup.allowance(material, radius, angle, length);
 		};
 	}
 
@@ -26,8 +29,8 @@ class BendDimensions {
 		return (radius + thickness) * Math.tan(Math.abs(angle) / 2);
 	}
 
-	public static function deduction(thickness:Float, radius:Float, angle:Float, rule:Null<BendRule>):Float {
-		return 2 * outsideSetback(thickness, radius, angle) - allowance(thickness, radius, angle, rule);
+	public static function deduction(material:SheetMaterial, radius:Float, angle:Float, length:Float = 1):Float {
+		return 2 * outsideSetback(material.thickness, radius, angle) - allowance(material, radius, angle, length);
 	}
 
 	public static function leg(dimension:Float, spec:LengthSpec, thickness:Float, radius:Float, angle:Float):Float {

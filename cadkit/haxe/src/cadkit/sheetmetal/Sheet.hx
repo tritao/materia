@@ -193,7 +193,7 @@ class Sheet {
 	}
 	public function bendAllowance(b:Bend):Float {
 		var current = bend(b.id);
-		return BendDimensions.allowance(thickness(), current.radius, current.angle, material.bendRule);
+		return BendDimensions.allowance(material, current.radius, current.angle, current.edgeA.span.length());
 	}
 	public function flat():SheetState {
 		var result = new SheetState();

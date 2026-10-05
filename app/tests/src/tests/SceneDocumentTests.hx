@@ -92,7 +92,7 @@ class SceneDocumentTests {
       loaded.dispose();
       Reflect.setField(record, "version", 99);
       rejects(function() { SceneCodec.decode(Json.stringify(record)); }, "unsupported version rejected");
-      Reflect.setField(record, "version", 1);
+      Reflect.setField(record, "version", SceneCodec.VERSION);
       Reflect.setField(records[1], "id", Reflect.field(records[0], "id"));
       rejects(function() { SceneCodec.decode(Json.stringify(record)); }, "duplicate IDs rejected");
       Reflect.setField(records[1], "id", "tower");
@@ -102,8 +102,8 @@ class SceneDocumentTests {
       Reflect.setField(records[0], "visible", "yes");
       rejects(function() { SceneCodec.decode(Json.stringify(record)); }, "wrong field types rejected");
       rejects(function() { SceneCodec.decode("null"); }, "null root rejected");
-      rejects(function() { SceneCodec.decode('{"format":"materia.scene","version":1,"objects":null}'); }, "null objects rejected");
-      var empty = new EditorScene(SceneCodec.decode('{"format":"materia.scene","version":1,"objects":[]}'));
+      rejects(function() { SceneCodec.decode('{"format":"materia.scene","version":2,"objects":null}'); }, "null objects rejected");
+      var empty = new EditorScene(SceneCodec.decode('{"format":"materia.scene","version":2,"objects":[]}'));
       check(empty.items().length == 0 && empty.selectedId == "scene", "empty scene opens safely");
       empty.dispose();
 

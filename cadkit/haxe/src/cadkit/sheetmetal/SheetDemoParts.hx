@@ -1,12 +1,15 @@
 package cadkit.sheetmetal;
 
+import materia.project.MaterialLibrary;
+
 /** Dimensioned acceptance parts shared by sheet, tooling and planning tests. All dimensions are mm. */
 class SheetDemoParts {
-	/** Assumed reference-part radius, until the process rule chooses tooling in SM6. */
+	/** Authored reference-part radius; process-driven parts derive theirs from selected tooling. */
 	public static inline var RADIUS:Float = 1;
 	public static function materialA():SheetMaterial {
-		return new SheetMaterial("mild-steel", 1.5, BendRule.KFactor(new KFactorTable([0], [0.38])),
-			{uts: 400, yield: 250, youngs: 205000}, RADIUS / 1.5);
+		var grade = MaterialLibrary.require("mild-steel");
+		return new SheetMaterial(grade.id, 1.5, BendRule.KFactor(new KFactorTable([0], [0.38])),
+			grade.mechanical, RADIUS / 1.5);
 	}
 
 	/** 100 along the bend, 60 outside base, 40 outside height. */

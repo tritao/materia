@@ -46,17 +46,18 @@ class SheetMetalSmoke {
 		near(isolated.at(1), 0.4, "table owns its input values");
 		var rule = BendRule.KFactor(new KFactorTable([0], [0.38]));
 		// Hand-computed for T=2, R=1.64, K=.38.
+		var dimensionStock = new SheetMaterial("dimension-stock", 2, rule);
 		var angles = [Math.PI / 6, Math.PI / 2, 3 * Math.PI / 4];
 		var allowances = [1.2566370614359172, 3.7699111843077517, 5.654866776461628];
 		var setbacks = [0.975335060448, 3.64, 8.787737366];
 		for (i in 0...angles.length) {
-			near(BendDimensions.allowance(2, 1.64, angles[i], rule), allowances[i], "allowance");
-			near(BendDimensions.allowance(2, 1.64, -angles[i], rule), allowances[i], "down allowance");
+			near(BendDimensions.allowance(dimensionStock, 1.64, angles[i]), allowances[i], "allowance");
+			near(BendDimensions.allowance(dimensionStock, 1.64, -angles[i]), allowances[i], "down allowance");
 			near(BendDimensions.outsideSetback(2, 1.64, angles[i]), setbacks[i], "setback", 1e-8);
-			near(BendDimensions.deduction(2, 1.64, angles[i], rule), 2 * setbacks[i] - allowances[i], "deduction", 2e-8);
+			near(BendDimensions.deduction(dimensionStock, 1.64, angles[i]), 2 * setbacks[i] - allowances[i], "deduction", 2e-8);
 		}
 		near(BendDimensions.leg(51.76, LengthSpec.OuterSharp, 2, 1.64, Math.PI / 2), 48.12, "published flange");
-		near(48.12 + BendDimensions.allowance(2, 1.64, Math.PI / 2, rule) / 2, 50, "published mould-line distance", 0.01);
+		near(48.12 + BendDimensions.allowance(dimensionStock, 1.64, Math.PI / 2) / 2, 50, "published mould-line distance", 0.01);
 		near(BendDimensions.leg(12, LengthSpec.Tangential, 2, 1.64, 3 * Math.PI / 4), 8.36, "obtuse tangential length");
 		near(BendDimensions.leg(12, LengthSpec.OuterSharp, 2, 1.64, 3 * Math.PI / 4), 3.212262632961934, "obtuse sharp length");
 		near(BendDimensions.leg(10, LengthSpec.InnerSharp, 2, 1.64, -Math.PI / 2), 8.36, "down inner sharp length");
@@ -65,13 +66,13 @@ class SheetMetalSmoke {
 		near(stock.thickness, 1.5, "sheet stock thickness");
 		var mechanical = stock.mechanical; if (mechanical == null) throw "missing test mechanical data";
 		near(mechanical.youngs, 205000, "modulus in MPa");
-		diagnosis("sheet.no-bend-rule", function() { var value = BendDimensions.allowance(2, 1, 1, null); });
+		diagnosis("sheet.no-bend-rule", function() { var value = BendDimensions.allowance(new SheetMaterial("no-rule", 2), 1, 1); });
 		diagnosis("sheet.sharp-length-angle", function() { var value = BendDimensions.leg(10, LengthSpec.InnerSharp, 2, 1, Math.PI); });
 		diagnosis("sheet.invalid-k-table", function() { var value = new KFactorTable([1, 1], [0.3, 0.4]); });
 		diagnosis("sheet.invalid-k-table", function() { var value = new KFactorTable([0], [0.6]); });
-		diagnosis("sheet.invalid-thickness", function() { var value = BendDimensions.allowance(0, 1, 1, rule); });
-		diagnosis("sheet.invalid-radius", function() { var value = BendDimensions.allowance(2, -1, 1, rule); });
-		diagnosis("sheet.invalid-angle", function() { var value = BendDimensions.allowance(2, 1, Math.NaN, rule); });
+		diagnosis("sheet.invalid-thickness", function() { var value = BendDimensions.allowance(new SheetMaterial("bad-thickness", 0, rule), 1, 1); });
+		diagnosis("sheet.invalid-radius", function() { var value = BendDimensions.allowance(dimensionStock, -1, 1); });
+		diagnosis("sheet.invalid-angle", function() { var value = BendDimensions.allowance(dimensionStock, 1, Math.NaN); });
 		diagnosis("sheet.invalid-flange-length", function() { var value = BendDimensions.leg(1, LengthSpec.OuterSharp, 2, 1, Math.PI / 2); });
 		diagnosis("sheet.invalid-k-table", function() { var value = new KFactorTable([], []); });
 		diagnosis("sheet.invalid-radius-ratio", function() { var value = table.at(-1); });
@@ -97,6 +98,7 @@ class SheetMetalSmoke {
 		assertions += SheetBlankSmoke.run();
 		assertions += SheetAncestorSmoke.run();
 		assertions += SheetProcessSmoke.run();
+		assertions += SheetProcessRuleSmoke.run();
 		trace("Sheet metal smoke passed (" + assertions + " assertions)");
 	}
 }

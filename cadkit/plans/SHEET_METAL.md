@@ -343,14 +343,16 @@ table in `tools/README.md`.
 - SM4e evaluates the union of all material domains together, rather than constructing
   temporary wall-only contours that can branch at point contacts before bend strips are added.
   The same exact line/arc membership assembly retains authored boundary identities and origins.
-- `SheetChecks.of(sheet)` returns a `SheetCheckReport` with one flat snapshot and typed findings,
+- `SheetChecks.of(sheet, ?tooling)` returns a `SheetCheckReport` with one flat snapshot and typed findings,
   measured units and exact offending geometry. Positive domain intersections above 1e-8 mm²
-  diagnose flat overlap. The assumed `4T` minimum is a straight leg from the tangent attachment,
+  diagnose flat overlap. The assumed `0.7V` minimum is a straight leg from the tangent attachment,
   measured as the minimum first outer-profile exit over material-bearing seam intervals; holes
   are covered by their separate clearance rule. Vertex/cardinal events split the exact contour
   into monotone branches, including tapered legs and circular notches. A ripped strip has no
   straight return: its detached wall cannot supply one. An unmeasurable seam is diagnosed,
-  never treated as infinite depth. SM6 replaces the placeholder when default tooling is available.
+  never treated as infinite depth. SM6 replaces the former 4T placeholder with V=8T for stock
+  up to 3 mm, the Process rule's selected tooling, or an explicit tooling argument; thicker
+  stock without tooling is diagnosed.
   Hole and surviving cut-feature boundaries use exact minimum distance to the full developed
   fold line and the assumed `2.5T + R` threshold; explicit relief origins are exempt. A fold-line
   endpoint strictly inside the united blank, more than 1e-8 mm from its boundary, needs an opening.
@@ -930,7 +932,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM4 | done: SM4a exact developed blank regions, typed domain owners, sorted bend data and interrupted fold markings, authored grain frame and typed version-14 snapshot; quick gate `sm4a-flat-verified` (5259 sheet assertions); SM4c typed shared drawing data, exact R12 DXF/SVG, bend annotations and grain arrow; quick gate `sm4c-drawing-exports` (5888 sheet assertions); SM4d typed cut/relief boundary provenance and propagation; quick gate `sm4d-boundary-provenance` (5911 sheet assertions); SM4e six typed manufacturability findings with exact geometry and minimum flange depth; quick gate `sm4e-checks-verified` (5944 sheet assertions); typed blank requirement with explicit order context; quick gate `sm4-flat-pattern-complete` (5963 sheet assertions) | a5508e566; 83a7a8c18; 723b0bac4; 27f66bb9e; a7156977e |
 | SM4b | done: typed editor base/flange commands, explicit stock input, parameter inspector, folded/flat publication, bend table, exact fold-line overlay and DXF/SVG commands; P2 editor workflow passes; full gate `sm4b-editor-full` passes | be21d1579 |
 | SM5 | in progress: SM5a unique native ancestry count/index/bulk queries and typed owning Haxe wrappers; three native suites and focused ancestry checks pass; quick gate `sm5a-ancestry` (5974 sheet assertions); recognition and convert feature deferred by user direction on 2026-10-05 | 51c4f2d5c |
-| SM6 | in progress: SM6a typed air-bending predictions, physical springback inversion and exact contact depth; focused process smoke passes 1235 assertions; quick gate `sm6a-air-bending` passes (7209 sheet assertions); SM6b explicit lot/tool/angle-band calibration with measured radius and additive depth correction, focused smoke passes 1257 assertions, quick gate `sm6b-calibration` passes (7231 sheet assertions); process rule and material-library integration remain | 7148a8bb8 |
+| SM6 | done: SM6a typed air-bending predictions, physical springback inversion and exact contact depth; focused process smoke passes 1235 assertions; quick gate `sm6a-air-bending` passes (7209 sheet assertions); SM6b explicit lot/tool/angle-band calibration with measured radius and additive depth correction, focused smoke passes 1257 assertions, quick gate `sm6b-calibration` passes (7231 sheet assertions); SM6 complete: typed grade defaults, editor selection, Process-rule persistence and tooling minimums; full gate `sm6-process-material-full` passes all stages (7248 sheet assertions, ProjectKit 155); final material integration and CAD workflow checks pass | 7148a8bb8; 6458df23b |
 | SM7 | planned | |
 | SM8a | planned | |
 | SM8b | planned (waits for MT5 on main) | |
@@ -1202,3 +1204,45 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
   ManufacturingKit 54), with unchanged original MachineKit summaries. No cast, schema, native
   or compiler change is made. Saved Process rules, tooling-based sheet checks and material-library
   integration remain required before SM6's full gate and final commit.
+
+- SM6 integration (complete): ProjectKit owns the canonical wire mechanical
+  properties and ANSI K-factor rows; CadKit uses those types directly. Haxeon's wire generator
+  deliberately rejects duplicate structural wire types (`WireCodecGenerator.hx:268`, E1024),
+  so the duplicate CadKit declarations are removed rather than aliased. Mechanical records remain
+  immutable. Specific mild-steel and 5052-H32 grades carry the plan's assumed strengths and
+  assumed development defaults; generic visual materials retain no inferred grade strength.
+  Demo parts obtain strengths from the library while keeping their explicit K=.38 reference rule,
+  authored radius and unconstrained grain, preserving their acceptance geometry.
+  Stock creation copies the library data and requires explicit root-frame rolling direction.
+  The editor selects built-in or custom sheet grades and permits an explicit K override.
+  Scene format 2 saves the material section through the typed wire codec; format 1 is rejected.
+  The current fixture and worker examples are regenerated with current serializers, including
+  their empty BIM sections formerly saved at CadKit version 11. The negative retired-human
+  fixture uses the current outer scene format so it still exercises its intended diagnosis.
+- Process rules save authored tool dimensions, optional explicit lot and immutable calibration
+  entries, never derived predictions. Document version 15 replaces version 14. Allowance and
+  deduction calculations consume stock directly, giving material properties and thickness one
+  owner. Default flange radii derive from tooling on each rebuild; explicit incompatible radii
+  receive `sheet.process-radius-mismatch`. The current air-bending rule refuses hems and other
+  angles beyond its physical/tool limits instead of substituting a K rule.
+  Sheet checks replace the temporary 4T minimum with the assumed 0.7V process minimum: default
+  V=8T for T<=3 mm, selected tooling for Process stock, or an explicit tooling argument. Thicker
+  stock without selected tooling is diagnosed. The 1.5 mm default minimum changes from 6 to
+  8.4 mm by this planned replacement; demo geometry and original machine summaries must not move.
+- Haxeon note (SM6): statement-switch definite assignment treats nullable enums as nonexhaustive
+  even with a catch-all (`BodyTyper.exhaustiveEnum`, lines 2217–2219); `StatementTyper.typeSwitch`
+  includes the unchanged incoming scope at lines 837–838, so a later read gets E1023. SheetChecks
+  uses a directly initialized switch expression instead. No compiler source change is made.
+
+  Focused SheetMetalSmoke passes 7248 assertions and the Process-rule production smoke passes
+  14 assertions. The app regression entry passes material integration, scene documents and worker
+  examples, then exposed a CAD test artifact path that assumed root cwd; a single worktree-aware
+  artifact helper fixes it. The affected CAD workflow passes from app/tests after that fix.
+  Scene format 2/current CadKit format 15 fixtures are generated by current serializers, and
+  `make-worker-gallery.py --check` passes. Full gate `sm6-process-material-full` passes every
+  kit stage, the app build and project-source runtime suite (all exit 0). The final material
+  integration binary also passes, including explicit K stock retaining known strengths without
+  sheet defaults. ProjectKit rises from 143 to 155 assertions for the canonical material data and
+  wire validation. SheetMetalSmoke rises from 7231 to 7248 for Process-rule document acceptance
+  and tooling-derived minimums. The original five MachineKit summaries and the SM4b router
+  engineering summaries are unchanged; tick timings and collection counts are observations.

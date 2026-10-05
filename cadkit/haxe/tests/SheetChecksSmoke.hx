@@ -30,7 +30,7 @@ class SheetChecksSmoke {
 		check(shortReport.has(ShortFlange), "short flange finding");
 		for (finding in shortReport.findings()) if (finding.kind == ShortFlange) {
 			check(finding.assumed && finding.code == "sheet.short-flange", "placeholder tooling rule is explicitly assumed");
-			switch (finding.measure) { case DistanceMm(actual, minimum): near(actual, 2, "actual flange leg"); near(minimum, 6, "4T tooling minimum"); case _: throw "wrong flange measurement"; }
+			switch (finding.measure) { case DistanceMm(actual, minimum): near(actual, 2, "actual flange leg"); near(minimum, 8.4, "0.7V minimum with default V=8T"); case _: throw "wrong flange measurement"; }
 			var geometry = finding.geometry(); var length = geometry.length; geometry.pop(); near(finding.geometry().length, length, "finding owns geometry arrays");
 		}
 		var tapered = SheetDemoParts.p1(); var taperedBend = tapered.bends()[0];

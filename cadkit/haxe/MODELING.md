@@ -397,8 +397,9 @@ while ungrained stock permits 0/90 degrees. The result is ManufacturingKit
 ### Editing sheets in the app
 
 In an empty CAD part, create and apply a constrained sketch. Select its feature,
-enter a material identity, thickness in mm and an explicit ANSI K factor in the
-inspector, then choose **Create sheet base**. Pick a straight wall-side face in
+choose a sheet grade, thickness in mm and rolling direction in the sketch frame,
+then choose **Create sheet base**. Leave the K-factor override blank to use the
+grade table; an explicit material identity without sheet defaults needs an ANSI K factor. Pick a straight wall-side face in
 the folded viewport, enter the straight flange length, signed bend angle in
 degrees and inner radius in mm, then choose **Create edge flange**.
 
@@ -434,6 +435,12 @@ Pass an immutable `CalibrationTable` to `AirBending` and the lot as the fifth
 prediction argument to apply it. The model reconstructs loaded radius and depth
 from the measured final radius before adding the offset. Overlapping entries
 and measurements incompatible with the punch are refused. Without a matching
-lot/key, `calibrated` is false and depth remains analytic. These predictions do
-not yet replace the sheet's authored development rule; saved process rules and
-material-library integration are the remaining SM6 work.
+lot/key, `calibrated` is false and depth remains analytic. Use `BendRule.Process(new ProcessBendRule(tools, calibration, lot))` on stock
+with mechanical properties to develop sheets for that setup. A flange with an
+omitted radius derives its released radius from the process on every rebuild;
+an explicit radius must match the prediction. Stock, tools, lot and calibration
+are saved; derived predictions are rebuilt. `BendDimensions.allowance(stock,
+radius, angle, bendLength)` and `deduction` consume the same stock object.
+Air bending refuses hems and tool-limited angles. The sheet checks use the
+assumed 0.7V flange minimum, with V=8T as the default for stock up to 3 mm;
+thicker stock requires selected tooling.

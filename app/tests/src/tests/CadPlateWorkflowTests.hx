@@ -29,6 +29,12 @@ import sys.io.File;
 
 /** End-to-end parametric plate edit, history, persistence, and interchange. */
 class CadPlateWorkflowTests {
+  /** The suite runs from either the repository root or app/tests; artifacts stay in this worktree. */
+  static function artifactRoot():String {
+    var repository = FileSystem.exists("cadkit/haxeon.json") ? "." : "../..";
+    if (!FileSystem.exists(repository + "/cadkit/haxeon.json")) throw "Cannot locate the CAD test worktree";
+    return FileSystem.fullPath(repository) + "/app/build";
+  }
   static function check(value:Bool, message:String):Void if (!value) throw message;
   static function object(scene:EditorScene, id:String):app.EditorSceneObject return scene.object(id);
   static function near(actual:Float, expected:Float, message:String):Void
@@ -291,7 +297,7 @@ class CadPlateWorkflowTests {
 
   static function sheetEditorWorkflow():Void {
     var scene = new EditorScene([]);
-    var file = Sys.getCwd() + "/app/build/sheet-editor-p2.dxf";
+    var file = artifactRoot() + "/sheet-editor-p2.dxf";
     try {
       check(scene.createCadPart() && scene.createSketch() && scene.addSketchDraftRectangle(), "start an editor sheet sketch");
       var id = scene.selectedId;

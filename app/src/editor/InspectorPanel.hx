@@ -10,6 +10,9 @@ import haxeon.ui.widgets.controls.Button;
 import haxeon.ui.widgets.layout.Column;
 import haxeon.ui.widgets.layout.Row;
 import haxeon.ui.widgets.properties.PropertyInspector;
+import haxeon.ui.widgets.controls.Select;
+import haxeon.ui.widgets.controls.SelectOption;
+import materia.project.MaterialLibrary;
 import app.editor.SheetWorkflowPanel;
 import haxeon.ui.widgets.text.Text;
 import haxeon.ui.widgets.text.TextField;
@@ -87,9 +90,15 @@ class InspectorPanel {
       var input = scene.sheetAuthoring;
       var entries:Array<{key:String, label:String, read:Void->String, write:String->Void}> = [];
       if (scene.canCreateExtrusion()) {
+        var grades = MaterialLibrary.sheetMaterials();
+        for (grade in session.customMaterials) if (grade.sheet != null) grades.push(grade);
+        var options = [for (grade in grades) new SelectOption<String>(grade.id, grade.name, grade.id)];
+        rows.push(new KeyedView("sheet-material-select", new Select<String>("sheet-material-select", options,
+          input.materialId, function(value) { input.materialId = value; input.kFactor = ""; app.commands.refresh(); })));
         entries.push({key:"material", label:"Sheet material identity", read:function() return input.materialId, write:function(v) input.materialId = v});
         entries.push({key:"thickness", label:"Thickness (mm)", read:function() return input.thickness, write:function(v) input.thickness = v});
-        entries.push({key:"k", label:"Explicit ANSI K factor (0–0.5)", read:function() return input.kFactor, write:function(v) input.kFactor = v});
+        entries.push({key:"k", label:"ANSI K factor override (blank uses sheet grade)", read:function() return input.kFactor, write:function(v) input.kFactor = v});
+        entries.push({key:"grain", label:"Rolling direction in sketch (deg)", read:function() return input.grainDegrees, write:function(v) input.grainDegrees = v});
       } else {
         entries.push({key:"length", label:"Flange straight length (mm)", read:function() return input.length, write:function(v) input.length = v});
         entries.push({key:"angle", label:"Signed bend angle (deg)", read:function() return input.angleDegrees, write:function(v) input.angleDegrees = v});
