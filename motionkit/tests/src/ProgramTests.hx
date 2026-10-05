@@ -1098,6 +1098,32 @@ class ProgramTests extends MotionKitTestSupport {
     for (_ in 0...5) {
       motion.update(0.01); simulationHarness.step(Int64.ofInt(tick++));
     }
+    // Let the owner finish while the host still has its last active plan.
+    for (_ in 0...800) {
+      simulationHarness.step(Int64.ofInt(tick++));
+      if (!robot.snapshot().trajectoryActive) break;
+    }
+    check(!robot.snapshot().trajectoryActive, "the owner finishes before the host observes completion");
+    var holdsBefore = robot.commandCount("hold");
+    resumesBefore = robot.commandCount("resume");
+    motion.hold();
+    motion.update(0.01);
+    simulationHarness.step(Int64.ofInt(tick++));
+    check(motion.sessionState() == Held && robot.commandCount("hold") == holdsBefore &&
+      robot.snapshot().faultCode == 0,
+      "holding a finished owner plan stays local and preserves the program");
+    motion.resume();
+    for (_ in 0...800) {
+      motion.update(0.01); simulationHarness.step(Int64.ofInt(tick++));
+      if (!motion.running) break;
+    }
+    check(motion.completed && motion.failure == null && robot.commandCount("resume") == resumesBefore,
+      "resuming a hold at the finished plan advances without an empty runtime resume");
+
+    motion.run(longMove);
+    for (_ in 0...5) {
+      motion.update(0.01); simulationHarness.step(Int64.ofInt(tick++));
+    }
     motion.abort();
     var commandsBeforeFault = robot.commands.length;
     robot.faultOverride = 42;

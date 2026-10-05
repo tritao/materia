@@ -35,7 +35,7 @@ class MachiningStock {
 	static inline final LEFTOVER = 0xE0C040FF;
 	static inline final GOUGE = 0xD04040FF;
 	/** Deviation below this counts as on target, in metres. */
-	static inline final TOLERANCE = 0.00002;
+	public static inline final TOLERANCE = 0.00002;
 	/**
 	 * Contact below this volume (cubic metres, a thousandth of a cubic millimetre) is the ray stock's
 	 * numerical grazing where a move ends at a surface, not a rapid or holder entering the stock.

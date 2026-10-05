@@ -663,8 +663,10 @@ class CncRouter extends AxisBuilder {
 			[40.0, 6.0, 6.0], [0.0, 1, 0], -1, (belts ? "pulley" : "screw") + "YLeft-turn");
 		buildHome(specs[1], "YRight", "sideRight", "uprightRight", [SIDE_X + 18.0, yb, 70.0],
 			[40.0, 6.0, 6.0], [0.0, 1, 0], -1, (belts ? "pulley" : "screw") + "YRight-turn");
-		buildHome(specs[0], "X", "beamUpper", "xPlate", [xc, blockFace - 30.0, 250.0],
-			[6.0, 40.0, 6.0], [1.0, 0, 0], -1, (belts ? "pulleyX-turn" : "screwX-turn"));
+		// Put the X contact in the gap behind its plate and ahead of the beam.
+		// A contact in front of X lies inside the independent Z plate's sweep.
+		buildHome(specs[0], "X", "beamUpper", "xPlate", [xc, blockFace + 6.0, 250.0],
+			[6.0, 12.0, 6.0], [1.0, 0, 0], -1, (belts ? "pulleyX-turn" : "screwX-turn"));
 		buildHome(specs[2], "Z", "xPlate", "zPlate", [xc + 75.0, zBlockFace, zPlateBottom + 35.0],
 			[40.0, 6.0, 6.0], [0.0, 0, 1], 1, foldedZ ? "motorZ-turn" : "screwZ-turn");
 		exposeConnector("nose", "spindle", "nose");

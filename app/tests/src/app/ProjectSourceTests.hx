@@ -1978,6 +1978,7 @@ class ProjectSourceTests {
     // The Z screw (and the X screw of the screw router) turns half a turn for every millimetre of its axis.
     var screwParts = belts ? ["", "screwZCoupling"] : ["screwXCoupling", "screwZCoupling"];
     var screwStart = [for (id in screwParts) id == "" ? [] : partRotation(id)];
+    var lastHomingSeconds = player.homingSeconds, machiningReference = false;
     var lowest = 0.0, steps = 0, stepping = 0.0, tools:Array<Int> = [player.loadedTool];
     // Allocation is counted, not timed, so it holds whatever else the machine is doing.
     var allocatedBefore = hl.Gc.totalAllocated(), collectionsBefore = hl.Gc.collections();
@@ -1986,9 +1987,16 @@ class ProjectSourceTests {
       simulation.step();
       stepping += Sys.time() - before;
       check(simulation.cncFailure() == null, 'the router program runs: ${simulation.cncFailure()}');
-      if (steps % 10 == 0) lowest = Math.min(lowest, toolPosition()[2] - start[2]);
+      if (machiningReference && steps % 10 == 0) lowest = Math.min(lowest, toolPosition()[2] - start[2]);
       if (player.loadedTool != tools[tools.length - 1]) tools.push(player.loadedTool);
-      if (steps % 1000 == 0) {
+      if (!machiningReference && lastHomingSeconds > 0 && player.homingSeconds == lastHomingSeconds) {
+        // Homing establishes coordinate and drive zeros independently. Compare
+        // physical screw travel from the completed homing reference.
+        start = toolPosition();
+        screwStart = [for (id in screwParts) id == "" ? [] : partRotation(id)];
+        machiningReference = true;
+        lowest = 0.0;
+      } else if (machiningReference && steps % 1000 == 0) {
         // The X and Z screws turn half a turn for every millimetre their axes move.
         var now = toolPosition();
         for (axis in [0, 2]) {
@@ -2000,7 +2008,10 @@ class ProjectSourceTests {
             'the ${axis == 0 ? "X" : "Z"} screw turns with its axis: ${2 * Math.acos(Math.min(1.0, dot))} rad for $turned');
         }
       }
+      lastHomingSeconds = player.homingSeconds;
     }
+    check(player.passes == 1,
+      'the $kind finishes its program: total=${simulation.activeSession().simulationTime()} s, homing=${player.homingSeconds} s, line=${player.currentLine}, homingStatus=${@:privateAccess player.homing.homingStatus()}');
     var allocatedPerTick = (hl.Gc.totalAllocated() - allocatedBefore) / steps;
     var collections = hl.Gc.collections() - collectionsBefore;
     // About 46 KB a tick when measured (2026-10-02, sensor values pooled per snapshot): mostly robot snapshots, then the stock's cut moves.
@@ -2039,7 +2050,14 @@ class ProjectSourceTests {
     check(stock.rapidContacts == 0 && stock.collisions == 0,
       'no rapid runs through the stock and the holder never touches it (${stock.rapidContacts}, ${stock.collisions})');
     var deviation = stock.deviation();
-    check(deviation.gouge < 1e-9, 'nothing is cut from the finished plate, gouge ${deviation.gouge} m³');
+    // Homing has finite repeatability. Bound missing target volume by the
+    // machined wall/floor area swept through the stated positional tolerance.
+    // A raw ray-stock volume comparison includes even sub-tolerance offsets.
+    var wallArea = Math.PI * (0.0383 * 0.006 + 4 * 0.010 * 0.0054 + 4 * 0.0055 * (0.020 - 0.0054));
+    var floorArea = Math.PI * (0.01915 * 0.01915 + 4 * (0.005 * 0.005 - 0.00275 * 0.00275));
+    var gougeAllowance = (wallArea + floorArea) * MachiningStock.TOLERANCE;
+    check(deviation.gouge < gougeAllowance + 1e-9,
+      'the homed plate stays within its machining tolerance: gouge ${deviation.gouge} m³, surface-volume bound $gougeAllowance m³');
     check(deviation.leftover < recesses * 0.02,
       'only slivers of stock are left on the plate, leftover ${deviation.leftover} m³');
     check(stock.geometry().triangleCount() > 12, "the machined stock meshes");
@@ -2116,6 +2134,7 @@ class ProjectSourceTests {
       return until == null;
     }
     var lines = player.sourceLines();
+    check(run(600.0, () -> @:privateAccess player.homingComplete), "the router completes physical homing before machining controls");
     check(run(20.0, () -> player.currentLine > 0), "the player reports the line it runs");
     check(StringTools.trim(lines[player.currentLine - 1]).length > 0, "the running line is a line of the program");
     // The CNC panel, laid out on its own and operated by pointer.
@@ -2519,6 +2538,18 @@ class ProjectSourceTests {
       checkVirtualRouterHoming(root);
       return 0;
     }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "remaining") {
+      checkCncRouter(root);
+      checkBeltRouter(root);
+      checkCoreXyPlotter(root);
+      checkMobileBase(root);
+      checkMobileMission(root);
+      checkMobileObstacle(root);
+      checkMissionOverlayEdge();
+      checkCncControls(root);
+      checkBackgroundLaunch(root);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "router") {
       checkCncRouter(root);
       checkBeltRouter(root);
@@ -2530,6 +2561,7 @@ class ProjectSourceTests {
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "controls") {
       checkCncControls(root);
+      checkBackgroundLaunch(root);
       return 0;
     }
     var manifest = FileSystem.fullPath(root + "/cadkit/examples/modeling/materia.project.json");

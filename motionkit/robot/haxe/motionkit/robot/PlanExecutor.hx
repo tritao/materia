@@ -133,7 +133,10 @@ class PlanExecutor {
   }
 
   public function hold():Void {
-    if (session.hold() && plan != null) stream.submit(session, RobotCommand.Hold);
+    if (!session.hold() || plan == null) return;
+    // Feedback may still be settling after the owner has emptied this plan.
+    // Keep the program held locally: an empty runtime has no path to hold.
+    if (!stream.finishedProgram(sync())) stream.submit(session, RobotCommand.Hold);
   }
   public function resume():Void {
     if (session.resume() && plan != null) {

@@ -396,6 +396,9 @@ class CncProgramPlayer implements SessionMember {
 				homeView.update(session.fixedTimestep());
 				if (homeView.homingStatus() != "Complete") return;
 				homingComplete = true;
+				// Latching changed the calibration revision used by every machining plan.
+				motion = newMotion();
+				if (speedOverride != 1.0) motion.setSpeedOverride(speedOverride);
 				var positions = robot.robot.snapshot().positions;
 				var pose = solver.forward([for (index in axisJoints) positions.get(index)]);
 				compileFrom(new Point3(pose.x, pose.y, pose.z));

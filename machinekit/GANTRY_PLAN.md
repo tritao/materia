@@ -3627,3 +3627,27 @@ runtime copy was also rebuilt.
 The router now gets past homing admission. Remaining app validation is still
 in progress; G13/Phase C is not yet complete. Temporary diagnostic prints were
 removed. The already-passing welder checks are not being repeated.
+
+### Phase C gate — physical homing, calibration and controls
+
+The screw router's X proximity sensor projected into the swept Z carriage.
+Its mount now fits between the X plate and the beam; a CAD clearance grid covers
+both drive variants and the overtravel envelope. Mass fixtures reflect the
+smaller mount. Machining recreates its planning binding after homing changes
+the calibration revision. Placement/rotation measurements start after homing,
+and the recess gouge-volume check uses the existing 20 µm stock tolerance times
+the authored wall/floor area, retaining the removal, leftover and contact checks.
+
+Both ordinary MuJoCo routers passed all 128 machining plans and physical homing:
+screw 337.0 s including 104.8 s homing, belt 273.0 s including 57.8 s homing.
+Neither stalled. CoreXY, mobile base/missions/obstacle/overlay checks passed.
+The CNC controls and background launch now pass too. Holding while an owner
+plan has finished but feedback is still settling stays local; sending Hold to
+an empty native queue was rejected. A focused arm-session regression passes
+14 assertions, including hold and resume at that boundary.
+
+The final app compiler-only build passed. Native CTest passed 19/19, full
+MachineKit, RobotKit (5021 assertions), picker (48 plans) and homing passed.
+The full MotionKit suite is being rerun after the hold fix. Existing passing
+welder and other phase checks have not been repeated. Phase C stays open until
+that final MotionKit result; G14 integration and yaw handling are separate work.

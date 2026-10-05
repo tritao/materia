@@ -62,8 +62,8 @@ class FoldedZRouterCheck {
 		CncRouterChecks.near(directLoad.backlash * 1000, 0.05, "direct Z backlash baseline", 1e-6);
 		CncRouterChecks.near(foldedLoad.backlash * 1000, 0.051, "folded Z backlash baseline", 1e-6);
 		Sys.println('router mass: direct ${new CncRouter().massProperties().mass}, folded ${folded.massProperties().mass}');
-		CncRouterChecks.near(new CncRouter().massProperties().mass, 37.025008686290356, "direct router mass baseline", 1e-6);
-		CncRouterChecks.near(folded.massProperties().mass, 37.16745220969244, "folded router mass baseline", 1e-6);
+		CncRouterChecks.near(new CncRouter().massProperties().mass, 37.013596686290356, "direct router mass baseline", 1e-6);
+		CncRouterChecks.near(folded.massProperties().mass, 37.15604020969244, "folded router mass baseline", 1e-6);
 		if (CncRouter.FoldedZMotorPlate.TENSION_TRAVEL < 4.0)
 			throw "Folded Z motor plate needs at least 4 mm of slot adjustment";
 		var centre = belt.wraps()[1].x - belt.wraps()[0].x;

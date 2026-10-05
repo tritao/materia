@@ -185,6 +185,7 @@ class CncRouterChecks {
 		var mass = router.massProperties().mass;
 		Sys.println('cnc router: ${scene.parts.length} definitions, ${definition.occurrences.length} occurrences, ' +
 			'${bom.length} BOM lines, ${Math.round(mass * 10) / 10} kg');
+		checkXHomeClearance(router);
 		runBelts();
 	}
 
@@ -280,6 +281,7 @@ class CncRouterChecks {
 			["crossBack", "sideLeft", "sideRight", "spoilboard"]);
 		checkClear(router, state, [300, 0, 0], ["xPlate", "beltBracketX", "blockXUpper", "blockXLower"], ["pulleyX", "idlerX", "motorX", "motorPlateX", "idlerPlateX"]);
 		checkClear(router, state, [0, 0, 0], ["xPlate", "beltBracketX", "blockXUpper", "blockXLower"], ["pulleyX", "idlerX", "motorX", "motorPlateX", "idlerPlateX"]);
+		checkXHomeClearance(router);
 		Sys.println('cnc router belts: ${report.join("; ")}');
 	}
 
@@ -310,6 +312,23 @@ class CncRouterChecks {
 	}
 
 	/** No member of `moving` intersects a member of `others` at machine position `at`. */
+	static function checkXHomeClearance(router:CncRouter):Void {
+		var definition = router.definition();
+		for (joint in definition.joints) if (joint.limits.overtravel != null) {
+			if (joint.limits.lower != null) joint.limits.lower -= joint.limits.overtravel;
+			if (joint.limits.upper != null) joint.limits.upper += joint.limits.overtravel;
+		}
+		var state = new AssemblyState(definition);
+		// Include the interior pose that blocked physical homing, and both guide ends.
+		for (x in [-router.axisOvertravel("x"), 0.0, 36.4, 150.0, 300.0, 300.0 + router.axisOvertravel("x")])
+			for (z in [-80.0 - router.axisOvertravel("z"), -80.0, 0.0, router.axisOvertravel("z")]) {
+				checkClear(router, state, [x, 150.0, z],
+					["xPlate", "zPlate", "blockZLeft", "blockZRight", "spindleClamp", "spindle", "tool", "homeTriggerZ"],
+					["homeX", "homeXMount"]);
+				checkClear(router, state, [x, 150.0, z], ["homeTriggerX"], ["beamUpper", "railXUpper"]);
+			}
+	}
+
 	public static function checkClear(router:CncRouter, state:AssemblyState, at:Array<Float>, moving:Array<String>,
 			others:Array<String>):Void {
 		moveTo(state, at);
