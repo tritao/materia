@@ -157,10 +157,14 @@ class ManipulatorKinematics implements RedundantPathSolver {
     var attemptLimit = Math.min(combinationCount, Math.max(32, maxCount * 32));
     for (attempt in 0...Std.int(attemptLimit)) {
       var code = attempt;
+      var shift = attempt % 3;
       var seed:Array<Float> = [];
       for (joint in 0...jointCount()) {
         var level = code % 3;
         code = Std.int(code / 3);
+        // A bijective ternary shear preserves the full lattice while giving
+        // high-index joints all levels in each early three-attempt block.
+        if (joint > 0) level = (level + shift) % 3;
         var limits = manipulator.group.limitsOf(joint);
         if (limits.lower < limits.upper) {
           var fraction = level == 0 ? 0.5 : (level == 1 ? 0.25 : 0.75);

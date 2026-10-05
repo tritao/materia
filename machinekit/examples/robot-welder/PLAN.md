@@ -2546,3 +2546,22 @@ alternates removed. Recorded pins remain 2491a1b101283cf7886d05033345b7e82182531
 and ab128b97b27d33b8cc7e19e0c98f850e08315569. Git status works again.
 Obsolete owned native-test build caches/intermediates were also removed as disk
 space fell; current app/integration libraries and verification reports are kept.
+
+### P3 budgeted IK seed coverage (2026-10-06)
+
+The six-axis candidate lattice has 729 combinations, while the existing
+candidate-discovery budget visits only the first 384. Lexicographic enumeration
+left the highest-index joints without one of their three coarse levels in that
+prefix. The near-limit fallback varies one joint at a time and cannot cover the
+missing combinations. MotionKit now applies a bijective ternary shear to the
+same lattice before visiting it. This preserves the seed set and every search
+budget while ensuring each joint sees all three levels in every initial block
+of three attempts; no arm-specific limits or policy are introduced.
+
+Focused seed coverage passes 13 assertions for three- and six-joint groups,
+including uniqueness, unchanged attempt counts, and all three levels per joint.
+Native contact motion passes 104 assertions, weld planning passes 54, and the
+app compiler passes 1,937 sources (27.3 s). These checks do not establish that
+the final registration face is reachable: the full two-station mission has not
+yet passed with this ordering. MachineKit smoke, the current displacement
+boundary, full mission, and milestone app checks remain open.
