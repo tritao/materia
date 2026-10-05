@@ -60,7 +60,7 @@ class MobileBasePreview {
 			wheelRadius: robot.wheel.radius / 1000, trackWidth: robot.trackWidth() / 1000,
 			maxLinearSpeed: MobileBase.MAX_LINEAR_SPEED, maxAngularSpeed: MobileBase.MAX_ANGULAR_SPEED,
 			maxLinearAcceleration: MobileBase.MAX_LINEAR_ACCELERATION, maxAngularAcceleration: MobileBase.MAX_ANGULAR_ACCELERATION,
-			footprintLength: MobileBase.LENGTH / 1000, footprintWidth: MobileBase.WIDTH / 1000};
+			footprintLength: robot.length / 1000, footprintWidth: robot.width / 1000};
 
 	static function metres(pose:MobileBaseCell.FloorPose):materia.project.SceneArtifact.SceneArtifactFloorPose
 		return {x: pose.x / 1000, y: pose.y / 1000, yaw: pose.yaw};

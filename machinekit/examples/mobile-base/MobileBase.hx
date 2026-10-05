@@ -1,3 +1,4 @@
+import machinekit.power.BatteryPack;
 import machinekit.motion.MotorDriver;
 import cadkit.modeling.Align;
 import cadkit.modeling.Part;
@@ -118,38 +119,6 @@ class MotorBracket extends MachineComponent {
 	}
 }
 
-/** Battery pack: a box standing on its base (z=0), centred on its origin. */
-class BatteryPack extends MachineComponent implements machinekit.motion.ElectricalSource {
-	public final voltage:Float;
-	public final length:Float;
-	public final width:Float;
-	public final height:Float;
-
-	public function new(length:Float, width:Float, height:Float, voltage:Float = 24) {
-		if (!(voltage > 0) || !Math.isFinite(voltage)) throw "Battery needs a finite positive voltage";
-		if (!(length > 0) || !(width > 0) || !(height > 0)) throw "Battery needs positive dimensions";
-		super('BATTERY-${Dimension.format(length)}x${Dimension.format(width)}x${Dimension.format(height)}-${Dimension.format(voltage)}V',
-			"Battery pack", "plastic", true);
-		this.voltage = voltage;
-		this.length = length;
-		this.width = width;
-		this.height = height;
-		addConnector("base", Mount, Solids.axial(0, 0, 0));
-		for (side in ["Left", "Right"])
-			addPort({name: 'power$side', kind: ElectricalPower, role: Supply, iface: Unspecified, required: false});
-	}
-
-	public function outputVoltage(name:String):Float {
-		var output = port(name);
-		return voltage;
-	}
-
-	override public function hasGeometry():Bool return true;
-
-	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Part.box(length, width, height);
-}
-
 /** A cut length of rectangular tube standing along local +Z from its `base` (z=0) to its `top`, its section centred. */
 class TubePost extends MachineComponent {
 	public final profile:RectTube;
@@ -201,6 +170,16 @@ class LidarPuck extends MachineComponent {
 			Part.cylinderSpan(DIAMETER / 2, 60, HEIGHT)]);
 	}
 }
+
+/** The mechanical payload layout; all values are CAD millimetres. */
+typedef MobileBaseLayout = {
+  var length:Float;
+  var width:Float;
+  var payloadX:Float;
+  var batteryX:Float;
+  var battery:BatteryPack;
+}
+
 
 /**
  * Differential-drive mobile base: an aluminium base plate with two wheel slots, two NEMA 23 steppers
@@ -266,6 +245,11 @@ class MobileBase extends MachineAssembly {
 	/** Turn of the payload seat about its up axis. */
 	public static final ARM_TURN:Float = Math.PI / 2;
 
+	public final length:Float;
+	public final width:Float;
+	public final payloadX:Float;
+	public final batteryX:Float;
+	public final battery:BatteryPack;
 	public final motor:NemaStepper;
 	public final wheel:DriveWheel;
 	public final caster:CasterWheel;
@@ -283,9 +267,20 @@ class MobileBase extends MachineAssembly {
 	 * The bare base, or with `arm` standing on the deck's payload seat by its pedestal's `floor`; the arm
 	 * then joins the robot as `arm/...`, its joints `arm/j1`..`arm/j6`.
 	 */
-	public function new(?arm:RobotArm, supplyVoltage:Float = WHEEL_SUPPLY) {
+	public function new(?arm:RobotArm, supplyVoltage:Float = WHEEL_SUPPLY, ?layout:MobileBaseLayout) {
 		super();
 		this.arm = arm;
+		length = layout == null ? LENGTH : layout.length;
+		width = layout == null ? WIDTH : layout.width;
+		payloadX = layout == null ? PAYLOAD_X : layout.payloadX;
+		batteryX = layout == null ? 0 : layout.batteryX;
+		battery = layout == null ? new BatteryPack(supplyVoltage, 480, 260, 180, 110, 5.148, 2) : layout.battery;
+		if (!Math.isFinite(length) || !Math.isFinite(width) || length < LENGTH || width < WIDTH ||
+			!Math.isFinite(payloadX) || !Math.isFinite(batteryX) || battery == null || battery.outlets < 2)
+			throw "Invalid mobile base payload layout";
+		if (Math.abs(batteryX) + battery.length / 2 > length / 2 - MINIMUM_WEB ||
+			battery.width > width - 2 * MINIMUM_WEB || battery.height > DECK_Z - BASE_Z - BASE_THICKNESS)
+			throw "Battery enclosure does not fit between the chassis plates";
 		motor = NemaStepper.frame(23);
 		wheel = new DriveWheel(WHEEL_DIAMETER, WHEEL_WIDTH, motor.variant.shaftDiameter, 40, WHEEL_HUB_LENGTH);
 		caster = new CasterWheel(75, 25, BASE_Z, 30, 60);
@@ -293,11 +288,11 @@ class MobileBase extends MachineAssembly {
 		bracket = new MotorBracket(motor, 80, axleZ - 40, BASE_Z - axleZ, BRACKET_THICKNESS, 40, 5);
 		post = new TubePost(new RectTube(40, 40, 3), DECK_Z - BASE_Z - BASE_THICKNESS);
 
-		for (slot in wheelSlots()) if (WIDTH / 2 - Math.abs(slot.y) - slot.width / 2 < MINIMUM_WEB) throw "Base plate needs its minimum wheel-slot web";
-		addComponent("basePlate", new ChassisPlate(LENGTH, WIDTH, BASE_THICKNESS, "Base plate", baseSeats(),
+		for (slot in wheelSlots()) if (width / 2 - Math.abs(slot.y) - slot.width / 2 < MINIMUM_WEB) throw "Base plate needs its minimum wheel-slot web";
+		addComponent("basePlate", new ChassisPlate(length, width, BASE_THICKNESS, "Base plate", baseSeats(),
 			wheelSlots()), AssemblyFrames.translation(0, 0, BASE_Z));
 
-		addComponent("battery", new BatteryPack(260, 180, 110, supplyVoltage));
+		addComponent("battery", battery);
 		addMate("battery-mount", "fixed", "basePlate", "battery", "battery", "base");
 
 		// Drives: the bracket hangs from its seat, the motor sits on the bracket, and the wheel turns at the gearhead output.
@@ -317,9 +312,9 @@ class MobileBase extends MachineAssembly {
 			// The wheel's drive: the stepper through the gearhead, which is where those limits come from.
 			var driver = 'driver${side.name}';
 			addComponent(driver, wheelDriver());
-			addMemberConnector("basePlate", driver, Solids.axial(side.sign * 210, 0, BASE_THICKNESS));
+			addMemberConnector("basePlate", driver, Solids.axial(layout == null ? side.sign * 210 : 200, layout == null ? 0 : side.sign * 80, BASE_THICKNESS));
 			addMate('$driver-mount', "fixed", "basePlate", driver, driver, "mount");
-			connectPorts('$driver-power', "battery", 'power${side.name}', driver, "power");
+			connectPorts('$driver-power', "battery", side.sign > 0 ? "power1" : "power2", driver, "power");
 			addMotor('drive${side.name}', side.joint, 'motor${side.name}', driver, 0.5, gearbox);
 		}
 
@@ -333,7 +328,7 @@ class MobileBase extends MachineAssembly {
 			addMate('post${corner.name}-mount', "fixed", "basePlate", 'post${corner.name}', 'post${corner.name}', "base");
 		}
 		// The deck rests on all four posts; one carries it in the mate tree.
-		addComponent("deck", new ChassisPlate(LENGTH, WIDTH, DECK_THICKNESS, "Deck", deckSeats()));
+		addComponent("deck", new ChassisPlate(length, width, DECK_THICKNESS, "Deck", deckSeats()));
 		addMate("deck-mount", "fixed", "postFrontLeft", "top", "deck", "postFrontLeft");
 		addComponent("lidar", lidar);
 		addMate("lidar-mount", "fixed", "deck", "lidar", "lidar", "base");
@@ -342,8 +337,11 @@ class MobileBase extends MachineAssembly {
 		if (arm != null) {
 			include("arm", arm);
 			addMate("arm-mount", "fixed", "deck", "payload", "arm/pedestal", "floor");
-			// The arm's tool runs on compressed air, which the base passes on as its own service input.
-			exposePort("compressedAir", "arm/tool/ejector", "air");
+			// Pass through the payload's declared services without assuming which tool it carries.
+			for (name in arm.portNames()) {
+				var inlet = arm.port(name, "arm");
+				exposePort(name, inlet.instanceId, inlet.portName);
+			}
 		}
 	}
 
@@ -358,12 +356,12 @@ class MobileBase extends MachineAssembly {
 				holes: [for (x in [-bracket.holeOffset, bracket.holeOffset]) {x: x, y: holeY, diameter: bracket.holeDiameter}]});
 		}
 		var casterHoles = caster.plateSize / 2 - 8;
-		for (end in [{name: "Front", x: CASTER_X}, {name: "Rear", x: -CASTER_X}])
+		for (end in [{name: "Front", x: length / 2 - 70}, {name: "Rear", x: -length / 2 + 70}])
 			seats.push({name: 'caster${end.name}', frame: ChassisPlate.underneath(end.x, 0),
 				holes: [for (dx in [-1, 1]) for (dy in [-1, 1]) {x: end.x + dx * casterHoles, y: dy * casterHoles, diameter: 6.6}]});
-		seats.push({name: "battery", frame: ChassisPlate.onTop(0, 0, BASE_THICKNESS), holes: []});
+		seats.push({name: "battery", frame: ChassisPlate.onTop(batteryX, 0, BASE_THICKNESS), holes: []});
 		for (corner in CORNERS) {
-			var x = corner.x * POST_X, y = corner.y * POST_Y;
+			var x = corner.x * (length / 2 - 40), y = corner.y * (width / 2 - (WIDTH / 2 - POST_Y));
 			seats.push({name: 'post${corner.name}', frame: ChassisPlate.onTop(x, y, BASE_THICKNESS),
 				holes: [{x: x, y: y, diameter: 8.4}]});
 		}
@@ -373,11 +371,11 @@ class MobileBase extends MachineAssembly {
 	/** Seats on the deck: the post tops underneath, the lidar and a payload mount on top. */
 	function deckSeats():Array<PlateSeat> {
 		var seats:Array<PlateSeat> = [for (corner in CORNERS) {name: 'post${corner.name}',
-			frame: ChassisPlate.underneath(corner.x * POST_X, corner.y * POST_Y),
-			holes: [{x: corner.x * POST_X, y: corner.y * POST_Y, diameter: 8.4}]}];
-		seats.push({name: "lidar", frame: ChassisPlate.onTop(LIDAR_X, 0, DECK_THICKNESS), holes: []});
+			frame: ChassisPlate.underneath(corner.x * (length / 2 - 40), corner.y * (width / 2 - (WIDTH / 2 - POST_Y))),
+			holes: [{x: corner.x * (length / 2 - 40), y: corner.y * (width / 2 - (WIDTH / 2 - POST_Y)), diameter: 8.4}]}];
+		seats.push({name: "lidar", frame: ChassisPlate.onTop(length / 2 - 80, 0, DECK_THICKNESS), holes: []});
 		// The arm's own cell lies along its -Y; a quarter turn about the seat's up axis brings that ahead.
-		seats.push({name: "payload", frame: AssemblyFrames.compose(ChassisPlate.onTop(PAYLOAD_X, 0, DECK_THICKNESS),
+		seats.push({name: "payload", frame: AssemblyFrames.compose(ChassisPlate.onTop(payloadX, 0, DECK_THICKNESS),
 			AssemblyFrames.turnY(ARM_TURN)), holes: []});
 		return seats;
 	}
@@ -396,14 +394,14 @@ class MobileBase extends MachineAssembly {
 	/** Distance between the wheels' mid-tread planes, measured from the solved assembly. */
 	public function trackWidth():Float {
 		var poses = solvedPoses();
-		function centreY(id:String):Float
-			return AssemblyFrames.compose(poses.get(id), memberConnectorFrame(id, "centre")).y;
-		return centreY("wheelLeft") - centreY("wheelRight");
+		var left = AssemblyFrames.compose(poses.get("wheelLeft"), memberConnectorFrame("wheelLeft", "centre"));
+		var right = AssemblyFrames.compose(poses.get("wheelRight"), memberConnectorFrame("wheelRight", "centre"));
+		return left.y - right.y;
 	}
 
 	/** Outline of the chassis on the floor, counter-clockwise, in millimetres from the assembly origin. */
-	public static function footprint():Array<{x:Float, y:Float}> {
-		var hx = LENGTH / 2, hy = WIDTH / 2;
+	public function footprint():Array<{x:Float, y:Float}> {
+		var hx = length / 2, hy = width / 2;
 		return [{x: hx, y: hy}, {x: -hx, y: hy}, {x: -hx, y: -hy}, {x: hx, y: -hy}];
 	}
 }
