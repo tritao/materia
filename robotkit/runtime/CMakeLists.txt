@@ -143,6 +143,16 @@ if(RK_BUILD_TESTS)
     endif()
 
 
+    add_executable(robotkit_brake_release_interlock_tests tests/brake_release_interlock.cpp)
+    target_compile_features(robotkit_brake_release_interlock_tests PRIVATE cxx_std_20)
+    if(MSVC)
+        target_compile_options(robotkit_brake_release_interlock_tests PRIVATE /UNDEBUG)
+    else()
+        target_compile_options(robotkit_brake_release_interlock_tests PRIVATE -UNDEBUG)
+    endif()
+    add_test(NAME robotkit_brake_release_interlock COMMAND robotkit_brake_release_interlock_tests)
+    set_tests_properties(robotkit_brake_release_interlock PROPERTIES LABELS "robot;runtime" TIMEOUT 30)
+
     add_executable(robotkit_validation_tests tests/validation.cpp)
     target_compile_features(robotkit_validation_tests PRIVATE cxx_std_20)
     target_link_libraries(robotkit_validation_tests PRIVATE RobotKit::runtime)
