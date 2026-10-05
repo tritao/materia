@@ -493,6 +493,9 @@ class MissionPlayer implements SessionMember {
       motion = new ManipulatorMotion(robot.robot, compiler, (_) -> null, () -> robot.runtime.pollEvents(), indices);
       jointMotions.set(name, motion);
     }
+    // A different skill may have moved this chain since its last joint program completed.
+    // Keep the compiler and plan sequence, but acquire the next start from the live robot.
+    motion.reset();
     var q = motion.commandedPositions();
     if (q == null) {
       var positions = robot.robot.snapshot().positions;

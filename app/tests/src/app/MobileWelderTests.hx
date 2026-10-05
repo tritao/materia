@@ -3,11 +3,66 @@ package app;
 import sys.FileSystem;
 import robotkit.world.RobotWorld;
 import robotkit.mobile.Twist2;
+import robotkit.skill.Skill;
+import robotkit.skill.SkillStatus;
 
 /** The CAD mobile welding carrier loads and moves unchanged on both native backends. */
 @:access(app.ApplicationSimulation)
 @:access(app.MissionPlayer)
 class MobileWelderTests {
+  static function execute(simulation:ApplicationSimulation, mission:MissionPlayer, skill:Skill):Void {
+    skill.start();
+    var limit = simulation.activeSession().simulationTime() + 20;
+    while (skill.status() == Running && simulation.activeSession().simulationTime() < limit) {
+      simulation.step();
+      var outcome = skill.update(mission.robot.robot.snapshot(), simulation.timestep);
+    }
+    if (skill.status() != Succeeded) throw 'Joint owner handoff failed: ${skill.status()}';
+  }
+
+  /** A cached joint runner must reacquire its start after another motion owner moves the arm. */
+  public static function runJointHandoff(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-welder/materia.mobile.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var tool = generated.robotTools[0];
+    var first:materia.project.SceneArtifact.SceneArtifactMissionStep = {kind: "moveJoints", at: tool.contact,
+      joints: [{joint: "robot/arm/j1", position: 0.2}]};
+    generated.mission = {steps: [first]};
+    for (backend in [ApplicationSimulation.DETERMINISTIC, ApplicationSimulation.MUJOCO]) {
+      var session = new ProjectDocumentSession(null, false);
+      session.openGeneratedProject(generated, manifest);
+      var simulation = new ApplicationSimulation(new RobotWorld());
+      simulation.setBackend(backend);
+      try {
+        if (!simulation.rebuild(session.sensors, session.scene, session)) throw simulation.error;
+        var mission:MissionPlayer = cast simulation.missionPlayer();
+        mission.finished = true; // Drive the skills explicitly so the test can insert a second owner.
+        execute(simulation, mission, mission.jointMove(first));
+        var arm = mission.toolArm(tool);
+        var indices = [for (target in arm.toJointTargets([for (_ in 0...arm.group.count()) 0.0])) target.joint];
+        var measured = mission.robot.robot.snapshot().positions;
+        if (Math.abs(measured.get(indices[0]) - 0.2) > 0.005) throw "First joint owner missed its target";
+        var planning = processkit.WeldingPlanRunner.planning(arm, MissionPlayer.ARM_ACCELERATION);
+        var independent = new motionkit.robot.ManipulatorMotion(mission.robot.robot, planning.compiler,
+          (_) -> null, () -> mission.robot.runtime.pollEvents(), indices);
+        var target = [for (index in indices) measured.get(index)]; target[0] = 0.4;
+        execute(simulation, mission, new motionkit.robot.MotionProgramSkill(independent,
+          new motionkit.program.MotionProgram([motionkit.program.MotionOp.MoveJ(
+            motionkit.program.MoveTarget.JointTarget(target), new motionkit.MotionOptions(), motionkit.program.Blend.ExactStop)])));
+        if (Math.abs(mission.robot.robot.snapshot().positions.get(indices[0]) - 0.4) > 0.005)
+          throw "Independent joint owner missed its target";
+        execute(simulation, mission, mission.jointMove({kind: "moveJoints", at: tool.contact,
+          joints: [{joint: "robot/arm/j1", position: 0.0}]}));
+        if (Math.abs(mission.robot.robot.snapshot().positions.get(indices[0])) > 0.005)
+          throw "Reacquired joint owner missed its target";
+        Sys.println('mobile joint handoff ($backend): cached owner 0.2 rad, independent owner 0.4 rad, reacquired owner 0 rad');
+      } catch (error:Dynamic) {
+        simulation.clear(); session.dispose(); throw error;
+      }
+      simulation.clear(); session.dispose();
+    }
+  }
+
   static function position(simulation:ApplicationSimulation, id:String):Array<Float> {
     for (entry in simulation.capturePresentationSnapshot().environment) if (entry.id == id) return entry.position.copy();
     throw 'Missing mobile welding part $id';

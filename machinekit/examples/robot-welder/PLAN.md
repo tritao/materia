@@ -1507,3 +1507,12 @@ radius, soft inflation distance and two grid cells, keeping the old one-metre mi
 carriers. CAD planning and execution use the same rule. All 485 floor-map assertions pass,
 including rejection of the clipped route and successful detour with derived bounds. The app
 execution retry and milestone gates remain pending.
+
+P2 execution after the map repair reached both stations and all welds, then rejected the last
+stow submission at 268.71 s (step 13): RobotKit status -2. MissionPlayer cached a joint runner's
+old commanded endpoint across intervening welding ownership. Each new joint step now resets
+the completed runner's planning anchor and acquires the live robot start while retaining its
+compiler and plan sequence. A focused executed handoff passes on both native backends: cached
+owner to 0.2 rad, independent owner to 0.4 rad, cached owner reacquires and returns to 0 rad.
+This is application ownership policy; no RobotRuntime or MotionKit semantics change. App compile
+passes with 1846 sources. The full mobile mission retry and milestone regression gates remain open.
