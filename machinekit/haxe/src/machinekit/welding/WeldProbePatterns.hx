@@ -17,6 +17,22 @@ class WeldProbeStage {
 
 /** Select geometrically observable contact patterns from patches large enough for the current uncertainty. */
 class WeldProbePatterns {
+  /** Preserve lattice-order ties while rejecting unreachable extrema from the outside inward. */
+  static function reachableExtreme(candidates:Array<Vector>, axis:Vector, maximum:Bool, face:WeldProbeFace,
+      uncertainty:WeldProbeUncertainty, possible:Null<WeldProbeFace->Vector->WeldProbeRegionBounds->Bool>):Null<Vector> {
+    while (candidates.length > 0) {
+      var chosen = 0;
+      for (index in 1...candidates.length) {
+        var value = candidates[index].dot(axis), current = candidates[chosen].dot(axis);
+        if (maximum ? value > current : value < current) chosen = index;
+      }
+      var point = candidates[chosen];
+      if (possible == null || possible(face, point, uncertainty.region(face, point))) return point;
+      candidates.splice(chosen, 1);
+    }
+    return null;
+  }
+
   public static function stages(geometry:WeldProbeGeometry, count:Int, previousNormals:Array<Vector>,
       uncertainty:WeldProbeUncertainty, clearance:Float = 3, divisions:Int = 33,
       ?possible:WeldProbeFace->Vector->WeldProbeRegionBounds->Bool):Array<WeldProbeStage> {
@@ -38,7 +54,7 @@ class WeldProbePatterns {
         var approach = bounds.normalTravel + clearance;
         if (!geometry.exposedRegion(face, point, bounds.halfU + approach * bounds.tiltU,
           bounds.halfV + approach * bounds.tiltV, approach, clearance)) continue;
-        if (count != 1 && possible != null && !possible(face, point, bounds)) continue;
+        if (count == 3 && possible != null && !possible(face, point, bounds)) continue;
         candidates.push(point); travel = Math.max(travel, approach);
       }
       if (candidates.length < count) continue;
@@ -65,14 +81,14 @@ class WeldProbePatterns {
       } else if (count == 2) {
         // Separation along the planes' intersection observes rotation about the first plane's normal.
         var axis = normals[0].cross(face.normal).normalized();
-        var first = candidates[0], second = first;
-        for (point in candidates) {
-          if (point.dot(axis) < first.dot(axis)) first = point;
-          if (point.dot(axis) > second.dot(axis)) second = point;
-        }
+        var first = reachableExtreme(candidates, axis, false, face, uncertainty, possible);
+        if (first == null) continue;
+        var second = reachableExtreme(candidates, axis, true, face, uncertainty, possible);
+        if (second == null) continue;
         var span = Math.abs(second.subtract(first).dot(axis));
         if (span < clearance) continue;
         points = [first, second]; score = span * span;
+        travel = Math.max(uncertainty.region(face, first).normalTravel, uncertainty.region(face, second).normalTravel) + clearance;
       } else {
         // Only one contact is needed: screen nearest points lazily instead of solving IK for the whole patch.
         var chosen:Null<Vector> = null, distance = Math.POSITIVE_INFINITY;

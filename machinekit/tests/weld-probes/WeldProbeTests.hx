@@ -162,6 +162,33 @@ class WeldProbeTests {
     check(secondStages.length > 0, "Independent second-plane patterns are available after uncertainty is reduced");
     for (stage in secondStages) check(Math.abs(stage.points[1].subtract(stage.points[0]).dot(firstNormal.cross(stage.face.normal))) >= 3,
       "Second-plane contacts observe the remaining rotational component");
+    var pairChecks = new Map<String, Int>();
+    var directPairs = WeldProbePatterns.stages(work, 2, [firstNormal], reduced, 3, 9,
+      (face, _, _) -> {
+        var prior = pairChecks.get(face.name());
+        pairChecks.set(face.name(), prior == null ? 1 : prior + 1); return true;
+      });
+    var unfilteredPairs = WeldProbePatterns.stages(work, 2, [firstNormal], reduced, 3, 9);
+    check(directPairs.length > 0, "Reachable extrema yield second-plane stages");
+    for (tested in pairChecks) check(tested == 2,
+      "Two-contact selection screens only its reachable extrema, even for a geometrically narrow patch");
+    for (index in 0...directPairs.length) {
+      check(directPairs[index].face.name() == unfilteredPairs[index].face.name() &&
+        directPairs[index].score == unfilteredPairs[index].score &&
+        directPairs[index].points[0].subtract(unfilteredPairs[index].points[0]).length() < 1e-10 &&
+        directPairs[index].points[1].subtract(unfilteredPairs[index].points[1]).length() < 1e-10,
+        "Lazy extrema retain the broadest pair and stage ordering");
+    }
+    var rejectedExtrema = new Map<String, Bool>();
+    var alternativePairs = WeldProbePatterns.stages(work, 2, [firstNormal], reduced, 3, 9,
+      (face, _, _) -> {
+        if (rejectedExtrema.exists(face.name())) return true;
+        rejectedExtrema.set(face.name(), true); return false;
+      });
+    check(alternativePairs.length == directPairs.length,
+      "An unreachable extreme still permits a broad reachable pair");
+    check(WeldProbePatterns.stages(work, 2, [firstNormal], reduced, 3, 9, (_, _, _) -> false).length == 0,
+      "An entirely unreachable second plane is rejected");
     var thirdStages = WeldProbePatterns.stages(work, 1, [firstNormal, secondStages[0].face.normal], reduced);
     check(thirdStages.length > 0, "Third-plane candidates complete the independent three-plane basis");
     var screenings = [0];

@@ -2106,3 +2106,22 @@ corridor rejection, mismatched-goal rejection before motion and obstructed direc
 The rejection tests publish the queued stop before retrying; otherwise the native owner is
 correctly unavailable for a new plan. Compiler-only builds use existing native libraries.
 The production P3 retry remains outstanding; main has not advanced.
+
+The branch-preserving production retry generated 66 records (2,877,017 bytes) and completed
+three coarse/fine pairs on its first face without air-approach touches. The last retreat
+started at 59.49 simulation seconds. It was deliberately interrupted with exit 143 while
+planning the second face; this is not a complete registration pass. Log:
+ignored app/build/p3-branch-registration.log. Commit for the tested branch policy:
+97ff470b267acd3edfc959aeb6c5901c0ce4e749.
+
+Two-contact CAD selection previously screened every eligible lattice point for IK before
+using only the extrema along the planes' intersection. It now screens those extrema lazily,
+rejecting unreachable points from the outside inward and preserving lattice-order ties.
+This retains the same broadest reachable pair and face score/order for a fixed predicate;
+interior points cannot change either extremum. The stage approach bound is derived from its
+two selected points. All geometric region and exposure checks remain in force, and three-
+contact breadth selection is unchanged. The focused CAD probe suite passes 4,975 assertions
+with 468 exposed samples, including unchanged extrema/order, unreachable-extreme fallback,
+all-unreachable rejection and two checks per face when both extrema are reachable. An initial
+call-count assertion incorrectly ignored geometrically narrow patches discarded after
+screening; that assertion was corrected. No production speedup or P3 pass is claimed yet.
