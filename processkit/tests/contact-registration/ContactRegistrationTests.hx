@@ -24,6 +24,7 @@ class ContactRegistrationTests {
   public static function main():Void {
     ContactSearchTests.run();
     ContactPoseEnvelopeTests.run();
+    ContactRegistrationSequenceTests.run();
     var nominal = new Transform3(new Vec3(1.7, -0.2, 0.6), Quat.fromRollPitchYaw(0.1, -0.1, 0.7));
     for (x in [-0.02, 0.0, 0.02]) for (y in [-0.02, 0.02]) for (yaw in [-2.0, 2.0]) {
       var correction = new Transform3(new Vec3(x, y, 0.01), Quat.fromRollPitchYaw(0.01, -0.015, yaw * Math.PI / 180));

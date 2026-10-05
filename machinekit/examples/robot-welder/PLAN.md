@@ -1751,3 +1751,24 @@ inside its predicted region, and the six contacts produce an accepted rank-six f
 passes 3,177 assertions with 468 exposed samples. These observations are synthesized for the focused
 geometry test; execution on the mobile robot, saved registration steps and noisy mission gates are
 still required before P3 can land.
+
+### P3 measured registration execution sequence (2026-10-05)
+
+`ContactRegistrationSequence` owns the 3-2-1 measurement policy. A caller supplies checked CAD-derived
+probes on one nominal work plane per stage; the selector receives previous independent normals and
+the measured pose envelope. Each complete stage refines that envelope before selecting the next.
+Parallel planes, inconsistent observations and deficient final contact rank fail explicitly. Only an
+accepted six-component rigid fit publishes a result, with residual tolerance tied to calibrated
+contact error. A sequence is single-use so measurements cannot be carried across parking events.
+
+`ContactRegistrationRunner` drives the sequence through one `ContactProbeRunner`, accepting each
+measurement only after its checked retreat completes. Probe failure, selector failure and cancellation
+leave no published work frame. ProcessKit owns this execution policy; the selector boundary keeps
+CAD shape extraction and candidate/motion preparation outside the measured registration state.
+
+Focused tests pass 18 sequence assertions plus 51 envelope, 20 search and 109 rigid-fit assertions.
+The native contact-motion suite passes 34 assertions: its new wrapper case executes three full probes
+(six coarse/fine touch episodes), rejects an unavailable second independent plane, and leaves arc/wire
+off with observed joint rest. This one-axis case proves the execution/failure boundary, not successful
+six-component mobile registration. Saved mission integration, CAD-aware request preparation on the
+six-axis arm and both-backend injected-parking mission gates remain open. P4 and P5 remain required.

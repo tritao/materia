@@ -115,7 +115,7 @@ class ContactSearchMotionTests {
     check(Math.abs(robot.snapshot().velocities.get(0)) < 1e-6, "The native joint is at rest after probing");
     servo.dispose(); harness.dispose();
   }
-  static function completeProbe():Void {
+  static function completeProbe(registration:Bool = false):Void {
     var fixture = axis(true);
     var model = fixture.model, arm = fixture.arm;
     var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
@@ -131,11 +131,20 @@ class ContactSearchMotionTests {
     var probe = new ContactProbeRunner(motion, new ProbeMotionPlanner(arm, planning.compiler), channels, "torch",
       () -> new ServoSession(robot, arm));
     var prepared = new Transform3(new Vec3(0, 0, 0.01), arm.tcpPose([0.0]).rotation);
-    probe.start(new ContactProbeRequest(prepared, new Vec3(0, 0, -1), 0.04, 0.005, 0.0005, 0.002,
-      WeldArcModel.TOUCH_TOLERANCE));
+    var requested = new ContactProbeRequest(prepared, new Vec3(0, 0, -1), 0.04, 0.005, 0.0005, 0.002,
+      WeldArcModel.TOUCH_TOLERANCE);
+    var registrationRunner = new processkit.ContactRegistrationRunner(probe,
+      new processkit.perception.ContactRegistrationSequence(
+        new processkit.perception.ContactPoseEnvelope(Transform3.identity(), new Vec3(0, 0, 0.001), new Vec3(), 0.00001),
+        (count, _, _) -> {
+          if (count != 3) throw "No second independent reachable plane";
+          return new processkit.perception.ContactRegistrationSequence.ContactRegistrationStage(new Vec3(0, 0, 1), -0.02,
+            [requested, requested, requested]);
+        }));
+    if (registration) registrationRunner.start(); else probe.start(requested);
     var sensing = new WeldArcModel({maxCurrentA: 300.0, efficiency: 0.85, wireDiameterMm: 1.2, stickoutMm: 15.0});
     var tick = 0, safe = true, touchEpisodes = 0, touching = false;
-    while (tick < 2400 && probe.running()) {
+    while (tick < 7200 && (registration ? registrationRunner.running() : probe.running())) {
       harness.step(Int64.ofInt(tick++));
       var snapshot = robot.snapshot();
       var on = switch runtime.channelValue(channels.arc) { case Digital(value): value; default: true; };
@@ -147,7 +156,15 @@ class ContactSearchMotionTests {
       if (reading.touch && !touching) touchEpisodes++;
       touching = reading.touch;
       runtime.publishSensorFrame("torch", WeldSensor.values(reading), Int64.ofInt(tick), snapshot.sourceTimestampNs, snapshot.sourceClockId);
-      probe.update(0.01);
+      if (registration) registrationRunner.update(0.01); else probe.update(0.01);
+    }
+    if (registration) {
+      check(!registrationRunner.running() && !registrationRunner.completed() && registrationRunner.workFrame == null &&
+        registrationRunner.failure == "No second independent reachable plane", "Unreachable later registration stage fails without a work frame");
+      check(touchEpisodes == 6, "Three registration contacts each execute coarse and fine touch episodes");
+      check(safe && Math.abs(robot.snapshot().velocities.get(0)) < 1e-5,
+        "Registration failure leaves arc and wire off and the observed arm at rest");
+      harness.dispose(); return;
     }
     check(probe.completed() && probe.failure == null, 'The complete checked/refined probe succeeds: ${probe.failure}, tick=$tick, q=${robot.snapshot().positions.get(0)}, contacts=$touchEpisodes');
     var point:Vec3 = cast probe.contact;
@@ -159,7 +176,7 @@ class ContactSearchMotionTests {
     harness.dispose();
   }
   public static function main():Void {
-    run(false, false); run(true, false); run(false, true); completeProbe();
+    run(false, false); run(true, false); run(false, true); completeProbe(); completeProbe(true);
     Sys.println('Contact search native motion: $checks assertions passed');
   }
 }
