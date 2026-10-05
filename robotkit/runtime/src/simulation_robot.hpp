@@ -82,6 +82,8 @@ private:
     /** Resolves spindle setpoint channels and queues their velocity targets. */
     std::optional<ProcessChannelFault> apply_velocity_drives(const RobotRuntime &runtime,
                                     std::vector<nksim_joint_target> &targets, bool deenergized = false);
+    rk_result apply_brake_coils(const RobotRuntime &runtime,
+        std::optional<ProcessChannelFault> &fault, bool deenergized = false);
     /** Queues a zero-velocity hold for one actuated joint. */
     void queue_velocity_hold(std::size_t joint);
     /** Mutable copy of the committed joint commands for the apply in progress. */
@@ -166,6 +168,14 @@ private:
         double max_rate = 0.0;
     };
     std::vector<VelocityDriveState> velocity_drives_;
+    struct BrakeBinding {
+        uint32_t joint;
+        std::string release_channel;
+    };
+    std::vector<BrakeBinding> brakes_;
+    std::vector<uint8_t> brake_group_;
+    struct BrakeContact { bool configured = false; bool released = false; };
+    std::vector<BrakeContact> joint_brake_state_;
 };
 
 } // namespace robotkit

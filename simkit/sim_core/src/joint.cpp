@@ -67,4 +67,10 @@ nksim_result NKSIM_CALL nksim_joint_get_brake_released(nksim_world world, nksim_
     return result;
 }
 
+nksim_result NKSIM_CALL nksim_world_set_brake_outputs(nksim_world world,
+    const nksim_brake_output *outputs, uint32_t count) {
+    const auto value = nksim::resolve_world(world);
+    return value ? value->set_brake_outputs(outputs, count) : NKSIM_ERROR_INVALID_HANDLE;
+}
+
 } // extern "C"

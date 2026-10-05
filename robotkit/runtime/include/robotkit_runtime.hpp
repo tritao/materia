@@ -401,6 +401,7 @@ private:
     double brake_hold_positions_[RK_MAX_JOINTS]{};
     bool brakes_motion_ready_ = true;
     bool brake_hold_active_ = false;
+    bool brake_powered_[RK_MAX_JOINTS]{};
     int32_t update_brake_interlocks(uint64_t owner_ns, bool servo_enabled, const rk_robot_state &sample);
     std::condition_variable queue_condition_;
     std::deque<QueuedCommand> commands_;

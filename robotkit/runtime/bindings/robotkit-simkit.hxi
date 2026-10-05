@@ -307,6 +307,16 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		reserved2: u32 @offset(92);
 	}
 	/**
+	 * Simulation-owned spring-applied friction brake; all values are SI units.
+	 */
+	struct rk_simulation_brake @layout(32, 8) {
+		joint: u32 @offset(0);
+		reserved: u32 @offset(4);
+		holding_effort: f64 @offset(8);
+		release_delay: f64 @offset(16);
+		application_delay: f64 @offset(24);
+	}
+	/**
 	 * Read-only clock values published by a Simulation tick.
 	 *
 	 * step_index counts successfully completed physics advances. simulation_time
@@ -511,7 +521,7 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		position: array<f64, 3> @offset(32);
 		rotation: array<f64, 4> @offset(56);
 	}
-	struct rk_simulation_robot_desc @layout(2521536, 8) {
+	struct rk_simulation_robot_desc @layout(2537928, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		flags: u32 @offset(4);
 		initial_pose: rk_simulation_pose @offset(8);
@@ -620,6 +630,8 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		virtual_device_feedback_joint: array<u8, 64> @offset(2520444);
 		virtual_device_feedback_ratio: array<f64, 64> @offset(2520512);
 		virtual_device_feedback_offset: array<f64, 64> @offset(2521024);
+		brake_count: u32 @offset(2521536);
+		brakes: array<rk_simulation_brake, 512> @offset(2521544);
 	}
 	/**
 	 * World-frame twist of one body: metres per second and radians per second.

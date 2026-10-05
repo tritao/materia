@@ -35,6 +35,7 @@ int main() {
     blueprint.sensors[0].rotation[3] = 1.0;
     blueprint.sensor_joint[0] = 0;
     blueprint.brake_count = 1;
+    blueprint.joint_servo[0] = {100.0, 10.0};
     blueprint.brakes[0] = {0, 0, 0, 0, 250'000'000, 30'000'000};
     assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_OK);
     blueprint.channels[0].safe_value.digital = 1;
@@ -53,6 +54,7 @@ int main() {
     blueprint.brakes[1] = blueprint.brakes[0];
     assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_ERROR_INVALID_ARGUMENT);
     blueprint.brake_count = blueprint.channel_count = blueprint.sensor_count = 0;
+    blueprint.joint_servo[0] = {};
     blueprint.owner_period_ns = static_cast<uint64_t>(INT64_MAX) + 1;
     assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_ERROR_INVALID_ARGUMENT);
     blueprint.struct_size = offsetof(rk_robot_runtime_blueprint, owner_period_ns);

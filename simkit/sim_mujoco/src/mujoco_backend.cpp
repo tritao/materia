@@ -678,7 +678,12 @@ public:
         const auto state = nksim::BrakeState::create(parameters);
         if (!state) return NKSIM_ERROR_INVALID_ARGUMENT;
         found->second.brake = state;
-        return NKSIM_OK;
+        const auto result = rebuild();
+        if (result != NKSIM_OK) {
+            found->second.brake.reset();
+            rebuild();
+        }
+        return result;
     }
 
     nksim_result joint_set_brake_release(std::uint64_t id, bool energized) override {
@@ -867,12 +872,20 @@ public:
         }
         const auto drives = kinematic_drives();
         for (std::uint32_t index = 0; index < substeps; ++index) {
-            for (auto &[id, joint] : joints) if (joint.brake) {
+            for (auto &response : brake_responses) {
+                auto &joint = *response.joint;
                 if (!joint.brake->advance(model->opt.timestep)) return NKSIM_ERROR_INVALID_ARGUMENT;
-                const int native = model_joint_id(joint);
-                if (native < 0) return NKSIM_ERROR_BACKEND;
-                model->dof_frictionloss[model->jnt_dofadr[native]] =
-                    joint.desc.friction_loss + joint.brake->friction_effort();
+                model->dof_frictionloss[response.dof] = joint.desc.friction_loss + joint.brake->friction_effort();
+                std::copy(response.reference.begin(), response.reference.end(), model->dof_solref + response.dof * mjNREF);
+                std::copy(response.impedance.begin(), response.impedance.end(), model->dof_solimp + response.dof * mjNIMP);
+                if (!joint.brake->released()) {
+                    // Dry friction has a velocity residual, not an elastic position
+                    // residual. Use the solver's maximum impedance and timestep floor
+                    // for a sticking brake; its rated effort still bounds the reaction.
+                    model->dof_solref[response.dof * mjNREF] = 2.0 * model->opt.timestep;
+                    model->dof_solimp[response.dof * mjNIMP] = mjMAXIMP;
+                    model->dof_solimp[response.dof * mjNIMP + 1] = mjMAXIMP;
+                }
             }
             if (!drives.empty())
                 place_kinematic_drives(drives,
@@ -950,6 +963,7 @@ public:
             if (found == joints.end())
                 return NKSIM_ERROR_INVALID_HANDLE;
             auto &state = states[index];
+            state.brake_released = found->second.brake && found->second.brake->released();
             state.position = 0.0;
             state.velocity = 0.0;
             state.effort = 0.0;
@@ -1369,6 +1383,7 @@ private:
         apply_joint_targets();
         mj_forward(model, data);
         rebuild_coupling_responses();
+        rebuild_brake_responses();
         return NKSIM_OK;
     }
 
@@ -1453,6 +1468,20 @@ private:
 
     // MuJoCo's mass-normalised equality response follows transmission compliance
     // and follower inertia. Resolve names and combine terms once per model rebuild.
+    void rebuild_brake_responses() {
+        brake_responses.clear();
+        for (auto &[id, joint] : joints) if (joint.brake) {
+            const auto native = model_joint_id(joint);
+            if (native < 0) continue;
+            BrakeSolverResponse response;
+            response.joint = &joint;
+            response.dof = model->jnt_dofadr[native];
+            std::copy_n(model->dof_solref + response.dof * mjNREF, mjNREF, response.reference.begin());
+            std::copy_n(model->dof_solimp + response.dof * mjNIMP, mjNIMP, response.impedance.begin());
+            brake_responses.push_back(response);
+        }
+    }
+
     void rebuild_coupling_responses() {
         coupling_responses.clear();
         std::map<std::uint64_t, std::pair<double, bool>> responses;
@@ -2195,6 +2224,13 @@ private:
     }
     std::vector<nksim::BackendJointCoupling> couplings;
     std::vector<std::pair<int, double>> coupling_responses;
+    struct BrakeSolverResponse {
+        JointRecord *joint = nullptr;
+        int dof = 0;
+        std::array<mjtNum, mjNREF> reference{};
+        std::array<mjtNum, mjNIMP> impedance{};
+    };
+    std::vector<BrakeSolverResponse> brake_responses;
     DriveCoordinateSpace servo_space;
     std::unique_ptr<ServoCoordinateMap> servo_coordinates;
     bool servo_coordinates_dirty = true;

@@ -81,7 +81,17 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
         for (std::size_t index = 0; index < joints_.size(); ++index) {
             if (index >= actuated_joints_.size() || !actuated_joints_[index])
                 continue;
-            queue_velocity_hold(index);
+            if (index < brake_group_.size() && brake_group_[index]) {
+                nksim_joint_target target{};
+                target.struct_size = sizeof(target);
+                target.joint = joints_[index];
+                target.mode = NKSIM_JOINT_TARGET_EFFORT;
+                target.target = 0.0;
+                pending_targets_.push_back(target);
+                staged_commands()[index] = {NKSIM_JOINT_TARGET_EFFORT, 0.0};
+            } else {
+                queue_velocity_hold(index);
+            }
         }
         return RK_OK;
     }
@@ -298,6 +308,23 @@ std::optional<ProcessChannelFault> SimulationRobot::apply_velocity_drives(const 
     return std::nullopt;
 }
 
+rk_result SimulationRobot::apply_brake_coils(const RobotRuntime &runtime,
+    std::optional<ProcessChannelFault> &fault, bool deenergized) {
+    const ProcessChannelReader reader([&runtime](const char *channel, rk_event_value &value) {
+        return runtime.channel_value(channel, value);
+    });
+    nksim_brake_output outputs[RK_MAX_JOINTS]{};
+    for (std::size_t i = 0; i < brakes_.size(); ++i) {
+        const auto &brake = brakes_[i];
+        const auto coil = deenergized ? ProcessChannelReading<bool>{} : reader.digital(brake.release_channel);
+        if (coil.fault) { fault = coil.fault; return RK_OK; }
+        outputs[i].joint = joints_[brake.joint];
+        outputs[i].energized = coil.value ? 1 : 0;
+    }
+    return nksim_session_submit_brake_outputs(simulation_.session_, outputs,
+        static_cast<uint32_t>(brakes_.size())) == NKSIM_OK ? RK_OK : RK_ERROR_BACKEND;
+}
+
 rk_result SimulationRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) {
     const auto snapshot = nksim_session_latest_snapshot(simulation_.session_);
     nksim_session_status status{};
@@ -322,6 +349,7 @@ rk_result SimulationRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) 
                 state.position[target] = source.position - counter_origin_[target];
                 state.velocity[target] = source.velocity;
                 state.effort[target] = source.effort;
+                joint_brake_state_[target] = {source.brake_configured != 0, source.brake_released != 0};
                 break;
             }
         }
@@ -373,6 +401,11 @@ rk_result SimulationRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) 
             } else if (config.kind == RK_SENSOR_IMU) {
                 sample.value_count = 6;
                 sensors::imu(rotation, base->angular_velocity, acceleration, simulation_.gravity_, sensor.values);
+            } else if (config.kind == RK_SENSOR_BRAKE_RELEASED) {
+                if (sensor.joint >= joint_brake_state_.size() || !joint_brake_state_[sensor.joint].configured)
+                    return RK_ERROR_BACKEND;
+                sample.value_count = 1;
+                sensor.values[0] = joint_brake_state_[sensor.joint].released ? 1.0 : 0.0;
             } else if (config.kind == RK_SENSOR_JOINT_SWITCH) {
                 if (sensor.joint >= state.joint_count) return RK_ERROR_BACKEND;
                 const double position = state.position[sensor.joint];

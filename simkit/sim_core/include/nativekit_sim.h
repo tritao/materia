@@ -260,7 +260,16 @@ typedef struct nksim_joint_state {
     double effort;
     uint32_t reserved0;
     uint64_t reserved[2];
+    uint32_t brake_configured;
+    uint32_t brake_released;
 } nksim_joint_state;
+
+/** Digital release output; physical contact and effort are independent of this command. */
+typedef struct nksim_brake_output {
+    nksim_joint joint;
+    uint32_t energized;
+    uint32_t reserved;
+} nksim_brake_output;
 
 typedef struct nksim_joint_target {
     uint32_t struct_size NK_STRUCT_SIZE;
@@ -473,6 +482,9 @@ NKSIM_API nksim_result NKSIM_CALL nksim_joint_configure_brake(
 /** Digital release coil; zero de-energizes, one energizes. */
 NKSIM_API nksim_result NKSIM_CALL nksim_joint_set_brake_release(
     nksim_world world, nksim_joint joint, uint32_t energized);
+/** Applies a complete batch on the physics owner thread. */
+NKSIM_API nksim_result NKSIM_CALL nksim_world_set_brake_outputs(
+    nksim_world world, const nksim_brake_output *outputs NK_IN_ARRAY(count), uint32_t count);
 /** Physical released contact after the simulated mechanical delay. */
 NKSIM_API nksim_result NKSIM_CALL nksim_joint_get_brake_released(
     nksim_world world, nksim_joint joint, uint32_t *out_released NK_OUT);

@@ -44,6 +44,7 @@ class RobotRuntimeBlueprint {
   /** Velocity process drives are bound to analog channels, never to trajectory axes. */
   public final velocityDrives:Array<RobotRuntimeVelocityDriveBlueprint> = [];
   public final brakes:Array<RobotRuntimeBrakeBlueprint> = [];
+  public final brakePhysics:Array<RobotRuntimeBrakePhysicsBlueprint> = [];
   public final links:Array<RobotRuntimeLinkBlueprint> = [];
   /** Process ownership covers the whole mechanically coupled set, not just its motor shaft. */
   public function processJoints():Array<Bool> {

@@ -126,7 +126,7 @@ class Simulation {
     if (space != null) space.requireDrives(blueprint);
     var robotDesc:Null<rk_simulation_robot_desc> = null;
     if (initialPose != null || virtualDevice != null || blueprint.pneumaticDrives.length > 0 ||
-        blueprint.velocityDrives.length > 0) {
+        blueprint.velocityDrives.length > 0 || blueprint.brakePhysics.length > 0) {
       robotDesc = new rk_simulation_robot_desc();
       robotDesc.set_struct_size(rk_simulation_robot_desc.size());
       robotDesc.set_initial_pose(initialPose == null ?
@@ -261,6 +261,26 @@ class Simulation {
         native.set_max_effort(drive.maxEffort);
         native.set_max_rate(drive.maxRate);
         desc.set_velocity_drives(index, native);
+      }
+    }
+    if (blueprint.brakePhysics.length != blueprint.brakes.length)
+      throw "Every brake interlock requires one physical brake";
+    if (blueprint.brakePhysics.length > 0) {
+      var desc = requireRobotDescription(robotDesc);
+      desc.set_brake_count(blueprint.brakePhysics.length);
+      for (index in 0...blueprint.brakePhysics.length) {
+        var brake = blueprint.brakePhysics[index];
+        var matched = false;
+        for (control in blueprint.brakes) if (control.joint == brake.joint) matched = true;
+        if (!matched) throw "Physical brake has no controller interlock";
+        for (earlier in 0...index) if (blueprint.brakePhysics[earlier].joint == brake.joint)
+          throw "Duplicate physical brake joint";
+        var native = new rk_simulation_brake();
+        native.set_joint(brake.joint);
+        native.set_holding_effort(brake.holdingEffort);
+        native.set_release_delay(brake.releaseDelay);
+        native.set_application_delay(brake.applicationDelay);
+        desc.set_brakes(index, native);
       }
     }
     if (linkCollisionBoxes != null) {

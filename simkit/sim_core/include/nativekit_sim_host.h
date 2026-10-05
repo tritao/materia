@@ -75,6 +75,9 @@ NKSIM_HOST_API nksim_result NKSIM_HOST_CALL nksim_host_submit_forces(
     nksim_host host, const nksim_body_force *forces NK_IN_ARRAY(count), uint32_t count);
 NKSIM_HOST_API nksim_result NKSIM_HOST_CALL nksim_host_submit_joint_targets(
     nksim_host host, const nksim_joint_target *targets NK_IN_ARRAY(count), uint32_t count);
+/** Queue digital brake outputs for the physics owner thread. */
+NKSIM_HOST_API nksim_result NKSIM_HOST_CALL nksim_host_submit_brake_outputs(
+    nksim_host host, const nksim_brake_output *outputs NK_IN_ARRAY(count), uint32_t count);
 /**
  * Queue body state writes applied on the owner thread before the next tick,
  * with the same semantics as nksim_body_set_state(). For a kinematic body the

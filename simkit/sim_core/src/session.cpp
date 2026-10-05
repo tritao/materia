@@ -754,6 +754,13 @@ public:
                           : nksim_world_set_joint_targets(world_, targets, count);
     }
 
+    nksim_result submit_brake_outputs(const nksim_brake_output *outputs, uint32_t count) {
+        std::lock_guard lock(mutex);
+        if (count == 0) return NKSIM_OK;
+        return host_ != 0 ? nksim_host_submit_brake_outputs(host_, outputs, count)
+                          : nksim_world_set_brake_outputs(world_, outputs, count);
+    }
+
     nksim_result submit_forces(const nksim_body_force *forces, uint32_t count) {
         std::lock_guard lock(mutex);
         if (count == 0) return NKSIM_OK;
@@ -1502,6 +1509,13 @@ nksim_result NKSIM_CALL nksim_session_submit_joint_targets(nksim_session session
     if (count != 0 && !targets) return NKSIM_ERROR_INVALID_ARGUMENT;
     NKSIM_SESSION_OR_FAIL(value);
     return value->submit_joint_targets(targets, count);
+}
+
+nksim_result NKSIM_CALL nksim_session_submit_brake_outputs(nksim_session session,
+    const nksim_brake_output *outputs, uint32_t count) {
+    if (count && !outputs) return NKSIM_ERROR_INVALID_ARGUMENT;
+    NKSIM_SESSION_OR_FAIL(value);
+    return value->submit_brake_outputs(outputs, count);
 }
 
 nksim_result NKSIM_CALL nksim_session_submit_forces(nksim_session session,

@@ -141,6 +141,15 @@ typedef struct rk_simulation_pneumatic_drive {
     double rated_speed;
 } rk_simulation_pneumatic_drive;
 
+/** Simulation-owned spring-applied friction brake; all values are SI units. */
+typedef struct rk_simulation_brake {
+    uint32_t joint;
+    uint32_t reserved;
+    double holding_effort;
+    double release_delay;
+    double application_delay;
+} rk_simulation_brake;
+
 /** A simulation-owned continuous joint whose speed is set by analog process channels. */
 typedef struct rk_simulation_velocity_drive {
     uint32_t joint;
@@ -252,6 +261,8 @@ typedef struct rk_simulation_robot_desc {
     uint8_t virtual_device_feedback_joint[64];
     double virtual_device_feedback_ratio[64];
     double virtual_device_feedback_offset[64];
+    uint32_t brake_count;
+    rk_simulation_brake brakes[RK_MAX_JOINTS];
 } rk_simulation_robot_desc;
 
 /** Latest numeric device observation, independent of the authored sensor layout. */

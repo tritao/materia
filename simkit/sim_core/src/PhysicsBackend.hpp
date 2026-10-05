@@ -91,6 +91,7 @@ struct BackendJointState {
     double position = 0.0;
     double velocity = 0.0;
     double effort = 0.0;
+    bool brake_released = false;
 };
 
 struct BackendJointTarget {

@@ -12,11 +12,12 @@ namespace {
 constexpr std::uint32_t default_command_capacity = 256;
 
 struct Command {
-    enum class Kind { Forces, JointTargets, BodyStates, BodyDrives, BodyMotionType };
+    enum class Kind { Forces, JointTargets, BodyStates, BodyDrives, BodyMotionType, BrakeOutputs };
 
     Kind kind = Kind::Forces;
     std::vector<nksim_body_force> forces;
     std::vector<nksim_joint_target> joint_targets;
+    std::vector<nksim_brake_output> brake_outputs;
     std::vector<nksim_body_state> body_states;
     nksim_body body = 0;
     std::uint32_t motion_type = 0;
@@ -199,6 +200,18 @@ public:
         return enqueue(std::move(command));
     }
 
+    nksim_result submit_brake_outputs(const nksim_brake_output *outputs, uint32_t count) {
+        if (count && !outputs) return NKSIM_ERROR_INVALID_ARGUMENT;
+        Command command;
+        command.kind = Command::Kind::BrakeOutputs;
+        for (uint32_t i = 0; i < count; ++i) {
+            if (!outputs[i].joint || outputs[i].energized > 1 || outputs[i].reserved)
+                return NKSIM_ERROR_INVALID_ARGUMENT;
+            command.brake_outputs.push_back(outputs[i]);
+        }
+        return enqueue(std::move(command));
+    }
+
     nksim_result submit_body_states(const nksim_body_state *states, std::uint32_t count,
                                     Command::Kind kind = Command::Kind::BodyStates) {
         if (count != 0 && !states)
@@ -278,7 +291,7 @@ public:
 private:
     nksim_result enqueue(Command command) {
         if (command.kind != Command::Kind::BodyMotionType && command.forces.empty() &&
-            command.joint_targets.empty() && command.body_states.empty())
+            command.joint_targets.empty() && command.brake_outputs.empty() && command.body_states.empty())
             return NKSIM_OK;
         std::lock_guard lock(mutex);
         if (!started || !running || stop_requested)
@@ -319,6 +332,9 @@ private:
                 result = world->set_joint_targets(
                     command.joint_targets.data(),
                     static_cast<std::uint32_t>(command.joint_targets.size()));
+            } else if (command.kind == Command::Kind::BrakeOutputs) {
+                result = world->set_brake_outputs(command.brake_outputs.data(),
+                    static_cast<uint32_t>(command.brake_outputs.size()));
             } else if (command.kind == Command::Kind::BodyMotionType) {
                 result = world->set_body_motion_type(command.body, command.motion_type);
             } else {
@@ -535,6 +551,12 @@ nksim_result NKSIM_HOST_CALL nksim_host_submit_joint_targets(
     nksim_host host, const nksim_joint_target *targets, uint32_t count) {
     const auto value = nksim::resolve_host(host);
     return value ? value->submit_joint_targets(targets, count) : NKSIM_ERROR_INVALID_HANDLE;
+}
+
+nksim_result NKSIM_HOST_CALL nksim_host_submit_brake_outputs(
+    nksim_host host, const nksim_brake_output *outputs, uint32_t count) {
+    const auto value = nksim::resolve_host(host);
+    return value ? value->submit_brake_outputs(outputs, count) : NKSIM_ERROR_INVALID_HANDLE;
 }
 
 nksim_result NKSIM_HOST_CALL nksim_host_submit_body_states(

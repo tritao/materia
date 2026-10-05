@@ -238,9 +238,23 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         return RK_ERROR_INVALID_STATE;
     if (rk_robot_runtime_blueprint_validate(&blueprint) != RK_OK || blueprint.link_count == 0)
         return RK_ERROR_INVALID_ARGUMENT;
-    // Brake feedback cannot be synthesized without a bound physical brake.
-    // The controller handshake is available to endpoints supplying real contact samples.
-    if (blueprint.brake_count != 0) return RK_ERROR_UNSUPPORTED;
+    const auto brake_count = robot_desc ? robot_desc->brake_count : 0;
+    if (brake_count != blueprint.brake_count) return RK_ERROR_INVALID_ARGUMENT;
+    if (brake_count && robot_desc->virtual_device_enabled) return RK_ERROR_UNSUPPORTED;
+    for (uint32_t i = 0; i < brake_count; ++i) {
+        const auto &brake = robot_desc->brakes[i];
+        if (brake.joint >= blueprint.joint_count || brake.reserved ||
+            !std::isfinite(brake.holding_effort) || brake.holding_effort <= 0.0 ||
+            !std::isfinite(brake.release_delay) || brake.release_delay < 0.0 ||
+            !std::isfinite(brake.application_delay) || brake.application_delay < 0.0)
+            return RK_ERROR_INVALID_ARGUMENT;
+        bool matched = false;
+        for (uint32_t j = 0; j < blueprint.brake_count; ++j)
+            if (blueprint.brakes[j].joint == brake.joint) matched = true;
+        if (!matched) return RK_ERROR_INVALID_ARGUMENT;
+        for (uint32_t j = 0; j < i; ++j)
+            if (robot_desc->brakes[j].joint == brake.joint) return RK_ERROR_INVALID_ARGUMENT;
+    }
     const bool has_pneumatic_desc = robot_desc != nullptr;
     const auto pneumatic_count = has_pneumatic_desc ? robot_desc->pneumatic_drive_count : 0;
     if (pneumatic_count > RK_MAX_JOINTS) return RK_ERROR_INVALID_ARGUMENT;
@@ -688,6 +702,14 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             binding->actuated_joints_.push_back(source.type != RK_RUNTIME_JOINT_FIXED && !process_joint);
             joints_.push_back(joint);
         }
+        for (uint32_t i = 0; i < brake_count; ++i) {
+            const auto &source = robot_desc->brakes[i];
+            require_sim(nksim_joint_configure_brake(world, binding->joints_[source.joint],
+                source.holding_effort, source.release_delay, source.application_delay), "nksim_joint_configure_brake");
+            for (uint32_t j = 0; j < blueprint.brake_count; ++j)
+                if (blueprint.brakes[j].joint == source.joint)
+                    binding->brakes_.push_back({source.joint, blueprint.channels[blueprint.brakes[j].release_channel].id});
+        }
         // A process drive may command its joint before any controller joint
         // target has staged a command. Keep its applied state from the first tick.
         binding->commanded_.resize(blueprint.joint_count);
@@ -738,6 +760,19 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 }
             }
             if (!changed) break;
+        }
+        binding->joint_brake_state_.assign(blueprint.joint_count, SimulationRobot::BrakeContact{});
+        binding->brake_group_.assign(blueprint.joint_count, 0);
+        for (const auto &brake : binding->brakes_) binding->brake_group_[brake.joint] = 1;
+        bool expanded = true;
+        while (expanded) {
+            expanded = false;
+            for (uint32_t i = 0; i < blueprint.coupling_count; ++i) {
+                const auto &coupling = blueprint.couplings[i];
+                if (!(binding->brake_group_[coupling.leader] || binding->brake_group_[coupling.follower])) continue;
+                if (!binding->brake_group_[coupling.leader] || !binding->brake_group_[coupling.follower]) expanded = true;
+                binding->brake_group_[coupling.leader] = binding->brake_group_[coupling.follower] = 1;
+            }
         }
         for (uint32_t index = 0; index < blueprint.coupling_count; ++index) {
             const auto &source = blueprint.couplings[index];
@@ -1780,13 +1815,17 @@ rk_result Simulation::submit(const nksim_tick &tick) {
         auto &runtime = *runtimes_[binding_index];
         auto process_fault = binding->apply_pneumatic_valves(runtime, targets);
         if (!process_fault) process_fault = binding->apply_velocity_drives(runtime, targets);
-        if (process_fault) {
+        rk_result brake_result = RK_OK;
+        if (!process_fault) brake_result = binding->apply_brake_coils(runtime, process_fault);
+        if (process_fault || brake_result != RK_OK) {
             // Reject this robot's staged motion, keep the shared world advancing, and
             // apply physical de-energized behavior (latched valves retain supply air).
-            runtime.fail_tick(process_fault->code());
+            runtime.fail_tick(process_fault ? process_fault->code() : RK_FAULT_ENDPOINT);
             targets = binding->take_pending_targets();
             const auto safe_valves = binding->apply_pneumatic_valves(runtime, targets, true);
             const auto safe_velocity = binding->apply_velocity_drives(runtime, targets, true);
+            std::optional<ProcessChannelFault> safe_brake_fault;
+            if (binding->apply_brake_coils(runtime, safe_brake_fault, true) != RK_OK) return RK_ERROR_BACKEND;
         }
         if (virtual_devices_[binding_index]) {
             rk_robot_state state{};

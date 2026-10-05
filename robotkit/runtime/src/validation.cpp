@@ -184,7 +184,10 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
     if (blueprint->brake_count > RK_MAX_JOINTS) return RK_ERROR_INVALID_ARGUMENT;
     for (uint32_t i = 0; i < blueprint->brake_count; ++i) {
         const auto &brake = blueprint->brakes[i];
-        if (brake.joint >= blueprint->joint_count || blueprint->process_joint[brake.joint] ||
+        if (brake.joint >= blueprint->joint_count || brake.joint >= RK_MAX_SERVO_JOINTS ||
+            blueprint->process_joint[brake.joint] || blueprint->joint_servo[brake.joint].stiffness <= 0.0 ||
+            !(blueprint->joints[brake.joint].limit_flags & RK_LIMIT_EFFORT) ||
+            blueprint->joints[brake.joint].max_effort <= 0.0 ||
             brake.release_channel >= blueprint->channel_count || brake.released_sensor >= blueprint->sensor_count ||
             brake.reserved || !brake.release_timeout_ns || !brake.feedback_max_age_ns ||
             brake.feedback_max_age_ns > brake.release_timeout_ns ||

@@ -47,6 +47,7 @@ std::unique_ptr<rk_robot_runtime_blueprint> blueprint() {
     }
     value->joints[0] = {0, RK_RUNTIME_JOINT_REVOLUTE, 0, 1, -2.0, 2.0, 10.0};
     value->joints[0].axis[2] = 1.0;
+    value->joints[0].limit_flags |= RK_LIMIT_EFFORT;
     value->joints[0].parent_frame_rotation[3] = value->joints[0].child_frame_rotation[3] = 1.0;
     value->joint_servo[0] = {100.0, 10.0};
     value->channel_count = 1;

@@ -409,6 +409,8 @@ nksim_result World::read_backend_state() {
             joint.state.position = state.position;
             joint.state.velocity = state.velocity;
             joint.state.effort = state.effort;
+            joint.state.brake_configured = joint.brake_configured ? 1 : 0;
+            joint.state.brake_released = state.brake_released ? 1 : 0;
         });
     }
     return NKSIM_OK;
@@ -1120,10 +1122,31 @@ nksim_result World::configure_joint_brake(nksim_joint handle, BrakeParameters pa
     if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
     if (!parameters.valid())
         return NKSIM_ERROR_INVALID_ARGUMENT;
-    const auto *joint = joints.get(handle);
+    auto *joint = joints.get(handle);
     if (!joint) return NKSIM_ERROR_INVALID_HANDLE;
     if (joint->desc.type == NKSIM_JOINT_FIXED) return NKSIM_ERROR_INVALID_STATE;
-    return backend->joint_configure_brake(joint->backend_joint, parameters);
+    const auto result = backend->joint_configure_brake(joint->backend_joint, parameters);
+    if (result == NKSIM_OK) {
+        joint->brake_configured = true;
+        joint->state.brake_configured = 1;
+    }
+    return result;
+}
+
+nksim_result World::set_brake_outputs(const nksim_brake_output *outputs, uint32_t count) {
+    if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
+    if (count && !outputs) return NKSIM_ERROR_INVALID_ARGUMENT;
+    for (uint32_t i = 0; i < count; ++i) {
+        if (outputs[i].energized > 1 || outputs[i].reserved) return NKSIM_ERROR_INVALID_ARGUMENT;
+        const auto *joint = joints.get(outputs[i].joint);
+        if (!joint) return NKSIM_ERROR_INVALID_HANDLE;
+        if (!joint->brake_configured) return NKSIM_ERROR_INVALID_STATE;
+    }
+    for (uint32_t i = 0; i < count; ++i) {
+        const auto result = set_joint_brake_release(outputs[i].joint, outputs[i].energized != 0);
+        if (result != NKSIM_OK) return result;
+    }
+    return NKSIM_OK;
 }
 
 nksim_result World::set_joint_brake_release(nksim_joint handle, bool energized) {

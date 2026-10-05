@@ -308,6 +308,9 @@ NKSIM_API nksim_result NKSIM_CALL nksim_session_get_body_state(
 /** Joint targets, kinematic drives, and state writes for the next tick. */
 NKSIM_API nksim_result NKSIM_CALL nksim_session_submit_joint_targets(
     nksim_session session, const nksim_joint_target *targets, uint32_t count);
+/** Digital brake outputs staged for the physics owner before the next tick. */
+NKSIM_API nksim_result NKSIM_CALL nksim_session_submit_brake_outputs(
+    nksim_session session, const nksim_brake_output *outputs NK_IN_ARRAY(count), uint32_t count);
 /**
  * Forces and torques, world frame, applied at bodies' centres of mass for the
  * next tick only, on top of any others submitted for it. Repeat every tick to
