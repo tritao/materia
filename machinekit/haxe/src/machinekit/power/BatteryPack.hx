@@ -38,6 +38,12 @@ class BatteryPack extends MachineComponent implements ElectricalSource {
     addFacet(new BatteryStorage(nominalVolts, capacityWh));
     declareMass(massKg, new Vector(0, 0, height / 2));
   }
+  override public function electricalSource():Null<ElectricalSource> return this;
+  /** Assumed 1 C continuous discharge and 0.25 C regenerative charge limits of this pack. */
+  public function outputRating(name:String):machinekit.motion.ElectricalSupplyRating {
+    var volts = outputVoltage(name);
+    return {voltage: volts, current: capacityWh / volts, regenerativePower: capacityWh * 0.25};
+  }
   public function outputVoltage(name:String):Float {
     var output = port(name);
     if (output.kind != ElectricalPower || output.role != Supply) throw "Not a battery output";

@@ -12,7 +12,7 @@ class MobileWelderChecks {
     var defaultBase = new MobileBase(new RobotArm(false));
     if (!defaultBase.hasPort("compressedAir")) throw "Suction tool services must still pass through";
     var welding = new RobotArm(false, new ArmWeldingTool());
-    welding.replaceComponent("powerSupply", new IsolatedDcConverter(48, 48, 30, 6));
+    welding.replaceComponent("powerSupply", new IsolatedDcConverter(48, 310, 10, 6, 120, 60, 30, 0.95, 2, 2500));
     var robot = new MobileBase(welding, 48, {length: 2400, width: 1000, payloadX: 700,
       batteryX: -600, battery: new BatteryPack(48, 25000, 1000, 600, 180, 230, 4)});
     if (robot.hasPort("compressedAir") || !robot.hasPort("torchPower")) throw "Base must expose the actual tool services";

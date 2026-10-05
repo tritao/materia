@@ -1,8 +1,9 @@
 # Machine tending remaining review fixes
 
-MT1–MT6 and the MT5b review fixes are complete. All six groups passed the complete
-sequential closing gate and focused native checks. MT7 remains a separate handoff.
-The sections below retain checkpoint history; final verification closes every earlier pending item.
+MT1–MT6 and the first MT5b review passed their closing gate before the rebase.
+The follow-up review has reopened the integration gate; its remaining work is listed
+at the end of this document. MT7 remains a separate handoff.
+The sections below retain checkpoint history, rather than certify the current work in progress.
 Do not retain old-format compatibility: migrate in-repo callers and fixtures, require the
 current format, and remove obsolete paths. Reference hardware data remains explicitly assumed.
 
@@ -229,3 +230,47 @@ Done. What was built and decided:
 - Reach remains Reach850 on a 600 mm riser: fifteen cell-derived poses, 16.239926% minimum joint margin. Two cell controllers own sixteen disjoint joints. The new physical brake and paired-guide changes intentionally alter mill mass, inertia and cycle figures as recorded above; other example baselines do not move in this closing gate.
 - No new confirmed haxeon compiler defect was found, and haxeon was not patched. The section-return expression avoids a captured-local definite-assignment diagnostic; the earlier enum `Array.contains` claim remains unconfirmed.
 - Current formats are MachineKit v16, ProjectKit assembly/state v8 and RobotModel v12. Old acceptance paths are removed and in-repo producers/fixtures migrated. No push or merge into main was performed. MT7–MT12 remain planned; live monitoring of moving foreign obstacles and device-owned brake queue handshakes are not introduced in this handoff.
+
+
+## Rebase onto local main (2026-10-05)
+
+The 25 commits after the previous main integration were replayed onto `f4dc7456a`. The original branch remains at `machine-tending-before-rebase-160241a3b`; main's checkout and submodule pins were not modified. Earlier commit references above identify the original history.
+
+Main now keeps nested assemblies intact and separates mechanical, service, drive and codec responsibilities. Command-relative spindle feedback, crossed-hose polarity, electrical sizing, scoped process channels and physical brake bindings now use `DriveSystem`; controller ownership reads the flattened derived view so nested motors and wiring remain visible. Brake recipes register in the motion package; controller recipes register in their own control package. Main's virtual welder and live mission start behavior remain alongside cell inputs and polynomial clearance checks.
+
+The saved MachineKit assembly format is now **v17**, rejecting all older layouts: the nested main format differs from the original branch's v16 description. ProjectKit remains at v8 and RobotModel at v12. Nested drive and document checks follow the new representation; no compatibility reader was added. The canonical native binding retains both main's virtual peripheral fields and physical brake fields.
+
+The new mobile welder's isolated arm converter now supplies the existing arm's 310 V, 10 A bus and 2500 W regeneration rating instead of 48 V. Its winding curves, gearboxes and mechanical mass remain the same. The converter exposes its regenerative rating through the shared supply API; battery ratings are explicitly assumed 1 C discharge and 0.25 C regenerative charge.
+
+
+## Follow-up review gate before main integration
+
+The final review reopened this milestone. MT7 remains paused. The current-only format policy is retained: tracked documents and fixtures are migrated directly, with no old-format reader or converter shipped. An audit of tracked JSON and Materia files found two shipped worker scenes and the retired-humans refusal fixture with v9 robot models; all now carry the current v12 model. The refusal fixture still tests retired human storage, independently of robot model loading. `app/tests/haxeon.json` runs the full app tests from the existing app build directory, alongside the project-source gate.
+
+Remaining groups: electrical winding/supply reconciliation; valid measured brake hold, rollback, reset and confirmed engagement before torque removal; MT6 ownership, environment, identity, visuals and real signal routing; conservative polynomial clearance; pulley efficiency, guide reactions, presence shapes and explicit CNC scope; native ABI/API simplification; full verification and baseline reconciliation. Earlier passing gates describe their recorded checkpoints, not completion of this new review.
+
+Follow-up verification checkpoint:
+
+- The complete editor `AppTests` suite passed, including worker-gallery and worker document checks (`/tmp/mt-review-editor-tests.log`). The three tracked embedded robot models are v12; the negative worker fixture still tests retired human storage rather than a retired robot schema.
+- Thirteen native suites passed (`/tmp/mt-rebase-native-summary.txt`): runtime, brake-runtime, validation, runtime C API, SimCore, session, simulation C API, MuJoCo, robot MuJoCo, robot simulation, physical brake, brake handshake and brake state. New regressions cover a 0.4 rad startup pose, rollback of the release handshake, reset of the physical brake and rejection of feedback rates slower than their freshness window.
+- Contact C API operations use the complete current layout and typed assignment. An old contact-layout assertion now checks rejection. Normal zero-initialized current-layout output buffers remain supported.
+- Single-controller assemblies retain their assembly robot identity. Cell signal wiring requires an output-to-input connection. A new application regression submits a real timed output event and checks next-tick bus delivery and the receiver's sensor frame; its application build/run is pending.
+- Emergency-stop engagement sequencing, electrical winding/source assumptions, continuous clearance certification and the remaining MT6/export corrections are still open. No main integration has been performed.
+
+Follow-up cell checkpoint:
+
+- The application build passed, and `PROJECT_SOURCE_ONLY=cell` passed with two robots and sixteen disjoint joints (`/tmp/mt-review-cell-tests.log`). The new test raises `robot.clear` through a real execution-plan event, proves the receiver stays low in the firing tick, then checks both the bus input and the receiver's published high sensor frame in the following tick.
+- Belt visuals are partitioned by their driver joint, independently of CNC-job ownership. Axis programs follow their own axes; a CNC job on a different controller does not suppress them. Missing ownership is an explicit error. These changes compile; explicit animation and single-cabinet motion regressions remain to be added.
+- Shared fixed supports keep root anchor frames in each model but contribute mass, collision geometry and visual ownership only to the environment. CadBridge passed at 161 assertions, including the new regression partitioning two independent axes on one support and checking that its hull and mass are not duplicated.
+- Native feedback timing validation now accounts for owner-cycle quantization and the actual simulation period, using one controller timing helper. A 25 ms acquisition period on a 20 ms owner cycle is rejected against a 30 ms freshness window.
+- The direct MachineKit binary printed `MachineKit smoke passed` (`/tmp/mt-review-smoke-direct.log`). The CLI-wrapped run returned zero but omitted its final output. `haxeon/src/build/execution/ProcessRunner.hx` catches EOF before its final output flush; tests use direct HashLink execution when the completion marker is required. No haxeon code was changed.
+
+Still open before main integration:
+
+- Restore the intended low-voltage RobotArm/mobile-welder design with explicit motor winding variants and defensible amplifier/source ratings. The temporary 310 V converter remains a rebase workaround, not the accepted final design. Revisit cobot winding assumptions and peak demand rather than choosing limits immediately above the computed result.
+- Coordinate powered e-stop holding with fresh brake-engaged feedback before dropping torque; distinguish hard power loss. Simplify brake collision geometry, APIs and validation, and use reserved joint-state storage for brake flags.
+- Replace fixed angular clearance sampling with a conservative interval certificate and fail-closed subdivision. Add independent thin-obstacle and large-arm regressions.
+- Finish MT6 shared-device/cross-reference coverage, add animation and single-controller identity regressions, use convex environment geometry, and handle exclusions between controllers.
+- Extend presence-volume queries to every supported loose-object shape. Carry CNC channel ownership explicitly, verify faulted-spindle coasting, clear/rebuild servo reference state on reset, and verify asymmetric spindle belt direction and efficiency.
+- Correct guide-block transverse load accounting. Recheck the session-clock change against arm, mobile base and welder application baselines. Isolate the shared ExecutionPlanSubmission correction with its regression for eventual main integration.
+- Run the complete sequential gate, including the full editor AppTests suite, project-source examples, kit suites, native regressions and binding audits. Record all changed measurements, then commit the review fixes. MT7 and later are paused; no push or main integration was performed.

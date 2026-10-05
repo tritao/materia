@@ -675,6 +675,11 @@ Done. What was built and decided:
   - a scripted-signal sim test with no robot: open door, place the blank by script, clamp, close, start, wait for complete, open, unclamp. Volume as in MT2.
 
 **MT8. The parallel gripper, for real.**
+- Current suction handling keeps a held workpiece kinematic: its mass contributes
+  neither to the arm's dynamics nor to acceleration feedforward. MT8's physical
+  contact grip must retain the dynamic workpiece and verify the resulting payload
+  reaction and feedforward. This is an existing simulation limitation, not a
+  validated payload-capacity result.
 - `ParallelGripper` becomes an assembly:
   - a body;
   - two jaws on prismatic joints, the second mirror-coupled (ratio −1, X5 coupling);

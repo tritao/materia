@@ -289,7 +289,7 @@ class DriveSystem {
 		if (trace.supplied && !trace.external) {
 			// Energy traces to the pack, but a converter's output sets the driver's voltage.
 			var delivered = ServiceNetwork.trace(flat, ServiceNetwork.portRef(id, "power"),
-				(part, port) -> Std.isOfType(part, machinekit.motion.ElectricalSource));
+				(part, port) -> part.electricalSource() != null);
 			var source = delivered.port;
 			if (complete) {
 				var checked = new Diagnostics();
@@ -410,7 +410,6 @@ class DriveSystem {
 		part.encoder(record.encoder, record.joint);
 	}
 
-	/** Compile every binding anew; connecting a supply after binding must not leave an old curve. */
 	/** Check the whole wired source, including simultaneous peak loads and regeneration. */
 	public static function checkElectricalSources(flat:FlatAssembly):Void {
 		var demands:Map<String, {rating:machinekit.motion.ElectricalSupplyRating, peak:Float, regeneration:Float}> = [];
@@ -445,7 +444,7 @@ class DriveSystem {
 		}
 	}
 
-
+	/** Compile every binding anew; connecting a supply after binding must not leave an old curve. */
 	public static function compileMotors(flat:FlatAssembly):MotorCompilation {
 		checkElectricalSources(flat);
 		var actuators = [for (record in flat.motors) resolveMotor(flat, record, true)];

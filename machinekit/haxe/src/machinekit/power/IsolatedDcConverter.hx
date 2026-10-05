@@ -8,11 +8,11 @@ class IsolatedDcConverter extends PowerSupply {
   public final inputVolts:Float;
   public final efficiency:Float;
   public function new(inputVolts:Float, outputVolts:Float, outputAmps:Float, outlets:Int,
-      width:Float = 120, height:Float = 60, depth:Float = 30, efficiency:Float = 0.95, massKg:Float = 2) {
+      width:Float = 120, height:Float = 60, depth:Float = 30, efficiency:Float = 0.95, massKg:Float = 2, regenerativePower:Float = 0) {
     if (!Math.isFinite(inputVolts) || inputVolts <= 0 || !Math.isFinite(efficiency) ||
         efficiency <= 0 || efficiency > 1 || !Math.isFinite(massKg) || massKg <= 0)
       throw "Invalid isolated DC converter ratings";
-    super(outputVolts, outputAmps, outlets, width, height, depth);
+    super(outputVolts, outputAmps, outlets, width, height, depth, regenerativePower);
     this.inputVolts = inputVolts;
     this.efficiency = efficiency;
     addPort({name: "dc", kind: ElectricalPower, role: Consumer, iface: Unspecified, required: true});
