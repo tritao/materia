@@ -1952,3 +1952,35 @@ The mission adapter/application/generator draft remains uncommitted. P3 is not a
 so no main fast-forward was attempted; main remains f4dc7456a65fb32dd2459d9a36d36dd8c80457a1.
 P3 full two-station and 20 mm/2-degree boundary validation, P4 energy/docking and P5 rendered-depth
 tracking remain required and open.
+
+### P3 authorized unlimited-acceleration repair (2026-10-05)
+
+The user authorized repairing the newly exposed kinematics prerequisite and resuming P3.
+Local main was merged before this work (already up to date at f4dc7456a65fb32dd2459d9a36d36dd8c80457a1).
+KinematicsKit owns differential-step travel and braking limits, so the repair is in StepLimits.
+The braking roots are now evaluated in their rationalized form: it is algebraically equivalent
+for finite positive acceleration, avoids cancellation at high acceleration, and has a finite
+travel-bound limit when acceleration is positive infinity. Absent acceleration, zero and positive
+infinity consistently mean unlimited acceleration; position, velocity and ramp turning-point
+bounds still apply. Invalid previous velocities fail before QP bounds can be produced. No motor
+rating or arbitrary acceleration cap was added to hide the numerical defect.
+
+Focused checks pass: 39 pure bounds assertions (including multiple numerical scales and interior
+ramp overshoot), 32 native differential-IK assertions (including the bounded fallback after QP
+failure), and the 50 native contact-probe motion assertions. Builds remain compiler-only with the
+existing native libraries. The production app rebuild passed (1,863 sources). The repair is
+committed as 00e80e2b43e8a0daaa0952069cdfce79fb724082, `KinematicsKit: keep unlimited acceleration
+steps finite`.
+
+The production registration retry then stopped before CAD generation with exit 1:
+`Could not compile Materia project entrypoint (exit 1)` and
+`/tmp/materia-project-3098987-1791196217.54144-804289383/preview.hl: No such file or directory`.
+The producer reports MateriaProjectModuleBuild.hx:75, its File.saveBytes call for the compiled
+module; the runner rethrows at MateriaProjectRunner.hx:222. The exact log is in ignored
+app/build/p3-limits-registration.log. The cause of the missing temporary output directory is
+not established. No compiler change, stale artifact bypass or production registration pass is
+claimed. This new tool/environment failure triggers the user's outside-scope stop rule.
+
+P3 remains incomplete, with production registration, full two-station coverage and boundary
+validation still open. Main remains f4dc7456a65fb32dd2459d9a36d36dd8c80457a1; no fast-forward was
+attempted. P4 energy/docking and required P5 rendered-depth tracking remain open.
