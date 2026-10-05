@@ -1725,3 +1725,18 @@ its prepared air pose and leaves the joint at rest with arc and wire off through
 verify stale/no-touch stops, unreachable goals, intervening fixtures and predicted braking obstruction.
 This proves a complete single probe; CAD stage selection, measured posterior bounds, mobile scene
 steps and the noisy multi-face welding mission remain open. P3 has not passed its milestone gates.
+
+### P3 measured pose uncertainty (2026-10-05)
+
+`ContactPoseEnvelope` retains a bounded set of chassis pose errors consistent with measured plane
+contacts. Conservative interval rotation, translation contraction and same-plane contact differences
+reduce the set without treating unobserved degrees of freedom as zero. A finite subdivision/cell
+budget leaves wider feasible regions; reducing the cell cap merges them conservatively. Inconsistent
+contacts fail explicitly. Its provisional centre places subsequent probes but does not authorize
+welding: the final six-observable-component rigid fit remains required.
+
+Search-ray intersection bounds include the chassis yaw lever arm and remaining translation/rotation,
+with explicit metre units and calibrated contact error. Focused tests pass 51 envelope assertions,
+20 search assertions and 109 rigid-fit assertions. They cover parking extremes, partially observed
+interior poses, general six-component uncertainty, exact tolerance boundaries and budget exhaustion.
+CAD selection using these measured bounds and the executed mobile registration mission remain open.
