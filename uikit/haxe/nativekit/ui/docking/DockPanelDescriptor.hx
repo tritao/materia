@@ -6,6 +6,9 @@ import nativekit.ui.icons.IconName;
 class DockPanelDescriptor {
 	public final id:String;
 	public final title:String;
+	public var badgeCount(default, null):Int = 0;
+	@:allow(nativekit.ui.docking.DockWorkspaceModel)
+	function setBadgeCount(value:Int):Void badgeCount = value;
 	public final closable:Bool;
 	public final enabled:Bool;
 	public final icon:Null<IconName>;

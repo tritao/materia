@@ -1109,7 +1109,7 @@ bool read_layout_transaction(const uint8_t *bytes, uint32_t byte_count,
                 return false;
             if (!std::isfinite(node.style.aspect_ratio) || node.style.aspect_ratio < 0.0f)
                 return false;
-            if (font_family > static_cast<uint32_t>(nkui::FontFamily::Emoji) ||
+            if ((font_family != NKUI_FONT_FAMILY_DEFAULT && font_family != NKUI_FONT_FAMILY_EMOJI && font_family != NKUI_FONT_FAMILY_MONOSPACE) ||
                 !std::isfinite(node.text_style.font_size) || node.text_style.font_size <= 0.0f ||
                 !std::isfinite(node.text_style.letter_spacing) ||
                 !std::isfinite(node.paragraph_style.line_height) ||
@@ -1138,7 +1138,7 @@ bool text_options_from_api(const nkui_text_style *text_style,
         paragraph_style->struct_size < sizeof(*paragraph_style))
         return false;
     if (text_style->family < NKUI_FONT_FAMILY_DEFAULT ||
-        text_style->family > NKUI_FONT_FAMILY_EMOJI ||
+        (text_style->family != NKUI_FONT_FAMILY_DEFAULT && text_style->family != NKUI_FONT_FAMILY_EMOJI && text_style->family != NKUI_FONT_FAMILY_MONOSPACE) ||
         paragraph_style->wrap < NKUI_TEXT_WRAP_NONE ||
         paragraph_style->wrap > NKUI_TEXT_WRAP_WORD_CHARACTER ||
         paragraph_style->alignment < NKUI_TEXT_ALIGN_START ||
@@ -1860,7 +1860,7 @@ extern "C" nkui_result nkui_font_collection_create(nkui_resource *out_fonts) {
 
 extern "C" nkui_result nkui_font_collection_add(nkui_resource fonts, const char *path,
                                                 nkui_font_family family) {
-    if (!path || !*path || (family != NKUI_FONT_FAMILY_DEFAULT && family != NKUI_FONT_FAMILY_EMOJI))
+    if (!path || !*path || (family != NKUI_FONT_FAMILY_DEFAULT && family != NKUI_FONT_FAMILY_EMOJI && family != NKUI_FONT_FAMILY_MONOSPACE))
         return NKUI_ERROR_INVALID_ARGUMENT;
     std::lock_guard<std::mutex> lock(resources_mutex);
     auto *slot = resolve(fonts, nkui::ResourceKind::FontCollection);
@@ -1870,7 +1870,7 @@ extern "C" nkui_result nkui_font_collection_add(nkui_resource fonts, const char 
     if (mutable_result != NKUI_OK)
         return mutable_result;
     {
-        slot->fonts.push_back({path, family == NKUI_FONT_FAMILY_EMOJI ? nkui::FontFamily::Emoji
+        slot->fonts.push_back({path, family == NKUI_FONT_FAMILY_MONOSPACE ? nkui::FontFamily::Monospace : family == NKUI_FONT_FAMILY_EMOJI ? nkui::FontFamily::Emoji
                                                                       : nkui::FontFamily::Default});
         const auto &entry = slot->fonts.back();
         if (!slot->font_collection->add_font(entry.path.c_str(), entry.family)) {
@@ -1885,7 +1885,7 @@ extern "C" nkui_result nkui_font_collection_add_data(nkui_resource fonts, const 
                                                      const uint8_t *font_data, uint32_t font_bytes,
                                                      nkui_font_family family) {
     if (!name || !*name || !font_data || !font_bytes ||
-        (family != NKUI_FONT_FAMILY_DEFAULT && family != NKUI_FONT_FAMILY_EMOJI))
+        (family != NKUI_FONT_FAMILY_DEFAULT && family != NKUI_FONT_FAMILY_EMOJI && family != NKUI_FONT_FAMILY_MONOSPACE))
         return NKUI_ERROR_INVALID_ARGUMENT;
     std::lock_guard<std::mutex> lock(resources_mutex);
     auto *slot = resolve(fonts, nkui::ResourceKind::FontCollection);
@@ -1898,7 +1898,7 @@ extern "C" nkui_result nkui_font_collection_add_data(nkui_resource fonts, const 
         auto data = std::make_shared<std::vector<uint8_t>>(font_data, font_data + font_bytes);
         slot->fonts.push_back(
             {name,
-             family == NKUI_FONT_FAMILY_EMOJI ? nkui::FontFamily::Emoji : nkui::FontFamily::Default,
+             family == NKUI_FONT_FAMILY_MONOSPACE ? nkui::FontFamily::Monospace : family == NKUI_FONT_FAMILY_EMOJI ? nkui::FontFamily::Emoji : nkui::FontFamily::Default,
              std::move(data)});
         const auto &entry = slot->fonts.back();
         if (!slot->font_collection->add_font_from_shared_data(entry.path.c_str(), entry.data,
@@ -3631,8 +3631,9 @@ static nkui_result renderer_render_frame_impl(nkui_renderer renderer, nkui_displ
                         auto row_command = command;
                         row_command.resource = nkui::make_resource_id(
                             nkui::ResourceKind::TextLayout, 0x0FFE, prepared_slot++);
-                        row_command.x += bounds.x * raster_scale;
-                        row_command.y += bounds.y * raster_scale;
+                        // Row origins stay in layout units; the device transform applies zoom.
+                        row_command.x += bounds.x;
+                        row_command.y += bounds.y;
                         row_command.width = bounds.width;
                         row_command.height = bounds.height;
                         row_command.transform = transform;
@@ -3837,12 +3838,19 @@ static nkui_result renderer_render_frame_impl(nkui_renderer renderer, nkui_displ
         }
         const bool sealed_executed = nkui::execute_render_plan(*renderer_slot->renderer, *sealed,
                                                                {main_target, frame_target});
-        return sealed_executed ? NKUI_OK : NKUI_ERROR_RENDERING;
+        return sealed_executed ? NKUI_OK : renderer_slot->renderer->resourceLimited()
+            ? NKUI_ERROR_RESOURCE_LIMIT : NKUI_ERROR_RENDERING;
     }
     /* Frames that composite a live surface producer keep the borrowed path. */
+    nkui::RenderExecutionError execution_error{};
     const bool executed = nkui::execute_render_plan(*renderer_slot->renderer, plan, frame_resources,
-                                                    {main_target, frame_target});
-    return executed ? NKUI_OK : NKUI_ERROR_RENDERING;
+                                                    {main_target, frame_target}, &execution_error);
+    if (!executed)
+        std::fprintf(stderr, "UIKit render execution failed: pass %u command %u: %s\n",
+                     execution_error.pass_index, execution_error.command_index,
+                     execution_error.message ? execution_error.message : "unknown renderer failure");
+    return executed ? NKUI_OK : renderer_slot->renderer->resourceLimited()
+        ? NKUI_ERROR_RESOURCE_LIMIT : NKUI_ERROR_RENDERING;
 }
 
 extern "C" nkui_result nkui_renderer_render_frame(nkui_renderer renderer, nkui_display_list list,
@@ -4288,8 +4296,9 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
                             nkui::ResourceKind::TextLayout, 0x0FFD,
                             static_cast<uint16_t>(prepared_slot++));
                         const auto glyph_id = row_command.resource;
-                        row_command.x += bounds.x * raster_scale;
-                        row_command.y += bounds.y * raster_scale;
+                        // Row origins stay in layout units; the device transform applies zoom.
+                        row_command.x += bounds.x;
+                        row_command.y += bounds.y;
                         row_command.width = bounds.width;
                         row_command.height = bounds.height;
                         row_command.content_generation =
@@ -4536,14 +4545,21 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
             frame_guard.handed_off = true;
             return NKUI_OK;
         }
+        nkui::RenderExecutionError execution_error{};
         const bool sealed_executed = nkui::execute_render_plan(*renderer_slot->renderer, *sealed,
-                                                               {main_target, frame_target});
-        return sealed_executed ? NKUI_OK : NKUI_ERROR_RENDERING;
+                                                               {main_target, frame_target}, &execution_error);
+        if (!sealed_executed)
+            std::fprintf(stderr, "UIKit render execution failed: pass %u command %u: %s\n",
+                         execution_error.pass_index, execution_error.command_index,
+                         execution_error.message ? execution_error.message : "unknown renderer failure");
+        return sealed_executed ? NKUI_OK : renderer_slot->renderer->resourceLimited()
+            ? NKUI_ERROR_RESOURCE_LIMIT : NKUI_ERROR_RENDERING;
     }
     /* Frames that composite a live surface producer keep the borrowed path. */
     const bool executed = nkui::execute_render_plan(*renderer_slot->renderer, plan, frame_resources,
                                                     {main_target, frame_target});
-    return executed ? NKUI_OK : NKUI_ERROR_RENDERING;
+    return executed ? NKUI_OK : renderer_slot->renderer->resourceLimited()
+        ? NKUI_ERROR_RESOURCE_LIMIT : NKUI_ERROR_RENDERING;
 }
 
 extern "C" nkui_result nkui_renderer_render(nkui_renderer renderer, nkui_display_list list,

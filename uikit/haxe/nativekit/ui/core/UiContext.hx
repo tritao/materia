@@ -67,6 +67,7 @@ class UiContext {
 	var submittedStyleSheet:Null<StyleSheet>;
 	final hitTestIds:Array<Int>;
 	var disposed:Bool;
+	final stalePaintNodes:Array<Int> = [];
 	var customCanvases:Map<Int, Canvas>;
 	var customLists:Map<Int, DisplayList>;
 	var customGeometries:Map<Int, ResolvedLayoutItem>;
@@ -93,6 +94,8 @@ class UiContext {
 	var frameNumber:Int;
 	var diagnosticStage:Int = 0;
 	public final textInput:TextInputBridge;
+	/** Application layout to window logical coordinates for platform geometry. */
+	public var platformCoordinateScale:Float = 1.0;
 
 	public function new(?session:LayoutSession, ?fonts:FontCollection, ?theme:Theme) {
 		this.session = session == null ? LayoutSession.create() : session;
@@ -402,6 +405,8 @@ class UiContext {
 		// Blur is the old tree's final lifecycle event, so its handlers must still
 		// be able to access widget state while that event is being dispatched.
 		stateStore.endFrame();
+		buildContext.pruneSelfUpdatingBuilds(nodesById);
+		buildContext.stateStore.prunePaths(nodesById);
 		submittedStateRevision = resolvedStateRevision;
 		submittedInteractionRevision = interactionStates.revision;
 		submittedStyleRevision = buildContext.styleRevision;
@@ -416,8 +421,10 @@ class UiContext {
 		submittedStyleSheet = buildContext.styleSheet;
 		if (accessibilityBridge != null && (styleInvalidation.treeChanged ||
 			styleInvalidation.semanticsInvalidatedNodes > 0 ||
-			resolvedGeometryChangedNodes > 0 || focusChanged))
+			resolvedGeometryChangedNodes > 0 || focusChanged)) {
+			accessibilityBridge.coordinateScale = platformCoordinateScale;
 			accessibilityBridge.update(next, focus.focusedId);
+		}
 		// A newly mounted focus trap chooses its first target after layout. Rebuild
 		// once with that focus state before returning the frame for painting.
 		if (reconcileNewFocus && focusChanged && nextFocus != null)
@@ -462,7 +469,17 @@ class UiContext {
 			accessibilitySurface = surface;
 			accessibilityBridge = new AccessibilityBridge(surface);
 		}
+		accessibilityBridge.coordinateScale = platformCoordinateScale;
 		accessibilityBridge.update(root, focus.focusedId);
+	}
+
+	/** Matches the render traversal's eligibility checks without a second node map. */
+	function hasCurrentCustomPaint(nodeId:Int):Bool {
+		var node = currentNodesById.get(nodeId);
+		if (node == null || !node.hasPaintHandler() || node.resolved == null) return false;
+		var geometry = node.resolved;
+		return geometry.width > 0.0 && geometry.height > 0.0 &&
+			geometry.clipBounds.width > 0.0 && geometry.clipBounds.height > 0.0;
 	}
 
 	public function render(renderer:Renderer, surface:Surface, frame:FrameInfo):Void {
@@ -473,7 +490,6 @@ class UiContext {
 		if (root == null)
 			throw "Submit a view before rendering the UI context";
 		diagnosticStage = 21;
-		var painted = new Map<Int, Bool>();
 		var paintedNodes = 0;
 		var paintSkippedNodes = 0;
 		var emptyPaintNodes = 0;
@@ -489,7 +505,9 @@ class UiContext {
 			if (node.resolved.visible &&
 				(node.resolved.width <= 0.0 || node.resolved.height <= 0.0))
 				emptyPaintNodes++;
-			if (node.resolved.width <= 0.0 || node.resolved.height <= 0.0 ||
+			// A hidden painter records nothing; do not cache that empty result as its content.
+			// Keep any existing local list so it can be rebound when the node becomes visible.
+			if (!node.resolved.visible || node.resolved.width <= 0.0 || node.resolved.height <= 0.0 ||
 				node.resolved.clipBounds.width <= 0.0 || node.resolved.clipBounds.height <= 0.0) {
 				clearCustomPaintBindings(nodeId);
 				return;
@@ -577,21 +595,14 @@ class UiContext {
 			}
 			if (contentReused)
 				paintSkippedNodes++;
-			painted.set(nodeId, true);
 		});
 		diagnosticStage = 23;
-		var stale:Array<Int> = [];
-		var staleSeen = new Map<Int, Bool>();
+		var stale = stalePaintNodes;
+		stale.resize(0);
 		for (nodeId in customLists.keys())
-			if (!painted.exists(nodeId) && !staleSeen.exists(nodeId)) {
-				stale.push(nodeId);
-				staleSeen.set(nodeId, true);
-			}
+			if (!hasCurrentCustomPaint(nodeId)) stale.push(nodeId);
 		for (nodeId in customCompositeLists.keys())
-			if (!painted.exists(nodeId) && !staleSeen.exists(nodeId)) {
-				stale.push(nodeId);
-				staleSeen.set(nodeId, true);
-			}
+			if (!customLists.exists(nodeId) && !hasCurrentCustomPaint(nodeId)) stale.push(nodeId);
 		for (nodeId in stale) {
 			clearCustomPaintBindings(nodeId);
 			var canvas = customCanvases.get(nodeId);
@@ -979,6 +990,7 @@ class UiContext {
 			clearWindowDecorations();
 		decorationWindow = null;
 		stateStore.dispose();
+		buildContext.dispose();
 		interactionStates.dispose();
 		disposed = true;
 		root = null;

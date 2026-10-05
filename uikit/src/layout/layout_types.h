@@ -23,6 +23,7 @@ enum class LayoutVisualKind : uint8_t {
 enum class FontFamily : uint8_t {
     Default = 0,
     Emoji = 1,
+    Monospace = 4,
 };
 
 enum class TextWrapMode : uint8_t {

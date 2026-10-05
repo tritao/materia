@@ -6,4 +6,6 @@ enum TextEditIntent {
 	Paste(text:String);
 	DeleteBackward;
 	DeleteForward;
+	DeleteWordBackward(macStyle:Bool);
+	DeleteWordForward(macStyle:Bool);
 }

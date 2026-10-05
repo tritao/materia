@@ -78,6 +78,8 @@ class RenderNode {
 	var resolvedHandlers:Null<Array<ResolvedLayoutItem->Void>>;
 	var paintHandlers:Null<Array<Canvas->ResolvedLayoutItem->Void>>;
 	var paintCacheKeys:Null<Array<Null<String>>>;
+	var basePaintKey:Null<String>;
+	var basePaintKeyResolved:Bool = false;
 	var decorations:Null<Array<Decoration>>;
 	var decorationCacheKeys:Null<Array<Null<String>>>;
 	/** Shared by every node without classes or tags; never mutated. */
@@ -323,6 +325,7 @@ class RenderNode {
 		}
 		paintHandlers.push(handler);
 		paintCacheKeys.push(cacheKey);
+		basePaintKeyResolved = false;
 		return this;
 	}
 
@@ -344,6 +347,7 @@ class RenderNode {
 		}
 		decorations.push(decoration);
 		decorationCacheKeys.push(cacheKey);
+		basePaintKeyResolved = false;
 		return this;
 	}
 
@@ -381,26 +385,27 @@ class RenderNode {
 	/** Returns the complete opt-in fingerprint for safe retained paint reuse. */
 	@:allow(nativekit.ui.core.UiContext)
 	function retainedPaintKey():Null<String> {
-		if (!hasPaintHandler())
-			return null;
+		if (!hasPaintHandler()) return null;
+		if (!basePaintKeyResolved) {
+			basePaintKey = buildBasePaintKey();
+			basePaintKeyResolved = true;
+		}
+		if (basePaintKey == null) return null;
+		var style = computedStyle == null ? null : computedStyle.getReadOnly(StyleProperty.Decorations);
+		return style != null && style.decorations.length > 0
+			? basePaintKey + "|style-decorations:" + style.key() : basePaintKey;
+	}
+
+	function buildBasePaintKey():Null<String> {
 		var result = "paint";
-		var style = computedStyle == null ? null : computedStyle.get(StyleProperty.Decorations);
-		if (style != null && style.decorations.length > 0)
-			result += "|style-decorations:" + style.key();
-		if (paintHandlers != null)
-			for (index in 0...paintHandlers.length) {
-				var key = paintCacheKeys[index];
-				if (key == null)
-					return null;
-				result += "|handler:" + key;
-			}
-		if (decorations != null)
-			for (index in 0...decorations.length) {
-				var key = decorationCacheKeys[index];
-				if (key == null)
-					return null;
-				result += "|decoration:" + key;
-			}
+		if (paintCacheKeys != null) for (key in paintCacheKeys) {
+			if (key == null) return null;
+			result += "|handler:" + key;
+		}
+		if (decorationCacheKeys != null) for (key in decorationCacheKeys) {
+			if (key == null) return null;
+			result += "|decoration:" + key;
+		}
 		return result;
 	}
 
@@ -410,9 +415,9 @@ class RenderNode {
 		if (!hasCompositePaint())
 			return null;
 		var style = computedStyle == null ? new ComputedStyle() : computedStyle;
-		var effects = style.get(StyleProperty.Effects);
-		var backdropEffects = style.get(StyleProperty.BackdropEffects);
-		var mask = style.get(StyleProperty.Mask);
+		var effects = style.getReadOnly(StyleProperty.Effects);
+		var backdropEffects = style.getReadOnly(StyleProperty.BackdropEffects);
+		var mask = style.getReadOnly(StyleProperty.Mask);
 		var maskKey = mask == null ? "" : mask.describe();
 		if (mask != null && mask.image != null)
 			maskKey += ":image=" + mask.image.identity;
@@ -434,14 +439,16 @@ class RenderNode {
 	function paintContent(canvas:Canvas):Bool {
 		if (resolved == null || !resolved.visible || !hasPaintHandler())
 			return false;
-		var style = computedStyle == null ? new ComputedStyle() : computedStyle;
-		var styleDecorations = style.get(StyleProperty.Decorations);
+		var style = computedStyle;
+		var styleDecorations = style == null ? null : style.getReadOnly(StyleProperty.Decorations);
 		if (styleDecorations != null)
 			for (decoration in styleDecorations.decorations)
 				decoration.paint(canvas, resolved, style);
-		if (decorations != null)
+		if (decorations != null && decorations.length > 0) {
+			var decorationStyle = style == null ? new ComputedStyle() : style;
 			for (decoration in decorations)
-				decoration.paint(canvas, resolved, style);
+				decoration.paint(canvas, resolved, decorationStyle);
+		}
 		if (paintHandlers != null)
 			for (handler in paintHandlers)
 				handler(canvas, resolved);
@@ -450,15 +457,15 @@ class RenderNode {
 
 	@:allow(nativekit.ui.core.UiContext)
 	function hasCompositePaint():Bool {
-		if (resolved == null || !resolved.visible || !hasPaintHandler())
+		if (computedStyle == null || resolved == null || !resolved.visible || !hasPaintHandler())
 			return false;
-		var style = computedStyle == null ? new ComputedStyle() : computedStyle;
+		var style = computedStyle;
 		var opacity = style.get(StyleProperty.Opacity);
-		var effects = style.get(StyleProperty.Effects);
+		var effects = style.getReadOnly(StyleProperty.Effects);
 		var hasEffects = effects != null && effects.effects.length > 0;
-		var backdropEffects = style.get(StyleProperty.BackdropEffects);
+		var backdropEffects = style.getReadOnly(StyleProperty.BackdropEffects);
 		var hasBackdropEffects = backdropEffects != null && backdropEffects.effects.length > 0;
-		var mask = style.get(StyleProperty.Mask);
+		var mask = style.getReadOnly(StyleProperty.Mask);
 		return opacity < 1.0 || hasEffects || hasBackdropEffects || mask != null;
 	}
 
@@ -504,7 +511,7 @@ class RenderNode {
 	function hasStyleDecorations():Bool {
 		if (computedStyle == null)
 			return false;
-		var value = computedStyle.get(StyleProperty.Decorations);
+		var value = computedStyle.getReadOnly(StyleProperty.Decorations);
 		return value != null && value.decorations.length > 0;
 	}
 

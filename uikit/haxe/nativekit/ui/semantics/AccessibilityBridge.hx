@@ -10,6 +10,7 @@ import nativekit.ui.core.WidgetId;
 
 /** Projects Haxe semantics and resolved geometry into NativeKit's virtual tree. */
 class AccessibilityBridge {
+	public var coordinateScale:Float = 1.0;
 	final surface:NativeKitSurface;
 	var previousParents:Map<Int, Int>;
 	var disposed:Bool;
@@ -45,7 +46,7 @@ class AccessibilityBridge {
 		for (item in snapshot)
 			currentParents.set(item.id, item.parentId);
 		var requestedFocus = focused == null ? NativeKitConstants.NK_ACCESSIBILITY_ROOT : focused.value;
-		var batch = buildUpdate(snapshot, previousParents, requestedFocus);
+		var batch = buildUpdate(snapshot, previousParents, requestedFocus, coordinateScale);
 		NativeKit.nk_surface_accessibility_update_with_removed_ids_checked(surface.nativeHandle(),
 			batch.nativeUpdate, batch.removedNodeIds);
 		previousParents = currentParents;
@@ -53,11 +54,11 @@ class AccessibilityBridge {
 
 	/** Builds a platform-neutral atomic NativeKit update from a complete semantic snapshot. */
 	public static function buildUpdate(snapshot:Array<AccessibilitySnapshotNode>,
-			previousParents:Map<Int, Int>, focus:Int):AccessibilityUpdateBatch {
+			previousParents:Map<Int, Int>, focus:Int, coordinateScale:Float = 1.0):AccessibilityUpdateBatch {
 		var currentIds:Map<Int, Bool> = new Map();
 		for (item in snapshot)
 			currentIds.set(item.id, true);
-		var nodes = buildNodes(snapshot);
+		var nodes = buildNodes(snapshot, coordinateScale);
 		var removed:Array<Int> = [];
 		for (id in previousParents.keys()) {
 			if (!currentIds.exists(id)) {
@@ -95,10 +96,10 @@ class AccessibilityBridge {
 	}
 
 	/** Serializes every record in a semantic snapshot into native ABI structures. */
-	public static function buildNodes(snapshot:Array<AccessibilitySnapshotNode>):Array<AccessibilityNode> {
+	public static function buildNodes(snapshot:Array<AccessibilitySnapshotNode>, coordinateScale:Float = 1.0):Array<AccessibilityNode> {
 		var result:Array<AccessibilityNode> = [];
 		for (item in snapshot)
-			result.push(toNativeNode(item));
+			result.push(toNativeNode(item, coordinateScale));
 		return result;
 	}
 
@@ -112,7 +113,7 @@ class AccessibilityBridge {
 		previousParents = new Map();
 	}
 
-	static function toNativeNode(item:AccessibilitySnapshotNode):AccessibilityNode {
+	static function toNativeNode(item:AccessibilitySnapshotNode, coordinateScale:Float = 1.0):AccessibilityNode {
 		var value = item.semantics;
 		var node = new AccessibilityNode();
 		node.set_struct_size(AccessibilityNode.size());
@@ -123,10 +124,10 @@ class AccessibilityBridge {
 		node.set_states(cast(item.states, AccessibilityStates));
 		node.set_actions(cast(item.actions, AccessibilityActions));
 		node.set_reserved0(0);
-		node.set_x(item.bounds.x);
-		node.set_y(item.bounds.y);
-		node.set_width(item.bounds.width);
-		node.set_height(item.bounds.height);
+		node.set_x(item.bounds.x * coordinateScale);
+		node.set_y(item.bounds.y * coordinateScale);
+		node.set_width(item.bounds.width * coordinateScale);
+		node.set_height(item.bounds.height * coordinateScale);
 		node.set_label(value.label);
 		node.set_value(value.value);
 		node.set_numeric_value(value.numericValue);

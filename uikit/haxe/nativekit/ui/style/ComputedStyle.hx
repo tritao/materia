@@ -82,6 +82,12 @@ class ComputedStyle {
 		return property.copiedOnRead ? cast copyValue(cast property, value) : cast value;
 	}
 
+	/** Reads the effective value without copying it; callers must not mutate the result. */
+	public function getReadOnly<T>(property:StyleProperty<T>):T {
+		if (property == null) throw "Computed styles require a property";
+		return isSet(property.slot) ? cast valueAt(property.slot) : property.defaultValue;
+	}
+
 	/** True when both styles read the same value storage (cache forks do until one mutates), so no value can differ. */
 	public function sharesValuesWith(other:Null<ComputedStyle>):Bool
 		return other != null && values == other.values;

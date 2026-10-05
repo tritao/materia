@@ -1,5 +1,6 @@
 package nativekit.ui.widgets.scroll;
 
+import Color;
 import LayoutAxis;
 import LayoutPositioning;
 import LayoutStyle;
@@ -31,6 +32,10 @@ class ScrollView implements View {
 	public var onScroll:UiEvent->Void;
 	/** Shows an interactive overlay scrollbar when vertical content overflows. */
 	public var showScrollbar:Bool;
+	/** Null inherits the application environment policy. */
+	public var scrollbarVisibility:Null<Int> = null;
+	/** Optional non-scrolling ancestor with the same vertical extent. */
+	public var scrollbarOverlayHost:Null<RenderNode> = null;
 
 	public function new(key:String, child:View, ?style:LayoutStyle,
 			axis:Int = ScrollAxis.Vertical, ?controller:ScrollController) {
@@ -67,14 +72,19 @@ class ScrollView implements View {
 			viewport.layout.style.clipVertical = viewport.layout.style.clipVertical ||
 				axis == ScrollAxis.Vertical || axis == ScrollAxis.Both;
 			if (!suppliedController) {
-				var stored:State<ScrollController> = context.state(viewport.id, controller);
+				var stored:State<ScrollController> = context.resourceState(viewport.id, function() return controller, function(_) {});
 				controller = stored.value;
 			}
 			// The offset is applied to the content in place after layout (see onResolved below), so a scroll needs a new
 			// frame but not a rebuild: bumping the state revision here would invalidate every cached subtree around it.
-			controller.bind(function(_) {
-				context.commands.refresh();
-			});
+			var binding = context.resourceState(context.id("controller-binding"), function() return new ScrollBinding(),
+				function(value) value.dispose());
+			var visibility = context.resourceState(context.id("scrollbar-visibility"), function() return new ScrollbarVisibilityController(), function(value) value.dispose());
+			var visibilityChanged = function() { visibility.update(visibility.value); context.commands.refresh(); };
+			visibility.value.attach(context.animations, visibilityChanged);
+			visibility.value.bindSource(controller);
+			var policy:Int = scrollbarVisibility == null ? context.environment.scrollbarVisibility : scrollbarVisibility;
+			visibility.value.configure(showScrollbar ? policy : ScrollbarVisibility.Hidden, context.environment.reducedMotion);
 
 			var contentStyle = new LayoutStyle();
 			contentStyle.width = axis == ScrollAxis.Vertical ? LayoutAxis.stretch() : LayoutAxis.fit();
@@ -87,9 +97,16 @@ class ScrollView implements View {
 				return context.withScope(new Key("content"), function() return child.build(context));
 			});
 			translatedContent.add(content);
+			binding.value.attach(controller, context.animations, function(_) {
+				translatedContent.layout.style.transform = Transform2D.identity().translated(-controller.offsetX, -controller.offsetY);
+				visibility.value.reveal();
+				context.commands.refresh();
+			});
+
 			viewport.add(translatedContent);
-			var scrollbar = showScrollbar && axis != ScrollAxis.Horizontal
-				? addVerticalScrollbar(context, viewport) : null;
+			var overlayHost = scrollbarOverlayHost == null ? viewport : scrollbarOverlayHost;
+			var scrollbar = showScrollbar && policy != ScrollbarVisibility.Hidden && axis != ScrollAxis.Horizontal
+				? addVerticalScrollbar(context, overlayHost, visibility.value, visibilityChanged) : null;
 
 			translatedContent.onResolved(function(geometry) {
 				var viewportGeometry:ResolvedLayoutItem = cast viewport.resolved;
@@ -108,7 +125,8 @@ class ScrollView implements View {
 					translatedContent.layout.style.transform = nextTransform;
 					context.requestLayoutFeedback();
 				}
-				if (scrollbar != null && updateVerticalScrollbar(scrollbar))
+				visibility.value.setAvailable(scrollbar != null && controller.maxScrollY > 0 && controller.viewportHeight > 0);
+				if (scrollbar != null && updateVerticalScrollbar(scrollbar, overlayHost.resolved == null ? controller.viewportWidth : overlayHost.resolved.width))
 					context.requestLayoutFeedback();
 			});
 			viewport.on(UiEventKind.Scroll, function(event) {
@@ -118,6 +136,7 @@ class ScrollView implements View {
 					return;
 				var dx = axis == ScrollAxis.Horizontal || axis == ScrollAxis.Both ? event.deltaX : 0.0;
 				var dy = axis == ScrollAxis.Vertical || axis == ScrollAxis.Both ? event.deltaY : 0.0;
+				if (dx != 0 || dy != 0) visibility.value.reveal();
 				if (controller.scrollBy(dx, dy))
 					event.stopPropagation();
 			});
@@ -148,11 +167,19 @@ class ScrollView implements View {
 			};
 			viewport.on(UiEventKind.KeyDown, handleKey);
 			viewport.on(UiEventKind.KeyRepeat, handleKey);
+			if (scrollbar != null && overlayHost != viewport) {
+				scrollbar.on(UiEventKind.KeyDown, handleKey);
+				scrollbar.on(UiEventKind.KeyRepeat, handleKey);
+				scrollbar.on(UiEventKind.Scroll, function(event) {
+					visibility.value.reveal();
+					if (controller.scrollBy(0, event.deltaY)) event.stopPropagation();
+				});
+			}
 			return viewport;
 		});
 	}
 
-	function addVerticalScrollbar(context:BuildContext, viewport:RenderNode):RenderNode {
+	function addVerticalScrollbar(context:BuildContext, viewport:RenderNode, visibility:ScrollbarVisibilityController, changed:Void->Void):RenderNode {
 		var trackWidth = 10.0;
 		var inset = 2.0;
 		var trackHeight = Math.max(0.0, controller.viewportHeight - inset * 2.0);
@@ -201,20 +228,53 @@ class ScrollView implements View {
 		semantics.numericValue = controller.offsetY;
 		semantics.orientation = AccessibilityOrientation.Vertical;
 		thumb.semantics = semantics;
-		var dragState:State<ScrollbarDragState> = context.state(thumbId,
-			new ScrollbarDragState());
+		var updatePaint = function() {
+			var opacity = visibility.opacity;
+			var trackColor = context.theme.controlUnselected, thumbColor = context.theme.accent;
+			track.layout.style.background = Color.rgba(trackColor.red, trackColor.green, trackColor.blue, trackColor.alpha * opacity);
+			thumb.layout.style.background = Color.rgba(thumbColor.red, thumbColor.green, thumbColor.blue, thumbColor.alpha * opacity);
+			// Only the narrow track receives pointer input while the thumb is hidden.
+			thumb.hitTestSelf = opacity > 0;
+		};
+		visibility.attach(context.animations, function() { thumb.hitTestSelf = visibility.opacity > 0; changed(); });
+		updatePaint();
+		track.on(UiEventKind.HoverEnter, function(event) { if (event.target.equals(track.id)) visibility.setHovered(true); });
+		track.on(UiEventKind.HoverLeave, function(event) { if (event.target.equals(track.id)) visibility.setHovered(false); });
+		thumb.on(UiEventKind.Focus, function(_) visibility.setFocused(true));
+		thumb.on(UiEventKind.Blur, function(_) visibility.setFocused(false));
+		thumb.on(UiEventKind.FocusLost, function(_) visibility.setFocused(false));
+		var dragState:State<ScrollbarDragState> = context.resourceState(thumbId,
+			function() return new ScrollbarDragState(), function(_) {});
 		thumb.on(UiEventKind.PointerDown, function(event) {
 			if (event.button != 0)
 				return;
 			dragState.value.dragging = true;
+			visibility.setFocused(false);
+			visibility.setDragging(true);
 			dragState.value.pointerY = event.y;
+			dragState.value.lastPointerY = event.y;
 			dragState.value.offsetY = controller.offsetY;
+			dragState.value.maxScrollY = controller.maxScrollY;
+			dragState.value.travel = Math.max(0.0, track.layout.style.height.value - thumb.layout.style.height.value);
 			dragState.update(dragState.value);
 			event.capturePointer();
 			event.stopPropagation();
 			event.preventDefault();
 		});
+		// Metrics may change while the pointer is captured (window resize or reflow).
+		// Rebase at the last pointer position so subsequent movement uses the new range.
+		track.onResolved(function(_) {
+			var drag = dragState.value;
+			var travel = Math.max(0.0, track.layout.style.height.value - thumb.layout.style.height.value);
+			if (drag.dragging && (drag.maxScrollY != controller.maxScrollY || drag.travel != travel)) {
+				drag.pointerY = drag.lastPointerY;
+				drag.offsetY = controller.offsetY;
+				drag.maxScrollY = controller.maxScrollY;
+				drag.travel = travel;
+			}
+		});
 		thumb.on(UiEventKind.PointerMove, function(event) {
+			dragState.value.lastPointerY = event.y;
 			var travel = Math.max(0.0, track.layout.style.height.value -
 				thumb.layout.style.height.value);
 			if (!dragState.value.dragging || travel <= 0.0)
@@ -227,6 +287,7 @@ class ScrollView implements View {
 			if (!dragState.value.dragging)
 				return;
 			dragState.value.dragging = false;
+			visibility.setDragging(false);
 			dragState.update(dragState.value);
 			event.releasePointer();
 			event.preventDefault();
@@ -244,6 +305,7 @@ class ScrollView implements View {
 		track.on(UiEventKind.PointerDown, function(event) {
 			if (event.button != 0 || track.resolved == null)
 				return;
+			visibility.reveal();
 			var thumbHeight = thumb.layout.style.height.value;
 			var travel = Math.max(0.0, track.layout.style.height.value - thumbHeight);
 			var geometry:ResolvedLayoutItem = cast track.resolved;
@@ -260,7 +322,7 @@ class ScrollView implements View {
 		return track;
 	}
 
-	function updateVerticalScrollbar(track:RenderNode):Bool {
+	function updateVerticalScrollbar(track:RenderNode, width:Float):Bool {
 		var thumb = track.children[0];
 		var trackStyle = track.layout.style;
 		var thumbStyle = thumb.layout.style;
@@ -273,7 +335,7 @@ class ScrollView implements View {
 		var thumbY = controller.maxScrollY <= 0.0 ? 0.0 :
 			controller.offsetY / controller.maxScrollY * travel;
 		var visible = controller.maxScrollY > 0.0 && controller.viewportHeight > 0.0;
-		var trackX = Math.max(0.0, controller.viewportWidth - 12.0);
+		var trackX = Math.max(0.0, width - 12.0);
 		var changed = trackStyle.positionX != trackX ||
 			trackStyle.height.value != trackHeight || thumbStyle.height.value != thumbHeight ||
 			thumbStyle.positionY != thumbY || trackStyle.visible != visible;
@@ -294,6 +356,9 @@ class ScrollView implements View {
 private class ScrollbarDragState {
 	public var dragging:Bool = false;
 	public var pointerY:Float = 0.0;
+	public var lastPointerY:Float = 0.0;
 	public var offsetY:Float = 0.0;
+	public var maxScrollY:Float = 0.0;
+	public var travel:Float = 0.0;
 	public function new() {}
 }

@@ -84,6 +84,20 @@ struct TextEngine::State {
 
 namespace {
 
+// Native layouts own their data. Scratch allocations are valid only for one
+// operation, including early returns and nested fallback shaping.
+class TextScratchScope {
+  public:
+    explicit TextScratchScope(skb_temp_alloc_t *allocator)
+        : allocator_(allocator), mark_(skb_temp_alloc_save(allocator)) {}
+    ~TextScratchScope() { skb_temp_alloc_restore(allocator_, mark_); }
+    TextScratchScope(const TextScratchScope &) = delete;
+    TextScratchScope &operator=(const TextScratchScope &) = delete;
+  private:
+    skb_temp_alloc_t *allocator_;
+    skb_temp_alloc_mark_t mark_;
+};
+
 TextEngine::State::RetainedLayout *find_layout(TextEngine::State &state, TextLayoutId id) {
     const auto found = state.layouts.find(id);
     return found == state.layouts.end() ? nullptr : found->second.get();
@@ -383,6 +397,7 @@ bool FontCollection::valid() const {
 
 bool FontCollection::add_font(const char *path, FontFamily family) {
     const uint8_t skb_family =
+        family == FontFamily::Monospace ? SKB_FONT_FAMILY_MONOSPACE :
         family == FontFamily::Emoji ? SKB_FONT_FAMILY_EMOJI : SKB_FONT_FAMILY_DEFAULT;
     if (!path || !skb_font_collection_add_font(state_->fonts, path, skb_family, nullptr))
         return false;
@@ -394,6 +409,7 @@ bool FontCollection::add_font_from_shared_data(const char *name,
                                                const std::shared_ptr<std::vector<uint8_t>> &data,
                                                FontFamily family) {
     const uint8_t skb_family =
+        family == FontFamily::Monospace ? SKB_FONT_FAMILY_MONOSPACE :
         family == FontFamily::Emoji ? SKB_FONT_FAMILY_EMOJI : SKB_FONT_FAMILY_DEFAULT;
     if (!name || !*name || !data || data->empty() || !valid() ||
         !skb_font_collection_add_font_from_data(state_->fonts, name, data->data(), data->size(),
@@ -424,9 +440,16 @@ TextEngine::TextEngine() : TextEngine(std::make_shared<FontCollection>()) {}
 
 TextEngine::TextEngine(std::shared_ptr<FontCollection> fonts) : state_(new State) {
     state_->font_collection = std::move(fonts);
-    state_->temporary = skb_temp_alloc_create(512 * 1024);
+    // Small paragraph engines grow on demand; avoid a half-megabyte floor per chunk.
+    state_->temporary = skb_temp_alloc_create(32 * 1024);
     state_->rasterizer = skb_rasterizer_create(nullptr);
-    state_->atlas = skb_image_atlas_create(nullptr);
+    // Most engines shape a small editor chunk. Start compact and let Skribidi
+    // expand atlas pages to its normal limits as additional glyphs are needed.
+    auto atlas_config = skb_image_atlas_get_default_config();
+    atlas_config.init_width = 256;
+    atlas_config.init_height = 256;
+    atlas_config.expand_size = 256;
+    state_->atlas = skb_image_atlas_create(&atlas_config);
     if (state_->atlas)
         skb_image_atlas_set_create_texture_callback(state_->atlas, atlas_texture_created, state_);
 }
@@ -488,6 +511,7 @@ bool TextEngine::measure_intrinsic_utf8(const char *text, const TextLayoutOption
         options.line_height < 0.0f)
         return false;
 
+    TextScratchScope scratch(state_->temporary);
     constexpr std::size_t max_cached_measurements = 8192;
     const uint64_t font_generation = state_->font_collection->generation();
     if (state_->intrinsic_cache_generation != font_generation) {
@@ -561,6 +585,7 @@ bool TextEngine::layout_utf8(const char *text, float width, const TextLayoutOpti
         !std::isfinite(options.letter_spacing) || !std::isfinite(options.line_height) ||
         options.line_height < 0.0f)
         return false;
+    TextScratchScope scratch(state_->temporary);
     const uint64_t font_generation = state_->font_collection->generation();
     for (auto &entry : state_->layouts) {
         auto &cached = *entry.second;
@@ -726,6 +751,7 @@ bool TextEngine::edit_utf8(int32_t start, int32_t end, const char *replacement,
     auto *current = active_layout(*state_);
     if (!current || start < 0 || end < start || !replacement)
         return false;
+    TextScratchScope scratch(state_->temporary);
     std::size_t byte_start = 0;
     std::size_t byte_end = 0;
     if (!utf8_byte_range(current->text, start, end, byte_start, byte_end))
@@ -980,6 +1006,7 @@ std::shared_ptr<const PreparedGlyphs> TextEngine::publish_glyphs(TextLayoutId id
     if (line_index >= 0 && end_line < 0 && static_cast<std::size_t>(line_index) >= layout->result.lines.size())
         return {};
 
+    TextScratchScope scratch(state_->temporary);
     const uint32_t scale_key =
         static_cast<uint32_t>(std::max(1.0, std::round(static_cast<double>(pixel_scale) * 1024.0)));
     const bool single_line = line_index >= 0 && end_line < 0 &&
@@ -1094,6 +1121,7 @@ bool TextEngine::prepare_glyphs_internal(TextLayoutId id, float origin_x, float 
     const auto *retained = find_layout(*state_, id);
     if (!retained || pixel_scale <= 0.0f)
         return false;
+    TextScratchScope scratch(state_->temporary);
     const uint32_t scale_key =
         static_cast<uint32_t>(std::max(1.0, std::round(static_cast<double>(pixel_scale) * 1024.0)));
     if (state_->last_scale_key != scale_key) {
@@ -1477,8 +1505,11 @@ uint32_t TextEngine::scale_generation() const {
 TextEngineStats TextEngine::stats() const {
     if (!state_->atlas)
         return {};
+    const auto scratch = skb_temp_alloc_stats(state_->temporary);
     const skb_image_atlas_stats_t atlas_stats = skb_image_atlas_get_stats(state_->atlas);
     TextEngineStats result{};
+    result.scratch_allocated_bytes = scratch.allocated;
+    result.scratch_used_bytes = scratch.used;
     result.glyph_cache_misses = atlas_stats.glyph_cache_misses;
     result.glyphs_rasterized = atlas_stats.glyphs_rasterized;
     result.prepared_batch_count = state_->prepared_batch_count;

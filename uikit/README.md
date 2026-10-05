@@ -26,6 +26,14 @@ so custom drawing shares the same transforms, clipping, and sibling order as
 boxes, text, and images. Clay remains pinned as a private dependency; this
 branch carries only small layout-kernel fixes intended to be upstreamable.
 
+UIKit disables Clay's persistent native scroll tracking: clipping remains active,
+while Haxe `ScrollController` owns offsets and input. Clipped labels therefore
+consume no Clay scroll records. Standalone Clay users retain native scrolling by
+default. Scroll/transition state capacities scale with the declared element
+capacity, including overlap between consecutive layouts. State exhaustion reports
+the table, capacity and element ID and rejects the frame without writing into a
+fallback record. Stale scroll records retire before scroll-target selection.
+
 The C layout bridge uses a versioned transaction with fixed node records of
 `NKUI_LAYOUT_NODE_RECORD_BYTES` bytes and a 16 MiB transaction bound. Node
 capacity grows with submitted data rather than imposing a small framework node
@@ -373,3 +381,20 @@ through the private Skribidi path.
 
 The browser owns the frame loop through `nk_surface_set_frame_callback()`;
 Emscripten types do not appear in NativeKit's public headers.
+
+### GPU stream pages
+
+The native renderer retains reusable vertex and index buffer pages, moving to
+another page before an append would overflow. A mesh larger than a normal page
+gets a dedicated page, and recorded commands retain their original buffer
+handles. Sokol manages each page's storage across frames in flight.
+
+`UiStreamBufferConfig` controls page sizes and the stream memory budget in the
+native renderer factory. Defaults are 4 MiB for solid/glyph vertices and indices,
+1 MiB for composite/surface vertices, and 64 MiB total. These limits cover stream
+buffers only; textures and render targets have separate ownership.
+
+Budget exhaustion or failure to allocate another page returns
+`NKUI_ERROR_RESOURCE_LIMIT`. The renderer discards the incomplete frame and
+invalidates its unfinished cached passes. The shared Haxe host keeps running,
+records `lastRenderResourceError`, and allows a subsequent frame to succeed.

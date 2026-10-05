@@ -790,6 +790,29 @@ int main(int argc, char **argv) {
                                     snapshot, &error))
             return 51 + frame_index;
     }
+    // Frequent tree/label replacement must not retain Clay scroll records.
+    LayoutEngine clipped_engine(8);
+    for (uint32_t frame_index = 0; frame_index < 12; ++frame_index) {
+        std::vector<LayoutNode> clipped_nodes;
+        auto root = box(200000 + frame_index * 10000, -1);
+        root.style.width = {LayoutSizing::Fixed, 400.0f};
+        root.style.height = {LayoutSizing::Fixed, 300.0f};
+        root.style.clip_horizontal = root.style.clip_vertical = true;
+        clipped_nodes.push_back(root);
+        for (uint32_t child = 0; child < 3000; ++child) {
+            auto node = box(root.id + child + 1, 0);
+            node.style.width = {LayoutSizing::Fixed, 600.0f};
+            node.style.height = {LayoutSizing::Fixed, 10.0f};
+            node.style.clip_horizontal = node.style.clip_vertical = true;
+            clipped_nodes.push_back(node);
+        }
+        if (!clipped_engine.layout(clipped_nodes, 400, 300, 1.0f / 60, snapshot, &error)) {
+            std::cerr << error.message << "\n";
+            return 60;
+        }
+        auto child = snapshot.find(root.id + 1);
+        if (!child || child->clip_bounds.width > 400.01f || snapshot.items.size() != clipped_nodes.size()) return 61;
+    }
     std::cout << "PASS: Clay layout boxes, text, transforms, and geometry\n";
     return 0;
 #endif
