@@ -55,6 +55,8 @@ import haxe.io.Bytes;
 @:access(motionkit.robot.ManipulatorMotion)
 @:access(motionkit.robot.PlanExecutor)
 @:access(processkit.WeldingPlanRunner)
+@:access(app.ApplicationSimulation)
+@:access(app.CellSignals)
 class ProjectSourceTests {
   static function check(value:Bool, message:String):Void {
     if (!value) throw message;
@@ -2344,7 +2346,9 @@ class ProjectSourceTests {
       "tending cell exports two wired controllers and two signal links");
     var wires = generated.signals;
     if (wires == null) throw "Tending cell lost its signal wires";
-    var first = wires[0], output = false, published = false, now = 0.0;
+    var robotSignals = [for (wire in wires) if (wire.from.controller == "robotController") wire];
+    check(robotSignals.length == 1, "the robot cabinet has one authored output signal");
+    var first = robotSignals[0], output = false, published = false, now = 0.0;
     var bus = new CellSignals(wires, () -> now,
       (controller, channel) -> channel == first.name && output,
       (controller, channel, on, sequence, stamp) -> {
@@ -2400,6 +2404,43 @@ class ProjectSourceTests {
           received = true;
       }
       check(received, "the other controller receives a digital sensor frame on the shared tick");
+      var source = simulation.world.robot("assembly:tending-controllers:" + first.from.controller);
+      var signals = simulation.cellSignals;
+      if (source == null || signals == null) throw "Tending signal has no source runtime or bus";
+      var pose = source.snapshot().positions.toArray();
+      var zero = [for (_ in pose) 0.0];
+      var hold = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(200000000),
+        [for (position in pose) [position, 0.0]]);
+      var outputEvent = new ProcessTimedEvent(Int64.ofInt(10000000), first.name, ProcessEventValue.Digital(true));
+      source.submit(robotkit.core.RobotCommand.ExecutionPlan(new ExecutionPlanSubmission(
+        Int64.ofInt(1801), Int64.ofInt(simulation.appliedRevision), Int64.ofInt(0),
+        RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE |
+          RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_EVENTS, pose, zero, zero, [hold],
+        null, null, null, null, null, true, [outputEvent])));
+      var fired = false;
+      for (_ in 0...100) {
+        simulation.step();
+        if (signals.readOutput(first.from.controller, first.name)) {
+          fired = true;
+          var input = signals.input(first.to.controller, first.name);
+          check(input != null && switch input {case Digital(on): !on; case _: false;},
+            "a real runtime output stays invisible to the receiver in its firing tick");
+          break;
+        }
+      }
+      check(fired, "the source runtime fires its authored digital output");
+      simulation.step();
+      var nextInput = signals.input(first.to.controller, first.name);
+      check(nextInput != null && switch nextInput {case Digital(on): on; case _: false;},
+        "the real runtime output crosses the cabinet bus on the following tick");
+      var high = false;
+      var nextFrames = target.snapshot().sensors;
+      for (index in 0...nextFrames.length) {
+        var frame = nextFrames.get(index);
+        if (frame.sensorId == first.name && frame.values.length == 1 && frame.values.get(0) == 1.0)
+          high = true;
+      }
+      check(high, "the receiving runtime publishes the real high digital input");
       Sys.println('tending controllers: ${ids.length} robots, ${[for (_ in joints.keys()) _].length} disjoint joints');
     } catch (error:Dynamic) {
       simulation.dispose(); session.dispose(); throw error;

@@ -385,7 +385,8 @@ class AssemblyRobot {
         candidate.setPowerUpSides(robotIndex, placement.offsets, placement.drives);
       } else candidate.setPowerUpOffsets(robotIndex, base);
     }
-    var robot = new SimulatedRobot(idFor(assembly, control == null ? null : control.id), runtime, converted.model.name,
+    var robot = new SimulatedRobot(idFor(assembly,
+      control == null || session.controllers.length == 1 ? null : control.id), runtime, converted.model.name,
       [for (link in converted.model.links) link.id],
       [for (joint in converted.model.joints) joint.id]);
     // A wheeled assembly's chassis rolls by the wheel rates the robot applies each tick, whoever commands them.

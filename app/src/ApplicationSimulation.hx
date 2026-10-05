@@ -58,7 +58,7 @@ class ApplicationSimulation {
   /** The simulated tools on the session's robots. */
   var tools:Null<SimulatedTools> = null;
   var cnc:Null<CncProgramPlayer> = null;
-  var beltVisuals:Null<BeltVisuals> = null;
+  var beltVisuals:Array<BeltVisuals> = [];
   var machineProgram:Null<MachineProgramPlayer> = null;
   /** The project's wheeled assembly's drive, when it has one. */
   var mobile:Null<robotkit.mobile.MobileBase> = null;
@@ -148,7 +148,7 @@ class ApplicationSimulation {
     var candidateAssemblyParts:Array<AssemblyPart> = [];
     var candidateWarnings:Array<String> = [];
     var candidateCnc:Null<CncProgramPlayer> = null;
-    var candidateBelts:Null<BeltVisuals> = null;
+    var candidateBelts:Array<BeltVisuals> = [];
     var candidateProgram:Null<MachineProgramPlayer> = null;
     var candidateMobile:Null<robotkit.mobile.MobileBase> = null;
     var candidateMission:Null<MissionPlayer> = null;
@@ -207,7 +207,8 @@ class ApplicationSimulation {
         var controls:Array<Null<materia.project.SceneArtifact.SceneArtifactCellController>> =
           session.controllers.length == 0 ? [null] : [for (control in session.controllers) control];
         for (control in controls) {
-          var id = AssemblyRobot.idFor(assembly, control == null ? null : control.id);
+          var id = AssemblyRobot.idFor(assembly,
+            control == null || session.controllers.length == 1 ? null : control.id);
           if (world.robot(id) != null && simulatedIds.indexOf(id) < 0)
             throw 'Robot "$id" is remote and read-only';
           var robotIndex = candidateRobots.length;
@@ -233,15 +234,20 @@ class ApplicationSimulation {
           if (job != null && ownsJob) candidateCnc = new CncProgramPlayer(job, built, candidate, session,
             createdSpace.session, candidateSignals == null || control == null ? null : candidateSignals.inputFor(control.id));
           var machine = session.machineMotion;
-          if (machine != null && (control == null || ownsJob)) {
-            if (machine.belts.length > 0) candidateBelts = new BeltVisuals(session, built, candidate, machine.belts);
-            if (machine.program != null) {
-              if (job != null) throw "A machine cannot run a CNC job and an axis program together";
+          if (machine != null) {
+            var jointIds = [for (joint in built.model.joints) joint.id];
+            var ownedBelts = [for (belt in machine.belts) if (jointIds.indexOf(belt.driverJoint) >= 0) belt];
+            if (ownedBelts.length > 0) candidateBelts.push(new BeltVisuals(session, built, candidate, ownedBelts));
+            if (machine.program != null && machine.program.axes.length > 0 &&
+                jointIds.indexOf(machine.program.axes[0]) >= 0) {
+              if (ownsJob) throw "A controller cannot run a CNC job and an axis program together";
               candidateProgram = new MachineProgramPlayer(machine.program, built, createdSpace.session,
                 machine.virtualDevice == true, candidateSignals == null || control == null ? null : candidateSignals.inputFor(control.id));
             }
           }
         }
+        if (session.machineMotion != null && session.machineMotion.program != null && candidateProgram == null)
+          throw "Machine axis program has no controller owning its axes";
       }
       var resolvedMotions = RobotMotionPlayer.resolve(candidateMotions,
         [for (robot in candidateRobots) robot.id()], candidateRobotModels);
@@ -301,10 +307,10 @@ class ApplicationSimulation {
       if (work != null) {
         if (candidateAssembly == null) throw "A mission needs the project's assembly";
         candidateMission = new MissionPlayer(work, candidateAssembly, candidate, assemblyIndex, timestep, heldBoxes,
-          candidateTools.objectsByScene(), session, [for (id in candidateByController.keys()) candidateByController.get(id)], virtualWelder
-            ? MissionPlayer.ARM_ACCELERATION * robotkit.runtime.VirtualServoOptions.ACCELERATION_SCALE
-            : MissionPlayer.ARM_ACCELERATION,
-          candidateSignals == null || work.controllerId == null ? null : candidateSignals.inputFor(work.controllerId));
+          candidateTools.objectsByScene(), session, [for (id in candidateByController.keys()) candidateByController.get(id)],
+          candidateSignals == null || work.controllerId == null ? null : candidateSignals.inputFor(work.controllerId), null,
+          virtualWelder ? MissionPlayer.ARM_ACCELERATION * robotkit.runtime.VirtualServoOptions.ACCELERATION_SCALE
+            : MissionPlayer.ARM_ACCELERATION);
         // A mission that welds lays the weld metal as the welder deposits it.
         var welds = [for (step in work.steps) if (step.kind == "weld") step].length > 0;
         if (welds) {
@@ -354,7 +360,7 @@ class ApplicationSimulation {
       tools = candidateTools;
       workforce = candidateWorkforce;
       if (cnc != null) cnc.dispose();
-      if (beltVisuals != null) beltVisuals.reset();
+      for (visual in beltVisuals) visual.reset();
       beltVisuals = candidateBelts;
       if (machineProgram != null) machineProgram.beforeReset();
       machineProgram = candidateProgram;
@@ -439,7 +445,7 @@ class ApplicationSimulation {
     pumpStamp = -1.0;
     // The session's own reset has restored its objects and actors; what lives beside it follows.
     for (member in members) member.reset();
-    if (beltVisuals != null) beltVisuals.reset();
+    for (visual in beltVisuals) visual.reset();
     presentMembers();
     presentationEpoch++; return true;
   }
@@ -453,7 +459,11 @@ class ApplicationSimulation {
   /** The project's CNC program player, or null when the project has no CNC job. */
   public function cncPlayer():Null<CncProgramPlayer> return cnc;
   public function programPlayer():Null<MachineProgramPlayer> return machineProgram;
-  public function beltDisplayUpdates():Int return beltVisuals == null ? 0 : beltVisuals.updates;
+  public function beltDisplayUpdates():Int {
+    var count = 0;
+    for (visual in beltVisuals) count += visual.updates;
+    return count;
+  }
   /** The drive of the project's wheeled assembly, for twist commands; null when it has none. */
   public function mobileBase():Null<robotkit.mobile.MobileBase> return mobile;
   /** The mission the assembly robot is running, or null when its project ships none. */
@@ -527,7 +537,7 @@ class ApplicationSimulation {
   public function simulatedRobotIds():Array<String> return simulatedIds.copy();
   /** Captures physics poses once, then combines the matching frame's world publications. */
   public function capturePresentationSnapshot():ApplicationPresentationSnapshot {
-    if (beltVisuals != null) beltVisuals.present();
+    for (visual in beltVisuals) visual.present();
     var active = space, robotsInSession = simulation;
     var frame = active == null ? null : active.session.capture();
     var physics = frame == null || robotsInSession == null ? null : robotsInSession.presentFrame(frame);
@@ -603,8 +613,8 @@ class ApplicationSimulation {
     workforce = null; motions = null; tools = null;
     if (cnc != null) cnc.dispose();
     if (beads != null) beads.dispose();
-    if (beltVisuals != null) beltVisuals.reset();
-    beltVisuals = null;
+    for (visual in beltVisuals) visual.reset();
+    beltVisuals = [];
     if (machineProgram != null) machineProgram.beforeReset();
     machineProgram = null;
     cnc = null; mobile = null; mission = null; beads = null; cellSignals = null; refreshMembers();

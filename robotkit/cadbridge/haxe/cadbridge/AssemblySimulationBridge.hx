@@ -196,6 +196,7 @@ class AssemblySimulationBridge {
     var linkHulls:Array<AssemblyLinkHull> = [];
     for (body in AssemblyBodies.of(definition)) {
       if (free.exists(body.id)) continue;
+      var environmentAnchor = false;
       if (ownedJoints != null) {
         if (body.joint != null && !selected.exists(body.joint)) continue;
         if (body.joint == null) {
@@ -208,7 +209,9 @@ class AssemblySimulationBridge {
               if (selected.exists(edge.id)) attached++; else foreign++;
             }
           if (attached == 0) continue;
-          if (foreign > 0) throw 'Fixed body "${body.id}" bridges controllers; mount their machines on separate roots';
+          // A stationary support shared by control domains belongs to the world.
+          // Keep its frames as root anchors without duplicating its mass or hull.
+          environmentAnchor = foreign > 0;
         }
       }
       var index = 0;
@@ -236,6 +239,7 @@ class AssemblySimulationBridge {
         var offset = AssemblyFrames.compose(toLink, placement.worldPose(id));
         offsets.set(id, offset);
         linkIndexOfPart.set(id, index);
+        if (environmentAnchor) continue;
         partLinks.set(id, {link: index, offset: scaled(offset, scale)});
         var center = AssemblyFrames.transformPoint(offset, part.centerOfMass[0], part.centerOfMass[1],
           part.centerOfMass[2]);

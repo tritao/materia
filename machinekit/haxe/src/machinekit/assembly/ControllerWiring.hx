@@ -22,7 +22,7 @@ class ControllerWiring {
 		var ids = [for (id in cabinets.keys()) id];
 		ids.sort(Reflect.compare);
 		if (ids.length == 0) return null;
-		var saved = assembly.describe().machine;
+		var flat = assembly.derived();
 		var owner = new Map<String, String>();
 		var byId = new Map<String, SceneArtifactCellController>();
 		var controllers:Array<SceneArtifactCellController> = [];
@@ -38,7 +38,7 @@ class ControllerWiring {
 			return entry;
 		}
 		function terminal(instance:String, port:String):Null<String> {
-			for (wire in saved.portConnections)
+			for (wire in flat.connections)
 				if (wire.toInstance == instance && wire.toPort == port && cabinets.exists(wire.fromInstance))
 					return wire.fromInstance;
 			return null;
@@ -49,7 +49,7 @@ class ControllerWiring {
 				throw 'Joint "$joint" is wired to both "$prior" and "$cabinet"';
 			owner.set(joint, cabinet);
 		}
-		if (saved.motors != null) for (motor in saved.motors) {
+		if (flat.motors != null) for (motor in flat.motors) {
 			var cabinet = terminal(motor.driver, "bus");
 			if (cabinet == null) cabinet = terminal(motor.driver, "step-dir");
 			if (cabinet == null) throw 'Motor "${motor.actuator}" has no controller wiring';
@@ -63,7 +63,7 @@ class ControllerWiring {
 			var brake = motor.brake;
 			if (brake != null) owned(cabinet).channels.push(brake.releaseChannel);
 		}
-		if (saved.cylinders != null) for (cylinder in saved.cylinders) {
+		if (flat.cylinders != null) for (cylinder in flat.cylinders) {
 			var cabinet = terminal(cylinder.valve, "coilA");
 			if (cabinet == null) throw 'Cylinder "${cylinder.actuator}" has no controller wiring';
 			var other = terminal(cylinder.valve, "coilB");
@@ -96,7 +96,7 @@ class ControllerWiring {
 				var head = heads.get(sensor.id);
 				var expected = sensor.kind == "presence" ? "presence" : "reed";
 				if (head == null || head.kind != expected) throw 'Sensor "${sensor.id}" has no matching field head';
-				for (wire in saved.portConnections)
+				for (wire in flat.connections)
 				if (wire.fromInstance == sensor.id && wire.fromPort == "signal" && cabinets.exists(wire.toInstance)) {
 					if (cabinet != null && cabinet != wire.toInstance)
 						throw 'Sensor "${sensor.id}" is wired to multiple controllers';
@@ -104,17 +104,30 @@ class ControllerWiring {
 				}
 			}
 			if (cabinet == null) throw 'Sensor "${sensor.id}" has no controller';
+			if (sensor.joint != null && owner.exists(sensor.joint) && owner.get(sensor.joint) != cabinet)
+				throw 'Sensor "${sensor.id}" observes joint "${sensor.joint}" owned by "${owner.get(sensor.joint)}", '
+					+ 'but is wired to "$cabinet"; wire its field head to the joint owner and route a cell signal to the other controller';
 			owned(cabinet).sensors.push(sensor.id);
 		}
 		var signals:Array<SceneArtifactCellSignal> = [];
-		for (wire in saved.portConnections)
+		for (wire in flat.connections)
 			if (cabinets.exists(wire.fromInstance) && cabinets.exists(wire.toInstance))
 				{
+					var source = cabinets.get(wire.fromInstance).port(wire.fromPort);
+					var target = cabinets.get(wire.toInstance).port(wire.toPort);
+					if (source.kind != machinekit.component.PortKind.Signal ||
+						target.kind != machinekit.component.PortKind.Signal ||
+						source.role != machinekit.component.PortRole.Supply ||
+						target.role != machinekit.component.PortRole.Consumer)
+						throw 'Cell signal "${wire.id}" must connect a controller output to a controller input';
 					owned(wire.fromInstance).channels.push(wire.id);
 					signals.push({name: wire.id, from: {controller: wire.fromInstance, port: wire.fromPort},
 						to: {controller: wire.toInstance, port: wire.toPort}});
 				}
 		for (entry in controllers) {
+			var channels:Array<String> = [];
+			for (channel in entry.channels) if (channels.indexOf(channel) < 0) channels.push(channel);
+			entry.channels = channels;
 			entry.joints.sort(Reflect.compare);
 			entry.sensors.sort(Reflect.compare);
 			entry.channels.sort(Reflect.compare);

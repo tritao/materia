@@ -806,6 +806,18 @@ class CadBridgeTests {
         normals: Bytes.alloc(0), indices: Bytes.alloc(0), faceRanges: []
       }]});
     var lead = AssemblySimulationBridge.toRobotModel(screwed.definition("lead-test"), screwParts).model.couplings[0];
+    var sharedSupport = screwed.definition("shared-support");
+    sharedSupport.couplings = [];
+    for (joint in ["slide", "turn"]) {
+      var domain = AssemblySimulationBridge.toRobotModel(sharedSupport, screwParts,
+        null, null, null, null, [joint]);
+      check(domain.model.joints.length == 1 && domain.model.joints[0].id == joint,
+        "shared support retains each controller's own joint and its root anchor");
+      check(!domain.partLinks.exists("base") &&
+        [for (hull in domain.linkHulls) if (hull.part == "base") hull].length == 0 &&
+        domain.model.links[0].mass < 0.01,
+        "shared fixed support belongs to the environment without duplicate mass or collision geometry");
+    }
     check(Math.abs(lead.stiffness - 1.0e5) < 1e-6 && Math.abs(lead.backlash - 5e-5) < 1e-15 && lead.drag == 0.02 &&
       Math.abs(lead.efficiency - 0.4) < 1e-15, "a coupling's stiffness, backlash and drag reach the robot in SI units");
     check(translated.linkHulls.length == 2 && translated.linkHulls[0].link == 0 &&
