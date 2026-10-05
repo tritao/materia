@@ -1621,3 +1621,22 @@ scaled plane equations, deficient/duplicate contacts, inconsistent observations,
 iteration exhaustion and invalid inputs. This is numerical solver evidence only. Executed contact
 searches, CAD probe-region selection, saved mission integration and displaced-parking weld checks
 remain open; P3 has not passed its milestone gate. P4 and P5 remain required and open.
+
+### P3 bounded touch-search policy and servo adapter (2026-10-05)
+
+`ContactSearch` owns the arc-off contact-search policy: a measured TCP origin, inward direction,
+finite distance/time/corridor bounds, and an explicit calibrated sensing-threshold offset. Fresh
+noncontact feedback must arm a search before a new touch can finish it. Missing, stale, future,
+regressing or clock-mismatched observations, invalid frames, active arc/current and welder faults
+stop probing. Sensor skew is bounded on the joint clock rather than inferred from host receipt time.
+
+`ContactSearchRunner` connects this policy to an exclusively owned fresh MotionKit servo session.
+It reads measured joint positions for TCP FK and captures that point on touch before requesting
+braking. Completion waits until the servo reports rest. The caller must first execute a checked
+approach with arc and wire channels off; this adapter does not replace approach planning or CAD
+probe-region clearance checks. Existing MotionKit servo deadlines bound a stalled host's commands.
+
+The focused suite passes 20 search assertions plus the existing 109 registration assertions.
+The servo adapter compiles, but its executed native motion has not yet been exercised: the unit
+suite proves the search policy and constructor validation, not a mobile contact-search mission.
+CAD probe selection, safe approach/retreat, saved mission steps and observed-frame use remain open.
