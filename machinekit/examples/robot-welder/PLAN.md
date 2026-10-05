@@ -995,7 +995,7 @@ Dependencies:
 | W5 | Done (2026-10-04) | Seam-progress weave; CAD-derived pass recipes; deposited bead grounding and clearance; scene schema 16 rejects older versions; smaller restart hump. Woven 7 mm measures 6.998 mm, three-pass 10 mm measures 9.999 mm on both backends; all affected gates pass. |
 | W6 | Done (2026-10-04) | RKD6 numeric feedback and virtual welder; checked retrofit profile; Modbus map/adapter with independent ProcessKit owner; unchanged seam and all six shutdown cases pass. Full welder, arm, mobile and MachineKit smoke gates pass; phase one lands on local main. |
 | P1 | Done (2026-10-05) | Mobile welding carrier, insulated storage and converter service graph; CAD fit/mass checks and both-backend carrier movement pass. |
-| P2 | In progress (2026-10-05), branch only | Reach/clearance-derived station cover and ordered goTo/weld mission. |
+| P2 | Done (2026-10-05) | Minimum verified candidate cover: 2 stations / 10 seams; complete goTo/weld/stow mission passes both backends in 270.3 s; affected milestone gates pass. |
 | P3 | Open | Executed touch searches and correction under injected parking error. |
 | P4 | Open | Measured load integration, voltage sag/cutoff and pre-seam docking/charging. |
 | P5 | Open; required | Rendered-depth laser profiler and executed live seam correction. |
@@ -1542,7 +1542,67 @@ Keep contact search and welding registration in ProcessKit, CAD probe selection 
 `machinekit.welding`, and generic motion/servo mechanisms in their existing owners. Reacquire
 the frame after every parking step, and use the accepted observation for all station seams.
 Injected parking displacement must change the real base pose without giving the estimator the
-same correction: Simulation exposes base teleport while preserving the shared clock, and wheel
-odometry can retain the estimated pose. The test must demonstrate that executed contacts,
+same correction: Simulation.placeRobotBase applies a jump without stopping the clock or resetting
+sensor history, and wheel odometry can retain the estimated pose. The test must demonstrate that executed contacts,
 rather than an exact simulation localization or work-body lookup, recover the weld frame.
 P3 implementation, saved-format changes and executed noise checks have not started.
+
+P3 probe uncertainty must include parking yaw about the chassis origin, not only translation.
+At 1.7 m from that origin, 2 degrees contributes about 59 mm of position error; add the
+translation bound and the tool's clearance when deriving search envelopes from CAD. A fixed
+30 mm search would not cover the requested parking error. Use provisional observable pose
+components from early face contacts to place later probes on narrower faces. Provisional
+estimates can guide searches but cannot authorize welding; the final registration must pass
+the full observability and consistency checks.
+
+### P2 final gate record (2026-10-05)
+
+All affected gates passed, with heavy suites run one at a time. App compiled 1846 sources;
+MachineKit smoke compiled 1307 sources. No native rebuild or OCCT rebuild was needed.
+
+- Focused station policy: 148 checks for minimum covers, directed routes, deferred verification
+  and CAD-derived proposals. Shared welding planning: 44 planning and 19 pass-path assertions
+  plus compiled-motion/end-joint checks. Joint-route search: 21 assertions. Floor map: 485 assertions.
+- CAD station integration: two stations, all ten seams, 14 steps, 9.323968 m planned route.
+- Complete mobile welding: both backends, 270.3 s, all 680 mm covered without gaps; legs
+  5.0–5.1 mm on the test backend and 4.9–5.1 mm on MuJoCo; weld and stow checks pass.
+- Independent frame and collision checks passed earlier on both backends. The focused joint-owner
+  handoff passes on both backends with moves to 0.2 rad, 0.4 rad and back to zero.
+- PROJECT_SOURCE_ONLY=welder: terminal exit 0. Whole fixed weldment remains 106.5 s on both
+  backends, all ten beads within length/leg tolerance and tip within 0.1 mm. Single seam 20.6 s,
+  recovery 21.1 s with one restart and 3 mm overlap, no gaps. In-air failure retains the exact
+  three-restart reason. Crater dropout has no restart; displaced work remains within 0.1 mm and
+  leg 5 mm. Post chain remains the recorded W4 baseline of 29.8 s, not the former unchecked
+  19.9 s; the clearance/wrist-limit reason is recorded above. Woven 7 mm measures 6.998 mm at
+  27.17 s; three-pass 10 mm measures 9.999 mm at 65.55 s on both backends.
+- PROJECT_SOURCE_ONLY=arm: terminal exit 0, pick/place round remains 23.5 s.
+- PROJECT_SOURCE_ONLY=mobile: terminal exit 0. Both bases move 400 mm and turn 0.5 rad; handling
+  round 56.4 s, obstacle round 60 s, one replan, closest 413 mm. The prior 61/65 s and 416 mm
+  record changes with world-aligned map cells and bounds that include the starting pose. This
+  changes discretized routes and turn/guard timing while retaining handling success, obstacle
+  avoidance and one replan; the enlarged-carrier route-clipping regression is fixed.
+- MachineKitSmoke: terminal exit 0, including mobile carrier and welding generation checks.
+
+P2 preserves scene schema 16 and the public ArmTool/RobotArm interfaces. The planned mobile
+mission has its own manifest; the carrier-only manifest remains a distinct motion/fit fixture.
+P3 executed contact registration, P4 measured energy/docking and P5 rendered-depth tracking
+remain required and open. P3 design notes above are preparation, not implementation evidence.
+Local main was still 7e3474144d11ab731d01b661ce4a5b0d5228879c throughout these gates; perform
+the guarded fast-forward after committing this milestone record.
+
+P2 commit ledger before this final record:
+
+- `dc16212bb637c176d9029c9b3edd10c0852d7702` ProcessKit: select minimum welding station covers and feasible routes
+- `a7637b14e8adc1ba800f5627d2ed303e7fccf0b4` App: resolve independent welding work through live assembly frames
+- `833dc0b88b416b8b60b9172f0b48a02455d3eb8a` ProcessKit: verify selected welding station coverage before accepting it
+- `18f000453447fc73f25ef1f956859b258e99a722` ProcessKit: derive welding parking candidates from work bounds and arm mounting
+- `1c63277550263eeb2c38eb7ddfc37b5c6dc37fbb` RobotKit: share posed floor obstacle mapping with upstream planners
+- `7c0624d0c3ba00a47a414f9fabc6cf520a2b4c50` ProcessKit: expose complete welding motion checks for station planning
+- `54c918cfb396cc4be63ed29aeeb9f09f6000467c` RobotKit: plan checked joint-space detours around obstacles
+- `75c98a5639ec87e99e420df8523fb9dde2be0fb7` RobotKit: keep floor cells stable across mission goal sets
+- `e0262617dcc2d1d890b25f6bd49e56a853c51e90` ProcessKit: share scene welding pass conversion with CAD planning
+- `591a02580f78ad091afa5040690b0fa0da15e395` MachineKit: generate mobile welding stations and checked stow moves
+- `aa75823205c08a7a4c5e14ad8697104a55dcba19` RobotKit: size navigation map margins for enlarged footprints
+- `574d49ba97fa49250c1650de4a806dec13b0e14c` App: reacquire live arm starts between mission motion owners
+- `0e20c96730971d68e02d969280381216ac447a65` App: verify complete mobile welding missions on both backends
+- `619f2cf2734a048e37823d030fda4a197b6ed873` ProcessKit: record the observed-frame design for mobile weld registration
