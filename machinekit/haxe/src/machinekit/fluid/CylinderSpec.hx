@@ -1,7 +1,7 @@
-package machinekit.pneumatic;
+package machinekit.fluid;
 
-/** Typed mechanical and force data exposed by a pneumatic cylinder component. */
-interface PneumaticCylinderSpec {
+/** Typed mechanical and force data shared by fluid-powered cylinder components. */
+interface CylinderSpec {
 	function boreMm():Float;
 	function rodMm():Float;
 	function strokeMm():Float;

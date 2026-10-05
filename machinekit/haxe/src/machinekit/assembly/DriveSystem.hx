@@ -487,7 +487,7 @@ class DriveSystem {
 
 	/** Check a cylinder binding: typed cylinder and valve parts on a prismatic tree joint with no other drive. */
 	public static function checkCylinder(flat:FlatAssembly, record:CylinderRecord):Void {
-		if (flat.member(record.cylinder).pneumaticCylinderSpec() == null || flat.member(record.valve).pneumaticValveSpec() == null)
+		if (flat.member(record.cylinder).cylinderSpec() == null || flat.member(record.valve).valveSpec() == null)
 			throw "Cylinder binding needs cylinder and valve parts";
 		for (cylinder in flat.cylinders) if (cylinder.actuator == record.actuator || cylinder.joint == record.joint)
 			throw "Duplicate cylinder actuator or joint";
@@ -502,8 +502,8 @@ class DriveSystem {
 
 	/** A cylinder's actuator: force from the supply pressure, direction from its hoses and geometry. */
 	static function compileCylinder(flat:FlatAssembly, record:CylinderRecord):AssemblyActuator {
-		var cylinder = flat.member(record.cylinder).pneumaticCylinderSpec();
-		var valve = flat.member(record.valve).pneumaticValveSpec();
+		var cylinder = flat.member(record.cylinder).cylinderSpec();
+		var valve = flat.member(record.valve).valveSpec();
 		if (cylinder == null || valve == null) throw "Cylinder binding lost its typed cylinder or valve part";
 		var pressure = airPressure(flat, record.valve, "P");
 		var valvePart = flat.member(record.valve);
@@ -555,9 +555,9 @@ class DriveSystem {
 		if (!source.supplied) throw ServiceNetwork.unsuppliedMessage(source.chain);
 		if (source.external) throw 'Air pressure at "$instanceId/$portName" needs a modelled supply';
 		var part = flat.member(source.port.instanceId);
-		if (!Std.isOfType(part, machinekit.pneumatic.PressureSource))
+		var supply = part.pressureSource();
+		if (supply == null)
 			throw 'Air source "${source.port.instanceId}/${source.port.portName}" does not state pressure';
-		var supply:machinekit.pneumatic.PressureSource = cast part;
 		var pressure = supply.outputPressure(source.port.portName);
 		if (!(pressure >= 0) || !Math.isFinite(pressure)) throw "Air pressure must be finite and nonnegative";
 		return pressure;

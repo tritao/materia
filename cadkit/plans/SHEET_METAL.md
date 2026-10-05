@@ -942,7 +942,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM6 | done: SM6a typed air-bending predictions, physical springback inversion and exact contact depth; focused process smoke passes 1235 assertions; quick gate `sm6a-air-bending` passes (7209 sheet assertions); SM6b explicit lot/tool/angle-band calibration with measured radius and additive depth correction, focused smoke passes 1257 assertions, quick gate `sm6b-calibration` passes (7231 sheet assertions); SM6 complete: typed grade defaults, editor selection, Process-rule persistence and tooling minimums; full gate `sm6-process-material-full` passes all stages (7248 sheet assertions, ProjectKit 155); final material integration and CAD workflow checks pass | 7148a8bb8; 6458df23b; d664caa22 |
 | SM7 | done: typed exact punch and single-/four-V die catalogue; standard segments and physical horns; independently segmented paired rows and validated bed layouts; derived process contact data; registered segment/clamp recipes and manual/powered clamp capabilities; strong unique tooling face names. Quick gates `sm7a-profile-foundation`, `sm7b-punch-profiles`, `sm7c-die-profiles` and full gate `sm7-tooling-verified-full` pass; original MachineKit and router engineering summaries unchanged | c4e418ba5; 310a41894; 67da9cae8; final tooling integration |
 | SM8a | done: cylinder parts and coupled mechanical assembly; typed planning geometry derived from physical datums, independent reference comparisons, full-bed force/depth and conservative demo/frame checks; Start-page project with editable ram, X/R and depth-stop axes. Quick gates `sm8a-cylinder-parts`, `sm8a-mechanical-assembly` and full gate `sm8a-press-assembly-full` pass every stage; original MachineKit and router engineering summaries unchanged | c4517c795; ed8faa29b; final assembly integration |
-| SM8b | planned: MT5 dependency is on local main 1484b924d and merged | |
+| SM8b | in progress: MT5 is on local main 1484b924d and merged; shared typed fluid cylinder/valve/pressure-source interfaces replace pneumatic-only interfaces, and pressure resolution no longer casts components; quick gate `sm8b-fluid-interfaces` passes all five suites with unchanged original MachineKit summaries | |
 | SM9 | planned | |
 | SM10 | planned | |
 | SM11 | planned | |
@@ -1415,3 +1415,14 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
   ProjectKit (155), ManufacturingKit (54), MachineKit, workspace, app build and
   project-source runtime all return zero. Original five MachineKit engineering
   summaries and router cutting/drive results are unchanged; no new compiler issue.
+
+- SM8b shared fluid interfaces: `machinekit.fluid.CylinderSpec`, `ValveSpec` and
+  `PressureSource` replace the pneumatic-only interface names, with no aliases.
+  `MachineComponent` exposes typed optional capabilities, including pressure sources;
+  air-pressure resolution uses that capability rather than a runtime type test and cast.
+  The existing MT5 binding, saved data and runtime behavior are unchanged at this checkpoint.
+
+- SM8b interface checkpoint gate `sm8b-fluid-interfaces` passes all five suites
+  (7504 sheet, 155 project, 54 manufacturing assertions); original five MachineKit
+  summaries match exactly. Hydraulic parts, saved drive data, phase speeds and switches
+  remain for the subsequent SM8b checkpoints. No new cast or compiler workaround.

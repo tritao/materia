@@ -25,11 +25,14 @@ class MachineComponent {
 	public function electricalSource():Null<machinekit.motion.ElectricalSource> return null;
 	public function motorBrakeSpec():Null<machinekit.motion.MotorBrakeSpec> return null;
 
-	/** Typed pneumatic model when this component is a cylinder. */
-	public function pneumaticCylinderSpec():Null<machinekit.pneumatic.PneumaticCylinderSpec> return null;
+	/** Typed fluid model when this component is a cylinder. */
+	public function cylinderSpec():Null<machinekit.fluid.CylinderSpec> return null;
 
-	/** Typed pneumatic model when this component is a directional valve. */
-	public function pneumaticValveSpec():Null<machinekit.pneumatic.PneumaticValveSpec> return null;
+	/** Typed fluid model when this component is a directional valve. */
+	public function valveSpec():Null<machinekit.fluid.ValveSpec> return null;
+
+	/** Typed pressure data when this component supplies a fluid service. */
+	public function pressureSource():Null<machinekit.fluid.PressureSource> return null;
 
 	function addFacet(facet:ComponentFacet):Void {
 		if (facet == null) throw 'Null facet on "$designation"';

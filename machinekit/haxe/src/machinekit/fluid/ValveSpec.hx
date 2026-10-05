@@ -1,7 +1,7 @@
-package machinekit.pneumatic;
+package machinekit.fluid;
 
 /** Typed spool behavior exposed by a directional valve component. */
-interface PneumaticValveSpec {
+interface ValveSpec {
 	function isDoubleSolenoid():Bool;
 	function defaultsToA():Bool;
 }

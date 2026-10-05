@@ -34,7 +34,7 @@ class PneumaticPartTests {
 					throw '$family bore ${bores[i]} disagrees with reference force table';
 				var recipe = cylinder.componentType();
 				if (recipe == null) throw "Cylinder recipe is missing";
-				var rebuilt = recipe.create(cylinder.values()).pneumaticCylinderSpec();
+				var rebuilt = recipe.create(cylinder.values()).cylinderSpec();
 				if (rebuilt == null) throw "Cylinder recipe did not rebuild its typed pneumatic specification";
 				close(rebuilt.retractForce(600000), cylinder.retractForce(600000), "reconstructed annular force");
 			}
