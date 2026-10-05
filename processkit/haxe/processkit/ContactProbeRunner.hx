@@ -41,6 +41,7 @@ class ContactProbeRequest {
 
 /** One exclusive owner alternates checked motion programs with contact servo searches. */
 class ContactProbeRunner {
+  static inline var SEARCH_AGE_SECONDS:Float = 0.02;
   public final motion:ManipulatorMotion;
   public final planner:ProbeMotionPlanner;
   public final channels:WelderChannels;
@@ -100,14 +101,16 @@ class ContactProbeRunner {
   }
 
   function beginSearch(speed:Float, distance:Float):Void {
+    var requested:ContactProbeRequest = cast request;
+    var checkedSpeed = planner.sensingSpeed(positions(), requested.direction, distance, speed, requested.contactOffset, 2 * SEARCH_AGE_SECONDS);
     var servo = makeServo();
     if (servo == null || servo.robot != motion.robot || servo.manipulator != planner.arm) {
       if (servo != null) servo.dispose();
       throw "Contact probe servo factory returned a different robot or arm";
     }
     try {
-      search = new ContactSearchRunner(servo, sensor, cast(request, ContactProbeRequest).direction, distance, speed,
-        0.02, 0.002, cast(request, ContactProbeRequest).contactOffset, mappings);
+      search = new ContactSearchRunner(servo, sensor, cast(request, ContactProbeRequest).direction, distance, checkedSpeed,
+        SEARCH_AGE_SECONDS, 0.002, cast(request, ContactProbeRequest).contactOffset, mappings);
     } catch (error:Dynamic) { servo.dispose(); throw error; }
   }
 
@@ -145,7 +148,7 @@ class ContactProbeRunner {
           var velocity = [for (index in indices) snapshot.velocities.get(index)];
           var hit = planner.stoppingViolation(joints, velocity, 0.02);
           if (hit != null)
-            throw 'Contact probe predicted braking motion is obstructed: ${hit.a} against ${hit.b}, ${hit.distance} m < ${hit.required} m; joints=${joints.join(",")}; velocity=${velocity.join(",")}';
+            throw 'Contact probe predicted braking motion is obstructed: ${hit.a} against ${hit.b}, clearance ${hit.distance} m (required ${hit.required} m); joints=${joints.join(",")}; velocity=${velocity.join(",")}';
           active.update();
           if (active.stopped) {
             if (!active.completed()) throw active.search.failure;

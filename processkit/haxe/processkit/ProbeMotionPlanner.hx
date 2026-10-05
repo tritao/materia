@@ -3,6 +3,7 @@ package processkit;
 import haxe.Int64;
 import motionkit.MotionOptions;
 import motionkit.kinematics.Pose3;
+import motionkit.kinematics.Twist6;
 import motionkit.program.Blend;
 import motionkit.program.MotionOp;
 import motionkit.program.MotionProgram;
@@ -168,6 +169,70 @@ class ProbeMotionPlanner {
       q = next;
     }
     return true;
+  }
+
+  /** Bound wire travel during sensor age, a missed command deadline and joint braking using CAD lever lengths. */
+  public function sensingSpeed(start:Array<Float>, direction:Vec3, distance:Float, requested:Float,
+      contactOffset:Float, reactionSeconds:Float = 0.04):Float {
+    if (start == null || start.length != arm.group.count() || direction == null || Math.abs(direction.norm() - 1) > 1e-8 ||
+        !Math.isFinite(distance) || !(distance > 0) || !Math.isFinite(requested) || !(requested > 0) ||
+        !Math.isFinite(contactOffset) || contactOffset < 0 || !Math.isFinite(reactionSeconds) || reactionSeconds < 0)
+      throw "Probe speed needs a bounded ray, requested speed, calibration and deadline";
+    if (contactOffset == 0) {
+      if (wireClearance != null) throw "Wire sensing needs a positive calibrated stopping stand-off";
+      return requested;
+    }
+    var reserve = compiler.ikTolerance.position + (wireClearance == null ? 0.0 : wireClearance.envelopeExcess);
+    var budget = contactOffset - reserve;
+    if (!(budget > 0)) throw "Probe calibration leaves no wire stopping reserve";
+    var indices = arm.jointIndices();
+    var zero = [for (_ in indices) 0.0];
+    var children = [for (index in indices) arm.robot.joints[index].child.id];
+    var poses = arm.linkPoses(zero, children);
+    var origins = [for (i in 0...indices.length) poses[i].transformPoint(Vec3.fromArray(arm.robot.joints[indices[i]].childFramePosition))];
+    var last = origins.length - 1;
+    var distal = wireClearance == null ? arm.tcpPose(zero).translation.sub(origins[last]).norm()
+      : wireClearance.extentFrom(zero, origins[last]);
+    var levers = [for (_ in indices) 0.0];
+    for (i in 0...indices.length) {
+      var joint = indices.length - 1 - i;
+      if (joint < last) distal += origins[joint + 1].sub(origins[joint]).norm();
+      levers[joint] = arm.robot.joints[indices[joint]].type == JointType.Prismatic ? 1.0 : distal;
+      if (arm.robot.joints[indices[joint]].type == JointType.Prismatic && joint > 0) {
+        var travel = arm.group.limitsOf(joint);
+        if (!Math.isFinite(travel.lower) || !Math.isFinite(travel.upper) || !(travel.lower < travel.upper))
+          throw "Probe stopping reserve needs bounded distal prismatic travel";
+        distal += Math.max(Math.abs(travel.lower), Math.abs(travel.upper));
+      }
+    }
+    var from = arm.tcpPose(start), q = start.copy(), speed = requested;
+    var steps = Std.int(Math.max(1.0, Math.ceil(distance / 0.001)));
+    for (step in 0...steps + 1) {
+      if (step > 0) {
+        var at = from.translation.add(direction.scale(distance * step / steps));
+        var next = compiler.solver.solvePose(pose(new Transform3(at, from.rotation)), q, compiler.ikTolerance);
+        if (next == null) throw "Probe speed corridor leaves the executed IK branch";
+        q = next;
+      }
+      var rates = compiler.solver.solveDifferential(q, new Twist6(direction.x, direction.y, direction.z, 0, 0, 0));
+      if (rates == null) throw "Probe sensing ray has no finite differential motion";
+      var hold = 0.0, brake = 0.0;
+      for (joint in 0...indices.length) {
+        var rate = rates[joint];
+        if (!Math.isFinite(rate)) throw "Probe sensing ray has no finite differential motion";
+        var acceleration = compiler.maxAcceleration[joint];
+        var bound = arm.group.limitsOf(joint).maxAcceleration;
+        if (bound != null && Math.isFinite(bound) && bound > 0) acceleration = Math.min(acceleration, bound);
+        hold += levers[joint] * Math.abs(rate) * reactionSeconds;
+        brake += levers[joint] * rate * rate / (2 * acceleration);
+      }
+      // Rationalized positive quadratic root avoids cancellation at low braking distances.
+      var allowed = brake > 0 ? 2 * budget / (hold + Math.sqrt(hold * hold + 4 * brake * budget))
+        : hold > 0 ? budget / hold : requested;
+      speed = Math.min(speed, allowed);
+    }
+    if (!Math.isFinite(speed) || !(speed > 0)) throw "Probe sensing ray has no positive safe speed";
+    return speed;
   }
 
   /** Reject an obstructed predicted per-joint deadline brake from the current measured motion. */

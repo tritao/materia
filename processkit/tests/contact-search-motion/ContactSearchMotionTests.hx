@@ -84,6 +84,22 @@ class ContactSearchMotionTests {
       var wire = new processkit.ProbeWireClearance(arm, tool.id, Transform3.identity(), 0.001, 0.015,
         [{name: "fixture", link: base.id, vertices: cube(0.015), tool: false}]);
       var wireGuarded = new ProbeMotionPlanner(arm, planning.compiler, null, wire);
+      var safeSpeed = wireGuarded.sensingSpeed([0.0], new Vec3(0, 0, 1), 0.04, 0.02, 0.0005);
+      check(safeSpeed > 0 && safeSpeed < 0.02, "Calibration and CAD wire extent bound requested sensing speed");
+      check(safeSpeed * 0.04 + safeSpeed * safeSpeed / 2 <= 0.0005 - planning.compiler.ikTolerance.position - wire.envelopeExcess + 1e-10,
+        "The derived prismatic speed fits the entire deadline and braking travel inside touch stand-off");
+      check(wireGuarded.sensingSpeed([0.0], new Vec3(0, 0, 1), 0.04, 0.02, 0.0005, 0.08) < safeSpeed,
+        "A longer command deadline reduces safe sensing speed");
+      check(wireGuarded.sensingSpeed([0.0], new Vec3(0, 0, 1), 0.04, 0.02, 0.001) > safeSpeed,
+        "A larger calibrated stand-off permits faster sensing");
+      var missingReserve = false;
+      try wireGuarded.sensingSpeed([0.0], new Vec3(0, 0, 1), 0.04, 0.02, 0)
+        catch (_:Dynamic) missingReserve = true;
+      check(missingReserve, "A physical wire cannot invent a sensing stand-off when calibration is absent");
+      missingReserve = false;
+      try wireGuarded.sensingSpeed([0.0], new Vec3(0, 0, 1), 0.04, 0.02, 0.0001)
+        catch (_:Dynamic) missingReserve = true;
+      check(missingReserve, "Calibration smaller than the geometry and IK reserve cannot authorize sensing");
       check(wireGuarded.violation([0.0]) == null, "The CAD wire is initially clear of the fixture");
       check(wireGuarded.violation([0.012]) != null, "Air clearance includes the wire beyond the nozzle");
       check(wireGuarded.violation([0.0135], true) == null, "Calibrated near-contact sensing permits the wire to approach without penetration");
@@ -241,6 +257,8 @@ class ContactSearchMotionTests {
       var request = prepared.prepare(new Vec3(0.35, 0.2, 0.15), normal, 0.02, start, 0.0005);
       check(request.approach.rotation.rotate(new Vec3(0, 0, 1)).sub(normal.scale(-1)).norm() < 1e-8,
         "Six-axis preparation aligns the wire with each independent CAD normal");
+      var speed = prepared.motion.sensingSpeed(cast request.approachJoints, request.direction, request.distance, 0.01, request.contactOffset);
+      check(speed > 0 && speed <= 0.01, "Each checked six-axis sensing branch has a positive bounded stopping speed");
       var move = prepared.motion.approachJoints(cast request.approachJoints, start);
       check(fixture.arm.tcpPose(move.endJoints).translation.sub(request.approach.translation).norm() < 0.0001,
         "Six-axis checked approach reaches the prepared uncertain contact pose");

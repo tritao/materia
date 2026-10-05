@@ -2182,3 +2182,32 @@ relaxed. The focused native probe suite passes 65 assertions, including named wi
 findings. Production diagnosis must distinguish stopping-speed limits from a contact patch
 whose required sensing motion cannot clear another body before changing policy. Main and
 P3 completion status remain unchanged.
+
+The named-violation retry reproduced the seventh-touch failure: the conservative wire
+against work/beam reached zero separation during predicted deadline braking. Observed joints
+were 0.3258992621434045, 0.89290211905716, 1.1071958311472911, 2.361256812989156,
+-3.417395752561875, 2.5245429725158504; velocities were 0.00040074658884161794,
+-0.026254886297125357, -0.0693552988105068, 0.011303023065705617,
+0.030346696573941727, 0.03264635749882565. The deterministic retry terminated with exit 1.
+No clearance, sensing threshold or stop guard was weakened.
+
+ProbeMotionPlanner now derives a sensing-speed upper bound instead of assuming the requested
+coarse speed can always stop inside the calibrated touch stand-off. It walks the checked IK
+branch in existing 1 mm corridor steps and solves unit normal differential motion. A sum of
+CAD joint-to-joint lengths plus the distal wire extent bounds rotational lever arms; bounded
+distal prismatic strokes are included, and prismatic rates contribute directly. Independent
+joint deadline/braking travel therefore has a conservative path-length bound quadratic in
+TCP speed. The rationalized positive root caps the requested speed at each corridor sample.
+The reaction budget includes maximum sensor age and command keepalive (20 ms each); IK
+position tolerance and the circumscribed wire-box excess are reserved from calibration.
+A physical wire without a positive sufficient stand-off is rejected. Actual measured-joint
+braking collision checks remain in force, so this speed estimate cannot override them.
+
+The executed probe selects its speed before creating the fresh servo owner, for coarse and
+fine searches. Requested recipe speeds and saved formats are unchanged; only the new P3
+registration can take longer because the effective sensing speed respects stopping geometry.
+Fixed welding and arm mission paths do not use this policy. Focused native tests pass 74
+assertions: complete refined probing still succeeds, three six-axis sensing branches have
+positive bounded speeds, the prismatic deadline/brake travel fits its reserve, longer reaction
+reduces speed, larger calibration permits more speed, and absent/insufficient wire calibration
+fails. Production validation with derived speed remains pending.

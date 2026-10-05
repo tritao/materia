@@ -32,6 +32,8 @@ private class WireObstacle {
 /** The unconsumed CAD wire must stay clear in air and cannot penetrate solids during touch sensing. */
 class ProbeWireClearance {
   public final arm:Manipulator;
+  /** Extra radial reach of the conservative box beyond the CAD wire cylinder. */
+  public final envelopeExcess:Float;
   final links:Array<LinkId>;
   final obstacles:Array<WireObstacle> = [];
   final corners:Array<Float> = [];
@@ -47,6 +49,7 @@ class ProbeWireClearance {
     this.arm = arm; this.airMargin = airMargin;
     links = [link];
     var half = diameter / 2;
+    envelopeExcess = (Math.sqrt(2) - 1) * half;
     // A circumscribed box is conservative for the cylindrical wire, including its end cap.
     for (x in [-half, half]) for (y in [-half, half]) for (z in [-stickout, 0.0]) {
       var point = tip.transformPoint(new Vec3(x, y, z));
@@ -70,6 +73,17 @@ class ProbeWireClearance {
       result.push(point.x); result.push(point.y); result.push(point.z);
     }
     return result;
+  }
+
+  /** A posture-independent distal lever bound is built from the rigid wire's extent at zero joints. */
+  public function extentFrom(q:Array<Float>, origin:Vec3):Float {
+    var pose = arm.linkPoses(q, [links[0]])[0];
+    var far = 0.0;
+    for (index in 0...Std.int(corners.length / 3)) {
+      var at = pose.transformPoint(new Vec3(corners[3 * index], corners[3 * index + 1], corners[3 * index + 2]));
+      far = Math.max(far, at.sub(origin).norm());
+    }
+    return far;
   }
 
   public function violation(q:Array<Float>, contact:Bool = false):Null<ClearanceViolation> {
