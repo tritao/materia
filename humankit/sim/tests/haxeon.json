@@ -8,7 +8,7 @@
     "humankit-facility": { "path": "../../facility" },
     "animkit": { "path": "../../../animkit" },
     "scenekit": { "path": "../../../scenekit" },
-    "nativekit": { "path": "../../../nativekit" }
+    "haxeon-platform": { "path": "../../../haxeon/packages/platform" }
   },
   "native": {
     "cmake": {

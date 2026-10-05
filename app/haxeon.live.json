@@ -15,8 +15,8 @@
     "manufacturingkit": {
       "path": "../manufacturingkit"
     },
-    "nativekit": {
-      "path": "../nativekit"
+    "haxeon-platform": {
+      "path": "../haxeon/packages/platform"
     },
     "cadkit": {
       "path": "../cadkit"

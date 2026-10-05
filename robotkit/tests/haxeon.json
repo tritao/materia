@@ -9,8 +9,8 @@
     "../../sensorkit/sensor_io/haxe"
   ],
   "dependencies": {
-    "nativekit": {
-      "path": "../../nativekit"
+    "haxeon-platform": {
+      "path": "../../haxeon/packages/platform"
     },
     "robotkit": {
       "path": ".."

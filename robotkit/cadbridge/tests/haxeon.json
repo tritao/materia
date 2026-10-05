@@ -11,8 +11,8 @@
     "../../../machinekit/examples/robot-arm"
   ],
   "dependencies": {
-    "nativekit": {
-      "path": "../../../nativekit"
+    "haxeon-platform": {
+      "path": "../../../haxeon/packages/platform"
     },
     "projectkit": {
       "path": "../../../projectkit"

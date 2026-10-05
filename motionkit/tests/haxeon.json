@@ -21,8 +21,8 @@
     "motionkit-robot": {
       "path": "../robot"
     },
-    "nativekit": {
-      "path": "../../nativekit"
+    "haxeon-platform": {
+      "path": "../../haxeon/packages/platform"
     },
     "robotkit": {
       "path": "../../robotkit"

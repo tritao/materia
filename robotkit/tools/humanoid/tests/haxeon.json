@@ -9,8 +9,8 @@
     "../src"
   ],
   "dependencies": {
-    "nativekit": {
-      "path": "../../../../nativekit"
+    "haxeon-platform": {
+      "path": "../../../../haxeon/packages/platform"
     },
     "robotkit": {
       "path": "../../.."

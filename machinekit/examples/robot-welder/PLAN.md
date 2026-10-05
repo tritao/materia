@@ -2338,3 +2338,22 @@ or disk failure. Resolving it requires the matching package sources/pin to land 
 on main; the user prohibits changing submodule pins here. Stop at this new outside-scope
 boundary. The transport runtime check and all remaining P3 checks are still pending; no
 new passing build or runtime result is claimed.
+
+### Authorized extracted-package repair (2026-10-05)
+
+The user authorized the narrow Haxeon pin exception after the missing-package stop.
+Haxeon now records be53817d9ab611072b95ecee49513e6fcb529e38, which supplies the
+platform/GPU extraction required by main. Direct first-party Haxe dependencies on
+NativeKit now use haxeon-platform; SceneKit/UIKit already own their haxeon-gpu
+dependencies. Native CMake providers remain unchanged. This gives each FFI interface
+one package owner, rather than filtering duplicate declarations or adding compatibility.
+
+Focused integration compilation passes (665 sources), its native build passes, and
+the outbound scheduler runtime passes latest-wins/fairness with exact received payloads.
+This validates the projected receive buffer repair. The complete app compiler-only
+build passes (1,936 sources, 29.3 s). MCAP and LZ4 were initialized at main's recorded
+pins for the native build; neither pin changed. Disk was checked before native builds;
+OCCT was not rebuilt. Logs are ignored app/build/p3-platform-*.log.
+
+P3 execution gates remain pending; these prerequisite passes do not complete P3 or
+authorize advancing main. P4/P5 remain open.
