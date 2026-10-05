@@ -2085,3 +2085,24 @@ reset wheel odometry, copy the physical root into the registration prior, or res
 epochs. A consistent post-jump observation precedes planning, while the same stale wheel pose
 and injected parking uncertainty remain inputs to contact registration. No simulation/runtime
 source change was needed. The new full registration retry is pending.
+
+### P3 checked sensing branch and direct approach preference (2026-10-05)
+
+Preparation now retains its checked joint goal in the runtime contact request. Execution
+checks an air route to that same configuration, verifies the resulting TCP against both IK
+tolerances and rechecks continuation through the complete bounded sensing corridor before
+submitting movement. Manually supplied TCP requests receive the same executed-corridor check.
+This closes the previous mismatch where execution could select a different IK branch from
+the one proved during preparation. These requests are ephemeral; no saved format changed.
+
+Approach policy tries checked direct IK alternatives across the existing torch rolls before
+spending the bounded detour budget. Rolls retain their nearest-orientation order within each
+pass. If no direct approach has a reachable sensing corridor, the complete original detour
+search remains the fallback. Clearance sampling, wire guards and the 1,024-proposal detour
+budget are unchanged. This is a ProcessKit planning choice, not a runtime or CAD exception.
+
+The focused native probe suite passes 64 assertions, including retained joint goals, manual
+corridor rejection, mismatched-goal rejection before motion and obstructed direct approaches.
+The rejection tests publish the queued stop before retrying; otherwise the native owner is
+correctly unavailable for a new plan. Compiler-only builds use existing native libraries.
+The production P3 retry remains outstanding; main has not advanced.

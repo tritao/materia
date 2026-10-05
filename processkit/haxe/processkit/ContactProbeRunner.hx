@@ -24,9 +24,10 @@ class ContactProbeRequest {
   public final fineSpeed:Float;
   public final backoff:Float;
   public final contactOffset:Float;
+  public final approachJoints:Null<Array<Float>>;
 
   public function new(approach:Transform3, direction:Vec3, distance:Float, coarseSpeed:Float = 0.01,
-      fineSpeed:Float = 0.0005, backoff:Float = 0.002, contactOffset:Float = 0.0) {
+      fineSpeed:Float = 0.0005, backoff:Float = 0.002, contactOffset:Float = 0.0, ?approachJoints:Array<Float>) {
     if (approach == null || direction == null || !Math.isFinite(direction.norm()) || direction.norm() < 1e-12 ||
         !Math.isFinite(distance) || !(distance > 0) || !Math.isFinite(coarseSpeed) || !(coarseSpeed > 0) ||
         !Math.isFinite(fineSpeed) || !(fineSpeed > 0) || fineSpeed > coarseSpeed || !Math.isFinite(backoff) ||
@@ -34,6 +35,7 @@ class ContactProbeRequest {
       throw "Contact probe needs a prepared pose, finite bounded search and calibrated refinement";
     this.approach = approach; this.direction = direction.normalized(); this.distance = distance;
     this.coarseSpeed = coarseSpeed; this.fineSpeed = fineSpeed; this.backoff = backoff; this.contactOffset = contactOffset;
+    this.approachJoints = approachJoints == null ? null : approachJoints.copy();
   }
 }
 
@@ -81,7 +83,14 @@ class ContactProbeRunner {
     try {
       sourceClock = motion.robot.snapshot().sourceClockId;
       motion.reset();
-      var move = planner.approach(request.approach, positions());
+      var goal = request.approachJoints;
+      var move = goal == null ? planner.approach(request.approach, positions()) : planner.approachJoints(goal, positions());
+      var at = planner.arm.tcpPose(move.endJoints);
+      if (at.translation.sub(request.approach.translation).norm() > planner.compiler.ikTolerance.position ||
+          at.rotation.angularDistance(request.approach.rotation) > planner.compiler.ikTolerance.orientation)
+        throw "Prepared probe joint goal does not match its TCP approach";
+      if (!planner.corridorReachable(move.endJoints, request.direction, request.distance))
+        throw "Probe sensing corridor leaves the executed IK branch";
       // These records precede every movement; stop policy also keeps them safe through servo ownership.
       var ops:Array<MotionOp> = [MotionOp.SetOutput(channels.wireSpeed, EventValue.Analog(0.0)),
         MotionOp.SetOutput(channels.arc, EventValue.Digital(false))];

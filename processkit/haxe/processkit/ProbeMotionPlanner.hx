@@ -14,6 +14,7 @@ import robotkit.manipulation.ArmClearance;
 import robotkit.manipulation.ArmClearance.ClearanceViolation;
 import robotkit.manipulation.JointRoute;
 import robotkit.spatial.Transform3;
+import robotkit.spatial.Vec3;
 import robotkit.model.JointType;
 
 /** A complete checked air move; its end state comes from the compiled trajectory. */
@@ -99,6 +100,22 @@ class ProbeMotionPlanner {
   public function approach(target:Transform3, start:Array<Float>, proposals:Int = 1024):CheckedProbeMove {
     if (target == null || start == null || start.length != arm.group.count() || proposals < 1)
       throw "Probe approach needs a target, joint start and positive search budget";
+    return approachCandidates(goalsFor(target, start), start, proposals);
+  }
+
+  /** Try all checked direct IK alternatives before committing to a detour search. */
+  public function directApproach(target:Transform3, start:Array<Float>):CheckedProbeMove {
+    if (target == null || start == null || start.length != arm.group.count())
+      throw "Direct probe approach needs a target and matching joint start";
+    for (goal in goalsFor(target, start)) {
+      if (!edge(start, goal)) continue;
+      var program = new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(goal), new MotionOptions(), Blend.ExactStop)]);
+      return new CheckedProbeMove(program, inspect(program, start, false));
+    }
+    throw "Probe approach has no checked direct IK configuration";
+  }
+
+  function goalsFor(target:Transform3, start:Array<Float>):Array<Array<Float>> {
     var requested = pose(target);
     var goals = compiler.solver.sampleCandidates(requested, 12, compiler.ikTolerance);
     var continued = compiler.solver.solvePose(requested, start, compiler.ikTolerance);
@@ -109,6 +126,17 @@ class ProbeMotionPlanner {
       return result;
     }
     goals.sort((a, b) -> Reflect.compare(cost(a), cost(b)));
+    return goals;
+  }
+
+  /** Preserve the configuration whose bounded sensing corridor was checked during preparation. */
+  public function approachJoints(goal:Array<Float>, start:Array<Float>, proposals:Int = 1024):CheckedProbeMove {
+    if (goal == null || start == null || goal.length != arm.group.count() || start.length != goal.length || proposals < 1)
+      throw "Probe joint approach needs matching configurations and a positive search budget";
+    return approachCandidates([goal.copy()], start, proposals);
+  }
+
+  function approachCandidates(goals:Array<Array<Float>>, start:Array<Float>, proposals:Int):CheckedProbeMove {
     var lower = [for (i in 0...arm.group.count()) arm.group.limitsOf(i).lower];
     var upper = [for (i in 0...arm.group.count()) arm.group.limitsOf(i).upper];
     var reasons:Array<String> = [];
@@ -124,6 +152,22 @@ class ProbeMotionPlanner {
     }
     throw goals.length == 0 ? "Probe approach has no reachable IK configuration"
       : 'Probe approach exhausted its checked candidates: ${reasons.join("; ")}';
+  }
+
+  /** Continue from the actual checked joint goal through the whole bounded search ray. */
+  public function corridorReachable(start:Array<Float>, direction:Vec3, distance:Float):Bool {
+    if (start == null || start.length != arm.group.count() || direction == null || Math.abs(direction.norm() - 1) > 1e-8 ||
+        !Math.isFinite(distance) || !(distance > 0)) throw "Probe corridor needs observed joints, a unit direction and finite distance";
+    var from = arm.tcpPose(start);
+    var q = start.copy();
+    var steps = Std.int(Math.max(1.0, Math.ceil(distance / 0.001)));
+    for (step in 1...steps + 1) {
+      var at = from.translation.add(direction.scale(distance * step / steps));
+      var next = compiler.solver.solvePose(pose(new Transform3(at, from.rotation)), q, compiler.ikTolerance);
+      if (next == null) return false;
+      q = next;
+    }
+    return true;
   }
 
   /** Reject an obstructed predicted per-joint deadline brake from the current measured motion. */

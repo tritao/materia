@@ -59,22 +59,15 @@ class ProbePosePlanner {
     var approachPoint = point.add(outward.scale(normalTravel + airMargin));
     var distance = 2 * normalTravel + airMargin;
     var reasons:Array<String> = [];
-    for (rotation in candidates) {
+    for (pass in 0...2) for (rotation in candidates) {
       try {
         var approach = new Transform3(approachPoint, rotation);
-        var request = new ContactProbeRequest(approach, outward.scale(-1), distance, 0.01, 0.0005, 0.002, contactOffset);
-        var checked = motion.approach(approach, start);
+        var checked = pass == 0 ? motion.directApproach(approach, start) : motion.approach(approach, start);
         // Contact is not yet localized, so a nominal contact move could penetrate the real plane.
         // Check corridor kinematics here; CAD region screening and measured servo/brake checks own obstruction checks.
-        var q = checked.endJoints.copy();
-        var steps = Std.int(Math.max(1.0, Math.ceil(distance / 0.001)));
-        for (step in 1...steps + 1) {
-          var at = approachPoint.sub(outward.scale(distance * step / steps));
-          var next = motion.compiler.solver.solvePose(pose(new Transform3(at, rotation)), q, motion.compiler.ikTolerance);
-          if (next == null) throw "Probe sensing corridor leaves the reachable IK branch";
-          q = next;
-        }
-        return request;
+        if (!motion.corridorReachable(checked.endJoints, outward.scale(-1), distance))
+          throw "Probe sensing corridor leaves the reachable IK branch";
+        return new ContactProbeRequest(approach, outward.scale(-1), distance, 0.01, 0.0005, 0.002, contactOffset, checked.endJoints);
       } catch (error:Dynamic) reasons.push(Std.string(error));
     }
     throw 'Probe has no checked reachable normal orientation: ${reasons.join("; ")}';
