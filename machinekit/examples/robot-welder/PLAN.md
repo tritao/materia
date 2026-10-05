@@ -2319,3 +2319,22 @@ P3 is not complete and mobile-welder has not advanced main. Latest focused nativ
 main merge; no latest-main runtime pass is claimed. Full-mission, 20 mm/2-degree executed
 boundary and final welder/arm/mobile/MachineKit gates remain pending. P4/P5 remain open.
 All production trials are stopped; no heavy check is left running.
+
+### Authorized transport repair and package-boundary stop (2026-10-05)
+
+The user authorized repairing the transport prerequisite. NativeTransport.receive now passes
+its allocated Bytes buffer to nk_transport_receive without a separate capacity argument: the
+tracked input-array FFI projection derives that count from the buffer. Buffer allocation,
+partial-result slicing and would-block/error handling are unchanged. No compatibility API
+or NativeKit pin change was introduced. git diff --check passes.
+
+The focused robotkit/tests/integration compiler-only build is blocked before compilation by:
+haxeon: Package "haxeon-gpu" path source does not exist:
+/home/joao/dev/materia-worktrees/mobile-welder/haxeon/packages/gpu
+Log: ignored app/build/p3-transport-integration-build.log. Main’s scenekit/uikit descriptors
+require this extracted package, but recorded Haxeon 99893ce3031fea2569ab076c52da87b5278719a8
+has no packages tree and no GPU package submodule. This is not an uninitialized dependency
+or disk failure. Resolving it requires the matching package sources/pin to land consistently
+on main; the user prohibits changing submodule pins here. Stop at this new outside-scope
+boundary. The transport runtime check and all remaining P3 checks are still pending; no
+new passing build or runtime result is claimed.
