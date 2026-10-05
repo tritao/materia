@@ -42,6 +42,13 @@ typedef MillAxisSpec = {
 	var holdingBrake:Bool;
 }
 
+/** Installed parts of one axis; references are shared with the mechanical assembly. */
+typedef MillAxisDrive = {
+	var spec:MillAxisSpec;
+	var screw:BallScrew;
+	var motor:ServoMotor;
+}
+
 /** Table X and saddle Y move opposite the tool's work coordinates; the head moves along Z.
  * All mates are solved from the zero poses, as on the router. The rails, screw supports and
  * current motor parts decide room, speed and acceleration every time the machine is compiled.
@@ -66,6 +73,7 @@ class BenchMill extends MachineAssembly {
 		{id: "y", lower: 0, upper: 150, initial: 75, holdingBrake: false},
 		{id: "z", lower: -250, upper: 0, initial: 0, holdingBrake: true}
 	];
+	public final axisDrives:Array<MillAxisDrive> = [];
 	public final tableTop:Float;
 	public final gaugeZero:AssemblyFrame;
 	final zeroPoses = new Map<String, AssemblyFrame>();
@@ -214,6 +222,7 @@ class BenchMill extends MachineAssembly {
 		var motorId = "motor" + spec.id.toUpperCase();
 		var motor = ServoMotor.model(spec.id == "z" ? "GENERIC-SERVO-750W" : "GENERIC-SERVO-400W");
 		var screw = new BallScrew(length), nut = new BallNut();
+		axisDrives.push({spec: spec, screw: screw, motor: motor});
 		var coupling = new ShaftCoupling(motor.rating.shaftDiameter, BallScrew.JOURNAL_DIAMETER);
 		var shaftLength = motor.rating.shaftLength;
 		// The shaft seats through side A to the sleeve midpoint; side B seats on the screw.

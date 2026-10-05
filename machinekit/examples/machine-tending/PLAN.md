@@ -170,7 +170,7 @@ Surveyed 2026-10-03 on local main 1048bf768, plus the `mobile-welder` and `x7-tr
 | Structure | Cast base, column bolted to the base's back, saddle (Y) on the base, table (X) on the saddle, head (Z) on the column |
 | Rails | HGR15 on all axes (new catalogue rows) |
 | Screws | Ball screws SFU1605 (Ø16, lead 5, preloaded), BK12 fixed end and BF12 support end |
-| Axis drives | 400 W servos (new row, marked assumed), direct coupling. Z keeps its holding brake as a property. |
+| Axis drives | X/Y 400 W and Z 750 W assumed servos, direct coupling (R2). The physical Z brake remains open in the review-fix R3 group. |
 | Spindle | ER20 cartridge, max 10 000 rpm, 1.1 kW motor, HTD-5M belt 1:1. The spindle is a continuous joint driven by `spindle.speed`. |
 | Enclosure | Steel panels on a chip tray, front frame around a 450 × 400 mm opening, sliding door with a polycarbonate window |
 | Door | Door on a guide rail, moved by a pneumatic cylinder (Ø25, stroke 460). Door-closed safety switch plus a reed switch at each end of the cylinder. |
@@ -771,6 +771,19 @@ MT0 ─┬─ MT1 ── MT2 ─┬─ MT4 (reach study) ─┐
 - MT5 is independent of controllers, but the gripper (MT8) and the vise and door actuation need it.
 - MT6 needs X8 wiring.
 - MT10 needs everything before it.
+
+**Articulated inertia and joint-plan admission (MT5b follow-up).**
+
+Done. What was built and decided:
+
+- Use every carried link in the neutral inertia estimate; simulation feedforward uses the live articulated mass matrix, including cross-axis terms, projected through nominal transmission coordinates. Remove unused scalar inertia from native targets and blueprints and migrate callers/bindings without a compatibility path.
+- Admit mission joint moves only after checking their timed polynomials against the controllers' mechanical hulls. A speed bound controls interior sampling; this is a sampled check, not a continuous collision certificate. Require actual velocity limits, and keep installed mill drive references typed.
+- Check a compiled G54-zero move against stock/spindle geometry; check posed doorway bounds, numeric casting masses, exported cobot limits and CAD overlap at zero/ready poses.
+- The complete `review-inertia-clearance` gate passed every suite and app checks. RobotKit 4,999; MotionKit 67,535; CadBridge 157; CncKit 317; CamKit 12,311; ProjectKit 144; ProcessKit 23 + weld-path 19; StockKit 100,673 + 17,494 reference rays. Native runtime/MuJoCo checks passed.
+- At 10 ms the bare/enclosed mill remains 51.77/52.49 s with X/Y/Z peaks 0.077237/0.051505/0.053502 mm. Rapids remain 15.0955/25/22.8666 m/min. Door and seated-blank clamp remain 1.50/1.79 s and 0.08 s at 482.55 N.
+- Cobot cycles remain 2.06 s. Reach500/850/900/1300 peaks change to 0.004640/0.005987/0.011236/0.016598 mrad because feedforward now includes the complete articulated inertia. Other MT6/R2 motion baselines remain unchanged.
+- Reach stays Reach850, 600 mm riser, 15 poses and 16.2399% minimum joint margin. R2's separate spindle motor increases the cell from 15 to 16 disjoint joints.
+- The physical brake, remaining environment/limit checks and support geometry are still open in [REVIEW_FIXES.md](REVIEW_FIXES.md). This checkpoint does not finish those review groups.
 
 ## Progress
 

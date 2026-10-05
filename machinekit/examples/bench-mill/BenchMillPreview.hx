@@ -106,16 +106,10 @@ class BenchMillChecks {
 		if (mountOverlap(mill, state, "screwXNutBracket", "table", 0, 0, 0.05) < 1 ||
 			mountOverlap(mill, state, "screwYNutBracket", "saddle", 0, -0.05, 0) < 1)
 			throw "The X/Y nut brackets lack finite bearing faces on their moving castings";
-		for (spec in mill.specs) {
+		for (drive in mill.axisDrives) {
+			var spec = drive.spec, screw = drive.screw, motor = drive.motor;
 			if (!(mill.axisOvertravel(spec.id) > 0)) throw "Mill rail has no overtravel";
 			var suffix = spec.id.toUpperCase();
-			var screw:machinekit.motion.BallScrew = null;
-			var motor:machinekit.motion.ServoMotor = null;
-			for (entry in mill.components()) {
-				if (entry.id == "screw" + suffix) screw = cast entry.component;
-				if (entry.id == "motor" + suffix) motor = cast entry.component;
-			}
-			if (screw == null || motor == null) throw "Mill axis has no screw or servo";
 			var couplingId = "screw" + suffix + "Coupling", shaftId = "motor" + suffix + "Shaft";
 			var sleeve = state.worldPose(couplingId);
 			var axis = AssemblyFrames.transformVector(sleeve, 0, 0, 1);
@@ -126,7 +120,7 @@ class BenchMillChecks {
 			var dx = shaftEnd.x - midpoint.x, dy = shaftEnd.y - midpoint.y, dz = shaftEnd.z - midpoint.z;
 			if (start > 1e-6 || depth <= 5 || dx * dx + dy * dy + dz * dz > 1e-12)
 				throw '${spec.id} motor shaft does not seat into its coupling';
-			var rapid = Math.min(screw.criticalSpeed(Fixed, Simple), motor.rating.maxSpeed) * 5 / (2 * Math.PI);
+			var rapid = Math.min(screw.criticalSpeed(Fixed, Simple), motor.rating.maxSpeed) * screw.thread.lead / (2 * Math.PI);
 			if (rapid < 8000.0 / 60) throw '${spec.id} rapid is below 8 m/min';
 			trace('Mill ${spec.id}: ${rapid * 60 / 1000} m/min source-derived rapid, ${mill.axisOvertravel(spec.id)} mm overtravel');
 		}
@@ -223,8 +217,10 @@ class EnclosedMillChecks {
 		if (openLeft <= cell.opening.x + cell.openingWidth / 2)
 			throw "Open door does not clear the opening";
 		state.setJoint("mill/z", cell.mill.specs[2].upper);
-		var head = state.worldPose("mill/head");
-		if (head.z < cell.opening.z + cell.openingHeight) throw "Retracted head crosses the doorway";
+		var head = BenchMillChecks.posed(cell, state, "mill/head");
+		var headBottom = head.shape.bounds().get_min().get_z();
+		head.close();
+		if (headBottom < cell.opening.z + cell.openingHeight) throw "Retracted head casting crosses the doorway";
 		var vise = cell.mill.vise;
 		if (vise == null) throw "Enclosed mill has no vise";
 		var processDefinition = state.definition;
@@ -286,11 +282,35 @@ class EnclosedMillChecks {
 		fixedFace = state.worldPose("mill/vise/fixedJaw").y + vise.fixedJaw.depth / 2;
 		if (Math.abs(datum.x - stop.x - vise.endStop.width / 2) > 1e-9 || Math.abs(datum.y - fixedFace) > 1e-9 ||
 			Math.abs(datum.z - parallel.z - vise.parallels.height) > 1e-9) throw "Datum does not lie on the actual locating faces";
-		var gauge = state.worldConnector("mill/spindle", "gaugeLine");
 		var offset = cell.mill.workOffset();
-		if (Math.abs(offset[0] - datum.x + gauge.x) > 1e-9 || Math.abs(offset[1] - datum.y + gauge.y) > 1e-9 ||
-			Math.abs(offset[2] - datum.z - BenchMill.STOCK_HEIGHT + gauge.z) > 1e-9)
-			throw "G54 does not follow the vise datum";
+		var probeController = new cnckit.CncController();
+		probeController.setWorkOffset(54, offset[0] / 1000, offset[1] / 1000, offset[2] / 1000);
+		var probe = cnckit.CncCompiler.compileDetailed("G21 G90 G54\nG0 X0 Y0 Z0\nM2",
+			probeController, new toolpathkit.path.Point3(0, 0, 0));
+		if (probe.diagnostics.length != 0) throw "G54 datum probe does not compile";
+		var commanded:Null<toolpathkit.path.Point3> = null;
+		var probeFrame = toolpathkit.path.ToolpathFrame.of(probe.program);
+		for (op in probe.program.ops) {
+			probeFrame.advance(op);
+			switch op {
+				case Move(_, geometry, _, _, _):
+					var machineGeometry = toolpathkit.path.GeometryOffset.translate(geometry, probeFrame.toMachine());
+					commanded = toolpathkit.path.GeometryTools.pointAt(machineGeometry, toolpathkit.path.GeometryTools.length(machineGeometry));
+				case MachineMove(_, geometry, _, _, _):
+					commanded = toolpathkit.path.GeometryTools.pointAt(geometry, toolpathkit.path.GeometryTools.length(geometry));
+				case _:
+			}
+		}
+		if (commanded == null) throw "G54 datum probe produced no machine move";
+		state.setJoint("mill/x", commanded.x * 1000);
+		state.setJoint("mill/y", commanded.y * 1000);
+		state.setJoint("mill/z", commanded.z * 1000);
+		var probeDatum = state.worldConnector("mill/vise/body", "datum");
+		var probeGauge = state.worldConnector("mill/spindle", "gaugeLine");
+		if (Math.abs(probeDatum.x - probeGauge.x) > 1e-6 || Math.abs(probeDatum.y - probeGauge.y) > 1e-6 ||
+			Math.abs(probeDatum.z + BenchMill.STOCK_HEIGHT - probeGauge.z) > 1e-6)
+			throw "Compiled G54 zero does not align the spindle gauge with the seated stock datum";
+		for (spec in cell.mill.specs) state.setJoint("mill/" + spec.id, 0);
 		var scene = SceneArtifact.decode(BenchMillPreview.enclosed());
 		var job = scene.machining;
 		if (job == null) throw "Enclosed mill has no CNC job";

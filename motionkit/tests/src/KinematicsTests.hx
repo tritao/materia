@@ -122,6 +122,63 @@ import MotionKitTestSupport.TrialRig;
 class KinematicsTests extends MotionKitTestSupport {
   public function new() { super(); }
 
+  /** Clear endpoints do not permit a polynomial excursion through a fixed body. */
+  public function testJointPlanClearanceChecksInteriorExcursion():Void {
+    var model = new robotkit.model.RobotModel("clearance slide");
+    var base = model.addLink(new robotkit.model.Link("base"));
+    var tool = model.addLink(new robotkit.model.Link("tool"));
+    var joint = model.addJoint(new robotkit.model.Joint("slide", robotkit.model.JointType.Prismatic, base, tool));
+    joint.axis = [1, 0, 0];
+    var frame = model.addFrame(new robotkit.model.Frame("tool-frame", tool));
+    var arm = new Manipulator(model, base.id, frame.id);
+    var corners:Array<Float> = [];
+    for (corner in 0...8) {
+      corners.push((corner & 1) == 0 ? -0.01 : 0.01);
+      corners.push((corner & 2) == 0 ? -0.01 : 0.01);
+      corners.push((corner & 4) == 0 ? -0.01 : 0.01);
+    }
+    var clearance = new robotkit.manipulation.ArmClearance(arm, [
+      {name: "moving tool", link: tool.id, vertices: corners, tool: false},
+      {name: "fixed obstacle", link: base.id, vertices: corners, tool: false}
+    ], [-0.2]);
+    check(clearance.violation([-0.2]) == null && clearance.violation([0.2]) == null, "both excursion extrema are clear");
+    var trajectory = motionkit.trajectory.Trajectory.fromSegments([
+      {timeFromStartNs: Int64.ofInt(0), durationNs: Int64.ofInt(1000000000), coefficients: [[-0.2, 1.6, -1.6]]}
+    ]);
+    var limits = new motionkit.trajectory.ValidationLimits(1, Int64.ofInt(1), Int64.ofInt(1));
+    limits.position(0, -1, 1); limits.velocity(0, 2); limits.acceleration(0, 4); limits.jerk(0, 10);
+    var plan = motionkit.trajectory.ExecutionPlan.create(trajectory, limits, Int64.ofInt(1),
+      [-0.2], [1.6], [-3.2], [1e-6], [1e-6], [1e-6]);
+    var validator = new motionkit.robot.ArmPlanClearance(clearance, [0.001]);
+    var rejected = false;
+    try validator.fork().check(plan) catch (error:Dynamic) rejected = Std.string(error).indexOf("fixed obstacle") >= 0;
+    check(rejected, "timed polynomial clearance rejects an interior collision despite its returning endpoint");
+    plan.dispose(); trajectory.dispose();
+  }
+
+
+  public function testPathConfigurationSelector():Void {
+    var selector = new PathConfigurationSelector(new PlanarSolver(),
+      [for (_ in 0...6) -20.0], [for (_ in 0...6) 20.0],
+      [for (_ in 0...6) 2.0], [for (_ in 0...6) 1.0]);
+    var candidate = (x:Float) -> [x, 0.0, 0.0, 0.0, 0.0, 0.0];
+    var chosen = selector.select([0.0, 0.5, 1.0], [
+      [candidate(0.0), candidate(10.0)],
+      [candidate(1.0), candidate(9.0)], [candidate(10.0)]]);
+    near(chosen[0][0], 10.0, "Descartes avoids an unreachable nearest branch");
+    near(chosen[1][0], 9.0, "Descartes keeps the continuous branch");
+    var narrow = new PathConfigurationSelector(new PlanarSolver(),
+      [for (_ in 0...6) -20.0], [for (_ in 0...6) 20.0],
+      [for (_ in 0...6) 0.5], [for (_ in 0...6) 1.0]);
+    var message = "";
+    try narrow.select([0.0, 0.5, 1.0], [
+      [candidate(0.0), candidate(10.0)],
+      [candidate(1.0), candidate(9.0)], [candidate(10.0)]])
+    catch (error:Dynamic) message = Std.string(error);
+    check(message.indexOf("0.500000") >= 0,
+      "Descartes reports the first disconnected sample distance");
+  }
+
   /** One group serves several threads at once: each evaluates in data of its own. */
   public function testSharedGroupAcrossThreads():Void {
     var arm = buildContractArmFixture().arm;

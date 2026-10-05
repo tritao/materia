@@ -909,21 +909,9 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		 * Coupling stiffness in follower-coordinate effort per unit of follower travel.
 		 */
 		coupling_stiffness: array<f64, 512> @offset(280304);
-		/**
-<<<<<<< HEAD
-		 * Versioned command ownership: process joints accept no host or trajectory targets.
-		 */
+		/** Versioned command ownership: process joints accept no host or trajectory targets. */
 		process_joint: array<u32, 512> @offset(284400);
-		/**
-		 * Versioned metadata for joint switches and speed sensors; ordinary sensor slots use UINT32_MAX.
-=======
-		 * Versioned command ownership: process joints accept no host or trajectory targets.
-		 */
-		process_joint: array<u32, 512> @offset(288496);
-		/**
-		 * Versioned metadata for joint switches and speed sensors; ordinary sensor slots use UINT32_MAX.
->>>>>>> 0c733751b (Scope drive references and remove legacy runtime paths (machine tending MT5b))
-		 */
+		/** Versioned metadata for joint switches and speed sensors; ordinary sensor slots use UINT32_MAX. */
 		sensor_joint: array<u32, 8> @offset(286448);
 		sensor_window_lower: array<f64, 8> @offset(286480);
 		sensor_window_upper: array<f64, 8> @offset(286544);

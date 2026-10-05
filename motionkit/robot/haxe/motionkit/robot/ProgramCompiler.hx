@@ -80,6 +80,8 @@ class ProgramCompiler {
    * plan chunks run their checks at their submission boundaries.
    */
   public var planCheck:Null<PlanCheck> = null;
+  /** Checks the timed polynomial before it can enter the execution queue. */
+  public var planValidator:Null<PlanValidator> = null;
   /** Linear motor sums for machines whose axis velocities use the single-axis envelope. */
   public var motorSpace:Null<MotorSpaceConstraints> = null;
   /** Pure, worker-safe event scheduling on the actual timed path section.
@@ -120,6 +122,7 @@ class ProgramCompiler {
     if (planCheck != null) worker.planCheck = planCheck.fork();
     worker.configurationConstraint = configurationConstraint == null ? null :
       new ConfigurationConstraint(forked,configurationConstraint.configuration);
+    if (planValidator != null) worker.planValidator = planValidator.fork();
     worker.motorSpace = motorSpace;
     worker.pathEventSchedule = pathEventSchedule;
     return worker;
@@ -651,6 +654,8 @@ class ProgramCompiler {
         queries:taskProof==null?0:taskProof.queries,positionBound:taskProof==null?null:taskProof.positionBound,
         orientationBound:taskProof==null?null:taskProof.orientationBound}));
       mark("taskSpaceCheck");
+      var admission = planValidator;
+      if (admission != null) admission.check(completedPlan);
       var check = planCheck;
       if (check != null && check.checks()) {
         var result = check.check(completedPlan, pending.opIndex, pending.feed);

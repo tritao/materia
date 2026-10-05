@@ -28,6 +28,11 @@ class MotionKitBootstrapTests {
       Sys.println('Tool freedom tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
     }
+    if (Sys.getEnv("MOTIONKIT_CLEARANCE_ONLY") == "1") {
+      kinematicsTests.testJointPlanClearanceChecksInteriorExcursion();
+      Sys.println('Joint plan clearance tests passed (${MotionKitTestSupport.assertions} assertions)');
+      return;
+    }
     if (Sys.getEnv("MOTIONKIT_ARM_SESSION_ONLY") == "1") {
       programTests.testManipulatorSessionTransitions();
       Sys.println('Arm session tests passed (${MotionKitTestSupport.assertions} assertions)');
@@ -170,6 +175,7 @@ class MotionKitBootstrapTests {
       {name: "kinematicsTests.testCandidateProblem", run: () -> kinematicsTests.testCandidateProblem(), weight: 0.05},
       {name: "kinematicsTests.testRedundancySpline", run: () -> kinematicsTests.testRedundancySpline(), weight: 0.05},
       {name: "kinematicsTests.testOrientationDifferential", run: () -> kinematicsTests.testOrientationDifferential(), weight: 0.05},
+      {name: "kinematicsTests.testJointPlanClearanceChecksInteriorExcursion", run: () -> kinematicsTests.testJointPlanClearanceChecksInteriorExcursion(), weight: 1.0},
       {name: "programTests.testMotionProgramContracts", run: () -> programTests.testMotionProgramContracts(), weight: 0.05},
       {name: "programTests.testProgramCompiler", run: () -> programTests.testProgramCompiler(), weight: 0.1},
       {name: "programTests.testRedundantArmPaths", run: () -> programTests.testRedundantArmPaths(), weight: 0.3},

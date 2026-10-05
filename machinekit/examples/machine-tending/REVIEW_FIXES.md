@@ -9,9 +9,9 @@ current format, and remove obsolete paths. Reference hardware data remains expli
 |---|---|---|---|
 | R1 | One current assembly schema and runtime layout; migrate producers/tests; delete legacy defaults and dead helpers | done | `0121118f2` |
 | R2 | Motor/driver/supply sizing; real spindle belt transmission; motor shaft and coupling engagement; explicit screw root | done | `59791d003` |
-| R3 | Physical Z brake and fault sequencing; full downstream inertia feedforward | planned | |
-| R4 | Swept clearance for joint moves; assembled limits; independent geometry/mass/speed checks | planned | |
-| R5 | Per-joint servo interpolation; consistent slip; typed channel faults; cached coupling setup; qualified channels and two-mill check | done | |
+| R3 | Physical Z brake and fault sequencing; full downstream inertia feedforward | in progress: inertia implemented; brake remains | `6e94de72f` |
+| R4 | Swept clearance for joint moves; assembled limits; independent geometry/mass/speed checks | in progress: joint-plan clearance implemented | |
+| R5 | Per-joint servo interpolation; consistent slip; typed channel faults; cached coupling setup; qualified channels and two-mill check | done | `dd0c14091` |
 | R6 | Rail support/load paths, bearing walls, cabinet mounts and material assumptions; remaining diagnostics and dead code | planned | |
 
 ## Verification
@@ -67,3 +67,28 @@ Done. What was built and decided:
 - MachineKit smoke passed after all capability and nested-channel migrations. Toolpath motion: 18 assertions, accuracy 2, machining run 12, scenarios 2,952.
 - Native runtime tests passed, including mixed ordinary/servo timing, coupled followers, typed channel errors and fault isolation. Native MuJoCo tests passed, including rejection of truncated layouts and Hermite interval-end feedforward.
 - Mill application checks passed with physical readiness selected by the spindle's mechanical joint: bare/enclosed 51.77/52.49 s; X/Y/Z peaks 0.077237/0.051505/0.053502 mm. These match R2. Added full-job tracking and physical readiness checks.
+
+## R3 articulated inertia
+
+- The drive gain/stability estimate includes every descendant's rotated tensor and centre-of-mass parallel-axis term at the neutral configuration. It is explicitly a reference estimate.
+- Physics acceleration feedforward uses MuJoCo's live full mass matrix, including articulated cross terms and native payload attachments. Cached transmission nullspace coordinates lift motor reference accelerations to the mechanism and project the resulting effort back by virtual work. Parallel drives share effort by their capacity and leverage.
+- SimKit targets and the native robot blueprint no longer carry obsolete scalar reflected inertia. The estimate stays in Haxe for drive stability calculations. Native/Haxe callers and generated bindings use the new complete layouts; no previous-layout fallback remains.
+- Native MuJoCo tests pass with a 3 kg downstream attachment and a two-link arm at 0 and 90 degrees, verifying both shoulder and elbow effort. Interval-end feedforward remains zero.
+- Mill application checks pass without a changed baseline: bare/enclosed 51.77/52.49 s; X/Y/Z peaks 0.077237/0.051505/0.053502 mm at 10 ms. The physical brake and its sequencing remain to be implemented before R3 is complete.
+
+## R4 joint-plan admission
+
+- A typed plan validator checks the actual timed polynomial before submission, including its interior. A maximum-speed bound determines sample count for each segment, catching excursions whose endpoints return to the same place. This remains a sampled clearance check, not a continuous collision certificate.
+- Mission joint moves snapshot fixed cell geometry and other controllers' bodies at planning start. The worker uses the same immutable clearance policy. Moving obstacles still require runtime monitoring.
+- Joint moves require mechanical velocity limits and a typed mission frame; the cast and arbitrary 2 rad/s velocity fallback are removed.
+- Focused interior-excursion clearance regression: 2 assertions passed. The complete gate runs the registered regression and passes MotionKit at 67,535 assertions.
+- RobotKit passed at 4,999 assertions, including the downstream inertia estimate. All cobot missions still take 2.06 s; Reach500/850/900/1300 peaks become 0.004640/0.005987/0.011236/0.016598 mrad because acceleration feedforward now includes the complete articulated inertia.
+- Bench-mill checks retain typed installed drive references instead of casting component entries. Screw lead is read from the part; the doorway uses posed casting bounds; a compiled G54-zero probe is checked against actual stock and spindle locating geometry.
+- Cobot checks verify exported joint limits and CAD overlap at both zero and ready configurations. A full-turn periodic FK identity no longer masquerades as a joint-limit clearance check.
+
+## Verified checkpoint: articulated inertia and joint-plan admission
+
+- `mt-suite-review-inertia-clearance.txt`: every sequential kit, CadKit, MachineKit smoke, app build and complete project-source suite passed. Native runtime and MuJoCo checks passed against the rebuilt current layouts.
+- Compared with R2, mill and all existing example cycle baselines remain unchanged. Screw/belt router 232.2/215.2 s, 128 plans, 0.05/1.76 mm worst deviation; CoreXY 649.6 mm/s and 71.549 m/s²; arm 5.8/12/17.2/23.5 s; mobile mission/obstacle 61/65 s; welder 20.6/21.1 s and whole weldment 106.5 s.
+- Reach remains Reach850 on a 600 mm riser, with 15 poses and 16.2399% minimum joint margin. Door 1.50/1.79 s, seated blank clamp 0.08 s at 482.55 N. The cell has 16 disjoint joints: R2's separate spindle-motor rotation adds one to MT6's 15.
+- Open work: physical Z brake and fault sequencing (R3); remaining joint-limit and independent-environment clearance work (R4); rail/support sizing, bearing-block wall and cabinet mounts (R6). No new compiler defect was found.

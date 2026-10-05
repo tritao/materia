@@ -40,6 +40,7 @@ import processkit.skill.WeldSeam;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
 import robotkit.manipulation.ArmClearance;
+import motionkit.robot.ArmPlanClearance;
 import robotkit.manipulation.ArmClearance.ClearanceViolation;
 import robotkit.manipulation.Manipulator;
 import robotkit.model.Frame;
@@ -159,6 +160,7 @@ class MissionPlayer implements SessionMember {
   public var homingSeconds(default, null):Float = 0.0;
   var homingEncoders:Null<EncoderMonitor> = null;
   var homingSlip:Null<StepperSlip> = null;
+  final cellRobots:Array<AssemblyRobot>;
   var runner = new SkillRunner();
   var jointMotions = new Map<String, ManipulatorMotion>();
   /** The arm and its suction tool's vacuum sensor, when the mission picks and places. */
@@ -205,12 +207,13 @@ class MissionPlayer implements SessionMember {
   final idle = new PerceptionSnapshot();
 
   public function new(mission:SceneArtifactMission, robot:AssemblyRobot, simulation:Simulation, robotIndex:Int,
-      timestep:Float, obstacles:Array<FloorObstacle>, objects:Array<GripObject>, project:ProjectDocumentSession, weldAcceleration:Float = ARM_ACCELERATION, ?cellInput:String->Null<EventValue>) {
+      timestep:Float, obstacles:Array<FloorObstacle>, objects:Array<GripObject>, project:ProjectDocumentSession, cellRobots:Array<AssemblyRobot>, weldAcceleration:Float = ARM_ACCELERATION, ?cellInput:String->Null<EventValue>) {
     if (!Math.isFinite(weldAcceleration) || weldAcceleration <= 0.0 || weldAcceleration > ARM_ACCELERATION)
       throw "Invalid welding planning acceleration";
     if (mission.steps.length == 0) throw "A mission needs steps";
     this.mission = mission;
     this.robot = robot;
+    this.cellRobots = cellRobots.copy();
     this.timestep = timestep;
     this.cellInput = cellInput;
     this.obstacles = standing(obstacles);
@@ -345,16 +348,21 @@ class MissionPlayer implements SessionMember {
    * and 0.5 mm between tool and work at the seam; the arm's installed gearheads have 4.5 mm designed clearance to the next tube. `ignored` are occurrences that
    * are no obstacle (the weld metal).
    */
-  function weldClearance(arm:Manipulator, torch:String, ignored:Array<String>):ArmClearance {
-    return armClearance(arm, weldCollisionBodies(arm, torch, ignored));
+  function weldClearance(arm:Manipulator, torch:String, ignored:Array<String>):ArmClearance
+    return cellClearance(arm, torch.substr(0, torch.lastIndexOf("/") + 1), ignored, processkit.WeldPathPlanner.AIR_MARGIN);
+
+  function weldCollisionBodies(arm:Manipulator, torch:String, ignored:Array<String>):Array<robotkit.manipulation.ArmClearance.ClearanceBodyData>
+    return cellCollisionBodies(arm, torch.substr(0, torch.lastIndexOf("/") + 1), ignored);
+
+  /** Fixed cell geometry and other controllers' bodies at the start of planning. */
+  function cellClearance(arm:Manipulator, toolPrefix:Null<String>, ignored:Array<String>, margin:Float):ArmClearance {
+    return armClearanceAtMargin(arm, cellCollisionBodies(arm, toolPrefix, ignored), margin);
   }
 
-  function weldCollisionBodies(arm:Manipulator, torch:String, ignored:Array<String>):Array<robotkit.manipulation.ArmClearance.ClearanceBodyData> {
+  function cellCollisionBodies(arm:Manipulator, toolPrefix:Null<String>, ignored:Array<String>):Array<robotkit.manipulation.ArmClearance.ClearanceBodyData> {
     var links = robot.model.links;
-    // The tool is everything the torch's assembly holds (the plate on the flange, the torch and its neck).
-    var toolPrefix = torch.substr(0, torch.lastIndexOf("/") + 1);
     var bodies = [for (hull in robot.hulls) if (ignored.indexOf(hull.part) < 0)
-      {name: hull.part, link: links[hull.link].id, vertices: hull.vertices, tool: StringTools.startsWith(hull.part, toolPrefix)}];
+      {name: hull.part, link: links[hull.link].id, vertices: hull.vertices, tool: toolPrefix != null && StringTools.startsWith(hull.part, toolPrefix)}];
     var base = simulation.linkPose(robotIndex, 0);
     var baseInverse = new Transform3(new Vec3(base.position[0], base.position[1], base.position[2]),
       new Quat(base.rotation[0], base.rotation[1], base.rotation[2], base.rotation[3])).inverse();
@@ -371,6 +379,23 @@ class MissionPlayer implements SessionMember {
       }
       bodies.push({name: entry.id.substr(8), link: links[0].id, vertices: vertices, tool: false});
     }
+    var included = new Map<String, Bool>();
+    for (body in bodies) included.set(body.name, true);
+    for (other in cellRobots) if (other != robot && other.parts.length > 0) {
+      var index = other.parts[0].robotIndex;
+      for (hull in other.hulls) if (!included.exists(hull.part) && ignored.indexOf(hull.part) < 0) {
+        var pose = simulation.linkPose(index, hull.link);
+        var worldPose = new Transform3(new Vec3(pose.position[0], pose.position[1], pose.position[2]),
+          new Quat(pose.rotation[0], pose.rotation[1], pose.rotation[2], pose.rotation[3]));
+        var localPose = baseInverse.compose(worldPose), vertices:Array<Float> = [];
+        for (corner in 0...Std.int(hull.vertices.length / 3)) {
+          var point = localPose.transformPoint(new Vec3(hull.vertices[corner * 3], hull.vertices[corner * 3 + 1], hull.vertices[corner * 3 + 2]));
+          vertices.push(point.x); vertices.push(point.y); vertices.push(point.z);
+        }
+        bodies.push({name: hull.part, link: links[0].id, vertices: vertices, tool: false});
+        included.set(hull.part, true);
+      }
+    }
     for (hull in depositedWeldHulls()) {
       var vertices:Array<Float> = [];
       for (index in 0...Std.int(hull.vertices.length / 3)) {
@@ -383,10 +408,15 @@ class MissionPlayer implements SessionMember {
   }
 
   function armClearance(arm:Manipulator, bodies:Array<robotkit.manipulation.ArmClearance.ClearanceBodyData>):ArmClearance {
+    return armClearanceAtMargin(arm, bodies, processkit.WeldPathPlanner.AIR_MARGIN);
+  }
+
+  function armClearanceAtMargin(arm:Manipulator,
+      bodies:Array<robotkit.manipulation.ArmClearance.ClearanceBodyData>, margin:Float):ArmClearance {
     var positions = robot.robot.snapshot().positions;
     var indices = [for (target in arm.toJointTargets([for (_ in 0...arm.dofCount()) 0.0])) target.joint];
     clearanceJoints = indices;
-    return new ArmClearance(arm, bodies, [for (index in indices) positions.get(index)], processkit.WeldPathPlanner.AIR_MARGIN);
+    return new ArmClearance(arm, bodies, [for (index in indices) positions.get(index)], margin);
   }
 
   /**
@@ -608,12 +638,16 @@ class MissionPlayer implements SessionMember {
           observe);
       case "pick":
         cast(handling,HandlingPlanRunner).configuration=configurationFor(step);
-        var at:SceneArtifactPlace = cast step.at;
+        var target = step.at;
+        if (target == null) throw "Pick mission step needs a target frame";
+        var at:SceneArtifactPlace = target;
         grasped = at;
         return HandlePart.pick(cast handling, localization, () -> graspPoint(at), vacuumSensor, 40.0, handlingOrientation(step));
       case "place":
         cast(handling,HandlingPlanRunner).configuration=configurationFor(step);
-        var at:SceneArtifactPlace = cast step.at;
+        var target = step.at;
+        if (target == null) throw "Place mission step needs a target frame";
+        var at:SceneArtifactPlace = target;
         return HandlePart.place(cast handling, localization, () -> placeContact(at, step.yaw), vacuumSensor, 40.0, handlingOrientation(step));
       case "weld":
         var weld:SceneArtifactWeld = cast step.weld;
@@ -633,7 +667,8 @@ class MissionPlayer implements SessionMember {
 
   /** Plans absolute mechanical coordinates on the chain ending at the named connector. */
   function jointMove(step:SceneArtifactMissionStep):Skill {
-    var at:SceneArtifactPlace = cast step.at;
+    var at = step.at;
+    if (at == null) throw "Joint motion needs a mission frame";
     var name = AssemblyRobot.missionFrameName(at);
     var frame = robot.missionFrames.get(name);
     if (frame == null) throw 'The robot has no mission frame "$name"';
@@ -649,7 +684,9 @@ class MissionPlayer implements SessionMember {
         var bound = arm.group.limitsOf(i);
         if (bound.lower < bound.upper) limits.position(i, bound.lower, bound.upper);
         var speedLimit:Float = bound.velocity == null ? 0.0 : bound.velocity;
-        var speed = speedLimit > 0 ? speedLimit : 2.0;
+        if (!(speedLimit > 0) || !Math.isFinite(speedLimit))
+          throw 'Joint "${robot.model.joints[indices[i]].name}" needs a finite mechanical velocity limit';
+        var speed = speedLimit;
         velocities.push(speed);
         limits.velocity(i, speed);
         var accelerationLimit:Float = bound.maxAcceleration == null ? 0.0 : bound.maxAcceleration;
@@ -687,6 +724,9 @@ class MissionPlayer implements SessionMember {
       }
       if (!found) throw 'Joint "${target.joint}" is outside the chain ending at "$name"';
     }
+    motion.compiler.planValidator = new ArmPlanClearance(cellClearance(arm, null, [], ArmClearance.MARGIN),
+      [for (index in indices) robot.model.joints[index].type == robotkit.model.JointType.Prismatic ?
+        ArmPlanClearance.LINEAR_STEP : ArmPlanClearance.ANGULAR_STEP]);
     return new MotionProgramSkill(motion, new MotionProgram([
       MotionOp.MoveJ(MoveTarget.JointTarget(q), new MotionOptions(), Blend.ExactStop)],configurationFor(step)));
   }

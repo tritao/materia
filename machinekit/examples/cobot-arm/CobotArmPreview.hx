@@ -69,6 +69,19 @@ class CobotArmChecks {
 				near(at.z, zero.z, "Full-turn limit Z");
 				state.setJoint('j${i + 1}', 0);
 			}
+			checkOverlap(arm, state);
+			for (i in 0...6) {
+				var exported = [for (joint in definition.joints) if (joint.id == 'j${i + 1}') joint];
+				if (exported.length != 1) throw "Cobot must export each joint exactly once";
+				var lower = exported[0].limits.lower, upper = exported[0].limits.upper;
+				if (lower == null || upper == null) throw "Cobot must export finite mechanical joint limits";
+				near(lower, -2 * Math.PI, "Exported lower joint limit", 1e-10);
+				near(upper, 2 * Math.PI, "Exported upper joint limit", 1e-10);
+			}
+			var ready = arm.ready();
+			for (i in 0...6) state.setJoint('j${i + 1}', ready[i]);
+			checkOverlap(arm, state);
+			for (i in 0...6) state.setJoint('j${i + 1}', 0);
 			var shoulder = state.worldPose("joint2"), flange = state.worldPose("toolFlange");
 			var dx = flange.x - shoulder.x, dy = flange.y - shoulder.y, dz = flange.z - shoulder.z;
 			var reach = Math.sqrt(dx * dx + dy * dy + dz * dz);
@@ -90,7 +103,7 @@ class CobotArmChecks {
 				Math.abs(mass / arm.reference.mass - 1) > 0.25)
 				throw '${arm.reference.designation} assembled mass $mass kg differs from its checked design and published class';
 			if (definition.encoders == null || definition.encoders.length != 6) throw "Cobot needs six output encoders";
-			Sys.println('${arm.reference.designation}: $mass kg assembled (published reference ${arm.reference.mass} kg), DH-zero shoulder distance $reach mm, holding N m $torques, DH FK at five poses and full-turn limits passed');
+			Sys.println('${arm.reference.designation}: $mass kg assembled (published reference ${arm.reference.mass} kg), DH-zero shoulder distance $reach mm, holding N m $torques, DH FK at five poses, exported limits and zero/ready CAD overlap checks passed');
 		}
 	}
 

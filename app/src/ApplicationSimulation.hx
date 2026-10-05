@@ -301,7 +301,7 @@ class ApplicationSimulation {
       if (work != null) {
         if (candidateAssembly == null) throw "A mission needs the project's assembly";
         candidateMission = new MissionPlayer(work, candidateAssembly, candidate, assemblyIndex, timestep, heldBoxes,
-          candidateTools.objectsByScene(), session, virtualWelder
+          candidateTools.objectsByScene(), session, [for (id in candidateByController.keys()) candidateByController.get(id)], virtualWelder
             ? MissionPlayer.ARM_ACCELERATION * robotkit.runtime.VirtualServoOptions.ACCELERATION_SCALE
             : MissionPlayer.ARM_ACCELERATION,
           candidateSignals == null || work.controllerId == null ? null : candidateSignals.inputFor(work.controllerId));

@@ -44,9 +44,17 @@ class MillPartTests {
 			machinekit.milling.MillCasting.MillCastingKind.Table, machinekit.milling.MillCasting.MillCastingKind.Head]) {
 			var casting = new machinekit.milling.MillCasting(kind);
 			var mass = casting.massProperties();
-			if (!(mass.mass > 0) || mass.inertia == null) throw "Mill castings need computed mass and inertia";
+			var expectedMass = switch kind {
+				case Base: 58.6401;
+				case Column: 49.5415;
+				case Saddle: 22.4309;
+				case Table: 11.7125;
+				case Head: 30.6695;
+			};
+			if (!Math.isFinite(mass.mass) || Math.abs(mass.mass - expectedMass) > 0.01 || mass.inertia == null)
+				throw 'Mill casting $kind mass ${mass.mass} kg differs from its checked design ($expectedMass kg)';
 			near(casting.connector("top").frame.z, casting.height, "Casting top frame");
-			var rebuiltCasting:machinekit.milling.MillCasting = cast casting.componentType().create(casting.values());
+			var rebuiltCasting = casting.componentType().create(casting.values());
 			near(rebuiltCasting.massProperties().mass, mass.mass, "Rebuilt casting mass");
 			Sys.println('mill casting ${kind}: ${mass.mass} kg');
 		}
