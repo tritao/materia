@@ -120,7 +120,7 @@ typedef struct nksim_world_desc {
     uint32_t physics_substeps;
     double gravity[3];
     uint64_t reserved[4];
-    /* Optional when struct_size includes this tail; zero keeps backend defaults. */
+    /* Zero selects backend defaults. The complete current descriptor is required. */
     uint32_t integrator; /**< NKSIM_INTEGRATOR_*. */
     uint32_t friction_cone; /**< NKSIM_FRICTION_CONE_*. */
     /** Constraint solver iteration limits; zero keeps the backend default. */
@@ -203,19 +203,13 @@ typedef struct nksim_joint_desc {
     double lower_limit;
     double upper_limit;
     double max_force; /**< 0: unspecified; negative: explicitly unpowered; positive: force ceiling. */
-    /**
-     * Joint-frame orientation relative to body_a/body_b (x, y, z, w),
-     * appended after the original fields so an old struct prefix remains
-     * valid. A struct_size that ends before rotation_b means the
-     * caller predates these fields; backends must treat them as identity
-     * rather than reading past the caller's actual struct.
-     */
+    /** Joint-frame orientation relative to body_a/body_b (x, y, z, w).
+     * The complete current descriptor is required. */
     double rotation_a[4];
     double rotation_b[4];
     uint64_t reserved[4];
     /*
-     * Optional joint dynamics, read when struct_size includes them. Zero is
-     * none. armature is rotor inertia reflected to the joint (kg m^2, or kg for
+     * Joint dynamics; zero is none. armature is rotor inertia reflected to the joint (kg m^2, or kg for
      * a prismatic joint); damping is effort per unit velocity; friction_loss
      * is dry friction effort.
      */
@@ -223,8 +217,7 @@ typedef struct nksim_joint_desc {
     double damping;
     double friction_loss;
     /*
-     * Optional limit softness, read when struct_size includes it; zeros keep
-     * the backend default. The limit acts like a soft contact:
+     * Limit softness; zeros keep the backend default. The limit acts like a soft contact:
      * limit_time_constant (s) and limit_damping_ratio set its stiffness and
      * damping, limit_impedance its impedance curve (MuJoCo's solimp: dmin,
      * dmax, width, midpoint, power).
