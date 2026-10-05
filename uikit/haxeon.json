@@ -4,7 +4,8 @@
 	"sourceRoots": ["haxe", "bindings/haxe"],
 	"scopeSourceRoots": false,
 	"dependencies": {
-		"nativekit": { "path": "../nativekit" },
+		"haxeon-platform": { "path": "../haxeon/packages/platform" },
+		"haxeon-gpu": { "path": "../haxeon/packages/gpu" },
 		"editorkit": { "path": "../editorkit" }
 	},
 	"ffi": {
