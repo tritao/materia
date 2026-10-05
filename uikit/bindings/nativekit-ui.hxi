@@ -500,6 +500,10 @@ interface NativeKitUI @target("portable-abi64") @library("nativekit_ui") @depend
 		 * The graphics backend could not initialize or execute the render.
 		 */
 		NKUI_ERROR_RENDERING = -5;
+		/**
+		 * A frame exceeded its stream budget or could not allocate another page. Retryable.
+		 */
+		NKUI_ERROR_RESOURCE_LIMIT = -6;
 	}
 	/**
 	 * Horizontal alignment of paragraph lines.

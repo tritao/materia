@@ -381,3 +381,20 @@ through the private Skribidi path.
 
 The browser owns the frame loop through `nk_surface_set_frame_callback()`;
 Emscripten types do not appear in NativeKit's public headers.
+
+### GPU stream pages
+
+The native renderer retains reusable vertex and index buffer pages, moving to
+another page before an append would overflow. A mesh larger than a normal page
+gets a dedicated page, and recorded commands retain their original buffer
+handles. Sokol manages each page's storage across frames in flight.
+
+`UiStreamBufferConfig` controls page sizes and the stream memory budget in the
+native renderer factory. Defaults are 4 MiB for solid/glyph vertices and indices,
+1 MiB for composite/surface vertices, and 64 MiB total. These limits cover stream
+buffers only; textures and render targets have separate ownership.
+
+Budget exhaustion or failure to allocate another page returns
+`NKUI_ERROR_RESOURCE_LIMIT`. The renderer discards the incomplete frame and
+invalidates its unfinished cached passes. The shared Haxe host keeps running,
+records `lastRenderResourceError`, and allows a subsequent frame to succeed.

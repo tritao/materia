@@ -1,6 +1,8 @@
 package nativekit.ui.host;
 
 import FrameInfo;
+import UiResult.UiError;
+import NativeKitUI.UiStatus;
 import LayoutFrame;
 import NativeKitEvents;
 import NativeKitSurface;
@@ -18,6 +20,8 @@ class UiHostRuntime {
 	public var framebufferHeight(get, never):Int;
 	public var scale(get, never):Float;
 	public var rendered(default, null):Int = 0;
+	/** The most recent skipped frame; cleared by the next successful render. */
+	public var lastRenderResourceError(default, null):Null<String> = null;
 	public var surfaceReady(get, never):Bool;
 
 	final window:WindowHandle;
@@ -112,12 +116,21 @@ class UiHostRuntime {
 				return false;
 			}
 			application.context().render(renderer, renderSurface, frameInfo);
+			lastRenderResourceError = null;
 			rendered++;
 			callbackDepth--;
 			if (callbackDepth == 0 && disposeRequested) disposeNow();
 			return true;
 		} catch (error:Dynamic) {
 			if (callbackDepth > 0) callbackDepth--;
+			if (Std.isOfType(error, UiError)) {
+				var uiError:UiError = cast error;
+				if (uiError.status == UiStatus.ErrorResourceLimit) {
+					lastRenderResourceError = uiError.message;
+					if (callbackDepth == 0 && disposeRequested) disposeNow();
+					return false;
+				}
+			}
 			fail("frame", error);
 			if (callbackDepth == 0 && disposeRequested) disposeNow();
 			return false;

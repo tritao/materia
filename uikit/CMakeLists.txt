@@ -160,6 +160,25 @@ if(NK_BUILD_TESTS)
                 TIMEOUT 15)
         endif()
     endif()
+    if(NKUI_BACKEND_XVFB_RUN)
+        add_executable(nativekit_ui_stream_buffers_test
+            tests/stream_buffers.cpp src/render/ui_renderer.cpp
+            src/prepare/text_engine.cpp src/prepare/system_fonts.cpp
+            src/prepare/nanovg_path.cpp src/render/frame_resources.cpp
+            src/display_list/display_list.cpp)
+        target_compile_features(nativekit_ui_stream_buffers_test PRIVATE cxx_std_20)
+        target_compile_definitions(nativekit_ui_stream_buffers_test PRIVATE NKGPU_TESTING=1)
+        target_include_directories(nativekit_ui_stream_buffers_test PRIVATE src
+            "${NKUI_NATIVEKIT_DIR}/modules/gpu/src")
+        target_link_libraries(nativekit_ui_stream_buffers_test PRIVATE
+            NativeKit::ui NativeKit::gpu NativeKit::nativekit nkui_nanovg_core nkui_skribidi)
+        find_package(OpenGL REQUIRED)
+        target_link_libraries(nativekit_ui_stream_buffers_test PRIVATE OpenGL::GL)
+        add_test(NAME nativekit_ui_stream_buffers COMMAND ${NKUI_BACKEND_XVFB_RUN} -a
+            $<TARGET_FILE:nativekit_ui_stream_buffers_test>)
+        set_tests_properties(nativekit_ui_stream_buffers PROPERTIES
+            ENVIRONMENT "LIBGL_ALWAYS_SOFTWARE=1" LABELS "graphics;gpu;ui" TIMEOUT 30)
+    endif()
     add_executable(nativekit_ui_abi_test tests/abi.c)
     target_compile_definitions(nativekit_ui_abi_test PRIVATE
         NKUI_TEST_FONT_PATH="${NK_VENDOR_DIR}/skribidi/example/data/IBMPlexSans-Regular.ttf")

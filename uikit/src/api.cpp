@@ -3837,12 +3837,19 @@ static nkui_result renderer_render_frame_impl(nkui_renderer renderer, nkui_displ
         }
         const bool sealed_executed = nkui::execute_render_plan(*renderer_slot->renderer, *sealed,
                                                                {main_target, frame_target});
-        return sealed_executed ? NKUI_OK : NKUI_ERROR_RENDERING;
+        return sealed_executed ? NKUI_OK : renderer_slot->renderer->resourceLimited()
+            ? NKUI_ERROR_RESOURCE_LIMIT : NKUI_ERROR_RENDERING;
     }
     /* Frames that composite a live surface producer keep the borrowed path. */
+    nkui::RenderExecutionError execution_error{};
     const bool executed = nkui::execute_render_plan(*renderer_slot->renderer, plan, frame_resources,
-                                                    {main_target, frame_target});
-    return executed ? NKUI_OK : NKUI_ERROR_RENDERING;
+                                                    {main_target, frame_target}, &execution_error);
+    if (!executed)
+        std::fprintf(stderr, "UIKit render execution failed: pass %u command %u: %s\n",
+                     execution_error.pass_index, execution_error.command_index,
+                     execution_error.message ? execution_error.message : "unknown renderer failure");
+    return executed ? NKUI_OK : renderer_slot->renderer->resourceLimited()
+        ? NKUI_ERROR_RESOURCE_LIMIT : NKUI_ERROR_RENDERING;
 }
 
 extern "C" nkui_result nkui_renderer_render_frame(nkui_renderer renderer, nkui_display_list list,
@@ -4536,14 +4543,21 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
             frame_guard.handed_off = true;
             return NKUI_OK;
         }
+        nkui::RenderExecutionError execution_error{};
         const bool sealed_executed = nkui::execute_render_plan(*renderer_slot->renderer, *sealed,
-                                                               {main_target, frame_target});
-        return sealed_executed ? NKUI_OK : NKUI_ERROR_RENDERING;
+                                                               {main_target, frame_target}, &execution_error);
+        if (!sealed_executed)
+            std::fprintf(stderr, "UIKit render execution failed: pass %u command %u: %s\n",
+                         execution_error.pass_index, execution_error.command_index,
+                         execution_error.message ? execution_error.message : "unknown renderer failure");
+        return sealed_executed ? NKUI_OK : renderer_slot->renderer->resourceLimited()
+            ? NKUI_ERROR_RESOURCE_LIMIT : NKUI_ERROR_RENDERING;
     }
     /* Frames that composite a live surface producer keep the borrowed path. */
     const bool executed = nkui::execute_render_plan(*renderer_slot->renderer, plan, frame_resources,
                                                     {main_target, frame_target});
-    return executed ? NKUI_OK : NKUI_ERROR_RENDERING;
+    return executed ? NKUI_OK : renderer_slot->renderer->resourceLimited()
+        ? NKUI_ERROR_RESOURCE_LIMIT : NKUI_ERROR_RENDERING;
 }
 
 extern "C" nkui_result nkui_renderer_render(nkui_renderer renderer, nkui_display_list list,

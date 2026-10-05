@@ -20,7 +20,8 @@ namespace nkui {
 class UiRendererImpl final : public UiRenderer {
   public:
     explicit UiRendererImpl(nk_surface surface);
-    UiRendererImpl(nk_surface surface, const nk_surface_frame_target *frame_target);
+    UiRendererImpl(nk_surface surface, const nk_surface_frame_target *frame_target,
+                   const UiStreamBufferConfig &streams = {});
     ~UiRendererImpl() override;
     bool initialize() override;
     bool valid() const override;
@@ -68,6 +69,8 @@ class UiRendererImpl final : public UiRenderer {
                    const PreparedTexture *image) override;
     bool endPass() override;
     bool endFrame() override;
+    void abortFrame() override;
+    bool resourceLimited() const override;
     UiRendererStats stats() const override;
     const char *lastError() const override;
 
@@ -191,6 +194,16 @@ struct UiRendererImpl::State {
     nkgpu_buffer composite_vertices{};
     nkgpu_buffer surface_mesh_vertices{};
     nkgpu_buffer indices{};
+    struct StreamPool {
+        nkgpu_buffer_usage usage = NKGPU_BUFFER_VERTEX;
+        uint32_t page_bytes = 0;
+        size_t cursor = 0;
+        std::vector<nkgpu_buffer> pages;
+    };
+    std::array<StreamPool, 5> streams;
+    UiStreamBufferConfig stream_config{};
+    uint64_t stream_bytes = 0;
+    bool resource_limited = false;
     std::unordered_map<uint64_t, AtlasImage> atlases;
     std::unordered_map<uint32_t, Target> targets;
     std::unordered_map<TargetPoolKey, std::vector<Target>, TargetPoolKeyHash> transient_target_pool;
@@ -539,6 +552,45 @@ bool emit_draw(UiRendererImpl::State &state, uint32_t base, uint32_t count, uint
     return gpu_result(state, nkgpu_draw(state.renderer, base, count, instances));
 }
 
+bool reserve_stream(UiRendererImpl::State &state, nkgpu_buffer base, uint32_t bytes,
+                    nkgpu_buffer &selected) {
+    for (auto &pool : state.streams) {
+        if (pool.pages.empty() || pool.pages.front().id != base.id)
+            continue;
+        const uint64_t aligned = (uint64_t{bytes} + 3) & ~uint64_t{3};
+        while (pool.cursor < pool.pages.size()) {
+            nkgpu_stream_buffer_info info{};
+            if (!gpu_result(state, nkgpu_buffer_get_stream_info(
+                    state.renderer, pool.pages[pool.cursor], &info)))
+                return false;
+            if (aligned <= info.remaining) {
+                selected = pool.pages[pool.cursor];
+                return true;
+            }
+            ++pool.cursor;
+        }
+        const uint64_t capacity = std::max<uint64_t>(pool.page_bytes, aligned);
+        if (capacity > uint64_t{INT32_MAX} ||
+            capacity > state.stream_config.memory_budget_bytes - state.stream_bytes) {
+            state.resource_limited = true;
+            return fail(state, "UI stream buffer memory budget exceeded");
+        }
+        nkgpu_buffer page{};
+        const auto result = nkgpu_buffer_create_stream(state.renderer,
+            static_cast<uint32_t>(capacity), pool.usage, &page);
+        if (result == NKGPU_ERROR_OUT_OF_MEMORY)
+            state.resource_limited = true;
+        if (!gpu_result(state, result))
+            return false;
+        pool.pages.push_back(page);
+        state.stream_bytes += capacity;
+        ++state.stats.gpu_resources;
+        selected = page;
+        return true;
+    }
+    return fail(state, "unknown UI stream buffer");
+}
+
 template <class Vertex>
 bool draw_mesh(UiRendererImpl::State &state, nkgpu_pipeline pipeline,
                const std::vector<Vertex> &vertices, const std::vector<uint32_t> &indices,
@@ -555,20 +607,23 @@ bool draw_mesh(UiRendererImpl::State &state, nkgpu_pipeline pipeline,
     uint32_t index_offset = 0;
     const size_t vertex_bytes = vertices.size() * sizeof(Vertex);
     const size_t index_bytes = indices.size() * sizeof(uint32_t);
-    if (vertex_bytes > UINT32_MAX || index_bytes > UINT32_MAX ||
-        !gpu_result(state,
-                    nkgpu_buffer_append(state.renderer,
-                                        vertex_buffer.id ? vertex_buffer : state.solid_vertices,
-                                        reinterpret_cast<const uint8_t *>(vertices.data()),
-                                        static_cast<uint32_t>(vertex_bytes), &vertex_offset)) ||
-        !gpu_result(state,
-                    nkgpu_buffer_append(state.renderer, state.indices,
-                                        reinterpret_cast<const uint8_t *>(indices.data()),
-                                        static_cast<uint32_t>(index_bytes), &index_offset)) ||
+    nkgpu_buffer vertices_page{}, indices_page{};
+    if (vertex_bytes > UINT32_MAX || index_bytes > UINT32_MAX)
+        return fail(state, "UI mesh exceeds the GPU address range");
+    // Reserve both uploads before changing either cursor. Recorded commands retain
+    // the selected handles, so rolling to a new page never invalidates prior draws.
+    if (!reserve_stream(state, vertex_buffer.id ? vertex_buffer : state.solid_vertices,
+                        static_cast<uint32_t>(vertex_bytes), vertices_page) ||
+        !reserve_stream(state, state.indices, static_cast<uint32_t>(index_bytes), indices_page) ||
+        !gpu_result(state, nkgpu_buffer_append(state.renderer, vertices_page,
+                        reinterpret_cast<const uint8_t *>(vertices.data()),
+                        static_cast<uint32_t>(vertex_bytes), &vertex_offset)) ||
+        !gpu_result(state, nkgpu_buffer_append(state.renderer, indices_page,
+                        reinterpret_cast<const uint8_t *>(indices.data()),
+                        static_cast<uint32_t>(index_bytes), &index_offset)) ||
         !emit_pipeline(state, pipeline) ||
-        !emit_vertex_buffer(state, 0, vertex_buffer.id ? vertex_buffer : state.solid_vertices,
-                            vertex_offset) ||
-        !emit_index_buffer(state, state.indices, index_offset))
+        !emit_vertex_buffer(state, 0, vertices_page, vertex_offset) ||
+        !emit_index_buffer(state, indices_page, index_offset))
         return false;
     ++state.stats.pipeline_changes;
     if ((image.id && !emit_image(state, 0, image)) ||
@@ -1487,8 +1542,10 @@ nkgpu_stencil_face_state stencil_face(nkgpu_compare_func compare, nkgpu_stencil_
 
 UiRendererImpl::UiRendererImpl(nk_surface surface) : UiRendererImpl(surface, nullptr) {}
 
-UiRendererImpl::UiRendererImpl(nk_surface surface, const nk_surface_frame_target *frame_target)
+UiRendererImpl::UiRendererImpl(nk_surface surface, const nk_surface_frame_target *frame_target,
+                               const UiStreamBufferConfig &streams)
     : state_(new State) {
+    state_->stream_config = streams;
     state_->surface = surface;
     if (!surface) {
         state_->error = "UI renderer requires a NativeKit surface";
@@ -1675,16 +1732,31 @@ bool UiRendererImpl::initialize() {
                     nkgpu_image_create(state_->renderer, 1, 1, NKGPU_IMAGEFORMAT_RGBA8,
                                        white.data(), white.size(), 0, &state_->white_image)))
         return false;
-    const auto create_stream = [this](uint32_t size, nkgpu_buffer_usage usage,
-                                      nkgpu_buffer &buffer) {
-        return gpu_result(*state_,
-                          nkgpu_buffer_create_stream(state_->renderer, size, usage, &buffer));
+    const auto &config = state_->stream_config;
+    const uint64_t initial_bytes = uint64_t{config.vertex_page_bytes} * 2 +
+        uint64_t{config.small_vertex_page_bytes} * 2 + config.index_page_bytes;
+    const auto valid_page = [](uint32_t bytes) {
+        return bytes && !(bytes & 3) && bytes <= uint32_t{INT32_MAX};
     };
-    if (!create_stream(4 * 1024 * 1024, NKGPU_BUFFER_VERTEX, state_->solid_vertices) ||
-        !create_stream(4 * 1024 * 1024, NKGPU_BUFFER_VERTEX, state_->glyph_vertices) ||
-        !create_stream(1024 * 1024, NKGPU_BUFFER_VERTEX, state_->composite_vertices) ||
-        !create_stream(1024 * 1024, NKGPU_BUFFER_VERTEX, state_->surface_mesh_vertices) ||
-        !create_stream(4 * 1024 * 1024, NKGPU_BUFFER_INDEX, state_->indices))
+    if (!valid_page(config.vertex_page_bytes) || !valid_page(config.small_vertex_page_bytes) ||
+        !valid_page(config.index_page_bytes) || initial_bytes > config.memory_budget_bytes)
+        return fail(*state_, "invalid UI stream buffer configuration");
+    const auto create_stream = [this](size_t index, uint32_t size, nkgpu_buffer_usage usage,
+                                      nkgpu_buffer &buffer) {
+        if (!gpu_result(*state_, nkgpu_buffer_create_stream(state_->renderer, size, usage, &buffer)))
+            return false;
+        auto &pool = state_->streams[index];
+        pool.usage = usage;
+        pool.page_bytes = size;
+        pool.pages.push_back(buffer);
+        state_->stream_bytes += size;
+        return true;
+    };
+    if (!create_stream(0, config.vertex_page_bytes, NKGPU_BUFFER_VERTEX, state_->solid_vertices) ||
+        !create_stream(1, config.vertex_page_bytes, NKGPU_BUFFER_VERTEX, state_->glyph_vertices) ||
+        !create_stream(2, config.small_vertex_page_bytes, NKGPU_BUFFER_VERTEX, state_->composite_vertices) ||
+        !create_stream(3, config.small_vertex_page_bytes, NKGPU_BUFFER_VERTEX, state_->surface_mesh_vertices) ||
+        !create_stream(4, config.index_page_bytes, NKGPU_BUFFER_INDEX, state_->indices))
         return false;
     state_->stats.gpu_resources = 38;
     state_->initialized = true;
@@ -1710,6 +1782,9 @@ bool UiRendererImpl::lost() const {
 bool UiRendererImpl::beginFrame(bool record, const nk_surface_frame_target *frame_target) {
     if (!valid() || state_->in_frame)
         return fail(*state_, "invalid UI frame state");
+    state_->resource_limited = false;
+    state_->error.clear();
+    for (auto &pool : state_->streams) pool.cursor = 0;
     recycle_transient_targets(*state_);
     state_->target_aliases.clear();
     ++state_->frame_serial;
@@ -2623,6 +2698,32 @@ bool UiRendererImpl::endFrame() {
     return true;
 }
 
+void UiRendererImpl::abortFrame() {
+    if (!state_ || !state_->in_frame)
+        return;
+    if (state_->batch.id) nkgpu_batch_destroy(state_->batch);
+    state_->batch = {};
+    state_->record_commands.clear();
+    nkgpu_frame_abort(state_->renderer);
+    state_->recording = false;
+    state_->in_pass = false;
+    state_->in_frame = false;
+    state_->has_frame_target = false;
+    // Cached passes inserted during this frame may never have executed.
+    for (auto *cache : {&state_->effect_cache, &state_->raster_cache}) {
+        for (auto it = cache->begin(); it != cache->end();) {
+            if (it->second.last_used_frame == state_->frame_serial) {
+                destroy_cached_effect(*state_, it->second);
+                it = cache->erase(it);
+            } else ++it;
+        }
+    }
+    state_->target_aliases.clear();
+    for (auto &[id, surface] : state_->surfaces) surface.generation = 0;
+}
+
+bool UiRendererImpl::resourceLimited() const { return state_ && state_->resource_limited; }
+
 UiRendererStats UiRendererImpl::stats() const {
     if (!state_)
         return {};
@@ -2686,6 +2787,12 @@ std::unique_ptr<UiRenderer> create_ui_renderer(nk_surface surface,
     if (!surface)
         return nullptr;
     return std::make_unique<UiRendererImpl>(surface, frame_target);
+}
+
+std::unique_ptr<UiRenderer> create_ui_renderer(nk_surface surface,
+    const nk_surface_frame_target *frame_target, const UiStreamBufferConfig &streams) {
+    if (!surface) return nullptr;
+    return std::make_unique<UiRendererImpl>(surface, frame_target, streams);
 }
 
 } // namespace nkui
