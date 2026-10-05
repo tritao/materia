@@ -2551,6 +2551,10 @@ void RobotRuntime::reset_control() {
 
 void RobotRuntime::discard_pending_commands() noexcept {
     std::lock_guard owner_lock(owner_mutex_);
+    discard_pending_commands_locked();
+}
+
+void RobotRuntime::discard_pending_commands_locked() noexcept {
     endpoint_->discard_pending();
     std::lock_guard state_lock(state_mutex_);
     if (state_backup_valid_) {
@@ -2566,12 +2570,14 @@ void RobotRuntime::discard_pending_commands() noexcept {
 }
 
 void RobotRuntime::fail_tick(int32_t fault_code) noexcept {
-    discard_pending_commands();
     std::lock_guard owner_lock(owner_mutex_);
     {
         std::lock_guard state_lock(state_mutex_);
         if (state_.safety == RK_SAFETY_FAULT || state_.safety == RK_SAFETY_EMERGENCY_STOP) return;
     }
+    // A fault already staged its emergency outputs. Do not roll them back
+    // to the preceding powered reference when the session reports failure.
+    discard_pending_commands_locked();
     latch_fault(true, fault_code);
 }
 

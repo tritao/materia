@@ -300,6 +300,7 @@ public:
     void set_externally_driven(bool value) noexcept;
 
 private:
+    void discard_pending_commands_locked() noexcept;
     rk_result publish_sample_impl(uint64_t timestamp_ns, const rk_robot_state *sample,
                                   rk_result sample_result);
     struct QueuedEvent {

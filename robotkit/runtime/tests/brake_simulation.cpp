@@ -6,7 +6,7 @@
 #include <memory>
 #include <cstdio>
 
-void check_brake(double holding_force, bool holds, bool implicit_clock = false) {
+void check_brake(double holding_force, bool holds, bool implicit_clock = false, bool jammed = false) {
     nkscene_scene scene = 0;
     nksim_world world = 0;
     nksim_session session = 0;
@@ -60,7 +60,7 @@ void check_brake(double holding_force, bool holds, bool implicit_clock = false) 
     description->initial_pose.position[2] = 1.0;
     description->initial_pose.rotation[3] = 1.0;
     description->brake_count = 1;
-    description->brakes[0] = {0, 0, holding_force, 0.05, 0.03};
+    description->brakes[0] = {0, 0, holding_force, jammed ? 1.0 : 0.05, 0.03};
     assert(rk_simulation_add_robot(simulation, blueprint.get(), description.get(), &runtime) == RK_OK);
     rk_robot_snapshot state{};
     state.struct_size = sizeof(state);
@@ -81,6 +81,18 @@ void check_brake(double holding_force, bool holds, bool implicit_clock = false) 
         assert(state.sensor_count == 1 && state.sensors[0].value_count == 1);
         if (i < 3) assert(RK_SENSOR_VALUE(state, 0, 0) == 0.0);
         assert(std::abs(state.position[0]) < 0.002); // idle servo hold precedes release
+    }
+    if (jammed) {
+        for (int i = 0; i < 40; ++i) step();
+        assert(state.fault_code == RK_FAULT_BRAKE_RELEASE_TIMEOUT);
+        std::fprintf(stderr, "jammed brake: position %.9f, motor effort %.9f\n", state.position[0], state.effort[0]);
+        assert(std::abs(state.effort[0]) < 1e-6);
+        assert(std::abs(state.position[0]) < 0.002);
+        rk_simulation_destroy(simulation);
+        nksim_session_destroy(session);
+        nksim_world_destroy(world);
+        nkscene_scene_destroy(scene);
+        return;
     }
     assert(RK_SENSOR_VALUE(state, 0, 0) == 1.0);
     rk_robot_command command{};
@@ -130,5 +142,6 @@ void check_brake(double holding_force, bool holds, bool implicit_clock = false) 
 int main() {
     check_brake(150.0, true);
     check_brake(50.0, false);
+    check_brake(150.0, true, true, true);
     check_brake(150.0, true, true); // every phase must share the default owner clock
 }
