@@ -670,7 +670,7 @@ nksim_result World::create_convex_shape(const double *vertices, std::uint32_t co
 nksim_result World::create_compound_shape(const nksim_shape *children,
         const nksim_shape_pose *poses, std::uint32_t count, nksim_shape *out_shape) {
     if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
-    if (!children || !poses || !out_shape || count == 0 || count > 64)
+    if (!children || !poses || !out_shape || count == 0)
         return NKSIM_ERROR_INVALID_ARGUMENT;
     std::vector<BackendShapePart> parts;
     parts.reserve(count);

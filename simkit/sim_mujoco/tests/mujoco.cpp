@@ -1919,12 +1919,19 @@ void compound_shape_preserves_an_l_shaped_gap() {
     nksim_shape horizontal = 0, vertical = 0, compound = 0, sphere = 0;
     assert(nksim_shape_create_box(world, horizontal_half, &horizontal) == NKSIM_OK);
     assert(nksim_shape_create_box(world, vertical_half, &vertical) == NKSIM_OK);
-    const nksim_shape children[] = {horizontal, vertical};
-    nksim_shape_pose poses[2]{};
+    nksim_shape children[80]{};
+    nksim_shape_pose poses[80]{};
+    children[0] = horizontal; children[1] = vertical;
+    for (uint32_t index = 2; index < 80; ++index) {
+        children[index] = vertical;
+        poses[index].position[0] = 3.0 * index;
+        poses[index].position[2] = 0.5;
+        poses[index].rotation[3] = 1.0;
+    }
     poses[0].position[0] = 0.5; poses[0].position[2] = 0.05;
     poses[1].position[0] = 0.95; poses[1].position[2] = 0.5;
     poses[0].rotation[3] = poses[1].rotation[3] = 1.0;
-    assert(nksim_shape_create_compound(world, children, poses, 2, &compound) == NKSIM_OK);
+    assert(nksim_shape_create_compound(world, children, poses, 80, &compound) == NKSIM_OK);
     assert(nksim_shape_create_sphere(world, 0.08, &sphere) == NKSIM_OK);
     const auto obstacle = make_body(world, make_node_xyz(scene, 0.0, 0.0, 0.0),
                                     NKSIM_MOTION_STATIC, 0.0, compound);
@@ -1932,6 +1939,8 @@ void compound_shape_preserves_an_l_shaped_gap() {
                                NKSIM_MOTION_DYNAMIC, 1.0, sphere);
     const auto contact = make_body(world, make_node_xyz(scene, 0.95, 0.0, 1.2),
                                    NKSIM_MOTION_DYNAMIC, 1.0, sphere);
+    const auto last = make_body(world, make_node_xyz(scene, poses[79].position[0], 0.0, 1.2),
+                               NKSIM_MOTION_DYNAMIC, 1.0, sphere);
     step_world(world, 20);
     nksim_body_state gap_state{}, contact_state{};
     gap_state.struct_size = contact_state.struct_size = sizeof(nksim_body_state);
@@ -1940,6 +1949,10 @@ void compound_shape_preserves_an_l_shaped_gap() {
     assert(std::abs(gap_state.position[0] - 0.5) < 1e-6);
     assert(gap_state.position[2] < 1.03);
     assert(contact_state.position[2] > gap_state.position[2] + 0.04);
+    nksim_body_state last_state{};
+    last_state.struct_size = sizeof(last_state);
+    assert(nksim_body_get_state(world, last, &last_state) == NKSIM_OK);
+    assert(last_state.position[2] > 1.03); // geometry beyond the old child limit still supports the load
     nksim_world_destroy(world);
     nkscene_scene_destroy(scene);
 }
