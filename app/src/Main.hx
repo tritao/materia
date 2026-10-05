@@ -910,7 +910,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
       addSection("Machining", ObjectKindRegistry.addMenuCommands("Machining"));
       addSection("People", ObjectKindRegistry.addMenuCommands("People"));
       addSection("Feature", ["scene.create-sketch", "scene.create-face-sketch",
-        "scene.create-extrusion", "scene.add-face-hole", "scene.create-pocket",
+        "scene.create-extrusion", "scene.create-sheet-base", "scene.create-sheet-flange",
+        "scene.add-face-hole", "scene.create-pocket",
         "scene.create-vertical-fillet"]);
       addSection("Import", ObjectKindRegistry.addMenuCommands("Import"));
       var addMenu = new Menu("hierarchy-add-menu", items, hierarchyAddX, hierarchyAddY,

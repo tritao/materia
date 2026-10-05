@@ -375,8 +375,11 @@ table in `tools/README.md`.
   SVG reflects Y and changes arc sweep flags accordingly; circles remain circles, and XML
   annotation text is escaped. Annotations have explicit dimensions for drawing bounds.
 - `manufacturingkit` gets a `SheetPartRequirement` from a flat pattern: blank = bounding box
-  (rectangular stock only, until nesting exists), grain constraint from the bend lines (bends
-  across the grain preferred), thickness from the sheet.
+  (rectangular stock only, until nesting exists), grain constraint from the authored rolling
+  direction with export X aligned to grain, thickness and material identity from the sheet.
+  Bend lines check the authored grain; they cannot determine a stock's rolling direction.
+  Caller-owned order identities, revisions, quantity and explicit dimensional tolerances enter
+  through `SheetBlankOrder`; neither the geometry nor the material invents production context.
 
 **SM-D7. Converting a solid is a one-time import into a `Sheet`.**
 - Algorithm (ideas from FreeCAD's new unfolder, our own code): faces that share an edge and meet
@@ -671,6 +674,14 @@ setbacks; these define new fixtures, with no existing baseline-number changes.
 - Create sheet features from the editor (base from a sketch, flange from a picked edge face),
   edit their parameters, toggle the viewport between folded and flat, show bend lines and the
   bend table, export the flat pattern as DXF/SVG.
+- Before SM6 supplies the material library, the inspector requires an explicit material identity
+  and ANSI K factor for a custom stock. No silent rule is created. Stock/flange form input is
+  transient; the typed feature snapshot remains the saved source of truth. Flat view is session
+  state and derives a fresh solid on publication, without modifying the document or its history.
+  Export-plane fold intervals are mapped back to the sheet plane for the viewport overlay.
+  Inspector/table/overlay share an immutable flat snapshot per publication and selected feature;
+  publication invalidates it. P2 outside dimensions are verified against analytic graph bounds: the
+  existing native bounds query includes triangulation deflection after viewport tessellation.
 - Tests: an app test in the style of `app/tests/src/tests/CadPlateWorkflowTests.hx` builds P2
   through the editor commands and exports a DXF.
 
@@ -895,8 +906,8 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM2 | done: named wall extrusions and bend revolutions fused for flat/folded/partial states; P1–P5 validity, single bodies, volumes, axes and stable names; quick gate `sm2-solid` passes (3757 sheet assertions) | 7a3836d8c |
 | SM3 | done (required feature chain); optional corner closure tracked separately as SM3o: SM3a atomic graph publication; SM3b exact sketch-backed base, side A/B, stock codec and named thickness builder; quick gates `sm3a-staging` (3773) and `sm3b-base` (3813 sheet assertions); SM3c authored segment names and exact face-to-graph picks; quick gate `sm3c-edges` (3843 sheet assertions); SM3d exact flange geometry and alignment; quick gate `sm3d-flange-geometry` (3880 sheet assertions); SM3e typed flange features, authored shared identities, gaps/extensions, stock radius defaults and P1–P5 document acceptance; quick gate `sm3e-flanges-typed` (4044 sheet assertions); SM3f exact planar subtraction foundation; quick gate `sm3f-outline-cuts` (4068 sheet assertions); SM3g typed rectangular/obround reliefs and sizing, exact gap/bend-width semantics, atomic edits and codec; quick gate `sm3g-reliefs` (4132 sheet assertions); SM3h closed/open/teardrop hems, shared edge selection, typed codec and builder; quick gate `sm3h-hems` (4303 sheet assertions); SM3i permanent bend-id rip feature, typed codec and builder; quick gate `sm3i-rips` (4315 sheet assertions); SM3j exact through-wall cuts on staged attached sketches, shared region mapping, typed codec and builder; quick gate `sm3j-wall-cuts` (4348 sheet assertions); SM3k nominal seam datums, exact bend material regions and seam validation; quick gate `sm3k-bend-regions` (4368 sheet assertions); SM3l native mapped positive-radius regions and adaptive volume integration; quick gate `sm3l-native-regions` (4368 sheet assertions); SM3m developed cuts across wall/bend/flange domains, named native patches, typed codec and edits, certified material bounds; quick gate `sm3m-cross-bend-cuts` (4633 sheet assertions); SM3n graph-derived collapsed-axis sectors, exact closed-hem cuts, material connectivity and production save/edit checks; quick gate `sm3n-closed-hem-cuts` (5200 sheet assertions) | 535ebc547; 08afd7a32; bb3405a64; 84a51f00d; 3ed9b3971; 31a696ed7; a02214101; f3ef57fa0; e5d66c947; 3d2d330dd; 6033a2f60; ee0d9e834; f83853060; db7e8be88; ab52986ef |
 | SM3o | planned: optional corner closure after SM6, before phase B; gap/overlap and round/square relief semantics remain | |
-| SM4 | done: SM4a exact developed blank regions, typed domain owners, sorted bend data and interrupted fold markings, authored grain frame and typed version-14 snapshot; quick gate `sm4a-flat-verified` (5259 sheet assertions); SM4c typed shared drawing data, exact R12 DXF/SVG, bend annotations and grain arrow; quick gate `sm4c-drawing-exports` (5888 sheet assertions); SM4d typed cut/relief boundary provenance and propagation; quick gate `sm4d-boundary-provenance` (5911 sheet assertions); SM4e six typed manufacturability findings with exact geometry and minimum flange depth; quick gate `sm4e-checks-verified` (5944 sheet assertions); typed blank requirement with explicit order context; quick gate `sm4-flat-pattern-complete` (5963 sheet assertions) | a5508e566; 83a7a8c18; 723b0bac4; 27f66bb9e; SM4 final commit |
-| SM4b | planned | |
+| SM4 | done: SM4a exact developed blank regions, typed domain owners, sorted bend data and interrupted fold markings, authored grain frame and typed version-14 snapshot; quick gate `sm4a-flat-verified` (5259 sheet assertions); SM4c typed shared drawing data, exact R12 DXF/SVG, bend annotations and grain arrow; quick gate `sm4c-drawing-exports` (5888 sheet assertions); SM4d typed cut/relief boundary provenance and propagation; quick gate `sm4d-boundary-provenance` (5911 sheet assertions); SM4e six typed manufacturability findings with exact geometry and minimum flange depth; quick gate `sm4e-checks-verified` (5944 sheet assertions); typed blank requirement with explicit order context; quick gate `sm4-flat-pattern-complete` (5963 sheet assertions) | a5508e566; 83a7a8c18; 723b0bac4; 27f66bb9e; a7156977e |
+| SM4b | done: typed editor base/flange commands, explicit stock input, parameter inspector, folded/flat publication, bend table, exact fold-line overlay and DXF/SVG commands; P2 editor workflow passes; full gate `sm4b-editor-full` passes | SM4b final commit |
 | SM5 | planned | |
 | SM6 | planned | |
 | SM7 | planned | |
@@ -1119,3 +1130,21 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
   `sm4-flat-pattern-complete` passes all five suites: 5963 sheet assertions (19 new),
   ProjectKit 143, ManufacturingKit 54 and unchanged original MachineKit summaries.
   No saved schema change, unchecked cast or new haxeon issue is introduced.
+
+- SM4b: the editor creates sheet bases from solved sketches and flanges from persistent picked
+  wall-side faces, edits dimensions with document history, displays the derived flat solid and
+  exact bend intervals, lists sorted bend data and exports DXF/SVG. Stock identity and ANSI K
+  remain explicit until SM6 supplies the library; numeric form input rejects trailing text.
+  A publication-scoped flat snapshot prevents exact unions on every repaint. View state does
+  not change the saved graph. Touched publication/refinement paths use typed shape locals.
+  P2 editor acceptance verifies 60/120/40 mm outside dimensions, 1.5 mm flat thickness, parameter
+  edits, explicit-rule form defaults, unchanged authored graph across view toggles and DXF output.
+  Existing CAD workflow fixtures now write inside this worktree. The final focused CAD workflow
+  runtime passes, and full gate `sm4b-editor-full` passes all five quick suites, the maintained
+  workspace selection (peer tests excluded), app build and complete project-source suite.
+  Sheet assertions remain 5963, ProjectKit 143 and ManufacturingKit 54; original MachineKit
+  summaries match baseline exactly. The suite uses a local copy of the supplied gate script
+  with HashLink's library directory added to its runtime path; the supplied script is unchanged.
+  Population ran once; cloned nested Haxeon/NativeKit repositories needed local submodule
+  registration to stop repeated cloning. Approved coal/proxsuite symlinks are unstaged.
+  Every CadKit configure uses prebuilt OCCT; no vendor pin, saved schema or haxeon source changes.

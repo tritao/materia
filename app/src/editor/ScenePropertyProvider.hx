@@ -165,6 +165,7 @@ class ScenePropertyProvider {
     if (!importedShape && !genericPart)
       result.push(scene.dimensionProperty(id, 2, prefix));
     for (property in kindProperties) result.push(property);
+    scene.appendSheetProperties(result, id, prefix);
     var selectedFeature = scene.selectedCadFeature(id);
     if (selectedFeature != null && selectedFeature.active && Std.isOfType(selectedFeature, ExtrudeFeature)) {
       var extrusion:ExtrudeFeature = cast selectedFeature;

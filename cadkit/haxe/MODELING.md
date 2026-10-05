@@ -393,3 +393,17 @@ and `SheetTolerance(minus, plus)` values in mm for thickness, width and height.
 The exported X axis follows authored grain; grained stock permits rotation 0,
 while ungrained stock permits 0/90 degrees. The result is ManufacturingKit
 `SheetPartRequirement`, ready for its current project codec and stock planning.
+
+### Editing sheets in the app
+
+In an empty CAD part, create and apply a constrained sketch. Select its feature,
+enter a material identity, thickness in mm and an explicit ANSI K factor in the
+inspector, then choose **Create sheet base**. Pick a straight wall-side face in
+the folded viewport, enter the straight flange length, signed bend angle in
+degrees and inner radius in mm, then choose **Create edge flange**.
+
+The selected sheet feature exposes editable dimensions and the bend table.
+**Flat pattern** switches the viewport to the derived blank and shows up/down
+bend intervals in blue/orange. This is view state; it does not edit the saved
+feature graph. Flanges are created in folded view. **Export flat DXF** and
+**Export flat SVG** export the exact current blank, bend marks and annotations.

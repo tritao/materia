@@ -289,6 +289,56 @@ class CadPlateWorkflowTests {
     if (FileSystem.exists(file)) FileSystem.deleteFile(file);
   }
 
+  static function sheetEditorWorkflow():Void {
+    var scene = new EditorScene([]);
+    var file = Sys.getCwd() + "/app/build/sheet-editor-p2.dxf";
+    try {
+      check(scene.createCadPart() && scene.createSketch() && scene.addSketchDraftRectangle(), "start an editor sheet sketch");
+      var id = scene.selectedId;
+      check(edit(scene, "Dimension width", 55) == PropertyEditResult.Applied, "set P2 web width");
+      check(edit(scene, "Dimension height", 120) == PropertyEditResult.Applied, "set P2 web length");
+      check(scene.applySelectedSketchEdit(), "publish P2 base profile");
+      var stock = cadkit.sheetmetal.SheetDemoParts.materialA();
+      check(scene.sheetAuthoring.materialId == "" && scene.sheetAuthoring.kFactor == "",
+        "the editor requires an explicit material identity and bend rule");
+      check(scene.createSheetBase(stock), "create a sheet base with explicit stock");
+      check(scene.selectedSheetFeature() != null, "sheet selection is typed");
+      check(edit(scene, "Sheet thickness", 1.2) == PropertyEditResult.Applied, "edit sheet thickness in inspector");
+      check(edit(scene, "Sheet thickness", 1.5) == PropertyEditResult.Applied, "restore P2 stock thickness");
+      check(scene.selectAtRay(0.1, 0.05, -0.00075, -1, 0, 0) == id, "pick P2 right wall-side face");
+      check(scene.createSheetFlange(37.5, Math.PI / 2, 1), "bend first P2 flange through editor");
+      check(scene.selectAtRay(-0.1, 0.05, -0.00075, 1, 0, 0) == id, "pick P2 left wall-side face");
+      check(scene.createSheetFlange(37.5, Math.PI / 2, 1), "bend second P2 flange through editor");
+      check(scene.selectedSheetBends().length == 2, "P2 exposes two sorted bend records");
+      var output = scene.selectedSheetFeature();
+      if (output == null) throw "P2 has no selected sheet output";
+      var graph = output.sheet();
+      var foldedBounds = graph.evaluate(graph.folded()).bounds();
+      nearWithin(foldedBounds.maxX - foldedBounds.minX, 60, 0.00001, "P2 outside width");
+      nearWithin(foldedBounds.maxY - foldedBounds.minY, 120, 0.00001, "P2 length");
+      nearWithin(foldedBounds.maxZ - foldedBounds.minZ, 40, 0.00001, "P2 outside height");
+      check(edit(scene, "Flange length", 42) == PropertyEditResult.Applied, "edit flange length in inspector");
+      check(edit(scene, "Flange length", 37.5) == PropertyEditResult.Applied, "restore P2 flange length");
+      var encoded = scene.currentCadGraph(id);
+      scene.setSelectedSheetFlatView(true);
+      check(scene.cadSession(id).sheetFlatView && scene.currentCadGraph(id) == encoded, "flat view leaves authored graph unchanged");
+      var flatShape = scene.cadSession(id).copyPublishedShape();
+      try {
+        var bounds = flatShape.bounds();
+        nearWithin(bounds.get_max().get_z() - bounds.get_min().get_z(), 1.5, 0.00001, "flat viewport has stock thickness");
+      } catch (error:Dynamic) { flatShape.close(); throw error; }
+      flatShape.close();
+      scene.exportSelectedSheet(file);
+      check(File.getContent(file).indexOf("AC1009") >= 0 && File.getContent(file).indexOf("BEND_UP") >= 0,
+        "editor exports P2 DXF with bend layer");
+      scene.setSelectedSheetFlatView(false);
+      check(!scene.cadSession(id).sheetFlatView && scene.currentCadGraph(id) == encoded, "folded view restores without authoring changes");
+    } catch (error:Dynamic) {
+      scene.dispose(); if (FileSystem.exists(file)) FileSystem.deleteFile(file); throw error;
+    }
+    scene.dispose(); if (FileSystem.exists(file)) FileSystem.deleteFile(file);
+  }
+
   static function sketchExtrusionWorkflow():Void {
     var scene = new EditorScene([]);
     try {
@@ -1186,6 +1236,7 @@ class CadPlateWorkflowTests {
       sketchCreationWorkflow();
       sketchDraftPersistenceWorkflow();
       sketchExtrusionWorkflow();
+      sheetEditorWorkflow();
       faceSketchPocketWorkflow();
       supportFaceRepairWorkflow();
       splitSupportRepairWorkflow();

@@ -34,6 +34,15 @@ import haxeon.ui.properties.PropertyValue;
 import nativekit.scene.PickResult;
 import CadKit;
 import cadkit.Shape;
+import cadkit.sheetmetal.SheetBaseFeature;
+import cadkit.sheetmetal.SheetEdgeFlangeFeature;
+import cadkit.sheetmetal.SheetFeature;
+import cadkit.sheetmetal.SheetMaterial;
+import cadkit.sheetmetal.FlatPattern;
+import cadkit.sheetmetal.FlatBend;
+import cadkit.drawing.Drawing2D;
+import cadkit.drawing.Dxf;
+import cadkit.drawing.Svg;
 import cadkit.parametric.Feature;
 import cadkit.parametric.ReferenceState;
 import cadkit.parametric.SelectionRecipe;
@@ -679,6 +688,115 @@ class EditorScene {
     for (match in matches)
       match.close();
     return isSelectedFace ? recipe : null;
+  }
+
+  /** A sheet base uses an explicitly chosen stock and development rule. */
+  public final sheetAuthoring = new app.editor.SheetMetalAuthoring();
+
+  public function createSheetBase(stock:SheetMaterial):Bool {
+    if (!canCreateExtrusion()) return false;
+    var source = Std.downcast(selectedCadFeature(selectedId), ConstrainedSketchFeature);
+    if (source == null) return false;
+    var feature = new SheetBaseFeature(source, stock);
+    if (!addCadFeature(selectedId, "Create sheet base", feature)) return false;
+    selectCadFeature(selectedId, feature);
+    refreshSelectionRevision();
+    return true;
+  }
+
+  public function selectedSheetFeature():Null<SheetFeature> {
+    if (object(selectedId) == null || !isCadKind(requiredObject(selectedId).kind)) return null;
+    var feature = Std.downcast(selectedCadFeature(selectedId), SheetFeature);
+    return feature != null && feature.active ? feature : null;
+  }
+
+  public function canCreateSheetFlange():Bool {
+    return activeSketchEdit == null && selectedCadFace != null && selectedSheetFeature() != null
+      && !requireCadSession(selectedId).sheetFlatView;
+  }
+
+  /** Persist the picked wall-side face; graph validation refuses unsuitable faces. */
+  public function createSheetFlange(length:Float, angle:Float, radius:Float):Bool {
+    if (!canCreateSheetFlange()) return false;
+    var source = selectedSheetFeature();
+    if (source == null) return false;
+    var feature = new SheetEdgeFlangeFeature(source, [selectedCadFace], length, angle, radius);
+    if (!addCadFeature(selectedId, "Create sheet flange", feature)) return false;
+    selectCadFeature(selectedId, feature);
+    clearSelectedCadFace();
+    refreshSelectionRevision();
+    return true;
+  }
+
+  public function selectedSheetFlatPattern():FlatPattern {
+    var feature = selectedSheetFeature();
+    if (feature == null) throw "Select a sheet feature";
+    return requireCadSession(selectedId).sheetFlatPattern(feature);
+  }
+
+  public function setSelectedSheetFlatView(flat:Bool):Void {
+    if (selectedSheetFeature() == null) throw "Select a sheet feature";
+    requireCadSession(selectedId).setSheetFlatView(flat);
+    clearSelectedCadFace();
+    syncCadSession(selectedId);
+    refreshSelectionRevision();
+  }
+
+  /** Inspector descriptors read the current feature on every edit and use document history. */
+  public function appendSheetProperties(result:Array<PropertyDescriptor>, id:String, prefix:String):Void {
+    var selected = selectedCadFeature(id);
+    var base = Std.downcast(selected, SheetBaseFeature);
+    var flange = Std.downcast(selected, SheetEdgeFlangeFeature);
+    var fields:Array<{name:String, label:String, unit:String}> = [];
+    if (base != null) fields.push({name:"sheet.thickness", label:"Sheet thickness", unit:"mm"});
+    if (flange != null) {
+      fields.push({name:"sheet.length", label:"Flange length", unit:"mm"});
+      fields.push({name:"sheet.angle", label:"Bend angle", unit:"deg"});
+      if (!flange.useMaterialRadius) fields.push({name:"sheet.radius", label:"Inner bend radius", unit:"mm"});
+      for (field in [{name:"offset", label:"Flange offset"}, {name:"gap1", label:"Start gap"},
+          {name:"gap2", label:"End gap"}, {name:"extend1", label:"Start extension"},
+          {name:"extend2", label:"End extension"}])
+        fields.push({name:"sheet." + field.name, label:field.label, unit:"mm"});
+    }
+    if (selected == null || !selected.active) return;
+    var featureId = selected.id.toInt();
+    var sheet = Std.downcast(selected, SheetFeature);
+    if (sheet != null) {
+      var viewSettings = new PropertyDescriptorOptions();
+      viewSettings.category = "Sheet metal"; viewSettings.recordHistory = false;
+      result.push(new PropertyDescriptor(prefix + "sheet.flat-view", "Flat pattern", PropertyType.Bool,
+        function(_) return PropertyValue.Bool(requireCadSession(id).sheetFlatView),
+        function(_, value) {
+          var flat = switch value { case Bool(v): v; default: throw "Flat pattern requires a boolean"; };
+          requireCadSession(id).setSheetFlatView(flat);
+          clearSelectedCadFace(); syncCadSession(id); refreshSelectionRevision();
+        }, viewSettings));
+    }
+    for (field in fields) {
+      var entry = field;
+      var scale = entry.unit == "deg" ? 180 / Math.PI : 1.0;
+      var settings = new PropertyDescriptorOptions();
+      settings.category = "Sheet metal"; settings.unit = entry.unit; settings.recordHistory = false;
+      result.push(new PropertyDescriptor(prefix + entry.name, entry.label, PropertyType.Float,
+        function(_) {
+          var current = requireCadSession(id).document.featureById(featureId);
+          if (current == null) throw "The sheet feature is no longer available";
+          return PropertyValue.Float(current.parameter(entry.name).value * scale);
+        }, function(_, value) {
+          var number:Float = switch value { case Float(v): v; case Int(v): v; default: throw "A sheet dimension requires a number"; };
+          setCadFeatureParameter(id, featureId, entry.name, number / scale);
+        }, settings));
+    }
+  }
+
+  public function selectedSheetBends():Array<FlatBend> {
+    return selectedSheetFlatPattern().bends();
+  }
+
+  /** Export current developed geometry without changing the document or its history. */
+  public function exportSelectedSheet(path:String, svg:Bool = false):Void {
+    var drawing = Drawing2D.of(selectedSheetFlatPattern());
+    sys.io.File.saveContent(path, svg ? Svg.write(drawing) : Dxf.write(drawing));
   }
 
   public function canCreateExtrusion():Bool {

@@ -22,6 +22,29 @@ class SceneObjectCommands {
     app.commands.register(new Command("scene.create-extrusion", "Extrude selected sketch", function() {
       app.runSceneEdit("Could not create extrusion", function() app.scene.createExtrusion());
     }, null, function() return app.canEditObjects() && app.scene.canCreateExtrusion()));
+    app.commands.register(new Command("scene.create-sheet-base", "Create sheet base", function() {
+      app.runSceneEdit("Could not create sheet base", function() return app.scene.createSheetBase(app.scene.sheetAuthoring.stock()));
+    }, null, function() return app.canEditObjects() && app.scene.canCreateExtrusion()));
+    app.commands.register(new Command("scene.create-sheet-flange", "Create edge flange", function() {
+      var input = app.scene.sheetAuthoring;
+      app.runSceneEdit("Could not create sheet flange", function() return app.scene.createSheetFlange(
+        SheetMetalAuthoring.number(input.length, "Flange length"),
+        SheetMetalAuthoring.number(input.angleDegrees, "Bend angle") * Math.PI / 180,
+        SheetMetalAuthoring.number(input.radius, "Inner radius")));
+    }, null, function() return app.canEditObjects() && app.scene.canCreateSheetFlange()));
+    for (format in ["dxf", "svg"]) {
+      var extension = format;
+      app.commands.register(new Command("scene.export-sheet-" + extension, "Export flat " + extension.toUpperCase(), function() {
+        var chooser = app.files;
+        if (chooser == null) return;
+        chooser.chooseExport("Export flat pattern", "Flat pattern." + extension, function(path, error) {
+          if (error != null) { app.log(error); return; }
+          if (path == null) return;
+          try app.scene.exportSelectedSheet(path, extension == "svg")
+          catch (failure:Dynamic) app.log("Flat export failed: " + Std.string(failure));
+        });
+      }, null, function() return app.files != null && app.scene.selectedSheetFeature() != null));
+    }
     app.commands.register(new Command("scene.create-face-sketch", "Sketch on selected face", function() {
       app.runSceneEdit("Could not create face sketch", function() app.scene.createFaceSketch());
     }, null, function() return app.canEditObjects() && app.scene.canCreateFaceSketch()));
