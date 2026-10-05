@@ -11,6 +11,8 @@ class TabItem {
 	public final content:View;
 	public final enabled:Bool;
 	public final icon:Null<IconName>;
+	/** Optional decorative view used in place of the standard icon. */
+	public var iconView:Null<View>;
 
 	public function new(key:String, label:String, content:View, enabled:Bool = true,
 			?icon:IconName, ?displayLabel:String) {

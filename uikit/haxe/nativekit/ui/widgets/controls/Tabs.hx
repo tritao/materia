@@ -129,6 +129,7 @@ class Tabs implements View {
 				button.variant = ButtonVariant.Navigation;
 				button.classes = ["tab-header"];
 				button.leadingIcon = item.icon;
+				button.leadingView = item.iconView;
 				button.iconSize = 14.0;
 				button.enabled = item.enabled;
 				button.selected = item.key == active;

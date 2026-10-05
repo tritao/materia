@@ -57,6 +57,8 @@ class TreeView implements View {
 	public var expandOnSingleClick:Bool = false;
 	public var onItemContextMenu:Null<String->UiEvent->Void>;
 	public var onItemRename:Null<String->Void>;
+	/** Optional row builder receiving the current expansion state. */
+	public var itemBuilder:Null<(String, Bool)->View>;
 	public var onExpandedChanged:Null<String->Bool->Void>;
 
 	final fallbackViewportHeight:Float;
@@ -246,7 +248,7 @@ class TreeView implements View {
 					ensureEntryDetails(entry);
 					entryByKey.set(entry.key, entry);
 					var nodeKey = entry.key;
-					var item = model.buildItem(nodeKey);
+					var item = itemBuilder == null ? model.buildItem(nodeKey) : itemBuilder(nodeKey, entry.expanded);
 					if (item == null)
 						throw 'TreeView model returned null for key $nodeKey';
 					var row = new TreeViewRow("row", nodeKey, item, entry, selectedKey == nodeKey,

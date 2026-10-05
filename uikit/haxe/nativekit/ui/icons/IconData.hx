@@ -42,6 +42,9 @@ class IconData {
 			case IconName.NewFile: new PathBuilder().moveTo(13, 3).lineTo(5, 3).lineTo(5, 21)
 				.lineTo(19, 21).lineTo(19, 9).lineTo(13, 3).lineTo(13, 9).lineTo(19, 9)
 				.moveTo(12, 13).lineTo(12, 19).moveTo(9, 16).lineTo(15, 16).build();
+			case IconName.FolderClosed: new PathBuilder().moveTo(3, 7).lineTo(3, 5)
+				.lineTo(10, 5).lineTo(12, 7).lineTo(21, 7).lineTo(21, 20)
+				.lineTo(3, 20).lineTo(3, 7).build();
 			case IconName.FolderOpen: new PathBuilder().moveTo(3, 7).lineTo(3, 5)
 				.lineTo(10, 5).lineTo(12, 7).lineTo(21, 7).lineTo(21, 10)
 				.moveTo(3, 11).lineTo(22, 11).lineTo(19, 20).lineTo(5, 20).lineTo(3, 11).build();
