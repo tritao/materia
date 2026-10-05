@@ -260,7 +260,7 @@ class DriveLoads {
       // Process-owned axes receive effort from a valve or spindle channel, not
       // from the trajectory planner's motor budget.
       if (actuator.processVelocity != null ||
-          (actuator.drive != null && actuator.drive.pneumatic() != null)) continue;
+          (actuator.drive != null && actuator.drive.cylinder() != null)) continue;
       switch actuator.transmission {
       case SimpleTransmission(target, transmissionRatio, _):
         var index = -1;

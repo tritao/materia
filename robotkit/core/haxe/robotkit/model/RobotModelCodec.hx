@@ -2,8 +2,10 @@ package robotkit.model;
 
 
 import haxe.Json;
+import haxeon.wire.JsonWire;
 import haxe.io.Bytes;
 import robotkit.model.ActuatorDrive;
+import robotkit.model.ActuatorDrive.HydraulicDrive;
 import robotkit.model.ProcessVelocityDrive;
 import robotkit.model.CollisionShape;
 import robotkit.model.Transmission;
@@ -633,6 +635,7 @@ class RobotModelCodec {
       var stepper = drive.stepper();
       var servo = drive.servo();
       var pneumatic = drive.pneumatic();
+      var hydraulic = drive.hydraulic();
       if (stepper != null) {
         record.drive = {kind: "stepper", fullStepsPerRevolution: stepper.fullStepsPerRevolution,
           rotorInertia: stepper.rotorInertia, holdingTorque: stepper.holdingTorque, curve: stepper.curve.flatten()};
@@ -645,12 +648,27 @@ class RobotModelCodec {
           stroke: pneumatic.stroke, ratedSpeed: pneumatic.ratedSpeed, pressurePa: pneumatic.pressurePa,
           channelA: pneumatic.channelA, channelB: pneumatic.channelB,
           normallyToA: pneumatic.normallyToA, extendSign: pneumatic.extendSign};
+      } else if (hydraulic != null) {
+        var channelB = hydraulic.channelB;
+        if (channelB == null) throw 'Hydraulic actuator ${value.id} has no return coil';
+        var saved:HydraulicDriveRecord = {bore: hydraulic.bore, rod: hydraulic.rod,
+          stroke: hydraulic.stroke, pressurePa: hydraulic.pressurePa, approachSpeed: hydraulic.approachSpeed,
+          workingSpeed: hydraulic.workingSpeed, returnSpeed: hydraulic.returnSpeed,
+          changePoint: hydraulic.changePoint, channelA: hydraulic.channelA, channelB: channelB,
+          extendSign: hydraulic.extendSign, retractedPosition: hydraulic.retractedPosition};
+        record.drive = {kind: "hydraulic", parameters: Json.parse(JsonWire.encode(saved))};
       } else throw 'Actuator ${value.id} has an unsupported drive';
     }
     return record;
   }
 
   static function readActuatorDrive(record:Dynamic):ActuatorDrive {
+    if (text(record, "kind") == "hydraulic") {
+      var saved:HydraulicDriveRecord = JsonWire.decode(Json.stringify(Reflect.field(record, "parameters")));
+      return new HydraulicDrive(saved.bore, saved.rod, saved.stroke, saved.pressurePa,
+        saved.approachSpeed, saved.workingSpeed, saved.returnSpeed, saved.changePoint,
+        saved.channelA, saved.channelB, saved.extendSign, saved.retractedPosition);
+    }
     if (text(record, "kind") == "pneumatic")
       return new PneumaticDrive(number(record, "bore"), number(record, "rod"), number(record, "stroke"),
         number(record, "ratedSpeed"), number(record, "pressurePa"), text(record, "channelA"),
@@ -683,8 +701,8 @@ class RobotModelCodec {
       throw "Actuator microsteps must be an integer from 1 to 1024";
     if (value.maxStepRate != null && (!(value.maxStepRate > 0) || !Math.isFinite(value.maxStepRate)))
       throw "Actuator maxStepRate must be finite and positive";
-    if (value.drive != null && !Std.isOfType(value.drive, StepperDrive) && !Std.isOfType(value.drive, ServoDrive) &&
-        !Std.isOfType(value.drive, PneumaticDrive))
+    var drive = value.drive;
+    if (drive != null && drive.stepper() == null && drive.servo() == null && drive.cylinder() == null)
       throw 'Actuator ${value.id} has an unsupported drive';
     requireText(value.id, "actuator ID");
     if (value.maxEffort != null) finite(value.maxEffort, "actuator maxEffort");

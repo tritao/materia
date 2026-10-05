@@ -4056,7 +4056,7 @@ class ProjectSourceTests {
       var expectedViseSeconds = gripTravel * 0.98 / viseDrive.ratedSpeed;
       check(doorOpenStart > 0 && doorOpenReached > doorOpenStart &&
         Math.abs(doorOpenSeconds / expectedDoorSeconds - 1.0) <= 0.1,
-        'MuJoCo door extension takes stroke / rated speed within 10%, measured $doorOpenSeconds s; start=$doorOpenStart reached=$doorOpenReached position=$lastDoorPosition peak=$peakDoorPosition effort=$peakDoorEffort stroke=${doorDrive.stroke} speed=${doorDrive.ratedSpeed} sign=${doorDrive.extendSign} drives=${blueprint.pneumaticDrives.length}, trajectory=${runtime.snapshot().trajectoryTimeNs}, active=${runtime.snapshot().trajectoryActive}, safety=${runtime.snapshot().safety}');
+        'MuJoCo door extension takes stroke / rated speed within 10%, measured $doorOpenSeconds s; start=$doorOpenStart reached=$doorOpenReached position=$lastDoorPosition peak=$peakDoorPosition effort=$peakDoorEffort stroke=${doorDrive.stroke} speed=${doorDrive.ratedSpeed} sign=${doorDrive.extendSign} drives=${blueprint.cylinderDrives.length}, trajectory=${runtime.snapshot().trajectoryTimeNs}, active=${runtime.snapshot().trajectoryActive}, safety=${runtime.snapshot().safety}');
       check(doorCloseStart > 0 && doorCloseReached > doorCloseStart &&
         Math.abs(doorCloseSeconds / expectedDoorCloseSeconds - 1.0) <= 0.1,
         'MuJoCo door retraction takes stroke / rated speed within 10%, measured $doorCloseSeconds s');

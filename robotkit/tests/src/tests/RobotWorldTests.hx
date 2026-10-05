@@ -281,6 +281,8 @@ class RobotWorldTests {
     testRuntimeProcessEvents();
     testControllerProcessOutputs();
     testPneumaticProcessDrive();
+    assertions += HydraulicRuntimeTests.run(0);
+    assertions += HydraulicRuntimeTests.pressureLoss(0);
     testDiscreteNativeSensors();
     testVirtualDeviceSimulation();
     assertions += SpatialTests.run();
@@ -4924,16 +4926,16 @@ class RobotWorldTests {
     viseActuator.drive = viseDrive;
     model.addActuator(viseActuator);
     var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
-    check(blueprint.pneumaticDrives.length == 2 && blueprint.channels.length == 4,
+    check(blueprint.cylinderDrives.length == 2 && blueprint.channels.length == 4,
       "cylinder compilation binds process joints and declares digital valve coils");
-    check(Math.abs(blueprint.pneumaticDrives[0].ratedSpeed - drive.ratedSpeed) < 1e-9 &&
-      Math.abs(blueprint.pneumaticDrives[1].ratedSpeed - viseDrive.ratedSpeed) < 1e-9,
+    check(Math.abs(blueprint.cylinderDrives[0].ratedSpeed - drive.ratedSpeed) < 1e-9 &&
+      Math.abs(blueprint.cylinderDrives[1].ratedSpeed - viseDrive.ratedSpeed) < 1e-9,
       "cylinder rated speed remains simulation metadata for flow damping");
     check(model.actuators[0].planningEffort() == null && model.actuators[0].planningRate() == null,
       "process-driven pneumatic axes are excluded from trajectory planning limits");
     var encoded = RobotModelCodec.encode(model);
     check(RobotModelCodec.decode(encoded).actuators[0].drive.kind() == "pneumatic",
-      "RobotModel v10 preserves pneumatic process drives");
+      "Current RobotModel preserves pneumatic process drives");
 
     var simulationHarness = new SimulationHarness();
     var runtime = simulationHarness.simulation.addRobot(blueprint);
@@ -5066,10 +5068,10 @@ class RobotWorldTests {
       "process spindle compiles to typed analog speed and direction channels");
     var encoded = RobotModelCodec.encode(model);
     var restored = RobotModelCodec.decode(encoded).actuators[0].processVelocity;
-    check(RobotModelCodec.VERSION == 12 && restored != null &&
+    check(RobotModelCodec.VERSION == RobotModel.CURRENT_VERSION && restored != null &&
       restored.speedChannel == "spindle.speed" && restored.directionChannel == "spindle.direction" &&
       Math.abs(restored.radiansPerSpeedUnit - 1.0) < 1e-9,
-      "RobotModel v12 preserves the typed spindle process binding");
+      "Current RobotModel preserves the typed spindle process binding");
     var runtime = simulationHarness.simulation.addRobot(blueprint);
     var robot = new SimulatedRobot("discrete-process-sensors", runtime,
       "discrete-process-sensors", ["base", "carriage", "spindle"], ["slide", "spindle"]);

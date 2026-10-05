@@ -13,7 +13,7 @@ namespace robotkit {
 
 /** A failed typed read belongs to the owning robot, not to the shared physics tick. */
 struct ProcessChannelFault {
-    enum class Reason { Missing, Type, Value };
+    enum class Reason { Missing, Type, Value, Endpoint };
     Reason reason;
     std::string channel;
     rk_result source_result;
@@ -22,6 +22,7 @@ struct ProcessChannelFault {
         case Reason::Missing: return RK_FAULT_PROCESS_CHANNEL_MISSING;
         case Reason::Type: return RK_FAULT_PROCESS_CHANNEL_TYPE;
         case Reason::Value: return RK_FAULT_PROCESS_CHANNEL_VALUE;
+        case Reason::Endpoint: return RK_FAULT_ENDPOINT;
         }
         return RK_FAULT_ENDPOINT;
     }

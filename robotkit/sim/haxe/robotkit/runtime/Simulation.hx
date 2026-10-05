@@ -126,7 +126,7 @@ class Simulation {
       SimulatedSwitchSensorAdapter.bindingIndices(blueprint);
     if (space != null) space.requireDrives(blueprint);
     var robotDesc:Null<rk_simulation_robot_desc> = null;
-    if (initialPose != null || virtualDevice != null || blueprint.pneumaticDrives.length > 0 ||
+    if (initialPose != null || virtualDevice != null || blueprint.cylinderDrives.length > 0 ||
         blueprint.velocityDrives.length > 0 || blueprint.brakePhysics.length > 0 ||
         restContactGroup != null || linkExcludes != null) {
       robotDesc = new rk_simulation_robot_desc();
@@ -214,11 +214,11 @@ class Simulation {
         }
       }
     }
-    if (blueprint.pneumaticDrives.length > 0) {
+    if (blueprint.cylinderDrives.length > 0) {
       var desc = requireRobotDescription(robotDesc);
-      desc.set_pneumatic_drive_count(blueprint.pneumaticDrives.length);
-      for (index in 0...blueprint.pneumaticDrives.length) {
-        var drive = blueprint.pneumaticDrives[index];
+      desc.set_cylinder_drive_count(blueprint.cylinderDrives.length);
+      for (index in 0...blueprint.cylinderDrives.length) {
+        var drive = blueprint.cylinderDrives[index];
         var channelA = -1, channelB = -1;
         for (channelIndex in 0...blueprint.channels.length) {
           var channel = blueprint.channels[channelIndex];
@@ -228,17 +228,27 @@ class Simulation {
           if (drive.channelB != null && channel.id == drive.channelB) channelB = channelIndex;
         }
         if (channelA < 0 || (drive.channelB != null && channelB < 0))
-          throw 'Pneumatic drive on joint ${drive.joint} references an undeclared digital coil';
-        var native = new rk_simulation_pneumatic_drive();
+          throw 'Cylinder drive on joint ${drive.joint} references an undeclared digital coil';
+        var native = new rk_simulation_cylinder_drive();
         native.set_joint(drive.joint);
         native.set_channel_a(channelA);
         native.set_channel_b(drive.channelB == null ? -1 : channelB);
         native.set_normally_to_a(drive.normallyToA ? 1 : 0);
+        native.set_control(switch drive.control {
+          case PressureEffort: RkCylinderControl.PressureEffort;
+          case FlowLimited: RkCylinderControl.FlowLimited;
+        });
         native.set_extension_force(drive.extensionForce);
         native.set_retraction_force(drive.retractionForce);
         native.set_extend_sign(drive.extendSign);
         native.set_rated_speed(drive.ratedSpeed);
-        desc.set_pneumatic_drives(index, native);
+        native.set_stroke(drive.stroke);
+        native.set_approach_speed(drive.approachSpeed);
+        native.set_working_speed(drive.workingSpeed);
+        native.set_return_speed(drive.returnSpeed);
+        native.set_change_point(drive.changePoint);
+        native.set_retracted_position(drive.retractedPosition);
+        desc.set_cylinder_drives(index, native);
       }
     }
     if (blueprint.velocityDrives.length > 0) {

@@ -3,7 +3,7 @@ package tests;
 /**
  * Entry point for the separate `robotkit/tests/mujoco` haxeon project (see
  * ARCHITECTURE.md "Simulated wall-finishing robot (M9)"): runs only the
- * MuJoCo-backend variant of the M9 wall-finishing scenario. Kept as its own
+ * MuJoCo-backend scenarios and shared hydraulic process drives. Kept as its own
  * tiny entry rather than folding into `RobotWorldTests.main()`, since that
  * class is also the entry for the standard `robotkit/tests` project, whose
  * native build has no MuJoCo backend compiled in.
@@ -11,6 +11,9 @@ package tests;
 class WallFinishingMuJoCoRunner {
   public static function main():Void {
     SimulationPoseResetTests.run(1);
+    var strokeAssertions = HydraulicRuntimeTests.run(1);
+    var pressureAssertions = HydraulicRuntimeTests.pressureLoss(1);
+    Sys.println('Hydraulic MuJoCo runtime tests passed (${strokeAssertions + pressureAssertions} assertions)');
     WallFinishingScenarioTests.runMuJoCo();
   }
 }

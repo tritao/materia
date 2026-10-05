@@ -447,8 +447,6 @@ class AssemblySimulationBridge {
     // A motor on a joint: its effort and rate in robot units, and its rotor turning with the joint.
     if (definition.actuators != null) for (actuator in definition.actuators) {
 			if (ownedJoints != null && !selected.exists(actuator.joint)) continue;
-      if (actuator.hydraulic != null)
-        throw 'Assembly actuator "${actuator.id}" needs a hydraulic simulation drive';
       var driven:Null<Joint> = null;
       for (joint in model.joints) if (joint.id == actuator.joint) driven = joint;
       var edge:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
@@ -474,6 +472,14 @@ class AssemblySimulationBridge {
             driven.limits.overtravel);
           driven.limitDampingRatio = 1.0;
         }
+      }
+      if (actuator.hydraulic != null) {
+        var h = actuator.hydraulic;
+        var retracted = h.extendSign > 0.0 ? driven.limits.lower : driven.limits.upper;
+        added.drive = new robotkit.model.ActuatorDrive.HydraulicDrive(h.bore * scale, h.rod * scale,
+          h.stroke * scale, h.pressurePa, h.approachSpeed * scale, h.workingSpeed * scale,
+          h.returnSpeed * scale, h.changePoint * scale, h.channelA, h.channelB, h.extendSign,
+          retracted);
       }
       if (actuator.processVelocity != null) {
         var process = actuator.processVelocity;

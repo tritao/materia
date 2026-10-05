@@ -38,7 +38,7 @@ class RobotRuntimeBlueprint {
    * Resolve the cushioned stop's force/mass time constant with MuJoCo's two-step floor. */
   public function pneumaticStabilityInterval():Float {
     var interval = Math.POSITIVE_INFINITY;
-    for (drive in pneumaticDrives) {
+    for (drive in cylinderDrives) {
       if (drive.joint < 0 || drive.joint >= joints.length)
         throw 'Pneumatic stability references unknown joint ${drive.joint}';
       var joint = joints[drive.joint];
@@ -62,8 +62,8 @@ class RobotRuntimeBlueprint {
   /** Immutable switch definitions sampled by simulation or supplied by device inputs. */
   public final switches:Array<robotkit.model.JointSwitch> = [];
   public final channels:Array<ProcessChannelDeclaration> = [];
-  /** Pneumatic process drives are bound to channels, never to trajectory axes. */
-  public final pneumaticDrives:Array<RobotRuntimePneumaticDriveBlueprint> = [];
+  /** Cylinder process drives are bound to channels, never to trajectory axes. */
+  public final cylinderDrives:Array<RobotRuntimeCylinderDriveBlueprint> = [];
   /** Velocity process drives are bound to analog channels, never to trajectory axes. */
   public final velocityDrives:Array<RobotRuntimeVelocityDriveBlueprint> = [];
   public final brakes:Array<RobotRuntimeBrakeBlueprint> = [];
@@ -72,7 +72,7 @@ class RobotRuntimeBlueprint {
   /** Process ownership covers the whole mechanically coupled set, not just its motor shaft. */
   public function processJoints():Array<Bool> {
     var owned = [for (_ in joints) false];
-    for (drive in pneumaticDrives) {
+    for (drive in cylinderDrives) {
       if (drive.joint < 0 || drive.joint >= joints.length) throw "Pneumatic drive joint is outside the blueprint";
       owned[drive.joint] = true;
     }
@@ -244,12 +244,12 @@ class RobotRuntimeBlueprint {
         : RobotKitRuntimeConstants.RK_CHANNEL_SAFE_ON_STOP);
       value.set_channels(index, nativeChannel);
     }
-    if (pneumaticDrives.length > RobotKitRuntimeConstants.RK_MAX_JOINTS)
+    if (cylinderDrives.length > RobotKitRuntimeConstants.RK_MAX_JOINTS)
       throw "Too many process-driven joints";
     var processJointIds = new Map<Int, Bool>();
-    for (drive in pneumaticDrives) {
+    for (drive in cylinderDrives) {
       if (drive.joint < 0 || drive.joint >= jointCount)
-        throw 'Pneumatic process drive references unknown joint ${drive.joint}';
+        throw 'Cylinder process drive references unknown joint ${drive.joint}';
       if (processJointIds.exists(drive.joint))
         throw 'Multiple process drives reference joint ${drive.joint}';
       processJointIds.set(drive.joint, true);
@@ -259,7 +259,7 @@ class RobotRuntimeBlueprint {
         if (drive.channelB != null && channel.id == drive.channelB && channel.safeValue == Digital(false)) channelB = true;
       }
       if (!channelA || !channelB)
-        throw 'Pneumatic drive on joint ${drive.joint} needs declared digital coil channels';
+        throw 'Cylinder drive on joint ${drive.joint} needs declared digital coil channels';
     }
     if (velocityDrives.length > RobotKitRuntimeConstants.RK_MAX_JOINTS)
       throw "Too many process-driven joints";

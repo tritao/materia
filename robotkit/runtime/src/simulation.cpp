@@ -277,11 +277,11 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         for (uint32_t j = 0; j < i; ++j)
             if (robot_desc->brakes[j].joint == brake.joint) return RK_ERROR_INVALID_ARGUMENT;
     }
-    const bool has_pneumatic_desc = robot_desc != nullptr;
-    const auto pneumatic_count = has_pneumatic_desc ? robot_desc->pneumatic_drive_count : 0;
-    if (pneumatic_count > RK_MAX_JOINTS) return RK_ERROR_INVALID_ARGUMENT;
-    for (uint32_t index = 0; index < pneumatic_count; ++index) {
-        const auto &drive = robot_desc->pneumatic_drives[index];
+    const bool has_cylinder_desc = robot_desc != nullptr;
+    const auto cylinder_count = has_cylinder_desc ? robot_desc->cylinder_drive_count : 0;
+    if (cylinder_count > RK_MAX_JOINTS) return RK_ERROR_INVALID_ARGUMENT;
+    for (uint32_t index = 0; index < cylinder_count; ++index) {
+        const auto &drive = robot_desc->cylinder_drives[index];
         if (drive.joint >= blueprint.joint_count ||
             blueprint.joints[drive.joint].type != RK_RUNTIME_JOINT_PRISMATIC ||
             !blueprint.process_joint[drive.joint] ||
@@ -297,8 +297,19 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             (drive.channel_b != UINT32_MAX &&
              blueprint.channels[drive.channel_b].kind != RK_EVENT_DIGITAL))
             return RK_ERROR_INVALID_ARGUMENT;
+        if (drive.control != RK_CYLINDER_PRESSURE_EFFORT && drive.control != RK_CYLINDER_FLOW_LIMITED)
+            return RK_ERROR_INVALID_ARGUMENT;
+        if (drive.control == RK_CYLINDER_FLOW_LIMITED &&
+            (drive.channel_b == UINT32_MAX || !std::isfinite(drive.stroke) || drive.stroke <= 0.0 ||
+             !std::isfinite(drive.approach_speed) || drive.approach_speed <= 0.0 ||
+             !std::isfinite(drive.working_speed) || drive.working_speed <= 0.0 ||
+             !std::isfinite(drive.return_speed) || drive.return_speed <= 0.0 ||
+             !std::isfinite(drive.change_point) || drive.change_point < 0.0 || drive.change_point > drive.stroke ||
+             !std::isfinite(drive.retracted_position) ||
+             std::max({drive.approach_speed, drive.working_speed, drive.return_speed}) > drive.rated_speed))
+            return RK_ERROR_INVALID_ARGUMENT;
         for (uint32_t earlier = 0; earlier < index; ++earlier)
-            if (robot_desc->pneumatic_drives[earlier].joint == drive.joint)
+            if (robot_desc->cylinder_drives[earlier].joint == drive.joint)
                 return RK_ERROR_INVALID_ARGUMENT;
     }
     const bool has_velocity_desc = robot_desc != nullptr;
@@ -320,8 +331,8 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         for (uint32_t earlier = 0; earlier < index; ++earlier)
             if (robot_desc->velocity_drives[earlier].joint == drive.joint)
                 return RK_ERROR_INVALID_ARGUMENT;
-        for (uint32_t pneumatic = 0; pneumatic < pneumatic_count; ++pneumatic)
-            if (robot_desc->pneumatic_drives[pneumatic].joint == drive.joint)
+        for (uint32_t cylinder = 0; cylinder < cylinder_count; ++cylinder)
+            if (robot_desc->cylinder_drives[cylinder].joint == drive.joint)
                 return RK_ERROR_INVALID_ARGUMENT;
     }
     if (initial_pose && (initial_pose->struct_size < sizeof(*initial_pose) ||
@@ -413,10 +424,16 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
     }
     try {
         auto binding = std::shared_ptr<SimulationRobot>(new SimulationRobot(*this));
-        for (uint32_t index = 0; index < pneumatic_count; ++index) {
-            const auto &source = robot_desc->pneumatic_drives[index];
-            SimulationRobot::PneumaticDriveState drive;
+        for (uint32_t index = 0; index < cylinder_count; ++index) {
+            const auto &source = robot_desc->cylinder_drives[index];
+            SimulationRobot::CylinderDriveState drive;
             drive.joint = source.joint;
+            drive.control = source.control;
+            drive.approach_speed = source.approach_speed;
+            drive.working_speed = source.working_speed;
+            drive.return_speed = source.return_speed;
+            drive.change_point = source.change_point;
+            drive.retracted_position = source.retracted_position;
             drive.channel_a = blueprint.channels[source.channel_a].id;
             drive.has_channel_b = source.channel_b != UINT32_MAX;
             if (drive.has_channel_b) drive.channel_b = blueprint.channels[source.channel_b].id;
@@ -425,7 +442,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             drive.extension_force = source.extension_force;
             drive.retraction_force = source.retraction_force;
             drive.extend_sign = source.extend_sign;
-            binding->pneumatic_drives_.push_back(std::move(drive));
+            binding->cylinder_drives_.push_back(std::move(drive));
         }
         for (uint32_t index = 0; index < velocity_count; ++index) {
             const auto &source = robot_desc->velocity_drives[index];
@@ -703,7 +720,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             desc.axis_a[2] = a[2] + q[3]*t[2] + q[0]*t[1] - q[1]*t[0];
             std::copy_n(source.parent_frame_rotation, 4, desc.rotation_a);
             std::copy_n(source.child_frame_rotation, 4, desc.rotation_b);
-            // A pneumatic cylinder's overtravel is its compressible end cushion: keep
+            // A cylinder's overtravel is its compressible end cushion: keep
             // the physics stop at the stroke boundary while the runtime tolerates
             // that small penetration in the observed joint position.
             const double overtravel = blueprint.process_joint[index] ? 0.0 : blueprint.joint_overtravel[index];
@@ -722,13 +739,14 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 desc.limit_damping_ratio = dynamics.limit_damping_ratio;
                 std::copy_n(dynamics.limit_impedance, 5, desc.limit_impedance);
             }
-            for (uint32_t drive_index = 0; drive_index < pneumatic_count; ++drive_index) {
-                const auto &drive = robot_desc->pneumatic_drives[drive_index];
+            for (uint32_t drive_index = 0; drive_index < cylinder_count; ++drive_index) {
+                const auto &drive = robot_desc->cylinder_drives[drive_index];
                 if (drive.joint != index) continue;
                 desc.max_force = std::max(desc.max_force,
                     std::max(drive.extension_force, drive.retraction_force));
-                desc.damping += std::max(drive.extension_force, drive.retraction_force) /
-                    drive.rated_speed;
+                if (drive.control == RK_CYLINDER_PRESSURE_EFFORT)
+                    desc.damping += std::max(drive.extension_force, drive.retraction_force) /
+                        drive.rated_speed;
             }
             nksim_joint joint = 0;
             require_sim(nksim_joint_create(world, &desc, &joint), "nksim_joint_create");
@@ -1865,7 +1883,7 @@ rk_result Simulation::submit(const nksim_tick &tick) {
         auto targets = binding->take_pending_targets();
         if (binding_index >= runtimes_.size()) return RK_ERROR_BACKEND;
         auto &runtime = *runtimes_[binding_index];
-        auto process_fault = binding->apply_pneumatic_valves(runtime, targets);
+        auto process_fault = binding->apply_cylinder_valves(runtime, targets);
         if (!process_fault) process_fault = binding->apply_velocity_drives(runtime, targets);
         rk_result brake_result = RK_OK;
         if (!process_fault) brake_result = binding->apply_brake_coils(runtime, process_fault);
@@ -1874,7 +1892,7 @@ rk_result Simulation::submit(const nksim_tick &tick) {
             // apply physical de-energized behavior (latched valves retain supply air).
             runtime.fail_tick(process_fault ? process_fault->code() : RK_FAULT_ENDPOINT);
             targets = binding->take_pending_targets();
-            const auto safe_valves = binding->apply_pneumatic_valves(runtime, targets, true);
+            const auto safe_valves = binding->apply_cylinder_valves(runtime, targets, true);
             const auto safe_velocity = binding->apply_velocity_drives(runtime, targets, true);
             std::optional<ProcessChannelFault> safe_brake_fault;
             if (binding->apply_brake_coils(runtime, safe_brake_fault, true) != RK_OK) return RK_ERROR_BACKEND;

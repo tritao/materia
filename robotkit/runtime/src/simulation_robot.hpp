@@ -40,7 +40,7 @@ public:
         staged_stopped_ = false;
         std::fill(commanded_.begin(), commanded_.end(), JointCommand{});
         stopped_ = false;
-        for (auto &drive : pneumatic_drives_) drive.to_a = drive.normally_to_a;
+        for (auto &drive : cylinder_drives_) drive.to_a = drive.normally_to_a;
         reset_sensors();
         queue_rest_holds();
     }
@@ -77,7 +77,7 @@ private:
     /** Hands this tick's targets to the backend and commits what they command. */
     std::vector<nksim_joint_target> take_pending_targets();
     /** Resolves valve coils and queues simulation-owned cylinder effort for this physics tick. */
-    std::optional<ProcessChannelFault> apply_pneumatic_valves(const RobotRuntime &runtime,
+    std::optional<ProcessChannelFault> apply_cylinder_valves(const RobotRuntime &runtime,
                                      std::vector<nksim_joint_target> &targets, bool deenergized = false);
     /** Resolves spindle setpoint channels and queues their velocity targets. */
     std::optional<ProcessChannelFault> apply_velocity_drives(const RobotRuntime &runtime,
@@ -147,8 +147,9 @@ private:
         bool active = false;
     };
     std::vector<SensorState> sensors_;
-    struct PneumaticDriveState {
+    struct CylinderDriveState {
         uint32_t joint = 0;
+        uint32_t control = RK_CYLINDER_PRESSURE_EFFORT;
         std::string channel_a;
         std::string channel_b;
         bool has_channel_b = false;
@@ -157,8 +158,13 @@ private:
         double extension_force = 0.0;
         double retraction_force = 0.0;
         double extend_sign = 1.0;
+        double approach_speed = 0.0;
+        double working_speed = 0.0;
+        double return_speed = 0.0;
+        double change_point = 0.0;
+        double retracted_position = 0.0;
     };
-    std::vector<PneumaticDriveState> pneumatic_drives_;
+    std::vector<CylinderDriveState> cylinder_drives_;
     struct VelocityDriveState {
         uint32_t joint = 0;
         std::string speed_channel;

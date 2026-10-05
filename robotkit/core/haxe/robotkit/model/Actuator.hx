@@ -80,7 +80,7 @@ class Actuator {
    */
   public function planningEffort():Null<Float> {
     var current = drive, effort = maxEffort;
-    if (processVelocity != null || (current != null && current.pneumatic() != null)) return null;
+    if (processVelocity != null || (current != null && current.cylinder() != null)) return null;
     if (current == null || !Std.isOfType(current, ServoDrive)) return effort;
     return effort == null ? current.peakTorque() : Math.min(effort, current.peakTorque());
   }
@@ -88,7 +88,7 @@ class Actuator {
   /** Missing motor speed stays missing until a stated drive or driver supplies a cap. */
   public function planningRate():Null<Float> {
     var current = drive, rate = maxRate;
-    if (processVelocity != null || (current != null && current.pneumatic() != null)) return null;
+    if (processVelocity != null || (current != null && current.cylinder() != null)) return null;
     if (current != null && Std.isOfType(current, ServoDrive))
       rate = rate == null ? current.maxSpeed() : Math.min(rate, current.maxSpeed());
     var setting = microsteps, inputRate = maxStepRate;

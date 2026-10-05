@@ -1,7 +1,7 @@
 package robotkit.model;
 
 /**
- * What kind of motor an actuator is, and what it can deliver. Steppers and servos fail
+ * What powers an actuator, and what it can deliver. Steppers and servos fail
  * differently: a stepper that is asked for more torque than its pull-out curve gives loses steps,
  * a servo that is asked for more than its peak torque falls behind or trips. Drive-level
  * behaviour only; current loops and thermal mass are left out.
@@ -30,7 +30,13 @@ class ActuatorDrive {
   /** Stepper fields when this drive has steps; null for other drives. */
   public function stepper():Null<StepperDrive> return null;
 
-  /** Pneumatic fields when this drive is a cylinder; null for electric drives. */
+  /** Fluid cylinder fields when this drive belongs to a process joint. */
+  public function cylinder():Null<CylinderDrive> return null;
+
+  /** Hydraulic phase fields when this drive uses flow control. */
+  public function hydraulic():Null<HydraulicDrive> return null;
+
+  /** Pressure-effort pneumatic fields; null for other drives. */
   public function pneumatic():Null<PneumaticDrive> return null;
 
   /** Servo fields when this drive has a position loop; null for other drives. */
@@ -118,8 +124,8 @@ class ServoDrive extends ActuatorDrive {
   override public function servo():Null<ServoDrive> return this;
 }
 
-/** Double-acting cylinder whose effort is selected by process valve channels, not a motion plan. */
-class PneumaticDrive extends ActuatorDrive {
+/** Shared double-acting cylinder dimensions, pressure forces and process channels in SI units. */
+class CylinderDrive extends ActuatorDrive {
   public final bore:Float;
   public final rod:Float;
   public final stroke:Float;
@@ -130,21 +136,35 @@ class PneumaticDrive extends ActuatorDrive {
   public final normallyToA:Bool;
   public final extendSign:Float;
 
-  public function new(bore:Float, rod:Float, stroke:Float, ratedSpeed:Float, pressurePa:Float,
+  function new(bore:Float, rod:Float, stroke:Float, ratedSpeed:Float, pressurePa:Float,
       channelA:String, channelB:Null<String>, normallyToA:Bool, extendSign:Float) {
     super(0.0, TorqueSpeedCurve.flat(0.0, ratedSpeed));
     if (!(bore > rod && rod > 0 && stroke > 0 && ratedSpeed > 0 && pressurePa >= 0) ||
         !Math.isFinite(bore + rod + stroke + ratedSpeed + pressurePa) ||
         channelA == null || channelA.length == 0 || (channelB != null && channelB.length == 0) ||
         (extendSign != 1.0 && extendSign != -1.0))
-      throw "Invalid pneumatic drive";
+      throw "Invalid cylinder drive";
     this.bore = bore; this.rod = rod; this.stroke = stroke; this.ratedSpeed = ratedSpeed;
     this.pressurePa = pressurePa; this.channelA = channelA; this.channelB = channelB;
     this.normallyToA = normallyToA; this.extendSign = extendSign;
+    if (!Math.isFinite(extensionForce() + retractionForce())) throw "Cylinder pressure-area force overflows";
   }
 
   public function extensionForce():Float return pressurePa * Math.PI * bore * bore / 4.0;
   public function retractionForce():Float return pressurePa * Math.PI * (bore * bore - rod * rod) / 4.0;
+  public function extensionSpeed(extension:Float):Float return ratedSpeed;
+  public function returningSpeed():Float return ratedSpeed;
+  override public function cylinder():Null<CylinderDrive> return this;
+  override public function peakTorque():Float return extensionForce();
+  override public function maxSpeed():Float return ratedSpeed;
+}
+
+/** Pressure effort with a spring-return or latched directional valve. */
+class PneumaticDrive extends CylinderDrive {
+  public function new(bore:Float, rod:Float, stroke:Float, ratedSpeed:Float, pressurePa:Float,
+      channelA:String, channelB:Null<String>, normallyToA:Bool, extendSign:Float) {
+    super(bore, rod, stroke, ratedSpeed, pressurePa, channelA, channelB, normallyToA, extendSign);
+  }
   /** A critically damped end stop: static deflection uses one quarter of the cushion's allowance. */
   public function limitTimeConstant(movingMass:Float, cushionCompression:Float):Float {
     if (!(movingMass > 0.0) || !(cushionCompression > 0.0) || !(extensionForce() > 0.0) ||
@@ -154,6 +174,35 @@ class PneumaticDrive extends ActuatorDrive {
   }
   override public function pneumatic():Null<PneumaticDrive> return this;
   override public function kind():String return "pneumatic";
-  override public function peakTorque():Float return extensionForce();
-  override public function maxSpeed():Float return ratedSpeed;
+}
+
+/** Flow-limited hydraulic cylinder. Coincident coil states close the valve centre. */
+class HydraulicDrive extends CylinderDrive {
+  public final approachSpeed:Float;
+  public final workingSpeed:Float;
+  public final returnSpeed:Float;
+  public final changePoint:Float;
+  /** Joint coordinate at which the cylinder is retracted, in metres. */
+  public final retractedPosition:Float;
+
+  public function new(bore:Float, rod:Float, stroke:Float, pressurePa:Float,
+      approachSpeed:Float, workingSpeed:Float, returnSpeed:Float, changePoint:Float,
+      channelA:String, channelB:String, extendSign:Float, retractedPosition:Float = 0.0) {
+    super(bore, rod, stroke, Math.max(approachSpeed, Math.max(workingSpeed, returnSpeed)),
+      pressurePa, channelA, channelB, false, extendSign);
+    if (!(approachSpeed > 0.0 && workingSpeed > 0.0 && returnSpeed > 0.0) ||
+        changePoint < 0.0 || changePoint > stroke || channelB == null || channelA == channelB ||
+        !Math.isFinite(approachSpeed + workingSpeed + returnSpeed + changePoint + retractedPosition))
+      throw "Invalid hydraulic phase speeds, change point or valve channels";
+    this.approachSpeed = approachSpeed; this.workingSpeed = workingSpeed;
+    this.returnSpeed = returnSpeed; this.changePoint = changePoint;
+    this.retractedPosition = retractedPosition;
+  }
+  override public function extensionSpeed(extension:Float):Float {
+    if (!Math.isFinite(extension)) throw "Hydraulic extension must be finite";
+    return extension < changePoint ? approachSpeed : workingSpeed;
+  }
+  override public function returningSpeed():Float return returnSpeed;
+  override public function hydraulic():Null<HydraulicDrive> return this;
+  override public function kind():String return "hydraulic";
 }

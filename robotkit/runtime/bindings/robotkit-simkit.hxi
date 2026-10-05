@@ -44,6 +44,13 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		RK_CONTACT_OTHER_OBJECT = 1;
 		RK_CONTACT_OTHER_ROBOT_LINK = 2;
 	}
+	/**
+	 * The control law of a process-owned fluid cylinder.
+	 */
+	enum rk_cylinder_control : c_int {
+		RK_CYLINDER_PRESSURE_EFFORT = 0;
+		RK_CYLINDER_FLOW_LIMITED = 1;
+	}
 	enum rk_simulation_presentation_pose_kind : c_int {
 		RK_SIMULATION_PRESENTATION_ROBOT_BASE = 1;
 		RK_SIMULATION_PRESENTATION_ROBOT_LINK = 2;
@@ -362,6 +369,30 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		reserved0: u32 @offset(52);
 	}
 	/**
+	 * A simulation-owned cylinder and valve acting on one process joint. SI units.
+	 */
+	struct rk_simulation_cylinder_drive @layout(104, 8) {
+		joint: u32 @offset(0);
+		channel_a: u32 @offset(4);
+		/**
+		 * < UINT32_MAX for a single-coil, spring-return valve.
+		 */
+		channel_b: u32 @offset(8);
+		normally_to_a: u32 @offset(12);
+		control: u32 @offset(16);
+		reserved0: u32 @offset(20);
+		extension_force: f64 @offset(24);
+		retraction_force: f64 @offset(32);
+		extend_sign: f64 @offset(40);
+		rated_speed: f64 @offset(48);
+		stroke: f64 @offset(56);
+		approach_speed: f64 @offset(64);
+		working_speed: f64 @offset(72);
+		return_speed: f64 @offset(80);
+		change_point: f64 @offset(88);
+		retracted_position: f64 @offset(96);
+	}
+	/**
 	 * Latest numeric device observation, independent of the authored sensor layout.
 	 */
 	struct rk_simulation_device_sensor @layout(2912, 8) {
@@ -499,22 +530,6 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		wheel_rates: array<f64, 3> @offset(40);
 		reserved: array<u64, 2> @offset(64);
 	}
-	/**
-	 * A simulation-owned cylinder and valve latch acting on one process joint.
-	 */
-	struct rk_simulation_pneumatic_drive @layout(48, 8) {
-		joint: u32 @offset(0);
-		channel_a: u32 @offset(4);
-		/**
-		 * < UINT32_MAX for a single-coil, spring-return valve.
-		 */
-		channel_b: u32 @offset(8);
-		normally_to_a: u32 @offset(12);
-		extension_force: f64 @offset(16);
-		retraction_force: f64 @offset(24);
-		extend_sign: f64 @offset(32);
-		rated_speed: f64 @offset(40);
-	}
 	struct rk_simulation_pose @layout(64, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		reserved0: u32 @offset(4);
@@ -537,7 +552,7 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		position: array<f64, 3> @offset(32);
 		rotation: array<f64, 4> @offset(56);
 	}
-	struct rk_simulation_robot_desc @layout(2595024, 8) {
+	struct rk_simulation_robot_desc @layout(2623696, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		flags: u32 @offset(4);
 		initial_pose: rk_simulation_pose @offset(8);
@@ -623,43 +638,43 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		/**
 		 * Appended v28 tail: physical cylinders are simulation models, not runtime targets.
 		 */
-		pneumatic_drive_count: u32 @offset(2494736);
-		pneumatic_drives: array<rk_simulation_pneumatic_drive, 512> @offset(2494744);
+		cylinder_drive_count: u32 @offset(2494736);
+		cylinder_drives: array<rk_simulation_cylinder_drive, 512> @offset(2494744);
 		/**
 		 * Appended v29 tail: spindle speed is a typed analog process drive.
 		 */
-		velocity_drive_count: u32 @offset(2519320);
-		velocity_drives: array<rk_simulation_velocity_drive, 512> @offset(2519328);
+		velocity_drive_count: u32 @offset(2547992);
+		velocity_drives: array<rk_simulation_velocity_drive, 512> @offset(2548000);
 		/**
 		 * Optional board-defined peripheral profile; zero disables it.
 		 */
-		virtual_peripheral_kind: u32 @offset(2539808);
-		virtual_peripheral_parameter_count: u32 @offset(2539812);
-		virtual_external_sensor_mask: u32 @offset(2539816);
-		virtual_peripheral_parameters: array<f64, 16> @offset(2539824);
+		virtual_peripheral_kind: u32 @offset(2568480);
+		virtual_peripheral_parameter_count: u32 @offset(2568484);
+		virtual_external_sensor_mask: u32 @offset(2568488);
+		virtual_peripheral_parameters: array<f64, 16> @offset(2568496);
 		/**
 		 * Optional physical virtual-device switch wiring and step thresholds.
 		 */
-		virtual_device_input_count: u32 @offset(2539952);
-		virtual_device_input_actuator: array<u8, 64> @offset(2539956);
-		virtual_device_input_active_high: array<u8, 64> @offset(2540020);
-		virtual_device_input_active_above: array<u8, 64> @offset(2540084);
-		virtual_device_input_threshold_steps: array<i64, 64> @offset(2540152);
-		virtual_device_input_switch_ids: array<u8, 4096> @offset(2540664);
+		virtual_device_input_count: u32 @offset(2568624);
+		virtual_device_input_actuator: array<u8, 64> @offset(2568628);
+		virtual_device_input_active_high: array<u8, 64> @offset(2568692);
+		virtual_device_input_active_above: array<u8, 64> @offset(2568756);
+		virtual_device_input_threshold_steps: array<i64, 64> @offset(2568824);
+		virtual_device_input_switch_ids: array<u8, 4096> @offset(2569336);
 		/**
 		 * Optional original shaft feedback mappings; count zero keeps legacy mappings.
 		 */
-		virtual_device_feedback_count: u32 @offset(2544760);
-		virtual_device_feedback_joint: array<u8, 64> @offset(2544764);
-		virtual_device_feedback_ratio: array<f64, 64> @offset(2544832);
-		virtual_device_feedback_offset: array<f64, 64> @offset(2545344);
-		brake_count: u32 @offset(2545856);
-		brakes: array<rk_simulation_brake, 512> @offset(2545864);
+		virtual_device_feedback_count: u32 @offset(2573432);
+		virtual_device_feedback_joint: array<u8, 64> @offset(2573436);
+		virtual_device_feedback_ratio: array<f64, 64> @offset(2573504);
+		virtual_device_feedback_offset: array<f64, 64> @offset(2574016);
+		brake_count: u32 @offset(2574528);
+		brakes: array<rk_simulation_brake, 512> @offset(2574536);
 		/**
 		 * Appended tail: link index pairs that never collide, used with RK_SIMULATION_ROBOT_EXPLICIT_EXCLUDES.
 		 */
-		link_exclude_count: u32 @offset(2562248);
-		link_excludes: array<u32, 8192> @offset(2562252);
+		link_exclude_count: u32 @offset(2590920);
+		link_excludes: array<u32, 8192> @offset(2590924);
 	}
 	/**
 	 * World-frame twist of one body: metres per second and radians per second.

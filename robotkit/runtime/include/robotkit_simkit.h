@@ -135,17 +135,31 @@ typedef struct rk_simulation_contact_pair {
     uint32_t reserved0;
 } rk_simulation_contact_pair;
 
-/** A simulation-owned cylinder and valve latch acting on one process joint. */
-typedef struct rk_simulation_pneumatic_drive {
+/** The control law of a process-owned fluid cylinder. */
+enum rk_cylinder_control {
+    RK_CYLINDER_PRESSURE_EFFORT = 0,
+    RK_CYLINDER_FLOW_LIMITED = 1
+};
+
+/** A simulation-owned cylinder and valve acting on one process joint. SI units. */
+typedef struct rk_simulation_cylinder_drive {
     uint32_t joint;
     uint32_t channel_a;
     uint32_t channel_b; /**< UINT32_MAX for a single-coil, spring-return valve. */
     uint32_t normally_to_a;
+    uint32_t control;
+    uint32_t reserved0;
     double extension_force;
     double retraction_force;
     double extend_sign;
     double rated_speed;
-} rk_simulation_pneumatic_drive;
+    double stroke;
+    double approach_speed;
+    double working_speed;
+    double return_speed;
+    double change_point;
+    double retracted_position;
+} rk_simulation_cylinder_drive;
 
 /** Simulation-owned spring-applied friction brake; all values are SI units. */
 typedef struct rk_simulation_brake {
@@ -255,8 +269,8 @@ typedef struct rk_simulation_robot_desc {
     uint32_t link_hull_count;
     rk_simulation_link_hull link_hulls[RK_MAX_LINK_HULLS];
     /** Appended v28 tail: physical cylinders are simulation models, not runtime targets. */
-    uint32_t pneumatic_drive_count;
-    rk_simulation_pneumatic_drive pneumatic_drives[RK_MAX_JOINTS];
+    uint32_t cylinder_drive_count;
+    rk_simulation_cylinder_drive cylinder_drives[RK_MAX_JOINTS];
     /** Appended v29 tail: spindle speed is a typed analog process drive. */
     uint32_t velocity_drive_count;
     rk_simulation_velocity_drive velocity_drives[RK_MAX_JOINTS];

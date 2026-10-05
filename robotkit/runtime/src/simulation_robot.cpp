@@ -248,37 +248,85 @@ std::vector<nksim_joint_target> SimulationRobot::take_pending_targets() {
     return result;
 }
 
-std::optional<ProcessChannelFault> SimulationRobot::apply_pneumatic_valves(const RobotRuntime &runtime,
+std::optional<ProcessChannelFault> SimulationRobot::apply_cylinder_valves(const RobotRuntime &runtime,
                                         std::vector<nksim_joint_target> &targets, bool deenergized) {
     const ProcessChannelReader reader([&runtime](const char *channel, rk_event_value &value) {
         return runtime.channel_value(channel, value);
     });
     // Resolve every coil before committing any valve latch state.
     std::vector<bool> spool_states;
-    for (const auto &drive : pneumatic_drives_) {
+    std::vector<std::pair<bool, bool>> coil_states;
+    for (const auto &drive : cylinder_drives_) {
         const auto a = deenergized ? ProcessChannelReading<bool>{} : reader.digital(drive.channel_a);
         if (a.fault) return a.fault;
+        bool coil_b = false;
         bool to_a = drive.to_a;
         if (!drive.has_channel_b) {
             to_a = a.value ? !drive.normally_to_a : drive.normally_to_a;
         } else {
             const auto b = deenergized ? ProcessChannelReading<bool>{} : reader.digital(drive.channel_b);
             if (b.fault) return b.fault;
+            coil_b = b.value;
             // Both coils off or on hold the last double-solenoid spool state.
             if (a.value != b.value) to_a = a.value;
         }
         spool_states.push_back(to_a);
+        coil_states.emplace_back(a.value, coil_b);
     }
-    for (std::size_t index = 0; index < pneumatic_drives_.size(); ++index) {
-        auto &drive = pneumatic_drives_[index];
-        drive.to_a = spool_states[index];
+    for (std::size_t index = 0; index < cylinder_drives_.size(); ++index) {
+        auto &drive = cylinder_drives_[index];
+        const auto coil_a = coil_states[index].first;
+        const auto coil_b = coil_states[index].second;
         nksim_joint_target target{};
         target.struct_size = sizeof(target);
         target.joint = joints_[drive.joint];
-        target.mode = NKSIM_JOINT_TARGET_EFFORT;
-        target.target = drive.to_a ? drive.extension_force * drive.extend_sign
-            : -drive.retraction_force * drive.extend_sign;
-        target.max_force = std::max(drive.extension_force, drive.retraction_force);
+        if (drive.control == RK_CYLINDER_FLOW_LIMITED) {
+            target.mode = NKSIM_JOINT_TARGET_VELOCITY;
+            target.target = 0.0; // A closed centre requests no fluid displacement.
+            auto force = std::max(drive.extension_force, drive.retraction_force);
+            if (coil_a != coil_b) {
+                if (coil_a) {
+                    // Phase selection uses the measured coordinate, including an edited home pose.
+                    const auto snapshot = nksim_session_latest_snapshot(simulation_.session_);
+                    uint64_t count = 0;
+                    if (snapshot == 0 || nksim_snapshot_get_joint_count(snapshot, &count) != NKSIM_OK)
+                        return ProcessChannelFault{ProcessChannelFault::Reason::Endpoint, "", RK_ERROR_INVALID_STATE};
+                    bool found = false;
+                    double position = 0.0;
+                    for (uint64_t index = 0; index < count; ++index) {
+                        nksim_joint_state measured{};
+                        measured.struct_size = sizeof(measured);
+                        if (nksim_snapshot_get_joint(snapshot, index, &measured) != NKSIM_OK)
+                            return ProcessChannelFault{ProcessChannelFault::Reason::Endpoint, "", RK_ERROR_BACKEND};
+                        if (measured.joint != target.joint) continue;
+                        position = measured.position;
+                        found = true;
+                        break;
+                    }
+                    if (!found || !std::isfinite(position)) return ProcessChannelFault{ProcessChannelFault::Reason::Endpoint, "", RK_ERROR_BACKEND};
+                    const auto extension = (position - drive.retracted_position) * drive.extend_sign;
+                    const auto speed = extension < drive.change_point ? drive.approach_speed : drive.working_speed;
+                    target.target = speed * drive.extend_sign;
+                    force = drive.extension_force;
+                } else {
+                    target.target = -drive.return_speed * drive.extend_sign;
+                    force = drive.retraction_force;
+                }
+            }
+            // SimKit's zero ceiling inherits the joint rating; pressure loss must be unpowered.
+            target.max_force = force > 0.0 ? force : -1.0;
+            if (force == 0.0) {
+                target.mode = NKSIM_JOINT_TARGET_EFFORT;
+                target.target = 0.0;
+            }
+        } else {
+            const bool to_a = spool_states[index];
+            drive.to_a = to_a;
+            target.mode = NKSIM_JOINT_TARGET_EFFORT;
+            target.target = to_a ? drive.extension_force * drive.extend_sign
+                : -drive.retraction_force * drive.extend_sign;
+            target.max_force = std::max(drive.extension_force, drive.retraction_force);
+        }
         targets.push_back(target);
     }
     return std::nullopt;
