@@ -3,12 +3,14 @@ package robotkit.skill;
 import robotkit.localization.Localization;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
+import robotkit.spatial.Quat;
 import robotkit.core.RobotSnapshot;
 
 /**
  * Picks a part up with a vacuum tool, or sets the held part down. `contact` gives, in the map frame,
  * where the tool meets: the part's grasp point to pick, or where its contact must be for the held part
- * to rest on its seat to place. It is read when the skill starts, so it follows the part wherever it
+ * to rest on its seat to place. Optional `orientation` gives the tool rotation in the same map frame;
+ * omission leaves spin free. Both are read when the skill starts, so they follow the part wherever it
  * is; the robot's place comes from `localization`, and its base must stand still meanwhile. The arm's
  * program switches the tool's channel on the robot, as it would a real ejector valve. With the tool's
  * vacuum sensor the skill tells the outcome as a real cell does: picking succeeds when the sensor reads
@@ -22,23 +24,25 @@ class HandlePart implements Skill {
 
   final localization:Localization;
   final contact:Void -> Vec3;
+  final orientation:Null<Void -> Quat>;
   final lifecycle = new SkillLifecycle();
 
   public static function pick(runner:HandlingRunner, localization:Localization, grasp:Void -> Vec3,
-      ?vacuumSensor:String, holdThresholdKpa:Float = 40.0):HandlePart
-    return new HandlePart(runner, localization, grasp, true, vacuumSensor, holdThresholdKpa);
+      ?vacuumSensor:String, holdThresholdKpa:Float = 40.0, ?orientation:Void -> Quat):HandlePart
+    return new HandlePart(runner, localization, grasp, true, vacuumSensor, holdThresholdKpa, orientation);
 
   public static function place(runner:HandlingRunner, localization:Localization, contact:Void -> Vec3,
-      ?vacuumSensor:String, holdThresholdKpa:Float = 40.0):HandlePart
-    return new HandlePart(runner, localization, contact, false, vacuumSensor, holdThresholdKpa);
+      ?vacuumSensor:String, holdThresholdKpa:Float = 40.0, ?orientation:Void -> Quat):HandlePart
+    return new HandlePart(runner, localization, contact, false, vacuumSensor, holdThresholdKpa, orientation);
 
   public function new(runner:HandlingRunner, localization:Localization, contact:Void -> Vec3, hold:Bool,
-      ?vacuumSensor:String, holdThresholdKpa:Float = 40.0) {
+      ?vacuumSensor:String, holdThresholdKpa:Float = 40.0, ?orientation:Void -> Quat) {
     if (runner == null || localization == null || contact == null || !(holdThresholdKpa > 0))
       throw "HandlePart needs a runner, localization, contact point and a positive hold threshold";
     this.runner = runner;
     this.localization = localization;
     this.contact = contact;
+    this.orientation = orientation;
     this.hold = hold;
     this.vacuumSensor = vacuumSensor;
     this.holdThresholdKpa = holdThresholdKpa;
@@ -50,7 +54,9 @@ class HandlePart implements Skill {
       var state = localization.state();
       if (state == null) throw "HandlePart has no robot pose";
       var base_T_map = Transform3.fromPose2(state.pose).inverse();
-      runner.run(base_T_map.transformPoint(contact()), hold);
+      var requested = orientation;
+      runner.run(base_T_map.transformPoint(contact()), hold,
+        requested == null ? null : base_T_map.rotation.multiply(requested()));
     } catch (error:Dynamic) {
       lifecycle.fail(Std.string(error));
     }

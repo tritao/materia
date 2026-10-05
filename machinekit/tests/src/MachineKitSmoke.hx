@@ -2551,6 +2551,7 @@ class MachineKitSmoke {
 		MachineAssemblyDescriptionTests.run();
 		AxisBuilderChecks.run();
 		GantryChecks.run();
+		RotaryHeadCheck.run();
 		GantryPickerChecks.run();
 		EndEffectorTests.run();
 		EndEffectorSetTests.run();

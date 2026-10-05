@@ -41,7 +41,7 @@ class RotaryHeadCheck {
 		return machine;
 	}
 
-	static function run():Void {
+	public static function run():Void {
 		var c = new CHead();
 		powered(c);
 		var state = new AssemblyState(c.definition());

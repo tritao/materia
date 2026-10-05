@@ -211,6 +211,19 @@ class PlanCheckTests extends MotionKitTestSupport {
 
   /** Missions on an XYZ screw machine use drive caps and submit accepted runtime segments. */
   public function testHandlingUsesCoupledLimits():Void {
+    var axis = new motionkit.axis.MotionAxis(new motionkit.axis.MotionAxisBlueprint("x", ["x"], -0.15, 0.15,
+      0.1, 0.2, 0.0, [1.0], [0.0]), ["c", "x"]);
+    var planner = new motionkit.robot.AxisPlanner([axis], 0.01);
+    var homingMove = planner.plan([0.3, 0.0], {targets: [new motionkit.AxisTarget("x", 0.04)], options: null}).trajectory;
+    for (sample in 0...11) {
+      var state = homingMove.evaluate(homingMove.durationSeconds() * sample / 10);
+      near(state.positions[0], 0.3, "homing keeps the unmapped C axis at its starting position");
+      near(state.velocities[0], 0.0, "homing commands no C velocity");
+      near(state.accelerations[0], 0.0, "homing commands no C acceleration");
+    }
+    throws(() -> planner.planRetarget(new motionkit.trajectory.TrajectoryState(
+      [0.3, 0.0], [0.1, 0.0], [0.0, 0.0], [0.0, 0.0]), [new motionkit.AxisTarget("x", 0.04)], null),
+      "an unmapped moving rotary joint still needs an axis mapping");
     var model = new RobotModel("handling-screw-xyz");
     var base = model.addLink(new Link("base"));
     var parent = base;
@@ -261,6 +274,25 @@ class PlanCheckTests extends MotionKitTestSupport {
       check(runner.motion.compiler.maxAcceleration[index] == planning.acceleration[index] &&
         runner.motion.compiler.maxJerk[index] == planning.jerk[index],
         "handling preserves each joint's acceleration and jerk");
+    }
+    var contact = new Vec3(0.04, 0.03, 0.06);
+    var free = runner.program(contact, true).ops;
+    var fixed = runner.program(contact, true, robotkit.spatial.Quat.fromAxisAngle(new Vec3(0, 0, 1), Math.PI / 2)).ops;
+    switch free[0] {
+      case MoveL(_, _, _, _, freedom):
+        check(freedom == motionkit.path.OrientationPolicy.FreeAboutTool, "ordinary handling leaves spin free");
+      case _: throw "handling must approach linearly";
+    }
+    switch fixed[0] {
+      case MoveL(_, _, _, _, freedom):
+        check(freedom == motionkit.path.OrientationPolicy.Interpolated, "approach turns smoothly to the requested heading");
+      case _: throw "handling must approach linearly";
+    }
+    switch fixed[1] {
+      case MoveL(pose, _, _, _, freedom):
+        check(freedom == motionkit.path.OrientationPolicy.Fixed, "requested handling orientation fixes spin");
+        near(pose.qz, Math.sin(Math.PI / 4), "an explicit handling orientation fixes the requested yaw");
+      case _: throw "handling must approach linearly";
     }
     runner.run(new Vec3(0.04, 0.03, 0.06), true);
     var tick = 0;

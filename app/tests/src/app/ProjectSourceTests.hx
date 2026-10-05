@@ -812,8 +812,8 @@ class ProjectSourceTests {
   }
 
   /** Runs the actual Cartesian picker mission and measures its placement and drive budget. */
-  static function checkGantryPicker(root:String):Void {
-    var manifest = FileSystem.fullPath(root + "/machinekit/examples/gantry-picker/materia.project.json");
+  static function checkGantryPicker(root:String, yaw:Bool = false):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/gantry-picker/" + (yaw ? "materia.yaw.project.json" : "materia.project.json"));
     var generated = MateriaProjectRunner.loadProject(manifest);
     var definition:AssemblyDefinition = cast generated.assemblyDefinition;
     var placement = new AssemblyState(definition, generated.assemblyState);
@@ -827,14 +827,18 @@ class ProjectSourceTests {
       if (mission == null || mission.handling == null) throw "gantry picker has no handling mission";
       var motion = mission.handling.motion;
       var model = mission.robot.model;
-      check(motion.compiler.solver.jointCount() == 3, "picker plans three controllable translational joints");
+      check(motion.compiler.solver.jointCount() == (yaw ? 4 : 3), "picker plans XYZ and its selected C head");
       for (index in 0...motion.jointIndices.length) {
         var joint = model.joints[motion.jointIndices[index]];
         var coupled = model.coupledLimits(joint.id, new SteadyLoads());
         check(motion.compiler.maxVelocity[index] <= coupled.requireVelocity() + 1e-9,
           "picker planner respects coupled speed on " + joint.id);
-        check(motion.compiler.maxAcceleration[index] <= coupled.requireAcceleration() + 1e-9,
-          "picker planner respects coupled acceleration on " + joint.id);
+        if (coupled.maxAcceleration != null)
+          check(motion.compiler.maxAcceleration[index] <= coupled.requireAcceleration() + 1e-9,
+            "picker planner respects coupled acceleration on " + joint.id);
+        else check([for (assumption in motion.compiler.planningAssumptions)
+          if (assumption.indexOf('joint "${joint.id}" acceleration') >= 0) assumption].length == 1,
+          "picker states the assumed acceleration for a servo without a derived cap");
       }
       function pose(id:String):app.ApplicationSimulation.SimulationPoseVisual {
         var found = [for (entry in simulation.capturePresentationSnapshot().environment) if (entry.id == id) entry];
@@ -943,7 +947,9 @@ class ProjectSourceTests {
             Math.pow(box.position[1] - seat.y * scale, 2) +
             Math.pow(box.position[2] - (seat.z * scale + 0.025), 2));
           check(error <= 0.002, "picker carton is within 2 mm of its slot: " + error);
-          var angle = 2 * Math.acos(Math.min(1, Math.abs(box.rotation[3])));
+          var targetYaw:Float = step.yaw == null ? 0.0 : step.yaw;
+          var angle = new robotkit.spatial.Quat(box.rotation[0], box.rotation[1], box.rotation[2], box.rotation[3])
+            .angularDistance(robotkit.spatial.Quat.fromAxisAngle(new robotkit.spatial.Vec3(0, 0, 1), targetYaw));
           check(angle <= 2 * Math.PI / 180, "picker carton is within 2 degrees of its slot");
           placed++;
         }
@@ -956,7 +962,7 @@ class ProjectSourceTests {
       check(planned > 0 && motion.checks.plans > 0, "picker executes physically checked plans");
       check(motion.checks.count(PlanDiagnosticKind.StepperStall) == 0, "picker drive checks report no stall");
       check(measuredTicks > 0 && bytes / measuredTicks < 200000, "picker allocates below its assumed 200 KB execution-tick budget");
-      Sys.println("gantry picker mission: " + simulation.activeSession().simulationTime() + " s, six cartons; " +
+      Sys.println((yaw ? "gantry C-head yaw picker mission: " : "gantry picker mission: ") + simulation.activeSession().simulationTime() + " s, six cartons; " +
         Math.round(bytes / measuredTicks) + " bytes per execution tick; " + planned + " plans, no stalls");
       simulation.clear(); session.dispose();
     } catch (error:Dynamic) { simulation.clear(); session.dispose(); throw error; }
@@ -2496,6 +2502,10 @@ class ProjectSourceTests {
       checkCoreXyPlotter(root);
       return 0;
     }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "gantry-yaw") {
+      checkGantryPicker(root, true);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "gantry") {
       checkGantryPicker(root);
       return 0;
@@ -2839,6 +2849,7 @@ class ProjectSourceTests {
     checkRobotArm(root);
     checkCobotArms(root);
     checkGantryPicker(root);
+    checkGantryPicker(root, true);
     checkRobotWelder(root);
     checkMates(root);
     checkBenchMill(root);

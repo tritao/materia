@@ -11,6 +11,7 @@ import motionkit.program.MotionProgram;
 import motionkit.program.MoveTarget;
 import robotkit.manipulation.KinematicGroup;
 import robotkit.spatial.Vec3;
+import robotkit.spatial.Quat;
 import robotkit.execution.FiredProcessEvent;
 import robotkit.core.Robot;
 
@@ -20,7 +21,8 @@ import robotkit.core.Robot;
  * and returns to the arm's home joints, run by `ManipulatorMotion` like every other arm program. To
  * pick, it presses `pressDepth` past the contact, as a compliant suction cup is pressed onto a part,
  * so the cup meets the part within the motion's position tolerance.
- * The tool keeps its home Z direction, with home orientation preferred and spin free. The arm's other joints, such as a mobile base's
+ * Without an explicit orientation the tool keeps its home Z direction and spin is free.
+ * A requested orientation fixes its heading as well. Other joints, such as a mobile base's
  * wheels, hold still while the program runs.
  */
 class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
@@ -76,20 +78,22 @@ class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
     this.pressDepth = pressDepth;
   }
 
-  public function run(contact:Vec3, hold:Bool):Void motion.run(program(contact, hold));
+  public function run(contact:Vec3, hold:Bool, ?orientation:Quat):Void motion.run(program(contact, hold, orientation));
 
   /** The program `run` executes. */
-  public function program(contact:Vec3, hold:Bool):MotionProgram {
+  public function program(contact:Vec3, hold:Bool, ?orientation:Quat):MotionProgram {
     if (contact == null) throw "HandlingPlanRunner needs a contact point";
-    var q = homePose;
-    var above = new Pose3(contact.x, contact.y, contact.z + approachHeight, q.qx, q.qy, q.qz, q.qw);
-    var at = new Pose3(contact.x, contact.y, contact.z - (hold ? pressDepth : 0.0), q.qx, q.qy, q.qz, q.qw);
+    var q = orientation == null ? new Quat(homePose.qx, homePose.qy, homePose.qz, homePose.qw) : orientation;
+    var policy = orientation == null ? OrientationPolicy.FreeAboutTool : OrientationPolicy.Fixed;
+    var above = new Pose3(contact.x, contact.y, contact.z + approachHeight, q.x, q.y, q.z, q.w);
+    var at = new Pose3(contact.x, contact.y, contact.z - (hold ? pressDepth : 0.0), q.x, q.y, q.z, q.w);
     return new MotionProgram([
-      MotionOp.MoveL(above, FRAME, travelSpeed, Blend.ExactStop, OrientationPolicy.FreeAboutTool),
-      MotionOp.MoveL(at, FRAME, contactSpeed, Blend.ExactStop, OrientationPolicy.FreeAboutTool),
+      MotionOp.MoveL(above, FRAME, travelSpeed, Blend.ExactStop,
+        orientation == null ? policy : OrientationPolicy.Interpolated),
+      MotionOp.MoveL(at, FRAME, contactSpeed, Blend.ExactStop, policy),
       MotionOp.SetOutput(channel, EventValue.Digital(hold)),
       MotionOp.Dwell(dwell),
-      MotionOp.MoveL(above, FRAME, contactSpeed, Blend.ExactStop, OrientationPolicy.FreeAboutTool),
+      MotionOp.MoveL(above, FRAME, contactSpeed, Blend.ExactStop, policy),
       MotionOp.MoveJ(MoveTarget.JointTarget(home), new MotionOptions(), Blend.ExactStop)
     ]);
   }

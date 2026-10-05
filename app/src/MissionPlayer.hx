@@ -523,10 +523,10 @@ class MissionPlayer implements SessionMember {
       case "pick":
         var at:SceneArtifactPlace = cast step.at;
         grasped = at;
-        return HandlePart.pick(cast handling, localization, () -> graspPoint(at), vacuumSensor);
+        return HandlePart.pick(cast handling, localization, () -> graspPoint(at), vacuumSensor, 40.0, handlingOrientation(step));
       case "place":
         var at:SceneArtifactPlace = cast step.at;
-        return HandlePart.place(cast handling, localization, () -> placeContact(at), vacuumSensor);
+        return HandlePart.place(cast handling, localization, () -> placeContact(at, step.yaw), vacuumSensor, 40.0, handlingOrientation(step));
       case "weld":
         var weld:SceneArtifactWeld = cast step.weld;
         return new processkit.skill.WeldPasses([for (pass in weld.passes)
@@ -688,14 +688,47 @@ class MissionPlayer implements SessionMember {
    * where the tool's contact now stands from the part's origin, which rests on the seat. Both are read
    * as they are, so a grip a little off the grasp point still sets the part down where it belongs.
    */
-  function placeContact(at:SceneArtifactPlace):Vec3 {
+  function placeContact(at:SceneArtifactPlace, ?yaw:Float):Vec3 {
     var held = grasped;
     if (held == null) throw "Nothing was picked to place";
     var seat = AssemblyFrames.compose(staticPose(at.occurrence), connectorFrame(at));
     var origin = partFrame(held.occurrence);
     var tool = toolContact();
-    return new Vec3(seat.x * metres + tool.x - origin.x, seat.y * metres + tool.y - origin.y,
-      seat.z * metres + tool.z - origin.z);
+    var offset = new Vec3(tool.x - origin.x, tool.y - origin.y, tool.z - origin.z);
+    if (yaw != null) offset = yawRotation(yaw - frameYaw(origin)).rotate(offset);
+    return new Vec3(seat.x * metres + offset.x, seat.y * metres + offset.y, seat.z * metres + offset.z);
+  }
+
+  static function frameYaw(frame:AssemblyFrame):Float {
+    var x = new Quat(frame.qx, frame.qy, frame.qz, frame.qw).rotate(new Vec3(1, 0, 0));
+    return Math.atan2(x.y, x.x);
+  }
+
+  static function yawRotation(yaw:Float):Quat return Quat.fromAxisAngle(new Vec3(0, 0, 1), yaw);
+
+  /** Fix the part's heading while preserving the tool-to-part grasp rotation. */
+  function handlingOrientation(step:SceneArtifactMissionStep):Null<Void -> Quat> {
+    var yaw = step.yaw;
+    if (yaw == null) return null;
+    return () -> {
+      if (step.kind == "pick") {
+        var runner:HandlingPlanRunner = cast handling;
+        var home = runner.homePose;
+        var state = localization.state();
+        if (state == null) throw "Handling orientation needs a localized base";
+        var worldHome = Transform3.fromPose2(state.pose).rotation.multiply(
+          new Quat(home.qx, home.qy, home.qz, home.qw));
+        var at:SceneArtifactPlace = cast step.at;
+        return yawRotation(yaw - frameYaw(staticPose(at.occurrence))).multiply(worldHome);
+      }
+      var held = grasped;
+      var tip = toolTip;
+      if (held == null || tip == null) throw "A heading-constrained place needs a held part and tool";
+      var link = simulation.linkPose(robotIndex, toolLink);
+      var rotation = new Quat(link.rotation[0], link.rotation[1], link.rotation[2], link.rotation[3])
+        .multiply(new Quat(tip.qx, tip.qy, tip.qz, tip.qw));
+      return yawRotation(yaw - frameYaw(partFrame(held.occurrence))).multiply(rotation);
+    };
   }
 
   /** Where the tool's contact is now, in metres. */

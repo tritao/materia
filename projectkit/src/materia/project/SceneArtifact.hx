@@ -226,6 +226,8 @@ typedef SceneArtifactMissionStep = {
 	var kind:String;
 	@:optional var pose:SceneArtifactFloorPose;
 	@:optional var at:SceneArtifactPlace;
+	/** Requested part heading in world radians; omission leaves tool spin free. */
+	@:optional var yaw:Float;
 	@:optional var weld:SceneArtifactWeld;
 	@:optional var joints:Array<SceneArtifactJointTarget>;
 }
@@ -818,6 +820,7 @@ class SceneArtifact {
 					if (!finiteFloorPose(step.pose)) fail('step $index needs a finite pose');
 				case "pick" | "place":
 					handles = true;
+					if (step.yaw != null && !finite(step.yaw)) fail('step $index needs a finite yaw');
 					if (!exists(step.at)) fail('step $index names no connector of an occurrence in the assembly');
 				case "moveJoints":
 					if (!exists(step.at)) fail('step $index names no connector of an occurrence in the assembly');
@@ -1092,6 +1095,7 @@ class SceneArtifact {
 			if (pose != null) step.pose = {x: number(pose, "x"), y: number(pose, "y"), yaw: number(pose, "yaw")};
 			var at:Dynamic = Reflect.field(raw, "at");
 			if (at != null) step.at = place(at);
+			if (Reflect.field(raw, "yaw") != null) step.yaw = number(raw, "yaw");
 			var targets:Dynamic = Reflect.field(raw, "joints");
 			if (targets != null) {
 				if (!Std.isOfType(targets, Array)) fail();

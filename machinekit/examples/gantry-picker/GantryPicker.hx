@@ -22,16 +22,20 @@ class GantryPicker extends Gantry {
 	public static inline var BOX_COUNT:Int = 6;
 	public final tool:SuctionTool;
 
-	public function new() {
+	public function new(?headKind:GantryHead = GantryHead.None) {
 		var belt:GantryDrive = Belt(TimingBeltProfile.GT2, 20, 9);
 		// The suction tool projects in front of the slide. Keep the front crossbar
 		// beyond its vertical sweep, including the guide's homing overtravel.
+		// A rotating carton needs its diagonal reach, preserving the original
+		// clearance to the Z switch mount during turns at the home height.
 		super(new GantrySpec(1500, 1000, 500, belt, belt, belt, true, "MGN12C", 23,
-			"HFS5-4040", "HFS5-4040", false, GantryHead.None, 0.5, 24, 16, 200, 100, 50, 60));
-		var flange:RobotFlange = cast component("flange");
+			"HFS5-4040", "HFS5-4040", false, headKind, 0.5, 24, 16, 200, 100, 50,
+			headKind == GantryHead.None ? 60 : 60 + BOX_WIDTH * (Math.sqrt(2) - 1) / 2));
+		var flange:RobotFlange = head == null ? cast component("flange") : head.flange;
 		tool = new SuctionTool(flange);
 		include("tool", tool);
-		addMate("tool-mount", "fixed", "flange", "face", "tool/plate", "robot");
+		var output = connector("toolFlange");
+		addMate("tool-mount", "fixed", output.instanceId, output.connectorName, "tool/plate", "robot");
 		exposeConnector("toolContact", "tool/cup", "contact");
 		exposePort("compressedAir", "tool/ejector", "air");
 		addComponent("infeed", new PickerTable(400, 300, TABLE_TOP), AssemblyFrames.translation(250, 200, 0));

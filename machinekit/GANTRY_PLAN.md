@@ -565,7 +565,7 @@ G0 → G1 → G2 → G3 ──────────────────�
 | G11 | in progress; reference-state foundation added | see progress notes |
 | G12 | implemented; requested compiler/runtime/picker/homing checkpoint passed | see progress notes |
 | G13 | complete; restructure and Phase C gate passed | `38f15b995`, `ad5211f04`, `acb1ab460`; see progress notes |
-| G14 | in progress; integrated C/CA mechanics and clearance passed, yaw picker under validation | `7822171b5`; see progress notes |
+| G14 | implemented; focused mechanics and C-head yaw picker passed, Phase D gate pending | `7822171b5`, `58075ec63`; see progress notes |
 | G15 | planned | — |
 | G16 | planned | — |
 | G17 | planned | — |
@@ -3671,3 +3671,25 @@ CADBridge 173 assertions; Toolpath core 12, accuracy 2, machining 12, scenarios
 3008. Together with the preceding full MachineKit/RobotKit/native/app results,
 this completes the requested restructure gate and G13. Board pin assignments
 remain documented assumptions, not a claim of hardware verification.
+
+### G14 — requested part yaw and C-head picker
+
+Pick/place steps can state an optional world-frame part yaw. RobotKit's handling
+skill transports an optional tool quaternion into the localized base frame;
+MotionKit interpolates the turn during approach and fixes it for descent/lift.
+Without the request, tool spin remains free. Placement preserves the live
+tool-to-part grasp rotation and rotates off-centre grasp offsets with the part.
+The scene reader retains yaw, and validation rejects non-finite requests.
+
+The C-head picker variant places all six cartons at alternating +90/-90 degrees.
+The tool mount moves forward by the carton's extra diagonal reach to preserve
+clearance to the Z switch mount while turning. The axis planner holds unmapped
+stationary joints constant during XYZ homing; unmapped motion still requires
+an explicit mapping. Focused MotionKit checks pass 3308 assertions, including
+the stationary-C and moving-unmapped regressions and orientation policies.
+
+MuJoCo completed all twelve pick/place steps in 184.36 simulated seconds,
+48 physically checked plans, no stalls or unintended contacts, and 77 KB per
+execution tick. Every carton is within 2 mm and 2 degrees of its requested seat
+and heading. The regular and yaw picker plus head mechanics are included in the
+next phase-boundary suites. G15 is next; full Phase D testing remains pending.
