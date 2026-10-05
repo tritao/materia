@@ -5,6 +5,12 @@ import machinekit.welding.WeldProbeGeometry;
 import machinekit.welding.WeldProbeGeometry.WeldProbeFace;
 import materia.assembly.AssemblyFrames;
 import machinekit.welding.WeldProbeParkingBounds;
+import machinekit.welding.WeldProbePatterns;
+import processkit.perception.ContactRegistration;
+import processkit.perception.ContactRegistration.PlaneContact;
+import robotkit.spatial.Transform3;
+import robotkit.spatial.Vec3;
+import robotkit.spatial.Quat;
 
 class WeldProbeTests {
   static var checks = 0;
@@ -49,6 +55,9 @@ class WeldProbeTests {
     top = [for (face in geometry.faces) if (face.member == "plate" && face.normal.z > 0.9) face][0];
     check(!geometry.exposed(top, new Vector(30, 0, 10), 30), "A mating clamp blocks a nominal probe ray");
     check(geometry.exposed(top, new Vector(-30, 0, 10), 30), "An unobstructed probe ray stays usable");
+    check(!geometry.exposedRegion(top, new Vector(30, 15, 10), 12, 5, 30),
+      "An off-centre clamp masks the uncertain region even when its centre ray is clear");
+    check(geometry.exposedRegion(top, new Vector(-30, 0, 10), 5, 5, 30), "A clear full approach region remains usable");
     for (face in geometry.faces) if (face.member == "clamp") check(!face.target, "Fixture geometry is not a registration target");
     clamp.close(); clampLocal.close(); pierced.close(); cutter.close(); plate.close();
 
@@ -79,6 +88,36 @@ class WeldProbeTests {
           Math.abs(travel) <= bound.normalTravel + 1e-7, "Continuous parking bounds enclose the displaced probe-plane intersection");
       }
     }
+    var firstStages = WeldProbePatterns.stages(work, 3, [], envelope);
+    check(firstStages.length > 0, "Actual CAD supplies first-plane patterns under the complete parking envelope");
+    for (stage in firstStages) {
+      check(stage.points.length == 3, "First-plane patterns contain three contacts");
+      check(stage.points[1].subtract(stage.points[0]).cross(stage.points[2].subtract(stage.points[0])).length() > 1,
+        "First-plane contacts are noncollinear");
+      for (point in stage.points) check(envelope.fits(stage.face, point, 3), "Each first contact contains the full parking uncertainty");
+    }
+    var reduced = new WeldProbeParkingBounds(chassis, new Vector(), 0);
+    var firstNormal = firstStages[0].face.normal;
+    var secondStages = WeldProbePatterns.stages(work, 2, [firstNormal], reduced);
+    check(secondStages.length > 0, "Independent second-plane patterns are available after uncertainty is reduced");
+    for (stage in secondStages) check(Math.abs(stage.points[1].subtract(stage.points[0]).dot(firstNormal.cross(stage.face.normal))) >= 3,
+      "Second-plane contacts observe the remaining rotational component");
+    var thirdStages = WeldProbePatterns.stages(work, 1, [firstNormal, secondStages[0].face.normal], reduced);
+    check(thirdStages.length > 0, "Third-plane candidates complete the independent three-plane basis");
+    for (stage in thirdStages) check(Math.abs(firstNormal.cross(secondStages[0].face.normal).dot(stage.face.normal)) > 1e-3,
+      "Third-plane normals observe the remaining translation");
+    var actual = new Transform3(new Vec3(0.02, -0.02, 0), Quat.fromRollPitchYaw(0, 0, 2 * Math.PI / 180));
+    var observations:Array<PlaneContact> = [];
+    for (stage in [firstStages[0], secondStages[0], thirdStages[0]]) for (point in stage.points) {
+      var normal = stage.face.normal;
+      observations.push(new PlaneContact(new Vec3(normal.x, normal.y, normal.z), stage.face.offset() * 0.001,
+        actual.transformPoint(new Vec3(point.x * 0.001, point.y * 0.001, point.z * 0.001))));
+    }
+    var fitted = ContactRegistration.fit(observations, Transform3.identity());
+    check(fitted.accepted && fitted.rank == 6, "The CAD-selected 3-2-1 contacts observe all six rigid pose components");
+    var testPoint = new Vec3(0.4, -0.1, 0.05);
+    check(fitted.require().transformPoint(testPoint).sub(actual.transformPoint(testPoint)).norm() < 1e-7,
+      "CAD-selected contact constraints recover a displaced rigid work frame");
     var exposed = 0;
     for (face in useful) for (point in face.samples(5, 1)) if (work.exposed(face, point, 100)) exposed++;
     check(exposed > 20, "The actual workpiece has exposed CAD-derived contact samples");

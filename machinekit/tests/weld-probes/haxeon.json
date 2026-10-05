@@ -3,7 +3,7 @@
   "package": {"name": "machinekit-weld-probe-tests"},
   "entry": "WeldProbeTests",
   "sourceRoots": [".", "../../examples/robot-welder", "../../examples/robot-arm", "../../examples/mobile-base"],
-  "dependencies": {"machinekit": {"path": "../.."}, "machinekit-robot": {"path": "../../robot"}},
+  "dependencies": {"machinekit": {"path": "../.."}, "machinekit-robot": {"path": "../../robot"}, "processkit": {"path": "../../../processkit"}},
   "target": "host",
   "outputDir": "build"
 }

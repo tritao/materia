@@ -154,6 +154,28 @@ class WeldProbeGeometry {
     }
   }
 
+  /** Conservative obstruction mask over a full uncertain approach prism, rather than its centre ray. */
+  public function exposedRegion(face:WeldProbeFace, point:Vector, halfU:Float, halfV:Float,
+      approach:Float, inset:Float = 1):Bool {
+    if (!Math.isFinite(approach) || !(approach > 0)) throw "Probe-region visibility needs a positive finite approach";
+    if (!face.target || !face.containsRegion(point, halfU, halfV, inset)) return false;
+    for (other in faces) if (other != face) {
+      var lowU = Math.POSITIVE_INFINITY, highU = Math.NEGATIVE_INFINITY;
+      var lowV = Math.POSITIVE_INFINITY, highV = Math.NEGATIVE_INFINITY;
+      var lowN = Math.POSITIVE_INFINITY, highN = Math.NEGATIVE_INFINITY;
+      for (chord in other.chords) for (vertex in chord) {
+        var delta = vertex.subtract(point);
+        lowU = Math.min(lowU, delta.dot(face.u)); highU = Math.max(highU, delta.dot(face.u));
+        lowV = Math.min(lowV, delta.dot(face.v)); highV = Math.max(highV, delta.dot(face.v));
+        lowN = Math.min(lowN, delta.dot(face.normal)); highN = Math.max(highN, delta.dot(face.normal));
+      }
+      if (highN < -1e-5 || lowN > approach || lowU > halfU + inset || highU < -halfU - inset ||
+          lowV > halfV + inset || highV < -halfV - inset) continue;
+      if (highN > 1e-5 || other.normal.dot(face.normal) < -0.9) return false;
+    }
+    return true;
+  }
+
   /** The outward approach segment may not cross another CAD face or a mating surface. */
   public function exposed(face:WeldProbeFace, point:Vector, approach:Float, inset:Float = 1):Bool {
     if (!Math.isFinite(approach) || !(approach > 0)) throw "Probe visibility needs a positive finite approach distance";

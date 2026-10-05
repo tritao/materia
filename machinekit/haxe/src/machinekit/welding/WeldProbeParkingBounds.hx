@@ -10,8 +10,11 @@ class WeldProbeRegionBounds {
   public final halfU:Float;
   public final halfV:Float;
   public final normalTravel:Float;
-  public function new(halfU:Float, halfV:Float, normalTravel:Float) {
+  public final tiltU:Float;
+  public final tiltV:Float;
+  public function new(halfU:Float, halfV:Float, normalTravel:Float, tiltU:Float, tiltV:Float) {
     this.halfU = halfU; this.halfV = halfV; this.normalTravel = normalTravel;
+    this.tiltU = tiltU; this.tiltV = tiltV;
   }
 }
 
@@ -64,7 +67,7 @@ class WeldProbeParkingBounds {
     // The tilted search ray meets the nominal plane with at least cos(yaw) normal projection.
     var depth = projected(p, normal) / Math.cos(yaw);
     return new WeldProbeRegionBounds(projected(p, u) + depth * yawProjection(normal, u),
-      projected(p, v) + depth * yawProjection(normal, v), depth);
+      projected(p, v) + depth * yawProjection(normal, v), depth, yawProjection(normal, u), yawProjection(normal, v));
   }
 
   public function fits(face:WeldProbeFace, point:Vector, inset:Float = 1):Bool {

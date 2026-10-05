@@ -1671,3 +1671,21 @@ build or OCCT rebuild was needed. These are geometric candidates, not reach-appr
 Multi-face selection, checked approach/refinement/retreat and mission observed-frame integration
 remain open. Probe order must follow observable uncertainty and feasible patch width rather than
 always assuming the top face is the first usable datum.
+
+P3's `WeldProbePatterns` now builds CAD-derived 3–2–1 stage candidates. Three contacts must be
+noncollinear; the second pair separates along the two planes' intersection to observe the remaining
+rotation; the final plane's normal must complete an independent basis. Pattern ordering favors
+geometric spread, while later arm planning must still prove each complete move. An uncertain
+approach prism conservatively masks every other face's projected bounds, including off-centre
+fixtures; yaw-induced search-ray tilt expands that prism. This can reject usable patches but must
+not accept a nominal centre ray whose uncertain contact could hit a neighbour.
+
+The CAD suite passes 3,167 assertions, including generated pattern observability and full rigid
+frame recovery from the selected six CAD constraints. Its later-stage tests deliberately use zero
+uncertainty to verify pattern geometry; they do not claim that runtime observations have reduced
+uncertainty. Actual posterior bounds and staged probe execution remain to be integrated.
+For planar parking error a broad vertical datum can be followed by an independent vertical datum,
+then a horizontal one: the second vertical face measures the unresolved horizontal displacement
+before a narrow top patch is approached. Choose feasible stages by current measured uncertainty,
+not by a fixed top-first order. Fine contact refinement is needed so detection-period error divided
+by the first-stage baseline does not amplify into unacceptable seam error far from those contacts.
