@@ -32,6 +32,12 @@ class StateStore {
 			paths.set(id.value, path);
 	}
 
+	/** Keep diagnostic paths only for mounted nodes or retained application state. */
+	public function prunePaths(mounted:Map<Int, RenderNode>):Void {
+		var stale = [for (id in paths.keys()) if (!mounted.exists(id) && !values.exists(id)) id];
+		for (id in stale) paths.remove(id);
+	}
+
 	public function initialize(id:WidgetId, initial:Dynamic):Void {
 		if (id == null)
 			throw "State requires a widget ID";

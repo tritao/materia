@@ -72,7 +72,7 @@ class ScrollView implements View {
 			viewport.layout.style.clipVertical = viewport.layout.style.clipVertical ||
 				axis == ScrollAxis.Vertical || axis == ScrollAxis.Both;
 			if (!suppliedController) {
-				var stored:State<ScrollController> = context.state(viewport.id, controller);
+				var stored:State<ScrollController> = context.resourceState(viewport.id, function() return controller, function(_) {});
 				controller = stored.value;
 			}
 			// The offset is applied to the content in place after layout (see onResolved below), so a scroll needs a new
@@ -241,8 +241,8 @@ class ScrollView implements View {
 		thumb.on(UiEventKind.Focus, function(_) visibility.setFocused(true));
 		thumb.on(UiEventKind.Blur, function(_) visibility.setFocused(false));
 		thumb.on(UiEventKind.FocusLost, function(_) visibility.setFocused(false));
-		var dragState:State<ScrollbarDragState> = context.state(thumbId,
-			new ScrollbarDragState());
+		var dragState:State<ScrollbarDragState> = context.resourceState(thumbId,
+			function() return new ScrollbarDragState(), function(_) {});
 		thumb.on(UiEventKind.PointerDown, function(event) {
 			if (event.button != 0)
 				return;

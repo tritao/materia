@@ -33,7 +33,7 @@ class MiddleEllipsisText implements View {
 
   public function build(context:BuildContext):RenderNode {
     return context.withScope(new Key(key), function() {
-      var displayed = context.state(context.id("displayed"), value);
+      var displayed = context.resourceState(context.id("displayed"), function() return value, function(_) {});
       var style = new LayoutStyle();
       style.width = LayoutAxis.grow();
       style.clipHorizontal = true;
@@ -43,7 +43,7 @@ class MiddleEllipsisText implements View {
       if (node.semantics != null) node.semantics.label = value;
       var resolved = context.resolveTextRole(TextRole.Body, textStyle);
       // Shaping a layout to measure is the expensive part, so remember the answer while its inputs stay the same.
-      var memo:EllipsisMemo = context.state(context.id("ellipsis-memo"), new EllipsisMemo()).value;
+      var memo:EllipsisMemo = context.resourceState(context.id("ellipsis-memo"), function() return new EllipsisMemo(), function(_) {}).value;
       node.onResolved(function(geometry) {
         if (context.fonts == null) return;
         var available = Math.max(0.0, geometry.clippedViewportBounds().width);

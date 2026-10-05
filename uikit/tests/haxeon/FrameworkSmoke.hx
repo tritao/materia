@@ -594,6 +594,8 @@ class FrameworkSmoke {
 			return 30;
 		if (!commandHistoryValid(context))
 			return 230;
+		if (!selfUpdatingLifetimeValid(context)) throw "self-updating widget lifetime regression";
+		if (!transientWidgetLifetimeValid(context)) throw "transient widget lifetime regression";
 		if (!externalScrollbarValid(context)) throw "external scrollbar placement or input regression";
 		if (!scrollbarVisibilityValid(context)) throw "scrollbar visibility regression";
 		if (!smoothScrollValid(context)) throw "smooth scrolling motion or lifetime regression";
@@ -4839,6 +4841,41 @@ class FrameworkSmoke {
 		if (disabledRuns != 0)
 			return false;
 		return true;
+	}
+
+	static function transientWidgetLifetimeValid(context:UiContext):Bool {
+		var frame = new LayoutFrame(240, 80);
+		context.submit(new Text("lifetime baseline"), frame);
+		var before = context.buildContext.stateStore.diagnosticCounts();
+		for (index in 0...40) {
+			var content = new LayoutStyle(); content.height = LayoutAxis.fixed(500);
+			var label = new nativekit.ui.widgets.text.MiddleEllipsisText("label-" + index, "A long transient label");
+			var children:Array<KeyedView> = [new KeyedView("label", label)];
+			var scroll = new ScrollView("scroll-" + index, new Column("content", children, content));
+			context.submit(scroll, frame);
+			context.submit(new Text("lifetime baseline"), frame);
+		}
+		var after = context.buildContext.stateStore.diagnosticCounts();
+		return after.values == before.values && after.resources == before.resources && after.paths == before.paths;
+	}
+
+	static function selfUpdatingLifetimeValid(context:UiContext):Bool {
+		var field = new TextField("builder-lifetime", "document");
+		var view = new nativekit.ui.core.RetainedView("builder-retained", function(_) return field);
+		var frame = new LayoutFrame(240, 80);
+		var root = context.submit(view, frame);
+		var id = root.id;
+		// Retained trees must keep patching without rebuilding their widget.
+		context.submit(view, frame);
+		if (!context.buildContext.requestPatch(id)) return false;
+		context.submit(view, frame);
+		context.submit(new Text("unmounted builder"), frame);
+		if (context.buildContext.requestPatch(id)) return false;
+		// A fresh mount with the same key restores a live builder.
+		root = context.submit(view, frame);
+		if (!root.id.equals(id) || !context.buildContext.requestPatch(id)) return false;
+		context.submit(new Text("unmounted again"), frame);
+		return !context.buildContext.requestPatch(id);
 	}
 
 	static function externalScrollbarValid(context:UiContext):Bool {

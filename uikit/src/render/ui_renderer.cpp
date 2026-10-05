@@ -140,6 +140,8 @@ struct UiRendererImpl::State {
         nkgpu_image image{};
         nkgpu_sampler sampler{};
         uint32_t generation = 0;
+        uint64_t last_used_frame = 0;
+        uint64_t bytes = 0;
         PreparedTextureType type = PreparedTextureType::Rgba;
         PreparedImageFlags flags = PreparedImageFlags::None;
     };
@@ -969,6 +971,7 @@ const PreparedTexture *find_texture(const PreparedPathData &path, PreparedImageT
 
 bool upload_texture(UiRendererImpl::State &state, const PreparedTexture &source,
                     UiRendererImpl::State::PaintImage &image) {
+    image.last_used_frame = state.frame_serial;
     if (!image.image) {
         const uint32_t bytes_per_pixel = source.type == PreparedTextureType::Rgba ? 4 : 1;
         const auto format = source.type == PreparedTextureType::Rgba ? NKGPU_IMAGEFORMAT_RGBA8
@@ -996,6 +999,7 @@ bool upload_texture(UiRendererImpl::State &state, const PreparedTexture &source,
             image.image = {};
             return false;
         }
+        image.bytes = source.pixels.size();
         image.type = source.type;
         image.flags = source.flags;
         state.stats.gpu_resources += 3;
@@ -1016,6 +1020,60 @@ bool upload_texture(UiRendererImpl::State &state, const PreparedTexture &source,
         state.stats.uploaded_bytes += source.pixels.size();
     }
     return true;
+}
+
+// Uploaded source images are reconstructible from prepared display-list resources.
+// Bound this cache just like raster/effect caches, without evicting a current-frame image.
+void trim_image_cache(UiRendererImpl::State &state) {
+    constexpr uint64_t budget = 64u * 1024u * 1024u;
+    constexpr size_t entry_limit = 128;
+    constexpr uint64_t idle_frames = 120;
+    using Image = UiRendererImpl::State::PaintImage;
+    auto release = [&](Image &image) {
+        if (image.sampler.id) nkgpu_sampler_destroy(state.renderer, image.sampler);
+        if (image.image.id) nkgpu_image_destroy(state.renderer, image.image);
+    };
+    uint64_t bytes = 0;
+    size_t count = 0;
+    auto sweep = [&](auto &images) {
+        for (auto it = images.begin(); it != images.end();) {
+            if (state.frame_serial - it->second.last_used_frame > idle_frames) {
+                release(it->second);
+                it = images.erase(it);
+            } else {
+                bytes += it->second.bytes;
+                ++count;
+                ++it;
+            }
+        }
+    };
+    sweep(state.images);
+    for (auto &entry : state.paint_images) sweep(entry.second);
+    while (bytes > budget || count > entry_limit) {
+        Image *victim = nullptr;
+        auto find = [&](auto &images) {
+            for (auto &entry : images) {
+                auto &image = entry.second;
+                if (image.last_used_frame != state.frame_serial &&
+                    (!victim || image.last_used_frame < victim->last_used_frame)) victim = &image;
+            }
+        };
+        find(state.images);
+        for (auto &entry : state.paint_images) find(entry.second);
+        if (!victim) break;
+        bytes -= victim->bytes;
+        --count;
+        release(*victim);
+        auto erase = [&](auto &images) {
+            for (auto it = images.begin(); it != images.end(); ++it)
+                if (&it->second == victim) { images.erase(it); return true; }
+            return false;
+        };
+        if (!erase(state.images))
+            for (auto &entry : state.paint_images) if (erase(entry.second)) break;
+    }
+    for (auto it = state.paint_images.begin(); it != state.paint_images.end();)
+        if (it->second.empty()) it = state.paint_images.erase(it); else ++it;
 }
 
 bool resolve_paint_image(UiRendererImpl::State &state, const PreparedPathData &path,
@@ -2689,12 +2747,14 @@ bool UiRendererImpl::endFrame() {
         state_->recording = false;
         state_->has_frame_target = false;
         state_->in_frame = false;
+        trim_image_cache(*state_);
         return sealed && submitted;
     }
     if (!gpu_result(*state_, nkgpu_end_frame_deferred_present(state_->renderer)))
         return false;
     state_->in_frame = false;
     state_->has_frame_target = false;
+    trim_image_cache(*state_);
     return true;
 }
 

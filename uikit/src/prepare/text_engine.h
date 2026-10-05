@@ -168,6 +168,8 @@ struct AtlasUpload {
 };
 
 struct TextEngineStats {
+    uint64_t scratch_allocated_bytes = 0;
+    uint64_t scratch_used_bytes = 0;
     uint64_t glyph_cache_misses = 0;
     uint64_t glyphs_rasterized = 0;
     uint64_t prepared_batch_count = 0;

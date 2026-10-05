@@ -404,6 +404,8 @@ class UiContext {
 		// Blur is the old tree's final lifecycle event, so its handlers must still
 		// be able to access widget state while that event is being dispatched.
 		stateStore.endFrame();
+		buildContext.pruneSelfUpdatingBuilds(nodesById);
+		buildContext.stateStore.prunePaths(nodesById);
 		submittedStateRevision = resolvedStateRevision;
 		submittedInteractionRevision = interactionStates.revision;
 		submittedStyleRevision = buildContext.styleRevision;
@@ -984,6 +986,7 @@ class UiContext {
 			clearWindowDecorations();
 		decorationWindow = null;
 		stateStore.dispose();
+		buildContext.dispose();
 		interactionStates.dispose();
 		disposed = true;
 		root = null;

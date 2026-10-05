@@ -530,6 +530,7 @@ int main(int argc, char **argv) {
                                              &stable_selection_bytes) != NKUI_OK)
         return 5;
 
+    bool image_cache_tested = false;
     int result = 0;
     bool ready = false;
     int width = 0, height = 0, frames = 0;
@@ -566,6 +567,45 @@ int main(int argc, char **argv) {
         const nkui_frame_info frame_info{
             sizeof(frame_info), width / pixel_scale, height / pixel_scale, width, height,
             pixel_scale};
+        if (!image_cache_tested) {
+            nkui_display_list retained_image_list{};
+            nkui_renderer_stats pressure_stats{};
+            // Each destroyed source has a fresh resource generation. Its GPU upload must be bounded.
+            for (int index = 0; index < 140 && !result; ++index) {
+                nkui_resource source{};
+                nkui_display_list image_list{};
+                const uint8_t pixels[] = {static_cast<uint8_t>(index == 0 ? 30 : 240), 90,
+                                          static_cast<uint8_t>(index == 0 ? 240 : 30), 255};
+                if (nkui_image_create(1, 1, NKUI_IMAGE_RGBA8, pixels, sizeof(pixels), &source) != NKUI_OK ||
+                    nkui_display_list_create(&image_list) != NKUI_OK) { result = 32; break; }
+                std::vector<uint8_t> image_commands;
+                append(image_commands, nkui_draw_rect_command{{NKUI_COMMAND_DRAW_IMAGE, NKUI_COMMAND_VERSION,
+                    sizeof(nkui_draw_rect_command)}, source, 0.0f, 0.0f, 16.0f, 16.0f});
+                if (nkui_display_list_submit(image_list, image_commands.data(), image_commands.size()) != NKUI_OK ||
+                    nkui_renderer_render_frame(renderer, image_list, surface, &frame_info) != NKUI_OK) result = 32;
+                nkui_resource_destroy(source);
+                if (index == 0) retained_image_list = image_list;
+                else nkui_display_list_destroy(image_list);
+            }
+            if (!result && (nkui_renderer_get_stats(renderer, &pressure_stats) != NKUI_OK ||
+                            pressure_stats.images_live > 130)) result = 32;
+            // The retained list can rebuild an evicted upload even after its external source was destroyed.
+            if (!result && nkui_renderer_render_frame(renderer, retained_image_list, surface, &frame_info) != NKUI_OK)
+                result = 32;
+            uint8_t restored_pixel[4]{};
+            glReadPixels(8, height - 8, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, restored_pixel);
+            if (!result && restored_pixel[2] <= restored_pixel[0]) result = 32;
+            nkui_renderer_stats restored_stats{};
+            if (!result && (nkui_renderer_get_stats(renderer, &restored_stats) != NKUI_OK ||
+                            restored_stats.resource_creations <= pressure_stats.resource_creations)) result = 32;
+            for (int index = 0; index < 121 && !result; ++index)
+                if (nkui_renderer_render_frame(renderer, retained_image_list, surface, &frame_info) != NKUI_OK) result = 32;
+            if (!result && (nkui_renderer_get_stats(renderer, &restored_stats) != NKUI_OK ||
+                            restored_stats.images_live > 3)) result = 32;
+            nkui_display_list_destroy(retained_image_list);
+            if (result) std::fprintf(stderr, "uploaded image cache lifetime regression\n");
+            image_cache_tested = true;
+        }
         nkui_result render_result = NKUI_OK;
         if (!result && frames == 0)
             render_result = nkui_renderer_render_frame(renderer, mask_list, surface, &frame_info);
