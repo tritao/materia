@@ -51,6 +51,10 @@ class ContactSearchMotionTests {
         "Candidate screening keeps a reachable aligned probe");
       check(!screening.hasClearApproachConfiguration(new Vec3(0, 0, -0.02), new Vec3(0, 1, 0), 0.02, [0.0]),
         "Candidate screening excludes unreachable torch orientations before pattern selection");
+      check(screening.hasClearObservedApproachConfiguration(new Vec3(0, 0, -0.02), new Vec3(0, 0, -1), 0.02, [0.0]),
+        "observed branch screening accepts a clear reachable normal");
+      check(!screening.hasClearObservedApproachConfiguration(new Vec3(0, 0, -0.02), new Vec3(0, 1, 0), 0.02, [0.0]),
+        "observed branch screening rejects an unreachable normal");
       var preparedProbe = new processkit.ProbePosePlanner(probePlanner).prepare(new Vec3(0, 0, -0.02),
         new Vec3(0, 0, -1), 0.02, [0.0], WeldArcModel.TOUCH_TOLERANCE, 0.003, 1);
       check(Math.abs(preparedProbe.approach.translation.z + 0.043 + probePlanner.airPoseReserve) < 1e-9 &&

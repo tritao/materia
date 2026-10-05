@@ -2252,3 +2252,23 @@ clearance authority. Native focused tests pass 92 assertions including reachable
 unreachable normal screening. No production speedup is claimed yet. Full-mission retries
 will print station-step progress, and a separate registration entry point injects the
 20 mm per-axis/2-degree parking boundary without rerunning the smaller-error test.
+
+The observed-roll-first retry still remained at first-station findWork after 18 minutes of
+app CPU time and was deliberately terminated (not a pass). A five-minute HashLink capture
+with probe-phase logs then showed first-face probing complete at 206.56 simulation seconds
+and the delay in second-face selection. Across the whole capture, candidate screening is
+55.86% inclusive and numerical sampleCandidates 56.33%; individual selection windows are
+100% numerical IK. Capture/report: ignored app/build/p3-full-mission.hlpc and
+p3-full-mission-profile-report.txt. The diagnostic execution was stopped after capture.
+
+Stage selection now prefers reachable observed-branch patterns across all CAD faces and
+existing 9/17/33 lattices before globally discovering branches on any face. Geometric ranking
+remains within each pass; this is an explicit policy preference for continuation from measured
+configuration, not global optimality over every possible IK branch. If no checked observed-
+branch stage succeeds, all original global-discovery orientations, seed budgets and lattices
+remain available. A fresh immutable helper binding supplies each screening policy to avoid
+captured loop-state ambiguity. Both passes require full prepared trajectories and sensing
+corridors before accepting a stage. ProcessKit exposes observed-only configuration screening
+separately from the full discovery API; neither authorizes movement. Focused native tests
+pass 94 assertions, including observed-branch reachable/unreachable normal checks. Full
+mission production validation and measured speedup remain pending; main is unchanged.

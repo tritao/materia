@@ -2,6 +2,7 @@ package machinekit.welding;
 
 import cadkit.modeling.Vector;
 import machinekit.welding.WeldProbeGeometry;
+import machinekit.welding.WeldProbeGeometry.WeldProbeFace;
 import machinekit.welding.WeldProbePatterns;
 import materia.project.SceneContactRegistration.SceneContactWork;
 import machinekit.welding.WeldProbeParkingBounds.WeldProbeRegionBounds;
@@ -36,6 +37,14 @@ class WeldContactSelection {
     return new ContactRegistrationSequence(envelope, select);
   }
 
+  function screen(estimate:Transform3, start:Array<Float>, discover:Bool):WeldProbeFace->Vector->WeldProbeRegionBounds->Bool {
+    return (face, point, bounds) -> discover
+      ? prepare.hasClearApproachConfiguration(estimate.transformPoint(metres(point)),
+          estimate.rotation.rotate(direction(face.normal)), bounds.normalTravel * 0.001, start)
+      : prepare.hasClearObservedApproachConfiguration(estimate.transformPoint(metres(point)),
+          estimate.rotation.rotate(direction(face.normal)), bounds.normalTravel * 0.001, start);
+  }
+
   function select(count:Int, normals:Array<Vec3>, envelope:ContactPoseEnvelope):ContactRegistrationStage {
     var estimate = envelope.estimate();
     var provider = new WeldProbeObservedBounds((face, point) -> {
@@ -45,14 +54,15 @@ class WeldContactSelection {
     });
     var start = positions();
     var reasons:Array<String> = [];
-    for (divisions in [9, 17, 33]) {
+    // Prefer observed-branch stages across faces before global discovery on any face.
+    // Full preparation still proves every trajectory and sensing corridor.
+    for (discover in [false, true]) for (divisions in [9, 17, 33]) {
       var previous = [for (normal in normals) new Vector(normal.x, normal.y, normal.z)];
       var geometric = WeldProbePatterns.stages(geometry, count, previous, provider, 3, divisions);
       // Rank by geometric observability, then prove one face at a time. Unused faces need no IK solves.
       for (candidate in geometric) {
         var stages = WeldProbePatterns.stages(geometry, count, previous, provider, 3, divisions,
-          (face, point, bounds) -> prepare.hasClearApproachConfiguration(estimate.transformPoint(metres(point)),
-            estimate.rotation.rotate(direction(face.normal)), bounds.normalTravel * 0.001, start), candidate.face);
+          screen(estimate, start, discover), candidate.face);
         for (stage in stages) {
           try {
             var probes:Array<ContactProbeRequest> = [];

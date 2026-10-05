@@ -32,6 +32,15 @@ class ProbePosePlanner {
 
   /** Candidate screening only: a clear endpoint does not authorize the approach trajectory. */
   public function hasClearApproachConfiguration(point:Vec3, outward:Vec3, normalTravel:Float, start:Array<Float>):Bool {
+    return clearApproachConfiguration(point, outward, normalTravel, start, true);
+  }
+
+  /** Prefer configurations reached by continuation from observed joints; global discovery remains a separate fallback. */
+  public function hasClearObservedApproachConfiguration(point:Vec3, outward:Vec3, normalTravel:Float, start:Array<Float>):Bool {
+    return clearApproachConfiguration(point, outward, normalTravel, start, false);
+  }
+
+  function clearApproachConfiguration(point:Vec3, outward:Vec3, normalTravel:Float, start:Array<Float>, discover:Bool):Bool {
     if (point == null || outward == null || Math.abs(outward.norm() - 1) > 1e-8 ||
         !Math.isFinite(normalTravel) || normalTravel < 0 || start == null || start.length != motion.arm.group.count())
       throw "Probe candidate screening needs a unit normal, observed joints and finite search bounds";
@@ -43,6 +52,7 @@ class ProbePosePlanner {
       var q = motion.compiler.solver.solvePose(target, start, motion.compiler.ikTolerance);
       if (q != null && motion.violation(q) == null) return true;
     }
+    if (!discover) return false;
     for (target in targets)
       for (candidate in motion.compiler.solver.sampleCandidates(target, 12, motion.compiler.ikTolerance))
         if (motion.violation(candidate) == null) return true;
