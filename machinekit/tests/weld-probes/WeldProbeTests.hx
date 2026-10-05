@@ -178,6 +178,12 @@ class WeldProbeTests {
       for (point in 0...3) check(lazyTriples[index].points[point].subtract(geometricTriples[index].points[point]).length() < 1e-10,
         "Lazy breadth selection preserves each farthest-point choice");
     }
+    var oneFaceChecks = [0];
+    var oneFace = WeldProbePatterns.stages(work, 3, [], reduced, 3, 9,
+      (face, _, _) -> { oneFaceChecks[0]++; check(face == geometricTriples[0].face,
+        "Single-face screening never solves unused faces"); return true; }, geometricTriples[0].face);
+    check(oneFace.length == 1 && oneFace[0].score == geometricTriples[0].score && oneFaceChecks[0] == 6,
+      "Demand-driven screening preserves the selected geometric stage");
     var pairChecks = new Map<String, Int>();
     var directPairs = WeldProbePatterns.stages(work, 2, [firstNormal], reduced, 3, 9,
       (face, _, _) -> {

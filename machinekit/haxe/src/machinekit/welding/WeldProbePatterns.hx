@@ -33,7 +33,7 @@ class WeldProbePatterns {
 
   public static function stages(geometry:WeldProbeGeometry, count:Int, previousNormals:Array<Vector>,
       uncertainty:WeldProbeUncertainty, clearance:Float = 3, divisions:Int = 33,
-      ?possible:WeldProbeFace->Vector->WeldProbeRegionBounds->Bool):Array<WeldProbeStage> {
+      ?possible:WeldProbeFace->Vector->WeldProbeRegionBounds->Bool, ?onlyFace:WeldProbeFace):Array<WeldProbeStage> {
     if (geometry == null || uncertainty == null || previousNormals == null || count < 1 || count > 3 ||
         previousNormals.length != 3 - count || !Math.isFinite(clearance) || !(clearance > 0))
       throw "Contact patterns need CAD geometry, uncertainty and a 3-2-1 sequence of independent normals";
@@ -41,7 +41,7 @@ class WeldProbePatterns {
     if (normals.length == 2 && normals[0].cross(normals[1]).length() < 1e-3)
       throw "The first two registration planes must be independent";
     var stages:Array<WeldProbeStage> = [];
-    for (face in geometry.faces) if (face.target) {
+    for (face in geometry.faces) if (face.target && (onlyFace == null || face == onlyFace)) {
       if (count == 2 && normals[0].cross(face.normal).length() < 1e-3) continue;
       if (count == 1 && Math.abs(normals[0].cross(normals[1]).dot(face.normal)) < 1e-3) continue;
       var candidates:Array<Vector> = [];

@@ -2137,3 +2137,31 @@ ranked checks per face rather than a complete lattice of IK checks. Focused CAD 
 and point choices with six reach checks per face. The two-contact-only production retry was
 interrupted (exit 143) during initial-face planning; no additional production pass is claimed.
 The next retry includes lazy screening for all three contact-pattern sizes.
+
+### P3 profiler diagnosis and demand-driven CAD faces (2026-10-05)
+
+The combined lazy-pattern retry again completed the first face with six touch episodes and no
+air-contact fault; it remained in later-stage computation and was interrupted with exit 143.
+A cached-artifact retry used HashLink's existing loopback diagnostics profiler, without edits
+to the compiler or runtime. The finalized capture reports 86.09% inclusive time in
+ProbePosePlanner.hasClearApproachConfiguration and 85.59% in numerical sampleCandidates;
+individual planning windows are entirely IK. Logs/capture remain under ignored app/build.
+The sampler attempts up to 384 seeds per pose and the unchanged welding IK tolerance permits
+300 iterations per solve. Thus unused-face screening is a measured cost, not a disk symptom.
+
+An analytic-IK prototype was removed without committing it. The numerical unit fixture is
+UR-style, and the production CAD arm also fails the existing OPW adapter with the exact error:
+"OPW joint robot/arm/j4 violates the parallel-base/spherical-wrist axis pattern". No solver,
+model, RobotArm or MotionKit change remains. The production posture replay still passes with
+sensor/FK error 8.955206467987463e-16 m and rejects physical wire contact. The app compiles
+1,864 sources; no complete registration pass is claimed.
+
+The CAD bridge now ranks geometric stages first and proves one candidate face at a time,
+accepting the first fully prepared stage. This replaces global ranking over every face's
+reachable pattern with geometric observability preference followed by checked feasibility.
+It avoids solving unused faces after an acceptable stage has been found. Failed faces and
+all existing lattice resolutions remain available; search budgets, sensing proofs and
+clearance checks are unchanged. WeldProbePatterns can restrict screening to one CAD face.
+The focused CAD suite passes 5,148 assertions and 468 exposed samples, including exclusion of
+unused faces and preservation of the selected geometric stage. Main remains unchanged and
+P3 production validation is pending.
