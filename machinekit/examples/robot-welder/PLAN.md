@@ -1516,3 +1516,12 @@ compiler and plan sequence. A focused executed handoff passes on both native bac
 owner to 0.2 rad, independent owner to 0.4 rad, cached owner reacquires and returns to 0 rad.
 This is application ownership policy; no RobotRuntime or MotionKit semantics change. App compile
 passes with 1846 sources. The full mobile mission retry and milestone regression gates remain open.
+
+P2 complete mobile execution now passes on both native backends using the same generated scene:
+two stations, ten unique CAD seams, 270.3 s cycle, lengths 40/40/40/40/40/40/180/180/40/40 mm.
+The test backend measures legs 5.0–5.1 mm; MuJoCo measures 4.9–5.1 mm. Every bead meets the
+2 mm extent and 0.5 mm leg tolerances with no gap; tip tracking stays within 1.5 mm while the
+arc is established. Weld and stow clearance checks pass, and driving/stow transitions require
+the arc out. The cover is minimum among the documented CAD-derived candidate grid; this is
+not a claim of global optimality over continuous parking space. The final welder, arm, mobile
+and MachineKit milestone regression gates and main sync remain pending.

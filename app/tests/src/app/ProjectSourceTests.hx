@@ -2235,6 +2235,10 @@ class ProjectSourceTests {
       MobileWelderTests.runFrames(root);
       return 0;
     }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-mission") {
+      MobileWelderTests.runMission(root);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-joint-handoff") {
       MobileWelderTests.runJointHandoff(root);
       return 0;

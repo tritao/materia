@@ -63,6 +63,97 @@ class MobileWelderTests {
     }
   }
 
+  /** Execute the generated station mission, including driving and every checked stow transition. */
+  public static function runMission(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-welder/materia.mobilemission.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var authored:materia.project.SceneArtifact.SceneArtifactMission = cast generated.mission;
+    var expected = new Map<String, Bool>();
+    var stations = 0;
+    for (step in authored.steps) {
+      if (step.kind == "goTo") stations++;
+      if (step.kind == "weld") {
+        var weld:materia.project.SceneArtifact.SceneArtifactWeld = cast step.weld;
+        for (segment in weld.path) {
+          if (expected.exists(segment.seam)) throw 'Mobile mission repeats ${segment.seam}';
+          expected.set(segment.seam, true);
+        }
+      }
+    }
+    var seamCount = 0;
+    for (_ in expected.keys()) seamCount++;
+    if (stations == 0 || seamCount != 10) throw 'Mobile mission has $stations stations and $seamCount seams';
+    for (backend in [ApplicationSimulation.DETERMINISTIC, ApplicationSimulation.MUJOCO]) {
+      var session = new ProjectDocumentSession(null, false);
+      session.openGeneratedProject(generated, manifest);
+      var simulation = new ApplicationSimulation(new RobotWorld());
+      simulation.setBackend(backend);
+      try {
+        if (!simulation.rebuild(session.sensors, session.scene, session)) throw simulation.error;
+        var mission = simulation.missionPlayer(), beads = simulation.weldBeads(), welder = simulation.welder();
+        if (mission == null || beads == null || welder == null) throw "Mobile welding mission is incomplete";
+        var limit = simulation.activeSession().simulationTime() + 1200;
+        var tick = 0, stowing = -1;
+        var worst = 0.0;
+        var stowClearance:Null<robotkit.manipulation.ArmClearance> = null;
+        while (!mission.finished && simulation.activeSession().simulationTime() < limit) {
+          simulation.step(); tick++;
+          if (mission.failure != null) throw 'Mobile weld failed at ${simulation.activeSession().simulationTime()} s: ${mission.failure}';
+          var weldStep = mission.weldingStep();
+          if (weldStep >= 0) {
+            var tip = beads.toFrame(weldStep, welder.tip());
+            var nearest = Math.POSITIVE_INFINITY;
+            for (bead in beads.beadOf(weldStep).beads) {
+              var relative = [for (axis in 0...3) tip[axis] - bead.start[axis]];
+              var along = 0.0;
+              for (axis in 0...3) along += relative[axis] * bead.tangent[axis];
+              var point = bead.pointAt(Math.min(bead.length, Math.max(0.0, along)));
+              var squared = 0.0;
+              for (axis in 0...3) squared += Math.pow(tip[axis] - point[axis], 2);
+              nearest = Math.min(nearest, Math.sqrt(squared));
+            }
+            if (welder.reading().arc) worst = Math.max(worst, nearest);
+            if (tick % 5 == 0) {
+              var hit = mission.clearanceViolation(nearest <= processkit.WeldPathPlanner.CONTACT_ZONE);
+              if (hit != null) throw 'Mobile weld clearance: ${hit.a}/${hit.b}';
+            }
+          }
+          var index = mission.completed;
+          if (index < authored.steps.length && authored.steps[index].kind == "moveJoints") {
+            if (stowing != index) {
+              stowing = index;
+              var tool = session.robotTools[0];
+              stowClearance = mission.weldClearance(mission.toolArm(tool), tool.contact.occurrence,
+                [for (step in authored.steps) if (step.kind == "weld") cast(step.weld,
+                  materia.project.SceneArtifact.SceneArtifactWeld).metal]);
+            }
+            if (tick % 5 == 0) {
+              var clear:robotkit.manipulation.ArmClearance = cast stowClearance;
+              var positions = mission.robot.robot.snapshot().positions;
+              var hit = clear.violation([for (joint in mission.clearanceJoints) positions.get(joint)]);
+              if (hit != null) throw 'Mobile stow clearance: ${hit.a}/${hit.b}';
+            }
+          }
+          if (index < authored.steps.length && authored.steps[index].kind != "weld" && welder.reading().arc)
+            throw "Mobile mission moves between welds with the arc established";
+        }
+        if (!mission.finished || worst > 0.0015) throw 'Mobile weld incomplete or off seam ($worst m)';
+        var lengths:Array<String> = [], legs:Array<String> = [];
+        for (entry in beads.beads) {
+          var bead = entry.bead, leg = bead.meanLeg(0.3, 0.7);
+          if (Math.abs(leg - entry.weld.legSize) > 0.0005 || Math.abs(bead.extent() - bead.length) > 0.002 || bead.gaps() > 0)
+            throw 'Mobile bead ${entry.step}/${entry.segment}: leg ${leg * 1000} mm, extent ${bead.extent() * 1000} mm';
+          legs.push(Std.string(Math.round(leg * 10000) / 10));
+          lengths.push(Std.string(Math.round(bead.extent() * 10000) / 10));
+        }
+        Sys.println('mobile welding ($backend): $stations stations, $seamCount seams, ${Math.round(simulation.activeSession().simulationTime() * 10) / 10} s; legs ${legs.join("/")} mm, lengths ${lengths.join("/")} mm, clear stow');
+      } catch (error:Dynamic) {
+        simulation.clear(); session.dispose(); throw error;
+      }
+      simulation.clear(); session.dispose();
+    }
+  }
+
   static function position(simulation:ApplicationSimulation, id:String):Array<Float> {
     for (entry in simulation.capturePresentationSnapshot().environment) if (entry.id == id) return entry.position.copy();
     throw 'Missing mobile welding part $id';
