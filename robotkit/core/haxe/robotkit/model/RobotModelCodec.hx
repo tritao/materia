@@ -11,8 +11,6 @@ import robotkit.model.Transmission;
 /** Canonical, versioned JSON artifact for an editable RobotModel. */
 class RobotModelCodec {
   public static inline final VERSION:Int = RobotModel.CURRENT_VERSION;
-  static inline final LEGACY_VERSION:Int = VERSION - 2;
-  static inline final PREVIOUS_VERSION:Int = VERSION - 1;
 
   public static function encode(model:RobotModel):Bytes {
     if (model == null) throw "RobotModel is required";
@@ -158,7 +156,7 @@ class RobotModelCodec {
       finite(sensor.startAngleRadians, "sensor startAngleRadians");
       finite(sensor.fieldOfViewRadians, "sensor fieldOfViewRadians");
       finite(sensor.noiseStddev, "sensor noiseStddev");
-      if (sensor.kind == "joint_switch" || sensor.kind == "at_speed") {
+      if (sensor.kind == "joint_switch" || sensor.kind == "at_speed" || sensor.kind == "brake_released") {
         requireText(sensor.joint, 'sensor ${sensor.id} joint');
         if (!joints.exists(sensor.joint)) throw 'Sensor ${sensor.id} references unknown joint ${sensor.joint}';
         finite(sensor.windowLower, "sensor windowLower");
@@ -172,6 +170,7 @@ class RobotModelCodec {
       if (sensor.kind == "presence" && sensor.maxRange <= 0.0)
         throw 'Sensor ${sensor.id} needs a positive presence range';
     }
+    validateBrakes(model);
     var encodedSensors:Array<Dynamic> = [for (sensor in model.sensors) {
       id: sensor.id, name: sensor.name, kind: sensor.kind,
       updateRate: sensor.updateRate,
@@ -183,7 +182,7 @@ class RobotModelCodec {
     }];
     for (index in 0...model.sensors.length) {
       var sensor = model.sensors[index], record:Dynamic = encodedSensors[index];
-      if (sensor.kind == "joint_switch" || sensor.kind == "at_speed") {
+      if (sensor.kind == "joint_switch" || sensor.kind == "at_speed" || sensor.kind == "brake_released") {
         Reflect.setField(record, "joint", sensor.joint);
         Reflect.setField(record, "windowLower", sensor.windowLower);
         Reflect.setField(record, "windowUpper", sensor.windowUpper);
@@ -191,8 +190,7 @@ class RobotModelCodec {
       }
     }
     var document:Dynamic = {
-      schemaVersion: hasProcessVelocityDrive(model) ? VERSION :
-        hasPneumaticDrive(model) ? PREVIOUS_VERSION : LEGACY_VERSION,
+      schemaVersion: VERSION,
       name: model.name,
       collisionApproximation: collisionName(model.collisionApproximation),
       floatingBase: model.floatingBase,
@@ -244,6 +242,12 @@ class RobotModelCodec {
       if (contact.homeAfter.length > 0) encoded.homeAfter = contact.homeAfter;
       encoded;
     }];
+    if (model.brakes.length > 0) document.brakes = [for (brake in model.brakes) {
+      id: brake.id, joint: brake.joint, releaseChannel: brake.releaseChannel,
+      releasedSensor: brake.releasedSensor, holdingEffort: brake.holdingEffort,
+      releaseDelay: brake.releaseDelay, applicationDelay: brake.applicationDelay,
+      releaseTimeoutMs: brake.releaseTimeoutMs, feedbackMaxAgeMs: brake.feedbackMaxAgeMs
+    }];
     if (model.elasticNetworks.length == 0) Reflect.deleteField(document, "elasticNetworks");
     return Bytes.ofString(Json.stringify(document));
   }
@@ -268,8 +272,8 @@ class RobotModelCodec {
     try root = Json.parse(bytes.toString()) catch (_:Dynamic)
       throw "Malformed RobotModel artifact";
     var version = fieldInt(root, "schemaVersion");
-    if (version != VERSION && version != PREVIOUS_VERSION && version != LEGACY_VERSION)
-      throw 'Unsupported RobotModel schema version $version; supported $LEGACY_VERSION, $PREVIOUS_VERSION and $VERSION';
+    if (version != VERSION)
+      throw 'Unsupported RobotModel schema version $version; expected $VERSION';
     if (Reflect.hasField(root, "mobileBase") || Reflect.hasField(root, "forkMechanism"))
       throw "RobotModel cannot contain interpretation profiles";
 
@@ -411,6 +415,17 @@ class RobotModelCodec {
           throw 'Actuator ${actuator.id} references unknown encoder ${actuator.encoder}';
     }
 
+    if (Reflect.hasField(root, "brakes")) for (record in array(root, "brakes")) {
+      var timeout = number(record, "releaseTimeoutMs"), age = number(record, "feedbackMaxAgeMs");
+      if (timeout != Math.floor(timeout) || age != Math.floor(age) ||
+          timeout > 2147483647 || age > 2147483647)
+        throw "Brake timing policy must use integer milliseconds";
+      model.brakes.push(new Brake(text(record, "id"), text(record, "joint"),
+        text(record, "releaseChannel"), text(record, "releasedSensor"),
+        number(record, "holdingEffort"), number(record, "releaseDelay"),
+        number(record, "applicationDelay"), Std.int(timeout), Std.int(age)));
+    }
+
     var frames = new Map<String, Frame>();
     for (record in array(root, "frames")) {
       var id = text(record, "id");
@@ -492,18 +507,30 @@ class RobotModelCodec {
         owners.push(owner);
       }
     }
+    validateBrakes(model);
     return model;
   }
 
-  static function hasPneumaticDrive(model:RobotModel):Bool {
-    for (actuator in model.actuators)
-      if (actuator.drive != null && Std.isOfType(actuator.drive, PneumaticDrive)) return true;
-    return false;
-  }
-
-  static function hasProcessVelocityDrive(model:RobotModel):Bool {
-    for (actuator in model.actuators) if (actuator.processVelocity != null) return true;
-    return false;
+  static function validateBrakes(model:RobotModel):Void {
+    var ids = new Map<String, Bool>(), joints = new Map<String, Bool>();
+    var outputs = new Map<String, Bool>(), contacts = new Map<String, Bool>();
+    for (brake in model.brakes) {
+      if (brake == null) throw "Robot brake is null";
+      if (ids.exists(brake.id) || joints.exists(brake.joint) ||
+          outputs.exists(brake.releaseChannel) || contacts.exists(brake.releasedSensor))
+        throw 'Brake ${brake.id} has duplicate identity, joint, output or contact ownership';
+      ids.set(brake.id, true);
+      joints.set(brake.joint, true);
+      outputs.set(brake.releaseChannel, true);
+      contacts.set(brake.releasedSensor, true);
+      var found = false;
+      for (joint in model.joints) if (joint.id == brake.joint) found = true;
+      if (!found) throw 'Brake ${brake.id} references unknown joint ${brake.joint}';
+      var contact = false;
+      for (sensor in model.sensors) if (sensor.id == brake.releasedSensor &&
+          sensor.kind == "brake_released" && sensor.joint == brake.joint) contact = true;
+      if (!contact) throw 'Brake ${brake.id} needs a released-contact sensor on its joint';
+    }
   }
 
   public static function encodeCollisionShape(shape:CollisionShape):Dynamic {

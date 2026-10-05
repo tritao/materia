@@ -204,6 +204,16 @@ class RobotRuntimeCompiler {
         sensor.startAngleRadians, sensor.fieldOfViewRadians, sensorJoint,
         sensor.windowLower, sensor.windowUpper, sensor.hysteresis));
     }
+    for (brake in robot.brakes) {
+      var jointIndex = -1;
+      for (i in 0...robot.joints.length) if (robot.joints[i].id == brake.joint) jointIndex = i;
+      ensureDigitalChannel(result, brake.releaseChannel, true);
+      result.brakes.push(new RobotRuntimeBrakeBlueprint(jointIndex, brake.releaseChannel,
+        brake.releasedSensor, haxe.Int64.ofInt(brake.releaseTimeoutMs) * haxe.Int64.ofInt(1000000),
+        haxe.Int64.ofInt(brake.feedbackMaxAgeMs) * haxe.Int64.ofInt(1000000)));
+      result.brakePhysics.push(new RobotRuntimeBrakePhysicsBlueprint(jointIndex,
+        brake.holdingEffort, brake.releaseDelay, brake.applicationDelay));
+    }
     return result;
   }
 
@@ -688,6 +698,48 @@ class RobotRuntimeCompiler {
         if (!reachable[index])
           diagnostics.push(new RobotCompileDiagnostic("RK_TOPOLOGY_DISCONNECTED", 'links[$index]',
             "link is not reachable from the robot root"));
+    }
+    var brakeIds = new Map<String, Bool>(), brakeJoints = new Map<String, Bool>();
+    var brakeOutputs = new Map<String, Bool>(), brakeContacts = new Map<String, Bool>();
+    for (index in 0...robot.brakes.length) {
+      var brake = robot.brakes[index], path = 'brakes[$index]';
+      if (brake == null) {
+        diagnostics.push(new RobotCompileDiagnostic("RK_BRAKE_NULL", path, "brake is null"));
+        continue;
+      }
+      if (brakeIds.exists(brake.id) || brakeJoints.exists(brake.joint) ||
+          brakeOutputs.exists(brake.releaseChannel) || brakeContacts.exists(brake.releasedSensor))
+        diagnostics.push(new RobotCompileDiagnostic("RK_BRAKE_DUPLICATE", path,
+          "brakes need distinct identities, joints, release outputs and contact sensors"));
+      brakeIds.set(brake.id, true);
+      brakeJoints.set(brake.joint, true);
+      brakeOutputs.set(brake.releaseChannel, true);
+      brakeContacts.set(brake.releasedSensor, true);
+      var jointIndex = -1;
+      for (i in 0...robot.joints.length) if (robot.joints[i].id == brake.joint) jointIndex = i;
+      var servo = false;
+      for (actuator in robot.actuators) if (actuator != null) switch actuator.transmission {
+        case SimpleTransmission(joint, _, _):
+          if (joint == brake.joint && actuator.drive != null && actuator.drive.servo() != null)
+            servo = true;
+      }
+      if (jointIndex < 0 || jointIndex >= 64 || !servo)
+        diagnostics.push(new RobotCompileDiagnostic("RK_BRAKE_JOINT", path,
+          "brake needs a servo motor joint in the native servo range"));
+      var contact = false;
+      for (sensor in robot.sensors) if (sensor != null && sensor.id == brake.releasedSensor &&
+          sensor.kind == "brake_released" && sensor.joint == brake.joint) contact = true;
+      if (!contact) diagnostics.push(new RobotCompileDiagnostic("RK_BRAKE_CONTACT", path,
+        "brake needs its dedicated released-contact sensor on the same joint"));
+      for (actuator in robot.actuators) if (actuator != null) {
+        var pneumatic = actuator.drive == null ? null : actuator.drive.pneumatic();
+        var process = actuator.processVelocity;
+        if ((pneumatic != null && (pneumatic.channelA == brake.releaseChannel ||
+            pneumatic.channelB == brake.releaseChannel)) || (process != null &&
+            (process.speedChannel == brake.releaseChannel || process.directionChannel == brake.releaseChannel)))
+          diagnostics.push(new RobotCompileDiagnostic("RK_BRAKE_CHANNEL", path,
+            "brake release cannot share a pneumatic or speed output"));
+      }
     }
     return diagnostics;
   }

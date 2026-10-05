@@ -9,7 +9,7 @@ current format, and remove obsolete paths. Reference hardware data remains expli
 |---|---|---|---|
 | R1 | One current assembly schema and runtime layout; migrate producers/tests; delete legacy defaults and dead helpers | done; descriptor-entry cleanup awaits closing verification | `0121118f2`, `57db394b3` |
 | R2 | Motor/driver/supply sizing; real spindle belt transmission; motor shaft and coupling engagement; explicit screw root | done | `59791d003` |
-| R3 | Physical Z brake and fault sequencing; full downstream inertia feedforward | in progress: inertia and brake physics verified; assembly/controller integration remains | `6e94de72f`, `ea48834a8`, `f38740676`, `b248a1301` |
+| R3 | Physical Z brake and fault sequencing; full downstream inertia feedforward | in progress: integrated controller/simulation brake verified; physical mill assembly remains | `6e94de72f`, `ea48834a8`, `f38740676`, `b248a1301`, `a56345609`, `03838fb54` |
 | R4 | Swept clearance for joint moves; assembled limits; independent geometry/mass/speed checks | implemented: clearance, environment objects and explicit motion policy; closing gate pending | `4fc64fbee`, `8b22593be`, `4bd869718` |
 | R5 | Per-joint servo interpolation; consistent slip; typed channel faults; cached coupling setup; qualified channels and two-mill check | done | `dd0c14091` |
 | R6 | Rail support/load paths, bearing walls, cabinet mounts and material assumptions; remaining diagnostics and dead code | implemented: supports, paired guides and load admission verified; closing gate pending | `20f0d3e16`, `56923ba3e` |
@@ -187,3 +187,11 @@ Additional cleanup found while tracing the brake API:
 - Applied brake friction uses the physics timestep's two-step response floor and MuJoCo's maximum supported impedance, restoring the joint's original friction response when released. This is separate from transmission coupling stiffness. See [MuJoCo friction solver documentation](https://mujoco.readthedocs.io/en/stable/modeling.html#friction).
 - The registered integrated gravity test passes for a 10 kg prismatic load: a 150 N brake drifts 0.147 micrometres over 0.3 s after application; an undersized 50 N brake slips 693.96 mm. The 30 ms application delay allows 12.34 mm of sag before the rated brake settles. This generic fixture is not evidence for the actual mill Z assembly.
 - Recompiled runtime, brake-runtime, ABI validation, C API, SimCore, SimKit MuJoCo and RobotKit MuJoCo suites pass against the rebuilt libraries. Actual mill hardware/bindings and the closing gate remain open.
+- The absolute-path app build passes with the complete new simulation descriptor and joint snapshot layout (`/tmp/mt-brake-physical-app-build.log`). Additional SimCore C API and RobotKit kinematic simulation tests pass after recompilation.
+
+## R3 authored brake model in progress
+
+- An authored brake binds its mechanical motor joint, release output and released-contact sensor, with physical rating/delays and separate controller timing policy. Compilation produces separate controller and physical simulation records; duplicate ownership, missing contact and shared pneumatic/speed outputs are rejected.
+- RobotModel moves to v12. Its remaining feature-selected v9/v10/v11 writer and older-version reader are removed. In-repo authored model fixtures and the deployment model migrate to v12; unsupported-version rejection fixtures remain unsupported. This completes a compatibility cleanup missed by R1 rather than introducing a brake-only format.
+- Actual mill parts, mechanical assembly binding and Z-axis verification remain open.
+- RobotKit world passes at 5,006 assertions (`/tmp/mt-brake-model-robotkit.log`), including the authored brake round trip, separate lowering, old-schema rejection, wrong-contact rejection and duplicate ownership rejection. Other suites and the complete closing gate remain pending for this schema change.

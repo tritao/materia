@@ -232,6 +232,7 @@ class RobotWorldTests {
     testMobileLayer();
     testModelDrivenConfiguration();
     testRobotModelCodec();
+    testBrakeModel();
     testEncoders();
     testMjcfWalkerImport();
     testUrdfWalkerImport();
@@ -4930,6 +4931,54 @@ class RobotWorldTests {
 
   }
 
+  static function testBrakeModel():Void {
+    var model = new RobotModel("braked-servo");
+    var root = model.addLink(new Link("base", "base"));
+    var rotor = model.addLink(new Link("rotor", "rotor"));
+    rotor.mass = 1;
+    rotor.inertiaTensor = [0.01, 0.0, 0.0, 0.0, 0.01, 0.0, 0.0, 0.0, 0.01];
+    var joint = model.addJoint(new Joint("shaft", JointType.Continuous, root, rotor, "shaft"));
+    joint.limits = new robotkit.model.JointLimits(-100, 100, 20, 5);
+    var motor = model.addActuator(new Actuator("motor", 5, 20,
+      Transmission.SimpleTransmission(joint.id, 1, 0)));
+    motor.drive = new ServoDrive(2, 5, 10, 20, 0.001, 1000);
+    motor.servoStiffness = 1000;
+    motor.servoDamping = 10;
+    motor.positionLoopRate = 2000;
+    var contact = model.addSensor(new robotkit.model.Sensor("released", "brake_released", 0, "released"));
+    contact.joint = joint.id;
+    model.brakes.push(new robotkit.model.Brake("brake", joint.id, "brake.release", contact.id,
+      4, 0.05, 0.03, 250, 30));
+    var profile = new robotkit.profile.RobotProfile();
+    var blueprint = RobotRuntimeCompiler.compile(model, profile);
+    check(blueprint.brakes.length == 1 && blueprint.brakePhysics.length == 1 &&
+      blueprint.brakes[0].joint == 0 && blueprint.brakePhysics[0].holdingEffort == 4 &&
+      blueprint.channels.length == 1 && blueprint.channels[0].keepOnStop,
+      "authored brake compiles to separate controller policy and physical device settings");
+    var encoded = RobotModelCodec.encode(model);
+    var restored = RobotModelCodec.decode(encoded);
+    check(restored.brakes.length == 1 && restored.brakes[0].applicationDelay == 0.03 &&
+      restored.brakes[0].releaseTimeoutMs == 250 &&
+      RobotModelCodec.encode(restored).toString() == encoded.toString(),
+      "current robot model preserves the complete brake binding canonically");
+    var old:Dynamic = haxe.Json.parse(encoded.toString());
+    Reflect.setField(old, "schemaVersion", 11);
+    throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(old))),
+      "previous robot model schema is rejected rather than losing brake data");
+    contact.joint = "absent";
+    check(RobotRuntimeCompiler.validate(model, profile).length > 0,
+      "a contact on another joint cannot admit the braked servo");
+    throws(function() RobotModelCodec.encode(model),
+      "saved brake data rejects a contact on another joint");
+    contact.joint = joint.id;
+    model.brakes.push(new robotkit.model.Brake("second", joint.id, "second.release", contact.id,
+      4, 0.05, 0.03, 250, 30));
+    check(RobotRuntimeCompiler.validate(model, profile).length > 0,
+      "duplicate physical joint and contact ownership are rejected");
+    throws(function() RobotModelCodec.encode(model),
+      "saved brake data rejects duplicate mechanical ownership");
+  }
+
   static function testDiscreteNativeSensors():Void {
     var model = new RobotModel("discrete-process-sensors");
     var base = model.addLink(new Link("base", "link/base"));
@@ -4972,10 +5021,10 @@ class RobotWorldTests {
       "process spindle compiles to typed analog speed and direction channels");
     var encoded = RobotModelCodec.encode(model);
     var restored = RobotModelCodec.decode(encoded).actuators[0].processVelocity;
-    check(RobotModelCodec.VERSION == 11 && restored != null &&
+    check(RobotModelCodec.VERSION == 12 && restored != null &&
       restored.speedChannel == "spindle.speed" && restored.directionChannel == "spindle.direction" &&
       Math.abs(restored.radiansPerSpeedUnit - 1.0) < 1e-9,
-      "RobotModel v11 preserves the typed spindle process binding");
+      "RobotModel v12 preserves the typed spindle process binding");
     var runtime = simulationHarness.simulation.addRobot(blueprint);
     var robot = new SimulatedRobot("discrete-process-sensors", runtime,
       "discrete-process-sensors", ["base", "carriage", "spindle"], ["slide", "spindle"]);
