@@ -25,6 +25,12 @@ class MobileWelderChecks {
     diagnostics.throwIfErrors();
     if (carrier.upstream("source", "mains").port.instanceId != "battery") throw "Welding source is not battery fed";
     if (carrier.upstreamChain("source", "mains").indexOf("inverter/mains") < 0) throw "Welder bypasses inverter";
+    for (driver in ["driverLeft", "driverRight"]) {
+      var trace = carrier.upstreamChain(driver, "power");
+      if (trace.indexOf("driveSupply/dc") < 0 || trace.indexOf("battery/power1") < 0)
+        throw 'Wheel driver $driver bypasses the isolated drive supply';
+    }
+    if (carrier.driveSupply == null || carrier.driveSupply.voltage != 48) throw "Drive supply rating is missing";
     var parents = carrier.mateParents();
     for (name in ["source", "inverter", "cylinder"]) if (parents.get(name) != "deck") throw 'Equipment $name is not carried';
     var poses = carrier.solvedPoses();
@@ -35,7 +41,7 @@ class MobileWelderChecks {
         var part = parts.posed(member.component, poses.get(member.id));
         placed.push({id: member.id, part: part, box: PosedParts.boxOf(part)});
       }
-      for (equipment in placed) if (["battery", "source", "inverter", "cylinder", "computerSupply"].indexOf(equipment.id) >= 0) {
+      for (equipment in placed) if (["battery", "source", "inverter", "cylinder", "computerSupply", "driveSupply"].indexOf(equipment.id) >= 0) {
         if (equipment.box.minX < -carrier.length / 2 - 1e-6 || equipment.box.maxX > carrier.length / 2 + 1e-6 ||
             equipment.box.minY < -carrier.width / 2 - 1e-6 || equipment.box.maxY > carrier.width / 2 + 1e-6)
           throw 'Equipment ${equipment.id} overhangs the platform footprint';

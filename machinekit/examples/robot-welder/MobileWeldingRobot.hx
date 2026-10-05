@@ -18,11 +18,11 @@ class MobileWeldingRobot extends MobileBase {
   public final computerSupply:IsolatedDcConverter;
 
   public function new(?pack:BatteryPack, ?powerSource:WeldingPowerSource, ?powerInverter:Inverter) {
-    var storage = pack == null ? new BatteryPack(48, 25000, 1000, 600, 180, 230, 5) : pack;
+    var storage = pack == null ? new BatteryPack(48, 25000, 1000, 600, 180, 230, 4) : pack;
     var supply = powerSource == null ? new WeldingPowerSource() : powerSource;
     var conversion = powerInverter == null ? new Inverter(48, 230, 10000, 600, 400, 300, 45) : powerInverter;
-    if (storage.nominalVolts != conversion.inputVolts || storage.outlets < 5)
-      throw "The mobile welding pack must match the inverter and supply five branches";
+    if (storage.nominalVolts != conversion.inputVolts || storage.outlets < 4)
+      throw "The mobile welding pack must match the inverter and supply four branches";
     var weldingArm = new RobotArm(false, new ArmWeldingTool());
     weldingArm.replaceComponent("powerSupply", new IsolatedDcConverter(storage.nominalVolts, 48, 30, 6));
     super(weldingArm, storage.nominalVolts, payloadLayout(storage, supply, conversion));
@@ -53,9 +53,9 @@ class MobileWeldingRobot extends MobileBase {
     addMemberConnector("arm/upperArm", "feederSeat", AssemblyFrames.alongY(40, 0, 160, 1, 0, 0));
     addMate("feeder-mount", "fixed", "arm/upperArm", "feederSeat", "feeder", "mount");
 
-    connectPorts("pack-inverter", "battery", "power3", "inverter", "dc");
-    connectPorts("pack-arm", "battery", "power4", "arm/powerSupply", "dc");
-    connectPorts("pack-computer", "battery", "power5", "computerSupply", "dc");
+    connectPorts("pack-inverter", "battery", "power2", "inverter", "dc");
+    connectPorts("pack-arm", "battery", "power3", "arm/powerSupply", "dc");
+    connectPorts("pack-computer", "battery", "power4", "computerSupply", "dc");
     connectPorts("welder-mains", "inverter", "mains", "source", "mains");
     connectPorts("gas-hose", "cylinder", "gas", "source", "gas");
     connectPorts("weld-cable", "source", "weldPositive", "feeder", "power");
@@ -80,6 +80,7 @@ class MobileWeldingRobot extends MobileBase {
     var plateWidth = Math.max(MobileBase.WIDTH, Math.max(pack.width + 2 * gap,
       source.depth + inverter.width + 3 * gap));
     return {length: 2 * halfLength, width: plateWidth, payloadX: halfLength - 300,
-      batteryX: equipmentX, battery: pack};
+      batteryX: equipmentX, battery: pack,
+      driveSupply: new IsolatedDcConverter(pack.nominalVolts, 48, 30, 2)};
   }
 }

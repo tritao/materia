@@ -1334,7 +1334,7 @@ fixture assumptions; the mobile welder's 48 V-class, 25 kWh LFP envelope (1,000 
 not vendor-verified hardware claims.
 
 The 10 kW inverter feeds the unchanged welding source's mains port. Separate isolated DC branches
-feed the arm and computer. The pack has no conductive connection to the chassis; the work lead
+feed the arm, wheel drive and computer. Four pack outlets feed those three branches and the inverter. The pack has no conductive connection to the chassis; the work lead
 ends at the clamp on the separate weldment. `replaceComponent` preserves a local member's mating
 and port interfaces, allowing the arm's standalone supply to be replaced by an isolated converter
 without editing the reusable arm. Supply voltage resolution uses the nearest electrical conversion
@@ -1345,8 +1345,8 @@ does not mutate the assembly.
 The initial layout placed the battery too close to the wheels; actual posed-solid overlap caught
 it. Its forward edge now includes the wheel radius plus a 40 mm service gap. The equipment layout
 then derives a 2,450 x 820 mm platform. Tests verify the battery, power source, inverter, cylinder
-and computer converter are within the platform and intersect no other carried component.
-Total carried mass is **577.6 kg**, with no unaccounted component mass. Drive effort, wheel radius
+and both deck-mounted DC converters are within the platform and intersect no other carried component.
+Total carried mass is **579.6 kg**, with no unaccounted component mass. Drive effort, wheel radius
 and that mass set **0.209 m/s²** acceleration, including a 20% effort reserve. The yaw acceleration
 uses the platform rectangle's mass-inertia approximation; this is an explicit conservative operating
 profile, not a claim of measured yaw inertia. The actual mounting envelopes and source dimensions
@@ -1384,3 +1384,9 @@ P1 commits so far (since the W6 landing):
 - `8b5b827ccb1315e2b610a5ba25f165ff13fd720f` App: ground external weldments through their live object poses
 - `6d48e10bbc8afd77751ebb91e6824925e88eed0f` MachineKit: assemble the battery-powered mobile welding carrier
 - `60d00e14721c5fb70f132058fa61b1b94771803f` App: verify the mobile welding carrier on both simulation backends
+
+P1 drive-isolation completion: the wheel drivers now receive 48 V through a dedicated isolated
+DC converter, matching the phase-2 hardware contract. The optional converter belongs to the reusable
+base layout; the default base remains directly battery-fed. Posed-solid fit and service tracing
+pass with the additional 2 kg component. The full fixed-welder gate completed with exit 0;
+both three-pass checks measure 9.999 mm at 65.55 s. Carrier, arm, mobile and smoke gates follow.

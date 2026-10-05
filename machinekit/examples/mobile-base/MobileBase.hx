@@ -1,4 +1,5 @@
 import machinekit.power.BatteryPack;
+import machinekit.power.IsolatedDcConverter;
 import machinekit.motion.MotorDriver;
 import cadkit.modeling.Align;
 import cadkit.modeling.Part;
@@ -178,6 +179,7 @@ typedef MobileBaseLayout = {
   var payloadX:Float;
   var batteryX:Float;
   var battery:BatteryPack;
+  @:optional var driveSupply:IsolatedDcConverter;
 }
 
 
@@ -250,6 +252,7 @@ class MobileBase extends MachineAssembly {
 	public final payloadX:Float;
 	public final batteryX:Float;
 	public final battery:BatteryPack;
+	public final driveSupply:Null<IsolatedDcConverter>;
 	public final motor:NemaStepper;
 	public final wheel:DriveWheel;
 	public final caster:CasterWheel;
@@ -274,6 +277,7 @@ class MobileBase extends MachineAssembly {
 		width = layout == null ? WIDTH : layout.width;
 		payloadX = layout == null ? PAYLOAD_X : layout.payloadX;
 		batteryX = layout == null ? 0 : layout.batteryX;
+		driveSupply = layout == null ? null : layout.driveSupply;
 		battery = layout == null ? new BatteryPack(supplyVoltage, 480, 260, 180, 110, 5.148, 2) : layout.battery;
 		if (!Math.isFinite(length) || !Math.isFinite(width) || length < LENGTH || width < WIDTH ||
 			!Math.isFinite(payloadX) || !Math.isFinite(batteryX) || battery == null || battery.outlets < 2)
@@ -294,6 +298,14 @@ class MobileBase extends MachineAssembly {
 
 		addComponent("battery", battery);
 		addMate("battery-mount", "fixed", "basePlate", "battery", "battery", "base");
+		if (driveSupply != null) {
+			if (driveSupply.inputVolts != battery.nominalVolts || driveSupply.outlets < 2)
+				throw "Drive supply must match the pack and feed both wheel drivers";
+			addComponent("driveSupply", driveSupply);
+			addMemberConnector("basePlate", "driveSupply", Solids.axial(200, -180, BASE_THICKNESS));
+			addMate("drive-supply-mount", "fixed", "basePlate", "driveSupply", "driveSupply", "mount");
+			connectPorts("pack-drive", "battery", "power1", "driveSupply", "dc");
+		}
 
 		// Drives: the bracket hangs from its seat, the motor sits on the bracket, and the wheel turns at the gearhead output.
 		for (side in SIDES) {
@@ -314,7 +326,7 @@ class MobileBase extends MachineAssembly {
 			addComponent(driver, wheelDriver());
 			addMemberConnector("basePlate", driver, Solids.axial(layout == null ? side.sign * 210 : 200, layout == null ? 0 : side.sign * 80, BASE_THICKNESS));
 			addMate('$driver-mount', "fixed", "basePlate", driver, driver, "mount");
-			connectPorts('$driver-power', "battery", side.sign > 0 ? "power1" : "power2", driver, "power");
+			connectPorts('$driver-power', driveSupply == null ? "battery" : "driveSupply", side.sign > 0 ? "power1" : "power2", driver, "power");
 			addMotor('drive${side.name}', side.joint, 'motor${side.name}', driver, 0.5, gearbox);
 		}
 
