@@ -3920,3 +3920,44 @@ counters do not distinguish compilation errors from subsequent clearance
 rejections) and repeated IK along unsuccessful candidates; investigating those
 failures is the next
 performance follow-up. G18 remains optional and unstarted.
+
+### Long-weld rejection profiling — entry validation experiment
+
+Followed up the 49 rejected compiled candidates with temporary stage/error
+tracing. All 49 were compiler failures in operation 1, the approach: 26
+joint-limit overshoots, 17 IK-continuity failures and six task-space tolerance
+failures. None was a rejection by compiled clearance validation. The original
+planner with the clearance broad phase passed the focused G17 weld in 359.66 s
+of planning during this investigation (shared CPU load varies).
+
+Tested compiling and clearance-checking the identical entry prefix earlier,
+while retaining complete-program compilation and clearance validation for all
+accepted candidates. Three placements produced these observed planning times:
+
+| Entry check placement | Planning seconds | Checked poses |
+| --- | ---: | ---: |
+| Existing full-candidate validation | 359.66 | 224878 |
+| Before any seam samples | 358.85 | 140999 |
+| After the first 16 seam samples | 348.00 | 142983 |
+| Halfway through the first segment | 371.34 | 207854 |
+
+Every completed physical weld passed with the same -90 degree roll, entry/exit,
+2.599998690 m track travel, 0.775421815 rad arm margin, 0.000017742 rad maximum
+joint step, 236.6 s simulated cycle, 2600 mm seam and 5 mm bead leg, and no
+clearance violation. Experimental regressions passed 68 weld-planning
+assertions, including prefix compiler/clearance rejection, complete validation
+of later failures, and avoiding prefix compilation for quickly blocked seams.
+
+The extra prefix compilations largely consumed the saved seam-check time;
+a partial eager-prefix trace measured 31.16 s for just 29 completed prefixes.
+The small best-case difference is within the variation seen between runs and
+does not justify adding a second compilation path. All experimental runtime
+and test changes and timing prints were removed. The committed clearance broad
+phase remains the only performance implementation from this investigation.
+No full cross-kit phase-boundary gate was repeated.
+
+Further profiling should concentrate on the sampled IK chain and repeated
+forward-kinematics evaluation, rather than moving entry compilation earlier.
+`KinematicGroup.evaluate()` currently reevaluates a snapshot even when a TCP
+query and a clearance query use exactly the same joint state; a future cache
+must also account for root-pose changes and mutation of state DOF arrays.
