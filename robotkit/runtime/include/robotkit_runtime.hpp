@@ -3,6 +3,7 @@
 
 #include "robotkit_runtime.h"
 #include "trajectory_core.hpp"
+#include "brake_release_interlock.hpp"
 
 #include <array>
 #include <chrono>
@@ -394,6 +395,13 @@ private:
      */
     rk_event_value channel_outputs_[RK_MAX_PROCESS_CHANNELS]{};
     rk_event_value channel_outputs_backup_[RK_MAX_PROCESS_CHANNELS]{};
+    std::vector<internal::BrakeReleaseInterlock> brake_interlocks_;
+    uint64_t brake_sample_sequences_[RK_MAX_JOINTS]{};
+    uint64_t brake_sample_owner_ns_[RK_MAX_JOINTS]{};
+    double brake_hold_positions_[RK_MAX_JOINTS]{};
+    bool brakes_motion_ready_ = true;
+    bool brake_hold_active_ = false;
+    int32_t update_brake_interlocks(uint64_t owner_ns, bool servo_enabled, const rk_robot_state &sample);
     std::condition_variable queue_condition_;
     std::deque<QueuedCommand> commands_;
     std::thread worker_;

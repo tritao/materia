@@ -1,4 +1,4 @@
-#include "../src/brake_release_interlock.hpp"
+#include "../include/brake_release_interlock.hpp"
 #include <cassert>
 
 using namespace robotkit::internal;

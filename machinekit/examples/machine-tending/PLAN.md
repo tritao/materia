@@ -798,6 +798,7 @@ Done. What was built and decided:
 | MT4 | done | c945a0dc8, f518b0dff |
 | MT5 | done | 453d890ad, 5f06c32e5, a397b187a, a6230c46e, 1484b924d |
 | MT5b | done: review regressions | 04d3d092d |
+| MT5b follow-up | in progress: physical brake binding and closing gate | see [REVIEW_FIXES.md](REVIEW_FIXES.md) |
 | MT6 | done | 4c9e6ebec |
 | MT7 | planned | |
 | MT8 | planned | |
@@ -814,3 +815,10 @@ Done. What was built and decided:
 - Focused bare/enclosed app checks pass at 52.51/53.24 s, 78 plans. Nominal removal increases by 144 mm³ to 3846.78 mm³; measured removal is 3860.62 mm³, leftover 7.14 mm³ and gouge 0.618 mm³, with no rapid or holder collisions. X/Y/Z tracking peaks become 0.085925/0.051505/0.053502 mm at 10 ms. The larger blank increases carried mass; rapids remain 15.0955/25/22.8666 m/min and accelerations become approximately 29.86/28.95/26.93 m/s².
 - Door 1.50/1.79 s and seated clamp 0.08 s at 482.55 N remain unchanged. Cabinet supports add 5.2752 kg of stationary structure and bring the enclosed scene to 122 objects. Reach remains Reach850 on 600 mm, with 15 poses and 16.2399% joint margin.
 - All eleven kit suites, CadKit and MachineKit smoke passed. The first complete app run caught a stale analytical pocket-volume expectation; after correction, the complete app retry passed with exit 0 and no uncaught exception. Router, belt router, CoreXY, arm, mobile and welder baselines match their recorded values. The physical Z brake and rail support sizing remain open; no MT7 work has started.
+
+**Brake controller integration (MT5b follow-up, physical binding still open).**
+
+- The typed runtime blueprint binds a braked joint to a controller-owned digital release output and a released-contact sensor. Timeout and sample-age limits are controller policy; holding effort and physical contact delays stay in SimKit.
+- The runtime freezes trajectory and ramp clocks until newer released feedback arrives. Waiting references have stationary Hermite endpoints, zero velocity and zero acceleration feedforward. Normal stops retain release; emergency stops drop it; reset requires a new feedback epoch. Feedback age uses the owner clock, leaving public wall-clock receipt metadata unchanged.
+- Registered native checks pass for waiting, fresh release, normal stop, emergency stop, reset, missing/stale/lost feedback and rejection of program writes to the brake coil. The complete existing runtime, ABI validation and C API suites pass against rebuilt libraries. Device-owned queues require their own handshake and are explicitly unsupported for this host gate.
+- The physical brake part, simulation/assembly binding, saved-model migration and Z gravity-holding checks remain required, followed by the complete closing gate. Simulation currently rejects a brake blueprint without a physical adapter; no invented feedback or MT7 work is introduced.

@@ -74,6 +74,44 @@ void RobotRuntime::safe_channels(uint64_t owner_ns, rk_event_cause cause, bool h
     if (!hold_only) control_.events.clear();
 }
 
+int32_t RobotRuntime::update_brake_interlocks(uint64_t owner_ns, bool servo_enabled,
+    const rk_robot_state &sample) {
+    brakes_motion_ready_ = true;
+    int32_t fault = 0;
+    for (uint32_t i = 0; i < blueprint_.brake_count; ++i) {
+        const auto &binding = blueprint_.brakes[i];
+        internal::BrakeReleaseFeedback feedback{};
+        if (binding.released_sensor < sample.sensor_count) {
+            const auto &sensor = sample.sensors[binding.released_sensor];
+            if (sensor.value_count == 1) {
+                feedback.sequence = sensor.sequence;
+                feedback.received_ns = brake_sample_owner_ns_[i];
+                const double value = RK_SENSOR_VALUE(sample, binding.released_sensor, 0);
+                feedback.released = value == 1.0;
+                if (value != 0.0 && value != 1.0) feedback.sequence = 0;
+            }
+        }
+        auto &brake = brake_interlocks_[i];
+        brake.update(servo_enabled, owner_ns, feedback);
+        brakes_motion_ready_ = brakes_motion_ready_ && brake.motion_ready();
+        rk_event_value coil{};
+        coil.kind = RK_EVENT_DIGITAL;
+        coil.digital = brake.release_coil() ? 1 : 0;
+        if (channel_outputs_[binding.release_channel].digital != coil.digital)
+            record_event(binding.release_channel, coil, 0, 0, owner_ns, RK_EVENT_CONTROLLER);
+        if (servo_enabled && brake.fault() != internal::BrakeReleaseFault::none)
+            fault = brake.fault() == internal::BrakeReleaseFault::release_timeout
+                ? RK_FAULT_BRAKE_RELEASE_TIMEOUT : RK_FAULT_BRAKE_FEEDBACK;
+    }
+    if (!brakes_motion_ready_ && !brake_hold_active_) {
+        std::copy_n(sample.position, blueprint_.joint_count, brake_hold_positions_);
+        brake_hold_active_ = true;
+    } else if (brakes_motion_ready_) {
+        brake_hold_active_ = false;
+    }
+    return fault;
+}
+
 namespace {
 
 uint64_t monotonic_now_ns() {
@@ -338,6 +376,9 @@ RobotRuntime::RobotRuntime(const rk_robot_runtime_blueprint &blueprint,
     }
     for (uint32_t i = 0; i < blueprint_.channel_count && i < RK_MAX_PROCESS_CHANNELS; ++i)
         channel_outputs_[i] = blueprint_.channels[i].safe_value;
+    for (uint32_t i = 0; i < blueprint_.brake_count; ++i)
+        brake_interlocks_.emplace_back(blueprint_.brakes[i].release_timeout_ns,
+            blueprint_.brakes[i].feedback_max_age_ns);
     state_.struct_size = sizeof(state_);
     state_.joint_count = blueprint_.joint_count;
     state_.safety = endpoint_ ? endpoint_->initial_safety_state() : RK_SAFETY_READY;
@@ -470,6 +511,8 @@ rk_result RobotRuntime::submit(const rk_robot_command &command) {
 }
 
 rk_result RobotRuntime::submit_segments(const rk_robot_command &command, SegmentBatch batch) {
+    if (blueprint_.brake_count && endpoint_->executes_trajectory_queue())
+        return RK_ERROR_UNSUPPORTED;
     if (command.kind != RK_COMMAND_TRAJECTORY_SEGMENTS ||
         rk_robot_command_validate_for_blueprint(&command, &blueprint_) != RK_OK ||
         validate_segments_for_blueprint(batch, blueprint_) != RK_OK)
@@ -664,6 +707,10 @@ rk_result RobotRuntime::limit_input(uint32_t joint, bool active) {
 }
 
 rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
+    // A device-owned path clock needs its own release handshake. The host gate
+    // cannot certify an independently executing queue.
+    if (blueprint_.brake_count && endpoint_->executes_trajectory_queue())
+        return RK_ERROR_UNSUPPORTED;
     if (validate_plan_for_blueprint(plan, blueprint_) != RK_OK)
         return RK_ERROR_INVALID_ARGUMENT;
     if ((plan.required_capabilities & ~(RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE |
@@ -1117,6 +1164,48 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
     std::copy_n(velocity_anchor_pending_, RK_MAX_JOINTS,
         velocity_anchor_pending_backup_);
 
+    const bool has_command = !commands.empty();
+    rk_command_kind final_kind = RK_COMMAND_NONE;
+    uint64_t final_timestamp_ns = 0;
+    rk_safety_state safety = RK_SAFETY_READY;
+    rk_robot_state &current = owner_state_;
+    {
+        std::lock_guard state_lock(state_mutex_);
+        current = state_;
+        safety = state_.safety;
+    }
+    if (owner_time_ns == 0)
+        owner_time_ns = current.source_timestamp_ns +
+            static_cast<uint64_t>(std::max<int64_t>(0, period_.count()));
+    current_owner_time_ns_ = owner_time_ns;
+    // Emergency stop remains the one intentionally non-sequential operation:
+    // it wins over every other command in the drained owner cycle. All other
+    // commands are then applied in mailbox order so a reset/flush/chunk
+    // sequence and multiple trajectory chunks retain their meaning.
+    const rk_robot_command *emergency = nullptr;
+    for (const auto &queued : commands) {
+        const auto &value = queued.command;
+        if (value.kind == RK_COMMAND_EMERGENCY_STOP) {
+            emergency = &value;
+            break;
+        }
+    }
+
+    std::size_t last_reset_index = commands.size();
+    for (std::size_t index = 0; index < commands.size(); ++index)
+        if (commands[index].command.kind == RK_COMMAND_RESET_SAFETY)
+            last_reset_index = index;
+
+    if (emergency == nullptr && last_reset_index != commands.size())
+        for (auto &brake : brake_interlocks_) brake.reset();
+    const bool servo_enabled = emergency == nullptr &&
+        (safety == RK_SAFETY_READY || safety == RK_SAFETY_STOPPING || last_reset_index != commands.size());
+    const auto brake_result = update_brake_interlocks(owner_time_ns, servo_enabled, current);
+    if (brake_result != 0) {
+        latch_fault(true, brake_result);
+        return RK_ERROR_SAFETY_STOPPED;
+    }
+
     bool trajectory_stop_completed = false;
     // Set when a path-following stop reaches the end of the queued path this
     // cycle while still moving, so it can hand over to a straight ramp with
@@ -1143,6 +1232,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         return requested > 0.0 ? std::min(physical, requested) : physical;
     };
     auto advance_reference_clock = [&]() {
+        if (!brakes_motion_ready_) return;
         if (control_.trajectory_active && !trajectory_.empty()) {
             const auto period_count = period_.count();
             const auto period_ns = period_count > 0 ? static_cast<uint64_t>(period_count) : 0;
@@ -1313,38 +1403,6 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
 
     };
     advance_reference_clock();
-
-    const bool has_command = !commands.empty();
-    rk_command_kind final_kind = RK_COMMAND_NONE;
-    uint64_t final_timestamp_ns = 0;
-    rk_safety_state safety = RK_SAFETY_READY;
-    rk_robot_state &current = owner_state_;
-    {
-        std::lock_guard state_lock(state_mutex_);
-        current = state_;
-        safety = state_.safety;
-    }
-    if (owner_time_ns == 0)
-        owner_time_ns = current.source_timestamp_ns +
-            static_cast<uint64_t>(std::max<int64_t>(0, period_.count()));
-    current_owner_time_ns_ = owner_time_ns;
-    // Emergency stop remains the one intentionally non-sequential operation:
-    // it wins over every other command in the drained owner cycle. All other
-    // commands are then applied in mailbox order so a reset/flush/chunk
-    // sequence and multiple trajectory chunks retain their meaning.
-    const rk_robot_command *emergency = nullptr;
-    for (const auto &queued : commands) {
-        const auto &value = queued.command;
-        if (value.kind == RK_COMMAND_EMERGENCY_STOP) {
-            emergency = &value;
-            break;
-        }
-    }
-
-    std::size_t last_reset_index = commands.size();
-    for (std::size_t index = 0; index < commands.size(); ++index)
-        if (commands[index].command.kind == RK_COMMAND_RESET_SAFETY)
-            last_reset_index = index;
 
     bool controlled_stop = false;
     auto refresh_trajectory_progress = [&]() {
@@ -2106,6 +2164,23 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         }
     }
 
+    if (!brakes_motion_ready_ && output.kind == RK_COMMAND_JOINT_TARGETS) {
+        for (uint32_t i = 0; i < output.target_count; ++i) {
+            auto &target = output.targets[i];
+            const auto joint = target.joint;
+            target.mode = blueprint_.joint_servo[joint].stiffness > 0.0 ? RK_TARGET_SERVO : RK_TARGET_POSITION;
+            target.target = brake_hold_positions_[joint];
+            control_.position_reference[joint] = target.target;
+            control_.reference_initialized[joint] = true;
+            if (i < RK_MAX_SERVO_JOINTS) {
+                output.servos[i].velocity = output.servos[i].feedforward = 0.0;
+                output.servos[i].stiffness = blueprint_.joint_servo[joint].stiffness;
+                output.servos[i].damping = blueprint_.joint_servo[joint].damping;
+            }
+            output.reference_end_position[i] = target.target;
+            output.reference_end_velocity[i] = 0.0;
+        }
+    }
     output.sequence = ++endpoint_command_sequence_;
     const bool device_executes = device_plan_cycle && output.kind == RK_COMMAND_JOINT_TARGETS;
     auto endpoint_output = output;
@@ -2315,6 +2390,13 @@ rk_result RobotRuntime::publish_sample_impl(uint64_t timestamp_ns,
                 && old.source_timestamp_ns == sample.source_timestamp_ns
                 ? old.received_timestamp_ns : next.received_timestamp_ns;
         }
+        for (uint32_t i = 0; i < blueprint_.brake_count; ++i) {
+            const auto slot = blueprint_.brakes[i].released_sensor;
+            if (slot < next.sensor_count && next.sensors[slot].sequence != brake_sample_sequences_[i]) {
+                brake_sample_sequences_[i] = next.sensors[slot].sequence;
+                brake_sample_owner_ns_[i] = timestamp_ns;
+            }
+        }
         next.struct_size = sizeof(next);
         if (pending_device_stop_source_ &&
             next.source_timestamp_ns > *pending_device_stop_source_ &&
@@ -2479,6 +2561,11 @@ void RobotRuntime::reset_state() noexcept {
     std::fill_n(velocity_anchor_pending_, RK_MAX_JOINTS, false);
     std::fill_n(velocity_anchor_pending_backup_, RK_MAX_JOINTS, false);
     control_backup_ = {};
+    for (auto &brake : brake_interlocks_) brake.reset();
+    brakes_motion_ready_ = true;
+    brake_hold_active_ = false;
+    std::fill_n(brake_sample_sequences_, RK_MAX_JOINTS, 0);
+    std::fill_n(brake_sample_owner_ns_, RK_MAX_JOINTS, 0);
     trajectory_.reset();
     state_backup_valid_ = false;
 }

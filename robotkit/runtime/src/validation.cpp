@@ -149,7 +149,7 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
     uint64_t pooled_values = 0;
     for (uint32_t i = 0; i < blueprint->sensor_count; ++i) {
         const auto &sensor = blueprint->sensors[i];
-        if (sensor.kind < RK_SENSOR_ENCODER || sensor.kind > RK_SENSOR_PRESENCE ||
+        if (sensor.kind < RK_SENSOR_ENCODER || sensor.kind > RK_SENSOR_BRAKE_RELEASED ||
             sensor.link >= blueprint->link_count || !is_finite(sensor.update_rate) || sensor.update_rate < 0.0 ||
             !is_finite(sensor.noise_stddev) || sensor.noise_stddev < 0.0)
             return RK_ERROR_INVALID_ARGUMENT;
@@ -178,9 +178,29 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
         pooled_values += sensor.kind == RK_SENSOR_LIDAR ? sensor.ray_count
             : sensor.kind == RK_SENSOR_IMU ? 6
             : sensor.kind == RK_SENSOR_JOINT_SWITCH || sensor.kind == RK_SENSOR_AT_SPEED ||
-                sensor.kind == RK_SENSOR_PRESENCE ? 1 : blueprint->joint_count;
+                sensor.kind == RK_SENSOR_PRESENCE || sensor.kind == RK_SENSOR_BRAKE_RELEASED ? 1 : blueprint->joint_count;
     }
     if (pooled_values > RK_SENSOR_VALUE_POOL) return RK_ERROR_INVALID_ARGUMENT;
+    if (blueprint->brake_count > RK_MAX_JOINTS) return RK_ERROR_INVALID_ARGUMENT;
+    for (uint32_t i = 0; i < blueprint->brake_count; ++i) {
+        const auto &brake = blueprint->brakes[i];
+        if (brake.joint >= blueprint->joint_count || blueprint->process_joint[brake.joint] ||
+            brake.release_channel >= blueprint->channel_count || brake.released_sensor >= blueprint->sensor_count ||
+            brake.reserved || !brake.release_timeout_ns || !brake.feedback_max_age_ns ||
+            brake.feedback_max_age_ns > brake.release_timeout_ns ||
+            blueprint->sensors[brake.released_sensor].kind != RK_SENSOR_BRAKE_RELEASED ||
+            blueprint->sensor_joint[brake.released_sensor] != brake.joint)
+            return RK_ERROR_INVALID_ARGUMENT;
+        const auto &channel = blueprint->channels[brake.release_channel];
+        if (channel.kind != RK_EVENT_DIGITAL || channel.safe_value.digital != 0 ||
+            channel.stop_policy != RK_CHANNEL_KEEP_ON_STOP)
+            return RK_ERROR_INVALID_ARGUMENT;
+        for (uint32_t j = 0; j < i; ++j)
+            if (blueprint->brakes[j].joint == brake.joint ||
+                blueprint->brakes[j].release_channel == brake.release_channel ||
+                blueprint->brakes[j].released_sensor == brake.released_sensor)
+                return RK_ERROR_INVALID_ARGUMENT;
+    }
     for (uint32_t index = 0; index < blueprint->joint_count; ++index) {
         const auto &joint = blueprint->joints[index];
         if (joint.joint != index || joint.type < RK_RUNTIME_JOINT_FIXED ||
@@ -438,6 +458,9 @@ rk_result validate_plan_for_blueprint(const PlanRequest &plan,
             if (std::strcmp(event.channel, blueprint.channels[j].id) == 0 &&
                 event.value.kind == blueprint.channels[j].kind) declared = true;
         if (!declared) return RK_ERROR_INVALID_ARGUMENT;
+        for (uint32_t j = 0; j < blueprint.brake_count; ++j)
+            if (std::strcmp(event.channel, blueprint.channels[blueprint.brakes[j].release_channel].id) == 0)
+                return RK_ERROR_INVALID_ARGUMENT; // controller output, never a program event
     }
     return RK_OK;
 }

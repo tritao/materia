@@ -318,7 +318,8 @@ typedef struct rk_robot_runtime_link {
 } rk_robot_runtime_link;
 
 enum { RK_SENSOR_ENCODER = 1, RK_SENSOR_IMU = 2, RK_SENSOR_LIDAR = 3,
-    RK_SENSOR_JOINT_SWITCH = 4, RK_SENSOR_AT_SPEED = 5, RK_SENSOR_PRESENCE = 6 };
+    RK_SENSOR_JOINT_SWITCH = 4, RK_SENSOR_AT_SPEED = 5, RK_SENSOR_PRESENCE = 6,
+    RK_SENSOR_BRAKE_RELEASED = 7 };
 
 /** Compiled sensor slot. Semantic IDs live in the immutable host mapping. */
 typedef struct rk_sensor_config {
@@ -393,7 +394,7 @@ typedef struct rk_timed_event {
 
 typedef uint32_t rk_event_cause;
 enum { RK_EVENT_SCHEDULED = 1, RK_EVENT_HOLD_SAFE = 2,
-    RK_EVENT_RESUME_RESTORE = 3, RK_EVENT_STOP_SAFE = 4 };
+    RK_EVENT_RESUME_RESTORE = 3, RK_EVENT_STOP_SAFE = 4, RK_EVENT_CONTROLLER = 5 };
 typedef struct rk_event_record {
     uint64_t plan_id;
     uint64_t scheduled_time_ns;
@@ -430,6 +431,17 @@ typedef struct rk_robot_joint_coupling {
     double ratio;
     double offset;
 } rk_robot_joint_coupling;
+
+/** Controller-owned brake release output and released-contact handshake. Physical
+ * holding effort and contact delays belong to the simulation/device, not this table. */
+typedef struct rk_robot_brake_interlock {
+    uint32_t joint;
+    uint32_t release_channel;
+    uint32_t released_sensor;
+    uint32_t reserved;
+    uint64_t release_timeout_ns;
+    uint64_t feedback_max_age_ns;
+} rk_robot_brake_interlock;
 
 typedef struct rk_robot_runtime_blueprint {
     uint32_t struct_size RK_STRUCT_SIZE; /**< Set to sizeof this struct. */
@@ -491,6 +503,8 @@ typedef struct rk_robot_runtime_blueprint {
     double sensor_window_lower[RK_MAX_SENSORS];
     double sensor_window_upper[RK_MAX_SENSORS];
     double sensor_hysteresis[RK_MAX_SENSORS];
+    uint32_t brake_count;
+    rk_robot_brake_interlock brakes[RK_MAX_JOINTS];
 } rk_robot_runtime_blueprint;
 
 /* ------------------------------------------------------------------------- */
@@ -562,7 +576,8 @@ enum { RK_FAULT_ENDPOINT = 1, RK_FAULT_TRAJECTORY_UNDERFLOW = 2, RK_FAULT_RAMP_L
     /** A velocity target outlived its command's expires_at_ns; the joint brakes to zero. */
     RK_FAULT_COMMAND_EXPIRED = 7, RK_FAULT_LIMIT_SWITCH = 8,
     RK_FAULT_PROCESS_CHANNEL_MISSING = 9, RK_FAULT_PROCESS_CHANNEL_TYPE = 10,
-    RK_FAULT_PROCESS_CHANNEL_VALUE = 11 };
+    RK_FAULT_PROCESS_CHANNEL_VALUE = 11, RK_FAULT_BRAKE_RELEASE_TIMEOUT = 12,
+    RK_FAULT_BRAKE_FEEDBACK = 13 };
 
 typedef uint32_t rk_session_state;
 enum {

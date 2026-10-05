@@ -572,7 +572,7 @@ class RobotRuntimeCompiler {
     for (sensor in robot.sensors) if (sensor != null)
       pooledValues += sensor.kind == "lidar" ? sensor.rayCount : sensor.kind == "imu" ? 6
         : sensor.kind == "joint_encoder" ? robot.joints.length
-        : sensor.kind == "joint_switch" || sensor.kind == "at_speed" || sensor.kind == "presence" ? 1 : 0;
+        : sensor.kind == "joint_switch" || sensor.kind == "at_speed" || sensor.kind == "presence" || sensor.kind == "brake_released" ? 1 : 0;
     if (pooledValues > RobotKitRuntimeConstants.RK_SENSOR_VALUE_POOL)
       diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_VALUES", "sensors", "sensors report more values together than a state holds"));
     var sensorIds = new Map<String, Bool>();
@@ -622,7 +622,7 @@ class RobotRuntimeCompiler {
           || sensor.fieldOfViewRadians <= 0.0 || sensor.fieldOfViewRadians > Math.PI * 2.0 + 1e-6))
         diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_SCAN", path,
           "invalid LiDAR resolution, range, or angular coverage"));
-      if (sensor.kind == "joint_switch" || sensor.kind == "at_speed") {
+      if (sensor.kind == "joint_switch" || sensor.kind == "at_speed" || sensor.kind == "brake_released") {
         var index = -1;
         for (jointIndex in 0...robot.joints.length) if (robot.joints[jointIndex].id == sensor.joint) index = jointIndex;
         if (index < 0) diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_JOINT", '$path.joint',

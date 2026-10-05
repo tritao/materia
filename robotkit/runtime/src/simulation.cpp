@@ -238,6 +238,9 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         return RK_ERROR_INVALID_STATE;
     if (rk_robot_runtime_blueprint_validate(&blueprint) != RK_OK || blueprint.link_count == 0)
         return RK_ERROR_INVALID_ARGUMENT;
+    // Brake feedback cannot be synthesized without a bound physical brake.
+    // The controller handshake is available to endpoints supplying real contact samples.
+    if (blueprint.brake_count != 0) return RK_ERROR_UNSUPPORTED;
     const bool has_pneumatic_desc = robot_desc != nullptr;
     const auto pneumatic_count = has_pneumatic_desc ? robot_desc->pneumatic_drive_count : 0;
     if (pneumatic_count > RK_MAX_JOINTS) return RK_ERROR_INVALID_ARGUMENT;

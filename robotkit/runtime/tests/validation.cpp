@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cmath>
+#include <cstring>
 
 int main() {
     rk_robot_runtime_blueprint blueprint{};
@@ -24,6 +25,34 @@ int main() {
         joint.axis[2] = 1.0;
     }
     assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_OK);
+    blueprint.channel_count = 1;
+    std::strcpy(blueprint.channels[0].id, "z.brake.release");
+    blueprint.channels[0].kind = RK_EVENT_DIGITAL;
+    blueprint.channels[0].safe_value.kind = RK_EVENT_DIGITAL;
+    blueprint.channels[0].stop_policy = RK_CHANNEL_KEEP_ON_STOP;
+    blueprint.sensor_count = 1;
+    blueprint.sensors[0].kind = RK_SENSOR_BRAKE_RELEASED;
+    blueprint.sensors[0].rotation[3] = 1.0;
+    blueprint.sensor_joint[0] = 0;
+    blueprint.brake_count = 1;
+    blueprint.brakes[0] = {0, 0, 0, 0, 250'000'000, 30'000'000};
+    assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_OK);
+    blueprint.channels[0].safe_value.digital = 1;
+    assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_ERROR_INVALID_ARGUMENT);
+    blueprint.channels[0].safe_value.digital = 0;
+    blueprint.channels[0].stop_policy = RK_CHANNEL_SAFE_ON_STOP;
+    assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_ERROR_INVALID_ARGUMENT);
+    blueprint.channels[0].stop_policy = RK_CHANNEL_KEEP_ON_STOP;
+    blueprint.sensor_joint[0] = 1;
+    assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_ERROR_INVALID_ARGUMENT);
+    blueprint.sensor_joint[0] = 0;
+    blueprint.brakes[0].feedback_max_age_ns = 251'000'000;
+    assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_ERROR_INVALID_ARGUMENT);
+    blueprint.brakes[0].feedback_max_age_ns = 30'000'000;
+    blueprint.brake_count = 2;
+    blueprint.brakes[1] = blueprint.brakes[0];
+    assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_ERROR_INVALID_ARGUMENT);
+    blueprint.brake_count = blueprint.channel_count = blueprint.sensor_count = 0;
     blueprint.owner_period_ns = static_cast<uint64_t>(INT64_MAX) + 1;
     assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_ERROR_INVALID_ARGUMENT);
     blueprint.struct_size = offsetof(rk_robot_runtime_blueprint, owner_period_ns);

@@ -43,6 +43,7 @@ class RobotRuntimeBlueprint {
   public final pneumaticDrives:Array<RobotRuntimePneumaticDriveBlueprint> = [];
   /** Velocity process drives are bound to analog channels, never to trajectory axes. */
   public final velocityDrives:Array<RobotRuntimeVelocityDriveBlueprint> = [];
+  public final brakes:Array<RobotRuntimeBrakeBlueprint> = [];
   public final links:Array<RobotRuntimeLinkBlueprint> = [];
   /** Process ownership covers the whole mechanically coupled set, not just its motor shaft. */
   public function processJoints():Array<Bool> {
@@ -295,6 +296,38 @@ class RobotRuntimeBlueprint {
       value.set_sensor_window_lower(i, sensor.windowLower);
       value.set_sensor_window_upper(i, sensor.windowUpper);
       value.set_sensor_hysteresis(i, sensor.hysteresis);
+    }
+    if (brakes.length > RobotKitRuntimeConstants.RK_MAX_JOINTS) throw "Too many brake interlocks";
+    value.set_brake_count(brakes.length);
+    for (i in 0...brakes.length) {
+      var brake = brakes[i];
+      if (brake.joint < 0 || brake.joint >= jointCount ||
+          haxe.Int64.compare(brake.releaseTimeoutNs, haxe.Int64.ofInt(0)) <= 0 ||
+          haxe.Int64.compare(brake.feedbackMaxAgeNs, haxe.Int64.ofInt(0)) <= 0 ||
+          haxe.Int64.compare(brake.feedbackMaxAgeNs, brake.releaseTimeoutNs) > 0)
+        throw "Invalid brake interlock limits";
+      for (j in 0...i) if (brakes[j].joint == brake.joint ||
+          brakes[j].releaseChannel == brake.releaseChannel || brakes[j].releasedSensor == brake.releasedSensor)
+        throw "Brake interlocks must have distinct joints, release outputs and feedback";
+      var channelIndex = -1, sensorIndex = -1;
+      for (j in 0...channels.length) if (channels[j].id == brake.releaseChannel) {
+        var valid = switch channels[j].safeValue { case Digital(false): true; case _: false; };
+        if (!valid || !channels[j].keepOnStop) throw "Brake release needs a de-energized digital safe value and keep-on-stop policy";
+        channelIndex = j;
+      }
+      for (j in 0...layout.length) if (layout[j].id == brake.releasedSensor) {
+        if (layout[j].kind != "brake_released" || layout[j].joint != brake.joint)
+          throw "Brake feedback must read its mechanical joint";
+        sensorIndex = j;
+      }
+      if (channelIndex < 0 || sensorIndex < 0) throw "Brake release output or feedback is undeclared";
+      var nativeBrake = new rk_robot_brake_interlock();
+      nativeBrake.set_joint(brake.joint);
+      nativeBrake.set_release_channel(channelIndex);
+      nativeBrake.set_released_sensor(sensorIndex);
+      nativeBrake.set_release_timeout_ns(brake.releaseTimeoutNs);
+      nativeBrake.set_feedback_max_age_ns(brake.feedbackMaxAgeNs);
+      value.set_brakes(i, nativeBrake);
     }
     for (index in 0...joints.length) {
       var joint = joints[index];

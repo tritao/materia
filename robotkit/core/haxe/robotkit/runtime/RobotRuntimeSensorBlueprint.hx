@@ -52,7 +52,7 @@ class RobotRuntimeSensorBlueprint {
   /** True for sensors the native runtime samples itself. */
   public static function isNativeKind(kind:String):Bool
     return kind == "joint_encoder" || kind == "imu" || kind == "lidar" ||
-      kind == "joint_switch" || kind == "at_speed" || kind == "presence";
+      kind == "joint_switch" || kind == "at_speed" || kind == "presence" || kind == "brake_released";
 
   public var external(get, never):Bool;
 
@@ -61,7 +61,7 @@ class RobotRuntimeSensorBlueprint {
   public function nativeValue():rk_sensor_config {
     var value = new rk_sensor_config();
     value.set_kind(switch kind { case "joint_encoder": 1; case "imu": 2; case "lidar": 3;
-      case "joint_switch": 4; case "at_speed": 5; case "presence": 6; default: throw "Unsupported sensor kind"; });
+      case "joint_switch": 4; case "at_speed": 5; case "presence": 6; case "brake_released": 7; default: throw "Unsupported sensor kind"; });
     value.set_link(link);
     for (i in 0...3) value.set_position(i, position.get(i));
     for (i in 0...4) value.set_rotation(i, rotation.get(i));
