@@ -267,7 +267,7 @@ impl VirtualDevice {
                 self.publish_state();
                 true
             }
-            20 => {
+            24 => {
                 let command = HomingCounterBatch6::decode(payload).unwrap();
                 let mut accepted = false;
                 if command.session == self.session && command.sequence > self.control_sequence &&
@@ -286,12 +286,12 @@ impl VirtualDevice {
                 let ack = HomingControlAck6 { session: self.session, sequence: command.sequence,
                     scope: command.scope, accepted: accepted as u8 };
                 let mut bytes = [0; HomingControlAck6::SIZE];
-                ack.encode(&mut bytes).unwrap(); self.emit(19, &bytes);
+                ack.encode(&mut bytes).unwrap(); self.emit(23, &bytes);
                 if accepted { self.publish_state(); }
                 true
             }
-            17 | 18 => {
-                let (session, sequence, scope) = if kind == 17 {
+            21 | 22 => {
+                let (session, sequence, scope) = if kind == 21 {
                     let command = HomingScope6::decode(payload).unwrap();
                     (command.session, command.sequence, command.scope)
                 } else {
@@ -301,7 +301,7 @@ impl VirtualDevice {
                 let mut accepted = false;
                 if session == self.session && sequence > self.control_sequence && self.profile == 1 {
                     self.control_sequence = sequence;
-                    if kind == 17 {
+                    if kind == 21 {
                         let command = HomingScope6::decode(payload).unwrap();
                         if command.action == 0 && self.homing_scope.is_none() &&
                             self.core.as_ref().unwrap().remaining_capacity() == CAPACITY &&
@@ -325,7 +325,7 @@ impl VirtualDevice {
                 }
                 let ack = HomingControlAck6 { session: self.session, sequence, scope, accepted: accepted as u8 };
                 let mut bytes = [0; HomingControlAck6::SIZE];
-                ack.encode(&mut bytes).unwrap(); self.emit(19, &bytes);
+                ack.encode(&mut bytes).unwrap(); self.emit(23, &bytes);
                 if accepted { self.publish_state(); }
                 true
             }
@@ -356,7 +356,7 @@ impl VirtualDevice {
                     let mut positions = self.core.as_ref().unwrap().positions();
                     if self.profile == 1 {
                         let Some(projected) = self.steps.stopped_targets(&self.board,
-                            &self.actuator_joint, &self.actuator_ratio, self.count) else { return false; };
+                            &self.actuator_joint, &self.actuator_ratio, self.active_count) else { return false; };
                         positions = projected;
                     }
                     if self.core.as_mut().unwrap().prepare_stopped_queue(now, positions).is_err() {
@@ -603,7 +603,7 @@ impl VirtualDevice {
                 let start = Sensor6Header::SIZE + i * Sensor6Value::SIZE;
                 Sensor6Value { value: *value }.encode(&mut body[start..start + Sensor6Value::SIZE]).unwrap();
             }
-            self.emit(21, &body);
+            self.emit(17, &body);
         }
     }
 
@@ -1052,7 +1052,7 @@ mod tests {
         let mut q = [0; QueueBegin6::SIZE]; queue.encode(&mut q).unwrap();
         assert!(send::<QueueBegin6>(&mut d, 5, &q));
         let header = Segment6Header { queue_revision: 1, plan_id: 1, t0_ticks: 0,
-            duration_ticks, degree: 0, actuator_count: 1, ends_at_rest: 1, reserved: 0 };
+            duration_ticks, degree: 0, actuator_count: 1, ends_at_rest: 1, purpose: 0 };
         let row = Segment6Coefficients { actuator: 0, c0: 0.0, c1: 0.0, c2: 0.0,
             c3: 0.0, c4: 0.0, c5: 0.0 };
         let mut segment = vec![0; Segment6Header::SIZE + Segment6Coefficients::SIZE];
@@ -1127,7 +1127,7 @@ mod tests {
     #[test]
     fn welding_feedback_travels_in_sensor_frames() {
         let mut d = welding_device(true); d.outbox.clear(); assert!(d.advance(10_000_000));
-        let frame = d.outbox.iter().find(|f| decode_frame6(f).unwrap().0 == 21).unwrap();
+        let frame = d.outbox.iter().find(|f| decode_frame6(f).unwrap().0 == 17).unwrap();
         let (_, body) = decode_frame6(frame).unwrap();
         let header = Sensor6Header::decode(&body[..Sensor6Header::SIZE]).unwrap();
         assert_eq!(header.session, 9); assert_eq!(header.slot, 0); assert_eq!(header.value_count, 6);
@@ -1165,13 +1165,13 @@ mod tests {
                 action, first: 0, second: 1, skew_bound: 0.02 };
             let mut body = [0; HomingScope6::SIZE];
             record.encode(&mut body).unwrap();
-            assert!(send::<HomingScope6>(device, 17, &body));
+            assert!(send::<HomingScope6>(device, 21, &body));
         };
         let side = |device: &mut VirtualDevice, sequence, hold| {
             let record = HomingSide6 { session: 9, sequence, scope: 1, actuator: 0, hold };
             let mut body = [0; HomingSide6::SIZE];
             record.encode(&mut body).unwrap();
-            assert!(send::<HomingSide6>(device, 18, &body));
+            assert!(send::<HomingSide6>(device, 22, &body));
         };
         let queue = |device: &mut VirtualDevice, revision, position, speed, duration, purpose| {
             let t0 = device.board.now_ticks();
@@ -1214,7 +1214,7 @@ mod tests {
         let batch = HomingCounterBatch6 { session: 9, sequence: 6, scope: 1,
             first: 0, second: 1, first_delta: 0.0, second_delta: 0.004 };
         let mut body = [0; HomingCounterBatch6::SIZE]; batch.encode(&mut body).unwrap();
-        assert!(send::<HomingCounterBatch6>(&mut device, 20, &body));
+        assert!(send::<HomingCounterBatch6>(&mut device, 24, &body));
         assert_eq!(device.steps.counter_position(&device.board, 1), Some(0.0));
         scope(&mut device, 7, 1);
         assert_eq!(device.homing_scope, None);
@@ -1225,7 +1225,7 @@ mod tests {
         for sequence in 1..=7 {
             let ack = device.outbox.iter().filter_map(|frame| {
                 let (kind, body) = decode_frame6(frame).ok()?;
-                if kind == 19 { HomingControlAck6::decode(body).ok() } else { None }
+                if kind == 23 { HomingControlAck6::decode(body).ok() } else { None }
             }).find(|ack| ack.sequence == sequence).unwrap();
             assert_eq!(ack.accepted, 1);
         }

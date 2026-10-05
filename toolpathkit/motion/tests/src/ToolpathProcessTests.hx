@@ -139,7 +139,9 @@ class ToolpathProcessTests extends ToolpathTestSupport {
     var blueprint = MachineKitRobotCompiler.compileGantry(gantry, 0.1, 0.4);
     check(blueprint.model.joints.length == blueprint.model.couplings.length + 3 && blueprint.model.actuators.length == 4,
       "physical gantry includes three leaders and four authored motors");
-    check(blueprint.model.couplings.length == gantry.describe().mechanical.couplings.length,
+    var gantryCouplings = gantry.definition().couplings;
+    if (gantryCouplings == null) throw "Gantry definition has no drive couplings";
+    check(blueprint.model.couplings.length == gantryCouplings.length,
       "physical gantry keeps every part-derived drive coupling");
     var hasTenMillimetreVertex = false, linksValid = physical.linkHulls.length > 0;
     for (hull in physical.linkHulls) {
@@ -220,7 +222,10 @@ class ToolpathProcessTests extends ToolpathTestSupport {
     var robot = new SimulatedRobot("physical-cnc", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name]);
-    var binding = ToolpathTestSupport.cncBinding(cnc, blueprint);
+    homeGantryFixture(blueprint, runtime, simulationHarness, robot);
+    var state = runtime.snapshot();
+    var binding = new toolpathkit.motion.ToolpathMotionBinding(cnc.binding, blueprint,
+      state.modelRevision, state.calibrationRevision);
     var motion = new ManipulatorMotion(robot, binding.compiler,
       function(channel) return channel == "spindle.at_speed" ?
         EventValue.Digital(true) : null,

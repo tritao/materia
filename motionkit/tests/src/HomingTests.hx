@@ -26,6 +26,8 @@ class HomingTests {
     approach(delayed, delayedCycle);
     delayed.delayHolds = true;
     delayed.next(-0.001, true, false, 2, 0); delayedCycle.update(0.01);
+    delayedCycle.update(0.01);
+    check(delayedCycle.status() == "Approach", "A pending control must wait without consuming the same cached capture twice");
     delayed.next(-0.0015, true, false, 2, 0); delayedCycle.update(0.01);
     check(delayed.holdPolls > 0 && delayedCycle.status() == "Approach",
       "First-side hold acknowledgment must progress while the second switch is open");

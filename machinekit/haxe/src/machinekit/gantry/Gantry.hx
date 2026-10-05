@@ -210,7 +210,7 @@ class Gantry extends AxisBuilder {
 			var mount = id + "Mount";
 			mountSwitch(mount, fixed, moving, trigger, suffix, origin, pose, sensor.spec.diameter);
 			attach(id, sensor, pose, mount);
-			addSwitch(id, axis.id, id, {instanceId: trigger, connectorName: kind + suffix},
+			addTripSwitch(id, axis.id, id, {instanceId: trigger, connectorName: kind + suffix},
 				side, kind == "home" ? "home" : "limit", suffix == "YRight" ? 2 : 1, driveJoint);
 		}
 	}
@@ -266,7 +266,7 @@ class Gantry extends AxisBuilder {
 
 	/** All descendants carried by X, including the Z carriage and its guide allowance. */
 	function movingBounds(moving:String):GantryBox {
-		var definition = machinekit.assembly.FrozenAssemblyDefinitions.thaw(describe().mechanical);
+		var definition = this.definition();
 		var lo = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
 		var hi = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
 		for (member in components()) {

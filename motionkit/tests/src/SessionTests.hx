@@ -529,9 +529,9 @@ class SessionTests extends MotionKitTestSupport {
     var holdTick = 2;
     var worstAcceleration = 0.0;
     var worstTick = -1;
+    var blueprint = MachineKitRobotCompiler.compileGantry(
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(200, 150, 100)), 0.1, limit);
     while (moveTicks == 0 || holdTick < moveTicks) {
-      var blueprint = MachineKitRobotCompiler.compileXYZGantry(new LinearAxis(23, 10, 200),
-        new LinearAxis(23, 10, 60), new LinearAxis(23, 10, 40), 0.1, limit);
       var simulationHarness = new SimulationHarness(0.01);
       var simulation = simulationHarness.simulation;
       var runtime = simulation.addRobot(blueprint.runtime);

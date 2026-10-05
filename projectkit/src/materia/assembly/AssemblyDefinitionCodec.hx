@@ -85,6 +85,14 @@ class AssemblyDefinitionCodec {
 			}
 			if (component.robotFlangeConnector != null && !names.exists(component.robotFlangeConnector))
 				throw 'Robot flange "${component.id}" references a missing face connector';
+			if (component.collisionHulls != null) {
+				if (component.collisionHulls.length == 0) throw 'Component "${component.id}" has no collision pieces';
+				for (hull in component.collisionHulls) {
+					if (hull == null || hull.length < 12 || hull.length > 192 || hull.length % 3 != 0)
+						throw 'Component "${component.id}" has an invalid collision hull';
+					for (value in hull) if (!Math.isFinite(value)) throw 'Component "${component.id}" has a non-finite collision hull';
+				}
+			}
 			definitions.set(component.id, component);
 		}
 

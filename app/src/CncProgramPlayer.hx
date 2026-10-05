@@ -191,14 +191,11 @@ class CncProgramPlayer implements SessionMember {
 		var placement = new AssemblyState(definition, state);
 		checkOptions = check == null ? new PlanCheckOptions() : check.copy();
 		var steady = checkOptions.steady;
-		// Pulse timing caps stepper channels; servos retain their own motor/driver limits.
+		// Apply the controller pulse ceiling to stepper planning.
 		var machineModel = robot.model;
 		var wiring = job.controller;
-		if (wiring != null) {
-			var pulseLayout = DeviceLayout.forSteppers(robot.model);
-			if (pulseLayout.channels.length > 0)
-				machineModel = DeviceBinding.bind(robot.model, pulseLayout, wiring.stepTickHz).model;
-		}
+		if (wiring != null)
+			machineModel = DeviceBinding.planningModel(robot.model, wiring.stepTickHz);
 		var axes:Array<MotionAxisBlueprint> = [];
 		var start:Array<Float> = [];
 		// Rapids ask for the fastest axis speed; the planner still holds each joint to its own limit.
@@ -321,7 +318,10 @@ class CncProgramPlayer implements SessionMember {
 		homing = newHoming();
 		homingComplete = homing == null;
 		newMotion = () -> {
-			var made = new ManipulatorMotion(robot.robot, binding.compiler,
+			var state = robot.runtime.snapshot();
+			var currentBinding = new ToolpathMotionBinding(machine, binding.blueprint, state.modelRevision, state.calibrationRevision);
+			currentBinding.compiler.planCheck = binding.compiler.planCheck;
+			var made = new ManipulatorMotion(robot.robot, currentBinding.compiler,
 				channel -> {
 					if (channel == "spindle.at_speed") return spindleAtSpeed();
 					if (!StringTools.startsWith(channel, TOOL_CHANGE)) return null;

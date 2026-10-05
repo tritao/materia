@@ -783,7 +783,7 @@ void Rkd6Endpoint::poll_frames(std::uint64_t owner_now_ns) {
                 clock_.observe(reply.host_send_ns,
                     transport_->received_at_ns() ? transport_->received_at_ns() : owner_now_ns,
                     reply.device_rx_ticks, reply.device_tx_ticks);
-        } else if (decoded.kind == 19) {
+        } else if (decoded.kind == 23) {
             device_wire6::HomingControlAck6 ack{};
             if (device_wire6::decode(decoded.payload, ack) && ack.session == ack_.session &&
                 ack.sequence == control_sequence_ && ack.scope == control_scope_ && !control_accepted_.has_value()) {
@@ -856,7 +856,8 @@ void Rkd6Endpoint::poll_frames(std::uint64_t owner_now_ns) {
             if (decoded.payload.size() < device_wire6::State6Header::SIZE ||
                 !device_wire6::decode(decoded.payload.first(device_wire6::State6Header::SIZE), header) ||
                 header.session != ack_.session || header.actuator_count != ack_.actuator_count ||
-                header.input_count != input_layout_.size()) continue;
+                header.input_count != input_layout_.size() ||
+                (counter_state_pending_ && header.accepted_sequence < counter_state_sequence_)) continue;
             state_header_ = header;
             for (std::size_t i = 0; i < state_header_.actuator_count; ++i)
                 device_wire6::decode(decoded.payload.subspan(device_wire6::State6Header::SIZE +
@@ -869,7 +870,7 @@ void Rkd6Endpoint::poll_frames(std::uint64_t owner_now_ns) {
             if (counter_state_pending_ && state_header_.accepted_sequence >= counter_state_sequence_)
                 counter_state_pending_ = false;
             has_state_ = true;
-        } else if (decoded.kind == 21) {
+        } else if (decoded.kind == 17) {
             device_wire6::Sensor6Header header{};
             if (!device_wire6::decode(decoded.payload.first(header.SIZE), header) ||
                 header.session != ack_.session || header.slot >= RK_MAX_SENSORS ||
@@ -978,7 +979,7 @@ void Rkd6Endpoint::pump_queue() {
 
 rk_result Rkd6Endpoint::sample(std::uint64_t timestamp_ns, rk_robot_state &state) {
     now_ns_ = std::max(now_ns_, timestamp_ns);
-    if (clock_.sync_due(timestamp_ns, 100'000'000)) {
+    if (clock_.sync_due(timestamp_ns, 100'000'000) && (!clock_.ready() || link_drain_ns() == 0)) {
         device_wire6::TimeSyncRequest request{timestamp_ns};
         std::array<std::uint8_t, request.SIZE> body{};
         if (!device_wire6::encode(request, body) || !send_record(3, body)) return RK_ERROR_BACKEND;
@@ -986,7 +987,12 @@ rk_result Rkd6Endpoint::sample(std::uint64_t timestamp_ns, rk_robot_state &state
     }
     poll_frames(timestamp_ns);
     pump_queue();
-    if (!has_state_ || counter_state_pending_) return RK_ERROR_STALE_STATE;
+    if (!has_state_) return RK_ERROR_STALE_STATE;
+    // A control acknowledgement precedes its state frame. Keep reporting the last
+    // coherent measurement while homing readiness and input captures remain blocked.
+    // Its original source timestamp is retained; a missing confirming frame times out.
+    if (counter_state_pending_ && now_ns_ - std::min(now_ns_, control_sent_ns_) >= control_timeout_ns_)
+        return RK_ERROR_BACKEND;
     state.struct_size = sizeof(state);
     state.joint_count = joint_count_;
     state.source_timestamp_ns = static_cast<std::uint64_t>(
@@ -1124,7 +1130,9 @@ namespace robotkit {
 rk_result Rkd6Endpoint::homing_control_status(std::uint64_t sequence) const {
     if (!sequence || sequence != control_sequence_) return RK_ERROR_STALE_COMMAND;
     if (control_accepted_) {
-        if (*control_accepted_ && counter_state_pending_) return RK_ERROR_STALE_STATE;
+        if (*control_accepted_ && counter_state_pending_)
+            return now_ns_ - std::min(now_ns_, control_sent_ns_) >= control_timeout_ns_
+                ? RK_ERROR_BACKEND : RK_ERROR_STALE_STATE;
         return *control_accepted_ ? RK_OK : RK_ERROR_INVALID_STATE;
     }
     if (now_ns_ - std::min(now_ns_, control_sent_ns_) >= control_timeout_ns_) return RK_ERROR_BACKEND;
@@ -1144,7 +1152,7 @@ rk_result Rkd6Endpoint::request_homing_scope(std::uint64_t sequence, std::uint64
     command.action = action; command.first = first; command.second = second;
     command.skew_bound = static_cast<float>(skew_bound);
     std::array<std::uint8_t, device_wire6::HomingScope6::SIZE> bytes{};
-    if (!device_wire6::encode(command, bytes) || !send_record(17, bytes)) return RK_ERROR_BACKEND;
+    if (!device_wire6::encode(command, bytes) || !send_record(21, bytes)) return RK_ERROR_BACKEND;
     control_sequence_ = sequence; control_scope_ = scope; control_sent_ns_ = now_ns_; control_accepted_.reset();
     homing_stop_pending_ = action == 2;
     return RK_OK;
@@ -1160,7 +1168,7 @@ rk_result Rkd6Endpoint::request_homing_side(std::uint64_t sequence, std::uint64_
     command.session = ack_.session; command.sequence = sequence; command.scope = scope;
     command.actuator = actuator; command.hold = hold;
     std::array<std::uint8_t, device_wire6::HomingSide6::SIZE> bytes{};
-    if (!device_wire6::encode(command, bytes) || !send_record(18, bytes)) return RK_ERROR_BACKEND;
+    if (!device_wire6::encode(command, bytes) || !send_record(22, bytes)) return RK_ERROR_BACKEND;
     control_sequence_ = sequence; control_scope_ = scope; control_sent_ns_ = now_ns_; control_accepted_.reset();
     return RK_OK;
 }
@@ -1200,7 +1208,7 @@ rk_result Rkd6Endpoint::request_homing_counter_batch(std::uint64_t sequence, std
     command.session = ack_.session; command.sequence = sequence; command.scope = scope;
     command.first = first; command.second = second; command.first_delta = first_delta; command.second_delta = second_delta;
     std::array<std::uint8_t, device_wire6::HomingCounterBatch6::SIZE> bytes{};
-    if (!device_wire6::encode(command, bytes) || !send_record(20, bytes)) return RK_ERROR_BACKEND;
+    if (!device_wire6::encode(command, bytes) || !send_record(24, bytes)) return RK_ERROR_BACKEND;
     control_sequence_ = sequence; control_scope_ = scope; control_sent_ns_ = now_ns_; control_accepted_.reset();
     counter_batch_ = command;
     return RK_OK;

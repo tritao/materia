@@ -153,7 +153,7 @@ fn handle<T: Write<u8>>(input: &[u8], board: &mut StubBoard,
                 let mut inputs = InputCapture::new();
                 for i in 0..begin.input_count as usize {
                     if !inputs.bind(board, i, InputBinding { actuator: begin.input_actuator[i] as usize,
-                        active_high: (begin.input_active_high & (1u64 << i)) != 0 }, JOINTS) { return; }
+                        active_high: (begin.input_active_high & (1u64 << i)) != 0 }, begin.actuator_count as usize) { return; }
                 }
                 board.inputs = inputs;
                 board.input_count = begin.input_count as usize;

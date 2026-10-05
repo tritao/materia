@@ -34,6 +34,7 @@ class FlatAssembly {
 	public final encoders:Array<EncoderRecord> = [];
 	public final cylinders:Array<machinekit.assembly.MachineAssemblyDescription.CylinderRecord> = [];
 	public final sensors:Array<materia.assembly.AssemblyDefinition.AssemblySensor> = [];
+	public final switches:Array<materia.assembly.AssemblyDefinition.AssemblySwitch> = [];
 	public final bomItems:Array<BomEntry> = [];
 	/** Findings from working the transmission couplings out from their parts. */
 	public final diagnostics:Diagnostics = new Diagnostics();
@@ -55,6 +56,8 @@ class FlatAssembly {
 		definition.definitions.push(entry);
 		var flange = machinekit.robotics.RobotFlangeFacet.of(component);
 		if (flange != null) entry.robotFlangeConnector = flange.connector;
+		var collision = machinekit.component.CollisionHullFacet.of(component);
+		if (collision != null) entry.collisionHulls = [for (hull in collision.hulls) hull.copy()];
 		definitionById.set(id, entry);
 		definition.occurrences.push({id: id, definition: id, initialPose: pose, includePath: includePath});
 	}

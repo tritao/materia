@@ -72,7 +72,7 @@ class MachineKitRobotCompiler {
     var mechanical = new AssemblyModel();
     assembly.addTo(mechanical, "");
     var definition = mechanical.definition("machinekit-machine");
-    machinekit.assembly.AssemblyPreview.preserveOwnership(definition, assembly.describe().mechanical);
+    machinekit.assembly.AssemblyPreview.preserveOwnership(definition, assembly.definition());
     var components = assembly.components();
     var parts:Array<cadbridge.AssemblySimulationBridge.AssemblyPhysicalPart> = [];
     for (entry in definition.definitions) {

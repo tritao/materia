@@ -33,7 +33,8 @@ struct Frame {
 inline bool decode(std::span<const std::uint8_t> bytes, Frame &frame) {
     if (bytes.size() < HEADER_SIZE + CRC_SIZE || bytes.size() > MAX_FRAME_SIZE ||
         bytes[0] != 'R' || bytes[1] != 'K' || bytes[2] != 'D' || bytes[3] != '6' ||
-        bytes[5] != 0 || bytes[4] == 0 || bytes[4] > 21) return false;
+        bytes[5] != 0 || bytes[4] == 0 || bytes[4] > 24 ||
+        (bytes[4] >= 18 && bytes[4] <= 20)) return false;
     const auto length = std::size_t(bytes[6]) | (std::size_t(bytes[7]) << 8);
     if (length > MAX_PAYLOAD_SIZE || bytes.size() != HEADER_SIZE + length + CRC_SIZE) return false;
     const auto expected = std::uint32_t(bytes[8 + length]) |
@@ -49,30 +50,30 @@ inline bool decode(std::span<const std::uint8_t> bytes, Frame &frame) {
         (bytes[4] == 7 && length != device_wire6::Commit6::SIZE) ||
         (bytes[4] == 14 && length != device_wire6::QueueStatus6::SIZE) ||
         (bytes[4] == 16 && length != device_wire6::Event6::SIZE) ||
-        (bytes[4] == 17 && length != device_wire6::HomingScope6::SIZE) ||
-        (bytes[4] == 18 && length != device_wire6::HomingSide6::SIZE) ||
-        (bytes[4] == 19 && length != device_wire6::HomingControlAck6::SIZE) ||
-        (bytes[4] == 20 && length != device_wire6::HomingCounterBatch6::SIZE)) return false;
-    if (bytes[4] == 17) {
+        (bytes[4] == 21 && length != device_wire6::HomingScope6::SIZE) ||
+        (bytes[4] == 22 && length != device_wire6::HomingSide6::SIZE) ||
+        (bytes[4] == 23 && length != device_wire6::HomingControlAck6::SIZE) ||
+        (bytes[4] == 24 && length != device_wire6::HomingCounterBatch6::SIZE)) return false;
+    if (bytes[4] == 21) {
         device_wire6::HomingScope6 command{};
         if (!device_wire6::decode(bytes.subspan(HEADER_SIZE, command.SIZE), command) ||
             !command.session || !command.sequence || !command.scope || command.action > 2 ||
             command.first >= 64 || command.second >= 64 || command.first == command.second ||
             !std::isfinite(command.skew_bound) || command.skew_bound <= 0) return false;
     }
-    if (bytes[4] == 18) {
+    if (bytes[4] == 22) {
         device_wire6::HomingSide6 command{};
         if (!device_wire6::decode(bytes.subspan(HEADER_SIZE, command.SIZE), command) ||
             !command.session || !command.sequence || !command.scope || command.actuator >= 64 || command.hold > 1) return false;
     }
-    if (bytes[4] == 20) {
+    if (bytes[4] == 24) {
         device_wire6::HomingCounterBatch6 batch{};
         if (!device_wire6::decode(bytes.subspan(HEADER_SIZE, batch.SIZE), batch) ||
             !batch.session || !batch.sequence || !batch.scope || batch.first >= 64 ||
             batch.second >= 64 || batch.first == batch.second ||
             !std::isfinite(batch.first_delta) || !std::isfinite(batch.second_delta)) return false;
     }
-    if (bytes[4] == 19) {
+    if (bytes[4] == 23) {
         device_wire6::HomingControlAck6 ack{};
         if (!device_wire6::decode(bytes.subspan(HEADER_SIZE, ack.SIZE), ack) ||
             !ack.session || !ack.sequence || !ack.scope || ack.accepted > 1) return false;
@@ -154,7 +155,7 @@ inline bool decode(std::span<const std::uint8_t> bytes, Frame &frame) {
 
 inline bool encode(std::uint8_t kind, std::span<const std::uint8_t> payload,
                    std::vector<std::uint8_t> &out) {
-    if (kind == 0 || kind > 21 || payload.size() > MAX_PAYLOAD_SIZE) return false;
+    if (kind == 0 || kind > 24 || payload.size() > MAX_PAYLOAD_SIZE) return false;
     out.resize(HEADER_SIZE + payload.size() + CRC_SIZE);
     out[0] = 'R'; out[1] = 'K'; out[2] = 'D'; out[3] = '6';
     out[4] = kind; out[5] = 0;

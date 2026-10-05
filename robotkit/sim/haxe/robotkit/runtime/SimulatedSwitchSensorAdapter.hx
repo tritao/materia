@@ -39,7 +39,7 @@ class SimulatedSwitchSensorAdapter implements SimulationStepObserver {
       for (i in 0...blueprint.jointCount) if (blueprint.identity.jointId(i) == contact.joint) index = i;
       if (index < 0) throw 'Switch ${contact.id} has no monitored joint';
       var mounted = false;
-      for (sensor in blueprint.sensors) if (sensor.id == contact.id && sensor.kind == "joint_switch" &&
+      for (sensor in blueprint.sensors) if (sensor.id == contact.id && sensor.kind == "trip_switch" &&
           sensor.frameId == contact.frameId) mounted = true;
       if (!mounted) throw 'Switch ${contact.id} has no matching external sensor mount';
       indices.push(SwitchDriveBinding.resolve(blueprint, contact).joint);

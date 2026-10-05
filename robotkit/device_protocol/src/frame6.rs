@@ -67,10 +67,10 @@ fn validate_payload(kind: u8, bytes: &[u8]) -> Result<(), Frame6Error> {
         8..=13 => Some(0), 14 => Some(QueueStatus6::SIZE),
         15 | 6 => None,
         16 => Some(Event6::SIZE),
-        21 => None,
-        17 => Some(HomingScope6::SIZE), 18 => Some(HomingSide6::SIZE),
-        19 => Some(HomingControlAck6::SIZE),
-        20 => Some(HomingCounterBatch6::SIZE),
+        17 => None,
+        21 => Some(HomingScope6::SIZE), 22 => Some(HomingSide6::SIZE),
+        23 => Some(HomingControlAck6::SIZE),
+        24 => Some(HomingCounterBatch6::SIZE),
         _ => return Err(Frame6Error::BadType),
     };
     if let Some(size) = exact {
@@ -127,7 +127,7 @@ fn validate_payload(kind: u8, bytes: &[u8]) -> Result<(), Frame6Error> {
             return Err(Frame6Error::BadPayload);
         }
     }
-    if kind == 21 {
+    if kind == 17 {
         if bytes.len() < Sensor6Header::SIZE { return Err(Frame6Error::BadLength); }
         let header = Sensor6Header::decode(&bytes[..Sensor6Header::SIZE])
             .map_err(|_| Frame6Error::BadPayload)?;
@@ -142,19 +142,19 @@ fn validate_payload(kind: u8, bytes: &[u8]) -> Result<(), Frame6Error> {
             }
         }
     }
-    if kind == 17 {
+    if kind == 21 {
         let scope = HomingScope6::decode(bytes).map_err(|_| Frame6Error::BadPayload)?;
         if scope.session == 0 || scope.sequence == 0 || scope.scope == 0 || scope.action > 2 ||
             scope.first >= 64 || scope.second >= 64 || scope.first == scope.second ||
             !scope.skew_bound.is_finite() || scope.skew_bound <= 0.0 { return Err(Frame6Error::BadPayload); }
     }
-    if kind == 18 {
+    if kind == 22 {
         let side = HomingSide6::decode(bytes).map_err(|_| Frame6Error::BadPayload)?;
         if side.session == 0 || side.sequence == 0 || side.scope == 0 || side.actuator >= 64 || side.hold > 1 {
             return Err(Frame6Error::BadPayload);
         }
     }
-    if kind == 20 {
+    if kind == 24 {
         let batch = HomingCounterBatch6::decode(bytes).map_err(|_| Frame6Error::BadPayload)?;
         if batch.session == 0 || batch.sequence == 0 || batch.scope == 0 ||
             batch.first >= 64 || batch.second >= 64 || batch.first == batch.second ||
@@ -162,7 +162,7 @@ fn validate_payload(kind: u8, bytes: &[u8]) -> Result<(), Frame6Error> {
             return Err(Frame6Error::BadPayload);
         }
     }
-    if kind == 19 {
+    if kind == 23 {
         let ack = HomingControlAck6::decode(bytes).map_err(|_| Frame6Error::BadPayload)?;
         if ack.session == 0 || ack.sequence == 0 || ack.scope == 0 || ack.accepted > 1 { return Err(Frame6Error::BadPayload); }
     }

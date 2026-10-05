@@ -151,6 +151,7 @@ class GantryBoredBracket extends GantryPlate {
 		this.boreFace = boreFace; this.clearanceDiameter = clearanceDiameter;
 		this.sections = sections == null ? [[-width / 2, -depth / 2, 0.0, width / 2, depth / 2, height]] : [for (section in sections) section.copy()];
 		if (this.sections.length == 0) throw "Bracket needs a solid section";
+		addFacet(machinekit.component.CollisionHullFacet.fromBoxes(this.sections));
 		for (section in this.sections) {
 			if (section.length != 6) throw "Bracket section needs six bounds";
 			for (value in section) if (!Math.isFinite(value)) throw "Bracket bounds must be finite";

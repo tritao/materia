@@ -235,6 +235,7 @@ class AssemblyDefinitionFlattener {
 				if (!emittedDefinitions.exists(component.id)) {
 					var copied:AssemblyComponentDefinition = {id: scoped(prefix, component.id), connectors: component.connectors};
 					if (component.robotFlangeConnector != null) copied.robotFlangeConnector = component.robotFlangeConnector;
+					if (component.collisionHulls != null) copied.collisionHulls = [for (hull in component.collisionHulls) hull.copy()];
 					flat.definitions.push(copied);
 					emittedDefinitions.set(component.id, true);
 				}

@@ -2308,6 +2308,7 @@ rk_result RobotRuntime::publish_sample_impl(uint64_t timestamp_ns,
         next.joint_count != blueprint_.joint_count ||
         next.sensor_count > configured_sensor_count ||
             (next.sensor_count != 0 && next.sensor_count != configured_sensor_count)) {
+        std::fprintf(stderr, "RobotRuntime observation rejected: result=%d joints=%u/%u sensors=%u/%u\n", result, next.joint_count, blueprint_.joint_count, next.sensor_count, configured_sensor_count);
         latch_fault();
         return result != RK_OK ? result : RK_ERROR_BACKEND;
     }
@@ -2325,6 +2326,7 @@ rk_result RobotRuntime::publish_sample_impl(uint64_t timestamp_ns,
                 precision * std::max(1.0, std::abs(limits.lower_limit)) ||
             next.position[joint] > limits.upper_limit + margin +
                 precision * std::max(1.0, std::abs(limits.upper_limit))) {
+            std::fprintf(stderr, "RobotRuntime observed limit: joint=%u position=%.17g bounds=[%.17g,%.17g] margin=%.17g precision=%.17g\n", joint, next.position[joint], limits.lower_limit, limits.upper_limit, margin, precision);
             latch_fault();
             return RK_ERROR_LIMIT;
         }

@@ -225,8 +225,10 @@ class AssemblySimulationBridge {
         if (!Math.isFinite(mass) || mass <= 0) throw 'Assembly occurrence "$id" has an invalid mass';
         masses[index].push({mass: mass, center: [center.x * scale, center.y * scale, center.z * scale],
           inertia: rotated(part.inertia, offset, part.density * Math.pow(scale, 5) * mass / baseMass)});
-        var hull = part.collisionHull;
-        if (hull != null) {
+        var component = [for (entry in definition.definitions) if (entry.id == occurrence.definition) entry][0];
+        var hulls = component.collisionHulls == null ?
+          (part.collisionHull == null ? [] : [part.collisionHull]) : component.collisionHulls;
+        for (hull in hulls) {
           if (hull.length < 12 || hull.length > 64 * 3 || hull.length % 3 != 0)
             throw 'Assembly occurrence "$id" has an invalid collision hull';
           var vertices:Array<Float> = [];
@@ -479,7 +481,7 @@ class AssemblySimulationBridge {
         contact.side, (contact.trip - placement.joint(contact.joint)) * scale,
         contact.hysteresis * scale, contact.repeatability * scale, contact.seed, contact.driveJoint);
       model.addSwitch(added);
-      var sensor = new robotkit.model.Sensor(contact.id, "joint_switch", 0.0, contact.id);
+      var sensor = new robotkit.model.Sensor(contact.id, "trip_switch", 0.0, contact.id);
       sensor.frame = frame;
       model.addSensor(sensor);
     }

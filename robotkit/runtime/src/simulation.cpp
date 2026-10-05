@@ -706,14 +706,19 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             binding->actuated_joints_.push_back(source.type != RK_RUNTIME_JOINT_FIXED && !process_joint);
             joints_.push_back(joint);
         }
-        // Parallel drive shafts need independent targets for squaring. Keep
+        // Parallel powered drive shafts need independent targets for squaring.
+        // An unpowered idler following the same axis is not a second drive. Keep
         // ordinary single-output transmissions physically constrained so their
         // load and shaft cannot drift apart while tracking a moving target.
         std::vector<uint8_t> independent_coupling(blueprint.joint_count, 0);
         for (uint32_t i = 0; i < blueprint.coupling_count; ++i)
             for (uint32_t k = 0; k < i; ++k)
                 if (blueprint.couplings[i].leader == blueprint.couplings[k].leader &&
-                    blueprint.couplings[i].follower != blueprint.couplings[k].follower)
+                    blueprint.couplings[i].follower != blueprint.couplings[k].follower &&
+                    (blueprint.joints[blueprint.couplings[i].follower].limit_flags & RK_LIMIT_EFFORT) &&
+                    blueprint.joints[blueprint.couplings[i].follower].max_effort > 0.0 &&
+                    (blueprint.joints[blueprint.couplings[k].follower].limit_flags & RK_LIMIT_EFFORT) &&
+                    blueprint.joints[blueprint.couplings[k].follower].max_effort > 0.0)
                     independent_coupling[blueprint.couplings[i].leader] = 1;
         for (uint32_t pass = 0; pass < blueprint.joint_count; ++pass) {
             bool changed = false;

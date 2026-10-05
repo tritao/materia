@@ -30,7 +30,7 @@ class DeviceSwitchSensorAdapter {
     }
     for (input in inputs) {
       var mounted = false;
-      for (sensor in blueprint.sensors) if (sensor.id == input.wiring.switchId && sensor.kind == "joint_switch") mounted = true;
+      for (sensor in blueprint.sensors) if (sensor.id == input.wiring.switchId && sensor.kind == "trip_switch") mounted = true;
       if (!mounted) throw "Device switch has no external sensor mount";
       leaders.push(binding.channels[input.actuatorChannel].jointIndex);
       timestamps.push(null);

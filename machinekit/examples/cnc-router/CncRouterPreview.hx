@@ -65,13 +65,16 @@ class CncRouterChecks {
 			throw '$message: expected $expected, got $actual';
 	}
 
-	public static function run():Void {
+	public static function run():Void withGeometry(runChecks);
+
+	/** Own the geometry cache for checks invoked from either standalone fixture. */
+	public static function withGeometry(check:Void -> Void):Void {
 		parts = new PosedParts();
-		try runChecks() catch (error:Dynamic) {
-			parts.close();
+		try check() catch (error:Dynamic) {
+			parts.close(); parts = null;
 			throw error;
 		}
-		parts.close();
+		parts.close(); parts = null;
 	}
 
 	/** The geometry of the members posed by this run, built once each; closed when the run ends. */

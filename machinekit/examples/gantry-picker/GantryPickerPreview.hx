@@ -7,7 +7,7 @@ class GantryPickerPreview {
 	public static function picker():Bytes {
 		var picker = new GantryPicker();
 		var scene = AssemblyPreview.scene(picker, "gantry-picker");
-		scene.robotTools = AssemblyPreview.robotTools(picker.tool, "tool");
+		scene.robotTools = machinekit.robot.RobotScene.robotTools(picker.tool, "tool");
 		var steps:Array<materia.project.SceneArtifact.SceneArtifactMissionStep> = [];
 		for (index in 0...GantryPicker.BOX_COUNT) {
 			steps.push({kind: "pick", at: {occurrence: "box" + index, connector: "top"}});

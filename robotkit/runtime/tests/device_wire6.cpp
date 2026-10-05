@@ -51,10 +51,14 @@ int main(int argc, char **argv) {
         assert(robotkit::device_frame6::decode(bytes, frame));
         assert(frame.kind == kind && frame.payload.size() == record.SIZE);
     };
-    check_homing_frame(17, HomingScope6{7, 1, 1, 0, 0, 1, 0.01f});
-    check_homing_frame(18, HomingSide6{7, 2, 1, 0, 1});
-    check_homing_frame(19, HomingControlAck6{7, 2, 1, 1});
-    check_homing_frame(20, HomingCounterBatch6{7, 3, 1, 0, 1, 0.1, -0.1});
+    check_homing_frame(21, HomingScope6{7, 1, 1, 0, 0, 1, 0.01f});
+    check_homing_frame(22, HomingSide6{7, 2, 1, 0, 1});
+    check_homing_frame(23, HomingControlAck6{7, 2, 1, 1});
+    check_homing_frame(24, HomingCounterBatch6{7, 3, 1, 0, 1, 0.1, -0.1});
+    for (std::uint8_t kind = 18; kind <= 20; ++kind) {
+        std::vector<std::uint8_t> rejected;
+        assert(!robotkit::device_frame6::encode(kind, {}, rejected));
+    }
     std::ifstream input(argv[1]);
     assert(input.good());
     std::string line;

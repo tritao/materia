@@ -864,7 +864,10 @@ class ProjectSourceTests {
         motion = currentHandling.motion;
         var allocated = hl.Gc.totalAllocated() - before;
         ticks++;
-        if (mission.failure != null) throw "gantry picker mission: " + mission.failure;
+        if (mission.failure != null) {
+          var failed = mission.robot.runtime.snapshot();
+          throw 'gantry picker mission: ${mission.failure}; time=${simulation.activeSession().simulationTime()} names=${mission.robot.robot.description().joints} offsets=${[for (joint in 0...failed.q.length) mission.robot.runtime.referenceOffset(joint)]} q=${failed.q.toArray()} setpoint=${mission.robot.robot.snapshot().setpointPositions.toArray()}';
+        }
         var plan = motion.executor.plan;
         // Planning happens on a worker. Measure ordinary execution ticks separately from plan admission.
         if (priorPlan != null && plan == priorPlan) { bytes += allocated; measuredTicks++; }

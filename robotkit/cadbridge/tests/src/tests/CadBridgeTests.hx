@@ -641,7 +641,7 @@ class CadBridgeTests {
     var outer = new MachineAssembly();
     outer.addComponent("rootFlange", new machinekit.robotics.RobotFlange(50));
     outer.include("cell", cell);
-    var definition = machinekit.assembly.FrozenAssemblyDefinitions.thaw(outer.describe().mechanical);
+    var definition = outer.definition();
     var physical:cadbridge.AssemblySimulationBridge.AssemblyPhysicalData = {metresPerUnit: 0.001,
       parts: [for (part in outer.components()) {id: part.id, materialId: "steel", volume: 1000.0,
         centerOfMass: [0.0, 0.0, 0.0], inertia: [100000.0, 0.0, 0.0, 0.0, 100000.0, 0.0, 0.0, 0.0, 100000.0], density: 7850.0}]};
@@ -811,6 +811,14 @@ class CadBridgeTests {
     check(translated.linkHulls.length == 2 && translated.linkHulls[0].link == 0 &&
       translated.linkHulls[1].link == 1 && translated.linkHulls[1].vertices.length <= 64 * 3,
       "physical-part view supplies each part's bounded hull on its link");
+    var authored = assembly.definition("authored-collision");
+    var authoredSlider = [for (entry in authored.definitions) if (entry.id == "slider") entry][0];
+    authoredSlider.collisionHulls = machinekit.component.CollisionHullFacet.fromBoxes([
+      [-20, -20, 0, -10, 20, 5], [10, -20, 0, 20, 20, 5]]).hulls;
+    var pieces = AssemblySimulationBridge.toRobotModel(authored, parts).linkHulls;
+    check(pieces.length == 3 && pieces[1].link == 1 && pieces[2].link == 1 &&
+      pieces[1].vertices.length == 24 && pieces[2].vertices.length == 24,
+      "authored convex pieces replace the envelope hull without filling the gap");
     var baseLink = translated.partLinks.get("base"), sliderLink = translated.partLinks.get("slider");
     check(baseLink != null && sliderLink != null && baseLink.link == 0 && sliderLink.link == 1,
       "each part knows its link");

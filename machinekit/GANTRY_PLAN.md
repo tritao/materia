@@ -3540,3 +3540,49 @@ the fixture queried display designations instead of recipe BOM part numbers.
 The two quantity checks now use the component's actual BOM key, keeping the
 expected one flange and four motors. This final fixture correction awaits
 compilation. Native CTest remains 19/19; router screw rotation remains unresolved.
+
+
+### G4/G13 — port onto the MachineKit restructure (2026-10-05)
+
+Rebased gantries onto local main `8a209d9ff`, including the requested
+`a5d1e7e40` restructure and machine tending. The original branch is preserved
+as `gantries-before-restructure-4441c7a4e`.
+
+Geometry-derived bindings are now `addTripSwitch`; main's window-based
+`addSwitch` remains available. Trip records belong to each level's DriveSystem,
+are mapped into FlatAssembly, derived and diagnosed there, and saved/read by
+MachineAssemblyCodec's v13 level records. RobotFlangeFacet replaces the old
+capability. Flattened definitions carry flange and include ownership metadata;
+RobotScene provides robot tool/sensor records. Recipe registration uses the
+package registries. There is no saved-schema compatibility path.
+
+The native protocol merge keeps Sensor6 at kind 17 and places homing records at
+21–24; Rust/C++ bindings and vectors were regenerated. Homing now tolerates the
+last coherent measurement between an asynchronous acknowledgement and its
+confirming State6 frame without consuming stale captures, and missing state
+confirmation still times out. Established clock refreshes wait for queued UART
+traffic to drain; the virtual router's clock-loss failure is resolved. A passive
+belt idler no longer makes a single motor look like independently squared drives.
+
+Routed bracket geometry now carries CollisionHullFacet's individual convex
+sections through flattened and saved component definitions. The bridge consumes
+these pieces instead of filling a bent bracket's gap with one envelope hull.
+The picker completed all six cartons in 177.1 simulated seconds, with 48 plans
+and no stalls. CadBridge passed 173 assertions, and native CTest passed 19/19.
+Toolpath's final runtime passed its core, accuracy, machining and 3008 scenario
+assertions. Full MachineKit, MotionKit and app phase gates are still running;
+G13 is not yet marked complete and G14 has not started.
+
+The full `machinekit/scripts/test-haxeon` gate now passes, including nested
+collision-piece preservation, gantry geometry/overtravel, scene export, BOM,
+derived limits and the corrected folded-Z mass baselines. RobotKit passed
+5021 assertions. Nucleo `cargo check --offline` and both four-platform runtime
+ABI audits passed. Compiler-only app (1847 sources), CadBridge (1234), MotionKit
+(1195), Toolpath (1268) and project-source app fixtures (1874) passed. MotionKit
+and the full app runtime remain in progress at this checkpoint.
+
+MotionKit's full runtime now passes 71299 assertions, including homing and
+dual-drive squaring. The four requested compiler-only projects also passed on
+the final source. The app's full runtime has completed the arm/cobot variants,
+picker and its first whole-weldment run; the remaining welding and router
+fixtures are still running. This is a port checkpoint, not Phase C completion.

@@ -25,11 +25,11 @@ pub enum MessageType6 {
     QueueStatus = 14,
     State6 = 15,
     Event = 16,
-    Sensor6 = 21,
-    HomingScope = 17,
-    HomingSide = 18,
-    HomingControlAck = 19,
-    HomingCounterBatch = 20,
+    Sensor6 = 17,
+    HomingScope = 21,
+    HomingSide = 22,
+    HomingControlAck = 23,
+    HomingCounterBatch = 24,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

@@ -146,7 +146,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     ops.push(MotionOp.MoveL(along(pose(plan.stop()), plan.stop(), -LIFT), FRAME,
       Math.max(LIFT / plan.parameters.burnback, 0.01), Blend.ExactStop));
     ops.push(MotionOp.MoveL(planned.retreat, FRAME, APPROACH_SPEED, Blend.ExactStop));
-    return compiler.compile(new MotionProgram(ops), start, Int64.ofInt(1));
+    return compiler.compile(new MotionProgram(ops), start, haxe.Int64.ofInt(1));
   }
 
   /** The same complete-motion planner used by execution, without a robot or channel owner. */
@@ -167,11 +167,12 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     compiler.planCheck = planning.check();
     // The torch turns at corners as the wrist allows: the slowest of its last three joints, and the programs' acceleration.
     var wristSpeed = Math.POSITIVE_INFINITY;
+    var wristAcceleration = Math.POSITIVE_INFINITY;
     for (joint in Std.int(Math.max(0, count - 3))...count) {
-      var speed = manipulator.group.limitsOf(joint).velocity;
-      wristSpeed = Math.min(wristSpeed, speed != null && speed > 0.0 ? speed : 2.0);
+      wristSpeed = Math.min(wristSpeed, planning.velocity[joint]);
+      wristAcceleration = Math.min(wristAcceleration, planning.acceleration[joint]);
     }
-    var wrist:WristLimits = {angularSpeed: wristSpeed, angularAcceleration: planning.acceleration[count - 1]};
+    var wrist:WristLimits = {angularSpeed: wristSpeed, angularAcceleration: wristAcceleration};
     var planner = new WeldPathPlanner(compiler.solver, compiler.ikTolerance, compiler.maxVelocity, wrist, clearance, compiler.perJointMaxJump,
       function(planned, start) return compileWeld(compiler, wrist, planned, start));
     return new WeldPlanning(compiler, wrist, planner);

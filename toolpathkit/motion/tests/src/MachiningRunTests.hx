@@ -48,7 +48,8 @@ class MachiningRunTests {
       [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name]);
     var binding = new MachineBinding("work", "x", "y", "z", 0.02);
-    var robotBinding = new ToolpathMotionBinding(binding, blueprint);
+    homeFixture(robot, blueprint, runtime, simulationHarness);
+    var robotBinding = new ToolpathMotionBinding(binding, blueprint, runtime.snapshot().modelRevision, runtime.snapshot().calibrationRevision);
     var contour = new CamContour([
       new Point3(0.004, 0.004, 0.01), new Point3(0.012, 0.004, 0.01),
       new Point3(0.012, 0.012, 0.01), new Point3(0.004, 0.012, 0.01)
@@ -207,6 +208,21 @@ class MachiningRunTests {
     Sys.println("Machining run tests passed (12 assertions)");
   }
 
+  static function homeFixture(robot:SimulatedRobot, blueprint:motionkit.robot.MotionSystemBlueprint,
+      runtime:robotkit.runtime.RobotRuntime, harness:SimulationHarness):Void {
+    var homing = new motionkit.robot.MotionSystem(robot, blueprint);
+    homing.configureRuntimeHoming(runtime, () -> {}, harness.simulation.homingSides(0));
+    harness.step();
+    homing.home();
+    var homeTicks = 0;
+    while (homing.homingStatus() != "Complete" && homeTicks++ < 60000) {
+      harness.step();
+      homing.update(0.01);
+    }
+    if (homing.homingStatus() != "Complete")
+      throw "CAM gantry homing failed: " + homing.homingStatus();
+  }
+
   /**
     Ticks a small CAM pocket takes on a fresh gantry when the speed override
     is set to `override` a little way in, so the rest is planned again.
@@ -223,6 +239,7 @@ class MachiningRunTests {
     var robot = new SimulatedRobot("override-pocket", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name]);
+    homeFixture(robot, blueprint, runtime, harness);
     var binding = new MachineBinding("work", "x", "y", "z", 0.02);
     var contour = new CamContour([
       new Point3(0.004, 0.004, 0.01), new Point3(0.012, 0.004, 0.01),
@@ -231,7 +248,7 @@ class MachiningRunTests {
     var cam = new CamJob(0.014, 12000).pocket(contour,
       new Tool(3, 0.0, 0.002), 0.009, 0.01, 0.001).finish(new Setup("1", new Point3(0, 0, 0)));
     var program:MotionProgram = cast ToolpathMotion.lower(cam, binding).program;
-    var motion = new ManipulatorMotion(robot, new ToolpathMotionBinding(binding, blueprint).compiler,
+    var motion = new ManipulatorMotion(robot, new ToolpathMotionBinding(binding, blueprint, runtime.snapshot().modelRevision, runtime.snapshot().calibrationRevision).compiler,
       channel -> channel == "spindle.at_speed" || StringTools.startsWith(channel, "cnc.tool_change.") ?
         EventValue.Digital(true) : null,
       () -> runtime.pollEvents());

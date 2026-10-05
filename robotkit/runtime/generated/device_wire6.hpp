@@ -28,11 +28,11 @@ enum class MessageType6 : std::uint8_t {
     queue_status = 14,
     state6 = 15,
     event = 16,
-    sensor6 = 21,
-    homing_scope = 17,
-    homing_side = 18,
-    homing_control_ack = 19,
-    homing_counter_batch = 20,
+    sensor6 = 17,
+    homing_scope = 21,
+    homing_side = 22,
+    homing_control_ack = 23,
+    homing_counter_batch = 24,
 };
 
 inline constexpr std::size_t SessionBegin6_SIZE = 5013;

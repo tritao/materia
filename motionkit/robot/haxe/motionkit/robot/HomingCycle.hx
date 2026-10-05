@@ -84,13 +84,15 @@ class HomingCycle {
     var axis = axes[index];
     try {
       var observation = driver.observe(axis.joint);
-      validateFresh(axis, observation);
-      // Asynchronous stop/hold commands must progress even while still moving.
-      controlsReady();
+      // Stop/hold/counter acknowledgements can precede their confirming state.
+      // Progress the controls, but do not consume cached captures during that barrier.
       elapsed += dt;
+      var controlsConfirmed = controlsReady();
       var timeout = axis.maximumTravel / axis.latchSpeed + 10 * axis.seekSpeed / axis.acceleration;
       if (elapsed > timeout || Math.abs(observation.position - origin) > axis.maximumTravel)
         throw 'Homing axis "${axis.id}" did not reach its switch within physical travel';
+      if (!controlsConfirmed && !observationAdvanced(axis, observation)) return true;
+      validateFresh(axis, observation);
       var stopped = Math.abs(observation.velocity) <= axis.latchSpeed * 0.01;
       switch phase {
         case AwaitScope:
@@ -225,6 +227,21 @@ class HomingCycle {
       case Return: driver.returnHome(axis.joint, axis.home, axis.seekSpeed, axis.acceleration);
       case _:
     }
+  }
+
+  function observationAdvanced(axis:HomingAxis, observation:HomingObservation):Bool {
+    if (observationClock != null && observation.clockId != observationClock) return true;
+    for (contact in axis.switches) {
+      var signal = signalFor(contact.id, observation);
+      if (signal.clockId != observation.clockId || Int64.compare(signal.timestampNs, observation.timestampNs) > 0) return true;
+    }
+    if (lastTimestamp != null && Int64.compare(observation.timestampNs, lastTimestamp) <= 0) return false;
+    for (contact in axis.switches) {
+      var signal = signalFor(contact.id, observation), previous = sequences.get(signal.id);
+      if (Int64.toFloat(Int64.sub(observation.timestampNs, signal.timestampNs)) > axis.timestep * 1e9 * (1 + 1e-9) ||
+          (previous != null && Int64.compare(signal.sequence, previous) <= 0)) return false;
+    }
+    return true;
   }
 
   function validateFresh(axis:HomingAxis, observation:HomingObservation):Void {

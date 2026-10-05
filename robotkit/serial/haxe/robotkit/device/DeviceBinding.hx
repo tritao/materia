@@ -77,9 +77,11 @@ class DeviceBinding {
 
   /** Controller rate ceilings for host planning; GPIO deployment is not implied. */
   public static function planningModel(robot:RobotModel, stepTickHz:Int):RobotModel {
-    var rates = bindActuators(robot, DeviceLayout.forActuators(robot), stepTickHz);
-    rates.model.materializeLimits();
-    return rates.model;
+    var layout = DeviceLayout.forSteppers(robot);
+    var model = layout.channels.length == 0 ? RobotModelCodec.decode(RobotModelCodec.encode(robot))
+      : bindActuators(robot, layout, stepTickHz).model;
+    model.materializeLimits();
+    return model;
   }
 
   static function bindActuators(robot:RobotModel, layout:DeviceLayout, stepTickHz:Int):{

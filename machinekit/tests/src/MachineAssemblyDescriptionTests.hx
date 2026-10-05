@@ -161,6 +161,7 @@ class MachineAssemblyDescriptionTests {
 		if (rebuilt.billOfMaterials().quantity(flangePart) != beforeEdit + 1)
 			throw "Editing a rebuilt assembly did not update its evaluated BOM";
 		nestedRoundTrip();
+		tripSwitchRoundTrip();
 		includedConnectorRuntime();
 		suctionInterfaceRoundTrip();
 		documentRoundTrip();
@@ -179,6 +180,53 @@ class MachineAssemblyDescriptionTests {
 		MachineKitSmoke.massProperties();
 		MachineKitSmoke.ports();
 		RecipeContractTests.run();
+	}
+
+	static function tripSwitchRoundTrip():Void {
+		var inner = new MachineAssembly();
+		inner.addComponent("base", new RobotFlange(50));
+		var slider = new RobotFlange(50);
+		var collision = machinekit.component.CollisionHullFacet.fromBoxes([
+			[-20, -20, 0, -10, 20, 5], [10, -20, 0, 20, 20, 5]]);
+		@:privateAccess slider.addFacet(collision);
+		inner.addComponent("slider", slider);
+		inner.addMateOnAxis("slide", "prismatic", "base", "face", "slider", "face",
+			{x: 1, y: 0, z: 0}, 0, {lower: 0, upper: 10, velocity: null, effort: null,
+				overtravel: 2, rackingTolerance: 0.5});
+		var state = new AssemblyState(inner.definition());
+		var trigger = state.worldConnector("slider", "face");
+		var axis = AssemblyFrames.transformVector(state.worldConnector("base", "face"), 1, 0, 0);
+		var contact = new machinekit.motion.LimitSwitch();
+		var trip = contact.connector("trip").frame;
+		var pose = AssemblyFrames.identity();
+		pose.x = trigger.x - axis.x - trip.x;
+		pose.y = trigger.y - axis.y - trip.y;
+		pose.z = trigger.z - axis.z - trip.z;
+		inner.addComponent("switch", contact, pose);
+		inner.addTripSwitch("home", "slide", "switch", {instanceId: "slider", connectorName: "face"}, -1);
+		inner.addSwitch("in-window", "slide", {lower: 0, upper: 1, velocity: null, effort: null});
+		var outer = new MachineAssembly();
+		outer.include("axis", inner);
+		var saved = outer.describe();
+		if (saved.machine.switches.length != 0 || saved.subassemblies.length != 1 ||
+			saved.subassemblies[0].machine.switches[0].joint != "slide" || saved.mechanical.switches != null)
+			throw "Trip switches must be saved locally in their owning machine level";
+		var restored = MachineAssembly.decode(outer.encode());
+		var flat = restored.definition();
+		var sliderDefinition = [for (entry in flat.definitions) if (entry.collisionHulls != null) entry][0];
+		if (haxe.Json.stringify(sliderDefinition.collisionHulls) != haxe.Json.stringify(collision.hulls))
+			throw "Authored collision pieces must survive nested assembly round trip";
+		var switches = flat.switches;
+		if (switches == null || switches.length != 1 || switches[0].id != "axis/home" ||
+			switches[0].part != "axis/switch" || Math.abs(switches[0].trip + 1) > 1e-9)
+			throw "Nested trip switch references and geometry must survive wire round trip";
+		if (restored.describe().subassemblies[0].machine.sensors.length != 1)
+			throw "Window sensors must coexist with geometry trip switches";
+		var model = new AssemblyModel();
+		restored.addTo(model, "machine");
+		var exported = model.definition().switches;
+		if (exported == null || exported[0].joint != "machine/axis/slide")
+			throw "Trip switch export must map the containing model prefix";
 	}
 
 	static function includedConnectorRuntime():Void {

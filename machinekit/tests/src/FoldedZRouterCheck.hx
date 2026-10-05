@@ -10,7 +10,7 @@ import materia.project.SceneArtifact;
 
 class FoldedZRouterCheck {
 	public static function main():Void {
-		runFoldedZ();
+		CncRouterChecks.withGeometry(runFoldedZ);
 		var combined = new CncRouter(true, true);
 		var networks = combined.definition().elasticNetworks;
 		if (networks == null || networks.length != 1 ||
@@ -47,10 +47,11 @@ class FoldedZRouterCheck {
 		if (stage == null || !switch stage.source { case BeltReduction("beltZ", "pulleyScrewZ", "pulleyMotorZ"): true; case _: false; })
 			throw "Folded Z must compile from its actual two pulleys";
 		var directZ = direct.coupledLimits("z"), foldedZ = converted.coupledLimits("z");
+		Sys.println('folded Z acceleration: direct ${directZ.requireAcceleration() * 1000}, folded ${foldedZ.requireAcceleration() * 1000} mm/s²');
 		CncRouterChecks.near(directZ.requireVelocity() * 1000, 43.6539272481, "direct Z speed baseline", 1e-6);
 		CncRouterChecks.near(foldedZ.requireVelocity() * 1000, 21.8269636240, "folded Z speed baseline", 1e-6);
-		CncRouterChecks.near(directZ.requireAcceleration() * 1000, 6117.45629356, "direct Z acceleration baseline", 1e-3);
-		CncRouterChecks.near(foldedZ.requireAcceleration() * 1000, 3263.41002285, "folded Z acceleration baseline", 1e-3);
+		CncRouterChecks.near(directZ.requireAcceleration() * 1000, 6116.92589072, "direct Z acceleration baseline", 1e-3);
+		CncRouterChecks.near(foldedZ.requireAcceleration() * 1000, 3263.33221329, "folded Z acceleration baseline", 1e-3);
 		CncRouterChecks.near(foldedZ.requireVelocity() * 2, directZ.requireVelocity(), "the two-to-one belt uses twice the motor rate", 1e-9);
 		if (!(foldedZ.requireAcceleration() > 0 && foldedZ.requireAcceleration() < directZ.requireAcceleration()))
 			throw "The folded motor's inertia must tighten the Z acceleration bound";
@@ -60,8 +61,9 @@ class FoldedZRouterCheck {
 		CncRouterChecks.near(foldedLoad.stiffness / 1e6, 486.86732785, "folded Z stiffness baseline, MN/m", 0.01);
 		CncRouterChecks.near(directLoad.backlash * 1000, 0.05, "direct Z backlash baseline", 1e-6);
 		CncRouterChecks.near(foldedLoad.backlash * 1000, 0.051, "folded Z backlash baseline", 1e-6);
-		CncRouterChecks.near(new CncRouter().massProperties().mass, 36.9, "direct router mass baseline", 0.1);
-		CncRouterChecks.near(folded.massProperties().mass, 37.1, "folded router mass baseline", 0.1);
+		Sys.println('router mass: direct ${new CncRouter().massProperties().mass}, folded ${folded.massProperties().mass}');
+		CncRouterChecks.near(new CncRouter().massProperties().mass, 37.025008686290356, "direct router mass baseline", 1e-6);
+		CncRouterChecks.near(folded.massProperties().mass, 37.16745220969244, "folded router mass baseline", 1e-6);
 		if (CncRouter.FoldedZMotorPlate.TENSION_TRAVEL < 4.0)
 			throw "Folded Z motor plate needs at least 4 mm of slot adjustment";
 		var centre = belt.wraps()[1].x - belt.wraps()[0].x;

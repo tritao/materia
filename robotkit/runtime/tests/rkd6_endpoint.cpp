@@ -13,6 +13,7 @@ public:
     int segment_frames = 0;
     int commit_frames = 0;
     int queue_begin_frames = 0;
+    int time_sync_frames = 0;
     std::array<std::uint8_t, 16> controller{};
     bool minimal = false;
     /** The id the board reports when it is not the one the host expects. */
@@ -90,6 +91,7 @@ public:
             assert(device_frame6::encode(15, body, framed));
             incoming.push_back(std::move(framed));
         } else if (decoded.kind == 3) {
+            ++time_sync_frames;
             device_wire6::TimeSyncRequest request{};
             assert(device_wire6::decode(decoded.payload, request));
             const auto ticks = 50'000 + request.host_send_ns / 1'000 + 100 + jump_ticks;
@@ -160,6 +162,18 @@ void unseen_backlog_holds_segments(const rk_robot_runtime_blueprint &blueprint) 
     observed->push(14, status);
     assert(endpoint->sample(160'000'000, state) == RK_OK);
     assert(observed->segment_frames == 1);
+    // An established clock update must not sit behind an unseen serial backlog:
+    // asymmetric queuing would masquerade as clock drift in the RTT midpoint.
+    observed->reported_received = 0;
+    observed->push(14, status);
+    assert(endpoint->sample(199'000'000, state) == RK_OK);
+    const auto syncs = observed->time_sync_frames;
+    assert(endpoint->sample(200'000'000, state) == RK_OK);
+    assert(observed->time_sync_frames == syncs);
+    observed->reported_received = observed->received_bytes;
+    observed->push(14, status);
+    assert(endpoint->sample(300'000'000, state) == RK_OK);
+    assert(observed->time_sync_frames == syncs + 1);
 }
 
 int main() {
@@ -229,12 +243,14 @@ int main() {
         rk_robot_state measured{};
         assert(homing->sample(0, measured) == RK_OK);
         assert(homing->request_homing_scope(1, 1, 0, 0, 1, 0.01) == RK_OK);
-        wire->push(19, device_wire6::HomingControlAck6{91, 1, 1, 1});
+        wire->push(23, device_wire6::HomingControlAck6{91, 1, 1, 1});
         assert(homing->sample(100'000, measured) == RK_OK);
         assert(homing->homing_control_status(1) == RK_OK);
         assert(homing->request_homing_counter_batch(2, 1, 0, 1, 0.01, -0.01) == RK_OK);
-        wire->push(19, device_wire6::HomingControlAck6{91, 2, 1, 1});
-        assert(homing->sample(200'000, measured) == RK_ERROR_STALE_STATE);
+        wire->push(23, device_wire6::HomingControlAck6{91, 2, 1, 1});
+        assert(homing->sample(200'000, measured) == RK_OK);
+        assert(measured.position[0] == 0 && measured.position[1] == 0);
+        assert(measured.source_timestamp_ns == 0);
         assert(homing->homing_control_status(2) == RK_ERROR_STALE_STATE);
         auto feedback = [&](uint64_t session, uint64_t sequence, uint8_t count) {
             device_wire6::State6Header header{};
@@ -252,16 +268,29 @@ int main() {
             wire->incoming.push_back(std::move(frame));
         };
         feedback(90, 2, 2);
-        assert(homing->sample(300'000, measured) == RK_ERROR_STALE_STATE);
+        assert(homing->sample(300'000, measured) == RK_OK);
+        assert(measured.position[0] == 0 && measured.position[1] == 0);
+        assert(measured.source_timestamp_ns == 0);
         feedback(91, 1, 2);
-        assert(homing->sample(400'000, measured) == RK_ERROR_STALE_STATE);
+        assert(homing->sample(400'000, measured) == RK_OK);
+        assert(measured.position[0] == 0 && measured.position[1] == 0);
+        assert(measured.source_timestamp_ns == 0);
         feedback(91, 2, 1);
-        assert(homing->sample(500'000, measured) == RK_ERROR_STALE_STATE);
+        assert(homing->sample(500'000, measured) == RK_OK);
+        assert(measured.position[0] == 0 && measured.position[1] == 0);
+        assert(measured.source_timestamp_ns == 0);
         assert(homing->request_homing_scope(3, 1, 1, 0, 1, 0.01) == RK_ERROR_INVALID_STATE);
         feedback(91, 2, 2);
         assert(homing->sample(600'000, measured) == RK_OK);
         assert(homing->homing_control_status(2) == RK_OK);
         assert(std::abs(measured.position[1] - 0.3) < 1e-6);
+        assert(homing->request_homing_scope(3, 1, 2, 0, 1, 0.01) == RK_OK);
+        wire->push(23, device_wire6::HomingControlAck6{91, 3, 1, 1});
+        assert(homing->sample(700'000, measured) == RK_OK);
+        assert(homing->homing_control_status(3) == RK_ERROR_STALE_STATE);
+        assert(std::abs(measured.position[1] - 0.3) < 1e-6);
+        assert(homing->sample(501'000'000, measured) == RK_ERROR_BACKEND);
+        assert(homing->homing_control_status(3) == RK_ERROR_BACKEND);
     }
     {
         auto wrong = std::make_unique<MockLink>();

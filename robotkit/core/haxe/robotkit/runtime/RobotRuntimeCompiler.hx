@@ -267,7 +267,7 @@ class RobotRuntimeCompiler {
       for (joint in robot.joints) if (joint != null && joint.id == contact.driveJoint) driveFound = true;
       for (joint in robot.joints) if (joint != null && joint.id == contact.joint) jointFound = true;
       for (frame in robot.frames) if (frame != null && frame.id == contact.frameId) frameFound = true;
-      for (sensor in robot.sensors) if (sensor != null && sensor.id == contact.id && sensor.kind == "joint_switch" &&
+      for (sensor in robot.sensors) if (sensor != null && sensor.id == contact.id && sensor.kind == "trip_switch" &&
           sensor.frame != null && sensor.frame.id == contact.frameId) sensorFound = true;
       if (switchIds.exists(contact.id) || !jointFound || !frameFound || !sensorFound || !driveFound)
         diagnostics.push(new RobotCompileDiagnostic("RK_SWITCH_BINDING", path,

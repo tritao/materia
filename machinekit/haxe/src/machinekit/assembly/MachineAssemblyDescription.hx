@@ -162,6 +162,7 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 	@:id(11) var cylinders:Array<CylinderRecord>;
 	/** Switches, at-speed and presence sensors. */
 	@:id(12) var sensors:Array<materia.assembly.AssemblyDefinition.AssemblySensor>;
+	@:id(13) var switches:Array<materia.assembly.AssemblyDefinition.AssemblySwitch>;
 }
 
 /** One subassembly: its path from the root, its entry in the mechanical table, and its facts. */

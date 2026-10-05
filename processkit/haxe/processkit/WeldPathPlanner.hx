@@ -337,8 +337,8 @@ class WeldPathPlanner {
       var upright = new Vec3(0.0, 0.0, VIA_HEIGHT);
       var waypoints = way.high ? [approach.add(upright), approach] : [approach];
       var poses = [for (point in waypoints) pose(point, segment.start.rotation)];
-      var goals = solver.sampleCandidates(poses[0], GOALS, tolerance);
-      var continued = solver.solvePose(poses[0], start, tolerance);
+      var goals = solver.sampleCandidates(poses[0], GOALS, tolerance, null);
+      var continued = solver.solvePose(poses[0], start, tolerance, null);
       if (continued != null) {
         var duplicate = false;
         for (goal in goals) {
@@ -477,7 +477,7 @@ class WeldPathPlanner {
       for (index in 0...steps.length) {
         var step = steps[index];
         var previous = cast(q, Array<Float>).copy();
-        q = solver.solvePose(step.pose, cast q, tolerance);
+        q = solver.solvePose(step.pose, cast q, tolerance, null);
         if (q == null) {
           failure = 'unreachable at ' + where(step.pose);
           break;

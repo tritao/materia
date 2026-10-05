@@ -18,7 +18,8 @@ class ToolpathMotionBinding {
   public final solver:AxisKinematics;
   public final compiler:ProgramCompiler;
 
-  public function new(machine:MachineBinding, blueprint:MotionSystemBlueprint) {
+  public function new(machine:MachineBinding, blueprint:MotionSystemBlueprint,
+      ?modelRevision:Int64, ?calibrationRevision:Int64) {
     if (machine == null || blueprint == null)
       throw "CNC binding needs a machine and motion-system blueprint";
     this.machine = machine;
@@ -57,8 +58,9 @@ class ToolpathMotionBinding {
     machine.setTravel(new TravelEnvelope(
       new Point3(envelopeLower[0], envelopeLower[1], envelopeLower[2]),
       new Point3(envelopeUpper[0], envelopeUpper[1], envelopeUpper[2])));
-    var limits = new ValidationLimits(count, Int64.ofInt(blueprint.runtime.revision),
-      Int64.ofInt(blueprint.runtime.calibrationRevision));
+    var limits = new ValidationLimits(count,
+      modelRevision == null ? Int64.ofInt(blueprint.runtime.revision) : modelRevision,
+      calibrationRevision == null ? Int64.ofInt(blueprint.runtime.calibrationRevision) : calibrationRevision);
     var velocity = [for (_ in 0...count) 0.0];
     var acceleration = [for (_ in 0...count) 0.0];
     var jerk = [for (_ in 0...count) 0.0];

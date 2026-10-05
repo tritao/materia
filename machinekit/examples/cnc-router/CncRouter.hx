@@ -700,7 +700,7 @@ class CncRouter extends AxisBuilder {
 		attach(mount, new RouterPlate(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2], "aluminium 6061", "Home switch mount"),
 			AssemblyFrames.translation((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2]), fixed);
 		attach(id, sensor, pose, mount);
-		addSwitch(id, axis.id, id, {instanceId: trigger, connectorName: "trip"}, side, "home",
+		addTripSwitch(id, axis.id, id, {instanceId: trigger, connectorName: "trip"}, side, "home",
 			suffix == "YRight" ? 2 : 1, shaft);
 	}
 
