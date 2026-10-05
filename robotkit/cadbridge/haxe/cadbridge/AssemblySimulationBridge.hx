@@ -94,6 +94,48 @@ class AssemblySimulationBridge {
   public static inline final DEFAULT_PRISMATIC_OVERTRAVEL = 0.001;
   public static final DEFAULT_ROTARY_OVERTRAVEL = Math.PI / 180;
 
+  /** Select the robot's kinematic subgraph, retaining stationary surroundings in the source scene. */
+  static function selectRobot(definition:AssemblyDefinition, root:String):AssemblyDefinition {
+    var prefix = root + "/";
+    var inside = new Map<String, Bool>();
+    for (occurrence in definition.occurrences)
+      if (StringTools.startsWith(occurrence.id, prefix)) inside.set(occurrence.id, true);
+    if ([for (id in inside.keys()) id].length == 0) throw 'Mobile robot "$root" has no occurrences';
+    for (edge in definition.joints) if (inside.exists(edge.parent) != inside.exists(edge.child))
+      throw 'Joint "${edge.id}" crosses the mobile robot boundary';
+    definition.occurrences = [for (occurrence in definition.occurrences) if (inside.exists(occurrence.id)) occurrence];
+    definition.joints = [for (edge in definition.joints) if (inside.exists(edge.parent)) edge];
+    var joints = new Map<String, Bool>();
+    for (edge in definition.joints) joints.set(edge.id, true);
+    if (definition.couplings != null) {
+      for (coupling in definition.couplings) if (joints.exists(coupling.source) != joints.exists(coupling.target))
+        throw 'Coupling "${coupling.id}" crosses the mobile robot boundary';
+      definition.couplings = [for (coupling in definition.couplings) if (joints.exists(coupling.source)) coupling];
+    }
+    if (definition.actuators != null)
+      definition.actuators = [for (actuator in definition.actuators) if (joints.exists(actuator.joint)) actuator];
+    if (definition.encoders != null)
+      definition.encoders = [for (encoder in definition.encoders) if (joints.exists(encoder.joint)) encoder];
+    if (definition.sensors != null)
+      definition.sensors = [for (sensor in definition.sensors)
+        if ((sensor.joint != null && joints.exists(sensor.joint)) ||
+          (sensor.occurrence != null && inside.exists(sensor.occurrence))) sensor];
+    if (definition.elasticNetworks != null) {
+      var selected:Array<materia.assembly.AssemblyDefinition.AssemblyElasticNetwork> = [];
+      for (network in definition.elasticNetworks) {
+        var contained = false, external = false;
+        for (span in network.spans) for (term in span.terms)
+          if (joints.exists(term.joint)) contained = true; else external = true;
+        if (network.clearances != null) for (clearance in network.clearances)
+          if (joints.exists(clearance.joint)) contained = true; else external = true;
+        if (contained && external) throw 'Elastic network "${network.id}" crosses the mobile robot boundary';
+        if (contained) selected.push(network);
+      }
+      definition.elasticNetworks = selected;
+    }
+    return definition;
+  }
+
   /**
    * `freeOccurrences` are parts the simulation holds or moves on its own instead of bolting them to
    * the assembly: a workpiece, or a mobile robot's surroundings; they get no link, and no joint may
@@ -128,6 +170,9 @@ class AssemblySimulationBridge {
     for (edge in definition.joints) if (free.exists(edge.parent) || free.exists(edge.child))
       throw 'Free part is joined by "${edge.id}"; a part the simulation holds or moves on its own cannot be joined';
     var placement = new AssemblyState(sourceDefinition, savedState);
+    // Robot membership is not dynamic-body ownership: stationary external assemblies may be joined.
+    if (mobileBase != null && mobileBase.robot != null)
+      definition = selectRobot(definition, mobileBase.robot);
     var rootFrame = mobileBase == null || mobileBase.origin == null ? AssemblyFrames.identity() :
       {x: mobileBase.origin.x / scale, y: mobileBase.origin.y / scale, z: 0.0, qx: 0.0, qy: 0.0,
         qz: Math.sin(mobileBase.origin.yaw / 2), qw: Math.cos(mobileBase.origin.yaw / 2)};

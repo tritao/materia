@@ -197,7 +197,7 @@ class AssemblyRobot {
       masses.set(occurrence.id, chosenMass);
     }
     var converted = AssemblySimulationBridge.toRobotModel(assembly, physical,
-      session.projectAssemblyState, [for (id in free.keys()) id], id -> masses.get(id), session.mobileBase);
+      session.projectAssemblyState, [for (id in freeOccurrences(scene, assembly).keys()) id], id -> masses.get(id), session.mobileBase);
     // Link collision geometry is installed with generated-part hulls in the
     // collision phase; the runtime's generic 10 cm robot box is not a part shape.
     converted.model.collisionApproximation = CollisionApproximation.None;
