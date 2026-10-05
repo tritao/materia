@@ -93,6 +93,7 @@
 #include <TopLoc_Location.hxx>
 #include <TopExp.hxx>
 #include <TopTools_ShapeMapHasher.hxx>
+#include <NCollection_IndexedDataMap.hxx>
 #include <TCollection_AsciiString.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Shape.hxx>
@@ -534,6 +535,27 @@ cad_curve_kind curve_kind_from_occt(GeomAbs_CurveType kind) {
         return CAD_CURVE_UNKNOWN;
     }
     return CAD_CURVE_UNKNOWN;
+}
+
+cad_result collect_ancestors(const TopoDS_Shape& source, const TopoDS_Shape& sub,
+    cad_shape_kind kind, std::vector<TopoDS_Shape>& output) {
+    TopAbs_ShapeEnum ancestor_kind = TopAbs_SHAPE;
+    if (!shape_kind_to_occt(kind, ancestor_kind) || ancestor_kind >= sub.ShapeType()) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "ancestor kind must strictly contain the subshape kind");
+    }
+    NCollection_IndexedDataMap<TopoDS_Shape, NCollection_List<TopoDS_Shape>, TopTools_ShapeMapHasher> map;
+    TopExp::MapShapesAndAncestors(source, sub.ShapeType(), ancestor_kind, map);
+    if (!map.Contains(sub)) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "subshape is not a member of the source shape");
+    }
+    NCollection_IndexedMap<TopoDS_Shape, TopTools_ShapeMapHasher> unique;
+    for (const auto& ancestor : map.FindFromKey(sub)) {
+        if (!unique.Contains(ancestor)) {
+            unique.Add(ancestor);
+            output.push_back(ancestor);
+        }
+    }
+    return CAD_OK;
 }
 
 cad_result collect_subshapes(
@@ -2723,6 +2745,112 @@ extern "C" CADKIT_API cad_result cad_shape_subshapes(
             ++inserted;
         }
         return CAD_OK;
+    } catch (const Standard_Failure& error) {
+        return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (const std::bad_alloc& error) {
+        return fail(CAD_ERROR_OUT_OF_MEMORY, error);
+    } catch (const std::exception& error) {
+        return fail(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (...) {
+        return fail(CAD_ERROR_OPERATION_FAILED, "unknown native exception");
+    }
+}
+
+extern "C" CADKIT_API cad_result cad_shape_ancestor_count(cad_shape shape, cad_shape sub,
+    cad_shape_kind kind, std::uint32_t* out_count) {
+    clear_error();
+    if (out_count == nullptr) return fail(CAD_ERROR_INVALID_ARGUMENT, "out_count must not be null");
+    *out_count = 0;
+    naming::NamedShape source;
+    auto result = copy_named_shape(shape, source);
+    if (result != CAD_OK) return result;
+    TopoDS_Shape member;
+    result = copy_shape(sub, member);
+    if (result != CAD_OK) return result;
+    try {
+        std::vector<TopoDS_Shape> ancestors;
+        result = collect_ancestors(source.shape, member, kind, ancestors);
+        if (result != CAD_OK) return result;
+        if (ancestors.size() > std::numeric_limits<std::uint32_t>::max())
+            return fail(CAD_ERROR_OPERATION_FAILED, "ancestor count exceeds 32-bit range");
+        for (std::size_t index = 0; index < ancestors.size(); ++index) ++*out_count;
+        return CAD_OK;
+    } catch (const Standard_Failure& error) {
+        return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (const std::bad_alloc& error) {
+        return fail(CAD_ERROR_OUT_OF_MEMORY, error);
+    } catch (const std::exception& error) {
+        return fail(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (...) {
+        return fail(CAD_ERROR_OPERATION_FAILED, "unknown native exception");
+    }
+}
+
+extern "C" CADKIT_API cad_result cad_shape_ancestor_at(cad_shape shape, cad_shape sub,
+    cad_shape_kind kind, std::uint32_t index, cad_shape* out_shape) {
+    clear_error();
+    if (out_shape == nullptr) return fail(CAD_ERROR_INVALID_ARGUMENT, "out_shape must not be null");
+    *out_shape = 0;
+    naming::NamedShape source;
+    auto result = copy_named_shape(shape, source);
+    if (result != CAD_OK) return result;
+    TopoDS_Shape member;
+    result = copy_shape(sub, member);
+    if (result != CAD_OK) return result;
+    try {
+        std::vector<TopoDS_Shape> ancestors;
+        result = collect_ancestors(source.shape, member, kind, ancestors);
+        if (result != CAD_OK) return result;
+        if (index >= ancestors.size()) return fail(CAD_ERROR_INVALID_ARGUMENT, "ancestor index is out of range");
+        return insert_shape(ancestors[index], out_shape,
+            naming::restrict_to(source.shape, *source.names, ancestors[index]));
+    } catch (const Standard_Failure& error) {
+        return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (const std::bad_alloc& error) {
+        return fail(CAD_ERROR_OUT_OF_MEMORY, error);
+    } catch (const std::exception& error) {
+        return fail(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (...) {
+        return fail(CAD_ERROR_OPERATION_FAILED, "unknown native exception");
+    }
+}
+
+extern "C" CADKIT_API cad_result cad_shape_ancestors(cad_shape shape, cad_shape sub,
+    cad_shape_kind kind, cad_shape* output, std::uint32_t capacity) {
+    clear_error();
+    naming::NamedShape source;
+    auto result = copy_named_shape(shape, source);
+    if (result != CAD_OK) return result;
+    TopoDS_Shape member;
+    result = copy_shape(sub, member);
+    if (result != CAD_OK) return result;
+    try {
+        std::vector<TopoDS_Shape> ancestors;
+        result = collect_ancestors(source.shape, member, kind, ancestors);
+        if (result != CAD_OK) return result;
+        if (capacity < ancestors.size()) return fail(CAD_ERROR_BUFFER_TOO_SMALL, "ancestor output buffer is too small");
+        if (!ancestors.empty() && output == nullptr) return fail(CAD_ERROR_INVALID_ARGUMENT, "ancestor output buffer must not be null");
+        std::vector<cad_shape> inserted;
+        inserted.reserve(ancestors.size());
+        try {
+            std::uint32_t index = 0;
+            for (const auto& ancestor : ancestors) {
+                cad_shape handle = 0;
+                result = insert_shape(ancestor, &handle, naming::restrict_to(source.shape, *source.names, ancestor));
+                if (result != CAD_OK) break;
+                inserted.push_back(handle);
+                output[index++] = handle;
+            }
+        } catch (...) {
+            std::lock_guard lock(g_shapes_mutex);
+            for (const auto handle : inserted) release_shape_locked(handle);
+            throw;
+        }
+        if (result != CAD_OK) {
+            std::lock_guard lock(g_shapes_mutex);
+            for (const auto handle : inserted) release_shape_locked(handle);
+        }
+        return result;
     } catch (const Standard_Failure& error) {
         return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
     } catch (const std::bad_alloc& error) {

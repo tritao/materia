@@ -95,6 +95,7 @@ class SheetMetalSmoke {
 		assertions += SheetBoundaryOriginSmoke.run();
 		assertions += SheetChecksSmoke.run();
 		assertions += SheetBlankSmoke.run();
+		assertions += SheetAncestorSmoke.run();
 		trace("Sheet metal smoke passed (" + assertions + " assertions)");
 	}
 }

@@ -476,6 +476,26 @@ CADKIT_API cad_result cad_shape_subshapes(
     cad_shape* output,
     uint32_t capacity);
 
+/* Unique ancestors of a member subshape, ignoring its orientation. Ancestor kind
+ * must strictly contain the subshape kind. Returned handles retain source names. */
+CADKIT_API cad_result cad_shape_ancestor_count(
+    cad_shape shape,
+    cad_shape sub,
+    cad_shape_kind kind,
+    uint32_t* out_count CADKIT_HXI_OUT);
+CADKIT_API cad_result cad_shape_ancestor_at(
+    cad_shape shape,
+    cad_shape sub,
+    cad_shape_kind kind,
+    uint32_t index,
+    cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+CADKIT_API cad_result cad_shape_ancestors(
+    cad_shape shape,
+    cad_shape sub,
+    cad_shape_kind kind,
+    cad_shape* output,
+    uint32_t capacity);
+
 /* Topological identity ignores orientation, matching OCCT IsSame(). */
 CADKIT_API cad_result cad_shape_is_same(
     cad_shape first,
