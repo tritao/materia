@@ -339,8 +339,57 @@ class ContactSearchMotionTests {
     harness.dispose();
   }
   public static function main():Void {
+    fiveAxisPreparation();
     run(false, false); run(true, false); run(false, true); completeProbe(); completeProbe(true); sixAxisPreparation(); resetEpochs();
     Sys.println('Contact search native motion: $checks assertions passed');
+  }
+
+  static function fiveAxisPreparation():Void {
+    var model = new RobotModel("five-axis-probe");
+    var links = [for (i in 0...6) model.addLink(new Link('link-$i'))];
+    var axes = [[1.0,0,0], [0.0,1,0], [0.0,0,1], [0.0,0,1], [0.0,1,0]];
+    for (i in 0...5) {
+      var joint = model.addJoint(new Joint('joint-$i', i < 3 ? JointType.Prismatic : JointType.Revolute,
+        links[i], links[i+1]));
+      joint.axis = axes[i];
+      joint.limits.lower = i < 3 ? -1.0 : -Math.PI;
+      joint.limits.upper = i < 3 ? 1.0 : Math.PI;
+      joint.limits.velocity = 0.5;
+      joint.limits.maxAcceleration = 1.0;
+    }
+    var flange = model.addFrame(new Frame("tip", links[5]));
+    var arm = new Manipulator(model, links[0].id, flange.id);
+    var planning = WeldingPlanRunner.planning(arm, 1.0);
+    var source = planning.compiler;
+    var solver = new ObservedProbeSolver(arm);
+    var compiler = new motionkit.robot.ProgramCompiler(solver, source.limits, source.frameId,
+      source.maxVelocity, source.maxAcceleration, source.maxJerk, source.startTolerances,
+      source.timing, source.cartesianResolution, source.maxJointJump, source.positionTolerance,
+      source.orientationTolerance, source.ikTolerance, null, source.perJointMaxJump);
+    compiler.planCheck = source.planCheck;
+    var motion = new ProbeMotionPlanner(arm, compiler);
+    var preparation = new processkit.ProbePosePlanner(motion);
+    var point = new Vec3(0.2, 0.1, 0.05);
+    var outward = new Vec3(1,1,-1).normalized();
+    var start = [0.0,0,0,0,0];
+    check(preparation.hasClearObservedApproachConfiguration(point, outward, 0.01, start),
+      "Five-axis contact screening constrains the wire axis without requiring independent tool spin");
+    var prepared = preparation.prepareObserved(point, outward, 0.01, start, 0.0005, 0.003, 1);
+    check(solver.discoveries == 0, "Five-axis preparation uses observed continuation only");
+    var actual = arm.tcpPose(cast prepared.approachJoints);
+    check(actual.rotation.rotate(new Vec3(0,0,1)).dot(outward.scale(-1)) >= Math.cos(compiler.ikTolerance.orientation),
+      "Selected roll retains the inward wire axis tolerance");
+    check(actual.translation.sub(prepared.approach.translation).norm() < 1e-9
+      && actual.rotation.angularDistance(prepared.approach.rotation) < 1e-9,
+      "Preparation locks the actual checked pose for execution");
+    var spin = actual.rotation.multiply(Quat.fromAxisAngle(new Vec3(0,0,1), 0.3));
+    var fixed = new motionkit.kinematics.Pose3(actual.translation.x, actual.translation.y,
+      actual.translation.z, spin.x, spin.y, spin.z, spin.w);
+    check(solver.solvePose(fixed, cast prepared.approachJoints, compiler.ikTolerance) == null,
+      "An unreachable independent spin does not invalidate the reachable contact-axis task");
+    var replay = motion.approachJoints(cast prepared.approachJoints, start);
+    check(motion.corridorReachable(replay.endJoints, outward.scale(-1), prepared.distance),
+      "The locked five-axis goal retains a fully checked sensing corridor");
   }
 }
 

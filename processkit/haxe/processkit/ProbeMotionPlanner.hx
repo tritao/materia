@@ -113,7 +113,15 @@ class ProbeMotionPlanner {
     if (target == null || start == null || start.length != arm.group.count())
       throw "Observed probe approach needs a target and matching joint start";
     var goal = compiler.solver.solvePose(pose(target), start, compiler.ikTolerance);
-    if (goal == null || !edge(start, goal)) throw "Probe approach has no checked observed IK configuration";
+    if (goal == null) throw "Probe approach has no checked observed IK configuration";
+    return observedApproachJoints(goal, start);
+  }
+
+  /** Prove an observed-branch solution without repeating IK or discovering a detour. */
+  public function observedApproachJoints(goal:Array<Float>, start:Array<Float>):CheckedProbeMove {
+    if (goal == null || start == null || goal.length != arm.group.count() || start.length != goal.length)
+      throw "Observed probe joint approach needs matching configurations";
+    if (!edge(start, goal)) throw "Probe approach has no checked observed IK configuration";
     var program = new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(goal), new MotionOptions(), Blend.ExactStop)]);
     return new CheckedProbeMove(program, inspect(program, start, false));
   }

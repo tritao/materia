@@ -2485,3 +2485,30 @@ refinement retains the complete search and can resolve a blocked observed branch
 sooner. Both changes are confined to the optional CAD/process bridge, so they do
 not invalidate the already running CAD producer. The app compiles 1,937 sources;
 full mission validation remains pending (app/build/p3-region-cache-app-build.log).
+
+
+The coarse selector progressed through five station-one probe pairs at 216.42
+simulated seconds, but final-face discovery was still running when stopped for
+the next repair. Its completed 5,990-sample profile had no unresolved frames or
+dropped records: 99.03% was global IK candidate sampling. This confirms that the
+remaining cost is branch discovery, rather than stale repeated region evaluation.
+Two obsolete ignored profiler captures were removed after retaining their text
+reports, reclaiming about 1.6 GB; the latest captures remain available.
+
+Contact probing physically requires an inward wire axis and a clear roll, rather
+than an independently prescribed spin. ProcessKit now solves FreeAboutTool first
+on the observed branch, then globally if needed. It checks the actual FK position
+and axis against the existing IK tolerances, proves the complete air motion and
+sensing corridor, and locks that actual pose/joint goal for execution. Local
+preparation uses a direct checked joint edge without global discovery or detours.
+The original 16 full-roll candidates and their global/route fallbacks remain.
+This makes task freedom explicit in its owning process layer, rather than
+weakening collision checks or changing numerical search budgets.
+
+Focused native contact motion passes 104 assertions. A five-axis fixture proves
+that contact-axis preparation works without independent tool spin, uses no global
+discovery locally, locks the actual pose, and retains its checked sensing corridor;
+a forced independent spin on that fixture is explicitly unreachable. The app
+compiles 1,937 sources (32.9 s). Full mission and final P3 gates remain pending;
+this ProcessKit change legitimately invalidates the CAD producer fingerprint.
+Logs: ignored app/build/p3-axis-*.log.
