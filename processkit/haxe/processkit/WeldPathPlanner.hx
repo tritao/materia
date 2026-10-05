@@ -347,37 +347,44 @@ class WeldPathPlanner {
       var upright = new Vec3(0.0, 0.0, VIA_HEIGHT);
       var waypoints = way.high ? [approach.add(upright), approach] : [approach];
       var poses = [for (point in waypoints) pose(point, segment.start.rotation)];
-      var goals = solver.sampleCandidates(poses[0], GOALS, tolerance, motionkit.path.OrientationPolicy.FreeAboutTool);
       var continued = solver.solvePose(poses[0], start, tolerance, motionkit.path.OrientationPolicy.FreeAboutTool);
-      if (continued != null) {
-        var duplicate = false;
+      // Prove the current branch before paying for global discovery. Failed continuations retain every other sampled goal.
+      for (discovery in [false, true]) {
+        var goals:Array<Array<Float>> = [];
+        if (!discovery) {
+          if (continued != null) goals.push(continued);
+        } else {
+          for (goal in solver.sampleCandidates(poses[0], GOALS, tolerance, motionkit.path.OrientationPolicy.FreeAboutTool)) {
+            var duplicate = false;
+            if (continued != null) {
+              var separation = 0.0;
+              for (joint in 0...goal.length) separation += (goal[joint] - continued[joint]) * (goal[joint] - continued[joint]);
+              duplicate = separation < tolerance.candidateSeparation * tolerance.candidateSeparation;
+            }
+            if (!duplicate) goals.push(goal);
+          }
+        }
+        if (discovery && continued == null && goals.length == 0) unreachable.push('$label, ${way.name}: no entry IK configuration at ' + where(poses[0]));
+        goals.sort(function(a, b) return Reflect.compare(cost(a, start), cost(b, start)));
         for (goal in goals) {
-          var distance = 0.0;
-          for (joint in 0...goal.length) distance += (goal[joint] - continued[joint]) * (goal[joint] - continued[joint]);
-          if (distance < tolerance.candidateSeparation * tolerance.candidateSeparation) duplicate = true;
-        }
-        if (!duplicate) goals.push(continued);
-      }
-      if (goals.length == 0) unreachable.push('$label, ${way.name}: no entry IK configuration at ' + where(poses[0]));
-      goals.sort(function(a, b) return Reflect.compare(cost(a, start), cost(b, start)));
-      for (goal in goals) {
-        var air = clearance == null ? null : clearance.sweep(start, goal, false, AIR_STEP, AIR_MARGIN);
-        if (air != null) {
-          collisions.push('$label, ${way.name}: the joint move to the entry (tip bound for ' + where(poses[0]) + ') ' + describeHit(air));
-          continue;
-        }
-        var steps:Array<Step> = [{pose: poses[0], contact: false}];
-        var from = waypoints[0];
-        for (index in 1...waypoints.length) {
-          line(from, segment.start.rotation, waypoints[index], segment.start.rotation, steps, true);
-          from = waypoints[index];
-        }
-        line(from, segment.start.rotation, segment.start.translation, segment.start.rotation, steps, true);
-        var done = chain(steps, [goal], '$label, ${way.name}');
-        if (done.q != null) {
-          entryMotionBlocked = false;
-          var accepted = accept(new WeldEntry(way.name, goal, poses.slice(1)), cast done.q);
-          if (accepted != null) return accepted;
+          var air = clearance == null ? null : clearance.sweep(start, goal, false, AIR_STEP, AIR_MARGIN);
+          if (air != null) {
+            collisions.push('$label, ${way.name}: the joint move to the entry (tip bound for ' + where(poses[0]) + ') ' + describeHit(air));
+            continue;
+          }
+          var steps:Array<Step> = [{pose: poses[0], contact: false}];
+          var from = waypoints[0];
+          for (index in 1...waypoints.length) {
+            line(from, segment.start.rotation, waypoints[index], segment.start.rotation, steps, true);
+            from = waypoints[index];
+          }
+          line(from, segment.start.rotation, segment.start.translation, segment.start.rotation, steps, true);
+          var done = chain(steps, [goal], '$label, ${way.name}');
+          if (done.q != null) {
+            entryMotionBlocked = false;
+            var accepted = accept(new WeldEntry(way.name, goal, poses.slice(1)), cast done.q);
+            if (accepted != null) return accepted;
+          }
         }
       }
     }

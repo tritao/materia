@@ -251,9 +251,11 @@ class WeldPlanningTests {
   }
 
   static function testEntryUsesTheCurrentConfiguration():Void {
-    var planner = new WeldPathPlanner(new CurrentEntryFixture(), new IkTolerance(2e-4, 1e-3, 300, 0.03), [3.0], WRIST);
+    var solver = new CurrentEntryFixture();
+    var planner = new WeldPathPlanner(solver, new IkTolerance(2e-4, 1e-3, 300, 0.03), [3.0], WRIST);
     var planned = planner.plan(seam(), [0.3]);
     near(planned.entry.joints[0], 0.3, 1e-9, "the current arm configuration can reach an entry missed by broad IK sampling");
+    check(solver.discoveries == 0, "a fully proved current branch avoids global IK discovery");
   }
 
   static function testBlockedJointEntrySkipsDownstreamRolls():Void {
@@ -351,9 +353,13 @@ private class ContinuousBranchFixture extends EntryBranchFixture {
 }
 
 private class CurrentEntryFixture extends ContinuousBranchFixture {
+  public var discoveries:Int = 0;
   public function new() super();
   override public function sampleCandidates(target:motionkit.kinematics.Pose3, maxCount:Int,
-      tolerance:motionkit.kinematics.IkTolerance, ?freedom:motionkit.path.OrientationPolicy):Array<Array<Float>> return [];
+      tolerance:motionkit.kinematics.IkTolerance, ?freedom:motionkit.path.OrientationPolicy):Array<Array<Float>> {
+    discoveries++;
+    return [];
+  }
 }
 
 private class EntryTrajectorySolver extends ContinuousBranchFixture {

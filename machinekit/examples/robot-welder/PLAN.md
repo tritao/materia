@@ -2357,3 +2357,26 @@ OCCT was not rebuilt. Logs are ignored app/build/p3-platform-*.log.
 
 P3 execution gates remain pending; these prerequisite passes do not complete P3 or
 authorize advancing main. P4/P5 remain open.
+
+### P3 demand-driven weld entry discovery (2026-10-05)
+
+The latest-main app native build passes after initializing main's seven recorded
+MuJoCo dependency pins. Its boundary trial spent over eleven minutes in the CAD
+producer and was deliberately stopped (exit 143), not counted as a test pass.
+A separate 60 s loopback-only live profile attributes 94% of samples to global
+IK candidate generation in station verification. That diagnostic producer was
+also stopped; no diagnostic process remains running.
+
+WeldPathPlanner now tries the current configuration's continuation through the
+entire existing air/chain/compiler acceptance path before generating broad IK
+candidates for that entry. Global discovery retains its twelve-goal limit and
+all other candidates, avoiding a duplicate of the already checked continuation.
+This deliberately prioritizes a proved current branch over the global candidates'
+travel-cost ordering; it does not weaken reach, continuity, clearance or compilation
+checks. The policy belongs in ProcessKit rather than a mobile-example shortcut.
+
+Focused WeldPlanningTests pass 54 assertions, including no global discovery for
+a proved continuation, alternate-branch fallback after compiler rejection,
+blocked-entry pruning, corner selection and collision refusal. Logs are ignored
+app/build/p3-lazy-weld-entry-*.log. Full mobile execution and fixed-welder gates
+remain required; no claim is made that path/time baselines are unchanged.
