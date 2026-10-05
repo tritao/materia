@@ -9,7 +9,185 @@ import robotkit.skill.SkillStatus;
 /** The CAD mobile welding carrier loads and moves unchanged on both native backends. */
 @:access(app.ApplicationSimulation)
 @:access(app.MissionPlayer)
+@:access(processkit.skill.FindWeldWork)
+@:access(processkit.ContactProbeRunner)
+@:access(processkit.perception.ContactRegistrationSequence)
+@:access(processkit.ProbeWireClearance)
+@:access(processkit.simulation.SimulatedWelder)
 class MobileWelderTests {
+  /** Replay the observed air-contact posture without running the expensive probe selector. */
+  public static function runWireClearance(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-welder/materia.mobilemission.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var authored:materia.project.SceneArtifact.SceneArtifactMission = cast generated.mission;
+    var session = new ProjectDocumentSession(null, false);
+    session.openGeneratedProject(generated, manifest);
+    var simulation = new ApplicationSimulation(new RobotWorld());
+    simulation.setBackend(ApplicationSimulation.DETERMINISTIC);
+    try {
+      if (!simulation.rebuild(session.sensors, session.scene, session)) throw simulation.error;
+      var mission:MissionPlayer = cast simulation.missionPlayer();
+      while (mission.stepIndex == 0 && simulation.activeSession().simulationTime() < 60) {
+        simulation.step();
+        if (mission.failure != null) throw mission.failure;
+      }
+      if (mission.stepIndex != 1) throw "Wire-clearance replay did not reach the parking station";
+      simulation.activeSession().stop();
+      var physics:robotkit.runtime.Simulation = cast simulation.simulation;
+      var base = physics.linkPose(mission.robotIndex, 0);
+      var before = new robotkit.spatial.Transform3(robotkit.spatial.Vec3.fromArray(base.position), robotkit.spatial.Quat.fromArray(base.rotation));
+      var shifted = before.compose(new robotkit.spatial.Transform3(new robotkit.spatial.Vec3(0.012, -0.009, 0),
+        robotkit.spatial.Quat.fromRollPitchYaw(0, 0, 0.025)));
+      physics.placeRobotBase(mission.robotIndex, shifted.translation.toArray(), shifted.rotation.toArray());
+      mission.robot.robot.stop(robotkit.core.StopMode.Normal);
+      var job:materia.project.SceneContactRegistration.SceneContactWork = cast authored.steps[1].contactWork;
+      var factory = mission.newRegistration;
+      if (factory == null) throw "Wire-clearance replay has no probe factory";
+      var registration = factory(job);
+      var planner = registration.probe.planner;
+      try {
+        var analytic = new motionkit.robot.OpwKinematics(mission.robot.model, planner.arm);
+        Sys.println("Production probe geometry: CAD-validated OPW solver available");
+      } catch (error:Dynamic) Sys.println('Production probe geometry: ${Std.string(error)}');
+      var q = [0.6676030989851316, -0.21797454761040297, -0.9093220264586326,
+        -1.3662865416110088, -0.7644976321991027, 2.464939730522297];
+      var indices = planner.arm.jointIndices();
+      var snapshot = mission.robot.robot.snapshot();
+      var positions = [for (index in 0...snapshot.positions.length) snapshot.positions.get(index)];
+      for (index in 0...indices.length) positions[indices[index]] = q[index];
+      physics.setJointPositions(mission.robotIndex, positions);
+      mission.robot.robot.submit(robotkit.core.RobotCommand.JointTargets([for (index in 0...indices.length)
+        robotkit.core.JointTarget.position(indices[index], q[index])], null));
+      // Step physics and its sensor observers directly; do not start the pending findWork skill.
+      for (_ in 0...200) simulation.activeSession().step();
+      var wire = planner.wireClearance;
+      if (wire == null) throw "Wire-clearance replay lacks the CAD wire envelope";
+      var poses = planner.arm.linkPoses(q, wire.links);
+      var wirePoints = processkit.ProbeWireClearance.placed(wire.corners, poses[0]);
+      var tip = planner.arm.tcpPose(q).translation;
+      var welder:processkit.simulation.SimulatedWelder = cast simulation.welder();
+      var tool = physics.linkPose(mission.robotIndex, welder.linkIndex);
+      var actualWorld = new robotkit.spatial.Transform3(robotkit.spatial.Vec3.fromArray(tool.position),
+        robotkit.spatial.Quat.fromArray(tool.rotation)).transformPoint(robotkit.spatial.Vec3.fromArray(welder.tipPosition));
+      var rootBody = physics.linkPose(mission.robotIndex, 0);
+      var rootPose = new robotkit.spatial.Transform3(robotkit.spatial.Vec3.fromArray(rootBody.position),
+        robotkit.spatial.Quat.fromArray(rootBody.rotation));
+      var actual = rootPose.inverse().transformPoint(actualWorld);
+      var distances:Array<Dynamic> = [];
+      for (body in wire.obstacles) {
+        var points = processkit.ProbeWireClearance.placed(body.corners, poses[body.link]);
+        var pointDistance = new robotkit.tool.ConvexSolid(points).distance(tip.x, tip.y, tip.z);
+        var hullDistance = robotkit.tool.ConvexDistance.between(wirePoints, points, 0.003);
+        distances.push({name: body.name, pointDistance: pointDistance, hullDistance: hullDistance, points: points});
+      }
+      distances.sort((a, b) -> Reflect.compare(a.pointDistance, b.pointDistance));
+      var diagnostic = {joints: q, tip: tip.toArray(), actualSensorTip: actual.toArray(), sensorFkError: tip.sub(actual).norm(),
+        touch: welder.reading().touch, groundDistance: welder.work.distance(actualWorld.x, actualWorld.y, actualWorld.z),
+        wirePoints: wirePoints, clearance: planner.violation(q), closest: distances.slice(0, 5)};
+      sys.io.File.saveContent(root + "/app/build/p3-wire-posture.json", haxe.Json.stringify(diagnostic));
+      if (!welder.reading().touch || tip.sub(actual).norm() > 0.0001 || planner.violation(q) == null)
+        throw "The recorded physical wire-contact posture must be rejected by the matching CAD wire envelope";
+      Sys.println('mobile wire-clearance posture: ${tip.sub(actual).norm()} m sensor/FK error; physical touch rejected');
+    } catch (error:Dynamic) { simulation.clear(); session.dispose(); throw error; }
+    simulation.clear(); session.dispose();
+  }
+  /** Contacts must recover a parked work frame while wheel odometry retains its pre-jump estimate. */
+  public static function runRegistration(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-welder/materia.mobilemission.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var authored:materia.project.SceneArtifact.SceneArtifactMission = cast generated.mission;
+    if (authored.steps[1].kind != "findWork") throw "Mobile mission lacks contact registration after parking";
+    generated.mission = {steps: authored.steps.slice(0, 3)};
+    for (backend in [ApplicationSimulation.DETERMINISTIC, ApplicationSimulation.MUJOCO]) {
+      var session = new ProjectDocumentSession(null, false);
+      session.openGeneratedProject(generated, manifest);
+      var simulation = new ApplicationSimulation(new RobotWorld()); simulation.setBackend(backend);
+      try {
+        if (!simulation.rebuild(session.sensors, session.scene, session)) throw simulation.error;
+        var mission:MissionPlayer = cast simulation.missionPlayer();
+        var physics:robotkit.runtime.Simulation = cast simulation.simulation;
+        var injected = false;
+        var touchEpisodes = 0, touching = false;
+        var probeProgress = "";
+        var welder:processkit.simulation.SimulatedWelder = cast simulation.welder();
+        // Calibrated stopping can make near-singular probe branches slower than the requested recipe.
+        while (!mission.finished && simulation.activeSession().simulationTime() < 1200) {
+          if (mission.stepIndex == 1 && !injected) {
+            var base = physics.linkPose(mission.robotIndex, 0);
+            var old = new robotkit.spatial.Transform3(new robotkit.spatial.Vec3(base.position[0], base.position[1], base.position[2]),
+              robotkit.spatial.Quat.fromArray(base.rotation));
+            var error = new robotkit.spatial.Transform3(new robotkit.spatial.Vec3(0.012, -0.009, 0),
+              robotkit.spatial.Quat.fromRollPitchYaw(0, 0, 0.025));
+            var shifted = old.compose(error);
+            physics.placeRobotBase(mission.robotIndex, shifted.translation.toArray(), shifted.rotation.toArray());
+            // placeRobotBase applies on the next owner tick. Publish the displaced plant before planning its clearance world.
+            simulation.activeSession().step();
+            injected = true;
+            Sys.println('mobile contact registration ($backend): injected parking error');
+          }
+          simulation.step();
+          if (mission.failure != null) throw 'Mobile contact registration ($backend) failed: ${mission.failure}';
+          if (mission.stepIndex == 1) {
+            var finding:processkit.skill.FindWeldWork = cast mission.runner.activeSkill();
+            var registration = finding == null ? null : finding.runner;
+            if (registration != null) {
+              var sequence = registration.sequence;
+              var progress = '${sequence.normals.length + 1}/${sequence.index + 1} ${registration.probe.phase}';
+              if (progress != probeProgress) {
+                probeProgress = progress;
+                var search = registration.probe.search;
+                var speed = search == null ? "" : ' at ${search.search.speed} m/s';
+                Sys.println('mobile contact registration ($backend): probe $progress at ${simulation.activeSession().simulationTime()} s$speed');
+              }
+            }
+            var reading = welder.reading();
+            if (reading.arc) throw "Contact registration establishes an arc";
+            if (reading.touch && registration != null && Std.string(registration.probe.phase) == "Approaching") {
+              var snapshot = mission.robot.robot.snapshot();
+              var planner = registration.probe.planner;
+              var joints = [for (index in planner.arm.jointIndices()) snapshot.positions.get(index)];
+              var body = physics.linkPose(mission.robotIndex, 0);
+              var rootPose = new robotkit.spatial.Transform3(robotkit.spatial.Vec3.fromArray(body.position),
+                robotkit.spatial.Quat.fromArray(body.rotation));
+              var expectedTip = rootPose.transformPoint(planner.arm.tcpPose(joints).translation);
+              var error = expectedTip.sub(mission.toolContact()).norm();
+              throw 'Unexpected wire touch during checked air approach: FK error $error m, clearance ${haxe.Json.stringify(planner.violation(joints))}, joints ${joints.join(",")}';
+            }
+            if (reading.touch && !touching) {
+              touchEpisodes++;
+              Sys.println('mobile contact registration ($backend): touch $touchEpisodes at ${simulation.activeSession().simulationTime()} s');
+            }
+            touching = reading.touch;
+          }
+        }
+        var job:materia.project.SceneContactRegistration.SceneContactWork = cast authored.steps[1].contactWork;
+        var measured = mission.registeredWork.get(job.frame);
+        if (!injected || !mission.finished || measured == null) throw "Mobile contact registration did not complete";
+        var base = physics.linkPose(mission.robotIndex, 0);
+        var root = new robotkit.spatial.Transform3(robotkit.spatial.Vec3.fromArray(base.position), robotkit.spatial.Quat.fromArray(base.rotation));
+        var live = mission.assemblyParts.get("project:" + job.frame).pose();
+        var actual = root.inverse().compose(new robotkit.spatial.Transform3(robotkit.spatial.Vec3.fromArray(live.position),
+          robotkit.spatial.Quat.fromArray(live.rotation)));
+        var estimated = cast(mission.wheels, robotkit.localization.WheelOdometryLocalization).state();
+        if (estimated == null || Math.sqrt(Math.pow(estimated.pose.x - root.translation.x, 2) +
+          Math.pow(estimated.pose.y - root.translation.y, 2)) < 0.008)
+          throw "Injected parking error was handed to wheel localization";
+        if (touchEpisodes != 12) throw 'Registration needs six coarse/fine contact pairs, saw $touchEpisodes touch episodes';
+        var error = 0.0;
+        var weld:materia.project.SceneArtifact.SceneArtifactWeld = cast authored.steps[2].weld;
+        for (segment in weld.path) for (pose in [segment.start, segment.stop]) {
+          var point = robotkit.spatial.Vec3.fromArray(pose.position);
+          error = Math.max(error, measured.transformPoint(point).sub(actual.transformPoint(point)).norm());
+        }
+        if (error > 0.0001) throw 'Mobile measured work frame misses the real seam by $error m';
+        var beads:WeldBeads = cast simulation.weldBeads();
+        for (entry in beads.beads) if (Math.abs(entry.bead.meanLeg(0.3, 0.7) - entry.weld.legSize) > 0.0005 || entry.bead.gaps() > 0)
+          throw "Registered mobile weld has a wrong leg or gap";
+        Sys.println('mobile contact registration ($backend): $touchEpisodes touch episodes, ${error * 1000} mm seam-frame error; first weld passes');
+      } catch (error:Dynamic) { simulation.clear(); session.dispose(); throw error; }
+      simulation.clear(); session.dispose();
+    }
+  }
   static function execute(simulation:ApplicationSimulation, mission:MissionPlayer, skill:Skill):Void {
     skill.start();
     var limit = simulation.activeSession().simulationTime() + 20;

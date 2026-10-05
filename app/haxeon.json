@@ -8,6 +8,7 @@
     "src"
   ],
   "dependencies": {
+    "machinekit-process": {"path": "../machinekit/process"},
     "projectkit": {
       "path": "../projectkit"
     },

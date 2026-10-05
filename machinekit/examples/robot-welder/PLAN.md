@@ -2223,3 +2223,21 @@ keeps rotation away from contact and preserves the proved branch for the next pr
 start/goal clearance failures replace the generic endpoint message. Focused native tests
 pass 92 assertions, including exact restoration of all six joints on three probe normals.
 Production registration remains pending; main has not been advanced.
+
+The restored-goal production retry completed ten touch episodes and passed the formerly
+blocked second-face approach. Final-face selection succeeded, then its coarse search began
+at 175.96 s with a calibrated speed of 0.00003682122177501335 m/s. The test reached its
+300 s watchdog while still sensing, with no runtime motion-guard failure. The registration
+test budget is now 1,200 s, matching the full mission test, to accommodate the physically
+bounded speed; runtime search deadlines, freshness and collision guards are unchanged.
+Ignored log: app/build/p3-retreat-registration.log. No registration pass is claimed.
+
+Production registration now passes on both backends with the measured work frame feeding
+the first weld. Deterministic: 12 touch episodes, 0.004839356540509003 mm maximum seam-frame
+error; MuJoCo: 12 episodes, 0.008527291404108734 mm error. Both satisfy the 0.1 mm requirement,
+retain at least 8 mm wheel-estimate error, keep arc off throughout contact registration, and
+produce the first weld without wrong leg or gaps. Deterministic final fine touch occurs at
+567.04 s, MuJoCo at 551.89 s. The extended integration-test budget is supported by executed
+calibrated sensing durations. App compilation passes 1,864 sources. Exit 0 log:
+ignored app/build/p3-registration-budget.log. Full two-station, parking-boundary and baseline
+validation still remain before P3 can pass or main can advance.

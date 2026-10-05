@@ -2231,6 +2231,14 @@ class ProjectSourceTests {
     }
     Sys.setCwd(root);
     // PROJECT_SOURCE_ONLY=mobile, =arm or =welder runs just those example's checks, for iterating on them.
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-registration") {
+      MobileWelderTests.runRegistration(root);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-wire-clearance") {
+      MobileWelderTests.runWireClearance(root);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-frames") {
       MobileWelderTests.runFrames(root);
       return 0;
