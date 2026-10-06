@@ -2571,6 +2571,7 @@ class MachineKitSmoke {
 			{name: "EndEffectorComponentTests.run", run: EndEffectorComponentTests.run, weight: 0.05},
 			{name: "EndEffectorExampleChecks.run", run: EndEffectorExampleChecks.run, weight: 0.1},
 			{name: "RobotArmChecks.run", run: RobotArmChecks.run, weight: 0.6},
+			{name: "RobotArmAnalyticTests.main", run: RobotArmAnalyticTests.main, weight: 3.0},
 			{name: "CncRouterChecks.run", run: CncRouterChecks.run, weight: 4},
 			{name: "FoldedZRouterCheck.main", run: FoldedZRouterCheck.main, weight: 5.1},
 			{name: "MobileBaseChecks.run", run: MobileBaseChecks.run, weight: 2},

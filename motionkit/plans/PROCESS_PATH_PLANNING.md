@@ -539,7 +539,7 @@ Submodules come from the main checkout's stores, not from other worktrees (which
 | Step | State | Commits |
 |------|-------|---------|
 | PP0 | in progress: harness and diagnostics; baseline completion pending | `0d43b32c0` (partial) |
-| PP0a | in progress: industrial geometry/zero, IK labels and program/mission pins implemented; all-size branch coverage, limit/load checks, re-baselines and phase gate pending | see progress |
+| PP0a | in progress: industrial geometry/zero, IK labels and program/mission pins implemented; all-size branch acceptance passed; limit/load checks, re-baselines and phase gate pending | see progress |
 | PP1a | planned (revision 2026-10-06): EAIK spike | — |
 | PP1 | in progress: Cartesian, OPW and authored Cobot UR verified; offset RobotArm unresolved | `0d43b32c0`, `bfec0fa28`, `8569a2a98` (partial) |
 | PP2 | in progress: native family samplers and Haxe problem construction implemented; close-out pending | `601fff4ba`, `8569a2a98`, `e28f1092e` |
@@ -2141,3 +2141,34 @@ All-size authored RobotArm branch acceptance, physical limit/load checks,
 all-user re-baselines and the full PP0a phase gate remain open. Mission runtime
 re-baselines have not been claimed by these compiler/codec checks. PP1a has not
 started.
+
+### PP0a all-size authored analytic branch acceptance
+
+RobotArmAnalyticTests compiles each authored Reach700/900/1300 mechanism through
+AssemblyPreview, the scene codec and AssemblySimulationBridge, then extracts OPW
+parameters from that model. It supplies no hand-written OPW values and retains
+production joint limits. For each class, 1,000 deterministic reachable joint
+vectors check analytic FK against independent RobotKit model FK, verify every
+returned IK branch's position/orientation and bounds, and require the original
+physical joints to be among the solutions. Every returned solution carries the
+expected OPW shoulder/elbow/wrist label and physical turn counts.
+
+All three classes expose all eight labelled solutions at the same reachable
+target within real limits. The fixed target sequence produced 253 such targets
+for Reach700, 254 for Reach900 and 258 for Reach1300. Each class also pins each of
+the eight branch/lift configurations in an actual native candidate ladder,
+selects a complete route and checks that analytic refinement retains the pin.
+
+Final compiler-only and focused runtime exited zero:
+`process-path-arm-eight-build-final.log`, `process-path-arm-eight-runtime-final.log`.
+The initial nested example package did not discover the entry module; the check
+now lives in MachineKit's normal test source tree with a focused manifest
+`machinekit/tests/haxeon.industrial-arm-analytic.json`. An initial direct preview
+bridge lacked resolved scene mass data; round-tripping through SceneArtifact's
+codec supplies the same material/inertia data as a generated project. These
+setup failures precede the final green checks and are not acceptance evidence.
+
+MachineKitSmoke registers this acceptance check for the full phase suite.
+Physical interference at limits, all-class drive/load/BOM acceptance, all-user
+mission re-baselines and the complete PP0a phase gate remain pending. PP1a has
+not started; this focused run does not replace the phase gate.
