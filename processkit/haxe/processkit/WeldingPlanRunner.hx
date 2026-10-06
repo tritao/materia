@@ -248,8 +248,17 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     var group=cast(motion.compiler.solver,ManipulatorKinematics).manipulator;
     var before=group.numericSolveCount(),start=startPositions();
     var problem=new WeldPathProblem(requested,wrist,[for(_ in requested.segments)WeldCorner.AROUND],FRAME,APPROACH_SPEED);
-    var curves=selectProblem(problem,start);
-    runSelected(problem,curves);
+    var best:Null<processkit.WeldPathProblem.WeldPathSelection> = null;
+    var reasons:Array<String> = [];
+    for(alternative in [problem,problem.reversed()]){
+      try {
+        var selected=selectProblem(alternative,start);
+        if(best==null || selected.cost<cast(best,processkit.WeldPathProblem.WeldPathSelection).cost)best=selected;
+      }catch(error:Dynamic){reasons.push(Std.string(error));}
+    }
+    if(best==null)throw 'Cannot select either weld travel direction: ${reasons.join("; ")}';
+    var chosen=cast(best,processkit.WeldPathProblem.WeldPathSelection);
+    runSelected(chosen.problem,chosen.curves);
     planningSeconds=Sys.time()-began;planningIkSolves=group.numericSolveCount()-before;
   }
 
@@ -275,7 +284,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     }catch(error:Dynamic){releaseSelected();throw error;}
   }
 
-  function selectProblem(problem:WeldPathProblem,start:Array<Float>):Array<motionkit.planner.JointPathSamples> {
+  function selectProblem(problem:WeldPathProblem,start:Array<Float>):processkit.WeldPathProblem.WeldPathSelection {
     var solver=cast(motion.compiler.solver,ManipulatorKinematics),group=solver.manipulator;
     var request=problem.request(start,motion.compiler.ikTolerance,
       motion.compiler.perJointMaxJump,motion.compiler.maxVelocity);
@@ -291,7 +300,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
       ranges.push(new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(joint,limits.lower,limits.upper,points));
     }
     var sampling=new motionkit.robot.CandidateProblem.CandidateSamplingOptions(8,3,8,false,ranges);
-    return problem.select(group,request,sampling,clearance,(from,to)->{
+    return problem.selectWithCost(group,request,sampling,clearance,(from,to)->{
       var entry=motion.compiler.generateEntry(from,to);
       try {
         var violation=clearance==null ? null : motionkit.robot.TrajectoryClearance.violation(
@@ -420,7 +429,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
         var positions=motion.robot.snapshot().positions;
         var stopped=[for(index in motion.jointIndices)positions.get(index)];
         var began=Sys.time(),before=group.numericSolveCount();
-        var curves=selectProblem(problem,stopped);
+        var curves=selectProblem(problem,stopped).curves;
         var program=new WeldPathProgram(problem,curves,channels,process.interruptedAt);
         var compiled=program.compile(motion.compiler,group,stopped,motion.compilationPlanId(),clearance);
         if(selectedCompilation!=null)selectedCompilation.dispose();

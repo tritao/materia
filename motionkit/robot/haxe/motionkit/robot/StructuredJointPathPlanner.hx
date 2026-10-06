@@ -15,6 +15,8 @@ import robotkit.manipulation.ArmClearance;
  * it overrides contact at every clearance sample, including swept interiors. */
 class StructuredJointPathPlanner implements JointPathPlanner {
   public final group:KinematicGroup;
+  /** Cost of the last successfully selected complete discrete route. */
+  public var selectionCost(default,null):Null<Float> = null;
   public var fallbackDiagnostic(default,null):Null<String> = null;
   final sampling:Null<CandidateSamplingOptions>;
   final coarse:Null<CoarseSearchOptions>;
@@ -106,6 +108,7 @@ class StructuredJointPathPlanner implements JointPathPlanner {
   public function planSections(paths:Array<PosePath>,request:PathRequest,?pinStart:Bool,
       ?entryCheck:(Array<Float>,Array<Float>)->Null<ArmClearance.ClearanceViolation>,
       ?exitCheck:Array<Float>->Null<ArmClearance.ClearanceViolation>):Array<JointPathSamples> {
+    selectionCost=null;
     if(paths==null || paths.length==0 || request==null || request.distances.length<2 || request.distances[0]!=0)
       throw "Joint path sections require a complete sampled request";
     var offsets:Array<Float> = [],providers:Array<PosePathRefinement> = [],total=0.0;
@@ -215,6 +218,7 @@ class StructuredJointPathPlanner implements JointPathPlanner {
         searchAndChecksSeconds:searchAndChecksSeconds,refinementSeconds:refinementSeconds,
         refinementAttempts:refinementAttempts}));
     }
+    selectionCost=selected.cost;
     return refined;
   }
 }

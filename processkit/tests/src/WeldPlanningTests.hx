@@ -150,6 +150,12 @@ class WeldPlanningTests {
       [for(_ in measured)3.0],[for(_ in measured)2.0],[for(_ in measured)20.0],
       motionkit.robot.StartTolerances.uniform(6,0.01,0.01,0.01),null,0.002,0.2,
       0.001,0.02,new IkTolerance(1e-6,1e-6));
+    var forwardSelection=problem.selectWithCost(fixture.arm,freeRequest,null,world);
+    var reverseProblem=problem.reversed();
+    var reverseSelection=reverseProblem.selectWithCost(fixture.arm,
+      reverseProblem.request(measured,compiler.ikTolerance,compiler.perJointMaxJump,compiler.maxVelocity),null,world);
+    check(Math.isFinite(forwardSelection.cost) && Math.isFinite(reverseSelection.cost),
+      "both travel directions expose the shared ladder objective without timing");
     var recoveryProblem=problem.recovery(0.037);
     var recoveryRequest=recoveryProblem.request(measured,compiler.ikTolerance,compiler.perJointMaxJump,compiler.maxVelocity);
     var recoveryEntries=0;

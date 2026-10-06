@@ -123,12 +123,23 @@ class WeldPathProblem {
       ?exitCheck:Array<Float>->Null<ArmClearance.ClearanceViolation>,
       ?retreatJoints:Array<Float>,?weights:Array<Float>,rollWeight:Float=0,
       ?preferences:ManipulatorKinematics):Array<JointPathSamples> {
+    return selectWithCost(group,request,sampling,clearance,entryCheck,exitCheck,
+      retreatJoints,weights,rollWeight,preferences).curves;
+  }
+
+  public function selectWithCost(group:KinematicGroup,request:PathRequest,?sampling:CandidateSamplingOptions,
+      ?clearance:ArmClearance,
+      ?entryCheck:(Array<Float>,Array<Float>)->Null<ArmClearance.ClearanceViolation>,
+      ?exitCheck:Array<Float>->Null<ArmClearance.ClearanceViolation>,
+      ?retreatJoints:Array<Float>,?weights:Array<Float>,rollWeight:Float=0,
+      ?preferences:ManipulatorKinematics):WeldPathSelection {
     var options=sampling==null ? new CandidateSamplingOptions(8,3,8,false) : sampling;
     var source=preferences;
     if(source==null){source=new ManipulatorKinematics(group);source.preferTargetOrientation=true;}
     var planner=new StructuredJointPathPlanner(group,options,null,clearance,8,false,
       null,retreatJoints,weights,rollWeight,source,contact);
-    return planner.planSections(sections,request,null,entryCheck,exitCheck);
+    var curves=planner.planSections(sections,request,null,entryCheck,exitCheck);
+    return new WeldPathSelection(this,curves,cast(planner.selectionCost,Float));
   }
 
   /** Geometric contact permission, evaluated at actual TCP poses in the task
@@ -188,4 +199,15 @@ enum WeldPathPhase {
   Weld;
   Burnback;
   Retreat;
+}
+
+/** One complete geometric choice and its ladder objective; no timing artifact. */
+class WeldPathSelection {
+  public final problem:WeldPathProblem;
+  public final curves:Array<JointPathSamples>;
+  public final cost:Float;
+  public function new(problem:WeldPathProblem,curves:Array<JointPathSamples>,cost:Float){
+    if(problem==null || curves==null || !Math.isFinite(cost))throw "Weld selection requires a finite complete route";
+    this.problem=problem;this.curves=curves;this.cost=cost;
+  }
 }
