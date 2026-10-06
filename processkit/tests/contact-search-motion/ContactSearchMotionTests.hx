@@ -24,7 +24,6 @@ import robotkit.spatial.Vec3;
 import motionkit.robot.ServoSession;
 
 @:access(WeldPlanningTests)
-@:access(processkit.ProbePosePlanner)
 class ContactSearchMotionTests {
   static var checks = 0;
   static function check(ok:Bool, message:String):Void { checks++; if (!ok) throw message; }
@@ -341,7 +340,7 @@ class ContactSearchMotionTests {
   }
   public static function main():Void {
     fiveAxisPreparation();
-    contactCandidateRanking();
+    checkedJointRetreatFallback();
     run(false, false); run(true, false); run(false, true); completeProbe(); completeProbe(true); sixAxisPreparation(); resetEpochs();
     Sys.println('Contact search native motion: $checks assertions passed');
   }
@@ -394,20 +393,24 @@ class ContactSearchMotionTests {
       "The locked five-axis goal retains a fully checked sensing corridor");
   }
 
-  static function contactCandidateRanking():Void {
+  static function checkedJointRetreatFallback():Void {
     var fixture = axis();
     var planning = WeldingPlanRunner.planning(fixture.arm, 1.0);
     var source = planning.compiler;
-    var solver = new OrderedProbeSolver(fixture.arm, [[0.02], [0.005]]);
+    var solver = new RetreatProbeSolver(fixture.arm);
     var compiler = new motionkit.robot.ProgramCompiler(solver, source.limits, source.frameId,
       source.maxVelocity, source.maxAcceleration, source.maxJerk, source.startTolerances,
       source.timing, source.cartesianResolution, source.maxJointJump, source.positionTolerance,
       source.orientationTolerance, source.ikTolerance, null, source.perJointMaxJump);
-    var planner = new processkit.ProbePosePlanner(new ProbeMotionPlanner(fixture.arm, compiler));
-    var goals = planner.axisGoals(new motionkit.kinematics.Pose3(0, 0, 0), [0.0], true);
-    check(goals.length == 2, "Global contact-axis discovery retains every returned branch");
-    check(goals[0][0] == 0.005 && goals[1][0] == 0.02,
-      "Contact preparation tries branches in normalized joint-travel order, independent of sampler order");
+    var planner = new ProbeMotionPlanner(fixture.arm, compiler);
+    var goal = [0.01], contact = [0.02];
+    var returned = planner.retreat(fixture.arm.tcpPose(goal), contact, 0.01, goal);
+    check(returned.program.ops.length == 1 && switch returned.program.ops[0] {
+      case motionkit.program.MotionOp.MoveJ(_ , _, _): true;
+      case _: false;
+    }, "A checked joint retreat replaces a Cartesian path that the solver cannot compile");
+    check(Math.abs(returned.endJoints[0] - goal[0]) < 5e-5,
+      "The fallback restores the checked air configuration after sweeping the contact-aware joint path");
   }
 }
 
@@ -425,14 +428,10 @@ private class ObservedProbeSolver extends motionkit.robot.ManipulatorKinematics 
   }
 }
 
-private class OrderedProbeSolver extends motionkit.robot.ManipulatorKinematics {
-  final candidates:Array<Array<Float>>;
-  public function new(arm:Manipulator, candidates:Array<Array<Float>>) {
+private class RetreatProbeSolver extends motionkit.robot.ManipulatorKinematics {
+  public function new(arm:Manipulator) {
     super(arm);
-    this.candidates = candidates;
   }
-  override public function sampleCandidates(target:motionkit.kinematics.Pose3, maxCount:Int,
-      tolerance:motionkit.kinematics.IkTolerance,
-      ?freedom:motionkit.path.OrientationPolicy):Array<Array<Float>>
-    return [for (candidate in candidates) candidate.copy()];
+  override public function solvePathWithRates(request:motionkit.kinematics.PathRequest):motionkit.kinematics.PathSolution
+    return new motionkit.kinematics.PathSolution([for (_ in request.poses) null]);
 }

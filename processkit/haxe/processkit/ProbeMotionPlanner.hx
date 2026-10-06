@@ -295,7 +295,24 @@ class ProbeMotionPlanner {
   /** Withdraw without rotating near contact, then restore the original proved air configuration. */
   public function retreat(target:Transform3, start:Array<Float>, speed:Float, goal:Array<Float>):CheckedProbeMove {
     if (target == null || goal == null || goal.length != arm.group.count()) throw "Probe retreat needs its checked air goal";
-    var withdrawn = line(new Transform3(target.translation, arm.tcpPose(start).rotation), start, speed, true);
+    var withdrawn:CheckedProbeMove;
+    try {
+      withdrawn = line(new Transform3(target.translation, arm.tcpPose(start).rotation), start, speed, true);
+    } catch (axialError:Dynamic) {
+      // Servo contact can leave a measured pose from which Cartesian IK is marginal even though
+      // the proved air joint goal remains reachable. A direct joint return is accepted only after
+      // the complete trajectory is compiled and swept with the calibrated contact allowance.
+      var program = new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(goal.copy()),
+        new MotionOptions(), Blend.ExactStop)]);
+      try {
+        var checked = new CheckedProbeMove(program, inspect(program, start, true));
+        var hit = violation(checked.endJoints);
+        if (hit != null) throw 'Probe joint retreat ends blocked: ${hit.a} against ${hit.b}, ${hit.distance} m < ${hit.required} m';
+        return checked;
+      } catch (jointError:Dynamic) {
+        throw 'Probe retreat cannot compile its axial withdrawal (${Std.string(axialError)}) or checked joint return (${Std.string(jointError)})';
+      }
+    }
     var correction = false;
     for (joint in 0...goal.length) if (Math.abs(withdrawn.endJoints[joint] - goal[joint]) > 1e-8) correction = true;
     var checked = withdrawn;
