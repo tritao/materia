@@ -4,9 +4,11 @@
 #include <cmath>
 #include <cstddef>
 #include <cstring>
+#include <cstdlib>
 #include <atomic>
 #include <thread>
 #include <initializer_list>
+#include <string>
 
 namespace {
 
@@ -333,6 +335,49 @@ void task_space_slot_writer() {
     assert(check.resolution_ns == 500'000);
     assert(mk_report_set_task_space(&report, MK_CHECK_PASSED, 0.0, 0.0,
         0.005, 0) == MK_ERROR_INVALID_ARGUMENT);
+    assert(mk_report_set_task_space_bound(&report,0.0001,0.005)==MK_OK);
+    assert(check.status==MK_CHECK_PASSED && check.method==MK_CHECK_METHOD_BOUND);
+    near(check.value,0.0001);near(check.margin,0.0049);
+    assert(check.time_seconds==0 && check.resolution_ns==0);
+    assert(mk_report_set_task_space_bound(&report,0.006,0.005)==MK_ERROR_INVALID_ARGUMENT);
+    assert(mk_report_set_task_space_bound(&report,-1,0.005)==MK_ERROR_INVALID_ARGUMENT);
+    assert(mk_report_set_task_space_bound(&report,NAN,0.005)==MK_ERROR_INVALID_ARGUMENT);
+}
+
+void execution_certificate_parity() {
+    auto mode=[](bool audit){
+#ifdef _WIN32
+        _putenv_s("PROCESS_PATH_VERIFY_EXECUTION",audit?"1":"0");
+#else
+        setenv("PROCESS_PATH_VERIFY_EXECUTION",audit?"1":"0",1);
+#endif
+    };
+    const char *previous=std::getenv("PROCESS_PATH_VERIFY_EXECUTION");
+    const bool had_previous=previous!=nullptr;const std::string saved=previous?previous:"";
+    for(unsigned fixture=0;fixture<200;++fixture){
+        mk_trajectory_handle trajectory{};assert(mk_trajectory_create(2,&trajectory)==MK_OK);
+        mk_segment segment{};segment.struct_size=sizeof(segment);segment.joint_count=2;
+        segment.duration_ns=100'000'000+fixture*10'000'000;segment.degree=5;
+        for(unsigned j=0;j<2;++j)for(unsigned k=0;k<6;++k)
+            segment.coefficients[j].value[k]=fixture<100 ? (k?(j==0?1.0:-0.1)*(fixture%7+1)/(k+1):0.0) : std::sin((fixture+1)*(j+2)*(k+3))*5;
+        assert(mk_trajectory_append_segment(trajectory,&segment)==MK_OK);
+        mk_limits limits{};limits.struct_size=sizeof(limits);limits.joint_count=2;
+        for(unsigned j=0;j<2;++j){limits.position_claimed[j]=1;limits.position_lower[j]=-4;limits.position_upper[j]=4;
+            limits.derivative_claimed[j]=7;limits.max_velocity[j]=5;limits.max_acceleration[j]=10;limits.max_jerk[j]=30;}
+        mk_validation_report certified{},reference{};certified.struct_size=sizeof(certified);reference.struct_size=sizeof(reference);
+        mode(false);assert(mk_validate(trajectory,&limits,&certified)==MK_OK);
+        mode(true);assert(mk_validate(trajectory,&limits,&reference)==MK_OK);
+        for(unsigned i=0;i<MK_CHECK_COUNT;++i){auto &a=certified.checks[i],&b=reference.checks[i];
+            assert(a.status==b.status && a.method==b.method && a.joint==b.joint && a.derivative_order==b.derivative_order);
+            assert(std::abs(a.value-b.value)<=1e-9 && std::abs(a.time_seconds-b.time_seconds)<=1e-9);
+            assert(std::abs(a.tolerance-b.tolerance)<=1e-9 && std::abs(a.margin-b.margin)<=1e-9);}
+        mk_trajectory_destroy(trajectory);
+    }
+#ifdef _WIN32
+    _putenv_s("PROCESS_PATH_VERIFY_EXECUTION",had_previous?saved.c_str():"");
+#else
+    if(had_previous)setenv("PROCESS_PATH_VERIFY_EXECUTION",saved.c_str(),1);else unsetenv("PROCESS_PATH_VERIFY_EXECUTION");
+#endif
 }
 
 } // namespace
@@ -433,5 +478,9 @@ int main() {
     zero_origin_real_overshoot_fails();
     nonfinite_extrema_rejected();
     task_space_slot_writer();
+    execution_certificate_parity();
+#ifndef __EMSCRIPTEN__
+    // This single-threaded Node target has no pthread worker pool.
     plans_across_threads();
+#endif
 }

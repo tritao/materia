@@ -11,6 +11,7 @@ interface TrajectoryCore @target("portable-abi64") @library("trajectory_core") {
 	const MK_CHECK_COUNT = 6;
 	const MK_CHECK_FAILED = 2;
 	const MK_CHECK_JERK = 3;
+	const MK_CHECK_METHOD_BOUND = 2;
 	const MK_CHECK_METHOD_EXACT = 0;
 	const MK_CHECK_METHOD_SAMPLED = 1;
 	const MK_CHECK_PASSED = 1;
@@ -60,6 +61,11 @@ interface TrajectoryCore @target("portable-abi64") @library("trajectory_core") {
 	 * Fills the planner-owned sampled task-space check in a validation report.
 	 */
 	extern fn mk_report_set_task_space(report: ptr<mk_validation_report>, status: u32, worst: f64, time_seconds: f64, tolerance: f64, resolution_ns: u64) -> mk_result;
+	/**
+	 * Records a planner-proven whole-path task-error upper bound. No sampled
+	 * peak time/resolution is claimed. The planner owns the geometric proof.
+	 */
+	extern fn mk_report_set_task_space_bound(report: ptr<mk_validation_report>, upper_bound: f64, tolerance: f64) -> mk_result;
 	extern fn mk_trajectory_append_segment(trajectory: mk_trajectory_handle, segment: ptr<const<mk_segment>>) -> mk_result;
 	extern fn mk_trajectory_boundary_continuity(trajectory: mk_trajectory_handle, boundary_index: u32, out_continuity: ptr<mk_continuity>) -> mk_result;
 	extern fn mk_trajectory_create(joint_count: u32, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
@@ -228,7 +234,7 @@ interface TrajectoryCore @target("portable-abi64") @library("trajectory_core") {
 		 */
 		derivative_order: u32 @offset(8);
 		/**
-		 * < MK_CHECK_METHOD_*; task-space validation is sampled.
+		 * < MK_CHECK_METHOD_*; BOUND stores a continuous upper bound.
 		 */
 		method: u32 @offset(12);
 		/**
@@ -236,7 +242,7 @@ interface TrajectoryCore @target("portable-abi64") @library("trajectory_core") {
 		 */
 		value: f64 @offset(16);
 		/**
-		 * < Time from trajectory clock epoch, including t0.
+		 * < Time from trajectory clock epoch, including t0; zero for a whole-path bound.
 		 */
 		time_seconds: f64 @offset(24);
 		/**

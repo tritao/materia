@@ -1766,6 +1766,15 @@ class KinematicsTests extends MotionKitTestSupport {
         "fixed envelope bounds exact hull and moving-work TCP displacement");
       check(coupledWorld.auditDisplacement(q,perturbed,errors)<=1+1e-8,
         "rotary, prismatic and multi-source follower hull motion stays inside CL-D5 bound");
+      var exactTip=coupledGroup.tcpPose(perturbed),initialTip=coupledGroup.tcpPose(q),tipJacobian=coupledGroup.tcpJacobian(q),remainderSquared=0.0;
+      for(axis in 0...3){
+        var residual=axis==0 ? exactTip.translation.x-initialTip.translation.x :
+          axis==1 ? exactTip.translation.y-initialTip.translation.y : exactTip.translation.z-initialTip.translation.z;
+        for(j in 0...q.length)residual-=tipJacobian[axis*q.length+j]*(perturbed[j]-q[j]);
+        remainderSquared+=residual*residual;
+      }
+      check(Math.sqrt(remainderSquared)<=cachedEnvelope.tcpLinearizationRemainder(errors)+1e-12,
+        "TCP Taylor remainder bounds affine followers and a moving work reference");
     }
     var screwModel=new RobotModel("axial-screw-bound"),screwRoot=screwModel.addLink(new Link("screw-root")),
       carriage=screwModel.addLink(new Link("carriage")),shaft=screwModel.addLink(new Link("shaft"));
@@ -1844,6 +1853,23 @@ class KinematicsTests extends MotionKitTestSupport {
         for(i in 0...21)check(Math.abs(timed.trajectory.evaluate(timed.trajectory.durationSeconds()*i/20).velocities[0])<=0.010001,
           "air slowdown retains the original physical velocity limit");
         timed.releaseDistanceMap();timed.trajectory.dispose();
+        var taskArc=new motionkit.path.PoseArc(new PoseWaypoint(from,0.0001,0.001),
+          new PoseWaypoint(new Pose3(from.x+0.02*Math.sqrt(0.5),from.y+0.02*(1-Math.sqrt(0.5)),from.z,
+            from.qx,from.qy,from.qz,from.qw),0.0001,0.001),
+          new PoseWaypoint(new Pose3(from.x+0.02,from.y+0.02,from.z,from.qx,from.qy,from.qz,from.qw),0.0001,0.001),
+          OrientationPolicy.Fixed,0.01);
+        var taskArcPath=new PosePath("task",[taskArc]),taskArcDistances=[for(i in 0...21)taskArcPath.length()*i/20];
+        var taskArcRequest=new PathRequest(taskArcDistances,[for(s in taskArcDistances)taskArcPath.poseAt(s)],start,
+          new IkTolerance(1e-6,1e-6),[1.0,1.0,1.0],[1.0,1.0,1.0]);
+        var taskArcCurve=planner.plan(taskArcPath,taskArcRequest),taskArcProof=motionkit.robot.JointCurveTask.prove(group,taskArcPath,taskArcCurve,1e-6);
+        check(taskArcProof!=null,"curved authored geometry has a continuous task certificate");
+        var taskArcBound:motionkit.robot.JointCurveTask=cast taskArcProof;
+        for(span in 0...taskArcCurve.s.length-1)for(piece in 0...5){var fraction=piece/4.0;
+          var taskArcQ=motionkit.planner.JointPathPolynomial.at(motionkit.planner.JointPathPolynomial.coefficients(taskArcCurve,span),fraction);
+          var taskArcDistance=taskArcCurve.s[span]+fraction*(taskArcCurve.s[span+1]-taskArcCurve.s[span]);
+          check(motionkit.path.PoseMath.distance(numeric.forward(taskArcQ),taskArcPath.poseAt(taskArcDistance))<=taskArcBound.positionBound+1e-10,
+            "task bound includes exact interior arc curvature");
+        }
         var fixedRequest=new PathRequest([0.0,airPath.length()],[from,to],start,new IkTolerance(1e-6,1e-6),
           [1.0,1.0,1.0],speed,32,[OrientationPolicy.Fixed,OrientationPolicy.Fixed],
           new motionkit.kinematics.PathDriveLimits(acceleration,[0.08,0.08]));
@@ -1893,6 +1919,23 @@ class KinematicsTests extends MotionKitTestSupport {
       var authoredRefiner=new motionkit.robot.AnalyticPathRefiner(marked,authoredProblem,motionkit.robot.StructuredLadder.search(authoredProblem));
       var provider=new motionkit.robot.PosePathRefinement(authoredPath);
       var authoredSamples=authoredRefiner.refinePath([for(i in 0...11)authoredPath.length()*i/10],provider.at);
+      var taskProof=motionkit.robot.JointCurveTask.prove(marked,authoredPath,authoredSamples,1e-8);
+      check(taskProof!=null,"refined Cartesian line has a continuous task certificate");
+      var certifiedTask:motionkit.robot.JointCurveTask=cast taskProof;
+      for(span in 0...authoredSamples.s.length-1)for(piece in 0...5){
+        var at=piece/4.0,actualQ=motionkit.planner.JointPathPolynomial.at(
+          motionkit.planner.JointPathPolynomial.coefficients(authoredSamples,span),at);
+        var desiredPose=authoredPath.poseAt(authoredSamples.s[span]+at*(authoredSamples.s[span+1]-authoredSamples.s[span]));
+        check(motionkit.path.PoseMath.distance(new ManipulatorKinematics(marked).forward(actualQ),desiredPose)<=certifiedTask.positionBound+1e-10,
+          "continuous task bound covers exact interior FK");
+      }
+      var badRates=[for(row in authoredSamples.qPrime)row.copy()];badRates[0][1]+=5;
+      var badTaskCurve=new motionkit.planner.JointPathSamples(authoredSamples.s,authoredSamples.q,badRates,
+        authoredSamples.qDoublePrime,authoredSamples.qDoublePrimeBefore);
+      check(motionkit.robot.JointCurveTask.prove(marked,authoredPath,badTaskCurve,1e-8)==null,
+        "matching endpoint IK does not certify an interior task excursion");
+      check(motionkit.robot.JointCurveTask.prove(marked,authoredPath,authoredSamples,0.001)==null,
+        "task certificate refuses a lowering reserve larger than the task tolerance");
       var plannedDistances=[for(i in 0...11)authoredPath.length()*i/10];
       var plannedRequest=new PathRequest(plannedDistances,[for(s in plannedDistances)authoredPath.poseAt(s)],markedQ,
         new IkTolerance(1e-6,1e-6),[for(_ in markedQ)0.5],[for(_ in markedQ)1.0]);

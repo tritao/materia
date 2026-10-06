@@ -710,7 +710,7 @@ Submodules come from the main checkout's stores, not from other worktrees (which
 | PP5 | revision 7 continuous quintic certificate, lowering displacement and timed-pass removal complete; phase gate passes | original phase: `e1435022f`, `e5336893f`, `bfd03d585`; revision 7 evidence below |
 | PP6 | in progress: planner argument, axis/standalone OPW defaults, class removal and free entry verified; remaining defaults and joined approach/retreat pending | `46f29f74f`, `4edacf8af`, `fc0efe042` |
 | PP7 | complete: generated entry/retreat selection, retries and emission; full MotionKit/native gate passed | `92b8c69ee`, `093e65a46`, `e41bdfffa`; retreat gate below |
-| PP8 | in progress: robot weldment tenfold targets met against PP0; G17 five-run median 14.387 s on non-quiet host; gantry speed target, two further savings and migration remain open | per-step profiles below |
+| PP8 | in progress: robot weldment tenfold targets met against PP0; G17 five-run median 14.387 s on non-quiet host; both revision-8 savings and boundary gate pass; gantry speed regression, quiet acceptance and migration remain open | per-step profiles below |
 | PP9 | in progress: handling and surface use the structured planner and authored missions pass; toolpaths/deletions/remaining mission gate pending | runner migrations below |
 | PP10 | planned | — |
 | PP11 | planned | — |
@@ -3287,3 +3287,77 @@ posture and weld quality are unchanged. This overlaps validation on a busy
 host and is not the final quiet median. Evidence:
 `process-path-revision8-saving1-g17-profile.log`. Full boundary validation
 follows saving 2; no native implementation changed for saving 1.
+
+
+### Revision 8 saving 2: continuous compiler task and execution bounds
+
+`JointCurveTask` bounds the actual refined quintic, rather than assuming
+that exact IK endpoints certify its interior. Bernstein controls bound the
+linearized FK residual; rigid-chain Taylor remainders, authored arc curvature
+and the validated 1.01× lowering deviation bound the remainder. Orientation
+has its own angular bound. Unsupported geometry, variable position tolerances,
+motor projection/couplings, other timing backends and inconclusive bounds
+retain dense checks. The compiler builds fresh evidence for each section.
+The report records `BOUND` with a continuous upper bound, not a sampled peak.
+
+Execution validation retains exact peak values, times and joints. Strict
+Bernstein derivative signs eliminate unnecessary extrema solves; continuous
+hulls below an already established exact maximum or worst position score
+eliminate dominated solves. Inconclusive bounds use the original solver.
+`PROCESS_PATH_VERIFY_EXECUTION=1` restores the original extrema calculations;
+200 monotonic/nonmonotonic fixtures compare every reported check against it.
+
+Restored dense task/execution audits exit zero for G17 and both robot
+whole-weldment backends: **6 / 148 certified sections**, **233,489 / 179,214
+samples**, no bound violations. G17's long weld alone checks **229,485**
+samples against a **0.000011067 m** positional bound and **0.001319747 rad**
+angular bound. Cycle/posture remain **232.5 s / 0.778094423 rad**; both robot
+backends retain ten seams and **99.9 s** cycles. Evidence:
+`process-path-revision8-task-{g17,welder}-audit.log`.
+
+Native validation passes **16/16 CTests**, including the report API and
+execution parity. The Node/WebAssembly gate now also passes **16/16**, beyond
+the previous five planner suites: validation/generator fixtures require a
+1 MiB test stack and exception-enabled tests; the native thread-ownership
+fixture stays native because the Node target has no pthread worker pool.
+Production trajectory exceptions are enabled consistently with MotionKit.
+Compiler and full boundary runtime results follow below.
+
+
+The ordinary saving-2 G17 profile exits zero at **10.014669 s** planning,
+retained compilation **3.833809 s**. The long-weld certificate costs
+**0.037157 s**, task-report publication **0.000058 s**, execution-plan creation
+**0.288078 s** and plan-load checks **0.574533 s**. This overlapped boundary
+validation; comparison with saving 1's 10.255984 s is diagnostic, not a
+controlled timing claim. Evidence: `process-path-revision8-saving2-g17-profile.log`.
+
+The gantry whole-weldment restored-check audit also exits zero: **78
+certified sections / 117,092 dense samples**, no bound violations.
+All ten seams retain **171.3 s** cycle time, the existing corner slowing and
+clearance/quality acceptance. Evidence: `process-path-revision8-task-gantry-audit.log`.
+
+
+The saving-2 phase boundary passes: full MachineKit; all six compiler-only
+manifests; full MotionKit **1,224,712 assertions**, ProcessKit, CadBridge
+**173**, ToolpathKit Motion **3,034**, RobotKit world **5,431** plus excavator
+**37**; native MotionKit/TrajectoryKit **16/16**, RobotKit **17/17**, and Node
+**16/16** CTests. The first full MotionKit attempt found its obsolete sampled-
+only telemetry assertion; it now verifies either an actual continuous bound
+or ≤1 ms sampling, and the complete suite exits zero. Logs use
+`process-path-revision8-boundary-*` in external scratch.
+
+The requested ordinary gantry profile exposes a **regression**, not a speed
+acceptance: **5.743426 / 14.354799 / 13.116461 / 67.567942 s**, total
+**100.782628 s**, versus the preceding 69.165926 s diagnostic. Both overlap
+other checks. Coarse direction screening alone costs **52.037091 s**; fine
+inclusive search/checks **35.878027 s**, of which geometric clearance is
+**22.572931 s**. Retained generated-motion clearance adds **11.612527 s**.
+Candidate construction **0.008116 s**, refinement **0.046051 s**, time laws
+**0.763298 s**, execution-plan creation **0.130805 s**, task certificates
+**0.052270 s**, task publication **0.001412 s**, and plan-load checks
+**0.215133 s** are small. These stages overlap where explicitly inclusive.
+Run 4 repeats an already feasible reverse screening five times while the
+forward direction has an unreachable sample at every density, costing
+about **39 s**. That repeated clearance is the immediate fix to pursue;
+more G17 tuning is not justified. Cycle/corner slowing/quality remain
+unchanged. Evidence: `process-path-revision8-saving2-gantry-profile.log`.

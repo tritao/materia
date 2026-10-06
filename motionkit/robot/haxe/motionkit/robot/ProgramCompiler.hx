@@ -625,20 +625,37 @@ class ProgramCompiler {
       if(configurationConstraint!=null)configurationConstraint.checkTrajectory(
         projected == null ? pending.trajectory : projected,controllerPeriodSeconds);
       mark("configurationCheck");
-      plan = ExecutionPlan.create(projected == null ? pending.trajectory : projected,
+      var completedPlan:ExecutionPlan = ExecutionPlan.create(projected == null ? pending.trajectory : projected,
         pending.path == null ? limits : limits.withoutJerk(), id, pending.startQ,
         zeros(), zeros(), startTolerances.position, startTolerances.velocity,
         startTolerances.acceleration, pending.events);
+      plan=completedPlan;
       mark("executionPlanCreation");
-      if (pending.path != null) checkTaskSpace(plan, pending.path, pending.checkDistances,
-        pending.checkTimes, pending.opIndex, pending.authoredPolyline,
-        pending.blendTolerance, pending.taskSampleDistances);
+      var taskProof:Null<JointCurveTask> = null;
+      if(pending.path!=null && pending.geometryRefined && pending.geometryCurve!=null &&
+          pending.authoredPolyline==null && Std.isOfType(timing,ToppraPathTiming) &&
+          couplingIndices.length==0 && motorSpace==null){
+        var arm:Null<robotkit.manipulation.KinematicGroup> = null;
+        if(Std.isOfType(solver,ManipulatorKinematics))arm=cast(solver,ManipulatorKinematics).manipulator;
+        else if(Std.isOfType(solver,EaikKinematics))arm=cast(solver,EaikKinematics).manipulator;
+        if(arm!=null){var nativeTiming:ToppraPathTiming=cast timing;
+          taskProof=JointCurveTask.prove(arm,pending.path,pending.geometryCurve,nativeTiming.loweringTolerance);}
+      }
+      mark("taskSpaceCertificate");
+      var auditTask=Sys.getEnv("PROCESS_PATH_VERIFY_TASK")=="1";
+      if(pending.path!=null && (taskProof==null || auditTask))checkTaskSpace(completedPlan,pending.path,pending.checkDistances,
+        pending.checkTimes,pending.opIndex,pending.authoredPolyline,pending.blendTolerance,pending.taskSampleDistances,taskProof);
+      if(taskProof!=null)completedPlan.report.setTaskSpaceBound(taskProof.positionBound,taskProof.positionTolerance);
+      if(profiling && pending.path!=null)Sys.println("PROCESS_PATH_TASK_CERTIFICATE "+haxe.Json.stringify({
+        op:pending.opIndex,certified:taskProof!=null,audited:auditTask && taskProof!=null,
+        queries:taskProof==null?0:taskProof.queries,positionBound:taskProof==null?null:taskProof.positionBound,
+        orientationBound:taskProof==null?null:taskProof.orientationBound}));
       mark("taskSpaceCheck");
       var check = planCheck;
       if (check != null && check.checks()) {
-        var result = check.check(plan, pending.opIndex, pending.feed);
+        var result = check.check(completedPlan, pending.opIndex, pending.feed);
         result.locate(pending.times, pending.opDistances());
-        plan.checked = result;
+        completedPlan.checked = result;
         if (check.options.rejects && result.diagnostics.length > 0)
           throw 'plan check: ${[for (diagnostic in result.diagnostics) diagnostic.describe()].join("; ")}';
       }
@@ -646,7 +663,7 @@ class ProgramCompiler {
       if (profiling) Sys.println("PROCESS_PATH_COMPILE_CHECKS " + haxe.Json.stringify({op:pending.opIndex, stages:profileRows}));
       pending.trajectory.dispose();
       if (projected != null) projected.dispose();
-      return plan;
+      return completedPlan;
     } catch (error:Dynamic) {
       if (plan != null) plan.dispose();
       if (projected != null) projected.dispose();
@@ -888,7 +905,7 @@ class ProgramCompiler {
       var made = new PendingMotion(index, startQ, positions[count], timed.trajectory, events,
         path, distances, timeMap, authoredPolyline, blendTolerance,
         taskSampleDistances, checkDistances, checkTimes);
-      made.geometryClearance=geometryClearance;made.geometryCurve=jointPath;
+      made.geometryClearance=geometryClearance;made.geometryCurve=jointPath;made.geometryRefined=refined!=null;
       made.feed = feed;
       return made;
     } catch (error:Dynamic) {
@@ -902,8 +919,8 @@ class ProgramCompiler {
   function checkTaskSpace(plan:ExecutionPlan, path:PosePath,
       checkDistances:Array<Float>, checkTimes:Array<Float>, index:Int,
       authoredPolyline:Null<Array<Pose3>>, blendTolerance:Float,
-      taskSampleDistances:Array<Float>):Void {
-    var worst = 0.0, worstTime = 0.0;
+      taskSampleDistances:Array<Float>,?certificate:JointCurveTask):Void {
+    var worst = 0.0, worstTime = 0.0,worstOrientation=0.0;
     var tolerance = authoredPolyline == null && path.authoredGeometry == null ?
       positionTolerance : authoredPolyline == null ? path.blendTolerance : blendTolerance;
     var failure:Null<String> = null;
@@ -921,6 +938,9 @@ class ProgramCompiler {
           desired.positionTolerance;
       var angle = orientationError(actual, desired.pose,
         path.orientationPolicyAt(distance));
+      worstOrientation=Math.max(worstOrientation,angle);
+      if(certificate!=null && (error>certificate.positionBound+1e-9 || angle>certificate.orientationBound+1e-9))
+        throw 'Task certificate audit exceeded its continuous bound at op $index: $error / ${certificate.positionBound}, $angle / ${certificate.orientationBound}';
       if (error > worst) { worst = error; worstTime = time; tolerance = allowed; }
       if (error > allowed + 1e-9 ||
           angle > desired.orientationTolerance + 1e-9)
@@ -936,6 +956,9 @@ class ProgramCompiler {
     plan.report.setTaskSpace(failure == null ? TrajectoryCoreConstants.MK_CHECK_PASSED :
       TrajectoryCoreConstants.MK_CHECK_FAILED, worst, worstTime, tolerance,
       Trajectory.nanoseconds(plan.durationSeconds / timeSteps));
+    if(certificate!=null)Sys.println("PROCESS_PATH_TASK_AUDIT "+haxe.Json.stringify({op:index,
+      samples:checkDistances.length+timeSteps+1,positionError:worst,positionBound:certificate.positionBound,
+      orientationError:worstOrientation,orientationBound:certificate.orientationBound}));
     if (failure != null) throw failure;
   }
 
@@ -1155,6 +1178,7 @@ class PendingMotion {
   /** The programmed speed of a path move in m/s, 0 for a joint move. */
   public var feed:Float = 0.0;
   public var geometryClearance:Bool = false;
+  public var geometryRefined:Bool = false;
   public var geometryCurve:Null<JointPathSamples> = null;
 
   public function new(opIndex:Int, startQ:Array<Float>, endQ:Array<Float>,

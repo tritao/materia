@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdio>
+#include <cstdlib>
 #include <limits>
 #include <vector>
 
@@ -132,9 +133,42 @@ std::vector<long double> quartic_roots(const Polynomial &coefficients, long doub
     return roots;
 }
 
+/** Bernstein's convex-hull property proves a derivative has no interior
+ * zero when all controls have one strict sign. The roundoff reserve covers
+ * normalization, binomial conversion and summation on double/long double.
+ * Inconclusive signs retain the existing exact extrema solver. */
+bool bernstein_bounds(const Polynomial &coefficients, int degree, long double duration,
+                      long double &lower, long double &upper, bool rounded_double=false) {
+    Polynomial normalized{};
+    long double power=1.0L,scale=0.0L;
+    for(int i=0;i<=degree;++i){
+        normalized[i]=coefficients[i]*power;
+        if(!std::isfinite(normalized[i]) || (coefficients[i]!=0.0L && normalized[i]==0.0L))return false;
+        scale+=std::abs(normalized[i]);power*=duration;
+    }
+    if(!std::isfinite(scale))return false;
+    const long double epsilon=rounded_double ? std::numeric_limits<double>::epsilon() :
+        std::numeric_limits<long double>::epsilon();
+    const long double error=512*epsilon*scale+512*std::numeric_limits<double>::denorm_min();
+    lower=std::numeric_limits<long double>::infinity();upper=-lower;
+    for(int k=0;k<=degree;++k){
+        long double control=0.0L,ratio=1.0L;
+        for(int i=0;i<=k;++i){
+            if(i)ratio*=static_cast<long double>(k-i+1)/(degree-i+1);
+            control+=ratio*normalized[i];
+        }
+        lower=std::min(lower,control-error);upper=std::max(upper,control+error);
+    }
+    return std::isfinite(lower) && std::isfinite(upper);
+}
+bool strict_bernstein_sign(const Polynomial &coefficients, int degree, long double duration) {
+    long double lower,upper;
+    return bernstein_bounds(coefficients,degree,duration,lower,upper) && (lower>0 || upper<0);
+}
+
 std::vector<long double> roots_inside(const Polynomial &coefficients, int degree,
-                                      long double duration) {
-    if (degree <= 0) return {};
+                                      long double duration, bool prove_monotonic) {
+    if (degree <= 0 || (prove_monotonic && strict_bernstein_sign(coefficients,degree,duration))) return {};
     auto roots = degree <= 3 ? closed_roots(coefficients, degree) :
         quartic_roots(coefficients, duration);
     roots.erase(std::remove_if(roots.begin(), roots.end(), [duration](long double root) {
@@ -194,7 +228,7 @@ void observe(mk_validation_report &report, std::array<long double, MK_CHECK_COUN
 
 using DerivativeMaxima = std::array<std::array<double, 5>, MK_MAX_JOINTS>;
 
-DerivativeMaxima derivative_maxima(const Trajectory &trajectory) {
+DerivativeMaxima derivative_maxima(const Trajectory &trajectory, bool prove_monotonic) {
     DerivativeMaxima maxima{};
     for (uint32_t index = 0; index < trajectory.segment_count(); ++index) {
         const auto &segment = trajectory.segment(index);
@@ -207,9 +241,14 @@ DerivativeMaxima derivative_maxima(const Trajectory &trajectory) {
             for (uint32_t order = 1; order <= 4; ++order) {
                 polynomial = derivative(polynomial, degree);
                 degree = std::max(0, degree - 1);
+                long double lower,upper;
+                // A continuous hull below the existing exact maximum cannot
+                // change the quantization reserve. Keep its exact value.
+                if(prove_monotonic && bernstein_bounds(polynomial,degree,duration,lower,upper,true) &&
+                    std::max(std::abs(lower),std::abs(upper))<maxima[joint][order])continue;
                 std::vector<long double> times{0.0L, duration};
                 const auto critical = roots_inside(derivative(polynomial, degree),
-                    std::max(0, degree - 1), duration);
+                    std::max(0, degree - 1), duration, prove_monotonic);
                 times.insert(times.end(), critical.begin(), critical.end());
                 for (const long double time : times)
                     maxima[joint][order] = std::max(maxima[joint][order],
@@ -260,7 +299,9 @@ mk_result validate(const Trajectory &trajectory, const mk_limits &limits,
     report.executor_time_resolution_ns =
         limits.struct_size >= sizeof(mk_limits) && limits.executor_time_resolution_ns != 0
             ? limits.executor_time_resolution_ns : 1;
-    const auto maxima = derivative_maxima(trajectory);
+    const char *audit=std::getenv("PROCESS_PATH_VERIFY_EXECUTION");
+    const bool prove_monotonic=!(audit && audit[0]=='1' && audit[1]=='\0');
+    const auto maxima = derivative_maxima(trajectory,prove_monotonic);
     for (uint32_t joint = 0; joint < trajectory.joint_count(); ++joint)
         for (uint32_t order = 1; order <= 4; ++order)
             if (!std::isfinite(maxima[joint][order])) return MK_ERROR_INVALID_ARGUMENT;
@@ -307,10 +348,23 @@ mk_result validate(const Trajectory &trajectory, const mk_limits &limits,
                     order == 1 ? (limits.derivative_claimed[joint] & 1) :
                     order == 2 ? (limits.derivative_claimed[joint] & 2) :
                                  (limits.derivative_claimed[joint] & 4);
-                if (claimed) {
+                bool dominated=false;
+                if(claimed && order==0 && prove_monotonic){
+                    long double lower,upper;
+                    if(bernstein_bounds(polynomial,degree,duration,lower,upper,true)){
+                        const double tolerance=position_comparison_tolerance(limits.position_lower[joint],
+                            limits.position_upper[joint],maxima[joint][1],report.executor_time_resolution_ns);
+                        const long double excess=std::max(upper-limits.position_upper[joint],
+                            limits.position_lower[joint]-lower);
+                        dominated=(excess-tolerance)/std::max(1.0,limits.position_upper[joint]-
+                            limits.position_lower[joint])<scores[MK_CHECK_POSITION];
+                    }
+                }
+                // Dominance preserves the original worst value, time and joint.
+                if (claimed && !dominated) {
                     std::vector<long double> times{0.0L, duration};
                     const auto next = derivative(polynomial, degree);
-                    auto critical = roots_inside(next, std::max(0, degree - 1), duration);
+                    auto critical = roots_inside(next, std::max(0, degree - 1), duration, prove_monotonic);
                     times.insert(times.end(), critical.begin(), critical.end());
                     for (long double local_time : times) {
                         const double value = static_cast<double>(evaluate(polynomial, degree, local_time));

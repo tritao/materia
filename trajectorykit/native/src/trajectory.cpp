@@ -382,6 +382,23 @@ mk_result MK_CALL mk_report_set_task_space(mk_validation_report *report,
     return MK_OK;
 }
 
+mk_result MK_CALL mk_report_set_task_space_bound(mk_validation_report *report,
+    double upper_bound, double tolerance) {
+    if (report == nullptr || report->struct_size < sizeof(mk_validation_report) ||
+        !std::isfinite(upper_bound) || upper_bound < 0.0 ||
+        !std::isfinite(tolerance) || tolerance < upper_bound)
+        return MK_ERROR_INVALID_ARGUMENT;
+    mk_validation_check check{};
+    check.status = MK_CHECK_PASSED;
+    check.joint = UINT32_MAX;
+    check.method = MK_CHECK_METHOD_BOUND;
+    check.value = upper_bound;
+    check.limit = tolerance;
+    check.margin = tolerance - upper_bound;
+    report->checks[MK_CHECK_TASK_SPACE] = check;
+    return MK_OK;
+}
+
 mk_result MK_CALL mk_plan_create(mk_trajectory_handle trajectory, const mk_plan_spec *spec,
     const mk_limits *limits, mk_plan_handle *out_plan, mk_validation_report *out_report) {
     if (out_plan == nullptr || out_report == nullptr ||

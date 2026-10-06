@@ -52,6 +52,15 @@ class ValidationReport {
       native.get_checks(TrajectoryCoreConstants.MK_CHECK_TASK_SPACE));
   }
 
+  /** A continuous whole-path upper bound, with no sampled peak timestamp.
+   * The compiler must own the geometric/lowering certificate. */
+  public function setTaskSpaceBound(upperBound:Float,tolerance:Float):Void {
+    var result=TrajectoryCore.mk_report_set_task_space_bound(native,upperBound,tolerance);
+    if(result!=TrajectoryCoreConstants.MK_OK)throw 'validationReport.setTaskSpaceBound failed with MotionKit error $result';
+    checks[TrajectoryCoreConstants.MK_CHECK_TASK_SPACE]=ValidationCheck.fromNative(
+      native.get_checks(TrajectoryCoreConstants.MK_CHECK_TASK_SPACE));
+  }
+
   public function hasFailure():Bool {
     for (check in checks)
       if (check.status == TrajectoryCoreConstants.MK_CHECK_FAILED) return true;

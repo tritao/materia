@@ -558,11 +558,15 @@ class ProgramTests extends MotionKitTestSupport {
       pathPlan.durationSeconds, "SetOutput fires at the prior move end", 1e-9);
     check(pathPlan.report.checks[TrajectoryCoreConstants.MK_CHECK_TASK_SPACE].status ==
       TrajectoryCoreConstants.MK_CHECK_PASSED,
-      "sampled task-space validation is recorded in the plan");
+      "task-space validation is recorded in the plan");
     check(switch pathPlan.guarantees().taskSpace {
       case Sampled(resolutionNs): Int64.compare(resolutionNs, Int64.ofInt(1000000)) <= 0;
+      case Proven: pathPlan.report.checks[TrajectoryCoreConstants.MK_CHECK_TASK_SPACE].method ==
+        TrajectoryCoreConstants.MK_CHECK_METHOD_BOUND &&
+        pathPlan.report.checks[TrajectoryCoreConstants.MK_CHECK_TASK_SPACE].value <=
+        pathPlan.report.checks[TrajectoryCoreConstants.MK_CHECK_TASK_SPACE].limit;
       case _: false;
-    }, "plan telemetry reports task-space sampling at most 1 ms apart");
+    }, "plan telemetry reports a continuous task bound or sampling at most 1 ms apart");
     lowered.dispose();
 
     var line = compiler.compile(new MotionProgram([MotionOp.MoveL(endPose,

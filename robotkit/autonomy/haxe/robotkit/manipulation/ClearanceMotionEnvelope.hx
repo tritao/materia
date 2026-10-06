@@ -13,6 +13,10 @@ class ClearanceMotionEnvelope {
   final gains:Array<Array<Float>>;
   final hulls:Array<Array<Float>>;
   final tip:Array<Float>;
+  final tipAngular:Array<Float>;
+  final tipPrismatic:Array<Float>;
+  final taylorAngles:Array<Float>;
+  final tipReach:Float;
   public function new(arm:KinematicGroup,lower:Array<Float>,upper:Array<Float>,links:Array<String>,corners:Array<Array<Float>>) {
     this.arm=arm;
     var n=arm.group.count(),m=arm.model;
@@ -33,10 +37,18 @@ class ClearanceMotionEnvelope {
     hulls=[for(i in 0...links.length)hull(links[i],corners[i])];
     var f=m.frameIndex(arm.flangeFrame),flange=point(m.bodyIds[m.frameBody[f]],norm(m.frameOffset,7*f)+arm.flangeTTcp.translation.norm());
     tip=flange.coefficients;
+    var flangeLink=m.bodyIds[m.frameBody[f]],reach=flange.reach;
+    tipAngular=angular(flangeLink);taylorAngles=tipAngular.copy();tipPrismatic=prismatic(flangeLink);
     if(arm.workFrame!=null){
       var w=m.frameIndex(arm.workFrame),link=m.bodyIds[m.frameBody[w]],work=point(link,norm(m.frameOffset,7*w)),angles=angular(link);
-      for(i in 0...n)tip[i]+=work.coefficients[i]+angles[i]*(flange.reach+work.reach);
+      var workPrismatic=prismatic(link);
+      for(i in 0...n){
+        tip[i]+=work.coefficients[i]+angles[i]*(flange.reach+work.reach);
+        tipAngular[i]+=angles[i];taylorAngles[i]+=2*angles[i];tipPrismatic[i]+=workPrismatic[i];
+      }
+      reach+=work.reach;
     }
+    tipReach=reach;
   }
   static function norm(v:Array<Float>,i:Int):Float return Math.sqrt(v[i]*v[i]+v[i+1]*v[i+1]+v[i+2]*v[i+2]);
   function point(link:String,radius:Float):{coefficients:Array<Float>,reach:Float} {
@@ -89,6 +101,22 @@ class ClearanceMotionEnvelope {
       body=m.jointParent[j];}
     return result;
   }
+  function prismatic(link:String):Array<Float> {
+    var m=arm.model,body=m.bodyIndex(link),result=[for(_ in 0...arm.group.count())0.0];
+    while(m.bodyParentJoint[body]>=0){var j=m.bodyParentJoint[body];
+      if(m.jointKind[j]==JointKind.Prismatic)for(i in 0...result.length)result[i]+=gains[j][i];
+      body=m.jointParent[j];}
+    return result;
+  }
+  /** Bounds the remainder after the TCP Jacobian's linear term. Each rigid
+   * offset contributes |v| A²/2, each affine prismatic travel contributes
+   * |t|max A²/2 + |delta t| A. For a moving reference, a work-side offset can
+   * rotate on both sides, hence two work-chain angular sums. */
+  public function tcpLinearizationRemainder(errors:Array<Float>):Float {
+    validate(errors);var angle=dot(taylorAngles,errors),travelError=dot(tipPrismatic,errors);
+    return tipReach*angle*angle/2+travelError*angle;
+  }
+  public function angularBound(errors:Array<Float>):Float {validate(errors);return dot(tipAngular,errors);}
   function validate(errors:Array<Float>):Void {
     if(errors.length!=arm.group.count())throw "Invalid clearance envelope error dimensions";
     for(e in errors)if(!Math.isFinite(e) || e<0)throw "Invalid clearance envelope error";

@@ -127,7 +127,7 @@ enum { MK_CHECK_POSITION = 0, MK_CHECK_VELOCITY = 1,
     MK_CHECK_TASK_SPACE = 5, /**< Reserved for Cartesian and tool-path tolerance. */
     MK_CHECK_COUNT = 6 };
 enum { MK_CHECK_UNCHECKED = 0, MK_CHECK_PASSED = 1, MK_CHECK_FAILED = 2 };
-enum { MK_CHECK_METHOD_EXACT = 0, MK_CHECK_METHOD_SAMPLED = 1 };
+enum { MK_CHECK_METHOD_EXACT = 0, MK_CHECK_METHOD_SAMPLED = 1, MK_CHECK_METHOD_BOUND = 2 };
 
 /** Zero motion limits are unclaimed. Position limits use an explicit flag so zero is usable. */
 typedef struct mk_limits {
@@ -151,9 +151,9 @@ typedef struct mk_validation_check {
     uint32_t status; /**< MK_CHECK_* status. */
     uint32_t joint; /**< UINT32_MAX when no limit is claimed. */
     uint32_t derivative_order; /**< 0 for position, 1..3 for derivatives. */
-    uint32_t method; /**< MK_CHECK_METHOD_*; task-space validation is sampled. */
+    uint32_t method; /**< MK_CHECK_METHOD_*; BOUND stores a continuous upper bound. */
     double value; /**< Signed position or absolute derivative/jump value. */
-    double time_seconds; /**< Time from trajectory clock epoch, including t0. */
+    double time_seconds; /**< Time from trajectory clock epoch, including t0; zero for a whole-path bound. */
     double limit; /**< Boundary or absolute maximum corresponding to value. */
     double margin; /**< Signed room to limit: negative means measured value exceeds it. */
     double tolerance; /**< Explicit permitted comparison excess, in check units. */
@@ -272,6 +272,10 @@ TC_API mk_result MK_CALL mk_validate(mk_trajectory_handle trajectory,
 TC_API mk_result MK_CALL mk_report_set_task_space(mk_validation_report *report,
     uint32_t status, double worst, double time_seconds, double tolerance,
     uint64_t resolution_ns);
+/** Records a planner-proven whole-path task-error upper bound. No sampled
+ * peak time/resolution is claimed. The planner owns the geometric proof. */
+TC_API mk_result MK_CALL mk_report_set_task_space_bound(mk_validation_report *report,
+    double upper_bound, double tolerance);
 /** Deep-copies the trajectory and refuses any failed validation check. */
 TC_API mk_result MK_CALL mk_plan_create(mk_trajectory_handle trajectory,
     const mk_plan_spec *spec, const mk_limits *limits,
