@@ -941,3 +941,17 @@ brute-force cost on reachable random small ladders; disconnected cases
 agree on their first failure. All 15 native tests, four-platform ABI audit,
 compiler-only and focused Haxe runtime (1,143,581 assertions) pass.
 Authored large-track acceptance and the PP3 phase gate remain outstanding.
+
+PP3 corridor-validation hardening: common settings validation now runs
+before coarse lattice indexing, and all consumed source candidates are
+validated before corridor/coarse filtering. Invalid state costs are checked
+even when the candidate would be omitted. Regressions reject oversized
+external dimensions and an off-corridor NaN joint rather than accepting
+the remaining path. Focused native tests pass. The full synthetic probe
+with this validation measured 1.050869 s and 1.179377 s after replacing
+the hash-range division with its equivalent multiplication; these timings
+do not establish a stable subsecond acceptance gate.
+Authored TrackWelder inspection confirms it includes RobotArm, whose
+35 mm offset wrist remains unsupported by OPW. A user geometry decision
+(preserve offset wrist and add a supported solver, or redesign for OPW)
+is pending; the authored OPW/track acceptance requirement is still open.

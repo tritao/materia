@@ -123,4 +123,10 @@ int main(){
     auto fallback=coarse_ladder(bend,corridor_settings,CoarseLadderSettings{4,2,1,0});
     assert(fallback.failed==UINT32_MAX && fallback.route==exact_bend.route && fallback.cost==exact_bend.cost);
 
+    auto invalid_coarse=[&](){bool rejected=false;try{coarse_ladder(bend,corridor_settings,CoarseLadderSettings{4,2,1,0});}
+        catch(const std::invalid_argument &){rejected=true;}assert(rejected);};
+    corridor_settings.externals=MK_MAX_JOINTS+1;invalid_coarse();corridor_settings.externals=1;
+    // This state is omitted by the narrow corridor, but still must be rejected.
+    auto invalid_cell=bend[2][0];invalid_cell.external_coordinates[0]=100;invalid_cell.joints[0]=NAN;bend[2].push_back(invalid_cell);invalid_coarse();
+
 }

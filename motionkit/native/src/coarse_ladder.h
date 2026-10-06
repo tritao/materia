@@ -32,7 +32,7 @@ template<class Layers> struct CorridorLayers {
             if(period>1){d=std::fmod(d,period);d=std::min(d,period-d);}
             return d<=radius+1e-12;
         };
-        for(unsigned i=0;i<all.size();++i){const auto &c=all[i],&a=centres[lo],&b=centres[hi];bool keep=true;
+        for(unsigned i=0;i<all.size();++i){const auto &c=all[i],&a=centres[lo],&b=centres[hi];validate_ladder_candidate(c,settings);bool keep=true;
             for(unsigned j=0;j<settings.externals;++j)keep=keep && close(c.external_coordinates[j],a.external_coordinates[j],b.external_coordinates[j],0);
             keep=keep && close(c.roll_index,a.roll_index,b.roll_index,settings.rolls) &&
                 close(c.tilt_index,a.tilt_index,b.tilt_index,0) && close(c.azimuth_index,a.azimuth_index,b.azimuth_index,settings.azimuths);
@@ -46,6 +46,7 @@ template<class Layers> struct CorridorLayers {
  * All branches and legal wrap representatives inside the corridor remain. */
 template<class Layers> LadderResult coarse_ladder(const Layers &source,const LadderSettings &settings,
         const CoarseLadderSettings &options={},const std::vector<std::vector<double>> &state_cost={}) {
+    validate_ladder_settings(settings);
     if(options.sample_stride==0 || options.lattice_stride==0 || options.corridor_radius==0 || options.widenings>16)
         throw std::invalid_argument("Invalid coarse ladder resolution");
     if(source.empty())return structured_ladder(source,settings,state_cost);
@@ -59,7 +60,9 @@ template<class Layers> LadderResult coarse_ladder(const Layers &source,const Lad
     std::vector<std::vector<double>> costs;
     for(auto layer:anchors){const auto &all=source[layer];LadderLayer cells;std::vector<unsigned> indices;std::vector<double> prices;
         if(!state_cost.empty() && state_cost[layer].size()!=all.size())throw std::invalid_argument("Coarse state-cost candidate mismatch");
-        for(unsigned i=0;i<all.size();++i){auto c=all[i];bool keep=all.size()==1;
+        for(unsigned i=0;i<all.size();++i){auto c=all[i];validate_ladder_candidate(c,settings);
+            if(!state_cost.empty() && (std::isnan(state_cost[layer][i]) || state_cost[layer][i]<0))throw std::invalid_argument("Invalid coarse state cost");
+            bool keep=all.size()==1;
             if(!keep){keep=c.roll_index%stride==0 && c.tilt_index%stride==0 && c.azimuth_index%stride==0;
                 for(unsigned j=0;j<settings.externals;++j)keep=keep && c.external_coordinates[j]%stride==0;}
             if(!keep)continue;
@@ -84,6 +87,7 @@ template<class Layers> LadderResult coarse_ladder(const Layers &source,const Lad
         std::vector<std::vector<double>> fine_costs;
         if(!state_cost.empty())for(unsigned i=0;i<source.size();++i){corridor[i];std::vector<double> prices;
             if(state_cost[i].size()!=source[i].size())throw std::invalid_argument("Fine state-cost candidate mismatch");
+            for(auto price:state_cost[i])if(std::isnan(price) || price<0)throw std::invalid_argument("Invalid fine state cost");
             for(auto index:corridor.mapping[i%2])prices.push_back(state_cost[i][index]);fine_costs.push_back(std::move(prices));}
         auto fine=structured_ladder(corridor,settings,fine_costs);tested+=fine.tested_edges;
         if(fine.failed==UINT32_MAX){for(unsigned i=0;i<fine.route.size();++i)fine.route[i]=corridor.all_mapping[i][fine.route[i]];
