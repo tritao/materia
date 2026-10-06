@@ -899,3 +899,18 @@ passes. Compiler-only build and focused runtime pass (1,143,579 assertions),
 including deterministic selected-route FK, disabled-state and empty-layer
 diagnostics and no numeric IK calls. This bridge is not yet wired into
 production compiler selection; PP3/PP6 and later phases remain outstanding.
+
+PP3 initial coarse-to-fine implementation: sparse sample anchors and a
+coarsened lattice produce a route; a streamed fine corridor interpolates
+external/orientation coordinates, respecting periodic roll/azimuth seams.
+All branches and wraps inside the corridor remain, and fine edges retain
+the original jump limits. Disconnected corridors widen, then fall back to
+the full graph. Corridor selection is approximate and does not promise the
+full-graph global optimum. Tests cover unchanged full-corridor results on
+100 random ladders, widening around an off-centre bend and full fallback.
+The synthetic 1301 x 7700 probe completed in 0.963783 s, peak RSS 86412 KB,
+17,653,870 tested edges, cost 2.602 (same as full search on that fixture).
+This is one preliminary Release measurement including synthetic streamed
+generation, not authored-track acceptance or a production speedup claim.
+Coarse-to-fine remains internal: native/Haxe API integration, Descartes
+dispatch and authored performance verification are outstanding.

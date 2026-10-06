@@ -1,7 +1,7 @@
 #ifdef NDEBUG
 #undef NDEBUG
 #endif
-#include "../src/structured_ladder.h"
+#include "../src/coarse_ladder.h"
 #include <cassert>
 #include <random>
 using namespace motionkit;
@@ -26,6 +26,8 @@ int main(){
             for(unsigned j=0;j<4;++j)c.joints[j]=q(random);layers[l].push_back(c);states[l].push_back(.01*i);
         }
         auto result=structured_ladder(layers,s,states);
+        auto coarse_exact=coarse_ladder(layers,s,CoarseLadderSettings{1,1,10,0},states);
+        assert(coarse_exact.failed==result.failed && coarse_exact.cost==result.cost && coarse_exact.route==result.route);
         CachedLayers streamed{layers};auto streamed_result=structured_ladder(streamed,s,states);
         assert(streamed_result.failed==result.failed && streamed_result.route==result.route);
         assert(streamed_result.cost==result.cost && streamed_result.tested_edges==result.tested_edges);
@@ -92,5 +94,17 @@ int main(){
     assert(mk_search_ladder(&request,samples,2,cells,costs,2,selected,&report)==MK_ERROR_INVALID_ARGUMENT);
     samples[1].candidate_count=1;request.max_jump[0]=0;
     assert(mk_search_ladder(&request,samples,2,cells,costs,2,selected,&report)==MK_ERROR_INVALID_ARGUMENT);
+
+    LadderSettings corridor_settings;corridor_settings.joints=1;corridor_settings.externals=1;
+    corridor_settings.jump[0]=.15;corridor_settings.velocity[0]=corridor_settings.weight[0]=1;
+    std::vector<LadderLayer> bend(5);
+    unsigned coordinates[]={0,1,2,1,0};
+    for(unsigned l=0;l<5;++l){mk_lattice_candidate c{};c.joints[0]=.1*l;c.external_coordinates[0]=coordinates[l];bend[l].push_back(c);}
+    auto exact_bend=structured_ladder(bend,corridor_settings);
+    auto widened=coarse_ladder(bend,corridor_settings,CoarseLadderSettings{4,2,1,1});
+    assert(widened.failed==UINT32_MAX && widened.route==exact_bend.route && widened.cost==exact_bend.cost);
+    assert(widened.tested_edges>exact_bend.tested_edges);
+    auto fallback=coarse_ladder(bend,corridor_settings,CoarseLadderSettings{4,2,1,0});
+    assert(fallback.failed==UINT32_MAX && fallback.route==exact_bend.route && fallback.cost==exact_bend.cost);
 
 }

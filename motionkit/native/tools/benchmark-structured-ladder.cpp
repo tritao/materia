@@ -1,4 +1,4 @@
-#include "../src/structured_ladder.h"
+#include "../src/coarse_ladder.h"
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -34,7 +34,7 @@ int main(int argc,char **argv){
     LadderSettings settings;settings.joints=7;settings.externals=1;settings.rolls=24;
     for(unsigned j=0;j<7;++j){settings.jump[j]=.15;settings.velocity[j]=1;settings.weight[j]=1;}
     TrackLayers layers{samples};
-    const auto start=std::chrono::steady_clock::now();auto result=structured_ladder(layers,settings);
+    const auto start=std::chrono::steady_clock::now();auto result=argc>2 ? coarse_ladder(layers,settings) : structured_ladder(layers,settings);
     const double seconds=std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count();
     std::printf("synthetic track-shaped ladder: samples=%u candidates=7700 seconds=%.6f tested_edges=%llu cost=%.9f failed=%u\n",samples,seconds,(unsigned long long)result.tested_edges,result.cost,result.failed);
     return result.route.size()==samples ? 0:1;
