@@ -777,3 +777,16 @@ focused C4 runtime pass (1,159,649 assertions). Authored Cobot and Cartesian
 example checks now include combined native sampling; their app compiler-only
 build passes, and the authored runtime job is running (results not yet claimed).
 PP2 acceptance is still pending that job and the appropriate phase gate.
+
+PP2 authored validation exposed an empty candidate set after Cobot500 passed,
+while checking Cobot850. Cone centres were built from ToolFreedom's canonical
+axis-alignment quaternion, discarding the requested target spin. The lattice
+centre now minimally aligns the target's tool axis to the cone axis while
+preserving its spin preference; when the axes already match, the original
+orientation is retained. Stable atan2 alignment handles antipodal and nearly
+antipodal axes without the cancellation of a 1+dot construction. All orientation
+and combined-sampler wrappers share this convention. Regression checks verify
+spin retention and exact/near-antipodal alignment, and existing candidate/FK
+coverage passes. MotionKit and authored-app compiler-only builds pass; focused
+C4 runtime passes 1,143,524 assertions. The authored Cobot/gantry job has been
+restarted after the earlier job terminated, and its acceptance remains pending.

@@ -587,6 +587,18 @@ class KinematicsTests extends MotionKitTestSupport {
   public function testOrientationLattice():Void {
     var rotation = Quat.fromAxisAngle(new Vec3(1,2,3).normalized(),0.73);
     var target = new Pose3(0.4,-0.1,0.8,rotation.x,rotation.y,rotation.z,rotation.w);
+    var ownAxis=rotation.rotate(new Vec3(0,0,1)).toArray();
+    var kept=motionkit.robot.OrientationLattice.sample(target,motionkit.path.OrientationPolicy.Cone(ownAxis,0.2),1,1,1);
+    near(motionkit.path.PoseMath.angle(kept[0].pose,target),0,"cone centre preserves the target spin when its axis already matches",1e-7);
+    var almostOpposite=rotation.rotate(new Vec3(1e-5,0,-1).normalized()).toArray();
+    var almostFlipped=motionkit.robot.OrientationLattice.centre(target,motionkit.path.OrientationPolicy.Cone(almostOpposite,0.0));
+    near(motionkit.robot.ToolFreedom.orientationError(almostFlipped,target,motionkit.path.OrientationPolicy.Cone(almostOpposite,0.0)),0,
+      "cone axis alignment remains accurate near the antipodal case",1e-7);
+    var opposite=rotation.rotate(new Vec3(0,0,-1)).toArray();
+    var flipped=motionkit.robot.OrientationLattice.centre(target,motionkit.path.OrientationPolicy.Cone(opposite,0.2));
+    near(motionkit.robot.ToolFreedom.orientationError(flipped,target,motionkit.path.OrientationPolicy.Cone(opposite,0.2)),0,
+      "cone centre handles the antipodal axis",1e-7);
+
     for (freedom in [motionkit.path.OrientationPolicy.Fixed,motionkit.path.OrientationPolicy.FreeAboutTool,
         motionkit.path.OrientationPolicy.Cone([0.3,0.4,0.5],0.4)]) {
       var cells = motionkit.robot.OrientationLattice.sample(target,freedom);

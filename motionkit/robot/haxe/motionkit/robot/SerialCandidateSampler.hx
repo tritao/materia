@@ -34,7 +34,7 @@ class SerialCandidateSampler {
     if(target==null)throw "Serial candidate sampling requires a target";
     var external=ExternalAxisGrid.describe(group,seed,ranges);
     var orientation=OrientationLattice.describe(freedom,rollCount,tiltRings,azimuthCount);
-    var centre=ToolFreedom.of(target,freedom,0.0).target;
+    var centre=OrientationLattice.centre(target,freedom);
     var pose=new mk_opw_pose();pose.set_struct_size(mk_opw_pose.size());
     var p=[centre.x,centre.y,centre.z],r=[centre.qx,centre.qy,centre.qz,centre.qw];
     for(i in 0...3)pose.set_position(i,p[i]);for(i in 0...4)pose.set_quaternion(i,r[i]);
