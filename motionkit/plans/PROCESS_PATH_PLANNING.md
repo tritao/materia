@@ -968,3 +968,17 @@ edges (previously 17,653,870); three measurements were 0.867291, 0.915042,
 0.524589 s; search consumed 0.276073, 0.287907, 0.286611 s respectively.
 All retained cost 2.602. This proves the synthetic search scale only;
 authored-track acceptance and overall production planning remain open.
+
+PP4 independent spline preparation: RedundancySpline fits a natural C2
+cubic in path distance, unwraps periodic roll knots before fitting, and
+evaluates the value and analytic first/second derivatives without wrapping
+the output back across its seam. It rejects invalid knots, extrapolation
+and unrepresentable intervals/coefficients/samples. Cubic overshoot is
+explicitly left for refinement bounds validation rather than clipping
+and breaking smoothness. Tests cover affine and two-knot reproduction,
+roll-seam continuity, knot interpolation and C1/C2 continuity, derivative
+finite-difference agreement and invalid inputs. Compiler-only and focused
+runtime pass (1,144,398 assertions). This does not complete PP4: fixed-
+branch analytic arm re-solving, differential joint derivatives,
+JointPathSamples/timing integration and authored-track acceptance remain
+outstanding, as do the earlier PP1/PP3 authored gates.

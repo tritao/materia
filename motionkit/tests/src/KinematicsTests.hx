@@ -607,6 +607,35 @@ class KinematicsTests extends MotionKitTestSupport {
 
   }
 
+  public function testRedundancySpline():Void {
+    var knots=[0.0,0.2,0.7,1.0],affine=new motionkit.robot.RedundancySpline(knots,[for(x in knots)0.3+0.7*x]);
+    var periodic=new motionkit.robot.RedundancySpline(knots,[for(x in knots){var angle=3.0+0.4*x;angle>Math.PI ? angle-2*Math.PI : angle;}],2*Math.PI);
+    for(i in 0...101){var x=i/100.0,a=affine.evaluate(x),r=periodic.evaluate(x);
+      near(a.value,0.3+0.7*x,"redundancy spline reproduces affine external motion",1e-10);
+      near(a.first,0.7,"affine external derivative",1e-10);near(a.second,0,"affine external curvature",1e-10);
+      near(r.value,3.0+0.4*x,"period-aware roll stays continuous across its seam",1e-10);
+      near(r.first,0.4,"period-aware roll derivative",1e-10);near(r.second,0,"period-aware roll curvature",1e-10);
+    }
+    var nonlinear=new motionkit.robot.RedundancySpline(knots,[0.0,0.4,-0.1,0.2]);
+    for(i in 0...knots.length)near(nonlinear.evaluate(knots[i]).value,[0.0,0.4,-0.1,0.2][i],"spline interpolates each selected knot",1e-10);
+    for(i in 1...100){var x=i/100.0,step=1e-5,at=nonlinear.evaluate(x),before=nonlinear.evaluate(x-step),after=nonlinear.evaluate(x+step);
+      near(at.first,(after.value-before.value)/(2*step),"spline first derivative matches finite differences",1e-6);
+      near(at.second,(after.first-before.first)/(2*step),"spline second derivative matches finite differences",0.002);
+    }
+    for(knot in [0.2,0.7]){var before=nonlinear.evaluate(knot-1e-9),after=nonlinear.evaluate(knot+1e-9);
+      near(before.first,after.first,"redundancy spline is C1 at knots",1e-6);
+      near(before.second,after.second,"redundancy spline is C2 at knots",1e-6);}
+    var rejected=false;try new motionkit.robot.RedundancySpline([0.0,0.0],[0.0,1.0]) catch(_:Dynamic)rejected=true;
+    check(rejected,"spline rejects coincident distances");
+    rejected=false;try nonlinear.evaluate(-0.1) catch(_:Dynamic)rejected=true;check(rejected,"spline rejects extrapolation");
+    rejected=false;try new motionkit.robot.RedundancySpline([-1e308,1e308],[0.0,0.0]) catch(_:Dynamic)rejected=true;
+    check(rejected,"spline rejects an overflowing interval");
+    var two=new motionkit.robot.RedundancySpline([0.0,1.0],[0.2,0.6]);
+    near(two.evaluate(0.3).value,0.32,"two-knot spline remains linear",1e-12);
+    near(two.evaluate(0.3).first,0.4,"two-knot spline has the exact derivative",1e-12);
+
+  }
+
   public function testOrientationLattice():Void {
     var rotation = Quat.fromAxisAngle(new Vec3(1,2,3).normalized(),0.73);
     var target = new Pose3(0.4,-0.1,0.8,rotation.x,rotation.y,rotation.z,rotation.w);
