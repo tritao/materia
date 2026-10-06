@@ -566,6 +566,60 @@ class AssemblySimulationBridge {
       closureIds: closures, closures: closureGeometry};
   }
 
+/** Parts at rotary or pneumatic joints and their directly mounted accessories,
+ * derived from the kinematic tree. Unrelated parts sharing a root link are not interfaces. */
+  public static function jointInterfaces(definition:AssemblyDefinition, model:RobotModel,
+      hulls:Array<AssemblyLinkHull>):Array<AssemblyJointInterface> {
+    var available = new Map<String, AssemblyLinkHull>();
+    for (hull in hulls) available.set(hull.part, hull);
+    var result:Array<AssemblyJointInterface> = [];
+    var seen = new Map<String, Bool>();
+    var pneumatic = new Map<String, Bool>();
+    if (definition.actuators != null) for (actuator in definition.actuators)
+      if (actuator.pneumatic != null) pneumatic.set(actuator.joint, true);
+    function add(first:String, second:String):Void {
+      var a = available.get(first), b = available.get(second);
+      if (a == null || b == null || a.link == b.link) return;
+      var parent = model.links[a.link].id, child = model.links[b.link].id;
+      var adjacent = false;
+      for (joint in model.joints)
+        if ((joint.parent.id == parent && joint.child.id == child) ||
+            (joint.parent.id == child && joint.child.id == parent)) adjacent = true;
+      if (!adjacent || seen.exists(first + "\n" + second)) return;
+      seen.set(first + "\n" + second, true);
+      seen.set(second + "\n" + first, true);
+      result.push({first: first, second: second});
+    }
+    for (joint in definition.joints) {
+      var rotary = joint.type == AssemblyJointType.Revolute || joint.type == AssemblyJointType.Continuous;
+      var pneumaticSlide = joint.type == AssemblyJointType.Prismatic && pneumatic.exists(joint.id);
+      if (joint.role != AssemblyJointRole.Tree || (!rotary && !pneumaticSlide)) continue;
+      add(joint.parent, joint.child);
+      for (mounted in definition.joints) if (mounted.type == AssemblyJointType.Fixed) {
+        if (mounted.parent == joint.parent) add(mounted.child, joint.child);
+        if (mounted.child == joint.parent) add(mounted.parent, joint.child);
+        if (mounted.parent == joint.child) add(joint.parent, mounted.child);
+        if (mounted.child == joint.child) add(joint.parent, mounted.parent);
+      }
+      if (pneumaticSlide) {
+        // A valve can be mounted to the cylinder body while its rod is mounted to
+        // the moving jaw. Those two accessories are also a designed interface of
+        // this slide, even though neither is an endpoint of the actuator joint.
+        var parentAccessories:Array<String> = [], childAccessories:Array<String> = [];
+        for (mounted in definition.joints) if (mounted.role == AssemblyJointRole.Tree &&
+            mounted.type == AssemblyJointType.Fixed) {
+          if (mounted.parent == joint.parent) parentAccessories.push(mounted.child);
+          else if (mounted.child == joint.parent) parentAccessories.push(mounted.parent);
+          if (mounted.parent == joint.child) childAccessories.push(mounted.child);
+          else if (mounted.child == joint.child) childAccessories.push(mounted.parent);
+        }
+        for (parentAccessory in parentAccessories) for (childAccessory in childAccessories)
+          add(parentAccessory, childAccessory);
+      }
+    }
+    return result;
+  }
+
   /** A frame with its translation scaled to metres. */
   static function scaled(frame:AssemblyFrame, scale:Float):AssemblyFrame
     return {x: frame.x * scale, y: frame.y * scale, z: frame.z * scale, qx: frame.qx, qy: frame.qy,

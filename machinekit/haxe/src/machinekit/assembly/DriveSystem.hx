@@ -506,7 +506,11 @@ class DriveSystem {
 		var valve = flat.member(record.valve).pneumaticValveSpec();
 		if (cylinder == null || valve == null) throw "Cylinder binding lost its typed cylinder or valve part";
 		var pressure = airPressure(flat, record.valve, "P");
-		var a = directUpstream(flat, record.cylinder, "A"), b = directUpstream(flat, record.cylinder, "B");
+		var valvePart = flat.member(record.valve);
+		var a = ServiceNetwork.trace(flat, ServiceNetwork.portRef(record.cylinder, "A"),
+			(part, port) -> part == valvePart && (port.name == "A" || port.name == "B")).port;
+		var b = ServiceNetwork.trace(flat, ServiceNetwork.portRef(record.cylinder, "B"),
+			(part, port) -> part == valvePart && (port.name == "A" || port.name == "B")).port;
 		if (a.instanceId != record.valve || b.instanceId != record.valve || a.portName == b.portName ||
 			(a.portName != "A" && a.portName != "B") || (b.portName != "A" && b.portName != "B"))
 			throw "Cylinder hoses must connect to the bound valve's A/B outlets";
@@ -536,12 +540,6 @@ class DriveSystem {
 			pneumatic: {bore: cylinder.boreMm(), rod: cylinder.rodMm(), stroke: cylinder.strokeMm(), ratedSpeed: cylinder.ratedSpeedMmPerSecond(),
 				pressurePa: pressure, channelA: record.valve + "/" + extendCoil, channelB: valve.isDoubleSolenoid() ? record.valve + "/" + retractCoil : null,
 				normallyToA: hoseSign > 0 ? valve.defaultsToA() : !valve.defaultsToA(), extendSign: dot > 0 ? 1.0 : -1.0}};
-	}
-
-	static function directUpstream(flat:FlatAssembly, instanceId:String, portName:String):machinekit.assembly.MachineAssembly.PortRef {
-		for (connection in flat.connections) if (connection.toInstance == instanceId && connection.toPort == portName)
-			return {instanceId: connection.fromInstance, portName: connection.fromPort};
-		throw 'Unwired cylinder port "$instanceId/$portName"';
 	}
 
 	/** Gauge pressure at a pneumatic consumer, traced through its current air wiring to a modelled supply. */

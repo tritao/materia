@@ -149,9 +149,9 @@ class ProjectKitTests {
     var truncated = Bytes.alloc(10);
     truncated.blit(0, encoded, 0, 10);
     rejects(function() SceneArtifact.decode(truncated), "truncated scene");
-    var badVersion = Bytes.alloc(encoded.length); badVersion.blit(0, encoded, 0, encoded.length);
-    badVersion.setInt32(4, 15);
-    rejects(function() SceneArtifact.decode(badVersion), "previous scene version is rejected");
+    var previousVersion = Bytes.alloc(encoded.length); previousVersion.blit(0, encoded, 0, encoded.length);
+    previousVersion.setInt32(4, SceneArtifact.VERSION - 1);
+    rejects(function() SceneArtifact.decode(previousVersion), "previous scene version is rejected");
     var invalidScale = Bytes.alloc(encoded.length);
     invalidScale.blit(0, encoded, 0, encoded.length);
     invalidScale.setDouble(8, -1);

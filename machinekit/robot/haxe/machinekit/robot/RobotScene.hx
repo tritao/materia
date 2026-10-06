@@ -20,6 +20,19 @@ class RobotScene {
 	public static function robotTools(tool:EndEffector, prefix:String, ?welding:WeldingEquipmentData):Array<SceneArtifactRobotTool> {
 		var controls = EndEffectorControls.derive(tool, prefix);
 		if (controls.arcs.length > 0) return torchTools(controls, prefix, welding);
+		if (controls.grippers.length > 0) {
+			if (controls.grippers.length != 1 || controls.suctions.length != 0)
+				throw "A robot tool needs one physical gripper or suction contacts, not a mixture";
+			var channel = controls.gripperChannel();
+			if (channel == null) throw "The parallel gripper has no close control";
+			var grip = controls.grippers[0];
+			return [{kind: "gripper", contact: {occurrence: prefix + "/" + grip.member,
+				connector: grip.connector}, channel: channel, sensor: grip.sensor,
+				gripper: {minimumPartWidthMm: grip.minimumPartWidthMm,
+					nominalPartWidthMm: grip.nominalPartWidthMm, maximumPartWidthMm: grip.maximumPartWidthMm,
+					fingerLengthMm: grip.fingerLengthMm,
+					fingerPadFrictionCoefficient: grip.fingerPadFrictionCoefficient}}];
+		}
 		var channel = controls.vacuumChannel();
 		if (channel == null) throw "The suction tool has no vacuum control";
 		return [for (suction in controls.suctions) {

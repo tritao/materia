@@ -296,6 +296,16 @@ class PlanCheckTests extends MotionKitTestSupport {
         near(pose.qz, Math.sin(Math.PI / 4), "an explicit handling orientation fixes the requested yaw");
       case _: throw "handling must approach linearly";
     }
+    switch free[free.length - 1] {
+      case MoveJ(_, _, _): check(true, "free-orientation handling returns to its home joints");
+      case _: throw "free-orientation handling must end at home";
+    }
+    switch fixed[fixed.length - 1] {
+      case MoveL(_, _, _, _, freedom):
+        check(freedom == motionkit.path.OrientationPolicy.Fixed,
+          "oriented handling stops at the raised pose and keeps the carried part's orientation");
+      case _: throw "oriented handling must leave the part at its safe raised pose";
+    }
     runner.run(new Vec3(0.04, 0.03, 0.06), true);
     var tick = 0;
     while (!runner.completed() && runner.failure() == null && tick < 8000) {

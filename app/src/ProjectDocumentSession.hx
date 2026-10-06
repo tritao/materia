@@ -51,6 +51,7 @@ import materia.assembly.AssemblyDefinition.AssemblyMateKind;
 import cadkit.modeling.AssemblyState;
 import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.GeometricConnectors.GeometricConnectorError;
+import cadkit.parametric.GeometricConnectors.PlanarFaceDescriptor;
 import machinekit.document.MachineKitRecipes;
 import nativekit.scene.GeometryData;
 import cadbridge.AssemblySimulationBridge.AssemblyPhysicalData;
@@ -73,6 +74,16 @@ class ProjectDocumentSession {
   public var projectAssemblyDefinition(default,null):Null<AssemblyDefinition> = null;
   public var projectAssemblyState(default,null):Null<AssemblyStateRecord> = null;
   public var projectPhysical(default,null):Null<AssemblyPhysicalData> = null;
+  /** Face descriptors written by the project generator for one assembly definition. */
+  public function assemblyFaceDescriptorsFor(definitionId:String):Null<String>
+    return definitionId == null ? null : assemblyFaceDescriptors.get(definitionId);
+
+  /** Measured planar faces, in the CAD coordinate frame and units of the part. */
+  public function assemblyPlanarFacesFor(definitionId:String):Null<Array<PlanarFaceDescriptor>> {
+    var descriptors = assemblyFaceDescriptorsFor(definitionId);
+    return descriptors == null ? null : cadkit.parametric.GeometricConnectors.planarFaces(descriptors);
+  }
+
   public function assemblyPreviewCenter(definitionId:String):Null<Array<Float>> {
     var centers = assemblyLocalCentersByDefinition;
     var value = centers == null ? null : centers.get(definitionId);

@@ -18,6 +18,13 @@ enum EndEffectorControl {
 /** Where a suction cup meets what it holds: its member and its contact connector. */
 typedef SuctionContact = {member:String, connector:String};
 
+/** Physical jaws, their grasp-state switch, and the connector at the finger workspace. */
+typedef GripperContact = {
+	member:String, connector:String, sensor:String,
+	minimumPartWidthMm:Float, nominalPartWidthMm:Float, maximumPartWidthMm:Float, fingerLengthMm:Float,
+	fingerPadFrictionCoefficient:Float
+};
+
 /**
  * An arc torch and the channels that work it, named `<prefix>/<member>.<signal>`:
  * - `channel`, digital: lights the arc (the `Arc` control);
@@ -47,13 +54,15 @@ class EndEffectorControls {
 	public final controls:Array<EndEffectorControl>;
 	public final vacuumSensor:Null<String>;
 	public final suctions:Array<SuctionContact>;
+	public final grippers:Array<GripperContact>;
 	public final arcs:Array<ArcTorchControl>;
 
 	function new(controls:Array<EndEffectorControl>, vacuumSensor:Null<String>, suctions:Array<SuctionContact>,
-			arcs:Array<ArcTorchControl>) {
+			grippers:Array<GripperContact>, arcs:Array<ArcTorchControl>) {
 		this.controls = controls;
 		this.vacuumSensor = vacuumSensor;
 		this.suctions = suctions;
+		this.grippers = grippers;
 		this.arcs = arcs;
 	}
 
@@ -69,10 +78,20 @@ class EndEffectorControls {
 		return null;
 	}
 
+	/** The physical gripper's single logical close channel, or null when absent. */
+	public function gripperChannel():Null<String> {
+		for (control in controls) switch control {
+			case Gripper(channel, _, _, _): return channel;
+			case _:
+		}
+		return null;
+	}
+
 	public static function derive(configuration:EndEffector, prefix:String):EndEffectorControls {
 		if (configuration == null) throw "End effector configuration is required";
 		var controls:Array<EndEffectorControl> = [];
 		var suctions:Array<SuctionContact> = [];
+		var grippers:Array<GripperContact> = [];
 		var arcs:Array<ArcTorchControl> = [];
 		var sensorId:Null<String> = null;
 		var hasGripper = false, hasVacuum = false, hasLock = false;
@@ -87,6 +106,16 @@ class EndEffectorControls {
 				requireInlet(configuration, member.id, grip.openPort, [PortKind.Pneumatic, PortKind.Signal]);
 				requireInlet(configuration, member.id, grip.closePort, [PortKind.Pneumatic, PortKind.Signal]);
 				controls.push(Gripper('$name.close', member.id, grip.openPort, grip.closePort));
+				var slash = member.id.lastIndexOf("/");
+				var scope = slash < 0 ? "" : member.id.substr(0, slash);
+				var sensorParts:Array<String> = [];
+				if (prefix != null && prefix.length > 0) sensorParts.push(prefix);
+				if (scope.length > 0) sensorParts.push(scope);
+				sensorParts.push(grip.graspSensor);
+				grippers.push({member: member.id, connector: grip.contactConnector, sensor: sensorParts.join("/"),
+					minimumPartWidthMm: grip.minimumPartWidthMm, nominalPartWidthMm: grip.nominalPartWidthMm,
+					maximumPartWidthMm: grip.maximumPartWidthMm, fingerLengthMm: grip.fingerLengthMm,
+					fingerPadFrictionCoefficient: grip.fingerPadFrictionCoefficient});
 				hasGripper = true;
 			} else if (Std.isOfType(facet, machinekit.pneumatic.VacuumActuatorFacet)) {
 				var actuator:machinekit.pneumatic.VacuumActuatorFacet = cast facet;
@@ -129,7 +158,7 @@ class EndEffectorControls {
 			}
 		}
 		if (sensorId != null && !hasVacuum) throw "Vacuum pressure sensor has no bound vacuum actuator";
-		return new EndEffectorControls(controls, sensorId, suctions, arcs);
+		return new EndEffectorControls(controls, sensorId, suctions, grippers, arcs);
 	}
 
 	static function requireInlet(configuration:EndEffector, instanceId:String, portName:String, allowed:Array<PortKind>):Void {

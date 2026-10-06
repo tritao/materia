@@ -8,6 +8,8 @@ import machinekit.robotics.EndEffectorSet;
 import machinekit.robotics.ToolChangerMaster;
 import machinekit.robotics.ToolChangerTool;
 import machinekit.robotics.ParallelGripper;
+import machinekit.robotics.ParallelGripperBody;
+import machinekit.robotics.ParallelGripperSpec;
 import machinekit.robotics.schmalz.SchmalzSxtMaster;
 import machinekit.robotics.schmalz.SchmalzSxtTool;
 import materia.assembly.AssemblyFrames;
@@ -163,15 +165,17 @@ class EndEffectorSetTests {
 			coupledSxt.billOfMaterials().quantity("10.07.13.00013") != 1 ||
 			coupledSxt.billOfMaterials().quantity("10.07.13.00018") != 1)
 			throw "SXT catalog halves must couple and bridge the keyed air passage";
-		var gripper = new ParallelGripper(40, 20, 60, 30);
-		var preview = gripper.geometry(Preview), envelope = gripper.geometry(Envelope);
-		var previewBox = preview.shape.bounds(), envelopeBox = envelope.shape.bounds();
-		close(previewBox.get_max().get_x() - previewBox.get_min().get_x(), 40,
-			"gripper preview width");
-		close(envelopeBox.get_max().get_x() - envelopeBox.get_min().get_x(), 70,
-			"gripper full-open envelope width");
+		var gripper = new ParallelGripper(new ParallelGripperSpec(40, 60, 60, 16));
+		if (gripper.validate().length != 0 || gripper.spec.totalJawTravel != 32 ||
+			gripper.spec.ratedGripForce <= 0 || gripper.port("airA").instanceId != "cylinder" ||
+			gripper.port("airA").portName != "A" ||
+			gripper.components().filter(entry -> entry.id == "jawLeft" || entry.id == "jawRight").length != 2)
+			throw "Parallel gripper must validate with its mirrored jaws and exposed cylinder ports";
+		var body = new ParallelGripperBody(new ParallelGripperSpec(40, 60, 60, 16));
+		var preview = body.geometry(Preview), previewBox = preview.shape.bounds();
+		close(previewBox.get_max().get_x() - previewBox.get_min().get_x(), gripper.spec.bodyWidth,
+			"gripper housing width derived from its cylinder envelope");
 		preview.close();
-		envelope.close();
 		var set = new EndEffectorSet();
 		set.addComponent("master", new TestChangerMaster());
 		set.mount("master", "mount");

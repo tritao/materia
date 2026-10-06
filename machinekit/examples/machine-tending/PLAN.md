@@ -417,14 +417,15 @@ Done. What was built and decided:
   locating faces, giving G54 [95, 55, -230] mm. Projection of that datum onto the table travel
   gives the load position [95, 150, 0] mm. The typed toolpath ends with retract-then-position
   `MachineMove` operations; export/recompile verifies their final G53 coordinates.
-- Static `TendingReach` chooses **Reach850 on a 600 mm riser**, with 15 poses (vise, two door
+- The MT4 placeholder-tool study chose **Reach850 on a 600 mm riser**, with 15 poses (vise, two door
   via-poses, twelve tray slots), 16.23993% minimum joint margin and minimum |sin(q5)| ≈ 1.
   Review fixed the tray poses in the cell frame and added both tray decks to the clearance
   scene; the earlier 550 mm riser collided with the outfeed tray at an infeed pose. It checks
   the actual mill, open-door and tray hulls with 5 mm clearance (1 mm for the tool only at the
   vise); the grasped blank is the intended contact target. The future gripper is explicitly
   an assumed 80 × 50 × 150 mm body/finger envelope with 16 mm opening travel, not an MT8
-  operational gripper. World TCP frames and solved joints are returned for the later cell.
+  operational gripper. World TCP frames and solved joints were returned for the later cell;
+  MT8 replaces this provisional result with the physical gripper and records its final reach below.
 - The doorway must pass the wrist as well as the tool: via height comes from its header,
   tool length and wrist-module geometry. Numeric IK checks alternate elbow/wrist branches
   when its first solution hits a panel; the first outfeed solution otherwise crossed the
@@ -588,9 +589,10 @@ Done. What was built and decided:
   **22.8666 m/min**. The bare bearing-block cycle is **51.86 s**, 78 plans, with
   0.077247/0.051552/0.043834 mm X/Y/Z peak tracking; the enclosed cycle is
   **52.30 s** with the same removal volume. Door open/close stay **1.50/1.79 s**.
-- The reach study now fixes tray targets in the cell frame, includes both tray decks,
+- The MT4 placeholder-tool reach study fixed tray targets in the cell frame, included both tray decks,
   limits its 1 mm contact allowance to the vise, and asserts its result. It selects
-  **Reach850 on a 600 mm riser**, 15 poses and 16.23993% minimum joint margin.
+  **Reach850 on a 600 mm riser**, 15 poses and 16.23993% minimum joint margin at that checkpoint.
+  The operational gripper changes that geometry; its replacement study and result are recorded in MT8.
   Cobot mass checks use measured CAD masses rather than positivity alone. The unused
   `ConvexSolid.distanceBelow` helper and its tests were removed; clearance tests now
   exercise the production `ConvexDistance.between` path.
@@ -699,18 +701,34 @@ Done. What was built and decided:
   - a body;
   - two jaws on prismatic joints, the second mirror-coupled (ratio −1, X5 coupling);
   - an internal piston as a `Pneumatic` actuator on the first jaw. Force and stroke come from a catalogue of generic 2-jaw pneumatic grippers, sizes 25/32/40, marked assumed.
-  - fingers as parametric parts (length, pad width, optional V or step for the blank), mounted on the jaws;
-  - jaw `joint_switch` windows for open, closed-empty and gripped (the width band of the expected part).
+  - replaceable fingers with pad depth derived from the housing depth; an optional assumed 6 mm fingertip toe is a separate convex collision piece. The tending cell uses flat 50 mm pads: the longer support toe intersects the vise end stop during an open-jaw insertion, while the flat pads clear the vise and carry the measured dynamic blank by friction;
+  - jaw `joint_switch` windows for open, closed-empty and gripped. The gripped window is derived from the full supported part-width band and excludes both end-switch bands, so different accepted widths can stop the jaws anywhere inside the mechanical stroke.
 - `ArmGripperTool implements ArmTool`: plate, gripper, valve on the arm (like the welder's feeder seat), hoses, TCP between the finger pads.
-- Robot-tool kind `gripper`: scene validation, the cadbridge binding and `EndEffectorControls` (`Gripper` control). The app does not make a `SimulatedSuctionTool` for it, because the jaws are physical.
+- Robot-tool kind `gripper`: scene validation, the cadbridge binding and `EndEffectorControls` (`Gripper` control). The assumed rubber-pad friction coefficient (1.5) is saved with the jaw limits in SceneArtifact v19 and applied to the two pad hulls only. The app does not make a `SimulatedSuctionTool` for it, because the jaws are physical.
 - `Grasp.find(part)` derives grasp frames from opposite planar faces (MT-D6), with the width and approach direction, ranked by finger fit. Pick and place targets carry a full pose.
 - `HandlingPlanRunner` gets oriented approach and retract along the grasp frame's approach axis, and stays compatible with suction.
+- With an explicit grasp orientation, the runner stops at the raised retreat pose so the next handling operation starts there and carries the part without folding the loaded arm through its generic home posture. Unoriented suction handling retains its home return.
 - The grasp is judged from the jaw switch: the gripped band means OK, closed-empty means missed.
 - Tests on MuJoCo:
   - pick, carry and place a blank 50 times on a table;
   - slip relative to the fingers stays under 0.5 mm at the arm's planned accelerations;
   - a missing blank reports a miss;
   - the existing suction mission still passes.
+
+Done. What was built and measured:
+- The physical gripper assembly has a routed double-solenoid valve, a cylinder-driven jaw and a
+  mirrored jaw. Saved tool limits, finger reach and the assumed rubber friction stay together in
+  SceneArtifact v19. Open, gripped and closed-empty switches use derived jaw-travel windows.
+- The tending cell uses 50 mm flat fingers derived from the 50 mm housing depth. MuJoCo completed
+  50 physical pick/carry/place round trips with a free dynamic blank: **0.373 mm** peak slip from
+  the TCP, **0.208 mm** pickup seating, and **51.99 N m** peak arm-joint effort. The empty grasp
+  reports a miss. Contact transmits payload reaction to the arm; inverse-dynamics feedforward still
+  describes the robot assembly only, so this is not a payload-capacity or payload-feedforward claim.
+- The physical-tool clearance study replaces MT4's placeholder result: **Reach850 on a 550 mm riser**,
+  15 cell poses, **28.472%** minimum joint margin and `|sin(q5)| ≈ 1`. Both the selected result and
+  the required joint/wrist margins are asserted. The approach check found the 60 mm pad depth
+  touched the vise end stop; pads now follow the housing depth and fit the load pose.
+- The existing suction arm mission remains at **5.8 / 12 / 17.2 / 23.5 s**.
 
 **MT9. Blanks, trays and stock on free bodies.**
 - `PartTray` (grid of pockets with chamfers, `slot-r-c` seat connectors, presence sensor per slot optional) for infeed and outfeed, on a cell table.
@@ -878,7 +896,7 @@ Second-review closing work (validated):
 - Powered emergency stop retains measured-position servo holding until fresh brake-engaged feedback; hard power loss removes torque immediately. The brake coil drops immediately in both cases. Brake state uses the existing joint-state flag word, and stator geometry uses the minimum sectors needed to clear its rotor.
 - Joint plans require conservative continuous hull-motion certificates instead of fixed angular samples. Guide blocks carry transverse loads and residual moments while the screw carries axial force at its assembled line of action.
 - MT6 validates sensor and program ownership, retains single-cabinet identities and animates each controller's belts independently. Shared mounted geometry has an explicit transient contact group; unrelated robots and loose objects retain contact. Environment CAD uses the existing bounded hull generator.
-- Presence sensing tests every supported loose-object shape against its volume. CNC process scope is explicit in SceneArtifact v18, with migrated producers and no old-format reader. Unpowered spindles coast; asymmetric belt tests distinguish coordinate direction from power direction.
+- Presence sensing tests every supported loose-object shape against its volume. CNC process scope is explicit in SceneArtifact v18; MT8 adds saved gripper limits as v19, with migrated producers and no old-format reader. Unpowered spindles coast; asymmetric belt tests distinguish coordinate direction from power direction.
 - The sequential `review-final` gate and its focused retries cover the completed implementation. Compiler corrections, regression evidence, final measurements and commits are recorded in [REVIEW_FIXES.md](REVIEW_FIXES.md). MT7 and later remain paused.
 
 Done. What was built and decided (second-review validation):

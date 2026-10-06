@@ -30,6 +30,9 @@ enum abstract GeometricFeatureKind(String) to String {
 	var Line = "line";
 }
 
+/** A measured planar face in the owning part's local CAD coordinate frame. */
+typedef PlanarFaceDescriptor = {var origin:cadkit.modeling.Vector; var normal:cadkit.modeling.Vector;}
+
 /**
 	A connector whose frame comes from a face or edge of the component's
 	geometry (plan C4.4). In an assembly record it is an ordinary connector
@@ -264,6 +267,19 @@ class GeometricConnectors {
 			};
 		}];
 		return Json.stringify(records);
+	}
+
+	/** Typed planar faces from the saved descriptors produced by `describeFaces`. */
+	public static function planarFaces(descriptors:String):Array<PlanarFaceDescriptor> {
+		if (descriptors == null || descriptors.length == 0) throw "Planar face descriptors are required";
+		var result:Array<PlanarFaceDescriptor> = [];
+		for (candidate in parseDescriptors(descriptors)) {
+			var feature = candidate.feature;
+			if (feature.kind != Plane) continue;
+			result.push({origin: new cadkit.modeling.Vector(feature.origin[0], feature.origin[1], feature.origin[2]),
+				normal: new cadkit.modeling.Vector(feature.direction[0], feature.direction[1], feature.direction[2])});
+		}
+		return result;
 	}
 
 	/** A connector on face `faceIndex` of a component described by `descriptors` (see `describeFaces`), as an assembly connector. */

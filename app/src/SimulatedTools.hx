@@ -6,6 +6,7 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.project.SceneArtifact.SceneArtifactRobotTool;
 import nativekit.sim.SimObject;
 import robotkit.runtime.SimulatedSuctionTool;
+import robotkit.runtime.SimulatedPneumaticGripper;
 import processkit.simulation.SimulatedWelder;
 import robotkit.runtime.Simulation;
 import robotkit.tool.ConvexSolid;
@@ -20,6 +21,7 @@ typedef GripObject = {id:String, object:SimObject};
  */
 class SimulatedTools implements SessionMember {
 	public final tools:Array<SimulatedSuctionTool> = [];
+	public final grippers:Array<SimulatedPneumaticGripper> = [];
 	public final welders:Array<SimulatedWelder> = [];
 	final objects:Array<GripObject>;
 
@@ -28,6 +30,11 @@ class SimulatedTools implements SessionMember {
 	public function add(tool:SimulatedSuctionTool):SimulatedSuctionTool {
 		tools.push(tool);
 		return tool;
+	}
+
+	public function addGripper(gripper:SimulatedPneumaticGripper):SimulatedPneumaticGripper {
+		grippers.push(gripper);
+		return gripper;
 	}
 
 	public function addWelder(welder:SimulatedWelder):SimulatedWelder {
@@ -95,6 +102,7 @@ class SimulatedTools implements SessionMember {
 
 	public function reset():Void {
 		for (tool in tools) tool.reset();
+		for (gripper in grippers) gripper.reset();
 		for (welder in welders) welder.reset();
 	}
 

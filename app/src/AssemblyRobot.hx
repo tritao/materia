@@ -237,19 +237,45 @@ class AssemblyRobot {
         hasPneumaticActuator = true;
         switch actuator.transmission {
           case SimpleTransmission(jointId, _, _):
-            for (joint in converted.model.joints) if (joint.id == jointId) {
-              pneumaticContactLinks.set(converted.model.links.indexOf(joint.parent), true);
-              pneumaticContactLinks.set(converted.model.links.indexOf(joint.child), true);
+            var pending = [jointId];
+            var visited = new Map<String, Bool>();
+            while (pending.length > 0) {
+              var current:Null<String> = pending.pop();
+              if (current == null) continue;
+              if (visited.exists(current)) continue;
+              visited.set(current, true);
+              var joint = [for (candidate in converted.model.joints) if (candidate.id == current) candidate];
+              if (joint.length != 1) throw 'Pneumatic drive references missing joint "$current"';
+              pneumaticContactLinks.set(converted.model.links.indexOf(joint[0].parent), true);
+              pneumaticContactLinks.set(converted.model.links.indexOf(joint[0].child), true);
+              // Pneumatic force enters through the driven coordinate, but every
+              // mechanically coupled jaw must stop against the workpiece with
+              // the same contact response.
+              for (coupling in converted.model.couplings)
+                if (coupling.leader == current) pending.push(coupling.follower);
             }
           case _:
         }
-      }
+    }
     var pneumaticContact = hasPneumaticActuator ? SimulationContactSurfaces.robotPart() : null;
+    var fingerPadSurfaces = new Map<String, robotkit.model.CollisionShape.ContactSurface>();
+    for (tool in session.robotTools) if (tool.kind == "gripper" && tool.gripper != null) {
+      var occurrence = tool.contact.occurrence;
+      var slash = occurrence.lastIndexOf("/");
+      if (slash < 0) throw 'Gripper tool "${occurrence}" has no member path';
+      var prefix = occurrence.substr(0, slash + 1);
+      var surface = SimulationContactSurfaces.gripperFinger(tool.gripper.fingerPadFrictionCoefficient);
+      fingerPadSurfaces.set(prefix + "fingerLeft", surface);
+      fingerPadSurfaces.set(prefix + "fingerRight", surface);
+    }
     for (hull in converted.linkHulls) {
       var record = sceneParts.get("project:" + hull.part);
       if (record != null && record.collisionEnabled && !rolling.exists(hull.link)) {
         var simulationHull:SimulationLinkHull = {link: hull.link, vertices: hull.vertices};
-        if (pneumaticContact != null && pneumaticContactLinks.exists(hull.link))
+        var padSurface = fingerPadSurfaces.get(hull.part);
+        if (padSurface != null)
+          simulationHull.surface = padSurface;
+        else if (pneumaticContact != null && pneumaticContactLinks.exists(hull.link))
           simulationHull.surface = pneumaticContact;
         linkHulls.push(simulationHull);
       }
@@ -293,11 +319,17 @@ class AssemblyRobot {
       if (sensorId == null) continue;
       var carrier = converted.partLinks.get(tool.contact.occurrence);
       if (carrier == null) throw 'Robot tool "${tool.contact.occurrence}" is not part of the robot';
-      var kind = tool.kind == "torch" ? processkit.tool.WeldSensor.KIND : "tool_vacuum_kpa";
-      var sensor = converted.model.addSensor(new robotkit.model.Sensor(sensorId, kind, 0.0, sensorId));
-      var mount = converted.model.addFrame(new robotkit.model.Frame(sensorId + " mount", converted.model.links[carrier.link]));
-      mount.position = [carrier.offset.x, carrier.offset.y, carrier.offset.z];
-      sensor.frame = mount;
+      if (tool.kind == "gripper") {
+        var physical = [for (sensor in converted.model.sensors) if (sensor.id == sensorId) sensor];
+        if (physical.length != 1 || physical[0].kind != "joint_switch")
+          throw 'Gripper sensor "$sensorId" must be a joint switch in the robot assembly';
+      } else {
+        var kind = tool.kind == "torch" ? processkit.tool.WeldSensor.KIND : "tool_vacuum_kpa";
+        var sensor = converted.model.addSensor(new robotkit.model.Sensor(sensorId, kind, 0.0, sensorId));
+        var mount = converted.model.addFrame(new robotkit.model.Frame(sensorId + " mount", converted.model.links[carrier.link]));
+        mount.position = [carrier.offset.x, carrier.offset.y, carrier.offset.z];
+        sensor.frame = mount;
+      }
     }
     // A frame on a link at a connector of the part riding it, in the link's frame and metres.
     function mountFrame(name:String, at:SceneArtifactPlace):robotkit.model.Frame {
@@ -370,8 +402,10 @@ class AssemblyRobot {
     for (tool in session.robotTools) {
       if (control != null && converted.partLinks.get(tool.contact.occurrence) == null) continue;
       var welder = tool.torch;
-      blueprint.addTool(welder == null ? new robotkit.tool.SuctionChannels(tool.channel)
-        : new processkit.tool.WeldChannels(tool.channel, welder.wireSpeedChannel, welder.voltageChannel));
+      blueprint.addTool(welder != null
+        ? new processkit.tool.WeldChannels(tool.channel, welder.wireSpeedChannel, welder.voltageChannel)
+        : tool.kind == "gripper" ? new robotkit.tool.GripperChannels(tool.channel)
+        : new robotkit.tool.SuctionChannels(tool.channel));
     }
     if (virtualWelder) {
       var torches = [for (tool in session.robotTools) if (tool.torch != null) tool];

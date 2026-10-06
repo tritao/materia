@@ -15,6 +15,9 @@ class RoboticsComponents {
 		registry.register(ArmLink.recipeType());
 		registry.register(ArmWristFork.recipeType());
 		registry.register(ParallelGripper.recipeType());
+		registry.register(ParallelGripperBody.recipeType());
+		registry.register(ParallelGripperJaw.recipeType());
+		registry.register(ParallelGripperFinger.recipeType());
 		registry.register(ToolChangerMaster.recipeType());
 		registry.register(ToolChangerTool.recipeType());
 		registry.register(machinekit.robotics.schmalz.SchmalzSxtMaster.recipeType());

@@ -337,6 +337,12 @@ class ApplicationSimulation {
           candidate.addStepObserver(candidateTools.addWelder(welder));
           continue;
         }
+        if (tool.kind == "gripper") {
+          if (tool.sensor == null) throw 'Gripper tool "${tool.channel}" has no jaw switch';
+          candidate.addStepObserver(candidateTools.addGripper(new robotkit.runtime.SimulatedPneumaticGripper(
+            toolRobot.runtime, toolRobot.blueprint, tool.channel, tool.sensor)));
+          continue;
+        }
         var carrier = toolRobot.part("project:" + tool.contact.occurrence);
         candidate.addStepObserver(candidateTools.add(new robotkit.runtime.SimulatedSuctionTool(candidate,
           toolRobot.runtime, toolIndex, carrier.linkIndex, tool.channel, freeObjects, tool.sensor)));

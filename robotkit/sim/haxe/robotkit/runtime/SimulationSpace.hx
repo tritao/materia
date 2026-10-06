@@ -70,8 +70,10 @@ class SimulationSpace {
 	/** Derives integration from the drive loops and their mechanical loads. */
 	public function requireDrives(blueprint:RobotRuntimeBlueprint):Void {
 		var rate = blueprint.fastestPositionLoopRate();
-		if (rate <= 0) return;
-		var interval = Math.min(1.0 / rate, blueprint.servoStabilityInterval());
+		var interval = blueprint.pneumaticStabilityInterval();
+		if (rate > 0.0) interval = Math.min(interval,
+			Math.min(1.0 / rate, blueprint.servoStabilityInterval()));
+		if (!Math.isFinite(interval) || !(interval > 0.0)) return;
 		requiredSubsteps = Std.int(Math.max(requiredSubsteps, Math.ceil(timestep / interval)));
 		configureWorld(requiredSubsteps, NativeKitSimConstants.NKSIM_INTEGRATOR_IMPLICIT_FAST);
 	}

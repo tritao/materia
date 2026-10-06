@@ -16,10 +16,12 @@ import robotkit.execution.FiredProcessEvent;
 import robotkit.core.Robot;
 
 /**
- * Picks and places with an arm: a motion program that comes down onto the contact point from above
- * at `approachHeight`, sets the tool's hold channel there, dwells while it seals or lets go, rises
- * and returns to the arm's home joints, run by `ManipulatorMotion` like every other arm program. To
- * pick, it presses `pressDepth` past the contact, as a compliant suction cup is pressed onto a part,
+ * Picks and places with an arm: a motion program that comes to the contact point along an approach
+ * at `approachHeight`, sets the tool's hold channel there, dwells while it seals or lets go, then
+ * rises again. A free-orientation tool returns home; a tool with a requested orientation remains at
+ * the raised pose so a following operation can carry the held part without folding through the
+ * home posture. Motion runs through `ManipulatorMotion` like every other arm program. To pick, it
+ * presses `pressDepth` past the contact, as a compliant suction cup is pressed onto a part,
  * so the cup meets the part within the motion's position tolerance.
  * Without an explicit orientation the tool keeps its home Z direction and spin is free.
  * A requested orientation fixes its heading as well. Other joints, such as a mobile base's
@@ -27,6 +29,8 @@ import robotkit.core.Robot;
  */
 class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
   public static inline var FRAME:String = "arm-base";
+  /** Default vertical clearance between the grasp plane and the transport pose. */
+  public static inline var DEFAULT_APPROACH_HEIGHT:Float = 0.12;
 
   public final motion:ManipulatorMotion;
   public final channel:String;
@@ -42,7 +46,7 @@ class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
 
   public static function create(robot:Robot, manipulator:KinematicGroup,
       eventSource:Void -> {events:Array<FiredProcessEvent>, overflow:Bool}, channel:String,
-      planning:PlanningLimits, ?approachHeight:Float = 0.12, ?travelSpeed:Float = 0.3, ?contactSpeed:Float = 0.08,
+      planning:PlanningLimits, ?approachHeight:Float = DEFAULT_APPROACH_HEIGHT, ?travelSpeed:Float = 0.3, ?contactSpeed:Float = 0.08,
       ?dwell:Float = 0.4, ?pressDepth:Float = 0.003):HandlingPlanRunner {
     var count = manipulator.group.count();
     planning.requireGroup(manipulator);
@@ -90,24 +94,30 @@ class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
     this.pressDepth = pressDepth;
   }
 
-  public function run(contact:Vec3, hold:Bool, ?orientation:Quat):Void motion.run(program(contact, hold, orientation));
+  public function run(contact:Vec3, hold:Bool, ?orientation:Quat, ?approach:Vec3):Void
+    motion.run(program(contact, hold, orientation, approach));
 
   /** The program `run` executes. */
-  public function program(contact:Vec3, hold:Bool, ?orientation:Quat):MotionProgram {
+  public function program(contact:Vec3, hold:Bool, ?orientation:Quat, ?approach:Vec3):MotionProgram {
     if (contact == null) throw "HandlingPlanRunner needs a contact point";
+    var lift = approach == null ? new Vec3(0, 0, 1) : approach.normalized();
     var q = orientation == null ? new Quat(homePose.qx, homePose.qy, homePose.qz, homePose.qw) : orientation;
     var policy = orientation == null ? OrientationPolicy.FreeAboutTool : OrientationPolicy.Fixed;
-    var above = new Pose3(contact.x, contact.y, contact.z + approachHeight, q.x, q.y, q.z, q.w);
-    var at = new Pose3(contact.x, contact.y, contact.z - (hold ? pressDepth : 0.0), q.x, q.y, q.z, q.w);
-    return new MotionProgram([
+    var abovePoint = contact.add(lift.scale(approachHeight));
+    var atPoint = contact.sub(lift.scale(hold ? pressDepth : 0.0));
+    var above = new Pose3(abovePoint.x, abovePoint.y, abovePoint.z, q.x, q.y, q.z, q.w);
+    var at = new Pose3(atPoint.x, atPoint.y, atPoint.z, q.x, q.y, q.z, q.w);
+    var ops = [
       MotionOp.MoveL(above, FRAME, travelSpeed, Blend.ExactStop,
         orientation == null ? policy : OrientationPolicy.Interpolated),
       MotionOp.MoveL(at, FRAME, contactSpeed, Blend.ExactStop, policy),
       MotionOp.SetOutput(channel, EventValue.Digital(hold)),
       MotionOp.Dwell(dwell),
-      MotionOp.MoveL(above, FRAME, contactSpeed, Blend.ExactStop, policy),
-      MotionOp.MoveJ(MoveTarget.JointTarget(home), new MotionOptions(), Blend.ExactStop)
-    ],configuration);
+      MotionOp.MoveL(above, FRAME, contactSpeed, Blend.ExactStop, policy)
+    ];
+    if (orientation == null)
+      ops.push(MotionOp.MoveJ(MoveTarget.JointTarget(home), new MotionOptions(), Blend.ExactStop));
+    return new MotionProgram(ops, configuration);
   }
 
   public function update(dtSeconds:Float):Void motion.update(dtSeconds);

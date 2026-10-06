@@ -20,9 +20,13 @@ class SolenoidValve extends MachineComponent implements PneumaticValveSpec {
 		super(doubleSolenoid ? "VALVE-5/2-DOUBLE" : "VALVE-5/2-SINGLE", "Reference pneumatic directional valve", "aluminium 6061", true);
 		this.doubleSolenoid = doubleSolenoid; this.normallyToA = normallyToA;
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
-		addPort({name: "P", kind: Pneumatic, role: Consumer, iface: PushIn(6), required: true});
+		addConnector("portP", Face, Solids.axial(0, 0, 30));
+		addConnector("portA", Face, Solids.axial(-25, 0, 30));
+		addConnector("portB", Face, Solids.axial(25, 0, 30));
+		addPort({name: "P", kind: Pneumatic, role: Consumer, iface: PushIn(6), required: true, connector: "portP"});
 		for (name in ["A", "B"]) {
-			addPort({name: name, kind: Pneumatic, role: Supply, iface: PushIn(6), required: false});
+			addPort({name: name, kind: Pneumatic, role: Supply, iface: PushIn(6), required: false,
+				connector: name == "A" ? "portA" : "portB"});
 			addBridge("P", name);
 		}
 		addPort({name: "coilA", kind: Signal, role: Consumer, iface: Plug("24V-coil", 2), required: false});

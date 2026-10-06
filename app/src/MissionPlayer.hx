@@ -43,6 +43,9 @@ import robotkit.manipulation.ArmClearance;
 import motionkit.robot.ArmPlanClearance;
 import robotkit.manipulation.ArmClearance.ClearanceViolation;
 import robotkit.manipulation.Manipulator;
+import robotkit.manipulation.Grasp;
+import robotkit.manipulation.Grasp.GraspFrame;
+import robotkit.manipulation.Grasp.GraspPlane;
 import robotkit.model.Frame;
 import robotkit.model.SteadyLoads;
 import robotkit.skill.HandlePart;
@@ -97,10 +100,10 @@ typedef MissionOverlay = {
  * the session resets. `goTo` is RobotKit's `GoTo`: `Navigator` plans on a map drawn from the
  * robot's surroundings (the boxes it collides with as held objects, so nothing is drawn by hand)
  * and follows the route with pure pursuit, the robot's place coming from the simulation. `pick` and
- * `place` are RobotKit's `HandlePart` with the robot's suction tool: the arm runs a MotionKit program
- * down onto the part's grasp connector, or onto its seat with the held part, read where they are when
- * the step starts; the program switches the tool's channel on the robot, the simulated tool holds or
- * lets go, and the skill reads the outcome on the tool's vacuum sensor. `weld` is RobotKit's `WeldSeam` with the robot's
+ * `place` are RobotKit's `HandlePart`: the arm runs a MotionKit program down onto the selected grasp,
+ * or onto its seat with the held part, read where they are when the step starts. Physical jaws hold
+ * gripper-picked parts by contact; suction tools use the simulated cup. Both report their grasp
+ * sensor. `weld` is RobotKit's `WeldSeam` with the robot's
  * torch: the arm runs a process run's MotionKit program along the seam the step carries, the program switches the torch's
  * channels on the robot, the simulated welder strikes and holds the arc, and the skill reads the outcome on the torch's
  * weld sensor (`WeldBeads` lays the metal beside it). A mission that does not loop stops after its last step.
@@ -163,7 +166,7 @@ class MissionPlayer implements SessionMember {
   final cellRobots:Array<AssemblyRobot>;
   var runner = new SkillRunner();
   var jointMotions = new Map<String, ManipulatorMotion>();
-  /** The arm and its suction tool's vacuum sensor, when the mission picks and places. */
+  /** The tool feedback and threshold that confirm picks and releases. */
   var handling:Null<HandlingPlanRunner>;
   /** Makes the arm's handling runner afresh: a reset starts the robot's runtime over, plans and all. */
   final newHandling:Null<Void->HandlingPlanRunner>;
@@ -182,7 +185,9 @@ class MissionPlayer implements SessionMember {
   var toolLink:Int = -1;
   var toolTip:Null<AssemblyFrame> = null;
   final robotIndex:Int;
-  final vacuumSensor:Null<String>;
+  final graspSensor:Null<String>;
+  final graspThreshold:Float;
+  final physicalGripper:Null<SceneArtifactRobotTool>;
   final simulation:Simulation;
   final weldAcceleration:Float;
   final objects:Array<GripObject>;
@@ -192,6 +197,11 @@ class MissionPlayer implements SessionMember {
   final metres:Float;
   /** The grasp connector of the part the last pick took hold of. */
   var grasped:Null<SceneArtifactPlace> = null;
+  /** Selected local grasp and the measured tool transform while it carries the part. */
+  var currentGrasp:Null<GraspFrame> = null;
+  var heldToolOffsetInPart:Null<Vec3> = null;
+  var heldToolRotationInPart:Null<Quat> = null;
+  var heldApproachInPart:Null<Vec3> = null;
   final navigator:Null<Navigator>;
   final localization:SimulationTruthLocalization;
   /** The lidar's perception, in the map frame, and the sensor it reads. */
@@ -274,20 +284,27 @@ class MissionPlayer implements SessionMember {
     var welds = [for (step in mission.steps) if (step.kind == "weld" || step.kind == "findWork") step].length > 0;
     if (handles && welds) throw "A mission picks and places, or it welds: the robot works with one tool on its arm";
     var suctions = [for (tool in project.robotTools) if (tool.kind == "suction") tool];
+    var grippers = [for (tool in project.robotTools) if (tool.kind == "gripper") tool];
+    physicalGripper = grippers.length == 1 ? grippers[0] : null;
     var torches = [for (tool in project.robotTools) if (tool.kind == "torch") tool];
     if (!handles) {
       handling = null;
       newHandling = null;
-      vacuumSensor = null;
+      graspSensor = null;
+      graspThreshold = 40.0;
     } else {
-      if (suctions.length != 1) throw 'A mission that picks needs one suction tool, the robot has ${suctions.length}';
-      var tool = suctions[0];
-      vacuumSensor = tool.sensor;
+      if (suctions.length + grippers.length != 1)
+        throw 'A handling mission needs one suction tool or gripper, found ${suctions.length} and ${grippers.length}';
+      var physicalGripper = grippers.length == 1;
+      var tool = physicalGripper ? grippers[0] : suctions[0];
+      graspSensor = tool.sensor;
+      graspThreshold = physicalGripper ? 0.5 : 40.0;
       var arm = toolArm(tool);
       newHandling = () -> {
         var state = robot.runtime.snapshot();
         return HandlingPlanRunner.create(robot.robot, arm, () -> robot.runtime.pollEvents(), tool.channel,
-          PlanningLimits.ofGroup(arm, new SteadyLoads(), ARM_ACCELERATION, null, state.modelRevision, state.calibrationRevision));
+          PlanningLimits.ofGroup(arm, new SteadyLoads(), ARM_ACCELERATION, null, state.modelRevision, state.calibrationRevision),
+          HandlingPlanRunner.DEFAULT_APPROACH_HEIGHT, 0.3, 0.08, 0.4, physicalGripper ? 0.0 : 0.003);
       };
       handling = newHandling();
     }
@@ -591,6 +608,10 @@ class MissionPlayer implements SessionMember {
     failure = null;
     finished = false;
     grasped = null;
+    currentGrasp = null;
+    heldToolOffsetInPart = null;
+    heldToolRotationInPart = null;
+    heldApproachInPart = null;
     wheelsSeeded = false;
     scanned = null;
     sensed = new PerceptionSnapshot();
@@ -628,6 +649,14 @@ class MissionPlayer implements SessionMember {
   /** After a tick: a finished step hands over to the next, a failed one stops the mission. */
   function settle():Void switch runner.status() {
     case Succeeded:
+      var completedStep = mission.steps[stepIndex];
+      if (completedStep.kind == "pick" && physicalGripper != null) captureHeldGripperTransform();
+      if (completedStep.kind == "place" && physicalGripper != null) {
+        currentGrasp = null;
+        heldToolOffsetInPart = null;
+        heldToolRotationInPart = null;
+        heldApproachInPart = null;
+      }
       // Different motion runners own their last commanded coordinates. A joint
       // move changes the handling station; a handling/process step invalidates
       // cached joint-move anchors before another controller takes over.
@@ -665,18 +694,22 @@ class MissionPlayer implements SessionMember {
         return new GoTo(activeNavigator, new NavigationGoal(floorPose(step), FRAME, POSITION_TOLERANCE, HEADING_TOLERANCE),
           observe);
       case "pick":
-        cast(handling,HandlingPlanRunner).configuration=configurationFor(step);
+        var handlingPlan = handlingRunner();
+        handlingPlan.configuration=configurationFor(step);
         var target = step.at;
         if (target == null) throw "Pick mission step needs a target frame";
         var at:SceneArtifactPlace = target;
         grasped = at;
-        return HandlePart.pick(cast handling, localization, () -> graspPoint(at), vacuumSensor, 40.0, handlingOrientation(step));
+        return HandlePart.pick(handlingPlan, localization, () -> graspPoint(at), graspSensor, graspThreshold,
+          handlingOrientation(step), handlingApproach(step));
       case "place":
-        cast(handling,HandlingPlanRunner).configuration=configurationFor(step);
+        var handlingPlan = handlingRunner();
+        handlingPlan.configuration=configurationFor(step);
         var target = step.at;
         if (target == null) throw "Place mission step needs a target frame";
         var at:SceneArtifactPlace = target;
-        return HandlePart.place(cast handling, localization, () -> placeContact(at, step.yaw), vacuumSensor, 40.0, handlingOrientation(step));
+        return HandlePart.place(handlingPlan, localization, () -> placeContact(at, step.yaw), graspSensor, graspThreshold,
+          handlingOrientation(step), handlingApproach(step));
       case "weld":
         var weld:SceneArtifactWeld = cast step.weld;
         return new processkit.skill.WeldPasses([for (pass in weld.passes)
@@ -691,6 +724,12 @@ class MissionPlayer implements SessionMember {
       default:
         throw 'Mission step kind "${step.kind}" is not supported';
     }
+  }
+
+  function handlingRunner():HandlingPlanRunner {
+    var active = handling;
+    if (active == null) throw "A pick or place mission has no arm handling runner";
+    return active;
   }
 
   /** Plans absolute mechanical coordinates on the chain ending at the named connector. */
@@ -872,6 +911,14 @@ class MissionPlayer implements SessionMember {
 
   /** Where the grasp connector `at` of a free part is now, in metres. */
   function graspPoint(at:SceneArtifactPlace):Vec3 {
+    if (physicalGripper != null) {
+      var selected = findGrasp(at);
+      currentGrasp = selected;
+      var frame = partFrame(at.occurrence);
+      var point = AssemblyFrames.transformPoint(frame, selected.contact.x / 1000,
+        selected.contact.y / 1000, selected.contact.z / 1000);
+      return new Vec3(point.x, point.y, point.z);
+    }
     var frame = partFrame(at.occurrence);
     var local = connectorFrame(at);
     var point = AssemblyFrames.transformPoint(frame, local.x * metres, local.y * metres, local.z * metres);
@@ -887,6 +934,13 @@ class MissionPlayer implements SessionMember {
     var held = grasped;
     if (held == null) throw "Nothing was picked to place";
     var seat = AssemblyFrames.compose(staticPose(at.occurrence), connectorFrame(at));
+    if (physicalGripper != null) {
+      var offset = heldToolOffsetInPart;
+      if (offset == null) throw "The gripper has no measured tool-to-part transform";
+      var rotation = placementRotation(at.occurrence, yaw);
+      var shifted = rotation.rotate(offset);
+      return new Vec3(seat.x * metres + shifted.x, seat.y * metres + shifted.y, seat.z * metres + shifted.z);
+    }
     var origin = partFrame(held.occurrence);
     var tool = toolContact();
     var offset = new Vec3(tool.x - origin.x, tool.y - origin.y, tool.z - origin.z);
@@ -903,17 +957,37 @@ class MissionPlayer implements SessionMember {
 
   /** Fix the part's heading while preserving the tool-to-part grasp rotation. */
   function handlingOrientation(step:SceneArtifactMissionStep):Null<Void -> Quat> {
+    if (physicalGripper != null) {
+      if (step.kind == "pick") return () -> {
+        var selected = currentGrasp;
+        var at = step.at;
+        if (selected == null || at == null) throw "Gripper grasp frame was not derived before motion";
+        var frame = partFrame(at.occurrence);
+        var part = frameRotation(frame);
+        heldToolRotationInPart = selected.toolRotation;
+        heldApproachInPart = selected.approachAxis;
+        return part.multiply(selected.toolRotation);
+      };
+      if (step.kind == "place") return () -> {
+        var at = step.at;
+        var relative = heldToolRotationInPart;
+        if (at == null || relative == null) throw "Gripper place has no measured grasp orientation";
+        return placementRotation(at.occurrence, step.yaw).multiply(relative);
+      };
+      return null;
+    }
     var yaw = step.yaw;
     if (yaw == null) return null;
     return () -> {
       if (step.kind == "pick") {
-        var runner:HandlingPlanRunner = cast handling;
+        var runner = handlingRunner();
         var home = runner.homePose;
         var state = localization.state();
         if (state == null) throw "Handling orientation needs a localized base";
         var worldHome = Transform3.fromPose2(state.pose).rotation.multiply(
           new Quat(home.qx, home.qy, home.qz, home.qw));
-        var at:SceneArtifactPlace = cast step.at;
+        var at = step.at;
+        if (at == null) throw "Pick needs a mission frame";
         return yawRotation(yaw - frameYaw(staticPose(at.occurrence))).multiply(worldHome);
       }
       var held = grasped;
@@ -925,6 +999,85 @@ class MissionPlayer implements SessionMember {
       return yawRotation(yaw - frameYaw(partFrame(held.occurrence))).multiply(rotation);
     };
   }
+
+  /** The world-space direction away from the grasp surface, used for approach and retract. */
+  function handlingApproach(step:SceneArtifactMissionStep):Null<Void -> Vec3> {
+    if (physicalGripper == null) return null;
+    if (step.kind == "pick") return () -> {
+      var selected = currentGrasp;
+      var at = step.at;
+      if (selected == null || at == null) throw "Gripper approach was not derived before motion";
+      return frameRotation(partFrame(at.occurrence)).rotate(selected.approachAxis).normalized();
+    };
+    if (step.kind == "place") return () -> {
+      var at = step.at;
+      var approach = heldApproachInPart;
+      if (at == null || approach == null) throw "Gripper place has no grasp approach frame";
+      return placementRotation(at.occurrence, step.yaw).rotate(approach).normalized();
+    };
+    return null;
+  }
+
+  function findGrasp(at:SceneArtifactPlace):GraspFrame {
+    var tool = physicalGripper;
+    if (tool == null) throw "Mission gripper has no physical jaw limits";
+    var limit = tool.gripper;
+    if (limit == null) throw "Mission gripper has no physical jaw limits";
+    var definitionId = definitionOf(at.occurrence);
+    var measuredFaces = project.assemblyPlanarFacesFor(definitionId);
+    var physical = project.projectPhysical;
+    if (measuredFaces == null || physical == null)
+      throw 'Part "${at.occurrence}" has no saved planar-face and collision-hull data for grasp planning';
+    var parts = [for (part in physical.parts) if (part.id == definitionId) part];
+    if (parts.length != 1)
+      throw 'Part "${at.occurrence}" has no usable convex hull for grasp planning';
+    var vertices = parts[0].collisionHull;
+    if (vertices == null || vertices.length < 12 || vertices.length % 3 != 0)
+      throw 'Part "${at.occurrence}" has no usable convex hull for grasp planning';
+    var millimetresPerUnit = metres * 1000;
+    var faces:Array<GraspPlane> = [for (face in measuredFaces) {
+      origin: new Vec3(face.origin.x * millimetresPerUnit, face.origin.y * millimetresPerUnit,
+        face.origin.z * millimetresPerUnit),
+      normal: new Vec3(face.normal.x, face.normal.y, face.normal.z)
+    }];
+    var hull:Array<Vec3> = [];
+    for (index in 0...Std.int(vertices.length / 3))
+      hull.push(new Vec3(vertices[index * 3] * millimetresPerUnit,
+        vertices[index * 3 + 1] * millimetresPerUnit, vertices[index * 3 + 2] * millimetresPerUnit));
+    var connector = connectorFrame(at);
+    // Face connectors define their outward normal on local +Y (ConnectorRole.Face),
+    // including the top face's +Z normal. +Z is the gripper finger insertion axis.
+    var approach = AssemblyFrames.transformVector(connector, 0, 1, 0);
+    return Grasp.find(faces, hull, new Vec3(approach.x, approach.y, approach.z),
+      limit.minimumPartWidthMm, limit.nominalPartWidthMm, limit.maximumPartWidthMm, limit.fingerLengthMm);
+  }
+
+  function captureHeldGripperTransform():Void {
+    var at = grasped;
+    if (at == null) throw "Gripper picked a part without a grasp occurrence";
+    var part = partFrame(at.occurrence);
+    var rotation = frameRotation(part);
+    var origin = new Vec3(part.x, part.y, part.z);
+    heldToolOffsetInPart = rotation.conjugate().rotate(toolContact().sub(origin));
+    heldToolRotationInPart = rotation.conjugate().multiply(toolRotation());
+  }
+
+  function toolRotation():Quat {
+    var tip = toolTip;
+    if (tip == null) throw "The mission has no tool frame";
+    var link = simulation.linkPose(robotIndex, toolLink);
+    return new Quat(link.rotation[0], link.rotation[1], link.rotation[2], link.rotation[3])
+      .multiply(new Quat(tip.qx, tip.qy, tip.qz, tip.qw));
+  }
+
+  function placementRotation(occurrence:String, ?yaw:Float):Quat {
+    var pose = staticPose(occurrence);
+    var result = frameRotation(pose);
+    return yaw == null ? result : yawRotation(yaw - frameYaw(pose)).multiply(result);
+  }
+
+  static function frameRotation(frame:AssemblyFrame):Quat
+    return new Quat(frame.qx, frame.qy, frame.qz, frame.qw);
 
   /** Where the tool's contact is now, in metres. */
   function toolContact():Vec3 {

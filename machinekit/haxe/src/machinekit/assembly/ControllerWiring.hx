@@ -91,7 +91,8 @@ class ControllerWiring {
 		}
 		if (definition.sensors != null) for (sensor in definition.sensors) {
 			var cabinet:Null<String> = null;
-			if (sensor.kind == "at_speed" || sensor.kind == "brake_released") cabinet = owner.get(sensor.joint);
+			if (sensor.kind == "at_speed" || sensor.kind == "brake_released" || sensor.kind == "joint_switch")
+				cabinet = owner.get(sensor.joint);
 			else {
 				var head = heads.get(sensor.id);
 				var expected = sensor.kind == "presence" ? "presence" : "reed";

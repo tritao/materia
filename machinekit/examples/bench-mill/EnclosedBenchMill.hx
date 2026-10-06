@@ -156,7 +156,7 @@ class EnclosedBenchMill extends MachineAssembly {
 		// One FRL and the existing two-outlet manifold supply both double-solenoid valves.
 		var serviceX = cabinetX, serviceY = cabinetY;
 		addComponent("airSupply", new AirSupply(600000), AssemblyFrames.translation(serviceX, serviceY, cabinetZ + 12));
-		addComponent("airManifold", new PneumaticManifold(2), AssemblyFrames.translation(serviceX, serviceY, cabinetZ + 125));
+		addComponent("airManifold", new PneumaticManifold(3), AssemblyFrames.translation(serviceX, serviceY, cabinetZ + 125));
 		addComponent("doorValve", new SolenoidValve(true, false), AssemblyFrames.translation(serviceX - 48, serviceY, cabinetZ + 180));
 		addComponent("viseValve", new SolenoidValve(true, true), AssemblyFrames.translation(serviceX + 48, serviceY, cabinetZ + 180));
 		var hose:BomItem = {partNumber: "REF-PNEU-HOSE-6MM", description: "Assumed 6 mm polyurethane air hose",

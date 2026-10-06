@@ -15,8 +15,14 @@ import RobotArm;
 import BenchMill;
 import BenchMillPreview;
 import TendingControllers;
+import machinekit.robotics.ArmGripperTool;
+import machinekit.robot.RobotScene;
+import machinekit.assembly.AssemblyPreview;
+import machinekit.assembly.MachineAssembly;
+import machinekit.pneumatic.AirSupply;
 import app.MatePickTool;
 import cadkit.modeling.AssemblyState;
+import materia.assembly.AssemblyFrames;
 import app.ApplicationSimulation;
 import robotkit.world.RobotWorld;
 import cadbridge.AssemblySimulationBridge;
@@ -64,6 +70,7 @@ import cnckit.controller.RobotInterfaceChannels;
 @:access(processkit.WeldingPlanRunner)
 @:access(app.ApplicationSimulation)
 @:access(app.CellSignals)
+@:access(robotkit.runtime.RuntimeRobotAdapter)
 class ProjectSourceTests {
   static function check(value:Bool, message:String):Void {
     if (!value) throw message;
@@ -2437,6 +2444,49 @@ class ProjectSourceTests {
         "CNC and arm joints follow their wired controllers");
       simulation.step();
       check(simulation.simulatedRobotIds().length == 2, "both robots advance one shared MuJoCo world");
+      var arm = simulation.world.robot("assembly:tending-controllers:robotController");
+      if (arm == null) throw "Tending cell has no robot controller runtime";
+      var armAdapter:robotkit.runtime.RuntimeRobotAdapter = cast arm;
+      var armRuntime = @:privateAccess armAdapter.runtime;
+      var jawIndex = arm.description().joints.indexOf("arm/tool/gripper/jaw-left-slide");
+      if (jawIndex < 0) throw "Tending arm has no physical gripper jaw joint";
+      var jawStart = armRuntime.snapshot().q.get(jawIndex);
+      var logicalGripper = "arm/tool/gripper/body.close";
+      armRuntime.writeDigitalOutput(logicalGripper, true);
+      function sensed(snapshot:robotkit.runtime.RobotSnapshot, id:String):Float {
+        for (frame in snapshot.sensors.toArray()) if (frame.sensorId == id && frame.values.length > 0)
+          return frame.values.get(0);
+        return -1.0;
+      }
+      var closedEmpty = false, closeCoilOff = false;
+      for (_ in 0...100) {
+        simulation.step();
+        var snapshot = armRuntime.snapshot();
+        closedEmpty = snapshot.q.get(jawIndex) > jawStart + 0.01 &&
+          sensed(snapshot, "arm/tool/gripper/jaw-closed-empty") > 0.5;
+        closeCoilOff = switch armRuntime.channelValue("arm/tool/valve/coilA") {
+          case Digital(on): !on;
+          case _: false;
+        };
+        if (closedEmpty && closeCoilOff) break;
+      }
+      check(closedEmpty, "the logical gripper command closes the real jaws to the empty-vise switch");
+      check(closeCoilOff, "the double-solenoid gripper coil de-energizes after its pulse");
+      armRuntime.writeDigitalOutput(logicalGripper, false);
+      var reopened = false, openCoilOff = false;
+      for (_ in 0...100) {
+        simulation.step();
+        var snapshot = armRuntime.snapshot();
+        reopened = snapshot.q.get(jawIndex) < jawStart + 0.001 &&
+          sensed(snapshot, "arm/tool/gripper/jaw-open") > 0.5;
+        openCoilOff = switch armRuntime.channelValue("arm/tool/valve/coilB") {
+          case Digital(on): !on;
+          case _: false;
+        };
+        if (reopened && openCoilOff) break;
+      }
+      check(reopened, "the open command returns the real jaws to their reed switch");
+      check(openCoilOff, "the open-valve coil also de-energizes after its pulse");
       check(simulation.environmentObject("project:floorMarker") != null &&
         simulation.environmentObject("project:mill/mill/base") == null &&
         simulation.environmentObject("project:arm/baseFlange") == null,
@@ -2548,6 +2598,249 @@ class ProjectSourceTests {
       check(Math.abs(target.snapshot().velocities.get(spindleIndex)) > 0.9 * spindleSpeed,
         "an emergency-stopped spindle coasts instead of applying full braking torque");
       Sys.println('tending controllers: ${ids.length} robots, ${[for (_ in joints.keys()) _].length} disjoint joints');
+    } catch (error:Dynamic) {
+      simulation.dispose(); session.dispose(); throw error;
+    }
+    simulation.dispose(); session.dispose();
+  }
+
+  /** A physical pneumatic gripper carries a dynamic blank between the robot-arm cell's pads. */
+  static function checkParallelGripperMission(root:String):Void {
+    var arm = new RobotArm(true, new ArmGripperTool(32, 60, 60, 16));
+    if (arm.tool == null) throw "Physical-gripper fixture has no end effector";
+    var cell = new MachineAssembly();
+    cell.include("arm", arm);
+    cell.addComponent("airSupply", new AirSupply(), AssemblyFrames.translation(3000, 3000, 0));
+    cell.connectPorts("gripper-air", "airSupply", "air", "arm", "compressedAir");
+    var artifact = AssemblyPreview.scene(cell, "mt8-parallel-gripper");
+    artifact.robotTools = RobotScene.robotTools(arm.tool, "arm/tool");
+    artifact.mission = {loop: true, steps: [
+      {kind: "pick", at: {occurrence: "arm/workpiece", connector: "top"}},
+      {kind: "place", at: {occurrence: "arm/padPlace", connector: "top"}},
+      {kind: "pick", at: {occurrence: "arm/workpiece", connector: "top"}},
+      {kind: "place", at: {occurrence: "arm/padPick", connector: "top"}}
+    ]};
+    var generated = MateriaProjectRunner.generatedFromArtifact(SceneArtifact.encode(artifact));
+    var blanks = [for (object in generated.objects) if (object.id == "project:arm/workpiece") object];
+    if (blanks.length != 1) throw "Physical-gripper fixture needs one generated blank";
+    blanks[0].dynamicBody = true;
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-arm/materia.project.json");
+    var session = new ProjectDocumentSession(null, false);
+    session.openGeneratedProject(generated, manifest);
+    var simulation = new ApplicationSimulation(new RobotWorld());
+    simulation.setBackend(ApplicationSimulation.MUJOCO);
+    try {
+      check(simulation.rebuild(session.sensors, session.scene, session),
+        "physical-gripper fixture builds: " + simulation.error);
+      var mission = simulation.missionPlayer();
+      var blank = simulation.environmentObject("project:arm/workpiece");
+      if (mission == null || blank == null) throw "Physical-gripper mission lost its player or dynamic blank";
+      var jawIndex = -1;
+      for (index in 0...mission.robot.model.joints.length)
+        if (mission.robot.model.joints[index].id == "arm/tool/gripper/jaw-left-slide") jawIndex = index;
+      if (jawIndex < 0) throw "Physical-gripper mission has no driven jaw joint";
+      var armJointIndices = [for (index in 0...mission.robot.model.joints.length)
+        if (StringTools.startsWith(mission.robot.model.joints[index].id, "arm/j")) index];
+      if (armJointIndices.length != 6) throw "Physical-gripper fixture needs all six arm joints";
+      check(blank.motion == nativekit.sim.MotionType.Dynamic,
+        "the workpiece remains a dynamic body throughout physical handling");
+      var workpiece = blank;
+      var gripStart:Null<robotkit.spatial.Transform3> = null;
+      var carryStart:Null<robotkit.spatial.Transform3> = null;
+      var fingerLinks = [
+        mission.robot.part("project:arm/tool/gripper/fingerLeft").linkIndex,
+        mission.robot.part("project:arm/tool/gripper/fingerRight").linkIndex
+      ];
+      var blankCorners = [for (x in [-0.03, 0.03]) for (y in [-0.03, 0.03]) for (z in [-0.025, 0.025])
+        new robotkit.spatial.Vec3(x, y, z)];
+      // Bound seating while the support toes take the blank's load off the table. Start the
+      // transport measurement at the stopped end of the planned pickup lift, before the arm
+      // accelerates into its carry motion.
+      var freeCarryCenterZ = (RobotArm.TABLE_TOP + RobotArm.PAD_HEIGHT +
+        RobotArm.WORKPIECE_HEIGHT) / 1000.0;
+      var pickupTopZ = freeCarryCenterZ - RobotArm.WORKPIECE_HEIGHT / 2000.0 +
+        motionkit.robot.HandlingPlanRunner.DEFAULT_APPROACH_HEIGHT - 0.002;
+      var worstSlip = 0.0, carrySlip = 0.0, carryTranslationSlip = 0.0, carryRotationSlip = 0.0;
+      var worstPickupSeatSlip = 0.0, carryPickupSeatSlip = 0.0;
+      var peakArmTorque = 0.0;
+      var carryPeakTime = 0.0, carryPeakZ = 0.0;
+      var carryLeftContacts = 0, carryRightContacts = 0;
+      var carryContactGapSteps = 0;
+      var carryOtherContacts:Array<String> = [];
+      var carryStartTool:Null<robotkit.spatial.Transform3> = null;
+      var carryActive = false;
+      var stableGripSeconds = 0.0;
+      var carryMotionObserved = false, measuredCarryMotionObserved = false;
+      var lastSimulationTime = simulation.activeSession().simulationTime();
+      var observedFingerContact = false, remainedFreeDynamicBody = true;
+      var requiredSteps = 50 * 4;
+      while (mission.completed < requiredSteps && simulation.activeSession().simulationTime() < 1500) {
+        simulation.step();
+        var simulationTime = simulation.activeSession().simulationTime();
+        var elapsed = simulationTime - lastSimulationTime;
+        lastSimulationTime = simulationTime;
+        var runtimeSnapshot = mission.robot.runtime.snapshot();
+        if (mission.failure != null)
+        {
+          var state = runtimeSnapshot;
+          var gripSignal = -1.0, emptySignal = -1.0;
+          for (frame in state.sensors.toArray()) {
+            if (frame.values.length == 0) continue;
+            if (frame.sensorId == "arm/tool/gripper/gripped") gripSignal = frame.values.get(0);
+            if (frame.sensorId == "arm/tool/gripper/jaw-closed-empty") emptySignal = frame.values.get(0);
+          }
+          var failedPartPose = mission.simulation.objectPose(workpiece);
+          throw 'Parallel-gripper mission failed after ${mission.completed} of $requiredSteps steps: ${mission.failure}; ' +
+            't=${simulation.activeSession().simulationTime()} q=${state.q.toArray()} ' +
+            'gripped=$gripSignal empty=$emptySignal slip=$worstSlip ' +
+            'fingerContact=$observedFingerContact peakArmTorque=$peakArmTorque N m ' +
+            'part=(${failedPartPose.x},${failedPartPose.y},${failedPartPose.z})';
+        }
+        var grippedSignal = -1.0;
+        for (frame in runtimeSnapshot.sensors.toArray())
+          if (frame.sensorId == "arm/tool/gripper/gripped" && frame.values.length > 0)
+            grippedSignal = frame.values.get(0);
+        var closeCommand = switch mission.robot.runtime.channelValue("arm/tool/gripper/body.close") {
+          case Digital(value): value;
+          case _: false;
+        };
+        var settledJaw = Math.abs(runtimeSnapshot.dq.get(jawIndex)) < 0.005;
+        if (grippedSignal > 0.5 && closeCommand && settledJaw)
+          stableGripSeconds += elapsed;
+        else
+          stableGripSeconds = 0.0;
+        if (grippedSignal > 0.5 && closeCommand && stableGripSeconds >= 0.05) {
+          carryActive = true;
+          remainedFreeDynamicBody = remainedFreeDynamicBody &&
+            mission.simulation.objectCarrier(workpiece).rawValue() == 0;
+          var link = mission.simulation.linkPose(mission.robotIndex, mission.toolLink);
+          var toolTip = mission.toolTip;
+          if (toolTip == null) throw "Physical gripper has no TCP for the slip measurement";
+          var world_T_link = new robotkit.spatial.Transform3(
+            robotkit.spatial.Vec3.fromArray(link.position), robotkit.spatial.Quat.fromArray(link.rotation));
+          var link_T_tcp = new robotkit.spatial.Transform3(
+            new robotkit.spatial.Vec3(toolTip.x, toolTip.y, toolTip.z),
+            new robotkit.spatial.Quat(toolTip.qx, toolTip.qy, toolTip.qz, toolTip.qw));
+          var tcp = world_T_link.compose(link_T_tcp);
+          var objectPose = mission.simulation.objectPose(workpiece);
+          var world_T_object = new robotkit.spatial.Transform3(
+            new robotkit.spatial.Vec3(objectPose.x, objectPose.y, objectPose.z),
+            new robotkit.spatial.Quat(objectPose.qx, objectPose.qy, objectPose.qz, objectPose.qw));
+          var relative = tcp.inverse().compose(world_T_object);
+          if (gripStart == null) gripStart = relative;
+          if (objectPose.z > freeCarryCenterZ && carryStart == null) {
+            var initial = gripStart;
+            if (initial != null) for (corner in blankCorners) {
+              var seatSlip = relative.transformPoint(corner).sub(initial.transformPoint(corner)).norm();
+              carryPickupSeatSlip = Math.max(carryPickupSeatSlip, seatSlip);
+            }
+            worstPickupSeatSlip = Math.max(worstPickupSeatSlip, carryPickupSeatSlip);
+          }
+          if (carryStart == null && objectPose.z >= pickupTopZ) {
+            carryStart = relative;
+            carryStartTool = tcp;
+            carrySlip = 0.0;
+            carryTranslationSlip = 0.0;
+            carryRotationSlip = 0.0;
+            carryPeakTime = 0.0;
+            carryPeakZ = 0.0;
+            carryLeftContacts = 0;
+            carryRightContacts = 0;
+            carryContactGapSteps = 0;
+            carryOtherContacts = [];
+            carryMotionObserved = false;
+          } else if (carryStart != null && objectPose.z > freeCarryCenterZ) {
+            var start = carryStart;
+            var toolStart = carryStartTool;
+            if (toolStart != null && (tcp.translation.sub(toolStart.translation).norm() > 0.001 ||
+                tcp.rotation.angularDistance(toolStart.rotation) > 0.001)) carryMotionObserved = true;
+            measuredCarryMotionObserved = measuredCarryMotionObserved || carryMotionObserved;
+            var translationDelta = relative.translation.sub(start.translation);
+            var translationSlip = translationDelta.norm();
+            var rotationSlip = relative.rotation.angularDistance(start.rotation);
+            carryTranslationSlip = Math.max(carryTranslationSlip, translationSlip);
+            carryRotationSlip = Math.max(carryRotationSlip, rotationSlip);
+            if (start != null) for (corner in blankCorners) {
+              var slip = relative.transformPoint(corner).sub(start.transformPoint(corner)).norm();
+              if (slip > carrySlip) {
+                carryPeakTime = simulationTime;
+                carryPeakZ = objectPose.z;
+              }
+              carrySlip = Math.max(carrySlip, slip);
+              worstSlip = Math.max(worstSlip, slip);
+            }
+          }
+          for (jointIndex in armJointIndices)
+            peakArmTorque = Math.max(peakArmTorque, Math.abs(runtimeSnapshot.effort.get(jointIndex)));
+          var leftContactThisStep = false, rightContactThisStep = false;
+          for (contact in mission.simulation.robotContacts(mission.robot.runtime)) {
+            var fingerIndex = fingerLinks.indexOf(contact.linkIndex);
+            if (contact.active && contact.otherKind == robotkit.runtime.RobotContactOtherKind.Object &&
+                contact.otherObject == workpiece.handle.rawValue() && fingerIndex >= 0) {
+              observedFingerContact = true;
+              if (fingerIndex == 0) { carryLeftContacts++; leftContactThisStep = true; }
+              else { carryRightContacts++; rightContactThisStep = true; }
+            } else if (contact.active && fingerIndex >= 0) {
+              var otherLink = contact.otherLink >= 0 && contact.otherLink < mission.robot.model.links.length
+                ? mission.robot.model.links[contact.otherLink].id : 'link-${contact.otherLink}';
+              var extra = '${contact.otherKind}:${contact.otherObject}/$otherLink@${contact.distance}';
+              if (carryOtherContacts.length < 8 && carryOtherContacts.indexOf(extra) < 0)
+                carryOtherContacts.push(extra);
+            }
+          }
+          if (objectPose.z > freeCarryCenterZ && (!leftContactThisStep || !rightContactThisStep))
+            carryContactGapSteps++;
+        }
+        else if (carryActive) {
+          check(carryLeftContacts > 0 && carryRightContacts > 0,
+            'each physical carry contacts both pads (left=$carryLeftContacts right=$carryRightContacts)');
+          check(carryContactGapSteps == 0,
+            'both pads maintain contact throughout free carry (gap steps=$carryContactGapSteps)');
+          check(carryMotionObserved,
+            "the gripper slip measurement includes arm motion after the stopped pickup lift");
+          check(carryPickupSeatSlip < 0.001,
+            'the blank seats on the support toes within 1 mm during pickup (${carryPickupSeatSlip * 1000} mm)');
+          check(carrySlip < 0.0005,
+            'the dynamic blank slips ${carrySlip * 1000} mm relative to the TCP while both pads hold; ' +
+            'translation=${carryTranslationSlip * 1000} mm rotation=${carryRotationSlip * 1000} mrad ' +
+            'peakAt=${carryPeakTime}s z=${carryPeakZ}m ' +
+            'contactGapSteps=$carryContactGapSteps otherContacts=${carryOtherContacts.join(",")} ' +
+            'peakArmTorque=$peakArmTorque N m');
+          carryActive = false;
+          gripStart = null;
+          carryStart = null;
+          carryStartTool = null;
+        }
+      }
+      check(mission.completed >= requiredSteps,
+        'physical gripper completes 50 pick/carry/place round trips (${mission.completed} steps)');
+      check(observedFingerContact, "the workpiece load reaches the arm through real jaw contact");
+      check(remainedFreeDynamicBody, "the workpiece remains a free body instead of being kinematically attached");
+      check(worstSlip < 0.0005,
+        'the dynamic blank slips ${worstSlip * 1000} mm relative to the gripper TCP over 50 round trips');
+      check(worstPickupSeatSlip < 0.001,
+        'the support toes seat the blank within 1 mm during pickup (${worstPickupSeatSlip * 1000} mm worst)');
+      check(measuredCarryMotionObserved, "the dynamic grip was measured during actual transport");
+      check(peakArmTorque > 0.01 && Math.isFinite(peakArmTorque),
+        'the arm servos produce a finite torque while carrying the dynamic blank (${peakArmTorque} N m peak)');
+
+      // Let the next pick plan against the blank, then remove it from the target at the next
+      // physics step. The real jaws should close empty and the handling skill should report failure.
+      simulation.step();
+      workpiece.setPoseForNextTick(new nativekit.sim.SimPose(3.0, 3.0, 1.0));
+      var missDeadline = simulation.activeSession().simulationTime() + 120;
+      while (mission.failure == null && simulation.activeSession().simulationTime() < missDeadline)
+        simulation.step();
+      check(mission.failure != null && mission.failure.indexOf("did not confirm a grasp") >= 0,
+        'a blank removed during the pick is reported as a missed grasp: ${mission.failure}');
+      var emptyClosed = false;
+      for (frame in mission.robot.runtime.snapshot().sensors.toArray())
+        if (frame.sensorId == "arm/tool/gripper/jaw-closed-empty" && frame.values.length > 0)
+          emptyClosed = frame.values.get(0) > 0.5;
+      check(emptyClosed, "a missing blank drives the physical jaws to the closed-empty switch");
+      Sys.println('parallel gripper: 50 physical round trips, ${Math.round(worstSlip * 1000000) / 1000} mm peak slip, ' +
+        '${Math.round(worstPickupSeatSlip * 1000000) / 1000} mm pickup seating, ' +
+        '${Math.round(peakArmTorque * 100) / 100} N m peak arm torque, empty grasp reported');
     } catch (error:Dynamic) {
       simulation.dispose(); session.dispose(); throw error;
     }
@@ -3763,6 +4056,14 @@ class ProjectSourceTests {
       checkWholeWeldment(root, ApplicationSimulation.DETERMINISTIC, "test backend");
       return 0;
     }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "gripper") {
+      checkParallelGripperMission(root);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "after-track") {
+      checkAfterTrack(root);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "welder") {
       checkRobotWelder(root);
       return 0;
@@ -4158,6 +4459,7 @@ class ProjectSourceTests {
     session.dispose();
     if (FileSystem.exists(output)) FileSystem.deleteFile(output);
     checkRobotArm(root);
+    checkParallelGripperMission(root);
     checkCobotArms(root);
     checkGantryPicker(root);
     checkGantryPicker(root, true);

@@ -1477,21 +1477,25 @@ private:
 
     void rebuild_coupling_responses() {
         coupling_responses.clear();
-        std::map<std::uint64_t, std::pair<double, bool>> responses;
+        std::map<std::uint64_t, double> compliances;
         for (const auto &term : couplings) {
-            auto [entry, inserted] = responses.try_emplace(term.follower, 0.0, true);
-            if (term.stiffness > 0.0) entry->second.first += 1.0 / term.stiffness;
-            else entry->second.second = false;
+            auto &compliance = compliances[term.follower];
+            if (term.stiffness > 0.0) compliance += 1.0 / term.stiffness;
         }
-        for (const auto &[follower_id, response] : responses) {
-            if (!response.second || response.first <= 0.0) continue;
+        for (const auto &[follower_id, compliance] : compliances) {
             const int jid = model_joint_id(joints.at(follower_id));
             const std::string name = "nksim_drive_coupling_" + std::to_string(follower_id);
             const int equality = mj_name2id(model, mjOBJ_EQUALITY, name.c_str());
             if (jid < 0 || equality < 0) continue;
             const double inverse_inertia = model->dof_invweight0[model->jnt_dofadr[jid]];
-            if (inverse_inertia > 0.0)
-                coupling_responses.emplace_back(equality, std::sqrt(response.first / inverse_inertia));
+            if (inverse_inertia > 0.0) {
+                // A zero-stiffness relation is an ideal mechanical constraint. Give
+                // it the smallest stable MuJoCo time constant at step time; leaving
+                // the default 20 ms response lets high-force drives stretch it.
+                const double time_constant = compliance > 0.0
+                    ? std::sqrt(compliance / inverse_inertia) : 0.0;
+                coupling_responses.emplace_back(equality, time_constant);
+            }
         }
     }
 

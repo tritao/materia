@@ -52,7 +52,8 @@ import machinekit.component.PortRole;
 import machinekit.component.PortInterface;
 import machinekit.robotics.EndEffector;
 import machinekit.robotics.EndEffectorSet;
-import machinekit.robotics.ParallelGripper;
+import machinekit.robotics.ParallelGripperBody;
+import machinekit.robotics.ParallelGripperSpec;
 import machinekit.pneumatic.SuctionCup;
 import machinekit.pneumatic.VacuumGenerator;
 import machinekit.pneumatic.VacuumPressureSensor;
@@ -576,7 +577,7 @@ class CadBridgeTests {
     gripperSet.changer("manual", "base", "contact", [
       {robot: "open", tool: "openAir"}, {robot: "close", tool: "closeAir"}]);
     var gripperTool = new EndEffector();
-    gripperTool.addComponent("gripper", new ParallelGripper(40, 20, 60, 12));
+    gripperTool.addComponent("gripper", new ParallelGripperBody(new ParallelGripperSpec(40, 60, 60, 12)));
     gripperTool.mount("gripper", "mount");
     gripperTool.exposePort("openAir", "gripper", "open");
     gripperTool.exposePort("closeAir", "gripper", "close");
@@ -1198,9 +1199,10 @@ private class BridgeServiceSourcePart extends MachineComponent {
     super("BRIDGE-SERVICE-SOURCE", "service source fixture", "steel", true);
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addConnector("contact", Face, Solids.axial(0, 0, 10));
-    for (name in ["air", "open", "close"])
-      addPort({name: name, kind: Pneumatic, role: Supply,
-        iface: Unspecified, required: false});
+    addPort({name: "air", kind: Pneumatic, role: Supply, iface: Unspecified, required: false});
+    for (name in ["open", "close"])
+      addPort({name: name, kind: Signal, role: Supply,
+        iface: Plug("24V-input", 2), required: false});
     addPort({name: "valveCommand", kind: Signal, role: Supply,
       iface: Plug("digital-valve", 2), required: false});
     declareMass(1, new Vector(0, 0, 5), InertiaTensor.zero());

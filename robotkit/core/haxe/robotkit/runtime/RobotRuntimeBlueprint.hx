@@ -34,6 +34,29 @@ class RobotRuntimeBlueprint {
       interval = Math.min(interval, 0.5 * Math.sqrt(joint.reflectedInertia / joint.servoStiffness));
     return interval;
   }
+  /** Maximum physics interval for pressure-loaded cylinder end stops, seconds.
+   * Resolve the cushioned stop's force/mass time constant with MuJoCo's two-step floor. */
+  public function pneumaticStabilityInterval():Float {
+    var interval = Math.POSITIVE_INFINITY;
+    for (drive in pneumaticDrives) {
+      if (drive.joint < 0 || drive.joint >= joints.length)
+        throw 'Pneumatic stability references unknown joint ${drive.joint}';
+      var joint = joints[drive.joint];
+      if (joint.childLink < 0 || joint.childLink >= links.length)
+        throw 'Pneumatic stability for joint ${drive.joint} references unknown child link';
+      var cushion = joint.overtravel;
+      var mass = links[joint.childLink].mass;
+      var force = Math.max(drive.extensionForce, drive.retractionForce);
+      if (!(cushion > 0.0) || !(mass > 0.0) || !(force > 0.0)) continue;
+      var stopTimeConstant = Math.sqrt(mass * cushion / force) / 2.0;
+      // MuJoCo clamps a time constant below twice the physics step. Keep that
+      // floor at or below the pneumatic stop's force/mass response time.
+      interval = Math.min(interval, stopTimeConstant / 2.0);
+      if (drive.ratedSpeed > 0.0)
+        interval = Math.min(interval, cushion / drive.ratedSpeed);
+    }
+    return interval;
+  }
   public final couplings:Array<RobotRuntimeJointCouplingBlueprint> = [];
   public final sensors:Array<RobotRuntimeSensorBlueprint> = [];
   /** Immutable switch definitions sampled by simulation or supplied by device inputs. */

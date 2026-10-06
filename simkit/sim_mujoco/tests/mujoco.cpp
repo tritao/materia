@@ -1730,6 +1730,63 @@ void coupled_prismatic_joints_use_equality_and_convex_collision() {
     nkscene_scene_destroy(scene);
 }
 
+// Zero coupling stiffness denotes an ideal relation in RobotKit. It must stay
+// rigid when a pneumatic cylinder applies hundreds of newtons to one jaw.
+void rigid_coupling_holds_under_high_effort() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    nksim_world_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.scene = scene;
+    desc.fixed_timestep = 0.01;
+    desc.physics_substeps = 20;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
+    const auto base = make_body(world, make_node(scene, 0.0), NKSIM_MOTION_STATIC, 0.0);
+    const auto left_body = make_body(world, make_node(scene, 0.0), NKSIM_MOTION_DYNAMIC, 1.0);
+    const auto right_body = make_body(world, make_node(scene, 0.0), NKSIM_MOTION_DYNAMIC, 1.0);
+    nksim_joint_desc joint{};
+    joint.struct_size = sizeof(joint);
+    joint.type = NKSIM_JOINT_PRISMATIC;
+    joint.body_a = base;
+    joint.axis_a[0] = 1.0;
+    joint.lower_limit = -1.0;
+    joint.upper_limit = 1.0;
+    joint.max_force = 500.0;
+    nksim_joint left = 0, right = 0;
+    joint.body_b = left_body;
+    assert(nksim_joint_create(world, &joint, &left) == NKSIM_OK);
+    joint.body_b = right_body;
+    assert(nksim_joint_create(world, &joint, &right) == NKSIM_OK);
+    nksim_joint_coupling_desc coupling{};
+    coupling.struct_size = sizeof(coupling);
+    coupling.leader = left;
+    coupling.follower = right;
+    coupling.ratio = -1.0;
+    assert(nksim_joint_couple(world, &coupling) == NKSIM_OK);
+    nksim_joint_target force{};
+    force.struct_size = sizeof(force);
+    force.joint = left;
+    force.mode = NKSIM_JOINT_TARGET_EFFORT;
+    force.target = 500.0;
+    force.max_force = 500.0;
+    assert(nksim_world_set_joint_targets(world, &force, 1) == NKSIM_OK);
+    step_world(world, 4);
+    nksim_joint_state left_state{}, right_state{};
+    left_state.struct_size = right_state.struct_size = sizeof(left_state);
+    assert(nksim_joint_get_state(world, left, &left_state) == NKSIM_OK);
+    assert(nksim_joint_get_state(world, right, &right_state) == NKSIM_OK);
+    assert(std::abs(left_state.position) > 0.05);
+    assert(std::abs(right_state.position + left_state.position) < 0.001);
+    nksim_joint_destroy(world, right);
+    nksim_joint_destroy(world, left);
+    nksim_body_destroy(world, right_body);
+    nksim_body_destroy(world, left_body);
+    nksim_body_destroy(world, base);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
 // A follower with two leaders is held by a fixed tendon and a tendon equality, like a CoreXY
 // motor turning with both axes.
 void a_follower_with_two_leaders_uses_a_tendon_equality() {
@@ -2692,6 +2749,7 @@ int main() {
     body_without_inertials_has_center_of_mass_at_origin();
     applied_force_and_torque_act_on_their_own_axes();
     coupled_prismatic_joints_use_equality_and_convex_collision();
+    rigid_coupling_holds_under_high_effort();
     a_follower_with_two_leaders_uses_a_tendon_equality();
     convex_hulls_overlapping_at_rest_do_not_collide();
     mounted_contact_groups_span_articulations_only();

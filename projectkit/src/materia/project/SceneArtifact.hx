@@ -144,7 +144,8 @@ typedef SceneArtifactRobotSensor = {
  * A tool on the assembly's robot and how it is worked, as its parts' declared
  * capabilities say: a `suction` tool seals on what touches the occurrence `contact.occurrence` at its
  * connector `contact.connector` while the digital process channel `channel` is on, and reports the
- * vacuum it pulls on the sensor `sensor` when it has one.
+ * vacuum it pulls on the sensor `sensor` when it has one. A `gripper` has physical jaws, closes on
+ * the same kind of digital channel, and uses its native joint switch `sensor` as grasp feedback.
  *
  * A `torch` tool is a MIG/MAG welding torch: `contact` is the connector at its wire tip (the tool point),
  * `channel` is the digital channel that lights its arc, `sensor` is its `tool_weld` sensor, and `torch`
@@ -155,7 +156,18 @@ typedef SceneArtifactRobotTool = {
 	var contact:SceneArtifactPlace;
 	var channel:String;
 	@:optional var sensor:String;
+	@:optional var gripper:SceneArtifactGripper;
 	@:optional var torch:SceneArtifactTorch;
+}
+
+/** Assumed physical limits used to choose and orient a grasp from the blank's planar faces. */
+typedef SceneArtifactGripper = {
+	var minimumPartWidthMm:Float;
+	var nominalPartWidthMm:Float;
+	var maximumPartWidthMm:Float;
+	var fingerLengthMm:Float;
+	/** Assumed sliding coefficient of the physical finger pads. */
+	var fingerPadFrictionCoefficient:Float;
 }
 
 /**
@@ -427,7 +439,7 @@ typedef SceneArtifactTool = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 18;
+	public static inline var VERSION:Int = 19;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -791,7 +803,7 @@ class SceneArtifact {
 		var channels = new Map<String, Bool>();
 		var torches = 0;
 		for (tool in tools) {
-			if (tool == null || (tool.kind != "suction" && tool.kind != "torch"))
+	if (tool == null || (tool.kind != "suction" && tool.kind != "gripper" && tool.kind != "torch"))
 				fail('kind "${tool == null ? null : tool.kind}" is unknown');
 			var contact = tool.contact;
 			var occurrence = contact == null ? [] : [for (item in flat.occurrences) if (item.id == contact.occurrence) item];
@@ -806,6 +818,27 @@ class SceneArtifact {
 			if (tool.sensor != null && tool.sensor.length == 0) fail("has an empty sensor name");
 			if (tool.kind == "suction") {
 				if (tool.torch != null) fail("is a suction tool with a torch description");
+				continue;
+			}
+			if (tool.kind == "gripper") {
+				if (tool.torch != null) fail("is a gripper with a torch description");
+				if (tool.sensor == null) fail("has no jaw-state sensor");
+				var gripper = tool.gripper;
+				if (gripper == null || !finite(gripper.minimumPartWidthMm) ||
+					!finite(gripper.nominalPartWidthMm) || !finite(gripper.maximumPartWidthMm) ||
+					!finite(gripper.fingerLengthMm) || !finite(gripper.fingerPadFrictionCoefficient) ||
+					!(gripper.fingerPadFrictionCoefficient > 0) || !(gripper.minimumPartWidthMm > 0) ||
+					gripper.minimumPartWidthMm > gripper.nominalPartWidthMm ||
+					gripper.nominalPartWidthMm > gripper.maximumPartWidthMm || !(gripper.fingerLengthMm > 0))
+					fail("has invalid jaw width or finger reach data");
+				var sensors = flat.sensors == null ? [] : flat.sensors;
+				var foundSwitch = [for (sensor in sensors) if (sensor.id == tool.sensor && sensor.kind == "joint_switch") sensor];
+				if (foundSwitch.length != 1) fail('has no physical joint switch "${tool.sensor}"');
+				var actuators = flat.actuators == null ? [] : flat.actuators;
+				var cylinders = [for (actuator in actuators) if (actuator.joint == foundSwitch[0].joint &&
+					actuator.pneumatic != null && actuator.pneumatic.channelB != null) actuator];
+				if (cylinders.length != 1)
+					fail('has no unique double-solenoid cylinder on jaw switch joint "${foundSwitch[0].joint}"');
 				continue;
 			}
 			// A torch is worked on three channels and reports on one sensor; the weld circuit closes through its work.
@@ -945,6 +978,17 @@ class SceneArtifact {
 				contact: {occurrence: text(contact, "occurrence"), connector: text(contact, "connector")},
 				channel: text(raw, "channel")};
 			if (Reflect.field(raw, "sensor") != null) tool.sensor = text(raw, "sensor");
+			var gripper:Dynamic = Reflect.field(raw, "gripper");
+			if (gripper != null) {
+				function number(name:String):Float {
+					var item:Dynamic = Reflect.field(gripper, name);
+					return Std.isOfType(item, Float) || Std.isOfType(item, Int) ? (item:Float) : fail();
+				}
+				tool.gripper = {minimumPartWidthMm: number("minimumPartWidthMm"),
+					nominalPartWidthMm: number("nominalPartWidthMm"),
+					maximumPartWidthMm: number("maximumPartWidthMm"), fingerLengthMm: number("fingerLengthMm"),
+					fingerPadFrictionCoefficient: number("fingerPadFrictionCoefficient")};
+			}
 			var welder:Dynamic = Reflect.field(raw, "torch");
 			if (welder != null) {
 				function number(name:String):Float {
@@ -1038,7 +1082,8 @@ class SceneArtifact {
 			}
 		}
 		var suctions = data.robotTools == null ? 0 : [for (tool in data.robotTools) if (tool.kind == "suction") tool].length;
-		if (handles && suctions != 1) fail('picks and places, but the robot has $suctions suction tools, not one');
+		var grippers = data.robotTools == null ? 0 : [for (tool in data.robotTools) if (tool.kind == "gripper") tool].length;
+		if (handles && suctions + grippers != 1) fail('picks and places, but the robot has $suctions suction tools and $grippers grippers');
 		var torches = data.robotTools == null ? 0 : [for (tool in data.robotTools) if (tool.kind == "torch") tool].length;
 		if (welds && torches != 1) fail('welds, but the robot has $torches torches, not one');
 		var tools = data.robotTools;
