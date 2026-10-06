@@ -1114,3 +1114,16 @@ geometry differences in the common fixed-orientation process case.
 Compiler-only and focused runtime pass (1,148,298 assertions). Cone-centre
 rates, broader rotating/weave paths, numeric refinement, branch segmentation
 and production/authored gates remain open.
+
+PP6 contract preparation: JointPathPlanner returns complete JointPathSamples
+for an authored PosePath and PathRequest. StructuredJointPathPlanner composes
+CandidateProblem, native StructuredLadder and AnalyticPathRefiner with the
+pose-path task provider, retaining sampling/coarse-search settings. It
+checks full-range coverage and alignment of searched geometry and freedoms
+with the refined task, and reports family/selection failures explicitly.
+All three Cartesian authored-path fixtures exercise this contract and
+produce the same positions/rates as the separately verified pipeline.
+Compiler-only and focused runtime pass (1,148,562 assertions). This is
+preparation: ProgramCompiler still uses its existing path lowering, and
+collision filtering, unsupported-family fallback, branch segmentation,
+k-best starts and selector removal remain outstanding. PP6 is not complete.

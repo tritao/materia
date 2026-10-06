@@ -901,6 +901,15 @@ class KinematicsTests extends MotionKitTestSupport {
       var authoredRefiner=new motionkit.robot.AnalyticPathRefiner(marked,authoredProblem,motionkit.robot.StructuredLadder.search(authoredProblem));
       var provider=new motionkit.robot.PosePathRefinement(authoredPath);
       var authoredSamples=authoredRefiner.refinePath([for(i in 0...11)authoredPath.length()*i/10],provider.at);
+      var plannedDistances=[for(i in 0...11)authoredPath.length()*i/10];
+      var plannedRequest=new PathRequest(plannedDistances,[for(s in plannedDistances)authoredPath.poseAt(s)],markedQ,
+        new IkTolerance(1e-6,1e-6),[for(_ in markedQ)0.5],[for(_ in markedQ)1.0]);
+      var planner:motionkit.robot.JointPathPlanner=new motionkit.robot.StructuredJointPathPlanner(marked);
+      var plannedSamples=planner.plan(authoredPath,plannedRequest);
+      for(i in 0...11)for(j in 0...count) {
+        near(plannedSamples.q[i][j],authoredSamples.q[i][j],"joint planner composes selection and refinement",1e-7);
+        near(plannedSamples.qPrime[i][j],authoredSamples.qPrime[i][j],"joint planner returns timing-ready derivatives",1e-7);
+      }
       for(i in 0...11)for(j in 0...count) {
         near(authoredSamples.q[i][j],markedQ[j]+(j==0?0.002*i:0),"authored pose path drives analytic refinement",1e-7);
         near(authoredSamples.qPrime[i][j],j==0?1.0:0,"authored primitive supplies task rates",1e-6);
