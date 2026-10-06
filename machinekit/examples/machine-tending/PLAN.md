@@ -165,6 +165,13 @@ Surveyed 2026-10-03 on local main 1048bf768, plus the `mobile-welder` and `x7-tr
   source and mobile-welder converter from their demand; this supersedes the earlier
   promise to leave all of its electrical hardware untouched.
 
+**MT-D12. Tray vision uses a wrist camera, not a mast.**
+- The arm is idle while the mill cuts, so a look pose over the trays costs no cycle time if it happens then, never on the door's critical path.
+- One camera covers both trays at close range, and it measures blanks in the same frame the arm picks in, through the same kinematics. A mast needs a camera, or a wide view, per area plus its own robot registration.
+- The camera travels with the arm, which mobile tending needs.
+- The camera finds parts; it never feeds an interlock. It never enters the machine (chips and coolant): the vise keeps its air-gauge presence sensor and the gripper its jaw switches.
+- **Rejected:** a fixed mast camera. It wins only when the cell needs observation while the arm is busy, which this cell does not.
+
 ## The machine (starting numbers, fixed in MT1–MT4)
 
 | Item | Value |
@@ -793,6 +800,36 @@ Done. What was built and measured:
 - The timeline is a per-cycle breakdown: door, load, clamp, cut, unload, idle. The panel shows spindle use.
 - Target: spindle use ≥ 75 % for the bearing-block job, with numbers recorded here.
 
+**MT13. Wrist camera for the trays.**
+- **Hardware:**
+  - `CameraBracket` and a camera part (MachineKit) on the `ArmGripperTool` plate, beside the gripper, looking along the approach axis.
+  - An `optical` connector gives the CAD extrinsic, so the mounting is derived from geometry.
+  - The housing and cable join the tool's collision hulls and mass, and must clear both grippers of MT12's dual tool.
+- **Sensor:**
+  - a `camera` sensor on the tool link at the optical connector;
+  - SensorKit renders RGB and depth with its noise and latency models;
+  - segmentation is test ground truth only, never pipeline input, because real cameras do not provide it.
+- **Calibration:**
+  - hand-eye (camera to flange) solved from ChArUco views at several arm poses;
+  - VisionKit gains hand-eye solving, its open TODO, through OpenCV in the native kit;
+  - the pipeline uses the solved extrinsic, not the CAD one, so simulation and hardware take the same path. The CAD value is the check.
+- **Vision:**
+  - tray registration from AprilTag or ArUco markers on the tray corners (`MarkerDetector`, `vk_solve_pnp`, RobotKit `FiducialPerception`);
+  - slot occupancy, and each blank's pose from depth (top-face plane fit plus edges), measured in the registered tray frame;
+  - pick targets come from the measured blank pose, not the nominal slot frame.
+- **Mission:**
+  - a look step while the mill cuts;
+  - an unreadable or empty slot is a named failure in the MT11 style;
+  - the jaw switch still judges every grasp.
+- **Clean break:** MT13 replaces MT9's per-slot tray presence sensors, which are removed. The vise presence sensor stays.
+- **Tests (MuJoCo plus rendered frames):**
+  - a tray placed ±10 mm and ±5° off nominal registers within 1 mm and 0.5°;
+  - blank poses are measured within 0.5 mm and 1° of simulation truth;
+  - occupancy is right with empty and misplaced slots;
+  - the solved hand-eye extrinsic is within 0.5 mm and 0.2° of CAD;
+  - the look time is hidden behind the cut, so spindle use is unchanged from MT12;
+  - the four-part acceptance still passes with the trays offset from nominal.
+
 **Later.**
 - Real I/O:
   - LinuxCNC HAL pins and `halui`, with `M62`–`M66` in `CncInterpreter` (`ToolpathOp.SetOutput`/`WaitInput`);
@@ -801,7 +838,7 @@ Done. What was built and measured:
 - An umbrella automatic tool changer (`M6` handled by the machine).
 - Planned approaches with CL6/CL7 in place of derived via-poses.
 - A second operation with a regrip or flip station.
-- Tray registration by camera (VisionKit).
+- Fixed (mast) cameras, if a later cell needs observation while the arm is busy; MT13 covers tray vision with a wrist camera.
 - Chips and coolant.
 - Mobile tending: the arm on the mobile base, docking, and touch or vision registration to the machine (the welder's P3).
 
@@ -810,7 +847,7 @@ Done. What was built and measured:
 ```
 MT0 ─┬─ MT1 ── MT2 ─┬─ MT4 (reach study) ─┐
      ├─ MT3 (arms) ─┘                     ├─ MT6 ── MT7 ─┐
-     └─ (welder + X7/X8 merged) ──────────┘              ├─ MT10 ── MT11 ── MT12
+     └─ (welder + X7/X8 merged) ──────────┘              ├─ MT10 ── MT11 ── MT12 ── MT13
                         MT5 (after MT4) ── MT8 ── MT9 ───┘
 ```
 
@@ -818,6 +855,7 @@ MT0 ─┬─ MT1 ── MT2 ─┬─ MT4 (reach study) ─┐
 - MT5 is independent of controllers, but the gripper (MT8) and the vise and door actuation need it.
 - MT6 needs X8 wiring.
 - MT10 needs everything before it.
+- MT13 needs MT8's tool, MT10's mission and MT12's dual-gripper envelope. It replaces MT9's per-slot tray sensors.
 
 **Articulated inertia and joint-plan admission (MT5b follow-up).**
 
@@ -852,6 +890,7 @@ Done. What was built and decided:
 | MT10 | planned | |
 | MT11 | planned | |
 | MT12 | planned | |
+| MT13 | planned | |
 
 **Environment clearance and support geometry (MT5b follow-up, verified in `8b22593be` and `20f0d3e16`).**
 
