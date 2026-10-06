@@ -137,3 +137,31 @@ construction, exact isolation and reconstruction. Output is retained in
 This finite-instance proof does not classify extraneous factors generically,
 cover projective boundaries/continua, apply actual joint limits, or meet native
 bulk performance and authored track gates. No production family changed.
+
+## Complementary projective charts
+
+The prototype now constructs direct and reciprocal half-angle charts for both
+base and final-wrist angles, solving all four combinations. Numerator formulas
+switch cos from (1-u^2)/(1+u^2) to (u^2-1)/(1+u^2) in the reciprocal chart;
+sin retains 2u/(1+u^2). Coordinate zero in that chart represents angle pi.
+Only |coordinate|<=1 is retained in each chart to avoid large-coordinate
+reconstruction; overlaps are deduplicated modulo rotary turns. Lateral
+back-substitution supports linear degree drops. Identically zero resultants,
+vanishing lateral polynomials and projected-middle-axis degeneracy still produce
+explicit diagnostics rather than a completeness claim.
+
+`--check-boundaries` generates exact-rational FK targets for base pi, final wrist
+pi and both pi. All three recover their generating six-joint configurations
+modulo turns; each returns four FK-verified solutions, maximum error
+2.220446049250313e-16. The original target still returns eight solutions after
+four-chart deduplication. Actual script exit zero, 6.844 seconds including all
+four targets (`process-path-offset-boundaries.json`); original-target-only run
+exit zero, 1.467 seconds (`process-path-offset-charts.json`). Earlier single-chart
+limitations above describe the preceding prototype revision.
+
+This improves finite-chart coverage, not a certified inverse solver. Floating
+coefficient degree/drop/discriminant thresholds during back-substitution can
+still lose close or repeated roots. The exact univariate root isolation does
+not certify the subsequent floating reconstruction. Generic factor classification,
+projected-axis special systems and positive-dimensional families remain open,
+as do native runtime performance, real model limits and authored acceptance.
