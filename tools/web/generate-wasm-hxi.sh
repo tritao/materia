@@ -22,6 +22,9 @@ shim_dir=$(mktemp -d)
 trap 'rm -rf -- "${shim_dir:?}"' EXIT
 
 mkdir -p "$shim_dir/scripts"
+# Package generators resolve managed headers and native sources through HAXEON_DIR.
+ln -s "$haxeon_dir/packages" "$shim_dir/packages"
+ln -s "$haxeon_dir/vendor" "$shim_dir/vendor"
 cat > "$shim_dir/scripts/haxeon-ffi-audit" <<SHIM
 #!/usr/bin/env bash
 set -euo pipefail

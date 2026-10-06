@@ -1,9 +1,6 @@
 [submodule "haxeon"]
 	path = haxeon
 	url = https://github.com/tritao/haxeon.git
-[submodule "nativekit"]
-	path = nativekit
-	url = https://github.com/tritao/nativekit.git
 [submodule "uikit/vendor/clay"]
 	path = uikit/vendor/clay
 	url = https://github.com/tritao/clay.git

@@ -1,7 +1,7 @@
 import nativekit.ffi.NativeKitTypes;
 import nativekit.ffi.NativeKit;
 import NativeKitUI;
-import GraphicsImageRef;
+import haxeon.platform.GraphicsImageRef;
 
 /** Typed compositable surface produced by NativeKit's renderer. */
 class GraphicsSurface extends NativeKitUIResource {

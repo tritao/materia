@@ -1,7 +1,7 @@
 package nativekit.ui.host;
 
 import FontCollection;
-import NativeKitEvents;
+import haxeon.platform.NativeKitEvents;
 import nativekit.ffi.NativeKitTypes;
 
 /** Live services, with the window and surface, available while constructing a hosted desktop or browser application. */

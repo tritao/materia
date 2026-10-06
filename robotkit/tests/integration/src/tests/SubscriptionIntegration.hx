@@ -1,7 +1,7 @@
 package tests;
 
 import robotkit.client.RobotClient;
-import NativeKitRuntime;
+import haxeon.platform.NativeKitRuntime;
 
 /** Two observers request different RKF1 families from one real robotd. */
 class SubscriptionIntegration {

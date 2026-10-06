@@ -1,8 +1,8 @@
 package examples.nativekit;
 
 import cadkit.Mesh;
-import nativekit.gpu.Buffer;
-import nativekit.gpu.Renderer;
+import haxeon.gpu.Buffer;
+import haxeon.gpu.Renderer;
 
 /** Optional application-layer bridge; CadKit itself does not import NativeKit. */
 class MeshUpload {

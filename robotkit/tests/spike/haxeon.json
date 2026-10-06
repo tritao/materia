@@ -9,9 +9,7 @@
     "../../../sensorkit/sensor_io/haxe"
   ],
   "dependencies": {
-    "nativekit": {
-      "path": "../../../nativekit"
-    },
+    "haxeon-platform": { "path": "../../../haxeon/packages/platform" },
     "robotkit": {
       "path": "../.."
     },
@@ -30,7 +28,7 @@
         "../../inference/CMakeLists.txt",
         "../../inference/src/inference.cpp",
         "../../inference/include/robotkit_inference.h",
-        "../../../nativekit/CMakeLists.txt",
+        "../../../haxeon/vendor/nativekit/CMakeLists.txt",
         "../../policy/CMakeLists.txt",
         "../../policy/src/policy.cpp",
         "../../policy/include/robotkit_policy.h"

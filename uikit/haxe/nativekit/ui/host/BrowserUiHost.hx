@@ -1,9 +1,9 @@
 package nativekit.ui.host;
 
 import FontCollection;
-import NativeKitEventValue;
-import NativeKitEvents;
-import NativeKitEvents.NativeKitEventSubscription;
+import haxeon.platform.NativeKitEventValue;
+import haxeon.platform.NativeKitEvents;
+import haxeon.platform.NativeKitEvents.NativeKitEventSubscription;
 import haxe.io.Bytes;
 import nativekit.ffi.NativeKit;
 import nativekit.ffi.NativeKitConstants;

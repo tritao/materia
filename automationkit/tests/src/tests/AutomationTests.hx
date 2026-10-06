@@ -1,6 +1,6 @@
 package tests;
 
-import NativeKitRuntime;
+import haxeon.platform.NativeKitRuntime;
 import haxe.Int64;
 import materia.automation.facility.Charger;
 import materia.automation.facility.Facility;

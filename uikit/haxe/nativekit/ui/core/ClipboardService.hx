@@ -2,7 +2,7 @@ package nativekit.ui.core;
 import nativekit.ffi.NativeKitTypes;
 
 import nativekit.ffi.NativeKit;
-import NativeKitEventValue;
+import haxeon.platform.NativeKitEventValue;
 
 /** UI-thread clipboard bridge with asynchronous paste completion routing. */
 class ClipboardService {

@@ -6,7 +6,7 @@
   "dependencies": {
     "animkit": { "path": ".." },
     "scenekit": { "path": "../../scenekit" },
-    "nativekit": { "path": "../../nativekit" }
+    "haxeon-platform": { "path": "../../haxeon/packages/platform" }
   },
   "native": {
     "cmake": {
@@ -20,7 +20,7 @@
         "../native/src/import.cpp",
         "../native/src/runtime.cpp",
         "../../scenekit/scene/CMakeLists.txt",
-        "../../nativekit/CMakeLists.txt"
+        "../../haxeon/vendor/nativekit/CMakeLists.txt"
       ]
     }
   },

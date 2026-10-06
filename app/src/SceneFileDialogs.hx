@@ -3,7 +3,7 @@ package app;
 import nativekit.ui.host.DesktopUiHostContext;
 import nativekit.ffi.NativeKit;
 import nativekit.ffi.NativeKitTypes;
-import NativeKitEventValue;
+import haxeon.platform.NativeKitEventValue;
 import haxe.io.Bytes;
 
 /**

@@ -15,7 +15,7 @@ start.
 | --- | --- |
 | [`app/`](app/) | Reference editor shell and Component Lab host |
 | [`haxeon/`](haxeon/) | Haxe-compatible compiler, HashLink runtime, and project CLI |
-| [`nativekit/`](nativekit/) | Windows, surfaces, input, GPU, and native runtime services |
+| [`haxeon/vendor/nativekit/`](haxeon/vendor/nativekit/) | Windows, surfaces, input, GPU, and native runtime services |
 | [`uikit/`](uikit/) | Retained UI layout, text, rendering, styles, and Haxe widgets |
 | [`scenekit/`](scenekit/) | Retained scene data, rendering, picking, and interaction |
 | [`simkit/`](simkit/) | Deterministic simulation orchestration and physics integration |
@@ -27,7 +27,11 @@ start.
 | [`animkit/`](animkit/) | glTF character import and skeletal animation above ozz-animation |
 | [`humankit/`](humankit/) | Standard humanoid skeleton, pose landmarks, and bone attachments above AnimKit |
 
-The native components are kept as sibling projects so they can be built and
+NativeKit is pinned by Haxeon under `haxeon/vendor/nativekit`; its managed
+platform and GPU APIs live in `haxeon/packages/platform` and
+`haxeon/packages/gpu`. Materia uses that checkout for all native builds.
+
+The other native components are kept as sibling projects so they can be built and
 tested independently. Their focused instructions live in each package's
 README.
 
@@ -128,7 +132,7 @@ and host integration details.
 
 Use the package README files for focused native build and test commands:
 
-- [NativeKit](nativekit/README.md) and [UIKit](uikit/README.md) for platform and UI work;
+- [NativeKit](haxeon/vendor/nativekit/README.md) and [UIKit](uikit/README.md) for platform and UI work;
 - [SceneKit](scenekit/README.md) and [SimKit](simkit/README.md) for scene and simulation work;
 - [CadKit](cadkit/README.md) for the headless CAD core;
 - [AnimKit](animkit/README.md) for glTF characters and skeletal animation;

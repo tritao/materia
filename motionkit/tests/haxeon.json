@@ -21,9 +21,7 @@
     "motionkit-robot": {
       "path": "../robot"
     },
-    "nativekit": {
-      "path": "../../nativekit"
-    },
+    "haxeon-platform": { "path": "../../haxeon/packages/platform" },
     "robotkit": {
       "path": "../../robotkit"
     }
@@ -49,7 +47,7 @@
         "../../motionkit/native/src/path.cpp",
         "../../motionkit/native/vendor/ruckig/CMakeLists.txt",
         "../../motionkit/native/vendor/toppra/cpp/CMakeLists.txt",
-        "../../nativekit/CMakeLists.txt",
+        "../../haxeon/vendor/nativekit/CMakeLists.txt",
         "../../simkit/CMakeLists.txt"
       ]
     }

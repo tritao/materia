@@ -1,7 +1,7 @@
 package nativekit.ui.core;
 
 import FontCollection;
-import NativeKitSurface;
+import haxeon.platform.NativeKitSurface;
 import LayoutStyle;
 import nativekit.ui.theme.Theme;
 import nativekit.ui.theme.TextRole;

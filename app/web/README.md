@@ -11,13 +11,13 @@ share one linear memory:
   imports.
 
 `materia.js` loads both, checks that they agree on the
-[memory contract](../../nativekit/docs/wasm-host-memory.md), and drives
+[memory contract](../../haxeon/vendor/nativekit/docs/wasm-host-memory.md), and drives
 `app.MainWeb.frame` from `requestAnimationFrame`.
 
 ## Build and run
 
 ```sh
-./nativekit/tools/setup-web.sh          # once: installs Emscripten
+./haxeon/vendor/nativekit/tools/setup-web.sh          # once: installs Emscripten
 ./app/web/build.sh                      # about 2 minutes from clean
 python3 -m http.server --directory app/build/web/site 8080
 ```
@@ -34,7 +34,7 @@ every guarded `try`, and LLVM emits invalid Wasm for that mix under Wasm
 exceptions (V8: "br_table: label arity inconsistent").
 
 ```sh
-source nativekit/.tools/emsdk/emsdk_env.sh
+source haxeon/vendor/nativekit/.tools/emsdk/emsdk_env.sh
 emcmake cmake -S cadkit/third_party/occt -B <build> -G Ninja \
   -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=<prefix> \
   "-DCMAKE_CXX_FLAGS=-fwasm-exceptions -UOCC_CONVERT_SIGNALS" \

@@ -5,7 +5,7 @@ module_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 simkit_dir=$(dirname "$module_dir")
 materia_dir=$(dirname "$simkit_dir")
 scenekit_dir=${SCENEKIT_DIR:-"$materia_dir/scenekit"}
-nativekit_dir=${NATIVEKIT_DIR:-"$materia_dir/nativekit"}
+nativekit_dir=${NATIVEKIT_DIR:-"$materia_dir/haxeon/vendor/nativekit"}
 haxeon_dir=${HAXEON_DIR:-"$materia_dir/haxeon"}
 output=${1:-"$module_dir/bindings/nativekit-sim.hxi"}
 
@@ -19,7 +19,7 @@ output=${1:-"$module_dir/bindings/nativekit-sim.hxi"}
     --interface=NativeKitSim \
     --depends=NativeKitScene \
     --dependency-hxi="$scenekit_dir/scene/bindings/nativekit-scene.hxi" \
-    --dependency-hxi="$nativekit_dir/bindings/haxe/nativekit.hxi" \
+    --dependency-hxi="${haxeon_dir}/packages/platform/bindings/nativekit.hxi" \
     --include="$module_dir/include" \
     --include="$scenekit_dir/scene/include" \
     --include="$nativekit_dir/include" \

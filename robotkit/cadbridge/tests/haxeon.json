@@ -11,9 +11,7 @@
     "../../../machinekit/examples/robot-arm"
   ],
   "dependencies": {
-    "nativekit": {
-      "path": "../../../nativekit"
-    },
+    "haxeon-platform": { "path": "../../../haxeon/packages/platform" },
     "projectkit": {
       "path": "../../../projectkit"
     },
@@ -51,7 +49,7 @@
         "../../../trajectorykit/native/CMakeLists.txt",
         "../../../trajectorykit/native/include/trajectory_core.h",
         "../../../trajectorykit/native/include/trajectory_core.hpp",
-        "../../../nativekit/CMakeLists.txt",
+        "../../../haxeon/vendor/nativekit/CMakeLists.txt",
         "../../../simkit/CMakeLists.txt",
         "../../inference/CMakeLists.txt",
         "../../inference/src/inference.cpp",

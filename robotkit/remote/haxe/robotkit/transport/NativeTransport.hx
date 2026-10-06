@@ -69,7 +69,7 @@ class NativeTransport {
     if (capacity <= 0)
       throw "RobotKit TCP receive capacity must be positive";
     var buffer = Bytes.alloc(capacity);
-    var result = NativeKit.nk_transport_receive(transport, buffer, capacity);
+    var result = NativeKit.nk_transport_receive(transport, buffer);
     if (result.status == RECEIVE_WOULD_BLOCK)
       return Bytes.alloc(0);
     if (result.status != Result.Ok)

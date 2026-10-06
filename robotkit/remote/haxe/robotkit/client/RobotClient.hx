@@ -2,10 +2,10 @@ package robotkit.client;
 import nativekit.ffi.NativeKitTypes;
 
 import nativekit.ffi.NativeKit;
-import NativeKitEventValue;
-import NativeKitEvents;
-import NativeKitEvents.NativeKitEventSubscription;
-import NativeKitRuntime;
+import haxeon.platform.NativeKitEventValue;
+import haxeon.platform.NativeKitEvents;
+import haxeon.platform.NativeKitEvents.NativeKitEventSubscription;
+import haxeon.platform.NativeKitRuntime;
 import haxe.Int64;
 import robotkit.protocol.ControlHeartbeat;
 import robotkit.protocol.Fault;

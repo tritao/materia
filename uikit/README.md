@@ -344,7 +344,7 @@ The browser backend uses Emscripten and WebGL2 through NativeKit core and GPU.
 Set up Emscripten, then build and test with:
 
 ```sh
-../nativekit/tools/setup-web.sh
+../haxeon/vendor/nativekit/tools/setup-web.sh
 ./tools/build-web.sh
 ./tools/test-web.sh
 python3 -m http.server --directory build-web 8080

@@ -14,7 +14,7 @@ set -euo pipefail
 app_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 materia_dir=$(dirname "$app_dir")
 haxeon_dir=${HAXEON_DIR:-"$materia_dir/haxeon"}
-emsdk_dir=${EMSDK_DIR:-"$materia_dir/nativekit/.tools/emsdk"}
+emsdk_dir=${EMSDK_DIR:-"$materia_dir/haxeon/vendor/nativekit/.tools/emsdk"}
 build_dir=${MATERIA_WEB_BUILD_DIR:-"$app_dir/build/web"}
 build_type=${CMAKE_BUILD_TYPE:-Release}
 # wasm-gc keeps Haxe values as Wasm GC objects; wasm32 keeps them in linear memory with Haxeon's own collector
@@ -35,7 +35,7 @@ if (( host_limit % page_size != 0 || memory_size % page_size != 0 || host_limit 
 fi
 
 if [[ ! -f "$emsdk_dir/emsdk_env.sh" ]]; then
-	echo "build.sh: Emscripten is not installed; run nativekit/tools/setup-web.sh" >&2
+	echo "build.sh: Emscripten is not installed; run haxeon/vendor/nativekit/tools/setup-web.sh" >&2
 	exit 1
 fi
 if [[ ! -x "$haxeon_dir/.tools/hashlink/hl" ]]; then

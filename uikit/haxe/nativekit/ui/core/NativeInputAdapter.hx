@@ -2,9 +2,9 @@ package nativekit.ui.core;
 import nativekit.ffi.NativeKitTypes;
 import nativekit.ffi.NativeKit;
 
-import NativeKitEventValue;
-import NativeKitEvents;
-import NativeKitEvents.NativeKitEventSubscription;
+import haxeon.platform.NativeKitEventValue;
+import haxeon.platform.NativeKitEvents;
+import haxeon.platform.NativeKitEvents.NativeKitEventSubscription;
 
 /** Routes decoded NativeKit window input into one Haxe UiContext. */
 class NativeInputAdapter {

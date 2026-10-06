@@ -1,10 +1,10 @@
 import nativekit.ffi.NativeKitTypes;
 import nativekit.ffi.NativeKit;
 import nativekit.ffi.NativeKitConstants;
-import NativeKitEventValue;
-import NativeKitEvents;
-import NativeKitEvents.NativeKitEventSubscription;
-import NativeKitSurface;
+import haxeon.platform.NativeKitEventValue;
+import haxeon.platform.NativeKitEvents;
+import haxeon.platform.NativeKitEvents.NativeKitEventSubscription;
+import haxeon.platform.NativeKitSurface;
 import haxe.io.Bytes;
 import nativekit.ui.core.NativeInputAdapter;
 import haxe.CallStack;

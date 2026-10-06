@@ -1,7 +1,7 @@
 package tests;
 
 import RobotKitRuntime;
-import NativeKitRuntime;
+import haxeon.platform.NativeKitRuntime;
 import haxe.Int64;
 import motionkit.trajectory.Trajectory;
 import robotkit.execution.ExecutionPlanSubmission;

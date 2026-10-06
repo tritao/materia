@@ -7,7 +7,7 @@ materia_dir=$(dirname "$robotkit_dir")
 haxeon_dir=${HAXEON_DIR:-"$materia_dir/haxeon"}
 simkit_dir=${SIMKIT_DIR:-"$materia_dir/simkit"}
 scenekit_dir=${SCENEKIT_DIR:-"$materia_dir/scenekit"}
-nativekit_dir=${NATIVEKIT_DIR:-"$materia_dir/nativekit"}
+nativekit_dir=${NATIVEKIT_DIR:-"$materia_dir/haxeon/vendor/nativekit"}
 output=${1:-"$module_dir/bindings/robotkit-simkit.hxi"}
 
 "$haxeon_dir/scripts/haxeon-ffi-audit" \
@@ -21,7 +21,7 @@ output=${1:-"$module_dir/bindings/robotkit-simkit.hxi"}
     --depends=RobotKitRuntime \
     --depends=NativeKitSim \
     --dependency-hxi="$module_dir/bindings/robotkit-runtime.hxi" \
-    --dependency-hxi="$nativekit_dir/bindings/haxe/nativekit.hxi" \
+    --dependency-hxi="${haxeon_dir}/packages/platform/bindings/nativekit.hxi" \
     --dependency-hxi="$scenekit_dir/scene/bindings/nativekit-scene.hxi" \
     --dependency-hxi="$simkit_dir/sim_core/bindings/nativekit-sim.hxi" \
     --include="$module_dir/include" \

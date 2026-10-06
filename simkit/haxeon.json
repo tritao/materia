@@ -9,9 +9,7 @@
   ],
   "scopeSourceRoots": false,
   "dependencies": {
-    "nativekit": {
-      "path": "../nativekit"
-    },
+    "haxeon-platform": { "path": "../haxeon/packages/platform" },
     "scenekit": {
       "path": "../scenekit"
     }

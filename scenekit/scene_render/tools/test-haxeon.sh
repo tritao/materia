@@ -4,7 +4,7 @@ set -euo pipefail
 module_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 scenekit_dir=$(dirname "$module_dir")
 materia_dir=$(dirname "$scenekit_dir")
-nativekit_dir=${NATIVEKIT_DIR:-"$materia_dir/nativekit"}
+nativekit_dir=${NATIVEKIT_DIR:-"$materia_dir/haxeon/vendor/nativekit"}
 haxeon_dir=${HAXEON_DIR:-"$materia_dir/haxeon"}
 nativekit_build=${NATIVEKIT_BUILD:-"$scenekit_dir/build"}
 target=${NATIVEKIT_HAXE_TARGET:-x86_64-linux-gnu}
@@ -17,8 +17,8 @@ mkdir -p "$generated_dir"
 scene_header="$scenekit_dir/scene/include/nativekit_scene.h"
 render_header="$scenekit_dir/scene_render/include/nativekit_scene_render.h"
 interaction_header="$scenekit_dir/scene_interaction/include/nativekit_scene_interaction.h"
-nativekit_import_header="$nativekit_dir/bindings/haxe/nativekit_import.h"
-gpu_import_header="$nativekit_dir/modules/gpu/bindings/nativekit_gpu_import.h"
+nativekit_import_header="${haxeon_dir}/packages/platform/bindings/nativekit_import.h"
+gpu_import_header="${haxeon_dir}/packages/gpu/bindings/nativekit_gpu_import.h"
 nativekit_header="$nativekit_dir/include/nativekit.h"
 graphics_header="$nativekit_dir/include/nativekit_graphics.h"
 gpu_header="$nativekit_dir/modules/gpu/include/nativekit_gpu.h"
@@ -45,7 +45,7 @@ import_hxi \
 	--interface=NativeKitGpu \
 	--depends=NativeKit \
 	--include="$nativekit_dir/modules/gpu/include" \
-	--include="$nativekit_dir/modules/gpu/bindings" \
+	--include="${haxeon_dir}/packages/gpu/bindings" \
 	--include="$nativekit_dir/include" \
 	--exclude-header="$nativekit_header" \
 	--exclude-header="$graphics_header" \
@@ -108,7 +108,7 @@ output="$generated_dir/nativekit-scene.hx.hl"
 	cd "$haxeon_dir"
 	"$haxe_bin" -cp "$haxeon_dir/src" -cp "$module_dir/tests/haxeon" --run HxiNativeKitSceneMain \
 		"$output" "$generated_dir/nativekit-scene.hxi" "$generated_dir/nativekit-scene-render.hxi" \
-		"$generated_dir/nativekit-scene-interaction.hxi" "$nativekit_dir" "$scenekit_dir" \
+		"$generated_dir/nativekit-scene-interaction.hxi" "$haxeon_dir" "$scenekit_dir" \
 		"$generated_dir/nativekit.hxi" "$generated_dir/nativekit-gpu.hxi"
 )
 

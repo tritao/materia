@@ -9,7 +9,7 @@
     "materia-automation": { "path": "../../automationkit" },
     "animkit": { "path": "../../animkit" },
     "scenekit": { "path": "../../scenekit" },
-    "nativekit": { "path": "../../nativekit" }
+    "haxeon-platform": { "path": "../../haxeon/packages/platform" }
   },
   "native": {
     "cmake": {
@@ -24,7 +24,7 @@
         "../../animkit/native/src/runtime.cpp",
         "../../animkit/native/src/vendor.cpp",
         "../../scenekit/scene/CMakeLists.txt",
-        "../../nativekit/CMakeLists.txt"
+        "../../haxeon/vendor/nativekit/CMakeLists.txt"
       ]
     }
   },

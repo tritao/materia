@@ -15,7 +15,7 @@ import FrameInfo;
 import Rect;
 import ResolvedLayoutItem;
 import FontCollection;
-import NativeKitSurface;
+import haxeon.platform.NativeKitSurface;
 import nativekit.ffi.NativeKit;
 import nativekit.ui.core.CursorShape as UiCursorShape;
 import nativekit.ui.semantics.AccessibilityBridge;

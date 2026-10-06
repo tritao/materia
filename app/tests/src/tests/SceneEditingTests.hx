@@ -13,7 +13,7 @@ import nativekit.scene.SceneView;
 import nativekit.scene.Transform;
 import nativekit.scene.GeometryData;
 import LayoutFrame;
-import NativeKitEvents;
+import haxeon.platform.NativeKitEvents;
 import app.ProjectDocumentSession;
 import app.SceneCodec;
 import app.SensorConfiguration;

@@ -4,7 +4,7 @@
 	"entry": "tests.AutomationTests",
 	"sourceRoots": ["src"],
 	"dependencies": {
-		"nativekit": { "path": "../../nativekit" },
+		"haxeon-platform": { "path": "../../haxeon/packages/platform" },
 		"materia-automation": { "path": ".." }
 	},
 	"native": {
@@ -16,7 +16,7 @@
 				"../../robotkit/CMakeLists.txt",
 				"../../robotkit/runtime/CMakeLists.txt",
 				"../../robotkit/runtime/include/robotkit_runtime.h",
-				"../../nativekit/CMakeLists.txt",
+				"../../haxeon/vendor/nativekit/CMakeLists.txt",
 				"../../simkit/CMakeLists.txt"
 			]
 		}

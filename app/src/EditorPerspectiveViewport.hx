@@ -1,5 +1,6 @@
 package app;
 
+import haxeon.platform.GraphicsImageRef;
 import Canvas;
 import app.MissionPlayer.MissionOverlay;
 import Color;

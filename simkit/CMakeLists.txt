@@ -13,7 +13,7 @@ option(NK_SIM_MUJOCO_USE_VENDORED "Use SimKit's pinned MuJoCo checkout" ON)
 
 set(NKSIM_SCENEKIT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../scenekit" CACHE PATH
     "Path to the SceneKit source checkout")
-set(NKSCENE_NATIVEKIT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../nativekit" CACHE PATH
+set(NKSCENE_NATIVEKIT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../haxeon/vendor/nativekit" CACHE PATH
     "Path to the NativeKit source checkout")
 set(NK_MUJOCO_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vendor/mujoco" CACHE PATH
     "Path to the MuJoCo source checkout")

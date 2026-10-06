@@ -2,11 +2,11 @@ import nativekit.ffi.NativeKitTypes;
 import nativekit.ffi.NativeKit;
 import nativekit.ffi.NativeKitConstants;
 import nativekit.ffi.NativeKitGpu;
-import NativeKitEventValue;
-import NativeKitEvents;
-import NativeKitEvents.NativeKitEventSubscription;
-import NativeKitSurface;
-import NativeKitError;
+import haxeon.platform.NativeKitEventValue;
+import haxeon.platform.NativeKitEvents;
+import haxeon.platform.NativeKitEvents.NativeKitEventSubscription;
+import haxeon.platform.NativeKitSurface;
+import haxeon.platform.NativeKitError;
 import nativekit.ui.core.NativeInputAdapter;
 import WindowChromeDemo;
 

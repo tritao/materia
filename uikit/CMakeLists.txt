@@ -5,7 +5,7 @@ project(UIKit VERSION 0.1.0 LANGUAGES C CXX)
 include(GNUInstallDirs)
 include(CTest)
 
-set(NKUI_NATIVEKIT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../nativekit" CACHE PATH
+set(NKUI_NATIVEKIT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../haxeon/vendor/nativekit" CACHE PATH
     "Path to the NativeKit source checkout")
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
@@ -555,7 +555,7 @@ if(NK_BUILD_EXAMPLES)
                 "${CMAKE_CURRENT_SOURCE_DIR}/examples/ui_showcase/*.hx"
                 "${CMAKE_CURRENT_SOURCE_DIR}/haxe/nativekit/ui/*.hx"
                 "${CMAKE_CURRENT_SOURCE_DIR}/bindings/haxe/*.hx"
-                "${NKUI_NATIVEKIT_DIR}/bindings/haxe/*.hx")
+                "${NKUI_HAXEON_DIR}/packages/platform/src/*.hx")
             set(NKUI_HAXEON_MEMORY_CONTRACT_VERSION 1)
             set(NKUI_HAXEON_WASM_PAGE_SIZE 65536)
             set(NKUI_HAXEON_HOST_HEAP_BASE 0)
@@ -601,9 +601,9 @@ if(NK_BUILD_EXAMPLES)
                     "${CMAKE_CURRENT_SOURCE_DIR}/bindings/nativekit-ui-wasm.hxi"
                     "${CMAKE_CURRENT_SOURCE_DIR}/bindings/nativekit-ui-showcase-wasm.hxi"
                     "${CMAKE_CURRENT_SOURCE_DIR}/bindings/nativekit-ui-showcase.hxmap"
-                    "${NKUI_NATIVEKIT_DIR}/bindings/haxe/nativekit-wasm.hxi"
+                    "${NKUI_HAXEON_DIR}/packages/platform/bindings/nativekit-wasm.hxi"
                     "${CMAKE_CURRENT_SOURCE_DIR}/bindings/nativekit-ui.hxmap"
-                    "${NKUI_NATIVEKIT_DIR}/bindings/haxe/nativekit.hxmap"
+                    "${NKUI_HAXEON_DIR}/packages/platform/bindings/nativekit.hxmap"
                     ${NKUI_HAXEON_GUEST_HX_DEPS}
                     ${NKUI_HAXEON_DEPS}
                 WORKING_DIRECTORY "${NKUI_NATIVEKIT_DIR}"
