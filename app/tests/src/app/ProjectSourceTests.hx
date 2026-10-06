@@ -1154,10 +1154,18 @@ class ProjectSourceTests {
             if(same){found=true;check(Math.abs(probe.residual)<1e-6,"authored known wrist angle has zero inverse consistency residual");}
           }
           check(found,"authored inverse slice preserves original joints modulo turns");
+          var roots=extracted.simpleRoots(expected,[for(_ in q)0.0]),recovered=false;
+          for(root in roots){
+            var same=true;
+            for(j in 0...6){var d=root.q[j]-q[j];if(Math.abs(Math.atan2(Math.sin(d),Math.cos(d)))>1e-5)same=false;}
+            recovered=recovered || same;
+          }
+          check(recovered,'authored unknown-angle root search recovers sample $sample');
+
 
         }
         check(arm.numericSolveCount()==before,"authored offset forward verification uses no inverse queries");
-        Sys.println("Authored RobotArm offset geometry: 100 forward and known-angle inverse-slice comparisons passed");
+        Sys.println("Authored RobotArm offset geometry: 100 forward, known-angle slice and unknown-angle root comparisons passed");
         simulation.dispose();session.dispose();return;
       }
       var analytic = new motionkit.robot.OpwKinematics(group.robot, arm);
