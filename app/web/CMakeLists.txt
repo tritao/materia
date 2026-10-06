@@ -45,6 +45,9 @@ add_subdirectory("${MATERIA_SOURCE_ROOT}/scenekit/scene_render" scene_render)
 set(NKSIM_SCENEKIT_DIR "${MATERIA_SOURCE_ROOT}/scenekit")
 set(NK_SIM_MUJOCO_USE_VENDORED ON CACHE BOOL "" FORCE)
 set(NK_MUJOCO_SOURCE_DIR "${MATERIA_SOURCE_ROOT}/simkit/vendor/mujoco" CACHE PATH "" FORCE)
+# Emscripten provides libm through its standard libraries. libCCD's older
+# find_library check expects a physical archive; preserve its portable -lm link.
+set(LIBM_LIBRARY m)
 add_subdirectory("${MATERIA_SOURCE_ROOT}/simkit/sim_core" sim_core)
 add_subdirectory("${MATERIA_SOURCE_ROOT}/simkit/sim_mujoco" sim_mujoco)
 
