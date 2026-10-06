@@ -42,7 +42,8 @@ class SurfacePlanRunner implements processkit.skill.SurfacePlanRunner {
       planning.velocity, planning.acceleration, planning.jerk,
       planning.startTolerances(0.005),
       null, Math.min(cartesianResolution, 0.0075), maxJointJump, 0.005, 0.02,
-      new IkTolerance(2e-3, 5e-3, 300, 0.03));
+      new IkTolerance(2e-3, 5e-3, 300, 0.03),
+      new StructuredJointPathPlanner(manipulator));
     compiler.planningAssumptions = planning.assumptions.copy();
     compiler.planCheck = planning.check();
     var indices = [for (target in manipulator.toJointTargets(
@@ -79,18 +80,43 @@ class SurfacePlanRunner implements processkit.skill.SurfacePlanRunner {
       event.channel, event.value, event.leadSeconds, HoldPolicy.RestoreOnResume)];
     var start = points[0].work_T_tcp;
     var end = points[points.length - 1].work_T_tcp;
-    var ik = ReachabilityChecker.solveApproach(manipulator, start, seed, 2e-3, 5e-3, 300, 0.03);
-    if (!ik.converged) throw 'Surface patch approach pose is unreachable (position=${ik.positionError}, orientation=${ik.orientationError}, status=${ik.status})';
+    var approach = approachConfiguration(start, seed);
     var localEnd = patch.toolpath.points[patch.toolpath.points.length - 1].work_T_tcp;
     var retractLocal = new Transform3(
       localEnd.translation.add(new Vec3(0.0, 0.0, 0.03)), localEnd.rotation);
     var retract = base_T_work.compose(retractLocal);
     return new MotionProgram([
-      MotionOp.MoveJ(MoveTarget.JointTarget(ik.q), new MotionOptions(), Blend.ExactStop),
+      MotionOp.MoveJ(MoveTarget.JointTarget(approach), new MotionOptions(), Blend.ExactStop),
       MotionOp.Dwell(0.6),
       MotionOp.FollowPath(path, "arm-base", feed, events),
       MotionOp.MoveL(pose(retract), "arm-base", feed, Blend.ExactStop)
     ]);
+  }
+
+  function approachConfiguration(target:Transform3, seed:Array<Float>):Array<Float> {
+    var backend = BranchIk.of(manipulator);
+    if (backend.family() == "numeric-fallback") {
+      var ik = ReachabilityChecker.solveApproach(manipulator, target, seed,
+        1e-8, 1e-8, 300, 0.03);
+      if (!ik.converged)
+        throw 'Surface patch approach pose is unreachable (position=${ik.positionError}, orientation=${ik.orientationError}, status=${ik.status})';
+      return ik.q;
+    }
+    // The approach is the pinned start of the process curve. Use an exact
+    // geometric branch rather than pinning a tolerance-sized IK residual.
+    var best:Null<Array<Float>> = null;
+    var cost = Math.POSITIVE_INFINITY;
+    for (candidate in backend.branches(pose(target), seed,
+        motionkit.path.OrientationPolicy.Fixed)) {
+      var distance = 0.0;
+      for (joint in 0...seed.length) {
+        var delta = candidate.q[joint] - seed[joint];
+        distance += delta * delta;
+      }
+      if (distance < cost) { best = candidate.q; cost = distance; }
+    }
+    if (best == null) throw "Surface patch approach pose is unreachable";
+    return best.copy();
   }
 
   public function update(dtSeconds:Float):Void motion.update(dtSeconds);

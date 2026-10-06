@@ -22,6 +22,9 @@ class PosePathRefinement {
       start=end;
     }
     var primitive=path.primitives[index],policy=primitive.orientationPolicy();
+    // The globally checked endpoint can subtract to slightly more than the
+    // final primitive's length after accumulated floating-point additions.
+    local=Math.min(primitive.length(),Math.max(0.0,local));
     // The authored primitive supplies an orientation centre even when rotation is free.
     var pose=primitive.waypointAt(local).pose;
     var outgoing=centreRates(pose,policy,primitive.derivativesAt(local)),incoming=outgoing;

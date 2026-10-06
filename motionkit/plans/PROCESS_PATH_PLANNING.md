@@ -388,7 +388,7 @@ Submodules come from the main checkout's stores, not from other worktrees (which
 | PP6 | in progress: planner argument, axis/standalone OPW defaults, class removal and free entry verified; remaining defaults and joined approach/retreat pending | `46f29f74f`, `4edacf8af`, `fc0efe042` |
 | PP7 | complete: generated entry/retreat selection, retries and emission; full MotionKit/native gate passed | `92b8c69ee`, `093e65a46`, `e41bdfffa`; retreat gate below |
 | PP8 | planned | — |
-| PP9 | in progress: handling uses the structured planner and authored mission passes; other runners/deletions/mission gate pending | handling migration below |
+| PP9 | in progress: handling and surface use the structured planner and authored missions pass; toolpaths/deletions/remaining mission gate pending | runner migrations below |
 | PP10 | planned | — |
 | PP11 | planned | — |
 
@@ -1457,3 +1457,13 @@ Validation:
 This authored case is slower than PP0 (0.189–0.278 s per step and 23.46 s cycle): cycle rises about 8.5%, and numeric candidate generation costs more than the old continuation. No handling speedup or final benchmark acceptance is claimed. The measurement records base revision b90a32b92 plus this uncommitted runner patch; the committed source below has the same runner behavior. Final PP11 benchmarking must use the completed pipeline at a clean revision.
 
 The initial authored attempt stopped on a stale staged app MotionKit library missing `mk_external_lattice_count`, before planner acceptance. Its failed log is retained separately. The already-tested workspace library was atomically staged into the app's generated native directory; no native source changes were made. The rerun passes. PP9 remains incomplete: SurfacePlanRunner, ToolpathPlanRunner, legacy deletions and the other named mission gates are outstanding.
+
+### PP9 surface runner migration
+
+`SurfacePlanRunner.create()` now supplies `StructuredJointPathPlanner`. The separate approach and dwell retain their authored order. The approach chooses the nearest exact FK-verified analytic branch for supported geometry; unsupported geometry retains a single-pose reaching solve with tight tolerances. This prevents a tolerance-sized approach residual from changing the pinned process start during refinement. Joined approach/retreat geometry remains PP6 work.
+
+The first authored run exposed accumulated-length roundoff at a later patch endpoint: subtracting the primitive prefix yielded a local distance slightly above its length. `PosePathRefinement` now bounds the local coordinate after validating the global distance, matching `PosePath.waypointAt()`. A regression checks the decimal-length endpoint, its derivatives and rejection of genuinely out-of-range distances.
+
+RobotKit and MotionKit compiler-only builds pass. C4 passes 1,149,267 assertions (`process-path-pp9-surface-c4.log`). The default-backend WallFinishing mission passes all 71 assertions: three patches, 99.5995% coverage, zero exclusion coverage, maximum tracking error 8.76e-16 m, zero numeric IK queries during measured compilation. Planning takes 5.382185, 6.131609 and 7.554938 s, with cycles 86.119952, 85.144768 and 85.145687 s. These planning times are slower than PP0's 0.91–1.01 s; no speedup is claimed.
+
+Successful records are in external scratch `process-path-pp9-surface-draft-v2/results.json`; they identify ed61ae5ec plus this then-uncommitted patch. The failed initial endpoint run remains separately in `process-path-pp9-surface-draft`. This is focused migration validation, not a full phase gate or MuJoCo WallFinishing acceptance. ToolpathPlanRunner, shared legacy deletion, remaining mission gates and performance work are still outstanding.

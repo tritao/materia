@@ -1245,6 +1245,14 @@ class KinematicsTests extends MotionKitTestSupport {
     var discontinuous=new motionkit.robot.PosePathRefinement(new motionkit.path.PosePath("task",[line,corner]));
     throws(function() discontinuous.at(line.length()),"refinement rejects an unblended task-velocity corner");
     throws(function() joined.at(-0.01),"refinement rejects distance before the authored path");
+    var decimalPath=new motionkit.path.PosePath("task",[
+      new PoseLine(waypoint(0,0),waypoint(0.1,0),motionkit.path.OrientationPolicy.Fixed,0.1,0.1),
+      new PoseLine(waypoint(0.1,0),waypoint(0.1,0.2),motionkit.path.OrientationPolicy.Fixed,0.1,0.1)]);
+    var decimalEnd=new motionkit.robot.PosePathRefinement(decimalPath).at(decimalPath.length());
+    near(decimalEnd.pose.y,0.2,"refinement preserves an endpoint after accumulated decimal lengths",1e-12);
+    near(decimalEnd.velocity[1],1,"endpoint roundoff retains final primitive derivatives",1e-12);
+    throws(function() new motionkit.robot.PosePathRefinement(decimalPath).at(decimalPath.length()+1e-6),
+      "endpoint rounding does not admit an out-of-path request");
     for (count in 3...6) {
       var model = new RobotModel('analytic-cartesian-$count');
       var base = model.addLink(new Link("cartesian-base")), parent = base;
