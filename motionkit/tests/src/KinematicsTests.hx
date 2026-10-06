@@ -629,6 +629,25 @@ class KinematicsTests extends MotionKitTestSupport {
       ({a:"arm",b:"fixture",distance:0.0,required:0.01})),"impossible pinned start reports collision blockage");
     throws(function() motionkit.robot.LazyCollisionLadder.selectWithChecks(problem,q -> null,8,
       (from,to) -> ({a:"tool",b:"post",distance:0.0,required:0.01})),"sweep blockage cannot return a clear route");
+    var rerouteRequest=new PathRequest(request.distances,request.poses,start,request.tolerance,
+      [for(_ in start)10.0],request.velocity);
+    var rerouteProblem=new motionkit.robot.CandidateProblem(fixture.arm,rerouteRequest);
+    var initialRoute=motionkit.robot.StructuredLadder.search(rerouteProblem);
+    var blockedEndpoint=initialRoute.candidates[1].q,rerouteChecks=0;
+    var rerouted=motionkit.robot.LazyCollisionLadder.selectWithChecks(rerouteProblem,q -> {
+      rerouteChecks++;
+      return q==blockedEndpoint ? {a:"wrist",b:"obstacle",distance:0.0,required:0.01} : null;
+    },2);
+    check(rerouted.diagnostic==null && rerouted.candidates[1].q!=blockedEndpoint,
+      "lazy collision retries select a different legal candidate");
+    check(rerouteChecks==4,"one rejected sample causes exactly two bounded search rounds");
+    near(motionkit.path.PoseMath.distance(solver.forward(rerouted.candidates[1].q),request.poses[1]),0,
+      "collision rerouting retains the geometric task",1e-6);
+    throws(function() motionkit.robot.LazyCollisionLadder.selectWithChecks(rerouteProblem,q ->
+      q==blockedEndpoint ? {a:"wrist",b:"obstacle",distance:0.0,required:0.01} : null,1),
+      "collision retry budget is enforced before accepting an unchecked alternate");
+    var originalRoute=motionkit.robot.StructuredLadder.search(rerouteProblem);
+    check(originalRoute.candidates[1].q==blockedEndpoint,"lazy collision filtering leaves the source candidate problem unchanged");
     var refiner=new motionkit.robot.AnalyticPathRefiner(fixture.arm,problem,selected);
     var previous=start.copy();
     for(i in 0...11){var q=start.copy();q[0]+=0.003*i;var target=solver.forward(q);

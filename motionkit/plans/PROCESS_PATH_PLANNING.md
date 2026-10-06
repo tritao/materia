@@ -1140,3 +1140,16 @@ rejection tests pass. Compiler-only and focused runtime pass (1,148,566
 assertions). Native edge exclusion, physical obstacle rerouting acceptance,
 closest-clearance reporting and refined-curve checking remain outstanding;
 PP5 is not complete and this is not yet wired into production planning.
+
+PP5/PP6 collision composition: StructuredJointPathPlanner accepts an
+optional ArmClearance world, contact mode and collision-round budget. It
+uses lazy sample filtering for discrete selection and checks the refined
+samples and joint sweeps before returning the curve. Refined collisions
+are diagnosed, not silently accepted. An injected-checker UR test rejects
+the first selected endpoint, verifies a different task-valid candidate in
+exactly two rounds, enforces a one-round failure budget, and proves the
+source problem is unchanged. Compiler-only and focused runtime pass
+(1,148,571 assertions). This is injected-checker rerouting, not physical
+obstacle acceptance. Native edge exclusion, closest clearance, refined
+collision re-search, physical integration acceptance and production
+compiler wiring remain outstanding.

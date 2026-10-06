@@ -7,16 +7,22 @@ import motionkit.planner.JointPathSamples;
 import motionkit.robot.CandidateProblem.CandidateSamplingOptions;
 import motionkit.robot.StructuredLadder.CoarseSearchOptions;
 import robotkit.manipulation.KinematicGroup;
+import robotkit.manipulation.ArmClearance;
 
 /** Native ladder selection followed by analytic geometric refinement.
- * Collision filtering and unsupported-family fallback are separate stages. */
+ * Unsupported-family fallback and edge exclusion remain separate stages. */
 class StructuredJointPathPlanner implements JointPathPlanner {
   public final group:KinematicGroup;
   final sampling:Null<CandidateSamplingOptions>;
   final coarse:Null<CoarseSearchOptions>;
-  public function new(group:KinematicGroup,?sampling:CandidateSamplingOptions,?coarse:CoarseSearchOptions) {
-    if(group==null)throw "Joint path planner requires a compiled kinematic group";
+  final clearance:Null<ArmClearance>;
+  final collisionRounds:Int;
+  final contact:Bool;
+  public function new(group:KinematicGroup,?sampling:CandidateSamplingOptions,?coarse:CoarseSearchOptions,
+      ?clearance:ArmClearance,collisionRounds:Int=8,contact:Bool=false) {
+    if(group==null || collisionRounds<1)throw "Joint path planner requires a compiled group and positive collision round budget";
     this.group=group;this.sampling=sampling;this.coarse=coarse;
+    this.clearance=clearance;this.collisionRounds=collisionRounds;this.contact=contact;
   }
   public function plan(path:PosePath,request:PathRequest):JointPathSamples {
     if(path==null || request==null || request.distances.length<2 || request.distances[0]!=0 ||
@@ -35,8 +41,17 @@ class StructuredJointPathPlanner implements JointPathPlanner {
     }
     var problem=new CandidateProblem(group,request,sampling);
     if(problem.diagnostic!=null)throw 'Joint path family requires fallback: ${problem.diagnostic}';
-    var selected=StructuredLadder.search(problem,null,0,null,coarse);
+    var selected=clearance==null ? StructuredLadder.search(problem,null,0,null,coarse)
+      : LazyCollisionLadder.select(problem,clearance,collisionRounds,contact,coarse);
     if(selected.diagnostic!=null)throw 'Joint path selection failed at distance ${selected.failedDistance}: ${selected.diagnostic}';
-    return new AnalyticPathRefiner(group,problem,selected).refinePath(request.distances,provider.at);
+    var refined=new AnalyticPathRefiner(group,problem,selected).refinePath(request.distances,provider.at);
+    // Spline refinement can leave the discrete joint interpolation. Check
+    // the resulting samples and sweeps before releasing it to timing.
+    if(clearance!=null)for(i in 0...refined.q.length){
+      var failure=clearance.violation(refined.q[i],contact);
+      if(failure==null && i>0)failure=clearance.sweep(refined.q[i-1],refined.q[i],contact);
+      if(failure!=null)throw 'Refined path collision at distance ${refined.s[i]} (${failure.a}, ${failure.b})';
+    }
+    return refined;
   }
 }
