@@ -15,6 +15,41 @@ struct CachedLayers {
         unsigned slot=layer%2;if(index[slot]!=layer){cache[slot]=source[layer];index[slot]=layer;}return cache[slot];
     }
 };
+// No fixed-size joint/wrap arrays or owning candidate records in this source.
+struct CompactCandidate {
+    const double *joints;
+    const unsigned *external_coordinates;
+    unsigned roll_index,tilt_index,azimuth_index,branch;
+};
+struct CompactLayer {
+    std::vector<double> joints;
+    std::vector<unsigned> cells;
+    unsigned joint_count,external_count;
+    unsigned size()const{return cells.size()/(external_count+4);}
+    bool empty()const{return size()==0;}
+    CompactCandidate operator[](unsigned i)const {
+        auto c=cells.data()+i*(external_count+4);
+        return {joints.data()+i*joint_count,c,c[external_count],c[external_count+1],c[external_count+2],c[external_count+3]};
+    }
+    struct Iterator {
+        const CompactLayer *layer;unsigned index;
+        CompactCandidate operator*()const{return (*layer)[index];}
+        Iterator &operator++(){++index;return *this;}
+        bool operator!=(const Iterator &other)const{return index!=other.index;}
+    };
+    Iterator begin()const{return {this,0};}
+    Iterator end()const{return {this,size()};}
+};
+std::vector<CompactLayer> compact_layers(const std::vector<LadderLayer> &source,const LadderSettings &settings) {
+    std::vector<CompactLayer> result;
+    for(const auto &layer:source){CompactLayer compact{{},{},settings.joints,settings.externals};
+        for(const auto &c:layer){
+            for(unsigned j=0;j<settings.joints;++j)compact.joints.push_back(c.joints[j]);
+            for(unsigned j=0;j<settings.externals;++j)compact.cells.push_back(c.external_coordinates[j]);
+            for(auto value:{c.roll_index,c.tilt_index,c.azimuth_index,c.branch})compact.cells.push_back(value);
+        }result.push_back(std::move(compact));
+    }return result;
+}
 int main(){
     LadderSettings s;s.joints=4;s.externals=1;s.rolls=4;s.roll_weight=.07;
     for(unsigned j=0;j<4;++j){s.jump[j]=.5;s.weight[j]=1+j;s.velocity[j]=1;}
@@ -55,6 +90,12 @@ int main(){
             for(unsigned j=0;j<4;++j)c.joints[j]=q(random)*(trial<50?.2:1.0);layers[l].push_back(c);states[l].push_back(.01*i);
         }
         auto result=structured_ladder(layers,s,states);
+        auto compact=compact_layers(layers,s);
+        auto compact_result=structured_ladder(compact,s,states);
+        assert(compact_result.route==result.route && compact_result.cost==result.cost);
+        assert(compact_result.failed==result.failed && compact_result.tested_edges==result.tested_edges);
+        auto compact_coarse=coarse_ladder(compact,s,CoarseLadderSettings{1,1,10,0},states);
+        assert(compact_coarse.route==result.route && compact_coarse.cost==result.cost && compact_coarse.failed==result.failed);
         auto coarse_exact=coarse_ladder(layers,s,CoarseLadderSettings{1,1,10,0},states);
         assert(coarse_exact.failed==result.failed && coarse_exact.cost==result.cost && coarse_exact.route==result.route);
         CachedLayers streamed{layers};auto streamed_result=structured_ladder(streamed,s,states);
@@ -90,6 +131,10 @@ int main(){
             mk_ladder_edge blocked{sizeof(mk_ladder_edge),1,indices[0]-samples[0].first_candidate,indices[1]-samples[1].first_candidate};
             auto allowed=[&](unsigned layer,unsigned from,unsigned to){return !(layer==blocked.sample && from==blocked.from_candidate && to==blocked.to_candidate);};
             auto expected=structured_ladder(layers,s,states,allowed);
+            auto compact_filtered=structured_ladder(compact,s,states,allowed);
+            assert(compact_filtered.route==expected.route && compact_filtered.cost==expected.cost && compact_filtered.failed==expected.failed);
+            auto compact_filtered_coarse=coarse_ladder(compact,s,CoarseLadderSettings{2,1,10,0},states,allowed);
+            assert(compact_filtered_coarse.route==expected.route && compact_filtered_coarse.cost==expected.cost && compact_filtered_coarse.failed==expected.failed);
             for(unsigned coarse_stride:{0u,2u}){
                 request.coarse_sample_stride=coarse_stride;request.coarse_lattice_stride=1;request.corridor_radius=10;request.corridor_widenings=0;
                 auto filtered=mk_search_ladder_filtered(&request,samples,4,flat.data(),prices.data(),flat.size(),&blocked,1,indices,&report);

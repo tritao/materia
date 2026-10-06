@@ -5,6 +5,18 @@ namespace motionkit {
 struct CoarseLadderSettings {
     unsigned sample_stride=10,lattice_stride=4,corridor_radius=2,widenings=2;
 };
+// Only selected coarse/corridor cells need owning records. The complete
+// source may expose compact views over joint and lattice-coordinate arrays.
+inline mk_lattice_candidate own_ladder_candidate(const mk_lattice_candidate &c,const LadderSettings &) {return c;}
+template<class Candidate>
+inline mk_lattice_candidate own_ladder_candidate(const Candidate &c,const LadderSettings &s) {
+    mk_lattice_candidate result{};result.struct_size=sizeof(result);
+    for(unsigned j=0;j<s.joints;++j)result.joints[j]=c.joints[j];
+    for(unsigned j=0;j<s.externals;++j)result.external_coordinates[j]=c.external_coordinates[j];
+    result.roll_index=c.roll_index;result.tilt_index=c.tilt_index;
+    result.azimuth_index=c.azimuth_index;result.branch=c.branch;
+    return result;
+}
 template<class Layers> struct CorridorLayers {
     const Layers &source;
     const LadderSettings &settings;
@@ -32,11 +44,11 @@ template<class Layers> struct CorridorLayers {
             if(period>1){d=std::fmod(d,period);d=std::min(d,period-d);}
             return d<=radius+1e-12;
         };
-        for(unsigned i=0;i<all.size();++i){const auto &c=all[i],&a=centres[lo],&b=centres[hi];validate_ladder_candidate(c,settings);bool keep=true;
+        for(unsigned i=0;i<all.size();++i){const auto &c=all[i];const auto &a=centres[lo],&b=centres[hi];validate_ladder_candidate(c,settings);bool keep=true;
             for(unsigned j=0;j<settings.externals;++j)keep=keep && close(c.external_coordinates[j],a.external_coordinates[j],b.external_coordinates[j],0);
             keep=keep && close(c.roll_index,a.roll_index,b.roll_index,settings.rolls) &&
                 close(c.tilt_index,a.tilt_index,b.tilt_index,0) && close(c.azimuth_index,a.azimuth_index,b.azimuth_index,settings.azimuths);
-            if(keep){cells.push_back(c);indices.push_back(i);}
+            if(keep){cells.push_back(own_ladder_candidate(c,settings));indices.push_back(i);}
         }
         all_mapping[layer]=indices;cached[slot]=layer;return cells;
     }
@@ -61,7 +73,7 @@ template<class Layers> LadderResult coarse_ladder(const Layers &source,const Lad
     std::vector<std::vector<double>> costs;
     for(auto layer:anchors){const auto &all=source[layer];LadderLayer cells;std::vector<unsigned> indices;std::vector<double> prices;
         if(!state_cost.empty() && state_cost[layer].size()!=all.size())throw std::invalid_argument("Coarse state-cost candidate mismatch");
-        for(unsigned i=0;i<all.size();++i){auto c=all[i];validate_ladder_candidate(c,settings);
+        for(unsigned i=0;i<all.size();++i){auto c=own_ladder_candidate(all[i],settings);validate_ladder_candidate(c,settings);
             if(!state_cost.empty() && (std::isnan(state_cost[layer][i]) || state_cost[layer][i]<0))throw std::invalid_argument("Invalid coarse state cost");
             bool keep=all.size()==1;
             if(!keep){keep=c.roll_index%stride==0 && c.tilt_index%stride==0 && c.azimuth_index%stride==0;
@@ -93,7 +105,7 @@ template<class Layers> LadderResult coarse_ladder(const Layers &source,const Lad
     if(route.failed!=UINT32_MAX){auto complete=structured_ladder(source,settings,state_cost,edge_allowed);
         complete.tested_edges+=coarse_tested;return complete;}
     std::vector<mk_lattice_candidate> centres;
-    for(unsigned i=0;i<anchors.size();++i)centres.push_back(source[anchors[i]][mapping[i][route.route[i]]]);
+    for(unsigned i=0;i<anchors.size();++i)centres.push_back(own_ladder_candidate(source[anchors[i]][mapping[i][route.route[i]]],settings));
     uint64_t tested=coarse_tested;
     unsigned radius=options.corridor_radius;
     for(unsigned attempt=0;attempt<=options.widenings;++attempt){

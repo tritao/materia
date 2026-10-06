@@ -36,7 +36,8 @@ struct LatticeHash {
         size_t h=a.branch;for(unsigned i=0;i<a.dimensions;++i)h=(h^a.cell[i])*1099511628211ull;return h;
     }
 };
-inline LatticeKey lattice_key(const mk_lattice_candidate &c,unsigned external) {
+template<class Candidate>
+inline LatticeKey lattice_key(const Candidate &c,unsigned external) {
     LatticeKey key{};key.branch=c.branch;key.dimensions=external+3;
     for(unsigned i=0;i<external;++i)key.cell[i]=c.external_coordinates[i];
     key.cell[external]=c.roll_index;key.cell[external+1]=c.tilt_index;key.cell[external+2]=c.azimuth_index;
@@ -61,7 +62,8 @@ inline void validate_ladder_settings(const LadderSettings &s) {
             !std::isfinite(s.weight[j]) || s.weight[j]<0 || !std::isfinite(s.start[j]))
             throw std::invalid_argument("Ladder requires finite joints, positive jumps/speeds and nonnegative weights");
 }
-inline void validate_ladder_candidate(const mk_lattice_candidate &c,const LadderSettings &s) {
+template<class Candidate>
+inline void validate_ladder_candidate(const Candidate &c,const LadderSettings &s) {
     if(c.roll_index>=s.rolls || c.tilt_index>=s.tilts || c.azimuth_index>=s.azimuths)
         throw std::invalid_argument("Ladder orientation coordinate out of range");
     for(unsigned j=0;j<s.joints;++j)
@@ -123,7 +125,7 @@ inline LadderResult structured_ladder(const Layers &layers,
                 spread.push_back({(hi-lo)/s.jump[j],j});}
             std::sort(spread.rbegin(),spread.rend());
             unsigned nd=std::min(3u,s.joints);for(unsigned d=0;d<nd;++d)dimensions[d]=spread[d].second;
-            auto joint_key=[&](const mk_lattice_candidate &c){JointKey k;
+            auto joint_key=[&](const auto &c){JointKey k;
                 for(unsigned d=0;d<nd;++d)k.cell[d]=static_cast<int64_t>(std::floor(c.joints[dimensions[d]]/(s.jump[dimensions[d]]+1e-12)));return k;};
             for(unsigned i=0;i<prior.size();++i)if(std::isfinite(previous[i])){
                 lattice[lattice_key(prior[i],s.externals)].push_back(i);joints[joint_key(prior[i])].push_back(i);
