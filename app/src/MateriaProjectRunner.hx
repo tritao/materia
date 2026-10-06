@@ -330,10 +330,28 @@ class MateriaProjectRunner {
     if (status != 0) {
       var details = StringTools.trim(stderr + "\n" + stdout);
       if (details.length > 6000) details = details.substr(details.length - 6000);
-      throw '$description (exit $status):\n$details';
+      var message = description + " (" + processExitDescription(status) + ")";
+      throw details.length == 0 ? message : message + ":\n" + details;
     }
     return stdout;
     #end
+  }
+
+  /** HashLink encodes POSIX signal termination separately from normal exit codes. */
+  public static function processExitDescription(status:Int):String {
+    if (Sys.systemName() != "Windows" && status >= 0 && (status & 0x40000000) != 0) {
+      var signal = status & 0x3fffffff;
+      var name = switch signal {
+        case 2: "SIGINT";
+        case 6: "SIGABRT";
+        case 9: "SIGKILL";
+        case 11: "SIGSEGV";
+        case 15: "SIGTERM";
+        case _: null;
+      };
+      return name == null ? 'terminated by signal $signal' : 'terminated by $name (signal $signal)';
+    }
+    return 'exit $status';
   }
 
   static function previewRecords(snapshot:Bytes):GeneratedAssemblyScene {
