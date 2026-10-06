@@ -14,7 +14,8 @@ seconds instead of minutes. Decide the discrete choices once, globally:
 Then make the path smooth, time it once, and check collisions only where the chosen path goes.
 
 Target: the G17 2.6 m track weld plans in under 15 s, down from about 306 s. The robot-welder and
-gantry-welder whole-weldment missions plan at least 10× faster with the same weld quality.
+gantry-welder whole-weldment missions plan at least 10× faster than **PP0's original planner** with
+the same weld quality. The baseline is PP0's numbers, not the industrial re-baselines (revision 8).
 
 ## Revision 2026-10-06
 
@@ -88,6 +89,37 @@ Work already done stays where it fits; what doesn't is reworked in the step name
      - Drop the separate dense clearance pass on the timed trajectory.
    - **Fix 3: the search wrapper** (state costs, packing, Haxe wrapper work) comes only after fixes 1
      and 2.
+8. **Speed targets are measured against the original planner; two more savings** (PP8, 2026-10-06).
+   - **Corrected baseline.**
+     - The "10× faster" whole-weldment target compares against PP0's original planner, which is what
+       it was written to measure.
+     - The industrial re-baselines (PP0a) already ran on the new pipeline, so a 10× target against
+       them (1.47 s) is not meaningful.
+     - PP0's robot welder totals: MuJoCo 223.92 + 17.03 + 3.43 + 49.32 = **293.70 s**; test backend
+       161.06 + 17.50 + 3.33 + 47.27 = **229.15 s**. The 10× targets are ≤ 29.37 s and ≤ 22.92 s.
+     - The current 9.74 s and 9.81 s meet them (about 30× and 23×).
+     - Gantry welder: use PP0's gantry planning numbers if they were recorded. Otherwise use the
+       pre-planner Phase E log (40.69 / 124.41 / 193.74 / 437.51 s, total 796.35 s, in
+       `gantries-phase-e-app-posture-runtime.log`). Record which.
+   - **Saving 1: choose the travel direction before the full search.**
+     - Today both directions are fully built and searched (about 978k candidates each).
+     - Run the coarse pass for both, pick the direction with the lower coarse cost, and run the fine
+       search and refinement once.
+     - Fall back to the other direction only when the chosen one fails the fine search, refinement
+       or the clearance proof.
+     - The two must agree with today's full search on every authored weld; record any case where the
+       coarse choice differs.
+   - **Saving 2: certify the compiler's checks instead of repeating them.**
+     - The task-space check (1.6 s on G17) and the execution checks (1.3 s) re-sample the timed
+       trajectory densely.
+     - For a refined process section, the exact analytic re-solve and the lowering's validated joint
+       deviation already bound task-space error, just as PP5's curve proof bounds clearance.
+     - Derive that bound once per section and skip the dense re-sampling where the bound holds.
+     - Keep the dense checks for sections without a proof (generated entries, opaque policies,
+       timing backends without a lowering bound), as PP5 does.
+     - Audit the bound against restored dense checks on G17 and the whole weldment.
+   - **Measurement.** Report G17 planning as the median of 5 runs on a quiet host, and say whether the
+     host was quiet. A single run between 14 and 17 s is not a pass or a fail.
 5. **Refinement is an interface** (PP4).
    - The spline smoothing plus exact re-solve is the first implementation behind a
      `PathRefinement`-style interface.
@@ -551,13 +583,18 @@ joint path q(s), q'(s), q''(s)  ──► TOPP-RA once ──► final checks (l
      about 1.1 s per direction) and candidate construction (4.4 s).
 
   Re-profile after each step and record the split here.
+  4. Then revision 8's two savings: choose the travel direction from the coarse pass, and certify the
+     task-space and execution checks for refined sections.
 - **Acceptance (on the PP0 benchmarks):**
   - G17 track weld under 15 s planning: 2600 mm, 5 mm leg, arm margin ≥ the PP0 value, no clearance
     violation, cycle time within 5 % of PP0 (**<=248.43 s**, from 236.6 s),
     arm margin **>=0.775421815 rad**. Industrial re-baselines do not reset these
     acceptance thresholds; the diagnostic 383.4 s / 0.628358847 rad result failed both;
-  - robot-welder and gantry-welder whole weldments at least 10× faster, with every seam welded and leg
-    sizes and the `WeldPlanningTests` cases unchanged.
+  - robot-welder and gantry-welder whole weldments at least 10× faster **than PP0's original planner**:
+    - robot welder: ≤ 29.37 s (MuJoCo) and ≤ 22.92 s (test backend);
+    - gantry welder: against PP0's recorded numbers, or the Phase E log as revision 8 says;
+    - every seam welded, and leg sizes and the `WeldPlanningTests` cases unchanged;
+  - G17's under-15-second figure is the median of 5 quiet runs (revision 8).
 
 **PP9. Other runners.**
 - `SurfacePlanRunner`, `ToolpathPlanRunner` (FollowPath instead of MoveJ per waypoint) and
