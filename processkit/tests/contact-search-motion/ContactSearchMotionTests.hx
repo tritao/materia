@@ -3,6 +3,8 @@ import processkit.ContactSearchRunner;
 import processkit.ProbeMotionPlanner;
 import processkit.ContactProbeRunner;
 import processkit.ContactProbeRunner.ContactProbeRequest;
+import processkit.ContactRegistrationRunner;
+import processkit.WeldStowPlanner;
 import motionkit.robot.ManipulatorMotion;
 import processkit.WeldingPlanRunner;
 import robotkit.spatial.Transform3;
@@ -123,6 +125,25 @@ class ContactSearchMotionTests {
       check(safeSpeed > 0 && safeSpeed < 0.02, "Calibration and CAD wire extent bound requested sensing speed");
       check(safeSpeed * 0.04 + safeSpeed * safeSpeed / 2 <= 0.0005 - planning.compiler.ikTolerance.position - wire.envelopeExcess + 1e-10,
         "The derived prismatic speed fits the entire deadline and braking travel inside touch stand-off");
+      var localSolver = new StepLimitedProbeSolver(arm, 0.0005);
+      var localCompiler = new motionkit.robot.ProgramCompiler(localSolver, source.limits, source.frameId,
+        source.maxVelocity, source.maxAcceleration, source.maxJerk, source.startTolerances,
+        source.timing, source.cartesianResolution, source.maxJointJump, source.positionTolerance,
+        source.orientationTolerance, source.ikTolerance, null, source.perJointMaxJump);
+      var localPlanner = new ProbeMotionPlanner(arm, localCompiler);
+      var locallyContinuedSpeed = localPlanner.sensingSpeed([0.0], new Vec3(0, 0, 1), 0.004, 0.02, 0.0005);
+      check(locallyContinuedSpeed > 0 && localSolver.largestRequest > 0.0005 &&
+        localSolver.largestAcceptedStep <= 0.0005000001,
+        'Sensing speed refines the Cartesian step while staying on the observed IK branch (${localSolver.largestRequest}/${localSolver.largestAcceptedStep}, $locallyContinuedSpeed)');
+      var unreachableSolver = new StepLimitedProbeSolver(arm, 0.00001);
+      var unreachableCompiler = new motionkit.robot.ProgramCompiler(unreachableSolver, source.limits, source.frameId,
+        source.maxVelocity, source.maxAcceleration, source.maxJerk, source.startTolerances,
+        source.timing, source.cartesianResolution, source.maxJointJump, source.positionTolerance,
+        source.orientationTolerance, source.ikTolerance, null, source.perJointMaxJump);
+      var boundedFailure = false;
+      try new ProbeMotionPlanner(arm, unreachableCompiler).sensingSpeed([0.0], new Vec3(0, 0, 1), 0.004, 0.02, 0.0005)
+        catch (error:Dynamic) boundedFailure = Std.string(error).indexOf("minimum continuation step") >= 0;
+      check(boundedFailure, "Sensing speed fails closed when bounded local IK continuation cannot advance");
       check(wireGuarded.sensingSpeed([0.0], new Vec3(0, 0, 1), 0.04, 0.02, 0.0005, 0.08) < safeSpeed,
         "A longer command deadline reduces safe sensing speed");
       check(wireGuarded.sensingSpeed([0.0], new Vec3(0, 0, 1), 0.04, 0.02, 0.001) > safeSpeed,
@@ -156,6 +177,10 @@ class ContactSearchMotionTests {
       try guarded.observedApproach(new Transform3(new Vec3(0, 0, 0.03), Quat.identity()), [0.0]) catch (_:Dynamic) forbidden = true;
       check(forbidden, "Direct preference cannot authorize an intervening fixture collision");
       check(guarded.stoppingClear([0.0], [0.0], 0.02), "A stationary clear probe has a safe braking sweep");
+      check(guarded.stoppingClear([0.1000000000000005], [0.0], 0.02),
+        "Stationary braking tolerates representation-sized sensor overshoot at a joint limit");
+      check(!guarded.stoppingClear([0.1000001], [0.0], 0.02),
+        "Stationary braking rejects a measured joint position beyond numerical limit tolerance");
       check(!guarded.stoppingClear([0.008], [0.1], 0.02), "A clear current posture can still have an obstructed braking sweep");
       forbidden = false;
       try guarded.approach(new Transform3(new Vec3(0, 0, 0.03), Quat.identity()), [0.0], 32) catch (_:Dynamic) forbidden = true;
@@ -251,7 +276,7 @@ class ContactSearchMotionTests {
     }
     if (registration) registrationRunner.start(); else probe.start(requested);
     var sensing = new WeldArcModel({maxCurrentA: 300.0, efficiency: 0.85, wireDiameterMm: 1.2, stickoutMm: 15.0});
-    var tick = 0, safe = true, touchEpisodes = 0, touching = false;
+    var tick = 0, safe = true, touchEpisodes = 0, touching = false, fineRangeChecked = false;
     while (tick < 7200 && (registration ? registrationRunner.running() : probe.running())) {
       harness.step(Int64.ofInt(tick++));
       var snapshot = robot.snapshot();
@@ -265,6 +290,12 @@ class ContactSearchMotionTests {
       touching = reading.touch;
       runtime.publishSensorFrame("torch", WeldSensor.values(reading), Int64.ofInt(tick), snapshot.sourceTimestampNs, snapshot.sourceClockId);
       if (registration) registrationRunner.update(0.01); else probe.update(0.01);
+      if (!registration && !fineRangeChecked && Std.string(Reflect.field(probe, "phase")) == "Fine") {
+        var fine:ContactSearchRunner = cast Reflect.field(probe, "search");
+        check(fine != null && Math.abs(fine.search.distance - requested.backoff) < 1e-12,
+          "Fine search reaches the corrected material point without adding the calibrated contact offset twice");
+        fineRangeChecked = true;
+      }
     }
     if (registration) {
       check(!registrationRunner.running() && !registrationRunner.completed() && registrationRunner.workFrame == null &&
@@ -275,6 +306,7 @@ class ContactSearchMotionTests {
       harness.dispose(); return;
     }
     check(probe.completed() && probe.failure == null, 'The complete checked/refined probe succeeds: ${probe.failure}, tick=$tick, q=${robot.snapshot().positions.get(0)}, contacts=$touchEpisodes');
+    check(fineRangeChecked, "Fine contact refinement executes with its bounded material distance");
     var point:Vec3 = cast probe.contact;
     check(point != null && Math.abs(point.z + 0.02) < 0.000006, "Fine probing improves the calibrated observation to within 6 micrometres");
     check(touchEpisodes == 2, "The executed probe withdraws and measures a fresh second contact");
@@ -324,6 +356,12 @@ class ContactSearchMotionTests {
       servo.dispose(); harness.dispose(); return;
     }
     var planning = WeldingPlanRunner.planning(fixture.arm, 1.0);
+    var clear = new ArmClearance(fixture.arm, [], [0.0]);
+    var stow = WeldStowPlanner.plan(fixture.arm, planning.compiler, clear, [0.03], [0.0]);
+    check(stow.ops.length == 1 && switch stow.ops[0] {
+      case motionkit.program.MotionOp.MoveJ(motionkit.program.MoveTarget.JointTarget(goal), _, _): Math.abs(goal[0]) < 1e-12;
+      case _: false;
+    }, "Live weld stow compiles a checked return from the measured configuration to CAD ready");
     var motion = new ManipulatorMotion(robot, planning.compiler, (_) -> null, () -> runtime.pollEvents(), [0]);
     var probe = new ContactProbeRunner(motion, new ProbeMotionPlanner(fixture.arm, planning.compiler), channels, "torch",
       () -> new ServoSession(robot, fixture.arm));
@@ -352,8 +390,50 @@ class ContactSearchMotionTests {
   public static function main():Void {
     fiveAxisPreparation();
     checkedJointRetreatFallback();
-    run(false, false); run(true, false); run(false, true); completeProbe(); completeProbe(true); sixAxisPreparation(); resetEpochs();
+    run(false, false); run(true, false); run(false, true); completeProbe(); completeProbe(true);
+    registrationReturnsToStart(); sixAxisPreparation(); resetEpochs();
     Sys.println('Contact search native motion: $checks assertions passed');
+  }
+
+  static function registrationReturnsToStart():Void {
+    var fixture = axis();
+    var blueprint = RobotRuntimeCompiler.compile(fixture.model, new robotkit.profile.RobotProfile());
+    var channels = {arc: "torch.arc", wireSpeed: "torch.wire", voltage: "torch.voltage"};
+    blueprint.addTool(new processkit.tool.WeldChannels(channels.arc, channels.wireSpeed, channels.voltage));
+    var harness = new SimulationHarness(0.01);
+    var runtime = harness.simulation.addRobot(blueprint);
+    var robot = new SimulatedRobot("registration-return", runtime, fixture.model.name, ["base", "tool"], ["probe"]);
+    var planning = WeldingPlanRunner.planning(fixture.arm, 1.0);
+    var motion = new ManipulatorMotion(robot, planning.compiler, (_) -> null, () -> runtime.pollEvents(), [0]);
+    var probe = new RegistrationReturnProbe(motion, new ProbeMotionPlanner(fixture.arm, planning.compiler), channels,
+      "torch", () -> new ServoSession(robot, fixture.arm));
+    var points = [new Vec3(-0.1, -0.1, 0), new Vec3(0.1, -0.1, 0), new Vec3(0.1, 0.1, 0),
+      new Vec3(-0.1, 0.02, 0.05), new Vec3(0.1, 0.02, 0.05), new Vec3(0.04, -0.04, 0.05)];
+    var normals = [new Vec3(0, 0, 1), new Vec3(0, 1, 0), new Vec3(1, 0, 0)];
+    var sequence = new processkit.perception.ContactRegistrationSequence(
+      new processkit.perception.ContactPoseEnvelope(Transform3.identity(), new Vec3(0.1, 0.1, 0.1),
+        new Vec3(0.1, 0.1, 0.1), 0.00001), (count, _, _) -> {
+          var first = count == 3 ? 0 : count == 2 ? 3 : 5;
+          var normal = normals[3 - count];
+          return new processkit.perception.ContactRegistrationSequence.ContactRegistrationStage(normal,
+            normal.dot(points[first]), [for (index in first...first + count)
+              new ContactProbeRequest(new Transform3(points[index], Quat.identity()), new Vec3(0, 0, -1), 0.1)]);
+        });
+    var registration = new ContactRegistrationRunner(probe, sequence);
+    var initial = robot.snapshot().positions.get(0);
+    registration.start();
+    var tick = 0;
+    while (registration.running() && tick < 12000) {
+      harness.step(Int64.ofInt(tick++));
+      registration.update(0.01);
+    }
+    check(registration.completed() && registration.failure == null && registration.workFrame != null,
+      'Accepted registration completes only after returning to its start: ${registration.failure}');
+    check(probe.requests == 6, "Registration executes all 3–2–1 contacts before restoring the arm");
+    check(Math.abs(robot.snapshot().positions.get(0) - initial) < 0.005 &&
+      Math.abs(robot.snapshot().velocities.get(0)) < 1e-5,
+      "Accepted contact registration restores the measured starting posture at rest");
+    harness.dispose();
   }
 
   static function fiveAxisPreparation():Void {
@@ -445,4 +525,79 @@ private class RetreatProbeSolver extends motionkit.robot.ManipulatorKinematics {
   }
   override public function solvePathWithRates(request:motionkit.kinematics.PathRequest):motionkit.kinematics.PathSolution
     return new motionkit.kinematics.PathSolution([for (_ in request.poses) null]);
+}
+
+private class StepLimitedProbeSolver extends motionkit.robot.ManipulatorKinematics {
+  final arm:Manipulator;
+  final maximumStep:Float;
+  public var largestRequest(default, null):Float = 0.0;
+  public var largestAcceptedStep(default, null):Float = 0.0;
+  public function new(arm:Manipulator, maximumStep:Float) {
+    super(arm, 1e-8);
+    this.arm = arm;
+    this.maximumStep = maximumStep;
+  }
+  override public function solvePose(target:motionkit.kinematics.Pose3, seed:Array<Float>,
+      tolerance:motionkit.kinematics.IkTolerance,
+      ?freedom:motionkit.path.OrientationPolicy):Null<Array<Float>> {
+    var current = arm.tcpPose(seed).translation;
+    var requested = new Vec3(target.x, target.y, target.z).sub(current).norm();
+    largestRequest = Math.max(largestRequest, requested);
+    if (requested > maximumStep + 1e-12) return null;
+    largestAcceptedStep = Math.max(largestAcceptedStep, requested);
+    return super.solvePose(target, seed, tolerance, freedom);
+  }
+}
+
+private class RegistrationReturnProbe extends ContactProbeRunner {
+  public var requests(default, null):Int = 0;
+  var fakeRunning = false;
+  var fakeCompleted = false;
+  var measured:Null<Vec3> = null;
+
+  public function new(motion:ManipulatorMotion, planner:ProbeMotionPlanner,
+      channels:processkit.WelderProcessDevice.WelderChannels, sensor:String, makeServo:Void -> ServoSession) {
+    super(motion, planner, channels, sensor, makeServo);
+  }
+
+  override public function start(request:ContactProbeRequest):Void {
+    if (fakeRunning) throw "Fake registration probe is already running";
+    requests++;
+    measured = request.approach.translation;
+    Reflect.setField(this, "contact", null);
+    Reflect.setField(this, "failure", null);
+    fakeCompleted = false;
+    if (requests == 1) {
+      motion.reset();
+      motion.run(new motionkit.program.MotionProgram([
+        motionkit.program.MotionOp.MoveJ(motionkit.program.MoveTarget.JointTarget([0.03]),
+          new motionkit.MotionOptions(), motionkit.program.Blend.ExactStop)]));
+      fakeRunning = true;
+    } else {
+      Reflect.setField(this, "contact", measured);
+      fakeCompleted = true;
+    }
+  }
+
+  override public function update(dt:Float):Void {
+    if (!fakeRunning) return;
+    motion.update(dt);
+    if (motion.failure != null) {
+      Reflect.setField(this, "failure", motion.failure);
+      fakeRunning = false;
+    } else if (motion.completed) {
+      Reflect.setField(this, "contact", measured);
+      fakeRunning = false;
+      fakeCompleted = true;
+    }
+  }
+
+  override public function running():Bool return fakeRunning;
+  override public function completed():Bool return fakeCompleted;
+
+  override public function cancel():Void {
+    fakeRunning = false;
+    fakeCompleted = false;
+    try motion.abort() catch (_:Dynamic) {}
+  }
 }
