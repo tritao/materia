@@ -90,6 +90,35 @@ class OffsetWristGeometry {
     return new Transform3(new Vec3(pose.get_position(0),pose.get_position(1),pose.get_position(2)).add(middle.scale(offset)),r);
   }
 
+  /** Evaluate the OPW branches after removing the displacement for one
+   * canonical final-wrist angle. Zero residual is the consistency condition;
+   * these probes are not full inverse enumeration or legal periodic lifts. */
+  public function inverseSlice(target:Pose3,cell:Array<Float>,theta:Float):Array<OffsetWristProbe> {
+    if(target==null || cell==null || cell.length!=group.group.count() || !Math.isFinite(theta))
+      throw "Offset wrist slice requires a target, complete cell and finite angle";
+    for(value in cell)if(!Math.isFinite(value))throw "Offset wrist cell must be finite";
+    var requested=new Transform3(new Vec3(target.x,target.y,target.z),new Quat(target.qx,target.qy,target.qz,target.qw));
+    var local=base.inverse().compose(group.linkPoses(cell,[armRoot])[0].inverse()).compose(requested).compose(tool.inverse());
+    var middle=local.rotation.multiply(Quat.fromAxisAngle(new Vec3(0,0,1),-theta)).rotate(new Vec3(0,1,0));
+    var p=local.translation.sub(middle.scale(offset)),r=local.rotation;
+    var pose=new MotionKitNative.mk_opw_pose();pose.set_struct_size(MotionKitNative.mk_opw_pose.size());
+    var position=p.toArray(),rotation=[r.x,r.y,r.z,r.w];
+    for(i in 0...3)pose.set_position(i,position[i]);
+    for(i in 0...4)pose.set_quaternion(i,rotation[i]);
+    var result=MotionKitNative.mk_opw_inverse(native,pose,8);
+    if(result.status!=TrajectoryCoreConstants.MK_OK)throw "Offset wrist slice inverse failed";
+    var probes:Array<OffsetWristProbe> = [],branch=0;
+    for(solution in result.out_solutions){
+      var index=branch++;
+      if(solution.get_valid()==0)continue;
+      var q=cell.copy();for(i in 0...6)q[armIndices[i]]=solution.get_joints(i);
+      var solved=solution.get_joints(5)*parameters.signCorrections[5]-parameters.offsets[5];
+      var delta=solved-theta;
+      probes.push(new OffsetWristProbe(q,index,Math.atan2(Math.sin(delta),Math.cos(delta))));
+    }
+    return probes;
+  }
+
   public function forward(q:Array<Float>):Pose3 {
     if(q==null || q.length!=group.group.count())throw "Offset wrist forward requires complete joints";
     for(value in q)if(!Math.isFinite(value))throw "Offset wrist joints must be finite";
@@ -97,4 +126,11 @@ class OffsetWristGeometry {
     var p=pose.translation,r=pose.rotation;
     return new Pose3(p.x,p.y,p.z,r.x,r.y,r.z,r.w);
   }
+}
+
+class OffsetWristProbe {
+  public final q:Array<Float>;
+  public final branch:Int;
+  public final residual:Float;
+  public function new(q:Array<Float>,branch:Int,residual:Float){this.q=q;this.branch=branch;this.residual=residual;}
 }

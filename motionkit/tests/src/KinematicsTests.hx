@@ -2020,6 +2020,14 @@ class KinematicsTests extends MotionKitTestSupport {
       var expected=new ManipulatorKinematics(offsetArm).forward(q),actual=offsetGeometry.forward(q);
       near(motionkit.path.PoseMath.distance(actual,expected),0,"offset wrist position agrees with compiled model",1e-6);
       near(motionkit.path.PoseMath.angle(actual,expected),0,"offset wrist rotation agrees with compiled model",1e-6);
+      var theta=q[5]*offsetGeometry.parameters.signCorrections[5]-offsetGeometry.parameters.offsets[5],found=false;
+      for(probe in offsetGeometry.inverseSlice(expected,q,theta)){
+        var same=true;
+        for(j in 0...6){var delta=probe.q[j]-q[j];if(Math.abs(Math.atan2(Math.sin(delta),Math.cos(delta)))>1e-5)same=false;}
+        if(same){found=true;near(probe.residual,0,"known final angle makes offset inverse slice consistent",1e-6);}
+      }
+      check(found,"offset inverse slice contains original arm configuration modulo turns");
+
     }
     model.joints[5].parentFramePosition[1]=originalWristPosition;
     var bad = buildContractArmFixture();

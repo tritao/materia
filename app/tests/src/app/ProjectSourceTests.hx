@@ -1147,9 +1147,17 @@ class ProjectSourceTests {
           var actual=extracted.forward(q),expected=numeric.forward(q);
           check(motionkit.path.PoseMath.distance(actual,expected)<1e-6,"authored offset position matches compiled FK");
           check(motionkit.path.PoseMath.angle(actual,expected)<1e-6,"authored offset orientation matches compiled FK");
+          var theta=q[5]*extracted.parameters.signCorrections[5]-extracted.parameters.offsets[5],found=false;
+          for(probe in extracted.inverseSlice(expected,q,theta)){
+            var same=true;
+            for(j in 0...6){var delta=probe.q[j]-q[j];if(Math.abs(Math.atan2(Math.sin(delta),Math.cos(delta)))>1e-5)same=false;}
+            if(same){found=true;check(Math.abs(probe.residual)<1e-6,"authored known wrist angle has zero inverse consistency residual");}
+          }
+          check(found,"authored inverse slice preserves original joints modulo turns");
+
         }
         check(arm.numericSolveCount()==before,"authored offset forward verification uses no inverse queries");
-        Sys.println("Authored RobotArm offset geometry: 100 forward comparisons passed");
+        Sys.println("Authored RobotArm offset geometry: 100 forward and known-angle inverse-slice comparisons passed");
         simulation.dispose();session.dispose();return;
       }
       var analytic = new motionkit.robot.OpwKinematics(group.robot, arm);
