@@ -1202,3 +1202,15 @@ Compiler-only and focused runtime pass (1,148,574 assertions). Physical
 obstacle branch/roll acceptance, closest-clearance reporting, refined
 collision re-search and production/compiler migration remain outstanding;
 PP5 and the full plan remain incomplete.
+
+PP5 closest-pair query preparation: ArmClearance.closest returns the nearest
+checked hull pair even when all pairs exceed the required margin, retaining
+body names and the effective contact/arm margin. It queries full hull
+distance with no margin-based early exit and reuses placed hulls per pose.
+As with ConvexDistance, an iteration-limit result is a conservative lower
+bound, not a certified converged exact distance. A physical prismatic
+fixture checks two obstacles, nearest-pair selection, independent known
+box gaps at two configurations, contact margin and empty-world behavior.
+Compiler-only and focused runtime pass (1,148,580 assertions). Route/sweep
+closest-clearance aggregation, physical branch/roll rerouting acceptance,
+refined collision re-search and production migration remain outstanding.

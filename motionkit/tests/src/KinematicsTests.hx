@@ -859,6 +859,28 @@ class KinematicsTests extends MotionKitTestSupport {
   }
 
   public function testCartesianAnalyticIk():Void {
+    var clearanceModel=new RobotModel("closest-clearance");
+    var fixedLink=clearanceModel.addLink(new Link("fixed")),movingLink=clearanceModel.addLink(new Link("moving"));
+    var slide=clearanceModel.addJoint(new Joint("slide",JointType.Prismatic,fixedLink,movingLink));
+    slide.axis=[1.0,0.0,0.0];slide.limits.lower=-2;slide.limits.upper=2;
+    var tip=clearanceModel.addFrame(new Frame("tip",movingLink));
+    var clearanceGroup=new robotkit.manipulation.KinematicGroup(clearanceModel,fixedLink.id,tip.id);
+    function cube(x:Float):Array<Float> {
+      var vertices:Array<Float> = [];
+      for(dx in [-0.01,0.01])for(y in [-0.01,0.01])for(z in [-0.01,0.01]){vertices.push(x+dx);vertices.push(y);vertices.push(z);}
+      return vertices;
+    }
+    var world=new robotkit.manipulation.ArmClearance(clearanceGroup,[
+      {name:"tool",link:movingLink.id,vertices:cube(0),tool:true},
+      {name:"far",link:fixedLink.id,vertices:cube(1.5),tool:false},
+      {name:"near",link:fixedLink.id,vertices:cube(1),tool:false}],[0.0]);
+    var closest=world.closest([0.0]);check(closest!=null,"closest clearance reports clear pairs");
+    if(closest!=null){near(closest.distance,0.98,"closest clearance measures the nearest hull gap",1e-8);
+      check(closest.a=="near" || closest.b=="near","closest clearance retains the nearest body pair");}
+    var moved=world.closest([0.5],true);if(moved!=null){near(moved.distance,0.48,"closest clearance follows moving geometry",1e-8);
+      near(moved.required,robotkit.manipulation.ArmClearance.CONTACT_MARGIN,"closest clearance retains contact margin",1e-12);}
+    var emptyWorld=new robotkit.manipulation.ArmClearance(clearanceGroup,[],[0.0]);
+    check(emptyWorld.closest([0.0])==null,"empty clearance world has no closest pair");
     function waypoint(x:Float,y:Float):PoseWaypoint return new PoseWaypoint(new Pose3(x,y,0),1e-6,1e-6);
     var line=new PoseLine(waypoint(-1,0),waypoint(0,0),motionkit.path.OrientationPolicy.Fixed,0.1,0.1);
     var arc=new motionkit.path.PoseArc(waypoint(0,0),waypoint(Math.sqrt(0.5),1-Math.sqrt(0.5)),

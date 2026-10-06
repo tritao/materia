@@ -227,6 +227,26 @@ class ArmClearance {
     return null;
   }
 
+  /** Closest checked pair, including clear pairs, or null for an empty world.
+   * Uses full hull queries; at the GJK iteration limit the distance remains
+   * a conservative lower bound, as in ConvexDistance.between. */
+  public function closest(q:Array<Float>,contact:Bool=false,?wanted:Float):Null<ClearanceViolation> {
+    var poses=arm.linkPoses(q,links);
+    var placed:Array<Null<Array<Float>>> = [for(_ in bodies)null];
+    function corners(index:Int):Array<Float> {
+      var found=placed[index];if(found!=null)return found;
+      var made=bodies[index].placed(poses[bodies[index].linkIndex]);placed[index]=made;return made;
+    }
+    var best:Null<ClearanceViolation> = null;
+    for(pair in pairs){var a=bodies[pair[0]],b=bodies[pair[1]];
+      var required=contact && (a.tool && !b.moving || b.tool && !a.moving) ? contactMargin
+        : (wanted==null ? margin : Math.min(margin,wanted));
+      var apart=ConvexDistance.between(corners(pair[0]),corners(pair[1]),Math.POSITIVE_INFINITY);
+      if(best==null || apart<best.distance)best={a:a.name,b:b.name,distance:apart,required:required};
+    }
+    return best;
+  }
+
   /**
    * The first violation along the straight joint-space motion from `from` to `to`, sampled so that no joint turns more than
    * `maxJointStep` radians between samples, or null.
