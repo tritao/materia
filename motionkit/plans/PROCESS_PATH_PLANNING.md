@@ -1065,3 +1065,17 @@ Compiler-only and focused runtime pass (1,147,331 assertions). Production
 integration, Cartesian/numeric refinement, branch segmentation, geometric
 centre derivative providers and authored timing/performance gates remain
 outstanding; this does not complete PP4.
+
+PP4 Cartesian refinement: AnalyticPathRefiner now dispatches its fixed
+refined targets to the native Cartesian sampler for XYZ, XYZ+C and
+XYZ+C+A, while retaining serial sampling for OPW/UR. Cartesian task axes
+remain fully solved, including axes marked external by assembly ownership;
+they are not held as serial redundancy coordinates. The existing branch,
+physical lift, jump, task-freedom and FK checks apply to both families.
+All three rotated-base/tool-offset Cartesian fixtures now produce complete
+JointPathSamples on eleven fine samples with exact task-axis motion,
+differential velocity and zero straight-path curvature. Their existing
+numeric-query checks prove no numeric pose IK is introduced. Compiler-only
+and focused runtime pass (1,147,730 assertions). Rotary Cartesian curvature
+acceptance, numeric fallback refinement, branch segmentation, geometric
+centre derivative providers and production/authored gates remain open.

@@ -10,13 +10,14 @@ import robotkit.manipulation.KinematicGroup;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Vec3;
 
-/** Serial-arm refinement on one geometric branch. Differential joint output
- * and branch-transition segmentation are handled separately. */
+/** Analytic refinement on one geometric branch. Branch-transition
+ * segmentation is handled separately. */
 class AnalyticPathRefiner {
   final group:KinematicGroup;
   final problem:CandidateProblem;
   final selection:LadderSelection;
-  final sampler:SerialCandidateSampler;
+  final sampler:Null<SerialCandidateSampler>;
+  final cartesian:Null<CartesianCandidateSampler>;
   final branch:Int;
   final external:Array<RedundancySpline>;
   final roll:RedundancySpline;
@@ -26,9 +27,12 @@ class AnalyticPathRefiner {
     if(group==null || problem==null || selection==null || selection.diagnostic!=null ||
         problem.samples.length<2 || selection.candidates.length!=problem.samples.length)
       throw "Analytic refinement requires a complete selected path with at least two samples";
-    if(problem.family!="UR6R" && problem.family!="OPW")throw "Serial refinement requires a supported analytic arm";
+    var isCartesian=problem.family=="XYZ" || problem.family=="XYZ+C" || problem.family=="XYZ+C+A";
+    if(!isCartesian && problem.family!="UR6R" && problem.family!="OPW")throw "Refinement requires a supported analytic family";
     this.group=group;this.problem=problem;this.selection=selection;
-    sampler=new SerialCandidateSampler(group);branch=selection.candidates[0].branch;
+    sampler=isCartesian ? null : new SerialCandidateSampler(group);
+    cartesian=isCartesian ? new CartesianCandidateSampler(group) : null;
+    branch=selection.candidates[0].branch;
     var distances=[for(layer in problem.samples)layer.distance];
     for(c in selection.candidates)if(c.branch!=branch)throw "Refinement must split the route at geometric branch transitions";
     external=[for(j in problem.externalJoints)new RedundancySpline(distances,[for(c in selection.candidates)c.q[j]])];
@@ -114,7 +118,9 @@ class AnalyticPathRefiner {
     if(ToolFreedom.orientationError(refined,target,freedom)>problem.request.tolerance.orientation)
       throw 'Refined orientation exceeds task freedom at distance $distance';
     var best:Null<LatticeCandidate> = null,bestDistance=Math.POSITIVE_INFINITY;
-    for(c in sampler.sample(refined,q,OrientationPolicy.Fixed,ranges,1,1,1))if(c.branch==branch){
+    var candidates=cartesian!=null ? cartesian.sample(refined,q,OrientationPolicy.Fixed,1,1,1)
+      : sampler.sample(refined,q,OrientationPolicy.Fixed,ranges,1,1,1);
+    for(c in candidates)if(c.branch==branch){
       var d=0.0,legal=true;for(j in 0...q.length){d+=Math.abs(c.q[j]-q[j]);
         if(Math.abs(c.q[j]-previous[j])>problem.request.maxJump[j]+1e-12)legal=false;}
       if(legal && d<bestDistance){best=c;bestDistance=d;}}

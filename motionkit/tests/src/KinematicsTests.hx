@@ -860,6 +860,25 @@ class KinematicsTests extends MotionKitTestSupport {
       var markedProblem = new motionkit.robot.CandidateProblem(marked,markedRequest);
       check(markedProblem.externalJoints.length==0 && markedProblem.samples[0].candidates.length==1,
         "Cartesian task axes are solved geometrically rather than sampled independently");
+      var refinedEnd = markedQ.copy();refinedEnd[0] += 0.02;
+      var refineRequest = new PathRequest([0.0,0.04],[markedTarget,new ManipulatorKinematics(marked).forward(refinedEnd)],
+        markedQ,new IkTolerance(1e-6,1e-6),[for(_ in markedQ)0.5],[for(_ in markedQ)1.0]);
+      var refineProblem = new motionkit.robot.CandidateProblem(marked,refineRequest);
+      var route = motionkit.robot.StructuredLadder.search(refineProblem);
+      check(route.diagnostic==null,"Cartesian refinement has a complete selected route");
+      var refiner = new motionkit.robot.AnalyticPathRefiner(marked,refineProblem,route);
+      var delta = new ManipulatorKinematics(marked).forward(refinedEnd);
+      var velocity = [(delta.x-markedTarget.x)/0.04,(delta.y-markedTarget.y)/0.04,(delta.z-markedTarget.z)/0.04,0.0,0.0,0.0];
+      var refined = refiner.refinePath([for(i in 0...11)0.004*i],distance -> {
+        var q=markedQ.copy();q[0]+=0.5*distance;
+        return new motionkit.robot.AnalyticPathRefiner.RefinementTarget(new ManipulatorKinematics(marked).forward(q),
+          motionkit.path.OrientationPolicy.Fixed,velocity,[for(_ in 0...6)0.0]);
+      });
+      for(i in 0...11)for(j in 0...count) {
+        near(refined.q[i][j],markedQ[j]+(j==0?0.002*i:0),"Cartesian refinement preserves geometric task axes",1e-7);
+        near(refined.qPrime[i][j],j==0?0.5:0,"Cartesian refinement solves task derivatives",1e-7);
+        near(refined.qDoublePrime[i][j],0,"Cartesian straight refinement has zero curvature",1e-6);
+      }
       for (sample in 0...40) {
         var q = [for (joint in 0...count) 1.4 * Math.sin((sample + 1) * (joint + 1) * 1.618)];
         var target = numeric.forward(q);
