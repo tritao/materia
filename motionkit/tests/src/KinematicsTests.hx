@@ -633,6 +633,13 @@ class KinematicsTests extends MotionKitTestSupport {
     var complete = [for (i in 0...cell.group.group.count()) 0.1*Math.sin(i+0.3)];
     var candidates = held.branches(held.forward(complete),complete);
     check(candidates.length > 0,"numeric fallback accepts an external lattice cell");
+    var changedExternal=complete.copy();
+    for(i in 0...complete.length)if(cell.group.external[i])changedExternal[i]+=0.01;
+    var solveBefore=cell.group.numericSolveCount();
+    var deduplicated=held.branchesFromNeighbours(held.forward(complete),[complete,changedExternal,complete.copy()],complete,null,false);
+    check(cell.group.numericSolveCount()-solveBefore==1,"held external cells collapse identical numeric seeds before solving");
+    check(deduplicated.length==1 && deduplicated[0].branch==0,"collapsed numeric seeds retain the first original identity");
+
     for (candidate in candidates) for (i in 0...complete.length) if (cell.group.external[i])
       near(candidate.q[i],complete[i],"numeric fallback holds external coordinates",1e-12);
   }

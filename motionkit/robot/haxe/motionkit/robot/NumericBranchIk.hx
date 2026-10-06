@@ -65,10 +65,22 @@ class NumericBranchIk implements AnalyticIk {
     }
     var answers:Array<AnalyticBranch> = [], seeds = includeFixedSeeds ? neighbours.concat(fixedSeeds) : neighbours;
     var task = ToolFreedom.of(target,freedom,tolerance.orientation);
+    var attempted=new Map<String,Array<Array<Float>>>();
     for (index in 0...seeds.length) {
       if (seeds[index] == null || seeds[index].length != jointCount()) throw "Numeric fallback neighbour is incomplete";
       var q = seeds[index].copy();
       for (i in held) q[i] = cell[i];
+      // Holding a cell can collapse neighbour seeds that differed only in
+      // external coordinates. Solve each exact resulting seed once, preserving
+      // its first original index and every distinct internal configuration.
+      var key=haxe.Json.stringify(q),bucket=attempted.get(key),repeated=false;
+      if(bucket!=null)for(previous in bucket){
+        var same=true;for(j in 0...q.length)if(previous[j]!=q[j])same=false;
+        if(same)repeated=true;
+      }
+      if(repeated)continue;
+      if(bucket==null){bucket=[];attempted.set(key,bucket);}
+      bucket.push(q.copy());
       var options = task.options(tolerance);
       options.held = held; options.heldValues = [for (i in held) cell[i]];
       var solved = group.solve(new Transform3(new Vec3(task.target.x,task.target.y,task.target.z),
