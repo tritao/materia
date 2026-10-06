@@ -31,8 +31,12 @@ class WeldPathProblem {
   public final seam:PosePath;
   public final path:PosePath;
   public final sections:Array<PosePath>;
+  public final phases:Array<WeldPathPhase>;
   public final seamOffset:Float;
   public final seamLength:Float;
+  public final seamEnd:Float;
+  public final burnbackEnd:Float;
+  public final lift:Pose3;
   public final approach:Pose3;
   public final retreat:Pose3;
   final contactSegments:Array<{from:Vec3,to:Vec3}>;
@@ -52,14 +56,30 @@ class WeldPathProblem {
     var start=pose(first),stop=pose(last);
     approach=displaced(first,-plan.parameters.approach);
     retreat=displaced(last,-plan.parameters.approach);
-    var primitives:Array<PosePrimitive> = [line(approach,start,approachSpeed)];
-    seamOffset=primitives[0].length();
-    for(primitive in seam.primitives)primitives.push(primitive);
-    // Burnback lift is a process boundary on this same geometric retreat line;
-    // engagement outputs/dwells belong to the compiler's process schedule.
-    primitives.push(line(stop,retreat,approachSpeed));
+    lift=displaced(last,-WeldPathPlanner.LIFT);
+    var groups:Array<{phase:WeldPathPhase,path:PosePath}> = [
+      {phase:Approach,path:new PosePath(frame,[line(approach,start,approachSpeed)])},
+      {phase:Weld,path:seam},
+      {phase:Burnback,path:new PosePath(frame,[line(stop,lift,
+        Math.max(WeldPathPlanner.LIFT/plan.parameters.burnback,0.01))])}
+    ];
+    seamOffset=groups[0].path.length();
+    seamEnd=seamOffset+seamLength;
+    burnbackEnd=seamEnd+groups[2].path.length();
+    // Exact process stops remain even if neighboring tangents/speeds agree.
+    // A short approach may place the retreat inside the burnback lift: preserve
+    // the resulting reverse travel rather than replacing it with one line.
+    if(motionkit.path.PoseMath.distance(lift,retreat)>1e-12)
+      groups.push({phase:Retreat,path:new PosePath(frame,[line(lift,retreat,approachSpeed)])});
+    var primitives:Array<PosePrimitive> = [];
+    sections=[];phases=[];
+    for(group in groups){
+      for(primitive in group.path.primitives)primitives.push(primitive);
+      for(section in ProgramCompiler.timingSections(group.path)){
+        sections.push(section.path);phases.push(group.phase);
+      }
+    }
     path=new PosePath(frame,primitives);
-    sections=[for(section in ProgramCompiler.timingSections(path))section.path];
     contactSegments=[for(segment in plan.segments){
       from:new Vec3(segment.start.translation.x,segment.start.translation.y,segment.start.translation.z),
       to:new Vec3(segment.stop.translation.x,segment.stop.translation.y,segment.stop.translation.z)
@@ -144,4 +164,12 @@ class WeldPathProblem {
   static function line(from:Pose3,to:Pose3,speed:Float):PoseLine
     return new PoseLine(new PoseWaypoint(from,WeldingPlanRunner.PATH_TOLERANCE,0.01),
       new PoseWaypoint(to,WeldingPlanRunner.PATH_TOLERANCE,0.01),OrientationPolicy.FreeAboutTool,0.1,speed);
+}
+
+/** Engagement phase for each stopped timing section of a joined weld problem. */
+enum WeldPathPhase {
+  Approach;
+  Weld;
+  Burnback;
+  Retreat;
 }

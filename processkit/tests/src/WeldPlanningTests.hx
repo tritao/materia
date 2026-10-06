@@ -53,12 +53,32 @@ class WeldPlanningTests {
     near(problem.seamLength,requested.length(),1e-12,"joined weld preserves deposited seam length");
     near(problem.path.length(),requested.length()+2*PARAMETERS.approach,1e-12,
       "joined geometric route covers approach, seam and retreat");
-    check(problem.sections.length==3,"wire approach and retreat retain their task-velocity stops");
+    check(problem.sections.length==4,"joined weld retains approach, deposition, burnback and retreat stops");
+    check(problem.phases[0]==processkit.WeldPathProblem.WeldPathPhase.Approach &&
+      problem.phases[1]==processkit.WeldPathProblem.WeldPathPhase.Weld &&
+      problem.phases[2]==processkit.WeldPathProblem.WeldPathPhase.Burnback &&
+      problem.phases[3]==processkit.WeldPathProblem.WeldPathPhase.Retreat,
+      "stopped sections retain their engagement phases");
+    near(problem.seamEnd,problem.seamOffset+problem.seamLength,0,"deposition ends at its global process boundary");
+    near(problem.burnbackEnd-problem.seamEnd,WeldPathPlanner.LIFT,1e-12,"burnback retains the complete lift distance");
+    near(problem.sections[2].primitives[0].speedLimit(),WeldPathPlanner.LIFT/PARAMETERS.burnback,1e-12,
+      "burnback geometry uses the execution lift speed");
     check(!problem.contact(problem.approach) && !problem.contact(problem.retreat),
       "air endpoints keep the air clearance margin");
     check(problem.contact(problem.seam.poseAt(0.05)),"seam positions permit the contact margin");
     check(problem.contact(new motionkit.kinematics.Pose3(0.4,0.2,0.155)),
       "burnback lift remains inside the geometric contact zone");
+    for(approach in [WeldPathPlanner.LIFT,WeldPathPlanner.LIFT/2]){
+      var parameters:WeldParameters={wireSpeed:PARAMETERS.wireSpeed,voltage:PARAMETERS.voltage,
+        travelSpeed:PARAMETERS.travelSpeed,approach:approach,startDwell:PARAMETERS.startDwell,
+        craterDwell:PARAMETERS.craterDwell,burnback:PARAMETERS.burnback};
+      var shortProblem=new processkit.WeldPathProblem(new WeldPlan(requested.segments,parameters),WRIST,
+        [WeldCorner.AROUND],"weld-task");
+      check(shortProblem.sections.length==(approach==WeldPathPlanner.LIFT?3:4),
+        "coincident retreat omits zero-length motion while shorter retreats preserve reverse travel");
+      near(shortProblem.path.length(),requested.length()+approach+WeldPathPlanner.LIFT+
+        Math.abs(approach-WeldPathPlanner.LIFT),1e-12,"short retreat preserves actual execution travel");
+    }
     var fixture=arm(),solver=new ManipulatorKinematics(fixture.arm),before=fixture.arm.numericSolveCount();
     var backend=motionkit.robot.BranchIk.of(fixture.arm);
     check(backend.family()=="UR6R","authored weld fixture has a model-derived analytic family");
@@ -66,12 +86,16 @@ class WeldPlanningTests {
     check(goals.length>0,"joined wire approach has an analytic start");
     var start=goals[0].q;
     var request=problem.request(start,new IkTolerance(1e-6,1e-6),[for(_ in start)0.2],[for(_ in start)3.0]);
+    for(boundary in [problem.seamOffset,problem.seamEnd,problem.burnbackEnd]){
+      var retained=false;for(distance in request.distances)if(Math.abs(distance-boundary)<1e-12)retained=true;
+      check(retained,"global selection grid retains each engagement stop");
+    }
     var world=cell(null).clearance.withGroup(fixture.arm);
     var planner=new motionkit.robot.StructuredJointPathPlanner(fixture.arm,
       new motionkit.robot.CandidateProblem.CandidateSamplingOptions(8,2,4),null,world,8,false,
       null,null,null,0,null,problem.contact);
     var curves=planner.planSections(problem.sections,request);
-    check(curves.length==3,"one joined weld problem refines all three timing sections");
+    check(curves.length==4,"one joined weld problem refines all four process timing sections");
     var offset=0.0;
     for(section in 0...curves.length){
       var curve=curves[section];
@@ -106,7 +130,7 @@ class WeldPlanningTests {
       var entered=acceptedEntry.evaluate(acceptedEntry.durationSeconds()).positions;
       for(j in 0...measured.length)near(entered[j],freeCurves[0].q[0][j],1e-7,
         "accepted free-entry motion reaches the globally selected approach start");
-      check(freeCurves.length==3,"free entry choice covers the complete approach, weld and retreat");
+      check(freeCurves.length==4,"free entry choice covers the complete approach, weld, burnback and retreat");
       check(fixture.arm.numericSolveCount()==before,"free-start weld selection needs no numeric pose IK");
     } catch(error:Dynamic){if(acceptedEntry!=null)acceptedEntry.dispose();throw error;}
     if(acceptedEntry!=null)acceptedEntry.dispose();
