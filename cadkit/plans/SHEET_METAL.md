@@ -1018,7 +1018,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM15 | blocked: requires SM14 multi-bend simulation to supply measured bends for calibration | |
 | SM16 | blocked: requires SM15 calibration and the preceding simulated bending cell (SM13–SM15) for safe-state fault and recovery scenarios | |
 | SM17 | blocked: later step after SM13–SM16; the bending-cell/tool-change foundation is blocked by MT6–MT8 and MT10 on local main 3bc5f73aa | |
-| SM18 | later | |
+| SM18 | blocked: later Level-2 hardware step after SM11–SM16; the simulated press/cell foundation is blocked by MT6–MT8 and MT10 on local main 3bc5f73aa | |
 
 ### Implementation notes
 
