@@ -710,7 +710,7 @@ Submodules come from the main checkout's stores, not from other worktrees (which
 | PP5 | revision 7 continuous quintic certificate, lowering displacement and timed-pass removal complete; phase gate passes | original phase: `e1435022f`, `e5336893f`, `bfd03d585`; revision 7 evidence below |
 | PP6 | in progress: planner argument, axis/standalone OPW defaults, class removal and free entry verified; remaining defaults and joined approach/retreat pending | `46f29f74f`, `4edacf8af`, `fc0efe042` |
 | PP7 | complete: generated entry/retreat selection, retries and emission; full MotionKit/native gate passed | `92b8c69ee`, `093e65a46`, `e41bdfffa`; retreat gate below |
-| PP8 | in progress: G17 final planning 14.004 s, cycle/posture gates pass; optimization/full phase/audits pass; whole-mission tenfold targets and migration remain open | per-step profiles below |
+| PP8 | in progress: robot weldment tenfold targets met against PP0; G17 five-run median 14.387 s on non-quiet host; gantry speed target, two further savings and migration remain open | per-step profiles below |
 | PP9 | in progress: handling and surface use the structured planner and authored missions pass; toolpaths/deletions/remaining mission gate pending | runner migrations below |
 | PP10 | planned | — |
 | PP11 | planned | — |
@@ -3247,3 +3247,43 @@ zero with unchanged cycle/posture/quality and zero numeric IK. The host was
 Node test used a core throughout. This is a five-run diagnostic, not a claim
 of quiet-host acceptance. Snapshots and all five logs are retained under
 `process-path-revision8-g17-baseline-*` in external scratch.
+
+
+### Revision 8 saving 1: rank directions before fine refinement
+
+`WeldingPlanRunner` ranks both geometric alternatives with a sparse ladder,
+then performs fine selection/refinement only for the cheaper direction.
+Failure of its fine search, drive refinement or continuous clearance falls
+back to the other direction. Air-clearance alternatives retain their prior
+ordering and exception handling. Coarse state costs are weighted by nearest
+fine-grid samples, retaining the objective's density around tight corners.
+The physical jump limit is unchanged: disconnected sparse ladders densify
+both directions together (20 / 10 / 5 / 2.5 / 2 mm). Entry/exit feasibility
+and sparse clearance participate in ranking; fine refinement and its
+continuous certificate remain authoritative.
+
+Initial audit prototypes found and fixed two discrepancies on robot whole
+mission run 1: enlarging coarse jump limits admitted a cheap disconnected
+route, and omitting entry checks favored a blocked start. The adopted coarse
+pass retains the jump limit and the same entry/exit policy. With
+`PROCESS_PATH_VERIFY_DIRECTIONS=1`, the complete fine two-direction reference
+now agrees on **29 accepted selections**: G17 **1**, full robot-welder suite
+**24**, gantry whole mission **4**. Both robot backends retain all ten seams,
+99.9 s cycles, restart/no-arc/crater/displaced-work/post/weave/multipass
+quality; G17 remains 232.5 s / 0.778094423 rad; gantry remains 171.3 s.
+There are **two allowed fallbacks**, whole mission run 2 on both robot
+backends: coarse prefers reverse, its drive QP fails at the requested feed,
+and forward succeeds, matching the full reference. No accepted coarse
+choice disagrees. All audit VMs and the full ProcessKit suite exit zero.
+Evidence: `process-path-revision8-direction-final-{g17,welder,gantry}-audit.log`
+and `process-path-revision8-direction-final-process-runtime.log`.
+
+The ordinary saving-1 G17 diagnostic exits zero in **10.255984 s**, with one
+fine lattice/refinement (977,992 candidates / 1,424 samples) rather than two.
+Coarse alternatives each use **146 samples**, taking **0.608178 / 0.458022 s**.
+Fine build **1.996473 s**, inclusive search/clearance **2.437081 s**, refinement
+**0.398557 s**, retained compilation **4.350713 s**. Zero numeric IK; cycle,
+posture and weld quality are unchanged. This overlaps validation on a busy
+host and is not the final quiet median. Evidence:
+`process-path-revision8-saving1-g17-profile.log`. Full boundary validation
+follows saving 2; no native implementation changed for saving 1.

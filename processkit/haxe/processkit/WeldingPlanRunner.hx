@@ -276,17 +276,49 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     // work. The same geometry owns entry and retreat; both directions use DP.
     var airDistance=2*requested.parameters.approach;
     var alternatives=clearance==null ? [0.0] : [airDistance,0.0];
+    var auditDirections=Sys.getEnv("PROCESS_PATH_VERIFY_DIRECTIONS")=="1";
     for(clearanceDistance in alternatives){
-      for(direction in [problem,problem.reversed()]){
+      var directions=[problem,problem.reversed()];
+      var ranked:Array<{problem:WeldPathProblem,index:Int,cost:Float}> = [];
+      for(index in 0...directions.length)try {
+        var alternative=clearanceDistance==0 ? directions[index] : directions[index].withAirClearance(clearanceDistance);
+        ranked.push({problem:alternative,index:index,cost:Math.POSITIVE_INFINITY});
+      }catch(error:Dynamic)reasons.push(Std.string(error));
+      if(ranked.length==0)continue;
+      // Keep the physical jump limit. A sparse grid that disconnects a
+      // tight wrist turn is densified for both directions before ranking.
+      for(resolution in [0.02,0.01,0.005,0.0025,WeldPathPlanner.STEP]){
+        var complete=true;
+        for(direction in ranked){
+          try direction.cost=coarseCost(compiler,clearance,direction.problem,start,configuration,resolution)
+          catch(error:Dynamic){direction.cost=Math.POSITIVE_INFINITY;reasons.push(Std.string(error));}
+          if(!Math.isFinite(direction.cost))complete=false;
+        }
+        if(complete)break;
+      }
+      ranked.sort((a,b)->a.cost<b.cost?-1:a.cost>b.cost?1:a.index-b.index);
+      var chosen:Null<processkit.WeldPathProblem.WeldPathSelection> = null,chosenIndex = -1,bestIndex = -1;
+      for(rank in 0...ranked.length){
+        var direction=ranked[rank];
         try {
-          var alternative=clearanceDistance==0 ? direction : direction.withAirClearance(clearanceDistance);
-          var selected=selectProblem(compiler,clearance,alternative,start,configuration);
-          if(best==null || selected.cost<cast(best,processkit.WeldPathProblem.WeldPathSelection).cost)best=selected;
+          var selected=selectProblem(compiler,clearance,direction.problem,start,configuration);
+          if(auditDirections)Sys.println("PROCESS_PATH_DIRECTION_FINE "+haxe.Json.stringify({direction:direction.index,cost:selected.cost}));
+          if(chosen==null){chosen=selected;chosenIndex=direction.index;}
+          if(best==null || selected.cost<cast(best,processkit.WeldPathProblem.WeldPathSelection).cost ||
+              selected.cost==cast(best,processkit.WeldPathProblem.WeldPathSelection).cost && direction.index<bestIndex){best=selected;bestIndex=direction.index;}
+          if(!auditDirections)break;
         }catch(error:Dynamic){reasons.push(Std.string(error));
           if(Sys.getEnv("PROCESS_PATH_PROFILE")=="1")Sys.println("PROCESS_PATH_ALTERNATIVE_REJECTED "+haxe.Json.stringify({
-            reversed:direction!=problem,airClearance:clearanceDistance,reason:Std.string(error)}));
+            reversed:direction.index==1,airClearance:clearanceDistance,reason:Std.string(error)}));
         }
       }
+      if(Sys.getEnv("PROCESS_PATH_PROFILE")=="1" || auditDirections)
+        Sys.println("PROCESS_PATH_DIRECTION "+haxe.Json.stringify({coarseFirst:ranked[0].index,
+          coarseCosts:[for(direction in ranked)direction.cost],coarseDirections:[for(direction in ranked)direction.index],
+          segments:[for(segment in requested.segments)segment.name],selected:chosenIndex,audited:auditDirections,
+          agrees:!auditDirections || chosen==null ? null : best!=null && chosen.problem==best.problem,airClearance:clearanceDistance}));
+      if(auditDirections && chosen!=null && best!=null && chosen.problem!=best.problem)
+        throw "Coarse weld direction differs from full two-direction selection";
       if(best!=null)break;
     }
     if(best==null)throw 'Cannot select either weld travel direction: ${reasons.join("; ")}';
@@ -315,12 +347,50 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     }catch(error:Dynamic){releaseSelected();throw error;}
   }
 
-  static function selectProblem(compiler:ProgramCompiler,clearance:Null<ArmClearance>,problem:WeldPathProblem,
-      start:Array<Float>,configuration:Null<motionkit.kinematics.SixAxisConfiguration>):processkit.WeldPathProblem.WeldPathSelection {
+  /** A sparse geometric ladder ranks directions without refinement or timing.
+   * Fine selection still owns entry, drive and continuous-clearance acceptance. */
+  static function coarseCost(compiler:ProgramCompiler,clearance:Null<ArmClearance>,problem:WeldPathProblem,start:Array<Float>,
+      configuration:Null<motionkit.kinematics.SixAxisConfiguration>,resolution:Float):Float {
+    var began=Sys.time(),group=cast(compiler.solver,ManipulatorKinematics).manipulator;
+    var inputs=selectionInputs(compiler,problem,start,configuration,resolution);
+    var candidates=new motionkit.robot.CandidateProblem(group,inputs.request,inputs.sampling,true);
+    candidates.pruneUnreachableBounds();
+    var preferences=new motionkit.robot.JointPathPreferences(cast compiler.solver);
+    var cost=preferences.forProblem(group,candidates);
+    // Weight each sparse state by its nearest fine-grid samples. Curved
+    // primitives can retain the fine density even at a coarse resolution.
+    var weights=[for(_ in candidates.samples)0.0],offset=0.0,nearest=0;
+    for(section in problem.sections)for(primitive in section.primitives){
+      var pieces=motionkit.path.PoseSampling.pieces(primitive,WeldPathPlanner.STEP),length=primitive.length();
+      for(piece in 0...pieces){
+        var distance=offset+length*piece/pieces;
+        while(nearest<candidates.samples.length-1 && distance>
+            (candidates.samples[nearest].distance+candidates.samples[nearest+1].distance)*0.5)nearest++;
+        weights[nearest]++;
+      }
+      offset+=length;
+    }
+    weights[weights.length-1]++;
+    var weighted:(Int,motionkit.robot.CartesianCandidateSampler.LatticeCandidate)->Float =
+      (sample,candidate)->cost(sample,candidate)*weights[sample];
+    var contactAt:Array<Float>->Bool=q->problem.contact(compiler.solver.forward(q));
+    var selected=clearance==null ? motionkit.robot.StructuredLadder.search(candidates,null,0,weighted) :
+      motionkit.robot.LazyCollisionLadder.selectWithChecks(candidates,
+        q->clearance.violation(q,contactAt(q)),8,
+        (from,to)->clearance.sweep(from,to,false,0.02,null,contactAt,true),null,null,weighted,
+        (from,to)->entryFailure(compiler,clearance,problem,from,to),q->clearance.violation(q,false));
+    if(Sys.getEnv("PROCESS_PATH_PROFILE")=="1")Sys.println("PROCESS_PATH_COARSE_DIRECTION "+haxe.Json.stringify({
+      samples:candidates.samples.length,resolution:resolution,cost:selected.cost,seconds:Sys.time()-began,diagnostic:selected.diagnostic}));
+    return selected.cost;
+  }
+
+  static function selectionInputs(compiler:ProgramCompiler,problem:WeldPathProblem,start:Array<Float>,
+      configuration:Null<motionkit.kinematics.SixAxisConfiguration>,resolution:Float):
+      {request:motionkit.kinematics.PathRequest,sampling:motionkit.robot.CandidateProblem.CandidateSamplingOptions} {
     var solver=cast(compiler.solver,ManipulatorKinematics),group=solver.manipulator;
     var cartesian=Std.isOfType(motionkit.robot.BranchIk.of(group),motionkit.robot.CartesianAnalyticIk);
     var request=problem.request(start,compiler.ikTolerance,
-      compiler.perJointMaxJump,compiler.maxVelocity,WeldPathPlanner.STEP,compiler.maxAcceleration,!cartesian);
+      compiler.perJointMaxJump,compiler.maxVelocity,resolution,compiler.maxAcceleration,!cartesian);
     // Omitted ranges hold axes at the seed. Welds with a work positioner or
     // rail must search its physical range rather than freezing it there.
     var ranges:Array<motionkit.robot.ExternalAxisGrid.ExternalAxisRange> = [];
@@ -331,18 +401,31 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
       if(!Math.isFinite(limits.lower) || !Math.isFinite(limits.upper))
         throw "Weld external-axis selection requires finite planning bounds";
       var span=limits.upper-limits.lower;
-      var points=span==0 ? 1 : Std.int(Math.ceil(span/(request.maxJump[joint]*0.5)))+1;
+      var points=span==0 ? 1 : Std.int(Math.ceil(span/(compiler.perJointMaxJump[joint]*0.5)))+1;
       ranges.push(new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(joint,limits.lower,limits.upper,points));
     }
     var sampling=new motionkit.robot.CandidateProblem.CandidateSamplingOptions(8,3,8,false,ranges,null,configuration);
-    return problem.selectWithCost(group,request,sampling,clearance,(from,to)->{
-      var entry=compiler.generateEntry(from,to);
-      try {
-        var violation=clearance==null ? null : motionkit.robot.TrajectoryClearance.violation(
-          clearance,entry,false,0.01,q->problem.contact(solver.forward(q)));
-        entry.dispose();return violation;
-      }catch(error:Dynamic){entry.dispose();throw error;}
-    },clearance==null ? null : q -> clearance.violation(q,false),null,null,0,solver);
+    return {request:request,sampling:sampling};
+  }
+
+  static function selectProblem(compiler:ProgramCompiler,clearance:Null<ArmClearance>,problem:WeldPathProblem,
+      start:Array<Float>,configuration:Null<motionkit.kinematics.SixAxisConfiguration>):processkit.WeldPathProblem.WeldPathSelection {
+    var solver=cast(compiler.solver,ManipulatorKinematics),group=solver.manipulator;
+    var inputs=selectionInputs(compiler,problem,start,configuration,WeldPathPlanner.STEP);
+    var request=inputs.request,sampling=inputs.sampling;
+    return problem.selectWithCost(group,request,sampling,clearance,
+      (from,to)->entryFailure(compiler,clearance,problem,from,to),
+      clearance==null ? null : q->clearance.violation(q,false),null,null,0,solver);
+  }
+
+  static function entryFailure(compiler:ProgramCompiler,clearance:Null<ArmClearance>,problem:WeldPathProblem,
+      from:Array<Float>,to:Array<Float>):Null<ArmClearance.ClearanceViolation> {
+    var entry=compiler.generateEntry(from,to);
+    try {
+      var violation=clearance==null ? null : motionkit.robot.TrajectoryClearance.violation(
+        clearance,entry,false,0.01,q->problem.contact(compiler.solver.forward(q)));
+      entry.dispose();return violation;
+    }catch(error:Dynamic){entry.dispose();throw error;}
   }
 
   function prepareWeld(prepared:WeldPlan,path:PosePath,exitPose:Pose3):Void {
