@@ -32,8 +32,52 @@ class StructuredLadder {
   }
 
   public static function search(problem:CandidateProblem,?weights:Array<Float>,rollWeight:Float=0,
-      ?stateCost:(Int,LatticeCandidate)->Float,?coarse:CoarseSearchOptions,?blockedEdges:Array<BlockedLadderEdge>):LadderSelection {
+      ?stateCost:(Int,LatticeCandidate)->Float,?coarse:CoarseSearchOptions,?blockedEdges:Array<BlockedLadderEdge>,maxPacketBytes:Int=268435456):LadderSelection {
+    if(maxPacketBytes<mk_lattice_candidate.size() || maxPacketBytes>268435456)
+      throw "Ladder packet budget must hold a candidate and stay within the FFI safety limit";
+    return searchRegion(problem,weights,rollWeight,stateCost,coarse,blockedEdges,candidate->true,maxPacketBytes);
+  }
+
+  // A gap wider than the jump bound in any joint disconnects the graph.
+  // Search those components separately when fixed-capacity ABI records would
+  // exceed the FFI packet limit. Every state/edge and its cost is retained.
+  static function searchRegion(problem:CandidateProblem,weights:Null<Array<Float>>,rollWeight:Float,
+      stateCost:Null<(Int,LatticeCandidate)->Float>,coarse:Null<CoarseSearchOptions>,
+      blockedEdges:Null<Array<BlockedLadderEdge>>,allowed:LatticeCandidate->Bool,maxPacketBytes:Int):LadderSelection {
     if(problem==null || problem.samples.length==0)throw "Ladder search requires candidate layers";
+    var count=0;
+    for(layer in problem.samples)for(candidate in layer.candidates)if(allowed(candidate))count++;
+    if(count>Std.int(maxPacketBytes/mk_lattice_candidate.size())) {
+      for(joint in 0...problem.request.startQ.length){
+        var values:Array<Float> = [];
+        for(layer in problem.samples)for(candidate in layer.candidates)if(allowed(candidate))values.push(candidate.q[joint]);
+        values.sort(Reflect.compare);
+        var boundaries:Array<Float> = [];
+        for(i in 1...values.length)if(values[i]-values[i-1]>problem.request.maxJump[joint]+1e-12)
+          boundaries.push((values[i]+values[i-1])/2);
+        if(boundaries.length==0)continue;
+        var best:Null<LadderSelection> = null,failure:Null<LadderSelection> = null;
+        for(part in 0...boundaries.length+1){
+          var lower=part==0?Math.NEGATIVE_INFINITY:boundaries[part-1];
+          var upper=part==boundaries.length?Math.POSITIVE_INFINITY:boundaries[part];
+          var axis=joint;
+          var result=searchRegion(problem,weights,rollWeight,stateCost,coarse,blockedEdges,
+            candidate->allowed(candidate) && candidate.q[axis]>=lower && candidate.q[axis]<upper,maxPacketBytes);
+          if(result.diagnostic!=null){if(failure==null || result.failedSample>failure.failedSample)failure=result;continue;}
+          var replace=best==null || result.cost<best.cost;
+          if(best!=null && result.cost==best.cost){
+            // Native DP breaks ties by the lowest final index, then predecessor.
+            for(reverse in 0...result.candidates.length){var sample=result.candidates.length-1-reverse;
+              var a=problem.samples[sample].candidates.indexOf(result.candidates[sample]);
+              var b=problem.samples[sample].candidates.indexOf(best.candidates[sample]);
+              if(a!=b){replace=a<b;break;}}
+          }
+          if(replace)best=result;
+        }
+        return best==null?failure:best;
+      }
+      throw "Connected ladder exceeds the FFI packet limit; native streaming candidate search is required";
+    }
     var path=problem.request,n=path.startQ.length;
     if(weights!=null && weights.length!=n)throw "Ladder weight count must match joints";
     var request=new mk_ladder_request();request.set_struct_size(mk_ladder_request.size());
@@ -46,10 +90,14 @@ class StructuredLadder {
       request.set_weights(j,weights==null ? 1.0 : weights[j]);request.set_start_joints(j,path.startQ[j]);}
     var samples:Array<mk_configuration_sample> = [],candidates:Array<mk_lattice_candidate> = [],costs:Array<Float> = [];
     var originals:Array<LatticeCandidate> = [];
+    var localMaps:Array<Array<Int>> = [];
     for(i in 0...problem.samples.length){var layer=problem.samples[i];
       var sample=new mk_configuration_sample();sample.set_struct_size(mk_configuration_sample.size());sample.set_distance(layer.distance);
-      sample.set_first_candidate(candidates.length);sample.set_candidate_count(layer.candidates.length);samples.push(sample);
+      sample.set_first_candidate(candidates.length);samples.push(sample);
+      var localMap:Array<Int> = [],localCount=0;localMaps.push(localMap);
       for(c in layer.candidates){
+        if(!allowed(c)){localMap.push(-1);continue;}
+        localMap.push(localCount++);
         if(c.q.length!=n || c.wraps.length!=n || c.external.length!=problem.externalJoints.length)
           throw "Ladder candidate dimensions must match the problem";
         var record=new mk_lattice_candidate();record.set_struct_size(mk_lattice_candidate.size());
@@ -59,14 +107,17 @@ class StructuredLadder {
         record.set_branch(c.branch);record.set_singular(c.singular);
         candidates.push(record);originals.push(c);costs.push(stateCost==null ? 0.0 : stateCost(i,c));
       }
+      sample.set_candidate_count(localCount);
     }
     var exclusions:Array<mk_ladder_edge> = [];
     if(blockedEdges!=null)for(edge in blockedEdges){
       if(edge==null || edge.sample<1 || edge.sample>=problem.samples.length || edge.from<0 || edge.to<0 ||
           edge.from>=problem.samples[edge.sample-1].candidates.length || edge.to>=problem.samples[edge.sample].candidates.length)
         throw "Blocked ladder edge must address adjacent candidate layers";
+      var from=localMaps[edge.sample-1][edge.from],to=localMaps[edge.sample][edge.to];
+      if(from<0 || to<0)continue;
       var record=new mk_ladder_edge();record.set_struct_size(mk_ladder_edge.size());
-      record.set_sample(edge.sample);record.set_from_candidate(edge.from);record.set_to_candidate(edge.to);exclusions.push(record);
+      record.set_sample(edge.sample);record.set_from_candidate(from);record.set_to_candidate(to);exclusions.push(record);
     }
     var result=MotionKitNative.mk_search_ladder_filtered(request,samples,candidates,costs,exclusions);
     if(result.status==TrajectoryCoreConstants.MK_ERROR_GENERATION){var report=result.out_result;

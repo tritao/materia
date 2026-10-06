@@ -1,3 +1,4 @@
+import MotionKitNative.mk_lattice_candidate;
 import haxe.Int64;
 import haxe.io.Bytes;
 import machinekit.assembly.LinearAxis;
@@ -1321,6 +1322,29 @@ class KinematicsTests extends MotionKitTestSupport {
       [motionkit.path.OrientationPolicy.FreeAboutTool,motionkit.path.OrientationPolicy.FreeAboutTool]);
     var rollProblem=new motionkit.robot.CandidateProblem(rollGroup,rollRequest,
       new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,1,1));
+    var partitionProblem=new motionkit.robot.CandidateProblem(rollGroup,new PathRequest(rollRequest.distances,
+      rollRequest.poses,rollStart,rollRequest.tolerance,[1.0,1.0,1.0,0.1],rollRequest.velocity,32,rollRequest.freedoms),
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,1,1,false));
+    var partitionCost=(sample:Int,candidate:motionkit.robot.CartesianCandidateSampler.LatticeCandidate)->
+      10*Math.pow(candidate.q[3]-Math.PI/2,2);
+    var completeRoute=motionkit.robot.StructuredLadder.search(partitionProblem,null,0,partitionCost);
+    var packetBudget=mk_lattice_candidate.size()*4;
+    var componentRoute=motionkit.robot.StructuredLadder.search(partitionProblem,null,0,partitionCost,null,null,packetBudget);
+    near(componentRoute.cost,completeRoute.cost,"component packets preserve exhaustive optimal cost",1e-12);
+    for(i in 0...completeRoute.candidates.length)for(j in 0...4)
+      near(componentRoute.candidates[i].q[j],completeRoute.candidates[i].q[j],
+        "component packets retain the exhaustive physical route",1e-12);
+    var removedEdge=new motionkit.robot.StructuredLadder.BlockedLadderEdge(1,
+      partitionProblem.samples[0].candidates.indexOf(completeRoute.candidates[0]),
+      partitionProblem.samples[1].candidates.indexOf(completeRoute.candidates[1]));
+    var fullFiltered=motionkit.robot.StructuredLadder.search(partitionProblem,null,0,partitionCost,null,[removedEdge]);
+    var componentFiltered=motionkit.robot.StructuredLadder.search(partitionProblem,null,0,partitionCost,null,[removedEdge],packetBudget);
+    near(componentFiltered.cost,fullFiltered.cost,"component packet search preserves global blocked-edge indices",1e-12);
+    for(i in 0...fullFiltered.candidates.length)for(j in 0...4)
+      near(componentFiltered.candidates[i].q[j],fullFiltered.candidates[i].q[j],
+        "component packet blocked edges retain the exhaustive alternative route",1e-12);
+    throws(function() motionkit.robot.StructuredLadder.search(partitionProblem,null,0,null,null,null,
+      mk_lattice_candidate.size()),"connected components exceeding a packet are diagnosed without pruning states");
     function rollHull(x:Float):Array<Float>{var vertices:Array<Float> = [];
       for(dx in [-0.01,0.01])for(y in [-0.01,0.01])for(z in [-0.01,0.01]){
         vertices.push(x+dx);vertices.push(y);vertices.push(z);}
