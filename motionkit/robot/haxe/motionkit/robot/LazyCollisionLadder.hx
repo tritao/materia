@@ -8,13 +8,21 @@ import robotkit.manipulation.ArmClearance;
 import robotkit.manipulation.ArmClearance.ClearanceViolation;
 
 /** Check only winning routes and disable colliding sample candidates.
- * Failed sweeps exclude transitions; closest-clearance reporting is separate. */
+ * Failed sweeps exclude transitions; final sweeps report sampled clearance. */
 class LazyCollisionLadder {
   public static function select(problem:CandidateProblem,clearance:ArmClearance,rounds:Int=8,
       contact:Bool=false,?coarse:CoarseSearchOptions):LadderSelection {
     if(clearance==null)throw "Lazy collision selection requires a clearance world";
-    return selectWithChecks(problem,q -> clearance.violation(q,contact),rounds,
+    var selected=selectWithChecks(problem,q -> clearance.violation(q,contact),rounds,
       (from,to) -> clearance.sweep(from,to,contact),coarse);
+    if(selected.diagnostic!=null)return selected;
+    var closest:Null<ClearanceViolation> = null;
+    for(i in 0...selected.candidates.length){
+      var found=i==0 ? clearance.closest(selected.candidates[i].q,contact)
+        : clearance.closestSweep(selected.candidates[i-1].q,selected.candidates[i].q,contact);
+      if(found!=null && (closest==null || found.distance<closest.distance))closest=found;
+    }
+    return new LadderSelection(selected.candidates,selected.cost,-1,0,null,closest);
   }
   public static function selectWithChecks(problem:CandidateProblem,
       check:Array<Float>->Null<ClearanceViolation>,rounds:Int=8,

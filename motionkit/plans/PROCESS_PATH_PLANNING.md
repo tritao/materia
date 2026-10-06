@@ -1214,3 +1214,16 @@ box gaps at two configurations, contact margin and empty-world behavior.
 Compiler-only and focused runtime pass (1,148,580 assertions). Route/sweep
 closest-clearance aggregation, physical branch/roll rerouting acceptance,
 refined collision re-search and production migration remain outstanding.
+
+PP5 sampled route clearance: ArmClearance.closestSweep aggregates full hull
+queries over the same straight joint-space sampling rule as sweep(), with
+finite-step/joint validation. LazyCollisionLadder.select measures only the
+winning route after collision retries and attaches its closest checked
+pair to LadderSelection.closestClearance. The result is sampled clearance,
+not a continuous swept-volume guarantee; GJK iteration-limit bounds retain
+the documented conservative semantics. Physical box acceptance verifies
+an interior collision between clear endpoints, a clear sweep's known
+minimum gap and invalid sampling-step rejection. Compiler-only and focused
+runtime pass (1,148,584 assertions). Physical branch/roll obstacle rerouting,
+refined collision re-search and production/compiler migration remain open;
+PP5 and the full plan remain incomplete.

@@ -879,6 +879,12 @@ class KinematicsTests extends MotionKitTestSupport {
       check(closest.a=="near" || closest.b=="near","closest clearance retains the nearest body pair");}
     var moved=world.closest([0.5],true);if(moved!=null){near(moved.distance,0.48,"closest clearance follows moving geometry",1e-8);
       near(moved.required,robotkit.manipulation.ArmClearance.CONTACT_MARGIN,"closest clearance retains contact margin",1e-12);}
+    var sweepClosest=world.closestSweep([0.0],[1.2],false,0.02);
+    check(sweepClosest!=null,"closest sweep reports a checked hull pair");
+    if(sweepClosest!=null)near(sweepClosest.distance,0,"closest sweep finds an interior collision between clear endpoints",1e-8);
+    var clearSweep=world.closestSweep([0.0],[0.5]);
+    if(clearSweep!=null)near(clearSweep.distance,0.48,"closest sweep aggregates clear route distances",1e-8);
+    throws(function() world.closestSweep([0.0],[0.5],false,Math.POSITIVE_INFINITY),"closest sweep rejects an infinite sampling step");
     var emptyWorld=new robotkit.manipulation.ArmClearance(clearanceGroup,[],[0.0]);
     check(emptyWorld.closest([0.0])==null,"empty clearance world has no closest pair");
     function waypoint(x:Float,y:Float):PoseWaypoint return new PoseWaypoint(new Pose3(x,y,0),1e-6,1e-6);

@@ -264,6 +264,25 @@ class ArmClearance {
   }
 
 
+  /** Minimum hull clearance over the same sampled straight joint sweep as
+   * sweep(). This is a sampled result, not a continuous collision bound. */
+  public function closestSweep(from:Array<Float>,to:Array<Float>,contact:Bool=false,
+      maxJointStep:Float=0.02,?wanted:Float):Null<ClearanceViolation> {
+    if(from==null || to==null || from.length!=to.length || !Math.isFinite(maxJointStep) || maxJointStep<=0)
+      throw "A closest-clearance sweep needs matching joints and a finite positive step";
+    var steps=1;
+    for(joint in 0...from.length){
+      if(!Math.isFinite(from[joint]) || !Math.isFinite(to[joint]))throw "Clearance sweep joints must be finite";
+      steps=Std.int(Math.max(steps,Math.ceil(Math.abs(to[joint]-from[joint])/maxJointStep)));
+    }
+    var best:Null<ClearanceViolation> = null;
+    for(step in 0...steps+1){var t=step/steps;
+      var found=closest([for(joint in 0...from.length)from[joint]+(to[joint]-from[joint])*t],contact,wanted);
+      if(found!=null && (best==null || found.distance<best.distance))best=found;
+    }
+    return best;
+  }
+
   /** The distance between two bodies whose corners are `cornersA` and `cornersB` in the arm's frame (`enough`: see `ConvexDistance`). */
   static function distance(a:ClearanceBody, cornersA:Array<Float>, ta:Transform3, b:ClearanceBody, cornersB:Array<Float>, tb:Transform3,
       enough:Float):Float {
