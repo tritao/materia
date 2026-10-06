@@ -252,3 +252,24 @@ refinements and verifies its true coordinate using rational squared inequalities
 An exact chart-boundary coordinate is retained and an outside-chart coordinate
 rejected. Evidence: `process-path-offset-intervals-final.json`, total 4.436 s.
 These helper checks validate refinement, not all-target/singular-family completeness.
+
+## Exact recovery across the reachable-target sweep
+
+`--certify --check-random=12` now applies exact coupled recovery and rational
+coordinate enclosures to each deterministic reachable target, rather than only
+the original fixed target. The actual run exits zero and recovers all twelve
+generating configurations modulo turns. It returns the same per-target solution
+counts (four to eight) as the previous floating sweep, with maximum FK error
+3.219646771412954e-14. The sweep includes q4=0 (sample 5), q5=0 (sample 4),
+and base half-angle coordinate 1 (samples 10/11); these factor/reconstruction cases
+also pass. Evidence: `process-path-offset-certified-sweep.json` and progress log
+of the same stem. Combined elapsed time is 138.363 seconds including the fixed
+reference target and interval helper checks.
+
+This verifies the certificate path across twelve exact-rational reachable targets;
+it is not a generic all-root/singular-system proof. The continuum diagnostic remains
+an unsupported family representation, and trigonometric reconstruction remains
+floating. Symbolic runtime is unsuitable for bulk planning: this reference must
+inform native polynomial generation/isolation and actual compiled model acceptance,
+not become the production candidate sampler. No authored track or full phase gate
+was rerun or accepted from this evidence.

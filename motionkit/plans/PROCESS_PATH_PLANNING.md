@@ -1908,3 +1908,7 @@ Research `--certify` mode verifies a linear subresultant recovery map in QQ[t]/e
 ### PP1 rational recovered-coordinate enclosure
 
 Certified research mode now encloses the recovered base coordinate by exact rational interval arithmetic and refines isolated final-coordinate roots until both chart memberships and base width <=1e-14 are decided. Original target retains eight FK-verified solutions, max enclosure width 4.829e-17. Cancellation stress needs seven refinements and passes exact squared-bound assertions; exact boundary/outside-chart checks pass. Actual final exit zero (`process-path-offset-intervals-final.json`, 4.436 s). Trigonometric/singular reconstruction, generic completeness, parameterized continua, native integration and all whole-plan gates remain open.
+
+### PP1 certified reachable-target sweep
+
+`--certify --check-random=12` now uses exact coupled-polynomial recovery and rational coordinate enclosures for every sweep target. Actual exit zero: all twelve originals recovered modulo turns, four to eight solutions each, maximum FK error 3.22e-14; q4=0, q5=0 and exact base chart-overlap targets are included. Evidence `process-path-offset-certified-sweep.json` and log, total symbolic runtime 138.363 s. This extends the reference certificate evidence, not generic completeness or native/bulk performance. Continuum representation, floating trigonometric certification, native/model integration and all original acceptance requirements remain open.

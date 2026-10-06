@@ -284,14 +284,14 @@ def boundary_checks(dimensions):
     return records
 
 
-def random_checks(dimensions, count):
+def random_checks(dimensions, count, certify=False):
     import random
     rng=random.Random(712019)
     records=[]
     for sample in range(count):
         tangents=[s.Rational(rng.randint(-9,9),rng.randint(1,9)) for _ in range(6)]
         R,position,original=exact_target(tangents,dimensions)
-        result=solve(R,position,dimensions)
+        result=solve(R,position,dimensions,certify=certify)
         recovered=any(all(abs(math.atan2(math.sin(a-b),math.cos(a-b)))<1e-7
                           for a,b in zip(original,item['q'])) for item in result['solutions'])
         assert recovered, {'sample':sample,'tangents':list(map(str,tangents)),'result':result}
@@ -317,7 +317,7 @@ def main():
         result['boundary_checks']=boundary_checks(dimensions)
     for argument in sys.argv[1:]:
         if argument.startswith('--check-random='):
-            result['random_checks']=random_checks(dimensions,int(argument.split('=',1)[1]))
+            result['random_checks']=random_checks(dimensions,int(argument.split('=',1)[1]),certify='--certify' in sys.argv)
     result['elapsed_seconds']=time.monotonic()-started
     print(json.dumps(result,indent=2))
 
