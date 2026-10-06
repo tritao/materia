@@ -859,6 +859,47 @@ class KinematicsTests extends MotionKitTestSupport {
   }
 
   public function testCartesianAnalyticIk():Void {
+    var rollModel=new RobotModel("physical-roll-reroute");
+    var rollBase=rollModel.addLink(new Link("base")),rollParent=rollBase;
+    for(j in 0...4){var child=rollModel.addLink(new Link('roll-link-$j'));
+      var joint=rollModel.addJoint(new Joint('roll-joint-$j',j<3?JointType.Prismatic:JointType.Revolute,rollParent,child));
+      joint.axis=j<3?[for(k in 0...3)k==j?1.0:0.0]:[0.0,0.0,1.0];
+      joint.limits.lower=j<3?-1:-Math.PI;joint.limits.upper=j<3?1:Math.PI;rollParent=child;}
+    var rollTip=rollModel.addFrame(new Frame("tip",rollParent));
+    var rollGroup=new robotkit.manipulation.KinematicGroup(rollModel,rollBase.id,rollTip.id);
+    var rollStart=[0.0,0.0,0.0,0.0],rollEnd=[0.2,0.0,0.0,0.0];
+    var rollSolver=new ManipulatorKinematics(rollGroup);
+    var rollRequest=new PathRequest([0.0,0.2],[rollSolver.forward(rollStart),rollSolver.forward(rollEnd)],rollStart,
+      new IkTolerance(1e-6,1e-6),[1.0,1.0,1.0,2.0],[1.0,1.0,1.0,1.0],32,
+      [motionkit.path.OrientationPolicy.FreeAboutTool,motionkit.path.OrientationPolicy.FreeAboutTool]);
+    var rollProblem=new motionkit.robot.CandidateProblem(rollGroup,rollRequest,
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,1,1));
+    function rollHull(x:Float):Array<Float>{var vertices:Array<Float> = [];
+      for(dx in [-0.01,0.01])for(y in [-0.01,0.01])for(z in [-0.01,0.01]){
+        vertices.push(x+dx);vertices.push(y);vertices.push(z);}
+      return vertices;}
+    var rollWorld=new robotkit.manipulation.ArmClearance(rollGroup,[
+      {name:"offset-tool",link:rollParent.id,vertices:rollHull(0.1),tool:true},
+      {name:"post",link:rollBase.id,vertices:rollHull(0.3),tool:false}],rollStart);
+    var unobstructed=motionkit.robot.StructuredLadder.search(rollProblem);
+    check(rollWorld.violation(unobstructed.candidates[1].q)!=null,"physical post blocks the cheapest roll route");
+    var avoided=motionkit.robot.LazyCollisionLadder.select(rollProblem,rollWorld,3);
+    check(avoided.diagnostic==null && Math.abs(avoided.candidates[1].q[3])>1,
+      "physical obstacle forces a native tool-roll change within the round budget");
+    check(rollWorld.sweep(avoided.candidates[0].q,avoided.candidates[1].q)==null,
+      "physical rerouted roll transition has no sampled clearance violation");
+    near(motionkit.path.PoseMath.distance(rollSolver.forward(avoided.candidates[1].q),rollRequest.poses[1]),0,
+      "physical roll rerouting retains the TCP position",1e-8);
+    check(avoided.closestClearance!=null,"physical reroute returns its closest sampled clearance");
+    if(avoided.closestClearance!=null)check(avoided.closestClearance.distance>=avoided.closestClearance.required,
+      "physical reroute clearance exceeds the required margin");
+    var blockedWorld=new robotkit.manipulation.ArmClearance(rollGroup,[
+      {name:"offset-tool",link:rollParent.id,vertices:rollHull(0.1),tool:true},
+      {name:"blocking-post",link:rollBase.id,vertices:rollHull(0.1),tool:false}],rollStart);
+    var blockage="";
+    try {motionkit.robot.LazyCollisionLadder.select(rollProblem,blockedWorld,3);}catch(error:Dynamic){blockage=Std.string(error);}
+    check(blockage.indexOf("sample 0")>=0 && blockage.indexOf("offset-tool")>=0 && blockage.indexOf("blocking-post")>=0,
+      "impossible physical pinned start reports both blocking bodies and sample");
     var clearanceModel=new RobotModel("closest-clearance");
     var fixedLink=clearanceModel.addLink(new Link("fixed")),movingLink=clearanceModel.addLink(new Link("moving"));
     var slide=clearanceModel.addJoint(new Joint("slide",JointType.Prismatic,fixedLink,movingLink));

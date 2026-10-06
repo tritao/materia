@@ -1227,3 +1227,14 @@ minimum gap and invalid sampling-step rejection. Compiler-only and focused
 runtime pass (1,148,584 assertions). Physical branch/roll obstacle rerouting,
 refined collision re-search and production/compiler migration remain open;
 PP5 and the full plan remain incomplete.
+
+PP5 physical obstacle acceptance: an XYZ+C cell carries an offset convex
+tool body past a fixed convex post with free tool spin. The cheapest native
+route collides; LazyCollisionLadder with the real ArmClearance world selects
+an alternate roll within three rounds. Its joint sweep is clear, TCP
+position is preserved and returned sampled clearance exceeds its margin.
+A second physical world blocks the pinned start and reports sample zero
+plus both body names. Compiler-only and focused runtime pass (1,148,591
+assertions). Phase-boundary full-suite validation, refined collision
+re-search and production/compiler migration remain outstanding; no authored
+weld performance or full-plan completion claim is made.
