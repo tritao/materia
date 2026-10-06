@@ -205,6 +205,42 @@ class WeldPlanningTests {
         "only confirmed execution completion closes the deposited seam");
     }catch(error:Dynamic){compiled.dispose();throw error;}
     compiled.dispose();
+    var harness=new robotkit.runtime.SimulationHarness(0.01);
+    var blueprint=robotkit.runtime.RobotRuntimeCompiler.compile(fixture.arm.robot,new robotkit.profile.RobotProfile());
+    var channels={arc:"selected.arc",wireSpeed:"selected.wire",voltage:"selected.voltage"};
+    blueprint.channels.push(new robotkit.execution.ProcessChannelDeclaration(channels.arc,robotkit.execution.ProcessEventValue.Digital(false)));
+    blueprint.channels.push(new robotkit.execution.ProcessChannelDeclaration(channels.wireSpeed,robotkit.execution.ProcessEventValue.Analog(0)));
+    blueprint.channels.push(new robotkit.execution.ProcessChannelDeclaration(channels.voltage,robotkit.execution.ProcessEventValue.Analog(0)));
+    var runtime=harness.simulation.addRobot(blueprint);
+    var robot=new robotkit.simulation.SimulatedRobot("selected-weld",runtime,fixture.arm.robot.name,
+      [for(link in fixture.arm.robot.links)link.name],[for(joint in fixture.arm.robot.joints)joint.name]);
+    robot.submit(robotkit.core.RobotCommand.JointTargets([for(j in 0...6)robotkit.core.JointTarget.position(j,measured[j])],null));
+    var tick=0;for(_ in 0...400)harness.step(haxe.Int64.ofInt(++tick));
+    var arc=false;
+    var runner=processkit.WeldingPlanRunner.create(robot,fixture.arm,()->{
+      var batch=runtime.pollEvents();
+      for(event in batch.events)if(event.channel==channels.arc)switch event.value {
+        case robotkit.execution.ProcessEventValue.Digital(value):arc=value;
+        default:
+      }
+      return batch;
+    },channels,motionkit.robot.PlanningLimits.ofGroup(fixture.arm,new robotkit.model.SteadyLoads(),2.0),0,world);
+    var executionProblem=new processkit.WeldPathProblem(requested,WRIST,[WeldCorner.AROUND],processkit.WeldingPlanRunner.FRAME);
+    try {
+      runner.runSelected(executionProblem,freeCurves);
+      for(_ in 0...4000){
+        runner.update(0.01,{arc:arc,currentA:arc?200.0:0.0,voltageV:24.0,touch:false,
+          fault:processkit.tool.WeldFault.None,powerW:arc?4800.0:0.0});
+        harness.step(haxe.Int64.ofInt(++tick));
+        if(runner.completed() || runner.failure()!=null)break;
+      }
+      check(runner.completed() && runner.failure()==null,'selected runner executes its retained compilation: ${runner.failure()}');
+      check(runner.motion.planningMetrics().seconds==0 && runner.motion.planningMetrics().numericIkSolves==0,
+        "selected runner launch performs no additional compilation");
+      check(runner.restarts()==0 && !arc,"selected runner completes burnback without a recovery or active arc");
+      check(cast(runner.current,processkit.ProcessRun).state==processkit.ProcessRunState.Completion,"selected runner completes through the process lifecycle");
+    }catch(error:Dynamic){runner.abort();harness.dispose();throw error;}
+    harness.dispose();
 
   }
 

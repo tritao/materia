@@ -96,6 +96,13 @@ class ManipulatorMotion {
   public function commandedPositions():Null<Array<Float>>
     return lastCommandedQ == null ? null : lastCommandedQ.copy();
 
+  /** First unused ID for a compilation prepared while this motion is idle. */
+  public function compilationPlanId():Int64 {
+    session.requireReady();
+    if(running || session.isStopping())throw "Compilation IDs are available only while motion is idle";
+    return nextPlanId;
+  }
+
   public function run(program:MotionProgram):Void {
     session.requireReady();
     if (program == null) throw "Manipulator program is required";

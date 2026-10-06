@@ -113,6 +113,10 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
 
   final planner:WeldPathPlanner;
   final wrist:WristLimits;
+  final clearance:Null<ArmClearance>;
+  var selectedProgram:Null<WeldPathProgram> = null;
+  var selectedCompilation:Null<motionkit.robot.CompiledProgram> = null;
+  var selectedActive:Bool = false;
   final outputs:ChannelWelderOutputs;
   final latest:LatestReading;
   var phase:WeldingPhase = Idle;
@@ -204,7 +208,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     var latest = new LatestReading();
     var motion = new ManipulatorMotion(robot, compiler, function(channel) return channel == ARC_ESTABLISHED
       ? EventValue.Digital(latest.reading().arc) : null, eventSource, indices);
-    return new WeldingPlanRunner(motion, channels, latest, maxRestarts, checked.planner, checked.wrist);
+    return new WeldingPlanRunner(motion, channels, latest, maxRestarts, checked.planner, checked.wrist,clearance);
   }
 
   /** Up to three rotary drivers nearest the tool; work-positioner joints are excluded. */
@@ -225,11 +229,11 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
 
   /** Over an existing motion, whose input wait reads the established arc from `latest`. */
   function new(motion:ManipulatorMotion, channels:WelderChannels, latest:LatestReading, maxRestarts:Int, planner:WeldPathPlanner,
-      wrist:WristLimits) {
+      wrist:WristLimits,?clearance:ArmClearance) {
     if (motion == null || channels == null || latest == null || maxRestarts < 0 || planner == null || wrist == null)
       throw "WeldingPlanRunner needs motion, the torch's channels, a restart limit of zero or more, a planner and the wrist's limits";
     this.planner = planner;
-    this.wrist = wrist;
+    this.wrist = wrist;this.clearance=clearance;
     this.motion = motion;
     this.channels = channels;
     this.maxRestarts = maxRestarts;
@@ -244,6 +248,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
 
   public function run(requested:WeldPlan):Void {
     if (running()) throw "A weld is already running";
+    releaseSelected();
     // Candidate verification must not inherit a previous weld's rate recipe.
     motion.compiler.pathEventSchedule=null;
     // Plan first: the rolls of the torch, how it comes in and leaves, reach and clearance all along. A weld that cannot be
@@ -255,13 +260,31 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     planningSeconds = Sys.time() - began;
     planningIkSolves = group.numericSolveCount() - solvesBefore;
     this.planned = planned;
-    var plan = planned.plan;
-    this.plan = plan;
-    var parameters = plan.parameters;
-    var stop = pose(plan.stop());
-    var travel = parameters.travelSpeed;
-    seam = new PosePath(FRAME, pathOf(plan, travel, wrist, planned.styles));
-    retreat = planned.retreat;
+    prepareWeld(planned.plan,new PosePath(FRAME,pathOf(planned.plan,
+      planned.plan.parameters.travelSpeed,wrist,planned.styles)),planned.retreat);
+  }
+
+  /** Execute a global selection without running the legacy roll/entry search.
+   * The selected geometry is compiled once before preparing the device. */
+  public function runSelected(problem:WeldPathProblem,curves:Array<motionkit.planner.JointPathSamples>):Void {
+    if(running())throw "A weld is already running";
+    if(problem==null || problem.path.frameId!=FRAME)throw "Selected weld must use the runner's task frame";
+    releaseSelected();
+    var group=cast(motion.compiler.solver,ManipulatorKinematics).manipulator;
+    var began=Sys.time(),before=group.numericSolveCount();
+    var program=new WeldPathProgram(problem,curves,channels);
+    var compiled=program.compile(motion.compiler,group,startPositions(),motion.compilationPlanId(),clearance);
+    try {
+      selectedProgram=program;selectedCompilation=compiled;planned=null;
+      prepareWeld(problem.plan,problem.seam,problem.retreat);
+      planningSeconds=Sys.time()-began;planningIkSolves=group.numericSolveCount()-before;
+    }catch(error:Dynamic){releaseSelected();throw error;}
+  }
+
+  function prepareWeld(prepared:WeldPlan,path:PosePath,exitPose:Pose3):Void {
+    var plan=prepared;this.plan=plan;
+    var parameters=plan.parameters,stop=pose(plan.stop()),travel=parameters.travelSpeed;
+    seam=path;retreat=exitPose;
     // Arc on with the wire at the weld speed, held until the arc is established, then the start dwell.
     var entry:Array<MotionOp> = [
       MotionOp.SetOutput(channels.wireSpeed, EventValue.Analog(parameters.wireSpeed)),
@@ -349,7 +372,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
 
   public function abort():Void {
     if (!running()) return;
-    motion.abort();
+    motion.abort();releaseSelected();
     phase = Idle;
   }
 
@@ -368,6 +391,12 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
   /** Starts the process run's program, the first time from a joint move to the approach pose. */
   function launch(first:Bool):Void {
     var process = cast(current, ProcessRun);
+    if(first && selectedProgram!=null && selectedCompilation!=null){
+      process.activatePrepared(0);outputs.drain();
+      selectedActive=true;igniteIndex=cast(selectedProgram,WeldPathProgram).ignitionOp;waiting=0;
+      motion.runCompiled(selectedCompilation);phase=Welding;return;
+    }
+    selectedActive=false;
     var retreatMove = MotionOp.MoveL(cast(retreat, Pose3), FRAME, APPROACH_SPEED, Blend.ExactStop, OrientationPolicy.FreeAboutTool);
     var body = process.takeProgram(retreatMove);
     var ops:Array<MotionOp> = outputs.drain();
@@ -400,6 +429,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
 
   /** The seam distance the torch has reached: where the program is on the path, before and after it the start and the end. */
   function travelled():Float {
+    if(selectedActive)return selectedProgram.progress(selectedCompilation,motion.progress(),motion.completed).seamDistance;
     var length = cast(seam, PosePath).length();
     var progress = motion.progress();
     if (progress.op == followIndex) {
@@ -411,6 +441,10 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
 
   /** The program is past the path, in the crater fill, burnback, lift or retreat. */
   function pastPath():Bool {
+    if(selectedActive)return switch selectedProgram.progress(selectedCompilation,motion.progress(),motion.completed).phase {
+      case FillingCrater | BurningBack | Retreating | Complete:true;
+      default:false;
+    };
     var op = motion.progress().op;
     if (op == followIndex) reachedPath = true;
     return reachedPath && (op > followIndex || op < 0);
@@ -418,8 +452,13 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
 
   function fail(message:String):Void {
     try motion.abort() catch (_:Dynamic) {}
-    failureMessage = message;
+    releaseSelected();failureMessage = message;
     phase = Failed;
+  }
+
+  function releaseSelected():Void {
+    if(selectedCompilation!=null)selectedCompilation.dispose();
+    selectedCompilation=null;selectedProgram=null;selectedActive=false;
   }
 
   /** Where the arm's joints are now, or will be when the program running ends: where the next program starts. */
