@@ -3170,3 +3170,29 @@ seam error remains **31.776692 µm**. The accepted industrial baseline's
 **1.465409 s** tenfold target is still unmet. Evidence:
 `process-path-pp8-final-weldment-profile.log`. All validation VMs have exited;
 this increment leaves unrelated `nativekit/` and lodepng work untouched.
+
+
+### Revision 8 baseline correction
+
+Revision 8 supersedes the previous industrial-baseline interpretation. The
+whole-weldment tenfold gate compares against the original PP0 planner.
+Robot MuJoCo **293.70 s → 9.739783 s** (**30.15×**, target ≤29.37 s) and
+test backend **229.15 s → 9.814784 s** (**23.35×**, target ≤22.92 s) both
+**meet the target**. The industrial PP0a numbers already used this pipeline
+and are useful diagnostics, not another tenfold acceptance baseline.
+
+For the gantry, use the recorded PP0 planning samples
+**3.429472 / 23.115319 / 20.144919 / 49.658794 s**, total **96.348504 s**,
+rather than the alternative Phase E baseline. Its latest functional total
+**69.165926 s** is **1.39×**, so the ≤**9.634850 s** target remains open.
+The earlier industrial-target conclusions above are historical and superseded
+by this explicit correction.
+
+
+Revision 8's pre-saving G17 five-run baseline is **14.386827 / 14.838290 /
+14.555788 / 14.204653 / 14.286545 s**, median **14.386827 s**, all runs exit
+zero with unchanged cycle/posture/quality and zero numeric IK. The host was
+**not quiet**: other worktree builds/VMs overlapped early runs and a persistent
+Node test used a core throughout. This is a five-run diagnostic, not a claim
+of quiet-host acceptance. Snapshots and all five logs are retained under
+`process-path-revision8-g17-baseline-*` in external scratch.
