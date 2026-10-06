@@ -1,0 +1,149 @@
+#include "motionkit.h"
+#include <Eigen/Geometry>
+#include <array>
+#include <vector>
+#include <cmath>
+#include <limits>
+#include <new>
+namespace {
+using T=Eigen::Isometry3d;
+using V=Eigen::Vector3d;
+V vector(const double *p) {return V(p[0],p[1],p[2]);}
+bool valid_pose(const double *p,const double *q) {
+    for(unsigned i=0;i<3;++i)if(!std::isfinite(p[i]))return false;
+    for(unsigned i=0;i<4;++i)if(!std::isfinite(q[i]))return false;
+    return std::abs(Eigen::Quaterniond(q[3],q[0],q[1],q[2]).norm()-1)<1e-8;
+}
+T pose(const double *p,const double *q) {
+    T t=T::Identity();t.translation()=vector(p);t.linear()=Eigen::Quaterniond(q[3],q[0],q[1],q[2]).toRotationMatrix();return t;
+}
+mk_opw_pose record(const T &t) {
+    mk_opw_pose p={};p.struct_size=sizeof(p);Eigen::Quaterniond q(t.linear());
+    for(unsigned i=0;i<3;++i)p.position[i]=t.translation()[i];
+    p.quaternion[0]=q.x();p.quaternion[1]=q.y();p.quaternion[2]=q.z();p.quaternion[3]=q.w();return p;
+}
+bool valid_model(const mk_serial_cell_model *m,const mk_external_lattice *e,uint32_t n) {
+    if(!m || m->struct_size!=sizeof(*m) || m->joint_count!=n || n>MK_MAX_JOINTS || n<6 ||
+        m->external_count!=n-6 || !e || e->axis_count!=m->external_count || e->joint_count!=n ||
+        !valid_pose(m->base_position,m->base_quaternion) || !valid_pose(m->work_position,m->work_quaternion) ||
+        !valid_pose(m->tool_position,m->tool_quaternion))return false;
+    std::array<bool,MK_MAX_JOINTS> seen={};
+    for(unsigned i=0;i<6;++i) {
+        auto j=m->arm_joint_indices[i];if(j>=n || seen[j])return false;seen[j]=true;
+    }
+    for(unsigned i=0;i<m->external_count;++i) {
+        auto j=m->external_joint_indices[i];
+        if(j>=n || seen[j] || j!=e->joint_indices[i] || m->external_scopes[i]>1 || m->external_kinds[i]>1)return false;
+        seen[j]=true;
+        for(unsigned k=0;k<3;++k)if(!std::isfinite(m->external_axes[3*i+k]) || !std::isfinite(m->external_origins[3*i+k]))return false;
+        if(std::abs(vector(m->external_axes+3*i).norm()-1)>1e-8)return false;
+    }
+    return true;
+}
+T frame(const mk_serial_cell_model &m,const double *q,unsigned scope) {
+    T t=T::Identity();
+    for(unsigned i=0;i<m.external_count;++i)if(m.external_scopes[i]==scope) {
+        const V axis=vector(m.external_axes+3*i),origin=vector(m.external_origins+3*i);
+        T step=T::Identity();const double value=q[m.external_joint_indices[i]];
+        if(m.external_kinds[i]==0)step.translation()=axis*value;
+        else {step.linear()=Eigen::AngleAxisd(value,axis).toRotationMatrix();step.translation()=origin-step.linear()*origin;}
+        t=t*step;
+    }
+    return t*(scope==0 ? pose(m.base_position,m.base_quaternion) : pose(m.work_position,m.work_quaternion));
+}
+mk_result run(const mk_ur_parameters *p,const mk_opw_parameters *opw,const mk_serial_cell_model *m,const mk_external_lattice *e,
+    const mk_orientation_lattice *o,const mk_joint_lift_request *limits,const mk_opw_pose *target,
+    const double *seed,uint32_t n,mk_lattice_candidate *out,uint32_t &count) {
+    if(!seed || !limits || limits->struct_size!=sizeof(*limits) || limits->joint_count!=n || !valid_model(m,e,n))
+        return MK_ERROR_INVALID_ARGUMENT;
+    uint32_t nc,no,unused;
+    auto status=mk_external_lattice_count(e,&nc);if(status!=MK_OK)return status;
+    status=mk_orientation_lattice_count(o,&no);if(status!=MK_OK)return status;
+    status=mk_joint_lift_count(limits,seed,n,&unused);if(status!=MK_OK)return status;
+    double arm_seed[6];for(unsigned i=0;i<6;++i)arm_seed[i]=seed[m->arm_joint_indices[i]];
+    mk_opw_pose validation;
+    status=p ? mk_analytic_ur_forward(p,arm_seed,6,&validation) : mk_opw_forward(opw,arm_seed,6,&validation);if(status!=MK_OK)return status;
+    for(unsigned i=0;i<m->external_count;++i) {
+        const auto joint=m->external_joint_indices[i];
+        if(e->lower[i]<limits->lower[joint]-1e-9 || e->upper[i]>limits->upper[joint]+1e-9)return MK_ERROR_INVALID_ARGUMENT;
+    }
+    std::vector<mk_external_cell> cells(nc);std::vector<mk_orientation_sample> orientations(no);
+    status=mk_sample_external_cells(e,seed,n,cells.data(),nc,&unused);if(status!=MK_OK)return status;
+    status=mk_sample_orientations(o,target,orientations.data(),no,&unused);if(status!=MK_OK)return status;
+    auto held_limits=*limits;for(unsigned i=0;i<m->external_count;++i)held_limits.periodic[m->external_joint_indices[i]]=0;
+    const T tool_inverse=pose(m->tool_position,m->tool_quaternion).inverse();
+    uint64_t total=0;
+    for(const auto &cell:cells) {
+        const T base_inverse=frame(*m,cell.joints,0).inverse(),work=frame(*m,cell.joints,1);
+        for(const auto &orientation:orientations) {
+            const auto goal=record(base_inverse*work*pose(orientation.position,orientation.quaternion)*tool_inverse);
+            mk_analytic_solution branches[8];uint32_t nb;
+            if(p) status=mk_analytic_ur_inverse(p,&goal,arm_seed[5],branches,8,&nb);
+            else {
+                mk_opw_solution slots[8];nb=0;status=mk_opw_inverse(opw,&goal,slots,8);
+                if(status==MK_OK)for(unsigned i=0;i<8;++i)if(slots[i].valid) {
+                    auto &branch=branches[nb++];branch={};branch.struct_size=sizeof(branch);branch.branch=i;branch.singular=slots[i].singular;
+                    for(unsigned j=0;j<6;++j)branch.joints[j]=slots[i].joints[j];
+                }
+            }
+            if(status!=MK_OK)return status;
+            for(unsigned b=0;b<nb;++b) {
+                std::array<double,MK_MAX_JOINTS> q={};
+                for(unsigned i=0;i<n;++i)q[i]=cell.joints[i];
+                for(unsigned i=0;i<6;++i)q[m->arm_joint_indices[i]]=branches[b].joints[i];
+                uint32_t nl;
+                status=mk_joint_lift_count(&held_limits,q.data(),n,&nl);if(status!=MK_OK)return status;
+                if(total+nl>std::numeric_limits<uint32_t>::max())return MK_ERROR_LIMIT;
+                if(out && nl) {
+                    std::vector<mk_joint_lift> lifts(nl);
+                    status=mk_enumerate_joint_lifts(&held_limits,q.data(),n,lifts.data(),nl,&unused);if(status!=MK_OK)return status;
+                    for(const auto &lift:lifts) {
+                        auto &candidate=out[total++];candidate={};candidate.struct_size=sizeof(candidate);
+                        for(unsigned i=0;i<n;++i){candidate.joints[i]=lift.joints[i];candidate.wraps[i]=lift.wraps[i];}
+                        for(unsigned i=0;i<m->external_count;++i)candidate.external_coordinates[i]=cell.coordinates[i];
+                        candidate.roll_index=orientation.roll_index;candidate.tilt_index=orientation.tilt_index;
+                        candidate.azimuth_index=orientation.azimuth_index;candidate.branch=branches[b].branch;candidate.singular=branches[b].singular;
+                    }
+                } else total+=nl;
+            }
+        }
+    }
+    count=uint32_t(total);return MK_OK;
+}
+}
+extern "C" mk_result MK_CALL mk_ur_candidate_count(const mk_ur_parameters *p,const mk_serial_cell_model *m,
+    const mk_external_lattice *e,const mk_orientation_lattice *o,const mk_joint_lift_request *limits,
+    const mk_opw_pose *target,const double *seed,uint32_t n,uint32_t *out_count) {
+    if(!out_count)return MK_ERROR_INVALID_ARGUMENT;
+    try {uint32_t count;auto status=run(p,nullptr,m,e,o,limits,target,seed,n,nullptr,count);if(status==MK_OK)*out_count=count;return status;}
+    catch(const std::bad_alloc &){return MK_ERROR_OUT_OF_MEMORY;}
+}
+extern "C" mk_result MK_CALL mk_sample_ur_candidates(const mk_ur_parameters *p,const mk_serial_cell_model *m,
+    const mk_external_lattice *e,const mk_orientation_lattice *o,const mk_joint_lift_request *limits,
+    const mk_opw_pose *target,const double *seed,uint32_t n,mk_lattice_candidate *out,uint32_t capacity,uint32_t *out_count) {
+    if(!out_count)return MK_ERROR_INVALID_ARGUMENT;
+    try {
+        uint32_t count;auto status=run(p,nullptr,m,e,o,limits,target,seed,n,nullptr,count);if(status!=MK_OK)return status;
+        if(capacity<count || (count && !out))return MK_ERROR_INVALID_ARGUMENT;
+        if(count)status=run(p,nullptr,m,e,o,limits,target,seed,n,out,count);
+        if(status==MK_OK)*out_count=count;return status;
+    }catch(const std::bad_alloc &){return MK_ERROR_OUT_OF_MEMORY;}
+}
+extern "C" mk_result MK_CALL mk_opw_candidate_count(const mk_opw_parameters *p,const mk_serial_cell_model *m,
+    const mk_external_lattice *e,const mk_orientation_lattice *o,const mk_joint_lift_request *limits,
+    const mk_opw_pose *target,const double *seed,uint32_t n,uint32_t *out_count) {
+    if(!out_count)return MK_ERROR_INVALID_ARGUMENT;
+    try {uint32_t count;auto status=run(nullptr,p,m,e,o,limits,target,seed,n,nullptr,count);if(status==MK_OK)*out_count=count;return status;}
+    catch(const std::bad_alloc &){return MK_ERROR_OUT_OF_MEMORY;}
+}
+extern "C" mk_result MK_CALL mk_sample_opw_candidates(const mk_opw_parameters *p,const mk_serial_cell_model *m,
+    const mk_external_lattice *e,const mk_orientation_lattice *o,const mk_joint_lift_request *limits,
+    const mk_opw_pose *target,const double *seed,uint32_t n,mk_lattice_candidate *out,uint32_t capacity,uint32_t *out_count) {
+    if(!out_count)return MK_ERROR_INVALID_ARGUMENT;
+    try {
+        uint32_t count;auto status=run(nullptr,p,m,e,o,limits,target,seed,n,nullptr,count);if(status!=MK_OK)return status;
+        if(capacity<count || (count && !out))return MK_ERROR_INVALID_ARGUMENT;
+        if(count)status=run(nullptr,p,m,e,o,limits,target,seed,n,out,count);
+        if(status==MK_OK)*out_count=count;return status;
+    }catch(const std::bad_alloc &){return MK_ERROR_OUT_OF_MEMORY;}
+}

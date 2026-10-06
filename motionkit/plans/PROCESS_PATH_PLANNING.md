@@ -684,3 +684,19 @@ coordinates, preserved arm joints and original analytic UR branches in each
 cell, with zero numeric IK calls. Compiler-only build and focused C4 runtime
 pass (182,310 assertions). Combined native cell × orientation × branch/wrap
 candidate assembly remains outstanding; this does not complete PP2.
+
+PP2 combined native serial-arm sampling now exists for UR and OPW. It composes
+upstream arm-base and moving-workpiece space screws at each external cell,
+transforms each work-frame orientation target into the analytic arm frame,
+enumerates geometric branches, and filters/enumerates legal lifts while holding
+external values. Candidates retain branch/singularity flags, external/roll/
+tilt/azimuth coordinates and joint wrap indices. Count and sample APIs reject
+invalid descriptors, out-of-limit grids, count overflow and insufficient
+capacity explicitly; unreachable tasks return zero candidates. Independent
+native FK checks cover a rotated track, rotating positioner, displaced/pitched
+tool, all fixed/roll/cone cells, deterministic output and legal bounds for both
+families. All 14 native CTests and the four-platform ABI audit pass; added
+unreachable/duplicate-driver cases also pass the focused candidate test.
+Haxe export of the native space-screw model and combined Cartesian sampling
+remain outstanding. These APIs are not yet called by production planning;
+PP2 is still incomplete.

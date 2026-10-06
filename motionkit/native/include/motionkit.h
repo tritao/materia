@@ -127,6 +127,39 @@ typedef struct mk_external_cell {
     uint32_t coordinates[MK_MAX_JOINTS]; /**< In external-axis descriptor order. */
 } mk_external_cell;
 
+/** Space screws of external joints, in a common root frame at q=0.
+ * Entries follow each chain's root-to-tip order. Scope 0 moves the arm base,
+ * scope 1 moves the work frame. Kind 0 is prismatic, kind 1 is revolute. */
+typedef struct mk_serial_cell_model {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    uint32_t joint_count;
+    uint32_t external_count;
+    uint32_t arm_joint_indices[6];
+    uint32_t external_joint_indices[MK_MAX_JOINTS];
+    uint32_t external_scopes[MK_MAX_JOINTS];
+    uint32_t external_kinds[MK_MAX_JOINTS];
+    double external_axes[3*MK_MAX_JOINTS];
+    double external_origins[3*MK_MAX_JOINTS];
+    double base_position[3];
+    double base_quaternion[4];
+    double work_position[3];
+    double work_quaternion[4];
+    double tool_position[3];
+    double tool_quaternion[4];
+} mk_serial_cell_model;
+
+typedef struct mk_lattice_candidate {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    double joints[MK_MAX_JOINTS];
+    int32_t wraps[MK_MAX_JOINTS];
+    uint32_t external_coordinates[MK_MAX_JOINTS];
+    uint32_t roll_index;
+    uint32_t tilt_index;
+    uint32_t azimuth_index;
+    uint32_t branch;
+    uint32_t singular;
+} mk_lattice_candidate;
+
 /** Candidate sets for one Descartes ladder-graph selection call. */
 typedef struct mk_configuration_request {
     uint32_t struct_size MK_STRUCT_SIZE;
@@ -269,6 +302,31 @@ MK_API mk_result MK_CALL mk_external_lattice_count(const mk_external_lattice *la
 MK_API mk_result MK_CALL mk_sample_external_cells(const mk_external_lattice *lattice,
     const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
     mk_external_cell *out_cells MK_OUT_ARRAY(cell_capacity), uint32_t cell_capacity, uint32_t *out_count MK_OUT);
+/** Complete UR external-cell x orientation x branch x legal-lift sampling.
+ * Target poses are in the work frame. Tool/base conventions match UR analytic FK.
+ * External coordinates are held and are never independently lifted. */
+MK_API mk_result MK_CALL mk_ur_candidate_count(const mk_ur_parameters *parameters,
+    const mk_serial_cell_model *model, const mk_external_lattice *external,
+    const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
+    const mk_opw_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
+    uint32_t *out_count MK_OUT);
+MK_API mk_result MK_CALL mk_sample_ur_candidates(const mk_ur_parameters *parameters,
+    const mk_serial_cell_model *model, const mk_external_lattice *external,
+    const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
+    const mk_opw_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
+    mk_lattice_candidate *out_candidates MK_OUT_ARRAY(candidate_capacity), uint32_t candidate_capacity,
+    uint32_t *out_count MK_OUT);
+MK_API mk_result MK_CALL mk_opw_candidate_count(const mk_opw_parameters *parameters,
+    const mk_serial_cell_model *model, const mk_external_lattice *external,
+    const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
+    const mk_opw_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
+    uint32_t *out_count MK_OUT);
+MK_API mk_result MK_CALL mk_sample_opw_candidates(const mk_opw_parameters *parameters,
+    const mk_serial_cell_model *model, const mk_external_lattice *external,
+    const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
+    const mk_opw_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
+    mk_lattice_candidate *out_candidates MK_OUT_ARRAY(candidate_capacity), uint32_t candidate_capacity,
+    uint32_t *out_count MK_OUT);
 /** Returns MK_ERROR_GENERATION with a sample-distance diagnostic if disconnected. */
 MK_API mk_result MK_CALL mk_select_configurations(const mk_configuration_request *request,
     const mk_configuration_sample *samples MK_IN_ARRAY(sample_count), uint32_t sample_count,

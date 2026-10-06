@@ -30,6 +30,7 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * Infinite planning ranges or a count/index overflow return INVALID_ARGUMENT.
 	 */
 	extern fn mk_joint_lift_count(request: ptr<const<mk_joint_lift_request>>, joints: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_count: ptr<u32> @out) -> mk_result;
+	extern fn mk_opw_candidate_count(parameters: ptr<const<mk_opw_parameters>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_opw_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_count: ptr<u32> @out) -> mk_result;
 	/**
 	 * All eight slots are written, including invalid solutions.
 	 */
@@ -61,7 +62,9 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * Non-external joints are copied from the seed. Zero external axes yields one cell.
 	 */
 	extern fn mk_sample_external_cells(lattice: ptr<const<mk_external_lattice>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_cells: ptr<mk_external_cell> @out_array("cell_capacity"), cell_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
+	extern fn mk_sample_opw_candidates(parameters: ptr<const<mk_opw_parameters>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_opw_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_candidates: ptr<mk_lattice_candidate> @out_array("candidate_capacity"), candidate_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
 	extern fn mk_sample_orientations(lattice: ptr<const<mk_orientation_lattice>>, target: ptr<const<mk_opw_pose>>, out_samples: ptr<mk_orientation_sample> @out_array("sample_capacity"), sample_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
+	extern fn mk_sample_ur_candidates(parameters: ptr<const<mk_ur_parameters>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_opw_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_candidates: ptr<mk_lattice_candidate> @out_array("candidate_capacity"), candidate_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
 	/**
 	 * Returns MK_ERROR_GENERATION with a sample-distance diagnostic if disconnected.
 	 */
@@ -78,6 +81,12 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * Reachability-based TOPP-RA timing and its validated lowered trajectory.
 	 */
 	extern fn mk_time_path(path: mk_path_handle, max_velocity: ptr<const<f64>> @in_array("joint_count"), max_acceleration: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, speed_caps: ptr<const<f64>> @in_array("speed_cap_count"), speed_cap_count: u32, start_speed: f64, end_speed: f64, lowering_tolerance: f64, out_law: ptr<mk_time_law_handle> @out @owned, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
+	/**
+	 * Complete UR external-cell x orientation x branch x legal-lift sampling.
+	 * Target poses are in the work frame. Tool/base conventions match UR analytic FK.
+	 * External coordinates are held and are never independently lifted.
+	 */
+	extern fn mk_ur_candidate_count(parameters: ptr<const<mk_ur_parameters>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_opw_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_count: ptr<u32> @out) -> mk_result;
 	/**
 	 * Cartesian chain represented by its zero-pose space screws and TCP pose.
 	 * The three translation axes are columns of translation_axes. Optional C/A
@@ -177,6 +186,17 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		upper: array<f64, 64> @offset(520);
 		periodic: array<u8, 64> @offset(1032);
 	}
+	struct mk_lattice_candidate @layout(1056, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		joints: array<f64, 64> @offset(8);
+		wraps: array<i32, 64> @offset(520);
+		external_coordinates: array<u32, 64> @offset(776);
+		roll_index: u32 @offset(1032);
+		tilt_index: u32 @offset(1036);
+		azimuth_index: u32 @offset(1040);
+		branch: u32 @offset(1044);
+		singular: u32 @offset(1048);
+	}
 	/**
 	 * OPW's seven geometric parameters and manufacturer joint conventions.
 	 */
@@ -263,6 +283,28 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		first: array<f64, 64> @offset(536);
 		second: array<f64, 64> @offset(1048);
 		second_before: array<f64, 64> @offset(1560);
+	}
+	/**
+	 * Space screws of external joints, in a common root frame at q=0.
+	 * Entries follow each chain's root-to-tip order. Scope 0 moves the arm base,
+	 * scope 1 moves the work frame. Kind 0 is prismatic, kind 1 is revolute.
+	 */
+	struct mk_serial_cell_model @layout(4048, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		joint_count: u32 @offset(4);
+		external_count: u32 @offset(8);
+		arm_joint_indices: array<u32, 6> @offset(12);
+		external_joint_indices: array<u32, 64> @offset(36);
+		external_scopes: array<u32, 64> @offset(292);
+		external_kinds: array<u32, 64> @offset(548);
+		external_axes: array<f64, 192> @offset(808);
+		external_origins: array<f64, 192> @offset(2344);
+		base_position: array<f64, 3> @offset(3880);
+		base_quaternion: array<f64, 4> @offset(3904);
+		work_position: array<f64, 3> @offset(3936);
+		work_quaternion: array<f64, 4> @offset(3960);
+		tool_position: array<f64, 3> @offset(3992);
+		tool_quaternion: array<f64, 4> @offset(4016);
 	}
 	/**
 	 * Offline Ruckig request. Velocity-stop ignores target position and velocity limits.
