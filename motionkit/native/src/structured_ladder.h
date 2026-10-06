@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <functional>
 #include <stdexcept>
 #include <unordered_map>
 #include <vector>
@@ -74,7 +75,8 @@ inline void validate_ladder_candidate(const mk_lattice_candidate &c,const Ladder
  * a wrap seam between samples; physical joint jumps decide connectivity. */
 template<class Layers>
 inline LadderResult structured_ladder(const Layers &layers,
-        const LadderSettings &s,const std::vector<std::vector<double>> &state_cost={}) {
+        const LadderSettings &s,const std::vector<std::vector<double>> &state_cost={},
+        const std::function<bool(unsigned,unsigned,unsigned)> &edge_allowed={}) {
     validate_ladder_settings(s);
     if(!state_cost.empty() && state_cost.size()!=layers.size())
         throw std::invalid_argument("Ladder state-cost layer count mismatch");
@@ -140,7 +142,9 @@ inline LadderResult structured_ladder(const Layers &layers,
                     possible=possible || close;}can_flip[c.first]=possible;}
             for(unsigned i=0;i<current.size();++i){
                 const auto &c=current[i];
-                auto consider=[&](unsigned p){double cost=previous[p]+edge(prior[p].joints,c.joints);
+                auto consider=[&](unsigned p){
+                    if(edge_allowed && !edge_allowed(layer,p,i))return;
+                    double cost=previous[p]+edge(prior[p].joints,c.joints);
                     unsigned rd=prior[p].roll_index>c.roll_index ? prior[p].roll_index-c.roll_index : c.roll_index-prior[p].roll_index;
                     if(s.rolls>1)rd=std::min(rd,s.rolls-rd);
                     cost+=s.roll_weight*rd;

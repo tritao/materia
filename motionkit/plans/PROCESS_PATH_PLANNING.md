@@ -1153,3 +1153,15 @@ source problem is unchanged. Compiler-only and focused runtime pass
 obstacle acceptance. Native edge exclusion, closest clearance, refined
 collision re-search, physical integration acceptance and production
 compiler wiring remain outstanding.
+
+PP5 native edge-exclusion preparation: the internal structured_ladder
+accepts an optional transition predicate keyed by destination layer and
+local predecessor/destination indices. Exclusions are applied before
+transition relaxation, preserving both endpoint candidates. A native test
+blocks the cheapest edge, retains its destination through another
+predecessor, checks exact route/cost for stored and two-slot streamed
+layers, and verifies edge-only disconnection reports an edge failure.
+Native rebuild and focused structured-ladder CTest pass. Public native/
+Haxe blocked-edge records, coarse index mapping, Descartes handling and
+lazy sweep retry integration remain outstanding. This internal primitive
+alone does not complete PP5.

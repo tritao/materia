@@ -18,6 +18,23 @@ struct CachedLayers {
 int main(){
     LadderSettings s;s.joints=4;s.externals=1;s.rolls=4;s.roll_weight=.07;
     for(unsigned j=0;j<4;++j){s.jump[j]=.5;s.weight[j]=1+j;s.velocity[j]=1;}
+    // Exclude a transition, not its endpoints: the blocked destination is
+    // still reachable from a different predecessor in the optimal route.
+    LadderSettings edge_settings;edge_settings.joints=1;
+    edge_settings.jump[0]=1;edge_settings.weight[0]=edge_settings.velocity[0]=1;
+    std::vector<LadderLayer> edge_layers(3);
+    for(double value:{0.0,0.2}){mk_lattice_candidate c{};c.joints[0]=value;edge_layers[0].push_back(c);}
+    for(unsigned layer=1;layer<3;++layer){mk_lattice_candidate c{};c.joints[0]=0.0;edge_layers[layer].push_back(c);}
+    auto exclude=[](unsigned layer,unsigned from,unsigned to){return !(layer==1 && from==0 && to==0);};
+    auto edge_route=structured_ladder(edge_layers,edge_settings,{},exclude);
+    assert(edge_route.failed==UINT32_MAX && edge_route.route==std::vector<unsigned>({1,0,0}));
+    assert(std::abs(edge_route.cost-.4)<1e-12);
+    CachedLayers edge_stream{edge_layers};
+    auto streamed_edge_route=structured_ladder(edge_stream,edge_settings,{},exclude);
+    assert(streamed_edge_route.route==edge_route.route && streamed_edge_route.cost==edge_route.cost);
+    auto impossible_edge=structured_ladder(edge_layers,edge_settings,{},
+        [](unsigned layer,unsigned,unsigned){return layer!=1;});
+    assert(impossible_edge.failed==1 && !impossible_edge.no_candidates);
     std::mt19937 random(177);std::uniform_real_distribution<double> q(-1,1);
     for(unsigned trial=0;trial<100;++trial){
         std::vector<LadderLayer> layers(4);std::vector<std::vector<double>> states(4);
