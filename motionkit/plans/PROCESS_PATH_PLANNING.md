@@ -1920,3 +1920,7 @@ Added internal fixed-storage long-double coefficient construction plus a reprodu
 ### PP1 native coefficient sweep and input validation
 
 The internal native builder validates finite dimensions/poses, positive arm lengths/nonnegative flange length, proper rotation and finite coefficient results. Expanded committed checker passes all 11,664 slots across eighteen targets and eight invalid-input cases; strict standalone compile and actual checker exit zero (`process-path-native-offset-sweep-final.json`), max absolute error 2.69e-17. First expanded run failed the old absolute 1e-17 envelope; final envelope is explicitly 1e-16*max(1,abs(coefficient)), and that failure is retained as failed evidence. Generic conditioning/overflow-case checks, native isolation/recovery, production integration and all original phase/acceptance requirements remain unresolved.
+
+### PP1 native scalar resultant evaluation
+
+Added internal Horner/Sylvester determinant evaluation with polynomial scaling, partial pivoting and nonfinite diagnostics. Strict standalone compile and reproducible exact-reference checker exit zero; twenty points across four charts match rational resultants with max relative error 8.99e-19 (`process-path-native-resultants-final.json`). This scalar evaluator does not isolate/certify roots or signs near singularities; leading-degree drops and underflow remain explicit limitations. Native isolation/recovery/integration and all original phase/acceptance gates stay open.

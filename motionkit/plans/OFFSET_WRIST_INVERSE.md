@@ -323,3 +323,26 @@ on differently sized coefficients. The preceding failure is not reported as gree
 This finite sweep does not bound conditioning for all inputs, validate the arithmetic
 overflow branch itself, isolate roots, register a native solver, or satisfy runtime
 phase/track acceptance. Those original requirements remain open.
+
+## Native scalar resultant evaluation
+
+The internal prototype evaluates the formal degree-(2,8) Sylvester determinant
+at a final-wrist half-angle coordinate. It evaluates the bivariate coefficients
+by Horner arithmetic, normalizes each polynomial by its maximum coefficient,
+and uses partial-pivot Gaussian elimination on the 10-by-10 matrix. Restoring
+eight lateral and two length scale factors returns the unnormalized resultant.
+Nonfinite coordinate/evaluation/result values produce explicit diagnostics.
+
+Reproduce the exact point comparison using the built coefficient emitter with
+`--check-native-resultants=/path/to/offset-wrist-coefficients`. The committed
+checker verifies the exact 20 sample keys (four charts, coordinates -1,-.5,0,.5,1)
+and compares values against exact-rational SymPy resultants. Strict standalone
+compilation and final committed checker exit zero; max relative difference
+8.981e-19 (`process-path-native-resultants-final.json`).
+
+This evaluates a scalar elimination function; it does not isolate roots or
+provide certified signs, especially near multiple roots, singular matrices or
+underflow. Formal leading-degree drops may produce zeros without a common finite
+base root and require explicit recovery checks. Polynomial reconstruction/isolation,
+native singular/root recovery and full-family integration remain necessary.
+No native runtime/ctest or authored planning phase gate is claimed.

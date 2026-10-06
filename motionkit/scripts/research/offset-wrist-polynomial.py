@@ -358,6 +358,34 @@ def native_coefficient_sweep(executable,rotation,position,dimensions):
             'invalid_inputs_rejected':8,'status':'passed'}
 
 
+def native_resultant_check(executable,rotation,position,dimensions):
+    import subprocess
+    from decimal import Decimal,localcontext
+    references={}
+    for base in range(2):
+        for wrist in range(2):
+            u,t,F,G=constraints(rotation,position,dimensions,base,wrist)
+            references[base,wrist]=s.Poly(s.resultant(F.as_expr(),G.as_expr(),u),t)
+    output=subprocess.check_output([executable,'--resultants'],text=True)
+    worst=Decimal(0);seen=set()
+    with localcontext() as context:
+        context.prec=70
+        for line in output.splitlines():
+            base,wrist,coordinate,value=line.split()
+            key=(int(base),int(wrist),s.Rational(coordinate))
+            assert key not in seen
+            seen.add(key)
+            exact=references[key[:2]].eval(key[2])
+            expected=Decimal(int(s.numer(exact)))/Decimal(int(s.denom(exact)))
+            assert expected!=0, 'Zero-resultant samples require absolute error analysis'
+            relative=abs(Decimal(value)-expected)/abs(expected)
+            worst=max(worst,relative)
+            assert relative<Decimal('1e-10'),(key,relative)
+    assert seen=={(b,w,t) for b in range(2) for w in range(2)
+                 for t in map(s.Rational,[-1,'-.5',0,'.5',1])}
+    return {'evaluations':len(seen),'max_relative_error':str(worst),'status':'passed'}
+
+
 def main():
     rotation=s.Matrix([[s.Rational(2,15),-s.Rational(2,3),s.Rational(11,15)],
                        [s.Rational(14,15),s.Rational(1,3),s.Rational(2,15)],
@@ -366,6 +394,9 @@ def main():
     position=s.Matrix([s.Rational(3,5),s.Rational(1,5),s.Rational(7,10)])
     dimensions=list(map(s.Rational,['.17','-.09','.08','.4','.6','.5','.12','.035']))
     for argument in sys.argv[1:]:
+        if argument.startswith('--check-native-resultants='):
+            print(json.dumps(native_resultant_check(argument.split('=',1)[1],rotation,position,dimensions),indent=2))
+            return
         if argument.startswith('--check-native='):
             print(json.dumps(native_coefficient_sweep(argument.split('=',1)[1],rotation,position,dimensions),indent=2))
             return

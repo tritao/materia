@@ -4,6 +4,7 @@
 // Internal coefficient prototype. Not an inverse solver or registered family.
 // Coefficients are indexed [base half-angle power][final-wrist power].
 #include <array>
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
 
@@ -108,6 +109,46 @@ inline Constraints constraints(const std::array<long double,9> &rotation,
         for(const auto &row:poly->coefficients) for(auto value:row)
             if(!std::isfinite(value)) throw std::overflow_error("Offset coefficient arithmetic overflow");
     return result;
+}
+
+inline std::array<long double,9> at_wrist(const Polynomial &polynomial,long double wrist) {
+    if(!std::isfinite(wrist)) throw std::invalid_argument("Offset wrist coordinate must be finite");
+    std::array<long double,9> result{};
+    for(int i=0;i<9;++i) {
+        for(int j=8;j>=0;--j) result[i]=result[i]*wrist+polynomial.coefficients[i][j];
+        if(!std::isfinite(result[i])) throw std::overflow_error("Offset evaluation arithmetic overflow");
+    }
+    return result;
+}
+
+// Evaluate the formal degree-(2,8) resultant. A leading-degree drop can make
+// this zero without a common finite root; root recovery must check that case.
+inline long double resultant_at_wrist(const Constraints &constraints,long double wrist) {
+    auto f=at_wrist(constraints.lateral,wrist),g=at_wrist(constraints.length,wrist);
+    std::array<std::array<long double,10>,10> matrix{};
+    long double f_scale=0,g_scale=0;
+    for(int i=0;i<=2;++i) f_scale=std::max(f_scale,std::abs(f[i]));
+    for(int i=0;i<=8;++i) g_scale=std::max(g_scale,std::abs(g[i]));
+    if(f_scale==0 || g_scale==0) return 0;
+    for(int row=0;row<8;++row) for(int i=0;i<=2;++i) matrix[row][row+i]=f[2-i]/f_scale;
+    for(int row=0;row<2;++row) for(int i=0;i<=8;++i) matrix[8+row][row+i]=g[8-i]/g_scale;
+    long double determinant=1;
+    for(int column=0;column<10;++column) {
+        int pivot=column;
+        for(int row=column+1;row<10;++row)
+            if(std::abs(matrix[row][column])>std::abs(matrix[pivot][column])) pivot=row;
+        if(matrix[pivot][column]==0) return 0;
+        if(pivot!=column) {std::swap(matrix[pivot],matrix[column]);determinant=-determinant;}
+        determinant*=matrix[column][column];
+        for(int row=column+1;row<10;++row) {
+            const auto multiplier=matrix[row][column]/matrix[column][column];
+            for(int i=column+1;i<10;++i) matrix[row][i]-=multiplier*matrix[column][i];
+        }
+    }
+    for(int i=0;i<8;++i) determinant*=f_scale;
+    determinant*=g_scale*g_scale;
+    if(!std::isfinite(determinant)) throw std::overflow_error("Offset resultant arithmetic overflow");
+    return determinant;
 }
 } // namespace motionkit_offset
 #endif

@@ -28,6 +28,16 @@ int main(int argc,char **argv) {
         rr=r;for(int i=0;i<3;++i) rr[i]=-rr[i];check(rr,p,d);
         std::cout<<rejected<<" invalid inputs rejected\n";return 0;
     }
+    if(argc==2 && std::string(argv[1])=="--resultants") {
+        std::cout<<std::setprecision(24);
+        for(int base=0;base<2;++base)for(int wrist=0;wrist<2;++wrist) {
+            const auto polynomials=motionkit_offset::constraints(r,p,d,base,wrist);
+            for(long double coordinate:{-1.L,-.5L,0.L,.5L,1.L})
+                std::cout<<base<<' '<<wrist<<' '<<coordinate<<' '
+                         <<motionkit_offset::resultant_at_wrist(polynomials,coordinate)<<'\n';
+        }
+        return 0;
+    }
     std::cout<<std::setprecision(24);
     for(int base=0;base<2;++base)for(int wrist=0;wrist<2;++wrist){
         auto result=motionkit_offset::constraints(r,p,d,base,wrist);
