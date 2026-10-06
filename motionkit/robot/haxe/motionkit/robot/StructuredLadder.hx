@@ -94,6 +94,7 @@ class StructuredLadder {
       }
       throw "Connected ladder exceeds the FFI packet limit; native streaming candidate search is required";
     }
+    var profiling=Sys.getEnv("PROCESS_PATH_PROFILE")=="1",packingStarted=profiling?Sys.time():0.0;
     var path=problem.request,n=path.startQ.length;
     if(weights!=null && weights.length!=n)throw "Ladder weight count must match joints";
     var request=new mk_ladder_request();request.set_struct_size(mk_ladder_request.size());
@@ -121,7 +122,7 @@ class StructuredLadder {
         for(j in 0...c.external.length)record.set_external_coordinates(j,c.external[j]);
         record.set_roll_index(c.roll);record.set_tilt_index(c.tilt);record.set_azimuth_index(c.azimuth);
         record.set_branch(c.branch);record.set_singular(c.singular);
-        candidates.push(record);originals.push(c);costs.push(stateCost==null ? 0.0 : stateCost(i,c));
+        candidates.push(record);originals.push(c);
       }
       sample.set_candidate_count(localCount);
     }
@@ -135,7 +136,18 @@ class StructuredLadder {
       var record=new mk_ladder_edge();record.set_struct_size(mk_ladder_edge.size());
       record.set_sample(edge.sample);record.set_from_candidate(from);record.set_to_candidate(to);exclusions.push(record);
     }
+    var packingSeconds=profiling?Sys.time()-packingStarted:0.0;
+    var costStarted=profiling?Sys.time():0.0;
+    for(i in 0...samples.length){var sample=samples[i];
+      for(index in sample.get_first_candidate()...sample.get_first_candidate()+sample.get_candidate_count())
+        costs.push(stateCost==null?0.0:stateCost(i,originals[index]));
+    }
+    var costSeconds=profiling?Sys.time()-costStarted:0.0;
+    var nativeStarted=profiling?Sys.time():0.0;
     var result=MotionKitNative.mk_search_ladder_filtered(request,samples,candidates,costs,exclusions);
+    if(profiling)Sys.println("PROCESS_PATH_LADDER_PROFILE "+haxe.Json.stringify({
+      samples:samples.length,candidates:candidates.length,packetBytes:candidates.length*mk_lattice_candidate.size(),
+      packingSeconds:packingSeconds,stateCostSeconds:costSeconds,nativeCallSeconds:Sys.time()-nativeStarted}));
     if(result.status==TrajectoryCoreConstants.MK_ERROR_GENERATION){var report=result.out_result;
       return new LadderSelection([],report.get_cost(),report.get_failed_sample(),report.get_failed_distance(),
         report.get_failure_kind()==1 ? "no candidates (unreachable or joint limits)" : "no legal edges (jump or disabled states)");}

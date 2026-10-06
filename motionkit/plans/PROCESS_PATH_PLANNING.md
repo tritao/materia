@@ -1624,3 +1624,23 @@ The original old-source free-entry runtime was explicitly ended with SIGTERM aft
 ProcessKit compiler-only passes. Focused planning passes welder-process (56), weld-planning (331) and rate-schedule (20) assertions (`process-path-weld-free-entry-planning-bins.log`). The free UR fixture retains all 481,280 candidates over 94 samples, checks its actual generated entry trajectory against physical clearance, verifies that entry reaches the selected approach start, refines all three joined sections, and makes zero numeric pose IK queries. Measured planner phases are construction 4.977786 s, search/checks 15.634417 s and refinement 0.004292 s (one refinement attempt). The pinned counterpart retains 94 candidates and takes milliseconds.
 
 This establishes free-entry geometric acceptance on the fixture, not production weld migration or acceptable long-weld speed: approximately 20.6 s for this short joined fixture is already too slow for the 2.6 m under-15 s target. Periodic-lift construction/transport/search still need substantial work. Production search deletion, engagement scheduling, retained-curve execution, closed-run global starts, external rules and authored weld speed/quality gates remain incomplete.
+
+### PP2/PP3 candidate transport profile
+
+`PROCESS_PATH_PROFILE=1` now emits `PROCESS_PATH_LADDER_PROFILE` per packet, separating record packing, state-cost evaluation and the native call. The benchmark harness retains these records. Native-call time includes generated FFI marshaling as well as native search; it is not a pure native DP measurement. The opt-in timing does not change candidate inclusion, graph edges or search costs.
+
+ProcessKit compiler-only and its focused planning runtime pass (welder-process 56, weld-planning 331, rate-schedule 20 assertions), retained in external scratch `process-path-free-entry-detail-build.log` and `process-path-free-entry-detail.log`. The free-entry fixture still retains all 481,280 candidates across 94 samples, checks generated entry clearance, and uses zero numeric pose IK. Five packets report:
+
+| Candidates | Candidate bytes | Packing seconds | State-cost seconds | Native-call seconds |
+|---|---|---|---|---|
+| 105,280 | 111,175,680 | 0.490334 | 0.141254 | 0.504493 |
+| 120,320 | 127,057,920 | 4.117916 | 0.130792 | 0.431130 |
+| 120,320 | 127,057,920 | 2.767935 | 0.150927 | 0.424311 |
+| 120,320 | 127,057,920 | 2.627516 | 0.158072 | 0.432776 |
+| 15,040 | 15,882,240 | 0.045152 | 0.013598 | 0.037764 |
+
+Construction is 3.912805 s, search/checks 12.511691 s, refinement 0.004309 s, with one refinement attempt. These are diagnostic observations, not a controlled speedup comparison or long-weld acceptance. Approximately ten seconds of packing makes candidate transport the next optimization target.
+
+Inspection of the pinned Haxeon emitter shows that a 1,056-byte numeric candidate constructor explicitly zeros every byte and reserves 132 pointer-root slots on this 64-bit host. Array marshaling copies each record and inspects its root slots. Raw byte casts cannot safely bypass this: the runtime's `structGetRoots` rejects storage without managed roots. No emitter, runtime or submodule pin was changed. Compact primitive-array transport with native views should preserve all candidates while avoiding per-candidate record/root allocation; connected native streaming remains necessary for very long paths. Neither is implemented by this profile change.
+
+MotionKit compiler-only passes, and the focused C4 runtime passes 1,150,903 assertions (`process-path-ladder-detail-c4-build.log` and `process-path-ladder-detail-c4-runtime.log`). This verifies existing route/cost equivalence and blocked-edge/component behavior after separating cost evaluation from record packing. No native ABI changed or native rebuild was required. PP2/PP3 performance acceptance, production weld migration and full phase gates remain outstanding.

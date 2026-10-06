@@ -68,7 +68,7 @@ def main():
             for line in process.stdout:
                 out.write(line)
                 out.flush()
-                if line.startswith(("PROCESS_PATH_RUN ", "PROCESS_PATH_QUALITY ", "PROCESS_PATH_PROFILE ")):
+                if line.startswith(("PROCESS_PATH_RUN ", "PROCESS_PATH_QUALITY ", "PROCESS_PATH_PROFILE ", "PROCESS_PATH_LADDER_PROFILE ")):
                     kind, data = line.split(" ", 1)
                     records.append({"kind": kind, **json.loads(data)})
                     print(name, line.rstrip(), flush=True)
